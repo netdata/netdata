@@ -185,7 +185,7 @@ class OtelConfig:
     fast on an occupied port. The local storage layout is derived from a
     single ``base_dir`` that is always pinned under the run dir for per-agent
     isolation (re-pinned after the ``extra_yaml`` merge, alongside
-    ``endpoint.path`` and ``endpoint.http_path``). Caller-supplied paths do
+    ``endpoint.grpc_path`` and ``endpoint.http_path``). Caller-supplied paths do
     exist beyond the pin: ``remote_storage_uri``, ``journal_dir``, and whatever
     ``extra_yaml`` reaches — the server is a localhost-only developer tool, so
     the caller is trusted. The rotation/retention knobs are the edge-case
@@ -194,7 +194,7 @@ class OtelConfig:
     viewer's fixture).
     """
 
-    otlp_endpoint: str | None = None          # endpoint.path; None → auto free loopback port
+    otlp_endpoint: str | None = None          # endpoint.grpc_path; None → auto free loopback port
     otlp_http_endpoint: str | None = None     # endpoint.http_path; None → auto free loopback port, "" → null (disable)
     # Per-signal tuning (dirs are derived from base_dir, not set here). Each
     # signal has an independent set; an omitted knob keeps the plugin's stock
@@ -223,7 +223,7 @@ class OtelConfig:
     # value replaces). Reaches knobs without first-class fields (auth, ingest
     # windows, retention max_age/horizon, catalog rotation_period, per-tenant
     # override blocks, startup_op_timeout) and deliberately-invalid keys for
-    # strict-config refusal tests. base_dir, endpoint.path, and endpoint.http_path
+    # strict-config refusal tests. base_dir, endpoint.grpc_path, and endpoint.http_path
     # stay pinned (the harness' per-agent isolation invariants) — see _otel_doc.
     # Validated as parseable YAML at the tool boundary; a semantically bad config
     # surfaces as the plugin's own refuse-to-start (that IS the test).
@@ -349,7 +349,7 @@ def _otel_doc(cfg: OtelConfig, rd: Path, otlp_endpoint: str, otlp_http_endpoint:
         logs["journal_dir"] = cfg.journal_dir
 
     doc: dict = {
-        "endpoint": {"path": otlp_endpoint, "http_path": otlp_http_endpoint or None},
+        "endpoint": {"grpc_path": otlp_endpoint, "http_path": otlp_http_endpoint or None},
         "base_dir": base_dir,
     }
     if remote_storage:
@@ -379,11 +379,14 @@ def _otel_doc(cfg: OtelConfig, rd: Path, otlp_endpoint: str, otlp_http_endpoint:
             doc["base_dir"] = base_dir
             doc.setdefault("endpoint", {})
             if isinstance(doc["endpoint"], dict):
-                doc["endpoint"]["path"] = otlp_endpoint
+                # `path` is the deprecated name of grpc_path; the plugin
+                # refuses a file setting both, and the pin must win anyway.
+                doc["endpoint"].pop("path", None)
+                doc["endpoint"]["grpc_path"] = otlp_endpoint
                 doc["endpoint"]["http_path"] = otlp_http_endpoint or None
             else:
                 doc["endpoint"] = {
-                    "path": otlp_endpoint,
+                    "grpc_path": otlp_endpoint,
                     "http_path": otlp_http_endpoint or None,
                 }
     return doc

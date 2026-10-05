@@ -189,18 +189,21 @@ impl LegacyLogsConfig {
     }
 }
 
-/// Ingestion listener endpoints: the mandatory OTLP/gRPC listener (`path`
-/// plus its TLS trio) and the optional OTLP/HTTP listener (`http_path` plus
+/// Ingestion listener endpoints: the mandatory OTLP/gRPC listener
+/// (`grpc_path` plus its TLS trio) and the optional OTLP/HTTP listener (`http_path` plus
 /// its own TLS trio), which serves the same signals over HTTP
 /// `POST /v1/{logs,traces,metrics}` for senders that speak OTLP/HTTP.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct EndpointConfig {
     /// Bind address for the OTLP/gRPC listener (e.g., "127.0.0.1:4317").
-    pub path: String,
-    /// TLS certificate file path for the OTLP/gRPC listener. The aliases
-    /// keep a stock file written before the `grpc_` prefix parsing; the user
-    /// and env layers accept the old names too, with a deprecation warning.
+    /// The alias keeps a stock file written before the `grpc_` prefix
+    /// parsing; the user and env layers accept the old name too, with a
+    /// deprecation warning.
+    #[serde(alias = "path")]
+    pub grpc_path: String,
+    /// TLS certificate file path for the OTLP/gRPC listener (aliased like
+    /// `grpc_path`).
     #[serde(default, alias = "tls_cert_path")]
     pub grpc_tls_cert_path: Option<String>,
     /// TLS private key file path for the OTLP/gRPC listener.
@@ -211,7 +214,7 @@ pub struct EndpointConfig {
     #[serde(default, alias = "tls_ca_cert_path")]
     pub grpc_tls_ca_cert_path: Option<String>,
     /// Bind address for the OTLP/HTTP listener (e.g., "127.0.0.1:4318");
-    /// `None` disables the listener (gRPC alone is served). Like `path`,
+    /// `None` disables the listener (gRPC alone is served). Like `grpc_path`,
     /// this is a network address, not a filesystem path. Optional so the
     /// pre-HTTP schema (and stock files written before this field existed)
     /// keeps parsing unchanged.
@@ -943,7 +946,7 @@ mod tests {
     /// derivation per signal is observable).
     const FULL_YAML: &str = r#"
 endpoint:
-  path: "127.0.0.1:4317"
+  grpc_path: "127.0.0.1:4317"
 metrics:
   max_new_charts_per_request: 100
 base_dir: /var/lib/netdata/otel

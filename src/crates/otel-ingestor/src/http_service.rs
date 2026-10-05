@@ -1495,7 +1495,7 @@ mod tests {
 
         fn endpoint(&self, mtls: bool) -> EndpointConfig {
             EndpointConfig {
-                path: "127.0.0.1:0".to_string(),
+                grpc_path: "127.0.0.1:0".to_string(),
                 grpc_tls_cert_path: None,
                 grpc_tls_key_path: None,
                 grpc_tls_ca_cert_path: None,

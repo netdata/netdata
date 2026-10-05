@@ -20,7 +20,7 @@ Bind beyond loopback only with TLS, and prefer mutual TLS:
 
 ```yaml
 endpoint:
-  path: "0.0.0.0:4317"
+  grpc_path: "0.0.0.0:4317"
   grpc_tls_cert_path: /etc/netdata/ssl/server-cert.pem
   grpc_tls_key_path: /etc/netdata/ssl/server-key.pem
   # Require client certificates (mutual TLS): senders must present a

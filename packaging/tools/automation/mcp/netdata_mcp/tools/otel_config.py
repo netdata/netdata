@@ -101,7 +101,7 @@ _ExtraYaml = Annotated[
             "per-tenant rotation/retention override blocks, remote_storage.startup_op_timeout, "
             "remote_storage.read_cache_max_size (the download cache both signals share) — "
             "and deliberately-unknown keys for strict-config refuse-to-start tests. "
-            "base_dir, endpoint.path, and endpoint.http_path stay pinned for "
+            "base_dir, endpoint.grpc_path, and endpoint.http_path stay pinned for "
             "per-agent isolation and cannot be overridden. SHARP TOOL: a semantically invalid config keeps "
             "the otel plugin down until reconfigured (check netdata_agent_logs "
             "component='supervisor'/'ledger' for the refusal) — that failure mode is "
@@ -151,7 +151,7 @@ def register(mcp: FastMCP) -> None:
             "first-class param (auth, ingest windows, retention max_age/horizon, "
             "per-tenant overrides) or for strict-config refusal tests, pass a raw "
             "YAML mapping via extra_yaml — it deep-merges over the generated file "
-            "and wins on conflicts (base_dir/endpoint.path/http_path stay pinned)."
+            "and wins on conflicts (base_dir/endpoint.grpc_path/http_path stay pinned)."
         ),
     )
     async def netdata_agent_otel_config(

@@ -24,7 +24,7 @@
 //! - Transports: `http_service` (OTLP/HTTP, `POST /v1/{logs,traces,metrics}`
 //!   with protobuf + JSON codecs on `endpoint.http_path`) and `otlp_json`
 //!   (its OTLP/JSON decoding over the `opentelemetry-proto` derives); gRPC
-//!   serving is wired inline in `run_ingestor` on `endpoint.path`.
+//!   serving is wired inline in `run_ingestor` on `endpoint.grpc_path`.
 //! - Metrics support: `aggregation` (per-slot accumulation + cross-slot
 //!   contexts), `chart` (per-chart dimension state), `chart_config` (stock +
 //!   user chart config), `iter` (OTLP metric traversal), `otel` (proto
@@ -121,16 +121,18 @@ async fn run_ingestor(
     // the ingestor touches its WAL directories or the seq high-water file.
     // tonic's `serve(addr)` would bind lazily, only when the server future is
     // polled.
-    let addr: std::net::SocketAddr =
-        config.endpoint.path.parse().with_context(|| {
-            format!("failed to parse endpoint address: {}", config.endpoint.path)
-        })?;
+    let addr: std::net::SocketAddr = config.endpoint.grpc_path.parse().with_context(|| {
+        format!(
+            "failed to parse endpoint address: {}",
+            config.endpoint.grpc_path
+        )
+    })?;
     // `serve_with_incoming` discards the builder's TCP options, so restore the
     // TCP_NODELAY default that `serve(addr)` used to apply to accepted sockets.
     let incoming = TcpIncoming::bind(addr)
-        .with_context(|| format!("failed to bind gRPC endpoint {}", config.endpoint.path))?
+        .with_context(|| format!("failed to bind gRPC endpoint {}", config.endpoint.grpc_path))?
         .with_nodelay(Some(true));
-    tracing::info!(endpoint = %config.endpoint.path, "gRPC endpoint bound");
+    tracing::info!(endpoint = %config.endpoint.grpc_path, "gRPC endpoint bound");
 
     // Bind the OTLP/HTTP listener under the same strict fail-fast rule (user
     // decision D4): a bind or TLS failure here aborts the worker exactly like
@@ -305,7 +307,7 @@ async fn run_ingestor(
     } else {
         tracing::warn!(
             "TLS disabled, using insecure connection on endpoint: {}",
-            config.endpoint.path
+            config.endpoint.grpc_path
         );
     }
 
@@ -317,7 +319,7 @@ async fn run_ingestor(
     let traces_svc = TraceServiceServer::from_arc(Arc::clone(&traces_service))
         .accept_compressed(tonic::codec::CompressionEncoding::Gzip);
 
-    tracing::info!(endpoint = %config.endpoint.path, "gRPC server starting (metrics + logs + traces)");
+    tracing::info!(endpoint = %config.endpoint.grpc_path, "gRPC server starting (metrics + logs + traces)");
     let grpc_server = server_builder
         .add_service(metrics_svc)
         .add_service(logs_svc)
@@ -350,7 +352,7 @@ async fn run_ingestor(
     // run both transport servers
     tokio::select! {
         result = grpc_server => {
-            result.with_context(|| format!("gRPC server error on {}", config.endpoint.path))?;
+            result.with_context(|| format!("gRPC server error on {}", config.endpoint.grpc_path))?;
         }
         result = async {
             match http_server {

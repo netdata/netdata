@@ -10,23 +10,26 @@
 #
 # Settings resolve in this order: installed stock file < your otel.yaml copy
 # < NETDATA_OTEL_CFG_* environment variables. Variable names mirror the
-# option path (endpoint.path -> NETDATA_OTEL_CFG_ENDPOINT_PATH); see the
-# plugin README for the exact naming rules. Restart the Netdata Agent after
-# changing this file or any of the variables.
+# option path (endpoint.grpc_path -> NETDATA_OTEL_CFG_ENDPOINT_GRPC_PATH);
+# see the plugin README for the exact naming rules. Restart the Netdata Agent
+# after changing this file or any of the variables.
 
 endpoint:
-  # Bind address (host:port) for the OTLP/gRPC listener — the key is named
+  # The gRPC keys below were previously named without the grpc_ prefix
+  # (path, tls_cert_path, tls_key_path, tls_ca_cert_path). The former names
+  # still work but log a deprecation warning; setting one key under both
+  # names fails at startup.
+
+  # Bind address (host:port) for the OTLP/gRPC listener — the key ends in
   # "path" but it is a network address, not a filesystem path. The loopback
   # default accepts only local senders; to receive from other hosts, bind a
   # non-loopback address and protect the endpoint with TLS and network
   # access controls.
-  path: "127.0.0.1:4317"
+  grpc_path: "127.0.0.1:4317"
 
   # Server TLS certificate (PEM) for the OTLP/gRPC listener. TLS is enabled
   # only when both this and grpc_tls_key_path are set; providing either one
-  # alone fails at startup. The former names of these three keys
-  # (tls_cert_path, tls_key_path, tls_ca_cert_path) still work but log a
-  # deprecation warning; setting a key under both names fails at startup.
+  # alone fails at startup.
   grpc_tls_cert_path: null
 
   # Server TLS private key (PEM) for the OTLP/gRPC listener. Required when

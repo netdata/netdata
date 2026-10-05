@@ -361,13 +361,13 @@ fn validate_tls_pairing(
 /// [`ConfigOverride::validate`], which judges a single layer in isolation,
 /// these checks depend on the combined result: `base_dir` must be set and
 /// absolute (the per-signal dirs join onto it); `remote_storage.uri` must be
-/// non-empty when storage is enabled; `endpoint.path` must contain a `:port` —
+/// non-empty when storage is enabled; `endpoint.grpc_path` must contain a `:port` —
 /// a shape check only, the ingestor does the full `SocketAddr` parse when it
 /// binds (`otel-ingestor/src/lib.rs` `run_ingestor`); each listener's TLS
 /// cert and key must come as a pair, with the CA requiring both
 /// ([`validate_tls_pairing`]); the optional `endpoint.http_path` (OTLP/HTTP
 /// listener), when enabled, carries the same host:port shape and must differ
-/// from `endpoint.path` (two listeners cannot bind one address); and each
+/// from `endpoint.grpc_path` (two listeners cannot bind one address); and each
 /// signal's retention must satisfy the catalog-horizon invariant
 /// (`netdata-plugin/bridge/src/config.rs` `RetentionPolicy::validate`).
 fn validate(config: &PluginConfig) -> Result<()> {
@@ -389,10 +389,10 @@ fn validate(config: &PluginConfig) -> Result<()> {
         anyhow::bail!("remote_storage.uri must be set when remote_storage.enabled is true");
     }
 
-    if !config.endpoint.path.contains(':') {
+    if !config.endpoint.grpc_path.contains(':') {
         anyhow::bail!(
-            "endpoint must be in format host:port, got: {}",
-            config.endpoint.path
+            "endpoint.grpc_path must be in format host:port, got: {}",
+            config.endpoint.grpc_path
         );
     }
 
@@ -416,11 +416,11 @@ fn validate(config: &PluginConfig) -> Result<()> {
         if http_path.is_empty() || !http_path.contains(':') {
             anyhow::bail!("endpoint.http_path must be in format host:port, got: {http_path}");
         }
-        if listeners_overlap(http_path, &config.endpoint.path) {
+        if listeners_overlap(http_path, &config.endpoint.grpc_path) {
             anyhow::bail!(
-                "endpoint.http_path ({http_path}) must differ from endpoint.path ({}): \
+                "endpoint.http_path ({http_path}) must differ from endpoint.grpc_path ({}): \
                  the OTLP/HTTP and OTLP/gRPC listeners cannot share an address and port",
-                config.endpoint.path
+                config.endpoint.grpc_path
             );
         }
     }
@@ -567,7 +567,7 @@ mod tests {
 
     const STOCK_YAML: &str = r#"
 endpoint:
-  path: "127.0.0.1:4317"
+  grpc_path: "127.0.0.1:4317"
   grpc_tls_cert_path: null
   grpc_tls_key_path: null
   grpc_tls_ca_cert_path: null
@@ -657,7 +657,7 @@ traces:
     #[test]
     fn stock_yaml_parses() {
         let config = resolved_stock();
-        assert_eq!(config.endpoint.path, "127.0.0.1:4317");
+        assert_eq!(config.endpoint.grpc_path, "127.0.0.1:4317");
         assert!(config.endpoint.grpc_tls_cert_path.is_none());
         assert_eq!(config.endpoint.http_path.as_deref(), Some("127.0.0.1:4318"));
         assert!(config.endpoint.http_tls_cert_path.is_none());
@@ -734,8 +734,8 @@ traces:
 
     #[test]
     fn override_endpoint_path() {
-        let config = resolve_with_user("endpoint:\n  path: '0.0.0.0:4317'\n").unwrap();
-        assert_eq!(config.endpoint.path, "0.0.0.0:4317");
+        let config = resolve_with_user("endpoint:\n  grpc_path: '0.0.0.0:4317'\n").unwrap();
+        assert_eq!(config.endpoint.grpc_path, "0.0.0.0:4317");
         assert!(config.endpoint.grpc_tls_cert_path.is_none());
     }
 
@@ -753,17 +753,18 @@ traces:
             config.endpoint.grpc_tls_key_path.as_deref(),
             Some("/etc/ssl/key.pem")
         );
-        assert_eq!(config.endpoint.path, "127.0.0.1:4317");
+        assert_eq!(config.endpoint.grpc_path, "127.0.0.1:4317");
     }
 
     // -- Deprecated gRPC TLS key names (before the `grpc_` prefix) --
 
     #[test]
-    fn deprecated_tls_keys_still_configure_the_grpc_listener() {
+    fn deprecated_grpc_keys_still_configure_the_grpc_listener() {
         let config = resolve_with_user(
-            "endpoint:\n  tls_cert_path: /c.pem\n  tls_key_path: /k.pem\n  tls_ca_cert_path: /ca.pem\n",
+            "endpoint:\n  path: '0.0.0.0:4317'\n  tls_cert_path: /c.pem\n  tls_key_path: /k.pem\n  tls_ca_cert_path: /ca.pem\n",
         )
         .unwrap();
+        assert_eq!(config.endpoint.grpc_path, "0.0.0.0:4317");
         assert_eq!(
             config.endpoint.grpc_tls_cert_path.as_deref(),
             Some("/c.pem")
@@ -805,8 +806,9 @@ traces:
     }
 
     #[test]
-    fn stale_stock_file_with_former_tls_key_names_parses() {
+    fn stale_stock_file_with_former_grpc_key_names_parses() {
         let stale = STOCK_YAML
+            .replace("  grpc_path:", "  path:")
             .replace("  grpc_tls_cert_path: null", "  tls_cert_path: '/c.pem'")
             .replace("  grpc_tls_key_path: null", "  tls_key_path: '/k.pem'");
         let config = resolve_stock_yaml(&stale).unwrap();
@@ -859,7 +861,7 @@ traces:
         assert!(config.endpoint.http_tls_key_path.is_none());
         assert!(config.endpoint.http_tls_ca_cert_path.is_none());
         // Every pre-change key resolved to the user file's value.
-        assert_eq!(config.endpoint.path, "0.0.0.0:4317");
+        assert_eq!(config.endpoint.grpc_path, "0.0.0.0:4317");
         assert!(config.endpoint.grpc_tls_cert_path.is_none());
         assert_eq!(config.metrics.interval_secs, Some(30));
         assert_eq!(config.metrics.max_new_charts_per_request, 200);
@@ -880,18 +882,18 @@ traces:
         let config = resolve_stock_yaml(&stale_stock_yaml()).unwrap();
         assert_eq!(config.endpoint.http_path, None);
         assert!(config.endpoint.http_tls_cert_path.is_none());
-        assert_eq!(config.endpoint.path, "127.0.0.1:4317");
+        assert_eq!(config.endpoint.grpc_path, "127.0.0.1:4317");
         assert_eq!(config.metrics.interval_secs, Some(10));
     }
 
     /// The pre-OTLP/HTTP stock file: [`STOCK_YAML`] minus the four http
-    /// keys, with the gRPC TLS keys under their former unprefixed names —
+    /// keys, with the gRPC keys under their former unprefixed names —
     /// what an upgrading host has on disk until the new stock file is
     /// installed. Derived from the fixture (not duplicated as a second one)
     /// so it tracks the current stock shape.
     fn stale_stock_yaml() -> String {
         STOCK_YAML
-            .replace("  grpc_tls_", "  tls_")
+            .replace("  grpc_", "  ")
             .replace("  http_path: \"127.0.0.1:4318\"\n", "")
             .replace("  http_tls_cert_path: null\n", "")
             .replace("  http_tls_key_path: null\n", "")
@@ -904,7 +906,7 @@ traces:
         // user file turns it off. The gRPC listener is untouched.
         let config = resolve_with_user("endpoint:\n  http_path: null\n").unwrap();
         assert_eq!(config.endpoint.http_path, None);
-        assert_eq!(config.endpoint.path, "127.0.0.1:4317");
+        assert_eq!(config.endpoint.grpc_path, "127.0.0.1:4317");
     }
 
     #[test]
@@ -1075,7 +1077,7 @@ remote_storage:
         let config = resolve_with_user(
             r#"
 endpoint:
-  path: "0.0.0.0:9999"
+  grpc_path: "0.0.0.0:9999"
 metrics:
   expiry_duration_secs: 1800
 logs:
@@ -1085,7 +1087,7 @@ logs:
 "#,
         )
         .unwrap();
-        assert_eq!(config.endpoint.path, "0.0.0.0:9999");
+        assert_eq!(config.endpoint.grpc_path, "0.0.0.0:9999");
         assert_eq!(config.metrics.expiry_duration_secs, Some(1800));
         assert_eq!(config.metrics.interval_secs, Some(10));
         let retention = config.logs.retention.resolve("default");
@@ -1095,7 +1097,7 @@ logs:
     #[test]
     fn empty_override_changes_nothing() {
         let config = resolve_with_user("{}\n").unwrap();
-        assert_eq!(config.endpoint.path, "127.0.0.1:4317");
+        assert_eq!(config.endpoint.grpc_path, "127.0.0.1:4317");
         assert_eq!(config.metrics.interval_secs, Some(10));
     }
 
@@ -1298,7 +1300,7 @@ logs:
 
     #[test]
     fn validation_rejects_invalid_endpoint() {
-        assert!(resolve_with_user("endpoint:\n  path: no-port\n").is_err());
+        assert!(resolve_with_user("endpoint:\n  grpc_path: no-port\n").is_err());
     }
 
     #[test]
@@ -1338,7 +1340,7 @@ logs:
         // config load names both fields instead of surfacing a raw bind error.
         let err = resolve_with_user("endpoint:\n  http_path: '127.0.0.1:4317'\n").unwrap_err();
         let msg = format!("{err:#}");
-        assert!(msg.contains("must differ from endpoint.path"), "{msg}");
+        assert!(msg.contains("must differ from endpoint.grpc_path"), "{msg}");
         assert!(msg.contains("127.0.0.1:4317"), "{msg}");
     }
 
@@ -1346,9 +1348,9 @@ logs:
     fn validation_rejects_a_wildcard_grpc_path_over_the_http_port() {
         // A gRPC listener moved to 0.0.0.0:4318 claims the stock HTTP
         // listener's 127.0.0.1:4318 too, though the strings differ.
-        let err = resolve_with_user("endpoint:\n  path: '0.0.0.0:4318'\n").unwrap_err();
+        let err = resolve_with_user("endpoint:\n  grpc_path: '0.0.0.0:4318'\n").unwrap_err();
         let msg = format!("{err:#}");
-        assert!(msg.contains("must differ from endpoint.path"), "{msg}");
+        assert!(msg.contains("must differ from endpoint.grpc_path"), "{msg}");
         assert!(msg.contains("0.0.0.0:4318"), "{msg}");
     }
 
@@ -1458,7 +1460,7 @@ logs:
         // not silently ignored. The error names every offender.
         let err = ConfigOverride::from_map(&env_map(&[
             ("NETDATA_OTEL_CFG_LOGS_RETENSION_MAX_FILES", "5"),
-            ("NETDATA_OTEL_CFG_ENDPOINT_PATH", "0.0.0.0:9999"),
+            ("NETDATA_OTEL_CFG_ENDPOINT_GRPC_PATH", "0.0.0.0:9999"),
         ]))
         .unwrap_err();
         let msg = format!("{err:#}");
@@ -1495,7 +1497,7 @@ logs:
             ("NETDATA_OTEL_SERVICE_HOST", "10.96.0.10"),
             ("NETDATA_OTEL_SERVICE_PORT", "4317"),
             ("NETDATA_OTEL_SERVICE_PORT_OTEL", "4317"),
-            ("NETDATA_OTEL_CFG_ENDPOINT_PATH", "0.0.0.0:9999"),
+            ("NETDATA_OTEL_CFG_ENDPOINT_GRPC_PATH", "0.0.0.0:9999"),
         ];
         let map = env::otel_env_from_iter(
             vars.iter()
@@ -1503,7 +1505,7 @@ logs:
         );
         let o = ConfigOverride::from_map(&map).unwrap();
         assert_eq!(
-            o.endpoint.as_ref().unwrap().path.as_deref(),
+            o.endpoint.as_ref().unwrap().grpc_path.as_deref(),
             Some("0.0.0.0:9999")
         );
     }
@@ -1523,19 +1525,23 @@ logs:
     #[test]
     fn env_override_endpoint_path() {
         let o = ConfigOverride::from_map(&env_map(&[(
-            "NETDATA_OTEL_CFG_ENDPOINT_PATH",
+            "NETDATA_OTEL_CFG_ENDPOINT_GRPC_PATH",
             "0.0.0.0:9999",
         )]))
         .unwrap();
         assert_eq!(
-            o.endpoint.as_ref().unwrap().path.as_deref(),
+            o.endpoint.as_ref().unwrap().grpc_path.as_deref(),
             Some("0.0.0.0:9999")
         );
     }
 
     #[test]
-    fn env_grpc_tls_names_old_and_new() {
+    fn env_grpc_names_old_and_new() {
         let names = [
+            (
+                "NETDATA_OTEL_CFG_ENDPOINT_PATH",
+                "NETDATA_OTEL_CFG_ENDPOINT_GRPC_PATH",
+            ),
             (
                 "NETDATA_OTEL_CFG_ENDPOINT_TLS_CERT_PATH",
                 "NETDATA_OTEL_CFG_ENDPOINT_GRPC_TLS_CERT_PATH",
@@ -1549,20 +1555,22 @@ logs:
                 "NETDATA_OTEL_CFG_ENDPOINT_GRPC_TLS_CA_CERT_PATH",
             ),
         ];
-        let grpc_trio = |o: &ConfigOverride| {
+        let grpc_keys = |o: &ConfigOverride| {
             let ep = o.endpoint.as_ref().unwrap();
             [
+                ep.grpc_path.clone(),
                 ep.grpc_tls_cert_path.clone(),
                 ep.grpc_tls_key_path.clone(),
                 ep.grpc_tls_ca_cert_path.clone(),
             ]
         };
         let expected = [
+            Some("127.0.0.1:1".to_string()),
             Some("/c".to_string()),
             Some("/k".to_string()),
             Some("/ca".to_string()),
         ];
-        let values = ["/c", "/k", "/ca"];
+        let values = ["127.0.0.1:1", "/c", "/k", "/ca"];
         for use_old_names in [true, false] {
             let pairs: Vec<_> = names
                 .iter()
@@ -1570,7 +1578,7 @@ logs:
                 .map(|(&(old, new), v)| (if use_old_names { old } else { new }, v))
                 .collect();
             let o = ConfigOverride::from_map(&env_map(&pairs)).unwrap();
-            assert_eq!(grpc_trio(&o), expected, "{pairs:?}");
+            assert_eq!(grpc_keys(&o), expected, "{pairs:?}");
         }
         // Both names of one key set → rejected, naming the deprecated one.
         let err = ConfigOverride::from_map(&env_map(&[
@@ -1634,7 +1642,7 @@ logs:
         // Unset (the variable simply not present) is the third state: no
         // override, so the stock/user value stands.
         let o = ConfigOverride::from_map(&env_map(&[(
-            "NETDATA_OTEL_CFG_ENDPOINT_PATH",
+            "NETDATA_OTEL_CFG_ENDPOINT_GRPC_PATH",
             "0.0.0.0:9999",
         )]))
         .unwrap();
@@ -1811,7 +1819,7 @@ logs:
         // A consumed var whose value is not UTF-8 must surface an error at load.
         let mut env: std::collections::HashMap<String, OsString> = std::collections::HashMap::new();
         env.insert(
-            "NETDATA_OTEL_CFG_ENDPOINT_PATH".to_string(),
+            "NETDATA_OTEL_CFG_ENDPOINT_GRPC_PATH".to_string(),
             OsString::from_vec(vec![0xff, 0xfe]),
         );
         assert!(ConfigOverride::from_map(&env).is_err());
@@ -1827,7 +1835,7 @@ logs:
         let dir = tempfile::tempdir().unwrap();
         let stock = write_file(dir.path(), "stock.yaml", STOCK_YAML);
         let config = ConfigResolver::from_stock(stock).resolve().unwrap();
-        assert_eq!(config.endpoint.path, "127.0.0.1:4317");
+        assert_eq!(config.endpoint.grpc_path, "127.0.0.1:4317");
     }
 
     #[test]
@@ -1837,13 +1845,13 @@ logs:
         let user = write_file(
             dir.path(),
             "user.yaml",
-            "endpoint:\n  path: '192.168.1.1:4317'\n",
+            "endpoint:\n  grpc_path: '192.168.1.1:4317'\n",
         );
         let config = ConfigResolver::from_stock(stock)
             .with_user(user)
             .resolve()
             .unwrap();
-        assert_eq!(config.endpoint.path, "192.168.1.1:4317");
+        assert_eq!(config.endpoint.grpc_path, "192.168.1.1:4317");
     }
 
     #[test]
@@ -1853,10 +1861,10 @@ logs:
         let user = write_file(
             dir.path(),
             "user.yaml",
-            "endpoint:\n  path: '192.168.1.1:4317'\n",
+            "endpoint:\n  grpc_path: '192.168.1.1:4317'\n",
         );
         let env = ConfigOverride::from_map(&env_map(&[(
-            "NETDATA_OTEL_CFG_ENDPOINT_PATH",
+            "NETDATA_OTEL_CFG_ENDPOINT_GRPC_PATH",
             "0.0.0.0:9999",
         )]))
         .unwrap();
@@ -1865,7 +1873,7 @@ logs:
             .with_env(env)
             .resolve()
             .unwrap();
-        assert_eq!(config.endpoint.path, "0.0.0.0:9999");
+        assert_eq!(config.endpoint.grpc_path, "0.0.0.0:9999");
     }
 
     #[test]
@@ -1912,7 +1920,7 @@ logs:
             .unwrap();
         assert_eq!(config.endpoint.http_path, None);
         // The gRPC listener is untouched by the HTTP clear.
-        assert_eq!(config.endpoint.path, "127.0.0.1:4317");
+        assert_eq!(config.endpoint.grpc_path, "127.0.0.1:4317");
     }
 
     #[test]
@@ -1947,7 +1955,7 @@ logs:
             .with_user(dir.path().join("absent.yaml"))
             .resolve()
             .unwrap();
-        assert_eq!(config.endpoint.path, "127.0.0.1:4317");
+        assert_eq!(config.endpoint.grpc_path, "127.0.0.1:4317");
     }
 
     #[test]
@@ -2058,7 +2066,7 @@ logs:
             .replace("@logdir_POST@", "/var/log/netdata");
         let config = resolve_stock_yaml(&substituted).expect("shipped stock file must resolve");
 
-        assert_eq!(config.endpoint.path, "127.0.0.1:4317");
+        assert_eq!(config.endpoint.grpc_path, "127.0.0.1:4317");
         assert!(config.endpoint.grpc_tls_cert_path.is_none());
         assert!(config.endpoint.grpc_tls_key_path.is_none());
         assert!(config.endpoint.grpc_tls_ca_cert_path.is_none());

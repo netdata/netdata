@@ -240,10 +240,10 @@ impl ConfigOverride {
 
 impl EndpointOverride {
     fn from_map(env: &EnvReader<'_>) -> Result<Self> {
-        let [cert, key, ca] =
+        let [path, cert, key, ca] =
             RENAMED_KEYS.map(|(old, new)| get_renamed_endpoint_env(env, old, new));
         Ok(Self {
-            path: get_env(env, "NETDATA_OTEL_CFG_ENDPOINT_PATH")?.map(str::to_string),
+            grpc_path: path?.map(str::to_string),
             grpc_tls_cert_path: cert?.map(str::to_string),
             grpc_tls_key_path: key?.map(str::to_string),
             grpc_tls_ca_cert_path: ca?.map(str::to_string),

@@ -122,7 +122,7 @@ def test_generate_runtime_writes_otel_yaml_with_isolated_base_dir_and_endpoint(t
     # dir from it (per-agent isolation for both logs and traces).
     assert doc["base_dir"] == str(rd / "lib" / "otel")
     # endpoint auto-assigned on loopback and reported back
-    assert doc["endpoint"]["path"] == otlp
+    assert doc["endpoint"]["grpc_path"] == otlp
     assert otlp.startswith("127.0.0.1:")
     # the OTLP/HTTP listener gets its OWN auto-assigned loopback port — never
     # the stock 4318 (a collide-and-fail-fast across parallel agents), never
@@ -169,7 +169,7 @@ def test_generate_runtime_auto_ports_never_collide(tmp_path, monkeypatch):
     rd, _conf, otlp, http = runtime.generate_runtime("agent-ports", reserved_ports=(5000,))
     assert (otlp, http) == ("127.0.0.1:6000", "127.0.0.1:7000")
     doc = yaml.safe_load((rd / "etc" / "otel.yaml").read_text())
-    assert (doc["endpoint"]["path"], doc["endpoint"]["http_path"]) == (otlp, http)
+    assert (doc["endpoint"]["grpc_path"], doc["endpoint"]["http_path"]) == (otlp, http)
     # a pinned gRPC endpoint is avoided too
     picks = iter([4317, 8000])
     rd, _conf, otlp, http = runtime.generate_runtime(
@@ -240,7 +240,7 @@ def test_generate_runtime_otel_emits_only_set_knobs(tmp_path, monkeypatch):
     rd, _conf, otlp, _http = runtime.generate_runtime("agent-k", otel=cfg)
     doc = yaml.safe_load((rd / "etc" / "otel.yaml").read_text())
     assert otlp == "127.0.0.1:4317"  # caller endpoint wins over auto-assign
-    assert doc["endpoint"]["path"] == "127.0.0.1:4317"
+    assert doc["endpoint"]["grpc_path"] == "127.0.0.1:4317"
     # tuning lands flat under logs.* — the plugin's public schema (no dirs,
     # no wal/index nesting)
     assert doc["logs"]["rotation"]["default"] == {"max_entries": 10}
@@ -359,7 +359,8 @@ def test_generate_runtime_otel_extra_yaml_cannot_override_pins(tmp_path, monkeyp
         extra_yaml=(
             "base_dir: /tmp/escape\n"
             "endpoint:\n"
-            '  path: "1.2.3.4:1"\n'
+            '  path: "1.2.3.4:0"\n'
+            '  grpc_path: "1.2.3.4:1"\n'
             '  http_path: "1.2.3.4:2"\n'
             "  grpc_tls_cert_path: /x.pem\n"
             "  http_tls_cert_path: /y.pem\n"
@@ -368,7 +369,9 @@ def test_generate_runtime_otel_extra_yaml_cannot_override_pins(tmp_path, monkeyp
     rd, _conf, otlp, _http = runtime.generate_runtime("agent-pin", otel=cfg)
     doc = yaml.safe_load((rd / "etc" / "otel.yaml").read_text())
     assert doc["base_dir"] == str(rd / "lib" / "otel")
-    assert doc["endpoint"]["path"] == otlp
+    assert doc["endpoint"]["grpc_path"] == otlp
+    # The deprecated name is dropped too: the plugin refuses both names.
+    assert "path" not in doc["endpoint"]
     # http_path re-pinned to the auto-assigned address, not the override
     assert doc["endpoint"]["http_path"].startswith("127.0.0.1:")
     assert doc["endpoint"]["http_path"] != otlp
@@ -388,7 +391,7 @@ def test_generate_runtime_otel_extra_yaml_pins_survive_non_mapping_endpoint(tmp_
         rd, _conf, otlp, _http = runtime.generate_runtime("agent-nd", otel=cfg)
         doc = yaml.safe_load((rd / "etc" / "otel.yaml").read_text())
         assert doc["base_dir"] == str(rd / "lib" / "otel"), evil
-        assert doc["endpoint"] == {"path": otlp, "http_path": None}, evil
+        assert doc["endpoint"] == {"grpc_path": otlp, "http_path": None}, evil
 
 
 def test_generate_runtime_otel_extra_yaml_rejects_invalid_yaml(tmp_path, monkeypatch):

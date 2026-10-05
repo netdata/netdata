@@ -491,9 +491,9 @@ SYSLOG_SETUP = setup_block(
      ('Devices pointed at it',
       'The routers, switches, and firewalls must be configured to send syslog to the collector\'s listener.')],
     options=[
-        {'name': 'endpoint.path', 'description': 'OTLP/gRPC endpoint the Agent listens on. The default accepts '
-                                                 'only local senders; bind a non-loopback address to accept a '
-                                                 'Collector on another host, and protect it when you do.',
+        {'name': 'endpoint.grpc_path', 'description': 'OTLP/gRPC endpoint the Agent listens on. The default accepts '
+                                                      'only local senders; bind a non-loopback address to accept a '
+                                                      'Collector on another host, and protect it when you do.',
          'default_value': '127.0.0.1:4317', 'required': False},
         {'name': 'endpoint.grpc_tls_cert_path', 'description': 'Server TLS certificate. Set together with '
                                                                '`endpoint.grpc_tls_key_path`.',
@@ -512,7 +512,7 @@ SYSLOG_SETUP = setup_block(
                        'certificate signed by your CA can send. Without the TLS keys this endpoint would accept '
                        'telemetry from anyone who can reach it.',
         'config': 'endpoint:\n'
-                  '  path: 0.0.0.0:4317\n'
+                  '  grpc_path: 0.0.0.0:4317\n'
                   '  grpc_tls_cert_path: /etc/netdata/ssl/otel.crt\n'
                   '  grpc_tls_key_path: /etc/netdata/ssl/otel.key\n'
                   '  grpc_tls_ca_cert_path: /etc/netdata/ssl/ca.crt\n',

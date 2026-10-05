@@ -1,7 +1,7 @@
 //! Partial overrides for the OTLP listener endpoints: the addresses the
 //! ingestor binds for OTLP exporters plus their TLS certificate material
 //! (`otel-ingestor` serves them; not the ferryboat IPC sockets between
-//! supervisor and workers). The gRPC listener is mandatory (`path` +
+//! supervisor and workers). The gRPC listener is mandatory (`grpc_path` +
 //! `grpc_tls_*` trio); the OTLP/HTTP listener is optional (`http_path` +
 //! `http_tls_*` trio, clearable to disable).
 //!
@@ -16,12 +16,13 @@ use anyhow::Result;
 use bridge::config::EndpointConfig;
 use serde::Deserialize;
 
-/// The gRPC TLS keys before they took the `grpc_` prefix (symmetric with
-/// `http_tls_*`), each paired with its current name. Existing user files and
+/// The gRPC listener keys before they took the `grpc_` prefix (symmetric
+/// with `http_path`/`http_tls_*`), each paired with its current name. Existing user files and
 /// env vars keep working: an old name is accepted with a deprecation warning,
 /// and setting both names in one layer is an error, since neither can be
 /// silently preferred. `env.rs` derives the env var names from this table.
-pub(super) const RENAMED_KEYS: [(&str, &str); 3] = [
+pub(super) const RENAMED_KEYS: [(&str, &str); 4] = [
+    ("path", "grpc_path"),
     ("tls_cert_path", "grpc_tls_cert_path"),
     ("tls_key_path", "grpc_tls_key_path"),
     ("tls_ca_cert_path", "grpc_tls_ca_cert_path"),
@@ -54,16 +55,19 @@ mod double_option {
 pub(super) struct EndpointOverride {
     /// Bind address (`host:port`), not a filesystem path.
     #[serde(default)]
-    pub(super) path: Option<String>,
+    pub(super) grpc_path: Option<String>,
     #[serde(default)]
     pub(super) grpc_tls_cert_path: Option<String>,
     #[serde(default)]
     pub(super) grpc_tls_key_path: Option<String>,
     #[serde(default)]
     pub(super) grpc_tls_ca_cert_path: Option<String>,
-    /// Deprecated names of the `grpc_tls_*` trio ([`RENAMED_KEYS`]), read only
-    /// from YAML; [`EndpointOverride::migrate_renamed_keys`] moves them onto
-    /// the current fields before the layer is applied.
+    /// Deprecated names of `grpc_path` and the `grpc_tls_*` trio
+    /// ([`RENAMED_KEYS`]), read only from YAML;
+    /// [`EndpointOverride::migrate_renamed_keys`] moves them onto the current
+    /// fields before the layer is applied.
+    #[serde(default)]
+    pub(super) path: Option<String>,
     #[serde(default)]
     pub(super) tls_cert_path: Option<String>,
     #[serde(default)]
@@ -75,7 +79,7 @@ pub(super) struct EndpointOverride {
     /// override, the stock value stands), YAML `null` → `Some(None)`
     /// (explicitly disable the HTTP listener), string → `Some(Some(v))`
     /// (set/replace). The listener is optional, so unlike the mandatory
-    /// gRPC `path` it must be clearable — a plain `Option<String>` could not
+    /// gRPC `grpc_path` it must be clearable — a plain `Option<String>` could not
     /// tell "unset" apart from "set to null" (see `double_option`).
     #[serde(default, deserialize_with = "double_option::deserialize")]
     pub(super) http_path: Option<Option<String>>,
@@ -91,7 +95,7 @@ impl EndpointOverride {
     /// True when the override sets any field. `env.rs` uses this to collapse
     /// an all-empty env override into `None`.
     pub(super) fn has_any(&self) -> bool {
-        self.path.is_some()
+        self.grpc_path.is_some()
             || self.grpc_tls_cert_path.is_some()
             || self.grpc_tls_key_path.is_some()
             || self.grpc_tls_ca_cert_path.is_some()
@@ -107,6 +111,7 @@ impl EndpointOverride {
     /// so a copy of the former stock file needs no edit.
     pub(super) fn migrate_renamed_keys(&mut self, source: &str) -> Result<()> {
         let pairs = [
+            (&mut self.path, &mut self.grpc_path),
             (&mut self.tls_cert_path, &mut self.grpc_tls_cert_path),
             (&mut self.tls_key_path, &mut self.grpc_tls_key_path),
             (&mut self.tls_ca_cert_path, &mut self.grpc_tls_ca_cert_path),
@@ -136,8 +141,8 @@ impl EndpointOverride {
 /// `http_path` carries its own `Some(None)` clear state (the HTTP listener
 /// is optional, so an override may deliberately turn it off).
 pub(super) fn apply(config: &mut EndpointConfig, o: &EndpointOverride) {
-    if let Some(v) = &o.path {
-        config.path = v.clone();
+    if let Some(v) = &o.grpc_path {
+        config.grpc_path = v.clone();
     }
     if let Some(v) = &o.grpc_tls_cert_path {
         config.grpc_tls_cert_path = Some(v.clone());
