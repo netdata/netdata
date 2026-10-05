@@ -5,11 +5,21 @@ def test_endpoint_error_accepts_valid_host_port():
     assert _endpoint_error("a", "127.0.0.1:4317") is None
     assert _endpoint_error("a", "0.0.0.0:65535") is None
     assert _endpoint_error("a", "[::1]:4317") is None
+    assert _endpoint_error("a", "[::ffff:127.0.0.1]:4317") is None
 
 
 def test_endpoint_error_rejects_what_the_plugin_cannot_parse():
     # The plugin parses a Rust SocketAddr: no hostnames, IPv6 only in brackets.
-    for value in ("localhost:4317", "::1:4317", "[127.0.0.1]:4317", "[::1:4317", "http://127.0.0.1:4317"):
+    for value in (
+        "localhost:4317",
+        "::1:4317",
+        "[127.0.0.1]:4317",
+        "[::1:4317",
+        "http://127.0.0.1:4317",
+        "[fe80::1%eth0]:4317",
+        "[::1[]:4317",
+        "127.0.0.1:\uff11\uff12\uff13",
+    ):
         err = _endpoint_error("a", value)
         assert err is not None and err.state == "error", value
 

@@ -26,27 +26,29 @@ from .models import RunInfo, agent_declared, agent_error, run_info, unknown_agen
 # instead of an opaque agent-launch failure several tool calls later. The
 # plugin parses both listeners as a Rust SocketAddr: an IP literal (IPv6 in
 # brackets) and a port, never a hostname.
-_HOST_PORT_RE = re.compile(r"(\[[^\]\s]+\]|[^\s:\[\]]+):(\d{1,5})")
+_HOST_PORT_RE = re.compile(r"(?:\[([0-9A-Fa-f:.]+)\]|([0-9.]+)):([0-9]{1,5})", re.ASCII)
 
 
 def _endpoint_error(agent_id: str, value: str, name: str = "otlp_endpoint") -> RunInfo | None:
     """Return an error RunInfo if ``value`` is not a valid ip:port, else None."""
     m = _HOST_PORT_RE.fullmatch(value)
-    if m is None:
-        return agent_error(agent_id, f"{name} must be 'ip:port', got {value!r}")
-    host = m.group(1)
-    try:
-        ip = ipaddress.ip_address(host.strip("[]"))
-    except ValueError:
-        ip = None
-    if ip is None or (ip.version == 6) != host.startswith("["):
+    if m is None or not _is_ip(m.group(1), 6) and not _is_ip(m.group(2), 4):
         return agent_error(
             agent_id,
-            f"{name} needs an IP address, not a hostname (e.g. '127.0.0.1:4317', '[::1]:4317'), got {value!r}",
+            f"{name} must be 'ip:port' with an IP address, not a hostname "
+            f"(e.g. '127.0.0.1:4317', '[::1]:4317'), got {value!r}",
         )
-    if not (1 <= int(m.group(2)) <= 65535):
+    if not (1 <= int(m.group(3)) <= 65535):
         return agent_error(agent_id, f"{name} port out of range (1-65535): {value!r}")
     return None
+
+
+def _is_ip(text: str | None, version: int) -> bool:
+    try:
+        return text is not None and ipaddress.ip_address(text).version == version
+    except ValueError:
+        return False
+
 
 _AgentId = Annotated[str, Field(description="The declared agent to configure.")]
 _Endpoint = Annotated[
