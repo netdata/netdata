@@ -1853,6 +1853,62 @@ modules:
               chart_type: line
               dimensions:
                 - name: uptime
+            - name: iis.website_blocked_async_io_requests
+              description: Website blocked async I/O requests
+              unit: "requests"
+              chart_type: line
+              dimensions:
+                - name: blocked
+            - name: iis.website_cgi_requests
+              description: Website active CGI requests
+              unit: "requests"
+              chart_type: line
+              dimensions:
+                - name: active
+            - name: iis.website_anonymous_users_total
+              description: Website anonymous users
+              unit: "users"
+              chart_type: line
+              dimensions:
+                - name: users
+            - name: iis.website_blocked_async_io_requests_total
+              description: Website blocked async I/O requests
+              unit: "requests"
+              chart_type: line
+              dimensions:
+                - name: requests
+            - name: iis.website_cgi_requests_total
+              description: Website CGI requests
+              unit: "requests"
+              chart_type: line
+              dimensions:
+                - name: requests
+            - name: iis.website_non_anonymous_users_total
+              description: Website non-anonymous users
+              unit: "users"
+              chart_type: line
+              dimensions:
+                - name: users
+            - name: iis.website_rejected_async_io_requests_total
+              description: Website rejected async I/O requests
+              unit: "requests"
+              chart_type: line
+              dimensions:
+                - name: requests
+        - name: IIS website requests by method
+          description: "Cumulative HTTP requests grouped by request method."
+          labels:
+            - name: website
+              description: The name of the IIS website.
+            - name: method
+              description: HTTP request method.
+          metrics:
+            - name: iis.website_requests_total
+              description: Website HTTP requests by method
+              unit: "requests"
+              chart_type: line
+              dimensions:
+                - name: requests
         - name: IIS Application Pool
           description: "These metrics refer to the IIS application pool WAS (Windows Process Activation Service)."
           labels:
@@ -1916,6 +1972,18 @@ modules:
               chart_type: line
               dimensions:
                 - name: uptime
+            - name: iis.application_pool_current_uptime
+              description: IIS App Pool current uptime
+              unit: "seconds"
+              chart_type: line
+              dimensions:
+                - name: uptime
+            - name: iis.application_pool_time_since_last_worker_process_failure
+              description: Time since the last IIS worker process failure
+              unit: "seconds"
+              chart_type: line
+              dimensions:
+                - name: seconds
         - name: IIS W3SCV W3MP
           description: "These metrics refer to the World Wide Web Publishing Service, the service responsible for hosting and serving web content."
           labels:
@@ -2000,6 +2068,357 @@ modules:
               chart_type: line
               dimensions:
                 - name: output_cache_entries
+        - name: IIS W3SVC W3WP Worker Process
+          description: "These metrics describe IIS worker process activity, caches, and WebSocket requests."
+          labels:
+            - name: app
+              description: Application pool name.
+            - name: pid
+              description: Worker process identifier.
+          metrics:
+            - name: iis.w3svc_w3wp_maximum_threads
+              description: Maximum worker threads
+              unit: "threads"
+              chart_type: line
+              dimensions:
+                - name: threads
+            - name: iis.w3svc_w3wp_active_flushed_entries
+              description: Worker cache entries pending flush
+              unit: "entries"
+              chart_type: line
+              dimensions:
+                - name: entries
+            - name: iis.w3svc_w3wp_file_cache_max_memory
+              description: Maximum worker file cache memory
+              unit: "bytes"
+              chart_type: line
+              dimensions:
+                - name: used
+            - name: iis.w3svc_w3wp_file_cache_flushes
+              description: Worker file cache flushes
+              unit: "flushes/s"
+              chart_type: line
+              dimensions:
+                - name: flushes
+            - name: iis.w3svc_w3wp_file_cache_hits
+              description: Worker file cache hits
+              unit: "hits/s"
+              chart_type: line
+              dimensions:
+                - name: hits
+            - name: iis.w3svc_w3wp_files_cached
+              description: Files currently in the worker file cache
+              unit: "files"
+              chart_type: line
+              dimensions:
+                - name: files
+            - name: iis.w3svc_w3wp_uri_cache_hits
+              description: Worker URI cache hits
+              unit: "hits/s"
+              chart_type: line
+              dimensions:
+                - name: hits
+            - name: iis.w3svc_w3wp_uri_cache_misses
+              description: Worker URI cache misses
+              unit: "misses/s"
+              chart_type: line
+              dimensions:
+                - name: misses
+            - name: iis.w3svc_w3wp_uris_cached
+              description: URIs currently in the worker cache
+              unit: "uris"
+              chart_type: line
+              dimensions:
+                - name: uris
+            - name: iis.w3svc_w3wp_metadata_cache_hits
+              description: Worker metadata cache hits
+              unit: "hits/s"
+              chart_type: line
+              dimensions:
+                - name: hits
+            - name: iis.w3svc_w3wp_metadata_cache_misses
+              description: Worker metadata cache misses
+              unit: "misses/s"
+              chart_type: line
+              dimensions:
+                - name: misses
+            - name: iis.w3svc_w3wp_metadata_cached
+              description: Metadata currently in the worker cache
+              unit: "blocks"
+              chart_type: line
+              dimensions:
+                - name: blocks
+            - name: iis.w3svc_w3wp_metadata_cache_flushes
+              description: Worker metadata cache flushes
+              unit: "flushes/s"
+              chart_type: line
+              dimensions:
+                - name: flushes
+            - name: iis.w3svc_w3wp_output_cache_items
+              description: Items currently in the worker output cache
+              unit: "items"
+              chart_type: line
+              dimensions:
+                - name: items
+            - name: iis.w3svc_w3wp_output_cache_hits
+              description: Worker output cache hits
+              unit: "hits/s"
+              chart_type: line
+              dimensions:
+                - name: hits
+            - name: iis.w3svc_w3wp_output_cache_misses
+              description: Worker output cache misses
+              unit: "misses/s"
+              chart_type: line
+              dimensions:
+                - name: misses
+            - name: iis.w3svc_w3wp_output_cache_flushed_items
+              description: Worker output cache items flushed
+              unit: "items/s"
+              chart_type: line
+              dimensions:
+                - name: items
+            - name: iis.w3svc_w3wp_http_responses
+              description: Worker HTTP responses by status
+              unit: "responses/s"
+              chart_type: line
+              dimensions:
+                - name: "401"
+                - name: "403"
+                - name: "404"
+                - name: "500"
+            - name: iis.w3svc_w3wp_websocket_active_requests
+              description: Active worker WebSocket requests
+              unit: "requests"
+              chart_type: line
+              dimensions:
+                - name: active
+            - name: iis.w3svc_w3wp_websocket_connection_attempts
+              description: Worker WebSocket connection attempts
+              unit: "connections/s"
+              chart_type: line
+              dimensions:
+                - name: attempts
+            - name: iis.w3svc_w3wp_websocket_connections_accepted
+              description: Worker WebSocket connections accepted
+              unit: "connections/s"
+              chart_type: line
+              dimensions:
+                - name: accepted
+            - name: iis.w3svc_w3wp_websocket_connections_rejected
+              description: Worker WebSocket connections rejected
+              unit: "connections/s"
+              chart_type: line
+              dimensions:
+                - name: rejected
+        - name: IIS HTTP Service Request Queues
+          description: HTTP.sys request queue metrics for IIS sites.
+          labels:
+            - name: site
+              description: The IIS site or request queue name.
+          metrics:
+            - name: iis.http_request_queues_current_queue_size
+              description: Current HTTP request queue size
+              unit: "requests"
+              chart_type: line
+              dimensions:
+                - name: queued
+            - name: iis.http_request_queues_rejected_requests
+              description: Total HTTP requests rejected from the queue
+              unit: "requests"
+              chart_type: line
+              dimensions:
+                - name: rejected
+            - name: iis.http_request_queues_max_queue_item_age
+              description: Maximum age of an HTTP request in the queue
+              unit: "seconds"
+              chart_type: line
+              dimensions:
+                - name: age
+            - name: iis.http_request_queues_arrival_rate
+              description: HTTP request queue arrival rate
+              unit: "requests/s"
+              chart_type: line
+              dimensions:
+                - name: requests
+        - name: IIS Web Service Cache
+          description: IIS server cache metrics.
+          labels: []
+          metrics:
+            - name: iis.server_cache_active_flushed_entries
+              description: IIS server cache entries pending flush
+              unit: "entries"
+              chart_type: line
+              dimensions:
+                - name: entries
+            - name: iis.server_file_cache_memory
+              description: IIS server file cache memory
+              unit: "bytes"
+              chart_type: area
+              dimensions:
+                - name: used
+            - name: iis.server_file_cache_max_memory
+              description: IIS server maximum file cache memory
+              unit: "bytes"
+              chart_type: line
+              dimensions:
+                - name: maximum
+            - name: iis.server_file_cache_flushes
+              description: IIS server file cache flushes
+              unit: "flushes/s"
+              chart_type: line
+              dimensions:
+                - name: flushes
+            - name: iis.server_file_cache_queries
+              description: IIS server file cache queries
+              unit: "queries/s"
+              chart_type: line
+              dimensions:
+                - name: queries
+            - name: iis.server_file_cache_hits
+              description: IIS server file cache hits
+              unit: "hits/s"
+              chart_type: line
+              dimensions:
+                - name: hits
+            - name: iis.server_files_cached
+              description: Files in the IIS server cache
+              unit: "files"
+              chart_type: line
+              dimensions:
+                - name: files
+            - name: iis.server_files_cached_total
+              description: Files added to the IIS server cache
+              unit: "files/s"
+              chart_type: line
+              dimensions:
+                - name: files
+            - name: iis.server_files_flushed_total
+              description: Files removed from the IIS server cache
+              unit: "files/s"
+              chart_type: line
+              dimensions:
+                - name: files
+            - name: iis.server_metadata_cached
+              description: Metadata blocks in the IIS cache
+              unit: "blocks"
+              chart_type: line
+              dimensions:
+                - name: blocks
+            - name: iis.server_metadata_flushes
+              description: IIS metadata cache flushes
+              unit: "flushes/s"
+              chart_type: line
+              dimensions:
+                - name: flushes
+            - name: iis.server_metadata_queries
+              description: IIS metadata cache queries
+              unit: "queries/s"
+              chart_type: line
+              dimensions:
+                - name: queries
+            - name: iis.server_metadata_hits
+              description: IIS metadata cache hits
+              unit: "hits/s"
+              chart_type: line
+              dimensions:
+                - name: hits
+            - name: iis.server_metadata_cached_total
+              description: Metadata blocks added to the IIS cache
+              unit: "blocks/s"
+              chart_type: line
+              dimensions:
+                - name: blocks
+            - name: iis.server_metadata_flushed_total
+              description: Metadata blocks removed from the IIS cache
+              unit: "blocks/s"
+              chart_type: line
+              dimensions:
+                - name: blocks
+            - name: iis.server_output_cache_active_flushed
+              description: Active and flushed IIS output cache items
+              unit: "items"
+              chart_type: line
+              dimensions:
+                - name: items
+            - name: iis.server_output_cache_items
+              description: Items in the IIS output cache
+              unit: "items"
+              chart_type: line
+              dimensions:
+                - name: items
+            - name: iis.server_output_cache_memory
+              description: IIS output cache memory
+              unit: "bytes"
+              chart_type: area
+              dimensions:
+                - name: used
+            - name: iis.server_output_cache_queries
+              description: IIS output cache queries
+              unit: "queries/s"
+              chart_type: line
+              dimensions:
+                - name: queries
+            - name: iis.server_output_cache_hits
+              description: IIS output cache hits
+              unit: "hits/s"
+              chart_type: line
+              dimensions:
+                - name: hits
+            - name: iis.server_output_cache_flushed
+              description: IIS output cache items flushed
+              unit: "items/s"
+              chart_type: line
+              dimensions:
+                - name: items
+            - name: iis.server_output_cache_flushes
+              description: IIS output cache flushes
+              unit: "flushes/s"
+              chart_type: line
+              dimensions:
+                - name: flushes
+        - name: IIS Web Service Cache Mode
+          description: IIS URI cache metrics split between user and kernel modes.
+          labels:
+            - name: mode
+              description: Cache mode, either user or kernel.
+          metrics:
+            - name: iis.server_uri_cache_flushes
+              description: IIS URI cache flushes
+              unit: "flushes/s"
+              chart_type: line
+              dimensions:
+                - name: flushes
+            - name: iis.server_uri_cache_queries
+              description: IIS URI cache queries
+              unit: "queries/s"
+              chart_type: line
+              dimensions:
+                - name: queries
+            - name: iis.server_uri_cache_hits
+              description: IIS URI cache hits
+              unit: "hits/s"
+              chart_type: line
+              dimensions:
+                - name: hits
+            - name: iis.server_uris_cached
+              description: URIs in the IIS cache
+              unit: "uris"
+              chart_type: line
+              dimensions:
+                - name: uris
+            - name: iis.server_uris_cached_total
+              description: URIs added to the IIS cache
+              unit: "uris/s"
+              chart_type: line
+              dimensions:
+                - name: uris
+            - name: iis.server_uris_flushed_total
+              description: URIs removed from the IIS cache
+              unit: "uris/s"
+              chart_type: line
+              dimensions:
+                - name: uris
   - meta:
       plugin_name: windows.plugin
       module_name: PerflibHyperV

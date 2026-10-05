@@ -3,6 +3,11 @@
 #include "windows_plugin.h"
 #include "windows-internals.h"
 
+void do_PerflibWebServiceExtraWeb(PERF_DATA_BLOCK *data, int update_every);
+void do_PerflibWebServiceExtraWorker(PERF_DATA_BLOCK *data, int update_every);
+void do_PerflibWebServiceExtraHTTPQueue(PERF_DATA_BLOCK *data, int update_every);
+void do_PerflibWebServiceExtraCache(PERF_DATA_BLOCK *data, int update_every);
+
 struct web_service {
     RRDSET *st_request_rate;
     RRDDIM *rd_request_rate;
@@ -179,6 +184,12 @@ struct iis_app {
 
     RRDSET *st_app_application_pool_uptime;
     RRDDIM *rd_app_application_pool_uptime;
+
+    RRDSET *st_app_current_application_pool_uptime;
+    RRDDIM *rd_app_current_application_pool_uptime;
+
+    RRDSET *st_app_time_since_process_failure;
+    RRDDIM *rd_app_time_since_process_failure;
 
     RRDSET *st_app_worker_process_created;
     RRDDIM *rd_app_worker_process_created;
@@ -884,6 +895,8 @@ static inline void netdata_webservice_requests(
 
 static bool do_web_services(PERF_DATA_BLOCK *pDataBlock, int update_every)
 {
+    do_PerflibWebServiceExtraWeb(pDataBlock, update_every);
+
     PERF_OBJECT_TYPE *pObjectType = perflibFindObjectTypeByName(pDataBlock, "Web Service");
     if (!pObjectType)
         return false;
@@ -1220,6 +1233,83 @@ static inline void app_pool_uptime(
     }
 }
 
+static inline void app_pool_current_uptime(
+    struct iis_app *p,
+    PERF_DATA_BLOCK *pDataBlock,
+    PERF_OBJECT_TYPE *pObjectType,
+    PERF_INSTANCE_DEFINITION *pi,
+    int update_every)
+{
+    if (!perflibGetInstanceCounter(pDataBlock, pObjectType, pi, &p->APPCurrentApplicationPoolUptime))
+        return;
+
+    if (!p->st_app_current_application_pool_uptime) {
+        char id[RRD_ID_LENGTH_MAX + 1];
+        snprintfz(id, sizeof(id), "application_pool_%s_current_uptime", windows_shared_buffer);
+        netdata_fix_chart_name(id);
+        p->st_app_current_application_pool_uptime = rrdset_create_localhost(
+            "iis",
+            id,
+            NULL,
+            "app pool uptime",
+            "iis.application_pool_current_uptime",
+            "IIS App Pool current uptime",
+            "seconds",
+            PLUGIN_WINDOWS_NAME,
+            "PerflibWebService",
+            PRIO_IIS_APP_POOL_TOTAL_UPTIME + 1,
+            update_every,
+            RRDSET_TYPE_LINE);
+        p->rd_app_current_application_pool_uptime = perflib_rrddim_add(
+            p->st_app_current_application_pool_uptime, "uptime", NULL, 1, 1, &p->APPCurrentApplicationPoolUptime);
+        rrdlabels_add(
+            p->st_app_current_application_pool_uptime->rrdlabels, "app", windows_shared_buffer, RRDLABEL_SRC_AUTO);
+    }
+
+    perflib_rrddim_set_by_pointer(
+        p->st_app_current_application_pool_uptime,
+        p->rd_app_current_application_pool_uptime,
+        &p->APPCurrentApplicationPoolUptime);
+    rrdset_done(p->st_app_current_application_pool_uptime);
+}
+
+static inline void app_pool_time_since_failure(
+    struct iis_app *p,
+    PERF_DATA_BLOCK *pDataBlock,
+    PERF_OBJECT_TYPE *pObjectType,
+    PERF_INSTANCE_DEFINITION *pi,
+    int update_every)
+{
+    if (!perflibGetInstanceCounter(pDataBlock, pObjectType, pi, &p->APPTimeSinceProcessFailure))
+        return;
+
+    if (!p->st_app_time_since_process_failure) {
+        char id[RRD_ID_LENGTH_MAX + 1];
+        snprintfz(id, sizeof(id), "application_pool_%s_time_since_failure", windows_shared_buffer);
+        netdata_fix_chart_name(id);
+        p->st_app_time_since_process_failure = rrdset_create_localhost(
+            "iis",
+            id,
+            NULL,
+            "app pool worker process",
+            "iis.application_pool_time_since_last_worker_process_failure",
+            "Time since the last IIS worker process failure",
+            "seconds",
+            PLUGIN_WINDOWS_NAME,
+            "PerflibWebService",
+            PRIO_IIS_APP_POOL_WORKER_PROCESS_RECENT_FAILURES + 1,
+            update_every,
+            RRDSET_TYPE_LINE);
+        p->rd_app_time_since_process_failure = perflib_rrddim_add(
+            p->st_app_time_since_process_failure, "seconds", NULL, 1, 1, &p->APPTimeSinceProcessFailure);
+        rrdlabels_add(p->st_app_time_since_process_failure->rrdlabels, "app", windows_shared_buffer, RRDLABEL_SRC_AUTO);
+    }
+
+    perflib_rrddim_set_by_pointer(
+        p->st_app_time_since_process_failure, p->rd_app_time_since_process_failure, &p->APPTimeSinceProcessFailure);
+    rrdset_done(p->st_app_time_since_process_failure);
+}
+
 static inline void app_pool_worker_processes_created(
     struct iis_app *p,
     PERF_DATA_BLOCK *pDataBlock,
@@ -1358,8 +1448,22 @@ static bool do_app_pool(PERF_DATA_BLOCK *pDataBlock, int update_every)
 
         app_pool_recycles(p, pDataBlock, pObjectType, pi, update_every);
         app_pool_uptime(p, pDataBlock, pObjectType, pi, update_every);
+        app_pool_current_uptime(p, pDataBlock, pObjectType, pi, update_every);
+        app_pool_time_since_failure(p, pDataBlock, pObjectType, pi, update_every);
     }
 
+    return true;
+}
+
+static bool do_extra_http_queue(PERF_DATA_BLOCK *data, int update_every)
+{
+    do_PerflibWebServiceExtraHTTPQueue(data, update_every);
+    return true;
+}
+
+static bool do_extra_web_service_cache(PERF_DATA_BLOCK *data, int update_every)
+{
+    do_PerflibWebServiceExtraCache(data, update_every);
     return true;
 }
 
@@ -1913,6 +2017,8 @@ static inline void w3svc_w3wp_output_cache_flushed_total(
 
 static bool do_W3SCV_W3WP(PERF_DATA_BLOCK *pDataBlock, int update_every)
 {
+    do_PerflibWebServiceExtraWorker(pDataBlock, update_every);
+
     PERF_OBJECT_TYPE *pObjectType = perflibFindObjectTypeByName(pDataBlock, "W3SVC_W3WP");
     if (!pObjectType)
         return false;
@@ -1931,7 +2037,9 @@ static bool do_W3SCV_W3WP(PERF_DATA_BLOCK *pDataBlock, int update_every)
             continue;
         }
 
-        struct ws3svc_w3wp_data *p = dictionary_set(w3svc_w3wp_service, windows_shared_buffer, NULL, sizeof(*p));
+        char instance_key[PERFLIB_MAX_NAME_LENGTH];
+        strncpyz(instance_key, windows_shared_buffer, sizeof(instance_key) - 1);
+
         // Instance example: "11084_MSExchangeOABAppPool"
         char *app = strchr(windows_shared_buffer, '_');
         if (!app) {
@@ -1939,6 +2047,10 @@ static bool do_W3SCV_W3WP(PERF_DATA_BLOCK *pDataBlock, int update_every)
         }
 
         *app++ = '\0';
+        if (strchr(app, '#'))
+            continue;
+
+        struct ws3svc_w3wp_data *p = dictionary_set(w3svc_w3wp_service, instance_key, NULL, sizeof(*p));
 
         w3svc_w3wp_active_threads(p, pDataBlock, pObjectType, pi, update_every, app);
 
@@ -1974,12 +2086,16 @@ int do_PerflibWebService(int update_every __maybe_unused, usec_t dt __maybe_unus
     }
 
     int ret = 0;
-#define TOTAL_NUMBER_OF_FAILURES (3)
+#define TOTAL_NUMBER_OF_FAILURES (5)
     if (iis_web_service("Web Service", update_every, do_web_services))
         ret++;
     if (iis_web_service("APP_POOL_WAS", update_every, do_app_pool))
         ret++;
     if (iis_web_service("W3SVC_W3WP", update_every, do_W3SCV_W3WP))
+        ret++;
+    if (iis_web_service("HTTP Service Request Queues", update_every, do_extra_http_queue))
+        ret++;
+    if (iis_web_service("Web Service Cache", update_every, do_extra_web_service_cache))
         ret++;
 
     return (ret == TOTAL_NUMBER_OF_FAILURES) ? -1 : 0;

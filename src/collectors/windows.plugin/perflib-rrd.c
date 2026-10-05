@@ -236,6 +236,13 @@ collected_number perflib_rrddim_set_by_pointer(RRDSET *st, RRDDIM *rd, COUNTER_D
             value = (collected_number)(doubleValue * COLLECTED_NUMBER_PRECISION);
             break;
 
+        case PERF_ELAPSED_TIME:
+            if (!cd->current.Frequency)
+                return 0;
+            doubleValue = (double)(cd->current.Time - cd->current.Data) / (double)cd->current.Frequency;
+            value = (collected_number)doubleValue;
+            break;
+
         default:
             return 0;
     }
