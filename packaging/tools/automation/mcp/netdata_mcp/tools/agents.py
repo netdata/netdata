@@ -21,7 +21,8 @@ _Port = Annotated[
         description=(
             "Optional fixed web port (127.0.0.1) for every start/restart of this agent, "
             "so its URL stays the same. Omit for an auto-assigned port per start. A start "
-            "fails if the port is already in use."
+            "fails if the port is already in use. Refused if a pinned OTLP endpoint "
+            "(netdata_agent_otel_config) uses it on 127.0.0.1 or a wildcard address."
         ),
     ),
 ]

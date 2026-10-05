@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import asyncio
 import errno
+import ipaddress
 import json
 import os
 import re
@@ -432,8 +433,9 @@ def generate_runtime(
     free loopback port so parallel agents don't collide on 4317; the OTLP/HTTP
     listener gets its own free port for the same reason (the plugin fails fast on
     an occupied port), unless the config disables it (``otlp_http_endpoint=""``)
-    or pins it; ``reserved_ports`` (the web port) are never auto-assigned. Both
-    endpoints are returned so the caller can report where to push OTLP data.
+    or pins it; ``reserved_ports`` (the web port) are never auto-assigned, and a
+    pinned endpoint that overlaps one raises ``ValueError`` (``web_port_clash``).
+    Both endpoints are returned so the caller can report where to push OTLP data.
     """
     rd = run_dir(agent_id)
     for sub in ("etc", "cache", "lib", "log", "run"):
@@ -448,16 +450,17 @@ def generate_runtime(
     conf_path.write_text(_render_ini(conf), encoding="utf-8")
 
     cfg = otel or OtelConfig()
+    reserved = set(reserved_ports)
     # A pinned endpoint on the web port would lose the bind to netdata itself,
     # while the run still reports that port as the OTLP endpoint.
-    for web_port in reserved_ports:
+    for web_port in reserved:
         if (clash := web_port_clash(cfg, web_port)) is not None:
             raise ValueError(clash)
     # Every auto-assigned port must differ from the caller's (the web port),
     # from any pinned endpoint and from each other: free_port() releases its
     # socket, so two calls can return the same port, and the plugin refuses
     # to start when its two listeners collide.
-    taken = set(reserved_ports) | pinned_ports(cfg)
+    taken = reserved | pinned_ports(cfg)
     if cfg.otlp_endpoint:
         otlp_endpoint = cfg.otlp_endpoint
     else:
@@ -488,13 +491,29 @@ def pinned_ports(cfg: OtelConfig | None) -> set[int]:
 
 
 def web_port_clash(cfg: OtelConfig | None, web_port: int | None) -> str | None:
-    """Why a pinned OTLP endpoint in ``cfg`` cannot share ``web_port``, or None."""
+    """Why a pinned OTLP endpoint in ``cfg`` cannot share ``web_port``, or None.
+
+    The web server binds 127.0.0.1 (``_default_conf``), so only an endpoint
+    whose address overlaps it clashes: 127.0.0.1 itself, its IPv4-mapped
+    form, or a wildcard. ``[::1]:P`` or ``127.0.0.2:P`` can share the port.
+    """
     if cfg is None or web_port is None:
         return None
     for name, endpoint in (("otlp_endpoint", cfg.otlp_endpoint), ("otlp_http_endpoint", cfg.otlp_http_endpoint)):
-        if endpoint and _endpoint_port(endpoint) == web_port:
+        if endpoint and _endpoint_port(endpoint) == web_port and _overlaps_web_address(endpoint):
             return f"{name} {endpoint} uses the agent's web port {web_port}; pin another port"
     return None
+
+
+def _overlaps_web_address(endpoint: str) -> bool:
+    host = endpoint.rpartition(":")[0].strip("[]")
+    try:
+        ip = ipaddress.ip_address(host)
+    except ValueError:
+        return True  # not an IP literal: assume the worst
+    if isinstance(ip, ipaddress.IPv6Address) and ip.ipv4_mapped is not None:
+        ip = ip.ipv4_mapped
+    return ip.is_unspecified or ip == ipaddress.IPv4Address("127.0.0.1")
 
 
 def free_port_except(taken: set[int], attempts: int = 64) -> int:

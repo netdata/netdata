@@ -150,7 +150,9 @@ class RunRegistry:
         - ``"started"`` - no live run existed; a fresh run started.
 
         ``port`` pins the web port (the agent's declared port); None picks a
-        fresh free loopback port for this launch.
+        fresh free loopback port for this launch, avoiding the ports of pinned
+        OTLP endpoints. ``generate_runtime`` raises ``ValueError`` when a pinned
+        OTLP endpoint overlaps the web port.
         """
         # Held across the decide + stop + create so a concurrent start for the
         # same agent observes the fresh run, not the one we're about to replace.

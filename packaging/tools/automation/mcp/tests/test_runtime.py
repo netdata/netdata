@@ -207,6 +207,32 @@ def test_web_port_clash_only_on_the_same_port():
     assert runtime.pinned_ports(cfg) == {4317}
 
 
+@pytest.mark.parametrize(
+    "host, clashes",
+    [
+        ("127.0.0.1", True),
+        ("0.0.0.0", True),
+        ("[::]", True),
+        ("[::ffff:127.0.0.1]", True),
+        ("[::1]", False),
+        ("127.0.0.2", False),
+    ],
+)
+def test_web_port_clash_only_where_the_address_overlaps_the_web_bind(host, clashes):
+    # The web server binds 127.0.0.1 only.
+    cfg = runtime.OtelConfig(otlp_endpoint=f"{host}:5000")
+    assert (runtime.web_port_clash(cfg, 5000) is not None) == clashes
+
+
+def test_generate_runtime_reads_reserved_ports_once(tmp_path, monkeypatch):
+    # A one-shot iterable must still exclude the web port from auto-assignment.
+    monkeypatch.setattr(runtime.Path, "home", classmethod(lambda cls: tmp_path))
+    picks = iter([19999, 9000, 9001])
+    monkeypatch.setattr(runtime, "free_port", lambda: next(picks))
+    _rd, _conf, otlp, http = runtime.generate_runtime("agent-once", reserved_ports=iter([19999]))
+    assert (otlp, http) == ("127.0.0.1:9000", "127.0.0.1:9001")
+
+
 def test_generate_runtime_portless_pinned_endpoint_still_fails_cleanly(tmp_path, monkeypatch):
     # A pinned endpoint without a numeric port reserves nothing; running out of
     # ports must still raise the intended RuntimeError, not a sort TypeError.

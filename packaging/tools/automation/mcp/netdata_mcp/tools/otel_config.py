@@ -53,7 +53,13 @@ def _is_ip(text: str | None, version: int) -> bool:
 _AgentId = Annotated[str, Field(description="The declared agent to configure.")]
 _Endpoint = Annotated[
     str | None,
-    Field(description="OTLP/gRPC listen address 'ip:port' (e.g. '127.0.0.1:4317'). Omit to auto-assign a free loopback port."),
+    Field(
+        description=(
+            "OTLP/gRPC listen address 'ip:port' (e.g. '127.0.0.1:4317'). Omit to auto-assign "
+            "a free loopback port. Refused on the agent's declared web port (127.0.0.1 or a "
+            "wildcard address)."
+        )
+    ),
 ]
 _HttpEndpoint = Annotated[
     str | None,
@@ -62,7 +68,8 @@ _HttpEndpoint = Annotated[
             "OTLP/HTTP listen address 'ip:port' (e.g. '127.0.0.1:4318'). Omit to "
             "auto-assign a free loopback port; pass the EMPTY STRING '' to disable "
             "the HTTP listener (writes http_path: null); any other value must be "
-            "'ip:port'."
+            "'ip:port', and is refused on the agent's declared web port (127.0.0.1 "
+            "or a wildcard address)."
         )
     ),
 ]
