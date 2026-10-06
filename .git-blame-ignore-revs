@@ -1,0 +1,4 @@
+# Bulk-formatting commits for git blame to skip; GitHub reads this file, local git needs blame.ignoreRevsFile.
+
+# cargo fmt over src/crates (#24164)
+95167c963a48bd5eadf7ef0b28be004260c03a20
