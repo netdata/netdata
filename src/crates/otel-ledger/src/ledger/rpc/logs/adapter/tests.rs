@@ -210,7 +210,12 @@ fn empty_logs_data_shapes_a_full_zero_count_envelope() {
     assert!(dps.iter().all(|dp| dp.items == vec![[0, 0, 0]]));
 
     let v = serde_json::to_value(&r).unwrap();
-    let mut column_keys: Vec<&str> = v["columns"].as_object().unwrap().keys().map(String::as_str).collect();
+    let mut column_keys: Vec<&str> = v["columns"]
+        .as_object()
+        .unwrap()
+        .keys()
+        .map(String::as_str)
+        .collect();
     column_keys.sort_unstable();
     assert_eq!(column_keys, vec!["cursor", "severity", "timestamp"]);
     assert!(v["facets"].as_array().unwrap().is_empty());

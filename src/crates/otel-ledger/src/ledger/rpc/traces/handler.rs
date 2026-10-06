@@ -34,19 +34,16 @@ use file_lifecycle::registry::TenantRegistries;
 use sfsq::traces::{
     AttributeNamesQuery, AttributeRequestError, AttributeValuesQuery, DEFAULT_SLOWEST_LIMIT,
     OverviewQuery, OverviewRequestError, Predicate, PredicateTarget, SLOWEST_LIMIT_MAX,
-    SPANS_PER_TRACE_MAX,
-    SearchQuery, SearchRequestError, SearchSources, SlowestQuery, SlowestRequestError, TimeWindow,
-    TraceQuery,
-    TraceRequestError, attribute_names, attribute_values, overview, search, slowest, trace_by_id,
+    SPANS_PER_TRACE_MAX, SearchQuery, SearchRequestError, SearchSources, SlowestQuery,
+    SlowestRequestError, TimeWindow, TraceQuery, TraceRequestError, attribute_names,
+    attribute_values, overview, search, slowest, trace_by_id,
 };
 
 use super::adapter::{
     ResolvedWindow, build_predicate, builtin_word, completion_capture_range, heatmap_predicate,
-    parse_cursor,
-    parse_enumeration_key, parse_owner_word, parse_trace_id, resolve_window,
-    to_attribute_values_result,
-    to_attributes_result, to_overview_result, to_overview_section, to_search_result,
-    to_slowest_result, to_trace_result, validate_trace_bounds,
+    parse_cursor, parse_enumeration_key, parse_owner_word, parse_trace_id, resolve_window,
+    to_attribute_values_result, to_attributes_result, to_overview_result, to_overview_section,
+    to_search_result, to_slowest_result, to_trace_result, validate_trace_bounds,
 };
 use super::sources::{Capture, CaptureError, TracesSourceSupplier};
 use super::wire::{
@@ -245,8 +242,7 @@ impl OtelTracesHandler {
         tenant: Option<&str>,
         aggregate: Option<AggregateRequest>,
     ) -> netdata_plugin_error::Result<SearchResult> {
-        let client_err =
-            |e: String| handler_err(format!("invalid otel-traces request: {e}"));
+        let client_err = |e: String| handler_err(format!("invalid otel-traces request: {e}"));
 
         // Zero must be rejected BEFORE the anchor allowance is added —
         // `limit=0` with a cursor would otherwise sneak a positive engine
@@ -500,7 +496,9 @@ impl OtelTracesHandler {
                 && params.max_trace_duration_ns.is_none(),
             predicate: heatmap_predicate,
         });
-        let data = self.search_result(ctx, &search_params, tenant, aggregate).await?;
+        let data = self
+            .search_result(ctx, &search_params, tenant, aggregate)
+            .await?;
         Ok(OtelTracesResponse::Functions(Box::new(
             FunctionsTracesResponse::new(data),
         )))
@@ -709,7 +707,9 @@ impl OtelTracesHandler {
                 "otel-traces internal error: captured source set is inconsistent: {e}"
             ))),
             Ok(Err(e)) => Err(client_err(e.to_string())),
-            Err(e) => Err(handler_err(format!("otel-traces overview task failed: {e}"))),
+            Err(e) => Err(handler_err(format!(
+                "otel-traces overview task failed: {e}"
+            ))),
         }
     }
 

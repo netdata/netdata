@@ -2,7 +2,7 @@
 
 use super::raw;
 use crate::protocol::{
-    CgroupsLookupResponseView, NipcError, METHOD_CGROUPS_LOOKUP, PROFILE_BASELINE,
+    CgroupsLookupResponseView, METHOD_CGROUPS_LOOKUP, NipcError, PROFILE_BASELINE,
 };
 
 #[cfg(unix)]
@@ -15,8 +15,8 @@ use crate::transport::windows::{
     ClientConfig as TransportClientConfig, ServerConfig as TransportServerConfig,
 };
 
-use std::sync::atomic::AtomicBool;
 use std::sync::Arc;
+use std::sync::atomic::AtomicBool;
 
 pub use raw::{CgroupsLookupHandler, ClientAbortHandle, ClientState, ClientStatus};
 
@@ -220,8 +220,8 @@ impl ManagedServer {
 mod tests {
     use super::*;
     use crate::protocol::PROFILE_SHM_FUTEX;
-    use std::sync::atomic::Ordering;
     use std::sync::Arc;
+    use std::sync::atomic::Ordering;
 
     #[test]
     fn client_config_maps_to_transport() {

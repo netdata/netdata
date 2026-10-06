@@ -80,7 +80,11 @@ pub async fn startup_catalog_sync<S: Storage>(
     let prefix = crate::remote_keys::catalog_prefix(signal);
     let keys = match tokio::time::timeout(op_timeout, storage.list(&prefix)).await {
         Ok(Ok(keys)) => keys,
-        Ok(Err(e)) => return Err(anyhow::anyhow!("startup catalog LIST ({signal}) failed: {e}")),
+        Ok(Err(e)) => {
+            return Err(anyhow::anyhow!(
+                "startup catalog LIST ({signal}) failed: {e}"
+            ));
+        }
         Err(_) => {
             return Err(anyhow::anyhow!(
                 "startup catalog LIST ({signal}) timed out after {op_timeout:?}"
@@ -408,7 +412,13 @@ pub(crate) fn validate_catalog(
     // Recompute the fold via the shared `Catalog::fold` — the single source
     // of the filename fields (the builder stamps, the validator checks; see
     // otel-catalog) — and compare against the key's filename fields.
-    if catalog.fold() != (parsed.max_seq, parsed.min_timestamp_s, parsed.max_timestamp_s) {
+    if catalog.fold()
+        != (
+            parsed.max_seq,
+            parsed.min_timestamp_s,
+            parsed.max_timestamp_s,
+        )
+    {
         return Err("entries fold != filename fields".into());
     }
 

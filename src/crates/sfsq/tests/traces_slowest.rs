@@ -46,8 +46,8 @@ use tokio_util::sync::CancellationToken;
 
 use common::{missing_source, req, sealed_source, sp, tail_source, unavailable_source, write_wal};
 use sfsq::traces::{
-    PartialReason, QueryStatus, SLOWEST_LIMIT_MAX, SlowestData, SlowestQuery,
-    SlowestRequestError, TimeWindow, TraceSource, slowest,
+    PartialReason, QueryStatus, SLOWEST_LIMIT_MAX, SlowestData, SlowestQuery, SlowestRequestError,
+    TimeWindow, TraceSource, slowest,
 };
 
 /// The suite's default window: the half-open [0s, 100s).
@@ -153,7 +153,11 @@ fn limit_truncates_to_the_top_k() {
         vec![sealed_source(dir.path(), &wal, "s")],
         SlowestQuery::new(window()).limit(2),
     );
-    assert_eq!(data.status, QueryStatus::Complete, "truncation is not a partial");
+    assert_eq!(
+        data.status,
+        QueryStatus::Complete,
+        "truncation is not a partial"
+    );
     let got: Vec<_> = data.traces.iter().map(|t| t.trace_id).collect();
     assert_eq!(
         got,
@@ -201,12 +205,25 @@ fn straddling_trace_ranks_once_with_the_merged_envelope_and_root() {
     let dir = tempfile::tempdir().unwrap();
     let wal_1 = write_wal(
         dir.path(),
-        vec![req(&[tspan(0xA, 1, 1_000_000_000, 1_200_000_000, "a-root")])],
+        vec![req(&[tspan(
+            0xA,
+            1,
+            1_000_000_000,
+            1_200_000_000,
+            "a-root",
+        )])],
         "part1",
     );
     let wal_2 = write_wal(
         dir.path(),
-        vec![req(&[cspan(0xA, 2, 1, 1_100_000_000, 9_000_000_000, "a-child")])],
+        vec![req(&[cspan(
+            0xA,
+            2,
+            1,
+            1_100_000_000,
+            9_000_000_000,
+            "a-child",
+        )])],
         "part2",
     );
     let data = run(
@@ -233,12 +250,24 @@ fn multi_root_straddle_picks_the_smallest_root_span_id() {
     let dir = tempfile::tempdir().unwrap();
     let wal_1 = write_wal(
         dir.path(),
-        vec![req(&[tspan(0xA, 7, 1_000_000_000, 2_000_000_000, "late-root")])],
+        vec![req(&[tspan(
+            0xA,
+            7,
+            1_000_000_000,
+            2_000_000_000,
+            "late-root",
+        )])],
         "part1",
     );
     let wal_2 = write_wal(
         dir.path(),
-        vec![req(&[tspan(0xA, 3, 1_500_000_000, 2_500_000_000, "small-root")])],
+        vec![req(&[tspan(
+            0xA,
+            3,
+            1_500_000_000,
+            2_500_000_000,
+            "small-root",
+        )])],
         "part2",
     );
     // Both source orders must produce the same pick.
@@ -310,7 +339,14 @@ fn a_straddle_whose_merged_start_is_pre_window_is_clipped_whole() {
     );
     let wal_2 = write_wal(
         dir.path(),
-        vec![req(&[cspan(0xA, 2, 1, 3_000_000_000, 9_000_000_000, "late")])],
+        vec![req(&[cspan(
+            0xA,
+            2,
+            1,
+            3_000_000_000,
+            9_000_000_000,
+            "late",
+        )])],
         "part2",
     );
     let data = run(

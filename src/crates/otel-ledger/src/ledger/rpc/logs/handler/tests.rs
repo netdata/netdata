@@ -17,13 +17,13 @@
 //! free-text `query` regex path.
 use super::*;
 use file_registry::{ByteSize, FileId, TenantId, TimestampNs};
+use file_registry::{Identity, InstanceId, MachineId, test_identity};
 use otel_logs_identity::ServiceStream;
 use serde_json::Value;
 use sfst::BitmapValue;
 use std::collections::HashMap;
 use tokio_util::sync::CancellationToken;
 use uuid::Uuid;
-use file_registry::{test_identity, Identity, InstanceId, MachineId};
 
 /// Fresh registries rooted at three throwaway temp dirs (WAL / SFST
 /// index / catalog): each test builds its own isolated storage.
@@ -1326,7 +1326,10 @@ async fn a_failed_download_does_not_hide_the_other_remote_files() {
 async fn remote_fetch_failure_degrades() {
     let mut tr = make_tenant_registries();
     let id = FileId::new(
-        Identity::new(MachineId::new(Uuid::from_u128(0x11)).unwrap(), InstanceId::new(Uuid::from_u128(0x22)).unwrap()),
+        Identity::new(
+            MachineId::new(Uuid::from_u128(0x11)).unwrap(),
+            InstanceId::new(Uuid::from_u128(0x22)).unwrap(),
+        ),
         0,
         1,
         ServiceStream::new("ns", "svc").ns_hash(),

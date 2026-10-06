@@ -39,10 +39,18 @@ fn ss(namespace: &str, name: &str) -> (String, String) {
     (namespace.to_owned(), name.to_owned())
 }
 
-fn machine() -> file_registry::MachineId { file_registry::MachineId::new(Uuid::from_u128(0x0011_2233_4455_6677_8899_aabb_ccdd_eeff)).unwrap() }
-fn instance() -> file_registry::InstanceId { file_registry::InstanceId::new(Uuid::from_u128(0xaaaa_bbbb_cccc_dddd_eeee_ffff_0000_1111)).unwrap() }
+fn machine() -> file_registry::MachineId {
+    file_registry::MachineId::new(Uuid::from_u128(0x0011_2233_4455_6677_8899_aabb_ccdd_eeff))
+        .unwrap()
+}
+fn instance() -> file_registry::InstanceId {
+    file_registry::InstanceId::new(Uuid::from_u128(0xaaaa_bbbb_cccc_dddd_eeee_ffff_0000_1111))
+        .unwrap()
+}
 
-fn ident() -> file_registry::Identity { file_registry::Identity::new(machine(), instance()) }
+fn ident() -> file_registry::Identity {
+    file_registry::Identity::new(machine(), instance())
+}
 /// A `FileId` under `ident()` with pipeline id `0`.
 fn fid(seq: u64, part_key: u64) -> FileId {
     FileId::new(ident(), 0, seq, part_key)
@@ -127,8 +135,7 @@ fn track_remote_as(reg: &mut Registry, seq: u64, ns: &str, name: &str, min_s: u3
         remote_etag: None,
     };
 
-    let mut catalog =
-        otel_catalog::Catalog::new(TenantId::from("tenant1"), date, ident());
+    let mut catalog = otel_catalog::Catalog::new(TenantId::from("tenant1"), date, ident());
     catalog.add(entry);
 
     let path = reg

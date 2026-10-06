@@ -268,7 +268,10 @@ async fn corrupt_wal_is_refused_whole_but_sealed_files_still_serve() {
         &supplier.registries,
         "default",
         4,
-        vec![otlp_req(0x11, 3, 1_000_000_000), otlp_req(0x22, 3, 2_000_000_000)],
+        vec![
+            otlp_req(0x11, 3, 1_000_000_000),
+            otlp_req(0x22, 3, 2_000_000_000),
+        ],
     )
     .await;
     let len = std::fs::metadata(&path).unwrap().len();
@@ -276,7 +279,8 @@ async fn corrupt_wal_is_refused_whole_but_sealed_files_still_serve() {
     {
         use std::io::{Seek, Write};
         let mut f = std::fs::OpenOptions::new().write(true).open(&path).unwrap();
-        f.seek(std::io::SeekFrom::Start(wal::HEADER_SIZE as u64)).unwrap();
+        f.seek(std::io::SeekFrom::Start(wal::HEADER_SIZE as u64))
+            .unwrap();
         f.write_all(&garbage).unwrap();
     }
 

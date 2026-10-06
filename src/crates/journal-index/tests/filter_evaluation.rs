@@ -452,9 +452,9 @@ fn test_filter_empty_or() {
     assert!(filter.is_none());
 }
 
-    // Not a filter test: pins the FileIndex surface filter results are read
-    // against — the file handle, bucketed time range, field sets, entry
-    // count, and the pair->bitmap map.
+// Not a filter test: pins the FileIndex surface filter results are read
+// against — the file handle, bucketed time range, field sets, entry
+// count, and the pair->bitmap map.
 #[test]
 fn test_file_index_metadata() {
     let entries = vec![

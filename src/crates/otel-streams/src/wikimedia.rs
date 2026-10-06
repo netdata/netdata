@@ -255,6 +255,9 @@ mod tests {
         let value: serde_json::Value =
             serde_json::from_str(r#"{"type":"edit","meta":{"domain":"canary"}}"#).unwrap();
         let event: Event = serde_json::from_value(value).unwrap();
-        assert_eq!(event.meta.as_ref().map(|m| m.domain.as_str()), Some("canary"));
+        assert_eq!(
+            event.meta.as_ref().map(|m| m.domain.as_str()),
+            Some("canary")
+        );
     }
 }

@@ -366,11 +366,7 @@ impl FunctionsParams {
         let after = if self.after == 0 {
             0
         } else {
-            resolve(
-                "after",
-                self.after,
-                if before == 0 { now } else { before },
-            )?
+            resolve("after", self.after, if before == 0 { now } else { before })?
         };
 
         Ok(SearchParams {
