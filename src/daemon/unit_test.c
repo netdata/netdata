@@ -2389,27 +2389,53 @@ static int test_receiver_replication_completion_ratio(void) {
     return rc;
 }
 
+// Shared setup for the tests that start from one chart holding the only claim on `localhost`: ALLOC memory
+// mode, the accounting word saved and zeroed, a new chart, and its first claim. Returns 1 when that claim
+// did not win. receiver_replication_fixture_end() releases the claim, frees the chart and restores both.
+struct receiver_replication_fixture {
+    RRD_DB_MODE old_default_rrd_memory_mode;
+    uint64_t saved_accounting;
+    RRDHOST *host;
+    RRDSET *st;
+};
+
+static int receiver_replication_fixture_begin(
+    struct receiver_replication_fixture *f, const char *chart_id, const char *test) {
+    f->old_default_rrd_memory_mode = default_rrd_memory_mode;
+    default_rrd_memory_mode = RRD_DB_MODE_ALLOC;
+
+    f->host = localhost;
+    f->saved_accounting = rrdhost_receiver_replication_accounting(f->host);
+    rrdhost_receiver_replication_accounting_set(f->host, 0, 0);
+
+    f->st = rrdset_create_localhost(
+        "netdata", chart_id, chart_id, "netdata", NULL,
+        "Unit Testing", "x", "unittest", NULL, 1, nd_profile.update_every, RRDSET_TYPE_LINE);
+
+    if(!rrdhost_receiver_replication_claim(f->st)) {
+        fprintf(stderr, "%s: initial claim did not win\n", test);
+        return 1;
+    }
+
+    return 0;
+}
+
+static void receiver_replication_fixture_end(struct receiver_replication_fixture *f) {
+    rrdhost_receiver_replication_release(f->st, 0);
+    rrdset_free(f->st);
+    rrdhost_receiver_replication_accounting_restore(f->host, f->saved_accounting);
+    default_rrd_memory_mode = f->old_default_rrd_memory_mode;
+}
+
 // A duplicate CHART_DEFINITION_END for an already-replicating chart must withdraw its entire
 // speculative contribution. It must not alter either accounting half or the derived snapshot.
 static int test_receiver_replication_duplicate_claim_does_not_change_accounting(void) {
     fprintf(stderr, "%s() running...\n", __FUNCTION__);
 
-    RRD_DB_MODE old_default_rrd_memory_mode = default_rrd_memory_mode;
-    default_rrd_memory_mode = RRD_DB_MODE_ALLOC;
-
-    int rc = 0;
-    RRDHOST *host = localhost;
-    uint64_t saved_accounting = rrdhost_receiver_replication_accounting(host);
-    rrdhost_receiver_replication_accounting_set(host, 0, 0);
-
-    RRDSET *st = rrdset_create_localhost(
-        "netdata", "unittest-rcv-repl-duplicate", "unittest-rcv-repl-duplicate", "netdata", NULL,
-        "Unit Testing", "x", "unittest", NULL, 1, nd_profile.update_every, RRDSET_TYPE_LINE);
-
-    if(!rrdhost_receiver_replication_claim(st)) {
-        fprintf(stderr, "%s: initial claim did not win\n", __FUNCTION__);
-        rc = 1;
-    }
+    struct receiver_replication_fixture f;
+    int rc = receiver_replication_fixture_begin(&f, "unittest-rcv-repl-duplicate", __FUNCTION__);
+    RRDHOST *host = f.host;
+    RRDSET *st = f.st;
 
     uint32_t instances_before = UINT32_MAX;
     NETDATA_DOUBLE completion_before = rrdhost_receiver_replication_completion(host, &instances_before);
@@ -2439,10 +2465,7 @@ static int test_receiver_replication_duplicate_claim_does_not_change_accounting(
         rc = 1;
     }
 
-    rrdhost_receiver_replication_release(st, 0);
-    rrdset_free(st);
-    rrdhost_receiver_replication_accounting_restore(host, saved_accounting);
-    default_rrd_memory_mode = old_default_rrd_memory_mode;
+    receiver_replication_fixture_end(&f);
     return rc;
 }
 
@@ -2452,22 +2475,10 @@ static int test_receiver_replication_duplicate_claim_does_not_change_accounting(
 static int test_receiver_replication_obsolete_keeps_claim(void) {
     fprintf(stderr, "%s() running...\n", __FUNCTION__);
 
-    RRD_DB_MODE old_default_rrd_memory_mode = default_rrd_memory_mode;
-    default_rrd_memory_mode = RRD_DB_MODE_ALLOC;
-
-    int rc = 0;
-    RRDHOST *host = localhost;
-    uint64_t saved_accounting = rrdhost_receiver_replication_accounting(host);
-    rrdhost_receiver_replication_accounting_set(host, 0, 0);
-
-    RRDSET *st = rrdset_create_localhost(
-        "netdata", "unittest-rcv-repl-obsolete", "unittest-rcv-repl-obsolete", "netdata", NULL,
-        "Unit Testing", "x", "unittest", NULL, 1, nd_profile.update_every, RRDSET_TYPE_LINE);
-
-    if(!rrdhost_receiver_replication_claim(st)) {
-        fprintf(stderr, "%s: initial claim did not win\n", __FUNCTION__);
-        rc = 1;
-    }
+    struct receiver_replication_fixture f;
+    int rc = receiver_replication_fixture_begin(&f, "unittest-rcv-repl-obsolete", __FUNCTION__);
+    RRDHOST *host = f.host;
+    RRDSET *st = f.st;
 
     rrdset_is_obsolete___safe_from_collector_thread(st);
 
@@ -2490,11 +2501,8 @@ static int test_receiver_replication_obsolete_keeps_claim(void) {
         rc = 1;
     }
 
-    rrdhost_receiver_replication_release(st, 0);
     rrdset_isnot_obsolete___safe_from_collector_thread(st);
-    rrdset_free(st);
-    rrdhost_receiver_replication_accounting_restore(host, saved_accounting);
-    default_rrd_memory_mode = old_default_rrd_memory_mode;
+    receiver_replication_fixture_end(&f);
     return rc;
 }
 
