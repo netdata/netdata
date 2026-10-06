@@ -24,6 +24,14 @@
     </dict>
     <key>RunAtLoad</key>
     <false/>
+    <!-- Marks the run as the scheduled one, for the
+         NETDATA_MACOS_AUTO_UPDATES opt-out; it survives the updater's
+         self-update re-exec, which a tty or cron test would not. -->
+    <key>EnvironmentVariables</key>
+    <dict>
+        <key>NETDATA_UPDATER_LAUNCHD_JOB</key>
+        <string>1</string>
+    </dict>
     <key>WorkingDirectory</key>
     <string>@NETDATA_RUNTIME_PREFIX@</string>
     <key>StandardOutPath</key>

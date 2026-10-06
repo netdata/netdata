@@ -109,7 +109,7 @@ if /bin/launchctl print "system/${LABEL}" >/dev/null 2>&1; then
         i=$((i + 1))
     done
     if /bin/launchctl print "system/${LABEL}" >/dev/null 2>&1; then
-        echo "netdata preinstall: ${LABEL} did not stop within 60 seconds; refusing to replace the payload under it. Retry the installation." >&2
+        echo "netdata preinstall: ${LABEL} did not stop within 60 seconds; refusing to replace the payload under it. The Agent stays stopped until the next boot or a successful install; retry the installation." >&2
         exit 1
     fi
 fi

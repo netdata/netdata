@@ -100,7 +100,7 @@ For automatic updates, see our [Windows automatic updates guide](https://learn.n
 
 If you installed Netdata's native macOS package, it registers a daily `launchd` updater job (`com.github.netdata.updater`), but that job does not install updates yet: until Netdata publishes signed packages, the updater refuses any package it cannot verify and leaves your install unchanged. To move to a newer version, install the newer package over the existing one. Your configuration and metrics database are kept.
 
-To disable or re-enable the updater job:
+To disable or re-enable the updater job (re-enabling only sticks once any `NETDATA_MACOS_AUTO_UPDATES=0` setting, described below, is removed):
 
 ```bash
 sudo /opt/netdata/usr/libexec/netdata/netdata-updater.sh --disable-auto-updates
@@ -189,7 +189,7 @@ Pass `--no-updates` to the kickstart script to skip setting up auto-updates enti
 wget -O /tmp/netdata-kickstart.sh https://get.netdata.cloud/kickstart.sh && sh /tmp/netdata-kickstart.sh --no-updates
 ```
 
-To explicitly control the scheduling method, use `--auto-update-type` with one of `systemd`, `interval`, or `crontab`. (The native macOS package always uses `launchd`; kickstart selects it automatically.)
+To explicitly control the scheduling method, use `--auto-update-type` with one of `systemd`, `interval`, or `crontab`. (The native macOS package defaults to `launchd`; kickstart selects it automatically.)
 
 ```bash
 wget -O /tmp/netdata-kickstart.sh https://get.netdata.cloud/kickstart.sh && sh /tmp/netdata-kickstart.sh --auto-update-type systemd
