@@ -174,8 +174,8 @@ func TestProcessingSamplingPromotionKeepsHistoryAndExportsCurrentObservation(t *
 		[]string{"pageview", "event", "error"},
 		[]string{history.events[0].Type, history.events[1].Type, history.events[2].Type},
 	)
-	assert.Equal(t, now.UnixMicro(), history.events[0].TSUnixUS)
-	assert.Equal(t, now.UnixMicro(), history.events[1].TSUnixUS)
+	assert.Equal(t, now.UnixMicro(), history.events[0].ObservedUS)
+	assert.Equal(t, now.UnixMicro(), history.events[1].ObservedUS)
 	assert.Equal(t, "failure", history.events[2].Fingerprint)
 	// Prior observations replay into history only; export sees neither the old
 	// pageview nor custom event. It does not invent a session start.

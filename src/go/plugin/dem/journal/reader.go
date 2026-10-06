@@ -8,14 +8,16 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
+	"sync"
 
 	"github.com/netdata/systemd-journal-sdk/go/journal"
 )
 
-// OpenReader takes a stable snapshot before an append/rotation/sweep can change
-// the file set. SDK snapshot construction stores O(retained entries) offsets;
-// reducers stream rows and do not retain another complete event copy.
+// OpenReader captures the retained file set and native index bounds while
+// appends, rotation and retention are excluded. Traversal releases admission and
+// keeps only bounded SDK buffers, not an offset for every retained entry.
 func (s *Store) OpenReader(ctx context.Context) (*Snapshot, func(), error) {
 	if err := s.acquire(ctx); err != nil {
 		return nil, nil, err
@@ -24,26 +26,16 @@ func (s *Store) OpenReader(ctx context.Context) (*Snapshot, func(), error) {
 	if s.closed {
 		return nil, nil, os.ErrClosed
 	}
-	paths, err := s.journalPaths(ctx)
+	if s.failure != nil {
+		return nil, nil, s.failure
+	}
+	paths, err := s.journalPaths(ctx, false)
 	if err != nil {
 		return nil, nil, err
 	}
-	if len(paths) == 0 {
-		return nil, func() {}, nil
-	}
-	// OpenFiles reports unreadable/corrupt owned files; OpenDirectory silently
-	// skips them and could label an incomplete aggregate as exact.
-	reader := &Snapshot{
-		ctx: ctx,
-	}
+	reader := &Snapshot{ctx: ctx}
 	for _, path := range paths {
-		if err := ctx.Err(); err != nil {
-			_ = reader.close()
-			return nil, nil, err
-		}
-		// SDK OpenFiles leaks earlier readers when opening a later file fails.
-		// Own each single-file reader so all successful opens can be closed.
-		file, err := journal.OpenFilesWithOptions([]string{path}, journal.DefaultReaderOptions().WithSnapshot(true))
+		file, err := openSnapshot(ctx, path)
 		if err != nil {
 			_ = reader.close()
 			return nil, nil, err
@@ -51,20 +43,43 @@ func (s *Store) OpenReader(ctx context.Context) (*Snapshot, func(), error) {
 		reader.files = append(reader.files, file)
 	}
 	s.readers.Add(1)
-	return reader, func() { _ = reader.close(); s.readers.Done() }, nil
+	var once sync.Once
+	return reader, func() { once.Do(func() { _ = reader.close(); s.readers.Done() }) }, nil
 }
 
-// Glob suppresses directory I/O errors. Explicit enumeration keeps an
-// unavailable history directory from masquerading as an empty exact result.
-func (s *Store) journalPaths(ctx context.Context) ([]string, error) {
+func openSnapshot(ctx context.Context, path string) (*journal.IndexedSnapshot, error) {
+	file, err := journal.OpenIndexedSnapshot(ctx, path, journal.IndexedSnapshotOptions{
+		CaptureFields: [][]byte{[]byte(rumBucket), []byte(syntheticBucket)},
+		CaptureValues: []journal.Field{journal.StringField(schemaField, schemaVersion)},
+	})
+	if err != nil {
+		return nil, fmt.Errorf("open history snapshot %q: %w", path, err)
+	}
+	coverage, err := file.CapturedValue([]byte(schemaField), []byte(schemaVersion))
+	if err == nil && coverage.EntryCount != file.EntryCount() {
+		err = fmt.Errorf("incompatible DEM history schema: current schema covers %d of %d records", coverage.EntryCount, file.EntryCount())
+	}
+	if err == nil && filepath.Base(path) != "dem.journal" && !file.IsArchived() {
+		err = fmt.Errorf("history archive is not finalized")
+	}
+	if err != nil {
+		_ = file.Close()
+		return nil, fmt.Errorf("history %q: %w", path, err)
+	}
+	return file, nil
+}
+
+// Explicit enumeration preserves directory I/O failures. Glob and SDK directory
+// readers can silently skip unavailable files and produce incomplete aggregates.
+func (s *Store) journalPaths(ctx context.Context, allowMissingCurrent bool) ([]string, error) {
 	entries, err := os.ReadDir(s.root)
 	if err != nil {
 		return nil, fmt.Errorf("read history root: %w", err)
 	}
-	currentMachine := s.host.MachineID().String()
-	machines := []string{currentMachine}
+	current := s.host.MachineID().String()
+	machines := []string{current}
 	for _, entry := range entries {
-		if entry.Name() == currentMachine {
+		if entry.Name() == current {
 			continue
 		}
 		if _, err := journal.ParseUUID(entry.Name()); err == nil {
@@ -78,20 +93,22 @@ func (s *Store) journalPaths(ctx context.Context) ([]string, error) {
 		}
 		dir := filepath.Join(s.root, machine)
 		files, err := os.ReadDir(dir)
+		if allowMissingCurrent && machine == current && errors.Is(err, os.ErrNotExist) {
+			continue
+		}
 		if err != nil {
 			return nil, fmt.Errorf("read history machine directory: %w", err)
 		}
 		for _, file := range files {
-			if !strings.HasPrefix(file.Name(), "dem@") {
+			name := file.Name()
+			if name != "dem.journal" && name != "dem.journal~" && !strings.HasPrefix(name, "dem@") {
 				continue
 			}
-			path := filepath.Join(dir, file.Name())
-			// SDK quarantines damaged active journals as .journal~ and leaves their
-			// recovery/removal to the operator. Never silently omit owned history.
-			if strings.HasSuffix(file.Name(), ".journal~") {
+			path := filepath.Join(dir, name)
+			if strings.HasSuffix(name, ".journal~") {
 				return nil, fmt.Errorf("history contains damaged journal %q; operator recovery is required", path)
 			}
-			if strings.HasSuffix(file.Name(), ".journal") {
+			if strings.HasSuffix(name, ".journal") {
 				paths = append(paths, path)
 			}
 		}
@@ -99,13 +116,11 @@ func (s *Store) journalPaths(ctx context.Context) ([]string, error) {
 	return paths, nil
 }
 
-// Snapshot owns stable readers until the release function returned by OpenReader runs.
-// Reducers order their final output themselves; no merged row copy is needed.
-// Keeping one reader per file also permits cancellation between snapshot opens.
+// Snapshot owns independent single-consumer SDK readers until release. Callers
+// copy domain values in callbacks and discard partial results on any error.
 type Snapshot struct {
 	ctx   context.Context
-	files []*journal.DirectoryReader
-	index int
+	files []*journal.IndexedSnapshot
 }
 
 func (r *Snapshot) close() error {
@@ -115,33 +130,64 @@ func (r *Snapshot) close() error {
 	}
 	return err
 }
-func (r *Snapshot) Step() (bool, error) {
-	for r.index < len(r.files) {
-		if err := r.ctx.Err(); err != nil {
-			return false, err
-		}
-		more, err := r.files[r.index].Step()
-		if err != nil || more {
-			return more, err
-		}
-		r.index++
-	}
-	return false, nil
-}
-func (r *Snapshot) SeekRealtimeUsec(usec uint64) error {
+func (r *Snapshot) VisitEntries(visit func(*journal.SnapshotEntry) error) error {
 	for _, file := range r.files {
-		if err := r.ctx.Err(); err != nil {
-			return err
-		}
-		if err := file.SeekRealtimeUsec(usec); err != nil {
+		if err := file.VisitEntries(r.ctx, visit); err != nil {
 			return err
 		}
 	}
-	return nil
+	return r.ctx.Err()
 }
-func (r *Snapshot) GetRealtimeUsec() (uint64, error) {
-	return r.files[r.index].GetRealtimeUsec()
+func (r *Snapshot) VisitMatch(name, value string, visit func(*journal.SnapshotEntry) error) error {
+	for _, file := range r.files {
+		if err := file.VisitMatch(r.ctx, []byte(name), []byte(value), visit); err != nil {
+			return err
+		}
+	}
+	return r.ctx.Err()
 }
-func (r *Snapshot) VisitEntryPayloads(visit func([]byte) error) error {
-	return r.files[r.index].VisitEntryPayloads(visit)
+
+// Narrow ranges probe occupied minute candidates cheaply; broad/sparse ranges
+// walk existing bucket values. This crossover affects cost only, never coverage.
+// Mixed retained-history measurements keep exact probes ahead through 256
+// minutes; sparse multi-day ranges favor FIELD enumeration.
+const exactBucketLimit = int64(256)
+
+// VisitRange selects candidates by the domain clock's minute. Domain decoders
+// validate exact timestamps against the inclusive whole-second bounds afterward.
+func (r *Snapshot) VisitRange(kind string, after, before int64, visit func(*journal.SnapshotEntry) error) error {
+	if after < 0 || before < after {
+		return fmt.Errorf("invalid history observation/start range")
+	}
+	field := ""
+	switch kind {
+	case "rum":
+		field = rumBucket
+	case "synthetic":
+		field = syntheticBucket
+	default:
+		return fmt.Errorf("invalid history kind %q", kind)
+	}
+	first, last := after/60, before/60
+	for _, file := range r.files {
+		if last-first < exactBucketLimit {
+			for minute := first; minute <= last; minute++ {
+				if err := file.VisitMatch(r.ctx, []byte(field), []byte(strconv.FormatInt(minute, 10)), visit); err != nil {
+					return err
+				}
+			}
+		} else {
+			err := file.VisitField(r.ctx, []byte(field), func(value []byte) (bool, error) {
+				minute, err := decimal(value)
+				if err != nil {
+					return false, fmt.Errorf("invalid history bucket: %w", err)
+				}
+				return minute >= first && minute <= last, nil
+			}, visit)
+			if err != nil {
+				return err
+			}
+		}
+	}
+	return r.ctx.Err()
 }

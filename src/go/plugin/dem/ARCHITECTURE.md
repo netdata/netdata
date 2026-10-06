@@ -91,7 +91,9 @@ heuristics without mutating the stored input. Browser bootstrap limits instrumen
 receiver independently enforces the same policy and normalizes supported URLs, paths and text before aggregation,
 retained history or enabled exports. Geolocation off skips lookup while HTTP IP admission remains active. Country mode
 retains only country; city mode adds approximate city/coordinates to live observations only. Journals and OTLP never
-receive city coordinates. Disabled frustration has no instruments or page counts. Application-provided user IDs use bounded text normalization without path-style numeric/UUID substitution; per-event attribution and retained observed-ID membership are distinct from display summaries.
+receive city coordinates. Disabled frustration has no instruments or page counts. Application-provided user IDs use
+bounded text normalization without path-style numeric/UUID substitution; per-event attribution and retained observed-ID
+membership are distinct from display summaries.
 These targeted transformations do not constitute general privacy or consent enforcement.
 
 Faro's `beforeSend` runs before its session sampling hook. Browser shaping clones metadata and preserves the
@@ -174,12 +176,38 @@ including when an error or cancellation races them. Appends, sync, snapshot cons
 Log access; the SDK disk operation itself is not interruptible. A non-quiescent exit uses the existing host fail-stop
 boundary. Snapshot scans release writer admission and copy SDK payloads before their borrowed lifetime ends.
 
-History filters select saved time; session timelines and retained activity spans use original observation time.
-Retained counts are derived from selected events, not reconstructed lifetime totals. Error fingerprint overview is
-linear in matched retained events and fingerprints; selected fingerprint details additionally retain distinct session,
-page and browser sets for that group. Queries materialize SDK entry offsets but no second complete event list.
+History selects original Agent receipt (`ObservedUS` / `DEM_OBSERVED_US`) for RUM and immutable attempt start
+(`DEM_STARTED_US`) for synthetics. Inclusive whole-second ranges are checked against decoded microsecond clocks after
+index selection, without overflowing second-to-microsecond multiplication. RUM counts and spans describe selected
+retained activity; user-ID membership filters summaries after aggregation. Session order uses the exposed
+`last_observed_us` before limiting. Identity timelines use session/run postings across all retained time, then verify
+domain and site/job identity; RUM preserves its occurrence-aware pending/retained union.
+
+The shared append boundary derives `DEM_SCHEMA=1` and one canonical decimal minute field: `DEM_RUM_MINUTE` or
+`DEM_SYNTHETIC_MINUTE`, computed as floor(domain microseconds / 60,000,000). Callers cannot supply envelope metadata.
+Domain decoders check required scalar multiplicity, identity and timestamp agreement. Each snapshot captures both bucket
+FIELD heads and schema posting counts while admission excludes append/rotation/retention; current schema must cover
+every committed entry. Opening owns bounded SDK buffers rather than a vector of all ENTRY offsets. Exact minute lookups
+serve narrow ranges; broader ranges enumerate existing minute values. The crossover changes cost only. No saved-time
+seek, file pruning, candidate cap or hidden full-scan fallback is used. Payload views end with their callback; reducers
+retain only domain summaries or requested timeline output.
+
+Cost follows retained file count at capture, native bucket/hash traversal plus selected postings during selection, and
+selected records/distinct summary keys during reduction. Broad queries still decode all selected evidence. Error
+fingerprint details additionally retain distinct session/page/browser sets. Saved-time retention stays independent of
+these query clocks.
 Query failures return errors instead of silently labeling corrupt or quarantined history as complete. Damaged
 `.journal~` files remain for operator investigation and are outside the SDK retention policy.
+
+Recovery validates every preexisting `dem.journal` with the SDK strict index verifier before `NewLog` can mutate
+history. `StrictSystemdNaming` and default archive sync separate active files from `dem@…journal` finalized archives.
+Nonempty archives require archived header state and complete current-schema coverage; empty archives require strict
+verification because they have no encoder marker. Under the supported single-owner lifecycle, these finalized archives
+avoid a whole-graph startup scan. A schema marker alone does not certify arbitrary external modifications. Verification
+uses graph-sized memory and fails closed without repair/deletion. An SDK uncertain-write sentinel poisons the shared
+store: new reads, writes, sync and retention return the failure; SDK cleanup releases resources without rewriting clean
+metadata. Private temporary history is also preserved on failure. Measurements/exports remain independent; existing
+startup failure stops the plugin when retained history cannot be opened.
 
 One process worker archives idle history, reopens lazily and applies the plugin-wide age/committed-byte policy even
 when all sites are disabled. Failed sweeps retry after five seconds; the store owns the reopened lazy Log before
@@ -214,13 +242,17 @@ worker starts. Node terminal evidence and Linux process-tree completion are dist
 owners after verified supervision; false Drained poisons admission and wakes command fail-stop before attempting reader
 joins. The command cannot close stores when the host returns forced recovery or the engine reports unverified cleanup.
 
-Run starts/completions are immutable self-contained journal records. Saved-time filters are applied before phase grouping;
-a selected start without a selected completion is unknown. Outcome filtering occurs after grouping. Summary reduction
-is O(selected runs) memory and stores no full timelines; SDK snapshots additionally own O(retained entry) offsets.
+Run starts/completions are immutable self-contained journal records carrying the same scalar/JSON start clock.
+Start-time selection includes both phases even when completion is saved outside the picker. Completion wins over start,
+including positive wall-clock rollback; an unmatched start remains unknown. A retained completion does not need its
+start record. Outcome filtering follows grouping. Identity detail retains active-first diagnosis. Summary reduction is
+O(selected runs) memory and stores no full timelines; SDK snapshots use bounded buffers per retained file.
 Current synthetic registry registrations own copied generation observations and reset unknown on replacement. Freshness is two native
 intervals and remains independent of an in-flight attempt; history does not drive current incidents.
 
-Chromium receives a short `/tmp/nd-dem-<run-id>` alias for its private work directory because its profile singleton uses Unix sockets with a small pathname limit. The artifact owner never adopts an existing alias and removes it only after verified drainage and an exact target check.
+Chromium receives a short `/tmp/nd-dem-<run-id>` alias for its private work directory because its profile singleton uses
+Unix sockets with a small pathname limit. The artifact owner never adopts an existing alias and removes it only after
+verified drainage and an exact target check.
 
 Artifact publication starts only after verified tree/reader completion. A Go-owned synced drained marker grants cleanup
 permission; work without it remains protected across restart. Captures are constrained beneath output and copied into

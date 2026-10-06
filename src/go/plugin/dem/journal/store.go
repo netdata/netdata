@@ -26,6 +26,7 @@ type Store struct {
 	config          journal.LogConfig
 	log             *journal.Log
 	closed          bool
+	failure         error
 	readers         sync.WaitGroup
 }
 
@@ -71,9 +72,10 @@ func Open(ctx context.Context, path string) (*Store, error) {
 	}
 	st.host = host
 	st.config = journal.LogConfig{
-		Source:       "dem",
-		IdentityMode: journal.LogIdentityStrict,
-		OpenMode:     journal.LogOpenEager,
+		Source:              "dem",
+		StrictSystemdNaming: true,
+		IdentityMode:        journal.LogIdentityStrict,
+		OpenMode:            journal.LogOpenEager,
 		Options: journal.Options{
 			MachineID: host.MachineID(),
 			BootID:    host.BootID(),
@@ -81,6 +83,9 @@ func Open(ctx context.Context, path string) (*Store, error) {
 		},
 	}
 	if err := ctx.Err(); err != nil {
+		return nil, err
+	}
+	if err := st.verifyStartup(ctx); err != nil {
 		return nil, err
 	}
 	st.log, err = journal.NewLog(path, st.config)
@@ -117,7 +122,7 @@ func (s *Store) Close() error {
 	if s.log != nil {
 		err = s.log.Close()
 	}
-	if s.temporary != "" {
+	if s.temporary != "" && s.failure == nil && err == nil {
 		err = errors.Join(err, os.RemoveAll(s.temporary))
 	}
 	return err

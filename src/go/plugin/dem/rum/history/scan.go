@@ -4,16 +4,18 @@ package history
 
 import (
 	"context"
+	"fmt"
+
+	"github.com/netdata/systemd-journal-sdk/go/journal"
 )
 
-// scan uses unfiltered Step so cancellation is checked for every examined row,
-// including nonmatches. The SDK's filtered Step may scan many rows internally.
+// scan selects receipt-time buckets, then checks inclusive whole-second bounds.
 func (s *Store) scan(ctx context.Context, site string, after, before int64, visit func(EventRecord)) error {
 	if err := ctx.Err(); err != nil {
 		return err
 	}
-	if before < after || before < 0 {
-		return nil
+	if after < 0 || before < after {
+		return fmt.Errorf("invalid RUM observation range")
 	}
 	reader, closeReader, err := s.journal.OpenReader(ctx)
 	if err != nil {
@@ -23,43 +25,36 @@ func (s *Store) scan(ctx context.Context, site string, after, before int64, visi
 	if reader == nil {
 		return ctx.Err()
 	}
-	if after > 0 {
-		if uint64(after) > ^uint64(0)/1_000_000 {
-			return nil
-		}
-		if err := reader.SeekRealtimeUsec(uint64(after) * 1_000_000); err != nil {
+	return reader.VisitRange("rum", after, before, func(entry *journal.SnapshotEntry) error {
+		record, rum, err := decodeEvent(entry)
+		if err != nil {
 			return err
 		}
+		if rum && (site == "" || record.Site == site) && record.ObservedUS/1_000_000 >= after && record.ObservedUS/1_000_000 <= before {
+			visit(record)
+		}
+		return nil
+	})
+}
+
+// matchSession reads identity postings across all retained time.
+func (s *Store) matchSession(ctx context.Context, site, session string, visit func(EventRecord)) error {
+	reader, closeReader, err := s.journal.OpenReader(ctx)
+	if err != nil {
+		return err
 	}
-	for {
-		if err := ctx.Err(); err != nil {
-			return err
-		}
-		more, err := reader.Step()
-		if err != nil {
-			return err
-		}
-		if !more {
-			return nil
-		}
-		saved, err := reader.GetRealtimeUsec()
-		if err != nil {
-			return err
-		}
-		seconds := saved / 1_000_000
-		if seconds > uint64(before) {
-			continue
-		}
-		if after > 0 && seconds < uint64(after) {
-			continue
-		}
-		record, rum, err := decodeEvent(reader)
-		if err != nil {
-			return err
-		}
-		if !rum || (site != "" && record.Site != site) {
-			continue
-		}
-		visit(record)
+	defer closeReader()
+	if reader == nil {
+		return ctx.Err()
 	}
+	return reader.VisitMatch("DEM_SESSION_ID", session, func(entry *journal.SnapshotEntry) error {
+		record, rum, err := decodeEvent(entry)
+		if err != nil {
+			return err
+		}
+		if rum && record.SessionID == session && (site == "" || record.Site == site) {
+			visit(record)
+		}
+		return nil
+	})
 }

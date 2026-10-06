@@ -86,7 +86,7 @@ func TestDEMHistoryFunctionsIndependentOfCollectorSelection(t *testing.T) {
 			_, err = rumhistory.NewStore(history).AppendEvent(ctx, rumhistory.EventRecord{
 				Site:      "retired",
 				SessionID: "session",
-				TSUnixUS:  now,
+				ObservedUS:  now,
 				Type:      "pageview",
 				Page:      "/checkout",
 			})
