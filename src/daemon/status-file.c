@@ -74,10 +74,9 @@ void daemon_status_file_periodic_update(void) {
     static bool triggered1, triggered5, triggered10;
 
     double free_mem = os_system_memory_available_percent(os_system_memory(false));
-    bool save_again =
-        status_threshold_trigger_smaller(&triggered1, 1.0, 1.0, free_mem) ||
-        status_threshold_trigger_smaller(&triggered5, 5.0, 1.0, free_mem) ||
-        status_threshold_trigger_smaller(&triggered10, 10.0, 1.0, free_mem);
+    bool save_again = status_threshold_trigger_smaller(&triggered1, 1.0, 1.0, free_mem);
+    save_again |= status_threshold_trigger_smaller(&triggered5, 5.0, 1.0, free_mem);
+    save_again |= status_threshold_trigger_smaller(&triggered10, 10.0, 1.0, free_mem);
     usec_t mt = now_monotonic_usec();
 
     if (!initialized) {
@@ -87,7 +86,7 @@ void daemon_status_file_periodic_update(void) {
 
     if ((mt - last_update_mt) >= save_every_ut || save_again) {
         daemon_status_file_update_status(DAEMON_STATUS_NONE);
-        last_update_mt += save_every_ut;
+        last_update_mt = mt;
     }
 }
 

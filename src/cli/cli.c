@@ -17,7 +17,7 @@ static int exit_status;
 static bool command_pipe_server_is_trusted(HANDLE pipe)
 {
     ULONG server_pid = 0;
-    HANDLE process = NULL, token = NULL;
+    HANDLE process = NULL, token = NULL, membership_source = NULL, membership_token = NULL;
     PSID system_sid = NULL, administrators_sid = NULL;
     bool trusted = false;
     TOKEN_USER *user = NULL;
@@ -52,8 +52,12 @@ static bool command_pipe_server_is_trusted(HANDLE pipe)
                                   DOMAIN_ALIAS_RID_ADMINS, 0, 0, 0, 0, 0, 0, &administrators_sid))
         goto cleanup;
 
+    if (!OpenProcessToken(process, TOKEN_QUERY | TOKEN_DUPLICATE, &membership_source) ||
+        !DuplicateToken(membership_source, SecurityIdentification, &membership_token))
+        goto cleanup;
+
     BOOL is_admin = FALSE;
-    if (CheckTokenMembership(token, administrators_sid, &is_admin) && is_admin)
+    if (CheckTokenMembership(membership_token, administrators_sid, &is_admin) && is_admin)
         trusted = true;
 
 cleanup:
@@ -65,6 +69,8 @@ cleanup:
     if (administrators_sid) FreeSid(administrators_sid);
     if (system_sid) FreeSid(system_sid);
     freez(user);
+    if (membership_token) CloseHandle(membership_token);
+    if (membership_source) CloseHandle(membership_source);
     if (token) CloseHandle(token);
     if (process) CloseHandle(process);
     return trusted;

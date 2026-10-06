@@ -184,6 +184,9 @@ SPAWN_INSTANCE* spawn_server_exec(SPAWN_SERVER *server, int stderr_fd __maybe_un
     }
 
     char *command = (char *)buffer_tostring(wb);
+    // Keep this byte-based check conservative: CreateProcess enforces its limit
+    // after converting the narrow command line to UTF-16, so multibyte input may
+    // be rejected below that limit, but an over-limit command cannot slip through.
     if (buffer_strlen(wb) > SPAWN_SERVER_WINDOWS_MAX_COMMAND_LENGTH) {
         nd_log(NDLS_COLLECTORS, NDLP_ERR,
                "SPAWN PARENT: command line exceeds the Windows CreateProcess limit for request No %zu",

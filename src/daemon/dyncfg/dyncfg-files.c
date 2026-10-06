@@ -297,9 +297,6 @@ void dyncfg_load_all(void) {
 
 static bool dyncfg_read_file_to_buffer(const char *filename, BUFFER *dst) {
     struct stat st = { 0 };
-    if(stat(filename, &st) != 0 || !S_ISREG(st.st_mode))
-        return false;
-
     int fd = open(filename, O_RDONLY | O_CLOEXEC | O_NONBLOCK);
     if(unlikely(fd == -1))
         return false;
