@@ -194,6 +194,7 @@ struct jv2_metrics_info {
     time_t first_time_s;
     time_t last_time_s;
     Pvoid_t JudyL_pages_by_start_time;
+    uint64_t samples;           // stored slots of its indexed pages, set by the journal v2 writer
 };
 
 struct jv2_page_info {
@@ -492,50 +493,6 @@ static inline void ctx_io_error(struct rrdengine_instance *ctx) {
 static inline void ctx_fs_error(struct rrdengine_instance *ctx) {
     __atomic_add_fetch(&ctx->stats.fs_errors, 1, __ATOMIC_RELAXED);
     rrd_stat_atomic_add(&global_stats.global_fs_errors, 1);
-}
-
-static inline bool rrdeng_retention_samples_delta(
-    struct rrdengine_instance *ctx,
-    time_t first_time_s,
-    time_t last_time_s,
-    uint32_t update_every_s,
-    const char *reason,
-    uint64_t *samples)
-{
-    *samples = 0;
-
-    if(!update_every_s || !first_time_s || !last_time_s || first_time_s == last_time_s)
-        return false;
-
-    if(unlikely(first_time_s > last_time_s)) {
-        int tier = ctx ? ctx->config.tier : -1;
-
-        internal_fatal(
-            true,
-            "DBENGINE: tier %d: invalid retention interval while %s (first=%ld, last=%ld, update_every=%u)",
-            tier,
-            reason,
-            (long)first_time_s,
-            (long)last_time_s,
-            update_every_s);
-
-        nd_log_limit_static_global_var(erl, 60, 0);
-        nd_log_limit(
-            &erl,
-            NDLS_DAEMON,
-            NDLP_ERR,
-            "DBENGINE: tier %d: invalid retention interval while %s (first=%ld, last=%ld, update_every=%u); not updating sample counter",
-            tier,
-            reason,
-            (long)first_time_s,
-            (long)last_time_s,
-            update_every_s);
-
-        return false;
-    }
-
-    *samples = (last_time_s - first_time_s) / update_every_s;
-    return *samples > 0;
 }
 
 static inline bool rrdeng_atomic_uint64_sub_saturating(

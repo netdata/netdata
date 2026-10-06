@@ -34,6 +34,56 @@ void datafile_list_delete_unsafe(struct rrdengine_instance *ctx, struct rrdengin
 }
 
 
+// ----------------------------------------------------------------------------
+// samples accounting
+//
+// Samples are stored slots: the points of the pages written to disk, empty
+// (gap) slots included; a page stored in two files counts twice. Every datafile
+// carries the samples charged to it, and ctx->atomic.samples is their sum:
+//
+//  - a flushed extent charges the slots of its pages to its datafile,
+//  - replaying a v1 journal charges the slots of its valid pages,
+//  - loading a journal v2 at startup sets the charge from its samples section,
+//    or from a per-metric estimate when the file has no section,
+//  - writing a journal v2 successfully resets the charge to the indexed count
+//    (pages the index drops - duplicate start times, deleted metrics - are
+//    unreachable and stop counting; the next startup reads the same count),
+//  - deleting a datafile removes its whole charge.
+//
+// A datafile is never flushed to and re-indexed at the same time (journal v2
+// indexing skips datafiles with running writers), so a set never races a charge
+// of the same datafile.
+
+void rrdeng_datafile_samples_charge(struct rrdengine_datafile *datafile, uint64_t samples) {
+    if(!samples)
+        return;
+
+    __atomic_add_fetch(&datafile->samples.charged, samples, __ATOMIC_RELAXED);
+    __atomic_add_fetch(&datafile->ctx->atomic.samples, samples, __ATOMIC_RELAXED);
+}
+
+void rrdeng_datafile_samples_set(struct rrdengine_datafile *datafile, uint64_t samples, bool estimated) {
+    struct rrdengine_instance *ctx = datafile->ctx;
+
+    uint64_t old = __atomic_exchange_n(&datafile->samples.charged, samples, __ATOMIC_RELAXED);
+    __atomic_store_n(&datafile->samples.estimated, estimated, __ATOMIC_RELAXED);
+
+    if(samples > old)
+        __atomic_add_fetch(&ctx->atomic.samples, samples - old, __ATOMIC_RELAXED);
+    else if(old > samples)
+        rrdeng_atomic_uint64_sub_saturating(
+            ctx, &ctx->atomic.samples, old - samples, "samples", "resetting the samples of a datafile");
+}
+
+void rrdeng_datafile_samples_uncharge(struct rrdengine_datafile *datafile) {
+    struct rrdengine_instance *ctx = datafile->ctx;
+
+    uint64_t old = __atomic_exchange_n(&datafile->samples.charged, 0, __ATOMIC_RELAXED);
+    if(old)
+        rrdeng_atomic_uint64_sub_saturating(
+            ctx, &ctx->atomic.samples, old, "samples", "deleting a datafile");
+}
+
 static struct rrdengine_datafile *datafile_alloc_and_init(struct rrdengine_instance *ctx, unsigned tier, unsigned fileno)
 {
     fatal_assert(tier == 1);
@@ -526,6 +576,8 @@ static int scan_data_files(struct rrdengine_instance *ctx)
                 generate_datafilepath(datafile, path, sizeof(path));
                 netdata_log_info("DBENGINE: deleted data file \"%s\".", path);
             }
+            // the v1 replay may have charged samples to this datafile already
+            rrdeng_datafile_samples_uncharge(datafile);
             freez(journalfile);
             freez(datafile);
             ++failed_to_load;
