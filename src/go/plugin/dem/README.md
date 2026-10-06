@@ -54,7 +54,7 @@ invalid changes retain the last valid policy and produce a warning. Queued event
 Flushes sync pending appends; clean idle ticks skip sync. A crash can lose records still queued or
 not synced. Queue overflow and append failures count dropped records; sync failures produce a warning. Failed retention
 sweeps retry after five seconds. An uncertain journal mutation or sync failure makes shared history unavailable until
-restart verification; subsequent reads, writes and retention fail rather than expose a partial result. RUM measurements
+restart verification; subsequent reads, writes, sync and retention fail rather than expose a partial result. RUM measurements
 and enabled exports continue independently, and synthetic current diagnosis reports history errors. This is sampled
 investigation history, not a lossless event archive.
 

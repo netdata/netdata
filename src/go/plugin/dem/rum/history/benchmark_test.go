@@ -116,8 +116,9 @@ func BenchmarkHistoryQueries(b *testing.B) {
 	}
 }
 
-// Includes the actual domain encoder and shared journal append. Like the queued
-// writer, this benchmark does not request fsync for each event.
+// Measures synchronous AppendEvent validation, encoding and SDK append. It excludes
+// queueing, periodic Sync, rotation and retention. The journal grows throughout each
+// run; use a fixed count (e.g. -benchtime=50000x) when comparing implementations.
 func BenchmarkHistoryEventAppend(b *testing.B) {
 	ctx := context.Background()
 	owner, err := demjournal.Open(ctx, "")

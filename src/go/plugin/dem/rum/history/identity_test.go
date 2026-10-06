@@ -59,6 +59,7 @@ func TestSessionUserIDsOnlyIncludeReceiptTimeRange(t *testing.T) {
 	root := t.TempDir()
 	now := time.Now()
 	old := now.Add(-time.Hour)
+	// Delayed persistence must not bring an older observation into the selected range.
 	seedOldJournal(t, root, EventRecord{
 		Site:       "shop",
 		SessionID:  "shared",
@@ -66,7 +67,7 @@ func TestSessionUserIDsOnlyIncludeReceiptTimeRange(t *testing.T) {
 		Type:       "pageview",
 		Page:       "/old",
 		UserID:     "prior-user",
-	}, old)
+	}, now)
 	owner, err := demjournal.Open(ctx, root)
 	require.NoError(t, err)
 	t.Cleanup(func() { require.NoError(t, owner.Close()) })

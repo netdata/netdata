@@ -141,6 +141,7 @@ func TestProcessingSamplingPromotionKeepsHistoryAndExportsCurrentObservation(t *
 		KeepErrors: true,
 	})
 	now := time.Now()
+	browserTime := now.Add(-5 * time.Minute)
 	first := &beacon.Beacon{
 		Site:         "site",
 		Received:     now,
@@ -148,7 +149,10 @@ func TestProcessingSamplingPromotionKeepsHistoryAndExportsCurrentObservation(t *
 		ExperienceID: "document",
 		Path:         "/checkout",
 		PageGroup:    "/checkout",
-		Events:       []beacon.Event{{Kind: beacon.EventDocument, ID: "document", Revision: 1, Time: now}, {Name: "earlier-action", Time: now}},
+		Events: []beacon.Event{
+			{Kind: beacon.EventDocument, ID: "document", Revision: 1, Time: browserTime},
+			{Name: "earlier-action", Time: browserTime},
+		},
 	}
 	p.Ingest(first)
 	assert.Empty(t, history.events)

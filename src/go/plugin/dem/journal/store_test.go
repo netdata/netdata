@@ -201,16 +201,21 @@ func TestEnvelopeChecksSchemaClockAndBucket(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, "rum", kind)
 	assert.Equal(t, int64(60000001), timestamp)
-	for name, field := range map[string]journal.Field{
-		"duplicate":          journal.StringField("DEM_RUM_MINUTE", "1"),
-		"unsupported schema": journal.StringField("DEM_SCHEMA", "0"),
-		"noncanonical":       journal.StringField("DEM_RUM_MINUTE", "01"),
-	} {
-		t.Run(name, func(t *testing.T) {
-			candidate := valid
-			assert.Error(t, candidate.Observe([]byte(field.Name), field.Value))
-		})
-	}
+	t.Run("duplicate", func(t *testing.T) {
+		candidate := valid
+		assert.ErrorContains(t, candidate.Observe([]byte("DEM_RUM_MINUTE"), []byte("1")), "duplicate history field")
+	})
+	t.Run("unsupported schema", func(t *testing.T) {
+		var candidate Envelope
+		assert.ErrorContains(t, candidate.Observe([]byte("DEM_SCHEMA"), []byte("0")), "incompatible DEM history schema")
+	})
+	t.Run("noncanonical", func(t *testing.T) {
+		var candidate Envelope
+		for _, field := range fields[:3] {
+			require.NoError(t, candidate.Observe([]byte(field.Name), field.Value))
+		}
+		assert.ErrorContains(t, candidate.Observe([]byte("DEM_RUM_MINUTE"), []byte("01")), "expected canonical nonnegative decimal")
+	})
 	fields[3] = journal.StringField("DEM_RUM_MINUTE", "2")
 	var mismatch Envelope
 	for _, field := range fields {
