@@ -154,7 +154,7 @@ if [ "${event_type}" != 'pull_request' ] && [ "${build_type}" != 'nightly' ]; th
 
     rm -f "${dl_log}"
     set +e
-    wget -S -o "${dl_log}" --spider "${VERSION_URL_PREFIX}/latest/Version"
+    wget -S -o "${dl_log}" "${VERSION_URL_PREFIX}/latest/Version"
     ret="$?"
     set -e
 
@@ -189,7 +189,7 @@ if [ "${event_type}" != 'pull_request' ] && [ "${build_type}" != 'nightly' ]; th
         for t in "${major}" "${major}.${minor}" ; do
             rm -f "${dl_log}"
             set +e
-            wget -S -o "${dl_log}" --spider "${VERSION_URL_PREFIX}/${t}/Version"
+            wget -S -o "${dl_log}" "${VERSION_URL_PREFIX}/${t}/Version"
             ret="$?"
             set -e
 
