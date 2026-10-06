@@ -16,6 +16,7 @@ import (
 
 	"github.com/netdata/netdata/go/plugins/plugin/dem/rum/aggregate"
 	"github.com/netdata/netdata/go/plugins/plugin/dem/rum/beacon"
+	"github.com/netdata/netdata/go/plugins/plugin/dem/rum/config"
 	"github.com/netdata/netdata/go/plugins/plugin/dem/rum/otlp"
 )
 
@@ -79,14 +80,12 @@ func newProcessingTest(
 	)
 	h := &processingHistory{}
 	a.SetHistorySink(h)
-	exporter, err := otlp.New(
+	exporter, err := otlp.NewLogs(
 		context.Background(),
-		otlp.Config{
-			Enabled:  "yes",
-			Endpoint: listener.Addr().String(),
+		config.Destination{
+			Endpoint: new("http://" + listener.Addr().String()),
 		},
 		"site",
-		"",
 		a,
 		nil,
 	)
@@ -97,24 +96,29 @@ func newProcessingTest(
 	drain := func() []string {
 		ctx, cancel := context.WithCancel(context.Background())
 		cancel()
-		exporter.Run(ctx)
+		finalCtx, finish := context.WithTimeout(context.Background(), time.Second)
+		defer finish()
+		exporter.Run(ctx, func() context.Context { return finalCtx })
 		return logs.snapshot()
 	}
 	return &processor{
 		aggregator: a,
-		exporter:   exporter,
+		logs:       exporter,
 	}, h, drain
 }
 
 func TestProcessingDeduplicatesWithoutMutatingInput(t *testing.T) {
-	p, history, drain := newProcessingTest(t, aggregate.InvestigateCfg{})
+	p, history, drain := newProcessingTest(t, aggregate.InvestigateCfg{
+		Rate: 1,
+	})
 	event := &beacon.Beacon{
-		Site:      "site",
-		Received:  time.Now(),
-		SessionID: "session",
-		PageID:    "page",
-		Path:      "/checkout",
-		PageGroup: "/checkout",
+		Site:         "site",
+		Received:     time.Now(),
+		SessionID:    "session",
+		ExperienceID: "page",
+		Events:       []beacon.Event{{Kind: beacon.EventDocument, ID: "page", Revision: 1}},
+		Path:         "/checkout",
+		PageGroup:    "/checkout",
 	}
 	before := *event
 	p.Ingest(event)
@@ -123,10 +127,9 @@ func TestProcessingDeduplicatesWithoutMutatingInput(t *testing.T) {
 	snapshot := p.aggregator.Snapshot()
 	assert.EqualValues(t, 2, snapshot.Counters[aggregate.CounterAccepted])
 	assert.EqualValues(t, 1, snapshot.Counters[aggregate.CounterPageviews])
-	require.Len(t, history.events, 2)
+	require.Len(t, history.events, 1, "a replay cannot create another retained activity record")
 	assert.Equal(t, "pageview", history.events[0].Type)
-	assert.Equal(t, "activity", history.events[1].Type)
-	assert.Equal(t, []string{"session_start", "pageview"}, drain())
+	assert.Equal(t, []string{"pageview"}, drain())
 }
 
 func TestProcessingSamplingPromotionKeepsHistoryAndExportsCurrentObservation(t *testing.T) {
@@ -139,12 +142,13 @@ func TestProcessingSamplingPromotionKeepsHistoryAndExportsCurrentObservation(t *
 	})
 	now := time.Now()
 	first := &beacon.Beacon{
-		Site:      "site",
-		Received:  now,
-		SessionID: session,
-		Path:      "/checkout",
-		PageGroup: "/checkout",
-		Events:    []beacon.Event{{Name: "earlier-action", Time: now}},
+		Site:         "site",
+		Received:     now,
+		SessionID:    session,
+		ExperienceID: "document",
+		Path:         "/checkout",
+		PageGroup:    "/checkout",
+		Events:       []beacon.Event{{Kind: beacon.EventDocument, ID: "document", Revision: 1, Time: now}, {Name: "earlier-action", Time: now}},
 	}
 	p.Ingest(first)
 	assert.Empty(t, history.events)
@@ -153,11 +157,12 @@ func TestProcessingSamplingPromotionKeepsHistoryAndExportsCurrentObservation(t *
 	assert.True(t, rows[0].PageView)
 	assert.EqualValues(t, 1, p.aggregator.Snapshot().Counters[aggregate.CounterPageviews])
 	promoted := &beacon.Beacon{
-		Site:      "site",
-		Received:  now.Add(time.Second),
-		SessionID: session,
-		Path:      "/checkout",
-		PageGroup: "/checkout",
+		Site:         "site",
+		Received:     now.Add(time.Second),
+		SessionID:    session,
+		ExperienceID: "document",
+		Path:         "/checkout",
+		PageGroup:    "/checkout",
 		Errors: []beacon.Error{
 			{Fingerprint: "failure", Type: "Error", Message: "failed", Time: now.Add(time.Second)},
 		},
@@ -173,8 +178,8 @@ func TestProcessingSamplingPromotionKeepsHistoryAndExportsCurrentObservation(t *
 	assert.Equal(t, now.UnixMicro(), history.events[1].TSUnixUS)
 	assert.Equal(t, "failure", history.events[2].Fingerprint)
 	// Prior observations replay into history only; export sees neither the old
-	// pageview nor custom event. Its first investigated observation starts a session.
-	assert.Equal(t, []string{"session_start", "error"}, drain())
+	// pageview nor custom event. It does not invent a session start.
+	assert.Equal(t, []string{"error"}, drain())
 	assert.EqualValues(t, 1, p.aggregator.Snapshot().Counters[aggregate.CounterJSErrors])
 }
 

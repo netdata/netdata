@@ -58,5 +58,4 @@ impl IndexWriter {
     ) -> Result<(W, Summary, Metadata), Error> {
         build::build_into(row_index, sink, content_meta)
     }
-
 }

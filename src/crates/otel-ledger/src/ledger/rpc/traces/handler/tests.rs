@@ -75,9 +75,22 @@ async fn info_returns_the_descriptor() {
     assert_eq!(
         v["accepted_params"],
         json!([
-            "info", "trace", "attributes", "attribute_values", "overview",
-            "slowest", "search", "tenant", "after", "before", "last", "anchor", "selections",
-            "min_trace_duration_ns", "max_trace_duration_ns", "overview_facets"
+            "info",
+            "trace",
+            "attributes",
+            "attribute_values",
+            "overview",
+            "slowest",
+            "search",
+            "tenant",
+            "after",
+            "before",
+            "last",
+            "anchor",
+            "selections",
+            "min_trace_duration_ns",
+            "max_trace_duration_ns",
+            "overview_facets"
         ])
     );
     assert_eq!(v["required_params"], json!([]));
@@ -105,14 +118,19 @@ async fn an_empty_search_object_is_an_empty_complete_page() {
 /// neither wrapper key.
 #[tokio::test]
 async fn a_mode_less_request_wraps_the_existing_search_contract_as_traces() {
-    let resp = call(json!({"after": -3600, "before": 0, "last": 7})).await.unwrap();
+    let resp = call(json!({"after": -3600, "before": 0, "last": 7}))
+        .await
+        .unwrap();
     let v = serde_json::to_value(&resp).unwrap();
     assert_eq!(v["status"], 200);
     assert_eq!(v["type"], "traces");
     assert_eq!(v["data"]["mode"], "search");
     assert_eq!(v["data"]["version"], 1);
     assert_eq!(v["data"]["status"], json!({"complete": true}));
-    assert_eq!(v["data"]["items"], json!({"returned": 0, "max_to_return": 7}));
+    assert_eq!(
+        v["data"]["items"],
+        json!({"returned": 0, "max_to_return": 7})
+    );
     assert_eq!(v["data"]["traces"], json!([]));
 
     let native = serde_json::to_value(call(json!({"search": {}})).await.unwrap()).unwrap();
@@ -131,7 +149,9 @@ async fn every_mode_is_implemented_an_empty_agent_answers_them_all() {
         json!({"attributes": {}}),
         json!({"attribute_values": {"key": "name"}}),
     ] {
-        call(body.clone()).await.unwrap_or_else(|e| panic!("{body}: {e}"));
+        call(body.clone())
+            .await
+            .unwrap_or_else(|e| panic!("{body}: {e}"));
     }
 }
 
@@ -216,7 +236,10 @@ async fn trace_coverage_declares_the_full_range_for_absent_bounds() {
         .await
         .unwrap();
     let v = serde_json::to_value(&resp).unwrap();
-    assert_eq!(v["coverage"], json!({"after": 0, "before": 4_294_967_295_u32}));
+    assert_eq!(
+        v["coverage"],
+        json!({"after": 0, "before": 4_294_967_295_u32})
+    );
 }
 
 /// Present bounds echo in `coverage` and change nothing else: the
@@ -334,7 +357,10 @@ async fn trace_by_id_assembles_the_fixture_trace_end_to_end() {
     let v = serde_json::to_value(&resp).unwrap();
 
     assert_eq!(v["trace_id"], FIXTURE_TRACE_ID);
-    assert_eq!(v["coverage"], json!({"after": 0, "before": 4_294_967_295_u32}));
+    assert_eq!(
+        v["coverage"],
+        json!({"after": 0, "before": 4_294_967_295_u32})
+    );
     assert_eq!(v["status"], json!({"complete": true}));
     assert_eq!(v["items"]["returned"], 3);
     // Span 1 (unset parent) is the root; spans 2 and 3 parent to it.
@@ -443,7 +469,9 @@ async fn semantically_invalid_trace_requests_are_clean_client_errors() {
             "after 100 >= before 100",
         ),
     ] {
-        let err = call(body.clone()).await.expect_err("must be a client error");
+        let err = call(body.clone())
+            .await
+            .expect_err("must be a client error");
         let msg = err.to_string();
         assert!(msg.contains(needle), "for {body}: {msg}");
     }
@@ -510,7 +538,8 @@ fn ids(v: &serde_json::Value) -> Vec<String> {
 #[tokio::test]
 async fn search_declares_the_widened_completion_coverage() {
     let h = handler_with_search_corpus().await;
-    let v = serde_json::to_value(call_on(&h, as_mode("search", window_body())).await.unwrap()).unwrap();
+    let v =
+        serde_json::to_value(call_on(&h, as_mode("search", window_body())).await.unwrap()).unwrap();
     // Window width 100s clamps to the 1h minimum slack per side.
     assert_eq!(
         v["completion_coverage"],
@@ -532,7 +561,8 @@ async fn search_completion_captures_slack_files_and_skips_beyond_slack() {
     // Inside the slack band (30min past the window edge).
     install_sfst(&registries, "default", 2, T_S + 1_800, T_S + 1_900).await;
     let h = make_handler_over(registries);
-    let v = serde_json::to_value(call_on(&h, as_mode("search", window_body())).await.unwrap()).unwrap();
+    let v =
+        serde_json::to_value(call_on(&h, as_mode("search", window_body())).await.unwrap()).unwrap();
     assert_eq!(v["status"], json!({"partial": ["source_failure"]}));
 
     let registries = make_registries();
@@ -546,7 +576,8 @@ async fn search_completion_captures_slack_files_and_skips_beyond_slack() {
     // Beyond the slack band (2h past a 100s window's 1h slack).
     install_sfst(&registries, "default", 2, T_S + 7_300, T_S + 7_400).await;
     let h = make_handler_over(registries);
-    let v = serde_json::to_value(call_on(&h, as_mode("search", window_body())).await.unwrap()).unwrap();
+    let v =
+        serde_json::to_value(call_on(&h, as_mode("search", window_body())).await.unwrap()).unwrap();
     assert_eq!(v["status"], json!({"complete": true}));
 }
 
@@ -660,19 +691,22 @@ async fn pagination_walks_the_corpus_without_dups_or_gaps_across_the_tie() {
     // Page 1 (limit=2): E, C — the tail C ties with D.
     let mut body = window_body();
     body["limit"] = json!(2);
-    let v1 = serde_json::to_value(call_on(&h, as_mode("search", body.clone())).await.unwrap()).unwrap();
+    let v1 =
+        serde_json::to_value(call_on(&h, as_mode("search", body.clone())).await.unwrap()).unwrap();
     assert_eq!(ids(&v1), vec!["0e", "0c"]);
     let next1 = v1["anchor"]["next"].as_str().unwrap().to_string();
 
     // Page 2: the tie partner D, then B.
     body["anchor"] = json!(next1);
-    let v2 = serde_json::to_value(call_on(&h, as_mode("search", body.clone())).await.unwrap()).unwrap();
+    let v2 =
+        serde_json::to_value(call_on(&h, as_mode("search", body.clone())).await.unwrap()).unwrap();
     assert_eq!(ids(&v2), vec!["0d", "0b"]);
     let next2 = v2["anchor"]["next"].as_str().unwrap().to_string();
 
     // Page 3: A alone; short page, walk over.
     body["anchor"] = json!(next2);
-    let v3 = serde_json::to_value(call_on(&h, as_mode("search", body.clone())).await.unwrap()).unwrap();
+    let v3 =
+        serde_json::to_value(call_on(&h, as_mode("search", body.clone())).await.unwrap()).unwrap();
     assert_eq!(ids(&v3), vec!["0a"]);
     assert!(v3.get("anchor").is_none());
 }
@@ -700,8 +734,14 @@ async fn invalid_search_requests_are_clean_client_errors() {
     for (body, needle) in [
         (json!({"limit": 0}), "zero 'limit'"),
         (json!({"limit": 1001}), "exceeds the maximum"),
-        (json!({"spans_per_trace": 200}), "exceeds the library maximum"),
-        (json!({"selections": {"bogus": ["x"]}}), "unknown selection key"),
+        (
+            json!({"spans_per_trace": 200}),
+            "exceeds the library maximum",
+        ),
+        (
+            json!({"selections": {"bogus": ["x"]}}),
+            "unknown selection key",
+        ),
         (json!({"anchor": "junk"}), "malformed anchor"),
         (json!({"after": 500, "before": 400}), "invalid window"),
     ] {
@@ -742,7 +782,8 @@ async fn pagination_survives_a_trace_whose_envelope_predates_its_rank() {
     let mut body = window_body();
     body["limit"] = json!(2);
     body["spans_per_trace"] = json!(0);
-    let v1 = serde_json::to_value(call_on(&h, as_mode("search", body.clone())).await.unwrap()).unwrap();
+    let v1 =
+        serde_json::to_value(call_on(&h, as_mode("search", body.clone())).await.unwrap()).unwrap();
     assert_eq!(ids(&v1), vec!["1b", "0f"], "V (50s) then F (rank 45s)");
     body["anchor"] = v1["anchor"]["next"].clone();
     let v2 = serde_json::to_value(call_on(&h, as_mode("search", body)).await.unwrap()).unwrap();
@@ -775,11 +816,17 @@ async fn straddling_trace_above_the_tail_never_reappears() {
     let mut body = window_body();
     body["limit"] = json!(2);
     body["spans_per_trace"] = json!(0);
-    let v1 = serde_json::to_value(call_on(&h, as_mode("search", body.clone())).await.unwrap()).unwrap();
+    let v1 =
+        serde_json::to_value(call_on(&h, as_mode("search", body.clone())).await.unwrap()).unwrap();
     assert_eq!(ids(&v1), vec!["0f", "1a"], "F (rank 70s) then U (50s)");
     body["anchor"] = v1["anchor"]["next"].clone();
-    let v2 = serde_json::to_value(call_on(&h, as_mode("search", body.clone())).await.unwrap()).unwrap();
-    assert_eq!(ids(&v2), vec!["1b"], "only W is fresh — F must not duplicate");
+    let v2 =
+        serde_json::to_value(call_on(&h, as_mode("search", body.clone())).await.unwrap()).unwrap();
+    assert_eq!(
+        ids(&v2),
+        vec!["1b"],
+        "only W is fresh — F must not duplicate"
+    );
     assert!(v2.get("anchor").is_none());
 }
 
@@ -827,7 +874,8 @@ async fn late_arrivals_above_the_key_shorten_pages_but_never_duplicate() {
     let mut body = window_body();
     body["limit"] = json!(2);
     body["spans_per_trace"] = json!(0);
-    let v1 = serde_json::to_value(call_on(&h, as_mode("search", body.clone())).await.unwrap()).unwrap();
+    let v1 =
+        serde_json::to_value(call_on(&h, as_mode("search", body.clone())).await.unwrap()).unwrap();
     assert_eq!(ids(&v1), vec!["0d", "0c"]);
 
     // A burst of three late arrivals, all ranked above the key (0c@30).
@@ -870,7 +918,12 @@ async fn attributes_lists_keys_in_the_selection_grammar() {
     let v = serde_json::to_value(call_on(&h, body).await.unwrap()).unwrap();
     assert_eq!(v["status"], json!({"complete": true}));
     assert_eq!(v["truncated"], false);
-    let keys: Vec<&str> = v["keys"].as_array().unwrap().iter().map(|k| k.as_str().unwrap()).collect();
+    let keys: Vec<&str> = v["keys"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|k| k.as_str().unwrap())
+        .collect();
     assert!(keys.contains(&"resource.service.name"), "{keys:?}");
     assert!(keys.contains(&"name"), "builtin word: {keys:?}");
     // The round-trip contract (every returned key feeds straight back
@@ -893,7 +946,8 @@ async fn attributes_owner_filter_and_truncation_are_exact() {
     let keys = v["keys"].as_array().unwrap();
     assert!(!keys.is_empty());
     assert!(
-        keys.iter().all(|k| k.as_str().unwrap().starts_with("resource.")),
+        keys.iter()
+            .all(|k| k.as_str().unwrap().starts_with("resource.")),
         "{keys:?}"
     );
 
@@ -914,10 +968,22 @@ async fn attribute_values_returns_storage_labels_with_kinds() {
     let v = serde_json::to_value(call_on(&h, body).await.unwrap()).unwrap();
     assert_eq!(v["key"], "resource.service.name");
     assert_eq!(v["truncated"], false);
-    let values: Vec<&str> = v["values"].as_array().unwrap().iter().map(|x| x["value"].as_str().unwrap()).collect();
-    assert!(values.contains(&"svc-a") && values.contains(&"svc-b"), "{values:?}");
+    let values: Vec<&str> = v["values"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|x| x["value"].as_str().unwrap())
+        .collect();
     assert!(
-        v["values"].as_array().unwrap().iter().all(|x| x["kind"] == "str"),
+        values.contains(&"svc-a") && values.contains(&"svc-b"),
+        "{values:?}"
+    );
+    assert!(
+        v["values"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .all(|x| x["kind"] == "str"),
         "service names carry their schema kind: {}",
         v["values"]
     );
@@ -927,12 +993,20 @@ async fn attribute_values_returns_storage_labels_with_kinds() {
     merge(&mut body, json!({"key": "name"}));
     let body = as_mode("attribute_values", body);
     let v = serde_json::to_value(call_on(&h, body).await.unwrap()).unwrap();
-    let values: Vec<&str> = v["values"].as_array().unwrap().iter().map(|x| x["value"].as_str().unwrap()).collect();
+    let values: Vec<&str> = v["values"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|x| x["value"].as_str().unwrap())
+        .collect();
     assert!(values.contains(&"span-1"), "{values:?}");
 
     // Truncation flag exact.
     let mut body = window_body();
-    merge(&mut body, json!({"key": "resource.service.name", "max_values": 1}));
+    merge(
+        &mut body,
+        json!({"key": "resource.service.name", "max_values": 1}),
+    );
     let body = as_mode("attribute_values", body);
     let v = serde_json::to_value(call_on(&h, body).await.unwrap()).unwrap();
     assert_eq!(v["values"].as_array().unwrap().len(), 1);
@@ -946,13 +1020,21 @@ async fn enumeration_invalid_requests_are_clean_client_errors() {
     // territory now; these are the handler's semantic rejections.
     for (body, needle) in [
         (json!({"attributes": {"owner": "bogus"}}), "unknown owner"),
-        (json!({"attributes": {"max_keys": 0}}), "zero key/value limit"),
-        (json!({"attribute_values": {"key": "bogus"}}), "unknown selection key"),
+        (
+            json!({"attributes": {"max_keys": 0}}),
+            "zero key/value limit",
+        ),
+        (
+            json!({"attribute_values": {"key": "bogus"}}),
+            "unknown selection key",
+        ),
         // A virtual builtin has no value dictionary — the engine's own
         // message surfaces.
         (json!({"attribute_values": {"key": "duration"}}), "virtual"),
     ] {
-        let err = call_on(&h, body.clone()).await.expect_err("must be a client error");
+        let err = call_on(&h, body.clone())
+            .await
+            .expect_err("must be a client error");
         let msg = err.to_string();
         assert!(msg.contains(needle), "for {body}: {msg}");
     }
@@ -970,7 +1052,10 @@ async fn overview_facets_are_opt_in_and_partition_the_population() {
     merge(&mut body, json!({}));
     let body = as_mode("overview", body);
     let v = serde_json::to_value(call_on(&h, body).await.unwrap()).unwrap();
-    assert!(v.get("top_root_services").is_none(), "absent unless requested");
+    assert!(
+        v.get("top_root_services").is_none(),
+        "absent unless requested"
+    );
     assert!(v.get("top_root_operations").is_none());
 
     let mut body = window_body();
@@ -1054,7 +1139,10 @@ async fn slowest_limit_truncates_and_zero_is_a_client_error() {
     merge(&mut body, json!({"limit": 1001}));
     let body = as_mode("slowest", body);
     let err = call_on(&h, body).await.expect_err("limit beyond max");
-    assert!(err.to_string().contains("exceeds the library maximum"), "{err}");
+    assert!(
+        err.to_string().contains("exceeds the library maximum"),
+        "{err}"
+    );
 }
 
 #[tokio::test]
@@ -1078,7 +1166,11 @@ async fn overview_grid_matches_the_corpus_distribution() {
     );
     let cells = v["grid"]["cells"].as_array().unwrap();
     assert_eq!(cells.len(), 100);
-    let sum: u64 = cells.iter().flat_map(|r| r.as_array().unwrap()).map(|c| c.as_u64().unwrap()).sum();
+    let sum: u64 = cells
+        .iter()
+        .flat_map(|r| r.as_array().unwrap())
+        .map(|c| c.as_u64().unwrap())
+        .sum();
     assert_eq!(sum, 5, "cell sums equal totals.traces");
     // A starts at second 10, B at 20; the C/D pair share second 30
     // (two traces, one cell); E is ONE trace at second 40.
@@ -1134,11 +1226,19 @@ async fn the_grid_carries_error_counts_per_bucket_and_duration_bin() {
     let errors = v["grid"]["error_cells"].as_array().unwrap();
     assert_eq!(errors.len(), cells.len(), "index-parallel to the cells");
     for row in errors {
-        assert_eq!(row.as_array().unwrap().len(), 6, "one column per duration bin");
+        assert_eq!(
+            row.as_array().unwrap().len(),
+            6,
+            "one column per duration bin"
+        );
     }
     // Every corpus envelope is sub-millisecond, so the failures land in
     // the first duration bin of the second the traces started in.
-    assert_eq!(errors[10], json!([0, 0, 0, 0, 0, 0]), "the healthy trace's bucket");
+    assert_eq!(
+        errors[10],
+        json!([0, 0, 0, 0, 0, 0]),
+        "the healthy trace's bucket"
+    );
     assert_eq!(errors[20], json!([2, 0, 0, 0, 0, 0]), "both failing traces");
     let sum: u64 = errors
         .iter()
@@ -1191,10 +1291,13 @@ async fn overview_invalid_selectors_are_clean_client_errors() {
     // Shape errors are wire-test territory; the inverted window is the
     // semantic rejection the handler owns (the window now rides INSIDE
     // the mode object).
-    for (body, needle) in [
-        (json!({"overview": {"after": 500, "before": 400}}), "invalid window"),
-    ] {
-        let err = call_on(&h, body.clone()).await.expect_err("must be a client error");
+    for (body, needle) in [(
+        json!({"overview": {"after": 500, "before": 400}}),
+        "invalid window",
+    )] {
+        let err = call_on(&h, body.clone())
+            .await
+            .expect_err("must be a client error");
         let msg = err.to_string();
         assert!(msg.contains(needle), "for {body}: {msg}");
     }
@@ -1256,7 +1359,10 @@ async fn the_functions_view_aggregates_the_whole_window_beside_the_page() {
     let h = handler_with_search_corpus().await;
     let v = serde_json::to_value(call_on(&h, functions_body(2)).await.unwrap()).unwrap();
     // The page is 2 of the window's 5 traces...
-    assert_eq!(v["data"]["items"], json!({"returned": 2, "max_to_return": 2}));
+    assert_eq!(
+        v["data"]["items"],
+        json!({"returned": 2, "max_to_return": 2})
+    );
     assert_eq!(ids(&v["data"]), ["0e", "0c"]);
     // ...and the aggregate describes the WINDOW, not the page.
     let o = &v["data"]["overview"];
@@ -1356,7 +1462,10 @@ async fn the_scope_gate_suppresses_the_root_facets_while_selections_are_active()
     assert_eq!(cells[20][0], 0);
     assert_eq!(cells[30][0], 1);
     assert_eq!(cells[40][0], 1);
-    assert!(o.get("top_root_services").is_none(), "facets stay whole-window-or-nothing");
+    assert!(
+        o.get("top_root_services").is_none(),
+        "facets stay whole-window-or-nothing"
+    );
     assert!(o.get("top_root_operations").is_none());
 }
 
@@ -1421,7 +1530,11 @@ async fn a_trace_level_selection_word_falls_back_to_the_window_grid() {
         assert_eq!(ids(&v["data"]), listed, "{word}: the list applies the word");
         let o = &v["data"]["overview"];
         assert_eq!(o["scope"], "window", "{word}");
-        assert_eq!(o["totals"], json!({"traces": 5, "spans": 8, "errors": 0}), "{word}");
+        assert_eq!(
+            o["totals"],
+            json!({"traces": 5, "spans": 8, "errors": 0}),
+            "{word}"
+        );
     }
 
     // Mixed with a span-level word, the WHOLE predicate is dropped: the
@@ -1441,7 +1554,10 @@ async fn a_trace_level_selection_word_falls_back_to_the_window_grid() {
 async fn the_overview_mode_applies_selections_and_reports_scope() {
     let h = handler_with_search_corpus().await;
     let mut body = window_body();
-    merge(&mut body, json!({"selections": {"resource.service.name": ["svc-b"]}}));
+    merge(
+        &mut body,
+        json!({"selections": {"resource.service.name": ["svc-b"]}}),
+    );
     let v = serde_json::to_value(call_on(&h, as_mode("overview", body)).await.unwrap()).unwrap();
     assert_eq!(v["mode"], "overview");
     assert_eq!(v["scope"], "selection");
@@ -1450,8 +1566,12 @@ async fn the_overview_mode_applies_selections_and_reports_scope() {
     assert_eq!(cells[20][0], 1, "B at 20");
     assert_eq!(cells[30][0], 1, "D at 30");
 
-    let v = serde_json::to_value(call_on(&h, as_mode("overview", window_body())).await.unwrap())
-        .unwrap();
+    let v = serde_json::to_value(
+        call_on(&h, as_mode("overview", window_body()))
+            .await
+            .unwrap(),
+    )
+    .unwrap();
     assert_eq!(v["scope"], "window");
     assert_eq!(v["totals"], json!({"traces": 5, "spans": 8, "errors": 0}));
 
@@ -1542,9 +1662,12 @@ async fn the_aggregate_captures_the_aligned_window_and_carries_its_own_status() 
         json!({"traces": 1, "spans": 3, "errors": 0})
     );
 
-    let native =
-        serde_json::to_value(call_on(&h, as_mode("overview", window_body())).await.unwrap())
-            .unwrap();
+    let native = serde_json::to_value(
+        call_on(&h, as_mode("overview", window_body()))
+            .await
+            .unwrap(),
+    )
+    .unwrap();
     assert_eq!(native["status"], v["data"]["overview"]["status"]);
     assert_eq!(native["totals"], v["data"]["overview"]["totals"]);
     assert_eq!(native["grid"], v["data"]["overview"]["grid"]);
@@ -1671,7 +1794,8 @@ async fn tenant_scoping_isolates_and_defaults() {
     let mut body = window_body();
     body["spans_per_trace"] = json!(0);
     // Default tenant: tenant-a's data is invisible.
-    let v = serde_json::to_value(call_on(&h, as_mode("search", body.clone())).await.unwrap()).unwrap();
+    let v =
+        serde_json::to_value(call_on(&h, as_mode("search", body.clone())).await.unwrap()).unwrap();
     assert_eq!(v["items"]["returned"], 0);
     // The owning tenant sees it — `tenant` rides at the TOP level.
     let mut wrapped = as_mode("search", body.clone());
@@ -1738,7 +1862,10 @@ async fn raw_call(payload: Option<&[u8]>) -> (u32, String) {
         outbound_tx: tx,
     });
     let res = adapter.handle_raw(ctx).await;
-    (res.status, String::from_utf8_lossy(&res.payload).into_owned())
+    (
+        res.status,
+        String::from_utf8_lossy(&res.payload).into_owned(),
+    )
 }
 
 #[tokio::test]
@@ -1749,16 +1876,31 @@ async fn shape_errors_are_transport_400s() {
             br#"{"search": {}, "after": 1}"#,
             "cannot mix a mode selector with Functions parameters",
         ),
-        (br#"{"trace": {}, "overview": {}}"#, "conflicting mode selectors"),
+        (
+            br#"{"trace": {}, "overview": {}}"#,
+            "conflicting mode selectors",
+        ),
         (br#"{"info": true}"#, "invalid info selector"),
         (br#"{"trace": null}"#, "invalid trace selector"),
         (br#"{"overview": []}"#, "expected an object"),
         (br#"[]"#, "otel-traces request object"),
-        (br#"{"search": {}, "tenant": "a", "tenant": "b"}"#, "duplicate field"),
+        (
+            br#"{"search": {}, "tenant": "a", "tenant": "b"}"#,
+            "duplicate field",
+        ),
     ] {
         let (status, body) = raw_call(Some(payload)).await;
-        assert_eq!(status, 400, "for {}: {body}", String::from_utf8_lossy(payload));
-        assert!(body.contains(needle), "for {}: {body}", String::from_utf8_lossy(payload));
+        assert_eq!(
+            status,
+            400,
+            "for {}: {body}",
+            String::from_utf8_lossy(payload)
+        );
+        assert!(
+            body.contains(needle),
+            "for {}: {body}",
+            String::from_utf8_lossy(payload)
+        );
     }
 }
 
@@ -1773,7 +1915,12 @@ async fn semantic_errors_keep_the_handler_status() {
         br#"{"trace": {"id": "xyz"}}"#,
     ] {
         let (status, body) = raw_call(Some(payload)).await;
-        assert_eq!(status, 500, "for {}: {body}", String::from_utf8_lossy(payload));
+        assert_eq!(
+            status,
+            500,
+            "for {}: {body}",
+            String::from_utf8_lossy(payload)
+        );
         assert!(
             body.contains("invalid otel-traces request"),
             "for {}: {body}",
@@ -1822,7 +1969,10 @@ async fn every_response_shape_declares_its_mode() {
             },
             "attribute_values",
         ),
-        (json!({"trace": {"id": "0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a"}}), "trace"),
+        (
+            json!({"trace": {"id": "0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a"}}),
+            "trace",
+        ),
     ] {
         let v = serde_json::to_value(call_on(&h, body.clone()).await.unwrap()).unwrap();
         assert_eq!(v["mode"], mode, "for {body}");

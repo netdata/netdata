@@ -23,12 +23,19 @@ func (h *Handler) sessionEventsRows(ctx context.Context, site, session string) (
 	var events []query.SessionEvent
 	events, err = h.deps.SessionEvents(ctx, site, session)
 	for _, e := range events {
-		rows = append(rows, []any{e.TSUnixUS, e.Type, e.Page, h.redact.Apply(e.Text), e.TraceID})
+		rows = append(rows, []any{e.TSUnixUS, e.Type, e.Page, h.redact.Apply(e.Text), e.TraceID, h.redact.Apply(e.UserID), e.ExperienceID, h.redact.Apply(e.View), e.ViewID, e.MetricID, e.Revision})
 	}
 	return rows, err
 }
 
 var rumSessionEventsColumns = map[string]any{
+	"user_id": (funcapi.Column{
+		Index:         5,
+		Name:          "User ID at Event",
+		Type:          funcapi.FieldTypeString,
+		Visualization: funcapi.FieldVisualValue,
+		Visible:       true,
+	}).BuildColumn(),
 	"ts": (funcapi.Column{
 		Index:         0,
 		Name:          "Time",
@@ -65,5 +72,45 @@ var rumSessionEventsColumns = map[string]any{
 		Type:          funcapi.FieldTypeString,
 		Visualization: funcapi.FieldVisualValue,
 		Visible:       true,
+	}).BuildColumn(),
+	"experience_id": (funcapi.Column{
+		Index:         6,
+		Name:          "Document Experience",
+		Type:          funcapi.FieldTypeString,
+		Visualization: funcapi.FieldVisualValue,
+		Visible:       true,
+		Sortable:      true,
+	}).BuildColumn(),
+	"view": (funcapi.Column{
+		Index:         7,
+		Name:          "Application View",
+		Type:          funcapi.FieldTypeString,
+		Visualization: funcapi.FieldVisualValue,
+		Visible:       true,
+		Sortable:      true,
+	}).BuildColumn(),
+	"view_id": (funcapi.Column{
+		Index:         8,
+		Name:          "Application View ID",
+		Type:          funcapi.FieldTypeString,
+		Visualization: funcapi.FieldVisualValue,
+		Visible:       true,
+		Sortable:      true,
+	}).BuildColumn(),
+	"metric_id": (funcapi.Column{
+		Index:         9,
+		Name:          "Metric ID",
+		Type:          funcapi.FieldTypeString,
+		Visualization: funcapi.FieldVisualValue,
+		Visible:       true,
+		Sortable:      true,
+	}).BuildColumn(),
+	"revision": (funcapi.Column{
+		Index:         10,
+		Name:          "Revision",
+		Type:          funcapi.FieldTypeInteger,
+		Visualization: funcapi.FieldVisualValue,
+		Visible:       true,
+		Sortable:      true,
 	}).BuildColumn(),
 }

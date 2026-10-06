@@ -3,6 +3,7 @@ package query
 
 import (
 	"context"
+	"slices"
 	"sort"
 
 	"github.com/netdata/netdata/go/plugins/plugin/dem/internal/redact"
@@ -17,8 +18,8 @@ func (s *Service) redactors(ctx context.Context) (map[string]*redact.Redactor, e
 	err := s.visit(ctx, "", func(key string, site *rumregistry.Site) { out[key] = siteRedactor(site) })
 	return out, err
 }
-func (s *Service) Sessions(ctx context.Context, site string, after, before int64) ([]Session, error) {
-	rows, err := s.history.QuerySessions(ctx, site, after, before, 2000)
+func (s *Service) Sessions(ctx context.Context, site, userID string, after, before int64) ([]Session, error) {
+	rows, err := s.history.QuerySessions(ctx, site, userID, after, before, 2000)
 	if err != nil {
 		return nil, err
 	}
@@ -26,12 +27,15 @@ func (s *Service) Sessions(ctx context.Context, site string, after, before int64
 	for i := range rows {
 		r := &rows[i]
 		if redact := redactors[r.Site]; redact != nil {
-			r.UserID = redact.Apply(r.UserID)
+			for j := range r.UserIDs {
+				r.UserIDs[j] = redact.Apply(r.UserIDs[j])
+			}
+			sort.Strings(r.UserIDs)
+			r.UserIDs = slices.Compact(r.UserIDs)
 			r.Version = redact.Apply(r.Version)
 			r.Browser = redact.Apply(r.Browser)
 			r.Device = redact.Apply(r.Device)
 			r.Country = redact.Apply(r.Country)
-			r.City = redact.Apply(r.City)
 			r.EntryPage = redact.Apply(r.EntryPage)
 			r.LastPage = redact.Apply(r.LastPage)
 		}
@@ -53,6 +57,12 @@ func (s *Service) SessionEvents(ctx context.Context, site, session string) ([]Se
 		events, _ := runtime.Aggregator.SessionEvents(session)
 		for _, event := range events {
 			row := history.SessionEventRecord{
+				ExperienceID: event.ExperienceID,
+				View:         event.View,
+				ViewID:       event.ViewID,
+				MetricID:     event.MetricID,
+				Revision:     event.Revision,
+
 				Site:      key,
 				SessionID: session,
 				TSUnixUS:  event.TS.UnixMicro(),
@@ -60,6 +70,7 @@ func (s *Service) SessionEvents(ctx context.Context, site, session string) ([]Se
 				Page:      event.Page,
 				Text:      event.Text,
 				TraceID:   event.TraceID,
+				UserID:    event.UserID,
 			}
 			redactSessionEvent(&row, redact)
 			live = append(live, row)
@@ -96,8 +107,10 @@ func (s *Service) SessionEvents(ctx context.Context, site, session string) ([]Se
 	return out, ctx.Err()
 }
 func redactSessionEvent(row *history.SessionEventRecord, redact *redact.Redactor) {
+	row.UserID = redact.Apply(row.UserID)
 	row.Type = redact.Apply(row.Type)
 	row.Page = redact.Apply(row.Page)
+	row.View = redact.Apply(row.View)
 	row.Text = redact.Apply(row.Text)
 }
 

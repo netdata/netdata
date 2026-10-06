@@ -19,10 +19,13 @@ const SDKOrigin = "https://cdn.jsdelivr.net"
 // BootstrapOptions carries effective site settings. Propagate contains
 // already-compiled JavaScript regular expression patterns.
 type BootstrapOptions struct {
-	MeasureRate float64
-	IncludeBots bool
-	Tracing     bool
-	Propagate   []string
+	MeasureRate        float64
+	IncludeBots        bool
+	ConsoleLogs        bool
+	EventLogs          bool
+	FrustrationSignals bool
+	Tracing            bool
+	Propagate          []string
 }
 
 //go:embed bootstrap.js
@@ -34,10 +37,13 @@ func Bootstrap(key, base string, opts BootstrapOptions) string {
 	k, _ := json.Marshal(key)
 	b, _ := json.Marshal(base)
 	opt := map[string]any{
-		"sampling":    opts.MeasureRate,
-		"bots":        beacon.BotPatternJS(),
-		"includeBots": opts.IncludeBots,
-		"tracing":     nil,
+		"sampling":           opts.MeasureRate,
+		"bots":               beacon.BotPatternJS(),
+		"includeBots":        opts.IncludeBots,
+		"consoleLogs":        opts.ConsoleLogs,
+		"eventLogs":          opts.EventLogs,
+		"frustrationSignals": opts.FrustrationSignals,
+		"tracing":            nil,
 	}
 	if opts.Tracing {
 		opt["tracing"] = append([]string{}, opts.Propagate...)

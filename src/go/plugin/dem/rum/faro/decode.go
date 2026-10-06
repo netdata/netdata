@@ -4,12 +4,14 @@ package faro
 
 import (
 	"encoding/json"
-	"fmt"
+	"io"
+	"math"
 	"net/url"
 	"strconv"
 	"strings"
 	"time"
 
+	"github.com/netdata/netdata/go/plugins/plugin/dem/internal/redact"
 	"github.com/netdata/netdata/go/plugins/plugin/dem/rum/beacon"
 )
 
@@ -36,6 +38,7 @@ type faroPayload struct {
 		} `json:"browser"`
 		View struct {
 			Name string `json:"name"`
+			ID   string `json:"id"`
 		} `json:"view"`
 		App struct {
 			Version     string `json:"version"`
@@ -46,32 +49,18 @@ type faroPayload struct {
 		} `json:"user"`
 	} `json:"meta"`
 	Measurements []struct {
-		Type   string             `json:"type"`
-		Values map[string]float64 `json:"values"`
-		// Legacy scalar shapes seen from older/custom senders.
-		Value struct {
-			Duration float64 `json:"duration"`
-			Value    float64 `json:"value"`
-		} `json:"value"`
-		Meta struct {
-			Name string `json:"name"`
-		} `json:"meta"`
-		Context   map[string]any  `json:"context"`
-		Timestamp json.RawMessage `json:"timestamp"`
+		Type      string             `json:"type"`
+		Values    map[string]float64 `json:"values"`
+		Context   map[string]any     `json:"context"`
+		Timestamp json.RawMessage    `json:"timestamp"`
 	} `json:"measurements"`
 	Exceptions []struct {
 		Type       string `json:"type"`
 		Value      string `json:"value"`
 		Stacktrace struct {
-			Frames []struct {
-				Filename string `json:"filename"`
-				Function string `json:"function"`
-				Lineno   int    `json:"lineno"`
-				Colno    int    `json:"colno"`
-			} `json:"frames"`
+			Frames []stackFrame `json:"frames"`
 		} `json:"stacktrace"`
-		StackTrace string          `json:"stackTrace"` // legacy flat string
-		Timestamp  json.RawMessage `json:"timestamp"`
+		Timestamp json.RawMessage `json:"timestamp"`
 	} `json:"exceptions"`
 	Events []struct {
 		Name       string            `json:"name"`
@@ -88,6 +77,7 @@ type faroPayload struct {
 		ResourceSpans []otlpResourceSpans `json:"resourceSpans"`
 	} `json:"traces"`
 	Logs []struct {
+		Context   json.RawMessage `json:"context"`
 		Message   string          `json:"message"`
 		Level     string          `json:"level"`
 		Timestamp json.RawMessage `json:"timestamp"`
@@ -96,6 +86,7 @@ type faroPayload struct {
 
 // Bounds on client-supplied strings (cardinality and record size).
 const (
+	maxPathLen    = 512
 	maxUserIDLen  = 128
 	maxSelector   = 200
 	maxNameLen    = 64
@@ -115,16 +106,19 @@ var vitalKeys = map[string]string{
 // The client IP itself never reaches Decode. Now anchors the 24-hour past to
 // 10-minute future window used for measurement, event and log timestamps.
 type Options struct {
-	Site        string
-	Now         time.Time
-	Country     string
-	City        string
-	Lat         float64
-	Lon         float64
-	HasGeo      bool
-	ConsoleLogs bool
-	Tracing     bool
-	PathRules   []beacon.PathRule
+	Site               string
+	Now                time.Time
+	Country            string
+	City               string
+	Lat                float64
+	Lon                float64
+	HasGeo             bool
+	EventLogs          bool
+	FrustrationSignals bool
+	Redactor           *redact.Redactor
+	ConsoleLogs        bool
+	Tracing            bool
+	PathRules          []beacon.PathRule
 }
 
 const (
@@ -150,21 +144,22 @@ func Decode(raw []byte, opt Options) (*beacon.Beacon, error) {
 	b := &beacon.Beacon{
 		Site:           opt.Site,
 		Received:       now,
-		SessionID:      beacon.Clean(p.Meta.Session.ID, maxNameLen),
-		PageID:         beacon.Clean(p.Meta.Page.ID, maxNameLen),
-		Browser:        beacon.Clean(p.Meta.Browser.Name, maxNameLen),
-		BrowserVersion: beacon.Clean(p.Meta.Browser.Version, maxNameLen),
-		OS:             beacon.Clean(p.Meta.Browser.OS, maxNameLen),
+		SessionID:      observationID(p.Meta.Session.ID),
+		ExperienceID:   observationID(p.Meta.Page.ID),
+		ViewID:         observationID(p.Meta.View.ID),
+		Browser:        opt.text(p.Meta.Browser.Name, maxNameLen),
+		BrowserVersion: opt.text(p.Meta.Browser.Version, maxNameLen),
+		OS:             opt.text(p.Meta.Browser.OS, maxNameLen),
 		Device:         beacon.DeviceDesktop,
 		Country:        opt.Country,
 		City:           opt.City,
 		Lat:            opt.Lat,
 		Lon:            opt.Lon,
 		HasGeo:         opt.HasGeo,
-		View:           beacon.Clean(p.Meta.View.Name, maxNameLen),
-		AppVersion:     beacon.Clean(p.Meta.App.Version, maxNameLen),
-		UserID:         beacon.Clean(p.Meta.User.ID, maxUserIDLen),
-		Environment:    beacon.Clean(p.Meta.App.Environment, maxNameLen),
+		View:           opt.view(p.Meta.View.Name),
+		AppVersion:     opt.text(p.Meta.App.Version, maxNameLen),
+		UserID:         opt.text(p.Meta.User.ID, maxUserIDLen),
+		Environment:    opt.text(p.Meta.App.Environment, maxNameLen),
 	}
 	if p.Meta.Browser.Mobile {
 		b.Device = beacon.DeviceMobile
@@ -175,13 +170,10 @@ func Decode(raw []byte, opt Options) (*beacon.Beacon, error) {
 			b.Device = beacon.DeviceTablet
 		}
 	}
-	b.Path = beacon.RedactPath(beacon.Path(p.Meta.Page.URL), opt.PathRules)
-	b.PageHost = pageHost(p.Meta.Page.URL)
-	if b.View != "" {
-		b.PageGroup = b.View
-	} else {
-		b.PageGroup = beacon.PageGroup(b.Path)
-	}
+	pageURL := opt.cleanURL(p.Meta.Page.URL)
+	b.Path = beacon.Path(pageURL)
+	b.PageHost = pageHost(pageURL)
+	b.PageGroup = beacon.PageGroup(b.Path)
 
 	for i, m := range p.Measurements {
 		if i >= maxItems {
@@ -191,71 +183,46 @@ func Decode(raw []byte, opt Options) (*beacon.Beacon, error) {
 		if len(m.Values) > 0 {
 			for k, v := range m.Values {
 				name, ok := vitalKeys[strings.ToLower(k)]
-				if !ok || v < 0 || v != v { // unknown key or NaN
+				if !ok || v < 0 || math.IsNaN(v) || math.IsInf(v, 0) {
 					continue
 				}
 				b.Vitals = append(
 					b.Vitals,
 					beacon.Vital{
-						Name:    name,
-						Value:   v,
-						Time:    ts,
-						Element: attributedElement(name, m.Context),
+						ID:       observationContextID(m.Context),
+						Revision: observationContextRevision(m.Context),
+						Name:     name,
+						Value:    v,
+						Time:     ts,
+						Element:  opt.attributedElement(name, m.Context),
 					},
 				)
 			}
 			continue
 		}
-		// Legacy/custom scalar shape: type or meta.name carries the vital.
-		name := strings.ToLower(strings.TrimSpace(m.Meta.Name))
-		if name == "" || name == "web-vital" || name == "web-vitals" {
-			name = strings.ToLower(strings.TrimSpace(m.Type))
-		}
-		vital, ok := vitalKeys[name]
-		if !ok {
-			continue
-		}
-		val := m.Value.Duration
-		if val == 0 {
-			val = m.Value.Value
-		}
-		if val <= 0 {
-			continue
-		}
-		b.Vitals = append(b.Vitals, beacon.Vital{
-			Name:  vital,
-			Value: val,
-			Time:  ts,
-		})
 	}
 
 	for i, e := range p.Exceptions {
 		if i >= maxItems {
 			break
 		}
-		stack := e.StackTrace
+		var stack strings.Builder
 		firstFrame := ""
-		if len(e.Stacktrace.Frames) > 0 {
-			// First frame without line/column (fingerprint
-			// input): the structured frame is still available here, before
-			// it gets flattened into the rendered stack string below.
-			f0 := e.Stacktrace.Frames[0]
-			firstFrame = f0.Function + "@" + f0.Filename
-			var sb strings.Builder
-			for _, f := range e.Stacktrace.Frames {
-				fmt.Fprintf(&sb, "%s (%s:%d:%d)\n", f.Function, f.Filename, f.Lineno, f.Colno)
-				if sb.Len() > maxStackLen {
-					break
-				}
+		for i, frame := range e.Stacktrace.Frames {
+			identity := opt.appendFrame(&stack, frame)
+			if i == 0 {
+				firstFrame = identity
 			}
-			stack = sb.String()
+			if stack.Len() >= maxStackLen {
+				break
+			}
 		}
-		typ := beacon.Clean(e.Type, maxNameLen)
-		msg := beacon.Clean(e.Value, maxMessageLen)
+		typ := opt.text(e.Type, maxNameLen)
+		msg := opt.text(e.Value, maxMessageLen)
 		b.Errors = append(b.Errors, beacon.Error{
 			Type:        typ,
 			Message:     msg,
-			Stack:       truncate(stack, maxStackLen),
+			Stack:       beacon.Truncate(stack.String(), maxStackLen),
 			Time:        flexTime(e.Timestamp, now),
 			Fingerprint: beacon.Fingerprint(typ, msg, firstFrame),
 		})
@@ -265,41 +232,71 @@ func Decode(raw []byte, opt Options) (*beacon.Beacon, error) {
 		if i >= maxItems {
 			break
 		}
-		name := beacon.Clean(ev.Name, maxNameLen)
-		if name == "" {
+		// Classification uses protocol names, before free-text transformation.
+		name := beacon.Clean(ev.Name, len(ev.Name))
+		if name == "" || name == "securitypolicyviolation" || name == "faro.user.action" || (beacon.IsFrustration(name) && !opt.FrustrationSignals) {
 			continue
+		}
+		kind := eventKind(name)
+		if kind == beacon.EventCustom && !beacon.IsFrustration(name) {
+			name = opt.text(ev.Name, maxNameLen)
 		}
 		var attrs map[string]string
 		if len(ev.Attributes) > 0 {
-			attrs = make(map[string]string, len(ev.Attributes))
 			for k, v := range ev.Attributes {
 				if len(attrs) >= maxEventAttrs {
 					break
 				}
-				if k = beacon.Clean(k, maxNameLen); k != "" {
-					attrs[k] = opt.cleanAttr(k, v)
+				k = beacon.Clean(k, len(k))
+				nativeAttr := keepEventAttr(kind, name, k)
+				if !opt.EventLogs && !nativeAttr {
+					continue
+				}
+				value, valid := opt.eventAttr(kind, k, v)
+				if !valid {
+					continue
+				}
+				// Known keys carry protocol semantics; custom keys are diagnostic text.
+				if !nativeAttr {
+					k = opt.text(k, maxNameLen)
+				}
+				if k != "" {
+					if attrs == nil {
+						attrs = make(map[string]string, min(len(ev.Attributes), maxEventAttrs))
+					}
+					attrs[k] = value
 				}
 			}
 		}
+		id := observationID(ev.Attributes["observation_id"])
+		revision := observationRevision(ev.Attributes["observation_sequence"])
 		b.Events = append(b.Events, beacon.Event{
-			Name:    name,
-			Kind:    eventKind(name),
-			Domain:  beacon.Clean(ev.Domain, maxNameLen),
-			Attrs:   attrs,
-			Time:    flexTime(ev.Timestamp, now),
-			TraceID: hexID(ev.Trace.TraceID, 32),
+			ID:       id,
+			Revision: revision,
+			Name:     name,
+			Kind:     kind,
+			Domain:   opt.text(ev.Domain, maxNameLen),
+			Attrs:    attrs,
+			Time:     flexTime(ev.Timestamp, now),
+			TraceID:  hexID(ev.Trace.TraceID, 32),
 		})
 		// Navigation/resource timing ride the generic events array — also lift them into typed fields the aggregator uses
-		// for the rum.load/rum.dcl/rum.resource_* charts. Attribute names
+		// for document navigation and resource measurements. Attribute names
 		// verified against a captured Faro 2.11 beacon, see
 		// TestParseFaro timing-event cases in decode_test.go.
 		switch name {
 		case navigationEvent:
-			b.Navigation = parseNavigationAttrs(attrs)
-		case resourceEvent:
-			if r, ok := parseResourceAttrs(attrs); ok {
-				b.Resources = append(b.Resources, r)
+			n := parseNavigationAttrs(attrs)
+			if n != nil {
+				n.Revision = revision
+				if b.Navigation == nil || n.Revision > b.Navigation.Revision {
+					b.Navigation = n
+				}
 			}
+		case resourceEvent:
+			r := parseResourceAttrs(attrs)
+			r.ID = id
+			b.Resources = append(b.Resources, r)
 		}
 	}
 
@@ -312,14 +309,17 @@ func Decode(raw []byte, opt Options) (*beacon.Beacon, error) {
 			if i >= maxItems {
 				break
 			}
-			msg := beacon.Clean(l.Message, maxMessageLen)
+			msg := opt.text(l.Message, maxMessageLen)
 			if msg == "" {
 				continue
 			}
+			errorType, stack := consoleErrorContext(l.Context, opt)
 			b.Logs = append(b.Logs, beacon.Log{
-				Level:   beacon.Clean(strings.ToLower(l.Level), 16),
-				Message: msg,
-				Time:    flexTime(l.Timestamp, now),
+				ErrorType: errorType,
+				Stack:     stack,
+				Level:     opt.text(strings.ToLower(l.Level), 16),
+				Message:   msg,
+				Time:      flexTime(l.Timestamp, now),
 			})
 		}
 	}
@@ -327,19 +327,12 @@ func Decode(raw []byte, opt Options) (*beacon.Beacon, error) {
 }
 
 // attributedElement is the redacted selector Faro reports for vital.
-func attributedElement(vital string, ctx map[string]any) string {
+func (o Options) attributedElement(vital string, ctx map[string]any) string {
 	v, ok := ctx[attributionKeys[vital]].(string)
 	if !ok {
 		return ""
 	}
-	return beacon.RedactSelector(beacon.Clean(v, maxSelector))
-}
-
-func truncate(s string, n int) string {
-	if len(s) > n {
-		return s[:n]
-	}
-	return s
+	return o.selector(v)
 }
 
 // pageHost is the page URL's host (first-party resource
@@ -354,7 +347,7 @@ func pageHost(raw string) string {
 }
 
 // parseNavigationAttrs reads the two navigation-timing attributes the
-// rum.load/rum.dcl charts need from a faro.performance.navigation
+// navigation measurements need from a faro.performance.navigation
 // event's attributes. Field names verified against a captured Faro 2.11
 // beacon and pinned by TestParseFaro in decode_test.go:
 // "pageLoadTime" (fetchStart..domComplete, the SDK's own "page load"
@@ -369,38 +362,33 @@ func parseNavigationAttrs(attrs map[string]string) *beacon.Navigation {
 		return nil
 	}
 	n := &beacon.Navigation{}
-	if v, err := strconv.ParseFloat(attrs["pageLoadTime"], 64); err == nil && v >= 0 {
+	if v, err := strconv.ParseFloat(attrs["pageLoadTime"], 64); err == nil && v >= 0 && !math.IsInf(v, 0) && !math.IsNaN(v) {
 		n.LoadMS, n.HasLoad = v, true
 	}
-	if v, err := strconv.ParseFloat(attrs["domContentLoadHandlerTime"], 64); err == nil && v >= 0 {
+	if v, err := strconv.ParseFloat(attrs["domContentLoadHandlerTime"], 64); err == nil && v >= 0 && !math.IsInf(v, 0) && !math.IsNaN(v) {
 		n.DCLMS, n.HasDCL = v, true
+	}
+	if !n.HasLoad && !n.HasDCL {
+		return nil
 	}
 	return n
 }
 
-// parseResourceAttrs reads host, duration, transfer size and initiator
-// type from a faro.performance.resource event. TestParseFaro pins the
-// captured field names: "httpHost", "duration",
-// "transferSize", and "initiatorType". ok is false when no numeric
-// attribute is present.
-func parseResourceAttrs(attrs map[string]string) (beacon.Resource, bool) {
-	dur, durErr := strconv.ParseFloat(attrs["duration"], 64)
-	if durErr != nil {
-		return beacon.Resource{}, false
-	}
+// parseResourceAttrs preserves entries whose duration is unavailable. Count and
+// duration populations differ; a present finite zero remains a duration sample.
+func parseResourceAttrs(attrs map[string]string) beacon.Resource {
 	r := beacon.Resource{
-		Host:       strings.ToLower(attrs["httpHost"]),
-		DurationMS: dur,
-		Initiator:  beacon.Clean(attrs["initiatorType"], maxNameLen),
+		Host:      strings.ToLower(attrs["httpHost"]),
+		Initiator: beacon.Clean(attrs["initiatorType"], maxNameLen),
+		Self:      isCollectorRequest(attrs["name"]),
 	}
-	if xfer, err := strconv.ParseFloat(attrs["transferSize"], 64); err == nil {
+	if dur, err := strconv.ParseFloat(attrs["duration"], 64); err == nil && dur >= 0 && !math.IsInf(dur, 0) && !math.IsNaN(dur) {
+		r.DurationMS, r.HasDuration = dur, true
+	}
+	if xfer, err := strconv.ParseFloat(attrs["transferSize"], 64); err == nil && xfer >= 0 && !math.IsInf(xfer, 0) && !math.IsNaN(xfer) {
 		r.TransferB = xfer
 	}
-	if r.Host == "" {
-		r.Host = "unknown"
-	}
-	r.Self = isCollectorRequest(attrs["name"])
-	return r, true
+	return r
 }
 
 // isCollectorRequest reports whether a resource URL is the snippet's own
@@ -448,7 +436,47 @@ func eventKind(name string) beacon.EventKind {
 		return beacon.EventResource
 	case fetchTraceEvent, xhrTraceEvent:
 		return beacon.EventRequest
+	case "document_activated":
+		return beacon.EventDocument
+	case "view_changed":
+		return beacon.EventView
+	case "session_start", "session_resume", "session_extend":
+		return beacon.EventSession
 	default:
 		return beacon.EventCustom
 	}
+}
+
+// consoleErrorContext reads the space-separated JSON frames Faro 2.11 emits.
+// Only the known Error subset is retained; malformed context cannot reject vitals.
+func consoleErrorContext(raw json.RawMessage, opt Options) (string, string) {
+	var ctx struct {
+		Type        json.RawMessage `json:"type"`
+		StackFrames json.RawMessage `json:"stackFrames"`
+	}
+	if json.Unmarshal(raw, &ctx) != nil {
+		return "", ""
+	}
+	var typ, encoded string
+	_ = json.Unmarshal(ctx.Type, &typ)
+	_ = json.Unmarshal(ctx.StackFrames, &encoded)
+	typ = opt.text(typ, maxNameLen)
+	var stack strings.Builder
+	decoder := json.NewDecoder(strings.NewReader(encoded))
+	for {
+		var f *stackFrame
+		if err := decoder.Decode(&f); err == io.EOF {
+			break
+		} else if err != nil {
+			return typ, ""
+		}
+		if f == nil {
+			return typ, ""
+		}
+		opt.appendFrame(&stack, *f)
+		if stack.Len() >= maxStackLen {
+			break
+		}
+	}
+	return typ, beacon.Truncate(stack.String(), maxStackLen)
 }

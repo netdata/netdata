@@ -54,14 +54,15 @@ func (c *Collector) Init(ctx context.Context) error {
 			return errors.New("origin wildcard is only allowed as a leading *.")
 		}
 	}
+	c.Site = c.Site.Effective()
 	if errs := config.ValidateSiteExtras(c.Site); len(errs) > 0 {
 		return errors.New(strings.Join(errs, "; "))
 	}
-	if math.IsNaN(c.MeasureSampleRate) || c.MeasureSampleRate < 0 || c.MeasureSampleRate > 1 {
+	if math.IsNaN(c.MeasureRate()) || c.MeasureRate() < 0 || c.MeasureRate() > 1 {
 		return errors.New("measure_sample_rate must be between 0 and 1")
 	}
 	if c.Investigate != nil {
-		if math.IsNaN(c.Investigate.SampleRate) || c.Investigate.SampleRate < 0 || c.Investigate.SampleRate > 1 {
+		if math.IsNaN(c.InvestigateRate()) || c.InvestigateRate() < 0 || c.InvestigateRate() > 1 {
 			return errors.New("investigate sample_rate must be between 0 and 1")
 		}
 		for _, keep := range c.Investigate.AlwaysKeep {
@@ -78,18 +79,24 @@ func (c *Collector) Init(ctx context.Context) error {
 			return errors.New("public_url must be an http(s) base URL")
 		}
 	}
-	if c.OTLP.Enabled != "auto" && c.OTLP.Enabled != "yes" && c.OTLP.Enabled != "no" {
-		return errors.New("otlp.enabled must be auto, yes or no")
+	if c.EventLogsOn() {
+		if err := otlp.ValidateDestination(ctx, c.EventLogs.Destination); err != nil {
+			return fmt.Errorf("event_logs.destination: %w", err)
+		}
 	}
-	if err := otlp.ValidateConfig(ctx, c.OTLP); err != nil {
-		return err
+	if c.TracingOn() {
+		if err := otlp.ValidateDestination(ctx, c.Tracing.Destination); err != nil {
+			return fmt.Errorf("tracing.destination: %w", err)
+		}
 	}
-	c.redactor = redact.NewRedactor(c.OTLP.AuthToken)
+	// Retained inactive credentials still need output redaction.
+	c.redactor = redact.NewRedactor(c.EventLogs.Destination.AuthToken, c.Tracing.Destination.AuthToken)
 	c.aggregator = aggregate.New(time.Duration(c.Window), aggregate.SiteCfg{
-		Name:        c.Name,
-		DisplayName: c.Label(),
-		PageGroups:  c.PageGroups,
-		Countries:   c.Countries,
+		Name:               c.Name,
+		DisplayName:        c.Label(),
+		PageGroups:         c.PageGroups,
+		Countries:          c.Countries,
+		FrustrationSignals: c.FrustrationSignalsOn(),
 		Investigate: aggregate.InvestigateCfg{
 			Rate:           c.InvestigateRate(),
 			KeepErrors:     c.KeepsErrors(),
@@ -103,6 +110,6 @@ func (c *Collector) Init(ctx context.Context) error {
 			Value: c.redactor.Apply(c.DisplayName),
 		})
 	}
-	c.metrics = newCollectorMetrics(m)
+	c.metrics = newCollectorMetrics(m, c.EventLogsOn(), c.TracingOn(), c.FrustrationSignalsOn())
 	return nil
 }

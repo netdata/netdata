@@ -33,13 +33,27 @@
 //! passes themselves expose.
 use super::*;
 
-fn machine() -> file_registry::MachineId { file_registry::MachineId::new(uuid::Uuid::from_u128(0x0011_2233_4455_6677_8899_aabb_ccdd_eeff)).unwrap() }
+fn machine() -> file_registry::MachineId {
+    file_registry::MachineId::new(uuid::Uuid::from_u128(
+        0x0011_2233_4455_6677_8899_aabb_ccdd_eeff,
+    ))
+    .unwrap()
+}
 
-fn instance() -> file_registry::InstanceId { file_registry::InstanceId::new(uuid::Uuid::from_u128(0xaaaa_bbbb_cccc_dddd_eeee_ffff_0000_1111)).unwrap() }
+fn instance() -> file_registry::InstanceId {
+    file_registry::InstanceId::new(uuid::Uuid::from_u128(
+        0xaaaa_bbbb_cccc_dddd_eeee_ffff_0000_1111,
+    ))
+    .unwrap()
+}
 
-fn ident() -> file_registry::Identity { file_registry::Identity::new(machine(), instance()) }
+fn ident() -> file_registry::Identity {
+    file_registry::Identity::new(machine(), instance())
+}
 
-fn sk(seq: u64) -> file_registry::SeqKey { file_registry::SeqKey::new(ident(), seq) }
+fn sk(seq: u64) -> file_registry::SeqKey {
+    file_registry::SeqKey::new(ident(), seq)
+}
 
 use crate::test_helpers::empty_summary;
 
@@ -84,12 +98,7 @@ fn write_catalog_file(
     let max_seq = entries.iter().map(|e| e.id.seq).max().unwrap();
     let min_ts = entries.iter().map(|e| e.min_timestamp_s).min().unwrap_or(0);
     let max_ts = entries.iter().map(|e| e.max_timestamp_s).max().unwrap_or(0);
-    let path = dir.join(otel_catalog::filename(
-        ident(),
-        max_seq,
-        min_ts,
-        max_ts,
-    ));
+    let path = dir.join(otel_catalog::filename(ident(), max_seq, min_ts, max_ts));
     let mut catalog = Catalog::new(TenantId::from("tenant1"), date, ident());
     for entry in entries {
         catalog.add(entry.clone());
@@ -153,8 +162,14 @@ async fn seed_storage_disabled_skips_corrupt_without_rename() {
     )
     .await;
 
-    assert!(corrupt.exists(), "corrupt file left in place when storage disabled");
-    assert!(!quarantine_exists(&corrupt), "must NOT quarantine when storage disabled");
+    assert!(
+        corrupt.exists(),
+        "corrupt file left in place when storage disabled"
+    );
+    assert!(
+        !quarantine_exists(&corrupt),
+        "must NOT quarantine when storage disabled"
+    );
     assert!(!reg.is_uploaded(sk(1)));
     assert!(!reg.is_rotated(sk(1)));
 }
@@ -162,7 +177,10 @@ async fn seed_storage_disabled_skips_corrupt_without_rename() {
 /// True iff a `{name}.corrupt.<unix-ns>` quarantine of `original` exists in its
 /// directory (the heal path suffixes the quarantine name with a ns timestamp).
 fn quarantine_exists(original: &std::path::Path) -> bool {
-    let prefix = format!("{}.corrupt.", original.file_name().unwrap().to_str().unwrap());
+    let prefix = format!(
+        "{}.corrupt.",
+        original.file_name().unwrap().to_str().unwrap()
+    );
     std::fs::read_dir(original.parent().unwrap())
         .unwrap()
         .flatten()
@@ -203,7 +221,10 @@ async fn seed_heals_corrupt_catalog_from_remote() {
 
     seed_from_catalog_files(&mut reg, Some(&storage), machine(), "logs", long_timeout()).await;
 
-    assert!(quarantine_exists(&local), "corrupt body quarantined to .corrupt.<ns>");
+    assert!(
+        quarantine_exists(&local),
+        "corrupt body quarantined to .corrupt.<ns>"
+    );
     assert_eq!(
         std::fs::read(&local).unwrap(),
         good_bytes,
@@ -240,9 +261,18 @@ async fn seed_heal_failure_quarantines_and_continues() {
 
     seed_from_catalog_files(&mut reg, Some(&storage), machine(), "logs", long_timeout()).await;
 
-    assert!(quarantine_exists(&corrupt), "quarantine stands on heal failure");
-    assert!(!corrupt.exists(), "corrupt file renamed away, not reinstalled");
-    assert!(reg.is_uploaded(sk(5)) && reg.is_rotated(sk(5)), "good catalog still seeded");
+    assert!(
+        quarantine_exists(&corrupt),
+        "quarantine stands on heal failure"
+    );
+    assert!(
+        !corrupt.exists(),
+        "corrupt file renamed away, not reinstalled"
+    );
+    assert!(
+        reg.is_uploaded(sk(5)) && reg.is_rotated(sk(5)),
+        "good catalog still seeded"
+    );
     assert!(!reg.is_uploaded(sk(2)), "unhealed catalog not seeded");
 }
 
@@ -271,7 +301,9 @@ async fn seed_after_heal_reboots_with_zero_downloads() {
     let mut reg = make_registry(catalog_dir.path());
     reg.catalog_files.recover();
     seed_from_catalog_files(&mut reg, Some(&storage), machine(), "logs", long_timeout()).await;
-    let after_heal = storage.read_calls.load(std::sync::atomic::Ordering::Relaxed);
+    let after_heal = storage
+        .read_calls
+        .load(std::sync::atomic::Ordering::Relaxed);
     assert!(after_heal >= 1, "heal performed a download");
 
     // Second boot over the same dir: the healed file parses, so no download.
@@ -279,7 +311,9 @@ async fn seed_after_heal_reboots_with_zero_downloads() {
     reg2.catalog_files.recover();
     seed_from_catalog_files(&mut reg2, Some(&storage), machine(), "logs", long_timeout()).await;
     assert_eq!(
-        storage.read_calls.load(std::sync::atomic::Ordering::Relaxed),
+        storage
+            .read_calls
+            .load(std::sync::atomic::Ordering::Relaxed),
         after_heal,
         "healthy reboot does zero downloads"
     );
@@ -333,14 +367,25 @@ async fn seed_future_version_left_in_place_not_healed() {
     let storage = crate::storage::MockStorage::default();
     seed_from_catalog_files(&mut reg, Some(&storage), machine(), "logs", long_timeout()).await;
 
-    assert!(future.exists(), "future-version catalog left in place (not quarantined)");
-    assert!(!quarantine_exists(&future), "no quarantine for a version mismatch");
+    assert!(
+        future.exists(),
+        "future-version catalog left in place (not quarantined)"
+    );
+    assert!(
+        !quarantine_exists(&future),
+        "no quarantine for a version mismatch"
+    );
     assert_eq!(
-        storage.read_calls.load(std::sync::atomic::Ordering::Relaxed),
+        storage
+            .read_calls
+            .load(std::sync::atomic::Ordering::Relaxed),
         0,
         "no re-fetch attempted for a version mismatch"
     );
-    assert!(reg.is_uploaded(sk(5)) && reg.is_rotated(sk(5)), "good catalog still seeded");
+    assert!(
+        reg.is_uploaded(sk(5)) && reg.is_rotated(sk(5)),
+        "good catalog still seeded"
+    );
     assert!(!reg.is_uploaded(sk(2)), "future-version catalog not seeded");
 }
 
@@ -379,7 +424,10 @@ fn validate_catalog_rejects_cross_date_entry() {
     };
     let err = super::startup::validate_catalog(&bytes, &parsed, machine(), "logs")
         .expect_err("cross-date entry must be rejected");
-    assert!(err.contains("date"), "rejection reason mentions date: {err}");
+    assert!(
+        err.contains("date"),
+        "rejection reason mentions date: {err}"
+    );
 }
 
 /// Run `validate_catalog` over a single-entry catalog (envelope valid: own
@@ -436,25 +484,48 @@ fn validate_catalog_rejection_arm_priority() {
         // foreign machine + wrong FileId (seq 6) → arm 1 must win over arm 3.
         (
             "foreign machine",
-            sfst("logs", &tenant, date, file_registry::FileId::new(foreign, 0, 6, pk)),
+            sfst(
+                "logs",
+                &tenant,
+                date,
+                file_registry::FileId::new(foreign, 0, 6, pk),
+            ),
             "foreign-machine",
         ),
         // wrong tenant + wrong FileId → arm 2 wins over arm 3.
         (
             "wrong tenant",
-            sfst("logs", &other, date, file_registry::FileId::new(ident(), 0, 6, pk)),
+            sfst(
+                "logs",
+                &other,
+                date,
+                file_registry::FileId::new(ident(), 0, 6, pk),
+            ),
             "tenant",
         ),
         // own machine/tenant, wrong FileId + wrong date → arm 3 wins over arm 4.
         (
             "FileId mismatch",
-            sfst("logs", &tenant, other_date, file_registry::FileId::new(ident(), 0, 6, pk)),
+            sfst(
+                "logs",
+                &tenant,
+                other_date,
+                file_registry::FileId::new(ident(), 0, 6, pk),
+            ),
             "FileId",
         ),
         // own machine/tenant/FileId, wrong date only → arm 4.
-        ("wrong date", sfst("logs", &tenant, other_date, own_id), "date"),
+        (
+            "wrong date",
+            sfst("logs", &tenant, other_date, own_id),
+            "date",
+        ),
         // structurally malformed key → the `None` arm.
-        ("malformed key", "not/a/valid/sfst/key".to_owned(), "well-formed"),
+        (
+            "malformed key",
+            "not/a/valid/sfst/key".to_owned(),
+            "well-formed",
+        ),
     ];
     for (name, remote_key, expected) in cases {
         let err = validate_one_entry_key(remote_key).expect_err(name);
@@ -583,8 +654,7 @@ fn place_local_catalog(
 
     // Write a real catalog container so reconcile can read its SFST seqs; the
     // single entry's seq is `max_seq`.
-    let mut catalog =
-        otel_catalog::Catalog::new(TenantId::from("tenant1"), date, ident());
+    let mut catalog = otel_catalog::Catalog::new(TenantId::from("tenant1"), date, ident());
     catalog.add(make_entry(max_seq));
     let bytes = catalog.to_container_bytes().unwrap();
     std::fs::write(&path, &bytes).unwrap();
@@ -1124,7 +1194,10 @@ async fn reconcile_remote_uploads_marks_uploaded_and_enqueues_add_entry() {
     .await
     .unwrap();
 
-    assert!(reg.is_uploaded(sk(10)), "remote SFST must be marked uploaded");
+    assert!(
+        reg.is_uploaded(sk(10)),
+        "remote SFST must be marked uploaded"
+    );
     assert_eq!(
         catalog_builder.pending(),
         1,
@@ -1471,8 +1544,10 @@ fn holds_seq_tracks_wal_or_sfst_artifacts() {
 // (D6 filter, splice guard, per-identity floor, mark round-trip).
 
 fn machine2() -> file_registry::MachineId {
-    file_registry::MachineId::new(uuid::Uuid::from_u128(0x2222_3333_4444_5555_6666_7777_8888_9999))
-        .unwrap()
+    file_registry::MachineId::new(uuid::Uuid::from_u128(
+        0x2222_3333_4444_5555_6666_7777_8888_9999,
+    ))
+    .unwrap()
 }
 
 fn instance2() -> file_registry::InstanceId {
@@ -1526,7 +1601,14 @@ fn place_local_catalog_for(
     let bytes = catalog.to_container_bytes().unwrap();
     std::fs::write(&path, &bytes).unwrap();
     reg.catalog_files.track(
-        otel_catalog::File::new(date, identity, max_seq, min_ts, max_ts, ByteSize(bytes.len() as u64)),
+        otel_catalog::File::new(
+            date,
+            identity,
+            max_seq,
+            min_ts,
+            max_ts,
+            ByteSize(bytes.len() as u64),
+        ),
         path.clone(),
     );
     path
@@ -1593,7 +1675,11 @@ async fn reconcile_remote_does_not_falsely_mark_local_sfst_at_reused_seq() {
         "a stale/foreign object at the same seq must not mark the current-identity file"
     );
     let unuploaded: Vec<u64> = reg.unuploaded_ids().iter().map(|i| i.seq).collect();
-    assert_eq!(unuploaded, vec![5], "the current-identity SFST is still unuploaded");
+    assert_eq!(
+        unuploaded,
+        vec![5],
+        "the current-identity SFST is still unuploaded"
+    );
     // The same-machine prior-instance object is ours, marked under its own key.
     assert!(reg.is_uploaded(file_registry::SeqKey::new(prior, 5)));
     // No AddEntry: the prior object's local seq holds a different identity.
@@ -1690,7 +1776,10 @@ async fn reconcile_remote_splice_guard_rejects_identity_mismatch() {
         "an identity-mismatched local seq must not be spliced into a catalog entry"
     );
     assert!(reg.is_uploaded(file_registry::SeqKey::new(prior, 7)));
-    assert!(!reg.is_uploaded(sk(7)), "the current-identity local file is untouched");
+    assert!(
+        !reg.is_uploaded(sk(7)),
+        "the current-identity local file is untouched"
+    );
     cancel.cancel();
 }
 
@@ -1923,7 +2012,11 @@ async fn startup_sync_restores_after_wipe() {
             parsed.min_timestamp_s,
             parsed.max_timestamp_s,
         ));
-        assert_eq!(&std::fs::read(&path).unwrap(), bytes, "installed byte-identical");
+        assert_eq!(
+            &std::fs::read(&path).unwrap(),
+            bytes,
+            "installed byte-identical"
+        );
     }
     let foreign_parsed = crate::remote_keys::parse_catalog_key(&objs[4].0, "logs").unwrap();
     let foreign_path = file_registry::layout::date_tenant_dir(
@@ -1931,8 +2024,16 @@ async fn startup_sync_restores_after_wipe() {
         foreign_parsed.date,
         foreign_parsed.tenant_id.as_str(),
     )
-    .join(otel_catalog::filename(foreign_parsed.identity, 99, 100, 200));
-    assert!(!foreign_path.exists(), "foreign-machine catalog must not install");
+    .join(otel_catalog::filename(
+        foreign_parsed.identity,
+        99,
+        100,
+        200,
+    ));
+    assert!(
+        !foreign_path.exists(),
+        "foreign-machine catalog must not install"
+    );
 
     // Highwater raised to the max filename seq across kept keys (42).
     assert_eq!(wal::read_seq_highwater(&hw_path), Some(42));
@@ -1970,9 +2071,16 @@ async fn startup_sync_fails_closed_on_list_error() {
         ..crate::storage::MockStorage::default()
     };
     assert!(
-        startup_catalog_sync(&storage, "logs", machine(), catalog_base.path(), &hw.path().join("hw"), long_timeout())
-            .await
-            .is_err(),
+        startup_catalog_sync(
+            &storage,
+            "logs",
+            machine(),
+            catalog_base.path(),
+            &hw.path().join("hw"),
+            long_timeout()
+        )
+        .await
+        .is_err(),
         "LIST error must fail closed"
     );
 }
@@ -1989,9 +2097,16 @@ async fn startup_sync_fails_closed_on_transport_error() {
         ..crate::storage::MockStorage::default()
     };
     assert!(
-        startup_catalog_sync(&storage, "logs", machine(), catalog_base.path(), &hw.path().join("hw"), long_timeout())
-            .await
-            .is_err(),
+        startup_catalog_sync(
+            &storage,
+            "logs",
+            machine(),
+            catalog_base.path(),
+            &hw.path().join("hw"),
+            long_timeout()
+        )
+        .await
+        .is_err(),
         "download transport error must fail closed"
     );
 }
@@ -2039,12 +2154,21 @@ async fn startup_sync_noop_when_all_local() {
         list_response: vec![key],
         ..crate::storage::MockStorage::default()
     };
-    startup_catalog_sync(&storage, "logs", machine(), catalog_base.path(), &hw_path, long_timeout())
-        .await
-        .unwrap();
+    startup_catalog_sync(
+        &storage,
+        "logs",
+        machine(),
+        catalog_base.path(),
+        &hw_path,
+        long_timeout(),
+    )
+    .await
+    .unwrap();
 
     assert_eq!(
-        storage.read_calls.load(std::sync::atomic::Ordering::Relaxed),
+        storage
+            .read_calls
+            .load(std::sync::atomic::Ordering::Relaxed),
         0,
         "no downloads when every catalog is already local"
     );
@@ -2105,7 +2229,10 @@ async fn startup_sync_rejects_invalid_bodies() {
     // The three invalid ones did not install (t1 dir holds exactly the good file).
     let t1_dir = file_registry::layout::date_tenant_dir(catalog_base.path(), d(17), "t1");
     let count = std::fs::read_dir(&t1_dir).unwrap().count();
-    assert_eq!(count, 1, "only the valid catalog is installed: {count} files");
+    assert_eq!(
+        count, 1,
+        "only the valid catalog is installed: {count} files"
+    );
 }
 
 /// Seed correctness from filenames alone: highwater is raised to the max
@@ -2128,13 +2255,22 @@ async fn startup_sync_seeds_from_filenames() {
         list_response: vec![key],
         ..crate::storage::MockStorage::default()
     };
-    startup_catalog_sync(&storage, "logs", machine(), catalog_base.path(), &hw_path, long_timeout())
-        .await
-        .unwrap();
+    startup_catalog_sync(
+        &storage,
+        "logs",
+        machine(),
+        catalog_base.path(),
+        &hw_path,
+        long_timeout(),
+    )
+    .await
+    .unwrap();
 
     assert_eq!(wal::read_seq_highwater(&hw_path), Some(500));
     assert_eq!(
-        storage.read_calls.load(std::sync::atomic::Ordering::Relaxed),
+        storage
+            .read_calls
+            .load(std::sync::atomic::Ordering::Relaxed),
         0,
         "seeding needs no downloads"
     );
@@ -2167,7 +2303,9 @@ async fn startup_sync_sanitizer_skips_hostile_keys() {
     .expect("hostile keys skipped, not fatal");
     assert!(tenants.is_empty(), "no tenant discovered from hostile keys");
     assert_eq!(
-        storage.read_calls.load(std::sync::atomic::Ordering::Relaxed),
+        storage
+            .read_calls
+            .load(std::sync::atomic::Ordering::Relaxed),
         0
     );
 }
@@ -2370,11 +2508,18 @@ async fn startup_sync_restores_default_tenant() {
     .await
     .unwrap();
 
-    assert!(tenants.contains(&default), "default tenant must be discovered");
+    assert!(
+        tenants.contains(&default),
+        "default tenant must be discovered"
+    );
     let parsed = crate::remote_keys::parse_catalog_key(&key, "logs").unwrap();
     let path = file_registry::layout::date_tenant_dir(catalog_base.path(), parsed.date, "default")
         .join(otel_catalog::filename(parsed.identity, 11, 100, 200));
-    assert_eq!(&std::fs::read(&path).unwrap(), &bytes, "default catalog installed");
+    assert_eq!(
+        &std::fs::read(&path).unwrap(),
+        &bytes,
+        "default catalog installed"
+    );
     assert_eq!(wal::read_seq_highwater(&hw_path), Some(11));
 }
 
@@ -2391,11 +2536,22 @@ async fn startup_sync_list_error_leaves_highwater_untouched() {
         ..crate::storage::MockStorage::default()
     };
     assert!(
-        startup_catalog_sync(&storage, "logs", machine(), catalog_base.path(), &hw_path, long_timeout())
-            .await
-            .is_err()
+        startup_catalog_sync(
+            &storage,
+            "logs",
+            machine(),
+            catalog_base.path(),
+            &hw_path,
+            long_timeout()
+        )
+        .await
+        .is_err()
     );
-    assert_eq!(wal::read_seq_highwater(&hw_path), Some(777), "highwater untouched on LIST error");
+    assert_eq!(
+        wal::read_seq_highwater(&hw_path),
+        Some(777),
+        "highwater untouched on LIST error"
+    );
 }
 
 /// A LIST of only foreign-machine keys discovers no tenants and leaves the
@@ -2414,15 +2570,26 @@ async fn startup_sync_foreign_only_list_is_inert() {
         ..crate::storage::MockStorage::default()
     };
     let tenants = startup_catalog_sync(
-        &storage, "logs", machine(), catalog_base.path(), &hw_path, long_timeout(),
+        &storage,
+        "logs",
+        machine(),
+        catalog_base.path(),
+        &hw_path,
+        long_timeout(),
     )
     .await
     .unwrap();
     assert!(tenants.is_empty(), "no own-machine tenant discovered");
     assert_eq!(
-        storage.read_calls.load(std::sync::atomic::Ordering::Relaxed),
+        storage
+            .read_calls
+            .load(std::sync::atomic::Ordering::Relaxed),
         0,
         "foreign keys are never downloaded"
     );
-    assert_eq!(wal::read_seq_highwater(&hw_path), Some(5), "highwater untouched");
+    assert_eq!(
+        wal::read_seq_highwater(&hw_path),
+        Some(5),
+        "highwater untouched"
+    );
 }

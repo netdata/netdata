@@ -3,41 +3,58 @@
 package otlp
 
 import (
+	"strconv"
+	"strings"
 	"time"
-	"unicode/utf8"
 
 	"github.com/netdata/netdata/go/plugins/plugin/dem/rum/beacon"
 	commonpb "go.opentelemetry.io/proto/otlp/common/v1"
 	logspb "go.opentelemetry.io/proto/otlp/logs/v1"
 )
 
-// maxStackBytes bounds error.stack (≤4 KiB). the Faro decoder already
-// truncates at this length before the beacon reaches here; this is a
-// defensive second cap so a future producer cannot regress it silently.
-const maxStackBytes = 4096
-
 // queued is one record waiting on the owning site's export queue.
 type queued struct{ rec *logspb.LogRecord }
 
-// build turns one accepted beacon into zero or more queued records:
-// pageview, session_start (first sighting per session/TTL), one per JS
-// error, one per custom event, one per console log line (already
-// filtered upstream by collect_console_logs). Free-form text is redacted
-// before it reaches the record.
-func (e *Exporter) build(b *beacon.Beacon, pageView bool) []queued {
+// build turns admitted observations into document activations, vital updates,
+// JS errors, custom events and console log lines (already
+// filtered upstream by ConsoleLogsOn). Receiver normalization owns all text
+// cleaning and bounds; export preserves the accepted observation.
+func (e *Logs) build(b *beacon.Beacon, pageView bool) []queued {
 	base := baseAttrs(b)
-	now := e.now()
 	var out []queued
 
-	if b.SessionID != "" && e.sessions.starts(b.SessionID, now) {
-		out = append(out, e.record(base, "session_start", b.Received, sevInfo, "session start"))
-	}
 	if pageView {
-		out = append(out, e.record(base, "pageview", b.Received, sevInfo, "pageview "+b.Path))
+		attrs, ts := base, b.Received
+		for _, event := range b.Events {
+			if event.Kind == beacon.EventDocument {
+				attrs = append(append([]*commonpb.KeyValue{}, base...), strAttr("event.id", event.ID), strAttr("event.revision", strconv.FormatUint(event.Revision, 10)))
+				if !event.Time.IsZero() {
+					ts = event.Time
+				}
+				break
+			}
+		}
+		out = append(out, e.record(attrs, "pageview", ts, sevInfo, "pageview "+b.PageGroup))
+	}
+	for _, vital := range b.Vitals {
+		vitalBase := base
+		page := b.PageGroup
+		if origin := vital.Origin; origin != nil {
+			observed := *b
+			observed.PageGroup, observed.Browser, observed.Device = origin.PageGroup, origin.Browser, origin.Device
+			observed.Country, observed.AppVersion = origin.Country, origin.AppVersion
+			vitalBase, page = baseAttrs(&observed), origin.PageGroup
+		}
+		attrs := append(append([]*commonpb.KeyValue{}, vitalBase...),
+			strAttr("metric.name", vital.Name), strAttr("metric.id", vital.ID),
+			strAttr("metric.revision", strconv.FormatUint(vital.Revision, 10)),
+			strAttr("metric.value", strconv.FormatFloat(vital.Value, 'g', -1, 64)),
+			strAttr("metric.element", vital.Element))
+		out = append(out, e.record(attrs, "vital", vital.Time, sevInfo, "vital "+vital.Name+" @ "+page))
 	}
 	for _, err := range b.Errors {
-		msg := e.redact(err.Message)
-		stack := truncate(e.redact(err.Stack), maxStackBytes)
+		msg := err.Message
+		stack := err.Stack
 		attrs := append(append([]*commonpb.KeyValue{}, base...),
 			strAttr("error.type", err.Type), strAttr("error.message", msg), strAttr("error.stack", stack))
 		if err.Fingerprint != "" {
@@ -47,17 +64,30 @@ func (e *Exporter) build(b *beacon.Beacon, pageView bool) []queued {
 		out = append(out, e.record(attrs, "error", err.Time, sevError, body))
 	}
 	for _, ev := range b.Events {
+		if ev.Kind == beacon.EventSession || ev.Kind == beacon.EventDocument {
+			continue
+		}
 		attrs := append(append([]*commonpb.KeyValue{}, base...), strAttr("event.name", ev.Name))
+		if ev.ID != "" {
+			attrs = append(attrs, strAttr("event.id", ev.ID), strAttr("event.revision", strconv.FormatUint(ev.Revision, 10)))
+		}
 		for k, v := range ev.Attrs {
-			attrs = append(attrs, strAttr("event.attr."+k, e.redact(v)))
+			attrs = append(attrs, strAttr("event.attr."+k, v))
 		}
 		body := "event " + ev.Name + " @ " + b.Path
 		out = append(out, e.record(attrs, "event", ev.Time, sevInfo, body))
 	}
 	for _, l := range b.Logs {
-		msg := e.redact(l.Message)
+		msg := l.Message
 		body := "console " + l.Level + ": " + msg
-		out = append(out, e.record(base, "console", l.Time, sevInfo, body))
+		attrs := append(append([]*commonpb.KeyValue{}, base...), strAttr("console.level", l.Level))
+		if typ := l.ErrorType; typ != "" {
+			attrs = append(attrs, strAttr("error.type", typ))
+		}
+		if stack := l.Stack; stack != "" {
+			attrs = append(attrs, strAttr("error.stack", stack))
+		}
+		out = append(out, e.record(attrs, "console", l.Time, consoleSeverity(l.Level), body))
 	}
 	return out
 }
@@ -77,6 +107,8 @@ func baseAttrs(b *beacon.Beacon) []*commonpb.KeyValue {
 		}
 	}
 	add("session.id", b.SessionID)
+	add("document.experience.id", b.ExperienceID)
+	add("application.view.id", b.ViewID)
 	add("page.path", b.Path)
 	add("page.group", b.PageGroup)
 	add("page.view", b.View)
@@ -90,7 +122,7 @@ func baseAttrs(b *beacon.Beacon) []*commonpb.KeyValue {
 	return out
 }
 
-func (e *Exporter) record(
+func (e *Logs) record(
 	attrs []*commonpb.KeyValue,
 	typ string,
 	ts time.Time,
@@ -118,11 +150,22 @@ func (e *Exporter) record(
 	}
 }
 
-func sevText(sev logspb.SeverityNumber) string {
-	if sev == sevError {
-		return "ERROR"
+func consoleSeverity(level string) logspb.SeverityNumber {
+	switch strings.ToLower(level) {
+	case "error":
+		return sevError
+	case "warn", "warning":
+		return logspb.SeverityNumber_SEVERITY_NUMBER_WARN
+	case "debug":
+		return logspb.SeverityNumber_SEVERITY_NUMBER_DEBUG
+	case "trace":
+		return logspb.SeverityNumber_SEVERITY_NUMBER_TRACE
+	default:
+		return sevInfo
 	}
-	return "INFO"
+}
+func sevText(sev logspb.SeverityNumber) string {
+	return strings.TrimPrefix(sev.String(), "SEVERITY_NUMBER_")
 }
 
 func strAttr(k, v string) *commonpb.KeyValue {
@@ -134,14 +177,4 @@ func strAttr(k, v string) *commonpb.KeyValue {
 			},
 		},
 	}
-}
-
-func truncate(s string, n int) string {
-	if len(s) <= n {
-		return s
-	}
-	for n > 0 && !utf8.RuneStart(s[n]) {
-		n-- // never cut inside a multi-byte rune
-	}
-	return s[:n]
 }

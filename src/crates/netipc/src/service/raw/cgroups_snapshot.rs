@@ -1,7 +1,7 @@
 use super::client::{ClientConfig, RawCallKind, RawClient};
 use super::dispatch::{DispatchError, DispatchHandler};
 use crate::protocol::{
-    self, CgroupsRequest, CgroupsResponseView, NipcError, METHOD_CGROUPS_SNAPSHOT,
+    self, CgroupsRequest, CgroupsResponseView, METHOD_CGROUPS_SNAPSHOT, NipcError,
 };
 use std::sync::Arc;
 

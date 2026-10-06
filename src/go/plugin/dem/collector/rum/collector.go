@@ -14,7 +14,6 @@ import (
 	"github.com/netdata/netdata/go/plugins/plugin/dem/rum/aggregate"
 	"github.com/netdata/netdata/go/plugins/plugin/dem/rum/config"
 	rumhistory "github.com/netdata/netdata/go/plugins/plugin/dem/rum/history"
-	"github.com/netdata/netdata/go/plugins/plugin/dem/rum/otlp"
 	rumregistry "github.com/netdata/netdata/go/plugins/plugin/dem/rum/registry"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/collectorapi"
 )
@@ -29,7 +28,6 @@ type Config struct {
 	UpdateEvery int              `yaml:"update_every,omitempty" json:"update_every"`
 	Window      confopt.Duration `yaml:"window"                 json:"window"`
 	config.Site `yaml:",inline" json:""`
-	OTLP        otlp.Config `yaml:"otlp"                   json:"otlp"`
 }
 type Dependencies struct {
 	Registry *rumregistry.Registry
@@ -61,21 +59,20 @@ func New(deps Dependencies) *Collector {
 		Config: Config{
 			Window: confopt.Duration(5 * time.Minute),
 			Site: config.Site{
-				PageGroups:        20,
-				Countries:         20,
-				MeasureSampleRate: 1,
-				Bots:              config.BotsExclude,
-			},
-			OTLP: otlp.Config{
-				Enabled:  "auto",
-				Endpoint: "127.0.0.1:4317",
-			},
+				PageGroups: 20,
+				Countries:  20,
+				Bots:       config.BotsExclude,
+			}.Effective(),
 		},
 		deps:  deps,
 		store: metrix.NewCollectorStore(),
 	}
 }
-func (c *Collector) Configuration() any                 { return c.Config }
+func (c *Collector) Configuration() any {
+	config := c.Config
+	config.Site = config.Site.Effective()
+	return config
+}
 func (c *Collector) MetricStore() metrix.CollectorStore { return c.store }
 func (c *Collector) ChartTemplateYAML() string          { return charts }
 

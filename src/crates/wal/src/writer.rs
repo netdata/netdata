@@ -839,7 +839,11 @@ mod tests {
                 _ => None,
             })
             .collect();
-        assert_eq!(closed.len(), 1, "exactly one stream should seal: {events:?}");
+        assert_eq!(
+            closed.len(),
+            1,
+            "exactly one stream should seal: {events:?}"
+        );
         let (part_key, valid_up_to, entry_count, size) = closed[0];
         assert_eq!(part_key, pk(1), "the expired stream (A) must be sealed");
         assert!(

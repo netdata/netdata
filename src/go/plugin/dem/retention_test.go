@@ -76,7 +76,7 @@ func TestRetentionWithoutSitesAndAfterServiceShutdown(t *testing.T) {
 		t.Fatal("retention did not stop")
 	}
 	// The command still owns the journal while native site jobs drain.
-	rows, err := rumhistory.NewStore(st).QuerySessions(ctx, "", 0, now+1, 2000)
+	rows, err := rumhistory.NewStore(st).QuerySessions(ctx, "", "", 0, now+1, 2000)
 	require.NoError(t, err)
 	require.Len(t, rows, 1)
 	assert.Equal(t, "recent", rows[0].SessionID)

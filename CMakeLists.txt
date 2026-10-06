@@ -2283,6 +2283,7 @@ set(WINDOWS_PLUGIN_FILES
         src/collectors/windows.plugin/perflib-network.c
         src/collectors/windows.plugin/perflib-smb.c
         src/collectors/windows.plugin/perflib-terminal-services.c
+        src/collectors/windows.plugin/perflib-dns.c
         src/collectors/windows.plugin/perflib-netframework.c
         src/collectors/windows.plugin/perflib-memory.c
         src/collectors/windows.plugin/perflib-processes.c
@@ -4965,3 +4966,9 @@ add_custom_target(setup-mcp
                 --tool all --source-dir "${CMAKE_SOURCE_DIR}"
         USES_TERMINAL
         COMMENT "Configuring netdata-build MCP server for opencode/Claude Code (global config)")
+
+# Opt-in: `ninja setup-git-hooks` installs the hooks in packaging/tools/git-hooks.
+add_custom_target(setup-git-hooks
+        COMMAND "${CMAKE_COMMAND}" -P "${CMAKE_SOURCE_DIR}/packaging/tools/git-hooks/install-git-hooks.cmake"
+        USES_TERMINAL
+        COMMENT "Installing git hooks from packaging/tools/git-hooks")

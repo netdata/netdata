@@ -18,7 +18,7 @@
 //!   `out.len()` around the call (see `raw.rs`) and treat the
 //!   growth as the result's tree bytes — the convention sfst's set ops
 //!   build on (`PosSet::or_assign`/`and_assign` in `sfst/src/index_reader.rs`).
-use crate::node::{child_index, NodeReader};
+use crate::node::{NodeReader, child_index};
 
 /// Walk the tree to `value`, reading one node byte per level: take the
 /// child selected by `value`'s 3-bit field, return `false` if that child

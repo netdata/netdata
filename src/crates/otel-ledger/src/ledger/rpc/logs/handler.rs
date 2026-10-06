@@ -443,10 +443,8 @@ impl FunctionHandler for OtelLogsHandler {
                     // response, but the cancel `select!` can race and
                     // deliver it — so it must be the same well-formed
                     // empty envelope as every other path, selector included.
-                    let mut result = to_result(
-                        LogsData::empty(query.histogram_field(), query.grid()),
-                        last,
-                    );
+                    let mut result =
+                        to_result(LogsData::empty(query.histogram_field(), query.grid()), last);
                     result.required_params = required_params;
                     return Ok(OtelLogsResponse::Logs(result));
                 }

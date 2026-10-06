@@ -2,6 +2,238 @@ plugin_name: windows.plugin
 modules:
   - meta:
       plugin_name: windows.plugin
+      module_name: PerflibDNS
+      monitored_instance:
+        name: DNS Server
+        link: "https://learn.microsoft.com/en-us/windows-server/networking/dns/dns-overview"
+        categories:
+          - data-collection.operating-systems
+        icon_filename: "windows.svg"
+      related_resources:
+        integrations:
+          list: []
+      info_provided_to_referring_integrations:
+        description: ""
+      keywords:
+        - windows
+        - dns server
+        - dns
+        - perflib
+        - microsoft
+    overview:
+      data_collection:
+        metrics_description: |
+          Monitor DNS Server query traffic, recursion, zone transfers, dynamic updates, memory, response handling, and WINS lookups on Windows.
+        method_description: |
+          It reads DNS Server performance counters from Windows Perflib.
+      supported_platforms:
+        include: ["windows"]
+        exclude: []
+      multi_instance: false
+      additional_permissions:
+        description: ""
+      default_behavior:
+        auto_detection:
+          description: |
+            This collector is enabled by default and checks for DNS Server counters on every collection. Once Windows registers the counters, DNS Server charts appear on the next collection if the DNS Server service is running.
+        limits:
+          description: ""
+        performance_impact:
+          description: ""
+    setup:
+      prerequisites:
+        list:
+          - title: DNS Server role
+            description: Install the Windows DNS Server role and run its service so Windows exposes the DNS performance object.
+      configuration:
+        file:
+          name: "netdata.conf"
+          section_name: "[plugin:windows:PerflibDNS]"
+          description: "The Netdata main configuration file"
+        options:
+          description: ""
+          folding:
+            title: "Config option"
+            enabled: false
+          list:
+            - name: update every
+              description: Data collection frequency.
+              default_value: 1
+              required: false
+        examples:
+          folding:
+            enabled: true
+            title: ""
+          list: []
+    troubleshooting:
+      problems:
+        list: []
+    alerts: []
+    metrics:
+      folding:
+        title: Metrics
+        enabled: false
+      description: "DNS Server event counters are running totals, displayed as per-second rates. Missing counters leave gaps. Query-drop totals and individual reasons are separate, non-stacked dimensions. Suppressed responses and recursive send timeouts have separate charts and units."
+      availability: []
+      scopes:
+        - name: DNS Server
+          description: Aggregate counters from the DNS Server performance object on the host.
+          labels: []
+          metrics:
+            - name: windows.dns.queries
+              description: DNS queries received
+              unit: "queries/s"
+              chart_type: stacked
+              dimensions:
+                - name: tcp
+                - name: udp
+            - name: windows.dns.responses
+              description: DNS responses sent
+              unit: "responses/s"
+              chart_type: stacked
+              dimensions:
+                - name: tcp
+                - name: udp
+            - name: windows.dns.query_handling
+              description: DNS queries dropped
+              unit: "queries/s"
+              chart_type: line
+              dimensions:
+                - name: dropped_total
+                - name: dropped_policy
+                - name: dropped_rate_limiting
+                - name: dropped_send
+                - name: dropped_bad_socket
+            - name: windows.dns.suppressed_responses
+              description: DNS responses suppressed
+              unit: "responses/s"
+              chart_type: line
+              dimensions:
+                - name: suppressed
+            - name: windows.dns.remote_queries
+              description: DNS remote queries in flight
+              unit: "queries"
+              chart_type: line
+              dimensions:
+                - name: in_flight
+            - name: windows.dns.recursive_queries
+              description: DNS recursive queries
+              unit: "queries/s"
+              chart_type: line
+              dimensions:
+                - name: queries
+                - name: failures
+            - name: windows.dns.recursive_send_timeouts
+              description: DNS recursive send timeouts
+              unit: "timeouts/s"
+              chart_type: line
+              dimensions:
+                - name: timeouts
+            - name: windows.dns.zone_transfer_requests_received
+              description: DNS zone transfer requests received
+              unit: "requests/s"
+              chart_type: line
+              dimensions:
+                - name: axfr
+                - name: ixfr
+            - name: windows.dns.zone_transfer_requests_sent
+              description: DNS zone transfer requests sent
+              unit: "requests/s"
+              chart_type: line
+              dimensions:
+                - name: axfr
+                - name: ixfr
+                - name: soa
+            - name: windows.dns.zone_transfer_responses_received
+              description: DNS zone transfer responses received
+              unit: "responses/s"
+              chart_type: line
+              dimensions:
+                - name: axfr
+                - name: ixfr
+            - name: windows.dns.zone_transfer_success_received
+              description: DNS zone transfers completed on secondary
+              unit: "transfers/s"
+              chart_type: line
+              dimensions:
+                - name: axfr
+                - name: ixfr_tcp
+                - name: ixfr_udp
+            - name: windows.dns.zone_transfer_success_sent
+              description: DNS zone transfers completed on primary
+              unit: "transfers/s"
+              chart_type: line
+              dimensions:
+                - name: axfr
+                - name: ixfr
+            - name: windows.dns.zone_transfer_failures
+              description: DNS zone transfer failures
+              unit: "failures/s"
+              chart_type: line
+              dimensions:
+                - name: failures
+            - name: windows.dns.notify_received
+              description: DNS notifications received
+              unit: "notifications/s"
+              chart_type: line
+              dimensions:
+                - name: received
+            - name: windows.dns.notify_sent
+              description: DNS notifications sent
+              unit: "notifications/s"
+              chart_type: line
+              dimensions:
+                - name: sent
+            - name: windows.dns.dynamic_updates
+              description: DNS dynamic update events
+              unit: "updates/s"
+              chart_type: line
+              dimensions:
+                - name: no_operation
+                - name: written
+                - name: rejected
+                - name: timed_out
+                - name: secure_received
+                - name: secure_failure
+            - name: windows.dns.dynamic_updates_queued
+              description: DNS dynamic updates queued
+              unit: "updates"
+              chart_type: line
+              dimensions:
+                - name: queued
+            - name: windows.dns.memory_used
+              description: DNS server memory used
+              unit: "bytes"
+              chart_type: line
+              dimensions:
+                - name: caching
+                - name: database_node
+                - name: nbstat
+                - name: record_flow
+                - name: tcp_message
+                - name: udp_message
+            - name: windows.dns.unmatched_responses
+              description: DNS unmatched responses
+              unit: "responses/s"
+              chart_type: line
+              dimensions:
+                - name: unmatched
+            - name: windows.dns.wins_lookups
+              description: DNS WINS lookups received
+              unit: "lookups/s"
+              chart_type: line
+              dimensions:
+                - name: forward
+                - name: reverse
+            - name: windows.dns.wins_responses
+              description: DNS WINS responses sent
+              unit: "responses/s"
+              chart_type: line
+              dimensions:
+                - name: forward
+                - name: reverse
+  - meta:
+      plugin_name: windows.plugin
       module_name: PerflibProcessor
       monitored_instance:
         name: Processor

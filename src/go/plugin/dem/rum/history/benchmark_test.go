@@ -91,10 +91,13 @@ func BenchmarkHistoryQueries(b *testing.B) {
 			return err
 		}},
 		{"sessions_15m", func() error {
-			_, err := s.QuerySessions(context.Background(), "shop", now.Add(-15*time.Minute).Unix(), now.Unix(), 0)
+			_, err := s.QuerySessions(context.Background(), "shop", "", now.Add(-15*time.Minute).Unix(), now.Unix(), 0)
 			return err
 		}},
-		{"sessions_all", func() error { _, err := s.QuerySessions(context.Background(), "shop", 0, now.Unix(), 0); return err }},
+		{"sessions_all", func() error {
+			_, err := s.QuerySessions(context.Background(), "shop", "", 0, now.Unix(), 0)
+			return err
+		}},
 		{"errors_overview_all", func() error { _, err := s.QueryErrors(context.Background(), "shop", "", 0, now.Unix()); return err }},
 		{"error_selected_all", func() error {
 			_, err := s.QueryErrors(context.Background(), "shop", "fingerprint-1", 0, now.Unix())

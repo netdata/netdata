@@ -23,7 +23,7 @@
 use std::io;
 
 use crate::ceil_log8;
-use crate::node::{child_index, child_offset, skip_subtree_at, NodeReader};
+use crate::node::{NodeReader, child_index, child_offset, skip_subtree_at};
 use crate::ops::{
     contains_inner, difference_subtree, intersect_subtree, range_count, remove_range_subtree,
     symmetric_difference_subtree, union_subtree,

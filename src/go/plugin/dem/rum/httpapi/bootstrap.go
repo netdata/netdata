@@ -43,10 +43,13 @@ func (s *Server) bootstrap(w http.ResponseWriter, r *http.Request) {
 	// "private" keeps CDNs out: Cloudflare rewrites a plain no-cache or a
 	// short max-age to its own browser TTL (4 h by default).
 	js := faro.Bootstrap(key, base, faro.BootstrapOptions{
-		MeasureRate: st.measureRate,
-		IncludeBots: st.includeBots,
-		Tracing:     st.tracing,
-		Propagate:   st.propagate,
+		MeasureRate:        st.measureRate,
+		IncludeBots:        st.includeBots,
+		EventLogs:          route.config.EventLogsOn(),
+		FrustrationSignals: route.config.FrustrationSignalsOn(),
+		ConsoleLogs:        route.config.ConsoleLogsOn(),
+		Tracing:            st.tracing,
+		Propagate:          st.propagate,
 	})
 	sum := sha256.Sum256([]byte(js))
 	etag := `"` + hex.EncodeToString(sum[:8]) + `"`

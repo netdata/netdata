@@ -29,6 +29,7 @@ DWORD RegistryFindIDByName(const char *name);
 
 PERF_DATA_BLOCK *perflibGetPerformanceData(DWORD id);
 void perflibFreePerformanceData(void);
+bool perflibRefreshPerformanceDataCache(void);
 PERF_OBJECT_TYPE *perflibFindObjectTypeByName(PERF_DATA_BLOCK *pDataBlock, const char *name);
 PERF_INSTANCE_DEFINITION *perflibForEachInstance(PERF_DATA_BLOCK *pDataBlock, PERF_OBJECT_TYPE *pObjectType, PERF_INSTANCE_DEFINITION *lastInstance);
 

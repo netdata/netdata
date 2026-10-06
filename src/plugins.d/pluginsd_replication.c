@@ -53,13 +53,8 @@ PARSER_RC pluginsd_chart_definition_end(char **words, size_t num_words, PARSER *
     time_t child_wall_clock_time = (wall_clock_time_txt && *wall_clock_time_txt) ? (time_t)str2ul(wall_clock_time_txt) : now_realtime_sec();
 
     bool ok = true;
-    RRDSET_FLAGS old = rrdset_flag_set_and_clear(
-        st, RRDSET_FLAG_RECEIVER_REPLICATION_IN_PROGRESS, RRDSET_FLAG_RECEIVER_REPLICATION_FINISHED);
 
-    if(!(old & RRDSET_FLAG_RECEIVER_REPLICATION_IN_PROGRESS)) {
-        if(rrdhost_receiver_replicating_charts_plus_one(st->rrdhost) == 1)
-            pulse_host_status(host, PULSE_HOST_STATUS_RCV_REPLICATING, 0);
-
+    if(rrdhost_receiver_replication_claim(st)) {
         __atomic_add_fetch(&host->stream.rcv.status.replication.counter_in, 1, __ATOMIC_RELAXED);
 
 #ifdef REPLICATION_TRACKING
@@ -95,8 +90,9 @@ PARSER_RC pluginsd_chart_definition_end(char **words, size_t num_words, PARSER *
             ok = backfill_callback(0, 0, &brd);
     }
     else {
-        // this is normal, since dimensions may be added to a chart,
-        // and the child will send another CHART_DEFINITION_END command.
+        // this is normal, since dimensions may be added to a chart, and the child will send another
+        // CHART_DEFINITION_END command. rrdhost_receiver_replication_claim() has already withdrawn its
+        // own speculative increment.
 
 #ifdef NETDATA_LOG_REPLICATION_REQUESTS
         internal_error(true, "REPLAY: 'host:%s/chart:%s' not sending duplicate replication request",
@@ -417,17 +413,9 @@ ALWAYS_INLINE PARSER_RC pluginsd_replay_end(char **words, size_t num_words, PARS
     if(parser->user.replay.rset_enabled && st)
         st->replication_empty_response_count = 0;
 
-    if(parser->user.replay.rset_enabled && st->rrdhost->receiver) {
-        time_t now = now_realtime_sec();
-        time_t started = st->rrdhost->receiver->replication.first_time_s;
-        time_t current = parser->user.replay.end_time;
-
-        if(started && current > started) {
-            host->stream.rcv.status.replication.percent = (NETDATA_DOUBLE) (current - started) * 100.0 / (NETDATA_DOUBLE) (now - started);
-            worker_set_metric(WORKER_RECEIVER_JOB_REPLICATION_COMPLETION,
-                              host->stream.rcv.status.replication.percent);
-        }
-    }
+    if(parser->user.replay.rset_enabled && st->rrdhost->receiver)
+        worker_set_metric(WORKER_RECEIVER_JOB_REPLICATION_COMPLETION,
+                          rrdhost_receiver_replication_completion(host, NULL));
 
     parser->user.replay.start_time = 0;
     parser->user.replay.end_time = 0;
@@ -459,15 +447,9 @@ ALWAYS_INLINE PARSER_RC pluginsd_replay_end(char **words, size_t num_words, PARS
         if (st->update_every != update_every_child)
             rrdset_set_update_every_s(st, update_every_child);
 
-        RRDSET_FLAGS old = rrdset_flag_set_and_clear(
-            st, RRDSET_FLAG_RECEIVER_REPLICATION_FINISHED,
-            RRDSET_FLAG_RECEIVER_REPLICATION_IN_PROGRESS | RRDSET_FLAG_SYNC_CLOCK);
+        RRDSET_FLAGS old = rrdhost_receiver_replication_release(st, RRDSET_FLAG_SYNC_CLOCK);
 
-        if(!(old & RRDSET_FLAG_RECEIVER_REPLICATION_FINISHED)) {
-            if(rrdhost_receiver_replicating_charts_minus_one(st->rrdhost) == 0)
-                pulse_host_status(host, PULSE_HOST_STATUS_RCV_RUNNING, 0);
-        }
-        else
+        if(old & RRDSET_FLAG_RECEIVER_REPLICATION_FINISHED)
             nd_log(NDLS_DAEMON, NDLP_WARNING,
                 "PLUGINSD REPLAY ERROR: 'host:%s/chart:%s' got a " PLUGINSD_KEYWORD_REPLAY_END " "
                 "with enable_streaming = true, but there was no replication in progress for this chart.",
@@ -475,8 +457,8 @@ ALWAYS_INLINE PARSER_RC pluginsd_replay_end(char **words, size_t num_words, PARS
 
         pluginsd_clear_scope_chart(parser, PLUGINSD_KEYWORD_REPLAY_END, NULL);
 
-        host->stream.rcv.status.replication.percent = 100.0;
-        worker_set_metric(WORKER_RECEIVER_JOB_REPLICATION_COMPLETION, host->stream.rcv.status.replication.percent);
+        worker_set_metric(WORKER_RECEIVER_JOB_REPLICATION_COMPLETION,
+                          rrdhost_receiver_replication_completion(host, NULL));
 
         stream_thread_received_replication();
 
@@ -564,18 +546,11 @@ ALWAYS_INLINE PARSER_RC pluginsd_replay_end(char **words, size_t num_words, PARS
             // IMPORTANT: Mark as finished and decrement counter NOW, before sending final request.
             // This prevents infinite loops even if child continues to respond with start_streaming=false.
             // The next REPLAY_END will see FINISHED flag and handle accordingly.
-            RRDSET_FLAGS old = rrdset_flag_set_and_clear(
-                st, RRDSET_FLAG_RECEIVER_REPLICATION_FINISHED,
-                RRDSET_FLAG_RECEIVER_REPLICATION_IN_PROGRESS | RRDSET_FLAG_SYNC_CLOCK);
-
-            if(!(old & RRDSET_FLAG_RECEIVER_REPLICATION_FINISHED)) {
-                if(rrdhost_receiver_replicating_charts_minus_one(st->rrdhost) == 0)
-                    pulse_host_status(host, PULSE_HOST_STATUS_RCV_RUNNING, 0);
-            }
+            rrdhost_receiver_replication_release(st, RRDSET_FLAG_SYNC_CLOCK);
 
             pluginsd_clear_scope_chart(parser, PLUGINSD_KEYWORD_REPLAY_END, NULL);
-            host->stream.rcv.status.replication.percent = 100.0;
-            worker_set_metric(WORKER_RECEIVER_JOB_REPLICATION_COMPLETION, host->stream.rcv.status.replication.percent);
+            worker_set_metric(WORKER_RECEIVER_JOB_REPLICATION_COMPLETION,
+                              rrdhost_receiver_replication_completion(host, NULL));
 
             // Send one final request to notify child. If child responds with start_streaming=true,
             // it will start streaming. If it responds with start_streaming=false, the next

@@ -27,22 +27,29 @@ func (c *Collector) Run(ctx context.Context, ready func()) error {
 	if c.aggregator == nil {
 		return errors.New("site is not initialized")
 	}
-	traceDestination := ""
+	p := &processor{
+		aggregator: c.aggregator,
+	}
+	if c.EventLogsOn() {
+		logs, err := otlp.NewLogs(ctx, c.EventLogs.Destination, c.Name, c.aggregator, c.redactor)
+		if err != nil {
+			return err
+		}
+		p.logs = logs
+		defer logs.Close()
+	}
 	if c.TracingOn() {
-		traceDestination = c.Tracing.ExportTo
+		traces, err := otlp.NewTraces(ctx, c.Tracing.Destination, c.Name, c.aggregator, c.redactor)
+		if err != nil {
+			return err
+		}
+		p.traces = traces
+		defer traces.Close()
 	}
-	exporter, err := otlp.New(ctx, c.OTLP, c.Name, traceDestination, c.aggregator, c.redactor)
-	if err != nil {
-		return err
-	}
-	defer exporter.Close()
-	writer := history.NewWriter(c.Name, c.deps.History, c.aggregator, c.redactor)
+	writer := history.NewWriter(c.Name, c.deps.History, c.aggregator)
 	c.aggregator.SetHistorySink(writer)
 	state := diagnostics.New(c.Site)
-	route := httpapi.NewRoute(c.Site, &processor{
-		aggregator: c.aggregator,
-		exporter:   exporter,
-	}, state)
+	route := httpapi.NewRoute(c.Site, p, state)
 	var id [16]byte
 	if _, err := rand.Read(id[:]); err != nil {
 		return err
@@ -63,7 +70,27 @@ func (c *Collector) Run(ctx context.Context, ready func()) error {
 	workersCtx, stopWorkers := context.WithCancel(context.Background())
 	var workers sync.WaitGroup
 	workers.Go(func() { writer.Run(workersCtx) })
-	workers.Go(func() { exporter.Run(workersCtx) })
+	// Enabled exports share one absolute final-flush budget after route leases drain.
+	var finalOnce sync.Once
+	var finalCtx context.Context
+	var finalCancel context.CancelFunc
+	final := func() context.Context {
+		finalOnce.Do(func() {
+			finalCtx, finalCancel = context.WithTimeout(context.Background(), otlp.ShutdownFlushTimeout)
+		})
+		return finalCtx
+	}
+	defer func() {
+		if finalCancel != nil {
+			finalCancel()
+		}
+	}()
+	if p.logs != nil {
+		workers.Go(func() { p.logs.Run(workersCtx, final) })
+	}
+	if p.traces != nil {
+		workers.Go(func() { p.traces.Run(workersCtx, final) })
+	}
 	probeCtx, stopProbes := context.WithCancel(ctx)
 	probesDone := make(chan struct{})
 	client := &http.Client{

@@ -20,7 +20,7 @@ type Deps interface {
 	Sites(context.Context) ([]query.Site, error)
 	Pages(context.Context, string) ([]query.Page, error)
 	Live(context.Context, string, string, int) ([]query.LiveEvent, string, error)
-	Sessions(context.Context, string, int64, int64) ([]query.Session, error)
+	Sessions(context.Context, string, string, int64, int64) ([]query.Session, error)
 	SessionEvents(context.Context, string, string) ([]query.SessionEvent, error)
 	Errors(context.Context, string, string, int64, int64) ([]query.ErrorGroup, error)
 }
@@ -112,16 +112,25 @@ func (h *Handler) HandleRaw(ctx context.Context, req funcapi.RawMethodRequest) *
 			return functionError(err)
 		}
 		var notes []string
+		problemBiased := false
 		for _, site := range sites {
 			if args["site"] != "" && args["site"] != site.Name {
 				continue
 			}
-			if note := samplingNote(site); note != "" {
-				notes = append(notes, note)
+			notes = append(notes, samplingNote(site))
+			sampling := site.Sampling
+			if sampling.InvestigateRate < 1 && (sampling.KeepErrors || sampling.KeepPoorVitals) {
+				problemBiased = true
 			}
 		}
 		if len(notes) > 0 {
-			response["help"] = spec.help + ". Sampled: " + strings.Join(notes, "; ")
+			help := spec.help + ". Current sampling policy: " + strings.Join(notes, "; ") +
+				". Historical evidence may reflect earlier policies, bounded context, retention and delivery loss. " +
+				"These rows do not estimate all visitors or errors."
+			if problemBiased {
+				help += " Problem overrides bias retained detail toward failures."
+			}
+			response["help"] = help
 		}
 	}
 	if len(spec.params) > 0 {
@@ -157,7 +166,7 @@ func (h *Handler) HandleRaw(ctx context.Context, req funcapi.RawMethodRequest) *
 			return funcapi.ErrorResponse(400, "%v", err)
 		}
 		if req.Method == "rum-sessions" {
-			rows, err = h.sessionsRows(ctx, args["site"], after, before, now)
+			rows, err = h.sessionsRows(ctx, args["site"], args["user_id"], after, before, now)
 		} else {
 			rows, err = h.errorsRows(ctx, args["site"], args["fingerprint"], after, before, now)
 		}

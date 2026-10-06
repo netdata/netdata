@@ -8,6 +8,7 @@ import (
 	"net/http"
 
 	"github.com/netdata/netdata/go/plugins/plugin/dem/rum/beacon"
+	"github.com/netdata/netdata/go/plugins/plugin/dem/rum/config"
 	"github.com/netdata/netdata/go/plugins/plugin/dem/rum/faro"
 )
 
@@ -115,23 +116,35 @@ func (s *Server) collect(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusBadRequest)
 		return
 	}
+	// Preserve admission and body-size checks for stale pages and custom
+	// producers, but intentional exclusion is neither acceptance nor loss.
+	if st.measureRate == 0 {
+		w.WriteHeader(http.StatusNoContent)
+		return
+	}
 	var country, city string
 	var lat, lon float64
 	var hasGeo bool
-	if s.geo != nil && ip.IsValid() && !ip.IsLoopback() && !ip.IsPrivate() {
+	if route.config.GeolocationMode() != config.GeolocationOff && s.geo != nil && ip.IsValid() && !ip.IsLoopback() && !ip.IsPrivate() {
 		country, city, lat, lon, hasGeo = s.geo.Lookup(ipKey)
 	}
+	if route.config.GeolocationMode() != config.GeolocationCity {
+		city, lat, lon, hasGeo = "", 0, 0, false
+	}
 	b, err := faro.Decode(body, faro.Options{
-		Site:        st.key,
-		Now:         now,
-		Country:     country,
-		City:        city,
-		Lat:         lat,
-		Lon:         lon,
-		HasGeo:      hasGeo,
-		ConsoleLogs: route.config.CollectConsoleLogs,
-		Tracing:     st.tracing,
-		PathRules:   st.pathRules,
+		Site:               st.key,
+		Now:                now,
+		Country:            country,
+		City:               city,
+		Lat:                lat,
+		Lon:                lon,
+		HasGeo:             hasGeo,
+		EventLogs:          route.config.EventLogsOn(),
+		FrustrationSignals: route.config.FrustrationSignalsOn(),
+		Redactor:           st.redactor,
+		ConsoleLogs:        route.config.ConsoleLogsOn(),
+		Tracing:            st.tracing,
+		PathRules:          st.pathRules,
 	})
 	if err != nil {
 		route.processor.Reject(st.key, beacon.RejectInvalid)

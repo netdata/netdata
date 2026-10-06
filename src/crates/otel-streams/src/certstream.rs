@@ -78,30 +78,36 @@ pub async fn connect(
     url: &str,
     tx: mpsc::Sender<(CertData, serde_json::Value)>,
 ) -> anyhow::Result<()> {
-    crate::ws::run("CertStream", url, None, Some(PING_INTERVAL), move |raw_json| {
-        let tx = tx.clone();
-        async move {
-            let message: Message = match serde_json::from_value(raw_json.clone()) {
-                Ok(m) => m,
-                Err(e) => {
-                    warn!("Failed to deserialize CertStream message: {e}");
-                    return ControlFlow::Continue(());
+    crate::ws::run(
+        "CertStream",
+        url,
+        None,
+        Some(PING_INTERVAL),
+        move |raw_json| {
+            let tx = tx.clone();
+            async move {
+                let message: Message = match serde_json::from_value(raw_json.clone()) {
+                    Ok(m) => m,
+                    Err(e) => {
+                        warn!("Failed to deserialize CertStream message: {e}");
+                        return ControlFlow::Continue(());
+                    }
+                };
+
+                let data = match message {
+                    Message::CertificateUpdate(data) => *data,
+                    Message::Other => return ControlFlow::Continue(()),
+                };
+
+                if tx.send((data, raw_json)).await.is_err() {
+                    info!("Receiver dropped, stopping WebSocket reader");
+                    return ControlFlow::Break(());
                 }
-            };
 
-            let data = match message {
-                Message::CertificateUpdate(data) => *data,
-                Message::Other => return ControlFlow::Continue(()),
-            };
-
-            if tx.send((data, raw_json)).await.is_err() {
-                info!("Receiver dropped, stopping WebSocket reader");
-                return ControlFlow::Break(());
+                ControlFlow::Continue(())
             }
-
-            ControlFlow::Continue(())
-        }
-    })
+        },
+    )
     .await
 }
 

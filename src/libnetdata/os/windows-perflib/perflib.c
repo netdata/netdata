@@ -12,6 +12,8 @@
 // and the RegQueryValueEx will set your size variable to the required buffer size. However,
 // if the source is "Global" or one or more object index values, you will need to increment
 // the buffer size in a loop until RegQueryValueEx does not return ERROR_MORE_DATA.
+static RW_SPINLOCK performance_data_lock = RW_SPINLOCK_INITIALIZER;
+
 static LPBYTE getPerformanceData(const char *pwszSource, DWORD *bytes_used) {
     static __thread DWORD size = 0;
     static __thread LPBYTE buffer = NULL;
@@ -31,12 +33,16 @@ static LPBYTE getPerformanceData(const char *pwszSource, DWORD *bytes_used) {
         buffer = mallocz(size);
     }
 
+    rw_spinlock_read_lock(&performance_data_lock);
+
     LONG status = ERROR_SUCCESS;
     while ((status = RegQueryValueEx(HKEY_PERFORMANCE_DATA, pwszSource,
                                      NULL, NULL, buffer, &size)) == ERROR_MORE_DATA) {
         size *= 2;
         buffer = reallocz(buffer, size);
     }
+
+    rw_spinlock_read_unlock(&performance_data_lock);
 
     if (status != ERROR_SUCCESS) {
         nd_log_limit_static_global_var(erl, 60, 0);
@@ -52,6 +58,25 @@ static LPBYTE getPerformanceData(const char *pwszSource, DWORD *bytes_used) {
 
 void perflibFreePerformanceData(void) {
     getPerformanceData((const char *)0x01, NULL);
+}
+
+bool perflibRefreshPerformanceDataCache(void)
+{
+    rw_spinlock_write_lock(&performance_data_lock);
+    LONG status = RegCloseKey(HKEY_PERFORMANCE_DATA);
+    rw_spinlock_write_unlock(&performance_data_lock);
+
+    if (status != ERROR_SUCCESS) {
+        nd_log_limit_static_global_var(erl_refresh, 60, 0);
+        nd_log_limit(
+            &erl_refresh,
+            NDLS_COLLECTORS,
+            NDLP_WARNING,
+            "RegCloseKey(HKEY_PERFORMANCE_DATA) failed with 0x%x.\n",
+            status);
+    }
+
+    return status == ERROR_SUCCESS;
 }
 
 // --------------------------------------------------------------------------------------------------------------------

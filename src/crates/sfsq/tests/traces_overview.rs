@@ -649,7 +649,9 @@ fn the_partition_identity_holds_under_a_partial_and_facets_survive_it() {
         OverviewQuery::new(grid()).root_facets(true),
     );
     assert!(data.status.has(PartialReason::RollupAbsent));
-    let f = data.root_facets.expect("requested facets survive the partial");
+    let f = data
+        .root_facets
+        .expect("requested facets survive the partial");
     for list in [&f.services, &f.operations] {
         let sum: u64 = list.top.iter().map(|(_, n)| n).sum();
         assert_eq!(sum + list.other + list.unattributed, data.total_traces);
@@ -688,8 +690,7 @@ fn all_traces_outside_the_grid_yield_empty_facets_with_the_zero_identity() {
     let data = run(
         vec![sealed_source(dir.path(), &wal, "s")],
         // The corpus lives in [1s, 6s); this grid starts at 100s.
-        OverviewQuery::new(sfst::Grid::new(100_000_000_000, 1_000_000_000, 10))
-            .root_facets(true),
+        OverviewQuery::new(sfst::Grid::new(100_000_000_000, 1_000_000_000, 10)).root_facets(true),
     );
     assert_eq!(data.status, QueryStatus::Complete);
     assert_eq!(data.total_traces, 0);
@@ -797,7 +798,10 @@ fn filtered_grid_bins_only_traces_with_a_matching_stored_row() {
     cells[1][3] = 1;
     cells[3][0] = 1;
     assert_eq!(data.cells, cells);
-    assert_eq!((data.total_traces, data.total_spans, data.total_errors), (2, 3, 1));
+    assert_eq!(
+        (data.total_traces, data.total_spans, data.total_errors),
+        (2, 3, 1)
+    );
 
     // The match-all predicate IS the unfiltered grid.
     let all = filtered(src(), Predicate::all());
@@ -833,7 +837,11 @@ fn filtered_grid_honours_resource_attributes() {
     assert_eq!(cart.cells[1][3], 1, "A binned");
     let flagd = filtered(src(), service_eq("flagd"));
     assert_eq!(flagd.total_traces, 2);
-    assert_eq!((flagd.cells[3][0], flagd.cells[5][5]), (1, 1), "B and C binned");
+    assert_eq!(
+        (flagd.cells[3][0], flagd.cells[5][5]),
+        (1, 1),
+        "B and C binned"
+    );
 }
 
 /// A trace straddling a sealed file and a tail is selected by a match in
@@ -882,13 +890,19 @@ fn filtered_grid_requires_the_match_to_start_inside_the_grid() {
         ("tail", vec![tail_source(&wal, "t")]),
     ] {
         let plain = run(src.clone(), OverviewQuery::new(grid()));
-        assert_eq!(plain.total_traces, 1, "{id}: D bins by its 2s envelope start");
+        assert_eq!(
+            plain.total_traces, 1,
+            "{id}: D bins by its 2s envelope start"
+        );
         assert_eq!(plain.cells[2][5], 1, "{id}: 10.1s envelope");
         let by_d1 = filtered(src.clone(), name_in(&["d-1"]));
         assert_eq!(by_d1.total_traces, 1, "{id}: in-grid match selects D");
         assert_eq!(by_d1.cells[2][5], 1, "{id}: still the whole envelope");
         let by_d2 = filtered(src, name_in(&["d-2"]));
-        assert_eq!(by_d2.total_traces, 0, "{id}: a match past the grid end selects nothing");
+        assert_eq!(
+            by_d2.total_traces, 0,
+            "{id}: a match past the grid end selects nothing"
+        );
     }
 }
 
@@ -963,7 +977,10 @@ fn filter_work_accumulates_across_sources() {
     // Together they need the SUM: one unit short trips the ceiling.
     let data = at(vec![src_a(), src_b()], cost_a + cost_b - 1);
     assert!(data.status.has(PartialReason::OverviewCeiling));
-    assert_eq!(data.total_traces, 1, "the first file's selection survives the stop");
+    assert_eq!(
+        data.total_traces, 1,
+        "the first file's selection survives the stop"
+    );
     assert_eq!(data.cells[1][3], 1, "A");
     assert_eq!(data.cells[5][5], 0, "C was never flagged");
 
@@ -1084,7 +1101,9 @@ fn filtered_grid_agrees_with_search_on_a_canonical_corpus() {
                 window: src(),
                 completion: src(),
             },
-            SearchQuery::new(predicate.clone()).window(window).limit(100),
+            SearchQuery::new(predicate.clone())
+                .window(window)
+                .limit(100),
             CancellationToken::new(),
             Arc::new(AtomicUsize::new(0)),
         )

@@ -143,42 +143,76 @@ impl From<std::io::Error> for Error {
 /// `src/plugins.d/pluginsd_parser.c`).
 pub enum Command<'a> {
     // Chart definition commands
-    Chart { args: &'a [u8] },
-    Dimension { args: &'a [u8] },
-    Variable { args: &'a [u8] },
+    Chart {
+        args: &'a [u8],
+    },
+    Dimension {
+        args: &'a [u8],
+    },
+    Variable {
+        args: &'a [u8],
+    },
     ChartDefinitionEnd,
 
     // Data update commands
-    Begin { args: &'a [u8] },
-    Set { args: &'a [u8] },
-    End { args: &'a [u8] },
+    Begin {
+        args: &'a [u8],
+    },
+    Set {
+        args: &'a [u8],
+    },
+    End {
+        args: &'a [u8],
+    },
 
     // Function commands
-    Function { args: &'a [u8] },
+    Function {
+        args: &'a [u8],
+    },
     /// Keyword `FUNCTION_PAYLOAD`: a call whose body follows as a payload
     /// block; opens the block.
-    FunctionPayloadBegin { args: &'a [u8] },
+    FunctionPayloadBegin {
+        args: &'a [u8],
+    },
     /// Keyword `FUNCTION_PAYLOAD_END` (the name lags the keyword it maps
     /// to); only reached outside an open block, since inside one the payload
     /// scanner consumes the marker line first.
-    FunctionPayload { args: &'a [u8] },
-    FunctionResultBegin { args: &'a [u8] },
-    FunctionResultEnd { args: &'a [u8] },
-    FunctionCancel { args: &'a [u8] },
-    FunctionProgress { args: &'a [u8] },
+    FunctionPayload {
+        args: &'a [u8],
+    },
+    FunctionResultBegin {
+        args: &'a [u8],
+    },
+    FunctionResultEnd {
+        args: &'a [u8],
+    },
+    FunctionCancel {
+        args: &'a [u8],
+    },
+    FunctionProgress {
+        args: &'a [u8],
+    },
 
     // Label commands
-    Clabel { args: &'a [u8] },
+    Clabel {
+        args: &'a [u8],
+    },
     ClabelCommit,
 
     // Multi-line commands: opens a payload block; its body is returned later
     // by parse_payload_block.
-    Json { args: &'a [u8] },
+    Json {
+        args: &'a [u8],
+    },
 
     // The body of a payload block, returned as one chunk when the end-marker
     // line is found.
-    FunctionResultPayload { data: &'a [u8] },
-    FunctionPayloadData { data: &'a [u8] },
+    FunctionResultPayload {
+        data: &'a [u8],
+    },
+    FunctionPayloadData {
+        data: &'a [u8],
+    },
 
     // Shutdown
     Quit,

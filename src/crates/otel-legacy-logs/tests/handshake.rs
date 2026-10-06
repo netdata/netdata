@@ -64,9 +64,7 @@ async fn start(
 
 /// Await one worker response; the 30 s bound is a test hang-guard, not
 /// a contract.
-async fn recv(
-    conn: &mut Connection<LegacyLogsRequest, LegacyLogsResponse>,
-) -> LegacyLogsResponse {
+async fn recv(conn: &mut Connection<LegacyLogsRequest, LegacyLogsResponse>) -> LegacyLogsResponse {
     tokio::time::timeout(Duration::from_secs(30), conn.recv())
         .await
         .expect("timed out waiting for worker response")
@@ -89,11 +87,10 @@ async fn reports_disabled_and_exits_when_journal_dir_absent() {
     let sock = dir.path().join("legacy.sock");
     let (mut conn, worker) = start(sock.to_str().unwrap()).await;
 
-    let config = LegacyLogsConfig::new(
-        dir.path().join("does-not-exist"),
-        dir.path().join("cache"),
-    );
-    conn.send(LegacyLogsRequest::Configure(config)).await.unwrap();
+    let config = LegacyLogsConfig::new(dir.path().join("does-not-exist"), dir.path().join("cache"));
+    conn.send(LegacyLogsRequest::Configure(config))
+        .await
+        .unwrap();
 
     match recv(&mut conn).await {
         LegacyLogsResponse::Disabled => {}
@@ -117,7 +114,9 @@ async fn reports_disabled_and_exits_when_handler_init_fails() {
     let (mut conn, worker) = start(sock.to_str().unwrap()).await;
 
     let config = LegacyLogsConfig::new(journal_dir, blocker.join("cache"));
-    conn.send(LegacyLogsRequest::Configure(config)).await.unwrap();
+    conn.send(LegacyLogsRequest::Configure(config))
+        .await
+        .unwrap();
 
     match recv(&mut conn).await {
         LegacyLogsResponse::Disabled => {}
@@ -135,7 +134,9 @@ async fn serves_when_journal_dir_exists_even_empty() {
     let (mut conn, worker) = start(sock.to_str().unwrap()).await;
 
     let config = LegacyLogsConfig::new(journal_dir, dir.path().join("cache"));
-    conn.send(LegacyLogsRequest::Configure(config)).await.unwrap();
+    conn.send(LegacyLogsRequest::Configure(config))
+        .await
+        .unwrap();
 
     match recv(&mut conn).await {
         LegacyLogsResponse::Ready { declarations } => assert_eq!(declarations.len(), 1),

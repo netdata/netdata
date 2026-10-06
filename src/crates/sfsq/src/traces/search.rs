@@ -397,7 +397,11 @@ impl FileDiscovery {
                 // would turn a provably complete result
                 // Partial{WorkCeiling} when the last match crossed the
                 // ceiling.
-                self.band_bottom = if emitted.len() < count { self.lo } else { lowest };
+                self.band_bottom = if emitted.len() < count {
+                    self.lo
+                } else {
+                    lowest
+                };
                 if self.band_bottom > self.lo
                     && self.compiled.count_in_range(self.lo, self.band_bottom) == 0
                 {
@@ -511,14 +515,19 @@ pub fn search(
         return Err(SearchRequestError::ZeroLimit);
     }
     if query.spans_per_trace > SPANS_PER_TRACE_MAX {
-        return Err(SearchRequestError::SpansPerTraceBeyondMax { got: query.spans_per_trace });
+        return Err(SearchRequestError::SpansPerTraceBeyondMax {
+            got: query.spans_per_trace,
+        });
     }
     query.predicate.validate()?;
     query.predicate.ensure_evaluable()?;
     validate_sources(&sources.window)?;
     validate_sources(&sources.completion)?;
-    let completion_ids: HashSet<&SourceId> =
-        sources.completion.iter().map(TraceSource::source_id).collect();
+    let completion_ids: HashSet<&SourceId> = sources
+        .completion
+        .iter()
+        .map(TraceSource::source_id)
+        .collect();
     for source in &sources.window {
         if !completion_ids.contains(source.source_id()) {
             return Err(SearchRequestError::WindowNotInCompletion(
@@ -536,8 +545,7 @@ pub fn search(
     let (span_local, trace_level) = remainder.partition();
     let plan = span_local.to_trace_plan();
     let eval = EvalPredicate::new(&plan);
-    let trace_level_eval =
-        (!trace_level.is_all()).then(|| TraceLevelEval::new(&trace_level));
+    let trace_level_eval = (!trace_level.is_all()).then(|| TraceLevelEval::new(&trace_level));
 
     let mut status = StatusBuilder::new();
     let mut work = ScanWork::default();
@@ -663,17 +671,15 @@ pub fn search(
         // overlap comparison key enumeration shares
         // (`TimeWindow::overlaps_summary`); exact for span-start
         // windows because file ranges are span-start-based.
-        if query
-            .window
-            .is_some_and(|w| !w.overlaps_summary(c.summary.min_timestamp_s, c.summary.max_timestamp_s))
-        {
+        if query.window.is_some_and(|w| {
+            !w.overlaps_summary(c.summary.min_timestamp_s, c.summary.max_timestamp_s)
+        }) {
             continue;
         }
         // The exclusive upper bound on any in-window candidate start
         // this file could hold: its inclusive-seconds summary end,
         // expanded like the overlap test, clipped by the window.
-        let file_end = (i64::from(c.summary.max_timestamp_s) + 1)
-            .saturating_mul(1_000_000_000);
+        let file_end = (i64::from(c.summary.max_timestamp_s) + 1).saturating_mul(1_000_000_000);
         let rank_bound = match query.window {
             Some(w) => file_end.min(w.range_ns().end),
             None => file_end,

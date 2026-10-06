@@ -55,6 +55,7 @@ int do_PerflibNUMA(int update_every, usec_t dt __maybe_unused);
 int do_PerflibASP(int update_every, usec_t dt __maybe_unused);
 int do_PerflibSMB(int update_every, usec_t dt __maybe_unused);
 int do_PerflibTerminalServices(int update_every, usec_t dt __maybe_unused);
+int do_PerflibDNS(int update_every, usec_t dt __maybe_unused);
 
 // Cleanup
 void do_GetHardwareInfo_cleanup();
@@ -386,6 +387,28 @@ enum PERFLIB_PRIO {
     PRIO_SMB_SERVER_SHARES_FILES_OPENED,
 
     PRIO_TERMINAL_SERVICES_SESSIONS,
+    PRIO_DNS_QUERIES,
+    PRIO_DNS_RESPONSES,
+    PRIO_DNS_QUERY_HANDLING,
+    PRIO_DNS_SUPPRESSED_RESPONSES,
+    PRIO_DNS_REMOTE_QUERIES,
+    PRIO_DNS_RECURSIVE_QUERIES,
+    PRIO_DNS_RECURSIVE_SEND_TIMEOUTS,
+    PRIO_DNS_ZONE_REQUESTS_RECEIVED,
+    PRIO_DNS_ZONE_REQUESTS_SENT,
+    PRIO_DNS_ZONE_RESPONSES_RECEIVED,
+    PRIO_DNS_ZONE_SUCCESS_RECEIVED,
+    PRIO_DNS_ZONE_SUCCESS_SENT,
+    PRIO_DNS_ZONE_FAILURES,
+    PRIO_DNS_NOTIFY_RECEIVED,
+    PRIO_DNS_NOTIFY_SENT,
+    PRIO_DNS_DYNAMIC_UPDATES,
+    PRIO_DNS_DYNAMIC_UPDATES_QUEUED,
+    PRIO_DNS_MEMORY_USED,
+    PRIO_DNS_UNMATCHED_RESPONSES,
+    PRIO_DNS_WINS_LOOKUPS,
+    PRIO_DNS_WINS_RESPONSES,
+
     PRIO_IIS_EXTRA_WEBSITE = 25000,
     PRIO_IIS_EXTRA_WORKER = 25100,
     PRIO_HTTP_SERVICE_QUEUE = 25200,

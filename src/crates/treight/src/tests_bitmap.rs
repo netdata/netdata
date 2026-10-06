@@ -467,6 +467,8 @@ fn test_bitmap_and_not_all_flag_combinations() {
     assert!(c.is_empty(&out));
 
     // complement round-trips
-    assert_eq!(a.complement().complement().iter(&da).collect::<Vec<_>>(),
-               a.iter(&da).collect::<Vec<_>>());
+    assert_eq!(
+        a.complement().complement().iter(&da).collect::<Vec<_>>(),
+        a.iter(&da).collect::<Vec<_>>()
+    );
 }

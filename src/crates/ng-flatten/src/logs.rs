@@ -236,8 +236,7 @@ pub fn normalize_log_request(
                 }
                 // Bounds apply to the RESOLVED, client-provided timestamp (inclusive).
                 if let Some(b) = bounds {
-                    if !synthesized
-                        && (r.time_unix_nano < b.min_ns || r.time_unix_nano > b.max_ns)
+                    if !synthesized && (r.time_unix_nano < b.min_ns || r.time_unix_nano > b.max_ns)
                     {
                         out.rejected += 1;
                         return false;
@@ -332,6 +331,7 @@ fn json_to_any_value(value: serde_json::Value) -> AnyValue {
                 .into_iter()
                 .map(|(key, val)| KeyValue {
                     key,
+                    key_strindex: 0,
                     value: Some(json_to_any_value(val)),
                 })
                 .collect(),

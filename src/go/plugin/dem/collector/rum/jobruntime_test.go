@@ -105,10 +105,9 @@ func TestNativeJobsIngressReplacementAndHistory(t *testing.T) {
 	site.Name = "shop"
 	site.DisplayName = "Shop"
 	site.AllowedOrigins = []string{"https://example.org"}
-	site.OTLP.Enabled = "no"
 	siteJob, siteOut, stopSite := startJob(t, "rum", "shop", site)
 	tickUntil(t, siteJob, siteOut, "SET 'unavailable' = 1")
-	assert.NotContains(t, siteOut.String(), "rum.lcp", "no browser measurement has been made")
+	assert.NotContains(t, siteOut.String(), "'rum.lcp'", "no browser percentile sample has been observed")
 	newReceiver := func() (*jobruntime.JobV2, *output, func()) {
 		c := receiver.New(hub)
 		c.Listen = "127.0.0.1:0"
@@ -117,7 +116,8 @@ func TestNativeJobsIngressReplacementAndHistory(t *testing.T) {
 	recvJob, recvOut, stopReceiver := newReceiver()
 	tickUntil(t, recvJob, recvOut, "SET 'serving' = 1")
 	send := func(path string) {
-		body := `{"meta":{"page":{"url":"https://example.org` + path + `"},"session":{"id":"browser"},"browser":{"name":"Chrome"}},"measurements":[{"type":"web-vitals","values":{"lcp":3000,"cls":0.12}}]}`
+		id := "document-" + strings.TrimPrefix(path, "/")
+		body := `{"meta":{"page":{"id":"` + id + `","url":"https://example.org` + path + `"},"session":{"id":"browser"},"browser":{"name":"Chrome"}},"events":[{"name":"document_activated","attributes":{"observation_id":"` + id + `","observation_sequence":"1"}}],"measurements":[{"type":"web-vitals","values":{"lcp":3000},"context":{"id":"lcp-` + id + `","observation_sequence":"2"}},{"type":"web-vitals","values":{"cls":0.12},"context":{"id":"cls-` + id + `","observation_sequence":"3"}}]}`
 		req, err := http.NewRequest(
 			"POST",
 			"http://"+hub.Availability().Listen+"/rum/shop/collect",
@@ -156,7 +156,7 @@ func TestNativeJobsIngressReplacementAndHistory(t *testing.T) {
 	send("/checkout")
 	stopNext()
 	stopSite()
-	rows, err := rumhistory.NewStore(db).QuerySessions(context.Background(), "shop", 0, time.Now().Unix()+10, 10)
+	rows, err := rumhistory.NewStore(db).QuerySessions(context.Background(), "shop", "", 0, time.Now().Unix()+10, 10)
 	require.NoError(t, err)
 	require.Len(t, rows, 1)
 	assert.EqualValues(t, 2, rows[0].Pageviews)
@@ -174,7 +174,9 @@ func TestCancelledOTLPPreparationHonorsCaller(t *testing.T) {
 	})
 	site.Name = "shop"
 	site.AllowedOrigins = []string{"https://example.org"}
-	site.OTLP.TLSCA = "synthetic-ca.pem"
+	site.EventLogs.Enabled = true
+	site.EventLogs.Destination.Endpoint = new("https://localhost:4317")
+	site.EventLogs.Destination.TLSCA = "synthetic-ca.pem"
 	ctx, cancel := context.WithCancel(context.Background())
 	cancel()
 	require.ErrorIs(t, site.Init(ctx), context.Canceled)
@@ -191,7 +193,7 @@ func TestIndependentSitesSurviveReceiverReplacementAndRetirement(t *testing.T) {
 			Registry: hub,
 			History:  rumhistory.NewStore(db),
 		})
-		c.Name, c.AllowedOrigins, c.OTLP.Enabled = name, []string{"https://example.org"}, "no"
+		c.Name, c.AllowedOrigins = name, []string{"https://example.org"}
 		_, _, stop := startJob(t, "rum", name, c)
 		return stop
 	}
@@ -204,7 +206,8 @@ func TestIndependentSitesSurviveReceiverReplacementAndRetirement(t *testing.T) {
 	}
 	stopReceiver := startReceiver()
 	send := func(site, page string, status int) {
-		body := `{"meta":{"page":{"url":"https://example.org` + page + `"},"session":{"id":"same-session"},"browser":{"name":"Chrome"}}}`
+		id := "document-" + strings.TrimPrefix(page, "/")
+		body := `{"meta":{"page":{"id":"` + id + `","url":"https://example.org` + page + `"},"session":{"id":"same-session"},"browser":{"name":"Chrome"}},"events":[{"name":"document_activated","attributes":{"observation_id":"` + id + `","observation_sequence":"1"}}]}`
 		req, err := http.NewRequestWithContext(
 			ctx,
 			http.MethodPost,
@@ -228,7 +231,7 @@ func TestIndependentSitesSurviveReceiverReplacementAndRetirement(t *testing.T) {
 		snapshot := data.Aggregator.Snapshot()
 		release()
 		require.EqualValues(t, 1, snapshot.Counters[aggregate.CounterPageviews])
-		require.Equal(t, 1, snapshot.ActiveSessions)
+		require.Equal(t, 1, snapshot.ObservedSessions)
 	}
 	stopReceiver()
 	stopNext := startReceiver()
@@ -245,7 +248,7 @@ func TestIndependentSitesSurviveReceiverReplacementAndRetirement(t *testing.T) {
 	stopBeta()
 	stopNext()
 	for name, want := range map[string]uint64{"alpha": 1, "beta": 2} {
-		rows, err := rumhistory.NewStore(db).QuerySessions(ctx, name, 0, time.Now().Unix()+10, 10)
+		rows, err := rumhistory.NewStore(db).QuerySessions(ctx, name, "", 0, time.Now().Unix()+10, 10)
 		require.NoError(t, err)
 		require.Len(t, rows, 1)
 		require.Equal(t, "same-session", rows[0].SessionID)
@@ -264,7 +267,6 @@ func TestOversizedChunkedUploadRespondsPromptlyAndDisablesKeepAlive(t *testing.T
 	})
 	site.Name = "shop"
 	site.AllowedOrigins = []string{"https://example.org"}
-	site.OTLP.Enabled = "no"
 	startJob(t, "rum", "shop", site)
 	listener := receiver.New(hub)
 	listener.Listen = "127.0.0.1:0"

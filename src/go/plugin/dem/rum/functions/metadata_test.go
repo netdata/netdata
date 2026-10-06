@@ -85,7 +85,7 @@ func (metadataFunctionSource) Pages(context.Context, string) ([]query.Page, erro
 func (metadataFunctionSource) Live(context.Context, string, string, int) ([]query.LiveEvent, string, error) {
 	return nil, "", nil
 }
-func (metadataFunctionSource) Sessions(context.Context, string, int64, int64) ([]query.Session, error) {
+func (metadataFunctionSource) Sessions(context.Context, string, string, int64, int64) ([]query.Session, error) {
 	return []query.Session{{Site: "shop", SessionID: "visit"}}, nil
 }
 func (metadataFunctionSource) SessionEvents(context.Context, string, string) ([]query.SessionEvent, error) {
