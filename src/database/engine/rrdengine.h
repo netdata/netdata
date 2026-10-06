@@ -307,6 +307,7 @@ enum rrdeng_opcode {
     RRDENG_OPCODE_PARALLEL_WEIGHT,
     RRDENG_OPCODE_MRG_LOAD,
     RRDENG_OPCODE_CLEANUP,
+    RRDENG_OPCODE_RETENTION_SUMMARY,
 
     RRDENG_OPCODE_MAX
 };
@@ -464,6 +465,15 @@ struct rrdengine_instance {
         struct completion load_mrg;
         bool create_new_datafile_pair;
     } loading;
+
+    struct {
+        SPINLOCK spinlock;
+        Pvoid_t JudyL;                              // block id -> file size of its published retention summary
+        Pvoid_t skip_JudyL;                         // block ids that cannot be summarised (until restart)
+        bool pending;                               // a build is queued or running (event loop only)
+        bool building;                              // a build is running (ctx shutdown waits for it)
+        bool ready;                                 // the MRG population of this tier has finished
+    } summaries;
 
     struct rrdengine_statistics stats;
 };

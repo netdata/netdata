@@ -2,6 +2,7 @@
 
 #include "mrg-internals.h"
 #include "rrdengine.h"
+#include "retention-summary.h"
 
 // Global dummy rrdengine_instances for tests
 static struct rrdengine_instance test_ctx_0 = {0};
@@ -2727,6 +2728,7 @@ int mrg_unittest(void) {
     errors += mrg_jv2_real_writer_unittest();
     errors += mrg_jv2_samples_section_unittest();
     errors += mrg_jv2_rejected_journal_unittest();
+    errors += retention_summary_unittest();
     errors += mrg_uuid_lookup_delete_race_unittest();
 
     // Use mrg_create_for_unittest to avoid pre-loaded metrics that block deletion

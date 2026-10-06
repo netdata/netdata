@@ -3,6 +3,7 @@
 #include "rrdengine.h"
 #include "pdc.h"
 #include "dbengine-compression.h"
+#include "retention-summary.h"
 
 struct rrdeng_global_stats global_stats = { 0 };
 
@@ -49,6 +50,7 @@ struct rrdeng_main {
     size_t evict_open_running;
     size_t evict_extent_running;
     size_t cleanup_running;
+    size_t summary_build_running;
 
     // pool threads that may wait for an EXTENT_WRITE - owned by the event loop thread
     // see extent_waiters_max() for why they are bounded
@@ -103,6 +105,7 @@ struct rrdeng_main {
         .flushes_running = 0,
         .evict_main_running = 0,
         .cleanup_running = 0,
+        .summary_build_running = 0,
         .extent_waiters = {
                 .running = 0,
                 .deferred = NULL,
@@ -1814,6 +1817,9 @@ void datafile_delete(
     freez(datafile);
 
     ctx_current_disk_space_decrease(ctx, deleted_bytes);
+
+    // the block of this datafile is no longer complete
+    retention_summary_datafile_deleted(ctx, fileno);
     char size_for_humans[128];
     size_snprintf(size_for_humans, sizeof(size_for_humans), deleted_bytes, "B", false);
 
@@ -1901,6 +1907,7 @@ static void *flush_dirty_pages_of_section_tp_worker(struct rrdengine_instance *c
 struct mrg_load_thread {
     uv_sem_t *sem;
     struct rrdengine_datafile *datafile;
+    RETENTION_SUMMARY_BLOCK *block;     // set instead of datafile for a retention summary
     size_t *total;
     size_t *populated_datafiles;
 };
@@ -1923,11 +1930,19 @@ static void *tier_mrg_load(
 {
     worker_is_busy(UV_EVENT_DBENGINE_MRG_LOAD);
     struct mrg_load_thread *mlt = data;
-    journalfile_v2_populate_retention_to_mrg_worker(mlt);
-    mlt->datafile->populate_mrg.populated = true;
-    spinlock_unlock(&mlt->datafile->populate_mrg.spinlock);
+    if (mlt->block) {
+        // its datafiles were marked populated when the summary was claimed
+        retention_summary_apply(mlt->block);
+        uv_sem_post(mlt->sem);
+        __atomic_add_fetch(mlt->populated_datafiles, RETENTION_SUMMARY_FILES_PER_BLOCK, __ATOMIC_RELAXED);
+    }
+    else {
+        journalfile_v2_populate_retention_to_mrg_worker(mlt);
+        mlt->datafile->populate_mrg.populated = true;
+        spinlock_unlock(&mlt->datafile->populate_mrg.spinlock);
+        __atomic_add_fetch(mlt->populated_datafiles, 1, __ATOMIC_RELAXED);
+    }
 
-    __atomic_add_fetch(mlt->populated_datafiles, 1, __ATOMIC_RELAXED);
     __atomic_sub_fetch(mlt->total, 1, __ATOMIC_RELEASE);
     freez(mlt);
     worker_is_idle();
@@ -2007,11 +2022,31 @@ static void *populate_mrg_tp_worker(
 
     if (total_datafiles == 0) {
         nd_log_daemon(NDLP_WARNING, "DBENGINE: tier %d: no datafiles to populate MRG", tier);
+        __atomic_store_n(&ctx->summaries.ready, true, __ATOMIC_RELEASE);
         worker_is_idle();
         return data;
     }
 
     size_t total = 0;
+
+    // blocks with a valid retention summary first: their datafiles are claimed
+    // here, so the per-file loop below skips them
+    {
+        RETENTION_SUMMARY_BLOCK **blocks = NULL;
+        size_t blocks_count = retention_summary_claim(ctx, &blocks);
+        for (size_t i = 0; i < blocks_count; i++) {
+            uv_sem_wait(mlt->sem);
+            struct mrg_load_thread *local_mlt = callocz(1, sizeof(struct mrg_load_thread));
+            local_mlt->block = blocks[i];
+            local_mlt->sem = mlt->sem;
+            local_mlt->total = &total;
+            local_mlt->populated_datafiles = &populated_datafiles;
+            __atomic_add_fetch(local_mlt->total, 1, __ATOMIC_RELAXED);
+            rrdeng_enq_cmd(ctx, RRDENG_OPCODE_MRG_LOAD, local_mlt, NULL, STORAGE_PRIORITY_INTERNAL_DBENGINE, NULL, NULL);
+        }
+        freez(blocks);
+    }
+
     Word_t last_index = 0;
     bool resume_scan = false;
     do {
@@ -2094,6 +2129,9 @@ static void *populate_mrg_tp_worker(
                       tier, (uint64_t)__atomic_load_n(&ctx->atomic.samples, __ATOMIC_RELAXED), exact, estimated);
     }
 
+    // the builder may now summarise complete blocks (retention_timer_cb)
+    __atomic_store_n(&ctx->summaries.ready, true, __ATOMIC_RELEASE);
+
     worker_is_idle();
     return data;
 }
@@ -2107,7 +2145,8 @@ static void *ctx_shutdown_tp_worker(struct rrdengine_instance *ctx __maybe_unuse
 
     bool logged = false;
     while(__atomic_load_n(&ctx->atomic.extents_currently_being_flushed, __ATOMIC_RELAXED) ||
-            __atomic_load_n(&ctx->atomic.inflight_queries, __ATOMIC_RELAXED)) {
+            __atomic_load_n(&ctx->atomic.inflight_queries, __ATOMIC_RELAXED) ||
+            __atomic_load_n(&ctx->summaries.building, __ATOMIC_ACQUIRE)) {
         if(!logged) {
             logged = true;
             netdata_log_info("DBENGINE: waiting for %zu inflight queries to finish to shutdown tier %d...",
@@ -2493,6 +2532,23 @@ struct rrdeng_buffer_sizes rrdeng_pulse_memory_sizes(void) {
     };
 }
 
+static void after_retention_summary_build(struct rrdengine_instance *ctx, void *data __maybe_unused, struct completion *completion __maybe_unused, uv_work_t* req __maybe_unused, int status __maybe_unused) {
+    rrdeng_main.summary_build_running--;
+    ctx->summaries.pending = false;
+    __atomic_store_n(&ctx->summaries.building, false, __ATOMIC_RELEASE);
+}
+
+static void *retention_summary_build_tp_worker(struct rrdengine_instance *ctx, void *data __maybe_unused, struct completion *completion __maybe_unused, uv_work_t *uv_work_req __maybe_unused) {
+    worker_is_busy(UV_EVENT_DBENGINE_RETENTION_SUMMARY);
+
+    // one block per run: the retention timer paces the builds
+    if (ctx_is_available_for_queries(ctx))
+        (void)retention_summary_build_one(ctx);
+
+    worker_is_idle();
+    return data;
+}
+
 static void after_cleanup(struct rrdengine_instance *ctx __maybe_unused, void *data __maybe_unused, struct completion *completion __maybe_unused, uv_work_t* req __maybe_unused, int status __maybe_unused) {
     rrdeng_main.cleanup_running--;
 }
@@ -2598,6 +2654,22 @@ static void retention_timer_cb(uv_timer_t *handle __maybe_unused)
         if (!eng || eng->seb != STORAGE_ENGINE_BACKEND_DBENGINE)
             continue;
         check_and_schedule_db_rotation(multidb_ctx[tier]);
+    }
+
+    // build at most one retention summary per minute, the tiers taking turns
+    static size_t summary_next_tier = 0;
+    for (size_t i = 0; i < nd_profile.storage_tiers && !rrdeng_main.summary_build_running; i++) {
+        size_t tier = (summary_next_tier + i) % nd_profile.storage_tiers;
+        STORAGE_ENGINE *eng = localhost->db[tier].eng;
+        struct rrdengine_instance *ctx = multidb_ctx[tier];
+        if (!eng || eng->seb != STORAGE_ENGINE_BACKEND_DBENGINE || ctx->summaries.pending ||
+            !__atomic_load_n(&ctx->summaries.ready, __ATOMIC_ACQUIRE) || !ctx_is_available_for_queries(ctx))
+            continue;
+
+        ctx->summaries.pending = true;
+        rrdeng_enq_cmd(ctx, RRDENG_OPCODE_RETENTION_SUMMARY, NULL, NULL, STORAGE_PRIORITY_INTERNAL_DBENGINE, NULL, NULL);
+        summary_next_tier = tier + 1;
+        break;
     }
 
     worker_is_idle();
@@ -2825,6 +2897,7 @@ void dbengine_event_loop(void* arg) {
     worker_register_job_name(RRDENG_OPCODE_SHUTDOWN_EVLOOP,                          "dbengine shutdown");
     worker_register_job_name(RRDENG_OPCODE_PARALLEL_WEIGHT,                          "parallel weight");
     worker_register_job_name(RRDENG_OPCODE_MRG_LOAD,                                 "mrg tier load");
+    worker_register_job_name(RRDENG_OPCODE_RETENTION_SUMMARY,                        "retention summary");
 
 
     worker_register_job_name(RRDENG_OPCODE_MAX,                                      "get opcode");
@@ -2841,6 +2914,7 @@ void dbengine_event_loop(void* arg) {
     worker_register_job_name(RRDENG_OPCODE_MAX + RRDENG_OPCODE_CTX_QUIESCE,          "ctx quiesce cb");
     worker_register_job_name(RRDENG_OPCODE_MAX + RRDENG_OPCODE_PARALLEL_WEIGHT,      "parallel weight cb");
     worker_register_job_name(RRDENG_OPCODE_MAX + RRDENG_OPCODE_MRG_LOAD,             "mrg tier load cb");
+    worker_register_job_name(RRDENG_OPCODE_MAX + RRDENG_OPCODE_RETENTION_SUMMARY,    "retention summary cb");
 
     // special jobs
     worker_register_job_name(RRDENG_RETENTION_TIMER_CB,                              "retention timer");
@@ -2967,6 +3041,23 @@ void dbengine_event_loop(void* arg) {
                         rrdeng_main.cleanup_running++;
                         work_dispatch(NULL, NULL, NULL, opcode, cleanup_tp_worker, after_cleanup);
                     }
+                    break;
+                }
+
+                case RRDENG_OPCODE_RETENTION_SUMMARY: {
+                    struct rrdengine_instance *ctx = cmd.ctx;
+                    bool dispatched = false;
+                    if (!rrdeng_main.summary_build_running && ctx_is_available_for_queries(ctx)) {
+                        rrdeng_main.summary_build_running++;
+                        __atomic_store_n(&ctx->summaries.building, true, __ATOMIC_RELEASE);
+                        dispatched = work_dispatch(ctx, NULL, NULL, opcode, retention_summary_build_tp_worker, after_retention_summary_build);
+                        if (!dispatched) {
+                            rrdeng_main.summary_build_running--;
+                            __atomic_store_n(&ctx->summaries.building, false, __ATOMIC_RELEASE);
+                        }
+                    }
+                    if (!dispatched)
+                        ctx->summaries.pending = false;
                     break;
                 }
 

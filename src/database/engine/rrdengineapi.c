@@ -3,6 +3,7 @@
 #include "database/engine/rrddiskprotocol.h"
 #include "rrdengine.h"
 #include "dbengine-compression.h"
+#include "retention-summary.h"
 
 /* Default global database instance */
 struct rrdengine_instance multidb_ctx_storage_tier0 = { 0 };
@@ -45,6 +46,7 @@ size_t page_type_size[256] = {
 static inline void initialize_single_ctx(struct rrdengine_instance *ctx) {
     memset(ctx, 0, sizeof(*ctx));
     netdata_rwlock_init(&ctx->datafiles.rwlock);
+    spinlock_init(&ctx->summaries.spinlock);
     rw_spinlock_init(&ctx->njfv2idx.spinlock);
 }
 
@@ -1315,6 +1317,8 @@ int rrdeng_exit(struct rrdengine_instance *ctx) {
 
     completion_wait_for(&completion);
     completion_destroy(&completion);
+
+    retention_summary_ctx_cleanup(ctx);
 
     rrd_stat_atomic_add(&global_stats.rrdeng_reserved_file_descriptors, -RRDENG_FD_BUDGET_PER_INSTANCE);
     return 0;

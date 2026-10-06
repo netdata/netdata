@@ -1563,9 +1563,27 @@ int journalfile_v2_load(struct rrdengine_instance *ctx, struct rrdengine_journal
         return 1;
     }
 
-    // validation reads the file sequentially — hint the kernel to prefetch
+    // validation reads the header, the extent list and the file trailer -
+    // prefetch only those. The metric list is read later by the per-file MRG
+    // population (which prefetches it), or not at all when a retention summary
+    // covers this file; the page list only by queries.
     madvise_sequential(data_start, journal_v2_file_size);
-    madvise_willneed(data_start, journal_v2_file_size);
+    if (db_engine_journal_check)
+        // the full check reads the metric and page lists too
+        madvise_willneed(data_start, journal_v2_file_size);
+    else {
+        // read the header with pread, not through the mapping: a fault here
+        // would be outside the protected region set up for validation below
+        struct journal_v2_header j2_header;
+        size_t directory_head = RRDENG_BLOCK_SIZE;
+        if (pread(fd, &j2_header, sizeof(j2_header), 0) == (ssize_t)sizeof(j2_header))
+            directory_head = (size_t)j2_header.extent_trailer_offset + sizeof(struct journal_v2_block_trailer);
+        if (directory_head > journal_v2_file_size)
+            directory_head = journal_v2_file_size;
+        madvise_willneed(data_start, directory_head);
+        size_t trailer_page = journal_v2_file_size > RRDENG_BLOCK_SIZE ? ALIGN_BYTES_FLOOR(journal_v2_file_size - RRDENG_BLOCK_SIZE) : 0;
+        madvise_willneed(data_start + trailer_page, journal_v2_file_size - trailer_page);
+    }
 
     nd_log_daemon(NDLP_DEBUG, "DBENGINE: checking integrity of \"%s\"", path_v2);
 
