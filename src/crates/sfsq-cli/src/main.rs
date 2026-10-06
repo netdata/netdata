@@ -13,8 +13,8 @@ use std::process::ExitCode;
 use clap::Parser;
 
 use sfsq_cli::traces::{
-    SearchArgs, AttributeValuesArgs, AttributesArgs, TraceArgs, run_search, run_attribute_values, run_attributes,
-    run_trace,
+    AttributeValuesArgs, AttributesArgs, SearchArgs, TraceArgs, run_attribute_values,
+    run_attributes, run_search, run_trace,
 };
 use sfsq_cli::{Args, init_tracing, is_broken_pipe, run};
 

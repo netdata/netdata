@@ -3,8 +3,8 @@ use super::*;
 use crate::protocol::PROFILE_SHM_FUTEX;
 use crate::protocol::{CgroupsBuilder, NipcError, PROFILE_BASELINE};
 use std::path::PathBuf;
-use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Arc;
+use std::sync::atomic::{AtomicU64, Ordering};
 use std::thread;
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 

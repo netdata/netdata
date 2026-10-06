@@ -187,7 +187,10 @@ pub enum GroupCondition {
     /// (`events.attributes.X`, `events.name`, `links.attributes.X`) —
     /// refined by KvId membership against the tokens the matcher
     /// selects from the field's dictionary.
-    Field { field: String, matcher: PlanMatcher },
+    Field {
+        field: String,
+        matcher: PlanMatcher,
+    },
     /// `event:timeSinceStart` in any of the inclusive ns intervals —
     /// computed in refine from the event time and the row start
     /// (event groups only).
@@ -338,8 +341,11 @@ fn matcher_hits(
             exact.iter().any(|e| e.as_bytes() == value)
                 || compiled_patterns.iter().any(|r| r.is_match(value))
         }
-        PlanMatcher::Number { cmp, values } => std::str::from_utf8(value)
-            .is_ok_and(|v| values.iter().any(|&rhs| numeric_token_matches(v, *cmp, rhs))),
+        PlanMatcher::Number { cmp, values } => std::str::from_utf8(value).is_ok_and(|v| {
+            values
+                .iter()
+                .any(|&rhs| numeric_token_matches(v, *cmp, rhs))
+        }),
     }
 }
 
@@ -517,9 +523,9 @@ impl IndexReader<'_> {
                         !self.has_link_index()
                     };
                     let impossible = chunk_absent
-                        || resolved_conditions.iter().any(|c| {
-                            matches!(c, ResolvedGroupCondition::Kv(kvids) if kvids.is_empty())
-                        });
+                        || resolved_conditions.iter().any(
+                            |c| matches!(c, ResolvedGroupCondition::Kv(kvids) if kvids.is_empty()),
+                        );
                     resolved.push(None);
                     durations.push(None);
                     groups.push(GroupSlot {
@@ -603,9 +609,11 @@ impl IndexReader<'_> {
             }
             acc.is_some_and(|set| set.is_empty())
         };
-        let ready_empty = resolved.iter().flatten().any(|term| {
-            combine_ready(term).is_some_and(|set| set.is_empty())
-        }) || durations.iter().flatten().any(PosSet::is_empty)
+        let ready_empty = resolved
+            .iter()
+            .flatten()
+            .any(|term| combine_ready(term).is_some_and(|set| set.is_empty()))
+            || durations.iter().flatten().any(PosSet::is_empty)
             || groups.iter().any(group_ready_empty);
         // When short-circuiting, the scan is skipped and the probe
         // slots get throwaway empty sets — every consumer of
@@ -653,12 +661,8 @@ impl IndexReader<'_> {
                 if self.has_event_index() {
                     let events = self.event_index()?;
                     let timestamps = self.load_timestamps()?;
-                    let Some(set) = refine_rows(
-                        range_set.iter(),
-                        total,
-                        ceiling,
-                        work,
-                        |pos, count| {
+                    let Some(set) =
+                        refine_rows(range_set.iter(), total, ceiling, work, |pos, count| {
                             let start = timestamps.at(pos).unwrap_or(0);
                             let mut hit = false;
                             for e in events.events_for_row(pos) {
@@ -672,8 +676,7 @@ impl IndexReader<'_> {
                                         // Saturating, matching the recorded
                                         // ingest semantics — a wrapping cast
                                         // would flip far-future times negative.
-                                        let t = i64::try_from(e.time_unix_nano)
-                                            .unwrap_or(i64::MAX);
+                                        let t = i64::try_from(e.time_unix_nano).unwrap_or(i64::MAX);
                                         let dt = t.saturating_sub(start);
                                         intervals.iter().any(|&(lo, hi)| {
                                             lo.is_none_or(|lo| dt >= lo)
@@ -688,8 +691,8 @@ impl IndexReader<'_> {
                                 }
                             }
                             hit
-                        },
-                    ) else {
+                        })
+                    else {
                         return Ok(None);
                     };
                     set
@@ -698,25 +701,31 @@ impl IndexReader<'_> {
                 }
             } else if self.has_link_index() {
                 let links = self.link_index()?;
-                let Some(set) = refine_rows(range_set.iter(), total, ceiling, work, |pos, count| {
-                    let mut hit = false;
-                    for l in links.links_for_row(pos) {
-                        *count += 1;
-                        let ok = group.conditions.iter().all(|c| match c {
-                            ResolvedGroupCondition::Kv(kvids) => {
-                                l.attr_refs.iter().any(|id| kvids.contains(&id.0))
+                let Some(set) =
+                    refine_rows(range_set.iter(), total, ceiling, work, |pos, count| {
+                        let mut hit = false;
+                        for l in links.links_for_row(pos) {
+                            *count += 1;
+                            let ok = group.conditions.iter().all(|c| match c {
+                                ResolvedGroupCondition::Kv(kvids) => {
+                                    l.attr_refs.iter().any(|id| kvids.contains(&id.0))
+                                }
+                                ResolvedGroupCondition::LinkSpanIds(ids) => {
+                                    ids.contains(&l.span_id)
+                                }
+                                ResolvedGroupCondition::LinkTraceIds(ids) => {
+                                    ids.contains(&l.trace_id)
+                                }
+                                ResolvedGroupCondition::TimeSince(_) => false, // event-only
+                            });
+                            if ok {
+                                hit = true;
+                                break;
                             }
-                            ResolvedGroupCondition::LinkSpanIds(ids) => ids.contains(&l.span_id),
-                            ResolvedGroupCondition::LinkTraceIds(ids) => ids.contains(&l.trace_id),
-                            ResolvedGroupCondition::TimeSince(_) => false, // event-only
-                        });
-                        if ok {
-                            hit = true;
-                            break;
                         }
-                    }
-                    hit
-                }) else {
+                        hit
+                    })
+                else {
                     return Ok(None);
                 };
                 set
@@ -909,12 +918,13 @@ impl IndexReader<'_> {
             Some(FieldLocation::Low) => {
                 let prefix = format!("{field}=");
                 let mut off = 0u32;
-                self.primary.prefix_for_each(prefix.as_bytes(), |kv_bytes, _| {
-                    if hits(kv_bytes) {
-                        out.insert(start + off);
-                    }
-                    off += 1;
-                });
+                self.primary
+                    .prefix_for_each(prefix.as_bytes(), |kv_bytes, _| {
+                        if hits(kv_bytes) {
+                            out.insert(start + off);
+                        }
+                        off += 1;
+                    });
             }
             Some(FieldLocation::Mid(idx)) => {
                 let chunk = self.sfst.mid_field(idx)?;
@@ -955,13 +965,7 @@ impl CompiledTracePlan {
     /// partition-point search over `range_cardinality` locates the tail
     /// band holding exactly `min(k, matched)` positions, and only that
     /// band is iterated — every emitted position counts into `work`.
-    pub fn newest_in_range(
-        &self,
-        lo: u32,
-        hi: u32,
-        k: usize,
-        work: &mut ScanWork,
-    ) -> Vec<u32> {
+    pub fn newest_in_range(&self, lo: u32, hi: u32, k: usize, work: &mut ScanWork) -> Vec<u32> {
         let hi = hi.min(self.universe);
         if k == 0 || lo >= hi {
             return Vec::new();

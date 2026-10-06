@@ -1,0 +1,63 @@
+#!/usr/bin/env bash
+# SPDX-License-Identifier: GPL-3.0-or-later
+# managed-by: netdata setup-git-hooks
+# Blocks commits that stage unformatted Rust under src/crates (checks the index, never edits files).
+set -euo pipefail
+
+# All crates use edition 2024 and there is no rustfmt.toml; stdin formatting
+# then matches `cargo fmt` byte for byte. Revisit if either changes.
+edition=2024
+
+# cargo fmt never reaches this file: no `mod` declares it.
+skip_paths=(
+    src/crates/journal-engine/src/logs/transformations.rs
+)
+
+mapfile -d '' files < <(git diff --cached --name-only --diff-filter=ACMR -z -- 'src/crates/*.rs')
+(( ${#files[@]} )) || exit 0
+
+if ! command -v rustfmt >/dev/null 2>&1; then
+    echo "pre-commit: rustfmt not found, so the staged Rust files cannot be checked." >&2
+    echo "pre-commit: install it with 'rustup component add rustfmt', or commit with --no-verify." >&2
+    exit 1
+fi
+
+unformatted=()
+broken=()
+for f in "${files[@]}"; do
+    for s in "${skip_paths[@]}"; do
+        [[ $f == "$s" ]] && continue 2
+    done
+
+    # Generated code (prost-build output) keeps its generator's layout.
+    first_line=$(git cat-file blob ":$f" | sed -n 1p)
+    [[ $first_line == *@generated* ]] && continue
+
+    # `rustfmt --check` exits 0 on stdin input even when it prints a diff,
+    # so compare the formatted output with the staged bytes instead.
+    set +e
+    git cat-file blob ":$f" | rustfmt --edition "$edition" | cmp -s - <(git cat-file blob ":$f")
+    status=("${PIPESTATUS[@]}")
+    set -e
+
+    if (( status[1] != 0 )); then
+        broken+=("$f")
+    elif (( status[2] != 0 )); then
+        unformatted+=("$f")
+    fi
+done
+
+(( ${#unformatted[@]} + ${#broken[@]} )) || exit 0
+
+if (( ${#broken[@]} )); then
+    echo "pre-commit: rustfmt could not parse these staged files (see the errors above):" >&2
+    printf '  %s\n' "${broken[@]}" >&2
+fi
+if (( ${#unformatted[@]} )); then
+    echo "pre-commit: these staged Rust files are not formatted:" >&2
+    printf '  %s\n' "${unformatted[@]}" >&2
+    echo "pre-commit: run 'cargo fmt' in their workspace (src/crates, src/crates/jf or" >&2
+    echo "            src/crates/treight/fuzz), stage the result, and commit again." >&2
+fi
+echo "pre-commit: 'git commit --no-verify' skips this check." >&2
+exit 1

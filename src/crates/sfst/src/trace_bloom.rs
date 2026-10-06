@@ -432,10 +432,9 @@ mod tests {
             tree: SchemaTree::flat(&Vec::new().into()),
             columns: ColumnsTable::default(), // no TRCE in the manifest
         };
-        let prim = crate::PrefixMap::<crate::BitmapValue>::build(
-            Vec::<(&str, crate::BitmapValue)>::new(),
-        )
-        .unwrap();
+        let prim =
+            crate::PrefixMap::<crate::BitmapValue>::build(Vec::<(&str, crate::BitmapValue)>::new())
+                .unwrap();
 
         let mut w = chunk_file::container::StreamingWriter::new(
             std::io::Cursor::new(Vec::new()),
@@ -444,16 +443,31 @@ mod tests {
             7,
         )
         .unwrap();
-        w.write_chunk(crate::CHUNK_SUMMARY, &crate::writer::pack(&summary, lvl).unwrap())
-            .unwrap();
-        w.write_chunk(crate::CHUNK_META, &crate::writer::pack(&metadata, lvl).unwrap())
-            .unwrap();
-        w.write_chunk(crate::CHUNK_TIMS, &crate::writer::pack(&[1i64][..], lvl).unwrap())
-            .unwrap();
-        w.write_chunk(crate::CHUNK_PRIMARY, &crate::writer::pack(&prim, lvl).unwrap())
-            .unwrap();
-        w.write_chunk(crate::CHUNK_TRACE_INDEX, &crate::writer::pack(&idx, lvl).unwrap())
-            .unwrap();
+        w.write_chunk(
+            crate::CHUNK_SUMMARY,
+            &crate::writer::pack(&summary, lvl).unwrap(),
+        )
+        .unwrap();
+        w.write_chunk(
+            crate::CHUNK_META,
+            &crate::writer::pack(&metadata, lvl).unwrap(),
+        )
+        .unwrap();
+        w.write_chunk(
+            crate::CHUNK_TIMS,
+            &crate::writer::pack(&[1i64][..], lvl).unwrap(),
+        )
+        .unwrap();
+        w.write_chunk(
+            crate::CHUNK_PRIMARY,
+            &crate::writer::pack(&prim, lvl).unwrap(),
+        )
+        .unwrap();
+        w.write_chunk(
+            crate::CHUNK_TRACE_INDEX,
+            &crate::writer::pack(&idx, lvl).unwrap(),
+        )
+        .unwrap();
         w.write_chunk(
             crate::CHUNK_TRACE_BLOOM,
             &crate::writer::pack(&bloom, lvl).unwrap(),
@@ -468,6 +482,9 @@ mod tests {
 
         let reader = crate::reader::ChunkReader::open(&buf).unwrap();
         assert!(reader.has_trace_id_bloom() && reader.has_trace_id_index());
-        assert!(reader.trace_id_bloom().is_err(), "missing TRCE column rejected");
+        assert!(
+            reader.trace_id_bloom().is_err(),
+            "missing TRCE column rejected"
+        );
     }
 }

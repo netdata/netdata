@@ -154,12 +154,11 @@ impl TraceWalScan {
         let mut flattener = ng_flatten::Flattener::new();
         while let Some(frame) = reader.next_frame()? {
             frame_no += 1;
-            let flattened = ng_flatten::decode_trace_frame(frame.data).map_err(|e| {
-                TraceScanError::Decode {
+            let flattened =
+                ng_flatten::decode_trace_frame(frame.data).map_err(|e| TraceScanError::Decode {
                     frame: frame_no,
                     msg: e.to_string(),
-                }
-            })?;
+                })?;
             let tree = &flattened.tree;
             let _ = flattener.merge_tree(tree);
             // Resolve each node's path once per frame (spans reuse nodes).

@@ -24,22 +24,22 @@ use std::mem;
 // Universe sizes hitting the minimum and maximum value at every tree depth
 // 1-8, per treight::ceil_log8 (src/crates/treight/src/lib.rs).
 const UNIVERSES: [u32; 16] = [
-    1,           // 1 level
-    8,           // 1 level (max)
-    9,           // 2 levels (min)
-    64,          // 2 levels (max)
-    65,          // 3 levels (min)
-    512,         // 3 levels (max)
-    513,         // 4 levels (min)
-    4_096,       // 4 levels (max)
-    4_097,       // 5 levels (min)
-    32_768,      // 5 levels (max)
-    32_769,      // 6 levels (min)
-    262_144,     // 6 levels (max)
-    262_145,     // 7 levels (min)
-    2_097_152,   // 7 levels (max)
-    2_097_153,   // 8 levels (min)
-    16_777_216,  // 8 levels (max)
+    1,          // 1 level
+    8,          // 1 level (max)
+    9,          // 2 levels (min)
+    64,         // 2 levels (max)
+    65,         // 3 levels (min)
+    512,        // 3 levels (max)
+    513,        // 4 levels (min)
+    4_096,      // 4 levels (max)
+    4_097,      // 5 levels (min)
+    32_768,     // 5 levels (max)
+    32_769,     // 6 levels (min)
+    262_144,    // 6 levels (max)
+    262_145,    // 7 levels (min)
+    2_097_152,  // 7 levels (max)
+    2_097_153,  // 8 levels (min)
+    16_777_216, // 8 levels (max)
 ];
 
 /// Value payload for the value-carrying ops, read straight from the fuzz
@@ -88,7 +88,13 @@ struct FuzzInput {
 /// Assert the treight and roaring sides hold the same set: len, min, max,
 /// emptiness and full ascending iteration must all agree.
 fn check_equal(t: &treight::RawBitmap, td: &[u8], r: &roaring::RoaringBitmap) {
-    assert_eq!(t.len(td), r.len(), "len mismatch: treight={} roaring={}", t.len(td), r.len());
+    assert_eq!(
+        t.len(td),
+        r.len(),
+        "len mismatch: treight={} roaring={}",
+        t.len(td),
+        r.len()
+    );
     assert_eq!(t.min(td), r.min(), "min mismatch");
     assert_eq!(t.max(td), r.max(), "max mismatch");
     assert_eq!(t.is_empty(td), r.is_empty(), "is_empty mismatch");
@@ -231,7 +237,8 @@ fuzz_target!(|input: FuzzInput| {
                 // identically to the original.
                 let mut buf = Vec::new();
                 lhs_t.serialize_into(&lhs_d, &mut buf).unwrap();
-                let (restored, restored_data) = treight::RawBitmap::deserialize_from(&buf[..]).unwrap();
+                let (restored, restored_data) =
+                    treight::RawBitmap::deserialize_from(&buf[..]).unwrap();
                 assert_eq!(
                     lhs_t.iter(&lhs_d).collect::<Vec<_>>(),
                     restored.iter(&restored_data).collect::<Vec<_>>(),

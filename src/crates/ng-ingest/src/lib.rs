@@ -59,8 +59,8 @@ pub fn write_request(
     let fallback_base_ns = clock.now_ns().as_u64();
     // `None` bounds: this dev/bench tool enforces no ingestion time window — the
     // production window is applied only by the otel-ingestor service.
-    let frame =
-        ng_flatten::prepare_log_frame(req, fallback_base_ns, None).context("prepare flattened frame")?;
+    let frame = ng_flatten::prepare_log_frame(req, fallback_base_ns, None)
+        .context("prepare flattened frame")?;
     // `ts_range` is None exactly when the request has no records.
     if frame.ts_range.is_none() {
         return Ok(0);

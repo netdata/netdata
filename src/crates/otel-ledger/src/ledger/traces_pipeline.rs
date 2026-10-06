@@ -91,7 +91,10 @@ pub(crate) async fn build_traces_pipeline(
                 Arc::new(HandlerAdapter::new(traces_handler));
             // The traces-own GET shim: the literal `info` token →
             // `{"info": {}}`, anything else → no payload (POST-only data).
-            (handler, super::rpc::patch_traces_args_into_payload as ArgShim)
+            (
+                handler,
+                super::rpc::patch_traces_args_into_payload as ArgShim,
+            )
         },
     )
     .await

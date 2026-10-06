@@ -61,51 +61,53 @@
 //! - window — [`TimeWindow`]: the half-open query window shared by
 //!   every operation that takes one.
 
+mod attributes;
 mod by_id;
+mod fold;
 mod gate;
 mod overview;
 mod predicate;
-mod fold;
 mod rollup;
-mod slowest;
 mod search;
+mod slowest;
 mod sources;
 mod status;
-mod attributes;
 mod vocab;
 mod wal_scan;
 mod window;
 
-pub use by_id::{DEFAULT_SPAN_CAP, FieldKinds, TraceData, TraceQuery, TraceRequestError, trace_by_id};
+pub use attributes::{
+    AttributeNamesData, AttributeNamesQuery, AttributeRequestError, AttributeValue,
+    AttributeValuesData, AttributeValuesQuery, attribute_names, attribute_values,
+};
+pub use by_id::{
+    DEFAULT_SPAN_CAP, FieldKinds, TraceData, TraceQuery, TraceRequestError, trace_by_id,
+};
 pub use overview::{
     DURATION_BIN_COUNT, DURATION_BIN_LABELS, DurationPercentiles, FACET_TOP_K, FacetList,
     OverviewData, OverviewQuery, OverviewRequestError, RootFacets, overview,
+};
+pub use predicate::{
+    CompareOp, Condition, Predicate, PredicateError, PredicateTarget, PredicateValue, span_matches,
 };
 pub use rollup::{
     TraceAggregate, TraceRootInfo, sealed_trace_aggregates, sealed_trace_envelopes,
     tail_trace_aggregates,
 };
+pub use search::{
+    DEFAULT_SEARCH_LIMIT, DEFAULT_SPANS_PER_TRACE, SERVICE_BREAKDOWN_TOP_K, SPANS_PER_TRACE_MAX,
+    SearchData, SearchQuery, SearchRequestError, SearchSources, ServiceBreakdown, TraceSummary,
+    search,
+};
 pub use slowest::{
     DEFAULT_SLOWEST_LIMIT, SLOWEST_LIMIT_MAX, SlowTrace, SlowestData, SlowestQuery,
     SlowestRequestError, slowest,
-};
-pub use predicate::{
-    CompareOp, Condition, Predicate, PredicateError, PredicateTarget, PredicateValue,
-    span_matches,
-};
-pub use search::{
-    DEFAULT_SEARCH_LIMIT, DEFAULT_SPANS_PER_TRACE, SERVICE_BREAKDOWN_TOP_K, SPANS_PER_TRACE_MAX, SearchData,
-    SearchQuery, SearchRequestError, SearchSources, ServiceBreakdown, TraceSummary, search,
 };
 pub use sources::{
     SourceId, SourceSetError, TraceSfstCandidate, TraceSource, TraceUnavailable, TraceWalTail,
     WalCoverage, validate_sources,
 };
 pub use status::{PartialReason, QueryStatus, StatusBuilder};
-pub use attributes::{
-    AttributeNamesData, AttributeNamesQuery, AttributeRequestError, AttributeValue, AttributeValuesData, AttributeValuesQuery,
-    attribute_names, attribute_values,
-};
 pub use vocab::{AttributeKey, AttributeOwner, BuiltinField, storage_to_attribute};
 pub use wal_scan::{TraceScanError, TraceWalScan};
 pub use window::{TimeWindow, WindowError};

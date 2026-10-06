@@ -23,10 +23,10 @@ use crate::{
     ALL_COLUMNS, BitmapValue, CHUNK_DROPPED_ATTRS, CHUNK_DURATION, CHUNK_EVENTS, CHUNK_FLAGS,
     CHUNK_LINKS, CHUNK_META, CHUNK_OBSERVED_TS, CHUNK_PARENT_SPAN_IDS, CHUNK_PRIMARY,
     CHUNK_SPAN_IDS, CHUNK_SUMMARY, CHUNK_TIMS, CHUNK_TRACE_BLOOM, CHUNK_TRACE_IDS,
-    CHUNK_TRACE_INDEX, CHUNK_TRACE_ROLLUP, ColumnSpec, ColumnsTable, DroppedAttributeCounts, Durations, Error, Flags,
-    HighField, MAGIC, MAX_STREAM_BATCHES, Metadata, ObservedTimestamps, ParentSpanIds, SpanIds,
-    StreamBatch, Summary, TraceIdIndex, TraceIds, VERSION, ZSTD_LEVEL_DEFAULT, ZSTD_LEVEL_FST,
-    high_field_id, mid_field_id, stream_batch_id,
+    CHUNK_TRACE_INDEX, CHUNK_TRACE_ROLLUP, ColumnSpec, ColumnsTable, DroppedAttributeCounts,
+    Durations, Error, Flags, HighField, MAGIC, MAX_STREAM_BATCHES, Metadata, ObservedTimestamps,
+    ParentSpanIds, SpanIds, StreamBatch, Summary, TraceIdIndex, TraceIds, VERSION,
+    ZSTD_LEVEL_DEFAULT, ZSTD_LEVEL_FST, high_field_id, mid_field_id, stream_batch_id,
 };
 
 /// Serialize a value with bincode, then compress with zstd at

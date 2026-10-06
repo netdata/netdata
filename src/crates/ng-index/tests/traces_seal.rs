@@ -126,11 +126,10 @@ fn seal(reqs: Vec<ExportTraceServiceRequest>) -> Vec<u8> {
         // The production content_meta: the version-tagged empty-ServiceStream
         // blob the unattributed stream carries (not a bare empty slice), so
         // the seal is exercised against production-shaped WAL headers.
-        let content_meta =
-            otel_logs_identity::encode_content_meta(&otel_logs_identity::ServiceStream::new(
-                "", "",
-            ))
-            .expect("the empty identity always encodes");
+        let content_meta = otel_logs_identity::encode_content_meta(
+            &otel_logs_identity::ServiceStream::new("", ""),
+        )
+        .expect("the empty identity always encodes");
         writer
             .write_frame(
                 0,
@@ -452,7 +451,10 @@ fn trace_by_id_self_parent_is_a_root() {
         .unwrap();
     assert_eq!(tr.spans.len(), 1);
     assert_eq!(tr.roots.len(), 1, "self-parent treated as root");
-    assert!(tr.children.iter().all(|kids| kids.is_empty()), "no self-edge");
+    assert!(
+        tr.children.iter().all(|kids| kids.is_empty()),
+        "no self-edge"
+    );
 }
 
 #[test]
@@ -700,7 +702,11 @@ fn events_links_and_deferred_scalars_round_trip() {
     assert_eq!(root.events.len(), 2);
     let ev = &root.events[0];
     assert_eq!(
-        (ev.time_unix_nano, ev.name.as_str(), ev.dropped_attributes_count),
+        (
+            ev.time_unix_nano,
+            ev.name.as_str(),
+            ev.dropped_attributes_count
+        ),
         (2_100, "exception", 7)
     );
     assert_eq!(
@@ -747,7 +753,10 @@ fn events_links_and_deferred_scalars_round_trip() {
     assert_eq!(child.events.len(), 1);
     assert_eq!(child.events[0].name, "cache-miss");
     assert!(child.links.is_empty());
-    assert_eq!((child.dropped_events_count, child.dropped_links_count), (0, 0));
+    assert_eq!(
+        (child.dropped_events_count, child.dropped_links_count),
+        (0, 0)
+    );
 
     // Flat search tokens exist in the field table (searchable) but are excluded
     // from the reconstructed span's facet list (represented structurally).
@@ -758,7 +767,11 @@ fn events_links_and_deferred_scalars_round_trip() {
             .iter()
             .any(|f| f.name == "events.attributes.exception.stacktrace")
     );
-    assert!(fields.iter().any(|f| f.name == "links.attributes.messaging.operation"));
+    assert!(
+        fields
+            .iter()
+            .any(|f| f.name == "links.attributes.messaging.operation")
+    );
     assert!(
         root.fields.iter().all(|(k, _)| !k.starts_with("events.")),
         "flat events.* tokens excluded from the structured span"
@@ -775,12 +788,7 @@ fn events_links_and_deferred_scalars_round_trip() {
 fn no_events_no_links_no_chunks() {
     let trace = [0xE2u8; 16];
     let bytes = seal(vec![req(vec![span(
-        trace,
-        [1; 8],
-        [0; 8],
-        1_000,
-        2_000,
-        "plain",
+        trace, [1; 8], [0; 8], 1_000, 2_000, "plain",
     )])]);
     let index = IndexReader::open(&bytes).unwrap();
     assert!(!index.has_event_index());
@@ -854,12 +862,7 @@ fn seal_writes_the_trace_rollup_with_honest_roots_and_stored_counts() {
     let a_root = span([0xA; 16], [1; 8], [0; 8], 1_000, 2_000, "root-op");
     let a_child = span([0xA; 16], [2; 8], [1; 8], 1_200, 1_500, "child-op");
     let b_orphan = span([0xB; 16], [3; 8], [9; 8], 5_000, 6_000, "orphan-op");
-    let bytes = seal(vec![req(vec![
-        a_root,
-        a_child.clone(),
-        a_child,
-        b_orphan,
-    ])]);
+    let bytes = seal(vec![req(vec![a_root, a_child.clone(), a_child, b_orphan])]);
 
     let reader = IndexReader::open(&bytes).unwrap();
     assert!(reader.has_trace_rollup());
@@ -883,7 +886,10 @@ fn seal_writes_the_trace_rollup_with_honest_roots_and_stored_counts() {
     assert_eq!(resolve(rollup.root_name_refs[0]), "name=root-op");
 
     assert_eq!(rollup.trace_ids.get(1), TraceId::from([0xB; 16]));
-    assert_eq!(rollup.root_is_true_root[1], 0, "no true root → honest absence");
+    assert_eq!(
+        rollup.root_is_true_root[1], 0,
+        "no true root → honest absence"
+    );
     assert!(rollup.root_span_ids.get(1).is_unset());
     assert_eq!(rollup.root_service_refs[1], sfst::ROLLUP_NO_REF);
 
@@ -907,7 +913,14 @@ fn rollup_captures_error_status_kind_and_service_absence() {
     });
     let child = span([0xC; 16], [2; 8], [1; 8], 1_100, 1_200, "ok-child");
 
-    let mut svcless = req(vec![span([0xD; 16], [3; 8], [0; 8], 9_000, 9_100, "svcless-root")]);
+    let mut svcless = req(vec![span(
+        [0xD; 16],
+        [3; 8],
+        [0; 8],
+        9_000,
+        9_100,
+        "svcless-root",
+    )]);
     svcless.resource_spans[0].resource = Some(Resource::default());
 
     let bytes = seal(vec![req(vec![root, child]), svcless]);

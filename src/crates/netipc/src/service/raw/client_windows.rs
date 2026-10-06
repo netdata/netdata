@@ -1,8 +1,8 @@
 use super::client::{ClientState, RawClient};
 use super::common::{CLIENT_SHM_ATTACH_RETRY_INTERVAL_MS, CLIENT_SHM_ATTACH_RETRY_TIMEOUT_MS};
 use crate::transport::win_shm::{
-    WinShmContext, PROFILE_BUSYWAIT as WIN_SHM_PROFILE_BUSYWAIT,
-    PROFILE_HYBRID as WIN_SHM_PROFILE_HYBRID,
+    PROFILE_BUSYWAIT as WIN_SHM_PROFILE_BUSYWAIT, PROFILE_HYBRID as WIN_SHM_PROFILE_HYBRID,
+    WinShmContext,
 };
 use crate::transport::windows::{NpError, NpSession};
 
