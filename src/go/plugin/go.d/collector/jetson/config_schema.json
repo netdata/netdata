@@ -1,0 +1,17 @@
+{
+  "jsonSchema": {
+    "$schema": "http://json-schema.org/draft-07/schema#",
+    "title": "NVIDIA Jetson collector configuration.",
+    "type": "object",
+    "properties": {
+      "update_every": {
+        "title": "Update every",
+        "description": "Interval in seconds between published observations. Tegrastats continues sampling once per second.",
+        "type": "integer",
+        "minimum": 1,
+        "default": 1
+      }
+    }
+  },
+  "uiSchema": {}
+}
