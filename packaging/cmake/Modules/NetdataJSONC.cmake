@@ -70,7 +70,9 @@ macro(netdata_detect_jsonc)
                 pkg_check_modules(JSONC json-c>=0.14)
         endif()
 
-        if(NOT JSONC_FOUND)
+        # JSONC_FOUND is cached by pkg_check_modules, so a reused build tree
+        # still has it set after the bundled copy is forced.
+        if(ENABLE_BUNDLED_JSONC OR NOT JSONC_FOUND)
                 set(ENABLE_BUNDLED_JSONC True)
                 netdata_bundle_jsonc()
                 set(NETDATA_JSONC_LDFLAGS json-c)

@@ -57,7 +57,9 @@ macro(netdata_detect_libyaml)
                 pkg_check_modules(YAML yaml-0.1)
         endif()
 
-        if(NOT YAML_FOUND)
+        # YAML_FOUND is cached by pkg_check_modules, so a reused build tree
+        # still has it set after the bundled copy is forced.
+        if(ENABLE_BUNDLED_YAML OR NOT YAML_FOUND)
                 set(ENABLE_BUNDLED_YAML True)
                 netdata_bundle_libyaml()
                 set(NETDATA_YAML_LDFLAGS yaml)

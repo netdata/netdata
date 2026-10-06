@@ -5,27 +5,14 @@
 # licence obligations into the shipped package, so every bundled component's
 # licence text is staged into the payload together with an inventory file.
 #
-# A missing licence file is a hard error: the bundle set is fixed for pkg
-# builds, so a gap means either the manifest or the bundling changed without
-# the notices following - fail closed rather than ship without a notice.
+# The manifest is built at configure time from the components this build
+# actually bundled. A missing licence file for a listed component is a hard
+# error: fail closed rather than ship without a notice.
 
-set(build_dir "@CMAKE_BINARY_DIR@")
 set(dest "$ENV{DESTDIR}@CMAKE_INSTALL_PREFIX@/usr/share/netdata/licenses")
 
-# component=path-inside-the-build-tree
-set(manifest
-    "bash=bundled-bash-prefix/src/bundled-bash/COPYING"
-    "openssl=bundled-openssl-prefix/src/bundled-openssl/LICENSE.txt"
-    "abseil=_deps/absl-src/LICENSE"
-    "brotli=_deps/brotli-src/LICENSE"
-    "dlib=_deps/dlib-src/LICENSE.txt"
-    "json-c=_deps/json-c-src/COPYING"
-    "libuv=_deps/libuv-src/LICENSE"
-    "lz4=_deps/lz4-src/LICENSE"
-    "protobuf=_deps/protobuf-src/LICENSE"
-    "snappy=_deps/snappy-src/COPYING"
-    "libyaml=_deps/yaml-src/License"
-    "zstd=_deps/zstd-src/COPYING")
+# component=absolute-path-of-its-licence-file
+set(manifest "@NETDATA_PKG_LICENSE_MANIFEST@")
 
 file(MAKE_DIRECTORY "${dest}")
 
@@ -37,13 +24,13 @@ string(APPEND inventory "under packaging/cmake/Modules/ (the module that bundles
 foreach(entry IN LISTS manifest)
     string(REPLACE "=" ";" pair "${entry}")
     list(GET pair 0 component)
-    list(GET pair 1 relpath)
+    list(GET pair 1 licence)
 
-    if(NOT EXISTS "${build_dir}/${relpath}")
-        message(FATAL_ERROR "licence file for bundled component '${component}' not found at ${build_dir}/${relpath}; refusing to stage a package without its notices")
+    if(NOT EXISTS "${licence}")
+        message(FATAL_ERROR "licence file for bundled component '${component}' not found at ${licence}; refusing to stage a package without its notices")
     endif()
 
-    file(COPY_FILE "${build_dir}/${relpath}" "${dest}/${component}.txt")
+    file(COPY_FILE "${licence}" "${dest}/${component}.txt")
     string(APPEND inventory "${component}\n")
 endforeach()
 

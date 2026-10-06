@@ -188,7 +188,7 @@ endif()
 # WINDOWS dev tree last configured in service/package mode trips loudly and
 # needs one wipe - accepted; loud beats a silent bundle build.)
 if(BUILD_FOR_PACKAGING OR NOT "${NETDATA_PACKAGING_FORMAT}" STREQUAL "")
-        message(FATAL_ERROR "BUILD_FOR_PACKAGING and NETDATA_PACKAGING_FORMAT were replaced by NETDATA_PACKAGE_KIND (bundle, deb, rpm, or msi). Update the invocation.")
+        message(FATAL_ERROR "BUILD_FOR_PACKAGING and NETDATA_PACKAGING_FORMAT were replaced by NETDATA_PACKAGE_KIND (bundle, deb, rpm, msi, or pkg). Update the invocation.")
 endif()
 
 # Derived, not settable: the one token for "this build stages a native package",
@@ -224,6 +224,13 @@ if(NETDATA_PACKAGE_KIND STREQUAL "pkg")
         # wiring will raise this further if it needs to.
         if(CMAKE_VERSION VERSION_LESS 3.28)
                 message(FATAL_ERROR "NETDATA_PACKAGE_KIND=pkg requires CMake >= 3.28; this is ${CMAKE_VERSION}")
+        endif()
+
+        # The root file defaults the prefix for this kind; an explicit other
+        # prefix is refused because the package scripts, the updater and
+        # kickstart all locate the install at /opt/netdata.
+        if(NOT CMAKE_INSTALL_PREFIX STREQUAL "/opt/netdata")
+                message(FATAL_ERROR "NETDATA_PACKAGE_KIND=pkg installs to /opt/netdata only; CMAKE_INSTALL_PREFIX is ${CMAKE_INSTALL_PREFIX}")
         endif()
 
         set(ENABLE_BUNDLED_JSONC True)

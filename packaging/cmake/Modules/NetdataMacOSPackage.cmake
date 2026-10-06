@@ -48,9 +48,36 @@ function(netdata_add_macos_package_target)
                 DESTINATION /Library/LaunchDaemons)
 
         # Third-party licence notices: static distribution carries the bundled
-        # libraries' obligations into the package. The script runs at install
-        # time, after every bundled component's source exists in the build
-        # tree, and fails closed on a missing licence file.
+        # libraries' obligations into the package. The manifest is built here
+        # from what this configuration actually fetched (options such as
+        # ENABLE_ML or USE_CXX_11 change the set), using each dependency's real
+        # source directory so a FETCHCONTENT_SOURCE_DIR_<NAME> override is
+        # honoured. The script runs at install time and fails closed on a
+        # listed component whose licence file is missing.
+        include(FetchContent)
+        set(NETDATA_PKG_LICENSE_MANIFEST
+            "bash=${CMAKE_BINARY_DIR}/bundled-bash-prefix/src/bundled-bash/COPYING"
+            "openssl=${CMAKE_BINARY_DIR}/bundled-openssl-prefix/src/bundled-openssl/LICENSE.txt")
+        foreach(entry IN ITEMS
+                "abseil=absl=LICENSE"
+                "brotli=brotli=LICENSE"
+                "dlib=dlib=LICENSE.txt"
+                "json-c=json-c=COPYING"
+                "libuv=libuv=LICENSE"
+                "lz4=lz4=LICENSE"
+                "protobuf=protobuf=LICENSE"
+                "snappy=snappy=COPYING"
+                "libyaml=yaml=License"
+                "zstd=zstd=COPYING")
+                string(REPLACE "=" ";" fields "${entry}")
+                list(GET fields 0 component)
+                list(GET fields 1 dep)
+                list(GET fields 2 licence)
+                FetchContent_GetProperties(${dep})
+                if(${dep}_POPULATED)
+                        list(APPEND NETDATA_PKG_LICENSE_MANIFEST "${component}=${${dep}_SOURCE_DIR}/${licence}")
+                endif()
+        endforeach()
         configure_file("${CMAKE_SOURCE_DIR}/packaging/macos/install-licenses.cmake.in"
                        "${pkg_dir}/install-licenses.cmake" @ONLY)
         install(SCRIPT "${pkg_dir}/install-licenses.cmake" COMPONENT netdata)

@@ -72,11 +72,14 @@ macro(add_ibm_plugin_target)
     set(MQ_INSTALLATION_PATH "")
   endif()
 
-  # Spliced conditionally: a bare trailing ':' is an empty ld.so element, which
-  # glibc reads as the current working directory.
+  # Spliced without empty elements: an empty ld.so element (a leading,
+  # trailing or doubled ':') is read by glibc as the current working directory.
   set(IBM_LD_LIBRARY_PATH_TAIL "")
-  if(NOT "$ENV{LD_LIBRARY_PATH}" STREQUAL "")
-    set(IBM_LD_LIBRARY_PATH_TAIL ":$ENV{LD_LIBRARY_PATH}")
+  string(REPLACE ":" ";" _ibm_inherited_ld_path "$ENV{LD_LIBRARY_PATH}")
+  list(FILTER _ibm_inherited_ld_path EXCLUDE REGEX "^$")
+  if(_ibm_inherited_ld_path)
+    list(JOIN _ibm_inherited_ld_path ":" _ibm_inherited_ld_path)
+    set(IBM_LD_LIBRARY_PATH_TAIL ":${_ibm_inherited_ld_path}")
   endif()
 
   # Build with CGO enabled and multiple rpath entries for different installation methods

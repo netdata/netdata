@@ -48,10 +48,10 @@
 #                                 link error, and the resolution is find_program
 #                                 rather than a library search.
 #
-#   IOKit, Foundation, OSLog      NetdataPlatform.cmake, next to the platform
-#                                 detection that selects them. Part of being on
-#                                 macOS rather than part of what Netdata depends
-#                                 on.
+#   IOKit, Foundation, OSLog      The root CMakeLists.txt preamble, before the
+#                                 OSLogStore probe that reads them. Part of being
+#                                 on macOS rather than part of what Netdata
+#                                 depends on.
 
 include_guard()
 

@@ -83,8 +83,9 @@ netdata_fixup_system_processor()
 # collision, the layout static Linux installs already use). Runtime paths are
 # baked into the binaries from the prefix, so it must be settled here - before
 # NETDATA_RUNTIME_PREFIX snapshots it - and only when the user did not choose
-# a prefix explicitly. NETDATA_PACKAGE_KIND is read as the raw cache value;
-# NetdataOptions declares and validates it a few lines down.
+# a prefix explicitly (NetdataOptions refuses any other explicit prefix for this
+# kind). NETDATA_PACKAGE_KIND is read as the raw cache value; NetdataOptions
+# declares and validates it a few lines down.
 if("${NETDATA_PACKAGE_KIND}" STREQUAL "pkg" AND CMAKE_INSTALL_PREFIX_INITIALIZED_TO_DEFAULT)
   set(CMAKE_INSTALL_PREFIX "/opt/netdata" CACHE PATH "Install path prefix, prepended onto install directories." FORCE)
 endif()
@@ -151,7 +152,17 @@ endif()
 if(OS_MACOS)
   enable_language(OBJC)
   if(OSLOG AND FOUNDATION)
-    add_compile_definitions(HAVE_OSLOG)
+    # macos-logs.plugin needs OSLogStore, which only exists in the 10.15 SDK and later;
+    # the OSLog framework alone (10.12 SDK) is not sufficient. HAVE_OSLOG_STORE is
+    # also read by the plugin's module and by Packaging.cmake.
+    include(CheckOBJCSourceCompiles)
+    check_objc_source_compiles("
+#import <OSLog/OSLog.h>
+int main(void) { OSLogStore *store = nil; return store != nil; }
+" HAVE_OSLOG_STORE)
+    if(HAVE_OSLOG_STORE)
+      add_compile_definitions(HAVE_OSLOG)
+    endif()
   endif()
 endif()
 

@@ -40,7 +40,8 @@ endfunction()
 # Handle setup of snappy for the build.
 #
 # The pkg package kind must not link libraries from the build host, so it
-# always bundles; everything else finds the system copy with pkg-config,
+# bundles - only when the remote-write exporter is on, since the fetch is a
+# network clone; everything else finds the system copy with pkg-config,
 # with NetdataDaemon.cmake's check_library_exists fallback still covering
 # systems whose snappy ships no .pc file.
 #
@@ -49,12 +50,14 @@ endfunction()
 # whether a missing snappy is fatal.
 macro(netdata_detect_snappy)
         if(NETDATA_PACKAGE_KIND STREQUAL "pkg")
-                include(FetchContent)
-                netdata_bundle_snappy()
-                set(SNAPPY_FOUND TRUE)
-                set(SNAPPY_LIBRARIES snappy)
-                set(SNAPPY_INCLUDE_DIRS "")
-                set(SNAPPY_CFLAGS_OTHER "")
+                if(ENABLE_EXPORTER_PROMETHEUS_REMOTE_WRITE)
+                        include(FetchContent)
+                        netdata_bundle_snappy()
+                        set(SNAPPY_FOUND TRUE)
+                        set(SNAPPY_LIBRARIES snappy)
+                        set(SNAPPY_INCLUDE_DIRS "")
+                        set(SNAPPY_CFLAGS_OTHER "")
+                endif()
         else()
                 pkg_check_modules(SNAPPY snappy)
         endif()

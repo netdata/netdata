@@ -242,7 +242,7 @@ function(precompile_python dir component)
     COMPONENT ${component}
   )
   install(
-    CODE "execute_process(COMMAND ${Python3_EXECUTABLE} -O -m compileall -j0 -o2 ${prefix}/${dir} WORKING_DIRECTORY ${prefix}/${dir})"
+    CODE "execute_process(COMMAND \"${Python3_EXECUTABLE}\" -O -m compileall -j0 -o2 \"${prefix}/${dir}\" WORKING_DIRECTORY \"${prefix}/${dir}\")"
     COMPONENT ${component}
   )
 endfunction()
