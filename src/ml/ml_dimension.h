@@ -95,8 +95,9 @@ public:
         if (AcqRH) {
             RRDHOST *RH = rrdhost_acquired_to_rrdhost(AcqRH);
             if (RH && !rrdhost_flag_check(RH, RRDHOST_FLAG_ORPHAN | RRDHOST_FLAG_ARCHIVED)) {
-                // obsolete charts are found too, so they are told apart from deleted ones below
-                AcqRS = rrdset_find_and_acquire(RH, DLI.chartId(), true);
+                // obsolete charts are found too, so they are told apart from deleted ones below; their access
+                // time is left alone, or the retries of a queued dimension would keep the chart from being freed
+                AcqRS = rrdset_find_and_acquire_obsolete_untouched(RH, DLI.chartId());
                 if (AcqRS) {
                     RRDSET *RS = rrdset_acquired_to_rrdset(AcqRS);
                     if (RS && !rrdset_flag_check(RS, RRDSET_FLAG_OBSOLETE)) {

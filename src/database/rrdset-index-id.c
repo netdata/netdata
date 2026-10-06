@@ -404,7 +404,7 @@ RRDSET *rrdset_find_bytype(RRDHOST *host, const char *type, const char *id, bool
     return rrdset_find(host, buf, include_obsolete);
 }
 
-RRDSET_ACQUIRED *rrdset_find_and_acquire(RRDHOST *host, const char *id, bool include_obsolete) {
+static RRDSET_ACQUIRED *rrdset_find_and_acquire_internal(RRDHOST *host, const char *id, bool include_obsolete, bool touch_obsolete) {
 #ifdef NETDATA_INTERNAL_CHECKS
     if(unlikely(debug_flags & D_RRD_CALLS)) {
         RRDHOST_IDENTITY identity = rrdhost_identity_acquire(host);
@@ -428,11 +428,22 @@ RRDSET_ACQUIRED *rrdset_find_and_acquire(RRDHOST *host, const char *id, bool inc
                 return NULL;
             }
 
-            rrdset_touch_last_accessed_time_s(st);
+            if(touch_obsolete || rrdset_is_discoverable(st))
+                rrdset_touch_last_accessed_time_s(st);
         }
     }
 
     return sta;
+}
+
+RRDSET_ACQUIRED *rrdset_find_and_acquire(RRDHOST *host, const char *id, bool include_obsolete) {
+    return rrdset_find_and_acquire_internal(host, id, include_obsolete, true);
+}
+
+// finds obsolete charts too, but leaves their last access time alone, so a caller that keeps looking one up
+// does not keep the obsolete chart cleanup from freeing it
+RRDSET_ACQUIRED *rrdset_find_and_acquire_obsolete_untouched(RRDHOST *host, const char *id) {
+    return rrdset_find_and_acquire_internal(host, id, true, false);
 }
 
 RRDSET *rrdset_acquired_to_rrdset(RRDSET_ACQUIRED *rsa) {
