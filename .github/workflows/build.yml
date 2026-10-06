@@ -81,6 +81,7 @@ jobs:
             packaging/*.sh
             packaging/*.version
             packaging/*.checksums
+            tests/*.sh
           files_ignore: |
             packaging/**/*.md
             packaging/repoconfig/
