@@ -388,4 +388,27 @@ However, when multiple netdata MCP servers are configured, all AI assistants hav
 - **Cursor**: Similarly, it is impossible to instruct it to use the right one. However, there is a toggle and it works properly, but you still need to ensure that the Netdata server you want to use is the only one enabled.
 - **Claude Code**: this project has a different philosophy: you can have a different `.mcp.json` file in each project directory (the current directory from which you run it), so you can have different configurations for each project/directory. Since **Claude Code** also supports a `Claude.md` file with default instructions to the AI assistant, you can have different directories with different instructions and configurations, so you can use multiple Netdata MCP servers by spawning multiple Claude Code instances in different directories.
 
+## Diagnostic Prompts (`prompts/list`, `prompts/get`)
+
+Netdata implements the MCP `prompts/list` and `prompts/get` server primitives in `src/web/mcp/mcp-prompts.c`:
+
+- `prompts/list`: Enumerates standard diagnostic prompt templates:
+  - `troubleshoot_alert`: Focuses on active or transition alerts, extracts alert metadata from host health logs under spinlock, and crafts a bounded diagnostic briefing.
+  - `explain_anomaly`: Outlines anomaly rate detection and correlates metrics across the observed time window.
+- `prompts/get`: Returns the prompt message formatted as an advisory diagnostic briefing with:
+  - Incident Alert / Anomaly Context
+  - Ambiguity warnings if an alert name matches multiple distinct charts or instances
+  - Recommended non-destructive Netdata MCP tool calls (`find_anomalous_metrics`, `find_correlated_metrics`, `query_metrics`, `execute_function` processes)
+  - Diagnostic hypotheses checklist and uncertainty disclosure
+  - Strictly enforced 16KB size ceiling (`MCP_PROMPT_CONTEXT_MAX_BYTES`)
+
+The prompt implementation does not perform LLM inference or make outbound LLM API requests from the Netdata Agent. The prompt exposes diagnostic information through the existing MCP interface to the connected MCP client; access controls depend on configured transport authentication.
+
+### Unit Testing
+
+Run standalone prompts unit tests via Netdata's unittest suite:
+```bash
+netdata -W mcppromptstest
+```
+
 For more information about Netdata, visit [netdata.cloud](https://netdata.cloud)
