@@ -41,6 +41,10 @@ int do_PerflibMemory(int update_every, usec_t dt);
 int do_PerflibObjects(int update_every, usec_t dt);
 int do_PerflibThermalZone(int update_every, usec_t dt);
 int do_PerflibWebService(int update_every, usec_t dt);
+int do_PerflibHttpService(int update_every, usec_t dt);
+void do_PerflibWebServiceExtraWeb(PERF_DATA_BLOCK *data, int update_every);
+void do_PerflibWebServiceExtraWorker(PERF_DATA_BLOCK *data, int update_every);
+void do_PerflibWebServiceExtraCache(PERF_DATA_BLOCK *data, int update_every);
 int do_PerflibNetFramework(int update_every, usec_t dt);
 int do_PerflibAD(int update_every, usec_t dt);
 int do_PerflibADCS(int update_every, usec_t dt);
@@ -86,6 +90,8 @@ enum PERFLIB_PRIO {
     PRIO_IIS_APP_POOL_TOTAL_WORKER_PROCESS_SHUTDOWN_FAILURES,
     PRIO_IIS_APP_POOL_TOTAL_WORKER_PROCESS_STARTUP_FAILURES,
     PRIO_IIS_APP_POOL_TOTAL_UPTIME,
+    PRIO_IIS_APP_POOL_CURRENT_UPTIME,
+    PRIO_IIS_APP_POOL_TIME_SINCE_FAILURE,
 
     PRIO_W3SVC_W3WP_ACTIVE_THREADS,
     PRIO_W3SVC_W3WP_REQUESTS_TOTAL,
@@ -379,7 +385,11 @@ enum PERFLIB_PRIO {
     PRIO_SMB_SERVER_SHARES_METADATA_REQUESTS,
     PRIO_SMB_SERVER_SHARES_FILES_OPENED,
 
-    PRIO_TERMINAL_SERVICES_SESSIONS
+    PRIO_TERMINAL_SERVICES_SESSIONS,
+    PRIO_IIS_EXTRA_WEBSITE = 25000,
+    PRIO_IIS_EXTRA_WORKER = 25100,
+    PRIO_HTTP_SERVICE_QUEUE = 25200,
+    PRIO_IIS_EXTRA_CACHE = 25300,
 };
 
 #endif //NETDATA_WINDOWS_PLUGIN_H

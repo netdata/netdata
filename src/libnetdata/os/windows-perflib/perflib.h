@@ -43,10 +43,11 @@ typedef struct _rawdata {
 typedef struct _counterdata {
     DWORD id;
     bool updated;
-    uint8_t failures;           // consecutive failures to find this key (0..PERFLIB_MAX_FAILURES_TO_FIND_METRIC)
-    uint16_t backoff;           // when parked, cycles remaining until the next re-probe (fits in struct padding)
+    uint8_t failures; // consecutive failures to find this key (0..PERFLIB_MAX_FAILURES_TO_FIND_METRIC)
+    uint16_t backoff; // when parked, cycles remaining until the next re-probe (fits in struct padding)
     const char *key;
     DWORD OverwriteCounterType; // if set, the counter type will be overwritten once read
+    bool elapsed_time_uses_wall_clock;
     RAW_DATA current;
     RAW_DATA previous;
 } COUNTER_DATA;

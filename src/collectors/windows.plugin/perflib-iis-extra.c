@@ -6,7 +6,6 @@
 /* Additional IIS counters are table-driven so optional Perflib counters stay independent. */
 enum iis_extra_scope {
     IIS_EXTRA_SITE,
-    IIS_EXTRA_APP,
     IIS_EXTRA_WORKER,
     IIS_EXTRA_QUEUE,
     IIS_EXTRA_GLOBAL,
@@ -15,15 +14,12 @@ enum iis_extra_scope {
 
 struct iis_extra_definition {
     const char *key;
-    const char *key2;
     const char *chart;
     const char *context;
     const char *title;
     const char *units;
     const char *dimension;
     const char *label;
-    const char *label2;
-    const char *label_value;
     enum iis_extra_scope scope;
     bool incremental;
     RRDSET_TYPE chart_type;
@@ -31,7 +27,6 @@ struct iis_extra_definition {
 
 struct iis_extra_value {
     COUNTER_DATA first;
-    COUNTER_DATA second;
     RRDSET *st;
     RRDDIM *rd;
 };
@@ -50,1255 +45,771 @@ struct iis_extra_group {
     size_t count;
     const char *object;
     const char *chart_prefix;
+    const char *module_name;
+    int priority_base;
 };
 
-#define IIS_EXTRA_DEFINE(                                                                                              \
-    group_, key_, key2_, chart_, context_, title_, units_, dim_, label_, label2_, value_, scope_, incremental_, type_) \
-    {key_, key2_, chart_, context_, title_, units_, dim_, label_, label2_, value_, scope_, incremental_, type_}
-#define IIS_EXTRA(group_, key_, key2_, chart_, context_, title_, units_, dim_, label_, label2_, value_, scope_, type_) \
-    IIS_EXTRA_DEFINE(                                                                                                  \
-        group_, key_, key2_, chart_, context_, title_, units_, dim_, label_, label2_, value_, scope_, false, type_)
-#define IIS_EXTRA_INCREMENTAL(                                                                                         \
-    group_, key_, key2_, chart_, context_, title_, units_, dim_, label_, label2_, value_, scope_, type_)               \
-    IIS_EXTRA_DEFINE(                                                                                                  \
-        group_, key_, key2_, chart_, context_, title_, units_, dim_, label_, label2_, value_, scope_, true, type_)
+#define IIS_EXTRA_DEFINE(key_, chart_, context_, title_, units_, dim_, label_, scope_, incremental_, type_)            \
+    {key_, chart_, context_, title_, units_, dim_, label_, scope_, incremental_, type_}
+#define IIS_EXTRA(key_, chart_, context_, title_, units_, dim_, label_, scope_, type_)                                 \
+    IIS_EXTRA_DEFINE(key_, chart_, context_, title_, units_, dim_, label_, scope_, false, type_)
+#define IIS_EXTRA_INCREMENTAL(key_, chart_, context_, title_, units_, dim_, label_, scope_, type_)                     \
+    IIS_EXTRA_DEFINE(key_, chart_, context_, title_, units_, dim_, label_, scope_, true, type_)
 
 static const struct iis_extra_definition web_service_definitions[] = {
     IIS_EXTRA(
-        web_service,
         "Current Blocked Async I/O Requests",
-        NULL,
         "blocked_async_io",
         "iis.website_blocked_async_io_requests",
         "Website blocked async I/O requests",
         "requests",
         "blocked",
         "website",
-        NULL,
-        NULL,
         IIS_EXTRA_SITE,
         RRDSET_TYPE_LINE),
     IIS_EXTRA(
-        web_service,
         "Current CGI Requests",
-        NULL,
         "cgi_requests",
         "iis.website_cgi_requests",
         "Website active CGI requests",
         "requests",
         "active",
         "website",
-        NULL,
-        NULL,
         IIS_EXTRA_SITE,
         RRDSET_TYPE_LINE),
-    IIS_EXTRA(
-        web_service,
+    IIS_EXTRA_INCREMENTAL(
         "Total Anonymous Users",
-        NULL,
-        "anonymous_users_total",
-        "iis.website_anonymous_users_total",
-        "Website anonymous users",
-        "users",
-        "users",
+        "users_total",
+        "iis.website_users_total_rate",
+        "Website total user counts",
+        "users/s",
+        "anonymous",
         "website",
-        NULL,
-        NULL,
         IIS_EXTRA_SITE,
         RRDSET_TYPE_LINE),
-    IIS_EXTRA(
-        web_service,
+    IIS_EXTRA_INCREMENTAL(
         "Total Blocked Async I/O Requests",
-        NULL,
         "blocked_async_io_total",
-        "iis.website_blocked_async_io_requests_total",
-        "Website blocked async I/O requests",
-        "requests",
+        "iis.website_blocked_async_io_requests_rate",
+        "Website total blocked async I/O requests",
+        "requests/s",
         "requests",
         "website",
-        NULL,
-        NULL,
         IIS_EXTRA_SITE,
         RRDSET_TYPE_LINE),
-    IIS_EXTRA(
-        web_service,
+    IIS_EXTRA_INCREMENTAL(
         "Total CGI Requests",
-        NULL,
         "cgi_requests_total",
-        "iis.website_cgi_requests_total",
+        "iis.website_cgi_requests_rate",
         "Website CGI requests",
-        "requests",
+        "requests/s",
         "requests",
         "website",
-        NULL,
-        NULL,
         IIS_EXTRA_SITE,
         RRDSET_TYPE_LINE),
-    IIS_EXTRA(
-        web_service,
+    IIS_EXTRA_INCREMENTAL(
         "Total NonAnonymous Users",
-        NULL,
-        "non_anonymous_users_total",
-        "iis.website_non_anonymous_users_total",
-        "Website non-anonymous users",
-        "users",
-        "users",
+        "users_total",
+        "iis.website_users_total_rate",
+        "Website total user counts",
+        "users/s",
+        "non_anonymous",
         "website",
-        NULL,
-        NULL,
         IIS_EXTRA_SITE,
         RRDSET_TYPE_LINE),
-    IIS_EXTRA(
-        web_service,
+    IIS_EXTRA_INCREMENTAL(
         "Total Rejected Async I/O Requests",
-        NULL,
         "rejected_async_io_total",
-        "iis.website_rejected_async_io_requests_total",
+        "iis.website_rejected_async_io_requests_rate",
         "Website rejected async I/O requests",
-        "requests",
-        "requests",
-        "website",
-        NULL,
-        NULL,
-        IIS_EXTRA_SITE,
-        RRDSET_TYPE_LINE),
-    IIS_EXTRA(
-        web_service,
-        "Total Other Request Methods",
-        NULL,
-        "requests_other_total",
-        "iis.website_requests_total",
-        "Website HTTP requests by method",
-        "requests",
+        "requests/s",
         "requests",
         "website",
-        "method",
-        "other",
-        IIS_EXTRA_SITE,
-        RRDSET_TYPE_LINE),
-    IIS_EXTRA(
-        web_service,
-        "Total Copy Requests",
-        NULL,
-        "requests_copy_total",
-        "iis.website_requests_total",
-        "Website HTTP requests by method",
-        "requests",
-        "requests",
-        "website",
-        "method",
-        "copy",
-        IIS_EXTRA_SITE,
-        RRDSET_TYPE_LINE),
-    IIS_EXTRA(
-        web_service,
-        "Total Delete Requests",
-        NULL,
-        "requests_delete_total",
-        "iis.website_requests_total",
-        "Website HTTP requests by method",
-        "requests",
-        "requests",
-        "website",
-        "method",
-        "delete",
-        IIS_EXTRA_SITE,
-        RRDSET_TYPE_LINE),
-    IIS_EXTRA(
-        web_service,
-        "Total Get Requests",
-        NULL,
-        "requests_get_total",
-        "iis.website_requests_total",
-        "Website HTTP requests by method",
-        "requests",
-        "requests",
-        "website",
-        "method",
-        "get",
-        IIS_EXTRA_SITE,
-        RRDSET_TYPE_LINE),
-    IIS_EXTRA(
-        web_service,
-        "Total Head Requests",
-        NULL,
-        "requests_head_total",
-        "iis.website_requests_total",
-        "Website HTTP requests by method",
-        "requests",
-        "requests",
-        "website",
-        "method",
-        "head",
-        IIS_EXTRA_SITE,
-        RRDSET_TYPE_LINE),
-    IIS_EXTRA(
-        web_service,
-        "Total Lock Requests",
-        NULL,
-        "requests_lock_total",
-        "iis.website_requests_total",
-        "Website HTTP requests by method",
-        "requests",
-        "requests",
-        "website",
-        "method",
-        "lock",
-        IIS_EXTRA_SITE,
-        RRDSET_TYPE_LINE),
-    IIS_EXTRA(
-        web_service,
-        "Total Mkcol Requests",
-        NULL,
-        "requests_mkcol_total",
-        "iis.website_requests_total",
-        "Website HTTP requests by method",
-        "requests",
-        "requests",
-        "website",
-        "method",
-        "mkcol",
-        IIS_EXTRA_SITE,
-        RRDSET_TYPE_LINE),
-    IIS_EXTRA(
-        web_service,
-        "Total Move Requests",
-        NULL,
-        "requests_move_total",
-        "iis.website_requests_total",
-        "Website HTTP requests by method",
-        "requests",
-        "requests",
-        "website",
-        "method",
-        "move",
-        IIS_EXTRA_SITE,
-        RRDSET_TYPE_LINE),
-    IIS_EXTRA(
-        web_service,
-        "Total Options Requests",
-        NULL,
-        "requests_options_total",
-        "iis.website_requests_total",
-        "Website HTTP requests by method",
-        "requests",
-        "requests",
-        "website",
-        "method",
-        "options",
-        IIS_EXTRA_SITE,
-        RRDSET_TYPE_LINE),
-    IIS_EXTRA(
-        web_service,
-        "Total Post Requests",
-        NULL,
-        "requests_post_total",
-        "iis.website_requests_total",
-        "Website HTTP requests by method",
-        "requests",
-        "requests",
-        "website",
-        "method",
-        "post",
-        IIS_EXTRA_SITE,
-        RRDSET_TYPE_LINE),
-    IIS_EXTRA(
-        web_service,
-        "Total Propfind Requests",
-        NULL,
-        "requests_propfind_total",
-        "iis.website_requests_total",
-        "Website HTTP requests by method",
-        "requests",
-        "requests",
-        "website",
-        "method",
-        "propfind",
-        IIS_EXTRA_SITE,
-        RRDSET_TYPE_LINE),
-    IIS_EXTRA(
-        web_service,
-        "Total Proppatch Requests",
-        NULL,
-        "requests_proppatch_total",
-        "iis.website_requests_total",
-        "Website HTTP requests by method",
-        "requests",
-        "requests",
-        "website",
-        "method",
-        "proppatch",
-        IIS_EXTRA_SITE,
-        RRDSET_TYPE_LINE),
-    IIS_EXTRA(
-        web_service,
-        "Total Put Requests",
-        NULL,
-        "requests_put_total",
-        "iis.website_requests_total",
-        "Website HTTP requests by method",
-        "requests",
-        "requests",
-        "website",
-        "method",
-        "put",
-        IIS_EXTRA_SITE,
-        RRDSET_TYPE_LINE),
-    IIS_EXTRA(
-        web_service,
-        "Total Search Requests",
-        NULL,
-        "requests_search_total",
-        "iis.website_requests_total",
-        "Website HTTP requests by method",
-        "requests",
-        "requests",
-        "website",
-        "method",
-        "search",
-        IIS_EXTRA_SITE,
-        RRDSET_TYPE_LINE),
-    IIS_EXTRA(
-        web_service,
-        "Total Trace Requests",
-        NULL,
-        "requests_trace_total",
-        "iis.website_requests_total",
-        "Website HTTP requests by method",
-        "requests",
-        "requests",
-        "website",
-        "method",
-        "trace",
-        IIS_EXTRA_SITE,
-        RRDSET_TYPE_LINE),
-    IIS_EXTRA(
-        web_service,
-        "Total Unlock Requests",
-        NULL,
-        "requests_unlock_total",
-        "iis.website_requests_total",
-        "Website HTTP requests by method",
-        "requests",
-        "requests",
-        "website",
-        "method",
-        "unlock",
         IIS_EXTRA_SITE,
         RRDSET_TYPE_LINE),
 };
 
 static const struct iis_extra_definition http_queue_definitions[] = {
     IIS_EXTRA(
-        http_queue,
         "CurrentQueueSize",
-        NULL,
         "current_queue_size",
-        "iis.http_request_queues_current_queue_size",
+        "windows.http_service_queue_current_queue_size",
         "Current HTTP request queue size",
         "requests",
         "queued",
-        "site",
-        NULL,
-        NULL,
+        "queue",
         IIS_EXTRA_QUEUE,
         RRDSET_TYPE_LINE),
-    IIS_EXTRA(
-        http_queue,
+    IIS_EXTRA_INCREMENTAL(
         "RejectedRequests",
-        NULL,
-        "rejected_requests",
-        "iis.http_request_queues_rejected_requests",
-        "Total HTTP requests rejected from the queue",
-        "requests",
+        "request_rates",
+        "windows.http_service_queue_request_rate",
+        "HTTP request queue rates",
+        "requests/s",
         "rejected",
-        "site",
-        NULL,
-        NULL,
+        "queue",
         IIS_EXTRA_QUEUE,
         RRDSET_TYPE_LINE),
     IIS_EXTRA(
-        http_queue,
         "MaxQueueItemAge",
-        NULL,
         "max_queue_item_age",
-        "iis.http_request_queues_max_queue_item_age",
+        "windows.http_service_queue_max_queue_item_age",
         "Maximum age of an HTTP request in the queue",
         "seconds",
         "age",
-        "site",
-        NULL,
-        NULL,
+        "queue",
         IIS_EXTRA_QUEUE,
         RRDSET_TYPE_LINE),
     IIS_EXTRA(
-        http_queue,
         "ArrivalRate",
-        NULL,
-        "arrival_rate",
-        "iis.http_request_queues_arrival_rate",
-        "HTTP request queue arrival rate",
+        "request_rates",
+        "windows.http_service_queue_request_rate",
+        "HTTP request queue rates",
         "requests/s",
         "requests",
-        "site",
-        NULL,
-        NULL,
+        "queue",
         IIS_EXTRA_QUEUE,
         RRDSET_TYPE_LINE),
 };
 
 static const struct iis_extra_definition worker_definitions[] = {
     IIS_EXTRA(
-        worker,
         "Maximum Threads Count",
-        NULL,
         "maximum_threads",
         "iis.w3svc_w3wp_maximum_threads",
         "Maximum worker threads",
         "threads",
         "threads",
         "app",
-        "pid",
-        NULL,
         IIS_EXTRA_WORKER,
         RRDSET_TYPE_LINE),
     IIS_EXTRA(
-        worker,
         "Active Flushed Entries",
-        NULL,
         "active_flushed_entries",
         "iis.w3svc_w3wp_active_flushed_entries",
         "Worker cache entries pending flush",
         "entries",
         "entries",
         "app",
-        "pid",
-        NULL,
         IIS_EXTRA_WORKER,
         RRDSET_TYPE_LINE),
     IIS_EXTRA(
-        worker,
         "Maximum File Cache Memory Usage",
-        NULL,
         "file_cache_max_memory",
         "iis.w3svc_w3wp_file_cache_max_memory",
         "Maximum worker file cache memory",
         "bytes",
         "used",
         "app",
-        "pid",
-        NULL,
         IIS_EXTRA_WORKER,
         RRDSET_TYPE_LINE),
     IIS_EXTRA_INCREMENTAL(
-        worker,
         "File Cache Flushes",
-        NULL,
         "file_cache_flushes",
         "iis.w3svc_w3wp_file_cache_flushes",
         "Worker file cache flushes",
         "flushes/s",
         "flushes",
         "app",
-        "pid",
-        NULL,
         IIS_EXTRA_WORKER,
         RRDSET_TYPE_LINE),
     IIS_EXTRA_INCREMENTAL(
-        worker,
         "File Cache Hits",
-        NULL,
-        "file_cache_hits",
-        "iis.w3svc_w3wp_file_cache_hits",
-        "Worker file cache hits",
-        "hits/s",
+        "file_cache_queries",
+        "iis.w3svc_w3wp_file_cache_queries",
+        "Worker file cache hits and misses",
+        "queries/s",
         "hits",
         "app",
-        "pid",
-        NULL,
+        IIS_EXTRA_WORKER,
+        RRDSET_TYPE_LINE),
+    IIS_EXTRA_INCREMENTAL(
+        "File Cache Misses",
+        "file_cache_queries",
+        "iis.w3svc_w3wp_file_cache_queries",
+        "Worker file cache hits and misses",
+        "queries/s",
+        "misses",
+        "app",
         IIS_EXTRA_WORKER,
         RRDSET_TYPE_LINE),
     IIS_EXTRA(
-        worker,
         "Current Files Cached",
-        NULL,
         "files_cached",
         "iis.w3svc_w3wp_files_cached",
         "Files currently in the worker file cache",
         "files",
         "files",
         "app",
-        "pid",
-        NULL,
         IIS_EXTRA_WORKER,
         RRDSET_TYPE_LINE),
     IIS_EXTRA_INCREMENTAL(
-        worker,
         "URI Cache Hits",
-        NULL,
-        "uri_cache_hits",
-        "iis.w3svc_w3wp_uri_cache_hits",
-        "Worker URI cache hits",
-        "hits/s",
+        "uri_cache_queries",
+        "iis.w3svc_w3wp_uri_cache_queries",
+        "Worker URI cache hits and misses",
+        "queries/s",
         "hits",
         "app",
-        "pid",
-        NULL,
         IIS_EXTRA_WORKER,
         RRDSET_TYPE_LINE),
     IIS_EXTRA_INCREMENTAL(
-        worker,
         "URI Cache Misses",
-        NULL,
-        "uri_cache_misses",
-        "iis.w3svc_w3wp_uri_cache_misses",
-        "Worker URI cache misses",
-        "misses/s",
+        "uri_cache_queries",
+        "iis.w3svc_w3wp_uri_cache_queries",
+        "Worker URI cache hits and misses",
+        "queries/s",
         "misses",
         "app",
-        "pid",
-        NULL,
         IIS_EXTRA_WORKER,
         RRDSET_TYPE_LINE),
     IIS_EXTRA(
-        worker,
         "Current URIs Cached",
-        NULL,
         "uris_cached",
         "iis.w3svc_w3wp_uris_cached",
         "URIs currently in the worker cache",
         "uris",
         "uris",
         "app",
-        "pid",
-        NULL,
         IIS_EXTRA_WORKER,
         RRDSET_TYPE_LINE),
     IIS_EXTRA_INCREMENTAL(
-        worker,
         "Metadata Cache Hits",
-        NULL,
-        "metadata_cache_hits",
-        "iis.w3svc_w3wp_metadata_cache_hits",
-        "Worker metadata cache hits",
-        "hits/s",
+        "metadata_cache_queries",
+        "iis.w3svc_w3wp_metadata_cache_queries",
+        "Worker metadata cache hits and misses",
+        "queries/s",
         "hits",
         "app",
-        "pid",
-        NULL,
         IIS_EXTRA_WORKER,
         RRDSET_TYPE_LINE),
     IIS_EXTRA_INCREMENTAL(
-        worker,
         "Metadata Cache Misses",
-        NULL,
-        "metadata_cache_misses",
-        "iis.w3svc_w3wp_metadata_cache_misses",
-        "Worker metadata cache misses",
-        "misses/s",
+        "metadata_cache_queries",
+        "iis.w3svc_w3wp_metadata_cache_queries",
+        "Worker metadata cache hits and misses",
+        "queries/s",
         "misses",
         "app",
-        "pid",
-        NULL,
         IIS_EXTRA_WORKER,
         RRDSET_TYPE_LINE),
     IIS_EXTRA(
-        worker,
         "Current Metadata Cached",
-        NULL,
         "metadata_cached",
         "iis.w3svc_w3wp_metadata_cached",
         "Metadata currently in the worker cache",
         "blocks",
         "blocks",
         "app",
-        "pid",
-        NULL,
         IIS_EXTRA_WORKER,
         RRDSET_TYPE_LINE),
     IIS_EXTRA_INCREMENTAL(
-        worker,
         "Metadata Cache Flushes",
-        NULL,
         "metadata_cache_flushes",
         "iis.w3svc_w3wp_metadata_cache_flushes",
         "Worker metadata cache flushes",
         "flushes/s",
         "flushes",
         "app",
-        "pid",
-        NULL,
         IIS_EXTRA_WORKER,
         RRDSET_TYPE_LINE),
     IIS_EXTRA(
-        worker,
         "Output Cache Current Items",
-        NULL,
         "output_cache_items",
         "iis.w3svc_w3wp_output_cache_items",
         "Items currently in the worker output cache",
         "items",
         "items",
         "app",
-        "pid",
-        NULL,
         IIS_EXTRA_WORKER,
         RRDSET_TYPE_LINE),
     IIS_EXTRA_INCREMENTAL(
-        worker,
         "Output Cache Total Hits",
-        NULL,
-        "output_cache_hits",
-        "iis.w3svc_w3wp_output_cache_hits",
-        "Worker output cache hits",
-        "hits/s",
+        "output_cache_queries",
+        "iis.w3svc_w3wp_output_cache_queries",
+        "Worker output cache hits and misses",
+        "queries/s",
         "hits",
         "app",
-        "pid",
-        NULL,
         IIS_EXTRA_WORKER,
         RRDSET_TYPE_LINE),
     IIS_EXTRA_INCREMENTAL(
-        worker,
         "Output Cache Total Misses",
-        NULL,
-        "output_cache_misses",
-        "iis.w3svc_w3wp_output_cache_misses",
-        "Worker output cache misses",
-        "misses/s",
+        "output_cache_queries",
+        "iis.w3svc_w3wp_output_cache_queries",
+        "Worker output cache hits and misses",
+        "queries/s",
         "misses",
         "app",
-        "pid",
-        NULL,
         IIS_EXTRA_WORKER,
         RRDSET_TYPE_LINE),
     IIS_EXTRA_INCREMENTAL(
-        worker,
         "Output Cache Total Flushed Items",
-        NULL,
         "output_cache_flushed_items",
         "iis.w3svc_w3wp_output_cache_flushed_items",
         "Worker output cache items flushed",
         "items/s",
         "items",
         "app",
-        "pid",
-        NULL,
         IIS_EXTRA_WORKER,
         RRDSET_TYPE_LINE),
-    IIS_EXTRA(
-        worker,
+    IIS_EXTRA_INCREMENTAL(
         "% 401 HTTP Response Sent",
-        NULL,
-        "responses_401",
+        "http_responses",
         "iis.w3svc_w3wp_http_responses",
         "Worker HTTP responses by status",
         "responses/s",
         "401",
         "app",
-        "pid",
-        NULL,
         IIS_EXTRA_WORKER,
         RRDSET_TYPE_LINE),
-    IIS_EXTRA(
-        worker,
+    IIS_EXTRA_INCREMENTAL(
         "% 403 HTTP Response Sent",
-        NULL,
-        "responses_403",
+        "http_responses",
         "iis.w3svc_w3wp_http_responses",
         "Worker HTTP responses by status",
         "responses/s",
         "403",
         "app",
-        "pid",
-        NULL,
         IIS_EXTRA_WORKER,
         RRDSET_TYPE_LINE),
-    IIS_EXTRA(
-        worker,
+    IIS_EXTRA_INCREMENTAL(
         "% 404 HTTP Response Sent",
-        NULL,
-        "responses_404",
+        "http_responses",
         "iis.w3svc_w3wp_http_responses",
         "Worker HTTP responses by status",
         "responses/s",
         "404",
         "app",
-        "pid",
-        NULL,
         IIS_EXTRA_WORKER,
         RRDSET_TYPE_LINE),
-    IIS_EXTRA(
-        worker,
+    IIS_EXTRA_INCREMENTAL(
         "% 500 HTTP Response Sent",
-        NULL,
-        "responses_500",
+        "http_responses",
         "iis.w3svc_w3wp_http_responses",
         "Worker HTTP responses by status",
         "responses/s",
         "500",
         "app",
-        "pid",
-        NULL,
         IIS_EXTRA_WORKER,
         RRDSET_TYPE_LINE),
     IIS_EXTRA(
-        worker,
         "WebSocket Active Requests",
-        NULL,
         "websocket_active",
         "iis.w3svc_w3wp_websocket_active_requests",
         "Active worker WebSocket requests",
         "requests",
         "active",
         "app",
-        "pid",
-        NULL,
         IIS_EXTRA_WORKER,
         RRDSET_TYPE_LINE),
     IIS_EXTRA(
-        worker,
         "WebSocket Connection Attempts / Sec",
-        NULL,
         "websocket_attempts",
         "iis.w3svc_w3wp_websocket_connection_attempts",
         "Worker WebSocket connection attempts",
         "connections/s",
         "attempts",
         "app",
-        "pid",
-        NULL,
         IIS_EXTRA_WORKER,
         RRDSET_TYPE_LINE),
     IIS_EXTRA(
-        worker,
         "WebSocket Connections Accepted / Sec",
-        NULL,
         "websocket_accepted",
         "iis.w3svc_w3wp_websocket_connections_accepted",
         "Worker WebSocket connections accepted",
         "connections/s",
         "accepted",
         "app",
-        "pid",
-        NULL,
         IIS_EXTRA_WORKER,
         RRDSET_TYPE_LINE),
     IIS_EXTRA(
-        worker,
         "WebSocket Connections Rejected / Sec",
-        NULL,
         "websocket_rejected",
         "iis.w3svc_w3wp_websocket_connections_rejected",
         "Worker WebSocket connections rejected",
         "connections/s",
         "rejected",
         "app",
-        "pid",
-        NULL,
         IIS_EXTRA_WORKER,
         RRDSET_TYPE_LINE),
 };
 
 static const struct iis_extra_definition cache_definitions[] = {
     IIS_EXTRA(
-        cache,
         "Active Flushed Entries",
-        NULL,
         "active_flushed_entries",
         "iis.server_cache_active_flushed_entries",
         "IIS server cache entries pending flush",
         "entries",
         "entries",
         NULL,
-        NULL,
-        NULL,
         IIS_EXTRA_GLOBAL,
         RRDSET_TYPE_LINE),
     IIS_EXTRA(
-        cache,
         "Current File Cache Memory Usage",
-        NULL,
         "file_cache_memory",
         "iis.server_file_cache_memory",
         "IIS server file cache memory",
         "bytes",
         "used",
         NULL,
-        NULL,
-        NULL,
         IIS_EXTRA_GLOBAL,
         RRDSET_TYPE_AREA),
     IIS_EXTRA(
-        cache,
         "Maximum File Cache Memory Usage",
-        NULL,
-        "file_cache_max_memory",
-        "iis.server_file_cache_max_memory",
-        "IIS server maximum file cache memory",
+        "file_cache_memory",
+        "iis.server_file_cache_memory",
+        "IIS server file cache memory",
         "bytes",
         "maximum",
         NULL,
-        NULL,
-        NULL,
         IIS_EXTRA_GLOBAL,
-        RRDSET_TYPE_LINE),
+        RRDSET_TYPE_AREA),
     IIS_EXTRA_INCREMENTAL(
-        cache,
         "File Cache Flushes",
-        NULL,
         "file_cache_flushes",
         "iis.server_file_cache_flushes",
         "IIS server file cache flushes",
         "flushes/s",
         "flushes",
         NULL,
-        NULL,
+        IIS_EXTRA_GLOBAL,
+        RRDSET_TYPE_LINE),
+    IIS_EXTRA_INCREMENTAL(
+        "File Cache Hits",
+        "file_cache_queries",
+        "iis.server_file_cache_queries",
+        "IIS server file cache hits and misses",
+        "queries/s",
+        "hits",
         NULL,
         IIS_EXTRA_GLOBAL,
         RRDSET_TYPE_LINE),
     IIS_EXTRA_INCREMENTAL(
-        cache,
-        "File Cache Hits",
         "File Cache Misses",
         "file_cache_queries",
         "iis.server_file_cache_queries",
-        "IIS server file cache queries",
+        "IIS server file cache hits and misses",
         "queries/s",
-        "queries",
-        NULL,
-        NULL,
-        NULL,
-        IIS_EXTRA_GLOBAL,
-        RRDSET_TYPE_LINE),
-    IIS_EXTRA_INCREMENTAL(
-        cache,
-        "File Cache Hits",
-        NULL,
-        "file_cache_hits",
-        "iis.server_file_cache_hits",
-        "IIS server file cache hits",
-        "hits/s",
-        "hits",
-        NULL,
-        NULL,
+        "misses",
         NULL,
         IIS_EXTRA_GLOBAL,
         RRDSET_TYPE_LINE),
     IIS_EXTRA(
-        cache,
         "Current Files Cached",
-        NULL,
         "files_cached",
         "iis.server_files_cached",
         "Files in the IIS server cache",
         "files",
         "files",
         NULL,
-        NULL,
-        NULL,
         IIS_EXTRA_GLOBAL,
         RRDSET_TYPE_LINE),
     IIS_EXTRA_INCREMENTAL(
-        cache,
         "Total Files Cached",
-        NULL,
-        "files_cached_total",
-        "iis.server_files_cached_total",
-        "Files added to the IIS server cache",
+        "files_cache_rate",
+        "iis.server_files_cache_rate",
+        "IIS server files added to and removed from cache",
         "files/s",
-        "files",
-        NULL,
-        NULL,
+        "cached",
         NULL,
         IIS_EXTRA_GLOBAL,
         RRDSET_TYPE_LINE),
     IIS_EXTRA_INCREMENTAL(
-        cache,
         "Total Flushed Files",
-        NULL,
-        "files_flushed_total",
-        "iis.server_files_flushed_total",
-        "Files removed from the IIS server cache",
+        "files_cache_rate",
+        "iis.server_files_cache_rate",
+        "IIS server files added to and removed from cache",
         "files/s",
-        "files",
-        NULL,
-        NULL,
+        "flushed",
         NULL,
         IIS_EXTRA_GLOBAL,
         RRDSET_TYPE_LINE),
     IIS_EXTRA_INCREMENTAL(
-        cache,
-        "Total Flushed URIs",
-        NULL,
-        "uri_flushes_user",
+        "URI Cache Flushes",
+        "uri_flushes",
         "iis.server_uri_cache_flushes",
         "IIS URI cache flushes",
         "flushes/s",
-        "flushes",
-        "mode",
-        NULL,
         "user",
+        NULL,
         IIS_EXTRA_MODE,
         RRDSET_TYPE_LINE),
     IIS_EXTRA_INCREMENTAL(
-        cache,
-        "Kernel: Total Flushed URIs",
-        NULL,
-        "uri_flushes_kernel",
+        "Kernel: URI Cache Flushes",
+        "uri_flushes",
         "iis.server_uri_cache_flushes",
         "IIS URI cache flushes",
         "flushes/s",
-        "flushes",
-        "mode",
-        NULL,
         "kernel",
+        NULL,
         IIS_EXTRA_MODE,
         RRDSET_TYPE_LINE),
     IIS_EXTRA_INCREMENTAL(
-        cache,
         "URI Cache Hits",
+        "uri_queries",
+        "iis.server_uri_cache_queries",
+        "IIS URI cache hits and misses",
+        "queries/s",
+        "user_hits",
+        NULL,
+        IIS_EXTRA_MODE,
+        RRDSET_TYPE_LINE),
+    IIS_EXTRA_INCREMENTAL(
+        "Kernel: URI Cache Hits",
+        "uri_queries",
+        "iis.server_uri_cache_queries",
+        "IIS URI cache hits and misses",
+        "queries/s",
+        "kernel_hits",
+        NULL,
+        IIS_EXTRA_MODE,
+        RRDSET_TYPE_LINE),
+    IIS_EXTRA_INCREMENTAL(
         "URI Cache Misses",
-        "uri_queries_user",
+        "uri_queries",
         "iis.server_uri_cache_queries",
-        "IIS URI cache queries",
+        "IIS URI cache hits and misses",
         "queries/s",
-        "queries",
-        "mode",
+        "user_misses",
         NULL,
-        "user",
         IIS_EXTRA_MODE,
         RRDSET_TYPE_LINE),
     IIS_EXTRA_INCREMENTAL(
-        cache,
-        "Kernel: URI Cache Hits",
         "Kernel: URI Cache Misses",
-        "uri_queries_kernel",
+        "uri_queries",
         "iis.server_uri_cache_queries",
-        "IIS URI cache queries",
+        "IIS URI cache hits and misses",
         "queries/s",
-        "queries",
-        "mode",
+        "kernel_misses",
         NULL,
-        "kernel",
-        IIS_EXTRA_MODE,
-        RRDSET_TYPE_LINE),
-    IIS_EXTRA_INCREMENTAL(
-        cache,
-        "URI Cache Hits",
-        NULL,
-        "uri_hits_user",
-        "iis.server_uri_cache_hits",
-        "IIS URI cache hits",
-        "hits/s",
-        "hits",
-        "mode",
-        NULL,
-        "user",
-        IIS_EXTRA_MODE,
-        RRDSET_TYPE_LINE),
-    IIS_EXTRA_INCREMENTAL(
-        cache,
-        "Kernel: URI Cache Hits",
-        NULL,
-        "uri_hits_kernel",
-        "iis.server_uri_cache_hits",
-        "IIS URI cache hits",
-        "hits/s",
-        "hits",
-        "mode",
-        NULL,
-        "kernel",
         IIS_EXTRA_MODE,
         RRDSET_TYPE_LINE),
     IIS_EXTRA(
-        cache,
         "Current URIs Cached",
-        NULL,
-        "uris_cached_user",
+        "uris_cached",
         "iis.server_uris_cached",
         "URIs in the IIS cache",
         "uris",
-        "uris",
-        "mode",
-        NULL,
         "user",
+        NULL,
         IIS_EXTRA_MODE,
         RRDSET_TYPE_LINE),
     IIS_EXTRA(
-        cache,
         "Kernel: Current URIs Cached",
-        NULL,
-        "uris_cached_kernel",
+        "uris_cached",
         "iis.server_uris_cached",
         "URIs in the IIS cache",
         "uris",
-        "uris",
-        "mode",
-        NULL,
         "kernel",
+        NULL,
         IIS_EXTRA_MODE,
         RRDSET_TYPE_LINE),
     IIS_EXTRA_INCREMENTAL(
-        cache,
         "Total URIs Cached",
-        NULL,
-        "uris_cached_total_user",
-        "iis.server_uris_cached_total",
-        "URIs added to the IIS cache",
+        "uris_cached_total",
+        "iis.server_uris_cached_rate",
+        "IIS URI cache additions",
         "uris/s",
-        "uris",
-        "mode",
-        NULL,
         "user",
+        NULL,
         IIS_EXTRA_MODE,
         RRDSET_TYPE_LINE),
     IIS_EXTRA_INCREMENTAL(
-        cache,
         "Kernel: Total URIs Cached",
-        NULL,
-        "uris_cached_total_kernel",
-        "iis.server_uris_cached_total",
-        "URIs added to the IIS cache",
+        "uris_cached_total",
+        "iis.server_uris_cached_rate",
+        "IIS URI cache additions",
         "uris/s",
-        "uris",
-        "mode",
-        NULL,
         "kernel",
+        NULL,
         IIS_EXTRA_MODE,
         RRDSET_TYPE_LINE),
     IIS_EXTRA_INCREMENTAL(
-        cache,
         "Total Flushed URIs",
-        NULL,
-        "uris_flushed_user",
-        "iis.server_uris_flushed_total",
-        "URIs removed from the IIS cache",
+        "uris_flushed",
+        "iis.server_uris_flushed_rate",
+        "IIS URI cache removals",
         "uris/s",
-        "uris",
-        "mode",
-        NULL,
         "user",
+        NULL,
         IIS_EXTRA_MODE,
         RRDSET_TYPE_LINE),
     IIS_EXTRA_INCREMENTAL(
-        cache,
         "Kernel: Total Flushed URIs",
-        NULL,
-        "uris_flushed_kernel",
-        "iis.server_uris_flushed_total",
-        "URIs removed from the IIS cache",
+        "uris_flushed",
+        "iis.server_uris_flushed_rate",
+        "IIS URI cache removals",
         "uris/s",
-        "uris",
-        "mode",
-        NULL,
         "kernel",
+        NULL,
         IIS_EXTRA_MODE,
         RRDSET_TYPE_LINE),
     IIS_EXTRA(
-        cache,
         "Current Metadata Cached",
-        NULL,
         "metadata_cached",
         "iis.server_metadata_cached",
         "Metadata blocks in the IIS cache",
         "blocks",
         "blocks",
         NULL,
-        NULL,
-        NULL,
         IIS_EXTRA_GLOBAL,
         RRDSET_TYPE_LINE),
     IIS_EXTRA_INCREMENTAL(
-        cache,
         "Metadata Cache Flushes",
-        NULL,
         "metadata_flushes",
         "iis.server_metadata_flushes",
         "IIS metadata cache flushes",
         "flushes/s",
         "flushes",
         NULL,
-        NULL,
+        IIS_EXTRA_GLOBAL,
+        RRDSET_TYPE_LINE),
+    IIS_EXTRA_INCREMENTAL(
+        "Metadata Cache Hits",
+        "metadata_queries",
+        "iis.server_metadata_queries",
+        "IIS metadata cache hits and misses",
+        "queries/s",
+        "hits",
         NULL,
         IIS_EXTRA_GLOBAL,
         RRDSET_TYPE_LINE),
     IIS_EXTRA_INCREMENTAL(
-        cache,
-        "Metadata Cache Hits",
         "Metadata Cache Misses",
         "metadata_queries",
         "iis.server_metadata_queries",
-        "IIS metadata cache queries",
+        "IIS metadata cache hits and misses",
         "queries/s",
-        "queries",
-        NULL,
-        NULL,
+        "misses",
         NULL,
         IIS_EXTRA_GLOBAL,
         RRDSET_TYPE_LINE),
     IIS_EXTRA_INCREMENTAL(
-        cache,
-        "Metadata Cache Hits",
-        NULL,
-        "metadata_hits",
-        "iis.server_metadata_hits",
-        "IIS metadata cache hits",
-        "hits/s",
-        "hits",
-        NULL,
-        NULL,
-        NULL,
-        IIS_EXTRA_GLOBAL,
-        RRDSET_TYPE_LINE),
-    IIS_EXTRA_INCREMENTAL(
-        cache,
         "Total Metadata Cached",
-        NULL,
-        "metadata_cached_total",
-        "iis.server_metadata_cached_total",
-        "Metadata blocks added to the IIS cache",
+        "metadata_cache_rate",
+        "iis.server_metadata_cache_rate",
+        "IIS metadata blocks added to and removed from cache",
         "blocks/s",
-        "blocks",
-        NULL,
-        NULL,
+        "cached",
         NULL,
         IIS_EXTRA_GLOBAL,
         RRDSET_TYPE_LINE),
     IIS_EXTRA_INCREMENTAL(
-        cache,
         "Total Flushed Metadata",
-        NULL,
-        "metadata_flushed_total",
-        "iis.server_metadata_flushed_total",
-        "Metadata blocks removed from the IIS cache",
+        "metadata_cache_rate",
+        "iis.server_metadata_cache_rate",
+        "IIS metadata blocks added to and removed from cache",
         "blocks/s",
-        "blocks",
-        NULL,
-        NULL,
+        "flushed",
         NULL,
         IIS_EXTRA_GLOBAL,
         RRDSET_TYPE_LINE),
     IIS_EXTRA(
-        cache,
         "Output Cache Current Flushed Items",
-        NULL,
-        "output_active_flushed",
-        "iis.server_output_cache_active_flushed",
-        "Active and flushed IIS output cache items",
-        "items",
-        "items",
-        NULL,
-        NULL,
-        NULL,
-        IIS_EXTRA_GLOBAL,
-        RRDSET_TYPE_LINE),
-    IIS_EXTRA(
-        cache,
-        "Output Cache Current Items",
-        NULL,
         "output_items",
         "iis.server_output_cache_items",
-        "Items in the IIS output cache",
+        "IIS output cache items",
         "items",
-        "items",
-        NULL,
-        NULL,
+        "flushed",
         NULL,
         IIS_EXTRA_GLOBAL,
         RRDSET_TYPE_LINE),
     IIS_EXTRA(
-        cache,
-        "Output Cache Current Memory Usage",
+        "Output Cache Current Items",
+        "output_items",
+        "iis.server_output_cache_items",
+        "IIS output cache items",
+        "items",
+        "current",
         NULL,
+        IIS_EXTRA_GLOBAL,
+        RRDSET_TYPE_LINE),
+    IIS_EXTRA(
+        "Output Cache Current Memory Usage",
         "output_memory",
         "iis.server_output_cache_memory",
         "IIS output cache memory",
         "bytes",
         "used",
         NULL,
-        NULL,
-        NULL,
         IIS_EXTRA_GLOBAL,
         RRDSET_TYPE_AREA),
     IIS_EXTRA_INCREMENTAL(
-        cache,
         "Output Cache Total Hits",
+        "output_queries",
+        "iis.server_output_cache_queries",
+        "IIS output cache hits and misses",
+        "queries/s",
+        "hits",
+        NULL,
+        IIS_EXTRA_GLOBAL,
+        RRDSET_TYPE_LINE),
+    IIS_EXTRA_INCREMENTAL(
         "Output Cache Total Misses",
         "output_queries",
         "iis.server_output_cache_queries",
-        "IIS output cache queries",
+        "IIS output cache hits and misses",
         "queries/s",
-        "queries",
-        NULL,
-        NULL,
+        "misses",
         NULL,
         IIS_EXTRA_GLOBAL,
         RRDSET_TYPE_LINE),
     IIS_EXTRA_INCREMENTAL(
-        cache,
-        "Output Cache Total Hits",
-        NULL,
-        "output_hits",
-        "iis.server_output_cache_hits",
-        "IIS output cache hits",
-        "hits/s",
-        "hits",
-        NULL,
-        NULL,
-        NULL,
-        IIS_EXTRA_GLOBAL,
-        RRDSET_TYPE_LINE),
-    IIS_EXTRA_INCREMENTAL(
-        cache,
         "Output Cache Total Flushed Items",
-        NULL,
         "output_flushed",
         "iis.server_output_cache_flushed",
         "IIS output cache items flushed",
         "items/s",
         "items",
         NULL,
-        NULL,
-        NULL,
         IIS_EXTRA_GLOBAL,
         RRDSET_TYPE_LINE),
     IIS_EXTRA_INCREMENTAL(
-        cache,
         "Output Cache Total Flushes",
-        NULL,
         "output_flushes",
         "iis.server_output_cache_flushes",
         "IIS output cache flushes",
         "flushes/s",
         "flushes",
         NULL,
-        NULL,
-        NULL,
         IIS_EXTRA_GLOBAL,
         RRDSET_TYPE_LINE),
 };
+
+_Static_assert(
+    IIS_EXTRA_MAX >= IIS_EXTRA_ARRAY_SIZE(web_service_definitions),
+    "IIS website table exceeds value storage");
+_Static_assert(IIS_EXTRA_MAX >= IIS_EXTRA_ARRAY_SIZE(http_queue_definitions), "HTTP queue table exceeds value storage");
+_Static_assert(IIS_EXTRA_MAX >= IIS_EXTRA_ARRAY_SIZE(worker_definitions), "IIS worker table exceeds value storage");
+_Static_assert(IIS_EXTRA_MAX >= IIS_EXTRA_ARRAY_SIZE(cache_definitions), "IIS cache table exceeds value storage");
 
 static struct iis_extra_group web_service_group = {
     .definitions = web_service_definitions,
     .count = IIS_EXTRA_ARRAY_SIZE(web_service_definitions),
     .object = "Web Service",
-    .chart_prefix = "iis_site"};
+    .chart_prefix = "iis_site",
+    .priority_base = PRIO_IIS_EXTRA_WEBSITE};
 static struct iis_extra_group http_queue_group = {
     .definitions = http_queue_definitions,
     .count = IIS_EXTRA_ARRAY_SIZE(http_queue_definitions),
     .object = "HTTP Service Request Queues",
-    .chart_prefix = "iis_http_queue"};
+    .chart_prefix = "http_service_queue",
+    .module_name = "PerflibHttpService",
+    .priority_base = PRIO_HTTP_SERVICE_QUEUE};
 static struct iis_extra_group worker_group = {
     .definitions = worker_definitions,
     .count = IIS_EXTRA_ARRAY_SIZE(worker_definitions),
     .object = "W3SVC_W3WP",
-    .chart_prefix = "iis_worker"};
+    .chart_prefix = "iis_worker",
+    .priority_base = PRIO_IIS_EXTRA_WORKER};
 static struct iis_extra_group cache_group = {
     .definitions = cache_definitions,
     .count = IIS_EXTRA_ARRAY_SIZE(cache_definitions),
     .object = "Web Service Cache",
-    .chart_prefix = "iis_server_cache"};
+    .chart_prefix = "iis_server_cache",
+    .priority_base = PRIO_IIS_EXTRA_CACHE};
 
 static void iis_extra_instance_delete_cb(const DICTIONARY_ITEM *item __maybe_unused, void *value, void *data)
 {
@@ -1335,63 +846,69 @@ static void iis_extra_emit(
     const struct iis_extra_definition *definition,
     const char *instance,
     const char *app,
-    const char *pid,
     int update_every)
 {
-    COUNTER_DATA combined;
     COUNTER_DATA *counter = &value->first;
-    if (definition->key2) {
-        if (!value->first.updated || !value->second.updated)
-            return;
-        combined = value->first;
-        combined.current.Data += value->second.current.Data;
-        combined.previous.Data += value->second.previous.Data;
-        combined.current.CounterType = PERF_COUNTER_BULK_COUNT;
-        counter = &combined;
-    } else if (!counter->updated)
+    if (!counter->updated)
         return;
 
     if (unlikely(!value->st)) {
         char id[RRD_ID_LENGTH_MAX + 1];
         char identity[PERFLIB_MAX_NAME_LENGTH];
-        if (pid)
-            snprintfz(identity, sizeof(identity), "%s_%s", pid, app ? app : instance);
-        else
-            strncpyz(identity, app ? app : (instance ? instance : "global"), sizeof(identity) - 1);
+        strncpyz(identity, app ? app : (instance ? instance : "global"), sizeof(identity) - 1);
         snprintfz(id, sizeof(id), "%s_%s_%s", group->chart_prefix, identity, definition->chart);
         netdata_fix_chart_name(id);
+        const char *family = definition->scope == IIS_EXTRA_QUEUE ?
+                                 "http queue" :
+                                 (definition->scope == IIS_EXTRA_WORKER ? "w3svc w3wp" :
+                                  definition->scope == IIS_EXTRA_SITE   ? "requests" :
+                                                                          "cache");
+        const char *module_name = group->module_name ? group->module_name : "PerflibWebService";
+        size_t chart_index = (size_t)(definition - group->definitions);
+        for (size_t n = 0; n < chart_index; n++)
+            if (strcmp(group->definitions[n].chart, definition->chart) == 0) {
+                chart_index = n;
+                break;
+            }
+        int priority = group->priority_base + (int)chart_index;
         value->st = rrdset_create_localhost(
-            "iis",
+            definition->scope == IIS_EXTRA_QUEUE ? "windows" : "iis",
             id,
             NULL,
-            definition->label ? "iis" : "iis server",
+            family,
             definition->context,
             definition->title,
             definition->units,
             PLUGIN_WINDOWS_NAME,
-            "PerflibWebService",
-            PRIO_WEBSITE_IIS_REQUESTS_RATE + 100 + (int)(definition - group->definitions),
+            module_name,
+            priority,
             update_every,
             definition->chart_type);
         value->rd = definition->incremental ?
                         rrddim_add(value->st, definition->dimension, NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL) :
                         perflib_rrddim_add(value->st, definition->dimension, NULL, 1, 1, counter);
-        if (definition->label && (app || instance || definition->label_value)) {
-            const char *label_value =
-                (definition->label_value && !definition->label2) ? definition->label_value : (app ? app : instance);
-            rrdlabels_add(value->st->rrdlabels, definition->label, label_value, RRDLABEL_SRC_AUTO);
-        }
-        if (definition->label2 && pid)
-            rrdlabels_add(value->st->rrdlabels, definition->label2, pid, RRDLABEL_SRC_AUTO);
-        if (definition->label_value && definition->label2) {
-            const char *value_label =
-                (pid && strcmp(definition->label2, "pid") == 0) ? "status_code" : definition->label2;
-            rrdlabels_add(value->st->rrdlabels, value_label, definition->label_value, RRDLABEL_SRC_AUTO);
-        }
+        if (definition->label && (app || instance))
+            rrdlabels_add(value->st->rrdlabels, definition->label, app ? app : instance, RRDLABEL_SRC_AUTO);
     }
 
     perflib_rrddim_set_by_pointer(value->st, value->rd, counter);
-    rrdset_done(value->st);
+}
+
+static void iis_extra_done_charts(struct iis_extra_group *group, struct iis_extra_instance *state)
+{
+    for (size_t n = 0; n < group->count; n++) {
+        RRDSET *st = state->values[n].st;
+        if (!st)
+            continue;
+        bool already_done = false;
+        for (size_t previous = 0; previous < n; previous++)
+            if (state->values[previous].st == st) {
+                already_done = true;
+                break;
+            }
+        if (!already_done)
+            rrdset_done(st);
+    }
 }
 
 static bool do_iis_extra_group(PERF_DATA_BLOCK *data, struct iis_extra_group *group, int update_every)
@@ -1415,8 +932,6 @@ static bool do_iis_extra_group(PERF_DATA_BLOCK *data, struct iis_extra_group *gr
         if (!state->initialized) {
             for (size_t n = 0; n < group->count; n++) {
                 state->values[n].first.key = group->definitions[n].key;
-                if (group->definitions[n].key2)
-                    state->values[n].second.key = group->definitions[n].key2;
             }
             state->initialized = true;
         }
@@ -1424,10 +939,9 @@ static bool do_iis_extra_group(PERF_DATA_BLOCK *data, struct iis_extra_group *gr
         for (size_t n = 0; n < group->count; n++) {
             struct iis_extra_value *value = &state->values[n];
             perflibGetObjectCounter(data, object, &value->first);
-            if (group->definitions[n].key2)
-                perflibGetObjectCounter(data, object, &value->second);
-            iis_extra_emit(group, value, &group->definitions[n], NULL, NULL, NULL, update_every);
+            iis_extra_emit(group, value, &group->definitions[n], NULL, NULL, update_every);
         }
+        iis_extra_done_charts(group, state);
         iis_extra_remove_unseen(group);
         return true;
     }
@@ -1443,7 +957,6 @@ static bool do_iis_extra_group(PERF_DATA_BLOCK *data, struct iis_extra_group *gr
         char instance_key[PERFLIB_MAX_NAME_LENGTH];
         strncpyz(instance_key, windows_shared_buffer, sizeof(instance_key) - 1);
         char app[PERFLIB_MAX_NAME_LENGTH] = "";
-        char pid[32] = "";
         const char *instance = windows_shared_buffer;
         if (group == &cache_group) {
             if (strcasecmp(instance, "_Total") != 0 && object->NumInstances > 1)
@@ -1456,31 +969,69 @@ static bool do_iis_extra_group(PERF_DATA_BLOCK *data, struct iis_extra_group *gr
             *separator++ = '\0';
             if (strchr(separator, '#'))
                 continue;
-            strncpyz(pid, windows_shared_buffer, sizeof(pid) - 1);
             strncpyz(app, separator, sizeof(app) - 1);
             instance = app;
         } else if (strcasecmp(instance, "_Total") == 0 || strncmp(instance, "---", 3) == 0)
             continue;
 
-        struct iis_extra_instance *state = dictionary_set(group->instances, instance_key, NULL, sizeof(*state));
+        const bool worker = group == &worker_group;
+        struct iis_extra_instance *state =
+            dictionary_set(group->instances, worker ? app : instance_key, NULL, sizeof(*state));
+        const bool first_worker_instance = worker && !state->seen;
+        if (first_worker_instance)
+            for (size_t n = 0; n < group->count; n++) {
+                struct iis_extra_value *value = &state->values[n];
+                value->first.previous = value->first.current;
+                value->first.current = RAW_DATA_EMPTY;
+                value->first.updated = false;
+            }
         state->seen = true;
         if (!state->initialized) {
             for (size_t n = 0; n < group->count; n++) {
                 state->values[n].first.key = group->definitions[n].key;
-                if (group->definitions[n].key2)
-                    state->values[n].second.key = group->definitions[n].key2;
+                if (group == &worker_group && group->definitions[n].key[0] == '%')
+                    state->values[n].first.OverwriteCounterType = PERF_COUNTER_RAWCOUNT;
             }
             state->initialized = true;
         }
 
         for (size_t n = 0; n < group->count; n++) {
             struct iis_extra_value *value = &state->values[n];
-            perflibGetInstanceCounter(data, object, pi, &value->first);
-            if (group->definitions[n].key2)
-                perflibGetInstanceCounter(data, object, pi, &value->second);
-            iis_extra_emit(
-                group, value, &group->definitions[n], instance, app[0] ? app : NULL, pid[0] ? pid : NULL, update_every);
+            if (worker) {
+                COUNTER_DATA first_sample = value->first;
+                first_sample.current = RAW_DATA_EMPTY;
+                first_sample.previous = RAW_DATA_EMPTY;
+                bool first_updated = perflibGetInstanceCounter(data, object, pi, &first_sample);
+                value->first.id = first_sample.id;
+                value->first.failures = first_sample.failures;
+                value->first.backoff = first_sample.backoff;
+                if (first_updated) {
+                    value->first.current.CounterType = first_sample.current.CounterType;
+                    value->first.current.Time = first_sample.current.Time;
+                    value->first.current.Frequency = first_sample.current.Frequency;
+                    value->first.current.Data += first_sample.current.Data;
+                    value->first.updated = true;
+                }
+            } else
+                perflibGetInstanceCounter(data, object, pi, &value->first);
+            if (!worker)
+                iis_extra_emit(group, value, &group->definitions[n], instance, app[0] ? app : NULL, update_every);
         }
+        if (!worker)
+            iis_extra_done_charts(group, state);
+    }
+    if (group == &worker_group) {
+        struct iis_extra_instance *state;
+        dfe_start_write(group->instances, state)
+        {
+            if (!state->seen)
+                continue;
+            const char *app = state_dfe.name;
+            for (size_t n = 0; n < group->count; n++)
+                iis_extra_emit(group, &state->values[n], &group->definitions[n], app, app, update_every);
+            iis_extra_done_charts(group, state);
+        }
+        dfe_done(state);
     }
     iis_extra_remove_unseen(group);
     return true;
@@ -1496,9 +1047,18 @@ void do_PerflibWebServiceExtraWorker(PERF_DATA_BLOCK *data, int update_every)
     do_iis_extra_group(data, &worker_group, update_every);
 }
 
-void do_PerflibWebServiceExtraHTTPQueue(PERF_DATA_BLOCK *data, int update_every)
+int do_PerflibHttpService(int update_every, usec_t dt __maybe_unused)
 {
+    DWORD id = RegistryFindIDByName("HTTP Service Request Queues");
+    if (id == PERFLIB_REGISTRY_NAME_NOT_FOUND)
+        return -1;
+
+    PERF_DATA_BLOCK *data = perflibGetPerformanceData(id);
+    if (!data)
+        return 0;
+
     do_iis_extra_group(data, &http_queue_group, update_every);
+    return 0;
 }
 
 void do_PerflibWebServiceExtraCache(PERF_DATA_BLOCK *data, int update_every)

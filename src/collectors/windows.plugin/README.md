@@ -31,6 +31,7 @@ To change a setting, remove the comment symbol (`#`) from the beginning of the l
         # PerflibHyperV = yes
         # PerflibThermalZone = no
         # PerflibWebService = yes
+        # PerflibHttpService = yes
         # PerflibNetFramework = yes
         # PerflibAD = yes
         # PerflibADCS = yes
