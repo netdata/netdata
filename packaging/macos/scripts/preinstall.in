@@ -108,6 +108,10 @@ if /bin/launchctl print "system/${LABEL}" >/dev/null 2>&1; then
         sleep 1
         i=$((i + 1))
     done
+    if /bin/launchctl print "system/${LABEL}" >/dev/null 2>&1; then
+        echo "netdata preinstall: ${LABEL} did not stop within 60 seconds; refusing to replace the payload under it. Retry the installation." >&2
+        exit 1
+    fi
 fi
 
 exit 0

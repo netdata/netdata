@@ -98,6 +98,8 @@ account_is_ours=0
 #
 # Stop and unregister both launchd jobs. bootout is asynchronous - wait
 # for the label to actually disappear so no process outlives the removal.
+# A job that is still registered after the wait aborts the uninstall before
+# anything is deleted; re-running it later finishes the job.
 #
 for label in "${LABEL}" "${UPDATER_LABEL}"; do
     if /bin/launchctl print "system/${label}" >/dev/null 2>&1; then
@@ -109,6 +111,16 @@ for label in "${LABEL}" "${UPDATER_LABEL}"; do
             i=$((i + 1))
         done
     fi
+done
+
+for label in "${LABEL}" "${UPDATER_LABEL}"; do
+    if /bin/launchctl print "system/${label}" >/dev/null 2>&1; then
+        log "${label} is still registered with launchd; nothing was removed. Try again in a minute." >&2
+        exit 1
+    fi
+done
+
+for label in "${LABEL}" "${UPDATER_LABEL}"; do
     rm -f "/Library/LaunchDaemons/${label}.plist"
 done
 

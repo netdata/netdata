@@ -20,12 +20,24 @@ INTERP="${2:?usage: rewrite-shebangs.sh <tree> <interpreter>}"
 
 [ -d "${TREE}" ] || { echo "rewrite-shebangs: no such tree: ${TREE}" >&2; exit 1; }
 
+# The file list is collected first so a traversal error fails the install
+# instead of leaving part of the tree unrewritten.
+FILES_LIST="$(mktemp "${TMPDIR:-/tmp}/rewrite-shebangs.XXXXXX")"
+trap 'rm -f "${FILES_LIST}"' EXIT
+if ! find "${TREE}" -type f > "${FILES_LIST}"; then
+    echo "rewrite-shebangs: could not walk ${TREE}" >&2
+    exit 1
+fi
+
 # The whole pipeline tail runs in one subshell so the counter survives the
 # read loop; iterating with read keeps paths with spaces intact.
-find "${TREE}" -type f | LC_ALL=C sort | {
+LC_ALL=C sort "${FILES_LIST}" | {
     rewritten=0
     while IFS= read -r f; do
-        line="$(head -n 1 "${f}" 2>/dev/null || true)"
+        if ! line="$(head -n 1 "${f}")"; then
+            echo "rewrite-shebangs: cannot read ${f}" >&2
+            exit 1
+        fi
         case "${line}" in
             '#!/usr/bin/env bash'|'#!/usr/bin/env bash '*|'#!/bin/bash'|'#!/bin/bash '*)
                 # Keep any arguments after the interpreter.

@@ -98,8 +98,15 @@ system_interpreter_ok() { # command basename
 
 # Map an absolute path under the install prefix to its location in the tree.
 # Prints the mapped path; returns 1 when the path is not under the prefix.
+# A path with "." or ".." components is refused rather than normalised: the
+# prefix test is textual, so "<prefix>/../x" would otherwise map to a file
+# outside the tree and pass.
 map_into_tree() { # absolute path
   local path="$1"
+  case "/${path}/" in
+    */./*|*/../*) return 1 ;;
+    *) ;;
+  esac
   if [ -n "${PREFIX}" ]; then
     case "${path}" in
       "${PREFIX}"/*) printf '%s/%s\n' "${TREE}" "${path#"${PREFIX}"/}"; return 0 ;;
@@ -129,10 +136,10 @@ check_macho() { # file
 
   load_cmds="$(otool -l "${f}" 2>/dev/null)"
 
-  # Dependent libraries: LC_LOAD_DYLIB / LC_LOAD_WEAK_DYLIB / LC_REEXPORT_DYLIB.
+  # Dependent libraries: every load command that names a dylib.
   # The name lines look like:  name /usr/lib/libSystem.B.dylib (offset 24)
   for entry in $(printf '%s\n' "${load_cmds}" \
-                 | awk '/cmd LC_(LOAD_DYLIB|LOAD_WEAK_DYLIB|REEXPORT_DYLIB)/ {want=1}
+                 | awk '/cmd LC_(LOAD_DYLIB|LOAD_WEAK_DYLIB|REEXPORT_DYLIB|LOAD_UPWARD_DYLIB|LAZY_LOAD_DYLIB)$/ {want=1}
                         want && $1 == "name" {print $2; want=0}'); do
     case "${entry}" in
       /usr/lib/*|/System/Library/*)
@@ -201,7 +208,7 @@ check_shebang() { # file
       fi
       ;;
     *)
-      if mapped="$(map_into_tree "${interp}")" && [ -f "${mapped}" ]; then
+      if mapped="$(map_into_tree "${interp}")" && [ -f "${mapped}" ] && [ -x "${mapped}" ]; then
         : # payload-internal interpreter
       elif system_interpreter_ok "$(basename "${interp}")" && [ -x "${interp}" ] \
            && case "${interp}" in /bin/*|/usr/bin/*) true ;; *) false ;; esac; then
@@ -243,6 +250,15 @@ scanned_machos=0
 scanned_scripts=0
 scanned_symlinks=0
 
+# Collected up front so a traversal error fails the gate instead of silently
+# shrinking the set of files it checks.
+FILES_LIST="$(mktemp "${TMPDIR:-/tmp}/artifact-gate.XXXXXX")" || exit 2
+trap 'rm -f "${VIOLATIONS_FILE}" "${FILES_LIST}"' EXIT
+if ! find "${TREE}" \( -type f -o -type l \) > "${FILES_LIST}"; then
+  echo "artifact-gate: could not walk ${TREE}" >&2
+  exit 2
+fi
+
 while IFS= read -r f; do
   if [ -L "${f}" ]; then
     scanned_symlinks=$((scanned_symlinks + 1))
@@ -263,7 +279,7 @@ while IFS= read -r f; do
       fi
       ;;
   esac
-done < <(find "${TREE}" \( -type f -o -type l \) | sort)
+done < <(sort "${FILES_LIST}")
 
 total=0
 echo "artifact-gate: scanned ${scanned_machos} Mach-O files, ${scanned_scripts} executables, ${scanned_symlinks} symlinks under ${TREE}"
