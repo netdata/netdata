@@ -360,10 +360,18 @@ if(NETDATA_PACKAGE_KIND STREQUAL "pkg")
   # it downloads against the identifier and architecture recorded here. A pkg
   # install has no .environment file, so this also carries the two facts the
   # updater's shared plumbing reads from there: the installing uid (root -
-  # installer(8) runs as root) and the runtime prefix.
+  # installer(8) runs as root) and the runtime prefix. It also carries the
+  # release channel the updater follows, which a source or binpkg install
+  # records elsewhere: release builds follow stable, everything else nightly.
+  if(NETDATA_VERSION_TYPE STREQUAL "stable")
+    set(_macos_pkg_channel "stable")
+  else()
+    set(_macos_pkg_channel "nightly")
+  endif()
   file(WRITE "${CMAKE_BINARY_DIR}/system/.install-type"
        "INSTALL_TYPE='macos-pkg'
 INSTALL_UID='0'
+RELEASE_CHANNEL='${_macos_pkg_channel}'
 PREBUILT_ARCH='${CMAKE_SYSTEM_PROCESSOR}'
 NETDATA_PREFIX='${NETDATA_RUNTIME_PREFIX}'
 NETDATA_MACOS_PKG_IDENTIFIER='${NETDATA_PKG_IDENTIFIER}'

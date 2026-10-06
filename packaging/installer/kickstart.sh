@@ -2585,6 +2585,13 @@ try_macos_pkg_install() {
     fatal "macOS package checksum validation failed.\n${bad_sums_report}\n${BADCACHE_MSG}." F0207
   fi
 
+  # The package starts the Agent from its postinstall, so the opt-out marker
+  # has to be pre-staged; files under etc/netdata survive the install.
+  if [ "${NETDATA_DISABLE_TELEMETRY}" -eq 1 ]; then
+    run_as_root mkdir -p "/opt/netdata/etc/netdata"
+    run_as_root touch "/opt/netdata/etc/netdata/.opt-out-from-anonymous-statistics"
+  fi
+
   progress "Installing netdata"
   # The package's own preinstall refuses to install over a foreign Netdata
   # (source install, Homebrew service, port conflict) without touching the

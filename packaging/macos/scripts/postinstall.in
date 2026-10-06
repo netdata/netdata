@@ -165,6 +165,12 @@ fi
 
 if /bin/launchctl print "system/${UPDATER_LABEL}" 2>/dev/null | grep -q "state = running"; then
     log "updater is mid-transaction; leaving its registration untouched"
+    # disable only writes the override database; it does not boot the
+    # running job out, so the opt-out is still honoured from the next boot.
+    if [ "${auto_updates}" -eq 0 ]; then
+        log "auto-updates opted out; disabling ${UPDATER_LABEL}"
+        /bin/launchctl disable "system/${UPDATER_LABEL}" 2>/dev/null || true
+    fi
 else
     if /bin/launchctl print "system/${UPDATER_LABEL}" >/dev/null 2>&1; then
         /bin/launchctl bootout "system/${UPDATER_LABEL}" 2>/dev/null || true

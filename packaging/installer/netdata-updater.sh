@@ -1320,6 +1320,16 @@ verify_macos_pkg() {
 }
 
 update_macos_pkg() {
+  # The package's postinstall applies NETDATA_MACOS_AUTO_UPDATES=0 only when
+  # it runs outside an update, so a scheduled run also honours an opt-out
+  # made after install: persist the disable and stop. Manual runs still update.
+  if [ "${NETDATA_MACOS_AUTO_UPDATES:-1}" = "0" ] && [ -z "${NETDATA_NOT_RUNNING_FROM_CRON}" ] && [ ! -t 1 ]; then
+    info "Automatic updates are disabled by NETDATA_MACOS_AUTO_UPDATES=0; disabling the scheduled updater."
+    launchctl disable system/com.github.netdata.updater 2>/dev/null || true
+    [ -n "${logfile}" ] && rm "${logfile}" && logfile=
+    return 0
+  fi
+
   create_exec_tmp_directory
   PREVDIR="$(pwd)"
 
