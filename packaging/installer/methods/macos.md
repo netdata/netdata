@@ -6,7 +6,7 @@ You can install Netdata in one of the three following ways:
 - [Install Netdata via Homebrew](#install-netdata-via-homebrew)
 - [Install Netdata from source](#install-netdata-from-source)
 
-On Apple Silicon Macs running macOS 14 or newer, the recommended method installs Netdata's **native package**: a self-contained `.pkg` that needs no Homebrew and no other dependencies. On Intel Macs and older macOS versions, the same script builds Netdata from source, which requires [Homebrew](https://brew.sh/) for dependencies.
+The recommended method builds Netdata from source, which requires [Homebrew](https://brew.sh/) for dependencies. Netdata also has a **native package** for Apple Silicon Macs running macOS 14 or newer: a self-contained `.pkg` that needs no Homebrew and no other dependencies. It is not published yet. Once it is, the same script installs it on those Macs.
 
 :::info
 
@@ -30,16 +30,16 @@ To install Netdata using our automatic [kickstart](/packaging/installer/methods/
 curl https://get.netdata.cloud/kickstart.sh > /tmp/netdata-kickstart.sh && sh /tmp/netdata-kickstart.sh
 ```
 
-On Apple Silicon Macs running macOS 14 or newer, this installs the native package under `/opt/netdata`. On other systems the Agent is built from source and installed under `/usr/local/netdata`, with dependencies handled via Homebrew.
+The Agent is built from source and installed under `/usr/local/netdata`, with dependencies handled via Homebrew. Once the native package is published, Apple Silicon Macs running macOS 14 or newer get the package under `/opt/netdata` instead.
 
 ### The native package
 
 The native package:
 
 - installs everything under `/opt/netdata`, with the configuration directory at `/opt/netdata/etc/netdata` (use the `edit-config` script there; stock configuration lives at `/opt/netdata/usr/lib/netdata/conf.d`);
-- creates a hidden `netdata` system service account the daemon drops privileges to — configuration files are owned `root:netdata`, and the Agent's writable state belongs to the service account;
+- creates a hidden `netdata` system service account the daemon drops privileges to, or reuses an existing service-shaped `netdata` account — configuration files are owned `root:netdata`, and the Agent's writable state belongs to the service account;
 - registers a `launchd` system daemon (`com.github.netdata`) that starts the Agent at boot;
-- enables automatic daily updates through a second `launchd` daemon (`com.github.netdata.updater`) — see [Update Netdata](/packaging/installer/UPDATE.md) for how to disable or trigger updates;
+- registers a second `launchd` daemon (`com.github.netdata.updater`) for automatic daily updates. It does not install updates yet: until Netdata publishes signed packages, the updater refuses any package it cannot verify and changes nothing. See [Update Netdata](/packaging/installer/UPDATE.md);
 - refuses to install when another Netdata already exists on the machine — a source install, a Homebrew Netdata service, or an unknown process on port 19999. Nothing is stopped or modified in that case; the Installer log (`/var/log/install.log`) names what was found and how to resolve it. An existing native package install is upgraded in place, preserving your configuration and the metrics database.
 
 :::note
@@ -58,7 +58,7 @@ Run the uninstaller that ships inside the package:
 sudo /opt/netdata/usr/libexec/netdata/netdata-uninstaller.sh
 ```
 
-By default it removes everything the package owns — the payload, both `launchd` jobs, the package receipt, and the service account — but keeps your configuration, the metrics database, and the machine's Cloud claim identity under `/opt/netdata`, re-owned to `root:wheel` until a reinstall. Add `--purge` to delete the retained data as well. `kickstart.sh --uninstall` runs the same uninstaller.
+By default it removes everything the package owns — the payload, both `launchd` jobs, the package receipt, and the service account if the package created it (an existing account it reused is left in place) — but keeps your configuration, the metrics database, and the machine's Cloud claim identity under `/opt/netdata`, re-owned to `root:wheel` until a reinstall. Add `--purge` to delete the retained data as well. `kickstart.sh --uninstall` runs the same uninstaller.
 
 ### Automatically connect to Netdata Cloud during installation
 

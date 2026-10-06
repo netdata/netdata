@@ -65,6 +65,7 @@ The following table contains all possible installation types:
 | legacy-build       | Used for pre-existing kickstart.sh or netdata-installer.sh installations. This exist because we cannot determine how the install originally happened.       |
 | legacy-static      | Same as legacy-build, but for static installs.                                                                                                              |
 | oci                | Installed using official Docker images from Netdata, though not necessarily running on Docker                                                               |
+| macos-pkg          | Netdata's native macOS package for Apple Silicon. See [Install Netdata on macOS](/packaging/installer/methods/macos.md).                                   |
 | custom             | Anything not covered by the other identifiers, including manual builds, manually running netdata-installer.sh, and third-party packages (community).        |
 | Unknown            | Same as custom.                                                                                                                                             |
 
@@ -97,20 +98,16 @@ For automatic updates, see our [Windows automatic updates guide](https://learn.n
 <details>
 <summary><strong>macOS</strong></summary><br/>
 
-If you installed Netdata's native macOS package (the default on Apple Silicon Macs running macOS 14 or newer), it updates itself automatically once a day through a `launchd` daemon (`com.github.netdata.updater`). To update immediately, run the updater yourself:
+If you installed Netdata's native macOS package, it registers a daily `launchd` updater job (`com.github.netdata.updater`), but that job does not install updates yet: until Netdata publishes signed packages, the updater refuses any package it cannot verify and leaves your install unchanged. To move to a newer version, install the newer package over the existing one. Your configuration and metrics database are kept.
 
-```bash
-sudo /opt/netdata/usr/libexec/netdata/netdata-updater.sh
-```
-
-To disable or re-enable automatic updates:
+To disable or re-enable the updater job:
 
 ```bash
 sudo /opt/netdata/usr/libexec/netdata/netdata-updater.sh --disable-auto-updates
 sudo /opt/netdata/usr/libexec/netdata/netdata-updater.sh --enable-auto-updates
 ```
 
-Managed deployments can opt out of automatic updates before the package is even installed by pre-staging `/opt/netdata/etc/netdata/netdata-updater.conf` containing `NETDATA_MACOS_AUTO_UPDATES=0`.
+Managed deployments can also opt out of automatic updates, before or after installing the package, with `/opt/netdata/etc/netdata/netdata-updater.conf` containing `NETDATA_MACOS_AUTO_UPDATES=0`.
 
 If you installed Netdata using Homebrew, you can explicitly request an update:
 
@@ -192,7 +189,7 @@ Pass `--no-updates` to the kickstart script to skip setting up auto-updates enti
 wget -O /tmp/netdata-kickstart.sh https://get.netdata.cloud/kickstart.sh && sh /tmp/netdata-kickstart.sh --no-updates
 ```
 
-To explicitly control the scheduling method, use `--auto-update-type` with one of `systemd`, `interval`, `crontab`, or (native macOS package) `launchd`:
+To explicitly control the scheduling method, use `--auto-update-type` with one of `systemd`, `interval`, or `crontab`. (The native macOS package always uses `launchd`; kickstart selects it automatically.)
 
 ```bash
 wget -O /tmp/netdata-kickstart.sh https://get.netdata.cloud/kickstart.sh && sh /tmp/netdata-kickstart.sh --auto-update-type systemd
@@ -263,11 +260,11 @@ The script auto-detects the appropriate scheduler for your system. To explicitly
 sudo /usr/libexec/netdata/netdata-updater.sh --enable-auto-updates systemd
 ```
 
-Valid methods are `systemd`, `interval`, and `crontab`.
+Valid methods are `systemd`, `interval`, and `crontab`, plus `launchd` for the native macOS package.
 
 :::warning
 
-`netdata-updater.conf` controls **how** the updater runs, not **whether** it runs — see the [configuration options](#control-runtime-behavior-of-the-updater-script) above. It does not contain an option to disable the auto-update schedule, and setting variables in it will not stop auto-updates. To turn auto-updates off, use the disable command above — not the config file.
+`netdata-updater.conf` controls **how** the updater runs, not **whether** it runs — see the [configuration options](#control-runtime-behavior-of-the-updater-script) above. It does not contain an option to disable the auto-update schedule, and setting variables in it will not stop auto-updates. To turn auto-updates off, use the disable command above — not the config file. The one exception is the native macOS package's `NETDATA_MACOS_AUTO_UPDATES=0`, described in the macOS section.
 
 :::
 
@@ -282,7 +279,7 @@ Valid methods are `systemd`, `interval`, and `crontab`.
 | **legacy-build/static**    | Kickstart script       | `wget -O /tmp/netdata-kickstart.sh https://get.netdata.cloud/kickstart.sh && sh /tmp/netdata-kickstart.sh` |
 | **manual-static-ARCH**     | Kickstart script       | `wget -O /tmp/netdata-kickstart.sh https://get.netdata.cloud/kickstart.sh && sh /tmp/netdata-kickstart.sh` |
 | **custom**                 | System package manager | Use your system's package manager                                                                          |
-| **macos-pkg**              | Native macOS package   | Automatic daily updates; or `sudo /opt/netdata/usr/libexec/netdata/netdata-updater.sh`                     |
+| **macos-pkg**              | Native macOS package   | Install the newer package (automatic updates wait for signed packages)                                     |
 | **macOS (Homebrew)**       | Homebrew               | `brew upgrade netdata`                                                                                     |
 | **Manual Git**             | Git + installer        | See [manual installation steps](#update-methods-by-platform)                                               |
 | **Docker (OCI)**           | Image pull + recreate  | See [Docker update instructions](/packaging/docker/README.md#update-your-netdata-docker-container)         |
