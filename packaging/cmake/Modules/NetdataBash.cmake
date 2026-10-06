@@ -52,8 +52,11 @@ function(netdata_bundle_bash)
         # newer than configure whenever extraction crosses a second boundary;
         # make then regenerates configure with autoconf, which macOS runners
         # do not ship.
+        # The URLs are tried in order; the kernel.org mirror keeps the build
+        # going when ftp.gnu.org is down, and the hash pins the content.
         ExternalProject_Add(bundled-bash
                 URL https://ftp.gnu.org/gnu/bash/bash-${version}.tar.gz
+                    https://mirrors.kernel.org/gnu/bash/bash-${version}.tar.gz
                 URL_HASH SHA256=${sha256}
                 DOWNLOAD_EXTRACT_TIMESTAMP TRUE
                 CONFIGURE_COMMAND <SOURCE_DIR>/configure ${configure_args}
