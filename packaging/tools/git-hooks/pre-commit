@@ -1,17 +1,7 @@
 #!/usr/bin/env bash
 # SPDX-License-Identifier: GPL-3.0-or-later
-#
 # managed-by: netdata setup-git-hooks
-#
-# Blocks a commit that stages unformatted Rust code under src/crates.
-#
-# Opt-in: install or update it with `ninja setup-git-hooks` from a configured
-# build directory, or `cmake -P packaging/tools/git-hooks/install-git-hooks.cmake`
-# without one. The installer copies this file; rerun it after this file changes.
-#
-# It checks the staged content (the index), not the working tree, so a file
-# staged in part with `git add -p` is checked exactly as it will be committed.
-# It never edits files: run `cargo fmt`, stage the result, and commit again.
+# Blocks commits that stage unformatted Rust under src/crates (checks the index, never edits files).
 set -euo pipefail
 
 # All crates use edition 2024 and there is no rustfmt.toml; stdin formatting

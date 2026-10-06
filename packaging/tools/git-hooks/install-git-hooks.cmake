@@ -1,14 +1,5 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
-#
-# Installs the git hooks in this directory into the checkout's hooks directory.
-#
-# Usage:
-#   ninja setup-git-hooks                                       (configured build directory)
-#   cmake -P packaging/tools/git-hooks/install-git-hooks.cmake  (no build directory)
-#
-# It copies each hook, so the installed hook does not depend on any one worktree
-# staying around; rerun it after a hook changes. It replaces only a hook that
-# carries the managed-by marker and stops on any other hook.
+# Copies these hooks into the shared git hooks dir; run via `ninja setup-git-hooks` or `cmake -P`.
 
 cmake_minimum_required(VERSION 3.16)
 
