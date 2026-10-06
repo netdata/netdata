@@ -2555,7 +2555,7 @@ modules:
       module_name: PerflibHttpService
       monitored_instance:
         name: HTTP Service
-        description: Monitor HTTP.sys request queues on Windows.
+        description: Monitor HTTP.sys request queues, including queued requests, arrival rates, rejections, and request age, on Windows.
         link: "https://learn.microsoft.com/en-us/windows/win32/http/http-api-start-page"
         categories:
           - data-collection.web-servers-and-proxies

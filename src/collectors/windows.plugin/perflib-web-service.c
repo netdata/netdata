@@ -393,7 +393,7 @@ static void w3svc_w3wp_remove_unseen(void)
     dfe_start_write(w3svc_w3wp_service, p)
     {
         if (!p->seen)
-            dictionary_del(w3svc_w3wp_service, w3svc_w3wp_service_dfe.name);
+            dictionary_del(w3svc_w3wp_service, p_dfe.name);
     }
     dfe_done(p);
     dictionary_garbage_collect(w3svc_w3wp_service);
@@ -2112,7 +2112,7 @@ static bool do_W3SCV_W3WP(PERF_DATA_BLOCK *pDataBlock, int update_every)
     {
         if (!p->seen)
             continue;
-        const char *app = w3svc_w3wp_service_dfe.name;
+        const char *app = p_dfe.name;
         w3svc_w3wp_active_threads(p, update_every, (char *)app);
         w3svc_w3wp_requests_total(p, update_every, (char *)app);
         w3svc_w3wp_requests_active(p, update_every, (char *)app);
