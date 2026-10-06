@@ -351,12 +351,15 @@ A collector that works only on some operating systems (its `metadata.yaml` `supp
 elsewhere, or its stock job starts and fails there:
 
 - Put the matching build constraint, such as `//go:build linux`, on every source and test file of the collector
-  package, after the SPDX line with a blank line before and after.
+  package except `doc.go`, after the SPDX line with a blank line before and after.
 - Add an untagged `doc.go` containing only the package clause and its doc comment, so the `init.go` import still
   compiles on every platform.
 - Platform-neutral subpackages such as `<name>func/` and `internal/` need no constraint; only the tagged files link
   them.
-- Run the package tests on a supported platform and build `./cmd/godplugin` for an excluded one (`GOOS=windows`).
+- From `src/go`, run the package tests on a supported platform, then check a platform that `supported_platforms`
+  excludes (for example `GOOS=windows` for a Linux-only collector): with that `GOOS`,
+  `go build -o /dev/null ./cmd/godplugin` succeeds and `go list -f '{{.GoFiles}}' ./plugin/go.d/collector/<name>`
+  prints only `[doc.go]`.
 
 Examples: `ap`, `zfspool`, `smbios_memory`.
 
