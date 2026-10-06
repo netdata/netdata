@@ -121,9 +121,9 @@ static void ml_queue_start_pass(ml_queue_t *q, ml_queue_pass_timing_t *timing)
     q->create_sorting = 0;
 
     if (aborted) {
-        // keep the entries for accounting; nothing consumes them after a stop request, so hand them back
-        // without copying whenever nothing arrived during the scan (the common case)
-        // (copying only the few arrivals of the scan window, never the pass itself)
+        // nothing consumes the entries after a stop request, but keep them so the queue size stays truthful: put the
+        // pass back in front of anything pushed during the scan (push order kept), moving the pass and copying only
+        // those few arrivals
         pass.insert(pass.end(), q->create_next.begin(), q->create_next.end());
         q->create_next.swap(pass);
         netdata_cond_broadcast(&q->cond_var);
