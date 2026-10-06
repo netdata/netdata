@@ -1886,7 +1886,7 @@ extern "C" int ml_queue_host_order_unittest(RRDHOST *host)
     rrdhost_flag_set(host, RRDHOST_FLAG_ORPHAN);
     enum ml_worker_result res = ml_worker_create_new_model(nullptr, req_b);
     if (!was_orphan)
-        rrdhost_flag_clear(host, RRDHOST_FLAG_ORPHAN);
+        __atomic_and_fetch(&host->flags, (RRDHOST_FLAGS)~RRDHOST_FLAG_ORPHAN, __ATOMIC_RELEASE);
     ML_HOST_TEST_CHECK(res == ML_WORKER_RESULT_DIMENSION_UNAVAILABLE && ml_should_requeue_create_new_model(res),
                        "a dimension of a disconnected child is requeued, not dropped");
 
