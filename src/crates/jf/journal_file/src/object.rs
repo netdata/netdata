@@ -986,11 +986,11 @@ impl<B: ByteSlice> DataObject<B> {
             let compressed_data = &payload[8..];
 
             buf.clear();
-            if uncompressed_size > buf.capacity() {
-                if buf.try_reserve_exact(uncompressed_size).is_err() {
-                    *buf = Vec::new();
-                    return Err(JournalError::DecompressorError);
-                }
+            if uncompressed_size > buf.capacity()
+                && buf.try_reserve_exact(uncompressed_size).is_err()
+            {
+                *buf = Vec::new();
+                return Err(JournalError::DecompressorError);
             }
             buf.resize(uncompressed_size, 0);
 
