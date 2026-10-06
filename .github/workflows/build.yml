@@ -76,6 +76,7 @@ jobs:
             packaging/cmake/
             packaging/makeself/
             packaging/installer/
+            packaging/macos/
             packaging/windows/
             packaging/*.sh
             packaging/*.version
@@ -1425,6 +1426,8 @@ jobs:
           sudo launchctl print system/com.github.netdata | grep -q 'state = running'
           pkgutil --pkg-info cloud.netdata.agent
           sudo grep -q "INSTALL_TYPE='macos-pkg'" /opt/netdata/etc/netdata/.install-type
+          sudo grep -qE "RELEASE_CHANNEL='(stable|nightly)'" /opt/netdata/etc/netdata/.install-type
+          sudo test -x /opt/netdata/usr/libexec/netdata/plugins.d/macos-logs.plugin
       - name: Reinstall over the existing install
         id: reinstall-pkg
         if: needs.file-check.outputs.run == 'true'

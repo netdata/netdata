@@ -85,11 +85,21 @@ iokit_path='IOService:/ExampleController(Example)@0/Namespace@1'
 # exit 4 - even when an admin-writable smartctl exists. Argument
 # validation runs before the search and keeps its own exit codes.
 
-# Make sure an admin-writable smartctl exists, so the refusals below prove
-# the search path is closed rather than merely that the tool is missing.
-# The marker file catches any execution of the plant.
+# Make sure an admin-writable smartctl exists in /usr/local/bin, so the
+# refusals below prove the search path is closed rather than merely that the
+# tool is missing. It is checked by path, not with command -v: CI also
+# installs Homebrew's smartctl under /opt/homebrew, and that copy alone
+# would leave /usr/local/bin - which the non-macOS search path includes -
+# untested. The marker file catches any execution of the plant.
 planted=""
-if ! command -v smartctl > /dev/null 2>&1; then
+cleanup() {
+    if [[ -n "${planted}" ]]; then
+        sudo rm -f "${planted}"
+    fi
+    sudo rm -f /tmp/ndsudo-planted-executed
+}
+trap cleanup EXIT
+if [[ ! -e /usr/local/bin/smartctl ]]; then
     sudo mkdir -p /usr/local/bin
     printf '#!/bin/sh\ntouch /tmp/ndsudo-planted-executed\n' | sudo tee /usr/local/bin/smartctl > /dev/null
     sudo chmod 755 /usr/local/bin/smartctl
@@ -135,7 +145,3 @@ if [[ -e /tmp/ndsudo-planted-executed ]]; then
     fail_command "the planted smartctl was EXECUTED by ndsudo" test -e /tmp/ndsudo-planted-executed
 fi
 printf '%b[OK]%b admin-writable smartctl was never executed\n' "${GREEN}" "${NC}" >&2
-
-if [[ -n "${planted}" ]]; then
-    sudo rm -f "${planted}"
-fi
