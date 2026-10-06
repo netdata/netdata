@@ -799,6 +799,7 @@ mod tests {
                 value: Some(AnyValue {
                     value: Some(Value::StringValue(ns.to_string())),
                 }),
+                key_strindex: 0,
             });
         }
         if let Some(n) = name {
@@ -807,6 +808,7 @@ mod tests {
                 value: Some(AnyValue {
                     value: Some(Value::StringValue(n.to_string())),
                 }),
+                key_strindex: 0,
             });
         }
         ResourceLogs {

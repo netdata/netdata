@@ -743,6 +743,7 @@ mod tests {
                         value: Some(opentelemetry_proto::tonic::common::v1::AnyValue {
                             value: Some(Value::StringValue("http-tests".into())),
                         }),
+                        key_strindex: 0,
                     }],
                     ..Default::default()
                 }),

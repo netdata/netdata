@@ -332,6 +332,7 @@ fn json_to_any_value(value: serde_json::Value) -> AnyValue {
                 .into_iter()
                 .map(|(key, val)| KeyValue {
                     key,
+                    key_strindex: 0,
                     value: Some(json_to_any_value(val)),
                 })
                 .collect(),

@@ -1,23 +1,18 @@
 //! OTLP/JSON request decoding for the OTLP/HTTP receiver.
 //!
-//! The codec is the `opentelemetry-proto` 0.31 `with-serde` derives, which
-//! accept a narrower and less uniform JSON than the OTLP/JSON contract
+//! The codec is the `opentelemetry-proto` 0.33 `with-serde` derives, which
+//! accept a narrower JSON than the OTLP/JSON contract
 //! (opentelemetry-proto `docs/specification.md`, "JSON Protobuf Encoding"):
 //!
 //! - 64-bit integers: the contract writes them as decimal strings and accepts
-//!   numbers or strings on decode; the derives accept exactly one form per
-//!   field — strings for the log/span/event and number/histogram point
-//!   timestamps, numbers for everything else (counts, bucket counts, `asInt`,
-//!   exponential-histogram, summary and exemplar fields); only
-//!   `AnyValue.intValue` takes both. Real senders differ:
-//!   the collector, Python, Go and C++ write strings; JS writes counts and
-//!   `asInt` as numbers; Rust writes `asInt` as a number.
+//!   numbers or strings on decode; the derives accept both everywhere except
+//!   `asInt` (number points and exemplars), which takes numbers only. Real
+//!   senders differ: the collector, Python, Go and C++ write strings; JS
+//!   writes counts and `asInt` as numbers; Rust writes `asInt` as a number.
 //! - Omitted fields: proto3 JSON lets any field be absent (or `null`), but the
-//!   derives require the top-level `resource*` array and most fields of
-//!   exponential-histogram points, buckets, summary points, quantiles,
-//!   exemplars, `ArrayValue`/`KeyValueList`, `KeyValue.key` and every field
-//!   of a resource's `EntityRef`; an empty
-//!   `AnyValue` (`{}`, meaning unset, or only unknown fields) is rejected.
+//!   derives require most fields of exponential-histogram points and their
+//!   buckets, quantiles, exemplars, `ArrayValue`/`KeyValueList`,
+//!   `KeyValue.key` and every field of a resource's `EntityRef`.
 //! - Exemplar values: the contract puts `asInt`/`asDouble` on the exemplar
 //!   itself; the derives expect them nested under `value`.
 //!
@@ -32,8 +27,10 @@
 //! empty. Such a loss — input the derives cannot represent even after the
 //! rewrite, e.g. a `"NaN"` double — becomes a decode error (HTTP 400, as the
 //! contract requires for undecodable data), never a silent drop. The rewrite
-//! is tied to this crate version's quirks; the tests pin every form so an
-//! upgrade that changes them fails loudly.
+//! was written against 0.31's quirks; the tests pin the decoded result of
+//! every form, so an upgrade that stops reading a rewritten form fails
+//! loudly, while one that reads more (as 0.32 and 0.33 do) only leaves some
+//! rewrites redundant.
 
 use opentelemetry_proto::tonic::collector::logs::v1::{
     ExportLogsServiceRequest, ExportLogsServiceResponse,
@@ -239,7 +236,8 @@ fn single_value(object: &Object) -> Result<(), String> {
 }
 
 /// An `AnyValue` object with none of its oneof keys: `{}` or only unknown
-/// fields. The derives reject both ("no known keys found").
+/// fields. The 0.31 derives rejected both ("no known keys found"); 0.33
+/// reads them as unset.
 fn is_unset_any_value(value: &Value) -> bool {
     const KINDS: [&str; 7] = [
         "stringValue",
@@ -586,8 +584,9 @@ fn json_pointer(path: &str) -> String {
 // Field helpers
 // ---------------------------------------------------------------------------
 
-/// The request object, with its one top-level array defaulted: the derives
-/// require it, while `{}` is a valid (empty) export.
+/// The request object, with its one top-level array defaulted: the 0.31
+/// derives required it (0.33 does not), while `{}` is a valid (empty)
+/// export.
 fn top_level<'a>(root: &'a mut Value, key: &str) -> &'a mut Object {
     let root = root.as_object_mut().expect("parse admits objects only");
     root.entry(key).or_insert_with(|| Value::Array(Vec::new()));
@@ -1022,6 +1021,7 @@ mod tests {
         let kv = |key: &str, value: Option<any_value::Value>| KeyValue {
             key: key.into(),
             value: value.map(|v| AnyValue { value: Some(v) }),
+            key_strindex: 0,
         };
         let expected = ExportLogsServiceRequest {
             resource_logs: vec![ResourceLogs {
