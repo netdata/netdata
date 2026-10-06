@@ -37,6 +37,7 @@ pub fn kv_str(k: &str, v: &str) -> KeyValue {
         value: Some(AnyValue {
             value: Some(Av::StringValue(v.into())),
         }),
+        key_strindex: 0,
     }
 }
 
@@ -46,6 +47,7 @@ pub fn kv_int(k: &str, v: i64) -> KeyValue {
         value: Some(AnyValue {
             value: Some(Av::IntValue(v)),
         }),
+        key_strindex: 0,
     }
 }
 
@@ -55,6 +57,7 @@ pub fn kv_double(k: &str, v: f64) -> KeyValue {
         value: Some(AnyValue {
             value: Some(Av::DoubleValue(v)),
         }),
+        key_strindex: 0,
     }
 }
 
@@ -64,6 +67,7 @@ pub fn kv_null(k: &str) -> KeyValue {
     KeyValue {
         key: k.into(),
         value: None,
+        key_strindex: 0,
     }
 }
 

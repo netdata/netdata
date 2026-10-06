@@ -2,11 +2,15 @@
 package rum
 
 import (
+	"context"
 	"encoding/json"
 	"os"
 	"testing"
 
+	demjournal "github.com/netdata/netdata/go/plugins/plugin/dem/journal"
 	"github.com/netdata/netdata/go/plugins/plugin/dem/rum/config"
+	rumhistory "github.com/netdata/netdata/go/plugins/plugin/dem/rum/history"
+	rumregistry "github.com/netdata/netdata/go/plugins/plugin/dem/rum/registry"
 	"github.com/santhosh-tekuri/jsonschema/v6"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -86,4 +90,74 @@ func TestExportFormAndRuntimeAddressValidation(t *testing.T) {
 		}
 	}
 
+}
+
+func TestSamplingFormAndRuntimeValidation(t *testing.T) {
+	var bundle map[string]any
+	require.NoError(t, json.Unmarshal([]byte(schema), &bundle))
+	compiler := jsonschema.NewCompiler()
+	require.NoError(t, compiler.AddResource("rum.json", bundle["jsonSchema"]))
+	form, err := compiler.Compile("rum.json")
+	require.NoError(t, err)
+	db, err := demjournal.Open(context.Background(), "")
+	require.NoError(t, err)
+	t.Cleanup(func() { require.NoError(t, db.Close()) })
+	for _, tc := range []struct {
+		name   string
+		fields string
+		valid  bool
+	}{
+		{"omitted", ``, true},
+		{"null", `,"measure_sample_rate":null,"investigate":null`, true},
+		{"null fields", `,"investigate":{"sample_rate":null,"always_keep":null}`, true},
+		{"zero", `,"measure_sample_rate":0,"investigate":{"sample_rate":0,"always_keep":[]}`, true},
+		{"fraction", `,"measure_sample_rate":0.25,"investigate":{"sample_rate":0.25}`, true},
+		{"one", `,"measure_sample_rate":1,"investigate":{"sample_rate":1}`, true},
+		{"negative collection", `,"measure_sample_rate":-0.01`, false},
+		{"large collection", `,"measure_sample_rate":1.01`, false},
+		{"negative detail", `,"investigate":{"sample_rate":-0.01}`, false},
+		{"large detail", `,"investigate":{"sample_rate":1.01}`, false},
+		{"unknown override", `,"investigate":{"always_keep":["unknown"]}`, false},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			raw := []byte(`{"name":"shop","allowed_origins":["https://shop.example.org"]` + tc.fields + `}`)
+			var input map[string]any
+			require.NoError(t, json.Unmarshal(raw, &input))
+			assert.Equal(t, tc.valid, form.Validate(input) == nil, "form")
+			c := New(Dependencies{
+				Registry: rumregistry.New(),
+				History:  rumhistory.NewStore(db),
+			})
+			require.NoError(t, json.Unmarshal(raw, &c.Config))
+			assert.Equal(t, tc.valid, c.Init(context.Background()) == nil, "runtime")
+		})
+	}
+}
+
+func TestCaptureFormAndRuntimeValidation(t *testing.T) {
+	var bundle map[string]any
+	require.NoError(t, json.Unmarshal([]byte(schema), &bundle))
+	compiler := jsonschema.NewCompiler()
+	require.NoError(t, compiler.AddResource("rum.json", bundle["jsonSchema"]))
+	form, err := compiler.Compile("rum.json")
+	require.NoError(t, err)
+	for _, tc := range []struct {
+		capture string
+		valid   bool
+	}{
+		{`null`, true}, {`{}`, true}, {`{"geolocation":null,"frustration_signals":null}`, true},
+		{`{"geolocation":"off"}`, true}, {`{"geolocation":"country"}`, true}, {`{"geolocation":"city","frustration_signals":true}`, true},
+		{`{"geolocation":""}`, false}, {`{"geolocation":"precise"}`, false}, {`{"geolocation":1}`, false}, {`{"frustration_signals":"true"}`, false}, {`{"frustration_signals":1}`, false},
+	} {
+		t.Run(tc.capture, func(t *testing.T) {
+			raw := []byte(`{"name":"shop","allowed_origins":["https://shop.example.org"],"capture":` + tc.capture + `}`)
+			var input map[string]any
+			require.NoError(t, json.Unmarshal(raw, &input))
+			assert.Equal(t, tc.valid, form.Validate(input) == nil, "form")
+			var site config.Site
+			err := json.Unmarshal(raw, &site)
+			valid := err == nil && len(config.ValidateSiteExtras(site)) == 0
+			assert.Equal(t, tc.valid, valid, "runtime")
+		})
+	}
 }

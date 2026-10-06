@@ -104,6 +104,16 @@ Runtime facts:
 Use `$dimension_raw` only when the contract specifically needs the last collected value before interpolation/storage
 presentation, and `$dimension_last_collected_t` only when it needs that dimension's collection timestamp.
 
+Do not treat equal dimension timestamps as a collection identifier: PLUGINSD `SET` calls timestamp dimensions
+independently. `pluginsd_set` calls `rrddim_set_by_pointer` (or its double variant), which stamps a `timeval` with
+microsecond precision; health's `variable_lookup_in_chart` exposes only its `tv_sec` field. One complete collection
+can cross a second boundary. Conversely, an omitted dimension retains its previous raw value, so freshness and
+arithmetic coherence alone can miss a partial collection. When using raw values, also test stored-input gaps:
+`rrdset_done_interpolate` sets the normal dimension value to NaN when an omitted dimension reaches a storage beat.
+Validate omission after a valid zero, as well as a never-present dimension. These checks provide native freshness
+and gap eligibility; they do not prove atomic transaction membership, particularly when collections occur faster
+than the storage cadence.
+
 ### Pattern 2 — dimensions from another chart or context
 
 Use a dotted chart/context reference when values live on different charts:

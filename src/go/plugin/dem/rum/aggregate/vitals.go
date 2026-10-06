@@ -5,40 +5,16 @@ package aggregate
 import (
 	"math"
 	"sort"
-	"time"
 
 	"github.com/netdata/netdata/go/plugins/plugin/dem/rum/beacon"
 )
 
 // navLoadName/navDCLName are series keys distinct from any beacon.Vitals
-// name (rum.load/rum.dcl, no CWV rating computed for either).
+// name (document load time and DOMContentLoaded handler duration; neither is a CWV).
 const (
 	navLoadName = "__nav_load"
 	navDCLName  = "__nav_dcl"
 )
-
-func (st *siteState) recordVitals(b *beacon.Beacon, kind, value string, now time.Time) {
-	for _, v := range b.Vitals {
-		st.addSample(seriesKey{v.Name, kind, value}, v.Value, now)
-	}
-}
-
-// addSample appends one windowed sample to a series, dropping the oldest
-// once the per-series cap is hit (shared by vitals and navigation timing).
-func (st *siteState) addSample(k seriesKey, val float64, now time.Time) {
-	s, ok := st.series[k]
-	if !ok {
-		s = &series{}
-		st.series[k] = s
-	}
-	if len(s.vals) >= maxSamplesPerSeries {
-		s.ts = s.ts[1:]
-		s.vals = s.vals[1:]
-		st.counters[CounterSamplesDropped]++
-	}
-	s.ts = append(s.ts, now)
-	s.vals = append(s.vals, val)
-}
 
 // thresholds are the CWV good/poor boundaries (good ≤ first, poor > second).
 var thresholds = map[string][2]float64{
@@ -83,20 +59,12 @@ func stats(vital string, vals []float64) VitalStats {
 		}
 	}
 	n := len(sorted)
-	// Counts, not percentages: sum-aggregation across sites and nodes then
-	// yields traffic-weighted ratios, like httpcheck.status.
+	// Counts combine only for aligned, complete and disjoint populations;
+	// overlapping rolling windows must not be summed over time.
 	st.Good = good
 	st.Poor = poor
 	st.NeedsImpr = n - good - poor
 	return st
-}
-
-// percentile is nearest-rank on an unsorted copy.
-func percentile(vals []float64, p float64) float64 {
-	sorted := make([]float64, len(vals))
-	copy(sorted, vals)
-	sort.Float64s(sorted)
-	return pctSorted(sorted, p)
 }
 
 func pctSorted(sorted []float64, p float64) float64 {

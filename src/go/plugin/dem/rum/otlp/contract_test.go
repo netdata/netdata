@@ -10,6 +10,7 @@ import (
 	"crypto/tls"
 	"crypto/x509"
 	"crypto/x509/pkix"
+	"encoding/json"
 	"encoding/pem"
 	"fmt"
 	"math/big"
@@ -28,6 +29,7 @@ import (
 	"github.com/netdata/netdata/go/plugins/plugin/dem/rum/aggregate"
 	"github.com/netdata/netdata/go/plugins/plugin/dem/rum/beacon"
 	"github.com/netdata/netdata/go/plugins/plugin/dem/rum/config"
+	"github.com/netdata/netdata/go/plugins/plugin/dem/rum/faro"
 	"github.com/stretchr/testify/require"
 	logs "go.opentelemetry.io/proto/otlp/collector/logs/v1"
 	traces "go.opentelemetry.io/proto/otlp/collector/trace/v1"
@@ -38,9 +40,10 @@ import (
 	"google.golang.org/grpc/status"
 )
 
-func accepted() aggregate.Result {
+func accepted(b *beacon.Beacon) aggregate.Result {
 	return aggregate.Result{
 		Accepted:     true,
+		Observation:  b,
 		Investigated: true,
 		PageView:     true,
 	}
@@ -56,17 +59,17 @@ func TestIngestDispositionAndOverflow(t *testing.T) {
 	}
 	wrong := tracedBeacon()
 	wrong.Site = "other"
-	l.Ingest(wrong, accepted())
-	tr.Ingest(wrong, accepted())
+	l.Ingest(wrong, accepted(wrong))
+	tr.Ingest(wrong, accepted(wrong))
 	require.Empty(t, l.ch)
 	require.Empty(t, tr.spanCh)
 	require.Empty(t, c.snapshot())
 	// Exercise the actual bounded queues, without replacing their capacities.
 	for range queueCap + 1 {
-		l.Ingest(tracedBeacon(), accepted())
+		l.Ingest(tracedBeacon(), accepted(tracedBeacon()))
 	}
 	for range spanQueueCap + 1 {
-		tr.Ingest(tracedBeacon(), accepted())
+		tr.Ingest(tracedBeacon(), accepted(tracedBeacon()))
 	}
 	require.Len(t, l.ch, queueCap)
 	require.Len(t, tr.spanCh, spanQueueCap)
@@ -82,8 +85,8 @@ func TestSharedShutdownDrainsOrDropsUnattempted(t *testing.T) {
 			l := newExporter(t, startServer(t, ls), c, nil)
 			tr := newTraceExporter(t, startTraceServer(t, ts), "s1", c, nil)
 			for range 300 {
-				l.Ingest(tracedBeacon(), accepted())
-				tr.Ingest(tracedBeacon(), accepted())
+				l.Ingest(tracedBeacon(), accepted(tracedBeacon()))
+				tr.Ingest(tracedBeacon(), accepted(tracedBeacon()))
 			}
 			ctx, cancel := context.WithCancel(context.Background())
 			cancel()
@@ -138,8 +141,8 @@ func TestPartialCountsAndSafeDiagnostics(t *testing.T) {
 			l := newExporter(t, startServer(t, ls), c, nil)
 			tr := newTraceExporter(t, startTraceServer(t, ts), "s1", c, nil)
 			for range 5 {
-				l.Ingest(tracedBeacon(), accepted())
-				tr.Ingest(tracedBeacon(), accepted())
+				l.Ingest(tracedBeacon(), accepted(tracedBeacon()))
+				tr.Ingest(tracedBeacon(), accepted(tracedBeacon()))
 			}
 			ctx, cancel := context.WithCancel(context.Background())
 			cancel()
@@ -203,8 +206,8 @@ func TestRepeatedReceiverFailuresHaveBoundedDiagnostics(t *testing.T) {
 				b := tracedBeacon()
 				b.Site = site
 				for range attempts {
-					l.Ingest(b, accepted())
-					tr.Ingest(b, accepted())
+					l.Ingest(b, accepted(b))
+					tr.Ingest(b, accepted(b))
 					l.export(context.Background(), []queued{<-l.ch}, exportTimeout)
 					tr.exportSpans(context.Background(), []spanItem{<-tr.spanCh}, exportTimeout)
 				}
@@ -233,22 +236,26 @@ func TestConsoleSeverityAndErrorDetails(t *testing.T) {
 		now: func() time.Time { return t0 },
 	}
 	for level, want := range map[string]string{"info": "INFO", "warn": "WARN", "error": "ERROR", "debug": "DEBUG", "trace": "TRACE"} {
-		b := mkBeacon()
-		b.Logs = []beacon.Log{
-			{
-				Level:     level,
-				Message:   "secret-value",
-				ErrorType: "secret-value TypeError",
-				Stack:     strings.Repeat("é", 3000) + "secret-value",
-			},
-		}
+		frame, err := json.Marshal(map[string]any{"function": strings.Repeat("é", 3000) + "secret-value", "filename": "app.js"})
+		require.NoError(t, err)
+		raw, err := json.Marshal(map[string]any{"logs": []any{map[string]any{
+			"level": level, "message": "secret-value",
+			"context": map[string]any{"type": "secret-value TypeError", "stackFrames": string(frame)},
+		}}})
+		require.NoError(t, err)
+		b, err := faro.Decode(raw, faro.Options{
+			Now:         t0,
+			ConsoleLogs: true,
+			Redactor:    newRedactor(t, "secret-value"),
+		})
+		require.NoError(t, err)
 		recs := e.build(b, false)
 		require.Len(t, recs, 1)
 		rec := simplify(recs[0])
 		require.Equal(t, want, rec.severity)
 		require.NotContains(t, rec.body, "secret-value")
 		require.Equal(t, "[REDACTED] TypeError", rec.attrs["error.type"])
-		require.LessOrEqual(t, len(rec.attrs["error.stack"]), maxStackBytes)
+		require.LessOrEqual(t, len(rec.attrs["error.stack"]), 4096)
 	}
 }
 

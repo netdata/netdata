@@ -12,7 +12,7 @@ import (
 var sitesMethod = method{
 	id:      "rum-sites",
 	title:   "RUM Sites",
-	help:    "RUM site setup and observed activity",
+	help:    "RUM site setup and receipt-window activity. Observed sessions count measured browser identities, not people or concurrent visitors; null means capacity loss or measurement is unavailable. Tracked investigated sessions count the bounded detail cache, independently of the measurement window. Activity counts are null while window loss is nonzero; loss counts identify incomplete populations. Capture columns show current policy; retained history may reflect earlier policies. City locations are approximate live activity only; frustration signals are optional interaction heuristics",
 	sort:    "site",
 	every:   10,
 	columns: rumSitesColumns,
@@ -25,11 +25,15 @@ func (h *Handler) sitesRows(ctx context.Context, now int64) (rows [][]any, recei
 	for _, s := range sites {
 		a := s.Activity
 		state := "enabled"
-		if !receiver.Serving {
+		if s.Sampling.MeasureRate == 0 {
+			state = "collection_disabled"
+		} else if !receiver.Serving {
 			state = "ingress_unavailable"
 		} else if a.LastBeaconAgeS < 0 || a.LastBeaconAgeS > 3600 {
 			state = "no_beacons"
 		}
+		measurementKnown := s.Sampling.MeasureRate > 0 && receiver.Serving
+		activityKnown := measurementKnown && a.WindowLost == 0
 		measured, investigated := samplingLabels(s.Sampling)
 		reach := s.Reach.State
 		snippet := s.Snippet.State
@@ -49,9 +53,9 @@ func (h *Handler) sitesRows(ctx context.Context, now int64) (rows [][]any, recei
 				strings.Join(s.AllowedOrigins, ","),
 				a.BeaconsPerMin,
 				a.LastBeaconAgeS,
-				a.ActiveSessions,
-				a.PageviewsWindow,
-				a.JSErrorsWindow,
+				detail(measurementKnown && a.SessionsLost == 0, a.ObservedSessions),
+				detail(activityKnown, a.PageviewsWindow),
+				detail(activityKnown, a.JSErrorsWindow),
 				a.RejectedPerMin,
 				reach,
 				h.redact.Apply(s.Reach.Detail),
@@ -63,6 +67,9 @@ func (h *Handler) sitesRows(ctx context.Context, now int64) (rows [][]any, recei
 				h.redact.Apply(s.Snippet.Detail),
 				h.redact.Apply(s.Rejected.Origin),
 				rejectAge,
+				s.Capture.Geolocation,
+				boolean(s.Capture.FrustrationSignals),
+				detail(activityKnown, a.ApplicationViewsWindow), a.WindowLost, a.SessionsLost,
 			},
 		)
 	}
@@ -71,6 +78,20 @@ func (h *Handler) sitesRows(ctx context.Context, now int64) (rows [][]any, recei
 }
 
 var rumSitesColumns = map[string]any{
+	"capture_geolocation": (funcapi.Column{
+		Index:         22,
+		Name:          "Current Geolocation Capture",
+		Type:          funcapi.FieldTypeString,
+		Visualization: funcapi.FieldVisualValue,
+		Visible:       true,
+	}).BuildColumn(),
+	"capture_frustration_signals": (funcapi.Column{
+		Index:         23,
+		Name:          "Current Frustration Capture",
+		Type:          funcapi.FieldTypeBoolean,
+		Visualization: funcapi.FieldVisualValue,
+		Visible:       true,
+	}).BuildColumn(),
 	"site": (funcapi.Column{
 		Index:         0,
 		UniqueKey:     true,
@@ -135,9 +156,9 @@ var rumSitesColumns = map[string]any{
 		Visible:       true,
 		Sortable:      true,
 	}).BuildColumn(),
-	"active_sessions": (funcapi.Column{
+	"observed_sessions": (funcapi.Column{
 		Index:         8,
-		Name:          "Active Sessions",
+		Name:          "Observed Sessions (window)",
 		Type:          funcapi.FieldTypeInteger,
 		Visualization: funcapi.FieldVisualValue,
 		Visible:       true,
@@ -145,7 +166,7 @@ var rumSitesColumns = map[string]any{
 	}).BuildColumn(),
 	"pageviews_window": (funcapi.Column{
 		Index:         9,
-		Name:          "Page Views (window)",
+		Name:          "Document Views (window)",
 		Type:          funcapi.FieldTypeInteger,
 		Visualization: funcapi.FieldVisualValue,
 		Visible:       true,
@@ -200,7 +221,7 @@ var rumSitesColumns = map[string]any{
 	}).BuildColumn(),
 	"investigated_sessions": (funcapi.Column{
 		Index:         16,
-		Name:          "Investigated Sessions",
+		Name:          "Tracked Investigated Sessions",
 		Type:          funcapi.FieldTypeInteger,
 		Visualization: funcapi.FieldVisualValue,
 		Visible:       true,
@@ -241,6 +262,30 @@ var rumSitesColumns = map[string]any{
 	"last_rejected_age_s": (funcapi.Column{
 		Index:         21,
 		Name:          "Last Rejection (s ago)",
+		Type:          funcapi.FieldTypeInteger,
+		Visualization: funcapi.FieldVisualValue,
+		Visible:       true,
+		Sortable:      true,
+	}).BuildColumn(),
+	"application_views_window": (funcapi.Column{
+		Index:         24,
+		Name:          "Application Views (window)",
+		Type:          funcapi.FieldTypeInteger,
+		Visualization: funcapi.FieldVisualValue,
+		Visible:       true,
+		Sortable:      true,
+	}).BuildColumn(),
+	"window_lost": (funcapi.Column{
+		Index:         25,
+		Name:          "Window Observations Lost",
+		Type:          funcapi.FieldTypeInteger,
+		Visualization: funcapi.FieldVisualValue,
+		Visible:       true,
+		Sortable:      true,
+	}).BuildColumn(),
+	"sessions_lost": (funcapi.Column{
+		Index:         26,
+		Name:          "Session Observations Lost",
 		Type:          funcapi.FieldTypeInteger,
 		Visualization: funcapi.FieldVisualValue,
 		Visible:       true,

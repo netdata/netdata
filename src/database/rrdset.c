@@ -143,6 +143,13 @@ void rrdset_is_obsolete___safe_from_collector_thread(RRDSET *st) {
                 pulse_host_status(st->rrdhost, PULSE_HOST_STATUS_SND_RUNNING, 0);
         }
 
+        // The receiver side MUST NOT be released here. RRDSET_FLAG_RECEIVER_REPLICATION_IN_PROGRESS is
+        // also what makes a later CHART_DEFINITION_END a duplicate. A child sends one after every
+        // obsolete CHART, so clearing the flag here re-claims the chart and starts a second replication
+        // while its backfill may still be writing the higher tiers - two writers on one collect handle.
+        // It is released instead by its REPLAY_END if one arrives, else by the connect/disconnect reset
+        // or chart teardown.
+
         rrdset_metadata_updated(st);
 
         // the chart will not get more updates (data collection)

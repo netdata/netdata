@@ -28,7 +28,8 @@ def register(mcp: FastMCP) -> None:
         name="netdata_run_start",
         description=(
             "Start a declared agent: build+install its (worktree, profile) if needed, "
-            "then launch netdata on an auto-assigned loopback port. Returns immediately; "
+            "then launch netdata on the agent's declared port (else an auto-assigned "
+            "loopback port). Returns immediately; "
             "poll netdata_run_status until state is 'ready'. First start for a profile "
             "builds+installs and can take minutes. Idempotent while the agent is live: a "
             "plain start does NOT rebuild a running agent. After editing source, pass "
@@ -40,7 +41,7 @@ def register(mcp: FastMCP) -> None:
         if spec is None:
             return unknown_agent(agent_id)
         run, outcome = await get_runs(ctx).start(
-            agent_id, spec.worktree, spec.profile, otel=spec.otel, restart=restart
+            agent_id, spec.worktree, spec.profile, otel=spec.otel, port=spec.port, restart=restart
         )
         poll = f"Poll netdata_run_status({agent_id!r}) until 'ready'."
         # "already-running" covers any live state; say "running" only when ready.

@@ -25,6 +25,7 @@ struct page_descr_with_data {
     uint8_t type;
     uint32_t update_every_s;
     uint32_t page_length;
+    uint32_t slots;             // stored slots of the page, set when its extent is written
     struct pgd *pgd;
 
     struct {

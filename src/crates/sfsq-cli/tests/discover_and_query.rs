@@ -70,6 +70,7 @@ fn kv(key: &str, value: &str) -> KeyValue {
     KeyValue {
         key: key.to_string(),
         value: Some(sv(value)),
+        key_strindex: 0,
     }
 }
 

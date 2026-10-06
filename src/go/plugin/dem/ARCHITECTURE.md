@@ -29,8 +29,8 @@ RUM processing is separate from investigation queries and Function presentation:
 
 | Package | Responsibility |
 |---|---|
-| `rum/beacon` | Normalized browser observations, event kinds and pure sampling/privacy rules |
-| `rum/config` | Receiver/site declarations, validation and effective sampling policy |
+| `rum/beacon` | Normalized browser observations, event kinds and pure sampling and normalization rules |
+| `rum/config` | Receiver/site declarations, validation and effective capture and sampling policy |
 | `rum/faro` | Faro wire decoding, spans, event classification and pinned bootstrap rendering/assets |
 | `rum/httpapi` | HTTP endpoints, exact route leases, origin/proxy/body/rate policy, caching and demo responses |
 | `rum/diagnostics` | Per-site public-address observations, reachability, snippet/CSP probes and rejected origins |
@@ -86,10 +86,32 @@ These objects have no site inventory or reconfiguration API. The registry admits
 it does not construct them. The route records address/rejection observations in the separate diagnostic state.
 Aggregation and each exporter reject an observation for another site before changing state.
 
+Each site owns immutable capture policy. Config materializes country-only geolocation and disabled frustration
+heuristics without mutating the stored input. Browser bootstrap limits instrumentation and outgoing metadata; the
+receiver independently enforces the same policy and normalizes supported URLs, paths and text before aggregation,
+retained history or enabled exports. Geolocation off skips lookup while HTTP IP admission remains active. Country mode
+retains only country; city mode adds approximate city/coordinates to live observations only. Journals and OTLP never
+receive city coordinates. Disabled frustration has no instruments or page counts. Application-provided user IDs use bounded text normalization without path-style numeric/UUID substitution; per-event attribution and retained observed-ID membership are distinct from display summaries.
+These targeted transformations do not constitute general privacy or consent enforcement.
+
+Faro's `beforeSend` runs before its session sampling hook. Browser shaping clones metadata and preserves the
+`isSampled` session attribute until the SDK consumes it; removing it early silently drops telemetry. Session lifecycle
+and `view_changed` envelopes carry metadata even on quiet pages, so they stay on the wire. Native history suppresses
+generic session lifecycle rows and uses explicit view events to preserve transitions between identically normalized
+routes. The pinned-SDK capture and sampling fixtures exercise the real metadata providers and transport hooks,
+including selected/excluded session rollover; SDK upgrades MUST verify this ordering against the new bundle.
+The decoder targets the pinned SDK's measurement `values` map. Legacy experimental scalar `value.duration` and
+`value.value` payloads are unsupported; no compatibility adapter is retained.
+
 The collector's processor calls aggregation and then each enabled exporter directly. Aggregation leaves the normalized Beacon
-unchanged and returns Accepted, PageView and Investigated decisions. Every accepted observation contributes to
-measurements and the live stream; investigation sampling controls retained history and OTLP export. History promotion
-can replay retained session events, while OTLP exports only the current observation. Faro classifies protocol event
+unchanged and returns acceptance/detail decisions plus a filtered observation containing only newly eligible reports.
+Exporters consume that filtered observation, including when it is empty; they MUST NOT fall back to the input batch.
+Eligible measurements and live rows are independent of detail selection; investigation sampling controls retained history and OTLP export. Config owns
+omitted/null defaults; the aggregator receives literal effective rates, including zero. Receiver collection zero
+acknowledges otherwise admissible requests before decode, geo lookup or processing; bootstrap zero avoids SDK startup.
+History promotion replays preceding bounded context with each event's original attribution, then emits current
+entries independently of the live ring cap. Poor-vital entries do not require element attribution. OTLP exports only
+newly selected observations; prior exports and asynchronously arriving spans are not reconstructed. Faro classifies protocol event
 names into domain kinds without changing their original names for presentation. HTTP rejection accounting reaches
 aggregation only. History enqueue remains nonblocking under the aggregate lock and does not call back into it.
 
@@ -102,8 +124,44 @@ An HTTP request acquires one exact site registration containing both policy and 
 beacon endpoints use this same admission. Retirement removes future admission, cancels admitted request contexts and
 joins their leases. Cancellation interrupts socket reads through a response-controller deadline before closing bodies;
 closing a net/http request body alone can wait behind a stalled read. Cancellation callbacks join before leases release.
-Concurrent body reads can complete out of receipt-time order. Rolling-window reads filter all expired observations;
+Concurrent body reads can complete out of receipt-time order. Rolling-window reads filter every expired observation;
 session activity and deduplication keep the newest receipt time without rewriting event timestamps.
+
+`rum/aggregate` owns one canonical latest observation per `(experience, vital)` and separate bounded activation,
+view/resource identity, activity and observed-session records. Resource observations and replay evidence have separate
+retention from document/vital activity, so resource pressure cannot invalidate unrelated measurements. Facet distributions
+and top-N complements derive from canonical populations at read time; host/error grouping is bounded by those retained
+observations and folded only after ranking. Receipt-ordered retention costs O(log retained) per changed entry without
+scanning retained measurements during ingestion. Snapshots scan bounded state and sort populations for percentiles and
+ranking; the Sites summary scans only its required activity and session populations.
+Measurement retention is independent of the investigation-session LRU and live ring. Pages reads expose all retained
+page groups rather than chart top-N only. Capacity loss conservatively invalidates affected results and remains visible
+until the newest relevant loss expires. This constant-space loss episode may include older loss during continuous
+overload; it is not an exact window-loss count. The drop counter remains cumulative actual loss. Identity loss is scoped
+to affected measurements; resource identity loss still invalidates session completeness because resource-only reports
+can renew session activity. Unidentified errors, logs, spans and ordinary custom events have no replay suppression.
+
+Faro page metadata captures a frozen activation ID and document-entry URL before queueing. A persisted pageshow starts
+a new activation before SDK BFCache reports are generated. Custom metadata providers retain SDK browser/OS/sdk fields;
+raw setPage cannot replace the frozen document scope. The FetchTransport subclass changes only its ignore-URL
+matcher to an escaped, anchored collector URL; inherited delivery/batching/retry behavior stays intact. Raw URL
+strings become regular expressions in the pinned SDK and otherwise mis-handle bot query strings or prefix matches. The WebVitals instrumentation wrapper attaches increasing
+revisions in measurement context, never changing metadata for every measurement: Faro groups by metadata, so per-item
+metadata would destroy default batching. Explicit document/view/session lifecycle events and performance entries receive identities
+before transport; retries preserve identical IDs/revisions. Identity evidence lasts at most 30 minutes subject to
+capacity and restart. The SDK has no finite maximum delivery delay, so this is best-effort replay suppression.
+
+Filtered vital reports carry `Vital.Origin` with frozen page/browser/device/country/version dimensions. User identity,
+view label and view occurrence remain per-report attributes. These MUST NOT be frozen at the first metric report,
+because login/logout and SPA transitions can occur before later revisions. History promotion retains each report's
+original attributes. Native live/history and enabled exports preserve the same experience/metric/revision identity.
+
+Collector gauges expose current retained population counts and loss evidence on every eligible collection cycle.
+Percentile gauges are omitted for empty or incomplete populations; measurement gauges are omitted when collection is
+zero or ingress unavailable. Top-N window counts are gauges, not cumulative counters with changing membership.
+Dynamic series use ephemeral metrix handles and a separate bucket label for pooled Other. Stock quality alerts read
+coherent fresh population dimensions directly, require 30 observations, and compare threshold counts without averaging
+percentiles. Missing/stale/partial populations yield undefined, not a synthetic healthy zero.
 Live queries merge per-site stream heads by receipt time while preserving each stream's sequence prefix; concurrent receipt and ingestion order can differ.
 All-site Errors, Pages and Sessions use a separate site-scoped row key without replacing their filter values.
 Function reads lease domain state only while copying snapshots, and historical queries own independent journal snapshots and check caller cancellation between files and rows.

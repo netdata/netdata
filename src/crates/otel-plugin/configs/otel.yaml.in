@@ -1,6 +1,6 @@
 # OpenTelemetry Plugin Configuration
 # Configures how Netdata ingests OpenTelemetry metrics, logs, and traces over
-# OTLP/gRPC.
+# OTLP/gRPC and OTLP/HTTP.
 #
 # To customize, run: edit-config otel.yaml
 # Include only the fields you want to change — everything left out keeps its
@@ -10,29 +10,45 @@
 #
 # Settings resolve in this order: installed stock file < your otel.yaml copy
 # < NETDATA_OTEL_CFG_* environment variables. Variable names mirror the
-# option path (endpoint.path -> NETDATA_OTEL_CFG_ENDPOINT_PATH); see the
-# plugin README for the exact naming rules. Restart the Netdata Agent after
+# option path (receivers.otlp.protocols.grpc.endpoint ->
+# NETDATA_OTEL_CFG_RECEIVERS_OTLP_PROTOCOLS_GRPC_ENDPOINT); see the plugin
+# README for the exact naming rules. Restart the Netdata Agent after
 # changing this file or any of the variables.
 
-endpoint:
-  # Bind address (host:port) for the OTLP/gRPC listener — the key is named
-  # "path" but it is a network address, not a filesystem path. The loopback
-  # default accepts only local senders; to receive from other hosts, bind a
-  # non-loopback address and protect the endpoint with TLS and network
-  # access controls.
-  path: "127.0.0.1:4317"
+receivers:
+  otlp:
+    # The two OTLP listeners. Keep at least one of them enabled. The
+    # loopback defaults accept only local senders. To receive from other
+    # hosts, bind a non-loopback address and protect the listener with TLS
+    # and network access controls. Disable a listener that no sender uses.
+    #
+    # TLS: set cert_file and key_file together (PEM files).
+    # client_ca_file enables mutual TLS: senders must present a client
+    # certificate signed by this CA. Each listener has its own TLS settings.
+    #
+    # Older files configure the gRPC listener in an "endpoint:" section
+    # (path, tls_cert_path, tls_key_path, tls_ca_cert_path). These names
+    # still work and log a deprecation warning. If a file sets an option
+    # under both names, the plugin uses the value under "receivers:".
+    protocols:
+      # OTLP/gRPC listener.
+      grpc:
+        enabled: true
+        endpoint: "127.0.0.1:4317"
+        tls:
+          cert_file: null
+          key_file: null
+          client_ca_file: null
 
-  # Server TLS certificate (PEM). TLS is enabled only when both this and
-  # tls_key_path are set; providing either one alone fails at startup.
-  tls_cert_path: null
-
-  # Server TLS private key (PEM). Required when tls_cert_path is set.
-  tls_key_path: null
-
-  # CA certificate (PEM) for mutual TLS: senders must present a client
-  # certificate signed by this CA. Requires both tls_cert_path and
-  # tls_key_path to be set.
-  tls_ca_cert_path: null
+      # OTLP/HTTP listener. It is off by default. Set enabled to true to
+      # receive OTLP/HTTP.
+      http:
+        enabled: false
+        endpoint: "127.0.0.1:4318"
+        tls:
+          cert_file: null
+          key_file: null
+          client_ca_file: null
 
 metrics:
   # Directory holding optional per-metric mapping files that shape how OTEL
@@ -96,8 +112,9 @@ remote_storage:
   read_cache_max_size: "1GB"
 
 auth:
-  # Require senders to identify a tenant via the X-Scope-OrgID gRPC header.
-  # This is tenant selection, not user authentication — trust the header only
+  # Require senders to identify a tenant via the X-Scope-OrgID header on
+  # either transport (gRPC metadata or HTTP header). This is tenant
+  # selection, not user authentication — trust the header only
   # on a protected endpoint (TLS and network controls). When disabled, all
   # data belongs to a single "default" tenant. Applies to logs and traces;
   # metrics have no tenants.

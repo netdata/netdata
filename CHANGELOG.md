@@ -39,6 +39,14 @@
 - Refactor(dem): make browser collectors own their lifecycle and metrics ([#24141](https://github.com/netdata/netdata/issues/24141))
 - Refactor(dem): organize domain queries and persistence ([#24142](https://github.com/netdata/netdata/issues/24142))
 - Refactor(dem): make RUM processing boundaries explicit ([#24143](https://github.com/netdata/netdata/issues/24143))
+- Build(deps): bump github.com/moby/moby/api from 1.56.0 to 1.56.1 in /src/go ([#24145](https://github.com/netdata/netdata/issues/24145))
+- Build(deps): bump github.com/moby/moby/client from 0.6.0 to 0.6.1 in /src/go ([#24144](https://github.com/netdata/netdata/issues/24144))
+- Fix(go.d/docker): reduce Docker daemon CPU caused by collection ([#24146](https://github.com/netdata/netdata/issues/24146))
+- Fix(go.d/docker): count image usage from the container list ([#24147](https://github.com/netdata/netdata/issues/24147))
+- Feat(dem): make RUM event logs and tracing independent opt-ins ([#24148](https://github.com/netdata/netdata/issues/24148))
+- Fix(dem): make RUM sampling and retained evidence predictable ([#24151](https://github.com/netdata/netdata/issues/24151))
+- Feat(dem): define explicit RUM capture and normalize evidence at ingestion ([#24152](https://github.com/netdata/netdata/issues/24152))
+- Fix(dem): align RUM measurements and alerts with browser experiences ([#24154](https://github.com/netdata/netdata/issues/24154))
 
 ## [2.12.0] - 2026-09-30
 

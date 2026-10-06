@@ -1,9 +1,9 @@
 //! The `NETDATA_OTEL_CFG_*` environment-variable layer of config resolution —
 //! the highest-precedence source in `mod.rs`' stock < user < env order.
 //!
-//! Names mirror the YAML keys: `NETDATA_OTEL_CFG_{SECTION}_{FIELD}` for the
-//! global sections (`ENDPOINT_`, `METRICS_`, `BASE_DIR`, `REMOTE_STORAGE_`,
-//! `AUTH_`) and `NETDATA_OTEL_CFG_{LOGS|TRACES}_{FIELD}` for per-signal
+//! Names mirror the YAML keys: the dotted path upper-cased with `.` → `_`
+//! under `NETDATA_OTEL_CFG_` for the global sections (`RECEIVERS_OTLP_PROTOCOLS_`,
+//! `METRICS_`, `BASE_DIR`, `REMOTE_STORAGE_`, `AUTH_`) and `NETDATA_OTEL_CFG_{LOGS|TRACES}_{FIELD}` for per-signal
 //! tuning. Values parse like the YAML layer's overrides: integers and byte
 //! sizes (`"2GiB"`) via `FromStr`, durations (`"2 hours"`) via `humantime`.
 //!
@@ -25,8 +25,10 @@ use std::time::Duration;
 use anyhow::Result;
 
 use super::ConfigOverride;
-use super::endpoint::EndpointOverride;
 use super::metrics::MetricsOverride;
+use super::receivers::{
+    DEPRECATED_ENDPOINT_KEYS, ProtocolOverride, ReceiversOverride, TlsOverride, resolve_deprecated,
+};
 use super::signal::{
     AuthOverride, CatalogOverride, IngestOverride, RemoteStorageOverride, SignalOverride,
 };
@@ -56,9 +58,7 @@ pub(super) fn otel_env_from_process() -> EnvMap {
 /// `NETDATA_OTEL_SERVICE_HOST` and `NETDATA_OTEL_PORT_4317_TCP` into every pod
 /// that can see a Service named `netdata-otel`, and those must never reach the
 /// strict unknown-name check below.
-pub(super) fn otel_env_from_iter(
-    vars: impl IntoIterator<Item = (OsString, OsString)>,
-) -> EnvMap {
+pub(super) fn otel_env_from_iter(vars: impl IntoIterator<Item = (OsString, OsString)>) -> EnvMap {
     let mut env = EnvMap::new();
     for (key, value) in vars {
         let Some(key) = key.to_str() else { continue };
@@ -173,6 +173,28 @@ fn parse_env_bool(env: &EnvReader<'_>, name: &str) -> Result<Option<bool>> {
     }
 }
 
+/// The env var name of a dotted YAML key: `receivers.otlp.protocols.grpc.endpoint`
+/// → `NETDATA_OTEL_CFG_RECEIVERS_OTLP_PROTOCOLS_GRPC_ENDPOINT`.
+fn env_name(key: &str) -> String {
+    format!("NETDATA_OTEL_CFG_{}", key.replace('.', "_").to_uppercase())
+}
+
+/// Look up a receiver key under its env name and, for the gRPC keys that
+/// have one, its deprecated `NETDATA_OTEL_CFG_ENDPOINT_*` name
+/// ([`DEPRECATED_ENDPOINT_KEYS`]).
+/// Same rule as the user file: the old name works with a warning, and when
+/// both are set the new one wins.
+fn get_receiver_env<'a>(env: &EnvReader<'a>, key: &str) -> Result<Option<String>> {
+    let new_name = env_name(key);
+    let new = get_env(env, &new_name)?;
+    let Some((old_key, _)) = DEPRECATED_ENDPOINT_KEYS.iter().find(|(_, new)| *new == key) else {
+        return Ok(new.map(str::to_string));
+    };
+    let old_name = env_name(old_key);
+    let old = get_env(env, &old_name)?;
+    Ok(resolve_deprecated("environment", &old_name, old, &new_name, new).map(str::to_string))
+}
+
 impl ConfigOverride {
     /// Build the config overrides from an [`EnvMap`] snapshot of the
     /// `NETDATA_OTEL_CFG_*` variables. Pure: reads only the provided map,
@@ -183,7 +205,7 @@ impl ConfigOverride {
     /// only where at least one variable was set.
     pub(super) fn from_map(env: &EnvMap) -> Result<Self> {
         let env = &EnvReader::new(env);
-        let endpoint = EndpointOverride::from_map(env)?;
+        let receivers = receivers_from_map(env)?;
         let metrics = MetricsOverride::from_map(env)?;
         let base_dir = get_env(env, "NETDATA_OTEL_CFG_BASE_DIR")?.map(PathBuf::from);
         let remote_storage = RemoteStorageOverride::from_map(env)?;
@@ -193,11 +215,9 @@ impl ConfigOverride {
         env.ensure_fully_consumed()?;
 
         Ok(Self {
-            endpoint: if endpoint.has_any() {
-                Some(endpoint)
-            } else {
-                None
-            },
+            receivers,
+            // The deprecated env names were resolved by `receivers_from_map`.
+            endpoint: None,
             metrics: if metrics.has_any() {
                 Some(metrics)
             } else {
@@ -216,16 +236,25 @@ impl ConfigOverride {
     }
 }
 
-impl EndpointOverride {
-    fn from_map(env: &EnvReader<'_>) -> Result<Self> {
-        Ok(Self {
-            path: get_env(env, "NETDATA_OTEL_CFG_ENDPOINT_PATH")?.map(str::to_string),
-            tls_cert_path: get_env(env, "NETDATA_OTEL_CFG_ENDPOINT_TLS_CERT_PATH")?.map(str::to_string),
-            tls_key_path: get_env(env, "NETDATA_OTEL_CFG_ENDPOINT_TLS_KEY_PATH")?.map(str::to_string),
-            tls_ca_cert_path: get_env(env, "NETDATA_OTEL_CFG_ENDPOINT_TLS_CA_CERT_PATH")?
-                .map(str::to_string),
-        })
-    }
+/// Build the `receivers.otlp.protocols` override from its env vars; `None`
+/// when none is set.
+fn receivers_from_map(env: &EnvReader<'_>) -> Result<Option<ReceiversOverride>> {
+    let grpc = protocol_from_map(env, "grpc")?;
+    let http = protocol_from_map(env, "http")?;
+    Ok(ReceiversOverride::from_protocols(grpc, http))
+}
+
+fn protocol_from_map(env: &EnvReader<'_>, protocol: &str) -> Result<ProtocolOverride> {
+    let key = |field: &str| format!("receivers.otlp.protocols.{protocol}.{field}");
+    Ok(ProtocolOverride {
+        enabled: parse_env_bool(env, &env_name(&key("enabled")))?,
+        endpoint: get_receiver_env(env, &key("endpoint"))?,
+        tls: Some(TlsOverride {
+            cert_file: get_receiver_env(env, &key("tls.cert_file"))?,
+            key_file: get_receiver_env(env, &key("tls.key_file"))?,
+            client_ca_file: get_receiver_env(env, &key("tls.client_ca_file"))?,
+        }),
+    })
 }
 
 impl MetricsOverride {
@@ -235,7 +264,10 @@ impl MetricsOverride {
                 .map(str::to_string),
             interval_secs: parse_env_var(env, "NETDATA_OTEL_CFG_METRICS_INTERVAL_SECS")?,
             grace_period_secs: parse_env_var(env, "NETDATA_OTEL_CFG_METRICS_GRACE_PERIOD_SECS")?,
-            expiry_duration_secs: parse_env_var(env, "NETDATA_OTEL_CFG_METRICS_EXPIRY_DURATION_SECS")?,
+            expiry_duration_secs: parse_env_var(
+                env,
+                "NETDATA_OTEL_CFG_METRICS_EXPIRY_DURATION_SECS",
+            )?,
             max_new_charts_per_request: parse_env_var(
                 env,
                 "NETDATA_OTEL_CFG_METRICS_MAX_NEW_CHARTS_PER_REQUEST",
@@ -324,11 +356,7 @@ impl SignalOverride {
             } else {
                 None
             },
-            ingest: if ingest.has_any() {
-                Some(ingest)
-            } else {
-                None
-            },
+            ingest: if ingest.has_any() { Some(ingest) } else { None },
             // The former plugin's journal dir stays YAML-only (`logs.journal_dir`,
             // consumed by `resolve_legacy_journal_dir`); no env var exists for it.
             journal_dir: None,

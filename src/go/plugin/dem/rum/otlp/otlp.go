@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-// Package otlp exports RUM events (pageviews, JS errors,
+// Package otlp exports RUM observations (document activations, vital updates, JS errors,
 // custom events, console logs) and browser spans to independent OTLP/gRPC
 // receivers. It talks the wire protocol directly via
 // generated go.opentelemetry.io/proto/otlp types — no OTel SDK, so there
@@ -150,7 +150,10 @@ func (e *Logs) Ingest(b *beacon.Beacon, result aggregate.Result) {
 	if !result.Investigated {
 		return // measured, but its session is not investigated
 	}
-	recs := e.build(b, result.PageView)
+	if result.Observation == nil {
+		return
+	}
+	recs := e.build(result.Observation, result.PageView)
 	for _, q := range recs {
 		select {
 		case e.ch <- q:

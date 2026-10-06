@@ -38,7 +38,7 @@ func TestCancelledDomainQueries(t *testing.T) {
 	})
 	assert.False(t, attempted)
 	assert.ErrorIs(t, err, context.Canceled)
-	_, err = s.QuerySessions(ctx, "", 0, time.Now().Unix(), 0)
+	_, err = s.QuerySessions(ctx, "", "", 0, time.Now().Unix(), 0)
 	assert.ErrorIs(t, err, context.Canceled)
 	_, err = s.QuerySessionEvents(ctx, "", "s")
 	assert.ErrorIs(t, err, context.Canceled)

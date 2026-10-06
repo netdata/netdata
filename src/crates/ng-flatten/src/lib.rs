@@ -83,6 +83,7 @@ mod tests {
         KeyValue {
             key: key.to_string(),
             value: Some(av(v)),
+            key_strindex: 0,
         }
     }
     /// All values at `path`, in document order (handles array-collapsed dups).
@@ -100,6 +101,21 @@ mod tests {
         (0..tree.len() as NodeId)
             .find(|&id| tree.path(id) == path)
             .unwrap_or_else(|| panic!("no node for path {path:?}"))
+    }
+
+    #[test]
+    fn profiling_string_table_reference_flattens_as_null() {
+        let record = LogRecord {
+            attributes: vec![kv("ref", Av::StringValueStrindex(3))],
+            ..Default::default()
+        };
+
+        let mut f = Flattener::new();
+        let entries = f.flatten_record(record);
+        let tree = f.into_tree();
+        let leaves = tree.resolve(&entries);
+
+        assert_eq!(at(&leaves, "attributes.ref"), [&Value::Null]);
     }
 
     #[test]

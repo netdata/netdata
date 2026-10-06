@@ -688,8 +688,10 @@ mod tests {
                         values: vec![KeyValue {
                             key: "inner".into(),
                             value: any(Av::IntValue(1)),
+                            key_strindex: 0,
                         }],
                     })),
+                    key_strindex: 0,
                 },
                 KeyValue {
                     key: "tags".into(),
@@ -698,6 +700,7 @@ mod tests {
                             value: Some(Av::StringValue("a".into())),
                         }],
                     })),
+                    key_strindex: 0,
                 },
             ],
             ..Default::default()

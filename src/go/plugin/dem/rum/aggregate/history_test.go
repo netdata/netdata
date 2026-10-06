@@ -19,7 +19,7 @@ func TestHistoryEventsAreSelfContained(t *testing.T) {
 	sink := &fakeHistorySink{}
 	a.SetHistorySink(sink)
 	b := mk(*now, "sess1", "/a")
-	b.City = "Athens"
+
 	b.UserID = "customer"
 	a.Ingest(b)
 	*now = now.Add(5 * time.Second)
@@ -30,8 +30,8 @@ func TestHistoryEventsAreSelfContained(t *testing.T) {
 	last := sink.events[1]
 	assert.Equal(t, "sess1", last.SessionID)
 	assert.Equal(t, "/b", last.Page)
-	assert.Equal(t, "Athens", last.City)
-	assert.Equal(t, "customer", last.UserID)
+	assert.Equal(t, "customer", sink.events[0].UserID)
+	assert.Empty(t, last.UserID)
 	assert.Equal(t, now.UnixMicro(), last.TSUnixUS)
 }
 func TestErrorHistoryNeedsNoParentRecord(t *testing.T) {
@@ -81,6 +81,7 @@ func TestHistoryRecordsActivityWithoutTimelineEvents(t *testing.T) {
 	a.Ingest(b)
 	*now = now.Add(time.Second)
 	b.Received = *now
+	b.Logs = []beacon.Log{{Message: "console observation"}}
 	a.Ingest(b)
 	require.Len(t, sink.events, 2)
 	assert.Equal(t, "activity", sink.events[1].Type)

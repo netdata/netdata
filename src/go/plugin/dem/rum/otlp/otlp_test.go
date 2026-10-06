@@ -155,7 +155,6 @@ func TestBuild(t *testing.T) {
 	tests := map[string]struct {
 		pageView bool
 		beacon   func() *beacon.Beacon
-		secret   string // known secret value the redactor must strip
 		want     []simpleRec
 	}{
 		"pageview": {
@@ -189,20 +188,19 @@ func TestBuild(t *testing.T) {
 				},
 			}},
 		},
-		"error is redacted and severity ERROR": {
+		"normalized error preserves severity ERROR": {
 			beacon: func() *beacon.Beacon {
 				b := mkBeacon()
 				b.Errors = []beacon.Error{
 					{
 						Type:    "TypeError",
-						Message: "token=SEKRET1234 undefined",
-						Stack:   "at f (x.js:1:1) SEKRET1234",
+						Message: "token=[REDACTED] undefined",
+						Stack:   "at f (x.js:1:1) [REDACTED]",
 						Time:    t0,
 					},
 				}
 				return b
 			},
-			secret: "SEKRET1234",
 			want: []simpleRec{{
 				body: "TypeError: token=[REDACTED] undefined @ /pricing", severity: "ERROR",
 				attrs: map[string]string{
@@ -212,15 +210,14 @@ func TestBuild(t *testing.T) {
 				},
 			}},
 		},
-		"event carries name and redacted attrs": {
+		"event carries normalized name and attrs": {
 			beacon: func() *beacon.Beacon {
 				b := mkBeacon()
 				b.Events = []beacon.Event{
-					{Name: "checkout", Attrs: map[string]string{"coupon": "SEKRET1234"}, Time: t0},
+					{Name: "checkout", Attrs: map[string]string{"coupon": "[REDACTED]"}, Time: t0},
 				}
 				return b
 			},
-			secret: "SEKRET1234",
 			want: []simpleRec{{
 				body: "event checkout @ /pricing", severity: "INFO",
 				attrs: map[string]string{
@@ -268,9 +265,6 @@ func TestBuild(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			e := &Logs{
 				now: func() time.Time { return t0 },
-				transport: &transport{
-					redactor: newRedactor(t, tc.secret),
-				},
 			}
 			var got []simpleRec
 			for _, q := range e.build(tc.beacon(), tc.pageView) {
@@ -363,6 +357,7 @@ func TestIngestDropsOnFullQueue(t *testing.T) {
 
 	b1 := mkBeacon() // One pageview fills the queue.
 	e.Ingest(b1, aggregate.Result{
+		Observation:  b1,
 		Accepted:     true,
 		Investigated: true,
 		PageView:     true,
@@ -370,6 +365,7 @@ func TestIngestDropsOnFullQueue(t *testing.T) {
 	b2 := mkBeacon()
 	b2.SessionID = "sess2"
 	e.Ingest(b2, aggregate.Result{
+		Observation:  b2,
 		Accepted:     true,
 		Investigated: true,
 		PageView:     true,
@@ -387,6 +383,7 @@ func TestIngestDropsOnFullQueue(t *testing.T) {
 func TestShutdownFlushIsBounded(t *testing.T) {
 	e := newExporter(t, "192.0.2.1:4317", newRecCounters(), nil)
 	e.Ingest(mkBeacon(), aggregate.Result{
+		Observation:  mkBeacon(),
 		Accepted:     true,
 		Investigated: true,
 		PageView:     true,
@@ -438,7 +435,8 @@ func TestIngestSkipsSampledOutBeacons(t *testing.T) {
 	e := newExporter(t, "127.0.0.1:1", counters, nil)
 	b := mkBeacon()
 	e.Ingest(b, aggregate.Result{
-		Accepted: true,
+		Observation: b,
+		Accepted:    true,
 	})
 	if n := len(e.ch); n != 0 {
 		t.Fatalf("queued %d records for a sampled-out beacon", n)

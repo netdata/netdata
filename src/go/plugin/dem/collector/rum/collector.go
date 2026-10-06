@@ -59,10 +59,9 @@ func New(deps Dependencies) *Collector {
 		Config: Config{
 			Window: confopt.Duration(5 * time.Minute),
 			Site: config.Site{
-				PageGroups:        20,
-				Countries:         20,
-				MeasureSampleRate: 1,
-				Bots:              config.BotsExclude,
+				PageGroups: 20,
+				Countries:  20,
+				Bots:       config.BotsExclude,
 			}.Effective(),
 		},
 		deps:  deps,

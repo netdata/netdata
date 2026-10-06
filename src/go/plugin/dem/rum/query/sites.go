@@ -54,6 +54,10 @@ func (s *Service) Sites(ctx context.Context) ([]Site, error) {
 					KeepErrors:      cfg.KeepsErrors(),
 					KeepPoorVitals:  cfg.KeepsPoorVitals(),
 				},
+				Capture: Capture{
+					Geolocation:        cfg.GeolocationMode(),
+					FrustrationSignals: cfg.FrustrationSignalsOn(),
+				},
 				Activity: Activity(site.Aggregator.Activity()),
 				Reach: Diagnostic{
 					State:  reach.State,
