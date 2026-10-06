@@ -143,6 +143,13 @@ static void bearer_test_netdata_logger(
     }
 }
 
+// bearer_token_save_to_file() opens through fopen_secret_write() (paths.c), which
+// pins mode 0600. It is a real function rather than a libc call, so it has to be
+// intercepted by name too - otherwise the stream is never recorded here and the
+// fwrite/ferror/fclose fault injection below silently stops firing. The mode this
+// helper enforces is not what these tests cover; they cover the write/close
+// failure handling in http_auth.c, so routing it to the plain wrapper is correct.
+#define fopen_secret_write bearer_test_fopen
 #define fopen bearer_test_fopen
 #define fwrite bearer_test_fwrite
 #define ferror bearer_test_ferror
@@ -157,6 +164,7 @@ static void bearer_test_netdata_logger(
 #undef ferror
 #undef fwrite
 #undef fopen
+#undef fopen_secret_write
 
 void web_client_set_permissions(
     struct web_client *w, HTTP_ACCESS access, HTTP_USER_ROLE role, USER_AUTH_METHOD type) {
@@ -328,6 +336,9 @@ static int bearer_test_save_case(
         struct stat st;
         errors += bearer_test_expect(stat(filename, &st) == 0, "successful save must retain the final file");
         errors += bearer_test_expect(S_ISREG(st.st_mode), "successful save must produce a regular file");
+        // fopen_secret_write() is intercepted above, so this only observes the
+        // test's own umask(0077); it is not evidence that the helper pins 0600.
+        // That is covered directly by test_fopen_secret_write.c.
         errors += bearer_test_expect((st.st_mode & 0777) == 0600, "save must retain fopen plus umask permissions");
         errors += bearer_test_expect(!bearer_test_file_matches_payload(filename), "successful file bytes must match fwrite input");
     }
