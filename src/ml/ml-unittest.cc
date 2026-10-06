@@ -1102,25 +1102,28 @@ static void test_reset_generation_cancels_model_publish()
     fprintf(stderr, "  test_reset_generation_cancels_model_publish...\n");
 
     bool training_in_progress = true;
-    bool should_publish = ml_should_publish_model_update(true, 8, 7, &training_in_progress);
+    bool should_publish = ml_should_publish_model_update(true, 8, 7, false, &training_in_progress);
     ML_TEST_ASSERT(!should_publish,
                    "generation mismatch should cancel model publication");
     ML_TEST_ASSERT(!training_in_progress,
                    "generation mismatch should clear training_in_progress");
 
     training_in_progress = true;
-    should_publish = ml_should_publish_model_update(false, 7, 7, &training_in_progress);
+    should_publish = ml_should_publish_model_update(false, 7, 7, false, &training_in_progress);
     ML_TEST_ASSERT(!should_publish,
                    "stopped hosts should cancel model publication");
     ML_TEST_ASSERT(!training_in_progress,
                    "stopped-host cancellation should clear training_in_progress");
 
     training_in_progress = true;
-    should_publish = ml_should_publish_model_update(true, 7, 7, &training_in_progress);
+    should_publish = ml_should_publish_model_update(true, 7, 7, false, &training_in_progress);
     ML_TEST_ASSERT(should_publish,
                    "matching generation on a running host should allow model publication");
     ML_TEST_ASSERT(training_in_progress,
                    "successful publication path should leave training_in_progress unchanged");
+
+    should_publish = ml_should_publish_model_update(true, 7, 7, false, nullptr);
+    ML_TEST_ASSERT(should_publish, "a downstream install (no training flag to clear) is published");
 }
 
 // Regression: DimensionLookupInfo's ctors used to copy a fixed
@@ -1602,8 +1605,51 @@ static void test_dimension_accept_downstream_model()
     ML_TEST_ASSERT(ml_dimension_accept_downstream_model(&dim, newest), "a newer model is accepted");
 
     dim.training_in_progress = true;
-    ML_TEST_ASSERT(!ml_dimension_accept_downstream_model(&dim, newest),
-                   "no downstream model is staged while a local training uses the dimension's buffer");
+    ML_TEST_ASSERT(ml_dimension_accept_downstream_model(&dim, newest),
+                   "a local training in progress does not block a downstream model");
+}
+
+// Regression: training threads share one queue, so a child's model for dimension X can be popped by one thread
+// while another trains X. The model used to be refused (and never retried) because the local training wrote into the
+// dimension's own buffer; now the downstream model is installed, and the local result is dropped when it is ready.
+static void test_downstream_model_during_local_training()
+{
+    fprintf(stderr, "  test_downstream_model_during_local_training...\n");
+
+    ml_dimension_t dim = {};
+    spinlock_init(&dim.slock);
+    dim.reset_generation = 7;
+
+    // thread A starts a local training of X (ml_dimension_train_model())
+    enum ml_worker_result precheck = ML_WORKER_RESULT_OK;
+    ML_TEST_ASSERT(!ml_dimension_train_model_precheck(METRIC_TYPE_VARIABLE, dim.has_received_downstream_model,
+                                                      dim.training_in_progress, &precheck),
+                   "thread A: X goes to local training");
+    dim.training_in_progress = true;
+    uint32_t generation_a = dim.reset_generation;
+
+    // thread B pops the child's model for X and installs it (ml_worker_add_existing_model())
+    ml_kmeans_inlined_t child;
+    child.after = 100;
+    child.before = 200;
+    ML_TEST_ASSERT(ml_dimension_accept_downstream_model(&dim, child), "thread B: the child's model is accepted mid-training");
+    ML_TEST_ASSERT(ml_should_publish_model_update(true, dim.reset_generation, dim.reset_generation, false, nullptr),
+                   "thread B: the child's model is installed");
+    dim.km_contexts.emplace_back(child);
+    dim.has_received_downstream_model = true;
+    ML_TEST_ASSERT(dim.training_in_progress, "thread B: the install leaves thread A's training flag alone");
+
+    // thread A's training completes: its install is dropped, and its flag cleared
+    ML_TEST_ASSERT(!ml_should_publish_model_update(true, dim.reset_generation, generation_a,
+                                                   dim.has_received_downstream_model, &dim.training_in_progress),
+                   "thread A: the local model is dropped, X is downstream-supplied now");
+    ML_TEST_ASSERT(!dim.training_in_progress, "thread A: the dropped install clears its training flag");
+
+    // X's create-model entry then leaves the queue
+    ML_TEST_ASSERT(ml_dimension_train_model_precheck(METRIC_TYPE_VARIABLE, dim.has_received_downstream_model,
+                                                     dim.training_in_progress, &precheck) &&
+                   precheck == ML_WORKER_RESULT_DOWNSTREAM_MODEL_SUPPLIED && !ml_should_requeue_create_new_model(precheck),
+                   "the next pop of X stops local training");
 }
 
 static void test_pending_models_keep_install_order()
@@ -1831,6 +1877,29 @@ extern "C" int ml_queue_host_order_unittest(RRDHOST *host)
 
     ml_queue_destroy(q);
 
+    // Regression: a create-model request popped while its child is disconnected (orphan host) or its chart is
+    // obsolete used to be dropped. The dimension keeps create_new_model_queued, so ml_host_start() does not enqueue it
+    // again on reconnect and it was never trained again. Such requests are requeued now; only a dimension that is
+    // really gone is dropped. (The worker is not used when the dimension cannot be acquired.)
+    ml_request_create_new_model_t req_b = { DimensionLookupInfo(host->machine_guid, id_b, "dim") };
+    bool was_orphan = rrdhost_flag_check(host, RRDHOST_FLAG_ORPHAN);
+    rrdhost_flag_set(host, RRDHOST_FLAG_ORPHAN);
+    enum ml_worker_result res = ml_worker_create_new_model(nullptr, req_b);
+    if (!was_orphan)
+        rrdhost_flag_clear(host, RRDHOST_FLAG_ORPHAN);
+    ML_HOST_TEST_CHECK(res == ML_WORKER_RESULT_DIMENSION_UNAVAILABLE && ml_should_requeue_create_new_model(res),
+                       "a dimension of a disconnected child is requeued, not dropped");
+
+    ml_request_create_new_model_t req_c = { DimensionLookupInfo(host->machine_guid, id_c, "dim") };
+    res = ml_worker_create_new_model(nullptr, req_c);
+    ML_HOST_TEST_CHECK(res == ML_WORKER_RESULT_DIMENSION_UNAVAILABLE && ml_should_requeue_create_new_model(res),
+                       "a dimension of an obsolete chart is requeued, not dropped");
+
+    ml_request_create_new_model_t req_e = { DimensionLookupInfo(host->machine_guid, id_e.c_str(), "dim") };
+    res = ml_worker_create_new_model(nullptr, req_e);
+    ML_HOST_TEST_CHECK(res == ML_WORKER_RESULT_NULL_ACQUIRED_DIMENSION && !ml_should_requeue_create_new_model(res),
+                       "a deleted dimension is dropped");
+
     storage_engine_store_flush(rd_a->tiers[0].sch);
     storage_engine_store_flush(rd_b->tiers[0].sch);
     storage_engine_store_flush(rd_c->tiers[0].sch);
@@ -1883,6 +1952,7 @@ extern "C" int ml_unittest()
     test_queue_consumers_share_one_sort();
     test_queue_stop_during_sort_wakes_every_consumer();
     test_dimension_accept_downstream_model();
+    test_downstream_model_during_local_training();
     test_pending_models_keep_install_order();
 
     fprintf(stderr, "\nML tests: %d run, %d failed\n", tests_run, tests_failed);

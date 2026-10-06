@@ -39,6 +39,10 @@ typedef struct {
     calculated_number_t *scratch_training_cns;
     std::vector<DSample> training_samples;
 
+    // the output of a local training; installed into the dimension under its slock, so a downstream model can be
+    // installed meanwhile
+    ml_kmeans_t training_kmeans;
+
     // the batch of Cfg.pending_models this thread is writing to ml.db (see ml_flush_pending_models())
     std::vector<ml_model_info_t> pending_model_info;
 

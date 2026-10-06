@@ -412,8 +412,6 @@ void ml_dimension_new(RRDDIM *rd)
     dim->reset_generation = 0;
     dim->cns_head = 0;
 
-    ml_kmeans_init(&dim->kmeans);
-
     if (simple_pattern_matches(Cfg.sp_charts_to_skip, rrdset_name(rd->rrdset)))
         dim->mls = MACHINE_LEARNING_STATUS_DISABLED_DUE_TO_EXCLUDED_CHART;
     else
