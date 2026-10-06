@@ -53,6 +53,7 @@ var rumSessionsColumns = map[string]any{
 		Name:          "Last Selected Observation",
 		Sort:          funcapi.FieldSortDescending,
 		Type:          funcapi.FieldTypeTimestamp,
+		ValueOptions:  funcapi.ValueOptions{Transform: funcapi.FieldTransformDatetimeUsec},
 		Visualization: funcapi.FieldVisualValue,
 		Visible:       true,
 		Sortable:      true,

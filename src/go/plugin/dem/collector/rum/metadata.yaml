@@ -399,7 +399,7 @@ modules:
           - id: rum-sessions
             function_name: rum-sessions
             name: RUM Sessions
-            description: Investigate retained sampled sessions that overlap a time range, including pages, errors and
+            description: Investigate sampled sessions with retained observations received within a time range, including pages, errors and
                 optional interaction heuristics.
             parameters:
               - id: site

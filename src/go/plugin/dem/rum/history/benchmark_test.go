@@ -115,3 +115,30 @@ func BenchmarkHistoryQueries(b *testing.B) {
 		})
 	}
 }
+
+// Includes the actual domain encoder and shared journal append. Like the queued
+// writer, this benchmark does not request fsync for each event.
+func BenchmarkHistoryEventAppend(b *testing.B) {
+	ctx := context.Background()
+	owner, err := demjournal.Open(ctx, "")
+	if err != nil {
+		b.Fatal(err)
+	}
+	defer owner.Close()
+	store := NewStore(owner)
+	event := EventRecord{
+		Revision: 1, Site: "shop", SessionID: "session", Type: "error",
+		Page: "/checkout", Browser: "Firefox", Country: "GR", Device: "desktop",
+		Version: "release-1", UserID: "user-id", Fingerprint: "fingerprint",
+		ErrorType: "TypeError", Message: "request failed", SampleStack: "app.js:10",
+	}
+	b.ReportAllocs()
+	b.ResetTimer()
+	for i := range b.N {
+		event.ObservedUS = 1_700_000_000_000_000 + int64(i)*1_000_000
+		if _, err := store.AppendEvent(ctx, event); err != nil {
+			b.Fatal(err)
+		}
+	}
+	b.StopTimer()
+}

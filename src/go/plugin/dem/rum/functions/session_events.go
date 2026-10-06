@@ -40,6 +40,7 @@ var rumSessionEventsColumns = map[string]any{
 		Index:         0,
 		Name:          "Agent Observation Time",
 		Type:          funcapi.FieldTypeTimestamp,
+		ValueOptions:  funcapi.ValueOptions{Transform: funcapi.FieldTransformDatetimeUsec},
 		Visualization: funcapi.FieldVisualValue,
 		Visible:       true,
 		Sortable:      true,

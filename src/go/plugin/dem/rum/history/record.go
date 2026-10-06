@@ -98,57 +98,75 @@ func decodeEvent(entry *journal.SnapshotEntry) (EventRecord, bool, error) {
 			return fmt.Errorf("invalid journal field payload")
 		}
 		name, value := payload[:separator], payload[separator+1:]
-		if err := envelope.Observe(name, value); err != nil {
-			return err
-		}
-		if bit := scalarBit(string(name)); bit != 0 {
-			if seen&bit != 0 {
-				return fmt.Errorf("duplicate %s", name)
-			}
-			seen |= bit
-		}
+		var bit uint32
 		switch string(name) {
 		case "DEM_REVISION":
+			bit = 1 << 0
 			revision = string(value)
 		case "DEM_EXPERIENCE_ID":
+			bit = 1 << 1
 			r.ExperienceID = string(value)
 		case "DEM_VIEW":
+			bit = 1 << 2
 			r.View = string(value)
 		case "DEM_VIEW_ID":
+			bit = 1 << 3
 			r.ViewID = string(value)
 		case "DEM_METRIC_ID":
+			bit = 1 << 4
 			r.MetricID = string(value)
 		case "DEM_SITE":
+			bit = 1 << 5
 			r.Site = string(value)
 		case "DEM_SESSION_ID":
+			bit = 1 << 6
 			r.SessionID = string(value)
 		case "DEM_TYPE":
+			bit = 1 << 7
 			r.Type = string(value)
 		case "DEM_PAGE":
+			bit = 1 << 8
 			r.Page = string(value)
 		case "DEM_TEXT":
+			bit = 1 << 9
 			r.Text = string(value)
 		case "DEM_TRACE_ID":
+			bit = 1 << 10
 			r.TraceID = string(value)
 		case "DEM_BROWSER":
+			bit = 1 << 11
 			r.Browser = string(value)
 		case "DEM_DEVICE":
+			bit = 1 << 12
 			r.Device = string(value)
 		case "DEM_COUNTRY":
+			bit = 1 << 13
 			r.Country = string(value)
 		case "DEM_VERSION":
+			bit = 1 << 14
 			r.Version = string(value)
 		case "DEM_USER_ID":
+			bit = 1 << 15
 			r.UserID = string(value)
 		case "DEM_FINGERPRINT":
+			bit = 1 << 16
 			r.Fingerprint = string(value)
 		case "DEM_ERROR_TYPE":
+			bit = 1 << 17
 			r.ErrorType = string(value)
 		case "DEM_MESSAGE":
+			bit = 1 << 18
 			r.Message = string(value)
 		case "DEM_SAMPLE_STACK":
+			bit = 1 << 19
 			r.SampleStack = string(value)
+		default:
+			return envelope.Observe(name, value)
 		}
+		if seen&bit != 0 {
+			return fmt.Errorf("duplicate %s", name)
+		}
+		seen |= bit
 		return nil
 	})
 	if err != nil {
@@ -177,52 +195,4 @@ func validateEvent(r EventRecord) error {
 		return fmt.Errorf("RUM observation time must not precede epoch")
 	}
 	return nil
-}
-
-// Each native RUM field is scalar, including optional display metadata.
-func scalarBit(name string) uint32 {
-	switch name {
-	case "DEM_REVISION":
-		return 1 << 0
-	case "DEM_EXPERIENCE_ID":
-		return 1 << 1
-	case "DEM_VIEW":
-		return 1 << 2
-	case "DEM_VIEW_ID":
-		return 1 << 3
-	case "DEM_METRIC_ID":
-		return 1 << 4
-	case "DEM_SITE":
-		return 1 << 5
-	case "DEM_SESSION_ID":
-		return 1 << 6
-	case "DEM_TYPE":
-		return 1 << 7
-	case "DEM_PAGE":
-		return 1 << 8
-	case "DEM_TEXT":
-		return 1 << 9
-	case "DEM_TRACE_ID":
-		return 1 << 10
-	case "DEM_BROWSER":
-		return 1 << 11
-	case "DEM_DEVICE":
-		return 1 << 12
-	case "DEM_COUNTRY":
-		return 1 << 13
-	case "DEM_VERSION":
-		return 1 << 14
-	case "DEM_USER_ID":
-		return 1 << 15
-	case "DEM_FINGERPRINT":
-		return 1 << 16
-	case "DEM_ERROR_TYPE":
-		return 1 << 17
-	case "DEM_MESSAGE":
-		return 1 << 18
-	case "DEM_SAMPLE_STACK":
-		return 1 << 19
-	default:
-		return 0
-	}
 }

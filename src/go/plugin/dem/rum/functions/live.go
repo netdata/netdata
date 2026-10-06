@@ -70,6 +70,7 @@ var rumLiveColumns = map[string]any{
 		Index:         1,
 		Name:          "Time",
 		Type:          funcapi.FieldTypeTimestamp,
+		ValueOptions:  funcapi.ValueOptions{Transform: funcapi.FieldTransformDatetimeUsec},
 		Visualization: funcapi.FieldVisualValue,
 		Visible:       true,
 		Sortable:      true,
