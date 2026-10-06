@@ -2085,9 +2085,23 @@ static bool jv2_file_pwrite(const char *path, const void *buf, size_t size, off_
     if(fd == -1)
         return false;
 
-    bool ok = pwrite(fd, buf, size, offset) == (ssize_t)size;
+    uv_fs_t req;
+    uv_buf_t iov = uv_buf_init((char *)buf, (unsigned int)size);
+    int ret = uv_fs_write(NULL, &req, fd, &iov, 1, (int64_t)offset, NULL);
+    bool ok = ret >= 0 && req.result == (ssize_t)size;
+    uv_fs_req_cleanup(&req);
     close(fd);
     return ok;
+}
+
+// Reads a buffer at an offset using libuv's portable filesystem API.
+static ssize_t jv2_file_pread(int fd, void *buf, size_t size, off_t offset) {
+    uv_fs_t req;
+    uv_buf_t iov = uv_buf_init(buf, (unsigned int)size);
+    int ret = uv_fs_read(NULL, &req, fd, &iov, 1, (int64_t)offset, NULL);
+    ssize_t result = ret < 0 ? ret : (ssize_t)req.result;
+    uv_fs_req_cleanup(&req);
+    return result;
 }
 
 // A charge no journal of these tests holds, set before reloading so a loader that
@@ -2310,7 +2324,7 @@ static int mrg_jv2_samples_section_check(void) {
         uint32_t original_value = 0;
         int fd = open(path, O_RDWR | O_CLOEXEC);
         if(fd == -1 ||
-           pread(fd, &descriptor, sizeof(descriptor), JOURNAL_V2_SAMPLES_DESCRIPTOR_OFFSET) != (ssize_t)sizeof(descriptor)) {
+           jv2_file_pread(fd, &descriptor, sizeof(descriptor), JOURNAL_V2_SAMPLES_DESCRIPTOR_OFFSET) != (ssize_t)sizeof(descriptor)) {
             fprintf(stderr, "ERROR: cannot read the samples descriptor back\n");
             errors++;
         }
@@ -2322,10 +2336,10 @@ static int mrg_jv2_samples_section_check(void) {
             }
 
             uint32_t value;
-            if(pread(fd, &value, sizeof(value), descriptor.offset) == (ssize_t)sizeof(value)) {
+            if(jv2_file_pread(fd, &value, sizeof(value), descriptor.offset) == (ssize_t)sizeof(value)) {
                 original_value = value;
                 value ^= 0x5a5a;
-                if(pwrite(fd, &value, sizeof(value), descriptor.offset) != (ssize_t)sizeof(value)) {
+                if(!jv2_file_pwrite(path, &value, sizeof(value), descriptor.offset)) {
                     fprintf(stderr, "ERROR: cannot damage the samples section\n");
                     errors++;
                 }
