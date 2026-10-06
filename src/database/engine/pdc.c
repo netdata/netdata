@@ -980,6 +980,9 @@ static ALWAYS_INLINE struct page_details *epdl_get_pd_load_link_list_from_metric
     struct page_details *pd_list = NULL;
 
     // the caller has detached the list (epdl_pending_del()), so it is safe to traverse it without e->spinlock
+    internal_fatal(epdl->head_to_datafile_extent_queries_pending_for_extent,
+                   "DBENGINE: traversing an epdl list that is not detached");
+
     for(EPDL *ep = epdl; ep ;ep = ep->query.next) {
         Pvoid_t *pd_by_start_time_s_judyL = PDCJudyLGet(ep->page_details_by_metric_id_JudyL, metric_id, PJE0);
         internal_fatal(pd_by_start_time_s_judyL == PJERR, "DBENGINE: corrupted extent metrics JudyL");
@@ -1025,6 +1028,9 @@ static size_t epdl_queries_count(EPDL *epdl) {
 
 // the list must be detached (epdl_pending_del()) and wanted must have room for one entry per query
 static size_t epdl_wanted_metrics_get(EPDL *epdl, struct epdl_wanted_metric *wanted) {
+    internal_fatal(epdl->head_to_datafile_extent_queries_pending_for_extent,
+                   "DBENGINE: traversing an epdl list that is not detached");
+
     size_t count = 0;
 
     for(EPDL *ep = epdl; ep ;ep = ep->query.next) {
