@@ -1,0 +1,66 @@
+{
+  "jsonSchema": {
+    "title": "OpenTelemetry hostmetrics",
+    "type": "object",
+    "properties": {
+      "name": {
+        "type": "string",
+        "title": "Job name",
+        "description": "The name assigned to this job."
+      },
+      "service_name": {
+        "type": "string",
+        "title": "Service name",
+        "description": "The service.name resource attribute sent to Netdata.",
+        "default": "otel-orchestrator-poc",
+        "minLength": 1
+      },
+      "collection_interval": {
+        "type": "string",
+        "title": "Collection interval",
+        "description": "How often the Collector reads host metrics; minimum 1 second.",
+        "default": "2s"
+      },
+      "scrapers": {
+        "type": "array",
+        "title": "Host metrics",
+        "description": "Host metric groups to collect.",
+        "items": {
+          "type": "string",
+          "enum": [
+            "cpu",
+            "memory"
+          ]
+        },
+        "minItems": 1,
+        "uniqueItems": true,
+        "default": [
+          "cpu",
+          "memory"
+        ]
+      },
+      "update_every": {
+        "type": "integer",
+        "title": "Worker status interval",
+        "description": "How often to update the worker uptime chart, in seconds. Host metric collection uses its own interval.",
+        "minimum": 1,
+        "default": 1
+      }
+    },
+    "required": [
+      "service_name",
+      "collection_interval",
+      "scrapers"
+    ],
+    "additionalProperties": false,
+    "$schema": "http://json-schema.org/draft-07/schema#"
+  },
+  "uiSchema": {
+    "name": {
+      "ui:widget": "hidden"
+    },
+    "update_every": {
+      "ui:widget": "hidden"
+    }
+  }
+}

@@ -1,0 +1,23 @@
+dist:
+  module: github.com/netdata/netdata/otel-orchestrator-poc/distribution
+  name: otel-worker
+  description: Experimental Netdata managed OpenTelemetry worker
+  version: 0.0.1
+  output_path: .build/collector
+providers:
+  - gomod: go.opentelemetry.io/collector/confmap/provider/envprovider v1.63.0
+  - gomod: github.com/netdata/netdata/otel-orchestrator-poc v0.0.0
+    import: github.com/netdata/netdata/otel-orchestrator-poc/workerprovider
+    path: .
+extensions:
+  - gomod: github.com/netdata/netdata/otel-orchestrator-poc v0.0.0
+    import: github.com/netdata/netdata/otel-orchestrator-poc/workerextension
+    path: .
+  - gomod: github.com/open-telemetry/opentelemetry-collector-contrib/extension/storage/filestorage v0.157.0
+receivers:
+  - gomod: github.com/open-telemetry/opentelemetry-collector-contrib/receiver/filelogreceiver v0.157.0
+  - gomod: github.com/open-telemetry/opentelemetry-collector-contrib/receiver/hostmetricsreceiver v0.157.0
+processors:
+  - gomod: github.com/open-telemetry/opentelemetry-collector-contrib/processor/resourceprocessor v0.157.0
+exporters:
+  - gomod: go.opentelemetry.io/collector/exporter/otlpexporter v0.157.0

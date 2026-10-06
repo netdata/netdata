@@ -31,6 +31,7 @@ var configSchemaGlobs = []string{
 	"*/config_schema.json",
 	"../discovery/sdext/config_schema_*.json",
 	"../../scripts.d/collector/*/config_schema.json",
+	"../../otelcolpoc/*_schema.json",
 	"../../scripts.d/development/*/config_schema.json",
 	"../../statsd/collector/*/config_schema.json",
 	"../../dem/collector/*/config_schema.json",

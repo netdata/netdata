@@ -1,0 +1,13 @@
+version: v1
+context_namespace: otel_orchestrator
+groups:
+  - family: worker
+    metrics: [worker_uptime]
+    charts:
+      - id: worker_uptime
+        title: OpenTelemetry worker uptime
+        context: worker_uptime
+        units: seconds
+        dimensions:
+          - selector: worker_uptime
+            name: uptime
