@@ -347,6 +347,19 @@ For a new collector `<name>`:
 
 Use `.agents/skills/integrations-lifecycle/recipes/add-go-collector.md` for the integration-generation commands.
 
+A collector that works only on some operating systems (its `metadata.yaml` `supported_platforms`) MUST NOT register
+elsewhere, or its stock job starts and fails there:
+
+- Put the matching build constraint, such as `//go:build linux`, on every source and test file of the collector
+  package, after the SPDX line with a blank line before and after.
+- Add an untagged `doc.go` containing only the package clause and its doc comment, so the `init.go` import still
+  compiles on every platform.
+- Platform-neutral subpackages such as `<name>func/` and `internal/` need no constraint; only the tagged files link
+  them.
+- Run the package tests on a supported platform and build `./cmd/godplugin` for an excluded one (`GOOS=windows`).
+
+Examples: `ap`, `zfspool`, `smbios_memory`.
+
 The PR description or design note MUST enumerate the relevant collector consistency artifacts and justify every artifact
 that did not need a matching change. Most of this is not CI-enforced; it must be reviewer-visible.
 
