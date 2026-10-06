@@ -39,6 +39,7 @@
 #include "process_path.h"
 #include "boottime.h"
 #include "boot_id.h"
+#include "privileged_dir.h"
 #include "run_dir.h"
 #include "file_lock.h"
 #include "mmap_limit.h"

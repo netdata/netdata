@@ -153,8 +153,10 @@ static void connect_cb(uv_connect_t* req, int status)
 
     (void)req;
     if (status) {
+        const char *pipename = daemon_pipename();
         fprintf(stderr, "uv_pipe_connect(): %s\n", uv_strerror(status));
-        fprintf(stderr, "Cannot connect to '%s'.\nMake sure the netdata service is running.\n", daemon_pipename());
+        fprintf(stderr, "Cannot connect to '%s'.\nMake sure the netdata service is running.\n",
+                pipename ? pipename : "(unknown)");
         exit(-1);
     }
     if (0 == command_string_size) {
@@ -210,6 +212,15 @@ int main(int argc, char **argv)
     req.data = buffer_create(128, NULL);
 
     const char *pipename = daemon_pipename();
+    if (!pipename) {
+        fprintf(stderr,
+                "Cannot determine the netdata run directory, so I do not know where the netdata "
+                "socket is.\nSet NETDATA_PIPENAME to the socket path, or NETDATA_RUN_DIR to the run "
+                "directory netdata uses.\n");
+        buffer_free(req.data);
+        return exit_status;
+    }
+
     uv_pipe_connect(&req, &client_pipe, pipename, connect_cb);
 
     uv_run(loop, UV_RUN_DEFAULT);
