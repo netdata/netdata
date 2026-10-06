@@ -223,17 +223,25 @@ for x in ndsudo apps.plugin perf.plugin slabinfo.plugin debugfs.plugin freeipmi.
 done
 
 if command -v setcap >/dev/null 2>&1; then
-  if ! run setcap "cap_dac_read_search,cap_sys_ptrace=ep" "usr/libexec/netdata/plugins.d/apps.plugin"; then
-    run chmod 4750 "usr/libexec/netdata/plugins.d/apps.plugin"
+  if [ -f "usr/libexec/netdata/plugins.d/apps.plugin" ]; then
+    if ! run setcap "cap_dac_read_search,cap_sys_ptrace=ep" "usr/libexec/netdata/plugins.d/apps.plugin"; then
+      run chmod 4750 "usr/libexec/netdata/plugins.d/apps.plugin"
+    fi
   fi
-  if ! run setcap "cap_dac_read_search=ep" "usr/libexec/netdata/plugins.d/slabinfo.plugin"; then
-    run chmod 4750 "usr/libexec/netdata/plugins.d/slabinfo.plugin"
+  if [ -f "usr/libexec/netdata/plugins.d/slabinfo.plugin" ]; then
+    if ! run setcap "cap_dac_read_search=ep" "usr/libexec/netdata/plugins.d/slabinfo.plugin"; then
+      run chmod 4750 "usr/libexec/netdata/plugins.d/slabinfo.plugin"
+    fi
   fi
-  if ! run setcap "cap_dac_read_search,cap_audit_control=ep" "usr/libexec/netdata/plugins.d/debugfs.plugin"; then
-    run chmod 4750 "usr/libexec/netdata/plugins.d/debugfs.plugin"
+  if [ -f "usr/libexec/netdata/plugins.d/debugfs.plugin" ]; then
+    if ! run setcap "cap_dac_read_search,cap_audit_control=ep" "usr/libexec/netdata/plugins.d/debugfs.plugin"; then
+      run chmod 4750 "usr/libexec/netdata/plugins.d/debugfs.plugin"
+    fi
   fi
-  if ! run setcap "cap_dac_read_search+epi cap_net_admin+epi cap_net_raw=eip cap_net_bind_service=eip" "usr/libexec/netdata/plugins.d/go.d.plugin"; then
-    run chmod 4750 "usr/libexec/netdata/plugins.d/go.d.plugin"
+  if [ -f "usr/libexec/netdata/plugins.d/go.d.plugin" ]; then
+    if ! run setcap "cap_dac_read_search+epi cap_net_admin+epi cap_net_raw=eip cap_net_bind_service=eip" "usr/libexec/netdata/plugins.d/go.d.plugin"; then
+      run chmod 4750 "usr/libexec/netdata/plugins.d/go.d.plugin"
+    fi
   fi
 
   perf_caps="cap_sys_admin=ep"
@@ -241,8 +249,10 @@ if command -v setcap >/dev/null 2>&1; then
     perf_caps="cap_perfmon=ep"
   fi
 
-  if ! run setcap "${perf_caps}" "usr/libexec/netdata/plugins.d/perf.plugin"; then
-    run chmod 4750 "usr/libexec/netdata/plugins.d/perf.plugin"
+  if [ -f "usr/libexec/netdata/plugins.d/perf.plugin" ]; then
+    if ! run setcap "${perf_caps}" "usr/libexec/netdata/plugins.d/perf.plugin"; then
+      run chmod 4750 "usr/libexec/netdata/plugins.d/perf.plugin"
+    fi
   fi
   if [ -f "usr/libexec/netdata/plugins.d/systemd-journal.plugin" ]; then
     if ! run setcap "cap_dac_read_search=eip" "usr/libexec/netdata/plugins.d/systemd-journal.plugin"; then
@@ -255,7 +265,9 @@ if command -v setcap >/dev/null 2>&1; then
 else
   for x in apps.plugin perf.plugin slabinfo.plugin debugfs.plugin; do
     f="usr/libexec/netdata/plugins.d/${x}"
-    run chmod 4750 "${f}"
+    if [ -f "${f}" ]; then
+      run chmod 4750 "${f}"
+    fi
   done
   if [ -f "usr/libexec/netdata/plugins.d/systemd-journal.plugin" ]; then
     run chmod 4750 "usr/libexec/netdata/plugins.d/systemd-journal.plugin"

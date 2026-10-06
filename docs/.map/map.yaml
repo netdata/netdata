@@ -908,6 +908,33 @@ sidebar:
           label: OpenTelemetry Plugin Reference
           edit_url: https://github.com/netdata/netdata/edit/master/src/crates/otel-plugin/README.md
           description: Ingest OpenTelemetry metrics, logs, and traces with the Netdata Agent.
+  # Edge Device Monitoring
+  - meta:
+      label: Edge Device Monitoring
+      edit_url: https://github.com/netdata/netdata/edit/master/docs/fleet-management/README.md
+      description: Monitor robots, signage, gateways and other edge devices centrally while reducing device disk, CPU, memory and cellular use.
+    items:
+      - meta:
+          label: Deploy and Identify Fleet Devices
+          edit_url: https://github.com/netdata/netdata/edit/master/docs/fleet-management/deployment-and-identity.md
+      - meta:
+          label: Minimize Disk Footprint
+          edit_url: https://github.com/netdata/netdata/edit/master/docs/fleet-management/minimize-disk-footprint.md
+      - meta:
+          label: Minimize CPU and Memory
+          edit_url: https://github.com/netdata/netdata/edit/master/docs/fleet-management/minimize-cpu-and-memory.md
+      - meta:
+          label: Minimize Cellular Traffic
+          edit_url: https://github.com/netdata/netdata/edit/master/docs/fleet-management/minimize-cellular-traffic.md
+      - meta:
+          label: Disconnected Devices and Failover
+          edit_url: https://github.com/netdata/netdata/edit/master/docs/fleet-management/disconnected-devices-and-failover.md
+      - meta:
+          label: Monitor the Fleet
+          edit_url: https://github.com/netdata/netdata/edit/master/docs/fleet-management/monitor-the-fleet.md
+      - meta:
+          label: Updates and Troubleshooting
+          edit_url: https://github.com/netdata/netdata/edit/master/docs/fleet-management/updates-and-troubleshooting.md
   # Live
   - meta:
       label: Live View
