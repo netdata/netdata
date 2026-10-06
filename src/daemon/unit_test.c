@@ -2391,7 +2391,8 @@ static int test_receiver_replication_completion_ratio(void) {
 
 // Shared setup for the tests that start from one chart holding the only claim on `localhost`: ALLOC memory
 // mode, the accounting word saved and zeroed, a new chart, and its first claim. Returns 1 when that claim
-// did not win. receiver_replication_fixture_end() releases the claim, frees the chart and restores both.
+// did not win, as the caller's first failure count. The fixture is armed either way, so the caller MUST
+// always call receiver_replication_fixture_end(), which releases the claim, frees the chart and restores both.
 struct receiver_replication_fixture {
     RRD_DB_MODE old_default_rrd_memory_mode;
     uint64_t saved_accounting;
