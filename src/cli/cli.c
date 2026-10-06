@@ -234,6 +234,7 @@ static void connect_cb(uv_connect_t* req, int status)
     ret = uv_write(&write_req, (uv_stream_t *)&client_pipe, &write_buf, 1, pipe_write_cb);
     if (ret) {
         fprintf(stderr, "uv_write(): %s\n", uv_strerror(ret));
+        close_client_pipe();
     }
 //  fprintf(stderr, "COMMAND: Sending command: \"%s\"\n", command_string);
 }
