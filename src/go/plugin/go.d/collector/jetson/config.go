@@ -4,6 +4,8 @@ package jetson
 
 import "errors"
 
+const defaultUpdateEvery = 1
+
 type Config struct {
 	UpdateEvery int `yaml:"update_every,omitempty" json:"update_every"`
 }

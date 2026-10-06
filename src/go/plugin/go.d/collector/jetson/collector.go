@@ -5,10 +5,6 @@ package jetson
 import (
 	"context"
 	_ "embed"
-	"errors"
-	"os/exec"
-	"runtime"
-	"sync"
 	"sync/atomic"
 	"time"
 
@@ -26,7 +22,7 @@ func init() {
 	collectorapi.Register("jetson", collectorapi.Creator{
 		JobConfigSchema: configSchema,
 		Defaults: collectorapi.Defaults{
-			UpdateEvery: 1,
+			UpdateEvery: defaultUpdateEvery,
 		},
 		CreateV2: func() collectorapi.CollectorV2 { return New() },
 		Config:   func() any { return &Config{} },
@@ -37,16 +33,16 @@ func New() *Collector {
 	store := metrix.NewCollectorStore()
 	return &Collector{
 		Config: Config{
-			UpdateEvery: 1,
+			UpdateEvery: defaultUpdateEvery,
 		},
-		store:      store,
-		metrics:    newCollectorMetrics(store),
-		findBinary: findTegrastats,
+		store:          store,
+		metrics:        newCollectorMetrics(store),
+		findTegrastats: lookupTegrastats,
 		timing: sourceTiming{
-			freshFor:   3 * time.Second,
-			stallAfter: 10 * time.Second,
-			retryMin:   time.Second,
-			retryMax:   30 * time.Second,
+			maxSampleAge:    3 * tegrastatsInterval,
+			stallTimeout:    10 * tegrastatsInterval,
+			restartDelayMin: time.Second,
+			restartDelayMax: 30 * time.Second,
 		},
 	}
 }
@@ -55,34 +51,31 @@ type Collector struct {
 	collectorapi.Base
 	Config `yaml:",inline" json:""`
 
-	store      metrix.CollectorStore
-	metrics    *collectorMetrics
-	findBinary func() (string, error)
-	binary     string
-	timing     sourceTiming
-	latest     atomic.Pointer[observation]
-	runMu      sync.Mutex
-	cancel     context.CancelFunc
+	store   metrix.CollectorStore
+	metrics *collectorMetrics
+
+	// findTegrastats resolves the executable in Check; tests inject a fake.
+	findTegrastats func() (string, error)
+	tegrastatsPath string
+	timing         sourceTiming
+
+	// latest is the most recent record from the running tegrastats, nil while none is running.
+	latest atomic.Pointer[observation]
 }
 
 func (c *Collector) Configuration() any { return c.Config }
 
-func (c *Collector) Init(ctx context.Context) error {
-	if err := ctx.Err(); err != nil {
-		return err
-	}
-	return c.Config.validate()
-}
+func (c *Collector) Init(context.Context) error { return c.Config.validate() }
 
 func (c *Collector) Check(ctx context.Context) error {
 	if err := ctx.Err(); err != nil {
 		return err
 	}
-	binary, err := c.findBinary()
+	path, err := c.findTegrastats()
 	if err != nil {
 		return err
 	}
-	c.binary = binary
+	c.tegrastatsPath = path
 	return nil
 }
 
@@ -90,24 +83,9 @@ func (c *Collector) Collect(ctx context.Context) error { return c.collect(ctx) }
 
 func (c *Collector) Run(ctx context.Context, ready func()) error { return c.run(ctx, ready) }
 
-func (c *Collector) Cleanup(context.Context) {
-	c.runMu.Lock()
-	defer c.runMu.Unlock()
-	if c.cancel != nil {
-		c.cancel()
-	}
-}
+// Cleanup has nothing to release: Run owns tegrastats and returns before Cleanup is called.
+func (c *Collector) Cleanup(context.Context) {}
 
 func (c *Collector) MetricStore() metrix.CollectorStore { return c.store }
-func (c *Collector) ChartTemplateYAML() string          { return chartTemplateYAML }
 
-func findTegrastats() (string, error) {
-	if runtime.GOOS != "linux" {
-		return "", errors.New("jetson requires Linux")
-	}
-	path, err := exec.LookPath("tegrastats")
-	if err != nil {
-		return "", errors.New("tegrastats executable not found in PATH")
-	}
-	return path, nil
-}
+func (c *Collector) ChartTemplateYAML() string { return chartTemplateYAML }

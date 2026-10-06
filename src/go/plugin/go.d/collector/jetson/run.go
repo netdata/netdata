@@ -3,153 +3,89 @@
 package jetson
 
 import (
-	"bufio"
 	"context"
 	"errors"
-	"fmt"
-	"os"
 	"time"
-
-	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/ndexec"
 )
 
+// sourceTiming holds the tegrastats supervision intervals; tests shorten them.
 type sourceTiming struct {
-	freshFor   time.Duration
-	stallAfter time.Duration
-	retryMin   time.Duration
-	retryMax   time.Duration
-}
-
-type observation struct {
-	sample sample
-	at     time.Time
+	// maxSampleAge is how long a record stays publishable.
+	maxSampleAge time.Duration
+	// stallTimeout restarts tegrastats when no record arrives for this long.
+	stallTimeout time.Duration
+	// restartDelayMin and restartDelayMax bound the exponential restart backoff.
+	restartDelayMin time.Duration
+	restartDelayMax time.Duration
 }
 
 func (c *Collector) run(ctx context.Context, ready func()) error {
-	ctx, cancel := context.WithCancel(ctx)
-	c.runMu.Lock()
-	if c.cancel != nil {
-		c.runMu.Unlock()
-		cancel()
-		return errors.New("tegrastats acquisition is already running")
-	}
-	c.cancel = cancel
-	c.runMu.Unlock()
-	defer func() {
-		cancel()
-		c.latest.Store(nil)
-		c.runMu.Lock()
-		c.cancel = nil
-		c.runMu.Unlock()
-	}()
-	if c.binary == "" {
+	if c.tegrastatsPath == "" {
 		return errors.New("tegrastats executable has not been resolved")
 	}
 
-	started := false
-	retry := c.timing.retryMin
-	for ctx.Err() == nil {
-		since := time.Now()
-		observed, err := c.runSource(ctx, func() {
-			if !started {
-				started = true
-				ready()
-			}
-		})
+	// A startup failure is returned to the managed runtime and its retry policy.
+	proc, err := startTegrastats(ctx, c.tegrastatsPath)
+	if err != nil {
 		if ctx.Err() != nil {
 			return nil
 		}
-		// Startup failures belong to the managed runtime. After readiness, keep
-		// recovery inside Run: returning would permanently stop this job.
-		if !started {
-			return err
-		}
-		c.Limit("tegrastats:source", 1, time.Minute).Warningf("tegrastats source unavailable: %v", err)
-		if observed && time.Since(since) >= c.timing.stallAfter {
-			retry = c.timing.retryMin
-		}
-		timer := time.NewTimer(retry)
-		select {
-		case <-ctx.Done():
-			timer.Stop()
-			return nil
-		case <-timer.C:
-		}
-		retry = min(retry*2, c.timing.retryMax)
+		return err
 	}
-	return nil
+	ready()
+
+	// After readiness, returning would permanently fail the job, so source
+	// failures are recovered here.
+	delay := c.timing.restartDelayMin
+	for {
+		began := time.Now()
+		observed, err := c.follow(ctx, proc)
+		// A source that stayed healthy for a while restarts without accumulated backoff.
+		if observed && time.Since(began) >= c.timing.stallTimeout {
+			delay = c.timing.restartDelayMin
+		}
+		for {
+			if ctx.Err() != nil {
+				return nil
+			}
+			c.Limit("jetson:tegrastats", 1, time.Minute).Warningf("tegrastats source unavailable: %v", err)
+			select {
+			case <-ctx.Done():
+				return nil
+			case <-time.After(delay):
+			}
+			delay = min(delay*2, c.timing.restartDelayMax)
+			if proc, err = startTegrastats(ctx, c.tegrastatsPath); err == nil {
+				break
+			}
+		}
+	}
 }
 
-func (c *Collector) runSource(ctx context.Context, ready func()) (bool, error) {
-	readEnd, writeEnd, err := os.Pipe()
-	if err != nil {
-		return false, fmt.Errorf("open tegrastats output pipe: %w", err)
-	}
-	process, err := ndexec.StartUnprivilegedProcess(ctx, ndexec.ProcessOptions{
-		Stdout: writeEnd,
-	}, c.binary, "--interval", "1000")
-	_ = writeEnd.Close()
-	if err != nil {
-		_ = readEnd.Close()
-		return false, fmt.Errorf("start tegrastats: %w", err)
-	}
-	readCtx, cancelRead := context.WithCancel(ctx)
-	samples := make(chan observation)
-	readDone := make(chan struct{})
-	waitDone := make(chan struct{})
-	var readErr, waitErr error
-	go func() { defer close(readDone); readErr = readSamples(readCtx, readEnd, samples) }()
-	go func() { defer close(waitDone); waitErr = process.Wait() }()
+// follow publishes the records of proc until it fails or ctx is canceled, then
+// withdraws the latest record and closes proc. It reports whether any record arrived.
+func (c *Collector) follow(ctx context.Context, proc *tegrastatsProcess) (observed bool, err error) {
 	defer func() {
 		c.latest.Store(nil)
-		cancelRead()
-		_ = readEnd.Close()
-		_ = process.Close()
-		// Join the reader and the owned process before starting a replacement.
-		<-readDone
-		<-waitDone
+		proc.close()
 	}()
-	ready()
-	watchdog := time.NewTimer(c.timing.stallAfter)
-	defer watchdog.Stop()
-	observed := false
-	for {
-		select {
-		case <-ctx.Done():
-			return observed, nil
-		case <-waitDone:
-			return observed, fmt.Errorf("tegrastats exited: %v", waitErr)
-		case <-readDone:
-			return observed, fmt.Errorf("read tegrastats output: %w", readErr)
-		case next := <-samples:
-			observed = true
-			c.latest.Store(&next)
-			watchdog.Reset(c.timing.stallAfter)
-		case <-watchdog.C:
-			return observed, errors.New("tegrastats stopped producing recognizable samples")
-		}
-	}
-}
 
-func readSamples(ctx context.Context, pipe *os.File, samples chan<- observation) error {
-	reader := bufio.NewReader(pipe)
+	stall := time.NewTimer(c.timing.stallTimeout)
+	defer stall.Stop()
 	for {
-		line, err := reader.ReadString('\n')
-		if err != nil {
-			return err
-		}
-		value, ok := parseSample(line)
-		if !ok {
-			continue
-		}
-		next := observation{
-			sample: value,
-			at:     time.Now(),
-		}
 		select {
-		case samples <- next:
 		case <-ctx.Done():
-			return ctx.Err()
+			return observed, ctx.Err()
+		case <-proc.exited:
+			return observed, proc.exitError()
+		case <-proc.readDone:
+			return observed, proc.readError()
+		case obs := <-proc.records:
+			observed = true
+			c.latest.Store(&obs)
+			stall.Reset(c.timing.stallTimeout)
+		case <-stall.C:
+			return observed, errors.New("tegrastats stopped producing recognizable samples")
 		}
 	}
 }

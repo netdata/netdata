@@ -11,7 +11,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestParseSampleFixtures(t *testing.T) {
+func TestParseRecordFixtures(t *testing.T) {
 	tests := map[string]struct {
 		want sample
 	}{
@@ -76,15 +76,17 @@ func TestParseSampleFixtures(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			data, err := os.ReadFile(filepath.Join("testdata", "tegrastats", name+".txt"))
 			require.NoError(t, err)
-			got, ok := parseSample(string(data))
+			got, ok := parseRecord(string(data))
 			assert.True(t, ok)
 			assert.Equal(t, test.want, got)
 		})
 	}
 }
 
-func TestParseSampleMeasurements(t *testing.T) {
-	const envelope = "RAM 20/100MB (lfb 3x4MB) CPU [0%@100,off] "
+// testRecordPrefix is a minimal record envelope that synthetic readings follow.
+const testRecordPrefix = "RAM 20/100MB (lfb 3x4MB) CPU [0%@100,off] "
+
+func TestParseRecordReadings(t *testing.T) {
 	tests := map[string]struct {
 		fields string
 		want   sample
@@ -148,22 +150,25 @@ func TestParseSampleMeasurements(t *testing.T) {
 			GPUUtilization: measurement(20),
 			EMCUtilization: measurement(30),
 		}},
-		"unrelated fields": {fields: "FUTURE_FREQ 100%@900 GR3D_FREQ 8% GPU 30/40 EMC_FREQ @1500 NEW [1,2,3]", want: sample{
-			GPUUtilization: measurement(8),
-			EMCFrequency:   measurement(1500),
-		}},
+		"unrelated fields": {
+			fields: "FUTURE_FREQ 100%@900 GR3D_FREQ 8% GPU 30/40 EMC_FREQ @1500 NEW [1,2,3]",
+			want: sample{
+				GPUUtilization: measurement(8),
+				EMCFrequency:   measurement(1500),
+			},
+		},
 		"exact key": {fields: "NOT_GR3D_FREQ 20% OTHER_EMC_FREQ 40%"},
 	}
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
-			got, ok := parseSample(envelope + test.fields)
+			got, ok := parseRecord(testRecordPrefix + test.fields)
 			assert.True(t, ok)
 			assert.Equal(t, test.want, got)
 		})
 	}
 }
 
-func TestParseSampleRecordRecognition(t *testing.T) {
+func TestParseRecordRecognition(t *testing.T) {
 	tests := map[string]struct {
 		line string
 		ok   bool
@@ -181,14 +186,14 @@ func TestParseSampleRecordRecognition(t *testing.T) {
 	}
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
-			got, ok := parseSample(test.line)
+			got, ok := parseRecord(test.line)
 			assert.Equal(t, test.ok, ok)
 			assert.Equal(t, sample{}, got)
 		})
 	}
 }
 
-func TestSampleHasMetrics(t *testing.T) {
+func TestSampleHasReadings(t *testing.T) {
 	tests := map[string]struct {
 		sample sample
 		want   bool
@@ -214,7 +219,7 @@ func TestSampleHasMetrics(t *testing.T) {
 		}, want: true},
 	}
 	for name, test := range tests {
-		t.Run(name, func(t *testing.T) { assert.Equal(t, test.want, test.sample.hasMetrics()) })
+		t.Run(name, func(t *testing.T) { assert.Equal(t, test.want, test.sample.hasReadings()) })
 	}
 }
 

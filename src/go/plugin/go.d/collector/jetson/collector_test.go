@@ -9,9 +9,10 @@ import (
 	"runtime"
 	"testing"
 
-	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/collecttest"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/collecttest"
 )
 
 func TestConfiguration(t *testing.T) {
@@ -20,7 +21,7 @@ func TestConfiguration(t *testing.T) {
 		interval  int
 		wantError bool
 	}{
-		"default":            {interval: 1},
+		"default":            {interval: defaultUpdateEvery},
 		"slower publication": {interval: 5},
 		"zero":               {interval: 0, wantError: true},
 		"negative":           {interval: -1, wantError: true},
@@ -29,27 +30,31 @@ func TestConfiguration(t *testing.T) {
 			c := New()
 			c.UpdateEvery = tc.interval
 			assert.Equal(t, tc.wantError, c.Init(t.Context()) != nil)
-			c.Cleanup(t.Context())
 		})
 	}
 }
 
 func TestCheckOnlyResolvesExecutable(t *testing.T) {
-	for name, tc := range map[string]struct{ lookupError error }{
-		"found":   {},
-		"missing": {lookupError: errors.New("not installed")},
+	for name, tc := range map[string]struct {
+		lookupErr error
+		wantPath  string
+	}{
+		"found":   {wantPath: "/not-executed"},
+		"missing": {lookupErr: errors.New("not installed")},
 	} {
 		t.Run(name, func(t *testing.T) {
 			c := New()
 			calls := 0
-			c.findBinary = func() (string, error) { calls++; return "/not-executed", tc.lookupError }
+			c.findTegrastats = func() (string, error) {
+				calls++
+				return "/not-executed", tc.lookupErr
+			}
 			require.NoError(t, c.Init(t.Context()))
 			assert.Zero(t, calls)
-			assert.Equal(t, tc.lookupError, c.Check(t.Context()))
+			assert.Equal(t, tc.lookupErr, c.Check(t.Context()))
 			assert.Equal(t, 1, calls)
+			assert.Equal(t, tc.wantPath, c.tegrastatsPath)
 			assert.Nil(t, c.latest.Load())
-			assert.Nil(t, c.cancel)
-			c.Cleanup(t.Context())
 		})
 	}
 }
@@ -58,16 +63,14 @@ func TestCanceledLifecycle(t *testing.T) {
 	ctx, cancel := context.WithCancel(t.Context())
 	cancel()
 	c := New()
-	c.findBinary = func() (string, error) { t.Fatal("canceled Check performed discovery"); return "", nil }
-	assert.ErrorIs(t, c.Init(ctx), context.Canceled)
+	c.findTegrastats = func() (string, error) { t.Fatal("canceled Check performed discovery"); return "", nil }
 	assert.ErrorIs(t, c.Check(ctx), context.Canceled)
 	assert.ErrorIs(t, c.Collect(ctx), context.Canceled)
-	c.Cleanup(ctx)
 }
 
-func TestExecutableDiscovery(t *testing.T) {
+func TestLookupTegrastats(t *testing.T) {
 	t.Setenv("PATH", t.TempDir())
-	_, err := findTegrastats()
+	_, err := lookupTegrastats()
 	if runtime.GOOS == "linux" {
 		assert.ErrorContains(t, err, "not found in PATH")
 	} else {
