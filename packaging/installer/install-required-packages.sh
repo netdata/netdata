@@ -703,6 +703,7 @@ declare -A pkg_protobuf_dev=(
   ['suse']="protobuf-devel"
   ['freebsd']="protobuf"
   ['macos']="protobuf"
+  ['clearlinux']="WARNING|"
   ['default']="protobuf-devel"
 )
 
@@ -716,6 +717,7 @@ declare -A pkg_protobuf_compiler=(
   ['suse']="NOTREQUIRED"
   ['freebsd']="NOTREQUIRED"
   ['macos']="NOTREQUIRED"
+  ['clearlinux']="WARNING|"
   ['default']="protobuf-compiler"
 )
 
