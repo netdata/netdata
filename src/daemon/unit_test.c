@@ -2446,6 +2446,51 @@ static int test_receiver_replication_duplicate_claim_does_not_change_accounting(
     return rc;
 }
 
+// A child sends CHART_DEFINITION_END after every CHART, including an obsolete one. Marking the chart
+// obsolete mid-replication MUST keep its claim, so that CHART_DEFINITION_END is a duplicate and does not
+// start a second replication while the first one's backfill may still be writing the higher tiers.
+static int test_receiver_replication_obsolete_keeps_claim(void) {
+    fprintf(stderr, "%s() running...\n", __FUNCTION__);
+
+    RRD_DB_MODE old_default_rrd_memory_mode = default_rrd_memory_mode;
+    default_rrd_memory_mode = RRD_DB_MODE_ALLOC;
+
+    int rc = 0;
+    RRDHOST *host = localhost;
+    uint64_t saved_accounting = rrdhost_receiver_replication_accounting(host);
+    rrdhost_receiver_replication_accounting_set(host, 0, 0);
+
+    RRDSET *st = rrdset_create_localhost(
+        "netdata", "unittest-rcv-repl-obsolete", "unittest-rcv-repl-obsolete", "netdata", NULL,
+        "Unit Testing", "x", "unittest", NULL, 1, nd_profile.update_every, RRDSET_TYPE_LINE);
+
+    if(!rrdhost_receiver_replication_claim(st)) {
+        fprintf(stderr, "%s: initial claim did not win\n", __FUNCTION__);
+        rc = 1;
+    }
+
+    rrdset_is_obsolete___safe_from_collector_thread(st);
+
+    if(!rrdset_flag_check(st, RRDSET_FLAG_RECEIVER_REPLICATION_IN_PROGRESS) ||
+       rrdhost_receiver_replicating_charts(host) != 1) {
+        fprintf(stderr, "%s: marking the chart obsolete released its receiver replication (remaining=%u)\n",
+                __FUNCTION__, rrdhost_receiver_replicating_charts(host));
+        rc = 1;
+    }
+
+    if(rrdhost_receiver_replication_claim(st)) {
+        fprintf(stderr, "%s: CHART_DEFINITION_END after an obsolete CHART re-claimed the chart\n", __FUNCTION__);
+        rc = 1;
+    }
+
+    rrdhost_receiver_replication_release(st, 0);
+    rrdset_isnot_obsolete___safe_from_collector_thread(st);
+    rrdset_free(st);
+    rrdhost_receiver_replication_accounting_restore(host, saved_accounting);
+    default_rrd_memory_mode = old_default_rrd_memory_mode;
+    return rc;
+}
+
 // A2b: the ownership invariant under real concurrency.
 //
 // Two parts. The first pins the exact interleaving the claim-before-publish ordering exists for, using
@@ -3093,6 +3138,7 @@ int run_all_mockup_tests(void)
     receiver_replication_failures += test_receiver_replication_release_does_not_steal();
     receiver_replication_failures += test_receiver_replication_completion_ratio();
     receiver_replication_failures += test_receiver_replication_duplicate_claim_does_not_change_accounting();
+    receiver_replication_failures += test_receiver_replication_obsolete_keeps_claim();
     receiver_replication_failures += test_receiver_replication_ownership_under_concurrency();
     if(receiver_replication_failures)
         return 1;

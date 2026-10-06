@@ -87,9 +87,10 @@ typedef enum __attribute__ ((__packed__)) rrdset_flags {
 // Receiver replication ownership.
 //
 // The SINGLE implementation of the receiver-replication claim and release. Every lifecycle site uses
-// these - the parser's CHART_DEFINITION_END, both REPLAY_END branches, the connect/disconnect reset,
-// chart obsolete marking and chart teardown (rrdset_free(), and the delete callback when a host is
-// archived or freed). Do NOT open-code the flag CAS plus the counter movement anywhere else: the
+// these - the parser's CHART_DEFINITION_END, both REPLAY_END branches, the connect/disconnect reset and
+// chart teardown (rrdset_free(), and the delete callback when a host is archived or freed). Obsolete
+// marking is deliberately NOT a release site: the flag gates re-claims while backfill may still run.
+// Do NOT open-code the flag CAS plus the counter movement anywhere else: the
 // ownership invariant is only enforceable while it lives in one place. Every decrement must be either a
 // release that cleared IN_PROGRESS in its own CAS old value, or the speculative-increment rollback in
 // claim() for a duplicate CHART_DEFINITION_END. The rollback does not clear the flag because the chart

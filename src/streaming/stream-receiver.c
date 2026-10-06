@@ -1355,12 +1355,8 @@ static void stream_receiver_replication_reset(RRDHOST *host) {
     // releases under this same lock before unlinking a chart, so its flag CAS and decrement land
     // entirely before this reset or entirely after it, and a later delete callback for that chart
     // finds IN_PROGRESS clear and decrements nothing. Replay-completion releases run on this
-    // connection's parser thread, which is this thread or already stopped. Obsolete marking off that
-    // thread is svc_rrdhost_obsolete_all_charts(): from the service thread (service.c) only while no
-    // receiver is attached and the host has been disconnected longer than the cleanup delay, and from
-    // stream-receiver-connection.c on an accepted connection, after its attach ran this reset and
-    // before the connection is queued to a stream thread, so before its parser can claim. Both find
-    // every flag already cleared and release nothing.
+    // connection's parser thread, which is this thread or already stopped. Obsolete marking releases
+    // nothing (see rrdset_is_obsolete___safe_from_collector_thread()).
     if(rrdhost_receiver_replicating_charts(host) != 0) {
         nd_log(NDLS_DAEMON, NDLP_WARNING,
                "STREAM REPLAY ERROR: receiver replication instances counter should be zero, but it is %u"
