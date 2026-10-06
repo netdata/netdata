@@ -87,7 +87,7 @@ private:
 
 class AcquiredDimension {
 public:
-    AcquiredDimension(const DimensionLookupInfo &DLI) : temporarily_unavailable(false), AcqRH(nullptr), AcqRS(nullptr), AcqRD(nullptr), Dim(nullptr)
+    explicit AcquiredDimension(const DimensionLookupInfo &DLI)
     {
         rrd_rdlock();
 
@@ -182,11 +182,11 @@ public:
 
 private:
     const char *acquire_failure_reason;
-    bool temporarily_unavailable;
-    RRDHOST_ACQUIRED *AcqRH;
-    RRDSET_ACQUIRED *AcqRS;
-    RRDDIM_ACQUIRED *AcqRD;
-    ml_dimension_t *Dim;
+    bool temporarily_unavailable = false;
+    RRDHOST_ACQUIRED *AcqRH = nullptr;
+    RRDSET_ACQUIRED *AcqRS = nullptr;
+    RRDDIM_ACQUIRED *AcqRD = nullptr;
+    ml_dimension_t *Dim = nullptr;
 };
 
 #endif /* ML_LOOKUP_H */

@@ -1663,7 +1663,7 @@ time_t ml_queue_dimension_pass_key(const ml_request_create_new_model_t &req, voi
     return now_realtime_sec() + to_close_s;
 }
 
-enum ml_worker_result ml_worker_create_new_model(ml_worker_t *worker, ml_request_create_new_model_t req) {
+enum ml_worker_result ml_worker_create_new_model(ml_worker_t *worker, const ml_request_create_new_model_t &req) {
     AcquiredDimension AcqDim(req.DLI);
 
     if (!AcqDim.acquired()) {
@@ -1696,7 +1696,7 @@ bool ml_dimension_accept_downstream_model(const ml_dimension_t *dim, const ml_km
     return true;
 }
 
-static enum ml_worker_result ml_worker_add_existing_model(ml_worker_t *worker, ml_request_add_existing_model_t req) {
+static enum ml_worker_result ml_worker_add_existing_model(ml_worker_t *worker, const ml_request_add_existing_model_t &req) {
     AcquiredDimension AcqDim(req.DLI);
 
     if (!AcqDim.acquired()) {

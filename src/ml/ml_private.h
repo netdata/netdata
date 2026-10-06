@@ -29,7 +29,7 @@ bool ml_dimension_accept_downstream_model(const ml_dimension_t *dim, const ml_km
 
 // One create-model step of a training thread: acquire the dimension and train it. `worker` is used only once the
 // dimension is acquired.
-enum ml_worker_result ml_worker_create_new_model(ml_worker_t *worker, ml_request_create_new_model_t req);
+enum ml_worker_result ml_worker_create_new_model(ml_worker_t *worker, const ml_request_create_new_model_t &req);
 
 // The models installed by any training thread and not yet written to ml.db (Cfg.pending_models).
 void ml_pending_models_add(const ml_model_info_t &model_info);
