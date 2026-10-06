@@ -367,7 +367,7 @@ static BOOL getCounterData(
             break;
 
         case PERF_ELAPSED_TIME:
-            pRawData->Data = *(UNALIGNED ULONGLONG *)pData;
+            pRawData->Data = *(UNALIGNED ULONGLONG*)pData;
             pRawData->Time = pObject->PerfTime.QuadPart;
             pRawData->Frequency = pObject->PerfFreq.QuadPart;
             break;
@@ -887,11 +887,12 @@ static bool perflib_get_counter(PERF_DATA_BLOCK *pDataBlock, PERF_OBJECT_TYPE *p
         }
 
         cd->current.CounterType = cd->OverwriteCounterType ? cd->OverwriteCounterType : pCounterDefinition->CounterType;
-        PERF_COUNTER_BLOCK *pCounterBlock = object_scope ? getObjectTypeCounterBlock(pDataBlock, pObjectType) :
-                                                           getInstanceCounterBlock(pDataBlock, pObjectType, pInstance);
+        PERF_COUNTER_BLOCK *pCounterBlock = object_scope ?
+            getObjectTypeCounterBlock(pDataBlock, pObjectType) :
+            getInstanceCounterBlock(pDataBlock, pObjectType, pInstance);
 
         cd->previous = cd->current;
-        if (likely(getCounterData(pDataBlock, pObjectType, pCounterDefinition, pCounterBlock, &cd->current))) {
+        if(likely(getCounterData(pDataBlock, pObjectType, pCounterDefinition, pCounterBlock, &cd->current))) {
             if (cd->elapsed_time_uses_wall_clock && pCounterDefinition->CounterType == PERF_ELAPSED_TIME) {
                 // APP_POOL_WAS stores these start stamps in the 100-ns wall-clock domain.
                 cd->current.Time = pDataBlock->PerfTime100nSec.QuadPart;

@@ -1293,10 +1293,8 @@ static inline void app_pool_current_uptime(
             RRDSET_TYPE_LINE);
         p->rd_app_current_application_pool_uptime = perflib_rrddim_add(
             p->st_app_current_application_pool_uptime, "uptime", NULL, 1, 1, &p->APPCurrentApplicationPoolUptime);
-        rrdlabels_add(p->st_app_current_application_pool_uptime->rrdlabels,
-                      "app_pool",
-                      windows_shared_buffer,
-                      RRDLABEL_SRC_AUTO);
+        rrdlabels_add(
+            p->st_app_current_application_pool_uptime->rrdlabels, "app_pool", windows_shared_buffer, RRDLABEL_SRC_AUTO);
     }
 
     perflib_rrddim_set_by_pointer(
@@ -1775,8 +1773,8 @@ static inline void w3svc_w3wp_total_uri_cached(struct ws3svc_w3wp_data *p, int u
                 update_every,
                 RRDSET_TYPE_LINE);
 
-            p->rd_w3svc_w3wp_total_uri_cached = rrddim_add(
-                p->st_w3svc_w3wp_total_uri_cached, "uri_cache_blocks", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+            p->rd_w3svc_w3wp_total_uri_cached =
+                rrddim_add(p->st_w3svc_w3wp_total_uri_cached, "uri_cache_blocks", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
             rrdlabels_add(p->st_w3svc_w3wp_total_uri_cached->rrdlabels, "app", app_name, RRDLABEL_SRC_AUTO);
         }
 
@@ -1810,8 +1808,8 @@ static inline void w3svc_w3wp_total_metadata_cached(struct ws3svc_w3wp_data *p, 
                 update_every,
                 RRDSET_TYPE_LINE);
 
-            p->rd_w3svc_w3wp_total_metadata_cache = rrddim_add(
-                p->st_w3svc_w3wp_total_metadata_cache, "metadata_blocks", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+            p->rd_w3svc_w3wp_total_metadata_cache =
+                rrddim_add(p->st_w3svc_w3wp_total_metadata_cache, "metadata_blocks", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
             rrdlabels_add(p->st_w3svc_w3wp_total_metadata_cache->rrdlabels, "app", app_name, RRDLABEL_SRC_AUTO);
         }
 
@@ -1845,8 +1843,8 @@ static inline void w3svc_w3wp_total_metadata_flushed(struct ws3svc_w3wp_data *p,
                 update_every,
                 RRDSET_TYPE_LINE);
 
-            p->rd_w3svc_w3wp_total_metadata_flushed = rrddim_add(
-                p->st_w3svc_w3wp_total_metadata_flushed, "metadata_blocks", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+            p->rd_w3svc_w3wp_total_metadata_flushed =
+                rrddim_add(p->st_w3svc_w3wp_total_metadata_flushed, "metadata_blocks", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
             rrdlabels_add(p->st_w3svc_w3wp_total_metadata_flushed->rrdlabels, "app", app_name, RRDLABEL_SRC_AUTO);
         }
 
@@ -1952,13 +1950,8 @@ static inline void w3svc_w3wp_output_cache_flushed_total(struct ws3svc_w3wp_data
                 update_every,
                 RRDSET_TYPE_LINE);
 
-            p->rd_w3svc_w3wp_output_cache_flushed_total = rrddim_add(
-                p->st_w3svc_w3wp_output_cache_flushed_total,
-                "output_cache_entries",
-                NULL,
-                1,
-                1,
-                RRD_ALGORITHM_INCREMENTAL);
+            p->rd_w3svc_w3wp_output_cache_flushed_total =
+                rrddim_add(p->st_w3svc_w3wp_output_cache_flushed_total, "output_cache_entries", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
             rrdlabels_add(p->st_w3svc_w3wp_output_cache_flushed_total->rrdlabels, "app", app_name, RRDLABEL_SRC_AUTO);
         }
 

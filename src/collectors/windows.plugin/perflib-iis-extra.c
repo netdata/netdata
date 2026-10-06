@@ -858,11 +858,15 @@ static void iis_extra_emit(
         strncpyz(identity, app ? app : (instance ? instance : "global"), sizeof(identity) - 1);
         snprintfz(id, sizeof(id), "%s_%s_%s", group->chart_prefix, identity, definition->chart);
         netdata_fix_chart_name(id);
-        const char *family = definition->scope == IIS_EXTRA_QUEUE ?
-                                 "http queue" :
-                                 (definition->scope == IIS_EXTRA_WORKER ? "w3svc w3wp" :
-                                  definition->scope == IIS_EXTRA_SITE   ? "requests" :
-                                                                          "cache");
+        const char *family;
+        if (definition->scope == IIS_EXTRA_QUEUE)
+            family = "http queue";
+        else if (definition->scope == IIS_EXTRA_WORKER)
+            family = "w3svc w3wp";
+        else if (definition->scope == IIS_EXTRA_SITE)
+            family = strcmp(definition->chart, "users_total") == 0 ? "users" : "requests";
+        else
+            family = "cache";
         const char *module_name = group->module_name ? group->module_name : "PerflibWebService";
         size_t chart_index = (size_t)(definition - group->definitions);
         for (size_t n = 0; n < chart_index; n++)
@@ -975,8 +979,8 @@ static bool do_iis_extra_group(PERF_DATA_BLOCK *data, struct iis_extra_group *gr
             continue;
 
         const bool worker = group == &worker_group;
-        struct iis_extra_instance *state =
-            dictionary_set(group->instances, worker ? app : instance_key, NULL, sizeof(*state));
+        const char *state_key = group == &cache_group ? "global" : (worker ? app : instance_key);
+        struct iis_extra_instance *state = dictionary_set(group->instances, state_key, NULL, sizeof(*state));
         const bool first_worker_instance = worker && !state->seen;
         if (first_worker_instance)
             for (size_t n = 0; n < group->count; n++) {
