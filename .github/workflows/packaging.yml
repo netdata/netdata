@@ -361,6 +361,73 @@ jobs:
               echo "RELEASE_PIPELINE=Unknown" >> "${GITHUB_ENV}"
               echo "UPLOAD_SENTRY=false" >> "${GITHUB_ENV}"
           fi
+      - name: Set sccache env vars
+        id: set-sccache-env-vars
+        env:
+          REPOSITORY: ${{ github.repository }}
+          EVENT_NAME: ${{ github.event_name }}
+          BUILD_TYPE: ${{ github.event.inputs.type }}
+          BUCKET: ${{ vars.SCCACHE_BUCKET }}
+          ENDPOINT: ${{ vars.SCCACHE_ENDPOINT }}
+          RO_KEY_ID: ${{ secrets.SCCACHE_R2_RO_KEY_ID }}
+          RO_SECRET: ${{ secrets.SCCACHE_R2_RO_SECRET }}
+          RW_KEY_ID: ${{ secrets.SCCACHE_R2_RW_KEY_ID }}
+          RW_SECRET: ${{ secrets.SCCACHE_R2_RW_SECRET }}
+        run: |
+          # Nightly and release packages are what users install, so they are
+          # never assembled from cached objects.
+          #
+          # Only pushes to master write to the cache. Every other build runs
+          # from a ref nobody has reviewed -- a pull request, or a manual
+          # dispatch of an arbitrary branch -- so its objects must not end up
+          # in anyone else's build. Read-only access is enforced by the token,
+          # not by SCCACHE_S3_RW_MODE, which a compromised build could ignore.
+          key_id=''
+          secret=''
+          rw_mode=''
+
+          case "${BUILD_TYPE}" in
+              release|nightly) ;;
+              *)
+                  if [ "${EVENT_NAME}" = 'push' ]; then
+                      key_id="${RW_KEY_ID}"
+                      secret="${RW_SECRET}"
+                      rw_mode='READ_WRITE'
+                  else
+                      key_id="${RO_KEY_ID}"
+                      secret="${RO_SECRET}"
+                      rw_mode='READ_ONLY'
+                  fi
+                  ;;
+          esac
+
+          # Gate on the credentials as well as the variables: repository
+          # variables are visible to pull requests from forks, but secrets are
+          # not, so a variable-only check would hand fork builds a bucket they
+          # cannot authenticate against. Every value is required, because a
+          # partially configured cache still arms the launchers and the build
+          # then pays a failed round-trip on every compile.
+          if [ "${REPOSITORY}" = 'netdata/netdata' ] && \
+             [ -n "${BUCKET}" ] && [ -n "${ENDPOINT}" ] && \
+             [ -n "${key_id}" ] && [ -n "${secret}" ]; then
+              {
+                  echo "SCCACHE_LAUNCHER=sccache"
+                  echo "SCCACHE_ACTIVE_BUCKET=${BUCKET}"
+                  echo "SCCACHE_ACTIVE_ENDPOINT=${ENDPOINT}"
+                  echo "SCCACHE_ACTIVE_RW_MODE=${rw_mode}"
+                  echo "SCCACHE_ACTIVE_KEY_ID=${key_id}"
+                  echo "SCCACHE_ACTIVE_SECRET=${secret}"
+              } >> "${GITHUB_ENV}"
+          else
+              {
+                  echo "SCCACHE_LAUNCHER="
+                  echo "SCCACHE_ACTIVE_BUCKET="
+                  echo "SCCACHE_ACTIVE_ENDPOINT="
+                  echo "SCCACHE_ACTIVE_RW_MODE="
+                  echo "SCCACHE_ACTIVE_KEY_ID="
+                  echo "SCCACHE_ACTIVE_SECRET="
+              } >> "${GITHUB_ENV}"
+          fi
       - name: Setup QEMU
         id: qemu
         if: matrix.qemu && needs.file-check.outputs.run == 'true'
@@ -397,13 +464,22 @@ jobs:
         id: build
         if: needs.file-check.outputs.run == 'true'
         shell: bash
+        env:
+          AWS_ACCESS_KEY_ID: ${{ env.SCCACHE_ACTIVE_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ env.SCCACHE_ACTIVE_SECRET }}
         run: |
           docker run --security-opt seccomp=unconfined -e DISABLE_TELEMETRY=1 -e VERSION=${{ needs.version-check.outputs.version }} \
                      -e ENABLE_SENTRY=${{ matrix.bundle_sentry }} -e RELEASE_PIPELINE=${{ env.RELEASE_PIPELINE }} \
                      -e BUILD_DESTINATION=${{ matrix.distro }}${{ matrix.version }}_${{ matrix.arch }} -e UPLOAD_SENTRY=${{ env.UPLOAD_SENTRY }} \
                      -e SENTRY_AUTH_TOKEN=${{ secrets.SENTRY_CLI_TOKEN }} -e NETDATA_SENTRY_DSN=${{ secrets.SENTRY_DSN }} \
                      -e NETDATA_TOPOLOGY_IP_INTEL_STOCK_DIR=/netdata/.topology-ip-intel-stock \
-                     -e GOOS=$(echo ${{ matrix.platform }} | cut -f 1 -d '/') -e GOARCH=$(echo ${{ matrix.platform }} | cut -f 2 -d '/') \
+                     -e GOOS="$(echo '${{ matrix.platform }}' | cut -f 1 -d '/')" -e GOARCH="$(echo '${{ matrix.platform }}' | cut -f 2 -d '/')" \
+                     -e CMAKE_C_COMPILER_LAUNCHER=${{ env.SCCACHE_LAUNCHER }} -e CMAKE_CXX_COMPILER_LAUNCHER=${{ env.SCCACHE_LAUNCHER }} \
+                     -e RUSTC_WRAPPER=${{ env.SCCACHE_LAUNCHER }} \
+                     -e SCCACHE_BUCKET=${{ env.SCCACHE_ACTIVE_BUCKET }} -e SCCACHE_ENDPOINT=${{ env.SCCACHE_ACTIVE_ENDPOINT }} \
+                     -e SCCACHE_REGION=auto -e SCCACHE_S3_KEY_PREFIX=${{ matrix.distro }}${{ matrix.version }}-${{ matrix.arch }} \
+                     -e SCCACHE_S3_RW_MODE=${{ env.SCCACHE_ACTIVE_RW_MODE }} \
+                     -e AWS_ACCESS_KEY_ID -e AWS_SECRET_ACCESS_KEY \
                      --platform=${{ matrix.platform }} -v "$PWD":/netdata netdata/package-builders:${{ matrix.distro }}${{ matrix.version }}-${{ matrix.builder_rev }}
       - name: Save Packages
         id: artifacts
