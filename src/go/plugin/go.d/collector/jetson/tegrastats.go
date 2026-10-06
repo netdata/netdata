@@ -1,5 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
+//go:build linux
+
 package jetson
 
 import (
@@ -9,7 +11,6 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
-	"runtime"
 	"strconv"
 	"time"
 
@@ -20,9 +21,6 @@ import (
 const tegrastatsInterval = time.Second
 
 func lookupTegrastats() (string, error) {
-	if runtime.GOOS != "linux" {
-		return "", errors.New("jetson requires Linux")
-	}
 	path, err := exec.LookPath("tegrastats")
 	if err != nil {
 		return "", errors.New("tegrastats executable not found in PATH")

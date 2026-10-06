@@ -1,12 +1,13 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
+//go:build linux
+
 package jetson
 
 import (
 	"context"
 	"errors"
 	"os"
-	"runtime"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -58,11 +59,7 @@ func TestCanceledLifecycle(t *testing.T) {
 func TestLookupTegrastats(t *testing.T) {
 	t.Setenv("PATH", t.TempDir())
 	_, err := lookupTegrastats()
-	if runtime.GOOS == "linux" {
-		assert.ErrorContains(t, err, "not found in PATH")
-	} else {
-		assert.ErrorContains(t, err, "requires Linux")
-	}
+	assert.EqualError(t, err, "tegrastats executable not found in PATH")
 }
 
 func TestArtifacts(t *testing.T) {

@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-//go:build linux || darwin
+//go:build linux
 
 package jetson
 

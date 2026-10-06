@@ -106,10 +106,6 @@ modules:
     troubleshooting:
       errors:
         list:
-          - error: jetson requires Linux
-            cause: Netdata is running on an operating system other than Linux, where the collector's stock job also starts.
-            fix: |
-              This collector works only on Jetson devices running Linux. To silence the message, set `jetson: no` in the `modules` section of `go.d.conf`.
           - error: tegrastats executable not found in PATH
             cause: No executable named `tegrastats` is in Netdata's `PATH`. This is expected on Linux hosts that are not Jetson devices, and when Netdata runs in a container.
             fix: |

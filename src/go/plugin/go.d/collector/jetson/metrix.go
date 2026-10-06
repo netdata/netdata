@@ -1,5 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
+//go:build linux
+
 package jetson
 
 import "github.com/netdata/netdata/go/plugins/pkg/metrix"
