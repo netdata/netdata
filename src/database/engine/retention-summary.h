@@ -76,12 +76,12 @@ struct retention_summary_record {
 typedef struct retention_summary_block RETENTION_SUMMARY_BLOCK;
 
 // Startup, before the per-file MRG population: deletes temporary and unusable
-// summaries, and claims (marks as populated) the datafiles of every summary that
-// matches the loaded journals. Returns the number of claimed blocks in *blocks.
+// summaries, and claims (marks as populated and acquires) the datafiles of every
+// summary that matches the loaded journals. Returns the number of claimed blocks in *blocks.
 size_t retention_summary_claim(struct rrdengine_instance *ctx, RETENTION_SUMMARY_BLOCK ***blocks);
 
 // Loads one claimed block into the MRG (falls back to the per-file walk of its
-// datafiles if the records are damaged) and frees it.
+// datafiles if the records are damaged), releases its datafiles and frees it.
 size_t retention_summary_apply(RETENTION_SUMMARY_BLOCK *block);
 
 // Builds the summary of one complete block that has none, newest first.

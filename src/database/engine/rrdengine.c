@@ -2022,6 +2022,12 @@ static void *populate_mrg_tp_worker(
 
     if (total_datafiles == 0) {
         nd_log_daemon(NDLP_WARNING, "DBENGINE: tier %d: no datafiles to populate MRG", tier);
+
+        // still delete leftover temporary and orphaned summaries
+        RETENTION_SUMMARY_BLOCK **blocks = NULL;
+        internal_fatal(retention_summary_claim(ctx, &blocks) != 0, "DBENGINE: claimed a retention summary without datafiles");
+        freez(blocks);
+
         __atomic_store_n(&ctx->summaries.ready, true, __ATOMIC_RELEASE);
         worker_is_idle();
         return data;

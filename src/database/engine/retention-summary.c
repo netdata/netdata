@@ -113,10 +113,20 @@ static uintptr_t rs_failed(struct rrdengine_instance *ctx, uint32_t block_id, bo
     return failures;
 }
 
-// unlinks the published summary of a block, if there is one
+// unlinks the published summary of a block, if there is one; it stays known
+// (and on the disk-space account) if it cannot be unlinked, so a later call retries
 static void rs_forget_and_unlink(struct rrdengine_instance *ctx, uint32_t block_id) {
-    uint64_t file_size = 0;
+    if (!rs_known(ctx, block_id, false))
+        return;
 
+    char path[RRDENG_PATH_MAX];
+    rs_path(ctx, block_id, false, path, sizeof(path));
+    if (unlink(path) != 0 && errno != ENOENT) {
+        nd_log_daemon(NDLP_WARNING, "DBENGINE: tier %d: cannot delete retention summary \"%s\"", ctx->config.tier, path);
+        return;
+    }
+
+    uint64_t file_size = 0;
     spinlock_lock(&ctx->summaries.spinlock);
     Pvoid_t *PValue = JudyLGet(ctx->summaries.JudyL, block_id, PJE0);
     if (PValue) {
@@ -125,12 +135,7 @@ static void rs_forget_and_unlink(struct rrdengine_instance *ctx, uint32_t block_
     }
     spinlock_unlock(&ctx->summaries.spinlock);
 
-    if (!PValue)
-        return;
-
-    char path[RRDENG_PATH_MAX];
-    rs_path(ctx, block_id, false, path, sizeof(path));
-    if (unlink(path) == 0 || errno == ENOENT)
+    if (PValue)
         ctx_current_disk_space_decrease(ctx, file_size);
 }
 
@@ -685,6 +690,7 @@ static RETENTION_SUMMARY_BLOCK *rs_claim_one(struct rrdengine_instance *ctx, con
             reason = "is invalid or of another version";
     }
 
+    size_t acquired = 0;
     if (!reason) {
         netdata_rwlock_rdlock(&ctx->datafiles.rwlock);
         for (size_t i = 0; i < RETENTION_SUMMARY_FILES_PER_BLOCK && !reason; i++) {
@@ -694,8 +700,12 @@ static RETENTION_SUMMARY_BLOCK *rs_claim_one(struct rrdengine_instance *ctx, con
                 reason = "covers a datafile that does not exist";
             else if (!rs_identity_matches(df, &block->header.files[i]))
                 reason = "does not match the journal files";
+            // held until the records are applied: a datafile deleted meanwhile
+            // (rotation can run during startup) waits for it, as for the builder
+            else if (!datafile_acquire(df, DATAFILE_ACQUIRE_RETENTION))
+                reason = "covers a datafile that is being deleted";
             else
-                block->datafiles[i] = df;
+                block->datafiles[acquired++] = df;
         }
 
         // claim the datafiles, so the per-file population skips them
@@ -716,6 +726,8 @@ static RETENTION_SUMMARY_BLOCK *rs_claim_one(struct rrdengine_instance *ctx, con
     }
 
     if (reason) {
+        while (acquired)
+            datafile_release(block->datafiles[--acquired], DATAFILE_ACQUIRE_RETENTION);
         nd_log_daemon(NDLP_NOTICE, "DBENGINE: tier %d: retention summary \"%s\" %s; deleting it",
                       ctx->config.tier, path, reason);
         (void)unlink(path);
@@ -863,6 +875,9 @@ size_t retention_summary_apply(RETENTION_SUMMARY_BLOCK *block) {
         for (size_t i = 0; i < RETENTION_SUMMARY_FILES_PER_BLOCK; i++)
             journalfile_v2_populate_retention_to_mrg(ctx, block->datafiles[i]->journalfile);
     }
+
+    for (size_t i = 0; i < RETENTION_SUMMARY_FILES_PER_BLOCK; i++)
+        datafile_release(block->datafiles[i], DATAFILE_ACQUIRE_RETENTION);
 
     freez(block);
     return records;
