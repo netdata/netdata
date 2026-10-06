@@ -91,7 +91,8 @@ pub(crate) fn flatten_and_strip(map: &JsonMap<String, JsonValue>) -> JsonMap<Str
 /// base64 strings; arrays keep their shape with elements converted
 /// recursively (kvlist elements stay objects until [`flatten_and_strip`]
 /// flattens them); kvlists become nested objects. A missing value maps to
-/// `null`.
+/// `null`, and so does the profiling-only string-table reference, which OTLP
+/// says other signals process as an absent value.
 fn json_from_any_value(any_value: &AnyValue) -> JsonValue {
     use opentelemetry_proto::tonic::common::v1::any_value::Value;
 
@@ -110,7 +111,7 @@ fn json_from_any_value(any_value: &AnyValue) -> JsonValue {
             JsonValue::Object(json_map_from_key_value_list(&kvl.values))
         }
         Some(Value::BytesValue(bytes)) => JsonValue::String(BASE64.encode(bytes)),
-        None => JsonValue::Null,
+        Some(Value::StringValueStrindex(_)) | None => JsonValue::Null,
     }
 }
 
@@ -154,5 +155,19 @@ pub fn json_from_instrumentation_scope(
         for (key, value) in scope_attrs {
             jm.insert(format!("scope.attributes.{}", key), value);
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use opentelemetry_proto::tonic::common::v1::any_value::Value;
+
+    #[test]
+    fn profiling_string_table_reference_is_null() {
+        let strindex = AnyValue {
+            value: Some(Value::StringValueStrindex(3)),
+        };
+        assert_eq!(json_from_any_value(&strindex), JsonValue::Null);
     }
 }

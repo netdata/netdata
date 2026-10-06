@@ -1022,6 +1022,7 @@ mod tests {
         let kv = |key: &str, value: Option<any_value::Value>| KeyValue {
             key: key.into(),
             value: value.map(|v| AnyValue { value: Some(v) }),
+            key_strindex: 0,
         };
         let expected = ExportLogsServiceRequest {
             resource_logs: vec![ResourceLogs {
