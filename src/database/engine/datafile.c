@@ -193,10 +193,13 @@ bool datafile_acquire_for_deletion(struct rrdengine_datafile *df)
     if(should_evict_open_pages)
         pgc_open_evict_clean_pages_of_datafile(open_cache, df);
 
+#ifdef NETDATA_INTERNAL_CHECKS
+    // walks the whole open cache clean queue, only to feed the internal_error() below
     usec_t time_to_scan_ut = now_monotonic_usec();
     size_t clean_pages_in_open_cache = pgc_count_clean_pages_having_data_ptr(open_cache, (Word_t)datafile_ctx(df), df);
     size_t hot_pages_in_open_cache = pgc_count_hot_pages_having_data_ptr(open_cache, (Word_t)datafile_ctx(df), df);
     time_to_scan_ut = now_monotonic_usec() - time_to_scan_ut;
+#endif
 
     spinlock_tracked_lock(&df->users.spinlock);
 
@@ -217,6 +220,7 @@ bool datafile_acquire_for_deletion(struct rrdengine_datafile *df)
 
     }
 
+#ifdef NETDATA_INTERNAL_CHECKS
     if(!can_be_deleted)
         internal_error(true, "DBENGINE: datafile %u of tier %d pending deletion has %u lockers "
                              "(oc:%u, pd:%u, rt:%u, ix:%u), writers %zu/%zu, open-cache clean/hot %zu/%zu "
@@ -232,6 +236,7 @@ bool datafile_acquire_for_deletion(struct rrdengine_datafile *df)
                        clean_pages_in_open_cache,
                        hot_pages_in_open_cache,
                        time_to_scan_ut);
+#endif
 
     spinlock_tracked_unlock(&df->users.spinlock);
 
