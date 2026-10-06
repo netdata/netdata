@@ -116,7 +116,7 @@ modules:
             fix: Install or restore the BSP's tegrastats utility and add its directory to the Netdata service's `PATH`, then restart Netdata.
           - error: "start tegrastats: `error`"
             cause: Netdata could not start its unprivileged command helper.
-            fix: Check the accompanying error and confirm that the Netdata installation includes an executable `nd-run` helper in its plugins directory.
+            fix: Check the accompanying error and repair the Netdata installation if its `nd-run` helper is missing or cannot be executed.
           - error: no fresh tegrastats sample
             cause: No complete tegrastats record has arrived yet, or the latest record is more than three seconds old.
             fix: Run `tegrastats --interval 1000` as the Netdata service account and confirm that it emits complete records once per second; inspect the collector log for an accompanying source error.
