@@ -84,6 +84,10 @@ func (o Options) appendFrame(stack *strings.Builder, frame stackFrame) string {
 
 // Typed event attributes serve native measurements even with optional logs off.
 func keepEventAttr(kind beacon.EventKind, name, key string) bool {
+	if key == "observation_id" || key == "observation_sequence" {
+		return kind == beacon.EventDocument || kind == beacon.EventView || kind == beacon.EventNavigation ||
+			kind == beacon.EventResource || kind == beacon.EventSession
+	}
 	switch kind {
 	case beacon.EventNavigation:
 		return key == "pageLoadTime" || key == "domContentLoadHandlerTime"
@@ -101,6 +105,16 @@ func keepEventAttr(kind beacon.EventKind, name, key string) bool {
 // Numeric protocol values are measurements, not free text. Interpret each field
 // by its original key, before custom-key redaction can change that meaning.
 func (o Options) eventAttr(kind beacon.EventKind, key, value string) (string, bool) {
+	if keepEventAttr(kind, "", key) {
+		if key == "observation_id" {
+			id := observationID(value)
+			return id, id != ""
+		}
+		if key == "observation_sequence" {
+			return value, observationRevision(value) != 0
+		}
+	}
+
 	if (kind == beacon.EventResource || kind == beacon.EventNavigation) && key == "name" {
 		return o.url(value, maxAttrLen), true
 	}
@@ -116,10 +130,46 @@ func (o Options) eventAttr(kind beacon.EventKind, key, value string) (string, bo
 	if numeric {
 		value = beacon.Clean(value, len(value))
 		n, err := strconv.ParseFloat(value, 64)
-		if err != nil || math.IsNaN(n) || math.IsInf(n, 0) {
+		if err != nil || n < 0 || math.IsNaN(n) || math.IsInf(n, 0) {
 			return "", false
 		}
 		return beacon.Truncate(value, maxAttrLen), true
 	}
 	return o.cleanAttr(key, value), true
+}
+
+// IDs are opaque and must survive unchanged. Reject, rather than truncate or
+// redact, malformed values so unrelated observations cannot collapse together.
+func observationID(value string) string {
+	if len(value) == 0 || len(value) > 128 {
+		return ""
+	}
+	for _, c := range value {
+		if !(c >= 'a' && c <= 'z' || c >= 'A' && c <= 'Z' || c >= '0' && c <= '9' || c == '_' || c == '-' || c == '.' || c == ':') {
+			return ""
+		}
+	}
+	return value
+}
+
+func observationRevision(value string) uint64 {
+	// The producer serializes positive Number-safe integers in canonical decimal.
+	if len(value) == 0 || len(value) > 16 || value[0] < '1' || value[0] > '9' {
+		return 0
+	}
+	n, err := strconv.ParseUint(value, 10, 64)
+	if err != nil || n == 0 || n > 9007199254740991 {
+		return 0
+	}
+	return n
+}
+
+func observationContextID(ctx map[string]any) string {
+	value, _ := ctx["id"].(string)
+	return observationID(value)
+}
+
+func observationContextRevision(ctx map[string]any) uint64 {
+	value, _ := ctx["observation_sequence"].(string)
+	return observationRevision(value)
 }

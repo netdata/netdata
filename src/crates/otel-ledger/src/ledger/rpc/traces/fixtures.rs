@@ -101,6 +101,7 @@ pub(crate) fn otlp_req_svc(
                     value: Some(AnyValue {
                         value: Some(Av::StringValue(service.into())),
                     }),
+                    key_strindex: 0,
                 }],
                 ..Default::default()
             }),

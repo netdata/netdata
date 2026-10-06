@@ -83,7 +83,13 @@ func TestSessionEventsRing(t *testing.T) {
 func TestSessionEventsFiltersNavigationAndResource(t *testing.T) {
 	a, now := newAgg(30 * time.Minute)
 	b := mk(*now, "sess1", "/a")
-	b.Events = []beacon.Event{{Kind: beacon.EventNavigation}, {Kind: beacon.EventResource}, {Name: "custom"}}
+	b.Events = append(b.Events, beacon.Event{
+		Kind: beacon.EventNavigation,
+	}, beacon.Event{
+		Kind: beacon.EventResource,
+	}, beacon.Event{
+		Name: "custom",
+	})
 	a.Ingest(b)
 	*now = now.Add(time.Second)
 
@@ -105,6 +111,10 @@ func TestSessionViewChangeEmitsViewEvent(t *testing.T) {
 	*now = now.Add(time.Second)
 	b2 := mk(*now, "sess1", "/")
 	b2.View = "checkout"
+	b2.ViewID = "checkout-occurrence"
+	b2.Events = []beacon.Event{
+		{Kind: beacon.EventView, ID: "checkout-event", Revision: 1, Attrs: map[string]string{"toView": "checkout"}},
+	}
 	a.Ingest(b2)
 
 	events, ok := a.SessionEvents("sess1")
@@ -171,10 +181,12 @@ func TestSessionsStayWithTheirOwner(t *testing.T) {
 		})
 		for _, incoming := range []string{"a", "b"} {
 			a.Ingest(&beacon.Beacon{
-				Site:      incoming,
-				Received:  *now,
-				SessionID: "shared",
-				PageGroup: "/" + incoming,
+				ExperienceID: incoming,
+				Events:       []beacon.Event{{ID: incoming, Revision: 1, Kind: beacon.EventDocument}},
+				Site:         incoming,
+				Received:     *now,
+				SessionID:    "shared",
+				PageGroup:    "/" + incoming,
 			})
 		}
 		events, ok := a.SessionEvents("shared")
@@ -184,15 +196,15 @@ func TestSessionsStayWithTheirOwner(t *testing.T) {
 	}
 }
 
-// The active-sessions gauge (rum.sessions) now reads off this same LRU.
-func TestActiveSessionsGaugeUsesSessionLRU(t *testing.T) {
+// The observation window controls session measurement independently of details.
+func TestObservedSessionsAgeByWindow(t *testing.T) {
 	a, now := newAgg(30 * time.Minute)
 	a.Ingest(mk(*now, "s1", "/a"))
 	a.Ingest(mk(*now, "s2", "/a"))
 	*now = now.Add(20 * time.Minute)
 	a.Ingest(mk(*now, "s1", "/b"))
 	*now = t0.Add(31 * time.Minute) // s2 idle 31m, s1 idle 11m
-	if got := a.Snapshot().ActiveSessions; got != 1 {
+	if got := a.Snapshot().ObservedSessions; got != 1 {
 		t.Fatalf("active=%d want 1", got)
 	}
 }
@@ -246,8 +258,7 @@ func TestElementsFrustrationAndUser(t *testing.T) {
 
 	b.UserID = "u_42"
 	b.Vitals = []beacon.Vital{
-		{Name: beacon.LCP, Value: 5200, Element: "#hero img"},
-		{Name: beacon.LCP, Value: 900, Element: "#logo"},
+		{ID: "lcp", Revision: 1, Name: beacon.LCP, Value: 5200, Element: "#hero img"},
 	}
 	b.Events = []beacon.Event{{Name: beacon.RageClickEvent, Attrs: map[string]string{"target": "button#buy"}}}
 	a.Ingest(b)

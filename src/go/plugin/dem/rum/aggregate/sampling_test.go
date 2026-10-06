@@ -140,7 +140,7 @@ func TestActivityCountsInvestigatedSessions(t *testing.T) {
 	b.Errors = []beacon.Error{{Type: "E", Message: "m", Fingerprint: "fp"}}
 	a.Ingest(b)
 	act := a.Activity()
-	if act.ActiveSessions != 2 || act.InvestigatedSessions != 1 {
+	if act.ObservedSessions != 2 || act.InvestigatedSessions != 1 {
 		t.Fatalf("activity = %+v, want 2 active, 1 investigated", act)
 	}
 }

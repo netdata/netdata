@@ -3,6 +3,7 @@
   // Faro app.version/app.environment; currentScript must be read
   // synchronously, before anything yields, or it stops pointing here.
   var cs = document.currentScript;
+  var entryURL = location.href;
   var ver = (cs && cs.getAttribute('data-version')) || '';
   var env = (cs && cs.getAttribute('data-env')) || '';
   // Crawlers, headless browsers and automation: send nothing unless
@@ -43,8 +44,68 @@
       if (ver) { app.version = ver; }
       if (env) { app.environment = env; }
       var sdk = GrafanaFaroWebSdk;
-      var inst = [new sdk.PerformanceInstrumentation(), new sdk.ErrorsInstrumentation(),
-        new sdk.WebVitalsInstrumentation(), new sdk.SessionInstrumentation(), new sdk.ViewInstrumentation()];
+      // The metadata provider returns a fresh object before queueing each item.
+      // Never stamp origin in beforeSend: it runs when a queued batch flushes.
+      var sequence = 0, occurrence = 0;
+      var documentID = sdk.genShortID();
+      var activation = { id: documentID + ':' + (++occurrence), url: entryURL };
+      function revision() { return String(++sequence); }
+      function eventIdentity(attrs) {
+        var seq = revision();
+        return Object.assign({}, attrs, { observation_id: activation.id + ':' + seq, observation_sequence: seq });
+      }
+      class DocumentPerformance extends sdk.PerformanceInstrumentation {
+        initialize() {
+          var push = this.api.pushEvent;
+          this.api = Object.assign({}, this.api, { pushEvent: function (name, attrs, domain, options) {
+            push(name, eventIdentity(attrs), domain, options);
+          } });
+          super.initialize();
+        }
+      }
+      class DocumentVitals extends sdk.WebVitalsInstrumentation {
+        initialize() {
+          var push = this.api.pushMeasurement;
+          this.api = Object.assign({}, this.api, { pushMeasurement: function (measurement, options) {
+            options = options || {};
+            push(measurement, Object.assign({}, options, {
+              context: Object.assign({}, options.context, { observation_sequence: revision() })
+            }));
+          } });
+          super.initialize();
+        }
+      }
+      class DocumentSessions extends sdk.SessionInstrumentation {
+        initialize() {
+          var push = this.api.pushEvent;
+          this.api = Object.assign({}, this.api, { pushEvent: function (name, attrs, domain, options) {
+            push(name, eventIdentity(attrs), domain, options);
+          } });
+          super.initialize();
+        }
+      }
+      class ApplicationViews extends sdk.ViewInstrumentation {
+        initialize() {
+          var push = this.api.pushEvent;
+          this.api = Object.assign({}, this.api, { pushEvent: function (name, attrs, domain, options) {
+            var id = this.getView().id;
+            push(name, Object.assign({}, attrs, { observation_id: id, observation_sequence: revision() }), domain, options);
+          } });
+          super.initialize();
+        }
+      }
+      function activate() {
+        var f = faroApi();
+        if (f) { f.pushEvent('document_activated', { observation_id: activation.id, observation_sequence: revision() }); }
+      }
+      // Register before web-vitals registers its BFCache callbacks.
+      window.addEventListener('pageshow', function (event) {
+        if (!event.persisted) { return; }
+        activation = { id: documentID + ':' + (++occurrence), url: entryURL };
+        activate();
+      });
+      var inst = [new DocumentPerformance(), new sdk.ErrorsInstrumentation(),
+        new DocumentVitals(), new DocumentSessions(), new ApplicationViews()];
       if (opt.consoleLogs) { inst.push(new sdk.ConsoleInstrumentation()); }
       if (opt.tracing && window.GrafanaFaroWebTracing) {
         // Same-origin requests always get traceparent; other origins only
@@ -55,11 +116,28 @@
           }
         }));
       }
-      var cfg = { url: base + '/rum/' + k + '/collect' + (bot ? '?bot=1' : ''), app: app, instrumentations: inst, beforeSend: shapeItem };
+      var collectorURL = new URL(base + '/rum/' + k + '/collect' + (bot ? '?bot=1' : ''), location.href).href;
+      var collectorPattern = new RegExp('^' + collectorURL.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '$');
+      // Faro treats URL strings as regex patterns and otherwise observes its
+      // own ?bot=1 requests. Inherit delivery unchanged; match only this URL.
+      class CollectorTransport extends sdk.FetchTransport {
+        getIgnoreUrls() { return [collectorPattern]; }
+      }
+      var cfg = { transports: [new CollectorTransport({ url: collectorURL })], app: app, instrumentations: inst, beforeSend: shapeItem };
       if (opt.consoleLogs) { cfg.consoleInstrumentation = { consoleErrorAsLog: true }; }
       cfg.sessionTracking = { samplingRate: opt.sampling };
-      GrafanaFaroWebSdk.initializeFaro(cfg);
+      cfg.metas = [sdk.browserMeta, sdk.osMeta, sdk.sdkMeta, function () { return { page: { id: activation.id, url: activation.url } }; }];
+      var faro = GrafanaFaroWebSdk.initializeFaro(cfg);
+      var setView = faro.api.setView;
+      faro.api.setView = function (view, options) {
+        var previous = faro.api.getView();
+        var id = previous && previous.name === (view && view.name) ? previous.id : documentID + ':view:' + (++occurrence);
+        setView(view && Object.assign({}, view, { id: id }), options);
+      };
+      // Application page metadata must not replace the document's entry origin.
+      faro.api.setPage = function () {};
       if (user) { applyUser(); }
+      activate();
       if (opt.frustrationSignals) { watchFrustration(); }
     } catch (e) { /* never break the host page */ }
   }
@@ -111,11 +189,15 @@
     });
   }
   var eventAttributeKeys = {
-    'faro.performance.navigation': ['pageLoadTime', 'domContentLoadHandlerTime'],
-    'faro.performance.resource': ['name', 'httpHost', 'duration', 'transferSize', 'initiatorType'],
+    'faro.performance.navigation': ['pageLoadTime', 'domContentLoadHandlerTime', 'observation_id', 'observation_sequence'],
+    'faro.performance.resource': ['name', 'httpHost', 'duration', 'transferSize', 'initiatorType', 'observation_id', 'observation_sequence'],
     'faro.tracing.fetch': ['url.full', 'http.request.method', 'http.response.status_code', 'duration_ns'],
     'faro.tracing.xml-http-request': ['url.full', 'http.request.method', 'http.response.status_code', 'duration_ns'],
-    'view_changed': ['fromView', 'toView'],
+    'session_start': ['observation_id', 'observation_sequence'],
+    'session_resume': ['observation_id', 'observation_sequence'],
+    'session_extend': ['observation_id', 'observation_sequence'],
+    'document_activated': ['observation_id', 'observation_sequence'],
+    'view_changed': ['fromView', 'toView', 'observation_id', 'observation_sequence'],
     'rage_click': ['target'], 'dead_click': ['target'], 'error_click': ['target']
   };
   var payloadKeys = {
@@ -166,7 +248,7 @@
     copy.meta = {
       page: pick(meta.page, ['id', 'url']), session: pick(meta.session, ['id']),
       browser: pick(meta.browser, ['name', 'version', 'os', 'mobile', 'viewportWidth']),
-      view: pick(meta.view, ['name']), app: pick(meta.app, ['version', 'environment']),
+      view: pick(meta.view, ['name', 'id']), app: pick(meta.app, ['version', 'environment']),
       user: pick(meta.user, ['id'])
     };
     if (meta.session && meta.session.attributes) {
@@ -192,7 +274,7 @@
       Object.keys(source.values || {}).forEach(function (key) {
         if (/^(lcp|fcp|ttfb|inp|cls)$/i.test(key)) { payload.values[key] = source.values[key]; }
       });
-      payload.context = pick(source.context, ['element', 'interaction_target', 'largest_shift_target']);
+      payload.context = pick(source.context, ['id', 'observation_sequence', 'element', 'interaction_target', 'largest_shift_target']);
     } else if (item.type === 'exception') {
       if (source.stacktrace) { payload.stacktrace = { frames: cleanFrames(source.stacktrace.frames || []) }; }
     } else if (item.type === 'log') {

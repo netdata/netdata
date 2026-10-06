@@ -112,12 +112,13 @@ func TestProcessingDeduplicatesWithoutMutatingInput(t *testing.T) {
 		Rate: 1,
 	})
 	event := &beacon.Beacon{
-		Site:      "site",
-		Received:  time.Now(),
-		SessionID: "session",
-		PageID:    "page",
-		Path:      "/checkout",
-		PageGroup: "/checkout",
+		Site:         "site",
+		Received:     time.Now(),
+		SessionID:    "session",
+		ExperienceID: "page",
+		Events:       []beacon.Event{{Kind: beacon.EventDocument, ID: "page", Revision: 1}},
+		Path:         "/checkout",
+		PageGroup:    "/checkout",
 	}
 	before := *event
 	p.Ingest(event)
@@ -126,9 +127,8 @@ func TestProcessingDeduplicatesWithoutMutatingInput(t *testing.T) {
 	snapshot := p.aggregator.Snapshot()
 	assert.EqualValues(t, 2, snapshot.Counters[aggregate.CounterAccepted])
 	assert.EqualValues(t, 1, snapshot.Counters[aggregate.CounterPageviews])
-	require.Len(t, history.events, 2)
+	require.Len(t, history.events, 1, "a replay cannot create another retained activity record")
 	assert.Equal(t, "pageview", history.events[0].Type)
-	assert.Equal(t, "activity", history.events[1].Type)
 	assert.Equal(t, []string{"pageview"}, drain())
 }
 
@@ -142,12 +142,13 @@ func TestProcessingSamplingPromotionKeepsHistoryAndExportsCurrentObservation(t *
 	})
 	now := time.Now()
 	first := &beacon.Beacon{
-		Site:      "site",
-		Received:  now,
-		SessionID: session,
-		Path:      "/checkout",
-		PageGroup: "/checkout",
-		Events:    []beacon.Event{{Name: "earlier-action", Time: now}},
+		Site:         "site",
+		Received:     now,
+		SessionID:    session,
+		ExperienceID: "document",
+		Path:         "/checkout",
+		PageGroup:    "/checkout",
+		Events:       []beacon.Event{{Kind: beacon.EventDocument, ID: "document", Revision: 1, Time: now}, {Name: "earlier-action", Time: now}},
 	}
 	p.Ingest(first)
 	assert.Empty(t, history.events)
@@ -156,11 +157,12 @@ func TestProcessingSamplingPromotionKeepsHistoryAndExportsCurrentObservation(t *
 	assert.True(t, rows[0].PageView)
 	assert.EqualValues(t, 1, p.aggregator.Snapshot().Counters[aggregate.CounterPageviews])
 	promoted := &beacon.Beacon{
-		Site:      "site",
-		Received:  now.Add(time.Second),
-		SessionID: session,
-		Path:      "/checkout",
-		PageGroup: "/checkout",
+		Site:         "site",
+		Received:     now.Add(time.Second),
+		SessionID:    session,
+		ExperienceID: "document",
+		Path:         "/checkout",
+		PageGroup:    "/checkout",
 		Errors: []beacon.Error{
 			{Fingerprint: "failure", Type: "Error", Message: "failed", Time: now.Add(time.Second)},
 		},

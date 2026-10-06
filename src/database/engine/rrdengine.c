@@ -710,11 +710,15 @@ extent_flush_to_open(struct rrdengine_instance *ctx, struct extent_io_descriptor
                        xt_io_descr->bytes);
 
     usec_t max_end_time_ut = 0;
+    uint64_t stored_slots = 0;
     for (i = 0 ; i < xt_io_descr->descr_count ; ++i) {
         descr = xt_io_descr->descr_array[i];
 
         if (descr->end_time_ut > max_end_time_ut)
             max_end_time_ut = descr->end_time_ut;
+
+        if (likely(!have_error))
+            stored_slots += descr->slots;
 
         if (likely(still_running && !have_error)) {
             pgc_open_add_hot_page(
@@ -733,6 +737,9 @@ extent_flush_to_open(struct rrdengine_instance *ctx, struct extent_io_descriptor
     }
 
     if (!have_error) {
+        // the pages are on disk now - they are samples of this datafile
+        rrdeng_datafile_samples_charge(datafile, stored_slots);
+
         if (max_end_time_ut > 0) {
             time_t new_last_time_s = (time_t)(max_end_time_ut / USEC_PER_SEC);
 
@@ -978,6 +985,7 @@ datafile_extent_build(struct rrdengine_instance *ctx, struct page_descr_with_dat
 
     for (i = 0 ; i < count ; ++i) {
         descr = xt_io_descr->descr_array[i];
+        descr->slots = pgd_slots_used(descr->pgd);
         header->descr[i].type = descr->type;
         uuid_copy(*(nd_uuid_t *)header->descr[i].uuid, *uuidmap_uuid_ptr(descr->uuid_id));
         header->descr[i].page_length = descr->page_length;
@@ -1632,26 +1640,8 @@ static void update_metrics_first_time_s(struct rrdengine_instance *ctx, struct r
 
         if (likely(uuid_first_t_entry->first_time_s != LONG_MAX)) {
 
-            time_t old_first_time_s = mrg_metric_get_first_time_s(main_mrg, uuid_first_t_entry->metric);
-
-            bool changed = mrg_metric_set_first_time_s_if_bigger(main_mrg, uuid_first_t_entry->metric, uuid_first_t_entry->first_time_s);
-            if (changed) {
-                uint32_t update_every_s = mrg_metric_get_update_every_s(main_mrg, uuid_first_t_entry->metric);
-                uint64_t remove_samples;
-                if (rrdeng_retention_samples_delta(
-                        ctx,
-                        old_first_time_s,
-                        uuid_first_t_entry->first_time_s,
-                        update_every_s,
-                        "advancing metric first retention time",
-                        &remove_samples))
-                    rrdeng_atomic_uint64_sub_saturating(
-                        ctx,
-                        &ctx->atomic.samples,
-                        remove_samples,
-                        "samples",
-                        "advancing metric first retention time");
-            }
+            // the samples of the deleted datafile are removed by datafile_delete()
+            mrg_metric_set_first_time_s_if_bigger(main_mrg, uuid_first_t_entry->metric, uuid_first_t_entry->first_time_s);
             mrg_metric_release(main_mrg, uuid_first_t_entry->metric);
         }
         else {
@@ -1660,24 +1650,6 @@ static void update_metrics_first_time_s(struct rrdengine_instance *ctx, struct r
             // there is no retention for this metric
             bool has_retention = mrg_metric_has_zero_disk_retention(main_mrg, uuid_first_t_entry->metric);
             if (!has_retention) {
-                time_t first_time_s = mrg_metric_get_first_time_s(main_mrg, uuid_first_t_entry->metric);
-                time_t last_time_s = mrg_metric_get_latest_time_s(main_mrg, uuid_first_t_entry->metric);
-                uint32_t update_every_s = mrg_metric_get_update_every_s(main_mrg, uuid_first_t_entry->metric);
-                uint64_t remove_samples;
-                if (rrdeng_retention_samples_delta(
-                        ctx,
-                        first_time_s,
-                        last_time_s,
-                        update_every_s,
-                        "deleting a metric with zero disk retention",
-                        &remove_samples))
-                    rrdeng_atomic_uint64_sub_saturating(
-                        ctx,
-                        &ctx->atomic.samples,
-                        remove_samples,
-                        "samples",
-                        "deleting a metric with zero disk retention");
-
                 bool deleted = mrg_metric_release_and_delete(main_mrg, uuid_first_t_entry->metric);
                 if(deleted)
                     deleted_metrics++;
@@ -1784,6 +1756,10 @@ void datafile_delete(
     netdata_rwlock_wrlock(&ctx->datafiles.rwlock);
     datafile_list_delete_unsafe(ctx, datafile);
     netdata_rwlock_wrunlock(&ctx->datafiles.rwlock);
+
+    // its samples are gone with it - whatever was charged to it (flushed
+    // extents, a replayed v1 journal, or its journal v2)
+    rrdeng_datafile_samples_uncharge(datafile);
 
     journal_file = datafile->journalfile;
     datafile_bytes = datafile->pos;
@@ -2034,6 +2010,22 @@ static void *populate_mrg_tp_worker(
             sleep_usec(10 * USEC_PER_MS);
         }
     } while (pending > 0);
+
+    {
+        size_t exact = 0, estimated = 0;
+        netdata_rwlock_rdlock(&ctx->datafiles.rwlock);
+        for (df = get_next_datafile(NULL, ctx, true); df; df = get_next_datafile(df, ctx, true)) {
+            if (__atomic_load_n(&df->samples.estimated, __ATOMIC_RELAXED))
+                estimated++;
+            else
+                exact++;
+        }
+        netdata_rwlock_rdunlock(&ctx->datafiles.rwlock);
+
+        nd_log_daemon(NDLP_INFO,
+                      "DBENGINE: tier %d: %" PRIu64 " samples on disk (%zu datafiles exact, %zu estimated)",
+                      tier, (uint64_t)__atomic_load_n(&ctx->atomic.samples, __ATOMIC_RELAXED), exact, estimated);
+    }
 
     worker_is_idle();
     return data;

@@ -22,6 +22,7 @@ fn kv(key: &str, v: any_value::Value) -> KeyValue {
     KeyValue {
         key: key.to_string(),
         value: Some(av(v)),
+        key_strindex: 0,
     }
 }
 

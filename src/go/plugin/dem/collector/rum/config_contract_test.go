@@ -387,8 +387,8 @@ func TestCaptureFrustrationChartsFollowPolicy(t *testing.T) {
 			recv.Listen = "127.0.0.1:0"
 			startJob(t, "receiver", "receiver", recv)
 			job, out, stop := startJob(t, "rum", "shop", site)
-			sendContractBeacon(t, hub, []byte(`{"meta":{"page":{"url":"https://example.org/cart"},"session":{"id":"capture-session"}},"events":[{"name":"rage_click"}]}`))
-			tickUntil(t, job, out, "SET 'pageviews' = 1")
+			sendContractBeacon(t, hub, []byte(`{"meta":{"page":{"id":"cart-document","url":"https://example.org/cart"},"session":{"id":"capture-session"}},"events":[{"name":"document_activated","attributes":{"observation_id":"cart-document","observation_sequence":"1"}},{"name":"rage_click"}]}`))
+			tickUntil(t, job, out, "SET 'document_views' = 1")
 			stop()
 			if enabled {
 				assert.Contains(t, out.String(), "rum.frustration")

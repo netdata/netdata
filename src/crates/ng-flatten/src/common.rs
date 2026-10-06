@@ -452,7 +452,9 @@ impl Flattener {
                     }
                 }
             }
-            None => self.emit(parent, step, Value::Null, out),
+            // Profiling-only string-table reference; OTLP says other signals
+            // process it as an absent value.
+            Some(Av::StringValueStrindex(_)) | None => self.emit(parent, step, Value::Null, out),
         }
     }
 

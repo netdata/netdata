@@ -86,7 +86,7 @@ traces requires a signed-in Netdata Cloud user of the Agent's Space; trace data 
 
 ## Where to next
 
-- [OTLP Ingestion](/docs/opentelemetry/otlp-ingestion.md) — send traces from an SDK or a Collector.
+- [OTLP Ingestion](/docs/opentelemetry/otlp-ingestion.md) — send traces through a Collector.
 - [Securing the OTLP Endpoint](/docs/opentelemetry/securing-the-otlp-endpoint.md) — TLS and mutual TLS for remote
   senders.
 - [OpenTelemetry plugin reference](/src/crates/otel-plugin/README.md) — every `otel.yaml` option.

@@ -67,9 +67,11 @@ func addSite(t *testing.T, hub *rumregistry.Registry, key, generation string) (*
 }
 func page(a *aggregate.Aggregator, site, path string) {
 	a.Ingest(&beacon.Beacon{
-		Site:      site,
-		SessionID: path,
-		PageGroup: path,
+		Site:         site,
+		ExperienceID: path,
+		Events:       []beacon.Event{{Kind: beacon.EventDocument, ID: path, Revision: 1}},
+		SessionID:    path,
+		PageGroup:    path,
 	})
 }
 
@@ -137,7 +139,9 @@ func TestSourceRedactsCopiesAndRejectsCancelledReads(t *testing.T) {
 	require.NoError(t, err)
 	require.Len(t, sites, 1)
 	assert.Equal(t, "site [REDACTED]", sites[0].Label)
-	assert.Equal(t, query.Capture{Geolocation: "country"}, sites[0].Capture)
+	assert.Equal(t, query.Capture{
+		Geolocation: "country",
+	}, sites[0].Capture)
 	ctx, cancel := context.WithCancel(context.Background())
 	cancel()
 	_, err = s.Pages(ctx, "")
@@ -176,10 +180,11 @@ func TestSessionEventsMergePendingAndPersistedWithoutDuplicates(t *testing.T) {
 	a.SetHistorySink(first)
 	a.Ingest(
 		&beacon.Beacon{
-			Site:      "site",
-			SessionID: "session",
-			PageGroup: "/first",
-			Events:    []beacon.Event{{Name: "[REDACTED]"}, {Name: "[REDACTED]"}},
+			Site:         "site",
+			SessionID:    "session",
+			PageGroup:    "/first",
+			ExperienceID: "first",
+			Events:       []beacon.Event{{Kind: beacon.EventDocument, ID: "first", Revision: 1}, {Name: "[REDACTED]"}, {Name: "[REDACTED]"}},
 		},
 	)
 	pending := request()
@@ -201,7 +206,7 @@ func TestSessionEventsMergePendingAndPersistedWithoutDuplicates(t *testing.T) {
 	merged := request()
 	require.Len(t, merged, 4)
 	assert.Equal(t, pending, merged[:3])
-	assert.Equal(t, []any{"event", "/second", "purchase", "", ""}, merged[3][1:])
+	assert.Equal(t, []any{"event", "/second", "purchase", "", "", "", "", "", "", uint64(0)}, merged[3][1:])
 	flush(second)
 	assert.Equal(t, merged, request())
 	retire()
@@ -209,10 +214,11 @@ func TestSessionEventsMergePendingAndPersistedWithoutDuplicates(t *testing.T) {
 	replacement, _ := addSite(t, hub, "site", "replacement")
 	replacement.Ingest(
 		&beacon.Beacon{
-			Site:      "site",
-			SessionID: "session",
-			PageGroup: "/reloaded",
-			Events:    []beacon.Event{{Name: "reloaded"}},
+			Site:         "site",
+			SessionID:    "session",
+			PageGroup:    "/reloaded",
+			ExperienceID: "reloaded",
+			Events:       []beacon.Event{{Kind: beacon.EventDocument, ID: "reloaded", Revision: 1}, {Name: "reloaded"}},
 		},
 	)
 	reloaded := request()
@@ -253,10 +259,12 @@ func TestFunctionStatusesAndMissingVitalsFromRealSource(t *testing.T) {
 	}
 	a.Ingest(
 		&beacon.Beacon{
-			Site:      "site",
-			SessionID: "empty",
-			PageGroup: "/empty",
-			Vitals:    []beacon.Vital{{Name: beacon.CLS, Value: 0}},
+			Site:         "site",
+			SessionID:    "empty",
+			PageGroup:    "/empty",
+			ExperienceID: "document",
+			Events:       []beacon.Event{{Kind: beacon.EventDocument, ID: "document", Revision: 1}},
+			Vitals:       []beacon.Vital{{Name: beacon.CLS, ID: "cls", Revision: 1, Value: 0}},
 		},
 	)
 	response := handler.HandleRaw(
@@ -299,13 +307,15 @@ func TestFunctionPayloadsValidateAgainstNativeSchema(t *testing.T) {
 	a.SetHistorySink(writer)
 	a.Ingest(
 		&beacon.Beacon{
-			Site:      "site",
-			SessionID: "session",
-			PageGroup: "/checkout",
-			Browser:   "browser",
-			Device:    "desktop",
-			Vitals:    []beacon.Vital{{Name: beacon.CLS, Value: 0}},
-			Errors:    []beacon.Error{{Type: "Error", Message: "checkout failed", Fingerprint: "checkout"}},
+			Site:         "site",
+			SessionID:    "session",
+			PageGroup:    "/checkout",
+			Browser:      "browser",
+			Device:       "desktop",
+			ExperienceID: "document",
+			Events:       []beacon.Event{{Kind: beacon.EventDocument, ID: "document", Revision: 1}},
+			Vitals:       []beacon.Vital{{Name: beacon.CLS, ID: "cls", Revision: 1, Value: 0}},
+			Errors:       []beacon.Error{{Type: "Error", Message: "checkout failed", Fingerprint: "checkout"}},
 		},
 	)
 	a.Snapshot()

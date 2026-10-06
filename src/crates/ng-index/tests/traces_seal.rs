@@ -34,6 +34,7 @@ fn kv(k: &str, v: &str) -> KeyValue {
         value: Some(AnyValue {
             value: Some(Av::StringValue(v.into())),
         }),
+        key_strindex: 0,
     }
 }
 
@@ -42,6 +43,7 @@ fn kv_any(k: &str, v: Av) -> KeyValue {
     KeyValue {
         key: k.into(),
         value: Some(AnyValue { value: Some(v) }),
+        key_strindex: 0,
     }
 }
 

@@ -856,14 +856,14 @@ sidebar:
   - meta:
       label: OpenTelemetry
       edit_url: https://github.com/netdata/netdata/edit/master/docs/category-overview-pages/opentelemetry.md
-      description: The Netdata Agent as an OTLP/gRPC receiver — metrics become charts, logs and traces are stored indexed on the Agent, with TLS and Collector recipes.
-      keywords: [opentelemetry, otel, otlp, grpc, metrics, logs, traces, collector]
+      description: The Netdata Agent as an OTLP receiver over gRPC and HTTP — metrics become charts, logs and traces are stored indexed on the Agent, with TLS and Collector recipes.
+      keywords: [opentelemetry, otel, otlp, grpc, http, metrics, logs, traces, collector]
     items:
       - meta:
           label: OTLP Ingestion
           edit_url: https://github.com/netdata/netdata/edit/master/docs/opentelemetry/otlp-ingestion.md
-          description: Export metrics, logs, and traces from an OpenTelemetry Collector or SDK to a Netdata Agent
-          keywords: [opentelemetry, otel, otlp, grpc, metrics, logs, traces, collector]
+          description: Export metrics, logs, and traces from an OpenTelemetry Collector to a Netdata Agent
+          keywords: [opentelemetry, otel, otlp, grpc, http, metrics, logs, traces, collector]
       - meta:
           label: Securing the OTLP Endpoint
           edit_url: https://github.com/netdata/netdata/edit/master/docs/opentelemetry/securing-the-otlp-endpoint.md
@@ -908,6 +908,33 @@ sidebar:
           label: OpenTelemetry Plugin Reference
           edit_url: https://github.com/netdata/netdata/edit/master/src/crates/otel-plugin/README.md
           description: Ingest OpenTelemetry metrics, logs, and traces with the Netdata Agent.
+  # Edge Device Monitoring
+  - meta:
+      label: Edge Device Monitoring
+      edit_url: https://github.com/netdata/netdata/edit/master/docs/fleet-management/README.md
+      description: Monitor robots, signage, gateways and other edge devices centrally while reducing device disk, CPU, memory and cellular use.
+    items:
+      - meta:
+          label: Deploy and Identify Fleet Devices
+          edit_url: https://github.com/netdata/netdata/edit/master/docs/fleet-management/deployment-and-identity.md
+      - meta:
+          label: Minimize Disk Footprint
+          edit_url: https://github.com/netdata/netdata/edit/master/docs/fleet-management/minimize-disk-footprint.md
+      - meta:
+          label: Minimize CPU and Memory
+          edit_url: https://github.com/netdata/netdata/edit/master/docs/fleet-management/minimize-cpu-and-memory.md
+      - meta:
+          label: Minimize Cellular Traffic
+          edit_url: https://github.com/netdata/netdata/edit/master/docs/fleet-management/minimize-cellular-traffic.md
+      - meta:
+          label: Disconnected Devices and Failover
+          edit_url: https://github.com/netdata/netdata/edit/master/docs/fleet-management/disconnected-devices-and-failover.md
+      - meta:
+          label: Monitor the Fleet
+          edit_url: https://github.com/netdata/netdata/edit/master/docs/fleet-management/monitor-the-fleet.md
+      - meta:
+          label: Updates and Troubleshooting
+          edit_url: https://github.com/netdata/netdata/edit/master/docs/fleet-management/updates-and-troubleshooting.md
   # Live
   - meta:
       label: Live View

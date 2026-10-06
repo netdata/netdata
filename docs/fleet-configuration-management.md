@@ -2,6 +2,8 @@
 
 As infrastructures grow from a handful of servers to thousands of nodes across mixed environments (Linux, Kubernetes, Windows, macOS, FreeBSD), managing observability agents becomes one of the most painful operational tasks.
 
+For constrained robots, signage players and other edge devices, see [Edge Device Monitoring](./fleet-management/README.md).
+
 **Without a coherent strategy, teams face:**
 - Dozens of exporters or collectors, each with its own configs and update cycles
 - Manual configuration files scattered across nodes

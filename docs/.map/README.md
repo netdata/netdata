@@ -42,6 +42,8 @@ Each node is either:
 | **keywords**    | List of keywords for search.                                                  | Example: `["install", "linux"]`                                                                                                                                                            |
 | **description** | Page description used by Learn metadata, search, and social previews.          | Write an accurate plain-text summary. Generated integration descriptions are not authored in this map; their metadata sources and validation contract are documented in [Integration description authoring](../../.agents/skills/integrations-lifecycle/description-authoring.md).          |
 
+For hand-authored pages without an explicit `description`, Docusaurus uses the introductory text. Keep that introduction specific to the page: putting the same cross-link paragraph first on multiple pages can create duplicate search descriptions and fail Learn's post-build gate. Place shared cross-links after each page's own introduction.
+
 #### Path Reconstruction
 
 The full Learn path for each document is automatically reconstructed by walking the tree hierarchy and concatenating parent labels. The `path` field in `meta` is only needed when a document's path segment differs from its tree position.
