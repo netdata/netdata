@@ -2483,6 +2483,13 @@ static int test_receiver_replication_obsolete_keeps_claim(void) {
         rc = 1;
     }
 
+    uint64_t accounting = rrdhost_receiver_replication_accounting(host);
+    if(accounting != rrdhost_receiver_replication_accounting_pack(1, 1)) {
+        fprintf(stderr, "%s: accounting after obsolete mark and duplicate claim is %" PRIu64 ", expected %" PRIu64 "\n",
+                __FUNCTION__, accounting, rrdhost_receiver_replication_accounting_pack(1, 1));
+        rc = 1;
+    }
+
     rrdhost_receiver_replication_release(st, 0);
     rrdset_isnot_obsolete___safe_from_collector_thread(st);
     rrdset_free(st);
