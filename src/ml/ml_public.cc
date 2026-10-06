@@ -568,7 +568,7 @@ void ml_init()
         worker->scratch_training_cns = new calculated_number_t[max_elements_needed_for_training]();
 
         worker->id = idx;
-        ml_kmeans_init(&worker->kmeans_scratch);
+        ml_kmeans_init(&worker->training_kmeans);
         worker->pending_model_info.reserve(Cfg.flush_models_batch_size);
         netdata_mutex_init(&worker->nd_mutex);
 

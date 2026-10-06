@@ -39,13 +39,9 @@ typedef struct {
     calculated_number_t *scratch_training_cns;
     std::vector<DSample> training_samples;
 
-    // Scratch k-means model, staged here and then installed into the
-    // dimension's km_contexts by ml_dimension_update_models(). It used to live
-    // in every ml_dimension_t, where it cost 56 bytes inline plus a 96-byte
-    // cluster_centers allocation per dimension - for state that is only live
-    // between staging and install. A worker processes one request at a time,
-    // so one scratch per worker is enough.
-    ml_kmeans_t kmeans_scratch;
+    // the output of a local training; installed into the dimension under its slock, so a downstream model can be
+    // installed meanwhile
+    ml_kmeans_t training_kmeans;
 
     // the batch of Cfg.pending_models this thread is writing to ml.db (see ml_flush_pending_models())
     std::vector<ml_model_info_t> pending_model_info;
