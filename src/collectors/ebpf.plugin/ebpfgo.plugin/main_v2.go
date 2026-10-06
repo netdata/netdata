@@ -1,15 +1,19 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+// +build ignore
+
+// This is the new main implementation using agent orchestration.
+// To use this, rename main.go to main_legacy.go and this to main.go
+
 package main
 
 import (
-	"context"
 	"fmt"
 	"log/slog"
 	"os"
-	"os/signal"
 	"os/user"
 	"strings"
-	"syscall"
 
+	"github.com/netdata/netdata/go/plugins/cmd/internal/agenthost"
 	"github.com/netdata/netdata/go/plugins/logger"
 	"github.com/netdata/netdata/go/plugins/pkg/buildinfo"
 	"github.com/netdata/netdata/go/plugins/pkg/cli"
@@ -24,14 +28,12 @@ import (
 )
 
 func init() {
-	executable.Name = "ebpfgo.plugin"
 	if v := os.Getenv("TZ"); strings.HasPrefix(v, ":") {
 		_ = os.Unsetenv("TZ")
 	}
 }
 
-func main() {
-	// Cap scheduler to reduce thread overhead from CGO calls to eBPF programs
+func mainNew() {
 	_, _ = maxprocs.Set(maxprocs.Logger(func(string, ...any) {}))
 
 	opts := parseCLI()
@@ -57,21 +59,27 @@ func main() {
 	isInsideK8s := hostinfo.IsInsideK8sCluster()
 
 	registry := NewEbpfRegistry()
+	var services []interface{}
+	if !isTerminal {
+		// In non-terminal mode, could add publisher or other services here
+	}
+
 	runModePolicy := policy.Agent(isTerminal)
 
 	a := agent.New(agent.Config{
-		Name:                      executable.Name,
+		Name:                      "ebpfgo.plugin",
 		PluginConfigDir:           pluginconfig.ConfigDir(),
 		CollectorsConfigDir:       pluginconfig.CollectorsDir(),
 		ServiceDiscoveryConfigDir: pluginconfig.ServiceDiscoveryDir(),
 		CollectorsConfigWatchPath: pluginconfig.CollectorsConfigWatchPaths(),
 		VarLibDir:                 pluginconfig.VarLibDir(),
 		ModuleRegistry:            registry,
-		IsInsideK8s:               isInsideK8s,
-		RunModePolicy:             runModePolicy,
-		RunModule:                 opts.Module,
-		RunJob:                    opts.Job,
-		MinUpdateEvery:            opts.UpdateEvery,
+		// Services:                  services,
+		IsInsideK8s:   isInsideK8s,
+		RunModePolicy: runModePolicy,
+		RunModule:     opts.Module,
+		RunJob:        opts.Job,
+		MinUpdateEvery: opts.UpdateEvery,
 	})
 
 	a.Infof("plugin: name=%s, %s", a.Name, buildinfo.Info())
@@ -85,34 +93,8 @@ func main() {
 	a.Infof("directories → config: %s | collectors: %s | sd: %s | varlib: %s",
 		a.ConfigDir, a.CollectorsConfDir, a.ServiceDiscoveryConfigDir, a.VarLibDir)
 
-	sigCh := make(chan os.Signal, 1)
-	signal.Notify(sigCh, syscall.SIGINT, syscall.SIGTERM)
-	defer signal.Stop(sigCh)
-
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
-	go func() {
-		select {
-		case <-sigCh:
-			a.Infof("shutdown signal received")
-			cancel()
-		case <-ctx.Done():
-		}
-	}()
-
-	if err := a.RunContext(ctx); err != nil {
+	if err := agenthost.Run(a); err != nil {
 		a.Errorf("plugin exiting after Agent failure: %v", err)
 		os.Exit(1)
 	}
-}
-
-func parseCLI() *cli.Option {
-	opt, err := cli.Parse(os.Args)
-	if err != nil {
-		if cli.IsHelp(err) {
-			os.Exit(0)
-		}
-		os.Exit(1)
-	}
-	return opt
 }
