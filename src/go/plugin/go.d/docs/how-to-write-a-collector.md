@@ -196,6 +196,11 @@ Config SHOULD stay small and operator-oriented:
 - `update_every`, `timeout`, and `vnode` when relevant;
 - selectors that let users intentionally scope cardinality.
 
+Every configuration path (stock and user files, service discovery, DynCfg) applies `confgroup.Config.ApplyDefaults`
+before the collector sees the job, replacing a non-positive `update_every`, `autodetection_retry` or `priority` with
+the module default. Collectors SHOULD NOT re-validate those values; such checks and their troubleshooting entries are
+unreachable.
+
 Implementation tuning SHOULD use constants:
 
 - discovery refresh cadence;
