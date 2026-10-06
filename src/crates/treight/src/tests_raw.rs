@@ -677,9 +677,10 @@ fn test_symmetric_difference_both_empty() {
     let a = RawBitmap::empty(64);
     let b = RawBitmap::empty(64);
     let mut out = Vec::new();
-    assert!(a
-        .symmetric_difference(&[], &b, &[], &mut out)
-        .is_empty(&out));
+    assert!(
+        a.symmetric_difference(&[], &b, &[], &mut out)
+            .is_empty(&out)
+    );
 }
 
 #[test]

@@ -15,16 +15,16 @@
 use std::collections::HashMap;
 
 use sfsq::traces::{
-    AttributeKey, AttributeNamesData, AttributeOwner, AttributeValuesData, BuiltinField,
-    CompareOp, Condition, DURATION_BIN_LABELS, DurationPercentiles, FieldKinds, OverviewData,
-    Predicate, PredicateTarget, PredicateValue, SearchData, SlowestData, TraceData,
+    AttributeKey, AttributeNamesData, AttributeOwner, AttributeValuesData, BuiltinField, CompareOp,
+    Condition, DURATION_BIN_LABELS, DurationPercentiles, FieldKinds, OverviewData, Predicate,
+    PredicateTarget, PredicateValue, SearchData, SlowestData, TraceData,
 };
 
 use super::wire::{
     AnchorWire, AttributeValueWire, AttributeValuesResult, AttributesResult, CoverageWire,
-    EventWire, FacetListWire, FacetValueWire, FieldKindsWire, LinkWire,
-    OverviewGridWire, OverviewPercentilesWire, OverviewResult, OverviewSection, OverviewTotals,
-    SearchItems, SearchResult, ServiceBreakdownWire, ServiceSpansWire, SlowestResult, SlowestTraceWire,
+    EventWire, FacetListWire, FacetValueWire, FieldKindsWire, LinkWire, OverviewGridWire,
+    OverviewPercentilesWire, OverviewResult, OverviewSection, OverviewTotals, SearchItems,
+    SearchResult, ServiceBreakdownWire, ServiceSpansWire, SlowestResult, SlowestTraceWire,
     SpanWire, StatusWire, TraceItems, TraceResult, TraceSummaryWire,
 };
 
@@ -189,7 +189,10 @@ const BUILTIN_WORDS: [(&str, BuiltinField); 17] = [
     ("status", BuiltinField::Status),
     ("status_message", BuiltinField::StatusMessage),
     ("instrumentation_name", BuiltinField::InstrumentationName),
-    ("instrumentation_version", BuiltinField::InstrumentationVersion),
+    (
+        "instrumentation_version",
+        BuiltinField::InstrumentationVersion,
+    ),
     ("event_name", BuiltinField::EventName),
     ("duration", BuiltinField::Duration),
     ("span_id", BuiltinField::SpanId),

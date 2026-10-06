@@ -59,15 +59,18 @@ use common::{
 };
 use sfsq::Source;
 use sfsq::traces::{
-    PartialReason, QueryStatus, SourceId, AttributeKey, AttributeNamesQuery, AttributeRequestError, AttributeOwner,
-    AttributeValuesQuery, TimeWindow, BuiltinField, TraceSfstCandidate, TraceSource, WalCoverage,
-    attribute_names, attribute_values,
+    AttributeKey, AttributeNamesQuery, AttributeOwner, AttributeRequestError, AttributeValuesQuery,
+    BuiltinField, PartialReason, QueryStatus, SourceId, TimeWindow, TraceSfstCandidate,
+    TraceSource, WalCoverage, attribute_names, attribute_values,
 };
 
 /// Run `attribute_names` with a live token and a throwaway progress
 /// counter; panics on request-validation errors (they have their own
 /// test).
-fn names(sources: Vec<TraceSource>, query: AttributeNamesQuery) -> sfsq::traces::AttributeNamesData {
+fn names(
+    sources: Vec<TraceSource>,
+    query: AttributeNamesQuery,
+) -> sfsq::traces::AttributeNamesData {
     attribute_names(
         sources,
         query,
@@ -78,7 +81,10 @@ fn names(sources: Vec<TraceSource>, query: AttributeNamesQuery) -> sfsq::traces:
 }
 
 /// Run `attribute_values` under the same terms as [`names`].
-fn values(sources: Vec<TraceSource>, query: AttributeValuesQuery) -> sfsq::traces::AttributeValuesData {
+fn values(
+    sources: Vec<TraceSource>,
+    query: AttributeValuesQuery,
+) -> sfsq::traces::AttributeValuesData {
     attribute_values(
         sources,
         query,
@@ -151,7 +157,10 @@ fn keys_partition_scopes_deterministically_under_permutation() {
     assert_eq!(data.status, QueryStatus::Complete);
     assert!(!data.truncated);
 
-    assert_eq!(owner_attrs(&data, AttributeOwner::Resource), ["host", "service.name"]);
+    assert_eq!(
+        owner_attrs(&data, AttributeOwner::Resource),
+        ["host", "service.name"]
+    );
     // The span attribute named trace_state IS vocabulary: the
     // exclusion drops only the BARE `trace_state` storage field
     // (`storage_to_attribute` in `src/traces/vocab.rs`), so typed keys
@@ -160,7 +169,10 @@ fn keys_partition_scopes_deterministically_under_permutation() {
         owner_attrs(&data, AttributeOwner::Span),
         ["ratio", "retries", "trace_state"]
     );
-    assert_eq!(owner_attrs(&data, AttributeOwner::Instrumentation), ["lang"]);
+    assert_eq!(
+        owner_attrs(&data, AttributeOwner::Instrumentation),
+        ["lang"]
+    );
     assert_eq!(owner_attrs(&data, AttributeOwner::Event), ["attempt"]);
     assert_eq!(owner_attrs(&data, AttributeOwner::Link), ["rel"]);
 
@@ -194,9 +206,20 @@ fn keys_partition_scopes_deterministically_under_permutation() {
     sources.rotate_left(1);
     let rotated = names(sources, AttributeNamesQuery::new());
     assert_eq!(data.keys, rotated.keys);
-    let only_span = names(build(), AttributeNamesQuery::new().owner(AttributeOwner::Span));
-    assert!(only_span.keys.iter().all(|(s, _)| *s == AttributeOwner::Span));
-    assert_eq!(owner_attrs(&only_span, AttributeOwner::Span), ["ratio", "retries", "trace_state"]);
+    let only_span = names(
+        build(),
+        AttributeNamesQuery::new().owner(AttributeOwner::Span),
+    );
+    assert!(
+        only_span
+            .keys
+            .iter()
+            .all(|(s, _)| *s == AttributeOwner::Span)
+    );
+    assert_eq!(
+        owner_attrs(&only_span, AttributeOwner::Span),
+        ["ratio", "retries", "trace_state"]
+    );
 }
 
 /// Values merge across a low-tier file, a mid-tier file (>100 distinct
@@ -274,7 +297,10 @@ fn values_merge_all_tiers_across_sources_with_exact_truncation() {
     // corpus — four sources all carrying `svc` collapse to one value.
     let svc = values(
         sources(),
-        AttributeValuesQuery::new(AttributeOwner::Resource, AttributeKey::Attribute("service.name".into())),
+        AttributeValuesQuery::new(
+            AttributeOwner::Resource,
+            AttributeKey::Attribute("service.name".into()),
+        ),
     );
     assert_eq!(value_strings(&svc), ["svc"]);
 }
@@ -310,7 +336,11 @@ fn kinds_coalesce_and_kindless_values_carry_none() {
         sealed_source(dir.path(), &wal_dbl, "dbl"),
     ]);
     assert_eq!(value_strings(&d), ["8.5", "80"]);
-    assert!(d.values.iter().all(|v| v.kind == Some(sfst::ValueKind::Double)));
+    assert!(
+        d.values
+            .iter()
+            .all(|v| v.kind == Some(sfst::ValueKind::Double))
+    );
 
     // Int ⊔ Str → Str (sealed + TAIL — the tail folds through the same
     // lattice).
@@ -319,7 +349,11 @@ fn kinds_coalesce_and_kindless_values_carry_none() {
         tail_source(&wal_str, "str-tail"),
     ]);
     assert_eq!(value_strings(&s), ["80", "www"]);
-    assert!(s.values.iter().all(|v| v.kind == Some(sfst::ValueKind::Str)));
+    assert!(
+        s.values
+            .iter()
+            .all(|v| v.kind == Some(sfst::ValueKind::Str))
+    );
 
     // Null-only: enumerated as a key, value is the empty rendering,
     // kind None — from a sealed file AND from a tail.
@@ -337,13 +371,19 @@ fn kinds_coalesce_and_kindless_values_carry_none() {
     }
     let g = values(
         vec![sealed_source(dir.path(), &wal_null, "null-sealed-2")],
-        AttributeValuesQuery::new(AttributeOwner::Span, AttributeKey::Attribute("ghost".into())),
+        AttributeValuesQuery::new(
+            AttributeOwner::Span,
+            AttributeKey::Attribute("ghost".into()),
+        ),
     );
     assert_eq!(value_strings(&g), [""]);
     assert_eq!(g.values[0].kind, None);
     let gt = values(
         vec![tail_source(&wal_null, "null-tail-2")],
-        AttributeValuesQuery::new(AttributeOwner::Span, AttributeKey::Attribute("ghost".into())),
+        AttributeValuesQuery::new(
+            AttributeOwner::Span,
+            AttributeKey::Attribute("ghost".into()),
+        ),
     );
     assert_eq!(value_strings(&gt), [""]);
     assert_eq!(gt.values[0].kind, None);
@@ -424,21 +464,27 @@ fn builtin_values_serve_and_virtual_builtins_reject() {
         vec![sealed_source(dir.path(), &plain, "bare")],
         AttributeNamesQuery::new().owner(AttributeOwner::Builtin),
     );
-    assert!(
-        keys.keys
-            .contains(&(AttributeOwner::Builtin, AttributeKey::Builtin(BuiltinField::Status)))
-    );
+    assert!(keys.keys.contains(&(
+        AttributeOwner::Builtin,
+        AttributeKey::Builtin(BuiltinField::Status)
+    )));
     // Its spans were sent without a status or kind: the OTel defaults are
     // stored, so they are the values.
     let sv = values(
         vec![sealed_source(dir.path(), &plain, "bare2")],
-        AttributeValuesQuery::new(AttributeOwner::Builtin, AttributeKey::Builtin(BuiltinField::Status)),
+        AttributeValuesQuery::new(
+            AttributeOwner::Builtin,
+            AttributeKey::Builtin(BuiltinField::Status),
+        ),
     );
     assert_eq!(value_strings(&sv), ["UNSET"]);
     assert_eq!(sv.status, QueryStatus::Complete);
     let kv = values(
         vec![sealed_source(dir.path(), &plain, "bare3")],
-        AttributeValuesQuery::new(AttributeOwner::Builtin, AttributeKey::Builtin(BuiltinField::Kind)),
+        AttributeValuesQuery::new(
+            AttributeOwner::Builtin,
+            AttributeKey::Builtin(BuiltinField::Kind),
+        ),
     );
     assert_eq!(value_strings(&kv), ["UNSPECIFIED"]);
 
@@ -452,12 +498,18 @@ fn builtin_values_serve_and_virtual_builtins_reject() {
     );
     let status = values(
         vec![sealed_source(dir.path(), &mixed, "mixed-status")],
-        AttributeValuesQuery::new(AttributeOwner::Builtin, AttributeKey::Builtin(BuiltinField::Status)),
+        AttributeValuesQuery::new(
+            AttributeOwner::Builtin,
+            AttributeKey::Builtin(BuiltinField::Status),
+        ),
     );
     assert_eq!(value_strings(&status), ["ERROR", "OK", "UNSET"]);
     let kind = values(
         vec![sealed_source(dir.path(), &mixed, "mixed-kind")],
-        AttributeValuesQuery::new(AttributeOwner::Builtin, AttributeKey::Builtin(BuiltinField::Kind)),
+        AttributeValuesQuery::new(
+            AttributeOwner::Builtin,
+            AttributeKey::Builtin(BuiltinField::Kind),
+        ),
     );
     assert_eq!(value_strings(&kind), ["SERVER", "UNSPECIFIED"]);
 }
@@ -618,10 +670,7 @@ fn absent_key_is_a_complete_empty() {
     let dir = tempfile::tempdir().unwrap();
     let wal = write_wal(dir.path(), vec![req(&[sp(1, 0, 1, "x")])], "a");
     let data = values(
-        vec![
-            sealed_source(dir.path(), &wal, "f"),
-            tail_source(&wal, "t"),
-        ],
+        vec![sealed_source(dir.path(), &wal, "f"), tail_source(&wal, "t")],
         AttributeValuesQuery::new(AttributeOwner::Link, AttributeKey::Attribute("nope".into())),
     );
     assert!(data.values.is_empty());
@@ -640,13 +689,19 @@ fn request_validation_rejects_bad_requests() {
     let counter = || Arc::new(AtomicUsize::new(0));
 
     assert!(matches!(
-        attribute_names(Vec::new(), AttributeNamesQuery::new().max_keys(0), cancel(), counter()),
+        attribute_names(
+            Vec::new(),
+            AttributeNamesQuery::new().max_keys(0),
+            cancel(),
+            counter()
+        ),
         Err(AttributeRequestError::ZeroLimit)
     ));
     assert!(matches!(
         attribute_values(
             Vec::new(),
-            AttributeValuesQuery::new(AttributeOwner::Span, AttributeKey::Attribute("k".into())).max_values(0),
+            AttributeValuesQuery::new(AttributeOwner::Span, AttributeKey::Attribute("k".into()))
+                .max_values(0),
             cancel(),
             counter()
         ),
@@ -685,11 +740,16 @@ fn request_validation_rejects_bad_requests() {
     assert!(matches!(
         attribute_values(
             Vec::new(),
-            AttributeValuesQuery::new(AttributeOwner::Span, AttributeKey::Builtin(BuiltinField::Name)),
+            AttributeValuesQuery::new(
+                AttributeOwner::Span,
+                AttributeKey::Builtin(BuiltinField::Name)
+            ),
             cancel(),
             counter()
         ),
-        Err(AttributeRequestError::BuiltinKeyOutsideBuiltinOwner(AttributeOwner::Span))
+        Err(AttributeRequestError::BuiltinKeyOutsideBuiltinOwner(
+            AttributeOwner::Span
+        ))
     ));
     // …and attribute keys inside it.
     assert!(matches!(
@@ -751,7 +811,10 @@ fn empty_sources_still_yield_the_static_builtins() {
     assert_eq!(got, want);
 
     // A non-Builtin owner filter on zero sources: zero keys, Complete.
-    let span_only = names(Vec::new(), AttributeNamesQuery::new().owner(AttributeOwner::Span));
+    let span_only = names(
+        Vec::new(),
+        AttributeNamesQuery::new().owner(AttributeOwner::Span),
+    );
     assert!(span_only.keys.is_empty());
     assert_eq!(span_only.status, QueryStatus::Complete);
 

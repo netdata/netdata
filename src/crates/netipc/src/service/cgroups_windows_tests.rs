@@ -1,7 +1,7 @@
 use super::*;
 use crate::protocol::{CgroupsBuilder, NipcError, PROFILE_BASELINE, PROFILE_SHM_HYBRID};
-use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Arc;
+use std::sync::atomic::{AtomicU64, Ordering};
 use std::thread;
 use std::time::Duration;
 

@@ -34,9 +34,9 @@
 
 use std::collections::HashMap;
 
+use crate::TraceId;
 use crate::index_reader::{IndexReader, TraceEvent, TraceLink, TraceSpan, kv_attr, kv_value};
 use crate::trace_combine::{SpanRef, SpanSource};
-use crate::TraceId;
 
 /// The bloom gate, resolved once per session.
 enum BloomGate {
@@ -173,7 +173,9 @@ impl<'r, 'a> TraceFileSession<'r, 'a> {
             )));
         }
         if self.batches.is_empty() {
-            self.batches = (0..self.reader.num_stream_batches()).map(|_| None).collect();
+            self.batches = (0..self.reader.num_stream_batches())
+                .map(|_| None)
+                .collect();
         }
         let b = (pos / crate::stream_batch_size(total)) as usize;
         if self.batches.get(b).is_none() {
@@ -341,8 +343,14 @@ impl SpanSource for TraceFileSession<'_, '_> {
                 .collect(),
             None => Vec::new(),
         };
-        let dropped_events_count = extras.events.as_ref().map_or(0, |ev| ev.row_dropped_count(pos));
-        let dropped_links_count = extras.links.as_ref().map_or(0, |lk| lk.row_dropped_count(pos));
+        let dropped_events_count = extras
+            .events
+            .as_ref()
+            .map_or(0, |ev| ev.row_dropped_count(pos));
+        let dropped_links_count = extras
+            .links
+            .as_ref()
+            .map_or(0, |lk| lk.row_dropped_count(pos));
 
         // `kind`: from the facet map when `span_refs` populated it (the
         // combiner always calls span_refs first); the field parse is the

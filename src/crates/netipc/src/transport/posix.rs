@@ -5,8 +5,8 @@
 //! Wire-compatible with the C implementation in netipc_uds.c.
 
 use crate::protocol::{
-    self, align8, ChunkHeader, Header, Hello, HelloAck, FLAG_BATCH, HEADER_SIZE, KIND_REQUEST,
-    KIND_RESPONSE, MAGIC_CHUNK, MAGIC_MSG, MAX_PAYLOAD_DEFAULT, PROFILE_BASELINE, VERSION,
+    self, ChunkHeader, FLAG_BATCH, HEADER_SIZE, Header, Hello, HelloAck, KIND_REQUEST,
+    KIND_RESPONSE, MAGIC_CHUNK, MAGIC_MSG, MAX_PAYLOAD_DEFAULT, PROFILE_BASELINE, VERSION, align8,
 };
 use std::collections::HashSet;
 use std::ffi::CString;
@@ -765,7 +765,7 @@ fn validate_service_name(name: &str) -> Result<(), UdsError> {
                 return Err(UdsError::BadParam(format!(
                     "service name contains invalid character: {:?}",
                     c as char
-                )))
+                )));
             }
         }
     }
@@ -819,11 +819,7 @@ fn highest_bit(mask: u32) -> u32 {
 }
 
 fn apply_default(val: u32, def: u32) -> u32 {
-    if val == 0 {
-        def
-    } else {
-        val
-    }
+    if val == 0 { def } else { val }
 }
 
 // ---------------------------------------------------------------------------
@@ -1174,7 +1170,7 @@ fn connect_and_handshake(
     let ack_hdr = match Header::decode(&buf[..n]) {
         Ok(hdr) => hdr,
         Err(crate::protocol::NipcError::BadVersion) => {
-            return Err(UdsError::Incompatible("ack header version mismatch".into()))
+            return Err(UdsError::Incompatible("ack header version mismatch".into()));
         }
         Err(e) => return Err(UdsError::Protocol(format!("ack header: {e}"))),
     };
@@ -1216,7 +1212,7 @@ fn connect_and_handshake(
         {
             return Err(UdsError::Incompatible(
                 "ack payload layout version mismatch".into(),
-            ))
+            ));
         }
         Err(e) => return Err(UdsError::Protocol(format!("ack payload: {e}"))),
     };

@@ -39,7 +39,7 @@
 
 use std::collections::HashMap;
 
-use crate::index_reader::{field_table_tiered, IndexReader};
+use crate::index_reader::{IndexReader, field_table_tiered};
 use crate::schema::{FieldTier, HighField};
 use crate::trace_rollup::ROLLUP_NO_REF;
 
@@ -145,9 +145,7 @@ impl<'r, 'a> RollupRootResolver<'r, 'a> {
 /// The ref's offset within `[start, start + cardinality)`, or `None`
 /// when it falls in another field's range.
 fn in_field_offset(kv_ref: u32, start: u32, cardinality: u32) -> Option<u32> {
-    kv_ref
-        .checked_sub(start)
-        .filter(|&off| off < cardinality)
+    kv_ref.checked_sub(start).filter(|&off| off < cardinality)
 }
 
 /// The value half of `key`, PROVEN to belong to `field_name`: the key

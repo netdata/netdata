@@ -1,8 +1,8 @@
-use super::{apps_lookup_dispatch, cgroups_lookup_dispatch, ClientState, DispatchError, RawClient};
+use super::{ClientState, DispatchError, RawClient, apps_lookup_dispatch, cgroups_lookup_dispatch};
 use crate::protocol::{
-    self, AppsLookupBuilder, CgroupsLookupBuilder, APPS_CGROUP_KNOWN, APPS_LOOKUP_KEY_SIZE,
-    APPS_LOOKUP_REQ_HDR_SIZE, APPS_LOOKUP_RESP_HDR_SIZE, CGROUPS_LOOKUP_REQ_HDR_SIZE,
-    CGROUPS_LOOKUP_RESP_HDR_SIZE, CGROUP_LOOKUP_KNOWN, LOOKUP_DIR_ENTRY_SIZE, NIPC_UID_UNSET,
+    self, APPS_CGROUP_KNOWN, APPS_LOOKUP_KEY_SIZE, APPS_LOOKUP_REQ_HDR_SIZE,
+    APPS_LOOKUP_RESP_HDR_SIZE, AppsLookupBuilder, CGROUP_LOOKUP_KNOWN, CGROUPS_LOOKUP_REQ_HDR_SIZE,
+    CGROUPS_LOOKUP_RESP_HDR_SIZE, CgroupsLookupBuilder, LOOKUP_DIR_ENTRY_SIZE, NIPC_UID_UNSET,
     ORCHESTRATOR_DOCKER, ORCHESTRATOR_K8S, PID_LOOKUP_KNOWN,
 };
 #[cfg(unix)]

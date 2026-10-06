@@ -21,16 +21,24 @@
 //!   exactly once — on an idle builder too, and after a `RotationFailed`
 //!   ("done", not "all succeeded").
 use super::*;
-use uuid::Uuid;
 use crate::component::ComponentHandle;
 use file_registry::FileId;
 use otel_catalog::CatalogEntry;
+use uuid::Uuid;
 
-fn machine() -> file_registry::MachineId { file_registry::MachineId::new(Uuid::from_u128(0x0011_2233_4455_6677_8899_aabb_ccdd_eeff)).unwrap() }
+fn machine() -> file_registry::MachineId {
+    file_registry::MachineId::new(Uuid::from_u128(0x0011_2233_4455_6677_8899_aabb_ccdd_eeff))
+        .unwrap()
+}
 
-fn instance() -> file_registry::InstanceId { file_registry::InstanceId::new(Uuid::from_u128(0xaaaa_bbbb_cccc_dddd_eeee_ffff_0000_1111)).unwrap() }
+fn instance() -> file_registry::InstanceId {
+    file_registry::InstanceId::new(Uuid::from_u128(0xaaaa_bbbb_cccc_dddd_eeee_ffff_0000_1111))
+        .unwrap()
+}
 
-fn ident() -> file_registry::Identity { file_registry::Identity::new(machine(), instance()) }
+fn ident() -> file_registry::Identity {
+    file_registry::Identity::new(machine(), instance())
+}
 
 fn date() -> NaiveDate {
     NaiveDate::from_ymd_opt(2026, 4, 17).unwrap()
@@ -281,7 +289,12 @@ async fn distinct_scopes_rotate_independently() {
     // must neither join nor trigger the original scope's rotation.
     let other_machine = file_registry::MachineId::new(Uuid::from_u128(0x1111)).unwrap();
     let other_entry = CatalogEntry {
-        id: FileId::new(file_registry::Identity::new(other_machine, instance()), 0, 1, 0),
+        id: FileId::new(
+            file_registry::Identity::new(other_machine, instance()),
+            0,
+            1,
+            0,
+        ),
         ..entry_for(1)
     };
     assert!(matches!(
@@ -297,9 +310,7 @@ async fn distinct_scopes_rotate_independently() {
     // tenant1 seq=2 — now hits threshold for the original scope.
     let resp = h.send_recv(add_request(2)).await;
     match resp {
-        CatalogBuilderResponse::Rotated {
-            identity, seqs, ..
-        } => {
+        CatalogBuilderResponse::Rotated { identity, seqs, .. } => {
             assert_eq!(identity.machine_id, machine());
             let mut sorted = seqs.clone();
             sorted.sort();
@@ -366,7 +377,12 @@ async fn flush_rotates_every_non_empty_scope_then_completes() {
     ));
     let other_machine = file_registry::MachineId::new(Uuid::from_u128(0x1111)).unwrap();
     let other_entry = CatalogEntry {
-        id: FileId::new(file_registry::Identity::new(other_machine, instance()), 0, 7, 0),
+        id: FileId::new(
+            file_registry::Identity::new(other_machine, instance()),
+            0,
+            7,
+            0,
+        ),
         ..entry_for(7)
     };
     assert!(matches!(

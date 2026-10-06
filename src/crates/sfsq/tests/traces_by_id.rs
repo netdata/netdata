@@ -120,7 +120,10 @@ fn assert_corpus_shape(data: &sfsq::traces::TraceData) {
         .find(|s| s.span_id == sfst::SpanId::from([2u8; 8]))
         .expect("child present");
     assert!(
-        child.fields.iter().any(|(k, v)| k == "name" && v == "child"),
+        child
+            .fields
+            .iter()
+            .any(|(k, v)| k == "name" && v == "child"),
         "the chronological-first copy is canonical"
     );
     // The shared pair's child hangs off the SERVER-kind node — the
@@ -147,7 +150,10 @@ fn assert_corpus_shape(data: &sfsq::traces::TraceData) {
             .any(|(k, v)| k == "exception.type" && v == "E")
     );
     assert_eq!(root_span.links.len(), 1);
-    assert_eq!(root_span.links[0].trace_id, sfst::TraceId::from([0x33u8; 16]));
+    assert_eq!(
+        root_span.links[0].trace_id,
+        sfst::TraceId::from([0x33u8; 16])
+    );
     // Sectioned kind maps use result-exposed names only —
     // "exception.line", not its storage-prefixed key.
     assert!(
@@ -304,10 +310,7 @@ fn request_validation_rejects_unset_id_zero_cap_and_bad_source_sets() {
         Arc::new(AtomicUsize::new(0)),
     )
     .unwrap_err();
-    assert!(matches!(
-        err,
-        sfsq::traces::TraceRequestError::UnsetTraceId
-    ));
+    assert!(matches!(err, sfsq::traces::TraceRequestError::UnsetTraceId));
 
     // Zero cap.
     let err = trace_by_id(
@@ -327,25 +330,22 @@ fn request_validation_rejects_unset_id_zero_cap_and_bad_source_sets() {
         Arc::new(AtomicUsize::new(0)),
     )
     .unwrap_err();
-    assert!(matches!(
-        err,
-        sfsq::traces::TraceRequestError::SourceSet(_)
-    ));
+    assert!(matches!(err, sfsq::traces::TraceRequestError::SourceSet(_)));
 
     // Overlapping WAL coverage (chunk and tail over intersecting ranges
     // of the same WAL — both helpers derive wal_id from the path, so the
     // collision is caught exactly as in production).
     let err = trace_by_id(
-        vec![memory_source(&wal, "one-wal"), tail_source(&wal, "one-wal-tail")],
+        vec![
+            memory_source(&wal, "one-wal"),
+            tail_source(&wal, "one-wal-tail"),
+        ],
         TraceQuery::new(sfst::TraceId::from(TRACE)),
         CancellationToken::new(),
         Arc::new(AtomicUsize::new(0)),
     )
     .unwrap_err();
-    assert!(matches!(
-        err,
-        sfsq::traces::TraceRequestError::SourceSet(_)
-    ));
+    assert!(matches!(err, sfsq::traces::TraceRequestError::SourceSet(_)));
 }
 
 #[test]
@@ -525,10 +525,7 @@ fn memory_chunk_without_coverage_is_a_request_error() {
         Arc::new(AtomicUsize::new(0)),
     )
     .unwrap_err();
-    assert!(matches!(
-        err,
-        sfsq::traces::TraceRequestError::SourceSet(_)
-    ));
+    assert!(matches!(err, sfsq::traces::TraceRequestError::SourceSet(_)));
 }
 
 #[test]

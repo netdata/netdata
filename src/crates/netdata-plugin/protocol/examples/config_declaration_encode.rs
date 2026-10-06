@@ -43,8 +43,7 @@ async fn main() {
     let mut writer = MessageWriter::new(stdout);
 
     match writer.send(message).await {
-        Ok(()) => {
-        }
+        Ok(()) => {}
         Err(e) => {
             eprintln!("Error sending message: {}", e);
         }

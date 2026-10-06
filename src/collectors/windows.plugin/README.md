@@ -27,6 +27,7 @@ To change a setting, remove the comment symbol (`#`) from the beginning of the l
         # PerflibNetwork = yes
         # PerflibSMB = yes
         # PerflibTerminalServices = yes
+        # PerflibDNS = yes
         # PerflibObjects = yes
         # PerflibHyperV = yes
         # PerflibThermalZone = no

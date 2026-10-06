@@ -22,10 +22,10 @@ use anyhow::{Context, Result, bail};
 use tokio_util::sync::CancellationToken;
 
 use sfsq::traces::{
+    AttributeKey, AttributeNamesQuery, AttributeOwner, AttributeValuesQuery, BuiltinField,
     CompareOp, Condition, Predicate, PredicateTarget, PredicateValue, QueryStatus, SearchQuery,
-    SearchSources, SourceId, AttributeKey, AttributeNamesQuery, AttributeOwner, AttributeValuesQuery, TimeWindow,
-    BuiltinField, TraceQuery, TraceSfstCandidate, TraceSource, TraceWalTail, WalCoverage,
-    search, attribute_names, attribute_values, trace_by_id,
+    SearchSources, SourceId, TimeWindow, TraceQuery, TraceSfstCandidate, TraceSource, TraceWalTail,
+    WalCoverage, attribute_names, attribute_values, search, trace_by_id,
 };
 
 /// Reconstruct one trace across sealed SFSTs and traces WALs.
@@ -257,7 +257,10 @@ const BUILTIN_WORDS: [(&str, BuiltinField); 17] = [
     ("status", BuiltinField::Status),
     ("status-message", BuiltinField::StatusMessage),
     ("instrumentation-name", BuiltinField::InstrumentationName),
-    ("instrumentation-version", BuiltinField::InstrumentationVersion),
+    (
+        "instrumentation-version",
+        BuiltinField::InstrumentationVersion,
+    ),
     ("event-name", BuiltinField::EventName),
     ("duration", BuiltinField::Duration),
     ("span-id", BuiltinField::SpanId),
@@ -313,7 +316,10 @@ fn parse_key(owner: AttributeOwner, key: &str) -> Result<AttributeKey> {
         .map(|(_, i)| AttributeKey::Builtin(*i))
         .ok_or_else(|| {
             let words: Vec<&str> = BUILTIN_WORDS.iter().map(|(w, _)| *w).collect();
-            anyhow::anyhow!("unknown builtin field {key:?}; one of: {}", words.join(", "))
+            anyhow::anyhow!(
+                "unknown builtin field {key:?}; one of: {}",
+                words.join(", ")
+            )
         })
 }
 
@@ -430,7 +436,10 @@ pub struct AttributeValuesArgs {
     pub end_ns: Option<i64>,
 }
 
-pub fn run_attribute_values(args: &AttributeValuesArgs, out: &mut dyn std::io::Write) -> Result<()> {
+pub fn run_attribute_values(
+    args: &AttributeValuesArgs,
+    out: &mut dyn std::io::Write,
+) -> Result<()> {
     let owner: AttributeOwner = args.owner.into();
     let key = parse_key(owner, &args.key)?;
     let sources = build_sources(&args.sfsts, &args.wals)?;
@@ -531,10 +540,7 @@ fn parse_condition(spec: &str) -> Result<Condition> {
     ];
     let (target_word, op, value) = OPS
         .iter()
-        .filter_map(|(sym, op)| {
-            spec.find(sym)
-                .map(|at| (at, sym.len(), *op))
-        })
+        .filter_map(|(sym, op)| spec.find(sym).map(|at| (at, sym.len(), *op)))
         .min_by_key(|&(at, len, _)| (at, std::cmp::Reverse(len)))
         .map(|(at, len, op)| (&spec[..at], op, &spec[at + len..]))
         .ok_or_else(|| anyhow::anyhow!("--where must be TARGET<op>VALUE, got {spec:?}"))?;
@@ -583,7 +589,10 @@ fn parse_target(word: &str) -> Result<PredicateTarget> {
     };
     // `.KEY` = the any-owner attribute (resource ∪ span disjunction).
     if let Some(key) = word.strip_prefix('.') {
-        return Ok(PredicateTarget::Attribute(AttributeOwner::Any, non_empty(key)?));
+        return Ok(PredicateTarget::Attribute(
+            AttributeOwner::Any,
+            non_empty(key)?,
+        ));
     }
     for (owner_name, owner) in [
         ("resource", AttributeOwner::Resource),
@@ -592,7 +601,10 @@ fn parse_target(word: &str) -> Result<PredicateTarget> {
         ("event", AttributeOwner::Event),
         ("link", AttributeOwner::Link),
     ] {
-        if let Some(key) = word.strip_prefix(owner_name).and_then(|r| r.strip_prefix('.')) {
+        if let Some(key) = word
+            .strip_prefix(owner_name)
+            .and_then(|r| r.strip_prefix('.'))
+        {
             return Ok(PredicateTarget::Attribute(owner, non_empty(key)?));
         }
     }
@@ -704,7 +716,10 @@ mod tests {
     fn where_targets_reject_empty_keys_but_keep_dotted_ones() {
         for bad in [".", "span.", "resource.", "event."] {
             let err = parse_target(bad).expect_err(bad);
-            assert!(err.to_string().contains("empty attribute key"), "{bad}: {err}");
+            assert!(
+                err.to_string().contains("empty attribute key"),
+                "{bad}: {err}"
+            );
         }
         assert!(matches!(
             parse_target("..foo"),
@@ -804,7 +819,11 @@ mod tests {
             .expect("one WAL");
 
         let range_of = |p: &PathBuf| -> wal::FrameRange {
-            match build_sources(&[], std::slice::from_ref(p)).unwrap().pop().unwrap() {
+            match build_sources(&[], std::slice::from_ref(p))
+                .unwrap()
+                .pop()
+                .unwrap()
+            {
                 TraceSource::Tail(t) => t.coverage.range,
                 _ => panic!("expected a tail source"),
             }
@@ -819,12 +838,19 @@ mod tests {
         f.set_len(len - 1).unwrap();
         let clamped = range_of(&path);
         assert!(clamped.end() < len - 1, "tail dropped, prefix kept");
-        assert_eq!(clamped.end(), wal::HEADER_SIZE as u64, "one-frame file: prefix is empty");
+        assert_eq!(
+            clamped.end(),
+            wal::HEADER_SIZE as u64,
+            "one-frame file: prefix is empty"
+        );
 
         // Header-only: empty range, no error.
         f.set_len(wal::HEADER_SIZE as u64).unwrap();
         let empty = range_of(&path);
-        assert_eq!((empty.start(), empty.end()), (wal::HEADER_SIZE as u64, wal::HEADER_SIZE as u64));
+        assert_eq!(
+            (empty.start(), empty.end()),
+            (wal::HEADER_SIZE as u64, wal::HEADER_SIZE as u64)
+        );
     }
 
     /// The CLI word table must stay in lockstep with the engine's

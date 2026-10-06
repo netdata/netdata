@@ -521,8 +521,7 @@ impl<'a> ChunkReader<'a> {
         // produced out-of-band, same as TIDX and TBLM (without it a missing
         // rollup row would answer "trace absent" instead of surfacing it).
         self.require_column(TraceIds::NAME, TraceIds::COLUMN_TYPE)?;
-        let rollup: crate::TraceRollup =
-            unpack(self.chunk_raw_by_id(crate::CHUNK_TRACE_ROLLUP)?)?;
+        let rollup: crate::TraceRollup = unpack(self.chunk_raw_by_id(crate::CHUNK_TRACE_ROLLUP)?)?;
         // Structural validation lives on the type (unit-tested there):
         // index-parallelism, ref ranges, flags, strictly increasing ids.
         rollup.validate(self.metadata()?.id_ranges.high_end.0)?;

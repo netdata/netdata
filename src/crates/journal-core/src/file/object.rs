@@ -426,30 +426,30 @@ impl std::fmt::Display for JournalState {
 #[derive(Default, Debug, Clone, Copy, FromBytes, IntoBytes, Immutable, KnownLayout)]
 #[repr(C)]
 pub struct JournalHeader {
-    pub signature: [u8; 8],                          // magic "LPKSHHRH" (validated on open)
-    pub compatible_flags: u32,                       // optional features: HeaderCompatibleFlags
-    pub incompatible_flags: u32,                     // required features: HeaderIncompatibleFlags
-    pub state: u8,                                   // JournalState: 0/1/2
-    pub reserved: [u8; 7],                           // Reserved
-    pub file_id: [u8; 16],                           // file id; the keyed-hash key (file/hash.rs)
-    pub machine_id: [u8; 16],                        // machine id, from JournalFileOptions
-    pub tail_entry_boot_id: [u8; 16],                // last entry's boot id (stamped by JournalWriter)
-    pub seqnum_id: [u8; 16],                         // seqnum-space id (returned by JournalReader::get_seqnum)
-    pub header_size: u64,                            // header size; arena after
-    pub arena_size: u64,                             // arena size (advanced per object by JournalWriter)
-    pub data_hash_table_offset: Option<NonZeroU64>,  // data hash table offset (laid out by JournalFile::create)
-    pub data_hash_table_size: Option<NonZeroU64>,    // buckets * sizeof(HashItem)
+    pub signature: [u8; 8],           // magic "LPKSHHRH" (validated on open)
+    pub compatible_flags: u32,        // optional features: HeaderCompatibleFlags
+    pub incompatible_flags: u32,      // required features: HeaderIncompatibleFlags
+    pub state: u8,                    // JournalState: 0/1/2
+    pub reserved: [u8; 7],            // Reserved
+    pub file_id: [u8; 16],            // file id; the keyed-hash key (file/hash.rs)
+    pub machine_id: [u8; 16],         // machine id, from JournalFileOptions
+    pub tail_entry_boot_id: [u8; 16], // last entry's boot id (stamped by JournalWriter)
+    pub seqnum_id: [u8; 16],          // seqnum-space id (returned by JournalReader::get_seqnum)
+    pub header_size: u64,             // header size; arena after
+    pub arena_size: u64,              // arena size (advanced per object by JournalWriter)
+    pub data_hash_table_offset: Option<NonZeroU64>, // data hash table offset (laid out by JournalFile::create)
+    pub data_hash_table_size: Option<NonZeroU64>,   // buckets * sizeof(HashItem)
     pub field_hash_table_offset: Option<NonZeroU64>, // field hash table offset (laid out by JournalFile::create)
     pub field_hash_table_size: Option<NonZeroU64>,   // buckets * sizeof(HashItem)
-    pub tail_object_offset: Option<NonZeroU64>,      // last object (committed by JournalWriter::new)
-    pub n_objects: u64,                              // object count (committed per entry by JournalWriter)
-    pub n_entries: u64,                              // entry count (committed per entry by JournalWriter)
-    pub tail_entry_seqnum: u64,                      // newest entry's seqnum (stamped per entry)
-    pub head_entry_seqnum: u64,                      // oldest entry's seqnum (stamped on the first entry)
-    pub entry_array_offset: Option<NonZeroU64>,      // entry-array chain head (read by JournalFile::entry_list)
-    pub head_entry_realtime: u64,                    // oldest entry's realtime (stamped on the first entry)
-    pub tail_entry_realtime: u64,                    // newest entry's realtime (stamped per entry)
-    pub tail_entry_monotonic: u64,                   // newest entry monotonic (stamped per entry)
+    pub tail_object_offset: Option<NonZeroU64>, // last object (committed by JournalWriter::new)
+    pub n_objects: u64, // object count (committed per entry by JournalWriter)
+    pub n_entries: u64, // entry count (committed per entry by JournalWriter)
+    pub tail_entry_seqnum: u64, // newest entry's seqnum (stamped per entry)
+    pub head_entry_seqnum: u64, // oldest entry's seqnum (stamped on the first entry)
+    pub entry_array_offset: Option<NonZeroU64>, // entry-array chain head (read by JournalFile::entry_list)
+    pub head_entry_realtime: u64, // oldest entry's realtime (stamped on the first entry)
+    pub tail_entry_realtime: u64, // newest entry's realtime (stamped per entry)
+    pub tail_entry_monotonic: u64, // newest entry monotonic (stamped per entry)
 }
 
 /*
