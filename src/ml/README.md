@@ -120,8 +120,10 @@ The anomaly detection algorithm uses the [Euclidean distance](https://en.wikiped
 The training threads retrain all dimensions one pass at a time. A pass takes about `train every`; with fewer
 dimensions than seconds in `train every` the threads together pace themselves to at most one dimension per second, so
 a pass is shorter and dimensions are retrained more often. That one-per-second limit applies to all of a parent's
-children together: a parent with fewer dimensions than that retrains them about once per `train every`, and after
-it starts it can take up to `train every` until every dimension has its first model. Within a pass, dimensions are trained in the order in which the database engine will complete their current tier-0 page,
+children together, so it is their combined dimension count that matters: once it exceeds the seconds in
+`train every`, each dimension is retrained about once per `train every`, even when each child alone has few enough
+dimensions to be retrained more often, and after the parent starts it can take up to `train every` until every
+dimension has its first model. Within a pass, dimensions are trained in the order in which the database engine will complete their current tier-0 page,
 which is also the order it packs pages into extents on disk. Dimensions whose pages complete together therefore
 train back to back, so the extents loaded for one dimension are still in the extent cache when its siblings are
 trained, instead of being reloaded and decompressed once per dimension hours apart. All training threads draw nearby
