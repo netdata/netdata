@@ -7,10 +7,9 @@ package jetson
 import (
 	"bytes"
 	"context"
-	"io"
 	"net"
 	"path/filepath"
-	"strings"
+	"regexp"
 	"sync"
 	"testing"
 	"time"
@@ -69,18 +68,20 @@ func TestCollectionTransitions(t *testing.T) {
 
 func TestSourceRecovery(t *testing.T) {
 	for name, tc := range map[string]struct {
-		fail    func(*testing.T, net.Conn)
-		silence bool
+		fail func(*testing.T, net.Conn)
 	}{
 		"nonzero exit": {fail: func(t *testing.T, conn net.Conn) {
-			code := 7
 			sendCommand(t, conn, fakeCommand{
-				Exit: &code,
+				Exit: new(7),
 			})
 		}},
-		"output EOF": {fail: func(t *testing.T, conn net.Conn) { require.NoError(t, conn.Close()) }},
-		"silence":    {silence: true},
-		"unrecognized output": {silence: true, fail: func(t *testing.T, conn net.Conn) {
+		"clean exit": {fail: func(t *testing.T, conn net.Conn) {
+			sendCommand(t, conn, fakeCommand{
+				Exit: new(0),
+			})
+		}},
+		"stall": {fail: func(*testing.T, net.Conn) {}},
+		"unrecognized output": {fail: func(t *testing.T, conn net.Conn) {
 			sendCommand(t, conn, fakeCommand{
 				Line: "warning GR3D_FREQ 90%",
 			})
@@ -101,19 +102,11 @@ func TestSourceRecovery(t *testing.T) {
 			_, err := collecttest.CollectScalarSeries(c)
 			require.NoError(t, err)
 
-			if tc.fail != nil {
-				tc.fail(t, conn)
-			}
-			if tc.silence {
-				require.Eventually(t, func() bool {
-					_, err := collecttest.CollectScalarSeries(c)
-					return err != nil
-				}, time.Second, 5*time.Millisecond)
-			} else {
-				require.Eventually(t, func() bool { return c.latest.Load() == nil }, time.Second, 5*time.Millisecond)
-			}
-
+			tc.fail(t, conn)
+			require.Eventually(t, func() bool { return c.latest.Load() == nil }, time.Second, 5*time.Millisecond)
 			replacement := fake.accept(t)
+			requireExited(t, conn) // the failed process never overlaps its replacement
+
 			sendRecord(t, replacement, "EMC_FREQ 12%@800")
 			waitSample(t, c, func(s sample) bool { return s.EMCFrequency != nil })
 			assertCollected(t, c, map[string]metrix.SampleValue{
@@ -133,11 +126,8 @@ func TestCancelTerminatesDescendants(t *testing.T) {
 	})
 	child := fake.accept(t)
 	stop()
-	for _, connection := range []net.Conn{conn, child} {
-		require.NoError(t, connection.SetReadDeadline(time.Now().Add(5*time.Second)))
-		_, err := connection.Read(make([]byte, 1))
-		require.ErrorIs(t, err, io.EOF) // every owned process closed its socket
-	}
+	requireExited(t, conn)
+	requireExited(t, child)
 }
 
 func TestManagedRuntime(t *testing.T) {
@@ -175,11 +165,12 @@ func TestManagedRuntime(t *testing.T) {
 	conn := fake.accept(t)
 	sendRecord(t, conn, "GR3D_FREQ 25%@900 EMC_FREQ 30%@1600")
 	waitSample(t, c, func(s sample) bool { return s.GPUFrequency != nil })
+	// The emitted frame carries the record's only reading equal to 25, the GPU utilization.
+	setUtilization := regexp.MustCompile(`(?m)^SET '[^']+' = 25$`)
 	require.Eventually(t, func() bool {
 		job.Tick(1)
-		return strings.Contains(out.String(), "jetson.gpu_utilization")
+		return setUtilization.MatchString(out.String())
 	}, 3*time.Second, 20*time.Millisecond)
-	assert.Contains(t, out.String(), "SET 'utilization' = 25")
 
 	run.Stop(nil)
 	select {
@@ -191,59 +182,52 @@ func TestManagedRuntime(t *testing.T) {
 	assert.False(t, run.Running())
 }
 
-func TestStartupAndLateExecFailure(t *testing.T) {
-	for name, tc := range map[string]struct{ missingWrapper bool }{
-		"helper acquisition fails":              {missingWrapper: true},
-		"target exec fails after helper starts": {},
-	} {
-		t.Run(name, func(t *testing.T) {
-			c, _ := newCollectorWithFake(t)
-			c.findTegrastats = func() (string, error) { return filepath.Join(t.TempDir(), "missing-tegrastats"), nil }
-			require.NoError(t, c.Check(t.Context()))
-			if tc.missingWrapper {
-				t.Cleanup(ndexec.SetRunnerPathsForTests(filepath.Join(t.TempDir(), "missing-wrapper"), ""))
-			}
-			ctx, cancel := context.WithCancel(t.Context())
-			defer cancel()
-			ready := make(chan struct{})
-			done := make(chan error, 1)
-			go func() { done <- c.Run(ctx, func() { close(ready) }) }()
+func TestRunStartupFailure(t *testing.T) {
+	c, _ := newCollectorWithFake(t)
+	require.NoError(t, c.Check(t.Context()))
+	t.Cleanup(ndexec.SetRunnerPathsForTests(filepath.Join(t.TempDir(), "missing-wrapper"), ""))
 
-			if tc.missingWrapper {
-				select {
-				case err := <-done:
-					require.ErrorContains(t, err, "start tegrastats")
-				case <-time.After(3 * time.Second):
-					t.Fatal("startup failure not returned")
-				}
-				select {
-				case <-ready:
-					t.Fatal("ready before acquisition")
-				default:
-				}
-				return
-			}
+	ready, done := goRun(t.Context(), c)
+	select {
+	case err := <-done:
+		require.ErrorContains(t, err, "start tegrastats")
+	case <-time.After(3 * time.Second):
+		t.Fatal("startup failure not returned")
+	}
+	select {
+	case <-ready:
+		t.Fatal("ready before acquisition")
+	default:
+	}
+}
 
-			select {
-			case <-ready:
-			case <-time.After(3 * time.Second):
-				t.Fatal("helper did not signal readiness")
-			}
-			_, err := collecttest.CollectScalarSeries(c)
-			require.Error(t, err)
-			select {
-			case err := <-done:
-				t.Fatalf("late exec failure ended Run: %v", err)
-			case <-time.After(150 * time.Millisecond):
-			}
-			cancel()
-			select {
-			case err := <-done:
-				require.NoError(t, err)
-			case <-time.After(3 * time.Second):
-				t.Fatal("retry did not cancel")
-			}
-		})
+func TestRunSurvivesLateExecFailure(t *testing.T) {
+	c, _ := newCollectorWithFake(t)
+	c.findTegrastats = func() (string, error) { return filepath.Join(t.TempDir(), "missing-tegrastats"), nil }
+	require.NoError(t, c.Check(t.Context()))
+
+	// The helper starts, so Run is ready before the missing executable fails.
+	ctx, cancel := context.WithCancel(t.Context())
+	defer cancel()
+	ready, done := goRun(ctx, c)
+	select {
+	case <-ready:
+	case <-time.After(3 * time.Second):
+		t.Fatal("helper did not signal readiness")
+	}
+	_, err := collecttest.CollectScalarSeries(c)
+	require.Error(t, err)
+	select {
+	case err := <-done:
+		t.Fatalf("late exec failure ended Run: %v", err)
+	case <-time.After(150 * time.Millisecond):
+	}
+	cancel()
+	select {
+	case err := <-done:
+		require.NoError(t, err)
+	case <-time.After(3 * time.Second):
+		t.Fatal("retry did not cancel")
 	}
 }
 
@@ -269,4 +253,44 @@ func (b *lockedBuffer) String() string {
 	b.mu.Lock()
 	defer b.mu.Unlock()
 	return b.buffer.String()
+}
+
+func TestFollowReportsSourceFailure(t *testing.T) {
+	// Exit cases wait longer than an exit can take, so only the stall case stalls.
+	for name, tc := range map[string]struct {
+		cmd          *fakeCommand
+		stallTimeout time.Duration
+		wantErr      string
+	}{
+		"nonzero exit": {
+			cmd:          &fakeCommand{Exit: new(7)},
+			stallTimeout: 10 * time.Second,
+			wantErr:      "tegrastats exited: exit status 7",
+		},
+		"clean exit": {
+			cmd:          &fakeCommand{Exit: new(0)},
+			stallTimeout: 10 * time.Second,
+			wantErr:      "tegrastats exited",
+		},
+		"stall": {
+			stallTimeout: 300 * time.Millisecond,
+			wantErr:      "tegrastats stopped producing records",
+		},
+	} {
+		t.Run(name, func(t *testing.T) {
+			c, fake := newCollectorWithFake(t)
+			c.timing.stallTimeout = tc.stallTimeout
+			require.NoError(t, c.Check(t.Context()))
+			proc, err := startTegrastats(t.Context(), c.tegrastatsPath)
+			require.NoError(t, err)
+			conn := fake.accept(t)
+			if tc.cmd != nil {
+				sendCommand(t, conn, *tc.cmd)
+			}
+			observed, err := c.follow(t.Context(), proc)
+			assert.False(t, observed)
+			assert.EqualError(t, err, tc.wantErr)
+			assert.Nil(t, c.latest.Load())
+		})
+	}
 }

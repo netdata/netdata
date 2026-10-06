@@ -30,18 +30,17 @@ func lookupTegrastats() (string, error) {
 	return path, nil
 }
 
-// tegrastatsProcess is one owned tegrastats process. It sends each recognized
-// record on records until reading fails or the process is closed.
+// tegrastatsProcess is one owned tegrastats process. While its output lasts, it
+// sends an observation of each recognized record on observations.
 type tegrastatsProcess struct {
 	process *ndexec.Process
 	stdout  *os.File
 	cancel  context.CancelFunc
 
-	records  chan observation
-	readDone chan struct{}
-	readErr  error
-	exited   chan struct{}
-	exitErr  error
+	observations chan observation
+	readDone     chan struct{}
+	exited       chan struct{}
+	exitErr      error
 }
 
 // startTegrastats starts tegrastats through the unprivileged command helper.
@@ -65,12 +64,12 @@ func startTegrastats(ctx context.Context, path string) (*tegrastatsProcess, erro
 	}
 
 	p := &tegrastatsProcess{
-		process:  process,
-		stdout:   stdout,
-		cancel:   cancel,
-		records:  make(chan observation),
-		readDone: make(chan struct{}),
-		exited:   make(chan struct{}),
+		process:      process,
+		stdout:       stdout,
+		cancel:       cancel,
+		observations: make(chan observation),
+		readDone:     make(chan struct{}),
+		exited:       make(chan struct{}),
 	}
 	go p.readRecords(ctx)
 	go func() {
@@ -98,18 +97,13 @@ func (p *tegrastatsProcess) exitError() error {
 	return errors.New("tegrastats exited")
 }
 
-// readError describes why reading stopped; valid only after readDone is closed.
-func (p *tegrastatsProcess) readError() error {
-	return fmt.Errorf("read tegrastats output: %w", p.readErr)
-}
-
+// readRecords parses the output until it ends or ctx is canceled.
 func (p *tegrastatsProcess) readRecords(ctx context.Context) {
 	defer close(p.readDone)
 	r := bufio.NewReader(p.stdout)
 	for {
 		line, err := r.ReadString('\n')
 		if err != nil {
-			p.readErr = err
 			return
 		}
 		s, ok := parseRecord(line)
@@ -117,12 +111,11 @@ func (p *tegrastatsProcess) readRecords(ctx context.Context) {
 			continue
 		}
 		select {
-		case p.records <- observation{
+		case p.observations <- observation{
 			sample: s,
 			at:     time.Now(),
 		}:
 		case <-ctx.Done():
-			p.readErr = ctx.Err()
 			return
 		}
 	}

@@ -158,6 +158,9 @@ func TestParseRecordReadings(t *testing.T) {
 			},
 		},
 		"exact key": {fields: "NOT_GR3D_FREQ 20% OTHER_EMC_FREQ 40%"},
+		"repeated key replaces the reading": {fields: "GR3D_FREQ 10%@[1,2] GR3D_FREQ 20%", want: sample{
+			GPUUtilization: measurement(20),
+		}},
 	}
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {

@@ -59,13 +59,14 @@ type Collector struct {
 	tegrastatsPath string
 	timing         sourceTiming
 
-	// latest is the most recent record from the running tegrastats, nil while none is running.
+	// latest is the most recent record of the running tegrastats; nil before its
+	// first record and while none runs.
 	latest atomic.Pointer[observation]
 }
 
 func (c *Collector) Configuration() any { return c.Config }
 
-func (c *Collector) Init(context.Context) error { return c.Config.validate() }
+func (c *Collector) Init(context.Context) error { return nil }
 
 func (c *Collector) Check(ctx context.Context) error {
 	if err := ctx.Err(); err != nil {

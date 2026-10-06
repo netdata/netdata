@@ -105,9 +105,6 @@ modules:
     troubleshooting:
       errors:
         list:
-          - error: update_every must be at least 1 second
-            cause: The configured publication interval is below the supported minimum.
-            fix: Set `update_every` to an integer of at least 1.
           - error: jetson requires Linux
             cause: The collector is running on an operating system other than Linux.
             fix: Run this collector in a native Netdata installation on the Jetson Linux host.

@@ -12,26 +12,13 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/netdata/netdata/go/plugins/plugin/framework/chartengine"
+	"github.com/netdata/netdata/go/plugins/plugin/framework/charttpl"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/collecttest"
 )
 
 func TestConfiguration(t *testing.T) {
 	collecttest.TestConfigurationSerialize(t, New(), []byte(`{"update_every":5}`), []byte("update_every: 5\n"))
-	for name, tc := range map[string]struct {
-		interval  int
-		wantError bool
-	}{
-		"default":            {interval: defaultUpdateEvery},
-		"slower publication": {interval: 5},
-		"zero":               {interval: 0, wantError: true},
-		"negative":           {interval: -1, wantError: true},
-	} {
-		t.Run(name, func(t *testing.T) {
-			c := New()
-			c.UpdateEvery = tc.interval
-			assert.Equal(t, tc.wantError, c.Init(t.Context()) != nil)
-		})
-	}
 }
 
 func TestCheckOnlyResolvesExecutable(t *testing.T) {
@@ -79,8 +66,17 @@ func TestLookupTegrastats(t *testing.T) {
 }
 
 func TestArtifacts(t *testing.T) {
+	collecttest.AssertChartTemplateSchema(t, chartTemplateYAML)
+	spec, err := charttpl.DecodeYAML([]byte(chartTemplateYAML))
+	require.NoError(t, err)
+	_, err = chartengine.Compile(spec, defaultUpdateEvery)
+	require.NoError(t, err)
+
 	metadata, err := os.ReadFile("metadata.yaml")
 	require.NoError(t, err)
-	collecttest.AssertChartTemplateSchema(t, chartTemplateYAML)
 	collecttest.AssertMetadataDocumentsChartTemplate(t, metadata, chartTemplateYAML, nil)
+	collecttest.AssertConfigSchemaMatchesMetadataWith(t, "config_schema.json", "metadata.yaml",
+		collecttest.ConfigSchemaCheck{
+			Defaults: true,
+		})
 }

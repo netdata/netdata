@@ -62,14 +62,16 @@ func (c *Collector) run(ctx context.Context, ready func()) error {
 	}
 }
 
-// follow publishes the records of proc until it fails or ctx is canceled, then
-// withdraws the latest record and closes proc. It reports whether any record arrived.
+// follow publishes the records of proc until it exits, stalls or ctx is canceled,
+// then withdraws the latest record and closes proc. It reports whether any record arrived.
 func (c *Collector) follow(ctx context.Context, proc *tegrastatsProcess) (observed bool, err error) {
 	defer func() {
 		c.latest.Store(nil)
 		proc.close()
 	}()
 
+	// The end of output is not a failure of its own: the exit that follows reports
+	// the status, and a process that keeps running without output is a stall.
 	stall := time.NewTimer(c.timing.stallTimeout)
 	defer stall.Stop()
 	for {
@@ -78,14 +80,12 @@ func (c *Collector) follow(ctx context.Context, proc *tegrastatsProcess) (observ
 			return observed, ctx.Err()
 		case <-proc.exited:
 			return observed, proc.exitError()
-		case <-proc.readDone:
-			return observed, proc.readError()
-		case obs := <-proc.records:
+		case obs := <-proc.observations:
 			observed = true
 			c.latest.Store(&obs)
 			stall.Reset(c.timing.stallTimeout)
 		case <-stall.C:
-			return observed, errors.New("tegrastats stopped producing recognizable samples")
+			return observed, errors.New("tegrastats stopped producing records")
 		}
 	}
 }

@@ -145,9 +145,7 @@ func startRun(t *testing.T, c *Collector) (stop context.CancelFunc) {
 	require.NoError(t, c.Init(t.Context()))
 	require.NoError(t, c.Check(t.Context()))
 	ctx, cancel := context.WithCancel(t.Context())
-	ready := make(chan struct{})
-	done := make(chan error, 1)
-	go func() { done <- c.Run(ctx, func() { close(ready) }) }()
+	ready, done := goRun(ctx, c)
 	t.Cleanup(func() {
 		cancel()
 		select {
@@ -165,6 +163,23 @@ func startRun(t *testing.T, c *Collector) (stop context.CancelFunc) {
 		t.Fatal("readiness waited for telemetry")
 	}
 	return cancel
+}
+
+// goRun calls Run in the background and returns its readiness and result channels.
+func goRun(ctx context.Context, c *Collector) (ready <-chan struct{}, done <-chan error) {
+	readyCh := make(chan struct{})
+	doneCh := make(chan error, 1)
+	go func() { doneCh <- c.Run(ctx, func() { close(readyCh) }) }()
+	return readyCh, doneCh
+}
+
+// requireExited requires the fake process behind conn, and every descendant
+// sharing it, to have exited.
+func requireExited(t *testing.T, conn net.Conn) {
+	t.Helper()
+	require.NoError(t, conn.SetReadDeadline(time.Now().Add(5*time.Second)))
+	_, err := conn.Read(make([]byte, 1))
+	require.ErrorIs(t, err, io.EOF)
 }
 
 // waitSample waits until the collector holds a record matching match.
