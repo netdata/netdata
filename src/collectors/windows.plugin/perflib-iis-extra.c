@@ -12,6 +12,12 @@ enum iis_extra_scope {
     IIS_EXTRA_MODE,
 };
 
+enum iis_extra_group_result {
+    IIS_EXTRA_GROUP_COLLECTED,
+    IIS_EXTRA_GROUP_OBJECT_MISSING,
+    IIS_EXTRA_GROUP_EXPIRED,
+};
+
 struct iis_extra_definition {
     const char *key;
     const char *chart;
@@ -36,6 +42,7 @@ struct iis_extra_value {
 struct iis_extra_instance {
     bool initialized;
     bool seen;
+    DICTIONARY *workers;
     struct iis_extra_value values[IIS_EXTRA_MAX];
 };
 
@@ -47,7 +54,15 @@ struct iis_extra_group {
     const char *chart_prefix;
     const char *module_name;
     int priority_base;
+    unsigned int missing_object_cycles;
 };
+
+static bool iis_extra_counter_is_incremental(const struct iis_extra_definition *definition, uint32_t counter_type)
+{
+    return definition->incremental || perflib_counter_type_is_incremental(counter_type);
+}
+
+#define IIS_EXTRA_OBJECT_MISSING_CYCLES 12
 
 #define IIS_EXTRA_DEFINE(key_, chart_, context_, title_, units_, dim_, label_, scope_, incremental_, type_)            \
     {key_, chart_, context_, title_, units_, dim_, label_, scope_, incremental_, type_}
@@ -817,6 +832,7 @@ static void iis_extra_instance_delete_cb(const DICTIONARY_ITEM *item __maybe_unu
     struct iis_extra_group *group = data;
     for (size_t n = 0; n < group->count; n++)
         rrdset_is_obsolete___safe_from_collector_thread(state->values[n].st);
+    dictionary_destroy(state->workers);
 }
 
 static void iis_extra_mark_all_unseen(struct iis_extra_group *group)
@@ -915,7 +931,8 @@ static void iis_extra_done_charts(struct iis_extra_group *group, struct iis_extr
     }
 }
 
-static bool do_iis_extra_group(PERF_DATA_BLOCK *data, struct iis_extra_group *group, int update_every)
+static enum iis_extra_group_result
+do_iis_extra_group(PERF_DATA_BLOCK *data, struct iis_extra_group *group, int update_every)
 {
     if (unlikely(!group->instances)) {
         group->instances = dictionary_create_advanced(
@@ -923,13 +940,19 @@ static bool do_iis_extra_group(PERF_DATA_BLOCK *data, struct iis_extra_group *gr
         dictionary_register_delete_callback(group->instances, iis_extra_instance_delete_cb, group);
     }
 
-    iis_extra_mark_all_unseen(group);
-
     PERF_OBJECT_TYPE *object = perflibFindObjectTypeByName(data, group->object);
     if (!object) {
-        iis_extra_remove_unseen(group);
-        return false;
+        if (++group->missing_object_cycles >= IIS_EXTRA_OBJECT_MISSING_CYCLES) {
+            iis_extra_mark_all_unseen(group);
+            iis_extra_remove_unseen(group);
+            group->missing_object_cycles = 0;
+            return IIS_EXTRA_GROUP_EXPIRED;
+        }
+        return IIS_EXTRA_GROUP_OBJECT_MISSING;
     }
+    group->missing_object_cycles = 0;
+
+    iis_extra_mark_all_unseen(group);
 
     if (group == &cache_group && object->NumInstances <= 0) {
         struct iis_extra_instance *state = dictionary_set(group->instances, "global", NULL, sizeof(*state));
@@ -947,7 +970,7 @@ static bool do_iis_extra_group(PERF_DATA_BLOCK *data, struct iis_extra_group *gr
         }
         iis_extra_done_charts(group, state);
         iis_extra_remove_unseen(group);
-        return true;
+        return IIS_EXTRA_GROUP_COLLECTED;
     }
 
     PERF_INSTANCE_DEFINITION *pi = NULL;
@@ -982,13 +1005,18 @@ static bool do_iis_extra_group(PERF_DATA_BLOCK *data, struct iis_extra_group *gr
         const char *state_key = group == &cache_group ? "global" : (worker ? app : instance_key);
         struct iis_extra_instance *state = dictionary_set(group->instances, state_key, NULL, sizeof(*state));
         const bool first_worker_instance = worker && !state->seen;
-        if (first_worker_instance)
+        if (first_worker_instance) {
+            if (!state->workers)
+                state->workers = perflib_worker_dictionary_create(group->count);
+            perflib_worker_state_mark_all_unseen(state->workers);
             for (size_t n = 0; n < group->count; n++) {
                 struct iis_extra_value *value = &state->values[n];
                 value->first.previous = value->first.current;
-                value->first.current = RAW_DATA_EMPTY;
+                if (!iis_extra_counter_is_incremental(&group->definitions[n], value->first.current.CounterType))
+                    value->first.current = RAW_DATA_EMPTY;
                 value->first.updated = false;
             }
+        }
         state->seen = true;
         if (!state->initialized) {
             for (size_t n = 0; n < group->count; n++) {
@@ -999,23 +1027,37 @@ static bool do_iis_extra_group(PERF_DATA_BLOCK *data, struct iis_extra_group *gr
             state->initialized = true;
         }
 
+        PERFLIB_WORKER_STATE *process = NULL;
+        bool *has_sample = NULL;
+        COUNTER_DATA *process_counters = NULL;
+        if (worker) {
+            process = perflib_worker_state_get(state->workers, instance_key, group->count);
+            if (!process)
+                continue;
+            has_sample = perflib_worker_state_has_sample(process);
+            process_counters = perflib_worker_state_counters(process);
+            if (!process->initialized) {
+                for (size_t i = 0; i < group->count; i++) {
+                    process_counters[i].key = group->definitions[i].key;
+                    process_counters[i].OverwriteCounterType = state->values[i].first.OverwriteCounterType;
+                }
+                process->initialized = true;
+            }
+            process->seen = true;
+        }
+
         for (size_t n = 0; n < group->count; n++) {
             struct iis_extra_value *value = &state->values[n];
             if (worker) {
-                COUNTER_DATA first_sample = value->first;
-                first_sample.current = RAW_DATA_EMPTY;
-                first_sample.previous = RAW_DATA_EMPTY;
-                bool first_updated = perflibGetInstanceCounter(data, object, pi, &first_sample);
-                value->first.id = first_sample.id;
-                value->first.failures = first_sample.failures;
-                value->first.backoff = first_sample.backoff;
-                if (first_updated) {
-                    value->first.current.CounterType = first_sample.current.CounterType;
-                    value->first.current.Time = first_sample.current.Time;
-                    value->first.current.Frequency = first_sample.current.Frequency;
-                    value->first.current.Data += first_sample.current.Data;
-                    value->first.updated = true;
+                COUNTER_DATA *sample = &process_counters[n];
+                if (!perflibGetInstanceCounter(data, object, pi, sample)) {
+                    has_sample[n] = false;
+                    continue;
                 }
+
+                const bool incremental =
+                    iis_extra_counter_is_incremental(&group->definitions[n], sample->current.CounterType);
+                perflib_aggregate_instance_sample(&value->first, sample, &has_sample[n], incremental);
             } else
                 perflibGetInstanceCounter(data, object, pi, &value->first);
             if (!worker)
@@ -1031,14 +1073,17 @@ static bool do_iis_extra_group(PERF_DATA_BLOCK *data, struct iis_extra_group *gr
             if (!state->seen)
                 continue;
             const char *app = state_dfe.name;
-            for (size_t n = 0; n < group->count; n++)
+            for (size_t n = 0; n < group->count; n++) {
                 iis_extra_emit(group, &state->values[n], &group->definitions[n], app, app, update_every);
+            }
             iis_extra_done_charts(group, state);
+
+            perflib_worker_state_remove_unseen(state->workers);
         }
         dfe_done(state);
     }
     iis_extra_remove_unseen(group);
-    return true;
+    return IIS_EXTRA_GROUP_COLLECTED;
 }
 
 void do_PerflibWebServiceExtraWeb(PERF_DATA_BLOCK *data, int update_every)
@@ -1046,9 +1091,9 @@ void do_PerflibWebServiceExtraWeb(PERF_DATA_BLOCK *data, int update_every)
     do_iis_extra_group(data, &web_service_group, update_every);
 }
 
-void do_PerflibWebServiceExtraWorker(PERF_DATA_BLOCK *data, int update_every)
+bool do_PerflibWebServiceExtraWorker(PERF_DATA_BLOCK *data, int update_every)
 {
-    do_iis_extra_group(data, &worker_group, update_every);
+    return do_iis_extra_group(data, &worker_group, update_every) == IIS_EXTRA_GROUP_EXPIRED;
 }
 
 int do_PerflibHttpService(int update_every, usec_t dt __maybe_unused)

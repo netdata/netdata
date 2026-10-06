@@ -5,6 +5,29 @@
 
 #include "database/rrd.h"
 
+typedef struct perflib_worker_state {
+    bool initialized;
+    bool seen;
+    size_t counter_count;
+    max_align_t data[];
+} PERFLIB_WORKER_STATE;
+
+bool perflib_counter_type_is_incremental(uint32_t counter_type);
+bool perflib_counter_type_is_32bit(uint32_t counter_type);
+bool perflib_counter_type_is_32bit_rate(uint32_t counter_type);
+uint64_t perflib_counter_delta(uint64_t previous, uint64_t current, bool is_32bit);
+void perflib_aggregate_instance_sample(
+    COUNTER_DATA *aggregate,
+    const COUNTER_DATA *sample,
+    bool *has_previous,
+    bool incremental);
+DICTIONARY *perflib_worker_dictionary_create(size_t counter_count);
+PERFLIB_WORKER_STATE *perflib_worker_state_get(DICTIONARY *workers, const char *key, size_t counter_count);
+bool *perflib_worker_state_has_sample(PERFLIB_WORKER_STATE *worker);
+COUNTER_DATA *perflib_worker_state_counters(PERFLIB_WORKER_STATE *worker);
+void perflib_worker_state_mark_all_unseen(DICTIONARY *workers);
+void perflib_worker_state_remove_unseen(DICTIONARY *workers);
+
 RRDDIM *perflib_rrddim_add(
     RRDSET *st,
     const char *id,

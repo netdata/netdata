@@ -93,8 +93,25 @@ struct web_service {
     COUNTER_DATA IISRequestsOther;
 };
 
+enum w3svc_w3wp_counter_index {
+    W3SVC_W3WP_ACTIVE_THREADS,
+    W3SVC_W3WP_REQUEST_TOTAL,
+    W3SVC_W3WP_REQUEST_ACTIVE,
+    W3SVC_W3WP_FILE_CACHE_MEMORY,
+    W3SVC_W3WP_FILES_CACHED_TOTAL,
+    W3SVC_W3WP_FILES_FLUSHED_TOTAL,
+    W3SVC_W3WP_URIS_FLUSHED_TOTAL,
+    W3SVC_W3WP_URIS_CACHED_TOTAL,
+    W3SVC_W3WP_METADATA_CACHED_TOTAL,
+    W3SVC_W3WP_METADATA_FLUSHED_TOTAL,
+    W3SVC_W3WP_OUTPUT_CACHE_ACTIVE_FLUSHED,
+    W3SVC_W3WP_OUTPUT_CACHE_MEMORY,
+    W3SVC_W3WP_OUTPUT_CACHE_FLUSHES_TOTAL,
+    W3SVC_W3WP_COUNTERS,
+};
 struct ws3svc_w3wp_data {
     bool seen;
+    DICTIONARY *workers;
     RRDSET *st_w3svc_w3wp_active_threads;
     RRDDIM *rd_w3svc_w3wp_active_threads;
 
@@ -302,10 +319,48 @@ static inline void initialize_w3svc_w3wp_keys(struct ws3svc_w3wp_data *p)
     p->W3SVCW3WPOutputCacheFlushesTotal.key = "Output Cache Total Flushes";
 }
 
+static inline bool w3svc_w3wp_counter_is_incremental(size_t index)
+{
+    switch (index) {
+        case W3SVC_W3WP_REQUEST_TOTAL:
+        case W3SVC_W3WP_FILES_CACHED_TOTAL:
+        case W3SVC_W3WP_FILES_FLUSHED_TOTAL:
+        case W3SVC_W3WP_URIS_FLUSHED_TOTAL:
+        case W3SVC_W3WP_URIS_CACHED_TOTAL:
+        case W3SVC_W3WP_METADATA_CACHED_TOTAL:
+        case W3SVC_W3WP_METADATA_FLUSHED_TOTAL:
+        case W3SVC_W3WP_OUTPUT_CACHE_FLUSHES_TOTAL:
+            return true;
+        default:
+            return false;
+    }
+}
+
+static void w3svc_w3wp_get_counters(struct ws3svc_w3wp_data *p, COUNTER_DATA **counters)
+{
+    COUNTER_DATA *items[W3SVC_W3WP_COUNTERS] = {
+        &p->W3SVCW3WPActiveThreads,
+        &p->W3SVCW3WPRequestTotal,
+        &p->W3SVCW3WPRequestActive,
+        &p->W3SVCW3WPFileCacheMemUsage,
+        &p->W3SVCW3WPFilesCachedTotal,
+        &p->W3SVCW3WPFilesFlushedTotal,
+        &p->W3SVCW3WPURICachedFlushed,
+        &p->W3SVCW3WPTotalURICached,
+        &p->W3SVCW3WPTotalMetadataCached,
+        &p->W3SVCW3WPTotalMetadataFlushed,
+        &p->W3SVCW3WPOutputCacheActiveFlushedItems,
+        &p->W3SVCW3WPOutputCacheMemoryUsage,
+        &p->W3SVCW3WPOutputCacheFlushesTotal,
+    };
+    memcpy(counters, items, sizeof(items));
+}
+
 void dict_wesvc_w3wp_insert_cb(const DICTIONARY_ITEM *item __maybe_unused, void *value, void *data __maybe_unused)
 {
     struct ws3svc_w3wp_data *p = value;
     initialize_w3svc_w3wp_keys(p);
+    p->workers = perflib_worker_dictionary_create(W3SVC_W3WP_COUNTERS);
 }
 
 static DICTIONARY *web_services = NULL;
@@ -316,6 +371,7 @@ static void
 dict_wesvc_w3wp_delete_cb(const DICTIONARY_ITEM *item __maybe_unused, void *value, void *data __maybe_unused)
 {
     struct ws3svc_w3wp_data *p = value;
+    dictionary_destroy(p->workers);
     rrdset_is_obsolete___safe_from_collector_thread(p->st_w3svc_w3wp_active_threads);
     rrdset_is_obsolete___safe_from_collector_thread(p->st_w3svc_w3wp_requests_total);
     rrdset_is_obsolete___safe_from_collector_thread(p->st_w3svc_w3wp_requests_active);
@@ -1274,6 +1330,9 @@ static inline void app_pool_current_uptime(
     if (!perflibGetInstanceCounter(pDataBlock, pObjectType, pi, &p->APPCurrentApplicationPoolUptime))
         return;
 
+    if (!p->APPCurrentApplicationPoolUptime.current.Data)
+        return;
+
     if (!p->st_app_current_application_pool_uptime) {
         char id[RRD_ID_LENGTH_MAX + 1];
         snprintfz(id, sizeof(id), "application_pool_%s_current_uptime", windows_shared_buffer);
@@ -1312,6 +1371,9 @@ static inline void app_pool_time_since_failure(
     int update_every)
 {
     if (!perflibGetInstanceCounter(pDataBlock, pObjectType, pi, &p->APPTimeSinceProcessFailure))
+        return;
+
+    if (!p->APPTimeSinceProcessFailure.current.Data)
         return;
 
     if (!p->st_app_time_since_process_failure) {
@@ -1966,16 +2028,22 @@ static inline void w3svc_w3wp_output_cache_flushed_total(struct ws3svc_w3wp_data
 
 static bool do_W3SCV_W3WP(PERF_DATA_BLOCK *pDataBlock, int update_every)
 {
-    do_PerflibWebServiceExtraWorker(pDataBlock, update_every);
-    struct ws3svc_w3wp_data *existing;
-    dfe_start_write(w3svc_w3wp_service, existing) existing->seen = false;
-    dfe_done(existing);
+    bool worker_expired = do_PerflibWebServiceExtraWorker(pDataBlock, update_every);
 
     PERF_OBJECT_TYPE *pObjectType = perflibFindObjectTypeByName(pDataBlock, "W3SVC_W3WP");
     if (!pObjectType) {
-        w3svc_w3wp_remove_unseen();
+        if (worker_expired) {
+            struct ws3svc_w3wp_data *p;
+            dfe_start_write(w3svc_w3wp_service, p) p->seen = false;
+            dfe_done(p);
+            w3svc_w3wp_remove_unseen();
+        }
         return false;
     }
+
+    struct ws3svc_w3wp_data *existing;
+    dfe_start_write(w3svc_w3wp_service, existing) existing->seen = false;
+    dfe_done(existing);
 
     PERF_INSTANCE_DEFINITION *pi = NULL;
     for (LONG i = 0; i < pObjectType->NumInstances; i++) {
@@ -1988,6 +2056,9 @@ static bool do_W3SCV_W3WP(PERF_DATA_BLOCK *pDataBlock, int update_every)
         if (strcasecmp(windows_shared_buffer, "_Total") == 0)
             continue;
 
+        char worker_name[PERFLIB_MAX_NAME_LENGTH];
+        strncpyz(worker_name, windows_shared_buffer, sizeof(worker_name) - 1);
+
         char *app = strchr(windows_shared_buffer, '_');
         if (!app || app == windows_shared_buffer || !app[1])
             continue;
@@ -1997,59 +2068,42 @@ static bool do_W3SCV_W3WP(PERF_DATA_BLOCK *pDataBlock, int update_every)
 
         struct ws3svc_w3wp_data *p = dictionary_set(w3svc_w3wp_service, app, NULL, sizeof(*p));
         if (!p->seen) {
-            COUNTER_DATA *counters[] = {
-                &p->W3SVCW3WPActiveThreads,
-                &p->W3SVCW3WPRequestTotal,
-                &p->W3SVCW3WPRequestActive,
-                &p->W3SVCW3WPFileCacheMemUsage,
-                &p->W3SVCW3WPFilesCachedTotal,
-                &p->W3SVCW3WPFilesFlushedTotal,
-                &p->W3SVCW3WPURICachedFlushed,
-                &p->W3SVCW3WPTotalURICached,
-                &p->W3SVCW3WPTotalMetadataCached,
-                &p->W3SVCW3WPTotalMetadataFlushed,
-                &p->W3SVCW3WPOutputCacheActiveFlushedItems,
-                &p->W3SVCW3WPOutputCacheMemoryUsage,
-                &p->W3SVCW3WPOutputCacheFlushesTotal,
-            };
+            COUNTER_DATA *counters[W3SVC_W3WP_COUNTERS];
+            w3svc_w3wp_get_counters(p, counters);
             for (size_t n = 0; n < sizeof(counters) / sizeof(counters[0]); n++) {
                 counters[n]->previous = counters[n]->current;
-                counters[n]->current = RAW_DATA_EMPTY;
+                if (!w3svc_w3wp_counter_is_incremental(n))
+                    counters[n]->current = RAW_DATA_EMPTY;
                 counters[n]->updated = false;
             }
+            perflib_worker_state_mark_all_unseen(p->workers);
         }
         p->seen = true;
 
-        COUNTER_DATA *counters[] = {
-            &p->W3SVCW3WPActiveThreads,
-            &p->W3SVCW3WPRequestTotal,
-            &p->W3SVCW3WPRequestActive,
-            &p->W3SVCW3WPFileCacheMemUsage,
-            &p->W3SVCW3WPFilesCachedTotal,
-            &p->W3SVCW3WPFilesFlushedTotal,
-            &p->W3SVCW3WPURICachedFlushed,
-            &p->W3SVCW3WPTotalURICached,
-            &p->W3SVCW3WPTotalMetadataCached,
-            &p->W3SVCW3WPTotalMetadataFlushed,
-            &p->W3SVCW3WPOutputCacheActiveFlushedItems,
-            &p->W3SVCW3WPOutputCacheMemoryUsage,
-            &p->W3SVCW3WPOutputCacheFlushesTotal,
-        };
-        for (size_t n = 0; n < sizeof(counters) / sizeof(counters[0]); n++) {
-            COUNTER_DATA sample = *counters[n];
-            sample.current = RAW_DATA_EMPTY;
-            sample.previous = RAW_DATA_EMPTY;
-            bool updated = perflibGetInstanceCounter(pDataBlock, pObjectType, pi, &sample);
-            counters[n]->id = sample.id;
-            counters[n]->failures = sample.failures;
-            counters[n]->backoff = sample.backoff;
-            if (!updated)
+        COUNTER_DATA *counters[W3SVC_W3WP_COUNTERS];
+        w3svc_w3wp_get_counters(p, counters);
+        PERFLIB_WORKER_STATE *worker = perflib_worker_state_get(p->workers, worker_name, W3SVC_W3WP_COUNTERS);
+        if (!worker)
+            continue;
+        bool *has_sample = perflib_worker_state_has_sample(worker);
+        COUNTER_DATA *worker_counters = perflib_worker_state_counters(worker);
+        if (!worker->initialized) {
+            for (size_t n = 0; n < W3SVC_W3WP_COUNTERS; n++)
+                worker_counters[n].key = counters[n]->key;
+            worker->initialized = true;
+        }
+        worker->seen = true;
+
+        for (size_t n = 0; n < W3SVC_W3WP_COUNTERS; n++) {
+            COUNTER_DATA *counter = counters[n];
+            COUNTER_DATA *process_counter = &worker_counters[n];
+            if (!perflibGetInstanceCounter(pDataBlock, pObjectType, pi, process_counter)) {
+                has_sample[n] = false;
                 continue;
-            counters[n]->current.CounterType = sample.current.CounterType;
-            counters[n]->current.Time = sample.current.Time;
-            counters[n]->current.Frequency = sample.current.Frequency;
-            counters[n]->current.Data += sample.current.Data;
-            counters[n]->updated = true;
+            }
+
+            perflib_aggregate_instance_sample(
+                counter, process_counter, &has_sample[n], w3svc_w3wp_counter_is_incremental(n));
         }
     }
 
@@ -2072,6 +2126,12 @@ static bool do_W3SCV_W3WP(PERF_DATA_BLOCK *pDataBlock, int update_every)
         w3svc_w3wp_output_cache_active_flushed_items(p, update_every, (char *)app);
         w3svc_w3wp_output_cache_memory_usage(p, update_every, (char *)app);
         w3svc_w3wp_output_cache_flushed_total(p, update_every, (char *)app);
+    }
+    dfe_done(p);
+
+    dfe_start_write(w3svc_w3wp_service, p)
+    {
+        perflib_worker_state_remove_unseen(p->workers);
     }
     dfe_done(p);
 

@@ -2105,7 +2105,7 @@ modules:
                 - name: anonymous
                 - name: non_anonymous
             - name: iis.website_blocked_async_io_requests_rate
-              description: Website blocked async I/O requests
+              description: Website total blocked async I/O requests
               unit: "requests/s"
               chart_type: line
               dimensions:

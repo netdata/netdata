@@ -2,7 +2,161 @@
 
 #include "perflib-rrd.h"
 
+#include "libnetdata/libnetdata.h"
+
 #define COLLECTED_NUMBER_PRECISION 10000
+
+bool perflib_counter_type_is_incremental(uint32_t counter_type)
+{
+    switch (counter_type) {
+        case PERF_COUNTER_COUNTER:
+        case PERF_SAMPLE_COUNTER:
+        case PERF_COUNTER_BULK_COUNT:
+        case PERF_COUNTER_QUEUELEN_TYPE:
+        case PERF_COUNTER_100NS_QUEUELEN_TYPE:
+        case PERF_COUNTER_OBJ_TIME_QUEUELEN_TYPE:
+        case PERF_COUNTER_LARGE_QUEUELEN_TYPE:
+        case PERF_AVERAGE_BULK:
+        case PERF_AVERAGE_TIMER:
+        case PERF_OBJ_TIME_TIMER:
+        case PERF_COUNTER_TIMER:
+        case PERF_100NSEC_TIMER:
+        case PERF_PRECISION_SYSTEM_TIMER:
+        case PERF_PRECISION_100NS_TIMER:
+        case PERF_PRECISION_OBJECT_TIMER:
+        case PERF_SAMPLE_FRACTION:
+            return true;
+        default:
+            return false;
+    }
+}
+
+bool perflib_counter_type_is_32bit(uint32_t counter_type)
+{
+    switch (counter_type) {
+        case PERF_COUNTER_COUNTER:
+        case PERF_SAMPLE_COUNTER:
+        case PERF_COUNTER_QUEUELEN_TYPE:
+        case PERF_OBJ_TIME_TIMER:
+        case PERF_COUNTER_RAWCOUNT:
+        case PERF_COUNTER_RAWCOUNT_HEX:
+        case PERF_COUNTER_DELTA:
+        case PERF_SAMPLE_FRACTION:
+        case PERF_RAW_FRACTION:
+            return true;
+        default:
+            return false;
+    }
+}
+
+bool perflib_counter_type_is_32bit_rate(uint32_t counter_type)
+{
+    return counter_type == PERF_COUNTER_COUNTER || counter_type == PERF_SAMPLE_COUNTER;
+}
+
+uint64_t perflib_counter_delta(uint64_t previous, uint64_t current, bool is_32bit)
+{
+    if (!is_32bit)
+        return current >= previous ? current - previous : current;
+
+    uint32_t previous32 = (uint32_t)previous;
+    uint32_t current32 = (uint32_t)current;
+    uint64_t delta = current32 >= previous32 ? (uint64_t)(current32 - previous32) :
+                                               (uint64_t)UINT32_MAX - previous32 + current32 + 1;
+    return delta < (UINT64_C(1) << 31) ? delta : 0;
+}
+
+void perflib_aggregate_instance_sample(
+    COUNTER_DATA *aggregate,
+    const COUNTER_DATA *sample,
+    bool *has_previous,
+    bool incremental)
+{
+    if (incremental) {
+        if (*has_previous)
+            aggregate->current.Data += perflib_counter_delta(
+                sample->previous.Data,
+                sample->current.Data,
+                perflib_counter_type_is_32bit(sample->current.CounterType));
+        *has_previous = true;
+    } else
+        aggregate->current.Data += sample->current.Data;
+
+    if (!aggregate->updated) {
+        aggregate->current.CounterType = sample->current.CounterType;
+        aggregate->current.Time = sample->current.Time;
+        aggregate->current.Frequency = sample->current.Frequency;
+    }
+    aggregate->updated = true;
+    aggregate->id = sample->id;
+}
+
+static size_t perflib_worker_counters_offset(size_t counter_count)
+{
+    size_t offset = counter_count * sizeof(bool);
+    size_t alignment = _Alignof(COUNTER_DATA);
+    return (offset + alignment - 1) & ~(alignment - 1);
+}
+
+static size_t perflib_worker_state_size(size_t counter_count)
+{
+    return offsetof(PERFLIB_WORKER_STATE, data) + perflib_worker_counters_offset(counter_count) +
+           counter_count * sizeof(COUNTER_DATA);
+}
+
+DICTIONARY *perflib_worker_dictionary_create(size_t counter_count)
+{
+    return dictionary_create_advanced(
+        DICT_OPTION_DONT_OVERWRITE_VALUE | DICT_OPTION_FIXED_SIZE, NULL, perflib_worker_state_size(counter_count));
+}
+
+PERFLIB_WORKER_STATE *perflib_worker_state_get(DICTIONARY *workers, const char *key, size_t counter_count)
+{
+    size_t value_size = perflib_worker_state_size(counter_count);
+    PERFLIB_WORKER_STATE *worker = dictionary_set(workers, key, NULL, value_size);
+    if (!worker)
+        return NULL;
+
+    if (worker->counter_count && worker->counter_count != counter_count)
+        return NULL;
+    worker->counter_count = counter_count;
+    return worker;
+}
+
+bool *perflib_worker_state_has_sample(PERFLIB_WORKER_STATE *worker)
+{
+    return (bool *)worker->data;
+}
+
+COUNTER_DATA *perflib_worker_state_counters(PERFLIB_WORKER_STATE *worker)
+{
+    return (COUNTER_DATA *)((uint8_t *)worker->data + perflib_worker_counters_offset(worker->counter_count));
+}
+
+void perflib_worker_state_mark_all_unseen(DICTIONARY *workers)
+{
+    if (!workers)
+        return;
+
+    PERFLIB_WORKER_STATE *worker;
+    dfe_start_write(workers, worker) worker->seen = false;
+    dfe_done(worker);
+}
+
+void perflib_worker_state_remove_unseen(DICTIONARY *workers)
+{
+    if (!workers)
+        return;
+
+    PERFLIB_WORKER_STATE *worker;
+    dfe_start_write(workers, worker)
+    {
+        if (!worker->seen)
+            dictionary_del(workers, worker_dfe.name);
+    }
+    dfe_done(worker);
+    dictionary_garbage_collect(workers);
+}
 
 RRDDIM *perflib_rrddim_add(
     RRDSET *st,
@@ -12,7 +166,8 @@ RRDDIM *perflib_rrddim_add(
     collected_number divider,
     COUNTER_DATA *cd)
 {
-    RRD_ALGORITHM algorithm = RRD_ALGORITHM_ABSOLUTE;
+    RRD_ALGORITHM algorithm = perflib_counter_type_is_incremental(cd->current.CounterType) ? RRD_ALGORITHM_INCREMENTAL :
+                                                                                             RRD_ALGORITHM_ABSOLUTE;
 
     switch (cd->current.CounterType) {
         case PERF_COUNTER_COUNTER:
@@ -22,7 +177,6 @@ RRDDIM *perflib_rrddim_add(
             // multiplier *= cd->current.Frequency / 10000000;
             // tested, the frequency is not that useful for netdata
             // we get right results without it.
-            algorithm = RRD_ALGORITHM_INCREMENTAL;
             break;
 
         case PERF_COUNTER_QUEUELEN_TYPE:
@@ -31,7 +185,6 @@ RRDDIM *perflib_rrddim_add(
         case PERF_COUNTER_LARGE_QUEUELEN_TYPE:
         case PERF_AVERAGE_BULK: // normally not displayed
             // (N1 - N0) / (D1 - D0)
-            algorithm = RRD_ALGORITHM_INCREMENTAL;
             break;
 
         case PERF_OBJ_TIME_TIMER:
@@ -43,7 +196,6 @@ RRDDIM *perflib_rrddim_add(
         case PERF_SAMPLE_FRACTION:
             // 100 * (N1 - N0) / (D1 - D0)
             multiplier *= 100;
-            algorithm = RRD_ALGORITHM_INCREMENTAL;
             break;
 
         case PERF_COUNTER_TIMER_INV:
@@ -100,7 +252,6 @@ RRDDIM *perflib_rrddim_add(
         case PERF_AVERAGE_TIMER:
             // ((N1 - N0) / TB) / (B1 - B0)
             // divider *= cd->current.Frequency / 10000000;
-            algorithm = RRD_ALGORITHM_INCREMENTAL;
             break;
 
         case PERF_ELAPSED_TIME:
