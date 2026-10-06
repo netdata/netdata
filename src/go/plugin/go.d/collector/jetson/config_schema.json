@@ -6,7 +6,7 @@
     "properties": {
       "update_every": {
         "title": "Update every",
-        "description": "Interval in seconds between published observations. Tegrastats continues sampling once per second.",
+        "description": "Data collection interval, in seconds. `tegrastats` samples once per second regardless; a longer interval charts the latest reading, not an average.",
         "type": "integer",
         "minimum": 1,
         "default": 1
