@@ -211,6 +211,23 @@ humantime = "2.2"
 humantime-serde = "1.1"
 tonic = "0.14"
 
+# OTLP/HTTP receiver front end for otel-ingestor: axum router served alongside
+# the tonic gRPC transport, with http/http-body-util request plumbing and
+# tokio-rustls TLS termination for the plain-HTTP listener. Axum runs with
+# default features off: the receiver decodes bodies itself (prost + serde_json
+# with mirrored Content-Type) and never uses the Json/Form/Query extractors,
+# and skipping them keeps serde_path_to_error out of the graph (and keeps
+# axum from adding serde_urlencoded, which opendal's S3 signer pulls in anyway). http2 is enabled so the h2 ALPN entry the TLS listener advertises is
+# honest; http1 + tokio are what axum::serve needs.
+axum = { version = "0.8", default-features = false, features = ["http1", "http2", "tokio"] }
+http = "1"
+http-body-util = "0.1"
+tokio-rustls = "0.26"
+# Test-only: in-memory CA/server/client certificates for the OTLP/HTTP TLS
+# listener tests, so no key material is committed. Default features select
+# `ring`, the workspace's rustls backend.
+rcgen = "0.14"
+
 flatten-serde-json = { git = "https://github.com/meilisearch/meilisearch", tag = "v1.22.1" }
 
 # Internal workspace crates

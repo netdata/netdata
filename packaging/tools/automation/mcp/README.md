@@ -43,17 +43,21 @@ so multiple agents of one worktree coexist without clobbering.
 
 | Tool | Purpose |
 |------|---------|
-| `netdata_agent_declare(agent_id, worktree, profile)` | Bind an `agent-id` to a `(worktree, profile)`. Idempotent. |
-| `netdata_run_start(agent_id, restart=False)` | Build+install if needed, then launch netdata on an auto-assigned loopback port. Returns immediately; poll status until `ready`. First start for a profile can take minutes. Idempotent while live: a plain start does **not** rebuild a running agent. Pass `restart=true` after editing source — it stops, rebuilds (incremental), and relaunches. |
+| `netdata_agent_declare(agent_id, worktree, profile, port=None)` | Bind an `agent-id` to a `(worktree, profile)`. Idempotent. Optional `port` pins the agent's web port for every start/restart (stable URLs, e.g. for a local dashboard); re-declaring without it returns to auto-assigned ports. A port that a pinned OTLP endpoint (`netdata_agent_otel_config`) uses on `127.0.0.1` or a wildcard address is refused. |
+| `netdata_run_start(agent_id, restart=False)` | Build+install if needed, then launch netdata on the declared port, else an auto-assigned loopback port (a declared port already in use fails the run before launch). Returns immediately; poll status until `ready`. First start for a profile can take minutes. Idempotent while live: a plain start does **not** rebuild a running agent. Pass `restart=true` after editing source — it stops, rebuilds (incremental), and relaunches. |
 | `netdata_run_status(agent_id)` | `building`/`starting`/`ready`/`stopped`/`failed` + the port and `url` (when ready), plus `claimed`/`cloud_connected` once ready. Long-polls ~8s while coming up. |
 | `netdata_run_logs(agent_id, offset)` | Combined build + netdata output, incremental. |
 | `netdata_agent_logs(agent_id, component, lines, grep, priority)` | Structured logs from the systemd journal for one part of the agent — `daemon` (netdata), `supervisor` (otel-plugin), or a worker (`ledger`/`ingestor`/`legacy-logs`) — scoped to that process by `_PID`. Read-only `journalctl` wrapper. Only registered where the journal is usable (`journalctl` on PATH and a running journald); elsewhere use `netdata_run_logs`. |
 | `netdata_run_stop(agent_id)` | Stop the agent (terminates its process group). |
 
 Each agent gets an isolated runtime dir **`~/opt/netdata-mcp/run/<agent-id>/`**
-(`etc`, `cache`, `lib`, `log`) and a generated `netdata.conf` (ram db, isolated
+(`etc`, `cache`, `lib`, `log`, `run`) and a generated `netdata.conf` (ram db, isolated
 `[directories]`, bind `127.0.0.1`); netdata launches as
-`<install>/usr/sbin/netdata -D -p <port> -c <conf>`. Readiness is probed via
+`<install>/usr/sbin/netdata -D -p <port> -c <conf>` with `NETDATA_RUN_DIR=<run dir>/run`,
+so its spawn-server and plugin sockets never collide with another agent's (without it
+every agent falls back to the shared `/tmp/netdata`). Unix socket paths are limited to
+107 bytes, so `netdata_agent_declare` refuses an agent id that would push the longest
+of them past it (about 35 chars under a short `/home/<user>`). Readiness is probed via
 `/api/v1/info`. The run dir is **kept after stop** for inspection; agent logs are
 not in the run dir — they're in the journal (`netdata_agent_logs`) on journald
 hosts, or in `netdata_run_logs` otherwise. Agents are in-memory and do not
@@ -124,7 +128,7 @@ A dedicated surface for iterating on the OTel-logs path against a ready agent:
 
 | Tool | What |
 |------|------|
-| `netdata_agent_otel_config(agent_id, …)` | Set otel-plugin knobs applied on the next start. REPLACES prior config. Tuning is per-signal: `logs_*` (WAL rotation, index retention, catalog) and `traces_*` knobs are independent; remote storage is global (`remote_storage_*`). Knobs without a first-class param (auth, ingest windows, retention `max_age`/`horizon`, per-tenant overrides) are reachable via the `extra_yaml` raw-YAML passthrough. |
+| `netdata_agent_otel_config(agent_id, …)` | Set otel-plugin knobs applied on the next start. REPLACES prior config. Tuning is per-signal: `logs_*` (WAL rotation, index retention, catalog) and `traces_*` knobs are independent; remote storage is global (`remote_storage_*`). Knobs without a first-class param (auth, ingest windows, retention `max_age`/`horizon`, per-tenant overrides) are reachable via the `extra_yaml` raw-YAML passthrough. An endpoint pinned to the agent's declared web port on `127.0.0.1` or a wildcard address is refused. |
 | `netdata_agent_otel_push_logs(agent_id, count, …)` | One-shot: send a deterministic synthetic OTLP LOG corpus (`otel-streams synth`) to the agent. `service_name`/`service_namespace` set the resource identity (one stream per batch; query by literal `service.name`/`service.namespace`). `service_name` is always emitted (queryable even when `""`); an omitted `service_namespace` emits no token (not queryable — reachable via `service.name`), while `service_namespace=""` emits a queryable empty value. |
 | `netdata_agent_otel_push_traces(agent_id, count, …)` | One-shot: send a deterministic synthetic OTLP TRACE corpus (`otel-streams synth-traces`) to the agent. Like the logs push but with `duration_nanos` (per-span duration), no `field_cardinality`, and a distinct default `service.name` (`otel-streams-synth-traces`). Pair with small `traces_*` config thresholds to seal the traces pipeline without an additional restart (the thresholds applied at the prior run_start make rotation automatic). |
 | `netdata_agent_otel_stream_{start,status,stop,list}(…)` | Run a live source (`source=certstream\|jetstream\|github`) as a daemon; `list` enumerates all streams. |

@@ -1,7 +1,10 @@
-//! The OTLP logs ingestion service: the gRPC `LogsService` implementation that
-//! receives `ExportLogsServiceRequest`s and lands them in per-tenant WALs.
+//! The OTLP logs ingestion service: receives `ExportLogsServiceRequest`s
+//! and lands them in per-tenant WALs. The logic is transport-agnostic — it
+//! lives on the [`NetdataLogsService::export_logs`] core, which both the
+//! gRPC `LogsService` wrapper and the OTLP/HTTP front end call.
 //!
-//! `export` flow: resolve the tenant (`x-scope-orgid` header) → group
+//! Export flow: the transport wrapper resolves the tenant (`x-scope-orgid`
+//! header) and calls the core, which groups
 //! `ResourceLogs` by [`ServiceStream`] identity → drop identities too large
 //! for the substrate's `content_meta` caps → reject streams whose `ns_hash`
 //! is already claimed by a different identity (first write wins, per tenant)
@@ -161,9 +164,9 @@ struct CollisionCheck {
 /// - If the entry mismatches, reject as a collision and record it for the
 ///   response's `partial_success`.
 ///
-/// Pure with respect to the I/O of the gRPC handler — the only side
-/// effect is mutating the canonical table. Extracted from `export` so it
-/// can be unit-tested without spinning up a writer or a tonic Request.
+/// Pure with respect to the I/O of the export path — the only side effect
+/// is mutating the canonical table. Extracted from `export_logs` so it can
+/// be unit-tested without spinning up a writer or a request.
 fn check_collisions(
     canonical: &mut HashMap<(TenantId, u64), ServiceStream>,
     tenant_id: &TenantId,
@@ -329,9 +332,11 @@ fn identity_preview(s: &str) -> String {
     s.chars().take(IDENTITY_LOG_PREVIEW_CHARS).collect()
 }
 
-/// gRPC sink for OTLP log exports: polices per-tenant stream identities,
-/// appends flattened frames to per-tenant WALs, and forwards lifecycle events
-/// to the ledger. See the module docs for the request flow.
+/// Transport-agnostic sink for OTLP log exports: polices per-tenant stream
+/// identities, appends flattened frames to per-tenant WALs, and forwards
+/// lifecycle events to the ledger. The gRPC path reaches it via the thin
+/// `LogsService` wrapper; the OTLP/HTTP front end calls the same core. See
+/// the module docs for the request flow.
 pub struct NetdataLogsService {
     /// Per-tenant WAL writers. The map mutex is held only for lookup/insert
     /// (a tenant's first request creates its writer under it); each request
@@ -414,7 +419,10 @@ impl NetdataLogsService {
     /// idle-rotation sweep enforces for most streams. Used at startup to warn
     /// when it is below the sweep granularity.
     pub fn default_max_file_duration(&self) -> std::time::Duration {
-        self.wal_config.rotation.resolve("default").max_file_duration
+        self.wal_config
+            .rotation
+            .resolve("default")
+            .max_file_duration
     }
 
     /// The resolved ingestion `future_skew`. Used at startup to warn when it is
@@ -536,24 +544,28 @@ fn encode_identity_or_drop(
     Ok(content_meta)
 }
 
-#[tonic::async_trait]
-impl LogsService for NetdataLogsService {
-    #[tracing::instrument(skip_all)]
-    async fn export(
+impl NetdataLogsService {
+    /// The transport-agnostic OTLP logs export core: everything between
+    /// "tenant resolved, request decoded" and the response. The gRPC
+    /// `LogsService::export` wrapper resolves the tenant from tonic
+    /// metadata and calls this; the OTLP/HTTP front end resolves the tenant
+    /// from HTTP headers and calls the same code — one behavior for both
+    /// transports. The caller owns transport concerns (metadata/headers,
+    /// request decoding, response framing); this core owns every rejection,
+    /// ordering, and durability decision.
+    pub(crate) async fn export_logs(
         &self,
-        request: Request<ExportLogsServiceRequest>,
-    ) -> Result<Response<ExportLogsServiceResponse>, Status> {
-        let tenant_id = extract_tenant_id(request.metadata(), &self.auth)?;
-        let req = request.into_inner();
-
+        tenant_id: &TenantId,
+        request: ExportLogsServiceRequest,
+    ) -> Result<ExportLogsServiceResponse, Status> {
         // Empty `ResourceLogs` contribute nothing (group_by_stream owns that
         // rule), so an all-empty request yields no groups.
-        let groups = group_by_stream(req.resource_logs);
+        let groups = group_by_stream(request.resource_logs);
 
         if groups.is_empty() {
-            return Ok(Response::new(ExportLogsServiceResponse {
+            return Ok(ExportLogsServiceResponse {
                 partial_success: None,
-            }));
+            });
         }
 
         // Validate identity encodability BEFORE the collision check mutates the
@@ -587,7 +599,7 @@ impl LogsService for NetdataLogsService {
             collisions,
         } = {
             let mut canonical = self.canonical.lock().unwrap();
-            check_collisions(&mut canonical, &tenant_id, storable)
+            check_collisions(&mut canonical, tenant_id, storable)
         };
 
         for c in &collisions {
@@ -603,9 +615,9 @@ impl LogsService for NetdataLogsService {
         // collision, or every group was dropped as oversized). Still report the
         // rejected records — collisions and oversized drops — to the client.
         if accepted.is_empty() {
-            return Ok(Response::new(ExportLogsServiceResponse {
+            return Ok(ExportLogsServiceResponse {
                 partial_success: build_partial_success(&collisions, &oversized, 0),
-            }));
+            });
         }
 
         // Phase 1 — prepare every frame WITHOUT holding any writer lock:
@@ -664,9 +676,9 @@ impl LogsService for NetdataLogsService {
         // Every accepted stream was fully rejected as out-of-window: nothing to
         // write, but still report the rejected records to the client.
         if prepared.is_empty() {
-            return Ok(Response::new(ExportLogsServiceResponse {
+            return Ok(ExportLogsServiceResponse {
                 partial_success: build_partial_success(&collisions, &oversized, out_of_window),
-            }));
+            });
         }
 
         // Phase 2 — the serialized region, under THIS TENANT's writer lock
@@ -677,7 +689,7 @@ impl LogsService for NetdataLogsService {
         // it). All sync code — no `.await` while a guard is held.
         let writer = {
             let mut writers = self.writers.lock().unwrap();
-            if let Some(w) = writers.get(&tenant_id) {
+            if let Some(w) = writers.get(tenant_id) {
                 Arc::clone(w)
             } else {
                 let path = self.wal_base_dir.join(tenant_id.as_str());
@@ -744,12 +756,30 @@ impl LogsService for NetdataLogsService {
             // is synchronous and non-blocking (unbounded channel), so no
             // `.await` is held under the lock.
             let events = writer.take_all_events();
-            self.sender.send_events(tenant_id, events);
+            // `send_events` takes the tenant by value and the core only
+            // borrows it, so clone here — the last use of the id in this
+            // request either way.
+            self.sender.send_events(tenant_id.clone(), events);
         }
 
-        Ok(Response::new(ExportLogsServiceResponse {
+        Ok(ExportLogsServiceResponse {
             partial_success: build_partial_success(&collisions, &oversized, out_of_window),
-        }))
+        })
+    }
+}
+
+#[tonic::async_trait]
+impl LogsService for NetdataLogsService {
+    /// gRPC entry point: resolve the tenant from request metadata, then run
+    /// the transport-agnostic core both front ends share.
+    #[tracing::instrument(skip_all)]
+    async fn export(
+        &self,
+        request: Request<ExportLogsServiceRequest>,
+    ) -> Result<Response<ExportLogsServiceResponse>, Status> {
+        let tenant_id = extract_tenant_id(request.metadata(), &self.auth)?;
+        let response = self.export_logs(&tenant_id, request.into_inner()).await?;
+        Ok(Response::new(response))
     }
 }
 
@@ -1159,7 +1189,10 @@ mod tests {
             .expect("a Closed event must reach the ledger");
 
         assert_eq!(entry_count, 1, "Closed carries the record count");
-        assert!(valid_up_to.0 > 0, "Closed carries a non-zero durable prefix");
+        assert!(
+            valid_up_to.0 > 0,
+            "Closed carries a non-zero durable prefix"
+        );
 
         let _ = std::fs::remove_file(&socket);
     }

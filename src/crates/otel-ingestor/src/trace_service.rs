@@ -1,12 +1,14 @@
-//! The OTLP traces ingestion service: the gRPC `TraceService` implementation
-//! that receives `ExportTraceServiceRequest`s and lands them in per-tenant
-//! WALs — the span analog of [`crate::logs_service::NetdataLogsService`], same
-//! two-phase export structure: prepare every frame lock-free (normalize +
-//! interval time bounds + flatten + encode, all owned by
-//! [`ng_flatten::prepare_trace_frame`]; `Some(bounds)` here — production
-//! enforces the window, while the `ng-ingest` dev tool and the tests pass
-//! `None`), then write + sync + drain-events under the tenant's writer lock
-//! only.
+//! The OTLP traces ingestion service: receives `ExportTraceServiceRequest`s
+//! and lands them in per-tenant WALs — the span analog of
+//! [`crate::logs_service::NetdataLogsService`]. The logic is
+//! transport-agnostic — it lives on the [`NetdataTracesService::export_traces`]
+//! core, which both the gRPC `TraceService` wrapper and the OTLP/HTTP front
+//! end call. Same two-phase export structure: prepare
+//! every frame lock-free (normalize + interval time bounds + flatten +
+//! encode, all owned by [`ng_flatten::prepare_trace_frame`]; `Some(bounds)`
+//! here — production enforces the window, while the `ng-ingest` dev tool and
+//! the tests pass `None`), then write + sync + drain-events under the
+//! tenant's writer lock only.
 //!
 //! ## Partitioning (the D7 seam)
 //!
@@ -125,9 +127,10 @@ fn build_partial_success(out_of_window: usize) -> Option<ExportTracePartialSucce
     })
 }
 
-/// gRPC sink for OTLP span exports: appends flattened frames to per-tenant
-/// WALs and forwards lifecycle events to the ledger. See the module docs for
-/// the request flow.
+/// Transport-agnostic sink for OTLP span exports: appends flattened frames to
+/// per-tenant WALs and forwards lifecycle events to the ledger. The gRPC
+/// path reaches it via the thin `TraceService` wrapper; the OTLP/HTTP front
+/// end calls the same core. See the module docs for the request flow.
 pub struct NetdataTracesService {
     /// Per-tenant WAL writers. The map mutex is held only for lookup/insert;
     /// each request then locks ONLY its tenant's writer for the write+sync
@@ -204,7 +207,10 @@ impl NetdataTracesService {
     /// when it is at or below the sweep interval (idle streams then rotate at
     /// sweep granularity).
     pub fn default_max_file_duration(&self) -> std::time::Duration {
-        self.wal_config.rotation.resolve("default").max_file_duration
+        self.wal_config
+            .rotation
+            .resolve("default")
+            .max_file_duration
     }
 
     /// The resolved ingestion `future_skew`. Used at startup to warn when it is
@@ -276,24 +282,28 @@ impl NetdataTracesService {
     }
 }
 
-#[tonic::async_trait]
-impl TraceService for NetdataTracesService {
-    #[tracing::instrument(skip_all)]
-    async fn export(
+impl NetdataTracesService {
+    /// The transport-agnostic OTLP traces export core: everything between
+    /// "tenant resolved, request decoded" and the response. The gRPC
+    /// `TraceService::export` wrapper resolves the tenant from tonic
+    /// metadata and calls this; the OTLP/HTTP front end resolves the tenant
+    /// from HTTP headers and calls the same code — one behavior for both
+    /// transports. The caller owns transport concerns (metadata/headers,
+    /// request decoding, response framing); this core owns every rejection,
+    /// ordering, and durability decision.
+    pub(crate) async fn export_traces(
         &self,
-        request: Request<ExportTraceServiceRequest>,
-    ) -> Result<Response<ExportTraceServiceResponse>, Status> {
-        let tenant_id = extract_tenant_id(request.metadata(), &self.auth)?;
-        let req = request.into_inner();
-
+        tenant_id: &TenantId,
+        request: ExportTraceServiceRequest,
+    ) -> Result<ExportTraceServiceResponse, Status> {
         // Nothing to write — no clock tick, no writer creation, no empty frame.
-        if count_spans(&req) == 0 {
-            return Ok(Response::new(ExportTraceServiceResponse {
+        if count_spans(&request) == 0 {
+            return Ok(ExportTraceServiceResponse {
                 partial_success: None,
-            }));
+            });
         }
 
-        let groups = partition_spans(req);
+        let groups = partition_spans(request);
 
         // Phase 1 — prepare every frame WITHOUT holding any writer lock:
         // `prepare_trace_frame` consumes an owned request and needs nothing
@@ -347,9 +357,9 @@ impl TraceService for NetdataTracesService {
         // Every span was rejected as out-of-window: nothing to write, but
         // still report the rejected spans to the client.
         if prepared.is_empty() {
-            return Ok(Response::new(ExportTraceServiceResponse {
+            return Ok(ExportTraceServiceResponse {
                 partial_success: build_partial_success(out_of_window),
-            }));
+            });
         }
 
         // Phase 2 — the serialized region, under THIS TENANT's writer lock
@@ -359,7 +369,7 @@ impl TraceService for NetdataTracesService {
         // held.
         let writer = {
             let mut writers = self.writers.lock().unwrap();
-            if let Some(w) = writers.get(&tenant_id) {
+            if let Some(w) = writers.get(tenant_id) {
                 Arc::clone(w)
             } else {
                 let path = self.wal_base_dir.join(tenant_id.as_str());
@@ -424,12 +434,30 @@ impl TraceService for NetdataTracesService {
             // and non-blocking (unbounded channel), so no `.await` under the
             // lock.
             let events = writer.take_all_events();
-            self.sender.send_events(tenant_id, events);
+            // `send_events` takes the tenant by value and the core only
+            // borrows it, so clone here — the last use of the id in this
+            // request either way.
+            self.sender.send_events(tenant_id.clone(), events);
         }
 
-        Ok(Response::new(ExportTraceServiceResponse {
+        Ok(ExportTraceServiceResponse {
             partial_success: build_partial_success(out_of_window),
-        }))
+        })
+    }
+}
+
+#[tonic::async_trait]
+impl TraceService for NetdataTracesService {
+    /// gRPC entry point: resolve the tenant from request metadata, then run
+    /// the transport-agnostic core both front ends share.
+    #[tracing::instrument(skip_all)]
+    async fn export(
+        &self,
+        request: Request<ExportTraceServiceRequest>,
+    ) -> Result<Response<ExportTraceServiceResponse>, Status> {
+        let tenant_id = extract_tenant_id(request.metadata(), &self.auth)?;
+        let response = self.export_traces(&tenant_id, request.into_inner()).await?;
+        Ok(Response::new(response))
     }
 }
 
@@ -482,7 +510,10 @@ mod tests {
         wal_dir: std::path::PathBuf,
         ingest: bridge::config::IngestConfig,
     ) -> NetdataTracesService {
-        let socket = format!("/tmp/netdata-traces-ingestor-test-{}.sock", std::process::id());
+        let socket = format!(
+            "/tmp/netdata-traces-ingestor-test-{}.sock",
+            std::process::id()
+        );
         let sender = Arc::new(LedgerSender::new(&socket));
 
         let mut rotation = HashMap::new();
@@ -655,9 +686,9 @@ mod tests {
             resource_spans: vec![ResourceSpans {
                 scope_spans: vec![ScopeSpans {
                     spans: vec![
-                        span(now, now + 1_000),              // in-window → kept
-                        span(now - 7_200_000_000_000, now),  // start 2h old → rejected
-                        span(now, now + 3_600_000_000_000),  // end 1h ahead → rejected
+                        span(now, now + 1_000),             // in-window → kept
+                        span(now - 7_200_000_000_000, now), // start 2h old → rejected
+                        span(now, now + 3_600_000_000_000), // end 1h ahead → rejected
                     ],
                     ..Default::default()
                 }],
@@ -680,9 +711,9 @@ mod tests {
         );
         let events = writer.lock().unwrap().shutdown_all().unwrap();
         assert!(
-            events
-                .iter()
-                .any(|e| matches!(e, wal::FileEvent::Closed { entry_count, .. } if *entry_count == 1)),
+            events.iter().any(
+                |e| matches!(e, wal::FileEvent::Closed { entry_count, .. } if *entry_count == 1)
+            ),
             "exactly the in-window span was stored: {events:?}"
         );
     }
@@ -791,7 +822,10 @@ mod tests {
             .expect("a Closed event must reach the ledger");
 
         assert_eq!(entry_count, 1, "Closed carries the span count");
-        assert!(valid_up_to.0 > 0, "Closed carries a non-zero durable prefix");
+        assert!(
+            valid_up_to.0 > 0,
+            "Closed carries a non-zero durable prefix"
+        );
 
         let _ = std::fs::remove_file(&socket);
     }
