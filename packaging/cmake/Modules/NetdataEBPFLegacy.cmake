@@ -13,6 +13,9 @@ set(ebpf-legacy_BUILD_DIR "${CMAKE_BINARY_DIR}/ebpf-legacy-build")
 function(netdata_fetch_legacy_ebpf_code)
     netdata_identify_libc(_libc)
 
+    # The root file forces BUILD_SHARED_LIBS off, so every current build takes
+    # the static arm and its one libc-independent tarball; the glibc/musl arms
+    # stay for the day that changes.
     if(DEFINED BUILD_SHARED_LIBS)
         if(NOT BUILD_SHARED_LIBS)
             set(need_static TRUE)

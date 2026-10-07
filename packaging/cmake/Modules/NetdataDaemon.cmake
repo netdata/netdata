@@ -164,7 +164,7 @@ if(ENABLE_EXPORTER_PROMETHEUS_REMOTE_WRITE)
 endif()
 
 #
-# build netdata (only Linux ATM)
+# build netdata
 #
 
 # The manifest is referenced by netdata.rc at compile time; the configured copy

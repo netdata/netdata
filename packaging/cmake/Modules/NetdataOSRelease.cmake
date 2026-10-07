@@ -1,8 +1,9 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
 # Distro detection from os-release.
 #
-# Shared by the install rules in the top-level CMakeLists.txt (format-specific
-# staging) and by Modules/Packaging.cmake (CPack per-distro configuration), so
-# it must be included before either consumer.
+# Read by NetdataSystemFiles.cmake (format-specific install staging) and by
+# Packaging.cmake (CPack per-distro configuration), so the root file includes
+# this ahead of both.
 
 include_guard(GLOBAL)
 

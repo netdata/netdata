@@ -4,9 +4,9 @@
 # include()d from the root file, so paths resolve against the repository and
 # build roots; nothing here may use CMAKE_CURRENT_LIST_DIR.
 #
-# Sets HAVE_CAPABILITY, a #cmakedefine that NetdataSystemFiles reads when it
+# Sets HAVE_CAPABILITY, a #cmakedefine that NetdataSystemFiles.cmake reads when it
 # generates config.h on the root file's last line - so this include() must
-# stay ahead of that, which its ordinal position guarantees by 400-odd lines.
+# stay ahead of that, which its ordinal position guarantees by 50-odd lines.
 
 include_guard()
 

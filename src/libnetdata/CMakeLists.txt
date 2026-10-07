@@ -159,12 +159,10 @@ if(OS_WINDOWS)
         set(HAVE_ETW True)
         set(HAVE_WEL True)
 
-        # Output the results for debugging purposes
         message(STATUS "Have Event Tracing for Windows (ETW): ${HAVE_ETW}")
         message(STATUS "Have Windows Event Log (WEL): ${HAVE_WEL}")
 
         if(HAVE_WEL OR HAVE_ETW)
-                # Define the source and generated file paths
                 set(WEVT_GEN_SRC_H_FILE "${CMAKE_SOURCE_DIR}/src/libnetdata/log/nd_log-to-windows-common.h")
                 set(WEVT_GEN_SRC_C_FILE "${CMAKE_SOURCE_DIR}/src/libnetdata/log/wevt_netdata_mc_generate.c")
                 set(WEVT_GEN_BIN_FILE "${CMAKE_BINARY_DIR}/wevt_netdata_mc_generate")
@@ -225,7 +223,6 @@ if(OS_WINDOWS)
                         )
                 endif()
 
-                # Create a custom target for the DLL
                 add_custom_target(wevt_netdata ALL DEPENDS ${WEVT_DLL_FILE})
 
                 set_source_files_properties(log/nd_log-to-windows-events.c PROPERTIES
@@ -239,8 +236,8 @@ if(OS_WINDOWS)
                                 COMPONENT wevt_netdata_dll
                                 DESTINATION "${BINDIR}")
                 else()
-                        # do not install the manifest in this case
-                        # the nsi installer will skip registering the ETW publisher
+                        # the manifest is not installed in this arm, so the
+                        # Windows installer skips registering the ETW publisher
                         install(FILES "${WEVT_DLL_FILE}"
                                 COMPONENT wevt_netdata_dll
                                 DESTINATION "${BINDIR}")
@@ -320,8 +317,8 @@ endif()
 
 # uuid
 if(OS_MACOS OR OS_WINDOWS)
-        # UUID functionality is part of the system libraries here, so no extra
-        # stuff needed.
+        # UUID functionality is part of the system libraries here, so there
+        # is nothing to link.
 else()
         target_include_directories(libnetdata BEFORE PUBLIC ${UUID_INCLUDE_DIRS})
         target_compile_options(libnetdata PUBLIC ${UUID_CFLAGS_OTHER})
@@ -343,9 +340,10 @@ target_link_libraries(libnetdata PUBLIC PkgConfig::TLS)
 # spawn-server test binary
 #
 # No install rule; it exists to be run from the build tree by
-# tests/run-unit-tests.sh, which invokes it as <build>/spawn-tester. A
-# subdirectory would otherwise put it in <build>/src/libnetdata, so the
-# output directory is pinned to keep that path working.
+# tests/spawn-server-tests.sh (itself run from tests/run-unit-tests.sh),
+# which invokes it as <build>/spawn-tester. A subdirectory would otherwise
+# put it in <build>/src/libnetdata, so the output directory is pinned to
+# keep that path working.
 #
 add_executable(spawn-tester spawn_server/spawn-tester.c)
 target_link_libraries(spawn-tester libnetdata)
@@ -363,7 +361,7 @@ set_target_properties(spawn-tester PROPERTIES
 # All six are read by packaging/cmake/config.cmake.h.in, each as a
 # #cmakedefine of the same name, and reach the build through config.h, which
 # NetdataSystemFiles.cmake generates from the root after this directory. A
-# missing export costs no error: config.h simply emits #undef and the feature
+# missing export costs no error: config.h emits #undef and the feature
 # disappears.
 #
 set(ENABLE_LZ4     "${ENABLE_LZ4}"     PARENT_SCOPE)

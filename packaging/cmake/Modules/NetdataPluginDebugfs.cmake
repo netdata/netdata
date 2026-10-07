@@ -28,27 +28,20 @@ set(DEBUGFS_PLUGIN_FILES
 )
 
 if(ENABLE_PLUGIN_DEBUGFS)
-    # Define debugfs.plugin source files
-    # Add executable for debugfs.plugin
     add_executable(debugfs.plugin ${DEBUGFS_PLUGIN_FILES})
 
-    # Add vendored libsensors library
     add_subdirectory(src/collectors/debugfs.plugin/libsensors)
 
-    # Link debugfs.plugin with vendored libsensors
     target_link_libraries(debugfs.plugin PRIVATE vendored_libsensors)
 
-    # Include vendored libsensors headers
     target_include_directories(debugfs.plugin PRIVATE
             src/collectors/debugfs.plugin/libsensors/vendored/lib
             ${CMAKE_CURRENT_BINARY_DIR}/src/collectors/debugfs.plugin/libsensors # For generated headers
     )
 
-    # Link against libnetdata and optionally libcap
     target_link_libraries(debugfs.plugin PRIVATE libnetdata
             "$<$<BOOL:${CAP_FOUND}>:PkgConfig::CAP>")
 
-    # Install the debugfs.plugin binary
     install(TARGETS debugfs.plugin
             COMPONENT plugin-debugfs
             DESTINATION ${PLUGINS_DEST})
@@ -59,6 +52,5 @@ if(ENABLE_PLUGIN_DEBUGFS)
             DESTINATION ${LIBCONFIG_DEST}
             RENAME sensors3.conf)
 
-    # Install additional packaging files if building for packaging
     netdata_add_deb_copyright(plugin-debugfs netdata-plugin-debugfs)
 endif()

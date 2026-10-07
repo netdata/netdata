@@ -3,10 +3,10 @@
 #
 # Handle bundling of SQLite.
 #
-# This fetches the SQLite source tree (via tarball or git clone),
-# generates the amalgamation at build time (with --enable-update-limit
-# so the parser supports UPDATE/DELETE ... LIMIT), then compiles it as
-# a separate static library that links into libnetdata.
+# This fetches the SQLite source tree (via tarball, git clone, or a local
+# source directory), generates the amalgamation at build time (with
+# --enable-update-limit so the parser supports UPDATE/DELETE ... LIMIT), then
+# compiles it as a separate static library that links into libnetdata.
 
 include_guard()
 
@@ -97,7 +97,6 @@ function(netdata_bundle_sqlite3)
 
         add_dependencies(sqlite3 sqlite_project)
 
-        # Export variables to parent scope
         set(NETDATA_SQLITE_INCLUDE_DIRS "${sqlite_OUTPUT_DIR}" PARENT_SCOPE)
         set(NETDATA_SQLITE_LIBRARIES sqlite3 PARENT_SCOPE)
 

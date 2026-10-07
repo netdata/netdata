@@ -12,7 +12,7 @@ if(OS_WINDOWS)
 
   # Both arms of the Windows prefix decision, in one place. A native package
   # owns the filesystem root and addresses everything from it; any other Windows
-  # build is relocatable under the install prefix. NetdataPlatform used to set
+  # build is relocatable under the install prefix. NetdataPlatform.cmake used to set
   # the packaging arm, which made it read an option defined ninety lines later.
   if(NETDATA_NATIVE_PACKAGE)
     set(NETDATA_RUNTIME_PREFIX "/")

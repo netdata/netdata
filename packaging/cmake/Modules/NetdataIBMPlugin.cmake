@@ -1,15 +1,20 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
-# Build configuration for ibm.d.plugin which requires CGO
+# ibm.d.plugin: the Go IBM ecosystem collector, built with CGO against the
+# vendored IBM MQ client libraries.
+#
+# include()d from the root file, so paths resolve against the repository and
+# build roots; nothing here may use CMAKE_CURRENT_LIST_DIR.
 
 include_guard()
 
 include(FetchContent)
 include(NetdataUtil)
 
-# add_ibm_plugin_target: Add target for building ibm.d.plugin with CGO
+# add_ibm_plugin_target: builds ibm.d.plugin with CGO.
 #
-# This plugin requires CGO and IBM DB2/MQ headers for compilation.
-# The plugin will download IBM libraries on first run.
+# Only the MQ collector needs the IBM MQ headers; the database collectors go
+# through unixODBC. The MQ client libraries themselves are downloaded at
+# configure time via FetchContent.
 macro(add_ibm_plugin_target)
   set(IBM_MQ_DIR_NAME "ibm-mqclient")
   set(IBM_MQ_BUILD_DIR "${CMAKE_BINARY_DIR}/${IBM_MQ_DIR_NAME}")
@@ -82,7 +87,8 @@ macro(add_ibm_plugin_target)
     set(IBM_LD_LIBRARY_PATH_TAIL ":${_ibm_inherited_ld_path}")
   endif()
 
-  # Build with CGO enabled and multiple rpath entries for different installation methods
+  # The single $ORIGIN rpath makes the installed plugin find the MQ
+  # libraries where install_ibm_runtime() stages them.
   add_custom_command(
     OUTPUT ibm.d.plugin
     COMMAND "${CMAKE_COMMAND}" -E env
@@ -115,7 +121,7 @@ endmacro()
 # Install the runtime components for the IBM MQ client libraries.
 #
 # This generates the list of files to install by parsing the manifest
-# file that’s included with the libraries.
+# file that's included with the libraries.
 function(install_ibm_runtime component)
   file(READ "${IBM_MQ_BUILD_DIR}/MANIFEST.Redist" _ibm_manifest)
   string(REPLACE "\n" ";" _ibm_manifest_lines "${_ibm_manifest}")

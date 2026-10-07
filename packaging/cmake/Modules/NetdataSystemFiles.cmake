@@ -100,7 +100,7 @@ endif()
 
 #
 # We don't check ENABLE_PLUGIN_CGROUP_NETWORK because rpm builds assume
-# the files exists unconditionally.
+# the file exists unconditionally.
 #
 configure_file(src/collectors/cgroups.plugin/cgroup-network-helper.sh.in
                src/collectors/cgroups.plugin/cgroup-network-helper.sh @ONLY)
@@ -410,7 +410,7 @@ if(NOT OS_WINDOWS)
           COMPONENT netdata
           DESTINATION ${LIBEXEC_DEST})
 
-  # user-facing support-bundle tool: on PATH as `netdata-support-bundle`, like netdatacli
+  # user-facing support-bundle tool: on PATH as netdata-support-bundle, like netdatacli
   install(PROGRAMS
           packaging/installer/netdata-support-bundle
           COMPONENT netdata
@@ -852,7 +852,7 @@ include(Packaging)
 
 #
 # Optional convenience: wire the netdata-build MCP server (packaging/tools/
-# automation/mcp) into a local agent client. Explicit one-off — `ninja setup-mcp`
+# automation/mcp) into a local agent client. Explicit one-off — ninja setup-mcp
 # — not part of the build (no ALL). Mutates the USER's global opencode/Claude
 # config for this checkout; never touches the repo. See the tool's README.
 #
@@ -864,7 +864,7 @@ add_custom_target(setup-mcp
         COMMENT "Configuring netdata-build MCP server for opencode/Claude Code (global config)")
 
 #
-# Opt-in: `ninja setup-git-hooks` installs the hooks in packaging/tools/git-hooks.
+# Opt-in: ninja setup-git-hooks installs the hooks in packaging/tools/git-hooks.
 # Ported from master's root file (#24164); kept beside setup-mcp as the other
 # developer-setup one-off — not part of the build (no ALL).
 #

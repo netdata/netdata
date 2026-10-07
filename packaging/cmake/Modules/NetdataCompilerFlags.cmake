@@ -9,10 +9,9 @@ include(CMakePushCheckState)
 
 # Conditionally add an extra compiler flag to C and C++ flags.
 #
-# If the language flags already match the `match` argument, skip this flag.
-# Otherwise, check for support for `flag` and if support is found, add it to
-# the compiler flags for the run. Also sets `result` to MATCHED/ADDED/UNSUPPORTED
-# depending on whether the flag was added or not.
+# Skips the flag when the language flags already match match; otherwise
+# probes for support and adds it only if both compilers accept it. result
+# comes back MATCHED, ADDED or UNSUPPORTED.
 function(add_extra_compiler_flag match flag result)
   cmake_push_check_state()
   set(CMAKE_REQUIRED_FLAGS "-Werror")
@@ -47,7 +46,7 @@ function(add_extra_compiler_flag match flag result)
   endif()
 endfunction()
 
-# Same as add_simple_extra_compiler_flag, but check for a second flag if the
+# Same as add_extra_compiler_flag, but check for a second flag if the
 # first one is unsupported.
 function(add_double_extra_compiler_flag match flag1 flag2 result)
   add_extra_compiler_flag("${match}" "${flag1}" flag1_success)
@@ -86,9 +85,11 @@ function(add_required_compiler_flag flag)
   endif()
 endfunction()
 
-# CMAKE_C_COMPILE_FEATURES is what this compiler supports; the global property
-# CMAKE_C_KNOWN_FEATURES (read here as a variable until 2026, so always empty)
-# only lists what CMake itself knows about.
+# CMAKE_C_COMPILE_FEATURES is the per-compiler answer this fork wants.
+# CMAKE_C_KNOWN_FEATURES would answer the wrong question - it lists what
+# CMake itself knows about - and it is a global property besides: read by
+# name as a variable, as this fork once did, it is always empty and every
+# build silently takes the C11 arm.
 if("c_std_17" IN_LIST CMAKE_C_COMPILE_FEATURES)
     set(CMAKE_C_STANDARD 17)
 else()
@@ -104,7 +105,6 @@ endif()
 set(CMAKE_C_STANDARD_REQUIRED On)
 set(CMAKE_CXX_STANDARD_REQUIRED On)
 
-# Check for the mold linker and try to use it if available
 if(USE_MOLD)
         message(CHECK_START "Searching for MOLD linker")
         find_program(MOLD_LINKER NAMES ld.mold mold)

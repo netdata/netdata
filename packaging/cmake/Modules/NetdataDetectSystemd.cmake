@@ -1,5 +1,8 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
-# CMake Module to handle all the systemd-related checks for Netdata.
+# systemd API probes, not systemd discovery: SYSTEMD_FOUND comes from the
+# pkg-config lookup in NetdataDependencies.cmake, and detect_systemd() runs only
+# when it is set, probing the sd-journal and sd-bus surface (the HAVE_SD_*
+# set and ENABLE_SYSTEMD_DBUS) that config.h turns into compile-time facts.
 
 include_guard()
 
@@ -9,6 +12,8 @@ include(CMakePushCheckState)
 
 macro(detect_systemd)
   if(SYSTEMD_FOUND)
+    # The probes must link against SYSTEMD_LIBRARIES; push/pop keeps that
+    # requirement from leaking into later check_* calls.
     cmake_push_check_state()
     set(CMAKE_REQUIRED_LIBRARIES "${CMAKE_REQUIRED_LIBRARIES};${SYSTEMD_LIBRARIES}")
 

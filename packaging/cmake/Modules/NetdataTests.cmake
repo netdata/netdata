@@ -2,8 +2,8 @@
 # Test executables. None is installed or registered with CTest - the project
 # defines no add_test() - but they are NOT all orphans: the topology container
 # tests workflow (.github/workflows/topology-container-tests.yml) builds nine of
-# these targets by name (plus three more that live beside their plugins, in
-# NetdataPluginLocalListeners and NetdataPluginNetworkViewer).
+# these targets by name (plus four more that live beside their plugins, in
+# NetdataPluginLocalListeners.cmake and NetdataPluginNetworkViewer.cmake).
 #
 # include()d from the root file, so paths resolve against the repository and
 # build roots; nothing here may use CMAKE_CURRENT_LIST_DIR.

@@ -4,7 +4,7 @@
 # include()d from the root file, so paths resolve against the repository and
 # build roots; nothing here may use CMAKE_CURRENT_LIST_DIR.
 #
-# libcurl is a hard requirement of the build, checked in NetdataDependencies,
+# libcurl is a hard requirement of the build, checked in NetdataDependencies.cmake,
 # so this links PkgConfig::CURL unconditionally.
 
 include_guard()

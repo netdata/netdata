@@ -20,9 +20,9 @@
 # a bundled subproject's own directory.
 #
 # find_package(PkgConfig REQUIRED) is deliberately NOT here. It stays in the root
-# file, where STATIC_BUILD appends --static to PKG_CONFIG_EXECUTABLE on the line
-# after it; that append needs the variable the find_package defines, so the two
-# cannot be separated.
+# file, next to the STATIC_BUILD branch that appends --static to
+# PKG_CONFIG_EXECUTABLE; that append needs the variable the find_package defines,
+# so the two cannot be separated.
 #
 # Four groups of external resolution stay where they are, listed here so this file
 # answers "what do we depend on" by enumeration even where it does not by
@@ -56,7 +56,9 @@
 include_guard()
 
 #
-# Linked into libnetdata, and through it into everything that links libnetdata.
+# libnetdata links libuuid, libsystemd, libunwind and zlib, so they reach
+# everything that links libnetdata. curl links into the netdata daemon and
+# systemd-cat-native, and libmnl into the plugins that consume it.
 #
 
 pkg_check_modules(CURL libcurl>=7.21 IMPORTED_TARGET)
@@ -121,8 +123,8 @@ pkg_check_modules(ELF libelf)
 # in when it lived next to its target - and it aborts earlier, before any of the work
 # that was going to fail anyway.
 #
-# The message does the naming, not the location: it says which feature is affected
-# and which option turns that feature off.
+# The message does the naming, not the location: it says which feature is affected,
+# and most name the option that turns that feature off.
 #
 
 if(NOT CURL_FOUND)

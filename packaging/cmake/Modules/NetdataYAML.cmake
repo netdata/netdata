@@ -44,7 +44,7 @@ endfunction()
 # Handle setup of libyaml for the build.
 #
 # This will attempt to find libyaml using pkg_check_modules. If it finds
-# a usable copy, that will be used. If not, it will bundle a vendored copy
+# a usable copy, that will be used. If not, it will build the bundled copy
 # as a sub-project.
 #
 # Irrespective of how libyaml is to be included, library names,

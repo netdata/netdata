@@ -17,7 +17,11 @@ function(netdata_bundle_dlib)
   set(repo https://github.com/davisking/dlib.git)
   set(tag 636c0bcd1e4f428d167699891bc12b404d2d1b41) # v19.24.8
 
+  # CMP0077 NEW so the DLIB_* values below override dlib's own option() defaults.
   set(CMAKE_POLICY_DEFAULT_CMP0077 NEW)
+  # Everything the ML feature does not need stays off: each of these pulls a
+  # transitive dependency (GUI toolkit, image codecs, BLAS/LAPACK, CUDA) the
+  # agent does not ship.
   set(DLIB_NO_GUI_SUPPORT ON)
   set(DLIB_JPEG_SUPPORT OFF)
   set(DLIB_LINK_WITH_SQLITE3 OFF)

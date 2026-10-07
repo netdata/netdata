@@ -8,7 +8,8 @@ include(NetdataUtil)
 
 set(libbpf_SOURCE_DIR "${CMAKE_BINARY_DIR}/libbpf")
 
-# Check if the kernel is old enough that we need to use a legacy copy of eBPF.
+# True when FORCE_LEGACY_LIBBPF is set or the host kernel predates 4.14; either
+# way the eBPF plugin needs the legacy libbpf.
 function(_need_legacy_libbpf _var)
     if(FORCE_LEGACY_LIBBPF)
         set(${_var} TRUE PARENT_SCOPE)
@@ -24,7 +25,7 @@ function(_need_legacy_libbpf _var)
     endif()
 endfunction()
 
-# Prepare a vendored copy of libbpf
+# Prepare the bundled copy of libbpf
 function(netdata_bundle_libbpf)
     _need_legacy_libbpf(USE_LEGACY_LIBBPF)
 

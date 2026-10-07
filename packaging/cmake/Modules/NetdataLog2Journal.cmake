@@ -10,7 +10,7 @@
 # ${CONFIG_H}, naming the generated config.h. A header in a source list produces
 # no build edge and no compile flag, so it went with the variable itself.
 #
-# Built only when libpcre2-8 was found. The lookup lives in NetdataDependencies, and
+# Built only when libpcre2-8 was found. The lookup lives in NetdataDependencies.cmake, and
 # log2journal is optional, so this reads PCRE2_FOUND instead of requiring it.
 
 include_guard()

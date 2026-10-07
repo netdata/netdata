@@ -42,7 +42,6 @@ set(SYSTEMD_JOURNAL_PLUGIN_FILES
         src/collectors/systemd-journal.plugin/systemd-journal-sampling.h
 )
 
-# Enable rust implementation if we don't have systemd and we want the journal plugin
 if(ENABLE_PLUGIN_SYSTEMD_JOURNAL AND NOT SYSTEMD_FOUND)
         if (NOT ENABLE_NETDATA_JOURNAL_FILE_READER)
                 message(WARNING "Systemd journal package not found, will try netdata's journal reader which requires cargo.")

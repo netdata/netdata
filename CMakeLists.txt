@@ -14,7 +14,7 @@
 #      -D_GNU_SOURCE, the compiler and linker flags, HAVE_OSLOG - because a
 #      directory property only reaches targets created after the mutation -
 #      which is also why the stack-trace flag pair lives here and not lower:
-#      every target, vendored included, is instrumented on purpose.
+#      every target, bundled ones included, is instrumented on purpose.
 #   3. platform capability probes (NetdataPlatformChecks), ahead of every
 #      bundled subproject so that our HAVE_* macros are answered by our own
 #      probes: check_* results share one cache namespace with every project
@@ -111,14 +111,14 @@ set(CMAKE_EXPORT_COMPILE_COMMANDS On)
 
 include(NetdataCompilerFlags)
 
-# Stack-trace flags for EVERY target, ours and vendored alike. Placed here -
+# Stack-trace flags for EVERY target, ours and bundled alike. Placed here -
 # before any bundled subproject exists - because add_compile_options sets a
 # directory property that reaches only targets created after the mutation.
-# The flags used to sit between the bundling calls, splitting the vendored
+# The flags used to sit between the bundling calls, splitting the bundled
 # code into an instrumented half and an uninstrumented half by accident of
 # statement order; instrumenting everything was decided deliberately, on the
 # measurement that it costs zero bytes of shipped .text on the default build
-# and keeps a crash inside vendored code (sqlite above all) readable.
+# and keeps a crash inside bundled code (sqlite above all) readable.
 if(CMAKE_C_COMPILER_ID MATCHES "GNU|Clang")
     # -fno-omit-frame-pointer = add frame pointers to all functions
     # -funwind-tables = generate unwind tables for all functions
@@ -181,7 +181,7 @@ if(ENABLE_PLUGIN_EBPF)
 endif()
 
 # The bundled-or-system dependencies: each module owns the choice between the
-# system copy and its vendored fallback.
+# system copy and its bundled fallback.
 include(NetdataJSONC)
 include(NetdataYAML)
 include(NetdataLZ4)

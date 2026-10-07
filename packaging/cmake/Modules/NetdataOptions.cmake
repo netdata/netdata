@@ -7,7 +7,7 @@
 # below depends on. Nothing here may use CMAKE_CURRENT_LIST_DIR.
 #
 # Ordering contract, and it is the reason this file is included where it is:
-# everything here runs after NetdataPlatform, because the dependent options gate on
+# everything here runs after NetdataPlatform.cmake, because the dependent options gate on
 # OS_*/CPU_*, and before every consumer, because an option read before its
 # declaration takes the unset value rather than the default. Do not move the
 # include() without checking both halves.
@@ -26,7 +26,7 @@ if(NOT DEFINED OS_LINUX)
 endif()
 
 # Toolchain and link knobs. Their readers sit in the root file a few lines below
-# this module's include, and in NetdataCompilerFlags, so they are declared first.
+# this module's include, and in NetdataCompilerFlags.cmake, so they are declared first.
 option(STATIC_BUILD "Use static linking instead of dynamic linking for the build." FALSE)
 mark_as_advanced(STATIC_BUILD)
 

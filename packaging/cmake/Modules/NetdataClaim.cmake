@@ -13,7 +13,7 @@ set(CLAIM_WINDOWS_FILES
         src/claim/ui.h
 )
 
-# The claim helper's resource script and its manifest.
+# The claim helper's resource script; it embeds the manifest configured below.
 set(NETDATA_CLAIM_RES_FILES "packaging/windows/resources/netdata_claim.rc")
 
 if(OS_WINDOWS)

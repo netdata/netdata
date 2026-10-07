@@ -1,10 +1,11 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
+# CPack configuration: the DEB and RPM package set, the per-component
+# metadata, and the component registry.
 #
-# CPack options
-#
+# include()d from NetdataSystemFiles.cmake, so paths resolve against the
+# repository and build roots; nothing here may use CMAKE_CURRENT_LIST_DIR.
 
 include_guard()
-
-# CPACK_PACKAGE_VERSION is set by the version handling code.
 
 set(CPACK_THREADS 0)
 set(CPACK_COMPONENTS_GROUPING IGNORE)
@@ -15,6 +16,7 @@ set(CPACK_DEBIAN_DEBUGINFO_PACKAGE NO)
 set(CPACK_DEBIAN_PACKAGE_SHLIBDEPS YES)
 set(CPACK_DEBIAN_COMPRESSION_TYPE "xz")
 
+# NETDATA_PACKAGE_VERSION is set by NetdataVersion.cmake.
 set(CPACK_PACKAGE_VERSION "${NETDATA_PACKAGE_VERSION}")
 
 include(NetdataOSRelease)

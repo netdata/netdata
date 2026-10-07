@@ -8,9 +8,9 @@
 # CMAKE_CURRENT_LIST_DIR.
 #
 # Inventory only. Every operation on these lists - the conditional
-# list(APPEND ...) calls and the NETDATA_FILES aggregation - stays in the
-# root file, because three of the aggregated lists are appended to after
-# this point and expanding them here would silently drop sources.
+# list(APPEND ...) calls and the NETDATA_FILES aggregation - stays in
+# NetdataDaemon.cmake, because three of the aggregated lists are appended to
+# after this point and expanding them here would silently drop sources.
 #
 # This file does not hold every source list in the build. A list lives beside
 # the target that consumes it: a plugin's in its own
@@ -922,8 +922,8 @@ set(PROMETHEUS_REMOTE_WRITE_EXPORTING_FILES
 )
 
 #
-# Guarded inventory. The root file keeps the guard and selects
-# from here; only the file lists live below.
+# Guarded inventory. NetdataDaemon.cmake keeps the guard and
+# selects from here; only the file lists live below.
 #
 
 # ml: the real implementation

@@ -44,7 +44,7 @@ if(NOT HAVE_LOG10)
         unset(HAVE_LOG10 CACHE)
         # -lm is wanted for this probe only. CMAKE_REQUIRED_LIBRARIES is global to
         # every later check_*, so restore it here rather than leaving the ~76 probes
-        # in this file, and the ones in NetdataDetectSystemd, silently linking libm.
+        # in this file, and the ones in NetdataDetectSystemd.cmake, silently linking libm.
         cmake_push_check_state()
         list(APPEND CMAKE_REQUIRED_LIBRARIES m)
         check_function_exists(log10 HAVE_LOG10)

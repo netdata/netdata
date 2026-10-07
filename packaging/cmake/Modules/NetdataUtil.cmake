@@ -290,6 +290,8 @@ function(get_vendored_url_and_hash component prefix)
   set("${prefix}_HASH" "${hash}" PARENT_SCOPE)
 endfunction()
 
+# Convert a native Windows path (C:\...) to the MSYS-style form (/c/...) the
+# runtime side expects, via cygpath when present and by hand otherwise.
 function(netdata_windows_path_to_runtime_path output_var input_path)
   set(_converted_path "")
   set(_cygpath_result 1)

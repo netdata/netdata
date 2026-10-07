@@ -3,7 +3,7 @@
 
 include_guard()
 
-# Prepare a vendored copy of Protobuf for use with Netdata.
+# Handle bundling of Protobuf for use with Netdata.
 function(netdata_bundle_protobuf)
         include(FetchContent)
         include(NetdataFetchContentExtra)
