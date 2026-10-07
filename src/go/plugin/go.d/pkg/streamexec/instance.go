@@ -55,6 +55,7 @@ func (s *Source[T]) start(ctx context.Context) (*instance[T], error) {
 		readDone: make(chan struct{}),
 		exited:   make(chan struct{}),
 	}
+	s.last = inst
 	go inst.read(ctx, s.cfg.NewDecoder())
 	go func() {
 		defer close(inst.exited)
@@ -63,14 +64,22 @@ func (s *Source[T]) start(ctx context.Context) (*instance[T], error) {
 	return inst, nil
 }
 
-// close terminates the owned process tree and joins the reader and the reaper. Canceling the instance context makes
-// ndexec terminate the tree; closing the read end also stops a writer that cannot be signaled, whose next write
-// fails with SIGPIPE.
-func (inst *instance[T]) close() {
+// close terminates the owned process tree, joins the reader, and waits at most wait for the process to exit. It
+// reports whether the process exited. Canceling the instance context makes ndexec terminate the tree; closing the read
+// end also makes a writer that cannot be signaled die of SIGPIPE at its next write, unless it handles SIGPIPE or EPIPE
+// itself. Such a writer that no longer writes keeps running, which is why the wait is bounded.
+func (inst *instance[T]) close(wait time.Duration) bool {
 	inst.cancel()
 	_ = inst.stdout.Close()
 	<-inst.readDone
-	<-inst.exited
+	timer := time.NewTimer(wait)
+	defer timer.Stop()
+	select {
+	case <-inst.exited:
+		return true
+	case <-timer.C:
+		return false
+	}
 }
 
 // exitError describes the process exit; valid only after exited is closed.
