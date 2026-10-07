@@ -116,7 +116,8 @@ Once your docs PR is merged:
 
 If you **delete**, **move**, or **unpublish** a file, redirects may break.
 
-1. Open [LegacyLearnCorrelateLinksWithGHURLs.json](https://github.com/netdata/learn/blob/master/LegacyLearnCorrelateLinksWithGHURLs.json).
-2. Search (`Ctrl+F`) for the old GitHub link.
-3. Update the entry to a relevant new location.
-4. If no suitable replacement exists → remove the entry.
+1. Update the file's node in `map.yaml`: set `edit_url` to the file's new path, or remove the node if the page is retired. The docs PR check runs `validate_map_schema.py`, which fails while a `netdata/netdata` `edit_url` names a file that does not exist.
+2. Open [LegacyLearnCorrelateLinksWithGHURLs.json](https://github.com/netdata/learn/blob/master/LegacyLearnCorrelateLinksWithGHURLs.json).
+3. Search (`Ctrl+F`) for the old GitHub link.
+4. Update the entry to a relevant new location.
+5. If no suitable replacement exists → remove the entry.
