@@ -23,10 +23,11 @@ modules:
       data_collection:
         metrics_description: |
           This collector gathers performance metrics for Intel integrated GPUs.
-          It relies on the [`intel_gpu_top`](https://manpages.debian.org/testing/intel-gpu-tools/intel_gpu_top.1.en.html) CLI tool but avoids directly executing the binary.
-          Instead, it utilizes `ndsudo`, a Netdata helper specifically designed to run privileged commands securely within the Netdata environment.
-          This approach eliminates the need to grant the CAP_PERFMON capability to `intel_gpu_top`, improving security and potentially simplifying permission management.
-        method_description: ""
+        method_description: |
+          The collector runs the [`intel_gpu_top`](https://manpages.debian.org/testing/intel-gpu-tools/intel_gpu_top.1.en.html) CLI tool through `ndsudo`, a Netdata helper that runs a fixed set of privileged commands, so `intel_gpu_top` needs no CAP_PERFMON capability grant.
+          Each job keeps one `intel_gpu_top` process running as root, sampling the GPU every 0.9 to 2.5 seconds depending on `update_every`, and charts its latest sample.
+
+          If `intel_gpu_top` exits or stops producing samples, the charts show a gap and the collector restarts it.
       supported_platforms:
         include: []
         exclude: []
