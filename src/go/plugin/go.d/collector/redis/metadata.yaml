@@ -52,7 +52,7 @@ modules:
             - /var/run/redis/redis.sock
             - /var/lib/redis/redis.sock
 
-            The Netdata Agent [service discovery](https://learn.netdata.cloud/docs/netdata-agent/configuration/find-anything-about-your-infrastructure/service-discovery) can also create jobs automatically:
+            The Netdata Agent [service discovery](/src/collectors/SERVICE-DISCOVERY.md) can also create jobs automatically:
 
             - The `net_listeners` discoverer matches processes listening on TCP port 6379, or whose command name is `redis-server`, and creates a job with the discovered address. The rule lives in `go.d/sd/net_listeners.conf`.
             - The `docker` discoverer matches containers exposing port 6379 or using a `redis` image and creates a job with the discovered address. The rule lives in `go.d/sd/docker.conf`.
@@ -505,7 +505,7 @@ modules:
             - /var/run/redis/redis.sock
             - /var/lib/redis/redis.sock
 
-            The Netdata Agent [service discovery](https://learn.netdata.cloud/docs/netdata-agent/configuration/find-anything-about-your-infrastructure/service-discovery) can also create jobs automatically:
+            The Netdata Agent [service discovery](/src/collectors/SERVICE-DISCOVERY.md) can also create jobs automatically:
 
             - The `net_listeners` discoverer matches processes listening on TCP port 6379, or whose command name is `redis-server`, and creates a job with the discovered address. The rule lives in `go.d/sd/net_listeners.conf`.
             - The `docker` discoverer matches containers exposing port 6379 or using a `redis` image and creates a job with the discovered address. The rule lives in `go.d/sd/docker.conf`.

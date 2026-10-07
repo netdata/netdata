@@ -23,9 +23,9 @@ read-only checkout/revision workflow; loading this skill does not request a mirr
 |---|---|
 | `docs/.map/README.md#steps-to-publish` | the publish and unpublish procedure, `meta` fields, path reconstruction, the placeholder node, the local test command |
 | `docs/.map/map.schema.json` | node shapes, required fields, the `edit_url` pattern, the `integration_kind` members |
-| `docs/.map/validate_map_schema.py` | the two custom map rules (no duplicate `edit_url`; a leaf needs an `edit_url`), hand-run |
+| `docs/.map/validate_map_schema.py` | the three custom map rules (no duplicate `edit_url`; a leaf needs an `edit_url`; a `netdata/netdata` `edit_url` names an existing file) |
 | `.github/workflows/trigger-learn-update.yml` | which pushes to `master` here dispatch the learn ingest |
-| `.github/workflows/check-markdown.yml` | the PR gate here that regenerates integrations and runs the real ingest with `--fail-links-netdata` |
+| `.github/workflows/check-markdown.yml` | the PR gate here that regenerates integrations, runs the map validator, and runs the real ingest with `--fail-links-netdata` |
 | `netdata/learn`: `ingest/ingest.py`, `ingest/autogenerateRedirects.py`, `static.toml`, `.github/workflows/ingest.yml`, `README.md`, `AGENTS.md` | everything the site does with a mapped file; facts in this skill are verified against `netdata/learn @ c3a16edd5ee4dc819976ef162c9afaff4b9b968c` and cite the symbol, never a line |
 | `.agents/sensitive-data-discipline.md#allowed-alternatives` | how paths into the learn repository are written in committed text (`${NETDATA_REPOS_DIR}/learn/...`; `.agents/ENV.md` documents the key) |
 
@@ -48,8 +48,8 @@ builds the site locally from a PR and loads this skill first; `repo-mirror-sourc
 | a mapped page renders empty | `./how-tos/repairing-empty-mapped-pages.md` |
 | links from integration descriptions to Learn | `./how-tos/integration-card-description-links.md` |
 
-Symptom to file: page missing on Learn or URL not what was expected: `./mapping.md#the-join-key`; ingest exited 2:
-schema, `./mapping.md#what-is-checked-and-by-what`; exited 3: `./redirects.md`; traceback naming
+Symptom to file: page missing on Learn or URL not what was expected: `./mapping.md#the-join-key`; ingest exited 2
+or the map validator failed: `./mapping.md#what-is-checked-and-by-what`; exited 3: `./redirects.md`; traceback naming
 `resolve_publish_path_collisions` or `populate_integrations`: `./mapping.md`; MDX build error or a page cut off:
 `./mdx-rules.md`; sidebar order, missing category, or a grid that turned into a page: `./sidebars.md`; old URL 404
 or redirect loop: `./redirects.md`; a change vanished from `docs/` in the learn repository: `./authoring-boundary.md`.
@@ -60,6 +60,9 @@ Enforced by code (the file names the tool and the effect):
 
 - `map.yaml` must validate against `docs/.map/map.schema.json`; ingest exits 2 otherwise
   (`./mapping.md#what-is-checked-and-by-what`).
+- A duplicate `edit_url`, a leaf without one, or a `netdata/netdata` `edit_url` that names no file fails
+  `docs/.map/validate_map_schema.py`, which `.github/workflows/check-markdown.yml` runs after generating the
+  integration pages; run it before opening a map PR (`./mapping.md#what-is-checked-and-by-what`).
 - A published path or slug collision that involves a non-integration page aborts ingest (`ValueError`);
   integration duplicates are suffixed automatically (`./mapping.md#file-path-and-slug`).
 - A redirect catalogue entry that resolves to nothing and is neither covered nor retired aborts ingest with exit 3
@@ -71,8 +74,8 @@ Enforced by code (the file names the tool and the effect):
 
 Hand-reviewed, because no code checks them:
 
-- Every published page has a `map.yaml` node with `label` and `edit_url`; a node whose URL matches no file is
-  silently unpublished, and a file without a node is silently skipped (`./mapping.md#the-join-key`).
+- Every published page has a `map.yaml` node with `label` and `edit_url`; a file without a node is silently skipped,
+  and a node of another repository whose URL matches no file is silently unpublished (`./mapping.md#the-join-key`).
 - Keep `edit_url` unchanged when moving a page; the redirect catalogue is anchored to it (`./redirects.md`).
 - A label decides the URL; choose labels that survive `_sanitize_mdx_filename_source` without colliding with a
   sibling (`./mapping.md#file-path-and-slug`).
@@ -80,7 +83,5 @@ Hand-reviewed, because no code checks them:
   (`./mapping.md#links-between-pages`).
 - Text that MDX reads as a tag (`<word>`, `<` before a digit, generics) is wrapped in inline code or rephrased
   (`./mdx-rules.md`).
-- Run `docs/.map/validate_map_schema.py` before opening a map PR (`./mapping.md#what-is-checked-and-by-what`);
-  nothing in CI runs it.
 - Learn paths in committed text use the `${NETDATA_REPOS_DIR}/learn/...` form; facts about learn code carry the
   `owner/repo @ commit` they were verified against.

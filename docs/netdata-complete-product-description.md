@@ -646,7 +646,7 @@ Netdata Logs Management is Netdata's OpenTelemetry logs pipeline: it collects, s
 
 **[Traces](/docs/opentelemetry/trace-storage-and-retention.md)**
 - Span storage with field-level indexing, trace-ID index and bloom filter, span events and links; retention and offload as for logs
-- **Traces explorer** (Netdata Cloud):
+- **Traces explorer** (Netdata Cloud; users turn it on in the Early Access panel):
   - Trace list: heatmap (trace count × duration band, with errors), volume, error and percentile charts over time, trace duration scatter, slowest traces
   - Trace detail: waterfall, span tree, span details, missing-span markers
   - Filters: service, operation, status, duration range, any resource, span, scope, event or link attribute
@@ -745,9 +745,10 @@ Netdata applies unsupervised machine learning to every metric it collects, on th
 
 **Machine learning**
 - [k-means clustering](/src/ml/ml-configuration.md) (k=2) per metric; 18 models per metric by default (configurable 1–168), trained on 6-hour windows and retrained every 3 hours
+- Detection starts on a new metric after about 15 minutes of data (its first model); all 18 default models are in place after about 54 hours (over two days)
 - Anomaly flag stored with every sample (tier 0) and anomaly counts in higher tiers
 - Anomaly rate per chart, dimension, instance and node; [anomaly ribbon](/docs/dashboards-and-charts/netdata-charts.md) on every chart; node-level anomaly rate
-- **[Anomaly Advisor](/docs/ml-ai/anomaly-advisor.md):** ranks the metrics that were anomalous in a selected time range across the infrastructure, to identify where a problem started and what it affected
+- **[Anomaly Advisor](/docs/ml-ai/anomaly-advisor.md):** ranks the metrics that were anomalous in a selected time range across the infrastructure, to identify where a problem started and what it affected; the root cause is usually among the top 30–50 ranked metrics
 - **[Metric Correlations](/docs/metric-correlations.md):** finds the metrics that changed most between a highlighted period and a baseline (KS2 and volume algorithms, on raw values or anomaly rates)
 - [Anomaly-based alerting](/src/health/REFERENCE.md): alerts on anomaly rates (stock examples for ML and BGP; user-defined on any metric)
 - Enabled by default on Agents and Parents with persistent storage; disabled automatically on constrained devices (`iot` profile)
@@ -773,7 +774,7 @@ Netdata applies unsupervised machine learning to every metric it collects, on th
 **Value**
 
 - **Anomaly detection on everything, without configuration.** Every metric of every system, container, application and device is monitored for unusual behavior from the moment it is collected.
-- **Fewer false alarms.** Consensus across multiple models flags only behavior that is unusual by every model's judgment.
+- **Fewer false alarms.** Consensus across multiple models flags only behavior that is unusual by every model's judgment, eliminating about 99% of false positives.
 - **Faster root-cause analysis.** Anomaly Advisor and Metric Correlations narrow thousands of metrics to the few that changed, across the whole infrastructure.
 - **Investigations in minutes.** Netdata AI produces troubleshooting and root-cause reports, capacity and performance reviews, and alert explanations from live infrastructure data.
 - **AI grounded in the customer's environment.** Infrastructure Knowledge, AI Memory and MCP Connections combine monitoring data with the customer's own context, code and incidents.
@@ -983,13 +984,15 @@ Netdata exchanges data with other systems through exporting connectors, Promethe
 
 | Plan | Price | For | Highlights |
 |---|---|---|---|
-| **Community** | Free | Personal, non-commercial use | Up to 5 active connected nodes, 1 custom dashboard per Room |
-| **Homelab** | $90/year or $10/month | Personal, non-commercial use | Unlimited nodes (fair usage policy), unlimited dashboards |
-| **Business** | $4.50/node/month billed yearly; $6/node/month billed monthly | Freelancers, professionals, businesses of all sizes | All features: Netdata AI, all roles (RBAC), enterprise SSO (Okta, OpenID Connect), SCIM, enterprise notification integrations, Netdata Cloud MCP, centralized configuration management, unlimited custom dashboards, audit events in the events feed |
+| **Community** | $0 | Personal, non-commercial use | Up to 5 active connected nodes, 1 custom dashboard per Room |
+| **Homelab** | $90/year or $10/month | Personal, non-commercial use | No hard limit on nodes (fair usage policy), no limit on custom dashboards |
+| **Business** | $4.50/node/month billed yearly; $6/node/month billed monthly | Freelancers, professionals, businesses of all sizes | All features: Netdata AI, all roles (RBAC), enterprise SSO (Okta, OpenID Connect), SCIM, enterprise notification integrations, Netdata Cloud MCP, centralized configuration management, no limit on custom dashboards, audit events in the events feed |
 | **Enterprise On-Prem** | Custom, from 200 node licenses | Air-gapped facilities, critical infrastructure | Everything in Business, running on customer infrastructure; priority support plans |
-| **Open-source Agent** | Free (Agent GPL v3+; dashboard NCUL1) | Self-hosted, any use | Complete Agent and Parents, unlimited metrics, local dashboards |
+| **Open-source Agent** | Free (Agent GPL v3+; dashboard NCUL1) | Self-hosted, any use | Complete Agent and Parents, no limit on metrics, local dashboards |
 
-Community and Homelab are for personal, non-commercial use only. Freelancers, professionals and businesses use the open-source Agent or the Business plan. A 14-day Business trial with unlimited nodes is available on sign-up.
+Community and Homelab are for personal, non-commercial use only. Freelancers, professionals and businesses use the open-source Agent or the Business plan. A 14-day Business trial with no limit on nodes is available on sign-up.
+
+Netdata is also available on [AWS Marketplace](https://aws.amazon.com/marketplace/seller-profile?id=seller-5bbjpj3csb4mw): Netdata Cloud as a pay-as-you-go subscription or an annual contract (SaaS), Netdata Cloud On-Prem (Helm chart, bring your own license) and the Netdata Agent for EKS (Helm chart, free).
 
 ### What is billed
 
@@ -998,7 +1001,7 @@ Community and Homelab are for personal, non-commercial use only. Freelancers, pr
 - **P90 billing:** daily, the node count at the 90th percentile of time-weighted usage; monthly, the 90th percentile of daily values (the top 3 days of a 30-day month are excluded). Short spikes and occasional high-usage days do not increase the bill.
 - **Not billed:** metrics volume, Logs Monitoring (querying logs in place), users, data retention, containers.
 - **Free Preview:** Logs Management (collecting, storing and indexing logs), Traces (OpenTelemetry trace storage and the Traces explorer), Network Flows (NetFlow, IPFIX, sFlow) and Digital Experience Monitoring (RUM, synthetic journeys, Lighthouse audits) are in Free Preview.
-- **Netdata AI:** usage measured in AI credits — one credit per investigation or report, fractional credits for smaller actions (conversations, alert creation and suggestion); alert explanations free. Business includes 10 AI credits per month; the 14-day trial includes 10 AI credits; additional credits are purchased in the app.
+- **Netdata AI:** usage measured in AI credits — one credit per investigation or report, fractional credits for smaller actions (conversations, alert creation and suggestion); alert explanations consume no credits. Business includes 10 AI credits per month; the 14-day trial includes 10 AI credits; additional credits are purchased in the app.
 - **Windows:** Windows Agents count as nodes like any other Agent and are monitored on every plan through Netdata Cloud (including Community); only the local dashboard of a standalone Windows Agent is unlocked on paid plans, and Windows Children streaming to a Linux Parent are shown on the Parent's dashboard on any plan.
 - **Plan-gated features:** Netdata Cloud MCP, enterprise notification integrations (all Cloud integrations except Discord, personal email and the mobile app), additional roles, SSO and SCIM require a paid plan.
 
@@ -1023,7 +1026,7 @@ Support by plan:
 **Learn more:** [Open source on netdata.cloud](https://www.netdata.cloud/open-source/)
 
 - Netdata Agent: GPL v3 or later
-- Netdata dashboard (UI): Netdata Cloud UI License (NCUL1) — free to use with Netdata Agents and Parents, not open source
+- Netdata dashboard (UI): Netdata Cloud UI License (NCUL1) — ships with the open-source Agent for use with Netdata Agents and Parents, not open source
 
 ## Key Differentiators
 
