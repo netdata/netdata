@@ -313,7 +313,7 @@ func (r *Receiver) Process(datagram Datagram) Result {
 		r.reportError(ErrorDroppedPolicy)
 		return Result{}
 	}
-	if packetContext.Packet != nil && pdu.Version == model.SnmpVersionV3 && !r.securityLevelAllowed(packetContext.Packet) {
+	if packetContext.Packet != nil && pdu.Version == model.SnmpVersionV3 && !r.v3SecurityAllowed(packetContext.Packet) {
 		r.reportError(ErrorUSMFailure)
 		return Result{}
 	}

@@ -42,15 +42,21 @@ func newUSMUserLevels(users []USMUser) ([]usmUserLevel, error) {
 	return levels, nil
 }
 
-// securityLevelAllowed reports whether a decoded SNMPv3 message meets the security level of its user.
+// v3SecurityAllowed reports whether a decoded SNMPv3 message passed USM and meets the security level of its user.
 //
-// The gosnmp table decode authenticates only what the message's own flags request, so a message that skips
-// authentication decodes successfully even when it names a user configured with an authentication protocol.
-// An authenticated message has passed digest verification during decode. An unauthenticated one is allowed
-// only when a configured entry for its user and engine ID is itself unauthenticated. All users are also
-// registered under the local engine ID for INFORMs, so any entry of the user matches that engine. Privacy
-// is not required.
-func (r *Receiver) securityLevelAllowed(pkt *gosnmp.SnmpPacket) bool {
+// The gosnmp table decode authenticates only what the message's own flags request, and only for the User-based
+// Security Model: a message claiming another model decodes with its auth flags unverified, so it is rejected.
+// A USM message with auth flags has passed digest verification during decode.
+//
+// A configured engine_id does not restrict which engines a user's messages come from: the table is keyed by
+// username, keys are localized to the message's engine, and engine authorization belongs to the whitelist or the
+// dynamic registry. So an unauthenticated message is allowed when a no-auth entry of its user applies to its
+// engine (same engine ID, an entry without engine ID, or the local engine ID under which all users are registered
+// for INFORMs), or when every entry of its user is no-auth. Privacy is not required.
+func (r *Receiver) v3SecurityAllowed(pkt *gosnmp.SnmpPacket) bool {
+	if pkt.SecurityModel != gosnmp.UserSecurityModel {
+		return false
+	}
 	if pkt.MsgFlags&gosnmp.AuthNoPriv != 0 {
 		return true
 	}
@@ -59,13 +65,17 @@ func (r *Receiver) securityLevelAllowed(pkt *gosnmp.SnmpPacket) bool {
 		return false
 	}
 	localEngine := r.localEngineID != nil && r.localEngineID.equalRaw(usm.AuthoritativeEngineID)
+	found, allUnauthenticated := false, true
 	for _, u := range r.usmUserLevels {
-		if !u.unauthenticated || u.username != usm.UserName {
+		if u.username != usm.UserName {
 			continue
 		}
-		if localEngine || u.engineID == "" || u.engineID == usm.AuthoritativeEngineID {
+		found = true
+		appliesToEngine := localEngine || u.engineID == "" || u.engineID == usm.AuthoritativeEngineID
+		if u.unauthenticated && appliesToEngine {
 			return true
 		}
+		allUnauthenticated = allUnauthenticated && u.unauthenticated
 	}
-	return false
+	return found && allUnauthenticated
 }

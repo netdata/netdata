@@ -286,9 +286,12 @@ catch-all `0.0.0.0/0` trusted-relay prefix draws a startup warning, because any 
 
 - USM users are validated at config time (priv requires auth; keys ≥ 8 chars; engine IDs 5–32 hex bytes).
 - Security level (`v3_security_level.go`): gosnmp's table decode authenticates only what a message's own flags
-  request, so an unauthenticated message naming a user configured with an authentication protocol would decode.
-  It is dropped as `usm_failures` unless a configured entry for its user and engine ID is itself unauthenticated.
-  Privacy is not required. The check runs before dynamic engine-ID registration and the INFORM acknowledgment.
+  request, and only for the User-based Security Model, so an unauthenticated or non-USM message naming a user
+  configured with an authentication protocol would decode. A non-USM message is dropped as `usm_failures`; an
+  unauthenticated one too, unless a no-auth entry of its user applies to its engine (same engine ID, no engine ID, or
+  the local engine) or every entry of its user is no-auth. A configured `engine_id` does not restrict which engines a
+  user's traffic comes from; engine authorization stays with the whitelist or the dynamic registry. Privacy is not
+  required. The check runs before dynamic engine-ID registration and the INFORM acknowledgment.
 - Trap authorization: the sender's engine ID must be in `engine_id_whitelist` — **or** `dynamic_engine_id_discovery`
   hot-registers unseen `(engineID, username)` pairs, capped by `dynamic_engine_id_max_pairs`. The two options are
   mutually exclusive by validation.
