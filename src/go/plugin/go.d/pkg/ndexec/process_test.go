@@ -36,6 +36,15 @@ func TestOwnedProcessHelper(t *testing.T) {
 	if mode == "failure" {
 		os.Exit(23)
 	}
+	if mode == "output" {
+		fmt.Println("stdout")
+		fmt.Fprintln(os.Stderr, "stderr")
+		os.Exit(1)
+	}
+	if mode == "silent" {
+		time.Sleep(2 * time.Second)
+		os.Exit(0)
+	}
 	if mode == "writer" {
 		// Writes until a closed output ends it with SIGPIPE; a broken owner cannot leave it alive indefinitely.
 		for deadline := time.Now().Add(5 * time.Second); time.Now().Before(deadline); {
