@@ -54,11 +54,13 @@ func StartUnprivilegedProcess(
 
 // StartNDSudoProcess starts a command exposed through ndsudo with the ownership of
 // StartUnprivilegedProcess. ndsudo runs the command as root, and an unprivileged caller
-// cannot signal it: the kernel denies termination, which is not an error here, and the
-// command ends when it exits or dies of SIGPIPE at its next write after the caller
-// closes its end of the command's stdout pipe. Until then Wait and Close block, so a
-// caller that must not hang closes that pipe end and bounds its own wait. A caller
-// allowed to signal root processes terminates the command as StartUnprivilegedProcess does.
+// cannot signal it; the kernel's denial of termination is not an error. With a pipe as
+// Stdout whose read end only the caller holds, the command ends when it exits or dies of
+// SIGPIPE at its next write after the caller closes that read end, unless it handles
+// SIGPIPE or EPIPE itself. Root descendants that outlive the command are neither
+// terminated nor reported. Until the command ends, Wait and Close block, so a caller that
+// must not hang bounds its own wait. A caller allowed to signal root processes terminates
+// the command and its descendants as StartUnprivilegedProcess does.
 func StartNDSudoProcess(
 	ctx context.Context,
 	opts ProcessOptions,
@@ -77,16 +79,6 @@ func StartNDSudoProcess(
 
 // ndsudoSignalsDenied is set by DenyNDSudoSignalsForTests.
 var ndsudoSignalsDenied bool
-
-// DenyNDSudoSignalsForTests makes processes that StartNDSudoProcess starts afterwards
-// behave as root commands of an unprivileged caller: termination sends no signal, so a
-// same-user test command ends only by exiting or by SIGPIPE. It returns a function that
-// restores signaling.
-func DenyNDSudoSignalsForTests() func() {
-	previous := ndsudoSignalsDenied
-	ndsudoSignalsDenied = true
-	return func() { ndsudoSignalsDenied = previous }
-}
 
 // ndsudoProcess is the handle of a command that ndsudo runs as root.
 type ndsudoProcess struct {

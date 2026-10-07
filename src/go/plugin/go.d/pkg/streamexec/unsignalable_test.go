@@ -69,25 +69,47 @@ func TestUnsignalableSilentCommandBoundsStop(t *testing.T) {
 	assert.Less(t, elapsed, 3*timing.StallTimeout, "stop waited beyond the bound")
 	assert.Nil(t, s.latest.Load())
 
-	// The command was left running, and its next write ends it.
+	// The command was left running, so the next Run does not start another instance until its next write ends it.
 	conn.RequireRunning(t)
+	ctx, cancel := context.WithCancel(t.Context())
+	defer cancel()
+	started, done := goRun(ctx, s)
+	fake.RequireNoStart(t, 500*time.Millisecond)
 	conn.Line(t, "late")
-	conn.WaitExited(t)
+	next := fake.Accept(t)
+	conn.RequireExited(t)
+	select {
+	case <-started:
+	case <-time.After(5 * time.Second):
+		t.Fatal("the next Run did not start")
+	}
+	next.Line(t, "record 2")
+	waitLatest(t, s, "record 2")
+	cancel()
+	next.Noise(t, "noise") // a writing command ends at once, so Run returns without the bound
+	select {
+	case err := <-done:
+		require.NoError(t, err)
+	case <-time.After(5 * time.Second):
+		t.Fatal("the next Run did not return")
+	}
 }
 
 func TestUnsignalableStalledCommandDelaysReplacement(t *testing.T) {
 	fake := streamexectest.NewFake(t)
 	timing := testTiming
-	timing.StallTimeout = 300 * time.Millisecond
+	// Long enough for a slow fake startup to deliver its first record before the stall timer fires.
+	timing.StallTimeout = time.Second
 	s := newUnsignalableSource(t, timing)
 	startRun(t, s)
 	conn := fake.Accept(t)
 	conn.Line(t, "record 1")
 	waitLatest(t, s, "record 1")
 
-	// The stalled instance writes nothing more, so it keeps running, and no replacement starts.
+	// The stalled instance writes nothing more, so it keeps running, and no replacement starts: neither while its close
+	// waits for the exit nor after that wait.
 	waitWithdrawn(t, s)
-	fake.RequireNoStart(t, time.Second)
+	fake.RequireNoStart(t, 2*timing.StallTimeout)
 	conn.RequireRunning(t)
 
 	conn.Line(t, "late")

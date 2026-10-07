@@ -4,13 +4,14 @@
 //
 // A Source starts one owned command instance, decodes its standard output line by line into records, and publishes
 // each record with the time it was read. When the instance exits or stops producing records, the Source withdraws the
-// latest record, terminates the instance, and starts a replacement after exponential backoff once the instance has
-// exited; an instance never overlaps its replacement. When the context ends, the Source withdraws the record,
-// terminates the instance, waits for it to exit, and returns.
+// latest record, terminates the instance, and starts a replacement after exponential backoff. When the context ends,
+// the Source withdraws the record, terminates the instance, waits for it to exit, and returns.
 //
 // A command that cannot be signaled, such as one that ndsudo runs as root for an unprivileged caller, ends only by
 // exiting or at its next write after the Source closes its output. The Source therefore waits at most StallTimeout for
-// a terminated instance to exit and then warns; when the context has ended, it returns without the exit.
+// a terminated instance to exit and then warns; when the context has ended, it returns without the exit. Instances of
+// one Source never overlap: every start, including the first one of a later Run or Background, waits for the previous
+// instance to exit.
 package streamexec
 
 import (
@@ -81,6 +82,9 @@ type Source[T any] struct {
 	// latest is the newest record of the running instance; nil before its first record and while none runs. Only the
 	// Run goroutine writes it, so withdrawal before a replacement starts cannot race with a late record.
 	latest atomic.Pointer[record[T]]
+	// last is the most recently started instance; it may still run after a bounded close. Only the Run goroutine uses
+	// it, and runs of one Source are sequential.
+	last *instance[T]
 }
 
 // observer receives supervision events on the Run goroutine; Run itself uses none.
@@ -139,9 +143,10 @@ func (s *Source[T]) Run(ctx context.Context, started func()) error {
 }
 
 // Background supervises the command on its own goroutine, for a collector without a managed runner. It returns once
-// the first instance has published a record; ctx bounds only this wait. It fails, leaving nothing running, when the
-// first instance cannot start, ends before publishing a record (with that instance's failure, without a replacement),
-// or ctx ends first. On success the caller MUST call stop, which ends supervision and waits for it; stop is idempotent.
+// the first instance has published a record; ctx bounds only this wait. It fails without a replacement when the first
+// instance cannot start, ends before publishing a record (with that instance's failure), or ctx ends first; supervision
+// has then ended, and only an instance that did not exit after termination can still run. On success the caller MUST
+// call stop, which ends supervision and waits for it; stop is idempotent.
 func (s *Source[T]) Background(ctx context.Context) (stop func(), err error) {
 	recorded := make(chan struct{})
 	var recordedOnce sync.Once
@@ -184,6 +189,9 @@ func (s *Source[T]) Background(ctx context.Context) (stop func(), err error) {
 }
 
 func (s *Source[T]) run(ctx context.Context, started func(), obs observer) error {
+	if !s.awaitLast(ctx) {
+		return nil
+	}
 	inst, err := s.start(ctx)
 	if err != nil {
 		if ctx.Err() != nil {
@@ -207,7 +215,6 @@ func (s *Source[T]) run(ctx context.Context, started func(), obs observer) error
 		if healthy >= timing.StallTimeout {
 			delay = timing.RestartDelayMin
 		}
-		prev := inst
 		for {
 			if ctx.Err() != nil {
 				return nil
@@ -220,16 +227,27 @@ func (s *Source[T]) run(ctx context.Context, started func(), obs observer) error
 			case <-time.After(delay):
 			}
 			delay = min(delay*2, timing.RestartDelayMax)
-			// follow leaves an instance that has not exited running; its replacement waits for the exit.
-			select {
-			case <-ctx.Done():
+			if !s.awaitLast(ctx) {
 				return nil
-			case <-prev.exited:
 			}
 			if inst, err = s.start(ctx); err == nil {
 				break
 			}
 		}
+	}
+}
+
+// awaitLast waits for the last instance to exit; follow leaves running one that did not exit within its bound. It
+// reports false if ctx ends first.
+func (s *Source[T]) awaitLast(ctx context.Context) bool {
+	if s.last == nil {
+		return true
+	}
+	select {
+	case <-s.last.exited:
+		return true
+	case <-ctx.Done():
+		return false
 	}
 }
 
@@ -241,8 +259,8 @@ func (s *Source[T]) follow(ctx context.Context, inst *instance[T], obs observer)
 		s.latest.Store(nil)
 		if !inst.close(s.cfg.Timing.StallTimeout) {
 			s.cfg.Logger.Limit("streamexec:"+s.cfg.Name+":exit", 1, time.Minute).
-				Warningf("%s is still running %v after termination; a command that cannot be signaled ends only "+
-					"at its next write", s.cfg.Name, s.cfg.Timing.StallTimeout)
+				Warningf("%s has not exited %v after termination; no replacement starts until it does",
+					s.cfg.Name, s.cfg.Timing.StallTimeout)
 		}
 	}()
 

@@ -55,6 +55,7 @@ func (s *Source[T]) start(ctx context.Context) (*instance[T], error) {
 		readDone: make(chan struct{}),
 		exited:   make(chan struct{}),
 	}
+	s.last = inst
 	go inst.read(ctx, s.cfg.NewDecoder())
 	go func() {
 		defer close(inst.exited)

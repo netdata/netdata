@@ -276,13 +276,16 @@ For a long-running command exposed through `ndsudo`, use `StartNDSudoProcess`. I
 ndsudo runs the command as root, and an unprivileged plugin cannot signal it:
 
 - the kernel-denied termination is not reported as an error;
-- the command ends when it exits or dies of SIGPIPE at its next write after the caller closes its end of the command's
-  stdout pipe (ndsudo restores the default SIGPIPE disposition before exec);
-- until then `Wait` and `Close` block, so the caller MUST close that pipe end and bound its own wait. A command that
-  stops writing keeps running as root;
-- a plugin allowed to signal root processes terminates the command as `StartUnprivilegedProcess` does.
+- with a pipe as `Stdout` whose read end only the caller holds, the command ends when it exits or dies of SIGPIPE at
+  its next write after the caller closes that read end (ndsudo restores the default SIGPIPE disposition before exec).
+  A command that handles SIGPIPE or EPIPE itself, or stops writing, keeps running as root;
+- root descendants that outlive the command are neither terminated nor reported;
+- until the command ends, `Wait` and `Close` block, so the caller MUST close that read end and bound its own wait;
+- a plugin allowed to signal root processes terminates the command and its descendants as `StartUnprivilegedProcess`
+  does.
 
-Tests reproduce the unprivileged case with a same-user fake through `DenyNDSudoSignalsForTests`.
+Unix tests reproduce the unprivileged case with a same-user fake through `DenyNDSudoSignalsForTests`, which sets
+process-wide state.
 
 The owned API supports Linux, macOS, FreeBSD and Windows 10 or later. Unix exit observation keeps the group leader
 unreaped until group termination is permanently disarmed. Descendants MUST remain in that process group; this is
@@ -351,11 +354,12 @@ A `streamexec.Source` owns:
 - publication of each record with its read time; `Latest` returns it only while it is younger than `MaxSampleAge`, so a
   stale record becomes a gap;
 - replacement of a process that exits or produces no record for `StallTimeout`, after exponential backoff between
-  `RestartDelayMin` and `RestartDelayMax`; the backoff resets after a process produced records for a stall period, and a
-  replacement starts only after its predecessor has exited;
+  `RestartDelayMin` and `RestartDelayMax`; the backoff resets after a process produced records for a stall period;
 - termination that waits at most `StallTimeout` for the exit. The source cancels the process and closes its output,
   so a command it cannot signal (an ndsudo command of an unprivileged plugin) ends at its next write. One that has
-  stopped writing is left running with a warning, and no replacement starts before it exits;
+  not exited by then is left running with a warning;
+- no overlap: every start, including the first one of a later `Run` or `Background`, waits for the source's previous
+  process to exit;
 - a warning for each failed process or restart attempt, limited to one per minute per command name.
 
 `Run(ctx, started)` returns a failure to start the first process and calls `started` once it runs, so a V2 collector
@@ -363,8 +367,9 @@ delegates its `CollectorV2Runner.Run` to it. Later failures are recovered inside
 cancellation once the process has exited, or after the `StallTimeout` wait.
 
 A collector without a managed runner (framework V1) uses `Background(ctx)` instead: it runs the same supervision on its
-own goroutine and returns once the first record arrives, with `ctx` bounding only that wait. It fails at once, with the
-process's own failure and without a restart, when the first process ends (exits or stalls) before producing a record.
+own goroutine and returns once the first record arrives, with `ctx` bounding only that wait. It fails without a restart,
+and without waiting for `ctx` to end, when the first process ends (exits or stalls) before producing a record; the error
+is that process's failure.
 Call it from `Check`, whose failures follow `autodetection_retry`, and call the returned `stop` from `Cleanup`.
 
 Tests use `streamexec/streamexectest`: the test binary doubles as the fake command (`RunIfFake` in `TestMain`), and each
