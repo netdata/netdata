@@ -3,6 +3,8 @@
 package bmc
 
 import (
+	"errors"
+	"slices"
 	"testing"
 	"time"
 
@@ -70,9 +72,24 @@ func TestReader_InventoryRejected(t *testing.T) {
 			},
 			wantErr: "SDR repository changed during discovery",
 		},
-		"record shorter than its header": {
-			prepare: func(b *fakeBMC) { b.records[0] = b.records[0][:types.SDRRecordHeaderSize] },
+		"whole-record read transport failure": {
+			prepare: func(b *fakeBMC) {
+				b.onExchange = func(req types.Request) error {
+					if q, ok := req.(*storage.GetSDRRequest); ok && q.ReadBytes == 0xff {
+						return errors.New("transport failed")
+					}
+					return nil
+				}
+			},
+			wantErr: "transport failed",
+		},
+		"record longer than its header": {
+			prepare: func(b *fakeBMC) { b.records[0] = append(slices.Clone(b.records[0]), 0, 0) },
 			wantErr: "length does not match header",
+		},
+		"record shorter than its header": {
+			prepare: func(b *fakeBMC) { b.records[0] = slices.Clone(b.records[0][:types.SDRRecordHeaderSize]) },
+			wantErr: "invalid partial SDR",
 		},
 		"chain continues past the record count": {
 			prepare: func(fake *fakeBMC) { fake.recordCount = 1 },
@@ -136,6 +153,19 @@ func TestReader_InventoryTolerated(t *testing.T) {
 		},
 		"whole-record reads refused": {
 			prepare: func(fake *fakeBMC) { fake.refuseWholeReads = true },
+		},
+		"whole-record reads fail with another completion code": {
+			prepare: func(fake *fakeBMC) {
+				fake.onExchange = func(req types.Request) error {
+					if q, ok := req.(*storage.GetSDRRequest); ok && q.ReadBytes == 0xff {
+						return types.NewResponseError(types.CodeUnspecifiedError, "unspecified")
+					}
+					return nil
+				}
+			},
+		},
+		"whole-record reads return fewer bytes than announced": {
+			prepare: func(fake *fakeBMC) { fake.wholeLength = func(size int) int { return size - 3 } },
 		},
 		"partial reads shorter than requested": {
 			prepare: func(fake *fakeBMC) {
@@ -203,4 +233,109 @@ func TestReader_PartialRecordReadsPastLastOffset(t *testing.T) {
 	got, err := newTestReader(fake).Collect(t.Context(), false)
 	require.ErrorContains(t, err, "past the last addressable offset")
 	assert.Nil(t, got)
+}
+
+func TestReader_PartialRecordReadRetries(t *testing.T) {
+	canceled := types.NewResponseError(types.CodeReservationCanceled, "reservation canceled")
+	refused := types.NewResponseError(types.CodeCannotReturnRequestedDataBytes, "cannot return bytes")
+	unspecified := types.NewResponseError(types.CodeUnspecifiedError, "unspecified")
+
+	tests := map[string]struct {
+		// fail answers the n-th (from 0) body read of the first record, or nil to serve it.
+		fail               func(n int, q *storage.GetSDRRequest) error
+		hideReserveSupport bool
+		wantErr            string
+		wantReservations   int   // for the whole walk: one per partially read record plus renewals
+		wantBodySizes      []int // leading body request sizes of the first record
+	}{
+		"canceled reservation is renewed": {
+			fail: func(n int, _ *storage.GetSDRRequest) error {
+				if n < 2 {
+					return canceled
+				}
+				return nil
+			},
+			wantReservations: 4,
+			wantBodySizes:    []int{16, 16, 16},
+		},
+		"reservation requested without advertised support": {
+			hideReserveSupport: true,
+			fail: func(_ int, q *storage.GetSDRRequest) error {
+				if q.ReservationID == 0 {
+					return canceled
+				}
+				return nil
+			},
+			wantReservations: 1,
+			wantBodySizes:    []int{16, 16},
+		},
+		"reservation canceled too often": {
+			fail:             func(int, *storage.GetSDRRequest) error { return canceled },
+			wantErr:          "reservation canceled",
+			wantReservations: 5,
+		},
+		"refused chunk size shrinks": {
+			fail: func(_ int, q *storage.GetSDRRequest) error {
+				if q.ReadBytes > 8 {
+					return refused
+				}
+				return nil
+			},
+			wantReservations: 2,
+			wantBodySizes:    []int{16, 12, 8, 8},
+		},
+		"unspecified error shrinks the chunk": {
+			fail: func(_ int, q *storage.GetSDRRequest) error {
+				if q.ReadBytes > 12 {
+					return unspecified
+				}
+				return nil
+			},
+			wantReservations: 2,
+			wantBodySizes:    []int{16, 12, 12},
+		},
+		"header-size chunk refused": {
+			fail:             func(int, *storage.GetSDRRequest) error { return refused },
+			wantErr:          "cannot return bytes",
+			wantReservations: 1,
+			wantBodySizes:    []int{16, 12, 8, 5},
+		},
+	}
+
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) {
+			fake := newFakeBMC()
+			fake.refuseWholeReads = true
+			fake.hideReserveSupport = tc.hideReserveSupport
+			var bodySizes []int
+			fake.onExchange = func(req types.Request) error {
+				q, ok := req.(*storage.GetSDRRequest)
+				if !ok || q.ReadBytes == 0xff || q.ReadOffset == 0 || q.RecordID > 1 {
+					return nil // whole, header and second-record reads
+				}
+				bodySizes = append(bodySizes, int(q.ReadBytes))
+				return tc.fail(len(bodySizes)-1, q)
+			}
+
+			got, err := newTestReader(fake).Collect(t.Context(), false)
+			if tc.wantErr != "" {
+				require.ErrorContains(t, err, tc.wantErr)
+				assert.Nil(t, got)
+			} else {
+				require.NoError(t, err)
+				assert.Equal(t, []Sensor{wantCPUTemp(StateNominal, new(25.0)), wantCPUPresence(StateNominal)}, got.Sensors)
+			}
+			var reservations int
+			for _, req := range fake.requests {
+				if _, ok := req.(*storage.ReserveSDRRepoRequest); ok {
+					reservations++
+				}
+			}
+			assert.Equal(t, tc.wantReservations, reservations)
+			if tc.wantBodySizes != nil {
+				require.GreaterOrEqual(t, len(bodySizes), len(tc.wantBodySizes))
+				assert.Equal(t, tc.wantBodySizes, bodySizes[:len(tc.wantBodySizes)])
+			}
+		})
+	}
 }

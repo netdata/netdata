@@ -23,8 +23,15 @@ const (
 
 	// readEntireRecord asks Get SDR for the whole record in one response.
 	readEntireRecord = 0xff
-	// partialReadSize is the chunk size once the BMC refuses whole-record reads.
+	// partialReadSize is the first chunk size once the BMC refuses whole-record
+	// reads; FreeIPMI found that most BMCs handle 16 bytes but many not 32.
 	partialReadSize = 16
+	// partialReadShrink reduces the chunk after the BMC refuses its size, down to
+	// the header size.
+	partialReadShrink = 4
+	// maxReservationRetries bounds re-reserving the repository after the BMC
+	// cancels a reservation during a partial read.
+	maxReservationRetries = 4
 	// maxReadOffset is the largest one-byte Get SDR offset. A record (five-byte
 	// header plus up to 255 body bytes) can extend past it.
 	maxReadOffset = 0xff
@@ -105,7 +112,10 @@ func (r *Reader) discoverSensors(ctx context.Context, repo storage.GetSDRRepoInf
 	return sensors, nil
 }
 
-// readRecord reads one SDR, in parts when the BMC cannot return it in one response.
+// readRecord reads one SDR in a single response when the BMC returns all of it.
+// Like FreeIPMI, it falls back to partial reads when the BMC refuses the whole
+// record with any completion code, or returns fewer bytes than the record
+// header announces. Transport and context failures are returned as they are.
 func (r *Reader) readRecord(ctx context.Context, id uint16, reservable bool) (*storage.GetSDRResponse, error) {
 	req := &storage.GetSDRRequest{
 		RecordID:  id,
@@ -113,38 +123,57 @@ func (r *Reader) readRecord(ctx context.Context, id uint16, reservable bool) (*s
 	}
 	var res storage.GetSDRResponse
 	err := r.exchange(ctx, req, &res)
-	if err == nil {
+	switch {
+	case err == nil && !truncatedRecord(res.RecordData):
 		return &res, nil
-	}
-	if cc, ok := types.IsResponseError(err); !ok || cc.CompletionCode() != types.CodeCannotReturnRequestedDataBytes {
+	case err == nil || isCompletionCodeError(err):
+		return r.readRecordInParts(ctx, id, reservable)
+	default:
 		return nil, err
 	}
-	return r.readRecordInParts(ctx, id, reservable)
+}
+
+// truncatedRecord reports whether data is shorter than its header announces.
+func truncatedRecord(data []byte) bool {
+	return len(data) < types.SDRRecordHeaderSize ||
+		len(data) < types.SDRRecordHeaderSize+int(data[recordLengthOffset])
 }
 
 // readRecordInParts reads the header first, then the body it announces, under a
-// repository reservation when the BMC supports one. Like FreeIPMI, it continues
-// from wherever a shorter-than-requested response stops; the header must
-// arrive whole.
+// repository reservation when the BMC advertises support. Like FreeIPMI, it:
+//   - reserves and retries when the BMC reports the reservation cancelled or
+//     invalid, even without advertised support;
+//   - shrinks the chunk when the BMC refuses its size, down to the header size;
+//   - continues from wherever a shorter-than-requested response stops.
+//
+// The header must arrive whole.
 func (r *Reader) readRecordInParts(ctx context.Context, id uint16, reservable bool) (*storage.GetSDRResponse, error) {
 	var reservation uint16
-	if reservable {
+	reserve := func() error {
 		var res storage.ReserveSDRRepoResponse
 		if err := r.exchange(ctx, &storage.ReserveSDRRepoRequest{}, &res); err != nil {
-			return nil, err
+			return err
 		}
 		reservation = res.ReservationID
+		return nil
+	}
+	if reservable {
+		if err := reserve(); err != nil {
+			return nil, err
+		}
 	}
 
 	var data []byte
 	var next uint16
 	total := types.SDRRecordHeaderSize
+	chunk := partialReadSize
+	reservationRetries := 0
 	for len(data) < total {
 		offset := len(data)
 		if offset > maxReadOffset {
 			return nil, fmt.Errorf("partial SDR %#06x continues past the last addressable offset", id)
 		}
-		count := min(partialReadSize, total-offset)
+		count := min(chunk, total-offset)
 		// End a chunk at the last addressable offset so the next one can start there.
 		if offset < maxReadOffset && offset+count > maxReadOffset {
 			count = maxReadOffset - offset
@@ -158,7 +187,23 @@ func (r *Reader) readRecordInParts(ctx context.Context, id uint16, reservable bo
 		}
 		var part storage.GetSDRResponse
 		if err := r.exchange(ctx, req, &part); err != nil {
-			return nil, err
+			cc, ok := types.IsResponseError(err)
+			switch {
+			case !ok:
+				return nil, err
+			case cc.CompletionCode() == types.CodeReservationCanceled && reservationRetries < maxReservationRetries:
+				reservationRetries++
+				if err := reserve(); err != nil {
+					return nil, err
+				}
+				continue
+			case (cc.CompletionCode() == types.CodeCannotReturnRequestedDataBytes ||
+				cc.CompletionCode() == types.CodeUnspecifiedError) && offset > 0 && count > types.SDRRecordHeaderSize:
+				chunk = max(count-partialReadShrink, types.SDRRecordHeaderSize)
+				continue
+			default:
+				return nil, err
+			}
 		}
 		got := len(part.RecordData)
 		if got == 0 || got > count || (offset == 0 && got < types.SDRRecordHeaderSize) {

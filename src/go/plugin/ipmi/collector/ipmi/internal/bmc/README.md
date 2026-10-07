@@ -20,9 +20,12 @@ rereading every SDR for each sample. A five-minute refresh catches firmware that
 metadata changes can therefore take up to five minutes to appear on such BMCs. Discovery rejects a changed repository
 generation, malformed record lengths, and a chain that continues past the repository record count (which includes
 cycles). As in FreeIPMI, a chain that ends before the record count is accepted, because some BMCs report a count that
-does not match their records. Failed discovery is retried on the next collection. Partial SDR reads use repository
-reservations when supported, continue after a shorter-than-requested response as FreeIPMI does, and account for the
-260-byte maximum record with a one-byte offset.
+does not match their records. Failed discovery is retried on the next collection. SDR reads follow FreeIPMI: a
+whole-record read that fails with any completion code, or returns fewer bytes than the record announces, falls back to
+partial reads. Partial reads use repository reservations when supported, reserve and retry up to four times when the BMC
+reports the reservation cancelled or invalid, start with 16-byte chunks and shrink them by 4 bytes down to the header
+size when the BMC refuses a size, continue after a shorter-than-requested response, and account for the 260-byte maximum
+record with a one-byte offset. Transport failures are not retried; they fail the collection.
 
 A disabled scanner or unavailable reading produces unknown state and no numeric sample. A missing status byte produces
 unknown state even when the independent numeric reading is valid. Completion-code errors for individual sensors leave

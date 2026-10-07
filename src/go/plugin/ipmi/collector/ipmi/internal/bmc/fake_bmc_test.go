@@ -35,8 +35,12 @@ type fakeBMC struct {
 	recordCount int
 	// refuseWholeReads makes Get SDR require partial reads.
 	refuseWholeReads bool
+	// hideReserveSupport reports no Reserve SDR Repository support.
+	hideReserveSupport bool
 	// partialLength, when set, decides how many requested bytes a partial Get SDR returns.
 	partialLength func(offset, requested int) int
+	// wholeLength, when set, decides how many bytes of a record a whole-record Get SDR returns.
+	wholeLength func(size int) int
 	// onConnect and onExchange run before Connect and each command; a non-nil
 	// error is returned instead.
 	onConnect  func() error
@@ -146,7 +150,9 @@ func (f *fakeBMC) respond(ctx context.Context, req types.Request) ([]byte, error
 		}
 		binary.LittleEndian.PutUint16(data[1:], uint16(count))
 		binary.LittleEndian.PutUint32(data[5:], f.additionTime)
-		data[13] = 0x02 // Reserve SDR Repository supported
+		if !f.hideReserveSupport {
+			data[13] = 0x02 // Reserve SDR Repository supported
+		}
 		return data, nil
 	case *storage.ReserveSDRRepoRequest:
 		return []byte{1, 0}, nil
@@ -194,10 +200,14 @@ func (f *fakeBMC) respondSDR(q *storage.GetSDRRequest) ([]byte, error) {
 	}
 	record := f.records[index]
 	if q.ReadBytes != 0xff {
-		record = record[int(q.ReadOffset) : int(q.ReadOffset)+int(q.ReadBytes)]
+		// Return only bytes the record has, like a BMC reading past its end.
+		start := min(int(q.ReadOffset), len(record))
+		record = record[start:min(start+int(q.ReadBytes), len(record))]
 		if f.partialLength != nil {
-			record = record[:f.partialLength(int(q.ReadOffset), int(q.ReadBytes))]
+			record = record[:min(len(record), f.partialLength(int(q.ReadOffset), int(q.ReadBytes)))]
 		}
+	} else if f.wholeLength != nil {
+		record = record[:f.wholeLength(len(record))]
 	}
 	data := make([]byte, 2+len(record))
 	binary.LittleEndian.PutUint16(data, next)
