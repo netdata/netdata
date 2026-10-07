@@ -646,7 +646,7 @@ Netdata Logs Management is Netdata's OpenTelemetry logs pipeline: it collects, s
 
 **[Traces](/docs/opentelemetry/trace-storage-and-retention.md)**
 - Span storage with field-level indexing, trace-ID index and bloom filter, span events and links; retention and offload as for logs
-- **Traces explorer** (Netdata Cloud):
+- **Traces explorer** (Netdata Cloud; users turn it on in the Early Access panel):
   - Trace list: heatmap (trace count × duration band, with errors), volume, error and percentile charts over time, trace duration scatter, slowest traces
   - Trace detail: waterfall, span tree, span details, missing-span markers
   - Filters: service, operation, status, duration range, any resource, span, scope, event or link attribute
