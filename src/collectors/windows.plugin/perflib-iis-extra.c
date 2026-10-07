@@ -29,6 +29,7 @@ struct iis_extra_definition {
     enum iis_extra_scope scope_override;
     bool incremental;
     bool area_chart;
+    bool percentage;
 };
 
 struct iis_extra_value {
@@ -38,6 +39,7 @@ struct iis_extra_value {
 };
 
 #define IIS_EXTRA_MAX 34
+#define IIS_EXTRA_PERCENTAGE_PRECISION 10000
 #define IIS_EXTRA_ARRAY_SIZE(array) (sizeof(array) / sizeof((array)[0]))
 struct iis_extra_instance {
     bool initialized;
@@ -62,23 +64,41 @@ struct iis_extra_group {
 
 static bool iis_extra_counter_is_incremental(const struct iis_extra_definition *definition, uint32_t counter_type)
 {
-    return definition->incremental || perflib_counter_type_is_incremental(counter_type);
+    return !definition->percentage && (definition->incremental || perflib_counter_type_is_incremental(counter_type));
+}
+
+static void
+iis_extra_aggregate_percentage(COUNTER_DATA *aggregate, const COUNTER_DATA *sample, bool *has_previous_sample)
+{
+    if (!*has_previous_sample) {
+        *has_previous_sample = true;
+        return;
+    }
+
+    aggregate->current.Data += perflib_counter_delta(
+        sample->previous.Data, sample->current.Data, perflib_counter_type_is_32bit(sample->current.CounterType));
+    aggregate->current.Time +=
+        (LONGLONG)perflib_counter_delta((uint64_t)sample->previous.Time, (uint64_t)sample->current.Time, true);
+    aggregate->current.CounterType = sample->current.CounterType;
+    aggregate->updated = true;
 }
 
 #define IIS_EXTRA_OBJECT_MISSING_CYCLES 12
 
-#define IIS_EXTRA_DEFINE(key_, chart_, context_, title_, units_, dim_, scope_, incremental_, area_)                    \
-    {key_, chart_, context_, title_, units_, dim_, scope_, incremental_, area_}
+#define IIS_EXTRA_DEFINE(key_, chart_, context_, title_, units_, dim_, scope_, incremental_, area_, percentage_)       \
+    {key_, chart_, context_, title_, units_, dim_, scope_, incremental_, area_, percentage_}
 #define IIS_EXTRA(key_, chart_, context_, title_, units_, dim_)                                                        \
-    IIS_EXTRA_DEFINE(key_, chart_, context_, title_, units_, dim_, IIS_EXTRA_SCOPE_GROUP_DEFAULT, false, false)
+    IIS_EXTRA_DEFINE(key_, chart_, context_, title_, units_, dim_, IIS_EXTRA_SCOPE_GROUP_DEFAULT, false, false, false)
 #define IIS_EXTRA_INCREMENTAL(key_, chart_, context_, title_, units_, dim_)                                            \
-    IIS_EXTRA_DEFINE(key_, chart_, context_, title_, units_, dim_, IIS_EXTRA_SCOPE_GROUP_DEFAULT, true, false)
+    IIS_EXTRA_DEFINE(key_, chart_, context_, title_, units_, dim_, IIS_EXTRA_SCOPE_GROUP_DEFAULT, true, false, false)
+#define IIS_EXTRA_PERCENTAGE(key_, chart_, context_, title_, units_, dim_)                                             \
+    IIS_EXTRA_DEFINE(key_, chart_, context_, title_, units_, dim_, IIS_EXTRA_SCOPE_GROUP_DEFAULT, false, false, true)
 #define IIS_EXTRA_MODE_ROW(key_, chart_, context_, title_, units_, dim_)                                               \
-    IIS_EXTRA_DEFINE(key_, chart_, context_, title_, units_, dim_, IIS_EXTRA_SCOPE_MODE, false, false)
+    IIS_EXTRA_DEFINE(key_, chart_, context_, title_, units_, dim_, IIS_EXTRA_SCOPE_MODE, false, false, false)
 #define IIS_EXTRA_MODE_INCREMENTAL_ROW(key_, chart_, context_, title_, units_, dim_)                                   \
-    IIS_EXTRA_DEFINE(key_, chart_, context_, title_, units_, dim_, IIS_EXTRA_SCOPE_MODE, true, false)
+    IIS_EXTRA_DEFINE(key_, chart_, context_, title_, units_, dim_, IIS_EXTRA_SCOPE_MODE, true, false, false)
 #define IIS_EXTRA_AREA(key_, chart_, context_, title_, units_, dim_)                                                   \
-    IIS_EXTRA_DEFINE(key_, chart_, context_, title_, units_, dim_, IIS_EXTRA_SCOPE_GROUP_DEFAULT, false, true)
+    IIS_EXTRA_DEFINE(key_, chart_, context_, title_, units_, dim_, IIS_EXTRA_SCOPE_GROUP_DEFAULT, false, true, false)
 
 static const struct iis_extra_definition web_service_definitions[] = {
     IIS_EXTRA(
@@ -290,33 +310,33 @@ static const struct iis_extra_definition worker_definitions[] = {
         "Worker output cache items flushed",
         "items/s",
         "items"),
-    IIS_EXTRA_INCREMENTAL(
+    IIS_EXTRA_PERCENTAGE(
         "% 401 HTTP Response Sent",
         "http_responses",
         "iis.w3svc_w3wp_http_responses",
         "Worker HTTP responses by status",
-        "responses/s",
+        "percentage",
         "401"),
-    IIS_EXTRA_INCREMENTAL(
+    IIS_EXTRA_PERCENTAGE(
         "% 403 HTTP Response Sent",
         "http_responses",
         "iis.w3svc_w3wp_http_responses",
         "Worker HTTP responses by status",
-        "responses/s",
+        "percentage",
         "403"),
-    IIS_EXTRA_INCREMENTAL(
+    IIS_EXTRA_PERCENTAGE(
         "% 404 HTTP Response Sent",
         "http_responses",
         "iis.w3svc_w3wp_http_responses",
         "Worker HTTP responses by status",
-        "responses/s",
+        "percentage",
         "404"),
-    IIS_EXTRA_INCREMENTAL(
+    IIS_EXTRA_PERCENTAGE(
         "% 500 HTTP Response Sent",
         "http_responses",
         "iis.w3svc_w3wp_http_responses",
         "Worker HTTP responses by status",
-        "responses/s",
+        "percentage",
         "500"),
     IIS_EXTRA(
         "WebSocket Active Requests",
@@ -672,7 +692,7 @@ static void iis_extra_emit(
     int update_every)
 {
     COUNTER_DATA *counter = &value->first;
-    if (!counter->updated)
+    if (!counter->updated || (definition->percentage && counter->current.Time <= 0))
         return;
 
     if (unlikely(!value->st)) {
@@ -713,14 +733,24 @@ static void iis_extra_emit(
             priority,
             update_every,
             definition->area_chart ? RRDSET_TYPE_AREA : group->chart_type);
-        value->rd = definition->incremental ?
-                        rrddim_add(value->st, definition->dimension, NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL) :
-                        perflib_rrddim_add(value->st, definition->dimension, NULL, 1, 1, counter);
+        if (definition->percentage)
+            value->rd = rrddim_add(
+                value->st, definition->dimension, NULL, 1, IIS_EXTRA_PERCENTAGE_PRECISION, RRD_ALGORITHM_ABSOLUTE);
+        else
+            value->rd = definition->incremental ?
+                            rrddim_add(value->st, definition->dimension, NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL) :
+                            perflib_rrddim_add(value->st, definition->dimension, NULL, 1, 1, counter);
         if (group->label && (app || instance))
             rrdlabels_add(value->st->rrdlabels, group->label, app ? app : instance, RRDLABEL_SRC_AUTO);
     }
 
-    perflib_rrddim_set_by_pointer(value->st, value->rd, counter);
+    if (definition->percentage) {
+        collected_number percentage =
+            (collected_number)(100.0 * (double)counter->current.Data / (double)counter->current.Time *
+                               IIS_EXTRA_PERCENTAGE_PRECISION);
+        rrddim_set_by_pointer(value->st, value->rd, percentage);
+    } else
+        perflib_rrddim_set_by_pointer(value->st, value->rd, counter);
 }
 
 static void iis_extra_done_charts(struct iis_extra_group *group, struct iis_extra_instance *state)
@@ -830,8 +860,6 @@ do_iis_extra_group(PERF_DATA_BLOCK *data, struct iis_extra_group *group, int upd
         if (!state->initialized) {
             for (size_t n = 0; n < group->count; n++) {
                 state->values[n].first.key = group->definitions[n].key;
-                if (group == &worker_group && group->definitions[n].key[0] == '%')
-                    state->values[n].first.OverwriteCounterType = PERF_COUNTER_RAWCOUNT;
             }
             state->initialized = true;
         }
@@ -848,8 +876,6 @@ do_iis_extra_group(PERF_DATA_BLOCK *data, struct iis_extra_group *group, int upd
             if (!process->initialized) {
                 for (size_t counter_index = 0; counter_index < group->count; counter_index++) {
                     process_counters[counter_index].key = group->definitions[counter_index].key;
-                    process_counters[counter_index].OverwriteCounterType =
-                        state->values[counter_index].first.OverwriteCounterType;
                 }
                 process->initialized = true;
             }
@@ -865,9 +891,13 @@ do_iis_extra_group(PERF_DATA_BLOCK *data, struct iis_extra_group *group, int upd
                     continue;
                 }
 
-                const bool incremental =
-                    iis_extra_counter_is_incremental(&group->definitions[n], sample->current.CounterType);
-                perflib_aggregate_instance_sample(&value->first, sample, &has_sample[n], incremental);
+                if (group->definitions[n].percentage)
+                    iis_extra_aggregate_percentage(&value->first, sample, &has_sample[n]);
+                else {
+                    const bool incremental =
+                        iis_extra_counter_is_incremental(&group->definitions[n], sample->current.CounterType);
+                    perflib_aggregate_instance_sample(&value->first, sample, &has_sample[n], incremental);
+                }
             } else
                 perflibGetInstanceCounter(data, object, pi, &value->first);
             if (!worker)

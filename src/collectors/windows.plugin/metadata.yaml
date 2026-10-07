@@ -2377,7 +2377,7 @@ modules:
                 - name: items
             - name: iis.w3svc_w3wp_http_responses
               description: Worker HTTP responses by status
-              unit: "responses/s"
+              unit: "percentage"
               chart_type: line
               dimensions:
                 - name: "401"
