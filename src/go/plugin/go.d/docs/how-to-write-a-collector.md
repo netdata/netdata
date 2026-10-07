@@ -198,8 +198,9 @@ Config SHOULD stay small and operator-oriented:
 
 Every configuration path (stock and user files, service discovery, DynCfg) applies `confgroup.Config.ApplyDefaults`
 before the collector sees the job, replacing a non-positive `update_every`, `autodetection_retry` or `priority` with
-the module default. Collectors SHOULD NOT re-validate those values; such checks and their troubleshooting entries are
-unreachable.
+the module default. A collector therefore always receives a positive `update_every` and `priority` and a non-negative
+`autodetection_retry`, where zero is the valid "no retry" value. Collectors SHOULD NOT re-check those bounds; such
+checks and their troubleshooting entries are unreachable.
 
 Implementation tuning SHOULD use constants:
 

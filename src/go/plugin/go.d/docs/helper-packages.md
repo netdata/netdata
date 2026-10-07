@@ -265,8 +265,9 @@ For a command that must own descendant cleanup, one-shot or persistent, use `Sta
 `ProcessOptions` file descriptors. Nil stdio uses the null device. The caller owns its pipe ends; the returned
 `Process` exclusively owns cancellation, termination and reaping. Call `Wait` to join it or `Close` to terminate
 and join; both permit repeated/concurrent calls. Completion joins the leader and termination requests, not each
-descendant independently, so an output pipe normally reaches EOF before `Wait` returns: a caller reporting why a
-streaming command stopped takes the cause from `Wait`, not from the end of output. Leader exit also requests
+descendant independently. End of output and `Wait` completion are unordered: the leader's exit usually closes its
+pipe end first, while a descendant still holding it can keep the pipe open after `Wait` returns. A caller reporting why
+a streaming command stopped takes the cause from `Wait`, not from the end of output. Leader exit also requests
 termination of contained descendants. Do not build
 this contract by calling a raw command's `Cancel` after `Wait`: a reaped Unix PID/process-group ID can be reused.
 
