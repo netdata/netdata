@@ -27,7 +27,9 @@ curl -A 'Mozilla/5.0' -sL 'https://learn.netdata.cloud/docs/netdata-agent/config
   | rg 'id="locate-your-config-directory"'
 ```
 
-Validate repository-relative metadata links (`/...`, `./` and `../` targets) against the source tree:
+Validate repository-relative metadata links (`/...`, `./` and `../` targets) against the source tree. The script checks
+that each file exists, not its anchors; ingest checks those
+(`.agents/skills/docs-learn-site-structure/mapping.md#links-between-pages`):
 
 ```bash
 python3 - <<'PY'
@@ -63,5 +65,7 @@ PY
 
 ## Repair rule
 
-Replace each absolute Learn URL with the repository-relative `.md` path of the target page's source file, keeping the
-anchor; the rule, and how the generator and ingest resolve that form, are in the Learn skill how-to named above.
+Replace each absolute Learn URL with the repository-relative `.md` path of the target page's source file. Keep an
+anchor only when it is the slug of the target heading's text: ingest checks repository-relative anchors differently
+from absolute Learn URLs (`.agents/skills/docs-learn-site-structure/mapping.md#links-between-pages`). The rule, and
+how the generator and ingest resolve that form, are in the Learn skill how-to named above.
