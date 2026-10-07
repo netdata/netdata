@@ -210,6 +210,17 @@ jobs:
             | gotestfmt -hide all
         working-directory: src/collectors/ebpf.plugin/ebpfgo.plugin
 
+      - name: Go test (shared-framework eBPF POC)
+        if: needs.file-check.outputs.run == 'true'
+        env:
+          CGO_LDFLAGS: -lbpf -lelf -lz
+        run: |
+          set -euo pipefail
+          CGO_ENABLED=1 go test -tags 'netdata_ebpf_libbpf netdata_ebpf_test' -json -race -count=1 ./plugin/ebpf/... ./cmd/ebpfpocplugin 2>&1 \
+            | "$GITHUB_WORKSPACE/.github/scripts/normalize-go-test-json.py" \
+            | gotestfmt -hide all
+        working-directory: src/go
+
   build-tests:
     name: Go build tests
     runs-on: ubuntu-latest

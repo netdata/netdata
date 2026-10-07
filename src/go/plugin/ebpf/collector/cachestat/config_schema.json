@@ -1,0 +1,17 @@
+{
+  "jsonSchema": {
+    "$schema": "http://json-schema.org/draft-07/schema#",
+    "title": "Experimental eBPF page-cache collector",
+    "type": "object",
+    "properties": {
+      "update_every": {
+        "title": "Collection interval",
+        "description": "Read accumulated kernel counters every this many seconds. Probes stay attached between collections.",
+        "type": "integer",
+        "minimum": 1,
+        "default": 1
+      }
+    }
+  },
+  "uiSchema": {}
+}
