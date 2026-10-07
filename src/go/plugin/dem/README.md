@@ -11,8 +11,8 @@ stable beacon/history key; `display_name` is presentation metadata. Renaming a s
 
 Expose the receiver through HTTPS, configure its public URL and actual trusted proxy addresses, then install
 `<script async src="https://rum.example.org/rum/shop.js"></script>` on the configured website. Public URLs may include a
-reverse-proxy path prefix. The bootstrap pins Faro 2.11.0 and loads the SDK from jsDelivr; the website's Content Security
-Policy must allow the SDK and receiver. Client IP addresses are used for rate limiting/geolocation and are not stored.
+reverse-proxy path prefix. The receiver serves the pinned Faro 2.11.0 SDK and optional tracing bundle; visitors need no
+SDK CDN connection. Client IP addresses are used for rate limiting/geolocation and are not stored.
 
 RUM and synthetic Function providers are independent of collector selection. Disabling `rum` or `journey`, selecting
 only `lighthouse`, or disabling all collectors preserves investigation of retained history while the plugin is enabled.
@@ -79,9 +79,63 @@ operator recovery; there is no automatic migration, repair or deletion. External
 archive-provenance guarantee.
 
 The browser normalization, bounded aggregation, OTLP and query behavior originated in the experimental
-[Netdata digital-experience POC](https://github.com/netdata/digital-experience), commit
+[Netdata digital-experience POC](https://github.com/netdata-labs/dem), commit
 `b3de4662f567dc63d33fee6201f8c2313568301b`. Its private configuration controller, scheduler, protocol emitter and root
 state reconciliation are replaced by the native Agent framework. Embedded third-party asset notices remain beside their source.
+
+## Install and verify browser collection
+
+Set receiver `public_url` to the HTTPS base visitors can reach, for example `https://rum.example.org/edge`.
+A site's `public_url` can override it. `rum-sites` offers the resulting `script_url` and HTML `snippet`; both are
+`null` when neither URL is configured. The receiver can still start and receive requests. A listener address or
+forwarded Host header never becomes an installation address; `trusted_proxies` applies to client IP provenance.
+
+Route the complete prefixed `/rum/` namespace to the receiver: the external script, SDK assets and collection POSTs.
+The browser resolves these requests relative to the external script element's URL. Use a canonical direct URL:
+a redirect of only the bootstrap does not redirect its sibling requests. Install a classic external script, including
+an asynchronously inserted external tag; copying the script body into an inline script, module or tag-manager eval
+is unsupported. Configure the tag manager to insert the external script element instead.
+
+Allow the receiver's script URLs in the site's applicable `script-src-elem` or `script-src` policy, and collection URL
+in `connect-src`. A nonce on the installed script is propagated to the SDK scripts; `strict-dynamic` trust follows
+normal browser rules. The receiver permits cross-origin embedding of its public scripts, including on cross-origin
+isolated pages. Collection still enforces the site's allowed origins. Policies requiring Trusted Types script URLs
+need deliberate website integration; the bootstrap does not create a permissive policy. Inspect browser CSP errors
+rather than infer policy from a fetched homepage. HTTPS pages require HTTPS receiver URLs.
+
+To troubleshoot, use the website's browser Network and Console panels:
+
+1. Confirm the external site script loads, then the receiver-hosted SDK (and optional tracing SDK). Browser-console
+   messages identify SDK load or initialization failures; a tracing **load** failure permits core RUM to continue.
+2. Inspect the `/rum/<site>/collect` POST and any preceding OPTIONS request. A rejected preflight can prevent the POST.
+3. Check `rum-sites` for a new accepted-payload timestamp. For a deterministic sampling check, explicitly set
+   `measure_sample_rate: 1` and use a fresh eligible browser session. A fresh session at a fractional rate may still
+   be sampled out; automation is excluded unless `bots: include` is configured.
+
+| Collection POST response | Meaning / action |
+| --- | --- |
+| 202 | Payload accepted into live processing; does not guarantee durable history or exporter delivery. |
+| 204 | Intentionally excluded bot or disabled collection. Check the current site policy. |
+| 400 | Invalid payload. Check that the installed bootstrap and served SDK belong to this receiver release. |
+| 403 | Origin refused. Compare the observed origin with the intended website before editing allowed origins. |
+| 404 | Site runtime is absent or the proxy route is wrong. Check native job state and request path. |
+| 413 | Payload exceeds the receiver body limit. |
+| 429 | Receiver rate limit reached. Check traffic and rate settings. |
+
+`rum-sites` exposes independent observations: receiver serving state, collection enabled, receiving runtime generation,
+last accepted payload and last rejected origin. Timestamps use Unix microseconds; timestamps and age fields are null when unseen. A rejected-origin observation can come from OPTIONS and can remain after successful collection.
+The rejection rate counts origin, rate and size rejections, excluding malformed payloads and bot exclusions. Silence
+is unknown; these fields do not certify website deployment, real human traffic or an outage. `/rum/ping` checks only
+whether the requesting browser can reach the receiver. Demo traffic cannot verify production installation.
+
+Runtime receipt evidence resets when the site runtime is replaced or restarted. Already-open pages can continue
+using earlier sampling/capture settings; receipt by a new runtime does not prove that page loaded its new bootstrap.
+A zero collection rate prevents new SDK loads and receiver processing. Browser-side policy changes reach pages on their next load.
+
+SDK assets have immutable byte-identified URLs; the per-site bootstrap revalidates on each load. All backends serving
+a public receiver route must serve the assets referenced by its bootstrap; coordinate routing and deployment across
+replicas. Agent builds and runtime need no SDK download. Shipped license notices are available through each asset's
+`rel="license"` response link. Source and update verification live in [the asset maintenance guide](rum/faro/assets/README.md).
 
 ## Browser measurement contract
 

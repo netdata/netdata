@@ -33,7 +33,7 @@ RUM processing is separate from investigation queries and Function presentation:
 | `rum/config` | Receiver/site declarations, validation and effective capture and sampling policy |
 | `rum/faro` | Faro wire decoding, spans, event classification and pinned bootstrap rendering/assets |
 | `rum/httpapi` | HTTP endpoints, exact route leases, origin/proxy/body/rate policy, caching and demo responses |
-| `rum/diagnostics` | Per-site public-address observations, reachability, snippet/CSP probes and rejected origins |
+| `rum/diagnostics` | Last rejected-origin observation owned by one site runtime |
 | `rum/aggregate` | One site's rolling measurements and investigation state, behind one lock |
 | `rum/otlp` | RUM log/span mapping, export queues, transport and drainage |
 | `rum/geoip` | Receiver-owned MMDB reader and RUM location policy |
@@ -219,9 +219,18 @@ Stock native health templates own alert policy and attach independently to each 
 measurements only; they do not write health configuration, invoke health reload or recover generated files. The command
 creates its history directory as the service account under the existing writable Agent state root.
 
-Reachability probes use an explicitly configured site or receiver public URL first. With neither configured, they probe
-the address learned from trusted proxy requests directly; setup Functions advertise it after successful confirmation.
-An explicit receiver public URL takes effect immediately, including when an older learned address was confirmed.
+Setup Functions use explicit site public_url, then receiver public_url, or return no install URL. They do not derive
+addresses from listeners/headers, contact websites or parse CSP. The browser derives sibling asset/collect URLs from
+its synchronously captured external script element src, preserving proxy prefixes; redirects do not change that src.
+The native Document getter obtains the executing script without trusting shadowing named HTML elements.
+Faro's exact published bundles and consolidated notices are embedded, content-identified and served as public assets.
+The policy bootstrap stays private/no-cache with a body-derived ETag; it changes when effective browser policy changes.
+
+Site runtime generation owns receipt/rejection evidence, not browser policy freshness: older pages can report into a
+replacement runtime. The Function publishes generation, collection policy and timestamped facts without inferring an
+installed/healthy state. Last accepted time reuses the aggregator's existing receipt state; origin rejection remains
+one observation including failed preflight. The receiver's bound Listen address is internal state, not a published
+diagnostic or installation URL. There is no outbound setup probe worker.
 
 Receiver and OTLP TLS preparation use the shared context-aware TLS helper, so native preflight cancellation reaches
 credential-file reads. Site redaction covers stored/exported payloads and remote OTLP diagnostic messages.

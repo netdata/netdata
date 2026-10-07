@@ -4,7 +4,6 @@ package aggregate_test
 
 import (
 	"encoding/json"
-	"os"
 	"os/exec"
 	"strings"
 	"testing"
@@ -17,11 +16,11 @@ import (
 )
 
 func TestPinnedSDKStartupReplayDoesNotRefreshSessions(t *testing.T) {
-	if os.Getenv("FARO_SDK_BUNDLE") == "" {
-		t.Skip("set FARO_SDK_BUNDLE to the pinned SDK IIFE")
+	if _, err := exec.LookPath("node"); err != nil {
+		t.Skip("Node is required for the shipped SDK fixture")
 	}
 	cmd := exec.Command("node", "../faro/testdata/identity-sdk.cjs")
-	cmd.Stdin = strings.NewReader(faro.Bootstrap("shop", "https://rum.example.org", faro.BootstrapOptions{
+	cmd.Stdin = strings.NewReader(faro.Bootstrap("shop", faro.BootstrapOptions{
 		MeasureRate: 1,
 	}))
 	raw, err := cmd.Output()

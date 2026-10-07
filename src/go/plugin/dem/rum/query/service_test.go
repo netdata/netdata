@@ -5,7 +5,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"net/http/httptest"
 	"os"
 	"path/filepath"
 	"testing"
@@ -49,7 +48,7 @@ func addSite(t *testing.T, hub *rumregistry.Registry, key, generation string) (*
 		DisplayName:    "site opaque-secret",
 		AllowedOrigins: []string{"https://example.org"},
 	}
-	state := diagnostics.New(cfg)
+	state := diagnostics.New()
 	route := httpapi.NewRoute(cfg, measurementProcessor{a}, state)
 	retire, err := hub.Register(
 		key,
@@ -370,16 +369,16 @@ func TestFunctionPayloadsValidateAgainstNativeSchema(t *testing.T) {
 }
 func TestFunctionsDescribeCurrentSamplingPolicy(t *testing.T) {
 	for _, tc := range []struct {
-		name                           string
-		measure, detail                float64
-		keep                           []string
-		measured, investigated, status string
+		name                   string
+		measure, detail        float64
+		keep                   []string
+		measured, investigated string
 	}{
-		{"fraction", 0.25, 0.1, []string{}, "25% of new browser sessions", "10% baseline of measured sessions", "no_beacons"},
-		{"full", 1, 1, nil, "100% of new browser sessions", "100% baseline of measured sessions", "no_beacons"},
-		{"problems only", 1, 0, nil, "100% of new browser sessions", "0% baseline of measured sessions + errors, poor vitals", "no_beacons"},
-		{"no detail", 1, 0, []string{}, "100% of new browser sessions", "0% baseline of measured sessions", "no_beacons"},
-		{"collection disabled", 0, 1, nil, "off (0%)", "100% baseline of measured sessions", "collection_disabled"},
+		{"fraction", 0.25, 0.1, []string{}, "25% of new browser sessions", "10% baseline of measured sessions"},
+		{"full", 1, 1, nil, "100% of new browser sessions", "100% baseline of measured sessions"},
+		{"problems only", 1, 0, nil, "100% of new browser sessions", "0% baseline of measured sessions + errors, poor vitals"},
+		{"no detail", 1, 0, []string{}, "100% of new browser sessions", "0% baseline of measured sessions"},
+		{"collection disabled", 0, 1, nil, "off (0%)", "100% baseline of measured sessions"},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			ctx := context.Background()
@@ -403,7 +402,7 @@ func TestFunctionsDescribeCurrentSamplingPolicy(t *testing.T) {
 					AlwaysKeep: tc.keep,
 				},
 			}
-			state := diagnostics.New(cfg)
+			state := diagnostics.New()
 			retire, err := hub.Register("shop", &rumregistry.Site{
 				Route:       httpapi.NewRoute(cfg, measurementProcessor{a}, state),
 				Diagnostics: state,
@@ -429,51 +428,11 @@ func TestFunctionsDescribeCurrentSamplingPolicy(t *testing.T) {
 			require.NotNil(t, response.RawResponse)
 			rows := response.RawResponse["data"].([][]any)
 			require.Len(t, rows, 1)
-			assert.Equal(t, tc.status, rows[0][2])
+			assert.Equal(t, tc.measure > 0, rows[0][3] == 1)
 			assert.Equal(t, tc.measured, rows[0][14])
 			assert.Equal(t, tc.investigated, rows[0][15])
 		})
 	}
-}
-
-func TestConfiguredReceiverURLOverridesPreviouslyConfirmedObservedBase(t *testing.T) {
-	hub := rumregistry.New()
-	addSite(t, hub, "shop", "generation")
-	data, _, release, ok := hub.AcquireSite("shop")
-	require.True(t, ok)
-	defer release()
-	server := httptest.NewServer(
-		httpapi.New(&config.Receiver{
-			TrustedProxies: []string{"127.0.0.1/32"},
-			MaxBodyBytes:   262144,
-			RateLimit: config.RateLimit{
-				PerIPPerMin:   120,
-				PerSitePerSec: 500,
-			},
-		}, hub, nil).
-			Handler(),
-	)
-	defer server.Close()
-	response, err := server.Client().Get(server.URL + "/rum/shop.js")
-	require.NoError(t, err)
-	require.NoError(t, response.Body.Close())
-	require.Equal(t, server.URL, data.Diagnostics.ObservedBase())
-	require.Equal(
-		t,
-		diagnostics.ReachOK,
-		data.Diagnostics.Probe(context.Background(), server.Client(), server.URL).State,
-	)
-	revoke := hub.PublishReceiver(
-		rumregistry.Availability{
-			Serving:   true,
-			PublicURL: "https://rum.example.org/new-prefix",
-		},
-	)
-	defer revoke()
-	rows, err := (query.New(hub, nil)).Sites(context.Background())
-	require.NoError(t, err)
-	require.Len(t, rows, 1)
-	require.Equal(t, "https://rum.example.org/new-prefix", rows[0].PublicBase)
 }
 
 func TestJournalFunctionFingerprintDetailAndReceiptTimeHelp(t *testing.T) {

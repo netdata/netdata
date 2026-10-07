@@ -49,18 +49,22 @@ modules:
                     type: string
                     unit: ''
                     description: Name.
-                  - name: status
+                  - name: generation
                     type: string
                     unit: ''
-                    description: Status.
-                  - name: beacon_url
+                    description: Receiving runtime identity; does not identify the browser policy revision.
+                  - name: collection_enabled
+                    type: boolean
+                    unit: ''
+                    description: Whether current site policy permits measurement collection.
+                  - name: script_url
                     type: string
                     unit: ''
-                    description: Beacon URL.
+                    description: External script URL from explicit configuration; null when no public URL is configured.
                   - name: snippet
                     type: string
                     unit: ''
-                    description: Snippet.
+                    description: Copyable external script tag; null when no public URL is configured.
                   - name: allowed_origins
                     type: string
                     unit: ''
@@ -68,11 +72,15 @@ modules:
                   - name: beacons_per_min
                     type: integer
                     unit: ''
-                    description: Beacons / min.
+                    description: Accepted payloads in the last minute; not visitors or durable history records.
+                  - name: last_beacon_at
+                    type: timestamp
+                    unit: ''
+                    description: Last accepted payload time in Unix microseconds; null when none has been accepted by this runtime.
                   - name: last_beacon_age_s
                     type: integer
                     unit: ''
-                    description: Last Beacon (s ago).
+                    description: Seconds since the last accepted payload; null when none has been accepted by this runtime.
                   - name: observed_sessions
                     type: integer
                     unit: ''
@@ -89,15 +97,7 @@ modules:
                   - name: rejected_per_min
                     type: integer
                     unit: ''
-                    description: Rejected / min.
-                  - name: reachable
-                    type: string
-                    unit: ''
-                    description: Reachable.
-                  - name: reach_detail
-                    type: string
-                    unit: ''
-                    description: Reachability Detail.
+                    description: Origin, rate and size rejections in the last minute; excludes invalid payloads and bot exclusions.
                   - name: measured
                     type: string
                     unit: ''
@@ -115,22 +115,18 @@ modules:
                     type: integer
                     unit: ''
                     description: Bots Filtered / min.
-                  - name: snippet_check
-                    type: string
-                    unit: ''
-                    description: Snippet On Site.
-                  - name: snippet_detail
-                    type: string
-                    unit: ''
-                    description: Snippet Detail.
                   - name: last_rejected_origin
                     type: string
                     unit: ''
-                    description: Last Rejected Origin.
+                    description: Last observed rejected origin, including preflight requests; not a recommendation to allow it.
+                  - name: last_rejected_at
+                    type: timestamp
+                    unit: ''
+                    description: Last rejected-origin observation time in Unix microseconds; null when none was observed.
                   - name: last_rejected_age_s
                     type: integer
                     unit: ''
-                    description: Last Rejection (s ago).
+                    description: Seconds since the last rejected-origin observation; null when none was observed.
                   - name: capture_geolocation
                     type: string
                     unit: ''
@@ -1567,8 +1563,7 @@ modules:
                     name: allowed_origins
                     required: true
                   - default_value: ""
-                    description: Externally reachable collector base URL for this site. Leave empty to use the receiver
-                        public URL.
+                    description: Public receiver base URL used for this site's installation snippet. Leave empty to use the receiver public URL.
                     group: Site
                     name: public_url
                     required: false
@@ -1771,8 +1766,9 @@ modules:
                     independently managed jobs.
                 title: Configure the receiver and site
               - description: Add `<script async src="https://rum.example.org/rum/shop.js"></script>` to the website,
-                    replacing the public receiver URL and site key. Allow this collector and the pinned Faro SDK CDN in
-                    the website Content Security Policy.
+                    replacing the configured public receiver URL and site key. The receiver serves the pinned SDK too;
+                    allow its script and connection URLs in the website Content Security Policy. Proxy the entire
+                    RUM path, including SDK assets and collect requests. A script-only redirect is insufficient.
                 title: Install the browser snippet
               - description: Event logs and tracing are optional and disabled by default. Enable an OTLP/gRPC receiver
                     separately. In the receiving Netdata node's Logs tab, select `otel-logs` and the `netdata-rum`
@@ -1796,9 +1792,14 @@ modules:
     troubleshooting:
         problems:
             list:
-              - description: Check receiver availability, the installed snippet URL and the site allowed origins. Open
-                    the rum-sites Function for reachability and rejected-origin diagnostics. Missing vital samples
-                    produce gaps, including when the receiver is unavailable.
+              - description: Open `rum-sites` for receiver availability, collection policy and last accepted payload or rejected-origin
+                    observations. Missing traffic alone is not failure. In the website browser Network panel, follow
+                    the script request, SDK request and collect POST; check console CSP and Netdata RUM errors.
+                    POST 202 means accepted, 204 means intentional bot or disabled-collection exclusion, 400 invalid
+                    payload, 403 origin rejection, 404 missing site runtime or incorrect proxy path, 413 size rejection
+                    and 429 rate limiting. For 404, check native job state and the request path. A fresh session can still
+                    be sampled out; explicitly select 100% collection for a deterministic eligible-session check.
+                    Receipt does not prove human traffic, retained history or export delivery.
                 name: No browser measurements
               - description: Check that the required signal is enabled and its receiver accepts OTLP/gRPC at the
                     configured explicit http or https URL and port. Verify Bearer authentication, TLS trust and paired

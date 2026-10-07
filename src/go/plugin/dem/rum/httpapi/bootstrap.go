@@ -16,6 +16,7 @@ import (
 // at this collector. It is a public asset (the key is already in the
 // page's HTML), so no origin check applies here.
 func (s *Server) bootstrap(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Cache-Control", "no-store")
 	file := r.PathValue("file")
 	key, ok := strings.CutSuffix(file, ".js")
 	if !ok {
@@ -28,21 +29,10 @@ func (s *Server) bootstrap(w http.ResponseWriter, r *http.Request) {
 	}
 	defer release()
 	st := route.policy
-	base := strings.TrimRight(route.config.PublicURL, "/")
-	if base == "" {
-		base = s.snap.publicURL
-	}
-	if base == "" {
-		base = s.baseURL(r)
-	}
-	if remote := parseAddr(r.RemoteAddr); remote.IsValid() && s.snap.isTrusted(remote) {
-		route.diagnostics.ObserveBase(base)
-	}
 	// The snippet carries the site's settings, so it is revalidated on every
 	// page load (ETag, usually a bodyless 304) instead of cached.
-	// "private" keeps CDNs out: Cloudflare rewrites a plain no-cache or a
-	// short max-age to its own browser TTL (4 h by default).
-	js := faro.Bootstrap(key, base, faro.BootstrapOptions{
+	// Shared caches must not retain site policy; browsers revalidate it.
+	js := faro.Bootstrap(key, faro.BootstrapOptions{
 		MeasureRate:        st.measureRate,
 		IncludeBots:        st.includeBots,
 		EventLogs:          route.config.EventLogsOn(),
@@ -53,6 +43,9 @@ func (s *Server) bootstrap(w http.ResponseWriter, r *http.Request) {
 	})
 	sum := sha256.Sum256([]byte(js))
 	etag := `"` + hex.EncodeToString(sum[:8]) + `"`
+	w.Header().Set("Access-Control-Allow-Origin", "*")
+	w.Header().Set("Cross-Origin-Resource-Policy", "cross-origin")
+	w.Header().Set("X-Content-Type-Options", "nosniff")
 	w.Header().Set("Cache-Control", "private, no-cache")
 	w.Header().Set("ETag", etag)
 	if r.Header.Get("If-None-Match") == etag {
@@ -61,24 +54,4 @@ func (s *Server) bootstrap(w http.ResponseWriter, r *http.Request) {
 	}
 	w.Header().Set("Content-Type", "application/javascript; charset=utf-8")
 	_, _ = io.WriteString(w, js)
-}
-
-// baseURL is scheme+host as the browser sees this collector. Behind a
-// trusted proxy X-Forwarded-Proto/Host are honored.
-func (s *Server) baseURL(r *http.Request) string {
-	snap := s.snap
-	scheme := "http"
-	if r.TLS != nil {
-		scheme = "https"
-	}
-	host := r.Host
-	if remote := parseAddr(r.RemoteAddr); remote.IsValid() && snap.isTrusted(remote) {
-		if p := strings.ToLower(r.Header.Get("X-Forwarded-Proto")); p == "https" || p == "http" {
-			scheme = p
-		}
-		if h := r.Header.Get("X-Forwarded-Host"); h != "" && len(h) < 256 && !strings.ContainsAny(h, " /\\\"'<>") {
-			host = h
-		}
-	}
-	return scheme + "://" + host
 }

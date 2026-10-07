@@ -19,7 +19,7 @@
       },
       "public_url": {
         "title": "Public URL",
-        "description": "Externally reachable collector base URL. Leave empty to derive it from the listener or a trusted proxy.",
+        "description": "Public receiver base URL used to generate installation snippets. If neither receiver nor site sets a public URL, no snippet is offered.",
         "type": "string"
       },
       "tls_cert": {
@@ -34,7 +34,7 @@
       },
       "trusted_proxies": {
         "title": "Trusted proxies",
-        "description": "Proxy IP addresses or CIDR ranges allowed to supply forwarded client addresses and public URLs. Leave empty to distrust forwarded headers.",
+        "description": "Proxy IP addresses or CIDR ranges allowed to supply forwarded client addresses. Leave empty to distrust forwarded headers.",
         "type": [
           "array",
           "null"
