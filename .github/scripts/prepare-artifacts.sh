@@ -183,6 +183,8 @@ if [ "${event_type}" != 'pull_request' ] && [ "${build_type}" != 'nightly' ]; th
             ;;
     esac
 
+    rm -f Version
+
     if [ "${build_type}" != "release-candidate" ]; then
         major="$(echo "${VERSION}" | tr -d 'v' | cut -f 1 -d '.')"
         minor="$(echo "${VERSION}" | tr -d 'v' | cut -f 2 -d '.')"
@@ -223,6 +225,8 @@ if [ "${event_type}" != 'pull_request' ] && [ "${build_type}" != 'nightly' ]; th
                 cp -va "artifacts/r2/${VERSION}" "artifacts/r2/${t}"
                 echo "::endgroup::"
             fi
+
+            rm -f Version
         done
     fi
 else
