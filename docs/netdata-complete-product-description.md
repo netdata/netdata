@@ -563,7 +563,7 @@ Syslog ingestion, Kubernetes log collection, log-pattern alerting (via logs-to-m
 **Capabilities**
 
 - **[Ingestion](/docs/opentelemetry/otlp-ingestion.md)** (`otel-plugin`)
-  - OTLP over gRPC (default `127.0.0.1:4317`)
+  - OTLP over gRPC (default `127.0.0.1:4317`) and over HTTP (`127.0.0.1:4318`)
   - TLS and mutual TLS; gzip compression
   - Durable acknowledgement: records are written to the write-ahead log before the sender is acknowledged; rejected records are reported through OTLP partial success
   - Accepts records up to 24 hours in the past and 10 minutes in the future
@@ -616,7 +616,7 @@ Netdata is an OpenTelemetry-native observability pipeline for metrics, logs and 
 **Design**
 
 - **Collection stage — OpenTelemetry Collector.** Receivers collect from any source; processors parse, filter and enrich; connectors derive signals (logs → metrics with `count`, traces → RED metrics with `spanmetrics`, service-to-service metrics with `servicegraph`); the `transform` processor computes percentiles from histograms (`extract_percentile_metric`); exporters route copies to additional destinations (e.g., SIEM).
-- **Backend stage — Netdata ([`otel-plugin`](/src/crates/otel-plugin/README.md)).** One OTLP/gRPC endpoint for metrics, logs and traces, with TLS/mTLS, gzip and durable acknowledgement (data is written to disk before the sender is acknowledged).
+- **Backend stage — Netdata ([`otel-plugin`](/src/crates/otel-plugin/README.md)).** One OTLP endpoint (gRPC and HTTP) for metrics, logs and traces, with TLS/mTLS, gzip and durable acknowledgement (data is written to disk before the sender is acknowledged).
 - **Data on the customer's infrastructure.** Logs and traces are stored on Netdata Agents (optionally offloaded to the customer's own S3-compatible or filesystem storage), never in Netdata Cloud.
 
 **Capabilities**
@@ -636,7 +636,7 @@ Netdata is an OpenTelemetry-native observability pipeline for metrics, logs and 
 Netdata Logs Management is Netdata's OpenTelemetry logs pipeline: it collects, stores, indexes and queries logs from any source. It is distinct from Logs Monitoring, which queries logs in place in the operating systems' own log stores (systemd-journal, Windows Event Log, macOS unified logs) (see Logs).
 
 - **[Collection stage](/docs/opentelemetry/logs-collection.md):** any source through the OpenTelemetry Collector — syslog, Kubernetes, files, applications, journald, Windows Event Log, macOS unified logs, cloud services — with parsing, filtering, enrichment, logs-to-metrics conversion, and forwarding to additional destinations (e.g., SIEM)
-- **Ingestion:** OTLP/gRPC; durable acknowledgement (records are written to the write-ahead log before the sender is acknowledged); rejected records reported through OTLP partial success; records accepted up to 24 hours in the past and 10 minutes in the future
+- **Ingestion:** OTLP/gRPC and OTLP/HTTP; durable acknowledgement (records are written to the write-ahead log before the sender is acknowledged); rejected records reported through OTLP partial success; records accepted up to 24 hours in the past and 10 minutes in the future
 - **Storage:** write-ahead log sealed into indexed files; field-level indexing of every field of every record; zstd compression; about 1/4 of raw log size; records queryable immediately, before files are sealed
 - **Streams and tenancy:** streams partitioned by `service.namespace` / `service.name`; tenant selection with the `X-Scope-OrgID` header; per-tenant retention
 - **Retention and offload:** by total size, age and file count; offload to S3-compatible object storage or a filesystem target, with on-demand read-back through a local cache
@@ -683,7 +683,7 @@ Netdata monitors applications from the user's side as well as the infrastructure
 
 **Design**
 
-- **Collected by Netdata Agents.** RUM beacons are received, and synthetic browser checks run, by the `dem.plugin` on any Netdata Agent or Parent; the customer chooses where data is received and where checks run from.
+- **Collected by Netdata Agents.** RUM beacons are received, and synthetic browser checks run, by the `dem.plugin` on Netdata Agents and Parents; the customer chooses where data is received and where checks run from.
 - **Privacy at ingestion.** URLs are stripped of query strings and fragments, identifiers (emails, UUIDs, IDs, tokens) are redacted from paths, and client IP addresses are used only for rate limiting and geolocation, never stored.
 - **Real browsers, real scripts.** Synthetic journeys are Playwright Test scripts executed in sandboxed Chromium, with a fresh browser per run; Lighthouse audits run in the same managed browser environment.
 - **Connected to the backend.** RUM can propagate W3C trace context and export browser logs and spans to Netdata's OpenTelemetry pipeline, linking user interactions to backend traces.
@@ -691,14 +691,14 @@ Netdata monitors applications from the user's side as well as the infrastructure
 **Capabilities**
 
 **Real User Monitoring**
-- One script tag per site (open-source browser SDK, loaded from the Agent); beacons to the Agent's RUM endpoint over HTTPS, with origin allow-lists and rate limits
+- One script tag per site (a bootstrap served by the Agent loads the open-source browser SDK from a public CDN); beacons to the Agent's RUM endpoint over HTTPS, with origin allow-lists and rate limits
 - Core Web Vitals — LCP, INP, CLS — plus FCP and TTFB, as p50/p75/p95 with good / needs-improvement / poor distributions
 - Page load time, DOMContentLoaded, first-party API duration, resource timing by host
 - Page views, active sessions, JavaScript errors grouped by fingerprint with sample stack traces, rage clicks, dead clicks, error clicks
 - Breakdowns by page group, browser, device, country and application version
 - Sampling with an investigation rate that always keeps sessions with errors or poor vitals; sampled session history retained on the Agent
 - Functions: `rum-sites`, `rum-pages`, `rum-live`, `rum-sessions`, `rum-errors`, `rum-session-events`
-- Stock alerts: LCP, INP and CLS p75 against Core Web Vitals thresholds; no page views received; telemetry export drops
+- Stock alerts: LCP, INP and CLS p75 against Core Web Vitals thresholds; telemetry export drops
 - Optional export of browser logs and spans to the OpenTelemetry pipeline; W3C `traceparent` propagation to backend services
 - Digital Experience views in Netdata Cloud: Live, Overview, Pages, Web Vitals, Audience, Errors, Sessions, Events, Sites, Alerts
 
@@ -706,12 +706,12 @@ Netdata monitors applications from the user's side as well as the infrastructure
 - Playwright Test scripts (JavaScript or TypeScript) with assertions and named steps, executed in sandboxed Chromium on a schedule
 - Secrets passed to scripts as environment variables and redacted from diagnostics
 - Failure screenshots; run history and artifacts retained on the Agent
-- Any Netdata Agent can act as a probe location
+- Netdata Agents act as probe locations
 - Functions: `synthetics-checks`, `synthetics-runs`, `synthetics-run`, `synthetics-artifact`; stock alert on journey failure
 - Netdata Cloud views: Journeys, Overview, Runs, Tests, Alerts
 
 **Lighthouse performance audits**
-- Scheduled Lighthouse performance audits: performance score (0–100), FCP, LCP, Total Blocking Time, Speed Index and CLS (lab data); HTML reports
+- Scheduled desktop Lighthouse performance audits: performance score (0–100), FCP, LCP, Total Blocking Time, Speed Index and CLS (lab data); HTML reports
 
 **Endpoint checks** (see Infrastructure Monitoring)
 - HTTP endpoints, TCP/UDP ports, ICMP, DNS, TLS certificate and domain expiry, files, S3-compatible storage; Nagios-compatible plugins
@@ -725,7 +725,7 @@ Netdata monitors applications from the user's side as well as the infrastructure
 - **Critical flows tested continuously.** Synthetic journeys catch broken logins, checkouts and sign-ups before users report them, using standard Playwright scripts.
 - **From the browser to the root cause.** Digital experience data sits next to backend traces and infrastructure metrics, and trace context links user interactions to the services that served them.
 - **Privacy by default.** Identifiers are redacted and IP addresses are not stored, simplifying privacy reviews.
-- **Probes where the users are.** Any Agent — in a data center, cloud region, office or branch — can run synthetic journeys from that location.
+- **Probes where the users are.** Netdata Agents in data centers, cloud regions, offices and branches run synthetic journeys from those locations.
 - **Standards-based.** Playwright, Lighthouse, Core Web Vitals, W3C trace context and OpenTelemetry; no proprietary scripting.
 
 ## Machine Learning and AI
