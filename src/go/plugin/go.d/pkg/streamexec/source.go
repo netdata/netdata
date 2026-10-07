@@ -4,9 +4,14 @@
 //
 // A Source starts one owned command instance, decodes its standard output line by line into records, and publishes
 // each record with the time it was read. When the instance exits or stops producing records, the Source withdraws the
-// latest record, terminates and joins the instance, and starts a replacement after exponential backoff; an instance
-// never overlaps its replacement. When the context ends, the Source withdraws the record, terminates and joins the
-// instance, and returns.
+// latest record, terminates the instance, and starts a replacement after exponential backoff. When the context ends,
+// the Source withdraws the record, terminates the instance, waits for it to exit, and returns.
+//
+// A command that cannot be signaled, such as one that ndsudo runs as root for an unprivileged caller, ends only by
+// exiting or at its next write after the Source closes its output. The Source therefore waits at most StallTimeout for
+// a terminated instance to exit and then warns; when the context has ended, it returns without the exit. Instances of
+// one Source never overlap: every start, including the first one of a later Run or Background, waits for the previous
+// instance to exit.
 package streamexec
 
 import (
@@ -48,7 +53,8 @@ func (f DecoderFunc[T]) Decode(line []byte) (T, bool) { return f(line) }
 type Timing struct {
 	// MaxSampleAge is how long a record stays available from Latest.
 	MaxSampleAge time.Duration
-	// StallTimeout replaces an instance that produces no record for this long.
+	// StallTimeout replaces an instance that produces no record for this long. It also bounds the wait for a
+	// terminated instance to exit: a command that still writes does so within it.
 	StallTimeout time.Duration
 	// RestartDelayMin and RestartDelayMax bound the exponential restart backoff. The delay returns to the minimum
 	// after an instance kept producing records for at least StallTimeout.
@@ -76,6 +82,9 @@ type Source[T any] struct {
 	// latest is the newest record of the running instance; nil before its first record and while none runs. Only the
 	// Run goroutine writes it, so withdrawal before a replacement starts cannot race with a late record.
 	latest atomic.Pointer[record[T]]
+	// last is the most recently started instance; it may still run after a bounded close. Only the Run goroutine uses
+	// it, and runs of one Source are sequential.
+	last *instance[T]
 }
 
 // observer receives supervision events on the Run goroutine; Run itself uses none.
@@ -127,15 +136,17 @@ func (s *Source[T]) Latest() (T, bool) {
 
 // Run starts the command and supervises it until ctx is canceled. A failure to start the first instance is returned,
 // or nil if ctx is canceled by then; started, when non-nil, is called once, after that instance starts. Later failures
-// are recovered here by replacing the instance. Run returns nil after cancellation once the instance is joined.
+// are recovered here by replacing the instance. Run returns nil after cancellation once the instance has exited, or
+// after StallTimeout without the exit of an instance that cannot be signaled.
 func (s *Source[T]) Run(ctx context.Context, started func()) error {
 	return s.run(ctx, started, observer{})
 }
 
 // Background supervises the command on its own goroutine, for a collector without a managed runner. It returns once
-// the first instance has published a record; ctx bounds only this wait. It fails, leaving nothing running, when the
-// first instance cannot start, ends before publishing a record (with that instance's failure, without a replacement),
-// or ctx ends first. On success the caller MUST call stop, which ends supervision and waits for it; stop is idempotent.
+// the first instance has published a record; ctx bounds only this wait. It fails without a replacement when the first
+// instance cannot start, ends before publishing a record (with that instance's failure), or ctx ends first; supervision
+// has then ended, and only an instance that did not exit after termination can still run. On success the caller MUST
+// call stop, which ends supervision and waits for it; stop is idempotent.
 func (s *Source[T]) Background(ctx context.Context) (stop func(), err error) {
 	recorded := make(chan struct{})
 	var recordedOnce sync.Once
@@ -178,6 +189,9 @@ func (s *Source[T]) Background(ctx context.Context) (stop func(), err error) {
 }
 
 func (s *Source[T]) run(ctx context.Context, started func(), obs observer) error {
+	if !s.awaitLast(ctx) {
+		return nil
+	}
 	inst, err := s.start(ctx)
 	if err != nil {
 		if ctx.Err() != nil {
@@ -213,6 +227,9 @@ func (s *Source[T]) run(ctx context.Context, started func(), obs observer) error
 			case <-time.After(delay):
 			}
 			delay = min(delay*2, timing.RestartDelayMax)
+			if !s.awaitLast(ctx) {
+				return nil
+			}
 			if inst, err = s.start(ctx); err == nil {
 				break
 			}
@@ -220,13 +237,31 @@ func (s *Source[T]) run(ctx context.Context, started func(), obs observer) error
 	}
 }
 
+// awaitLast waits for the last instance to exit; follow leaves running one that did not exit within its bound. It
+// reports false if ctx ends first.
+func (s *Source[T]) awaitLast(ctx context.Context) bool {
+	if s.last == nil {
+		return true
+	}
+	select {
+	case <-s.last.exited:
+		return true
+	case <-ctx.Done():
+		return false
+	}
+}
+
 // follow publishes the records of inst until it exits, stalls or ctx is canceled, then withdraws the latest record
-// and closes inst. It reports how long records kept arriving: the time from the start of following to the last
-// record.
+// and closes inst, waiting at most StallTimeout for its exit. It reports how long records kept arriving: the time
+// from the start of following to the last record.
 func (s *Source[T]) follow(ctx context.Context, inst *instance[T], obs observer) (healthy time.Duration, err error) {
 	defer func() {
 		s.latest.Store(nil)
-		inst.close()
+		if !inst.close(s.cfg.Timing.StallTimeout) {
+			s.cfg.Logger.Limit("streamexec:"+s.cfg.Name+":exit", 1, time.Minute).
+				Warningf("%s has not exited %v after termination; no replacement starts until it does",
+					s.cfg.Name, s.cfg.Timing.StallTimeout)
+		}
 	}()
 
 	// The end of output is not a failure of its own: the process exit reports the status, and a process that keeps
