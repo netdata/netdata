@@ -237,13 +237,14 @@ These are options dedicated to badges:
 
 -   `precision=NUMBER`
 
-    The number of decimal digits of the value. By default Netdata will add:
+    The number of decimal digits of the value. By default, Netdata picks it from the absolute value and then drops
+    trailing zeros from the decimal part:
 
-    -   no decimal digits for values > 1000
-    -   1 decimal digit for values > 100
-    -   2 decimal digits for values > 1
-    -   3 decimal digits for values > 0.1
-    -   4 decimal digits for values of 0.1 or less
+    -   no decimal digits for values of 1000 or more
+    -   1 decimal digit for values from 10 up to 1000
+    -   2 decimal digits for values from 0.1 up to 10
+    -   4 decimal digits for values from 0.01 up to 0.1
+    -   5 decimal digits from 0.001 up to 0.01, 6 from 0.0001 up to 0.001, and 7 below 0.0001
 
     Using the `precision=NUMBER` you can set your preference per badge.
 
