@@ -270,7 +270,7 @@ in-place write. Give the Netdata service account read access to the provisioned 
 | `build_at` | Database metadata build time; omitted when unseen. It is not provider freshness. |
 | `loaded_at` | Time the active snapshot was accepted; unchanged checks and failed refreshes do not advance it. |
 | `last_checked_at` | Most recent source check; omitted before the first check. |
-| `reason` | Bounded source-status code, with no filesystem path or raw error. Local Agent logs provide remediation details. |
+| `reason` | Bounded source-status code, with no filesystem path or raw error. Load errors are detailed in local Agent logs. |
 | `lookup_errors` | Error count for the active source generation; ordinary unmatched addresses and absent fields are not errors. |
 
 All three timestamps use Unix microseconds and are omitted when unseen. `loaded` means the declared geography format

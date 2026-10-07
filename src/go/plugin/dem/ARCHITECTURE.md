@@ -36,7 +36,7 @@ RUM processing is separate from investigation queries and Function presentation:
 | `rum/diagnostics` | Last rejected-origin observation owned by one site runtime |
 | `rum/aggregate` | One site's rolling measurements and investigation state, behind one lock |
 | `rum/otlp` | RUM log/span mapping, export queues, transport and drainage |
-| `rum/geoip` | Receiver-owned MMDB reader and RUM location policy |
+| `rum/geoip` | Receiver-owned geographic sources, snapshots and validated lookups |
 
 The top-level `config/` directory holds installed configuration files, not a Go package. Configuration policy does
 not read the hostname or generate UI prose; diagnostics derives fallback addresses and Functions owns presentation.
