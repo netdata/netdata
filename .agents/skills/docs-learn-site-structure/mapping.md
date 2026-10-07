@@ -112,8 +112,11 @@ published into its Learn URL. So a cross-reference is written as the repository-
 file with its `.md` extension, for example `/docs/npm/network-flows/configuration.md` or
 `/src/libnetdata/socket/README.md`; the `/docs/` prefix is not part of the rule. Details that bite:
 
-- A link already written as a `learn.netdata.cloud` URL is left untouched, so it is neither anchor-validated nor
-  rename-safe.
+- A link already written as a `learn.netdata.cloud` URL is not rewritten, so it is not rename-safe: after a move it
+  reaches the page only through a redirect. Ingest still checks it after its final reconciliation
+  (`ingest/learn_links.py`, added by netdata/learn#3110) against the published routes, their heading anchors
+  (Docusaurus spelling, `{#id}`, `id`/`name` attributes), redirect sources and static files; a miss is a hard failure
+  under `--fail-links-netdata`.
 - Anchors are validated against `extract_headers_from_file`, which slugifies heading text only: `<a id="...">` and
   `## Heading {#custom-id}` are not honoured, so write the heading text to slugify to the anchor you link. Cross-file
   `#anchor` links are checked; same-page ones are not. A miss is a hard failure under `--fail-links-netdata`, the mode
