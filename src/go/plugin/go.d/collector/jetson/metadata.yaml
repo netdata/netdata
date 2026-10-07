@@ -1,0 +1,174 @@
+plugin_name: go.d.plugin
+modules:
+  - meta:
+      id: collector-go.d.plugin-jetson
+      plugin_name: go.d.plugin
+      module_name: jetson
+      monitored_instance:
+        name: NVIDIA Jetson
+        link: https://www.nvidia.com/en-us/autonomous-machines/embedded-systems/
+        icon_filename: nvidia.svg
+        categories:
+          - data-collection.hardware-and-sensors
+      keywords:
+        - nvidia jetson
+        - jetson
+        - nvidia
+        - tegra
+        - tegrastats
+        - l4t
+        - orin
+        - xavier
+        - thor
+        - emc
+      related_resources:
+        integrations:
+          list: []
+      info_provided_to_referring_integrations:
+        description: ""
+    overview:
+      data_collection:
+        metrics_description: |
+          Monitor GPU and memory controller utilization and clock frequencies on NVIDIA Jetson devices.
+
+          You get:
+
+          - GPU utilization.
+          - GPU clock frequency, as one value or, on devices that report it, one value per graphics processing cluster (GPC).
+          - External memory controller (EMC) bandwidth utilization and clock frequency. The CPU and GPU share this memory, so high EMC utilization can reveal memory-bandwidth-bound workloads.
+
+          CPU, memory, and swap usage come from Netdata's standard Linux system monitoring; this collector adds the Jetson GPU and EMC readings those charts do not cover.
+        method_description: |
+          The collector runs NVIDIA's `tegrastats --interval 1000` on the local host and reads the line of readings it prints every second. One `tegrastats` process runs for as long as the job runs, under the Netdata service account (usually `netdata`); the collector never elevates its privileges.
+
+          It stops only the `tegrastats` process it started; other instances on the host, such as one you run in a terminal, are not affected.
+      supported_platforms:
+        include:
+          - Linux
+        exclude: []
+      multi_instance: false
+      additional_permissions:
+        description: |
+          The Netdata service account must be able to run `tegrastats`. Because the collector never elevates privileges, a reading that your Jetson Linux release shows only to root is not collected.
+      default_behavior:
+        auto_detection:
+          description: |
+            The stock configuration runs one job named `localhost`, which looks for `tegrastats` in Netdata's `PATH` and starts collecting when it is found.
+            If `tegrastats` is missing when Netdata starts, the job does not start; restart Netdata after making it available.
+        limits:
+          description: |
+            - The readings depend on the Jetson module, the Jetson Linux release, and permissions. For example, `tegrastats` on Jetson Thor can report GPU clocks without GPU utilization. A reading that `tegrastats` does not report leaves a gap; it is never charted as zero.
+            - If `tegrastats` stops printing readings, the charts show a gap after three seconds instead of repeating the last values.
+        performance_impact:
+          description: |
+            Each job keeps one `tegrastats --interval 1000` process running, the same load as running that command yourself. Netdata parses one line of its output per second.
+            A longer `update_every` reduces how often Netdata stores readings, not how often `tegrastats` samples.
+    setup:
+      prerequisites:
+        list:
+          - title: Make tegrastats available to Netdata
+            description: |
+              The collector needs Netdata installed natively on the Jetson device and the `tegrastats` utility that NVIDIA Jetson Linux (installed with JetPack) provides. Netdata running in a container is not supported.
+
+              Check that the Netdata service account can run it:
+
+              ```bash
+              sudo -u netdata tegrastats --interval 1000
+              ```
+
+              Each line should contain a `GR3D_FREQ` (GPU) or `EMC_FREQ` (memory controller) reading; stop the command with Ctrl+C. Readings missing from this output are also missing from Netdata.
+
+              If the command is not found, restore `tegrastats` with NVIDIA's [tegrastats deployment instructions](https://docs.nvidia.com/jetson/archives/r39.2/DeveloperGuide/AT/JetsonLinuxDevelopmentTools/TegrastatsUtility.html#re-deploying-tegrastats). Netdata searches its own `PATH`, which adds `/sbin`, `/usr/sbin`, `/usr/local/bin`, and `/usr/local/sbin` to the `PATH` it starts with. If `tegrastats` is in another directory, set `PATH` in the `[environment variables]` section of `netdata.conf` to a list that includes it, then restart Netdata.
+      configuration:
+        file:
+          name: go.d/jetson.conf
+        options:
+          description: |
+            The option can be set globally or per job. One job covers the whole Jetson device.
+          folding:
+            title: Config options
+            enabled: true
+          list:
+            - name: update_every
+              description: Data collection interval, in seconds. `tegrastats` samples once per second regardless; a longer interval charts the latest reading, not an average.
+              default_value: 1
+              required: false
+        examples:
+          folding:
+            title: Config
+            enabled: true
+          list:
+            - name: Basic
+              description: The stock configuration, with one job for the local Jetson device.
+              config: |
+                jobs:
+                  - name: localhost
+    troubleshooting:
+      errors:
+        list:
+          - error: tegrastats executable not found in PATH
+            cause: No executable named `tegrastats` is in Netdata's `PATH`. This is expected on Linux hosts that are not Jetson devices, and when Netdata runs in a container.
+            fix: |
+              On a Jetson device, make `tegrastats` available as described in Prerequisites, then restart Netdata. On other hosts, ignore the message or set `jetson: no` in the `modules` section of `go.d.conf`.
+          - error: "start tegrastats: `error`"
+            cause: Netdata could not start `tegrastats` through its unprivileged command helper, `nd-run`.
+            fix: Read the error text. If `nd-run` is missing or cannot be executed, repair or reinstall Netdata.
+          - error: "tegrastats source unavailable: `error`"
+            cause: The running `tegrastats` exited or stopped printing readings. Netdata keeps restarting it, at most 30 seconds apart.
+            fix: |
+              Run the check in Prerequisites and compare its output with the error text. `tegrastats exited: exit status N` means the utility failed; `tegrastats stopped producing records` means it kept running without printing complete lines.
+          - error: no fresh tegrastats sample
+            cause: Netdata has not received a complete `tegrastats` line in the last three seconds, usually because `tegrastats` is starting, has stopped, or is being restarted.
+            fix: If the error persists, look for `tegrastats source unavailable` messages in the collector log (see Diagnostics) and run the check in Prerequisites.
+          - error: tegrastats sample contains no supported GPU or EMC readings
+            cause: The latest `tegrastats` line has neither a valid `GR3D_FREQ` (GPU) nor `EMC_FREQ` (memory controller) reading. Which readings `tegrastats` prints depends on the Jetson module, the Jetson Linux release, and the account that runs it.
+            fix: Run the check in Prerequisites. If its output has no `GR3D_FREQ` or `EMC_FREQ` readings, this collector has nothing to chart on this device.
+    alerts: []
+    metrics:
+      folding:
+        title: Metrics
+        enabled: false
+      description: |
+        Charts show only readings present in the latest `tegrastats` line. A missing or invalid reading leaves a gap; a reported zero is charted as zero.
+      availability: []
+      scopes:
+        - name: global
+          description: The Jetson device's integrated GPU and external memory controller (EMC).
+          labels: []
+          metrics:
+            - name: jetson.gpu_utilization
+              description: GPU Utilization
+              unit: percentage
+              chart_type: line
+              dimensions:
+                - name: utilization
+            - name: jetson.gpu_frequency
+              description: GPU Frequency
+              unit: MHz
+              chart_type: line
+              dimensions:
+                - name: frequency
+            - name: jetson.emc_utilization
+              description: Memory Controller Bandwidth Utilization at Current Frequency
+              unit: percentage
+              chart_type: line
+              dimensions:
+                - name: utilization
+            - name: jetson.emc_frequency
+              description: Memory Controller Frequency
+              unit: MHz
+              chart_type: line
+              dimensions:
+                - name: frequency
+        - name: GPU graphics processing cluster
+          description: One graphics processing cluster (GPC) of the GPU, present when `tegrastats` reports a clock for each GPC.
+          labels:
+            - name: gpc
+              description: Position of the cluster in the `tegrastats` GPU clock list, starting at 0.
+          metrics:
+            - name: jetson.gpu_gpc_frequency
+              description: GPU Graphics Processing Cluster Frequency
+              unit: MHz
+              chart_type: line
+              dimensions:
+                - name: frequency
