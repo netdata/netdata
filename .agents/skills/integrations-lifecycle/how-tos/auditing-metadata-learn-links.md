@@ -27,7 +27,7 @@ curl -A 'Mozilla/5.0' -sL 'https://learn.netdata.cloud/docs/netdata-agent/config
   | rg 'id="locate-your-config-directory"'
 ```
 
-Validate source-relative metadata links (`/docs/...` and `../` targets) against the source tree:
+Validate repository-relative metadata links (`/...`, `./` and `../` targets) against the source tree:
 
 ```bash
 python3 - <<'PY'
@@ -41,7 +41,7 @@ for path in sorted(root.rglob('metadata.yaml')):
     text = path.read_text(errors='replace')
     for match in pat.finditer(text):
         target = match.group(1).strip()
-        if target.startswith('/docs/'):
+        if target.startswith('/') and not target.startswith('//'):
             file = root / target.split('#', 1)[0].lstrip('/')
         elif target.startswith('../') or target.startswith('./'):
             file = (path.parent / target.split('#', 1)[0]).resolve()
@@ -57,12 +57,11 @@ if problems:
         print(f'{path}:{line}: missing linked source file: {target}')
     sys.exit(1)
 
-print('OK: all metadata.yaml /docs and relative markdown links resolve to source files')
+print('OK: all repository-relative metadata.yaml links resolve to source files')
 PY
 ```
 
 ## Repair rule
 
-Prefer the source-relative `/docs/... .md` form when the consuming surface supports Learn ingest rewriting. Keep an
-absolute URL only for surfaces that do not rewrite, derive its slug from the `map.yaml` label, and verify it with `curl`
-as above.
+Replace each absolute Learn URL with the repository-relative `.md` path of the target page's source file, keeping the
+anchor; the rule, and how the generator and ingest resolve that form, are in the Learn skill how-to named above.
