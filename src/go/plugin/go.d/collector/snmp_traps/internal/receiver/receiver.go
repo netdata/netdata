@@ -81,6 +81,7 @@ type Receiver struct {
 	allowlist          *allowlist
 	rateLimiter        *rateLimiter
 	v3SecTable         *gosnmp.SnmpV3SecurityParametersTable
+	usmUserLevels      []usmUserLevel
 	engineIDs          map[string]struct{}
 	engineBoots        *engineBoots
 	localEngineID      *localEngineID
@@ -152,6 +153,11 @@ func (r *Receiver) PrepareV3(stateRoot, jobName string) error {
 		rollback()
 		return configPreparationError(err)
 	}
+	usmUserLevels, err := newUSMUserLevels(r.policy.users)
+	if err != nil {
+		rollback()
+		return configPreparationError(err)
+	}
 	engineIDs, err := buildEngineIDWhitelist(r.policy.engineIDWhitelist)
 	if err != nil {
 		rollback()
@@ -173,6 +179,7 @@ func (r *Receiver) PrepareV3(stateRoot, jobName string) error {
 	}
 
 	r.v3SecTable = table
+	r.usmUserLevels = usmUserLevels
 	r.engineIDs = engineIDs
 	r.localEngineID = localEngineID
 	r.engineBoots = engineBoots
@@ -304,6 +311,10 @@ func (r *Receiver) Process(datagram Datagram) Result {
 	}
 	if pdu.Version != model.SnmpVersionV3 && !r.communityAllowed(pdu.Community) {
 		r.reportError(ErrorDroppedPolicy)
+		return Result{}
+	}
+	if packetContext.Packet != nil && pdu.Version == model.SnmpVersionV3 && !r.v3SecurityAllowed(packetContext.Packet) {
+		r.reportError(ErrorUSMFailure)
 		return Result{}
 	}
 	if !r.ensureDynamicEngineIDRegistered(packetContext) {
