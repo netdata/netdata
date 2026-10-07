@@ -1,0 +1,66 @@
+{
+  "jsonSchema": {
+    "$schema": "http://json-schema.org/draft-07/schema#",
+    "title": "IPMI collector configuration.",
+    "type": "object",
+    "properties": {
+      "update_every": {
+        "title": "Update every",
+        "description": "Data collection frequency in seconds.",
+        "type": "integer",
+        "minimum": 5,
+        "default": 5
+      },
+      "driver": {
+        "title": "Driver",
+        "description": "Local Linux OpenIPMI transport. Only open is supported.",
+        "type": "string",
+        "enum": [
+          "open"
+        ],
+        "default": "open"
+      },
+      "timeout": {
+        "title": "Timeout",
+        "description": "Receive timeout for each IPMI command. Stopping a job can wait for an in-flight receive to finish.",
+        "type": "string",
+        "default": "5s"
+      },
+      "collect_sel": {
+        "title": "Collect SEL",
+        "description": "Collect the System Event Log entry count.",
+        "type": "boolean",
+        "default": true
+      },
+      "device": {
+        "title": "Device number",
+        "description": "Local OpenIPMI device number.",
+        "type": "integer",
+        "minimum": 0,
+        "default": 0
+      }
+    }
+  },
+  "uiSchema": {
+    "ui:flavour": "tabs",
+    "ui:options": {
+      "tabs": [
+        {
+          "title": "Connection",
+          "fields": [
+            "driver",
+            "device"
+          ]
+        },
+        {
+          "title": "Collection",
+          "fields": [
+            "update_every",
+            "timeout",
+            "collect_sel"
+          ]
+        }
+      ]
+    }
+  }
+}

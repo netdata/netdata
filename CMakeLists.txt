@@ -223,6 +223,13 @@ option(ENABLE_PLUGIN_GO "Enable metric collectors written in Go" ${DEFAULT_FEATU
 cmake_dependent_option(ENABLE_ND_MCP "Build nd-mcp stdio-to-websocket bridge for MCP integration" ${DEFAULT_FEATURE_STATE} "ENABLE_PLUGIN_GO" False)
 option(ENABLE_PLUGIN_SCRIPTS "Enable the experimental scripts plugin (Nagios compatibility module)" ON)
 option(ENABLE_PLUGIN_STATSD "Enable the experimental Go StatsD plugin (statsd.plugin)" OFF)
+option(ENABLE_PLUGIN_IPMI "Enable the experimental Go IPMI plugin (ipmi.plugin)" OFF)
+if(ENABLE_PLUGIN_IPMI)
+    if(NOT OS_LINUX OR NOT CMAKE_SIZEOF_VOID_P EQUAL 8 OR
+       NOT (CPU_X86_64 OR CPU_ARM64))
+        message(FATAL_ERROR "The experimental Go IPMI plugin requires Linux amd64 or arm64")
+    endif()
+endif()
 option(ENABLE_PLUGIN_DEM "Enable the experimental digital experience monitoring plugin" OFF)
 cmake_dependent_option(ENABLE_PLUGIN_OTEL "Enable collection of OpenTelemetry metrics and logs" ${DEFAULT_FEATURE_STATE} "OS_LINUX OR OS_MACOS" False)
 cmake_dependent_option(ENABLE_PLUGIN_NETFLOW "Enable NetFlow/IPFIX/sFlow flow analysis plugin" False "NOT OS_WINDOWS" False)
@@ -511,14 +518,14 @@ if(ENABLE_JEMALLOC)
 endif()
 
 set(ENABLE_PLUGIN_EBPF_GO OFF)
-if(ENABLE_PLUGIN_GO OR ENABLE_PLUGIN_EBPF OR ENABLE_PLUGIN_IBM OR ENABLE_PLUGIN_SCRIPTS OR ENABLE_PLUGIN_STATSD OR ENABLE_PLUGIN_DEM OR ENABLE_PLUGIN_NETFLOW OR ENABLE_CGROUP_NAME)
+if(ENABLE_PLUGIN_GO OR ENABLE_PLUGIN_EBPF OR ENABLE_PLUGIN_IBM OR ENABLE_PLUGIN_SCRIPTS OR ENABLE_PLUGIN_STATSD OR ENABLE_PLUGIN_IPMI OR ENABLE_PLUGIN_DEM OR ENABLE_PLUGIN_NETFLOW OR ENABLE_CGROUP_NAME)
     include(NetdataGoTools)
 
     find_min_go_version("${CMAKE_SOURCE_DIR}/src/go")
 
     find_package(Go "${MIN_GO_VERSION}" QUIET)
     if(NOT GO_FOUND)
-        if(ENABLE_PLUGIN_GO OR ENABLE_PLUGIN_IBM OR ENABLE_PLUGIN_SCRIPTS OR ENABLE_PLUGIN_STATSD OR ENABLE_PLUGIN_DEM OR ENABLE_PLUGIN_NETFLOW)
+        if(ENABLE_PLUGIN_GO OR ENABLE_PLUGIN_IBM OR ENABLE_PLUGIN_SCRIPTS OR ENABLE_PLUGIN_STATSD OR ENABLE_PLUGIN_IPMI OR ENABLE_PLUGIN_DEM OR ENABLE_PLUGIN_NETFLOW)
             find_package(Go "${MIN_GO_VERSION}" REQUIRED)
         endif()
     endif()
@@ -3952,6 +3959,27 @@ if(ENABLE_PLUGIN_STATSD)
 
     install(DIRECTORY src/go/plugin/statsd/config/statsd
             COMPONENT plugin-statsd
+            DESTINATION usr/lib/netdata/conf.d
+            FILES_MATCHING PATTERN "*.conf")
+endif()
+
+#
+# Build the experimental Go ipmi.plugin
+#
+
+if(ENABLE_PLUGIN_IPMI)
+    add_go_target(ipmi-go-plugin ipmi.plugin src/go cmd/ipmiplugin)
+
+    install(PROGRAMS ${CMAKE_BINARY_DIR}/ipmi.plugin
+            COMPONENT plugin-ipmi
+            DESTINATION usr/libexec/netdata/plugins.d)
+
+    install(FILES src/go/plugin/ipmi/config/ipmi.conf
+            COMPONENT plugin-ipmi
+            DESTINATION usr/lib/netdata/conf.d)
+
+    install(DIRECTORY src/go/plugin/ipmi/config/ipmi
+            COMPONENT plugin-ipmi
             DESTINATION usr/lib/netdata/conf.d
             FILES_MATCHING PATTERN "*.conf")
 endif()

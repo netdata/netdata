@@ -229,6 +229,8 @@ USAGE: ${PROGRAM} [options]
   --disable-plugin-dem       Explicitly disable the DEM plugin.
   --enable-plugin-statsd     Enable the experimental Go StatsD plugin. Default: disabled.
   --disable-plugin-statsd    Explicitly disable the Go StatsD plugin.
+  --enable-plugin-ipmi       Enable the experimental Go IPMI plugin (Linux amd64/arm64). Default: disabled.
+  --disable-plugin-ipmi      Explicitly disable the Go IPMI plugin.
   --enable-exporting-kinesis Enable AWS Kinesis exporting connector. Default: enable it when libaws_cpp_sdk_kinesis
                              and its dependencies are available.
   --disable-exporting-kinesis Explicitly disable AWS Kinesis exporting connector.
@@ -276,6 +278,7 @@ ENABLE_OTEL=""
 ENABLE_IBM=0
 ENABLE_SCRIPTS=1
 ENABLE_STATSD=0
+ENABLE_IPMI=0
 ENABLE_DEM=0
 FORCE_LEGACY_CXX=0
 NETDATA_CMAKE_OPTIONS="${NETDATA_CMAKE_OPTIONS-}"
@@ -330,6 +333,8 @@ while [ -n "${1}" ]; do
     "--disable-plugin-dem") ENABLE_DEM=0 ;;
     "--enable-plugin-statsd") ENABLE_STATSD=1 ;;
     "--disable-plugin-statsd") ENABLE_STATSD=0 ;;
+    "--enable-plugin-ipmi") ENABLE_IPMI=1 ;;
+    "--disable-plugin-ipmi") ENABLE_IPMI=0 ;;
     "--enable-exporting-kinesis" | "--enable-backend-kinesis")
       # TODO: Needs CMake Support
       ;;
@@ -580,7 +585,7 @@ trap build_error EXIT
 # -----------------------------------------------------------------------------
 # If we’re building any Go-based component, ensure a working Go toolchain exists.
 NEED_GO_TOOLCHAIN=0
-if [ "${ENABLE_GO}" -eq 1 ] || [ "${ENABLE_IBM}" -eq 1 ] || [ "${ENABLE_SCRIPTS}" -eq 1 ] || [ "${ENABLE_STATSD}" -eq 1 ] || [ "${ENABLE_DEM}" -eq 1 ]; then
+if [ "${ENABLE_GO}" -eq 1 ] || [ "${ENABLE_IBM}" -eq 1 ] || [ "${ENABLE_SCRIPTS}" -eq 1 ] || [ "${ENABLE_STATSD}" -eq 1 ] || [ "${ENABLE_IPMI}" -eq 1 ] || [ "${ENABLE_DEM}" -eq 1 ]; then
   NEED_GO_TOOLCHAIN=1
 fi
 
@@ -590,11 +595,12 @@ if [ "${NEED_GO_TOOLCHAIN}" -eq 1 ]; then
   . "${NETDATA_SOURCE_DIR}/packaging/check-for-go-toolchain.sh"
 
   if ! ensure_go_toolchain; then
-    warning "Go ${GOLANG_MIN_VERSION} needed to build Go-based plugins (go.d, scripts.d, Go StatsD, DEM, IBM), but could not find or install a usable toolchain: ${GOLANG_FAILURE_REASON}. Disabling those components."
+    warning "Go ${GOLANG_MIN_VERSION} needed to build Go-based plugins (go.d, scripts.d, Go StatsD, Go IPMI, DEM, IBM), but could not find or install a usable toolchain: ${GOLANG_FAILURE_REASON}. Disabling those components."
     ENABLE_GO=0
     ENABLE_IBM=0
     ENABLE_SCRIPTS=0
     ENABLE_STATSD=0
+    ENABLE_IPMI=0
     ENABLE_DEM=0
   fi
 fi
