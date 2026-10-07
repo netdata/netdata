@@ -50,7 +50,7 @@ func TestBootstrapDoesNotEmbedAdvertisedOrForwardedAddress(t *testing.T) {
 	for _, address := range []string{"advertised.example.org", "override.example.org", "internal", "untrusted.example.org"} {
 		assert.NotContains(t, rec.Body.String(), address)
 	}
-	assert.Contains(t, rec.Body.String(), "document.currentScript")
+	assert.Contains(t, rec.Body.String(), "getOwnPropertyDescriptor(Document.prototype, 'currentScript')")
 	assert.Equal(t, "*", rec.Header().Get("Access-Control-Allow-Origin"))
 	assert.Equal(t, "cross-origin", rec.Header().Get("Cross-Origin-Resource-Policy"))
 	assert.Equal(t, "nosniff", rec.Header().Get("X-Content-Type-Options"))

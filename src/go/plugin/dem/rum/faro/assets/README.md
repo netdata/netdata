@@ -17,7 +17,7 @@ with `rel="license"`. This keeps notices available with the installed binary.
 
 ## Verification
 
-From any working directory, run this directory's `verify.py` with Python 3.
+Run the following commands from the repository root with Python 3.
 The default check is offline. The explicit `--upstream` option reads public
 archives and the pinned lockfile, verifies integrity, compares the published
 bundle bytes and source inventories, and checks that the notice text includes

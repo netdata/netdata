@@ -61,6 +61,7 @@ function run({ rate, random = 0.8, savedStorage = storage(), bootstrap, bot = fa
     createElement() { return {}; },
     head: { appendChild(script) { loads++; loadSDK(); script.onload(); } },
   };
+  require('./script-context.cjs')(context);
   vm.createContext(context);
   let faro;
   function loadSDK() {

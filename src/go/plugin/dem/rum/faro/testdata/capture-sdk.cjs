@@ -62,6 +62,7 @@ context.document = {
     script.onload();
   } },
 };
+require('./script-context.cjs')(context);
 vm.createContext(context);
 const plain = value => JSON.parse(JSON.stringify(value));
 async function run() {

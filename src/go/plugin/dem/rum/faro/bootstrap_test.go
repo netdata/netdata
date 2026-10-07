@@ -66,7 +66,7 @@ func TestBootstrapReadsDataVersionEnv(t *testing.T) {
 		MeasureRate: 1,
 	})
 	for _, want := range []string{
-		"document.currentScript",
+		"getOwnPropertyDescriptor(Document.prototype, 'currentScript')",
 		"getAttribute('data-version')",
 		"getAttribute('data-env')",
 		"app.version = ver",

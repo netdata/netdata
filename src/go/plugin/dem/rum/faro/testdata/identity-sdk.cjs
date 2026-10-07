@@ -80,6 +80,7 @@ c.document = {
     script.onload();
   } },
 };
+require('./script-context.cjs')(c);
 vm.createContext(c);
 const tick = () => new Promise(resolve => setTimeout(resolve, 15));
 const settle = () => new Promise(resolve => setTimeout(resolve, 350));

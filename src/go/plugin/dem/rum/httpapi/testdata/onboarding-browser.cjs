@@ -86,6 +86,11 @@ async function requestsFor(key) {
         page.on('console', message => { if (message.type() === 'warn') warnings.push(message.text()); });
         page.on('pageerror', error => errors.push(error.message));
         await page.goto(options.website + '/' + key, {waitUntil: 'load'});
+        if (key === 'clobbered-script') {
+          assert.equal(await page.evaluate(() => document.currentScript.tagName), 'IMG', 'fixture must shadow the document property');
+          assert.equal(await page.evaluate(() => window.unexpectedSDKExecuted === true), false, 'named HTML must not select executable SDK content');
+          assert.ok(!requests.some(r => r.url.includes('/injected/rum/assets/')), 'named HTML must not redirect SDK requests');
+        }
         if (key === 'isolated') assert.equal(await page.evaluate(() => crossOriginIsolated), true);
         const noReceipt = ['core-failure', 'disabled', 'wrong-origin', 'alias-bootstrap-only'].includes(key);
         if (!noReceipt) {
@@ -104,7 +109,7 @@ async function requestsFor(key) {
           assert.ok(!requests.some(r => new URL(r.url).pathname.startsWith('/rum/')), 'proxy prefix lost');
           const sdkScripts = await page.evaluate(() => Array.from(document.scripts)
             .filter(s => s.src.includes('/assets/')).map(s => ({src: s.src, nonce: s.nonce})));
-          if (['nonce-csp', 'strict-dynamic', 'dynamic'].includes(key)) {
+          if (['nonce-csp', 'strict-dynamic', 'dynamic', 'clobbered-script'].includes(key)) {
             assert.ok(sdkScripts.length > 0);
             assert.ok(sdkScripts.every(s => s.nonce === 'fixture-nonce'));
           }

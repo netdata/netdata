@@ -2,7 +2,10 @@
   // data-version/data-env on our OWN <script> tag become
   // Faro app.version/app.environment; currentScript must be read
   // synchronously, before anything yields, or it stops pointing here.
-  var cs = document.currentScript;
+  // Named HTML elements can shadow document.currentScript. Read the native
+  // getter so only the executing script supplies URLs, attributes and nonce.
+  var cs;
+  try { cs = Object.getOwnPropertyDescriptor(Document.prototype, 'currentScript').get.call(document); } catch (e) {}
   var entryURL = location.href;
   var ver = (cs && cs.getAttribute('data-version')) || '';
   var env = (cs && cs.getAttribute('data-env')) || '';
@@ -38,7 +41,7 @@
   var scriptURL, nonce, collectorURL;
   try {
     if (!cs || !cs.src) { throw new Error('external script required'); }
-    scriptURL = new URL(cs.src, document.baseURI || location.href);
+    scriptURL = new URL(cs.src);
     if (!/^https?:$/.test(scriptURL.protocol) || scriptURL.username || scriptURL.password) {
       throw new Error('invalid script URL');
     }

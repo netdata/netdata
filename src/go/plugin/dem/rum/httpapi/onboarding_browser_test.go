@@ -47,7 +47,7 @@ func TestOnboardingBrowser(t *testing.T) {
 		require.NoError(t, err)
 	}
 	cases := []string{
-		"host-csp", "nonce-csp", "strict-dynamic", "dynamic", "isolated", "anonymous-cors",
+		"host-csp", "nonce-csp", "strict-dynamic", "dynamic", "isolated", "anonymous-cors", "clobbered-script",
 		"tracing-failure", "core-failure", "disabled", "wrong-origin", "alias-coherent", "alias-bootstrap-only",
 	}
 	hub := registry.New()
@@ -119,6 +119,13 @@ func TestOnboardingBrowser(t *testing.T) {
 	// browser-created telemetry enters the production handler and aggregator.
 	receiverURL := receiver.URL
 	website := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		// A scriptless injected image controls this harmless attacker endpoint.
+		// Executing it means the loader trusted a named element as currentScript.
+		if strings.HasPrefix(r.URL.Path, "/injected/rum/assets/") {
+			w.Header().Set("Content-Type", "application/javascript")
+			_, _ = fmt.Fprint(w, "window.unexpectedSDKExecuted = true;")
+			return
+		}
 		key := strings.TrimPrefix(r.URL.Path, "/")
 		found := false
 		for _, candidate := range cases {
@@ -144,7 +151,7 @@ func TestOnboardingBrowser(t *testing.T) {
 		switch key {
 		case "nonce-csp", "dynamic":
 			scripts, nonce = "'nonce-fixture-nonce'", ` nonce="fixture-nonce"`
-		case "strict-dynamic":
+		case "strict-dynamic", "clobbered-script":
 			scripts, nonce = "'nonce-fixture-nonce' 'strict-dynamic'", ` nonce="fixture-nonce"`
 		case "isolated":
 			w.Header().Set("Cross-Origin-Opener-Policy", "same-origin")
@@ -160,6 +167,9 @@ func TestOnboardingBrowser(t *testing.T) {
 		if key == "dynamic" {
 			encoded, _ := json.Marshal(src)
 			tag = `<script nonce="fixture-nonce">const s=document.createElement('script');s.async=true;s.nonce='fixture-nonce';s.src=` + string(encoded) + `;document.head.appendChild(s);</script>`
+		}
+		if key == "clobbered-script" {
+			tag = `<img name="currentScript" src="/injected/rum/site.js">` + tag
 		}
 		_, _ = fmt.Fprint(w, "<!doctype html><meta charset=utf-8><title>RUM onboarding fixture</title>"+tag+"<h1>Browser installation fixture</h1>")
 	}))

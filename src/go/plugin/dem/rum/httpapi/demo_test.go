@@ -42,7 +42,7 @@ func TestDemoBehindPathPrefix(t *testing.T) {
 	require.Equal(t, http.StatusOK, response.StatusCode)
 	js, err := io.ReadAll(response.Body)
 	require.NoError(t, err)
-	assert.Contains(t, string(js), "document.currentScript")
+	assert.Contains(t, string(js), "getOwnPropertyDescriptor(Document.prototype, 'currentScript')")
 	assert.NotContains(t, string(js), "https://collector.example/edge")
 }
 

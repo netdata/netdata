@@ -27,6 +27,7 @@ context.document = {
   head: { appendChild(script) { script.onload(); } },
   addEventListener() {},
 };
+require('./script-context.cjs')(context);
 vm.createContext(context);
 vm.runInContext(bundle.toString(), context);
 const sdk = context.GrafanaFaroWebSdk;

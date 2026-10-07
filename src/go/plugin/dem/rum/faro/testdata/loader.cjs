@@ -39,6 +39,9 @@ function run(options = {}) {
       s.onload();
     } },
   };
+  require('./script-context.cjs')(c);
+  if (options.clobbered) c.document.currentScript = { src: 'https://untrusted.example/rum/shop.js', getAttribute() { return ''; } };
+  if (options.missingNativeGetter) c.Document = class Document {};
   vm.createContext(c);
   assert.doesNotThrow(() => vm.runInContext(scripts[options.variant || 'core'], c));
   assert.equal(typeof c.netdataRum.setUser, 'function');
@@ -46,12 +49,13 @@ function run(options = {}) {
   return { warnings, loads, configs };
 }
 const normal = run();
+assert.equal(run({clobbered:true}).loads[0].src, normal.loads[0].src);
 assert.equal(normal.loads.length, 1);
 assert.equal(normal.loads[0].nonce, 'fixture-nonce');
 assert.ok(normal.loads[0].src.startsWith('https://receiver.example/prefix/rum/proxy/rum/assets/faro-web-sdk-2.11.0-'));
 assert.equal(normal.configs[0].transports[0].options.url, 'https://receiver.example/prefix/rum/proxy/rum/shop/collect');
 assert.equal(normal.warnings.length, 0);
-for (const options of [{missing:true}, {src:''}, {src:'data:text/javascript,void 0'}, {src:'https://secret:private@receiver.example/rum/shop.js'}]) {
+for (const options of [{missing:true}, {missingNativeGetter:true}, {src:''}, {src:'data:text/javascript,void 0'}, {src:'https://secret:private@receiver.example/rum/shop.js'}]) {
   const r = run(options); assert.equal(r.loads.length, 0); assert.equal(r.warnings.length, 1);
 }
 for (const throwAt of ['create','assign','append']) {

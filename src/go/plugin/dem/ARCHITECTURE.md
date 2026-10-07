@@ -222,14 +222,15 @@ creates its history directory as the service account under the existing writable
 Setup Functions use explicit site public_url, then receiver public_url, or return no install URL. They do not derive
 addresses from listeners/headers, contact websites or parse CSP. The browser derives sibling asset/collect URLs from
 its synchronously captured external script element src, preserving proxy prefixes; redirects do not change that src.
+The native Document getter obtains the executing script without trusting shadowing named HTML elements.
 Faro's exact published bundles and consolidated notices are embedded, content-identified and served as public assets.
 The policy bootstrap stays private/no-cache with a body-derived ETag; it changes when effective browser policy changes.
 
 Site runtime generation owns receipt/rejection evidence, not browser policy freshness: older pages can report into a
 replacement runtime. The Function publishes generation, collection policy and timestamped facts without inferring an
 installed/healthy state. Last accepted time reuses the aggregator's existing receipt state; origin rejection remains
-one observation including failed preflight. The receiver's internal bound Listen observation supports native socket
-lifecycle diagnostics and never supplies an installation URL. There is no outbound setup probe worker.
+one observation including failed preflight. The receiver's bound Listen address is internal state, not a published
+diagnostic or installation URL. There is no outbound setup probe worker.
 
 Receiver and OTLP TLS preparation use the shared context-aware TLS helper, so native preflight cancellation reaches
 credential-file reads. Site redaction covers stored/exported payloads and remote OTLP diagnostic messages.

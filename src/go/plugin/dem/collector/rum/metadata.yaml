@@ -1796,7 +1796,8 @@ modules:
                     observations. Missing traffic alone is not failure. In the website browser Network panel, follow
                     the script request, SDK request and collect POST; check console CSP and Netdata RUM errors.
                     POST 202 means accepted, 204 means intentional bot or disabled-collection exclusion, 400 invalid
-                    payload, 403 origin rejection, 413 size rejection and 429 rate limiting. A fresh session can still
+                    payload, 403 origin rejection, 404 missing site runtime or incorrect proxy path, 413 size rejection
+                    and 429 rate limiting. For 404, check native job state and the request path. A fresh session can still
                     be sampled out; explicitly select 100% collection for a deterministic eligible-session check.
                     Receipt does not prove human traffic, retained history or export delivery.
                 name: No browser measurements
