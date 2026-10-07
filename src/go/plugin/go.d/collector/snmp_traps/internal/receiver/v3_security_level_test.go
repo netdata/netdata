@@ -319,22 +319,55 @@ func TestV3SecurityLevelDynamicNoAuthUserWithEngineIDAcceptsOtherEngines(t *test
 	assert.Equal(t, 0, recorder.count(EventError, ErrorUSMFailure))
 }
 
+// A user with a no-auth entry without engine ID and an auth entry bound to one engine: the engine-bound entry decides
+// for its engine, the wildcard entry for every other engine.
 func TestV3SecurityLevelDynamicMixedLevelUser(t *testing.T) {
-	recorder := &receiverEventRecorder{}
-	recv := New(NewPolicy(PolicyConfig{
-		Versions:        []string{"v3"},
-		USMUsers:        []USMUser{securityLevelNoAuthUser(""), securityLevelAuthUser(testEngineIDHex)},
-		DynamicEngineID: true,
-	}), recorder.report)
-	require.NoError(t, recv.PrepareV3(t.TempDir(), "security-level-dynamic-mixed-test"))
-	t.Cleanup(recv.RollbackPreparedState)
-	peer := &net.UDPAddr{IP: net.ParseIP("10.1.2.3"), Port: 9162}
+	type outcome struct {
+		accepted    bool
+		usmFailures int
+	}
+	tests := map[string]struct {
+		engineIDHex string
+		want        outcome
+	}{
+		"unauthenticated trap from an unbound engine is accepted": {
+			engineIDHex: securityLevelOtherEngineIDHex,
+			want: outcome{
+				accepted:    true,
+				usmFailures: 0,
+			},
+		},
+		"unauthenticated trap from the auth-bound engine is dropped": {
+			engineIDHex: testEngineIDHex,
+			want: outcome{
+				accepted:    false,
+				usmFailures: 1,
+			},
+		},
+	}
 
-	data := buildV3TrapWithEngineID(t, "testuser", securityLevelOtherEngineIDHex, "1.3.6.1.6.3.1.1.5.1")
-	result := recv.Process(Datagram{Data: data, PeerIP: peer.IP, Peer: peer})
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) {
+			recorder := &receiverEventRecorder{}
+			recv := New(NewPolicy(PolicyConfig{
+				Versions:        []string{"v3"},
+				USMUsers:        []USMUser{securityLevelNoAuthUser(""), securityLevelAuthUser(testEngineIDHex)},
+				DynamicEngineID: true,
+			}), recorder.report)
+			require.NoError(t, recv.PrepareV3(t.TempDir(), "security-level-dynamic-mixed-test"))
+			t.Cleanup(recv.RollbackPreparedState)
+			peer := &net.UDPAddr{IP: net.ParseIP("10.1.2.3"), Port: 9162}
 
-	assert.NotNil(t, result.PDU)
-	assert.Equal(t, 0, recorder.count(EventError, ErrorUSMFailure))
+			data := buildV3TrapWithEngineID(t, "testuser", tc.engineIDHex, "1.3.6.1.6.3.1.1.5.1")
+			result := recv.Process(Datagram{Data: data, PeerIP: peer.IP, Peer: peer})
+
+			got := outcome{
+				accepted:    result.PDU != nil,
+				usmFailures: recorder.count(EventError, ErrorUSMFailure),
+			}
+			assert.Equal(t, tc.want, got)
+		})
+	}
 }
 
 // setV3SecurityModel rewrites the single-byte msgSecurityModel of an encoded SNMPv3 message.

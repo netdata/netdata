@@ -50,9 +50,10 @@ func newUSMUserLevels(users []USMUser) ([]usmUserLevel, error) {
 //
 // A configured engine_id does not restrict which engines a user's messages come from: the table is keyed by
 // username, keys are localized to the message's engine, and engine authorization belongs to the whitelist or the
-// dynamic registry. So an unauthenticated message is allowed when a no-auth entry of its user applies to its
-// engine (same engine ID, an entry without engine ID, or the local engine ID under which all users are registered
-// for INFORMs), or when every entry of its user is no-auth. Privacy is not required.
+// dynamic registry. An unauthenticated message is decided by the most specific entries of its user: entries bound
+// to its engine ID; otherwise entries without engine ID, or any entry when it targets the local engine, under which
+// all users are registered for INFORMs; otherwise it is allowed only when every entry of its user is no-auth.
+// Privacy is not required.
 func (r *Receiver) v3SecurityAllowed(pkt *gosnmp.SnmpPacket) bool {
 	if pkt.SecurityModel != gosnmp.UserSecurityModel {
 		return false
@@ -65,17 +66,25 @@ func (r *Receiver) v3SecurityAllowed(pkt *gosnmp.SnmpPacket) bool {
 		return false
 	}
 	localEngine := r.localEngineID != nil && r.localEngineID.equalRaw(usm.AuthoritativeEngineID)
-	found, allUnauthenticated := false, true
+
+	var found, boundToEngine, boundUnauthenticated, generalUnauthenticated bool
+	allUnauthenticated := true
 	for _, u := range r.usmUserLevels {
 		if u.username != usm.UserName {
 			continue
 		}
 		found = true
-		appliesToEngine := localEngine || u.engineID == "" || u.engineID == usm.AuthoritativeEngineID
-		if u.unauthenticated && appliesToEngine {
-			return true
-		}
 		allUnauthenticated = allUnauthenticated && u.unauthenticated
+		switch {
+		case u.engineID != "" && u.engineID == usm.AuthoritativeEngineID:
+			boundToEngine = true
+			boundUnauthenticated = boundUnauthenticated || u.unauthenticated
+		case u.engineID == "" || localEngine:
+			generalUnauthenticated = generalUnauthenticated || u.unauthenticated
+		}
 	}
-	return found && allUnauthenticated
+	if boundToEngine {
+		return boundUnauthenticated
+	}
+	return generalUnauthenticated || (found && allUnauthenticated)
 }

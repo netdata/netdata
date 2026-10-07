@@ -287,11 +287,13 @@ catch-all `0.0.0.0/0` trusted-relay prefix draws a startup warning, because any 
 - USM users are validated at config time (priv requires auth; keys ≥ 8 chars; engine IDs 5–32 hex bytes).
 - Security level (`v3_security_level.go`): gosnmp's table decode authenticates only what a message's own flags
   request, and only for the User-based Security Model, so an unauthenticated or non-USM message naming a user
-  configured with an authentication protocol would decode. A non-USM message is dropped as `usm_failures`; an
-  unauthenticated one too, unless a no-auth entry of its user applies to its engine (same engine ID, no engine ID, or
-  the local engine) or every entry of its user is no-auth. A configured `engine_id` does not restrict which engines a
-  user's traffic comes from; engine authorization stays with the whitelist or the dynamic registry. Privacy is not
-  required. The check runs before dynamic engine-ID registration and the INFORM acknowledgment.
+  configured with an authentication protocol would decode. A non-USM message is dropped as `usm_failures`; so is an
+  unauthenticated one unless the most specific entries of its user allow it: entries bound to its engine ID; else
+  entries without engine ID, or any entry for a message to the local engine; else only when every entry of the user is
+  no-auth. A configured `engine_id` does not restrict which engines a user's traffic comes from; engine authorization
+  stays with the whitelist or the dynamic registry. An INFORM carries the local engine ID, not the sender's, so a user
+  configured with both levels accepts unauthenticated INFORMs; give each security level its own username. Privacy is
+  not required. The check runs before dynamic engine-ID registration and the INFORM acknowledgment.
 - Trap authorization: the sender's engine ID must be in `engine_id_whitelist` — **or** `dynamic_engine_id_discovery`
   hot-registers unseen `(engineID, username)` pairs, capped by `dynamic_engine_id_max_pairs`. The two options are
   mutually exclusive by validation.
