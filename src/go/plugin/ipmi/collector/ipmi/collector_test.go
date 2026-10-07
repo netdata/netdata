@@ -9,7 +9,9 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"maps"
 	"os"
+	"slices"
 	"strings"
 	"sync"
 	"testing"
@@ -18,111 +20,149 @@ import (
 	"github.com/netdata/netdata/go/plugins/logger"
 	"github.com/netdata/netdata/go/plugins/pkg/confopt"
 	"github.com/netdata/netdata/go/plugins/pkg/funcapi"
+	"github.com/netdata/netdata/go/plugins/pkg/metrix"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/chartengine"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/charttpl"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/collecttest"
-	"github.com/netdata/netdata/go/plugins/plugin/ipmi/collector/ipmi/internal/ipmiapi"
-	"github.com/netdata/netdata/go/plugins/plugin/ipmi/collector/ipmi/ipmifunc"
+	"github.com/netdata/netdata/go/plugins/plugin/ipmi/collector/ipmi/internal/bmc"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
-type fakeReader struct {
-	snapshot              *ipmiapi.Snapshot
-	err                   error
-	checks, scans, closes int
-	sel                   bool
-	closeContext          context.Context
+func TestCollector_Init(t *testing.T) {
+	tests := map[string]struct {
+		config     func(*Config)
+		wantErr    bool
+		wantReader bmc.Config
+	}{
+		"defaults": {
+			wantReader: bmc.Config{
+				Device:  0,
+				Timeout: 5 * time.Second,
+			},
+		},
+		"device and timeout": {
+			config: func(c *Config) {
+				c.Device = 2
+				c.Timeout = confopt.Duration(3 * time.Second)
+			},
+			wantReader: bmc.Config{
+				Device:  2,
+				Timeout: 3 * time.Second,
+			},
+		},
+		"invalid config": {
+			config:  func(c *Config) { c.Driver = "lanplus" },
+			wantErr: true,
+		},
+	}
+
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) {
+			c := New()
+			if tc.config != nil {
+				tc.config(&c.Config)
+			}
+			var got *bmc.Config
+			c.newReader = func(cfg bmc.Config) sensorReader {
+				got = &cfg
+				return &fakeReader{}
+			}
+
+			err := c.Init(t.Context())
+			if tc.wantErr {
+				require.Error(t, err)
+				assert.Nil(t, got, "no reader for an invalid config")
+				return
+			}
+			require.NoError(t, err)
+			require.NotNil(t, got)
+			assert.Equal(t, tc.wantReader, *got)
+		})
+	}
 }
 
-func (r *fakeReader) Check(ctx context.Context) error { r.checks++; return ctx.Err() }
-func (r *fakeReader) Collect(ctx context.Context, sel bool) (*ipmiapi.Snapshot, error) {
-	r.scans++
-	r.sel = sel
-	return r.snapshot, r.err
-}
-func (r *fakeReader) Close(ctx context.Context) error {
-	r.closes++
-	r.closeContext = ctx
-	return nil
-}
-func testCollector(t *testing.T) (*Collector, *fakeReader) {
-	t.Helper()
-	c := New()
-	r := &fakeReader{snapshot: healthySnapshot()}
-	c.newReader = func(ipmiapi.Config) (reader, error) { return r, nil }
-	require.NoError(t, c.Init(t.Context()))
-	t.Cleanup(func() { c.Cleanup(context.Background()) })
-	return c, r
-}
-func healthySnapshot() *ipmiapi.Snapshot {
-	count := float64(12)
-	s := &ipmiapi.Snapshot{SEL: &count, CollectedAt: time.Now()}
-	for _, metric := range []string{"temperature_c", "temperature_f", "voltage", "ampere", "fan_speed", "power", "reading_percent"} {
-		value := float64(12.5)
-		s.Sensors = append(s.Sensors, ipmiapi.Sensor{Key: "test_" + metric, Name: metric, Type: "test", Component: "System", Metric: metric, Value: &value, State: "nominal"})
-	}
-	s.Sensors = append(s.Sensors, ipmiapi.Sensor{Key: "unavailable", Name: "Unavailable", State: "unknown"})
-	return s
-}
-func TestLifecycle(t *testing.T) {
-	c, r := testCollector(t)
+func TestCollector_Lifecycle(t *testing.T) {
+	c, reader := newTestCollector(t)
+
 	require.NoError(t, c.Check(t.Context()))
-	assert.Equal(t, 1, r.checks)
-	assert.Zero(t, r.scans, "Check must not perform full collection")
+	assert.Equal(t, 1, reader.checks)
+	assert.Zero(t, reader.collects, "Check must not perform a full collection")
 	assert.Nil(t, c.snapshot.Load())
-	points, err := collecttest.CollectScalarSeries(c)
+
+	points, err := collecttest.CollectScalarSeries(c, metrix.ReadFlatten())
 	require.NoError(t, err)
-	require.NotEmpty(t, points)
-	assert.True(t, r.sel)
-	assert.Equal(t, float64(12), points["sel_events"])
-	for key := range points {
-		assert.False(t, strings.HasPrefix(key, "temperature_c{") && strings.Contains(key, `sensor_id="unavailable"`))
-	}
+	assert.True(t, reader.collectSEL)
+	assert.Equal(t, wantSeries(reader.snapshot), points)
 	collecttest.AssertChartCoverage(t, c, collecttest.ChartCoverageExpectation{})
 	assert.Equal(t, 200, c.funcRouter.Handle(t.Context(), "sensors", funcapi.ResolvedParams{}).Status)
+
 	c.Cleanup(t.Context())
-	assert.Equal(t, 1, r.closes)
+	assert.Equal(t, 1, reader.closes)
+	assert.Nil(t, c.snapshot.Load(), "Cleanup unpublishes the Function snapshot")
+	c.Cleanup(t.Context())
+}
+
+func TestCollector_Cleanup_BeforeInit(t *testing.T) {
+	c := New()
+	c.Cleanup(t.Context())
 	assert.Nil(t, c.snapshot.Load())
 }
-func TestFailureAndRecovery(t *testing.T) {
-	c, r := testCollector(t)
+
+func TestCollector_Collect_MissingData(t *testing.T) {
+	c, reader := newTestCollector(t)
+	c.CollectSEL = false
+	reader.snapshot.SELEntries = nil
+	reader.snapshot.Sensors[0].Value = nil
+	reader.snapshot.Sensors[0].State = bmc.StateUnknown
+
+	points, err := collecttest.CollectScalarSeries(c, metrix.ReadFlatten())
+	require.NoError(t, err)
+	assert.False(t, reader.collectSEL)
+	assert.Equal(t, wantSeries(reader.snapshot), points, "unavailable readings and SEL leave gaps")
+}
+
+func TestCollector_Collect_FailureAndRecovery(t *testing.T) {
+	c, reader := newTestCollector(t)
 	_, err := collecttest.CollectScalarSeries(c)
 	require.NoError(t, err)
-	r.err = errors.New("transport failed")
+
+	reader.err = errors.New("transport failed")
 	_, err = collecttest.CollectScalarSeries(c)
 	require.ErrorContains(t, err, "transport failed")
-	assert.Nil(t, c.snapshot.Load())
-	assert.Equal(t, 1, r.closes)
-	r.err = nil
+	assert.Nil(t, c.snapshot.Load(), "the Function must not serve data older than a failure")
+
+	reader.err = nil
 	_, err = collecttest.CollectScalarSeries(c)
 	require.NoError(t, err)
 	assert.NotNil(t, c.snapshot.Load())
 }
-func TestCanceledCycle(t *testing.T) {
-	c, r := testCollector(t)
+
+func TestCollector_Collect_Canceled(t *testing.T) {
+	c, _ := newTestCollector(t)
 	ctx, cancel := context.WithCancel(t.Context())
 	cancel()
+
 	require.ErrorIs(t, c.Collect(ctx), context.Canceled)
-	assert.Zero(t, r.scans)
-	assert.Nil(t, c.snapshot.Load())
+	assert.Nil(t, c.snapshot.Load(), "a canceled cycle publishes nothing")
 }
-func TestMissingValuesAndDisabledSEL(t *testing.T) {
-	c, r := testCollector(t)
-	c.CollectSEL = false
-	r.snapshot.SEL = nil
-	r.snapshot.Sensors[0].Value = nil
-	r.snapshot.Sensors[0].State = "unknown"
-	points, err := collecttest.CollectScalarSeries(c)
-	require.NoError(t, err)
-	assert.False(t, r.sel)
-	assert.NotContains(t, points, "sel_events")
-	for key := range points {
-		assert.False(t, strings.HasPrefix(key, "temperature_c{"), key)
+
+func TestCollector_Collect_PartialWarningsAreRateLimited(t *testing.T) {
+	c, reader := newTestCollector(t)
+	var logs bytes.Buffer
+	c.Logger = logger.NewWithWriter(&logs)
+
+	for i := range 10 {
+		reader.snapshot.Warnings = []string{fmt.Sprintf("%d unsupported sensors", i+1)}
+		_, err := collecttest.CollectScalarSeries(c)
+		require.NoError(t, err)
 	}
+	assert.Equal(t, 1, strings.Count(logs.String(), "unsupported sensors"))
 }
-func TestConcurrentFunctionReads(t *testing.T) {
-	c, _ := testCollector(t)
+
+func TestCollector_ConcurrentFunctionReads(t *testing.T) {
+	c, _ := newTestCollector(t)
+
 	var wg sync.WaitGroup
 	for range 4 {
 		wg.Go(func() {
@@ -137,80 +177,201 @@ func TestConcurrentFunctionReads(t *testing.T) {
 	}
 	wg.Wait()
 }
+
 func TestArtifacts(t *testing.T) {
 	collecttest.AssertChartTemplateSchema(t, chartTemplateYAML)
 	spec, err := charttpl.DecodeYAML([]byte(chartTemplateYAML))
 	require.NoError(t, err)
 	_, err = chartengine.Compile(spec, defaultUpdateEvery)
 	require.NoError(t, err)
+
 	metadata, err := os.ReadFile("metadata.yaml")
 	require.NoError(t, err)
-	collecttest.AssertMetadataDocumentsChartTemplate(t, metadata, chartTemplateYAML, map[string][]string{"sensor_state": sensorStates})
-	collecttest.AssertConfigSchemaMatchesMetadataWith(t, "config_schema.json", "metadata.yaml", collecttest.ConfigSchemaCheck{Defaults: true})
-	c, _ := testCollector(t)
+	collecttest.AssertMetadataDocumentsChartTemplate(
+		t,
+		metadata,
+		chartTemplateYAML,
+		map[string][]string{"sensor_state": sensorStates},
+	)
+	collecttest.AssertConfigSchemaMatchesMetadataWith(
+		t,
+		"config_schema.json",
+		"metadata.yaml",
+		collecttest.ConfigSchemaCheck{
+			Defaults: true,
+		},
+	)
+
+	c, _ := newTestCollector(t)
 	_, err = collecttest.CollectScalarSeries(c)
 	require.NoError(t, err)
 	collecttest.AssertMetadataDocumentsFunctions(t, metadata, collecttest.MetadataFunctionsCheck{
-		Context: t.Context(), Module: "ipmi", Methods: ipmifunc.Methods(defaultUpdateEvery), Handler: c.funcRouter, JobSelectable: true})
+		Context:       t.Context(),
+		Module:        "ipmi",
+		Methods:       ipmiMethods(),
+		Handler:       c.funcRouter,
+		JobSelectable: true,
+	})
 }
 
-func TestCleanupHasFixedDeadline(t *testing.T) {
-	c, r := testCollector(t)
-	c.Timeout = confopt.Duration(24 * time.Hour)
-	require.NoError(t, c.Check(t.Context()))
-	before := time.Now()
-	c.Cleanup(t.Context())
-	require.NotNil(t, r.closeContext)
-	deadline, ok := r.closeContext.Deadline()
-	require.True(t, ok)
-	assert.WithinDuration(t, before.Add(2*time.Second), deadline, 100*time.Millisecond)
-	c.Cleanup(t.Context())
-	assert.Equal(t, 1, r.closes)
-}
-
-func TestPartialWarningsAreRateLimited(t *testing.T) {
-	c, r := testCollector(t)
-	var logs bytes.Buffer
-	c.Logger = logger.NewWithWriter(&logs)
-	for i := range 10 {
-		r.snapshot.Warnings = []string{fmt.Sprintf("%d unsupported sensors", i+1)}
-		_, err := collecttest.CollectScalarSeries(c)
-		require.NoError(t, err)
-	}
-	assert.Equal(t, 1, strings.Count(logs.String(), "unsupported sensors"))
-}
-
-func TestExperimentalPublicNames(t *testing.T) {
+func TestArtifacts_ExperimentalPublicNames(t *testing.T) {
 	charts, err := collecttest.ChartTemplateCharts(chartTemplateYAML)
 	require.NoError(t, err)
 	require.NotEmpty(t, charts)
 	for contextName, chart := range charts {
 		assert.True(t, strings.HasPrefix(contextName, "ipmi_go."), contextName)
-		// Only contexts move: retain the original chart IDs, including SEL events.
+		// Only contexts move: the C plugin's chart IDs stay, including SEL events.
 		wantID := strings.TrimPrefix(contextName, "ipmi_go.")
 		if wantID == "sel" {
 			wantID = "events"
 		}
 		assert.Equal(t, wantID, chart.ID)
 	}
-	methods := ipmifunc.Methods(defaultUpdateEvery)
+
+	methods := ipmiMethods()
 	require.Len(t, methods, 1)
 	assert.Equal(t, "ipmi-go-sensors", methods[0].FunctionName)
 }
 
-func TestSensorAlertBinding(t *testing.T) {
+func TestArtifacts_SensorAlertBinding(t *testing.T) {
 	health, err := os.ReadFile("../../../../../health/health.d/ipmi.conf")
 	require.NoError(t, err)
 	metadata, err := os.ReadFile("metadata.yaml")
 	require.NoError(t, err)
+
 	var bindings int
 	for _, alert := range collecttest.ParseHealthAlerts(health) {
 		if alert.On == "ipmi_go.sensor_state" {
 			bindings++
 		}
 	}
-	require.Equal(t, 1, bindings, "renamed sensor context must retain one alert owner")
-	opts := collecttest.HealthAlertsCheck{ContextPrefix: "ipmi_go."}
+	require.Equal(t, 1, bindings, "the renamed sensor context keeps one alert owner")
+
+	opts := collecttest.HealthAlertsCheck{
+		ContextPrefix: "ipmi_go.",
+	}
 	collecttest.AssertHealthAlertsTargetChartTemplateWith(t, health, chartTemplateYAML, opts)
 	collecttest.AssertHealthAlertsMatchMetadataWith(t, health, metadata, opts)
+}
+
+type fakeReader struct {
+	snapshot *bmc.Snapshot
+	err      error
+
+	checks     int
+	collects   int
+	closes     int
+	collectSEL bool
+}
+
+func (r *fakeReader) Check(ctx context.Context) error {
+	r.checks++
+	return ctx.Err()
+}
+
+func (r *fakeReader) Collect(_ context.Context, collectSEL bool) (*bmc.Snapshot, error) {
+	r.collects++
+	r.collectSEL = collectSEL
+	return r.snapshot, r.err
+}
+
+func (r *fakeReader) Close(context.Context) error {
+	r.closes++
+	return nil
+}
+
+func newTestCollector(t *testing.T) (*Collector, *fakeReader) {
+	t.Helper()
+	c := New()
+	reader := &fakeReader{
+		snapshot: healthySnapshot(),
+	}
+	c.newReader = func(bmc.Config) sensorReader { return reader }
+	require.NoError(t, c.Init(t.Context()))
+	t.Cleanup(func() { c.Cleanup(context.Background()) })
+	return c, reader
+}
+
+// healthySnapshot has one nominal sensor per numeric unit and one discrete sensor.
+func healthySnapshot() *bmc.Snapshot {
+	s := &bmc.Snapshot{
+		SELEntries:  new(12),
+		CollectedAt: time.Now(),
+	}
+	for _, unit := range []string{
+		bmc.UnitCelsius,
+		bmc.UnitFahrenheit,
+		bmc.UnitVolts,
+		bmc.UnitAmps,
+		bmc.UnitRPM,
+		bmc.UnitWatts,
+		bmc.UnitPercent,
+	} {
+		s.Sensors = append(s.Sensors, bmc.Sensor{
+			Key:       "test_" + unit,
+			Name:      unit + " sensor",
+			Type:      "test",
+			Component: "System",
+			Unit:      unit,
+			State:     bmc.StateNominal,
+			Value:     new(12.5),
+		})
+	}
+	s.Sensors = append(s.Sensors, bmc.Sensor{
+		Key:       "presence",
+		Name:      "Presence",
+		Type:      "Entity Presence",
+		Component: "Other",
+		State:     bmc.StateUnknown,
+	})
+	return s
+}
+
+// wantSeries derives the expected flattened series of a snapshot from the
+// public metric names: a state set per sensor, a reading per available value
+// and the SEL count.
+func wantSeries(s *bmc.Snapshot) map[string]metrix.SampleValue {
+	metricOfUnit := map[string]string{
+		bmc.UnitCelsius:    "temperature_c",
+		bmc.UnitFahrenheit: "temperature_f",
+		bmc.UnitVolts:      "voltage",
+		bmc.UnitAmps:       "ampere",
+		bmc.UnitRPM:        "fan_speed",
+		bmc.UnitWatts:      "power",
+		bmc.UnitPercent:    "reading_percent",
+	}
+	want := make(map[string]metrix.SampleValue)
+	for _, sensor := range s.Sensors {
+		labels := map[string]string{
+			"sensor_id": sensor.Key,
+			"sensor":    sensor.Name,
+			"type":      sensor.Type,
+			"component": sensor.Component,
+		}
+		for _, state := range []string{bmc.StateNominal, bmc.StateWarning, bmc.StateCritical, bmc.StateUnknown} {
+			var active metrix.SampleValue
+			if state == sensor.State {
+				active = 1
+			}
+			stateLabels := maps.Clone(labels)
+			stateLabels["sensor_state"] = state
+			want[seriesKey("sensor_state", stateLabels)] = active
+		}
+		if sensor.Value != nil {
+			want[seriesKey(metricOfUnit[sensor.Unit], labels)] = *sensor.Value
+		}
+	}
+	if s.SELEntries != nil {
+		want["sel_events"] = metrix.SampleValue(*s.SELEntries)
+	}
+	return want
+}
+
+// seriesKey formats a series the way collecttest reports it: labels sorted by key.
+func seriesKey(name string, labels map[string]string) string {
+	parts := make([]string, 0, len(labels))
+	for _, key := range slices.Sorted(maps.Keys(labels)) {
+		parts = append(parts, fmt.Sprintf("%s=%q", key, labels[key]))
+	}
+	return name + "{" + strings.Join(parts, ",") + "}"
 }

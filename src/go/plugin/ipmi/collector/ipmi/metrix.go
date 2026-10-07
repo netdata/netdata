@@ -6,39 +6,76 @@ package ipmi
 
 import (
 	"github.com/netdata/netdata/go/plugins/pkg/metrix"
-	"github.com/netdata/netdata/go/plugins/plugin/ipmi/collector/ipmi/internal/ipmiapi"
+	"github.com/netdata/netdata/go/plugins/plugin/ipmi/collector/ipmi/internal/bmc"
 )
 
-var sensorStates = []string{"nominal", "warning", "critical", "unknown"}
+var sensorStates = []string{bmc.StateNominal, bmc.StateWarning, bmc.StateCritical, bmc.StateUnknown}
+
+// readingMetrics names the reading metric of each unit with numeric samples.
+var readingMetrics = map[string]string{
+	bmc.UnitCelsius:    "temperature_c",
+	bmc.UnitFahrenheit: "temperature_f",
+	bmc.UnitVolts:      "voltage",
+	bmc.UnitAmps:       "ampere",
+	bmc.UnitRPM:        "fan_speed",
+	bmc.UnitWatts:      "power",
+	bmc.UnitPercent:    "reading_percent",
+}
 
 type collectorMetrics struct {
-	meter  metrix.SnapshotMeter
-	values map[string]metrix.SnapshotGauge
-	state  metrix.StateSetInstrument
-	events metrix.SnapshotGauge
+	meter      metrix.SnapshotMeter
+	readings   map[string]metrix.SnapshotGauge // by unit
+	state      metrix.StateSetInstrument
+	selEntries metrix.SnapshotGauge
 }
 
 func newCollectorMetrics(store metrix.CollectorStore) *collectorMetrics {
-	m := store.Write().SnapshotMeter("")
-	metrics := &collectorMetrics{meter: m, values: make(map[string]metrix.SnapshotGauge),
-		state:  m.StateSet("sensor_state", metrix.WithStateSetMode(metrix.ModeEnum), metrix.WithStateSetStates(sensorStates...)),
-		events: m.Gauge("sel_events")}
-	for _, name := range []string{"temperature_c", "temperature_f", "voltage", "ampere", "fan_speed", "power", "reading_percent"} {
-		metrics.values[name] = m.Gauge(name, metrix.WithFloat(true))
+	meter := store.Write().SnapshotMeter("")
+	m := &collectorMetrics{
+		meter:    meter,
+		readings: make(map[string]metrix.SnapshotGauge, len(readingMetrics)),
+		state: meter.StateSet(
+			"sensor_state",
+			metrix.WithStateSetMode(metrix.ModeEnum),
+			metrix.WithStateSetStates(sensorStates...),
+		),
+		selEntries: meter.Gauge("sel_events"),
 	}
-	return metrics
+	for unit, name := range readingMetrics {
+		m.readings[unit] = meter.Gauge(name, metrix.WithFloat(true))
+	}
+	return m
 }
-func (m *collectorMetrics) observe(s *ipmiapi.Snapshot) {
+
+// write observes a snapshot. Unavailable readings and SEL counts leave gaps.
+func (m *collectorMetrics) write(s *bmc.Snapshot) {
 	for _, sensor := range s.Sensors {
-		labels := m.meter.LabelSet(metrix.Label{Key: "sensor_id", Value: sensor.Key},
-			metrix.Label{Key: "sensor", Value: sensor.Name}, metrix.Label{Key: "type", Value: sensor.Type},
-			metrix.Label{Key: "component", Value: sensor.Component})
-		m.state.ObserveStateSet(metrix.StateSetPoint{States: map[string]bool{sensor.State: true}}, labels)
-		if gauge, ok := m.values[sensor.Metric]; ok && sensor.Value != nil {
+		labels := m.meter.LabelSet(
+			metrix.Label{
+				Key:   "sensor_id",
+				Value: sensor.Key,
+			},
+			metrix.Label{
+				Key:   "sensor",
+				Value: sensor.Name,
+			},
+			metrix.Label{
+				Key:   "type",
+				Value: sensor.Type,
+			},
+			metrix.Label{
+				Key:   "component",
+				Value: sensor.Component,
+			},
+		)
+		m.state.ObserveStateSet(metrix.StateSetPoint{
+			States: map[string]bool{sensor.State: true},
+		}, labels)
+		if gauge, ok := m.readings[sensor.Unit]; ok && sensor.Value != nil {
 			gauge.Observe(*sensor.Value, labels)
 		}
 	}
-	if s.SEL != nil {
-		m.events.Observe(*s.SEL)
+	if s.SELEntries != nil {
+		m.selEntries.Observe(float64(*s.SELEntries))
 	}
 }

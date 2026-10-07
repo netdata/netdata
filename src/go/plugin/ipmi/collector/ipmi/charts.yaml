@@ -3,6 +3,7 @@ context_namespace: ipmi_go
 groups:
   - family: Sensors
     chart_defaults:
+      label_promotion: [sensor, type, component]
       instances:
         by_labels: [sensor_id]
     groups:
@@ -12,8 +13,7 @@ groups:
           - id: sensor_temperature_c
             context: sensor_temperature_c
             title: IPMI Sensor Temperature
-            units: "Celsius"
-            label_promotion: [sensor, type, component]
+            units: Celsius
             dimensions:
               - selector: temperature_c
                 name: temperature
@@ -23,8 +23,7 @@ groups:
           - id: sensor_temperature_f
             context: sensor_temperature_f
             title: IPMI Sensor Temperature
-            units: "Fahrenheit"
-            label_promotion: [sensor, type, component]
+            units: Fahrenheit
             dimensions:
               - selector: temperature_f
                 name: temperature
@@ -34,8 +33,7 @@ groups:
           - id: sensor_voltage
             context: sensor_voltage
             title: IPMI Sensor Voltage
-            units: "Volts"
-            label_promotion: [sensor, type, component]
+            units: Volts
             dimensions:
               - selector: voltage
                 name: voltage
@@ -45,8 +43,7 @@ groups:
           - id: sensor_ampere
             context: sensor_ampere
             title: IPMI Sensor Current
-            units: "Amps"
-            label_promotion: [sensor, type, component]
+            units: Amps
             dimensions:
               - selector: ampere
                 name: ampere
@@ -56,8 +53,7 @@ groups:
           - id: sensor_fan_speed
             context: sensor_fan_speed
             title: IPMI Sensor Fan Speed
-            units: "RPM"
-            label_promotion: [sensor, type, component]
+            units: RPM
             dimensions:
               - selector: fan_speed
                 name: rotations
@@ -67,8 +63,7 @@ groups:
           - id: sensor_power
             context: sensor_power
             title: IPMI Sensor Power
-            units: "Watts"
-            label_promotion: [sensor, type, component]
+            units: Watts
             dimensions:
               - selector: power
                 name: power
@@ -79,7 +74,6 @@ groups:
             context: sensor_reading_percent
             title: IPMI Sensor Percentage Reading
             units: "%"
-            label_promotion: [sensor, type, component]
             dimensions:
               - selector: reading_percent
                 name: percentage
@@ -91,7 +85,6 @@ groups:
             title: IPMI Sensor State
             units: state
             type: stacked
-            label_promotion: [sensor, type, component]
             dimensions:
               - selector: sensor_state
   - family: System Event Log

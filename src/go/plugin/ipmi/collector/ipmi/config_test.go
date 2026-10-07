@@ -9,30 +9,50 @@ import (
 	"testing"
 
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/collecttest"
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
-func TestConfig(t *testing.T) {
-	for name, change := range map[string]func(*Config){
-		"interval":        func(c *Config) { c.UpdateEvery = 1 },
-		"timeout":         func(c *Config) { c.Timeout = 0 },
-		"driver":          func(c *Config) { c.Driver = "invalid" },
-		"negative device": func(c *Config) { c.Device = -1 },
-		"remote lan":      func(c *Config) { c.Driver = "lan" },
-		"remote lanplus":  func(c *Config) { c.Driver = "lanplus" },
-	} {
-		t.Run(name, func(t *testing.T) { c := defaultConfig(); change(&c); require.Error(t, c.validate()) })
+func TestConfig_Validate(t *testing.T) {
+	tests := map[string]struct {
+		change  func(*Config)
+		wantErr bool
+	}{
+		"defaults":              {},
+		"another local device":  {change: func(c *Config) { c.Device = 3 }},
+		"update_every below 5s": {change: func(c *Config) { c.UpdateEvery = 1 }, wantErr: true},
+		"zero timeout":          {change: func(c *Config) { c.Timeout = 0 }, wantErr: true},
+		"unknown driver":        {change: func(c *Config) { c.Driver = "invalid" }, wantErr: true},
+		"remote lan driver":     {change: func(c *Config) { c.Driver = "lan" }, wantErr: true},
+		"remote lanplus driver": {change: func(c *Config) { c.Driver = "lanplus" }, wantErr: true},
+		"negative device":       {change: func(c *Config) { c.Device = -1 }, wantErr: true},
 	}
-	c := defaultConfig()
-	require.NoError(t, c.validate())
-	// Effective configuration is available without connection or Init.
-	collector := New()
-	require.Equal(t, defaultConfig(), collector.Configuration())
+
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) {
+			cfg := defaultConfig()
+			if tc.change != nil {
+				tc.change(&cfg)
+			}
+			if tc.wantErr {
+				assert.Error(t, cfg.validate())
+			} else {
+				assert.NoError(t, cfg.validate())
+			}
+		})
+	}
 }
-func TestConfigurationSerialize(t *testing.T) {
-	j, err := os.ReadFile("testdata/config.json")
+
+func TestCollector_Configuration(t *testing.T) {
+	// The effective configuration is available without Init or a device.
+	assert.Equal(t, defaultConfig(), New().Configuration())
+}
+
+func TestCollector_ConfigurationSerialize(t *testing.T) {
+	cfgJSON, err := os.ReadFile("testdata/config.json")
 	require.NoError(t, err)
-	y, err := os.ReadFile("testdata/config.yaml")
+	cfgYAML, err := os.ReadFile("testdata/config.yaml")
 	require.NoError(t, err)
-	collecttest.TestConfigurationSerialize(t, &Collector{}, j, y)
+
+	collecttest.TestConfigurationSerialize(t, &Collector{}, cfgJSON, cfgYAML)
 }

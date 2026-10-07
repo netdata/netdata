@@ -10,14 +10,34 @@
 // WARRANTY, including MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
 // See the repository LICENSE for the full license text.
 
-package ipmiapi
+package bmc
 
-// Each mask indexes asserted offsets, not assertion/deassertion event codes.
-// A missing dispatch or any unrecognized asserted offset means unknown.
-type stateRule struct{ known, warning, critical uint16 }
-type stateKey struct{ event, sensor uint8 }
+const (
+	eventTypeThreshold = 0x01
+	// thresholdCriticalMask selects the lower/upper critical and non-recoverable
+	// assertions. FreeIPMI defaults non-critical assertions to nominal.
+	thresholdCriticalMask = 0x36
+	// extendedStateMask selects offsets 8-14, which only the optional extended
+	// state byte carries. Offset 15 is reserved and ignored.
+	extendedStateMask = 0x7f00
+)
 
-var stateRules = map[stateKey]stateRule{
+// stateRule holds masks over the asserted state offsets of one event/reading
+// type and sensor type pair. An asserted offset outside known is unrecognized.
+type stateRule struct {
+	known    uint16
+	warning  uint16
+	critical uint16
+}
+
+type stateRuleKey struct {
+	eventType  uint8
+	sensorType uint8
+}
+
+// stateRules covers the default FreeIPMI interpretation of discrete sensors.
+// A pair without a rule, or any unrecognized asserted offset, is unknown.
+var stateRules = map[stateRuleKey]stateRule{
 	{0x02, 0x12}: {0x0007, 0x0000, 0x0000}, // system_event_transition_state
 	{0x03, 0x01}: {0x0003, 0x0002, 0x0000}, // temperature_state
 	{0x03, 0x02}: {0x0003, 0x0002, 0x0000}, // voltage_state
@@ -96,33 +116,34 @@ var stateRules = map[stateKey]stateRule{
 	{0x6f, 0x2c}: {0x00ff, 0x006c, 0x0083}, // fru_state
 }
 
-func sensorState(event, kind uint8, reading readingResponse) string {
-	if reading.length < 3 || reading.ReadingUnavailable || reading.SensorScanningDisabled {
-		return "unknown"
+// sensorState interprets a reading with the FreeIPMI default policy.
+func sensorState(eventType, sensorType uint8, reading readingResponse) string {
+	if reading.size < readingSizeWithState || reading.ReadingUnavailable || reading.SensorScanningDisabled {
+		return StateUnknown
 	}
-	if event == 0x01 {
-		// FreeIPMI defaults non-critical flags to nominal, not warning.
-		if reading.OptionalData1&0x36 != 0 {
-			return "critical"
+	if eventType == eventTypeThreshold {
+		if reading.OptionalData1&thresholdCriticalMask != 0 {
+			return StateCritical
 		}
-		return "nominal"
+		return StateNominal
 	}
-	rule, ok := stateRules[stateKey{event, kind}]
+
+	rule, ok := stateRules[stateRuleKey{eventType, sensorType}]
 	if !ok {
-		return "unknown"
+		return StateUnknown
 	}
-	if reading.length < 4 && rule.known&0x7f00 != 0 {
-		return "unknown"
+	if reading.size < readingSizeWithExtendedState && rule.known&extendedStateMask != 0 {
+		return StateUnknown
 	}
-	bits := uint16(reading.OptionalData1) | uint16(reading.OptionalData2&0x7f)<<8
-	if bits & ^rule.known != 0 {
-		return "unknown"
+	asserted := uint16(reading.OptionalData1) | (uint16(reading.OptionalData2)<<8)&extendedStateMask
+	switch {
+	case asserted&^rule.known != 0:
+		return StateUnknown
+	case asserted&rule.critical != 0:
+		return StateCritical
+	case asserted&rule.warning != 0:
+		return StateWarning
+	default:
+		return StateNominal
 	}
-	if bits&rule.critical != 0 {
-		return "critical"
-	}
-	if bits&rule.warning != 0 {
-		return "warning"
-	}
-	return "nominal"
 }
