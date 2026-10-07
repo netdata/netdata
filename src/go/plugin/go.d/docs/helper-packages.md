@@ -356,8 +356,8 @@ A `streamexec.Source` owns:
 - replacement of a process that exits or produces no record for `StallTimeout`, after exponential backoff between
   `RestartDelayMin` and `RestartDelayMax`; the backoff resets after a process produced records for a stall period;
 - termination that waits at most `StallTimeout` for the exit. The source cancels the process and closes its output,
-  so a command it cannot signal (an ndsudo command of an unprivileged plugin) ends at its next write. One that has
-  not exited by then is left running with a warning;
+  so a command it cannot signal (an ndsudo command of an unprivileged plugin) dies of SIGPIPE at its next write,
+  unless it handles SIGPIPE or EPIPE itself. One that has not exited by then is left running with a warning;
 - no overlap: every start, including the first one of a later `Run` or `Background`, waits for the source's previous
   process to exit;
 - a warning for each failed process or restart attempt, limited to one per minute per command name.
