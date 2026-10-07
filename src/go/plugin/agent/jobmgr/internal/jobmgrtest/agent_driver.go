@@ -188,6 +188,24 @@ func (sb *synchronizedBuffer) String() string {
 	return sb.data.String()
 }
 
+// runningPublication is the CONFIG frame published when the fixture job becomes running.
+const runningPublication = "CONFIG jobmgrtest:collector:jobmgrtest status running"
+
+// runningRecorder records a "running" fixture event for every written
+// runningPublication, ordering it against collector lifecycle events.
+type runningRecorder struct {
+	output *synchronizedBuffer
+	state  *agentFixtureState
+}
+
+func (rr runningRecorder) Write(payload []byte) (int, error) {
+	written, err := rr.output.Write(payload)
+	for range bytes.Count(payload[:written], []byte(runningPublication)) {
+		rr.state.record("running")
+	}
+	return written, err
+}
+
 type observedFunctionResult struct {
 	status       int
 	contentType  string
@@ -397,58 +415,62 @@ func (f *agentFixture) close() {
 	_ = f.wait(ctx)
 }
 
-func runAgentCollectorLifecycle(ctx context.Context, v2 bool, restart bool) error {
-	fixture, err := startAgentFixture(ctx, v2)
+func runAgentCollectorLifecycle(ctx context.Context, v2 bool) error {
+	state := &agentFixtureState{}
+	fixture, err := startAgentFixtureConfiguredWithRegistry(
+		ctx,
+		state,
+		fixtureRegistry(state, v2),
+		func(output *synchronizedBuffer) io.Writer {
+			return runningRecorder{output: output, state: state}
+		},
+		policy.Agent(true),
+	)
 	if err != nil {
 		return err
 	}
 	defer fixture.close()
 	if err := waitUntil(ctx, func() bool {
-		return fixture.state.count("check") >= 1
+		return state.count("running") >= 1
 	}); err != nil {
 		_ = fixture.input.Close()
 		return fmt.Errorf("collector did not become active: %w", err)
 	}
-	if restart {
-		if err := fixture.agent.Restart(ctx); err != nil {
-			_ = fixture.input.Close()
-			return err
-		}
-		if err := waitUntil(ctx, func() bool {
-			return fixture.state.count("check") >= 2
-		}); err != nil {
-			_ = fixture.input.Close()
-			return fmt.Errorf("replacement collector did not start: %w", err)
-		}
+	if err := fixture.agent.Restart(ctx); err != nil {
+		_ = fixture.input.Close()
+		return err
+	}
+	if err := waitUntil(ctx, func() bool {
+		return state.count("running") >= 2
+	}); err != nil {
+		_ = fixture.input.Close()
+		return fmt.Errorf("replacement collector did not start: %w", err)
 	}
 	if err := fixture.terminate(ctx); err != nil {
 		return err
 	}
-	generations := 1
-	if restart {
-		generations = 2
-	}
+	const generations = 2
 	for _, event := range []string{"init", "check", "cleanup"} {
-		if got := fixture.state.count(event); got < generations {
+		if got := state.count(event); got < generations {
 			return fmt.Errorf(
 				"collector %s count=%d, want at least %d; events=%v",
 				event,
 				got,
 				generations,
-				fixture.state.snapshot(),
+				state.snapshot(),
 			)
 		}
 	}
-	if got := fixture.state.count("cleanup"); got != generations {
+	if got := state.count("cleanup"); got != generations {
 		return fmt.Errorf("collector cleanup count=%d, want %d", got, generations)
 	}
-	if restart {
-		events := fixture.state.snapshot()
-		firstCleanup := indexOf(events, "cleanup", 0)
-		secondInit := indexOf(events, "init", 1)
-		if firstCleanup < 0 || secondInit < 0 || firstCleanup >= secondInit {
-			return fmt.Errorf("replacement initialized before old cleanup: %v", events)
-		}
+	// The replacement's Init and Check may overlap the old generation's
+	// process-owned Cleanup; only its runtime installation waits for it.
+	events := state.snapshot()
+	firstCleanup := indexOf(events, "cleanup", 0)
+	secondRunning := indexOf(events, "running", 1)
+	if firstCleanup < 0 || secondRunning < 0 || firstCleanup >= secondRunning {
+		return fmt.Errorf("replacement became running before old cleanup: %v", events)
 	}
 	return nil
 }

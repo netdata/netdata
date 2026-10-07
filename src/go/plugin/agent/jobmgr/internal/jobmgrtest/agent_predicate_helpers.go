@@ -123,9 +123,15 @@ func runAgentStartReplacementOrderingVariant(ctx context.Context, v2 bool) error
 			fixture.output.String(),
 		)
 	}
-	events := state.snapshot()
-	if indexOf(events, "cleanup", 0) < 0 || state.count("init") != 1 || state.count("check") != 1 {
-		return fmt.Errorf("disable did not join exactly one held Start and Cleanup: %v", events)
+	// DISABLE replies after logical retirement; the process-owned collector
+	// Cleanup may still be running.
+	if err := waitUntil(ctx, func() bool {
+		return state.count("cleanup") == 1
+	}); err != nil {
+		return fmt.Errorf("disable did not clean up the held Start: %w; events=%v", err, state.snapshot())
+	}
+	if state.count("init") != 1 || state.count("check") != 1 {
+		return fmt.Errorf("disable did not join exactly one held Start: %v", state.snapshot())
 	}
 	return fixture.terminate(ctx)
 }
@@ -342,7 +348,6 @@ func runAgentFunctionReplacementOrdering(ctx context.Context) error {
 	}()
 	const functionPublication = `FUNCTION GLOBAL "jobmgrtest:echo"`
 	const initialPublication = "CONFIG jobmgrtest:collector:jobmgrtest create accepted single "
-	const runningPublication = "CONFIG jobmgrtest:collector:jobmgrtest status running"
 	if err := waitUntil(ctx, func() bool {
 		return fixture.output.contains(functionPublication) && fixture.output.contains(initialPublication) &&
 			fixture.output.contains(runningPublication)
