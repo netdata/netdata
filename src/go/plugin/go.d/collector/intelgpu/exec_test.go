@@ -100,7 +100,8 @@ func TestTopArgs(t *testing.T) {
 }
 
 func TestTopCollects(t *testing.T) {
-	collr, fake := newTopCollector(t, 1, "")
+	// The first sample may take the stall timeout (7.5s at this interval), which leaves room for a slow fake start.
+	collr, fake := newTopCollector(t, 3, "")
 	done := goCheck(collr)
 	conn := fake.Accept(t)
 	conn.Raw(t, "[\n\n") // intel_gpu_top opens its JSON array before the first sample
@@ -136,24 +137,26 @@ func TestTopCheckFailures(t *testing.T) {
 		},
 	} {
 		t.Run(name, func(t *testing.T) {
-			collr, fake := newTopCollector(t, 1, "")
+			// The stall timeout at this interval (7.5s) leaves room for a slow fake start before the failure.
+			collr, fake := newTopCollector(t, 3, "")
 			if tc.prepare != nil {
 				tc.prepare(t)
 			}
-			began := time.Now()
+			timing := sampleTiming(calcInterval(3))
 			done := goCheck(collr)
 			tc.act(t, fake)
+			began := time.Now()
 
 			require.ErrorContains(t, waitCheck(t, done), tc.wantErr)
-			assert.Less(t, time.Since(began), 2*time.Second, "a failure waits for nothing else")
-			fake.RequireNoStart(t, 300*time.Millisecond)
+			assert.Less(t, time.Since(began), timing.StallTimeout, "a failure waited for the stall timeout")
+			fake.RequireNoStart(t, timing.RestartDelayMin+500*time.Millisecond) // no restart after a failed Check
 		})
 	}
 }
 
 func TestTopStaleSampleIsAGapAndRestarts(t *testing.T) {
-	// A sample stays current for two sampling intervals (1.8s); intel_gpu_top is replaced after three without one.
-	collr, fake := newTopCollector(t, 1, "")
+	// A sample stays current for two sampling intervals (3s); intel_gpu_top is replaced after three (4.5s) without one.
+	collr, fake := newTopCollector(t, 2, "")
 	done := goCheck(collr)
 	conn := fake.Accept(t)
 	sendSample(t, conn, dataIntelTopGpuJSON)
@@ -163,11 +166,11 @@ func TestTopStaleSampleIsAGapAndRestarts(t *testing.T) {
 	// intel_gpu_top keeps running and writing, but completes no sample: the sample ages out before the stall timeout
 	// withdraws it, and intel_gpu_top is replaced.
 	conn.Noise(t, "noise")
+	stallTimeout := sampleTiming(calcInterval(2)).StallTimeout
 	began := time.Now()
-	require.Eventually(t, func() bool { return collr.Collect(context.Background()) == nil }, 3*time.Second,
+	require.Eventually(t, func() bool { return collr.Collect(context.Background()) == nil }, stallTimeout,
 		20*time.Millisecond)
-	stallTimeout := sampleTiming(calcInterval(1)).StallTimeout
-	assert.Less(t, time.Since(began), stallTimeout-300*time.Millisecond, "the sample did not age out before the stall")
+	assert.Less(t, time.Since(began), stallTimeout-500*time.Millisecond, "the sample did not age out before the stall")
 	replacement := fake.Accept(t)
 	conn.RequireExited(t)
 
@@ -178,14 +181,14 @@ func TestTopStaleSampleIsAGapAndRestarts(t *testing.T) {
 }
 
 func TestTopCleanupIsBoundedForSilentTop(t *testing.T) {
-	collr, fake := newTopCollector(t, 1, "")
+	collr, fake := newTopCollector(t, 2, "")
 	done := goCheck(collr)
 	conn := fake.Accept(t)
 	sendSample(t, conn, dataIntelTopGpuJSON)
 	require.NoError(t, waitCheck(t, done))
 
 	// An intel_gpu_top that stops writing cannot be ended: Cleanup waits for it at most the stall timeout.
-	stallTimeout := sampleTiming(calcInterval(1)).StallTimeout
+	stallTimeout := sampleTiming(calcInterval(2)).StallTimeout
 	began := time.Now()
 	collr.Cleanup(context.Background())
 	elapsed := time.Since(began)
@@ -202,8 +205,8 @@ func TestCalcInterval(t *testing.T) {
 		interval := calcInterval(updateEvery)
 		timing := sampleTiming(interval)
 
-		// The first sample completes one interval after intel_gpu_top starts.
-		require.Less(t, interval, firstSampleTimeout, "update_every %d", updateEvery)
+		// Every collection finds a new sample.
+		require.Less(t, interval, time.Duration(updateEvery)*time.Second, "update_every %d", updateEvery)
 		// A sample arrives every interval; one missed sample is neither a gap nor a stall.
 		require.Greater(t, timing.MaxSampleAge, interval, "update_every %d", updateEvery)
 		require.Greater(t, timing.StallTimeout, timing.MaxSampleAge, "update_every %d", updateEvery)
@@ -229,8 +232,7 @@ func TestSampleDecoder(t *testing.T) {
 		"{",
 		"\t\"period\": {",
 		"\t}",
-		"}",
-		"]", // after the last sample
+		"},", // the line of a sample's closing brace ends when the next sample starts
 	} {
 		if sample, ok := dec.Decode([]byte(line)); ok {
 			samples = append(samples, sample)

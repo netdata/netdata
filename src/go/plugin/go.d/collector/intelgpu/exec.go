@@ -22,10 +22,6 @@ type intelGpuTop interface {
 	stop()
 }
 
-// firstSampleTimeout bounds the wait for the first sample. intel_gpu_top prints a sample at once but completes it only
-// when it prints the next one, one sampling interval later, so the interval stays below this timeout.
-const firstSampleTimeout = 3 * time.Second
-
 // intelGpuTopExec keeps intel_gpu_top running through ndsudo and serves its latest fresh sample.
 type intelGpuTopExec struct {
 	source     *streamexec.Source[[]byte]
@@ -57,13 +53,12 @@ func newIntelGpuTopExec(log *logger.Logger, updateEvery int, device string) (*in
 	}, nil
 }
 
-// start runs intel_gpu_top and waits up to firstSampleTimeout for its first sample.
+// start runs intel_gpu_top and waits for its first sample. It fails when intel_gpu_top exits first, completes no sample
+// within the stall timeout, or ctx ends.
 func (e *intelGpuTopExec) start(ctx context.Context) error {
 	if e.stopSource != nil {
 		return nil
 	}
-	ctx, cancel := context.WithTimeout(ctx, firstSampleTimeout)
-	defer cancel()
 	stop, err := e.source.Background(ctx)
 	if err != nil {
 		return err
@@ -86,17 +81,20 @@ func (e *intelGpuTopExec) stop() {
 	}
 }
 
-// calcInterval returns the intel_gpu_top sampling interval for the data collection interval. It stays below
-// firstSampleTimeout, because a sample is complete only when the next one starts.
+// calcInterval returns the intel_gpu_top sampling interval: half a second below the data collection interval, so every
+// collection finds a new sample, or 0.9 seconds when collecting every second. It is capped at 2.5 seconds, so the stall
+// timeout, which also bounds Cleanup's wait for intel_gpu_top, stays within the job manager's shutdown budget.
 func calcInterval(updateEvery int) time.Duration {
-	if m := min(updateEvery, int(firstSampleTimeout.Seconds())); m > 1 {
+	if m := min(updateEvery, 3); m > 1 {
 		return time.Duration(m)*time.Second - 500*time.Millisecond
 	}
 	return 900 * time.Millisecond
 }
 
 // sampleTiming keeps a sample current for two sampling intervals and replaces intel_gpu_top after three without one.
-// The stall timeout also bounds Cleanup's wait for intel_gpu_top, which go.d.plugin cannot signal, to exit.
+// intel_gpu_top completes a sample only when it starts the next one, so the first sample takes one interval. The
+// stall timeout also bounds Check's wait for the first sample and Cleanup's wait for intel_gpu_top, which go.d.plugin
+// cannot signal, to exit.
 func sampleTiming(interval time.Duration) streamexec.Timing {
 	return streamexec.Timing{
 		MaxSampleAge:    2 * interval,
