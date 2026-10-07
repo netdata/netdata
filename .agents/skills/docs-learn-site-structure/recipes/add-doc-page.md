@@ -27,5 +27,6 @@ checks that catch the silent failures.
 8. After deploy, request the predicted URL and confirm the page, its sidebar position, and its description.
 
 Mistakes this catches: a missing node (no error, no page); an `edit_url` that does not match the schema pattern
-(exit 2); an `edit_url` that matches the pattern but not the file (no error, no page); content from another source
-repository whose node was forgotten here (`../authoring-boundary.md`).
+(exit 2); an `edit_url` that matches the pattern but not the file (the map validator fails for this repository; for
+another repository, no error and no page); content from another source repository whose node was forgotten here
+(`../authoring-boundary.md`).

@@ -6,7 +6,7 @@ no routing effect: every published page is one `map.yaml` node, and the URL is c
 Owners: `docs/.map/README.md#1-edit-mapyaml`, `docs/.map/README.md#meta-fields`,
 `docs/.map/README.md#path-reconstruction`, and `docs/.map/README.md#integration-placeholder-node` (node shapes and
 field meanings); `docs/.map/map.schema.json` (required fields, the `edit_url` pattern, the `integration_kind` members);
-`docs/.map/validate_map_schema.py` (the two custom rules). Learn-side behaviour below is verified against
+`docs/.map/validate_map_schema.py` (the three custom rules). Learn-side behaviour below is verified against
 `netdata/learn @ c3a16edd5ee4dc819976ef162c9afaff4b9b968c`, `ingest/ingest.py`, at the named symbols.
 
 ## What is checked, and by what
@@ -16,13 +16,17 @@ field meanings); `docs/.map/map.schema.json` (required fields, the `edit_url` pa
   violation; `required` on a node's `meta` is only `label`.
 - The schema's `edit_url` pattern accepts any GitHub owner and repository; the `netdata` owner restriction comes from
   the join key below, not from validation.
-- `docs/.map/validate_map_schema.py` (hand-run, any working directory, with an interpreter that has `ruamel.yaml`
-  and `jsonschema`, the integrations `.venv` where present; exit 1 on failure; nothing in `.github/workflows/` or
-  `integrations/` invokes it) adds two rules the schema cannot express: no duplicate
-  `edit_url` (`check_duplicate_edit_urls`) and a node without `items` must carry an `edit_url`
-  (`check_integration_placeholder_rule`).
-- Nothing checks that an `edit_url` points at an existing file. A row whose URL matches no source file is not an
-  error; the page is silently absent (see the join key below).
+- `docs/.map/validate_map_schema.py` (any working directory, an interpreter with `ruamel.yaml` and `jsonschema`, the
+  integrations `.venv` where present; exit 1 on failure) adds three rules the schema cannot express: no duplicate
+  `edit_url` (`check_duplicate_edit_urls`); a node without `items` must carry an `edit_url`
+  (`check_integration_placeholder_rule`); a `netdata/netdata` `edit_url`, on any branch, must name a file inside this
+  checkout, symlinks followed (`check_edit_url_files_exist`; the error gives the row's label path and the file path).
+- `.github/workflows/check-markdown.yml` runs it after the generators, so a row that names a generated page by path
+  (`src/collectors/COLLECTORS.md`, the `src/crates/otel-plugin/README.md` symlink) is checked against the tree ingest
+  publishes; run by hand, such a row fails until the generators have created its page. Integration placeholders carry
+  no path and are not checked.
+- A row of another repository is not checked for a file; if its URL matches no source file, the page is silently
+  absent (see the join key below).
 
 ## Rows ingest reads from the map
 
