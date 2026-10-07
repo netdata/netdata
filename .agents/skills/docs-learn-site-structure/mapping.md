@@ -119,8 +119,10 @@ file with its `.md` extension, for example `/docs/npm/network-flows/configuratio
 - Absolute `learn.netdata.cloud` links: not rewritten, so not rename-safe; after a move they reach the page only
   through a redirect. Ingest checks each one against its final output (`ingest/learn_links.py`, netdata/learn#3110 @
   `e47e89ec6`): on a published page the anchor must exist (Docusaurus heading slug, `{#id}`, `id`/`name` attribute),
-  except a `:~:` text fragment; a redirect source, a static file, `/` and `/search` pass with the anchor unchecked; any
-  other route fails. A miss is a hard failure under `--fail-links-netdata`.
+  except a `:~:` text fragment; under `--ignore-on-prem-repo`, the `netdata-cloud-onprem` pages already in Learn's
+  `docs/` count as published, with their anchors recorded before cleanup (`snapshot_pages`); a redirect source, a
+  static file, `/` and `/search` pass with the anchor unchecked; any other route fails. A miss is a hard failure under
+  `--fail-links-netdata`.
 - Repository-relative links: anchors are validated against `extract_headers_from_file`, which slugifies heading text
   only: `<a id="...">` and `## Heading {#custom-id}` are not honoured, so write the heading text to slugify to the
   anchor you link. Cross-file `#anchor` links are checked; same-page ones are not. A miss is a hard failure under
