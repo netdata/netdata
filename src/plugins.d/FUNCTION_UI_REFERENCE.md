@@ -420,8 +420,16 @@ around the object disables the styling. See
       "sortable": false,
       "sticky": true
     },
+    "rowOptions": {
+      "index": 1,              // Data index of the {"severity": ...} object
+      "name": "rowOptions",
+      "type": "none",
+      "visualization": "rowOptions",
+      "visible": false,
+      "dummy": true
+    },
     "level": {
-      "index": 1,
+      "index": 2,
       "id": "priority",        // Links to facet
       "name": "Level",
       "type": "string",
@@ -429,8 +437,15 @@ around the object disables the styling. See
       "filter": "facet",       // Not multiselect!
       "options": ["facet", "visible", "sticky"]
     },
-    "message": {
+    "source": {
       "index": 3,
+      "id": "source",
+      "name": "Source",
+      "type": "string",
+      "filter": "facet"
+    },
+    "message": {
+      "index": 4,
       "id": "message",
       "name": "Message",
       "type": "string",
