@@ -16,7 +16,7 @@ jobs:
   upload:
     name: Upload Updater Script
     runs-on: ubuntu-latest
-    if: github.repository == 'netdata/netdata'
+    if: github.repository == 'netdata/netdata' && github.ref == 'refs/heads/master'
     steps:
       - name: Checkout
         id: checkout
