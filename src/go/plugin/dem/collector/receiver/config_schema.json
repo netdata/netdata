@@ -45,7 +45,7 @@
       },
       "geoip_db": {
         "title": "GeoIP database",
-        "description": "MaxMind city database file. Leave empty to use the Agent IP intelligence database; unavailable data produces unknown locations.",
+        "description": "Geographic MMDB file; an explicit path uses only that file. Leave empty to try the Agent cache and then stock IP intelligence database; unavailable geography does not stop collection.",
         "type": "string"
       },
       "max_body_bytes": {
@@ -107,6 +107,9 @@
           ]
         }
       ]
+    },
+    "geoip_db": {
+      "ui:help": "Supported database types are Netdata-Topology-GEO, GeoLite2-City, GeoLite2-Country, GeoIP2-City, GeoIP2-Country, DBIP-City-Lite and DBIP-Country-Lite. Provision a readable file separately; DEM does not download it.\n\nSources are checked at receiver startup and every 60 seconds. Publish updates by atomic file replacement, never by overwriting or truncating the active file. Check collector.geoip in rum-sites for source availability; each site still controls capture.geolocation."
     }
   }
 }

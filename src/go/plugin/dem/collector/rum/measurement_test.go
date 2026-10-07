@@ -26,7 +26,7 @@ func measurementCollector(t *testing.T) (*Collector, *registry.Registry) {
 	hub := registry.New()
 	t.Cleanup(hub.PublishReceiver(registry.Availability{
 		Serving: true,
-	}))
+	}).Close)
 	c := New(Dependencies{
 		Registry: hub,
 		History:  history.NewStore(db),
@@ -64,7 +64,19 @@ func measurementValues(reader metrix.Reader, names ...string) map[string]float64
 
 func TestMeasurementPublicationReplacesVitalWithoutCountingAnotherDocument(t *testing.T) {
 	c, _ := measurementCollector(t)
-	population := []string{"cls_observations", "cls_lost_reports", "cls_good", "cls_needs_improvement", "cls_poor", "cls_p50", "cls_p75", "cls_p95", "document_views", "window_document_views", "observed_sessions"}
+	population := []string{
+		"cls_observations",
+		"cls_lost_reports",
+		"cls_good",
+		"cls_needs_improvement",
+		"cls_poor",
+		"cls_p50",
+		"cls_p75",
+		"cls_p95",
+		"document_views",
+		"window_document_views",
+		"observed_sessions",
+	}
 	empty := collectMeasurements(t, c)
 	require.Equal(t, map[string]float64{
 		"cls_observations": 0, "cls_lost_reports": 0, "cls_good": 0, "cls_needs_improvement": 0, "cls_poor": 0,
@@ -88,12 +100,22 @@ func TestMeasurementPublicationReplacesVitalWithoutCountingAnotherDocument(t *te
 	}
 	require.Equal(t, want, measurementValues(first, population...))
 	c.aggregator.Ingest(b)
-	require.Equal(t, want, measurementValues(collectMeasurements(t, c), population...), "a replay cannot increase measurement population or activity")
+	require.Equal(
+		t,
+		want,
+		measurementValues(collectMeasurements(t, c), population...),
+		"a replay cannot increase measurement population or activity",
+	)
 	b.Vitals[0].Revision, b.Vitals[0].Value = 2, 0.4
 	c.aggregator.Ingest(b)
 	want["cls_good"], want["cls_poor"] = 0, 1
 	want["cls_p50"], want["cls_p75"], want["cls_p95"] = 0.4, 0.4, 0.4
-	require.Equal(t, want, measurementValues(collectMeasurements(t, c), population...), "a newer revision replaces the prior rating and value")
+	require.Equal(
+		t,
+		want,
+		measurementValues(collectMeasurements(t, c), population...),
+		"a newer revision replaces the prior rating and value",
+	)
 }
 
 func TestMeasurementPublicationWithdrawsPercentilesAfterCapacityLoss(t *testing.T) {
@@ -111,14 +133,22 @@ func TestMeasurementPublicationWithdrawsPercentilesAfterCapacityLoss(t *testing.
 	}
 	ingest(0)
 	before := collectMeasurements(t, c)
-	require.Equal(t, map[string]float64{"lcp_p75": 100, "lcp_observations": 1, "lcp_lost_reports": 0}, measurementValues(before, "lcp_p75", "lcp_observations", "lcp_lost_reports"))
+	require.Equal(
+		t,
+		map[string]float64{"lcp_p75": 100, "lcp_observations": 1, "lcp_lost_reports": 0},
+		measurementValues(before, "lcp_p75", "lcp_observations", "lcp_lost_reports"),
+	)
 	// The production canonical population holds 10,000 observations. Cross that
 	// budget through admitted measurements, without replacing internal state or limits.
 	for i := 1; i <= 10000; i++ {
 		ingest(i)
 	}
 	after := collectMeasurements(t, c)
-	require.Equal(t, map[string]float64{"lcp_observations": 10000, "lcp_good": 10000, "lcp_needs_improvement": 0, "lcp_poor": 0}, measurementValues(after, "lcp_observations", "lcp_good", "lcp_needs_improvement", "lcp_poor"))
+	require.Equal(
+		t,
+		map[string]float64{"lcp_observations": 10000, "lcp_good": 10000, "lcp_needs_improvement": 0, "lcp_poor": 0},
+		measurementValues(after, "lcp_observations", "lcp_good", "lcp_needs_improvement", "lcp_poor"),
+	)
 	loss, ok := after.Value("lcp_lost_reports", nil)
 	require.True(t, ok)
 	require.Positive(t, loss)
@@ -127,7 +157,11 @@ func TestMeasurementPublicationWithdrawsPercentilesAfterCapacityLoss(t *testing.
 	require.Positive(t, sessionLoss)
 	_, present = after.Value("observed_sessions", nil)
 	require.False(t, present, "an incomplete session population is unavailable")
-	require.Empty(t, measurementValues(after, "lcp_p50", "lcp_p75", "lcp_p95"), "a previously published percentile must become unavailable")
+	require.Empty(
+		t,
+		measurementValues(after, "lcp_p50", "lcp_p75", "lcp_p95"),
+		"a previously published percentile must become unavailable",
+	)
 	labels := metrix.Labels{
 		"page":   "/entry",
 		"bucket": "value",
@@ -162,12 +196,33 @@ func TestMeasurementPublicationStopsWhenMeasurementUnavailable(t *testing.T) {
 				Vitals:       []beacon.Vital{{Name: beacon.LCP, ID: "lcp", Revision: 1, Value: 1200}},
 			})
 			before := collectMeasurements(t, c)
-			require.Equal(t, map[string]float64{"lcp_p75": 1200, "lcp_observations": 1, "document_views": 1, "observed_sessions": 1}, measurementValues(before, "lcp_p75", "lcp_observations", "document_views", "observed_sessions"))
+			require.Equal(
+				t,
+				map[string]float64{"lcp_p75": 1200, "lcp_observations": 1, "document_views": 1, "observed_sessions": 1},
+				measurementValues(before, "lcp_p75", "lcp_observations", "document_views", "observed_sessions"),
+			)
 			disable(c, hub)
 			after := collectMeasurements(t, c)
-			require.Empty(t, measurementValues(after, "lcp_p75", "lcp_observations", "lcp_lost_reports", "document_views", "observed_sessions", "window_document_views", "window_application_views", "window_js_errors", "window_lost_reports", "sessions_lost_reports"))
+			require.Empty(
+				t,
+				measurementValues(
+					after,
+					"lcp_p75",
+					"lcp_observations",
+					"lcp_lost_reports",
+					"document_views",
+					"observed_sessions",
+					"window_document_views",
+					"window_application_views",
+					"window_js_errors",
+					"window_lost_reports",
+					"sessions_lost_reports",
+				),
+			)
 			diagnostics := map[string]float64{}
-			after.ForEachSeries(func(name string, _ metrix.LabelView, value metrix.SampleValue) { diagnostics[name] = value })
+			after.ForEachSeries(
+				func(name string, _ metrix.LabelView, value metrix.SampleValue) { diagnostics[name] = value },
+			)
 			require.Equal(t, map[string]float64{"history_written": 0, "history_dropped": 0}, diagnostics)
 			_, ok := after.StateSet("ingress_state", nil)
 			require.True(t, ok, "receiver diagnostics remain observable")
@@ -184,8 +239,11 @@ func TestMeasurementPublicationSeparatesApplicationViewAndDocumentFacets(t *test
 		View:         "checkout",
 		ViewID:       "view",
 		SessionID:    "session",
-		Events:       []beacon.Event{{Kind: beacon.EventDocument, ID: "document", Revision: 1}, {Kind: beacon.EventView, ID: "view", Revision: 1}},
-		Vitals:       []beacon.Vital{{Name: beacon.LCP, ID: "lcp", Revision: 1, Value: 1200}},
+		Events: []beacon.Event{
+			{Kind: beacon.EventDocument, ID: "document", Revision: 1},
+			{Kind: beacon.EventView, ID: "view", Revision: 1},
+		},
+		Vitals: []beacon.Vital{{Name: beacon.LCP, ID: "lcp", Revision: 1, Value: 1200}},
 	})
 	reader := collectMeasurements(t, c)
 	views := map[string]float64{}
@@ -194,7 +252,15 @@ func TestMeasurementPublicationSeparatesApplicationViewAndDocumentFacets(t *test
 			views[name] = value
 		}
 	})
-	require.Equal(t, map[string]float64{"breakdown_view_application_views": 1, "breakdown_view_js_errors": 0, "breakdown_view_lost_reports": 0}, views)
+	require.Equal(
+		t,
+		map[string]float64{
+			"breakdown_view_application_views": 1,
+			"breakdown_view_js_errors":         0,
+			"breakdown_view_lost_reports":      0,
+		},
+		views,
+	)
 	contexts := map[string]bool{}
 	for _, create := range measurementCharts(t, c) {
 		if strings.HasPrefix(create.Meta.Context, "rum.view_") {
@@ -269,7 +335,10 @@ func measurementCharts(t *testing.T, c *Collector) []chartengine.CreateChartActi
 func TestMeasurementPublicationDistinguishesMissingAndLiteralUnknownHost(t *testing.T) {
 	c, _ := measurementCollector(t)
 	c.aggregator.Ingest(&beacon.Beacon{
-		Site: "shop", ExperienceID: "document", PageHost: "unknown", PageGroup: "/",
+		Site:         "shop",
+		ExperienceID: "document",
+		PageHost:     "unknown",
+		PageGroup:    "/",
 		Resources: []beacon.Resource{
 			{ID: "missing", Host: "", HasDuration: true, DurationMS: 100},
 			{ID: "literal", Host: "unknown", HasDuration: true, DurationMS: 200, Initiator: "fetch"},
@@ -277,7 +346,10 @@ func TestMeasurementPublicationDistinguishesMissingAndLiteralUnknownHost(t *test
 	})
 	reader := collectMeasurements(t, c)
 	for bucket, want := range map[string]float64{"unknown": 100, "value": 200} {
-		got, ok := reader.Value("resource_host_p75", metrix.Labels{"host": "unknown", "bucket": bucket})
+		got, ok := reader.Value("resource_host_p75", metrix.Labels{
+			"host":   "unknown",
+			"bucket": bucket,
+		})
 		require.True(t, ok, bucket)
 		require.Equal(t, want, got)
 	}
