@@ -10,6 +10,7 @@ package pluginconfig
 import (
 	"fmt"
 	"os"
+	"path"
 	"path/filepath"
 	"slices"
 	"strings"
@@ -338,7 +339,8 @@ func handleDirOnWin(base, p string, execDir string) string {
 	if base == "" || !strings.HasPrefix(p, "/") {
 		return p
 	}
-	return filepath.Join(base, strings.TrimPrefix(p, "/"))
+	// Clean in POSIX space first: parent components cannot traverse above its root.
+	return filepath.Join(base, strings.TrimPrefix(path.Clean(p), "/"))
 }
 
 func registryUniqueIDVarLibDir() string {

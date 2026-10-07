@@ -77,6 +77,24 @@ func TestDataRoots(t *testing.T) {
 			wantStock:     filepath.Join(root, "usr", "share", "netdata"),
 		},
 		{
+			name:          "runtime POSIX parent components stop at mapped root",
+			base:          root,
+			cache:         "/../../../../cache",
+			stock:         "/usr/../../../../stock",
+			compiledCache: "/compiled/cache",
+			compiledStock: "/compiled/stock",
+			wantCache:     filepath.Join(root, "cache"),
+			wantStock:     filepath.Join(root, "stock"),
+		},
+		{
+			name:          "compiled POSIX parent components stop at mapped root",
+			base:          root,
+			compiledCache: "/../../../../cache",
+			compiledStock: "/usr/../../../../stock",
+			wantCache:     filepath.Join(root, "cache"),
+			wantStock:     filepath.Join(root, "stock"),
+		},
+		{
 			name:          "independent runtime stock override",
 			stock:         filepath.Join(root, "runtime", "stock"),
 			compiledCache: filepath.Join(root, "compiled", "cache"),
@@ -113,4 +131,19 @@ func TestDataRootsWindowsDebugPaths(t *testing.T) {
 	require.NoError(t, d.build(InitInput{}, e, executable.Name, executable.Directory))
 	assert.Equal(t, filepath.Join(`C:\msys64`, "var", "cache", "netdata"), d.cacheDir)
 	assert.Equal(t, filepath.Join(`C:\msys64`, "usr", "share", "netdata"), d.stockDataDir)
+}
+
+func TestHandleDirOnWinRootSemantics(t *testing.T) {
+	base := filepath.FromSlash("C:/msys64")
+	for _, tc := range []struct{ name, base, input, want string }{
+		{"absolute parent components", base, "/var/../../cache", filepath.Join(base, "cache")},
+		{"mapped root", base, "/../../", base},
+		{"ordinary normalization", base, "/var/cache/../data", filepath.Join(base, "var", "data")},
+		{"native drive", base, `D:\data\cache`, `D:\data\cache`},
+		{"native UNC", base, `\\server\share\cache`, `\\server\share\cache`},
+		{"relative path", base, "../cache", "../cache"},
+		{"no mapping", "", "/../../cache", "/../../cache"},
+	} {
+		t.Run(tc.name, func(t *testing.T) { assert.Equal(t, tc.want, handleDirOnWin(tc.base, tc.input, "")) })
+	}
 }
