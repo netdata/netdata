@@ -65,6 +65,11 @@ func (r *Reader) refreshInventory(ctx context.Context) error {
 }
 
 // discoverSensors walks the SDR chain and describes its full and compact sensor records.
+//
+// Like FreeIPMI, the walk reads at most the repository's record count: a chain
+// that has not ended by then is broken (repeating or never reaching the
+// end-of-chain ID) and fails discovery. A chain that ends early is accepted,
+// because some BMCs report a record count that does not match their records.
 func (r *Reader) discoverSensors(ctx context.Context, repo storage.GetSDRRepoInfoResponse) ([]descriptor, error) {
 	// An empty repository has no first record to read.
 	if repo.RecordCount == 0 {
@@ -72,12 +77,10 @@ func (r *Reader) discoverSensors(ctx context.Context, repo storage.GetSDRRepoInf
 	}
 
 	var sensors []descriptor
-	seen := make(map[uint16]bool)
-	for id := uint16(firstRecordID); id != endOfChainRecordID; {
-		if seen[id] {
-			return nil, fmt.Errorf("SDR chain repeats record %#06x", id)
+	for id, read := uint16(firstRecordID), 0; id != endOfChainRecordID; read++ {
+		if read == int(repo.RecordCount) {
+			return nil, fmt.Errorf("SDR chain continues past the repository record count %d", repo.RecordCount)
 		}
-		seen[id] = true
 
 		record, err := r.readRecord(ctx, id, repo.SDROperationSupport.SupportReserveSDRRepo)
 		if err != nil {
@@ -120,7 +123,9 @@ func (r *Reader) readRecord(ctx context.Context, id uint16, reservable bool) (*s
 }
 
 // readRecordInParts reads the header first, then the body it announces, under a
-// repository reservation when the BMC supports one.
+// repository reservation when the BMC supports one. Like FreeIPMI, it continues
+// from wherever a shorter-than-requested response stops; the header must
+// arrive whole.
 func (r *Reader) readRecordInParts(ctx context.Context, id uint16, reservable bool) (*storage.GetSDRResponse, error) {
 	var reservation uint16
 	if reservable {
@@ -136,6 +141,9 @@ func (r *Reader) readRecordInParts(ctx context.Context, id uint16, reservable bo
 	total := types.SDRRecordHeaderSize
 	for len(data) < total {
 		offset := len(data)
+		if offset > maxReadOffset {
+			return nil, fmt.Errorf("partial SDR %#06x continues past the last addressable offset", id)
+		}
 		count := min(partialReadSize, total-offset)
 		// End a chunk at the last addressable offset so the next one can start there.
 		if offset < maxReadOffset && offset+count > maxReadOffset {
@@ -152,8 +160,9 @@ func (r *Reader) readRecordInParts(ctx context.Context, id uint16, reservable bo
 		if err := r.exchange(ctx, req, &part); err != nil {
 			return nil, err
 		}
-		if len(part.RecordData) != count {
-			return nil, fmt.Errorf("short partial SDR %#06x: got %d bytes, wanted %d", id, len(part.RecordData), count)
+		got := len(part.RecordData)
+		if got == 0 || got > count || (offset == 0 && got < types.SDRRecordHeaderSize) {
+			return nil, fmt.Errorf("invalid partial SDR %#06x response: got %d bytes, wanted %d", id, got, count)
 		}
 		if offset > 0 && part.NextRecordID != next {
 			return nil, errors.New("SDR chain changed during partial read")

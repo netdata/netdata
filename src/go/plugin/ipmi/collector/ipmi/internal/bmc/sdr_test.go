@@ -57,6 +57,7 @@ func TestReader_InventoryEmpty(t *testing.T) {
 func TestReader_InventoryRejected(t *testing.T) {
 	tests := map[string]struct {
 		prepare func(*fakeBMC)
+		wantErr string
 	}{
 		"repository changed during discovery": {
 			prepare: func(b *fakeBMC) {
@@ -67,9 +68,39 @@ func TestReader_InventoryRejected(t *testing.T) {
 					return nil
 				}
 			},
+			wantErr: "SDR repository changed during discovery",
 		},
 		"record shorter than its header": {
 			prepare: func(b *fakeBMC) { b.records[0] = b.records[0][:types.SDRRecordHeaderSize] },
+			wantErr: "length does not match header",
+		},
+		"chain continues past the record count": {
+			prepare: func(fake *fakeBMC) { fake.recordCount = 1 },
+			wantErr: "continues past the repository record count",
+		},
+		"partial header shorter than requested": {
+			prepare: func(fake *fakeBMC) {
+				fake.refuseWholeReads = true
+				fake.partialLength = func(offset, requested int) int {
+					if offset == 0 {
+						return 3
+					}
+					return requested
+				}
+			},
+			wantErr: "invalid partial SDR",
+		},
+		"empty partial response": {
+			prepare: func(fake *fakeBMC) {
+				fake.refuseWholeReads = true
+				fake.partialLength = func(offset, requested int) int {
+					if offset > 0 {
+						return 0
+					}
+					return requested
+				}
+			},
+			wantErr: "invalid partial SDR",
 		},
 		"cyclic record chain": {
 			prepare: func(b *fakeBMC) {
@@ -80,6 +111,7 @@ func TestReader_InventoryRejected(t *testing.T) {
 					return nil
 				}
 			},
+			wantErr: "continues past the repository record count",
 		},
 	}
 
@@ -89,22 +121,43 @@ func TestReader_InventoryRejected(t *testing.T) {
 			tc.prepare(fake)
 
 			got, err := newTestReader(fake).Collect(t.Context(), false)
-			require.Error(t, err)
+			require.ErrorContains(t, err, tc.wantErr)
 			assert.Nil(t, got, "no snapshot from an inconsistent inventory")
 		})
 	}
 }
 
-func TestReader_PartialRecordReads(t *testing.T) {
-	fake := newFakeBMC()
-	fake.refuseWholeReads = true
+func TestReader_InventoryTolerated(t *testing.T) {
+	tests := map[string]struct {
+		prepare func(*fakeBMC)
+	}{
+		"chain ends before the record count": {
+			prepare: func(fake *fakeBMC) { fake.recordCount = 5 },
+		},
+		"whole-record reads refused": {
+			prepare: func(fake *fakeBMC) { fake.refuseWholeReads = true },
+		},
+		"partial reads shorter than requested": {
+			prepare: func(fake *fakeBMC) {
+				fake.refuseWholeReads = true
+				fake.partialLength = func(_, requested int) int { return min(requested, 7) }
+			},
+		},
+	}
 
-	got, err := newTestReader(fake).Collect(t.Context(), false)
-	require.NoError(t, err)
-	assert.Equal(t, &Snapshot{
-		Sensors:     []Sensor{wantCPUTemp(StateNominal, new(25.0)), wantCPUPresence(StateNominal)},
-		CollectedAt: testNow,
-	}, got)
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) {
+			fake := newFakeBMC()
+			tc.prepare(fake)
+
+			got, err := newTestReader(fake).Collect(t.Context(), false)
+			require.NoError(t, err)
+			assert.Equal(t, &Snapshot{
+				Sensors:     []Sensor{wantCPUTemp(StateNominal, new(25.0)), wantCPUPresence(StateNominal)},
+				CollectedAt: testNow,
+			}, got)
+		})
+	}
 }
 
 func TestReader_PartialRecordReadsMaximumRecord(t *testing.T) {
@@ -129,4 +182,25 @@ func TestReader_PartialRecordReadsMaximumRecord(t *testing.T) {
 		ReadOffset:    0xff,
 		ReadBytes:     5,
 	}, requests[len(requests)-1], "the last chunk starts at the last addressable offset")
+}
+
+func TestReader_PartialRecordReadsPastLastOffset(t *testing.T) {
+	// Three-byte responses step past offset FFh before the 260-byte record is complete.
+	record := make([]byte, types.SDRRecordHeaderSize+255)
+	record[2] = 0x51 // SDR version
+	record[3] = 0xc0 // OEM record type
+	record[4] = 255  // record body length
+	fake := newFakeBMC()
+	fake.records = [][]byte{record}
+	fake.refuseWholeReads = true
+	fake.partialLength = func(offset, requested int) int {
+		if offset == 0 {
+			return requested
+		}
+		return min(requested, 3)
+	}
+
+	got, err := newTestReader(fake).Collect(t.Context(), false)
+	require.ErrorContains(t, err, "past the last addressable offset")
+	assert.Nil(t, got)
 }
