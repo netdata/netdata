@@ -23,7 +23,10 @@ netdata_fixup_system_processor()
 
 option(STATIC_BUILD "Use static linking instead of dynamic linking for the build." FALSE)
 mark_as_advanced(STATIC_BUILD)
-set(BUILD_SHARED_LIBS "${STATIC_BUILD}")
+# Every bundled sub-project is linked into our own binaries and deliberately
+# not installed, so they must always be static. Build intent lives in
+# STATIC_BUILD; this knob only governs bundled libraries.
+set(BUILD_SHARED_LIBS OFF)
 
 if(STATIC_BUILD)
   set(CMAKE_FIND_LIBRARY_PREFIXES "${CMAKE_STATIC_LIBRARY_PREFIX}")

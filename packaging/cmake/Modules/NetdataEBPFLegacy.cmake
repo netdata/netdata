@@ -11,10 +11,10 @@ set(ebpf-legacy_BUILD_DIR "${CMAKE_BINARY_DIR}/ebpf-legacy-build")
 function(netdata_fetch_legacy_ebpf_code)
     netdata_identify_libc(_libc)
 
-    if(DEFINED BUILD_SHARED_LIBS)
-        if(NOT BUILD_SHARED_LIBS)
-            set(need_static TRUE)
-        endif()
+    # Static builds ship the flavor-neutral object set; keep this test aligned
+    # with netdata_bundle_libbpf() in NetdataLibBPF.cmake.
+    if(STATIC_BUILD)
+        set(need_static TRUE)
     endif()
 
     if(need_static)
