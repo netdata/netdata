@@ -476,7 +476,7 @@ func TestConfiguredReceiverURLOverridesPreviouslyConfirmedObservedBase(t *testin
 	require.Equal(t, "https://rum.example.org/new-prefix", rows[0].PublicBase)
 }
 
-func TestJournalFunctionFingerprintDetailAndSavedTimeHelp(t *testing.T) {
+func TestJournalFunctionFingerprintDetailAndReceiptTimeHelp(t *testing.T) {
 	ctx := context.Background()
 	journalStore, err := journal.Open(ctx, "")
 	require.NoError(t, err)
@@ -489,7 +489,7 @@ func TestJournalFunctionFingerprintDetailAndSavedTimeHelp(t *testing.T) {
 			history.EventRecord{
 				Site:        "retired",
 				SessionID:   session,
-				TSUnixUS:    original,
+				ObservedUS:  original,
 				Type:        "error",
 				Fingerprint: "fp",
 				ErrorType:   "TypeError",
@@ -512,7 +512,7 @@ func TestJournalFunctionFingerprintDetailAndSavedTimeHelp(t *testing.T) {
 	assert.Nil(t, rows[0][5])
 	assert.Nil(t, rows[0][8])
 	assert.Nil(t, rows[0][9])
-	assert.Contains(t, overview.RawResponse["help"], "saved")
+	assert.Contains(t, overview.RawResponse["help"], "received by the Agent")
 	detail := handler.HandleRaw(
 		ctx,
 		funcapi.RawMethodRequest{

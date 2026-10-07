@@ -399,7 +399,7 @@ modules:
           - id: rum-sessions
             function_name: rum-sessions
             name: RUM Sessions
-            description: Investigate retained sampled sessions that overlap a time range, including pages, errors and
+            description: Investigate sampled sessions with retained observations received within a time range, including pages, errors and
                 optional interaction heuristics.
             parameters:
               - id: site
@@ -419,22 +419,25 @@ modules:
                 options: []
               - id: after
                 name: after
-                description: Start of the saved-time range as Unix seconds or a negative offset from now.
+                description: Inclusive Agent receipt-time lower bound in Unix seconds; zero is epoch and negative
+                    values are offsets from now.
                 type: integer
                 required: false
-                default: 15 minutes before before
+                default: 15 minutes before before, clamped to epoch
                 options: []
               - id: before
                 name: before
-                description: End of the saved-time range as Unix seconds or a negative offset from now.
+                description: Inclusive Agent receipt-time upper bound in Unix seconds; zero is epoch and negative
+                    values are offsets from now.
                 type: integer
                 required: false
                 default: now
                 options: []
             returns:
-                description: One session with retained activity saved in the selected range. Counts and activity span
-                    cover retained events, not lifetime totals. Results can include disabled sites until their history
-                    expires.
+                description: One session with retained observations originally received by the Agent in the selected range.
+                    Counts and activity span cover selected observations, not lifetime totals. Sessions are ordered
+                    by last selected observation at microsecond precision. Late-saved context can change an earlier
+                    range. Results can include disabled sites until their history expires.
                 columns:
                   - name: site
                     type: string
@@ -447,11 +450,11 @@ modules:
                   - name: started_age_s
                     type: integer
                     unit: ''
-                    description: First Retained Event (s ago).
+                    description: First Selected Observation (s ago).
                   - name: duration_s
                     type: integer
                     unit: ''
-                    description: Retained Activity Span (s).
+                    description: Selected Observation Span (s).
                   - name: pageviews
                     type: integer
                     unit: ''
@@ -502,6 +505,10 @@ modules:
                     type: integer
                     unit: ''
                     description: Retained application-view occurrences.
+                  - name: last_observed_us
+                    type: timestamp
+                    unit: ''
+                    description: Last Selected Observation in Unix microseconds; default descending sort.
             performance: Reads local retained history; work grows with the selected range and retained records.
             security: Results can include page paths, browser metadata, user identifiers, error messages and stack
                 traces. Restrict access to authorized operators.
@@ -512,8 +519,8 @@ modules:
           - id: rum-errors
             function_name: rum-errors
             name: RUM Errors
-            description: Group errors saved in the selected range by fingerprint; select a fingerprint to investigate
-                affected sessions, pages and browsers.
+            description: Group errors originally received by the Agent in the selected range by fingerprint; select a
+                fingerprint to investigate affected sessions, pages and browsers.
             parameters:
               - id: site
                 name: site
@@ -532,22 +539,25 @@ modules:
                 options: []
               - id: after
                 name: after
-                description: Start of the saved-time range as Unix seconds or a negative offset from now.
+                description: Inclusive Agent receipt-time lower bound in Unix seconds; zero is epoch and negative
+                    values are offsets from now.
                 type: integer
                 required: false
-                default: 15 minutes before before
+                default: 15 minutes before before, clamped to epoch
                 options: []
               - id: before
                 name: before
-                description: End of the saved-time range as Unix seconds or a negative offset from now.
+                description: Inclusive Agent receipt-time upper bound in Unix seconds; zero is epoch and negative
+                    values are offsets from now.
                 type: integer
                 required: false
                 default: now
                 options: []
             returns:
-                description: One error fingerprint per site with events saved in the selected range. Affected-session,
-                    page and browser statistics are null until a fingerprint is selected; first and last seen use
-                    original event time. Results can include disabled sites until their history expires.
+                description: One error fingerprint per site with observations originally received by the Agent in the selected
+                    range. Affected-session, page and browser statistics are null until a fingerprint is selected;
+                    first and last observations use Agent receipt time. Results can include disabled sites until their
+                    history expires.
                 columns:
                   - name: site
                     type: string
@@ -576,11 +586,11 @@ modules:
                   - name: first_seen_age_s
                     type: integer
                     unit: ''
-                    description: First Seen (s ago).
+                    description: First Selected Observation (s ago).
                   - name: last_seen_age_s
                     type: integer
                     unit: ''
-                    description: Last Seen (s ago).
+                    description: Last Selected Observation (s ago).
                   - name: top_page
                     type: string
                     unit: ''
@@ -628,9 +638,10 @@ modules:
                 default: ''
                 options: []
             returns:
-                description: One retained or pending session event, with original observation time in Unix microseconds
+                description: One retained or pending session event, with Agent receipt time in Unix microseconds
                     and an optional trace identifier. The available session timeline is returned without range
-                    filtering. Unknown sessions return an error.
+                    filtering. Activity-only observations contribute to summaries, not this timeline.
+                    Unknown sessions return an error.
                 columns:
                   - name: ts
                     type: timestamp

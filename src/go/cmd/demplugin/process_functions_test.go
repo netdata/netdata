@@ -84,11 +84,11 @@ func TestDEMHistoryFunctionsIndependentOfCollectorSelection(t *testing.T) {
 			t.Cleanup(func() { require.NoError(t, history.Close()) })
 			now := time.Now().UnixMicro()
 			_, err = rumhistory.NewStore(history).AppendEvent(ctx, rumhistory.EventRecord{
-				Site:      "retired",
-				SessionID: "session",
-				TSUnixUS:  now,
-				Type:      "pageview",
-				Page:      "/checkout",
+				Site:       "retired",
+				SessionID:  "session",
+				ObservedUS: now,
+				Type:       "pageview",
+				Page:       "/checkout",
 			})
 			require.NoError(t, err)
 			run := synthetic.Run{

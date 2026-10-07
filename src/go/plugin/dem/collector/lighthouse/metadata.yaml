@@ -276,9 +276,10 @@ modules:
         - id: synthetics-runs
           function_name: synthetics-runs
           name: Synthetic runs
-          description: Invoke `synthetics-runs`. Retained attempts filtered by journal saved time. after and
-            before accept Unix seconds or negative offsets from now; omitted bounds cover retained history
-            through now. Results are capped at 2000 and disclose truncation.
+          description: Invoke `synthetics-runs`. Retained attempts selected by start time, with their latest retained
+            outcome even when completion is outside the range. after and before include their entire Unix
+            second or accept negative offsets from now; omitted bounds cover retained history through now.
+            Results are capped at 2000 and disclose truncation.
           parameters:
             - id: job_id
               name: Monitor (`job_id`)
@@ -304,16 +305,16 @@ modules:
               default: ''
               options: []
             - id: after
-              name: Saved after (`after`)
-              description: Inclusive journal saved-time lower bound in Unix seconds or a negative offset from
+              name: Started after (`after`)
+              description: Inclusive run start-time lower bound in Unix seconds or a negative offset from
                 now. Leave empty for all retained history.
               type: string
               required: false
               default: ''
               options: []
             - id: before
-              name: Saved before (`before`)
-              description: Inclusive journal saved-time upper bound in Unix seconds or a negative offset from
+              name: Started before (`before`)
+              description: Inclusive run start-time upper bound in Unix seconds or a negative offset from
                 now. Leave empty for the current time.
               type: string
               required: false
@@ -328,7 +329,7 @@ modules:
               default: '2000'
               options: []
           returns:
-            description: At most limit retained attempts selected by saved time, with explicit truncated and
+            description: At most limit retained attempts selected by start time, with explicit truncated and
               effective time bounds. Zero or missing execution timestamps and missing durations are null rather
               than fabricated measurements.
             columns:
@@ -393,8 +394,8 @@ modules:
         - id: synthetics-run
           function_name: synthetics-run
           name: Synthetic run detail
-          description: Invoke `synthetics-run`. One retained or latest active attempt with original test phases,
-            errors, counts, nullable lab measurements and bounded reporter events. Missing completion means
+          description: Invoke `synthetics-run`. One retained or latest active attempt, independent of picker bounds,
+            with original test phases, errors, counts, nullable lab measurements and bounded reporter events. Missing completion means
             no verified terminal observation.
           parameters:
             - id: job_id

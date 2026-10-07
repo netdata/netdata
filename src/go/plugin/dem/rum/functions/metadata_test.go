@@ -94,3 +94,25 @@ func (metadataFunctionSource) SessionEvents(context.Context, string, string) ([]
 func (metadataFunctionSource) Errors(context.Context, string, string, int64, int64) ([]query.ErrorGroup, error) {
 	return nil, nil
 }
+
+func TestObservationTimestampColumnsDeclareMicroseconds(t *testing.T) {
+	for method, column := range map[string]string{
+		"rum-live": "ts", "rum-session-events": "ts", "rum-sessions": "last_observed_us",
+	} {
+		t.Run(method, func(t *testing.T) {
+			handler := rumfunctions.New(metadataFunctionSource{})
+			args := []string{"site:shop"}
+			if method == "rum-session-events" {
+				args = append(args, "session_id:visit")
+			}
+			response := handler.HandleRaw(context.Background(), funcapi.RawMethodRequest{Method: method, Args: args}).RawResponse
+			require.NotNil(t, response)
+			require.Equal(t, 200, response["status"])
+			fields := response["columns"].(map[string]any)
+			field := fields[column].(map[string]any)
+			require.Equal(t, "timestamp", field["type"])
+			options := field["value_options"].(map[string]any)
+			require.Equal(t, "datetime_usec", options["transform"], "timestamps are Unix microseconds on the wire")
+		})
+	}
+}

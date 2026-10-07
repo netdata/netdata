@@ -23,11 +23,11 @@ func TestHistoryFunctionsRemainAvailableWithoutActiveSites(t *testing.T) {
 	st := history.NewStore(journalStore)
 	now := time.Now().Unix()
 	_, err = st.AppendEvent(context.Background(), history.EventRecord{
-		Site:      "retired",
-		SessionID: "session",
-		TSUnixUS:  now * 1e6,
-		Type:      "pageview",
-		Page:      "/checkout",
+		Site:       "retired",
+		SessionID:  "session",
+		ObservedUS: now * 1e6,
+		Type:       "pageview",
+		Page:       "/checkout",
 	})
 	require.NoError(t, err)
 	components := New(Dependencies{

@@ -48,7 +48,7 @@ func (h *Handler) runs(ctx context.Context, args map[string]string, response map
 var runsMethod = method{
 	id:      "synthetics-runs",
 	title:   "Synthetic runs",
-	help:    "Retained attempts filtered by journal saved time. after and before accept Unix seconds or negative offsets from now; omitted bounds cover retained history through now. Results are capped at 2000 and disclose truncation.",
+	help:    "Retained attempts selected by start time, with their latest retained outcome even when completion is outside the range. after and before include their entire Unix second or accept negative offsets from now; omitted bounds cover retained history through now. Results are capped at 2000 and disclose truncation.",
 	sort:    "started_us",
 	history: true,
 	params:  []string{"job_id", "kind", "outcome", "after", "before", "limit"},

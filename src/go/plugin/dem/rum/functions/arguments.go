@@ -21,11 +21,14 @@ func historyRange(args map[string]string, now int64) (int64, int64, error) {
 			bounds[i] = value
 		}
 	}
-	if bounds[1] == 0 {
+	if args["before"] == "" {
 		bounds[1] = now
 	}
-	if bounds[0] == 0 {
-		bounds[0] = bounds[1] - 900
+	if args["after"] == "" {
+		bounds[0] = max(0, bounds[1]-900)
+	}
+	if bounds[0] < 0 || bounds[1] < 0 {
+		return 0, 0, errors.New("history bounds must not precede epoch")
 	}
 	if bounds[0] > bounds[1] {
 		return 0, 0, errors.New("after must not exceed before")

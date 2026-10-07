@@ -551,8 +551,43 @@ func TestHistoryExplicitEpochBoundThroughJournal(t *testing.T) {
 	got := call(h, "synthetics-runs", "before:0")
 	assert.Empty(t, responseData(t, got), "Unix epoch upper bound must exclude contemporary records")
 	assert.Equal(t, int64(0), got.RawResponse["before"])
-	// Internal detail lookup still has no saved-time bound.
+	// Internal detail lookup still has no picker bound.
 	retained, err := synthetichistory.NewStore(journal).GetRun(ctx, run.JobID, run.ID)
 	require.NoError(t, err)
 	assert.Equal(t, run.ID, retained.ID)
+}
+
+func TestHistoryPickerUsesStartAndLatestCompletionThroughFunction(t *testing.T) {
+	ctx := context.Background()
+	journal, err := demjournal.Open(ctx, t.TempDir())
+	require.NoError(t, err)
+	t.Cleanup(func() { require.NoError(t, journal.Close()) })
+	retained := synthetichistory.NewStore(journal)
+	run := model.Run{ID: "past-attempt", JobID: "journey:past", Kind: model.Journey, StartedUS: 100999999, Outcome: model.Unknown}
+	_, err = retained.AppendRun(ctx, "start", run)
+	require.NoError(t, err)
+	h := syntheticfunctions.New(query.New(nil, retained, nil))
+	beforeCompletion := call(h, "synthetics-runs", "after:100", "before:100", "outcome:unknown")
+	require.Len(t, responseData(t, beforeCompletion), 1)
+	validate(t, beforeCompletion)
+	run.CompletedUS = 300000000
+	run.Outcome = model.Failed
+	run.Events = []model.Event{{Kind: "error", Message: "later completion"}}
+	_, err = retained.AppendRun(ctx, "complete", run)
+	require.NoError(t, err)
+	got := call(h, "synthetics-runs", "after:100", "before:100", "outcome:failed")
+	rows := responseData(t, got)
+	require.Len(t, rows, 1)
+	values := rowValues(t, got, rows[0])
+	assert.Equal(t, run.ID, values["run_id"])
+	assert.Equal(t, run.StartedUS, values["started_us"])
+	assert.Equal(t, run.CompletedUS, values["completed_us"])
+	assert.Equal(t, run.Outcome, values["outcome"])
+	validate(t, got)
+	assert.Empty(t, responseData(t, call(h, "synthetics-runs", "after:100", "before:100", "outcome:unknown")))
+	assert.Empty(t, responseData(t, call(h, "synthetics-runs", "after:101", "before:300")))
+	detail := call(h, "synthetics-run", "job_id:journey:past", "run_id:past-attempt")
+	require.NotNil(t, detail.RawResponse)
+	assert.Equal(t, run.CompletedUS, detail.RawResponse["run"].(map[string]any)["completed_us"])
+	validate(t, detail)
 }

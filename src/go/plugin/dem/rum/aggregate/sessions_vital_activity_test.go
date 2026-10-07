@@ -28,7 +28,7 @@ func TestHistoryRecordsAcceptedGoodVitalActivity(t *testing.T) {
 	require.Len(t, sink.events, 2)
 	activity := sink.events[1]
 	assert.Equal(t, "activity", activity.Type)
-	assert.Equal(t, now.UnixMicro(), activity.TSUnixUS)
+	assert.Equal(t, now.UnixMicro(), activity.ObservedUS)
 	assert.Equal(t, b.SessionID, activity.SessionID)
 	assert.Equal(t, b.ExperienceID, activity.ExperienceID)
 	assert.Equal(t, "/entry", activity.Page)

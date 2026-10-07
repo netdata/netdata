@@ -4,6 +4,7 @@ package journal
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"os"
 
@@ -22,13 +23,20 @@ func (s *Store) Append(ctx context.Context, fields []journal.Field) (attempted b
 	if s.closed {
 		return false, os.ErrClosed
 	}
+	if s.failure != nil {
+		return false, s.failure
+	}
 	if s.log == nil {
 		return false, fmt.Errorf("history journal unavailable after reopen failure")
 	}
 	if err := ctx.Err(); err != nil {
 		return false, err
 	}
-	return true, s.log.Append(fields, s.host.EntryOptions())
+	fields, err = appendEnvelope(fields)
+	if err != nil {
+		return false, err
+	}
+	return true, s.recordFailure(s.log.Append(fields, s.host.EntryOptions()))
 }
 
 // Sync flushes admitted entries to disk. Cancellation interrupts admission, not
@@ -41,8 +49,18 @@ func (s *Store) Sync(ctx context.Context) error {
 	if s.closed {
 		return os.ErrClosed
 	}
+	if s.failure != nil {
+		return s.failure
+	}
 	if s.log == nil {
 		return fmt.Errorf("history journal unavailable after reopen failure")
 	}
-	return s.log.Sync()
+	return s.recordFailure(s.log.Sync())
+}
+
+func (s *Store) recordFailure(err error) error {
+	if errors.Is(err, journal.ErrWriterFailed) && s.failure == nil {
+		s.failure = err
+	}
+	return err
 }

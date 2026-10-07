@@ -39,10 +39,10 @@ func TestRetentionWithoutSitesAndAfterServiceShutdown(t *testing.T) {
 	t.Cleanup(func() { require.NoError(t, st.Close()) })
 	now := time.Now().Unix()
 	_, err = rumhistory.NewStore(st).AppendEvent(ctx, rumhistory.EventRecord{
-		Site:      "disabled",
-		SessionID: "recent",
-		TSUnixUS:  now * 1e6,
-		Type:      "pageview",
+		Site:       "disabled",
+		SessionID:  "recent",
+		ObservedUS: now * 1e6,
+		Type:       "pageview",
 	})
 	require.NoError(t, err)
 	components := New(Dependencies{

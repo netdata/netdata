@@ -22,8 +22,12 @@ keeps shared stores open until a clean shutdown.
 Six process Functions use the regular Netdata Function transport: `rum-sites`, `rum-pages`, `rum-live`, `rum-sessions`,
 `rum-errors`, and `rum-session-events`. Runtime observations include only admitted site jobs. Consumers join native
 DynCfg state to show disabled or failed configurations. Journal history remains queryable after a site stops. History range
-arguments filter when records were saved, using Unix seconds (negative values are relative offsets). A delayed session
-promotion can save older events in the current range. Timelines display original observation time in Unix microseconds.
+arguments select when the Agent originally received an observation, using inclusive Unix seconds: both endpoints include
+their entire second. Negative values are offsets from one captured now; explicit zero means epoch. With omitted bounds,
+RUM uses the 15 minutes ending at `before` (or now). Invalid or pre-epoch ranges fail.
+Delayed session promotion preserves that original receipt time, so late-saved context can change an earlier range. A
+past range shows currently retained evidence, not what was known at the time. Browser clocks do not define the native
+history axis.
 
 `rum-live` returns an opaque string `next` cursor, passed unchanged as `after` on the next request. Each event has a
 string identity combining site, runtime generation and sequence. Cursors track independent streams so a busy site cannot
@@ -33,21 +37,26 @@ running with explicit ingress availability and gaps in browser product measureme
 
 Investigation history uses pure-Go journal files under `${NETDATA_LIB_DIR}/dem/journal`, through the existing
 `systemd-journal-sdk`. Events include their session and error metadata, so investigation does not depend on a separate
-parent record. `rum-sessions` reports sessions with activity saved in the selected range; document views, application views, errors, frustration
+parent record. `rum-sessions` reports sessions with activity originally received in the selected range; document views, application views, errors, frustration
 counts and activity spans describe retained events in that range, rather than lifetime totals. `rum-errors` groups
 retained occurrences by fingerprint; affected-session, top-page and browser statistics are `null` until a `fingerprint`
 filter selects the group to investigate. `rum-session-events` returns the full retained and pending timeline for a
-session, ordered by original observation time, without range filtering.
+session, ordered by Agent observation time in Unix microseconds, without range filtering. Activity-only presence records
+contribute to summaries but stay out of timelines. Session rows sort by `last_observed_us` at microsecond precision
+before limiting; first/last observations and their span describe only the selected activity. A gap between observations
+does not prove continuous presence.
 
 One process-owned retention worker applies the whole-plugin `history.days` and `history.max_bytes` policy, including
 disabled sites. It removes oldest archived files by their saved-time head and committed journal bytes; it protects the active
 file. Filesystem preallocation can use more disk space than committed bytes. These are whole-file retention targets, not exact event TTLs or a hard instantaneous disk ceiling. The worker
 archives idle activity without creating an empty replacement file and applies policy changes at the next hourly sweep;
 invalid changes retain the last valid policy and produce a warning. Queued events flush every five seconds or 500 records.
-Flushes sync pending appends and retry failed syncs; clean idle ticks skip sync. A crash can lose records still queued or
+Flushes sync pending appends; clean idle ticks skip sync. A crash can lose records still queued or
 not synced. Queue overflow and append failures count dropped records; sync failures produce a warning. Failed retention
-close/reopen retries after five seconds so a transient filesystem error does not suspend history writes until the next
-hourly sweep. This is sampled investigation history, not a lossless event archive.
+sweeps retry after five seconds. An uncertain journal mutation or sync failure makes shared history unavailable until
+restart verification; subsequent reads, writes, sync and retention fail rather than expose a partial result. RUM measurements
+and enabled exports continue independently, and synthetic current diagnosis reports history errors. This is sampled
+investigation history, not a lossless event archive.
 
 Stock health templates evaluate the current LCP, INP and CLS populations once per minute. They require at least 30
 observations for that metric and complete local measurement state. More than 25% above the good threshold warns;
@@ -60,7 +69,14 @@ alarm because the Agent has no expected-traffic schedule.
 Customize alerts through normal Netdata health configuration, using `_collect_plugin=dem` and `_collect_job=<site>`
 chart-label filters for site-specific policies. The plugin does not generate health files or reload health configuration.
 Terminal/debug runs use private temporary journal and identity state, removed after readers and workers join; they leave
-live state untouched. An existing experimental `history.db` is not imported or deleted.
+live state untouched. Failed temporary history is preserved for investigation. An existing experimental `history.db` is not imported or deleted.
+
+New journals use `dem.journal` for active files and `dem@…journal` for finalized archives. Startup verifies preexisting
+active files before any journal reuse or archival, including retained machine directories. Finalized archives from the
+current schema and synchronized writer lifecycle avoid a full integrity scan at every restart. Unexpected archive state,
+old or partial schemas, detected index damage and quarantined `.journal~` files fail startup and remain intact for
+operator recovery; there is no automatic migration, repair or deletion. External file modification is outside this
+archive-provenance guarantee.
 
 The browser normalization, bounded aggregation, OTLP and query behavior originated in the experimental
 [Netdata digital-experience POC](https://github.com/netdata/digital-experience), commit
@@ -145,7 +161,7 @@ intent, frustration or causality. A disabled signal is unavailable, not a measur
 An application-provided user ID is an explicit capture choice. IDs remain application-controlled values and are not
 hashed or anonymized by DEM. Use an internal, non-sensitive ID of at most 128 bytes and clear it on logout. IDs undergo the same bounded text
 normalization as other diagnostic strings; numeric and UUID IDs are not generalized as URL paths. Per-event attribution survives login,
-logout and user changes. The `user_id` filter matches exact stored, normalized IDs within the selected saved-time range.
+logout and user changes. The `user_id` filter matches exact stored, normalized IDs within the selected observation range.
 Original IDs changed by normalization cannot be recovered through lookup. Current configured credentials also mask
 query output, so a displayed `[REDACTED]` value is not a reliable lookup key or a unique identity.
 User names, email fields and arbitrary user attributes are not part of this identity contract.
@@ -368,7 +384,9 @@ Functions show current execution and retained diagnosis.
 
 Lighthouse performance is a desktop lab score in points from 0 to 100; FCP, LCP, TBT and Speed Index are milliseconds,
 and CLS is dimensionless. Missing values are gaps/null, distinct from measured zero. Audit completion is separate from
-page performance. A failed optional report save marks capture unavailable and retains its diagnostic while preserving completed audit measurements. These lab measurements are not browser field Web Vitals; no lab-score alert threshold is enabled.
+page performance. A failed optional report save marks capture unavailable and retains its diagnostic while preserving
+completed audit measurements. These lab measurements are not browser field Web Vitals; no lab-score alert threshold is
+enabled.
 
 ## Synthetic diagnosis and captures
 
@@ -377,15 +395,23 @@ for retained history, `synthetics-run` for one run's full diagnosis, and `synthe
 Use the advertised `job_id`, `run_id` and other parameters. Disabled/failed-startup jobs remain in native configuration
 status. Current-generation last success/failure and freshness do not reconstruct a historical incident. A running or
 waiting attempt does not refresh its previous result. Run summaries are capped at 2000 rows with an explicit truncation
-flag; refine the saved-time range when truncated. Saved-time range arguments are Unix seconds; observation timestamps
-use Unix microseconds, while reporter event `at_ms` uses Unix milliseconds.
+flag; refine the start-time range when truncated. Ranges select the attempt’s actual start using inclusive Unix seconds,
+including the entire endpoint seconds. Explicit zero means epoch, negative values are offsets from one captured now, and
+omitted bounds cover epoch through now. Run timestamps use Unix microseconds, while reporter event `at_ms` uses Unix
+milliseconds.
 
 Start and completion records share the plugin-wide journal budget with RUM. Each completion is self-contained;
-a start without a retained completion remains unknown. History errors appear in current diagnosis. Publication is
+a start without a retained completion remains unknown. A selected run includes its latest retained completion even if it
+finished or was saved after the range, so outcome filtering follows phase resolution. Completion-only retained evidence
+remains queryable by its original start. A positive completion timestamp earlier than start after a wall-clock
+correction remains valid; independently measured duration is preserved. Identity drill-down ignores picker bounds and
+can show newer active evidence. History errors appear in current diagnosis. Publication is
 best effort; ambiguous append failures are never replayed, and history is not a lossless archive.
 
 Basic diagnosis includes bounded test, step, error, stdout and stderr events (500 records, 2000 characters per text),
-with dropped-event counts. Stdout/stderr use bounded stream redaction: lines longer than 2000 characters are omitted with a marker, and forced termination can lose buffered text. Structured test/step/error evidence remains incremental. There is no automatic page-console/network capture; scripts can forward diagnostics with
+with dropped-event counts. Stdout/stderr use bounded stream redaction: lines longer than 2000 characters are omitted
+with a marker, and forced termination can lose buffered text. Structured test/step/error evidence remains incremental.
+There is no automatic page-console/network capture; scripts can forward diagnostics with
 Playwright APIs. Optional failure PNG screenshots and Lighthouse HTML reports are disabled by default. Enable
 `screenshot_on_failure` or `save_report` before an incident if these captures are needed. Forced browser termination
 can prevent capture. Trace, HAR, video and filmstrip are not initial capabilities.

@@ -35,8 +35,8 @@ func (s *Store) QueryErrors(
 					SampleStack: r.SampleStack,
 					Details:     fingerprint != "",
 				},
-				first: r.TSUnixUS,
-				last:  r.TSUnixUS,
+				first: r.ObservedUS,
+				last:  r.ObservedUS,
 			}
 			if g.record.Details {
 				g.sessions = make(map[string]struct{})
@@ -46,11 +46,11 @@ func (s *Store) QueryErrors(
 			groups[key] = g
 		}
 		g.record.CountWindow++
-		if r.TSUnixUS < g.first {
-			g.first = r.TSUnixUS
+		if r.ObservedUS < g.first {
+			g.first = r.ObservedUS
 			g.record.Type, g.record.Message, g.record.SampleStack = r.ErrorType, r.Message, r.SampleStack
 		}
-		g.last = max(g.last, r.TSUnixUS)
+		g.last = max(g.last, r.ObservedUS)
 		if g.record.Details {
 			if r.SessionID != "" {
 				g.sessions[r.SessionID] = struct{}{}

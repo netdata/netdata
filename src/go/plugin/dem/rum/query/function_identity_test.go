@@ -34,7 +34,7 @@ func TestFunctionRowsHaveSiteScopedIdentities(t *testing.T) {
 			history.EventRecord{
 				Site:        site,
 				SessionID:   "shared-session",
-				TSUnixUS:    time.Now().UnixMicro(),
+				ObservedUS:  time.Now().UnixMicro(),
 				Type:        "error",
 				Page:        "/shared",
 				Fingerprint: fingerprint,
@@ -88,7 +88,7 @@ func TestFunctionsExposeRetainedIdentityAfterLogoutAndRetirement(t *testing.T) {
 	owner.SetHistorySink(writer)
 	// A shared SDK session can contain login, logout, and another login.
 	ids := []string{"550e8400-e29b-41d4-a716-446655440000", "", "123456"}
-	now := time.Now()
+	now := time.Now().Add(-time.Minute)
 	for i, id := range ids {
 		owner.Ingest(&beacon.Beacon{
 			Site:         "shop",
