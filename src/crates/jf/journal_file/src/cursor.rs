@@ -3,8 +3,9 @@ use error::{JournalError, Result};
 use std::num::NonZeroU64;
 use window_manager::MemoryMap;
 
-#[derive(Debug, Copy, Clone, PartialEq, Eq)]
+#[derive(Debug, Copy, Clone, PartialEq, Eq, Default)]
 pub enum Location {
+    #[default]
     Head,
     Tail,
     Realtime(u64),
@@ -12,12 +13,6 @@ pub enum Location {
     Seqnum(u64, Option<[u8; 16]>),
     XorHash(u64),
     ResolvedEntry(NonZeroU64),
-}
-
-impl Default for Location {
-    fn default() -> Self {
-        Self::Head
-    }
 }
 
 #[derive(Debug)]

@@ -101,8 +101,7 @@ impl JournalWriter {
                 xor_hash ^= journal_hash_data(payload, true, None);
             }
 
-            self.entry_items
-                .sort_unstable_by(|a, b| a.offset.cmp(&b.offset));
+            self.entry_items.sort_unstable_by_key(|a| a.offset);
             self.entry_items.dedup_by(|a, b| a.offset == b.offset);
         }
 

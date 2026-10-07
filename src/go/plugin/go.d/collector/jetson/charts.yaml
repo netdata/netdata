@@ -1,0 +1,46 @@
+version: v1
+context_namespace: jetson
+groups:
+  - family: GPU
+    metrics:
+      - gpu_utilization
+      - gpu_frequency
+      - gpu_gpc_frequency
+    charts:
+      - title: GPU Utilization
+        context: gpu_utilization
+        units: percentage
+        dimensions:
+          - selector: gpu_utilization
+            name: utilization
+      - title: GPU Frequency
+        context: gpu_frequency
+        units: MHz
+        dimensions:
+          - selector: gpu_frequency
+            name: frequency
+      - title: GPU Graphics Processing Cluster Frequency
+        context: gpu_gpc_frequency
+        units: MHz
+        instances:
+          by_labels: [gpc]
+        dimensions:
+          - selector: gpu_gpc_frequency
+            name: frequency
+  - family: Memory Controller
+    metrics:
+      - emc_utilization
+      - emc_frequency
+    charts:
+      - title: Memory Controller Bandwidth Utilization at Current Frequency
+        context: emc_utilization
+        units: percentage
+        dimensions:
+          - selector: emc_utilization
+            name: utilization
+      - title: Memory Controller Frequency
+        context: emc_frequency
+        units: MHz
+        dimensions:
+          - selector: emc_frequency
+            name: frequency

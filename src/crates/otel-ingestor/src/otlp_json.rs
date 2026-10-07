@@ -10,9 +10,10 @@
 //!   senders differ: the collector, Python, Go and C++ write strings; JS
 //!   writes counts and `asInt` as numbers; Rust writes `asInt` as a number.
 //! - Omitted fields: proto3 JSON lets any field be absent (or `null`), but the
-//!   derives require most fields of exponential-histogram points and their
-//!   buckets, quantiles, exemplars, `ArrayValue`/`KeyValueList`,
-//!   `KeyValue.key` and every field of a resource's `EntityRef`.
+//!   derives reject `null` and require most fields of exponential-histogram
+//!   points and their buckets, quantiles, exemplars,
+//!   `ArrayValue`/`KeyValueList`, `KeyValue.key` and every field of a
+//!   resource's `EntityRef`.
 //! - Exemplar values: the contract puts `asInt`/`asDouble` on the exemplar
 //!   itself; the derives expect them nested under `value`.
 //!
@@ -22,15 +23,14 @@
 //! vanishes from an otherwise successful decode.
 //!
 //! [`OtlpJson::decode_json`] therefore parses the body into a `serde_json::Value`, rewrites
-//! every affected field into the form the derives read, decodes, and then
+//! only those fields into the form the derives read, decodes, and then
 //! checks that no metric or number-point value present in the JSON came back
 //! empty. Such a loss — input the derives cannot represent even after the
 //! rewrite, e.g. a `"NaN"` double — becomes a decode error (HTTP 400, as the
-//! contract requires for undecodable data), never a silent drop. The rewrite
-//! was written against 0.31's quirks; the tests pin the decoded result of
-//! every form, so an upgrade that stops reading a rewritten form fails
-//! loudly, while one that reads more (as 0.32 and 0.33 do) only leaves some
-//! rewrites redundant.
+//! contract requires for undecodable data), never a silent drop. Everything
+//! else is the derives' own decoding, so their errors carry serde's message
+//! without a JSON path. The tests pin the decoded result of every form, so an
+//! upgrade that stops reading one fails loudly.
 
 use opentelemetry_proto::tonic::collector::logs::v1::{
     ExportLogsServiceRequest, ExportLogsServiceResponse,
@@ -55,17 +55,13 @@ pub(crate) trait OtlpJson: Sized {
 
 impl OtlpJson for ExportLogsServiceRequest {
     fn decode_json(body: &[u8]) -> Result<Self, String> {
-        let mut root = parse(body)?;
-        normalize_logs(&mut root)?;
-        from_value(root)
+        from_value(parse(body)?)
     }
 }
 
 impl OtlpJson for ExportTraceServiceRequest {
     fn decode_json(body: &[u8]) -> Result<Self, String> {
-        let mut root = parse(body)?;
-        normalize_traces(&mut root)?;
-        from_value(root)
+        from_value(parse(body)?)
     }
 }
 
@@ -158,16 +154,11 @@ fn from_value<T: DeserializeOwned>(root: Value) -> Result<T, String> {
 // ---------------------------------------------------------------------------
 
 /// Signal-independent rewrites, applied to the whole tree: drop `null`
-/// entries (proto3 JSON's "default value"), fill the `values` of an
+/// entries (proto3 JSON's "default value"), and fill the `values` of an
 /// `ArrayValue`/`KeyValueList`, the `key` of a `KeyValue` and the fields of
-/// an `EntityRef` when omitted, and drop an empty `AnyValue` (`{}`, unset)
-/// where a `KeyValue` or log body holds it. An `AnyValue` naming no known kind
-/// counts as empty: receivers ignore unknown fields, so a value kind newer
-/// than this decoder is unset rather than a derive error. The
-/// `arrayValue`/`kvlistValue`/`body`/`entityRefs` keys and the attribute-list
-/// keys occur only in those messages, so matching on names is unambiguous; a
-/// `value` key also names a quantile's double, so an empty `value` is dropped
-/// only inside the `KeyValue`s those lists hold.
+/// an `EntityRef` when omitted. The `arrayValue`/`kvlistValue`/`entityRefs`
+/// keys and the attribute-list keys occur only in those messages, so matching
+/// on names is unambiguous.
 fn prune(value: &mut Value) {
     match value {
         Value::Object(map) => {
@@ -207,23 +198,17 @@ fn prune(value: &mut Value) {
                     }
                 }
             }
-            if map.get("body").is_some_and(is_unset_any_value) {
-                map.remove("body");
-            }
         }
         Value::Array(items) => items.iter_mut().for_each(prune),
         _ => {}
     }
 }
 
-/// Repair one `KeyValue` of an attribute list or `kvlistValue`.
+/// Fill the omitted `key` of one `KeyValue` of an attribute list or `kvlistValue`.
 fn fill_key_value(pair: &mut Value) {
     if let Value::Object(pair) = pair {
         pair.entry("key")
             .or_insert_with(|| Value::String(String::new()));
-        if pair.get("value").is_some_and(is_unset_any_value) {
-            pair.remove("value");
-        }
     }
 }
 
@@ -235,66 +220,9 @@ fn single_value(object: &Object) -> Result<(), String> {
     Ok(())
 }
 
-/// An `AnyValue` object with none of its oneof keys: `{}` or only unknown
-/// fields. The 0.31 derives rejected both ("no known keys found"); 0.33
-/// reads them as unset.
-fn is_unset_any_value(value: &Value) -> bool {
-    const KINDS: [&str; 7] = [
-        "stringValue",
-        "boolValue",
-        "intValue",
-        "doubleValue",
-        "arrayValue",
-        "kvlistValue",
-        "bytesValue",
-    ];
-    value
-        .as_object()
-        .is_some_and(|map| !KINDS.iter().any(|kind| map.contains_key(*kind)))
-}
-
 // ---------------------------------------------------------------------------
-// Per-signal rewrites
+// Metrics rewrites
 // ---------------------------------------------------------------------------
-
-fn normalize_logs(root: &mut Value) -> Result<(), String> {
-    let root = top_level(root, "resourceLogs");
-    for (r, resource) in objects(root, "resourceLogs") {
-        for (s, scope) in objects(resource, "scopeLogs") {
-            for (l, record) in objects(scope, "logRecords") {
-                (|| {
-                    as_string(record, "timeUnixNano")?;
-                    as_string(record, "observedTimeUnixNano")
-                })()
-                .map_err(|e| format!("resourceLogs[{r}].scopeLogs[{s}].logRecords[{l}].{e}"))?;
-            }
-        }
-    }
-    Ok(())
-}
-
-fn normalize_traces(root: &mut Value) -> Result<(), String> {
-    let root = top_level(root, "resourceSpans");
-    for (r, resource) in objects(root, "resourceSpans") {
-        for (s, scope) in objects(resource, "scopeSpans") {
-            for (i, span) in objects(scope, "spans") {
-                (|| {
-                    as_string(span, "startTimeUnixNano")?;
-                    as_string(span, "endTimeUnixNano")?;
-                    for (e, event) in objects(span, "events") {
-                        as_string(event, "timeUnixNano")
-                            .map_err(|err| format!("events[{e}].{err}"))?;
-                    }
-                    Ok(())
-                })()
-                .map_err(|e: String| {
-                    format!("resourceSpans[{r}].scopeSpans[{s}].spans[{i}].{e}")
-                })?;
-            }
-        }
-    }
-    Ok(())
-}
 
 /// What the decoded metrics request must contain, in traversal order: for
 /// each metric, whether the JSON carried its data, and for each gauge/sum
@@ -323,7 +251,7 @@ const DATA_KINDS: [&str; 5] = [
 ];
 
 fn normalize_metrics(root: &mut Value) -> Result<ExpectedMetrics, String> {
-    let root = top_level(root, "resourceMetrics");
+    let root = root.as_object_mut().expect("parse admits objects only");
     let mut expected = ExpectedMetrics::default();
     for (r, resource) in objects(root, "resourceMetrics") {
         for (s, scope) in objects(resource, "scopeMetrics") {
@@ -370,18 +298,11 @@ fn normalize_metric_data(
             match kind {
                 "gauge" | "sum" => {
                     single_value(point)?;
-                    as_string(point, "startTimeUnixNano")?;
-                    as_string(point, "timeUnixNano")?;
-                    as_number(point, "asInt", Sign::Signed)?;
+                    as_int(point)?;
                     point_values
                         .push(point.contains_key("asInt") || point.contains_key("asDouble"));
                 }
-                "histogram" => {
-                    as_string(point, "startTimeUnixNano")?;
-                    as_string(point, "timeUnixNano")?;
-                    as_number(point, "count", Sign::Unsigned)?;
-                    as_numbers(point, "bucketCounts")?;
-                }
+                "histogram" => {}
                 "exponentialHistogram" => {
                     fill(
                         point,
@@ -397,9 +318,6 @@ fn normalize_metric_data(
                             ("zeroThreshold", 0.0.into()),
                         ],
                     );
-                    for key in ["startTimeUnixNano", "timeUnixNano", "count", "zeroCount"] {
-                        as_number(point, key, Sign::Unsigned)?;
-                    }
                     for side in ["positive", "negative"] {
                         if let Some(Value::Object(buckets)) = point.get_mut(side) {
                             fill(
@@ -409,27 +327,10 @@ fn normalize_metric_data(
                                     ("bucketCounts", Value::Array(Vec::new())),
                                 ],
                             );
-                            as_numbers(buckets, "bucketCounts")
-                                .map_err(|e| format!("{side}.{e}"))?;
                         }
                     }
                 }
                 "summary" => {
-                    fill(
-                        point,
-                        &[
-                            ("attributes", Value::Array(Vec::new())),
-                            ("startTimeUnixNano", 0.into()),
-                            ("timeUnixNano", 0.into()),
-                            ("count", 0.into()),
-                            ("sum", 0.0.into()),
-                            ("quantileValues", Value::Array(Vec::new())),
-                            ("flags", 0.into()),
-                        ],
-                    );
-                    for key in ["startTimeUnixNano", "timeUnixNano", "count"] {
-                        as_number(point, key, Sign::Unsigned)?;
-                    }
                     for (_, quantile) in objects(point, "quantileValues") {
                         fill(quantile, &[("quantile", 0.0.into()), ("value", 0.0.into())]);
                     }
@@ -457,8 +358,7 @@ fn normalize_exemplar(exemplar: &mut Object) -> Result<(), String> {
         ],
     );
     single_value(exemplar)?;
-    as_number(exemplar, "timeUnixNano", Sign::Unsigned)?;
-    as_number(exemplar, "asInt", Sign::Signed)?;
+    as_int(exemplar)?;
     // The contract carries the oneof inline; the derives nest it.
     for key in ["asInt", "asDouble"] {
         if let Some(v) = exemplar.remove(key) {
@@ -584,15 +484,6 @@ fn json_pointer(path: &str) -> String {
 // Field helpers
 // ---------------------------------------------------------------------------
 
-/// The request object, with its one top-level array defaulted: the 0.31
-/// derives required it (0.33 does not), while `{}` is a valid (empty)
-/// export.
-fn top_level<'a>(root: &'a mut Value, key: &str) -> &'a mut Object {
-    let root = root.as_object_mut().expect("parse admits objects only");
-    root.entry(key).or_insert_with(|| Value::Array(Vec::new()));
-    root
-}
-
 /// The object elements of the array under `key`, with their indexes. A
 /// missing key or non-array value yields nothing: the decode reports type
 /// errors, the rewrite only touches well-shaped input.
@@ -616,60 +507,24 @@ fn fill(object: &mut Object, defaults: &[(&str, Value)]) {
     }
 }
 
-/// Whether a 64-bit field is signed (`sfixed64`: `asInt`) or unsigned
-/// (`fixed64`/`uint64`: timestamps, counts).
-#[derive(Clone, Copy)]
-enum Sign {
-    Signed,
-    Unsigned,
-}
-
-/// Rewrite an unsigned 64-bit integer field into the decimal-string form.
-fn as_string(object: &mut Object, key: &str) -> Result<(), String> {
-    if let Some(value) = object.get_mut(key) {
-        let number = integer(value, Sign::Unsigned).map_err(|e| format!("{key}: {e}"))?;
-        *value = Value::String(number.to_string());
-    }
-    Ok(())
-}
-
-/// Rewrite a 64-bit integer field into the JSON-number form.
-fn as_number(object: &mut Object, key: &str, sign: Sign) -> Result<(), String> {
-    if let Some(value) = object.get_mut(key) {
-        *value = integer(value, sign).map_err(|e| format!("{key}: {e}"))?;
-    }
-    Ok(())
-}
-
-/// [`as_number`] over every element of a repeated unsigned 64-bit field.
-fn as_numbers(object: &mut Object, key: &str) -> Result<(), String> {
-    if let Some(Value::Array(items)) = object.get_mut(key) {
-        for (i, item) in items.iter_mut().enumerate() {
-            *item = integer(item, Sign::Unsigned).map_err(|e| format!("{key}[{i}]: {e}"))?;
-        }
-    }
-    Ok(())
-}
-
-/// A 64-bit integer given as a JSON integer or a decimal string (the forms
-/// senders write), as a JSON number in the field's range. The fraction and
+/// Rewrite an `asInt` given as a JSON integer or a decimal string (the forms
+/// senders write) into the JSON number the derives read. The fraction and
 /// exponent forms proto3 JSON also permits (`3.0`, `1e3`) are rejected with
-/// a 400: no surveyed sender writes them.
-fn integer(value: &Value, sign: Sign) -> Result<Value, String> {
-    let parsed = match (value, sign) {
-        (Value::Number(n), Sign::Unsigned) => n.as_u64().map(Value::from),
-        (Value::Number(n), Sign::Signed) => n.as_i64().map(Value::from),
-        (Value::String(s), Sign::Unsigned) => s.parse::<u64>().ok().map(Value::from),
-        (Value::String(s), Sign::Signed) => s.parse::<i64>().ok().map(Value::from),
+/// a 400: no surveyed sender writes them, and the derives reject them in every
+/// other 64-bit field too.
+fn as_int(object: &mut Object) -> Result<(), String> {
+    let Some(value) = object.get_mut("asInt") else {
+        return Ok(());
+    };
+    let parsed = match value {
+        Value::Number(n) => n.as_i64(),
+        Value::String(s) => s.parse::<i64>().ok(),
         _ => None,
     };
-    parsed.ok_or_else(|| {
-        let range = match sign {
-            Sign::Signed => "a signed",
-            Sign::Unsigned => "an unsigned",
-        };
-        format!("expected {range} 64-bit integer (number or decimal string), got {value}")
-    })
+    *value = parsed.map(Value::from).ok_or_else(|| {
+        format!("asInt: expected a signed 64-bit integer (number or decimal string), got {value}")
+    })?;
+    Ok(())
 }
 
 #[cfg(test)]
@@ -1007,10 +862,14 @@ mod tests {
     }
 
     #[test]
-    fn omitted_and_null_any_values_decode_as_unset() {
+    fn empty_and_unknown_any_values_decode_like_protobuf() {
+        // An AnyValue naming no known kind is present but empty, as protobuf
+        // decodes an empty AnyValue message; only `null` (or omission) leaves
+        // the value unset.
         let json = r#"{"resourceLogs":[{"scopeLogs":[{"logRecords":[{"body":{"futureValue":1},"attributes":[
             {"key":"empty","value":{}},
             {"key":"future","value":{"futureValue":1}},
+            {"key":"strindex","value":{"stringValueStrindex":3}},
             {"key":"mixed","value":{"stringValue":"s","futureValue":1}},
             {"key":"null","value":null},
             {"key":"list","value":{"kvlistValue":{}}},
@@ -1018,29 +877,33 @@ mod tests {
             {"value":{"stringValue":"keyless"}}
         ]}]}]}]}"#;
         let decoded = ExportLogsServiceRequest::decode_json(json.as_bytes()).unwrap();
-        let kv = |key: &str, value: Option<any_value::Value>| KeyValue {
+        let empty = Some(AnyValue { value: None });
+        let kv = |key: &str, value: Option<AnyValue>| KeyValue {
             key: key.into(),
-            value: value.map(|v| AnyValue { value: Some(v) }),
+            value,
             key_strindex: 0,
         };
+        let set = |v: any_value::Value| Some(AnyValue { value: Some(v) });
         let expected = ExportLogsServiceRequest {
             resource_logs: vec![ResourceLogs {
                 scope_logs: vec![ScopeLogs {
                     log_records: vec![LogRecord {
+                        body: empty.clone(),
                         attributes: vec![
-                            kv("empty", None),
-                            kv("future", None),
-                            kv("mixed", Some(any_value::Value::StringValue("s".into()))),
+                            kv("empty", empty.clone()),
+                            kv("future", empty.clone()),
+                            kv("strindex", empty.clone()),
+                            kv("mixed", set(any_value::Value::StringValue("s".into()))),
                             kv("null", None),
                             kv(
                                 "list",
-                                Some(any_value::Value::KvlistValue(KeyValueList::default())),
+                                set(any_value::Value::KvlistValue(KeyValueList::default())),
                             ),
                             kv(
                                 "array",
-                                Some(any_value::Value::ArrayValue(ArrayValue::default())),
+                                set(any_value::Value::ArrayValue(ArrayValue::default())),
                             ),
-                            kv("", Some(any_value::Value::StringValue("keyless".into()))),
+                            kv("", set(any_value::Value::StringValue("keyless".into()))),
                         ],
                         ..Default::default()
                     }],
@@ -1050,6 +913,12 @@ mod tests {
             }],
         };
         assert_eq!(decoded, expected);
+        // Protobuf keeps an empty AnyValue present too.
+        let wire = prost::Message::encode_to_vec(&expected);
+        assert_eq!(
+            <ExportLogsServiceRequest as prost::Message>::decode(wire.as_slice()).unwrap(),
+            expected
+        );
     }
 
     #[test]
@@ -1157,14 +1026,16 @@ mod tests {
                 gauge(r#"{"asDouble":1,"attributes":[{"key":"k","value":{"intValue":"x"}}]}"#),
                 "metrics[0].gauge: cannot be decoded",
             ),
-            // Not an integer at all: rejected by the rewrite, with its path.
+            // Not an integer at all: `asInt` is rejected by the rewrite, with
+            // its path; any other 64-bit field by the derive, inside the
+            // flatten, so only the metric is named.
             (
                 gauge(r#"{"asInt":"12abc"}"#),
                 "metrics[0].gauge.dataPoints[0].asInt: expected a signed 64-bit integer",
             ),
             (
                 histogram(r#"{"count":1.5}"#),
-                "metrics[0].histogram.dataPoints[0].count: expected an unsigned 64-bit integer",
+                "metrics[0].histogram: cannot be decoded: invalid type: floating point `1.5`, expected a u64 integer",
             ),
             // Invalid input that must not decode into fabricated or partial
             // values: an empty object where a quantile's double belongs...
@@ -1197,8 +1068,9 @@ mod tests {
             );
         }
 
+        // Logs and traces decode with the derives alone: serde's message, no path.
         let log = r#"{"resourceLogs":[{"scopeLogs":[{"logRecords":[{"timeUnixNano":-1}]}]}]}"#;
         let err = ExportLogsServiceRequest::decode_json(log.as_bytes()).unwrap_err();
-        assert!(err.contains("logRecords[0].timeUnixNano"), "{err}");
+        assert_eq!(err, "i64 value -1 is out of range for u64");
     }
 }

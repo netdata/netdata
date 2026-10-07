@@ -8,11 +8,6 @@ set -euo pipefail
 # then matches `cargo fmt` byte for byte. Revisit if either changes.
 edition=2024
 
-# cargo fmt never reaches this file: no `mod` declares it.
-skip_paths=(
-    src/crates/journal-engine/src/logs/transformations.rs
-)
-
 mapfile -d '' files < <(git diff --cached --name-only --diff-filter=ACMR -z -- 'src/crates/*.rs')
 (( ${#files[@]} )) || exit 0
 
@@ -25,10 +20,6 @@ fi
 unformatted=()
 broken=()
 for f in "${files[@]}"; do
-    for s in "${skip_paths[@]}"; do
-        [[ $f == "$s" ]] && continue 2
-    done
-
     # Generated code (prost-build output) keeps its generator's layout.
     first_line=$(git cat-file blob ":$f" | sed -n 1p)
     [[ $first_line == *@generated* ]] && continue
