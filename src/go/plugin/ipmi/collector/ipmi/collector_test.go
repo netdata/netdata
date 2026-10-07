@@ -5,14 +5,18 @@
 package ipmi
 
 import (
+	"bytes"
 	"context"
 	"errors"
+	"fmt"
 	"os"
 	"strings"
 	"sync"
 	"testing"
 	"time"
 
+	"github.com/netdata/netdata/go/plugins/logger"
+	"github.com/netdata/netdata/go/plugins/pkg/confopt"
 	"github.com/netdata/netdata/go/plugins/pkg/funcapi"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/chartengine"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/charttpl"
@@ -28,6 +32,7 @@ type fakeReader struct {
 	err                   error
 	checks, scans, closes int
 	sel                   bool
+	closeContext          context.Context
 }
 
 func (r *fakeReader) Check(ctx context.Context) error { r.checks++; return ctx.Err() }
@@ -36,7 +41,11 @@ func (r *fakeReader) Collect(ctx context.Context, sel bool) (*ipmiapi.Snapshot, 
 	r.sel = sel
 	return r.snapshot, r.err
 }
-func (r *fakeReader) Close(context.Context) error { r.closes++; return nil }
+func (r *fakeReader) Close(ctx context.Context) error {
+	r.closes++
+	r.closeContext = ctx
+	return nil
+}
 func testCollector(t *testing.T) (*Collector, *fakeReader) {
 	t.Helper()
 	c := New()
@@ -143,4 +152,30 @@ func TestArtifacts(t *testing.T) {
 	require.NoError(t, err)
 	collecttest.AssertMetadataDocumentsFunctions(t, metadata, collecttest.MetadataFunctionsCheck{
 		Context: t.Context(), Module: "ipmi", Methods: ipmifunc.Methods(defaultUpdateEvery), Handler: c.funcRouter, JobSelectable: true})
+}
+
+func TestCleanupHasFixedDeadline(t *testing.T) {
+	c, r := testCollector(t)
+	c.Timeout = confopt.Duration(24 * time.Hour)
+	require.NoError(t, c.Check(t.Context()))
+	before := time.Now()
+	c.Cleanup(t.Context())
+	require.NotNil(t, r.closeContext)
+	deadline, ok := r.closeContext.Deadline()
+	require.True(t, ok)
+	assert.WithinDuration(t, before.Add(2*time.Second), deadline, 100*time.Millisecond)
+	c.Cleanup(t.Context())
+	assert.Equal(t, 1, r.closes)
+}
+
+func TestPartialWarningsAreRateLimited(t *testing.T) {
+	c, r := testCollector(t)
+	var logs bytes.Buffer
+	c.Logger = logger.NewWithWriter(&logs)
+	for i := range 10 {
+		r.snapshot.Warnings = []string{fmt.Sprintf("%d unsupported sensors", i+1)}
+		_, err := collecttest.CollectScalarSeries(c)
+		require.NoError(t, err)
+	}
+	assert.Equal(t, 1, strings.Count(logs.String(), "unsupported sensors"))
 }

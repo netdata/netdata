@@ -37,9 +37,11 @@ selected device number). For a controlled test on a root-only device, invoke the
 configuration directory. Normal Agent execution requires device access arranged by the operator. Do not grant
 broader privileges to `go.d.plugin`.
 
-For a remote BMC use `driver: lanplus`, `hostname`, `username` and `password`; `lan` supports IPMI 1.5. The remote
-session requests user privilege. Credentials are literal configuration values in this experimental build. An optional
-`vnode` assigns remote measurements to an existing virtual node.
+Only local Linux OpenIPMI is supported in this build. LAN/LAN+ will be added after upstream session concurrency and
+shutdown fixes are available. The production FreeIPMI plugin continues to support remote BMCs.
+
+The command timeout defaults to five seconds. The pinned library cannot interrupt an in-flight local receive on
+cancellation; stopping a job can wait for that receive timeout. Cancellation is checked between commands.
 
 ## Compatibility
 
@@ -54,4 +56,4 @@ session requests user privilege. Credentials are literal configuration values in
   policy remain covered by FreeIPMI. Kernel-backed local KCS/SSIF is accessed through OpenIPMI.
 
 The hardware baseline proves the pinned upstream library can read one local Linux BMC. It does not establish full
-FreeIPMI parity or validate remote sessions on every BMC.
+FreeIPMI parity.

@@ -74,7 +74,7 @@ func describe(sdr *types.SDR) []descriptor {
 		name = "UNNAMED"
 	}
 	// Bridged/channel-specific ownership is intentionally not guessed. BMC LUNs
-	// use the library's per-command responder context for both local and LAN I/O.
+	// use the library's per-command responder context for local I/O.
 	d.supported = err == nil && (encoding.TypeCode() != 0 || len(id) == 0) && d.owner.OwnerID() == 0x20 && d.owner.ChannelNumber() == 0 && modifier <= 1 && int(d.number)+count <= 255
 	unit, metric, legacyUnit := metricUnit(d.unit)
 	legacyReading := 255

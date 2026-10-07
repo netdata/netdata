@@ -24,7 +24,10 @@ var configSchema string
 //go:embed charts.yaml
 var chartTemplateYAML string
 
-const defaultUpdateEvery = 5
+const (
+	defaultUpdateEvery = 5
+	cleanupTimeout     = 2 * time.Second
+)
 
 func init() {
 	collectorapi.Register("ipmi", collectorapi.Creator{
@@ -53,14 +56,13 @@ type reader interface {
 
 type Collector struct {
 	collectorapi.Base
-	Config      `yaml:",inline" json:""`
-	store       metrix.CollectorStore
-	metrics     *collectorMetrics
-	device      reader
-	newReader   func(ipmiapi.Config) (reader, error)
-	snapshot    atomic.Pointer[ipmiapi.Snapshot]
-	funcRouter  funcapi.MethodHandler
-	lastWarning string
+	Config     `yaml:",inline" json:""`
+	store      metrix.CollectorStore
+	metrics    *collectorMetrics
+	device     reader
+	newReader  func(ipmiapi.Config) (reader, error)
+	snapshot   atomic.Pointer[ipmiapi.Snapshot]
+	funcRouter funcapi.MethodHandler
 }
 
 func (c *Collector) Configuration() any         { return c.Config }
@@ -88,10 +90,9 @@ func (c *Collector) Collect(ctx context.Context) error {
 	c.metrics.observe(snapshot)
 	c.snapshot.Store(snapshot)
 	warning := strings.Join(snapshot.Warnings, "; ")
-	if warning != "" && warning != c.lastWarning {
-		c.Warning(warning)
+	if warning != "" {
+		c.Limit("ipmi:partial-collection", 1, time.Hour).Warning(warning)
 	}
-	c.lastWarning = warning
 	return nil
 }
 func (c *Collector) Cleanup(ctx context.Context) {
@@ -109,9 +110,7 @@ func (c *Collector) ensureReader(ctx context.Context) error {
 	if c.device != nil {
 		return nil
 	}
-	dev, err := c.newReader(ipmiapi.Config{Driver: c.Driver, Device: c.Device,
-		Hostname: c.Hostname, Port: c.Port, Username: c.Username, Password: c.Password,
-		Timeout: time.Duration(c.Timeout)})
+	dev, err := c.newReader(ipmiapi.Config{Device: c.Device, Timeout: time.Duration(c.Timeout)})
 	if err != nil {
 		return err
 	}
@@ -120,7 +119,7 @@ func (c *Collector) ensureReader(ctx context.Context) error {
 }
 func (c *Collector) closeReader() {
 	if c.device != nil {
-		ctx, cancel := context.WithTimeout(context.Background(), time.Duration(c.Timeout))
+		ctx, cancel := context.WithTimeout(context.Background(), cleanupTimeout)
 		defer cancel()
 		if err := c.device.Close(ctx); err != nil {
 			c.Debugf("close IPMI connection: %v", err)

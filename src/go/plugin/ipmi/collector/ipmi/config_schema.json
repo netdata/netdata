@@ -13,18 +13,16 @@
       },
       "driver": {
         "title": "Driver",
-        "description": "Use open for a local kernel device, lan for IPMI 1.5, or lanplus for IPMI 2.0.",
+        "description": "Local Linux OpenIPMI transport. Only open is supported.",
         "type": "string",
         "enum": [
-          "open",
-          "lan",
-          "lanplus"
+          "open"
         ],
         "default": "open"
       },
       "timeout": {
         "title": "Timeout",
-        "description": "Timeout for each IPMI command.",
+        "description": "Receive timeout for each IPMI command. Stopping a job can wait for an in-flight receive to finish.",
         "type": "string",
         "default": "5s"
       },
@@ -33,76 +31,17 @@
         "description": "Collect the System Event Log entry count.",
         "type": "boolean",
         "default": true
-      }
-    },
-    "dependencies": {
-      "driver": {
-        "oneOf": [
-          {
-            "properties": {
-              "driver": {
-                "enum": [
-                  "open"
-                ]
-              },
-              "device": {
-                "title": "Device number",
-                "description": "Local OpenIPMI device number.",
-                "type": "integer",
-                "minimum": 0,
-                "default": 0
-              }
-            }
-          },
-          {
-            "properties": {
-              "driver": {
-                "enum": [
-                  "lan",
-                  "lanplus"
-                ]
-              },
-              "hostname": {
-                "title": "Hostname",
-                "description": "Remote BMC hostname or IP address.",
-                "type": "string"
-              },
-              "port": {
-                "title": "Port",
-                "description": "Remote BMC UDP port.",
-                "type": "integer",
-                "minimum": 1,
-                "maximum": 65535,
-                "default": 623
-              },
-              "username": {
-                "title": "Username",
-                "description": "Remote BMC account name. Leave empty for an anonymous account if supported by the BMC.",
-                "type": "string"
-              },
-              "password": {
-                "title": "Password",
-                "description": "Remote BMC account password. Leave empty only if the account has no password.",
-                "type": "string"
-              },
-              "vnode": {
-                "title": "Virtual node",
-                "description": "Existing virtual node associated with the remote BMC. Leave empty to attach measurements to this Agent.",
-                "type": "string"
-              }
-            },
-            "required": [
-              "hostname"
-            ]
-          }
-        ]
+      },
+      "device": {
+        "title": "Device number",
+        "description": "Local OpenIPMI device number.",
+        "type": "integer",
+        "minimum": 0,
+        "default": 0
       }
     }
   },
   "uiSchema": {
-    "password": {
-      "ui:widget": "password"
-    },
     "ui:flavour": "tabs",
     "ui:options": {
       "tabs": [
@@ -110,11 +49,7 @@
           "title": "Connection",
           "fields": [
             "driver",
-            "device",
-            "hostname",
-            "port",
-            "username",
-            "password"
+            "device"
           ]
         },
         {
@@ -124,23 +59,8 @@
             "timeout",
             "collect_sel"
           ]
-        },
-        {
-          "title": "Virtual Node",
-          "fields": [
-            "vnode"
-          ]
         }
       ]
-    },
-    "driver": {
-      "ui:widget": "radio",
-      "ui:options": {
-        "inline": true
-      }
-    },
-    "hostname": {
-      "ui:placeholder": "bmc.example.com"
     }
   }
 }

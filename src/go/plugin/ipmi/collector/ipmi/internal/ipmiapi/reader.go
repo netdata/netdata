@@ -7,7 +7,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"strings"
 	"sync"
 	"time"
 
@@ -18,14 +17,13 @@ import (
 	"github.com/bougou/go-ipmi/pkg/types"
 )
 
+// Cleanup is independent of the configured command timeout. Closing the local
+// device does not send another IPMI command.
+const cleanupTimeout = 2 * time.Second
+
 type Config struct {
-	Driver   string
-	Device   int32
-	Hostname string
-	Port     int
-	Username string
-	Password string
-	Timeout  time.Duration
+	Device  int32
+	Timeout time.Duration
 }
 
 type Snapshot struct {
@@ -53,10 +51,33 @@ type connection struct {
 }
 
 func (c *connection) Connect(ctx context.Context) error {
-	if c.config.Driver == "open" {
-		return c.ConnectOpen(ctx, c.config.Device)
+	return c.ConnectOpen(ctx, c.config.Device)
+}
+
+func (c *connection) Exchange(ctx context.Context, req types.Request, res types.Response) error {
+	timeout, err := receiveTimeout(ctx, c.config.Timeout)
+	if err != nil {
+		return err
 	}
-	return c.Client.Connect(ctx)
+	// Reader serializes local commands; there is no LAN keepalive. The SDK's
+	// receive ignores context, so also pass the remaining budget as its timeout.
+	c.Client.WithTimeout(timeout)
+	defer c.Client.WithTimeout(c.config.Timeout)
+	return c.Client.Exchange(ctx, req, res)
+}
+
+func receiveTimeout(ctx context.Context, configured time.Duration) (time.Duration, error) {
+	if err := ctx.Err(); err != nil {
+		return 0, err
+	}
+	if deadline, ok := ctx.Deadline(); ok {
+		remaining := time.Until(deadline)
+		if remaining <= 0 {
+			return 0, context.DeadlineExceeded
+		}
+		return min(configured, remaining), nil
+	}
+	return configured, nil
 }
 
 // Reader serializes calls because the client owns mutable session state.
@@ -72,39 +93,20 @@ type Reader struct {
 }
 
 func New(config Config) (*Reader, error) {
-	switch config.Driver {
-	case "open", "lan", "lanplus":
-	default:
-		return nil, fmt.Errorf("unsupported IPMI driver %q", config.Driver)
-	}
 	if config.Device < 0 {
 		return nil, errors.New("IPMI device must be nonnegative")
 	}
 	if config.Timeout <= 0 {
 		return nil, errors.New("IPMI timeout must be positive")
 	}
-	if config.Driver != "open" && (config.Hostname == "" || config.Port < 1 || config.Port > 65535) {
-		return nil, errors.New("remote IPMI requires a hostname and port 1–65535")
-	}
-	// Avoid upstream validation errors that echo the username.
-	if len(config.Username) > 16 {
-		return nil, errors.New("IPMI username exceeds 16 bytes")
-	}
 	r := &Reader{config: config, now: time.Now}
 	r.factory = func() (transport, error) {
-		var c *client.Client
-		var err error
-		if config.Driver == "open" {
-			// NewClient initializes LAN sessions only; changing its interface does not
-			// initialize the OpenIPMI state that ConnectOpen requires.
-			c, err = client.NewOpenClient()
-		} else {
-			c, err = client.NewClient(config.Hostname, config.Port, config.Username, config.Password)
-		}
+		// Only NewOpenClient initializes the state required by ConnectOpen.
+		c, err := client.NewOpenClient()
 		if err != nil {
 			return nil, errors.New("create IPMI client failed")
 		}
-		c.WithInterface(client.Interface(config.Driver)).WithTimeout(config.Timeout).WithRetry(0).WithMaxPrivilegeLevel(types.PrivilegeLevelUser)
+		c.WithTimeout(config.Timeout)
 		return &connection{Client: c, config: config}, nil
 	}
 	return r, nil
@@ -124,13 +126,13 @@ func (r *Reader) ensure(ctx context.Context) error {
 	connectCtx, cancel := context.WithTimeout(ctx, r.config.Timeout)
 	defer cancel()
 	if err = c.Connect(connectCtx); err != nil {
-		closeCtx, closeCancel := context.WithTimeout(context.WithoutCancel(ctx), r.config.Timeout)
+		closeCtx, closeCancel := context.WithTimeout(ctx, cleanupTimeout)
 		_ = c.Close(closeCtx)
 		closeCancel()
 		if ctx.Err() != nil {
 			return ctx.Err()
 		}
-		return fmt.Errorf("connect IPMI: %w", r.safeError(err))
+		return fmt.Errorf("connect IPMI: %w", err)
 	}
 	r.conn = c
 	return nil
@@ -146,7 +148,7 @@ func (r *Reader) exchange(ctx context.Context, req types.Request, res types.Resp
 	if ctx.Err() != nil {
 		return ctx.Err()
 	}
-	return r.safeError(err)
+	return err
 }
 
 func (r *Reader) Check(ctx context.Context) error {
@@ -165,7 +167,7 @@ func (r *Reader) Check(ctx context.Context) error {
 
 func (r *Reader) disconnect(ctx context.Context) {
 	if r.conn != nil {
-		closeCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), r.config.Timeout)
+		closeCtx, cancel := context.WithTimeout(ctx, cleanupTimeout)
 		_ = r.conn.Close(closeCtx)
 		cancel()
 		r.conn = nil
@@ -180,10 +182,12 @@ func (r *Reader) Close(ctx context.Context) error {
 	if r.conn == nil {
 		return nil
 	}
-	err := r.conn.Close(ctx)
+	closeCtx, cancel := context.WithTimeout(ctx, cleanupTimeout)
+	defer cancel()
+	err := r.conn.Close(closeCtx)
 	r.conn = nil
 	r.inventoryAt = time.Time{}
-	return r.safeError(err)
+	return err
 }
 
 // Warning counts have a fixed vocabulary, so a large SDR cannot flood logs.
@@ -318,25 +322,4 @@ type readingResponse struct {
 func (r *readingResponse) Unpack(data []byte) error {
 	r.length = len(data)
 	return r.GetSensorReadingResponse.Unpack(data)
-}
-
-// Preserve error classification while preventing SDK errors from echoing credentials.
-type redactedError struct {
-	cause   error
-	message string
-}
-
-func (e redactedError) Error() string { return e.message }
-func (e redactedError) Unwrap() error { return e.cause }
-func (r *Reader) safeError(err error) error {
-	if err == nil {
-		return nil
-	}
-	message := err.Error()
-	for _, secret := range []string{r.config.Password, r.config.Username} {
-		if secret != "" {
-			message = strings.ReplaceAll(message, secret, "[redacted]")
-		}
-	}
-	return redactedError{cause: err, message: message}
 }

@@ -3,9 +3,11 @@
 This experimental adapter uses the published `bougou/go-ipmi` revision
 `1462645b281c34c91d1a7c78298e46a54479e9e5`. It reads the SDR repository, sensor
 readings, and optionally one SEL entry-count response. It does not write BMC
-configuration. LAN and LAN+ request USER privilege; local OpenIPMI uses ordinary
-process/device permissions. Reader calls are serialized; the SDK owns its LAN
-session keepalive and serializes LAN exchanges internally.
+configuration. The only transport is Linux OpenIPMI using ordinary process/device
+permissions. The adapter accepts a device number and command timeout, constructs
+`NewOpenClient`, and serializes its calls. LAN/LAN+ are deferred until upstream
+session concurrency fixes are available; the pinned SDK's automatic keepalive
+can race between sequence capture and request construction.
 
 ## Discovery and missing data
 
@@ -30,7 +32,9 @@ A disabled scanner or unavailable reading produces unknown state and no numeric
 sample. A missing status byte produces unknown state even when the independent
 numeric reading is valid. Completion-code errors for individual sensors leave
 healthy sensors collectable. Inventory/transport failures and caller cancellation
-fail collection and close the connection. Optional SEL failures omit its sample;
+fail collection and close the connection. All cleanup contexts use a fixed two-second
+deadline and retain the caller's cancellation or earlier deadline, independently
+of the configured command timeout. Local cleanup closes the device descriptor without sending another IPMI command. Optional SEL failures omit its sample;
 no previous value or zero substitute is returned. Each requested SEL collection
 performs a real, single `Get SEL Info` command rather than rereading the log.
 Warnings are counts in four fixed categories, never an unbounded list of records.
@@ -52,6 +56,19 @@ and correctly decoded non-ASCII names can have different identities from the C
 collector's default shared-sensor/name handling. Type labels follow the C
 collector; components use its ordered case-insensitive name patterns, Other
 fallback, and fixed sensor-type overrides. This is not a complete FreeIPMI compatibility layer.
+
+## Local receive deadline limitation
+
+The pinned Linux SDK checks context before sending, but does not observe context
+cancellation during its blocking receive. The adapter checks cancellation around
+every command and passes `min(configured timeout, remaining caller budget)` as
+the SDK receive timeout. This temporary SDK setting is restored after each
+serialized command. It improves deadline fidelity without changing the public
+timeout option or replacing the transport.
+
+Each receive is bounded by that timeout, but cancellation after receive begins
+cannot interrupt it. The SDK starts its relative receive deadline after command
+send overhead, so the caller's deadline is not an exact wall-clock guarantee.
 
 ## State policy and source ownership
 
@@ -80,4 +97,4 @@ Tests exercise actual command-response decoding through a narrow fake transport,
 Reader collection/recovery/refresh, the complete source-derived discrete fixture,
 threshold flags, missing bytes, ownership, sharing, unit/sign conversion, nonlinear
 factors, and the pinned EXP10 workaround. They do not establish live-hardware
-parity for remote sessions or any particular vendor.
+parity for any particular vendor; separate live OpenIPMI evidence is required.

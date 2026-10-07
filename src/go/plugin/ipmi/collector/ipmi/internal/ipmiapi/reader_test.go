@@ -9,7 +9,6 @@ import (
 	"fmt"
 	"math"
 	"reflect"
-	"strings"
 	"testing"
 	"time"
 
@@ -113,7 +112,7 @@ func (f *fakeTransport) Exchange(ctx context.Context, req types.Request, res typ
 }
 func newFakeReader(t *testing.T, f *fakeTransport) *Reader {
 	t.Helper()
-	r, err := New(Config{Driver: "open", Timeout: time.Second})
+	r, err := New(Config{Timeout: time.Second})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -426,15 +425,13 @@ func TestReaderPartialSDR(t *testing.T) {
 	}
 }
 func TestNewValidation(t *testing.T) {
-	for _, c := range []Config{{Driver: "other", Timeout: time.Second}, {Driver: "open", Device: -1, Timeout: time.Second}, {Driver: "open"}, {Driver: "lan", Timeout: time.Second}, {Driver: "lanplus", Timeout: time.Second, Hostname: "host", Port: 65536}} {
-		if _, err := New(c); err == nil {
-			t.Fatalf("accepted invalid config %+v", c)
+	for _, config := range []Config{{Device: -1, Timeout: time.Second}, {Timeout: 0}, {Timeout: -time.Second}} {
+		if _, err := New(config); err == nil {
+			t.Fatalf("accepted invalid config %+v", config)
 		}
 	}
-	for _, driver := range []string{"open", "lan", "lanplus"} {
-		if _, err := New(Config{Driver: driver, Hostname: "host", Port: 623, Timeout: time.Second}); err != nil {
-			t.Fatal(err)
-		}
+	if _, err := New(Config{Device: 1, Timeout: time.Second}); err != nil {
+		t.Fatal(err)
 	}
 }
 
@@ -524,61 +521,145 @@ func TestPartialSDRMaximumWireSize(t *testing.T) {
 		t.Fatalf("last offset wrapped: %+v", final)
 	}
 }
-func TestReaderCommandDeadlineAndSafeErrors(t *testing.T) {
+func TestReaderCommandDeadline(t *testing.T) {
 	f := baseFake()
 	r := newFakeReader(t, f)
-	r.config.Username = "synthetic-user"
-	r.config.Password = "synthetic-password"
-	f.repoError = fmt.Errorf("failed synthetic-user synthetic-password")
-	_, err := r.Collect(context.Background(), false)
-	if err == nil || strings.Contains(err.Error(), "synthetic-") {
-		t.Fatalf("unsanitized error %v", err)
-	}
-	f.repoError = nil
 	f.before = func(req types.Request) error {
 		if _, ok := req.(*storage.GetSDRRepoInfoRequest); ok {
 			return context.DeadlineExceeded
 		}
 		return nil
 	}
-	_, err = r.Collect(context.Background(), false)
+	_, err := r.Collect(context.Background(), false)
 	if !errors.Is(err, context.DeadlineExceeded) {
 		t.Fatalf("deadline identity lost: %v", err)
 	}
 }
 
 func TestRealClientFactory(t *testing.T) {
-	for _, driver := range []string{"open", "lan", "lanplus"} {
-		t.Run(driver, func(t *testing.T) {
-			r, err := New(Config{Driver: driver, Hostname: "bmc.example", Port: 623, Username: "monitor", Password: "synthetic-secret", Timeout: time.Second})
-			if err != nil {
-				t.Fatal(err)
-			}
-			transport, err := r.factory()
-			if err != nil {
-				t.Fatal(err)
-			}
-			c := transport.(*connection)
-			if c.Interface != client.Interface(driver) || c.SessionPrivilegeLevel() != types.PrivilegeLevelUser {
-				t.Fatalf("unexpected interface/privilege: %s/%s", c.Interface, c.SessionPrivilegeLevel())
-			}
-			if driver == "open" {
-				// The pinned SDK has no public backend-state accessor. Read (never mutate)
-				// this constructor invariant: ConnectOpen dereferences it after device open.
-				// Fake transport tests cannot exercise successful physical device opening.
-				backend := reflect.ValueOf(c.Client).Elem().FieldByName("openipmi")
-				if !backend.IsValid() || backend.IsNil() {
-					t.Fatal("local SDK client lacks OpenIPMI state required by ConnectOpen")
+	r, err := New(Config{Device: 1, Timeout: time.Second})
+	if err != nil {
+		t.Fatal(err)
+	}
+	transport, err := r.factory()
+	if err != nil {
+		t.Fatal(err)
+	}
+	c := transport.(*connection)
+	if c.Interface != client.InterfaceOpen {
+		t.Fatalf("unexpected interface %s", c.Interface)
+	}
+	// The pinned SDK has no public backend-state accessor. Read (never mutate)
+	// the invariant required after physical device opening in ConnectOpen.
+	backend := reflect.ValueOf(c.Client).Elem().FieldByName("openipmi")
+	if !backend.IsValid() || backend.IsNil() {
+		t.Fatal("local SDK client lacks required OpenIPMI state")
+	}
+	if err := c.Close(context.Background()); err != nil {
+		t.Fatalf("close unconnected local client: %v", err)
+	}
+}
+
+func TestReceiveTimeout(t *testing.T) {
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+	defer cancel()
+	got, err := receiveTimeout(ctx, time.Hour)
+	if err != nil || got <= 0 || got > time.Second {
+		t.Fatalf("remaining budget not applied: %v, %v", got, err)
+	}
+	got, err = receiveTimeout(ctx, time.Millisecond)
+	if err != nil || got != time.Millisecond {
+		t.Fatalf("configured cap not preserved: %v, %v", got, err)
+	}
+	cancel()
+	if _, err := receiveTimeout(ctx, time.Hour); !errors.Is(err, context.Canceled) {
+		t.Fatalf("cancellation lost: %v", err)
+	}
+	expired, done := context.WithDeadline(context.Background(), time.Now().Add(-time.Second))
+	defer done()
+	if _, err := receiveTimeout(expired, time.Hour); !errors.Is(err, context.DeadlineExceeded) {
+		t.Fatalf("deadline lost: %v", err)
+	}
+	got, err = receiveTimeout(context.Background(), time.Second)
+	if err != nil || got != time.Second {
+		t.Fatalf("configured timeout changed: %v, %v", got, err)
+	}
+}
+
+type cleanupTransport struct {
+	*fakeTransport
+	connect func(context.Context) error
+	close   func(context.Context) error
+}
+
+func (c *cleanupTransport) Connect(ctx context.Context) error {
+	if c.connect != nil {
+		return c.connect(ctx)
+	}
+	return c.fakeTransport.Connect(ctx)
+}
+func (c *cleanupTransport) Close(ctx context.Context) error { return c.close(ctx) }
+
+func TestCleanupDeadlineAndCancellation(t *testing.T) {
+	for _, path := range []string{"failed-connect", "failed-collection", "explicit-close"} {
+		for _, canceled := range []bool{false, true} {
+			t.Run(fmt.Sprintf("%s/canceled=%t", path, canceled), func(t *testing.T) {
+				ctx, cancel := context.WithCancel(context.Background())
+				defer cancel()
+				f := baseFake()
+				r := newFakeReader(t, f)
+				r.config.Timeout = 24 * time.Hour
+				closed := 0
+				tr := &cleanupTransport{fakeTransport: f}
+				tr.close = func(closeCtx context.Context) error {
+					closed++
+					deadline, ok := closeCtx.Deadline()
+					if !ok || time.Until(deadline) > 2*time.Second {
+						t.Errorf("cleanup deadline is not capped at two seconds: %v, present=%t", deadline, ok)
+					}
+					if canceled && !errors.Is(closeCtx.Err(), context.Canceled) {
+						t.Errorf("cleanup ignored caller cancellation: %v", closeCtx.Err())
+					}
+					return closeCtx.Err()
 				}
-				if c.Host != "" || c.Username != "" || c.Password != "" {
-					t.Fatal("local SDK client retained unused LAN credentials")
+				r.factory = func() (transport, error) { return tr, nil }
+				switch path {
+				case "failed-connect":
+					tr.connect = func(context.Context) error {
+						if canceled {
+							cancel()
+						}
+						return errors.New("connect failed")
+					}
+					if err := r.Check(ctx); err == nil {
+						t.Fatal("expected connect failure")
+					}
+				case "failed-collection":
+					f.before = func(types.Request) error {
+						if canceled {
+							cancel()
+						}
+						return errors.New("transport failed")
+					}
+					if _, err := r.Collect(ctx, false); err == nil {
+						t.Fatal("expected collection failure")
+					}
+				case "explicit-close":
+					if err := r.Check(ctx); err != nil {
+						t.Fatal(err)
+					}
+					if canceled {
+						cancel()
+					}
+					err := r.Close(ctx)
+					if canceled && !errors.Is(err, context.Canceled) {
+						t.Errorf("Close lost cancellation: %v", err)
+					}
 				}
-				if err := c.Close(context.Background()); err != nil {
-					t.Fatalf("close unconnected local client: %v", err)
+				if closed != 1 {
+					t.Fatalf("close calls: %d", closed)
 				}
-			} else if c.Host != "bmc.example" || c.Port != 623 || c.Username != "monitor" {
-				t.Fatal("LAN endpoint not configured")
-			}
-		})
+			})
+		}
 	}
 }

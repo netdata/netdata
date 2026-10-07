@@ -14,23 +14,16 @@ import (
 
 func TestConfig(t *testing.T) {
 	for name, change := range map[string]func(*Config){
-		"interval":          func(c *Config) { c.UpdateEvery = 1 },
-		"timeout":           func(c *Config) { c.Timeout = 0 },
-		"driver":            func(c *Config) { c.Driver = "invalid" },
-		"negative device":   func(c *Config) { c.Device = -1 },
-		"local credentials": func(c *Config) { c.Password = "secret" },
-		"local port":        func(c *Config) { c.Port = 624 },
-		"local vnode":       func(c *Config) { c.Vnode = "remote" },
-		"remote hostname":   func(c *Config) { c.Driver = "lanplus" },
-		"remote device":     func(c *Config) { c.Driver = "lanplus"; c.Hostname = "bmc.example.com"; c.Device = 1 },
-		"remote port":       func(c *Config) { c.Driver = "lan"; c.Hostname = "bmc.example.com"; c.Port = 0 },
+		"interval":        func(c *Config) { c.UpdateEvery = 1 },
+		"timeout":         func(c *Config) { c.Timeout = 0 },
+		"driver":          func(c *Config) { c.Driver = "invalid" },
+		"negative device": func(c *Config) { c.Device = -1 },
+		"remote lan":      func(c *Config) { c.Driver = "lan" },
+		"remote lanplus":  func(c *Config) { c.Driver = "lanplus" },
 	} {
 		t.Run(name, func(t *testing.T) { c := defaultConfig(); change(&c); require.Error(t, c.validate()) })
 	}
 	c := defaultConfig()
-	require.NoError(t, c.validate())
-	c.Driver = "lanplus"
-	c.Hostname = "bmc.example.com"
 	require.NoError(t, c.validate())
 	// Effective configuration is available without connection or Init.
 	collector := New()
