@@ -250,8 +250,8 @@ Two sharp edges:
    max encoded OID 128 bytes, max OctetString 1024 bytes (relaxed for v3, whose encrypted ScopedPDU is one large
    OctetString), no indefinite lengths, no trailing data. This is the DoS budget for malformed input.
 4. gosnmp decode (panic-guarded; the dependency is a fork: see the `replace` directive in `src/go/go.mod`).
-5. Post-decode checks: version re-check, community allowlist (v1/v2c; empty list = accept any), v3 engine-ID
-   authorization, dynamic engine-ID registration.
+5. Post-decode checks: version re-check, community allowlist (v1/v2c; empty list = accept any), v3 security level,
+   dynamic engine-ID registration, v3 engine-ID authorization.
 6. **INFORM acknowledgment** — sent *before* the rate-limit decision, so a rate-limited INFORM is still acked while
    its content is dropped.
 7. Rate limit (last).
@@ -285,6 +285,10 @@ catch-all `0.0.0.0/0` trusted-relay prefix draws a startup warning, because any 
 **SNMPv3** (`v3_state.go`, `v3_dynamic.go`, `v3_envelope.go`, `inform.go`):
 
 - USM users are validated at config time (priv requires auth; keys ≥ 8 chars; engine IDs 5–32 hex bytes).
+- Security level (`v3_security_level.go`): gosnmp's table decode authenticates only what a message's own flags
+  request, so an unauthenticated message naming a user configured with an authentication protocol would decode.
+  It is dropped as `usm_failures` unless a configured entry for its user and engine ID is itself unauthenticated.
+  Privacy is not required. The check runs before dynamic engine-ID registration and the INFORM acknowledgment.
 - Trap authorization: the sender's engine ID must be in `engine_id_whitelist` — **or** `dynamic_engine_id_discovery`
   hot-registers unseen `(engineID, username)` pairs, capped by `dynamic_engine_id_max_pairs`. The two options are
   mutually exclusive by validation.
