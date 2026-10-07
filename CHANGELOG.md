@@ -58,6 +58,14 @@
 - DNS Server (windows host) ([#24102](https://github.com/netdata/netdata/issues/24102))
 - Format the Rust code in src/crates with cargo fmt ([#24164](https://github.com/netdata/netdata/issues/24164))
 - Perf(dbengine): skip MRG lookups for unwanted extent pages ([#24155](https://github.com/netdata/netdata/issues/24155))
+- Docs: add the Netdata Complete Product Description to Learn ([#24173](https://github.com/netdata/netdata/issues/24173))
+- Build(go.d/smbios_memory): build the collector only on Linux ([#24169](https://github.com/netdata/netdata/issues/24169))
+- Feat(go.d/jetson): add NVIDIA Jetson GPU and memory controller collector ([#24167](https://github.com/netdata/netdata/issues/24167))
+- Remove an uncompiled journal-engine file and fix the jf clippy warnings ([#24171](https://github.com/netdata/netdata/issues/24171))
+- Remove the OTLP/JSON rewrites made redundant by opentelemetry-proto 0.33 ([#24172](https://github.com/netdata/netdata/issues/24172))
+- Refactor(go.d): extract streaming-command supervision into streamexec ([#24175](https://github.com/netdata/netdata/issues/24175))
+- Refactor(go.d/nvidia_smi): run loop mode on the shared streamexec supervisor ([#24177](https://github.com/netdata/netdata/issues/24177))
+- Fix Windows startup crash with a patched MSYS2 runtime ([#24170](https://github.com/netdata/netdata/issues/24170))
 
 ## [2.12.0] - 2026-09-30
 
