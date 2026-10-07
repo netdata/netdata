@@ -525,6 +525,13 @@ jobs:
           file-digest: SHA256
           timestamp-rfc3161: "http://timestamp.acs.microsoft.com"
           timestamp-digest: SHA256
+      - name: Cache Patched MSYS2 Runtime
+        id: msys2-runtime-cache
+        if: needs.file-check.outputs.run == 'true'
+        uses: actions/cache@v6
+        with:
+          path: C:\msys64\msys2-runtime
+          key: msys2-runtime-${{ hashFiles('packaging/windows/msys2-runtime/**') }}
       - name: Package Netdata
         id: package
         if: needs.file-check.outputs.run == 'true'
