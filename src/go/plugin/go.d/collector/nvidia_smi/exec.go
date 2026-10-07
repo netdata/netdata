@@ -95,6 +95,7 @@ func newNvidiaSmiLoopExec(path string, cfg Config, log *logger.Logger) (*nvidiaS
 	source, err := streamexec.New(streamexec.Config[[]byte]{
 		Name: "nvidia-smi",
 		Start: func(ctx context.Context, stdout *os.File) (*ndexec.Process, error) {
+			log.Debugf("executing '%s -q -x -l %d'", path, interval)
 			return ndexec.StartUnprivilegedProcess(ctx, ndexec.ProcessOptions{
 				Stdout: stdout,
 			},
