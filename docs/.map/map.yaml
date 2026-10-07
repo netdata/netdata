@@ -5,6 +5,14 @@ sidebar:
       edit_url: https://github.com/netdata/netdata/edit/master/docs/welcome-to-netdata.md
     items:
       - meta:
+          label: Complete Product Description
+          edit_url: https://github.com/netdata/netdata/edit/master/docs/netdata-complete-product-description.md
+          description: Everything Netdata does in one reference, from architecture, infrastructure, network, databases, logs and OpenTelemetry to cloud, edge, AI, alerting and pricing, with links to the documentation.
+          keywords:
+            - netdata features
+            - product overview
+            - observability platform
+      - meta:
           label: Enterprise Evaluation Guide
           edit_url: https://github.com/netdata/netdata/edit/master/docs/netdata-enterprise-evaluation.md
           description: Evaluate Netdata architecture, deployment models, infrastructure requirements, security, integrations, and operational capabilities.
