@@ -80,9 +80,11 @@ func RunUnprivilegedWithCmd(log *logger.Logger, timeout time.Duration, binPath s
 // RunNDSudoWithCmd runs cmd via ndsudo and also returns the formatted command string.
 //
 // ndsudo runs the command as root, which an unprivileged caller cannot signal. At the timeout the command is
-// terminated where permitted and its output is closed, so a command that keeps writing dies of SIGPIPE. If it has not
-// exited a moment later, the call returns the timeout error anyway and the command is reaped when it ends. Until then,
-// a call with the same command and arguments fails with ErrPreviousRunNotExited instead of starting another one.
+// terminated where permitted and its output is closed, so a command that keeps writing dies of SIGPIPE unless it
+// handles SIGPIPE or EPIPE itself. If it has not exited a moment later, the call returns the timeout error anyway and
+// the command is reaped when it ends. From the timeout until it exits, a call with the same command and arguments fails
+// with ErrPreviousRunNotExited instead of starting another one. As with StartNDSudoProcess, a caller allowed to signal
+// root processes also terminates descendants that outlive the command.
 func RunNDSudoWithCmd(log *logger.Logger, timeout time.Duration, cmd string, args ...string) ([]byte, string, error) {
 	return runNDSudo(log, timeout, append([]string{cmd}, args...))
 }

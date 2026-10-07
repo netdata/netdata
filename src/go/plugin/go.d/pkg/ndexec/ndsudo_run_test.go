@@ -11,6 +11,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -104,12 +105,78 @@ func TestRunNDSudoTimeout(t *testing.T) {
 			}
 			require.ErrorIs(t, err, ErrPreviousRunNotExited)
 			assert.Less(t, elapsed, timeout, "a refused run waited")
+			other := ownedHelperArgs("success", t.TempDir())
+			_, err = RunNDSudo(nil, 5*time.Second, other[0], other[1:]...)
+			require.NoError(t, err, "another command line was refused")
 
 			// Once the earlier command exits (the silent helper ends after 2s), the command runs again.
 			require.Eventually(t, func() bool {
 				_, err := run()
 				return !errors.Is(err, ErrPreviousRunNotExited)
 			}, 5*time.Second, 50*time.Millisecond)
+		})
+	}
+}
+
+func TestRunNDSudoGuardCountsConcurrentRuns(t *testing.T) {
+	useTestBinaryAsNDSudo(t)
+	t.Cleanup(DenyNDSudoSignalsForTests())
+	args := ownedHelperArgs("slot", t.TempDir())
+	began := time.Now()
+
+	// Two runs of the same command line time out together; their commands exit after 0.7s and 3s.
+	var wg sync.WaitGroup
+	errs := make([]error, 2)
+	for i := range errs {
+		wg.Go(func() { _, errs[i] = RunNDSudo(nil, 300*time.Millisecond, args[0], args[1:]...) })
+	}
+	wg.Wait()
+	for _, err := range errs {
+		require.ErrorIs(t, err, context.DeadlineExceeded)
+	}
+
+	// The command line stays refused while either command runs.
+	time.Sleep(time.Until(began.Add(1500 * time.Millisecond)))
+	_, err := RunNDSudo(nil, 300*time.Millisecond, args[0], args[1:]...)
+	require.ErrorIs(t, err, ErrPreviousRunNotExited)
+}
+
+func TestRunNDSudoDescendantHoldingOutput(t *testing.T) {
+	for name, tc := range map[string]struct {
+		denied     bool
+		wantErr    error
+		wantEscape bool
+	}{
+		// The descendant ends with the command; the run succeeds.
+		"signals permitted": {},
+		// The descendant survives and keeps the output open; the run reports it after the output wait.
+		"signals denied": {denied: true, wantErr: exec.ErrWaitDelay, wantEscape: true},
+	} {
+		t.Run(name, func(t *testing.T) {
+			useTestBinaryAsNDSudo(t)
+			if tc.denied {
+				t.Cleanup(DenyNDSudoSignalsForTests())
+			}
+			dir := t.TempDir()
+			args := ownedHelperArgs("parent-exit", dir)
+
+			_, err := RunNDSudo(nil, 5*time.Second, args[0], args[1:]...)
+
+			if tc.wantErr == nil {
+				require.NoError(t, err)
+			} else {
+				require.ErrorIs(t, err, tc.wantErr)
+			}
+			// The descendant writes "escaped" 1.2s after it starts, if it is still alive.
+			escaped := filepath.Join(dir, "escaped")
+			if tc.wantEscape {
+				require.Eventually(t, func() bool { _, err := os.Stat(escaped); return err == nil }, 3*time.Second,
+					20*time.Millisecond)
+				return
+			}
+			time.Sleep(1500 * time.Millisecond)
+			_, err = os.Stat(escaped)
+			assert.True(t, os.IsNotExist(err), "the descendant outlived the command")
 		})
 	}
 }

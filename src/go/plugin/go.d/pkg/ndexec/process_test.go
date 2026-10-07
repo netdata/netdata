@@ -45,6 +45,16 @@ func TestOwnedProcessHelper(t *testing.T) {
 		time.Sleep(2 * time.Second)
 		os.Exit(0)
 	}
+	if mode == "slot" {
+		// Instances with the same arguments live differently: the first to claim the slot briefly, others longer.
+		lifetime := 3 * time.Second
+		if f, err := os.OpenFile(filepath.Join(dir, "slot"), os.O_CREATE|os.O_EXCL, 0600); err == nil {
+			_ = f.Close()
+			lifetime = 700 * time.Millisecond
+		}
+		time.Sleep(lifetime)
+		os.Exit(0)
+	}
 	if mode == "writer" {
 		// Writes until a closed output ends it with SIGPIPE; a broken owner cannot leave it alive indefinitely.
 		for deadline := time.Now().Add(5 * time.Second); time.Now().Before(deadline); {

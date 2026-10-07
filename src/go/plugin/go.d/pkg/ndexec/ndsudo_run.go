@@ -17,20 +17,20 @@ import (
 )
 
 // ErrPreviousRunNotExited reports that an earlier RunNDSudo call with the same command and arguments timed out and its
-// command has not exited yet. No second instance is started meanwhile.
+// command has not exited yet. No further instance is started meanwhile.
 var ErrPreviousRunNotExited = errors.New("a previous run that timed out has not exited")
 
 // ndsudoExitWait bounds two waits of an ndsudo run: for the command to exit after the timeout, and for its output to
 // end after it exits. It matches the WaitDelay of the other Run helpers.
 const ndsudoExitWait = 250 * time.Millisecond
 
-// ndsudoUnreaped holds the command lines of timed-out ndsudo runs whose commands are still running, so a command that
-// hangs on every call does not accumulate root processes.
+// ndsudoUnreaped counts, per command line, the timed-out ndsudo runs whose commands are still running, so a command
+// that hangs on every call does not accumulate root processes.
 var ndsudoUnreaped = struct {
 	mu   sync.Mutex
-	runs map[string]struct{}
+	runs map[string]int
 }{
-	runs: make(map[string]struct{}),
+	runs: make(map[string]int),
 }
 
 func runNDSudo(log *logger.Logger, timeout time.Duration, argv []string) ([]byte, string, error) {
@@ -69,33 +69,43 @@ func runNDSudo(log *logger.Logger, timeout time.Duration, argv []string) ([]byte
 		stderr.close()
 		return nil, cmdStr, runError(label, cmdStr, err, nil)
 	}
-	exited := make(chan error, 1)
-	go func() { exited <- p.Wait() }()
-
 	var waitErr error
+	exited := make(chan struct{})
+	go func() {
+		waitErr = p.Wait()
+		close(exited)
+	}()
+
 	select {
-	case waitErr = <-exited:
+	case <-exited:
 		// A descendant can hold the output open after the command exits.
 		if !endOutput(ndsudoExitWait, stdout, stderr) && waitErr == nil {
 			waitErr = exec.ErrWaitDelay
 		}
 	case <-ctx.Done():
-		// A writer that cannot be signaled dies of SIGPIPE at its next write. The output is cut here, so the run
-		// reports the timeout even if the command exits during the wait.
+		// From the timeout until the command exits, runs of the same command line are refused.
+		ndsudoUnreaped.mu.Lock()
+		ndsudoUnreaped.runs[key]++
+		ndsudoUnreaped.mu.Unlock()
+		release := sync.OnceFunc(func() {
+			ndsudoUnreaped.mu.Lock()
+			if ndsudoUnreaped.runs[key]--; ndsudoUnreaped.runs[key] == 0 {
+				delete(ndsudoUnreaped.runs, key)
+			}
+			ndsudoUnreaped.mu.Unlock()
+		})
+		go func() {
+			<-exited
+			release()
+		}()
+		// A writer that cannot be signaled dies of SIGPIPE at its next write, unless it handles SIGPIPE or EPIPE
+		// itself. The output is cut here, so the run reports the timeout even if the command exits during the wait.
 		stdout.close()
 		stderr.close()
 		select {
 		case <-exited:
+			release()
 		case <-time.After(ndsudoExitWait):
-			ndsudoUnreaped.mu.Lock()
-			ndsudoUnreaped.runs[key] = struct{}{}
-			ndsudoUnreaped.mu.Unlock()
-			go func() {
-				<-exited
-				ndsudoUnreaped.mu.Lock()
-				delete(ndsudoUnreaped.runs, key)
-				ndsudoUnreaped.mu.Unlock()
-			}()
 		}
 		return stdout.buf.Bytes(), cmdStr, runError(label, cmdStr, contextError(ctx), stderr.buf.Bytes())
 	}
