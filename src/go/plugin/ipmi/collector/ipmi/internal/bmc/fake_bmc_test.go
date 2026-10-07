@@ -207,7 +207,7 @@ func (f *fakeBMC) respondSDR(q *storage.GetSDRRequest) ([]byte, error) {
 			record = record[:min(len(record), f.partialLength(int(q.ReadOffset), int(q.ReadBytes)))]
 		}
 	} else if f.wholeLength != nil {
-		record = record[:f.wholeLength(len(record))]
+		record = record[:min(len(record), f.wholeLength(len(record)))]
 	}
 	data := make([]byte, 2+len(record))
 	binary.LittleEndian.PutUint16(data, next)
