@@ -54,10 +54,10 @@ cp "${repo_root}/packaging/windows/copy_files.ps1" /opt/netdata/usr/libexec/netd
 rm -rf /opt/netdata/msys64/
 
 check_msys2_runtime() {
-    local version
+    local expected="$1" hint="$2" version
     version="$(strings -el /opt/netdata/usr/bin/msys-2.0.dll | grep -A1 '^FileVersion$' | tail -n 1 || true)"
-    if [ "${version}" != "$1" ]; then
-        echo "Bundled msys-2.0.dll is '${version}', expected '$1'. $2" >&2
+    if [ "${version}" != "${expected}" ]; then
+        echo "Bundled msys-2.0.dll is '${version}', expected '${expected}'. ${hint}" >&2
         exit 1
     fi
 }
