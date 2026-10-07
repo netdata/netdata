@@ -140,7 +140,6 @@ pub(crate) fn opaque_part_key(namespace: &str, name: &str) -> u64 {
     h.finish()
 }
 
-
 /// Highest WAL sequence on disk under `base`: the one-level walk over
 /// `base`'s subdirectories — the `{base}/{tenant}/*.wal` shape the
 /// ingestor's per-tenant writers produce. Returns `0` for a missing `base`

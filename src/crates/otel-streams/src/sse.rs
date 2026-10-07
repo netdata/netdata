@@ -173,7 +173,10 @@ mod tests {
     #[test]
     fn value_with_colons_preserved() {
         // Only the first colon separates field from value; JSON colons survive.
-        assert_eq!(feed(&["data: {\"t\":\"12:30\"}\n\n"]), vec!["{\"t\":\"12:30\"}"]);
+        assert_eq!(
+            feed(&["data: {\"t\":\"12:30\"}\n\n"]),
+            vec!["{\"t\":\"12:30\"}"]
+        );
     }
 
     #[test]

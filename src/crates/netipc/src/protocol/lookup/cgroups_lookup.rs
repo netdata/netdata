@@ -1,7 +1,7 @@
 //! CGROUPS_LOOKUP codec.
 
 use super::common::*;
-use crate::protocol::{align8, NipcError, StrView};
+use crate::protocol::{NipcError, StrView, align8};
 
 pub const CGROUP_LOOKUP_KNOWN: u16 = 0;
 pub const CGROUP_LOOKUP_UNKNOWN_RETRY_LATER: u16 = 1;
@@ -689,10 +689,10 @@ where
 #[cfg(test)]
 mod tests {
     use super::super::common::{
-        put_u16, put_u32, response_item_bounds, u32_at, LOOKUP_DIR_ENTRY_SIZE,
+        LOOKUP_DIR_ENTRY_SIZE, put_u16, put_u32, response_item_bounds, u32_at,
     };
     use super::*;
-    use crate::protocol::{align8, ORCHESTRATOR_K8S};
+    use crate::protocol::{ORCHESTRATOR_K8S, align8};
 
     #[test]
     fn cgroups_lookup_request_roundtrip() {

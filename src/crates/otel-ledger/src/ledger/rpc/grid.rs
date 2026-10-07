@@ -56,9 +56,10 @@ pub(crate) fn bucket_width_for_span_s(span_s: u32) -> u32 {
 pub(crate) fn align_window(after: u32, before: u32, width_s: u32) -> (u32, u32) {
     let aligned_after = (after / width_s) * width_s;
     let max_aligned = (u32::MAX / width_s) * width_s;
-    let aligned_before = u32::try_from(u64::from(before).div_ceil(u64::from(width_s)) * u64::from(width_s))
-        .unwrap_or(max_aligned)
-        .min(max_aligned);
+    let aligned_before =
+        u32::try_from(u64::from(before).div_ceil(u64::from(width_s)) * u64::from(width_s))
+            .unwrap_or(max_aligned)
+            .min(max_aligned);
     (aligned_after, aligned_before)
 }
 

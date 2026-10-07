@@ -28,8 +28,8 @@ mod trace_plan;
 pub use rollup_resolver::{RollupRefOutcome, RollupRootResolver};
 pub use session::TraceFileSession;
 pub use trace_plan::{
-    CompiledTracePlan, GroupCondition, IdColumnKind, NumberCmp, PlanMatcher, PlanTerm,
-    ScanWork, TracePlan, numeric_token_matches,
+    CompiledTracePlan, GroupCondition, IdColumnKind, NumberCmp, PlanMatcher, PlanTerm, ScanWork,
+    TracePlan, numeric_token_matches,
 };
 
 use crate::{
@@ -779,7 +779,6 @@ impl<'a> IndexReader<'a> {
         }
         Ok(outcome.trace)
     }
-
 
     /// Resolve a **single** field's values at `positions`, decoding only that
     /// field's chunk. Thin wrapper over [`materialize_fields`](Self::materialize_fields).

@@ -233,7 +233,10 @@ fn selectors_are_object_only_arrays_reject() {
 fn the_top_level_must_be_a_json_object() {
     for body in [json!([]), json!([{}]), json!([1, 2]), json!(7), json!("x")] {
         let err = req_err(body.clone());
-        assert!(err.contains("otel-traces request object"), "for {body}: {err}");
+        assert!(
+            err.contains("otel-traces request object"),
+            "for {body}: {err}"
+        );
     }
 }
 
@@ -422,7 +425,11 @@ fn overview_params_take_selections_but_no_duration_bounds() {
         panic!("overview mode expected");
     };
     assert!(p.selections.is_empty());
-    for field in ["min_trace_duration_ns", "max_trace_duration_ns", "min_duration_ns"] {
+    for field in [
+        "min_trace_duration_ns",
+        "max_trace_duration_ns",
+        "min_duration_ns",
+    ] {
         let msg = req_err(json!({"overview": {field: 1}}));
         assert!(msg.contains("unknown field"), "{field}: {msg}");
     }
@@ -480,7 +487,10 @@ fn response_envelope_is_untagged() {
 #[test]
 fn complete_status_serializes_as_complete_true() {
     let wire = StatusWire::from(&QueryStatus::Complete);
-    assert_eq!(serde_json::to_value(&wire).unwrap(), json!({"complete": true}));
+    assert_eq!(
+        serde_json::to_value(&wire).unwrap(),
+        json!({"complete": true})
+    );
 }
 
 #[test]
@@ -610,7 +620,10 @@ fn overview_facets_knob_parses_and_junk_is_rejected() {
         json!({"overview": {"bogus": 1}}),
     ] {
         let err = req_err(body.clone());
-        assert!(err.contains("invalid overview selector"), "for {body}: {err}");
+        assert!(
+            err.contains("invalid overview selector"),
+            "for {body}: {err}"
+        );
     }
 }
 

@@ -236,8 +236,7 @@ pub fn normalize_log_request(
                 }
                 // Bounds apply to the RESOLVED, client-provided timestamp (inclusive).
                 if let Some(b) = bounds {
-                    if !synthesized
-                        && (r.time_unix_nano < b.min_ns || r.time_unix_nano > b.max_ns)
+                    if !synthesized && (r.time_unix_nano < b.min_ns || r.time_unix_nano > b.max_ns)
                     {
                         out.rejected += 1;
                         return false;

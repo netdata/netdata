@@ -51,10 +51,17 @@
 //! over real catalog entries) by query/tests.rs.
 use super::*;
 use file_registry::ByteSize;
-use uuid::Uuid;
 use file_registry::{Identity, InstanceId, MachineId};
-fn ident() -> Identity { Identity::new(MachineId::new(Uuid::from_u128(1)).unwrap(), InstanceId::new(Uuid::from_u128(2)).unwrap()) }
-fn sk(seq: u64) -> file_registry::SeqKey { file_registry::SeqKey::new(ident(), seq) }
+use uuid::Uuid;
+fn ident() -> Identity {
+    Identity::new(
+        MachineId::new(Uuid::from_u128(1)).unwrap(),
+        InstanceId::new(Uuid::from_u128(2)).unwrap(),
+    )
+}
+fn sk(seq: u64) -> file_registry::SeqKey {
+    file_registry::SeqKey::new(ident(), seq)
+}
 
 fn make_registry() -> Registry {
     let wal_dir = tempfile::tempdir().unwrap();
@@ -175,14 +182,20 @@ fn seqstate_is_isolated_per_identity() {
     reg.mark_uploaded(a);
     reg.mark_remote_cataloged([a]);
     assert!(reg.is_uploaded(a));
-    assert!(!reg.is_uploaded(b), "same seq, different identity: independent");
+    assert!(
+        !reg.is_uploaded(b),
+        "same seq, different identity: independent"
+    );
     assert!(!reg.is_remote_cataloged(b));
 
     // Evicting one identity's key must leave the other's state intact.
     reg.mark_uploaded(b);
     reg.evict_seq(a);
     assert!(!reg.is_uploaded(a));
-    assert!(reg.is_uploaded(b), "evicting one identity must not touch another");
+    assert!(
+        reg.is_uploaded(b),
+        "evicting one identity must not touch another"
+    );
 }
 
 #[test]

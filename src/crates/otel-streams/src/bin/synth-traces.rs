@@ -93,9 +93,7 @@ async fn main() -> anyhow::Result<()> {
     // The whole corpus is materialized in memory before the first batch
     // is sent, so the event total needs the same bound as the span count.
     if args.count.saturating_mul(args.events_per_span) > MAX_COUNT {
-        anyhow::bail!(
-            "--count x --events-per-span must not exceed {MAX_COUNT} total events"
-        );
+        anyhow::bail!("--count x --events-per-span must not exceed {MAX_COUNT} total events");
     }
     // span_id packs the position into 20 bits and the trace index into
     // bits 20..63: beyond either range, distinct spans silently collide

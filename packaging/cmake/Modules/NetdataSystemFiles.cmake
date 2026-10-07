@@ -913,3 +913,13 @@ add_custom_target(setup-mcp
                 --tool all --source-dir "${CMAKE_SOURCE_DIR}"
         USES_TERMINAL
         COMMENT "Configuring netdata-build MCP server for opencode/Claude Code (global config)")
+
+#
+# Opt-in: `ninja setup-git-hooks` installs the hooks in packaging/tools/git-hooks.
+# Ported from master's root file (#24164); kept beside setup-mcp as the other
+# developer-setup one-off — not part of the build (no ALL).
+#
+add_custom_target(setup-git-hooks
+        COMMAND "${CMAKE_COMMAND}" -P "${CMAKE_SOURCE_DIR}/packaging/tools/git-hooks/install-git-hooks.cmake"
+        USES_TERMINAL
+        COMMENT "Installing git hooks from packaging/tools/git-hooks")

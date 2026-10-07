@@ -342,8 +342,7 @@ pub fn overview(
         resolve_roots: query.root_facets,
         filter,
     };
-    let Some(merged) = merge_trace_sources(sources, &spec, &cancel, &progress, &mut status)
-    else {
+    let Some(merged) = merge_trace_sources(sources, &spec, &cancel, &progress, &mut status) else {
         return Ok(OverviewData::empty(
             grid.num_buckets,
             query.root_facets,

@@ -173,8 +173,7 @@ pub fn flatten_trace_into(
                     // from_bytes(empty) → UNSET; unwrap_or_default is exact.
                     let trace_id = TraceId::from_bytes(&sp.trace_id).unwrap_or_default();
                     let span_id = SpanId::from_bytes(&sp.span_id).unwrap_or_default();
-                    let parent_span_id =
-                        SpanId::from_bytes(&sp.parent_span_id).unwrap_or_default();
+                    let parent_span_id = SpanId::from_bytes(&sp.parent_span_id).unwrap_or_default();
                     let flags = sp.flags;
                     let dropped_attributes_count = sp.dropped_attributes_count;
                     let dropped_events_count = sp.dropped_events_count;

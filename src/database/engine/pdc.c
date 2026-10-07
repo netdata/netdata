@@ -977,13 +977,12 @@ VALIDATED_PAGE_DESCRIPTOR validate_page(
 }
 
 static ALWAYS_INLINE struct page_details *epdl_get_pd_load_link_list_from_metric_start_time(EPDL *epdl, Word_t metric_id, time_t start_time_s) {
-
-    // stop appending more pages to this epdl
-    epdl_pending_del(epdl);
-
     struct page_details *pd_list = NULL;
 
-    // the list is detached above, so it is safe to traverse it without e->spinlock
+    // the caller has detached the list (epdl_pending_del()), so it is safe to traverse it without e->spinlock
+    internal_fatal(epdl->head_to_datafile_extent_queries_pending_for_extent,
+                   "DBENGINE: traversing an epdl list that is not detached");
+
     for(EPDL *ep = epdl; ep ;ep = ep->query.next) {
         Pvoid_t *pd_by_start_time_s_judyL = PDCJudyLGet(ep->page_details_by_metric_id_JudyL, metric_id, PJE0);
         internal_fatal(pd_by_start_time_s_judyL == PJERR, "DBENGINE: corrupted extent metrics JudyL");
@@ -1007,6 +1006,60 @@ static ALWAYS_INLINE struct page_details *epdl_get_pd_load_link_list_from_metric
     }
 
     return pd_list;
+}
+
+// The metrics the queries merged onto an extent want. Every EPDL belongs to one PDC and
+// every PDC queries one metric, which it holds acquired for its lifetime, so matching the
+// extent descriptors against this set needs no MRG lookup.
+#define EPDL_WANTED_METRICS_ON_STACK 16
+
+struct epdl_wanted_metric {
+    nd_uuid_t uuid;
+    Word_t metric_id;
+};
+
+static size_t epdl_queries_count(EPDL *epdl) {
+    size_t count = 0;
+    for(EPDL *ep = epdl; ep ;ep = ep->query.next)
+        count++;
+
+    return count;
+}
+
+// the list must be detached (epdl_pending_del()) and wanted must have room for one entry per query
+static size_t epdl_wanted_metrics_get(EPDL *epdl, struct epdl_wanted_metric *wanted) {
+    internal_fatal(epdl->head_to_datafile_extent_queries_pending_for_extent,
+                   "DBENGINE: traversing an epdl list that is not detached");
+
+    size_t count = 0;
+
+    for(EPDL *ep = epdl; ep ;ep = ep->query.next) {
+        Word_t metric_id = mrg_metric_id(main_mrg, ep->pdc->metric);
+
+        size_t i;
+        for(i = 0; i < count && wanted[i].metric_id != metric_id; i++) ;
+        if(i < count)
+            continue;
+
+        nd_uuid_t *uuid = mrg_metric_uuid(main_mrg, ep->pdc->metric);
+        internal_fatal(!uuid, "DBENGINE: acquired metric has no uuid");
+        if(unlikely(!uuid))
+            continue;
+
+        nd_uuid_copy(wanted[count].uuid, *uuid);
+        wanted[count].metric_id = metric_id;
+        count++;
+    }
+
+    return count;
+}
+
+static ALWAYS_INLINE Word_t epdl_wanted_metric_id(struct epdl_wanted_metric *wanted, size_t count, const uint8_t *uuid) {
+    for(size_t i = 0; i < count; i++)
+        if(nd_uuid_eq(wanted[i].uuid, uuid))
+            return wanted[i].metric_id;
+
+    return 0;
 }
 
 static void epdl_extent_loading_error_log(struct rrdengine_instance *ctx, EPDL *epdl, struct rrdeng_extent_page_descr *descr, const char *msg, ND_LOG_FIELD_PRIORITY priority) {
@@ -1186,6 +1239,15 @@ static bool epdl_populate_pages_from_extent_data(
     size_t stats_load_invalid_page = 0;
     size_t stats_cache_hit_while_inserting = 0;
 
+    // stop appending more queries to this epdl, so that the list is stable while we collect its metrics
+    epdl_pending_del(epdl);
+
+    struct epdl_wanted_metric wanted_on_stack[EPDL_WANTED_METRICS_ON_STACK];
+    size_t queries = epdl_queries_count(epdl);
+    struct epdl_wanted_metric *wanted = (queries <= EPDL_WANTED_METRICS_ON_STACK) ?
+        wanted_on_stack : mallocz(queries * sizeof(*wanted));
+    size_t wanted_count = epdl_wanted_metrics_get(epdl, wanted);
+
     uint32_t page_offset = 0, page_length;
     time_t now_s = max_acceptable_collected_time();
     for (i = 0; i < count; i++, page_offset += page_length) {
@@ -1199,15 +1261,9 @@ static bool epdl_populate_pages_from_extent_data(
             continue;
         }
 
-        METRIC *metric = mrg_metric_get_and_acquire_by_uuid(main_mrg, &header->descr[i].uuid, (Word_t)ctx);
-        Word_t metric_id = (Word_t)metric;
-        if(!metric) {
-            char log[200 + 1];
-            snprintfz(log, sizeof(log) - 1, "page %u (out of %u) has unknown UUID", i, count);
-            epdl_extent_loading_error_log(ctx, epdl, &header->descr[i], log, NDLP_DEBUG);
+        Word_t metric_id = epdl_wanted_metric_id(wanted, wanted_count, header->descr[i].uuid);
+        if(!metric_id)
             continue;
-        }
-        mrg_metric_release(main_mrg, metric);
 
         struct page_details *pd_list = epdl_get_pd_load_link_list_from_metric_start_time(epdl, metric_id, start_time_s);
         if(likely(!pd_list))
@@ -1364,6 +1420,9 @@ static bool epdl_populate_pages_from_extent_data(
 
     if(worker)
         worker_is_idle();
+
+    if(wanted != wanted_on_stack)
+        freez(wanted);
 
     extent_buffer_release(eb);
 

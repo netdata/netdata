@@ -215,11 +215,7 @@ fn field_values_per_tier_prefix_stripped_by_length() {
             .map(|(_, v)| v.clone())
             .collect();
         want.sort();
-        assert_eq!(
-            idx.field_values(field).unwrap(),
-            want,
-            "values of {field}"
-        );
+        assert_eq!(idx.field_values(field).unwrap(), want, "values of {field}");
     }
     assert!(matches!(
         idx.field_values("absent"),

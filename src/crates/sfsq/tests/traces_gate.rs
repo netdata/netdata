@@ -46,8 +46,8 @@ use common::{
 };
 use opentelemetry_proto::tonic::collector::trace::v1::ExportTraceServiceRequest;
 use sfsq::traces::{
-    BuiltinField, CompareOp, Condition, PartialReason, Predicate, PredicateTarget,
-    PredicateValue, QueryStatus, SearchData, SearchQuery, SearchSources, TraceSource, search,
+    BuiltinField, CompareOp, Condition, PartialReason, Predicate, PredicateTarget, PredicateValue,
+    QueryStatus, SearchData, SearchQuery, SearchSources, TraceSource, search,
 };
 
 const NS: u64 = 1_000_000_000;
@@ -165,7 +165,11 @@ fn root_span(trace: u8, id: u8, start: u64, end: u64, name: &'static str) -> Spa
 }
 
 fn root_service_eq(value: &str) -> Condition {
-    builtin(BuiltinField::RootServiceName, CompareOp::Eq, vec![text(value)])
+    builtin(
+        BuiltinField::RootServiceName,
+        CompareOp::Eq,
+        vec![text(value)],
+    )
 }
 
 fn min_duration(ns: i64) -> Condition {
@@ -181,8 +185,7 @@ fn min_duration(ns: i64) -> Condition {
 /// shape, built from a real modern seal (payload bytes untouched).
 fn hide_chunk(path: &Path, id: [u8; 4]) {
     let mut bytes = std::fs::read(path).unwrap();
-    let num_chunks =
-        u32::from_le_bytes(bytes[8..12].try_into().unwrap()) as usize;
+    let num_chunks = u32::from_le_bytes(bytes[8..12].try_into().unwrap()) as usize;
     let toc_start = chunk_file::container::HEADER_SIZE;
     let entry_size = 12; // ChunkId(4) + offset u64 LE
     let mut hidden = false;
@@ -218,13 +221,17 @@ fn rare_root_selection_completes_instead_of_burning_the_ceiling() {
     // 70 single-span traces > the 64-assembly floor at limit 1.
     let reqs: Vec<ExportTraceServiceRequest> = (0..70u8)
         .map(|i| {
-            req_with(hot.clone(), None, &[root_span(
-                i + 1,
-                0x10,
-                u64::from(i + 1) * NS,
-                u64::from(i + 1) * NS + 50,
-                "op",
-            )])
+            req_with(
+                hot.clone(),
+                None,
+                &[root_span(
+                    i + 1,
+                    0x10,
+                    u64::from(i + 1) * NS,
+                    u64::from(i + 1) * NS + 50,
+                    "op",
+                )],
+            )
         })
         .collect();
     let wal = write_wal(dir.path(), reqs, "incident");
@@ -242,7 +249,11 @@ fn rare_root_selection_completes_instead_of_burning_the_ceiling() {
     let sources = both_roles(|| vec![sealed_source(dir.path(), &wal, "one")]);
     let on = run(sources, q());
     assert!(on.traces.is_empty());
-    assert_eq!(on.status, QueryStatus::Complete, "gate-on proves the empty answer");
+    assert_eq!(
+        on.status,
+        QueryStatus::Complete,
+        "gate-on proves the empty answer"
+    );
 
     // The same corpus still answers the MATCHING selection.
     let sources = both_roles(|| vec![sealed_source(dir.path(), &wal, "one")]);
@@ -265,17 +276,25 @@ fn straddling_trace_survives_merged_envelope_and_split_root() {
     let svc = vec![kv_str("service.name", "svc-a")];
     // File A: the root, [100s, 100s+1ms]. File B: a child,
     // [109s, 110s]. Merged duration: 10s.
-    let a = req_with(svc.clone(), None, &[root_span(
-        1,
-        0x11,
-        100 * NS,
-        100 * NS + 1_000_000,
-        "root-op",
-    )]);
-    let b = req_with(svc.clone(), None, &[SpanSpec {
-        end: 110 * NS,
-        ..span_in(1, 0x12, 0x11, 109 * NS, "child-op")
-    }]);
+    let a = req_with(
+        svc.clone(),
+        None,
+        &[root_span(
+            1,
+            0x11,
+            100 * NS,
+            100 * NS + 1_000_000,
+            "root-op",
+        )],
+    );
+    let b = req_with(
+        svc.clone(),
+        None,
+        &[SpanSpec {
+            end: 110 * NS,
+            ..span_in(1, 0x12, 0x11, 109 * NS, "child-op")
+        }],
+    );
     let wal_a = write_wal(dir.path(), vec![a], "straddle-a");
     let wal_b = write_wal(dir.path(), vec![b], "straddle-b");
     let sources = || {
@@ -308,17 +327,25 @@ fn straddling_trace_survives_merged_envelope_and_split_root() {
 fn tail_presence_blocks_pruning() {
     let dir = tempfile::tempdir().unwrap();
     let svc = vec![kv_str("service.name", "svc-a")];
-    let sealed_req = req_with(svc.clone(), None, &[root_span(
-        1,
-        0x11,
-        100 * NS,
-        100 * NS + 1_000_000,
-        "root-op",
-    )]);
-    let tail_req = req_with(svc.clone(), None, &[SpanSpec {
-        end: 110 * NS,
-        ..span_in(1, 0x12, 0x11, 109 * NS, "tail-op")
-    }]);
+    let sealed_req = req_with(
+        svc.clone(),
+        None,
+        &[root_span(
+            1,
+            0x11,
+            100 * NS,
+            100 * NS + 1_000_000,
+            "root-op",
+        )],
+    );
+    let tail_req = req_with(
+        svc.clone(),
+        None,
+        &[SpanSpec {
+            end: 110 * NS,
+            ..span_in(1, 0x12, 0x11, 109 * NS, "tail-op")
+        }],
+    );
     let wal_sealed = write_wal(dir.path(), vec![sealed_req], "tailblock-sealed");
     let wal_tail = write_wal(dir.path(), vec![tail_req], "tailblock-tail");
     let sources = || {
@@ -345,13 +372,11 @@ fn absent_chunks_block_pruning_without_a_partial() {
     for hide_bloom_too in [false, true] {
         let dir = tempfile::tempdir().unwrap();
         let svc = vec![kv_str("service.name", "hot")];
-        let reqs = vec![req_with(svc, None, &[root_span(
-            1,
-            0x11,
-            100 * NS,
-            100 * NS + 50,
-            "op",
-        )])];
+        let reqs = vec![req_with(
+            svc,
+            None,
+            &[root_span(1, 0x11, 100 * NS, 100 * NS + 50, "op")],
+        )];
         let wal = write_wal(dir.path(), reqs, "prerollup");
         drop(sealed_source(dir.path(), &wal, "old"));
         let path = sealed_path(dir.path(), "old");
@@ -370,7 +395,10 @@ fn absent_chunks_block_pruning_without_a_partial() {
             on.status
         );
         // The matching selection still returns through assembly.
-        let hit = run(sources(), SearchQuery::new(pred(vec![root_service_eq("hot")])));
+        let hit = run(
+            sources(),
+            SearchQuery::new(pred(vec![root_service_eq("hot")])),
+        );
         assert_eq!(ids(&hit), vec![hex(1)], "hide_bloom_too={hide_bloom_too}");
     }
 }
@@ -388,13 +416,11 @@ fn rootless_traces_never_match_root_filters_either_polarity() {
     let dir = tempfile::tempdir().unwrap();
     let svc = vec![kv_str("service.name", "svc-a")];
     // Parent 0xEE never exported: no unset-parent span exists.
-    let reqs = vec![req_with(svc, None, &[span_in(
-        1,
-        0x11,
-        0xEE,
-        100 * NS,
-        "orphan-op",
-    )])];
+    let reqs = vec![req_with(
+        svc,
+        None,
+        &[span_in(1, 0x11, 0xEE, 100 * NS, "orphan-op")],
+    )];
     let wal = write_wal(dir.path(), reqs, "orphan");
     let sources = || both_roles(|| vec![sealed_source(dir.path(), &wal, "one")]);
     // Positive and NEGATED root conditions: both fail on a rootless
@@ -440,10 +466,14 @@ fn rootless_heavy_corpus_completes_root_selections() {
     // 70 two-span rootless traces (the parent was never exported).
     let reqs: Vec<ExportTraceServiceRequest> = (0..70u8)
         .map(|i| {
-            req_with(svc.clone(), None, &[
-                span_in(i + 1, 0x10, 0xEE, u64::from(i + 1) * NS, "eval"),
-                span_in(i + 1, 0x11, 0x10, u64::from(i + 1) * NS + 5, "resolve"),
-            ])
+            req_with(
+                svc.clone(),
+                None,
+                &[
+                    span_in(i + 1, 0x10, 0xEE, u64::from(i + 1) * NS, "eval"),
+                    span_in(i + 1, 0x11, 0x10, u64::from(i + 1) * NS + 5, "resolve"),
+                ],
+            )
         })
         .collect();
     let wal = write_wal(dir.path(), reqs, "rootless-heavy");
@@ -460,7 +490,11 @@ fn rootless_heavy_corpus_completes_root_selections() {
 
     let on = run(sources(), q());
     assert!(on.traces.is_empty());
-    assert_eq!(on.status, QueryStatus::Complete, "the no-root prune proves it");
+    assert_eq!(
+        on.status,
+        QueryStatus::Complete,
+        "the no-root prune proves it"
+    );
 }
 
 /// Negated conditions never prune: a `!=` root selection and a `!=`
@@ -475,7 +509,11 @@ fn negated_conditions_never_prune() {
     // Durations: trace 1 = 2s, trace 2 = 6s.
     let reqs = vec![
         req_with(hot, None, &[root_span(1, 0x11, 100 * NS, 102 * NS, "op-a")]),
-        req_with(cold, None, &[root_span(2, 0x21, 200 * NS, 206 * NS, "op-b")]),
+        req_with(
+            cold,
+            None,
+            &[root_span(2, 0x21, 200 * NS, 206 * NS, "op-b")],
+        ),
     ];
     let wal = write_wal(dir.path(), reqs, "negated");
     let sources = || both_roles(|| vec![sealed_source(dir.path(), &wal, "one")]);
@@ -517,9 +555,21 @@ fn multi_value_duration_bound_is_the_min_point() {
     let svc = vec![kv_str("service.name", "svc")];
     // Durations: 3s / 5s / 20s.
     let reqs = vec![
-        req_with(svc.clone(), None, &[root_span(1, 0x11, 100 * NS, 103 * NS, "op")]),
-        req_with(svc.clone(), None, &[root_span(2, 0x21, 200 * NS, 205 * NS, "op")]),
-        req_with(svc.clone(), None, &[root_span(3, 0x31, 300 * NS, 320 * NS, "op")]),
+        req_with(
+            svc.clone(),
+            None,
+            &[root_span(1, 0x11, 100 * NS, 103 * NS, "op")],
+        ),
+        req_with(
+            svc.clone(),
+            None,
+            &[root_span(2, 0x21, 200 * NS, 205 * NS, "op")],
+        ),
+        req_with(
+            svc.clone(),
+            None,
+            &[root_span(3, 0x31, 300 * NS, 320 * NS, "op")],
+        ),
     ];
     let wal = write_wal(dir.path(), reqs, "points");
     let sources = || both_roles(|| vec![sealed_source(dir.path(), &wal, "one")]);
@@ -547,8 +597,16 @@ fn upper_bounds_and_regex_selections_match_gate_off() {
     let dir = tempfile::tempdir().unwrap();
     let svc = vec![kv_str("service.name", "svc-a")];
     let reqs = vec![
-        req_with(svc.clone(), None, &[root_span(1, 0x11, 100 * NS, 102 * NS, "get-users")]),
-        req_with(svc.clone(), None, &[root_span(2, 0x21, 200 * NS, 220 * NS, "post-orders")]),
+        req_with(
+            svc.clone(),
+            None,
+            &[root_span(1, 0x11, 100 * NS, 102 * NS, "get-users")],
+        ),
+        req_with(
+            svc.clone(),
+            None,
+            &[root_span(2, 0x21, 200 * NS, 220 * NS, "post-orders")],
+        ),
     ];
     let wal = write_wal(dir.path(), reqs, "upper-regex");
     let sources = || both_roles(|| vec![sealed_source(dir.path(), &wal, "one")]);
@@ -589,12 +647,16 @@ fn split_root_claims_survive_on_any_match() {
     // contradicting themselves across files; same span id, same start
     // — the canonical copy is content-tie-broken, so assert only
     // equality with gate-off, not a specific value).
-    let a = req_with(vec![kv_str("service.name", "svc-a")], None, &[root_span(
-        1, 0x11, 100 * NS, 101 * NS, "op",
-    )]);
-    let b = req_with(vec![kv_str("service.name", "svc-b")], None, &[root_span(
-        1, 0x11, 100 * NS, 101 * NS, "op",
-    )]);
+    let a = req_with(
+        vec![kv_str("service.name", "svc-a")],
+        None,
+        &[root_span(1, 0x11, 100 * NS, 101 * NS, "op")],
+    );
+    let b = req_with(
+        vec![kv_str("service.name", "svc-b")],
+        None,
+        &[root_span(1, 0x11, 100 * NS, 101 * NS, "op")],
+    );
     let wal_a = write_wal(dir.path(), vec![a], "claims-a");
     let wal_b = write_wal(dir.path(), vec![b], "claims-b");
     let sources = || {
@@ -619,9 +681,11 @@ fn split_root_claims_survive_on_any_match() {
 fn pinned_lookups_bypass_the_gate() {
     let dir = tempfile::tempdir().unwrap();
     let svc = vec![kv_str("service.name", "hot")];
-    let reqs = vec![req_with(svc, None, &[root_span(
-        5, 0x51, 100 * NS, 101 * NS, "op",
-    )])];
+    let reqs = vec![req_with(
+        svc,
+        None,
+        &[root_span(5, 0x51, 100 * NS, 101 * NS, "op")],
+    )];
     let wal = write_wal(dir.path(), reqs, "pinned");
     let sources = || both_roles(|| vec![sealed_source(dir.path(), &wal, "one")]);
     let q = || {
@@ -645,9 +709,11 @@ fn pinned_lookups_bypass_the_gate() {
 fn corrupt_rollup_chunk_is_skipped_and_surfaced() {
     let dir = tempfile::tempdir().unwrap();
     let svc = vec![kv_str("service.name", "hot")];
-    let reqs = vec![req_with(svc, None, &[root_span(
-        1, 0x11, 100 * NS, 101 * NS, "op",
-    )])];
+    let reqs = vec![req_with(
+        svc,
+        None,
+        &[root_span(1, 0x11, 100 * NS, 101 * NS, "op")],
+    )];
     let wal = write_wal(dir.path(), reqs, "corrupt-trsu");
     // Seal once, corrupt in place, then build sources WITHOUT resealing.
     drop(sealed_source(dir.path(), &wal, "one"));
@@ -657,7 +723,10 @@ fn corrupt_rollup_chunk_is_skipped_and_surfaced() {
 
     let q = || SearchQuery::new(pred(vec![root_service_eq("hot")]));
     let on = run(build(), q());
-    assert!(on.traces.is_empty(), "indeterminate candidates are excluded");
+    assert!(
+        on.traces.is_empty(),
+        "indeterminate candidates are excluded"
+    );
     assert!(
         on.status.has(PartialReason::SourceFailure),
         "the skip is surfaced: {:?}",
@@ -677,9 +746,11 @@ fn corrupt_rollup_chunk_is_skipped_and_surfaced() {
 fn corrupt_bloom_chunk_is_skipped_and_surfaced() {
     let dir = tempfile::tempdir().unwrap();
     let svc = vec![kv_str("service.name", "hot")];
-    let reqs = vec![req_with(svc, None, &[root_span(
-        1, 0x11, 100 * NS, 101 * NS, "op",
-    )])];
+    let reqs = vec![req_with(
+        svc,
+        None,
+        &[root_span(1, 0x11, 100 * NS, 101 * NS, "op")],
+    )];
     let wal = write_wal(dir.path(), reqs, "corrupt-tblm");
     drop(sealed_source(dir.path(), &wal, "one"));
     let path = sealed_path(dir.path(), "one");
@@ -689,7 +760,11 @@ fn corrupt_bloom_chunk_is_skipped_and_surfaced() {
     let q = || SearchQuery::new(pred(vec![root_service_eq("hot")]));
     let on = run(build(), q());
     assert!(on.traces.is_empty());
-    assert!(on.status.has(PartialReason::SourceFailure), "{:?}", on.status);
+    assert!(
+        on.status.has(PartialReason::SourceFailure),
+        "{:?}",
+        on.status
+    );
 }
 
 /// The recorded status delta, pinned: a pruned candidate's would-have-
@@ -703,12 +778,16 @@ fn pruned_candidates_sizecap_partial_is_never_observed() {
     let hot = vec![kv_str("service.name", "hot")];
     let reqs = vec![
         // Trace 1: 4 spans — truncated under a span cap of 2.
-        req_with(cold, None, &[
-            root_span(1, 0x11, 100 * NS, 101 * NS, "op"),
-            span_in(1, 0x12, 0x11, 100 * NS + 10, "child"),
-            span_in(1, 0x13, 0x11, 100 * NS + 20, "child"),
-            span_in(1, 0x14, 0x11, 100 * NS + 30, "child"),
-        ]),
+        req_with(
+            cold,
+            None,
+            &[
+                root_span(1, 0x11, 100 * NS, 101 * NS, "op"),
+                span_in(1, 0x12, 0x11, 100 * NS + 10, "child"),
+                span_in(1, 0x13, 0x11, 100 * NS + 20, "child"),
+                span_in(1, 0x14, 0x11, 100 * NS + 30, "child"),
+            ],
+        ),
         req_with(hot, None, &[root_span(2, 0x21, 200 * NS, 201 * NS, "op")]),
     ];
     let wal = write_wal(dir.path(), reqs, "sizecap-delta");
@@ -738,17 +817,23 @@ fn mid_tier_resolution_and_the_resolver_closed_rule() {
     let dir = tempfile::tempdir().unwrap();
     let svc = vec![kv_str("service.name", "svc")];
     let names: Vec<String> = (0..150).map(|i| format!("op-{i:03}")).collect();
-    let leaked: Vec<&'static str> =
-        names.iter().map(|n| &*Box::leak(n.clone().into_boxed_str())).collect();
+    let leaked: Vec<&'static str> = names
+        .iter()
+        .map(|n| &*Box::leak(n.clone().into_boxed_str()))
+        .collect();
     let reqs: Vec<ExportTraceServiceRequest> = (0..150u64)
         .map(|i| {
-            req_with(svc.clone(), None, &[root_span(
-                (i + 1) as u8,
-                0x10,
-                (i + 1) * NS,
-                (i + 1) * NS + 50,
-                leaked[i as usize],
-            )])
+            req_with(
+                svc.clone(),
+                None,
+                &[root_span(
+                    (i + 1) as u8,
+                    0x10,
+                    (i + 1) * NS,
+                    (i + 1) * NS + 50,
+                    leaked[i as usize],
+                )],
+            )
         })
         .collect();
     let wal = write_wal(dir.path(), reqs, "midtier");
@@ -766,7 +851,11 @@ fn mid_tier_resolution_and_the_resolver_closed_rule() {
     };
     let on = run(sources(), q());
     let off = run(sources(), q().trace_gate_for_tests(false));
-    assert_eq!(on.traces.len(), 1, "mid-tier dictionary resolves in the gate");
+    assert_eq!(
+        on.traces.len(),
+        1,
+        "mid-tier dictionary resolves in the gate"
+    );
     assert_eq!(norm(&on), norm(&off));
 
     // The closed rule, on the sealed file directly.
@@ -810,9 +899,11 @@ fn mid_tier_resolution_and_the_resolver_closed_rule() {
 fn pruning_masks_assembly_only_corruption_by_design() {
     let dir = tempfile::tempdir().unwrap();
     let cold = vec![kv_str("service.name", "cold")];
-    let reqs = vec![req_with(cold, None, &[root_span(
-        1, 0x11, 100 * NS, 101 * NS, "op",
-    )])];
+    let reqs = vec![req_with(
+        cold,
+        None,
+        &[root_span(1, 0x11, 100 * NS, 101 * NS, "op")],
+    )];
     let wal = write_wal(dir.path(), reqs, "masked");
     drop(sealed_source(dir.path(), &wal, "one"));
     let path = sealed_path(dir.path(), "one");
@@ -852,14 +943,22 @@ fn ambiguous_root_ties_abstain_and_never_diverge() {
     // Same span id + start; CLIENT(3)/svc-first stored first,
     // SERVER(2)/svc-canon second — the combiner orders by kind, so the
     // canonical root is the SERVER copy whichever was stored first.
-    let first = req_with(vec![kv_str("service.name", "svc-first")], None, &[SpanSpec {
-        kind: 3,
-        ..root_span(1, 0x42, 100 * NS, 101 * NS, "op")
-    }]);
-    let second = req_with(vec![kv_str("service.name", "svc-canon")], None, &[SpanSpec {
-        kind: 2,
-        ..root_span(1, 0x42, 100 * NS, 101 * NS, "op")
-    }]);
+    let first = req_with(
+        vec![kv_str("service.name", "svc-first")],
+        None,
+        &[SpanSpec {
+            kind: 3,
+            ..root_span(1, 0x42, 100 * NS, 101 * NS, "op")
+        }],
+    );
+    let second = req_with(
+        vec![kv_str("service.name", "svc-canon")],
+        None,
+        &[SpanSpec {
+            kind: 2,
+            ..root_span(1, 0x42, 100 * NS, 101 * NS, "op")
+        }],
+    );
     let wal = write_wal(dir.path(), vec![first, second], "tie");
     let sources = || both_roles(|| vec![sealed_source(dir.path(), &wal, "one")]);
 
@@ -895,11 +994,15 @@ fn high_tier_resolution_matches_gate_off() {
         .map(|i| {
             let mut trace = [0u8; 16];
             trace[14..16].copy_from_slice(&(i as u16 + 1).to_be_bytes());
-            req_with(svc.clone(), None, &[SpanSpec {
-                trace,
-                end: (i + 1) * NS + 50,
-                ..sp(0x10, 0, (i + 1) * NS, names[i as usize])
-            }])
+            req_with(
+                svc.clone(),
+                None,
+                &[SpanSpec {
+                    trace,
+                    end: (i + 1) * NS + 50,
+                    ..sp(0x10, 0, (i + 1) * NS, names[i as usize])
+                }],
+            )
         })
         .collect();
     let wal = write_wal(dir.path(), reqs, "hightier");
@@ -935,7 +1038,10 @@ fn differential_gate_on_off_sweep() {
     struct Lcg(u64);
     impl Lcg {
         fn next(&mut self, bound: u64) -> u64 {
-            self.0 = self.0.wrapping_mul(6364136223846793005).wrapping_add(1442695040888963407);
+            self.0 = self
+                .0
+                .wrapping_mul(6364136223846793005)
+                .wrapping_add(1442695040888963407);
             (self.0 >> 33) % bound
         }
     }
@@ -962,7 +1068,11 @@ fn differential_gate_on_off_sweep() {
                 });
             }
             let req = req_with(vec![kv_str("service.name", svc)], None, &spans);
-            if t % 2 == 0 { reqs_a.push(req) } else { reqs_b.push(req) }
+            if t % 2 == 0 {
+                reqs_a.push(req)
+            } else {
+                reqs_b.push(req)
+            }
         }
         let wal_a = write_wal(dir.path(), reqs_a, "diff-a");
         let wal_b = write_wal(dir.path(), reqs_b, "diff-b");
@@ -1000,7 +1110,9 @@ fn differential_gate_on_off_sweep() {
             let on = run(sources(), SearchQuery::new(predicate.clone()).limit(30));
             let off = run(
                 sources(),
-                SearchQuery::new(predicate).limit(30).trace_gate_for_tests(false),
+                SearchQuery::new(predicate)
+                    .limit(30)
+                    .trace_gate_for_tests(false),
             );
             assert_eq!(norm(&on), norm(&off), "seed {seed} query {qi}");
         }

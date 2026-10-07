@@ -874,9 +874,11 @@ mod tests {
     fn resolve_identity_accepts_dashed_form() {
         // The registry file (/var/lib/netdata/registry/netdata.public.unique.id)
         // stores the machine GUID in dashed form.
-        let id =
-            resolve_identity(Some("550e8400-e29b-41d4-a716-446655440000"), "NETDATA_REGISTRY_UNIQUE_ID")
-                .unwrap();
+        let id = resolve_identity(
+            Some("550e8400-e29b-41d4-a716-446655440000"),
+            "NETDATA_REGISTRY_UNIQUE_ID",
+        )
+        .unwrap();
         assert_eq!(id.to_string(), "550e8400-e29b-41d4-a716-446655440000");
     }
 
@@ -885,9 +887,11 @@ mod tests {
         // The helper also accepts lowercase-compact UUIDs (no dashes), so a
         // compact-form source is handled defensively even though the registry
         // file is dashed.
-        let id =
-            resolve_identity(Some("550e8400e29b41d4a716446655440000"), "NETDATA_REGISTRY_UNIQUE_ID")
-                .unwrap();
+        let id = resolve_identity(
+            Some("550e8400e29b41d4a716446655440000"),
+            "NETDATA_REGISTRY_UNIQUE_ID",
+        )
+        .unwrap();
         assert_eq!(
             id.to_string(),
             "550e8400-e29b-41d4-a716-446655440000",

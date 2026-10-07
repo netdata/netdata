@@ -224,7 +224,11 @@ fn parent_edges_and_missing_parent_root() {
 
     assert_eq!(trace.spans.len(), 3);
     assert_eq!(trace.roots.len(), 2);
-    let a_idx = trace.spans.iter().position(|s| s.span_id == sid(1)).unwrap();
+    let a_idx = trace
+        .spans
+        .iter()
+        .position(|s| s.span_id == sid(1))
+        .unwrap();
     let a_children = &trace.children[a_idx];
     assert_eq!(a_children.len(), 1);
     assert_eq!(trace.spans[a_children[0]].span_id, sid(2));

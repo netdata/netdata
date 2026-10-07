@@ -166,8 +166,7 @@ pub fn slowest(
         resolve_roots: true,
         filter: None,
     };
-    let Some(merged) = merge_trace_sources(sources, &spec, &cancel, &progress, &mut status)
-    else {
+    let Some(merged) = merge_trace_sources(sources, &spec, &cancel, &progress, &mut status) else {
         return Ok(SlowestData {
             traces: Vec::new(),
             status: status.finish(),

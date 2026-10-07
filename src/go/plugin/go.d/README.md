@@ -77,6 +77,7 @@ All capabilities are set automatically during Netdata installation using the [of
 | [intelgpu](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/collector/intelgpu)                     |     Intel integrated GPU      |
 | [ipfs](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/collector/ipfs)                             |             IPFS              |
 | [isc_dhcpd](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/collector/isc_dhcpd)                   |           ISC DHCP            |
+| [jetson](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/collector/jetson)                         |         NVIDIA Jetson         |
 | [k8s_kubelet](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/collector/k8s_kubelet)               |            Kubelet            |
 | [k8s_kubeproxy](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/collector/k8s_kubeproxy)           |          Kube-proxy           |
 | [k8s_state](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/collector/k8s_state)                   |   Kubernetes cluster state    |

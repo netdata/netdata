@@ -31,11 +31,19 @@
 use super::*;
 use uuid::Uuid;
 
-fn machine() -> file_registry::MachineId { file_registry::MachineId::new(Uuid::from_u128(0x0011_2233_4455_6677_8899_aabb_ccdd_eeff)).unwrap() }
+fn machine() -> file_registry::MachineId {
+    file_registry::MachineId::new(Uuid::from_u128(0x0011_2233_4455_6677_8899_aabb_ccdd_eeff))
+        .unwrap()
+}
 
-fn instance() -> file_registry::InstanceId { file_registry::InstanceId::new(Uuid::from_u128(0xaaaa_bbbb_cccc_dddd_eeee_ffff_0000_1111)).unwrap() }
+fn instance() -> file_registry::InstanceId {
+    file_registry::InstanceId::new(Uuid::from_u128(0xaaaa_bbbb_cccc_dddd_eeee_ffff_0000_1111))
+        .unwrap()
+}
 
-fn ident() -> file_registry::Identity { file_registry::Identity::new(machine(), instance()) }
+fn ident() -> file_registry::Identity {
+    file_registry::Identity::new(machine(), instance())
+}
 
 fn sample_date() -> NaiveDate {
     NaiveDate::from_ymd_opt(2026, 4, 17).unwrap()
@@ -117,31 +125,43 @@ fn parse_catalog_key_shape_table() {
     // (description, key, should_parse)
     let cases: &[(&str, String, bool)] = &[
         ("valid", valid.clone(), true),
-        ("wrong extension (.sfst)", valid.replace(".catalog", ".sfst"), false),
+        (
+            "wrong extension (.sfst)",
+            valid.replace(".catalog", ".sfst"),
+            false,
+        ),
         ("no extension", valid.replace(".catalog", ""), false),
         (
             "too few segments",
             "v2/logs/catalog/2026-04-17/tenant1".to_owned(),
             false,
         ),
-        (
-            "too many segments",
-            format!("{valid}/extra"),
-            false,
-        ),
+        ("too many segments", format!("{valid}/extra"), false),
         (
             "bad tenant charset",
             valid.replace("/tenant1/", "/bad!tenant/"),
             false,
         ),
-        ("traversal (..) tenant", valid.replace("/tenant1/", "/../"), false),
+        (
+            "traversal (..) tenant",
+            valid.replace("/tenant1/", "/../"),
+            false,
+        ),
         ("dot (.) tenant", valid.replace("/tenant1/", "/./"), false),
         // The auth-off "default" tenant is a legitimate stored segment (this is
         // the auth-off restore blackout regression: `validate_path_segment`
         // admits what ingest validation rejects, so it MUST parse).
         (
             "default tenant",
-            catalog("logs", sample_date(), &TenantId::default_tenant(), ident(), 42, 100, 200),
+            catalog(
+                "logs",
+                sample_date(),
+                &TenantId::default_tenant(),
+                ident(),
+                42,
+                100,
+                200,
+            ),
             true,
         ),
         ("bad date", valid.replace("2026-04-17", "2026-13-99"), false),
@@ -153,7 +173,12 @@ fn parse_catalog_key_shape_table() {
         ),
         (
             "an SFST key",
-            sfst("logs", &tenant(), sample_date(), FileId::new(ident(), 0, 5, 0)),
+            sfst(
+                "logs",
+                &tenant(),
+                sample_date(),
+                FileId::new(ident(), 0, 5, 0),
+            ),
             false,
         ),
     ];
@@ -167,7 +192,10 @@ fn parse_catalog_key_shape_table() {
     // The valid key recovers the stored fields (tenant, identity, and max_seq
     // are asserted; the recovered date and timestamp range are not).
     let p = parse_catalog_key(&valid, "logs").unwrap();
-    assert_eq!((p.tenant_id, p.identity, p.max_seq), (tenant(), ident(), 42));
+    assert_eq!(
+        (p.tenant_id, p.identity, p.max_seq),
+        (tenant(), ident(), 42)
+    );
 }
 
 #[test]
@@ -176,15 +204,27 @@ fn parse_sfst_key_shape_table() {
     let valid = sfst("logs", &tenant(), sample_date(), id);
     let cases: &[(&str, String, bool)] = &[
         ("valid", valid.clone(), true),
-        ("wrong extension (.catalog)", valid.replace(".sfst", ".catalog"), false),
+        (
+            "wrong extension (.catalog)",
+            valid.replace(".sfst", ".catalog"),
+            false,
+        ),
         ("no extension", valid.replace(".sfst", ""), false),
         (
             "too few segments",
             "v2/logs/tenants/tenant1/sfst/2026-04-17".to_owned(),
             false,
         ),
-        ("bad tenant charset", valid.replace("/tenant1/", "/bad!tenant/"), false),
-        ("traversal (..) tenant", valid.replace("/tenant1/", "/../"), false),
+        (
+            "bad tenant charset",
+            valid.replace("/tenant1/", "/bad!tenant/"),
+            false,
+        ),
+        (
+            "traversal (..) tenant",
+            valid.replace("/tenant1/", "/../"),
+            false,
+        ),
         (
             "default tenant",
             sfst("logs", &TenantId::default_tenant(), sample_date(), id),
@@ -192,7 +232,11 @@ fn parse_sfst_key_shape_table() {
         ),
         ("bad date", valid.replace("2026-04-17", "not-a-date"), false),
         ("wrong schema version", valid.replace("v2/", "v1/"), false),
-        ("wrong signal segment", valid.replace("/logs/", "/traces/"), false),
+        (
+            "wrong signal segment",
+            valid.replace("/logs/", "/traces/"),
+            false,
+        ),
         (
             "a catalog key",
             catalog("logs", sample_date(), &tenant(), ident(), 42, 100, 200),
@@ -207,7 +251,10 @@ fn parse_sfst_key_shape_table() {
         );
     }
     let (parsed_id, parsed_tenant, parsed_date) = parse_sfst_key(&valid, "logs").unwrap();
-    assert_eq!((parsed_id, parsed_tenant, parsed_date), (id, tenant(), sample_date()));
+    assert_eq!(
+        (parsed_id, parsed_tenant, parsed_date),
+        (id, tenant(), sample_date())
+    );
     // Not re-tested in this shape table: nil-identity filenames are rejected
     // by `otel_catalog::parse_stem`/`FileId::parse` (their crates' own tests
     // pin that), so a nil-UUID key already fails both parsers.

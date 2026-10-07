@@ -22,9 +22,7 @@
 //! crate root and by journal-function
 //! (`journal-function/src/lib.rs`), where production callers go
 //! (`otel-legacy-logs/src/handler.rs` `LegacyLogsHandler`); `query::PaginationState` is
-//! the one item nothing re-exports. transformations.rs in this directory
-//! is not compiled — no `mod` declares it; the live registry is
-//! journal-function's (`journal-function/src/netdata/transformations.rs`).
+//! the one item nothing re-exports.
 
 pub mod query;
 pub mod table;
