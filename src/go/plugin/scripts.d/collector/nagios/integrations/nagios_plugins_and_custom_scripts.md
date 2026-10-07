@@ -150,7 +150,7 @@ This produces:
 
 This collector is supported on all platforms.
 
-This collector supports collecting metrics from multiple instances of this integration, including remote instances.
+This collector supports collecting metrics from multiple instances of this integration.
 
 No additional permissions are required by the collector itself. If a check needs access to protected files, sockets, or system commands, provide that access to the check command or helper it uses.
 
