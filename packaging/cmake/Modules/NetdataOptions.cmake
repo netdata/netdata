@@ -160,23 +160,13 @@ mark_as_advanced(NETDATA_SENTRY_ENVIRONMENT NETDATA_SENTRY_DIST NETDATA_SENTRY_D
 # One enum selects the install-tree layout: bundle (self-contained - the static
 # installer, kickstart-from-source, dev builds, plain cmake --install), or a
 # native package kind. packaging/build-package.sh passes deb/rpm; the Windows
-# build scripts pass msi; pkg is the native macOS package.
+# build scripts pass msi.
 set(NETDATA_PACKAGE_KIND "bundle" CACHE STRING
-    "Install-tree layout: bundle (self-contained), deb, rpm, msi, pkg")
-set_property(CACHE NETDATA_PACKAGE_KIND PROPERTY STRINGS bundle deb rpm msi pkg)
+    "Install-tree layout: bundle (self-contained), deb, rpm, msi")
+set_property(CACHE NETDATA_PACKAGE_KIND PROPERTY STRINGS bundle deb rpm msi)
 mark_as_advanced(NETDATA_PACKAGE_KIND)
-if(NOT NETDATA_PACKAGE_KIND MATCHES "^(bundle|deb|rpm|msi|pkg)$")
-        message(FATAL_ERROR "Invalid NETDATA_PACKAGE_KIND '${NETDATA_PACKAGE_KIND}' (expected bundle, deb, rpm, msi, or pkg)")
-endif()
-
-# The macOS package identifier is the upgrade identity macOS Installer keys
-# on, and it becomes an unchangeable public contract the moment a package
-# ships. PROVISIONAL until release approval; nothing is published from CI
-# while the work iterates. Defined here, not in NetdataMacOSPackage.cmake,
-# because the staged .install-type (NetdataSystemFiles) and the package
-# target both consume it.
-if(NETDATA_PACKAGE_KIND STREQUAL "pkg")
-        set(NETDATA_PKG_IDENTIFIER "cloud.netdata.agent")
+if(NOT NETDATA_PACKAGE_KIND MATCHES "^(bundle|deb|rpm|msi)$")
+        message(FATAL_ERROR "Invalid NETDATA_PACKAGE_KIND '${NETDATA_PACKAGE_KIND}' (expected bundle, deb, rpm, or msi)")
 endif()
 
 # The two names the enum replaced die loudly, not silently: CMake answers an
@@ -188,7 +178,7 @@ endif()
 # WINDOWS dev tree last configured in service/package mode trips loudly and
 # needs one wipe - accepted; loud beats a silent bundle build.)
 if(BUILD_FOR_PACKAGING OR NOT "${NETDATA_PACKAGING_FORMAT}" STREQUAL "")
-        message(FATAL_ERROR "BUILD_FOR_PACKAGING and NETDATA_PACKAGING_FORMAT were replaced by NETDATA_PACKAGE_KIND (bundle, deb, rpm, msi, or pkg). Update the invocation.")
+        message(FATAL_ERROR "BUILD_FOR_PACKAGING and NETDATA_PACKAGING_FORMAT were replaced by NETDATA_PACKAGE_KIND (bundle, deb, rpm, msi). Update the invocation.")
 endif()
 
 # Derived, not settable: the one token for "this build stages a native package",
@@ -207,47 +197,6 @@ if(NETDATA_PACKAGE_KIND STREQUAL "rpm" AND CMAKE_VERSION VERSION_LESS 4.1)
         message(FATAL_ERROR "RPM packaging requires CMake >= 4.1 (CPack weak-dependency support); this is ${CMAKE_VERSION}")
 endif()
 
-# The native macOS package is Apple Silicon only, permanently, and its payload
-# must run on a clean machine: nothing outside /usr/lib, /System/Library and
-# the payload itself (packaging/macos/artifact-gate.sh enforces this). The
-# kind therefore forces vendored copies of every third-party library instead
-# of whatever pkg-config finds on the build host - there are no per-library
-# toggles for it, the set below IS the mode, and it grows as bundling support
-# for the remaining libraries lands.
-if(NETDATA_PACKAGE_KIND STREQUAL "pkg")
-        if(NOT OS_MACOS OR NOT CMAKE_SYSTEM_PROCESSOR STREQUAL "arm64")
-                message(FATAL_ERROR "NETDATA_PACKAGE_KIND=pkg builds the native macOS package and requires arm64 macOS; this is ${CMAKE_SYSTEM_NAME}/${CMAKE_SYSTEM_PROCESSOR}")
-        endif()
-
-        # The bundling modules rely on FetchContent honouring SOURCE_SUBDIR
-        # and EXCLUDE_FROM_ALL in FetchContent_Declare. The CPack productbuild
-        # wiring will raise this further if it needs to.
-        if(CMAKE_VERSION VERSION_LESS 3.28)
-                message(FATAL_ERROR "NETDATA_PACKAGE_KIND=pkg requires CMake >= 3.28; this is ${CMAKE_VERSION}")
-        endif()
-
-        # The root file defaults the prefix for this kind; an explicit other
-        # prefix is refused because the package scripts, the updater and
-        # kickstart all locate the install at /opt/netdata.
-        if(NOT CMAKE_INSTALL_PREFIX STREQUAL "/opt/netdata")
-                message(FATAL_ERROR "NETDATA_PACKAGE_KIND=pkg installs to /opt/netdata only; CMAKE_INSTALL_PREFIX is ${CMAKE_INSTALL_PREFIX}")
-        endif()
-
-        set(ENABLE_BUNDLED_JSONC True)
-        set(ENABLE_BUNDLED_YAML True)
-        set(ENABLE_BUNDLED_PROTOBUF True)
-
-        # Plugins that cannot work on a clean macOS machine stay out of the
-        # payload entirely rather than shipping broken. python.d: /usr/bin/python3
-        # is a Command Line Tools stub that pops a GUI install dialog, so a root
-        # LaunchDaemon shipping it would periodically prompt users to install a
-        # compiler. charts.d: its only modules are example, libreswan (Linux
-        # IPsec) and opensips - no macOS value - and dropping it also removes
-        # the dependency on a `timeout` command stock macOS does not have.
-        set(ENABLE_PLUGIN_PYTHON False)
-        set(ENABLE_PLUGIN_CHARTS False)
-endif()
-
 # A few payloads live in different packages per format: RPM keeps the
 # sensors3/otel stock configs and nd-mcp in the main package and the swagger
 # files in the dashboard package, while the DEB layout groups them with their
@@ -260,15 +209,6 @@ if(NETDATA_PACKAGE_KIND STREQUAL "rpm")
         set(NETDATA_ND_MCP_COMPONENT netdata)
         set(NETDATA_OTEL_CONF_COMPONENT netdata)
         set(NETDATA_SWAGGER_COMPONENT dashboard)
-elseif(NETDATA_PACKAGE_KIND STREQUAL "pkg")
-        # The macOS package is monolithic; CPack silently drops any file whose
-        # component is missing from CPACK_COMPONENTS_ALL, so everything that
-        # can float between packages is pinned to the always-present main
-        # component rather than inheriting the DEB grouping below.
-        set(NETDATA_SENSORS3_COMPONENT netdata)
-        set(NETDATA_ND_MCP_COMPONENT netdata)
-        set(NETDATA_OTEL_CONF_COMPONENT netdata)
-        set(NETDATA_SWAGGER_COMPONENT netdata)
 else()
         set(NETDATA_SENSORS3_COMPONENT plugin-debugfs)
         set(NETDATA_ND_MCP_COMPONENT plugin-go)

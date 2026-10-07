@@ -123,7 +123,6 @@ For quick format guidance:
 - Docker under Linux is distributed as a `docker image`.
 - Static builds are distributed as `.gz.run` installers.
 - Linux native packages are distributed as `DEB` and `RPM` for platforms in the Core tier where native packages are available.
-- A macOS native package (a self-contained `.pkg` for Apple Silicon Macs running macOS 14 or newer) is built in CI but not published yet. Until it is, macOS installs build from source.
 
 :::important
 

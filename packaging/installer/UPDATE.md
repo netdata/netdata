@@ -65,7 +65,6 @@ The following table contains all possible installation types:
 | legacy-build       | Used for pre-existing kickstart.sh or netdata-installer.sh installations. This exist because we cannot determine how the install originally happened.       |
 | legacy-static      | Same as legacy-build, but for static installs.                                                                                                              |
 | oci                | Installed using official Docker images from Netdata, though not necessarily running on Docker                                                               |
-| macos-pkg          | Netdata's native macOS package for Apple Silicon. See [Install Netdata on macOS](/packaging/installer/methods/macos.md).                                   |
 | custom             | Anything not covered by the other identifiers, including manual builds, manually running netdata-installer.sh, and third-party packages (community).        |
 | Unknown            | Same as custom.                                                                                                                                             |
 
@@ -98,18 +97,7 @@ For automatic updates, see our [Windows automatic updates guide](https://learn.n
 <details>
 <summary><strong>macOS</strong></summary><br/>
 
-If you installed Netdata's native macOS package, it registers a daily `launchd` updater job (`com.github.netdata.updater`), but that job does not install updates yet: until Netdata publishes signed packages, the updater refuses any package it cannot verify and leaves your install unchanged. To move to a newer version, install the newer package over the existing one. Your configuration and metrics database are kept.
-
-To disable or re-enable the updater job (re-enabling only sticks once any `NETDATA_MACOS_AUTO_UPDATES=0` setting, described below, is removed):
-
-```bash
-sudo /opt/netdata/usr/libexec/netdata/netdata-updater.sh --disable-auto-updates
-sudo /opt/netdata/usr/libexec/netdata/netdata-updater.sh --enable-auto-updates
-```
-
-Managed deployments can also opt out of automatic updates, before or after installing the package, with `/opt/netdata/etc/netdata/netdata-updater.conf` containing `NETDATA_MACOS_AUTO_UPDATES=0`.
-
-If you installed Netdata using Homebrew, you can explicitly request an update:
+If you installed Netdata on your macOS system using Homebrew, you can explicitly request an update:
 
 ```bash
 brew upgrade netdata
@@ -176,7 +164,7 @@ This configuration file can be edited using our [`edit-config` script](/docs/net
 
 ## Managing Automatic Updates
 
-Netdata enables daily auto-updates by default when installed using the kickstart script (unless you pass `--no-updates` during installation). The schedule runs once per day. The installer auto-detects the scheduling method, which may be a cron entry under `/etc/cron.daily` or `/etc/periodic/daily`, the `netdata-updater.timer` systemd unit (`OnCalendar=daily`), a crontab under `/etc/cron.d`, or — for the native macOS package — a `launchd` calendar daemon (`com.github.netdata.updater`).
+Netdata enables daily auto-updates by default when installed using the kickstart script (unless you pass `--no-updates` during installation). The schedule runs once per day. The installer auto-detects the scheduling method, which may be a cron entry under `/etc/cron.daily` or `/etc/periodic/daily`, the `netdata-updater.timer` systemd unit (`OnCalendar=daily`), or a crontab under `/etc/cron.d`.
 
 ### Disable auto-updates
 
@@ -189,7 +177,7 @@ Pass `--no-updates` to the kickstart script to skip setting up auto-updates enti
 wget -O /tmp/netdata-kickstart.sh https://get.netdata.cloud/kickstart.sh && sh /tmp/netdata-kickstart.sh --no-updates
 ```
 
-To explicitly control the scheduling method, use `--auto-update-type` with one of `systemd`, `interval`, or `crontab`. (The native macOS package defaults to `launchd`; kickstart selects it automatically.)
+To explicitly control the scheduling method, use `--auto-update-type` with one of `systemd`, `interval`, or `crontab`:
 
 ```bash
 wget -O /tmp/netdata-kickstart.sh https://get.netdata.cloud/kickstart.sh && sh /tmp/netdata-kickstart.sh --auto-update-type systemd
@@ -209,7 +197,6 @@ This takes effect immediately — the systemd timer is stopped and any cron entr
 If you prefer to disable the scheduler manually:
 
 - **systemd:** `sudo systemctl disable --now netdata-updater.timer` (stops and disables the timer unit).
-- **macOS native package:** `sudo launchctl bootout system/com.github.netdata.updater && sudo launchctl disable system/com.github.netdata.updater` (the `--disable-auto-updates` command above does the same).
 - **non-systemd (cron):** remove the entry your installer created. Remove whichever exists:
   ```bash
   sudo rm -f /etc/cron.daily/netdata-updater /etc/cron.daily/netdata-updater.sh
@@ -260,11 +247,11 @@ The script auto-detects the appropriate scheduler for your system. To explicitly
 sudo /usr/libexec/netdata/netdata-updater.sh --enable-auto-updates systemd
 ```
 
-Valid methods are `systemd`, `interval`, and `crontab`, plus `launchd` for the native macOS package.
+Valid methods are `systemd`, `interval`, and `crontab`.
 
 :::warning
 
-`netdata-updater.conf` controls **how** the updater runs, not **whether** it runs — see the [configuration options](#control-runtime-behavior-of-the-updater-script) above. It does not contain an option to disable the auto-update schedule, and setting variables in it will not stop auto-updates. To turn auto-updates off, use the disable command above — not the config file. The one exception is the native macOS package's `NETDATA_MACOS_AUTO_UPDATES=0`, described in the macOS section.
+`netdata-updater.conf` controls **how** the updater runs, not **whether** it runs — see the [configuration options](#control-runtime-behavior-of-the-updater-script) above. It does not contain an option to disable the auto-update schedule, and setting variables in it will not stop auto-updates. To turn auto-updates off, use the disable command above — not the config file.
 
 :::
 
@@ -279,7 +266,6 @@ Valid methods are `systemd`, `interval`, and `crontab`, plus `launchd` for the n
 | **legacy-build/static**    | Kickstart script       | `wget -O /tmp/netdata-kickstart.sh https://get.netdata.cloud/kickstart.sh && sh /tmp/netdata-kickstart.sh` |
 | **manual-static-ARCH**     | Kickstart script       | `wget -O /tmp/netdata-kickstart.sh https://get.netdata.cloud/kickstart.sh && sh /tmp/netdata-kickstart.sh` |
 | **custom**                 | System package manager | Use your system's package manager                                                                          |
-| **macos-pkg**              | Native macOS package   | Install the newer package (automatic updates wait for signed packages)                                     |
 | **macOS (Homebrew)**       | Homebrew               | `brew upgrade netdata`                                                                                     |
 | **Manual Git**             | Git + installer        | See [manual installation steps](#update-methods-by-platform)                                               |
 | **Docker (OCI)**           | Image pull + recreate  | See [Docker update instructions](/packaging/docker/README.md#update-your-netdata-docker-container)         |

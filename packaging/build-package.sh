@@ -18,10 +18,7 @@ SCRIPT_SOURCE="$(
 )"
 SOURCE_DIR="$(dirname "$(dirname "${SCRIPT_SOURCE}")")"
 
-# macOS has no os-release; the PKG arm does not read distro facts.
-if [ -r /etc/os-release ]; then
-    . /etc/os-release
-fi
+. /etc/os-release
 
 # Keep one argument per line so POSIX sh preserves embedded spaces
 # without relying on arrays or eval.
@@ -259,14 +256,6 @@ case "${PKG_TYPE}" in
             add_cmake_option ENABLE_PLUGIN_OTEL Off
         fi
         ;;
-    PKG)
-        # The native macOS package. Self-contained dependency resolution and
-        # the payload trims all key off the kind inside CMake. The prefix
-        # override beats the CMAKE_INSTALL_PREFIX=/ every Linux package build
-        # above passes - the macOS payload is a self-contained tree.
-        add_cmake_option NETDATA_PACKAGE_KIND pkg
-        add_cmake_option CMAKE_INSTALL_PREFIX /opt/netdata
-        ;;
     *) echo "Unrecognized package type ${PKG_TYPE}." ; exit 1 ;;
 esac
 
@@ -286,20 +275,11 @@ else
 fi
 
 run_cmake
-# nproc is a coreutils tool Linux has and stock macOS does not.
-NPROC="$(nproc 2>/dev/null || sysctl -n hw.ncpu)"
-cmake --build "${BUILD_DIR}" --parallel "${NPROC}" -- -k 1
+cmake --build "${BUILD_DIR}" --parallel "$(nproc)" -- -k 1
 
 if [ "${ENABLE_SENTRY}" = "true" ] && [ "${UPLOAD_SENTRY}" = "true" ]; then
     sentry-cli debug-files upload -o netdata-inc -p netdata-agent --force-foreground --log-level=debug --wait --include-sources build/netdata
 fi
 
-if [ "${PKG_TYPE}" = "PKG" ]; then
-    # The macOS package is produced by its own target; CPack's productbuild
-    # generator is unusable for a monolithic payload (see
-    # packaging/macos/create-pkg.sh).
-    cmake --build "${BUILD_DIR}" --target package-macos
-else
-    cd "${BUILD_DIR}" || exit 1
-    cpack -V -G "${PKG_TYPE}"
-fi
+cd "${BUILD_DIR}" || exit 1
+cpack -V -G "${PKG_TYPE}"

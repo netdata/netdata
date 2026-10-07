@@ -6,7 +6,7 @@ You can install Netdata in one of the three following ways:
 - [Install Netdata via Homebrew](#install-netdata-via-homebrew)
 - [Install Netdata from source](#install-netdata-from-source)
 
-The recommended method builds Netdata from source, which requires [Homebrew](https://brew.sh/) for dependencies. Netdata also has a **native package** for Apple Silicon Macs running macOS 14 or newer: a self-contained `.pkg` that needs no Homebrew and no other dependencies. It is not published yet. Once it is, the same script installs it on those Macs.
+Each of these installation option requires [Homebrew](https://brew.sh/) for handling dependencies.
 
 :::info
 
@@ -30,35 +30,7 @@ To install Netdata using our automatic [kickstart](/packaging/installer/methods/
 curl https://get.netdata.cloud/kickstart.sh > /tmp/netdata-kickstart.sh && sh /tmp/netdata-kickstart.sh
 ```
 
-The Agent is built from source and installed under `/usr/local/netdata`, with dependencies handled via Homebrew. Once the native package is published, Apple Silicon Macs running macOS 14 or newer get the package under `/opt/netdata` instead.
-
-### The native package
-
-The native package:
-
-- installs everything under `/opt/netdata`, with the configuration directory at `/opt/netdata/etc/netdata` (use the `edit-config` script there; stock configuration lives at `/opt/netdata/usr/lib/netdata/conf.d`);
-- creates a hidden `netdata` system service account the daemon drops privileges to, or reuses an existing service-shaped `netdata` account — configuration files are owned `root:netdata`, and the Agent's writable state belongs to the service account;
-- registers a `launchd` system daemon (`com.github.netdata`) that starts the Agent at boot;
-- registers a second `launchd` daemon (`com.github.netdata.updater`) for automatic daily updates. It does not install updates yet: until Netdata publishes signed packages, the updater refuses any package it cannot verify and changes nothing. See [Update Netdata](/packaging/installer/UPDATE.md);
-- refuses to install when another Netdata already exists on the machine — a source install, a Homebrew Netdata service, or an unknown process on port 19999. Nothing is stopped or modified in that case; the Installer log (`/var/log/install.log`) names what was found and how to resolve it. An existing native package install is upgraded in place, preserving your configuration and the metrics database.
-
-:::note
-
-macOS may show background-item notifications for the two Netdata `launchd` jobs after installation. Both are expected: `com.github.netdata` is the Agent itself and `com.github.netdata.updater` is its updater. They appear under **System Settings → General → Login Items & Extensions**.
-
-:::
-
-For managed deployments (MDM, Munki, or any flow where the package is installed non-interactively), pre-stage configuration before or after installing the package: place a `claim.conf` with your Cloud claiming configuration at `/opt/netdata/etc/netdata/claim.conf`, and opt out of automatic updates, if desired, by pre-staging a `netdata-updater.conf` containing `NETDATA_MACOS_AUTO_UPDATES=0` in the same directory. Pre-staged files survive installs and upgrades.
-
-### Uninstall the native package
-
-Run the uninstaller that ships inside the package:
-
-```bash
-sudo /opt/netdata/usr/libexec/netdata/netdata-uninstaller.sh
-```
-
-By default it removes everything the package owns — the payload, both `launchd` jobs, the package receipt, and the service account if the package created it (an existing account it reused is left in place) — but keeps your configuration, the metrics database, and the machine's Cloud claim identity under `/opt/netdata`, re-owned to `root:wheel` until a reinstall. Add `--purge` to delete the retained data as well. `kickstart.sh --uninstall` runs the same uninstaller.
+The Netdata Agent is installed under `/usr/local/netdata`. Dependencies are handled via Homebrew.
 
 ### Automatically connect to Netdata Cloud during installation
 
@@ -163,7 +135,7 @@ We don't recommend installing Netdata from source on macOS, as it can be difficu
 3. Use the same terminal session to install some of Netdata's prerequisites using Homebrew. If you don't want to use [Netdata Cloud](/docs/netdata-cloud/README.md), you can omit `cmake`.
 
    ```bash
-   brew install autoconf automake pkg-config libuv lz4 json-c openssl libtool cmake
+   brew install ossp-uuid autoconf automake pkg-config libuv lz4 json-c openssl libtool cmake
    ```
 
    To include the OpenTelemetry plugin (`otel-plugin`), also install a Rust toolchain — either `brew install rust` or a stable toolchain via [rustup](https://rustup.rs/). The plugin is built automatically when a toolchain covering the minimum version (`rust-version` in `src/crates/Cargo.toml`) is available; without one, the installer prints a warning and builds the agent without the plugin.
