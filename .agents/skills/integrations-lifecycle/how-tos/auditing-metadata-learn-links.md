@@ -35,7 +35,7 @@ that each file exists, not its anchors; ingest checks those
 python3 - <<'PY'
 import pathlib, re, sys
 
-root = pathlib.Path('.')
+root = pathlib.Path('.').resolve()
 pat = re.compile(r'\[[^\]]+\]\(([^)]+)\)')
 problems = []
 
@@ -44,19 +44,19 @@ for path in sorted(root.rglob('metadata.yaml')):
     for match in pat.finditer(text):
         target = match.group(1).strip()
         if target.startswith('/') and not target.startswith('//'):
-            file = root / target.split('#', 1)[0].lstrip('/')
+            file = (root / target.split('#', 1)[0].lstrip('/')).resolve()
         elif target.startswith('../') or target.startswith('./'):
             file = (path.parent / target.split('#', 1)[0]).resolve()
         else:
             continue
 
-        if not file.is_file():
+        if not file.is_relative_to(root) or not file.is_file():
             line = text.count('\n', 0, match.start()) + 1
-            problems.append((str(path), line, target))
+            problems.append((str(path.relative_to(root)), line, target))
 
 if problems:
     for path, line, target in problems:
-        print(f'{path}:{line}: missing linked source file: {target}')
+        print(f'{path}:{line}: linked file missing or outside the repository: {target}')
     sys.exit(1)
 
 print('OK: all repository-relative metadata.yaml links resolve to source files')
