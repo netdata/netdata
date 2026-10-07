@@ -47,6 +47,17 @@
 - Fix(dem): make RUM sampling and retained evidence predictable ([#24151](https://github.com/netdata/netdata/issues/24151))
 - Feat(dem): define explicit RUM capture and normalize evidence at ingestion ([#24152](https://github.com/netdata/netdata/issues/24152))
 - Fix(dem): align RUM measurements and alerts with browser experiences ([#24154](https://github.com/netdata/netdata/issues/24154))
+- Build(deps): bump github.com/lmittmann/tint from 1.2.0 to 1.2.1 in /src/go ([#24156](https://github.com/netdata/netdata/issues/24156))
+- Add Edge Device Monitoring guides and reduced static packages ([#24127](https://github.com/netdata/netdata/issues/24127))
+- Otel-plugin: OTLP/HTTP receiver, plus TLS and OTLP/JSON fixes ([#24128](https://github.com/netdata/netdata/issues/24128))
+- Fix receiver replication accounting on parents ([#23843](https://github.com/netdata/netdata/issues/23843))
+- Dbengine: count stored samples per datafile ([#24072](https://github.com/netdata/netdata/issues/24072))
+- Stop obsolete marking from releasing receiver replication ([#24160](https://github.com/netdata/netdata/issues/24160))
+- Rust: bump opentelemetry-proto to 0.33 and refresh the lockfiles ([#24161](https://github.com/netdata/netdata/issues/24161))
+- Dbengine: skip debug-only open cache scan on datafile deletion ([#24162](https://github.com/netdata/netdata/issues/24162))
+- DNS Server (windows host) ([#24102](https://github.com/netdata/netdata/issues/24102))
+- Format the Rust code in src/crates with cargo fmt ([#24164](https://github.com/netdata/netdata/issues/24164))
+- Perf(dbengine): skip MRG lookups for unwanted extent pages ([#24155](https://github.com/netdata/netdata/issues/24155))
 
 ## [2.12.0] - 2026-09-30
 
