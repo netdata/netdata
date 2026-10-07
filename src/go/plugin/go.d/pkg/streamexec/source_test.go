@@ -69,27 +69,33 @@ func startBinary(path string) StartFunc {
 }
 
 // startRun runs s until the test ends or the returned stop is called. It returns once Run reports a started instance.
-func startRun(t *testing.T, s *Source[string]) (stop context.CancelFunc) {
+// stop cancels Run and waits for it to return.
+func startRun(t *testing.T, s *Source[string]) (stop func()) {
 	t.Helper()
 	ctx, cancel := context.WithCancel(t.Context())
 	started, done := goRun(ctx, s)
-	t.Cleanup(func() {
-		cancel()
-		select {
-		case err := <-done:
-			assert.NoError(t, err)
-		case <-time.After(5 * time.Second):
-			t.Error("Run did not join its instance")
-		}
-	})
+	var once sync.Once
+	stop = func() {
+		once.Do(func() {
+			cancel()
+			select {
+			case err := <-done:
+				assert.NoError(t, err)
+			case <-time.After(5 * time.Second):
+				t.Error("Run did not join its instance")
+			}
+		})
+	}
+	t.Cleanup(stop)
 	select {
 	case <-started:
 	case err := <-done:
+		once.Do(cancel)
 		t.Fatalf("Run failed before starting: %v", err)
 	case <-time.After(5 * time.Second):
 		t.Fatal("Run did not start")
 	}
-	return cancel
+	return stop
 }
 
 func goRun(ctx context.Context, s *Source[string]) (started <-chan struct{}, done <-chan error) {
@@ -179,15 +185,17 @@ func TestRunRecovers(t *testing.T) {
 	for name, tc := range map[string]struct {
 		fail func(*testing.T, *streamexectest.Conn)
 	}{
-		"nonzero exit":        {fail: func(t *testing.T, conn *streamexectest.Conn) { conn.Exit(t, 7) }},
-		"clean exit":          {fail: func(t *testing.T, conn *streamexectest.Conn) { conn.Exit(t, 0) }},
-		"stall":               {fail: func(*testing.T, *streamexectest.Conn) {}},
-		"unrecognized output": {fail: func(t *testing.T, conn *streamexectest.Conn) { conn.Line(t, "warning") }},
+		"nonzero exit": {fail: func(t *testing.T, conn *streamexectest.Conn) { conn.Exit(t, 7) }},
+		"clean exit":   {fail: func(t *testing.T, conn *streamexectest.Conn) { conn.Exit(t, 0) }},
+		"stall":        {fail: func(*testing.T, *streamexectest.Conn) {}},
+		// Output that never completes a record does not reset the stall timer.
+		"unrecognized output": {fail: func(t *testing.T, conn *streamexectest.Conn) { conn.Noise(t, "warning") }},
 	} {
 		t.Run(name, func(t *testing.T) {
 			fake := streamexectest.NewFake(t)
 			timing := testTiming
-			timing.StallTimeout = 300 * time.Millisecond
+			// Long enough for a slow fake startup to deliver its first record before the stall timer fires.
+			timing.StallTimeout = time.Second
 			s := newTestSource(t, fake, timing, recordDecoder)
 			startRun(t, s)
 			conn := fake.Accept(t)
@@ -197,7 +205,7 @@ func TestRunRecovers(t *testing.T) {
 			tc.fail(t, conn)
 			waitWithdrawn(t, s)
 			replacement := fake.Accept(t)
-			conn.RequireExited(t) // the failed instance never overlaps its replacement
+			conn.RequireExited(t) // the failed instance exited before its replacement started
 
 			replacement.Line(t, "record after")
 			waitLatest(t, s, "record after")
@@ -289,20 +297,41 @@ func TestCancelTerminatesDescendants(t *testing.T) {
 	require.True(t, child.Child)
 
 	stop()
-	conn.RequireExited(t)
-	child.RequireExited(t)
+	conn.RequireExited(t) // Run returned only after joining the instance
+	child.WaitExited(t)   // the descendant was terminated; Run does not wait for descendants
 }
 
 func TestFollowReportsFailure(t *testing.T) {
-	// Exit cases wait longer than an exit can take, so only the stall case stalls.
+	// Exit cases wait longer than an exit can take, so only the stall cases stall. The stall cases publish a record
+	// first, so its withdrawal is observable.
 	for name, tc := range map[string]struct {
-		exit         *int
+		fail         func(*testing.T, *streamexectest.Conn)
 		stallTimeout time.Duration
+		published    bool
 		wantErr      string
 	}{
-		"nonzero exit": {exit: new(7), stallTimeout: 10 * time.Second, wantErr: "fake exited: exit status 7"},
-		"clean exit":   {exit: new(0), stallTimeout: 10 * time.Second, wantErr: "fake exited"},
-		"stall":        {stallTimeout: 300 * time.Millisecond, wantErr: "fake stopped producing records"},
+		"nonzero exit": {
+			fail:         func(t *testing.T, conn *streamexectest.Conn) { conn.Exit(t, 7) },
+			stallTimeout: 10 * time.Second,
+			wantErr:      "fake exited: exit status 7",
+		},
+		"clean exit": {
+			fail:         func(t *testing.T, conn *streamexectest.Conn) { conn.Exit(t, 0) },
+			stallTimeout: 10 * time.Second,
+			wantErr:      "fake exited",
+		},
+		"stall": {
+			fail:         func(*testing.T, *streamexectest.Conn) {},
+			stallTimeout: 300 * time.Millisecond,
+			published:    true,
+			wantErr:      "fake stopped producing records",
+		},
+		"unrecognized output": {
+			fail:         func(t *testing.T, conn *streamexectest.Conn) { conn.Noise(t, "warning") },
+			stallTimeout: 300 * time.Millisecond,
+			published:    true,
+			wantErr:      "fake stopped producing records",
+		},
 	} {
 		t.Run(name, func(t *testing.T) {
 			fake := streamexectest.NewFake(t)
@@ -312,14 +341,25 @@ func TestFollowReportsFailure(t *testing.T) {
 			inst, err := s.start(t.Context())
 			require.NoError(t, err)
 			conn := fake.Accept(t)
-			if tc.exit != nil {
-				conn.Exit(t, *tc.exit)
-			}
 
-			healthy, err := s.follow(t.Context(), inst)
-			assert.Zero(t, healthy)
-			assert.EqualError(t, err, tc.wantErr)
-			assert.Nil(t, s.latest.Load())
+			done := make(chan error, 1)
+			go func() {
+				_, err := s.follow(t.Context(), inst)
+				done <- err
+			}()
+			if tc.published {
+				conn.Line(t, "record before")
+				require.Eventually(t, func() bool { return s.latest.Load() != nil }, time.Second, time.Millisecond)
+			}
+			tc.fail(t, conn)
+
+			select {
+			case err := <-done:
+				assert.EqualError(t, err, tc.wantErr)
+			case <-time.After(5 * time.Second):
+				t.Fatal("follow did not end")
+			}
+			assert.Nil(t, s.latest.Load(), "follow withdraws the record when it ends")
 		})
 	}
 }
@@ -425,4 +465,45 @@ func TestDecoderPerInstance(t *testing.T) {
 	replacement := fake.Accept(t)
 	replacement.Line(t, "c")
 	waitLatest(t, s, "1")
+}
+
+func TestRunStartWithoutProcess(t *testing.T) {
+	s, err := New(Config[string]{
+		Name:       "fake",
+		Start:      func(context.Context, *os.File) (*ndexec.Process, error) { return nil, nil },
+		NewDecoder: recordDecoder,
+		Timing:     testTiming,
+	})
+	require.NoError(t, err)
+
+	started, done := goRun(t.Context(), s)
+	select {
+	case err := <-done:
+		require.EqualError(t, err, "start fake: start function returned no process")
+	case <-time.After(3 * time.Second):
+		t.Fatal("missing process not reported")
+	}
+	select {
+	case <-started:
+		t.Fatal("started without a process")
+	default:
+	}
+}
+
+func TestRunAgainAfterReturn(t *testing.T) {
+	fake := streamexectest.NewFake(t)
+	s := newTestSource(t, fake, testTiming, recordDecoder)
+
+	stop := startRun(t, s)
+	first := fake.Accept(t)
+	first.Line(t, "record first")
+	waitLatest(t, s, "record first")
+	stop()
+	first.RequireExited(t)
+	assert.Nil(t, s.latest.Load())
+
+	startRun(t, s)
+	second := fake.Accept(t)
+	second.Line(t, "record second")
+	waitLatest(t, s, "record second")
 }

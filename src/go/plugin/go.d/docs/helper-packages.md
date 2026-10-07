@@ -329,7 +329,8 @@ output, such as a vendor tool printing one record per interval.
 
 A `streamexec.Source` owns:
 
-- start through the collector's `StartFunc`, which MUST use an owned `ndexec` constructor;
+- start through the collector's `StartFunc`, which MUST use an owned `ndexec` constructor given the context it
+  receives (canceling that context is how the source terminates a process);
 - line reading with a per-line memory bound (`bufio.MaxScanTokenSize`, terminator included; a longer line is
   discarded) and a fresh `Decoder` per process, so a replacement never inherits partial record state. A decoder's
   record MUST NOT share memory with the line or with buffers the decoder reuses; a line that completes no record does
@@ -339,15 +340,15 @@ A `streamexec.Source` owns:
 - replacement of a process that exits or produces no record for `StallTimeout`, after exponential backoff between
   `RestartDelayMin` and `RestartDelayMax`; the backoff resets after a process produced records for a stall period, and a
   process is terminated and joined before its replacement starts;
-- a rate-limited warning per restart cause.
+- a warning for each failed process or restart attempt, limited to one per minute per command name.
 
 `Run(ctx, started)` returns a failure to start the first process and calls `started` once it runs, so a V2 collector
 delegates its `CollectorV2Runner.Run` to it. Later failures are recovered inside `Run`, which returns nil after
 cancellation once the process is joined.
 
 Tests use `streamexec/streamexectest`: the test binary doubles as the fake command (`RunIfFake` in `TestMain`), and each
-started fake reports its arguments and prints, spawns or exits as the test instructs. Supervision is tested on Linux and
-macOS; the harness is Unix-only, and Windows behavior is unverified.
+started fake reports its arguments and prints, spawns or exits as the test instructs. A fake's connection closes only when
+its process exits, so tests can check exit ordering. The harness is Unix-only; Windows behavior is unverified.
 
 ## Log File Collectors
 

@@ -3,9 +3,10 @@
 // Package streamexec supervises a long-running sampling command and keeps its latest record.
 //
 // A Source starts one owned command instance, decodes its standard output line by line into records, and publishes
-// each record with the time it was read. When the instance exits, stops producing records or its context ends, the
-// Source withdraws the latest record, terminates and joins the instance, and starts a replacement after exponential
-// backoff. An instance never overlaps its replacement.
+// each record with the time it was read. When the instance exits or stops producing records, the Source withdraws the
+// latest record, terminates and joins the instance, and starts a replacement after exponential backoff; an instance
+// never overlaps its replacement. When the context ends, the Source withdraws the record, terminates and joins the
+// instance, and returns.
 package streamexec
 
 import (
@@ -21,9 +22,9 @@ import (
 )
 
 // StartFunc starts one command instance with stdout as its standard output. It MUST start the command through an
-// owned ndexec constructor, so canceling ctx and closing the returned Process terminate the instance. It MUST hand
-// stdout to the child before returning and MUST NOT retain or close it; the Source closes its copy in every case. A
-// non-nil error means no process was started.
+// owned ndexec constructor given ctx or a context derived from it: the Source terminates the instance only by
+// canceling ctx. It MUST hand stdout to the child before returning and MUST NOT retain or close it; the Source closes
+// its copy in every case. It returns either a started Process or a non-nil error.
 type StartFunc func(ctx context.Context, stdout *os.File) (*ndexec.Process, error)
 
 // Decoder turns output lines into records. Decode receives one line without its "\n" or "\r\n" terminator; the
@@ -62,7 +63,8 @@ type Config[T any] struct {
 	// NewDecoder returns the decoder of one instance, so a replacement never inherits partial record state.
 	NewDecoder func() Decoder[T]
 	Timing     Timing
-	Logger     *logger.Logger
+	// Logger receives the restart warning; nil uses a new logger, so the warning stays rate-limited.
+	Logger *logger.Logger
 }
 
 // Source supervises one command. Run MAY be called again after it returns but MUST NOT run concurrently with itself;
@@ -94,6 +96,9 @@ func New[T any](cfg Config[T]) (*Source[T], error) {
 		return nil, errors.New("streamexec: timing values must be positive")
 	case t.RestartDelayMin > t.RestartDelayMax:
 		return nil, errors.New("streamexec: minimum restart delay exceeds the maximum")
+	}
+	if cfg.Logger == nil {
+		cfg.Logger = logger.New()
 	}
 	return &Source[T]{
 		cfg: cfg,

@@ -38,6 +38,9 @@ func (s *Source[T]) start(ctx context.Context) (*instance[T], error) {
 	process, err := s.cfg.Start(ctx, childStdout)
 	// Close our copy of the write end: only the child's process tree keeps the pipe open.
 	_ = childStdout.Close()
+	if err == nil && process == nil {
+		err = errors.New("start function returned no process")
+	}
 	if err != nil {
 		cancel()
 		_ = stdout.Close()
