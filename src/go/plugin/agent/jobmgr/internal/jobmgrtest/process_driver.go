@@ -159,7 +159,6 @@ func runProcessRestart(ctx context.Context) error {
 	}
 	defer fixture.close()
 	defer releaseCleanup()
-	const runningPublication = "CONFIG jobmgrtest:collector:jobmgrtest status running"
 	if err := waitUntil(ctx, func() bool {
 		return state.count("check") == 1 && fixture.output.contains(runningPublication)
 	}); err != nil {
@@ -318,7 +317,6 @@ func runCollectorRepeatedStop(ctx context.Context) error {
 		releaseCleanup()
 		_ = fixture.input.Close()
 	}()
-	const runningPublication = "CONFIG jobmgrtest:collector:jobmgrtest status running"
 	if err := waitUntil(ctx, func() bool {
 		return state.count("check") == 1 && fixture.output.contains(runningPublication)
 	}); err != nil {
