@@ -4,6 +4,7 @@ package aggregate
 import "time"
 
 type SiteActivity struct {
+	LastBeaconAt                              time.Time
 	BeaconsPerMin, RejectedPerMin, BotsPerMin int
 	LastBeaconAgeS                            int
 	ObservedSessions, InvestigatedSessions    int
@@ -37,6 +38,7 @@ func (a *Aggregator) Activity() SiteActivity {
 		RejectedPerMin:         len(st.rejected),
 		BotsPerMin:             len(st.bots),
 		LastBeaconAgeS:         age,
+		LastBeaconAt:           st.lastAccepted,
 		ObservedSessions:       len(st.sessions),
 		InvestigatedSessions:   st.investigatedSessions(),
 		PageviewsWindow:        int(documents),

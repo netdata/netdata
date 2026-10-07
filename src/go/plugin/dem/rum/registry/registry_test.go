@@ -49,7 +49,7 @@ func TestRetirementInterruptsNetworkBody(t *testing.T) {
 		Name:           "shop",
 		AllowedOrigins: []string{"https://example.org"},
 	}
-	state := diagnostics.New(cfg)
+	state := diagnostics.New()
 	route := httpapi.NewRoute(cfg, measurementProcessor{aggregator}, state)
 	retire, err := hub.Register("shop", &rumregistry.Site{
 		Route:       route,
@@ -143,17 +143,17 @@ func TestRetirementIsIndependentAndGenerationFenced(t *testing.T) {
 func TestReceiverAvailabilityIsGenerationFenced(t *testing.T) {
 	hub := rumregistry.New()
 	old := hub.PublishReceiver(rumregistry.Availability{
-		Serving: true,
-		Listen:  "old",
+		Serving:   true,
+		PublicURL: "https://old.example",
 	})
 	next := hub.PublishReceiver(rumregistry.Availability{
-		Serving: true,
-		Listen:  "next",
+		Serving:   true,
+		PublicURL: "https://next.example",
 	})
 	old()
-	assert.Equal(t, "next", hub.Availability().Listen)
+	assert.Equal(t, "https://next.example", hub.Availability().PublicURL)
 	assert.True(t, hub.Availability().Serving)
 	next()
 	assert.False(t, hub.Availability().Serving)
-	assert.Equal(t, "next", hub.Availability().Listen)
+	assert.Equal(t, "https://next.example", hub.Availability().PublicURL)
 }

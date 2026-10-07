@@ -7,6 +7,9 @@ import (
 	"net/http/httptest"
 	"strings"
 	"testing"
+
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestPingAndRejectedOrigin(t *testing.T) {
@@ -34,19 +37,21 @@ func TestPingAndRejectedOrigin(t *testing.T) {
 	}
 }
 
-func TestBootstrapUsesConfiguredPublicBase(t *testing.T) {
-	for _, tt := range []struct{ name, siteURL, want string }{{"receiver", "", "https://rum.example.org/edge"}, {"site override", "https://site.example.org/telemetry", "https://site.example.org/telemetry"}} {
-		t.Run(tt.name, func(t *testing.T) {
-			cfg := testCfg()
-			cfg.PublicURL = "https://rum.example.org/edge"
-			cfg.Sites[0].PublicURL = tt.siteURL
-			server := newFixture(cfg, newRecSink(), nil)
-			req := httptest.NewRequest("GET", "http://internal/rum/shop.js", nil)
-			rec := httptest.NewRecorder()
-			server.Handler().ServeHTTP(rec, req)
-			if !strings.Contains(rec.Body.String(), `"`+tt.want+`"`) {
-				t.Fatalf("bootstrap did not preserve configured public base %q", tt.want)
-			}
-		})
+func TestBootstrapDoesNotEmbedAdvertisedOrForwardedAddress(t *testing.T) {
+	cfg := testCfg()
+	cfg.PublicURL = "https://advertised.example.org/edge"
+	cfg.Sites[0].PublicURL = "https://override.example.org/prefix"
+	server := newFixture(cfg, newRecSink(), nil)
+	req := httptest.NewRequest(http.MethodGet, "http://internal/rum/shop.js", nil)
+	req.Header.Set("X-Forwarded-Host", "untrusted.example.org")
+	rec := httptest.NewRecorder()
+	server.Handler().ServeHTTP(rec, req)
+	require.Equal(t, http.StatusOK, rec.Code)
+	for _, address := range []string{"advertised.example.org", "override.example.org", "internal", "untrusted.example.org"} {
+		assert.NotContains(t, rec.Body.String(), address)
 	}
+	assert.Contains(t, rec.Body.String(), "document.currentScript")
+	assert.Equal(t, "*", rec.Header().Get("Access-Control-Allow-Origin"))
+	assert.Equal(t, "cross-origin", rec.Header().Get("Cross-Origin-Resource-Policy"))
+	assert.Equal(t, "nosniff", rec.Header().Get("X-Content-Type-Options"))
 }
