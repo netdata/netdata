@@ -42,6 +42,9 @@ func (c *Collector) Init(ctx context.Context) error {
 	if c.job != nil {
 		return nil
 	}
+	if c.services.engineStateReadOnly != nil && c.services.engineStateReadOnly() {
+		c.Infof("running from a terminal: SNMPv3 engine state under %s is read-only, changes are not saved", c.services.engineStateRoot())
+	}
 
 	manager, commitCatalog := c.services.catalogCandidate()
 	job := jobruntime.New(validated.runtime, c.services.dependencies(c, manager))

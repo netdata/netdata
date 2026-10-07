@@ -125,12 +125,15 @@ func IsConfigPreparationError(err error) bool {
 func configPreparationError(err error) error  { return &preparationError{err: err, config: true} }
 func startupPreparationError(err error) error { return &preparationError{err: err} }
 
-func (r *Receiver) PrepareV3(stateRoot, jobName string) error {
+// PrepareV3 loads or creates the SNMPv3 engine state under stateRoot. With
+// readOnly the state is loaded and advanced in memory only; nothing is written.
+func (r *Receiver) PrepareV3(stateRoot, jobName string, readOnly bool) error {
 	if !r.policy.V3Enabled() {
 		return nil
 	}
 
 	paths := newEngineStatePaths(stateRoot, jobName)
+	paths.readOnly = readOnly
 	engineBootsExisted, err := engineStatePathExistsChecked(paths.engineBoots)
 	if err != nil {
 		return startupPreparationError(err)
