@@ -287,10 +287,33 @@ func TestFollowReportsSourceFailure(t *testing.T) {
 			if tc.cmd != nil {
 				sendCommand(t, conn, *tc.cmd)
 			}
-			observed, err := c.follow(t.Context(), proc)
-			assert.False(t, observed)
+			healthy, err := c.follow(t.Context(), proc)
+			assert.Zero(t, healthy)
 			assert.EqualError(t, err, tc.wantErr)
 			assert.Nil(t, c.latest.Load())
 		})
 	}
+}
+
+func TestRestartBackoffGrowsForBriefOutput(t *testing.T) {
+	c, fake := newCollectorWithFake(t)
+	c.timing = sourceTiming{
+		maxSampleAge:    100 * time.Millisecond,
+		stallTimeout:    300 * time.Millisecond,
+		restartDelayMin: 50 * time.Millisecond,
+		restartDelayMax: 800 * time.Millisecond,
+	}
+	startRun(t, c)
+
+	// Each process prints one record and then stalls: it never runs healthy
+	// for a stall period, so every restart waits twice as long as the last.
+	var starts []time.Time
+	for range 5 {
+		conn := fake.accept(t)
+		starts = append(starts, time.Now())
+		sendRecord(t, conn, "GR3D_FREQ 50%")
+	}
+	first := starts[1].Sub(starts[0])
+	last := starts[4].Sub(starts[3])
+	assert.GreaterOrEqual(t, last-first, 200*time.Millisecond, "restart intervals %v then %v", first, last)
 }

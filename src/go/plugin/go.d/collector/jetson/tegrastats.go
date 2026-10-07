@@ -53,7 +53,7 @@ func startTegrastats(ctx context.Context, path string) (*tegrastatsProcess, erro
 	process, err := ndexec.StartUnprivilegedProcess(ctx, ndexec.ProcessOptions{
 		Stdout: childStdout,
 	}, path, "--interval", interval)
-	// Only the child may keep the write end open, so its exit ends our reads.
+	// Close our copy of the write end: only the child's process tree keeps the pipe open.
 	_ = childStdout.Close()
 	if err != nil {
 		cancel()

@@ -40,10 +40,10 @@ func (c *Collector) run(ctx context.Context, ready func()) error {
 	// failures are recovered here.
 	delay := c.timing.restartDelayMin
 	for {
-		began := time.Now()
-		observed, err := c.follow(ctx, proc)
-		// A source that stayed healthy for a while restarts without accumulated backoff.
-		if observed && time.Since(began) >= c.timing.stallTimeout {
+		healthy, err := c.follow(ctx, proc)
+		// A source that kept producing records for a stall period restarts without
+		// accumulated backoff; one that fails sooner keeps backing off.
+		if healthy >= c.timing.stallTimeout {
 			delay = c.timing.restartDelayMin
 		}
 		for {
@@ -65,29 +65,31 @@ func (c *Collector) run(ctx context.Context, ready func()) error {
 }
 
 // follow publishes the records of proc until it exits, stalls or ctx is canceled,
-// then withdraws the latest record and closes proc. It reports whether any record arrived.
-func (c *Collector) follow(ctx context.Context, proc *tegrastatsProcess) (observed bool, err error) {
+// then withdraws the latest record and closes proc. It reports how long records
+// kept arriving: the time from the start of following to the last record.
+func (c *Collector) follow(ctx context.Context, proc *tegrastatsProcess) (healthy time.Duration, err error) {
 	defer func() {
 		c.latest.Store(nil)
 		proc.close()
 	}()
 
-	// The end of output is not a failure of its own: the exit that follows reports
-	// the status, and a process that keeps running without output is a stall.
+	// The end of output is not a failure of its own: the process exit reports the
+	// status, and a process that keeps running without output is a stall.
+	began := time.Now()
 	stall := time.NewTimer(c.timing.stallTimeout)
 	defer stall.Stop()
 	for {
 		select {
 		case <-ctx.Done():
-			return observed, ctx.Err()
+			return healthy, ctx.Err()
 		case <-proc.exited:
-			return observed, proc.exitError()
+			return healthy, proc.exitError()
 		case obs := <-proc.observations:
-			observed = true
+			healthy = obs.at.Sub(began)
 			c.latest.Store(&obs)
 			stall.Reset(c.timing.stallTimeout)
 		case <-stall.C:
-			return observed, errors.New("tegrastats stopped producing records")
+			return healthy, errors.New("tegrastats stopped producing records")
 		}
 	}
 }
