@@ -50,8 +50,8 @@ func New() *Collector {
 	return c
 }
 
-// sensorReader is the BMC access the collector needs. bmc.Reader opens the
-// device on demand and reopens it after a failed call.
+// sensorReader is the BMC access the collector needs. Check leaves the device
+// closed; Collect opens it on demand and Close releases it.
 type sensorReader interface {
 	Check(ctx context.Context) error
 	Collect(ctx context.Context, collectSEL bool) (*bmc.Snapshot, error)

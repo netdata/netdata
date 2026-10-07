@@ -27,6 +27,7 @@ func TestReader_CheckAndCollect(t *testing.T) {
 
 	require.NoError(t, r.Check(t.Context()))
 	assert.Equal(t, []types.Request{&app.GetDeviceIDRequest{}}, fake.requests, "Check is a single probe")
+	assert.Equal(t, 1, fake.closes, "Check leaves the device closed")
 
 	got, err := r.Collect(t.Context(), true)
 	require.NoError(t, err)
@@ -35,11 +36,11 @@ func TestReader_CheckAndCollect(t *testing.T) {
 		SELEntries:  new(fakeSELEntries),
 		CollectedAt: testNow,
 	}, got)
+	assert.Equal(t, 2, fake.connects, "Collect reopens the device")
 
 	require.NoError(t, r.Close(t.Context()))
 	require.NoError(t, r.Close(t.Context()))
-	assert.Equal(t, 1, fake.connects)
-	assert.Equal(t, 1, fake.closes)
+	assert.Equal(t, 2, fake.closes)
 }
 
 func TestReader_Collect_ReadingAvailability(t *testing.T) {
@@ -332,17 +333,52 @@ func TestReader_Collect_Conversion(t *testing.T) {
 	}
 }
 
-func TestReader_Check_ConnectFailure(t *testing.T) {
+func TestReader_Check(t *testing.T) {
 	tests := map[string]struct {
-		cancel     bool // the caller cancels while connecting
-		wantErr    error
-		wantErrMsg string
+		// prepare configures the fake; cancel cancels the caller's context.
+		prepare      func(fake *fakeBMC, cancel context.CancelFunc)
+		wantErr      error
+		wantErrMsg   string
+		wantRequests int
 	}{
-		"device error": {
+		"probe succeeds": {
+			wantRequests: 1,
+		},
+		"probe fails": {
+			prepare: func(fake *fakeBMC, _ context.CancelFunc) {
+				fake.onExchange = func(types.Request) error { return errors.New("transport failed") }
+			},
+			wantErrMsg:   "get IPMI device ID: transport failed",
+			wantRequests: 1,
+		},
+		"probe error wins over close error": {
+			prepare: func(fake *fakeBMC, _ context.CancelFunc) {
+				fake.onExchange = func(types.Request) error { return errors.New("transport failed") }
+				fake.closeErr = errors.New("bad descriptor")
+			},
+			wantErrMsg:   "get IPMI device ID: transport failed",
+			wantRequests: 1,
+		},
+		"close fails": {
+			prepare: func(fake *fakeBMC, _ context.CancelFunc) {
+				fake.closeErr = errors.New("bad descriptor")
+			},
+			wantErrMsg:   "close IPMI device: bad descriptor",
+			wantRequests: 1,
+		},
+		"connect fails": {
+			prepare: func(fake *fakeBMC, _ context.CancelFunc) {
+				fake.onConnect = func() error { return errors.New("permission denied") }
+			},
 			wantErrMsg: "connect IPMI: permission denied",
 		},
-		"caller cancellation takes precedence": {
-			cancel:  true,
+		"caller cancellation during connect takes precedence": {
+			prepare: func(fake *fakeBMC, cancel context.CancelFunc) {
+				fake.onConnect = func() error {
+					cancel()
+					return errors.New("permission denied")
+				}
+			},
 			wantErr: context.Canceled,
 		},
 	}
@@ -352,26 +388,21 @@ func TestReader_Check_ConnectFailure(t *testing.T) {
 			ctx, cancel := context.WithCancel(t.Context())
 			defer cancel()
 			fake := newFakeBMC()
-			fake.onConnect = func() error {
-				if tc.cancel {
-					cancel()
-				}
-				return errors.New("permission denied")
+			if tc.prepare != nil {
+				tc.prepare(fake, cancel)
 			}
-			r := newTestReader(fake)
 
-			err := r.Check(ctx)
-			if tc.wantErr != nil {
+			err := newTestReader(fake).Check(ctx)
+			switch {
+			case tc.wantErr != nil:
 				require.ErrorIs(t, err, tc.wantErr)
-			} else {
+			case tc.wantErrMsg != "":
 				require.EqualError(t, err, tc.wantErrMsg)
+			default:
+				require.NoError(t, err)
 			}
-			assert.Equal(t, 1, fake.closes, "a failed connect closes the transport")
-			assert.Empty(t, fake.requests)
-
-			fake.onConnect = nil
-			require.NoError(t, r.Check(t.Context()), "the next call connects again")
-			assert.Equal(t, 1, fake.connects)
+			assert.Len(t, fake.requests, tc.wantRequests)
+			assert.Equal(t, 1, fake.closes, "Check leaves the device closed")
 		})
 	}
 }

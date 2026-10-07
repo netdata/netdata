@@ -28,6 +28,7 @@ type fakeBMC struct {
 	readingErrs map[uint8]error
 	repoErr     error
 	selErr      error
+	closeErr    error
 	// additionTime is the repository's most recent addition timestamp.
 	additionTime uint32
 	// refuseWholeReads makes Get SDR require partial reads.
@@ -102,7 +103,7 @@ func (f *fakeBMC) Connect(context.Context) error {
 	return nil
 }
 
-func (f *fakeBMC) Close(context.Context) error { f.closes++; return nil }
+func (f *fakeBMC) Close(context.Context) error { f.closes++; return f.closeErr }
 
 func (f *fakeBMC) Exchange(ctx context.Context, req types.Request, res types.Response) error {
 	f.requests = append(f.requests, req)

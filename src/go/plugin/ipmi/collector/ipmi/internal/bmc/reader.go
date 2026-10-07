@@ -24,7 +24,8 @@ type Config struct {
 }
 
 // Reader reads the BMC one call at a time because the SDK client owns mutable
-// state. It opens the device on demand and reopens it after a failure.
+// state. Collect opens the device on demand and reopens it after a failure;
+// Check closes it again after its probe.
 type Reader struct {
 	mu  sync.Mutex
 	cfg Config
@@ -48,7 +49,8 @@ func New(cfg Config) *Reader {
 	}
 }
 
-// Check opens the device when needed and probes the BMC with Get Device ID.
+// Check opens the device, probes the BMC with Get Device ID and closes the
+// device again, so a probe leaves nothing to release.
 func (r *Reader) Check(ctx context.Context) error {
 	r.mu.Lock()
 	defer r.mu.Unlock()
@@ -56,9 +58,13 @@ func (r *Reader) Check(ctx context.Context) error {
 	if err := r.connect(ctx); err != nil {
 		return err
 	}
-	if err := r.exchange(ctx, &app.GetDeviceIDRequest{}, &app.GetDeviceIDResponse{}); err != nil {
-		_ = r.disconnect(ctx)
-		return fmt.Errorf("get IPMI device ID: %w", err)
+	probeErr := r.exchange(ctx, &app.GetDeviceIDRequest{}, &app.GetDeviceIDResponse{})
+	closeErr := r.disconnect(ctx)
+	if probeErr != nil {
+		return fmt.Errorf("get IPMI device ID: %w", probeErr)
+	}
+	if closeErr != nil {
+		return fmt.Errorf("close IPMI device: %w", closeErr)
 	}
 	return nil
 }
