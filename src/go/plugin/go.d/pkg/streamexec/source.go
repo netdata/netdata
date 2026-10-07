@@ -4,9 +4,13 @@
 //
 // A Source starts one owned command instance, decodes its standard output line by line into records, and publishes
 // each record with the time it was read. When the instance exits or stops producing records, the Source withdraws the
-// latest record, terminates and joins the instance, and starts a replacement after exponential backoff; an instance
-// never overlaps its replacement. When the context ends, the Source withdraws the record, terminates and joins the
-// instance, and returns.
+// latest record, terminates the instance, and starts a replacement after exponential backoff once the instance has
+// exited; an instance never overlaps its replacement. When the context ends, the Source withdraws the record,
+// terminates the instance, waits for it to exit, and returns.
+//
+// A command that cannot be signaled, such as one that ndsudo runs as root for an unprivileged caller, ends only by
+// exiting or at its next write after the Source closes its output. The Source therefore waits at most StallTimeout for
+// a terminated instance to exit and then warns; when the context has ended, it returns without the exit.
 package streamexec
 
 import (
@@ -48,7 +52,8 @@ func (f DecoderFunc[T]) Decode(line []byte) (T, bool) { return f(line) }
 type Timing struct {
 	// MaxSampleAge is how long a record stays available from Latest.
 	MaxSampleAge time.Duration
-	// StallTimeout replaces an instance that produces no record for this long.
+	// StallTimeout replaces an instance that produces no record for this long. It also bounds the wait for a
+	// terminated instance to exit: a command that still writes does so within it.
 	StallTimeout time.Duration
 	// RestartDelayMin and RestartDelayMax bound the exponential restart backoff. The delay returns to the minimum
 	// after an instance kept producing records for at least StallTimeout.
@@ -127,7 +132,8 @@ func (s *Source[T]) Latest() (T, bool) {
 
 // Run starts the command and supervises it until ctx is canceled. A failure to start the first instance is returned,
 // or nil if ctx is canceled by then; started, when non-nil, is called once, after that instance starts. Later failures
-// are recovered here by replacing the instance. Run returns nil after cancellation once the instance is joined.
+// are recovered here by replacing the instance. Run returns nil after cancellation once the instance has exited, or
+// after StallTimeout without the exit of an instance that cannot be signaled.
 func (s *Source[T]) Run(ctx context.Context, started func()) error {
 	return s.run(ctx, started, observer{})
 }
@@ -201,6 +207,7 @@ func (s *Source[T]) run(ctx context.Context, started func(), obs observer) error
 		if healthy >= timing.StallTimeout {
 			delay = timing.RestartDelayMin
 		}
+		prev := inst
 		for {
 			if ctx.Err() != nil {
 				return nil
@@ -213,6 +220,12 @@ func (s *Source[T]) run(ctx context.Context, started func(), obs observer) error
 			case <-time.After(delay):
 			}
 			delay = min(delay*2, timing.RestartDelayMax)
+			// follow leaves an instance that has not exited running; its replacement waits for the exit.
+			select {
+			case <-ctx.Done():
+				return nil
+			case <-prev.exited:
+			}
 			if inst, err = s.start(ctx); err == nil {
 				break
 			}
@@ -221,12 +234,16 @@ func (s *Source[T]) run(ctx context.Context, started func(), obs observer) error
 }
 
 // follow publishes the records of inst until it exits, stalls or ctx is canceled, then withdraws the latest record
-// and closes inst. It reports how long records kept arriving: the time from the start of following to the last
-// record.
+// and closes inst, waiting at most StallTimeout for its exit. It reports how long records kept arriving: the time
+// from the start of following to the last record.
 func (s *Source[T]) follow(ctx context.Context, inst *instance[T], obs observer) (healthy time.Duration, err error) {
 	defer func() {
 		s.latest.Store(nil)
-		inst.close()
+		if !inst.close(s.cfg.Timing.StallTimeout) {
+			s.cfg.Logger.Limit("streamexec:"+s.cfg.Name+":exit", 1, time.Minute).
+				Warningf("%s is still running %v after termination; a command that cannot be signaled ends only "+
+					"at its next write", s.cfg.Name, s.cfg.Timing.StallTimeout)
+		}
 	}()
 
 	// The end of output is not a failure of its own: the process exit reports the status, and a process that keeps

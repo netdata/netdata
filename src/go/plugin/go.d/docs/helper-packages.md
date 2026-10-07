@@ -272,6 +272,18 @@ a streaming command stopped takes the cause from `Wait`, not from the end of out
 termination of contained descendants. Do not build
 this contract by calling a raw command's `Cancel` after `Wait`: a reaped Unix PID/process-group ID can be reused.
 
+For a long-running command exposed through `ndsudo`, use `StartNDSudoProcess`. It gives the same ownership, but
+ndsudo runs the command as root, and an unprivileged plugin cannot signal it:
+
+- the kernel-denied termination is not reported as an error;
+- the command ends when it exits or dies of SIGPIPE at its next write after the caller closes its end of the command's
+  stdout pipe (ndsudo restores the default SIGPIPE disposition before exec);
+- until then `Wait` and `Close` block, so the caller MUST close that pipe end and bound its own wait. A command that
+  stops writing keeps running as root;
+- a plugin allowed to signal root processes terminates the command as `StartUnprivilegedProcess` does.
+
+Tests reproduce the unprivileged case with a same-user fake through `DenyNDSudoSignalsForTests`.
+
 The owned API supports Linux, macOS, FreeBSD and Windows 10 or later. Unix exit observation keeps the group leader
 unreaped until group termination is permanently disarmed. Descendants MUST remain in that process group; this is
 lifecycle containment, not a sandbox against a script deliberately creating another session/group. Windows uses a
@@ -329,8 +341,9 @@ output, such as a vendor tool printing one record per interval.
 
 A `streamexec.Source` owns:
 
-- start through the collector's `StartFunc`, which MUST use an owned `ndexec` constructor given the context it
-  receives (canceling that context is how the source terminates a process);
+- start through the collector's `StartFunc`, which MUST use an owned `ndexec` constructor (`StartUnprivilegedProcess`
+  or `StartNDSudoProcess`) given the context it receives (canceling that context is how the source terminates a
+  process);
 - line reading with a per-line memory bound (`bufio.MaxScanTokenSize`, terminator included; a longer line is
   discarded) and a fresh `Decoder` per process, so a replacement never inherits partial record state. A decoder's
   record MUST NOT share memory with the line or with buffers the decoder reuses; a line that completes no record does
@@ -339,12 +352,15 @@ A `streamexec.Source` owns:
   stale record becomes a gap;
 - replacement of a process that exits or produces no record for `StallTimeout`, after exponential backoff between
   `RestartDelayMin` and `RestartDelayMax`; the backoff resets after a process produced records for a stall period, and a
-  process is terminated and joined before its replacement starts;
+  replacement starts only after its predecessor has exited;
+- termination that waits at most `StallTimeout` for the exit. The source cancels the process and closes its output,
+  so a command it cannot signal (an ndsudo command of an unprivileged plugin) ends at its next write. One that has
+  stopped writing is left running with a warning, and no replacement starts before it exits;
 - a warning for each failed process or restart attempt, limited to one per minute per command name.
 
 `Run(ctx, started)` returns a failure to start the first process and calls `started` once it runs, so a V2 collector
 delegates its `CollectorV2Runner.Run` to it. Later failures are recovered inside `Run`, which returns nil after
-cancellation once the process is joined.
+cancellation once the process has exited, or after the `StallTimeout` wait.
 
 A collector without a managed runner (framework V1) uses `Background(ctx)` instead: it runs the same supervision on its
 own goroutine and returns once the first record arrives, with `ctx` bounding only that wait. It fails at once, with the
@@ -353,7 +369,9 @@ Call it from `Check`, whose failures follow `autodetection_retry`, and call the 
 
 Tests use `streamexec/streamexectest`: the test binary doubles as the fake command (`RunIfFake` in `TestMain`), and each
 started fake reports its arguments and prints, spawns or exits as the test instructs. A fake's connection closes only when
-its process exits, so tests can check exit ordering. The harness is Unix-only; Windows behavior is unverified.
+its process exits, so tests can check exit ordering. `NewFake` routes both nd-run and ndsudo starts to the fake; combine
+it with `ndexec.DenyNDSudoSignalsForTests` to test an ndsudo command the plugin cannot signal. The harness is Unix-only;
+Windows behavior is unverified.
 
 ## Log File Collectors
 
