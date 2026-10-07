@@ -3,8 +3,8 @@
 Use this when a generated integration page links to `learn.netdata.cloud` and a link may have drifted from the current
 Learn route. The rule and its evidence live in the Learn skill:
 `.agents/skills/docs-learn-site-structure/how-tos/integration-card-description-links.md` (absolute Learn URLs in
-metadata bypass ingest's link rewriting and anchor validation; Learn routes come from `docs/.map/map.yaml` labels, not
-from source filenames, so never infer a slug from a filename). This file keeps the audit commands.
+metadata bypass ingest's link rewriting; Learn routes come from `docs/.map/map.yaml` labels, not from source
+filenames, so never infer a slug from a filename). This file keeps the audit commands.
 
 ## Audit command
 
