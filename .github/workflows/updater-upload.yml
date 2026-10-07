@@ -38,7 +38,7 @@ jobs:
           RCLONE_CONFIG_S3_ENDPOINT: "${{ secrets.CLOUDFLARE_R2_RELEASE_ENDPOINT }}"
           RCLONE_CONFIG_S3_REGION: "auto"
         run: |
-          rclone copy --verbose --fast-list --use-server-modtime --header-upload "Cache-Control: no-transform" packaging/installer/netdata-updater.sh s3:netdata-agent-artifacts/netdata-updater.sh
+          rclone copyto --verbose --fast-list --use-server-modtime --header-upload "Cache-Control: no-transform" packaging/installer/netdata-updater.sh s3:netdata-agent-artifacts/netdata-updater.sh
       - name: Failure Notification
         uses: rtCamp/action-slack-notify@v2
         env:
