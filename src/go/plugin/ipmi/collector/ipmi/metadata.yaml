@@ -201,7 +201,7 @@ modules:
         - id: sensors
           function_name: ipmi-go-sensors
           name: IPMI Sensors
-          description: Show current readings and default FreeIPMI health states.
+          description: Show current readings and default FreeIPMI health states, with sensor counts by component and state.
           parameters:
             - id: __job
               name: Instance
@@ -232,11 +232,16 @@ modules:
               - name: Units
                 type: string
                 unit: ''
-                description: Reading units.
+                description: Reading units; null for discrete sensors.
               - name: State
                 type: string
                 unit: ''
                 description: Default FreeIPMI health interpretation.
+              - name: Key
+                type: string
+                unit: ''
+                description: Stable sensor identity within the collection job.
+                visibility: hidden
               - name: rowOptions
                 type: none
                 unit: ''

@@ -50,6 +50,7 @@ cancellation; stopping a job can wait for that receive timeout. Cancellation is 
   The state interpretation uses
   FreeIPMI defaults, including nominal non-critical threshold assertions; custom interpretation files are not loaded.
 - Unavailable numeric data produces gaps. `ipmi-go-sensors` reads an immutable snapshot and reports null readings.
+  Its summary charts show sensor counts by Component and State.
 - Canonical local job `ipmi` uses the `ipmi` chart type. Other job names receive the standard framework job prefix.
   Sensor keys remain stable when a reading becomes unavailable; the C library can change its reading-type key then.
 - SEL is the raw repository entry count, not FreeIPMI's interpreted/filtered count. The existing SEL alarm matches
