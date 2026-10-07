@@ -1335,7 +1335,7 @@ sidebar:
             items:
               - meta:
                   label: How to write a Netdata collector in Go
-                  edit_url: https://github.com/netdata/netdata/edit/master/src/go/plugin/go.d/docs/how-to-write-a-module.md
+                  edit_url: https://github.com/netdata/netdata/edit/master/src/go/plugin/go.d/docs/how-to-write-a-collector.md
                   description: This guide will walk you through the technical implementation of writing a new Netdata collector in Golang, with tips on interfaces, structure, configuration files, and more.
           - meta:
               label: python.d.plugin
