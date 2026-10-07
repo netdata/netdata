@@ -8,6 +8,7 @@ import (
 	"errors"
 	"os"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/netdata/netdata/go/plugins/logger"
@@ -37,6 +38,7 @@ func newIntelGpuTopExec(log *logger.Logger, updateEvery int, device string) (*in
 	source, err := streamexec.New(streamexec.Config[[]byte]{
 		Name: "intel_gpu_top",
 		Start: func(ctx context.Context, stdout *os.File) (*ndexec.Process, error) {
+			log.Debugf("executing 'ndsudo %s'", strings.Join(append([]string{command}, args...), " "))
 			return ndexec.StartNDSudoProcess(ctx, ndexec.ProcessOptions{
 				Stdout: stdout,
 			}, command, args...)
