@@ -984,13 +984,13 @@ Netdata exchanges data with other systems through exporting connectors, Promethe
 
 | Plan | Price | For | Highlights |
 |---|---|---|---|
-| **Community** | Free | Personal, non-commercial use | Up to 5 active connected nodes, 1 custom dashboard per Room |
-| **Homelab** | $90/year or $10/month | Personal, non-commercial use | Unlimited nodes (fair usage policy), unlimited dashboards |
-| **Business** | $4.50/node/month billed yearly; $6/node/month billed monthly | Freelancers, professionals, businesses of all sizes | All features: Netdata AI, all roles (RBAC), enterprise SSO (Okta, OpenID Connect), SCIM, enterprise notification integrations, Netdata Cloud MCP, centralized configuration management, unlimited custom dashboards, audit events in the events feed |
+| **Community** | $0 | Personal, non-commercial use | Up to 5 active connected nodes, 1 custom dashboard per Room |
+| **Homelab** | $90/year or $10/month | Personal, non-commercial use | No hard limit on nodes (fair usage policy), no limit on custom dashboards |
+| **Business** | $4.50/node/month billed yearly; $6/node/month billed monthly | Freelancers, professionals, businesses of all sizes | All features: Netdata AI, all roles (RBAC), enterprise SSO (Okta, OpenID Connect), SCIM, enterprise notification integrations, Netdata Cloud MCP, centralized configuration management, no limit on custom dashboards, audit events in the events feed |
 | **Enterprise On-Prem** | Custom, from 200 node licenses | Air-gapped facilities, critical infrastructure | Everything in Business, running on customer infrastructure; priority support plans |
-| **Open-source Agent** | Free (Agent GPL v3+; dashboard NCUL1) | Self-hosted, any use | Complete Agent and Parents, unlimited metrics, local dashboards |
+| **Open-source Agent** | Free (Agent GPL v3+; dashboard NCUL1) | Self-hosted, any use | Complete Agent and Parents, no limit on metrics, local dashboards |
 
-Community and Homelab are for personal, non-commercial use only. Freelancers, professionals and businesses use the open-source Agent or the Business plan. A 14-day Business trial with unlimited nodes is available on sign-up.
+Community and Homelab are for personal, non-commercial use only. Freelancers, professionals and businesses use the open-source Agent or the Business plan. A 14-day Business trial with no limit on nodes is available on sign-up.
 
 Netdata is also available on [AWS Marketplace](https://aws.amazon.com/marketplace/seller-profile?id=seller-5bbjpj3csb4mw): Netdata Cloud as a pay-as-you-go subscription or an annual contract (SaaS), Netdata Cloud On-Prem (Helm chart, bring your own license) and the Netdata Agent for EKS (Helm chart, free).
 
@@ -1001,7 +1001,7 @@ Netdata is also available on [AWS Marketplace](https://aws.amazon.com/marketplac
 - **P90 billing:** daily, the node count at the 90th percentile of time-weighted usage; monthly, the 90th percentile of daily values (the top 3 days of a 30-day month are excluded). Short spikes and occasional high-usage days do not increase the bill.
 - **Not billed:** metrics volume, Logs Monitoring (querying logs in place), users, data retention, containers.
 - **Free Preview:** Logs Management (collecting, storing and indexing logs), Traces (OpenTelemetry trace storage and the Traces explorer), Network Flows (NetFlow, IPFIX, sFlow) and Digital Experience Monitoring (RUM, synthetic journeys, Lighthouse audits) are in Free Preview.
-- **Netdata AI:** usage measured in AI credits — one credit per investigation or report, fractional credits for smaller actions (conversations, alert creation and suggestion); alert explanations free. Business includes 10 AI credits per month; the 14-day trial includes 10 AI credits; additional credits are purchased in the app.
+- **Netdata AI:** usage measured in AI credits — one credit per investigation or report, fractional credits for smaller actions (conversations, alert creation and suggestion); alert explanations consume no credits. Business includes 10 AI credits per month; the 14-day trial includes 10 AI credits; additional credits are purchased in the app.
 - **Windows:** Windows Agents count as nodes like any other Agent and are monitored on every plan through Netdata Cloud (including Community); only the local dashboard of a standalone Windows Agent is unlocked on paid plans, and Windows Children streaming to a Linux Parent are shown on the Parent's dashboard on any plan.
 - **Plan-gated features:** Netdata Cloud MCP, enterprise notification integrations (all Cloud integrations except Discord, personal email and the mobile app), additional roles, SSO and SCIM require a paid plan.
 
@@ -1026,7 +1026,7 @@ Support by plan:
 **Learn more:** [Open source on netdata.cloud](https://www.netdata.cloud/open-source/)
 
 - Netdata Agent: GPL v3 or later
-- Netdata dashboard (UI): Netdata Cloud UI License (NCUL1) — free to use with Netdata Agents and Parents, not open source
+- Netdata dashboard (UI): Netdata Cloud UI License (NCUL1) — ships with the open-source Agent for use with Netdata Agents and Parents, not open source
 
 ## Key Differentiators
 
