@@ -4,10 +4,7 @@
 
 package jetson
 
-import (
-	"slices"
-	"time"
-)
+import "slices"
 
 // sample holds the GPU and EMC readings of one tegrastats record. A nil reading
 // was absent or invalid in the record. Frequencies are MHz.
@@ -22,10 +19,4 @@ type sample struct {
 func (s sample) hasReadings() bool {
 	return s.GPUUtilization != nil || s.GPUFrequency != nil || s.EMCUtilization != nil || s.EMCFrequency != nil ||
 		slices.ContainsFunc(s.GPCFrequencies, func(f *float64) bool { return f != nil })
-}
-
-// observation is a sample and the time its record was read.
-type observation struct {
-	sample sample
-	at     time.Time
 }

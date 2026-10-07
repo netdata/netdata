@@ -7,7 +7,7 @@ package jetson
 import (
 	"bytes"
 	"context"
-	"net"
+	"os"
 	"path/filepath"
 	"regexp"
 	"sync"
@@ -21,12 +21,20 @@ import (
 	"github.com/netdata/netdata/go/plugins/plugin/framework/jobruntime"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/collecttest"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/ndexec"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/streamexec/streamexectest"
 )
+
+// TestMain doubles as the fake tegrastats; see streamexectest.
+func TestMain(m *testing.M) {
+	streamexectest.RunIfFake()
+	os.Exit(m.Run())
+}
 
 func TestCollectionTransitions(t *testing.T) {
 	c, fake := newCollectorWithFake(t)
 	startRun(t, c)
-	conn := fake.accept(t)
+	conn := fake.Accept(t)
+	assert.Equal(t, []string{"--interval", "1000"}, conn.Args)
 	_, err := collecttest.CollectScalarSeries(c)
 	require.ErrorContains(t, err, "no fresh")
 
@@ -66,72 +74,9 @@ func TestCollectionTransitions(t *testing.T) {
 	collecttest.AssertChartCoverage(t, c, collecttest.ChartCoverageExpectation{})
 }
 
-func TestSourceRecovery(t *testing.T) {
-	for name, tc := range map[string]struct {
-		fail func(*testing.T, net.Conn)
-	}{
-		"nonzero exit": {fail: func(t *testing.T, conn net.Conn) {
-			sendCommand(t, conn, fakeCommand{
-				Exit: new(7),
-			})
-		}},
-		"clean exit": {fail: func(t *testing.T, conn net.Conn) {
-			sendCommand(t, conn, fakeCommand{
-				Exit: new(0),
-			})
-		}},
-		"stall": {fail: func(*testing.T, net.Conn) {}},
-		"unrecognized output": {fail: func(t *testing.T, conn net.Conn) {
-			sendCommand(t, conn, fakeCommand{
-				Line: "warning GR3D_FREQ 90%",
-			})
-		}},
-	} {
-		t.Run(name, func(t *testing.T) {
-			c, fake := newCollectorWithFake(t)
-			c.timing = sourceTiming{
-				maxSampleAge:    100 * time.Millisecond,
-				stallTimeout:    300 * time.Millisecond,
-				restartDelayMin: 100 * time.Millisecond,
-				restartDelayMax: 200 * time.Millisecond,
-			}
-			startRun(t, c)
-			conn := fake.accept(t)
-			sendRecord(t, conn, "GR3D_FREQ 50%")
-			waitSample(t, c, func(s sample) bool { return s.GPUUtilization != nil })
-			_, err := collecttest.CollectScalarSeries(c)
-			require.NoError(t, err)
-
-			tc.fail(t, conn)
-			require.Eventually(t, func() bool { return c.latest.Load() == nil }, time.Second, 5*time.Millisecond)
-			replacement := fake.accept(t)
-			requireExited(t, conn) // the failed process never overlaps its replacement
-
-			sendRecord(t, replacement, "EMC_FREQ 12%@800")
-			waitSample(t, c, func(s sample) bool { return s.EMCFrequency != nil })
-			assertCollected(t, c, map[string]metrix.SampleValue{
-				"emc_utilization": 12,
-				"emc_frequency":   800,
-			})
-		})
-	}
-}
-
-func TestCancelTerminatesDescendants(t *testing.T) {
-	c, fake := newCollectorWithFake(t)
-	stop := startRun(t, c)
-	conn := fake.accept(t)
-	sendCommand(t, conn, fakeCommand{
-		Spawn: true,
-	})
-	child := fake.accept(t)
-	stop()
-	requireExited(t, conn)
-	requireExited(t, child)
-}
-
 func TestManagedRuntime(t *testing.T) {
 	c, fake := newCollectorWithFake(t)
+	c.timing.MaxSampleAge = time.Hour // only withdrawal, not age, can remove the record after stop
 	out := &lockedBuffer{}
 	job := jobruntime.NewJobV2(jobruntime.JobV2Config{
 		PluginName:  "go.d",
@@ -162,7 +107,7 @@ func TestManagedRuntime(t *testing.T) {
 	require.NoError(t, run.StartupErr())
 	require.True(t, run.Running())
 
-	conn := fake.accept(t)
+	conn := fake.Accept(t)
 	sendRecord(t, conn, "GR3D_FREQ 25%@900 EMC_FREQ 30%@1600")
 	waitSample(t, c, func(s sample) bool { return s.GPUFrequency != nil })
 	// The emitted frame carries the record's only reading equal to 25, the GPU utilization.
@@ -178,7 +123,8 @@ func TestManagedRuntime(t *testing.T) {
 	case <-time.After(5 * time.Second):
 		t.Fatal("managed Run not joined")
 	}
-	require.Nil(t, c.latest.Load())
+	_, ok := c.latestSample()
+	require.False(t, ok)
 	assert.False(t, run.Running())
 }
 
@@ -201,34 +147,79 @@ func TestRunStartupFailure(t *testing.T) {
 	}
 }
 
-func TestRunSurvivesLateExecFailure(t *testing.T) {
-	c, _ := newCollectorWithFake(t)
-	c.findTegrastats = func() (string, error) { return filepath.Join(t.TempDir(), "missing-tegrastats"), nil }
-	require.NoError(t, c.Check(t.Context()))
-
-	// The helper starts, so Run is ready before the missing executable fails.
-	ctx, cancel := context.WithCancel(t.Context())
-	defer cancel()
-	ready, done := goRun(ctx, c)
+func TestRunWithoutCheck(t *testing.T) {
+	ready, done := goRun(t.Context(), New())
+	select {
+	case err := <-done:
+		require.EqualError(t, err, "tegrastats executable has not been resolved")
+	case <-time.After(3 * time.Second):
+		t.Fatal("unresolved executable not reported")
+	}
 	select {
 	case <-ready:
-	case <-time.After(3 * time.Second):
-		t.Fatal("helper did not signal readiness")
+		t.Fatal("ready without an executable")
+	default:
 	}
-	_, err := collecttest.CollectScalarSeries(c)
-	require.Error(t, err)
+}
+
+// newCollectorWithFake returns a collector whose tegrastats is the test binary, started through a pass-through
+// nd-run.
+func newCollectorWithFake(t *testing.T) (*Collector, *streamexectest.Fake) {
+	t.Helper()
+	fake := streamexectest.NewFake(t)
+	c := New()
+	c.findTegrastats = func() (string, error) { return fake.Binary, nil }
+	return c, fake
+}
+
+// sendRecord makes the fake print a complete record with the given readings.
+func sendRecord(t *testing.T, conn *streamexectest.Conn, readings string) {
+	t.Helper()
+	conn.Line(t, testRecordPrefix+readings)
+}
+
+// startRun runs the collector until the test ends or the returned stop is called.
+// It returns once Run signals readiness.
+func startRun(t *testing.T, c *Collector) (stop context.CancelFunc) {
+	t.Helper()
+	require.NoError(t, c.Init(t.Context()))
+	require.NoError(t, c.Check(t.Context()))
+	ctx, cancel := context.WithCancel(t.Context())
+	ready, done := goRun(ctx, c)
+	t.Cleanup(func() {
+		cancel()
+		select {
+		case err := <-done:
+			assert.NoError(t, err)
+		case <-time.After(5 * time.Second):
+			t.Error("Run did not join its owned process")
+		}
+	})
 	select {
+	case <-ready:
 	case err := <-done:
-		t.Fatalf("late exec failure ended Run: %v", err)
-	case <-time.After(150 * time.Millisecond):
+		t.Fatalf("Run failed before readiness: %v", err)
+	case <-time.After(5 * time.Second):
+		t.Fatal("readiness waited for telemetry")
 	}
-	cancel()
-	select {
-	case err := <-done:
-		require.NoError(t, err)
-	case <-time.After(3 * time.Second):
-		t.Fatal("retry did not cancel")
-	}
+	return cancel
+}
+
+// goRun calls Run in the background and returns its readiness and result channels.
+func goRun(ctx context.Context, c *Collector) (ready <-chan struct{}, done <-chan error) {
+	readyCh := make(chan struct{})
+	doneCh := make(chan error, 1)
+	go func() { doneCh <- c.Run(ctx, func() { close(readyCh) }) }()
+	return readyCh, doneCh
+}
+
+// waitSample waits until the collector holds a fresh record matching match.
+func waitSample(t *testing.T, c *Collector, match func(sample) bool) {
+	t.Helper()
+	require.Eventually(t, func() bool {
+		s, ok := c.latestSample()
+		return ok && match(s)
+	}, 3*time.Second, 5*time.Millisecond)
 }
 
 func assertCollected(t *testing.T, c *Collector, want map[string]metrix.SampleValue) {
@@ -253,67 +244,4 @@ func (b *lockedBuffer) String() string {
 	b.mu.Lock()
 	defer b.mu.Unlock()
 	return b.buffer.String()
-}
-
-func TestFollowReportsSourceFailure(t *testing.T) {
-	// Exit cases wait longer than an exit can take, so only the stall case stalls.
-	for name, tc := range map[string]struct {
-		cmd          *fakeCommand
-		stallTimeout time.Duration
-		wantErr      string
-	}{
-		"nonzero exit": {
-			cmd:          &fakeCommand{Exit: new(7)},
-			stallTimeout: 10 * time.Second,
-			wantErr:      "tegrastats exited: exit status 7",
-		},
-		"clean exit": {
-			cmd:          &fakeCommand{Exit: new(0)},
-			stallTimeout: 10 * time.Second,
-			wantErr:      "tegrastats exited",
-		},
-		"stall": {
-			stallTimeout: 300 * time.Millisecond,
-			wantErr:      "tegrastats stopped producing records",
-		},
-	} {
-		t.Run(name, func(t *testing.T) {
-			c, fake := newCollectorWithFake(t)
-			c.timing.stallTimeout = tc.stallTimeout
-			require.NoError(t, c.Check(t.Context()))
-			proc, err := startTegrastats(t.Context(), c.tegrastatsPath)
-			require.NoError(t, err)
-			conn := fake.accept(t)
-			if tc.cmd != nil {
-				sendCommand(t, conn, *tc.cmd)
-			}
-			healthy, err := c.follow(t.Context(), proc)
-			assert.Zero(t, healthy)
-			assert.EqualError(t, err, tc.wantErr)
-			assert.Nil(t, c.latest.Load())
-		})
-	}
-}
-
-func TestRestartBackoffGrowsForBriefOutput(t *testing.T) {
-	c, fake := newCollectorWithFake(t)
-	c.timing = sourceTiming{
-		maxSampleAge:    100 * time.Millisecond,
-		stallTimeout:    300 * time.Millisecond,
-		restartDelayMin: 50 * time.Millisecond,
-		restartDelayMax: 800 * time.Millisecond,
-	}
-	startRun(t, c)
-
-	// Each process prints one record and then stalls: it never runs healthy
-	// for a stall period, so every restart waits twice as long as the last.
-	var starts []time.Time
-	for range 5 {
-		conn := fake.accept(t)
-		starts = append(starts, time.Now())
-		sendRecord(t, conn, "GR3D_FREQ 50%")
-	}
-	first := starts[1].Sub(starts[0])
-	last := starts[4].Sub(starts[3])
-	assert.GreaterOrEqual(t, last-first, 200*time.Millisecond, "restart intervals %v then %v", first, last)
 }
