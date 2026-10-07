@@ -167,6 +167,18 @@ func (f *Fake) Accept(t *testing.T) *Conn {
 	}
 }
 
+// RequireNoStart requires that no fake starts within d.
+func (f *Fake) RequireNoStart(t *testing.T, d time.Duration) {
+	t.Helper()
+	require.NoError(t, f.listener.SetDeadline(time.Now().Add(d)))
+	conn, err := f.listener.Accept()
+	if err == nil {
+		_ = conn.Close()
+		t.Fatal("a fake started")
+	}
+	require.ErrorIs(t, err, os.ErrDeadlineExceeded)
+}
+
 // Conn controls one running fake.
 type Conn struct {
 	// Args are the arguments the fake was started with.

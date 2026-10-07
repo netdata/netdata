@@ -14,6 +14,7 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"sync"
 	"sync/atomic"
 	"time"
 
@@ -31,9 +32,9 @@ type StartFunc func(ctx context.Context, stdout *os.File) (*ndexec.Process, erro
 // slice is valid only during the call. It reports a record when the line completes one.
 //
 // A returned record is published to other goroutines as is: it MUST NOT share memory with line or with buffers the
-// decoder reuses, and MUST NOT change afterwards. A false result skips the line without counting as a record, so
-// output that never completes a record ends the instance as a stall. A decoder that accumulates lines across calls
-// MUST bound what it keeps, discarding a partial record that exceeds its bound.
+// decoder reuses, and MUST NOT change afterwards. A false result skips the line without counting as a record. A
+// decoder MAY accumulate lines across calls: output that never completes a record ends the instance as a stall, and
+// the replacement gets a fresh decoder, so accumulation is bounded by what one instance writes within StallTimeout.
 type Decoder[T any] interface {
 	Decode(line []byte) (T, bool)
 }
@@ -75,6 +76,15 @@ type Source[T any] struct {
 	// latest is the newest record of the running instance; nil before its first record and while none runs. Only the
 	// Run goroutine writes it, so withdrawal before a replacement starts cannot race with a late record.
 	latest atomic.Pointer[record[T]]
+}
+
+// observer receives supervision events on the Run goroutine; Run itself uses none.
+type observer struct {
+	// published is called after a record is published.
+	published func()
+	// ended is called after an instance ended with err; returning true ends supervision without a replacement, and
+	// run then returns err.
+	ended func(err error) bool
 }
 
 // record is a decoded value and the time its last line was read.
@@ -119,6 +129,55 @@ func (s *Source[T]) Latest() (T, bool) {
 // or nil if ctx is canceled by then; started, when non-nil, is called once, after that instance starts. Later failures
 // are recovered here by replacing the instance. Run returns nil after cancellation once the instance is joined.
 func (s *Source[T]) Run(ctx context.Context, started func()) error {
+	return s.run(ctx, started, observer{})
+}
+
+// Background supervises the command on its own goroutine, for a collector without a managed runner. It returns once
+// the first instance has published a record; ctx bounds only this wait. It fails, leaving nothing running, when the
+// first instance cannot start, ends before publishing a record (with that instance's failure, without a replacement),
+// or ctx ends first. On success the caller MUST call stop, which ends supervision and waits for it; stop is idempotent.
+func (s *Source[T]) Background(ctx context.Context) (stop func(), err error) {
+	recorded := make(chan struct{})
+	var recordedOnce sync.Once
+	obs := observer{
+		published: func() { recordedOnce.Do(func() { close(recorded) }) },
+		// An instance that ends before publishing a record ends supervision with its failure.
+		ended: func(error) bool {
+			select {
+			case <-recorded:
+				return false
+			default:
+				return true
+			}
+		},
+	}
+
+	runCtx, cancel := context.WithCancel(context.Background())
+	done := make(chan error, 1)
+	go func() { done <- s.run(runCtx, nil, obs) }()
+	var stopOnce sync.Once
+	stop = func() {
+		stopOnce.Do(func() {
+			cancel()
+			<-done
+		})
+	}
+
+	select {
+	case <-recorded:
+		return stop, nil
+	case err := <-done:
+		// Before cancellation, run returns only a failure: the first instance did not start, or ended before
+		// publishing a record.
+		cancel()
+		return nil, err
+	case <-ctx.Done():
+		stop()
+		return nil, fmt.Errorf("wait for the first %s record: %w", s.cfg.Name, context.Cause(ctx))
+	}
+}
+
+func (s *Source[T]) run(ctx context.Context, started func(), obs observer) error {
 	inst, err := s.start(ctx)
 	if err != nil {
 		if ctx.Err() != nil {
@@ -133,7 +192,10 @@ func (s *Source[T]) Run(ctx context.Context, started func()) error {
 	timing := s.cfg.Timing
 	delay := timing.RestartDelayMin
 	for {
-		healthy, err := s.follow(ctx, inst)
+		healthy, err := s.follow(ctx, inst, obs)
+		if obs.ended != nil && obs.ended(err) {
+			return err
+		}
 		// An instance that kept producing records for a stall period restarts without accumulated backoff; one that
 		// fails sooner keeps backing off.
 		if healthy >= timing.StallTimeout {
@@ -161,7 +223,7 @@ func (s *Source[T]) Run(ctx context.Context, started func()) error {
 // follow publishes the records of inst until it exits, stalls or ctx is canceled, then withdraws the latest record
 // and closes inst. It reports how long records kept arriving: the time from the start of following to the last
 // record.
-func (s *Source[T]) follow(ctx context.Context, inst *instance[T]) (healthy time.Duration, err error) {
+func (s *Source[T]) follow(ctx context.Context, inst *instance[T], obs observer) (healthy time.Duration, err error) {
 	defer func() {
 		s.latest.Store(nil)
 		inst.close()
@@ -182,6 +244,9 @@ func (s *Source[T]) follow(ctx context.Context, inst *instance[T]) (healthy time
 			healthy = r.at.Sub(began)
 			s.latest.Store(&r)
 			stall.Reset(s.cfg.Timing.StallTimeout)
+			if obs.published != nil {
+				obs.published()
+			}
 		case <-stall.C:
 			return healthy, fmt.Errorf("%s stopped producing records", s.cfg.Name)
 		}
