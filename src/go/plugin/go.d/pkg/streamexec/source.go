@@ -32,9 +32,9 @@ type StartFunc func(ctx context.Context, stdout *os.File) (*ndexec.Process, erro
 // slice is valid only during the call. It reports a record when the line completes one.
 //
 // A returned record is published to other goroutines as is: it MUST NOT share memory with line or with buffers the
-// decoder reuses, and MUST NOT change afterwards. A false result skips the line without counting as a record, so
-// output that never completes a record ends the instance as a stall. A decoder that accumulates lines across calls
-// MUST bound what it keeps, discarding a partial record that exceeds its bound.
+// decoder reuses, and MUST NOT change afterwards. A false result skips the line without counting as a record. A
+// decoder MAY accumulate lines across calls: output that never completes a record ends the instance as a stall, and
+// the replacement gets a fresh decoder, so accumulation is bounded by what one instance writes within StallTimeout.
 type Decoder[T any] interface {
 	Decode(line []byte) (T, bool)
 }
@@ -82,7 +82,8 @@ type Source[T any] struct {
 type observer struct {
 	// published is called after a record is published.
 	published func()
-	// ended is called after an instance ended with err; returning true ends supervision without a replacement.
+	// ended is called after an instance ended with err; returning true ends supervision without a replacement, and
+	// run then returns err.
 	ended func(err error) bool
 }
 
@@ -137,18 +138,17 @@ func (s *Source[T]) Run(ctx context.Context, started func()) error {
 // or ctx ends first. On success the caller MUST call stop, which ends supervision and waits for it; stop is idempotent.
 func (s *Source[T]) Background(ctx context.Context) (stop func(), err error) {
 	recorded := make(chan struct{})
-	ended := make(chan error, 1)
 	var recordedOnce sync.Once
 	obs := observer{
 		published: func() { recordedOnce.Do(func() { close(recorded) }) },
-		ended: func(err error) bool {
+		// An instance that ends before publishing a record ends supervision with its failure.
+		ended: func(error) bool {
 			select {
 			case <-recorded:
 				return false
 			default:
+				return true
 			}
-			ended <- err
-			return true
 		},
 	}
 
@@ -166,11 +166,9 @@ func (s *Source[T]) Background(ctx context.Context) (stop func(), err error) {
 	select {
 	case <-recorded:
 		return stop, nil
-	case err := <-ended:
-		stop()
-		return nil, err
 	case err := <-done:
-		// Run returns before cancellation only when the first instance fails to start.
+		// Before cancellation, run returns only a failure: the first instance did not start, or ended before
+		// publishing a record.
 		cancel()
 		return nil, err
 	case <-ctx.Done():
@@ -196,7 +194,7 @@ func (s *Source[T]) run(ctx context.Context, started func(), obs observer) error
 	for {
 		healthy, err := s.follow(ctx, inst, obs)
 		if obs.ended != nil && obs.ended(err) {
-			return nil
+			return err
 		}
 		// An instance that kept producing records for a stall period restarts without accumulated backoff; one that
 		// fails sooner keeps backing off.

@@ -81,12 +81,17 @@ type nvidiaSmiLoopExec struct {
 	stopSource   func()
 }
 
+// loopTiming returns the nvidia-smi loop interval in seconds, the data collection interval capped at 5, and how long
+// a sample stays current. A query may take up to timeout, so a sample stays current, and the process alive, for one
+// loop interval plus timeout.
+func loopTiming(updateEvery int, timeout time.Duration) (interval int, freshFor time.Duration) {
+	interval = min(updateEvery, 5)
+	return interval, time.Duration(interval)*time.Second + timeout
+}
+
 func newNvidiaSmiLoopExec(path string, cfg Config, log *logger.Logger) (*nvidiaSmiLoopExec, error) {
-	interval := min(cfg.UpdateEvery, 5)
 	timeout := cfg.Timeout.Duration()
-	// A query may take up to timeout, so a sample stays current, and the process alive, for one loop interval plus
-	// timeout.
-	freshFor := time.Duration(interval)*time.Second + timeout
+	interval, freshFor := loopTiming(cfg.UpdateEvery, timeout)
 	source, err := streamexec.New(streamexec.Config[[]byte]{
 		Name: "nvidia-smi",
 		Start: func(ctx context.Context, stdout *os.File) (*ndexec.Process, error) {

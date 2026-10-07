@@ -86,7 +86,7 @@ func TestLoopModeCollects(t *testing.T) {
 	assert.Equal(t, collectFromMock(t, dataXMLRTX3060), collr.Collect(context.Background()))
 
 	collr.Cleanup(context.Background())
-	conn.RequireExited(t) // Cleanup joins nvidia-smi
+	conn.RequireExited(t) // nvidia-smi is gone once Cleanup returns
 }
 
 func TestLoopModeCheckFailures(t *testing.T) {
@@ -94,16 +94,21 @@ func TestLoopModeCheckFailures(t *testing.T) {
 		timeout time.Duration
 		act     func(*testing.T, *streamexectest.Conn)
 		wantErr string
+		minWait time.Duration // Check fails no sooner than this
+		maxWait time.Duration // and sooner than this
 	}{
 		"nvidia-smi exits before a sample": {
 			timeout: 10 * time.Second,
 			act:     func(t *testing.T, conn *streamexectest.Conn) { conn.Exit(t, 9) },
 			wantErr: "nvidia-smi exited: exit status 9",
+			maxWait: 3 * time.Second, // long before the timeout
 		},
 		"no sample within the timeout": {
-			timeout: 300 * time.Millisecond,
+			timeout: time.Second,
 			act:     func(*testing.T, *streamexectest.Conn) {},
 			wantErr: "wait for the first nvidia-smi record: context deadline exceeded",
+			minWait: time.Second,
+			maxWait: 1500 * time.Millisecond,
 		},
 	} {
 		t.Run(name, func(t *testing.T) {
@@ -113,7 +118,9 @@ func TestLoopModeCheckFailures(t *testing.T) {
 			tc.act(t, fake.Accept(t))
 
 			require.EqualError(t, waitCheck(t, done), tc.wantErr)
-			assert.Less(t, time.Since(began), 3*time.Second, "a failure waits for nothing else")
+			elapsed := time.Since(began)
+			assert.GreaterOrEqual(t, elapsed, tc.minWait)
+			assert.Less(t, elapsed, tc.maxWait, "a failure waits for nothing else")
 			fake.RequireNoStart(t, 300*time.Millisecond)
 		})
 	}
@@ -159,6 +166,28 @@ func TestLoopModeSlowSampleStaysCurrent(t *testing.T) {
 		sendSample(t, conn, dataXMLRTX3060)
 	}
 	fake.RequireNoStart(t, 100*time.Millisecond)
+}
+
+func TestLoopTiming(t *testing.T) {
+	// The loop interval is the data collection interval, at most 5 seconds; a sample stays current for one loop
+	// interval plus the timeout.
+	for name, tc := range map[string]struct {
+		updateEvery  int
+		timeout      time.Duration
+		wantInterval int
+		wantFreshFor time.Duration
+	}{
+		"fast collection":     {updateEvery: 1, timeout: 500 * time.Millisecond, wantInterval: 1, wantFreshFor: 1500 * time.Millisecond},
+		"interval at the cap": {updateEvery: 5, timeout: 10 * time.Second, wantInterval: 5, wantFreshFor: 15 * time.Second},
+		"default collection":  {updateEvery: 10, timeout: 10 * time.Second, wantInterval: 5, wantFreshFor: 15 * time.Second},
+		"slow collection":     {updateEvery: 60, timeout: 2 * time.Second, wantInterval: 5, wantFreshFor: 7 * time.Second},
+	} {
+		t.Run(name, func(t *testing.T) {
+			interval, freshFor := loopTiming(tc.updateEvery, tc.timeout)
+			assert.Equal(t, tc.wantInterval, interval)
+			assert.Equal(t, tc.wantFreshFor, freshFor)
+		})
+	}
 }
 
 func TestLogDecoder(t *testing.T) {
