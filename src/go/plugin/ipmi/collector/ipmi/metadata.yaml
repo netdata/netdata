@@ -38,11 +38,11 @@ modules:
         auto_detection:
           description: No jobs start by default. Build the experimental plugin explicitly and configure the target.
         limits:
-          description: 'This experimental plugin requires Linux amd64 or arm64 and supports local OpenIPMI only. Keep FreeIPMI for legacy direct drivers, OEM
-            interpretation or custom FreeIPMI interpretation files. Unknown or unavailable sensor readings leave gaps. Default
-            FreeIPMI policy treats non-critical threshold assertions as nominal. Do not run both IPMI plugins against the
-            same host with the canonical ipmi job name because chart IDs overlap. The Go collector uses separate ipmi_go.*
-            contexts and the ipmi-go-sensors Function.'
+          description: 'This experimental plugin requires Linux amd64 or arm64 and supports local OpenIPMI only. Keep
+            FreeIPMI for legacy direct drivers, OEM interpretation or custom FreeIPMI interpretation files. Unknown or
+            unavailable sensor readings leave gaps. Default FreeIPMI policy treats non-critical threshold assertions as
+            nominal. Do not run both IPMI plugins against the same host with the canonical ipmi job name because chart
+            IDs overlap. The Go collector uses separate ipmi_go.* contexts and the ipmi-go-sensors Function.'
         performance_impact:
           description: IPMI command latency grows with sensor count. Increase update_every when a complete sensor scan
             takes longer than the configured interval.
@@ -61,7 +61,8 @@ modules:
           name: ipmi/ipmi.conf
           description: ''
         options:
-          description: Options apply to each local IPMI job. Remote LAN/LAN+ is not supported in this experimental build.
+          description: Options apply to each local IPMI job. Remote LAN/LAN+ is not supported in this experimental
+            build.
           folding:
             title: Options
             enabled: false
@@ -82,7 +83,8 @@ modules:
               required: false
               group: Collection
             - name: timeout
-              description: Receive timeout for each IPMI command. Stopping a job can wait for an in-flight receive to finish.
+              description: Receive timeout for each IPMI command. Stopping a job can wait for an in-flight receive to
+                finish.
               default_value: 5s
               required: false
               group: Collection
@@ -201,7 +203,8 @@ modules:
         - id: sensors
           function_name: ipmi-go-sensors
           name: IPMI Sensors
-          description: Show current readings and default FreeIPMI health states, with sensor counts by component and state.
+          description: Show current readings and default FreeIPMI health states, with sensor counts by component and
+            state.
           parameters:
             - id: __job
               name: Instance
@@ -211,7 +214,8 @@ modules:
               default: First available job
               options: []
           returns:
-            description: One row per discovered full or compact sensor record, expanded for sharing. Unavailable numeric readings are null.
+            description: One row per discovered full or compact sensor record, expanded for sharing. Unavailable numeric
+              readings are null.
             columns:
               - name: Sensor
                 type: string
