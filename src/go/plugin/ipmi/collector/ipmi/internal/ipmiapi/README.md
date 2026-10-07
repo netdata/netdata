@@ -59,8 +59,8 @@ fallback, and fixed sensor-type overrides. This is not a complete FreeIPMI compa
 
 ## Local receive deadline limitation
 
-The pinned Linux SDK checks context before sending, but does not observe context
-cancellation during its blocking receive. The adapter checks cancellation around
+The pinned Linux SDK does not observe context cancellation during its blocking
+receive. The adapter checks cancellation around
 every command and passes `min(configured timeout, remaining caller budget)` as
 the SDK receive timeout. This temporary SDK setting is restored after each
 serialized command. It improves deadline fidelity without changing the public
