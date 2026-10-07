@@ -144,8 +144,8 @@ macro(netdata_detect_protobuf)
 
                 # Resolve protoc.  Priority order (highest first):
                 #  1. PROTOBUF_PROTOC_EXECUTABLE env var — explicit user override.
-                #  2. Bundled protoc target (protobuf::protoc) — when
-                #     ENABLE_BUNDLED_PROTOBUF is On; gencode version then equals
+                #  2. Bundled protoc target — when ENABLE_BUNDLED_PROTOBUF is On;
+                #     gencode version then equals
                 #     the bundled runtime version, avoiding compile-time version
                 #     mismatch errors in generated headers.
                 #  3. System protoc found by find_program — fallback.
@@ -154,13 +154,8 @@ macro(netdata_detect_protobuf)
                 # variable that shadows the CACHE entry.  Use a temp variable.
                 set(PROTOBUF_PROTOC_EXECUTABLE "$ENV{PROTOBUF_PROTOC_EXECUTABLE}")
                 if(NOT PROTOBUF_PROTOC_EXECUTABLE)
-                        if(ENABLE_BUNDLED_PROTOBUF AND TARGET protobuf::protoc)
-                                # Namespaced alias (protobuf v22+, added by protobuf's CMakeLists).
-                                set(PROTOBUF_PROTOC_EXECUTABLE "$<TARGET_FILE:protobuf::protoc>")
-                                set(PROTOBUF_PROTOC_TARGET "protobuf::protoc")
-                        elseif(ENABLE_BUNDLED_PROTOBUF AND TARGET protoc)
-                                # Non-namespaced target — older bundled protobuf or cmake version
-                                # that did not create the alias.
+                        if(ENABLE_BUNDLED_PROTOBUF AND TARGET protoc)
+                                # Use the real target directly; protobuf::protoc is its namespaced alias.
                                 set(PROTOBUF_PROTOC_EXECUTABLE "$<TARGET_FILE:protoc>")
                                 set(PROTOBUF_PROTOC_TARGET "protoc")
                         else()

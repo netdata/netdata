@@ -348,7 +348,8 @@ int main(int argc, char **argv)
             connect_cb(&req, uv_error);
         }
         else {
-            ret = uv_pipe_open(&client_pipe, pipe_fd);
+            // Successful adoption transfers pipe_fd ownership to libuv; close_client_pipe() closes it.
+            ret = uv_pipe_open(&client_pipe, pipe_fd); // NOSONAR (c:S2095)
             if (ret) {
                 close(pipe_fd);
                 connect_cb(&req, ret);

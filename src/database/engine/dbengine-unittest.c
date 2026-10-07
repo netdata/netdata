@@ -960,6 +960,11 @@ cleanup_watchdog:
     if (dbengine_shutdown_required)
         dbengine_shutdown();
 
+    for (size_t tier = 0; tier < DBENGINE_PLATFORM_TEST_TIERS; tier++) {
+        if (dbengine_initialized[tier])
+            finalize_rrd_files(multidb_ctx[tier]);
+    }
+
     if (watchdog_started) {
         __atomic_store_n(&watchdog.finished, true, __ATOMIC_RELEASE);
         (void)uv_thread_join(&watchdog_thread);

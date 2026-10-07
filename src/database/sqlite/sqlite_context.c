@@ -30,17 +30,36 @@ sqlite3 *db_context_meta = NULL;
  */
 int sql_init_context_database(int memory)
 {
-    char sqlite_database[FILENAME_MAX + 1];
     int rc;
+    CLEAN_CHAR_P *sqlite_database = NULL;
 
-    if (likely(!memory))
-        snprintfz(sqlite_database, sizeof(sqlite_database) - 1, "%s/context-meta.db", netdata_configured_cache_dir);
+    if (likely(!memory)) {
+        size_t cache_dir_size = strlen(netdata_configured_cache_dir);
+#if defined(OS_WINDOWS)
+        if (cache_dir_size + sizeof("/context-meta.db") - 1 >= OS_WINDOWS_PATH_TRANSLATION_MAX) {
+            error_report("SQLite context database path exceeds the Windows path translation limit");
+            return 1;
+        }
+#endif
+        size_t sqlite_database_size = cache_dir_size + sizeof("/context-meta.db");
+        sqlite_database = mallocz(sqlite_database_size);
+        snprintfz(sqlite_database, sqlite_database_size, "%s/context-meta.db", netdata_configured_cache_dir);
+    }
     else
-        strcpy(sqlite_database, ":memory:");
+        sqlite_database = strdupz(":memory:");
 
     // UCRT64 SQLite uses Win32 CreateFile, which requires native Windows paths.
-    char native_ctx_db[FILENAME_MAX + 1];
-    os_translate_path(native_ctx_db, sqlite_database, sizeof(native_ctx_db));
+    CLEAN_CHAR_P *native_ctx_db = NULL;
+#if defined(OS_WINDOWS)
+    native_ctx_db = os_translate_msys_to_windows_path(sqlite_database);
+#else
+    native_ctx_db = strdupz(sqlite_database);
+#endif
+    if (!native_ctx_db) {
+        error_report("Failed to translate SQLite database path %s", sqlite_database);
+        return 1;
+    }
+
     rc = sqlite3_open(native_ctx_db, &db_context_meta);
     if (rc != SQLITE_OK) {
         error_report("Failed to initialize database at %s, due to \"%s\"", sqlite_database, sqlite3_errstr(rc));
@@ -52,9 +71,6 @@ int sql_init_context_database(int memory)
     errno_clear();
     netdata_log_info("SQLite database %s initialization", sqlite_database);
 
-    char buf[1024 + 1] = "";
-    const char *list[2] = { buf, NULL };
-
     int target_version = DB_CONTEXT_METADATA_VERSION;
     if (likely(!memory))
         target_version = perform_context_database_migration(db_context_meta, DB_CONTEXT_METADATA_VERSION);
@@ -62,16 +78,39 @@ int sql_init_context_database(int memory)
     if (configure_sqlite_database(db_context_meta, target_version, "context_config"))
         return 1;
 
+    CLEAN_CHAR_P *attach_database = NULL;
     if (likely(!memory)) {
-        // SQLite ATTACH also uses Win32 CreateFile; use native path form.
-        char native_attach_dir[FILENAME_MAX + 1];
-        os_translate_path(native_attach_dir, netdata_configured_cache_dir, sizeof(native_attach_dir));
-        snprintfz(buf, sizeof(buf) - 1, "ATTACH DATABASE \"%s/netdata-meta.db\" as meta", native_attach_dir);
+        size_t attach_database_size = strlen(netdata_configured_cache_dir) + sizeof("/netdata-meta.db");
+        CLEAN_CHAR_P *attach_path = NULL;
+        attach_path = mallocz(attach_database_size);
+        snprintfz(attach_path, attach_database_size, "%s/netdata-meta.db", netdata_configured_cache_dir);
+#if defined(OS_WINDOWS)
+        attach_database = os_translate_msys_to_windows_path(attach_path);
+#else
+        attach_database = strdupz(attach_path);
+#endif
     }
     else
-        snprintfz(buf, sizeof(buf) - 1, "ATTACH DATABASE ':memory:' as meta");
+        attach_database = strdupz(":memory:");
 
-    if(init_database_batch(db_context_meta, list, "context")) return 1;
+    if (!attach_database) {
+        error_report("Failed to translate attached SQLite database path");
+        return 1;
+    }
+
+    // Quote the path through SQLite and build the statement dynamically so long
+    // cache directories are neither truncated nor interpreted as SQL.
+    char *attach_sql = sqlite3_mprintf("ATTACH DATABASE %Q as meta", attach_database);
+    if (!attach_sql) {
+        error_report("Failed to build SQLite context database attach statement");
+        return 1;
+    }
+    const char *attach_statements[] = { attach_sql, NULL };
+    int attach_rc = init_database_batch(db_context_meta, attach_statements, "context");
+    sqlite3_free(attach_sql);
+
+    if (attach_rc)
+        return 1;
 
     if (init_database_batch(db_context_meta, &database_context_config[0], "context_init"))
         return 1;

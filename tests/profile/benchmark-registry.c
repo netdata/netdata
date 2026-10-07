@@ -1,8 +1,7 @@
 /* SPDX-License-Identifier: GPL-3.0-or-later */
 
 /*
- * compile with
- *  gcc -O1 -ggdb -Wall -Wextra -I ../src/ -I ../ -o benchmark-registry benchmark-registry.c ../src/dictionary.o ../src/log.o ../src/avl.o ../src/common.o ../src/appconfig.o ../src/web_buffer.o ../src/storage_number.o ../src/rrd.o ../src/health.o -pthread -luuid -lm -DVARLIB_DIR="\"/tmp\""
+ * This standalone benchmark is not configured as a target in the current CMake build.
  */
 
 char *hostname = "me";

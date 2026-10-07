@@ -62,6 +62,7 @@ void os_get_system_HZ(void);
 static char *strncpyz(char *dst, const char *src, size_t dst_size_minus_1);
 
 #if defined(OS_WINDOWS)
+#define OS_WINDOWS_PATH_TRANSLATION_MAX 8191
 // On UCRT64, package-relative POSIX paths are resolved below NETDATA_WINDOWS_PATH_PREFIX.
 char *os_translate_path(char *dst, const char *src, size_t dst_size);
 char *os_translate_msys_to_windows_path(const char *src);

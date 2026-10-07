@@ -162,7 +162,20 @@ size_t rfc3339_datetime_ut(char *buffer, size_t len, usec_t now_ut, size_t fract
         struct tm tmp_gm = tmbuf;
         long offset = (long)(_mkgmtime(&tmp_gm) - t);
 #else
-        long offset = 0;
+        struct tm tmp_gm;
+        if (!gmtime_r(&t, &tmp_gm)) {
+            buffer[0] = '\0';
+            return 0;
+        }
+        // Interpret the UTC fields as local time using the local DST state at
+        // this instant; the epoch difference is the UTC offset.
+        tmp_gm.tm_isdst = tmbuf.tm_isdst;
+        time_t local_epoch = mktime(&tmp_gm);
+        if (local_epoch == (time_t)-1 && t != (time_t)-1) {
+            buffer[0] = '\0';
+            return 0;
+        }
+        long offset = (long)difftime(t, local_epoch);
 #endif
         int hours = (int)(offset / 3600);
         int minutes = abs((int)((offset % 3600) / 60));

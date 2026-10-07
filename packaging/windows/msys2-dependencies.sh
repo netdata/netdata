@@ -15,6 +15,10 @@ ${GITHUB_ACTIONS+echo "::group::Updating MSYS2"}
 pacman -Syuu --noconfirm
 ${GITHUB_ACTIONS+echo "::endgroup::"}
 
+# Installing the UCRT64 set does not remove MINGW64 packages left by older
+# versions of this script. Cleanup is intentionally not automatic because this
+# runs on developer machines too; remove obsolete packages manually or start
+# from a clean UCRT64 MSYS2 installation when migrating an existing host.
 ${GITHUB_ACTIONS+echo "::group::Installing dependencies"}
 pacman -S --noconfirm --needed \
     base-devel \

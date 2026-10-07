@@ -440,14 +440,13 @@ void *pluginsd_main(void *ptr) {
 
                     {
                         const char *def = "";
-                        char buf[PLUGINSD_CMD_MAX + 1];
-
-                        snprintfz(
-                            buf, sizeof(buf), "exec \"%s\" %d %s", string2str(cd->fullfilename),
+                        CLEAN_BUFFER *command = buffer_create(0, NULL);
+                        buffer_sprintf(
+                            command, "exec \"%s\" %d %s", string2str(cd->fullfilename),
                             cd->update_every, inicfg_get(&netdata_config, string2str(cd->id), "command options", def));
 
                         string_freez(cd->cmd);
-                        cd->cmd = string_strdupz(buf);
+                        cd->cmd = string_strdupz(buffer_tostring(command));
                     }
 
                     // link it

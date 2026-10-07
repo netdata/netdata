@@ -36,8 +36,6 @@ const char *os_type = "macos";
 #if defined(OS_WINDOWS)
 const char *os_type = "windows";
 
-#define OS_WINDOWS_PATH_TRANSLATION_MAX 8191
-
 static char *os_translate_windows_path_fallback(const char *src, const char *package_prefix) {
     size_t src_len = strnlen(src, OS_WINDOWS_PATH_TRANSLATION_MAX);
     bool package_relative_posix_path = package_prefix != NULL;
