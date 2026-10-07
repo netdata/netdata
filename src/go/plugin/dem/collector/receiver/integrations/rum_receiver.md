@@ -76,10 +76,10 @@ Options apply to the canonical receiver.
 | Group | Option | Description | Default | Required |
 |:------|:-----|:------------|:--------|:---------:|
 | **Connection** | listen | Address and port that accept browser telemetry. The default accepts connections from this host only. | 127.0.0.1:19938 | no |
-|  | public_url | Externally reachable collector base URL. Leave empty to derive it from the listener or a trusted proxy. |  | no |
+|  | public_url | Public receiver base URL used to generate installation snippets. If neither receiver nor site sets a public URL, no snippet is offered. |  | no |
 |  | tls_cert | Server certificate file. Leave empty with TLS key to serve HTTP. |  | no |
 |  | tls_key | Server private key file. Set together with TLS certificate to serve HTTPS. |  | no |
-|  | trusted_proxies | Proxy IP addresses or CIDR ranges allowed to supply forwarded client addresses and public URLs. Leave empty to distrust forwarded headers. |  | no |
+|  | trusted_proxies | Proxy IP addresses or CIDR ranges allowed to supply forwarded client addresses. Leave empty to distrust forwarded headers. |  | no |
 | **Limits** | max_body_bytes | Maximum accepted browser payload size, in bytes. Larger requests are rejected. | 262144 | no |
 |  | rate_limit | Limits for browser telemetry requests. |  | no |
 |  | rate_limit.per_ip_per_min | Maximum requests per client IP per minute. | 120 | no |
@@ -159,4 +159,4 @@ Metrics:
 
 #### No browser measurements
 
-Check receiver availability, the installed snippet URL and the site allowed origins. Open the rum-sites Function for reachability and rejected-origin diagnostics. Missing vital samples produce gaps, including when the receiver is unavailable.
+Check the serving state in `rum-sites`, the configured public URL and the site allowed origins. In the website browser, follow the script and SDK requests through the collect POST. Last accepted payload and rejected-origin timestamps are observations; silence alone does not prove failure.
