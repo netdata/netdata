@@ -75,7 +75,7 @@ Configure the canonical receiver in `dem/receiver.conf`, then add one job per we
 
 #### Install the browser snippet
 
-Add `<script async src="https://rum.example.org/rum/shop.js"></script>` to the website, replacing the public receiver URL and site key. Allow this collector and the pinned Faro SDK CDN in the website Content Security Policy.
+Add `<script async src="https://rum.example.org/rum/shop.js"></script>` to the website, replacing the configured public receiver URL and site key. The receiver serves the pinned SDK too; allow its script and connection URLs in the website Content Security Policy. Proxy the entire RUM path, including SDK assets and collect requests. A script-only redirect is insufficient.
 
 #### Optional searchable event logs
 
@@ -105,7 +105,7 @@ Options apply independently to each site job. Native job name is the beacon and 
 | **Site** | name | Stable site identifier used in beacon URLs and history. Renaming creates a new history identity. |  | yes |
 |  | display_name | Human-readable site name. Leave empty to use the site key. |  | no |
 |  | allowed_origins | Web origins allowed to send telemetry, such as https://example.org. A leading *. allows subdomains only. |  | yes |
-|  | public_url | Externally reachable collector base URL for this site. Leave empty to use the receiver public URL. |  | no |
+|  | public_url | Public receiver base URL used for this site's installation snippet. Leave empty to use the receiver public URL. |  | no |
 | **Collection** | update_every | Data collection interval, in seconds. | 10 | no |
 |  | window | Receiver-arrival window for recent browser measurements and distinct observed sessions. Accepts durations between 1m and 30m. | 5m | no |
 |  | page_groups | Maximum individual page groups shown in breakdown charts. Remaining groups are combined as other. | 20 | no |
@@ -562,26 +562,25 @@ One admitted site job. The response also includes collector public URL and ingre
 |:-------|:-----|:-----|:-----------|:------------|
 | site | string |  |  | Site. |
 | name | string |  |  | Name. |
-| status | string |  |  | Status. |
-| beacon_url | string |  |  | Beacon URL. |
-| snippet | string |  |  | Snippet. |
+| generation | string |  |  | Receiving runtime identity; does not identify the browser policy revision. |
+| collection_enabled | boolean |  |  | Whether current site policy permits measurement collection. |
+| script_url | string |  |  | External script URL from explicit configuration; null when no public URL is configured. |
+| snippet | string |  |  | Copyable external script tag; null when no public URL is configured. |
 | allowed_origins | string |  |  | Allowed Origins. |
-| beacons_per_min | integer |  |  | Beacons / min. |
-| last_beacon_age_s | integer |  |  | Last Beacon (s ago). |
+| beacons_per_min | integer |  |  | Accepted payloads in the last minute; not visitors or durable history records. |
+| last_beacon_at | timestamp |  |  | Last accepted payload time in Unix microseconds; null when none has been accepted by this runtime. |
+| last_beacon_age_s | integer |  |  | Seconds since the last accepted payload; null when none has been accepted by this runtime. |
 | observed_sessions | integer |  |  | Distinct browser session identities observed within the measurement window; not concurrent users. |
 | pageviews_window | integer |  |  | Explicit document activations in the window. |
 | js_errors_window | integer |  |  | JS Errors (window). |
-| rejected_per_min | integer |  |  | Rejected / min. |
-| reachable | string |  |  | Reachable. |
-| reach_detail | string |  |  | Reachability Detail. |
+| rejected_per_min | integer |  |  | Origin, rate and size rejections in the last minute; excludes invalid payloads and bot exclusions. |
 | measured | string |  |  | Measured. |
 | investigated | string |  |  | Investigated. |
 | investigated_sessions | integer |  |  | Sessions currently tracked for investigation; separate from observed measurement-window sessions. |
 | bots_per_min | integer |  |  | Bots Filtered / min. |
-| snippet_check | string |  |  | Snippet On Site. |
-| snippet_detail | string |  |  | Snippet Detail. |
-| last_rejected_origin | string |  |  | Last Rejected Origin. |
-| last_rejected_age_s | integer |  |  | Last Rejection (s ago). |
+| last_rejected_origin | string |  |  | Last observed rejected origin, including preflight requests; not a recommendation to allow it. |
+| last_rejected_at | timestamp |  |  | Last rejected-origin observation time in Unix microseconds; null when none was observed. |
+| last_rejected_age_s | integer |  |  | Seconds since the last rejected-origin observation; null when none was observed. |
 | capture_geolocation | string |  |  | Current Geolocation Capture. |
 | capture_frustration_signals | boolean |  |  | Current Frustration Capture. |
 | application_views_window | integer |  |  | Explicit application-view occurrences in the window. |
@@ -834,7 +833,7 @@ One retained or pending session event, with Agent receipt time in Unix microseco
 
 #### No browser measurements
 
-Check receiver availability, the installed snippet URL and the site allowed origins. Open the rum-sites Function for reachability and rejected-origin diagnostics. Missing vital samples produce gaps, including when the receiver is unavailable.
+Open `rum-sites` for receiver availability, collection policy and last accepted payload or rejected-origin observations. Missing traffic alone is not failure. In the website browser Network panel, follow the script request, SDK request and collect POST; check console CSP and Netdata RUM errors. POST 202 means accepted, 204 means intentional bot or disabled-collection exclusion, 400 invalid payload, 403 origin rejection, 404 missing site runtime or incorrect proxy path, 413 size rejection and 429 rate limiting. For 404, check native job state and the request path. A fresh session can still be sampled out; explicitly select 100% collection for a deterministic eligible-session check. Receipt does not prove human traffic, retained history or export delivery.
 
 #### Missing exported events or spans
 
