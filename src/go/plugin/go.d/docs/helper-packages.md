@@ -346,6 +346,11 @@ A `streamexec.Source` owns:
 delegates its `CollectorV2Runner.Run` to it. Later failures are recovered inside `Run`, which returns nil after
 cancellation once the process is joined.
 
+A collector without a managed runner (framework V1) uses `Background(ctx)` instead: it runs the same supervision on
+its own goroutine and returns once the first record arrives, with `ctx` bounding only that wait. It fails at once, with
+the process's own failure and without a restart, when the first process exits before producing a record. Call it from
+`Check`, whose failures follow `autodetection_retry`, and call the returned `stop` from `Cleanup`.
+
 Tests use `streamexec/streamexectest`: the test binary doubles as the fake command (`RunIfFake` in `TestMain`), and each
 started fake reports its arguments and prints, spawns or exits as the test instructs. A fake's connection closes only when
 its process exits, so tests can check exit ordering. The harness is Unix-only; Windows behavior is unverified.

@@ -344,7 +344,7 @@ func TestFollowReportsFailure(t *testing.T) {
 
 			done := make(chan error, 1)
 			go func() {
-				_, err := s.follow(t.Context(), inst)
+				_, err := s.follow(t.Context(), inst, observer{})
 				done <- err
 			}()
 			if tc.published {
@@ -506,4 +506,116 @@ func TestRunAgainAfterReturn(t *testing.T) {
 	second := fake.Accept(t)
 	second.Line(t, "record second")
 	waitLatest(t, s, "record second")
+}
+
+// goBackground calls Background in the background and returns its result channel.
+func goBackground(ctx context.Context, s *Source[string]) <-chan backgroundResult {
+	result := make(chan backgroundResult, 1)
+	go func() {
+		stop, err := s.Background(ctx)
+		result <- backgroundResult{
+			stop: stop,
+			err:  err,
+		}
+	}()
+	return result
+}
+
+type backgroundResult struct {
+	stop func()
+	err  error
+}
+
+func waitBackground(t *testing.T, result <-chan backgroundResult) backgroundResult {
+	t.Helper()
+	select {
+	case r := <-result:
+		return r
+	case <-time.After(5 * time.Second):
+		t.Fatal("Background did not return")
+		return backgroundResult{}
+	}
+}
+
+func TestBackgroundReturnsAfterFirstRecord(t *testing.T) {
+	fake := streamexectest.NewFake(t)
+	s := newTestSource(t, fake, testTiming, recordDecoder)
+	result := goBackground(t.Context(), s)
+	conn := fake.Accept(t)
+	select {
+	case r := <-result:
+		t.Fatalf("Background returned before a record: %v", r.err)
+	case <-time.After(100 * time.Millisecond):
+	}
+
+	conn.Line(t, "warning: not a record")
+	conn.Line(t, "record 1")
+	r := waitBackground(t, result)
+	require.NoError(t, r.err)
+	got, ok := s.Latest()
+	assert.True(t, ok)
+	assert.Equal(t, "record 1", got)
+
+	// Supervision continues after Background returns.
+	conn.Exit(t, 0)
+	replacement := fake.Accept(t)
+	conn.RequireExited(t)
+	replacement.Line(t, "record 2")
+	waitLatest(t, s, "record 2")
+
+	r.stop()
+	replacement.RequireExited(t) // stop waits for supervision to join its instance
+	assert.Nil(t, s.latest.Load())
+	r.stop() // idempotent
+}
+
+func TestBackgroundFailures(t *testing.T) {
+	for name, tc := range map[string]struct {
+		prepare func(*testing.T)
+		act     func(*testing.T, *streamexectest.Fake)
+		timeout time.Duration
+		wantErr string
+	}{
+		"start failure": {
+			prepare: func(t *testing.T) {
+				t.Cleanup(ndexec.SetRunnerPathsForTests(filepath.Join(t.TempDir(), "missing-wrapper"), ""))
+			},
+			act:     func(*testing.T, *streamexectest.Fake) {},
+			timeout: 5 * time.Second,
+			wantErr: "start fake:",
+		},
+		"first instance exits before a record": {
+			act: func(t *testing.T, fake *streamexectest.Fake) {
+				conn := fake.Accept(t)
+				conn.Line(t, "warning: not a record")
+				conn.Exit(t, 9)
+			},
+			timeout: 5 * time.Second,
+			wantErr: "fake exited: exit status 9",
+		},
+		"no record before the wait ends": {
+			act:     func(t *testing.T, fake *streamexectest.Fake) { fake.Accept(t) },
+			timeout: 300 * time.Millisecond,
+			wantErr: "wait for the first fake record: context deadline exceeded",
+		},
+	} {
+		t.Run(name, func(t *testing.T) {
+			fake := streamexectest.NewFake(t)
+			if tc.prepare != nil {
+				tc.prepare(t)
+			}
+			s := newTestSource(t, fake, testTiming, recordDecoder)
+			ctx, cancel := context.WithTimeout(t.Context(), tc.timeout)
+			defer cancel()
+			began := time.Now()
+			result := goBackground(ctx, s)
+			tc.act(t, fake)
+
+			r := waitBackground(t, result)
+			require.ErrorContains(t, r.err, tc.wantErr)
+			assert.Nil(t, r.stop)
+			assert.Less(t, time.Since(began), 3*time.Second, "a failure waits for nothing else")
+			fake.RequireNoStart(t, 300*time.Millisecond) // nothing keeps running or restarting
+		})
+	}
 }
