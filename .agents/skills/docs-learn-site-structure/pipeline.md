@@ -100,7 +100,7 @@ to generated output in learn PRs; `rendered-link-integrity.yml` renders head and
   `netdata/learn`, regenerates the integration pages, runs `integrations/tests/test_descriptions.py` against the map,
   runs `docs/.map/validate_map_schema.py` (`./mapping.md#what-is-checked-and-by-what`), and runs the real ingest with
   `--local-repo netdata:<workspace> --ignore-on-prem-repo --fail-links-netdata`. A broken link or anchor in a mapped
-  page, or a map row that names a missing file, fails the PR here, before any ingest PR exists.
+  page, or a `netdata/netdata` map row that names a missing file, fails the PR here, before any ingest PR exists.
 - Locally: `docs/.map/README.md#2-test-the-changes` has the command; the environment setup is the learn `README.md`
   "Manual ingest via local environment" (Python 3.13, `.learn_environment/ingest-requirements.txt` with
   `--require-hashes`).

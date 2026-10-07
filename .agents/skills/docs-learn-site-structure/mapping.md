@@ -23,8 +23,8 @@ field meanings); `docs/.map/map.schema.json` (required fields, the `edit_url` pa
   checkout, symlinks followed (`check_edit_url_files_exist`; the error gives the row's label path and the file path).
 - `.github/workflows/check-markdown.yml` runs it after the generators, so a row that names a generated page by path
   (`src/collectors/COLLECTORS.md`, the `src/crates/otel-plugin/README.md` symlink) is checked against the tree ingest
-  publishes; run by hand, such a row fails until the generators have created its page. Integration placeholders carry
-  no path and are not checked.
+  publishes; run by hand, a row whose generated page is not committed yet fails until its generator has run.
+  Integration placeholders carry no path and are not checked.
 - A row of another repository is not checked for a file; if its URL matches no source file, the page is silently
   absent (see the join key below).
 
