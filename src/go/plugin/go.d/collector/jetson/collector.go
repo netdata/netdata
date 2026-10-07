@@ -7,11 +7,12 @@ package jetson
 import (
 	"context"
 	_ "embed"
-	"sync/atomic"
+	"errors"
 	"time"
 
 	"github.com/netdata/netdata/go/plugins/pkg/metrix"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/collectorapi"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/streamexec"
 )
 
 //go:embed config_schema.json
@@ -40,11 +41,11 @@ func New() *Collector {
 		store:          store,
 		metrics:        newCollectorMetrics(store),
 		findTegrastats: lookupTegrastats,
-		timing: sourceTiming{
-			maxSampleAge:    3 * tegrastatsInterval,
-			stallTimeout:    10 * tegrastatsInterval,
-			restartDelayMin: time.Second,
-			restartDelayMax: 30 * time.Second,
+		timing: streamexec.Timing{
+			MaxSampleAge:    3 * tegrastatsInterval,
+			StallTimeout:    10 * tegrastatsInterval,
+			RestartDelayMin: time.Second,
+			RestartDelayMax: 30 * time.Second,
 		},
 	}
 }
@@ -58,12 +59,10 @@ type Collector struct {
 
 	// findTegrastats resolves the executable in Check; tests inject a fake.
 	findTegrastats func() (string, error)
-	tegrastatsPath string
-	timing         sourceTiming
+	timing         streamexec.Timing
 
-	// latest is the most recent record of the running tegrastats; nil before its
-	// first record and while none runs.
-	latest atomic.Pointer[observation]
+	// source supervises tegrastats once Check has resolved it; Run drives it.
+	source *streamexec.Source[sample]
 }
 
 func (c *Collector) Configuration() any { return c.Config }
@@ -74,17 +73,29 @@ func (c *Collector) Check(ctx context.Context) error {
 	if err := ctx.Err(); err != nil {
 		return err
 	}
+	c.source = nil
 	path, err := c.findTegrastats()
 	if err != nil {
 		return err
 	}
-	c.tegrastatsPath = path
+	source, err := c.newTegrastatsSource(path)
+	if err != nil {
+		return err
+	}
+	c.source = source
 	return nil
 }
 
 func (c *Collector) Collect(ctx context.Context) error { return c.collect(ctx) }
 
-func (c *Collector) Run(ctx context.Context, ready func()) error { return c.run(ctx, ready) }
+// Run supervises tegrastats: a startup failure is returned to the managed runtime and its retry policy; after
+// readiness, source failures are recovered by restarting tegrastats.
+func (c *Collector) Run(ctx context.Context, ready func()) error {
+	if c.source == nil {
+		return errors.New("tegrastats executable has not been resolved")
+	}
+	return c.source.Run(ctx, ready)
+}
 
 // Cleanup has nothing to release: Run owns tegrastats and returns before Cleanup is called.
 func (c *Collector) Cleanup(context.Context) {}
