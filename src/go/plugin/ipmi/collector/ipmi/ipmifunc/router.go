@@ -12,7 +12,7 @@ import (
 	"github.com/netdata/netdata/go/plugins/plugin/ipmi/collector/ipmi/internal/ipmiapi"
 )
 
-const FunctionName = "ipmi-sensors"
+const FunctionName = "ipmi-go-sensors"
 const methodSensors = "sensors"
 
 type Deps interface{ CurrentSnapshot() *ipmiapi.Snapshot }

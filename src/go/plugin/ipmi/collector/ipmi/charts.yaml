@@ -1,5 +1,5 @@
 version: v1
-context_namespace: ipmi
+context_namespace: ipmi_go
 groups:
   - family: Sensors
     chart_defaults:

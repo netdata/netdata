@@ -179,3 +179,38 @@ func TestPartialWarningsAreRateLimited(t *testing.T) {
 	}
 	assert.Equal(t, 1, strings.Count(logs.String(), "unsupported sensors"))
 }
+
+func TestExperimentalPublicNames(t *testing.T) {
+	charts, err := collecttest.ChartTemplateCharts(chartTemplateYAML)
+	require.NoError(t, err)
+	require.NotEmpty(t, charts)
+	for contextName, chart := range charts {
+		assert.True(t, strings.HasPrefix(contextName, "ipmi_go."), contextName)
+		// Only contexts move: retain the original chart IDs, including SEL events.
+		wantID := strings.TrimPrefix(contextName, "ipmi_go.")
+		if wantID == "sel" {
+			wantID = "events"
+		}
+		assert.Equal(t, wantID, chart.ID)
+	}
+	methods := ipmifunc.Methods(defaultUpdateEvery)
+	require.Len(t, methods, 1)
+	assert.Equal(t, "ipmi-go-sensors", methods[0].FunctionName)
+}
+
+func TestSensorAlertBinding(t *testing.T) {
+	health, err := os.ReadFile("../../../../../health/health.d/ipmi.conf")
+	require.NoError(t, err)
+	metadata, err := os.ReadFile("metadata.yaml")
+	require.NoError(t, err)
+	var bindings int
+	for _, alert := range collecttest.ParseHealthAlerts(health) {
+		if alert.On == "ipmi_go.sensor_state" {
+			bindings++
+		}
+	}
+	require.Equal(t, 1, bindings, "renamed sensor context must retain one alert owner")
+	opts := collecttest.HealthAlertsCheck{ContextPrefix: "ipmi_go."}
+	collecttest.AssertHealthAlertsTargetChartTemplateWith(t, health, chartTemplateYAML, opts)
+	collecttest.AssertHealthAlertsMatchMetadataWith(t, health, metadata, opts)
+}

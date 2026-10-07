@@ -41,7 +41,8 @@ modules:
           description: 'This experimental plugin requires Linux amd64 or arm64 and supports local OpenIPMI only. Keep FreeIPMI for legacy direct drivers, OEM
             interpretation or custom FreeIPMI interpretation files. Unknown or unavailable sensor readings leave gaps. Default
             FreeIPMI policy treats non-critical threshold assertions as nominal. Do not run both IPMI plugins against the
-            same host: they share chart contexts and the ipmi-sensors Function name.'
+            same host with the canonical ipmi job name because chart IDs overlap. The Go collector uses separate ipmi_go.*
+            contexts and the ipmi-go-sensors Function.'
         performance_impact:
           description: IPMI command latency grows with sensor count. Increase update_every when a complete sensor scan
             takes longer than the configured interval.
@@ -106,12 +107,12 @@ modules:
             fix: Grant device access through the host security policy, or run a trusted local test explicitly with sudo.
               Rebuilding the plugin does not grant device access.
     alerts:
-      - name: ipmi_sensor_state
-        metric: ipmi.sensor_state
+      - name: ipmi_go_sensor_state
+        metric: ipmi_go.sensor_state
         info: IPMI sensor ${label:sensor} (${label:component}) state
         link: https://github.com/netdata/netdata/blob/master/src/health/health.d/ipmi.conf
       - name: ipmi_events
-        metric: ipmi.sel
+        metric: ipmi_go.sel
         info: number of events in the IPMI System Event Log (SEL)
         link: https://github.com/netdata/netdata/blob/master/src/health/health.d/ipmi.conf
     metrics:
@@ -132,49 +133,49 @@ modules:
             - name: component
               description: Component inferred from the sensor name and type.
           metrics:
-            - name: ipmi.sensor_temperature_c
+            - name: ipmi_go.sensor_temperature_c
               description: IPMI Sensor Temperature
               unit: Celsius
               chart_type: line
               dimensions:
                 - name: temperature
-            - name: ipmi.sensor_temperature_f
+            - name: ipmi_go.sensor_temperature_f
               description: IPMI Sensor Temperature
               unit: Fahrenheit
               chart_type: line
               dimensions:
                 - name: temperature
-            - name: ipmi.sensor_voltage
+            - name: ipmi_go.sensor_voltage
               description: IPMI Sensor Voltage
               unit: Volts
               chart_type: line
               dimensions:
                 - name: voltage
-            - name: ipmi.sensor_ampere
+            - name: ipmi_go.sensor_ampere
               description: IPMI Sensor Current
               unit: Amps
               chart_type: line
               dimensions:
                 - name: ampere
-            - name: ipmi.sensor_fan_speed
+            - name: ipmi_go.sensor_fan_speed
               description: IPMI Sensor Fan Speed
               unit: RPM
               chart_type: line
               dimensions:
                 - name: rotations
-            - name: ipmi.sensor_power
+            - name: ipmi_go.sensor_power
               description: IPMI Sensor Power
               unit: Watts
               chart_type: line
               dimensions:
                 - name: power
-            - name: ipmi.sensor_reading_percent
+            - name: ipmi_go.sensor_reading_percent
               description: IPMI Sensor Percentage Reading
               unit: '%'
               chart_type: line
               dimensions:
                 - name: percentage
-            - name: ipmi.sensor_state
+            - name: ipmi_go.sensor_state
               description: IPMI Sensor State
               unit: state
               chart_type: stacked
@@ -187,7 +188,7 @@ modules:
           description: The selected BMC System Event Log.
           labels: []
           metrics:
-            - name: ipmi.sel
+            - name: ipmi_go.sel
               description: IPMI System Event Log Entries
               unit: events
               chart_type: line
@@ -198,7 +199,7 @@ modules:
       description: Inspect the latest successful collection without issuing more IPMI commands.
       list:
         - id: sensors
-          function_name: ipmi-sensors
+          function_name: ipmi-go-sensors
           name: IPMI Sensors
           description: Show current readings and default FreeIPMI health states.
           parameters:
