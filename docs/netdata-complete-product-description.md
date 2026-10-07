@@ -745,9 +745,10 @@ Netdata applies unsupervised machine learning to every metric it collects, on th
 
 **Machine learning**
 - [k-means clustering](/src/ml/ml-configuration.md) (k=2) per metric; 18 models per metric by default (configurable 1–168), trained on 6-hour windows and retrained every 3 hours
+- Detection starts on a new metric after about 15 minutes of data (its first model); all 18 default models are in place after about 54 hours (over two days)
 - Anomaly flag stored with every sample (tier 0) and anomaly counts in higher tiers
 - Anomaly rate per chart, dimension, instance and node; [anomaly ribbon](/docs/dashboards-and-charts/netdata-charts.md) on every chart; node-level anomaly rate
-- **[Anomaly Advisor](/docs/ml-ai/anomaly-advisor.md):** ranks the metrics that were anomalous in a selected time range across the infrastructure, to identify where a problem started and what it affected
+- **[Anomaly Advisor](/docs/ml-ai/anomaly-advisor.md):** ranks the metrics that were anomalous in a selected time range across the infrastructure, to identify where a problem started and what it affected; the root cause is usually among the top 30–50 ranked metrics
 - **[Metric Correlations](/docs/metric-correlations.md):** finds the metrics that changed most between a highlighted period and a baseline (KS2 and volume algorithms, on raw values or anomaly rates)
 - [Anomaly-based alerting](/src/health/REFERENCE.md): alerts on anomaly rates (stock examples for ML and BGP; user-defined on any metric)
 - Enabled by default on Agents and Parents with persistent storage; disabled automatically on constrained devices (`iot` profile)
@@ -773,7 +774,7 @@ Netdata applies unsupervised machine learning to every metric it collects, on th
 **Value**
 
 - **Anomaly detection on everything, without configuration.** Every metric of every system, container, application and device is monitored for unusual behavior from the moment it is collected.
-- **Fewer false alarms.** Consensus across multiple models flags only behavior that is unusual by every model's judgment.
+- **Fewer false alarms.** Consensus across multiple models flags only behavior that is unusual by every model's judgment, eliminating about 99% of false positives.
 - **Faster root-cause analysis.** Anomaly Advisor and Metric Correlations narrow thousands of metrics to the few that changed, across the whole infrastructure.
 - **Investigations in minutes.** Netdata AI produces troubleshooting and root-cause reports, capacity and performance reviews, and alert explanations from live infrastructure data.
 - **AI grounded in the customer's environment.** Infrastructure Knowledge, AI Memory and MCP Connections combine monitoring data with the customer's own context, code and incidents.
@@ -990,6 +991,8 @@ Netdata exchanges data with other systems through exporting connectors, Promethe
 | **Open-source Agent** | Free (Agent GPL v3+; dashboard NCUL1) | Self-hosted, any use | Complete Agent and Parents, unlimited metrics, local dashboards |
 
 Community and Homelab are for personal, non-commercial use only. Freelancers, professionals and businesses use the open-source Agent or the Business plan. A 14-day Business trial with unlimited nodes is available on sign-up.
+
+Netdata is also available on [AWS Marketplace](https://aws.amazon.com/marketplace/seller-profile?id=seller-5bbjpj3csb4mw): Netdata Cloud as a pay-as-you-go subscription or an annual contract (SaaS), Netdata Cloud On-Prem (Helm chart, bring your own license) and the Netdata Agent for EKS (Helm chart, free).
 
 ### What is billed
 
