@@ -24,10 +24,10 @@ func TestConfiguration(t *testing.T) {
 
 func TestCheckOnlyResolvesExecutable(t *testing.T) {
 	for name, tc := range map[string]struct {
-		lookupErr error
-		wantPath  string
+		lookupErr  error
+		wantSource bool
 	}{
-		"found":   {wantPath: "/not-executed"},
+		"found":   {wantSource: true},
 		"missing": {lookupErr: errors.New("not installed")},
 	} {
 		t.Run(name, func(t *testing.T) {
@@ -41,8 +41,9 @@ func TestCheckOnlyResolvesExecutable(t *testing.T) {
 			assert.Zero(t, calls)
 			assert.Equal(t, tc.lookupErr, c.Check(t.Context()))
 			assert.Equal(t, 1, calls)
-			assert.Equal(t, tc.wantPath, c.tegrastatsPath)
-			assert.Nil(t, c.latest.Load())
+			assert.Equal(t, tc.wantSource, c.source != nil)
+			_, ok := c.latestSample()
+			assert.False(t, ok)
 		})
 	}
 }

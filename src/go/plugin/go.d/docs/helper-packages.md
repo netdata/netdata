@@ -31,6 +31,7 @@ already owns the behavior.
 | Agent API / chart emission payloads | `src/go/pkg/netdataapi` |
 | TCP/UDP/Unix line-protocol clients | `src/go/plugin/go.d/pkg/socket` |
 | Command execution | `src/go/plugin/go.d/pkg/ndexec` |
+| Long-running sampling commands | `src/go/plugin/go.d/pkg/streamexec` |
 | Log-file readers/parsers | `src/go/plugin/go.d/pkg/logs` |
 | IP range parsing | `src/go/plugin/go.d/pkg/iprange` |
 | Shared reverse-DNS lookup/cache | `src/go/plugin/go.d/pkg/reversedns` |
@@ -320,6 +321,34 @@ Windows callers need an explicit platform path when this Unix privilege-drop beh
 
 The Unix file secret provider uses the default constructor; the command secret provider uses the preserving constructor.
 Both keep their own bounded output and secret-safe error handling. Windows providers retain direct execution.
+
+## Streaming Commands
+
+Use `src/go/plugin/go.d/pkg/streamexec` for a collector that keeps a sampling command running and publishes its latest
+output, such as a vendor tool printing one record per interval.
+
+A `streamexec.Source` owns:
+
+- start through the collector's `StartFunc`, which MUST use an owned `ndexec` constructor given the context it
+  receives (canceling that context is how the source terminates a process);
+- line reading with a per-line memory bound (`bufio.MaxScanTokenSize`, terminator included; a longer line is
+  discarded) and a fresh `Decoder` per process, so a replacement never inherits partial record state. A decoder's
+  record MUST NOT share memory with the line or with buffers the decoder reuses; a line that completes no record does
+  not reset the stall timer;
+- publication of each record with its read time; `Latest` returns it only while it is younger than `MaxSampleAge`, so a
+  stale record becomes a gap;
+- replacement of a process that exits or produces no record for `StallTimeout`, after exponential backoff between
+  `RestartDelayMin` and `RestartDelayMax`; the backoff resets after a process produced records for a stall period, and a
+  process is terminated and joined before its replacement starts;
+- a warning for each failed process or restart attempt, limited to one per minute per command name.
+
+`Run(ctx, started)` returns a failure to start the first process and calls `started` once it runs, so a V2 collector
+delegates its `CollectorV2Runner.Run` to it. Later failures are recovered inside `Run`, which returns nil after
+cancellation once the process is joined.
+
+Tests use `streamexec/streamexectest`: the test binary doubles as the fake command (`RunIfFake` in `TestMain`), and each
+started fake reports its arguments and prints, spawns or exits as the test instructs. A fake's connection closes only when
+its process exits, so tests can check exit ordering. The harness is Unix-only; Windows behavior is unverified.
 
 ## Log File Collectors
 
