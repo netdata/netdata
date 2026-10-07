@@ -36,10 +36,10 @@ Not covered by the transforms, each fails the MDX build:
   step 6, such as `<-->` or `< =`.
 
 Fixes, in order of preference: wrap the token in inline code (step 4 preserves it); rephrase (`under 100 minutes`);
-escape as `\<` only when the character must read as a less-than sign, never in `<=` or `<->` (step 6). Apart from
-step 6, fenced and inline code, MDX `import`/`export` at the top of the file, `style={{ }}`, and fenced Mermaid blocks
-(`markdown.mermaid` is on in `docusaurus.config.js`; `fix_mermaid_diagram_contrast` rewrites low-contrast fills)
-survive as written.
+escape as `\<` only when the character must read as a less-than sign. Step 6's `<=`, `%<` and `<->` are the exception:
+write them bare in prose, and expect an added backslash where code contains them. Otherwise fenced and inline code, MDX
+`import`/`export` at the top of the file, `style={{ }}`, and fenced Mermaid blocks (`markdown.mermaid` is on in
+`docusaurus.config.js`; `fix_mermaid_diagram_contrast` rewrites low-contrast fills) survive as written.
 
 ## Tests and gates
 
