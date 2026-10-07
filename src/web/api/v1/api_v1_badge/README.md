@@ -243,7 +243,7 @@ These are options dedicated to badges:
     -   1 decimal digit for values > 100
     -   2 decimal digits for values > 1
     -   3 decimal digits for values > 0.1
-    -   4 decimal digits for values \<= 0.1
+    -   4 decimal digits for values of 0.1 or less
 
     Using the `precision=NUMBER` you can set your preference per badge.
 
