@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
-"""Validate map.yaml against JSON Schema with additional custom rules.
+"""
+Validate map.yaml against JSON Schema with additional custom rules.
 
 This validator uses JSON Schema for structure validation and adds custom
 checks for rules that can't be expressed in JSON Schema:
@@ -105,7 +106,8 @@ NETDATA_EDIT_URL = re.compile(
 def iter_sidebar_nodes(
     nodes: Any, path: str = ""
 ) -> Iterator[Tuple[str, Dict[str, Any], Dict[str, Any]]]:
-    """Yield (node_path, node, meta) for every sidebar node, depth-first.
+    """
+    Yield (node_path, node, meta) for every sidebar node, depth-first.
 
     node_path joins the labels from the root. Integration placeholders and
     nodes whose meta is not a mapping are skipped together with their children.
@@ -169,7 +171,8 @@ def check_integration_placeholder_rule(
 def check_edit_url_files_exist(
     sidebar: List[Any], repo_root: Path, errors: List[MapValidationError]
 ) -> None:
-    """Check that every netdata/netdata edit_url names a file in this repository.
+    """
+    Check that every netdata/netdata edit_url names a file in this repository.
 
     Ingest publishes a row only when a source file matches its edit_url and
     drops the row silently otherwise, so a deleted or renamed page would
