@@ -1079,7 +1079,7 @@ set(CPACK_COMPONENT_PLUGIN-PYTHOND_DEPENDS "netdata")
 set(CPACK_COMPONENT_PLUGIN-PYTHOND_DESCRIPTION
 		"The python.d metrics collection plugin for the Netdata Agent
  Many of the collectors provided by this package are also available
- in netdata-plugin-god. In msot cases, you probably want to use those
+ in netdata-plugin-go. In most cases, you probably want to use those
  versions instead of the Python versions.")
 
 set(CPACK_DEBIAN_PLUGIN-PYTHOND_PACKAGE_NAME "netdata-plugin-pythond")
@@ -1134,7 +1134,7 @@ set(CPACK_RPM_PLUGIN-PYTHOND_USER_FILELIST
 set(CPACK_COMPONENT_PLUGIN-SLABINFO_DEPENDS "netdata")
 set(CPACK_COMPONENT_PLUGIN-SLABINFO_DESCRIPTION
 		"The slabinfo metrics collector for the Netdata Agent
- This plugin allows the Netdata Agent to collect perfromance and
+ This plugin allows the Netdata Agent to collect performance and
  utilization metrics for the Linux kernel’s SLAB allocator.")
 
 set(CPACK_DEBIAN_PLUGIN-SLABINFO_PACKAGE_NAME "netdata-plugin-slabinfo")
@@ -1213,7 +1213,7 @@ set(CPACK_RPM_PLUGIN-JOURNAL-VIEWER_PACKAGE_REQUIRES "netdata-plugin-systemd-jou
 set(CPACK_COMPONENT_PLUGIN-SYSTEMD-UNITS_DEPENDS "netdata")
 set(CPACK_COMPONENT_PLUGIN-SYSTEMD-UNITS_DESCRIPTION
 		"The systemd-units collector for the Netdata Agent
- This plugin allows the Netdata Agent to collect metrics about systmed units.")
+ This plugin allows the Netdata Agent to collect metrics about systemd units.")
 
 set(CPACK_DEBIAN_PLUGIN-SYSTEMD-UNITS_PACKAGE_NAME "netdata-plugin-systemd-units")
 set(CPACK_DEBIAN_PLUGIN-SYSTEMD-UNITS_PACKAGE_SECTION "net")
