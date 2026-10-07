@@ -16,8 +16,7 @@ endif()
 # The complexity below is needed to account for the complex rules we use for finding the Go install.
 #
 # If GOROOT is set, we honor that first. Otherwise, on Unix-like systems we probe common install locations and the
-# PATH copy, then select the newest usable Go binary we can find. For MSYS2, we prefer a Windows install over an
-# MSYS2 install.
+# PATH copy, then select the newest usable Go binary we can find.
 function(_netdata_probe_go_candidate candidate version_var root_var)
   if(NOT EXISTS "${candidate}")
     set(${version_var} "" PARENT_SCOPE)
@@ -73,12 +72,13 @@ if(DEFINED ENV{GOROOT} AND NOT "$ENV{GOROOT}" STREQUAL "")
 elseif(OS_WINDOWS)
   if(CMAKE_SYSTEM_NAME STREQUAL "Windows")
     set(_go_candidates C:/go/bin/${_go_executable_name}
-                       "C:/Program Files/go/bin/${_go_executable_name}"
-                       "$ENV{MSYS2_ROOT}/ucrt64/lib/go/bin/${_go_executable_name}"
-                       C:/msys64/ucrt64/lib/go/bin/${_go_executable_name}
-                       "$ENV{ChocolateyToolsLocation}/msys64/ucrt64/lib/go/bin/${_go_executable_name}")
+                       "C:/Program Files/go/bin/${_go_executable_name}")
   else()
-    set(_go_candidates /c/go/bin/${_go_executable_name} "/c/Program Files/go/bin/${_go_executable_name}" /ucrt64/lib/go/bin/${_go_executable_name} /clang64/lib/go/bin/${_go_executable_name})
+    set(_go_candidates /c/go/bin/${_go_executable_name} "/c/Program Files/go/bin/${_go_executable_name}")
+  endif()
+  find_program(_go_path_candidate "${_go_executable_name}")
+  if(_go_path_candidate)
+    list(APPEND _go_candidates "${_go_path_candidate}")
   endif()
 else()
   file(GLOB _go_versioned_candidates LIST_DIRECTORIES FALSE

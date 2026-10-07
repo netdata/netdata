@@ -12,7 +12,7 @@ include_guard()
 macro(_nd_windows_config)
   set(OS_WINDOWS True)
 
-  if(NOT "${CMAKE_INSTALL_PREFIX}" MATCHES "/opt/netdata$")
+  if(NOT "${CMAKE_INSTALL_PREFIX}" MATCHES "[/\\\\]opt[/\\\\]netdata$")
     message(FATAL_ERROR "CMAKE_INSTALL_PREFIX must end with /opt/netdata, but it is set to ${CMAKE_INSTALL_PREFIX}")
   endif()
 
@@ -29,16 +29,6 @@ macro(_nd_windows_config)
 
   if($ENV{CLION_IDE})
     set(RUN_UNDER_CLION True)
-
-    # clion needs these to find the includes
-    if("${CMAKE_SYSTEM_NAME}" STREQUAL "MSYS" OR "${CMAKE_SYSTEM_NAME}" STREQUAL "Windows")
-      if("$ENV{MSYSTEM}" STREQUAL "MSYS")
-        include_directories(c:/msys64/usr/include)
-        include_directories(c:/msys64/usr/include/w32api)
-      elseif("$ENV{MSYSTEM}" STREQUAL "UCRT64")
-        include_directories(c:/msys64/ucrt64/include)
-      endif()
-    endif()
   endif()
 
   message(STATUS " Compiling for Windows (${CMAKE_SYSTEM_NAME}, MSYSTEM=$ENV{MSYSTEM})... ")

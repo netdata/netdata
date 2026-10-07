@@ -19,7 +19,6 @@ project(netdata
 include(CMakeDependentOption)
 include(CMakePushCheckState)
 include(NetdataUtil)
-include(NetdataMSYS2)
 netdata_fixup_system_processor()
 
 option(STATIC_BUILD "Use static linking instead of dynamic linking for the build." FALSE)
@@ -2665,8 +2664,7 @@ if(OS_WINDOWS)
         # The Windows build publishes one manifest-backed ETW provider.  Classic WEL
         # cannot write to ETW channels, so falling back to ReportEventW produces a
         # different Event Viewer layout and cannot provide Netdata's channel hierarchy.
-        # wevt_netdata_compile.sh validates the required Windows SDK (mc.exe, rc.exe)
-        # and MSVC (link.exe) tools and reports an actionable error when they are absent.
+        # The Windows developer environment must expose the SDK and linker tools.
         set(HAVE_ETW True)
 
         # Output the results for debugging purposes
@@ -2676,17 +2674,16 @@ if(OS_WINDOWS)
                 # Define the source and generated file paths
                 set(WEVT_GEN_SRC_H_FILE "${CMAKE_SOURCE_DIR}/src/libnetdata/log/nd_log-to-windows-common.h")
                 set(WEVT_GEN_SRC_C_FILE "${CMAKE_SOURCE_DIR}/src/libnetdata/log/wevt_netdata_mc_generate.c")
-                set(WEVT_GEN_BIN_FILE "${CMAKE_BINARY_DIR}/wevt_netdata_mc_generate")
+                set(WEVT_GEN_BIN_FILE "${CMAKE_BINARY_DIR}/wevt_netdata_mc_generate.exe")
 
-                set(WEVT_BUILD_SCRIPT "${CMAKE_SOURCE_DIR}/src/libnetdata/log/wevt_netdata_compile.sh")
-                netdata_find_msys2_program(WEVT_BASH_EXECUTABLE
-                    NAMES bash.exe bash
-                    HINTS "$ENV{MSYS2_ROOT}/usr/bin"
-                          "C:/msys64/usr/bin"
-                          "$ENV{ChocolateyToolsLocation}/msys64/usr/bin")
-                if(NOT WEVT_BASH_EXECUTABLE)
-                        message(FATAL_ERROR "MSYS2 bash is required to generate Windows ETW resources")
-                endif()
+                find_program(WEVT_MC_EXECUTABLE NAMES mc.exe mc)
+                find_program(WEVT_RC_EXECUTABLE NAMES rc.exe rc)
+                find_program(WEVT_LINK_EXECUTABLE NAMES link.exe link)
+                foreach(_wevt_tool WEVT_MC_EXECUTABLE WEVT_RC_EXECUTABLE WEVT_LINK_EXECUTABLE)
+                        if(NOT ${_wevt_tool})
+                                message(FATAL_ERROR "${_wevt_tool} is required to generate Windows ETW resources; initialize the Windows SDK and Visual Studio tool environments")
+                        endif()
+                endforeach()
 
                 set(WEVT_MC_FILE "${CMAKE_BINARY_DIR}/wevt_netdata.mc")
                 set(WEVT_MAN_FILE "${CMAKE_BINARY_DIR}/wevt_netdata_manifest.xml")
@@ -2694,6 +2691,11 @@ if(OS_WINDOWS)
                 set(WEVT_MAN_H_FILE "${CMAKE_BINARY_DIR}/wevt_netdata_manifest.h")
 
                 set(WEVT_DLL_FILE "${CMAKE_BINARY_DIR}/wevt_netdata.dll")
+                set(WEVT_RC_FILE "${CMAKE_BINARY_DIR}/wevt_netdata.rc")
+                set(WEVT_RES_FILE "${CMAKE_BINARY_DIR}/wevt_netdata.res")
+                set(WEVT_MAN_COPY "${CMAKE_BINARY_DIR}/wevt_netdata_manifest.man")
+                set(WEVT_RESOURCE_RC "${CMAKE_BINARY_DIR}/wevt_netdata_resource.rc")
+                set(WEVT_GENERATOR_SCRIPT "${CMAKE_SOURCE_DIR}/packaging/cmake/GenerateWevt.cmake")
                 set(WEVT_ETW_INSTALL_SCRIPT "${CMAKE_SOURCE_DIR}/src/libnetdata/log/wevt_netdata_install.bat")
 
                 # we compile ${WEVT_GEN_BIN_FILE}, which generates the manifest, the .mc,
@@ -2702,10 +2704,22 @@ if(OS_WINDOWS)
                 add_custom_command(
                         OUTPUT "${WEVT_MC_H_FILE}" "${WEVT_MAN_H_FILE}" "${WEVT_MAN_FILE}" "${WEVT_DLL_FILE}"
                         COMMAND "${CMAKE_C_COMPILER}" -o "${WEVT_GEN_BIN_FILE}" "${WEVT_GEN_SRC_C_FILE}"
-                        COMMAND "${WEVT_GEN_BIN_FILE}" >"${WEVT_MC_FILE}"
-                        COMMAND "${WEVT_GEN_BIN_FILE}" --manifest >"${WEVT_MAN_FILE}"
-                        COMMAND "${WEVT_BASH_EXECUTABLE}" "${WEVT_BUILD_SCRIPT}" "${CMAKE_SOURCE_DIR}/src/libnetdata/log" "${CMAKE_BINARY_DIR}"
-                        DEPENDS "${WEVT_GEN_SRC_C_FILE}" "${WEVT_GEN_SRC_H_FILE}"
+                        COMMAND "${CMAKE_COMMAND}"
+                                "-DWEVT_GENERATOR=${WEVT_GEN_BIN_FILE}"
+                                "-DWEVT_MC_FILE=${WEVT_MC_FILE}"
+                                "-DWEVT_MAN_FILE=${WEVT_MAN_FILE}"
+                                -P "${WEVT_GENERATOR_SCRIPT}"
+                        COMMAND "${WEVT_MC_EXECUTABLE}" -v -b -U "${WEVT_MC_FILE}" "${WEVT_MAN_FILE}"
+                        COMMAND "${CMAKE_COMMAND}" -E copy "${WEVT_MAN_FILE}" "${WEVT_MAN_COPY}"
+                        COMMAND "${CMAKE_COMMAND}"
+                                "-DINPUT_RC=${WEVT_RC_FILE}"
+                                "-DOUTPUT_RC=${WEVT_RESOURCE_RC}"
+                                "-DMANIFEST_FILE=${WEVT_MAN_COPY}"
+                                -P "${CMAKE_SOURCE_DIR}/packaging/cmake/AppendManifestResource.cmake"
+                        COMMAND "${WEVT_RC_EXECUTABLE}" /v /fo "${WEVT_RES_FILE}" "${WEVT_RESOURCE_RC}"
+                        COMMAND "${WEVT_LINK_EXECUTABLE}" /dll /noentry /machine:x64
+                                "/out:${WEVT_DLL_FILE}" "${WEVT_RES_FILE}"
+                        DEPENDS "${WEVT_GEN_SRC_C_FILE}" "${WEVT_GEN_SRC_H_FILE}" "${WEVT_GENERATOR_SCRIPT}"
                         COMMENT "Compiling ${WEVT_MC_FILE} to generate ${WEVT_MC_H_FILE} and ${WEVT_DLL_FILE}"
                 )
 
@@ -3663,6 +3677,7 @@ if(OS_WINDOWS)
         set(NETDATA_RES_FILES "packaging/windows/resources/netdata.rc")
         configure_file(packaging/windows/resources/netdata.manifest.in ${CMAKE_SOURCE_DIR}/packaging/windows/resources/netdata.manifest @ONLY)
 
+        file(TO_NATIVE_PATH "${CMAKE_INSTALL_PREFIX}" NETDATA_INSTALL_PREFIX_WIX)
         configure_file(packaging/windows/netdata.wxs.in netdata.wxs @ONLY)
         configure_file(packaging/windows/NetdataWhite.ico NetdataWhite.ico COPYONLY)
         configure_file(packaging/windows/eula.rtf eula.rtf COPYONLY)
@@ -4450,10 +4465,15 @@ install(FILES
         COMPONENT netdata
         DESTINATION etc/netdata)
 
-install(PROGRAMS
-        system/edit-config
-        COMPONENT netdata
-        DESTINATION etc/netdata)
+if(OS_WINDOWS)
+        install(FILES packaging/windows/edit-config.ps1
+                COMPONENT netdata
+                DESTINATION usr/libexec/netdata)
+else()
+        install(PROGRAMS system/edit-config
+                COMPONENT netdata
+                DESTINATION etc/netdata)
+endif()
 
 if(BUILD_FOR_PACKAGING)
         set(NETDATA_CONF_DEST "etc/netdata")
@@ -4954,41 +4974,44 @@ if(OS_WINDOWS)
         # stores; `/usr/ssl` is an MSYS runtime path, not a valid CMake source
         # path in the native UCRT64 install tree.
 
-        # Resolve each installed executable's UCRT64 DLL dependencies and copy
-        # their union to the executable directories. The SYSTEM service account
-        # has no MSYS2/UCRT64 bin in its search path.
-        install(CODE "
-            set(_runtime_manifest \"${CMAKE_BINARY_DIR}/.netdata-runtime-dlls.manifest\")
-            file(REMOVE \"\${_runtime_manifest}\")
+        # Resolve native Windows executable dependencies and copy the UCRT64
+        # runtime DLLs beside executables; the service account has no UCRT64 PATH.
+        install(CODE [[
+            set(_runtime_stage "$ENV{DESTDIR}${CMAKE_INSTALL_PREFIX}")
+            file(TO_CMAKE_PATH "${_runtime_stage}" _runtime_stage)
             file(GLOB_RECURSE _runtime_executables LIST_DIRECTORIES FALSE
-                 \"\$ENV{DESTDIR}\${CMAKE_INSTALL_PREFIX}/usr/bin/*.exe\"
-                 \"\$ENV{DESTDIR}\${CMAKE_INSTALL_PREFIX}/usr/libexec/netdata/plugins.d/*.exe\")
+                 "${_runtime_stage}/usr/bin/*.exe"
+                 "${_runtime_stage}/usr/libexec/netdata/plugins.d/*.exe")
             if(NOT _runtime_executables)
-                message(FATAL_ERROR \"No Windows executables found to stage runtime DLLs for.\")
+                message(FATAL_ERROR "No Windows executables found to stage runtime DLLs for.")
             endif()
-            foreach(_runtime_executable IN LISTS _runtime_executables)
-                execute_process(
-                    COMMAND \"${WEVT_BASH_EXECUTABLE}\" --login
-                            \"${CMAKE_SOURCE_DIR}/packaging/windows/stage-runtime-dlls.sh\"
-                            \"\${_runtime_executable}\"
-                            \"${CMAKE_BINARY_DIR}/netdata-runtime-dlls\"
-                            \"\${_runtime_manifest}\"
-                    RESULT_VARIABLE _stage_runtime_result)
-                if(NOT _stage_runtime_result EQUAL 0)
-                    message(FATAL_ERROR \"Failed to stage runtime DLLs for \${_runtime_executable}.\")
+            file(GET_RUNTIME_DEPENDENCIES
+                 EXECUTABLES ${_runtime_executables}
+                 DIRECTORIES "$ENV{NETDATA_WINDOWS_RUNTIME_DLL_DIR}"
+                 PRE_EXCLUDE_REGEXES "^api-ms-win-" "^ext-ms-"
+                 POST_EXCLUDE_REGEXES
+                     ".*[Ww][Ii][Nn][Dd][Oo][Ww][Ss][/\\\\][Ss][Yy][Ss][Tt][Ee][Mm]32[/\\\\].*"
+                     ".*[Ww][Ii][Nn][Dd][Oo][Ww][Ss][/\\\\][Ss][Yy][Ss][Ww][Oo][Ww]64[/\\\\].*"
+                     ".*[Ww][Ii][Nn][Dd][Oo][Ww][Ss][/\\\\][Ww][Ii][Nn][Ss][Xx][Ss][/\\\\].*"
+                 RESOLVED_DEPENDENCIES_VAR _runtime_dependencies
+                 UNRESOLVED_DEPENDENCIES_VAR _unresolved_runtime_dependencies)
+            if(_unresolved_runtime_dependencies)
+                message(FATAL_ERROR "Unresolved Windows runtime dependencies: ${_unresolved_runtime_dependencies}")
+            endif()
+            if(NOT _runtime_dependencies)
+                message(FATAL_ERROR "No UCRT64 runtime DLLs were found for the Windows install.")
+            endif()
+            foreach(_runtime_dll IN LISTS _runtime_dependencies)
+                get_filename_component(_runtime_dll_name "${_runtime_dll}" NAME)
+                if(_runtime_dll_name MATCHES "^[Mm][Ss][Yy][Ss].*\\.dll$")
+                    message(FATAL_ERROR "MSYS runtime dependency is not allowed in the Windows package: ${_runtime_dll}")
                 endif()
+                file(COPY "${_runtime_dll}"
+                     DESTINATION "${_runtime_stage}/usr/bin")
+                file(COPY "${_runtime_dll}"
+                     DESTINATION "${_runtime_stage}/usr/libexec/netdata/plugins.d")
             endforeach()
-            file(STRINGS \"\${_runtime_manifest}\" _runtime_dll_names)
-            if(NOT _runtime_dll_names)
-                message(FATAL_ERROR \"No UCRT64 runtime DLLs were staged for the Windows install.\")
-            endif()
-            foreach(_runtime_dll IN LISTS _runtime_dll_names)
-                file(COPY \"${CMAKE_BINARY_DIR}/netdata-runtime-dlls/\${_runtime_dll}\"
-                     DESTINATION \"\$ENV{DESTDIR}\${CMAKE_INSTALL_PREFIX}/usr/bin\")
-                file(COPY \"${CMAKE_BINARY_DIR}/netdata-runtime-dlls/\${_runtime_dll}\"
-                     DESTINATION \"\$ENV{DESTDIR}\${CMAKE_INSTALL_PREFIX}/usr/libexec/netdata/plugins.d\")
-            endforeach()
-        " COMPONENT netdata)
+        ]] COMPONENT netdata)
 endif()
 
 #

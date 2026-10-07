@@ -69,19 +69,42 @@ if (-Not ($msysprefix)) {
     $msysprefix = Install-MSYS2
 }
 
-$msysbash = Get-MSYS2Bash "$msysprefix"
+$pacman = Join-Path $msysprefix 'usr\bin\pacman.exe'
+$env:MSYSTEM = 'UCRT64'
 $env:CHERE_INVOKING = 'yes'
+$env:PATH = "$msysprefix\ucrt64\bin;$msysprefix\usr\bin;$env:PATH"
 
-& $msysbash -l "$PSScriptRoot\msys2-dependencies.sh"
+& $pacman -Syuu --noconfirm
+if ($LASTEXITCODE -ne 0) {
+    Write-Host "The first package database update failed; retrying after the runtime update."
+    & $pacman -Syuu --noconfirm
+    if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+}
 
-if ($LastExitcode -ne 0) {
-    Write-Host "First update attempt failed. This is expected if the msys-runtime package needed updated, trying again."
-
-    & $msysbash -l "$PSScriptRoot\msys2-dependencies.sh"
-
-    if ($LastExitcode -ne 0) {
-        exit 1
-    }
+$packages = @(
+    'base-devel', 'cmake', 'git', 'ninja', 'python', 'msys2-devel',
+    'ucrt64/mingw-w64-ucrt-x86_64-rust',
+    'ucrt64/mingw-w64-ucrt-x86_64-toolchain',
+    'ucrt64/mingw-w64-ucrt-x86_64-brotli',
+    'ucrt64/mingw-w64-ucrt-x86_64-cmake',
+    'ucrt64/mingw-w64-ucrt-x86_64-curl',
+    'ucrt64/mingw-w64-ucrt-x86_64-go',
+    'ucrt64/mingw-w64-ucrt-x86_64-headers',
+    'ucrt64/mingw-w64-ucrt-x86_64-libuv',
+    'ucrt64/mingw-w64-ucrt-x86_64-libyaml',
+    'ucrt64/mingw-w64-ucrt-x86_64-lld',
+    'ucrt64/mingw-w64-ucrt-x86_64-lz4',
+    'ucrt64/mingw-w64-ucrt-x86_64-ninja',
+    'ucrt64/mingw-w64-ucrt-x86_64-nsis',
+    'ucrt64/mingw-w64-ucrt-x86_64-openssl',
+    'ucrt64/mingw-w64-ucrt-x86_64-pcre2',
+    'ucrt64/mingw-w64-ucrt-x86_64-protobuf',
+    'ucrt64/mingw-w64-ucrt-x86_64-zlib',
+    'ucrt64/mingw-w64-ucrt-x86_64-zstd'
+)
+& $pacman -S --noconfirm --needed @packages
+if ($LASTEXITCODE -ne 0) {
+    exit $LASTEXITCODE
 }
 
 $wixVersion = "5.0.2"

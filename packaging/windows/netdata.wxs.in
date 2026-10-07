@@ -71,6 +71,7 @@
                 <ComponentGroupRef Id="WevtComponents" />
                 <FeatureGroupRef Id="NetdataDriver" />
                 <ComponentRef Id="NetdataService" />
+                <ComponentRef Id="EditNetdataConfigShortcut" />
             </Feature>
 
             <StandardDirectory Id="ProgramFiles64Folder">
@@ -191,6 +192,10 @@
     </Package>
 
     <Fragment>
+            <StandardDirectory Id="ProgramMenuFolder">
+                <Directory Id="NetdataProgramMenuFolder" Name="Netdata" />
+            </StandardDirectory>
+
             <UI>
                 <ProgressText Action="NDKillProcess" Message="Stopping Netdata service before update..." />
                 <ProgressText Action="NDStopDriverSrv" Message="Stopping Netdata driver service..." />
@@ -207,14 +212,22 @@
 
             <!-- All the files except for the ones we need to handle specially -->
             <ComponentGroup Id="NetdataComponents" Directory="INSTALLFOLDER">
-                <Files Include="C:\msys64\opt\netdata\**">
-                    <Exclude Files="C:\msys64\opt\netdata\usr\bin\netdata.exe" />
-                    <Exclude Files="C:\msys64\opt\netdata\usr\bin\wevt_netdata_manifest.xml" />
-                    <Exclude Files="C:\msys64\opt\netdata\usr\bin\wevt_netdata.dll" />
-                    <Exclude Files="C:\msys64\opt\netdata\usr\bin\netdata_driver.sys" />
-                    <Exclude Files="C:\msys64\opt\netdata\usr\bin\netdata_driver.inf" />
+                <Files Include="@NETDATA_INSTALL_PREFIX_WIX@\**">
+                    <Exclude Files="@NETDATA_INSTALL_PREFIX_WIX@\usr\bin\netdata.exe" />
+                    <Exclude Files="@NETDATA_INSTALL_PREFIX_WIX@\usr\bin\wevt_netdata_manifest.xml" />
+                    <Exclude Files="@NETDATA_INSTALL_PREFIX_WIX@\usr\bin\wevt_netdata.dll" />
+                    <Exclude Files="@NETDATA_INSTALL_PREFIX_WIX@\usr\bin\netdata_driver.sys" />
+                    <Exclude Files="@NETDATA_INSTALL_PREFIX_WIX@\usr\bin\netdata_driver.inf" />
                 </Files>
             </ComponentGroup>
+
+            <Component Id="EditNetdataConfigShortcut" Directory="NetdataProgramMenuFolder" Guid="a1e5e77f-9122-44aa-b8e0-57c26f586ff1">
+                <Shortcut Id="EditNetdataConfig" Name="Edit Netdata Configuration"
+                          Target="[System64Folder]WindowsPowerShell\v1.0\powershell.exe"
+                          Arguments="-NoProfile -ExecutionPolicy Bypass -File &quot;[USRLIBEXECNETDATADIR]edit-config.ps1&quot; netdata.conf"
+                          WorkingDirectory="[USRLIBEXECNETDATADIR]" />
+                <RegistryValue Root="HKLM" Key="Software\Netdata\Installer" Name="EditConfigShortcut" Type="integer" Value="1" KeyPath="yes" />
+            </Component>
 
             <Component Id="NetdataVarCache" Directory="VARCACHEDIR" Guid="a41bc888-60d4-4d99-bb4f-da92614a8f72">
                 <CreateFolder />
@@ -309,18 +322,18 @@
 
             <!-- Install wevt manifest/dll files -->
             <ComponentGroup Id="WevtComponents" Directory="System64Folder">
-                <File Id="WevtDll" Name="wevt_netdata.dll" Source="C:\msys64\opt\netdata\usr\bin\wevt_netdata.dll">
+                <File Id="WevtDll" Name="wevt_netdata.dll" Source="@NETDATA_INSTALL_PREFIX_WIX@\usr\bin\wevt_netdata.dll">
                 </File>
 
-                <File Id="WevtManifest" Name="wevt_netdata_manifest.xml" Source="C:\msys64\opt\netdata\usr\bin\wevt_netdata_manifest.xml">
+                <File Id="WevtManifest" Name="wevt_netdata_manifest.xml" Source="@NETDATA_INSTALL_PREFIX_WIX@\usr\bin\wevt_netdata_manifest.xml">
                 </File>
             </ComponentGroup>
 
             <!-- Install netdata driver file -->
             <FeatureGroup Id="NetdataDriver">
-                <File Id="NetdataDrv" Name="netdata_driver.sys" Directory="DRIVERDIR" Source="C:\msys64\opt\netdata\usr\bin\netdata_driver.sys" Condition="NDDRVINST=1">
+                <File Id="NetdataDrv" Name="netdata_driver.sys" Directory="DRIVERDIR" Source="@NETDATA_INSTALL_PREFIX_WIX@\usr\bin\netdata_driver.sys" Condition="NDDRVINST=1">
                 </File>
-                <File Id="NetdataDrvInf" Name="netdata_driver.inf" Directory="INFDIR" Source="C:\msys64\opt\netdata\usr\bin\netdata_driver.inf" Condition="NDDRVINST=1">
+                <File Id="NetdataDrvInf" Name="netdata_driver.inf" Directory="INFDIR" Source="@NETDATA_INSTALL_PREFIX_WIX@\usr\bin\netdata_driver.inf" Condition="NDDRVINST=1">
                 </File>
             </FeatureGroup>
 
@@ -433,7 +446,7 @@
             </InstallExecuteSequence>
 
             <Component Id="NetdataService" Directory="USRBINDIR">
-                <File Id="netdata.exe" Source="C:\msys64\opt\netdata\usr\bin\netdata.exe" KeyPath="yes" />
+                <File Id="netdata.exe" Source="@NETDATA_INSTALL_PREFIX_WIX@\usr\bin\netdata.exe" KeyPath="yes" />
 
                 <ServiceInstall Id="InstallService"
                                 Name="Netdata"
