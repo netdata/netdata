@@ -32,7 +32,9 @@ type fakeBMC struct {
 	additionTime uint32
 	// refuseWholeReads makes Get SDR require partial reads.
 	refuseWholeReads bool
-	// onExchange runs before each command; a non-nil error is returned instead.
+	// onConnect and onExchange run before Connect and each command; a non-nil
+	// error is returned instead.
+	onConnect  func() error
 	onExchange func(types.Request) error
 
 	requests []types.Request
@@ -81,16 +83,24 @@ func wantCPUPresence(state string) Sensor {
 	}
 }
 
-func newTestReader(bmc *fakeBMC) *Reader {
+func newTestReader(fake *fakeBMC) *Reader {
 	r := New(Config{
 		Timeout: time.Second,
 	})
-	r.newTransport = func() (transport, error) { return bmc, nil }
+	r.newTransport = func() (transport, error) { return fake, nil }
 	r.now = func() time.Time { return testNow }
 	return r
 }
 
-func (f *fakeBMC) Connect(context.Context) error { f.connects++; return nil }
+func (f *fakeBMC) Connect(context.Context) error {
+	if f.onConnect != nil {
+		if err := f.onConnect(); err != nil {
+			return err
+		}
+	}
+	f.connects++
+	return nil
+}
 
 func (f *fakeBMC) Close(context.Context) error { f.closes++; return nil }
 
@@ -164,16 +174,17 @@ func (f *fakeBMC) respondSDR(q *storage.GetSDRRequest) ([]byte, error) {
 	if index >= len(f.records) {
 		return nil, fmt.Errorf("bad fake record %d", index)
 	}
-	if f.refuseWholeReads && q.ReadBytes == readEntireRecord {
+	// Get SDR: ReadBytes FFh reads the entire record; next record ID FFFFh ends the chain.
+	if f.refuseWholeReads && q.ReadBytes == 0xff {
 		return nil, types.NewResponseError(types.CodeCannotReturnRequestedDataBytes, "partial required")
 	}
 
 	next := uint16(index + 2)
 	if index == len(f.records)-1 {
-		next = lastRecordID
+		next = 0xffff
 	}
 	record := f.records[index]
-	if q.ReadBytes != readEntireRecord {
+	if q.ReadBytes != 0xff {
 		record = record[int(q.ReadOffset) : int(q.ReadOffset)+int(q.ReadBytes)]
 	}
 	data := make([]byte, 2+len(record))

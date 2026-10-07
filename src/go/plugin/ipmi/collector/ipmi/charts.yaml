@@ -3,7 +3,6 @@ context_namespace: ipmi_go
 groups:
   - family: Sensors
     chart_defaults:
-      label_promotion: [sensor, type, component]
       instances:
         by_labels: [sensor_id]
     groups:

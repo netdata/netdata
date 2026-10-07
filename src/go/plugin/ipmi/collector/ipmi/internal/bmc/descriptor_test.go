@@ -12,7 +12,7 @@ import (
 
 func TestDescribeSDR_Latin1Name(t *testing.T) {
 	// Type 3 ID strings are Latin-1; the SDK returns their bytes without UTF-8 conversion.
-	sdr, err := types.ParseSDR(fullRecord(1, 10, string([]byte{'T', 0xe9, 'm', 'p'})), lastRecordID)
+	sdr, err := types.ParseSDR(fullRecord(1, 10, string([]byte{'T', 0xe9, 'm', 'p'})), 0xffff)
 	require.NoError(t, err)
 
 	got := describeSDR(sdr)
@@ -133,6 +133,50 @@ func TestUnitOf(t *testing.T) {
 			gotName, gotLegacy := unitOf(tc.unit)
 			assert.Equal(t, tc.wantName, gotName)
 			assert.Equal(t, tc.wantLegacy, gotLegacy)
+		})
+	}
+}
+
+func TestDescribeSDR_SharedSensors(t *testing.T) {
+	tests := map[string]struct {
+		first         uint8
+		count         byte
+		modifierType  byte // 00b numeric, 01b alphabetic, others reserved
+		wantNumbers   []uint8
+		wantSupported bool
+	}{
+		"ends below the reserved number": {
+			first:         0xfd,
+			count:         2,
+			wantNumbers:   []uint8{0xfd, 0xfe},
+			wantSupported: true,
+		},
+		"reaches the reserved number FFh": {
+			first:       0xfe,
+			count:       2,
+			wantNumbers: []uint8{0xfe, 0xff},
+		},
+		"reserved instance modifier type": {
+			first:        0x10,
+			count:        2,
+			modifierType: 0b10,
+			wantNumbers:  []uint8{0x10, 0x11},
+		},
+	}
+
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) {
+			record := compactRecord(1, tc.first, 0x08, "PSU")
+			record[compactShareCount] = tc.modifierType<<4 | tc.count
+			sdr, err := types.ParseSDR(record, 0xffff)
+			require.NoError(t, err)
+
+			var numbers []uint8
+			for _, d := range describeSDR(sdr) {
+				numbers = append(numbers, d.number)
+				assert.Equal(t, tc.wantSupported, d.supported, "sensor %#02x", d.number)
+			}
+			assert.Equal(t, tc.wantNumbers, numbers)
 		})
 	}
 }

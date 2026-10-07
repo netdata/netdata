@@ -5,9 +5,7 @@ package bmc
 import (
 	"context"
 	"errors"
-	"fmt"
 	"testing"
-	"time"
 
 	"github.com/bougou/go-ipmi/pkg/command/app"
 	"github.com/bougou/go-ipmi/pkg/command/sensor"
@@ -24,11 +22,11 @@ const (
 )
 
 func TestReader_CheckAndCollect(t *testing.T) {
-	bmc := newFakeBMC()
-	r := newTestReader(bmc)
+	fake := newFakeBMC()
+	r := newTestReader(fake)
 
 	require.NoError(t, r.Check(t.Context()))
-	assert.Equal(t, []types.Request{&app.GetDeviceIDRequest{}}, bmc.requests, "Check is a single probe")
+	assert.Equal(t, []types.Request{&app.GetDeviceIDRequest{}}, fake.requests, "Check is a single probe")
 
 	got, err := r.Collect(t.Context(), true)
 	require.NoError(t, err)
@@ -40,8 +38,8 @@ func TestReader_CheckAndCollect(t *testing.T) {
 
 	require.NoError(t, r.Close(t.Context()))
 	require.NoError(t, r.Close(t.Context()))
-	assert.Equal(t, 1, bmc.connects)
-	assert.Equal(t, 1, bmc.closes)
+	assert.Equal(t, 1, fake.connects)
+	assert.Equal(t, 1, fake.closes)
 }
 
 func TestReader_Collect_ReadingAvailability(t *testing.T) {
@@ -78,12 +76,12 @@ func TestReader_Collect_ReadingAvailability(t *testing.T) {
 
 	for name, tc := range tests {
 		t.Run(name, func(t *testing.T) {
-			bmc := newFakeBMC()
-			r := newTestReader(bmc)
+			fake := newFakeBMC()
+			r := newTestReader(fake)
 			before, err := r.Collect(t.Context(), false)
 			require.NoError(t, err)
 
-			bmc.readings[10] = tc.reading
+			fake.readings[10] = tc.reading
 			got, err := r.Collect(t.Context(), false)
 			require.NoError(t, err)
 
@@ -98,11 +96,11 @@ func TestReader_Collect_ReadingAvailability(t *testing.T) {
 }
 
 func TestReader_Collect_PartialFailureAndRecovery(t *testing.T) {
-	bmc := newFakeBMC()
-	r := newTestReader(bmc)
+	fake := newFakeBMC()
+	r := newTestReader(fake)
 
-	bmc.readingErrs[10] = types.NewResponseError(0xcb, "not present")
-	bmc.selErr = errors.New("SEL transport failure")
+	fake.readingErrs[10] = types.NewResponseError(0xcb, "not present")
+	fake.selErr = errors.New("SEL transport failure")
 	got, err := r.Collect(t.Context(), true)
 	require.NoError(t, err)
 	assert.Equal(t, &Snapshot{
@@ -111,8 +109,8 @@ func TestReader_Collect_PartialFailureAndRecovery(t *testing.T) {
 		Warnings:    []string{readingWarning, selWarning},
 	}, got)
 
-	delete(bmc.readingErrs, 10)
-	bmc.selErr = nil
+	delete(fake.readingErrs, 10)
+	fake.selErr = nil
 	got, err = r.Collect(t.Context(), true)
 	require.NoError(t, err)
 	assert.Equal(t, &Snapshot{
@@ -132,24 +130,24 @@ func TestReader_Collect_FailureReconnects(t *testing.T) {
 
 	for name, tc := range tests {
 		t.Run(name, func(t *testing.T) {
-			bmc := newFakeBMC()
-			r := newTestReader(bmc)
+			fake := newFakeBMC()
+			r := newTestReader(fake)
 			_, err := r.Collect(t.Context(), false)
 			require.NoError(t, err)
 
-			tc.fail(bmc)
+			tc.fail(fake)
 			got, err := r.Collect(t.Context(), false)
 			require.ErrorContains(t, err, "transport failed")
 			assert.Nil(t, got)
-			assert.Equal(t, 1, bmc.closes, "a failed collection closes the device")
+			assert.Equal(t, 1, fake.closes, "a failed collection closes the device")
 
 			// The repository timestamps are sentinels, so only the reconnect makes a rename visible.
-			bmc.repoErr = nil
-			delete(bmc.readingErrs, 10)
-			bmc.records[0] = fullRecord(1, 10, "Renamed")
+			fake.repoErr = nil
+			delete(fake.readingErrs, 10)
+			fake.records[0] = fullRecord(1, 10, "Renamed")
 			got, err = r.Collect(t.Context(), false)
 			require.NoError(t, err)
-			assert.Equal(t, 2, bmc.connects)
+			assert.Equal(t, 2, fake.connects)
 			assert.Equal(t, "Renamed", got.Sensors[0].Name, "a reconnect rediscovers the inventory")
 		})
 	}
@@ -177,14 +175,14 @@ func TestReader_Collect_Cancellation(t *testing.T) {
 
 	for name, tc := range tests {
 		t.Run(name, func(t *testing.T) {
-			bmc := newFakeBMC()
-			r := newTestReader(bmc)
+			fake := newFakeBMC()
+			r := newTestReader(fake)
 			ctx, cancel := context.WithCancel(t.Context())
 			defer cancel()
 			if tc.cancelOn == nil {
 				cancel()
 			} else {
-				bmc.onExchange = func(req types.Request) error {
+				fake.onExchange = func(req types.Request) error {
 					if tc.cancelOn(req) {
 						cancel()
 					}
@@ -195,21 +193,24 @@ func TestReader_Collect_Cancellation(t *testing.T) {
 			got, err := r.Collect(ctx, true)
 			require.ErrorIs(t, err, context.Canceled)
 			assert.Nil(t, got)
-			assert.Equal(t, tc.wantCloses, bmc.closes)
+			assert.Equal(t, tc.wantCloses, fake.closes)
+			if tc.cancelOn == nil {
+				assert.Empty(t, fake.requests, "no command after an earlier cancellation")
+			}
 		})
 	}
 }
 
 func TestReader_Collect_CommandDeadlineIdentity(t *testing.T) {
-	bmc := newFakeBMC()
-	bmc.onExchange = func(req types.Request) error {
+	fake := newFakeBMC()
+	fake.onExchange = func(req types.Request) error {
 		if _, ok := req.(*storage.GetSDRRepoInfoRequest); ok {
 			return context.DeadlineExceeded
 		}
 		return nil
 	}
 
-	_, err := newTestReader(bmc).Collect(t.Context(), false)
+	_, err := newTestReader(fake).Collect(t.Context(), false)
 	require.ErrorIs(t, err, context.DeadlineExceeded)
 }
 
@@ -224,14 +225,14 @@ func TestReader_Collect_OwnershipAndSharing(t *testing.T) {
 	channel := fullRecord(6, 40, "Channel")
 	channel[recordOwnerLUN] = 0x10
 
-	bmc := newFakeBMC()
-	bmc.records = [][]byte{shared, satellite, lun, channel}
-	bmc.readings[20] = []byte{0, 0xc0, 0x01, 0} // presence detected
-	bmc.readings[21] = []byte{0, 0xc0, 0x02, 0} // failure detected
-	bmc.readings[22] = []byte{0, 0xc0, 0x80, 0} // configuration error
-	bmc.readings[30] = []byte{30, 0xc0, 0x00}
+	fake := newFakeBMC()
+	fake.records = [][]byte{shared, satellite, lun, channel}
+	fake.readings[20] = []byte{0, 0xc0, 0x01, 0} // presence detected
+	fake.readings[21] = []byte{0, 0xc0, 0x02, 0} // failure detected
+	fake.readings[22] = []byte{0, 0xc0, 0x80, 0} // configuration error
+	fake.readings[30] = []byte{30, 0xc0, 0x00}
 
-	got, err := newTestReader(bmc).Collect(t.Context(), false)
+	got, err := newTestReader(fake).Collect(t.Context(), false)
 	require.NoError(t, err)
 
 	powerSupply := func(key, name, state string) Sensor {
@@ -264,12 +265,12 @@ func TestReader_Collect_OwnershipAndSharing(t *testing.T) {
 			temperature("i6_n40_t2_u1_Channel", "Channel", StateUnknown, nil),
 		},
 		CollectedAt: testNow,
-		Warnings:    []string{"2 sensor records have unsupported ownership, sharing, or ID encoding"},
+		Warnings:    []string{"2 sensors have unsupported ownership, sharing, or ID encoding"},
 	}, got)
 	assert.Equal(
 		t,
 		[]uint8{20, 21, 22, 30},
-		bmc.sensorReadingRequests(),
+		fake.sensorReadingRequests(),
 		"satellite and other-channel sensors are never queried",
 	)
 }
@@ -304,19 +305,19 @@ func TestReader_Collect_Conversion(t *testing.T) {
 
 	for name, tc := range tests {
 		t.Run(name, func(t *testing.T) {
-			bmc := newFakeBMC()
-			bmc.records = bmc.records[:1]
-			bmc.records[0][fullLinearization] = byte(tc.linearization)
-			bmc.records[0][fullExponents] = 0xf0 // R exponent -1
-			bmc.readings[10] = []byte{tc.raw, 0xc0, 0x00}
-			bmc.onExchange = func(req types.Request) error {
+			fake := newFakeBMC()
+			fake.records = fake.records[:1]
+			fake.records[0][fullLinearization] = byte(tc.linearization)
+			fake.records[0][fullExponents] = 0xf0 // R exponent -1
+			fake.readings[10] = []byte{tc.raw, 0xc0, 0x00}
+			fake.onExchange = func(req types.Request) error {
 				if _, ok := req.(*sensor.GetSensorReadingFactorsRequest); ok {
 					return tc.factorsErr
 				}
 				return nil
 			}
 
-			got, err := newTestReader(bmc).Collect(t.Context(), false)
+			got, err := newTestReader(fake).Collect(t.Context(), false)
 			require.NoError(t, err)
 			require.Len(t, got.Sensors, 1)
 			assert.Equal(t, StateNominal, got.Sensors[0].State)
@@ -331,101 +332,46 @@ func TestReader_Collect_Conversion(t *testing.T) {
 	}
 }
 
-func TestReader_CleanupDeadline(t *testing.T) {
+func TestReader_Check_ConnectFailure(t *testing.T) {
 	tests := map[string]struct {
-		// cleanup drives one cleanup path; cancelCaller cancels the caller's context when the case requests it.
-		cleanup func(t *testing.T, ctx context.Context, r *Reader, conn *closeRecorder, cancelCaller func())
+		cancel     bool // the caller cancels while connecting
+		wantErr    error
+		wantErrMsg string
 	}{
-		"failed connect": {
-			cleanup: func(t *testing.T, ctx context.Context, r *Reader, conn *closeRecorder, cancelCaller func()) {
-				conn.onConnect = cancelCaller
-				conn.connectErr = errors.New("connect failed")
-				require.Error(t, r.Check(ctx))
-			},
+		"device error": {
+			wantErrMsg: "connect IPMI: permission denied",
 		},
-		"failed collection": {
-			cleanup: func(t *testing.T, ctx context.Context, r *Reader, conn *closeRecorder, cancelCaller func()) {
-				conn.onExchange = func(types.Request) error {
-					cancelCaller()
-					return errors.New("transport failed")
-				}
-				_, err := r.Collect(ctx, false)
-				require.Error(t, err)
-			},
-		},
-		"explicit close": {
-			cleanup: func(t *testing.T, ctx context.Context, r *Reader, _ *closeRecorder, cancelCaller func()) {
-				require.NoError(t, r.Check(ctx))
-				cancelCaller()
-				assert.Equal(t, ctx.Err(), r.Close(ctx), "Close reports the caller's cancellation")
-			},
+		"caller cancellation takes precedence": {
+			cancel:  true,
+			wantErr: context.Canceled,
 		},
 	}
 
 	for name, tc := range tests {
-		for _, canceled := range []bool{false, true} {
-			t.Run(fmt.Sprintf("%s/caller canceled=%t", name, canceled), func(t *testing.T) {
-				ctx, cancel := context.WithCancel(t.Context())
-				defer cancel()
-				cancelCaller := func() {
-					if canceled {
-						cancel()
-					}
+		t.Run(name, func(t *testing.T) {
+			ctx, cancel := context.WithCancel(t.Context())
+			defer cancel()
+			fake := newFakeBMC()
+			fake.onConnect = func() error {
+				if tc.cancel {
+					cancel()
 				}
-				conn := &closeRecorder{
-					fakeBMC: newFakeBMC(),
-				}
-				r := newTestReader(conn.fakeBMC)
-				r.newTransport = func() (transport, error) { return conn, nil }
-				// The cleanup budget must not scale with the command timeout.
-				r.cfg.Timeout = 24 * time.Hour
+				return errors.New("permission denied")
+			}
+			r := newTestReader(fake)
 
-				tc.cleanup(t, ctx, r, conn, cancelCaller)
+			err := r.Check(ctx)
+			if tc.wantErr != nil {
+				require.ErrorIs(t, err, tc.wantErr)
+			} else {
+				require.EqualError(t, err, tc.wantErrMsg)
+			}
+			assert.Equal(t, 1, fake.closes, "a failed connect closes the transport")
+			assert.Empty(t, fake.requests)
 
-				require.Len(t, conn.closeCalls, 1)
-				call := conn.closeCalls[0]
-				require.True(t, call.hasDeadline)
-				assert.LessOrEqual(t, call.remaining, cleanupTimeout)
-				if canceled {
-					assert.ErrorIs(t, call.err, context.Canceled, "cleanup keeps the caller's cancellation")
-				} else {
-					assert.NoError(t, call.err)
-				}
-			})
-		}
+			fake.onConnect = nil
+			require.NoError(t, r.Check(t.Context()), "the next call connects again")
+			assert.Equal(t, 1, fake.connects)
+		})
 	}
-}
-
-// closeRecorder records the context of every Close and can fail Connect.
-type closeRecorder struct {
-	*fakeBMC
-	onConnect  func()
-	connectErr error
-	closeCalls []closeCall
-}
-
-type closeCall struct {
-	hasDeadline bool
-	remaining   time.Duration
-	err         error
-}
-
-func (c *closeRecorder) Connect(ctx context.Context) error {
-	if c.onConnect != nil {
-		c.onConnect()
-	}
-	if c.connectErr != nil {
-		return c.connectErr
-	}
-	return c.fakeBMC.Connect(ctx)
-}
-
-func (c *closeRecorder) Close(ctx context.Context) error {
-	deadline, ok := ctx.Deadline()
-	c.closeCalls = append(c.closeCalls, closeCall{
-		hasDeadline: ok,
-		remaining:   time.Until(deadline),
-		err:         ctx.Err(),
-	})
-	return ctx.Err()
 }

@@ -13,8 +13,8 @@ import (
 )
 
 const (
-	// defaultUpdateEvery is also the minimum update_every.
 	defaultUpdateEvery = 5
+	minUpdateEvery     = 5
 	defaultTimeout     = 5 * time.Second
 
 	// driverOpen is local Linux OpenIPMI, the only driver of this experimental build.
@@ -39,8 +39,8 @@ func defaultConfig() Config {
 }
 
 func (c Config) validate() error {
-	if c.UpdateEvery < defaultUpdateEvery {
-		return fmt.Errorf("update_every must be at least %d seconds", defaultUpdateEvery)
+	if c.UpdateEvery < minUpdateEvery {
+		return fmt.Errorf("update_every must be at least %d seconds", minUpdateEvery)
 	}
 	if c.Timeout <= 0 {
 		return errors.New("timeout must be positive")

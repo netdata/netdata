@@ -93,14 +93,14 @@ func TestCollector_Lifecycle(t *testing.T) {
 	points, err := collecttest.CollectScalarSeries(c, metrix.ReadFlatten())
 	require.NoError(t, err)
 	assert.True(t, reader.collectSEL)
-	assert.Equal(t, wantSeries(reader.snapshot), points)
+	assert.Equal(t, wantSeries(t, reader.snapshot), points)
 	collecttest.AssertChartCoverage(t, c, collecttest.ChartCoverageExpectation{})
 	assert.Equal(t, 200, c.funcRouter.Handle(t.Context(), "sensors", funcapi.ResolvedParams{}).Status)
 
 	c.Cleanup(t.Context())
 	assert.Equal(t, 1, reader.closes)
 	assert.Nil(t, c.snapshot.Load(), "Cleanup unpublishes the Function snapshot")
-	c.Cleanup(t.Context())
+	assert.NotPanics(t, func() { c.Cleanup(t.Context()) }, "Cleanup is idempotent")
 }
 
 func TestCollector_Cleanup_BeforeInit(t *testing.T) {
@@ -119,7 +119,7 @@ func TestCollector_Collect_MissingData(t *testing.T) {
 	points, err := collecttest.CollectScalarSeries(c, metrix.ReadFlatten())
 	require.NoError(t, err)
 	assert.False(t, reader.collectSEL)
-	assert.Equal(t, wantSeries(reader.snapshot), points, "unavailable readings and SEL leave gaps")
+	assert.Equal(t, wantSeries(t, reader.snapshot), points, "unavailable readings and SEL leave gaps")
 }
 
 func TestCollector_Collect_FailureAndRecovery(t *testing.T) {
@@ -327,19 +327,19 @@ func healthySnapshot() *bmc.Snapshot {
 	return s
 }
 
-// wantSeries derives the expected flattened series of a snapshot from the
-// public metric names: a state set per sensor, a reading per available value
-// and the SEL count.
-func wantSeries(s *bmc.Snapshot) map[string]metrix.SampleValue {
-	metricOfUnit := map[string]string{
-		bmc.UnitCelsius:    "temperature_c",
-		bmc.UnitFahrenheit: "temperature_f",
-		bmc.UnitVolts:      "voltage",
-		bmc.UnitAmps:       "ampere",
-		bmc.UnitRPM:        "fan_speed",
-		bmc.UnitWatts:      "power",
-		bmc.UnitPercent:    "reading_percent",
+// wantSeries derives the expected flattened series of a snapshot: a state
+// set per sensor, a reading per available value and the SEL count. A reading
+// belongs to the chart template's metric whose chart has the sensor's unit.
+func wantSeries(t *testing.T, s *bmc.Snapshot) map[string]metrix.SampleValue {
+	t.Helper()
+	charts, err := collecttest.ChartTemplateCharts(chartTemplateYAML)
+	require.NoError(t, err)
+	metricOfUnit := make(map[string]string)
+	for _, chart := range charts {
+		require.Len(t, chart.Dimensions, 1, chart.ID)
+		metricOfUnit[chart.Units] = chart.Dimensions[0].Selector
 	}
+
 	want := make(map[string]metrix.SampleValue)
 	for _, sensor := range s.Sensors {
 		labels := map[string]string{
@@ -358,7 +358,9 @@ func wantSeries(s *bmc.Snapshot) map[string]metrix.SampleValue {
 			want[seriesKey("sensor_state", stateLabels)] = active
 		}
 		if sensor.Value != nil {
-			want[seriesKey(metricOfUnit[sensor.Unit], labels)] = *sensor.Value
+			metric, ok := metricOfUnit[sensor.Unit]
+			require.True(t, ok, "no chart for unit %q", sensor.Unit)
+			want[seriesKey(metric, labels)] = *sensor.Value
 		}
 	}
 	if s.SELEntries != nil {

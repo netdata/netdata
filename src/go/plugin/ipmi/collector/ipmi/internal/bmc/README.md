@@ -24,12 +24,11 @@ offset.
 
 A disabled scanner or unavailable reading produces unknown state and no numeric sample. A missing status byte produces
 unknown state even when the independent numeric reading is valid. Completion-code errors for individual sensors leave
-healthy sensors collectable. Inventory/transport failures and caller cancellation fail collection and close the
-connection. All cleanup contexts use a fixed two-second deadline and retain the caller's cancellation or earlier
-deadline, independently of the configured command timeout. Local cleanup closes the device descriptor without sending
-another IPMI command. Optional SEL failures omit its sample; no previous value or zero substitute is returned. Each
-requested SEL collection performs a real, single `Get SEL Info` command rather than rereading the log. Warnings are
-counts in four fixed categories, never an unbounded list of records.
+healthy sensors collectable. Inventory failures, other sensor command failures and caller cancellation fail collection
+and close the connection. Closing the device closes its descriptor with the caller's context; it sends no IPMI command
+and does not depend on the configured command timeout. Optional SEL failures omit its sample; no previous value or zero
+substitute is returned. Each requested SEL collection performs a real, single `Get SEL Info` command rather than
+rereading the log. Warnings are counts in four fixed categories, never an unbounded list of records.
 
 Supported numeric units are Celsius, Fahrenheit, volts, amps, RPM, watts, and unitless percentages. Other unit
 combinations retain status but omit numeric samples. Signed readings and standard linearizations are supported.

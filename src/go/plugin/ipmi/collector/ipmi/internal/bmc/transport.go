@@ -11,10 +11,6 @@ import (
 	"github.com/bougou/go-ipmi/pkg/types"
 )
 
-// cleanupTimeout bounds closing the device independently of the configured
-// command timeout. Closing a local device sends no IPMI command.
-const cleanupTimeout = 2 * time.Second
-
 // transport is the command/response boundary. Tests replace it below wire
 // decoding, so responses still go through the SDK's Unpack.
 type transport interface {
@@ -59,6 +55,7 @@ func (t *openTransport) Exchange(ctx context.Context, req types.Request, res typ
 	return t.sdk.Exchange(ctx, req, res)
 }
 
+// Close closes the device descriptor. It sends no IPMI command and the SDK ignores ctx.
 func (t *openTransport) Close(ctx context.Context) error {
 	return t.sdk.Close(ctx)
 }
@@ -77,12 +74,4 @@ func receiveTimeout(ctx context.Context, configured time.Duration) (time.Duratio
 		return 0, context.DeadlineExceeded
 	}
 	return min(configured, remaining), nil
-}
-
-// closeTransport closes t within cleanupTimeout, still honoring the caller's
-// cancellation or an earlier deadline.
-func closeTransport(ctx context.Context, t transport) error {
-	ctx, cancel := context.WithTimeout(ctx, cleanupTimeout)
-	defer cancel()
-	return t.Close(ctx)
 }

@@ -7,7 +7,7 @@ import "fmt"
 // collectionWarnings counts partially collected data in fixed categories, so a
 // large SDR repository cannot flood the logs.
 type collectionWarnings struct {
-	unsupported    int // records with unsupported ownership, sharing or ID encoding
+	unsupported    int // sensors whose record has unsupported ownership, sharing or ID encoding
 	reading        int // unavailable or incomplete readings
 	conversion     int // unsupported units or conversions, and invalid results
 	selUnavailable bool
@@ -19,7 +19,7 @@ func (w collectionWarnings) messages() []string {
 	if w.unsupported > 0 {
 		out = append(
 			out,
-			fmt.Sprintf("%d sensor records have unsupported ownership, sharing, or ID encoding", w.unsupported),
+			fmt.Sprintf("%d sensors have unsupported ownership, sharing, or ID encoding", w.unsupported),
 		)
 	}
 	if w.reading > 0 {

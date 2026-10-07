@@ -13,8 +13,8 @@ import (
 )
 
 func TestReader_InventoryCache(t *testing.T) {
-	bmc := newFakeBMC()
-	r := newTestReader(bmc)
+	fake := newFakeBMC()
+	r := newTestReader(fake)
 	now := testNow
 	r.now = func() time.Time { return now }
 
@@ -22,30 +22,30 @@ func TestReader_InventoryCache(t *testing.T) {
 		_, err := r.Collect(t.Context(), false)
 		require.NoError(t, err)
 	}
-	assert.Len(t, bmc.sdrRequests(), 2, "an unchanged repository is discovered once")
+	assert.Len(t, fake.sdrRequests(), 2, "an unchanged repository is discovered once")
 
 	// The sentinel timestamps never change; the maximum age still picks up a renamed sensor.
-	bmc.records[0] = fullRecord(1, 10, "New Name")
+	fake.records[0] = fullRecord(1, 10, "New Name")
 	now = now.Add(inventoryMaxAge)
 	got, err := r.Collect(t.Context(), false)
 	require.NoError(t, err)
 	assert.Equal(t, "New Name", got.Sensors[0].Name)
-	assert.Len(t, bmc.sdrRequests(), 4)
+	assert.Len(t, fake.sdrRequests(), 4)
 
 	// A repository change is discovered immediately.
-	bmc.additionTime = 123
-	bmc.records = bmc.records[:1]
+	fake.additionTime = 123
+	fake.records = fake.records[:1]
 	got, err = r.Collect(t.Context(), false)
 	require.NoError(t, err)
 	assert.Len(t, got.Sensors, 1)
-	assert.Len(t, bmc.sdrRequests(), 5)
+	assert.Len(t, fake.sdrRequests(), 5)
 }
 
 func TestReader_InventoryEmpty(t *testing.T) {
-	bmc := newFakeBMC()
-	bmc.records = nil
+	fake := newFakeBMC()
+	fake.records = nil
 
-	got, err := newTestReader(bmc).Collect(t.Context(), true)
+	got, err := newTestReader(fake).Collect(t.Context(), true)
 	require.NoError(t, err)
 	assert.Equal(t, &Snapshot{
 		Sensors:     []Sensor{},
@@ -75,7 +75,7 @@ func TestReader_InventoryRejected(t *testing.T) {
 			prepare: func(b *fakeBMC) {
 				b.onExchange = func(req types.Request) error {
 					if q, ok := req.(*storage.GetSDRRequest); ok {
-						q.RecordID = firstRecordID
+						q.RecordID = 0x0000
 					}
 					return nil
 				}
@@ -85,10 +85,10 @@ func TestReader_InventoryRejected(t *testing.T) {
 
 	for name, tc := range tests {
 		t.Run(name, func(t *testing.T) {
-			bmc := newFakeBMC()
-			tc.prepare(bmc)
+			fake := newFakeBMC()
+			tc.prepare(fake)
 
-			got, err := newTestReader(bmc).Collect(t.Context(), false)
+			got, err := newTestReader(fake).Collect(t.Context(), false)
 			require.Error(t, err)
 			assert.Nil(t, got, "no snapshot from an inconsistent inventory")
 		})
@@ -96,10 +96,10 @@ func TestReader_InventoryRejected(t *testing.T) {
 }
 
 func TestReader_PartialRecordReads(t *testing.T) {
-	bmc := newFakeBMC()
-	bmc.refuseWholeReads = true
+	fake := newFakeBMC()
+	fake.refuseWholeReads = true
 
-	got, err := newTestReader(bmc).Collect(t.Context(), false)
+	got, err := newTestReader(fake).Collect(t.Context(), false)
 	require.NoError(t, err)
 	assert.Equal(t, &Snapshot{
 		Sensors:     []Sensor{wantCPUTemp(StateNominal, new(25.0)), wantCPUPresence(StateNominal)},
@@ -112,21 +112,21 @@ func TestReader_PartialRecordReadsMaximumRecord(t *testing.T) {
 	record := make([]byte, types.SDRRecordHeaderSize+255)
 	record[2] = 0x51 // SDR version
 	record[3] = 0xc0 // OEM record type
-	record[recordLengthOffset] = 255
-	bmc := newFakeBMC()
-	bmc.records = [][]byte{record}
-	bmc.refuseWholeReads = true
+	record[4] = 255  // record body length
+	fake := newFakeBMC()
+	fake.records = [][]byte{record}
+	fake.refuseWholeReads = true
 
-	got, err := newTestReader(bmc).Collect(t.Context(), false)
+	got, err := newTestReader(fake).Collect(t.Context(), false)
 	require.NoError(t, err)
 	assert.Empty(t, got.Sensors, "an OEM record is not a sensor")
 
-	requests := bmc.sdrRequests()
+	requests := fake.sdrRequests()
 	require.NotEmpty(t, requests)
 	assert.Equal(t, &storage.GetSDRRequest{
 		ReservationID: 1,
-		RecordID:      firstRecordID,
-		ReadOffset:    maxReadOffset,
+		RecordID:      0x0000,
+		ReadOffset:    0xff,
 		ReadBytes:     5,
 	}, requests[len(requests)-1], "the last chunk starts at the last addressable offset")
 }

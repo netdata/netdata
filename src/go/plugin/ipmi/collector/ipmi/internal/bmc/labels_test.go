@@ -81,6 +81,18 @@ func TestSensorTypeAndComponent(t *testing.T) {
 			wantType:      "Power Supply",
 			wantComponent: "Power Supply",
 		},
+		"OEM sensor type": {
+			sensorType:    0xc0,
+			name:          "vendor sensor",
+			wantType:      "OEM",
+			wantComponent: "Other",
+		},
+		"unrecognized sensor type": {
+			sensorType:    0x2d,
+			name:          "future sensor",
+			wantType:      "Unrecognized",
+			wantComponent: "Other",
+		},
 		"memory type overrides name": {
 			sensorType:    0x0c,
 			name:          "DIMM",

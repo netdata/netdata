@@ -96,7 +96,6 @@ func (c *Collector) Cleanup(ctx context.Context) {
 	if c.reader == nil {
 		return
 	}
-	// The reader caps closing at a fixed budget, independent of the command timeout.
 	if err := c.reader.Close(ctx); err != nil {
 		c.Debugf("close IPMI device: %v", err)
 	}

@@ -19,6 +19,9 @@ const (
 
 const unnamedSensor = "UNNAMED"
 
+// reservedSensorNumber is not a valid sensor number.
+const reservedSensorNumber = 0xff
+
 // Compact record ID string instance modifier types.
 const (
 	modifierNumeric    = 0
@@ -175,10 +178,11 @@ func bmcOwned(owner types.GeneratorID) bool {
 	return owner.OwnerID() == types.BMC_SA && owner.ChannelNumber() == 0
 }
 
-// valid reports whether the shared sensor numbers starting at first fit in a
-// byte and the modifier type is known.
+// valid reports whether the modifier type is known and the shared sensor
+// numbers starting at first stay below the reserved sensor number.
 func (s sharing) valid(first uint8) bool {
-	return s.modifier <= modifierAlphabetic && int(first)+s.count <= 255
+	knownModifier := s.modifier == modifierNumeric || s.modifier == modifierAlphabetic
+	return knownModifier && int(first)+s.count <= reservedSensorNumber
 }
 
 // suffix returns the name suffix of the n-th shared sensor: its instance number,

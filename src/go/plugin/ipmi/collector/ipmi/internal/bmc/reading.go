@@ -114,8 +114,8 @@ func isCompletionCodeError(err error) bool {
 	return ok
 }
 
-// convertReading applies the SDR conversion formula. OEM non-linear
-// linearizations and non-finite results have no value.
+// convertReading applies the SDR conversion formula. Reserved and OEM
+// non-linear linearizations and non-finite results have no value.
 func convertReading(
 	raw uint8,
 	unit types.SensorUnit,

@@ -64,8 +64,9 @@ func (r *Reader) Check(ctx context.Context) error {
 }
 
 // Collect reads every inventory sensor and, when requested, the SEL entry
-// count. Per-sensor and SEL failures degrade only that data and are summarized
-// in Snapshot.Warnings. Inventory, transport and context failures fail the
+// count. A completion-code error or an unusable reading of one sensor, and any
+// SEL failure, degrade only that data and are summarized in Snapshot.Warnings.
+// Inventory failures, other sensor command failures and cancellation fail the
 // collection and close the device.
 func (r *Reader) Collect(ctx context.Context, collectSEL bool) (_ *Snapshot, err error) {
 	r.mu.Lock()
@@ -134,7 +135,7 @@ func (r *Reader) connect(ctx context.Context) error {
 	connectCtx, cancel := context.WithTimeout(ctx, r.cfg.Timeout)
 	defer cancel()
 	if err := conn.Connect(connectCtx); err != nil {
-		_ = closeTransport(ctx, conn)
+		_ = conn.Close(ctx)
 		if ctxErr := ctx.Err(); ctxErr != nil {
 			return ctxErr
 		}
@@ -151,7 +152,7 @@ func (r *Reader) disconnect(ctx context.Context) error {
 	if r.conn == nil {
 		return nil
 	}
-	err := closeTransport(ctx, r.conn)
+	err := r.conn.Close(ctx)
 	r.conn = nil
 	return err
 }

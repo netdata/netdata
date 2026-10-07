@@ -21,7 +21,7 @@ func (c *Collector) collect(ctx context.Context) error {
 		return err
 	}
 
-	c.metrics.write(snapshot)
+	c.writeMetrics(snapshot)
 	c.snapshot.Store(snapshot)
 	if len(snapshot.Warnings) > 0 {
 		c.Limit("ipmi:partial-collection", 1, time.Hour).Warning(strings.Join(snapshot.Warnings, "; "))

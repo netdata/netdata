@@ -18,7 +18,8 @@ const (
 	inventoryMaxAge = 5 * time.Minute
 
 	firstRecordID = 0x0000
-	lastRecordID  = 0xffff
+	// endOfChainRecordID is the next-record ID of the last record.
+	endOfChainRecordID = 0xffff
 
 	// readEntireRecord asks Get SDR for the whole record in one response.
 	readEntireRecord = 0xff
@@ -72,9 +73,9 @@ func (r *Reader) discoverSensors(ctx context.Context, repo storage.GetSDRRepoInf
 
 	var sensors []descriptor
 	seen := make(map[uint16]bool)
-	for id := uint16(firstRecordID); id != lastRecordID; {
+	for id := uint16(firstRecordID); id != endOfChainRecordID; {
 		if seen[id] {
-			return nil, fmt.Errorf("SDR chain repeats record %#04x", id)
+			return nil, fmt.Errorf("SDR chain repeats record %#06x", id)
 		}
 		seen[id] = true
 
@@ -87,7 +88,7 @@ func (r *Reader) discoverSensors(ctx context.Context, repo storage.GetSDRRepoInf
 			return nil, err
 		}
 		if len(record.RecordData) != types.SDRRecordHeaderSize+int(header.RecordLength) {
-			return nil, fmt.Errorf("SDR %#04x length does not match header", id)
+			return nil, fmt.Errorf("SDR %#06x length does not match header", id)
 		}
 		if header.RecordType == types.SDRRecordTypeFullSensor || header.RecordType == types.SDRRecordTypeCompactSensor {
 			sdr, err := types.ParseSDR(record.RecordData, record.NextRecordID)
@@ -152,7 +153,7 @@ func (r *Reader) readRecordInParts(ctx context.Context, id uint16, reservable bo
 			return nil, err
 		}
 		if len(part.RecordData) != count {
-			return nil, fmt.Errorf("short partial SDR %#04x: got %d bytes, wanted %d", id, len(part.RecordData), count)
+			return nil, fmt.Errorf("short partial SDR %#06x: got %d bytes, wanted %d", id, len(part.RecordData), count)
 		}
 		if offset > 0 && part.NextRecordID != next {
 			return nil, errors.New("SDR chain changed during partial read")
