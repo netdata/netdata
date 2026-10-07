@@ -3968,22 +3968,6 @@ if(ENABLE_PLUGIN_DEM)
     endif()
 
     add_go_target(dem-plugin ${DEM_PLUGIN_BIN} src/go cmd/demplugin)
-    # go:embed inputs must also trigger incremental CMake rebuilds.
-    add_custom_command(OUTPUT ${DEM_PLUGIN_BIN} APPEND DEPENDS
-            src/go/plugin/dem/collector/journey/charts.yaml
-            src/go/plugin/dem/collector/journey/config_schema.json
-            src/go/plugin/dem/collector/lighthouse/charts.yaml
-            src/go/plugin/dem/collector/lighthouse/config_schema.json
-            src/go/plugin/dem/collector/receiver/charts.yaml
-            src/go/plugin/dem/collector/receiver/config_schema.json
-            src/go/plugin/dem/collector/rum/charts.yaml
-            src/go/plugin/dem/collector/rum/config_schema.json
-            src/go/plugin/dem/rum/faro/assets/NOTICES.txt
-            src/go/plugin/dem/rum/faro/assets/faro-web-sdk.iife.js
-            src/go/plugin/dem/rum/faro/assets/faro-web-tracing.iife.js
-            src/go/plugin/dem/rum/faro/bootstrap.js
-            src/go/plugin/dem/rum/httpapi/demo.html
-    )
     netdata_add_deb_copyright(plugin-dem netdata-plugin-dem)
     install(PROGRAMS ${CMAKE_BINARY_DIR}/${DEM_PLUGIN_BIN}
             COMPONENT plugin-dem DESTINATION usr/libexec/netdata/plugins.d)
