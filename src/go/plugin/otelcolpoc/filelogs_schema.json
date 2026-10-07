@@ -1,0 +1,67 @@
+{
+  "jsonSchema": {
+    "title": "OpenTelemetry filelogs",
+    "type": "object",
+    "properties": {
+      "name": {
+        "type": "string",
+        "title": "Job name",
+        "description": "The name assigned to this job."
+      },
+      "service_name": {
+        "type": "string",
+        "title": "Service name",
+        "description": "The service.name resource attribute sent to Netdata.",
+        "default": "otel-orchestrator-poc",
+        "minLength": 1
+      },
+      "include": {
+        "type": "array",
+        "title": "Log files",
+        "description": "Absolute paths or glob patterns readable by the Netdata user.",
+        "items": {
+          "type": "string"
+        },
+        "minItems": 1
+      },
+      "start_at": {
+        "type": "string",
+        "title": "Initial read position",
+        "description": "Where to start for a file without a saved offset. Existing offsets take precedence.",
+        "enum": [
+          "beginning",
+          "end"
+        ],
+        "default": "end"
+      },
+      "update_every": {
+        "type": "integer",
+        "title": "Worker status interval",
+        "description": "How often to update the worker uptime chart, in seconds. Host metric collection uses its own interval.",
+        "minimum": 1,
+        "default": 1
+      }
+    },
+    "required": [
+      "service_name",
+      "include",
+      "start_at"
+    ],
+    "additionalProperties": false,
+    "$schema": "http://json-schema.org/draft-07/schema#"
+  },
+  "uiSchema": {
+    "name": {
+      "ui:widget": "hidden"
+    },
+    "update_every": {
+      "ui:widget": "hidden"
+    },
+    "start_at": {
+      "ui:widget": "radio",
+      "ui:options": {
+        "inline": true
+      }
+    }
+  }
+}
