@@ -28,6 +28,24 @@ macro(FetchContent_MakeAvailable_NoInstall name)
     endif()
 endmacro()
 
+# FetchContent_Populate_Only
+#
+# Download a declared dependency without adding its CMake project. SOURCE_SUBDIR
+# provides this behavior from CMake 3.18; older supported versions populate it
+# directly because their FetchContent_MakeAvailable has no SOURCE_SUBDIR option.
+macro(FetchContent_Populate_Only name)
+    include(FetchContent)
+
+    if(CMAKE_VERSION VERSION_LESS 3.18)
+        FetchContent_GetProperties(${name})
+        if(NOT ${name}_POPULATED)
+            FetchContent_Populate(${name})
+        endif()
+    else()
+        FetchContent_MakeAvailable(${name})
+    endif()
+endmacro()
+
 # NETDATA_PROPAGATE_TOOLCHAIN_ARGS
 #
 # Defines a set of CMake flags to be passed to CMAKE_ARGS for

@@ -126,13 +126,8 @@ if (-not $installedWixVersion) {
 }
 if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
-$wixCandidates = @()
-$wixCommand = Get-Command 'wix.exe' -ErrorAction SilentlyContinue
-if ($wixCommand) { $wixCandidates += $wixCommand.Source }
-if ($env:DOTNET_CLI_HOME) { $wixCandidates += (Join-Path $env:DOTNET_CLI_HOME '.dotnet\tools\wix.exe') }
-$wixCandidates += (Join-Path $env:USERPROFILE '.dotnet\tools\wix.exe')
-$wix = $wixCandidates | Where-Object { Test-Path -LiteralPath $_ -PathType Leaf } | Select-Object -First 1
-if (-not $wix) { throw 'WiX executable was not found in the global .NET tool locations.' }
+$wix = Resolve-WixExecutable
+if (-not $wix) { throw 'WiX executable was not found in PATH or the global .NET tool locations.' }
 
 $extensions = @(
     "WixToolset.Util.wixext/$wixVersion",

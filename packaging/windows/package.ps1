@@ -32,14 +32,8 @@ if ($legacyRuntimePaths) {
     throw "Staging tree contains legacy MSYS2 runtime files. Use a fresh BUILD_DIR before packaging: $($legacyRuntimePaths -join ', ')"
 }
 
-$wix = $env:WIX_BIN
-$wixCommand = if (-not $wix) { Get-Command wix.exe -ErrorAction SilentlyContinue }
-if (-not $wixCommand) { $wixCommand = Get-Command wix -ErrorAction SilentlyContinue }
-if (-not $wix -and -not $wixCommand) {
-    $dotnetTools = Join-Path $env:USERPROFILE '.dotnet\tools'
-    if (Test-Path (Join-Path $dotnetTools 'wix.exe')) { $wix = Join-Path $dotnetTools 'wix.exe' }
-    else { throw 'WiX v5 is not installed. Run install-dependencies.ps1 first.' }
-} elseif (-not $wix) { $wix = $wixCommand.Source }
+$wix = Resolve-WixExecutable $env:WIX_BIN
+if (-not $wix) { throw 'WiX v5 is not installed. Run install-dependencies.ps1 first.' }
 
 $wixArch = 'x64'
 if ($env:WIX_ARCH -and $env:WIX_ARCH -ine $wixArch) {

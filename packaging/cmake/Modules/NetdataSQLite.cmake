@@ -31,18 +31,23 @@ function(netdata_bundle_sqlite3)
                 # feature define alone is insufficient.
                 # Populate the source only; Netdata runs SQLite's own generator.
                 include(FetchContent)
+                include(NetdataFetchContentExtra)
+                set(_sqlite_fetch_only_options)
+                if(CMAKE_VERSION VERSION_GREATER_EQUAL 3.18)
+                        list(APPEND _sqlite_fetch_only_options SOURCE_SUBDIR _netdata_fetch_only)
+                endif()
                 if(SQLITE_USE_GIT)
                         FetchContent_Declare(netdata_sqlite_source
                                 GIT_REPOSITORY https://github.com/sqlite/sqlite.git
                                 GIT_TAG "${SQLITE_GIT_SHA}"
-                                SOURCE_SUBDIR _netdata_fetch_only)
+                                ${_sqlite_fetch_only_options})
                 else()
                         FetchContent_Declare(netdata_sqlite_source
                                 URL "https://www.sqlite.org/${SQLITE_VERSION_YEAR}/sqlite-src-${SQLITE_VERSION_NUMBER}.zip"
                                 URL_HASH "SHA256=${SQLITE_TARBALL_SHA256}"
-                                SOURCE_SUBDIR _netdata_fetch_only)
+                                ${_sqlite_fetch_only_options})
                 endif()
-                FetchContent_MakeAvailable(netdata_sqlite_source)
+                FetchContent_Populate_Only(netdata_sqlite_source)
                 set(sqlite_SOURCE_DIR "${netdata_sqlite_source_SOURCE_DIR}")
 
                 get_filename_component(_sqlite_ucrt_bin "${CMAKE_C_COMPILER}" DIRECTORY)

@@ -33,6 +33,25 @@ function Add-DirectoryToPathIfToolExists([string]$Directory, [string]$Tool) {
     return $false
 }
 
+function Resolve-WixExecutable([string]$Override) {
+    if ($Override) { return $Override }
+
+    foreach ($name in @('wix.exe', 'wix')) {
+        $command = Get-Command $name -ErrorAction SilentlyContinue | Select-Object -First 1
+        if ($command -and $command.Source) { return $command.Source }
+    }
+
+    $toolRoots = @()
+    if ($env:DOTNET_CLI_HOME) { $toolRoots += $env:DOTNET_CLI_HOME }
+    if ($env:USERPROFILE) { $toolRoots += $env:USERPROFILE }
+    foreach ($root in $toolRoots) {
+        $candidate = Join-Path (Join-Path $root '.dotnet\tools') 'wix.exe'
+        if (Test-Path -LiteralPath $candidate -PathType Leaf) { return $candidate }
+    }
+
+    return $null
+}
+
 function Initialize-WindowsBuildTools {
     $sdkRoot = Join-Path ${env:ProgramFiles(x86)} 'Windows Kits\10\bin'
     $sdkVersion = Get-LatestVersionDirectory $sdkRoot

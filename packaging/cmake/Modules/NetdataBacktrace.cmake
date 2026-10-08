@@ -12,6 +12,7 @@ function(netdata_bundle_libbacktrace)
 
         if(OS_WINDOWS)
                 include(FetchContent)
+                include(NetdataFetchContentExtra)
                 include(CheckCSourceCompiles)
                 check_c_source_compiles("#include <unwind.h>\nint main(void) { struct _Unwind_Context *c = 0; int b = 0; return (int)_Unwind_GetIPInfo(c, &b); }"
                         NETDATA_HAVE_UNWIND_GETIPINFO)
@@ -21,11 +22,15 @@ function(netdata_bundle_libbacktrace)
 
                 # Pin the native Windows build to a known upstream revision.
                 # This is source-only; Netdata builds the selected files below.
+                set(_backtrace_fetch_only_options)
+                if(CMAKE_VERSION VERSION_GREATER_EQUAL 3.18)
+                        list(APPEND _backtrace_fetch_only_options SOURCE_SUBDIR _netdata_fetch_only)
+                endif()
                 FetchContent_Declare(netdata_libbacktrace_source
                         GIT_REPOSITORY https://github.com/ianlancetaylor/libbacktrace.git
                         GIT_TAG 0b9b49cf4a2c9229fc052d6716e1528b2f23e91a
-                        SOURCE_SUBDIR _netdata_fetch_only)
-                FetchContent_MakeAvailable(netdata_libbacktrace_source)
+                        ${_backtrace_fetch_only_options})
+                FetchContent_Populate_Only(netdata_libbacktrace_source)
 
                 set(_backtrace_source "${netdata_libbacktrace_source_SOURCE_DIR}")
                 set(_backtrace_generated "${CMAKE_BINARY_DIR}/libbacktrace-generated")
