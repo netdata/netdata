@@ -2076,6 +2076,10 @@ static int rrdlabels_unittest_simple_pattern() {
     errors += rrdlabels_unittest_check_simple_pattern(labels, "tag4 tag2=x", false);
     errors += rrdlabels_unittest_check_simple_pattern(labels, "!tag1=value1 tag1", false);
     errors += rrdlabels_unittest_check_simple_pattern(labels, "!tag1=value9 tag1", true);
+    errors += rrdlabels_unittest_check_simple_pattern(labels, "tag1 !tag1=value1", false);
+    errors += rrdlabels_unittest_check_simple_pattern(labels, "tag1 !tag1=value9", true);
+    errors += rrdlabels_unittest_check_simple_pattern(labels, "!tag1:value1 tag1", false);
+    errors += rrdlabels_unittest_check_simple_pattern(labels, "tag1 !tag1:value1", false);
 
     rrdlabels_destroy(labels);
 
