@@ -209,8 +209,8 @@ stages 2 to 5, `rm` of the gitignored catalogs and the NPM side report, then `pe
 `.github/workflows/check-markdown.yml` (pull requests, path-filtered on Markdown, docs, metadata, `integrations/**`, the
 profile and ibm.d producer inputs): checks out the PR (with full history) and `netdata/learn`, installs Learn's
 hash-pinned ingest requirements plus `pip.sh`, then runs stage 0, the same runtime-output gate, stage 1, the same three
-test modules (`test_descriptions` with `LEARN_INGEST_PATH` set to Learn's ingest script), stages 2 to 5 with the dcstat
-step between 2 and 3, and finally `learn/ingest/ingest.py --local-repo netdata:... --ignore-on-prem-repo
+test modules (`test_descriptions` with `LEARN_INGEST_PATH` set to Learn's ingest script), stages 2 to 5, and finally
+`learn/ingest/ingest.py --local-repo netdata:... --ignore-on-prem-repo
 --fail-links-netdata`. It fails a PR on generation errors, test failures, or unresolved links; it does NOT compare the
 regenerated pages with the committed ones. `integrations/tests/test_collector_page_navigation.py` and `test_taxonomy.py`
 exist but no workflow runs them. What the two workflows mean for a source PR is in `consistency.md`, "Delivery
