@@ -189,7 +189,7 @@ def scan_code(code, addr):
         i1, i2, i3 = struct.unpack_from('<III', code, off)
         if is_erratum_sequence(i1, i2, i3):
             hits.append(addr + off)
-        elif end - off > 12 and not is_branch(i3):
+        elif end - off >= 16 and not is_branch(i3):
             i4, = struct.unpack_from('<I', code, off + 12)
             if is_erratum_sequence(i1, i2, i4):
                 hits.append(addr + off)

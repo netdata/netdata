@@ -99,6 +99,11 @@ class SequenceTests(unittest.TestCase):
     def test_second_instruction_overwrites_adrp_register(self):
         self.assertEqual(self.hits(0xff8, [ADRP_X12, LDR_X12_SP, LDR_X0_X12]), [])
 
+    def test_section_ending_mid_instruction(self):
+        # 13 bytes from the ADRP to the end of the code: no room for a fourth instruction, and no crash.
+        code = code_at(0xff8, [ADRP_X12, STR_X1_SP, NOP])[:0xff8 + 13]
+        self.assertEqual(check.scan_code(code, TEXT_ADDR), [])
+
     def test_final_load_uses_another_base(self):
         self.assertEqual(self.hits(0xff8, [ADRP_X12, STR_X1_SP, STR_X1_SP]), [])
 
