@@ -257,7 +257,9 @@ jobs:
           $listener = [Net.Sockets.TcpListener]::new([Net.IPAddress]::Loopback, 0)
           $listener.Start()
           $listener.LocalEndpoint.Port | Set-Content -NoNewline $PortFile
-          Start-Sleep -Seconds 30
+          # Keep the socket alive through the full support-bundle capture; CI
+          # stops this process explicitly after validating the archive.
+          Start-Sleep -Seconds 600
           $listener.Stop()
           '@ | Set-Content -Encoding UTF8 $fixtureChildScript
           @'

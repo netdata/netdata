@@ -211,7 +211,9 @@ if(OS_WINDOWS)
                                 "-DWEVT_MC_FILE=${WEVT_MC_FILE}"
                                 "-DWEVT_MAN_FILE=${WEVT_MAN_FILE}"
                                 -P "${WEVT_GENERATOR_SCRIPT}"
-                        COMMAND "${WEVT_MC_EXECUTABLE}" -v -b -U "${WEVT_MC_FILE}" "${WEVT_MAN_FILE}"
+                        COMMAND "${WEVT_MC_EXECUTABLE}" -v -b -U
+                                -h "${CMAKE_BINARY_DIR}" -r "${CMAKE_BINARY_DIR}"
+                                "${WEVT_MC_FILE}" "${WEVT_MAN_FILE}"
                         COMMAND "${CMAKE_COMMAND}" -E copy "${WEVT_MAN_FILE}" "${WEVT_MAN_COPY}"
                         COMMAND "${CMAKE_COMMAND}"
                                 "-DINPUT_RC=${WEVT_RC_FILE}"
@@ -225,6 +227,7 @@ if(OS_WINDOWS)
                                 "${CMAKE_SOURCE_DIR}/packaging/cmake/AppendManifestResource.cmake"
                         BYPRODUCTS "${WEVT_GEN_BIN_FILE}" "${WEVT_MC_FILE}" "${WEVT_MAN_COPY}"
                                    "${WEVT_RC_FILE}" "${WEVT_RESOURCE_RC}" "${WEVT_RES_FILE}"
+                        WORKING_DIRECTORY "${CMAKE_BINARY_DIR}"
                         COMMENT "Compiling ${WEVT_MC_FILE} to generate ${WEVT_MC_H_FILE} and ${WEVT_DLL_FILE}"
                 )
 
