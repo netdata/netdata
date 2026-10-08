@@ -14,7 +14,7 @@ import (
 // file. Only finalized current-schema archives from this writer lifecycle are
 // trusted without a whole-graph check. External modification is not supported.
 func (s *Store) verifyStartup(ctx context.Context) error {
-	paths, err := s.journalPaths(ctx, true)
+	paths, err := s.journalPaths(ctx)
 	if err != nil {
 		return err
 	}

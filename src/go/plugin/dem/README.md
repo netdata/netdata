@@ -46,14 +46,31 @@ contribute to summaries but stay out of timelines. Session rows sort by `last_ob
 before limiting; first/last observations and their span describe only the selected activity. A gap between observations
 does not prove continuous presence.
 
-One process-owned retention worker applies the whole-plugin `history.days` and `history.max_bytes` policy, including
-disabled sites. It removes oldest archived files by their saved-time head and committed journal bytes; it protects the active
-file. Filesystem preallocation can use more disk space than committed bytes. These are whole-file retention targets, not exact event TTLs or a hard instantaneous disk ceiling. The worker
-archives idle activity without creating an empty replacement file and applies policy changes at the next hourly sweep;
-invalid changes retain the last valid policy and produce a warning. Queued events flush every five seconds or 500 records.
+One process-owned retention worker applies one shared history budget across RUM, synthetic runs, disabled jobs and
+retained machine identities. Defaults are 30 days and 1 GiB; `history.max_bytes` must be at least 8 MiB. Accounting uses
+journal file lengths, including preallocation. Whole files expire after their latest saved record ages out; size pressure
+removes the oldest files sooner and can shorten the investigation window. High-volume RUM can evict older synthetic runs.
+New files span less than 24 hours of saved time. With normally advancing clocks and timely successful hourly maintenance,
+age alone can retain older records for approximately one extra day plus one hour. Existing files keep their actual spans.
+Query time ranges still use original observation/run time, so saved-time retention does not establish query coverage.
+
+The byte target is not a physical disk cap: active growth, allocation rounding and admitted appends can exceed it;
+open query readers can keep removed files allocated. Unsafe files and failed cleanup can leave excess until resolved.
+Hourly sweeps do not force archives; idle active files are sealed when needed for expiry. Valid policy edits apply at the
+next sweep. Invalid edits retain the last valid policy and report a warning and status error. Artifacts retain their
+separate 7-day/2-GiB policy.
+
+`dem-history-status` reports the effective policy, sampled file bytes/count, observation time, latest cleanup attempt,
+last successful cleanup, and separate inventory, cleanup, writer and policy reload errors. It is a read-only member
+Function available even with all collectors disabled, with no arguments, payload or time filters. Unknown or unattempted
+values are `null`; an inventory failure does not erase cleanup or writer facts. These facts help diagnose storage pressure
+and maintenance failures, but cannot explain whether an absent event expired, was sampled out or was never collected.
+Unusable history at startup still stops the plugin before Functions register; inspect process logs in that case.
+
+Queued events flush every five seconds or 500 records.
 Flushes sync pending appends; clean idle ticks skip sync. A crash can lose records still queued or
 not synced. Queue overflow and append failures count dropped records; sync failures produce a warning. Failed retention
-sweeps retry after five seconds. An uncertain journal mutation or sync failure makes shared history unavailable until
+sweeps retry after five seconds, independently of healthy appends. An uncertain journal mutation or sync failure makes shared history unavailable until
 restart verification; subsequent reads, writes, sync and retention fail rather than expose a partial result. RUM measurements
 and enabled exports continue independently, and synthetic current diagnosis reports history errors. This is sampled
 investigation history, not a lossless event archive.
