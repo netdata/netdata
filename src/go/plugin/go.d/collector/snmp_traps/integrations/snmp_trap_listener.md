@@ -100,7 +100,7 @@ Example conversion for a MIB module not shipped in the OOB pack:
 
 This collector is supported on all platforms.
 
-This collector supports collecting metrics from multiple instances of this integration, including remote instances.
+This collector supports collecting metrics from multiple instances of this integration.
 
 Binding to the standard SNMP trap port (UDP/162) requires elevated bind privileges on many platforms.
 On Linux, this means `CAP_NET_BIND_SERVICE` or root. Netdata packages grant this capability to `go.d.plugin` and allow it in `netdata.service`.
@@ -311,7 +311,7 @@ Configure the **snmp_traps** collector from the Netdata web interface:
 4. In the Search box, type _snmp_traps_ (or scroll the list) to locate the **snmp_traps** collector.
 5. Click the **+** next to the **snmp_traps** collector to add a new job.
 6. Fill in the job fields, then click **Test** to verify the configuration and **Submit** to save.
-    - **Test** runs the job with the provided settings and shows whether data can be collected.
+    - **Test** validates the provided settings and checks the collector's startup prerequisites. Successful validation does not guarantee that every metric will be available during collection.
     - If it fails, an error message appears with details (for example, connection refused, timeout, or command execution errors), so you can adjust and retest.
 
 

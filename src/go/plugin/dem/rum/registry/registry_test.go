@@ -10,6 +10,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/netdata/netdata/go/plugins/plugin/dem/rum/geoip"
+
 	"github.com/netdata/netdata/go/plugins/plugin/dem/rum/beacon"
 	"github.com/netdata/netdata/go/plugins/plugin/dem/rum/diagnostics"
 
@@ -49,7 +51,7 @@ func TestRetirementInterruptsNetworkBody(t *testing.T) {
 		Name:           "shop",
 		AllowedOrigins: []string{"https://example.org"},
 	}
-	state := diagnostics.New(cfg)
+	state := diagnostics.New()
 	route := httpapi.NewRoute(cfg, measurementProcessor{aggregator}, state)
 	retire, err := hub.Register("shop", &rumregistry.Site{
 		Route:       route,
@@ -143,17 +145,38 @@ func TestRetirementIsIndependentAndGenerationFenced(t *testing.T) {
 func TestReceiverAvailabilityIsGenerationFenced(t *testing.T) {
 	hub := rumregistry.New()
 	old := hub.PublishReceiver(rumregistry.Availability{
-		Serving: true,
-		Listen:  "old",
+		Serving:   true,
+		PublicURL: "https://old.example",
 	})
 	next := hub.PublishReceiver(rumregistry.Availability{
-		Serving: true,
-		Listen:  "next",
+		Serving:   true,
+		PublicURL: "https://next.example",
 	})
-	old()
-	assert.Equal(t, "next", hub.Availability().Listen)
+	next.SetGeoIP(
+		geoip.Status{
+			Selection:    "explicit",
+			State:        "loaded",
+			Source:       "explicit",
+			DatabaseType: "GeoLite2-Country",
+			LookupErrors: 3,
+		},
+	)
+	old.SetGeoIP(geoip.Status{
+		State:  "using_previous",
+		Source: "cache",
+	})
+	old.Close()
+	assert.Equal(t, "explicit", hub.Availability().GeoIP.Source)
+	assert.Equal(t, uint64(3), hub.Availability().GeoIP.LookupErrors)
+	assert.Equal(t, "https://next.example", hub.Availability().PublicURL)
 	assert.True(t, hub.Availability().Serving)
-	next()
+	next.Close()
+	next.SetGeoIP(geoip.Status{
+		State: "loaded",
+	})
+	assert.Equal(t, "unavailable", hub.Availability().GeoIP.State)
+	assert.Equal(t, "receiver_stopped", hub.Availability().GeoIP.Reason)
+	assert.Empty(t, hub.Availability().GeoIP.DatabaseType)
 	assert.False(t, hub.Availability().Serving)
-	assert.Equal(t, "next", hub.Availability().Listen)
+	assert.Equal(t, "https://next.example", hub.Availability().PublicURL)
 }

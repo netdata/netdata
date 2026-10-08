@@ -12,7 +12,7 @@ import (
 var errorsMethod = method{
 	id:      "rum-errors",
 	title:   "RUM Errors",
-	help:    "Retained errors saved in the selected range; select fingerprint for affected-session, page and browser statistics",
+	help:    "Retained errors originally received by the Agent in the selected inclusive Unix-second range; select fingerprint for affected-session, page and browser statistics",
 	sort:    "count_window",
 	every:   10,
 	history: true,
@@ -106,7 +106,7 @@ var rumErrorsColumns = map[string]any{
 	}).BuildColumn(),
 	"first_seen_age_s": (funcapi.Column{
 		Index:         6,
-		Name:          "First Seen (s ago)",
+		Name:          "First Selected Observation (s ago)",
 		Type:          funcapi.FieldTypeInteger,
 		Visualization: funcapi.FieldVisualValue,
 		Visible:       true,
@@ -114,7 +114,7 @@ var rumErrorsColumns = map[string]any{
 	}).BuildColumn(),
 	"last_seen_age_s": (funcapi.Column{
 		Index:         7,
-		Name:          "Last Seen (s ago)",
+		Name:          "Last Selected Observation (s ago)",
 		Type:          funcapi.FieldTypeInteger,
 		Visualization: funcapi.FieldVisualValue,
 		Visible:       true,

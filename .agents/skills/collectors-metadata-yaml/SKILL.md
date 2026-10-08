@@ -145,7 +145,7 @@ complete the validation and preview before committing:
 4. Empty `auto_detection`, `limits`, or `performance_impact` only where the placeholder sentence is true. A collector
    covered by a service-discovery rule, or with a cardinality cap or a metered API, fills them.
 5. No irrelevant implementation mechanics; unfamiliar operator terms defined at first use; no developer links
-   (`ARCHITECTURE.md`, source files). The test is per sentence, not per field: ask what the operator does differently
+   (`ARCHITECTURE.md`, source code). The test is per sentence, not per field: ask what the operator does differently
    for having read it. "Nothing" means it belongs to another field, to `ARCHITECTURE.md`, or nowhere — see the worked
    routing example in `overview.md` section 3. A field can pass every length and structure check and still fail this
    one, which is the failure mode that reaches production.

@@ -248,7 +248,7 @@ func (e sessionEvent) history(site, sessionID string) HistoryEvent {
 		Revision:     e.revision,
 		Site:         site,
 		SessionID:    sessionID,
-		TSUnixUS:     e.ts.UnixMicro(),
+		ObservedUS:   e.ts.UnixMicro(),
 		Type:         e.typ,
 		Page:         e.page,
 		Text:         e.text,

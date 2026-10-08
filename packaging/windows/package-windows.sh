@@ -22,9 +22,18 @@ ${GITHUB_ACTIONS+echo "::group::Installing"}
 cmake --install "${build}"
 ${GITHUB_ACTIONS+echo "::endgroup::"}
 
-if [ ! -f "/msys2-latest.tar.zst" ]; then
-    ${GITHUB_ACTIONS+echo "::group::Fetching MSYS2 files"}
-    "${repo_root}/packaging/windows/fetch-msys2-installer.py" /msys2-latest.tar.zst
+# Always run: it keeps a cached tarball that matches the pin and replaces any other.
+${GITHUB_ACTIONS+echo "::group::Fetching MSYS2 files"}
+"${repo_root}/packaging/windows/fetch-msys2-installer.py" /msys2-base.tar.zst
+${GITHUB_ACTIONS+echo "::endgroup::"}
+
+# shellcheck source=./msys2-runtime/runtime.env disable=SC1091
+. "${repo_root}/packaging/windows/msys2-runtime/runtime.env"
+msys2_runtime_dir="/msys2-runtime/${MSYS2_RUNTIME_PATCHED_COMMIT}"
+
+if [ ! -f "${msys2_runtime_dir}/msys-2.0.dll" ]; then
+    ${GITHUB_ACTIONS+echo "::group::Building patched MSYS2 runtime"}
+    "${repo_root}/packaging/windows/msys2-runtime/compile-runtime.sh" "${msys2_runtime_dir}"
     ${GITHUB_ACTIONS+echo "::endgroup::"}
 fi
 
@@ -39,10 +48,25 @@ fi
 ${GITHUB_ACTIONS+echo "::endgroup::"}
 
 ${GITHUB_ACTIONS+echo "::group::Copy Files"}
-tar -xf /msys2-latest.tar.zst -C /opt/netdata/ || exit 1
+tar -xf /msys2-base.tar.zst -C /opt/netdata/ || exit 1
 cp -R /opt/netdata/msys64/* /opt/netdata/ || exit 1
 cp "${repo_root}/packaging/windows/copy_files.ps1" /opt/netdata/usr/libexec/netdata/ || exit 1
 rm -rf /opt/netdata/msys64/
+
+check_msys2_runtime() {
+    local expected="$1" hint="$2" version
+    version="$(strings -el /opt/netdata/usr/bin/msys-2.0.dll | grep -A1 '^FileVersion$' | tail -n 1 || true)"
+    if [ "${version}" != "${expected}" ]; then
+        echo "Bundled msys-2.0.dll is '${version}', expected '${expected}'. ${hint}" >&2
+        exit 1
+    fi
+}
+
+# The override replaces the installer's runtime; if the installer pin moves to another runtime, revisit it.
+check_msys2_runtime "${MSYS2_RUNTIME_VERSION}-${MSYS2_RUNTIME_BASE_COMMIT}" \
+    "The MSYS2 installer pin no longer matches msys2-runtime/runtime.env; update or drop the runtime override."
+cp "${msys2_runtime_dir}/msys-2.0.dll" /opt/netdata/usr/bin/msys-2.0.dll || exit 1
+check_msys2_runtime "${MSYS2_RUNTIME_VERSION}-${MSYS2_RUNTIME_PATCHED_COMMIT}" "The patched runtime was not installed."
 ${GITHUB_ACTIONS+echo "::endgroup::"}
 
 ${GITHUB_ACTIONS+echo "::group::Configure Editor"}

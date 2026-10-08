@@ -158,10 +158,6 @@ sidebar:
               edit_url: https://github.com/netdata/netdata/edit/master/packaging/installer/UPDATE.md
               description: If you opted out of automatic updates, you need to update your Netdata Agent to the latest nightly or stable version.
           - meta:
-              label: Reinstall
-              edit_url: https://github.com/netdata/netdata/edit/master/packaging/installer/REINSTALL.md
-              description: Troubleshooting installation issues or force an update of the Netdata Agent by reinstalling it using the same method you used during installation.
-          - meta:
               label: Uninstall
               edit_url: https://github.com/netdata/netdata/edit/master/packaging/installer/UNINSTALL.md
               description: If you are no longer interested in using the Netdata Agent, use the self-contained uninstaller to remove all traces of binaries and configuration files.
@@ -351,9 +347,6 @@ sidebar:
               label: Configuring Metrics Centralization Points
               edit_url: https://github.com/netdata/netdata/edit/master/docs/observability-centralization-points/metrics-centralization-points/configuration.md
               description: Configure stream.conf for Netdata Children and Parents, including API keys, TLS encryption, routing, and troubleshooting.
-          - meta:
-              label: Sizing Netdata Parents
-              edit_url: https://github.com/netdata/netdata/edit/master/docs/observability-centralization-points/metrics-centralization-points/sizing-netdata-parents.md
           - meta:
               label: Clustering and High Availability of Netdata Parents
               edit_url: https://github.com/netdata/netdata/edit/master/docs/observability-centralization-points/metrics-centralization-points/clustering-and-high-availability-of-netdata-parents.md
@@ -1313,7 +1306,7 @@ sidebar:
                   edit_url: https://github.com/netdata/netdata/edit/master/src/web/api/formatters/value/README.md
           - meta:
               label: Netdata badges
-              edit_url: https://github.com/netdata/netdata/edit/master/src/web/api/badges/README.md
+              edit_url: https://github.com/netdata/netdata/edit/master/src/web/api/v1/api_v1_badge/README.md
       - meta:
           label: Dynamic Configuration
           edit_url: https://github.com/netdata/netdata/edit/master/docs/developer-and-contributor-corner/dyncfg.md
@@ -1342,7 +1335,7 @@ sidebar:
             items:
               - meta:
                   label: How to write a Netdata collector in Go
-                  edit_url: https://github.com/netdata/netdata/edit/master/src/go/plugin/go.d/docs/how-to-write-a-module.md
+                  edit_url: https://github.com/netdata/netdata/edit/master/src/go/plugin/go.d/docs/how-to-write-a-collector.md
                   description: This guide will walk you through the technical implementation of writing a new Netdata collector in Golang, with tips on interfaces, structure, configuration files, and more.
           - meta:
               label: python.d.plugin
@@ -1395,7 +1388,7 @@ sidebar:
               description: Use libnetdata clock APIs for wall-clock timestamps, monotonic elapsed time, heartbeat scheduling, sleeps, and safe time arithmetic.
           - meta:
               label: Netdata ini config files
-              edit_url: https://github.com/netdata/netdata/edit/master/src/libnetdata/config/README.md
+              edit_url: https://github.com/netdata/netdata/edit/master/src/libnetdata/inicfg/README.md
           - meta:
               label: JSON
               edit_url: https://github.com/netdata/netdata/edit/master/src/libnetdata/json/README.md
@@ -1405,12 +1398,6 @@ sidebar:
           - meta:
               label: One way allocator
               edit_url: https://github.com/netdata/netdata/edit/master/src/libnetdata/onewayalloc/README.md
-          - meta:
-              label: popen
-              edit_url: https://github.com/netdata/netdata/edit/master/src/libnetdata/popen/README.md
-          - meta:
-              label: parser
-              edit_url: https://github.com/netdata/netdata/edit/master/src/libnetdata/parser/README.md
           - meta:
               label: procfile
               edit_url: https://github.com/netdata/netdata/edit/master/src/libnetdata/procfile/README.md
@@ -1440,9 +1427,6 @@ sidebar:
               label: Dictionaries
               edit_url: https://github.com/netdata/netdata/edit/master/src/libnetdata/dictionary/README.md
           - meta:
-              label: July interface
-              edit_url: https://github.com/netdata/netdata/edit/master/src/libnetdata/july/README.md
-          - meta:
               label: Socket
               edit_url: https://github.com/netdata/netdata/edit/master/src/libnetdata/socket/README.md
               description: Use libnetdata socket APIs for connections, listeners, polling, peer details, access checks, and optional TLS transport.
@@ -1459,10 +1443,6 @@ sidebar:
           label: Import, export, and print a snapshot
           edit_url: https://github.com/netdata/netdata/edit/master/docs/dashboards-and-charts/import-export-print-snapshot.md
           description: Snapshots can be incredibly useful for diagnosing anomalies after they've already happened, and are interoperable with any other node running Netdata.
-      - meta:
-          label: Build a custom Dashboard HTML page
-          edit_url: https://github.com/netdata/netdata/edit/master/src/web/gui/custom/README.md
-          description: Build custom dashboards with key metrics from one or more nodes running the Netdata Agent and host them anywhere.
       - meta:
           label: Monitor Nginx or Apache web server log files with Netdata
           edit_url: https://github.com/netdata/netdata/edit/master/docs/developer-and-contributor-corner/collect-apache-nginx-web-logs.md
@@ -1488,15 +1468,9 @@ sidebar:
               edit_url: https://github.com/netdata/netdata/edit/master/packaging/installer/methods/source.md
               description: Package maintainers and power users may be interested in manually building Netdata from source without using any of our installation scripts.
           - meta:
-              label: External build-system
-              edit_url: https://github.com/netdata/netdata/edit/master/build_external/README.md
-          - meta:
               label: How to build native (DEB/RPM) packages locally for testing
               edit_url: https://github.com/netdata/netdata/edit/master/packaging/building-native-packages-locally.md
               description: Instructions for developers who need to build native packages locally for testing.
-          - meta:
-              label: Netdata contrib
-              edit_url: https://github.com/netdata/netdata/edit/master/contrib/README.md
       - meta:
           label: Install the Netdata Agent from a Git checkout
           edit_url: https://github.com/netdata/netdata/edit/master/packaging/installer/methods/manual.md

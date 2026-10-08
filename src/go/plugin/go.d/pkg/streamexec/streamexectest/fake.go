@@ -5,8 +5,9 @@
 // Package streamexectest provides a fake streaming command for tests of streamexec consumers.
 //
 // The test binary doubles as the fake: a test package calls RunIfFake first in TestMain, and a consumer under test
-// starts Fake.Binary through ndexec. Each started fake connects back to the test over a Unix socket, reports its
-// arguments, and then prints, spawns or exits as the test instructs. The fake knows nothing about the consumer.
+// starts Fake.Binary through ndexec's nd-run route, or any ndsudo command through its ndsudo route. Each started fake
+// connects back to the test over a Unix socket, reports its arguments, and then prints, spawns or exits as the test
+// instructs. The fake knows nothing about the consumer.
 //
 // A fake's connection closes only when its process exits, so end of connection means the process has gone.
 package streamexectest
@@ -19,6 +20,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strings"
 	"syscall"
 	"testing"
 	"time"
@@ -118,9 +120,9 @@ type Fake struct {
 	listener *net.UnixListener
 }
 
-// NewFake prepares the test binary to act as the fake and routes ndexec's unprivileged starts through a
-// pass-through nd-run for the rest of the test. It sets process-wide state, so tests using it MUST NOT run in
-// parallel.
+// NewFake prepares the test binary to act as the fake for the rest of the test. It routes ndexec's unprivileged starts
+// through a pass-through nd-run, and its ndsudo starts to the fake with the ndsudo command and its arguments as the
+// fake's arguments. It sets process-wide state, so tests using it MUST NOT run in parallel.
 func NewFake(t *testing.T) *Fake {
 	t.Helper()
 	// Unix socket names must fit the platform's sockaddr_un path limit, which t.TempDir paths can exceed.
@@ -136,12 +138,16 @@ func NewFake(t *testing.T) *Fake {
 	t.Cleanup(func() { _ = listener.Close() })
 	t.Setenv(socketEnv, socket)
 
-	wrapper := filepath.Join(dir, "nd-run")
-	require.NoError(t, os.WriteFile(wrapper, []byte("#!/bin/sh\nexec \"$@\"\n"), 0700))
-	t.Cleanup(ndexec.SetRunnerPathsForTests(wrapper, ""))
-
 	binary, err := os.Executable()
 	require.NoError(t, err)
+
+	ndRun := filepath.Join(dir, "nd-run")
+	require.NoError(t, os.WriteFile(ndRun, []byte("#!/bin/sh\nexec \"$@\"\n"), 0700))
+	ndSudo := filepath.Join(dir, "ndsudo")
+	script := fmt.Sprintf("#!/bin/sh\nexec '%s' \"$@\"\n", strings.ReplaceAll(binary, "'", `'\''`))
+	require.NoError(t, os.WriteFile(ndSudo, []byte(script), 0700))
+	t.Cleanup(ndexec.SetRunnerPathsForTests(ndRun, ndSudo))
+
 	return &Fake{
 		Binary:   binary,
 		listener: listener,
@@ -165,6 +171,18 @@ func (f *Fake) Accept(t *testing.T) *Conn {
 		Child: h.Child,
 		conn:  conn,
 	}
+}
+
+// RequireNoStart requires that no fake starts within d.
+func (f *Fake) RequireNoStart(t *testing.T, d time.Duration) {
+	t.Helper()
+	require.NoError(t, f.listener.SetDeadline(time.Now().Add(d)))
+	conn, err := f.listener.Accept()
+	if err == nil {
+		_ = conn.Close()
+		t.Fatal("a fake started")
+	}
+	require.ErrorIs(t, err, os.ErrDeadlineExceeded)
 }
 
 // Conn controls one running fake.
@@ -227,6 +245,14 @@ func (c *Conn) RequireExited(t *testing.T) {
 func (c *Conn) WaitExited(t *testing.T) {
 	t.Helper()
 	c.requireEOF(t, waitTimeout)
+}
+
+// RequireRunning requires the fake not to have exited.
+func (c *Conn) RequireRunning(t *testing.T) {
+	t.Helper()
+	require.NoError(t, c.conn.SetReadDeadline(time.Now().Add(exitedNow)))
+	_, err := c.conn.Read(make([]byte, 1))
+	require.ErrorIs(t, err, os.ErrDeadlineExceeded)
 }
 
 func (c *Conn) requireEOF(t *testing.T, timeout time.Duration) {

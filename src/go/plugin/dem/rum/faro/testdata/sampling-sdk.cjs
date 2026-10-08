@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// Faro 2.11.0 from the pinned jsDelivr URL used by bootstrap.go. We use the
+// Faro 2.11.0 from the shipped, checksum-pinned browser bundle. We use the
 // actual SDK initialization, SessionInstrumentation and transport filtering.
 // Browser APIs are synthetic; configured instrumentations, metadata and
 // transport hooks are the unchanged SDK implementations.
@@ -7,7 +7,7 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const vm = require('node:vm');
 const crypto = require('node:crypto');
-const bundle = fs.readFileSync(process.env.FARO_SDK_BUNDLE);
+const bundle = fs.readFileSync(require('node:path').join(__dirname, '../assets/faro-web-sdk.iife.js'));
 assert.equal(crypto.createHash('sha256').update(bundle).digest('hex'),
   'd7be021a7344131c89c02cf5b39aa9825c21cf17482bc1cd47e23cd7023ce118');
 const bootstraps = JSON.parse(fs.readFileSync(0, 'utf8'));
@@ -55,12 +55,13 @@ function run({ rate, random = 0.8, savedStorage = storage(), bootstrap, bot = fa
   advanceTime(0);
   context.window = context;
   context.document = {
-    location: context.location, currentScript: null, readyState: 'complete',
+    location: context.location, currentScript: { src: 'https://rum.example.org/rum/shop.js', getAttribute() { return null; } }, readyState: 'complete',
     cookie: '', visibilityState: 'visible',
     addEventListener() { listeners++; }, removeEventListener() {},
     createElement() { return {}; },
     head: { appendChild(script) { loads++; loadSDK(); script.onload(); } },
   };
+  require('./script-context.cjs')(context);
   vm.createContext(context);
   let faro;
   function loadSDK() {

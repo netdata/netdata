@@ -4,7 +4,6 @@ package faro
 
 import (
 	"encoding/json"
-	"os"
 	"os/exec"
 	"strings"
 	"testing"
@@ -15,11 +14,11 @@ import (
 )
 
 func TestPinnedSDKDocumentIdentity(t *testing.T) {
-	if os.Getenv("FARO_SDK_BUNDLE") == "" {
-		t.Skip("set FARO_SDK_BUNDLE to the pinned SDK IIFE")
-	}
+	requireNode(t)
 	cmd := exec.Command("node", "testdata/identity-sdk.cjs")
-	cmd.Stdin = strings.NewReader(Bootstrap("shop", "https://rum.example.org", BootstrapOptions{MeasureRate: 1}))
+	cmd.Stdin = strings.NewReader(Bootstrap("shop", BootstrapOptions{
+		MeasureRate: 1,
+	}))
 	raw, err := cmd.Output()
 	if exit, ok := err.(*exec.ExitError); ok {
 		t.Log(string(exit.Stderr))
@@ -29,7 +28,9 @@ func TestPinnedSDKDocumentIdentity(t *testing.T) {
 	require.NoError(t, json.Unmarshal(raw, &bodies))
 	var documents, views int
 	for _, body := range bodies {
-		b, err := Decode(body, Options{Now: now})
+		b, err := Decode(body, Options{
+			Now: now,
+		})
 		require.NoError(t, err)
 		assert.NotEmpty(t, b.ExperienceID)
 		assert.Equal(t, "/entry", b.PageGroup)
@@ -88,7 +89,9 @@ func TestObservationIdentityNormalization(t *testing.T) {
 				"events":       []any{map[string]any{"name": "document_activated", "attributes": map[string]string{"observation_id": tc.id, "observation_sequence": tc.revision}}},
 			})
 			require.NoError(t, err)
-			b, err := Decode(raw, Options{Now: now})
+			b, err := Decode(raw, Options{
+				Now: now,
+			})
 			require.NoError(t, err)
 			require.Len(t, b.Vitals, 1)
 			require.Len(t, b.Events, 1)
@@ -112,9 +115,15 @@ func TestDurationPresenceAndNavigationRevision(t *testing.T) {
   {"name":"faro.performance.navigation","attributes":{"pageLoadTime":"99","observation_sequence":"2"}},
   {"name":"faro.performance.resource","attributes":{"duration":"0","observation_id":"resource-1"}},
   {"name":"faro.performance.resource","attributes":{"httpHost":"example.org","observation_id":"resource-2"}},
-  {"name":"session_start"},{"name":"session_resume"},{"name":"session_extend"}]}`), Options{Now: now})
+  {"name":"session_start"},{"name":"session_resume"},{"name":"session_extend"}]}`), Options{
+		Now: now,
+	})
 	require.NoError(t, err)
-	assert.Equal(t, &beacon.Navigation{Revision: 3, HasLoad: true, HasDCL: true}, b.Navigation)
+	assert.Equal(t, &beacon.Navigation{
+		Revision: 3,
+		HasLoad:  true,
+		HasDCL:   true,
+	}, b.Navigation)
 	require.Len(t, b.Resources, 2)
 	assert.True(t, b.Resources[0].HasDuration)
 	assert.False(t, b.Resources[1].HasDuration)
@@ -125,11 +134,12 @@ func TestDurationPresenceAndNavigationRevision(t *testing.T) {
 }
 
 func TestPinnedSDKBotTransportURLExclusion(t *testing.T) {
-	if os.Getenv("FARO_SDK_BUNDLE") == "" {
-		t.Skip("set FARO_SDK_BUNDLE to the pinned SDK IIFE")
-	}
+	requireNode(t)
 	cmd := exec.Command("node", "testdata/identity-sdk.cjs", "bot")
-	cmd.Stdin = strings.NewReader(Bootstrap("shop", "https://rum.example.org", BootstrapOptions{MeasureRate: 1, IncludeBots: true}))
+	cmd.Stdin = strings.NewReader(Bootstrap("shop", BootstrapOptions{
+		MeasureRate: 1,
+		IncludeBots: true,
+	}))
 	_, err := cmd.Output()
 	if exit, ok := err.(*exec.ExitError); ok {
 		t.Log(string(exit.Stderr))

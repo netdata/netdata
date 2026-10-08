@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"github.com/netdata/netdata/go/plugins/plugin/dem/rum/aggregate"
+	"github.com/netdata/netdata/go/plugins/plugin/dem/rum/geoip"
 	"github.com/netdata/netdata/go/plugins/plugin/dem/rum/history"
 )
 
@@ -12,18 +13,20 @@ import (
 type Receiver struct {
 	Serving   bool
 	PublicURL string
+	GeoIP     geoip.Status
 }
 
 // Site contains only the copied observations needed to investigate one site.
 type Site struct {
-	Name, Label    string
-	AllowedOrigins []string
-	Sampling       Sampling
-	Capture        Capture
-	Activity       Activity
-	Reach, Snippet Diagnostic
-	Rejected       Rejection
-	PublicBase     string
+	Name, Label       string
+	AllowedOrigins    []string
+	Sampling          Sampling
+	Capture           Capture
+	Activity          Activity
+	Generation        string
+	CollectionEnabled bool
+	Rejected          Rejection
+	ScriptURL         string
 }
 type Capture struct {
 	Geolocation        string
@@ -33,7 +36,6 @@ type Sampling struct {
 	MeasureRate, InvestigateRate float64
 	KeepErrors, KeepPoorVitals   bool
 }
-type Diagnostic struct{ State, Detail string }
 type Rejection struct {
 	Origin string
 	At     time.Time

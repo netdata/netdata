@@ -42,7 +42,7 @@ func (h *Handler) run(ctx context.Context, args map[string]string, response map[
 var runMethod = method{
 	id:     "synthetics-run",
 	title:  "Synthetic run detail",
-	help:   "One retained or latest active attempt with original test phases, errors, counts, nullable lab measurements and bounded reporter events. Missing completion means no verified terminal observation.",
+	help:   "One retained or latest active attempt, independent of picker bounds, with original test phases, errors, counts, nullable lab measurements and bounded reporter events. Missing completion means no verified terminal observation.",
 	sort:   "at_ms",
 	params: []string{"job_id", "run_id"},
 	columns: columns(

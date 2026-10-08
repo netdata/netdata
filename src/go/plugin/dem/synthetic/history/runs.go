@@ -12,8 +12,9 @@ import (
 )
 
 // QueryRuns groups phases before outcome filtering. A retained start
-// without a selected completion is unknown. Queries include retired jobs.
-// Memory is O(selected runs); the SDK snapshot additionally owns entry offsets.
+// without a retained completion is unknown. Selection uses immutable run start
+// time; completion knowledge can be newer than the interval. Retired jobs remain
+// queryable. Memory is O(selected runs), with bounded SDK traversal buffers.
 func (s *Store) QueryRuns(ctx context.Context, f RunFilter) (RunPage, error) {
 	runs := make(map[string]synthetic.Run)
 	err := s.scanSynthetic(ctx, f, "", func(phase string, r synthetic.Run) {

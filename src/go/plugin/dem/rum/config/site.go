@@ -10,9 +10,8 @@ type Site struct {
 	AllowedOrigins []string `yaml:"allowed_origins"               json:"allowed_origins"`
 	PageGroups     int      `yaml:"page_groups"                   json:"page_groups"` // top-N page groups kept as instances (1..100)
 	Countries      int      `yaml:"countries"                     json:"countries"`   // top-N countries (1..100)
-	// PublicURL is the externally reachable collector base (reverse
-	// proxy/TLS) used in the setup snippet; "" derives one
-	// from the receiver listener and diagnostic observations.
+	// PublicURL overrides the receiver public base for install instructions.
+	// Neither configured means no generated snippet; runtime admission is independent.
 	PublicURL string `yaml:"public_url,omitempty"          json:"public_url"`
 	// MeasureSampleRate is the browser collection share. Nil defaults to one;
 	// zero disables collection, including traffic from previously sampled browsers.

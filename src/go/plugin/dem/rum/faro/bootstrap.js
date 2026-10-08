@@ -1,8 +1,11 @@
-(function (k, base, opt) {
+(function (k, opt) {
   // data-version/data-env on our OWN <script> tag become
   // Faro app.version/app.environment; currentScript must be read
   // synchronously, before anything yields, or it stops pointing here.
-  var cs = document.currentScript;
+  // Named HTML elements can shadow document.currentScript. Read the native
+  // getter so only the executing script supplies URLs, attributes and nonce.
+  var cs;
+  try { cs = Object.getOwnPropertyDescriptor(Document.prototype, 'currentScript').get.call(document); } catch (e) {}
   var entryURL = location.href;
   var ver = (cs && cs.getAttribute('data-version')) || '';
   var env = (cs && cs.getAttribute('data-env')) || '';
@@ -28,15 +31,44 @@
   var bot = false;
   try { bot = navigator.webdriver === true || new RegExp(opt.bots, 'i').test(navigator.userAgent || ''); } catch (e) {}
   if (bot && !opt.includeBots) { return; }
-  // Pinned Faro web SDK and tracing add-on (Apache-2.0), from the public CDN.
-  var cdn = '__SDK_ORIGIN__/npm/@grafana/';
-  function load(name, next, failed) {
-    var s = document.createElement('script');
-    s.async = true;
-    s.src = cdn + name + '@__VERSION__/dist/bundle/' + name + '.iife.js';
-    s.onload = next;
-    if (failed) { s.onerror = failed; }
-    document.head.appendChild(s);
+  // Capture the original console method before Faro can instrument it. Messages
+  // contain no page URLs, identifiers or exception text and never throw.
+  var warn;
+  try { warn = window.console.warn.bind(window.console); } catch (e) {}
+  function diagnose(message) {
+    try { if (warn) { warn('Netdata RUM: ' + message); } } catch (e) {}
+  }
+  var scriptURL, nonce, collectorURL;
+  try {
+    if (!cs || !cs.src) { throw new Error('external script required'); }
+    scriptURL = new URL(cs.src);
+    if (!/^https?:$/.test(scriptURL.protocol) || scriptURL.username || scriptURL.password) {
+      throw new Error('invalid script URL');
+    }
+    nonce = cs.nonce;
+    // Relative resolution keeps the external proxy prefix. src is the element's
+    // requested URL, not the final URL of an HTTP redirect.
+    collectorURL = new URL(encodeURIComponent(k) + '/collect', scriptURL);
+    if (bot) { collectorURL.searchParams.set('bot', '1'); }
+    collectorURL = collectorURL.href;
+  } catch (e) {
+    diagnose('cannot determine receiver URL. Use the external script tag from RUM setup.');
+    return;
+  }
+  function load(path, next, failed, name) {
+    function failure() {
+      diagnose('cannot load ' + name + '. Check the browser Network and CSP errors for the RUM script requests.');
+      if (failed) { failed(); }
+    }
+    try {
+      var s = document.createElement('script');
+      s.async = true;
+      if (nonce) { s.nonce = nonce; }
+      s.src = new URL(path, scriptURL).href;
+      s.onload = next;
+      s.onerror = failure;
+      document.head.appendChild(s);
+    } catch (e) { failure(); }
   }
   function start() {
     try {
@@ -116,7 +148,6 @@
           }
         }));
       }
-      var collectorURL = new URL(base + '/rum/' + k + '/collect' + (bot ? '?bot=1' : ''), location.href).href;
       var collectorPattern = new RegExp('^' + collectorURL.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '$');
       // Faro treats URL strings as regex patterns and otherwise observes its
       // own ?bot=1 requests. Inherit delivery unchanged; match only this URL.
@@ -139,7 +170,7 @@
       if (user) { applyUser(); }
       activate();
       if (opt.frustrationSignals) { watchFrustration(); }
-    } catch (e) { /* never break the host page */ }
+    } catch (e) { diagnose('SDK initialization failed. Check the browser console and site script policy.'); }
   }
   function pick(source, keys) {
     var result = {};
@@ -342,7 +373,7 @@
     window.addEventListener('error', onError);
     window.addEventListener('unhandledrejection', onError);
   }
-  load('faro-web-sdk', function () {
-    if (opt.tracing) { load('faro-web-tracing', start, start); } else { start(); }
-  });
-})(__KEY__, __BASE__, __OPT__);
+  load('__SDK_PATH__', function () {
+    if (opt.tracing) { load('__TRACING_PATH__', start, start, 'the tracing SDK'); } else { start(); }
+  }, null, 'the core SDK');
+})(__KEY__, __OPT__);

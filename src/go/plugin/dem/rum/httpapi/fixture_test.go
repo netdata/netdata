@@ -46,7 +46,7 @@ func (s *fixtureServer) Update(cfg *fixtureConfig) {
 	defer s.fixture.mu.Unlock()
 	s.fixture.sites = map[string]*Route{}
 	for _, sc := range cfg.Sites {
-		s.fixture.sites[sc.Name] = NewRoute(sc, s.sink, diagnostics.New(sc))
+		s.fixture.sites[sc.Name] = NewRoute(sc, s.sink, diagnostics.New())
 	}
 }
 func (s *fixtureServer) site(k string) *site {

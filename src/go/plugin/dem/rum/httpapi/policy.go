@@ -19,9 +19,8 @@ import (
 // requests for one receiver generation. Site policy comes from each
 // request's exact routing lease; neither is read from disk per request.
 type snapshot struct {
-	trusted   []netip.Prefix
-	maxBody   int64
-	publicURL string
+	trusted []netip.Prefix
+	maxBody int64
 }
 
 type site struct {
@@ -47,8 +46,7 @@ type originRule struct {
 
 func compile(cfg *config.Receiver) *snapshot {
 	s := &snapshot{
-		maxBody:   cfg.MaxBodyBytes,
-		publicURL: strings.TrimRight(cfg.PublicURL, "/"),
+		maxBody: cfg.MaxBodyBytes,
 	}
 	for _, tp := range cfg.TrustedProxies {
 		if p, err := netip.ParsePrefix(tp); err == nil {

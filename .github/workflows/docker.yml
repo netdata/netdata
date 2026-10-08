@@ -38,14 +38,14 @@ jobs:
       - name: Checkout
         id: checkout
         if: github.event_name != 'workflow_dispatch'
-        uses: actions/checkout@v7
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           fetch-depth: 0
           submodules: recursive
       - name: Check source files
         id: check-source-files
         if: github.event_name != 'workflow_dispatch'
-        uses: step-security/changed-files@v45
+        uses: step-security/changed-files@3dbe17c78367e7d60f00d78ae6781a35be47b4a1 # v45.0.1
         with:
           since_last_remote_commit: ${{ github.event_name != 'pull_request' }}
           files: |
@@ -64,7 +64,7 @@ jobs:
       - name: Check build system files
         id: check-build-files
         if: github.event_name != 'workflow_dispatch'
-        uses: step-security/changed-files@v45
+        uses: step-security/changed-files@3dbe17c78367e7d60f00d78ae6781a35be47b4a1 # v45.0.1
         with:
           since_last_remote_commit: ${{ github.event_name != 'pull_request' }}
           files: |
@@ -91,7 +91,7 @@ jobs:
       - name: Check Docker files
         id: check-docker-files
         if: github.event_name != 'workflow_dispatch'
-        uses: step-security/changed-files@v45
+        uses: step-security/changed-files@3dbe17c78367e7d60f00d78ae6781a35be47b4a1 # v45.0.1
         with:
           since_last_remote_commit: ${{ github.event_name != 'pull_request' }}
           files: |
@@ -160,7 +160,7 @@ jobs:
     steps:
       - name: Checkout
         id: checkout
-        uses: actions/checkout@v7
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - name: Prepare tools
         id: prepare
         run: |
@@ -173,7 +173,7 @@ jobs:
           echo "Generated matrix: ${matrix}"
           echo "matrix=${matrix}" >> "${GITHUB_OUTPUT}"
       - name: Failure Notification
-        uses: rtCamp/action-slack-notify@v2
+        uses: rtCamp/action-slack-notify@33ca3be66c6f378fe1610fd1d5258632dbed5e58 # v2.4.0
         env:
           SLACK_COLOR: 'danger'
           SLACK_FOOTER: ''
@@ -212,7 +212,7 @@ jobs:
       - name: Checkout
         id: checkout
         if: needs.file-check.outputs.run == 'true'
-        uses: actions/checkout@v7
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           fetch-depth: 0
           submodules: recursive
@@ -234,11 +234,11 @@ jobs:
       - name: Setup Buildx
         id: prepare
         if: needs.file-check.outputs.run == 'true'
-        uses: docker/setup-buildx-action@v4
+        uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
       - name: Build Image
         id: build
         if: needs.file-check.outputs.run == 'true'
-        uses: docker/build-push-action@v7
+        uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
         with:
           platforms: ${{ matrix.platform }}
           tags: netdata/netdata:test
@@ -257,13 +257,13 @@ jobs:
       - name: Upload Cache
         id: upload-cache
         if: github.repository == 'netdata/netdata' && needs.file-check.outputs.run == 'true' && github.event_name == 'workflow_dispatch'
-        uses: actions/upload-artifact@v7.0.1
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: cache-${{ steps.artifact-name.outputs.platform }}
           path: /tmp/build-cache/*
           retention-days: 1
       - name: Failure Notification
-        uses: rtCamp/action-slack-notify@v2
+        uses: rtCamp/action-slack-notify@33ca3be66c6f378fe1610fd1d5258632dbed5e58 # v2.4.0
         env:
           SLACK_COLOR: 'danger'
           SLACK_FOOTER: ''
@@ -306,7 +306,7 @@ jobs:
     steps:
       - name: Checkout
         id: checkout
-        uses: actions/checkout@v7
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - name: Generate Tags
         id: tag
         run: |
@@ -329,7 +329,7 @@ jobs:
     steps:
       - name: Checkout
         id: checkout
-        uses: actions/checkout@v7
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           fetch-depth: 0
           submodules: recursive
@@ -338,7 +338,7 @@ jobs:
         run: echo "platform=$(echo ${{ matrix.platform }} | tr '/' '-' | cut -f 2- -d '-')" >> "${GITHUB_OUTPUT}"
       - name: Download Cache
         id: fetch-cache
-        uses: actions/download-artifact@v8
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
           name: cache-${{ steps.artifact-name.outputs.platform }}
           path: /tmp/build-cache
@@ -349,20 +349,20 @@ jobs:
       - name: Setup QEMU
         id: qemu
         if: matrix.qemu
-        uses: docker/setup-qemu-action@v4
+        uses: docker/setup-qemu-action@99012661954931238ded8c8b007157a8430204e1 # v4.4.0
       - name: Setup Buildx
         id: prepare
-        uses: docker/setup-buildx-action@v4
+        uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
       - name: Registry Login
         id: login
         if: github.repository == 'netdata/netdata'
-        uses: docker/login-action@v4
+        uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4.6.0
         with:
           username: ${{ secrets.DOCKER_HUB_USERNAME }}
           password: ${{ secrets.DOCKER_HUB_PASSWORD }}
       - name: Build Image
         id: build
-        uses: docker/build-push-action@v7
+        uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
         with:
           platforms: ${{ matrix.platform }}
           cache-from: type=local,src=/tmp/build-cache
@@ -382,14 +382,14 @@ jobs:
       - name: Upload digest
         id: upload-digest
         if: github.repository == 'netdata/netdata'
-        uses: actions/upload-artifact@v7.0.1
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: docker-digests-${{ steps.artifact-name.outputs.platform }}
           path: /tmp/digests/*
           if-no-files-found: error
           retention-days: 1
       - name: Failure Notification
-        uses: rtCamp/action-slack-notify@v2
+        uses: rtCamp/action-slack-notify@33ca3be66c6f378fe1610fd1d5258632dbed5e58 # v2.4.0
         env:
           SLACK_COLOR: 'danger'
           SLACK_FOOTER: ''
@@ -425,21 +425,21 @@ jobs:
     steps:
       - name: Checkout
         id: checkout
-        uses: actions/checkout@v7
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - name: Download digests
         id: fetch-digests
-        uses: actions/download-artifact@v8
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
           path: /tmp/digests
           pattern: docker-digests-*
           merge-multiple: true
       - name: Setup Buildx
         id: prepare
-        uses: docker/setup-buildx-action@v4
+        uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
       - name: Registry Login
         id: login
         if: github.repository == 'netdata/netdata'
-        uses: docker/login-action@v4
+        uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4.6.0
         with:
           username: ${{ secrets.DOCKER_HUB_USERNAME }}
           password: ${{ secrets.DOCKER_HUB_PASSWORD }}
@@ -454,7 +454,7 @@ jobs:
         if: github.repository == 'netdata/netdata' && needs.gen-tags.outputs.nightly == '1'
         run: .github/scripts/rotate-docker-tags.sh "${{ needs.gen-tags.outputs.docker_repo }}" "${{ needs.gen-tags.outputs.nightly_tag }}" "${NIGHTLY_COUNT}"
       - name: Failure Notification
-        uses: rtCamp/action-slack-notify@v2
+        uses: rtCamp/action-slack-notify@33ca3be66c6f378fe1610fd1d5258632dbed5e58 # v2.4.0
         env:
           SLACK_COLOR: 'danger'
           SLACK_FOOTER: ''
@@ -489,7 +489,7 @@ jobs:
     steps:
       - name: Checkout
         id: checkout
-        uses: actions/checkout@v7
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           fetch-depth: 0
           submodules: recursive
@@ -498,7 +498,7 @@ jobs:
         run: echo "platform=$(echo ${{ matrix.platform }} | tr '/' '-' | cut -f 2- -d '-')" >> "${GITHUB_OUTPUT}"
       - name: Download Cache
         id: fetch-cache
-        uses: actions/download-artifact@v8
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
           name: cache-${{ steps.artifact-name.outputs.platform }}
           path: /tmp/build-cache
@@ -509,21 +509,21 @@ jobs:
       - name: Setup QEMU
         id: qemu
         if: matrix.qemu
-        uses: docker/setup-qemu-action@v4
+        uses: docker/setup-qemu-action@99012661954931238ded8c8b007157a8430204e1 # v4.4.0
       - name: Setup Buildx
         id: prepare
-        uses: docker/setup-buildx-action@v4
+        uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
       - name: Registry Login
         id: login
         if: github.repository == 'netdata/netdata'
-        uses: docker/login-action@v4
+        uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4.6.0
         with:
           registry: quay.io
           username: ${{ secrets.NETDATABOT_QUAY_USERNAME }}
           password: ${{ secrets.NETDATABOT_QUAY_TOKEN }}
       - name: Build Image
         id: build
-        uses: docker/build-push-action@v7
+        uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
         with:
           platforms: ${{ matrix.platform }}
           cache-from: type=local,src=/tmp/build-cache
@@ -543,14 +543,14 @@ jobs:
       - name: Upload digest
         id: upload-digest
         if: github.repository == 'netdata/netdata'
-        uses: actions/upload-artifact@v7.0.1
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: quay-digests-${{ steps.artifact-name.outputs.platform }}
           path: /tmp/digests/*
           if-no-files-found: error
           retention-days: 1
       - name: Failure Notification
-        uses: rtCamp/action-slack-notify@v2
+        uses: rtCamp/action-slack-notify@33ca3be66c6f378fe1610fd1d5258632dbed5e58 # v2.4.0
         env:
           SLACK_COLOR: 'danger'
           SLACK_FOOTER: ''
@@ -586,21 +586,21 @@ jobs:
     steps:
       - name: Checkout
         id: checkout
-        uses: actions/checkout@v7
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - name: Download digests
         id: fetch-digests
-        uses: actions/download-artifact@v8
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
           path: /tmp/digests
           pattern: quay-digests-*
           merge-multiple: true
       - name: Setup Buildx
         id: prepare
-        uses: docker/setup-buildx-action@v4
+        uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
       - name: Registry Login
         id: login
         if: github.repository == 'netdata/netdata'
-        uses: docker/login-action@v4
+        uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4.6.0
         with:
           registry: quay.io
           username: ${{ secrets.NETDATABOT_QUAY_USERNAME }}
@@ -616,7 +616,7 @@ jobs:
         if: github.repository == 'netdata/netdata' && needs.gen-tags.outputs.nightly == '1'
         run: .github/scripts/rotate-docker-tags.sh "${{ needs.gen-tags.outputs.quay_repo }}" "${{ needs.gen-tags.outputs.nightly_tag }}" "${NIGHTLY_COUNT}"
       - name: Failure Notification
-        uses: rtCamp/action-slack-notify@v2
+        uses: rtCamp/action-slack-notify@33ca3be66c6f378fe1610fd1d5258632dbed5e58 # v2.4.0
         env:
           SLACK_COLOR: 'danger'
           SLACK_FOOTER: ''
@@ -651,7 +651,7 @@ jobs:
     steps:
       - name: Checkout
         id: checkout
-        uses: actions/checkout@v7
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           fetch-depth: 0
           submodules: recursive
@@ -660,7 +660,7 @@ jobs:
         run: echo "platform=$(echo ${{ matrix.platform }} | tr '/' '-' | cut -f 2- -d '-')" >> "${GITHUB_OUTPUT}"
       - name: Download Cache
         id: fetch-cache
-        uses: actions/download-artifact@v8
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
           name: cache-${{ steps.artifact-name.outputs.platform }}
           path: /tmp/build-cache
@@ -671,21 +671,21 @@ jobs:
       - name: Setup QEMU
         id: qemu
         if: matrix.qemu
-        uses: docker/setup-qemu-action@v4
+        uses: docker/setup-qemu-action@99012661954931238ded8c8b007157a8430204e1 # v4.4.0
       - name: Setup Buildx
         id: prepare
-        uses: docker/setup-buildx-action@v4
+        uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
       - name: Registry Login
         id: login
         if: github.repository == 'netdata/netdata'
-        uses: docker/login-action@v4
+        uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4.6.0
         with:
           registry: ghcr.io
           username: ${{ github.repository_owner }}
           password: ${{ secrets.GITHUB_TOKEN }}
       - name: Build Image
         id: build
-        uses: docker/build-push-action@v7
+        uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
         with:
           platforms: ${{ matrix.platform }}
           cache-from: type=local,src=/tmp/build-cache
@@ -705,14 +705,14 @@ jobs:
       - name: Upload digest
         id: upload-digest
         if: github.repository == 'netdata/netdata'
-        uses: actions/upload-artifact@v7.0.1
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: ghcr-digests-${{ steps.artifact-name.outputs.platform }}
           path: /tmp/digests/*
           if-no-files-found: error
           retention-days: 1
       - name: Failure Notification
-        uses: rtCamp/action-slack-notify@v2
+        uses: rtCamp/action-slack-notify@33ca3be66c6f378fe1610fd1d5258632dbed5e58 # v2.4.0
         env:
           SLACK_COLOR: 'danger'
           SLACK_FOOTER: ''
@@ -748,21 +748,21 @@ jobs:
     steps:
       - name: Checkout
         id: checkout
-        uses: actions/checkout@v7
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - name: Download digests
         id: fetch-digests
-        uses: actions/download-artifact@v8
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
           path: /tmp/digests
           pattern: ghcr-digests-*
           merge-multiple: true
       - name: Setup Buildx
         id: prepare
-        uses: docker/setup-buildx-action@v4
+        uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
       - name: Registry Login
         id: login
         if: github.repository == 'netdata/netdata'
-        uses: docker/login-action@v4
+        uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4.6.0
         with:
           registry: ghcr.io
           username: ${{ github.repository_owner }}
@@ -778,7 +778,7 @@ jobs:
         if: github.repository == 'netdata/netdata' && needs.gen-tags.outputs.nightly == '1'
         run: .github/scripts/rotate-docker-tags.sh "${{ needs.gen-tags.outputs.ghcr_repo }}" "${{ needs.gen-tags.outputs.nightly_tag }}" "${NIGHTLY_COUNT}"
       - name: Failure Notification
-        uses: rtCamp/action-slack-notify@v2
+        uses: rtCamp/action-slack-notify@33ca3be66c6f378fe1610fd1d5258632dbed5e58 # v2.4.0
         env:
           SLACK_COLOR: 'danger'
           SLACK_FOOTER: ''
@@ -810,13 +810,13 @@ jobs:
     steps:
       - name: Checkout
         id: checkout
-        uses: actions/checkout@v7
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           submodules: recursive
       - name: Trigger Helmchart PR
         if: github.event_name == 'workflow_dispatch' && github.event.inputs.version != 'nightly' && github.repository == 'netdata/netdata'
         id: trigger-helmchart
-        uses: benc-uk/workflow-dispatch@v1
+        uses: benc-uk/workflow-dispatch@d004979be141727c7a17c28f603e2facc40d0855 # v1.3.3
         with:
           token: ${{ secrets.NETDATABOT_GITHUB_TOKEN }}
           repo: netdata/helmchart
@@ -826,7 +826,7 @@ jobs:
       - name: Trigger MSI build
         if: github.event_name == 'workflow_dispatch' && github.event.inputs.version != 'nightly' && github.repository == 'netdata/netdata'
         id: trigger-msi
-        uses: benc-uk/workflow-dispatch@v1
+        uses: benc-uk/workflow-dispatch@d004979be141727c7a17c28f603e2facc40d0855 # v1.3.3
         with:
           token: ${{ secrets.NETDATABOT_GITHUB_TOKEN }}
           repo: netdata/msi-installer
@@ -834,7 +834,7 @@ jobs:
           ref: refs/heads/master
           inputs: '{"tag": "stable", "pwd": "${{ secrets.MSI_CODE_SIGNING_PASSWORD }}"}'
       - name: Failure Notification
-        uses: rtCamp/action-slack-notify@v2
+        uses: rtCamp/action-slack-notify@33ca3be66c6f378fe1610fd1d5258632dbed5e58 # v2.4.0
         env:
           SLACK_COLOR: 'danger'
           SLACK_FOOTER: ''

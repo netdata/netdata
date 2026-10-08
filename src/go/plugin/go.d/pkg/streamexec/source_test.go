@@ -297,7 +297,7 @@ func TestCancelTerminatesDescendants(t *testing.T) {
 	require.True(t, child.Child)
 
 	stop()
-	conn.RequireExited(t) // Run returned only after joining the instance
+	conn.RequireExited(t) // the instance is gone once Run returns
 	child.WaitExited(t)   // the descendant was terminated; Run does not wait for descendants
 }
 
@@ -344,7 +344,7 @@ func TestFollowReportsFailure(t *testing.T) {
 
 			done := make(chan error, 1)
 			go func() {
-				_, err := s.follow(t.Context(), inst)
+				_, err := s.follow(t.Context(), inst, observer{})
 				done <- err
 			}()
 			if tc.published {
@@ -506,4 +506,162 @@ func TestRunAgainAfterReturn(t *testing.T) {
 	second := fake.Accept(t)
 	second.Line(t, "record second")
 	waitLatest(t, s, "record second")
+}
+
+// goBackground calls Background in the background and returns its result channel.
+func goBackground(ctx context.Context, s *Source[string]) <-chan backgroundResult {
+	result := make(chan backgroundResult, 1)
+	go func() {
+		stop, err := s.Background(ctx)
+		result <- backgroundResult{
+			stop: stop,
+			err:  err,
+		}
+	}()
+	return result
+}
+
+type backgroundResult struct {
+	stop func()
+	err  error
+}
+
+func waitBackground(t *testing.T, result <-chan backgroundResult) backgroundResult {
+	t.Helper()
+	select {
+	case r := <-result:
+		return r
+	case <-time.After(5 * time.Second):
+		t.Fatal("Background did not return")
+		return backgroundResult{}
+	}
+}
+
+func TestBackgroundReturnsAfterFirstRecord(t *testing.T) {
+	fake := streamexectest.NewFake(t)
+	s := newTestSource(t, fake, testTiming, recordDecoder)
+	ctx, cancel := context.WithCancel(t.Context())
+	defer cancel()
+	result := goBackground(ctx, s)
+	conn := fake.Accept(t)
+	select {
+	case r := <-result:
+		t.Fatalf("Background returned before a record: %v", r.err)
+	case <-time.After(100 * time.Millisecond):
+	}
+
+	conn.Line(t, "warning: not a record")
+	conn.Line(t, "record 1")
+	r := waitBackground(t, result)
+	require.NoError(t, r.err)
+	got, ok := s.Latest()
+	assert.True(t, ok)
+	assert.Equal(t, "record 1", got)
+
+	// Supervision continues after Background returns, independently of its context.
+	cancel()
+	conn.Exit(t, 0)
+	replacement := fake.Accept(t)
+	conn.RequireExited(t)
+	replacement.Line(t, "record 2")
+	waitLatest(t, s, "record 2")
+
+	r.stop()
+	replacement.RequireExited(t) // the instance is gone once stop returns
+	assert.Nil(t, s.latest.Load())
+	r.stop() // idempotent
+}
+
+func TestBackgroundFailures(t *testing.T) {
+	for name, tc := range map[string]struct {
+		prepare func(*testing.T)
+		act     func(*testing.T, *streamexectest.Fake, context.CancelFunc)
+		wantErr string
+	}{
+		"start failure": {
+			prepare: func(t *testing.T) {
+				t.Cleanup(ndexec.SetRunnerPathsForTests(filepath.Join(t.TempDir(), "missing-wrapper"), ""))
+			},
+			act:     func(*testing.T, *streamexectest.Fake, context.CancelFunc) {},
+			wantErr: "start fake:",
+		},
+		"first instance exits before a record": {
+			act: func(t *testing.T, fake *streamexectest.Fake, _ context.CancelFunc) {
+				conn := fake.Accept(t)
+				conn.Line(t, "warning: not a record")
+				conn.Exit(t, 9)
+			},
+			wantErr: "fake exited: exit status 9",
+		},
+		"wait ends before a record": {
+			act: func(t *testing.T, fake *streamexectest.Fake, cancel context.CancelFunc) {
+				fake.Accept(t)
+				cancel()
+			},
+			wantErr: "wait for the first fake record: context canceled",
+		},
+	} {
+		t.Run(name, func(t *testing.T) {
+			fake := streamexectest.NewFake(t)
+			if tc.prepare != nil {
+				tc.prepare(t)
+			}
+			s := newTestSource(t, fake, testTiming, recordDecoder)
+			ctx, cancel := context.WithCancel(t.Context())
+			defer cancel()
+			began := time.Now()
+			result := goBackground(ctx, s)
+			tc.act(t, fake, cancel)
+
+			r := waitBackground(t, result)
+			require.ErrorContains(t, r.err, tc.wantErr)
+			assert.Nil(t, r.stop)
+			assert.Less(t, time.Since(began), 3*time.Second, "a failure waits for nothing else")
+			fake.RequireNoStart(t, 300*time.Millisecond) // nothing keeps running or restarting
+		})
+	}
+}
+
+func TestStopJoinsTheReader(t *testing.T) {
+	fake := streamexectest.NewFake(t)
+	entered := make(chan struct{})
+	release := make(chan struct{})
+	s := newTestSource(t, fake, testTiming, func() Decoder[string] {
+		return DecoderFunc[string](func(line []byte) (string, bool) {
+			if string(line) == "block" {
+				close(entered)
+				<-release
+				return "", false
+			}
+			return string(line), true
+		})
+	})
+	result := goBackground(t.Context(), s)
+	conn := fake.Accept(t)
+	conn.Line(t, "record 1")
+	r := waitBackground(t, result)
+	require.NoError(t, r.err)
+
+	conn.Line(t, "block")
+	select {
+	case <-entered:
+	case <-time.After(5 * time.Second):
+		t.Fatal("the decoder did not receive the line")
+	}
+	stopped := make(chan struct{})
+	go func() {
+		r.stop()
+		close(stopped)
+	}()
+	select {
+	case <-stopped:
+		t.Fatal("stop returned while the reader was still decoding")
+	case <-time.After(200 * time.Millisecond):
+	}
+	close(release)
+	select {
+	case <-stopped:
+	case <-time.After(5 * time.Second):
+		t.Fatal("stop did not return after the reader finished")
+	}
 }

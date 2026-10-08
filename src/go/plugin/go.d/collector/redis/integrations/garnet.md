@@ -37,7 +37,7 @@ It connects to the Garnet instance via a TCP or UNIX socket and executes the fol
 
 This collector is supported on all platforms.
 
-This collector supports collecting metrics from multiple instances of this integration, including remote instances.
+This collector supports collecting metrics from multiple instances of this integration.
 
 
 Garnet can be monitored further using the following other integrations:
@@ -56,7 +56,7 @@ By default, it detects instances running on localhost by attempting to connect u
 - /var/run/redis/redis.sock
 - /var/lib/redis/redis.sock
 
-The Netdata Agent [service discovery](https://learn.netdata.cloud/docs/netdata-agent/configuration/find-anything-about-your-infrastructure/service-discovery) can also create jobs automatically:
+The Netdata Agent [service discovery](https://github.com/netdata/netdata/blob/master/src/collectors/SERVICE-DISCOVERY.md) can also create jobs automatically:
 
 - The `net_listeners` discoverer matches processes listening on TCP port 6379, or whose command name is `redis-server`, and creates a job with the discovered address. The rule lives in `go.d/sd/net_listeners.conf`.
 - The `docker` discoverer matches containers exposing port 6379 or using a `redis` image and creates a job with the discovered address. The rule lives in `go.d/sd/docker.conf`.
@@ -177,7 +177,7 @@ Configure the **redis** collector from the Netdata web interface:
 4. In the Search box, type _redis_ (or scroll the list) to locate the **redis** collector.
 5. Click the **+** next to the **redis** collector to add a new job.
 6. Fill in the job fields, then click **Test** to verify the configuration and **Submit** to save.
-    - **Test** runs the job with the provided settings and shows whether data can be collected.
+    - **Test** validates the provided settings and checks the collector's startup prerequisites. Successful validation does not guarantee that every metric will be available during collection.
     - If it fails, an error message appears with details (for example, connection refused, timeout, or command execution errors), so you can adjust and retest.
 
 

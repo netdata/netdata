@@ -24,6 +24,9 @@ func (s *Store) EnforceHistoryRetention(ctx context.Context, days int, maxBytes 
 	if s.closed {
 		return os.ErrClosed
 	}
+	if s.failure != nil {
+		return s.failure
+	}
 	policy := journal.RetentionPolicy{}
 	if days > 0 {
 		const maxDays = int64(^uint64(0)>>1) / int64(24*time.Hour)
@@ -38,7 +41,7 @@ func (s *Store) EnforceHistoryRetention(ctx context.Context, days int, maxBytes 
 	// Reopening applies the new policy; closing must not run stale limits.
 	if s.log != nil {
 		if err := s.log.CloseWithoutRetention(); err != nil {
-			return fmt.Errorf("archive history journal: %w", err)
+			return fmt.Errorf("archive history journal: %w", s.recordFailure(err))
 		}
 		s.log = nil
 	}

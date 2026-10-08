@@ -86,6 +86,13 @@ option(ENABLE_PLUGIN_GO "Enable metric collectors written in Go" ${DEFAULT_FEATU
 cmake_dependent_option(ENABLE_ND_MCP "Build nd-mcp stdio-to-websocket bridge for MCP integration" ${DEFAULT_FEATURE_STATE} "ENABLE_PLUGIN_GO" False)
 option(ENABLE_PLUGIN_SCRIPTS "Enable the experimental scripts plugin (Nagios compatibility module)" ON)
 option(ENABLE_PLUGIN_STATSD "Enable the experimental Go StatsD plugin (statsd.plugin)" OFF)
+option(ENABLE_PLUGIN_IPMI "Enable the experimental Go IPMI plugin (ipmi.plugin)" OFF)
+if(ENABLE_PLUGIN_IPMI)
+  if(NOT OS_LINUX OR NOT CMAKE_SIZEOF_VOID_P EQUAL 8 OR
+     NOT (CPU_X86_64 OR CPU_ARM64))
+    message(FATAL_ERROR "The experimental Go IPMI plugin requires Linux amd64 or arm64")
+  endif()
+endif()
 option(ENABLE_PLUGIN_DEM "Enable the experimental digital experience monitoring plugin" OFF)
 cmake_dependent_option(ENABLE_PLUGIN_OTEL "Enable collection of OpenTelemetry metrics and logs" ${DEFAULT_FEATURE_STATE} "OS_LINUX OR OS_MACOS" False)
 cmake_dependent_option(ENABLE_PLUGIN_NETFLOW "Enable NetFlow/IPFIX/sFlow flow analysis plugin" False "NOT OS_WINDOWS" False)

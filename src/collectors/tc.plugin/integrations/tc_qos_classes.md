@@ -29,7 +29,7 @@ This collector is only supported on the following platforms:
 
 - Linux
 
-This collector supports collecting metrics from multiple instances of this integration, including remote instances.
+This collector supports collecting metrics from multiple instances of this integration.
 
 The plugin needs to access command `tc` to get the necessary metrics. To achieve this netdata modifies permission of file `/usr/libexec/netdata/plugins.d/tc-qos-helper.sh`.
 

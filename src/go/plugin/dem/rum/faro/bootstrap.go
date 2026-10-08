@@ -13,9 +13,6 @@ import (
 // Version is the pinned Faro web SDK served by the bootstrap.
 const Version = "2.11.0"
 
-// SDKOrigin hosts the pinned browser SDK and tracing add-on.
-const SDKOrigin = "https://cdn.jsdelivr.net"
-
 // BootstrapOptions carries effective site settings. Propagate contains
 // already-compiled JavaScript regular expression patterns.
 type BootstrapOptions struct {
@@ -31,11 +28,10 @@ type BootstrapOptions struct {
 //go:embed bootstrap.js
 var bootstrapTemplate string
 
-// Bootstrap renders the loader; every caller-supplied value is JSON-encoded
-// so a hostile Host header cannot break out of the script.
-func Bootstrap(key, base string, opts BootstrapOptions) string {
+// Bootstrap renders site policy. The browser resolves transport and asset URLs
+// from its external script element; request Host headers are never embedded.
+func Bootstrap(key string, opts BootstrapOptions) string {
 	k, _ := json.Marshal(key)
-	b, _ := json.Marshal(base)
 	opt := map[string]any{
 		"sampling":           opts.MeasureRate,
 		"bots":               beacon.BotPatternJS(),
@@ -49,6 +45,6 @@ func Bootstrap(key, base string, opts BootstrapOptions) string {
 		opt["tracing"] = append([]string{}, opts.Propagate...)
 	}
 	o, _ := json.Marshal(opt)
-	return strings.NewReplacer("__KEY__", string(k), "__BASE__", string(b), "__OPT__", string(o), "__VERSION__", Version, "__SDK_ORIGIN__", SDKOrigin).
+	return strings.NewReplacer("__KEY__", string(k), "__OPT__", string(o), "__SDK_PATH__", SDKPath, "__TRACING_PATH__", TracingPath).
 		Replace(bootstrapTemplate)
 }
