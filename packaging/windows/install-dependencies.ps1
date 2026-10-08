@@ -126,15 +126,36 @@ if (-not $installedWixVersion) {
 }
 if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
-$wix = Join-Path $env:USERPROFILE '.dotnet\tools\wix.exe'
-if (-not (Test-Path $wix)) { throw "WiX executable was not found after installation: $wix" }
+$wixCandidates = @()
+$wixCommand = Get-Command 'wix.exe' -ErrorAction SilentlyContinue
+if ($wixCommand) { $wixCandidates += $wixCommand.Source }
+if ($env:DOTNET_CLI_HOME) { $wixCandidates += (Join-Path $env:DOTNET_CLI_HOME '.dotnet\tools\wix.exe') }
+$wixCandidates += (Join-Path $env:USERPROFILE '.dotnet\tools\wix.exe')
+$wix = $wixCandidates | Where-Object { Test-Path -LiteralPath $_ -PathType Leaf } | Select-Object -First 1
+if (-not $wix) { throw 'WiX executable was not found in the global .NET tool locations.' }
 
 $extensions = @(
     "WixToolset.Util.wixext/$wixVersion",
     "WixToolset.UI.wixext/$wixVersion"
 )
-$installedExtensions = & $wix extension list --global
-if ($LASTEXITCODE -ne 0) { throw 'Could not query globally installed WiX extensions.' }
+$previousErrorActionPreference = $ErrorActionPreference
+try {
+    # PowerShell 5.1 can promote native stderr to a terminating error when the preference is Stop.
+    $ErrorActionPreference = 'Continue'
+    $extensionListOutput = @(& $wix extension list --global 2>&1)
+    $extensionListExitCode = $LASTEXITCODE
+} finally {
+    $ErrorActionPreference = $previousErrorActionPreference
+}
+$extensionListText = ($extensionListOutput | ForEach-Object { "$_" }) -join [Environment]::NewLine
+$hasExtensionEntries = $extensionListText -match '(?m)^\s*\S+\s+\d+\.\d+'
+$extensionListHasError = $extensionListText -match '(?i)\b(error|exception|fatal)\b|\bWIX\d{4}\b'
+# WiX returns 2 for an empty extension list; the add commands below populate it.
+$emptyExtensionCache = $extensionListExitCode -eq 2 -and -not $hasExtensionEntries -and -not $extensionListHasError
+if ($extensionListExitCode -ne 0 -and -not $emptyExtensionCache) {
+    throw "Could not query globally installed WiX extensions (exit code $extensionListExitCode). $extensionListText"
+}
+$installedExtensions = @($extensionListText -split '\r?\n')
 foreach ($extension in $extensions) {
     $extensionId, $extensionVersion = $extension -split '/', 2
     $found = $installedExtensions | Where-Object {

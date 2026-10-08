@@ -48,7 +48,7 @@ $configureArgs = @(
     '-DCMAKE_EXE_LINKER_FLAGS=-fuse-ld=lld', '-DCMAKE_SHARED_LINKER_FLAGS=-fuse-ld=lld'
 )
 if ($WindowsPathPrefix) { $configureArgs += "-DNETDATA_WINDOWS_PATH_PREFIX=$WindowsPathPrefix" }
-if ($env:EXTRA_CMAKE_OPTIONS) { $configureArgs += ($env:EXTRA_CMAKE_OPTIONS.Trim() -split '\s+' | Where-Object { $_ }) }
+if ($env:EXTRA_CMAKE_OPTIONS) { $configureArgs += ConvertFrom-WindowsCommandLine $env:EXTRA_CMAKE_OPTIONS }
 
 New-Item -ItemType Directory -Force -Path $buildDir | Out-Null
 try {

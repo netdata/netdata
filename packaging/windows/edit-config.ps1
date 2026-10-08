@@ -22,8 +22,16 @@ try {
     }
 
     $relativePath = $ConfigFile.Replace('/', '\').TrimStart('\')
-    if ([IO.Path]::IsPathRooted($ConfigFile) -or $relativePath -match '(^|\\)\.\.(\\|$)') {
+    $segments = $relativePath -split '\\'
+    if ([IO.Path]::IsPathRooted($ConfigFile) -or
+        ($segments | Where-Object { $_.TrimEnd(' ', '.') -in @('.', '..') })) {
         throw 'Specify a configuration file name relative to the Netdata configuration directory.'
+    }
+
+    $destination = [IO.Path]::GetFullPath((Join-Path $configRoot $relativePath))
+    $configRootFull = [IO.Path]::GetFullPath($configRoot).TrimEnd('\') + '\'
+    if (-not $destination.StartsWith($configRootFull, [StringComparison]::OrdinalIgnoreCase)) {
+        throw 'The requested configuration file must remain inside the Netdata configuration directory.'
     }
 
     $principal = [Security.Principal.WindowsPrincipal][Security.Principal.WindowsIdentity]::GetCurrent()
@@ -39,7 +47,6 @@ try {
         return
     }
 
-    $destination = Join-Path $configRoot $relativePath
     $stockFile = Join-Path $stockRoot $relativePath
     if (-not (Test-Path -LiteralPath $destination)) {
         if (-not (Test-Path -LiteralPath $stockFile -PathType Leaf)) {
@@ -54,7 +61,7 @@ try {
         Start-Process -FilePath $destination
     } catch {
         $notepad = Join-Path $env:WINDIR 'System32\notepad.exe'
-        Start-Process -FilePath $notepad -ArgumentList @($destination)
+        Start-Process -FilePath $notepad -ArgumentList ('"{0}"' -f $destination)
     }
 } catch {
     Write-Host "Could not open Netdata configuration: $_" -ForegroundColor Red

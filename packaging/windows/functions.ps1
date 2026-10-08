@@ -17,20 +17,31 @@ function Get-MSYS2Prefix {
     return ""
 }
 
+function Get-LatestVersionDirectory([string]$Root) {
+    if (-not (Test-Path -LiteralPath $Root -PathType Container)) { return $null }
+    return Get-ChildItem -LiteralPath $Root -Directory |
+        Where-Object { $_.Name -match '^\d+\.\d+' } |
+        Sort-Object { [version]$_.Name } -Descending |
+        Select-Object -First 1
+}
+
+function Add-DirectoryToPathIfToolExists([string]$Directory, [string]$Tool) {
+    if (Test-Path -LiteralPath (Join-Path $Directory $Tool) -PathType Leaf) {
+        $env:PATH = "$Directory;$env:PATH"
+        return $true
+    }
+    return $false
+}
+
 function Initialize-WindowsBuildTools {
     $sdkRoot = Join-Path ${env:ProgramFiles(x86)} 'Windows Kits\10\bin'
-    if (Test-Path $sdkRoot) {
-        $sdkVersion = Get-ChildItem -Path $sdkRoot -Directory |
-            Where-Object { $_.Name -match '^\d+\.\d+' } |
-            Sort-Object { [version]$_.Name } -Descending |
-            Select-Object -First 1
-        if ($sdkVersion) {
-            $sdkTools = Join-Path $sdkVersion.FullName 'x64'
-            foreach ($tool in @('mc.exe', 'rc.exe')) {
-                if (-not (Test-Path (Join-Path $sdkTools $tool))) { throw "Windows SDK tool missing: $tool" }
-            }
-            $env:PATH = "$sdkTools;$env:PATH"
+    $sdkVersion = Get-LatestVersionDirectory $sdkRoot
+    if ($sdkVersion) {
+        $sdkTools = Join-Path $sdkVersion.FullName 'x64'
+        foreach ($tool in @('mc.exe', 'rc.exe')) {
+            if (-not (Test-Path (Join-Path $sdkTools $tool))) { throw "Windows SDK tool missing: $tool" }
         }
+        $env:PATH = "$sdkTools;$env:PATH"
     }
 
     $vswhere = Join-Path ${env:ProgramFiles(x86)} 'Microsoft Visual Studio\Installer\vswhere.exe'
@@ -38,10 +49,10 @@ function Initialize-WindowsBuildTools {
         $vsRoot = & $vswhere -latest -products '*' -requires Microsoft.VisualStudio.Component.VC.Tools.x86.x64 -property installationPath
         if ($vsRoot) {
             $vcTools = Join-Path $vsRoot 'VC\Tools\MSVC'
-            $vcVersion = Get-ChildItem -Path $vcTools -Directory | Sort-Object { [version]$_.Name } -Descending | Select-Object -First 1
+            $vcVersion = Get-LatestVersionDirectory $vcTools
             if ($vcVersion) {
                 $linkDir = Join-Path $vcVersion.FullName 'bin\Hostx64\x64'
-                if (Test-Path (Join-Path $linkDir 'link.exe')) { $env:PATH = "$linkDir;$env:PATH" }
+                [void](Add-DirectoryToPathIfToolExists $linkDir 'link.exe')
             }
         }
     }
@@ -58,7 +69,45 @@ function Initialize-WindowsBuildTools {
 
 function Resolve-WindowsBuildDirectory([string]$Path, [string]$RepoRoot) {
     if ([IO.Path]::IsPathRooted($Path)) { return [IO.Path]::GetFullPath($Path) }
-    return [IO.Path]::GetFullPath((Join-Path $PWD.Path $Path))
+    return [IO.Path]::GetFullPath((Join-Path $RepoRoot $Path))
+}
+
+if (-not ('NetdataWindowsCommandLine' -as [type])) {
+    Add-Type -TypeDefinition @'
+using System;
+using System.Runtime.InteropServices;
+
+public static class NetdataWindowsCommandLine {
+    [DllImport("shell32.dll", CharSet = CharSet.Unicode, ExactSpelling = true, SetLastError = true)]
+    private static extern IntPtr CommandLineToArgvW(string commandLine, out int argumentCount);
+
+    [DllImport("kernel32.dll")]
+    private static extern IntPtr LocalFree(IntPtr memory);
+
+    public static string[] Parse(string commandLine) {
+        int count;
+        // Supply argv[0] so the options use the normal argument parsing rules.
+        IntPtr arguments = CommandLineToArgvW("netdata-cmake-options.exe " + commandLine, out count);
+        if (arguments == IntPtr.Zero)
+            throw new System.ComponentModel.Win32Exception(Marshal.GetLastWin32Error());
+
+        try {
+            string[] result = new string[count - 1];
+            for (int i = 1; i < count; i++)
+                result[i - 1] = Marshal.PtrToStringUni(Marshal.ReadIntPtr(arguments, i * IntPtr.Size));
+            return result;
+        }
+        finally {
+            LocalFree(arguments);
+        }
+    }
+}
+'@
+}
+
+function ConvertFrom-WindowsCommandLine([string]$CommandLine) {
+    if ([string]::IsNullOrWhiteSpace($CommandLine)) { return @() }
+    return [NetdataWindowsCommandLine]::Parse($CommandLine.Trim())
 }
 
 function Clear-WindowsInstallStage([string]$BuildDirectory, [string]$RepoRoot) {

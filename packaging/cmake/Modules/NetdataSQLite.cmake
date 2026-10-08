@@ -29,20 +29,20 @@ function(netdata_bundle_sqlite3)
                 # SQLite's UPDATE/DELETE LIMIT grammar is selected when Lemon
                 # generates parse.c, so compiling the amalgamation with the
                 # feature define alone is insufficient.
+                # Populate the source only; Netdata runs SQLite's own generator.
                 include(FetchContent)
                 if(SQLITE_USE_GIT)
                         FetchContent_Declare(netdata_sqlite_source
                                 GIT_REPOSITORY https://github.com/sqlite/sqlite.git
-                                GIT_TAG "${SQLITE_GIT_SHA}")
+                                GIT_TAG "${SQLITE_GIT_SHA}"
+                                SOURCE_SUBDIR _netdata_fetch_only)
                 else()
                         FetchContent_Declare(netdata_sqlite_source
                                 URL "https://www.sqlite.org/${SQLITE_VERSION_YEAR}/sqlite-src-${SQLITE_VERSION_NUMBER}.zip"
-                                URL_HASH "SHA256=${SQLITE_TARBALL_SHA256}")
+                                URL_HASH "SHA256=${SQLITE_TARBALL_SHA256}"
+                                SOURCE_SUBDIR _netdata_fetch_only)
                 endif()
-                FetchContent_GetProperties(netdata_sqlite_source)
-                if(NOT netdata_sqlite_source_POPULATED)
-                        FetchContent_Populate(netdata_sqlite_source)
-                endif()
+                FetchContent_MakeAvailable(netdata_sqlite_source)
                 set(sqlite_SOURCE_DIR "${netdata_sqlite_source_SOURCE_DIR}")
 
                 get_filename_component(_sqlite_ucrt_bin "${CMAKE_C_COMPILER}" DIRECTORY)

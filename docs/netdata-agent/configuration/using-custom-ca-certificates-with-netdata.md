@@ -111,11 +111,20 @@ the certificate must be in PEM or DER format with a `.crt` extension.
 
 ## Using custom certificates on Windows
 
-Netdata uses the Windows certificate stores for TLS trust. To make a custom CA available to the Windows
-service, import it into **Local Computer → Trusted Root Certification Authorities**. For an interactive
-agent running as the current user, import it into **Current User → Trusted Root Certification Authorities**.
-Use the Certificates MMC snap-in (`certlm.msc` for the local computer store or `certmgr.msc` for the current
-user store), or import the certificate with the Windows certificate-management tools.
+Netdata's Windows TLS clients that use native Windows trust load certificates from the Windows certificate
+stores. To make a custom CA available to the Windows service, import it into **Local Computer → Trusted Root
+Certification Authorities**. For an interactive agent running as the current user, import it into **Current User
+→ Trusted Root Certification Authorities**. Use the Certificates MMC snap-in (`certlm.msc` for the local
+computer store or `certmgr.msc` for the current user store), or import the certificate with the Windows
+certificate-management tools.
+
+Streaming connections to a parent use OpenSSL's CA file and directory settings instead of the Windows stores.
+Configure `[stream]` `CAfile` or `CApath` in `stream.conf` to trust a private CA for streaming. For example:
+
+```ini
+[stream]
+CAfile = C:\path\to\custom-ca.pem
+```
 
 Certificates previously installed only in Netdata's bundled MSYS2 CA directory are no longer used. Import
 those certificates into the appropriate Windows Trusted Root store when upgrading.

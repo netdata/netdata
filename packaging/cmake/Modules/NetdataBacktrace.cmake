@@ -20,13 +20,12 @@ function(netdata_bundle_libbacktrace)
                 endif()
 
                 # Pin the native Windows build to a known upstream revision.
+                # This is source-only; Netdata builds the selected files below.
                 FetchContent_Declare(netdata_libbacktrace_source
                         GIT_REPOSITORY https://github.com/ianlancetaylor/libbacktrace.git
-                        GIT_TAG 0b9b49cf4a2c9229fc052d6716e1528b2f23e91a)
-                FetchContent_GetProperties(netdata_libbacktrace_source)
-                if(NOT netdata_libbacktrace_source_POPULATED)
-                        FetchContent_Populate(netdata_libbacktrace_source)
-                endif()
+                        GIT_TAG 0b9b49cf4a2c9229fc052d6716e1528b2f23e91a
+                        SOURCE_SUBDIR _netdata_fetch_only)
+                FetchContent_MakeAvailable(netdata_libbacktrace_source)
 
                 set(_backtrace_source "${netdata_libbacktrace_source_SOURCE_DIR}")
                 set(_backtrace_generated "${CMAKE_BINARY_DIR}/libbacktrace-generated")

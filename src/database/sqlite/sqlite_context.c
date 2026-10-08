@@ -1,5 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
+#include <stdio.h>
+
 #include "sqlite_functions.h"
 #include "sqlite_context.h"
 #include "sqlite_db_migration.h"
@@ -32,18 +34,38 @@ int sql_init_context_database(int memory)
 {
     int rc;
     CLEAN_CHAR_P *sqlite_database = NULL;
+    const char *cache_dir = netdata_configured_cache_dir;
+    size_t cache_dir_size = 0;
 
     if (likely(!memory)) {
-        size_t cache_dir_size = strlen(netdata_configured_cache_dir);
+        if (!cache_dir || !*cache_dir) {
+            error_report("SQLite context database requires a configured cache directory");
+            return 1;
+        }
+#if defined(OS_WINDOWS)
+        size_t cache_dir_max = OS_WINDOWS_PATH_TRANSLATION_MAX;
+#else
+        size_t cache_dir_max = FILENAME_MAX;
+#endif
+        cache_dir_size = strnlen(cache_dir, cache_dir_max);
+        if (cache_dir_size == cache_dir_max) {
+            error_report("SQLite context database cache directory exceeds the supported path limit");
+            return 1;
+        }
 #if defined(OS_WINDOWS)
         if (cache_dir_size + sizeof("/context-meta.db") - 1 >= OS_WINDOWS_PATH_TRANSLATION_MAX) {
             error_report("SQLite context database path exceeds the Windows path translation limit");
             return 1;
         }
+#else
+        if (cache_dir_size + sizeof("/context-meta.db") > FILENAME_MAX) {
+            error_report("SQLite context database path exceeds the supported path limit");
+            return 1;
+        }
 #endif
         size_t sqlite_database_size = cache_dir_size + sizeof("/context-meta.db");
         sqlite_database = mallocz(sqlite_database_size);
-        snprintfz(sqlite_database, sqlite_database_size, "%s/context-meta.db", netdata_configured_cache_dir);
+        snprintfz(sqlite_database, sqlite_database_size, "%s/context-meta.db", cache_dir);
     }
     else
         sqlite_database = strdupz(":memory:");
@@ -80,10 +102,10 @@ int sql_init_context_database(int memory)
 
     CLEAN_CHAR_P *attach_database = NULL;
     if (likely(!memory)) {
-        size_t attach_database_size = strlen(netdata_configured_cache_dir) + sizeof("/netdata-meta.db");
+        size_t attach_database_size = cache_dir_size + sizeof("/netdata-meta.db");
         CLEAN_CHAR_P *attach_path = NULL;
         attach_path = mallocz(attach_database_size);
-        snprintfz(attach_path, attach_database_size, "%s/netdata-meta.db", netdata_configured_cache_dir);
+        snprintfz(attach_path, attach_database_size, "%s/netdata-meta.db", cache_dir);
 #if defined(OS_WINDOWS)
         attach_database = os_translate_msys_to_windows_path(attach_path);
 #else

@@ -151,7 +151,7 @@ Navigate to your [Netdata config directory](/docs/netdata-agent/configuration/RE
 
 :::note
 
-**On Windows:** the stock (default) alert templates ship at `C:\Program Files\Netdata\usr\lib\netdata\conf.d\health.d\` — browse them to see which alerts ship with Netdata. Place your overrides in `C:\Program Files\Netdata\etc\netdata\health.d\` instead, so they survive Agent updates. Edit files there with the **Netdata → Edit Netdata Configuration** Start Menu shortcut, which requests administrator approval, or use the PowerShell helper described in [On Windows](/docs/netdata-agent/configuration/README.md#on-windows).
+**On Windows:** the stock (default) alert templates ship at `C:\Program Files\Netdata\usr\lib\netdata\conf.d\health.d\` — browse them to see which alerts ship with Netdata. Place your overrides in `C:\Program Files\Netdata\etc\netdata\health.d\` instead, so they survive Agent updates. The **Netdata → Edit Netdata Configuration** Start Menu shortcut opens `netdata.conf`; to edit an alert override, pass its relative path to the PowerShell helper, for example `edit-config.ps1 health.d\cpu.conf`, as described in [On Windows](/docs/netdata-agent/configuration/README.md#on-windows).
 
 :::
 
