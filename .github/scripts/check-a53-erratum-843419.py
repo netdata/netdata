@@ -229,7 +229,7 @@ def check_elf(data):
     if e_machine != EM_AARCH64 or e_type not in (ET_EXEC, ET_DYN):
         return None
     sections = read_sections(data)
-    is_go = any(s[0] in ('.go.buildinfo', '.note.go.buildid') for s in sections)
+    is_go = any(s[0] == '.go.buildinfo' for s in sections)
     hits = []
     for name, sh_type, flags, addr, off, size in sections:
         if not flags & SHF_EXECINSTR or sh_type == 8:  # SHT_NOBITS has no file contents
@@ -247,7 +247,13 @@ def main(argv):
 
     failed = False
     checked = 0
-    for root, dirs, files in os.walk(argv[1]):
+
+    def walk_error(e):
+        nonlocal failed
+        print(f'ERROR: {os.path.relpath(e.filename, argv[1])}: {e.strerror}')
+        failed = True
+
+    for root, dirs, files in os.walk(argv[1], onerror=walk_error):
         dirs.sort()
         for name in sorted(files):
             path = os.path.join(root, name)

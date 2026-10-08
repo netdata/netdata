@@ -51,7 +51,10 @@ errata_ldflags() {
 
 cache_path() {
   local key="${1}"
-  echo "${NETDATA_SOURCE_PATH}/artifacts/cache/${BUILDARCH}/${key}"
+  # A dependency built with other compiler flags must not be reused, so the flags are part of the cache identity.
+  local flags
+  flags="$(printf '%s' "${TUNING_FLAGS:-}" | sha256sum | cut -c 1-12)"
+  echo "${NETDATA_SOURCE_PATH}/artifacts/cache/${BUILDARCH}/${flags}/${key}"
 }
 
 build_path() {

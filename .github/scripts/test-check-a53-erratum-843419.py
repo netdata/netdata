@@ -6,6 +6,7 @@
 import contextlib
 import importlib.util
 import io
+import os
 import struct
 import tempfile
 import unittest
@@ -129,6 +130,29 @@ class ElfTests(unittest.TestCase):
         rc, out = self.run_dir({'go-prog': go})
         self.assertEqual(rc, 0, out)
         self.assertIn('NOTICE: go-prog', out)
+
+    def test_go_build_id_note_alone_is_not_go(self):
+        not_go = make_elf(self.BAD, extra_sections=[('.note.go.buildid', b'\0' * 16)])
+        rc, out = self.run_dir({'prog': not_go})
+        self.assertEqual(rc, 1)
+        self.assertIn('ERROR: prog: 1 sequence(s)', out)
+
+    @unittest.skipIf(os.geteuid() == 0, 'root can read any directory')
+    def test_unreadable_directory_fails(self):
+        with tempfile.TemporaryDirectory() as d:
+            Path(d, 'prog').write_bytes(make_elf(self.GOOD))
+            hidden = Path(d, 'hidden')
+            hidden.mkdir()
+            Path(hidden, 'prog').write_bytes(make_elf(self.BAD))
+            hidden.chmod(0)
+            try:
+                out = io.StringIO()
+                with contextlib.redirect_stdout(out):
+                    rc = check.main(['check', d])
+            finally:
+                hidden.chmod(0o700)
+        self.assertEqual(rc, 1, out.getvalue())
+        self.assertIn('ERROR: hidden:', out.getvalue())
 
     def test_other_machines_and_object_files_are_skipped(self):
         rc, out = self.run_dir({
