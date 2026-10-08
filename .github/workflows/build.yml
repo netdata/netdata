@@ -455,8 +455,8 @@ jobs:
         run: |
           set -euo pipefail
 
-          # QEMU does not model CPU errata, so the runtime checks of the build cannot see a binary linked without the
-          # Cortex-A53 erratum 843419 workaround; scan the shipped executables instead.
+          # The build machines do not exhibit Cortex-A53 erratum 843419, so the runtime checks cannot see a binary
+          # linked without its workaround; scan the shipped executables instead.
           archive="$(find "${GITHUB_WORKSPACE}/artifacts" \
             -maxdepth 1 \
             -type f \

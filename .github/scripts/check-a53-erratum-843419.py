@@ -6,11 +6,12 @@
 #
 # Static aarch64 builds run on Cortex-A53 boards (Raspberry Pi 3, ODROID-C2, ...). There an ADRP at page offset
 # 0xff8/0xffc followed by a load or store can use an address one page off, so a function pointer is loaded from the
-# wrong place and the agent dies at startup. QEMU does not model the erratum, so the runtime checks of the static build
-# cannot catch a missing workaround; this scan can.
+# wrong place and the agent dies at startup. Neither the CI runners' ARM cores nor QEMU exhibit the erratum, so the
+# runtime checks of the static build cannot catch a missing workaround; this scan can.
 #
 # The sequence rules are a port of lld's scanner (llvm/llvm-project lld/ELF/AArch64ErrataFix.cpp), which follows
-# the Cortex-A53 Software Developers Errata Notice (ARM-EPM-048406), as do ld.bfd and gold.
+# the Cortex-A53 Software Developers Errata Notice (ARM-EPM-048406). ld.bfd, which links the static build, patches a
+# superset of these sequences, so a correctly linked binary has none left.
 #
 # Go binaries are linked by the Go linker, which has no workaround for this erratum. They are reported but do not fail
 # the check.
@@ -223,7 +224,7 @@ def read_sections(data):
 
 def check_elf(data):
     """Return (is_go, [hit addresses]) for an AArch64 ELF image, or None if it is not an AArch64 program to check."""
-    if data[4] != 2 or data[5] != 1:
+    if data[4:6] != b'\x02\x01':
         return None  # only ELF64 little-endian can be AArch64 code
     e_type, e_machine = struct.unpack_from('<HH', data, 0x10)
     if e_machine != EM_AARCH64 or e_type not in (ET_EXEC, ET_DYN):

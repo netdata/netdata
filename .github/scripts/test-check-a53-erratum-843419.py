@@ -171,6 +171,14 @@ class ElfTests(unittest.TestCase):
         self.assertEqual(rc, 1)
         self.assertIn('ERROR: prog: invalid section header table', out)
 
+    def test_truncated_elf_does_not_crash(self):
+        # Too short to say what it is: skipped. Claims ELF64 LE but is truncated: reported as broken.
+        rc, out = self.run_dir({'prog': make_elf(self.GOOD), 'short': b'\x7fELF\x02'})
+        self.assertEqual(rc, 0, out)
+        rc, out = self.run_dir({'prog': make_elf(self.GOOD), 'broken': b'\x7fELF\x02\x01'})
+        self.assertEqual(rc, 1)
+        self.assertIn('ERROR: broken:', out)
+
     def test_no_aarch64_binaries_fails(self):
         rc, out = self.run_dir({'text': b'nothing to see'})
         self.assertEqual(rc, 1)
