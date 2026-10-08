@@ -396,31 +396,84 @@ static void app_pool_remove_unseen(void)
     dictionary_garbage_collect(app_pools);
 }
 
-const char *iis_worker_app_name(const char *name, char *buffer, size_t buffer_size)
+static char *iis_worker_numeric_suffix(char *name)
+{
+    char *suffix = strrchr(name, '#');
+    if (!suffix || suffix == name || !suffix[1])
+        return NULL;
+
+    for (const char *digit = suffix + 1; *digit; digit++) {
+        if (*digit < '0' || *digit > '9')
+            return NULL;
+    }
+
+    return suffix;
+}
+
+const char *iis_worker_app_name(
+    const char *name,
+    const char *pid,
+    DICTIONARY *current_worker_instances,
+    char *buffer,
+    size_t buffer_size)
 {
     if (!name || !buffer || !buffer_size)
         return NULL;
 
     strncpyz(buffer, name, buffer_size - 1);
+
+    if (!app_pool_snapshot_complete) {
+        // An unavailable app-pool snapshot cannot authorize names retained from a previous cycle.
+        char *suffix = iis_worker_numeric_suffix(buffer);
+        if (!suffix)
+            return buffer;
+
+        char worker_name[PERFLIB_MAX_NAME_LENGTH];
+        *suffix = '\0';
+        snprintfz(worker_name, sizeof(worker_name), "%s_%s", pid ? pid : "", buffer);
+        if (pid && current_worker_instances && dictionary_get(current_worker_instances, worker_name))
+            return buffer;
+
+        strncpyz(buffer, name, buffer_size - 1);
+        return buffer;
+    }
+
     struct iis_app *exact = dictionary_get(app_pools, buffer);
-    if (exact && (!app_pool_snapshot_complete || exact->seen))
+    if (exact && exact->seen)
         return buffer;
 
-    char *suffix = strrchr(buffer, '#');
-    if (!suffix || suffix == buffer || !suffix[1])
+    char *suffix = iis_worker_numeric_suffix(buffer);
+    if (!suffix)
         return buffer;
-    for (const char *digit = suffix + 1; *digit; digit++) {
-        if (*digit < '0' || *digit > '9')
-            return buffer;
-    }
 
     *suffix = '\0';
     struct iis_app *base = dictionary_get(app_pools, buffer);
-    if (base && (!app_pool_snapshot_complete || base->seen))
+    if (base && base->seen)
         return buffer;
 
     strncpyz(buffer, name, buffer_size - 1);
     return buffer;
+}
+
+static DICTIONARY *iis_w3svc_worker_instance_names(PERF_DATA_BLOCK *data, PERF_OBJECT_TYPE *object)
+{
+    DICTIONARY *names = dictionary_create(DICT_OPTION_SINGLE_THREADED);
+    if (!names)
+        return NULL;
+
+    PERF_INSTANCE_DEFINITION *pi = NULL;
+    for (LONG i = 0; i < object->NumInstances; i++) {
+        pi = perflibForEachInstance(data, object, pi);
+        if (!pi)
+            break;
+        if (!getInstanceName(data, object, pi, windows_shared_buffer, sizeof(windows_shared_buffer)))
+            continue;
+
+        uint8_t marker = 1;
+        dictionary_set(names, windows_shared_buffer, &marker, sizeof(marker));
+    }
+
+    return names;
 }
 
 static void
@@ -2101,10 +2154,9 @@ static inline void w3svc_w3wp_output_cache_flushed_total(struct ws3svc_w3wp_data
 
 static bool do_W3SCV_W3WP(PERF_DATA_BLOCK *pDataBlock, int update_every)
 {
-    bool worker_expired = do_PerflibWebServiceExtraWorker(pDataBlock, update_every);
-
     PERF_OBJECT_TYPE *pObjectType = perflibFindObjectTypeByName(pDataBlock, "W3SVC_W3WP");
     if (!pObjectType) {
+        bool worker_expired = do_PerflibWebServiceExtraWorker(pDataBlock, update_every, NULL);
         if (worker_expired) {
             struct ws3svc_w3wp_data *p;
             dfe_start_write(w3svc_w3wp_service, p) p->seen = false;
@@ -2113,6 +2165,10 @@ static bool do_W3SCV_W3WP(PERF_DATA_BLOCK *pDataBlock, int update_every)
         }
         return false;
     }
+
+    DICTIONARY *current_worker_instances =
+        app_pool_snapshot_complete ? NULL : iis_w3svc_worker_instance_names(pDataBlock, pObjectType);
+    bool worker_expired = do_PerflibWebServiceExtraWorker(pDataBlock, update_every, current_worker_instances);
 
     struct ws3svc_w3wp_data *existing;
     dfe_start_write(w3svc_w3wp_service, existing) existing->seen = false;
@@ -2140,7 +2196,7 @@ static bool do_W3SCV_W3WP(PERF_DATA_BLOCK *pDataBlock, int update_every)
         *app_separator++ = '\0';
 
         char app[PERFLIB_MAX_NAME_LENGTH];
-        if (!iis_worker_app_name(app_separator, app, sizeof(app)))
+        if (!iis_worker_app_name(app_separator, windows_shared_buffer, current_worker_instances, app, sizeof(app)))
             continue;
 
         char worker_name[PERFLIB_MAX_NAME_LENGTH];
@@ -2220,6 +2276,8 @@ static bool do_W3SCV_W3WP(PERF_DATA_BLOCK *pDataBlock, int update_every)
 
         w3svc_w3wp_remove_unseen();
     }
+    if (current_worker_instances)
+        dictionary_destroy(current_worker_instances);
     return true;
 }
 

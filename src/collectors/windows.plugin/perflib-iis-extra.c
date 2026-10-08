@@ -966,8 +966,11 @@ static void iis_extra_done_charts(struct iis_extra_group *group, struct iis_extr
         rrdset_done(chart_st);
 }
 
-static enum iis_extra_group_result
-do_iis_extra_group(PERF_DATA_BLOCK *data, struct iis_extra_group *group, int update_every)
+static enum iis_extra_group_result do_iis_extra_group(
+    PERF_DATA_BLOCK *data,
+    struct iis_extra_group *group,
+    int update_every,
+    DICTIONARY *current_worker_instances)
 {
     if (unlikely(!group->instances)) {
         iis_extra_group_initialize(group);
@@ -1039,7 +1042,7 @@ do_iis_extra_group(PERF_DATA_BLOCK *data, struct iis_extra_group *group, int upd
             if (!separator || separator == windows_shared_buffer || !separator[1])
                 continue;
             *separator++ = '\0';
-            if (!iis_worker_app_name(separator, app, sizeof(app)))
+            if (!iis_worker_app_name(separator, windows_shared_buffer, current_worker_instances, app, sizeof(app)))
                 continue;
             snprintfz(instance_key, sizeof(instance_key), "%s_%s", windows_shared_buffer, app);
             instance = app;
@@ -1154,12 +1157,12 @@ do_iis_extra_group(PERF_DATA_BLOCK *data, struct iis_extra_group *group, int upd
 
 void do_PerflibWebServiceExtraWeb(PERF_DATA_BLOCK *data, int update_every)
 {
-    do_iis_extra_group(data, &web_service_group, update_every);
+    do_iis_extra_group(data, &web_service_group, update_every, NULL);
 }
 
-bool do_PerflibWebServiceExtraWorker(PERF_DATA_BLOCK *data, int update_every)
+bool do_PerflibWebServiceExtraWorker(PERF_DATA_BLOCK *data, int update_every, DICTIONARY *current_worker_instances)
 {
-    return do_iis_extra_group(data, &worker_group, update_every) == IIS_EXTRA_GROUP_EXPIRED;
+    return do_iis_extra_group(data, &worker_group, update_every, current_worker_instances) == IIS_EXTRA_GROUP_EXPIRED;
 }
 
 int do_PerflibHttpService(int update_every, usec_t dt __maybe_unused)
@@ -1172,11 +1175,11 @@ int do_PerflibHttpService(int update_every, usec_t dt __maybe_unused)
     if (!data)
         return 0;
 
-    do_iis_extra_group(data, &http_queue_group, update_every);
+    do_iis_extra_group(data, &http_queue_group, update_every, NULL);
     return 0;
 }
 
 void do_PerflibWebServiceExtraCache(PERF_DATA_BLOCK *data, int update_every)
 {
-    do_iis_extra_group(data, &cache_group, update_every);
+    do_iis_extra_group(data, &cache_group, update_every, NULL);
 }
