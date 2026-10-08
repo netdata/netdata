@@ -2,6 +2,21 @@
 
 ### Merged Pull Requests:
 
+- Sync repos (netdata, ebpf-co-re, kernel-collector) ([#24008](https://github.com/netdata/netdata/issues/24008))
+- Fix(go.d/ceph): remove the stray selector from the configuration form ([#24108](https://github.com/netdata/netdata/issues/24108))
+- Feat(go.d/redfish): show credentials only for auth methods that use them ([#24106](https://github.com/netdata/netdata/issues/24106))
+- Fix(go.d/docker): reduce Docker daemon CPU caused by collection ([#24146](https://github.com/netdata/netdata/issues/24146))
+- Fix(go.d/docker): count image usage from the container list ([#24147](https://github.com/netdata/netdata/issues/24147))
+- Fix Windows startup crash with a patched MSYS2 runtime ([#24170](https://github.com/netdata/netdata/issues/24170))
+- Fix Windows timezone detection buffer overread ([#24101](https://github.com/netdata/netdata/issues/24101))
+- Dbengine: skip debug-only open cache scan on datafile deletion ([#24162](https://github.com/netdata/netdata/issues/24162))
+- Build(go.d/smbios_memory): build the collector only on Linux ([#24169](https://github.com/netdata/netdata/issues/24169))
+- Fix(go.d/redfish): accept same-origin resource URI aliases ([#24186](https://github.com/netdata/netdata/issues/24186))
+
+## [2.12.0] - 2026-09-30
+
+### Merged Pull Requests:
+
 - Rework Ceph collector as a Prometheus complement ([#23357](https://github.com/netdata/netdata/issues/23357))
 - Improve the support bundle: streaming api key, encoding fidelity, Windows ETW logs, permissions ([#23452](https://github.com/netdata/netdata/issues/23452))
 - Fix: replace dynamic proc netdev format strings ([#23450](https://github.com/netdata/netdata/issues/23450))
