@@ -38,7 +38,7 @@ jobs:
           submodules: recursive
       - name: Check source files
         id: check-source-files
-        uses: step-security/changed-files@3dbe17c78367e7d60f00d78ae6781a35be47b4a1 # v45.0.1
+        uses: step-security/changed-files@2e07db73e5ccdb319b9a6c7766bd46d39d304bad # v47.0.5
         with:
           since_last_remote_commit: ${{ github.event_name != 'pull_request' }}
           files: |
@@ -52,17 +52,17 @@ jobs:
             src/aclk/aclk-schemas/
             src/ml/dlib/
           files_ignore: |
-            netdata.spec.in
             src/go/otel-collector/release-config.yaml.in
             **/*.md
       - name: Check build files
         id: check-build-files
-        uses: step-security/changed-files@3dbe17c78367e7d60f00d78ae6781a35be47b4a1 # v45.0.1
+        uses: step-security/changed-files@2e07db73e5ccdb319b9a6c7766bd46d39d304bad # v47.0.5
         with:
           since_last_remote_commit: ${{ github.event_name != 'pull_request' }}
           files: |
             **/*.cmake
             CMakeLists.txt
+            **/CMakeLists.txt
             netdata-installer.sh
             .github/data/distros.yml
             .github/workflows/build.yml
@@ -80,13 +80,14 @@ jobs:
             packaging/*.sh
             packaging/*.version
             packaging/*.checksums
+            tests/*.sh
           files_ignore: |
             packaging/**/*.md
             packaging/repoconfig/
             src/go/tools/topology-ip-intel-downloader/README.md
       - name: Check static build files
         id: check-static-build-files
-        uses: step-security/changed-files@3dbe17c78367e7d60f00d78ae6781a35be47b4a1 # v45.0.1
+        uses: step-security/changed-files@2e07db73e5ccdb319b9a6c7766bd46d39d304bad # v47.0.5
         with:
           since_last_remote_commit: ${{ github.event_name != 'pull_request' }}
           files: |

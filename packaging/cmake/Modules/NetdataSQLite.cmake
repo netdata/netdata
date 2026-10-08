@@ -2,13 +2,14 @@
 #
 # Handle bundling of SQLite.
 
+include_guard()
+
 include(ExternalProject)
 
 set(SQLITE_VERSION "3.53.4")
 set(SQLITE_VERSION_NUMBER "3530400")
 set(SQLITE_VERSION_YEAR "2026")
 set(SQLITE_TARBALL_SHA256 "d18fa15aec74d8c17e1463f861095adc01b5ad190256acb4f91d22f0368d232b")
-set(SQLITE_AUTOCONF_SHA256 "0e9483900e92cd5de8fd48d16bf9200145a61f7fd5be542a5ac81d8a9516eb9c")
 set(SQLITE_GIT_SHA "b09c88c14082339b66c7b7158d609a771e64ca69")
 
 option(SQLITE_USE_GIT "Fetch SQLite sources via git clone instead of tarball" OFF)
@@ -29,26 +30,31 @@ function(netdata_bundle_sqlite3)
                 # SQLite's UPDATE/DELETE LIMIT grammar is selected when Lemon
                 # generates parse.c, so compiling the amalgamation with the
                 # feature define alone is insufficient.
-                # Populate the source only; Netdata runs SQLite's own generator.
-                include(FetchContent)
-                include(NetdataFetchContentExtra)
-                set(_sqlite_fetch_only_options)
-                if(CMAKE_VERSION VERSION_GREATER_EQUAL 3.18)
-                        list(APPEND _sqlite_fetch_only_options SOURCE_SUBDIR _netdata_fetch_only)
-                endif()
-                if(SQLITE_USE_GIT)
-                        FetchContent_Declare(netdata_sqlite_source
-                                GIT_REPOSITORY https://github.com/sqlite/sqlite.git
-                                GIT_TAG "${SQLITE_GIT_SHA}"
-                                ${_sqlite_fetch_only_options})
+                if(NETDATA_SQLITE_SOURCE_DIR)
+                        message(STATUS "Using local SQLite sources: ${NETDATA_SQLITE_SOURCE_DIR}")
+                        set(sqlite_SOURCE_DIR "${NETDATA_SQLITE_SOURCE_DIR}")
                 else()
-                        FetchContent_Declare(netdata_sqlite_source
-                                URL "https://www.sqlite.org/${SQLITE_VERSION_YEAR}/sqlite-src-${SQLITE_VERSION_NUMBER}.zip"
-                                URL_HASH "SHA256=${SQLITE_TARBALL_SHA256}"
-                                ${_sqlite_fetch_only_options})
+                        # Populate the source only; Netdata runs SQLite's generators.
+                        include(FetchContent)
+                        include(NetdataFetchContentExtra)
+                        set(_sqlite_fetch_only_options)
+                        if(CMAKE_VERSION VERSION_GREATER_EQUAL 3.18)
+                                list(APPEND _sqlite_fetch_only_options SOURCE_SUBDIR _netdata_fetch_only)
+                        endif()
+                        if(SQLITE_USE_GIT)
+                                FetchContent_Declare(netdata_sqlite_source
+                                        GIT_REPOSITORY https://github.com/sqlite/sqlite.git
+                                        GIT_TAG "${SQLITE_GIT_SHA}"
+                                        ${_sqlite_fetch_only_options})
+                        else()
+                                FetchContent_Declare(netdata_sqlite_source
+                                        URL "https://www.sqlite.org/${SQLITE_VERSION_YEAR}/sqlite-src-${SQLITE_VERSION_NUMBER}.zip"
+                                        URL_HASH "SHA256=${SQLITE_TARBALL_SHA256}"
+                                        ${_sqlite_fetch_only_options})
+                        endif()
+                        FetchContent_Populate_Only(netdata_sqlite_source)
+                        set(sqlite_SOURCE_DIR "${netdata_sqlite_source_SOURCE_DIR}")
                 endif()
-                FetchContent_Populate_Only(netdata_sqlite_source)
-                set(sqlite_SOURCE_DIR "${netdata_sqlite_source_SOURCE_DIR}")
 
                 get_filename_component(_sqlite_ucrt_bin "${CMAKE_C_COMPILER}" DIRECTORY)
                 find_program(SQLITE_TCLSH_EXECUTABLE NAMES tclsh.exe HINTS "${_sqlite_ucrt_bin}" NO_DEFAULT_PATH)
@@ -88,37 +94,37 @@ function(netdata_bundle_sqlite3)
                 set(sqlite_SOURCE_DIR "${CMAKE_BINARY_DIR}/sqlite-src")
                 set(sqlite_BINARY_DIR "${CMAKE_BINARY_DIR}/sqlite-build")
 
-                if(SQLITE_USE_GIT)
-                        ExternalProject_Add(sqlite_project
+                if(NETDATA_SQLITE_SOURCE_DIR)
+                        message(STATUS "Using local SQLite sources: ${NETDATA_SQLITE_SOURCE_DIR}")
+                        set(sqlite_SOURCE_DIR "${NETDATA_SQLITE_SOURCE_DIR}")
+                        set(SQLITE_FETCH_ARGS "")
+                elseif(SQLITE_USE_GIT)
+                        set(SQLITE_FETCH_ARGS
                                 GIT_REPOSITORY https://github.com/sqlite/sqlite.git
-                                GIT_TAG "${SQLITE_GIT_SHA}"
-                                SOURCE_DIR "${sqlite_SOURCE_DIR}"
-                                BINARY_DIR "${sqlite_BINARY_DIR}"
-                                CONFIGURE_COMMAND "${sqlite_SOURCE_DIR}/configure" --enable-update-limit
-                                BUILD_COMMAND ${CMAKE_COMMAND} -E env MAKEFLAGS= make sqlite3.c sqlite3.h
-                                INSTALL_COMMAND ${CMAKE_COMMAND} -E copy
-                                        "${sqlite_BINARY_DIR}/sqlite3.c" "${sqlite_BINARY_DIR}/sqlite3.h"
-                                        "${sqlite_SOURCE_DIR}/ext/recover/sqlite3recover.c"
-                                        "${sqlite_SOURCE_DIR}/ext/recover/sqlite3recover.h"
-                                        "${sqlite_SOURCE_DIR}/ext/recover/dbdata.c" "${sqlite_OUTPUT_DIR}"
-                                BUILD_BYPRODUCTS ${_sqlite_outputs}
-                                UPDATE_DISCONNECTED ON)
+                                GIT_TAG "${SQLITE_GIT_SHA}")
                 else()
-                        ExternalProject_Add(sqlite_project
+                        set(SQLITE_FETCH_ARGS
                                 URL "https://www.sqlite.org/${SQLITE_VERSION_YEAR}/sqlite-src-${SQLITE_VERSION_NUMBER}.zip"
-                                URL_HASH "SHA256=${SQLITE_TARBALL_SHA256}"
-                                SOURCE_DIR "${sqlite_SOURCE_DIR}"
-                                BINARY_DIR "${sqlite_BINARY_DIR}"
-                                CONFIGURE_COMMAND "${sqlite_SOURCE_DIR}/configure" --enable-update-limit
-                                BUILD_COMMAND ${CMAKE_COMMAND} -E env MAKEFLAGS= make sqlite3.c sqlite3.h
-                                INSTALL_COMMAND ${CMAKE_COMMAND} -E copy
-                                        "${sqlite_BINARY_DIR}/sqlite3.c" "${sqlite_BINARY_DIR}/sqlite3.h"
-                                        "${sqlite_SOURCE_DIR}/ext/recover/sqlite3recover.c"
-                                        "${sqlite_SOURCE_DIR}/ext/recover/sqlite3recover.h"
-                                        "${sqlite_SOURCE_DIR}/ext/recover/dbdata.c" "${sqlite_OUTPUT_DIR}"
-                                BUILD_BYPRODUCTS ${_sqlite_outputs}
-                                UPDATE_DISCONNECTED ON)
+                                URL_HASH "SHA256=${SQLITE_TARBALL_SHA256}")
                 endif()
+
+                ExternalProject_Add(sqlite_project
+                        ${SQLITE_FETCH_ARGS}
+                        SOURCE_DIR "${sqlite_SOURCE_DIR}"
+                        BINARY_DIR "${sqlite_BINARY_DIR}"
+                        CONFIGURE_COMMAND "${sqlite_SOURCE_DIR}/configure" --enable-update-limit
+                        # GNU Make jobserver flags are not understood by FreeBSD make.
+                        BUILD_COMMAND "${CMAKE_COMMAND}" -E env MAKEFLAGS= make sqlite3.c sqlite3.h
+                        INSTALL_COMMAND ${CMAKE_COMMAND} -E copy
+                                "${sqlite_BINARY_DIR}/sqlite3.c"
+                                "${sqlite_BINARY_DIR}/sqlite3.h"
+                                "${sqlite_SOURCE_DIR}/ext/recover/sqlite3recover.c"
+                                "${sqlite_SOURCE_DIR}/ext/recover/sqlite3recover.h"
+                                "${sqlite_SOURCE_DIR}/ext/recover/dbdata.c"
+                                "${sqlite_OUTPUT_DIR}"
+                        BUILD_BYPRODUCTS ${_sqlite_outputs}
+                        EXCLUDE_FROM_ALL 1
+                        UPDATE_DISCONNECTED ON)
         endif()
 
         set(SQLITE_SOURCES "${sqlite_OUTPUT_DIR}/sqlite3.c"

@@ -1,11 +1,7 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 #
-# Platform detection code.
-#
-# This sets various OS_* and CPU_* variables based on the OS.
-#
-# This sorts out what OS and CPU we’re building for, which is
-# information used by numerous other parts of the build system.
+# Works out which OS and CPU we are building for and exposes the answer as
+# the OS_* and CPU_* facts the rest of the build system gates on.
 
 include_guard()
 
@@ -14,10 +10,6 @@ macro(_nd_windows_config)
 
   if(NOT "${CMAKE_INSTALL_PREFIX}" MATCHES "[/\\\\]opt[/\\\\]netdata$")
     message(FATAL_ERROR "CMAKE_INSTALL_PREFIX must end with /opt/netdata, but it is set to ${CMAKE_INSTALL_PREFIX}")
-  endif()
-
-  if(BUILD_FOR_PACKAGING)
-    set(NETDATA_RUNTIME_PREFIX "/")
   endif()
 
   set(BINDIR usr/bin)
@@ -29,6 +21,18 @@ macro(_nd_windows_config)
 
   if($ENV{CLION_IDE})
     set(RUN_UNDER_CLION True)
+
+    # clion needs these to find the includes
+    if("${CMAKE_SYSTEM_NAME}" STREQUAL "MSYS" OR "${CMAKE_SYSTEM_NAME}" STREQUAL "Windows")
+      if("$ENV{MSYSTEM}" STREQUAL "MSYS")
+        include_directories(c:/msys64/usr/include)
+        include_directories(c:/msys64/usr/include/w32api)
+      elseif("$ENV{MSYSTEM}" STREQUAL "MINGW64")
+        include_directories(c:/msys64/mingw64/include)
+      elseif("$ENV{MSYSTEM}" STREQUAL "UCRT64")
+        include_directories(c:/msys64/ucrt64/include)
+      endif()
+    endif()
   endif()
 
   message(STATUS " Compiling for Windows (${CMAKE_SYSTEM_NAME}, MSYSTEM=$ENV{MSYSTEM})... ")
@@ -47,9 +51,6 @@ set(CPU_OTHER   False)
 
 if("${CMAKE_SYSTEM_NAME}" STREQUAL "Darwin")
   set(OS_MACOS True)
-  find_library(IOKIT IOKit)
-  find_library(FOUNDATION Foundation)
-  find_library(OSLOG OSLog)
   message(STATUS " Compiling for MacOS... ")
 elseif("${CMAKE_SYSTEM_NAME}" STREQUAL "FreeBSD")
   set(OS_FREEBSD True)
