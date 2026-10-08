@@ -8,6 +8,9 @@
 extern struct config netdata_config;
 bool netdata_conf_load(char *filename, char overwrite_used, const char **user);
 
+// re-read one section from the netdata.conf netdata_conf_load() loaded
+bool netdata_conf_reload_section(const char *section);
+
 #include "netdata-conf-backwards-compatibility.h"
 #include "netdata-conf-db.h"
 #include "netdata-conf-directories.h"
