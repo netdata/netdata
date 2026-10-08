@@ -11,7 +11,7 @@ import (
 var sessionEventsMethod = method{
 	id:      "rum-session-events",
 	title:   "RUM Session Events",
-	help:    "Full retained and pending timeline for one session, ordered by original event time",
+	help:    "Full retained and pending timeline for one session, ordered by Agent receipt time; includes observations outside the history picker range",
 	sort:    "ts",
 	every:   10,
 	history: true,
@@ -23,7 +23,7 @@ func (h *Handler) sessionEventsRows(ctx context.Context, site, session string) (
 	var events []query.SessionEvent
 	events, err = h.deps.SessionEvents(ctx, site, session)
 	for _, e := range events {
-		rows = append(rows, []any{e.TSUnixUS, e.Type, e.Page, h.redact.Apply(e.Text), e.TraceID, h.redact.Apply(e.UserID), e.ExperienceID, h.redact.Apply(e.View), e.ViewID, e.MetricID, e.Revision})
+		rows = append(rows, []any{e.ObservedUS, e.Type, e.Page, h.redact.Apply(e.Text), e.TraceID, h.redact.Apply(e.UserID), e.ExperienceID, h.redact.Apply(e.View), e.ViewID, e.MetricID, e.Revision})
 	}
 	return rows, err
 }
@@ -38,8 +38,9 @@ var rumSessionEventsColumns = map[string]any{
 	}).BuildColumn(),
 	"ts": (funcapi.Column{
 		Index:         0,
-		Name:          "Time",
+		Name:          "Agent Observation Time",
 		Type:          funcapi.FieldTypeTimestamp,
+		ValueOptions:  funcapi.ValueOptions{Transform: funcapi.FieldTransformDatetimeUsec},
 		Visualization: funcapi.FieldVisualValue,
 		Visible:       true,
 		Sortable:      true,

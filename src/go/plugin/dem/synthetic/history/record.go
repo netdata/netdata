@@ -6,6 +6,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"strconv"
 
 	"github.com/netdata/netdata/go/plugins/plugin/dem/synthetic"
 	"github.com/netdata/systemd-journal-sdk/go/journal"
@@ -20,7 +21,7 @@ func (s *Store) AppendRun(ctx context.Context, phase string, run synthetic.Run) 
 	if run.ID == "" || run.JobID == "" || run.StartedUS <= 0 {
 		return false, fmt.Errorf("invalid synthetic history identity")
 	}
-	if phase == "complete" && run.CompletedUS < run.StartedUS {
+	if phase == "complete" && run.CompletedUS <= 0 {
 		return false, fmt.Errorf("invalid synthetic completion time")
 	}
 	data, err := json.Marshal(run)
@@ -30,6 +31,7 @@ func (s *Store) AppendRun(ctx context.Context, phase string, run synthetic.Run) 
 	return s.journal.Append(ctx, []journal.Field{
 		journal.StringField("DEM_KIND", "synthetic"), journal.StringField("DEM_PHASE", phase),
 		journal.StringField("DEM_JOB_ID", run.JobID), journal.StringField("DEM_RUN_ID", run.ID),
+		journal.StringField("DEM_STARTED_US", strconv.FormatInt(run.StartedUS, 10)),
 		journal.StringField("DEM_DATA", string(data)), journal.StringField("MESSAGE", "synthetic "+phase),
 	})
 }

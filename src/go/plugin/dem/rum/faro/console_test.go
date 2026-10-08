@@ -4,7 +4,6 @@ package faro
 
 import (
 	"encoding/json"
-	"os"
 	"os/exec"
 	"strings"
 	"testing"
@@ -13,13 +12,9 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// FARO_SDK_BUNDLE points at the unchanged CDN bundle, pinned by SHA256 in the
-// fixture. This opt-in check requires Node, but no browser or npm dependencies:
-// https://cdn.jsdelivr.net/npm/@grafana/faro-web-sdk@2.11.0/dist/bundle/faro-web-sdk.iife.js
+// The shipped, checksum-pinned SDK is exercised with Node and synthetic browser APIs.
 func TestPinnedSDKConsoleContract(t *testing.T) {
-	if os.Getenv("FARO_SDK_BUNDLE") == "" {
-		t.Skip("set FARO_SDK_BUNDLE to the pinned SDK IIFE to execute the upstream oracle")
-	}
+	requireNode(t)
 	for _, enabled := range []bool{false, true} {
 		name := "false"
 		if enabled {
@@ -28,7 +23,7 @@ func TestPinnedSDKConsoleContract(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			cmd := exec.Command("node", "testdata/console-sdk.cjs", name)
 			cmd.Stdin = strings.NewReader(
-				Bootstrap("shop", "https://rum.example.org", BootstrapOptions{
+				Bootstrap("shop", BootstrapOptions{
 					MeasureRate: 1,
 					ConsoleLogs: enabled,
 				}),

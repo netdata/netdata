@@ -184,6 +184,9 @@ func TestSuccessfulExecutionJoinsAndFinalizes(t *testing.T) {
 	assert.Nil(t, h.runs[0].Tests)
 	assert.Nil(t, h.runs[0].DurationMS)
 	assert.Zero(t, h.runs[0].CompletedUS)
+	assert.Positive(t, h.runs[0].StartedUS)
+	assert.Equal(t, h.runs[0].StartedUS, h.runs[1].StartedUS)
+	assert.Equal(t, h.runs[0].StartedUS, execution.Run.StartedUS)
 	assert.Equal(t, execution.Run.Tests, h.runs[1].Tests)
 	execution.Run.Tests.Passed = 0
 	assert.Equal(t, 1, h.runs[1].Tests.Passed)

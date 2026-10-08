@@ -38,7 +38,7 @@ Each node is either:
 |-----------------|-------------------------------------------------------------------------------|--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
 | **label**       | The label shown in the sidebar.                                               | For category overview pages, this should match the sidebar position. Categories are defined by having `items`.                                                                             |
 | **path**        | Single path segment override (optional).                                      | Used when the document's Learn path segment differs from the tree structure. Example: `OpenTelemetry` (not a full path). If omitted, the path is derived from the tree hierarchy.          |
-| **edit_url**    | Full GitHub **Edit** link for the file. Used for the "Edit this page" button. | Must use the full link (supports repos beyond `netdata/netdata`). Can be omitted only for nodes with `integration_placeholder` children (the integrations themselves will have edit URLs). |
+| **edit_url**    | Full GitHub **Edit** link for the file. Used for the "Edit this page" button. | Must use the full link (supports repos beyond `netdata/netdata`). Can be omitted only for a category node (one with `items`), which then has no page of its own; a node with `integration_placeholder` children omits it because the integrations themselves have edit URLs. |
 | **keywords**    | List of keywords for search.                                                  | Example: `["install", "linux"]`                                                                                                                                                            |
 | **description** | Page description used by Learn metadata, search, and social previews.          | Write an accurate plain-text summary. Generated integration descriptions are not authored in this map; their metadata sources and validation contract are documented in [Integration description authoring](../../.agents/skills/integrations-lifecycle/description-authoring.md).          |
 
@@ -116,7 +116,8 @@ Once your docs PR is merged:
 
 If you **delete**, **move**, or **unpublish** a file, redirects may break.
 
-1. Open [LegacyLearnCorrelateLinksWithGHURLs.json](https://github.com/netdata/learn/blob/master/LegacyLearnCorrelateLinksWithGHURLs.json).
-2. Search (`Ctrl+F`) for the old GitHub link.
-3. Update the entry to a relevant new location.
-4. If no suitable replacement exists → remove the entry.
+1. Update the file's node in `map.yaml`: set `edit_url` to the file's new path, or remove the node if the page is retired. The docs PR check runs `validate_map_schema.py`, which fails while a `netdata/netdata` `edit_url` names a file that does not exist.
+2. Open [LegacyLearnCorrelateLinksWithGHURLs.json](https://github.com/netdata/learn/blob/master/LegacyLearnCorrelateLinksWithGHURLs.json).
+3. Search (`Ctrl+F`) for the old GitHub link.
+4. Update the entry to a relevant new location.
+5. If no suitable replacement exists → remove the entry.

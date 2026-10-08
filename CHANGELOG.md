@@ -66,6 +66,22 @@
 - Refactor(go.d): extract streaming-command supervision into streamexec ([#24175](https://github.com/netdata/netdata/issues/24175))
 - Refactor(go.d/nvidia_smi): run loop mode on the shared streamexec supervisor ([#24177](https://github.com/netdata/netdata/issues/24177))
 - Fix Windows startup crash with a patched MSYS2 runtime ([#24170](https://github.com/netdata/netdata/issues/24170))
+- Add workflow to upload updater script to artifacts.netdata.cloud. ([#24179](https://github.com/netdata/netdata/issues/24179))
+- Feat(go.d): add an owned ndsudo start and bound streamexec termination ([#24180](https://github.com/netdata/netdata/issues/24180))
+- Test(go/jobmgr): stop asserting Cleanup ordering the job manager doesnot guarantee ([#24181](https://github.com/netdata/netdata/issues/24181))
+- Fix(go.d/redfish): accept same-origin resource URI aliases ([#24186](https://github.com/netdata/netdata/issues/24186))
+- Feat(dem): select retained history by observation and run start ([#24159](https://github.com/netdata/netdata/issues/24159))
+- Docs(functions): correct the rowOptions row styling contract ([#24184](https://github.com/netdata/netdata/issues/24184))
+- Fix(functions): style failed API calls as critical in the progress Function ([#24185](https://github.com/netdata/netdata/issues/24185))
+- Refactor(go.d/intelgpu): run intel_gpu_top on the shared streamexec supervisor ([#24182](https://github.com/netdata/netdata/issues/24182))
+- Feat(ipmi): add opt-in experimental Go collector ([#24178](https://github.com/netdata/netdata/issues/24178))
+- Fix(go.d/snmp_traps): require authentication from SNMPv3 users configured with it ([#24188](https://github.com/netdata/netdata/issues/24188))
+- Fix dead Learn links and map rows; add ML and AWS Marketplace facts to the product description ([#24174](https://github.com/netdata/netdata/issues/24174))
+- Regenerate integrations docs ([#24134](https://github.com/netdata/netdata/issues/24134))
+- Feat(dem): make RUM installation explicit and receiver-hosted ([#24187](https://github.com/netdata/netdata/issues/24187))
+- Regenerate integrations docs ([#24190](https://github.com/netdata/netdata/issues/24190))
+- Docs: add alt text to the badge examples on the badges page ([#24191](https://github.com/netdata/netdata/issues/24191))
+- Build(deps): bump github.com/tidwall/gjson from 1.19.0 to 1.19.1 in /src/go ([#24193](https://github.com/netdata/netdata/issues/24193))
 
 ## [2.12.0] - 2026-09-30
 

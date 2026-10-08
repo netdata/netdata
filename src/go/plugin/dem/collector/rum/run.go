@@ -7,9 +7,7 @@ import (
 	"crypto/rand"
 	"encoding/hex"
 	"errors"
-	"net/http"
 	"sync"
-	"time"
 
 	"github.com/netdata/netdata/go/plugins/plugin/dem/rum/diagnostics"
 	"github.com/netdata/netdata/go/plugins/plugin/dem/rum/history"
@@ -48,7 +46,7 @@ func (c *Collector) Run(ctx context.Context, ready func()) error {
 	}
 	writer := history.NewWriter(c.Name, c.deps.History, c.aggregator)
 	c.aggregator.SetHistorySink(writer)
-	state := diagnostics.New(c.Site)
+	state := diagnostics.New()
 	route := httpapi.NewRoute(c.Site, p, state)
 	var id [16]byte
 	if _, err := rand.Read(id[:]); err != nil {
@@ -91,31 +89,10 @@ func (c *Collector) Run(ctx context.Context, ready func()) error {
 	if p.traces != nil {
 		workers.Go(func() { p.traces.Run(workersCtx, final) })
 	}
-	probeCtx, stopProbes := context.WithCancel(ctx)
-	probesDone := make(chan struct{})
-	client := &http.Client{
-		Timeout: 15 * time.Second,
-	}
-	go func() {
-		defer close(probesDone)
-		state.RunReachability(probeCtx, 5*time.Minute, c.probeBase, client)
-	}()
 	ready()
 	<-ctx.Done()
-	stopProbes()
 	retire()
-	<-probesDone
-	client.CloseIdleConnections()
 	stopWorkers()
 	workers.Wait()
 	return nil
-}
-
-// probeBase supplies only an explicitly configured address. With none, the
-// diagnostic owner probes the trusted-proxy address it learned before promoting it.
-func (c *Collector) probeBase() string {
-	if c.PublicURL != "" {
-		return c.PublicURL
-	}
-	return c.deps.Registry.Availability().PublicURL
 }

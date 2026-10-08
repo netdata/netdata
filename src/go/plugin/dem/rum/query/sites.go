@@ -5,7 +5,6 @@ import (
 	"context"
 	"strings"
 
-	"github.com/netdata/netdata/go/plugins/plugin/dem/rum/diagnostics"
 	rumregistry "github.com/netdata/netdata/go/plugins/plugin/dem/rum/registry"
 )
 
@@ -14,28 +13,16 @@ func (s *Service) Sites(ctx context.Context) ([]Site, error) {
 	state := s.registry.Availability()
 	err := s.visit(ctx, "", func(key string, site *rumregistry.Site) {
 		cfg := site.Route.Config()
-		fallback := state.PublicURL
-		if fallback == "" && state.Listen != "" {
-			fallback = diagnostics.ListenerBase(state.Listen, state.TLS)
+		publicBase := cfg.PublicURL
+		if publicBase == "" {
+			publicBase = state.PublicURL
 		}
-		// Explicit receiver configuration takes effect immediately, even while
-		// the site's last successful probe still describes an older proxy URL.
-		publicBase := strings.TrimRight(state.PublicURL, "/")
-		if cfg.PublicURL != "" || publicBase == "" {
-			publicBase = site.Diagnostics.PublicBase(fallback)
+		scriptURL := ""
+		if publicBase != "" {
+			scriptURL = strings.TrimRight(publicBase, "/") + "/rum/" + cfg.Name + ".js"
 		}
-		reach, _ := site.Diagnostics.Reachability()
-		snippet, _ := site.Diagnostics.Snippet()
 		rejected, _ := site.Diagnostics.LastRejectedOrigin()
-		if reach.State == "" {
-			reach.State = diagnostics.ReachUnknown
-		}
-		if snippet.State == "" {
-			snippet.State = diagnostics.SnippetUnchecked
-		}
 		redact := siteRedactor(site)
-		reach.Error = redact.Apply(reach.Error)
-		snippet.Detail = redact.Apply(snippet.Detail)
 		rejected.Origin = redact.Apply(rejected.Origin)
 		cfg.DisplayName = redact.Apply(cfg.DisplayName)
 		cfg.AllowedOrigins = append([]string(nil), cfg.AllowedOrigins...)
@@ -58,20 +45,14 @@ func (s *Service) Sites(ctx context.Context) ([]Site, error) {
 					Geolocation:        cfg.GeolocationMode(),
 					FrustrationSignals: cfg.FrustrationSignalsOn(),
 				},
-				Activity: Activity(site.Aggregator.Activity()),
-				Reach: Diagnostic{
-					State:  reach.State,
-					Detail: reach.Error,
-				},
-				Snippet: Diagnostic{
-					State:  snippet.State,
-					Detail: snippet.Detail,
-				},
+				Activity:          Activity(site.Aggregator.Activity()),
+				Generation:        site.Generation,
+				CollectionEnabled: cfg.MeasureRate() > 0,
 				Rejected: Rejection{
 					Origin: rejected.Origin,
 					At:     rejected.At,
 				},
-				PublicBase: redact.Apply(publicBase),
+				ScriptURL: redact.Apply(scriptURL),
 			},
 		)
 	})

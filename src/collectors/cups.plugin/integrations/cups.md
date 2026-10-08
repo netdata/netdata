@@ -27,7 +27,7 @@ The plugin uses CUPS shared library to connect and monitor the server.
 
 This collector is supported on all platforms.
 
-This collector supports collecting metrics from multiple instances of this integration, including remote instances.
+This collector supports collecting metrics from multiple instances of this integration.
 
 The plugin needs to access the server. Netdata sets permissions during installation time to reach the server through its library.
 

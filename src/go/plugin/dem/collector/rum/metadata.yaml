@@ -49,18 +49,22 @@ modules:
                     type: string
                     unit: ''
                     description: Name.
-                  - name: status
+                  - name: generation
                     type: string
                     unit: ''
-                    description: Status.
-                  - name: beacon_url
+                    description: Receiving runtime identity; does not identify the browser policy revision.
+                  - name: collection_enabled
+                    type: boolean
+                    unit: ''
+                    description: Whether current site policy permits measurement collection.
+                  - name: script_url
                     type: string
                     unit: ''
-                    description: Beacon URL.
+                    description: External script URL from explicit configuration; null when no public URL is configured.
                   - name: snippet
                     type: string
                     unit: ''
-                    description: Snippet.
+                    description: Copyable external script tag; null when no public URL is configured.
                   - name: allowed_origins
                     type: string
                     unit: ''
@@ -68,11 +72,15 @@ modules:
                   - name: beacons_per_min
                     type: integer
                     unit: ''
-                    description: Beacons / min.
+                    description: Accepted payloads in the last minute; not visitors or durable history records.
+                  - name: last_beacon_at
+                    type: timestamp
+                    unit: ''
+                    description: Last accepted payload time in Unix microseconds; null when none has been accepted by this runtime.
                   - name: last_beacon_age_s
                     type: integer
                     unit: ''
-                    description: Last Beacon (s ago).
+                    description: Seconds since the last accepted payload; null when none has been accepted by this runtime.
                   - name: observed_sessions
                     type: integer
                     unit: ''
@@ -89,15 +97,7 @@ modules:
                   - name: rejected_per_min
                     type: integer
                     unit: ''
-                    description: Rejected / min.
-                  - name: reachable
-                    type: string
-                    unit: ''
-                    description: Reachable.
-                  - name: reach_detail
-                    type: string
-                    unit: ''
-                    description: Reachability Detail.
+                    description: Origin, rate and size rejections in the last minute; excludes invalid payloads and bot exclusions.
                   - name: measured
                     type: string
                     unit: ''
@@ -115,22 +115,18 @@ modules:
                     type: integer
                     unit: ''
                     description: Bots Filtered / min.
-                  - name: snippet_check
-                    type: string
-                    unit: ''
-                    description: Snippet On Site.
-                  - name: snippet_detail
-                    type: string
-                    unit: ''
-                    description: Snippet Detail.
                   - name: last_rejected_origin
                     type: string
                     unit: ''
-                    description: Last Rejected Origin.
+                    description: Last observed rejected origin, including preflight requests; not a recommendation to allow it.
+                  - name: last_rejected_at
+                    type: timestamp
+                    unit: ''
+                    description: Last rejected-origin observation time in Unix microseconds; null when none was observed.
                   - name: last_rejected_age_s
                     type: integer
                     unit: ''
-                    description: Last Rejection (s ago).
+                    description: Seconds since the last rejected-origin observation; null when none was observed.
                   - name: capture_geolocation
                     type: string
                     unit: ''
@@ -399,7 +395,7 @@ modules:
           - id: rum-sessions
             function_name: rum-sessions
             name: RUM Sessions
-            description: Investigate retained sampled sessions that overlap a time range, including pages, errors and
+            description: Investigate sampled sessions with retained observations received within a time range, including pages, errors and
                 optional interaction heuristics.
             parameters:
               - id: site
@@ -419,22 +415,25 @@ modules:
                 options: []
               - id: after
                 name: after
-                description: Start of the saved-time range as Unix seconds or a negative offset from now.
+                description: Inclusive Agent receipt-time lower bound in Unix seconds; zero is epoch and negative
+                    values are offsets from now.
                 type: integer
                 required: false
-                default: 15 minutes before before
+                default: 15 minutes before before, clamped to epoch
                 options: []
               - id: before
                 name: before
-                description: End of the saved-time range as Unix seconds or a negative offset from now.
+                description: Inclusive Agent receipt-time upper bound in Unix seconds; zero is epoch and negative
+                    values are offsets from now.
                 type: integer
                 required: false
                 default: now
                 options: []
             returns:
-                description: One session with retained activity saved in the selected range. Counts and activity span
-                    cover retained events, not lifetime totals. Results can include disabled sites until their history
-                    expires.
+                description: One session with retained observations originally received by the Agent in the selected range.
+                    Counts and activity span cover selected observations, not lifetime totals. Sessions are ordered
+                    by last selected observation at microsecond precision. Late-saved context can change an earlier
+                    range. Results can include disabled sites until their history expires.
                 columns:
                   - name: site
                     type: string
@@ -447,11 +446,11 @@ modules:
                   - name: started_age_s
                     type: integer
                     unit: ''
-                    description: First Retained Event (s ago).
+                    description: First Selected Observation (s ago).
                   - name: duration_s
                     type: integer
                     unit: ''
-                    description: Retained Activity Span (s).
+                    description: Selected Observation Span (s).
                   - name: pageviews
                     type: integer
                     unit: ''
@@ -502,6 +501,10 @@ modules:
                     type: integer
                     unit: ''
                     description: Retained application-view occurrences.
+                  - name: last_observed_us
+                    type: timestamp
+                    unit: ''
+                    description: Last Selected Observation in Unix microseconds; default descending sort.
             performance: Reads local retained history; work grows with the selected range and retained records.
             security: Results can include page paths, browser metadata, user identifiers, error messages and stack
                 traces. Restrict access to authorized operators.
@@ -512,8 +515,8 @@ modules:
           - id: rum-errors
             function_name: rum-errors
             name: RUM Errors
-            description: Group errors saved in the selected range by fingerprint; select a fingerprint to investigate
-                affected sessions, pages and browsers.
+            description: Group errors originally received by the Agent in the selected range by fingerprint; select a
+                fingerprint to investigate affected sessions, pages and browsers.
             parameters:
               - id: site
                 name: site
@@ -532,22 +535,25 @@ modules:
                 options: []
               - id: after
                 name: after
-                description: Start of the saved-time range as Unix seconds or a negative offset from now.
+                description: Inclusive Agent receipt-time lower bound in Unix seconds; zero is epoch and negative
+                    values are offsets from now.
                 type: integer
                 required: false
-                default: 15 minutes before before
+                default: 15 minutes before before, clamped to epoch
                 options: []
               - id: before
                 name: before
-                description: End of the saved-time range as Unix seconds or a negative offset from now.
+                description: Inclusive Agent receipt-time upper bound in Unix seconds; zero is epoch and negative
+                    values are offsets from now.
                 type: integer
                 required: false
                 default: now
                 options: []
             returns:
-                description: One error fingerprint per site with events saved in the selected range. Affected-session,
-                    page and browser statistics are null until a fingerprint is selected; first and last seen use
-                    original event time. Results can include disabled sites until their history expires.
+                description: One error fingerprint per site with observations originally received by the Agent in the selected
+                    range. Affected-session, page and browser statistics are null until a fingerprint is selected;
+                    first and last observations use Agent receipt time. Results can include disabled sites until their
+                    history expires.
                 columns:
                   - name: site
                     type: string
@@ -576,11 +582,11 @@ modules:
                   - name: first_seen_age_s
                     type: integer
                     unit: ''
-                    description: First Seen (s ago).
+                    description: First Selected Observation (s ago).
                   - name: last_seen_age_s
                     type: integer
                     unit: ''
-                    description: Last Seen (s ago).
+                    description: Last Selected Observation (s ago).
                   - name: top_page
                     type: string
                     unit: ''
@@ -628,9 +634,10 @@ modules:
                 default: ''
                 options: []
             returns:
-                description: One retained or pending session event, with original observation time in Unix microseconds
+                description: One retained or pending session event, with Agent receipt time in Unix microseconds
                     and an optional trace identifier. The available session timeline is returned without range
-                    filtering. Unknown sessions return an error.
+                    filtering. Activity-only observations contribute to summaries, not this timeline.
+                    Unknown sessions return an error.
                 columns:
                   - name: ts
                     type: timestamp
@@ -1556,8 +1563,7 @@ modules:
                     name: allowed_origins
                     required: true
                   - default_value: ""
-                    description: Externally reachable collector base URL for this site. Leave empty to use the receiver
-                        public URL.
+                    description: Public receiver base URL used for this site's installation snippet. Leave empty to use the receiver public URL.
                     group: Site
                     name: public_url
                     required: false
@@ -1760,8 +1766,9 @@ modules:
                     independently managed jobs.
                 title: Configure the receiver and site
               - description: Add `<script async src="https://rum.example.org/rum/shop.js"></script>` to the website,
-                    replacing the public receiver URL and site key. Allow this collector and the pinned Faro SDK CDN in
-                    the website Content Security Policy.
+                    replacing the configured public receiver URL and site key. The receiver serves the pinned SDK too;
+                    allow its script and connection URLs in the website Content Security Policy. Proxy the entire
+                    RUM path, including SDK assets and collect requests. A script-only redirect is insufficient.
                 title: Install the browser snippet
               - description: Event logs and tracing are optional and disabled by default. Enable an OTLP/gRPC receiver
                     separately. In the receiving Netdata node's Logs tab, select `otel-logs` and the `netdata-rum`
@@ -1785,9 +1792,14 @@ modules:
     troubleshooting:
         problems:
             list:
-              - description: Check receiver availability, the installed snippet URL and the site allowed origins. Open
-                    the rum-sites Function for reachability and rejected-origin diagnostics. Missing vital samples
-                    produce gaps, including when the receiver is unavailable.
+              - description: Open `rum-sites` for receiver availability, collection policy and last accepted payload or rejected-origin
+                    observations. Missing traffic alone is not failure. In the website browser Network panel, follow
+                    the script request, SDK request and collect POST; check console CSP and Netdata RUM errors.
+                    POST 202 means accepted, 204 means intentional bot or disabled-collection exclusion, 400 invalid
+                    payload, 403 origin rejection, 404 missing site runtime or incorrect proxy path, 413 size rejection
+                    and 429 rate limiting. For 404, check native job state and the request path. A fresh session can still
+                    be sampled out; explicitly select 100% collection for a deterministic eligible-session check.
+                    Receipt does not prove human traffic, retained history or export delivery.
                 name: No browser measurements
               - description: Check that the required signal is enabled and its receiver accepts OTLP/gRPC at the
                     configured explicit http or https URL and port. Verify Bearer authentication, TLS trust and paired

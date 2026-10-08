@@ -26,7 +26,7 @@
       },
       "public_url": {
         "title": "Public URL",
-        "description": "Externally reachable collector base URL for this site. Leave empty to use the receiver public URL.",
+        "description": "Public receiver base URL used for this site's installation snippet. Leave empty to use the receiver public URL.",
         "type": "string"
       },
       "update_every": {

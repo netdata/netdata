@@ -71,6 +71,7 @@ func (s *Server) Handler() http.Handler {
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /rum/demo", s.demo)
 	mux.HandleFunc("GET /rum/ping", ping)
+	mux.HandleFunc("GET /rum/assets/{asset}", s.asset)
 	mux.HandleFunc("GET /rum/{file}", s.bootstrap)
 	mux.HandleFunc("POST /rum/{key}/collect", s.collect)
 	mux.HandleFunc("OPTIONS /rum/{key}/collect", s.preflight)

@@ -16,9 +16,9 @@ import (
 )
 
 // 10,000 retained rows span 200 sessions, seven error fingerprints, and 20
-// archives. Saved time spans 10,000 seconds; the recent window selects 900 rows.
-// Snapshot admission stores O(retained rows) offsets. Reducers then retain only
-// distinct summary keys or the requested timeline output, scanning outside the
+// archives. Receipt time spans 10,000 seconds; the recent window selects 891 rows.
+// Snapshot admission captures bounded index metadata per file. Reducers retain only
+// distinct summary keys or the requested timeline output, traversing outside the
 // writer gate. Selected fingerprint details retain its distinct session/page/
 // browser values. Timings are development-machine observations, not CI gates.
 func BenchmarkHistoryQueries(b *testing.B) {
@@ -32,7 +32,8 @@ func BenchmarkHistoryQueries(b *testing.B) {
 	log, err := journal.NewLog(
 		root,
 		journal.LogConfig{
-			Source: "dem",
+			Source:              "dem",
+			StrictSystemdNaming: true,
 			Options: journal.Options{
 				MachineID: host.MachineID(),
 				BootID:    host.BootID(),
@@ -48,14 +49,14 @@ func BenchmarkHistoryQueries(b *testing.B) {
 	for i := 0; i < 10000; i++ {
 		saved := now.Add(time.Duration(i-9999) * time.Second)
 		r := EventRecord{
-			Site:      "shop",
-			SessionID: fmt.Sprintf("session-%d", i%200),
-			TSUnixUS:  saved.Add(-10 * time.Second).UnixMicro(),
-			Type:      "pageview",
-			Page:      fmt.Sprintf("/page/%d", i%20),
-			Browser:   fmt.Sprintf("browser-%d", i%3),
-			Country:   "DE",
-			Device:    "desktop",
+			Site:       "shop",
+			SessionID:  fmt.Sprintf("session-%d", i%200),
+			ObservedUS: saved.Add(-10 * time.Second).UnixMicro(),
+			Type:       "pageview",
+			Page:       fmt.Sprintf("/page/%d", i%20),
+			Browser:    fmt.Sprintf("browser-%d", i%3),
+			Country:    "DE",
+			Device:     "desktop",
 		}
 		if i%4 == 0 {
 			r.Type = "error"
@@ -66,7 +67,7 @@ func BenchmarkHistoryQueries(b *testing.B) {
 		}
 		opts := host.EntryOptions()
 		opts.RealtimeUsec = uint64(saved.UnixMicro())
-		if err := log.Append(eventFields(r), opts); err != nil {
+		if err := log.Append(storedEventFields(r), opts); err != nil {
 			b.Fatal(err)
 		}
 	}
@@ -113,4 +114,32 @@ func BenchmarkHistoryQueries(b *testing.B) {
 			}
 		})
 	}
+}
+
+// Measures synchronous AppendEvent validation, encoding and SDK append. It excludes
+// queueing, periodic Sync, rotation and retention. The journal grows throughout each
+// run; use a fixed count (e.g. -benchtime=50000x) when comparing implementations.
+func BenchmarkHistoryEventAppend(b *testing.B) {
+	ctx := context.Background()
+	owner, err := demjournal.Open(ctx, "")
+	if err != nil {
+		b.Fatal(err)
+	}
+	defer owner.Close()
+	store := NewStore(owner)
+	event := EventRecord{
+		Revision: 1, Site: "shop", SessionID: "session", Type: "error",
+		Page: "/checkout", Browser: "Firefox", Country: "GR", Device: "desktop",
+		Version: "release-1", UserID: "user-id", Fingerprint: "fingerprint",
+		ErrorType: "TypeError", Message: "request failed", SampleStack: "app.js:10",
+	}
+	b.ReportAllocs()
+	b.ResetTimer()
+	for i := range b.N {
+		event.ObservedUS = 1_700_000_000_000_000 + int64(i)*1_000_000
+		if _, err := store.AppendEvent(ctx, event); err != nil {
+			b.Fatal(err)
+		}
+	}
+	b.StopTimer()
 }

@@ -35,6 +35,19 @@ func ParseSNMPv3SecurityLevel(level string) gosnmp.SnmpV3MsgFlags {
 	}
 }
 
+// SNMPv3SecurityLevel returns the USM security level the given protocols provide. Privacy without
+// authentication is not a valid USM level, so it yields NoAuthNoPriv.
+func SNMPv3SecurityLevel(auth gosnmp.SnmpV3AuthProtocol, priv gosnmp.SnmpV3PrivProtocol) gosnmp.SnmpV3MsgFlags {
+	switch {
+	case auth == 0 || auth == gosnmp.NoAuth:
+		return gosnmp.NoAuthNoPriv
+	case priv == 0 || priv == gosnmp.NoPriv:
+		return gosnmp.AuthNoPriv
+	default:
+		return gosnmp.AuthPriv
+	}
+}
+
 func ParseSNMPv3AuthProtocol(protocol string) gosnmp.SnmpV3AuthProtocol {
 	switch protocol {
 	case "1", "none", "noAuth", "":

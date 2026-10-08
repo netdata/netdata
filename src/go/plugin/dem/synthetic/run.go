@@ -47,6 +47,8 @@ type LabMetrics struct {
 
 // Run is a self-contained immutable history/diagnosis record. A missing
 // CompletedUS means no verified terminal result, never an invented failure.
+// StartedUS is immutable across both phases. Positive completion wall time may
+// precede start after a clock adjustment; DurationMS is measured independently.
 type Run struct {
 	ID            string      `json:"id"`
 	JobID         string      `json:"job_id"`

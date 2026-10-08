@@ -26,7 +26,7 @@ This collector is supported on all platforms.
 [% endif %]
 
 [% if entry.overview.multi_instance %]
-This collector supports collecting metrics from multiple instances of this integration, including remote instances.
+This collector supports collecting metrics from multiple instances of this integration.
 [% else %]
 This collector only supports collecting metrics from a single instance of this integration.
 [% endif %]

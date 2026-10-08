@@ -126,7 +126,7 @@ func TestPromotionPreservesOriginalContext(t *testing.T) {
 		assert.Equal(t, "GR", e.Country)
 		assert.Equal(t, "Chrome", e.Browser)
 		assert.Equal(t, "desktop", e.Device)
-		assert.Equal(t, before.Received.UnixMicro(), e.TSUnixUS)
+		assert.Equal(t, before.Received.UnixMicro(), e.ObservedUS)
 	}
 	for _, e := range h.events[2:] {
 		assert.Equal(t, "identity-after", e.UserID)

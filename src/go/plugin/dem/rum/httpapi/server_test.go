@@ -509,7 +509,9 @@ func (g fullGeo) Lookup(string) (string, string, float64, float64, bool) {
 
 func TestGeoCityLatLonAppliedFromResolver(t *testing.T) {
 	cfg := testCfg()
-	cfg.Sites[0].Capture = &config.Capture{Geolocation: new(config.GeolocationCity)}
+	cfg.Sites[0].Capture = &config.Capture{
+		Geolocation: new(config.GeolocationCity),
+	}
 	sink := newRecSink()
 	_, ts := newTestServer(
 		t,
@@ -594,13 +596,13 @@ func TestBootstrapAndDemo(t *testing.T) {
 		t.Fatalf("bootstrap status %d type %s", resp.StatusCode, resp.Header.Get("Content-Type"))
 	}
 	js := string(body)
-	for _, want := range []string{"load('faro-web-sdk'", `'@` + faro.Version + `/dist/bundle/'`, `})("demo", "` + ts.URL + `", {`, "/rum/' + k + '/collect"} {
+	for _, want := range []string{faro.SDKPath, faro.TracingPath, `})("demo", {`, "encodeURIComponent(k) + '/collect'"} {
 		if !strings.Contains(js, want) {
 			t.Fatalf("bootstrap missing %q in:\n%s", want, js)
 		}
 	}
-	if resp.Header.Get("Access-Control-Allow-Origin") != "" {
-		t.Fatal("bootstrap is a public asset and must not carry ACAO")
+	if resp.Header.Get("Access-Control-Allow-Origin") != "*" {
+		t.Fatal("bootstrap is a public asset and must permit anonymous CORS reads")
 	}
 
 	resp, err = ts.Client().Get(ts.URL + "/rum/demo")

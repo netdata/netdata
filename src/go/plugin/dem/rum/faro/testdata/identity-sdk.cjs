@@ -5,7 +5,7 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const vm = require('node:vm');
 const crypto = require('node:crypto');
-const bundle = fs.readFileSync(process.env.FARO_SDK_BUNDLE);
+const bundle = fs.readFileSync(require('node:path').join(__dirname, '../assets/faro-web-sdk.iife.js'));
 assert.equal(crypto.createHash('sha256').update(bundle).digest('hex'),
   'd7be021a7344131c89c02cf5b39aa9825c21cf17482bc1cd47e23cd7023ce118');
 const bootstrap = fs.readFileSync(0, 'utf8');
@@ -62,7 +62,7 @@ const c = {
 };
 c.window = c;
 c.document = {
-  location: c.location, cookie: '', readyState: 'complete', visibilityState: 'visible', currentScript: null,
+  location: c.location, cookie: '', readyState: 'complete', visibilityState: 'visible', currentScript: { src: 'https://rum.example.org/rum/shop.js', getAttribute() { return null; } },
   addEventListener: add, removeEventListener: remove, createElement() { return {}; },
   head: { appendChild(script) {
     c.location.href = 'https://shop.example.org/loading-route?private=route';
@@ -80,6 +80,7 @@ c.document = {
     script.onload();
   } },
 };
+require('./script-context.cjs')(c);
 vm.createContext(c);
 const tick = () => new Promise(resolve => setTimeout(resolve, 15));
 const settle = () => new Promise(resolve => setTimeout(resolve, 350));

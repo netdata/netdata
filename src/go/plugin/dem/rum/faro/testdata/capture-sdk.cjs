@@ -5,7 +5,7 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const vm = require('node:vm');
 const crypto = require('node:crypto');
-const bundle = fs.readFileSync(process.env.FARO_SDK_BUNDLE);
+const bundle = fs.readFileSync(require('node:path').join(__dirname, '../assets/faro-web-sdk.iife.js'));
 assert.equal(crypto.createHash('sha256').update(bundle).digest('hex'),
   'd7be021a7344131c89c02cf5b39aa9825c21cf17482bc1cd47e23cd7023ce118');
 const bootstrap = fs.readFileSync(0, 'utf8');
@@ -37,12 +37,12 @@ const context = {
 context.window = context;
 context.document = {
   location: context.location, cookie: '', readyState: 'complete', visibilityState: 'visible',
-  currentScript: { getAttribute: key => ({ 'data-version': 'release-1', 'data-env': 'test' })[key] },
+  currentScript: { src: 'https://rum.example.org/rum/shop.js', getAttribute: key => ({ 'data-version': 'release-1', 'data-env': 'test' })[key] },
   addEventListener(name, callback) { (listeners['document:' + name] ??= []).push(callback); }, removeEventListener() {},
   createElement() { return {}; },
   head: { appendChild(script) {
     if (script.src.includes('faro-web-tracing')) { script.onerror(); return; }
-    assert.match(script.src, /faro-web-sdk@2\.11\.0/);
+    assert.match(script.src, /faro-web-sdk-2\.11\.0-/);
     vm.runInContext(bundle.toString(), context);
     sdk = context.GrafanaFaroWebSdk;
     class Capture extends sdk.BaseTransport {
@@ -62,6 +62,7 @@ context.document = {
     script.onload();
   } },
 };
+require('./script-context.cjs')(context);
 vm.createContext(context);
 const plain = value => JSON.parse(JSON.stringify(value));
 async function run() {

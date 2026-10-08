@@ -12,11 +12,11 @@ For each metric/dimension and for arbitrary time-frames badges can show **min**,
 
 For example, there is [a chart in Netdata that shows the current requests/s of nginx](http://london.my-netdata.io/#nginx_local_nginx). Using this chart alone we can show the following badges (we could add more time-frames, like **today**, **yesterday**, etc):
 
-<a href="https://registry.my-netdata.io/#nginx_local_nginx"><img src="https://registry.my-netdata.io/api/v1/badge.svg?chart=nginx_local.connections&dimensions=active&value_color=grey:null%7Cblue&label=nginx%20active%20connections%20now&units=null&precision=0"/></a>  <a href="https://registry.my-netdata.io/#nginx_local_nginx"><img src="https://registry.my-netdata.io/api/v1/badge.svg?chart=nginx_local.connections&dimensions=active&after=-3600&value_color=orange&label=last%20hour%20average&units=null&options=unaligned&precision=0"/></a> <a href="https://registry.my-netdata.io/#nginx_local_nginx"><img src="https://registry.my-netdata.io/api/v1/badge.svg?chart=nginx_local.connections&dimensions=active&group=max&after=-3600&value_color=red&label=last%20hour%20max&units=null&options=unaligned&precision=0"/></a>
+<a href="https://registry.my-netdata.io/"><img alt="Netdata badge: nginx active connections now" src="https://registry.my-netdata.io/api/v1/badge.svg?chart=nginx_local.connections&dimensions=active&value_color=grey:null%7Cblue&label=nginx%20active%20connections%20now&units=null&precision=0"/></a>  <a href="https://registry.my-netdata.io/"><img alt="Netdata badge: last hour average" src="https://registry.my-netdata.io/api/v1/badge.svg?chart=nginx_local.connections&dimensions=active&after=-3600&value_color=orange&label=last%20hour%20average&units=null&options=unaligned&precision=0"/></a> <a href="https://registry.my-netdata.io/"><img alt="Netdata badge: last hour max" src="https://registry.my-netdata.io/api/v1/badge.svg?chart=nginx_local.connections&dimensions=active&group=max&after=-3600&value_color=red&label=last%20hour%20max&units=null&options=unaligned&precision=0"/></a>
 
 Similarly, there is [a chart that shows outbound bandwidth per class](http://london.my-netdata.io/#tc_eth0), using QoS data. So it shows `kilobits/s` per class. Using this chart we can show:
 
-<a href="https://registry.my-netdata.io/#tc_eth0"><img src="https://registry.my-netdata.io/api/v1/badge.svg?chart=tc.world_out&dimensions=web_server&value_color=green&label=web%20server%20sends%20now&units=kbps"/></a> <a href="https://registry.my-netdata.io/#tc_eth0"><img src="https://registry.my-netdata.io/api/v1/badge.svg?chart=tc.world_out&dimensions=web_server&after=-86400&options=unaligned&group=sum&divide=8388608&value_color=blue&label=web%20server%20sent%20today&units=GB"/></a>
+<a href="https://registry.my-netdata.io/"><img alt="Netdata badge: web server sends now" src="https://registry.my-netdata.io/api/v1/badge.svg?chart=tc.world_out&dimensions=web_server&value_color=green&label=web%20server%20sends%20now&units=kbps"/></a> <a href="https://registry.my-netdata.io/"><img alt="Netdata badge: web server sent today" src="https://registry.my-netdata.io/api/v1/badge.svg?chart=tc.world_out&dimensions=web_server&after=-86400&options=unaligned&group=sum&divide=8388608&value_color=blue&label=web%20server%20sent%20today&units=GB"/></a>
 
 The right one is a **volume** calculation. Netdata calculated the total of the last 86.400 seconds (a day) which gives `kilobits`, then divided it by 8 to make it KB, then by 1024 to make it MB and then by 1024 to make it GB. Calculations like this are quite accurate, since for every value collected, every second, Netdata interpolates it to second boundary using microsecond calculations.
 
@@ -24,15 +24,15 @@ Let's see a few more badge examples (they come from the [Netdata Registry](/src/
 
 -   **cpu usage of user `root`** (you can pick any user; 100% = 1 core). This will be `green <10%`, `yellow <20%`, `orange <50%`, `blue <100%` (1 core), `red` otherwise (you define thresholds and colors on the URL).
 
-    <a href="https://registry.my-netdata.io/#apps_cpu"><img src="https://registry.my-netdata.io/api/v1/badge.svg?chart=users.cpu&dimensions=root&value_color=grey:null%7Cgreen%3C10%7Cyellow%3C20%7Corange%3C50%7Cblue%3C100%7Cred&label=root%20user%20cpu%20now&units=%25"></img></a> <a href="https://registry.my-netdata.io/#apps_cpu"><img src="https://registry.my-netdata.io/api/v1/badge.svg?chart=users.cpu&dimensions=root&after=-3600&value_color=grey:null%7Cgreen%3C10%7Cyellow%3C20%7Corange%3C50%7Cblue%3C100%7Cred&label=root%20user%20average%20cpu%20last%20hour&units=%25"></img></a>
+    <a href="https://registry.my-netdata.io/"><img alt="Netdata badge: root user cpu now" src="https://registry.my-netdata.io/api/v1/badge.svg?chart=users.cpu&dimensions=root&value_color=grey:null%7Cgreen%3C10%7Cyellow%3C20%7Corange%3C50%7Cblue%3C100%7Cred&label=root%20user%20cpu%20now&units=%25"></img></a> <a href="https://registry.my-netdata.io/"><img alt="Netdata badge: root user average cpu last hour" src="https://registry.my-netdata.io/api/v1/badge.svg?chart=users.cpu&dimensions=root&after=-3600&value_color=grey:null%7Cgreen%3C10%7Cyellow%3C20%7Corange%3C50%7Cblue%3C100%7Cred&label=root%20user%20average%20cpu%20last%20hour&units=%25"></img></a>
 
 -   **mysql queries per second**
 
-    <a href="https://registry.my-netdata.io/#mysql_local"><img src="https://registry.my-netdata.io/api/v1/badge.svg?chart=mysql_local.queries&dimensions=questions&label=mysql%20queries%20now&value_color=red&units=%5Cs"></img></a> <a href="https://registry.my-netdata.io/#mysql_local"><img src="https://registry.my-netdata.io/api/v1/badge.svg?chart=mysql_local.queries&dimensions=questions&after=-3600&options=unaligned&group=sum&label=mysql%20queries%20this%20hour&value_color=green&units=null"></img></a> <a href="https://registry.my-netdata.io/#mysql_local"><img src="https://registry.my-netdata.io/api/v1/badge.svg?chart=mysql_local.queries&dimensions=questions&after=-86400&options=unaligned&group=sum&label=mysql%20queries%20today&value_color=blue&units=null"></img></a>
+    <a href="https://registry.my-netdata.io/"><img alt="Netdata badge: mysql queries now" src="https://registry.my-netdata.io/api/v1/badge.svg?chart=mysql_local.queries&dimensions=questions&label=mysql%20queries%20now&value_color=red&units=%5Cs"></img></a> <a href="https://registry.my-netdata.io/"><img alt="Netdata badge: mysql queries this hour" src="https://registry.my-netdata.io/api/v1/badge.svg?chart=mysql_local.queries&dimensions=questions&after=-3600&options=unaligned&group=sum&label=mysql%20queries%20this%20hour&value_color=green&units=null"></img></a> <a href="https://registry.my-netdata.io/"><img alt="Netdata badge: mysql queries today" src="https://registry.my-netdata.io/api/v1/badge.svg?chart=mysql_local.queries&dimensions=questions&after=-86400&options=unaligned&group=sum&label=mysql%20queries%20today&value_color=blue&units=null"></img></a>
 
     niche ones: **mysql SELECT statements with JOIN, which did full table scans**:
 
-    <a href="https://registry.my-netdata.io/#mysql_local_issues"><img src="https://registry.my-netdata.io/api/v1/badge.svg?chart=mysql_local.join_issues&dimensions=scan&after=-3600&label=full%20table%20scans%20the%20last%20hour&value_color=orange&group=sum&units=null"></img></a>
+    <a href="https://registry.my-netdata.io/"><img alt="Netdata badge: full table scans the last hour" src="https://registry.my-netdata.io/api/v1/badge.svg?chart=mysql_local.join_issues&dimensions=scan&after=-3600&label=full%20table%20scans%20the%20last%20hour&value_color=orange&group=sum&units=null"></img></a>
 
 ---
 
@@ -63,7 +63,7 @@ Here is what you can put for `options` (these are standard Netdata API options):
   Which produces this:
 
   <a href="#">
-     <img src="https://registry.my-netdata.io/api/v1/badge.svg?chart=system.cpu"></img>
+     <img alt="Netdata badge: system.cpu" src="https://registry.my-netdata.io/api/v1/badge.svg?chart=system.cpu"></img>
   </a>
 
 -   `alarm=NAME`
@@ -91,7 +91,7 @@ Here is what you can put for `options` (these are standard Netdata API options):
   Which produces this:
 
   <a href="#">
-     <img src="https://registry.my-netdata.io/api/v1/badge.svg?chart=system.cpu&dimensions=system%7Cnice"></img>
+     <img alt="Netdata badge: system.cpu (dimensions=system, nice)" src="https://registry.my-netdata.io/api/v1/badge.svg?chart=system.cpu&dimensions=system%7Cnice"></img>
   </a>
 
 -   `before=SECONDS` and `after=SECONDS`
@@ -113,7 +113,7 @@ Here is what you can put for `options` (these are standard Netdata API options):
   Which produces the average of last complete minute (XX:XX:00 - XX:XX:59):
 
   <a href="#">
-     <img src="https://registry.my-netdata.io/api/v1/badge.svg?chart=system.cpu&after=-60"></img>
+     <img alt="Netdata badge: system.cpu (after=-60)" src="https://registry.my-netdata.io/api/v1/badge.svg?chart=system.cpu&after=-60"></img>
   </a>
 
   While this is the previous minute (one minute before the last one, again aligned XX:XX:00 - XX:XX:59):
@@ -127,7 +127,7 @@ Here is what you can put for `options` (these are standard Netdata API options):
   It produces this:
 
   <a href="#">
-     <img src="https://registry.my-netdata.io/api/v1/badge.svg?chart=system.cpu&before=-60&after=-60"></img>
+     <img alt="Netdata badge: system.cpu (after=-60, before=-60)" src="https://registry.my-netdata.io/api/v1/badge.svg?chart=system.cpu&before=-60&after=-60"></img>
   </a>
 
 -   `group=min` or `group=max` or `group=average` (the default) or `group=sum` or `group=incremental-sum`
@@ -237,13 +237,14 @@ These are options dedicated to badges:
 
 -   `precision=NUMBER`
 
-    The number of decimal digits of the value. By default Netdata will add:
+    The number of decimal digits of the value. By default, Netdata picks it from the absolute value and then drops
+    trailing zeros from the decimal part:
 
-    -   no decimal digits for values > 1000
-    -   1 decimal digit for values > 100
-    -   2 decimal digits for values > 1
-    -   3 decimal digits for values > 0.1
-    -   4 decimal digits for values \<= 0.1
+    -   no decimal digits for values of 1000 or more
+    -   1 decimal digit for values from 10 up to 1000
+    -   2 decimal digits for values from 0.1 up to 10
+    -   4 decimal digits for values from 0.01 up to 0.1
+    -   5 decimal digits from 0.001 up to 0.01, 6 from 0.0001 up to 0.001, and 7 below 0.0001
 
     Using the `precision=NUMBER` you can set your preference per badge.
 
@@ -251,11 +252,11 @@ These are options dedicated to badges:
 
     This option scales the svg image. It accepts values above or equal to 100 (100% is the default scale). For example, lets get a few different sizes:
 
-       <img src="https://registry.my-netdata.io/api/v1/badge.svg?chart=system.cpu&after=-60&scale=100"></img> original<br/>
-       <img src="https://registry.my-netdata.io/api/v1/badge.svg?chart=system.cpu&after=-60&scale=125"></img> `scale=125`<br/>
-       <img src="https://registry.my-netdata.io/api/v1/badge.svg?chart=system.cpu&after=-60&scale=150"></img> `scale=150`<br/>
-       <img src="https://registry.my-netdata.io/api/v1/badge.svg?chart=system.cpu&after=-60&scale=175"></img> `scale=175`<br/>
-       <img src="https://registry.my-netdata.io/api/v1/badge.svg?chart=system.cpu&after=-60&scale=200"></img> `scale=200`
+       <img alt="Netdata badge: system.cpu (after=-60, scale=100)" src="https://registry.my-netdata.io/api/v1/badge.svg?chart=system.cpu&after=-60&scale=100"></img> original<br/>
+       <img alt="Netdata badge: system.cpu (after=-60, scale=125)" src="https://registry.my-netdata.io/api/v1/badge.svg?chart=system.cpu&after=-60&scale=125"></img> `scale=125`<br/>
+       <img alt="Netdata badge: system.cpu (after=-60, scale=150)" src="https://registry.my-netdata.io/api/v1/badge.svg?chart=system.cpu&after=-60&scale=150"></img> `scale=150`<br/>
+       <img alt="Netdata badge: system.cpu (after=-60, scale=175)" src="https://registry.my-netdata.io/api/v1/badge.svg?chart=system.cpu&after=-60&scale=175"></img> `scale=175`<br/>
+       <img alt="Netdata badge: system.cpu (after=-60, scale=200)" src="https://registry.my-netdata.io/api/v1/badge.svg?chart=system.cpu&after=-60&scale=200"></img> `scale=200`
 
 -   `fixed_width_lbl=NUMBER` and `fixed_width_val=NUMBER`
 
@@ -343,8 +344,8 @@ For example, this is the cpu badge shown above:
 
 Both produce this:
 
-<a href="https://registry.my-netdata.io/#apps_cpu">
-    <img src="https://registry.my-netdata.io/api/v1/badge.svg?chart=users.cpu&dimensions=root&value_color=grey:null%7Cgreen%3C10%7Cyellow%3C20%7Corange%3C50%7Cblue%3C100%7Cred&label=root%20user%20cpu%20now&units=%25"></img>
+<a href="https://registry.my-netdata.io/">
+    <img alt="Netdata badge: root user cpu now" src="https://registry.my-netdata.io/api/v1/badge.svg?chart=users.cpu&dimensions=root&value_color=grey:null%7Cgreen%3C10%7Cyellow%3C20%7Corange%3C50%7Cblue%3C100%7Cred&label=root%20user%20cpu%20now&units=%25"></img>
 </a>
 
 #### Auto-refreshing badges in GitHub

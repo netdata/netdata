@@ -98,11 +98,12 @@ to generated output in learn PRs; `rendered-link-integrity.yml` renders head and
 
 - `.github/workflows/check-markdown.yml` (job `check-documentation`) is the PR gate in this repository: it checks out
   `netdata/learn`, regenerates the integration pages, runs `integrations/tests/test_descriptions.py` against the map,
-  and runs the real ingest with `--local-repo netdata:<workspace> --ignore-on-prem-repo --fail-links-netdata`. A
-  broken link or anchor in a mapped page fails the PR here, before any ingest PR exists.
+  runs `docs/.map/validate_map_schema.py` (`./mapping.md#what-is-checked-and-by-what`), and runs the real ingest with
+  `--local-repo netdata:<workspace> --ignore-on-prem-repo --fail-links-netdata`. A broken link or anchor in a mapped
+  page, or a `netdata/netdata` map row that names a missing file, fails the PR here, before any ingest PR exists.
 - Locally: `docs/.map/README.md#2-test-the-changes` has the command; the environment setup is the learn `README.md`
   "Manual ingest via local environment" (Python 3.13, `.learn_environment/ingest-requirements.txt` with
-  `--require-hashes`). `docs/.map/validate_map_schema.py` is the hand-run map check (`./mapping.md`).
+  `--require-hashes`).
 - A full local build with a browser is `docs-learn-pr-preview`.
 
 ## Deploy
