@@ -5,10 +5,10 @@
 //!
 //! Export flow: the transport wrapper resolves the tenant (`x-scope-orgid`
 //! header) and calls the core, which groups
-//! `ResourceLogs` by [`ServiceStream`] identity → drop identities too large
+//! `ResourceLogs` by `ServiceStream` identity → drop identities too large
 //! for the substrate's `content_meta` caps → reject streams whose `ns_hash`
 //! is already claimed by a different identity (first write wins, per tenant)
-//! → prepare flattened frames lock-free via [`ng_flatten::prepare_log_frame`]
+//! → prepare flattened frames lock-free via `ng_flatten::prepare_log_frame`
 //! (normalization + flattening + the ingestion time-window; `Some(bounds)`
 //! here — production enforces the window, `ng-ingest` and the benches pass
 //! `None`) → under the tenant's writer lock: write frames, one `sync_all`,
@@ -46,8 +46,8 @@ use crate::tenant::extract_tenant_id;
 ///
 /// An absent attribute and an empty-string attribute collapse to the same
 /// empty-string field — they identify the same stream (see
-/// [`ServiceStream::ns_hash`]). The `ns_hash` is derived from the returned
-/// [`ServiceStream`] at the point it is needed, not stored alongside it.
+/// `ServiceStream::ns_hash`). The `ns_hash` is derived from the returned
+/// `ServiceStream` at the point it is needed, not stored alongside it.
 fn extract_stream(rl: &ResourceLogs) -> ServiceStream {
     let attrs = match rl.resource.as_ref() {
         Some(r) => &r.attributes,
@@ -95,14 +95,14 @@ struct Collision {
     rejected_log_records: usize,
 }
 
-/// One group of `ResourceLogs` that share an exact [`ServiceStream`]. The
+/// One group of `ResourceLogs` that share an exact `ServiceStream`. The
 /// identifying stream lives in the `HashMap` key in [`group_by_stream`].
 struct StreamGroup {
     log_record_count: usize,
     resource_logs: Vec<ResourceLogs>,
 }
 
-/// Group `ResourceLogs` by their [`ServiceStream`] identity. A `ResourceLogs`
+/// Group `ResourceLogs` by their `ServiceStream` identity. A `ResourceLogs`
 /// carrying zero log records contributes nothing (no group, no identity
 /// registration) — this is the single owner of the emptiness rule, so a
 /// request of only-empty `ResourceLogs` yields an empty map.
@@ -344,7 +344,7 @@ pub struct NetdataLogsService {
     /// region, so tenants ingest in parallel and same-tenant requests overlap
     /// everything before that region.
     writers: Mutex<HashMap<TenantId, Arc<Mutex<wal::Writer>>>>,
-    /// Canonical [`ServiceStream`] per `(tenant, ns_hash)`. First write
+    /// Canonical `ServiceStream` per `(tenant, ns_hash)`. First write
     /// wins; subsequent writes whose stream doesn't match are rejected via
     /// `partial_success`. In-memory only — on restart the table is empty and
     /// the first write of a tenant's stream re-establishes the canonical
@@ -362,7 +362,7 @@ pub struct NetdataLogsService {
     sender: Arc<LedgerSender>,
     wal_base_dir: PathBuf,
     wal_config: bridge::config::WalConfig,
-    /// Global ingestion time-bounds (P3): reject records whose resolved
+    /// Global ingestion time-bounds: reject records whose resolved
     /// timestamp is older than `max_age` or more than `future_skew` ahead.
     /// Applied per record inside `prepare_log_frame`.
     ingest_bounds: bridge::config::IngestConfig,
@@ -417,7 +417,7 @@ impl NetdataLogsService {
 
     /// The default (non-overridden) WAL rotation `max_duration` — the value the
     /// idle-rotation sweep enforces for most streams. Used at startup to warn
-    /// when it is below the sweep granularity.
+    /// when it is at or below the sweep interval.
     pub fn default_max_file_duration(&self) -> std::time::Duration {
         self.wal_config
             .rotation
@@ -438,7 +438,7 @@ impl NetdataLogsService {
     }
 
     /// Rotate any per-tenant WAL stream whose active file has passed a rotation
-    /// threshold as of now, without a new frame (the idle-rotation sweep, I2/P4).
+    /// threshold as of now, without a new frame (the idle-rotation sweep).
     /// Called periodically off the write path so a quiet stream still seals,
     /// gets indexed, and (with remote storage) uploaded.
     ///
@@ -593,7 +593,6 @@ impl NetdataLogsService {
             })
             .collect();
 
-        // Run the collision check only over storable streams.
         let CollisionCheck {
             accepted,
             collisions,
@@ -624,8 +623,8 @@ impl NetdataLogsService {
         // `prepare_log_frame` consumes an owned request and needs nothing
         // shared, so concurrent exports overlap all of this CPU work. The
         // single clock tick below is both the base for synthesized fallback
-        // timestamps and the reference "now" for the ingestion time-bounds
-        // (P3); reading it once per request gives every stream group the same
+        // timestamps and the reference "now" for the ingestion time-bounds;
+        // reading it once per request gives every stream group the same
         // window and the same fallback base. The frame header's `ingestion_ns`
         // is ticked separately at write time, inside the writer lock, so it
         // stays monotonic per file. A prepare error aborts the request before
@@ -633,8 +632,9 @@ impl NetdataLogsService {
         let fallback_base_ns = self.clock.lock().unwrap().now_ns().as_u64();
         // Inclusive window [now - max_age, now + future_skew] on the RESOLVED
         // per-record timestamp. Loop-invariant (one base per request), so it is
-        // built once. Synthesized (now-based) fallbacks land inside by
-        // construction, so timestamp-less records are never rejected.
+        // built once. `prepare_log_frame` exempts synthesized (now-based)
+        // fallbacks from the window entirely, so timestamp-less records are
+        // never rejected, whatever `future_skew` is.
         let bounds = ng_flatten::TimeBounds {
             min_ns: fallback_base_ns.saturating_sub(self.ingest_bounds.max_age_ns()),
             max_ns: fallback_base_ns.saturating_add(self.ingest_bounds.future_skew_ns()),
@@ -684,9 +684,8 @@ impl NetdataLogsService {
         // Phase 2 — the serialized region, under THIS TENANT's writer lock
         // only: frame writes, one durability sync (the ack is only returned
         // after `sync_all` succeeds, so a 200 implies the frames are on
-        // disk), event drain. The writer-map lock above is held just for
-        // lookup/insert (a tenant's first request creates its writer under
-        // it). All sync code — no `.await` while a guard is held.
+        // disk), event drain. All sync code — no `.await` while a guard is
+        // held.
         let writer = {
             let mut writers = self.writers.lock().unwrap();
             if let Some(w) = writers.get(tenant_id) {
@@ -1011,7 +1010,7 @@ mod tests {
     /// `LedgerSender` points at a path that intentionally won't accept a
     /// connection — `send_events` is fire-and-forget over an internal
     /// channel, so the unconnected sender doesn't block the service. The
-    /// background reconnect task gets dropped at end of test along with
+    /// background connect-retry task gets dropped at end of test along with
     /// the tokio runtime.
     fn test_service(wal_dir: std::path::PathBuf) -> NetdataLogsService {
         // Existing tests use arbitrary fixed timestamps and do not exercise the

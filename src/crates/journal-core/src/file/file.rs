@@ -20,8 +20,9 @@
 //!
 //! Consumers: `JournalWriter` (file/writer.rs) writes through the `*_mut`
 //! accessors; journal-log-writer creates files via [`JournalFileOptions`]
-//! and rotates via `create_successor`; journal-index, journal-engine and
-//! netflow-plugin read files via `open` and the typed accessors. Field-name
+//! and rotates via `create_successor`; journal-index and journal-engine
+//! read files via `open` and the typed accessors (netflow-plugin consumes
+//! the published `journal-sdk-core` release instead). Field-name
 //! remappings (`ND_REMAPPING=1` entries) are parsed by `load_fields` below;
 //! the shared registry type lives in field_map.rs.
 #![allow(clippy::field_reassign_with_default)]
@@ -178,7 +179,7 @@ impl JournalFileOptions {
 
             // 16 MiB -> 4096 data buckets
             let data_buckets = (max_file_size / 4096).max(1024).next_power_of_two() as usize;
-            let field_buckets = 128; // Fixed; ~8:1 vs data only at the 8 MiB default floor
+            let field_buckets = 128; // Fixed; 8:1 vs data at the 1024-bucket floor, 16:1 at the 8 MiB default
 
             (data_buckets, field_buckets)
         };
@@ -588,10 +589,12 @@ impl<M: MemoryMap> JournalFile<M> {
     }
 
     /// Runs a partition-point query over the entries referencing a data
-    /// object: the first (`Forward`) or last (`Backward`) entry offset
-    /// whose predicate holds. `Ok(None)` when the data object has no
-    /// inlined entry cursor or nothing matches. No current caller in this
-    /// crate tree (file/filter.rs keeps a commented-out reference).
+    /// object: `Forward` yields the first entry offset whose predicate is
+    /// false, `Backward` the last whose predicate is true
+    /// (`InlinedCursor::directed_partition_point`). `Ok(None)` when the
+    /// data object has no inlined entry cursor or nothing matches. No
+    /// current caller in this crate tree (file/filter.rs keeps a
+    /// commented-out reference).
     pub fn data_object_directed_partition_point<F>(
         &self,
         data_offset: NonZeroU64,
@@ -1004,12 +1007,13 @@ impl<M: MemoryMapMut> JournalFile<M> {
         ObjectHeader::mut_from_bytes(header_slice).map_err(|_| JournalError::ZerocopyFailure)
     }
 
-    /// Opens or creates a mutable object view at `offset`. `Some(size)`
-    /// initializes a new object header (type + size) with no bounds checks
-    /// - the file is extended as needed (`MemoryMapMut::create`,
-    /// file/mmap.rs). `None` reads the existing header and requires the
-    /// stored type to match (`InvalidObjectType`), with the usual
-    /// alignment/bounds validation.
+    /// Opens or creates a mutable object view at `offset`. Both paths run
+    /// the alignment and header-region checks. `Some(size)` initializes a
+    /// new object header (type + size) and skips the arena-bounds check -
+    /// the file is extended as needed (`MemoryMapMut::create`,
+    /// file/mmap.rs). `None` reads the existing header, requires the
+    /// stored type to match (`InvalidObjectType`), and validates that the
+    /// object fits the arena.
     fn journal_object_mut<'a, T>(
         &'a self,
         type_: ObjectType,

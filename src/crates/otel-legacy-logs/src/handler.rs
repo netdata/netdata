@@ -124,16 +124,16 @@ fn build_filter_from_selections(selections: &HashMap<String, Vec<String>>) -> Fi
 fn accepted_params() -> Vec<netdata::RequestParam> {
     use netdata::RequestParam;
 
-    // Advertise only what this handler deserializes and honors — the
-    // ledger's list (`otel-ledger/src/ledger/rpc/logs/wire.rs`
+    // The ledger's list (`otel-ledger/src/ledger/rpc/logs/wire.rs`
     // `ACCEPTED_PARAMS`) minus `tenant` (single journal directory, no
-    // storage tenants). `DataOnly`
-    // is deliberately omitted: the UI computes
-    // `dataOnly = data_only && accepted_params.includes(..)`, so advertising
-    // it would make the UI preserve stale columns/facets/pagination instead
+    // storage tenants). `Info` and `Slice` are advertised but unread —
+    // every call runs the same full query and returns the parameter
+    // definitions. `DataOnly` is deliberately omitted: the UI derives
+    // its `dataOnly` flag from this list's membership, so advertising it
+    // would make the UI preserve stale columns/facets/pagination instead
     // of refreshing from each full response — and this viewer recomputes
-    // everything per call. `IfModifiedSince`/`Delta`/`Tail`/`Sampling` drive
-    // incremental/live-tail/sampling modes that are not implemented here.
+    // everything per call. `IfModifiedSince`/`Delta`/`Tail`/`Sampling`
+    // drive incremental/live-tail/sampling modes not implemented here.
     vec![
         RequestParam::Info,
         RequestParam::After,

@@ -106,7 +106,7 @@ impl RotationState {
     }
 }
 
-/// Groups a journal file and its writer together
+/// The repository file, journal file, and writer for the file being written.
 struct ActiveFile {
     repository_file: repository::File,
     journal_file: JournalFile<MmapMut>,
@@ -114,7 +114,7 @@ struct ActiveFile {
 }
 
 impl ActiveFile {
-    /// Creates a new journal file with the given parameters
+    /// Creates a fresh journal file in the chain, starting at `next_seqnum`.
     fn create(
         chain: &mut OwnedChain,
         seqnum_id: uuid::Uuid,
@@ -169,14 +169,12 @@ impl ActiveFile {
         })
     }
 
-    /// Writes a journal entry
     fn write_entry(&mut self, items: &[&[u8]], realtime: u64, monotonic: u64) -> Result<()> {
         self.writer
             .add_entry(&mut self.journal_file, items, realtime, monotonic)?;
         Ok(())
     }
 
-    /// Gets the current file size
     fn current_file_size(&self) -> u64 {
         self.writer.current_file_size()
     }
@@ -241,11 +239,13 @@ impl EntryTimestamps {
 }
 
 impl Log {
-    /// Captures both realtime and monotonic timestamps, similar to systemd's dual_timestamp_now().
+    /// Returns the (realtime, monotonic) timestamp pair for an entry, using
+    /// `timestamp_override` for either value when set.
     ///
-    /// Returns (realtime_usec, monotonic_usec) where:
-    /// - realtime: microseconds since Unix epoch (CLOCK_REALTIME), monotonically increasing
-    /// - monotonic: microseconds since boot (CLOCK_MONOTONIC)
+    /// Realtime is microseconds since the Unix epoch (via the strictly
+    /// increasing `clock`); monotonic is microseconds since boot. Both are
+    /// clamped to a `last + 1us` floor, so overrides that go backwards are
+    /// bumped forward.
     fn capture_dual_timestamp(
         &mut self,
         timestamp_override: Option<&EntryTimestamps>,
@@ -302,6 +302,7 @@ impl Log {
             last_monotonic_usec,
             lifecycle_observer: None,
             boot_id_field: format!("_BOOT_ID={}", boot_id.as_simple()).into_bytes(),
+            // +20 digits covers any u64 microsecond timestamp.
             source_realtime_field: Vec::with_capacity(SOURCE_REALTIME_PREFIX.len() + 20),
         })
     }
@@ -346,6 +347,7 @@ impl Log {
 
         if self.should_rotate() {
             self.rotate()?;
+            // The new file re-learns its own mappings on the next entry.
             self.remapping_registry.clear();
         }
 
@@ -356,29 +358,24 @@ impl Log {
 
         for item in items {
             if let Some(field_name) = extract_field_name(item) {
-                // Skip if already systemd-compatible
                 if is_systemd_compatible(field_name) {
                     continue;
                 }
 
                 remapped_item_count += 1;
 
-                // Skip if already in registry
                 if self.remapping_registry.contains_otel_name(field_name) {
                     continue;
                 }
 
-                // Generate remapped name and add to list
                 let remapped_name = rdp::encode_full(field_name);
                 new_mappings.push((field_name.to_vec(), remapped_name));
             }
         }
 
-        // Write remapping entry if we have new mappings
         if !new_mappings.is_empty() {
             self.write_remapping_entry(&new_mappings, &timestamps)?;
 
-            // Update registry
             for (otel_name, systemd_name) in new_mappings.iter() {
                 self.remapping_registry
                     .add_otel_mapping(otel_name.clone(), systemd_name.clone());
@@ -426,6 +423,7 @@ impl Log {
         };
 
         let total_items = items.len() + 1 + usize::from(source_field.is_some());
+        // Typical entries stay on the stack; larger ones fall back to a Vec.
         if total_items <= STACK_ENTRY_REF_LIMIT {
             let mut refs = [&[] as &[u8]; STACK_ENTRY_REF_LIMIT];
             let mut len = 0usize;
@@ -516,9 +514,11 @@ impl Log {
     /// Format:
     /// _BOOT_ID=<boot_id>
     /// ND_REMAPPING=1
-    /// ND_<md5_1>=<otel_key_1>
-    /// ND_<md5_2>=<otel_key_2>
+    /// <remapped_name>=<original_field_name>
     /// ...
+    ///
+    /// `<remapped_name>` comes from `rdp::encode_full`: a structured `ND...`
+    /// encoding, or an `ND_<md5>` fallback for names it cannot encode.
     fn write_remapping_entry(
         &mut self,
         mappings: &[(Vec<u8>, String)],
@@ -526,14 +526,11 @@ impl Log {
     ) -> Result<()> {
         let mut remapping_items: Vec<Vec<u8>> = Vec::with_capacity(mappings.len() + 2);
 
-        // Inject _BOOT_ID field first
         let boot_id_field = format!("_BOOT_ID={}", self.boot_id.as_simple());
         remapping_items.push(boot_id_field.into_bytes());
 
-        // Add marker field
         remapping_items.push(REMAPPING_MARKER.to_vec());
 
-        // Add each mapping as ND_<md5>=<otel_key>
         for (otel_name, systemd_name) in mappings {
             let mut item = Vec::with_capacity(systemd_name.len() + 1 + otel_name.len());
             item.extend_from_slice(systemd_name.as_bytes());
@@ -542,7 +539,6 @@ impl Log {
             remapping_items.push(item);
         }
 
-        // Build references
         let items_refs: Vec<&[u8]> = remapping_items.iter().map(|v| v.as_slice()).collect();
 
         let (realtime, monotonic) = self.capture_dual_timestamp(Some(timestamps))?;
@@ -581,7 +577,7 @@ impl Log {
     fn rotate(&mut self) -> Result<()> {
         use journal_core::file::JournalState;
 
-        // Update chain with current file size before rotating
+        // Record the outgoing file's final size in the chain before replacing it.
         if let Some(active_file) = &self.active_file {
             self.chain.update_file_size(
                 &active_file.repository_file,
@@ -589,7 +585,6 @@ impl Log {
             );
         }
 
-        // Respect retention policy
         let retention = self.chain.retain(&self.config.retention_policy);
         let deleted_files = retention.deleted_files;
         if !deleted_files.is_empty()
@@ -603,7 +598,6 @@ impl Log {
             return Err(error);
         }
 
-        // Create new file (either initial or rotated)
         let max_file_size = self.config.rotation_policy.size_of_journal_file;
         let head_realtime = self.clock.now().get();
         let (new_file, rotation_event) = if let Some(mut old_file) = self.active_file.take() {
@@ -701,30 +695,24 @@ impl Log {
     pub fn write_structured<T: serde::Serialize>(&mut self, value: &T) -> Result<()> {
         use flatten_serde_json::flatten;
 
-        // Serialize to JSON value
         let json_value = serde_json::to_value(value).map_err(|e| {
             WriterError::Serialization(format!("failed to serialize to JSON: {}", e))
         })?;
 
-        // Flatten the JSON structure - requires a JSON object (Map)
         let flattened = if let serde_json::Value::Object(map) = json_value {
             flatten(&map)
         } else {
-            // If not an object, return error
             return Err(WriterError::Serialization(
                 "value must be a JSON object, not a primitive or array".to_string(),
             ));
         };
 
-        // Convert to journal field format (KEY=VALUE)
         let mut fields: Vec<Vec<u8>> = Vec::with_capacity(flattened.len());
 
         for (key, value) in flattened.iter() {
-            // Convert key to uppercase and replace dots with underscores
-            // (journal convention)
+            // Journal convention: field names are uppercase with dots as underscores.
             let journal_key = key.to_uppercase().replace('.', "_");
 
-            // Format as KEY=VALUE
             let field = match value {
                 serde_json::Value::String(s) => {
                     format!("{}={}", journal_key, s)
@@ -738,7 +726,7 @@ impl Log {
                 serde_json::Value::Null => {
                     format!("{}=", journal_key)
                 }
-                // Arrays and objects should be flattened already, but just in case
+                // Whatever flatten leaves nested (e.g. arrays) is written as JSON text.
                 _ => {
                     format!("{}={}", journal_key, value)
                 }
@@ -747,7 +735,6 @@ impl Log {
             fields.push(field.into_bytes());
         }
 
-        // Convert Vec<Vec<u8>> to Vec<&[u8]> for write_entry
         let field_refs: Vec<&[u8]> = fields.iter().map(|f| f.as_slice()).collect();
 
         self.write_entry(&field_refs, None)
@@ -759,13 +746,12 @@ impl Drop for Log {
         use journal_core::file::JournalState;
 
         if let Some(ref mut active_file) = self.active_file {
-            // A single file is opened for writing exactly once. Once closed, we
-            // treat them as immutable. We need a custom impl for `Drop` to keep
-            // this invariant true whenever the plugin receives a `SIGTERM` or
-            // a `SIGINT`.
+            // A journal file is opened for writing exactly once; once closed,
+            // it is treated as immutable. The custom `Drop` impl keeps that
+            // invariant when the plugin receives a `SIGTERM` or a `SIGINT`.
             active_file.journal_file.journal_header_mut().state = JournalState::Archived as u8;
 
-            // Best/Last-effort sync just to be on the cautious side.
+            // Best-effort sync; errors are ignored during drop.
             let _ = active_file.journal_file.sync();
         }
     }

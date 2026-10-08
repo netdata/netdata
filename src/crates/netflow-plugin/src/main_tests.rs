@@ -585,9 +585,10 @@ async fn e2e_rebuild_with_tiers_ahead_of_raw_adds_no_duplicate_rows() {
     let minute = 60_000_000_u64;
     // Anchor to a CLOSED 5m boundary ~20min in the past: deterministic 1m and
     // 5m buckets, and safely inside the rebuild raw-file window (the rebuild
-    // only considers raw files overlapping roughly the last hour — flows
-    // older than that are not rebuilt at all, which rules out using a closed
-    // 1h bucket here; the 1h tier shares the identical per-tier cutoff loop).
+    // only considers raw files overlapping the last hour — flows older than
+    // that are not rebuilt at all, so a deterministic fully closed 1h bucket
+    // cannot be pinned here; the 1h tier shares the identical per-tier cutoff
+    // loop).
     let base = closed_5m_base();
     let t1 = base + minute; // 1m bucket A, 5m bucket P
     let t2 = base + 2 * minute; // 1m bucket B, same 5m bucket P
@@ -688,7 +689,6 @@ async fn e2e_rebuild_tolerates_torn_tier_and_raw_tails() {
     let (cfg, _tmp) = offline_journal_cfg();
     let minute = 60_000_000_u64;
     let base = closed_5m_base();
-    // Two 1m buckets with two flows each.
     write_raw_flows(
         &cfg,
         0x11,
@@ -743,11 +743,6 @@ async fn e2e_rebuild_tolerates_torn_tier_and_raw_tails() {
     );
 }
 
-/// Cross-thread tier commit roundtrip: closed buckets handed to the spawned
-/// workers via the doorbell protocol must land in the tier journals (with one
-/// fsync per batch), and the shutdown drain must join cleanly. This is the
-/// path production takes; the rest of the suite covers the pre-worker inline
-/// path.
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn e2e_ingest_bind_failure_does_not_start_tier_workers() {
     let (mut cfg, _tmp) = offline_journal_cfg();
@@ -879,6 +874,11 @@ async fn e2e_ingest_receives_from_multiple_listeners() {
     );
 }
 
+/// Cross-thread tier commit roundtrip: closed buckets handed to the spawned
+/// workers via the doorbell protocol must land in the tier journals (with one
+/// fsync per batch), and the shutdown drain must join cleanly. This is the
+/// path production takes; most of the suite covers the pre-worker inline
+/// path.
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn e2e_tier_commit_workers_roundtrip() {
     let (cfg, _tmp) = offline_journal_cfg();
@@ -1111,7 +1111,7 @@ fn set_journal_state(path: &Path, state: JournalState) {
 /// Start of a fully closed 5m bucket ~20-25 minutes in the past: 1m and 5m
 /// buckets derived from it are deterministically closed, and the timestamps
 /// stay inside the rebuild's ~1h raw-file window (a fully closed 1h bucket
-/// would necessarily fall outside it).
+/// around such timestamps is not guaranteed — the wall-clock hour decides).
 fn closed_5m_base() -> u64 {
     let now = std::time::SystemTime::now()
         .duration_since(std::time::UNIX_EPOCH)
@@ -3636,7 +3636,7 @@ fn limit_netflow_v5_records_per_packet(payloads: &mut [Vec<u8>], records_per_pac
     }
 }
 
-/// SOW step-6 boundary soak: live UDP through the production `run()` loop
+/// Boundary soak: live UDP through the production `run()` loop
 /// (tier workers included) for >=75 s at >=30k flows/s, crossing at least one
 /// 1m tier boundary, with a per-packet srcaddr-mutating NetFlow v5 sender so
 /// the closed buckets carry real cardinality. Asserts ZERO kernel UDP drops
@@ -3696,9 +3696,6 @@ async fn bench_udp_boundary_soak() {
     let drops_before = read_udp_socket_drops(port);
     let recv_before = metrics.udp_packets_received.load(Ordering::Relaxed);
 
-    // Deadline-paced sender; every datagram rewrites each record's srcaddr
-    // from a bounded counter pool so per-minute buckets hold tens of
-    // thousands of distinct rows.
     let sender_listen = listen.clone();
     let sender = std::thread::spawn(move || -> u64 {
         let sock = StdUdpSocket::bind("127.0.0.1:0").expect("bind sender");
@@ -3796,7 +3793,7 @@ async fn bench_udp_boundary_soak() {
     assert!(tier_rows > 0, "tier rows must land on disk during the soak");
 }
 
-/// SOW step-7 crash-child helper: ingests two-protocol minute buckets from
+/// Crash-child helper: ingests two-protocol minute buckets from
 /// ~50 minutes ago toward now (monotone receive time), serving worker
 /// doorbells per batch, and reports committed tier rows on stdout. The
 /// parent SIGKILLs it mid-commit. Runs only when NETFLOW_CRASH_CHILD=1.
@@ -3868,7 +3865,7 @@ async fn crash_ingest_child() {
     }
 }
 
-/// SOW step-7 crash test: SIGKILL a child mid-ingest right after its first
+/// Crash test: SIGKILL a child mid-ingest right after its first
 /// worker tier commits land (the first 1m claim carries a ~48-bucket
 /// stretch batch, so the kill hits an active multi-bucket commit), then
 /// rebuild on the same journals and prove recovery: startup tolerates the
@@ -3896,11 +3893,11 @@ async fn crash_sigkill_then_rebuild_has_no_duplicates() {
         .spawn()
         .expect("spawn crash child");
 
-    // Watch the child's committed-row reports. The first doorbell response
-    // commits the oldest bucket within milliseconds (claim-on-spawn); the
-    // ~48-bucket backlog commits as one stretch batch at the 1m worker's
-    // first real anniversary (<=61s). Kill once that batch is in flight
-    // (row reports arrive every 100ms, mid-commit).
+    // Watch the child's committed-row reports. A spawn-time claim can commit
+    // the oldest bucket within milliseconds (claim-on-spawn); the ~48-bucket
+    // backlog commits as one stretch batch at the 1m worker's first real
+    // anniversary (<=61s). Kill once that batch is in flight (row reports
+    // arrive every 100ms, mid-commit).
     let stdout = child.stdout.take().expect("child stdout");
     let (line_tx, line_rx) = std::sync::mpsc::channel::<String>();
     let reader_thread = std::thread::spawn(move || {
@@ -3976,7 +3973,6 @@ async fn crash_sigkill_then_rebuild_has_no_duplicates() {
         }
     }
 
-    // A second rebuild must change nothing.
     rebuild_tiers_with_fresh_service(&cfg).await;
     let counts_after_second: Vec<BTreeMap<u64, usize>> = [
         cfg.journal.minute_1_tier_dir(),

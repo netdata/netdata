@@ -5,18 +5,18 @@
 //! core, which both the gRPC `TraceService` wrapper and the OTLP/HTTP front
 //! end call. Same two-phase export structure: prepare
 //! every frame lock-free (normalize + interval time bounds + flatten +
-//! encode, all owned by [`ng_flatten::prepare_trace_frame`]; `Some(bounds)`
+//! encode, all owned by `ng_flatten::prepare_trace_frame`; `Some(bounds)`
 //! here — production enforces the window, while the `ng-ingest` dev tool and
 //! the tests pass `None`), then write + sync + drain-events under the
 //! tenant's writer lock only.
 //!
-//! ## Partitioning (the D7 seam)
+//! ## Partitioning
 //!
 //! Traces are currently **unpartitioned**: [`partition_spans`] routes every
 //! span to the logs-convention *unattributed* stream — the exact stream the
 //! per-service scheme produces for spans with no `service.namespace`/
 //! `service.name` (`part_key = 0`, `content_meta` = the version-tagged empty
-//! [`ServiceStream`] blob). That function is the single seam a future switch
+//! `ServiceStream` blob). That function is the single seam a future switch
 //! to per-service partitioning replaces (extract the stream per resource,
 //! group, encode-or-drop, collision-check — the logs service is the working
 //! template); everything downstream of it already handles N groups, and files
@@ -29,7 +29,7 @@
 //! time window (there is no identity to collide or oversize): a span is kept
 //! only if its whole `[start, effective end]` interval lies inside
 //! `[now - max_age, now + future_skew]` (see
-//! [`ng_flatten::normalize_trace_request`]). Rejected spans are reported via
+//! `ng_flatten::normalize_trace_request`). Rejected spans are reported via
 //! OTLP `partial_success.rejected_spans`; the RPC still succeeds, and the ack
 //! is returned only after the WAL sync.
 //!
@@ -74,11 +74,11 @@ struct StorableSpans {
     request: ExportTraceServiceRequest,
 }
 
-/// THE traces partitioning seam (plan decision D7).
+/// THE traces partitioning seam.
 ///
 /// Today: unpartitioned — the whole request becomes ONE group on the
 /// *unattributed* stream, reusing the logs identity convention
-/// ([`ServiceStream`] `("", "")` → `part_key` `0`, version-tagged empty-fields
+/// (`ServiceStream` `("", "")` → `part_key` `0`, version-tagged empty-fields
 /// `content_meta`). This is deliberately the stream the per-service scheme
 /// assigns to spans without service identity, so flipping this seam later
 /// re-interprets nothing: existing files simply ARE the unattributed stream.

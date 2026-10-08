@@ -147,9 +147,6 @@ impl<'a> RowIndex<'a> {
 
     /// Build a permutation table mapping insertion-order positions to
     /// time-sorted positions.
-    ///
-    /// All bitmaps in Phase 2 are translated from insertion order to
-    /// chronological order so contiguous position ranges = contiguous time.
     pub(crate) fn time_order(&self) -> TimeOrder {
         build_time_order(&self.timestamps)
     }
@@ -205,7 +202,8 @@ impl<'a> RowIndex<'a> {
 
 /// Row ingestion: the producer interns each `key=value` pair to a [`KvSlot`]
 /// (directly or via the hash fast path) and hands the per-row slot list back;
-/// each call lands the row in the four Phase-1 structures.
+/// each call lands the row in the per-row Phase-1 structures (timestamps,
+/// slot list, per-slot bitmaps).
 impl<'a> RowIndex<'a> {
     /// Hash-only fast-path lookup: returns the slot a `key=value` was
     /// interned under if the producer's `xxhash64` is unambiguous, letting
@@ -246,12 +244,8 @@ impl<'a> RowIndex<'a> {
 // Time-sort remap and sparse histogram
 // ---------------------------------------------------------------------------
 
-/// Bidirectional mapping between insertion order and chronological order.
-///
-/// Built from the nanosecond timestamps collected during Phase 1. Used in
-/// Phase 2 to translate all bitmaps and row entries from insertion order to
-/// chronological order, so contiguous position ranges correspond to
-/// contiguous time windows.
+/// Bidirectional mapping between insertion order and chronological order,
+/// built from the Phase-1 timestamps.
 pub struct TimeOrder {
     /// `sorted_position[insertion_pos] = sorted_pos`
     sorted_position: Vec<u32>,
@@ -279,11 +273,6 @@ impl TimeOrder {
 
 /// Build a permutation table that maps insertion-order positions to
 /// time-sorted positions.
-///
-/// Rows are numbered in the order the producer read them (insertion order),
-/// but time-range queries need positions to correspond to chronology, so a
-/// contiguous range like `[100..200]` maps to a contiguous time window.
-/// Phase 2 translates every bitmap and row list through this remap.
 ///
 /// # Example
 ///

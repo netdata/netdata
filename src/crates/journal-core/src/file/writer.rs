@@ -25,8 +25,8 @@
 //! Concurrency and durability: the writer holds no locks and no interior
 //! mutability - every mutating method takes `&mut self` - and the
 //! `JournalFile` it drives admits one object view at a time
-//! (the `GuardedCell` in-use flag) and is not `Sync` (its window manager
-//! sits in an `UnsafeCell`), so the pair is used from a
+//! (the `GuardedCell` in-use flag) and is not `Sync` (the `GuardedCell`
+//! holds an `UnsafeCell`), so the pair is used from a
 //! single thread. The writer never syncs; appends reach disk only through
 //! [`JournalFile::sync`], which journal-log-writer calls
 //! per batch, on rotation and on drop
@@ -41,7 +41,8 @@
 //! in-tree jf twin has its own same-named writer
 //! (src/crates/jf/journal_file/src/writer.rs) - neither is this type.
 // The flat `crate::file::{...}` import below pulls in the whole object
-// vocabulary; most names go unused in this file - hence the blanket allow.
+// vocabulary; most names go unused in this file - hence the blanket allow
+// (its dead_code half covers the vestigial constant below).
 #![allow(unused_imports, dead_code)]
 
 use super::mmap::MemoryMapMut;
@@ -202,10 +203,9 @@ pub struct JournalWriter {
 impl JournalWriter {
     /// The written arena's end - where the next object appends, and what
     /// `header_size + arena_size` add up to. Not the on-disk length: mmap
-    /// windows map in whole chunks and the writable
-    /// `MemoryMapMut`'s `create`
-    /// extends the file past this. Rotation sizing reads it as the size
-    /// signal (journal-log-writer/src/log/mod.rs).
+    /// windows map in whole chunks and the writable `MemoryMapMut`'s
+    /// `create` extends the file past this. Rotation sizing reads it as
+    /// the size signal (journal-log-writer/src/log/mod.rs).
     pub fn current_file_size(&self) -> u64 {
         self.append_offset.get()
     }
@@ -299,9 +299,10 @@ impl JournalWriter {
     /// what [`JournalFileOptions::new`]'s defaults set and what every
     /// producer in this tree enables. A failed call leaves the objects it
     /// already wrote on disk - reachable through the hash tables, since
-    /// `add_data` registers them as it goes - but never registers an
-    /// entry: the header's entry-level fields commit only in
-    /// `entry_added`.
+    /// `add_data` registers them as it goes. The header's entry-level
+    /// fields commit only in `entry_added`, so a failed call never counts
+    /// the entry there - but one that fails after `append_to_entry_array`
+    /// stays recorded in the file-level entry array.
     pub fn add_entry(
         &mut self,
         journal_file: &mut JournalFile<MmapMut>,
@@ -564,7 +565,6 @@ impl JournalWriter {
         journal_file: &mut JournalFile<MmapMut>,
         capacity: NonZeroU64,
     ) -> Result<NonZeroU64> {
-        // let new_capacity = previous_capacity.saturating_mul(NonZeroU64::new(2).unwrap());
 
         let array_offset = self.append_offset;
         let array_size = {
@@ -686,7 +686,7 @@ impl JournalWriter {
             tail_guard.set(entries_in_tail as usize, entry_offset)?;
         } else {
             // Need to create a new array
-            let new_capacity = NonZeroU64::new(tail_capacity * 2).unwrap(); // Double the size
+            let new_capacity = NonZeroU64::new(tail_capacity * 2).unwrap();
             let new_array_offset = self.allocate_new_array(journal_file, new_capacity)?;
 
             // Link the old tail to the new array

@@ -1,3 +1,13 @@
+//! C API for reading systemd journal files.
+//!
+//! The exported `rsd_journal_*` functions mirror the systemd `sd_journal_*`
+//! API: a handle obtained through `rsd_journal_open_files` is passed as `j` to
+//! the other calls and released with `rsd_journal_close`. Functions return `0`
+//! on success, `1` when a value or entry was produced, and a negative
+//! `JournalError::to_error_code` code on failure.
+//!
+//! Pointer arguments are generally only validated by `debug_assert!` in debug
+//! builds; `j` must always be a live handle from `rsd_journal_open_files`.
 use journal_file::{Direction, HashableObject, JournalFile, JournalReader, Location};
 use memmap2::Mmap;
 use std::ffi::{CStr, c_char, c_int, c_void};
@@ -104,6 +114,13 @@ struct RsdJournal<'a> {
     decompressed_payload: Vec<u8>,
 }
 
+/// Opens the first path in `paths` for reading; the remaining paths and
+/// `flags` are accepted for `sd_journal_open_files` compatibility and ignored.
+///
+/// On success `*ret` receives a handle that the caller must release with
+/// `rsd_journal_close`. Opening also installs a process-wide SIGBUS handler so
+/// faults in the memory-mapped windows do not abort the process (see the
+/// `sigbus` crate).
 #[unsafe(no_mangle)]
 unsafe extern "C" fn rsd_journal_open_files(
     ret: *mut *mut RsdJournal,
@@ -118,13 +135,11 @@ unsafe extern "C" fn rsd_journal_open_files(
             eprintln!("Failed to install sigbus handler");
         }
 
-        // Get the first path
         let path_ptr = *paths;
         if path_ptr.is_null() {
             return error::JournalError::InvalidFfiOp.to_error_code();
         }
 
-        // Convert C string to Rust string
         let path = match CStr::from_ptr(path_ptr).to_str() {
             Ok(s) => s,
             Err(_) => {
@@ -132,7 +147,6 @@ unsafe extern "C" fn rsd_journal_open_files(
             }
         };
 
-        // Create the ObjectFile
         let window_size = 512 * 1024 * 1024;
         let journal_file = match JournalFile::<Mmap>::open(path, window_size) {
             Ok(f) => Box::new(f),
@@ -148,13 +162,13 @@ unsafe extern "C" fn rsd_journal_open_files(
             decompressed_payload: Vec::new(),
         });
 
-        // Pass ownership to the caller
         *ret = Box::into_raw(journal);
 
         0
     }
 }
 
+/// Releases a handle returned by `rsd_journal_open_files`.
 #[unsafe(no_mangle)]
 unsafe extern "C" fn rsd_journal_close(j: *mut RsdJournal) {
     unsafe {
@@ -193,6 +207,9 @@ unsafe extern "C" fn rsd_journal_seek_realtime_usec(j: *mut RsdJournal, usec: u6
     }
 }
 
+/// Steps to the next entry, honoring the installed matches. Returns `1` if an
+/// entry is available, `0` when the end of the journal is reached, negative on
+/// error.
 #[unsafe(no_mangle)]
 unsafe extern "C" fn rsd_journal_next(j: *mut RsdJournal) -> c_int {
     unsafe {
@@ -215,6 +232,9 @@ unsafe extern "C" fn rsd_journal_next(j: *mut RsdJournal) -> c_int {
     }
 }
 
+/// Steps to the previous entry, honoring the installed matches. Returns `1` if
+/// an entry is available, `0` when the start of the journal is reached,
+/// negative on error.
 #[unsafe(no_mangle)]
 unsafe extern "C" fn rsd_journal_previous(j: *mut RsdJournal) -> c_int {
     unsafe {
@@ -282,6 +302,9 @@ unsafe extern "C" fn rsd_journal_get_realtime_usec(j: *mut RsdJournal, ret: *mut
     }
 }
 
+/// Restarts data-field enumeration for the current entry, so the next
+/// `rsd_journal_enumerate_available_data` call starts from the first field
+/// again.
 #[unsafe(no_mangle)]
 unsafe extern "C" fn rsd_journal_restart_data(j: *mut RsdJournal) {
     unsafe {
@@ -292,6 +315,13 @@ unsafe extern "C" fn rsd_journal_restart_data(j: *mut RsdJournal) {
     }
 }
 
+/// Returns the next data field of the current entry in `FIELD=value` form:
+/// `1` with `*data` and `*l` set, `0` when the entry is exhausted, negative on
+/// error.
+///
+/// The pointer is owned by the journal handle and stays valid only until the
+/// next call on the same handle; compressed fields are decompressed into a
+/// buffer that is reused between calls.
 #[unsafe(no_mangle)]
 unsafe extern "C" fn rsd_journal_enumerate_available_data(
     j: *mut RsdJournal,
@@ -329,6 +359,8 @@ unsafe extern "C" fn rsd_journal_enumerate_available_data(
     }
 }
 
+/// Restarts field-name enumeration, so the next `rsd_journal_enumerate_fields`
+/// call starts from the first field again.
 #[unsafe(no_mangle)]
 unsafe extern "C" fn rsd_journal_restart_fields(j: *mut RsdJournal) {
     unsafe {
@@ -339,6 +371,12 @@ unsafe extern "C" fn rsd_journal_restart_fields(j: *mut RsdJournal) {
     }
 }
 
+/// Returns the next field name defined in the journal as a NUL-terminated
+/// string: `1` with `*field` set, `0` when the fields are exhausted, negative
+/// on error.
+///
+/// The string is owned by the journal handle and stays valid only until the
+/// next call on the same handle.
 #[unsafe(no_mangle)]
 unsafe extern "C" fn rsd_journal_enumerate_fields(
     j: *mut RsdJournal,
@@ -367,6 +405,9 @@ unsafe extern "C" fn rsd_journal_enumerate_fields(
     }
 }
 
+/// Prepares enumeration of the distinct values stored for `field`; iterate
+/// them with `rsd_journal_restart_unique` and
+/// `rsd_journal_enumerate_available_unique`.
 #[unsafe(no_mangle)]
 unsafe extern "C" fn rsd_journal_query_unique(j: *mut RsdJournal, field: *const c_char) -> c_int {
     unsafe {
@@ -387,6 +428,8 @@ unsafe extern "C" fn rsd_journal_query_unique(j: *mut RsdJournal, field: *const 
     }
 }
 
+/// Drops the value returned by the last `rsd_journal_enumerate_available_unique`
+/// call, invalidating its pointer.
 #[unsafe(no_mangle)]
 unsafe extern "C" fn rsd_journal_restart_unique(j: *mut RsdJournal) {
     unsafe {
@@ -396,6 +439,12 @@ unsafe extern "C" fn rsd_journal_restart_unique(j: *mut RsdJournal) {
     }
 }
 
+/// Returns the next distinct value stored for the field given to
+/// `rsd_journal_query_unique`: `1` with `*data` and `*l` set, `0` when the
+/// values are exhausted, negative on error.
+///
+/// The pointer is owned by the journal handle and stays valid only until the
+/// next call on the same handle.
 #[unsafe(no_mangle)]
 unsafe extern "C" fn rsd_journal_enumerate_available_unique(
     j: *mut RsdJournal,
@@ -434,6 +483,9 @@ unsafe extern "C" fn rsd_journal_enumerate_available_unique(
     }
 }
 
+/// Adds a match in `FIELD=value` form. If `size` is zero, `data` is read as a
+/// NUL-terminated string; otherwise exactly `size` bytes are used. Matches
+/// without a `=` are silently ignored.
 #[unsafe(no_mangle)]
 unsafe extern "C" fn rsd_journal_add_match(
     j: *mut RsdJournal,
@@ -462,6 +514,8 @@ unsafe extern "C" fn rsd_journal_add_match(
     }
 }
 
+/// Marks the following matches to be combined with the accumulated filter
+/// through a logical AND.
 #[unsafe(no_mangle)]
 unsafe extern "C" fn rsd_journal_add_conjunction(j: *mut RsdJournal) -> c_int {
     unsafe {
@@ -474,6 +528,8 @@ unsafe extern "C" fn rsd_journal_add_conjunction(j: *mut RsdJournal) -> c_int {
     }
 }
 
+/// Marks the following matches to be combined with the accumulated filter
+/// through a logical OR.
 #[unsafe(no_mangle)]
 unsafe extern "C" fn rsd_journal_add_disjunction(j: *mut RsdJournal) -> c_int {
     unsafe {
@@ -487,6 +543,7 @@ unsafe extern "C" fn rsd_journal_add_disjunction(j: *mut RsdJournal) -> c_int {
     }
 }
 
+/// Discards all installed matches.
 #[unsafe(no_mangle)]
 unsafe extern "C" fn rsd_journal_flush_matches(j: *mut RsdJournal) {
     unsafe {

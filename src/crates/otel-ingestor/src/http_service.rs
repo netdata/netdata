@@ -21,14 +21,14 @@
 //!   own tests flag as a bug; and the order — upstream's decompressor runs
 //!   before the Content-Type check, so a request bad in both gets its 400
 //!   where this receiver answers the Content-Type 415);
-//! - bodies are capped (see [`MAX_BODY_BYTES`], applied to the wire body AND
+//! - bodies are capped (see `MAX_BODY_BYTES`, applied to the wire body AND
 //!   the gzip-expanded body — the second cap is the decompression-bomb guard)
 //!   → over-limit `400` with a `google.rpc.Status` (local: the limit —
 //!   upstream caps at 20 MiB);
 //! - a body that fails to decompress or decode → `400` with a
 //!   `google.rpc.Status` body in the request's encoding;
 //! - tenant policy (`X-Scope-OrgID`) is identical to gRPC via
-//!   [`crate::tenant::extract_tenant_id_from_headers`], with the `tonic`
+//!   `crate::tenant::extract_tenant_id_from_headers`, with the `tonic`
 //!   `Status` mapped onto HTTP codes;
 //! - export errors are returned as `google.rpc.Status` in the request's
 //!   encoding (locally defined: we never attach `details`, so the wire format
@@ -38,7 +38,7 @@
 //!
 //! JSON bodies are OTLP/JSON (hex ids, integer enums, 64-bit integers as
 //! decimal strings or numbers, omitted fields), decoded by
-//! [`crate::otlp_json`], which repairs the `opentelemetry-proto` derives'
+//! `crate::otlp_json`, which repairs the `opentelemetry-proto` derives'
 //! narrower JSON forms first. Deviations from the collector's decoder: enum
 //! names and the `NaN`/`Infinity` doubles are rejected with a `400`, never
 //! dropped silently. Metric losses and the rewrite's own rejections name the
@@ -125,7 +125,8 @@ impl Codec {
 /// field 3 stays wire-compatible.
 #[derive(Clone, PartialEq, ::prost::Message)]
 struct RpcStatus {
-    /// The `google.rpc.Code` value (carried as the HTTP status analog).
+    /// The numeric `google.rpc.Code`; `http_status_for` derives the HTTP
+    /// status from it.
     #[prost(int32, tag = "1")]
     code: i32,
     #[prost(string, tag = "2")]
@@ -158,7 +159,7 @@ impl RpcStatus {
     }
 }
 
-/// Build the OTLP/HTTP router. Exposed separately from [`serve`] so the
+/// Build the OTLP/HTTP router. Exposed separately from `serve` so the
 /// handler tests can drive it with `tower::ServiceExt::oneshot` without a
 /// listener.
 pub(crate) fn router(state: HttpState) -> Router {
@@ -478,7 +479,7 @@ async fn export_metrics(
 ///
 /// `run` receives the request headers (handed over, not copied, once content
 /// negotiation is done with them) and the decoded request, and answers with
-/// the core's `Result<Response, Status>` — the same cores the gRPC wrappers
+/// the core's `Result<Resp, Status>` — the same cores the gRPC wrappers
 /// call — so the two transports cannot drift apart.
 async fn serve_export<Req, Resp, F, Fut>(headers: HeaderMap, body: Body, run: F) -> Response<Body>
 where
@@ -616,7 +617,7 @@ fn too_large(codec: Codec) -> Response<Body> {
     )
 }
 
-/// The request's `Content-Encoding` (case-insensitive). Absent or
+/// The request's `Content-Encoding` (case-insensitive). Absent, empty or
 /// `identity` means a raw body; anything but `gzip` is unsupported (see the
 /// module doc for how this differs from the collector).
 fn content_encoding(value: Option<&axum::http::HeaderValue>) -> Option<BodyCoding> {
@@ -721,9 +722,10 @@ mod tests {
     use crate::logs_service::NetdataLogsService;
     use crate::trace_service::NetdataTracesService;
 
-    /// One request-scoped log record, attributed to `service.name` so the
-    /// stream identity is realistic. Timestamps use a fixed instant inside
-    /// any sane ingest window (the test window is effectively unbounded).
+    /// A request-scoped logs export of `n_records` records, attributed to
+    /// `service.name` so the stream identity is realistic. Timestamps use a
+    /// fixed instant inside any sane ingest window (the test window is
+    /// effectively unbounded).
     fn logs_req(n_records: usize) -> ExportLogsServiceRequest {
         let records = (0..n_records)
             .map(|i| LogRecord {

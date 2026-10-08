@@ -39,8 +39,8 @@
 //! `get_or_build` callers (`rpc/logs/handler.rs`,
 //! `rpc/traces/sources.rs`); the indexer-response path
 //! (`ledger/indexer.rs`) is the `drop_seq` caller on rotation. Keys never
-//! collide across signals: [`file_registry::FileId::seq`] is a single
-//! per-process counter shared by all pipelines.
+//! collide across signals: [`file_registry::FileId::seq`] values are
+//! issued by a single per-process counter shared by all pipelines.
 
 use std::collections::HashMap;
 use std::future::Future;
@@ -84,8 +84,8 @@ pub struct ChunkCache {
 }
 
 /// The memoization key: `wal_seq` is the WAL's [`file_registry::FileId`]
-/// `seq` — a single per-process counter, so it uniquely names a WAL
-/// within this process — and `chunk_index` is the 0-based WAL-wide chunk
+/// `seq` — issued by a single per-process counter, so it uniquely names a
+/// WAL within this process — and `chunk_index` is the 0-based WAL-wide chunk
 /// ordinal from `wal::prefix::chunk_boundaries`.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 struct ChunkKey {

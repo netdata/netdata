@@ -178,9 +178,9 @@ fn request_roundtrips_through_a_wal_frame() {
     assert_eq!(flattened.resources[0].scopes.len(), 1);
     assert_eq!(flattened.resources[0].scopes[0].records.len(), 2);
 
-    // Per-row scalar fields survive on `Record` as columns (lossless frame), and are
-    // NOT flattened into entries. time/observed resolve to the record's timestamp
-    // (a concrete i64; here time_unix_nano was set, so no clock fallback).
+    // Per-row scalars survive as `Record` columns (lossless w.r.t. the normalized
+    // request), not entries: `ts` is the resolved time_unix_nano, `observed_ts` the
+    // raw observed time; time_unix_nano was set here, so no fallback applied.
     for rec in &flattened.resources[0].scopes[0].records {
         assert_eq!(rec.ts, 1_700_000_000_000_000_000);
         assert_eq!(rec.observed_ts, 1_700_000_000_000_000_001);
@@ -290,7 +290,7 @@ fn empty_request_writes_no_frame() {
     assert_eq!(wal_files, 0);
 }
 
-/// A one-resource/one-scope request wrapping `log_records`, for the fallback tests.
+/// A one-resource/one-scope request wrapping `log_records`, for the fallback and id tests.
 fn request_with(log_records: Vec<LogRecord>) -> ExportLogsServiceRequest {
     ExportLogsServiceRequest {
         resource_logs: vec![ResourceLogs {
@@ -351,8 +351,8 @@ fn ts_falls_back_to_observed_when_time_is_zero() {
 
 #[test]
 fn malformed_ids_are_cleared_at_ingest() {
-    // A wrong-length (non-empty) trace/span id is dropped at ingest; a conformant
-    // 16/8-byte id passes through. The frame thus carries only {spec-width | empty}.
+    // A wrong-length (non-empty) trace/span id is cleared at ingest; a conformant
+    // 16/8-byte id passes through, so the frame carries only full-width or UNSET ids.
     let req = request_with(vec![
         LogRecord {
             trace_id: vec![1, 2, 3, 4, 5], // not 16 → cleared
@@ -489,7 +489,7 @@ fn trace_request_roundtrips_through_a_wal_frame() {
     assert_eq!(sr.span_id, SpanId::from([0x22; 8]));
     assert_eq!(sr.parent_span_id, SpanId::from([0x33; 8]));
 
-    // Facets survive (name + dual enum label) alongside resource/scope.
+    // Facets survive (name + kind/status enum labels) alongside resource/scope.
     let mut leaves = Vec::new();
     {
         let tree = &flat.tree;

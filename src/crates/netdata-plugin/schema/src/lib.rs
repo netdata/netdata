@@ -74,7 +74,6 @@ impl Transform for CollectUISchema {
             return;
         };
 
-        // x-ui-* keys become ui:<suffix>; x-sensitive counts only when exactly Bool(true).
         let mut ui_props = Map::new();
         let mut keys_to_remove = Vec::new();
 
@@ -91,12 +90,11 @@ impl Transform for CollectUISchema {
             }
         }
 
-        // Consumed keys are stripped; a non-true x-sensitive stays in the schema.
+        // A non-true `x-sensitive` stays in the schema.
         for key in keys_to_remove {
             obj.remove(&key);
         }
 
-        // Store collected keys under the node's dotted path; the root merges into uiSchema itself.
         if !ui_props.is_empty() {
             let ui_path = if self.current_path.is_empty() {
                 ".".to_string()
@@ -160,7 +158,6 @@ impl Transform for CollectConfigDeclaration {
             return;
         };
 
-        // Only the keys of the schema object passed in are read; nothing recurses.
         let mut config_props = ConfigDeclarationBuilder::default();
         let mut keys_to_remove = Vec::new();
 
@@ -329,6 +326,4 @@ pub trait NetdataSchema: JsonSchema {
     }
 }
 
-/// Blanket impl: every `JsonSchema` type gets [`NetdataSchema`], so
-/// `T::netdata_schema()` needs no derive.
 impl<T> NetdataSchema for T where T: JsonSchema {}

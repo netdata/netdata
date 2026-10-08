@@ -33,9 +33,9 @@
 //! Consumers (grep-verified): the only in-repo user is `JournalReader`;
 //! `file/mod.rs` and lib.rs re-export both types. Near-identical
 //! twin: src/crates/jf/journal_file/src/cursor.rs (same code modulo
-//! imports); netflow-plugin instead queries through the published
-//! `systemd-journal-sdk-core` crate carrying this same design
-//! (src/crates/Cargo.toml).
+//! imports and a derived `Default`); netflow-plugin instead queries
+//! the published `systemd-journal-sdk-core` crate carrying this same
+//! design (src/crates/Cargo.toml).
 use super::mmap::MemoryMap;
 use crate::error::{JournalError, Result};
 use crate::file::{file::JournalFile, filter::FilterExpr, offset_array, offset_array::Direction};
@@ -172,7 +172,8 @@ impl JournalCursor {
 
     /// The current entry's object offset, to be resolved against the
     /// file with `JournalFile::entry_ref`. Errors with `UnsetCursor`
-    /// unless `step` has resolved a `Location::ResolvedEntry`.
+    /// unless `location` is a resolved entry - set by `step`, or
+    /// directly through `set_location`.
     pub fn position(&self) -> Result<NonZeroU64> {
         match self.location {
             Location::ResolvedEntry(entry_offset) => Ok(entry_offset),
@@ -227,17 +228,15 @@ impl JournalCursor {
                     .entry_list()
                     .ok_or(JournalError::InvalidOffsetArrayOffset)?;
 
-                // Binary search for the first entry whose realtime is at
-                // or after the requested time; the step direction is
-                // ignored here.
+                // First entry whose realtime is at or after the requested
+                // time; the step direction is ignored.
                 let predicate = |entry_offset| {
                     let entry_object = journal_file.entry_ref(entry_offset)?;
                     Ok(entry_object.header.realtime < realtime)
                 };
 
-                // Nothing at or after the requested time: land on the
-                // newest entry (`cursor_tail` walks the chain, hence the
-                // nested Result).
+                // Every entry older: land on the newest entry
+                // (`cursor_tail` walks the chain, hence the nested Result).
                 let cursor = entry_list
                     .directed_partition_point(journal_file, predicate, Direction::Forward)?
                     .map(Ok)
@@ -283,18 +282,20 @@ impl JournalCursor {
         Ok(new_location)
     }
 
-    /// Resolve the next location through the filter expression.
+    /// Resolve the next location through the filter expression. Only
+    /// called with a filter set (`step` dispatches on that), so the
+    /// `unwrap` below cannot panic.
     ///
     /// `FilterExpr::next`/`previous` continue from the expression's
     /// internal scan position and clamp to offsets >= / <= the needle,
     /// so fresh-resolution branches rewind with `head()`/`tail()` first;
-    /// without the rewind, `next` would return the already-current
-    /// entry. Needles 1/`u64::MAX` select the first/last match overall;
-    /// the +1/-1 needles at the `ResolvedEntry` arms move strictly past
-    /// the current entry, relying on entry offsets strictly increasing
-    /// along the chain. A filter that built to [`FilterExpr::None`] - no
-    /// match survived construction - matches nothing:
-    /// every step reports the end of iteration.
+    /// without the rewind, `next`/`previous` would return the
+    /// already-current entry. Needles 1/`u64::MAX` select the first/last
+    /// match overall; the +1/-1 needles at the `ResolvedEntry` arms move
+    /// strictly past the current entry, relying on entry offsets
+    /// strictly increasing along the chain. A filter that built to
+    /// [`FilterExpr::None`] - no match survived construction - matches
+    /// nothing: every step reports the end of iteration.
     fn resolve_filter_location<M: MemoryMap>(
         &mut self,
         journal_file: &JournalFile<M>,

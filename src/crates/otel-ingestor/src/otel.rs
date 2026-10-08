@@ -29,7 +29,7 @@ use std::hash::{Hash, Hasher};
  * tag: compare
  */
 
-/// Total order over OTLP value types — the sort key [`Normalize`] uses to
+/// Total order over OTLP value types — the sort key `Normalize` uses to
 /// bring attribute lists into a canonical order. Values of different types
 /// order by type tag; vecs compare by length before element-wise; doubles use
 /// `total_cmp` so NaN does not break the order.
@@ -145,7 +145,7 @@ impl Compare for Option<AnyValue> {
  */
 
 /// Bring OTLP structures into a canonical form: normalize nested values
-/// recursively, then sort every attribute list with [`Compare`] — kvlists,
+/// recursively, then sort every attribute list with `Compare` — kvlists,
 /// resource/scope attributes, metric metadata, and data-point attributes.
 /// Array order is preserved. Paired with [`MetricIdentityHash`] (which hashes
 /// vecs in slice order), this makes identity hashes independent of the order
@@ -325,7 +325,7 @@ impl Normalize for Metric {
 }
 
 /// Normalize a whole export request: resource and scope attributes, metric
-/// metadata, and every data point's attributes (see [`Normalize`]). Called by
+/// metadata, and every data point's attributes (see `Normalize`). Called by
 /// `metrics_service.rs::process_request` before chart matching and hashing.
 pub fn normalize_request(request: &mut ExportMetricsServiceRequest) {
     for rm in &mut request.resource_metrics {
@@ -507,7 +507,8 @@ impl<'a> DataPointRef<'a> {
 
     /// Dimension name for this data point: the string value of the attribute
     /// named `dimension_attr_key`, or the literal "value" when no key is
-    /// given, the attribute is missing, or its value is not a string.
+    /// given, the attribute is missing, or its value is unset or not a
+    /// string.
     pub fn dimension_name(&self, dimension_attr_key: Option<&str>) -> &str {
         let Some(key) = dimension_attr_key else {
             return "value";

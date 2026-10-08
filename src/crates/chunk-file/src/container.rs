@@ -78,9 +78,10 @@ pub enum Error {
     /// The TOC failed to parse or validate — carries the raw layer's
     /// structured error so callers can match the specific failure
     /// (duplicate id, non-monotonic offset, out-of-bounds, ...).
-    /// Transparent rather than hand-formatted: the source is already
-    /// printed via the anyhow chain, so repeating it in the message
-    /// would print it twice.
+    /// Transparent rather than hand-formatted: `Display` forwards to
+    /// the raw error and `source()` to its source, so the raw message
+    /// prints once; repeating it in this message would print it twice
+    /// (here, then again via the anyhow chain).
     #[error(transparent)]
     Toc(#[from] crate::Error),
 

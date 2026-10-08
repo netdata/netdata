@@ -199,7 +199,7 @@ pub async fn startup_catalog_sync<S: Storage>(
 /// at seeding time (`recovery::local::seed_from_catalog_files`, the sole
 /// caller). Quarantine it, then re-fetch + validate + atomically install the
 /// single remote object via the diff-sync helper, and return the re-parsed
-/// [`Catalog`](otel_catalog::Catalog) so the caller can seed it.
+/// `otel_catalog::Catalog` so the caller can seed it.
 ///
 /// Returns `None` — and boot continues — when storage is disabled, the
 /// quarantine rename fails, the re-fetch errors or skips, or the re-read of
@@ -210,7 +210,7 @@ pub async fn startup_catalog_sync<S: Storage>(
 /// masked.
 ///
 /// `parsed` is rebuilt by the caller from the catalog registry's
-/// filename-derived [`File`](otel_catalog::registry::File) fields plus its
+/// filename-derived `otel_catalog::registry::File` fields plus its
 /// tenant, so no remote key is trusted from the corrupt body.
 pub(crate) async fn heal_corrupt_catalog<S: Storage>(
     storage: Option<&S>,
@@ -378,8 +378,10 @@ async fn download_and_install<S: Storage>(
 
 /// Validate a downloaded catalog body against its remote key — the tenant
 /// oracle for installs. The key's segments (date, tenant, filename
-/// identity/fold) are trusted — `remote_keys::parse_catalog_key` produced them
-/// from the LIST — the body is not, so every identifying axis must agree.
+/// identity/fold) are trusted — the diff-sync's come from
+/// `remote_keys::parse_catalog_key` on the LIST, the heal's from the
+/// filename-derived registry fields — the body is not, so every identifying
+/// axis must agree.
 /// Returns `Err(reason)` (a description for the skip log) on any mismatch; the
 /// caller then skips the install. Checks:
 /// container magic/CRC + framing-version, then the JSON envelope's

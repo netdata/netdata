@@ -5,26 +5,23 @@
 //! Counts are the filtered half of each bucket's
 //! `fv_counts: FieldValuePair -> (unfiltered, filtered)`
 //! (`BucketResponse::fv_counts` in `journal-engine/src/histogram.rs`),
-//! summed across buckets, so they
-//! track the same selections-filtered result set the logs table shows (one
-//! filter feeds both: `LegacyLogsHandler::on_call` in
-//! `otel-legacy-logs/src/handler.rs`). Which
-//! fields can appear is fixed upstream - the file indexes hold bitmaps only
-//! for the query's requested facet fields (the file indexer records
-//! bitmaps only for the `FileIndexKey`'s requested facet fields - see
-//! `batch_compute_file_indexes` in `journal-engine/src/indexing.rs`) - so a
-//! facet exists for each
-//! requested field that has indexed values.
+//! summed across buckets, so they track the same selections-filtered
+//! result set the logs table shows (one filter feeds both:
+//! `LegacyLogsHandler::on_call` in `otel-legacy-logs/src/handler.rs`).
+//!
+//! Which fields can appear is fixed upstream: the file indexer records
+//! bitmaps only for the `FileIndexKey`'s requested facet fields (see
+//! `batch_compute_file_indexes` in `journal-engine/src/indexing.rs`), so a
+//! facet exists for each requested field that has indexed values.
 //!
 //! Unlike the histogram chart, these options never include an "(unset)"
 //! slice; entries lacking the field are counted only there
 //! (`chart_result_from_histogram` in `netdata/histogram.rs`).
 //!
 //! Sole consumer (grep-verified): `otel-legacy-logs/src/handler.rs`
-//! (`LegacyLogsHandler::on_call`), which
-//! puts the result into the `facets` field of
-//! [`crate::netdata::types::JournalResponse`] via
-//! the `facets` re-export in `netdata/mod.rs`.
+//! (`LegacyLogsHandler::on_call`), which puts the result into the `facets`
+//! field of [`crate::netdata::types::JournalResponse`] via the `facets`
+//! re-export in `netdata/mod.rs`.
 
 use super::transformations::TransformationRegistry;
 use super::ui_types::{Facet, FacetOption};

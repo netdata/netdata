@@ -109,7 +109,8 @@ impl Microseconds {
         self.0
     }
 
-    /// Convert to seconds (truncates).
+    /// Convert to seconds (truncates). Past `u32` capacity (year 2106) the
+    /// `u64`-to-`u32` cast keeps only the low bits.
     pub fn to_seconds(self) -> Seconds {
         Seconds((self.0 / 1_000_000) as u32)
     }
@@ -315,7 +316,7 @@ impl Default for RealtimeClock {
 
 /// Reads `CLOCK_MONOTONIC` as microseconds since boot.
 ///
-/// Not tied to the Unix epoch and unaffected by system-clock adjustments, but
+/// Not tied to the Unix epoch and unaffected by system-clock jumps, but
 /// it does not advance while the system is suspended. Matches the monotonic
 /// half of systemd's journal dual timestamps. Consecutive calls can repeat
 /// within one microsecond, so per-entry distinctness needs clamping —
@@ -389,7 +390,7 @@ mod tests {
     fn test_seconds_sub_underflow() {
         let a = Seconds::new(10);
         let b = Seconds::new(20);
-        let _ = a - b; // Should panic
+        let _ = a - b;
     }
 
     #[test]
@@ -451,7 +452,7 @@ mod tests {
 
         let g = Seconds::new(10);
         let h = Seconds::new(0);
-        assert!(!g.is_multiple_of(h)); // Division by zero case
+        assert!(!g.is_multiple_of(h)); // zero divisor returns false, no panic
     }
 
     #[test]
@@ -473,7 +474,7 @@ mod tests {
     fn test_microseconds_sub_underflow() {
         let a = Microseconds::new(1000);
         let b = Microseconds::new(2000);
-        let _ = a - b; // Should panic
+        let _ = a - b;
     }
 
     #[test]
@@ -535,7 +536,7 @@ mod tests {
 
         let g = Microseconds::new(10000);
         let h = Microseconds::new(0);
-        assert!(!g.is_multiple_of(h)); // Division by zero case
+        assert!(!g.is_multiple_of(h)); // zero divisor returns false, no panic
     }
 
     #[test]
@@ -570,7 +571,7 @@ mod tests {
         let t2 = clock.now();
 
         assert!(t2 > t1);
-        assert_eq!(t2.get() - t1.get(), 1); // Should increment by 1 microsecond
+        assert_eq!(t2.get() - t1.get(), 1);
     }
 
     #[test]

@@ -10,9 +10,13 @@
 //! Function. It shares the logs pipeline's chunk cache (seqs are
 //! process-global, so `(seq, index)` keys never collide across signals) and
 //! the shared download cache, but installs its own GET shim
-//! ([`super::rpc::patch_traces_args_into_payload`]): the traces wire is
-//! strict (one mode object, no top-level window), so only the literal
-//! `info` token synthesizes a payload and data calls are POST-only.
+//! ([`super::rpc::patch_traces_args_into_payload`]): it synthesizes a
+//! payload only for the literal `info` token — the `{"info": {}}`
+//! capability-discovery selector. A data GET is not rejected: the
+//! bridge deserializes the absent payload from `{}` into the
+//! selector-less `TracesMode::Functions` default view (every param
+//! has a serde default, `last` via a custom `default_limit` fn) and
+//! silently drops the GET's window args.
 //!
 //! Consumers: `Ledger::new` (`mod.rs`) builds this pipeline right after the
 //! logs one; the registry/catalog/recovery machinery is
@@ -90,7 +94,8 @@ pub(crate) async fn build_traces_pipeline(
             let handler: Arc<dyn RawFunctionHandler> =
                 Arc::new(HandlerAdapter::new(traces_handler));
             // The traces-own GET shim: the literal `info` token →
-            // `{"info": {}}`, anything else → no payload (POST-only data).
+            // `{"info": {}}`, anything else → no payload (the bridge then
+            // deserializes `{}` into the default Functions view).
             (
                 handler,
                 super::rpc::patch_traces_args_into_payload as ArgShim,

@@ -3,6 +3,8 @@ use error::{JournalError, Result};
 use std::num::{NonZeroU64, NonZeroUsize};
 use window_manager::MemoryMap;
 
+/// Search direction for partition-point queries: `Forward` selects the first
+/// match, `Backward` the last.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Direction {
     Forward,
@@ -19,7 +21,7 @@ pub struct Node {
 }
 
 impl Node {
-    /// Create a new offset array reference
+    /// Create a new offset array reference; fails if the array is empty
     fn new<M: MemoryMap>(
         journal_file: &JournalFile<M>,
         offset: NonZeroU64,
@@ -47,12 +49,14 @@ impl Node {
         self.capacity
     }
 
-    /// Get the number of items available in this array
+    /// Get the number of valid items in this array (its capacity, capped by the
+    /// items remaining in the chain)
     pub fn len(&self) -> NonZeroUsize {
         self.capacity.min(self.remaining_items)
     }
 
-    /// Check if this array has a next array in the chain
+    /// Check whether the chain continues after this array: a next array exists
+    /// and items remain beyond this array
     pub fn has_next(&self) -> bool {
         self.next_offset.is_some() && self.remaining_items > self.len()
     }
@@ -73,7 +77,7 @@ impl Node {
         Some(node).transpose()
     }
 
-    /// Get an item at the specified index
+    /// Get the item at `index` (error when out of range, `None` for an empty slot)
     pub fn get<M: MemoryMap>(
         &self,
         journal_file: &JournalFile<M>,
@@ -87,8 +91,9 @@ impl Node {
         array.get(index, self.remaining_items.get())
     }
 
-    /// Returns the first index where the predicate returns false, or array length if
-    /// the predicate is true for all elements
+    /// Binary search `[left, right)` for the first index whose item fails the
+    /// predicate (`right` when all items in range pass it). The items in range
+    /// must be partitioned: the predicate is true up to some point, false after.
     pub fn partition_point<M, F>(
         &self,
         journal_file: &JournalFile<M>,
@@ -122,7 +127,9 @@ impl Node {
         Ok(left)
     }
 
-    /// Find the forward or backward (depending on direction) position that matches the predicate.
+    /// Find the partition boundary in the given direction: `Forward` returns the
+    /// first index whose item fails the predicate, `Backward` the last index whose
+    /// item satisfies it; `None` when there is no such index.
     pub fn directed_partition_point<M, F>(
         &self,
         journal_file: &JournalFile<M>,
@@ -170,7 +177,8 @@ impl std::fmt::Debug for Node {
     }
 }
 
-/// A linked list of offset arrays
+/// A chain of offset arrays, identified by the offset of its head array and the
+/// total number of items across all arrays in the chain
 #[derive(Copy, Clone)]
 pub struct List {
     head_offset: NonZeroU64,
@@ -200,7 +208,7 @@ impl List {
         Node::new(journal_file, self.head_offset, self.total_items)
     }
 
-    /// Get the tail array of this list by traversing from head to tail
+    /// Traverse the chain and return its last array
     pub fn tail<M: MemoryMap>(&self, journal_file: &JournalFile<M>) -> Result<Node> {
         let mut current = self.head(journal_file)?;
 
@@ -221,12 +229,10 @@ impl List {
         Cursor::at_tail(journal_file, self)
     }
 
-    /// Finds the first/last array item position where the predicate function becomes false
-    /// in a chain of offset arrays.
-    ///
-    /// # Parameters
-    /// * `predicate` - Function that takes an array item value and returns true if the search should continue.
-    /// * `direction` - Direction of the search (Forward or Backward)
+    /// Search the whole chain for the first item that fails the predicate
+    /// (`Forward`) or the last item that satisfies it (`Backward`), returning a
+    /// cursor to it; `None` when there is no such item. The predicate returns
+    /// `true` for an item while the search should continue past it.
     pub fn directed_partition_point<M, F>(
         self,
         journal_file: &JournalFile<M>,
@@ -261,21 +267,18 @@ impl List {
                         return Ok(Some(cursor));
                     }
                     Direction::Backward => {
-                        // In backward direction, save this match and continue
-                        // to ensure we'll find the last match
+                        // Remember this match and keep searching: a later array may hold a later one
                         last_cursor = Some(cursor);
 
-                        // If this match is at the end of the array and there's a next array,
-                        // we should check the next array as well
+                        // The match is this array's last item: keep checking the next array
                         if index == node.len().get() - 1 && node.has_next() {
-                            // continue;
                         } else {
                             return Ok(last_cursor);
                         }
                     }
                 }
             } else if direction == Direction::Backward {
-                // No match in this array for backward direction
+                // No match in this array: none can follow, so the last match is final
                 return Ok(last_cursor);
             }
 
@@ -286,12 +289,11 @@ impl List {
             }
         }
 
-        // For backward direction, return the last match we found (if any)
         if direction == Direction::Backward {
             return Ok(last_cursor);
         }
 
-        // No match found in any array
+        // No match in any array (forward direction)
         Ok(None)
     }
 }
@@ -306,6 +308,7 @@ pub struct Cursor {
 }
 
 impl Cursor {
+    /// Return a fresh cursor at the head of the chain
     pub fn head(&self) -> Self {
         Self::at_head(self.list)
     }
@@ -336,7 +339,8 @@ impl Cursor {
         })
     }
 
-    /// Create a cursor at a specific position
+    /// Create a cursor at a specific position, validating that the array exists
+    /// and `array_index` is in bounds
     pub fn at_position<M: MemoryMap>(
         journal_file: &JournalFile<M>,
         offset_array_list: List,
@@ -346,10 +350,8 @@ impl Cursor {
     ) -> Result<Self> {
         debug_assert!(offset_array_list.total_items >= remaining_items);
 
-        // Verify the array exists
         let array = Node::new(journal_file, array_offset, remaining_items)?;
 
-        // Verify the index is valid
         if array_index >= array.len().get() {
             return Err(JournalError::InvalidOffsetArrayIndex);
         }
@@ -367,11 +369,12 @@ impl Cursor {
         Node::new(journal_file, self.array_offset, self.remaining_items)
     }
 
+    /// Get the item at this cursor's position
     pub fn value<M: MemoryMap>(&self, journal_file: &JournalFile<M>) -> Result<Option<NonZeroU64>> {
         self.node(journal_file)?.get(journal_file, self.array_index)
     }
 
-    /// Move to the next position
+    /// Return the cursor at the next position, or `None` at the end of the chain
     pub fn next<M: MemoryMap>(&self, journal_file: &JournalFile<M>) -> Result<Option<Self>> {
         let array_node = self.node(journal_file)?;
 
@@ -407,7 +410,8 @@ impl Cursor {
         }
     }
 
-    /// Move to the previous position
+    /// Return the cursor at the previous position, or `None` before the chain
+    /// head. Fails when the cursor's array is not reachable from the head
     pub fn previous<M: MemoryMap>(&self, journal_file: &JournalFile<M>) -> Result<Option<Self>> {
         if self.array_index > 0 {
             // Previous item is in the same array
@@ -451,6 +455,9 @@ impl std::fmt::Debug for Cursor {
     }
 }
 
+/// Iterates the entries referencing a data object: the object's inlined entry
+/// offset first, then the remaining offsets of its entry-array chain through the
+/// wrapped [`Cursor`] (absent when the object is referenced by a single entry)
 #[derive(Debug, Copy, Clone)]
 pub struct InlinedCursor {
     inlined_offset: NonZeroU64,
@@ -459,6 +466,7 @@ pub struct InlinedCursor {
 }
 
 impl InlinedCursor {
+    /// Create a cursor over an inlined entry and, optionally, its entry-array chain
     pub fn new(inlined_offset: NonZeroU64, cursor: Option<Cursor>) -> Self {
         Self {
             inlined_offset,
@@ -467,6 +475,7 @@ impl InlinedCursor {
         }
     }
 
+    /// Return a copy rewound to the chain head, pointing at the inlined entry
     pub fn head(&self) -> Self {
         Self {
             inlined_offset: self.inlined_offset,
@@ -475,11 +484,10 @@ impl InlinedCursor {
         }
     }
 
+    /// Copy this cursor with the wrapped chain cursor moved to the chain tail
     pub fn tail<M: MemoryMap>(&self, journal_file: &JournalFile<M>) -> Result<Self> {
-        // Start with a copy of the current cursor
         let mut result = *self;
 
-        // If we have an entry array list cursor, move it to the tail
         if let Some(cursor) = self.cursor {
             result.cursor = Some(cursor.list.cursor_tail(journal_file)?);
             result.at_inlined_offset = false;
@@ -489,7 +497,7 @@ impl InlinedCursor {
     }
 
     fn next<M: MemoryMap>(&self, journal_file: &JournalFile<M>) -> Result<Option<Self>> {
-        // Case 1: We're at the inlined entry, move to the first array entry
+        // Case 1: at the inlined entry; step to the wrapped cursor's chain position
         if self.at_inlined_offset {
             if self.cursor.is_some() {
                 return Ok(Some(Self {
@@ -529,7 +537,6 @@ impl InlinedCursor {
         if let Some(current_cursor) = self.cursor {
             // Try to move to the previous position in the array
             if let Some(prev_cursor) = current_cursor.previous(journal_file)? {
-                // We can move back within the array
                 let mut ic = *self;
                 ic.cursor = Some(prev_cursor);
                 return Ok(Some(ic));
@@ -544,13 +551,12 @@ impl InlinedCursor {
         unreachable!();
     }
 
+    /// Get the current value: the inlined offset, or the wrapped cursor's chain item
     pub fn value<M: MemoryMap>(&self, journal_file: &JournalFile<M>) -> Result<Option<NonZeroU64>> {
-        // Case 1: We're at the inlined entry
         if self.at_inlined_offset {
             return Ok(Some(self.inlined_offset));
         }
 
-        // Case 2: We're in the entry array
         if let Some(cursor) = self.cursor {
             return cursor.value(journal_file);
         }
@@ -558,6 +564,8 @@ impl InlinedCursor {
         unreachable!();
     }
 
+    /// Step forward until the current value is at or after `offset` and return
+    /// it; `None` when the iteration ends first
     pub fn next_until<M: MemoryMap>(
         &mut self,
         journal_file: &JournalFile<M>,
@@ -586,6 +594,8 @@ impl InlinedCursor {
         Ok(None)
     }
 
+    /// Step backward until the current value is at or before `offset` and return
+    /// it; `None` when the iteration ends first
     pub fn previous_until<M: MemoryMap>(
         &mut self,
         journal_file: &JournalFile<M>,
@@ -614,6 +624,8 @@ impl InlinedCursor {
         Ok(None)
     }
 
+    /// Run [`List::directed_partition_point`] over the inlined entry and the
+    /// entry-array chain, returning the direction's best match.
     pub fn directed_partition_point<M, F>(
         &self,
         journal_file: &JournalFile<M>,
@@ -624,10 +636,8 @@ impl InlinedCursor {
         M: MemoryMap,
         F: Fn(NonZeroU64) -> Result<bool>,
     {
-        // Variables to track our best match
         let mut best_match: Option<Self> = None;
 
-        // Handle the inlined entry based on direction
         match direction {
             Direction::Forward => {
                 if !predicate(self.inlined_offset)? {
@@ -636,32 +646,29 @@ impl InlinedCursor {
             }
             Direction::Backward => {
                 if predicate(self.inlined_offset)? {
-                    // If predicate is true for inlined entry and we're going backward,
-                    // this is potentially our best match
+                    // A satisfying inlined entry is only a candidate; the chain may hold a better one
                     best_match = Some(self.head());
                 }
             }
         }
 
-        // If we have an array cursor, check it too using binary search
+        // Search the chain as well, when there is one
         if let Some(cursor) = self.cursor {
             let ic = cursor
                 .list
                 .directed_partition_point(journal_file, predicate, direction)?;
 
             if let Some(ic) = ic {
-                // Create a new InlinedCursor with this array cursor
                 let array_match = Self {
                     inlined_offset: self.inlined_offset,
                     cursor: Some(ic),
                     at_inlined_offset: false,
                 };
 
-                // Compare with our current best match
                 if best_match.is_none() {
                     best_match = Some(array_match);
                 } else {
-                    // Choose the better match based on direction
+                    // Keep the earliest (Forward) or latest (Backward) of the two candidates
                     let best_offset = best_match.as_ref().unwrap().value(journal_file)?;
                     let array_offset = array_match.value(journal_file)?;
 

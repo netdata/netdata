@@ -4,9 +4,9 @@
 //! the parent module's contract.
 //!
 //! - The upload axis drives `unuploaded_ids`: an SFST is listed until
-//!   `mark_uploaded` clears it, and the list empties once every tracked file
-//!   is uploaded (the set recovery's remote reconciliation queues for
-//!   upload).
+//!   `mark_uploaded` marks it uploaded, and the list empties once every
+//!   tracked file is uploaded (the set recovery's remote reconciliation
+//!   queues for upload).
 //! - The `CatalogStage` axis: the derived `Ord` ranks
 //!   `NotRotated < RotatedLocal < Remote` — the `>=` accessors and
 //!   `mark_rotated`'s monotone guard depend on it (the parent pins the same

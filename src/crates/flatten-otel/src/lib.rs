@@ -73,11 +73,10 @@ fn json_map_from_key_value_list(kvl: &Vec<KeyValue>) -> JsonMap<String, JsonValu
 /// `flatten_serde_json` keeps each nested object as a value under its own
 /// key after flattening its fields (empty objects stay `{}`); the object
 /// filter here removes exactly those, so an empty nested attribute
-/// disappears entirely. Two shapes pass the filter with objects still
-/// inside: an array of kvlists keeps the original array-of-objects under
-/// the attribute key next to its flattened `a.b` key (arrays are not
-/// objects), and colliding keys (literal `a.b` vs nested `a` → `b`) merge
-/// into arrays.
+/// disappears entirely. Two exceptional shapes pass the filter: an array
+/// of kvlists keeps the original array-of-objects under the attribute key
+/// next to its flattened `a.b` key (arrays are not objects), and colliding
+/// keys (literal `a.b` vs nested `a` → `b`) merge into arrays.
 pub(crate) fn flatten_and_strip(map: &JsonMap<String, JsonValue>) -> JsonMap<String, JsonValue> {
     flatten_serde_json::flatten(map)
         .into_iter()

@@ -64,8 +64,8 @@ fn make_registry() -> Registry {
     let sfst = sfst::Registry::new(sfst_dir.path());
     let catalog_files = otel_catalog::Registry::new(catalog_dir.path(), TenantId::from("tenant1"));
     // Leak the TempDir guards so the three dirs outlive this helper — the
-    // registry's paths point into them (the OS reclaims the space at process
-    // exit).
+    // registry's paths point into them, and dropping a guard would delete
+    // its dir under the live registry.
     std::mem::forget((wal_dir, sfst_dir, catalog_dir));
     Registry::new(wal, sfst, catalog_files)
 }

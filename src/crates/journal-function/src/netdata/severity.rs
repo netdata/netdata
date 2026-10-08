@@ -37,7 +37,7 @@ impl Severity {
     /// (`str2i()`, same file) parses garbage as 0
     /// and reports Critical instead.
     pub fn from_priority(priority: Option<&str>) -> Self {
-        let priority_num = priority.and_then(|s| s.parse::<i32>().ok()).unwrap_or(6); // Default to LOG_INFO if missing or invalid
+        let priority_num = priority.and_then(|s| s.parse::<i32>().ok()).unwrap_or(6);
 
         if priority_num <= 3 {
             Severity::Critical
@@ -65,16 +65,12 @@ mod tests {
         assert_eq!(Severity::from_priority(Some("2")), Severity::Critical);
         assert_eq!(Severity::from_priority(Some("3")), Severity::Critical);
 
-        // Warning: 4
         assert_eq!(Severity::from_priority(Some("4")), Severity::Warning);
 
-        // Notice: 5
         assert_eq!(Severity::from_priority(Some("5")), Severity::Notice);
 
-        // Normal: 6 (INFO)
         assert_eq!(Severity::from_priority(Some("6")), Severity::Normal);
 
-        // Debug: 7
         assert_eq!(Severity::from_priority(Some("7")), Severity::Debug);
 
         // Default: missing or invalid → Normal

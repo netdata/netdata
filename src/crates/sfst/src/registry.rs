@@ -99,7 +99,9 @@ impl Registry {
         self.inner.file_path(id)
     }
 
-    /// Scan the directory for `.sfst` files and reconstruct state.
+    /// Scan the directory for `.sfst` files and reconstruct state — purely
+    /// additive: entries already tracked are never untracked, so a rebuild
+    /// must start from a fresh registry.
     ///
     /// Reads each file's `SUMR` chunk to recover the summary fields; files
     /// whose summary cannot be read are skipped with a warning rather than

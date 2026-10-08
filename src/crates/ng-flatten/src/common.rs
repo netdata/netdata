@@ -2,7 +2,7 @@
 //!
 //! A [`Flattener`] builds one [`SchemaTree`] (an arena of nodes interned by
 //! `(parent, step, kind)`) while flattening a resource, a scope, and its records
-//! or spans into it. Each leaf occurrence becomes an [`Entry`] `{ node, value }` —
+//! or spans into it. Each leaf occurrence becomes an [`Entry`] `{ node, value, hash }` —
 //! the path is *not* stored per entry; it is recovered on demand from the tree
 //! ([`SchemaTree::path`]). A node id is therefore a stable typed-column identity
 //! (collapsed path + kind), shared across every row that has that column.
@@ -88,8 +88,9 @@ impl Value {
 }
 
 /// How a node descends from its parent: a named field, or the merged array
-/// element. Distinguishing these is what makes a path unambiguous (an array index
-/// vs a key literally containing `[]`).
+/// element (every element of an array shares the one node). Distinguishing
+/// these keeps a key literally containing `[]` a separate column from a real
+/// array element, even though both render the same `a[]` path text.
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub enum Step {
     Field(String),
@@ -119,9 +120,10 @@ pub struct Entry {
     pub value: Value,
     /// Pre-computed `xxhash64` of this entry's `key=value` rendering, filled at
     /// emit time by the [`Flattener`] (an invariant, not a later fill pass).
-    /// Lets the SFST build's interner resolve a repeat pair from the hash alone
-    /// — no re-hash, no string compare (`lookup_hash`; feed at
-    /// `src/crates/ng-index/src/sfst_build.rs`).
+    /// Lets the SFST build's interner resolve a repeat pair via `lookup_hash`
+    /// without re-hashing the string; the build still re-renders the pair and
+    /// string-verifies each hit, so a collision falls through to the
+    /// string-path `intern` (feed at `src/crates/ng-index/src/sfst_build.rs`).
     pub hash: u64,
 }
 
@@ -336,8 +338,9 @@ impl Flattener {
     /// smaller id than its children (children are interned after their parent),
     /// so a single ascending pass sees every parent already mapped. Interning
     /// each `(global_parent, step, kind)` reuses flattening's logic, so a column
-    /// shared across frames collapses to one global node; callers renumber
-    /// entries through the returned map.
+    /// shared across frames collapses to one global node. The returned map
+    /// renumbers foreign node ids into the global space (today's callers drop
+    /// it — they resolve paths from the foreign per-frame tree).
     pub fn merge_tree(&mut self, foreign: &SchemaTree) -> Vec<NodeId> {
         let mut map = vec![ROOT; foreign.len()];
         for local in 1..foreign.len() as NodeId {
@@ -402,7 +405,7 @@ impl Flattener {
     }
 
     /// Build a leaf entry under `parent` via `step` (interning its node and
-    /// filling the emit-time hash) — the allocation-free single-entry form.
+    /// filling the emit-time hash, rendered into the reused `kv_buf`).
     fn emit_one(&mut self, parent: NodeId, step: StepRef<'_>, value: Value) -> Entry {
         let node = self.child(parent, step, value.kind());
         let hash = hash_kv(&self.paths[node as usize], &value, &mut self.kv_buf);
@@ -466,7 +469,8 @@ impl Flattener {
         // rewrites '=' to '_' and counts the rename for ingest to surface.
         let sanitized;
         let name: &str = if kv.key.is_empty() {
-            // Proto3 accepts an empty key (OTLP only SHOULDs non-empty), but
+            // Proto3 accepts an empty key (the spec requires non-empty
+            // attribute keys, but nothing on the wire enforces it), yet
             // stored bare it becomes a prefix-only field that cannot
             // round-trip through selections — degrade to "_", same as the
             // '=' rewrite, at the same choke point.
@@ -591,9 +595,9 @@ impl Flattener {
     /// an absent status object means), so they stay filterable and enumerable.
     /// This dual form is span-specific: `SpanKind`/`StatusCode` are closed enums
     /// whose labels are worth indexing, unlike the open numeric
-    /// `severity_number`. `trace_state` is carried **verbatim** (it embeds the
-    /// W3C sampling threshold `ot=th:`); `status_message` is emitted whenever
-    /// non-empty, independent of the status code.
+    /// `severity_number`. `trace_state` is carried **verbatim** (it can carry the
+    /// OpenTelemetry sampling threshold, `ot=th:`); `status_message` is emitted
+    /// whenever non-empty, independent of the status code.
     pub fn flatten_span(&mut self, span: Span) -> FlattenedSpan {
         let mut out = Vec::new();
 
@@ -738,8 +742,9 @@ pub struct TraceId([u8; TRACE_ID_LEN]);
 pub struct SpanId([u8; SPAN_ID_LEN]);
 
 /// Generate the shared id API (`from_bytes`/`as_bytes`/`is_unset`/`UNSET`,
-/// `From<[u8; W]>`, hex `Display`) for the fixed-width id newtypes. Mirrors the
-/// `sfst` id types so the conversion at the `ng-index` boundary is a byte copy.
+/// `From<[u8; W]>`, hex `Display`/`Debug`) for the fixed-width id newtypes.
+/// Mirrors the `sfst` id types so the conversion at the `ng-index` boundary is
+/// a byte copy.
 macro_rules! id_newtype {
     ($ty:ident, $width:expr) => {
         impl $ty {
@@ -824,11 +829,12 @@ pub struct TimeBounds {
     pub max_ns: u64,
 }
 
-/// Render a typed value into its `key=value` string form, appended to `out`:
-/// strings raw, ints/doubles decimal, bools `true`/`false`, bytes lowercase hex; the
-/// flatten-only empties render structurally. This is the single canonical rendering
-/// shared by the flattener's emit-time hash and the SFST build, so both
-/// agree on the exact `key=value` bytes.
+/// Render a typed value's half of the canonical `key=value` form, appended to
+/// `out`: strings raw, ints/doubles decimal, bools `true`/`false`, bytes
+/// lowercase hex, `Null` nothing, the flatten-only empties structurally
+/// (`[]`/`{}`). This is the single canonical rendering shared by the
+/// flattener's emit-time hash and the SFST build, so both agree on the exact
+/// `key=value` bytes.
 pub fn append_value(value: &Value, out: &mut String) {
     use std::fmt::Write as _;
     match value {

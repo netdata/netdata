@@ -3,7 +3,7 @@
 //!
 //! The CLI is a thin shell over the wire-neutral `sfsq` query engine: it
 //! resolves the WAL/SFST directories ([`config`]), discovers query sources off
-//! disk (the `discover` module), builds a neutral query ([`query`]), runs the engine,
+//! disk ([`mod@discover`]), builds a neutral query ([`query`]), runs the engine,
 //! and formats the result ([`output`]). No running agent is required. The
 //! [`traces`] module is the front door of `sfsq::traces`, powering the
 //! `trace`/`attributes`/`attribute-values`/`search` subcommands, which take
