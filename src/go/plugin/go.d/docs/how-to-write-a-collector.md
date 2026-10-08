@@ -196,6 +196,12 @@ Config SHOULD stay small and operator-oriented:
 - `update_every`, `timeout`, and `vnode` when relevant;
 - selectors that let users intentionally scope cardinality.
 
+Every configuration path (stock and user files, service discovery, DynCfg) applies `confgroup.Config.ApplyDefaults`
+before the collector sees the job, replacing a non-positive `update_every`, `autodetection_retry` or `priority` with
+the module default. A collector therefore always receives a positive `update_every` and `priority` and a non-negative
+`autodetection_retry`, where zero is the valid "no retry" value. Collectors SHOULD NOT re-check those bounds; such
+checks and their troubleshooting entries are unreachable.
+
 Implementation tuning SHOULD use constants:
 
 - discovery refresh cadence;
@@ -346,6 +352,22 @@ For a new collector `<name>`:
    README; follow `.agents/skills/integrations-lifecycle/consistency.md`.
 
 Use `.agents/skills/integrations-lifecycle/recipes/add-go-collector.md` for the integration-generation commands.
+
+A collector that works only on some operating systems (its `metadata.yaml` `supported_platforms`) MUST NOT register
+elsewhere, or its stock job starts and fails there:
+
+- Put the matching build constraint, such as `//go:build linux`, on every source and test file of the collector
+  package except `doc.go`, after the SPDX line with a blank line before and after.
+- Add an untagged `doc.go` containing only the package clause and its doc comment, so the `init.go` import still
+  compiles on every platform.
+- Platform-neutral subpackages such as `<name>func/` and `internal/` need no constraint; only the tagged files link
+  them.
+- From `src/go`, run the package tests on a supported platform, then check a platform that `supported_platforms`
+  excludes (for example `GOOS=windows` for a Linux-only collector): with that `GOOS`,
+  `go build -o /dev/null ./cmd/godplugin` succeeds and `go list -f '{{.GoFiles}}' ./plugin/go.d/collector/<name>`
+  prints only `[doc.go]`.
+
+Examples: `ap`, `zfspool`, `smbios_memory`.
 
 The PR description or design note MUST enumerate the relevant collector consistency artifacts and justify every artifact
 that did not need a matching change. Most of this is not CI-enforced; it must be reviewer-visible.

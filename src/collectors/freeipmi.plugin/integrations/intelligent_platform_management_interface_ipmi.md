@@ -30,7 +30,7 @@ The plugin uses open source library IPMImonitoring to communicate with sensors.
 
 This collector is supported on all platforms.
 
-This collector supports collecting metrics from multiple instances of this integration, including remote instances.
+This collector supports collecting metrics from multiple instances of this integration.
 
 The plugin needs setuid.
 

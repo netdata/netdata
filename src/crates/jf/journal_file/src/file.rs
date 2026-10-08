@@ -936,8 +936,7 @@ impl<M: MemoryMapMut> JournalFile<M> {
             size
         });
 
-        let offset_array = self.journal_object_mut(ObjectType::EntryArray, offset, size);
-        offset_array
+        self.journal_object_mut(ObjectType::EntryArray, offset, size)
     }
 
     pub fn field_mut(

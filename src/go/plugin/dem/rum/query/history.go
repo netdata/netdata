@@ -63,14 +63,14 @@ func (s *Service) SessionEvents(ctx context.Context, site, session string) ([]Se
 				MetricID:     event.MetricID,
 				Revision:     event.Revision,
 
-				Site:      key,
-				SessionID: session,
-				TSUnixUS:  event.TS.UnixMicro(),
-				Type:      event.Type,
-				Page:      event.Page,
-				Text:      event.Text,
-				TraceID:   event.TraceID,
-				UserID:    event.UserID,
+				Site:       key,
+				SessionID:  session,
+				ObservedUS: event.TS.UnixMicro(),
+				Type:       event.Type,
+				Page:       event.Page,
+				Text:       event.Text,
+				TraceID:    event.TraceID,
+				UserID:     event.UserID,
 			}
 			redactSessionEvent(&row, redact)
 			live = append(live, row)
@@ -99,7 +99,7 @@ func (s *Service) SessionEvents(ctx context.Context, site, session string) ([]Se
 		}
 		rows = append(rows, row)
 	}
-	sort.SliceStable(rows, func(i, j int) bool { return rows[i].TSUnixUS < rows[j].TSUnixUS })
+	sort.SliceStable(rows, func(i, j int) bool { return rows[i].ObservedUS < rows[j].ObservedUS })
 	out := make([]SessionEvent, len(rows))
 	for i, row := range rows {
 		out[i] = SessionEvent(row)

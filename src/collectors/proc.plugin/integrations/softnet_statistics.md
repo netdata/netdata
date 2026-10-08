@@ -50,7 +50,7 @@ Monitoring the /proc/net/softnet_stat file can be useful for:
 
 This collector is supported on all platforms.
 
-This collector supports collecting metrics from multiple instances of this integration, including remote instances.
+This collector supports collecting metrics from multiple instances of this integration.
 
 
 ### Default Behavior

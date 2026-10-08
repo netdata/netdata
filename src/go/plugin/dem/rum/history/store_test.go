@@ -6,6 +6,7 @@ import (
 	"context"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -28,20 +29,10 @@ func newTestStore(t *testing.T) (*Store, string) {
 
 func activeJournal(t *testing.T, root string) string {
 	t.Helper()
-	files, err := filepath.Glob(filepath.Join(root, "*", "dem@*.journal"))
+	files, err := filepath.Glob(filepath.Join(root, "*", "dem.journal"))
 	require.NoError(t, err)
-	var latest string
-	var sequence uint64
-	for _, path := range files {
-		reader, err := journal.OpenFile(path)
-		require.NoError(t, err)
-		head := reader.Header().HeadEntrySeqnum()
-		require.NoError(t, reader.Close())
-		if latest == "" || head > sequence {
-			latest, sequence = path, head
-		}
-	}
-	require.NotEmpty(t, latest, "journal missing")
+	require.Len(t, files, 1, "active journal missing")
+	latest := files[0]
 	return latest
 }
 
@@ -61,7 +52,7 @@ func TestJournalReopen(t *testing.T) {
 	event := EventRecord{
 		Site:        "shop",
 		SessionID:   "session",
-		TSUnixUS:    time.Now().UnixMicro(),
+		ObservedUS:  time.Now().UnixMicro(),
 		Type:        "error",
 		Fingerprint: "fp",
 		ErrorType:   "TypeError",
@@ -82,7 +73,7 @@ func TestJournalReopen(t *testing.T) {
 	events, err := s.QuerySessionEvents(ctx, "shop", "session")
 	require.NoError(t, err)
 	require.Len(t, events, 1)
-	assert.Equal(t, event.TSUnixUS, events[0].TSUnixUS)
+	assert.Equal(t, event.ObservedUS, events[0].ObservedUS)
 	assert.Equal(t, "trace", events[0].TraceID)
 	groups, err := s.QueryErrors(ctx, "shop", "fp", 0, time.Now().Unix()+1)
 	require.NoError(t, err)
@@ -94,31 +85,31 @@ func TestJournalReopen(t *testing.T) {
 	assert.NoError(t, err)
 }
 
-func TestSavedTimeFiltersAndOriginalTimeSummaries(t *testing.T) {
+func TestReceiptTimeFiltersAndSelectedSummaries(t *testing.T) {
 	s, _ := newTestStore(t)
 	ctx := context.Background()
 	saved := time.Now()
 	old := saved.Add(-10 * time.Minute)
 	records := []EventRecord{
 		{
-			Site:      "shop",
-			SessionID: "s",
-			TSUnixUS:  old.Add(time.Minute).UnixMicro(),
-			Type:      "error",
-			Page:      "/last",
-			Browser:   "latest",
-			UserID:    "u",
+			Site:       "shop",
+			SessionID:  "s",
+			ObservedUS: old.Add(time.Minute).UnixMicro(),
+			Type:       "error",
+			Page:       "/last",
+			Browser:    "latest",
+			UserID:     "u",
 		},
-		{Site: "shop", SessionID: "s", TSUnixUS: old.UnixMicro(), Type: "pageview", Page: "/first", Browser: "early"},
-		{Site: "shop", SessionID: "s", TSUnixUS: old.UnixMicro(), Type: "pageview", Page: "/first", Browser: "early"},
-		{Site: "shop", SessionID: "s", TSUnixUS: old.Add(time.Second).UnixMicro(), Type: "frustration", Page: "/first"},
-		{Site: "shop", SessionID: "activity", TSUnixUS: old.UnixMicro(), Type: "activity", Page: "/idle"},
-		{Site: "other", SessionID: "s", TSUnixUS: old.UnixMicro(), Type: "pageview"},
+		{Site: "shop", SessionID: "s", ObservedUS: old.UnixMicro(), Type: "pageview", Page: "/first", Browser: "early"},
+		{Site: "shop", SessionID: "s", ObservedUS: old.UnixMicro(), Type: "pageview", Page: "/first", Browser: "early"},
+		{Site: "shop", SessionID: "s", ObservedUS: old.Add(time.Second).UnixMicro(), Type: "frustration", Page: "/first"},
+		{Site: "shop", SessionID: "activity", ObservedUS: old.UnixMicro(), Type: "activity", Page: "/idle"},
+		{Site: "other", SessionID: "s", ObservedUS: old.UnixMicro(), Type: "pageview"},
 	}
 	for _, r := range records {
 		appendEvent(t, s, r)
 	}
-	sessions, err := s.QuerySessions(ctx, "shop", "", saved.Unix()-1, saved.Unix()+5, 0)
+	sessions, err := s.QuerySessions(ctx, "shop", "", old.Unix()-1, old.Unix()+100, 0)
 	require.NoError(t, err)
 	require.Len(t, sessions, 2)
 	got := sessions[0]
@@ -141,9 +132,9 @@ func TestSavedTimeFiltersAndOriginalTimeSummaries(t *testing.T) {
 	events, err = s.QuerySessionEvents(ctx, "shop", "activity")
 	require.NoError(t, err)
 	assert.Empty(t, events)
-	sessions, err = s.QuerySessions(ctx, "shop", "", old.Unix()-1, old.Unix()+100, 0)
+	sessions, err = s.QuerySessions(ctx, "shop", "", saved.Unix()-1, saved.Unix()+5, 0)
 	require.NoError(t, err)
-	assert.Empty(t, sessions, "saved-time filter must not match delayed original timestamps")
+	assert.Empty(t, sessions, "save time must not change receipt-time membership")
 	sessions, err = s.QuerySessions(ctx, "", "", 0, saved.Unix()+5, 1)
 	require.NoError(t, err)
 	assert.Len(t, sessions, 1)
@@ -156,7 +147,7 @@ func TestSelfContainedErrorsAndSelectedDetails(t *testing.T) {
 	records := []EventRecord{
 		{
 			Site:        "shop",
-			TSUnixUS:    now.Add(-time.Minute).UnixMicro(),
+			ObservedUS:  now.Add(-time.Minute).UnixMicro(),
 			Type:        "error",
 			Fingerprint: "fp",
 			ErrorType:   "TypeError",
@@ -168,7 +159,7 @@ func TestSelfContainedErrorsAndSelectedDetails(t *testing.T) {
 		{
 			Site:        "shop",
 			SessionID:   "one",
-			TSUnixUS:    now.UnixMicro(),
+			ObservedUS:  now.UnixMicro(),
 			Type:        "error",
 			Fingerprint: "fp",
 			ErrorType:   "TypeError",
@@ -179,7 +170,7 @@ func TestSelfContainedErrorsAndSelectedDetails(t *testing.T) {
 		{
 			Site:        "shop",
 			SessionID:   "one",
-			TSUnixUS:    now.UnixMicro(),
+			ObservedUS:  now.UnixMicro(),
 			Type:        "error",
 			Fingerprint: "fp",
 			Page:        "/a",
@@ -188,7 +179,7 @@ func TestSelfContainedErrorsAndSelectedDetails(t *testing.T) {
 		{
 			Site:        "shop",
 			SessionID:   "two",
-			TSUnixUS:    now.UnixMicro(),
+			ObservedUS:  now.UnixMicro(),
 			Type:        "error",
 			Fingerprint: "other",
 			Page:        "/other",
@@ -197,7 +188,7 @@ func TestSelfContainedErrorsAndSelectedDetails(t *testing.T) {
 	for _, r := range records {
 		appendEvent(t, s, r)
 	}
-	groups, err := s.QueryErrors(ctx, "shop", "", now.Unix()-1, now.Unix()+5)
+	groups, err := s.QueryErrors(ctx, "shop", "", now.Unix()-61, now.Unix()+5)
 	require.NoError(t, err)
 	require.Len(t, groups, 2)
 	assert.Equal(t, 3, groups[0].CountWindow)
@@ -208,7 +199,7 @@ func TestSelfContainedErrorsAndSelectedDetails(t *testing.T) {
 	assert.Equal(t, "parentless", groups[0].Message)
 	assert.Equal(t, "stack", groups[0].SampleStack)
 	assert.Equal(t, now.Add(-time.Minute).Unix(), groups[0].FirstSeen)
-	groups, err = s.QueryErrors(ctx, "shop", "fp", now.Unix()-1, now.Unix()+5)
+	groups, err = s.QueryErrors(ctx, "shop", "fp", now.Unix()-61, now.Unix()+5)
 	require.NoError(t, err)
 	require.Len(t, groups, 1)
 	assert.True(t, groups[0].Details)
@@ -231,7 +222,8 @@ func seedOldJournal(t *testing.T, root string, event EventRecord, saved time.Tim
 	log, err := journal.NewLog(
 		root,
 		journal.LogConfig{
-			Source: "dem",
+			Source:              "dem",
+			StrictSystemdNaming: true,
 			Options: journal.Options{
 				MachineID: host.MachineID(),
 				BootID:    host.BootID(),
@@ -242,7 +234,7 @@ func seedOldJournal(t *testing.T, root string, event EventRecord, saved time.Tim
 	require.NoError(t, err)
 	opts := host.EntryOptions()
 	opts.RealtimeUsec = uint64(saved.UnixMicro())
-	require.NoError(t, log.Append(eventFields(event), opts))
+	require.NoError(t, log.Append(storedEventFields(event), opts))
 	require.NoError(t, log.Close())
 }
 
@@ -254,11 +246,11 @@ func TestRetentionIdleExpiryAndRetainedCounts(t *testing.T) {
 		t,
 		root,
 		EventRecord{
-			Site:      "shop",
-			SessionID: "s",
-			Type:      "pageview",
-			TSUnixUS:  old.UnixMicro(),
-			Page:      "/expired",
+			Site:       "shop",
+			SessionID:  "s",
+			Type:       "pageview",
+			ObservedUS: old.UnixMicro(),
+			Page:       "/expired",
 		},
 		old,
 	)
@@ -278,11 +270,11 @@ func TestRetentionIdleExpiryAndRetainedCounts(t *testing.T) {
 		t,
 		s,
 		EventRecord{
-			Site:      "shop",
-			SessionID: "s",
-			Type:      "pageview",
-			TSUnixUS:  fresh.UnixMicro(),
-			Page:      "/retained",
+			Site:       "shop",
+			SessionID:  "s",
+			Type:       "pageview",
+			ObservedUS: fresh.UnixMicro(),
+			Page:       "/retained",
 		},
 	)
 	sessions, err = s.QuerySessions(ctx, "shop", "", 0, fresh.Unix()+5, 0)
@@ -297,10 +289,10 @@ func TestRetentionWholeFilesAndLiveWriter(t *testing.T) {
 	s, root := newTestStore(t)
 	ctx := context.Background()
 	appendEvent(t, s, EventRecord{
-		Site:      "shop",
-		SessionID: "s",
-		Type:      "pageview",
-		TSUnixUS:  time.Now().UnixMicro(),
+		Site:       "shop",
+		SessionID:  "s",
+		Type:       "pageview",
+		ObservedUS: time.Now().UnixMicro(),
 	})
 	reader, release, err := s.journal.OpenReader(ctx)
 	require.NoError(t, err)
@@ -309,9 +301,9 @@ func TestRetentionWholeFilesAndLiveWriter(t *testing.T) {
 	files, err := filepath.Glob(filepath.Join(root, "*", "dem@*.journal"))
 	require.NoError(t, err)
 	assert.Empty(t, files, "the idle sweep has no active file to protect")
-	has, err := reader.Step()
-	require.NoError(t, err)
-	assert.True(t, has, "opened snapshot survives archive unlink")
+	var retained int
+	require.NoError(t, reader.VisitEntries(func(*journal.SnapshotEntry) error { retained++; return nil }))
+	assert.Equal(t, 1, retained, "opened snapshot survives archive unlink")
 	sessions, err := s.QuerySessions(ctx, "", "", 0, time.Now().Unix()+5, 0)
 	require.NoError(t, err)
 	assert.Empty(t, sessions)
@@ -319,14 +311,14 @@ func TestRetentionWholeFilesAndLiveWriter(t *testing.T) {
 		t,
 		s,
 		EventRecord{
-			Site:      "shop",
-			SessionID: "fresh",
-			Type:      "activity",
-			TSUnixUS:  time.Now().UnixMicro(),
+			Site:       "shop",
+			SessionID:  "fresh",
+			Type:       "activity",
+			ObservedUS: time.Now().UnixMicro(),
 		},
 	)
 	require.NoError(t, s.Sync(ctx))
-	files, err = filepath.Glob(filepath.Join(root, "*", "dem@*.journal"))
+	files, err = filepath.Glob(filepath.Join(root, "*", "dem.journal"))
 	require.NoError(t, err)
 	require.Len(t, files, 1, "a new append creates a protected active file")
 	info, err := os.Stat(files[0])
@@ -350,7 +342,8 @@ func TestChainContinuesAcrossBootIdentityChange(t *testing.T) {
 	log, err := journal.NewLog(
 		root,
 		journal.LogConfig{
-			Source: "dem",
+			Source:              "dem",
+			StrictSystemdNaming: true,
 			Options: journal.Options{
 				MachineID: host.MachineID(),
 				BootID:    oldBoot,
@@ -364,19 +357,22 @@ func TestChainContinuesAcrossBootIdentityChange(t *testing.T) {
 	require.NoError(
 		t,
 		log.Append(
-			eventFields(
+			storedEventFields(
 				EventRecord{
-					Site:      "shop",
-					SessionID: "s",
-					Type:      "pageview",
-					TSUnixUS:  time.Now().UnixMicro(),
+					Site:       "shop",
+					SessionID:  "s",
+					Type:       "pageview",
+					ObservedUS: time.Now().UnixMicro(),
 				},
 			),
 			opts,
 		),
 	)
-	firstPath := log.ActivePath()
 	require.NoError(t, log.Close())
+	archives, err := filepath.Glob(filepath.Join(root, "*", "dem@*.journal"))
+	require.NoError(t, err)
+	require.Len(t, archives, 1)
+	firstPath := archives[0]
 	first, err := journal.OpenFile(firstPath)
 	require.NoError(t, err)
 	sequenceID, sequence := first.Header().SeqnumID(), first.Header().TailEntrySeqnum()
@@ -385,19 +381,18 @@ func TestChainContinuesAcrossBootIdentityChange(t *testing.T) {
 	s := NewStore(owner)
 	require.NoError(t, err)
 	appendEvent(t, s, EventRecord{
-		Site:      "shop",
-		SessionID: "s",
-		Type:      "pageview",
-		TSUnixUS:  time.Now().UnixMicro(),
+		Site:       "shop",
+		SessionID:  "s",
+		Type:       "pageview",
+		ObservedUS: time.Now().UnixMicro(),
 	})
-	secondPath := activeJournal(t, root)
-	require.NoError(t, s.journal.Close())
-	second, err := journal.OpenFile(secondPath)
+	second, err := journal.OpenFile(activeJournal(t, root))
 	require.NoError(t, err)
 	defer second.Close()
 	assert.Equal(t, sequenceID, second.Header().SeqnumID())
 	assert.Equal(t, sequence+1, second.Header().HeadEntrySeqnum())
 	assert.Equal(t, host.BootID(), second.Header().TailEntryBootID())
+	require.NoError(t, s.journal.Close())
 	owner, err = demjournal.Open(ctx, root)
 	s = NewStore(owner)
 	require.NoError(t, err)
@@ -416,11 +411,11 @@ func TestAppendReportsAttemptedOnFilesystemFailure(t *testing.T) {
 		t,
 		s,
 		EventRecord{
-			Site:      "shop",
-			SessionID: "s",
-			Type:      "pageview",
-			TSUnixUS:  time.Now().UnixMicro(),
-			Text:      strings.Repeat("x", 600*1024),
+			Site:       "shop",
+			SessionID:  "s",
+			Type:       "pageview",
+			ObservedUS: time.Now().UnixMicro(),
+			Text:       strings.Repeat("x", 600*1024),
 		},
 	)
 	machineDir := filepath.Dir(activeJournal(t, root))
@@ -429,17 +424,18 @@ func TestAppendReportsAttemptedOnFilesystemFailure(t *testing.T) {
 	attempted, err := s.AppendEvent(
 		ctx,
 		EventRecord{
-			Site:      "shop",
-			SessionID: "s",
-			Type:      "error",
-			TSUnixUS:  time.Now().UnixMicro(),
+			Site:       "shop",
+			SessionID:  "s",
+			Type:       "error",
+			ObservedUS: time.Now().UnixMicro(),
 		},
 	)
 	// Restore our task-owned directory before assertions and normal cleanup.
 	require.NoError(t, os.Rename(moved, machineDir))
 	assert.True(t, attempted, "the SDK was called even though archive publication failed")
-	assert.Error(t, err)
-	require.NoError(t, s.Sync(ctx))
+	assert.ErrorIs(t, err, journal.ErrWriterFailed)
+	require.ErrorIs(t, s.Sync(ctx), journal.ErrWriterFailed)
+	require.ErrorIs(t, s.journal.Close(), journal.ErrWriterFailed)
 }
 
 func TestCorruptArchiveReturnsErrorInsteadOfPartialCounts(t *testing.T) {
@@ -469,14 +465,14 @@ func BenchmarkAppendRumEvent(b *testing.B) {
 	}
 	defer s.journal.Close()
 	r := EventRecord{
-		Site:      "shop",
-		SessionID: "session",
-		TSUnixUS:  time.Now().UnixMicro(),
-		Type:      "pageview",
-		Page:      "/cart",
-		Browser:   "Firefox",
-		Device:    "desktop",
-		Country:   "DE",
+		Site:       "shop",
+		SessionID:  "session",
+		ObservedUS: time.Now().UnixMicro(),
+		Type:       "pageview",
+		Page:       "/cart",
+		Browser:    "Firefox",
+		Device:     "desktop",
+		Country:    "DE",
 	}
 	b.ReportAllocs()
 	b.ResetTimer()
@@ -543,10 +539,10 @@ func TestIdleRetentionDoesNotCreateActiveJournals(t *testing.T) {
 	s, root := newTestStore(t)
 	ctx := context.Background()
 	appendEvent(t, s, EventRecord{
-		Site:      "shop",
-		SessionID: "s",
-		Type:      "pageview",
-		TSUnixUS:  time.Now().UnixMicro(),
+		Site:       "shop",
+		SessionID:  "s",
+		Type:       "pageview",
+		ObservedUS: time.Now().UnixMicro(),
 	})
 	require.NoError(t, s.journal.EnforceHistoryRetention(ctx, 30, 1<<30))
 	files, err := filepath.Glob(filepath.Join(root, "*", "dem@*.journal"))
@@ -558,14 +554,14 @@ func TestIdleRetentionDoesNotCreateActiveJournals(t *testing.T) {
 	assert.Equal(t, files, after, "repeated idle sweeps must not manufacture empty archives")
 }
 
-func TestRetentionRecoversAfterArchiveDirectoryFailure(t *testing.T) {
+func TestRetentionRequiresRestartAfterArchiveDirectoryFailure(t *testing.T) {
 	s, root := newTestStore(t)
 	ctx := context.Background()
 	appendEvent(t, s, EventRecord{
-		Site:      "shop",
-		SessionID: "s",
-		Type:      "pageview",
-		TSUnixUS:  time.Now().UnixMicro(),
+		Site:       "shop",
+		SessionID:  "s",
+		Type:       "pageview",
+		ObservedUS: time.Now().UnixMicro(),
 	})
 	machineDir := filepath.Dir(activeJournal(t, root))
 	moved := machineDir + ".moved"
@@ -574,22 +570,35 @@ func TestRetentionRecoversAfterArchiveDirectoryFailure(t *testing.T) {
 	require.NoError(t, os.WriteFile(machineDir, []byte("obstruction"), 0600))
 	require.Error(t, s.journal.EnforceHistoryRetention(ctx, 30, 1<<30))
 	_, err := s.AppendEvent(ctx, EventRecord{
-		Site:     "shop",
-		Type:     "activity",
-		TSUnixUS: time.Now().UnixMicro(),
+		Site:       "shop",
+		Type:       "activity",
+		ObservedUS: time.Now().UnixMicro(),
 	})
 	require.Error(t, err)
 	require.NoError(t, os.Remove(machineDir))
 	require.NoError(t, os.Rename(moved, machineDir))
-	require.NoError(t, s.journal.EnforceHistoryRetention(ctx, 30, 1<<30))
+	require.ErrorIs(t, s.journal.EnforceHistoryRetention(ctx, 30, 1<<30), journal.ErrWriterFailed)
+	_, err = s.QuerySessions(ctx, "shop", "", 0, time.Now().Unix()+5, 0)
+	require.ErrorIs(t, err, journal.ErrWriterFailed)
+	require.NoError(t, s.journal.Close())
+	owner, err := demjournal.Open(ctx, root)
+	require.NoError(t, err)
+	t.Cleanup(func() { require.NoError(t, owner.Close()) })
+	s = NewStore(owner)
 	appendEvent(t, s, EventRecord{
-		Site:      "shop",
-		SessionID: "s",
-		Type:      "pageview",
-		TSUnixUS:  time.Now().UnixMicro(),
+		Site:       "shop",
+		SessionID:  "s",
+		Type:       "pageview",
+		ObservedUS: time.Now().UnixMicro(),
 	})
 	rows, err := s.QuerySessions(ctx, "shop", "", 0, time.Now().Unix()+5, 0)
 	require.NoError(t, err)
 	require.Len(t, rows, 1)
 	assert.EqualValues(t, 2, rows[0].Pageviews, "recovery preserves earlier history and resumes appends")
+}
+
+// SDK fixtures independently encode the documented envelope; production appends derive it.
+func storedEventFields(r EventRecord) []journal.Field {
+	return append(eventFields(r), journal.StringField("DEM_SCHEMA", "1"),
+		journal.StringField("DEM_RUM_MINUTE", strconv.FormatInt(r.ObservedUS/60_000_000, 10)))
 }

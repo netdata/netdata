@@ -5,7 +5,7 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const vm = require('node:vm');
 const crypto = require('node:crypto');
-const bundle = fs.readFileSync(process.env.FARO_SDK_BUNDLE);
+const bundle = fs.readFileSync(require('node:path').join(__dirname, '../assets/faro-web-sdk.iife.js'));
 assert.equal(crypto.createHash('sha256').update(bundle).digest('hex'),
   'd7be021a7344131c89c02cf5b39aa9825c21cf17482bc1cd47e23cd7023ce118');
 const bootstrap = fs.readFileSync(0, 'utf8');
@@ -22,11 +22,12 @@ const context = {
 context.window = context;
 context.document = {
   location: context.location,
-  currentScript: null,
+  currentScript: { src: 'https://rum.example.org/rum/shop.js', getAttribute() { return null; } },
   createElement() { return {}; },
   head: { appendChild(script) { script.onload(); } },
   addEventListener() {},
 };
+require('./script-context.cjs')(context);
 vm.createContext(context);
 vm.runInContext(bundle.toString(), context);
 const sdk = context.GrafanaFaroWebSdk;

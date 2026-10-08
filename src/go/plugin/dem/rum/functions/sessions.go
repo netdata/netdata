@@ -11,8 +11,8 @@ import (
 var sessionsMethod = method{
 	id:      "rum-sessions",
 	title:   "RUM Sessions",
-	help:    "Sessions with retained activity saved in the selected range; counts and duration cover retained events, not lifetime totals. user_id matches an exact stored, normalized ID observed in that range and returns the complete session summary. Credential-masked display values are not reliable lookup keys; redacted original IDs cannot be recovered",
-	sort:    "started_age_s",
+	help:    "Sessions with retained activity originally received by the Agent in the selected inclusive Unix-second range; counts and duration cover selected observations, not lifetime totals. Late-saved context can change an earlier range. user_id matches an exact stored, normalized ID observed in that range and returns the complete session summary. Credential-masked display values are not reliable lookup keys; redacted original IDs cannot be recovered",
+	sort:    "last_observed_us",
 	every:   10,
 	history: true,
 	params:  []string{"site", "after", "before", "user_id"},
@@ -40,7 +40,7 @@ func (h *Handler) sessionsRows(ctx context.Context, site, userID string, after, 
 				s.LastPage,
 				s.UserIDs,
 				s.Frustrations,
-				rowID(s.Site, s.SessionID), s.ApplicationViews,
+				rowID(s.Site, s.SessionID), s.ApplicationViews, s.LastObservedUS,
 			},
 		)
 	}
@@ -48,6 +48,16 @@ func (h *Handler) sessionsRows(ctx context.Context, site, userID string, after, 
 }
 
 var rumSessionsColumns = map[string]any{
+	"last_observed_us": (funcapi.Column{
+		Index:         16,
+		Name:          "Last Selected Observation",
+		Sort:          funcapi.FieldSortDescending,
+		Type:          funcapi.FieldTypeTimestamp,
+		ValueOptions:  funcapi.ValueOptions{Transform: funcapi.FieldTransformDatetimeUsec},
+		Visualization: funcapi.FieldVisualValue,
+		Visible:       true,
+		Sortable:      true,
+	}).BuildColumn(),
 	"row_id": (funcapi.Column{
 		Index:         14,
 		Name:          "Row ID",
@@ -73,7 +83,7 @@ var rumSessionsColumns = map[string]any{
 	}).BuildColumn(),
 	"started_age_s": (funcapi.Column{
 		Index:         2,
-		Name:          "First Retained Event (s ago)",
+		Name:          "First Selected Observation (s ago)",
 		Type:          funcapi.FieldTypeInteger,
 		Visualization: funcapi.FieldVisualValue,
 		Visible:       true,
@@ -81,7 +91,7 @@ var rumSessionsColumns = map[string]any{
 	}).BuildColumn(),
 	"duration_s": (funcapi.Column{
 		Index:         3,
-		Name:          "Retained Activity Span (s)",
+		Name:          "Selected Observation Span (s)",
 		Type:          funcapi.FieldTypeInteger,
 		Visualization: funcapi.FieldVisualValue,
 		Visible:       true,

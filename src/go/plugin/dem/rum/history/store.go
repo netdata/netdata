@@ -24,6 +24,9 @@ func (s *Store) AppendEvent(ctx context.Context, r EventRecord) (bool, error) {
 	if err := ctx.Err(); err != nil {
 		return false, err
 	}
+	if err := validateEvent(r); err != nil {
+		return false, err
+	}
 	return s.journal.Append(ctx, eventFields(r))
 }
 

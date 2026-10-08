@@ -92,7 +92,7 @@ modules:
                       name: listen
                       required: false
                     - default_value: ""
-                      description: Externally reachable collector base URL. Leave empty to derive it from the listener or a trusted proxy.
+                      description: Public receiver base URL used to generate installation snippets. If neither receiver nor site sets a public URL, no snippet is offered.
                       group: Connection
                       name: public_url
                       required: false
@@ -107,7 +107,7 @@ modules:
                       name: tls_key
                       required: false
                     - default_value: ""
-                      description: Proxy IP addresses or CIDR ranges allowed to supply forwarded client addresses and public URLs. Leave empty to distrust forwarded headers.
+                      description: Proxy IP addresses or CIDR ranges allowed to supply forwarded client addresses. Leave empty to distrust forwarded headers.
                       group: Connection
                       name: trusted_proxies
                       required: false
@@ -151,6 +151,6 @@ modules:
       troubleshooting:
         problems:
             list:
-                - description: Check receiver availability, the installed snippet URL and the site allowed origins. Open the rum-sites Function for reachability and rejected-origin diagnostics. Missing vital samples produce gaps, including when the receiver is unavailable.
+                - description: Check the serving state in `rum-sites`, the configured public URL and the site allowed origins. In the website browser, follow the script and SDK requests through the collect POST. Last accepted payload and rejected-origin timestamps are observations; silence alone does not prove failure.
                   name: No browser measurements
 plugin_name: dem.plugin

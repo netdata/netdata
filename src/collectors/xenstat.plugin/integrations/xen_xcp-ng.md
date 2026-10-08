@@ -27,7 +27,7 @@ Reads host and domain statistics directly from the local Xen hypervisor through 
 
 This collector is supported on all platforms.
 
-This collector supports collecting metrics from multiple instances of this integration, including remote instances.
+This collector supports collecting metrics from multiple instances of this integration.
 
 The plugin needs setuid.
 

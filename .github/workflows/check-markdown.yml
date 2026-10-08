@@ -142,6 +142,13 @@ jobs:
           source ./venv/bin/activate
           cd netdata && python3 integrations/gen_doc_service_discovery_page.py
 
+      - name: Validate docs/.map/map.yaml
+        run: |
+          # After the generators: a map row may name a generated page by path,
+          # and ingest silently drops a row whose file is missing.
+          source ./venv/bin/activate
+          cd netdata && python3 docs/.map/validate_map_schema.py
+
       - name: Run Ingest
         working-directory: learn
         run: |

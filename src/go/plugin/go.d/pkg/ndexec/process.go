@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"os"
 	"sync"
+	"syscall"
 )
 
 // ProcessOptions supplies child stdio. Nil files use the null device. The caller
@@ -19,8 +20,8 @@ type ProcessOptions struct {
 	Stderr *os.File
 }
 
-// Process owns termination and reaping of an unprivileged command and its
-// contained descendants. It must not be copied. Wait and Close may run concurrently.
+// Process owns termination and reaping of a command and its contained descendants,
+// started through nd-run or ndsudo. It must not be copied. Wait and Close may run concurrently.
 type Process struct {
 	handle      processHandle
 	mu          sync.Mutex
@@ -48,6 +49,64 @@ func StartUnprivilegedProcess(
 	binPath string,
 	args ...string,
 ) (*Process, error) {
+	return startProcess(ctx, opts, defaultRunner.ndRunPath, append([]string{binPath}, args...), nil)
+}
+
+// StartNDSudoProcess starts a command exposed through ndsudo with the ownership of
+// StartUnprivilegedProcess. ndsudo runs the command as root, and an unprivileged caller
+// cannot signal it; the kernel's denial of termination is not an error. With a pipe as
+// Stdout whose read end only the caller holds, the command ends when it exits or dies of
+// SIGPIPE at its next write after the caller closes that read end, unless it handles
+// SIGPIPE or EPIPE itself. Root descendants that outlive the command are neither
+// terminated nor reported. Until the command ends, Wait and Close block, so a caller that
+// must not hang bounds its own wait. A caller allowed to signal root processes terminates
+// the command and its descendants as StartUnprivilegedProcess does.
+func StartNDSudoProcess(
+	ctx context.Context,
+	opts ProcessOptions,
+	command string,
+	args ...string,
+) (*Process, error) {
+	signalsDenied := ndsudoSignalsDenied
+	return startProcess(ctx, opts, defaultRunner.ndSudoPath, append([]string{command}, args...),
+		func(handle processHandle) processHandle {
+			return ndsudoProcess{
+				processHandle: handle,
+				signalsDenied: signalsDenied,
+			}
+		})
+}
+
+// ndsudoSignalsDenied is set by DenyNDSudoSignalsForTests.
+var ndsudoSignalsDenied bool
+
+// ndsudoProcess is the handle of a command that ndsudo runs as root.
+type ndsudoProcess struct {
+	processHandle
+	signalsDenied bool
+}
+
+func (p ndsudoProcess) terminate() error {
+	if p.signalsDenied {
+		return nil
+	}
+	// A denied group kill means no group member could be signaled, so the direct
+	// kill of the leader joined to it was denied as well.
+	if err := p.processHandle.terminate(); !errors.Is(err, syscall.EPERM) {
+		return err
+	}
+	return nil
+}
+
+// startProcess starts helper with argv under owned containment. wrap, when non-nil,
+// adapts the handle's termination to the helper.
+func startProcess(
+	ctx context.Context,
+	opts ProcessOptions,
+	helper string,
+	argv []string,
+	wrap func(processHandle) processHandle,
+) (*Process, error) {
 	if ctx == nil {
 		ctx = context.Background()
 	}
@@ -70,10 +129,12 @@ func StartUnprivilegedProcess(
 			opts.Stderr = null
 		}
 	}
-	argv := append([]string{binPath}, args...)
-	handle, err := startOwnedProcess(defaultRunner.ndRunPath, argv, opts)
+	handle, err := startOwnedProcess(helper, argv, opts)
 	if err != nil {
 		return nil, fmt.Errorf("start owned command: %w", err)
+	}
+	if wrap != nil {
+		handle = wrap(handle)
 	}
 	return ownProcess(ctx, handle), nil
 }

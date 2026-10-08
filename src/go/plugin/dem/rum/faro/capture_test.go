@@ -4,7 +4,6 @@ package faro
 
 import (
 	"encoding/json"
-	"os"
 	"os/exec"
 	"strings"
 	"testing"
@@ -18,9 +17,7 @@ import (
 // The fixture uses real SDK metadata, instrumentations, hooks and wire bodies.
 // Its stdout is also consumable by receiver integration tests.
 func TestPinnedSDKCaptureContract(t *testing.T) {
-	if os.Getenv("FARO_SDK_BUNDLE") == "" {
-		t.Skip("set FARO_SDK_BUNDLE to the pinned SDK IIFE to execute the upstream oracle")
-	}
+	requireNode(t)
 	for _, enabled := range []bool{false, true} {
 		name := "false"
 		if enabled {
@@ -28,7 +25,7 @@ func TestPinnedSDKCaptureContract(t *testing.T) {
 		}
 		t.Run(name, func(t *testing.T) {
 			cmd := exec.Command("node", "testdata/capture-sdk.cjs", name)
-			cmd.Stdin = strings.NewReader(Bootstrap("shop", "https://rum.example.org", BootstrapOptions{
+			cmd.Stdin = strings.NewReader(Bootstrap("shop", BootstrapOptions{
 				MeasureRate:        1,
 				EventLogs:          enabled,
 				ConsoleLogs:        enabled,
@@ -104,7 +101,14 @@ func TestPinnedSDKCaptureContract(t *testing.T) {
 			assert.True(t, navigation.HasDCL)
 			require.Len(t, resources, 1)
 			assert.NotEmpty(t, resources[0].ID)
-			assert.Equal(t, beacon.Resource{ID: resources[0].ID, HasDuration: true, Host: "cdn.example.org", DurationMS: 23, TransferB: 456, Initiator: "fetch"}, resources[0])
+			assert.Equal(t, beacon.Resource{
+				ID:          resources[0].ID,
+				HasDuration: true,
+				Host:        "cdn.example.org",
+				DurationMS:  23,
+				TransferB:   456,
+				Initiator:   "fetch",
+			}, resources[0])
 			require.Len(t, vitals, 1)
 			assert.Equal(t, beacon.LCP, vitals[0].Name)
 			assert.Equal(t, float64(1200), vitals[0].Value)

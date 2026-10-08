@@ -165,7 +165,7 @@ The collector connects to IBM i (AS/400) and collects metrics via its monitoring
 
 This collector is supported on all platforms.
 
-This collector supports collecting metrics from multiple instances of this integration, including remote instances.
+This collector supports collecting metrics from multiple instances of this integration.
 
 
 ### Default Behavior

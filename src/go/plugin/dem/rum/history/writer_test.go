@@ -55,20 +55,20 @@ func TestWriterDrainsAlreadyNormalizedRecords(t *testing.T) {
 	now := time.Now().UnixMicro()
 	w.Event(
 		aggregate.HistoryEvent{
-			Site:      "site",
-			SessionID: "session",
-			TSUnixUS:  now,
-			Type:      "pageview",
-			Page:      "/[REDACTED]",
-			UserID:    "[REDACTED]",
-			Browser:   "Chrome",
+			Site:       "site",
+			SessionID:  "session",
+			ObservedUS: now,
+			Type:       "pageview",
+			Page:       "/[REDACTED]",
+			UserID:     "[REDACTED]",
+			Browser:    "Chrome",
 		},
 	)
 	w.Event(
 		aggregate.HistoryEvent{
 			Site:        "site",
 			SessionID:   "session",
-			TSUnixUS:    now + 1,
+			ObservedUS:  now + 1,
 			Type:        "error",
 			Page:        "/[REDACTED]",
 			UserID:      "[REDACTED]",
@@ -297,10 +297,10 @@ func TestWrongSiteDoesNotQueueOrCount(t *testing.T) {
 	w := NewWriter("site", NewStore(st), counters)
 	for range queueCap + 1 {
 		w.Event(aggregate.HistoryEvent{
-			Site:      "other",
-			SessionID: "session",
-			Type:      "event",
-			TSUnixUS:  time.Now().UnixMicro(),
+			Site:       "other",
+			SessionID:  "session",
+			Type:       "event",
+			ObservedUS: time.Now().UnixMicro(),
 		})
 	}
 	require.Empty(t, w.ch)

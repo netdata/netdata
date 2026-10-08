@@ -95,8 +95,8 @@ func TestErrorPromotesSessionWithItsEarlierEvents(t *testing.T) {
 	if len(h.events) != 3 || h.events[2].Fingerprint != "fp1" || h.events[2].SessionID != "late-error" {
 		t.Fatalf("error occurrence = %+v", h.events)
 	}
-	if h.events[0].TSUnixUS != now.Add(-10*time.Minute).UnixMicro() {
-		t.Fatal("promotion lost original event time")
+	if h.events[0].ObservedUS != now.Add(-10*time.Minute).UnixMicro() {
+		t.Fatal("promotion lost Agent receipt time")
 	}
 
 }

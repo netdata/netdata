@@ -96,7 +96,6 @@ func (c *Collector) Run(ctx context.Context, ready func()) error {
 		rumregistry.Availability{
 			Serving:   true,
 			Listen:    ln.Addr().String(),
-			TLS:       c.tlsConfig != nil,
 			PublicURL: c.PublicURL,
 		},
 	)

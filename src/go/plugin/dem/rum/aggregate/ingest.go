@@ -257,7 +257,7 @@ func (a *Aggregator) Ingest(b *beacon.Beacon) Result {
 		for _, e := range obs.Errors {
 			a.history.Event(HistoryEvent{
 				Site:         st.cfg.Name,
-				TSUnixUS:     now.UnixMicro(),
+				ObservedUS:   now.UnixMicro(),
 				Type:         "error",
 				Page:         b.PageGroup,
 				ExperienceID: b.ExperienceID,

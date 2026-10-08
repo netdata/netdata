@@ -23,10 +23,10 @@ type Site struct {
 	Redactor    *redact.Redactor
 }
 type Availability struct {
-	Serving   bool
+	// Listen is the actual bound socket, never an advertised browser address.
 	Listen    string
+	Serving   bool
 	PublicURL string
-	TLS       bool
 }
 type registration struct {
 	data   *Site

@@ -10,14 +10,14 @@ type HistorySink interface {
 }
 
 // HistoryEvent carries the metadata needed to investigate an event even after
-// earlier journal files expire. TSUnixUS is the original observation time;
+// earlier journal files expire. ObservedUS is the Agent receipt time;
 // the history writer assigns saved time separately. Activity events record
 // sessions with no new timeline event and are omitted from timeline displays.
 type HistoryEvent struct {
 	ExperienceID, View, ViewID, MetricID         string
 	Revision                                     uint64
 	Site, SessionID                              string
-	TSUnixUS                                     int64
+	ObservedUS                                   int64
 	Type, Page, Text, TraceID                    string
 	Browser, Device, Country, Version, UserID    string
 	Fingerprint, ErrorType, Message, SampleStack string

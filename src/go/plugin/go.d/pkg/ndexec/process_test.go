@@ -36,6 +36,14 @@ func TestOwnedProcessHelper(t *testing.T) {
 	if mode == "failure" {
 		os.Exit(23)
 	}
+	if mode == "writer" {
+		// Writes until a closed output ends it with SIGPIPE; a broken owner cannot leave it alive indefinitely.
+		for deadline := time.Now().Add(5 * time.Second); time.Now().Before(deadline); {
+			fmt.Println("line")
+			time.Sleep(10 * time.Millisecond)
+		}
+		os.Exit(0)
+	}
 	if mode == "descendant" {
 		if err := os.WriteFile(filepath.Join(dir, "child-ready"), []byte("ready"), 0600); err != nil {
 			os.Exit(2)

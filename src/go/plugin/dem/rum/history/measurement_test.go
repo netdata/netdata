@@ -15,9 +15,9 @@ func TestWriterRoundTripsMeasurementIdentity(t *testing.T) {
 	writer := NewWriter("shop", store, newFakeCounters())
 	now := time.Now().UnixMicro()
 	records := []aggregate.HistoryEvent{
-		{Site: "shop", SessionID: "session", TSUnixUS: now, Type: "pageview", Page: "/entry", ExperienceID: "document", View: "checkout", ViewID: "view-one", Revision: 1},
-		{Site: "shop", SessionID: "session", TSUnixUS: now + 1, Type: "view", Page: "/entry", ExperienceID: "document", View: "payment", ViewID: "view-two", Revision: 2},
-		{Site: "shop", SessionID: "session", TSUnixUS: now + 2, Type: "vital", Page: "/entry", ExperienceID: "document", View: "payment", ViewID: "view-two", MetricID: "metric", Revision: 3},
+		{Site: "shop", SessionID: "session", ObservedUS: now, Type: "pageview", Page: "/entry", ExperienceID: "document", View: "checkout", ViewID: "view-one", Revision: 1},
+		{Site: "shop", SessionID: "session", ObservedUS: now + 1, Type: "view", Page: "/entry", ExperienceID: "document", View: "payment", ViewID: "view-two", Revision: 2},
+		{Site: "shop", SessionID: "session", ObservedUS: now + 2, Type: "vital", Page: "/entry", ExperienceID: "document", View: "payment", ViewID: "view-two", MetricID: "metric", Revision: 3},
 	}
 	for _, record := range records {
 		writer.Event(record)
@@ -26,9 +26,9 @@ func TestWriterRoundTripsMeasurementIdentity(t *testing.T) {
 	events, err := store.QuerySessionEvents(context.Background(), "shop", "session")
 	require.NoError(t, err)
 	require.Equal(t, []SessionEventRecord{
-		{Site: "shop", SessionID: "session", TSUnixUS: now, Type: "pageview", Page: "/entry", ExperienceID: "document", View: "checkout", ViewID: "view-one", Revision: 1},
-		{Site: "shop", SessionID: "session", TSUnixUS: now + 1, Type: "view", Page: "/entry", ExperienceID: "document", View: "payment", ViewID: "view-two", Revision: 2},
-		{Site: "shop", SessionID: "session", TSUnixUS: now + 2, Type: "vital", Page: "/entry", ExperienceID: "document", View: "payment", ViewID: "view-two", MetricID: "metric", Revision: 3},
+		{Site: "shop", SessionID: "session", ObservedUS: now, Type: "pageview", Page: "/entry", ExperienceID: "document", View: "checkout", ViewID: "view-one", Revision: 1},
+		{Site: "shop", SessionID: "session", ObservedUS: now + 1, Type: "view", Page: "/entry", ExperienceID: "document", View: "payment", ViewID: "view-two", Revision: 2},
+		{Site: "shop", SessionID: "session", ObservedUS: now + 2, Type: "vital", Page: "/entry", ExperienceID: "document", View: "payment", ViewID: "view-two", MetricID: "metric", Revision: 3},
 	}, events)
 	sessions, err := store.QuerySessions(context.Background(), "shop", "", 0, time.Now().Unix()+1, 10)
 	require.NoError(t, err)

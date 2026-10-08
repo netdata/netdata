@@ -23,12 +23,13 @@ field means.
   as persisted state and how to reset it. `:::note` renders white and blends into the page; use it only for an aside
   that may blend in. At most one admonition per field. Prefer an admonition over a blockquote. An admonition never
   replaces the field's own first paragraph.
-- Define unfamiliar operator terms inline on first use; omit irrelevant implementation mechanics (see the reading
-  model in `SKILL.md`). A glossary table is allowed only when
-  four or more terms recur across the page and the options table, and then it closes `method_description`, after the
+- A glossary table is allowed only when four or more terms recur across the page and the options table (otherwise
+  terms are defined at first use, `./SKILL.md#the-reading-model`); it then closes `method_description`, after the
   reader knows what the collector does, never before.
-- Links go to user-facing pages only: another integration, a `profile-format.md`, a `docs/guides` page, Learn, vendor
-  documentation. Never to `ARCHITECTURE.md`, source files, or tests.
+- Links go to user-facing pages only: another integration, a `profile-format.md`, a `docs/guides` page, other Netdata
+  docs, vendor documentation; never `ARCHITECTURE.md`, source code, or tests. Link a Netdata page by its
+  repository-relative `.md` path (`/src/collectors/SERVICE-DISCOVERY.md`), never by a `learn.netdata.cloud` URL
+  (`.agents/skills/docs-learn-site-structure/how-tos/integration-card-description-links.md`).
 
 ## 2. `metrics_description`: The Overview Proper
 

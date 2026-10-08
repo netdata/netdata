@@ -72,7 +72,7 @@ The routers, switches, and firewalls must be configured to send syslog to the co
 
 #### Options
 
-The syslog receiver itself is configured on the OpenTelemetry Collector, not in the Agent. Use `otel.yaml` only to change the Agent's OTLP endpoint or retention. A ready-to-use syslog pipeline is in [Syslog via the OpenTelemetry Collector](https://github.com/netdata/netdata/blob/master/docs/npm/syslog/otel-collector.md). The endpoint listens on loopback by default, which accepts only local senders. Running the Collector on another host means binding a non-loopback address, and an OTLP endpoint reachable off-host must be protected with TLS or mutual TLS (`endpoint.tls_cert_path`, `endpoint.tls_key_path`, and `endpoint.tls_ca_cert_path` for mTLS) plus network access controls — otherwise anyone who can reach it can inject telemetry. Prefer keeping the Collector on the same host as the Agent.
+The syslog receiver itself is configured on the OpenTelemetry Collector, not in the Agent. Use `otel.yaml` only to change the Agent's OTLP endpoint or retention. A ready-to-use syslog pipeline is in [Syslog via the OpenTelemetry Collector](https://github.com/netdata/netdata/blob/master/docs/npm/syslog/otel-collector.md). The endpoint listens on loopback by default, which accepts only local senders. Running the Collector on another host means binding a non-loopback address, and an OTLP endpoint reachable off-host must be protected with TLS or mutual TLS (`receivers.otlp.protocols.grpc.tls.cert_file`, `receivers.otlp.protocols.grpc.tls.key_file`, and `receivers.otlp.protocols.grpc.tls.client_ca_file` for mTLS) plus network access controls — otherwise anyone who can reach it can inject telemetry. Prefer keeping the Collector on the same host as the Agent.
 
 <details open><summary>Config options</summary>
 
@@ -80,10 +80,10 @@ The syslog receiver itself is configured on the OpenTelemetry Collector, not in 
 
 | Option | Description | Default | Required |
 |:-----|:------------|:--------|:---------:|
-| endpoint.path | OTLP/gRPC endpoint the Agent listens on. The default accepts only local senders; bind a non-loopback address to accept a Collector on another host, and protect it when you do. | 127.0.0.1:4317 | no |
-| endpoint.tls_cert_path | Server TLS certificate. Set together with `endpoint.tls_key_path`. |  | no |
-| endpoint.tls_key_path | Server TLS private key. |  | no |
-| endpoint.tls_ca_cert_path | CA certificate used to verify client certificates. Setting it enables mutual TLS and therefore also requires the server certificate and key. |  | no |
+| receivers.otlp.protocols.grpc.endpoint | OTLP/gRPC endpoint the Agent listens on. The default accepts only local senders; bind a non-loopback address to accept a Collector on another host, and protect it when you do. | 127.0.0.1:4317 | no |
+| receivers.otlp.protocols.grpc.tls.cert_file | Server TLS certificate. Set together with `receivers.otlp.protocols.grpc.tls.key_file`. |  | no |
+| receivers.otlp.protocols.grpc.tls.key_file | Server TLS private key. |  | no |
+| receivers.otlp.protocols.grpc.tls.client_ca_file | CA certificate used to verify client certificates. Setting it enables mutual TLS and therefore also requires the server certificate and key. |  | no |
 
 
 </details>
@@ -110,11 +110,15 @@ sudo ./edit-config otel.yaml
 Binds a routable address and requires client certificates, so only Collectors holding a certificate signed by your CA can send. Without the TLS keys this endpoint would accept telemetry from anyone who can reach it.
 
 ```yaml
-endpoint:
-  path: 0.0.0.0:4317
-  tls_cert_path: /etc/netdata/ssl/otel.crt
-  tls_key_path: /etc/netdata/ssl/otel.key
-  tls_ca_cert_path: /etc/netdata/ssl/ca.crt
+receivers:
+  otlp:
+    protocols:
+      grpc:
+        endpoint: 0.0.0.0:4317
+        tls:
+          cert_file: /etc/netdata/ssl/otel.crt
+          key_file: /etc/netdata/ssl/otel.key
+          client_ca_file: /etc/netdata/ssl/ca.crt
 
 ```
 
