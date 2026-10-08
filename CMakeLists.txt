@@ -180,8 +180,9 @@ if(ENABLE_PLUGIN_EBPF)
         netdata_fetch_ebpf_co_re()
 endif()
 
-# The bundled-or-system dependencies: each module owns the choice between the
-# system copy and its bundled fallback.
+# Dependencies with a module of their own: the ones that bundle a copy, always
+# or as one arm of a system-or-bundled choice, and the six system lookups
+# NetdataDependencies.cmake lists as headed that way.
 include(NetdataJSONC)
 include(NetdataYAML)
 include(NetdataLZ4)

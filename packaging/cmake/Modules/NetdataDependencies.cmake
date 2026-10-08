@@ -1,8 +1,9 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 #
-# Every external library Netdata links against is looked up here, once.
+# Every external library Netdata links against is looked up here, once, apart
+# from the exceptions listed below.
 #
-# It answers that in two halves. First every lookup: what we go and look for, with no
+# It does that in two halves. First every lookup: what we go and look for, with no
 # REQUIRED and no guard, because probing for a library a platform does not have is
 # harmless and it keeps "what do we depend on" free of "what are we building today".
 # Then every requirement: which of those results are mandatory, and under what
@@ -24,7 +25,7 @@
 # PKG_CONFIG_EXECUTABLE; that append needs the variable the find_package defines,
 # so the two cannot be separated.
 #
-# Four groups of external resolution stay where they are, listed here so this file
+# Six groups of external resolution stay where they are, listed here so this file
 # answers "what do we depend on" by enumeration even where it does not by
 # execution:
 #
@@ -34,6 +35,14 @@
 #                                 bundled one. The lookup is one branch of that
 #                                 choice, so extracting it would leave a module
 #                                 that bundles but cannot decide whether to.
+#
+#   lz4, zstd, brotli, libuv,     NetdataLZ4.cmake and its five siblings. Today
+#   snappy, OpenSSL               each is only a system lookup, but the macOS
+#                                 package is to bundle all six, and then each
+#                                 module owns the system-or-bundled choice the
+#                                 way the group above does. snappy also keeps a
+#                                 check_library_exists fallback in
+#                                 NetdataDaemon.cmake for hosts without a .pc.
 #
 #   CUPS                          NetdataPluginCups.cmake. Three mechanisms in
 #                                 sequence: pkg-config libcups, then pkg-config
@@ -52,18 +61,22 @@
 #                                 OSLogStore probe that reads them. Part of being
 #                                 on macOS rather than part of what Netdata
 #                                 depends on.
+#
+#   librt                         NetdataPlatformChecks.cmake. A libc probe for
+#                                 where clock_gettime lives, not a dependency
+#                                 Netdata chooses.
 
 include_guard()
 
 #
-# libnetdata links libuuid, libsystemd, libunwind and zlib, so they reach
-# everything that links libnetdata. curl links into the netdata daemon and
-# systemd-cat-native, and libmnl into the plugins that consume it.
+# libnetdata links zlib everywhere, libuuid except on macOS and Windows,
+# libsystemd where it is found, and libunwind when ENABLE_LIBUNWIND is on;
+# through libnetdata they reach everything that links it. curl links into the
+# netdata daemon and systemd-cat-native, and libmnl into the plugins that
+# consume it.
 #
 
 pkg_check_modules(CURL libcurl>=7.21 IMPORTED_TARGET)
-
-
 
 pkg_check_modules(UUID uuid)
 # libmnl wraps Linux netlink; a Homebrew libmnl.pc on macOS is a false positive
