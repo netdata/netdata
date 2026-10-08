@@ -29,16 +29,9 @@ static void stream_thread_handle_op(struct stream_thread *sth, struct stream_opc
     {
         if(m->type == POLLFD_TYPE_SENDER) {
             if(msg->opcode & STREAM_OPCODE_SENDER_POLLOUT) {
-                m->s->thread.wanted = ND_POLL_READ | ND_POLL_WRITE;
-                if(!nd_poll_upd(sth->run.ndpl, m->s->sock.fd, m->s->thread.wanted)) {
-                    nd_log_limit_static_global_var(erl, 1, 0);
-                    nd_log_limit(&erl, NDLS_DAEMON, NDLP_DEBUG,
-                                 "STREAM SND[%zu] '%s' [to %s]: cannot enable output on sender socket %d.",
-                                 sth->id, rrdhost_hostname(m->s->host), m->s->remote_ip, m->s->sock.fd);
-                }
-
+                // send_data() enables ND_POLL_WRITE if the socket does not take everything
                 if(!stream_sender_send_data(sth, m->s, now_monotonic_usec(), false))
-                    // sender has been removed
+                    // sending failed - the poll loop will remove the sender
                     return;
 
                 msg->opcode &= ~(STREAM_OPCODE_SENDER_POLLOUT);
@@ -49,16 +42,9 @@ static void stream_thread_handle_op(struct stream_thread *sth, struct stream_opc
         }
         else if(m->type == POLLFD_TYPE_RECEIVER) {
             if (msg->opcode & STREAM_OPCODE_RECEIVER_POLLOUT) {
-                m->rpt->thread.wanted = ND_POLL_READ | ND_POLL_WRITE;
-                if (!nd_poll_upd(sth->run.ndpl, m->rpt->sock.fd, m->rpt->thread.wanted)) {
-                    nd_log_limit_static_global_var(erl, 1, 0);
-                    nd_log_limit(&erl, NDLS_DAEMON, NDLP_ERR,
-                                 "STREAM RCV[%zu] '%s' [from [%s]:%s]: cannot enable output on receiver socket %d.",
-                                 sth->id, rrdhost_hostname(m->rpt->host), m->rpt->remote_ip, m->rpt->remote_port, m->rpt->sock.fd);
-                }
-
+                // send_data() enables ND_POLL_WRITE if the socket does not take everything
                 if(!stream_receiver_send_data(sth, m->rpt, now_monotonic_usec(), false))
-                    // receiver has been removed
+                    // sending failed - the poll loop will remove the receiver
                     return;
 
                 msg->opcode &= ~(STREAM_OPCODE_RECEIVER_POLLOUT);
