@@ -187,6 +187,7 @@ class ElfTests(unittest.TestCase):
     def test_no_aarch64_binaries_fails(self):
         rc, out = self.run_dir({'text': b'nothing to see'})
         self.assertEqual(rc, 1)
+        self.assertIn('ERROR: no AArch64 executables found', out)
 
 
 if __name__ == '__main__':
