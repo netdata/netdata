@@ -1,48 +1,44 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 #
 # Every external library Netdata links against is looked up here, once, apart
-# from the exceptions listed below.
+# from the exceptions listed below. Libraries that are always bundled are not
+# looked up at all; each has a module of its own.
 #
 # It does that in two halves. First every lookup: what we go and look for, with no
 # REQUIRED and no guard, because probing for a library a platform does not have is
 # harmless and it keeps "what do we depend on" free of "what are we building today".
 # Then every requirement: which of those results are mandatory, and under what
-# condition. Read together, the two halves are the whole dependency contract, and
-# reading them is not a grep across seven files.
+# condition. Read together with the exceptions, the two halves are the whole
+# dependency contract.
 #
 # What stays out of the second half is derivation. Whether a dependency is mandatory
 # is a fact about the dependency and belongs here; what a found dependency switches
-# on is a fact about the feature, so every HAVE_* and ENABLE_* is still set next to
-# the target it configures. ENABLE_SYSTEMD_DBUS could not move anyway - it depends on
-# five capability probes that run much later.
+# on is a fact about the feature, so every HAVE_* and ENABLE_* is set next to the
+# target it configures.
 #
 # pkg_check_modules and find_package write their results to the CACHE, so every
 # result below is readable from every scope, including inside a function and inside
 # a bundled subproject's own directory.
 #
-# find_package(PkgConfig REQUIRED) is deliberately NOT here. It stays in the root
+# find_package(PkgConfig REQUIRED) is deliberately NOT here. It lives in the root
 # file, next to the STATIC_BUILD branch that appends --static to
 # PKG_CONFIG_EXECUTABLE; that append needs the variable the find_package defines,
 # so the two cannot be separated.
 #
-# Six groups of external resolution stay where they are, listed here so this file
-# answers "what do we depend on" by enumeration even where it does not by
-# execution:
+# The exceptions, listed so this file answers "what do we depend on" by
+# enumeration even where it does not by execution:
 #
 #   json-c, libyaml, protobuf     NetdataJSONC.cmake, NetdataYAML.cmake,
-#                                 NetdataProtobuf.cmake. Each of those modules
-#                                 exists to choose between the system copy and a
-#                                 bundled one. The lookup is one branch of that
-#                                 choice, so extracting it would leave a module
-#                                 that bundles but cannot decide whether to.
+#                                 NetdataProtobuf.cmake. Each chooses between the
+#                                 system copy and a bundled one, and the lookup is
+#                                 one arm of that choice.
 #
-#   lz4, zstd, brotli, libuv,     NetdataLZ4.cmake and its five siblings. Today
-#   snappy, OpenSSL               each is only a system lookup, but the macOS
-#                                 package is to bundle all six, and then each
-#                                 module owns the system-or-bundled choice the
-#                                 way the group above does. snappy also keeps a
-#                                 check_library_exists fallback in
-#                                 NetdataDaemon.cmake for hosts without a .pc.
+#   lz4, zstd, brotli, libuv,     NetdataLZ4.cmake, NetdataZSTD.cmake,
+#   snappy, OpenSSL               NetdataBrotli.cmake, NetdataLibUV.cmake,
+#                                 NetdataSnappy.cmake, NetdataOpenSSL.cmake.
+#                                 Package formats may bundle these, and the
+#                                 system-or-bundled choice belongs in each one's
+#                                 module, as with the group above.
 #
 #   CUPS                          NetdataPluginCups.cmake. Three mechanisms in
 #                                 sequence: pkg-config libcups, then pkg-config
@@ -69,11 +65,10 @@
 include_guard()
 
 #
-# libnetdata links zlib everywhere, libuuid except on macOS and Windows,
-# libsystemd where it is found, and libunwind when ENABLE_LIBUNWIND is on;
-# through libnetdata they reach everything that links it. curl links into the
-# netdata daemon and systemd-cat-native, and libmnl into the plugins that
-# consume it.
+# libnetdata links libuuid, libsystemd, libunwind and zlib where the platform
+# and build options use them, so they reach everything that links libnetdata.
+# curl links into the netdata daemon and systemd-cat-native, and libmnl into
+# the plugins that consume it.
 #
 
 pkg_check_modules(CURL libcurl>=7.21 IMPORTED_TARGET)
@@ -91,8 +86,8 @@ pkg_check_modules(LIBUNWIND libunwind IMPORTED_TARGET)
 # interchangeable. The macOS consumer links the ZLIB::ZLIB imported target, which
 # only FindZLIB creates - pkg-config does not. Trying a pkg-config lookup first
 # and falling back would therefore break every macOS host where pkg-config can
-# see zlib, and it would neuter CMAKE_DISABLE_FIND_PACKAGE_ZLIB as well. The OS
-# branch moves here intact instead: one place, one decision, two mechanisms.
+# see zlib, and it would neuter CMAKE_DISABLE_FIND_PACKAGE_ZLIB as well. So the
+# mechanism is chosen by OS: one place, one decision, two mechanisms.
 if(OS_MACOS)
   find_package(ZLIB)
 else()
@@ -132,9 +127,8 @@ pkg_check_modules(ELF libelf)
 # Requirements.
 #
 # A missing library is fatal here or nowhere. Each check carries the condition under
-# which the dependency is actually needed, so it fires in exactly the cases it fired
-# in when it lived next to its target - and it aborts earlier, before any of the work
-# that was going to fail anyway.
+# which the dependency is actually needed, so it fires only for builds that use the
+# dependency, and before any of the configure work that would fail without it.
 #
 # The message does the naming, not the location: it says which feature is affected,
 # and most name the option that turns that feature off.

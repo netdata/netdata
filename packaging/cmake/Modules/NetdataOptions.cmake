@@ -9,8 +9,7 @@
 # Ordering contract, and it is the reason this file is included where it is:
 # everything here runs before every consumer, because an option read before its
 # declaration takes the unset value rather than the default. Do not move the
-# include() later without checking that. The platform facts the dependent
-# options gate on are pulled in below rather than assumed.
+# include() later without checking that.
 #
 # Kept as one unit: splitting the option() calls from the validation and the remap that consume them would manufacture modularity without providing any.
 
