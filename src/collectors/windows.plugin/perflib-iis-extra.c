@@ -1007,12 +1007,17 @@ do_iis_extra_group(PERF_DATA_BLOCK *data, struct iis_extra_group *group, int upd
     }
 
     PERF_INSTANCE_DEFINITION *pi = NULL;
+    bool complete = true;
     for (LONG i = 0; i < object->NumInstances; i++) {
         pi = perflibForEachInstance(data, object, pi);
-        if (!pi)
+        if (!pi) {
+            complete = false;
             break;
-        if (!getInstanceName(data, object, pi, windows_shared_buffer, sizeof(windows_shared_buffer)))
+        }
+        if (!getInstanceName(data, object, pi, windows_shared_buffer, sizeof(windows_shared_buffer))) {
+            complete = false;
             continue;
+        }
 
         char instance_key[PERFLIB_MAX_NAME_LENGTH];
         strncpyz(instance_key, windows_shared_buffer, sizeof(instance_key) - 1);
@@ -1027,9 +1032,9 @@ do_iis_extra_group(PERF_DATA_BLOCK *data, struct iis_extra_group *group, int upd
             if (!separator || separator == windows_shared_buffer || !separator[1])
                 continue;
             *separator++ = '\0';
-            if (strchr(separator, '#'))
+            if (!iis_worker_app_name(separator, app, sizeof(app)))
                 continue;
-            strncpyz(app, separator, sizeof(app) - 1);
+            snprintfz(instance_key, sizeof(instance_key), "%s_%s", windows_shared_buffer, app);
             instance = app;
         } else if (strcasecmp(instance, "_Total") == 0 || strncmp(instance, "---", 3) == 0)
             continue;
@@ -1071,6 +1076,8 @@ do_iis_extra_group(PERF_DATA_BLOCK *data, struct iis_extra_group *group, int upd
         if (worker) {
             process = perflib_worker_state_get(state->workers, instance_key, group->dimension_count);
             if (!process)
+                continue;
+            if (process->seen)
                 continue;
             has_sample = perflib_worker_state_has_sample(process);
             process_counters = perflib_worker_state_counters(process);
@@ -1128,11 +1135,13 @@ do_iis_extra_group(PERF_DATA_BLOCK *data, struct iis_extra_group *group, int upd
                 iis_extra_emit(group, &state->values[n], chart, dimension, app, app, update_every);
             iis_extra_done_charts(group, state);
 
-            perflib_worker_state_remove_unseen(state->workers);
+            if (complete)
+                perflib_worker_state_remove_unseen(state->workers);
         }
         dfe_done(state);
     }
-    iis_extra_remove_unseen(group);
+    if (complete)
+        iis_extra_remove_unseen(group);
     return IIS_EXTRA_GROUP_COLLECTED;
 }
 

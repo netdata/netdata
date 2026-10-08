@@ -57,12 +57,14 @@ bool perflib_counter_type_is_32bit_rate(uint32_t counter_type)
 uint64_t perflib_counter_delta(uint64_t previous, uint64_t current, bool is_32bit)
 {
     if (!is_32bit)
+        // A decrease means the 64-bit counter reset; use its new value as this interval's delta.
         return current >= previous ? current - previous : current;
 
     uint32_t previous32 = (uint32_t)previous;
     uint32_t current32 = (uint32_t)current;
     uint64_t delta = current32 >= previous32 ? (uint64_t)(current32 - previous32) :
                                                (uint64_t)UINT32_MAX - previous32 + current32 + 1;
+    // A wrap of at least half the range is indistinguishable from a reset or stale sample; ignore it.
     return delta < (UINT64_C(1) << 31) ? delta : 0;
 }
 

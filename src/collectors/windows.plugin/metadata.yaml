@@ -2208,7 +2208,7 @@ modules:
               unit: "threads"
               chart_type: line
               dimensions:
-                - name: threads
+                - name: active
             - name: iis.w3svc_w3wp_requests_total
               description: HTTP requests served by the worker process
               unit: "requests/s"
@@ -2277,7 +2277,7 @@ modules:
                 - name: used
             - name: iis.w3svc_w3wp_output_cache_flushed_total
               description: Flushes of output cache
-              unit: "flushes"
+              unit: "flushes/s"
               chart_type: line
               dimensions:
                 - name: output_cache_entries
@@ -2526,8 +2526,8 @@ modules:
               chart_type: line
               dimensions:
                 - name: user_hits
-                - name: user_misses
                 - name: kernel_hits
+                - name: user_misses
                 - name: kernel_misses
             - name: iis.server_uris_cached
               description: URIs in the IIS cache

@@ -174,6 +174,7 @@ struct ws3svc_w3wp_data {
 
 // AD information
 struct iis_app {
+    bool seen;
     RRDSET *st_app_current_application_pool_state;
     RRDDIM *rd_app_current_application_pool_state_uninitialized;
     RRDDIM *rd_app_current_application_pool_state_initialized;
@@ -366,6 +367,64 @@ void dict_wesvc_w3wp_insert_cb(const DICTIONARY_ITEM *item __maybe_unused, void 
 static DICTIONARY *web_services = NULL;
 static DICTIONARY *app_pools = NULL;
 static DICTIONARY *w3svc_w3wp_service = NULL;
+static bool app_pool_snapshot_complete = false;
+
+static void dict_app_pool_delete_cb(const DICTIONARY_ITEM *item __maybe_unused, void *value, void *data __maybe_unused)
+{
+    struct iis_app *p = value;
+    rrdset_is_obsolete___safe_from_collector_thread(p->st_app_current_application_pool_state);
+    rrdset_is_obsolete___safe_from_collector_thread(p->st_app_current_worker_process);
+    rrdset_is_obsolete___safe_from_collector_thread(p->st_app_maximum_worker_process);
+    rrdset_is_obsolete___safe_from_collector_thread(p->st_app_recent_worker_process_failure);
+    rrdset_is_obsolete___safe_from_collector_thread(p->st_app_application_pool_recycles);
+    rrdset_is_obsolete___safe_from_collector_thread(p->st_app_application_pool_uptime);
+    rrdset_is_obsolete___safe_from_collector_thread(p->st_app_current_application_pool_uptime);
+    rrdset_is_obsolete___safe_from_collector_thread(p->st_app_time_since_process_failure);
+    rrdset_is_obsolete___safe_from_collector_thread(p->st_app_worker_process_created);
+    rrdset_is_obsolete___safe_from_collector_thread(p->st_app_worker_process_failures);
+}
+
+static void app_pool_remove_unseen(void)
+{
+    struct iis_app *p;
+    dfe_start_write(app_pools, p)
+    {
+        if (!p->seen)
+            dictionary_del(app_pools, p_dfe.name);
+    }
+    dfe_done(p);
+    dictionary_garbage_collect(app_pools);
+}
+
+const char *iis_worker_app_name(const char *name, char *buffer, size_t buffer_size)
+{
+    if (!name || !buffer || !buffer_size)
+        return NULL;
+
+    strncpyz(buffer, name, buffer_size - 1);
+    if (!app_pool_snapshot_complete)
+        return buffer;
+
+    struct iis_app *exact = dictionary_get(app_pools, buffer);
+    if (exact && exact->seen)
+        return buffer;
+
+    char *suffix = strrchr(buffer, '#');
+    if (!suffix || suffix == buffer || !suffix[1])
+        return buffer;
+    for (const char *digit = suffix + 1; *digit; digit++) {
+        if (*digit < '0' || *digit > '9')
+            return buffer;
+    }
+
+    *suffix = '\0';
+    struct iis_app *base = dictionary_get(app_pools, buffer);
+    if (base && base->seen)
+        return buffer;
+
+    strncpyz(buffer, name, buffer_size - 1);
+    return buffer;
+}
 
 static void
 dict_wesvc_w3wp_delete_cb(const DICTIONARY_ITEM *item __maybe_unused, void *value, void *data __maybe_unused)
@@ -412,6 +471,7 @@ static void initialize(void)
         DICT_OPTION_DONT_OVERWRITE_VALUE | DICT_OPTION_FIXED_SIZE, NULL, sizeof(struct iis_app));
 
     dictionary_register_insert_callback(app_pools, dict_app_pool_insert_cb, NULL);
+    dictionary_register_delete_callback(app_pools, dict_app_pool_delete_cb, NULL);
 
     w3svc_w3wp_service = dictionary_create_advanced(
         DICT_OPTION_DONT_OVERWRITE_VALUE | DICT_OPTION_FIXED_SIZE, NULL, sizeof(struct ws3svc_w3wp_data));
@@ -1512,18 +1572,28 @@ static inline void app_pool_worker_process_failures(
 
 static bool do_app_pool(PERF_DATA_BLOCK *pDataBlock, int update_every)
 {
+    app_pool_snapshot_complete = false;
     PERF_OBJECT_TYPE *pObjectType = perflibFindObjectTypeByName(pDataBlock, "APP_POOL_WAS");
     if (!pObjectType)
         return false;
 
+    struct iis_app *existing;
+    dfe_start_write(app_pools, existing) existing->seen = false;
+    dfe_done(existing);
+
     PERF_INSTANCE_DEFINITION *pi = NULL;
+    bool complete = true;
     for (LONG i = 0; i < pObjectType->NumInstances; i++) {
         pi = perflibForEachInstance(pDataBlock, pObjectType, pi);
-        if (!pi)
+        if (!pi) {
+            complete = false;
             break;
+        }
 
-        if (!getInstanceName(pDataBlock, pObjectType, pi, windows_shared_buffer, sizeof(windows_shared_buffer)))
-            strncpyz(windows_shared_buffer, "[unknown]", sizeof(windows_shared_buffer) - 1);
+        if (!getInstanceName(pDataBlock, pObjectType, pi, windows_shared_buffer, sizeof(windows_shared_buffer))) {
+            complete = false;
+            break;
+        }
 
         // We are not ploting _Total here, because cloud will group the sites
         if (strcasecmp(windows_shared_buffer, "_Total") == 0) {
@@ -1531,6 +1601,7 @@ static bool do_app_pool(PERF_DATA_BLOCK *pDataBlock, int update_every)
         }
 
         struct iis_app *p = dictionary_set(app_pools, windows_shared_buffer, NULL, sizeof(*p));
+        p->seen = true;
         app_pool_current_state(p, pDataBlock, pObjectType, pi, update_every);
 
         app_pool_current_worker_processes(p, pDataBlock, pObjectType, pi, update_every);
@@ -1544,6 +1615,11 @@ static bool do_app_pool(PERF_DATA_BLOCK *pDataBlock, int update_every)
         app_pool_uptime(p, pDataBlock, pObjectType, pi, update_every);
         app_pool_current_uptime(p, pDataBlock, pObjectType, pi, update_every);
         app_pool_time_since_failure(p, pDataBlock, pObjectType, pi, update_every);
+    }
+
+    if (complete) {
+        app_pool_remove_unseen();
+        app_pool_snapshot_complete = true;
     }
 
     return true;
@@ -2046,25 +2122,32 @@ static bool do_W3SCV_W3WP(PERF_DATA_BLOCK *pDataBlock, int update_every)
     dfe_done(existing);
 
     PERF_INSTANCE_DEFINITION *pi = NULL;
+    bool complete = true;
     for (LONG i = 0; i < pObjectType->NumInstances; i++) {
         pi = perflibForEachInstance(pDataBlock, pObjectType, pi);
-        if (!pi)
+        if (!pi) {
+            complete = false;
             break;
+        }
 
-        if (!getInstanceName(pDataBlock, pObjectType, pi, windows_shared_buffer, sizeof(windows_shared_buffer)))
+        if (!getInstanceName(pDataBlock, pObjectType, pi, windows_shared_buffer, sizeof(windows_shared_buffer))) {
+            complete = false;
             continue;
+        }
         if (strcasecmp(windows_shared_buffer, "_Total") == 0)
             continue;
 
-        char worker_name[PERFLIB_MAX_NAME_LENGTH];
-        strncpyz(worker_name, windows_shared_buffer, sizeof(worker_name) - 1);
+        char *app_separator = strchr(windows_shared_buffer, '_');
+        if (!app_separator || app_separator == windows_shared_buffer || !app_separator[1])
+            continue;
+        *app_separator++ = '\0';
 
-        char *app = strchr(windows_shared_buffer, '_');
-        if (!app || app == windows_shared_buffer || !app[1])
+        char app[PERFLIB_MAX_NAME_LENGTH];
+        if (!iis_worker_app_name(app_separator, app, sizeof(app)))
             continue;
-        *app++ = '\0';
-        if (strchr(app, '#'))
-            continue;
+
+        char worker_name[PERFLIB_MAX_NAME_LENGTH];
+        snprintfz(worker_name, sizeof(worker_name), "%s_%s", windows_shared_buffer, app);
 
         struct ws3svc_w3wp_data *p = dictionary_set(w3svc_w3wp_service, app, NULL, sizeof(*p));
         if (!p->seen) {
@@ -2084,6 +2167,8 @@ static bool do_W3SCV_W3WP(PERF_DATA_BLOCK *pDataBlock, int update_every)
         w3svc_w3wp_get_counters(p, counters);
         PERFLIB_WORKER_STATE *worker = perflib_worker_state_get(p->workers, worker_name, W3SVC_W3WP_COUNTERS);
         if (!worker)
+            continue;
+        if (worker->seen)
             continue;
         bool *has_sample = perflib_worker_state_has_sample(worker);
         COUNTER_DATA *worker_counters = perflib_worker_state_counters(worker);
@@ -2129,13 +2214,15 @@ static bool do_W3SCV_W3WP(PERF_DATA_BLOCK *pDataBlock, int update_every)
     }
     dfe_done(p);
 
-    dfe_start_write(w3svc_w3wp_service, p)
-    {
-        perflib_worker_state_remove_unseen(p->workers);
-    }
-    dfe_done(p);
+    if (complete) {
+        dfe_start_write(w3svc_w3wp_service, p)
+        {
+            perflib_worker_state_remove_unseen(p->workers);
+        }
+        dfe_done(p);
 
-    w3svc_w3wp_remove_unseen();
+        w3svc_w3wp_remove_unseen();
+    }
     return true;
 }
 
@@ -2147,6 +2234,8 @@ int do_PerflibWebService(int update_every __maybe_unused, usec_t dt __maybe_unus
         initialize();
         initialized = true;
     }
+
+    app_pool_snapshot_complete = false;
 
     int ret = 0;
 #define TOTAL_NUMBER_OF_FAILURES (4)
