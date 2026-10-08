@@ -1396,11 +1396,15 @@ class DocumentationSourceRegressionTest(unittest.TestCase):
                     names.index("Generate Integrations"),
                     names.index("Generate src/collectors/SERVICE-DISCOVERY.md"),
                 )
-                self.assertTrue(
-                    any(
-                        re.fullmatch(r"actions/setup-go@[0-9a-f]{40}", step.get("uses", ""))
-                        for step in steps
-                    )
+                setup_go_steps = [
+                    index
+                    for index, step in enumerate(steps)
+                    if re.fullmatch(r"actions/setup-go@[0-9a-f]{40}", step.get("uses", ""))
+                ]
+                self.assertEqual(len(setup_go_steps), 1)
+                self.assertLess(
+                    setup_go_steps[0],
+                    names.index("Generate Source Metadata"),
                 )
 
                 environment = "virtualenv" if workflow.name == "generate-integrations.yml" else "venv"
