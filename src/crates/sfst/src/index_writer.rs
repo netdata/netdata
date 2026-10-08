@@ -49,8 +49,8 @@ impl IndexWriter {
     /// sink plus the [`Summary`] / [`Metadata`] the file carries — the
     /// in-memory builds feed a `Cursor` and open the resulting bytes with
     /// [`IndexReader::open`](crate::IndexReader::open). Peak memory beyond
-    /// the [`RowIndex`] itself is a single packed chunk, not the whole
-    /// compressed file.
+    /// the [`RowIndex`] itself is the translated id lists of one stream
+    /// batch at a time, not the whole compressed file.
     pub fn write_into<W: Write + Seek>(
         row_index: &RowIndex,
         sink: W,

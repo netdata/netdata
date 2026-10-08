@@ -18,7 +18,7 @@
 //!
 //! The low/mid/high tiering is the interner's cardinality classification
 //! (`RowIndex::low_fields` and friends). Peak memory beyond the `RowIndex`
-//! itself is a single packed chunk.
+//! itself is the translated id lists of one stream batch at a time.
 //!
 //! Both entry points are `pub(crate)`, called only from `index_writer.rs`:
 //! [`build_and_write`] is the body of `IndexWriter::write_file` (durable
@@ -319,8 +319,8 @@ pub(crate) fn build_and_write(
 /// `SUMR`, `META`, `TIMS`, `PRIM`, then the optional per-row columns,
 /// `TIDX`/`TBLM`, `EVNB`/`LNKB`, `TRSU`, then mid-card, high-card, and
 /// the stream batches — which `ChunkWriter` enforces. Peak memory
-/// beyond the `RowIndex` itself is a single packed chunk, not the whole
-/// compressed file.
+/// beyond the `RowIndex` itself is the translated id lists of one
+/// stream batch at a time, not the whole compressed file.
 pub(crate) fn build_into<W: Write + Seek>(
     row_index: &RowIndex,
     sink: W,
