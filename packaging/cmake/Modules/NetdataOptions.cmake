@@ -7,10 +7,10 @@
 # below depends on. Nothing here may use CMAKE_CURRENT_LIST_DIR.
 #
 # Ordering contract, and it is the reason this file is included where it is:
-# everything here runs after NetdataPlatform.cmake, because the dependent options gate on
-# OS_*/CPU_*, and before every consumer, because an option read before its
+# everything here runs before every consumer, because an option read before its
 # declaration takes the unset value rather than the default. Do not move the
-# include() without checking both halves.
+# include() later without checking that. The platform facts the dependent
+# options gate on are pulled in below rather than assumed.
 #
 # Kept as one unit: splitting the option() calls from the validation and the remap that consume them would manufacture modularity without providing any.
 
@@ -18,12 +18,10 @@ include_guard()
 
 include(CMakeDependentOption)
 
-# Enforce the first half of the ordering contract. Without platform facts the
-# 23 dependent options below would not error - cmake_dependent_option reads an
-# undefined OS_* as false and silently forces every one of them off.
-if(NOT DEFINED OS_LINUX)
-  message(FATAL_ERROR "NetdataOptions.cmake must be included after NetdataPlatform.cmake")
-endif()
+# The dependent options below gate on OS_*/CPU_*. Without them they would not
+# error - cmake_dependent_option reads an undefined OS_* as false and silently
+# forces every one of them off.
+include(NetdataPlatform)
 
 # Toolchain and link knobs. Their readers sit in the root file a few lines below
 # this module's include, and in NetdataCompilerFlags.cmake, so they are declared first.
