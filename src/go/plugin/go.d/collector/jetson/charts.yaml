@@ -44,3 +44,15 @@ groups:
         dimensions:
           - selector: emc_frequency
             name: frequency
+  - family: Power
+    metrics:
+      - power_rail_power
+    charts:
+      - title: Power Rail Consumption
+        context: power_rail_power
+        units: Watts
+        instances:
+          by_labels: [rail]
+        dimensions:
+          - selector: power_rail_power
+            name: power
