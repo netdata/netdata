@@ -402,11 +402,8 @@ const char *iis_worker_app_name(const char *name, char *buffer, size_t buffer_si
         return NULL;
 
     strncpyz(buffer, name, buffer_size - 1);
-    if (!app_pool_snapshot_complete)
-        return buffer;
-
     struct iis_app *exact = dictionary_get(app_pools, buffer);
-    if (exact && exact->seen)
+    if (exact && (!app_pool_snapshot_complete || exact->seen))
         return buffer;
 
     char *suffix = strrchr(buffer, '#');
@@ -419,7 +416,7 @@ const char *iis_worker_app_name(const char *name, char *buffer, size_t buffer_si
 
     *suffix = '\0';
     struct iis_app *base = dictionary_get(app_pools, buffer);
-    if (base && base->seen)
+    if (base && (!app_pool_snapshot_complete || base->seen))
         return buffer;
 
     strncpyz(buffer, name, buffer_size - 1);

@@ -67,6 +67,7 @@ struct iis_extra_group {
     enum iis_extra_scope scope;
     const char *label;
     RRDSET_TYPE chart_type;
+    bool elapsed_time_max_value_is_zero;
 };
 
 static bool
@@ -585,7 +586,7 @@ static const struct iis_extra_chart_definition cache_definitions[] = {
      "bytes",
      1,
      IIS_EXTRA_SCOPE_GROUP_DEFAULT,
-     true,
+     false,
      cache_file_cache_memory_dimensions,
      IIS_EXTRA_ARRAY_SIZE(cache_file_cache_memory_dimensions)},
     {"file_cache_flushes",
@@ -770,7 +771,8 @@ static struct iis_extra_group http_queue_group = {
     .priority_base = PRIO_HTTP_SERVICE_QUEUE,
     .scope = IIS_EXTRA_QUEUE,
     .label = "queue",
-    .chart_type = RRDSET_TYPE_LINE};
+    .chart_type = RRDSET_TYPE_LINE,
+    .elapsed_time_max_value_is_zero = true};
 static struct iis_extra_group worker_group = {
     .charts = worker_definitions,
     .chart_count = IIS_EXTRA_ARRAY_SIZE(worker_definitions),
@@ -929,6 +931,11 @@ static void iis_extra_emit(
             (collected_number)(100.0 * (double)counter->current.Data / (double)counter->current.Time *
                                IIS_EXTRA_PERCENTAGE_PRECISION);
         rrddim_set_by_pointer(value->st, value->rd, percentage);
+    } else if (
+        group->elapsed_time_max_value_is_zero && counter->current.CounterType == PERF_ELAPSED_TIME &&
+        counter->current.Data == INT64_MAX) {
+        // HTTP.sys uses INT64_MAX to mean that the queue is empty.
+        rrddim_set_by_pointer(value->st, value->rd, 0);
     } else
         perflib_rrddim_set_by_pointer(value->st, value->rd, counter);
 }

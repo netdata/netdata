@@ -2421,7 +2421,7 @@ modules:
             - name: iis.server_file_cache_memory
               description: IIS server file cache memory
               unit: "bytes"
-              chart_type: area
+              chart_type: line
               dimensions:
                 - name: used
                 - name: maximum
