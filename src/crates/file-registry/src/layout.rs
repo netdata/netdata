@@ -79,13 +79,11 @@ pub struct DateTenantDir {
 ///
 /// Error policy (strict): the only failures that surface are
 /// non-`NotFound` failures of the `read_dir` calls that open `base` or
-/// a date directory; those propagate, so a caller whose correctness
-/// depends on seeing every partition — like the seq high-water scan,
-/// where a silently short list could under-seed the counter — gets the
-/// full list or an error. Skipped silently in both modes: a vanished
-/// date directory (`NotFound` on open) and entry-level misbehavior (an
-/// iteration error, a failed type lookup). Callers that prefer a
-/// partial result use [`date_tenant_dirs_lossy`].
+/// a date directory; those propagate. Skipped silently in both modes:
+/// a vanished date directory (`NotFound` on open) and entry-level
+/// misbehavior (an iteration error, a failed type lookup) — so even
+/// the strict walk can return a partial list without an error. Callers
+/// that prefer a partial result use [`date_tenant_dirs_lossy`].
 pub fn date_tenant_dirs(base: &Path) -> io::Result<Vec<DateTenantDir>> {
     collect(base, OnErr::Propagate)
 }

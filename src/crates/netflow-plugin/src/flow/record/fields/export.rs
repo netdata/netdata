@@ -22,8 +22,8 @@ use interfaces::*;
 
 impl FlowRecord {
     /// Materialize the record as a `FlowFields` map (a `BTreeMap` of field name to
-    /// string value), the inverse of `from_fields`. Every caller is a test asserting
-    /// against the field-map representation; no production path calls this.
+    /// string value), the inverse of `from_fields`. Every caller is test code; no
+    /// production path calls this.
     #[cfg(test)]
     pub(crate) fn to_fields(&self) -> FlowFields {
         let mut fields = FlowFields::new();

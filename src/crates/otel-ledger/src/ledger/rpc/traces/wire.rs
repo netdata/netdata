@@ -284,7 +284,8 @@ impl TryFrom<RawOtelTracesRequest> for OtelTracesRequest {
 /// Standard Functions parameters for the default trace-search view.
 /// They translate into the native search mode (see
 /// [`Self::search_params`]); the response is that mode's page wrapped
-/// in the Functions envelope, plus the full-window aggregate.
+/// in the Functions envelope, plus the full-window aggregate on a
+/// first page only — an anchored page carries none ([`Self::anchor`]).
 #[derive(Debug, Clone, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct FunctionsParams {

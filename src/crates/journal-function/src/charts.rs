@@ -10,9 +10,10 @@
 //! extensions are the chart's identity (id, title, units, family,
 //! context, type), read from the generated JSON schema at runtime
 //! by `NetdataChart::chart_metadata` (`netdata-plugin/rt/src/charts/chart_trait.rs`);
-//! the `NetdataChart` derive turns every field into a DIMENSION
-//! named after the field (the derive macro in
-//! `netdata-plugin/charts-derive/src/lib.rs`).
+//! the `NetdataChart` derive emits one SET per non-instance field,
+//! keyed by field name (the derive macro in
+//! `netdata-plugin/charts-derive/src/lib.rs`); the DIMENSION lines
+//! come from the same schema read, keyed the same way.
 //! `x-dimension-algorithm` tells the Agent how to process each value:
 //! `incremental` = counter (the Agent keeps the per-update delta, so with
 //! the 1s sampling below the `indexes/s` / `buckets/s` units read as

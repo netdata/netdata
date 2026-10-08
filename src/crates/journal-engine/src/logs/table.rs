@@ -79,11 +79,13 @@ impl ColumnInfo {
 /// renders a `Table` into the logs UI's JSON rows. All names here are
 /// re-exported flat (crate root; `journal-function/src/lib.rs`).
 ///
-/// Nothing enforces the row/column shape: `add_row` appends unchecked, the
-/// builders here emit `columns.len()` cells per row, and `Display` zips
-/// rows against the column widths - extra cells are dropped, short rows
-/// render short. The `Display` impl at the bottom of the file is a
-/// human-readable ASCII dump; nothing in-repo renders through it.
+/// Nothing enforces the row/column shape: `add_row` appends unchecked and
+/// the builders here emit `columns.len()` cells per row. `Display` zips
+/// rows against the column widths, so short rows render short; an
+/// oversized row panics before the zip - `calculate_column_widths` walks
+/// every cell against the per-column `widths` vector and indexes past its
+/// end. The `Display` impl at the bottom of the file is a human-readable
+/// ASCII dump; nothing in-repo renders through it.
 #[derive(Debug, Clone)]
 pub struct Table {
     /// Column headers; `index` in each matches the cell offset in rows.

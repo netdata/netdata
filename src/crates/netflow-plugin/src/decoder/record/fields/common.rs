@@ -70,9 +70,10 @@ pub(crate) fn should_skip_zero_ip(canonical: &str, value: &str) -> bool {
     ) && is_zero_ip_value(value)
 }
 
-/// Append an MPLS label to `MPLS_LABELS`, accepting decimal, `0x`/`0X`-prefixed
-/// or bare hex text. The value is shifted right by 4 to drop the EXP and
-/// bottom-of-stack bits; zero labels are skipped, as in Akvorado's decoder.
+/// Append an MPLS label to `MPLS_LABELS`, trying decimal first (digit-only
+/// text is never hex), then `0x`/`0X`-prefixed or bare hex text. The value is
+/// shifted right by 4 to drop the EXP and bottom-of-stack bits; zero labels
+/// are skipped, as in Akvorado's decoder.
 pub(crate) fn append_mpls_label(fields: &mut FlowFields, value: &str) {
     let raw = if let Ok(v) = value.parse::<u64>() {
         v

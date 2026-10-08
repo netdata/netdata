@@ -21,8 +21,10 @@
 //! `load_machine_id`, `load_boot_id`) carries a near-identical copy of the
 //! same lookups (same `/host` fallback and macOS parsing, but `[u8; 16]` +
 //! `JournalError` instead of `Uuid` + `io::Error`, and the Linux parsers
-//! decode hex by hand instead of `Uuid::try_parse`, so they accept only the
-//! 32-hex undashed form); the two must be edited in step by hand.
+//! decode hex by hand instead of `Uuid::try_parse`: there the machine-ID
+//! parser accepts only the 32-hex undashed form (`hex::decode` rejects
+//! hyphens), while the boot-ID parser strips hyphens first); the two must
+//! be edited in step by hand.
 
 use std::io;
 

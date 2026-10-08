@@ -49,7 +49,9 @@ impl JournalCursor {
     }
 
     /// Set the location; it is resolved to an entry by the next
-    /// [`JournalCursor::step`]. Any array-cursor position is discarded.
+    /// [`JournalCursor::step`]. Any array-cursor position is discarded, so
+    /// an unfiltered `step` from a directly set [`Location::ResolvedEntry`]
+    /// panics unwrapping the missing array cursor; set a filter first.
     pub fn set_location(&mut self, location: Location) {
         self.location = location;
         self.array_cursor = None;

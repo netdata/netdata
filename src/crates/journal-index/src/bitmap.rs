@@ -103,8 +103,8 @@ impl From<Bitmap> for RoaringBitmap {
 
 // Intersection (`&`) in every by-value/by-reference combination and union
 // only as `|=` (there is no by-value `|` impl), each delegating to the
-// matching `RoaringBitmap` operation. The by-reference forms avoid consuming
-// either operand; `filter` folds a resolved filter expression into a single
+// matching `RoaringBitmap` operation. Only borrowed operands remain
+// unconsumed; `filter` folds a resolved filter expression into a single
 // entry set with `&=`/`|=` (`src/filter.rs` `FilterExpr::evaluate`).
 impl std::ops::BitAndAssign<&Bitmap> for Bitmap {
     fn bitand_assign(&mut self, rhs: &Bitmap) {

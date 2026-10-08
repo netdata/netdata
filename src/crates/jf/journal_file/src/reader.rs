@@ -69,7 +69,8 @@ impl<'a, M: MemoryMap> JournalReader<'a, M> {
     ///
     /// Only [`Location::Head`], [`Location::Tail`], [`Location::Realtime`],
     /// and [`Location::ResolvedEntry`] are supported by `step`; the other
-    /// variants panic there.
+    /// variants panic there. A sought [`Location::ResolvedEntry`] also
+    /// needs an active filter; without one, `step` panics.
     pub fn set_location(&mut self, location: Location) {
         self.cursor.set_location(location)
     }

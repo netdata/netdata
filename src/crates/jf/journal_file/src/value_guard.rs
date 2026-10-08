@@ -23,8 +23,10 @@ use std::ops::{Deref, DerefMut};
 /// # Safety and Interior Mutability
 ///
 /// `JournalFile` wraps the window manager in an `UnsafeCell` so its `&self` methods can
-/// remap windows. This guard makes that safe: object accessors check the in-use flag
-/// before touching any window, so a live object view cannot be invalidated.
+/// remap windows. This guard makes guarded object access safe: those accessors check the
+/// in-use flag before touching any window, so a live object view cannot be invalidated
+/// through them. Internal helpers such as `object_header_ref` bypass that check and can
+/// still remap or evict windows while a view is live.
 #[derive(Debug)]
 pub struct ValueGuard<'a, T> {
     offset: NonZeroU64,

@@ -6,9 +6,11 @@
 //! expression.
 //!
 //! Data flow: `JournalReader::add_match` feeds a pending [`JournalFilter`]
-//! (field-name remapping happens there); the first `step` resolves it
-//! against the file and installs the result on the cursor, while
-//! `build_filter` resolves and returns it without installing. From then on
+//! (field-name remapping happens there); group-closing calls
+//! (`add_conjunction`/`add_disjunction`) resolve what they flush right
+//! away, and the first `step` resolves what is left against the file,
+//! installing the result on the cursor, while `build_filter` resolves and
+//! returns it without installing. From then on
 //! the cursor's filtered path drives the expression one entry at a time
 //! (`JournalCursor::resolve_filter_location`), rewinding with `head`/`tail`
 //! before resolving a location from scratch, because `next`/`previous`

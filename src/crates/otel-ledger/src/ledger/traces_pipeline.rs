@@ -14,8 +14,9 @@
 //! payload only for the literal `info` token — the `{"info": {}}`
 //! capability-discovery selector. A data GET is not rejected: the
 //! bridge deserializes the absent payload from `{}` into the
-//! selector-less `TracesMode::Functions` default view (every param is
-//! `#[serde(default)]`) and silently drops the GET's window args.
+//! selector-less `TracesMode::Functions` default view (every param
+//! has a serde default, `last` via a custom `default_limit` fn) and
+//! silently drops the GET's window args.
 //!
 //! Consumers: `Ledger::new` (`mod.rs`) builds this pipeline right after the
 //! logs one; the registry/catalog/recovery machinery is

@@ -87,8 +87,9 @@ pub(crate) fn patch_args_into_payload(args: &[String], payload: Option<&[u8]>) -
 /// NOTHING — a traces GET data call reaches the bridge with no payload,
 /// which it deserializes from `{}` (`netdata-plugin/bridge/src/function.rs`
 /// `HandlerAdapter::handle_raw`) into the selector-less
-/// `TracesMode::Functions` default view (every param is
-/// `#[serde(default)]`), silently dropping the GET's window args. The
+/// `TracesMode::Functions` default view (every param has a serde
+/// default, `last` via a custom `default_limit` fn), silently dropping
+/// the GET's window args. The
 /// `payload.is_some()` guard is load-bearing: dispatch gives synthesized
 /// content priority (`rpc/dispatch.rs`
 /// `dispatch_function_call`), so without it an `info` URL arg would

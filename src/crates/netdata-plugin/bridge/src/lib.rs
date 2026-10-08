@@ -16,8 +16,9 @@
 //!
 //! This module covers only the supervisor↔worker links. The ingestor's direct
 //! WAL-event socket to the ledger (`writer_socket_path`) is a separate
-//! ferryboat link carrying `wal::Message`; its accept/connect plumbing lives
-//! in `file_lifecycle::ipc`.
+//! ferryboat link carrying `wal::Message`: the ledger accepts via
+//! `file_lifecycle::ipc::accept_writer`, the ingestor connects via its
+//! `LedgerSender`.
 //!
 //! Ferryboat bincode-serializes these messages, so variant order and field
 //! shapes are wire contracts between the supervisor and the workers it spawns

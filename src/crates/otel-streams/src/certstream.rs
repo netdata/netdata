@@ -75,8 +75,10 @@ const PING_INTERVAL: Duration = Duration::from_secs(30);
 /// channel paired with its raw JSON. Heartbeats and unknown messages are
 /// skipped silently; malformed messages are logged and skipped. Returns when
 /// the connection closes or errors (mid-stream errors are logged and yield
-/// `Ok`; only a failed initial connect yields `Err`), or when the receiver
-/// drops the channel.
+/// `Ok`; only a failed initial connect yields `Err`), or when sending a
+/// certificate update fails because the receiver dropped the channel; the
+/// drop is noticed only at that send, so the loop can keep running through
+/// skipped messages or with no further updates.
 pub async fn connect(
     url: &str,
     tx: mpsc::Sender<(CertData, serde_json::Value)>,

@@ -351,8 +351,9 @@ impl FacetStore {
 }
 
 /// Bit set over values in `0..N`. `bits` stays empty until the first
-/// insert resizes it to N bits, so a set that never receives a value
-/// allocates nothing; `contains` bounds-checks for that unallocated case.
+/// in-range insert resizes it to N bits (out-of-range inserts return
+/// before resizing), so a set that never receives a value allocates
+/// nothing; `contains` bounds-checks for that unallocated case.
 #[derive(Debug, Clone)]
 pub(super) struct DenseBitSet<const N: usize> {
     bits: BitVec<usize, Lsb0>,

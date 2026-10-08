@@ -153,9 +153,9 @@ pub(crate) fn decode_netflow_result(
     if let Some(err) = result.error {
         if is_template_error(&err.to_string()) {
             // Missing templates usually arrive as explicit `NoTemplate` flow
-            // sets, already accounted by the append calls above. A parser-level
-            // template error has no Set object, so count one unresolved Set
-            // only when none was counted yet.
+            // sets, already accounted while processing the packets above. A
+            // parser-level template error has no Set object, so count one
+            // unresolved Set only when none was counted yet.
             if batch.stats.missing_template_sets == 0 {
                 batch.stats.missing_template_sets = 1;
             }

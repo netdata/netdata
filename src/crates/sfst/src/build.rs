@@ -17,8 +17,9 @@
 //!    (`HF{hi}{lo}`), then the time-sorted stream batches (`SB...`).
 //!
 //! The low/mid/high tiering is the interner's cardinality classification
-//! (`RowIndex::low_fields` and friends). Peak memory beyond the `RowIndex`
-//! itself is the translated id lists of one stream batch at a time.
+//! (`RowIndex::low_fields` and friends). Beyond the `RowIndex` itself, the
+//! stream-batch stage materialises every row's translated id list before
+//! writing the batch chunks.
 //!
 //! Both entry points are `pub(crate)`, called only from `index_writer.rs`:
 //! [`build_and_write`] is the body of `IndexWriter::write_file` (durable
@@ -318,9 +319,10 @@ pub(crate) fn build_and_write(
 /// chunk is packed, written, and dropped in the canonical stage order —
 /// `SUMR`, `META`, `TIMS`, `PRIM`, then the optional per-row columns,
 /// `TIDX`/`TBLM`, `EVNB`/`LNKB`, `TRSU`, then mid-card, high-card, and
-/// the stream batches — which `ChunkWriter` enforces. Peak memory
-/// beyond the `RowIndex` itself is the translated id lists of one
-/// stream batch at a time, not the whole compressed file.
+/// the stream batches — which `ChunkWriter` enforces. Beyond the
+/// `RowIndex` itself, the stream-batch stage materialises every row's
+/// translated id list before writing the batch chunks; the file itself
+/// is streamed, never buffered whole.
 pub(crate) fn build_into<W: Write + Seek>(
     row_index: &RowIndex,
     sink: W,

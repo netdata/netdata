@@ -135,7 +135,8 @@ impl ProjectedRowSink for ProjectedTimeseriesSink<'_> {
         // Top-N keys map to their dimension. A key retained from pass 1 but
         // ranked out of the top N is skipped: it has no dimension, and its
         // records were already counted in pass 1 under the key's own row.
-        // Unknown group values take the overflow dimension.
+        // Unknown group values take the overflow dimension only when the
+        // overflow row is in the top N; otherwise the record is skipped.
         let dimension_index = if self.row_values_known {
             self.top_group_keys
                 .get(self.row_group_field_ids.as_slice())

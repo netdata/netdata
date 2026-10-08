@@ -24,6 +24,7 @@
 //! `journal-engine/src/logs/query.rs`, `journal-engine/src/error.rs`);
 //! journal-function's facets/histogram/types code imports the field types
 //! and `Direction` (`journal-function/src/netdata/facets.rs`,
+//! `journal-function/src/netdata/histogram.rs`,
 //! `journal-function/src/netdata/types.rs`); otel-legacy-logs' log handler
 //! imports the field types, `Filter` and the time units
 //! (`otel-legacy-logs/src/handler.rs`); the crate's integration tests drive

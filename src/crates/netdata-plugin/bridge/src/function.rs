@@ -123,7 +123,7 @@ impl ProgressState {
         }
     }
 
-    /// Update both counters atomically; safe from any thread or context.
+    /// Update both counters; safe from any thread or context.
     pub fn update(&self, done: usize, total: usize) {
         self.done.store(done, Ordering::Relaxed);
         self.total.store(total, Ordering::Relaxed);

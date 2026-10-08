@@ -7,8 +7,10 @@
 //!   (`logs/query.rs`, private) picks and merges the matching entry IDs, then the
 //!   private `extract_entry_data` re-opens each journal file
 //!   once and returns [`LogEntryData`] values — field=value
-//!   pairs, values verbatim and names reverse-mapped to their OTEL
-//!   forms; the crate's only producer of `LogEntryData`.
+//!   pairs, values verbatim up to lossy UTF-8 decoding
+//!   (invalid sequences replaced with U+FFFD) and names
+//!   reverse-mapped to their OTEL forms; the crate's only
+//!   producer of `LogEntryData`.
 //!
 //! - table — the render types [`Table`] (text layout via its `Display`
 //!   impl), [`CellValue`], [`ColumnInfo`], plus

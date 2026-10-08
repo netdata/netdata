@@ -103,7 +103,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         })
         .collect();
 
-    // Index only the last 24h; QueryTimeRange picks the bucket duration and aligns the boundaries (`query_time_range.rs` `QueryTimeRange::new`).
+    // The 24h window selects granularity, not what gets indexed: `batch_compute_file_indexes` uses only the range's bucket duration, and each miss's file is indexed whole (`query_time_range.rs` `QueryTimeRange::new`).
     let now = std::time::SystemTime::now()
         .duration_since(std::time::UNIX_EPOCH)?
         .as_secs() as u32;

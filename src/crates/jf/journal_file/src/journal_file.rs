@@ -23,9 +23,9 @@ const OBJECT_ALIGNMENT: u64 = 8;
 /// # Memory Management
 ///
 /// This implementation uses a window-based memory mapping strategy similar to systemd's original
-/// implementation. Instead of mapping the entire file, it keeps persistent maps for the header and
-/// the two hash tables and serves all other objects from a small set of memory-mapped windows that
-/// are reused as needed.
+/// implementation. Instead of mapping the entire file, it keeps persistent maps for the header
+/// and, when present, the two hash tables and serves all other objects from a small set of
+/// memory-mapped windows that are reused as needed.
 ///
 /// # Concurrency and Safety
 ///
@@ -474,11 +474,12 @@ impl<M: MemoryMap> JournalFile<M> {
         )
     }
 
-    /// Runs a directed partition point query over the entries referencing a data object.
+    /// Applies `predicate` as a partition test over the entries referencing a data object.
     ///
-    /// Returns the offset of the first (forward) or last (backward) entry in the data object's
-    /// entry array chain whose offset satisfies `predicate`, or `None` if no entry references the
-    /// data object.
+    /// `Forward` returns the offset of the first entry in the data object's entry array chain
+    /// whose offset fails `predicate`; `Backward` the last entry whose offset satisfies it.
+    /// `None` when no entry in the chain lands on that side — including a chain with no entry
+    /// referencing the data object.
     pub fn data_object_directed_partition_point<F>(
         &self,
         data_offset: u64,

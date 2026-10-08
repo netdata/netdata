@@ -57,7 +57,8 @@ impl<T> PrefixMap<T> {
     }
 
     /// Sort entries by prefix length descending and rebuild the trie lookup index.
-    /// Must be called after all inserts; until then `lookup()` finds nothing.
+    /// `lookup()` is empty before the first call; an `insert()` after a finalize is
+/// invisible to it (earlier matches still resolve) until this runs again.
     pub(crate) fn finalize(&mut self) {
         self.v4_entries
             .sort_by(|a, b| b.prefix.prefix_len().cmp(&a.prefix.prefix_len()));
