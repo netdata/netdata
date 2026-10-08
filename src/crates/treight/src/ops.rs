@@ -1,8 +1,7 @@
 //! Recursive subtree walkers behind `RawBitmap`'s query, mutation and
-//! set-op methods. `raw` is the only importer (`raw.rs`'s `use crate::ops`
-//! block); bitmap.rs and
-//! sfst reach these through `RawBitmap`/`Bitmap` methods. Everything here
-//! is `pub(crate)`.
+//! set-op methods. `raw` is the only importer of this module; bitmap.rs
+//! and sfst reach these through `RawBitmap`/`Bitmap` methods. Everything
+//! here is `pub(crate)`.
 //!
 //! Shared conventions:
 //! - `level` is the height of the subtree at the reader's cursor and is
@@ -13,19 +12,19 @@
 //!   present children in index order), so each call consumes exactly one
 //!   subtree and later children are reached by skipping the preceding
 //!   ones.
-//! - Bytes appended to `out` are the result subtree's serialization,
-//!   appended at the end of `out`; [`RawBitmap`]'s set-op methods snapshot
-//!   `out.len()` around the call (see `raw.rs`) and treat the
-//!   growth as the result's tree bytes — the convention sfst's set ops
-//!   build on (`PosSet::or_assign`/`and_assign` in `sfst/src/index_reader.rs`).
+//! - Bytes appended to `out` are the result subtree's serialization;
+//!   `RawBitmap`'s set-op methods in raw.rs snapshot `out.len()` around
+//!   the call and treat the growth as the result's tree bytes — the
+//!   convention sfst's set ops build on (`PosSet::or_assign`/
+//!   `and_assign` in `sfst/src/index_reader.rs`).
 use crate::node::{NodeReader, child_index};
 
-/// Walk the tree to `value`, reading one node byte per level: take the
-/// child selected by `value`'s 3-bit field, return `false` if that child
-/// is absent, else skip the preceding siblings' subtrees so the cursor
-/// lands on the child's subtree, and recurse. `level` is the remaining
-/// height and is decremented first — the call at `level == 1` reads the
-/// leaf byte. Matches `is_hit_1` in GNU idutils' fid.c.
+/// Walk the tree to `value`, one node byte per level. `level` is the
+/// remaining height, decremented first; the child comes from `value`'s
+/// 3-bit field at that level, and a missing child is `false`. At the
+/// leaf level (entry `level == 1`) that bit is the answer; higher up,
+/// skip the preceding siblings' subtrees so the cursor lands on the
+/// child's subtree and recurse. Matches `is_hit_1` in GNU idutils' fid.c.
 pub(crate) fn contains_inner(nodes: &mut NodeReader, level: u32, value: u32) -> bool {
     let level = level - 1;
     let child = child_index(level, value);

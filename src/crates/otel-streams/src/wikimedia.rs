@@ -10,9 +10,10 @@ use crate::otel::{SEVERITY_INFO, bool_val, json_to_any_value, kv, now_unix_nanos
 
 /// A Wikimedia EventStreams `recentchange` event.
 ///
-/// Only the fields promoted to OTLP attributes are typed; the rest (title,
-/// comment, user, revision, length, log_params, ...) travel in the body via the
-/// raw JSON. `log_type`/`log_action` appear only on `type: "log"` events.
+/// The promoted attribute fields — plus `timestamp` (record time) and `meta`
+/// (canary filtering) — are typed; everything else (title, comment, user,
+/// revision, length, log_params, ...) travels in the body via the raw JSON.
+/// `log_type`/`log_action` appear only on `type: "log"` events.
 #[derive(Deserialize, Debug)]
 pub struct Event {
     #[serde(rename = "type", default)]
@@ -116,7 +117,7 @@ impl Source for Wikimedia {
             kv("wiki.server_name", str_val(&event.server_name)),
         ];
         // namespace is a small enum-like integer; promote as a string so it
-        // faces the same way as the other categorical dimensions.
+        // is treated like the other categorical dimensions.
         if let Some(ns) = event.namespace {
             attributes.push(kv("wiki.namespace", str_val(&ns.to_string())));
         }
@@ -134,7 +135,8 @@ impl Source for Wikimedia {
         }
 
         // Change time (epoch seconds) as the record time; now for observed —
-        // matching the other live sources. Fall back to now if absent.
+        // matching the other live sources. Fall back to now if absent or
+        // non-positive.
         let time_unix_nano = match event.timestamp {
             Some(ts) if ts > 0 => ts as u64 * 1_000_000_000,
             _ => now_unix_nanos(),

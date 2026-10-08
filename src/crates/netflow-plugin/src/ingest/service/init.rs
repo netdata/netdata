@@ -54,9 +54,8 @@ impl IngestService {
                 retention_policy =
                     retention_policy.with_duration_of_journal_files(duration_of_journal_files);
             }
-            // Fastest-storage profile for the netflow flow store: compact
-            // on-disk layout, no DATA compression, no FSS sealing (not enabled),
-            // and live publication disabled (0) — the plugin reads its own files
+            // Fastest-storage profile for the netflow flow store. Live
+            // publication is disabled (0): the plugin reads its own journals
             // by opening them, not via journalctl --follow, so the per-entry
             // inotify/set_len publication is pure overhead here.
             Config::new(origin, rotation_policy, retention_policy)

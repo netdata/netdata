@@ -7,16 +7,14 @@
 //! (file/value_guard.rs), whose `Drop` clears it. A conflicting borrow fails
 //! with [`JournalError::ValueGuardInUse`] (produced by the borrow checks in
 //! [`GuardedCell::borrow_mut_checked`] and [`GuardedCell::with_guarded`])
-//! instead of racing or
-//! panicking.
+//! instead of racing or panicking.
 //!
 //! The only consumer is `JournalFile`'s `window_manager` field
-//! (`file/file.rs`): the
-//! window manager (file/mmap.rs) remaps its windows on demand and thereby
-//! invalidates slices handed out earlier, so at most one window-backed
-//! object view may be live at a time. The module is private (`file/mod.rs`
-//! declares it without `pub`)
-//! and neither `GuardedCell` nor `ValueGuard` is re-exported from lib.rs.
+//! (`file/file.rs`): the window manager (file/mmap.rs) remaps its windows on
+//! demand and thereby invalidates slices handed out earlier, so at most one
+//! window-backed object view may be live at a time. The module is private
+//! (`file/mod.rs` declares it without `pub`) and neither `GuardedCell` nor
+//! `ValueGuard` is re-exported from lib.rs.
 //!
 //! Threading: `!Sync` for every `T` (`UnsafeCell` and `RefCell` are both
 //! `!Sync`); `Send` follows `T: Send`. Since `JournalFile` holds this cell,
@@ -35,17 +33,17 @@ use std::num::NonZeroU64;
 /// from it, such as a slice into an mmap window - must outlive the call.
 /// Instead the cell carries an in-use flag that the caller manages: check
 /// that it is clear, take the borrow, raise the flag while the reference is
-/// live, clear it when done. `ValueGuard` is the RAII wrapper that automates
-/// the last two steps.
+/// live, clear it when done. `with_guarded` and the `ValueGuard` it returns
+/// automate the last two steps.
 ///
 /// The flag is a protocol, not type-level enforcement:
-/// [`GuardedCell::borrow_mut_checked`]
-/// only checks it and never raises it, so a caller that returns references
-/// without raising the flag (the object-header helpers
+/// [`GuardedCell::borrow_mut_checked`] only checks it and never raises it,
+/// so a caller that returns references without raising the flag (the
+/// object-header helpers
 /// [`JournalFile::object_header_ref`](crate::file::JournalFile::object_header_ref)
 /// and `object_header_mut` in `file/file.rs`) bypasses the gate. In-crate
-/// callers should prefer
-/// [`GuardedCell::with_guarded`], which runs the full protocol and returns a `ValueGuard`.
+/// callers should prefer [`GuardedCell::with_guarded`], which runs the full
+/// protocol and returns a `ValueGuard`.
 pub struct GuardedCell<T> {
     value: UnsafeCell<T>,
     guard: RefCell<bool>,
@@ -60,10 +58,10 @@ impl<T> GuardedCell<T> {
         }
     }
 
-    /// The in-use flag, exposed so an external RAII guard can raise and clear
-    /// it: `ValueGuard` stores exactly such a `&RefCell<bool>` and clears it
-    /// on drop. `with_guarded` passes `&self.guard` directly, so today only
-    /// the tests use this accessor.
+    /// The in-use flag, exposed so an external RAII guard can clear it:
+    /// `ValueGuard` stores exactly such a `&RefCell<bool>` and clears it on
+    /// drop. `with_guarded` passes `&self.guard` directly, so today only the
+    /// tests use this accessor.
     #[allow(dead_code)]
     pub fn guard(&self) -> &RefCell<bool> {
         &self.guard
@@ -153,8 +151,6 @@ impl<T> GuardedCell<T> {
     }
 }
 
-// !Sync for every T (UnsafeCell and RefCell); Send follows T: Send. This is
-// why JournalFile, which holds a GuardedCell, is itself !Sync.
 
 #[cfg(test)]
 mod tests {
@@ -179,8 +175,8 @@ mod tests {
         // First cycle: check, borrow, use the slice, raise the flag - the
         // caller side of borrow_mut_checked's contract.
         {
-            // Scoped so the flag borrow is released before borrow_mut_checked
-            // runs (a held flag borrow would panic there).
+            // Scoped so the flag borrow is released before the block's later
+            // `borrow_mut()`: that call panics while any borrow is held.
             {
                 let is_in_use = cell.guard().borrow();
                 assert!(!*is_in_use);

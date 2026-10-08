@@ -10,7 +10,7 @@
 //!   trips (ascending input required, duplicates tolerated, an empty
 //!   iterator appends nothing).
 //! - Queries over the raw blob: `contains`, ascending `iter`, `len`,
-//!   `min`/`max`, `range_cardinality`.
+//!   `is_empty`, `min`/`max`, `range_cardinality`.
 //! - The four set ops as pure blob-to-blob functions, with
 //!   set-theoretic identities across 1-4 level trees.
 //! - In-place `insert`/`remove` — the crate's only tree-byte splice and
@@ -107,8 +107,8 @@ fn test_build_universe9_insert_8() {
 }
 
 // contains() over the raw blob, probed exhaustively for each universe;
-// out-of-universe values and the empty blob reject in the dedicated
-// tests below.
+// the empty blob rejects in its dedicated test below, and the dense
+// probe adds one out-of-universe miss.
 #[test]
 fn test_contains_universe8() {
     let (bm, data) = make_bitmap(8, &[0, 3, 7]);
@@ -1081,10 +1081,10 @@ fn test_from_sorted_iter_large_universe() {
     assert!(!bm.contains(&data, 1));
 }
 
-// from_range normalizes any RangeBounds<u32> into start..end —
-// inclusive bounds widen by one, the end is clamped to the universe —
-// and delegates to from_sorted_iter. An inverted or empty range yields
-// an empty set, never a panic.
+// from_range normalizes any RangeBounds<u32> into a half-open
+// start..end (an inclusive end widens by one, the end is clamped to
+// the universe) and delegates to from_sorted_iter. An inverted or
+// empty range yields an empty set, never a panic.
 #[test]
 fn test_from_range_full() {
     let mut data = Vec::new();

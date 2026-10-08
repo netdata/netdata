@@ -106,7 +106,8 @@ impl TenantId {
     /// key or a local directory name (never from a client). Same length and
     /// `[a-zA-Z0-9._-]` charset as [`validate_ingest`](Self::validate_ingest)
     /// (`/` and control bytes impossible — no path traversal), still rejects
-    /// `.`/`..` (a `date_tenant_dir(base, date, "..")` segment would escape),
+    /// `.`/`..` (a `..` tenant would make `date_tenant_dir` resolve the
+    /// partition path to `base` itself),
     /// but ALLOWS the literal [`DEFAULT`](TenantId::DEFAULT): a catalog this
     /// node itself wrote under the auth-disabled tenant is a legitimate
     /// object to parse. The `default` rejection is an ingest-side client

@@ -121,8 +121,7 @@ pub struct LinkRecord {
     pub attributes: Vec<Entry>,
 }
 
-/// The three outputs of flattening one span: its own entries plus the
-/// structured event/link lists. See [`Flattener::flatten_span`].
+/// The three outputs of flattening one span — see [`Flattener::flatten_span`].
 #[derive(Debug, Clone, Default)]
 pub struct FlattenedSpan {
     pub entries: Vec<Entry>,
@@ -130,10 +129,10 @@ pub struct FlattenedSpan {
     pub links: Vec<LinkRecord>,
 }
 
-/// Span duration in nanoseconds (`end - start`), clamped to `0` when the end time
-/// is unset (`0`) or precedes the start (clock skew). Saturates a `u64` past
-/// `i64::MAX`. Absolute end is recoverable as `ts + duration` only when `ts` did
-/// not saturate (start ≤ `i64::MAX`).
+/// Span duration in nanoseconds (`end - start`), clamped to `0` on an unset or
+/// before-start end (clock skew); a difference past `i64::MAX` saturates to
+/// `i64::MAX`. Absolute end is recoverable as `ts + duration` only when the end
+/// itself fits `i64` (then neither value saturates).
 fn span_duration(span: &Span) -> i64 {
     if span.end_time_unix_nano == 0 || span.end_time_unix_nano < span.start_time_unix_nano {
         return 0;

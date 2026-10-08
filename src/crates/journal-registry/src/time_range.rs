@@ -37,8 +37,9 @@ pub enum TimeRange {
 
     /// File that was still being written when indexed (journal header state
     /// 1 or an active filename, `journal-index/src/file_indexer.rs`).
-    /// `end` is only the newest entry seen at index time - the file keeps
-    /// growing after - so it counts as covering [start, ∞) and the filter
+    /// `end` is only the bucket-aligned end of the newest entry's bucket
+    /// as of index time - the file keeps growing after - so it counts as
+    /// covering [start, ∞) and the filter
     /// ([`crate::Registry::find_files_in_range`]) always passes it.
     Active {
         start: Seconds,

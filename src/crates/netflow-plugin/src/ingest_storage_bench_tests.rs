@@ -454,6 +454,7 @@ fn run_storage_component(
     assert_no_storage_errors(&service.metrics.snapshot())?;
 
     sync_tree(&tier_dir)?;
+    // Two identical snapshots prove the tree is quiescent before measuring.
     let first = snapshot_tree(&tier_dir)?;
     let second = snapshot_tree(&tier_dir)?;
     if !same_snapshot(&first, &second) {
@@ -666,7 +667,7 @@ fn generate_rollup_component(
 
                 // Each unique identity occurs once, so chunking a synthetic
                 // bucket preserves the exact finished journal rows while
-                // bounding the test-only rollup index's peak memory.
+                // bounding the benchmark's peak rollup-index memory.
                 service.flush_closed_tiers(bucket_start_usec.saturating_add(period_usec))?;
                 service.prune_unused_tier_flow_indexes();
             }

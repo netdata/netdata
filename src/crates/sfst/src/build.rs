@@ -44,7 +44,7 @@ use crate::{
 
 /// Build the tier-aligned `key=value` → file-ID translation table.
 ///
-/// [`RowIndex::tier_assignment`] yields each tier's slots in canonical
+/// `RowIndex::tier_assignment` yields each tier's slots in canonical
 /// order (fields by name, values sorted); concatenated low → mid → high,
 /// position `i` is file ID `i`. `table[slot.idx()] = KvId(i)`, and the
 /// returned [`IdRanges`] carries the cumulative tier boundaries.
@@ -91,8 +91,8 @@ fn build_id_translation(row_index: &RowIndex) -> (Vec<KvId>, IdRanges) {
 ///
 /// Materialises every log's `KvId` list in chronological order, splits
 /// the result into [`num_stream_batches`](crate::num_stream_batches)
-/// slices of `batch_size` entries each, and packs each slice into its
-/// own chunk — packed by the writer, written, and dropped in turn.
+/// slices of at most `batch_size` entries each, and emits one chunk per
+/// slice — packed by the writer, written, and dropped in turn.
 ///
 /// `total_rows == 0` is handled explicitly: a single empty batch is
 /// emitted so the file always carries at least one `SB{i}` chunk.
@@ -318,7 +318,7 @@ pub(crate) fn build_and_write(
 /// chunk is packed, written, and dropped in the canonical stage order —
 /// `SUMR`, `META`, `TIMS`, `PRIM`, then the optional per-row columns,
 /// `TIDX`/`TBLM`, `EVNB`/`LNKB`, `TRSU`, then mid-card, high-card, and
-/// the stream batches — which [`ChunkWriter`] enforces. Peak memory
+/// the stream batches — which `ChunkWriter` enforces. Peak memory
 /// beyond the `RowIndex` itself is a single packed chunk, not the whole
 /// compressed file.
 pub(crate) fn build_into<W: Write + Seek>(
@@ -563,8 +563,8 @@ pub(crate) fn build_into<W: Write + Seek>(
         w.trace_rollup(&rollup.sealed(&kv_to_file))?;
     }
 
-    // Low/mid-cardinality FSTs, high-cardinality chunks, then the
-    // stream batches — each packed, streamed, and dropped in turn.
+    // Mid-cardinality FSTs, high-cardinality chunks, then the stream
+    // batches — each packed, streamed, and dropped in turn.
     build_mid_card_chunks(row_index, &time_order, &mut w)?;
     build_high_card_chunks(row_index, &time_order, batch_size, &mut w)?;
 
@@ -601,7 +601,7 @@ fn check_column_len(column: &'static str, got: usize, expected: usize) -> Result
 /// Two independent decisions:
 ///
 /// - Encoding path, by cardinality: at `max(universe/64, 256)` positions a
-///   [`Bitset`] wins (O(n) set + ascending scan) over the O(n log n) sort
+///   `Bitset` wins (O(n) set + ascending scan) over the O(n log n) sort
 ///   of a sparse vec.
 /// - Complement, by density: when cardinality is over half the universe,
 ///   `Bitmap::from_sorted_iter_complemented` encodes the zeros instead —
@@ -622,7 +622,7 @@ fn remap_one_bitmap(rb: &RoaringBitmap, time_order: &TimeOrder) -> (Bitmap, Vec<
         return (desc, data);
     }
 
-    // Density threshold; the 256 floor keeps small bitmap work on the vec path.
+    // Cardinality threshold; the 256 floor keeps small bitmap work on the vec path.
     let bitset_threshold = (universe_size as usize / 64).max(256);
 
     if rb.len() as usize >= bitset_threshold {

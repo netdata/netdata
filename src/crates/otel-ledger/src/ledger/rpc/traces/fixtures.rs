@@ -26,7 +26,7 @@ pub(crate) fn make_registries() -> Arc<RwLock<TenantRegistries>> {
     )))
 }
 
-/// A hand-set [`sfst::Summary`] with empty `content_meta` — only
+/// A hand-set `sfst::Summary` with empty `content_meta` — only
 /// [`install_sfst`] needs one. The count 6 is not arbitrary: the
 /// sources suite asserts it passes through capture unchanged.
 pub(crate) fn summary(record_count: u32, min_s: u32, max_s: u32) -> sfst::Summary {
@@ -139,8 +139,9 @@ pub(crate) fn otlp_req_at(
     service: &str,
 ) -> ExportTraceServiceRequest {
     // The fixture id space is u8 (span ids are vec![i; 8] with i: u8):
-    // 256+ starts would wrap the `as u8` count to 0 and the zip below
-    // would build no spans; the assert turns that into a panic.
+    // 256+ starts would wrap the `as u8` count (256 → 0), and the zip
+    // below would stamp fewer spans than starts were given; the assert
+    // turns that into a panic.
     assert!(
         span_starts_ns.len() <= u8::MAX as usize,
         "{} spans would wrap the fixture's u8 count",

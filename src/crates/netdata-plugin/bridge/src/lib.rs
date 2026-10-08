@@ -16,7 +16,8 @@
 //!
 //! This module covers only the supervisor↔worker links. The ingestor's direct
 //! WAL-event socket to the ledger (`writer_socket_path`) is a separate
-//! ferryboat link whose message types live in `file_lifecycle::ipc`.
+//! ferryboat link carrying `wal::Message`; its accept/connect plumbing lives
+//! in `file_lifecycle::ipc`.
 //!
 //! Ferryboat bincode-serializes these messages, so variant order and field
 //! shapes are wire contracts between the supervisor and the workers it spawns
@@ -188,9 +189,9 @@ pub enum LedgerResponse {
 /// Messages sent from the supervisor to the legacy-logs worker.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum LegacyLogsRequest {
-    /// The worker's resolved config, sent exactly once as the first message
-    /// on the link — a worker receiving anything else bails out of the
-    /// handshake; later `Configure`s are logged and ignored.
+    /// Same contract as the ingestor's `Configure`: the worker's resolved
+    /// config, sent exactly once as the first message on the link; later
+    /// `Configure`s are logged and ignored.
     Configure(LegacyLogsConfig),
     /// Execute a function — same fields and semantics as
     /// [`IngestorRequest::Call`]. The worker runs its declared function

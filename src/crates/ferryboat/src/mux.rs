@@ -293,7 +293,7 @@ where
         self
     }
 
-    /// Max allowed frame size in bytes (default: 8 MB). IPC only.
+    /// Max allowed frame size in bytes (default: 8 MiB). IPC only.
     ///
     /// Applied to the serialized frame — id included, after compression —
     /// on send, and to frames received from the peer.
@@ -360,7 +360,7 @@ where
     Req: DeserializeOwned + Send + 'static,
     Resp: Serialize + Send + 'static,
 {
-    /// Max allowed frame size in bytes (default: 8 MB). IPC only.
+    /// Max allowed frame size in bytes (default: 8 MiB). IPC only.
     ///
     /// Applied to the serialized frame — id included, after compression —
     /// on send, and to frames received from the peer.

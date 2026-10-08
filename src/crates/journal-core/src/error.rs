@@ -92,11 +92,11 @@ pub enum JournalError {
     #[error("invalid zerocopy size")]
     InvalidZeroCopySize,
 
-    /// A `GuardedCell`'s guard is already held: a conflicting borrow is
-    /// active (re-entrant or concurrent access). The window-manager borrow
-    /// behind most `file/*` calls uses this path (the borrow checks in
-    /// `GuardedCell::borrow_mut_checked`/`with_guarded`,
-    /// file/guarded_cell.rs).
+    /// A `GuardedCell`'s guard is already held - a nested object access
+    /// while a `ValueGuard` is out; the cell is `!Sync`, so the conflict
+    /// is always same-thread. The window-manager borrow behind most
+    /// `file/*` calls uses this path (the borrow checks in
+    /// `GuardedCell::borrow_mut_checked`/`with_guarded`, file/guarded_cell.rs).
     #[error("previous object is still in use")]
     ValueGuardInUse,
 
@@ -134,7 +134,8 @@ pub enum JournalError {
     #[error("invalid offset array index")]
     InvalidOffsetArrayIndex,
 
-    /// The writer needs the entry-array list but the file has none
+    /// The writer needs the entry-array list but `entry_list()` builds
+    /// none - the header points at an array while `n_entries` is zero
     /// (`JournalWriter::append_to_entry_array`).
     #[error("empty offset array list")]
     EmptyOffsetArrayList,
@@ -179,7 +180,7 @@ pub enum JournalError {
     #[error("out of bounds index")]
     OutOfBoundsIndex,
 
-    /// A zero value where a non-zero object/data offset is required: a hash
+    /// A zero value where a non-zero object/data offset is required: an entry
     /// item or offset-array slot points at nothing
     /// (`EntryObject::collect_offsets`,
     /// `offset_array::Node::partition_point`), and the entry iterator ends

@@ -14,7 +14,7 @@
 //! into the `warn!` in `new`, losing events. All three fallible calls
 //! propagate `notify::Error` as [`crate::RegistryError::Notify`].
 //! Consumers: otel-legacy-logs drives the
-//! watch → process_event → find_files_in_range loop
+//! watch_directory → process_event → find_files_in_range loop
 //! (`otel-legacy-logs/src/handler.rs`) and journal-function
 //! re-exports `Monitor` (`journal-function/src/lib.rs`).
 use super::error::Result;

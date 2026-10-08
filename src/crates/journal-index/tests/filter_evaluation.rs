@@ -1,19 +1,20 @@
 //! Integration tests for `Filter` evaluation against a real indexed
-//! journal (filter.rs): every test writes a fresh journal file, indexes
-//! it with `FileIndexer::index`, and evaluates filters over the result.
+//! journal (filter.rs): every test writes a fresh journal file and
+//! indexes it with `FileIndexer::index`; the filter tests then evaluate
+//! a filter over the result.
 //!
 //! Fixture: one journal per test at `<tmp>/<machine-id>/system.journal`,
 //! the registry path grammar `File::from_path` parses (absolute path,
-//! `.journal` suffix, `system` source dir, machine-id dir above it —
-//! `journal-registry/src/repository/file.rs`). Every entry is
+//! `.journal` suffix, `system` basename, machine-id dir above the
+//! file — `journal-registry/src/repository/file.rs`). Every entry is
 //! stamped with `_SOURCE_REALTIME_TIMESTAMP=<microseconds>` and
 //! `add_entry` receives the same value as realtime and monotonic
 //! (`journal-core/src/file/writer.rs` `add_entry`), so indexing with
 //! `Some(&source_field)` orders entries by that field while `None`
-//! falls back to the journal realtime (`src/file_indexer.rs`
-//! `collect_source_field_info`/`build_histogram`).
-//! Indexing always uses 3600 s histogram buckets and builds bitmaps
-//! only for the requested fields.
+//! falls back to each entry's realtime timestamp
+//! (`src/file_indexer.rs` `collect_source_field_info`/`build_histogram`).
+//! Every test here indexes with 3600 s histogram buckets
+//! (`Seconds(3600)`); bitmaps are built only for the requested fields.
 //!
 //! Pinned behaviors and the contracts they guard:
 //!
@@ -49,9 +50,10 @@
 //! children — `src/filter.rs` `FilterExpr::resolve`; only construction-time
 //! flattening is exercised); time bounds, regex and pagination,
 //! applied after the bitmap stage (`src/file_index.rs`
-//! `find_log_entries`); a
-//! field present in the journal but left out of the indexed list; and
-//! consumers' `is_none()` skip path (journal-engine, otel-legacy-logs).
+//! `find_log_entries`); a filter leaf over a field present in the
+//! journal but left out of the indexed list (the metadata test pins
+//! only that no bitmap is built for it); and consumers' `is_none()`
+//! skip path (journal-engine, otel-legacy-logs).
 
 use journal_common::Seconds;
 use journal_core::file::{JournalFile, JournalFileOptions, JournalWriter};
@@ -95,8 +97,9 @@ impl TestEntry {
 }
 
 /// Journal path in the registry layout `<dir>/<machine-id>/system.journal`:
-/// `File::from_path` reads status from the suffix, source from the parent
-/// dir and machine id from the dir above
+/// `File::from_path` parses right to left — status from the `.journal`
+/// suffix, source from the `system` basename, machine id from the
+/// file's parent directory
 /// (`journal-registry/src/repository/file.rs` `File::from_path`).
 fn create_test_journal_path(temp_dir: &TempDir) -> PathBuf {
     let machine_id = Uuid::from_u128(0x12345678_1234_1234_1234_123456789abc);
@@ -179,7 +182,6 @@ fn test_filter_field_value_pair_single_match() {
     let filter = Filter::match_field_value_pair(pair);
     let bitmap = filter.evaluate(&file_index);
 
-    // Should match entries 0, 2, and 4
     assert_eq!(bitmap.len(), 3);
     assert!(bitmap.contains(0));
     assert!(bitmap.contains(2));
@@ -211,7 +213,6 @@ fn test_filter_field_name_matches_all_values() {
     let filter = Filter::match_field_name(priority_field);
     let bitmap = filter.evaluate(&file_index);
 
-    // Should match all entries (0, 1, 2)
     assert_eq!(bitmap.len(), 3);
     assert!(bitmap.contains(0));
     assert!(bitmap.contains(1));
@@ -291,7 +292,6 @@ fn test_filter_or_combination() {
 
     let bitmap = filter.evaluate(&file_index);
 
-    // Should match entries 0, 1, and 2
     assert_eq!(bitmap.len(), 3);
     assert!(bitmap.contains(0));
     assert!(bitmap.contains(1));

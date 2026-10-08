@@ -42,11 +42,12 @@ pub fn format_uuid_pair(machine_id: Uuid, instance_id: Uuid) -> String {
 /// before and between them must be hex UUIDs — `Uuid::try_parse` on the
 /// fixed 32-byte slices, so simple form only (a hyphenated UUID cannot
 /// fit) and upper/lowercase hex both decode. `None` for any violation:
-/// input shorter than 66 bytes, a non-dash separator, or a segment that
-/// does not decode as hex. The returned tail borrows `stem` and may be
-/// empty — an empty tail is prefix-valid; validating it is the caller's
-/// job (each artifact owns its tail's format; nil identities are not
-/// policed here — module docs).
+/// input shorter than 66 bytes, a non-dash separator, a segment that does
+/// not decode as hex, or a fixed offset (32 or 65) that is not a char
+/// boundary. The returned tail borrows `stem` and may be empty — an empty
+/// tail is prefix-valid; validating it is the caller's job (each artifact
+/// owns its tail's format; nil identities are not policed here — module
+/// docs).
 pub fn parse_uuid_pair(stem: &str) -> Option<(Uuid, Uuid, &str)> {
     let machine_str = stem.get(..32)?;
     if stem.as_bytes().get(32)? != &b'-' {

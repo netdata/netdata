@@ -318,7 +318,7 @@ impl<'r, 'a, 'e> TraceGate<'r, 'a, 'e> {
             let mut claiming = 0usize;
             for &RowEvidence { file, row, claim } in &rows {
                 if self.files[file].failed {
-                    continue; // failed mid-check while testing this candidate
+                    continue; // defensive: never read evidence from a failed file
                 }
                 let RollupState::Ready(rollup) = &self.files[file].rollup else {
                     unreachable!("evidence rows come from Ready rollups")
@@ -348,8 +348,9 @@ impl<'r, 'a, 'e> TraceGate<'r, 'a, 'e> {
             }
             if claiming > 0 {
                 // Every claiming row failed the condition. (No claim at
-                // all would mean the assembled root may be an orphan
-                // promotion the rollup never records — unprunable.)
+                // all is an evidence gap, never a proven non-match: zero
+                // evidence proves nothing, and the corruption-onset
+                // candidate reaches exactly this state.)
                 self.stats.prunes += 1;
                 return GateDecision::Prune;
             }

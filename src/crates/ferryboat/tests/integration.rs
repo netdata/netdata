@@ -1,7 +1,8 @@
 //! Integration tests for ferryboat's public API: `Connection`/`Listener`
 //! round-trips, the error paths around them, and the multiplexed RPC layer.
 //! Tests stay independent: in-process channel names and IPC socket paths
-//! are unique per test (the IPC helper appends the process id).
+//! are unique per test (the IPC helper appends the process id; the fixed
+//! nonexistent path in the retry-exhaustion test is the only exception).
 //!
 //! Pinned behaviors and the contracts they guard:
 //!
@@ -129,10 +130,8 @@ async fn in_process_connection_closed_on_drop() {
 
     let conn = listener.accept().await.unwrap();
 
-    // The server side drops its accepted connection.
     drop(conn);
 
-    // The client's next recv returns ConnectionClosed.
     let result = client.recv().await;
     assert!(matches!(result, Err(Error::ConnectionClosed)));
 }

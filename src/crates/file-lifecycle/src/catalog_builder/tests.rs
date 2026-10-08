@@ -45,7 +45,7 @@ fn date() -> NaiveDate {
 }
 
 /// One entry for `ident()` at the given seq. Only the fields the builder acts
-/// on matter — the `FileId` (scope + seq) and the timestamps folded into the
+/// on matter — the `FileId` (identity + seq) and the timestamps folded into the
 /// filename (the below-threshold test recomputes the expected path from them);
 /// everything else rides along verbatim.
 fn entry_for(seq: u64) -> CatalogEntry {
@@ -119,8 +119,8 @@ impl Harness {
     }
 }
 
-/// Cancel the builder's token on drop — the only way to stop the spawned
-/// task, whose `JoinHandle` was dropped at spawn (component contract).
+/// Cancel the builder's token on drop: the task is detached (its `JoinHandle`
+/// was dropped at spawn) and the handle exposes no stop, so the token ends it.
 impl Drop for Harness {
     fn drop(&mut self) {
         self.cancel.cancel();
@@ -322,19 +322,18 @@ async fn distinct_scopes_rotate_independently() {
 
 #[tokio::test(start_paused = true)]
 async fn time_trigger_rotates_non_empty_after_period() {
-    // A quiet scope well below the count threshold rotates once its age reaches
-    // rotation_period, driven by the 30s check ticker. Paused clock: advancing
-    // past period + one tick fires the time trigger.
+    // A quiet scope well below the count threshold rotates once its age
+    // reaches rotation_period, on the 30s check tick. Paused clock.
     let mut h = Harness::with_period(100, std::time::Duration::from_secs(60));
     assert!(matches!(
         h.send_recv(add_request(1)).await,
         CatalogBuilderResponse::EntryAccepted { seq: 1 }
     ));
 
-    // Below period + first tick: nothing rotates yet (30s tick, 60s period).
+    // Tick at 30s: age 30s, below the 60s period — nothing rotates yet.
     tokio::time::advance(std::time::Duration::from_secs(30)).await;
 
-    // Past the period: the next tick rotates the aged accumulator.
+    // Tick at 60s: the age has reached the period, so the check rotates it.
     tokio::time::advance(std::time::Duration::from_secs(40)).await;
     match h.recv().await {
         CatalogBuilderResponse::Rotated { seqs, path, .. } => {

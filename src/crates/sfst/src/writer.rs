@@ -11,7 +11,7 @@
 //! re-export is `test-util`-gated for test fixtures and raw-format
 //! introspection. The read-side counterpart is `reader.rs`
 //! (`ChunkReader`), and the container framing underneath is chunk-file's
-//! [`StreamingWriter`].
+//! `StreamingWriter`.
 
 use std::io::{Seek, Write};
 
@@ -45,7 +45,7 @@ pub(crate) fn pack<T: Serialize + ?Sized>(value: &T, zstd_level: i32) -> Result<
 /// [`ChunkWriter`] cannot express this shape — a file always carries at
 /// least one stream batch — so this seals the format's floor (the
 /// smallest valid SFST a reader must accept) directly through the
-/// container's [`StreamingWriter`]. Test-only: summary-only files stay
+/// container's `StreamingWriter`. Test-only: summary-only files stay
 /// valid on the read side (registry recovery reads just the summary),
 /// and the reader/writer boundary tests pin that.
 #[cfg(test)]
@@ -73,10 +73,11 @@ pub struct ColumnsPresent {
 }
 
 impl ColumnsPresent {
-    /// Whether the column described by `spec` is present. The single place the
-    /// named presence fields map to [`ALL_COLUMNS`] ordinal order — every other
-    /// column site iterates `ALL_COLUMNS` and asks here, so the presence struct,
-    /// the manifest, and the manifest-vs-counts check cannot drift apart.
+    /// Whether the column described by `spec` is present — the `ALL_COLUMNS`
+    /// ordinal → named-field match every spec-driven site asks through
+    /// (`present()`, the manifest-vs-counts check, and the test pinning it
+    /// against `ALL_COLUMNS`). The per-column write methods pair the same
+    /// ordinals with the same fields, so the two must stay in sync.
     pub fn has(self, spec: &ColumnSpec) -> bool {
         match spec.ordinal {
             0 => self.observed_ts,
@@ -142,7 +143,7 @@ pub struct ChunkCounts {
 /// Where the writer is in the canonical chunk order. The four prefix
 /// chunks each have their own step; the optional cold-region sections
 /// each have their own step and are skipped when undeclared; the
-/// counted sections share [`Stage::Secondary`] and are ordered by the
+/// counted sections share `Stage::Secondary` and are ordered by the
 /// per-section counters.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum Stage {
@@ -415,8 +416,9 @@ impl<W: Write + Seek> ChunkWriter<W> {
 
     /// Write one declared per-row column chunk (cold region, after PRIM). Columns
     /// may be written in any order; the writer rejects an undeclared or duplicate
-    /// column and advances to the secondary sections once every declared column is
-    /// written. `ordinal` is the column's bit in [`Self::cols_written`].
+    /// column, and once every declared column is written advances past the column
+    /// region (`after_columns` picks the stage). `ordinal` is the column's bit
+    /// position in `Self::cols_written` (`1 << ordinal`).
     fn write_column(
         &mut self,
         ordinal: u8,
