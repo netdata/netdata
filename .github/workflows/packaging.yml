@@ -35,13 +35,13 @@ jobs:
     steps:
       - name: Checkout
         id: checkout
-        uses: actions/checkout@v7
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           fetch-depth: 0
           submodules: recursive
       - name: Check files
         id: check-files
-        uses: step-security/changed-files@v45
+        uses: step-security/changed-files@3dbe17c78367e7d60f00d78ae6781a35be47b4a1 # v45.0.1
         with:
           since_last_remote_commit: ${{ github.event_name != 'pull_request' }}
           files: |
@@ -100,7 +100,7 @@ jobs:
     steps:
       - name: Checkout
         id: checkout
-        uses: actions/checkout@v7
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - name: Prepare tools
         id: prepare
         run: |
@@ -118,7 +118,7 @@ jobs:
           echo "Generated matrix: ${matrix}"
           echo "matrix=${matrix}" >> "${GITHUB_OUTPUT}"
       - name: Failure Notification
-        uses: rtCamp/action-slack-notify@v2
+        uses: rtCamp/action-slack-notify@33ca3be66c6f378fe1610fd1d5258632dbed5e58 # v2.4.0
         env:
           SLACK_COLOR: 'danger'
           SLACK_ICON_EMOJI: ':github-actions:'
@@ -148,7 +148,7 @@ jobs:
     steps:
       - name: Checkout
         id: checkout
-        uses: actions/checkout@v7
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - name: Check Version
         id: check-version
         run: |
@@ -175,7 +175,7 @@ jobs:
             echo "retention=0" >> "${GITHUB_OUTPUT}"
           fi
       - name: Failure Notification
-        uses: rtCamp/action-slack-notify@v2
+        uses: rtCamp/action-slack-notify@33ca3be66c6f378fe1610fd1d5258632dbed5e58 # v2.4.0
         env:
           SLACK_COLOR: 'danger'
           SLACK_ICON_EMOJI: ':github-actions:'
@@ -207,7 +207,7 @@ jobs:
       - name: Checkout
         id: checkout
         if: needs.file-check.outputs.run == 'true'
-        uses: actions/checkout@v7
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           fetch-depth: 1
           submodules: false
@@ -218,13 +218,13 @@ jobs:
       - name: Upload IBM MQ libs artifact
         id: upload-ibm-mq
         if: needs.file-check.outputs.run == 'true'
-        uses: actions/upload-artifact@v7.0.0
+        uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f # v7.0.0
         with:
           name: ibm-mq-libs
           path: ${{ github.workspace }}/tmp/ibm_mq
           include-hidden-files: true
       - name: Failure Notification
-        uses: rtCamp/action-slack-notify@v2
+        uses: rtCamp/action-slack-notify@33ca3be66c6f378fe1610fd1d5258632dbed5e58 # v2.4.0
         env:
           SLACK_COLOR: 'danger'
           SLACK_ICON_EMOJI: ':github-actions:'
@@ -258,14 +258,14 @@ jobs:
       - name: Checkout
         id: checkout
         if: needs.file-check.outputs.run == 'true'
-        uses: actions/checkout@v7
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           fetch-depth: 0
           submodules: recursive
       - name: Setup Go
         id: setup-go
         if: needs.file-check.outputs.run == 'true'
-        uses: actions/setup-go@v7
+        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
           go-version-file: src/go/go.mod
       - name: Prepare synthetic stock payload
@@ -278,7 +278,7 @@ jobs:
       - name: Prepare release stock payload
         id: prepare-release
         if: needs.file-check.outputs.run == 'true' && github.event_name != 'pull_request'
-        uses: nick-invision/retry@v4
+        uses: nick-fields/retry@ad984534de44a9489a53aefd81eb77f87c70dc60 # v4.0.0
         with:
           max_attempts: 3
           retry_wait_seconds: 30
@@ -290,13 +290,13 @@ jobs:
       - name: Upload topology-ip-intel stock payload
         id: upload-stock
         if: needs.file-check.outputs.run == 'true'
-        uses: actions/upload-artifact@v7.0.0
+        uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f # v7.0.0
         with:
           name: topology-ip-intel-stock
           path: ${{ github.workspace }}/.topology-ip-intel-stock/
           include-hidden-files: true
       - name: Failure Notification
-        uses: rtCamp/action-slack-notify@v2
+        uses: rtCamp/action-slack-notify@33ca3be66c6f378fe1610fd1d5258632dbed5e58 # v2.4.0
         env:
           SLACK_COLOR: 'danger'
           SLACK_ICON_EMOJI: ':github-actions:'
@@ -345,7 +345,7 @@ jobs:
       - name: Checkout
         id: checkout
         if: needs.file-check.outputs.run == 'true'
-        uses: actions/checkout@v7
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           fetch-depth: 0 # We need full history for versioning
           submodules: recursive
@@ -371,7 +371,7 @@ jobs:
       - name: Fetch images
         id: fetch-images
         if: needs.file-check.outputs.run == 'true'
-        uses: nick-invision/retry@v4
+        uses: nick-fields/retry@ad984534de44a9489a53aefd81eb77f87c70dc60 # v4.0.0
         with:
           max_attempts: 3
           retry_wait_seconds: 30
@@ -382,14 +382,14 @@ jobs:
       - name: Download IBM MQ libs
         id: fetch-ibm-mq
         if: (matrix.arch == 'amd64' || matrix.arch == 'x86_64') && needs.file-check.outputs.run == 'true'
-        uses: actions/download-artifact@v8
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
           name: ibm-mq-libs
           path: ${{ github.workspace }}/tmp/ibm_mq
       - name: Download topology-ip-intel stock payload
         id: fetch-topology-stock
         if: needs.file-check.outputs.run == 'true'
-        uses: actions/download-artifact@v8
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
           name: topology-ip-intel-stock
           path: ${{ github.workspace }}/.topology-ip-intel-stock
@@ -409,7 +409,7 @@ jobs:
         id: artifacts
         if: needs.file-check.outputs.run == 'true'
         continue-on-error: true
-        uses: actions/upload-artifact@v7.0.1
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: ${{ matrix.distro }}-${{ matrix.version }}-${{ matrix.arch }}-packages
           path: ${{ github.workspace }}/artifacts/*${{ matrix.format }}
@@ -426,7 +426,7 @@ jobs:
       - name: Import GPG Keys
         id: import-keys
         if: needs.file-check.outputs.run == 'true' && matrix.format == 'deb' && github.event_name != 'pull_request'
-        uses: crazy-max/ghaction-import-gpg@v7
+        uses: crazy-max/ghaction-import-gpg@2dc316deee8e90f13e1a351ab510b4d5bc0c82cd # v7.0.0
         with:
           gpg_private_key: ${{ secrets.NETDATABOT_PACKAGE_SIGNING_KEY }}
       - name: Sign DEB Packages
@@ -437,7 +437,7 @@ jobs:
       - name: SSH setup
         id: ssh-setup
         if: github.event_name == 'workflow_dispatch' && github.repository == 'netdata/netdata' && needs.file-check.outputs.run == 'true'
-        uses: shimataro/ssh-key-action@v2
+        uses: shimataro/ssh-key-action@87a8f067114a8ce263df83e9ed5c849953548bc3 # v2.8.1
         with:
           key: ${{ secrets.NETDATABOT_PACKAGES_SSH_KEY }}
           name: id_ecdsa
@@ -464,7 +464,7 @@ jobs:
           ${{ matrix.format }} \
           ${{ needs.version-check.outputs.repo }}
       - name: Failure Notification
-        uses: rtCamp/action-slack-notify@v2
+        uses: rtCamp/action-slack-notify@33ca3be66c6f378fe1610fd1d5258632dbed5e58 # v2.4.0
         env:
           SLACK_COLOR: 'danger'
           SLACK_ICON_EMOJI: ':github-actions:'

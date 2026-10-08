@@ -34,7 +34,7 @@ jobs:
         os: [ubuntu-latest, macos-latest]
     runs-on: ${{ matrix.os }}
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - name: Unprivileged command and file-reader tests
         run: python3 tests/nd-run/test_nd_run.py -v
       - name: Linux process-tree ownership tests
