@@ -1,5 +1,13 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
-# Macros and functions to assist in working with Go
+# Shared Go build helpers: the GO_LDFLAGS that bake the version and the
+# install paths into the binaries' buildinfo package, add_go_target(), and
+# find_min_go_version().
+#
+# The paths are read at include time, so this module - via NetdataGo or
+# NetdataAlarmNotifyGo - must come after NetdataInstallLayout.cmake; the root
+# file orders both paths that way.
+
+include_guard()
 
 if(CMAKE_BUILD_TYPE STREQUAL Debug)
     set(GO_LDFLAGS "")
@@ -21,18 +29,12 @@ set(GO_LDFLAGS "${GO_LDFLAGS} -X ${BUILDINFO_PKG}.LogDir=${LOG_DIR}")
 
 # add_go_target: Add a new target that needs to be built using the Go toolchain.
 #
-# Takes four arguments, the target name, the output artifact name, the
-# source tree for the Go module, and the sub-directory of that source tree
-# to pass to `go build`.
+# Takes four arguments: the target name, the output artifact name (produced
+# under the build directory), the source tree for the Go module, and the
+# sub-directory of that source tree to pass to go build.
 #
-# The target itself will invoke `go build` in the specified source tree,
-# using the `-o` option to produce the final output artifact, and passing
-# the requested sub-directory as the final argument.
-#
-# This will also automatically construct the dependency list for the
-# target by finding all Go source files under the specified source tree
-# and then appending the go.mod and go.sum files from the root of the
-# source tree.
+# The dependency list is every *.go file under the source tree plus its
+# go.mod and go.sum, so the artifact rebuilds when any of them changes.
 macro(add_go_target target output build_src build_dir)
     file(GLOB_RECURSE ${target}_DEPS CONFIGURE_DEPENDS "${build_src}/*.go")
     list(APPEND ${target}_DEPS
@@ -56,11 +58,9 @@ endmacro()
 
 # find_min_go_version: Determine the minimum Go version based on go.mod files
 #
-# Takes one argument, specifying a source tree to scan for go.mod files.
-#
-# All files found will be checked for a `go` directive, and the
-# MIN_GO_VERSION variable will be set to the highest version
-# number found among these directives.
+# Takes one argument, specifying a source tree to scan for go.mod files, and
+# sets MIN_GO_VERSION to the highest go directive found: each module states
+# its own minimum, and the tree as a whole needs the strictest of them.
 function(find_min_go_version src_tree)
     message(STATUS "Determining minimum required version of Go for this build")
 

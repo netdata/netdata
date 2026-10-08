@@ -7,6 +7,8 @@ on:
       - master
     paths:
       - 'CMakeLists.txt'
+      - 'src/**/CMakeLists.txt'
+      - '**.cmake'
       - '**.c'
       - '**.h'
       - 'tests/acls/**'
@@ -14,6 +16,8 @@ on:
   pull_request:
     paths:
       - 'CMakeLists.txt'
+      - 'src/**/CMakeLists.txt'
+      - '**.cmake'
       - '**.c'
       - '**.h'
       - 'tests/acls/**'
