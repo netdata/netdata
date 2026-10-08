@@ -684,10 +684,10 @@ echo "==> Phase 3a: fast path + start/end semantics"
 # produce the same name set. The fast path walks contexts directly; the
 # slow path resolves series. SOW-0019 chunk 1 added the live-instance
 # check to make these sets identical.
-FAST=$(curl -s 'http://localhost:19999/api/v1/label/__name__/values' \
+FAST=$(curl -s "$URL/api/v1/label/__name__/values" \
        | python3 -c "import json,sys; print(','.join(sorted(json.load(sys.stdin)['data'])))")
 SLOW=$(curl -s --data-urlencode 'match[]={__name__!=""}' \
-       'http://localhost:19999/api/v1/label/__name__/values' \
+       "$URL/api/v1/label/__name__/values" \
        | python3 -c "import json,sys; print(','.join(sorted(json.load(sys.stdin)['data'])))")
 if [[ "$FAST" == "$SLOW" && -n "$FAST" ]]; then
     printf '  %s metric-names fast path matches slow path (%d names)\n' \
@@ -724,7 +724,7 @@ check_discovery "future window: /label/__name__/values returns empty" \
 NOW=$(date +%s)
 RECENT_START=$((NOW - 60))
 NOWIN_COUNT=$(curl -s --data-urlencode 'match[]=system_cpu' \
-    'http://localhost:19999/api/v1/series' \
+    "$URL/api/v1/series" \
     | python3 -c "import json,sys; print(len(json.load(sys.stdin)['data']))")
 check_discovery "now window: /series returns same count as no-window" \
     "/api/v1/series" \
