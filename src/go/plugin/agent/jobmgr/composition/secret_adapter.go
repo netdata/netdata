@@ -132,7 +132,7 @@ func newSecretInitialRoute(
 			},
 			PublicName:          joboutput.DynCfgFunctionName,
 			Prefix:              prefix,
-			Resource:            functionadapter.ScopedDynCfgJobResource(0, prefix, "secretstore:"),
+			Resource:            functionadapter.ScopedDynCfgNamedResource(0, prefix, "secretstore:"),
 			CooperativeCancel:   true,
 			CooperativeDeadline: true,
 			RawPayload:          true,

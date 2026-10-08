@@ -79,6 +79,49 @@ type ProtocolTransaction interface {
 	Abort() error
 }
 
+// CommitBuiltProtocolTransaction prepares a frame only after ordinary admission.
+// The builder and transaction share the same exclusive lease as the complete write.
+func (fo *FrameOwner) CommitBuiltProtocolTransaction(
+	build func() ([]byte, error),
+	transaction ProtocolTransaction,
+) error {
+	if build == nil || transaction == nil {
+		return errors.Join(
+			errors.New("jobmgr frame owner: invalid frame builder"),
+			callFrameTransition("abort", transaction, false),
+		)
+	}
+	fo.stateMu.Lock()
+	for (fo.busy || fo.pendingControl) && !fo.poisoned {
+		fo.available.Wait()
+	}
+	if fo.poisoned {
+		fo.stateMu.Unlock()
+		return errors.Join(ErrFrameOwnerPoisoned, callFrameTransition("abort", transaction, false))
+	}
+	fo.busy = true
+	fo.stateMu.Unlock()
+	payload, err := callFrameBuilder(build)
+	if err == nil && len(payload) > MaximumOtherFrameBytes {
+		err = errors.New("jobmgr frame owner: invalid built protocol frame size")
+	}
+	if err != nil {
+		err = errors.Join(err, callFrameTransition("abort", transaction, false))
+		fo.releaseFrame(false)
+		return err
+	}
+	return fo.writeAndRelease(payload, true, transaction)
+}
+
+func callFrameBuilder(build func() ([]byte, error)) (payload []byte, err error) {
+	defer func() {
+		if recovered := recover(); recovered != nil {
+			err = fmt.Errorf("%w in frame builder: %v", ErrTaskPanic, recovered)
+		}
+	}()
+	return build()
+}
+
 func NewFrameOwner(writer io.Writer) (*FrameOwner, error) {
 	if writer == nil {
 		return nil, errors.New("jobmgr frame owner: nil writer")
@@ -412,7 +455,11 @@ func (fo *FrameOwner) Poison(cause error) {
 }
 
 func (fo *FrameOwner) writeAndRelease(payload []byte, borrowed bool, transaction ProtocolTransaction) error {
-	count, err := fo.writer.Write(payload)
+	var count int
+	var err error
+	if len(payload) != 0 {
+		count, err = fo.writer.Write(payload)
+	}
 	if err != nil || count != len(payload) {
 		if err == nil {
 			err = io.ErrShortWrite
@@ -429,6 +476,11 @@ func (fo *FrameOwner) writeAndRelease(payload []byte, borrowed bool, transaction
 		fo.poison(retainedFramePayload(payload, borrowed), err)
 		return err
 	}
+	fo.releaseFrame(len(payload) != 0)
+	return nil
+}
+
+func (fo *FrameOwner) releaseFrame(committed bool) {
 	fo.stateMu.Lock()
 	fo.busy = false
 	pending := fo.pendingControl
@@ -438,13 +490,12 @@ func (fo *FrameOwner) writeAndRelease(payload []byte, borrowed bool, transaction
 	observer := fo.runtimeObserver
 	fo.available.Broadcast()
 	fo.stateMu.Unlock()
-	if observer != nil {
+	if observer != nil && committed {
 		observer.AddRuntimeCounter(RuntimeCounterFramesCommitted, 1)
 	}
 	if (pending || idleWake) && notify != nil {
 		notify()
 	}
-	return nil
 }
 
 func retainedFramePayload(payload []byte, borrowed bool) []byte {

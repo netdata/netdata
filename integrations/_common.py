@@ -1,5 +1,6 @@
 import json
 import os
+from copy import deepcopy
 from pathlib import Path
 
 from jsonschema import Draft7Validator, FormatChecker, ValidationError
@@ -25,6 +26,8 @@ COLLECTOR_SOURCES = [
     (AGENT_REPO, REPO_PATH / 'src' / 'collectors' / 'guides', True),
     (AGENT_REPO, REPO_PATH / 'src' / 'go' / 'plugin' / 'go.d' / 'collector', True),
     (AGENT_REPO, REPO_PATH / 'src' / 'go' / 'plugin' / 'scripts.d' / 'collector', True),
+    (AGENT_REPO, REPO_PATH / 'src' / 'go' / 'plugin' / 'dem' / 'collector', True),
+    (AGENT_REPO, REPO_PATH / 'src' / 'go' / 'plugin' / 'ipmi' / 'collector', True),
     (AGENT_REPO, REPO_PATH / 'src' / 'go' / 'plugin' / 'ibm.d' / 'modules', True),
     (AGENT_REPO, REPO_PATH / 'src' / 'go' / 'plugin' / 'ibm.d' / 'modules' / 'websphere', True),
     (AGENT_REPO, REPO_PATH / 'src' / 'crates' / 'otel-plugin' / 'metadata.yaml', False),
@@ -35,13 +38,20 @@ FLOWS_SOURCES = [
     (AGENT_REPO, REPO_PATH / 'src' / 'crates' / 'netflow-plugin' / 'metadata.yaml', False),
 ]
 
+EBPFGO_PATH = REPO_PATH / 'src' / 'collectors' / 'ebpf.plugin' / 'ebpfgo.plugin'
+
 TAXONOMY_SOURCES = [
     *COLLECTOR_SOURCES,
     *FLOWS_SOURCES,
     (AGENT_REPO, REPO_PATH / 'src' / 'crates' / 'netflow-plugin' / 'taxonomy.yaml', False),
-    (AGENT_REPO, REPO_PATH / 'src' / 'collectors' / 'ebpf.plugin' / 'ebpfgo.plugin' / 'taxonomy.yaml', False),
-    (AGENT_REPO, REPO_PATH / 'src' / 'collectors' / 'ebpf.plugin' / 'ebpfgo.plugin' / 'dns' / 'taxonomy.yaml', False),
-    (AGENT_REPO, REPO_PATH / 'src' / 'collectors' / 'ebpf.plugin' / 'ebpfgo.plugin' / 'socket' / 'taxonomy.yaml', False),
+    # ebpf-go.plugin declares one taxonomy.yaml per module.  They must be listed
+    # individually because the recursive src/collectors entry only globs
+    # <plugin>/taxonomy.yaml, one level deep (see discover_taxonomy_files).
+    (AGENT_REPO, EBPFGO_PATH / 'taxonomy.yaml', False),
+    (AGENT_REPO, EBPFGO_PATH / 'dcstat' / 'taxonomy.yaml', False),
+    (AGENT_REPO, EBPFGO_PATH / 'dns' / 'taxonomy.yaml', False),
+    (AGENT_REPO, EBPFGO_PATH / 'fd' / 'taxonomy.yaml', False),
+    (AGENT_REPO, EBPFGO_PATH / 'socket' / 'taxonomy.yaml', False),
 ]
 
 GITHUB_ACTIONS = os.environ.get('GITHUB_ACTIONS', False)
@@ -168,12 +178,24 @@ def load_collectors(sources=None):
                 path)
             continue
 
-        for idx, item in enumerate(data['modules']):
+        profile_coverage = data.get('profile_coverage', {}).get('modules', {})
+        module_ids = {item['meta'].get('id') for item in data['modules']}
+        for module_id in sorted(set(profile_coverage) - module_ids):
+            warn(f'Profile coverage references unknown module id {module_id!r}.', path)
+
+        # Modules may share merged sub-objects (YAML anchors/merge keys); later
+        # pipeline steps mutate items in place (e.g. scope names), so each item
+        # must own its data. Deepcopy per item: one deepcopy of the whole list
+        # would keep the shared references shared (memoization).
+        for idx, raw_item in enumerate(data['modules']):
+            item = deepcopy(raw_item)
             item['meta']['plugin_name'] = data['plugin_name']
             item['integration_type'] = 'collector'
             item['_src_path'] = path
             item['_repo'] = repo
             item['_index'] = idx
+            if item['meta'].get('id') in profile_coverage:
+                item['_prometheus_profile_ids'] = list(profile_coverage[item['meta']['id']])
             ret.append(item)
 
     return ret

@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 
+import html
 import json
 import re
 import sys
@@ -21,6 +22,7 @@ from _common import (
     make_validator,
     warn,
 )
+from prometheus_profile_docs import project_prometheus_profile_coverage
 
 TEMPLATE_PATH = INTEGRATIONS_PATH / 'templates'
 OUTPUT_PATH = INTEGRATIONS_PATH / 'integrations.js'
@@ -177,6 +179,7 @@ def get_jinja_env():
         )
 
         _jinja_env.globals.update(strfy=strfy, anchorfy=anchorfy)
+        _jinja_env.filters['markdown_table_cell'] = markdown_table_cell
 
     return _jinja_env
 
@@ -187,6 +190,15 @@ def strfy(value):
     if isinstance(value, str):
         return ' '.join([v.strip() for v in value.strip().split("\n") if v]).replace('|', '/')
     return value
+
+
+def markdown_table_cell(value):
+    escaped = html.escape(str(value), quote=False)
+    return (escaped
+            .replace('\\', '&#92;')
+            .replace('|', '\\|')
+            .replace('{', '&#123;')
+            .replace('}', '&#125;'))
 
 
 def anchorfy(value):
@@ -738,6 +750,8 @@ def dedupe_integrations(integrations, ids):
 
 
 def render_collectors(categories, collectors, ids):
+    project_prometheus_profile_coverage(collectors)
+
     debug('Computing default categories.')
 
     default_cats, valid_cats = get_category_sets(categories)

@@ -5,6 +5,9 @@
 # - dot1qTpFdbTable provides per-FDB-domain MAC learning entries.
 # - dot1qVlanCurrentTable maps FDB domain IDs to VLAN IDs where available.
 
+extends:
+  - _std-topology-bridge-base-mib.yaml
+
 topology:
   # Q-BRIDGE-MIB: VLAN/FDB-domain forwarding table (MAC -> bridge port).
   - kind: qbridge_fdb_entry
@@ -13,7 +16,7 @@ topology:
       OID: 1.3.6.1.2.1.17.7.1.2.2.1
       name: dot1qTpFdbTable
     symbols:
-      # Use port column as numeric row anchor.
+      # Use the port column as the row-presence anchor.
       - OID: 1.3.6.1.2.1.17.7.1.2.2.1.2
         name: qbridge_fdb_entry
     metric_tags:
@@ -33,12 +36,12 @@ topology:
         symbol:
           OID: 1.3.6.1.2.1.17.7.1.2.2.1.3
           name: dot1qTpFdbStatus
-          mapping:
-            1: other
-            2: invalid
-            3: learned
-            4: self
-            5: mgmt
+        mapping:
+          1: other
+          2: invalid
+          3: learned
+          4: self
+          5: mgmt
 
   # Q-BRIDGE-MIB: maps FDB domain ID to VLAN ID.
   - kind: qbridge_vlan_entry

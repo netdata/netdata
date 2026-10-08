@@ -40,7 +40,11 @@ func newGenerationOutputGate(owner *lifecycle.FrameOwner) (*generationOutputGate
 	if owner == nil {
 		return nil, errors.New("job output: nil generation output owner")
 	}
-	gate := &generationOutputGate{writer: FrameWriter{Owner: owner}}
+	gate := &generationOutputGate{
+		writer: FrameWriter{
+			Owner: owner,
+		},
+	}
 	gate.state.Store(uint32(generationOutputInactive))
 	return gate, nil
 }
@@ -95,8 +99,12 @@ func (gog *generationOutputGate) Write(payload []byte) (int, error) {
 	}
 }
 
-func (gog *generationOutputGate) CommitJobOutput(
-	payload []byte,
+func (gog *generationOutputGate) CommitJobOutput(payload []byte, transaction jobruntime.OutputStateTransaction) error {
+	return gog.CommitBuiltJobOutput(func() ([]byte, error) { return payload, nil }, transaction)
+}
+
+func (gog *generationOutputGate) CommitBuiltJobOutput(
+	build func() ([]byte, error),
 	transaction jobruntime.OutputStateTransaction,
 ) error {
 	if transaction == nil {
@@ -115,7 +123,7 @@ func (gog *generationOutputGate) CommitJobOutput(
 	defer gog.mu.RUnlock()
 	switch generationOutputState(gog.state.Load()) {
 	case generationOutputActive:
-		return gog.writer.CommitJobOutput(payload, transaction)
+		return gog.writer.CommitBuiltJobOutput(build, transaction)
 	case generationOutputFenced:
 		return errors.Join(errGenerationOutputFenced, transaction.Abort())
 	default:
@@ -147,7 +155,9 @@ func NewCleanupOutputGate(owner *lifecycle.FrameOwner) (*CleanupOutputGate, erro
 		return nil, errors.New("job output: nil cleanup output owner")
 	}
 	return &CleanupOutputGate{
-		writer: FrameWriter{Owner: owner},
+		writer: FrameWriter{
+			Owner: owner,
+		},
 	}, nil
 }
 
@@ -177,4 +187,22 @@ func (cog *CleanupOutputGate) PoisonOutput(err error) {
 		return
 	}
 	cog.writer.PoisonOutput(err)
+}
+
+func (cog *CleanupOutputGate) CommitBuiltJobOutput(
+	build func() ([]byte, error),
+	transaction jobruntime.OutputStateTransaction,
+) error {
+	if transaction == nil {
+		return errors.New("job output: invalid cleanup output transaction")
+	}
+	if cog == nil {
+		return errors.Join(errCleanupOutputFenced, transaction.Abort())
+	}
+	cog.mu.RLock()
+	defer cog.mu.RUnlock()
+	if cog.fenced {
+		return errors.Join(errCleanupOutputFenced, transaction.Abort())
+	}
+	return cog.writer.CommitBuiltJobOutput(build, transaction)
 }

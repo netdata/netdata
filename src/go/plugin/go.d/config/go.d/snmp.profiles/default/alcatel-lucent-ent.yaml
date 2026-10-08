@@ -1,6 +1,9 @@
 extends:
   - alcatel-lucent.yaml
   - _alcatel-bgp.yaml
+  - _std-topology-interface-mib.yaml
+  - _std-topology-stp-mib.yaml
+  - _std-topology-arp-mib.yaml
 
 selector:
   - sysobjectid:

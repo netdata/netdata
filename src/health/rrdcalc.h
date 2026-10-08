@@ -60,6 +60,16 @@ typedef struct rrdcalc_runtime_snapshot {
     uint32_t times_repeat;
 } RRDCALC_RUNTIME_SNAPSHOT;
 
+// Tracks this alert's membership in host->rrdcalc_by_name. Three states, not a
+// bool: an alert that has been unlinked must be distinguishable from one that was
+// never linked, otherwise the internal-checks verification cannot tell a
+// legitimate in-flight removal from an alert insert() forgot to index.
+typedef enum __attribute__((packed)) {
+    RRDCALC_NAME_INDEX_NEVER = 0,   // never linked into the index
+    RRDCALC_NAME_INDEX_LINKED,      // currently linked
+    RRDCALC_NAME_INDEX_UNLINKED,    // was linked, then removed
+} RRDCALC_NAME_INDEX_STATE;
+
 struct rrdcalc {
     uint32_t id;                    // the unique id of this alarm
     uint32_t next_event_id;         // the next event id that will be used for this alarm
@@ -111,6 +121,19 @@ struct rrdcalc {
 
     struct rrdcalc *next;
     struct rrdcalc *prev;
+
+    // ------------------------------------------------------------------------
+    // host->rrdcalc_by_name list links
+    // Distinct from next/prev above, which thread the chart's alert list.
+
+    struct rrdcalc *name_next;
+    struct rrdcalc *name_prev;
+    RRDCALC_NAME_INDEX_STATE name_index_state;
+
+    // The rrdcalc_root_index item owning this RRDCALC, captured in the insert
+    // callback. Readers reaching this alert through the name index acquire a
+    // reference on it, which is what keeps the RRDCALC alive for them.
+    const DICTIONARY_ITEM *name_item;
 };
 
 #define rrdcalc_name(rc) string2str((rc)->config.name)
@@ -219,6 +242,29 @@ void rrdcalc_delete_all(RRDHOST *host);
 
 void rrdcalc_rrdhost_index_init(RRDHOST *host);
 void rrdcalc_rrdhost_index_destroy(RRDHOST *host);
+
+// Snapshot the host's alerts whose config.name is `name`, returning how many
+// exist. Each returned entry is an ACQUIRED rrdcalc_root_index item that the
+// caller MUST release with dictionary_acquired_item_release(); use
+// dictionary_acquired_item_value() to reach the RRDCALC.
+//
+// If the count exceeds dst_size nothing is acquired and nothing is written - the
+// caller retries with a larger buffer - so there is never a partial set to
+// release.
+//
+// Alerts being deleted are skipped, so the count can be lower than the number of
+// links in the index.
+//
+// The name-index lock is taken and released inside, deliberately: it must not be
+// held while the caller acquires chart locks (see rrdcalc_name_index_del()).
+size_t rrdcalc_by_name_snapshot(RRDHOST *host, STRING *name, const DICTIONARY_ITEM **dst, size_t dst_size);
+
+#ifdef NETDATA_INTERNAL_CHECKS
+// Verifies that `rc` and the name index agree about `rc`, and fatal()s if they do
+// not. `rc` must be alive for the duration of the call (the caller holds a
+// reference on it).
+void rrdcalc_name_index_verify(RRDHOST *host, RRDCALC *rc);
+#endif
 
 void rrdcalc_unlink_and_delete(RRDHOST *host, RRDCALC *rc, bool having_ll_wrlock);
 

@@ -279,5 +279,14 @@ func prepareNewTarget(sub subnet, ip string) *target {
 		Organization: "net-snmp",
 		Category:     "Server",
 		Model:        "Linux",
+		Probe: snmputils.SysInfoProbe{
+			PDUCount:        5,
+			SeenSysDescr:    true,
+			SeenSysObjectID: true,
+			SysObjectIDType: "ObjectIdentifier",
+			SeenSysContact:  true,
+			SeenSysName:     true,
+			SeenSysLocation: true,
+		},
 	})
 }

@@ -1,37 +1,111 @@
+//! Snapshot of the `NETDATA_*` environment variables the Netdata agent exports
+//! to the plugins and scripts it spawns. The daemon exports the directory
+//! variables and `NETDATA_UPDATE_EVERY` in `set_environment_for_plugins_and_scripts`
+//! (src/daemon/environment.c); the run dir comes from src/libnetdata/os/run_dir.c,
+//! the machine GUID and invocation id from src/daemon/machine-guid.c and the
+//! libnetdata log init, and the log settings from src/libnetdata/log/.
+//!
+//! This is a plain data snapshot: read with [`NetdataEnv::from_environment`]
+//! (typically once at startup); nothing in the module caches or re-probes.
+//! Every field is `Option` and `None` is not an error — a missing variable,
+//! non-UTF-8 contents, or a value that fails to parse all become `None`
+//! silently, and consumers fall back to their own defaults (netflow-plugin
+//! falls back per field; otel-plugin's supervisor, in contrast, aborts when
+//! `registry_unique_id` is missing).
+//!
+//! Inside `rt`, `tracing_setup::init_tracing_with_identifier` consumes
+//! `log_method`, `log_level`, and `systemd_journal_path` to choose the journald
+//! or stderr logging layer. Other consumers read the fields directly:
+//! netflow-plugin for config locations, host prefix, and state directories,
+//! and otel-plugin's supervisor for the IPC socket directory, node identity,
+//! and cache dir.
 #![allow(dead_code)]
+// The struct mirrors the agent's full export surface, not the subset any one
+// plugin reads, so some fields have no consumer in a given plugin.
 
 use std::env;
 use std::path::PathBuf;
 
+/// Snapshot of the `NETDATA_*` plugin environment; see the module docs for the
+/// `None` semantics and the agent-side export points. Field names mirror the
+/// variable names without the `NETDATA_` prefix, and the `Serialize` derive
+/// exists so consumers can log the snapshot as JSON (otel-plugin's supervisor
+/// does).
 #[derive(Debug, Clone, Default, serde::Serialize)]
 pub struct NetdataEnv {
+    /// `NETDATA_USER_CONFIG_DIR`: user configuration directory (normally
+    /// `/etc/netdata`); the agent verifies it exists before exporting it.
     pub user_config_dir: Option<PathBuf>,
+    /// `NETDATA_STOCK_CONFIG_DIR`: directory of the config files shipped with
+    /// Netdata.
     pub stock_config_dir: Option<PathBuf>,
+    /// `NETDATA_STOCK_DATA_DIR`: immutable packaged data files (e.g. MMDB
+    /// assets).
     pub stock_data_dir: Option<PathBuf>,
+    /// `NETDATA_PLUGINS_DIR`: the primary plugins directory.
     pub plugins_dir: Option<PathBuf>,
+    /// `NETDATA_USER_PLUGINS_DIRS`: custom plugin directories. The agent
+    /// exports the list space-separated (src/daemon/environment.c); this code
+    /// splits on `':'`, so a multi-directory value stays a single path.
     pub user_plugins_dirs: Option<Vec<PathBuf>>,
+    /// `NETDATA_WEB_DIR`: static web files.
     pub web_dir: Option<PathBuf>,
+    /// `NETDATA_CACHE_DIR`: scratch space; plugins are expected to create
+    /// their own subdirectory in it.
     pub cache_dir: Option<PathBuf>,
+    /// `NETDATA_RUN_DIR`: runtime directory for sockets and other transient
+    /// files, exported by the agent after run-dir detection
+    /// (src/libnetdata/os/run_dir.c).
     pub run_dir: Option<PathBuf>,
+    /// `NETDATA_LIB_DIR`: persistent varlib state (the agent's machine GUID
+    /// lives here; netflow-plugin keeps host state under it).
     pub lib_dir: Option<PathBuf>,
+    /// `NETDATA_LOG_DIR`: log files directory.
     pub log_dir: Option<PathBuf>,
+    /// `NETDATA_HOST_PREFIX`: prefix of another host's filesystem, where
+    /// `/proc`, `/sys`, and similar paths live; netflow-plugin uses it to
+    /// prefix host filesystem reads.
     pub host_prefix: Option<String>,
+    /// `NETDATA_DEBUG_FLAGS`: the agent's debug-flags bitmap, usually hex.
     pub debug_flags: Option<String>,
+    /// `NETDATA_UPDATE_EVERY`: the agent's chart update interval in seconds —
+    /// its internal clock; updating charts more often is pointless.
     pub update_every: Option<u64>,
+    /// `NETDATA_INVOCATION_ID`: UUID of this agent run (the systemd
+    /// `INVOCATION_ID` when running under systemd, otherwise generated;
+    /// src/libnetdata/log/nd_log-init.c). It marks one agent run, not one
+    /// plugin process.
     pub invocation_id: Option<String>,
-    /// Netdata machine GUID — the product's permanent node identity.
-    /// Exported by the agent as NETDATA_REGISTRY_UNIQUE_ID
-    /// (src/daemon/machine-guid.c). Survives log-volume wipes; defines "same node".
+    /// The agent's machine GUID — the product's permanent node identity,
+    /// persisted under varlib and exported as NETDATA_REGISTRY_UNIQUE_ID
+    /// (src/daemon/machine-guid.c). Survives log-volume wipes; defines
+    /// "same node".
     pub registry_unique_id: Option<String>,
+    /// `NETDATA_LOG_METHOD`: where the plugin should log (`syslog`,
+    /// `journal`, `stderr`, `none`).
     pub log_method: Option<LogMethod>,
+    /// `NETDATA_LOG_FORMAT`: wire format of the log lines (`journal`,
+    /// `logfmt`, `json`).
     pub log_format: Option<LogFormat>,
+    /// `NETDATA_LOG_LEVEL`: minimum priority the plugin should log at.
     pub log_level: Option<LogLevel>,
+    /// `NETDATA_SYSLOG_FACILITY`: syslog facility to log under.
     pub syslog_facility: Option<SyslogFacility>,
+    /// `NETDATA_ERRORS_THROTTLE_PERIOD`: log flood-protection window, in
+    /// seconds.
     pub errors_throttle_period: Option<u64>,
+    /// `NETDATA_ERRORS_PER_PERIOD`: log events allowed per throttle window.
     pub errors_per_period: Option<u64>,
+    /// `NETDATA_SYSTEMD_JOURNAL_PATH`: systemd-journald socket path, exported
+    /// when the agent sends collector logs straight to the journal
+    /// (src/libnetdata/log/nd_log-to-systemd-journal.c). `tracing_setup` keys
+    /// its journald layer off this field.
     pub systemd_journal_path: Option<PathBuf>,
 }
 
+/// Where the plugin should send its logs; mirrors the `NETDATA_LOG_METHOD`
+/// values. `tracing_setup` implements stderr and journald output only and maps
+/// `Syslog`/`None` onto plain stderr.
 #[derive(Debug, Clone, serde::Serialize)]
 pub enum LogMethod {
     Syslog,
@@ -40,6 +114,7 @@ pub enum LogMethod {
     None,
 }
 
+/// Log line wire format; mirrors the `NETDATA_LOG_FORMAT` values.
 #[derive(Debug, Clone, serde::Serialize)]
 pub enum LogFormat {
     Journal,
@@ -47,6 +122,9 @@ pub enum LogFormat {
     Json,
 }
 
+/// Log priorities, most severe first; mirrors the `NETDATA_LOG_LEVEL` values.
+/// `tracing_setup` folds them onto a coarser tracing filter: emergency through
+/// error → `error`, warning → `warn`, notice/info → `info`, debug → `trace`.
 #[derive(Debug, Clone, serde::Serialize)]
 pub enum LogLevel {
     Emergency,
@@ -59,6 +137,7 @@ pub enum LogLevel {
     Debug,
 }
 
+/// Standard syslog facilities accepted in `NETDATA_SYSLOG_FACILITY`.
 #[derive(Debug, Clone, serde::Serialize)]
 pub enum SyslogFacility {
     Auth,
@@ -84,6 +163,10 @@ pub enum SyslogFacility {
 }
 
 impl NetdataEnv {
+    /// Read the current process environment into a snapshot. A variable that
+    /// is unset, non-UTF-8, or fails to parse leaves its field `None` —
+    /// numeric fields parse as `u64`, the log enums via their `FromStr` impls
+    /// below — and nothing is logged or returned as an error.
     pub fn from_environment() -> Self {
         Self {
             user_config_dir: env::var("NETDATA_USER_CONFIG_DIR").ok().map(PathBuf::from),
@@ -129,8 +212,13 @@ impl NetdataEnv {
         }
     }
 
+    /// Heuristic detection of agent-spawned execution: true when any of the
+    /// probed variables is present. The agent exports all of them when it
+    /// spawns a plugin, so consumers use this to choose between the
+    /// agent-provided and a standalone configuration (netflow-plugin).
     pub fn running_under_netdata(&self) -> bool {
-        // we are overtly cautious, just one check would suffice
+        // Any single one of these would suffice in practice; checking several
+        // guards against a partially populated environment.
         self.user_config_dir.is_some()
             || self.stock_config_dir.is_some()
             || self.plugins_dir.is_some()
@@ -138,7 +226,9 @@ impl NetdataEnv {
     }
 }
 
-// Implement FromStr for the enums
+// FromStr for the log enums: case-insensitive match against the exact
+// spellings the agent exports; `from_environment` maps a parse error to
+// `None`.
 impl std::str::FromStr for LogMethod {
     type Err = String;
 

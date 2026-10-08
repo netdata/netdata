@@ -330,11 +330,10 @@ int main(int argc, char **argv) {
         fprintf(stderr, "starting data collection\n");
 
     time_t started_t = now_monotonic_sec();
-    size_t iteration = 0;
 
     heartbeat_t hb;
     heartbeat_init(&hb, netdata_update_every * USEC_PER_SEC);
-    for (iteration = 0; 1; iteration++) {
+    for (;;) {
         heartbeat_next(&hb);
 
         if (unlikely(exit_initiated_get()))

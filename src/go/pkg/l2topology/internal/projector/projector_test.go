@@ -738,17 +738,92 @@ func TestDeviceToTopologyActor_DoesNotOverrideExplicitVendor(t *testing.T) {
 	require.NotEmpty(t, actor.Detail.Device.VendorDerivedMatchPrefix)
 }
 
-func TestToGraph_DefaultDiscoveredCountWithoutLocalID(t *testing.T) {
-	result := model.Result{
-		Devices: []model.Device{
-			{ID: "a", Hostname: "a"},
-			{ID: "b", Hostname: "b"},
-			{ID: "c", Hostname: "c"},
+func TestDiscoveredDeviceCount(t *testing.T) {
+	tests := map[string]struct {
+		devices       []model.Device
+		localDeviceID string
+		want          int
+	}{
+		"no devices": {
+			want: 0,
+		},
+		"no local device": {
+			devices: []model.Device{{ID: "a"}, {ID: "b"}, {ID: "c"}},
+			want:    3,
+		},
+		"matching local device": {
+			devices:       []model.Device{{ID: "a"}, {ID: "b"}, {ID: "c"}},
+			localDeviceID: "b",
+			want:          2,
+		},
+		"normalized matching local device": {
+			devices:       []model.Device{{ID: " a "}, {ID: "b"}},
+			localDeviceID: " a ",
+			want:          1,
+		},
+		"unmatched local device": {
+			devices:       []model.Device{{ID: "a"}, {ID: "b"}, {ID: "c"}},
+			localDeviceID: "other",
+			want:          3,
+		},
+		"whitespace local device": {
+			devices:       []model.Device{{ID: "a"}, {ID: "b"}, {ID: "c"}},
+			localDeviceID: " \t ",
+			want:          3,
+		},
+		"blank device IDs": {
+			devices: []model.Device{{ID: ""}, {ID: " \t "}, {ID: "a"}},
+			want:    1,
 		},
 	}
 
-	_, stats := toGraphForTest(result, model.GraphOptions{})
-	require.Equal(t, 2, stats.DevicesDiscovered)
+	for name, test := range tests {
+		t.Run(name, func(t *testing.T) {
+			require.Equal(t, test.want, discoveredDeviceCount(test.devices, test.localDeviceID))
+		})
+	}
+}
+
+func TestBuildDeviceActorDetail_ClassifiesDiscoveredByNormalizedDeviceID(t *testing.T) {
+	tests := map[string]struct {
+		deviceID      string
+		localDeviceID string
+		want          bool
+	}{
+		"no local device": {
+			deviceID: "remote",
+			want:     true,
+		},
+		"matching local device": {
+			deviceID:      "local",
+			localDeviceID: "local",
+		},
+		"normalized matching local device": {
+			deviceID:      " local ",
+			localDeviceID: "\tlocal\t",
+		},
+		"unmatched local device": {
+			deviceID:      "remote",
+			localDeviceID: "local",
+			want:          true,
+		},
+		"blank device ID": {
+			deviceID: " \t ",
+		},
+	}
+
+	for name, test := range tests {
+		t.Run(name, func(t *testing.T) {
+			detail := buildDeviceActorDetail(
+				model.Device{ID: test.deviceID},
+				test.localDeviceID,
+				topologyDeviceInterfaceSummary{},
+				graph.Match{},
+				nil,
+			)
+			require.Equal(t, test.want, detail.Discovered)
+		})
+	}
 }
 
 func TestToGraph_AssignsDeterministicActorIDsAndLinkActorIDs(t *testing.T) {

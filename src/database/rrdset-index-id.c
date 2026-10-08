@@ -135,18 +135,27 @@ static void rrdset_insert_callback(const DICTIONARY_ITEM *item __maybe_unused, v
     ml_chart_new(st);
 }
 
-// the destructor - the dictionary is write locked while this runs
-static void rrdset_delete_callback(const DICTIONARY_ITEM *item __maybe_unused, void *rrdset, void *rrdhost) {
-    RRDHOST *host = rrdhost; (void)host;
+// the destructor - runs under the dictionary write lock when garbage collection frees the chart,
+// and with no dictionary lock held when dictionary_del() frees an unreferenced one
+static void rrdset_delete_callback(const DICTIONARY_ITEM *item __maybe_unused, void *rrdset, void *rrdhost __maybe_unused) {
     RRDSET *st = rrdset;
 
     rrdset_flag_clear(st, RRDSET_FLAG_INDEXED_ID);
 
+    // Fallback release for a chart freed without rrdset_free(): rrdset_index_flush() when the host is
+    // archived, or rrdset_index_destroy() when it is freed - both after its receiver has stopped, so
+    // there is no next connection to take a unit from. rrdset_free() has already released while the
+    // chart was indexed, so for it this finds IN_PROGRESS clear and does nothing.
+    //
+    // This may run under the dictionary write lock. rrdhost_receiver_replication_release() does only
+    // atomic flag and counter transitions plus pulse_host_status(), which is lock-free (a CAS on
+    // host->stream.pulse_state) - safe to call from here. Do NOT pass a 0 status to pulse_host_status()
+    // from this context: that variant calls rrdhost_status(), which takes rrdhost_receiver_lock().
+    rrdhost_receiver_replication_release(st, 0);
+
     rrdset_finalize_collection(st, false);
 
     rrdset_stream_send_chart_slot_release(st);
-
-    dictionary_destroy(st->functions_view);
 
     rrdcalc_unlink_and_delete_all_rrdset_alerts(st);
 
@@ -191,6 +200,26 @@ static void rrdset_delete_callback(const DICTIONARY_ITEM *item __maybe_unused, v
     memset(st, 0, sizeof(RRDSET));
 }
 
+// Re-intern a chart metadata field only when the incoming raw value differs from the
+// already-stored one, and report whether it changed.
+//
+// *field holds the output of rrd_string_strdupz(), i.e. the sanitized form. So an exact
+// match against the raw incoming string means sanitizing it is a no-op and interning it
+// would hand back the very same STRING - the whole update is provably a no-op and can be
+// skipped. A mismatch (including one that only sanitizing would resolve) falls through to
+// the full path, so this is one-directional and cannot skip a real change.
+static inline bool rrdset_metadata_field_update(STRING **field, const char *value) {
+    if(!value || !*value || string_strcmp(*field, value) == 0)
+        return false;
+
+    STRING *old = *field;
+    *field = rrd_string_strdupz(value);
+    bool changed = (old != *field);
+    string_freez(old);
+
+    return changed;
+}
+
 // the item to be inserted, is already in the dictionary
 // this callback deals with the situation, migrating the existing object to the new values
 // the dictionary is write locked while this runs
@@ -212,53 +241,23 @@ static bool rrdset_conflict_callback(const DICTIONARY_ITEM *item __maybe_unused,
         ctr->react_action |= RRDSET_REACT_UPDATED;
     }
 
-    if(ctr->plugin && *ctr->plugin) {
-        STRING *old_plugin = st->plugin_name;
-        st->plugin_name = rrd_string_strdupz(ctr->plugin);
-        if (old_plugin != st->plugin_name)
-            ctr->react_action |= RRDSET_REACT_PLUGIN_UPDATED;
-        string_freez(old_plugin);
-    }
+    if(rrdset_metadata_field_update(&st->plugin_name, ctr->plugin))
+        ctr->react_action |= RRDSET_REACT_PLUGIN_UPDATED;
 
-    if(ctr->module && *ctr->module) {
-        STRING *old_module = st->module_name;
-        st->module_name = rrd_string_strdupz(ctr->module);
-        if (old_module != st->module_name)
-            ctr->react_action |= RRDSET_REACT_MODULE_UPDATED;
-        string_freez(old_module);
-    }
+    if(rrdset_metadata_field_update(&st->module_name, ctr->module))
+        ctr->react_action |= RRDSET_REACT_MODULE_UPDATED;
 
-    if(ctr->title && *ctr->title) {
-        STRING *old_title = st->title;
-        st->title = rrd_string_strdupz(ctr->title);
-        if(old_title != st->title)
-            ctr->react_action |= RRDSET_REACT_UPDATED;
-        string_freez(old_title);
-    }
+    if(rrdset_metadata_field_update(&st->title, ctr->title))
+        ctr->react_action |= RRDSET_REACT_UPDATED;
 
-    if(ctr->units && *ctr->units) {
-        STRING *old_units = st->units;
-        st->units = rrd_string_strdupz(ctr->units);
-        if(old_units != st->units)
-            ctr->react_action |= RRDSET_REACT_UPDATED;
-        string_freez(old_units);
-    }
+    if(rrdset_metadata_field_update(&st->units, ctr->units))
+        ctr->react_action |= RRDSET_REACT_UPDATED;
 
-    if(ctr->family && *ctr->family) {
-        STRING *old_family = st->family;
-        st->family = rrd_string_strdupz(ctr->family);
-        if(old_family != st->family)
-            ctr->react_action |= RRDSET_REACT_UPDATED;
-        string_freez(old_family);
-    }
+    if(rrdset_metadata_field_update(&st->family, ctr->family))
+        ctr->react_action |= RRDSET_REACT_UPDATED;
 
-    if(ctr->context && *ctr->context) {
-        STRING *old_context = st->context;
-        st->context = rrd_string_strdupz(ctr->context);
-        if(old_context != st->context)
-            ctr->react_action |= RRDSET_REACT_UPDATED;
-        string_freez(old_context);
-    }
+    if(rrdset_metadata_field_update(&st->context, ctr->context))
+        ctr->react_action |= RRDSET_REACT_UPDATED;
 
     if(st->chart_type != ctr->chart_type) {
         st->chart_type = ctr->chart_type;
@@ -547,6 +546,20 @@ RRDSET *rrdset_create_custom(
         };
 
         st_item = rrdset_index_add_and_acquire(host, chart_full_id, &ctr);
+
+        if(unlikely(!st_item))
+            // The index refused the insert, which only happens once
+            // rrdset_index_destroy() has destroyed it - and that runs in
+            // rrdhost_free_unlinked(), after collection on this host has been
+            // stopped and the host unlinked. So we are being called with a
+            // host that is already being freed: retrying can never succeed
+            // (it would spin at 100% CPU forever) and we cannot return NULL,
+            // because rrdset_create() callers dereference the result
+            // unconditionally. The archive path only flushes the index, which
+            // keeps accepting inserts, so this is never the benign case.
+            fatal("RRDSET: chart '%s' of host '%s' cannot be created: the host's chart index is being destroyed. "
+                  "A collector is still creating charts on a host that is being freed.",
+                  chart_full_id, rrdhost_hostname(host));
     }
 
     RRDSET *st = dictionary_acquired_item_value(st_item);
@@ -580,6 +593,22 @@ RRDSET *rrdset_create_custom(
 
 void rrdset_free(RRDSET *st) {
     if(unlikely(!st)) return;
+
+    // Release any receiver-replication contribution while the chart is still indexed, where the
+    // connect/disconnect reset walk can see it. Once dictionary_del() unlinks it, the delete callback
+    // may run later (a referenced item waits for garbage collection), possibly after the reset has
+    // zeroed the accounting and the next connection has claimed - and its release would then take a
+    // unit that connection owns.
+    //
+    // Under the receiver lock, which both resets hold: a release is a flag CAS and then a decrement,
+    // and this one runs off the receiver's thread (the obsolete-chart cleanup), so without the lock it
+    // could clear the flag before the reset walk, be preempted, and decrement after the reset zeroed
+    // the word and the next connection claimed. Callers hold no rrdset dictionary lock here, and the
+    // reset takes the receiver lock before the dictionary, so the order is the reset's.
+    rrdhost_receiver_lock(st->rrdhost);
+    rrdhost_receiver_replication_release(st, 0);
+    rrdhost_receiver_unlock(st->rrdhost);
+
     rrdset_index_del_name(st->rrdhost, st);
     rrdset_index_del(st->rrdhost, st);
 }

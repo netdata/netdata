@@ -70,7 +70,7 @@ modules:
               default_value: redis://@localhost:9221
               required: true
               group: Target
-              details: |
+              detailed_description: |
                 There are two connection types: by TCP socket and by Unix socket.
 
                 - TCP connection: `redis://<user>:<password>@<host>:<port>/<db_number>`

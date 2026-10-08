@@ -1533,7 +1533,7 @@ void libsensors_thread(void *ptr __maybe_unused) {
             fprintf(stdout, PLUGINSD_KEYWORD_FUNCTION " GLOBAL \"sensors\" %d \"%s\" \"top\" " HTTP_ACCESS_FORMAT " %d\n",
                     PLUGINS_FUNCTIONS_TIMEOUT_DEFAULT, LIBSENSORS_FUNCTION_SENSORS_HELP,
                     (HTTP_ACCESS_FORMAT_CAST)(HTTP_ACCESS_ANONYMOUS_DATA),
-                    RRDFUNCTIONS_PRIORITY_DEFAULT);
+                    NRPC_PRIORITY_DEFAULT);
             function_declared = true;
         }
 

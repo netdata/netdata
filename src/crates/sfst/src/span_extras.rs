@@ -10,10 +10,16 @@
 //! the row carries. No value is stored twice; the skeleton is a few integers
 //! per event/link.
 //!
-//! Both chunks are optional and additive (the `TIDX` pattern): absent when the
-//! file has no events/links (and no dropped-count to preserve), detected via
-//! the TOC, no format version bump. Row positions are **chronological**, like
-//! every per-row column — the build reorders the insertion-order accumulators
+//! Both chunks are optional and additive (the `TIDX` pattern): written only
+//! when meaningful — at least one event/link, or a nonzero dropped count that
+//! must survive — detected via the TOC, no format version bump.
+//!
+//! Flow: the traces-seal producer fills the accumulators
+//! (`src/crates/ng-index/src/sfst_build.rs`), `build.rs` reorders and writes
+//! the chunks after `TIDX`, and `ChunkReader::event_index` / `link_index`
+//! validate and decode them; the trace session materializes per-span
+//! events/links from them. Row positions are **chronological**, like every
+//! per-row column — the build reorders the insertion-order accumulators
 //! through the same time permutation.
 //!
 //! Span-level `dropped_events_count` / `dropped_links_count` ride here as a
@@ -45,18 +51,18 @@ pub struct EventIndex {
     /// Per-event `Event.dropped_attributes_count`.
     dropped: Vec<u32>,
     /// Per-event name token (`events.name=<name>`); always present — the
-    /// flattener emits a name entry even for a (malformed) empty name.
+    /// producer interns one even for a (malformed) empty name.
     names: Vec<KvId>,
     /// `total_events + 1` prefix sums into `attr_refs`.
     attr_offsets: Vec<u32>,
     /// Per-attribute token refs (`events.attributes.*`), ordered within each
-    /// event. Bare `KvId`s: values type at field level via the schema tree —
-    /// the platform-wide fidelity bar (no per-occurrence type refs).
+    /// event. Bare `KvId`s — no per-occurrence type refs; values type at
+    /// field level via the schema tree (the platform fidelity bar).
     attr_refs: Vec<KvId>,
 }
 
 /// One event of one row, resolved from an [`EventIndex`] — token refs, not
-/// strings (the reader resolves refs in bulk per page/trace).
+/// strings (the reader resolves them in bulk alongside the row's own tokens).
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct EventRef<'a> {
     pub time_unix_nano: u64,
@@ -90,14 +96,16 @@ impl EventIndex {
     }
 
     /// Every token ref the index holds (names + attribute refs) — the reader
-    /// collects these per trace to resolve strings in one pass.
+    /// merges them with the row's own tokens and resolves strings in one
+    /// bulk pass.
     pub fn all_refs_for_row(&self, pos: u32) -> impl Iterator<Item = KvId> + '_ {
         self.events_for_row(pos)
             .flat_map(|e| std::iter::once(e.name).chain(e.attr_refs.iter().copied()))
     }
 
-    /// Panic-safety validation at the trust boundary (the `TIDX` contract):
-    /// array parallelism, prefix-sum monotonicity/termination, ref ranges.
+    /// Panic-safety validation at the trust boundary (the same contract the
+    /// `TIDX` reader applies): array parallelism, prefix-sum
+    /// monotonicity/termination, ref ranges.
     pub(crate) fn validate(&self, record_count: usize, kv_total: u32) -> Result<(), Error> {
         validate_skeleton(
             "event index",
@@ -299,9 +307,9 @@ fn validate_offsets(what: &str, offsets: &[u32], count: usize, total: usize) -> 
 // Build-side accumulators (insertion order, interner slots)
 // ---------------------------------------------------------------------------
 
-/// Insertion-order accumulator for [`EventIndex`]: the traces seal pushes each
-/// span's events ([`push_event`](Self::push_event)) and seals the row
-/// ([`end_row`](Self::end_row)) — exactly one `end_row` per
+/// Insertion-order accumulator for [`EventIndex`]: the traces-seal producer
+/// pushes each span's events ([`push_event`](Self::push_event)) and seals the
+/// row ([`end_row`](Self::end_row)) — exactly one `end_row` per
 /// [`RowIndex::row`](crate::RowIndex::row) call, enforced at build by the
 /// row-count check. Holds interner [`KvSlot`]s; the build remaps rows to
 /// chronological order and translates slots to file [`KvId`]s.
@@ -362,7 +370,8 @@ impl EventRows {
     }
 
     /// Whether the chunk would carry any information (an event, or a nonzero
-    /// dropped count that must survive). The producer skips the chunk otherwise.
+    /// dropped count that must survive). The producer drops the accumulator
+    /// otherwise, so no chunk is declared or written.
     pub fn is_meaningful(&self) -> bool {
         !self.times.is_empty() || self.row_dropped.iter().any(|&d| d != 0)
     }

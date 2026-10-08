@@ -8,6 +8,7 @@ type ProfileDesignDocument struct {
 	Match             string                          `yaml:"match"`
 	App               *string                         `yaml:"app,omitempty"`
 	Namespace         string                          `yaml:"namespace"`
+	Documentation     DesignDocumentation             `yaml:"documentation"`
 	Composition       DesignComposition               `yaml:"composition"`
 	Entities          map[string]EntityDefinition     `yaml:"entities"`
 	LabelPolicies     map[string]ViewLabels           `yaml:"label_policies,omitempty"`
@@ -18,12 +19,18 @@ type ProfileDesignDocument struct {
 	Views             map[string]ViewDefinition       `yaml:"views"`
 }
 
+type DesignDocumentation struct {
+	Title   string `yaml:"title"`
+	Summary string `yaml:"summary"`
+}
+
 type DesignComposition struct {
 	Supports map[string]SupportDependency `yaml:"supports"`
 }
 
 type SupportDependency struct {
-	When ConditionUse `yaml:"when,omitempty"`
+	When       ConditionUse `yaml:"when,omitempty"`
+	Activation string       `yaml:"activation"`
 }
 
 type EntityDefinition struct {

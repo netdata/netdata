@@ -13,10 +13,7 @@ type topologyVLANContext struct {
 	vlanName string
 }
 
-func (c *topologyCache) vtpVLANContexts() []topologyVLANContext {
-	c.mu.RLock()
-	defer c.mu.RUnlock()
-
+func (c *topologyBuilder) vtpVLANContexts() []topologyVLANContext {
 	contexts := make([]topologyVLANContext, 0, len(c.vlanNameByID))
 	for vlanID, mapping := range c.vlanNameByID {
 		id := strings.TrimSpace(vlanID)

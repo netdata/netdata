@@ -44,6 +44,7 @@ void stream_sender_structures_init(RRDHOST *host, bool stream, STRING *parents, 
         host->sender->disabled_capabilities |= STREAM_CAP_COMPRESSIONS_AVAILABLE;
 
     spinlock_init(&host->sender->spinlock);
+    spinlock_init(&host->sender->global_functions_spinlock);
     replication_sender_init(host->sender);
 
     // gracefully swap destination

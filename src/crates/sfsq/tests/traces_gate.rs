@@ -1,17 +1,36 @@
-//! The trace-level pre-assembly gate acceptance suite (phase 9).
+//! Integration tests for the trace-level pre-assembly gate — the
+//! TBLM-bloom + TRSU-rollup candidate prune filter `search` consults
+//! at each pool pop (sfsq/src/traces/gate.rs; gate engagement and the
+//! pruned-pops-don't-charge-the-ceiling rule live in
+//! sfsq/src/traces/search.rs).
 //!
-//! Pins the gate's three contracts:
+//! Fixtures come from tests/common/mod.rs: requests written to a WAL,
+//! sealed with `sealed_source` (or `sealed_source_at` after byte
+//! surgery on the sealed file), plus `tail_source` for tail presence.
+//! Each query runs twice — gate on vs `trace_gate_for_tests(false)` —
+//! and superset tests compare the answers through `norm`; the
+//! corrupt-file tests assert the designed divergence instead. Pinned
+//! contracts:
 //!
-//! - **Superset:** with the gate on, every query answers byte-identically
-//!   to the gate-off truth path on healthy, tie-free corpora — the gate
-//!   only removes work, never results. The known divergence is corrupt
-//!   corpora, where skip-and-surface is the DESIGNED difference.
+//! - **Superset:** gate-on answers are byte-identical to the gate-off
+//!   truth path on tie-free, corruption-free, single-valued corpora —
+//!   the gate only removes work, never results. The DESIGNED
+//!   differences live elsewhere: corrupt files (skip-and-surface) and
+//!   the status deltas a prune makes unobservable (a would-have-been
+//!   `SizeCap`; corruption only assembly would have found).
 //! - **The incident fix:** a rare trace-level predicate no longer burns
 //!   the assembled ceiling on discards — the gate-off `WorkCeiling`
 //!   partial becomes a gate-on `Complete`.
 //! - **Skip-and-surface:** a file that proves itself corrupt through any
 //!   gate read (TBLM, TRSU) is skipped as a failed source AND surfaced
 //!   (`SourceFailure`), never silently downgraded.
+//!
+//! Not pinned here: the no-root prune itself — its verdicts are
+//! observable, the prune is not (`GateStats` is crate-internal; see
+//! `rootless_traces_never_match_root_filters_either_polarity`) — and
+//! search's setup-failure engagement precondition (a completion source
+//! that failed to open disengages the gate; no fixture here fails at
+//! setup).
 
 mod common;
 
@@ -22,12 +41,13 @@ use std::sync::atomic::AtomicUsize;
 use tokio_util::sync::CancellationToken;
 
 use common::{
-    SpanSpec, kv_str, req_with, sealed_source, sealed_source_at, sp, tail_source, write_wal,
+    SpanSpec, corrupt_chunk, kv_str, req_with, sealed_source, sealed_source_at, sp, tail_source,
+    write_wal,
 };
 use opentelemetry_proto::tonic::collector::trace::v1::ExportTraceServiceRequest;
 use sfsq::traces::{
-    BuiltinField, CompareOp, Condition, PartialReason, Predicate, PredicateTarget,
-    PredicateValue, QueryStatus, SearchData, SearchQuery, SearchSources, TraceSource, search,
+    BuiltinField, CompareOp, Condition, PartialReason, Predicate, PredicateTarget, PredicateValue,
+    QueryStatus, SearchData, SearchQuery, SearchSources, TraceSource, search,
 };
 
 const NS: u64 = 1_000_000_000;
@@ -54,6 +74,8 @@ fn pred(conditions: Vec<Condition>) -> Predicate {
     Predicate { conditions }
 }
 
+/// One `search` call with a fresh cancellation token and progress
+/// counter; invalid requests panic rather than error.
 fn run(sources: SearchSources, query: SearchQuery) -> SearchData {
     search(
         sources,
@@ -64,6 +86,9 @@ fn run(sources: SearchSources, query: SearchQuery) -> SearchData {
     .expect("valid request")
 }
 
+/// Identical source vectors in both roles: `build()` runs once per
+/// role because `SearchSources` owns its vectors, and window ⊆
+/// completion holds trivially when both sides seal the same WALs.
 fn both_roles(build: impl Fn() -> Vec<TraceSource>) -> SearchSources {
     SearchSources {
         window: build(),
@@ -75,6 +100,8 @@ fn ids(data: &SearchData) -> Vec<String> {
     data.traces.iter().map(|t| t.trace_id.to_string()).collect()
 }
 
+/// `tid(n)`'s canonical hex rendering — the text form `trace:id =`
+/// conditions pin.
 fn hex(n: u8) -> String {
     sfst::TraceId::from(tid(n)).to_string()
 }
@@ -138,7 +165,11 @@ fn root_span(trace: u8, id: u8, start: u64, end: u64, name: &'static str) -> Spa
 }
 
 fn root_service_eq(value: &str) -> Condition {
-    builtin(BuiltinField::RootServiceName, CompareOp::Eq, vec![text(value)])
+    builtin(
+        BuiltinField::RootServiceName,
+        CompareOp::Eq,
+        vec![text(value)],
+    )
 }
 
 fn min_duration(ns: i64) -> Condition {
@@ -149,26 +180,12 @@ fn min_duration(ns: i64) -> Condition {
     )
 }
 
-/// Flip the first payload byte of chunk `id` inside a sealed SFST — a
-/// CRC mismatch, the cheapest "corrupt in any way".
-fn corrupt_chunk(path: &Path, id: [u8; 4]) {
-    let mut bytes = std::fs::read(path).unwrap();
-    let offset = {
-        let container = chunk_file::container::Container::open(&bytes, b"SFST", 1).unwrap();
-        let meta = container.chunk_meta(id).expect("chunk present");
-        usize::try_from(meta.offset).unwrap()
-    };
-    bytes[offset] ^= 0xFF;
-    std::fs::write(path, &bytes).unwrap();
-}
-
 /// Make chunk `id` ABSENT from a sealed SFST by renaming its TOC entry
 /// to an id no reader asks for — the "older file without this chunk"
 /// shape, built from a real modern seal (payload bytes untouched).
 fn hide_chunk(path: &Path, id: [u8; 4]) {
     let mut bytes = std::fs::read(path).unwrap();
-    let num_chunks =
-        u32::from_le_bytes(bytes[8..12].try_into().unwrap()) as usize;
+    let num_chunks = u32::from_le_bytes(bytes[8..12].try_into().unwrap()) as usize;
     let toc_start = chunk_file::container::HEADER_SIZE;
     let entry_size = 12; // ChunkId(4) + offset u64 LE
     let mut hidden = false;
@@ -194,8 +211,9 @@ fn sealed_path(dir: &Path, id: &str) -> std::path::PathBuf {
 
 /// Many candidates, none matching a rare root selection: gate-off burns
 /// the assembled ceiling on discards (`Partial{WorkCeiling}`); gate-on
-/// prunes every candidate without assembling and PROVES the empty
-/// answer (`Complete`) — the phase-9 fix, pinned.
+/// prunes every candidate without assembling — a pruned pop charges
+/// nothing — and PROVES the empty answer (`Complete`). The incident
+/// fix, pinned.
 #[test]
 fn rare_root_selection_completes_instead_of_burning_the_ceiling() {
     let dir = tempfile::tempdir().unwrap();
@@ -203,13 +221,17 @@ fn rare_root_selection_completes_instead_of_burning_the_ceiling() {
     // 70 single-span traces > the 64-assembly floor at limit 1.
     let reqs: Vec<ExportTraceServiceRequest> = (0..70u8)
         .map(|i| {
-            req_with(hot.clone(), None, &[root_span(
-                i + 1,
-                0x10,
-                u64::from(i + 1) * NS,
-                u64::from(i + 1) * NS + 50,
-                "op",
-            )])
+            req_with(
+                hot.clone(),
+                None,
+                &[root_span(
+                    i + 1,
+                    0x10,
+                    u64::from(i + 1) * NS,
+                    u64::from(i + 1) * NS + 50,
+                    "op",
+                )],
+            )
         })
         .collect();
     let wal = write_wal(dir.path(), reqs, "incident");
@@ -227,7 +249,11 @@ fn rare_root_selection_completes_instead_of_burning_the_ceiling() {
     let sources = both_roles(|| vec![sealed_source(dir.path(), &wal, "one")]);
     let on = run(sources, q());
     assert!(on.traces.is_empty());
-    assert_eq!(on.status, QueryStatus::Complete, "gate-on proves the empty answer");
+    assert_eq!(
+        on.status,
+        QueryStatus::Complete,
+        "gate-on proves the empty answer"
+    );
 
     // The same corpus still answers the MATCHING selection.
     let sources = both_roles(|| vec![sealed_source(dir.path(), &wal, "one")]);
@@ -250,17 +276,25 @@ fn straddling_trace_survives_merged_envelope_and_split_root() {
     let svc = vec![kv_str("service.name", "svc-a")];
     // File A: the root, [100s, 100s+1ms]. File B: a child,
     // [109s, 110s]. Merged duration: 10s.
-    let a = req_with(svc.clone(), None, &[root_span(
-        1,
-        0x11,
-        100 * NS,
-        100 * NS + 1_000_000,
-        "root-op",
-    )]);
-    let b = req_with(svc.clone(), None, &[SpanSpec {
-        end: 110 * NS,
-        ..span_in(1, 0x12, 0x11, 109 * NS, "child-op")
-    }]);
+    let a = req_with(
+        svc.clone(),
+        None,
+        &[root_span(
+            1,
+            0x11,
+            100 * NS,
+            100 * NS + 1_000_000,
+            "root-op",
+        )],
+    );
+    let b = req_with(
+        svc.clone(),
+        None,
+        &[SpanSpec {
+            end: 110 * NS,
+            ..span_in(1, 0x12, 0x11, 109 * NS, "child-op")
+        }],
+    );
     let wal_a = write_wal(dir.path(), vec![a], "straddle-a");
     let wal_b = write_wal(dir.path(), vec![b], "straddle-b");
     let sources = || {
@@ -293,17 +327,25 @@ fn straddling_trace_survives_merged_envelope_and_split_root() {
 fn tail_presence_blocks_pruning() {
     let dir = tempfile::tempdir().unwrap();
     let svc = vec![kv_str("service.name", "svc-a")];
-    let sealed_req = req_with(svc.clone(), None, &[root_span(
-        1,
-        0x11,
-        100 * NS,
-        100 * NS + 1_000_000,
-        "root-op",
-    )]);
-    let tail_req = req_with(svc.clone(), None, &[SpanSpec {
-        end: 110 * NS,
-        ..span_in(1, 0x12, 0x11, 109 * NS, "tail-op")
-    }]);
+    let sealed_req = req_with(
+        svc.clone(),
+        None,
+        &[root_span(
+            1,
+            0x11,
+            100 * NS,
+            100 * NS + 1_000_000,
+            "root-op",
+        )],
+    );
+    let tail_req = req_with(
+        svc.clone(),
+        None,
+        &[SpanSpec {
+            end: 110 * NS,
+            ..span_in(1, 0x12, 0x11, 109 * NS, "tail-op")
+        }],
+    );
     let wal_sealed = write_wal(dir.path(), vec![sealed_req], "tailblock-sealed");
     let wal_tail = write_wal(dir.path(), vec![tail_req], "tailblock-tail");
     let sources = || {
@@ -330,13 +372,11 @@ fn absent_chunks_block_pruning_without_a_partial() {
     for hide_bloom_too in [false, true] {
         let dir = tempfile::tempdir().unwrap();
         let svc = vec![kv_str("service.name", "hot")];
-        let reqs = vec![req_with(svc, None, &[root_span(
-            1,
-            0x11,
-            100 * NS,
-            100 * NS + 50,
-            "op",
-        )])];
+        let reqs = vec![req_with(
+            svc,
+            None,
+            &[root_span(1, 0x11, 100 * NS, 100 * NS + 50, "op")],
+        )];
         let wal = write_wal(dir.path(), reqs, "prerollup");
         drop(sealed_source(dir.path(), &wal, "old"));
         let path = sealed_path(dir.path(), "old");
@@ -355,7 +395,10 @@ fn absent_chunks_block_pruning_without_a_partial() {
             on.status
         );
         // The matching selection still returns through assembly.
-        let hit = run(sources(), SearchQuery::new(pred(vec![root_service_eq("hot")])));
+        let hit = run(
+            sources(),
+            SearchQuery::new(pred(vec![root_service_eq("hot")])),
+        );
         assert_eq!(ids(&hit), vec![hex(1)], "hide_bloom_too={hide_bloom_too}");
     }
 }
@@ -363,25 +406,21 @@ fn absent_chunks_block_pruning_without_a_partial() {
 /// True-root filter semantics (decision 1D): a trace whose root span
 /// was never exported matches NO root condition — either polarity —
 /// with gate on and off agreeing, and the trace stays findable by
-/// span-level conditions. (That the gate reaches this verdict WITHOUT
-/// assembling — the `ROOT_CLAIM_NONE` prune — has no public observable
-/// yet: `GateStats` is crate-internal. Mutation-checked 2026-08-15:
-/// removing the no-root prune leaves this test green because assembly
-/// evaluates the same predicate to the same emptiness. The prune-proof
-/// assertion lands when gate stats surface for the tail-aggregates /
-/// work-ceiling follow-ups.)
+/// span-level conditions. What this does NOT pin: the gate's no-root
+/// prune. Removing it leaves the test green — the post-assembly
+/// evaluator reaches the same emptiness — and the prune itself has no
+/// public observable (`GateStats` is crate-internal), so only the
+/// verdict above is under contract here.
 #[test]
 fn rootless_traces_never_match_root_filters_either_polarity() {
     let dir = tempfile::tempdir().unwrap();
     let svc = vec![kv_str("service.name", "svc-a")];
     // Parent 0xEE never exported: no unset-parent span exists.
-    let reqs = vec![req_with(svc, None, &[span_in(
-        1,
-        0x11,
-        0xEE,
-        100 * NS,
-        "orphan-op",
-    )])];
+    let reqs = vec![req_with(
+        svc,
+        None,
+        &[span_in(1, 0x11, 0xEE, 100 * NS, "orphan-op")],
+    )];
     let wal = write_wal(dir.path(), reqs, "orphan");
     let sources = || both_roles(|| vec![sealed_source(dir.path(), &wal, "one")]);
     // Positive and NEGATED root conditions: both fail on a rootless
@@ -427,10 +466,14 @@ fn rootless_heavy_corpus_completes_root_selections() {
     // 70 two-span rootless traces (the parent was never exported).
     let reqs: Vec<ExportTraceServiceRequest> = (0..70u8)
         .map(|i| {
-            req_with(svc.clone(), None, &[
-                span_in(i + 1, 0x10, 0xEE, u64::from(i + 1) * NS, "eval"),
-                span_in(i + 1, 0x11, 0x10, u64::from(i + 1) * NS + 5, "resolve"),
-            ])
+            req_with(
+                svc.clone(),
+                None,
+                &[
+                    span_in(i + 1, 0x10, 0xEE, u64::from(i + 1) * NS, "eval"),
+                    span_in(i + 1, 0x11, 0x10, u64::from(i + 1) * NS + 5, "resolve"),
+                ],
+            )
         })
         .collect();
     let wal = write_wal(dir.path(), reqs, "rootless-heavy");
@@ -447,7 +490,11 @@ fn rootless_heavy_corpus_completes_root_selections() {
 
     let on = run(sources(), q());
     assert!(on.traces.is_empty());
-    assert_eq!(on.status, QueryStatus::Complete, "the no-root prune proves it");
+    assert_eq!(
+        on.status,
+        QueryStatus::Complete,
+        "the no-root prune proves it"
+    );
 }
 
 /// Negated conditions never prune: a `!=` root selection and a `!=`
@@ -462,7 +509,11 @@ fn negated_conditions_never_prune() {
     // Durations: trace 1 = 2s, trace 2 = 6s.
     let reqs = vec![
         req_with(hot, None, &[root_span(1, 0x11, 100 * NS, 102 * NS, "op-a")]),
-        req_with(cold, None, &[root_span(2, 0x21, 200 * NS, 206 * NS, "op-b")]),
+        req_with(
+            cold,
+            None,
+            &[root_span(2, 0x21, 200 * NS, 206 * NS, "op-b")],
+        ),
     ];
     let wal = write_wal(dir.path(), reqs, "negated");
     let sources = || both_roles(|| vec![sealed_source(dir.path(), &wal, "one")]);
@@ -504,9 +555,21 @@ fn multi_value_duration_bound_is_the_min_point() {
     let svc = vec![kv_str("service.name", "svc")];
     // Durations: 3s / 5s / 20s.
     let reqs = vec![
-        req_with(svc.clone(), None, &[root_span(1, 0x11, 100 * NS, 103 * NS, "op")]),
-        req_with(svc.clone(), None, &[root_span(2, 0x21, 200 * NS, 205 * NS, "op")]),
-        req_with(svc.clone(), None, &[root_span(3, 0x31, 300 * NS, 320 * NS, "op")]),
+        req_with(
+            svc.clone(),
+            None,
+            &[root_span(1, 0x11, 100 * NS, 103 * NS, "op")],
+        ),
+        req_with(
+            svc.clone(),
+            None,
+            &[root_span(2, 0x21, 200 * NS, 205 * NS, "op")],
+        ),
+        req_with(
+            svc.clone(),
+            None,
+            &[root_span(3, 0x31, 300 * NS, 320 * NS, "op")],
+        ),
     ];
     let wal = write_wal(dir.path(), reqs, "points");
     let sources = || both_roles(|| vec![sealed_source(dir.path(), &wal, "one")]);
@@ -534,8 +597,16 @@ fn upper_bounds_and_regex_selections_match_gate_off() {
     let dir = tempfile::tempdir().unwrap();
     let svc = vec![kv_str("service.name", "svc-a")];
     let reqs = vec![
-        req_with(svc.clone(), None, &[root_span(1, 0x11, 100 * NS, 102 * NS, "get-users")]),
-        req_with(svc.clone(), None, &[root_span(2, 0x21, 200 * NS, 220 * NS, "post-orders")]),
+        req_with(
+            svc.clone(),
+            None,
+            &[root_span(1, 0x11, 100 * NS, 102 * NS, "get-users")],
+        ),
+        req_with(
+            svc.clone(),
+            None,
+            &[root_span(2, 0x21, 200 * NS, 220 * NS, "post-orders")],
+        ),
     ];
     let wal = write_wal(dir.path(), reqs, "upper-regex");
     let sources = || both_roles(|| vec![sealed_source(dir.path(), &wal, "one")]);
@@ -576,12 +647,16 @@ fn split_root_claims_survive_on_any_match() {
     // contradicting themselves across files; same span id, same start
     // — the canonical copy is content-tie-broken, so assert only
     // equality with gate-off, not a specific value).
-    let a = req_with(vec![kv_str("service.name", "svc-a")], None, &[root_span(
-        1, 0x11, 100 * NS, 101 * NS, "op",
-    )]);
-    let b = req_with(vec![kv_str("service.name", "svc-b")], None, &[root_span(
-        1, 0x11, 100 * NS, 101 * NS, "op",
-    )]);
+    let a = req_with(
+        vec![kv_str("service.name", "svc-a")],
+        None,
+        &[root_span(1, 0x11, 100 * NS, 101 * NS, "op")],
+    );
+    let b = req_with(
+        vec![kv_str("service.name", "svc-b")],
+        None,
+        &[root_span(1, 0x11, 100 * NS, 101 * NS, "op")],
+    );
     let wal_a = write_wal(dir.path(), vec![a], "claims-a");
     let wal_b = write_wal(dir.path(), vec![b], "claims-b");
     let sources = || {
@@ -606,9 +681,11 @@ fn split_root_claims_survive_on_any_match() {
 fn pinned_lookups_bypass_the_gate() {
     let dir = tempfile::tempdir().unwrap();
     let svc = vec![kv_str("service.name", "hot")];
-    let reqs = vec![req_with(svc, None, &[root_span(
-        5, 0x51, 100 * NS, 101 * NS, "op",
-    )])];
+    let reqs = vec![req_with(
+        svc,
+        None,
+        &[root_span(5, 0x51, 100 * NS, 101 * NS, "op")],
+    )];
     let wal = write_wal(dir.path(), reqs, "pinned");
     let sources = || both_roles(|| vec![sealed_source(dir.path(), &wal, "one")]);
     let q = || {
@@ -632,9 +709,11 @@ fn pinned_lookups_bypass_the_gate() {
 fn corrupt_rollup_chunk_is_skipped_and_surfaced() {
     let dir = tempfile::tempdir().unwrap();
     let svc = vec![kv_str("service.name", "hot")];
-    let reqs = vec![req_with(svc, None, &[root_span(
-        1, 0x11, 100 * NS, 101 * NS, "op",
-    )])];
+    let reqs = vec![req_with(
+        svc,
+        None,
+        &[root_span(1, 0x11, 100 * NS, 101 * NS, "op")],
+    )];
     let wal = write_wal(dir.path(), reqs, "corrupt-trsu");
     // Seal once, corrupt in place, then build sources WITHOUT resealing.
     drop(sealed_source(dir.path(), &wal, "one"));
@@ -644,15 +723,19 @@ fn corrupt_rollup_chunk_is_skipped_and_surfaced() {
 
     let q = || SearchQuery::new(pred(vec![root_service_eq("hot")]));
     let on = run(build(), q());
-    assert!(on.traces.is_empty(), "indeterminate candidates are excluded");
+    assert!(
+        on.traces.is_empty(),
+        "indeterminate candidates are excluded"
+    );
     assert!(
         on.status.has(PartialReason::SourceFailure),
         "the skip is surfaced: {:?}",
         on.status
     );
 
-    // Gate-off never reads TRSU: the corruption goes UNDISCOVERED and
-    // the trace returns — the designed v1 scope of the principle.
+    // Gate-off never reads TRSU (only the gate does): the corruption
+    // goes UNDISCOVERED and the trace returns — discovery laziness
+    // cuts both ways.
     let off = run(build(), q().trace_gate_for_tests(false));
     assert_eq!(ids(&off), vec![hex(1)]);
     assert_eq!(off.status, QueryStatus::Complete);
@@ -663,9 +746,11 @@ fn corrupt_rollup_chunk_is_skipped_and_surfaced() {
 fn corrupt_bloom_chunk_is_skipped_and_surfaced() {
     let dir = tempfile::tempdir().unwrap();
     let svc = vec![kv_str("service.name", "hot")];
-    let reqs = vec![req_with(svc, None, &[root_span(
-        1, 0x11, 100 * NS, 101 * NS, "op",
-    )])];
+    let reqs = vec![req_with(
+        svc,
+        None,
+        &[root_span(1, 0x11, 100 * NS, 101 * NS, "op")],
+    )];
     let wal = write_wal(dir.path(), reqs, "corrupt-tblm");
     drop(sealed_source(dir.path(), &wal, "one"));
     let path = sealed_path(dir.path(), "one");
@@ -675,7 +760,11 @@ fn corrupt_bloom_chunk_is_skipped_and_surfaced() {
     let q = || SearchQuery::new(pred(vec![root_service_eq("hot")]));
     let on = run(build(), q());
     assert!(on.traces.is_empty());
-    assert!(on.status.has(PartialReason::SourceFailure), "{:?}", on.status);
+    assert!(
+        on.status.has(PartialReason::SourceFailure),
+        "{:?}",
+        on.status
+    );
 }
 
 /// The recorded status delta, pinned: a pruned candidate's would-have-
@@ -689,12 +778,16 @@ fn pruned_candidates_sizecap_partial_is_never_observed() {
     let hot = vec![kv_str("service.name", "hot")];
     let reqs = vec![
         // Trace 1: 4 spans — truncated under a span cap of 2.
-        req_with(cold, None, &[
-            root_span(1, 0x11, 100 * NS, 101 * NS, "op"),
-            span_in(1, 0x12, 0x11, 100 * NS + 10, "child"),
-            span_in(1, 0x13, 0x11, 100 * NS + 20, "child"),
-            span_in(1, 0x14, 0x11, 100 * NS + 30, "child"),
-        ]),
+        req_with(
+            cold,
+            None,
+            &[
+                root_span(1, 0x11, 100 * NS, 101 * NS, "op"),
+                span_in(1, 0x12, 0x11, 100 * NS + 10, "child"),
+                span_in(1, 0x13, 0x11, 100 * NS + 20, "child"),
+                span_in(1, 0x14, 0x11, 100 * NS + 30, "child"),
+            ],
+        ),
         req_with(hot, None, &[root_span(2, 0x21, 200 * NS, 201 * NS, "op")]),
     ];
     let wal = write_wal(dir.path(), reqs, "sizecap-delta");
@@ -724,23 +817,31 @@ fn mid_tier_resolution_and_the_resolver_closed_rule() {
     let dir = tempfile::tempdir().unwrap();
     let svc = vec![kv_str("service.name", "svc")];
     let names: Vec<String> = (0..150).map(|i| format!("op-{i:03}")).collect();
-    let leaked: Vec<&'static str> =
-        names.iter().map(|n| &*Box::leak(n.clone().into_boxed_str())).collect();
+    let leaked: Vec<&'static str> = names
+        .iter()
+        .map(|n| &*Box::leak(n.clone().into_boxed_str()))
+        .collect();
     let reqs: Vec<ExportTraceServiceRequest> = (0..150u64)
         .map(|i| {
-            req_with(svc.clone(), None, &[root_span(
-                (i + 1) as u8,
-                0x10,
-                (i + 1) * NS,
-                (i + 1) * NS + 50,
-                leaked[i as usize],
-            )])
+            req_with(
+                svc.clone(),
+                None,
+                &[root_span(
+                    (i + 1) as u8,
+                    0x10,
+                    (i + 1) * NS,
+                    (i + 1) * NS + 50,
+                    leaked[i as usize],
+                )],
+            )
         })
         .collect();
     let wal = write_wal(dir.path(), reqs, "midtier");
     let sources = || both_roles(|| vec![sealed_source(dir.path(), &wal, "one")]);
 
-    // Trace ids wrap u8 (150 traces), so pick target 42 by name only.
+    // One distinct name per trace (ids 1..=150 stay inside u8): the
+    // query targets its trace by name, and the assertion pins ONE
+    // match — not which trace id returned.
     let q = || {
         SearchQuery::new(pred(vec![builtin(
             BuiltinField::RootName,
@@ -750,7 +851,11 @@ fn mid_tier_resolution_and_the_resolver_closed_rule() {
     };
     let on = run(sources(), q());
     let off = run(sources(), q().trace_gate_for_tests(false));
-    assert_eq!(on.traces.len(), 1, "mid-tier dictionary resolves in the gate");
+    assert_eq!(
+        on.traces.len(),
+        1,
+        "mid-tier dictionary resolves in the gate"
+    );
     assert_eq!(norm(&on), norm(&off));
 
     // The closed rule, on the sealed file directly.
@@ -794,9 +899,11 @@ fn mid_tier_resolution_and_the_resolver_closed_rule() {
 fn pruning_masks_assembly_only_corruption_by_design() {
     let dir = tempfile::tempdir().unwrap();
     let cold = vec![kv_str("service.name", "cold")];
-    let reqs = vec![req_with(cold, None, &[root_span(
-        1, 0x11, 100 * NS, 101 * NS, "op",
-    )])];
+    let reqs = vec![req_with(
+        cold,
+        None,
+        &[root_span(1, 0x11, 100 * NS, 101 * NS, "op")],
+    )];
     let wal = write_wal(dir.path(), reqs, "masked");
     drop(sealed_source(dir.path(), &wal, "one"));
     let path = sealed_path(dir.path(), "one");
@@ -836,14 +943,22 @@ fn ambiguous_root_ties_abstain_and_never_diverge() {
     // Same span id + start; CLIENT(3)/svc-first stored first,
     // SERVER(2)/svc-canon second — the combiner orders by kind, so the
     // canonical root is the SERVER copy whichever was stored first.
-    let first = req_with(vec![kv_str("service.name", "svc-first")], None, &[SpanSpec {
-        kind: 3,
-        ..root_span(1, 0x42, 100 * NS, 101 * NS, "op")
-    }]);
-    let second = req_with(vec![kv_str("service.name", "svc-canon")], None, &[SpanSpec {
-        kind: 2,
-        ..root_span(1, 0x42, 100 * NS, 101 * NS, "op")
-    }]);
+    let first = req_with(
+        vec![kv_str("service.name", "svc-first")],
+        None,
+        &[SpanSpec {
+            kind: 3,
+            ..root_span(1, 0x42, 100 * NS, 101 * NS, "op")
+        }],
+    );
+    let second = req_with(
+        vec![kv_str("service.name", "svc-canon")],
+        None,
+        &[SpanSpec {
+            kind: 2,
+            ..root_span(1, 0x42, 100 * NS, 101 * NS, "op")
+        }],
+    );
     let wal = write_wal(dir.path(), vec![first, second], "tie");
     let sources = || both_roles(|| vec![sealed_source(dir.path(), &wal, "one")]);
 
@@ -879,11 +994,15 @@ fn high_tier_resolution_matches_gate_off() {
         .map(|i| {
             let mut trace = [0u8; 16];
             trace[14..16].copy_from_slice(&(i as u16 + 1).to_be_bytes());
-            req_with(svc.clone(), None, &[SpanSpec {
-                trace,
-                end: (i + 1) * NS + 50,
-                ..sp(0x10, 0, (i + 1) * NS, names[i as usize])
-            }])
+            req_with(
+                svc.clone(),
+                None,
+                &[SpanSpec {
+                    trace,
+                    end: (i + 1) * NS + 50,
+                    ..sp(0x10, 0, (i + 1) * NS, names[i as usize])
+                }],
+            )
         })
         .collect();
     let wal = write_wal(dir.path(), reqs, "hightier");
@@ -919,7 +1038,10 @@ fn differential_gate_on_off_sweep() {
     struct Lcg(u64);
     impl Lcg {
         fn next(&mut self, bound: u64) -> u64 {
-            self.0 = self.0.wrapping_mul(6364136223846793005).wrapping_add(1442695040888963407);
+            self.0 = self
+                .0
+                .wrapping_mul(6364136223846793005)
+                .wrapping_add(1442695040888963407);
             (self.0 >> 33) % bound
         }
     }
@@ -946,7 +1068,11 @@ fn differential_gate_on_off_sweep() {
                 });
             }
             let req = req_with(vec![kv_str("service.name", svc)], None, &spans);
-            if t % 2 == 0 { reqs_a.push(req) } else { reqs_b.push(req) }
+            if t % 2 == 0 {
+                reqs_a.push(req)
+            } else {
+                reqs_b.push(req)
+            }
         }
         let wal_a = write_wal(dir.path(), reqs_a, "diff-a");
         let wal_b = write_wal(dir.path(), reqs_b, "diff-b");
@@ -984,7 +1110,9 @@ fn differential_gate_on_off_sweep() {
             let on = run(sources(), SearchQuery::new(predicate.clone()).limit(30));
             let off = run(
                 sources(),
-                SearchQuery::new(predicate).limit(30).trace_gate_for_tests(false),
+                SearchQuery::new(predicate)
+                    .limit(30)
+                    .trace_gate_for_tests(false),
             );
             assert_eq!(norm(&on), norm(&off), "seed {seed} query {qi}");
         }

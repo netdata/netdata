@@ -225,8 +225,8 @@ RRDR *rrd2rrdr_group_by_initialize(ONEWAYALLOC *owa, QUERY_TARGET *qt) {
         // v1 query
         RRDR *r = rrdr_create(owa, qt, qt->query.used, qt->window.points);
         if(unlikely(!r)) {
-            internal_error(true, "QUERY: cannot create RRDR for %s, after=%ld, before=%ld, dimensions=%u, points=%zu",
-                           qt->id, qt->window.after, qt->window.before, qt->query.used, qt->window.points);
+            internal_error(true, "QUERY: cannot create RRDR for %s, after=%" PRId64 ", before=%" PRId64 ", dimensions=%u, points=%zu",
+                           qt->id, (int64_t)qt->window.after, (int64_t)qt->window.before, qt->query.used, qt->window.points);
             return NULL;
         }
         r->group_by.r = NULL;
@@ -314,16 +314,25 @@ RRDR *rrd2rrdr_group_by_initialize(ONEWAYALLOC *owa, QUERY_TARGET *qt) {
     // so a percentage aggregation on a NONE pass resolves to NORMAL mode
     // everywhere - the same behavior such a query had before this scan
     ssize_t percentage_of_group_pass = -1;
+    size_t final_group_by_pass = 0;
     for(size_t g = 0; g < MAX_QUERY_GROUP_BY_PASSES ;g++) {
         if(qt->request.group_by[g].group_by == RRDR_GROUP_BY_NONE)
             break;
 
-        if((qt->request.group_by[g].group_by & RRDR_GROUP_BY_PERCENTAGE_OF_INSTANCE) ||
-            qt->request.group_by[g].aggregation == RRDR_GROUP_BY_FUNCTION_PERCENTAGE) {
+        final_group_by_pass = g;
+
+        if(percentage_of_group_pass < 0 &&
+           ((qt->request.group_by[g].group_by & RRDR_GROUP_BY_PERCENTAGE_OF_INSTANCE) ||
+            qt->request.group_by[g].aggregation == RRDR_GROUP_BY_FUNCTION_PERCENTAGE)) {
             percentage_of_group_pass = (ssize_t)g;
-            break;
         }
     }
+
+    bool final_pass_needs_raw_anomaly_contributors =
+        !query_target_aggregatable(qt) && final_group_by_pass > 0 &&
+        (qt->request.group_by[final_group_by_pass].aggregation == RRDR_GROUP_BY_FUNCTION_AVERAGE ||
+         qt->request.group_by[final_group_by_pass].aggregation == RRDR_GROUP_BY_FUNCTION_PERCENTAGE ||
+         (qt->request.group_by[final_group_by_pass].group_by & RRDR_GROUP_BY_PERCENTAGE_OF_INSTANCE));
 
     size_t added = 0;
     RRDR *first_r = NULL, *last_r = NULL;
@@ -472,8 +481,8 @@ RRDR *rrd2rrdr_group_by_initialize(ONEWAYALLOC *owa, QUERY_TARGET *qt) {
         RRDR *r = rrdr_create(owa, qt, added, qt->window.points);
         if (!r) {
             internal_error(true,
-                           "QUERY: cannot create group by RRDR for %s, after=%ld, before=%ld, dimensions=%zu, points=%zu",
-                           qt->id, qt->window.after, qt->window.before, added, qt->window.points);
+                           "QUERY: cannot create group by RRDR for %s, after=%" PRId64 ", before=%" PRId64 ", dimensions=%zu, points=%zu",
+                           qt->id, (int64_t)qt->window.after, (int64_t)qt->window.before, added, qt->window.points);
             goto cleanup;
         }
         // prevent double free at cleanup in case of error
@@ -509,6 +518,10 @@ RRDR *rrd2rrdr_group_by_initialize(ONEWAYALLOC *owa, QUERY_TARGET *qt) {
             if(r->n) {
                 r->gbc = onewayalloc_callocz(
                     owa, onewayalloc_mul_or_fatal(r->n, r->d, "RRDR group-by counts"), sizeof(*r->gbc));
+
+                if(final_grouping && final_pass_needs_raw_anomaly_contributors)
+                    r->arc = onewayalloc_callocz(
+                        owa, onewayalloc_mul_or_fatal(r->n, r->d, "RRDR anomaly-rate contributors"), sizeof(*r->arc));
 
                 if(hidden_dimensions && ((group_by & RRDR_GROUP_BY_PERCENTAGE_OF_INSTANCE) || (aggregation_method == RRDR_GROUP_BY_FUNCTION_PERCENTAGE))) {
                     // this is where we are going to group the hidden dimensions
@@ -574,8 +587,8 @@ RRDR *rrd2rrdr_group_by_initialize(ONEWAYALLOC *owa, QUERY_TARGET *qt) {
     r_tmp = rrdr_create(owa, qt, 1, qt->window.points);
     if (!r_tmp) {
         internal_error(true,
-                       "QUERY: cannot create group by temporary RRDR for %s, after=%ld, before=%ld, dimensions=%d, points=%zu",
-                       qt->id, qt->window.after, qt->window.before, 1, qt->window.points);
+                       "QUERY: cannot create group by temporary RRDR for %s, after=%" PRId64 ", before=%" PRId64 ", dimensions=%d, points=%zu",
+                       qt->id, (int64_t)qt->window.after, (int64_t)qt->window.before, 1, qt->window.points);
         goto cleanup;
     }
     rrd2rrdr_set_timestamps(r_tmp);

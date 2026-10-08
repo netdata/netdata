@@ -2,9 +2,12 @@
 
 package powerstore
 
-import "sync"
+import (
+	"context"
+	"sync"
+)
 
-func (c *Collector) collectNodes() {
+func (c *Collector) collectNodes(ctx context.Context) {
 	var wg sync.WaitGroup
 
 	for id, node := range c.discovered.nodes {
@@ -14,7 +17,7 @@ func (c *Collector) collectNodes() {
 			c.sem <- struct{}{}
 			defer func() { <-c.sem }()
 
-			pm, err := c.client.PerformanceMetricsByNode(id)
+			pm, err := c.client.PerformanceMetricsByNode(ctx, id)
 			if err != nil {
 				c.Warningf("error collecting node %s perf metrics: %v", id, err)
 			} else if len(pm) > 0 {

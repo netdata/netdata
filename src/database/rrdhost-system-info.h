@@ -19,6 +19,13 @@ struct rrdhost_system_info {
     char *host_os_version;
     char *host_os_version_id;
     char *host_os_detection;
+    // Host-label metadata intentionally stays out of the public system-info serializers.
+    char *host_os_label_name;
+    char *host_os_label_version;
+    char *host_os_label_release;
+    char *host_os_label_codename;
+    char *host_os_label_edition;
+    char *host_os_label_build;
     char *host_cores;
     char *host_cpu_freq;
     char *host_cpu_model;
@@ -111,8 +118,9 @@ int rrdhost_system_info_foreach(struct rrdhost_system_info *system_info, add_hos
 struct update_node_info;
 void rrdhost_system_info_to_node_info(struct rrdhost_system_info *system_info, struct update_node_info *node_info);
 
+size_t rrdhost_system_info_streaming_function_columns(BUFFER *wb, size_t field_id);
 void rrdhost_system_info_to_streaming_function_array(BUFFER *wb, struct rrdhost_system_info *system_info);
-void rrdhost_system_info_to_json_object_fields(BUFFER *wb, struct rrdhost_system_info *system_info);
+void rrdhost_system_info_streaming_function_group_by(BUFFER *wb);
 
 bool get_daemon_status_fields_from_system_info(DAEMON_STATUS_FILE *ds);
 void rrdhost_system_info_swap(struct rrdhost_system_info *a, struct rrdhost_system_info *b);

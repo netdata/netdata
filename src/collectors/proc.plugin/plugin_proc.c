@@ -211,7 +211,7 @@ void proc_main(void *ptr)
 
     worker_register("PROC");
 
-    rrd_collector_started();
+    nrpc_serving_started();
 
     if (inicfg_get_boolean(&netdata_config, "plugin:proc", "/proc/net/dev", CONFIG_BOOLEAN_YES)) {
         netdata_log_debug(D_SYSTEM, "Starting thread %s.", THREAD_NETDEV_NAME);

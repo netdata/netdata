@@ -203,10 +203,6 @@ func indexSemanticChartPolicies(
 				errs = append(errs, fmt.Errorf("production profile %q chart %s declares redundant explicit ID %q",
 					profile.Name, policy.RuntimePath, policy.ExplicitID))
 			}
-			if policy.Priority != 0 {
-				errs = append(errs, fmt.Errorf("production profile %q chart %s declares priority %d",
-					profile.Name, policy.RuntimePath, policy.Priority))
-			}
 			if policy.WildcardIdentity {
 				errs = append(errs, fmt.Errorf("production profile %q chart %s uses wildcard all-label identity",
 					profile.Name, policy.RuntimePath))

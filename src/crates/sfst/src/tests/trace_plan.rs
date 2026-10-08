@@ -1,14 +1,26 @@
-//! Per-file trace-search plan evaluation: tier matrix, conjunction,
-//! duration bounds, work counting, and the rank-bounded-extraction
-//! proof (positions emitted = min(K, matched), never the full set).
+//! Tests for the per-file search-plan executor
+//! (`index_reader/trace_plan.rs`): one compilation resolving every
+//! term against a file, then rank-bounded extractions of the newest-K
+//! matched positions. Pins: per-tier term resolution (exact, regex,
+//! dictionary numerics), cross-term conjunction, negation (the pinned
+//! `presence ∩ complement` rule), duration bounds, work accounting
+//! (free dictionary terms, ONE shared stream-batch pass, in-scan
+//! budget stops), and the rank-bounded proof — emission is
+//! `min(K, matched)`, never the full set.
+//!
+//! One shared 256-row fixture (one field per tier at threshold 10,
+//! plus a sparse field and a DURN column) is checked against a
+//! brute-force full-scan oracle; dedicated fixtures cover what it
+//! structurally cannot — multi-batch masking, the short-circuit arms
+//! (no event/link index; empty matching set with the chunk present),
+//! and a file without DURN.
 
 use std::io::Cursor;
 
 use bumpalo::Bump;
 
 use crate::{
-    CompiledTracePlan, Durations, IndexReader, IndexWriter, PlanTerm, RowIndex, ScanWork,
-    TracePlan,
+    CompiledTracePlan, Durations, IndexReader, IndexWriter, PlanTerm, RowIndex, ScanWork, TracePlan,
 };
 
 /// One fixture row's field values, mirrored for the oracle.
@@ -22,7 +34,7 @@ struct FixtureRow {
     s: Option<String>,
     /// Mid-card numeric-valued field (`i % 50`).
     num: i64,
-    /// High-card numeric-valued field (`(i % 130).5`).
+    /// High-card numeric-valued field (`(i % 130) + 0.5`).
     fnum: f64,
     dur: i64,
 }
@@ -70,8 +82,7 @@ fn fixture() -> (Vec<u8>, Vec<FixtureRow>) {
         rows.push(row);
     }
     ri.durations = Some(Durations(durations));
-    let (buf, _s, _m) =
-        IndexWriter::write_into(&ri, Cursor::new(Vec::new()), Vec::new()).unwrap();
+    let (buf, _s, _m) = IndexWriter::write_into(&ri, Cursor::new(Vec::new()), Vec::new()).unwrap();
     (buf.into_inner(), rows)
 }
 
@@ -87,6 +98,8 @@ fn plan(terms: Vec<PlanTerm>) -> TracePlan {
     TracePlan { terms }
 }
 
+/// [`tokens`] with `negated: true` — the pinned
+/// `presence ∩ complement` rule.
 fn not_tokens(field: &str, exact: &[&str], patterns: &[&str]) -> PlanTerm {
     let PlanTerm::Fields {
         fields, matcher, ..
@@ -101,6 +114,8 @@ fn not_tokens(field: &str, exact: &[&str], patterns: &[&str]) -> PlanTerm {
     }
 }
 
+/// A numeric-comparison `Fields` term; `negated` applies the same
+/// `presence ∩ complement` rule.
 fn number(field: &str, cmp: crate::NumberCmp, values: &[f64], negated: bool) -> PlanTerm {
     PlanTerm::Fields {
         fields: vec![field.to_string()],
@@ -135,8 +150,11 @@ fn oracle(
     matched.split_off(cut)
 }
 
-/// Every tier (exact and regex), cross-tier conjunctions, and duration
-/// bounds return exactly the oracle's newest-K, at several K and windows.
+/// The term matrix returns exactly the oracle's newest-K at several
+/// windows and K: every tier (exact and regex), cross-tier
+/// conjunctions, negation, multi-field OR, dictionary numerics, and
+/// duration bounds. Count agrees with the oracle, and extraction work
+/// equals emitted positions for both extraction shapes.
 #[test]
 fn tier_matrix_matches_the_oracle() {
     let (bytes, rows) = fixture();
@@ -162,10 +180,7 @@ fn tier_matrix_matches_the_oracle() {
             Box::new(|r: &FixtureRow| r.m == "v01" || r.m == "v02"),
         ),
         // Regex per tier (full-value anchored).
-        (
-            plan(vec![tokens("l", &[], &["a|b"])]),
-            Box::new(|_| true),
-        ),
+        (plan(vec![tokens("l", &[], &["a|b"])]), Box::new(|_| true)),
         (
             plan(vec![tokens("m", &[], &["v0[12]"])]),
             Box::new(|r: &FixtureRow| r.m == "v01" || r.m == "v02"),
@@ -181,9 +196,7 @@ fn tier_matrix_matches_the_oracle() {
                 tokens("m", &["v02"], &[]),
                 tokens("h", &[], &["w0.."]),
             ]),
-            Box::new(|r: &FixtureRow| {
-                r.l == "a" && r.m == "v02" && r.h.starts_with("w0")
-            }),
+            Box::new(|r: &FixtureRow| r.l == "a" && r.m == "v02" && r.h.starts_with("w0")),
         ),
         // Two high-card terms (the shared stream-batch pass).
         (
@@ -208,7 +221,7 @@ fn tier_matrix_matches_the_oracle() {
             ]),
             Box::new(|r: &FixtureRow| r.l == "b" && r.dur >= 1_000),
         ),
-        // ── Stage B: negation (presence ∩ complement) per tier ──────
+        // ── Negation: presence ∩ complement, per tier ──────
         // Sparse low field: absent rows never satisfy a negation.
         (
             plan(vec![not_tokens("s", &["yes"], &[])]),
@@ -229,8 +242,11 @@ fn tier_matrix_matches_the_oracle() {
             Box::new(|r: &FixtureRow| r.h != "w005"),
         ),
         // A negated term on an ABSENT field matches nothing.
-        (plan(vec![not_tokens("absent", &["x"], &[])]), Box::new(|_| false)),
-        // ── Stage B: multi-field OR (the unscoped disjunction) ──────
+        (
+            plan(vec![not_tokens("absent", &["x"], &[])]),
+            Box::new(|_| false),
+        ),
+        // ── Multi-field OR (the unscoped disjunction) ──────
         (
             plan(vec![PlanTerm::Fields {
                 fields: vec!["s".to_string(), "l".to_string()],
@@ -240,9 +256,7 @@ fn tier_matrix_matches_the_oracle() {
                 },
                 negated: false,
             }]),
-            Box::new(|r: &FixtureRow| {
-                r.s.as_deref() == Some("yes") || r.l == "a"
-            }),
+            Box::new(|r: &FixtureRow| r.s.as_deref() == Some("yes") || r.l == "a"),
         ),
         // Negated multi-field: present in either, matching in neither.
         (
@@ -255,12 +269,11 @@ fn tier_matrix_matches_the_oracle() {
                 negated: true,
             }]),
             Box::new(|r: &FixtureRow| {
-                let matches =
-                    r.s.as_deref() == Some("yes") || r.l == "a";
+                let matches = r.s.as_deref() == Some("yes") || r.l == "a";
                 !matches // l is always present, so presence always holds
             }),
         ),
-        // ── Stage B: dictionary numerics ────────────────────────────
+        // ── Dictionary numerics ────────────────────────────
         (
             plan(vec![number("num", crate::NumberCmp::Gte, &[45.0], false)]),
             Box::new(|r: &FixtureRow| r.num >= 45),
@@ -288,7 +301,7 @@ fn tier_matrix_matches_the_oracle() {
             plan(vec![number("m", crate::NumberCmp::Gte, &[0.0], false)]),
             Box::new(|_| false),
         ),
-        // ── Stage B: duration interval sets, straight and negated ───
+        // ── Duration interval sets, straight and negated ───
         (
             plan(vec![PlanTerm::Duration {
                 intervals: vec![(Some(0), Some(50)), (Some(1_000), Some(1_100))],
@@ -305,7 +318,7 @@ fn tier_matrix_matches_the_oracle() {
             }]),
             Box::new(|r: &FixtureRow| r.dur != 100 && r.dur != 200),
         ),
-        // ── Stage B composed: negation ∧ numeric ∧ token ────────────
+        // ── Composed: negation ∧ numeric ∧ token ────────────
         (
             plan(vec![
                 tokens("l", &["a"], &[]),
@@ -338,6 +351,20 @@ fn tier_matrix_matches_the_oracle() {
                     "case {ci}: count agrees with the oracle"
                 );
             }
+            // The whole-set extraction is the k = "everything" oracle,
+            // and charges exactly what it emits.
+            let mut w = ScanWork::default();
+            let all = compiled.matched_in_range(lo, hi, &mut w);
+            assert_eq!(
+                all,
+                oracle(rows.as_slice(), pred, lo, hi, N),
+                "case {ci}, window [{lo},{hi}): matched_in_range = full oracle"
+            );
+            assert_eq!(
+                w.rows_visited,
+                all.len() as u64,
+                "case {ci}: whole-set extraction work = emitted positions"
+            );
         }
     }
 }
@@ -350,7 +377,10 @@ fn absent_field_collapses_the_conjunction() {
     let mut work = ScanWork::default();
     let compiled = compile(
         &idx,
-        &plan(vec![tokens("l", &["a"], &[]), tokens("absent", &["x"], &[])]),
+        &plan(vec![
+            tokens("l", &["a"], &[]),
+            tokens("absent", &["x"], &[]),
+        ]),
         &mut work,
     );
     assert_eq!(compiled.count_in_range(0, N as u32), 0);
@@ -436,8 +466,7 @@ fn narrow_high_terms_visit_only_their_masked_batches() {
         let slots = vec![ri.intern(None, &kv)];
         ri.row(1_000 + i as i64, &slots);
     }
-    let (buf, _s, _m) =
-        IndexWriter::write_into(&ri, Cursor::new(Vec::new()), Vec::new()).unwrap();
+    let (buf, _s, _m) = IndexWriter::write_into(&ri, Cursor::new(Vec::new()), Vec::new()).unwrap();
     let bytes = buf.into_inner();
     let idx = IndexReader::open(&bytes).unwrap();
 
@@ -497,20 +526,30 @@ fn extraction_edges() {
     let compiled = compile(&idx, &p, &mut work);
     let matched = oracle(&rows, |r| r.m == "v03", 0, N as u32, N);
 
-    assert!(compiled.newest_in_range(0, N as u32, 0, &mut work).is_empty());
+    assert!(
+        compiled
+            .newest_in_range(0, N as u32, 0, &mut work)
+            .is_empty()
+    );
     assert!(compiled.newest_in_range(50, 50, 5, &mut work).is_empty());
     assert!(compiled.newest_in_range(60, 50, 5, &mut work).is_empty());
     // hi past the universe clamps.
-    assert_eq!(
-        compiled.newest_in_range(0, u32::MAX, N, &mut work),
-        matched
-    );
+    assert_eq!(compiled.newest_in_range(0, u32::MAX, N, &mut work), matched);
     // k beyond the match count returns all matches.
     assert_eq!(
         compiled.newest_in_range(0, N as u32, N * 10, &mut work),
         matched
     );
     assert_eq!(compiled.count_in_range(0, u32::MAX), matched.len() as u64);
+
+    // The whole-set extraction shares the window edges: empty and
+    // inverted windows emit nothing, hi past the universe clamps.
+    let mut w = ScanWork::default();
+    assert!(compiled.matched_in_range(50, 50, &mut w).is_empty());
+    assert!(compiled.matched_in_range(60, 50, &mut w).is_empty());
+    assert_eq!(w.rows_visited, 0, "empty extractions charge nothing");
+    assert_eq!(compiled.matched_in_range(0, u32::MAX, &mut w), matched);
+    assert_eq!(w.rows_visited, matched.len() as u64);
 }
 
 /// A malformed regex is a hard compile error, whichever tier the field
@@ -544,8 +583,7 @@ fn duration_term_requires_the_durn_column() {
     let mut ri = RowIndex::new(&arena, 10);
     let t = ri.intern(None, "l=a");
     ri.row(1_000, &[t]);
-    let (buf, _s, _m) =
-        IndexWriter::write_into(&ri, Cursor::new(Vec::new()), Vec::new()).unwrap();
+    let (buf, _s, _m) = IndexWriter::write_into(&ri, Cursor::new(Vec::new()), Vec::new()).unwrap();
     let bytes = buf.into_inner();
     let idx = IndexReader::open(&bytes).unwrap();
     let mut work = ScanWork::default();
@@ -579,7 +617,12 @@ fn compile_budget_stops_the_stream_batch_scan() {
     // still compiles them.
     let mut w2 = ScanWork::default();
     let low = idx
-        .compile_trace_plan(&plan(vec![tokens("l", &["a"], &[])]), (0, N as u32), 0, &mut w2)
+        .compile_trace_plan(
+            &plan(vec![tokens("l", &["a"], &[])]),
+            (0, N as u32),
+            0,
+            &mut w2,
+        )
         .unwrap();
     assert!(low.is_some());
     assert_eq!(w2.rows_visited, 0);
@@ -668,19 +711,18 @@ fn empty_event_kvid_set_short_circuits_with_the_chunk_present() {
     let mut events = crate::EventRows::new();
     for i in 0..ROWS {
         let h = ri.intern(None, &format!("h=w{i:03}"));
-        // events.name must be HIGH-TIER too: a low/mid-tier field's
-        // prefilter parts are all Ready, and their AND-to-empty arm of
-        // group_ready_empty short-circuits on its own — only a
-        // probe-based (non-Ready) prefilter leaves the empty-KvId
-        // disjunct as the load-bearing check.
+        // The queried value is absent from the events.name dictionary,
+        // so the condition is empty-KvId IMPOSSIBLE and its prefilter
+        // part is a ready empty set — both short-circuit arms agree.
+        // The test pins the outcome with the chunk present (zero
+        // budget compiles, no rows visited), not which arm fired.
         let name = ri.intern(None, &format!("events.name=e{i:03}"));
         ri.row(1_000 + i as i64, &[h, name]);
         events.push_event(1_000 + i as u64, 0, name, &[]);
         events.end_row(0);
     }
     ri.events = Some(events);
-    let (buf, _s, _m) =
-        IndexWriter::write_into(&ri, Cursor::new(Vec::new()), Vec::new()).unwrap();
+    let (buf, _s, _m) = IndexWriter::write_into(&ri, Cursor::new(Vec::new()), Vec::new()).unwrap();
     let bytes = buf.into_inner();
     let idx = IndexReader::open(&bytes).unwrap();
     assert!(idx.has_event_index(), "the fixture must carry EVNB");
@@ -721,5 +763,9 @@ fn empty_event_kvid_set_short_circuits_with_the_chunk_present() {
         .compile_trace_plan(&p, (0, ROWS as u32), u64::MAX, &mut work)
         .unwrap()
         .expect("within budget");
-    assert_eq!(compiled.count_in_range(0, ROWS as u32), 1, "only row 5 carries e005");
+    assert_eq!(
+        compiled.count_in_range(0, ROWS as u32),
+        1,
+        "only row 5 carries e005"
+    );
 }

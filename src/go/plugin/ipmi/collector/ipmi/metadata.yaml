@@ -1,0 +1,258 @@
+plugin_name: ipmi.plugin
+modules:
+  - meta:
+      id: collector-ipmi.plugin-ipmi
+      plugin_name: ipmi.plugin
+      module_name: ipmi
+      monitored_instance:
+        name: IPMI (experimental Go collector)
+        link: https://www.intel.com/content/www/us/en/products/docs/servers/ipmi/ipmi-home.html
+        icon_filename: microchip.svg
+        categories:
+          - data-collection.hardware-and-sensors
+      keywords:
+        - ipmi
+        - bmc
+        - openipmi
+        - hardware sensors
+        - system event log
+      related_resources:
+        integrations:
+          list: []
+      info_provided_to_referring_integrations:
+        description: ''
+    overview:
+      data_collection:
+        metrics_description: Monitor hardware sensor readings, sensor health and System Event Log entries through IPMI.
+        method_description: Queries the local Linux OpenIPMI device. The collector
+          reads sensors and SEL metadata; it does not change BMC configuration or clear the event log.
+      supported_platforms:
+        include:
+          - Linux
+        exclude: []
+      multi_instance: true
+      additional_permissions:
+        description: Local collection requires read/write access to the selected OpenIPMI device. Installation grants no
+          setuid mode, capabilities or device permissions.
+      default_behavior:
+        auto_detection:
+          description: No jobs start by default. Build the experimental plugin explicitly and configure the target.
+        limits:
+          description: 'This experimental plugin requires Linux amd64 or arm64 and supports local OpenIPMI only. Keep
+            FreeIPMI for legacy direct drivers, OEM interpretation or custom FreeIPMI interpretation files. Unknown or
+            unavailable sensor readings leave gaps. Default FreeIPMI policy treats non-critical threshold assertions as
+            nominal. Do not run both IPMI plugins against the same host with the canonical ipmi job name because chart
+            IDs overlap. The Go collector uses separate ipmi_go.* contexts and the ipmi-go-sensors Function.'
+        performance_impact:
+          description: IPMI command latency grows with sensor count. Increase update_every when a complete sensor scan
+            takes longer than the configured interval.
+    setup:
+      prerequisites:
+        list:
+          - title: Build the experimental plugin
+            description: Run `sudo ./netdata-installer.sh --enable-plugin-ipmi` from a source checkout. The option is
+              OFF in production builds. Installation uses ordinary executable permissions.
+          - title: Select one IPMI plugin
+            description: Before activating a Go IPMI job, set `freeipmi = no` in the `[plugins]` section of
+              netdata.conf. Use a trusted configuration and explicit sudo invocation for local debugging when the device
+              is root-only. For normal Agent execution, arrange device access according to the host security policy.
+      configuration:
+        file:
+          name: ipmi/ipmi.conf
+          description: ''
+        options:
+          description: Options apply to each local IPMI job. Remote LAN/LAN+ is not supported in this experimental
+            build.
+          folding:
+            title: Options
+            enabled: false
+          list:
+            - name: driver
+              description: Local Linux OpenIPMI transport. Only open is supported.
+              default_value: open
+              required: false
+              group: Connection
+            - name: device
+              description: Local OpenIPMI device number.
+              default_value: 0
+              required: false
+              group: Connection
+            - name: update_every
+              description: Data collection frequency in seconds.
+              default_value: 5
+              required: false
+              group: Collection
+            - name: timeout
+              description: Receive timeout for each IPMI command. Stopping a job can wait for an in-flight receive to
+                finish.
+              default_value: 5s
+              required: false
+              group: Collection
+            - name: collect_sel
+              description: Collect the System Event Log entry count.
+              default_value: true
+              required: false
+              group: Collection
+        examples:
+          folding:
+            title: Config
+            enabled: false
+          list:
+            - name: Local device
+              description: Monitor the first kernel IPMI device.
+              config: "jobs:\n  - name: ipmi\n    driver: open\n"
+    troubleshooting:
+      errors:
+        list:
+          - error: permission denied
+            cause: The plugin account cannot open the local IPMI device for reading and writing.
+            fix: Grant device access through the host security policy, or run a trusted local test explicitly with sudo.
+              Rebuilding the plugin does not grant device access.
+    alerts:
+      - name: ipmi_go_sensor_state
+        metric: ipmi_go.sensor_state
+        info: IPMI sensor ${label:sensor} (${label:component}) state
+        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/ipmi.conf
+      - name: ipmi_events
+        metric: ipmi_go.sel
+        info: number of events in the IPMI System Event Log (SEL)
+        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/ipmi.conf
+    metrics:
+      folding:
+        title: Metrics
+        enabled: false
+      description: Each sensor has its own reading and state chart. SEL is the raw repository entry count, including
+        records FreeIPMI may filter during interpretation. The stock SEL alarm targets the canonical local ipmi.events
+        chart; other job chart IDs include the job name.
+      scopes:
+        - name: sensor
+          description: A sensor on the selected BMC.
+          labels:
+            - name: sensor
+              description: Sensor name.
+            - name: type
+              description: IPMI sensor type.
+            - name: component
+              description: Component inferred from the sensor name and type.
+          metrics:
+            - name: ipmi_go.sensor_temperature_c
+              description: IPMI Sensor Temperature
+              unit: Celsius
+              chart_type: line
+              dimensions:
+                - name: temperature
+            - name: ipmi_go.sensor_temperature_f
+              description: IPMI Sensor Temperature
+              unit: Fahrenheit
+              chart_type: line
+              dimensions:
+                - name: temperature
+            - name: ipmi_go.sensor_voltage
+              description: IPMI Sensor Voltage
+              unit: Volts
+              chart_type: line
+              dimensions:
+                - name: voltage
+            - name: ipmi_go.sensor_ampere
+              description: IPMI Sensor Current
+              unit: Amps
+              chart_type: line
+              dimensions:
+                - name: ampere
+            - name: ipmi_go.sensor_fan_speed
+              description: IPMI Sensor Fan Speed
+              unit: RPM
+              chart_type: line
+              dimensions:
+                - name: rotations
+            - name: ipmi_go.sensor_power
+              description: IPMI Sensor Power
+              unit: Watts
+              chart_type: line
+              dimensions:
+                - name: power
+            - name: ipmi_go.sensor_reading_percent
+              description: IPMI Sensor Percentage Reading
+              unit: '%'
+              chart_type: line
+              dimensions:
+                - name: percentage
+            - name: ipmi_go.sensor_state
+              description: IPMI Sensor State
+              unit: state
+              chart_type: stacked
+              dimensions:
+                - name: nominal
+                - name: warning
+                - name: critical
+                - name: unknown
+        - name: global
+          description: The selected BMC System Event Log.
+          labels: []
+          metrics:
+            - name: ipmi_go.sel
+              description: IPMI System Event Log Entries
+              unit: events
+              chart_type: line
+              dimensions:
+                - name: events
+      availability: []
+    functions:
+      description: Inspect the latest successful collection without issuing more IPMI commands.
+      list:
+        - id: sensors
+          function_name: ipmi-go-sensors
+          name: IPMI Sensors
+          description: Show current readings and default FreeIPMI health states, with sensor counts by component and
+            state.
+          parameters:
+            - id: __job
+              name: Instance
+              type: select
+              description: Select the IPMI collection job.
+              required: false
+              default: First available job
+              options: []
+          returns:
+            description: One row per discovered full or compact sensor record, expanded for sharing. Unavailable numeric
+              readings are null.
+            columns:
+              - name: Sensor
+                type: string
+                unit: ''
+                description: Sensor name.
+              - name: Type
+                type: string
+                unit: ''
+                description: IPMI sensor type.
+              - name: Component
+                type: string
+                unit: ''
+                description: Component inferred from the sensor name and type.
+              - name: Reading
+                type: float
+                unit: ''
+                description: Current reading; null when unavailable.
+              - name: Units
+                type: string
+                unit: ''
+                description: Reading units; null for discrete sensors.
+              - name: State
+                type: string
+                unit: ''
+                description: Default FreeIPMI health interpretation.
+              - name: Key
+                type: string
+                unit: ''
+                description: Stable sensor identity within the collection job.
+                visibility: hidden
+              - name: rowOptions
+                type: none
+                unit: ''
+                description: Row health severity.
+                visibility: hidden
+          require_cloud: false
+          performance: Reads the latest completed snapshot without additional BMC requests.
+          security: Read-only sensor data from the configured target.
+          availability: Available while a collection job runs. Returns HTTP 503 before the first successful collection
+            or after a collection failure.

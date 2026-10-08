@@ -8,8 +8,10 @@ import (
 	"testing"
 	"time"
 
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_topology/internal/topologyenrich"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_topology/internal/topologyoptions"
 	topologyv1renderer "github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_topology/internal/topologyv1"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_topology/internal/topologyv1test"
 
 	topologyengine "github.com/netdata/netdata/go/plugins/pkg/l2topology"
 	"github.com/netdata/netdata/go/plugins/pkg/topology/graph"
@@ -23,7 +25,7 @@ import (
 func TestTopologyRegistry_SnapshotAggregatesAcrossCaches(t *testing.T) {
 	registry := newTopologyRegistry()
 
-	cacheA := newTopologyCache()
+	cacheA := newTopologyBuilder()
 	cacheA.updateTime = time.Now()
 	cacheA.lastUpdate = cacheA.updateTime
 	cacheA.agentID = "agent-test"
@@ -51,7 +53,7 @@ func TestTopologyRegistry_SnapshotAggregatesAcrossCaches(t *testing.T) {
 		},
 	}
 
-	cacheB := newTopologyCache()
+	cacheB := newTopologyBuilder()
 	cacheB.updateTime = time.Now().Add(time.Second)
 	cacheB.lastUpdate = cacheB.updateTime
 	cacheB.agentID = "agent-test"
@@ -79,8 +81,8 @@ func TestTopologyRegistry_SnapshotAggregatesAcrossCaches(t *testing.T) {
 		},
 	}
 
-	registry.register(cacheA)
-	registry.register(cacheB)
+	publishTestTopologyBuilder(registry, cacheA)
+	publishTestTopologyBuilder(registry, cacheB)
 
 	data, ok := snapshotTopologyRegistryForTest(registry)
 	require.True(t, ok)
@@ -96,9 +98,133 @@ func TestTopologyRegistry_SnapshotAggregatesAcrossCaches(t *testing.T) {
 func TestBuildSNMPTopologySnapshotPreservesL2BuildError(t *testing.T) {
 	_, ok, err := buildSNMPTopologySnapshot(topologymodel.ObservationAggregate{
 		L2Observations: []topologyengine.L2Observation{{}},
-	}, topologyoptions.DefaultQueryOptions())
+	}, topologyoptions.DefaultQueryOptions(), topologyGraphBuildEnvironment{})
 	require.ErrorContains(t, err, "empty device id")
 	require.False(t, ok)
+}
+
+func TestBuildProbableTopologySnapshotMatchesIndependentLegacyPath(t *testing.T) {
+	collectedAt := time.Date(2026, time.August, 19, 12, 0, 0, 0, time.UTC)
+	observations := []topologyengine.L2Observation{
+		{
+			DeviceID:          "switch-a",
+			Hostname:          "switch-a",
+			ManagementIP:      "192.0.2.1",
+			ManagementAliases: []string{"10.0.0.1", "192.0.2.1"},
+			ChassisID:         "00:11:22:33:44:55",
+			Labels:            map[string]string{"device_category": "Switch", "site": "lab-a"},
+			Interfaces: []topologyengine.ObservedInterface{{
+				IfIndex: 1, IfName: "Gi0/1", IfDescr: "uplink", MAC: "00:11:22:33:44:56",
+				SpeedBps: 1_000_000_000, AdminStatus: "up", OperStatus: "up",
+			}},
+			BridgePorts: []topologyengine.BridgePortObservation{{BasePort: "1", IfIndex: 1}},
+			LLDPRemotes: []topologyengine.LLDPRemoteObservation{{
+				LocalPortNum: "1", LocalPortID: "Gi0/1", ChassisID: "aa:bb:cc:dd:ee:ff",
+				SysName: "switch-b", PortID: "Gi0/2", ManagementIP: "192.0.2.2",
+			}},
+			FDBEntries: []topologyengine.FDBObservation{{
+				MAC: "02:00:00:00:00:10", BridgePort: "1", IfIndex: 1, Status: "learned", VLANID: "10",
+			}},
+			ARPNDEntries: []topologyengine.ARPNDObservation{{
+				Protocol: "arp", IfIndex: 1, IfName: "Gi0/1", IP: "198.51.100.10",
+				MAC: "02:00:00:00:00:10", State: "reachable", AddrType: "ipv4",
+			}},
+		},
+		{
+			DeviceID:          "switch-b",
+			Hostname:          "switch-b",
+			ManagementIP:      "192.0.2.2",
+			ManagementAliases: []string{"10.0.0.2", "192.0.2.2"},
+			ChassisID:         "aa:bb:cc:dd:ee:ff",
+			Labels:            map[string]string{"device_category": "Switch", "site": "lab-b"},
+			Interfaces: []topologyengine.ObservedInterface{{
+				IfIndex: 2, IfName: "Gi0/2", IfDescr: "downlink", MAC: "aa:bb:cc:dd:ee:fe",
+				SpeedBps: 1_000_000_000, AdminStatus: "up", OperStatus: "up",
+			}},
+			BridgePorts: []topologyengine.BridgePortObservation{{BasePort: "2", IfIndex: 2}},
+			FDBEntries: []topologyengine.FDBObservation{{
+				MAC: "02:00:00:00:00:10", BridgePort: "2", IfIndex: 2, Status: "learned", VLANID: "10",
+			}},
+		},
+	}
+	aggregate := topologymodel.ObservationAggregate{
+		L2Observations: observations,
+		L3Interfaces: []topologymodel.L3Interface{
+			{DeviceID: "switch-a", IP: "203.0.113.1", Netmask: "255.255.255.0", IfIndex: "1", IfName: "Gi0/1"},
+			{DeviceID: "switch-b", IP: "203.0.113.2", Netmask: "255.255.255.0", IfIndex: "2", IfName: "Gi0/2"},
+		},
+		Snapshots: []topologymodel.ObservationSnapshot{
+			{
+				LocalDeviceID: "switch-a",
+				LocalDevice: topologymodel.Device{
+					ChassisID: "00:11:22:33:44:55", ChassisIDType: "macAddress", SysName: "switch-a",
+					ManagementIP: "192.0.2.1", Labels: map[string]string{"site": "lab-a"},
+				},
+			},
+			{
+				LocalDeviceID: "switch-b",
+				LocalDevice: topologymodel.Device{
+					ChassisID: "aa:bb:cc:dd:ee:ff", ChassisIDType: "macAddress", SysName: "switch-b",
+					ManagementIP: "192.0.2.2", Labels: map[string]string{"site": "lab-b"},
+				},
+			},
+		},
+		AgentID:     "agent-1",
+		CollectedAt: collectedAt,
+	}
+	options := topologyoptions.DefaultQueryOptions()
+	options.MapType = topologyoptions.MapTypeAllDevicesLowConfidence
+
+	got, ok, err := buildProbableTopologySnapshot(aggregate, options, topologyGraphBuildEnvironment{})
+	require.NoError(t, err)
+	require.True(t, ok)
+
+	want := buildProbableTopologySnapshotIndependentLegacyForTest(t, aggregate, options)
+	require.Equal(t, want, got)
+	wantPayload, err := topologyv1renderer.Render(want)
+	require.NoError(t, err)
+	gotPayload, err := topologyv1renderer.Render(got)
+	require.NoError(t, err)
+	wantJSON := topologyv1test.CanonicalJSON(t, topologyv1test.NormalizeData(t, wantPayload))
+	gotJSON := topologyv1test.CanonicalJSON(t, topologyv1test.NormalizeData(t, gotPayload))
+	require.Equal(t, wantJSON, gotJSON)
+}
+
+func buildProbableTopologySnapshotIndependentLegacyForTest(
+	t *testing.T,
+	aggregate topologymodel.ObservationAggregate,
+	options topologyoptions.QueryOptions,
+) topologymodel.Data {
+	t.Helper()
+
+	strictResult, ok, err := buildSNMPL2TopologyResult(aggregate.L2Observations)
+	require.NoError(t, err)
+	require.True(t, ok)
+	strictOptions := options
+	strictOptions.MapType = topologyoptions.MapTypeHighConfidenceInferred
+	strictData, err := projectSNMPL2TopologyData(
+		strictResult, aggregate.AgentID, aggregate.CollectedAt, strictOptions, topologyGraphBuildEnvironment{},
+	)
+	require.NoError(t, err)
+	augmentTopologySnapshotLocals(&strictData, aggregate.Snapshots)
+	topologyshape.ApplyPolicies(&strictData, strictOptions)
+
+	probableResult, ok, err := buildSNMPL2TopologyResult(aggregate.L2Observations)
+	require.NoError(t, err)
+	require.True(t, ok)
+	probableOptions := options
+	probableOptions.MapType = topologyoptions.MapTypeAllDevicesLowConfidence
+	probableData, err := projectSNMPL2TopologyData(
+		probableResult, aggregate.AgentID, aggregate.CollectedAt, probableOptions, topologyGraphBuildEnvironment{},
+	)
+	require.NoError(t, err)
+	augmentTopologySnapshotLocals(&probableData, aggregate.Snapshots)
+	topologyshape.ApplyPolicies(&probableData, probableOptions)
+
+	topologyshape.MarkProbableDeltaLinks(&strictData, &probableData)
+	topologyenrich.ApplyLayer3(&probableData, aggregate)
+	topologyshape.ApplyDepthFocusFilter(&probableData, options)
+	return probableData
 }
 
 func TestTopologyRegistry_EnqueueReverseDNSWarmFromDefaultSnapshotUsesDisplayCandidates(t *testing.T) {
@@ -120,9 +246,9 @@ func TestTopologyRegistry_EnqueueReverseDNSWarmFromDefaultSnapshotUsesDisplayCan
 	registry.reverseDNSWarmer = dns.topologyReverseDNSWarmer
 	registry.setReverseDNSWarmContext(context.Background())
 
-	cache := newTopologyCache()
+	cache := newTopologyBuilder()
 	seedPublishedEndpointSnapshot(cache)
-	registry.register(cache)
+	publishTestTopologyBuilder(registry, cache)
 
 	require.True(t, registry.enqueueReverseDNSWarmFromDefaultSnapshot())
 	require.Eventually(t, func() bool {
@@ -150,18 +276,20 @@ func TestTopologyRegistry_ReverseDNSCandidatesExcludeDeviceAliases(t *testing.T)
 
 	registry := newTopologyRegistry()
 	registry.reverseDNS = dns.resolver
-	cache := newTopologyCache()
+	cache := newTopologyBuilder()
 	seedPublishedEndpointSnapshot(cache)
 	cache.localDevice.ManagementAddresses = []topologymodel.ManagementAddress{
 		{Address: "10.0.0.10", AddressType: "ipv4", Source: managementAddressSourceCollectorTarget},
 		{Address: "198.51.100.8", AddressType: "ipv4", Source: "lldp_local"},
 	}
-	registry.register(cache)
+	publishTestTopologyBuilder(registry, cache)
 
 	candidates := registry.reverseDNSCandidateCollector()
 	options := defaultTopologyQueryOptionsForTest()
-	options.ResolveDNSName = candidates.lookupCached
-	data, ok, err := registry.snapshotWithOptions(options)
+	data, ok, err := registry.snapshotWithEnvironment(
+		options,
+		topologyGraphBuildEnvironment{resolveDNSName: candidates.lookupCached},
+	)
 	require.NoError(t, err)
 
 	require.True(t, ok)
@@ -203,37 +331,42 @@ func TestTopologyRegistry_HasRenderableObservations(t *testing.T) {
 		},
 		"cache-not-yet-published": {
 			setup: func(registry *topologyRegistry) {
-				registry.register(newTopologyCache())
+				publishTestTopologyBuilder(registry, newTopologyBuilder())
 			},
 			want: false,
 		},
-		"cache-stale": {
+		"retained-generation-stale": {
 			setup: func(registry *topologyRegistry) {
-				cache := newTopologyCache()
+				cache := newTopologyBuilder()
 				seedPublishedEndpointSnapshot(cache)
-				cache.lastUpdate = time.Now().Add(-2 * time.Hour)
+				publishedAt := time.Now().Add(-2 * time.Hour)
+				cache.lastUpdate = publishedAt
+				cache.updateTime = cache.lastUpdate
 				cache.staleAfter = time.Hour
-				registry.register(cache)
+				const registrationID ddsnmp.DeviceRegistrationID = 1
+				device := freezeTestTopologyBuilderAt(registrationID, publishedAt, cache)
+				states := map[ddsnmp.DeviceRegistrationID]deviceRefreshState{registrationID: {generation: device}}
+				registry.publishGeneration(newTopologyGeneration(2, time.Now(), registry.producerScope(), states))
 			},
 			want: false,
 		},
 		"fresh-local-observation": {
 			setup: func(registry *topologyRegistry) {
-				cache := newTopologyCache()
+				cache := newTopologyBuilder()
 				now := time.Now()
 				cache.updateTime = now
 				cache.lastUpdate = now
 				cache.staleAfter = time.Hour
 				cache.localDevice = topologymodel.Device{ManagementIP: "10.0.0.1"}
-				registry.register(cache)
+				publishTestTopologyBuilder(registry, cache)
 			},
 			want: true,
 		},
 		"fresh-published-endpoint-snapshot": {
 			setup: func(registry *topologyRegistry) {
-				cache := newTopologyCache()
+				cache := newTopologyBuilder()
 				seedPublishedEndpointSnapshot(cache)
-				registry.register(cache)
+				publishTestTopologyBuilder(registry, cache)
 			},
 			want: true,
 		},
@@ -254,7 +387,7 @@ func TestTopologyRegistry_HasRenderableObservations(t *testing.T) {
 func TestTopologyRegistry_SnapshotSingleCacheKeepsLLDPUnidirectional(t *testing.T) {
 	registry := newTopologyRegistry()
 
-	cache := newTopologyCache()
+	cache := newTopologyBuilder()
 	cache.updateTime = time.Now()
 	cache.lastUpdate = cache.updateTime
 	cache.agentID = "agent-test"
@@ -282,7 +415,7 @@ func TestTopologyRegistry_SnapshotSingleCacheKeepsLLDPUnidirectional(t *testing.
 		},
 	}
 
-	registry.register(cache)
+	publishTestTopologyBuilder(registry, cache)
 
 	data, ok := snapshotTopologyRegistryForTest(registry)
 	require.True(t, ok)
@@ -297,7 +430,7 @@ func TestTopologyRegistry_SnapshotSingleCacheKeepsLLDPUnidirectional(t *testing.
 func TestTopologyRegistry_DefaultMapEmitsL3SubnetForManagedRoutersWithoutLLDP(t *testing.T) {
 	registry := newTopologyRegistry()
 
-	cacheA := newTopologyCache()
+	cacheA := newTopologyBuilder()
 	cacheA.updateTime = time.Now()
 	cacheA.lastUpdate = cacheA.updateTime
 	cacheA.agentID = "agent-test"
@@ -308,16 +441,17 @@ func TestTopologyRegistry_DefaultMapEmitsL3SubnetForManagedRoutersWithoutLLDP(t 
 		ManagementIP:  "10.0.0.1",
 	}
 	cacheA.updateIfIndexByIP(map[string]string{
-		tagTopoIfIndex: "2",
-		tagTopoIPAddr:  "198.51.100.1",
-		tagTopoIPMask:  "255.255.255.252",
+		tagTopoIPSource: topoIPSourceLegacy,
+		tagTopoIfIndex:  "2",
+		tagTopoIPAddr:   "198.51.100.1",
+		tagTopoIPMask:   "255.255.255.252",
 	})
 	cacheA.updateIfNameByIndex(map[string]string{
 		tagTopoIfIndex: "2",
 		tagTopoIfName:  "wan0",
 	})
 
-	cacheB := newTopologyCache()
+	cacheB := newTopologyBuilder()
 	cacheB.updateTime = time.Now().Add(time.Second)
 	cacheB.lastUpdate = cacheB.updateTime
 	cacheB.agentID = "agent-test"
@@ -328,17 +462,18 @@ func TestTopologyRegistry_DefaultMapEmitsL3SubnetForManagedRoutersWithoutLLDP(t 
 		ManagementIP:  "10.0.0.2",
 	}
 	cacheB.updateIfIndexByIP(map[string]string{
-		tagTopoIfIndex: "7",
-		tagTopoIPAddr:  "198.51.100.2",
-		tagTopoIPMask:  "255.255.255.252",
+		tagTopoIPSource: topoIPSourceLegacy,
+		tagTopoIfIndex:  "7",
+		tagTopoIPAddr:   "198.51.100.2",
+		tagTopoIPMask:   "255.255.255.252",
 	})
 	cacheB.updateIfNameByIndex(map[string]string{
 		tagTopoIfIndex: "7",
 		tagTopoIfName:  "wan7",
 	})
 
-	registry.register(cacheA)
-	registry.register(cacheB)
+	publishTestTopologyBuilder(registry, cacheA)
+	publishTestTopologyBuilder(registry, cacheB)
 
 	data, ok := snapshotTopologyRegistryForTest(registry)
 
@@ -364,15 +499,16 @@ func TestTopologyRegistry_DefaultMapEmitsL3SubnetForManagedRoutersWithoutLLDP(t 
 func TestTopologyRegistry_WeakDevicesUseSelectedManagementIPIdentity(t *testing.T) {
 	registry := newTopologyRegistry()
 	for i, ip := range []string{"192.0.2.10", "198.51.100.10"} {
-		cache := newTopologyCache()
+		cache := newTopologyBuilder()
 		cache.updateTime = time.Now().Add(time.Duration(i) * time.Millisecond)
 		cache.updateIfIndexByIP(map[string]string{
-			tagTopoIfIndex: "1",
-			tagTopoIPAddr:  ip,
-			tagTopoIPMask:  "255.255.255.0",
+			tagTopoIPSource: topoIPSourceLegacy,
+			tagTopoIfIndex:  "1",
+			tagTopoIPAddr:   ip,
+			tagTopoIPMask:   "255.255.255.0",
 		})
-		cache.finalizeTopologyCache()
-		registry.register(cache)
+		cache.finalize()
+		publishTestTopologyBuilder(registry, cache)
 	}
 
 	data, ok := snapshotTopologyRegistryForTest(registry)
@@ -395,7 +531,7 @@ func TestTopologyRegistry_DefaultMapEmitsL3SubnetSegmentForManagedRouters(t *tes
 	registry := newTopologyRegistry()
 	registry.producerScopeID = "producer-a"
 
-	cacheA := newTopologyCache()
+	cacheA := newTopologyBuilder()
 	cacheA.updateTime = time.Now()
 	cacheA.lastUpdate = cacheA.updateTime
 	cacheA.agentID = "agent-test"
@@ -406,16 +542,17 @@ func TestTopologyRegistry_DefaultMapEmitsL3SubnetSegmentForManagedRouters(t *tes
 		ManagementIP:  "10.0.0.1",
 	}
 	cacheA.updateIfIndexByIP(map[string]string{
-		tagTopoIfIndex: "2",
-		tagTopoIPAddr:  "203.0.113.1",
-		tagTopoIPMask:  "255.255.255.0",
+		tagTopoIPSource: topoIPSourceLegacy,
+		tagTopoIfIndex:  "2",
+		tagTopoIPAddr:   "203.0.113.1",
+		tagTopoIPMask:   "255.255.255.0",
 	})
 	cacheA.updateIfNameByIndex(map[string]string{
 		tagTopoIfIndex: "2",
 		tagTopoIfName:  "wan0",
 	})
 
-	cacheB := newTopologyCache()
+	cacheB := newTopologyBuilder()
 	cacheB.updateTime = time.Now().Add(time.Second)
 	cacheB.lastUpdate = cacheB.updateTime
 	cacheB.agentID = "agent-test"
@@ -426,16 +563,17 @@ func TestTopologyRegistry_DefaultMapEmitsL3SubnetSegmentForManagedRouters(t *tes
 		ManagementIP:  "10.0.0.2",
 	}
 	cacheB.updateIfIndexByIP(map[string]string{
-		tagTopoIfIndex: "7",
-		tagTopoIPAddr:  "203.0.113.2",
-		tagTopoIPMask:  "255.255.255.0",
+		tagTopoIPSource: topoIPSourceLegacy,
+		tagTopoIfIndex:  "7",
+		tagTopoIPAddr:   "203.0.113.2",
+		tagTopoIPMask:   "255.255.255.0",
 	})
 	cacheB.updateIfNameByIndex(map[string]string{
 		tagTopoIfIndex: "7",
 		tagTopoIfName:  "wan7",
 	})
 
-	cacheC := newTopologyCache()
+	cacheC := newTopologyBuilder()
 	cacheC.updateTime = time.Now().Add(2 * time.Second)
 	cacheC.lastUpdate = cacheC.updateTime
 	cacheC.agentID = "agent-test"
@@ -446,18 +584,19 @@ func TestTopologyRegistry_DefaultMapEmitsL3SubnetSegmentForManagedRouters(t *tes
 		ManagementIP:  "10.0.0.3",
 	}
 	cacheC.updateIfIndexByIP(map[string]string{
-		tagTopoIfIndex: "9",
-		tagTopoIPAddr:  "203.0.113.3",
-		tagTopoIPMask:  "255.255.255.0",
+		tagTopoIPSource: topoIPSourceLegacy,
+		tagTopoIfIndex:  "9",
+		tagTopoIPAddr:   "203.0.113.3",
+		tagTopoIPMask:   "255.255.255.0",
 	})
 	cacheC.updateIfNameByIndex(map[string]string{
 		tagTopoIfIndex: "9",
 		tagTopoIfName:  "wan9",
 	})
 
-	registry.register(cacheA)
-	registry.register(cacheB)
-	registry.register(cacheC)
+	publishTestTopologyBuilder(registry, cacheA)
+	publishTestTopologyBuilder(registry, cacheB)
+	publishTestTopologyBuilder(registry, cacheC)
 
 	data, ok := snapshotTopologyRegistryForTest(registry)
 
@@ -504,7 +643,7 @@ func TestTopologyRegistry_DefaultMapEmitsL3SubnetSegmentForManagedRouters(t *tes
 func TestTopologyRegistry_OSPFSnapshotEnrichesSubnetAfterNeighborIngest(t *testing.T) {
 	registry := newTopologyRegistry()
 
-	cacheA := newTopologyCache()
+	cacheA := newTopologyBuilder()
 	cacheA.updateTime = time.Now()
 	cacheA.lastUpdate = cacheA.updateTime
 	cacheA.agentID = "agent-test"
@@ -529,12 +668,13 @@ func TestTopologyRegistry_OSPFSnapshotEnrichesSubnetAfterNeighborIngest(t *testi
 		},
 	})
 	cacheA.updateIfIndexByIP(map[string]string{
-		tagTopoIfIndex: "2",
-		tagTopoIPAddr:  "198.51.100.1",
-		tagTopoIPMask:  "255.255.255.252",
+		tagTopoIPSource: topoIPSourceLegacy,
+		tagTopoIfIndex:  "2",
+		tagTopoIPAddr:   "198.51.100.1",
+		tagTopoIPMask:   "255.255.255.252",
 	})
 
-	cacheB := newTopologyCache()
+	cacheB := newTopologyBuilder()
 	cacheB.updateTime = time.Now().Add(time.Second)
 	cacheB.lastUpdate = cacheB.updateTime
 	cacheB.agentID = "agent-test"
@@ -550,13 +690,14 @@ func TestTopologyRegistry_OSPFSnapshotEnrichesSubnetAfterNeighborIngest(t *testi
 		},
 	}})
 	cacheB.updateIfIndexByIP(map[string]string{
-		tagTopoIfIndex: "7",
-		tagTopoIPAddr:  "198.51.100.2",
-		tagTopoIPMask:  "255.255.255.252",
+		tagTopoIPSource: topoIPSourceLegacy,
+		tagTopoIfIndex:  "7",
+		tagTopoIPAddr:   "198.51.100.2",
+		tagTopoIPMask:   "255.255.255.252",
 	})
 
-	registry.register(cacheA)
-	registry.register(cacheB)
+	publishTestTopologyBuilder(registry, cacheA)
+	publishTestTopologyBuilder(registry, cacheB)
 
 	data, ok := snapshotTopologyRegistryForTest(registry)
 
@@ -573,7 +714,7 @@ func TestTopologyRegistry_OSPFSnapshotEnrichesSubnetAfterNeighborIngest(t *testi
 func TestTopologyRegistry_BGPAdjacencyEmitsEstablishedManagedPeerLinkAndDetailRows(t *testing.T) {
 	registry := newTopologyRegistry()
 
-	cacheA := newTopologyCache()
+	cacheA := newTopologyBuilder()
 	cacheA.updateTime = time.Now()
 	cacheA.lastUpdate = cacheA.updateTime
 	cacheA.agentID = "agent-test"
@@ -594,7 +735,7 @@ func TestTopologyRegistry_BGPAdjacencyEmitsEstablishedManagedPeerLinkAndDetailRo
 		State:           "established",
 	}
 
-	cacheB := newTopologyCache()
+	cacheB := newTopologyBuilder()
 	cacheB.updateTime = time.Now().Add(time.Second)
 	cacheB.lastUpdate = cacheB.updateTime
 	cacheB.agentID = "agent-test"
@@ -615,8 +756,8 @@ func TestTopologyRegistry_BGPAdjacencyEmitsEstablishedManagedPeerLinkAndDetailRo
 		State:           "established",
 	}
 
-	registry.register(cacheA)
-	registry.register(cacheB)
+	publishTestTopologyBuilder(registry, cacheA)
+	publishTestTopologyBuilder(registry, cacheB)
 
 	data, ok := snapshotTopologyRegistryForTest(registry)
 
@@ -651,7 +792,7 @@ func TestTopologyRegistry_BGPAdjacencyEmitsEstablishedManagedPeerLinkAndDetailRo
 func TestTopologyRegistry_BGPAdjacencyKeepsUnresolvedAndNonEstablishedPeersAsDetails(t *testing.T) {
 	registry := newTopologyRegistry()
 
-	cache := newTopologyCache()
+	cache := newTopologyBuilder()
 	cache.updateTime = time.Now()
 	cache.lastUpdate = cache.updateTime
 	cache.agentID = "agent-test"
@@ -682,7 +823,7 @@ func TestTopologyRegistry_BGPAdjacencyKeepsUnresolvedAndNonEstablishedPeersAsDet
 		State:           "idle",
 	}
 
-	registry.register(cache)
+	publishTestTopologyBuilder(registry, cache)
 
 	data, ok := snapshotTopologyRegistryForTest(registry)
 
@@ -704,7 +845,7 @@ func TestTopologyRegistry_BGPAdjacencyKeepsUnresolvedAndNonEstablishedPeersAsDet
 
 func TestTopologyRegistry_SnapshotWithOptions_LLDPManagedKeepsRequestedMapType(t *testing.T) {
 	registry := newTopologyRegistry()
-	registry.register(newTestTopologyCacheLLDP(
+	publishTestTopologyBuilder(registry, newTestTopologyCacheLLDP(
 		"agent-test",
 		time.Now().UTC(),
 		"00:11:22:33:44:55",
@@ -732,7 +873,7 @@ func TestTopologyRegistry_SnapshotWithOptions_LLDPManagedKeepsRequestedMapType(t
 
 func TestTopologyRegistry_DefaultSnapshotSuppressesInferredNeighborWithOnlyIneligibleManagementAddress(t *testing.T) {
 	registry := newTopologyRegistry()
-	cache := newTopologyCache()
+	cache := newTopologyBuilder()
 	cache.updateTime = time.Now().UTC()
 	cache.agentID = "agent-test"
 	cache.localDevice = topologymodel.Device{
@@ -757,8 +898,8 @@ func TestTopologyRegistry_DefaultSnapshotSuppressesInferredNeighborWithOnlyIneli
 		tagLldpRemMgmtAddr:         "169.254.0.1",
 		tagLldpRemMgmtAddrSubtype:  "1",
 	})
-	cache.finalizeTopologyCache()
-	registry.register(cache)
+	cache.finalize()
+	publishTestTopologyBuilder(registry, cache)
 
 	data, ok := snapshotTopologyRegistryForTest(registry)
 	require.True(t, ok)
@@ -772,7 +913,7 @@ func TestTopologyRegistry_DefaultSnapshotSuppressesInferredNeighborWithOnlyIneli
 func TestTopologyRegistry_SnapshotWithOptions_CollapseByIPPreservesEngineManagedOverlapPruning(t *testing.T) {
 	registry := newTopologyRegistry()
 
-	cache := newTopologyCache()
+	cache := newTopologyBuilder()
 	cache.updateTime = time.Now().UTC()
 	cache.lastUpdate = cache.updateTime
 	cache.agentID = "agent-test"
@@ -812,7 +953,7 @@ func TestTopologyRegistry_SnapshotWithOptions_CollapseByIPPreservesEngineManaged
 		ip:      "10.20.4.22",
 		mac:     "9c:6b:00:7b:98:c7",
 	}
-	registry.register(cache)
+	publishTestTopologyBuilder(registry, cache)
 
 	withoutCollapse, ok, err := registry.snapshotWithOptions(topologyoptions.QueryOptions{
 		MapType:            topologyoptions.MapTypeAllDevicesLowConfidence,
@@ -838,7 +979,7 @@ func TestTopologyRegistry_SnapshotWithOptions_CollapseByIPPreservesEngineManaged
 
 func TestTopologyRegistry_ManagedDeviceFocusTargets_ReturnsPerDeviceIPTargets(t *testing.T) {
 	registry := newTopologyRegistry()
-	registry.register(newTestTopologyCacheLLDP(
+	publishTestTopologyBuilder(registry, newTestTopologyCacheLLDP(
 		"agent-test",
 		time.Now().UTC(),
 		"00:11:22:33:44:55",
@@ -877,12 +1018,12 @@ func TestTopologyRegistry_ManagedFocusRejectsTypedNonIPManagementEvidence(t *tes
 			ManagementIP:  "192.0.2.20",
 		},
 	} {
-		cache := newTopologyCache()
+		cache := newTopologyBuilder()
 		cache.updateTime = now
 		cache.lastUpdate = now
 		cache.agentID = device.SysName
 		cache.localDevice = device
-		registry.register(cache)
+		publishTestTopologyBuilder(registry, cache)
 	}
 
 	options := defaultTopologyQueryOptionsForTest()
@@ -900,7 +1041,7 @@ func TestTopologyRegistry_ManagedFocusUsesOnlyReconciledManagementAddresses(t *t
 	registry := newTopologyRegistry()
 	now := time.Now().UTC()
 
-	cacheA := newTopologyCache()
+	cacheA := newTopologyBuilder()
 	cacheA.updateTime = now
 	cacheA.lastUpdate = now
 	cacheA.agentID = "sw-a"
@@ -911,12 +1052,13 @@ func TestTopologyRegistry_ManagedFocusUsesOnlyReconciledManagementAddresses(t *t
 		ManagementIP:  "192.0.2.10",
 	}
 	cacheA.updateIfIndexByIP(map[string]string{
-		tagTopoIfIndex: "1",
-		tagTopoIPAddr:  "192.0.2.20",
-		tagTopoIPMask:  "255.255.255.0",
+		tagTopoIPSource: topoIPSourceLegacy,
+		tagTopoIfIndex:  "1",
+		tagTopoIPAddr:   "192.0.2.20",
+		tagTopoIPMask:   "255.255.255.0",
 	})
 
-	cacheB := newTopologyCache()
+	cacheB := newTopologyBuilder()
 	cacheB.updateTime = now
 	cacheB.lastUpdate = now
 	cacheB.agentID = "sw-b"
@@ -927,8 +1069,8 @@ func TestTopologyRegistry_ManagedFocusUsesOnlyReconciledManagementAddresses(t *t
 		ManagementIP:  "192.0.2.20",
 	}
 
-	registry.register(cacheA)
-	registry.register(cacheB)
+	publishTestTopologyBuilder(registry, cacheA)
+	publishTestTopologyBuilder(registry, cacheB)
 	baseline, ok := snapshotTopologyRegistryForTest(registry)
 	require.True(t, ok)
 	baselineA := findDeviceActorBySysName(baseline, "sw-a")
@@ -952,7 +1094,7 @@ func TestTopologyRegistry_ManagedFocusRetainsUniqueReconciledLocalAlias(t *testi
 	registry := newTopologyRegistry()
 	now := time.Now().UTC()
 
-	cacheA := newTopologyCache()
+	cacheA := newTopologyBuilder()
 	cacheA.updateTime = now
 	cacheA.lastUpdate = now
 	cacheA.agentID = "sw-a"
@@ -963,12 +1105,13 @@ func TestTopologyRegistry_ManagedFocusRetainsUniqueReconciledLocalAlias(t *testi
 		ManagementIP:  "192.0.2.10",
 	}
 	cacheA.updateIfIndexByIP(map[string]string{
-		tagTopoIfIndex: "1",
-		tagTopoIPAddr:  "192.0.2.11",
-		tagTopoIPMask:  "255.255.255.0",
+		tagTopoIPSource: topoIPSourceLegacy,
+		tagTopoIfIndex:  "1",
+		tagTopoIPAddr:   "192.0.2.11",
+		tagTopoIPMask:   "255.255.255.0",
 	})
 
-	cacheB := newTopologyCache()
+	cacheB := newTopologyBuilder()
 	cacheB.updateTime = now
 	cacheB.lastUpdate = now
 	cacheB.agentID = "sw-b"
@@ -979,8 +1122,8 @@ func TestTopologyRegistry_ManagedFocusRetainsUniqueReconciledLocalAlias(t *testi
 		ManagementIP:  "192.0.2.20",
 	}
 
-	registry.register(cacheA)
-	registry.register(cacheB)
+	publishTestTopologyBuilder(registry, cacheA)
+	publishTestTopologyBuilder(registry, cacheB)
 
 	options := defaultTopologyQueryOptionsForTest()
 	options.ManagedDeviceFocus = "ip:192.0.2.11"
@@ -995,7 +1138,7 @@ func TestTopologyRegistry_ManagedFocusRetainsUniqueReconciledLocalAlias(t *testi
 }
 
 func TestTopologyCache_SnapshotEngineObservationsUsesDirectLocalObservation(t *testing.T) {
-	cache := newTopologyCache()
+	cache := newTopologyBuilder()
 	cache.updateTime = time.Now()
 	cache.lastUpdate = cache.updateTime
 	cache.agentID = "agent-test"
@@ -1033,7 +1176,7 @@ func TestTopologyCache_SnapshotEngineObservationsUsesDirectLocalObservation(t *t
 		},
 	}
 
-	snapshot, ok := cache.snapshotEngineObservations()
+	snapshot, ok := snapshotTestTopologyBuilder(cache)
 	require.True(t, ok)
 	require.Len(t, snapshot.L2Observations, 1)
 	require.Equal(t, snapshot.LocalDeviceID, snapshot.L2Observations[0].DeviceID)
@@ -1042,7 +1185,7 @@ func TestTopologyCache_SnapshotEngineObservationsUsesDirectLocalObservation(t *t
 }
 
 func TestTopologyCache_SnapshotEngineObservationsIncludesL3Interfaces(t *testing.T) {
-	cache := newTopologyCache()
+	cache := newTopologyBuilder()
 	cache.updateTime = time.Now()
 	cache.lastUpdate = cache.updateTime
 	cache.agentID = "agent-test"
@@ -1053,9 +1196,10 @@ func TestTopologyCache_SnapshotEngineObservationsIncludesL3Interfaces(t *testing
 		ManagementIP:  "10.0.0.1",
 	}
 	cache.updateIfIndexByIP(map[string]string{
-		tagTopoIfIndex: "2",
-		tagTopoIPAddr:  "198.51.100.1",
-		tagTopoIPMask:  "255.255.255.252",
+		tagTopoIPSource: topoIPSourceLegacy,
+		tagTopoIfIndex:  "2",
+		tagTopoIPAddr:   "198.51.100.1",
+		tagTopoIPMask:   "255.255.255.252",
 	})
 	cache.updateIfNameByIndex(map[string]string{
 		tagTopoIfIndex: "2",
@@ -1063,11 +1207,12 @@ func TestTopologyCache_SnapshotEngineObservationsIncludesL3Interfaces(t *testing
 		tagTopoIfDescr: "Uplink",
 	})
 	cache.updateIfIndexByIP(map[string]string{
-		tagTopoIfIndex: "3",
-		tagTopoIPAddr:  "2001:db8::1",
+		tagTopoIPSource: topoIPSourceLegacy,
+		tagTopoIfIndex:  "3",
+		tagTopoIPAddr:   "2001:db8::1",
 	})
 
-	snapshot, ok := cache.snapshotEngineObservations()
+	snapshot, ok := snapshotTestTopologyBuilder(cache)
 
 	require.True(t, ok)
 	require.Len(t, snapshot.L3Interfaces, 1)
@@ -1109,8 +1254,8 @@ func TestAggregateTopologyObservationSnapshotsIncludesL3Interfaces(t *testing.T)
 
 func TestTopologyRegistry_SnapshotReturnsFalseWithoutCollectedCaches(t *testing.T) {
 	registry := newTopologyRegistry()
-	cache := newTopologyCache()
-	registry.register(cache)
+	cache := newTopologyBuilder()
+	publishTestTopologyBuilder(registry, cache)
 
 	_, ok := snapshotTopologyRegistryForTest(registry)
 	require.False(t, ok)
@@ -1119,7 +1264,7 @@ func TestTopologyRegistry_SnapshotReturnsFalseWithoutCollectedCaches(t *testing.
 func TestTopologyRegistry_SnapshotDeterministicAcrossRepeatedCalls(t *testing.T) {
 	registry := newTopologyRegistry()
 
-	cacheA := newTopologyCache()
+	cacheA := newTopologyBuilder()
 	cacheA.updateTime = time.Now()
 	cacheA.lastUpdate = cacheA.updateTime
 	cacheA.agentID = "agent-test"
@@ -1147,7 +1292,7 @@ func TestTopologyRegistry_SnapshotDeterministicAcrossRepeatedCalls(t *testing.T)
 		},
 	}
 
-	cacheB := newTopologyCache()
+	cacheB := newTopologyBuilder()
 	cacheB.updateTime = time.Now().Add(time.Second)
 	cacheB.lastUpdate = cacheB.updateTime
 	cacheB.agentID = "agent-test"
@@ -1175,8 +1320,8 @@ func TestTopologyRegistry_SnapshotDeterministicAcrossRepeatedCalls(t *testing.T)
 		},
 	}
 
-	registry.register(cacheA)
-	registry.register(cacheB)
+	publishTestTopologyBuilder(registry, cacheA)
+	publishTestTopologyBuilder(registry, cacheB)
 
 	baseline, ok := snapshotTopologyRegistryForTest(registry)
 	require.True(t, ok)
@@ -1193,7 +1338,7 @@ func TestTopologyRegistry_SnapshotDeterministicAcrossRepeatedCalls(t *testing.T)
 func TestTopologyRegistry_SnapshotDeduplicatesDuplicateDeviceObservations(t *testing.T) {
 	registry := newTopologyRegistry()
 
-	cacheA := newTopologyCache()
+	cacheA := newTopologyBuilder()
 	cacheA.updateTime = time.Now()
 	cacheA.lastUpdate = cacheA.updateTime
 	cacheA.agentID = "agent-test"
@@ -1221,7 +1366,7 @@ func TestTopologyRegistry_SnapshotDeduplicatesDuplicateDeviceObservations(t *tes
 		},
 	}
 
-	cacheB := newTopologyCache()
+	cacheB := newTopologyBuilder()
 	cacheB.updateTime = cacheA.updateTime
 	cacheB.lastUpdate = cacheA.lastUpdate
 	cacheB.agentID = cacheA.agentID
@@ -1229,8 +1374,8 @@ func TestTopologyRegistry_SnapshotDeduplicatesDuplicateDeviceObservations(t *tes
 	cacheB.lldpLocPorts["1"] = cacheA.lldpLocPorts["1"]
 	cacheB.lldpRemotes["1:1"] = cacheA.lldpRemotes["1:1"]
 
-	registry.register(cacheA)
-	registry.register(cacheB)
+	publishTestTopologyBuilder(registry, cacheA)
+	publishTestTopologyBuilder(registry, cacheB)
 
 	data, ok := snapshotTopologyRegistryForTest(registry)
 	require.True(t, ok)
@@ -1245,7 +1390,7 @@ func TestTopologyRegistry_DuplicateCachesPreserveReconciledManagementPrimary(t *
 	now := time.Now().UTC()
 
 	for _, managementIP := range []string{"192.0.2.30", "192.0.2.20"} {
-		cache := newTopologyCache()
+		cache := newTopologyBuilder()
 		cache.updateTime = now
 		cache.lastUpdate = now
 		cache.agentID = managementIP
@@ -1255,7 +1400,7 @@ func TestTopologyRegistry_DuplicateCachesPreserveReconciledManagementPrimary(t *
 			SysName:       "sw-a",
 			ManagementIP:  managementIP,
 		}
-		registry.register(cache)
+		publishTestTopologyBuilder(registry, cache)
 	}
 
 	data, ok := snapshotTopologyRegistryForTest(registry)

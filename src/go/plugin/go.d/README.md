@@ -69,7 +69,6 @@ All capabilities are set automatically during Netdata installation using the [of
 | [fluentd](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/collector/fluentd)                       |            Fluentd            |
 | [freeradius](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/collector/freeradius)                 |          FreeRADIUS           |
 | [gearman](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/collector/gearman)                       |            Gearman            |
-| [haproxy](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/collector/haproxy)                       |            HAProxy            |
 | [hddtemp](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/collector/hddtemp)                       |       Disks temperature       |
 | [hdfs](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/collector/hdfs)                             |             HDFS              |
 | [hpssa](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/collector/hpssa)                           |        HPE Smart Array        |
@@ -78,6 +77,7 @@ All capabilities are set automatically during Netdata installation using the [of
 | [intelgpu](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/collector/intelgpu)                     |     Intel integrated GPU      |
 | [ipfs](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/collector/ipfs)                             |             IPFS              |
 | [isc_dhcpd](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/collector/isc_dhcpd)                   |           ISC DHCP            |
+| [jetson](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/collector/jetson)                         |         NVIDIA Jetson         |
 | [k8s_kubelet](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/collector/k8s_kubelet)               |            Kubelet            |
 | [k8s_kubeproxy](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/collector/k8s_kubeproxy)           |          Kube-proxy           |
 | [k8s_state](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/collector/k8s_state)                   |   Kubernetes cluster state    |
@@ -122,16 +122,19 @@ All capabilities are set automatically during Netdata installation using the [of
 | [pulsar](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/collector/pulsar)                         |         Apache Pulsar         |
 | [puppet](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/collector/puppet)                         |            Puppet             |
 | [rabbitmq](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/collector/rabbitmq)                     |           RabbitMQ            |
+| [redfish](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/collector/redfish)                       |         Redfish BMCs          |
 | [redis](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/collector/redis)                           |             Redis             |
 | [rethinkdb](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/collector/rethinkdb)                   |           RethinkDB           |
 | [riakkv](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/collector/riakkv)                         |            Riak KV            |
 | [rspamd](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/collector/rspamd)                         |            Rspamd             |
+| [s3check](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/collector/s3check)                        | S3 Compatible Object Storage |
 | [samba](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/collector/samba)                           |             Samba             |
 | [scaleio](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/collector/scaleio)                       |       Dell EMC ScaleIO        |
 | [SNMP](https://github.com/netdata/netdata/blob/master/src/go/plugin/go.d/collector/snmp)                             |             SNMP              |
 | [squid](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/collector/squid)                           |             Squid             |
 | [squidlog](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/collector/squidlog)                     |             Squid             |
 | [smartctl](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/collector/smartctl)                     |   S.M.A.R.T Storage Devices   |
+| [smbios_memory](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/collector/smbios_memory)           |    SMBIOS Memory Inventory    |
 | [spigotmc](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/collector/spigotmc)                     |           SpigotMC            |
 | [storcli](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/collector/storcli)                       |    Broadcom Hardware RAID     |
 | [supervisord](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/collector/supervisord)               |          Supervisor           |

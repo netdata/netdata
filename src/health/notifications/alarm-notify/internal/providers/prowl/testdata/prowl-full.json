@@ -1,0 +1,20 @@
+{
+  "apikey": [
+    "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa,BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB"
+  ],
+  "application": [
+    "Netdata"
+  ],
+  "priority": [
+    "1"
+  ],
+  "event": [
+    "test-node WARNING: Temperature is high"
+  ],
+  "description": [
+    "Temperature is high\nA quote: \"hot\"\nUnicode: θερμοκρασία\nNode: test-node\nAlert: test_alert\nStatus: CLEAR → WARNING\nChart: test.chart\nContext: test.context\nValue: 42.5 C\nPrevious value: 0 C\nTime: 2026-09-14T12:00:00Z"
+  ],
+  "url": [
+    "https://example.com/alert?id=1&view=chart#details"
+  ]
+}

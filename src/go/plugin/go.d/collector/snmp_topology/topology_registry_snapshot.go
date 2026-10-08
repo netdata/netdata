@@ -4,7 +4,6 @@ package snmptopology
 
 import (
 	"strings"
-	"time"
 
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_topology/internal/topologymodel"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_topology/internal/topologyutil"
@@ -12,18 +11,10 @@ import (
 	topologyengine "github.com/netdata/netdata/go/plugins/pkg/l2topology"
 )
 
-func (c *topologyCache) snapshotEngineObservations() (topologymodel.ObservationSnapshot, bool) {
+func (c *topologyBuilder) buildObservationSnapshot() (topologymodel.ObservationSnapshot, bool) {
 	if c == nil {
 		return topologymodel.ObservationSnapshot{}, false
 	}
-
-	c.mu.RLock()
-	defer c.mu.RUnlock()
-
-	if !c.hasFreshSnapshotAt(time.Now()) {
-		return topologymodel.ObservationSnapshot{}, false
-	}
-
 	local := normalizeTopologyDevice(c.localDevice)
 	localObservation := c.buildEngineObservation(local)
 	localObservation.DeviceID = strings.TrimSpace(localObservation.DeviceID)
@@ -36,11 +27,12 @@ func (c *topologyCache) snapshotEngineObservations() (topologymodel.ObservationS
 			local.ChassisIDType = "macAddress"
 		}
 	}
+	l3Interfaces := c.snapshotL3Interfaces(localObservation.DeviceID)
 
 	return topologymodel.ObservationSnapshot{
 		L2Observations: []topologyengine.L2Observation{localObservation},
-		L3Interfaces:   c.snapshotL3Interfaces(localObservation.DeviceID),
-		OSPFNeighbors:  c.snapshotOSPFNeighbors(localObservation.DeviceID),
+		L3Interfaces:   l3Interfaces,
+		OSPFNeighbors:  c.snapshotOSPFNeighbors(localObservation.DeviceID, l3Interfaces),
 		BGPPeers:       c.snapshotBGPPeers(localObservation.DeviceID),
 		LocalDevice:    local,
 		LocalDeviceID:  localObservation.DeviceID,

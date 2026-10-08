@@ -14,35 +14,8 @@
 #include <bpf/libbpf.h>
 
 #include "../nd_alloc_shim.h"
+#include "nd_ebpf_runtime_common.h"
 
-/*
- * libbpf 0.0.9 (CentOS 7) compatibility shims — identical to those in
- * cachestat_libbpf.c so both files compile cleanly on old and new libbpf.
- */
-#ifndef LIBBPF_MAJOR_VERSION
-static inline int bpf_program__set_autoload(struct bpf_program *prog, bool autoload)
-{
-    (void)prog;
-    (void)autoload;
-    return 0;
-}
-
-static inline enum bpf_map_type bpf_map__type(const struct bpf_map *map)
-{
-    return bpf_map__def(map)->type;
-}
-
-static inline int bpf_map__set_type(struct bpf_map *map, enum bpf_map_type type)
-{
-    ((struct bpf_map_def *)bpf_map__def(map))->type = type;
-    return 0;
-}
-
-static inline int bpf_map__set_max_entries(struct bpf_map *map, __u32 max_entries)
-{
-    return bpf_map__resize(map, max_entries);
-}
-#endif /* !LIBBPF_MAJOR_VERSION */
 
 /* Passive connection value stored in tbl_lports.
  * Key: {protocol:u16, port:u16}  Value: this struct. */
@@ -619,8 +592,6 @@ struct netdata_ebpf_socket_runtime *netdata_socket_runtime_open_mode(const char 
 
     struct bpf_object *obj = bpf_object__open_file(path, NULL);
     if (!obj || libbpf_get_error(obj)) {
-        if (obj && libbpf_get_error(obj))
-            bpf_object__close(obj);
         freez(rt);
         return NULL;
     }
@@ -634,6 +605,10 @@ int netdata_socket_runtime_prepare(struct netdata_ebpf_socket_runtime *rt, int m
                                    uint32_t nd_socket_size, uint32_t nv_udp_size)
 {
     if (!rt || !rt->obj)
+        return -1;
+
+    int ncpu = libbpf_num_possible_cpus();
+    if (ncpu <= 0)
         return -1;
 
     socket_prepare_autoload(rt->obj, rt->kind == NETDATA_SOCKET_RUNTIME_CORE);
@@ -656,10 +631,6 @@ int netdata_socket_runtime_prepare(struct netdata_ebpf_socket_runtime *rt, int m
      * for libbpf_num_possible_cpus() so the post-load type query in the
      * snapshot path can safely use either ARRAY (count=1) or PERCPU_ARRAY
      * (count=percpu_u64_cap) without a buffer overflow. */
-    int ncpu = libbpf_num_possible_cpus();
-    if (ncpu <= 0)
-        ncpu = 1;
-
     rt->percpu_u64 = callocz((size_t)ncpu, sizeof(*rt->percpu_u64));
     if (!rt->percpu_u64)
         return -1;
@@ -668,19 +639,16 @@ int netdata_socket_runtime_prepare(struct netdata_ebpf_socket_runtime *rt, int m
     /* tbl_lports may be HASH or PERCPU_HASH depending on the binary and libbpf
      * version.  Always allocate for the maximum possible CPU count so both
      * variants are handled without a buffer overflow on lookup. */
-    int lports_ncpu = libbpf_num_possible_cpus();
-    if (lports_ncpu <= 0)
-        lports_ncpu = 1;
-    rt->percpu_passive = callocz((size_t)lports_ncpu, sizeof(*rt->percpu_passive));
+    rt->percpu_passive = callocz((size_t)ncpu, sizeof(*rt->percpu_passive));
     if (!rt->percpu_passive)
         return -1;
-    rt->percpu_passive_cap = lports_ncpu;
+    rt->percpu_passive_cap = ncpu;
 
     /* tbl_nd_socket may also be PERCPU_HASH — allocate per-CPU value buffer. */
-    rt->percpu_nd_socket = callocz((size_t)lports_ncpu, sizeof(*rt->percpu_nd_socket));
+    rt->percpu_nd_socket = callocz((size_t)ncpu, sizeof(*rt->percpu_nd_socket));
     if (!rt->percpu_nd_socket)
         return -1;
-    rt->percpu_nd_socket_cap = lports_ncpu;
+    rt->percpu_nd_socket_cap = ncpu;
 
     /* Per-connection last-seen snapshot and deferred-delete buffer: sized at
      * 2× max(nd_socket_size, SOCKET_CONN_SNAP_MIN) for ~50% load factor.

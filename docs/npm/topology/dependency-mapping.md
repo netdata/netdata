@@ -82,17 +82,18 @@ the value is in choosing the altitude that answers your question.
 | **Linux** | yes | yes | yes |
 | **FreeBSD** | yes | yes | no |
 | **macOS** | yes | yes | no |
-| **Windows** | no | — | — |
+| **Windows** | yes | yes | no |
 
 On Linux, container and Kubernetes attribution comes from the cgroup each socket's process belongs to. Netdata
 recognizes Docker, Kubernetes, Podman, LXC, systemd-nspawn, KVM guests, and plain systemd units, with no per-runtime
-configuration. On FreeBSD and macOS
+configuration. On FreeBSD, macOS, and Windows
 the map is drawn from processes and endpoints only — the cgroup enrichment that supplies container and workload
-identity is Linux-specific.
+identity is Linux-specific. On Windows, UDP rows are listener-only because the IP Helper API does not expose
+remote endpoints.
 
-Windows does not have this map. Netdata monitors Windows connections through the **Network Connections** table, with
-SMB statistics in the separate **Network Protocols** table, but the `topology:network-connections` graph is not
-available there.
+Windows has this map too, drawn from processes and endpoints only (no container/Kubernetes/systemd
+attribution, matching FreeBSD and macOS). UDP sockets appear as listeners only because the IP Helper API does not
+expose remote endpoints.
 
 ## How to open it
 

@@ -1,25 +1,14 @@
 # Auditing `metadata.yaml` links to Learn
 
-Use this when a generated integration page contains links to
-`learn.netdata.cloud` and one of them drifts from the current Learn route.
-
-## Why this matters
-
-`metadata.yaml` is rendered into integration pages on Learn, the website, and
-the in-app integrations catalog (`../SKILL.md:37`). A broken Learn URL in
-metadata therefore becomes a user-visible broken link on multiple surfaces.
-
-Learn routes are not derived from source filenames. They are derived from
-`docs/.map/map.yaml` labels and hierarchy, while source-relative `/docs/... .md`
-links can be rewritten by Learn ingest (`../../learn-site-structure/mapping.md:219`).
-For example, `docs/network-flows/visualization/summary-sankey.md` is published
-as `/docs/network-flows/visualization/sankey-and-table` because the map label is
-`Sankey and Table` (`docs/.map/map.yaml:515`).
+Use this when a generated integration page links to `learn.netdata.cloud` and a link may have drifted from the current
+Learn route. The rule and its evidence live in the Learn skill:
+`.agents/skills/docs-learn-site-structure/how-tos/integration-card-description-links.md` (absolute Learn URLs in
+metadata bypass ingest's link rewriting; Learn routes come from `docs/.map/map.yaml` labels, not from source
+filenames, so never infer a slug from a filename). This file keeps the audit commands.
 
 ## Audit command
 
-Extract unique absolute Learn URLs from all metadata files and check their
-published response:
+Extract unique absolute Learn URLs from all metadata files and check their published response:
 
 ```bash
 rg -No "https://learn\\.netdata\\.cloud/docs[^)\\]\\s,\"']+" --glob 'metadata.yaml' . \
@@ -31,21 +20,22 @@ rg -No "https://learn\\.netdata\\.cloud/docs[^)\\]\\s,\"']+" --glob 'metadata.ya
     done
 ```
 
-For URLs with fragments, also confirm the target anchor exists in the rendered
-HTML:
+For URLs with fragments, also confirm the target anchor exists in the rendered HTML:
 
 ```bash
 curl -A 'Mozilla/5.0' -sL 'https://learn.netdata.cloud/docs/netdata-agent/configuration' \
   | rg 'id="locate-your-config-directory"'
 ```
 
-Validate source-relative metadata links locally:
+Validate repository-relative metadata links (`/...`, `./` and `../` targets) against the source tree. The script checks
+that each file exists, not its anchors; ingest checks those
+(`.agents/skills/docs-learn-site-structure/mapping.md#links-between-pages`):
 
 ```bash
 python3 - <<'PY'
 import pathlib, re, sys
 
-root = pathlib.Path('.')
+root = pathlib.Path('.').resolve()
 pat = re.compile(r'\[[^\]]+\]\(([^)]+)\)')
 problems = []
 
@@ -53,48 +43,29 @@ for path in sorted(root.rglob('metadata.yaml')):
     text = path.read_text(errors='replace')
     for match in pat.finditer(text):
         target = match.group(1).strip()
-        if target.startswith('/docs/'):
-            file = root / target.split('#', 1)[0].lstrip('/')
+        if target.startswith('/') and not target.startswith('//'):
+            file = (root / target.split('#', 1)[0].lstrip('/')).resolve()
         elif target.startswith('../') or target.startswith('./'):
             file = (path.parent / target.split('#', 1)[0]).resolve()
         else:
             continue
 
-        if not file.is_file():
+        if not file.is_relative_to(root) or not file.is_file():
             line = text.count('\n', 0, match.start()) + 1
-            problems.append((str(path), line, target))
+            problems.append((str(path.relative_to(root)), line, target))
 
 if problems:
     for path, line, target in problems:
-        print(f'{path}:{line}: missing linked source file: {target}')
+        print(f'{path}:{line}: linked file missing or outside the repository: {target}')
     sys.exit(1)
 
-print('OK: all metadata.yaml /docs and relative markdown links resolve to source files')
+print('OK: all repository-relative metadata.yaml links resolve to source files')
 PY
 ```
 
 ## Repair rule
 
-- If the link is Markdown text and points to a Netdata source doc, prefer the
-  source-relative `/docs/... .md` form when the consuming surface supports Learn
-  ingest rewriting.
-- If the same metadata is consumed by non-Learn surfaces that do not rewrite
-  source-relative links, keep an absolute `https://learn.netdata.cloud/docs/...`
-  URL, but derive the slug from `docs/.map/map.yaml` labels and verify it with
-  `curl`.
-- Do not infer slugs from filenames. Check the map label first, then validate
-  the published URL.
-
-## How I figured this out
-
-Files read:
-
-- `../SKILL.md`
-- `../../learn-site-structure/mapping.md`
-- `docs/.map/map.yaml`
-
-Commands run:
-
-- `rg -No 'https://learn\.netdata\.cloud/docs...' --glob 'metadata.yaml' .`
-- `curl -sL -o /dev/null -w '%{http_code}\t%{url_effective}\n' <url>`
-- local source-relative metadata link validation script above.
+Replace each absolute Learn URL with the repository-relative `.md` path of the target page's source file. Keep an
+anchor only when it is the slug of the target heading's text: ingest checks repository-relative anchors differently
+from absolute Learn URLs (`.agents/skills/docs-learn-site-structure/mapping.md#links-between-pages`). The rule, and
+how the generator and ingest resolve that form, are in the Learn skill how-to named above.

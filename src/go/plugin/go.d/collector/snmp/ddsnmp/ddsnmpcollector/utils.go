@@ -313,9 +313,3 @@ func isInt(s string) bool {
 	_, err := strconv.ParseInt(s, 10, 64)
 	return err == nil
 }
-
-func mergeMetaTagIfAbsent(dest map[string]ddsnmp.MetaTag, key string, tag ddsnmp.MetaTag) {
-	if existing, ok := dest[key]; !ok || existing.Value == "" || (!existing.IsExactMatch && tag.IsExactMatch) {
-		dest[key] = tag
-	}
-}

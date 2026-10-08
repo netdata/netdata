@@ -12,9 +12,69 @@ import (
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp/ddsnmp/ddprofiledefinition"
 )
 
+func TestFindTopologyProfiles_IPBaselineBoundaries(t *testing.T) {
+	tests := map[string]struct {
+		device         ddsnmp.DeviceConnectionInfo
+		wantIPBaseline bool
+	}{
+		"Palo Alto inherits generic device": {
+			device:         ddsnmp.DeviceConnectionInfo{SysObjectID: "1.3.6.1.4.1.25461.2.3.33"},
+			wantIPBaseline: true,
+		},
+		"generic UPS owns its baseline": {
+			device:         ddsnmp.DeviceConnectionInfo{SysObjectID: "1.3.6.1.2.1.33"},
+			wantIPBaseline: true,
+		},
+		"manual composition keeps explicit generic topology owner": {
+			device: ddsnmp.DeviceConnectionInfo{
+				ManualProfiles: []string{"palo-alto", "generic-device"},
+			},
+			// The generic profile owns the deduplicated IP/OSPF baseline. The vendor
+			// metrics profile does not become a topology owner through composition.
+			wantIPBaseline: true,
+		},
+		"manual vendor alone does not inject baseline": {
+			device: ddsnmp.DeviceConnectionInfo{
+				ManualProfiles: []string{"palo-alto"},
+			},
+		},
+	}
+
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) {
+			profiles := (&Collector{}).findTopologyProfiles(tc.device)
+			require.NotEmpty(t, profiles)
+			ipSources := make(map[string]int)
+			for _, profile := range profiles {
+				for _, topology := range profile.Definition.Topology {
+					if topology.Kind != ddprofiledefinition.KindIpIfIndex {
+						continue
+					}
+					source := ""
+					for _, tag := range topology.StaticTags {
+						if tag.Tag == tagTopoIPSource {
+							source = tag.Value
+						}
+					}
+					if source == "" {
+						continue
+					}
+					ipSources[source]++
+				}
+			}
+			want := map[string]int{}
+			if tc.wantIPBaseline {
+				want[topoIPSourceLegacy] = 1
+				want[topoIPSourceModern] = 1
+			}
+			assert.Equal(t, want, ipSources)
+		})
+	}
+}
+
 func TestFindTopologyProfiles_UsesDeclarativeProfileExtensions(t *testing.T) {
 	profiles := (&Collector{}).findTopologyProfiles(ddsnmp.DeviceConnectionInfo{
-		SysObjectID: "1.3.6.1.4.1.9.1.1",
+		SysObjectID: "1.3.6.1.4.1.9.1.111",
 	})
 	require.NotEmpty(t, profiles)
 
@@ -64,7 +124,7 @@ func TestFindTopologyProfiles_UsesDeclarativeProfileExtensions(t *testing.T) {
 		field string
 	}{
 		"lldp-system-name": {field: "lldp_loc_sys_name"},
-		"vtp-version":      {field: "vtp_version"},
+		"bridge-address":   {field: "bridge_base_address"},
 	} {
 		t.Run("metadata/"+name, func(t *testing.T) {
 			assert.Contains(t, metadataFields, tc.field)

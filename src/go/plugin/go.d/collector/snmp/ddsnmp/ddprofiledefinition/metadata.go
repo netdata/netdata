@@ -19,14 +19,12 @@ func (mc MetadataConfig) Clone() MetadataConfig {
 // MetadataResourceConfig holds configs for a metadata resource
 type MetadataResourceConfig struct {
 	Fields map[string]MetadataField `yaml:"fields" json:"fields"`
-	IDTags MetricTagConfigList      `yaml:"id_tags,omitempty" json:"id_tags,omitempty"`
 }
 
 // Clone duplicates this MetadataResourceConfig
 func (c MetadataResourceConfig) Clone() MetadataResourceConfig {
 	return MetadataResourceConfig{
 		Fields: cloneMap(c.Fields),
-		IDTags: cloneSlice(c.IDTags),
 	}
 }
 

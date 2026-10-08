@@ -17,7 +17,7 @@ type (
 	// Prometheus is a helper for scrape and parse prometheus format metrics.
 	Prometheus interface {
 		// ScrapeSeries and parse prometheus format metrics
-		ScrapeSeries() (Series, error)
+		ScrapeSeries(ctx context.Context) (Series, error)
 		// Scrape is ScrapeContext with a background context (for callers that do
 		// not thread one).
 		Scrape() (MetricFamilies, error)
@@ -74,10 +74,10 @@ func (p *prometheus) HTTPClient() *http.Client {
 }
 
 // ScrapeSeries scrapes metrics, parses and sorts
-func (p *prometheus) ScrapeSeries() (Series, error) {
+func (p *prometheus) ScrapeSeries(ctx context.Context) (Series, error) {
 	p.buf.Reset()
 
-	if err := p.src.fetch(context.Background(), p.buf); err != nil {
+	if err := p.src.fetch(ctx, p.buf); err != nil {
 		return nil, err
 	}
 

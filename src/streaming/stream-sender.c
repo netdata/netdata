@@ -135,10 +135,16 @@ static void stream_sender_on_connect_and_disconnect(struct sender_state *s) {
 // interface than the stream uses. Runs once per (re)connect and rides out with the first host-labels
 // push in on_ready_to_dispatch(); on failover the connection breaks and reconnects over the new
 // interface, so it re-evaluates automatically.
+// Only for localhost: the sender of a relayed child or of a vnode egresses on OUR uplink, which is
+// not theirs - a child reports its own _net_default_iface.
 static void stream_sender_update_egress_iface_label(struct sender_state *s) {
+    if (s->host != localhost)
+        return;
+
     char iface[OS_IFNAME_MAX];
-    if (os_socket_egress_interface(s->sock.fd, iface, sizeof(iface)) && iface[0])
-        rrdlabels_add(s->host->rrdlabels, "_net_default_iface", iface, RRDLABEL_SRC_AUTO);
+    if (os_socket_egress_interface(s->sock.fd, iface, sizeof(iface)) && iface[0] &&
+        rrdlabels_add_changed(s->host->rrdlabels, "_net_default_iface", iface, RRDLABEL_SRC_AUTO))
+        rrdhost_labels_changed(s->host);
 }
 
 void stream_sender_on_connect(struct sender_state *s) {

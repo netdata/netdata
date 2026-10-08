@@ -10,7 +10,7 @@ import (
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_topology/internal/topologyutil"
 )
 
-func (c *topologyCache) appendObservedLLDPRemotes(observation *topologyengine.L2Observation) {
+func (c *topologyBuilder) appendObservedLLDPRemotes(observation *topologyengine.L2Observation) {
 	if observation == nil {
 		return
 	}
@@ -55,7 +55,7 @@ func (c *topologyCache) appendObservedLLDPRemotes(observation *topologyengine.L2
 	}
 }
 
-func (c *topologyCache) appendObservedCDPRemotes(observation *topologyengine.L2Observation) {
+func (c *topologyBuilder) appendObservedCDPRemotes(observation *topologyengine.L2Observation) {
 	if observation == nil {
 		return
 	}

@@ -13,6 +13,8 @@ import (
 	"os"
 	"time"
 
+	"context"
+
 	"github.com/netdata/netdata/go/plugins/pkg/tlscfg"
 )
 
@@ -36,13 +38,13 @@ type fromSMTP struct {
 	timeout   time.Duration
 }
 
-func newProvider(config Config) (provider, error) {
+func newProvider(ctx context.Context, config Config) (provider, error) {
 	sourceURL, err := url.Parse(config.Source)
 	if err != nil {
 		return nil, fmt.Errorf("source parse: %v", err)
 	}
 
-	tlsCfg, err := tlscfg.NewTLSConfig(config.TLSConfig)
+	tlsCfg, err := tlscfg.NewTLSConfig(ctx, config.TLSConfig)
 	if err != nil {
 		return nil, fmt.Errorf("create tls config: %v", err)
 	}

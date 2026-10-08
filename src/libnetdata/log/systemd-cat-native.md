@@ -14,7 +14,7 @@ this command does not support sending structured logs to it.
   - remote `systemd-journal-remote` using HTTP or HTTPS, the same way `systemd-journal-upload` does.
 - is the standard external logger of Netdata shell scripts
 
-## Simple use:
+## Basic use:
 
 ```bash
 printf "MESSAGE=hello world\nPRIORITY=6\n\n" | systemd-cat-native

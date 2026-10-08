@@ -49,9 +49,11 @@ struct aclk_bin_payload {
 // The host is identified by machine_guid, not by the node_id the manifest is keyed under at the
 // cloud: node_id is mutable and host->node_id can disagree with the ACLK config's copy, so it does
 // not identify the config to write back to. machine_guid is immutable for the host's lifetime.
+// The record is identified by token alone, never by the suppression key it was stored beside: two
+// distinct enqueues of identical content share a key, so a key comparison would let a stale drop
+// invalidate a later enqueue's record. The token is unique per enqueue and is strictly stronger.
 struct aclk_manifest_publication {
     char machine_guid[GUID_LEN + 1]; // the host whose config recorded this send
-    uint64_t key;                    // suppression key of this payload; 0 when not a manifest query
     uint64_t token;                  // identifies THIS enqueue, so a drop cannot invalidate a later one
     bool published;                  // set once the message reached the mqtt layer
 };

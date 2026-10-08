@@ -172,7 +172,6 @@ relabeling:
     metric_relabel_configs:
       - action: drop
 template:
-  family: vLLM
   context_namespace: vllm
   chart_defaults:
     label_promotion: [Version, SessionName, Component]

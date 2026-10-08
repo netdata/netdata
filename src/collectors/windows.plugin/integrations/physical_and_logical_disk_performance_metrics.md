@@ -25,7 +25,8 @@ Module: PerflibStorage
 Detailed statistics for all disk devices and volumes.
 
 
-It queries 'LogicalDisk' and 'PhysicalDisk' objects from Perflib in order to gather the metrics.
+It uses Windows volume-space APIs for disk-space metrics, including folder-mounted and Cluster Shared
+Volumes, and queries the 'LogicalDisk' and 'PhysicalDisk' objects from Perflib for the remaining metrics.
 
 
 This collector is only supported on the following platforms:
@@ -68,6 +69,7 @@ No action required.
 | Option | Description | Default | Required |
 |:-----|:------------|:--------|:---------:|
 | update every | Data collection frequency. | 1 | no |
+| exclude space metrics on paths | Space-separated, case-insensitive Netdata simple patterns for logical-volume mount points to exclude from disk space collection. Patterns support `*` wildcards and `!` negative terms. For example, `*AssuredRecoveryTemp*` excludes temporary backup volumes with that path component. |  | no |
 
 
 
@@ -96,7 +98,19 @@ sudo ./edit-config netdata.conf
 ```
 
 ##### Examples
-There are no configuration examples.
+
+###### Exclude temporary backup volumes
+
+Exclude logical-volume disk space metrics for mount points that contain `AssuredRecoveryTemp`.
+
+<details open><summary>Configuration</summary>
+
+```yaml
+[plugin:windows:PerflibStorage]
+  exclude space metrics on paths = *AssuredRecoveryTemp*
+
+```
+</details>
 
 
 
@@ -130,16 +144,17 @@ Metrics:
 
 ### Per Logical Disk
 
-These metrics refer to Logical Disks.
+These metrics refer to Logical Disks. Volumes without a drive letter are included, addressed by the folder they are mounted on - this covers Cluster Shared Volumes on failover-cluster nodes, which Windows exposes only below the system drive, as '%SystemDrive%\ClusterStorage\VolumeN' (for example 'C:\ClusterStorage\Volume1').
 
 Labels:
 
 | Label      | Description     |
 |:-----------|:----------------|
-| mount_point | Drive letter or mount point path assigned by Windows (e.g., 'C:', 'D:'). |
-| driver_type | Classification of the disk device (e.g., norootdir, removable, cdrom, ramdisk). |
-| filesystem | File system format used on the volume (e.g., NTFS, FAT32). |
+| mount_point | Drive letter or mount point path assigned by Windows (e.g., 'C:', 'D:', 'C:\ClusterStorage\Volume1'). |
+| drive_type | Classification of the disk device (e.g., norootdir, removable, fixed, remote, cdrom, ramdisk). |
+| filesystem | File system format used on the volume (e.g., ntfs, refs, csvfs). |
 | rw_mode | Current read/write permissions status of the volume (read-only access, read and write access). |
+| serial_number | Volume serial number reported by Windows, in hexadecimal. |
 
 Metrics:
 

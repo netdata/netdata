@@ -89,7 +89,7 @@
       },
       "relabeling": {
         "title": "Metric relabeling",
-        "description": "Job-owned Prometheus-compatible metric relabeling, applied after `selector` and before profile selection. Each block scopes its rules to metrics whose name matches `match`. Profiles may own the same block format for exporter normalization after selection. See the [relabeling reference](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/collector/prometheus/relabel#readme) for ordering, syntax, and examples.",
+        "description": "Job-owned Prometheus-compatible metric relabeling, applied after `selector` and before profile selection. Each block scopes its rules to metrics whose name matches `match`. Profiles may own the same block format for exporter normalization after selection. See the [relabeling reference](https://github.com/netdata/netdata/tree/master/src/go/pkg/relabel#readme) for ordering, syntax, and examples.",
         "type": [
           "array",
           "null"
@@ -222,6 +222,7 @@
                   },
                   "mode_exact": {
                     "title": "Exact profiles",
+                    "description": "Only the listed profile entries apply; nothing is matched automatically.",
                     "type": "object",
                     "properties": {
                       "entries": {
@@ -261,6 +262,7 @@
                   },
                   "mode_combined": {
                     "title": "Combined profiles",
+                    "description": "Automatically matched profiles plus the listed profile entries.",
                     "type": "object",
                     "properties": {
                       "entries": {
@@ -349,17 +351,29 @@
           }
         }
       },
+      "counter_raw_charts": {
+        "title": "Raw counter charts",
+        "description": "Counters whose raw cumulative value is also charted, next to their per-second rate chart, under the `prometheus.<app>.<metric>.raw` context. Leave empty to chart counters as rates only.",
+        "type": [
+          "array",
+          "null"
+        ],
+        "items": {
+          "title": "Pattern",
+          "type": "string",
+          "pattern": "^\\S+$"
+        },
+        "uniqueItems": true
+      },
       "username": {
         "title": "Username",
         "description": "The username for basic authentication.",
-        "type": "string",
-        "sensitive": true
+        "type": "string"
       },
       "password": {
         "title": "Password",
         "description": "The password for basic authentication.",
-        "type": "string",
-        "sensitive": true
+        "type": "string"
       },
       "bearer_token_file": {
         "title": "Bearer token file",
@@ -374,14 +388,12 @@
       "proxy_username": {
         "title": "Proxy username",
         "description": "The username for proxy authentication.",
-        "type": "string",
-        "sensitive": true
+        "type": "string"
       },
       "proxy_password": {
         "title": "Proxy password",
         "description": "The password for proxy authentication.",
-        "type": "string",
-        "sensitive": true
+        "type": "string"
       },
       "headers": {
         "title": "Headers",
@@ -436,9 +448,6 @@
     ]
   },
   "uiSchema": {
-    "uiOptions": {
-      "fullPage": true
-    },
     "ui:flavour": "tabs",
     "ui:options": {
       "tabs": [
@@ -484,6 +493,12 @@
           "title": "Untyped fallback",
           "fields": [
             "fallback_type"
+          ]
+        },
+        {
+          "title": "Raw counter charts",
+          "fields": [
+            "counter_raw_charts"
           ]
         },
         {
@@ -534,12 +549,6 @@
     "selector": {
       "ui:help": "The logic is as follows: `(allow1 OR allow2) AND !(deny1 OR deny2)`."
     },
-    "username": {
-      "ui:widget": "password"
-    },
-    "proxy_username": {
-      "ui:widget": "password"
-    },
     "password": {
       "ui:widget": "password"
     },
@@ -554,6 +563,9 @@
     },
     "force_http2": {
       "ui:widget": "hidden"
+    },
+    "counter_raw_charts": {
+      "ui:help": "Each item holds one metric name pattern with the same `*`, `?` and `[...]` wildcards as Untyped metrics fallback; a leading `!` excludes. Items are checked in order and the first match decides. Every matched counter series adds one chart.\n\nPatterns match the final metric name, after job and profile relabeling. Only counters shown on generic autogen charts get a raw chart: gauges, histogram and summary series, and metrics charted by a profile are not affected. An untyped metric qualifies once it is processed as a counter: through its `_total` suffix, the Untyped metrics fallback As Counter list, or a selected profile's fallback rules."
     }
   }
 }

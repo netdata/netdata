@@ -203,7 +203,7 @@ func (r *runtimeStoreBackend) recordMeasureSetGaugeSetPoint(desc *instrumentDesc
 		panic(errMeasureSetSchema)
 	}
 
-	values := normalizeMeasureSetPoint(point, schema)
+	validateMeasureSetPoint(point, schema, false)
 
 	labels, labelsKey, err := labelsFromSet(sets, r)
 	if err != nil {
@@ -216,7 +216,7 @@ func (r *runtimeStoreBackend) recordMeasureSetGaugeSetPoint(desc *instrumentDesc
 	key := makeSeriesKey(scope.ScopeKey, desc.name, labelsKey)
 	r.commitRuntimeWrite(func(old, next *readSnapshot, seq uint64, nowUnixNano int64) {
 		series := r.runtimeEnsureSeriesMutable(old, next, key, desc.name, scope.ScopeKey, scope, labels, labelsKey, desc, nowUnixNano)
-		series.measureSetValues = append(series.measureSetValues[:0], values...)
+		series.measureSetValues = append(series.measureSetValues[:0], point.Values...)
 		series.meta.LastSeenSuccessSeq = seq
 		series.runtimeLastSeenUnixNano = nowUnixNano
 	})
@@ -228,7 +228,7 @@ func (r *runtimeStoreBackend) recordMeasureSetGaugeAddPoint(desc *instrumentDesc
 		panic(errMeasureSetSchema)
 	}
 
-	values := normalizeMeasureSetPoint(delta, schema)
+	validateMeasureSetPoint(delta, schema, false)
 
 	labels, labelsKey, err := labelsFromSet(sets, r)
 	if err != nil {
@@ -244,7 +244,7 @@ func (r *runtimeStoreBackend) recordMeasureSetGaugeAddPoint(desc *instrumentDesc
 		if len(series.measureSetValues) == 0 {
 			series.measureSetValues = make([]SampleValue, len(schema.fields))
 		}
-		for i, deltaValue := range values {
+		for i, deltaValue := range delta.Values {
 			series.measureSetValues[i] += deltaValue
 		}
 		series.meta.LastSeenSuccessSeq = seq
@@ -291,7 +291,7 @@ func (r *runtimeStoreBackend) recordMeasureSetCounterAddPoint(desc *instrumentDe
 		panic(errMeasureSetSchema)
 	}
 
-	values := normalizeMeasureSetCounterDelta(delta, schema)
+	validateMeasureSetCounterDelta(delta, schema)
 
 	labels, labelsKey, err := labelsFromSet(sets, r)
 	if err != nil {
@@ -316,7 +316,7 @@ func (r *runtimeStoreBackend) recordMeasureSetCounterAddPoint(desc *instrumentDe
 			series.measureSetPreviousSeq = 0
 			series.measureSetHasPrev = false
 		}
-		for i, deltaValue := range values {
+		for i, deltaValue := range delta.Values {
 			series.measureSetValues[i] += deltaValue
 		}
 		series.measureSetCurrentSeq++

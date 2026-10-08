@@ -58,6 +58,15 @@ func TestLoadRejectsStrictShapeAndVersionErrors(t *testing.T) {
 			},
 			wantErr: "required field entities is missing",
 		},
+		"design missing required documentation": {
+			filename: ProfileDesignFilename,
+			content:  strings.Replace(validProfileDesignV1, "documentation:\n  title: Example application\n  summary: Curated request metrics for the example application.\n", "", 1),
+			load: func(path string) error {
+				_, err := LoadProfileDesign(path)
+				return err
+			},
+			wantErr: "required field documentation is missing",
+		},
 		"design wrong version": {
 			filename: ProfileDesignFilename,
 			content:  strings.Replace(validProfileDesignV1, "version: v1", "version: 1", 1),
@@ -188,6 +197,7 @@ func TestProfileDesignAcceptsDottedRelativeContext(t *testing.T) {
 func TestProfileDesignRejectsUnknownInlineConditionField(t *testing.T) {
 	content := strings.Replace(validProfileDesignV1, "supports: {}", `supports:
     runtime:
+      activation: Included when runtime instrumentation is enabled.
       when:
         any:
           - all:
@@ -199,6 +209,17 @@ func TestProfileDesignRejectsUnknownInlineConditionField(t *testing.T) {
 	writeTextFile(t, path, content)
 	if _, err := LoadProfileDesign(path); err == nil || !strings.Contains(err.Error(), "field unexpected not found") {
 		t.Fatalf("LoadProfileDesign() error = %v, want strict nested-field failure", err)
+	}
+}
+
+func TestProfileDesignRequiresSupportActivationDescription(t *testing.T) {
+	content := strings.Replace(validProfileDesignV1, "supports: {}", `supports:
+    runtime:
+      when: all_modes`, 1)
+	path := filepath.Join(t.TempDir(), ProfileDesignFilename)
+	writeTextFile(t, path, content)
+	if _, err := LoadProfileDesign(path); err == nil || !strings.Contains(err.Error(), "composition.supports.runtime.activation") {
+		t.Fatalf("LoadProfileDesign() error = %v, want required activation description failure", err)
 	}
 }
 
@@ -649,6 +670,9 @@ version: v1
 profile: example
 match: example_*
 namespace: example
+documentation:
+  title: Example application
+  summary: Curated request metrics for the example application.
 composition:
   supports: {}
 entities:

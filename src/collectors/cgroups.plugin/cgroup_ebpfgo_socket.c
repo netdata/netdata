@@ -50,44 +50,6 @@ static void cgroup_ebpfgo_socket_sum_pids(struct cgroup *cg)
     }
 }
 
-static void cgroup_ebpfgo_socket_update_single_chart(
-    struct cgroup *cg,
-    RRDSET **chart_ptr,
-    const char *chart_id,
-    const char *title,
-    const char *context,
-    const char *dimension,
-    const char *units,
-    int priority,
-    long divisor,
-    collected_number value)
-{
-    RRDSET *chart = *chart_ptr;
-
-    if (unlikely(!chart)) {
-        char buff[RRD_ID_LENGTH_MAX + 1];
-        chart = *chart_ptr = rrdset_create_localhost(
-            cgroup_chart_type(buff, cg),
-            chart_id,
-            NULL,
-            "network",
-            context,
-            title,
-            units,
-            PLUGIN_CGROUPS_NAME,
-            is_cgroup_systemd_service(cg) ? PLUGIN_CGROUPS_MODULE_SYSTEMD_NAME : PLUGIN_CGROUPS_MODULE_CGROUPS_NAME,
-            priority,
-            cgroup_update_every,
-            RRDSET_TYPE_LINE);
-
-        rrdset_update_rrdlabels(chart, cg->chart_labels);
-        rrddim_add(chart, dimension, NULL, 1, divisor, RRD_ALGORITHM_ABSOLUTE);
-    }
-
-    rrddim_set(chart, dimension, value);
-    rrdset_done(chart);
-}
-
 void cgroup_ebpfgo_socket_update_locked(void)
 {
     for (struct cgroup *cg = cgroup_root; cg; cg = cg->next) {
@@ -155,15 +117,17 @@ void cgroup_ebpfgo_socket_update_charts(struct cgroup *cg)
         cg->last_socket_divisor = ebpf_divisor;
     }
 
-    cgroup_ebpfgo_socket_update_single_chart(
+    cgroup_ebpfgo_update_single_chart(
         cg, &cg->st_net_conn_ipv4, "outbound_conn_v4",
         "TCP v4 outbound connections",
+        "network",
         is_service ? "systemd.service.net_conn_ipv4" : "cgroup.net_conn_ipv4",
         "connections", "connections/s", prio, ebpf_divisor, (collected_number)call_v4);
 
-    cgroup_ebpfgo_socket_update_single_chart(
+    cgroup_ebpfgo_update_single_chart(
         cg, &cg->st_net_conn_ipv6, "outbound_conn_v6",
         "TCP v6 outbound connections",
+        "network",
         is_service ? "systemd.service.net_conn_ipv6" : "cgroup.net_conn_ipv6",
         "connections", "connections/s", prio + 1, ebpf_divisor, (collected_number)call_v6);
 
@@ -194,33 +158,38 @@ void cgroup_ebpfgo_socket_update_charts(struct cgroup *cg)
         rrdset_done(chart);
     }
 
-    cgroup_ebpfgo_socket_update_single_chart(
+    cgroup_ebpfgo_update_single_chart(
         cg, &cg->st_net_tcp_recv, "bandwidth_tcp_recv",
         "TCP calls to cleanup buffer",
+        "network",
         is_service ? "systemd.service.net_tcp_recv" : "cgroup.net_tcp_recv",
         "calls", "calls/s", prio + 3, ebpf_divisor, (collected_number)tcp_rx);
 
-    cgroup_ebpfgo_socket_update_single_chart(
+    cgroup_ebpfgo_update_single_chart(
         cg, &cg->st_net_tcp_send, "bandwidth_tcp_send",
         "TCP calls to send",
+        "network",
         is_service ? "systemd.service.net_tcp_send" : "cgroup.net_tcp_send",
         "calls", "calls/s", prio + 4, ebpf_divisor, (collected_number)tcp_tx);
 
-    cgroup_ebpfgo_socket_update_single_chart(
+    cgroup_ebpfgo_update_single_chart(
         cg, &cg->st_net_retransmit, "bandwidth_tcp_retransmit",
         "TCP retransmits",
+        "network",
         is_service ? "systemd.service.net_retransmit" : "cgroup.net_retransmit",
         "calls", "calls/s", prio + 5, ebpf_divisor, (collected_number)retrans);
 
-    cgroup_ebpfgo_socket_update_single_chart(
+    cgroup_ebpfgo_update_single_chart(
         cg, &cg->st_net_udp_send, "bandwidth_udp_send",
         "UDP calls to send",
+        "network",
         is_service ? "systemd.service.net_udp_send" : "cgroup.net_udp_send",
         "calls", "calls/s", prio + 6, ebpf_divisor, (collected_number)udp_tx);
 
-    cgroup_ebpfgo_socket_update_single_chart(
+    cgroup_ebpfgo_update_single_chart(
         cg, &cg->st_net_udp_recv, "bandwidth_udp_recv",
         "UDP calls to receive",
+        "network",
         is_service ? "systemd.service.net_udp_recv" : "cgroup.net_udp_recv",
         "calls", "calls/s", prio + 7, ebpf_divisor, (collected_number)udp_rx);
 }

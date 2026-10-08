@@ -101,7 +101,7 @@ func (s *socketGlobalState) Update(snap libbpfloader.SocketSnapshot) (socketGlob
 // shouldPublish must be true when cachestat is not publishing to SHM; in that
 // case the socket collector opens the shared segment and publishes each cycle
 // so that cgroup.plugin can read socket data independently of cachestat.
-func runSocketGlobalCollector(api *netdataapi.API, handle *SocketLegacyHandle, stop <-chan struct{}, updateEvery int, store *cachestatSharedMemoryStore, fnStore *socketFunctionStore, shouldPublish bool) {
+func runSocketGlobalCollector(api *netdataapi.API, handle *SocketLegacyHandle, stop <-chan struct{}, updateEvery int, store *ebpfSharedMemoryStore, fnStore *socketFunctionStore, shouldPublish bool) {
 	if handle == nil || handle.Runtime == nil {
 		return
 	}
@@ -141,7 +141,7 @@ func runSocketGlobalCollector(api *netdataapi.API, handle *SocketLegacyHandle, s
 		// SOCKET bit (nil signals a failed cycle), so the bit stays cleared.
 		store.UpdateSocketApps(nil, 0)
 		if shmPublisher != nil {
-			if err := store.Publish(shmPublisher); err != nil {
+			if err := store.Publish(shmPublisher, ebpfgoSHMFlagSocket); err != nil {
 				logPluginErr("socket.publish", "socket", "shared memory publish", err)
 			}
 		}
@@ -183,7 +183,7 @@ func runSocketGlobalCollector(api *netdataapi.API, handle *SocketLegacyHandle, s
 			} else {
 				store.UpdateSocketApps(pidEntries, uint32(updateEvery))
 				if shmPublisher != nil {
-					if err := store.Publish(shmPublisher); err != nil {
+					if err := store.Publish(shmPublisher, ebpfgoSHMFlagSocket); err != nil {
 						logPluginErr("socket.publish", "socket", "shared memory publish", err)
 					}
 				}

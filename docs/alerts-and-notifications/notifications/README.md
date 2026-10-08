@@ -78,7 +78,7 @@ When you receive an alert, Netdata provides tools to help you understand and res
 
 ### Netdata Assistant
 
-The [Netdata Assistant](https://learn.netdata.cloud/docs/machine-learning-and-anomaly-detection/ai-powered-troubleshooting-assistant) is an AI-powered feature that guides you through troubleshooting alerts by providing:
+The [Netdata Assistant](/docs/netdata-ai/troubleshooting/index.md) is an AI-powered feature that guides you through troubleshooting alerts by providing:
 
 - Clear explanations of what the alert means
 - Assessment of potential causes

@@ -120,7 +120,12 @@ A `CollectorStore` write only exists inside a cycle. The job runtime drives the 
 | Failure | `AbortCycle` discards all staged writes and staged registrations — the committed state is untouched. |
 
 `RuntimeStore` has **no cycle API**: writes commit immediately, each producing a new overlay snapshot, and it is
-**stateful-only** (snapshot-mode registration returns an error; calling snapshot record methods panics).
+**stateful-only** (snapshot-mode registration returns an error; calling snapshot record methods panics). A producer
+that records many series at once can use the optional `RuntimeBatchWriter` (type assertion): writes made during
+`WriteBatch(fn)` are published together as one snapshot when `fn` returns or panics, and readers see none of them
+earlier. A store has one batch at a time, owned by the goroutine that opened it: any write made while it is open joins
+it, and a nested or concurrent `WriteBatch` only runs its `fn`, whose writes after the batch ends commit immediately.
+The chartengine runtime aggregator publishes each job cycle's rollup this way.
 
 ## Metric Identity: Names, Series, and Descriptors
 
@@ -260,9 +265,13 @@ The `Reader` interface exposes typed getters (`Value/Delta/Histogram/Summary/Sta
 - A successful commit and a failed/aborted attempt each publish a new exact snapshot, so freshness metadata and cached
   projections cannot cross the boundary.
 - Scalar gauge/counter series are shared with the canonical snapshot because committed series are immutable. Structured
-  families allocate their synthetic flattened series once per snapshot.
-- Raw and flattened readers use immutable per-scope name indexes. Scoped lookup and iteration therefore depend on that
-  scope's series, not on peer-scope cardinality.
+  families' synthetic series are built once per snapshot into shared series, descriptor and label blocks; each family
+  allocates one text buffer for its children's names, label keys and series keys, and bucket/quantile label values
+  come from the descriptor. A projection therefore allocates O(1) per structured family, not per synthetic series.
+- Text is per family, not per snapshot: consumers keep series IDs and label values across snapshots (chartengine route
+  caches, dimension names), so a retained ID pins only its own family's text.
+- Raw and flattened readers use immutable per-scope name indexes, built by one sort of the scalar series by scope, name
+  and labels key. Scoped lookup and iteration therefore depend on that scope's series, not on peer-scope cardinality.
 
 `RuntimeStore` deliberately keeps per-read flattening because its immediate-write overlay snapshots have a different
 lifetime and reuse profile. It still uses the same deterministic reader indexes within each read.
@@ -321,11 +330,34 @@ similar to `StateSet` for chart autogen.
 
 - **Prefer named write helpers** over raw positional `MeasureSetPoint` values.
 - **Snapshot handles** support full-family positional and named writes.
+- **Snapshot gauges** accept NaN for a declared field with no available value this snapshot. Zero is an available
+  numeric value. Infinity is rejected; stateful gauge writes and all counter writes still require finite values.
 - **Stateful handles** additionally support singular field writes (`SetField`/`AddField`), which update only the
   addressed field on top of the committed/staged family.
-- **Snapshot singular field writes do not exist** (phase 1): snapshot mode models one sampled family point per cycle;
-  partial field visibility is deferred.
+- **Snapshot writes replace the whole point**, including availability. Multiple writes in one cycle use the last
+  complete point. Singular field writes do not exist for snapshot handles.
 - **Named full-family writes require the exact declared field set** — missing or unknown fields panic.
+- **Positional writes require exactly one value per declared field**, in declaration order. Use NaN for unavailable
+  snapshot gauge fields rather than shortening the vector or omitting named fields.
+
+### Field availability
+
+A present field with no numeric observation keeps its identity. Snapshot gauges store NaN unchanged; typed reads and
+flattened scalar reads preserve it, and chartengine emits an empty value for that dimension. Available siblings remain
+visible. This applies to both integer and float fields: `Float` controls finite output formatting, not availability.
+
+An all-NaN snapshot still publishes the family. Autogen creates or retains the grouped chart and all its declared
+dimensions, including on the first snapshot. Repeating that snapshot keeps the fields observed without replaying old
+values. Omitting the family write instead follows normal snapshot freshness and configured series/chart expiry.
+The collector chooses which behavior matches its source; empty observation windows need not mean the family is gone.
+
+NaN is an explicit part of this instrument's contract: an accidental arithmetic NaN also becomes a gap. Callers that
+need to distinguish a computation error must check it before writing. Scalar gauge writes remain finite-only;
+Summary quantile values have their own existing NaN contract.
+
+Authored selectors can select each flattened field. If multiple label instances contribute to one rendered dimension,
+the existing [chart aggregation rules](../../plugin/framework/charttpl/README.md#aggregation) apply: sum/avg propagate
+NaN, while min/max ignore it when a finite contributor exists. Availability does not make percentiles mergeable.
 
 ### Schema example
 
@@ -335,16 +367,19 @@ meter := store.Write().SnapshotMeter("svc")
 latency := meter.MeasureSetGauge(
 	"latency",
 	metrix.WithMeasureSetFields(
-		metrix.MeasureFieldSpec{Name: "value"},
+		metrix.MeasureFieldSpec{Name: "value", Float: true},
 		metrix.MeasureFieldSpec{Name: "ratio", Float: true},
 	),
 	metrix.WithUnit("seconds"),
 )
 latency.ObserveFields(map[string]metrix.SampleValue{
 	"value": 1.5,
-	"ratio": 0.5,
+	"ratio": math.NaN(), // Declared, but unavailable in this snapshot.
 })
 ```
+
+As with other snapshot instruments, write inside the framework-managed collection cycle. A subsequent complete
+snapshot with a finite `ratio` restores its value on the same dimension.
 
 ### Stateful singular-write example
 
@@ -429,9 +464,16 @@ _ = ok
 ```go
 reader := store.Read()
 point, ok := reader.MeasureSet("svc.latency", nil)
-_ = point
-_ = ok
+if ok {
+	// The field order is value, ratio from the declaration above.
+	ratioAvailable := !math.IsNaN(point.Values[1])
+	_ = ratioAvailable
+}
 ```
+
+The boolean reports family presence under the reader's freshness policy, not whether its fields are numeric. It is
+true even for an all-NaN point. A flattened `Value` lookup similarly returns `(NaN, true)` for an unavailable field;
+iteration includes it, with its usual field label and metadata. Returned typed value slices are owned by the caller.
 
 For a complete collector integration pattern (cycle management, error handling), see
 [how-to-write-a-collector.md](/src/go/plugin/go.d/docs/how-to-write-a-collector.md).
@@ -450,8 +492,8 @@ For a complete collector integration pattern (cycle management, error handling),
 - **Snapshot freshness** — snapshot-mode instruments cannot use `FreshnessCommitted`.
 - **Runtime writes** — `RuntimeStore` rejects snapshot-mode registration with an error; calling snapshot record methods
   (`ObserveTotal`, `ObservePoint`) panics. MeasureSet families work only through `StatefulMeter(...)`.
-- **MeasureSet named writes** require the exact declared field set; snapshot singular field writes are absent in
-  phase 1.
+- **MeasureSet full-family writes** require the full declared shape. Only snapshot gauge fields may use NaN for unavailability;
+  it does not mean an omitted field or an absent family. See [field availability](#field-availability).
 - **MeasureSet counter semantics** — stateful counter-like families reject negative `AddPoint(...)` deltas, like scalar
   counters.
 - **Window/freshness coupling** — stateful histogram/summary with `WindowCycle` requires (and silently forces)
@@ -467,10 +509,10 @@ For a complete collector integration pattern (cycle management, error handling),
 | Area | Implementation pattern |
 |------|------------------------|
 | Snapshot publish | Read snapshots are immutable and atomically swapped. |
-| Collector commit | Staged frame → descriptor resolution → retention → single canonical pass → publish, all success-path; abort discards staged state. |
-| Descriptor resolution | Observed authorities per name are grouped in a fingerprint-indexed map (no cap); one canonical descriptor per accepted name. |
+| Collector commit | Staged frame → descriptor resolution → retention → single canonical pass → publish, all success-path; abort discards staged state. The frame allocates a staging map on the first write of its kind. |
+| Descriptor resolution | Observed authorities per name are grouped in a value-typed map sized by the cycle's writes; the first authority is inline and further ones are fingerprint-indexed (no cap); one canonical descriptor per accepted name. |
 | Descriptor eviction | One O(descriptor-universe) sweep at commit, after retention; `instrumentZeroSince` tracks idle-since on the successful-commit clock. |
-| Runtime commit | Overlay/compaction strategy with its own retention pruning. |
+| Runtime commit | Overlay/compaction strategy with its own retention pruning; a single-write overlay holds its series inline, and a batch publishes one overlay for all its writes. |
 | Collector read projection | One failure-safe lazy flattened projection per exact published snapshot; concurrent first users synchronize on one complete build. |
 | Iteration | Immutable per-scope name indexes and pre-sorted names; scoped traversal is independent of foreign-scope series. |
 | Identity | Canonical metric+labels key with a stable `SeriesIdentity` hash. |

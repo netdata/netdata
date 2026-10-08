@@ -37,10 +37,11 @@ agents_load_env
 # is fine and consistent.
 agents_query_agent \
     --node    "$NODE_UUID" \
-    --host    "$AGENT_HOST:19999" \
+    --host    "$AGENT_HOST" \
     --machine-guid "$AGENT_MG" \
     GET /api/v3/info \
-  | jq '.agents[0] | {nm, nd, mg, cloud, application: .application.package.version}'
+  | jq '.agents[0] | {nm, nd, mg, claim_id_present: ((.cloud.claim_id // "") | length > 0),
+                         application: .application.package.version}'
 
 # Hardware and OS labels are NOT under /api/v3/info -- that endpoint's
 # agents[0] object has no `labels` key (verified: v2.10.3 returns only
@@ -49,15 +50,20 @@ agents_query_agent \
 # / OS query patterns" below for the endpoint that actually has them.
 agents_query_agent \
     --node    "$NODE_UUID" \
-    --host    "$AGENT_HOST:19999" \
+    --host    "$AGENT_HOST" \
     --machine-guid "$AGENT_MG" \
     GET /api/v3/info \
-  | jq '.agents[0].application, .agents[0].cloud'
+  | jq '.agents[0] | {application, cloud_status: .cloud.status,
+                         claim_id_present: ((.cloud.claim_id // "") | length > 0)}'
 
-# Claim_id specifically (used by the bearer-mint flow).
-agents_query_agent --node "$NODE_UUID" --host "$AGENT_HOST:19999" --machine-guid "$AGENT_MG" \
-    GET /api/v3/info | jq -r '.agents[0].cloud.claim_id'
+# Check claim presence. The bearer resolver consumes the value privately; do not print it.
+agents_query_agent --node "$NODE_UUID" --host "$AGENT_HOST" --machine-guid "$AGENT_MG" \
+    GET /api/v3/info | jq '{claim_id_present: ((.agents[0].cloud.claim_id // "") | length > 0)}'
 ```
+
+The wrappers forward raw response bodies. These projections omit the claim value; preserve that boundary when
+customizing a query. To use the full identity tuple locally, capture the response without printing it, as in
+[the local flow validation recipe](./how-tos/validate-direct-local-flow-function.md).
 
 ## Top-level response shape (`/api/v3/info`)
 
@@ -105,19 +111,22 @@ Hardware, OS, and cloud-provider facts live in the agent's
 or a v3 metrics response):
 
 ```bash
-agents_query_agent --node "$NODE_UUID" --host "$AGENT_HOST:19999" --machine-guid "$AGENT_MG" \
+agents_query_agent --node "$NODE_UUID" --host "$AGENT_HOST" --machine-guid "$AGENT_MG" \
     GET /api/v1/info \
   | jq '.host_labels'
 ```
 
 | Field                                   | `.host_labels` key(s)                                                             |
 |-----------------------------------------|-------------------------------------------------------------------------------------|
-| Architecture, kernel, OS name/version   | `_architecture`, `_kernel_version`, `_os_name`, `_os_version`, `_os`                |
+| Architecture, kernel, OS metadata       | `_architecture`, `_kernel_version`, `_os`, `_os_name`, `_os_version`, `_os_marketing_version`, `_os_release`, `_os_codename`, `_os_edition`, `_os_build` |
 | CPU count, RAM, disk space               | `_system_cores`, `_system_cpu_model`, `_system_ram_total`, `_system_disk_space`     |
 | Hardware vendor/product                 | `_hw_sys_vendor`, `_hw_product_name`, `_hw_product_type`                           |
 | Cloud provider / region / instance type | `_cloud_provider_type`, `_cloud_instance_region`, `_cloud_instance_type`            |
 | Container/virtualization                | `_container`, `_container_detection`, `_virtualization`, `_virt_detection`, `_is_k8s_node` |
 | Streaming role / ephemerality            | `_is_parent`, `_is_ephemeral`                                                       |
+
+`_os_version` preserves the legacy display value. Use `_os_marketing_version` when filtering normalized product
+versions.
 
 ## Collection-job state (failed / disabled jobs)
 
@@ -126,7 +135,7 @@ status. See [query-dyncfg.md](./query-dyncfg.md):
 
 ```bash
 # List every go.d.plugin job and its current state.
-agents_query_agent --node "$NODE_UUID" --host "$AGENT_HOST:19999" --machine-guid "$AGENT_MG" \
+agents_query_agent --node "$NODE_UUID" --host "$AGENT_HOST" --machine-guid "$AGENT_MG" \
     GET '/api/v3/config?action=tree&path=/collectors/go.d/Jobs' \
   | jq '.tree["/collectors/go.d/Jobs"]'
 ```
@@ -143,15 +152,15 @@ under `/collectors/go.d/Vnodes` and `/collectors/ibm.d/Vnodes` in
 the DynCfg tree. Use the same DynCfg path:
 
 ```bash
-agents_query_agent --node "$NODE_UUID" --host "$AGENT_HOST:19999" --machine-guid "$AGENT_MG" \
+agents_query_agent --node "$NODE_UUID" --host "$AGENT_HOST" --machine-guid "$AGENT_MG" \
     GET '/api/v3/config?action=tree&path=/collectors/go.d/Vnodes'
 ```
 
 ## Limits and gotchas
 
-- **`/api/v1/info` and `/api/v3/info` are unauthenticated**, but
-  most other paths require the bearer. The wrapper always uses the
-  bearer; that's fine for `/info` too.
+- **`/api/v1/info` and `/api/v3/info` have no API bearer requirement.** Other endpoints depend on access rules and
+  bearer-protection settings. This wrapper always resolves a bearer, including for `/info`; use the entry
+  reachability probe when only unauthenticated access is needed.
 - **Host OS/hardware/cloud facts live only in `/api/v1/info`'s
   `.host_labels`.** Neither `/api/v3/info`'s `agents[0]` nor a v3
   metrics response's `summary.nodes[]` carries a `labels` field

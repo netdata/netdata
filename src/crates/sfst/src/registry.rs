@@ -8,8 +8,10 @@
 //! each file and faults in only the header, TOC, and SUMR pages.
 //!
 //! One registry covers one flat directory (`{base}/{tenant}/<files>`,
-//! see [`file_registry::FileDir`]); the per-tenant composition lives in
-//! `otel-ledger`, the only consumer.
+//! see [`file_registry::FileDir`]). Consumers (grep-verified):
+//! `file-lifecycle` embeds one per tenant in its `TenantRegistries` —
+//! the per-tenant composition `otel-ledger` drives — and `sfsq-cli`
+//! builds a standalone registry for offline discovery.
 
 use std::ops::Range;
 use std::path::{Path, PathBuf};
@@ -18,14 +20,17 @@ use file_registry::{ByteSize, FileDir, FileId, FileRegistry, Query};
 
 use crate::Summary;
 
+/// Filename extension of SFST index files (`<stem>.sfst`): this module's
+/// path derivation and recovery scans, plus
+/// [`scan_max_sequence_recursive`](crate::scan_max_sequence_recursive).
 pub(crate) const SFST_EXT: &str = "sfst";
 
 /// Retention limits for [`Registry::evaluate_retention`]: a file is
 /// evicted when keeping it would exceed any of the three.
 ///
-/// A plain policy type so the format crate doesn't depend on any
-/// config framework — the consumer resolves its configuration (e.g.
-/// per-tenant merging) and lowers it into this.
+/// A plain policy type so the format crate takes no config-framework
+/// dependency: the consumer resolves its configuration per tenant and
+/// lowers it into this (file-lifecycle's `sfst_retention_policy`).
 #[derive(Debug, Clone, Copy)]
 pub struct RetentionPolicy {
     /// Maximum number of files to keep.
@@ -37,7 +42,8 @@ pub struct RetentionPolicy {
     pub max_age: std::time::Duration,
 }
 
-/// One tracked `.sfst` file: identity, size, and inline summary.
+/// One tracked `.sfst` file: identity, size, inline summary, and
+/// deletion state.
 #[derive(Debug, Clone)]
 pub struct File {
     pub id: FileId,
@@ -46,6 +52,8 @@ pub struct File {
     /// inline so the query planner and catalog builder can read them without
     /// opening the file.
     pub summary: Summary,
+    /// Set while the file's removal is in flight — see
+    /// [`Self::is_pending_deletion`].
     pending_deletion: bool,
 }
 
@@ -57,15 +65,17 @@ impl File {
     }
 }
 
+/// Keys [`FileRegistry`]'s seq-indexed map by the entry's [`FileId::seq`].
 impl file_registry::Sequenced for File {
     fn seq(&self) -> u64 {
         self.id.seq
     }
 }
 
-/// The set of `.sfst` files in one directory, keyed by their sequence
-/// number (a [`FileId::seq`] is unique within a directory — see the
-/// seq-allocation rules in `wal`).
+/// The set of `.sfst` files in one directory, keyed by bare seq (a
+/// [`FileId::seq`] is unique within a directory — see the seq-allocation
+/// rules in `wal`). Wraps a [`file_registry::FileRegistry`], so iteration
+/// is ascending-seq, oldest first.
 pub struct Registry {
     inner: FileRegistry<File>,
 }
@@ -84,7 +94,7 @@ impl Registry {
         self.inner.dir().path()
     }
 
-    /// Derive the on-disk path for an index file from its FileId.
+    /// The on-disk path of the `.sfst` file `id` names: `<dir>/<stem>.sfst`.
     pub fn file_path(&self, id: FileId) -> PathBuf {
         self.inner.file_path(id)
     }
@@ -94,6 +104,10 @@ impl Registry {
     /// Reads each file's `SUMR` chunk to recover the summary fields; files
     /// whose summary cannot be read are skipped with a warning rather than
     /// aborting recovery. Returns the number of files successfully recovered.
+    /// Directory-scan errors are swallowed (`unwrap_or_default`) — a missing
+    /// or unreadable directory recovers nothing rather than failing — so
+    /// probe the directory yourself when an empty result must be
+    /// distinguishable from an error.
     pub fn recover(&mut self) -> usize {
         let scan_results = self.inner.dir().scan().unwrap_or_default();
         let dir = self.inner.dir().path().to_path_buf();
@@ -127,8 +141,10 @@ impl Registry {
         recovered
     }
 
-    /// Register a newly written file (the rotation path; recovery uses
-    /// [`recover`](Self::recover)). Replaces any entry with the same seq.
+    /// Register a newly written file — steady-state rotation and
+    /// recovery's index-drain both land here; the startup scan of existing
+    /// files uses [`recover`](Self::recover). Replaces any entry with the
+    /// same seq.
     pub fn track(&mut self, id: FileId, size: ByteSize, summary: Summary) {
         self.inner.insert(File {
             id,
@@ -177,14 +193,16 @@ impl Registry {
     /// `pending_deletion` so callers don't see files that are queued for
     /// removal by the cleaner.
     ///
-    /// Time-range overlap is computed against the file's full
-    /// `[min_timestamp_s, max_timestamp_s]` range (inclusive on both ends);
-    /// the query's `time_range` is `[start, end)` (half-open). A file is
-    /// included if any second is shared by both ranges.
+    /// Time-range overlap compares the file's full
+    /// `[min_timestamp_s, max_timestamp_s]` seconds (inclusive on both
+    /// ends) against the query's half-open `[start, end)` window — a file
+    /// qualifies iff any second is shared (the shared
+    /// [`file_registry::range_overlaps`] rule, so an empty window matches
+    /// nothing).
     ///
     /// Partition filter, when non-empty, keeps files whose opaque `part_key`
-    /// is one of [`Query::partition_keys`], compared as an opaque `u64`. There
-    /// is no partial / prefix matching — each SFST holds exactly one partition.
+    /// is one of [`Query::partition_keys`] — exact `u64` match, no partial
+    /// matching; each SFST holds exactly one partition.
     pub fn candidates<'a>(&'a self, q: &Query) -> impl Iterator<Item = &'a File> + 'a {
         // Copy q's fields so the returned iterator doesn't borrow q (callers
         // may pass a temporary Query).
@@ -207,16 +225,20 @@ impl Registry {
         self.inner.is_empty()
     }
 
-    /// Evaluate the retention policy and return sequences of files to evict.
+    /// Evaluate the retention policy and return the seqs to evict, oldest
+    /// first.
     ///
-    /// Only files that are not already pending deletion are considered.
-    /// Files are evaluated oldest-first (by sequence number). A file is
-    /// marked for eviction if any limit is exceeded.
+    /// Files already pending deletion are ignored and don't count toward
+    /// the limits. Eligible files are walked oldest-first (by sequence
+    /// number): the `max_files` / `max_total_size` limits are checked
+    /// against the totals remaining after earlier evictions, so files are
+    /// dropped until both fit, while `max_age` is a per-file check.
     ///
     /// Age is measured against `summary.max_timestamp_s` — the most recent
-    /// log entry in the file. An empty SFST (`record_count == 0`,
-    /// `max_timestamp_s == 0`) ages out immediately, which matches the
-    /// "no useful data" disposition.
+    /// log entry in the file — compared against `now_ns` truncated to
+    /// whole seconds. An empty SFST (`record_count == 0`, so
+    /// `max_timestamp_s == 0`) is older than any real age and evicts on
+    /// the first pass.
     pub fn evaluate_retention(&self, policy: &RetentionPolicy, now_ns: u64) -> Vec<u64> {
         let max_files = policy.max_files;
         let max_total_size = policy.max_total_size.as_u64();
@@ -264,26 +286,21 @@ impl Registry {
 /// the query's half-open `[start, end)` range — the shared
 /// [`file_registry::range_overlaps`] rule.
 ///
-/// Edge case: empty SFSTs (`record_count == 0`, `min == max == 0`)
-/// overlap with any query that includes second 0; in practice they're
-/// filtered earlier by retention.
+/// Edge case: empty SFSTs (`record_count == 0`, `min == max == 0`) overlap
+/// exactly the queries whose window includes second 0; retention normally
+/// evicts them before a query reaches this filter.
 fn range_overlaps(summary: &Summary, q: &Range<u32>) -> bool {
     file_registry::range_overlaps(q, summary.min_timestamp_s, summary.max_timestamp_s)
 }
 
-/// Read the `SUMR` chunk of an SFST file and decode the summary.
-///
-/// Used by [`Registry::recover`] to rebuild summaries on startup. Maps the
-/// file instead of reading it: `ChunkReader::open` touches only the header + TOC
-/// pages and `summary()` only the SUMR chunk's, so recovery faults in a few
-/// KB per file rather than the whole file — which, across thousands of
-/// files, turned startup into a multi-GB sequential read. `Advice::Random`
-/// suppresses readahead so the kernel doesn't speculatively pull
-/// neighbouring pages either.
+/// Read the `SUMR` chunk of an SFST file and decode its summary — the
+/// cheap read [`Registry::recover`] rebuilds state from: only the header,
+/// TOC, and `SUMR` pages fault in, never the whole file (access-pattern
+/// details in [`crate::read_summary_path`]).
 fn read_summary(path: &Path) -> Result<Summary, String> {
-    // The mmap-and-touch-only-SUMR mechanics moved to the public
-    // `crate::read_summary_path` (query tools need the same cheap read);
-    // this wrapper keeps recovery's string-error shape.
+    // Delegation only: the mmap-and-touch-only-SUMR mechanics live in the
+    // public `crate::read_summary_path` (query tools need the same cheap
+    // read); this wrapper keeps recovery's string-error shape.
     crate::reader::read_summary_path(path).map_err(|e| e.to_string())
 }
 

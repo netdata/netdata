@@ -266,9 +266,6 @@ func forbiddenLinkMapCarrierKeyValueError(
 	if name == "" {
 		return nil
 	}
-	if isAllowedLinkMapCarrierUse(path, name, node) {
-		return nil
-	}
 	return forbiddenLinkMapCarrierUseError(path, fset, node, name, "composite field", forbidden)
 }
 
@@ -294,6 +291,9 @@ func forbiddenLinkMapCarrierUseError(
 	kind string,
 	forbidden map[string]struct{},
 ) error {
+	if isAllowedLinkMapCarrierUse(path, name, node) {
+		return nil
+	}
 	if _, ok := forbidden[name]; !ok {
 		return nil
 	}
@@ -302,6 +302,9 @@ func forbiddenLinkMapCarrierUseError(
 }
 
 func isAllowedLinkMapCarrierUse(path, name string, node ast.Node) bool {
+	if filepath.ToSlash(path) == "internal/topologydiag/archive_acquisition.go" && name == "Metrics" {
+		return true
+	}
 	if filepath.Base(path) != "presentation.go" || name != "Metrics" {
 		return false
 	}

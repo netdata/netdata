@@ -1,0 +1,3971 @@
+version: v1
+context_namespace: redfish
+groups:
+  - family: Overview
+    chart_defaults:
+      priority: 70000
+      instances:
+        by_labels:
+          - endpoint_key
+          - resource_key
+    groups:
+      - family: Chassis
+        context_namespace: chassis
+        metrics:
+          - chassis_acquisition_state
+          - chassis_conditions_critical
+          - chassis_conditions_ok
+          - chassis_conditions_unknown
+          - chassis_conditions_warning
+          - chassis_health_rollup_status
+          - chassis_health_status
+          - chassis_intrusion_state
+          - chassis_power_state
+          - chassis_state
+        charts:
+          - title: Chassis Acquisition State
+            context: acquisition_state
+            units: state
+            type: stacked
+            dimensions:
+              - selector: chassis_acquisition_state
+          - title: Chassis Conditions
+            context: conditions
+            units: conditions
+            type: stacked
+            dimensions:
+              - selector: chassis_conditions_ok
+                name: ok
+              - selector: chassis_conditions_warning
+                name: warning
+              - selector: chassis_conditions_critical
+                name: critical
+              - selector: chassis_conditions_unknown
+                name: unknown
+          - title: Chassis Health
+            context: health
+            units: state
+            type: stacked
+            dimensions:
+              - selector: chassis_health_status
+          - title: Chassis Health Rollup
+            context: health_rollup
+            units: state
+            type: stacked
+            dimensions:
+              - selector: chassis_health_rollup_status
+          - title: Chassis Intrusion State
+            context: intrusion_state
+            units: state
+            type: stacked
+            dimensions:
+              - selector: chassis_intrusion_state
+          - title: Chassis Power State
+            context: power_state
+            units: state
+            type: stacked
+            dimensions:
+              - selector: chassis_power_state
+          - title: Chassis State
+            context: state
+            units: state
+            type: stacked
+            dimensions:
+              - selector: chassis_state
+      - family: Redundancy
+        context_namespace: redundancy
+        metrics:
+          - redundancy_acquisition_state
+          - redundancy_conditions_critical
+          - redundancy_conditions_ok
+          - redundancy_conditions_unknown
+          - redundancy_conditions_warning
+          - redundancy_enabled_state
+          - redundancy_health_rollup_status
+          - redundancy_health_status
+          - redundancy_members_active
+          - redundancy_members_total
+          - redundancy_mode
+          - redundancy_state
+        charts:
+          - title: Redundancy Acquisition State
+            context: acquisition_state
+            units: state
+            type: stacked
+            dimensions:
+              - selector: redundancy_acquisition_state
+          - title: Redundancy Conditions
+            context: conditions
+            units: conditions
+            type: stacked
+            dimensions:
+              - selector: redundancy_conditions_ok
+                name: ok
+              - selector: redundancy_conditions_warning
+                name: warning
+              - selector: redundancy_conditions_critical
+                name: critical
+              - selector: redundancy_conditions_unknown
+                name: unknown
+          - title: Redundancy Enabled
+            context: enabled
+            units: state
+            type: stacked
+            dimensions:
+              - selector: redundancy_enabled_state
+          - title: Redundancy Health
+            context: health
+            units: state
+            type: stacked
+            dimensions:
+              - selector: redundancy_health_status
+          - title: Redundancy Health Rollup
+            context: health_rollup
+            units: state
+            type: stacked
+            dimensions:
+              - selector: redundancy_health_rollup_status
+          - title: Redundancy Members
+            context: members
+            units: members
+            dimensions:
+              - selector: redundancy_members_active
+                name: active
+              - selector: redundancy_members_total
+                name: total
+          - title: Redundancy Mode
+            context: mode
+            units: state
+            type: stacked
+            dimensions:
+              - selector: redundancy_mode
+          - title: Redundancy State
+            context: state
+            units: state
+            type: stacked
+            dimensions:
+              - selector: redundancy_state
+      - family: Service
+        context_namespace: service
+        metrics:
+          - service_acquisition_state
+        charts:
+          - title: Redfish Service Acquisition State
+            context: acquisition_state
+            units: state
+            type: stacked
+            dimensions:
+              - selector: service_acquisition_state
+      - family: Systems
+        context_namespace: system
+        metrics:
+          - system_acquisition_state
+          - system_conditions_critical
+          - system_conditions_ok
+          - system_conditions_unknown
+          - system_conditions_warning
+          - system_health_rollup_status
+          - system_health_status
+          - system_memory_bandwidth
+          - system_memory_summary_health_rollup_status
+          - system_memory_summary_health_status
+          - system_memory_summary_state
+          - system_memory_utilization
+          - system_power_state
+          - system_processor_bandwidth
+          - system_processor_summary_health_rollup_status
+          - system_processor_summary_health_status
+          - system_processor_summary_state
+          - system_processor_utilization_kernel
+          - system_processor_utilization_user
+          - system_state
+        charts:
+          - title: System Acquisition State
+            context: acquisition_state
+            units: state
+            type: stacked
+            dimensions:
+              - selector: system_acquisition_state
+          - title: System Conditions
+            context: conditions
+            units: conditions
+            type: stacked
+            dimensions:
+              - selector: system_conditions_ok
+                name: ok
+              - selector: system_conditions_warning
+                name: warning
+              - selector: system_conditions_critical
+                name: critical
+              - selector: system_conditions_unknown
+                name: unknown
+          - title: System Health
+            context: health
+            units: state
+            type: stacked
+            dimensions:
+              - selector: system_health_status
+          - title: System Health Rollup
+            context: health_rollup
+            units: state
+            type: stacked
+            dimensions:
+              - selector: system_health_rollup_status
+          - title: System Memory Bandwidth
+            context: memory_bandwidth
+            units: percentage
+            dimensions:
+              - selector: system_memory_bandwidth
+                name: bandwidth
+          - title: System Memory Summary Health
+            context: memory_summary_health
+            units: state
+            type: stacked
+            dimensions:
+              - selector: system_memory_summary_health_status
+          - title: System Memory Summary Health Rollup
+            context: memory_summary_health_rollup
+            units: state
+            type: stacked
+            dimensions:
+              - selector: system_memory_summary_health_rollup_status
+          - title: System Memory Summary State
+            context: memory_summary_state
+            units: state
+            type: stacked
+            dimensions:
+              - selector: system_memory_summary_state
+          - title: System Memory Utilization
+            context: memory_utilization
+            units: percentage
+            dimensions:
+              - selector: system_memory_utilization
+                name: capacity
+          - title: System Power State
+            context: power_state
+            units: state
+            type: stacked
+            dimensions:
+              - selector: system_power_state
+          - title: System Processor Bandwidth
+            context: processor_bandwidth
+            units: percentage
+            dimensions:
+              - selector: system_processor_bandwidth
+                name: bandwidth
+          - title: System Processor Summary Health
+            context: processor_summary_health
+            units: state
+            type: stacked
+            dimensions:
+              - selector: system_processor_summary_health_status
+          - title: System Processor Summary Health Rollup
+            context: processor_summary_health_rollup
+            units: state
+            type: stacked
+            dimensions:
+              - selector: system_processor_summary_health_rollup_status
+          - title: System Processor Summary State
+            context: processor_summary_state
+            units: state
+            type: stacked
+            dimensions:
+              - selector: system_processor_summary_state
+          - title: System Processor Utilization
+            context: processor_utilization
+            units: percentage
+            dimensions:
+              - selector: system_processor_utilization_kernel
+                name: kernel
+              - selector: system_processor_utilization_user
+                name: user
+          - title: System State
+            context: state
+            units: state
+            type: stacked
+            dimensions:
+              - selector: system_state
+  - family: Compute
+    chart_defaults:
+      priority: 70100
+      instances:
+        by_labels:
+          - endpoint_key
+          - resource_key
+    groups:
+      - family: Processor Cores
+        context_namespace: processor_core
+        metrics:
+          - processor_core_acquisition_state
+          - processor_core_cycle_rate_io_stall
+          - processor_core_cycle_rate_memory_stall
+          - processor_core_cycle_rate_unhalted
+          - processor_core_error_rate_correctable_core
+          - processor_core_error_rate_correctable_other
+          - processor_core_error_rate_uncorrectable_core
+          - processor_core_error_rate_uncorrectable_other
+          - processor_core_instructions_per_cycle
+        charts:
+          - title: Processor Core Acquisition State
+            context: acquisition_state
+            units: state
+            type: stacked
+            dimensions:
+              - selector: processor_core_acquisition_state
+          - title: Processor Core Cycle Rate
+            context: cycle_rate
+            units: cycles/s
+            dimensions:
+              - selector: processor_core_cycle_rate_io_stall
+                name: io_stall
+              - selector: processor_core_cycle_rate_memory_stall
+                name: memory_stall
+              - selector: processor_core_cycle_rate_unhalted
+                name: unhalted
+          - title: Processor Core Error Rate
+            context: error_rate
+            units: errors/s
+            dimensions:
+              - selector: processor_core_error_rate_correctable_core
+                name: correctable_core
+              - selector: processor_core_error_rate_correctable_other
+                name: correctable_other
+              - selector: processor_core_error_rate_uncorrectable_core
+                name: uncorrectable_core
+              - selector: processor_core_error_rate_uncorrectable_other
+                name: uncorrectable_other
+          - title: Processor Core Instructions per Cycle
+            context: instructions_per_cycle
+            units: instructions/cycle
+            dimensions:
+              - selector: processor_core_instructions_per_cycle
+                name: instructions
+      - family: Processors
+        context_namespace: processor
+        metrics:
+          - processor_acquisition_state
+          - processor_bandwidth_utilization
+          - processor_clock_speed_operating
+          - processor_conditions_critical
+          - processor_conditions_ok
+          - processor_conditions_unknown
+          - processor_conditions_warning
+          - processor_error_rate_correctable_core
+          - processor_error_rate_correctable_other
+          - processor_error_rate_uncorrectable_core
+          - processor_error_rate_uncorrectable_other
+          - processor_frequency_ratio
+          - processor_health_rollup_status
+          - processor_health_status
+          - processor_pcie_error_rate_bad_dllp
+          - processor_pcie_error_rate_bad_tlp
+          - processor_pcie_error_rate_correctable
+          - processor_pcie_error_rate_fatal
+          - processor_pcie_error_rate_flow_control_timeout
+          - processor_pcie_error_rate_l0_to_recovery
+          - processor_pcie_error_rate_nak_received
+          - processor_pcie_error_rate_nak_sent
+          - processor_pcie_error_rate_non_fatal
+          - processor_pcie_error_rate_replay
+          - processor_pcie_error_rate_replay_rollover
+          - processor_pcie_error_rate_unsupported_request
+          - processor_power_state
+          - processor_state
+          - processor_thermal_headroom
+          - processor_throttle_time_power_limit
+          - processor_throttle_time_thermal_limit
+          - processor_throttling_state
+          - processor_utilization_kernel
+          - processor_utilization_user
+        charts:
+          - title: Processor Acquisition State
+            context: acquisition_state
+            units: state
+            type: stacked
+            dimensions:
+              - selector: processor_acquisition_state
+          - title: Processor Bandwidth Utilization
+            context: bandwidth_utilization
+            units: percentage
+            dimensions:
+              - selector: processor_bandwidth_utilization
+                name: bandwidth
+          - title: Processor Clock Speed
+            context: clock_speed
+            units: MHz
+            dimensions:
+              - selector: processor_clock_speed_operating
+                name: operating
+          - title: Processor Conditions
+            context: conditions
+            units: conditions
+            type: stacked
+            dimensions:
+              - selector: processor_conditions_ok
+                name: ok
+              - selector: processor_conditions_warning
+                name: warning
+              - selector: processor_conditions_critical
+                name: critical
+              - selector: processor_conditions_unknown
+                name: unknown
+          - title: Processor Error Rate
+            context: error_rate
+            units: errors/s
+            dimensions:
+              - selector: processor_error_rate_correctable_core
+                name: correctable_core
+              - selector: processor_error_rate_correctable_other
+                name: correctable_other
+              - selector: processor_error_rate_uncorrectable_core
+                name: uncorrectable_core
+              - selector: processor_error_rate_uncorrectable_other
+                name: uncorrectable_other
+          - title: Processor Frequency Ratio
+            context: frequency_ratio
+            units: ratio
+            dimensions:
+              - selector: processor_frequency_ratio
+                name: ratio
+          - title: Processor Health
+            context: health
+            units: state
+            type: stacked
+            dimensions:
+              - selector: processor_health_status
+          - title: Processor Health Rollup
+            context: health_rollup
+            units: state
+            type: stacked
+            dimensions:
+              - selector: processor_health_rollup_status
+          - title: Processor PCIe Error Rate
+            context: pcie_error_rate
+            units: errors/s
+            dimensions:
+              - selector: processor_pcie_error_rate_bad_dllp
+                name: bad_dllp
+              - selector: processor_pcie_error_rate_bad_tlp
+                name: bad_tlp
+              - selector: processor_pcie_error_rate_correctable
+                name: correctable
+              - selector: processor_pcie_error_rate_fatal
+                name: fatal
+              - selector: processor_pcie_error_rate_flow_control_timeout
+                name: flow_control_timeout
+              - selector: processor_pcie_error_rate_l0_to_recovery
+                name: l0_to_recovery
+              - selector: processor_pcie_error_rate_nak_received
+                name: nak_received
+              - selector: processor_pcie_error_rate_nak_sent
+                name: nak_sent
+              - selector: processor_pcie_error_rate_non_fatal
+                name: non_fatal
+              - selector: processor_pcie_error_rate_replay
+                name: replay
+              - selector: processor_pcie_error_rate_replay_rollover
+                name: replay_rollover
+              - selector: processor_pcie_error_rate_unsupported_request
+                name: unsupported_request
+          - title: Processor Power State
+            context: power_state
+            units: state
+            type: stacked
+            dimensions:
+              - selector: processor_power_state
+          - title: Processor State
+            context: state
+            units: state
+            type: stacked
+            dimensions:
+              - selector: processor_state
+          - title: Processor Thermal Headroom
+            context: thermal_headroom
+            units: Celsius
+            dimensions:
+              - selector: processor_thermal_headroom
+                name: headroom
+          - title: Processor Throttle Time
+            context: throttle_time
+            units: percentage
+            dimensions:
+              - selector: processor_throttle_time_power_limit
+                name: power_limit
+              - selector: processor_throttle_time_thermal_limit
+                name: thermal_limit
+          - title: Processor Throttling State
+            context: throttling_state
+            units: state
+            type: stacked
+            dimensions:
+              - selector: processor_throttling_state
+          - title: Processor Utilization
+            context: utilization
+            units: percentage
+            dimensions:
+              - selector: processor_utilization_user
+                name: user
+              - selector: processor_utilization_kernel
+                name: kernel
+  - family: Memory
+    chart_defaults:
+      priority: 70200
+      instances:
+        by_labels:
+          - endpoint_key
+          - resource_key
+    groups:
+      - family: Memory Modules
+        context_namespace: memory
+        metrics:
+          - memory_acquisition_state
+          - memory_bandwidth_utilization
+          - memory_capacity_utilization
+          - memory_conditions_critical
+          - memory_conditions_ok
+          - memory_conditions_unknown
+          - memory_conditions_warning
+          - memory_dirty_shutdown_rate
+          - memory_error_rate_correctable
+          - memory_error_rate_indeterminate_correctable
+          - memory_error_rate_indeterminate_uncorrectable
+          - memory_error_rate_uncorrectable
+          - memory_health_flags_address_parity
+          - memory_health_flags_correctable_ecc
+          - memory_health_flags_data_loss
+          - memory_health_flags_last_shutdown_failed
+          - memory_health_flags_performance_degraded
+          - memory_health_flags_spare_block
+          - memory_health_flags_temperature
+          - memory_health_flags_uncorrectable_ecc
+          - memory_health_rollup_status
+          - memory_health_status
+          - memory_io_read
+          - memory_io_written
+          - memory_media_health_life_left
+          - memory_media_health_spare_remaining
+          - memory_state
+        charts:
+          - title: Memory Module Acquisition State
+            context: acquisition_state
+            units: state
+            type: stacked
+            dimensions:
+              - selector: memory_acquisition_state
+          - title: Memory Module Bandwidth Utilization
+            context: bandwidth_utilization
+            units: percentage
+            dimensions:
+              - selector: memory_bandwidth_utilization
+                name: utilization
+          - title: Memory Module Capacity Utilization
+            context: capacity_utilization
+            units: percentage
+            dimensions:
+              - selector: memory_capacity_utilization
+                name: utilization
+          - title: Memory Module Conditions
+            context: conditions
+            units: conditions
+            type: stacked
+            dimensions:
+              - selector: memory_conditions_ok
+                name: ok
+              - selector: memory_conditions_warning
+                name: warning
+              - selector: memory_conditions_critical
+                name: critical
+              - selector: memory_conditions_unknown
+                name: unknown
+          - title: Memory Module Dirty Shutdown Rate
+            context: dirty_shutdown_rate
+            units: shutdowns/s
+            dimensions:
+              - selector: memory_dirty_shutdown_rate
+                name: shutdowns
+          - title: Memory Module Error Rate
+            context: error_rate
+            units: errors/s
+            dimensions:
+              - selector: memory_error_rate_correctable
+                name: correctable
+              - selector: memory_error_rate_indeterminate_correctable
+                name: indeterminate_correctable
+              - selector: memory_error_rate_uncorrectable
+                name: uncorrectable
+              - selector: memory_error_rate_indeterminate_uncorrectable
+                name: indeterminate_uncorrectable
+          - title: Memory Module Health
+            context: health
+            units: state
+            type: stacked
+            dimensions:
+              - selector: memory_health_status
+          - title: Memory Module Health Flags
+            context: health_flags
+            units: flags
+            type: stacked
+            dimensions:
+              - selector: memory_health_flags_data_loss
+                name: data_loss
+              - selector: memory_health_flags_last_shutdown_failed
+                name: last_shutdown_failed
+              - selector: memory_health_flags_performance_degraded
+                name: performance_degraded
+              - selector: memory_health_flags_address_parity
+                name: address_parity
+              - selector: memory_health_flags_correctable_ecc
+                name: correctable_ecc
+              - selector: memory_health_flags_spare_block
+                name: spare_block
+              - selector: memory_health_flags_temperature
+                name: temperature
+              - selector: memory_health_flags_uncorrectable_ecc
+                name: uncorrectable_ecc
+          - title: Memory Module Health Rollup
+            context: health_rollup
+            units: state
+            type: stacked
+            dimensions:
+              - selector: memory_health_rollup_status
+          - title: Memory Module I/O
+            context: io
+            units: bytes/s
+            dimensions:
+              - selector: memory_io_read
+                name: read
+              - selector: memory_io_written
+                name: written
+          - title: Memory Module Media Health
+            context: media_health
+            units: percentage
+            dimensions:
+              - selector: memory_media_health_life_left
+                name: life_left
+              - selector: memory_media_health_spare_remaining
+                name: spare_remaining
+          - title: Memory Module State
+            context: state
+            units: state
+            type: stacked
+            dimensions:
+              - selector: memory_state
+  - family: Storage
+    chart_defaults:
+      priority: 70300
+      instances:
+        by_labels:
+          - endpoint_key
+          - resource_key
+    groups:
+      - family: Controllers
+        context_namespace: storage_controller
+        metrics:
+          - storage_controller_acquisition_state
+          - storage_controller_cache_health_rollup_status
+          - storage_controller_cache_health_status
+          - storage_controller_cache_state
+          - storage_controller_conditions_critical
+          - storage_controller_conditions_ok
+          - storage_controller_conditions_unknown
+          - storage_controller_conditions_warning
+          - storage_controller_error_rate_correctable_ecc
+          - storage_controller_error_rate_correctable_parity
+          - storage_controller_error_rate_uncorrectable_ecc
+          - storage_controller_error_rate_uncorrectable_parity
+          - storage_controller_health_rollup_status
+          - storage_controller_health_status
+          - storage_controller_pcie_lanes_active
+          - storage_controller_state
+          - storage_controller_state_change_rate
+        charts:
+          - title: Storage Controller Acquisition State
+            context: acquisition_state
+            units: state
+            type: stacked
+            dimensions:
+              - selector: storage_controller_acquisition_state
+          - title: Storage Controller Cache Health
+            context: cache_health
+            units: state
+            type: stacked
+            dimensions:
+              - selector: storage_controller_cache_health_status
+          - title: Storage Controller Cache Health Rollup
+            context: cache_health_rollup
+            units: state
+            type: stacked
+            dimensions:
+              - selector: storage_controller_cache_health_rollup_status
+          - title: Storage Controller Cache State
+            context: cache_state
+            units: state
+            type: stacked
+            dimensions:
+              - selector: storage_controller_cache_state
+          - title: Storage Controller Conditions
+            context: conditions
+            units: conditions
+            type: stacked
+            dimensions:
+              - selector: storage_controller_conditions_ok
+                name: ok
+              - selector: storage_controller_conditions_warning
+                name: warning
+              - selector: storage_controller_conditions_critical
+                name: critical
+              - selector: storage_controller_conditions_unknown
+                name: unknown
+          - title: Storage Controller Error Rate
+            context: error_rate
+            units: errors/s
+            dimensions:
+              - selector: storage_controller_error_rate_correctable_ecc
+                name: correctable_ecc
+              - selector: storage_controller_error_rate_correctable_parity
+                name: correctable_parity
+              - selector: storage_controller_error_rate_uncorrectable_ecc
+                name: uncorrectable_ecc
+              - selector: storage_controller_error_rate_uncorrectable_parity
+                name: uncorrectable_parity
+          - title: Storage Controller Health
+            context: health
+            units: state
+            type: stacked
+            dimensions:
+              - selector: storage_controller_health_status
+          - title: Storage Controller Health Rollup
+            context: health_rollup
+            units: state
+            type: stacked
+            dimensions:
+              - selector: storage_controller_health_rollup_status
+          - title: Storage Controller PCIe Lanes
+            context: pcie_lanes
+            units: lanes
+            dimensions:
+              - selector: storage_controller_pcie_lanes_active
+                name: active
+          - title: Storage Controller State
+            context: state
+            units: state
+            type: stacked
+            dimensions:
+              - selector: storage_controller_state
+          - title: Storage Controller State Change Rate
+            context: state_change_rate
+            units: changes/s
+            dimensions:
+              - selector: storage_controller_state_change_rate
+                name: changes
+        groups:
+          - family: NVMe
+            context_namespace: nvme
+            metrics:
+              - storage_controller_nvme_busy_time_busy
+              - storage_controller_nvme_commands_read
+              - storage_controller_nvme_commands_written
+              - storage_controller_nvme_critical_warnings_media_read_only
+              - storage_controller_nvme_critical_warnings_namespaces_read_only
+              - storage_controller_nvme_critical_warnings_pmr_unreliable
+              - storage_controller_nvme_critical_warnings_power_backup_failed
+              - storage_controller_nvme_critical_warnings_reliability_degraded
+              - storage_controller_nvme_critical_warnings_spare_capacity_under_threshold
+              - storage_controller_nvme_critical_warnings_spare_capacity_worn_out
+              - storage_controller_nvme_critical_warnings_subsystem_degraded
+              - storage_controller_nvme_error_rate_error_log_entries
+              - storage_controller_nvme_error_rate_media_integrity
+              - storage_controller_nvme_event_rate_power_cycles
+              - storage_controller_nvme_event_rate_unsafe_shutdowns
+              - storage_controller_nvme_io_read
+              - storage_controller_nvme_io_written
+              - storage_controller_nvme_spare_available
+              - storage_controller_nvme_temperature_composite
+              - storage_controller_nvme_thermal_time_critical
+              - storage_controller_nvme_thermal_time_management_1
+              - storage_controller_nvme_thermal_time_management_2
+              - storage_controller_nvme_thermal_time_warning
+              - storage_controller_nvme_thermal_transition_rate_management_1
+              - storage_controller_nvme_thermal_transition_rate_management_2
+              - storage_controller_nvme_wear_used
+            charts:
+              - title: Storage Controller NVMe Busy Time
+                context: busy_time
+                units: percentage
+                dimensions:
+                  - selector: storage_controller_nvme_busy_time_busy
+                    name: busy
+              - title: Storage Controller NVMe Commands
+                context: commands
+                units: commands/s
+                dimensions:
+                  - selector: storage_controller_nvme_commands_read
+                    name: read
+                  - selector: storage_controller_nvme_commands_written
+                    name: written
+              - title: Storage Controller NVMe Critical Warnings
+                context: critical_warnings
+                units: flags
+                type: stacked
+                dimensions:
+                  - selector: storage_controller_nvme_critical_warnings_media_read_only
+                    name: media_read_only
+                  - selector: storage_controller_nvme_critical_warnings_subsystem_degraded
+                    name: subsystem_degraded
+                  - selector: storage_controller_nvme_critical_warnings_pmr_unreliable
+                    name: pmr_unreliable
+                  - selector: storage_controller_nvme_critical_warnings_power_backup_failed
+                    name: power_backup_failed
+                  - selector: storage_controller_nvme_critical_warnings_spare_capacity_worn_out
+                    name: spare_capacity_worn_out
+                  - selector: storage_controller_nvme_critical_warnings_namespaces_read_only
+                    name: namespaces_read_only
+                  - selector: storage_controller_nvme_critical_warnings_reliability_degraded
+                    name: reliability_degraded
+                  - selector: storage_controller_nvme_critical_warnings_spare_capacity_under_threshold
+                    name: spare_capacity_under_threshold
+              - title: Storage Controller NVMe Error Rate
+                context: error_rate
+                units: errors/s
+                dimensions:
+                  - selector: storage_controller_nvme_error_rate_media_integrity
+                    name: media_integrity
+                  - selector: storage_controller_nvme_error_rate_error_log_entries
+                    name: error_log_entries
+              - title: Storage Controller NVMe Event Rate
+                context: event_rate
+                units: events/s
+                dimensions:
+                  - selector: storage_controller_nvme_event_rate_unsafe_shutdowns
+                    name: unsafe_shutdowns
+                  - selector: storage_controller_nvme_event_rate_power_cycles
+                    name: power_cycles
+              - title: Storage Controller NVMe I/O
+                context: io
+                units: bytes/s
+                dimensions:
+                  - selector: storage_controller_nvme_io_read
+                    name: read
+                  - selector: storage_controller_nvme_io_written
+                    name: written
+              - title: Storage Controller NVMe Spare
+                context: spare
+                units: percentage
+                dimensions:
+                  - selector: storage_controller_nvme_spare_available
+                    name: available
+              - title: Storage Controller NVMe Temperature
+                context: temperature
+                units: Celsius
+                dimensions:
+                  - selector: storage_controller_nvme_temperature_composite
+                    name: composite
+              - title: Storage Controller NVMe Thermal Time
+                context: thermal_time
+                units: percentage
+                dimensions:
+                  - selector: storage_controller_nvme_thermal_time_warning
+                    name: warning
+                  - selector: storage_controller_nvme_thermal_time_critical
+                    name: critical
+                  - selector: storage_controller_nvme_thermal_time_management_1
+                    name: management_1
+                  - selector: storage_controller_nvme_thermal_time_management_2
+                    name: management_2
+              - title: Storage Controller NVMe Thermal Transition Rate
+                context: thermal_transition_rate
+                units: transitions/s
+                dimensions:
+                  - selector: storage_controller_nvme_thermal_transition_rate_management_1
+                    name: management_1
+                  - selector: storage_controller_nvme_thermal_transition_rate_management_2
+                    name: management_2
+              - title: Storage Controller NVMe Wear
+                context: wear
+                units: percentage
+                dimensions:
+                  - selector: storage_controller_nvme_wear_used
+                    name: used
+      - family: Drives
+        context_namespace: drive
+        metrics:
+          - drive_acquisition_state
+          - drive_conditions_critical
+          - drive_conditions_ok
+          - drive_conditions_unknown
+          - drive_conditions_warning
+          - drive_error_rate_bad_blocks
+          - drive_error_rate_correctable_read
+          - drive_error_rate_correctable_write
+          - drive_error_rate_uncorrectable_read
+          - drive_error_rate_uncorrectable_write
+          - drive_failure_predicted_state
+          - drive_health_rollup_status
+          - drive_health_status
+          - drive_io_read
+          - drive_io_written
+          - drive_link_speed_negotiated
+          - drive_media_life
+          - drive_queue_depth
+          - drive_state
+          - drive_status_indicator_state
+        charts:
+          - title: Drive Acquisition State
+            context: acquisition_state
+            units: state
+            type: stacked
+            dimensions:
+              - selector: drive_acquisition_state
+          - title: Drive Conditions
+            context: conditions
+            units: conditions
+            type: stacked
+            dimensions:
+              - selector: drive_conditions_ok
+                name: ok
+              - selector: drive_conditions_warning
+                name: warning
+              - selector: drive_conditions_critical
+                name: critical
+              - selector: drive_conditions_unknown
+                name: unknown
+          - title: Drive Error Rate
+            context: error_rate
+            units: errors/s
+            dimensions:
+              - selector: drive_error_rate_correctable_read
+                name: correctable_read
+              - selector: drive_error_rate_correctable_write
+                name: correctable_write
+              - selector: drive_error_rate_uncorrectable_read
+                name: uncorrectable_read
+              - selector: drive_error_rate_uncorrectable_write
+                name: uncorrectable_write
+              - selector: drive_error_rate_bad_blocks
+                name: bad_blocks
+          - title: Drive Failure Prediction
+            context: failure_predicted
+            units: state
+            type: stacked
+            dimensions:
+              - selector: drive_failure_predicted_state
+          - title: Drive Health
+            context: health
+            units: state
+            type: stacked
+            dimensions:
+              - selector: drive_health_status
+          - title: Drive Health Rollup
+            context: health_rollup
+            units: state
+            type: stacked
+            dimensions:
+              - selector: drive_health_rollup_status
+          - title: Drive I/O
+            context: io
+            units: bytes/s
+            dimensions:
+              - selector: drive_io_read
+                name: read
+              - selector: drive_io_written
+                name: written
+          - title: Drive Link Speed
+            context: link_speed
+            units: bit/s
+            dimensions:
+              - selector: drive_link_speed_negotiated
+                name: negotiated
+          - title: Drive Media Life
+            context: media_life
+            units: percentage
+            dimensions:
+              - selector: drive_media_life
+                name: remaining
+          - title: Drive Queue Depth
+            context: queue_depth
+            units: commands
+            dimensions:
+              - selector: drive_queue_depth
+                name: commands
+          - title: Drive State
+            context: state
+            units: state
+            type: stacked
+            dimensions:
+              - selector: drive_state
+          - title: Drive Status Indicator
+            context: status_indicator
+            units: state
+            type: stacked
+            dimensions:
+              - selector: drive_status_indicator_state
+        groups:
+          - family: NVMe
+            context_namespace: nvme
+            metrics:
+              - drive_nvme_busy_time_busy
+              - drive_nvme_commands_read
+              - drive_nvme_commands_written
+              - drive_nvme_critical_warnings_media_read_only
+              - drive_nvme_critical_warnings_namespaces_read_only
+              - drive_nvme_critical_warnings_pmr_unreliable
+              - drive_nvme_critical_warnings_power_backup_failed
+              - drive_nvme_critical_warnings_reliability_degraded
+              - drive_nvme_critical_warnings_spare_capacity_under_threshold
+              - drive_nvme_critical_warnings_spare_capacity_worn_out
+              - drive_nvme_critical_warnings_subsystem_degraded
+              - drive_nvme_error_rate_error_log_entries
+              - drive_nvme_error_rate_media_integrity
+              - drive_nvme_event_rate_power_cycles
+              - drive_nvme_event_rate_unsafe_shutdowns
+              - drive_nvme_io_read
+              - drive_nvme_io_written
+              - drive_nvme_spare_available
+              - drive_nvme_temperature_composite
+              - drive_nvme_thermal_time_critical
+              - drive_nvme_thermal_time_management_1
+              - drive_nvme_thermal_time_management_2
+              - drive_nvme_thermal_time_warning
+              - drive_nvme_thermal_transition_rate_management_1
+              - drive_nvme_thermal_transition_rate_management_2
+              - drive_nvme_wear_used
+            charts:
+              - title: Drive NVMe Busy Time
+                context: busy_time
+                units: percentage
+                dimensions:
+                  - selector: drive_nvme_busy_time_busy
+                    name: busy
+              - title: Drive NVMe Commands
+                context: commands
+                units: commands/s
+                dimensions:
+                  - selector: drive_nvme_commands_read
+                    name: read
+                  - selector: drive_nvme_commands_written
+                    name: written
+              - title: Drive NVMe Critical Warnings
+                context: critical_warnings
+                units: flags
+                type: stacked
+                dimensions:
+                  - selector: drive_nvme_critical_warnings_media_read_only
+                    name: media_read_only
+                  - selector: drive_nvme_critical_warnings_subsystem_degraded
+                    name: subsystem_degraded
+                  - selector: drive_nvme_critical_warnings_pmr_unreliable
+                    name: pmr_unreliable
+                  - selector: drive_nvme_critical_warnings_power_backup_failed
+                    name: power_backup_failed
+                  - selector: drive_nvme_critical_warnings_spare_capacity_worn_out
+                    name: spare_capacity_worn_out
+                  - selector: drive_nvme_critical_warnings_namespaces_read_only
+                    name: namespaces_read_only
+                  - selector: drive_nvme_critical_warnings_reliability_degraded
+                    name: reliability_degraded
+                  - selector: drive_nvme_critical_warnings_spare_capacity_under_threshold
+                    name: spare_capacity_under_threshold
+              - title: Drive NVMe Error Rate
+                context: error_rate
+                units: errors/s
+                dimensions:
+                  - selector: drive_nvme_error_rate_media_integrity
+                    name: media_integrity
+                  - selector: drive_nvme_error_rate_error_log_entries
+                    name: error_log_entries
+              - title: Drive NVMe Event Rate
+                context: event_rate
+                units: events/s
+                dimensions:
+                  - selector: drive_nvme_event_rate_unsafe_shutdowns
+                    name: unsafe_shutdowns
+                  - selector: drive_nvme_event_rate_power_cycles
+                    name: power_cycles
+              - title: Drive NVMe I/O
+                context: io
+                units: bytes/s
+                dimensions:
+                  - selector: drive_nvme_io_read
+                    name: read
+                  - selector: drive_nvme_io_written
+                    name: written
+              - title: Drive NVMe Spare
+                context: spare
+                units: percentage
+                dimensions:
+                  - selector: drive_nvme_spare_available
+                    name: available
+              - title: Drive NVMe Temperature
+                context: temperature
+                units: Celsius
+                dimensions:
+                  - selector: drive_nvme_temperature_composite
+                    name: composite
+              - title: Drive NVMe Thermal Time
+                context: thermal_time
+                units: percentage
+                dimensions:
+                  - selector: drive_nvme_thermal_time_warning
+                    name: warning
+                  - selector: drive_nvme_thermal_time_critical
+                    name: critical
+                  - selector: drive_nvme_thermal_time_management_1
+                    name: management_1
+                  - selector: drive_nvme_thermal_time_management_2
+                    name: management_2
+              - title: Drive NVMe Thermal Transition Rate
+                context: thermal_transition_rate
+                units: transitions/s
+                dimensions:
+                  - selector: drive_nvme_thermal_transition_rate_management_1
+                    name: management_1
+                  - selector: drive_nvme_thermal_transition_rate_management_2
+                    name: management_2
+              - title: Drive NVMe Wear
+                context: wear
+                units: percentage
+                dimensions:
+                  - selector: drive_nvme_wear_used
+                    name: used
+      - family: Storage Subsystems
+        context_namespace: storage
+        metrics:
+          - storage_acquisition_state
+          - storage_conditions_critical
+          - storage_conditions_ok
+          - storage_conditions_unknown
+          - storage_conditions_warning
+          - storage_health_rollup_status
+          - storage_health_status
+          - storage_io_read
+          - storage_io_written
+          - storage_iops_non_io
+          - storage_iops_read
+          - storage_iops_read_hit
+          - storage_iops_write_hit
+          - storage_iops_written
+          - storage_state
+          - storage_state_change_rate
+        charts:
+          - title: Storage Acquisition State
+            context: acquisition_state
+            units: state
+            type: stacked
+            dimensions:
+              - selector: storage_acquisition_state
+          - title: Storage Conditions
+            context: conditions
+            units: conditions
+            type: stacked
+            dimensions:
+              - selector: storage_conditions_ok
+                name: ok
+              - selector: storage_conditions_warning
+                name: warning
+              - selector: storage_conditions_critical
+                name: critical
+              - selector: storage_conditions_unknown
+                name: unknown
+          - title: Storage Health
+            context: health
+            units: state
+            type: stacked
+            dimensions:
+              - selector: storage_health_status
+          - title: Storage Health Rollup
+            context: health_rollup
+            units: state
+            type: stacked
+            dimensions:
+              - selector: storage_health_rollup_status
+          - title: Storage I/O
+            context: io
+            units: bytes/s
+            dimensions:
+              - selector: storage_io_read
+                name: read
+              - selector: storage_io_written
+                name: written
+          - title: Storage IOPS
+            context: iops
+            units: requests/s
+            dimensions:
+              - selector: storage_iops_read
+                name: read
+              - selector: storage_iops_written
+                name: written
+              - selector: storage_iops_read_hit
+                name: read_hit
+              - selector: storage_iops_write_hit
+                name: write_hit
+              - selector: storage_iops_non_io
+                name: non_io
+          - title: Storage State
+            context: state
+            units: state
+            type: stacked
+            dimensions:
+              - selector: storage_state
+          - title: Storage State Change Rate
+            context: state_change_rate
+            units: changes/s
+            dimensions:
+              - selector: storage_state_change_rate
+                name: changes
+      - family: Volumes
+        context_namespace: volume
+        metrics:
+          - volume_acquisition_state
+          - volume_conditions_critical
+          - volume_conditions_ok
+          - volume_conditions_unknown
+          - volume_conditions_warning
+          - volume_error_rate_consistency_check
+          - volume_error_rate_correctable_read
+          - volume_error_rate_correctable_write
+          - volume_error_rate_rebuild
+          - volume_error_rate_uncorrectable_read
+          - volume_error_rate_uncorrectable_write
+          - volume_event_rate_consistency_checks
+          - volume_event_rate_state_changes
+          - volume_health_rollup_status
+          - volume_health_status
+          - volume_io_read
+          - volume_io_time_non_io
+          - volume_io_time_read
+          - volume_io_time_written
+          - volume_io_written
+          - volume_iops_non_io
+          - volume_iops_read
+          - volume_iops_read_hit
+          - volume_iops_write_hit
+          - volume_iops_written
+          - volume_remaining_capacity
+          - volume_space_savings_compression
+          - volume_space_savings_deduplication
+          - volume_space_savings_thin_provisioning
+          - volume_state
+          - volume_write_cache_state
+        charts:
+          - title: Volume Acquisition State
+            context: acquisition_state
+            units: state
+            type: stacked
+            dimensions:
+              - selector: volume_acquisition_state
+          - title: Volume Conditions
+            context: conditions
+            units: conditions
+            type: stacked
+            dimensions:
+              - selector: volume_conditions_ok
+                name: ok
+              - selector: volume_conditions_warning
+                name: warning
+              - selector: volume_conditions_critical
+                name: critical
+              - selector: volume_conditions_unknown
+                name: unknown
+          - title: Volume Error Rate
+            context: error_rate
+            units: errors/s
+            dimensions:
+              - selector: volume_error_rate_correctable_read
+                name: correctable_read
+              - selector: volume_error_rate_correctable_write
+                name: correctable_write
+              - selector: volume_error_rate_uncorrectable_read
+                name: uncorrectable_read
+              - selector: volume_error_rate_uncorrectable_write
+                name: uncorrectable_write
+              - selector: volume_error_rate_consistency_check
+                name: consistency_check
+              - selector: volume_error_rate_rebuild
+                name: rebuild
+          - title: Volume Event Rate
+            context: event_rate
+            units: events/s
+            dimensions:
+              - selector: volume_event_rate_consistency_checks
+                name: consistency_checks
+              - selector: volume_event_rate_state_changes
+                name: state_changes
+          - title: Volume Health
+            context: health
+            units: state
+            type: stacked
+            dimensions:
+              - selector: volume_health_status
+          - title: Volume Health Rollup
+            context: health_rollup
+            units: state
+            type: stacked
+            dimensions:
+              - selector: volume_health_rollup_status
+          - title: Volume I/O
+            context: io
+            units: bytes/s
+            dimensions:
+              - selector: volume_io_read
+                name: read
+              - selector: volume_io_written
+                name: written
+          - title: Volume I/O Time
+            context: io_time
+            units: percentage
+            dimensions:
+              - selector: volume_io_time_read
+                name: read
+              - selector: volume_io_time_written
+                name: written
+              - selector: volume_io_time_non_io
+                name: non_io
+          - title: Volume IOPS
+            context: iops
+            units: requests/s
+            dimensions:
+              - selector: volume_iops_read
+                name: read
+              - selector: volume_iops_written
+                name: written
+              - selector: volume_iops_read_hit
+                name: read_hit
+              - selector: volume_iops_write_hit
+                name: write_hit
+              - selector: volume_iops_non_io
+                name: non_io
+          - title: Volume Remaining Capacity
+            context: remaining_capacity
+            units: percentage
+            dimensions:
+              - selector: volume_remaining_capacity
+                name: remaining
+          - title: Volume Space Savings
+            context: space_savings
+            units: bytes
+            dimensions:
+              - selector: volume_space_savings_compression
+                name: compression
+              - selector: volume_space_savings_deduplication
+                name: deduplication
+              - selector: volume_space_savings_thin_provisioning
+                name: thin_provisioning
+          - title: Volume State
+            context: state
+            units: state
+            type: stacked
+            dimensions:
+              - selector: volume_state
+          - title: Volume Write Cache State
+            context: write_cache_state
+            units: state
+            type: stacked
+            dimensions:
+              - selector: volume_write_cache_state
+  - family: Network
+    chart_defaults:
+      priority: 70400
+      instances:
+        by_labels:
+          - endpoint_key
+          - resource_key
+    groups:
+      - family: Ethernet Interfaces
+        context_namespace: ethernet_interface
+        metrics:
+          - ethernet_interface_acquisition_state
+          - ethernet_interface_conditions_critical
+          - ethernet_interface_conditions_ok
+          - ethernet_interface_conditions_unknown
+          - ethernet_interface_conditions_warning
+          - ethernet_interface_health_rollup_status
+          - ethernet_interface_health_status
+          - ethernet_interface_link_speed
+          - ethernet_interface_link_status
+          - ethernet_interface_state
+        charts:
+          - title: Ethernet Interface Acquisition State
+            context: acquisition_state
+            units: state
+            type: stacked
+            dimensions:
+              - selector: ethernet_interface_acquisition_state
+          - title: Ethernet Interface Conditions
+            context: conditions
+            units: conditions
+            type: stacked
+            dimensions:
+              - selector: ethernet_interface_conditions_ok
+                name: ok
+              - selector: ethernet_interface_conditions_warning
+                name: warning
+              - selector: ethernet_interface_conditions_critical
+                name: critical
+              - selector: ethernet_interface_conditions_unknown
+                name: unknown
+          - title: Ethernet Interface Health
+            context: health
+            units: state
+            type: stacked
+            dimensions:
+              - selector: ethernet_interface_health_status
+          - title: Ethernet Interface Health Rollup
+            context: health_rollup
+            units: state
+            type: stacked
+            dimensions:
+              - selector: ethernet_interface_health_rollup_status
+          - title: Ethernet Interface Link Speed
+            context: link_speed
+            units: bit/s
+            dimensions:
+              - selector: ethernet_interface_link_speed
+                name: speed
+          - title: Ethernet Interface Link Status
+            context: link_status
+            units: state
+            type: stacked
+            dimensions:
+              - selector: ethernet_interface_link_status
+          - title: Ethernet Interface State
+            context: state
+            units: state
+            type: stacked
+            dimensions:
+              - selector: ethernet_interface_state
+      - family: Network Adapters
+        context_namespace: network_adapter
+        metrics:
+          - network_adapter_acquisition_state
+          - network_adapter_conditions_critical
+          - network_adapter_conditions_ok
+          - network_adapter_conditions_unknown
+          - network_adapter_conditions_warning
+          - network_adapter_cpu_utilization
+          - network_adapter_frames_received_multicast
+          - network_adapter_frames_received_unicast
+          - network_adapter_frames_sent_multicast
+          - network_adapter_frames_sent_unicast
+          - network_adapter_health_rollup_status
+          - network_adapter_health_status
+          - network_adapter_host_bus_utilization_received
+          - network_adapter_host_bus_utilization_sent
+          - network_adapter_ncsi_frames_received
+          - network_adapter_ncsi_frames_sent
+          - network_adapter_ncsi_traffic_received
+          - network_adapter_ncsi_traffic_sent
+          - network_adapter_state
+          - network_adapter_traffic_received
+          - network_adapter_traffic_sent
+        charts:
+          - title: Network Adapter Acquisition State
+            context: acquisition_state
+            units: state
+            type: stacked
+            dimensions:
+              - selector: network_adapter_acquisition_state
+          - title: Network Adapter Conditions
+            context: conditions
+            units: conditions
+            type: stacked
+            dimensions:
+              - selector: network_adapter_conditions_ok
+                name: ok
+              - selector: network_adapter_conditions_warning
+                name: warning
+              - selector: network_adapter_conditions_critical
+                name: critical
+              - selector: network_adapter_conditions_unknown
+                name: unknown
+          - title: Network Adapter CPU Utilization
+            context: cpu_utilization
+            units: percentage
+            dimensions:
+              - selector: network_adapter_cpu_utilization
+                name: cpu
+          - title: Network Adapter Frame Rate
+            context: frames
+            units: frames/s
+            dimensions:
+              - selector: network_adapter_frames_received_unicast
+                name: received_unicast
+              - selector: network_adapter_frames_received_multicast
+                name: received_multicast
+              - selector: network_adapter_frames_sent_unicast
+                name: sent_unicast
+              - selector: network_adapter_frames_sent_multicast
+                name: sent_multicast
+          - title: Network Adapter Health
+            context: health
+            units: state
+            type: stacked
+            dimensions:
+              - selector: network_adapter_health_status
+          - title: Network Adapter Health Rollup
+            context: health_rollup
+            units: state
+            type: stacked
+            dimensions:
+              - selector: network_adapter_health_rollup_status
+          - title: Network Adapter Host Bus Utilization
+            context: host_bus_utilization
+            units: percentage
+            dimensions:
+              - selector: network_adapter_host_bus_utilization_received
+                name: received
+              - selector: network_adapter_host_bus_utilization_sent
+                name: sent
+          - title: Network Adapter NCSI Frame Rate
+            context: ncsi_frames
+            units: frames/s
+            dimensions:
+              - selector: network_adapter_ncsi_frames_received
+                name: received
+              - selector: network_adapter_ncsi_frames_sent
+                name: sent
+          - title: Network Adapter NCSI Traffic
+            context: ncsi_traffic
+            units: bytes/s
+            dimensions:
+              - selector: network_adapter_ncsi_traffic_received
+                name: received
+              - selector: network_adapter_ncsi_traffic_sent
+                name: sent
+          - title: Network Adapter State
+            context: state
+            units: state
+            type: stacked
+            dimensions:
+              - selector: network_adapter_state
+          - title: Network Adapter Traffic
+            context: traffic
+            units: bytes/s
+            dimensions:
+              - selector: network_adapter_traffic_received
+                name: received
+              - selector: network_adapter_traffic_sent
+                name: sent
+      - family: Network Device Functions
+        context_namespace: network_device_function
+        metrics:
+          - network_device_function_acquisition_state
+          - network_device_function_conditions_critical
+          - network_device_function_conditions_ok
+          - network_device_function_conditions_unknown
+          - network_device_function_conditions_warning
+          - network_device_function_frames_received
+          - network_device_function_frames_received_multicast
+          - network_device_function_frames_received_unicast
+          - network_device_function_frames_sent
+          - network_device_function_frames_sent_multicast
+          - network_device_function_frames_sent_unicast
+          - network_device_function_health_rollup_status
+          - network_device_function_health_status
+          - network_device_function_queue_depth_received
+          - network_device_function_queue_depth_sent
+          - network_device_function_queue_empty_state_received
+          - network_device_function_queue_empty_state_sent
+          - network_device_function_queue_full_received
+          - network_device_function_queue_full_sent
+          - network_device_function_state
+          - network_device_function_traffic_received
+          - network_device_function_traffic_sent
+        charts:
+          - title: Network Device Function Acquisition State
+            context: acquisition_state
+            units: state
+            type: stacked
+            dimensions:
+              - selector: network_device_function_acquisition_state
+          - title: Network Device Function Conditions
+            context: conditions
+            units: conditions
+            type: stacked
+            dimensions:
+              - selector: network_device_function_conditions_ok
+                name: ok
+              - selector: network_device_function_conditions_warning
+                name: warning
+              - selector: network_device_function_conditions_critical
+                name: critical
+              - selector: network_device_function_conditions_unknown
+                name: unknown
+          - title: Network Device Function Frame Rate
+            context: frames
+            units: frames/s
+            dimensions:
+              - selector: network_device_function_frames_received
+                name: received
+              - selector: network_device_function_frames_sent
+                name: sent
+              - selector: network_device_function_frames_received_unicast
+                name: received_unicast
+              - selector: network_device_function_frames_sent_unicast
+                name: sent_unicast
+              - selector: network_device_function_frames_received_multicast
+                name: received_multicast
+              - selector: network_device_function_frames_sent_multicast
+                name: sent_multicast
+          - title: Network Device Function Health
+            context: health
+            units: state
+            type: stacked
+            dimensions:
+              - selector: network_device_function_health_status
+          - title: Network Device Function Health Rollup
+            context: health_rollup
+            units: state
+            type: stacked
+            dimensions:
+              - selector: network_device_function_health_rollup_status
+          - title: Network Device Function Queue Depth
+            context: queue_depth
+            units: percentage
+            dimensions:
+              - selector: network_device_function_queue_depth_received
+                name: received
+              - selector: network_device_function_queue_depth_sent
+                name: sent
+          - title: Network Device Function Empty Queue State
+            context: queue_empty_state
+            units: flags
+            type: stacked
+            dimensions:
+              - selector: network_device_function_queue_empty_state_received
+                name: received
+              - selector: network_device_function_queue_empty_state_sent
+                name: sent
+          - title: Network Device Function Full Queues
+            context: queue_full
+            units: queues
+            dimensions:
+              - selector: network_device_function_queue_full_received
+                name: received
+              - selector: network_device_function_queue_full_sent
+                name: sent
+          - title: Network Device Function State
+            context: state
+            units: state
+            type: stacked
+            dimensions:
+              - selector: network_device_function_state
+          - title: Network Device Function Traffic
+            context: traffic
+            units: bytes/s
+            dimensions:
+              - selector: network_device_function_traffic_received
+                name: received
+              - selector: network_device_function_traffic_sent
+                name: sent
+      - family: Network Interfaces
+        context_namespace: network_interface
+        metrics:
+          - network_interface_acquisition_state
+          - network_interface_conditions_critical
+          - network_interface_conditions_ok
+          - network_interface_conditions_unknown
+          - network_interface_conditions_warning
+          - network_interface_health_rollup_status
+          - network_interface_health_status
+          - network_interface_state
+        charts:
+          - title: Network Interface Acquisition State
+            context: acquisition_state
+            units: state
+            type: stacked
+            dimensions:
+              - selector: network_interface_acquisition_state
+          - title: Network Interface Conditions
+            context: conditions
+            units: conditions
+            type: stacked
+            dimensions:
+              - selector: network_interface_conditions_ok
+                name: ok
+              - selector: network_interface_conditions_warning
+                name: warning
+              - selector: network_interface_conditions_critical
+                name: critical
+              - selector: network_interface_conditions_unknown
+                name: unknown
+          - title: Network Interface Health
+            context: health
+            units: state
+            type: stacked
+            dimensions:
+              - selector: network_interface_health_status
+          - title: Network Interface Health Rollup
+            context: health_rollup
+            units: state
+            type: stacked
+            dimensions:
+              - selector: network_interface_health_rollup_status
+          - title: Network Interface State
+            context: state
+            units: state
+            type: stacked
+            dimensions:
+              - selector: network_interface_state
+      - family: Network Ports
+        context_namespace: network_port
+        metrics:
+          - network_port_acquisition_state
+          - network_port_conditions_critical
+          - network_port_conditions_ok
+          - network_port_conditions_unknown
+          - network_port_conditions_warning
+          - network_port_health_rollup_status
+          - network_port_health_status
+          - network_port_link_speed
+          - network_port_link_status
+          - network_port_signal_detected_state
+          - network_port_state
+        charts:
+          - title: Network Port Acquisition State
+            context: acquisition_state
+            units: state
+            type: stacked
+            dimensions:
+              - selector: network_port_acquisition_state
+          - title: Network Port Conditions
+            context: conditions
+            units: conditions
+            type: stacked
+            dimensions:
+              - selector: network_port_conditions_ok
+                name: ok
+              - selector: network_port_conditions_warning
+                name: warning
+              - selector: network_port_conditions_critical
+                name: critical
+              - selector: network_port_conditions_unknown
+                name: unknown
+          - title: Network Port Health
+            context: health
+            units: state
+            type: stacked
+            dimensions:
+              - selector: network_port_health_status
+          - title: Network Port Health Rollup
+            context: health_rollup
+            units: state
+            type: stacked
+            dimensions:
+              - selector: network_port_health_rollup_status
+          - title: Network Port Link Speed
+            context: link_speed
+            units: bit/s
+            dimensions:
+              - selector: network_port_link_speed
+                name: speed
+          - title: Network Port Link Status
+            context: link_status
+            units: state
+            type: stacked
+            dimensions:
+              - selector: network_port_link_status
+          - title: Network Port Signal Detected
+            context: signal_detected
+            units: state
+            type: stacked
+            dimensions:
+              - selector: network_port_signal_detected_state
+          - title: Network Port State
+            context: state
+            units: state
+            type: stacked
+            dimensions:
+              - selector: network_port_state
+      - family: PCIe Devices
+        context_namespace: pcie_device
+        metrics:
+          - pcie_device_acquisition_state
+          - pcie_device_conditions_critical
+          - pcie_device_conditions_ok
+          - pcie_device_conditions_unknown
+          - pcie_device_conditions_warning
+          - pcie_device_health_rollup_status
+          - pcie_device_health_status
+          - pcie_device_link_width_active
+          - pcie_device_state
+        charts:
+          - title: PCIe Device Acquisition State
+            context: acquisition_state
+            units: state
+            type: stacked
+            dimensions:
+              - selector: pcie_device_acquisition_state
+          - title: PCIe Device Conditions
+            context: conditions
+            units: conditions
+            type: stacked
+            dimensions:
+              - selector: pcie_device_conditions_ok
+                name: ok
+              - selector: pcie_device_conditions_warning
+                name: warning
+              - selector: pcie_device_conditions_critical
+                name: critical
+              - selector: pcie_device_conditions_unknown
+                name: unknown
+          - title: PCIe Device Health
+            context: health
+            units: state
+            type: stacked
+            dimensions:
+              - selector: pcie_device_health_status
+          - title: PCIe Device Health Rollup
+            context: health_rollup
+            units: state
+            type: stacked
+            dimensions:
+              - selector: pcie_device_health_rollup_status
+          - title: PCIe Device Link Width
+            context: link_width
+            units: lanes
+            dimensions:
+              - selector: pcie_device_link_width_active
+                name: active
+          - title: PCIe Device State
+            context: state
+            units: state
+            type: stacked
+            dimensions:
+              - selector: pcie_device_state
+      - family: PCIe Functions
+        context_namespace: pcie_function
+        metrics:
+          - pcie_function_acquisition_state
+          - pcie_function_conditions_critical
+          - pcie_function_conditions_ok
+          - pcie_function_conditions_unknown
+          - pcie_function_conditions_warning
+          - pcie_function_health_rollup_status
+          - pcie_function_health_status
+          - pcie_function_state
+        charts:
+          - title: PCIe Function Acquisition State
+            context: acquisition_state
+            units: state
+            type: stacked
+            dimensions:
+              - selector: pcie_function_acquisition_state
+          - title: PCIe Function Conditions
+            context: conditions
+            units: conditions
+            type: stacked
+            dimensions:
+              - selector: pcie_function_conditions_ok
+                name: ok
+              - selector: pcie_function_conditions_warning
+                name: warning
+              - selector: pcie_function_conditions_critical
+                name: critical
+              - selector: pcie_function_conditions_unknown
+                name: unknown
+          - title: PCIe Function Health
+            context: health
+            units: state
+            type: stacked
+            dimensions:
+              - selector: pcie_function_health_status
+          - title: PCIe Function Health Rollup
+            context: health_rollup
+            units: state
+            type: stacked
+            dimensions:
+              - selector: pcie_function_health_rollup_status
+          - title: PCIe Function State
+            context: state
+            units: state
+            type: stacked
+            dimensions:
+              - selector: pcie_function_state
+      - family: Ports
+        context_namespace: port
+        metrics:
+          - port_acquisition_state
+          - port_conditions_critical
+          - port_conditions_ok
+          - port_conditions_unknown
+          - port_conditions_warning
+          - port_error_rate_received
+          - port_error_rate_sent
+          - port_frames_received
+          - port_frames_received_broadcast
+          - port_frames_received_multicast
+          - port_frames_received_unicast
+          - port_frames_sent
+          - port_frames_sent_broadcast
+          - port_frames_sent_multicast
+          - port_frames_sent_unicast
+          - port_health_rollup_status
+          - port_health_status
+          - port_link_speed_speed
+          - port_link_state
+          - port_link_status
+          - port_link_width_active
+          - port_network_error_rate_received_alignment
+          - port_network_error_rate_received_discards
+          - port_network_error_rate_received_false_carrier
+          - port_network_error_rate_received_fcs
+          - port_network_error_rate_received_oversize
+          - port_network_error_rate_received_undersize
+          - port_network_error_rate_sent_discards
+          - port_network_error_rate_sent_excessive_collisions
+          - port_network_error_rate_sent_late_collisions
+          - port_network_error_rate_sent_multiple_collisions
+          - port_network_error_rate_sent_single_collisions
+          - port_pcie_drop_rate_completion_credit
+          - port_pcie_drop_rate_non_posted_credit
+          - port_pcie_drop_rate_tag_unavailable
+          - port_pcie_error_rate_bad_dllp
+          - port_pcie_error_rate_bad_tlp
+          - port_pcie_error_rate_correctable
+          - port_pcie_error_rate_fatal
+          - port_pcie_error_rate_flow_control_timeout
+          - port_pcie_error_rate_l0_to_recovery
+          - port_pcie_error_rate_nak_received
+          - port_pcie_error_rate_nak_sent
+          - port_pcie_error_rate_non_fatal
+          - port_pcie_error_rate_replay
+          - port_pcie_error_rate_replay_rollover
+          - port_pcie_error_rate_unsupported_request
+          - port_pcie_tlp_rate_completion
+          - port_pcie_tlp_rate_read
+          - port_pcie_tlp_rate_write
+          - port_pcie_traffic_completion
+          - port_pcie_traffic_read
+          - port_pcie_traffic_write
+          - port_rdma_error_rate_protection
+          - port_rdma_error_rate_protocol
+          - port_rdma_traffic_received
+          - port_rdma_traffic_sent
+          - port_signal_detected_state
+          - port_state
+          - port_traffic_received
+          - port_traffic_sent
+        charts:
+          - title: Port Acquisition State
+            context: acquisition_state
+            units: state
+            type: stacked
+            dimensions:
+              - selector: port_acquisition_state
+          - title: Port Conditions
+            context: conditions
+            units: conditions
+            type: stacked
+            dimensions:
+              - selector: port_conditions_ok
+                name: ok
+              - selector: port_conditions_warning
+                name: warning
+              - selector: port_conditions_critical
+                name: critical
+              - selector: port_conditions_unknown
+                name: unknown
+          - title: Port Error Rate
+            context: error_rate
+            units: errors/s
+            dimensions:
+              - selector: port_error_rate_received
+                name: received
+              - selector: port_error_rate_sent
+                name: sent
+          - title: Port Frame Rate
+            context: frames
+            units: frames/s
+            dimensions:
+              - selector: port_frames_received
+                name: received
+              - selector: port_frames_sent
+                name: sent
+              - selector: port_frames_received_unicast
+                name: received_unicast
+              - selector: port_frames_sent_unicast
+                name: sent_unicast
+              - selector: port_frames_received_multicast
+                name: received_multicast
+              - selector: port_frames_sent_multicast
+                name: sent_multicast
+              - selector: port_frames_received_broadcast
+                name: received_broadcast
+              - selector: port_frames_sent_broadcast
+                name: sent_broadcast
+          - title: Port Health
+            context: health
+            units: state
+            type: stacked
+            dimensions:
+              - selector: port_health_status
+          - title: Port Health Rollup
+            context: health_rollup
+            units: state
+            type: stacked
+            dimensions:
+              - selector: port_health_rollup_status
+          - title: Port Link Speed
+            context: link_speed
+            units: bit/s
+            dimensions:
+              - selector: port_link_speed_speed
+                name: speed
+          - title: Port Link State
+            context: link_state
+            units: state
+            type: stacked
+            dimensions:
+              - selector: port_link_state
+          - title: Port Link Status
+            context: link_status
+            units: state
+            type: stacked
+            dimensions:
+              - selector: port_link_status
+          - title: Port Link Width
+            context: link_width
+            units: lanes
+            dimensions:
+              - selector: port_link_width_active
+                name: active
+          - title: Port Network Error Rate
+            context: network_error_rate
+            units: errors/s
+            dimensions:
+              - selector: port_network_error_rate_received_discards
+                name: received_discards
+              - selector: port_network_error_rate_sent_discards
+                name: sent_discards
+              - selector: port_network_error_rate_received_fcs
+                name: received_fcs
+              - selector: port_network_error_rate_received_false_carrier
+                name: received_false_carrier
+              - selector: port_network_error_rate_received_alignment
+                name: received_alignment
+              - selector: port_network_error_rate_received_oversize
+                name: received_oversize
+              - selector: port_network_error_rate_received_undersize
+                name: received_undersize
+              - selector: port_network_error_rate_sent_excessive_collisions
+                name: sent_excessive_collisions
+              - selector: port_network_error_rate_sent_late_collisions
+                name: sent_late_collisions
+              - selector: port_network_error_rate_sent_multiple_collisions
+                name: sent_multiple_collisions
+              - selector: port_network_error_rate_sent_single_collisions
+                name: sent_single_collisions
+          - title: Port PCIe Drop Rate
+            context: pcie_drop_rate
+            units: drops/s
+            dimensions:
+              - selector: port_pcie_drop_rate_completion_credit
+                name: completion_credit
+              - selector: port_pcie_drop_rate_non_posted_credit
+                name: non_posted_credit
+              - selector: port_pcie_drop_rate_tag_unavailable
+                name: tag_unavailable
+          - title: Port PCIe Error Rate
+            context: pcie_error_rate
+            units: errors/s
+            dimensions:
+              - selector: port_pcie_error_rate_bad_dllp
+                name: bad_dllp
+              - selector: port_pcie_error_rate_bad_tlp
+                name: bad_tlp
+              - selector: port_pcie_error_rate_correctable
+                name: correctable
+              - selector: port_pcie_error_rate_fatal
+                name: fatal
+              - selector: port_pcie_error_rate_flow_control_timeout
+                name: flow_control_timeout
+              - selector: port_pcie_error_rate_l0_to_recovery
+                name: l0_to_recovery
+              - selector: port_pcie_error_rate_nak_received
+                name: nak_received
+              - selector: port_pcie_error_rate_nak_sent
+                name: nak_sent
+              - selector: port_pcie_error_rate_non_fatal
+                name: non_fatal
+              - selector: port_pcie_error_rate_replay
+                name: replay
+              - selector: port_pcie_error_rate_replay_rollover
+                name: replay_rollover
+              - selector: port_pcie_error_rate_unsupported_request
+                name: unsupported_request
+          - title: Port PCIe TLP Rate
+            context: pcie_tlp_rate
+            units: packets/s
+            dimensions:
+              - selector: port_pcie_tlp_rate_completion
+                name: completion
+              - selector: port_pcie_tlp_rate_read
+                name: read
+              - selector: port_pcie_tlp_rate_write
+                name: write
+          - title: Port PCIe Traffic
+            context: pcie_traffic
+            units: bytes/s
+            dimensions:
+              - selector: port_pcie_traffic_completion
+                name: completion
+              - selector: port_pcie_traffic_read
+                name: read
+              - selector: port_pcie_traffic_write
+                name: write
+          - title: Port RDMA Error Rate
+            context: rdma_error_rate
+            units: errors/s
+            dimensions:
+              - selector: port_rdma_error_rate_protection
+                name: protection
+              - selector: port_rdma_error_rate_protocol
+                name: protocol
+          - title: Port RDMA Traffic
+            context: rdma_traffic
+            units: bytes/s
+            dimensions:
+              - selector: port_rdma_traffic_received
+                name: received
+              - selector: port_rdma_traffic_sent
+                name: sent
+          - title: Port Signal Detected
+            context: signal_detected
+            units: state
+            type: stacked
+            dimensions:
+              - selector: port_signal_detected_state
+          - title: Port State
+            context: state
+            units: state
+            type: stacked
+            dimensions:
+              - selector: port_state
+          - title: Port Traffic
+            context: traffic
+            units: bytes/s
+            dimensions:
+              - selector: port_traffic_received
+                name: received
+              - selector: port_traffic_sent
+                name: sent
+  - family: Thermal
+    chart_defaults:
+      priority: 70500
+      instances:
+        by_labels:
+          - endpoint_key
+          - resource_key
+    groups:
+      - family: Air Flow Readings
+        context_namespace: reading
+        metrics:
+          - reading_air_flow_value
+        chart_defaults:
+          instances:
+            by_labels:
+              - endpoint_key
+              - reading_key
+        charts:
+          - title: Air Flow Readings
+            context: air_flow
+            units: cubic-meters/minute
+            dimensions:
+              - selector: reading_air_flow_value
+                name: value
+      - family: Coolant Connectors
+        context_namespace: coolant_connector
+        metrics:
+          - coolant_connector_acquisition_state
+          - coolant_connector_conditions_critical
+          - coolant_connector_conditions_ok
+          - coolant_connector_conditions_unknown
+          - coolant_connector_conditions_warning
+          - coolant_connector_health_rollup_status
+          - coolant_connector_health_status
+          - coolant_connector_state
+        charts:
+          - title: Coolant Connector Acquisition State
+            context: acquisition_state
+            units: state
+            type: stacked
+            dimensions:
+              - selector: coolant_connector_acquisition_state
+          - title: Coolant Connector Conditions
+            context: conditions
+            units: conditions
+            type: stacked
+            dimensions:
+              - selector: coolant_connector_conditions_ok
+                name: ok
+              - selector: coolant_connector_conditions_warning
+                name: warning
+              - selector: coolant_connector_conditions_critical
+                name: critical
+              - selector: coolant_connector_conditions_unknown
+                name: unknown
+          - title: Coolant Connector Health
+            context: health
+            units: state
+            type: stacked
+            dimensions:
+              - selector: coolant_connector_health_status
+          - title: Coolant Connector Health Rollup
+            context: health_rollup
+            units: state
+            type: stacked
+            dimensions:
+              - selector: coolant_connector_health_rollup_status
+          - title: Coolant Connector State
+            context: state
+            units: state
+            type: stacked
+            dimensions:
+              - selector: coolant_connector_state
+      - family: Fans
+        context_namespace: fan
+        metrics:
+          - fan_acquisition_state
+          - fan_conditions_critical
+          - fan_conditions_ok
+          - fan_conditions_unknown
+          - fan_conditions_warning
+          - fan_health_rollup_status
+          - fan_health_status
+          - fan_state
+        charts:
+          - title: Fan Acquisition State
+            context: acquisition_state
+            units: state
+            type: stacked
+            dimensions:
+              - selector: fan_acquisition_state
+          - title: Fan Conditions
+            context: conditions
+            units: conditions
+            type: stacked
+            dimensions:
+              - selector: fan_conditions_ok
+                name: ok
+              - selector: fan_conditions_warning
+                name: warning
+              - selector: fan_conditions_critical
+                name: critical
+              - selector: fan_conditions_unknown
+                name: unknown
+          - title: Fan Health
+            context: health
+            units: state
+            type: stacked
+            dimensions:
+              - selector: fan_health_status
+          - title: Fan Health Rollup
+            context: health_rollup
+            units: state
+            type: stacked
+            dimensions:
+              - selector: fan_health_rollup_status
+          - title: Fan State
+            context: state
+            units: state
+            type: stacked
+            dimensions:
+              - selector: fan_state
+      - family: Filters
+        context_namespace: filter
+        metrics:
+          - filter_acquisition_state
+          - filter_conditions_critical
+          - filter_conditions_ok
+          - filter_conditions_unknown
+          - filter_conditions_warning
+          - filter_health_rollup_status
+          - filter_health_status
+          - filter_state
+        charts:
+          - title: Filter Acquisition State
+            context: acquisition_state
+            units: state
+            type: stacked
+            dimensions:
+              - selector: filter_acquisition_state
+          - title: Filter Conditions
+            context: conditions
+            units: conditions
+            type: stacked
+            dimensions:
+              - selector: filter_conditions_ok
+                name: ok
+              - selector: filter_conditions_warning
+                name: warning
+              - selector: filter_conditions_critical
+                name: critical
+              - selector: filter_conditions_unknown
+                name: unknown
+          - title: Filter Health
+            context: health
+            units: state
+            type: stacked
+            dimensions:
+              - selector: filter_health_status
+          - title: Filter Health Rollup
+            context: health_rollup
+            units: state
+            type: stacked
+            dimensions:
+              - selector: filter_health_rollup_status
+          - title: Filter State
+            context: state
+            units: state
+            type: stacked
+            dimensions:
+              - selector: filter_state
+      - family: Heat Readings
+        context_namespace: reading
+        metrics:
+          - reading_heat_value
+        chart_defaults:
+          instances:
+            by_labels:
+              - endpoint_key
+              - reading_key
+        charts:
+          - title: Heat Readings
+            context: heat
+            units: watts
+            dimensions:
+              - selector: reading_heat_value
+                name: value
+      - family: Heaters
+        context_namespace: heater
+        metrics:
+          - heater_acquisition_state
+          - heater_conditions_critical
+          - heater_conditions_ok
+          - heater_conditions_unknown
+          - heater_conditions_warning
+          - heater_health_rollup_status
+          - heater_health_status
+          - heater_heating_time_pre_power_on
+          - heater_heating_time_runtime
+          - heater_state
+        charts:
+          - title: Heater Acquisition State
+            context: acquisition_state
+            units: state
+            type: stacked
+            dimensions:
+              - selector: heater_acquisition_state
+          - title: Heater Conditions
+            context: conditions
+            units: conditions
+            type: stacked
+            dimensions:
+              - selector: heater_conditions_ok
+                name: ok
+              - selector: heater_conditions_warning
+                name: warning
+              - selector: heater_conditions_critical
+                name: critical
+              - selector: heater_conditions_unknown
+                name: unknown
+          - title: Heater Health
+            context: health
+            units: state
+            type: stacked
+            dimensions:
+              - selector: heater_health_status
+          - title: Heater Health Rollup
+            context: health_rollup
+            units: state
+            type: stacked
+            dimensions:
+              - selector: heater_health_rollup_status
+          - title: Heater Heating Time
+            context: heating_time
+            units: percentage
+            dimensions:
+              - selector: heater_heating_time_pre_power_on
+                name: pre_power_on
+              - selector: heater_heating_time_runtime
+                name: runtime
+          - title: Heater State
+            context: state
+            units: state
+            type: stacked
+            dimensions:
+              - selector: heater_state
+      - family: Leak Detection
+        context_namespace: leak_detection
+        metrics:
+          - leak_detection_acquisition_state
+          - leak_detection_conditions_critical
+          - leak_detection_conditions_ok
+          - leak_detection_conditions_unknown
+          - leak_detection_conditions_warning
+          - leak_detection_health_rollup_status
+          - leak_detection_health_status
+          - leak_detection_state
+        charts:
+          - title: Leak Detection Acquisition State
+            context: acquisition_state
+            units: state
+            type: stacked
+            dimensions:
+              - selector: leak_detection_acquisition_state
+          - title: Leak Detection Conditions
+            context: conditions
+            units: conditions
+            type: stacked
+            dimensions:
+              - selector: leak_detection_conditions_ok
+                name: ok
+              - selector: leak_detection_conditions_warning
+                name: warning
+              - selector: leak_detection_conditions_critical
+                name: critical
+              - selector: leak_detection_conditions_unknown
+                name: unknown
+          - title: Leak Detection Health
+            context: health
+            units: state
+            type: stacked
+            dimensions:
+              - selector: leak_detection_health_status
+          - title: Leak Detection Health Rollup
+            context: health_rollup
+            units: state
+            type: stacked
+            dimensions:
+              - selector: leak_detection_health_rollup_status
+          - title: Leak Detection State
+            context: state
+            units: state
+            type: stacked
+            dimensions:
+              - selector: leak_detection_state
+      - family: Leak Detector Groups
+        context_namespace: leak_detector_group
+        metrics:
+          - leak_detector_group_acquisition_state
+          - leak_detector_group_conditions_critical
+          - leak_detector_group_conditions_ok
+          - leak_detector_group_conditions_unknown
+          - leak_detector_group_conditions_warning
+          - leak_detector_group_health_rollup_status
+          - leak_detector_group_health_status
+          - leak_detector_group_state
+        charts:
+          - title: Leak Detector Group Acquisition State
+            context: acquisition_state
+            units: state
+            type: stacked
+            dimensions:
+              - selector: leak_detector_group_acquisition_state
+          - title: Leak Detector Group Conditions
+            context: conditions
+            units: conditions
+            type: stacked
+            dimensions:
+              - selector: leak_detector_group_conditions_ok
+                name: ok
+              - selector: leak_detector_group_conditions_warning
+                name: warning
+              - selector: leak_detector_group_conditions_critical
+                name: critical
+              - selector: leak_detector_group_conditions_unknown
+                name: unknown
+          - title: Leak Detector Group Health
+            context: health
+            units: state
+            type: stacked
+            dimensions:
+              - selector: leak_detector_group_health_status
+          - title: Leak Detector Group Health Rollup
+            context: health_rollup
+            units: state
+            type: stacked
+            dimensions:
+              - selector: leak_detector_group_health_rollup_status
+          - title: Leak Detector Group State
+            context: state
+            units: state
+            type: stacked
+            dimensions:
+              - selector: leak_detector_group_state
+      - family: Leak Detectors
+        context_namespace: leak_detector
+        metrics:
+          - leak_detector_acquisition_state
+          - leak_detector_conditions_critical
+          - leak_detector_conditions_ok
+          - leak_detector_conditions_unknown
+          - leak_detector_conditions_warning
+          - leak_detector_detector_state
+          - leak_detector_health_rollup_status
+          - leak_detector_health_status
+          - leak_detector_state
+        charts:
+          - title: Leak Detector Acquisition State
+            context: acquisition_state
+            units: state
+            type: stacked
+            dimensions:
+              - selector: leak_detector_acquisition_state
+          - title: Leak Detector Conditions
+            context: conditions
+            units: conditions
+            type: stacked
+            dimensions:
+              - selector: leak_detector_conditions_ok
+                name: ok
+              - selector: leak_detector_conditions_warning
+                name: warning
+              - selector: leak_detector_conditions_critical
+                name: critical
+              - selector: leak_detector_conditions_unknown
+                name: unknown
+          - title: Leak Detector State
+            context: detector_state
+            units: state
+            type: stacked
+            dimensions:
+              - selector: leak_detector_detector_state
+          - title: Leak Detector Health
+            context: health
+            units: state
+            type: stacked
+            dimensions:
+              - selector: leak_detector_health_status
+          - title: Leak Detector Health Rollup
+            context: health_rollup
+            units: state
+            type: stacked
+            dimensions:
+              - selector: leak_detector_health_rollup_status
+          - title: Leak Detector State
+            context: state
+            units: state
+            type: stacked
+            dimensions:
+              - selector: leak_detector_state
+      - family: Liquid Flow Readings
+        context_namespace: reading
+        metrics:
+          - reading_liquid_flow_value
+        chart_defaults:
+          instances:
+            by_labels:
+              - endpoint_key
+              - reading_key
+        charts:
+          - title: Liquid Flow Readings
+            context: liquid_flow
+            units: liters/minute
+            dimensions:
+              - selector: reading_liquid_flow_value
+                name: value
+      - family: Liquid Level Readings
+        context_namespace: reading
+        metrics:
+          - reading_liquid_level_value
+        chart_defaults:
+          instances:
+            by_labels:
+              - endpoint_key
+              - reading_key
+        charts:
+          - title: Liquid Level Readings
+            context: liquid_level
+            units: meters
+            dimensions:
+              - selector: reading_liquid_level_value
+                name: value
+      - family: Pumps
+        context_namespace: pump
+        metrics:
+          - pump_acquisition_state
+          - pump_conditions_critical
+          - pump_conditions_ok
+          - pump_conditions_unknown
+          - pump_conditions_warning
+          - pump_health_rollup_status
+          - pump_health_status
+          - pump_state
+        charts:
+          - title: Pump Acquisition State
+            context: acquisition_state
+            units: state
+            type: stacked
+            dimensions:
+              - selector: pump_acquisition_state
+          - title: Pump Conditions
+            context: conditions
+            units: conditions
+            type: stacked
+            dimensions:
+              - selector: pump_conditions_ok
+                name: ok
+              - selector: pump_conditions_warning
+                name: warning
+              - selector: pump_conditions_critical
+                name: critical
+              - selector: pump_conditions_unknown
+                name: unknown
+          - title: Pump Health
+            context: health
+            units: state
+            type: stacked
+            dimensions:
+              - selector: pump_health_status
+          - title: Pump Health Rollup
+            context: health_rollup
+            units: state
+            type: stacked
+            dimensions:
+              - selector: pump_health_rollup_status
+          - title: Pump State
+            context: state
+            units: state
+            type: stacked
+            dimensions:
+              - selector: pump_state
+      - family: Rotational Speed Readings
+        context_namespace: reading
+        metrics:
+          - reading_rotational_speed_value
+        chart_defaults:
+          instances:
+            by_labels:
+              - endpoint_key
+              - reading_key
+        charts:
+          - title: Rotational Speed Readings
+            context: rotational_speed
+            units: RPM
+            dimensions:
+              - selector: reading_rotational_speed_value
+                name: value
+      - family: Temperature Readings
+        context_namespace: reading
+        metrics:
+          - reading_temperature_value
+        chart_defaults:
+          instances:
+            by_labels:
+              - endpoint_key
+              - reading_key
+        charts:
+          - title: Temperature Readings
+            context: temperature
+            units: Celsius
+            dimensions:
+              - selector: reading_temperature_value
+                name: value
+      - family: Thermal Subsystems
+        context_namespace: thermal_subsystem
+        metrics:
+          - thermal_subsystem_acquisition_state
+          - thermal_subsystem_conditions_critical
+          - thermal_subsystem_conditions_ok
+          - thermal_subsystem_conditions_unknown
+          - thermal_subsystem_conditions_warning
+          - thermal_subsystem_health_rollup_status
+          - thermal_subsystem_health_status
+          - thermal_subsystem_state
+        charts:
+          - title: Thermal Subsystem Acquisition State
+            context: acquisition_state
+            units: state
+            type: stacked
+            dimensions:
+              - selector: thermal_subsystem_acquisition_state
+          - title: Thermal Subsystem Conditions
+            context: conditions
+            units: conditions
+            type: stacked
+            dimensions:
+              - selector: thermal_subsystem_conditions_ok
+                name: ok
+              - selector: thermal_subsystem_conditions_warning
+                name: warning
+              - selector: thermal_subsystem_conditions_critical
+                name: critical
+              - selector: thermal_subsystem_conditions_unknown
+                name: unknown
+          - title: Thermal Subsystem Health
+            context: health
+            units: state
+            type: stacked
+            dimensions:
+              - selector: thermal_subsystem_health_status
+          - title: Thermal Subsystem Health Rollup
+            context: health_rollup
+            units: state
+            type: stacked
+            dimensions:
+              - selector: thermal_subsystem_health_rollup_status
+          - title: Thermal Subsystem State
+            context: state
+            units: state
+            type: stacked
+            dimensions:
+              - selector: thermal_subsystem_state
+  - family: Power
+    chart_defaults:
+      priority: 70600
+      instances:
+        by_labels:
+          - endpoint_key
+          - resource_key
+    groups:
+      - family: Apparent Energy Readings
+        context_namespace: reading
+        metrics:
+          - reading_apparent_energy_value
+        chart_defaults:
+          instances:
+            by_labels:
+              - endpoint_key
+              - reading_key
+        charts:
+          - title: Apparent Energy Readings
+            context: apparent_energy
+            units: joule-equivalent
+            dimensions:
+              - selector: reading_apparent_energy_value
+                name: value
+      - family: Apparent Power Readings
+        context_namespace: reading
+        metrics:
+          - reading_apparent_power_value
+        chart_defaults:
+          instances:
+            by_labels:
+              - endpoint_key
+              - reading_key
+        charts:
+          - title: Apparent Power Readings
+            context: apparent_power
+            units: volt-amperes
+            dimensions:
+              - selector: reading_apparent_power_value
+                name: value
+      - family: Batteries
+        context_namespace: battery
+        metrics:
+          - battery_acquisition_state
+          - battery_c_rate
+          - battery_charge_capacity_actual
+          - battery_charge_state
+          - battery_conditions_critical
+          - battery_conditions_ok
+          - battery_conditions_unknown
+          - battery_conditions_warning
+          - battery_e_rate
+          - battery_energy_capacity_actual
+          - battery_health_rollup_status
+          - battery_health_status
+          - battery_metrics_health_rollup_status
+          - battery_metrics_health_status
+          - battery_metrics_state
+          - battery_state
+        charts:
+          - title: Battery Acquisition State
+            context: acquisition_state
+            units: state
+            type: stacked
+            dimensions:
+              - selector: battery_acquisition_state
+          - title: Battery C-rate
+            context: c_rate
+            units: ratio
+            dimensions:
+              - selector: battery_c_rate
+                name: rate
+          - title: Battery Charge Capacity
+            context: charge_capacity
+            units: ampere-hours
+            dimensions:
+              - selector: battery_charge_capacity_actual
+                name: actual
+          - title: Battery Charge State
+            context: charge_state
+            units: state
+            type: stacked
+            dimensions:
+              - selector: battery_charge_state
+          - title: Battery Conditions
+            context: conditions
+            units: conditions
+            type: stacked
+            dimensions:
+              - selector: battery_conditions_ok
+                name: ok
+              - selector: battery_conditions_warning
+                name: warning
+              - selector: battery_conditions_critical
+                name: critical
+              - selector: battery_conditions_unknown
+                name: unknown
+          - title: Battery E-rate
+            context: e_rate
+            units: ratio
+            dimensions:
+              - selector: battery_e_rate
+                name: rate
+          - title: Battery Energy Capacity
+            context: energy_capacity
+            units: watt-hours
+            dimensions:
+              - selector: battery_energy_capacity_actual
+                name: actual
+          - title: Battery Health
+            context: health
+            units: state
+            type: stacked
+            dimensions:
+              - selector: battery_health_status
+          - title: Battery Health Rollup
+            context: health_rollup
+            units: state
+            type: stacked
+            dimensions:
+              - selector: battery_health_rollup_status
+          - title: Battery Metrics Health
+            context: metrics_health
+            units: state
+            type: stacked
+            dimensions:
+              - selector: battery_metrics_health_status
+          - title: Battery Metrics Health Rollup
+            context: metrics_health_rollup
+            units: state
+            type: stacked
+            dimensions:
+              - selector: battery_metrics_health_rollup_status
+          - title: Battery Metrics State
+            context: metrics_state
+            units: state
+            type: stacked
+            dimensions:
+              - selector: battery_metrics_state
+          - title: Battery State
+            context: state
+            units: state
+            type: stacked
+            dimensions:
+              - selector: battery_state
+      - family: Charge Readings
+        context_namespace: reading
+        metrics:
+          - reading_charge_value
+        chart_defaults:
+          instances:
+            by_labels:
+              - endpoint_key
+              - reading_key
+        charts:
+          - title: Charge Readings
+            context: charge
+            units: ampere-hours
+            dimensions:
+              - selector: reading_charge_value
+                name: value
+      - family: Crest Factor Readings
+        context_namespace: reading
+        metrics:
+          - reading_crest_factor_value
+        chart_defaults:
+          instances:
+            by_labels:
+              - endpoint_key
+              - reading_key
+        charts:
+          - title: Crest Factor Readings
+            context: crest_factor
+            units: ratio
+            dimensions:
+              - selector: reading_crest_factor_value
+                name: value
+      - family: Current Readings
+        context_namespace: reading
+        metrics:
+          - reading_current_value
+        chart_defaults:
+          instances:
+            by_labels:
+              - endpoint_key
+              - reading_key
+        charts:
+          - title: Current Readings
+            context: current
+            units: amperes
+            dimensions:
+              - selector: reading_current_value
+                name: value
+      - family: Energy Readings
+        context_namespace: reading
+        metrics:
+          - reading_energy_value
+        chart_defaults:
+          instances:
+            by_labels:
+              - endpoint_key
+              - reading_key
+        charts:
+          - title: Energy Readings
+            context: energy
+            units: joules
+            dimensions:
+              - selector: reading_energy_value
+                name: value
+      - family: Frequency Readings
+        context_namespace: reading
+        metrics:
+          - reading_frequency_value
+        chart_defaults:
+          instances:
+            by_labels:
+              - endpoint_key
+              - reading_key
+        charts:
+          - title: Frequency Readings
+            context: frequency
+            units: hertz
+            dimensions:
+              - selector: reading_frequency_value
+                name: value
+      - family: Harmonic Distortion Readings
+        context_namespace: reading
+        metrics:
+          - reading_harmonic_distortion_value
+        chart_defaults:
+          instances:
+            by_labels:
+              - endpoint_key
+              - reading_key
+        charts:
+          - title: Harmonic Distortion Readings
+            context: harmonic_distortion
+            units: percentage
+            dimensions:
+              - selector: reading_harmonic_distortion_value
+                name: value
+      - family: Phase Angle Readings
+        context_namespace: reading
+        metrics:
+          - reading_phase_angle_value
+        chart_defaults:
+          instances:
+            by_labels:
+              - endpoint_key
+              - reading_key
+        charts:
+          - title: Phase Angle Readings
+            context: phase_angle
+            units: degrees
+            dimensions:
+              - selector: reading_phase_angle_value
+                name: value
+      - family: Power Factor Readings
+        context_namespace: reading
+        metrics:
+          - reading_power_factor_value
+        chart_defaults:
+          instances:
+            by_labels:
+              - endpoint_key
+              - reading_key
+        charts:
+          - title: Power Factor Readings
+            context: power_factor
+            units: ratio
+            dimensions:
+              - selector: reading_power_factor_value
+                name: value
+      - family: Power Readings
+        context_namespace: reading
+        metrics:
+          - reading_power_value
+        chart_defaults:
+          instances:
+            by_labels:
+              - endpoint_key
+              - reading_key
+        charts:
+          - title: Power Readings
+            context: power
+            units: watts
+            dimensions:
+              - selector: reading_power_value
+                name: value
+      - family: Power Subsystems
+        context_namespace: power_subsystem
+        metrics:
+          - power_subsystem_acquisition_state
+          - power_subsystem_capacity_allocated
+          - power_subsystem_capacity_requested
+          - power_subsystem_conditions_critical
+          - power_subsystem_conditions_ok
+          - power_subsystem_conditions_unknown
+          - power_subsystem_conditions_warning
+          - power_subsystem_health_rollup_status
+          - power_subsystem_health_status
+          - power_subsystem_state
+        charts:
+          - title: Power Subsystem Acquisition State
+            context: acquisition_state
+            units: state
+            type: stacked
+            dimensions:
+              - selector: power_subsystem_acquisition_state
+          - title: Power Subsystem Capacity
+            context: capacity
+            units: watts
+            dimensions:
+              - selector: power_subsystem_capacity_allocated
+                name: allocated
+              - selector: power_subsystem_capacity_requested
+                name: requested
+          - title: Power Subsystem Conditions
+            context: conditions
+            units: conditions
+            type: stacked
+            dimensions:
+              - selector: power_subsystem_conditions_ok
+                name: ok
+              - selector: power_subsystem_conditions_warning
+                name: warning
+              - selector: power_subsystem_conditions_critical
+                name: critical
+              - selector: power_subsystem_conditions_unknown
+                name: unknown
+          - title: Power Subsystem Health
+            context: health
+            units: state
+            type: stacked
+            dimensions:
+              - selector: power_subsystem_health_status
+          - title: Power Subsystem Health Rollup
+            context: health_rollup
+            units: state
+            type: stacked
+            dimensions:
+              - selector: power_subsystem_health_rollup_status
+          - title: Power Subsystem State
+            context: state
+            units: state
+            type: stacked
+            dimensions:
+              - selector: power_subsystem_state
+      - family: Power Supplies
+        context_namespace: power_supply
+        metrics:
+          - power_supply_acquisition_state
+          - power_supply_conditions_critical
+          - power_supply_conditions_ok
+          - power_supply_conditions_unknown
+          - power_supply_conditions_warning
+          - power_supply_health_rollup_status
+          - power_supply_health_status
+          - power_supply_line_input_status
+          - power_supply_metrics_health_rollup_status
+          - power_supply_metrics_health_status
+          - power_supply_metrics_state
+          - power_supply_state
+        charts:
+          - title: Power Supply Acquisition State
+            context: acquisition_state
+            units: state
+            type: stacked
+            dimensions:
+              - selector: power_supply_acquisition_state
+          - title: Power Supply Conditions
+            context: conditions
+            units: conditions
+            type: stacked
+            dimensions:
+              - selector: power_supply_conditions_ok
+                name: ok
+              - selector: power_supply_conditions_warning
+                name: warning
+              - selector: power_supply_conditions_critical
+                name: critical
+              - selector: power_supply_conditions_unknown
+                name: unknown
+          - title: Power Supply Health
+            context: health
+            units: state
+            type: stacked
+            dimensions:
+              - selector: power_supply_health_status
+          - title: Power Supply Health Rollup
+            context: health_rollup
+            units: state
+            type: stacked
+            dimensions:
+              - selector: power_supply_health_rollup_status
+          - title: Power Supply Line Input Status
+            context: line_input_status
+            units: state
+            type: stacked
+            dimensions:
+              - selector: power_supply_line_input_status
+          - title: Power Supply Metrics Health
+            context: metrics_health
+            units: state
+            type: stacked
+            dimensions:
+              - selector: power_supply_metrics_health_status
+          - title: Power Supply Metrics Health Rollup
+            context: metrics_health_rollup
+            units: state
+            type: stacked
+            dimensions:
+              - selector: power_supply_metrics_health_rollup_status
+          - title: Power Supply Metrics State
+            context: metrics_state
+            units: state
+            type: stacked
+            dimensions:
+              - selector: power_supply_metrics_state
+          - title: Power Supply State
+            context: state
+            units: state
+            type: stacked
+            dimensions:
+              - selector: power_supply_state
+      - family: Reactive Energy Readings
+        context_namespace: reading
+        metrics:
+          - reading_reactive_energy_value
+        chart_defaults:
+          instances:
+            by_labels:
+              - endpoint_key
+              - reading_key
+        charts:
+          - title: Reactive Energy Readings
+            context: reactive_energy
+            units: joule-equivalent
+            dimensions:
+              - selector: reading_reactive_energy_value
+                name: value
+      - family: Reactive Power Readings
+        context_namespace: reading
+        metrics:
+          - reading_reactive_power_value
+        chart_defaults:
+          instances:
+            by_labels:
+              - endpoint_key
+              - reading_key
+        charts:
+          - title: Reactive Power Readings
+            context: reactive_power
+            units: vars
+            dimensions:
+              - selector: reading_reactive_power_value
+                name: value
+      - family: Stored Energy Readings
+        context_namespace: reading
+        metrics:
+          - reading_stored_energy_value
+        chart_defaults:
+          instances:
+            by_labels:
+              - endpoint_key
+              - reading_key
+        charts:
+          - title: Stored Energy Readings
+            context: stored_energy
+            units: watt-hours
+            dimensions:
+              - selector: reading_stored_energy_value
+                name: value
+      - family: Voltage Readings
+        context_namespace: reading
+        metrics:
+          - reading_voltage_value
+        chart_defaults:
+          instances:
+            by_labels:
+              - endpoint_key
+              - reading_key
+        charts:
+          - title: Voltage Readings
+            context: voltage
+            units: volts
+            dimensions:
+              - selector: reading_voltage_value
+                name: value
+  - family: Environment
+    chart_defaults:
+      priority: 70700
+      instances:
+        by_labels:
+          - endpoint_key
+          - reading_key
+    groups:
+      - family: Absolute Humidity Readings
+        context_namespace: reading
+        metrics:
+          - reading_absolute_humidity_value
+        charts:
+          - title: Absolute Humidity Readings
+            context: absolute_humidity
+            units: grams/cubic-meter
+            dimensions:
+              - selector: reading_absolute_humidity_value
+                name: value
+      - family: Altitude Readings
+        context_namespace: reading
+        metrics:
+          - reading_altitude_value
+        charts:
+          - title: Altitude Readings
+            context: altitude
+            units: meters
+            dimensions:
+              - selector: reading_altitude_value
+                name: value
+      - family: Barometric Pressure Readings
+        context_namespace: reading
+        metrics:
+          - reading_barometric_pressure_value
+        charts:
+          - title: Barometric Pressure Readings
+            context: barometric_pressure
+            units: pascals
+            dimensions:
+              - selector: reading_barometric_pressure_value
+                name: value
+      - family: Humidity Readings
+        context_namespace: reading
+        metrics:
+          - reading_humidity_value
+        charts:
+          - title: Relative Humidity Readings
+            context: humidity
+            units: percentage
+            dimensions:
+              - selector: reading_humidity_value
+                name: value
+      - family: Linear Acceleration Readings
+        context_namespace: reading
+        metrics:
+          - reading_linear_acceleration_value
+        charts:
+          - title: Linear Acceleration Readings
+            context: linear_acceleration
+            units: meters/second2
+            dimensions:
+              - selector: reading_linear_acceleration_value
+                name: value
+      - family: Linear Position Readings
+        context_namespace: reading
+        metrics:
+          - reading_linear_position_value
+        charts:
+          - title: Linear Position Readings
+            context: linear_position
+            units: meters
+            dimensions:
+              - selector: reading_linear_position_value
+                name: value
+      - family: Linear Velocity Readings
+        context_namespace: reading
+        metrics:
+          - reading_linear_velocity_value
+        charts:
+          - title: Linear Velocity Readings
+            context: linear_velocity
+            units: meters/second
+            dimensions:
+              - selector: reading_linear_velocity_value
+                name: value
+      - family: Pressure Readings
+        context_namespace: reading
+        metrics:
+          - reading_pressure_value
+        charts:
+          - title: Pressure Readings
+            context: pressure
+            units: pascals
+            dimensions:
+              - selector: reading_pressure_value
+                name: value
+      - family: Rotational Acceleration Readings
+        context_namespace: reading
+        metrics:
+          - reading_rotational_acceleration_value
+        charts:
+          - title: Rotational Acceleration Readings
+            context: rotational_acceleration
+            units: radians/second2
+            dimensions:
+              - selector: reading_rotational_acceleration_value
+                name: value
+      - family: Rotational Position Readings
+        context_namespace: reading
+        metrics:
+          - reading_rotational_position_value
+        charts:
+          - title: Rotational Position Readings
+            context: rotational_position
+            units: radians
+            dimensions:
+              - selector: reading_rotational_position_value
+                name: value
+      - family: Rotational Velocity Readings
+        context_namespace: reading
+        metrics:
+          - reading_rotational_velocity_value
+        charts:
+          - title: Rotational Velocity Readings
+            context: rotational_velocity
+            units: radians/second
+            dimensions:
+              - selector: reading_rotational_velocity_value
+                name: value
+      - family: Valve Position Readings
+        context_namespace: reading
+        metrics:
+          - reading_valve_position_value
+        charts:
+          - title: Valve Position Readings
+            context: valve_position
+            units: percentage
+            dimensions:
+              - selector: reading_valve_position_value
+                name: value
+  - family: Controls
+    chart_defaults:
+      priority: 70800
+      instances:
+        by_labels:
+          - endpoint_key
+          - resource_key
+    metrics:
+      - control_acquisition_state
+      - control_conditions_critical
+      - control_conditions_ok
+      - control_conditions_unknown
+      - control_conditions_warning
+      - control_frequency_sensor
+      - control_frequency_setpoint
+      - control_frequency_setpoint_error
+      - control_health_rollup_status
+      - control_health_status
+      - control_linear_acceleration_sensor
+      - control_linear_acceleration_setpoint
+      - control_linear_acceleration_setpoint_error
+      - control_linear_position_sensor
+      - control_linear_position_setpoint
+      - control_linear_position_setpoint_error
+      - control_linear_velocity_sensor
+      - control_linear_velocity_setpoint
+      - control_linear_velocity_setpoint_error
+      - control_liquid_flow_sensor
+      - control_liquid_flow_setpoint
+      - control_liquid_flow_setpoint_error
+      - control_percentage_sensor
+      - control_percentage_setpoint
+      - control_percentage_setpoint_error
+      - control_power_sensor
+      - control_power_setpoint
+      - control_power_setpoint_error
+      - control_pressure_sensor
+      - control_pressure_setpoint
+      - control_pressure_setpoint_error
+      - control_rotational_acceleration_sensor
+      - control_rotational_acceleration_setpoint
+      - control_rotational_acceleration_setpoint_error
+      - control_rotational_position_sensor
+      - control_rotational_position_setpoint
+      - control_rotational_position_setpoint_error
+      - control_rotational_velocity_sensor
+      - control_rotational_velocity_setpoint
+      - control_rotational_velocity_setpoint_error
+      - control_state
+      - control_temperature_sensor
+      - control_temperature_setpoint
+      - control_temperature_setpoint_error
+      - control_valve_position_sensor
+      - control_valve_position_setpoint
+      - control_valve_position_setpoint_error
+    charts:
+      - title: Control Acquisition State
+        context: control.acquisition_state
+        units: state
+        type: stacked
+        dimensions:
+          - selector: control_acquisition_state
+      - title: Control Conditions
+        context: control.conditions
+        units: conditions
+        type: stacked
+        dimensions:
+          - selector: control_conditions_ok
+            name: ok
+          - selector: control_conditions_warning
+            name: warning
+          - selector: control_conditions_critical
+            name: critical
+          - selector: control_conditions_unknown
+            name: unknown
+      - title: Control Frequency
+        context: control.frequency
+        units: hertz
+        dimensions:
+          - selector: control_frequency_sensor
+            name: sensor
+          - selector: control_frequency_setpoint
+            name: setpoint
+          - selector: control_frequency_setpoint_error
+            name: setpoint_error
+      - title: Control Health
+        context: control.health
+        units: state
+        type: stacked
+        dimensions:
+          - selector: control_health_status
+      - title: Control Health Rollup
+        context: control.health_rollup
+        units: state
+        type: stacked
+        dimensions:
+          - selector: control_health_rollup_status
+      - title: Control Linear Acceleration
+        context: control.linear_acceleration
+        units: meters/second2
+        dimensions:
+          - selector: control_linear_acceleration_sensor
+            name: sensor
+          - selector: control_linear_acceleration_setpoint
+            name: setpoint
+          - selector: control_linear_acceleration_setpoint_error
+            name: setpoint_error
+      - title: Control Linear Position
+        context: control.linear_position
+        units: meters
+        dimensions:
+          - selector: control_linear_position_sensor
+            name: sensor
+          - selector: control_linear_position_setpoint
+            name: setpoint
+          - selector: control_linear_position_setpoint_error
+            name: setpoint_error
+      - title: Control Linear Velocity
+        context: control.linear_velocity
+        units: meters/second
+        dimensions:
+          - selector: control_linear_velocity_sensor
+            name: sensor
+          - selector: control_linear_velocity_setpoint
+            name: setpoint
+          - selector: control_linear_velocity_setpoint_error
+            name: setpoint_error
+      - title: Control Liquid Flow
+        context: control.liquid_flow
+        units: liters/minute
+        dimensions:
+          - selector: control_liquid_flow_sensor
+            name: sensor
+          - selector: control_liquid_flow_setpoint
+            name: setpoint
+          - selector: control_liquid_flow_setpoint_error
+            name: setpoint_error
+      - title: Control Percentage
+        context: control.percentage
+        units: percentage
+        dimensions:
+          - selector: control_percentage_sensor
+            name: sensor
+          - selector: control_percentage_setpoint
+            name: setpoint
+          - selector: control_percentage_setpoint_error
+            name: setpoint_error
+      - title: Control Power
+        context: control.power
+        units: watts
+        dimensions:
+          - selector: control_power_sensor
+            name: sensor
+          - selector: control_power_setpoint
+            name: setpoint
+          - selector: control_power_setpoint_error
+            name: setpoint_error
+      - title: Control Pressure
+        context: control.pressure
+        units: pascals
+        dimensions:
+          - selector: control_pressure_sensor
+            name: sensor
+          - selector: control_pressure_setpoint
+            name: setpoint
+          - selector: control_pressure_setpoint_error
+            name: setpoint_error
+      - title: Control Rotational Acceleration
+        context: control.rotational_acceleration
+        units: radians/second2
+        dimensions:
+          - selector: control_rotational_acceleration_sensor
+            name: sensor
+          - selector: control_rotational_acceleration_setpoint
+            name: setpoint
+          - selector: control_rotational_acceleration_setpoint_error
+            name: setpoint_error
+      - title: Control Rotational Position
+        context: control.rotational_position
+        units: radians
+        dimensions:
+          - selector: control_rotational_position_sensor
+            name: sensor
+          - selector: control_rotational_position_setpoint
+            name: setpoint
+          - selector: control_rotational_position_setpoint_error
+            name: setpoint_error
+      - title: Control Rotational Velocity
+        context: control.rotational_velocity
+        units: radians/second
+        dimensions:
+          - selector: control_rotational_velocity_sensor
+            name: sensor
+          - selector: control_rotational_velocity_setpoint
+            name: setpoint
+          - selector: control_rotational_velocity_setpoint_error
+            name: setpoint_error
+      - title: Control State
+        context: control.state
+        units: state
+        type: stacked
+        dimensions:
+          - selector: control_state
+      - title: Control Temperature
+        context: control.temperature
+        units: Celsius
+        dimensions:
+          - selector: control_temperature_sensor
+            name: sensor
+          - selector: control_temperature_setpoint
+            name: setpoint
+          - selector: control_temperature_setpoint_error
+            name: setpoint_error
+      - title: Control Valve Position
+        context: control.valve_position
+        units: percentage
+        dimensions:
+          - selector: control_valve_position_sensor
+            name: sensor
+          - selector: control_valve_position_setpoint
+            name: setpoint
+          - selector: control_valve_position_setpoint_error
+            name: setpoint_error
+  - family: Sensors
+    chart_defaults:
+      priority: 70900
+      instances:
+        by_labels:
+          - endpoint_key
+          - resource_key
+    groups:
+      - family: Percentage Readings
+        context_namespace: reading
+        metrics:
+          - reading_percentage_value
+        chart_defaults:
+          instances:
+            by_labels:
+              - endpoint_key
+              - reading_key
+        charts:
+          - title: Percentage Readings
+            context: percentage
+            units: percentage
+            dimensions:
+              - selector: reading_percentage_value
+                name: value
+      - family: Reading Health
+        context_namespace: reading
+        metrics:
+          - derived_health_status
+          - reading_alarm_status
+        chart_defaults:
+          instances:
+            by_labels:
+              - endpoint_key
+              - reading_key
+        charts:
+          - title: Redfish Reading Source Health State
+            context: alarm
+            units: state
+            type: stacked
+            dimensions:
+              - selector: reading_alarm_status
+          - title: Redfish Reading Derived Health (Thresholds)
+            context: derived_health
+            units: state
+            type: stacked
+            dimensions:
+              - selector: derived_health_status
+      - family: Sensor Resources
+        context_namespace: sensor
+        metrics:
+          - sensor_acquisition_state
+          - sensor_conditions_critical
+          - sensor_conditions_ok
+          - sensor_conditions_unknown
+          - sensor_conditions_warning
+          - sensor_health_rollup_status
+          - sensor_health_status
+          - sensor_state
+        charts:
+          - title: Sensor Acquisition State
+            context: acquisition_state
+            units: state
+            type: stacked
+            dimensions:
+              - selector: sensor_acquisition_state
+          - title: Sensor Conditions
+            context: conditions
+            units: conditions
+            type: stacked
+            dimensions:
+              - selector: sensor_conditions_ok
+                name: ok
+              - selector: sensor_conditions_warning
+                name: warning
+              - selector: sensor_conditions_critical
+                name: critical
+              - selector: sensor_conditions_unknown
+                name: unknown
+          - title: Sensor Health
+            context: health
+            units: state
+            type: stacked
+            dimensions:
+              - selector: sensor_health_status
+          - title: Sensor Health Rollup
+            context: health_rollup
+            units: state
+            type: stacked
+            dimensions:
+              - selector: sensor_health_rollup_status
+          - title: Sensor State
+            context: state
+            units: state
+            type: stacked
+            dimensions:
+              - selector: sensor_state
+  - family: Management
+    chart_defaults:
+      priority: 71000
+      instances:
+        by_labels:
+          - endpoint_key
+          - resource_key
+    groups:
+      - family: Assemblies
+        context_namespace: assembly
+        metrics:
+          - assembly_acquisition_state
+          - assembly_conditions_critical
+          - assembly_conditions_ok
+          - assembly_conditions_unknown
+          - assembly_conditions_warning
+          - assembly_health_rollup_status
+          - assembly_health_status
+          - assembly_state
+        charts:
+          - title: Assembly Acquisition State
+            context: acquisition_state
+            units: state
+            type: stacked
+            dimensions:
+              - selector: assembly_acquisition_state
+          - title: Assembly Conditions
+            context: conditions
+            units: conditions
+            type: stacked
+            dimensions:
+              - selector: assembly_conditions_ok
+                name: ok
+              - selector: assembly_conditions_warning
+                name: warning
+              - selector: assembly_conditions_critical
+                name: critical
+              - selector: assembly_conditions_unknown
+                name: unknown
+          - title: Assembly Health
+            context: health
+            units: state
+            type: stacked
+            dimensions:
+              - selector: assembly_health_status
+          - title: Assembly Health Rollup
+            context: health_rollup
+            units: state
+            type: stacked
+            dimensions:
+              - selector: assembly_health_rollup_status
+          - title: Assembly State
+            context: state
+            units: state
+            type: stacked
+            dimensions:
+              - selector: assembly_state
+      - family: Firmware
+        context_namespace: firmware
+        metrics:
+          - firmware_acquisition_state
+          - firmware_conditions_critical
+          - firmware_conditions_ok
+          - firmware_conditions_unknown
+          - firmware_conditions_warning
+          - firmware_health_rollup_status
+          - firmware_health_status
+          - firmware_state
+        charts:
+          - title: Firmware Acquisition State
+            context: acquisition_state
+            units: state
+            type: stacked
+            dimensions:
+              - selector: firmware_acquisition_state
+          - title: Firmware Conditions
+            context: conditions
+            units: conditions
+            type: stacked
+            dimensions:
+              - selector: firmware_conditions_ok
+                name: ok
+              - selector: firmware_conditions_warning
+                name: warning
+              - selector: firmware_conditions_critical
+                name: critical
+              - selector: firmware_conditions_unknown
+                name: unknown
+          - title: Firmware Health
+            context: health
+            units: state
+            type: stacked
+            dimensions:
+              - selector: firmware_health_status
+          - title: Firmware Health Rollup
+            context: health_rollup
+            units: state
+            type: stacked
+            dimensions:
+              - selector: firmware_health_rollup_status
+          - title: Firmware State
+            context: state
+            units: state
+            type: stacked
+            dimensions:
+              - selector: firmware_state
+      - family: Managers
+        context_namespace: manager
+        metrics:
+          - manager_acquisition_state
+          - manager_clock_offset
+          - manager_conditions_critical
+          - manager_conditions_ok
+          - manager_conditions_unknown
+          - manager_conditions_warning
+          - manager_health_rollup_status
+          - manager_health_status
+          - manager_power_state
+          - manager_state
+        charts:
+          - title: Manager Acquisition State
+            context: acquisition_state
+            units: state
+            type: stacked
+            dimensions:
+              - selector: manager_acquisition_state
+          - title: Manager Clock Offset
+            context: clock_offset
+            units: seconds
+            dimensions:
+              - selector: manager_clock_offset
+                name: offset
+          - title: Manager Conditions
+            context: conditions
+            units: conditions
+            type: stacked
+            dimensions:
+              - selector: manager_conditions_ok
+                name: ok
+              - selector: manager_conditions_warning
+                name: warning
+              - selector: manager_conditions_critical
+                name: critical
+              - selector: manager_conditions_unknown
+                name: unknown
+          - title: Manager Health
+            context: health
+            units: state
+            type: stacked
+            dimensions:
+              - selector: manager_health_status
+          - title: Manager Health Rollup
+            context: health_rollup
+            units: state
+            type: stacked
+            dimensions:
+              - selector: manager_health_rollup_status
+          - title: Manager Power State
+            context: power_state
+            units: state
+            type: stacked
+            dimensions:
+              - selector: manager_power_state
+          - title: Manager State
+            context: state
+            units: state
+            type: stacked
+            dimensions:
+              - selector: manager_state
+      - family: Software
+        context_namespace: software
+        metrics:
+          - software_acquisition_state
+          - software_conditions_critical
+          - software_conditions_ok
+          - software_conditions_unknown
+          - software_conditions_warning
+          - software_health_rollup_status
+          - software_health_status
+          - software_state
+        charts:
+          - title: Software Acquisition State
+            context: acquisition_state
+            units: state
+            type: stacked
+            dimensions:
+              - selector: software_acquisition_state
+          - title: Software Conditions
+            context: conditions
+            units: conditions
+            type: stacked
+            dimensions:
+              - selector: software_conditions_ok
+                name: ok
+              - selector: software_conditions_warning
+                name: warning
+              - selector: software_conditions_critical
+                name: critical
+              - selector: software_conditions_unknown
+                name: unknown
+          - title: Software Health
+            context: health
+            units: state
+            type: stacked
+            dimensions:
+              - selector: software_health_status
+          - title: Software Health Rollup
+            context: health_rollup
+            units: state
+            type: stacked
+            dimensions:
+              - selector: software_health_rollup_status
+          - title: Software State
+            context: state
+            units: state
+            type: stacked
+            dimensions:
+              - selector: software_state
+  - family: Collection
+    chart_defaults:
+      priority: 71100
+      instances:
+        by_labels:
+          - endpoint_key
+    metrics:
+      - collection_duration_seconds
+      - collection_failures_auth
+      - collection_failures_internal
+      - collection_failures_limit
+      - collection_failures_protocol
+      - collection_failures_timeout
+      - collection_failures_tls
+      - collection_failures_transport
+      - collection_http_requests_redirected
+      - collection_http_requests_started
+      - collection_operations_failed
+      - collection_operations_successful
+      - collection_resources_discovered
+      - collection_resources_readable
+      - collection_resources_unknown
+      - collection_resources_unreadable
+      - collection_status
+      - collection_traffic_received_bytes
+    charts:
+      - title: Redfish Collection Duration
+        context: collection.duration
+        units: seconds
+        dimensions:
+          - selector: collection_duration_seconds
+            name: duration
+      - title: Redfish Collection Failures
+        context: collection.failures
+        units: failures
+        type: stacked
+        dimensions:
+          - selector: collection_failures_auth
+            name: auth
+          - selector: collection_failures_tls
+            name: tls
+          - selector: collection_failures_transport
+            name: transport
+          - selector: collection_failures_timeout
+            name: timeout
+          - selector: collection_failures_protocol
+            name: protocol
+          - selector: collection_failures_limit
+            name: limit
+          - selector: collection_failures_internal
+            name: internal
+      - title: Redfish Collection HTTP Requests
+        context: collection.http_requests
+        units: requests/cycle
+        dimensions:
+          - selector: collection_http_requests_started
+            name: started
+          - selector: collection_http_requests_redirected
+            name: redirected
+      - title: Redfish Collection Operations
+        context: collection.operations
+        units: operations/cycle
+        type: stacked
+        dimensions:
+          - selector: collection_operations_successful
+            name: successful
+          - selector: collection_operations_failed
+            name: failed
+      - title: Redfish Collection Resources
+        context: collection.resources
+        units: resources
+        dimensions:
+          - selector: collection_resources_discovered
+            name: discovered
+          - selector: collection_resources_readable
+            name: readable
+          - selector: collection_resources_unreadable
+            name: unreadable
+          - selector: collection_resources_unknown
+            name: unknown
+      - title: Redfish Collection Status
+        context: collection.status
+        units: state
+        type: stacked
+        dimensions:
+          - selector: collection_status
+      - title: Redfish Collection Traffic
+        context: collection.traffic
+        units: bytes/cycle
+        dimensions:
+          - selector: collection_traffic_received_bytes
+            name: received

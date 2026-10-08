@@ -53,16 +53,39 @@ func TestParsePluginConfigFileLegacyKeys(t *testing.T) {
 		content      string
 		wantFlavor   *string
 		wantPidLevel *int
+		wantLoad     *LoadMethod
 	}{
-		"ebpf type format legacy forces tracing flavor": {
+		"ebpf type format legacy forces legacy load": {
 			content:    "[global]\nebpf type format = legacy\n",
 			wantFlavor: new("tracing"),
+			wantLoad:   new(LoadLegacy),
 		},
-		"ebpf type format auto leaves flavor unchanged": {
-			content: "[global]\nebpf type format = auto\n",
+		// `auto` and `co-re` emit a BLANK flavor, not a nil one.  Blank is the
+		// retraction marker: apply() merges each field independently, so without
+		// it a `tracing` flavor set by `legacy` in an earlier config layer would
+		// survive the override and keep forcing the base object.
+		// applyCommonCollectorConfig skips a blank flavor, so the collector
+		// default applies.
+		"ebpf type format auto retracts any earlier legacy flavor": {
+			content:    "[global]\nebpf type format = auto\n",
+			wantFlavor: new(""),
+			wantLoad:   new(LoadPlayDice),
 		},
-		"ebpf type format co-re leaves flavor unchanged": {
-			content: "[global]\nebpf type format = co-re\n",
+		"ebpf type format co-re forces core load and retracts the legacy flavor": {
+			content:    "[global]\nebpf type format = co-re\n",
+			wantFlavor: new(""),
+			wantLoad:   new(LoadCore),
+		},
+		// The merge order that motivated the retraction: legacy first, auto after.
+		"ebpf type format legacy then auto ends blank": {
+			content:    "[global]\nebpf type format = legacy\nebpf type format = auto\n",
+			wantFlavor: new(""),
+			wantLoad:   new(LoadPlayDice),
+		},
+		"explicit object flavor survives later auto in the same file": {
+			content:    "[global]\nebpf object flavor = arena\nebpf type format = auto\n",
+			wantFlavor: new("arena"),
+			wantLoad:   new(LoadPlayDice),
 		},
 		"ebpf co-re tracing probe forces tracing flavor": {
 			content:    "[global]\nebpf co-re tracing = probe\n",
@@ -78,7 +101,7 @@ func TestParsePluginConfigFileLegacyKeys(t *testing.T) {
 		"ebpf load mode entry is accepted as no-op": {
 			content: "[global]\nebpf load mode = entry\n",
 		},
-		"ebpf load mode return is recognized but unsupported": {
+		"ebpf load mode return is accepted by the generic parser": {
 			content: "[global]\nebpf load mode = return\n",
 		},
 		"ebpf object flavor buffer ring maps to buffer flavor": {
@@ -88,6 +111,11 @@ func TestParsePluginConfigFileLegacyKeys(t *testing.T) {
 		"ebpf object flavor ring buffer maps to buffer flavor": {
 			content:    "[global]\nebpf object flavor = ring-buffer\n",
 			wantFlavor: new("buffer"),
+		},
+		"type format legacy sets the load method and leaves the object flavor alone": {
+			content:    "[global]\nebpf type format = legacy\nebpf object flavor = buffer\n",
+			wantFlavor: new("buffer"),
+			wantLoad:   new(LoadLegacy),
 		},
 		"collect pid real parent sets level 0": {
 			content:      "[global]\ncollect pid = real parent\n",
@@ -108,6 +136,7 @@ func TestParsePluginConfigFileLegacyKeys(t *testing.T) {
 			cfg := parseTempConfig(t, "cachestat.conf", tc.content)
 			checkPtr(t, "ObjectFlavor", cfg.ObjectFlavor, tc.wantFlavor)
 			checkPtr(t, "CollectPidLevel", cfg.CollectPidLevel, tc.wantPidLevel)
+			checkPtr(t, "LoadMethod", cfg.LoadMethod, tc.wantLoad)
 		})
 	}
 }
@@ -272,4 +301,68 @@ func TestApplySocketTableSizeClamp(t *testing.T) {
 			}
 		})
 	}
+}
+
+// TestApplyCommonCollectorConfigLegacyReachesFlavourlessCollectors pins the
+// asymmetry between fd and the other collectors.
+//
+// `ebpf type format = legacy` emits BOTH a LoadMethod and a "tracing" flavor.
+// Only fd consumes LoadMethod (it derives the base object from LoadLegacy in
+// BuildFDLegacyPlan), so for fd the flavor merge must be suppressed and the
+// operator's `ebpf object flavor` left intact.  cachestat, dcstat and socket
+// pass no LoadMethod destination — for them the marker has to land on
+// ObjectFlavor, or `legacy` selects nothing at all and silently keeps buffer.
+func TestApplyCommonCollectorConfigLegacyReachesFlavourlessCollectors(t *testing.T) {
+	legacy := pluginConfigFile{
+		LoadMethod:   new(LoadLegacy),
+		ObjectFlavor: new("tracing"),
+	}
+
+	t.Run("collector without LoadMethod gets the flavor", func(t *testing.T) {
+		flavor := "buffer"
+		applyCommonCollectorConfig(legacy, collectorCommonConfig{ObjectFlavor: &flavor})
+		if flavor != "tracing" {
+			t.Fatalf("ObjectFlavor = %q, want %q: `ebpf type format = legacy` must not be a no-op",
+				flavor, "tracing")
+		}
+	})
+
+	t.Run("collector with LoadMethod keeps its flavor", func(t *testing.T) {
+		flavor := "buffer"
+		method := LoadCore
+		applyCommonCollectorConfig(legacy, collectorCommonConfig{
+			ObjectFlavor: &flavor,
+			LoadMethod:   &method,
+		})
+		if method != LoadLegacy {
+			t.Fatalf("LoadMethod = %v, want %v", method, LoadLegacy)
+		}
+		if flavor != "buffer" {
+			t.Fatalf("ObjectFlavor = %q, want %q: the load method already forces the base object, "+
+				"so the operator's flavor must not be clobbered", flavor, "buffer")
+		}
+	})
+
+	t.Run("core method still accepts an explicit flavor", func(t *testing.T) {
+		flavor := "buffer"
+		method := LoadCore
+		applyCommonCollectorConfig(pluginConfigFile{
+			LoadMethod:   &method,
+			ObjectFlavor: new("arena"),
+		}, collectorCommonConfig{ObjectFlavor: &flavor, LoadMethod: &method})
+		if flavor != "arena" {
+			t.Fatalf("ObjectFlavor = %q, want arena: only legacy must suppress the flavor merge", flavor)
+		}
+	})
+
+	t.Run("blank flavor is a retraction and never applied", func(t *testing.T) {
+		flavor := "arena"
+		applyCommonCollectorConfig(
+			pluginConfigFile{LoadMethod: new(LoadPlayDice), ObjectFlavor: new("")},
+			collectorCommonConfig{ObjectFlavor: &flavor})
+		if flavor != "arena" {
+			t.Fatalf("ObjectFlavor = %q, want %q: a blank flavor must leave the destination alone",
+				flavor, "arena")
+		}
+	})
 }

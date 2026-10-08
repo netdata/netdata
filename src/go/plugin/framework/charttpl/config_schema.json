@@ -22,7 +22,7 @@
       "type": "array",
       "minItems": 1,
       "items": {
-        "$ref": "#/$defs/group"
+        "$ref": "#/$defs/root_group"
       }
     }
   },
@@ -118,6 +118,16 @@
             "$ref": "#/$defs/engine_autogen_rule"
           }
         },
+        "counter_raw_charts": {
+          "type": [
+            "array",
+            "null"
+          ],
+          "items": {
+            "type": "string",
+            "pattern": "^\\S+$"
+          }
+        },
         "max_type_id_len": {
           "oneOf": [
             {
@@ -147,16 +157,13 @@
         }
       }
     },
-    "group": {
+    "root_group": {
       "type": "object",
       "additionalProperties": false,
-      "required": [
-        "family"
-      ],
       "properties": {
         "family": {
           "type": "string",
-          "minLength": 1
+          "pattern": "^$|\\S"
         },
         "context_namespace": {
           "type": "string"
@@ -181,6 +188,37 @@
           "items": {
             "$ref": "#/$defs/chart"
           }
+        }
+      },
+      "if": {
+        "required": [
+          "family"
+        ],
+        "properties": {
+          "family": {
+            "pattern": "\\S"
+          }
+        }
+      },
+      "else": {
+        "properties": {
+          "charts": {
+            "items": {
+              "$ref": "#/$defs/chart_with_family"
+            }
+          }
+        }
+      }
+    },
+    "group": {
+      "$ref": "#/$defs/root_group",
+      "required": [
+        "family"
+      ],
+      "properties": {
+        "family": {
+          "type": "string",
+          "pattern": "\\S"
         }
       }
     },
@@ -262,10 +300,25 @@
         }
       }
     },
+    "chart_with_family": {
+      "$ref": "#/$defs/chart",
+      "required": [
+        "family"
+      ],
+      "properties": {
+        "family": {
+          "type": "string",
+          "pattern": "\\S"
+        }
+      }
+    },
     "chart_defaults": {
       "type": "object",
       "additionalProperties": false,
       "properties": {
+        "priority": {
+          "type": "integer"
+        },
         "label_promotion": {
           "type": "array",
           "items": {

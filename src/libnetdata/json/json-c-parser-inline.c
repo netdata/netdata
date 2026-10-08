@@ -40,7 +40,7 @@ static void json_parser_format_error(char *dst, size_t dst_size, const char *err
               truncated ? JSON_PARSER_ERROR_TRUNCATION_SUFFIX : "");
 }
 
-int rrd_call_function_error(BUFFER *wb, const char *msg, int code) {
+int nrpc_call_error(BUFFER *wb, const char *msg, int code) {
     buffer_reset(wb);
     buffer_json_initialize(wb, "\"", "\"", 0, true, BUFFER_JSON_OPTIONS_MINIFY);
     buffer_json_member_add_int64(wb, "status", code);
@@ -54,13 +54,13 @@ int rrd_call_function_error(BUFFER *wb, const char *msg, int code) {
 
 struct json_object *json_parse_function_payload_or_error(BUFFER *output, BUFFER *payload, int *code, json_parse_function_payload_t cb, void *cb_data) {
     if(!payload || !buffer_strlen(payload)) {
-        *code = rrd_call_function_error(output, "No payload given, but a payload is required for this feature.", HTTP_RESP_BAD_REQUEST);
+        *code = nrpc_call_error(output, "No payload given, but a payload is required for this feature.", HTTP_RESP_BAD_REQUEST);
         return NULL;
     }
 
     struct json_tokener *tokener = json_tokener_new();
     if (!tokener) {
-        *code = rrd_call_function_error(output, "Failed to initialize json parser.", HTTP_RESP_INTERNAL_SERVER_ERROR);
+        *code = nrpc_call_error(output, "Failed to initialize json parser.", HTTP_RESP_INTERNAL_SERVER_ERROR);
         return NULL;
     }
 
@@ -70,7 +70,7 @@ struct json_object *json_parse_function_payload_or_error(BUFFER *output, BUFFER 
         char tmp[JSON_PARSER_ERROR_MSG_MAX];
         json_parser_format_error(tmp, sizeof(tmp), error_msg, error_msg ? strnlen(error_msg, JSON_PARSER_ERROR_MSG_MAX) : 0);
         json_tokener_free(tokener);
-        *code = rrd_call_function_error(output, tmp, HTTP_RESP_INTERNAL_SERVER_ERROR);
+        *code = nrpc_call_error(output, tmp, HTTP_RESP_INTERNAL_SERVER_ERROR);
         return NULL;
     }
     json_tokener_free(tokener);
@@ -79,7 +79,7 @@ struct json_object *json_parse_function_payload_or_error(BUFFER *output, BUFFER 
     if(!cb(jobj, cb_data, error)) {
         char tmp[JSON_PARSER_ERROR_MSG_MAX];
         json_parser_format_error(tmp, sizeof(tmp), buffer_tostring(error), buffer_strlen(error));
-        *code = rrd_call_function_error(output, tmp, HTTP_RESP_BAD_REQUEST);
+        *code = nrpc_call_error(output, tmp, HTTP_RESP_BAD_REQUEST);
         json_object_put(jobj);
         return NULL;
     }

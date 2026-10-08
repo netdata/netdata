@@ -52,7 +52,7 @@ Kubernetes pod, namespace, and workload owns it — without instrumenting any of
 You can regroup that map by process name, container, or PID, so you can look at the host at whichever level answers
 your question — the services it runs, or exactly which worker process opened a connection.
 
-The map is available on Linux, FreeBSD, and macOS; container and Kubernetes attribution is Linux-only. A host install
+The map is available on Linux, FreeBSD, macOS, and Windows; container and Kubernetes attribution is Linux-only. A host install
 needs nothing configured. Running the Agent in a container needs a few extra privileges, which
 [Application Dependency Mapping](/docs/npm/topology/dependency-mapping.md) lists.
 

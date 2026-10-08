@@ -35,7 +35,7 @@ Executed queries:
 
 This collector is supported on all platforms.
 
-This collector supports collecting metrics from multiple instances of this integration, including remote instances.
+This collector supports collecting metrics from multiple instances of this integration.
 
 
 ### Default Behavior
@@ -115,11 +115,31 @@ The following options can be defined globally: update_every, autodetection_retry
 |  | autodetection_retry | Autodetection retry interval (seconds). Set 0 to disable. | 0 | no |
 | **Target** | uri | MongoDB connection string. See [URI syntax](https://www.mongodb.com/docs/manual/reference/connection-string/). | mongodb://localhost:27017 | yes |
 |  | timeout | Query timeout (seconds). | 1 | no |
-| **Filters** | databases | Database selector. Defines which databases to collect metrics from. |  | no |
+| **Filters** | [databases](#option-filters-databases) | Database selector. Defines which databases to collect metrics from. |  | no |
 | **Functions** | functions.top_queries.disabled | Disable the [top-queries](#top-queries) function. | no | no |
 |  | functions.top_queries.timeout | Query timeout (seconds). Uses collector timeout if not set. |  | no |
 |  | functions.top_queries.limit | Maximum number of queries to return. | 500 | no |
 | **Virtual Node** | vnode | Associates this data collection job with a [Virtual Node](https://learn.netdata.cloud/docs/netdata-agent/configuration/organize-systems-metrics-and-alerts#virtual-nodes). |  | no |
+
+<a id="option-filters-databases"></a>
+##### databases
+
+Metrics of databases matching the selector will be collected. When unset, no per-database metrics are collected.
+
+- Logic: (pattern1 OR pattern2) AND !(pattern3 OR pattern4)
+- Pattern syntax: [matcher](https://github.com/netdata/netdata/tree/master/src/go/pkg/matcher#supported-format).
+- Syntax:
+
+  ```yaml
+  databases:
+    includes:
+      - pattern1
+      - pattern2
+    excludes:
+      - pattern3
+      - pattern4
+  ```
+
 
 
 </details>
@@ -135,7 +155,7 @@ Configure the **mongodb** collector from the Netdata web interface:
 4. In the Search box, type _mongodb_ (or scroll the list) to locate the **mongodb** collector.
 5. Click the **+** next to the **mongodb** collector to add a new job.
 6. Fill in the job fields, then click **Test** to verify the configuration and **Submit** to save.
-    - **Test** runs the job with the provided settings and shows whether data can be collected.
+    - **Test** validates the provided settings and checks the collector's startup prerequisites. Successful validation does not guarantee that every metric will be available during collection.
     - If it fails, an error message appears with details (for example, connection refused, timeout, or command execution errors), so you can adjust and retest.
 
 
@@ -497,7 +517,9 @@ Profiled query statistics from `system.profile`. Each row represents a single pr
 
 ## Troubleshooting
 
-### Debug Mode
+### Diagnostics
+
+#### Debug Mode
 
 **Important**: Debug mode is not supported for data collection jobs created via the UI using the Dyncfg feature.
 
@@ -529,14 +551,14 @@ should give you clues as to why the collector isn't working.
   ./go.d.plugin -d -m mongodb -j jobName
   ```
 
-### Getting Logs
+#### Getting Logs
 
 If you're encountering problems with the `mongodb` collector, follow these steps to retrieve logs and identify potential issues:
 
 - **Run the command** specific to your system (systemd, non-systemd, or Docker container).
 - **Examine the output** for any warnings or error messages that might indicate issues.  These messages should provide clues about the root cause of the problem.
 
-#### System with systemd
+##### System with systemd
 
 Use the following command to view logs generated since the last Netdata service restart:
 
@@ -544,7 +566,7 @@ Use the following command to view logs generated since the last Netdata service 
 journalctl _SYSTEMD_INVOCATION_ID="$(systemctl show --value --property=InvocationID netdata)" --namespace=netdata --grep mongodb
 ```
 
-#### System without systemd
+##### System without systemd
 
 Locate the collector log file, typically at `/var/log/netdata/collector.log`, and use `grep` to filter for collector's name:
 
@@ -554,7 +576,7 @@ grep mongodb /var/log/netdata/collector.log
 
 **Note**: This method shows logs from all restarts. Focus on the **latest entries** for troubleshooting current issues.
 
-#### Docker Container
+##### Docker Container
 
 If your Netdata runs in a Docker container named "netdata" (replace if different), use this command:
 

@@ -32,22 +32,27 @@ PARSER_RC pluginsd_config(char **words, size_t num_words, PARSER *parser) {
         HTTP_ACCESS view_access = http_access_from_hex(view_permissions_str);
         HTTP_ACCESS edit_access = http_access_from_hex(edit_permissions_str);
 
-        if(!dyncfg_add_low_level(
-                host,
-                id,
-                path,
-                status,
-                type,
-                source_type,
-                source,
-                cmds,
-                0,
-                0,
-                false,
-                view_access,
-                edit_access,
-                pluginsd_function_execute_cb,
-                parser))
+        // UAF-C fix: the node stores the plugin's TRANSPORT, not the raw
+        // parser - both as the execute data (pluginsd_nrpc_handler
+        // expects it and does acquire-or-503) and as the node's pinned
+        // transport, so the node outliving the parser holds a valid (dead)
+        // transport instead of a dangling parser pointer
+        if(!dyncfg_add_low_level(&(struct dyncfg_add_spec) {
+            .host = host,
+            .id = id,
+            .path = path,
+            .status = status,
+            .type = type,
+            .source_type = source_type,
+            .source = source,
+            .cmds = cmds,
+            .sync = false,
+            .view_access = view_access,
+            .edit_access = edit_access,
+            .handler = pluginsd_nrpc_handler,
+            .handler_data = parser->inflight.transport,
+            .transport = parser->inflight.transport,
+        }))
             return PARSER_RC_ERROR;
     }
     else if(strcmp(action, PLUGINSD_KEYWORD_CONFIG_ACTION_DELETE) == 0) {

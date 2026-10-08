@@ -29,9 +29,6 @@ and other operating systems and is regularly tested. You can find this tool [her
 - **Red Hat Enterprise Linux** and its derivatives (including **Fedora**, **CentOS**, **Amazon Machine Image**)
   - Please note that for RHEL/CentOS you need
       [EPEL](http://www.tecmint.com/how-to-enable-epel-repository-for-rhel-centos-6-5/).
-      In addition, RHEL/CentOS version 6 also need
-      [OKay](https://okay.com.mx) for package libuv version 1.
-  - CentOS 8 / RHEL 8 requires a bit of extra work. See the dedicated section below.
 
 - **SUSE** Linux and its derivatives (including **openSUSE**)
 
@@ -120,51 +117,6 @@ Netdata Cloud support may require the following packages to be installed:
 | `protobuf` | Used for the new Cloud<->Agent binary protocol                                                                                       |
 
 _Netdata will greatly benefit if you have the above packages installed, but it will still work without them._
-
-### CentOS / RHEL 6.x
-
-On CentOS / RHEL 6.x, many of the dependencies for Netdata are only
-available with versions older than what we need, so special setup is
-required if manually installing packages.
-
-CentOS 6.x:
-
-- Enable the EPEL repo
-- Enable the additional repo from [okay.network](https://okay.network)
-
-And install the minimum required dependencies.
-
-### CentOS / RHEL 8.x
-
-For CentOS / RHEL 8.x a lot of development packages have moved out into their
-own separate repositories. Some other dependencies are either missing completely
-or have to be sourced by 3rd-parties.
-
-CentOS 8.x:
-
-- Enable the PowerTools repo
-- Enable the EPEL repo
-- Enable the Extra repo from [OKAY](https://okay.network)
-
-And install the minimum required dependencies:
-
-```sh
-# Enable config-manager
-yum install -y 'dnf-command(config-manager)'
-
-# Enable PowerTools
-yum config-manager --set-enabled powertools
-
-# Enable EPEL
-yum install -y epel-release
-
-# Install Repo for libuv-devl (NEW)
-yum install -y http://repo.okay.com.mx/centos/8/x86_64/release/okay-release-1-3.el8.noarch.rpm
-
-# Install Devel Packages
-yum install autoconf automake curl gcc git cmake libuuid-devel openssl-devel libuv-devel lz4-devel make nc pkgconfig python3 zlib-devel
-
-```
 
 ## Install Netdata
 

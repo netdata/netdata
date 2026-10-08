@@ -1,0 +1,14 @@
+version: 1
+destinations:
+  critical_alerts:
+    type: webhook
+    url: http://127.0.0.1:18080/critical
+  audit:
+    type: webhook
+    url: http://127.0.0.1:18080/audit
+routing:
+  roles:
+    sysadmin: [critical_alerts, audit]
+  policies:
+    critical_alerts:
+      critical: true

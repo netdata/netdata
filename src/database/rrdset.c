@@ -90,18 +90,18 @@ void rrdset_get_retention_of_tier_for_collected_chart(RRDSET *st, time_t *first_
 
     if(unlikely(db_last_entry_s > now_s)) {
         internal_error(db_last_entry_s > now_s + 1,
-                       "RRDSET: 'host:%s/chart:%s' latest db time %ld is in the future, adjusting it to now %ld",
+                       "RRDSET: 'host:%s/chart:%s' latest db time %" PRId64 " is in the future, adjusting it to now %" PRId64,
                        rrdhost_hostname(st->rrdhost), rrdset_id(st),
-                       db_last_entry_s, now_s);
+                       (int64_t)db_last_entry_s, (int64_t)now_s);
         db_last_entry_s = now_s;
     }
 
     if(unlikely(db_first_entry_s && db_last_entry_s && db_first_entry_s >= db_last_entry_s)) {
         internal_error(db_first_entry_s > db_last_entry_s,
-                       "RRDSET: 'host:%s/chart:%s' oldest db time %ld is bigger than latest db time %ld, adjusting it to (latest time %ld - update every %ld)",
+                       "RRDSET: 'host:%s/chart:%s' oldest db time %" PRId64 " is bigger than latest db time %" PRId64 ", adjusting it to (latest time %" PRId64 " - update every %" PRId64 ")",
                        rrdhost_hostname(st->rrdhost), rrdset_id(st),
-                       db_first_entry_s, db_last_entry_s,
-                       db_last_entry_s, (time_t)st->update_every);
+                       (int64_t)db_first_entry_s, (int64_t)db_last_entry_s,
+                       (int64_t)db_last_entry_s, (int64_t)st->update_every);
         db_first_entry_s = db_last_entry_s - st->update_every;
     }
 
@@ -142,6 +142,13 @@ void rrdset_is_obsolete___safe_from_collector_thread(RRDSET *st) {
             if(rrdhost_sender_replicating_charts_minus_one(st->rrdhost) == 0)
                 pulse_host_status(st->rrdhost, PULSE_HOST_STATUS_SND_RUNNING, 0);
         }
+
+        // The receiver side MUST NOT be released here. RRDSET_FLAG_RECEIVER_REPLICATION_IN_PROGRESS is
+        // also what makes a later CHART_DEFINITION_END a duplicate. A child sends one after every
+        // obsolete CHART, so clearing the flag here re-claims the chart and starts a second replication
+        // while its backfill may still be writing the higher tiers - two writers on one collect handle.
+        // It is released instead by its REPLAY_END if one arrives, else by the connect/disconnect reset
+        // or chart teardown.
 
         rrdset_metadata_updated(st);
 

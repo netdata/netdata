@@ -28,7 +28,7 @@ Monitor Applications for optimal software performance and resource usage.
 
 This collector is supported on all platforms.
 
-This collector supports collecting metrics from multiple instances of this integration, including remote instances.
+This collector supports collecting metrics from multiple instances of this integration.
 
 
 ### Default Behavior
@@ -112,6 +112,14 @@ Metrics:
 | app.ebpf_cachestat_dirty_pages | Number of dirty pages | pages | page/s |
 | app.ebpf_cachestat_access | Number of accessed files | hits | hits/s |
 | app.ebpf_cachestat_misses | Files out of page cache | misses | misses/s |
+| app.ebpf_dc_hit | Percentage of directory lookups resolved by the cache. | ratio | % |
+| app.ebpf_dc_reference | Count file access. | files | files |
+| app.ebpf_dc_not_cache | Files not present inside directory cache. | files | files |
+| app.ebpf_dc_not_found | Files not found. | files | files |
+| app.ebpf_file_open | Number of open files | calls | calls/s |
+| app.ebpf_file_open_error | Fails to open files. | calls | calls/s |
+| app.ebpf_file_closed | Files closed. | calls | calls/s |
+| app.ebpf_file_close_error | Fails to close files. | calls | calls/s |
 | app.swap_usage | Apps swap usage | swap | MiB |
 | app.disk_physical_io | Apps disk physical IO | reads, writes | KiB/s |
 | app.disk_logical_io | Apps disk logical IO | reads, writes | KiB/s |

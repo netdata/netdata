@@ -19,6 +19,21 @@ id_to_path = {}
 # -----------------------------
 # FS utilities
 # -----------------------------
+# Files to preserve across cleanup(). These remain on master so the netdata/learn
+# redirect catalog continues to resolve their custom_edit_url after the module
+# has migrated to a new plugin. The integration-regen PR that closes the migration
+# is the place to retire these: drop the entry from PRESERVE_FILES when the
+# LegacyLearnCorrelateLinksWithGHURLs.json catalog entry has been republished to
+# point at the new generated page.
+PRESERVE_FILES = [
+    # dcstat moved from ebpf.plugin (C) to ebpf.plugin/ebpfgo.plugin (Go).
+    # The netdata/learn redirect catalog still anchors three historical routes
+    # to this file's GitHub URL (netdata/learn/LegacyLearnCorrelateLinksWithGHURLs.json:1704,2780,3171)
+    # until the catalog is republished to point at the new ebpfgo file.
+    "src/collectors/ebpf.plugin/integrations/ebpf_dcstat.md",
+]
+
+
 def with_single_final_newline(md: str) -> str:
     return md.rstrip("\r\n") + "\n"
 
@@ -28,10 +43,16 @@ def cleanup(only_base_paths=None):
     Clean generated /integrations folders.
     - If only_base_paths is provided (list of base dirs), clean ONLY those.
     - Otherwise, do a full cleanup (legacy behavior).
+
+    Files listed in PRESERVE_FILES are saved before rmtree and rewritten after,
+    so a module whose migration is still in flight keeps its legacy integration
+    page on master until the catalog catches up.
     """
     targets = [
         "src/go/plugin/go.d/collector",
         "src/go/plugin/scripts.d/collector",
+        "src/go/plugin/dem/collector",
+        "src/go/plugin/ipmi/collector",
         "src/go/plugin/ibm.d/modules",
         "src/crates/otel-plugin",
         "src/crates/netflow-plugin",
@@ -44,9 +65,21 @@ def cleanup(only_base_paths=None):
         "src/go/plugin/go.d/discovery/sdext/discoverer",
     ]
     bases = only_base_paths if only_base_paths else targets
+
+    preserved = {}
+    for preserve_path in PRESERVE_FILES:
+        p = Path(preserve_path)
+        if p.is_file():
+            preserved[preserve_path] = p.read_text(encoding="utf-8")
+
     for base in bases:
         for p in Path(base).glob("**/integrations"):
             shutil.rmtree(p, ignore_errors=True)
+
+    for preserve_path, content in preserved.items():
+        p = Path(preserve_path)
+        p.parent.mkdir(parents=True, exist_ok=True)
+        p.write_text(content, encoding="utf-8")
 
 
 def clean_and_write(md: str, path: Path):
@@ -140,6 +173,21 @@ def clean_string(string: str) -> str:
         .replace(")", "")
         .replace(":", "")
     )
+
+
+# The Syslog chapter lives in the OpenTelemetry section on Learn, while its
+# catalog category stays under Network Performance Monitoring. The matched
+# string comes from the 'network-performance-monitoring.syslog' category name in
+# integrations/categories.yaml; update both together.
+SYSLOG_CHAPTER_NPM_PATH = "Network Performance Monitoring/Syslog from Network Devices/Integrations"
+SYSLOG_CHAPTER_LEARN_PATH = "OpenTelemetry/Syslog from Network Devices/Integrations"
+
+
+def relocate_syslog_chapter(learn_rel_path: str) -> str:
+    """Map the NPM syslog chapter's Integrations node to its Learn location."""
+    if learn_rel_path == SYSLOG_CHAPTER_NPM_PATH:
+        return SYSLOG_CHAPTER_LEARN_PATH
+    return learn_rel_path
 
 
 def create_frontmatter(integration, meta_yaml: str, sidebar_label: str, learn_rel_path: str,
@@ -254,6 +302,7 @@ def build_readme_from_integration(integration, categories, mode: str = ""):
             # collectors (Collecting Metrics/...) are unaffected.
             if learn_rel_path.startswith("Network Performance Monitoring/"):
                 learn_rel_path += "/Integrations"
+            learn_rel_path = relocate_syslog_chapter(learn_rel_path)
             keywords = integration["meta"]["keywords"] if "keywords" in integration["meta"] else None
 
             md = create_frontmatter(
@@ -315,9 +364,9 @@ def build_readme_from_integration(integration, categories, mode: str = ""):
             # "Integrations" sub-node of their chapter so the hundreds of vendor
             # pages do not flood the chapter sidebars. Sidebar placement only —
             # the category (website integrations browser) is unchanged.
-            learn_rel_path = generate_category_from_name(
+            learn_rel_path = relocate_syslog_chapter(generate_category_from_name(
                 integration["meta"]["monitored_instance"]["categories"][0].split("."), categories
-            ) + "/Integrations"
+            ) + "/Integrations")
             keywords = integration["meta"]["keywords"] if "keywords" in integration["meta"] else None
 
             md = create_frontmatter(
@@ -415,16 +464,16 @@ def build_readme_from_integration(integration, categories, mode: str = ""):
         elif mode == "logs":
             meta_yaml = integration["edit_link"].replace("blob", "edit")
             sidebar_label = integration["meta"]["name"]
-            learn_rel_path = generate_category_from_name(
-                integration["meta"]["categories"][0].split("."), categories
-            )
+            # Logs integration cards live under the Logs Management
+            # section's Integrations folder on Learn.
+            learn_rel_path = "Logs Management/Integrations"
             keywords = integration["keywords"] if "keywords" in integration else None
 
             md = create_frontmatter(
                 integration,
                 meta_yaml,
                 sidebar_label,
-                learn_rel_path.replace("logs", "Logs"),
+                learn_rel_path,
                 "DO NOT EDIT THIS FILE DIRECTLY, IT IS GENERATED BY THE LOGS' metadata.yaml FILE",
                 keywords,
             )

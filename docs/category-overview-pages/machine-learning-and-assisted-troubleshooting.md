@@ -52,6 +52,10 @@ Local, unsupervised ML runs on every agent, learning normal behavior and scoring
 
 Connect AI clients to Netdata’s MCP server to bring live observability into natural‑language workflows and optional automation. Options include [MCP](/docs/netdata-ai/mcp/README.md), [Chat with Netdata](/docs/netdata-ai/mcp/ai-chat-netdata.md), and [Supported AI Clients](/docs/netdata-ai/mcp/mcp-clients/ai-devops-copilot.md) like Claude Desktop, Cursor, VS Code, JetBrains IDEs, Claude Code, Gemini CLI, and the Netdata Web Client. Netdata Cloud can also act as an MCP client that connects to your own tools — see [MCP Connections](/docs/netdata-ai/mcp/mcp-connections.md).
 
+### 8) Infrastructure Knowledge
+
+[Infrastructure Knowledge](/docs/netdata-ai/infrastructure-knowledge.md) is what Netdata AI knows about *your* infrastructure that telemetry cannot show: service tiers, ownership, known behaviours, SLOs. Write it down in a shared document, or simply tell Netdata AI in a conversation and let it remember — every conversation, investigation, and report uses it.
+
 ## Usage and credits
 
 - Eligible Spaces receive 10 free AI credits; each Insights report, investigation, or alert troubleshooting run consumes 1 AI credit.

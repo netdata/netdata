@@ -23,7 +23,7 @@ endmeta-->
 - A Netdata Cloud account
 - Access to the Space as an **Admin**
 - The Space needs to be on a paid plan
-- The Destination URL for your Splunk VictorOps REST Endpoint Integration. Refer to the [VictorOps documentation](https://help.victorops.com/knowledge-base/rest-endpoint-integration-guide) for detailed instructions.
+- The Destination URL for your Splunk VictorOps REST Endpoint Integration. Refer to the [Splunk On-Call documentation](https://help.splunk.com/en/splunk-cloud-platform/alert-and-respond/splunk-on-call/integrations-with-splunk-on-call/rest-endpoint-integration-for-splunk-on-call) for detailed instructions.
 
 ### Netdata Configuration
 

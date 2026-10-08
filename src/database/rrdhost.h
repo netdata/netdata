@@ -4,6 +4,7 @@
 #define NETDATA_RRDHOST_H
 
 #include "libnetdata/libnetdata.h"
+#include "nrpc/nrpc.h"   // NRPC_OWNER: the host doubles as the owner token of its function registry
 
 #define HOST_LABEL_IS_EPHEMERAL "_is_ephemeral"
 #define NETDATA_VIRTUAL_HOST "Netdata Virtual Host 1.0"
@@ -235,6 +236,9 @@ struct rrdhost {
             // reserved for the receiver/sender thread - do not use for other purposes
             struct sender_buffer commit;
 
+            // serializes the host labels snapshot and its commit (stream_send_host_labels())
+            SPINLOCK labels_spinlock;
+
             STRING *destination;                    // where to send metrics to
             STRING *api_key;                        // the api key at the receiving netdata
             SIMPLE_PATTERN *charts_matching;        // pattern to match the charts to be sent
@@ -244,6 +248,9 @@ struct rrdhost {
         // --- receiver ---
 
         struct {
+            uint32_t min_update_every;
+            uint32_t min_update_every_applied;
+
             struct {
                 SPINLOCK spinlock;                  // lock for the management of the allocation
                 uint32_t size;
@@ -263,8 +270,14 @@ struct rrdhost {
                     uint32_t counter_in;            // counts the number of replication statements we have received
                     uint32_t counter_out;           // counts the number of replication statements we have sent
                     uint32_t backfill_pending;      // the number of replication requests pending on us
-                    uint32_t charts;                // the number of charts currently being replicated from a child
-                    NETDATA_DOUBLE percent;         // the % of replication completion
+                    // High 32 bits: charts whose claim won the receiver-replication transition in this
+                    // connection generation. Low 32 bits: charts still outstanding. A duplicate
+                    // CHART_DEFINITION_END moves neither half. The ratio is therefore "completed charts
+                    // among the charts admitted in this connection generation", not a monotonic progress
+                    // clock: admitting new charts mid-generation legitimately moves it backwards.
+                    // Keep this naturally 8-byte aligned: misaligned 64-bit atomics on armv6l/armv7l
+                    // degrade to libatomic calls.
+                    uint64_t charts_started_and_remaining __attribute__((aligned(8)));
                 } replication;
 
                 // single-writer (the receiver thread), relaxed-atomic; read lock-free by the
@@ -288,9 +301,13 @@ struct rrdhost {
                 // pulse_host_status() (relaxed atomic).
                 bool running_latched;
 
-                // last host-label version applied to this host's per-child charts; the pulse
-                // traversal (single thread) re-applies labels + hops only when it changes, i.e. on
-                // reconnect / mid-stream label push.
+                // last host-label version applied to this host's per-child streaming.in.* charts.
+                // Written and read only by the pulse thread (pulse_child_charts_update()), which
+                // re-applies the labels when the version differs. labels_applied distinguishes
+                // "version 0 and never applied" from "version 0 and applied": a host with no labels
+                // at all keeps version 0 forever, so the version compare alone would never label its
+                // charts. See pulse-parents.c for what this version does and does not detect.
+                bool labels_applied;
                 uint32_t labels_applied_version;
             } status;
         } rcv;
@@ -331,6 +348,16 @@ struct rrdhost {
     // all RRDCALCs are primarily allocated and linked here
     DICTIONARY *rrdcalc_root_index;
 
+    // Secondary index of the above, keyed by the interned STRING* of
+    // rc->config.name, so health expression variable lookups can resolve an
+    // alert name without scanning every alert of the host. Alert names are not
+    // unique per host (the primary key is "{alert},on[{chart}]"), so each entry
+    // is the head of a list threaded through RRDCALC.name_next / name_prev.
+    struct {
+        RW_SPINLOCK spinlock;
+        Pvoid_t JudyL;
+    } rrdcalc_by_name;
+
     ALARM_LOG health_log;                           // alarms historical events (event log)
     uint32_t health_last_processed_id;              // the last processed health id from the log
     uint32_t health_max_unique_id;                  // the max alarm log unique id given for the host
@@ -352,10 +379,6 @@ struct rrdhost {
     // ------------------------------------------------------------------------
     // Support for host-level labels
     RRDLABELS *rrdlabels;
-
-    // ------------------------------------------------------------------------
-    // Support for functions
-    DICTIONARY *functions;                          // collector functions this rrdset supports, can be NULL
 
     // ------------------------------------------------------------------------
     // indexes
@@ -414,6 +437,10 @@ extern RRDHOST *localhost;
 // the child reconnects via normal backoff. With cleanup off the lock, all
 // other readers (status, ACLK, capabilities, paths, event-driven sends)
 // keep blocking-lock semantics and stay truthful.
+//
+// Error logs are tolerated under it, as on the attach and replication-reset paths. rrdset_free()
+// releases a chart's receiver-replication claim under it, and a refused release logs an error; a
+// refusal means the accounting is already corrupt, which the ownership invariant makes unreachable.
 #define rrdhost_receiver_lock(host) spinlock_lock(&(host)->receiver_lock)
 #define rrdhost_receiver_unlock(host) spinlock_unlock(&(host)->receiver_lock)
 
@@ -427,10 +454,79 @@ extern RRDHOST *localhost;
 #define rrdhost_program_name(host) string2str((host)->program_name)
 #define rrdhost_program_version(host) string2str((host)->program_version)
 
-#define rrdhost_receiver_replicating_charts(host) (__atomic_load_n(&((host)->stream.rcv.status.replication.charts), __ATOMIC_RELAXED))
-#define rrdhost_receiver_replicating_charts_plus_one(host) (__atomic_add_fetch(&((host)->stream.rcv.status.replication.charts), 1, __ATOMIC_RELAXED))
-#define rrdhost_receiver_replicating_charts_minus_one(host) (__atomic_sub_fetch(&((host)->stream.rcv.status.replication.charts), 1, __ATOMIC_RELAXED))
-#define rrdhost_receiver_replicating_charts_zero(host) (__atomic_store_n(&((host)->stream.rcv.status.replication.charts), 0, __ATOMIC_RELAXED))
+static inline uint64_t rrdhost_receiver_replication_accounting(RRDHOST *host) {
+    return __atomic_load_n(&host->stream.rcv.status.replication.charts_started_and_remaining, __ATOMIC_RELAXED);
+}
+
+// One claim attempt: one unit of cohort in the high half, one outstanding chart in the low half. The
+// claim adds it and the duplicate-CHART_DEFINITION_END rollback subtracts it, both in one atomic op,
+// so the two halves can never be observed out of step and a duplicate moves neither.
+//
+// The add is deliberately unguarded, unlike the two subtracts. A carry out of the low half needs 2^32
+// charts outstanding on one host at once, which the address space rules out. A wrap of the high half
+// needs 2^32 won claims inside a single connection generation, and its consequence is a cohort of 0
+// with work outstanding, i.e. the NAN diagnostic - the same wrap and the same reading the separate
+// uint32_t cohort had before it was packed. Neither warrants a CAS retry loop on the claim path.
+#define RRDHOST_RCV_REPLICATION_UNIT (((uint64_t)1 << 32) | 1)
+
+static inline uint64_t rrdhost_receiver_replication_accounting_pack(uint32_t started, uint32_t remaining) {
+    return ((uint64_t)started << 32) | remaining;
+}
+
+static inline uint32_t rrdhost_receiver_replication_remaining_of(uint64_t accounting) {
+    return (uint32_t)accounting;
+}
+
+static inline uint32_t rrdhost_receiver_replication_started_of(uint64_t accounting) {
+    return (uint32_t)(accounting >> 32);
+}
+
+// Reinstall a word saved by rrdhost_receiver_replication_accounting(); the tests save and restore the
+// host's real accounting around the synthetic states they install.
+static inline void rrdhost_receiver_replication_accounting_restore(RRDHOST *host, uint64_t saved) {
+    __atomic_store_n(&host->stream.rcv.status.replication.charts_started_and_remaining, saved, __ATOMIC_RELAXED);
+}
+
+// Test-facing setter: install both halves together so tests cannot create a torn synthetic state.
+static inline void rrdhost_receiver_replication_accounting_set(RRDHOST *host, uint32_t started, uint32_t remaining) {
+    rrdhost_receiver_replication_accounting_restore(host, rrdhost_receiver_replication_accounting_pack(started, remaining));
+}
+
+static inline uint32_t rrdhost_receiver_replicating_charts(RRDHOST *host) {
+    return rrdhost_receiver_replication_remaining_of(rrdhost_receiver_replication_accounting(host));
+}
+
+static inline uint32_t rrdhost_receiver_replicating_charts_started(RRDHOST *host) {
+    return rrdhost_receiver_replication_started_of(rrdhost_receiver_replication_accounting(host));
+}
+
+static inline void rrdhost_receiver_replicating_charts_zero(RRDHOST *host) {
+    rrdhost_receiver_replication_accounting_restore(host, 0);
+}
+
+// Decrement the outstanding half by one, CHECKED - unlike the sender counterpart. `function` names the
+// release site for the refusal log. Callers MUST only decrement a contribution they own, i.e. one whose
+// RRDSET_FLAG_RECEIVER_REPLICATION_IN_PROGRESS they observed in their own CAS old-value; the guard is
+// what stops an unowned one corrupting the word, and the refusal is how a test sees it happen. Reach it
+// through rrdhost_receiver_replication_release() (rrdset.h) unless you are a test driving the guard
+// itself: that function is what pairs the decrement with the flag transition that authorises it.
+//
+// Both decrements return the outstanding count: after the subtraction, or, when the guard refuses,
+// as observed in the word the refusal was decided on. Zero is a count, not a success indicator.
+uint32_t rrdhost_receiver_replicating_charts_decrement(RRDHOST *host, const char *function);
+
+// The duplicate-CHART_DEFINITION_END rollback: withdraw the speculative unit this same thread just
+// added, both halves together. Called by rrdhost_receiver_replication_claim() on a lost CAS, and by
+// the test that drives the guard directly. It is NOT a release - it does not clear the flag.
+uint32_t rrdhost_receiver_replication_withdraw(RRDHOST *host);
+#define rrdhost_receiver_replicating_charts_minus_one(host) rrdhost_receiver_replicating_charts_decrement(host, __FUNCTION__)
+
+// Receiver replication completion, as a percentage over the current connection generation's cohort.
+// Computed from the counters on every read - there is no stored value to go stale. Returns NAN (which
+// the JSON writers emit as `null`) only for a state the counters should make unreachable.
+NETDATA_DOUBLE rrdhost_receiver_replication_completion(RRDHOST *host, uint32_t *instances);
+
+// The receiver-replication claim/release pair is declared in rrdset.h, where RRDSET_FLAGS is visible.
 
 #define rrdhost_sender_replicating_charts(host) (__atomic_load_n(&((host)->stream.snd.status.replication.charts), __ATOMIC_RELAXED))
 #define rrdhost_sender_replicating_charts_plus_one(host) (__atomic_add_fetch(&((host)->stream.snd.status.replication.charts), 1, __ATOMIC_RELAXED))
@@ -480,6 +576,13 @@ RRDHOST *rrdhost_find_by_node_id(const char *node_id);
 // the lifetime argument, that constraint, and why this is not keyed on node_id
 bool rrdhost_apply_by_machine_guid(const char *machine_guid, void (*cb)(RRDHOST *host, void *data), void *data, bool may_block);
 
+// Copies a machine-guid into a GUID_LEN + 1 byte destination, truncating anything longer.
+// Exposed for rrdhost_machine_guid_unittest().
+void rrdhost_machine_guid_copy(char *dst, const char *guid);
+
+// True when a streamed machine-guid is a UUID that fits in RRDHOST.machine_guid unchanged.
+bool rrdhost_machine_guid_is_valid(const char *guid);
+
 #ifdef RRDHOST_INTERNALS
 RRDHOST *rrdhost_create(
     const char *hostname,
@@ -509,6 +612,16 @@ RRDHOST *rrdhost_create(
 
 void rrdhost_init(void);
 #endif
+
+// The host as an nRPC owner: the token the component keys its function-
+// registry index on and hands back to the owner callbacks. The component never
+// dereferences it - these two lines are the only place that casts.
+static inline NRPC_OWNER rrdhost_nrpc_owner(RRDHOST *host) { return (NRPC_OWNER){ .ptr = host }; }
+static inline RRDHOST *rrdhost_from_nrpc_owner(NRPC_OWNER id) { return (RRDHOST *)id.ptr; }
+
+// fill the host's nRPC function-registry owner vtable (see rrdhost.c); also
+// used by the nRPC unittests to re-init localhost's registry identically
+void rrdhost_nrpc_registry_owner(RRDHOST *host, struct nrpc_registry_owner *owner);
 
 RRDHOST *rrdhost_find_or_create(
     const char *hostname,

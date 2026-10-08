@@ -1,6 +1,45 @@
-//! Remote-storage reconciliation: queueing un-uploaded SFSTs, discovering
-//! remote uploads that were never cataloged, and re-uploading local catalog
-//! files missing from the remote. These talk to object storage directly.
+//! The remote half of startup recovery: per-tenant reconciliation against
+//! remote object storage. The ledger's `build_pipeline`
+//! (otel-ledger/src/ledger/pipeline.rs) runs these per storage-enabled tenant,
+//! after [`super::startup`]'s fail-closed catalog diff-sync and the local
+//! replay passes ([`super::local`]), before [`super::recover_retention`].
+//! Precondition: the diff-sync has made the local catalog set complete and
+//! `seed_from_catalog_files` has seeded the uploaded/rotated state these
+//! passes dedupe against. Three passes, in call order:
+//!
+//! 1. [`reconcile_remote_uploads`] — LIST the tenant's SFST keys for every
+//!    date from today back `min(catalog_retention_days,
+//!    ingest.reconcile_days())` days; mark every own-machine key uploaded
+//!    (sparing pass 2 a redundant re-upload) and re-send still-uncataloged
+//!    SFSTs to the catalog builder as `AddEntry` — the
+//!    uploaded-but-uncataloged crash-window repair.
+//! 2. [`recover_unuploaded`] — queue every tracked-but-unuploaded SFST to the
+//!    shared uploader. Fire-and-forget: only non-blocking channel sends, so a
+//!    slow or unreachable remote cannot delay startup; responses are
+//!    consumed by the steady-state run loop (`Ledger::handle_uploader_resp`).
+//! 3. [`reconcile_local_catalog_uploads`] — remote `stat` per local catalog:
+//!    confirmed → mark the covered SFSTs `remote_cataloged` (the eviction
+//!    gate; this pass is its only restart-time seed), missing → re-queue the
+//!    catalog upload.
+//!
+//! Unlike [`super::local`], nothing here uses
+//! [`crate::component::batch_recover`]: the reconciles talk to object storage
+//! directly through [`crate::storage::Storage`], and their requests go out
+//! fire-and-forget over the normal component channels (uploader, catalog
+//! builder); pass 1's queued `AddEntry`s surface as builder responses handed
+//! to the run loop by the pipeline's response forwarders.
+//!
+//! Errors: [`reconcile_remote_uploads`] returns the first LIST error as a
+//! typed [`crate::storage::StorageError`]; the caller logs it, skips the
+//! remote-dependent stat pass, and still runs [`recover_unuploaded`] (a local
+//! scan — it needs no remote LIST). Both async passes are wrapped by the caller in a
+//! `STARTUP_REMOTE_BUDGET` timeout and skipped on expiry. Failures inside
+//! either pass are per-file: logged and skipped — upload failures fall back
+//! to the steady-state retry queue, everything else to the next restart; only
+//! a LIST error propagates.
+//!
+//! Consumers (grep-verified): otel-ledger's `ledger/pipeline.rs` (ordering,
+//! budget, skip policy) and this crate's `recovery/tests.rs`.
 
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
@@ -17,17 +56,20 @@ use crate::storage::{Storage, StorageError};
 
 use super::now_ns;
 
-/// Queue uploads for index files not yet on the remote.
+/// Queue every tracked-but-unuploaded SFST ([`Registry::unuploaded_ids`]) to
+/// the shared uploader as one [`UploaderRequest::Upload`] per file, built by
+/// [`crate::helpers::sfst_upload_request`]. Files the registry no longer
+/// tracks are skipped; a failed send is logged — the file stays un-uploaded
+/// and is re-queued next restart.
 ///
-/// Fire-and-forget by design: the requests go onto the uploader and their
-/// responses are handled by the normal steady-state path
-/// (`Ledger::handle_uploader_resp`) once the run loop starts — `Uploaded` marks
-/// the seq and forwards the catalog `AddEntry`; `UploadFailed` enqueues a retry.
-/// This MUST NOT await the uploads: a prior version drained them synchronously
-/// via `batch_recover`, which stalled `Ledger::new` for the full opendal
-/// retry-layer budget per file whenever the remote was unreachable — delaying
-/// startup by minutes. Now it never blocks; a down remote simply routes the
-/// failures into the steady-state retry queue.
+/// Fire-and-forget by contract: this MUST NOT await the uploads. The
+/// responses are handled by the steady-state path once the run loop starts
+/// (`Ledger::handle_uploader_resp`): `Uploaded` marks the seq and forwards
+/// the catalog `AddEntry`; `UploadFailed` (while the local file still
+/// exists) enqueues a retry. A synchronous drain here would stall startup
+/// for the full opendal retry-layer budget per file whenever the remote is
+/// unreachable, so the caller never blocks on it — a down remote simply
+/// routes the failures into the steady-state retry queue.
 pub fn recover_unuploaded(
     registry: &Registry,
     signal: &str,
@@ -55,28 +97,31 @@ pub fn recover_unuploaded(
     }
 }
 
-/// List SFSTs in remote storage for every date in the catalog retention
-/// window (today, today-1, ..., today-N). For each one, mark it uploaded;
-/// for those not yet rotated into a closed catalog, build a fresh
-/// `AddEntry` from the local SFST registry's summary and send it to the
-/// catalog builder.
+/// LIST the tenant's SFST keys for every date from today back `max_days`
+/// days (`max_days + 1` dates) and reconcile each own-machine key: mark it
+/// uploaded, and unless already rotated into a closed catalog, rebuild its
+/// catalog entry from the local registry's summary and send
+/// [`CatalogBuilderRequest::AddEntry`] for the LIST's date bucket. A listed
+/// key the registry does not track locally is warned and skipped — the
+/// entry's summary fields exist only in the registry.
 ///
-/// The window is capped at the smaller of the catalog retention window and the
-/// ingestion window (`ingest.reconcile_days()`, itself hard-capped). This LIST
-/// only PRE-MARKS recently-uploaded SFSTs so they are not needlessly re-uploaded;
-/// any local SFST it misses (uploaded before a multi-day outage, older than the
-/// window) is still re-uploaded and re-cataloged by `recover_unuploaded`, which
-/// has no age bound — upload state is not persisted, so a missed SFST reads as
-/// un-uploaded on the next start and is re-queued. So a narrow window costs a
-/// redundant re-upload of an already-present immutable object, never a lost
-/// catalog entry; and the `reconcile_days` cap bounds the startup LIST fan-out.
+/// The window is capped at the smaller of
+/// [`crate::helpers::catalog_retention_days`] and the ingestion window
+/// (`ingest.reconcile_days()`, itself hard-capped). This LIST's marks only
+/// PRE-MARK recently-uploaded SFSTs so they are not needlessly re-uploaded;
+/// any local SFST it misses (uploaded before a multi-day outage, older than
+/// the window) is still re-uploaded and re-cataloged by
+/// [`recover_unuploaded`], which has no age bound — upload state is not
+/// persisted, so a missed SFST reads as un-uploaded on the next start and is
+/// re-queued. So a narrow window costs a redundant re-upload of an
+/// already-present immutable object, never a lost catalog entry; and the
+/// `reconcile_days` cap bounds the startup LIST fan-out.
 ///
-/// Returns `Err` if the remote is unreachable — the caller should skip
-/// further remote-dependent recovery.
-///
-/// SFSTs discovered in remote storage whose local file is missing are
-/// logged and skipped — the catalog entry cannot be reconstructed
-/// without the file's header.
+/// Errors: the first failed (or unreachable) LIST is returned as
+/// [`StorageError`]; earlier days' entries are still processed, later days
+/// are not. The caller then skips the remote-dependent
+/// [`reconcile_local_catalog_uploads`] but still runs [`recover_unuploaded`],
+/// which needs no remote LIST to queue uploads.
 ///
 /// `own_machine` filters the LIST to this node's own objects (D6 key layout
 /// keeps every machine's keys under one prefix, so each consumer MUST filter):
@@ -191,23 +236,28 @@ pub async fn reconcile_remote_uploads<S: Storage>(
     Ok(())
 }
 
-/// Re-upload local catalog files that are missing from remote storage.
+/// Reconcile local catalog files against the remote with one `stat()` per
+/// catalog. Confirmed present → mark the covered SFST seqs
+/// `remote_cataloged` under the catalog's own identity — the restart-time
+/// seed of the SFST eviction gate (`remote_cataloged` is not persisted;
+/// without this pass every SFST would sit deferred until its catalog were
+/// re-uploaded). `NotFound` → re-upload the file via
+/// [`UploaderRequest::UploadCatalog`], unless retention is about to evict it.
 ///
-/// Covers the crash-between-write-and-upload window: the catalog builder
-/// writes the local file atomically, then sends `UploadCatalog` and may
-/// die before the uploader actually puts the object. Without this pass,
-/// the remote would silently lose that catalog file. (The steady-state
-/// handler now re-queues `CatalogUploadFailed` on the retry queue, so this
-/// pass is the startup-time backstop rather than the only retry path.)
+/// The re-upload arm covers the crash-between-write-and-upload window: the
+/// catalog builder writes the local file atomically, then sends
+/// `UploadCatalog` and may die before the uploader puts the object. The
+/// steady-state handler re-queues `CatalogUploadFailed` on the retry queue,
+/// so this pass is the startup-time backstop rather than the only retry
+/// path.
 ///
-/// Strategy: per-catalog `stat()` against the remote. Cheaper than a
-/// LIST + symmetric-diff when the local catalog count is small (we
-/// expect ≤ retention_days × rotations_per_day) and the failure rate is
-/// near-zero.
-/// Also seeds the in-memory `remote_cataloged` set: a catalog confirmed present
-/// on the remote means the SFSTs it covers are safe to evict locally. Without
-/// this, the eviction guard (which now requires remote confirmation) would
-/// defer every SFST after a restart until its catalog were re-uploaded.
+/// Strategy: per-catalog `stat()` beats a LIST + symmetric-diff when the
+/// local catalog count is small (≤ retention_days × rotations_per_day) and
+/// the failure rate is near-zero. Errors are per catalog: only `NotFound`
+/// re-uploads; a transient stat error is logged and skipped (aborting the
+/// pass would defer every later catalog's SFSTs from eviction until the next
+/// restart). The function always returns `Ok` — the caller's `Err` arm is
+/// there for symmetry with [`reconcile_remote_uploads`].
 pub async fn reconcile_local_catalog_uploads<S: Storage>(
     registry: &mut Registry,
     pipeline_id: u16,
@@ -219,32 +269,36 @@ pub async fn reconcile_local_catalog_uploads<S: Storage>(
 ) -> Result<(), StorageError> {
     let today = chrono::Utc::now().date_naive();
     let max_days = crate::helpers::catalog_retention_days(retention);
-    // Files strictly older than `cutoff` will be evicted by the
-    // subsequent retention pass. Re-uploading them is pointless and
-    // also unsafe: the spawned upload task reads the local file via
-    // `tokio::fs::read`, but the cleaner could concurrently delete it.
-    // The `checked_sub_signed` fallback for absurd retention values
-    // means "no cutoff applies" — match retention.rs's own guard.
+    // Files strictly older than `cutoff` are evicted by the subsequent
+    // retention pass (same `today - catalog_retention_days` boundary as
+    // `otel_catalog::Registry::evaluate_retention`). Re-uploading them is
+    // pointless and also unsafe: the spawned upload task reads the local
+    // file via `tokio::fs::read`, and the cleaner could concurrently delete
+    // it. An unrepresentable date (`checked_sub_signed` → `None`, e.g. an
+    // absurd retention value) means no cutoff — re-upload everything; the
+    // retention passes use the same guard with the opposite consequence
+    // (evict nothing).
     let cutoff = today.checked_sub_signed(chrono::Duration::days(max_days as i64));
 
     // Confirm remote presence only for catalogs that can still gate a
-    // not-yet-evicted (still-local) SFST. `reconcile_local_catalog_uploads` is
-    // the sole restart-time source of `remote_cataloged` (it is not persisted;
-    // `seed_from_catalog_files` sets only uploaded/rotated), and the retention
-    // pass requires `remote_cataloged` before it may evict an SFST. So the
-    // confirm set MUST be bounded by the LOCAL SFSTs (themselves retention-
-    // bounded), NOT by catalog date/horizon: after downtime longer than
-    // `max_age`, a local SFST past `max_age` still needs its now-old catalog
-    // confirmed — a date bound would strand it and wedge eviction for ~horizon.
+    // still-local (not yet evicted) SFST. `remote_cataloged` is not persisted
+    // and this pass is its only restart-time source (`seed_from_catalog_files`
+    // seeds only uploaded/rotated), while the retention pass evicts an SFST
+    // only once it is `remote_cataloged` — so the confirm set MUST be bounded
+    // by the LOCAL SFSTs (themselves retention-bounded), NOT by catalog
+    // date/horizon: after downtime longer than `max_age`, a past-`max_age`
+    // SFST is still local and needs its now-older catalog confirmed — a date
+    // bound would strand it with no confirmable catalog and wedge its
+    // eviction.
     //
     // The seq floor is PER IDENTITY: local SFSTs can span this machine's prior
     // process instances, and a bare-seq floor would compare across identities
-    // (a high seq under one instance would strand a low-seq catalog of another).
-    // A catalog (single-identity by construction) can gate a local SFST only if
-    // its `max_seq` reaches the oldest local SFST seq OF ITS OWN identity;
-    // catalogs of an identity with no local SFSTs cover only already-evicted
-    // files and are skipped. The confirm set stays bounded by the local-SFST
-    // tail, never by the (much larger) horizon.
+    // (a high seq under one instance would strand a low-seq catalog of
+    // another). A catalog (single-identity by construction) can gate a local
+    // SFST only if its `max_seq` reaches the oldest still-local seq OF ITS OWN
+    // identity; catalogs of an identity with no local SFSTs cover only
+    // already-evicted files and are skipped. The confirm set stays bounded by
+    // the local-SFST tail, never by the (much larger) horizon.
     let mut min_local_seq_by_identity: HashMap<file_registry::Identity, u64> = HashMap::new();
     for f in registry.sfst.values() {
         let identity = file_registry::Identity::new(f.id.machine_id, f.id.instance_id);
@@ -355,11 +409,12 @@ pub async fn reconcile_local_catalog_uploads<S: Storage>(
 }
 
 /// Read the SFST sequence numbers recorded in a local catalog file. Returns
-/// `None` if the file can't be read or parsed.
+/// `None` if the file can't be read or parsed (the caller warns and skips
+/// the catalog).
 ///
-/// Blocking `std::fs::read` is intentional: called only during startup
-/// recovery (before the run loop), over at most `retention_days` catalog
-/// files that are a few KiB each.
+/// Blocking `std::fs::read` is intentional: startup-only, before the run
+/// loop, over the retained catalog set — narrowed further by the caller to
+/// catalogs that can still gate a still-local SFST.
 fn read_catalog_seqs(path: &Path) -> Option<Vec<u64>> {
     let bytes = std::fs::read(path).ok()?;
     let catalog = Catalog::from_container_bytes(&bytes).ok()?;

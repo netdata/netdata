@@ -252,7 +252,15 @@ void dyncfg_file_load(const char *d_name) {
     // it here too so the conflict_cb SWAP cannot reintroduce a stale mask.
     tmp.cmds = dyncfg_sanitize_cmds(tmp.type, tmp.current.source_type, tmp.cmds);
 
-    dictionary_set(dyncfg_globals.nodes, id, &tmp, sizeof(tmp));
+    if(!dictionary_set(dyncfg_globals.nodes, id, &tmp, sizeof(tmp))) {
+        // dyncfg_globals.nodes is being destroyed (dyncfg_shutdown_low_level()):
+        // the insert callback never ran, so we still own everything we
+        // allocated above - free it exactly as dyncfg_add_internal() does.
+        // NULL is unambiguous here only because value_len > 0 and the id is
+        // valid - see the set-family contract in dictionary.h
+        dyncfg_cleanup(&tmp);
+        return;
+    }
 
     // check if we need to rename the file
     CLEAN_CHAR_P *fixed_id = dyncfg_escape_id_for_filename(id);

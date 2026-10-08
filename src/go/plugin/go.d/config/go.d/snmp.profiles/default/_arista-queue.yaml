@@ -6,9 +6,9 @@ metrics:
     table:
       OID: 1.3.6.1.4.1.30065.3.6.1.1
       name: aristaIngressQueueTable
-    metric_type: monotonic_count
     symbols:
       - OID: 1.3.6.1.4.1.30065.3.6.1.1.1.3
+        metric_type: monotonic_count
         name: aristaIngressQueuePktsDropped
         chart_meta:
           description: The number of dropped packets due to congestion at the ingress port in an interface
@@ -29,9 +29,9 @@ metrics:
     table:
       OID: 1.3.6.1.4.1.30065.3.6.1.2
       name: aristaEgressQueueTable
-    metric_type: monotonic_count
     symbols:
       - OID: 1.3.6.1.4.1.30065.3.6.1.2.1.6
+        metric_type: monotonic_count
         name: aristaEgressQueuePktsDropped
         chart_meta:
           description: The number of packets discarded from this egress queue.

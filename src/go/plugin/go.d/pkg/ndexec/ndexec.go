@@ -39,6 +39,22 @@ func newRunnerFromBuildinfo() *runner {
 
 var defaultRunner = newRunnerFromBuildinfo()
 
+// UnprivilegedCommandContext constructs an unstarted command through nd-run.
+// The caller owns stdio, output limits, and Start/Wait. It does not log arguments
+// or output. Cancellation uses the same process containment as the Run helpers.
+func UnprivilegedCommandContext(ctx context.Context, binPath string, args ...string) *exec.Cmd {
+	argv := append([]string{binPath}, args...)
+	return commandContext(ctx, defaultRunner.ndRunPath, argv...)
+}
+
+// UnprivilegedCommandContextWithPreservedEnv is UnprivilegedCommandContext with
+// application environment preservation enabled. nd-run still resets USER,
+// LOGNAME, HOME, SHELL and LC_ALL. An older or missing helper fails closed.
+func UnprivilegedCommandContextWithPreservedEnv(ctx context.Context, binPath string, args ...string) *exec.Cmd {
+	argv := append([]string{"--preserve-env", "--", binPath}, args...)
+	return commandContext(ctx, defaultRunner.ndRunPath, argv...)
+}
+
 // RunUnprivileged runs binPath via nd-run with a timeout.
 // Returns stdout. On error, wraps the original error and includes a trimmed stderr snippet.
 func RunUnprivileged(log *logger.Logger, timeout time.Duration, binPath string, args ...string) ([]byte, error) {
@@ -47,7 +63,8 @@ func RunUnprivileged(log *logger.Logger, timeout time.Duration, binPath string, 
 }
 
 // RunNDSudo runs cmd via ndsudo with a timeout.
-// Returns stdout. On error, wraps the original error and includes a trimmed stderr snippet
+// Returns stdout. On error, wraps the original error and includes a trimmed stderr snippet.
+// The timeout holds even for a root command the caller cannot signal; see RunNDSudoWithCmd.
 func RunNDSudo(log *logger.Logger, timeout time.Duration, cmd string, args ...string) ([]byte, error) {
 	out, _, err := RunNDSudoWithCmd(log, timeout, cmd, args...)
 	return out, err
@@ -61,10 +78,15 @@ func RunUnprivilegedWithCmd(log *logger.Logger, timeout time.Duration, binPath s
 }
 
 // RunNDSudoWithCmd runs cmd via ndsudo and also returns the formatted command string.
+//
+// ndsudo runs the command as root, which an unprivileged caller cannot signal. At the timeout the command is
+// terminated where permitted and its output is closed, so a command that keeps writing dies of SIGPIPE unless it
+// handles SIGPIPE or EPIPE itself. If it has not exited a moment later, the call returns the timeout error anyway and
+// the command is reaped when it ends. From the timeout until it exits, a call with the same command and arguments fails
+// with ErrPreviousRunNotExited instead of starting another one. As with StartNDSudoProcess, a caller allowed to signal
+// root processes also terminates descendants that outlive the command.
 func RunNDSudoWithCmd(log *logger.Logger, timeout time.Duration, cmd string, args ...string) ([]byte, string, error) {
-	argv := append([]string{cmd}, args...)
-	out, formatted, _, err := defaultRunner.run(log, timeout, "", defaultRunner.ndSudoPath, "RunNDSudo", nil, argv...)
-	return out, formatted, err
+	return runNDSudo(log, timeout, append([]string{cmd}, args...))
 }
 
 // RunUnprivilegedWithEnv runs binPath via nd-run with a custom environment.
@@ -203,8 +225,7 @@ func (r *runner) runContext(
 		defer cancel()
 	}
 
-	ex := exec.CommandContext(ctx, helperPath, argv...) // argv comes from trusted sources; no shell, args passed separately
-	configureCommandCancellation(ex)
+	ex := commandContext(ctx, helperPath, argv...)
 	if dir != "" {
 		ex.Dir = dir
 	}
@@ -224,23 +245,38 @@ func (r *runner) runContext(
 	out, err := ex.Output()
 	usage := extractUsage(ex.ProcessState)
 	if err != nil {
-		s := stderr.String()
-		if len(s) > stderrLimit {
-			s = s[:stderrLimit] + "… (truncated)"
-		}
-		// Normalize context-related errors so callers can distinguish the
-		// execution timeout cause from caller-owned cancellation.
 		if ctx.Err() != nil {
-			cause := context.Cause(ctx)
-			if cause != nil && !errors.Is(cause, ctx.Err()) {
-				err = cause
-			} else {
-				err = ctx.Err()
-			}
+			err = contextError(ctx)
 		}
-
-		return out, cmdStr, usage, fmt.Errorf("%s: %v: %w (stderr: %s)", label, ex, err, strings.TrimSpace(s))
+		return out, cmdStr, usage, runError(label, cmdStr, err, stderr.Bytes())
 	}
 
 	return out, cmdStr, usage, nil
+}
+
+// contextError returns why ctx ended, so callers can tell the execution timeout from caller-owned cancellation.
+func contextError(ctx context.Context) error {
+	cause := context.Cause(ctx)
+	if cause != nil && !errors.Is(cause, ctx.Err()) {
+		return cause
+	}
+	return ctx.Err()
+}
+
+// runError describes a failed run: the label, the command, the cause and a trimmed stderr snippet.
+func runError(label, cmdStr string, err error, stderr []byte) error {
+	s := string(stderr)
+	if len(s) > stderrLimit {
+		s = s[:stderrLimit] + "… (truncated)"
+	}
+	return fmt.Errorf("%s: %s: %w (stderr: %s)", label, cmdStr, err, strings.TrimSpace(s))
+}
+
+func commandContext(ctx context.Context, binPath string, args ...string) *exec.Cmd {
+	if ctx == nil {
+		ctx = context.Background()
+	}
+	cmd := exec.CommandContext(ctx, binPath, args...) // No shell; arguments are passed separately.
+	configureCommandCancellation(cmd)
+	return cmd
 }

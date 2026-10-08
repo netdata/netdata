@@ -17,6 +17,12 @@ typedef enum tier_query_fetch {
     TIER_QUERY_FETCH_AVERAGE
 } TIER_QUERY_FETCH;
 
+typedef enum query_point_mode {
+    QUERY_POINT_MODE_LINEAR,
+    QUERY_POINT_MODE_HOLD,
+    QUERY_POINT_MODE_TOTAL,
+} QUERY_POINT_MODE;
+
 typedef enum __attribute__ ((__packed__)) rrdr_value_flag {
 
     // IMPORTANT:
@@ -75,6 +81,7 @@ typedef struct rrdresult {
     RRDR_VALUE_FLAGS *o;      // array n x d options for each value returned
     NETDATA_DOUBLE *ar;       // array n x d of anomaly rates (0 - 100)
     uint32_t *gbc;            // array n x d of group by count - NOT ALLOCATED when RRDR is created
+    uint32_t *arc;            // array n x d of anomaly-rate contributors, internal to group-by - NOT ALLOCATED when RRDR is created
     uint32_t *hgbc;           // array n x d of hidden (vh) group by count, internal to group-by - NOT ALLOCATED when RRDR is created
 
     struct {
@@ -104,6 +111,7 @@ typedef struct rrdresult {
         NETDATA_DOUBLE (*flush)(struct rrdresult *r, RRDR_VALUE_FLAGS *rrdr_value_options_ptr);
 
         TIER_QUERY_FETCH tier_query_fetch;  // which value to use from STORAGE_POINT
+        QUERY_POINT_MODE point_mode;
 
         size_t points_wanted;               // used by SES and DES
         size_t resampling_group;            // used by AVERAGE

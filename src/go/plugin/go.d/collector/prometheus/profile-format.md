@@ -6,7 +6,7 @@ a designed dashboard menu: named sections, per-instance charts, meaningful dimen
 limited to the stock library -- you can author a profile for your own application's metrics too.
 
 This page documents the profile file format. Profiles may also classify an exporter's untyped scalar metrics and
-provide [metric relabeling](/src/go/plugin/go.d/collector/prometheus/relabel/README.md) that normalizes its metrics
+provide [metric relabeling](/src/go/pkg/relabel/README.md) that normalizes its metrics
 after the profile is selected and before its chart template sees them. Jobs retain higher-precedence type and
 relabeling policy for operator-specific overrides before profile processing.
 
@@ -65,7 +65,7 @@ autogen:                    # optional. Controls fallback charts inside this
       - example_http_request_duration_seconds
 
 template:                   # REQUIRED. One chart-template group; at least one chart.
-  family: Example           # top-level dashboard menu section
+  family: Example           # optional root dashboard section; nested families remain required
   context_namespace: example  # context prefix; by convention the profile name
   groups:
     - family: Requests      # nested menu section: Example -> Requests
@@ -148,7 +148,7 @@ At runtime the collector uses profiles in seven ordered steps:
 1. **Scrape** -- the job scrapes the endpoint. The `selector` job option filters unwanted series
    ([selector syntax](/src/go/pkg/prometheus/selector/README.md)).
 2. **Job normalization** -- the job's
-   [relabeling](/src/go/plugin/go.d/collector/prometheus/relabel/README.md) rewrites names and labels. Histogram and
+   [relabeling](/src/go/pkg/relabel/README.md) rewrites names and labels. Histogram and
    summary integrity is checked before continuing.
 3. **Selection** -- once, at job autodetection, each profile's `match` is tested against the post-job metric family
    names, per the job's `profiles.mode` (see
@@ -199,7 +199,7 @@ profile name used everywhere else -- in `profiles.mode_exact`/`mode_combined` en
   `example_http_request_duration_seconds_bucket`). Counters keep their `_total` suffix in the family name -- Netdata
   does not strip it, so match `foo_total` or a glob, never a bare `foo`. (This is the opposite of the template's
   dimension selectors and the relabeling block `match`, which both work on the full suffixed names -- see
-  [Chart template rules](#chart-template-rules) and [the relabeling block `match`](/src/go/plugin/go.d/collector/prometheus/relabel/README.md#match).)
+  [Chart template rules](#chart-template-rules) and [the relabeling block `match`](/src/go/pkg/relabel/README.md#match).)
 - It sees the names **after** the job's `selector` and `relabeling` have been applied, so a rename can bring an
   endpoint's metrics into (or out of) a profile's match.
 - It sees names **before** this profile's own `relabeling`. A profile cannot rename an otherwise non-matching metric
@@ -250,7 +250,7 @@ template:
 ### `relabeling`
 
 `relabeling` stores normalization required by the exporter profile itself. It uses the exact same ordered block and
-rule format as job-level [metric relabeling](/src/go/plugin/go.d/collector/prometheus/relabel/README.md), including the
+rule format as job-level [metric relabeling](/src/go/pkg/relabel/README.md), including the
 full action set. Use it when the profile's template needs a stable metric or label shape across exporter versions. Use
 job-level relabeling for deployment-specific policy, filtering, or normalization needed before profile selection.
 
@@ -310,7 +310,7 @@ to the final post-profile family that reaches the chart engine.
 - Authored routing wins. A profile can create a heatmap from `foo_bucket` and deny `foo`; the bucket series still
   reaches the heatmap, while unmatched fallback charts for `foo_sum` and `foo_count` are suppressed.
 - This is chart suppression, not ingestion filtering. Use the job `selector` or a
-  [relabeling](/src/go/plugin/go.d/collector/prometheus/relabel/README.md) `drop` rule when the
+  [relabeling](/src/go/pkg/relabel/README.md) `drop` rule when the
   matching samples must be discarded.
 
 Example:
@@ -397,11 +397,17 @@ dimension, presentation, and selector field. Prometheus profiles add these rules
 - **The template is a group, not a full spec.** The linked reference's examples show complete `charts.yaml` specs (a
   `version` plus a top-level `groups` list); a profile's `template` is one item of that `groups` list, written without
   the leading dash -- you author the *content of one group*: `family`, `context_namespace`, `metrics`, `charts`, nested
-  `groups`, and `chart_defaults`. `instances`, `lifecycle`, and `label_promotion` are per-chart fields, not group fields
-  (`instances` and `label_promotion` can also be set once for a whole group via `chart_defaults`). The spec-level
+  `groups`, and `chart_defaults`. `priority`, `instances`, `lifecycle`, and `label_promotion` are per-chart fields, not
+  group fields (`priority`, `instances`, and `label_promotion` can also be set once for a whole group via
+  `chart_defaults`). The spec-level
   `version` and `engine` fields are rejected. The collector wraps your group into its per-job spec, where autogeneration
   for uncovered metrics stays enabled. Configure conditional fallback through the profile-root `autogen.selector`, not
   a nested `engine`.
+- **Root `family` is optional.** Omit `template.family` when the template root is only a container and the resolved
+  application already provides the same navigation level. Its named child groups then become the top-level families.
+  Keep a meaningful root on reusable instrumentation profiles so their charts remain identifiable when composed into
+  another application. Nested groups still require `family`; a chart directly under a family-less root must set its own
+  `family`, so every emitted chart has a nonblank effective family.
 - **Set `context_namespace` at the template root to the profile name.** This is the group-level `context_namespace`
   field -- a profile has no separate top-level one; the collector supplies the `prometheus.<app>` prefix. The emitted
   context is `prometheus.<app>.<context_namespace>.<chart context>`, with the namespace segment dropped when it equals
@@ -439,11 +445,11 @@ dimension, presentation, and selector field. Prometheus profiles add these rules
   lowers emitted chart cardinality; `aggregation` only selects the value for resulting collisions. Every scraped series is
   still processed and retained in the collector's metric store. This chart reduction is separate from Prometheus
   relabeling: it does not remove or rewrite stored series labels.
-- **Only collected series can be charted.** `*_info` families are skipped. Untyped scalar families are collected only
-  when the selected profile or job `fallback_type` maps them to a gauge or counter, or when the name ends in `_total`
-  (the last-resort implicit counter rule). Declared type wins; job policy wins over profile policy; and an explicit
-  gauge match wins over counter classification within the same policy layer. A chart's `algorithm` acts later and
-  cannot make an unclassified sample collectible.
+- **Only collected series can be charted.** Gauge families named `*_info` are skipped. Untyped scalar families are
+  collected only when the selected profile or job `fallback_type` maps them to a gauge or counter, or when the name ends
+  in `_total` (the last-resort implicit counter rule). Declared type wins; job policy wins over profile policy; and an
+  explicit gauge match wins over counter classification within the same policy layer. A chart's `algorithm` acts later
+  and cannot make an unclassified sample collectible.
 - **Every group that contains charts must list the metrics its selectors reference in its `metrics` list** (or inherit
   them from an ancestor group). A selector on a metric outside the group's declared scope fails validation.
 

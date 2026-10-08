@@ -3,6 +3,23 @@
 #include "rrdset-collection.h"
 #include "rrddim-collection.h"
 
+static void rrdset_observe_receiver_update_every(RRDSET *st) {
+    if(rrdset_flag_check(st, RRDSET_FLAG_OBSOLETE))
+        return;
+
+    uint32_t wanted = (uint32_t)st->update_every;
+    uint32_t current = __atomic_load_n(&st->rrdhost->stream.rcv.min_update_every, __ATOMIC_RELAXED);
+    while(wanted < current &&
+          !__atomic_compare_exchange_n(
+              &st->rrdhost->stream.rcv.min_update_every,
+              &current,
+              wanted,
+              true,
+              __ATOMIC_RELEASE,
+              __ATOMIC_RELAXED))
+        ;
+}
+
 time_t rrdset_set_update_every_s(RRDSET *st, time_t update_every_s) {
     if(unlikely(update_every_s <= 0 || update_every_s > INT32_MAX)) {
         internal_error(
@@ -12,8 +29,10 @@ time_t rrdset_set_update_every_s(RRDSET *st, time_t update_every_s) {
         return st->update_every;
     }
 
-    if(unlikely(update_every_s == st->update_every))
+    if(unlikely(update_every_s == st->update_every)) {
+        rrdset_observe_receiver_update_every(st);
         return st->update_every;
+    }
 
     internal_error(true, "RRDSET '%s' switching update every from %d to %d",
                    rrdset_id(st), (int)st->update_every, (int)update_every_s);
@@ -32,6 +51,8 @@ time_t rrdset_set_update_every_s(RRDSET *st, time_t update_every_s) {
         }
     }
     rrddim_foreach_done(rd);
+
+    rrdset_observe_receiver_update_every(st);
 
     return prev_update_every_s;
 }

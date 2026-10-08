@@ -59,6 +59,12 @@ area/database:
           - any-glob-to-any-file:
               - src/database/**
 
+area/nrpc:
+  - any:
+      - changed-files:
+          - any-glob-to-any-file:
+              - src/nrpc/**
+
 area/docs:
   - any:
       - changed-files:
@@ -256,7 +262,6 @@ area/packaging:
               - system/**
               - Dockerfile*
               - netdata-installer.sh
-              - netdata.spec.in
 
 area/registry:
   - any:

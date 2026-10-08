@@ -1,17 +1,19 @@
-//! `OtelTracesHandler` — typed `FunctionHandler` implementation for the
+//! `OtelTracesHandler` — the typed `FunctionHandler` for the
 //! `otel-traces` Function.
 //!
-//! The full mode catalog is implemented: `info` (capability
-//! discovery), `trace` (exact single-trace fetch), `search` (bounded
-//! most-recent-first trace search), the enumeration pair `attributes`
-//! / `attribute_values` (the facet rail's vocabulary), `overview` (the
-//! trace-density grid — the UI's default paint), and `slowest` (the
-//! window's duration-ranked top-K traces). Mode selection and every
-//! request-SHAPE validation happen during deserialization (the wire's
-//! typed request — shape errors are transport 400s); this handler owns
-//! only the semantic validation (trace-id shape, zero limit, bounds).
+//! The full mode catalog lives here: `info` (capability discovery),
+//! `trace` (exact single-trace fetch), `search` (bounded
+//! most-recent-first search), the enumeration pair `attributes`
+//! / `attribute_values` (the facet lists' vocabulary), `overview` (the
+//! trace-density grid), and `slowest` (the window's duration-ranked
+//! top-K). Mode selection and every request-SHAPE check happen at
+//! deserialization (the wire's typed request — shape errors are
+//! transport 400s); this handler owns only the semantic validation
+//! (trace-id shape, zero limits, bounds).
+//!
 //! The wire contract lives in [`super::wire`], the engine mapping in
-//! [`super::adapter`], and source resolution in [`super::sources`].
+//! [`super::adapter`], source resolution in [`super::sources`], and
+//! the shared time-grid derivation in [`super::super::grid`].
 //!
 //! Netdata-plugin glue only, like the logs handler: the engine
 //! ([`sfsq::traces`]) stays wire-neutral; the bridge's `HandlerAdapter`
@@ -31,27 +33,71 @@ use file_lifecycle::registry::TenantRegistries;
 
 use sfsq::traces::{
     AttributeNamesQuery, AttributeRequestError, AttributeValuesQuery, DEFAULT_SLOWEST_LIMIT,
-    OverviewQuery, OverviewRequestError, SLOWEST_LIMIT_MAX, SPANS_PER_TRACE_MAX, SearchQuery,
-    SearchRequestError, SearchSources, SlowestQuery, SlowestRequestError, TimeWindow, TraceQuery,
-    TraceRequestError, attribute_names, attribute_values, overview, search, slowest, trace_by_id,
+    OverviewQuery, OverviewRequestError, Predicate, PredicateTarget, SLOWEST_LIMIT_MAX,
+    SPANS_PER_TRACE_MAX, SearchQuery, SearchRequestError, SearchSources, SlowestQuery,
+    SlowestRequestError, TimeWindow, TraceQuery, TraceRequestError, attribute_names,
+    attribute_values, overview, search, slowest, trace_by_id,
 };
 
 use super::adapter::{
-    ResolvedWindow, build_predicate, parse_cursor, parse_enumeration_key, parse_owner_word,
-    completion_capture_range, parse_trace_id, resolve_window, to_attribute_values_result,
-    to_attributes_result, to_overview_result, to_search_result, to_slowest_result,
-    to_trace_result, validate_trace_bounds,
+    ResolvedWindow, build_predicate, builtin_word, completion_capture_range, heatmap_predicate,
+    parse_cursor, parse_enumeration_key, parse_owner_word, parse_trace_id, resolve_window,
+    to_attribute_values_result, to_attributes_result, to_overview_result, to_overview_section,
+    to_search_result, to_slowest_result, to_trace_result, validate_trace_bounds,
 };
-use super::sources::TracesSourceSupplier;
+use super::sources::{Capture, CaptureError, TracesSourceSupplier};
 use super::wire::{
-    AttributeValuesParams, AttributesParams, CoverageWire, InfoResponse, OtelTracesRequest,
-    OtelTracesResponse, OverviewParams, SearchParams, SearchResult, SlowestParams, TraceParams,
-    TracesMode,
+    AttributeValuesParams, AttributesParams, CoverageWire, FunctionsParams,
+    FunctionsTracesResponse, InfoResponse, OVERVIEW_SCOPE_SELECTION, OVERVIEW_SCOPE_WINDOW,
+    OtelTracesRequest, OtelTracesResponse, OverviewParams, SearchParams, SearchResult,
+    SlowestParams, TraceParams, TracesMode,
 };
+use file_lifecycle::remote_read::RemoteRead;
 
 /// Shorthand for the handler-level error every failure path maps to.
 fn handler_err(message: String) -> netdata_plugin_error::NetdataPluginError {
     netdata_plugin_error::NetdataPluginError::FunctionHandler { message }
+}
+
+/// A capture that failed as a whole: a hard error the caller can act on.
+fn capture_error(e: CaptureError) -> netdata_plugin_error::NetdataPluginError {
+    let size = |bytes: u64| bytesize::ByteSize::b(bytes).display().si().to_string();
+    match e {
+        CaptureError::TooLarge { at_least, capacity } => handler_err(format!(
+            "this query needs more than {} of remote trace data (at least {}), more than the \
+             download cache holds; narrow the time range or raise \
+             `remote_storage.read_cache_max_size`",
+            size(capacity),
+            size(at_least)
+        )),
+        CaptureError::EvictionFailed => handler_err(
+            "the remote-read download cache directory is unwritable (eviction failed); check \
+             its permissions and free space"
+                .to_string(),
+        ),
+        CaptureError::Planning(e) => {
+            handler_err(format!("otel-traces remote planning task failed: {e}"))
+        }
+    }
+}
+
+/// The Functions view's aggregate half: what the second engine pass
+/// needs beyond the page's own window. The window itself is the page's
+/// (grid-aligned); the predicate is the page's `selections` and
+/// nothing else — never the duration bounds — and the wire's scope flag
+/// reports which one ran.
+///
+/// `None` means no second pass and no `overview` section: the Functions
+/// view passes `None` on an ANCHOR page (the anchor gate in
+/// `functions`); the legacy `search` mode always does.
+struct AggregateRequest {
+    /// Root-facet lists: requested by the caller AND allowed by the
+    /// scope gate (see `functions`).
+    facets: bool,
+    /// The heatmap's filter: the page's selections when they are all
+    /// span-level, `None` for the plain window grid (no selections, or
+    /// a trace-level word — see `functions`).
+    predicate: Option<Predicate>,
 }
 
 pub(crate) struct OtelTracesHandler {
@@ -60,28 +106,31 @@ pub(crate) struct OtelTracesHandler {
 }
 
 impl OtelTracesHandler {
+    /// `remote` reads files that local retention evicted back from remote
+    /// storage; `None` when remote storage is disabled.
     pub(crate) fn new(
         registries: Arc<RwLock<TenantRegistries>>,
         chunk_cache: Arc<ChunkCache>,
         min_entries: u64,
+        remote: Option<RemoteRead>,
     ) -> Self {
         Self {
-            supplier: TracesSourceSupplier::new(registries, chunk_cache, min_entries),
+            supplier: TracesSourceSupplier::new(registries, chunk_cache, min_entries, remote),
         }
     }
 
     /// The `trace` mode: exact single-trace fetch via the engine's
     /// cross-source `trace_by_id`.
     ///
-    /// Ignores the ENVELOPE window; assembly bounds live in the `trace`
-    /// sub-object. Absent bounds capture the FULL range — a trace is an
-    /// exact object whose spans straddle files (WAL rotation is
-    /// content-agnostic), and only the caller knows how much slack its
-    /// anchor deserves. Present bounds prune the capture file-granularly
-    /// (a file overlapping the bounds is probed whole). Either way the
-    /// response DECLARES the range used (`coverage`) — spans beyond it
-    /// are unknown, never silently dropped: the declaration is the
-    /// honesty. An absent id is a Complete empty trace, not an error.
+    /// Ignores the envelope window; assembly bounds live in the `trace`
+    /// sub-object. Absent bounds capture the FULL range, remote history
+    /// included (too-large history fails via the download cache rather
+    /// than truncate) — a trace is one object whose spans straddle
+    /// files. Present bounds prune file-granularly (a file overlapping
+    /// the bounds is probed whole). Either way the response DECLARES
+    /// the range used (`coverage`) — spans beyond it are unknown, never
+    /// silently dropped. An id absent from the sources is a Complete
+    /// empty trace, not an error.
     async fn trace(
         &self,
         ctx: &FunctionCallContext,
@@ -132,16 +181,14 @@ impl OtelTracesHandler {
         // A cancelled capture returns NO copies; the empty default flows
         // into the engine, which polls the same token up front and
         // reports the Cancelled partial — one consistent cancel path.
-        let sources = self
+        // The capture sets the progress total; the engine ticks the done
+        // counter once per source and the bridge's ticker renders it.
+        let Capture { mut sets, pins } = self
             .supplier
-            .capture(&tenant, capture_range, 1, &ctx.cancellation)
+            .capture(&tenant, capture_range, 1, &ctx.cancellation, &ctx.progress)
             .await
-            .pop()
-            .unwrap_or_default();
-
-        // The engine ticks its progress counter once per source; the
-        // bridge's ticker renders it. Set before handing the counter off.
-        ctx.progress.set_total(sources.len());
+            .map_err(capture_error)?;
+        let sources = sets.pop().unwrap_or_default();
         let done = ctx.progress.done_counter();
         let cancel = ctx.cancellation.clone();
 
@@ -152,6 +199,7 @@ impl OtelTracesHandler {
         // the client's — framed as internal so a debugger looks at the
         // right side. A panicked task is a handler failure.
         let data = match tokio::task::spawn_blocking(move || {
+            let _pins = pins;
             trace_by_id(sources, query, cancel, done)
         })
         .await
@@ -175,17 +223,26 @@ impl OtelTracesHandler {
         ))))
     }
 
-    /// The `search` mode: the engine's bounded most-recent-first trace
-    /// search over the request's (canonicalized) window, with wire-level
-    /// tie-safe pagination — see the adapter's cursor docs.
-    async fn search(
+    /// The engine's bounded most-recent-first search over the request's
+    /// (canonicalized) window, with wire-level tie-safe pagination —
+    /// see the adapter's cursor docs. The shared page core of both the
+    /// `search` mode and the Functions view (which layers the aggregate
+    /// on through `aggregate`).
+    ///
+    /// `aggregate` adds the Functions view's full-window section: a
+    /// SECOND engine pass in this same call, off the same capture. It
+    /// cannot ride along with the first — search is top-K with early
+    /// termination and hard-caps its assembly far below the window's
+    /// population, so an accumulator on its scan loop would describe the
+    /// few hundred traces the ranker happened to touch, not the window.
+    async fn search_result(
         &self,
         ctx: &FunctionCallContext,
         params: &SearchParams,
         tenant: Option<&str>,
-    ) -> netdata_plugin_error::Result<OtelTracesResponse> {
-        let client_err =
-            |e: String| handler_err(format!("invalid otel-traces request: {e}"));
+        aggregate: Option<AggregateRequest>,
+    ) -> netdata_plugin_error::Result<SearchResult> {
+        let client_err = |e: String| handler_err(format!("invalid otel-traces request: {e}"));
 
         // Zero must be rejected BEFORE the anchor allowance is added —
         // `limit=0` with a cursor would otherwise sneak a positive engine
@@ -248,71 +305,209 @@ impl OtelTracesHandler {
         }
 
         // ONE capture over the COMPLETION range (the match window
-        // widened by the clamped slack), two roles: the engine narrows
-        // the window role internally (SFSTs by summary overlap, tail
-        // spans per-span), so identical copies keep window ⊆ completion
-        // by construction while slack-only files still complete
-        // straddling hits. The cursor keeps freezing the ORIGINAL
-        // window (window.capture) — the completion range re-derives
-        // from it deterministically on every page.
+        // widened by the clamped slack), feeding two roles: the engine
+        // narrows the window role internally, so identical copies keep
+        // window ⊆ completion by construction while slack-only files
+        // still complete straddling hits. The cursor keeps freezing the
+        // ORIGINAL window (window.capture) — the completion range
+        // re-derives from it deterministically on every page.
         let completion_range = completion_capture_range(&window.capture);
         let completion_coverage = CoverageWire {
             after: completion_range.start,
             before: completion_range.end,
         };
+        // The aggregate's geometry and window: the grid's, snapped
+        // outward to wall-clock bucket multiples — NOT the page's
+        // slack-widened range. Its sources are captured by that window
+        // alone, so the section reports exactly what the standalone
+        // `overview` mode reports for the same window.
+        let aggregate_grid = aggregate.as_ref().map(|_| {
+            super::super::grid::grid_for_window_s(window.capture.start, window.capture.end)
+        });
+
         let tenant = TenantId::resolve_query(tenant);
-        let mut sets = self
+        // ONE capture for every pass: the two search roles over the
+        // completion range, the aggregate over the grid's. One snapshot
+        // means one `valid_up_to`, so the page and the section can never
+        // describe two different corpora.
+        let mut ranges = vec![completion_range.clone(), completion_range];
+        if let Some((_, aligned_after, aligned_before)) = aggregate_grid {
+            ranges.push(aligned_after..aligned_before);
+        }
+        // The capture sets the progress total: the completion range's
+        // sources plus the aggregate's (the window role shares the
+        // completion range and does not tick).
+        let Capture { mut sets, pins } = self
             .supplier
-            .capture(&tenant, completion_range, 2, &ctx.cancellation)
-            .await;
+            .capture_ranges(&tenant, &ranges, &ctx.cancellation, &ctx.progress)
+            .await
+            .map_err(capture_error)?;
+        // The pops unwind `ranges` (aggregate was pushed last).
+        let aggregate_sources = match aggregate_grid {
+            Some(_) => sets.pop().unwrap_or_default(),
+            None => Vec::new(),
+        };
         let completion = sets.pop().unwrap_or_default();
         let window_sources = sets.pop().unwrap_or_default();
-
-        ctx.progress.set_total(completion.len());
         let done = ctx.progress.done_counter();
         let cancel = ctx.cancellation.clone();
+        let (aggregate_facets, aggregate_predicate) = aggregate
+            .map(|a| (a.facets, a.predicate))
+            .unwrap_or((false, None));
+        // The flag is set from what runs, never from what was asked.
+        let aggregate_scope = if aggregate_predicate.is_some() {
+            OVERVIEW_SCOPE_SELECTION
+        } else {
+            OVERVIEW_SCOPE_WINDOW
+        };
+        let aggregate_query = aggregate_grid.map(|(grid, ..)| {
+            let query = OverviewQuery::new(grid).root_facets(aggregate_facets);
+            match aggregate_predicate {
+                Some(predicate) => query.predicate(predicate),
+                None => query,
+            }
+        });
 
-        let data = match tokio::task::spawn_blocking(move || {
-            search(
+        // Both engine calls are pure-sync and expect to run off the
+        // runtime thread, so one blocking task covers the pair — and a
+        // cancellation between them cannot pair mismatched snapshots.
+        let joined = tokio::task::spawn_blocking(move || {
+            let _pins = pins;
+            let page = search(
                 SearchSources {
                     window: window_sources,
                     completion,
                 },
                 query,
-                cancel,
-                done,
-            )
+                cancel.clone(),
+                Arc::clone(&done),
+            );
+            let section = aggregate_query.map(|q| overview(aggregate_sources, q, cancel, done));
+            (page, section)
         })
-        .await
-        {
-            Ok(Ok(data)) => data,
-            // These two are structurally impossible from one capture —
-            // an occurrence means the supplier broke its contract.
-            Ok(Err(e @ SearchRequestError::SourceSet(_)))
-            | Ok(Err(e @ SearchRequestError::WindowNotInCompletion(_))) => {
-                return Err(handler_err(format!(
-                    "otel-traces internal error: captured source set is inconsistent: {e}"
-                )));
-            }
-            Ok(Err(e)) => return Err(client_err(e.to_string())),
+        .await;
+        let (page, section) = match joined {
+            Ok(both) => both,
             Err(e) => {
                 return Err(handler_err(format!("otel-traces search task failed: {e}")));
             }
         };
 
-        let result: SearchResult = to_search_result(
+        let data = match page {
+            Ok(data) => data,
+            // These two are structurally impossible from one capture —
+            // an occurrence means the supplier broke its contract.
+            Err(e @ SearchRequestError::SourceSet(_))
+            | Err(e @ SearchRequestError::WindowNotInCompletion(_)) => {
+                return Err(handler_err(format!(
+                    "otel-traces internal error: captured source set is inconsistent: {e}"
+                )));
+            }
+            Err(e) => return Err(client_err(e.to_string())),
+        };
+
+        let mut result: SearchResult = to_search_result(
             data,
             params.limit,
             cursor.as_ref(),
             (window.capture.start, window.capture.end),
             completion_coverage,
         );
-        Ok(OtelTracesResponse::Search(Box::new(result)))
+        if let (Some(section), Some((grid, aligned_after, aligned_before))) =
+            (section, aggregate_grid)
+        {
+            let section = match section {
+                Ok(section) => section,
+                Err(OverviewRequestError::SourceSet(e)) => {
+                    return Err(handler_err(format!(
+                        "otel-traces internal error: captured source set is inconsistent: {e}"
+                    )));
+                }
+                Err(e) => return Err(client_err(e.to_string())),
+            };
+            result.overview = Some(to_overview_section(
+                section,
+                grid,
+                CoverageWire {
+                    after: aligned_after,
+                    before: aligned_before,
+                },
+                aggregate_scope,
+            ));
+        }
+        Ok(result)
+    }
+
+    async fn search(
+        &self,
+        ctx: &FunctionCallContext,
+        params: &SearchParams,
+        tenant: Option<&str>,
+    ) -> netdata_plugin_error::Result<OtelTracesResponse> {
+        // The native mode keeps its own contract: no embedded section.
+        Ok(OtelTracesResponse::Search(Box::new(
+            self.search_result(ctx, params, tenant, None).await?,
+        )))
+    }
+
+    /// The Functions view: the search page plus the full-window
+    /// aggregate, in one request. Nothing else composes both — and only
+    /// a FIRST page does, since an anchor page's aggregate would repeat
+    /// the first page's (the anchor gate below).
+    async fn functions(
+        &self,
+        ctx: &FunctionCallContext,
+        params: &FunctionsParams,
+        tenant: Option<&str>,
+    ) -> netdata_plugin_error::Result<OtelTracesResponse> {
+        let search_params = params
+            .search_params(unix_now_s())
+            .map_err(|e| handler_err(format!("invalid otel-traces request: {e}")))?;
+        // The heatmap's predicate: the page's selections and NOTHING
+        // else. The duration bounds stay off the grid by design (duration
+        // is the grid's own axis — applying a cell click's band would
+        // blank every other row), and a trace-level word (`root_name`,
+        // `root_service_name`, `trace_duration`, `trace_id`) cannot be
+        // answered from stored rows, so the grid falls back to the plain
+        // window and SAYS so through `scope` rather than guess. The
+        // engine owns that word list (`trace_level_target`).
+        let heatmap_predicate = heatmap_predicate(&params.selections)
+            .map_err(|e| handler_err(format!("invalid otel-traces request: {e}")))?
+            .filter(|p| p.trace_level_target().is_none());
+        // The anchor gate. An anchor page reruns the same query over the
+        // cursor's FROZEN window, so the section it would compose is the
+        // first page's, byte for byte — only the rows advance. It is
+        // skipped and the section simply ABSENT (never a `null` on the
+        // wire); consumers re-read it on the next anchor-less request,
+        // the only kind that can move the window. Details on the wire
+        // (`SearchResult::overview`).
+        //
+        // The scope gate. Root-facet lists stay suppressed while ANY page
+        // filter is active — correctness where the grid cannot apply the
+        // filter (the trace-duration bounds, a trace-level word) and one
+        // uniform rule for the rest: facets describe the whole window or
+        // not at all. Gated before the engine call, so suppressed lists
+        // cost nothing (their price is the sealed sources' dictionary
+        // decodes).
+        let aggregate = params.anchor.is_none().then(|| AggregateRequest {
+            facets: params.overview_facets.unwrap_or(false)
+                && params.selections.is_empty()
+                && params.min_trace_duration_ns.is_none()
+                && params.max_trace_duration_ns.is_none(),
+            predicate: heatmap_predicate,
+        });
+        let data = self
+            .search_result(ctx, &search_params, tenant, aggregate)
+            .await?;
+        Ok(OtelTracesResponse::Functions(Box::new(
+            FunctionsTracesResponse::new(data),
+        )))
     }
 
     /// Common setup for the windowed fold modes (enumeration, slowest):
-    /// canonicalized window + one captured source set + the engine
-    /// window/progress plumbing. Callers pass their own params' window
+    /// canonicalized window + one captured source set (with its pins, for
+    /// the caller's blocking closure) + the engine window; the capture
+    /// sets the progress total. Callers pass their own params' window
     /// fields — every mode's window is self-contained on the wire.
     async fn enumeration_setup(
         &self,
@@ -320,7 +515,11 @@ impl OtelTracesHandler {
         after: u32,
         before: u32,
         tenant: Option<&str>,
-    ) -> netdata_plugin_error::Result<(Vec<sfsq::traces::TraceSource>, TimeWindow)> {
+    ) -> netdata_plugin_error::Result<(
+        Vec<sfsq::traces::TraceSource>,
+        Vec<file_cache::CachedFile>,
+        TimeWindow,
+    )> {
         let now_s = unix_now_s();
         let window: ResolvedWindow = resolve_window(after, before, now_s, None)
             .map_err(|e| handler_err(format!("invalid otel-traces request: {e}")))?;
@@ -328,18 +527,16 @@ impl OtelTracesHandler {
             .map_err(|e| handler_err(format!("invalid otel-traces request: {e}")))?;
 
         let tenant = TenantId::resolve_query(tenant);
-        let sources = self
+        let Capture { mut sets, pins } = self
             .supplier
-            .capture(&tenant, window.capture, 1, &ctx.cancellation)
+            .capture(&tenant, window.capture, 1, &ctx.cancellation, &ctx.progress)
             .await
-            .pop()
-            .unwrap_or_default();
-        ctx.progress.set_total(sources.len());
-        Ok((sources, engine_window))
+            .map_err(capture_error)?;
+        Ok((sets.pop().unwrap_or_default(), pins, engine_window))
     }
 
     /// The `attributes` mode: exact dictionary-backed key enumeration —
-    /// the facet rail's vocabulary, in the selection grammar.
+    /// the facet lists' vocabulary, in the selection grammar.
     async fn attributes(
         &self,
         ctx: &FunctionCallContext,
@@ -361,15 +558,18 @@ impl OtelTracesHandler {
             }
             query = query.max_keys(max);
         }
-        let (sources, window) = self
+        let (sources, pins, window) = self
             .enumeration_setup(ctx, params.after, params.before, tenant)
             .await?;
         query = query.window(window);
 
         let done = ctx.progress.done_counter();
         let cancel = ctx.cancellation.clone();
-        match tokio::task::spawn_blocking(move || attribute_names(sources, query, cancel, done))
-            .await
+        match tokio::task::spawn_blocking(move || {
+            let _pins = pins;
+            attribute_names(sources, query, cancel, done)
+        })
+        .await
         {
             Ok(Ok(data)) => Ok(OtelTracesResponse::Attributes(to_attributes_result(data))),
             Ok(Err(e)) => Err(map_attribute_error(e)),
@@ -400,7 +600,7 @@ impl OtelTracesHandler {
             }
             query = query.max_values(max);
         }
-        let (sources, window) = self
+        let (sources, pins, window) = self
             .enumeration_setup(ctx, params.after, params.before, tenant)
             .await?;
         query = query.window(window);
@@ -408,8 +608,11 @@ impl OtelTracesHandler {
         let done = ctx.progress.done_counter();
         let cancel = ctx.cancellation.clone();
         let wire_key = params.key.clone();
-        match tokio::task::spawn_blocking(move || attribute_values(sources, query, cancel, done))
-            .await
+        match tokio::task::spawn_blocking(move || {
+            let _pins = pins;
+            attribute_values(sources, query, cancel, done)
+        })
+        .await
         {
             Ok(Ok(data)) => Ok(OtelTracesResponse::AttributeValues(
                 to_attribute_values_result(data, wire_key),
@@ -451,29 +654,62 @@ impl OtelTracesHandler {
             resolve_window(params.after, params.before, now_s, None).map_err(client_err)?;
         let (grid, aligned_after, aligned_before) =
             super::super::grid::grid_for_window_s(window.capture.start, window.capture.end);
-        let query = OverviewQuery::new(grid).root_facets(params.facets.unwrap_or(false));
+        // Selections filter the grid as on the Functions view; unlike
+        // there, a trace-level word is a client error — this request has
+        // no list the word could legitimately be for.
+        let predicate = heatmap_predicate(&params.selections).map_err(client_err)?;
+        if let Some(PredicateTarget::Builtin(field)) =
+            predicate.as_ref().and_then(|p| p.trace_level_target())
+        {
+            return Err(client_err(format!(
+                "selection {:?} is a trace-level word; the overview grid applies span-level \
+                 selections only (the Functions view's list applies it beside its grid)",
+                builtin_word(*field)
+            )));
+        }
+        let scope = if predicate.is_some() {
+            OVERVIEW_SCOPE_SELECTION
+        } else {
+            OVERVIEW_SCOPE_WINDOW
+        };
+        let mut query = OverviewQuery::new(grid).root_facets(params.facets.unwrap_or(false));
+        if let Some(predicate) = predicate {
+            query = query.predicate(predicate);
+        }
 
         // Alignment can widen the window; prune files by the widened one.
         let tenant = TenantId::resolve_query(tenant);
-        let sources = self
+        let Capture { mut sets, pins } = self
             .supplier
-            .capture(&tenant, aligned_after..aligned_before, 1, &ctx.cancellation)
+            .capture(
+                &tenant,
+                aligned_after..aligned_before,
+                1,
+                &ctx.cancellation,
+                &ctx.progress,
+            )
             .await
-            .pop()
-            .unwrap_or_default();
-        ctx.progress.set_total(sources.len());
+            .map_err(capture_error)?;
+        let sources = sets.pop().unwrap_or_default();
         let done = ctx.progress.done_counter();
         let cancel = ctx.cancellation.clone();
 
-        match tokio::task::spawn_blocking(move || overview(sources, query, cancel, done)).await {
+        match tokio::task::spawn_blocking(move || {
+            let _pins = pins;
+            overview(sources, query, cancel, done)
+        })
+        .await
+        {
             Ok(Ok(data)) => Ok(OtelTracesResponse::Overview(Box::new(to_overview_result(
-                data, grid,
+                data, grid, scope,
             )))),
             Ok(Err(OverviewRequestError::SourceSet(e))) => Err(handler_err(format!(
                 "otel-traces internal error: captured source set is inconsistent: {e}"
             ))),
             Ok(Err(e)) => Err(client_err(e.to_string())),
-            Err(e) => Err(handler_err(format!("otel-traces overview task failed: {e}"))),
+            Err(e) => Err(handler_err(format!(
+                "otel-traces overview task failed: {e}"
+            ))),
         }
     }
 
@@ -503,14 +739,19 @@ impl OtelTracesHandler {
             )));
         }
 
-        let (sources, window) = self
+        let (sources, pins, window) = self
             .enumeration_setup(ctx, params.after, params.before, tenant)
             .await?;
         let query = SlowestQuery::new(window).limit(limit);
 
         let done = ctx.progress.done_counter();
         let cancel = ctx.cancellation.clone();
-        match tokio::task::spawn_blocking(move || slowest(sources, query, cancel, done)).await {
+        match tokio::task::spawn_blocking(move || {
+            let _pins = pins;
+            slowest(sources, query, cancel, done)
+        })
+        .await
+        {
             Ok(Ok(data)) => Ok(OtelTracesResponse::Slowest(Box::new(to_slowest_result(
                 data, limit,
             )))),
@@ -546,6 +787,7 @@ impl FunctionHandler for OtelTracesHandler {
     ) -> netdata_plugin_error::Result<Self::Response> {
         let tenant = req.tenant.as_deref();
         match &req.mode {
+            TracesMode::Functions(params) => self.functions(&ctx, params, tenant).await,
             TracesMode::Info => Ok(OtelTracesResponse::Info(InfoResponse::default())),
             TracesMode::Trace(params) => self.trace(&ctx, params, tenant).await,
             TracesMode::Search(params) => self.search(&ctx, params, tenant).await,
@@ -558,6 +800,10 @@ impl FunctionHandler for OtelTracesHandler {
         }
     }
 
+    /// Advertise the function to the agent/Cloud: `global` (not scoped
+    /// to one node), tagged `traces`, accessible to signed-in users of
+    /// the same space, with the SENSITIVE_DATA flag since trace payloads
+    /// may carry sensitive content.
     fn declaration(&self) -> FunctionDeclaration {
         let mut d = FunctionDeclaration::new("otel-traces", "Query OpenTelemetry traces");
         d.global = true;
@@ -570,3 +816,6 @@ impl FunctionHandler for OtelTracesHandler {
 
 #[cfg(test)]
 mod tests;
+
+#[cfg(test)]
+mod remote_tests;

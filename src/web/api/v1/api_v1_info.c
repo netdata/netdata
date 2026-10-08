@@ -130,7 +130,7 @@ static int web_client_api_request_v1_info_fill_buffer(RRDHOST *host, BUFFER *wb)
     rrdhost_system_info_free(system_info);
 
     host_labels2json(host, wb, "host_labels");
-    host_functions2json(host, wb);
+    nrpc_catalog_host2json(rrdhost_nrpc_owner(host), wb);
     host_collectors(host, wb);
 
     buffer_json_member_add_boolean(wb, "cloud-enabled", true);

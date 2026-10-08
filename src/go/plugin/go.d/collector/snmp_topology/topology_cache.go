@@ -4,20 +4,26 @@ package snmptopology
 
 import (
 	"net/netip"
-	"sync"
 	"time"
 
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_topology/internal/topologymodel"
 )
 
-type topologyCache struct {
-	mu         sync.RWMutex
+// topologyBuilder is a mutable, collection-only builder. Runtime readers only
+// receive immutable topologyDeviceGeneration values produced from it.
+type topologyBuilder struct {
 	lastUpdate time.Time
 	updateTime time.Time
 	staleAfter time.Duration
 
+	preparedSnapshot    topologymodel.ObservationSnapshot
+	hasPreparedSnapshot bool
+
 	agentID     string
 	localDevice topologymodel.Device
+	// localManagementAddressKeys deduplicates local management observations while the builder is mutable.
+	// It is build-only state and is released when the builder is finalized.
+	localManagementAddressKeys map[managementAddressKey]struct{}
 	// targetManagementIPs is private pre-finalization selection evidence.
 	targetManagementIPs []netip.Addr
 
@@ -25,25 +31,24 @@ type topologyCache struct {
 	lldpRemotes  map[string]*lldpRemote
 	cdpRemotes   map[string]*cdpRemote
 
-	ifNamesByIndex       map[string]string
-	ifStatusByIndex      map[string]ifStatus
-	ifIndexByIP          map[string]string
-	ifNetmaskByIP        map[string]string
-	l3InterfacesByIP     map[string]topologymodel.L3Interface
-	trapMatchMethodByIP  map[string]string
-	bridgePortToIf       map[string]string
-	fdbEntries           map[string]*fdbEntry
-	vlanByFDBID          map[string]fdbVLANMapping
-	vlanNameByID         map[string]vlanNameMapping
-	fdbRowsDroppedNoMAC  int
-	fdbRowsUnmappedPort  int
-	vtpVersion           string
-	stpBaseBridgeAddress string
-	stpDesignatedRoot    string
-	stpPorts             map[string]*stpPortEntry
-	arpEntries           map[string]*arpEntry
-	ospfNeighborsByKey   map[string]topologymodel.OSPFNeighbor
-	bgpPeersByKey        map[string]topologymodel.BGPPeer
+	ifNamesByIndex  map[string]string
+	ifStatusByIndex map[string]ifStatus
+	// ipAddressCandidatesByIP is build-only provenance state and is released at finalization.
+	ipAddressCandidatesByIP map[string]ipAddressCandidates
+	// ipAddressesByIP is the single resolved interface-address inventory.
+	ipAddressesByIP     map[string]resolvedIPAddress
+	trapMatchMethodByIP map[string]string
+	bridgePortToIf      map[string]string
+	fdbEntries          map[string]*fdbEntry
+	vlanByFDBID         map[string]fdbVLANMapping
+	vlanNameByID        map[string]vlanNameMapping
+	fdbRowsDroppedNoMAC int
+	fdbRowsUnmappedPort int
+	bridgeBaseAddress   string
+	stpPorts            map[string]*stpPortEntry
+	arpEntries          map[string]*arpEntry
+	ospfNeighborsByKey  map[string]topologymodel.OSPFNeighbor
+	bgpPeersByKey       map[string]topologymodel.BGPPeer
 }
 
 type ifStatus struct {

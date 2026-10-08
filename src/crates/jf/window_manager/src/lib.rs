@@ -103,7 +103,7 @@ pub struct WindowManager<M: MemoryMap> {
 
 impl<M: MemoryMap> WindowManager<M> {
     pub fn new(file: File, chunk_size: u64, max_windows: usize) -> Result<Self> {
-        debug_assert!(chunk_size != 0 && (chunk_size % PAGE_SIZE) == 0);
+        debug_assert!(chunk_size != 0 && chunk_size.is_multiple_of(PAGE_SIZE));
         debug_assert!(max_windows != 0);
 
         let _file_size = file.metadata()?.len();
@@ -147,10 +147,10 @@ impl<M: MemoryMap> WindowManager<M> {
     }
 
     fn lookup_window_by_range(&self, position: u64, size_needed: u64) -> Option<usize> {
-        if let Some(idx) = self.active_window_idx {
-            if self.windows[idx].contains_range(position, size_needed) {
-                return Some(idx);
-            }
+        if let Some(idx) = self.active_window_idx
+            && self.windows[idx].contains_range(position, size_needed)
+        {
+            return Some(idx);
         }
 
         for (idx, window) in self.windows.iter().enumerate() {
@@ -163,10 +163,10 @@ impl<M: MemoryMap> WindowManager<M> {
     }
 
     fn lookup_window_by_position(&self, position: u64) -> Option<usize> {
-        if let Some(idx) = self.active_window_idx {
-            if self.windows[idx].contains(position) {
-                return Some(idx);
-            }
+        if let Some(idx) = self.active_window_idx
+            && self.windows[idx].contains(position)
+        {
+            return Some(idx);
         }
 
         for (idx, window) in self.windows.iter().enumerate() {

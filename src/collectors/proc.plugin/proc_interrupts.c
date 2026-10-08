@@ -90,8 +90,86 @@ static inline bool proc_interrupts_word_has_trigger_suffix(const char *word) {
     return separator && proc_interrupts_word_is_trigger(separator + 1);
 }
 
-static size_t proc_interrupts_name_first_word(procfile *ff, size_t line, int cpus, size_t words) {
-    size_t first = (size_t)cpus + 1;
+static size_t proc_interrupts_strnlen(const char *s, size_t max) {
+    size_t len = 0;
+
+    if(!s)
+        return 0;
+
+    while(len < max && s[len])
+        len++;
+
+    return len;
+}
+
+// The first word of a /proc/interrupts line, split into the interrupt id and - when the kernel
+// printed no space between the label and the first counter - that counter.
+//
+// Since ':' is a word character here (interrupt names may contain colons, see #22532), the first
+// word arrives as 'IPI1:1282597797' whenever the counter fills its field width and consumes the
+// only space separating it from the label. Such a counter must never reach the id: it changes on
+// every collection, and a changing id creates a new dimension on every collection.
+struct interrupt_id {
+    char *id;                   // the id, with the colon and anything after it removed
+    size_t idlen;
+    const char *glued_value;    // the first cpu counter, when it was glued to the id
+    bool skip;                  // the line has no usable id
+};
+
+static struct interrupt_id proc_interrupts_parse_first_word(char *word) {
+    struct interrupt_id rc = { .id = word, .idlen = 0, .glued_value = NULL, .skip = true };
+
+    if(unlikely(!word))
+        return rc;
+
+    if(unlikely(!word[0]))
+        return rc;
+
+    char *colon = strchr(word, ':');
+
+    if(unlikely(colon == word))
+        // ':counter' - there is no id to name a dimension with
+        return rc;
+
+    if(colon) {
+        const char *rest = colon + 1;
+
+        // only an all-digit remainder is a counter; anything else is malformed input we cannot
+        // interpret, so we do not shift the rest of the line based on it
+        if(*rest && proc_interrupts_word_is_number(rest))
+            rc.glued_value = rest;
+
+        *colon = '\0';
+    }
+
+    rc.idlen = proc_interrupts_strnlen(word, MAX_INTERRUPT_NAME);
+    rc.skip = (rc.idlen == 0);
+
+    return rc;
+}
+
+// when the first counter was glued to the id, every remaining word of the line is shifted left
+static inline size_t proc_interrupts_word_offset(const struct interrupt_id *irrid) {
+    return irrid->glued_value ? 1 : 0;
+}
+
+static unsigned long long proc_interrupts_cpu_value(
+    procfile *ff, size_t line, size_t words, const struct interrupt_id *irrid, int c) {
+    const char *word;
+
+    if(unlikely(irrid->glued_value && c == 0))
+        word = irrid->glued_value;
+    else {
+        size_t w = (size_t)c + 1 - proc_interrupts_word_offset(irrid);
+        word = (w < words) ? proc_interrupts_lineword(ff, line, w) : NULL;
+    }
+
+    return word ? str2ull(word, NULL) : 0;
+}
+
+static size_t proc_interrupts_name_first_word(
+    procfile *ff, size_t line, int cpus, size_t words, size_t offset) {
+    size_t first = (size_t)cpus + 1 - offset;
     if(unlikely(first >= words))
         return words;
 
@@ -113,18 +191,6 @@ static size_t proc_interrupts_name_first_word(procfile *ff, size_t line, int cpu
 
 static inline char proc_interrupts_name_char(char c) {
     return (c == ':' || isspace((uint8_t)c)) ? '_' : c;
-}
-
-static size_t proc_interrupts_strnlen(const char *s, size_t max) {
-    size_t len = 0;
-
-    if(!s)
-        return 0;
-
-    while(len < max && s[len])
-        len++;
-
-    return len;
 }
 
 static inline void proc_interrupts_append_char(char *dst, size_t *len, char c) {
@@ -280,27 +346,21 @@ int do_proc_interrupts(int update_every, usec_t dt) {
         words = procfile_linewords(ff, l);
         if(unlikely(!words)) continue;
 
-        irr->id = proc_interrupts_lineword(ff, l, 0);
-        if(unlikely(!irr->id)) continue;
-        if(unlikely(!irr->id[0])) continue;
+        struct interrupt_id irrid = proc_interrupts_parse_first_word(proc_interrupts_lineword(ff, l, 0));
+        if(unlikely(irrid.skip)) continue;
 
-        size_t idlen = strlen(irr->id);
-        if(irr->id[idlen - 1] == ':')
-            irr->id[--idlen] = '\0';
+        irr->id = irrid.id;
+        size_t idlen = irrid.idlen;
 
         int c;
         for(c = 0; c < cpus ;c++) {
-            char *word = NULL;
-            if(likely((c + 1) < (int)words))
-                word = proc_interrupts_lineword(ff, l, (uint32_t)(c + 1));
-
-            irr->cpu[c].value = word ? str2ull(word, NULL) : 0;
-
+            irr->cpu[c].value = proc_interrupts_cpu_value(ff, l, words, &irrid, c);
             irr->total += irr->cpu[c].value;
         }
 
         if(unlikely(isdigit((uint8_t)irr->id[0]))) {
-            size_t first_name_word = proc_interrupts_name_first_word(ff, l, cpus, words);
+            size_t first_name_word =
+                proc_interrupts_name_first_word(ff, l, cpus, words, proc_interrupts_word_offset(&irrid));
             proc_interrupts_build_name(irr->name, ff, l, first_name_word, words, irr->id, idlen);
         }
         else {
@@ -425,7 +485,17 @@ int proc_interrupts_unittest(void) {
         "250:          3          4   PCI-MSI 5242880-edge      nvme 0 io5\n"
         "  0:          5          6   IO-APIC   2-edge          timer\n"
         "  1:          7          8   XT-PIC-XT                 keyboard\n"
-        " 27:          9         10   GICv3     27 Level        arch_timer\n";
+        " 27:          9         10   GICv3     27 Level        arch_timer\n"
+        // the kernel prints no space when the first counter fills its field width
+        "IPI0: 104908982  106865102       Rescheduling interrupts\n"
+        "IPI1:1282597797 1221739692       Function call interrupts\n"
+        "260:1234567890         12   PCI-MSI 5242880-edge      nvme 1 io6\n"
+        // malformed: the text after the colon is not a counter
+        "IPI9:garbage         11         12       Malformed interrupts\n"
+        // malformed: no colon at all
+        "IPI8                 21         22       Colonless interrupts\n"
+        // malformed: nothing to name a dimension with
+        ":1234567890         31         32       Idless interrupts\n";
 
     if(write(fd, fixture, sizeof(fixture) - 1) != (ssize_t)sizeof(fixture) - 1) {
         fprintf(stderr, "Cannot write in-memory /proc/interrupts fixture: %s\n", strerror(errno));
@@ -464,12 +534,31 @@ int proc_interrupts_unittest(void) {
             cpus++;
     }
 
-    static const char *expected[] = {
-        "mlx5_comp40@pci_0000_86_00.0_240",
-        "nvme_0_io5_250",
-        "timer_0",
-        "keyboard_1",
-        "arch_timer_27",
+    static const struct {
+        const char *id;
+        const char *name;
+        unsigned long long cpu[2];
+        bool skip;
+    } expected[] = {
+        { "240",  "mlx5_comp40@pci_0000_86_00.0_240", { 1, 2 },   false },
+        { "250",  "nvme_0_io5_250",                   { 3, 4 },   false },
+        { "0",    "timer_0",                          { 5, 6 },   false },
+        { "1",    "keyboard_1",                       { 7, 8 },   false },
+        { "27",   "arch_timer_27",                    { 9, 10 },  false },
+
+        // the id must never carry the glued counter, and the counter must be charged to CPU0
+        { "IPI0", "IPI0",                             { 104908982, 106865102 },   false },
+        { "IPI1", "IPI1",                             { 1282597797, 1221739692 }, false },
+        { "260",  "nvme_1_io6_260",                   { 1234567890, 12 },         false },
+
+        // malformed: id truncated at the colon, no column shift applied
+        { "IPI9", "IPI9",                             { 11, 12 }, false },
+
+        // malformed: no colon at all, the whole word is the id
+        { "IPI8", "IPI8",                             { 21, 22 }, false },
+
+        // malformed: no id, the line must be skipped
+        { NULL,   NULL,                               { 0, 0 },   true },
     };
 
     int rc = 0;
@@ -485,33 +574,71 @@ int proc_interrupts_unittest(void) {
             break;
         }
 
-        char id[MAX_INTERRUPT_NAME + 1];
-        const char *id_word = proc_interrupts_lineword(ff, line, 0);
-        if(!id_word) {
+        struct interrupt_id irrid = proc_interrupts_parse_first_word(proc_interrupts_lineword(ff, line, 0));
+        if(irrid.skip != expected[expected_idx].skip) {
+            fprintf(
+                stderr,
+                "proc_interrupts_unittest line %zu expected skip=%s, got skip=%s\n",
+                line,
+                expected[expected_idx].skip ? "true" : "false",
+                irrid.skip ? "true" : "false");
             rc = 1;
             break;
         }
 
-        strncpyz(id, id_word, MAX_INTERRUPT_NAME);
-        size_t idlen = proc_interrupts_strnlen(id, MAX_INTERRUPT_NAME);
-        if(idlen && id[idlen - 1] == ':')
-            id[--idlen] = '\0';
+        if(irrid.skip) {
+            expected_idx++;
+            continue;
+        }
 
-        size_t first_name_word = proc_interrupts_name_first_word(ff, line, cpus, words);
+        if(strcmp(irrid.id, expected[expected_idx].id) != 0) {
+            fprintf(
+                stderr,
+                "proc_interrupts_unittest line %zu expected id '%s', got '%s'\n",
+                line,
+                expected[expected_idx].id,
+                irrid.id);
+            rc = 1;
+            break;
+        }
 
         char name[MAX_INTERRUPT_NAME + 1];
-        proc_interrupts_build_name(name, ff, line, first_name_word, words, id, idlen);
+        if(isdigit((uint8_t)irrid.id[0])) {
+            size_t first_name_word =
+                proc_interrupts_name_first_word(ff, line, cpus, words, proc_interrupts_word_offset(&irrid));
+            proc_interrupts_build_name(name, ff, line, first_name_word, words, irrid.id, irrid.idlen);
+        }
+        else
+            strncpyz(name, irrid.id, MAX_INTERRUPT_NAME);
 
-        if(strcmp(name, expected[expected_idx]) != 0) {
+        if(strcmp(name, expected[expected_idx].name) != 0) {
             fprintf(
                 stderr,
                 "proc_interrupts_unittest line %zu expected '%s', got '%s'\n",
                 line,
-                expected[expected_idx],
+                expected[expected_idx].name,
                 name);
             rc = 1;
             break;
         }
+
+        for(int c = 0; c < cpus && c < 2 ;c++) {
+            unsigned long long value = proc_interrupts_cpu_value(ff, line, words, &irrid, c);
+            if(value != expected[expected_idx].cpu[c]) {
+                fprintf(
+                    stderr,
+                    "proc_interrupts_unittest line %zu cpu%d expected %llu, got %llu\n",
+                    line,
+                    c,
+                    expected[expected_idx].cpu[c],
+                    value);
+                rc = 1;
+                break;
+            }
+        }
+
+        if(rc)
+            break;
 
         expected_idx++;
     }

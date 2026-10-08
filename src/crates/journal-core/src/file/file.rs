@@ -1,3 +1,29 @@
+//! The mmap-backed journal object layer: [`JournalFile`] is the type every
+//! other `file/*` module builds on. It opens or creates systemd-format
+//! journal files (`LPKSHHRH` signature; layout in file/object.rs), keeps the
+//! header and both hash tables in persistent memory maps, and reaches every
+//! other object through a bounded set of mmap windows (file/mmap.rs).
+//!
+//! Object-offset validity (`journal_object_ref`/`_mut`): a journal object
+//! lives at a non-zero, 8-byte-aligned offset at or past the header, whose
+//! header-declared size fits the arena (`header_size + arena_size`). Two
+//! deliberate exceptions: new objects are written with an explicit size and
+//! may extend the file (`journal_object_mut`; `MemoryMapMut` grows it,
+//! file/mmap.rs), and the hash-table maps bypass this path via
+//! `map_hash_table` below.
+//!
+//! Concurrency: not `Sync` - the window manager sits in a `GuardedCell`
+//! (file/guarded_cell.rs) that admits one object at a time, wrapped in a
+//! `ValueGuard` (file/value_guard.rs) that releases the guard on drop.
+//! Conflicting access fails with `JournalError::ValueGuardInUse` rather
+//! than racing.
+//!
+//! Consumers: `JournalWriter` (file/writer.rs) writes through the `*_mut`
+//! accessors; journal-log-writer creates files via [`JournalFileOptions`]
+//! and rotates via `create_successor`; journal-index, journal-engine and
+//! netflow-plugin read files via `open` and the typed accessors. Field-name
+//! remappings (`ND_REMAPPING=1` entries) are parsed by `load_fields` below;
+//! the shared registry type lives in field_map.rs.
 #![allow(clippy::field_reassign_with_default)]
 
 use super::mmap::{MemoryMap, MemoryMapMut, WindowManager};
@@ -15,11 +41,10 @@ use zerocopy::{ByteSlice, FromBytes};
 
 use crate::file::value_guard::ValueGuard;
 
-// Size to pad objects to (8 bytes)
+// Objects are 8-byte aligned/padded (systemd journal format)
 const OBJECT_ALIGNMENT: u64 = 8;
 
-/// Validates that an offset is properly aligned for journal objects.
-/// Journal objects must be 8-byte aligned.
+/// Rejects offsets that are not 8-byte aligned; `MisalignedOffset` carries the offset.
 fn validate_offset_alignment(offset: NonZeroU64) -> Result<()> {
     if offset.get() % OBJECT_ALIGNMENT != 0 {
         return Err(JournalError::MisalignedOffset(offset.get()));
@@ -27,15 +52,20 @@ fn validate_offset_alignment(offset: NonZeroU64) -> Result<()> {
     Ok(())
 }
 
+/// Visitor over one hash-bucket chain: `visit` is called for each object
+/// from the bucket head; a `Some` output stops the walk (and becomes
+/// `visit_bucket`'s result), `None` continues to the next link.
 pub trait BucketVisitor<'a> {
     type Object: JournalObject<&'a [u8]> + HashableObject;
     type Output;
 
-    /// Called for each object in the bucket. Return Some(output) to stop iteration,
-    /// or None to continue to the next object.
+    /// Called for each object along the chain; returning `Some` stops the walk.
     fn visit(&mut self, object: &ValueGuard<'a, Self::Object>) -> Result<Option<Self::Output>>;
 }
 
+/// Bucket visitor used by `find_data_offset`/`find_field_offset`: matches a
+/// chain object with the expected stored hash and raw payload bytes, and
+/// returns its offset as the output.
 struct PayloadMatcher<'data, T> {
     payload: &'data [u8],
     hash: u64,
@@ -78,6 +108,10 @@ where
     }
 }
 
+/// Header configuration for a journal file, consumed only by `create`.
+/// Defaults: 64 KiB windows, 4096 data / 512 field hash-table buckets,
+/// keyed hash enabled. `file_id` is a fresh UUIDv4 per options value (not
+/// settable); `boot_id` is stored in the header's `tail_entry_boot_id`.
 #[derive(Debug, Clone)]
 pub struct JournalFileOptions {
     machine_id: uuid::Uuid,
@@ -91,6 +125,7 @@ pub struct JournalFileOptions {
 }
 
 impl JournalFileOptions {
+    /// Header IDs for the new file; all other settings keep their defaults.
     pub fn new(machine_id: uuid::Uuid, boot_id: uuid::Uuid, seqnum_id: uuid::Uuid) -> Self {
         let file_id = uuid::Uuid::new_v4();
 
@@ -106,7 +141,11 @@ impl JournalFileOptions {
         }
     }
 
-    /// Creates options with bucket sizes optimized based on previous utilization
+    /// Sizes the hash tables for a successor file. With utilization data:
+    /// double a table above 75% occupancy, halve it below 25% (only while
+    /// larger than the 4096/512 defaults), else keep it. Without: derive
+    /// data buckets from `max_file_size` (default 8 MiB) and fix field
+    /// buckets at 128.
     pub fn with_optimized_buckets(
         mut self,
         previous_utilization: Option<BucketUtilization>,
@@ -139,7 +178,7 @@ impl JournalFileOptions {
 
             // 16 MiB -> 4096 data buckets
             let data_buckets = (max_file_size / 4096).max(1024).next_power_of_two() as usize;
-            let field_buckets = 128; // Assume ~8:1 data:field ratio
+            let field_buckets = 128; // Fixed; ~8:1 vs data only at the 8 MiB default floor
 
             (data_buckets, field_buckets)
         };
@@ -149,6 +188,8 @@ impl JournalFileOptions {
         self
     }
 
+    /// Sets the journal's mmap window size; must be a multiple of 8 and of
+    /// the 4096-byte page (asserted).
     pub fn with_window_size(mut self, size: u64) -> Self {
         assert_eq!(size % OBJECT_ALIGNMENT, 0);
         assert_eq!(size % 4096, 0, "Window size must be page-aligned");
@@ -156,6 +197,8 @@ impl JournalFileOptions {
         self
     }
 
+    /// Bucket count; must be a power of two (asserted) - bucket lookup is
+    /// `hash % buckets` (object.rs).
     pub fn with_data_hash_table_buckets(mut self, buckets: usize) -> Self {
         assert!(
             buckets.is_power_of_two(),
@@ -165,6 +208,8 @@ impl JournalFileOptions {
         self
     }
 
+    /// Bucket count; must be a power of two (asserted) - bucket lookup is
+    /// `hash % buckets` (object.rs).
     pub fn with_field_hash_table_buckets(mut self, buckets: usize) -> Self {
         assert!(
             buckets.is_power_of_two(),
@@ -174,17 +219,21 @@ impl JournalFileOptions {
         self
     }
 
+    /// Sets the header's `KeyedHash` flag; see `JournalFile::hash`.
     pub fn with_keyed_hash(mut self, enabled: bool) -> Self {
         self.enable_keyed_hash = enabled;
         self
     }
 
+    /// Convenience wrapper around `JournalFile::create`.
     pub fn create<M: MemoryMapMut>(self, file: &crate::repository::File) -> Result<JournalFile<M>> {
         JournalFile::create(file, self)
     }
 }
 
-/// Hash table bucket utilization statistics
+/// Hash-table occupancy per table: `*_occupied` counts buckets with a
+/// chain head. Produced by `JournalFile::bucket_utilization`, consumed by
+/// `with_optimized_buckets`.
 #[derive(Debug, Clone, Copy)]
 pub struct BucketUtilization {
     pub data_occupied: usize,
@@ -211,40 +260,46 @@ impl BucketUtilization {
     }
 }
 
+/// The in-memory handle for one journal file. Read-only callers use
+/// `JournalFile<Mmap>` (`open`); writers use `JournalFile<MmapMut>`
+/// (`create`), whose maps extend the file as objects are appended.
 ///
-/// A reader for systemd journal files that efficiently maps small regions of the file into memory.
+/// # Memory management
 ///
-/// # Memory Management
+/// Only the file header and the two hash tables keep persistent maps; every
+/// other object is reached through a bounded set of mmap windows (16 after
+/// `open`, 32 after `create`) that the window manager remaps on demand
+/// (file/mmap.rs), mirroring systemd's bounded-window model.
 ///
-/// This implementation uses a window-based memory mapping strategy similar to systemd's original
-/// implementation. Instead of mapping the entire file, it maintains a small set of memory-mapped
-/// windows and reuses them as needed.
+/// # Concurrency and safety
 ///
-/// # Concurrency and Safety
-///
-/// `JournalFile` uses interior mutability to provide a safe API with the following characteristics:
-///
-/// - The window manager is wrapped in a `GuardedCell` which owns both the `WindowManager` and
-///   its guard flag, providing interior mutability with integrated guard-based exclusion.
-/// - The guard flag ensures only one object can be active at a time.
-/// - Methods like `data_object()` return a `ValueGuard<T>` that automatically releases the guard
-///   when dropped.
-///
-/// This design ensures that memory safety is maintained even though references to memory-mapped
-/// regions could be invalidated when new objects are created.
+/// Interior mutability through a `GuardedCell` (file/guarded_cell.rs) that
+/// owns the window manager and its guard flag. The guard admits exactly one
+/// object at a time: object accessors return a `ValueGuard`
+/// (file/value_guard.rs) that releases the guard on drop, and a second
+/// concurrent or re-entrant access fails with
+/// `JournalError::ValueGuardInUse`. The type is not `Sync` - use it from a
+/// single thread (or move it while no guard is alive).
 pub struct JournalFile<M: MemoryMap> {
-    // The validated File this journal represents
+    // Repository identity (path/status) this journal was opened/created for
     file: crate::repository::File,
 
-    // Persistent memory maps for journal header and data/field hash tables
+    // Persistent maps: the file header and both hash tables (whole lifetime)
     header_map: M,
     data_hash_table_map: Option<M>,
     field_hash_table_map: Option<M>,
 
-    // Window manager for other objects (owns the guard flag internally)
+    // Window manager for every other object; owns the journal fd (`sync` goes through it)
     window_manager: GuardedCell<WindowManager<M>>,
 }
 
+/// Maps a hash table as the journal object it is stored as: the header
+/// records the table payload's offset/size, and the map covers the payload
+/// plus one `ObjectHeader` before it (`offset - sizeof::<ObjectHeader>()`
+/// .. `offset + size`). `Ok(None)` when the header has no such table;
+/// `JournalError::InvalidObjectLocation` when the payload offset does not
+/// clear the `JournalHeader` region or the size does not exceed an
+/// `ObjectHeader`.
 fn map_hash_table<M: MemoryMap>(
     file: &File,
     offset: Option<NonZeroU64>,
@@ -267,6 +322,10 @@ fn map_hash_table<M: MemoryMap>(
 }
 
 impl<M: MemoryMap> JournalFile<M> {
+    /// Walks one hash bucket's chain, calling `visitor` for each object
+    /// until it returns `Some` (returned as the result) or the chain ends
+    /// (`Ok(None)`). Errors `JournalError::MissingHashTable` on a `None`
+    /// table. Only one object guard is live at a time while walking.
     pub fn visit_bucket<'a, H, V>(
         &'a self,
         hash_table: Option<H>,
@@ -294,16 +353,19 @@ impl<M: MemoryMap> JournalFile<M> {
         Ok(None)
     }
 
+    /// Opens an existing journal file read-only. Validates only the
+    /// `LPKSHHRH` signature (`JournalError::InvalidMagicNumber` otherwise) -
+    /// state and the other header fields are not checked here. Maps the
+    /// hash tables when the header points at them, then hands the opened fd
+    /// to the window manager (16 windows max).
     pub fn open(file: &crate::repository::File, window_size: u64) -> Result<Self> {
         debug_assert_eq!(window_size % OBJECT_ALIGNMENT, 0);
 
-        // Open file and check its size
         let fd = OpenOptions::new()
             .read(true)
             .write(false)
             .open(file.path())?;
 
-        // Create a memory map for the header
         let header_size = std::mem::size_of::<JournalHeader>() as u64;
         let header_map = M::create(&fd, 0, header_size)?;
         let header = JournalHeader::ref_from_prefix(&header_map).unwrap().0;
@@ -311,7 +373,6 @@ impl<M: MemoryMap> JournalFile<M> {
             return Err(JournalError::InvalidMagicNumber);
         }
 
-        // Initialize the hash table maps if they exist
         let data_hash_table_map = map_hash_table(
             &fd,
             header.data_hash_table_offset,
@@ -323,7 +384,6 @@ impl<M: MemoryMap> JournalFile<M> {
             header.field_hash_table_size,
         )?;
 
-        // Create window manager for the rest of the objects
         let window_manager = GuardedCell::new(WindowManager::new(fd, window_size, 16)?);
 
         Ok(JournalFile {
@@ -339,6 +399,10 @@ impl<M: MemoryMap> JournalFile<M> {
         &self.file
     }
 
+    /// The file's hash for `data`: SipHash-2-4 keyed by the file's
+    /// `file_id` when the header sets `KeyedHash`, else Jenkins lookup3 in
+    /// systemd's word order (file/hash.rs). Keyed hashes are file-specific:
+    /// a hash only compares within the file it was computed for.
     pub fn hash(&self, data: &[u8]) -> u64 {
         let is_keyed_hash = self
             .journal_header_ref()
@@ -355,6 +419,9 @@ impl<M: MemoryMap> JournalFile<M> {
         )
     }
 
+    /// The journal's entry-array list covering all `n_entries` entries;
+    /// `None` when the header has no `entry_array_offset` or zero entries
+    /// (file/cursor.rs treats `None` as `InvalidOffsetArrayOffset`).
     pub fn entry_list(&self) -> Option<offset_array::List> {
         let header = self.journal_header_ref();
 
@@ -364,6 +431,8 @@ impl<M: MemoryMap> JournalFile<M> {
         })
     }
 
+    /// Appends the offset of every entry in the entry-array chain to
+    /// `offsets`, in array order; no-op on an empty or absent list.
     pub fn entry_offsets(&self, offsets: &mut Vec<NonZeroU64>) -> Result<()> {
         if let Some(entry_list) = self.entry_list() {
             entry_list.collect_offsets(self, offsets)?;
@@ -372,8 +441,10 @@ impl<M: MemoryMap> JournalFile<M> {
         Ok(())
     }
 
-    // Returns the data object offsets of the entry object at the specified
-    // offset
+    /// Appends the data-object offsets of the entry at `entry_offset` to
+    /// `offsets`, in item order. A zero item offset fails with
+    /// `JournalError::InvalidOffset` (EntryObject::collect_offsets,
+    /// object.rs).
     pub fn entry_data_object_offsets(
         &self,
         entry_offset: NonZeroU64,
@@ -383,6 +454,9 @@ impl<M: MemoryMap> JournalFile<M> {
         entry_guard.collect_offsets(offsets)
     }
 
+    /// Borrows the header out of the persistent header map; the map is
+    /// created with exactly `size_of::<JournalHeader>()`, so the parse
+    /// cannot fail.
     pub fn journal_header_ref(&self) -> &JournalHeader {
         JournalHeader::ref_from_prefix(&self.header_map).unwrap().0
     }
@@ -394,18 +468,26 @@ impl<M: MemoryMap> JournalFile<M> {
         self.field_hash_table_map.as_ref()
     }
 
+    /// Typed view over the data hash-table map; `None` when the file has
+    /// none or the bytes do not parse.
     pub fn data_hash_table_ref(&self) -> Option<DataHashTable<&[u8]>> {
         self.data_hash_table_map
             .as_ref()
             .and_then(|m| DataHashTable::<&[u8]>::from_data(m, false))
     }
 
+    /// Typed view over the field hash-table map; `None` when the file has
+    /// none or the bytes do not parse.
     pub fn field_hash_table_ref(&self) -> Option<FieldHashTable<&[u8]>> {
         self.field_hash_table_map
             .as_ref()
             .and_then(|m| FieldHashTable::<&[u8]>::from_data(m, false))
     }
 
+    /// Reads one object header through the window manager (8-byte-aligned
+    /// offsets only). Caution: the returned reference borrows the window
+    /// manager without installing a guard - do not hold it across other
+    /// `JournalFile` calls.
     pub fn object_header_ref(&self, position: NonZeroU64) -> Result<&ObjectHeader> {
         validate_offset_alignment(position)?;
         let size_needed = std::mem::size_of::<ObjectHeader>() as u64;
@@ -414,6 +496,11 @@ impl<M: MemoryMap> JournalFile<M> {
         ObjectHeader::ref_from_bytes(header_slice).map_err(|_| JournalError::ZerocopyFailure)
     }
 
+    /// Validates and parses the object at `offset` - 8-byte-aligned, not
+    /// inside the file header, header-declared size inside the arena - and
+    /// returns it as a `ValueGuard` holding the window-manager guard. The
+    /// stored object type is not checked here; parse failures surface as
+    /// `ZerocopyFailure`.
     fn journal_object_ref<'a, T>(&'a self, offset: NonZeroU64) -> Result<ValueGuard<'a, T>>
     where
         T: JournalObject<&'a [u8]>,
@@ -431,7 +518,6 @@ impl<M: MemoryMap> JournalFile<M> {
         }
 
         self.window_manager.with_guarded(offset, |wm| {
-            // Get the object header to determine size
             let size_needed = {
                 let header_slice =
                     wm.get_slice(offset.get(), std::mem::size_of::<ObjectHeader>() as u64)?;
@@ -449,16 +535,17 @@ impl<M: MemoryMap> JournalFile<M> {
                 return Err(JournalError::ObjectExceedsFileBounds);
             }
 
-            // Get the full object data
             let data = wm.get_slice(offset.get(), size_needed)?;
 
-            // Parse the object
             let value = T::from_data(data, is_compact).ok_or(JournalError::ZerocopyFailure)?;
 
             Ok(value)
         })
     }
 
+    // Typed object accessors: each validates and parses through
+    // `journal_object_ref` and returns a `ValueGuard` holding the
+    // window-manager guard; only one may be live at a time.
     pub fn offset_array_ref(
         &self,
         offset: NonZeroU64,
@@ -482,20 +569,29 @@ impl<M: MemoryMap> JournalFile<M> {
         self.journal_object_ref(offset)
     }
 
+    /// Returns the data object whose stored hash and raw payload bytes
+    /// match `hash`/`payload`, walking its hash bucket. Byte comparison is
+    /// over stored bytes: a compressed data object matches only its
+    /// compressed stream, not the plaintext. Errors `MissingHashTable`
+    /// when the file has no data hash table.
     pub fn find_data_offset(&self, hash: u64, payload: &[u8]) -> Result<Option<NonZeroU64>> {
         let visitor = PayloadMatcher::data_matcher(payload, hash);
         self.visit_bucket(self.data_hash_table_ref(), hash, visitor)
     }
 
+    /// Returns the field object whose stored hash and payload bytes match
+    /// `hash`/`payload`; errors `MissingHashTable` when the file has no
+    /// field hash table. `hash` must come from this file's `hash()`.
     pub fn find_field_offset(&self, hash: u64, payload: &[u8]) -> Result<Option<NonZeroU64>> {
         let visitor = PayloadMatcher::field_matcher(payload, hash);
         self.visit_bucket(self.field_hash_table_ref(), hash, visitor)
     }
 
-    /// Run a directed partition point query on a data object's entry array
-    ///
-    /// This finds the first/last entry (depending on direction) that satisfies the given predicate
-    /// in the entry array chain of the data object.
+    /// Runs a partition-point query over the entries referencing a data
+    /// object: the first (`Forward`) or last (`Backward`) entry offset
+    /// whose predicate holds. `Ok(None)` when the data object has no
+    /// inlined entry cursor or nothing matches. No current caller in this
+    /// crate tree (file/filter.rs keeps a commented-out reference).
     pub fn data_object_directed_partition_point<F>(
         &self,
         data_offset: NonZeroU64,
@@ -516,12 +612,12 @@ impl<M: MemoryMap> JournalFile<M> {
         best_match.value(self)
     }
 
-    /// Creates an iterator over all field objects in the field hash table
+    /// Iterates every field object in the field hash table: bucket order,
+    /// then hash-chain order within each bucket. Yields nothing when the
+    /// file has no field hash table; ends after the first read error.
     pub fn fields(&self) -> FieldIterator<'_, M> {
-        // Get the field hash table
         let field_hash_table = self.field_hash_table_ref();
 
-        // Initialize with the first bucket
         let mut iterator = FieldIterator {
             journal: self,
             field_hash_table,
@@ -529,12 +625,39 @@ impl<M: MemoryMap> JournalFile<M> {
             next_field_offset: None,
         };
 
-        // Find the first non-empty bucket
         iterator.advance_to_next_nonempty_bucket();
 
         iterator
     }
 
+    /// Builds the field-name compatibility map for this file: original
+    /// (otel) name -> stored (systemd) journal name.
+    ///
+    /// Pass 1 - remapping entries: locates the data object whose payload is
+    /// exactly `ND_REMAPPING=1` (duplicated literal; the constant lives in
+    /// field_map.rs), walks every entry referencing it through the data
+    /// object's inlined cursor, and parses each entry's other data payloads
+    /// as `name=value` (first `=`), mapping `value` (original) -> `name`
+    /// (stored). No name-shape gate: both `rdp::encode_full` normal names
+    /// (`ND<checksum><structure>_<NAME>`) and MD5-fallback names (`ND_` +
+    /// 32 hex) load - unlike `JournalReader::load_remappings`
+    /// (file/reader.rs), which accepts only the 35-byte MD5-fallback shape
+    /// and silently drops normal names; the two reader paths disagree. A
+    /// payload without `=` fails with `InvalidField`; non-UTF-8 payloads
+    /// panic (`expect`). The `_BOOT_ID=...` item journal-log-writer adds to
+    /// every marker entry (journal-log-writer/src/log/mod.rs) is parsed
+    /// like any mapping and contributes `<boot-id> -> _BOOT_ID`.
+    ///
+    /// Pass 2 - identity mappings: every field-table field whose payload
+    /// does not start with `ND` (the marker and remapped names) is inserted
+    /// as `name -> name`. This pass runs after pass 1 and overwrites on key
+    /// collision (last wins - unlike `FieldMap::add_otel_mapping`, which
+    /// keeps the first).
+    ///
+    /// Without a marker data object, only pass 2 runs. Errors: hash-table
+    /// lookup failures propagate (`MissingHashTable`, ...); a marker data
+    /// object with no referencing entries (no inlined cursor) fails with
+    /// `EmptyInlineCursor`.
     pub fn load_fields(&self) -> Result<HashMap<String, String>> {
         let remapping_payload = b"ND_REMAPPING=1".as_slice();
         let hash = self.hash(remapping_payload);
@@ -580,7 +703,7 @@ impl<M: MemoryMap> JournalFile<M> {
                 }
             }
             Ok(None) => {
-                // Just load fields from the field hash table
+                // No remapping entries: only the identity pass below runs
             }
             Err(e) => {
                 return Err(e);
@@ -599,12 +722,14 @@ impl<M: MemoryMap> JournalFile<M> {
         Ok(field_map)
     }
 
-    /// Creates an iterator over all DATA objects for the specified field
+    /// Iterates the DATA objects chained under `field_name` (the field
+    /// object's `head_data_offset` list). The name is the stored (systemd)
+    /// field name, hashed with this file's `hash()`. An unknown field
+    /// yields an empty iterator, not an error.
     pub fn field_data_objects<'a>(
         &'a self,
         field_name: &'a [u8],
     ) -> Result<FieldDataIterator<'a, M>> {
-        // Find the field offset by name
         let field_hash = self.hash(field_name);
         let Some(field_offset) = self.find_field_offset(field_hash, field_name)? else {
             return Ok(FieldDataIterator {
@@ -613,29 +738,27 @@ impl<M: MemoryMap> JournalFile<M> {
             });
         };
 
-        // Get the field object to access its head_data_offset
         let field_guard = self.field_ref(field_offset)?;
         let head_data_offset = field_guard.header.head_data_offset;
 
-        // Create the iterator
         Ok(FieldDataIterator {
             journal: self,
             current_data_offset: head_data_offset,
         })
     }
 
-    /// Creates an iterator over all DATA objects for a specific entry
+    /// Iterates the DATA objects of the entry at `entry_offset`, in item
+    /// order. A zero item offset yields `JournalError::InvalidOffset` and
+    /// ends the iteration; any read error does the same - items are never
+    /// skipped.
     pub fn entry_data_objects(&self, entry_offset: NonZeroU64) -> Result<EntryDataIterator<'_, M>> {
-        // Get the entry object to determine how many data items it has
         let entry_guard = self.entry_ref(entry_offset)?;
 
-        // Get the total number of items
         let total_items = match &entry_guard.items {
             EntryItemsType::Regular(items) => items.len(),
             EntryItemsType::Compact(items) => items.len(),
         };
 
-        // Create the iterator
         Ok(EntryDataIterator {
             journal: self,
             entry_offset: Some(entry_offset),
@@ -644,7 +767,9 @@ impl<M: MemoryMap> JournalFile<M> {
         })
     }
 
-    /// Get hash table bucket utilization statistics
+    /// Occupied bucket counts per hash table (buckets with a chain head);
+    /// `None` when either table is missing. Consumed by `create_successor`
+    /// via `with_optimized_buckets`.
     pub fn bucket_utilization(&self) -> Option<BucketUtilization> {
         let data_hash_table = self.data_hash_table_ref()?;
         let data_total = data_hash_table.items.len();
@@ -670,8 +795,9 @@ impl<M: MemoryMap> JournalFile<M> {
         })
     }
 
-    /// Get the duration covered by all entries in the journal
-    /// Returns None if the journal is empty or contains only one entry
+    /// Tail-minus-head entry realtime as a `Duration` (microseconds).
+    /// `None` for an empty or single-entry journal, or when
+    /// `tail_entry_realtime <= head_entry_realtime`.
     pub fn duration(&self) -> Option<Duration> {
         let header = self.journal_header_ref();
 
@@ -690,23 +816,23 @@ impl<M: MemoryMap> JournalFile<M> {
 }
 
 impl<M: MemoryMapMut> JournalFile<M> {
-    /// Syncs all file data to disk, ensuring all changes are persisted
-    ///
-    /// This performs a two-step sync process:
-    /// 1. Flushes memory-mapped regions to the file page cache (msync)
-    /// 2. Syncs the file page cache to physical disk (fdatasync)
+    /// Persists the journal: msyncs the header map, then fdatasyncs the
+    /// file through the fd the window manager owns. The hash-table maps and
+    /// the windows reach disk only through that fdatasync.
     pub fn sync(&mut self) -> Result<()> {
-        // Flush memory-mapped header to file page cache
         self.header_map.flush()?;
 
-        // Sync file page cache to disk
         let window_manager = self.window_manager.get_mut();
         window_manager.sync()?;
 
         Ok(())
     }
 
-    /// Creates a successor journal file with optimized bucket sizes based on this file's utilization
+    /// Creates a fresh successor file for rotation: IDs copied from this
+    /// header (machine, boot, seqnum; a NEW random `file_id`), bucket
+    /// counts sized from this file's `bucket_utilization`, keyed-hash flag
+    /// inherited, 8 MiB windows. The successor starts empty. Used by
+    /// journal-log-writer on rotation (journal-log-writer/src/log/mod.rs).
     pub fn create_successor(
         &self,
         file: &crate::repository::File,
@@ -727,6 +853,12 @@ impl<M: MemoryMapMut> JournalFile<M> {
         Self::create(file, options)
     }
 
+    /// Creates a journal file at `file`'s path, truncating anything already
+    /// there. Writes the header (`LPKSHHRH`, `KeyedHash` flag per options,
+    /// hash-table locations/sizes, IDs, state ONLINE), stamps both
+    /// hash-table object headers, then syncs. The arena spans the header
+    /// through the end of the field hash table; `n_objects` counts the two
+    /// tables. The window manager (32 windows) takes over the opened fd.
     pub fn create(file: &crate::repository::File, options: JournalFileOptions) -> Result<Self> {
         let fd = OpenOptions::new()
             .create(true)
@@ -735,35 +867,29 @@ impl<M: MemoryMapMut> JournalFile<M> {
             .write(true)
             .open(file.path())?;
 
-        // Calculate hash table sizes
         let data_hash_table_size =
             options.data_hash_table_buckets * std::mem::size_of::<HashItem>();
         let field_hash_table_size =
             options.field_hash_table_buckets * std::mem::size_of::<HashItem>();
 
-        // Calculate hash table offsets
         let data_hash_table_offset = std::mem::size_of::<JournalHeader>() as u64
             + std::mem::size_of::<ObjectHeader>() as u64;
         let field_hash_table_offset = data_hash_table_offset
             + data_hash_table_size as u64
             + std::mem::size_of::<ObjectHeader>() as u64;
 
-        // Create header with options configuration
         let mut header = JournalHeader::default();
         header.signature = *b"LPKSHHRH";
 
-        // Set flags based on options configuration
         if options.enable_keyed_hash {
             header.incompatible_flags |= HeaderIncompatibleFlags::KeyedHash as u32;
         }
 
-        // Set hash table configuration
         header.data_hash_table_offset = NonZeroU64::new(data_hash_table_offset);
         header.data_hash_table_size = NonZeroU64::new(data_hash_table_size as u64);
         header.field_hash_table_offset = NonZeroU64::new(field_hash_table_offset);
         header.field_hash_table_size = NonZeroU64::new(field_hash_table_size as u64);
 
-        // Set other header fields
         header.tail_object_offset =
             NonZeroU64::new(data_hash_table_offset + data_hash_table_size as u64);
         header.header_size = std::mem::size_of::<JournalHeader>() as u64;
@@ -771,13 +897,11 @@ impl<M: MemoryMapMut> JournalFile<M> {
         header.arena_size =
             field_hash_table_offset + field_hash_table_size as u64 - header.header_size;
 
-        // Set IDs from options
         header.machine_id = *options.machine_id.as_bytes();
         header.tail_entry_boot_id = *options.boot_id.as_bytes();
         header.file_id = *options.file_id.as_bytes();
         header.seqnum_id = *options.seqnum_id.as_bytes();
 
-        // Create memory maps for hash tables
         let data_hash_table_map = map_hash_table(
             &fd,
             header.data_hash_table_offset,
@@ -789,17 +913,15 @@ impl<M: MemoryMapMut> JournalFile<M> {
             header.field_hash_table_size,
         )?;
 
-        // Create header memory map and write header
         let header_size = std::mem::size_of::<JournalHeader>() as u64;
         let mut header_map = M::create(&fd, 0, header_size)?;
         {
             let header_mut = JournalHeader::mut_from_prefix(&mut header_map).unwrap().0;
             *header_mut = header;
-            // Set state to ONLINE as per journal file format spec
+            // ONLINE per the journal format; persisted by the sync below
             header_mut.state = JournalState::Online as u8;
         }
 
-        // Create window manager for the rest of the objects
         let window_manager = GuardedCell::new(WindowManager::new(fd, options.window_size, 32)?);
 
         let mut jf = JournalFile {
@@ -810,7 +932,7 @@ impl<M: MemoryMapMut> JournalFile<M> {
             window_manager,
         };
 
-        // write data hash table object header info
+        // Stamp the data hash table's object header (type + size)
         {
             let offset = NonZeroU64::new(
                 header.data_hash_table_offset.unwrap().get()
@@ -825,7 +947,7 @@ impl<M: MemoryMapMut> JournalFile<M> {
             object_header.size = size
         }
 
-        // write field hash table object header info
+        // Stamp the field hash table's object header (type + size)
         {
             let offset = NonZeroU64::new(
                 header.field_hash_table_offset.unwrap().get()
@@ -840,30 +962,39 @@ impl<M: MemoryMapMut> JournalFile<M> {
             object_header.size = size
         }
 
-        // Sync to ensure the ONLINE state is persisted to disk
         jf.sync()?;
 
         Ok(jf)
     }
 
+    /// Mutable header access; writes land in the header map and reach disk
+    /// only on `sync`.
     pub fn journal_header_mut(&mut self) -> &mut JournalHeader {
         JournalHeader::mut_from_prefix(&mut self.header_map)
             .unwrap()
             .0
     }
 
+    /// Mutable typed view over the data hash-table map; `None` when the
+    /// file has none or the bytes do not parse.
     pub fn data_hash_table_mut(&mut self) -> Option<DataHashTable<&mut [u8]>> {
         self.data_hash_table_map
             .as_mut()
             .and_then(|m| DataHashTable::<&mut [u8]>::from_data_mut(m, false))
     }
 
+    /// Mutable typed view over the field hash-table map; `None` when the
+    /// file has none or the bytes do not parse.
     pub fn field_hash_table_mut(&mut self) -> Option<FieldHashTable<&mut [u8]>> {
         self.field_hash_table_map
             .as_mut()
             .and_then(|m| FieldHashTable::<&mut [u8]>::from_data_mut(m, false))
     }
 
+    /// Writes one object header through the window manager (8-byte-aligned
+    /// offsets only). Like `object_header_ref`, the returned reference
+    /// borrows the window manager without a guard; used briefly inside
+    /// `create`.
     #[allow(clippy::mut_from_ref)]
     fn object_header_mut(&self, offset: NonZeroU64) -> Result<&mut ObjectHeader> {
         validate_offset_alignment(offset)?;
@@ -873,6 +1004,12 @@ impl<M: MemoryMapMut> JournalFile<M> {
         ObjectHeader::mut_from_bytes(header_slice).map_err(|_| JournalError::ZerocopyFailure)
     }
 
+    /// Opens or creates a mutable object view at `offset`. `Some(size)`
+    /// initializes a new object header (type + size) with no bounds checks
+    /// - the file is extended as needed (`MemoryMapMut::create`,
+    /// file/mmap.rs). `None` reads the existing header and requires the
+    /// stored type to match (`InvalidObjectType`), with the usual
+    /// alignment/bounds validation.
     fn journal_object_mut<'a, T>(
         &'a self,
         type_: ObjectType,
@@ -932,16 +1069,18 @@ impl<M: MemoryMapMut> JournalFile<M> {
                 }
             };
 
-            // Get mutable object data
             let data = wm.get_slice_mut(offset.get(), size_needed)?;
 
-            // Parse the mutable object
             let value = T::from_data_mut(data, is_compact).ok_or(JournalError::ZerocopyFailure)?;
 
             Ok(value)
         })
     }
 
+    /// Opens or creates an entry-array object at `offset`. `Some(capacity)`
+    /// computes the on-disk size (`OffsetArrayObjectHeader` + `capacity`
+    /// entries - u64 each, u32 under the Compact flag) and initializes the
+    /// object; `None` opens the existing one.
     pub fn offset_array_mut(
         &self,
         offset: NonZeroU64,
@@ -965,6 +1104,8 @@ impl<M: MemoryMapMut> JournalFile<M> {
         self.journal_object_mut(ObjectType::EntryArray, offset, size)
     }
 
+    /// Opens or creates a field object; `Some(size)` is the payload length
+    /// (a `FieldObjectHeader` is prepended).
     pub fn field_mut(
         &self,
         offset: NonZeroU64,
@@ -974,6 +1115,9 @@ impl<M: MemoryMapMut> JournalFile<M> {
         self.journal_object_mut(ObjectType::Field, offset, size)
     }
 
+    /// Opens or creates an entry object; `Some(size)` is the item-array
+    /// length (a `DataObjectHeader` is prepended - entries share the
+    /// data-object header layout).
     pub fn entry_mut(
         &self,
         offset: NonZeroU64,
@@ -983,6 +1127,8 @@ impl<M: MemoryMapMut> JournalFile<M> {
         self.journal_object_mut(ObjectType::Entry, offset, size)
     }
 
+    /// Opens or creates a data object; `Some(size)` is the payload length
+    /// (a `DataObjectHeader` is prepended).
     pub fn data_mut(
         &self,
         offset: NonZeroU64,
@@ -992,6 +1138,8 @@ impl<M: MemoryMapMut> JournalFile<M> {
         self.journal_object_mut(ObjectType::Data, offset, size)
     }
 
+    /// Opens or creates a tag object; `new` selects creation
+    /// (`TagObjectHeader`-sized) vs open.
     pub fn tag_mut(
         &self,
         offset: NonZeroU64,
@@ -1006,6 +1154,10 @@ impl<M: MemoryMapMut> JournalFile<M> {
     }
 }
 
+// Appends an object to its hash bucket chain: links the current tail to the
+// new object (`set_next_hash_offset`) and updates the bucket's head (first
+// insert) and tail. Errors `MissingHashTable` when the table is absent.
+// Generated for the data and field tables below.
 macro_rules! impl_hash_table_set_tail_offset {
     (
         $method_name:ident,
@@ -1013,6 +1165,7 @@ macro_rules! impl_hash_table_set_tail_offset {
         $hash_table_mut:ident,
         $object_mut:ident
     ) => {
+        /// Appends `object_offset` to the tail of the `hash` bucket chain.
         pub fn $method_name(&mut self, hash: u64, object_offset: NonZeroU64) -> Result<()> {
             let hash_item = {
                 let Some(ht) = self.$hash_table_ref() else {
@@ -1057,7 +1210,10 @@ impl<M: MemoryMapMut> JournalFile<M> {
     );
 }
 
-/// Iterator that walks through all field objects in the field hash table
+/// Walks every field object in the field hash table: bucket order, then
+/// hash-chain order within each bucket. Yields `Result` items; a read error
+/// is yielded once and ends the iterator. Empty when the file has no field
+/// hash table.
 pub struct FieldIterator<'a, M: MemoryMap> {
     journal: &'a JournalFile<M>,
     field_hash_table: Option<FieldHashTable<&'a [u8]>>,
@@ -1068,14 +1224,13 @@ pub struct FieldIterator<'a, M: MemoryMap> {
 impl<M: MemoryMap> FieldIterator<'_, M> {
     /// Advances to the next non-empty bucket
     fn advance_to_next_nonempty_bucket(&mut self) {
-        // If we don't have a hash table, there's nothing to iterate
+        // No field hash table: nothing to iterate
         let Some(hash_table) = &self.field_hash_table else {
             return;
         };
 
         let items = &hash_table.items;
 
-        // Find the next non-empty bucket
         while self.current_bucket_index < items.len() {
             let bucket = items[self.current_bucket_index];
             if bucket.head_hash_offset.is_some() {
@@ -1085,7 +1240,6 @@ impl<M: MemoryMap> FieldIterator<'_, M> {
             self.current_bucket_index += 1;
         }
 
-        // No more non-empty buckets
         self.next_field_offset = None;
     }
 }
@@ -1117,7 +1271,9 @@ impl<'a, M: MemoryMap> Iterator for FieldIterator<'a, M> {
     }
 }
 
-/// Iterator that walks through all DATA objects for a specific field
+/// Walks the DATA objects chained under one field (each data object's
+/// `next_field_offset`). A read error is yielded once and ends the
+/// iterator.
 pub struct FieldDataIterator<'a, M: MemoryMap> {
     journal: &'a JournalFile<M>,
     current_data_offset: Option<NonZeroU64>,
@@ -1143,7 +1299,10 @@ impl<'a, M: MemoryMap> Iterator for FieldDataIterator<'a, M> {
     }
 }
 
-/// Iterator that walks through all DATA objects for a specific entry
+/// Walks the DATA items of one entry by index, re-reading the entry object
+/// on each step. A zero item offset yields `JournalError::InvalidOffset`
+/// and ends the iterator; other read errors do the same - items are never
+/// skipped.
 pub struct EntryDataIterator<'a, M: MemoryMap> {
     journal: &'a JournalFile<M>,
     entry_offset: Option<NonZeroU64>,
@@ -1157,12 +1316,10 @@ impl<'a, M: MemoryMap> Iterator for EntryDataIterator<'a, M> {
     fn next(&mut self) -> Option<Self::Item> {
         let entry_offset = self.entry_offset?;
 
-        // If we've reached the end of the data indices, return None
         if self.current_index >= self.total_items {
             return None;
         }
 
-        // Get the entry object to access the data offset
         match self.journal.entry_ref(entry_offset) {
             Ok(entry_guard) => {
                 let idx = self.current_index;
@@ -1194,18 +1351,15 @@ impl<'a, M: MemoryMap> Iterator for EntryDataIterator<'a, M> {
                 // Drop the entry guard before obtaining the data object
                 drop(entry_guard);
 
-                // Try to get the data object
                 match self.journal.data_ref(data_offset) {
                     Ok(data_guard) => Some(Ok(data_guard)),
                     Err(e) => {
-                        // If we can't read the data, return the error and stop iteration
                         self.current_index = self.total_items;
                         Some(Err(e))
                     }
                 }
             }
             Err(e) => {
-                // If we can't read the entry, return the error and stop iteration
                 self.current_index = self.total_items;
                 Some(Err(e))
             }

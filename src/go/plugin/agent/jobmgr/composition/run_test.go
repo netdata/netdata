@@ -5,6 +5,7 @@ package composition
 import (
 	"bytes"
 	"context"
+	"errors"
 	"fmt"
 	"slices"
 	"strings"
@@ -19,12 +20,12 @@ import (
 	"github.com/netdata/netdata/go/plugins/plugin/agent/jobmgr/containment"
 	"github.com/netdata/netdata/go/plugins/plugin/agent/jobmgr/joboutput"
 	"github.com/netdata/netdata/go/plugins/plugin/agent/jobmgr/lifecycle"
+	secretconfig "github.com/netdata/netdata/go/plugins/plugin/agent/secrets"
 	secretresolver "github.com/netdata/netdata/go/plugins/plugin/agent/secrets/resolver"
 	"github.com/netdata/netdata/go/plugins/plugin/agent/secrets/secretstore"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/collectorapi"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/confgroup"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/dyncfg"
-	"github.com/netdata/netdata/go/plugins/plugin/framework/vnoderegistry"
 	"github.com/stretchr/testify/require"
 )
 
@@ -43,6 +44,7 @@ func TestRunGenerationPublishesPerJobTemplatesInModuleOrder(t *testing.T) {
 	require.NoError(t, err)
 	uids := lifecycle.NewUIDLedger()
 	generation, err := newTestRunGeneration(t, runGenerationConfig{
+		Secrets:         testRunSecrets(t),
 		Generation:      7,
 		ShutdownTimeout: time.Second,
 		UIDs:            uids,
@@ -87,6 +89,7 @@ func TestRunGenerationQuarantinesUnpublishableDiscoveredConfigAndContinues(t *te
 	require.NoError(t, err)
 	uids := lifecycle.NewUIDLedger()
 	generation, err := newTestRunGeneration(t, runGenerationConfig{
+		Secrets:         testRunSecrets(t),
 		Generation:      1,
 		ShutdownTimeout: time.Second,
 		UIDs:            uids,
@@ -159,6 +162,7 @@ func TestRunGenerationGrowsBeyondFormerJobLimitWithDiscoveredJobs(t *testing.T) 
 				},
 			}
 			jobs := testRunJobServices(t)
+			secretConfig := testRunSecrets(t)
 			jobs.Defaults = confgroup.Registry{
 				"module": {UpdateEvery: 1},
 			}
@@ -168,6 +172,7 @@ func TestRunGenerationGrowsBeyondFormerJobLimitWithDiscoveredJobs(t *testing.T) 
 			require.NoError(t, err)
 			uids := lifecycle.NewUIDLedger()
 			generation, err := newTestRunGeneration(t, runGenerationConfig{
+				Secrets:         secretConfig,
 				Generation:      1,
 				ShutdownTimeout: 10 * time.Second,
 				UIDs:            uids,
@@ -201,87 +206,90 @@ func TestRunGenerationGrowsBeyondFormerJobLimitWithDiscoveredJobs(t *testing.T) 
 }
 
 func TestRunGenerationFunctionFlowAndShutdownOrder(t *testing.T) {
-	var eventsMu sync.Mutex
-	var events []string
-	record := func(event string) {
-		eventsMu.Lock()
-		events = append(events, event)
-		eventsMu.Unlock()
-	}
-	var output bytes.Buffer
-	frames, err := lifecycle.NewFrameOwner(runRecordingWriter{
-		target: &output,
-		record: func(payload []byte) {
-			switch {
-			case bytes.HasPrefix(payload, []byte("FUNCTION GLOBAL")) &&
-				bytes.Contains(payload, []byte(`"module:method"`)):
-				record("publish")
-			case bytes.HasPrefix(payload, []byte("FUNCTION_DEL")) &&
-				bytes.Contains(payload, []byte(`"module:method"`)):
-				record("withdraw")
-			case bytes.HasPrefix(payload, []byte("FUNCTION_RESULT_BEGIN")):
-				record("result")
-			}
-		},
-	})
-	require.NoError(t, err)
-	modules := collectorapi.Registry{
-		"module": {
-			AgentFunctions: func() []funcapi.FunctionConfig {
-				return []funcapi.FunctionConfig{{ID: "method"}}
-			},
-			MethodHandler: func(collectorapi.RuntimeJob) funcapi.MethodHandler {
-				return &runTestHandler{
-					cleanup: func() { record("cleanup") },
+	withSecretsModes(t, func(t *testing.T, secretConfig *SecretsConfig) {
+		var eventsMu sync.Mutex
+		var events []string
+		record := func(event string) {
+			eventsMu.Lock()
+			events = append(events, event)
+			eventsMu.Unlock()
+		}
+		var output bytes.Buffer
+		frames, err := lifecycle.NewFrameOwner(runRecordingWriter{
+			target: &output,
+			record: func(payload []byte) {
+				switch {
+				case bytes.HasPrefix(payload, []byte("FUNCTION GLOBAL")) &&
+					bytes.Contains(payload, []byte(`"module:method"`)):
+					record("publish")
+				case bytes.HasPrefix(payload, []byte("FUNCTION_DEL")) &&
+					bytes.Contains(payload, []byte(`"module:method"`)):
+					record("withdraw")
+				case bytes.HasPrefix(payload, []byte("FUNCTION_RESULT_BEGIN")):
+					record("result")
 				}
 			},
-		},
-	}
-	uids := lifecycle.NewUIDLedger()
-	generation, err := newTestRunGeneration(t, runGenerationConfig{
-		Generation:      1,
-		ShutdownTimeout: time.Second,
-		UIDs:            uids,
-		Frames:          frames,
-		Modules:         modules,
-		Jobs:            testRunJobServices(t),
-		Discovery:       testRunDiscoveryServices(t),
+		})
+		require.NoError(t, err)
+		modules := collectorapi.Registry{
+			"module": {
+				AgentFunctions: func() []funcapi.FunctionConfig {
+					return []funcapi.FunctionConfig{{ID: "method"}}
+				},
+				MethodHandler: func(collectorapi.RuntimeJob) funcapi.MethodHandler {
+					return &runTestHandler{
+						cleanup: func() { record("cleanup") },
+					}
+				},
+			},
+		}
+		uids := lifecycle.NewUIDLedger()
+		generation, err := newTestRunGeneration(t, runGenerationConfig{
+			Secrets:         secretConfig,
+			Generation:      1,
+			ShutdownTimeout: time.Second,
+			UIDs:            uids,
+			Frames:          frames,
+			Modules:         modules,
+			Jobs:            testRunJobServices(t),
+			Discovery:       testRunDiscoveryServices(t),
+		})
+		require.NoError(t, err)
+
+		require.NoError(t, generation.start(context.Background()))
+
+		require.NoError(t, generation.kernel.Submit(context.Background(), jobmgr.Request{
+			UID:    "function-flow",
+			Source: lifecycle.SourceFunction,
+			Route:  "module:method",
+		}),
+		)
+		require.Eventually(t, func() bool {
+			eventsMu.Lock()
+			defer eventsMu.Unlock()
+			return slices.Contains(events, "result")
+		}, time.Second, time.Millisecond)
+
+		generation.Stop()
+
+		require.NoError(t, generation.Wait(context.Background()))
+
+		want := []string{"publish", "result", "withdraw", "cleanup"}
+		require.Eventually(t, func() bool {
+			eventsMu.Lock()
+			defer eventsMu.Unlock()
+			return len(events) == len(want)
+		}, time.Second, time.Millisecond)
+		eventsMu.Lock()
+		got := append([]string(nil), events...)
+		eventsMu.Unlock()
+		require.EqualValues(t, len(want), len(got))
+		for index := range want {
+			require.EqualValues(t, want[index], got[index])
+		}
+
+		closeRunTestUIDs(t, uids)
 	})
-	require.NoError(t, err)
-
-	require.NoError(t, generation.start(context.Background()))
-
-	require.NoError(t, generation.kernel.Submit(context.Background(), jobmgr.Request{
-		UID:    "function-flow",
-		Source: lifecycle.SourceFunction,
-		Route:  "module:method",
-	}),
-	)
-	require.Eventually(t, func() bool {
-		eventsMu.Lock()
-		defer eventsMu.Unlock()
-		return slices.Contains(events, "result")
-	}, time.Second, time.Millisecond)
-
-	generation.Stop()
-
-	require.NoError(t, generation.Wait(context.Background()))
-
-	want := []string{"publish", "result", "withdraw", "cleanup"}
-	require.Eventually(t, func() bool {
-		eventsMu.Lock()
-		defer eventsMu.Unlock()
-		return len(events) == len(want)
-	}, time.Second, time.Millisecond)
-	eventsMu.Lock()
-	got := append([]string(nil), events...)
-	eventsMu.Unlock()
-	require.EqualValues(t, len(want), len(got))
-	for index := range want {
-		require.EqualValues(t, want[index], got[index])
-	}
-
-	closeRunTestUIDs(t, uids)
 }
 
 func TestRunGenerationKeepsDynCfgRoutePrivateAndUsesSameNamePerJobProtocolID(t *testing.T) {
@@ -319,6 +327,7 @@ func TestRunGenerationKeepsDynCfgRoutePrivateAndUsesSameNamePerJobProtocolID(t *
 	config.SetSourceType(confgroup.TypeDyncfg)
 	config.SetSource("test")
 	jobs := testRunJobServices(t)
+	secretConfig := testRunSecrets(t)
 	jobs.Defaults = confgroup.Registry{
 		"module": {UpdateEvery: 1},
 	}
@@ -328,6 +337,7 @@ func TestRunGenerationKeepsDynCfgRoutePrivateAndUsesSameNamePerJobProtocolID(t *
 	require.NoError(t, err)
 	uids := lifecycle.NewUIDLedger()
 	generation, err := newTestRunGeneration(t, runGenerationConfig{
+		Secrets:         secretConfig,
 		Generation:      1,
 		ShutdownTimeout: time.Second,
 		UIDs:            uids,
@@ -366,7 +376,7 @@ func TestRunGenerationKeepsDynCfgRoutePrivateAndUsesSameNamePerJobProtocolID(t *
 	wire := output.String()
 	templateAt := strings.Index(wire, "CONFIG go.d:collector:module create accepted template")
 	createAt := strings.Index(wire, "CONFIG go.d:collector:module:module create accepted job")
-	resultAt := strings.Index(wire, "FUNCTION_RESULT_BEGIN enable 200 application/json")
+	resultAt := strings.Index(wire, "FUNCTION_RESULT_BEGIN enable 202 application/json")
 	statusAt := strings.Index(wire, "CONFIG go.d:collector:module:module status running")
 	require.NotContains(t, wire, `FUNCTION GLOBAL "config"`)
 	require.NotContains(t, wire, `FUNCTION_DEL GLOBAL "config"`)
@@ -383,6 +393,260 @@ func TestRunGenerationKeepsDynCfgRoutePrivateAndUsesSameNamePerJobProtocolID(t *
 	}, time.Second, time.Millisecond)
 
 	closeRunTestUIDs(t, uids)
+}
+
+func TestRunGenerationAcceptedEnableDoesNotBlockDisableBehindNonCooperativeCheck(t *testing.T) {
+	checkEntered := make(chan struct{})
+	checkRelease := make(chan struct{})
+	var cleanupCalls atomic.Int32
+	modules := collectorapi.Registry{
+		"module": {
+			Create: func() collectorapi.CollectorV1 {
+				return &collectorapi.MockCollectorV1{
+					CheckFunc: func(context.Context) error {
+						close(checkEntered)
+						<-checkRelease
+						return nil
+					},
+					CleanupFunc: func(context.Context) {
+						cleanupCalls.Add(1)
+					},
+				}
+			},
+			Config: func() any {
+				return &collectorapi.MockConfiguration{}
+			},
+			AgentFunctions: func() []funcapi.FunctionConfig {
+				return []funcapi.FunctionConfig{{ID: "method"}}
+			},
+			MethodHandler: func(collectorapi.RuntimeJob) funcapi.MethodHandler {
+				return &runTestHandler{
+					cleanup: func() {},
+				}
+			},
+			JobConfigSchema: collectorapi.MockConfigSchema,
+		},
+	}
+	config := confgroup.Config{
+		"module":        "module",
+		"name":          "job",
+		"update_every":  1,
+		"function_only": true,
+	}
+	config.SetProvider(confgroup.TypeDyncfg)
+	config.SetSourceType(confgroup.TypeDyncfg)
+	config.SetSource("test")
+	jobs := testRunJobServices(t)
+	secretConfig := testRunSecrets(t)
+	jobs.Defaults = confgroup.Registry{
+		"module": {UpdateEvery: 1},
+	}
+
+	output := newProcessSynchronizedBuffer()
+	frames, err := lifecycle.NewFrameOwner(output)
+	require.NoError(t, err)
+	uids := lifecycle.NewUIDLedger()
+	generation, err := newTestRunGeneration(t, runGenerationConfig{
+		Secrets:         secretConfig,
+		Generation:      1,
+		ShutdownTimeout: time.Second,
+		UIDs:            uids,
+		Frames:          frames,
+		Modules:         modules,
+		Jobs:            jobs,
+		Discovery:       testRunDiscoveryServicesAccepted(t, config),
+	})
+	require.NoError(t, err)
+	require.NoError(t, generation.start(context.Background()))
+	t.Cleanup(func() {
+		select {
+		case <-checkRelease:
+		default:
+			close(checkRelease)
+		}
+		generation.Stop()
+		require.NoError(t, generation.Wait(context.Background()))
+		closeRunTestUIDs(t, uids)
+	})
+	require.Eventually(t, func() bool {
+		record, ok := generation.vnodes.graph.Lookup(config.FullName())
+		return ok && record.Status == dyncfg.StatusAccepted.String()
+	}, time.Second, time.Millisecond)
+
+	require.NoError(t, generation.kernel.Submit(
+		context.Background(),
+		jobmgr.Request{
+			UID:    "slow-enable",
+			Source: lifecycle.SourceFunction,
+			Route:  "config",
+			Args:   []string{"go.d:collector:module:job", string(dyncfg.CommandEnable)},
+		},
+	))
+	select {
+	case <-checkEntered:
+	case <-time.After(time.Second):
+		require.FailNow(t, "test failed", "managed check did not enter")
+	}
+	require.Eventually(t, func() bool {
+		wire := output.String()
+		return strings.Contains(wire, "FUNCTION_RESULT_BEGIN slow-enable 202 application/json") &&
+			strings.Contains(wire, "CONFIG go.d:collector:module:job status accepted")
+	}, time.Second, time.Millisecond)
+
+	require.NoError(t, generation.kernel.Submit(
+		context.Background(),
+		jobmgr.Request{
+			UID:    "disable-during-enable",
+			Source: lifecycle.SourceFunction,
+			Route:  "config",
+			Args:   []string{"go.d:collector:module:job", string(dyncfg.CommandDisable)},
+		},
+	))
+	require.Eventually(t, func() bool {
+		record, ok := generation.vnodes.graph.Lookup(config.FullName())
+		wire := output.String()
+		return ok && record.Status == dyncfg.StatusDisabled.String() &&
+			strings.Contains(wire, "FUNCTION_RESULT_BEGIN disable-during-enable 200 application/json") &&
+			strings.Contains(wire, "CONFIG go.d:collector:module:job status disabled")
+	}, time.Second, time.Millisecond)
+
+	close(checkRelease)
+	require.Eventually(t, func() bool {
+		return cleanupCalls.Load() == 1
+	}, time.Second, time.Millisecond)
+	require.NotContains(t, output.String(), "CONFIG go.d:collector:module:job status running")
+}
+
+func TestRunGenerationAcceptedEnablePublishesLateProbeFailure(t *testing.T) {
+	tests := map[string]struct {
+		sourceType string
+		wantStatus dyncfg.Status
+		wantFrame  string
+	}{
+		"dynamic config becomes failed": {
+			sourceType: confgroup.TypeDyncfg,
+			wantStatus: dyncfg.StatusFailed,
+			wantFrame:  "CONFIG go.d:collector:module:job status failed",
+		},
+		"file config becomes failed": {
+			sourceType: confgroup.TypeUser,
+			wantStatus: dyncfg.StatusFailed,
+			wantFrame:  "CONFIG go.d:collector:module:job status failed",
+		},
+		"plain stock config is removed": {
+			sourceType: confgroup.TypeStock,
+			wantFrame:  "CONFIG go.d:collector:module:job delete",
+		},
+	}
+	for name, test := range tests {
+		t.Run(name, func(t *testing.T) {
+			checkEntered := make(chan struct{})
+			checkRelease := make(chan struct{})
+			var cleanupCalls atomic.Int32
+			modules := collectorapi.Registry{
+				"module": {
+					Create: func() collectorapi.CollectorV1 {
+						return &collectorapi.MockCollectorV1{
+							CheckFunc: func(context.Context) error {
+								close(checkEntered)
+								<-checkRelease
+								return errors.New("check failed")
+							},
+							CleanupFunc: func(context.Context) {
+								cleanupCalls.Add(1)
+							},
+						}
+					},
+					Config: func() any {
+						return &collectorapi.MockConfiguration{}
+					},
+					JobConfigSchema: collectorapi.MockConfigSchema,
+				},
+			}
+			config := confgroup.Config{
+				"module":       "module",
+				"name":         "job",
+				"update_every": 1,
+			}
+			config.SetProvider(test.sourceType)
+			config.SetSourceType(test.sourceType)
+			config.SetSource("test")
+			jobs := testRunJobServices(t)
+			secretConfig := testRunSecrets(t)
+			jobs.Defaults = confgroup.Registry{
+				"module": {UpdateEvery: 1},
+			}
+
+			output := newProcessSynchronizedBuffer()
+			frames, err := lifecycle.NewFrameOwner(output)
+			require.NoError(t, err)
+			uids := lifecycle.NewUIDLedger()
+			generation, err := newTestRunGeneration(t, runGenerationConfig{
+				Secrets:         secretConfig,
+				Generation:      1,
+				ShutdownTimeout: time.Second,
+				UIDs:            uids,
+				Frames:          frames,
+				Modules:         modules,
+				Jobs:            jobs,
+				Discovery:       testRunDiscoveryServicesAccepted(t, config),
+			})
+			require.NoError(t, err)
+			require.NoError(t, generation.start(context.Background()))
+			t.Cleanup(func() {
+				select {
+				case <-checkRelease:
+				default:
+					close(checkRelease)
+				}
+				generation.Stop()
+				require.NoError(t, generation.Wait(context.Background()))
+				closeRunTestUIDs(t, uids)
+			})
+			require.Eventually(t, func() bool {
+				record, ok := generation.vnodes.graph.Lookup(config.FullName())
+				return ok && record.Status == dyncfg.StatusAccepted.String()
+			}, time.Second, time.Millisecond)
+
+			require.NoError(t, generation.kernel.Submit(
+				context.Background(),
+				jobmgr.Request{
+					UID:    "late-failure",
+					Source: lifecycle.SourceFunction,
+					Route:  "config",
+					Args:   []string{"go.d:collector:module:job", string(dyncfg.CommandEnable)},
+				},
+			))
+			select {
+			case <-checkEntered:
+			case <-time.After(time.Second):
+				require.FailNow(t, "test failed", "managed check did not enter")
+			}
+			require.Eventually(t, func() bool {
+				wire := output.String()
+				return strings.Contains(wire, "FUNCTION_RESULT_BEGIN late-failure 202 application/json") &&
+					strings.Contains(wire, "CONFIG go.d:collector:module:job status accepted")
+			}, time.Second, time.Millisecond)
+
+			close(checkRelease)
+			require.Eventually(t, func() bool {
+				record, exists := generation.vnodes.graph.Lookup(config.FullName())
+				if test.sourceType == confgroup.TypeStock {
+					return !exists
+				}
+				return exists && record.Status == test.wantStatus.String()
+			}, time.Second, time.Millisecond)
+			require.Eventually(t, func() bool {
+				wire := output.String()
+				resultAt := strings.Index(wire, "FUNCTION_RESULT_BEGIN late-failure 202 application/json")
+				terminalAt := strings.Index(wire, test.wantFrame)
+				return resultAt >= 0 && terminalAt > resultAt
+			}, time.Second, time.Millisecond)
+			require.Eventually(t, func() bool {
+				return cleanupCalls.Load() == 1
+			}, time.Second, time.Millisecond)
+		})
+	}
 }
 
 func TestRunGenerationShutdownRejectsInFlightJobProbeBeforePublication(t *testing.T) {
@@ -429,6 +693,7 @@ func TestRunGenerationShutdownRejectsInFlightJobProbeBeforePublication(t *testin
 	config.SetSourceType(confgroup.TypeDyncfg)
 	config.SetSource("test")
 	jobs := testRunJobServices(t)
+	secretConfig := testRunSecrets(t)
 	jobs.Defaults = confgroup.Registry{
 		"module": {UpdateEvery: 1},
 	}
@@ -438,6 +703,7 @@ func TestRunGenerationShutdownRejectsInFlightJobProbeBeforePublication(t *testin
 	require.NoError(t, err)
 	uids := lifecycle.NewUIDLedger()
 	generation, err := newTestRunGeneration(t, runGenerationConfig{
+		Secrets:         secretConfig,
 		Generation:      1,
 		ShutdownTimeout: time.Second,
 		UIDs:            uids,
@@ -515,16 +781,16 @@ func newTestRunGeneration(
 	config runGenerationConfig,
 ) (*runGeneration, error) {
 	t.Helper()
-	store, err := secretstore.NewSecretStore(config.Jobs.Resolver)
-	if err != nil {
-		return nil, err
+	var err error
+	var epoch *processSecretEpoch
+	if config.Secrets != nil {
+		store, err := secretstore.NewSecretStore(config.Secrets.Providers.Resolver)
+		if err != nil {
+			return nil, err
+		}
+		epoch = &processSecretEpoch{generation: config.Generation, store: store, diagnostics: config.Diagnostics}
+		config.SecretEpoch = epoch
 	}
-	epoch := &processSecretEpoch{
-		generation:  config.Generation,
-		store:       store,
-		diagnostics: config.Diagnostics,
-	}
-	config.SecretEpoch = epoch
 	ownsAttempts := config.Attempts == nil
 	if ownsAttempts {
 		config.Attempts, err = containment.NewAuthority(config.Diagnostics)
@@ -545,6 +811,9 @@ func newTestRunGeneration(
 			defer cancel()
 			require.NoError(t, config.Attempts.Shutdown(shutdownCtx))
 		}
+		if epoch == nil {
+			return
+		}
 		require.NoError(t, epoch.seal())
 		select {
 		case <-epoch.done():
@@ -557,17 +826,16 @@ func newTestRunGeneration(
 
 func testRunJobServices(t testing.TB) runJobServices {
 	t.Helper()
+	return runJobServices{PluginName: "go.d", Defaults: confgroup.Registry{}}
+}
+
+func testRunSecrets(t testing.TB) *SecretsConfig {
+	t.Helper()
 	resolver, err := secretresolver.NewAtomicResolver(nil)
 	require.NoError(t, err)
 	creators, err := secretstore.NewCreatorCatalog(nil)
 	require.NoError(t, err)
-	return runJobServices{
-		PluginName:    "go.d",
-		Defaults:      confgroup.Registry{},
-		Resolver:      resolver,
-		StoreCreators: creators,
-		Vnodes:        vnoderegistry.New(),
-	}
+	return &SecretsConfig{Providers: secretconfig.Config{Resolver: resolver, Creators: creators}}
 }
 
 func testRunDiscoveryServices(t testing.TB, configs ...confgroup.Config) runDiscoveryServices {

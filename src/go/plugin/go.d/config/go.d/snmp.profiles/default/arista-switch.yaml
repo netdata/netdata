@@ -6,6 +6,9 @@ extends:
   - _std-entity-sensor-mib.yaml
   - _std-if-mib.yaml
   - _std-ospf-mib.yaml
+  - _std-topology-interface-mib.yaml
+  - _std-topology-q-bridge-mib.yaml
+  - _std-topology-arp-mib.yaml
 
 metadata:
   device:

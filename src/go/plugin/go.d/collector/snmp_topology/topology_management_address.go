@@ -3,12 +3,9 @@
 package snmptopology
 
 import (
-	"encoding/hex"
-	"fmt"
 	"net"
 	"net/netip"
 	"slices"
-	"strconv"
 	"strings"
 
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_topology/internal/topologymodel"
@@ -48,25 +45,66 @@ func managementAddressTypeFromIP(ip string) string {
 	return "ipv6"
 }
 
-func appendManagementAddress(addrs []topologymodel.ManagementAddress, addr topologymodel.ManagementAddress) []topologymodel.ManagementAddress {
+type managementAddressKey struct {
+	address     string
+	addressType string
+	source      string
+}
+
+func normalizeManagementAddress(addr topologymodel.ManagementAddress) (topologymodel.ManagementAddress, managementAddressKey, bool) {
 	addr.Address = strings.TrimSpace(addr.Address)
 	addr.AddressType = strings.TrimSpace(addr.AddressType)
 	if addr.Address == "" {
-		return addrs
+		return topologymodel.ManagementAddress{}, managementAddressKey{}, false
 	}
 	if ip, ok := managementAddressIP(addr); ok {
 		if !isEligibleTopologyIPAddress(ip) {
-			return addrs
+			return topologymodel.ManagementAddress{}, managementAddressKey{}, false
 		}
 		addr.Address = ip.String()
 		addr.AddressType = managementAddressTypeFromIP(addr.Address)
 	}
+	return addr, managementAddressKey{
+		address:     addr.Address,
+		addressType: addr.AddressType,
+		source:      addr.Source,
+	}, true
+}
+
+func appendManagementAddress(addrs []topologymodel.ManagementAddress, addr topologymodel.ManagementAddress) []topologymodel.ManagementAddress {
+	addr, key, ok := normalizeManagementAddress(addr)
+	if !ok {
+		return addrs
+	}
 	for _, existing := range addrs {
-		if existing.Address == addr.Address && existing.AddressType == addr.AddressType && existing.Source == addr.Source {
+		if existing.Address == key.address && existing.AddressType == key.addressType && existing.Source == key.source {
 			return addrs
 		}
 	}
 	return append(addrs, addr)
+}
+
+func (c *topologyBuilder) appendLocalManagementAddress(addr topologymodel.ManagementAddress) {
+	if c == nil {
+		return
+	}
+	addr, key, ok := normalizeManagementAddress(addr)
+	if !ok {
+		return
+	}
+	if c.localManagementAddressKeys == nil {
+		c.localManagementAddressKeys = make(map[managementAddressKey]struct{}, len(c.localDevice.ManagementAddresses)+1)
+		for _, existing := range c.localDevice.ManagementAddresses {
+			if _, existingKey, ok := normalizeManagementAddress(existing); ok {
+				c.localManagementAddressKeys[existingKey] = struct{}{}
+			}
+		}
+	}
+	if _, exists := c.localManagementAddressKeys[key]; exists {
+		return
+	}
+	c.localManagementAddressKeys[key] = struct{}{}
+	c.localDevice.ManagementAddresses = append(c.localDevice.ManagementAddresses, addr)
 }
 
 func appendCdpManagementAddresses(tags map[string]string, current []topologymodel.ManagementAddress) []topologymodel.ManagementAddress {
@@ -243,14 +281,27 @@ func finalizeLocalManagementAddresses(
 	targets []netip.Addr,
 	netmasks map[string]string,
 ) {
+	finalizeLocalManagementAddressesWithLookup(device, targets, func(ip string) string {
+		return netmasks[ip]
+	})
+}
+
+func finalizeLocalManagementAddressesWithLookup(
+	device *topologymodel.Device,
+	targets []netip.Addr,
+	netmask func(string) string,
+) {
 	if device == nil {
 		return
+	}
+	if netmask == nil {
+		netmask = func(string) string { return "" }
 	}
 
 	var selector managementIPSelector
 	addTarget := func(addr netip.Addr) {
 		addr = addr.Unmap()
-		if isEligibleManagementInterfaceAddress(addr.String(), netmasks[addr.String()]) {
+		if isEligibleManagementInterfaceAddress(addr.String(), netmask(addr.String())) {
 			selector.add(addr, managementAddressSourceCollectorTarget)
 		}
 	}
@@ -265,7 +316,7 @@ func finalizeLocalManagementAddresses(
 	filtered := addrs[:0]
 	for _, addr := range addrs {
 		ip, ok := managementAddressIP(addr)
-		if ok && !isEligibleManagementInterfaceAddress(ip.String(), netmasks[ip.String()]) {
+		if ok && !isEligibleManagementInterfaceAddress(ip.String(), netmask(ip.String())) {
 			continue
 		}
 		filtered = append(filtered, addr)
@@ -276,30 +327,6 @@ func finalizeLocalManagementAddresses(
 	clear(addrs[len(filtered):])
 	device.ManagementAddresses = filtered
 	device.ManagementIP = selector.selected()
-}
-
-func reconstructLldpRemMgmtAddrHex(tags map[string]string) string {
-	lengthStr := strings.TrimSpace(tags[tagLldpRemMgmtAddrLen])
-	length, err := strconv.Atoi(lengthStr)
-	if err != nil || length <= 0 || length > net.IPv6len {
-		return ""
-	}
-
-	addr := make([]byte, 0, length)
-	for i := 1; i <= length; i++ {
-		tag := fmt.Sprintf("%s%d", tagLldpRemMgmtAddrOctetPref, i)
-		v := strings.TrimSpace(tags[tag])
-		if v == "" {
-			return ""
-		}
-		octet, err := strconv.Atoi(v)
-		if err != nil || octet < 0 || octet > 255 {
-			return ""
-		}
-		addr = append(addr, byte(octet))
-	}
-
-	return hex.EncodeToString(addr)
 }
 
 func normalizeLLDPManagementAddress(rawAddr, rawType string) (string, string) {

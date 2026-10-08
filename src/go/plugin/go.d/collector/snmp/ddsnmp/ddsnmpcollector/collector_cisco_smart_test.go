@@ -186,12 +186,12 @@ func mustLoadCiscoSmartProfile(t *testing.T) *ddsnmp.Profile {
 		if row.MIB == "CISCO-SMART-LIC-MIB" {
 			return true
 		}
-		for _, sig := range ddprofiledefinition.LicenseSignalValueRefs(row) {
-			if oid := strings.TrimPrefix(ddprofiledefinition.LicenseValueSourceOID(sig.Value), "."); oid != "" && strings.HasPrefix(oid, prefix) {
-				return true
-			}
-		}
-		if oid := strings.TrimPrefix(ddprofiledefinition.LicenseValueSourceOID(row.State.LicenseValueConfig), "."); oid != "" && strings.HasPrefix(oid, prefix) {
+		var matches bool
+		ddprofiledefinition.ForEachLicenseSignalValue(row, func(value ddprofiledefinition.LicenseValueConfig) {
+			oid := strings.TrimPrefix(value.SourceOID(), ".")
+			matches = matches || strings.HasPrefix(oid, prefix)
+		})
+		if matches {
 			return true
 		}
 		if oid := strings.TrimPrefix(row.Table.OID, "."); oid != "" && strings.HasPrefix(oid, prefix) {

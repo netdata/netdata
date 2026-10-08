@@ -26,17 +26,18 @@ Module: network-viewer
 
 Map application dependencies on a host. The network-viewer plugin reads the kernel's live socket table and draws which local process talks to which, and which remote endpoints they reach. On Linux it also attributes each process to the container, image, systemd unit, or Kubernetes pod, namespace, and workload that owns it, as far as the APPS_LOOKUP data allows — attribution is best effort, and a process it cannot resolve is still drawn.
 
-The network-viewer plugin builds the `topology:network-connections` view directly from the host's live socket table, with no SNMP and no instrumentation. It is available on Linux, FreeBSD, and macOS; container and Kubernetes attribution is Linux-only.
+The network-viewer plugin builds the `topology:network-connections` view directly from the host's live socket table, with no SNMP and no instrumentation. It is available on Linux, FreeBSD, macOS, and Windows; container and Kubernetes attribution is Linux-only, and Windows UDP rows are listener-only because the IP Helper API does not expose remote endpoints.
 
 This integration is only supported on the following platforms:
 
 - Linux
 - FreeBSD
 - macOS
+- Windows
 
 This integration runs as a single instance per Netdata Agent.
 
-The plugin needs privileged access to enumerate the sockets of every process; standard installations grant it. In a container it additionally needs the host network namespace, the host `/proc`, `SYS_ADMIN` for sibling containers, and `SYS_PTRACE` to attribute connections to processes. On macOS a non-privileged or TCC-restricted run omits protected processes; grant Full Disk Access where local policy requires it. The Function itself requires a signed-in Netdata identity in the same Space with permission to view sensitive data — it is not available anonymously.
+The plugin needs privileged access to enumerate the sockets of every process; standard installations grant it. In a container it additionally needs the host network namespace, the host `/proc`, `SYS_ADMIN` for sibling containers, and `SYS_PTRACE` to attribute connections to processes. On macOS a non-privileged or TCC-restricted run omits protected processes; grant Full Disk Access where local policy requires it. On Windows it uses the IP Helper API, so UDP rows are listener-only because it does not expose remote endpoints. The Function itself requires a signed-in Netdata identity in the same Space with permission to view sensitive data — it is not available anonymously.
 
 ### Default Behavior
 

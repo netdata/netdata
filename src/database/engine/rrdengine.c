@@ -27,6 +27,7 @@ struct rrdeng_cmd {
 };
 
 static inline struct rrdeng_cmd rrdeng_deq_cmd(bool from_worker);
+static void extent_waiter_done(void);
 static inline void worker_dispatch_extent_read(struct rrdeng_cmd cmd, bool from_worker);
 static inline void worker_dispatch_query_prep(struct rrdeng_cmd cmd, bool from_worker);
 
@@ -47,6 +48,13 @@ struct rrdeng_main {
     size_t evict_open_running;
     size_t evict_extent_running;
     size_t cleanup_running;
+
+    // pool threads that may wait for an EXTENT_WRITE - owned by the event loop thread
+    // see extent_waiters_max() for why they are bounded
+    struct {
+        size_t running;
+        struct rrdeng_cmd *deferred;    // over-budget commands waiting for a slot, in arrival order
+    } extent_waiters;
 
     struct {
         ARAL *ar;
@@ -90,6 +98,10 @@ struct rrdeng_main {
         .flushes_running = 0,
         .evict_main_running = 0,
         .cleanup_running = 0,
+        .extent_waiters = {
+                .running = 0,
+                .deferred = NULL,
+        },
 
         .cmd_queue = {
                 .unsafe = {
@@ -698,16 +710,21 @@ extent_flush_to_open(struct rrdengine_instance *ctx, struct extent_io_descriptor
                        xt_io_descr->bytes);
 
     usec_t max_end_time_ut = 0;
+    uint64_t stored_slots = 0;
     for (i = 0 ; i < xt_io_descr->descr_count ; ++i) {
         descr = xt_io_descr->descr_array[i];
 
         if (descr->end_time_ut > max_end_time_ut)
             max_end_time_ut = descr->end_time_ut;
 
+        if (likely(!have_error))
+            stored_slots += descr->slots;
+
         if (likely(still_running && !have_error)) {
             pgc_open_add_hot_page(
                 (Word_t)ctx,
                 descr->metric_id,
+                descr->uuid_id,
                 (time_t)(descr->start_time_ut / USEC_PER_SEC),
                 (time_t)(descr->end_time_ut / USEC_PER_SEC),
                 descr->update_every_s,
@@ -720,6 +737,9 @@ extent_flush_to_open(struct rrdengine_instance *ctx, struct extent_io_descriptor
     }
 
     if (!have_error) {
+        // the pages are on disk now - they are samples of this datafile
+        rrdeng_datafile_samples_charge(datafile, stored_slots);
+
         if (max_end_time_ut > 0) {
             time_t new_last_time_s = (time_t)(max_end_time_ut / USEC_PER_SEC);
 
@@ -923,7 +943,6 @@ datafile_extent_build(struct rrdengine_instance *ctx, struct page_descr_with_dat
     uint32_t uncompressed_payload_length, max_compressed_size, payload_offset;
     struct page_descr_with_data *descr, *eligible_pages[MAX_PAGES_PER_EXTENT];
     struct extent_io_descriptor *xt_io_descr;
-    Word_t Index;
     uint8_t compression_algorithm = ctx->config.global_compress_alg;
     struct rrdengine_datafile *datafile;
     /* persistent structures */
@@ -931,9 +950,9 @@ datafile_extent_build(struct rrdengine_instance *ctx, struct page_descr_with_dat
     struct rrdeng_df_extent_trailer *trailer;
     uLong crc;
 
-    for(descr = base, Index = 0, count = 0, uncompressed_payload_length = 0;
+    for(descr = base, count = 0, uncompressed_payload_length = 0;
         descr && count != rrdeng_pages_per_extent;
-        descr = descr->link.next, Index++) {
+        descr = descr->link.next) {
 
         uncompressed_payload_length += descr->page_length;
         eligible_pages[count++] = descr;
@@ -941,7 +960,12 @@ datafile_extent_build(struct rrdengine_instance *ctx, struct page_descr_with_dat
     }
 
     if (!count) {
-        __atomic_sub_fetch(&ctx->atomic.extents_currently_being_flushed, 1, __ATOMIC_RELAXED);
+        // No decrement here. The only caller does `if (!xt_io_descr) goto done;` and `done:`
+        // decrements extents_currently_being_flushed, so decrementing here too would take the
+        // unsigned counter below zero and wrap it, and both waiters on it - shutdown's
+        // ctx_shutdown_tp_worker() (rrdengine.c) and finalize_data_files() (datafile.c) - would
+        // spin forever. Not reachable today (the only EXTENT_WRITE producer returns early on an
+        // empty batch), but the accounting must not depend on that.
         return NULL;
     }
 
@@ -961,6 +985,7 @@ datafile_extent_build(struct rrdengine_instance *ctx, struct page_descr_with_dat
 
     for (i = 0 ; i < count ; ++i) {
         descr = xt_io_descr->descr_array[i];
+        descr->slots = pgd_slots_used(descr->pgd);
         header->descr[i].type = descr->type;
         uuid_copy(*(nd_uuid_t *)header->descr[i].uuid, *uuidmap_uuid_ptr(descr->uuid_id));
         header->descr[i].page_length = descr->page_length;
@@ -1275,7 +1300,10 @@ static time_t find_uuid_first_time(
         if (no_signal_received) {
             time_t journal_start_time_s = (time_t)(j2_header->start_time_ut / USEC_PER_SEC);
 
-            if (journal_start_time_s < global_first_time_s)
+            // same as journalfile_v2_populate_retention_to_mrg(): a zero header
+            // start time means the journal has no metrics, not that its
+            // retention starts at the epoch
+            if (journal_start_time_s > 0 && journal_start_time_s < global_first_time_s)
                 global_first_time_s = journal_start_time_s;
 
             size_t metric_offset = j2_header->metric_offset;
@@ -1612,26 +1640,8 @@ static void update_metrics_first_time_s(struct rrdengine_instance *ctx, struct r
 
         if (likely(uuid_first_t_entry->first_time_s != LONG_MAX)) {
 
-            time_t old_first_time_s = mrg_metric_get_first_time_s(main_mrg, uuid_first_t_entry->metric);
-
-            bool changed = mrg_metric_set_first_time_s_if_bigger(main_mrg, uuid_first_t_entry->metric, uuid_first_t_entry->first_time_s);
-            if (changed) {
-                uint32_t update_every_s = mrg_metric_get_update_every_s(main_mrg, uuid_first_t_entry->metric);
-                uint64_t remove_samples;
-                if (rrdeng_retention_samples_delta(
-                        ctx,
-                        old_first_time_s,
-                        uuid_first_t_entry->first_time_s,
-                        update_every_s,
-                        "advancing metric first retention time",
-                        &remove_samples))
-                    rrdeng_atomic_uint64_sub_saturating(
-                        ctx,
-                        &ctx->atomic.samples,
-                        remove_samples,
-                        "samples",
-                        "advancing metric first retention time");
-            }
+            // the samples of the deleted datafile are removed by datafile_delete()
+            mrg_metric_set_first_time_s_if_bigger(main_mrg, uuid_first_t_entry->metric, uuid_first_t_entry->first_time_s);
             mrg_metric_release(main_mrg, uuid_first_t_entry->metric);
         }
         else {
@@ -1640,24 +1650,6 @@ static void update_metrics_first_time_s(struct rrdengine_instance *ctx, struct r
             // there is no retention for this metric
             bool has_retention = mrg_metric_has_zero_disk_retention(main_mrg, uuid_first_t_entry->metric);
             if (!has_retention) {
-                time_t first_time_s = mrg_metric_get_first_time_s(main_mrg, uuid_first_t_entry->metric);
-                time_t last_time_s = mrg_metric_get_latest_time_s(main_mrg, uuid_first_t_entry->metric);
-                uint32_t update_every_s = mrg_metric_get_update_every_s(main_mrg, uuid_first_t_entry->metric);
-                uint64_t remove_samples;
-                if (rrdeng_retention_samples_delta(
-                        ctx,
-                        first_time_s,
-                        last_time_s,
-                        update_every_s,
-                        "deleting a metric with zero disk retention",
-                        &remove_samples))
-                    rrdeng_atomic_uint64_sub_saturating(
-                        ctx,
-                        &ctx->atomic.samples,
-                        remove_samples,
-                        "samples",
-                        "deleting a metric with zero disk retention");
-
                 bool deleted = mrg_metric_release_and_delete(main_mrg, uuid_first_t_entry->metric);
                 if(deleted)
                     deleted_metrics++;
@@ -1765,6 +1757,10 @@ void datafile_delete(
     datafile_list_delete_unsafe(ctx, datafile);
     netdata_rwlock_wrunlock(&ctx->datafiles.rwlock);
 
+    // its samples are gone with it - whatever was charged to it (flushed
+    // extents, a replayed v1 journal, or its journal v2)
+    rrdeng_datafile_samples_uncharge(datafile);
+
     journal_file = datafile->journalfile;
     datafile_bytes = datafile->pos;
     journal_file_bytes = journalfile_current_size(journal_file);
@@ -1852,7 +1848,7 @@ static void *database_rotate_tp_worker(struct rrdengine_instance *ctx __maybe_un
 }
 
 static void after_flush_all_hot_and_dirty_pages_of_section(struct rrdengine_instance *ctx __maybe_unused, void *data __maybe_unused, struct completion *completion __maybe_unused, uv_work_t* req __maybe_unused, int status __maybe_unused) {
-    ;
+    extent_waiter_done();
 }
 
 static void *flush_all_hot_and_dirty_pages_of_section_tp_worker(struct rrdengine_instance *ctx __maybe_unused, void *data __maybe_unused, struct completion *completion __maybe_unused, uv_work_t *uv_work_req __maybe_unused) {
@@ -1866,7 +1862,7 @@ static void *flush_all_hot_and_dirty_pages_of_section_tp_worker(struct rrdengine
 }
 
 static void after_flush_dirty_pages_of_section(struct rrdengine_instance *ctx __maybe_unused, void *data __maybe_unused, struct completion *completion __maybe_unused, uv_work_t* req __maybe_unused, int status __maybe_unused) {
-    ;
+    extent_waiter_done();
 }
 
 static void *flush_dirty_pages_of_section_tp_worker(struct rrdengine_instance *ctx __maybe_unused, void *data __maybe_unused, struct completion *completion __maybe_unused, uv_work_t *uv_work_req __maybe_unused) {
@@ -2015,12 +2011,28 @@ static void *populate_mrg_tp_worker(
         }
     } while (pending > 0);
 
+    {
+        size_t exact = 0, estimated = 0;
+        netdata_rwlock_rdlock(&ctx->datafiles.rwlock);
+        for (df = get_next_datafile(NULL, ctx, true); df; df = get_next_datafile(df, ctx, true)) {
+            if (__atomic_load_n(&df->samples.estimated, __ATOMIC_RELAXED))
+                estimated++;
+            else
+                exact++;
+        }
+        netdata_rwlock_rdunlock(&ctx->datafiles.rwlock);
+
+        nd_log_daemon(NDLP_INFO,
+                      "DBENGINE: tier %d: %" PRIu64 " samples on disk (%zu datafiles exact, %zu estimated)",
+                      tier, (uint64_t)__atomic_load_n(&ctx->atomic.samples, __ATOMIC_RELAXED), exact, estimated);
+    }
+
     worker_is_idle();
     return data;
 }
 
 static void after_ctx_shutdown(struct rrdengine_instance *ctx __maybe_unused, void *data __maybe_unused, struct completion *completion __maybe_unused, uv_work_t* req __maybe_unused, int status __maybe_unused) {
-    ;
+    extent_waiter_done();
 }
 
 static void *ctx_shutdown_tp_worker(struct rrdengine_instance *ctx __maybe_unused, void *data __maybe_unused, struct completion *completion __maybe_unused, uv_work_t *uv_work_req __maybe_unused) {
@@ -2122,12 +2134,12 @@ void async_cb(uv_async_t *handle)
 
 static void async_closed_cb(uv_handle_t *handle)
 {
-    struct rrdeng_main *main = handle->data;
+    struct rrdeng_main *rmain = handle->data;
 
-    int ret = uv_async_init(handle->loop, &main->async, async_cb);
+    int ret = uv_async_init(handle->loop, &rmain->async, async_cb);
     if (ret)
         netdata_log_error("DBENGINE: reinitializing uv_async_init(): %s", uv_strerror(ret));
-    __atomic_store_n(&main->async_ready, true, __ATOMIC_RELEASE);
+    __atomic_store_n(&rmain->async_ready, true, __ATOMIC_RELEASE);
 }
 #else
 void async_cb(uv_async_t *handle __maybe_unused)
@@ -2269,8 +2281,100 @@ static void *journal_v2_indexing_tp_worker(struct rrdengine_instance *ctx, void 
     return data;
 }
 
+// ----------------------------------------------------------------------------
+// extent waiters
+//
+// Some works block their pool thread until EXTENT_WRITEs complete: the flushers wait for the
+// extents they submit (main_cache_flush_dirty_page_callback() in pagecache.c) and the ctx
+// shutdown waits for all in-flight extents of its tier. EXTENT_WRITE runs on the same
+// process-wide libuv pool, so when waiters occupy every pool thread no extent can ever be
+// written and they all wait forever (shutdown hangs at "wait for dbengine collectors to finish").
+// The pool can be as small as MIN_LIBUV_WORKER_THREADS (8 on 32-bit), while FLUSH_MAIN alone is
+// allowed pgc_max_flushers() (the number of CPUs) and the per-tier flushes had no limit at all.
+//
+// So all of them share one budget below the pool size: these jobs alone can never occupy the
+// whole pool. Over-budget per-tier flushes and ctx shutdowns are deferred (never dropped) and
+// dispatched when a waiter finishes. FLUSH_MAIN is periodic, so over budget it is skipped, as it
+// already is over pgc_max_flushers(). flush_inline() in cache.c never runs on pool threads, for
+// the same reason. Everything here runs on the event loop thread.
+//
+// The budget does NOT guarantee free threads for extent writes: other pool jobs that block on
+// dbengine are not counted - Cloud queries (aclk_run_query_job()) and weights (weights_worker())
+// wait for EXTENT_READs that need a pool thread too - and together with the waiters here they
+// can still fill a small pool.
+
+static size_t extent_waiters_max(void) {
+    int max = libuv_worker_threads - RESERVED_LIBUV_WORKER_THREADS;
+    return (max < 1) ? 1 : (size_t)max;
+}
+
+static bool extent_waiters_slot_available(void) {
+    return rrdeng_main.extent_waiters.running < extent_waiters_max();
+}
+
+static void extent_waiter_dispatch(struct rrdeng_cmd *cmd) {
+    work_cb do_work_cb;
+    after_work_cb do_after_work_cb;
+
+    switch(cmd->opcode) {
+        case RRDENG_OPCODE_CTX_FLUSH_DIRTY:
+            do_work_cb = flush_dirty_pages_of_section_tp_worker;
+            do_after_work_cb = after_flush_dirty_pages_of_section;
+            break;
+
+        case RRDENG_OPCODE_CTX_FLUSH_HOT_DIRTY:
+            do_work_cb = flush_all_hot_and_dirty_pages_of_section_tp_worker;
+            do_after_work_cb = after_flush_all_hot_and_dirty_pages_of_section;
+            break;
+
+        case RRDENG_OPCODE_CTX_SHUTDOWN:
+            do_work_cb = ctx_shutdown_tp_worker;
+            do_after_work_cb = after_ctx_shutdown;
+            break;
+
+        default:
+            fatal("DBENGINE: opcode %d is not a deferrable extent waiter", (int)cmd->opcode);
+    }
+
+    rrdeng_main.extent_waiters.running++;
+    if(!work_dispatch(cmd->ctx, NULL, cmd->completion, cmd->opcode, do_work_cb, do_after_work_cb))
+        rrdeng_main.extent_waiters.running--;
+}
+
+static void extent_waiter_dispatch_or_defer(struct rrdeng_cmd *cmd) {
+    // keep the arrival order: while others are deferred, this one waits behind them
+    if(!rrdeng_main.extent_waiters.deferred && extent_waiters_slot_available()) {
+        extent_waiter_dispatch(cmd);
+        return;
+    }
+
+    struct rrdeng_cmd *deferred = aral_mallocz(rrdeng_main.cmd_queue.ar);
+    *deferred = *cmd;
+    DOUBLE_LINKED_LIST_APPEND_ITEM_UNSAFE(rrdeng_main.extent_waiters.deferred, deferred, queue.prev, queue.next);
+}
+
+static void extent_waiters_dispatch_deferred(void) {
+    while(rrdeng_main.extent_waiters.deferred && extent_waiters_slot_available()) {
+        struct rrdeng_cmd *deferred = rrdeng_main.extent_waiters.deferred;
+        DOUBLE_LINKED_LIST_REMOVE_ITEM_UNSAFE(rrdeng_main.extent_waiters.deferred, deferred, queue.prev, queue.next);
+
+        struct rrdeng_cmd cmd = *deferred;
+        aral_freez(rrdeng_main.cmd_queue.ar, deferred);
+
+        extent_waiter_dispatch(&cmd);
+    }
+}
+
+// the after-work callback of every extent waiter calls this
+static void extent_waiter_done(void) {
+    internal_fatal(!rrdeng_main.extent_waiters.running, "DBENGINE: extent waiters counter underflow");
+    rrdeng_main.extent_waiters.running--;
+    extent_waiters_dispatch_deferred();
+}
+
 static void after_do_cache_flush(struct rrdengine_instance *ctx __maybe_unused, void *data __maybe_unused, struct completion *completion __maybe_unused, uv_work_t* req __maybe_unused, int status __maybe_unused) {
     rrdeng_main.flushes_running--;
+    extent_waiter_done();
 }
 
 static void after_do_main_cache_evict(struct rrdengine_instance *ctx __maybe_unused, void *data __maybe_unused, struct completion *completion __maybe_unused, uv_work_t* req __maybe_unused, int status __maybe_unused) {
@@ -2430,6 +2534,9 @@ static void timer_per_sec_cb(uv_timer_t *handle __maybe_unused)
     worker_set_metric(RRDENG_OPCODES_WAITING, (NETDATA_DOUBLE)rrdeng_main.cmd_queue.unsafe.waiting);
     worker_set_metric(RRDENG_WORKS_DISPATCHED, (NETDATA_DOUBLE)__atomic_load_n(&rrdeng_main.work_cmd.atomics.dispatched, __ATOMIC_RELAXED));
     worker_set_metric(RRDENG_WORKS_EXECUTING, (NETDATA_DOUBLE)__atomic_load_n(&rrdeng_main.work_cmd.atomics.executing, __ATOMIC_RELAXED));
+
+    // normally dispatched when a waiter finishes; this only covers a failed dispatch
+    extent_waiters_dispatch_deferred();
 
     rrdeng_enq_cmd(NULL, RRDENG_OPCODE_FLUSH_MAIN, NULL, NULL, STORAGE_PRIORITY_INTERNAL_DBENGINE, NULL, NULL);
     rrdeng_enq_cmd(NULL, RRDENG_OPCODE_CLEANUP, NULL, NULL, STORAGE_PRIORITY_INTERNAL_DBENGINE, NULL, NULL);
@@ -2628,13 +2735,13 @@ void dbengine_event_loop(void* arg) {
     worker_register_job_custom_metric(RRDENG_WORKS_DISPATCHED, "works dispatched", "works",   WORKER_METRIC_ABSOLUTE);
     worker_register_job_custom_metric(RRDENG_WORKS_EXECUTING,  "works executing",  "works",   WORKER_METRIC_ABSOLUTE);
 
-    struct rrdeng_main *main = arg;
+    struct rrdeng_main *rmain = arg;
     enum rrdeng_opcode opcode;
     struct rrdeng_cmd cmd;
-    main->tid = gettid_cached();
+    rmain->tid = gettid_cached();
 
-    fatal_assert(0 == uv_timer_start(&main->timer, timer_per_sec_cb, TIMER_PERIOD_MS, TIMER_PERIOD_MS));
-    fatal_assert(0 == uv_timer_start(&main->retention_timer, retention_timer_cb, TIMER_PERIOD_MS * 60, TIMER_PERIOD_MS * 60));
+    fatal_assert(0 == uv_timer_start(&rmain->timer, timer_per_sec_cb, TIMER_PERIOD_MS, TIMER_PERIOD_MS));
+    fatal_assert(0 == uv_timer_start(&rmain->retention_timer, retention_timer_cb, TIMER_PERIOD_MS * 60, TIMER_PERIOD_MS * 60));
 
     bool shutdown = false;
     size_t cpus = netdata_conf_cpus();
@@ -2651,7 +2758,7 @@ void dbengine_event_loop(void* arg) {
 
     while (likely(!shutdown)) {
         worker_is_idle();
-        uv_run(&main->loop, UV_RUN_ONCE);
+        uv_run(&rmain->loop, UV_RUN_ONCE);
 
         do {
             worker_is_busy(RRDENG_OPCODE_MAX);
@@ -2680,8 +2787,8 @@ void dbengine_event_loop(void* arg) {
                     if (uv_hrtime() - last_async_callback > 1000UL * NSEC_PER_MSEC) {
                         if (++max_timeout_count > 30) {
                             netdata_log_error("DBENGINE: async callback timeout detected, re-initializing the async handle");
-                            __atomic_store_n(&main->async_ready, false, __ATOMIC_RELEASE);
-                            uv_close((uv_handle_t *)&main->async, async_closed_cb);
+                            __atomic_store_n(&rmain->async_ready, false, __ATOMIC_RELEASE);
+                            uv_close((uv_handle_t *)&rmain->async, async_closed_cb);
                             max_timeout_count = 0;
                         } else
                             netdata_log_error("DBENGINE: async callback timeout detected count = %d", max_timeout_count);
@@ -2699,9 +2806,17 @@ void dbengine_event_loop(void* arg) {
                 }
 
                 case RRDENG_OPCODE_FLUSH_MAIN: {
-                    if(rrdeng_main.flushes_running < pgc_max_flushers()) {
+                    // FLUSH_MAIN is an extent waiter; deferred per-tier flushes go first,
+                    // they are what shutdown waits for
+                    if(rrdeng_main.flushes_running < pgc_max_flushers() &&
+                        !rrdeng_main.extent_waiters.deferred && extent_waiters_slot_available()) {
                         rrdeng_main.flushes_running++;
-                        work_dispatch(NULL, NULL, NULL, opcode, cache_flush_tp_worker, after_do_cache_flush);
+                        rrdeng_main.extent_waiters.running++;
+                        if(!work_dispatch(NULL, NULL, NULL, opcode, cache_flush_tp_worker, after_do_cache_flush)) {
+                            // no after-work callback will run
+                            rrdeng_main.flushes_running--;
+                            rrdeng_main.extent_waiters.running--;
+                        }
                     }
                     break;
                 }
@@ -2769,21 +2884,10 @@ void dbengine_event_loop(void* arg) {
                     break;
                 }
 
-                case RRDENG_OPCODE_CTX_FLUSH_DIRTY: {
-                    struct rrdengine_instance *ctx = cmd.ctx;
-                    work_dispatch(ctx, NULL, NULL, opcode,
-                                  flush_dirty_pages_of_section_tp_worker,
-                                  after_flush_dirty_pages_of_section);
+                case RRDENG_OPCODE_CTX_FLUSH_DIRTY:
+                case RRDENG_OPCODE_CTX_FLUSH_HOT_DIRTY:
+                    extent_waiter_dispatch_or_defer(&cmd);
                     break;
-                }
-
-                case RRDENG_OPCODE_CTX_FLUSH_HOT_DIRTY: {
-                    struct rrdengine_instance *ctx = cmd.ctx;
-                    work_dispatch(ctx, NULL, NULL, opcode,
-                                  flush_all_hot_and_dirty_pages_of_section_tp_worker,
-                                  after_flush_all_hot_and_dirty_pages_of_section);
-                    break;
-                }
 
                 case RRDENG_OPCODE_CTX_QUIESCE: {
                     // a ctx will shutdown shortly
@@ -2793,22 +2897,19 @@ void dbengine_event_loop(void* arg) {
                     break;
                 }
 
-                case RRDENG_OPCODE_CTX_SHUTDOWN: {
+                case RRDENG_OPCODE_CTX_SHUTDOWN:
                     // a ctx is shutting down
-                    struct rrdengine_instance *ctx = cmd.ctx;
-                    struct completion *completion = cmd.completion;
-                    work_dispatch(ctx, NULL, completion, opcode, ctx_shutdown_tp_worker, after_ctx_shutdown);
+                    extent_waiter_dispatch_or_defer(&cmd);
                     break;
-                }
 
                 case RRDENG_OPCODE_SHUTDOWN_EVLOOP: {
-                    uv_close((uv_handle_t *)&main->async, NULL);
+                    uv_close((uv_handle_t *)&rmain->async, NULL);
 
-                    (void) uv_timer_stop(&main->timer);
-                    uv_close((uv_handle_t *)&main->timer, NULL);
+                    (void) uv_timer_stop(&rmain->timer);
+                    uv_close((uv_handle_t *)&rmain->timer, NULL);
 
-                    (void) uv_timer_stop(&main->retention_timer);
-                    uv_close((uv_handle_t *)&main->retention_timer, NULL);
+                    (void) uv_timer_stop(&rmain->retention_timer);
+                    uv_close((uv_handle_t *)&rmain->retention_timer, NULL);
                     shutdown = true;
                     break;
                 }
@@ -2826,7 +2927,7 @@ void dbengine_event_loop(void* arg) {
                 }
             }
             if (opcode != RRDENG_OPCODE_NOOP)
-                uv_run(&main->loop, UV_RUN_NOWAIT);
+                uv_run(&rmain->loop, UV_RUN_NOWAIT);
 
         } while (opcode != RRDENG_OPCODE_NOOP);
     }
@@ -2834,7 +2935,7 @@ void dbengine_event_loop(void* arg) {
     uv_sem_destroy(&sem);
 
     nd_log(NDLS_DAEMON, NDLP_DEBUG, "Shutting down dbengine thread");
-    (void) uv_loop_close(&main->loop);
+    (void) uv_loop_close(&rmain->loop);
     worker_unregister();
 }
 

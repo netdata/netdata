@@ -14,11 +14,13 @@ metadata:
 
 metric_tags:
   - tag: servertech_sentry3_system_version
-    OID: 1.3.6.1.4.1.1718.3.1.1.0
-    symbol: systemVersion
+    symbol:
+      OID: 1.3.6.1.4.1.1718.3.1.1.0
+      name: systemVersion
   - tag: servertech_sentry3_system_nic_serial_number
-    OID: 1.3.6.1.4.1.1718.3.1.2.0
-    symbol: systemNICSerialNumber
+    symbol:
+      OID: 1.3.6.1.4.1.1718.3.1.2.0
+      name: systemNICSerialNumber
 
 # SENTRY3-MIB
 # https://mibbrowser.online/mibdb_search.php?mib=SENTRY3-MIB

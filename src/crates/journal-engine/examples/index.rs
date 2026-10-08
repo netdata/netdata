@@ -1,34 +1,34 @@
-//! Simple test binary for batch_compute_file_indexes.
-//!
-//! Points at a directory of journal files and indexes them.
+//! Example: scan a journal directory via the registry, build a foyer index
+//! cache, and warm it with [`batch_compute_file_indexes`]
+//! for the last 24h. Run from src/crates: cargo run -p journal-engine --example index [dir]
 
-// # 1. Create a mount point
+// The default directory (/mnt/slow-disk/otel-aws) is a deliberately slow mount,
+// prepared by the steps below, to reproduce batch indexing under slow I/O.
 //
+// # 1. Create a loopback ext4 mount
 // dd if=/dev/zero of=/tmp/slow-disk.img bs=1G count=100
 // LOOP=$(sudo losetup -f --show /tmp/slow-disk.img)
 // sudo mkfs.ext4 $LOOP
-// sudo mkdir -p /mnt/slow-disk
-// sudo mount $LOOP /mnt/slow-disk
+// sudo mkdir -p /mnt/slow-disk && sudo mount $LOOP /mnt/slow-disk
 // sudo chown $USER:$USER /mnt/slow-disk
 //
-// # 2. Copy journal files
-// cp -r ~/repos/tmp/otel-aws /mnt/slow-disk/
+// # 2. Copy journal files under it (its name becomes the scan target)
+// cp -r /path/to/journals /mnt/slow-disk/
 //
-// # 3. Unmount and recreate with delay
+// # 3. Recreate the mount through device-mapper with 50ms read+write delays
 // sudo umount /mnt/slow-disk
 // SIZE=$(sudo blockdev --getsz $LOOP)
 // sudo dmsetup create slow-disk --table "0 $SIZE delay $LOOP 0 50 $LOOP 0 50"
 // sudo mount /dev/mapper/slow-disk /mnt/slow-disk
 //
-// # 4. Now /mnt/slow-disk/otel-aws has your journals on a "slow" disk
+// # 4. /mnt/slow-disk/otel-aws now sits on the "slow" disk
 //
-// # 5. Create slow-io cgroup
+// # 5. Optionally cap throughput with a cgroup v2 io controller
 // sudo mkdir -p /sys/fs/cgroup/slow-io
 // echo "+io" | sudo tee /sys/fs/cgroup/cgroup.controllers
-// # Find your device's major:minor (e.g., for nvme0n1)
-// cat /sys/block/nvme0n1/dev
-// # Let's say it's 259:0, Set a 10MB/s read and write limit
+// cat /sys/block/nvme0n1/dev   # prints major:minor, e.g. 259:0
 // echo "259:0 rbps=10485760 wbps=10485760" | sudo tee /sys/fs/cgroup/slow-io/io.max
+// echo $$ | sudo tee /sys/fs/cgroup/slow-io/cgroup.procs   # throttle this shell and its children
 
 use journal_engine::{
     Facets, FileIndexCacheBuilder, FileIndexKey, IndexingLimits, QueryTimeRange,
@@ -45,12 +45,12 @@ use tracing::{info, warn};
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
-    // Initialize tracing
+    // Debug-level tracing via tracing_subscriber::fmt().
     tracing_subscriber::fmt()
         .with_max_level(tracing::Level::DEBUG)
         .init();
 
-    // Get directory from args or use default
+    // Scan target: argv[1], else the default slow-disk directory prepared above.
     let dir = if let Some(arg) = env::args().nth(1) {
         PathBuf::from(arg)
     } else {
@@ -59,13 +59,13 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     info!("scanning directory: {}", dir.display());
 
-    // Create registry and scan directory
+    // Registry + notify monitor (`journal-registry/src/registry/monitor.rs` `Monitor`): watch_directory scans recursively; events stay unread.
     let (monitor, _event_receiver) = Monitor::new()?;
     let registry = Registry::new(monitor);
 
     registry.watch_directory(dir.to_str().unwrap())?;
 
-    // Find all files
+    // Find all scanned files: find_files_in_range over the full 0..u32::MAX range (`journal-registry/src/registry/mod.rs` `Registry::find_files_in_range`).
     let files = registry.find_files_in_range(
         journal_common::Seconds(0),
         journal_common::Seconds(u32::MAX),
@@ -75,11 +75,11 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     if files.is_empty() {
         return Ok(());
     }
-    // files.truncate(1);
+    // Debug toggle: keep only the first file (uncomment).
 
-    // Create file index cache
+    // Foyer hybrid cache (`indexing.rs` `FileIndexCacheBuilder`): 1000 in-memory entries + 2 GiB disk cache; the disk path persists across runs.
     let cache = FileIndexCacheBuilder::new()
-        // .with_cache_path("/mnt/slow-disk/foyer-cache")
+        // Alternative: keep the disk cache on the slow disk too (swap with the line below).
         .with_cache_path("/tmp/foyer-cache")
         .with_memory_capacity(1000)
         .with_disk_capacity(2048 * 1024 * 1024)
@@ -89,7 +89,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     info!("created file index cache");
 
-    // Configure indexing parameters (modify these as needed)
+    // Indexing inputs: which fields become facets (`facets.rs` `Facets::new`) and the source timestamp field.
     let facets = Facets::new(&["log.severity_number".to_string()]);
     let source_timestamp_field = FieldName::new("_SOURCE_REALTIME_TIMESTAMP").unwrap();
 
@@ -104,7 +104,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         })
         .collect();
 
-    // Create a time range for indexing (24 hours)
+    // Index only the last 24h; QueryTimeRange derives the aligned bucket duration (`query_time_range.rs` `QueryTimeRange::new`).
     let now = std::time::SystemTime::now()
         .duration_since(std::time::UNIX_EPOCH)?
         .as_secs() as u32;
@@ -117,7 +117,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         time_range.bucket_duration()
     );
 
-    // Run batch indexing
+    // Cache check, then parallel compute of misses on a rayon pool; results update the registry and cache.
     let start = std::time::Instant::now();
     let responses = batch_compute_file_indexes(
         &cache,
@@ -134,7 +134,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     info!("responses={}, duration={:?}", responses.len(), elapsed);
 
-    // Close the cache to flush and shut down I/O tasks gracefully
+    // Flush and shut down the cache's I/O tasks.
     cache.close().await?;
 
     Ok(())

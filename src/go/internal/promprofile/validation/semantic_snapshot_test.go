@@ -11,7 +11,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/netdata/netdata/go/plugins/internal/promprofile/replay"
+	promreplay "github.com/netdata/netdata/go/plugins/internal/promprofile/replay"
 )
 
 func TestValidateSemanticSnapshotUsesProductionFacts(t *testing.T) {
@@ -34,6 +34,8 @@ relabeling:
 template:
   family: Example
   context_namespace: app
+  chart_defaults:
+    priority: 100
   metrics: [app_value]
   charts:
     - title: Value
@@ -56,7 +58,9 @@ template:
 	report := validateTestMode(context.Background(), Options{
 		ProfilePath: profilePath,
 		DumpPath:    dumpPath,
-	}, validationMode{semanticFacts: true})
+	}, validationMode{
+		semanticFacts: true,
+	})
 	snapshot := report.ResultSnapshot().Semantics
 	if snapshot == nil {
 		t.Fatalf("semantic snapshot is nil; findings=%#v", report.Findings)
@@ -66,7 +70,8 @@ template:
 	}
 	if len(snapshot.Profiles) != 1 || snapshot.Profiles[0].ContextNamespace != "app" ||
 		len(snapshot.Profiles[0].FallbackRules) != 1 ||
-		snapshot.Profiles[0].FallbackRules[0].RuntimePath != "fallback_type.gauge[0]" {
+		snapshot.Profiles[0].FallbackRules[0].RuntimePath != "fallback_type.gauge[0]" ||
+		len(snapshot.Profiles[0].Charts) != 1 || snapshot.Profiles[0].Charts[0].Priority != 100 {
 		t.Fatalf("unexpected static profile facts: %#v", snapshot.Profiles)
 	}
 	if len(snapshot.Sources) != 1 {
@@ -120,7 +125,9 @@ template:
 	// ResultSnapshot must not expose report-owned slices.
 	snapshot.Sources[0].Routes[0].IdentityLabels[0] = "mutated"
 	snapshot.Sources[0].Routes[0].ChartLabelValues[0].Value = "mutated"
-	snapshot.PlanActions[0].Labels = append(snapshot.PlanActions[0].Labels, promreplay.SemanticLabel{Name: "mutated"})
+	snapshot.PlanActions[0].Labels = append(snapshot.PlanActions[0].Labels, promreplay.SemanticLabel{
+		Name: "mutated",
+	})
 	if got := report.ResultSnapshot().Semantics.Sources[0].Routes[0].IdentityLabels[0]; got != "instance" {
 		t.Fatalf("ResultSnapshot aliases report state: got %q", got)
 	}
@@ -171,7 +178,10 @@ zeta_value 2
 		ProfilePath:            zetaPath,
 		SupportingProfilePaths: []string{alphaPath},
 		DumpPath:               dumpPath,
-	}, validationMode{semanticFacts: true, automaticProfileSelection: true})
+	}, validationMode{
+		semanticFacts:             true,
+		automaticProfileSelection: true,
+	})
 	snapshot := report.ResultSnapshot().Semantics
 	if snapshot == nil {
 		t.Fatalf("semantic snapshot is nil; findings=%#v", report.Findings)
@@ -235,7 +245,9 @@ app_latency_seconds_count 2
 	report := validateTestMode(context.Background(), Options{
 		ProfilePath: profilePath,
 		DumpPath:    dumpPath,
-	}, validationMode{semanticFacts: true})
+	}, validationMode{
+		semanticFacts: true,
+	})
 	snapshot := report.ResultSnapshot().Semantics
 	if snapshot == nil {
 		t.Fatalf("semantic snapshot is nil; findings=%#v", report.Findings)
@@ -250,7 +262,11 @@ app_latency_seconds_count 2
 			continue
 		}
 		if len(source.RelabelRules) != 1 || source.RelabelRules[0].InputMetricName != source.MetricName {
-			t.Fatalf("source %q has another physical sample's relabel trace: %#v", source.MetricName, source.RelabelRules)
+			t.Fatalf(
+				"source %q has another physical sample's relabel trace: %#v",
+				source.MetricName,
+				source.RelabelRules,
+			)
 		}
 		want[source.MetricName]--
 	}
@@ -262,7 +278,12 @@ app_latency_seconds_count 2
 }
 
 func TestValidateDoesNotBuildSemanticSnapshotByDefault(t *testing.T) {
-	result := runValidation(t, singleInstanceValueGaugeProfile, "# TYPE app_value gauge\napp_value{instance=\"one\"} 1\n", "")
+	result := runValidation(
+		t,
+		singleInstanceValueGaugeProfile,
+		"# TYPE app_value gauge\napp_value{instance=\"one\"} 1\n",
+		"",
+	)
 	if result.report.ResultSnapshot().Semantics != nil {
 		t.Fatal("ordinary validation unexpectedly built semantic facts")
 	}
@@ -298,8 +319,11 @@ template:
 		t.Fatal(err)
 	}
 	report := validateTestMode(context.Background(), Options{
-		ProfilePath: profilePath, DumpPath: dumpPath,
-	}, validationMode{semanticFacts: true})
+		ProfilePath: profilePath,
+		DumpPath:    dumpPath,
+	}, validationMode{
+		semanticFacts: true,
+	})
 	if !report.Passed() || !hasFinding(report, "profile_suppressed_series", "warning") {
 		t.Fatalf("raw validator must retain the profile-suppression warning: %#v", report.Findings)
 	}
@@ -360,8 +384,11 @@ func TestValidateSemanticSnapshotLinksEveryDistributionComponent(t *testing.T) {
 		t.Fatal(err)
 	}
 	report := validateTestMode(context.Background(), Options{
-		ProfilePath: profilePath, DumpPath: dumpPath,
-	}, validationMode{semanticFacts: true})
+		ProfilePath: profilePath,
+		DumpPath:    dumpPath,
+	}, validationMode{
+		semanticFacts: true,
+	})
 	snapshot := report.ResultSnapshot().Semantics
 	if snapshot == nil {
 		t.Fatalf("semantic snapshot is nil; findings=%#v", report.Findings)

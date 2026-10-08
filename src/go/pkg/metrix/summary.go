@@ -124,7 +124,7 @@ func (c *storeCore) recordSummaryObservePoint(desc *instrumentDescriptor, scope 
 			labelsKey:    labelsKey,
 			desc:         desc,
 		}
-		c.active.summaries[key] = entry
+		stageEntry(&c.active.summaries, key, entry)
 	}
 
 	entry.count = count
@@ -187,7 +187,7 @@ func (c *storeCore) recordSummaryObserve(desc *instrumentDescriptor, scope HostS
 		if len(desc.summaryQuantiles()) > 0 && entry.sketch == nil {
 			entry.sketch = newSummaryQuantileSketch(desc.summaryReservoirSize(), summarySketchSeed(key))
 		}
-		c.active.summaries[key] = entry
+		stageEntry(&c.active.summaries, key, entry)
 	}
 
 	entry.count++

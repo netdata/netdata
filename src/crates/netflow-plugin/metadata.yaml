@@ -666,8 +666,8 @@ modules:
           `/usr/share/netdata/topology-ip-intel/`; the bundled refresh tool fetches updates
           into `/var/cache/netdata/topology-ip-intel/`.
 
-          DB-IP publishes the Lite databases monthly under a Creative Commons Attribution 4.0
-          International licence (https://db-ip.com/db/lite.php). The MMDB format is the MaxMind
+          DB-IP publishes the Lite databases monthly under a [Creative Commons Attribution 4.0
+          International licence](https://db-ip.com/db/lite.php). The MMDB format is the MaxMind
           binary database; lookups are in-process with no per-flow network call.
 
           Populates these flow record fields when a lookup succeeds:
@@ -728,8 +728,8 @@ modules:
               cadence -- more frequent runs will not produce newer data.
           - title: Licence acknowledgement
             description: |
-              DB-IP Lite databases are distributed under the Creative Commons Attribution 4.0
-              International licence (https://db-ip.com/db/lite.php). Attribution is required
+              DB-IP Lite databases are distributed under the [Creative Commons Attribution 4.0
+              International licence](https://db-ip.com/db/lite.php). Attribution is required
               when redistributing the data or derivative dashboards.
       configuration:
         file:
@@ -5310,7 +5310,7 @@ modules:
                 `services { inline-monitoring { ... } }` -- the template includes
                 `datalink-frame-size` and a `maximum-clip-length` controls how much of the
                 frame is captured. Reference recipe in the
-                [Akvorado documentation](https://demo.akvorado.net/docs/operations#ipfix-315).
+                [Akvorado documentation](https://demo.akvorado.net/docs/operations).
               - **sFlow** with header sampling -- supported by Juniper QFX, Arista EOS,
                 Mellanox/NVIDIA, MikroTik, and others. Header sampling is the default for
                 most agents; verify the agent emits `SampledHeader` rather than only

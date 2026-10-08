@@ -404,7 +404,7 @@ int progress_function_result(BUFFER *wb, const char *hostname) {
     buffer_json_member_add_string(wb, "type", "table");
     buffer_json_member_add_time_t(wb, "update_every", 1);
     buffer_json_member_add_boolean(wb, "has_history", false);
-    buffer_json_member_add_string(wb, "help", RRDFUNCTIONS_PROGRESS_HELP);
+    buffer_json_member_add_string(wb, "help", FUNCTION_PROGRESS_HELP);
     buffer_json_member_add_array(wb, "data");
 
     spinlock_lock(&progress.spinlock);
@@ -413,15 +413,13 @@ int progress_function_result(BUFFER *wb, const char *hostname) {
     usec_t now_ut = now_realtime_usec();
     usec_t max_duration_ut = 0;
     size_t max_size = 0, max_sent = 0;
-    size_t archived = 0, running = 0;
+    size_t archived __maybe_unused = 0; // only read by the assert() below
     SIMPLE_HASHTABLE_FOREACH_READ_ONLY(&progress.hashtable, sl, _QUERY) {
         QUERY_PROGRESS *qp = SIMPLE_HASHTABLE_FOREACH_READ_ONLY_VALUE(sl);
         if(unlikely(!qp)) continue; // not really needed, just for completeness
 
         if(qp->prev)
             archived++;
-        else
-            running++;
 
         bool finished = qp->finished_ut ? true : false;
         usec_t duration_ut = finished ? qp->duration_ut : now_ut - qp->started_ut;
@@ -486,14 +484,14 @@ int progress_function_result(BUFFER *wb, const char *hostname) {
 
         buffer_json_add_array_item_object(wb); // row options
         {
-            char *severity = "notice";
+            const char *severity = "notice";
             if(finished) {
                 if(qp->response_code == HTTP_RESP_NOT_MODIFIED ||
                     qp->response_code == HTTP_RESP_CLIENT_CLOSED_REQUEST ||
                     qp->response_code == HTTP_RESP_CONFLICT)
                     severity = "debug";
                 else if(qp->response_code >= 500 && qp->response_code <= 599)
-                    severity = "error";
+                    severity = "critical";
                 else if(qp->response_code >= 400 && qp->response_code <= 499)
                     severity = "warning";
                 else if(qp->response_code >= 300 && qp->response_code <= 399)

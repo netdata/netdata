@@ -33,7 +33,9 @@ ws_client *ws_client_new(size_t buf_size, char **host)
 
     // Fixed: raw WebSocket read staging; dynamic growth is only needed after payload decoding.
     client->buf_read = rbuf_create(size, size);
-    // Fixed: the send path masks buffered bytes in-place after rbuf_bump_head().
+    // Fixed: staging for outgoing frames. ws_client_send() writes only what fits and
+    // reports a short count, which the caller turns into back-pressure (POLLOUT), so
+    // growth would only add memory.
     client->buf_write = rbuf_create(size, size);
     client->buf_to_mqtt = rbuf_create(mqtt_input_size, MAX_MQTT_INPUT_BUFFER_SIZE);
 
@@ -388,6 +390,38 @@ static size_t get_ws_hdr_size(size_t payload_size)
     return hdr_len;
 }
 
+// Copy `len` bytes from `src` to `dst`, applying the client-to-server mask [RFC6455 5.3].
+// `stream_pos` is the offset of src[0] inside the frame payload; it selects the mask byte
+// to start from, so a payload split across a ringbuffer wrap keeps the mask phase.
+//
+// Copying and masking in one pass, at word width, matters more than it looks: this runs
+// inside the mqtt_ng hdr-buffer lock, which mqtt_ng_sync() holds across the whole send
+// path while every query thread waits to publish.
+static void ws_mask_copy(char *dst, const char *src, size_t len, const char mask[4], size_t stream_pos)
+{
+    // the mask repeats every 4 bytes and 4 divides sizeof(uint64_t), so one mask word
+    // built at stream_pos stays valid for every 8-byte block after it
+    uint8_t mask_bytes[sizeof(uint64_t)];
+    for (size_t i = 0; i < sizeof(mask_bytes); i++)
+        mask_bytes[i] = (uint8_t)mask[(stream_pos + i) & 3];
+
+    uint64_t mask_word;
+    memcpy(&mask_word, mask_bytes, sizeof(mask_word));
+
+    size_t i = 0;
+    for (; i + sizeof(uint64_t) <= len; i += sizeof(uint64_t)) {
+        uint64_t word;
+        // memcpy for the unaligned load/store: compilers turn these into single
+        // instructions, and it keeps the code endian- and alignment-agnostic
+        memcpy(&word, &src[i], sizeof(word));
+        word ^= mask_word;
+        memcpy(&dst[i], &word, sizeof(word));
+    }
+
+    for (; i < len; i++)
+        dst[i] = src[i] ^ mask[(stream_pos + i) & 3];
+}
+
 #define MAX_POSSIBLE_HDR_LEN 14
 int ws_client_send(const ws_client *client, enum websocket_opcode frame_type, const char *data, size_t size)
 {
@@ -397,8 +431,6 @@ int ws_client_send(const ws_client *client, enum websocket_opcode frame_type, co
     // one big MQTT message as single fragmented WebSocket envelope
     char hdr[MAX_POSSIBLE_HDR_LEN];
     char *ptr = hdr;
-    int size_written = 0;
-    size_t j = 0;
 
     size_t w_buff_free = rbuf_bytes_free(client->buf_write);
     size_t hdr_len = get_ws_hdr_size(size);
@@ -442,23 +474,25 @@ int ws_client_send(const ws_client *client, enum websocket_opcode frame_type, co
     if (!size)
         return 0;
 
-    // copy and mask data in the write ringbuffer
-    while (size - size_written) {
+    // copy and mask data into the write ringbuffer
+    size_t size_written = 0;
+    while (size_written < size) {
         size_t writable_bytes;
         char *w_ptr = rbuf_get_linear_insert_range(client->buf_write, &writable_bytes);
-        if(!writable_bytes)
+        if(!w_ptr || !writable_bytes)
             break;
 
-        writable_bytes = (writable_bytes > size) ? (size - size_written) : writable_bytes;
+        // the linear range can be larger than what is left of the payload, and after a
+        // wrap it can also be larger than what is left while still being <= size
+        if (writable_bytes > size - size_written)
+            writable_bytes = size - size_written;
 
-        memcpy(w_ptr, &data[size_written], writable_bytes);
+        ws_mask_copy(w_ptr, &data[size_written], writable_bytes, mask, size_written);
         rbuf_bump_head(client->buf_write, writable_bytes);
 
-        for (size_t i = 0; i < writable_bytes; i++, j++)
-            w_ptr[i] ^= mask[j % 4];
         size_written += writable_bytes;
     }
-    return size_written;
+    return (int)size_written;
 }
 
 static int check_opcode(enum websocket_opcode oc)
@@ -561,7 +595,7 @@ int ws_client_process_rx_ws(ws_client *client)
                 char *insert = rbuf_get_linear_insert_range(client->buf_to_mqtt, &size);
                 if (!insert) {
                     nd_log(NDLS_DAEMON, NDLP_ERR,
-                           "ACLK: inbound WebSocket MQTT buffer full! Cannot process payload of %"PRIu64" bytes "
+                           "ACLK: inbound WebSocket MQTT buffer full! Cannot process payload of %zu bytes "
                            "(processed %"PRIu64"/%"PRIu64"). Buffer capacity: %zu bytes, max capacity: %zu bytes",
                            remaining, client->rx.payload_processed, client->rx.payload_length,
                            rbuf_get_capacity(client->buf_to_mqtt), rbuf_get_max_capacity(client->buf_to_mqtt));

@@ -81,7 +81,7 @@ Netdata automatically generates host labels when it starts, capturing:
 
 | Label Category | Information Captured                                                                        |
 |----------------|---------------------------------------------------------------------------------------------|
-| System Info    | Kernel version, OS name and version                                                         |
+| System Info    | Kernel version; OS family, name, version, release, codename, edition, and build when available |
 | Hardware       | CPU architecture, cores, frequency, RAM, disk space, product ID, product name, product type |
 | Environment    | Container details, Kubernetes node status                                                   |
 | Infrastructure | Virtualization layer, Parent-child streaming status                                         |
@@ -184,7 +184,7 @@ Remove a custom label you no longer need.
 
 ### Stream labels from Child to Parent
 
-In Parent-Child setups, host labels automatically stream from children to the parent node. Access any child's labels through the parent at:
+In Parent-Child setups, host labels automatically stream from children to the parent node. A label change on a child, such as one applied with `netdatacli reload-labels`, reaches its parent and every Parent above it without reconnecting. Access any child's labels through the parent at:
 `http://localhost:19999/host/CHILD_HOSTNAME/api/v1/info`
 
 :::warning

@@ -29,7 +29,7 @@ Metrics are gathered by periodically sending HTTP requests to [Open vSwitch Expo
 
 This collector is supported on all platforms.
 
-This collector supports collecting metrics from multiple instances of this integration, including remote instances.
+This collector supports collecting metrics from multiple instances of this integration.
 
 
 ### Default Behavior
@@ -97,6 +97,7 @@ The following options can be defined globally: update_every, autodetection_retry
 | **Customization** | [fallback_type](#option-customization-fallback-type) | Job-level fallback type overrides for untyped metrics. |  | no |
 |  | [relabeling](#option-customization-relabeling) | Job-owned Prometheus-compatible metric relabeling, applied before profile selection. |  | no |
 |  | [profiles](#option-customization-profiles) | Curated, exporter-specific chart profiles with optional untyped classification, profile-owned normalization, and scoped fallback-chart policy. User profiles may constrain unmatched fallback charts; stock profiles preserve unknown future families. Disable profiles with mode `none`. | auto | no |
+| **Raw counter charts** | [counter_raw_charts](#option-raw-counter-charts-counter-raw-charts) | Counters whose raw cumulative value is also charted, next to their per-second rate chart, under the `prometheus.<app>.<metric>.raw` context. Leave empty to chart counters as rates only. |  | no |
 | **HTTP Auth** | username | Username for Basic HTTP authentication. |  | no |
 |  | password | Password for Basic HTTP authentication. |  | no |
 |  | bearer_token_file | Path to a file containing a bearer token (used for `Authorization: Bearer`). |  | no |
@@ -146,6 +147,9 @@ Job gauge rules take precedence over job counter rules, and both job rule sets t
 every profile rule. Use them for deployment-specific overrides rather than exporter behavior that
 belongs in a profile. Keep patterns narrow: a broad job rule such as `gauge: ['*']` overrides profile
 counter classifications. Blank patterns and patterns with leading or trailing whitespace are rejected.
+To keep a counter's rate chart and also chart its raw value on generic autogen charts, list the metric
+in `counter_raw_charts` instead of adding a gauge rule; an untyped metric without the `_total` suffix
+also needs a `counter` rule. Metrics charted by a profile get no raw chart.
 
 - Metric name pattern syntax: [shell file name pattern](https://golang.org/pkg/path/filepath/#Match).
 - Option syntax:
@@ -167,7 +171,7 @@ fallback_type:
 A list of job-owned relabeling blocks, applied after `selector` and before profile selection. Each block
 applies a list of Prometheus `metric_relabel_configs` rules to the metrics whose name matches `match`.
 Profiles may own the same block format for exporter normalization after selection. See the
-[relabeling reference](https://github.com/netdata/netdata/blob/master/src/go/plugin/go.d/collector/prometheus/relabel/README.md) for
+[relabeling reference](https://github.com/netdata/netdata/blob/master/src/go/pkg/relabel/README.md) for
 the full action set and more examples.
 
 - `match`: Netdata simple patterns matched against the full metric name — including any
@@ -231,6 +235,27 @@ profiles:
 ```
 
 
+<a id="option-raw-counter-charts-counter-raw-charts"></a>
+##### counter_raw_charts
+
+Use this option when you need a counter's total as well as its rate, for example to read the absolute
+number of requests served since the exporter started. Each item holds one metric name pattern with the
+same syntax as `fallback_type` (`*`, `?`, `[...]`); a leading `!` excludes, and the first matching item
+decides. Patterns match the final metric name after job and profile relabeling. Every matched counter
+series adds one chart.
+
+Only counters shown on generic autogen charts get a raw chart. Gauges, histogram and summary series,
+and metrics charted by a profile are not affected. An untyped metric qualifies once it is processed as
+a counter: through its `_total` suffix, `fallback_type.counter`, or a selected profile's
+`fallback_type`.
+
+```yaml
+counter_raw_charts:
+  - '!myapp_internal_*'
+  - 'myapp_*_total'
+```
+
+
 
 </details>
 
@@ -245,7 +270,7 @@ Configure the **prometheus** collector from the Netdata web interface:
 4. In the Search box, type _prometheus_ (or scroll the list) to locate the **prometheus** collector.
 5. Click the **+** next to the **prometheus** collector to add a new job.
 6. Fill in the job fields, then click **Test** to verify the configuration and **Submit** to save.
-    - **Test** runs the job with the provided settings and shows whether data can be collected.
+    - **Test** validates the provided settings and checks the collector's startup prerequisites. Successful validation does not guarantee that every metric will be available during collection.
     - If it fails, an error message appears with details (for example, connection refused, timeout, or command execution errors), so you can adjust and retest.
 
 
@@ -421,6 +446,7 @@ This collector has built-in grouping logic based on the [type of metrics](https:
 |---------------------------|-------------------------------------------|----------------------|-------------|
 | Gauge                     | for each label set                        | one, the metric name | absolute    |
 | Counter                   | for each label set                        | one, the metric name | incremental |
+| Counter in `counter_raw_charts`, raw chart (`.raw`) | for each label set     | one, the metric name | absolute    |
 | Summary (quantiles)       | for each label set (excluding 'quantile') | for each quantile    | absolute    |
 | Summary (sum and count)   | for each label set                        | the metric name      | incremental |
 | Histogram (buckets)       | for each label set (excluding 'le')       | for each bucket      | incremental |
@@ -439,7 +465,9 @@ Untyped metrics (have no '# TYPE') processing:
 
 ## Troubleshooting
 
-### Debug Mode
+### Diagnostics
+
+#### Debug Mode
 
 **Important**: Debug mode is not supported for data collection jobs created via the UI using the Dyncfg feature.
 
@@ -471,14 +499,14 @@ should give you clues as to why the collector isn't working.
   ./go.d.plugin -d -m prometheus -j jobName
   ```
 
-### Getting Logs
+#### Getting Logs
 
 If you're encountering problems with the `prometheus` collector, follow these steps to retrieve logs and identify potential issues:
 
 - **Run the command** specific to your system (systemd, non-systemd, or Docker container).
 - **Examine the output** for any warnings or error messages that might indicate issues.  These messages should provide clues about the root cause of the problem.
 
-#### System with systemd
+##### System with systemd
 
 Use the following command to view logs generated since the last Netdata service restart:
 
@@ -486,7 +514,7 @@ Use the following command to view logs generated since the last Netdata service 
 journalctl _SYSTEMD_INVOCATION_ID="$(systemctl show --value --property=InvocationID netdata)" --namespace=netdata --grep prometheus
 ```
 
-#### System without systemd
+##### System without systemd
 
 Locate the collector log file, typically at `/var/log/netdata/collector.log`, and use `grep` to filter for collector's name:
 
@@ -496,7 +524,7 @@ grep prometheus /var/log/netdata/collector.log
 
 **Note**: This method shows logs from all restarts. Focus on the **latest entries** for troubleshooting current issues.
 
-#### Docker Container
+##### Docker Container
 
 If your Netdata runs in a Docker container named "netdata" (replace if different), use this command:
 
@@ -504,6 +532,13 @@ If your Netdata runs in a Docker container named "netdata" (replace if different
 docker logs netdata 2>&1 | grep prometheus
 ```
 
-### Disappearing or sparse metrics not clearing alerts
+### Other Problems
 
-When a metric disappears from the Prometheus endpoint response (for example, a gauge that is only exposed when its value is greater than 0), Netdata does not require any special value to stop tracking it. The Prometheus collector automatically detects metrics that are no longer present in the scrape response. After 10 consecutive collection cycles where the metric is absent, the associated chart is automatically removed and any alerts on that chart will clear. You do not need to send a special value (such as 0, NaN, or StaleNaN) — simply omitting the metric from the response is sufficient. Note that during the 10-cycle grace period, the last known value remains and alerts may not clear immediately.
+#### Disappearing or sparse metrics not clearing alerts
+
+The Prometheus collector detects metrics that disappear from a successful scrape response. Generated charts
+and individual dimensions expire after their configured successful-cycle lifetime. An expired chart or
+dimension makes its alerts `REMOVED`; this is not a normal `CLEAR` transition and does not send a recovery
+notification. Export an explicit normal value (for example `0`) whenever an alert needs a reliable recovery
+transition. A failed scrape does not advance the expiry lifetime; use the generic collector collection-failure
+alert to detect that separate condition.

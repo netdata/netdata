@@ -18,32 +18,41 @@ metadata:
 
 metric_tags:
   - tag: filer_identifier
-    OID: 1.3.6.1.4.1.42040.1.1.0
-    symbol: filerIdentifier
+    symbol:
+      OID: 1.3.6.1.4.1.42040.1.1.0
+      name: filerIdentifier
   - tag: filer_version
-    OID: 1.3.6.1.4.1.42040.1.2.0
-    symbol: filerVersion
+    symbol:
+      OID: 1.3.6.1.4.1.42040.1.2.0
+      name: filerVersion
   - tag: filer_serial_number
-    OID: 1.3.6.1.4.1.42040.1.3.0
-    symbol: filerSerialNumber
+    symbol:
+      OID: 1.3.6.1.4.1.42040.1.3.0
+      name: filerSerialNumber
   - tag: filer_platform_name
-    OID: 1.3.6.1.4.1.42040.1.101.1.0
-    symbol: filerPlatformName
+    symbol:
+      OID: 1.3.6.1.4.1.42040.1.101.1.0
+      name: filerPlatformName
   - tag: filer_platform_type
-    OID: 1.3.6.1.4.1.42040.1.101.2.0
-    symbol: filerPlatformType
+    symbol:
+      OID: 1.3.6.1.4.1.42040.1.101.2.0
+      name: filerPlatformType
   - tag: filer_package_format
-    OID: 1.3.6.1.4.1.42040.1.101.3.0
-    symbol: filerPackageFormat
+    symbol:
+      OID: 1.3.6.1.4.1.42040.1.101.3.0
+      name: filerPackageFormat
   - tag: filer_bios_version
-    OID: 1.3.6.1.4.1.42040.1.101.4.0
-    symbol: filerBiosVersion
+    symbol:
+      OID: 1.3.6.1.4.1.42040.1.101.4.0
+      name: filerBiosVersion
   - tag: filer_cpu_model
-    OID: 1.3.6.1.4.1.42040.1.101.5.0
-    symbol: filerCpuModel
+    symbol:
+      OID: 1.3.6.1.4.1.42040.1.101.5.0
+      name: filerCpuModel
   - tag: filer_cpu_arch
-    OID: 1.3.6.1.4.1.42040.1.101.8.0
-    symbol: filerCpuArch
+    symbol:
+      OID: 1.3.6.1.4.1.42040.1.101.8.0
+      name: filerCpuArch
 
 # 1. NASUNI-FILER-MIB
 #    https://nasuni.my.salesforce.com/sfc/p/#A0000000HeWw/a/2K000000QDf1/q9463pwHtEdgobFDJgRazLocAq6wiExEG756nB7i7XM
@@ -126,27 +135,27 @@ metrics:
         family: 'Storage/Cache/Read/Miss'
         unit: "{miss}/s"
   - MIB: NASUNI-FILER-MIB
-    metric_type: gauge
     symbol:
       OID: 1.3.6.1.4.1.42040.1.100.1.0
+      metric_type: gauge
       name: nasuni.filerCacheTotal
       chart_meta:
         description: Total cache size
         family: 'Storage/Cache/Space/Total'
         unit: "By"
   - MIB: NASUNI-FILER-MIB
-    metric_type: gauge
     symbol:
       OID: 1.3.6.1.4.1.42040.1.100.2.0
+      metric_type: gauge
       name: nasuni.filerCacheUsed
       chart_meta:
         description: Used cache size
         family: 'Storage/Cache/Space/Used'
         unit: "By"
   - MIB: NASUNI-FILER-MIB
-    metric_type: gauge
     symbol:
       OID: 1.3.6.1.4.1.42040.1.100.3.0
+      metric_type: gauge
       name: nasuni.filerCacheFree
       chart_meta:
         description: Free cache size

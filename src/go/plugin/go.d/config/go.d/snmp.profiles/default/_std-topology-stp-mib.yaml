@@ -1,19 +1,8 @@
 # Supplemental topology profile for STP-derived bridge links.
-# Sources: BRIDGE-MIB dot1dBase + dot1dStpPortTable.
+# Source: BRIDGE-MIB dot1dStpPortTable.
 
-metadata:
-  device:
-    fields:
-      bridge_base_address:
-        symbol:
-          OID: 1.3.6.1.2.1.17.1.1
-          name: dot1dBaseBridgeAddress
-          format: hex
-      stp_designated_root:
-        symbol:
-          OID: 1.3.6.1.2.1.17.2.5
-          name: dot1dStpDesignatedRoot
-          format: hex
+extends:
+  - _std-topology-bridge-base-mib.yaml
 
 topology:
   - kind: stp_port
@@ -22,7 +11,7 @@ topology:
       OID: 1.3.6.1.2.1.17.2.15.1
       name: dot1dStpPortTable
     symbols:
-      # Numeric anchor to force row emission.
+      # Use port state as the row-presence anchor.
       - OID: 1.3.6.1.2.1.17.2.15.1.3
         name: stp_port
     metric_tags:

@@ -15,7 +15,7 @@ endmeta-->
 <img src="https://netdata.cloud/img/dynatrace.svg" width="150" alt="Dynatrace"/>
 
 
-Dynatrace allows you to receive notifications using their Events REST API. See the [Dynatrace documentation](https://www.dynatrace.com/support/help/dynatrace-api/environment-api/events-v2/post-event) about POSTing an event in the Events API for more details.
+Dynatrace allows you to receive notifications using their Events REST API. See the [Dynatrace documentation](https://docs.dynatrace.com/docs/dynatrace-api/environment-api/events-v2/post-event) about POSTing an event in the Events API for more details.
 You can send notifications to Dynatrace using Netdata's Agent alert notification feature, which supports dozens of endpoints, user roles, and more.
 
 
@@ -30,7 +30,7 @@ You can send notifications to Dynatrace using Netdata's Agent alert notification
 
 - A Dynatrace Server. You can use the same on all your Netdata servers but make sure the server is network visible from your Netdata hosts. The Dynatrace server should be with protocol prefixed (http:// or https://), for example: https://monitor.example.com.
 - An API Token. Generate a secure access API token that enables access to your Dynatrace monitoring data via the REST-based API. See [Dynatrace API - Authentication](https://www.dynatrace.com/support/help/extend-dynatrace/dynatrace-api/basics/dynatrace-api-authentication/) for more details.
-- An API Space. This is the URL part of the page you have access in order to generate the API Token. For example, the URL for a generated API token might look like: https://monitor.illumineit.com/e/2a93fe0e-4cd5-469a-9d0d-1a064235cfce/#settings/integration/apikeys;gf=all In that case, the Space is 2a93fe0e-4cd5-469a-9d0d-1a064235cfce.
+- An API Space. This is the URL part of the page you have access in order to generate the API Token. For example, the URL for a generated API token might look like: https://monitor.example.com/e/2a93fe0e-4cd5-469a-9d0d-1a064235cfce/#settings/integration/apikeys;gf=all In that case, the Space is 2a93fe0e-4cd5-469a-9d0d-1a064235cfce.
 - A Server Tag. To generate one on your Dynatrace Server, go to Settings --> Tags --> Manually applied tags and create the Tag. The Netdata alarm is sent as a Dynatrace Event to be correlated with all those hosts tagged with this Tag you have created.
 - Terminal access to the Agent you wish to configure
 
@@ -59,7 +59,7 @@ The following options can be defined for this notification
 <a id="option-dynatrace-space"></a>
 ##### DYNATRACE_SPACE
 
-For example, the URL for a generated API token might look like: https://monitor.illumineit.com/e/2a93fe0e-4cd5-469a-9d0d-1a064235cfce/#settings/integration/apikeys;gf=all In that case, the Space is 2a93fe0e-4cd5-469a-9d0d-1a064235cfce.
+For example, the URL for a generated API token might look like: https://monitor.example.com/e/2a93fe0e-4cd5-469a-9d0d-1a064235cfce/#settings/integration/apikeys;gf=all In that case, the Space is 2a93fe0e-4cd5-469a-9d0d-1a064235cfce.
 
 
 <a id="option-dynatrace-event"></a>
@@ -67,7 +67,7 @@ For example, the URL for a generated API token might look like: https://monitor.
 
 `AVAILABILITY_EVENT`, `CUSTOM_ALERT`, `CUSTOM_ANNOTATION`, `CUSTOM_CONFIGURATION`, `CUSTOM_DEPLOYMENT`, `CUSTOM_INFO`, `ERROR_EVENT`,
 `MARKED_FOR_TERMINATION`, `PERFORMANCE_EVENT`, `RESOURCE_CONTENTION_EVENT`.
-You can read more [here](https://www.dynatrace.com/support/help/dynatrace-api/environment-api/events-v2/post-event#request-body-objects).
+You can read more [here](https://docs.dynatrace.com/docs/dynatrace-api/environment-api/events-v2/post-event#openapi-parameter-body-objects-openapienv2).
 
 
 

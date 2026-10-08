@@ -103,6 +103,10 @@ FALLBACK_ICON = 'SNMP.png'
 # plugin (network-viewer.plugin, otel.plugin, netdata).
 PLUGIN_GO_D = 'go.d.plugin'
 
+# Selectable topology-role profiles add capabilities to matched devices; they
+# are not standalone device families and must not produce device catalog pages.
+INTERNAL_TOPOLOGY_ROLE_PREFIX = 'topology-role-'
+
 # Page descriptions that cannot be mechanically shortened without losing a
 # complete, profile-specific statement. Keys are the rendered page names.
 PAGE_DESCRIPTIONS = {
@@ -207,6 +211,11 @@ def load_profiles():
     return profiles
 
 
+def is_device_catalog_profile(name):
+    """Return whether a profile represents a public device integration."""
+    return not name.startswith('_') and not name.startswith(INTERNAL_TOPOLOGY_ROLE_PREFIX)
+
+
 def resolve_extends(name, profiles, seen=None):
     """Return the set of all module filenames reachable from `name` via transitive extends."""
     if seen is None:
@@ -242,7 +251,7 @@ def collect_vendors(profiles):
     """
     vendors = {}
     for name, p in profiles.items():
-        if name.startswith('_'):
+        if not is_device_catalog_profile(name):
             continue
         reachable = resolve_extends(name, profiles)
         vendor = device_field(p['data'], 'vendor') or inherited_field(reachable, profiles, 'vendor')
@@ -470,10 +479,10 @@ SYSLOG_SETUP = setup_block(
     '[Syslog via the OpenTelemetry Collector](/docs/npm/syslog/otel-collector.md). '
     'The endpoint listens on loopback by default, which accepts '
     'only local senders. Running the Collector on another host means binding a non-loopback address, and an OTLP '
-    'endpoint reachable off-host must be protected with TLS or mutual TLS (`endpoint.tls_cert_path`, '
-    '`endpoint.tls_key_path`, and `endpoint.tls_ca_cert_path` for mTLS) plus network access controls — otherwise '
-    'anyone who can reach it can inject telemetry. Note that `auth.enabled` selects the tenant; it does not '
-    'authenticate the sender. Prefer keeping the Collector on the same host as the Agent.',
+    'endpoint reachable off-host must be protected with TLS or mutual TLS '
+    '(`receivers.otlp.protocols.grpc.tls.cert_file`, `receivers.otlp.protocols.grpc.tls.key_file`, and '
+    '`receivers.otlp.protocols.grpc.tls.client_ca_file` for mTLS) plus network access controls — otherwise '
+    'anyone who can reach it can inject telemetry. Prefer keeping the Collector on the same host as the Agent.',
     [('The OpenTelemetry plugin',
       'The Netdata Agent must include the `otel` plugin, which is available on Linux and macOS. See the '
       'OpenTelemetry collector documentation for how it is enabled in each installation method.'),
@@ -483,16 +492,16 @@ SYSLOG_SETUP = setup_block(
      ('Devices pointed at it',
       'The routers, switches, and firewalls must be configured to send syslog to the collector\'s listener.')],
     options=[
-        {'name': 'endpoint.path', 'description': 'OTLP/gRPC endpoint the Agent listens on. The default accepts '
-                                                 'only local senders; bind a non-loopback address to accept a '
-                                                 'Collector on another host, and protect it when you do.',
+        {'name': 'receivers.otlp.protocols.grpc.endpoint',
+         'description': 'OTLP/gRPC endpoint the Agent listens on. The default accepts only local senders; bind a '
+                        'non-loopback address to accept a Collector on another host, and protect it when you do.',
          'default_value': '127.0.0.1:4317', 'required': False},
-        {'name': 'endpoint.tls_cert_path', 'description': 'Server TLS certificate. Set together with '
-                                                          '`endpoint.tls_key_path`.',
+        {'name': 'receivers.otlp.protocols.grpc.tls.cert_file',
+         'description': 'Server TLS certificate. Set together with `receivers.otlp.protocols.grpc.tls.key_file`.',
          'default_value': '', 'required': False},
-        {'name': 'endpoint.tls_key_path', 'description': 'Server TLS private key.',
+        {'name': 'receivers.otlp.protocols.grpc.tls.key_file', 'description': 'Server TLS private key.',
          'default_value': '', 'required': False},
-        {'name': 'endpoint.tls_ca_cert_path',
+        {'name': 'receivers.otlp.protocols.grpc.tls.client_ca_file',
          'description': 'CA certificate used to verify client certificates. Setting it enables mutual TLS and '
                         'therefore also requires the server certificate and key.',
          'default_value': '', 'required': False},
@@ -503,11 +512,15 @@ SYSLOG_SETUP = setup_block(
         'description': 'Binds a routable address and requires client certificates, so only Collectors holding a '
                        'certificate signed by your CA can send. Without the TLS keys this endpoint would accept '
                        'telemetry from anyone who can reach it.',
-        'config': 'endpoint:\n'
-                  '  path: 0.0.0.0:4317\n'
-                  '  tls_cert_path: /etc/netdata/ssl/otel.crt\n'
-                  '  tls_key_path: /etc/netdata/ssl/otel.key\n'
-                  '  tls_ca_cert_path: /etc/netdata/ssl/ca.crt\n',
+        'config': 'receivers:\n'
+                  '  otlp:\n'
+                  '    protocols:\n'
+                  '      grpc:\n'
+                  '        endpoint: 0.0.0.0:4317\n'
+                  '        tls:\n'
+                  '          cert_file: /etc/netdata/ssl/otel.crt\n'
+                  '          key_file: /etc/netdata/ssl/otel.key\n'
+                  '          client_ca_file: /etc/netdata/ssl/ca.crt\n',
     }],
 )
 
@@ -549,7 +562,19 @@ SNMP_TRAPS_SETUP = setup_block(
     }],
 )
 
-TROUBLESHOOTING = {'problems': {'list': []}}
+TROUBLESHOOTING = {
+    'problems': {
+        'list': [{
+            'name': 'Collect Diagnostics for Netdata Support',
+            'description':
+                'For SNMP metrics, BGP, licensing, or topology issues, follow '
+                '[Collect SNMP troubleshooting data](/docs/npm/device-metrics/collect-snmp-troubleshooting-data.md) '
+                'to include built-in diagnostics in a support bundle. SNMP evidence is unsanitized; '
+                'share the bundle through a restricted Netdata Support ticket.',
+        }],
+    },
+}
+EMPTY_TROUBLESHOOTING = {'problems': {'list': []}}
 METRICS = {'folding': {'title': 'Metrics', 'enabled': False}, 'description': '', 'availability': [], 'scopes': []}
 
 
@@ -570,7 +595,7 @@ def make_entry(name, link, categories, icon, keywords, ov, plugin_name=PLUGIN_GO
         },
         'overview': ov,
         'setup': setup if setup is not None else SETUP,
-        'troubleshooting': TROUBLESHOOTING,
+        'troubleshooting': TROUBLESHOOTING if module_name in ('snmp', 'snmp_topology') else EMPTY_TROUBLESHOOTING,
         'alerts': [],
         'metrics': metrics if metrics is not None else METRICS,
     }
@@ -595,6 +620,9 @@ GENERIC_NAMES = {
     'net-snmp.yaml': 'Net-SNMP Host',
     'generic-ups.yaml': 'Generic UPS (UPS-MIB)',
     'meraki-cloud-controller.yaml': 'Cisco Meraki (Cloud Controller)',
+    'ubiquiti-net-snmp.yaml': 'Ubiquiti Net-SNMP Devices',
+    'mikrotik-router.yaml': 'MikroTik Router',
+    'mikrotik-swos.yaml': 'MikroTik Switch',
 }
 
 
@@ -713,7 +741,7 @@ def build_device_modules(profiles):
     """One catalog page per concrete device profile (per profile, not per vendor),
     each listing the metrics it adds, grouped by family."""
     modules = []
-    for name in sorted(n for n in profiles if not n.startswith('_')):
+    for name in sorted(n for n in profiles if is_device_catalog_profile(n)):
         data = profiles[name]['data']
         vendor = device_field(data, 'vendor') or inherited_field(resolve_extends(name, profiles), profiles, 'vendor')
         dev_type = device_field(data, 'type') or inherited_field(resolve_extends(name, profiles), profiles, 'type')
@@ -816,10 +844,12 @@ def build_topology_modules():
          'reads the LLDP local and remote tables and builds device-to-device links carrying chassis ID, port, system '
          'name, '
          'and management address.',
-         'Netdata reads the LLDP-MIB local and remote neighbor tables over SNMP and stitches the links into the '
+         'Netdata reads the LLDP-MIB or LLDP-V2-MIB local and remote neighbor tables over SNMP and stitches the links '
+         'into the '
          '`topology:snmp` '
          'view.',
-         'Discovered automatically on devices that expose the LLDP-MIB.'),
+         'Discovered automatically when a matching stock device profile enables LLDP topology. LLDP-V2 is currently '
+         'enabled for Palo Alto firewalls.'),
         ('CDP Topology', ['cdp', 'cisco', 'topology', 'l2', 'snmp', 'npm'],
          'Map Layer 2 neighbor links on Cisco and Cisco-compatible devices that run CDP. Netdata reads the CDP cache '
          'table '
@@ -864,10 +894,11 @@ def build_topology_modules():
          'Discovered automatically on routers that expose the OSPF neighbor table.'),
     ]
 
-    # network-viewer.plugin builds topology:network-connections only where network-viewer.c
-    # is compiled — Linux, FreeBSD and macOS (CMakeLists.txt). Windows builds
-    # network-viewer-windows.c, which registers network-connections and network-protocols
-    # but NOT the topology Function. Container/Kubernetes/systemd enrichment needs the
+    # network-viewer.plugin builds topology:network-connections on Linux, FreeBSD,
+    # macOS, and Windows: network-viewer-topology.c provides the shared v1 renderer;
+    # network-viewer.c provides the Linux/macOS/FreeBSD entry point and socket
+    # backend, while network-viewer-windows.c registers the same Function on Windows.
+    # Container/Kubernetes/systemd enrichment needs the
     # APPS_LOOKUP client, which is Linux-only (network-viewer-apps-lookup-client.h).
     other = [
         ('Live Network Connections', 'network-viewer.plugin', 'network-viewer', 'network.svg',
@@ -879,10 +910,11 @@ def build_topology_modules():
          'as far as the APPS_LOOKUP data allows — attribution is best effort, and a process it cannot resolve is still '
          'drawn.',
          'The network-viewer plugin builds the `topology:network-connections` view directly from the host\'s live '
-         'socket table, with no SNMP and no instrumentation. It is available on Linux, FreeBSD, and macOS; container '
-         'and Kubernetes attribution is Linux-only.',
+         'socket table, with no SNMP and no instrumentation. It is available on Linux, FreeBSD, macOS, and Windows; '
+         'container and Kubernetes attribution is Linux-only, and Windows UDP rows are listener-only because the '
+         'IP Helper API does not expose remote endpoints.',
          'Always on; observes the host\'s live network connections.',
-         NETWORK_VIEWER_SETUP, ['Linux', 'FreeBSD', 'macOS'], False,
+         NETWORK_VIEWER_SETUP, ['Linux', 'FreeBSD', 'macOS', 'Windows'], False,
          'A single response is capped at 64 MiB. On a host with enough connections to exceed that, the request is '
          'aborted rather than truncated — group the map (by process name or container) to bring it back under the cap.',
          'Sockets are enumerated when the Function is called, not continuously in the background, so the cost is paid '
@@ -890,7 +922,9 @@ def build_topology_modules():
          'The plugin needs privileged access to enumerate the sockets of every process; standard installations grant '
          'it. In a container it additionally needs the host network namespace, the host `/proc`, `SYS_ADMIN` for '
          'sibling containers, and `SYS_PTRACE` to attribute connections to processes. On macOS a non-privileged or '
-         'TCC-restricted run omits protected processes; grant Full Disk Access where local policy requires it. The '
+         'TCC-restricted run omits protected processes; grant Full Disk Access where local policy requires it. '
+         'On Windows it uses the IP Helper API, so UDP rows are listener-only because it does not expose remote '
+         'endpoints. The '
          'Function itself requires a signed-in Netdata identity in the same Space with permission to view sensitive '
          'data — it is not available anonymously.'),
         ('Netdata Streaming Topology', 'netdata', 'streaming', 'netdata.png',
@@ -941,7 +975,8 @@ def build_topology_modules():
 def build_syslog_modules():
     """Static syslog catalog entry. Netdata has no native syslog listener; an
     OpenTelemetry Collector with a syslog receiver forwards device syslog over
-    OTLP/gRPC to the Agent's otel plugin, which stores it as journal logs."""
+    OTLP/gRPC to the Agent's otel plugin, which stores it in Netdata's indexed
+    log store."""
     return [make_entry(
         name='Syslog from Network Devices',
         link='',
@@ -953,12 +988,12 @@ def build_syslog_modules():
             'syslog '
             'receiver parses the device syslog stream and forwards it over OTLP/gRPC to the Netdata Agent, which '
             'stores '
-            'it as structured journal logs you explore and query in the Logs tab.',
+            'it in Netdata\'s indexed log store you explore and query in the Logs tab.',
             'Netdata does not listen for syslog directly. You run an OpenTelemetry Collector configured with a syslog '
             'receiver '
             'pointed at the Agent\'s OTLP/gRPC endpoint (default `127.0.0.1:4317`); the Agent\'s otel plugin writes '
             'the '
-            'records to systemd-compatible journal files.',
+            'records to Netdata\'s indexed log store.',
             'Not auto-detected. Configure an OpenTelemetry Collector syslog receiver to forward to the Agent\'s OTLP '
             'endpoint.',
             # The otel plugin is built for Linux and macOS only, as a single instance
@@ -1130,7 +1165,7 @@ def write_gap_report(profiles):
     """List device-profile metrics missing chart_meta (family/unit/description),
     so the profiles can be annotated. Written next to the catalogue for review."""
     rows = []
-    for name in sorted(n for n in profiles if not n.startswith('_')):
+    for name in sorted(n for n in profiles if is_device_catalog_profile(n)):
         for met in extract_profile_metrics(name, profiles):
             missing = [k for k in ('family', 'unit', 'desc') if not (met[k] and met[k] != 'Uncategorized')]
             if missing:

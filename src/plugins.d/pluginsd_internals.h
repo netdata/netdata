@@ -12,7 +12,7 @@
 #define SERVING_STREAMING(parser) ((parser)->repertoire == PARSER_INIT_STREAMING)
 #define SERVING_PLUGINSD(parser) ((parser)->repertoire == PARSER_INIT_PLUGINSD)
 
-PARSER_RC PLUGINSD_DISABLE_PLUGIN(PARSER *parser, const char *keyword, const char *msg);
+PARSER_RC PLUGINSD_PROTOCOL_ERROR(const char *keyword, const char *msg);
 
 ssize_t send_to_plugin(const char *txt, PARSER *parser, STREAM_TRAFFIC_TYPE type);
 
@@ -120,6 +120,7 @@ static inline void pluginsd_clear_scope_chart(PARSER *parser, const char *keywor
     parser->user.st = NULL;
     parser->user.cleanup_slots = false;
     parser->user.clabel_count = 0;
+    parser->user.clabel_changed = false;
 }
 
 static ALWAYS_INLINE bool pluginsd_set_scope_chart(PARSER *parser, RRDSET *st, const char *keyword) {
@@ -152,6 +153,7 @@ static ALWAYS_INLINE bool pluginsd_set_scope_chart(PARSER *parser, RRDSET *st, c
     parser->user.st = st;
     parser->user.cleanup_slots = false;
     parser->user.clabel_count = 0;
+    parser->user.clabel_changed = false;
 
     return true;
 }

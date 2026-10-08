@@ -3,6 +3,7 @@
 package rabbitmq
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"net/http"
@@ -12,9 +13,9 @@ import (
 	"github.com/netdata/netdata/go/plugins/pkg/web"
 )
 
-func (c *Collector) collect() (map[string]int64, error) {
+func (c *Collector) collect(ctx context.Context) (map[string]int64, error) {
 	if c.queryClusterMeta {
-		id, name, err := c.getClusterMeta()
+		id, name, err := c.getClusterMeta(ctx)
 		if err != nil {
 			return nil, err
 		}
@@ -27,17 +28,17 @@ func (c *Collector) collect() (map[string]int64, error) {
 
 	mx := make(map[string]int64)
 
-	if err := c.collectOverview(mx); err != nil {
+	if err := c.collectOverview(ctx, mx); err != nil {
 		return nil, err
 	}
-	if err := c.collectNodes(mx); err != nil {
+	if err := c.collectNodes(ctx, mx); err != nil {
 		return mx, err
 	}
-	if err := c.collectVhosts(mx); err != nil {
+	if err := c.collectVhosts(ctx, mx); err != nil {
 		return mx, err
 	}
 	if c.CollectQueues {
-		if err := c.collectQueues(mx); err != nil {
+		if err := c.collectQueues(ctx, mx); err != nil {
 			return mx, err
 		}
 	}
@@ -47,8 +48,8 @@ func (c *Collector) collect() (map[string]int64, error) {
 	return mx, nil
 }
 
-func (c *Collector) getClusterMeta() (id string, name string, err error) {
-	req, err := web.NewHTTPRequestWithPath(c.RequestConfig, urlPathAPIWhoami)
+func (c *Collector) getClusterMeta(ctx context.Context) (id string, name string, err error) {
+	req, err := web.NewHTTPRequestWithPath(ctx, c.RequestConfig, urlPathAPIWhoami)
 	if err != nil {
 		return "", "", fmt.Errorf("failed to create whoami request: %w", err)
 	}
@@ -72,7 +73,7 @@ func (c *Collector) getClusterMeta() (id string, name string, err error) {
 		return "", "", nil
 	}
 
-	req, err = web.NewHTTPRequestWithPath(c.RequestConfig, urlPathAPIDefinitions)
+	req, err = web.NewHTTPRequestWithPath(ctx, c.RequestConfig, urlPathAPIDefinitions)
 	if err != nil {
 		return "", "", fmt.Errorf("failed to create definitions request: %w", err)
 	}

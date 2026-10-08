@@ -358,7 +358,7 @@ information.
 ### Syntax highlighting
 
 Our documentation site at [learn.netdata.cloud](https://learn.netdata.cloud) uses
-[Prism](https://v2.docusaurus.io/docs/markdown-features#syntax-highlighting) for syntax highlighting. Netdata
+[Prism](https://docusaurus.io/docs/markdown-features/code-blocks#syntax-highlighting) for syntax highlighting. Netdata
 documentation will use the following for the most part: `c`, `python`, `js`, `shell`, `markdown`, `bash`, `css`, `html`,
 and `go`. If no language is specified, Prism tries to guess the language based on its content.
 
@@ -386,7 +386,7 @@ inline char *health_stock_config_dir(void) {
 ```
 
 Prism also supports titles and line highlighting. See
-the [Docusaurus documentation](https://v2.docusaurus.io/docs/markdown-features#code-blocks) for more information.
+the [Docusaurus documentation](https://docusaurus.io/docs/markdown-features/code-blocks) for more information.
 
 ### Adding Notes
 

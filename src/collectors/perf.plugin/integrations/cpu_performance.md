@@ -30,7 +30,7 @@ This collector is only supported on the following platforms:
 
 - Linux
 
-This collector supports collecting metrics from multiple instances of this integration, including remote instances.
+This collector supports collecting metrics from multiple instances of this integration.
 
 It needs setuid to use the necessary syscall to collect perf events. Netdata sets the permission during installation time.
 
@@ -194,7 +194,9 @@ Metrics:
 
 ## Troubleshooting
 
-### Debug Mode
+### Other Problems
+
+#### Debug Mode
 
 You can run `perf.plugin` with the debug option enabled to troubleshoot issues with it. The output should give you clues as to why the collector isn't working.
 

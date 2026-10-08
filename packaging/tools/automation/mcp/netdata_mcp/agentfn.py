@@ -3,7 +3,7 @@ MCP-server imports).
 
 netdata serves functions at ``POST /api/v3/function?function=<name>``; the
 request body is forwarded verbatim to the plugin as the function payload (see
-``api_v1_function`` → ``rrd_function_run(..., w->payload)``). The call is
+``api_v1_function`` → ``nrpc_call()`` with ``.payload = w->payload``). The call is
 synchronous — one POST returns the function's JSON result. Localhost agents
 allow anonymous access to most functions; access-gated ones (``SIGNED_ID``)
 need an ``Authorization: Bearer`` token (see ``bearer.py``), passed via the

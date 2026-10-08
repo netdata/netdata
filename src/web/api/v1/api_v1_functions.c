@@ -12,7 +12,7 @@ int api_v1_functions(RRDHOST *host, struct web_client *w, char *url __maybe_unus
     buffer_no_cacheable(wb);
 
     buffer_json_initialize(wb, "\"", "\"", 0, true, BUFFER_JSON_OPTIONS_DEFAULT);
-    host_functions2json(host, wb);
+    nrpc_catalog_host2json(rrdhost_nrpc_owner(host), wb);
     buffer_json_finalize(wb);
 
     return HTTP_RESP_OK;

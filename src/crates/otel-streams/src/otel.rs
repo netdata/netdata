@@ -21,6 +21,7 @@ pub fn kv(key: &str, value: Option<AnyValue>) -> KeyValue {
     KeyValue {
         key: key.to_string(),
         value,
+        key_strindex: 0,
     }
 }
 
@@ -60,6 +61,7 @@ pub fn json_to_any_value(value: &serde_json::Value) -> AnyValue {
                     .map(|(k, v)| KeyValue {
                         key: k.clone(),
                         value: Some(json_to_any_value(v)),
+                        key_strindex: 0,
                     })
                     .collect(),
             })),

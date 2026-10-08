@@ -3,14 +3,7 @@
   "hostname": "ok",
   "create_vnode": true,
   "vnode_device_down_threshold": 123,
-  "vnode": {
-    "name": "ok",
-    "guid": "ok",
-    "hostname": "ok",
-    "labels": {
-      "ok": "ok"
-    }
-  },
+  "vnode": "ok",
   "community": "ok",
   "user": {
     "name": "ok",
@@ -40,5 +33,13 @@
     "interface": "eth0",
     "packets": 5,
     "interval": 123.123
+  },
+  "local_vnode": {
+    "name": "ok",
+    "guid": "ok",
+    "hostname": "ok",
+    "labels": {
+      "ok": "ok"
+    }
   }
 }

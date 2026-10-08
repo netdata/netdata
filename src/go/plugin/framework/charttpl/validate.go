@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"slices"
 	"strings"
+	"unicode"
 
 	"github.com/netdata/netdata/go/plugins/pkg/matcher"
 	"github.com/netdata/netdata/go/plugins/pkg/metrix"
@@ -46,6 +47,53 @@ func (v Validation) AutogenRules() []ValidatedAutogenRule {
 	return slices.Clone(v.autogenRules)
 }
 
+// ValidatedCounterRawCharts is the compiled engine.autogen.counter_raw_charts
+// pattern list. The zero value selects nothing.
+type ValidatedCounterRawCharts struct {
+	names matcher.Matcher
+}
+
+// Selects reports whether a scalar counter metric also gets a raw-value chart.
+func (v ValidatedCounterRawCharts) Selects(metricName string) bool {
+	return v.names != nil && v.names.MatchString(metricName)
+}
+
+// CompileCounterRawCharts validates and compiles counter raw-chart patterns.
+// Each item is one glob, optionally negated with a leading `!`; items are
+// evaluated in order and the first match wins. Items must not contain
+// whitespace (a space would be a literal character, so "a !b" in one item
+// silently matches nothing), and at least one item must be positive. Item
+// errors name the item by index and value.
+func CompileCounterRawCharts(patterns []string) (ValidatedCounterRawCharts, error) {
+	if len(patterns) == 0 {
+		return ValidatedCounterRawCharts{}, nil
+	}
+	var errs []error
+	for i, pattern := range patterns {
+		glob := strings.TrimPrefix(pattern, "!")
+		switch {
+		case strings.TrimSpace(pattern) == "":
+			errs = append(errs, fmt.Errorf("item %d: must not be blank", i))
+		case strings.IndexFunc(pattern, unicode.IsSpace) >= 0:
+			errs = append(errs, fmt.Errorf("item %d (%q): must not contain whitespace; put each pattern in its own item", i, pattern))
+		case glob == "":
+			errs = append(errs, fmt.Errorf("item %d (%q): negation needs a pattern", i, pattern))
+		default:
+			if _, err := matcher.NewGlobMatcher(glob); err != nil {
+				errs = append(errs, fmt.Errorf("item %d (%q): %v", i, pattern, err))
+			}
+		}
+	}
+	if err := errors.Join(errs...); err != nil {
+		return ValidatedCounterRawCharts{}, err
+	}
+	names, err := matcher.NewSimplePatternListMatcher(patterns)
+	if err != nil {
+		return ValidatedCounterRawCharts{}, err
+	}
+	return ValidatedCounterRawCharts{names: names}, nil
+}
+
 // Validate performs semantic checks for one chart template spec.
 func (s *Spec) Validate() error {
 	_, err := Validate(s)
@@ -68,16 +116,28 @@ func Validate(s *Spec) (Validation, error) {
 	errs = append(errs, err)
 
 	for i := range s.Groups {
-		errs = append(errs, validateGroup(s.Groups[i], fmt.Sprintf("groups[%d]", i), nil))
+		errs = append(errs, validateGroup(s.Groups[i], fmt.Sprintf("groups[%d]", i), nil, false, false))
 	}
 	return Validation{autogenRules: rules}, errors.Join(errs...)
 }
 
-func validateGroup(group Group, path string, inheritedMetrics map[string]struct{}) error {
+func validateGroup(
+	group Group,
+	path string,
+	inheritedMetrics map[string]struct{},
+	inheritedFamily bool,
+	requireFamily bool,
+) error {
 	var errs []error
-	if strings.TrimSpace(group.Family) == "" {
-		errs = append(errs, semErr(path+".family", "must not be empty"))
+	family := strings.TrimSpace(group.Family)
+	if family == "" {
+		if requireFamily {
+			errs = append(errs, semErr(path+".family", "must not be empty"))
+		} else if group.Family != "" {
+			errs = append(errs, semErr(path+".family", "must not be whitespace-only"))
+		}
 	}
+	effectiveFamily := inheritedFamily || family != ""
 	errs = append(errs, validateChartDefaults(group.ChartDefaults, path))
 
 	ownMetrics := make(map[string]struct{}, len(group.Metrics))
@@ -102,10 +162,20 @@ func validateGroup(group Group, path string, inheritedMetrics map[string]struct{
 	}
 
 	for i := range group.Charts {
+		if !effectiveFamily && strings.TrimSpace(group.Charts[i].Family) == "" {
+			errs = append(errs, semErr(fmt.Sprintf("%s.charts[%d].family", path, i),
+				"must not be empty when no group family is set"))
+		}
 		errs = append(errs, validateChart(group.Charts[i], fmt.Sprintf("%s.charts[%d]", path, i), effective))
 	}
 	for i := range group.Groups {
-		errs = append(errs, validateGroup(group.Groups[i], fmt.Sprintf("%s.groups[%d]", path, i), effective))
+		errs = append(errs, validateGroup(
+			group.Groups[i],
+			fmt.Sprintf("%s.groups[%d]", path, i),
+			effective,
+			effectiveFamily,
+			true,
+		))
 	}
 	return errors.Join(errs...)
 }
@@ -322,6 +392,9 @@ func validateEngine(engine *Engine) ([]ValidatedAutogenRule, error) {
 		rules, err = CompileAutogenRules(engine.Autogen.Rules)
 		if err != nil {
 			errs = append(errs, err)
+		}
+		if _, err := CompileCounterRawCharts(engine.Autogen.CounterRawCharts); err != nil {
+			errs = append(errs, semErr("engine.autogen.counter_raw_charts", err.Error()))
 		}
 		if engine.Autogen.MaxTypeIDLen < 0 {
 			errs = append(errs, semErr("engine.autogen.max_type_id_len", "must be >= 0"))

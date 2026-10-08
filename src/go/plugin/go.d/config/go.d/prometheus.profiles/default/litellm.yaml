@@ -175,7 +175,6 @@ relabeling:
         target_label: measurement
         replacement: time
 template:
-  family: LiteLLM
   context_namespace: litellm
   groups:
     - family: Gateway

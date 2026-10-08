@@ -8,6 +8,8 @@ extends:
   - _juniper-firewall.yaml
   - _juniper-virtualchassis.yaml
   - _juniper.yaml
+  - _std-topology-interface-mib.yaml
+  - _std-topology-q-bridge-mib.yaml
 
 metadata:
   device:

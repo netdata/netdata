@@ -100,7 +100,7 @@ static struct proc_module {
      .func = do_PerflibStorage,
      .rd = NULL,
      .thread = NULL,
-     .cleanup = NULL},
+     .cleanup = do_PerflibStorage_cleanup},
     {.name = "PerflibNetwork",
      .dim = "PerflibNetwork",
      .enabled = CONFIG_BOOLEAN_YES,
@@ -117,6 +117,22 @@ static struct proc_module {
      .rd = NULL,
      .thread = NULL,
      .cleanup = do_PerflibSMB_cleanup},
+    {.name = "PerflibTerminalServices",
+     .dim = "PerflibTerminalServices",
+     .enabled = CONFIG_BOOLEAN_YES,
+     .update_every = UPDATE_EVERY_MIN,
+     .func = do_PerflibTerminalServices,
+     .rd = NULL,
+     .thread = NULL,
+     .cleanup = NULL},
+    {.name = "PerflibDNS",
+     .dim = "PerflibDNS",
+     .enabled = CONFIG_BOOLEAN_YES,
+     .update_every = UPDATE_EVERY_MIN,
+     .func = do_PerflibDNS,
+     .rd = NULL,
+     .thread = NULL,
+     .cleanup = NULL},
     {.name = "PerflibObjects",
      .dim = "PerflibObjects",
      .enabled = CONFIG_BOOLEAN_YES,
@@ -264,7 +280,7 @@ void win_plugin_main(void *ptr)
 {
     worker_register("WIN");
 
-    rrd_collector_started();
+    nrpc_serving_started();
     PerflibNamesRegistryInitialize();
 
     CLEANUP_FUNCTION_REGISTER(windows_main_cleanup) cleanup_ptr = ptr;

@@ -104,6 +104,141 @@ static int ws_client_unittest_verify_mqtt_payload(ws_client *client, size_t payl
     return errors;
 }
 
+static int ws_client_unittest_drain(rbuf_t buf, size_t bytes)
+{
+    char tmp[256];
+
+    while (bytes) {
+        size_t want = MIN(sizeof(tmp), bytes);
+        if (rbuf_pop(buf, tmp, want) != want)
+            return 0;
+        bytes -= want;
+    }
+
+    return 1;
+}
+
+// Sends payload_len bytes through ws_client_send() with the write ringbuffer's head
+// positioned by prefill/drain, then verifies the queued frame byte for byte against the
+// reference masking of RFC6455 5.3. prefill/drain place the head close to the end of the
+// ringbuffer so the payload has to be written in two chunks.
+static int ws_client_unittest_masked_frame(size_t buf_size, size_t payload_len, size_t prefill, size_t drain,
+                                          size_t expect_written, const char *label)
+{
+    int errors = 0;
+    char msg[256];
+    ws_client client = {
+        .state = WS_ESTABLISHED,
+        .rx.parse_state = WS_FIRST_2BYTES,
+        .buf_read = rbuf_create(64, 64),
+        .buf_write = rbuf_create(buf_size, buf_size),
+        .buf_to_mqtt = rbuf_create(64, 64),
+    };
+
+    if (prefill) {
+        char *filler = mallocz(prefill);
+        memset(filler, 'x', prefill);
+        snprintfz(msg, sizeof(msg), "%s: prefill write buffer", label);
+        WS_TEST(rbuf_push(client.buf_write, filler, prefill) == prefill, msg);
+        freez(filler);
+
+        snprintfz(msg, sizeof(msg), "%s: drain write buffer", label);
+        WS_TEST(ws_client_unittest_drain(client.buf_write, drain), msg);
+    }
+
+    // exact-sized allocation on purpose: reading past the payload is then a heap
+    // overflow that ASAN/valgrind can see
+    char *payload = mallocz(payload_len);
+    ws_client_unittest_payload_fill(payload, 0, payload_len);
+
+    int written = ws_client_send(&client, WS_OP_BINARY_FRAME, payload, payload_len);
+    snprintfz(msg, sizeof(msg), "%s: ws_client_send() writes exactly the payload", label);
+    WS_TEST(written == (int)expect_written, msg);
+
+    // 2 bytes of frame header + 4 bytes of mask key, plus the extended length field
+    size_t hdr_len = 2 + 4;
+    if (expect_written > 125)
+        hdr_len += 2;
+    if (expect_written > 65535)
+        hdr_len += 6;
+
+    snprintfz(msg, sizeof(msg), "%s: queued frame size", label);
+    WS_TEST(rbuf_bytes_available(client.buf_write) == (prefill - drain) + hdr_len + expect_written, msg);
+
+    snprintfz(msg, sizeof(msg), "%s: drain bytes queued before the frame", label);
+    WS_TEST(ws_client_unittest_drain(client.buf_write, prefill - drain), msg);
+
+    char hdr[2];
+    snprintfz(msg, sizeof(msg), "%s: pop frame header", label);
+    WS_TEST(rbuf_pop(client.buf_write, hdr, sizeof(hdr)) == sizeof(hdr), msg);
+
+    snprintfz(msg, sizeof(msg), "%s: FIN and binary opcode", label);
+    WS_TEST((unsigned char)hdr[0] == (0x80 | WS_OP_BINARY_FRAME), msg);
+
+    snprintfz(msg, sizeof(msg), "%s: mask bit set", label);
+    WS_TEST(((unsigned char)hdr[1] & 0x80) != 0, msg);
+
+    size_t declared = (unsigned char)hdr[1] & 0x7f;
+    if (declared == 126) {
+        char len[2];
+        snprintfz(msg, sizeof(msg), "%s: pop 16bit length", label);
+        WS_TEST(rbuf_pop(client.buf_write, len, sizeof(len)) == sizeof(len), msg);
+        declared = ((size_t)(unsigned char)len[0] << 8) | (size_t)(unsigned char)len[1];
+    }
+
+    snprintfz(msg, sizeof(msg), "%s: declared payload length", label);
+    WS_TEST(declared == expect_written, msg);
+
+    char mask[4];
+    snprintfz(msg, sizeof(msg), "%s: pop mask key", label);
+    WS_TEST(rbuf_pop(client.buf_write, mask, sizeof(mask)) == sizeof(mask), msg);
+
+    char *masked = mallocz(expect_written);
+    snprintfz(msg, sizeof(msg), "%s: pop masked payload", label);
+    WS_TEST(rbuf_pop(client.buf_write, masked, expect_written) == expect_written, msg);
+
+    size_t mismatches = 0;
+    for (size_t i = 0; i < expect_written; i++) {
+        if (masked[i] != (char)(payload[i] ^ mask[i & 3]))
+            mismatches++;
+    }
+
+    snprintfz(msg, sizeof(msg), "%s: payload masked per RFC6455 5.3", label);
+    WS_TEST(mismatches == 0, msg);
+
+    snprintfz(msg, sizeof(msg), "%s: write buffer fully consumed", label);
+    WS_TEST(rbuf_bytes_available(client.buf_write) == 0, msg);
+
+    freez(masked);
+    freez(payload);
+    rbuf_free(client.buf_read);
+    rbuf_free(client.buf_write);
+    rbuf_free(client.buf_to_mqtt);
+    return errors;
+}
+
+static int ws_client_unittest_masking(void)
+{
+    int errors = 0;
+
+    // shorter than the word-at-a-time step, so only the byte tail runs
+    errors += ws_client_unittest_masked_frame(1024, 5, 0, 0, 5, "5 byte payload");
+
+    // not a multiple of 8: word blocks plus a 4 byte tail, and the 16bit length header
+    errors += ws_client_unittest_masked_frame(1024, 300, 0, 0, 300, "300 byte payload");
+
+    // split across the ringbuffer wrap at payload offset 18, so the mask phase has to be
+    // carried into the second chunk at a non-multiple of 4
+    errors += ws_client_unittest_masked_frame(1024, 100, 1000, 990, 100, "wrapped payload");
+
+    // free space (108) exceeds the payload (100) by less than the first chunk (18), so the
+    // second chunk (90) is larger than what is left (82) while still being <= payload size.
+    // A clamp against the payload size instead of the remainder over-copies here.
+    errors += ws_client_unittest_masked_frame(1024, 100, 1000, 90, 100, "wrapped payload, nearly full buffer");
+
+    return errors;
+}
+
 static int ws_client_unittest_create_defaults(void)
 {
     int errors = 0;
@@ -286,6 +421,7 @@ int ws_client_unittest(void)
 
     fprintf(stderr, "\nrunning ws_client unittest\n");
 
+    errors += ws_client_unittest_masking();
     errors += ws_client_unittest_create_defaults();
     errors += ws_client_unittest_clamps_mqtt_input_initial_size();
     errors += ws_client_unittest_observed_size_payload();

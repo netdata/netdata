@@ -58,6 +58,7 @@ typedef struct parser_user_object {
     int trust_durations;
     RRDLABELS *new_host_labels;
     size_t clabel_count;
+    bool clabel_changed;                     // any CLABEL in this commit changed a key, value or source
     size_t data_collections_count;
     int enabled;
     bool retry;
@@ -107,6 +108,7 @@ typedef struct parser_user_object {
 
 typedef void (*parser_deferred_action_t)(struct parser *parser, void *action_data);
 struct parser;
+struct nrpc_transport;
 typedef ssize_t (*send_to_plugin_callback_t)(const char *txt, void *data, STREAM_TRAFFIC_TYPE type);
 
 struct parser {
@@ -130,11 +132,21 @@ struct parser {
         BUFFER *response;
         parser_deferred_action_t action;
         void *action_data;
+
+        // function-family defers only: the acquired inflight-dictionary item
+        // held across the RESULT_BEGIN..END span, so a concurrent GC delete
+        // cannot free the record (and its result buffer) mid-stream
+        const DICTIONARY_ITEM *item;
     } defer;
 
     struct {
-        DICTIONARY *functions;
+        DICTIONARY *calls;
         usec_t smaller_monotonic_timeout_ut;
+
+        // the refcounted lifetime shell handed to everyone who may need to
+        // reach this parser later (registry entries, cancel/progress hooks,
+        // dyncfg nodes); see parser_destroy() for the teardown protocol
+        struct nrpc_transport *transport;
     } inflight;
 
     struct {
@@ -179,7 +191,7 @@ bool parser_reconstruct_node(BUFFER *wb, void *ptr);
 bool parser_reconstruct_instance(BUFFER *wb, void *ptr);
 bool parser_reconstruct_context(BUFFER *wb, void *ptr);
 
-static inline int parser_action(PARSER *parser, char *input) {
+static inline PARSER_RC parser_action(PARSER *parser, char *input) {
 #ifdef NETDATA_LOG_STREAM_RECEIVER
     char line[1024];
     strncpyz(line, input, sizeof(line) - 1);
@@ -206,10 +218,10 @@ static inline int parser_action(PARSER *parser, char *input) {
                            parser->defer.end_keyword ? parser->defer.end_keyword : "unknown",
                            parser->user.cd ? string2str(parser->user.cd->filename) : "unknown",
                            parser->defer.action_data ? string2str((STRING *)parser->defer.action_data) : "none");
-                    return 1;
+                    return PARSER_RC_ERROR;
                 }
             }
-            return 0;
+            return PARSER_RC_OK;
         }
         else {
             // call the action
@@ -222,7 +234,7 @@ static inline int parser_action(PARSER *parser, char *input) {
             parser->defer.response = NULL;
             parser->flags &= ~PARSER_DEFER_UNTIL_KEYWORD;
         }
-        return 0;
+        return PARSER_RC_OK;
     }
 
     parser->line.num_words = quoted_strings_splitter_pluginsd(input, parser->line.words, PLUGINSD_MAX_WORDS);
@@ -230,7 +242,7 @@ static inline int parser_action(PARSER *parser, char *input) {
 
     if(unlikely(!command)) {
         line_splitter_reset(&parser->line);
-        return 0;
+        return PARSER_RC_OK;
     }
 
     PARSER_RC rc;
@@ -258,7 +270,7 @@ static inline int parser_action(PARSER *parser, char *input) {
 #endif
 
     line_splitter_reset(&parser->line);
-    return (rc == PARSER_RC_ERROR || rc == PARSER_RC_STOP);
+    return rc;
 }
 
 #endif //NETDATA_PLUGINSD_PARSER_H

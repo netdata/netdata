@@ -88,7 +88,7 @@ Configure the **snmp** collector from the Netdata web interface:
 4. In the Search box, type _snmp_ (or scroll the list) to locate the **snmp** collector.
 5. Click the **+** next to the **snmp** collector to add a new job.
 6. Fill in the job fields, then click **Test** to verify the configuration and **Submit** to save.
-    - **Test** runs the job with the provided settings and shows whether data can be collected.
+    - **Test** validates the provided settings and checks the collector's startup prerequisites. Successful validation does not guarantee that every metric will be available during collection.
     - If it fails, an error message appears with details (for example, connection refused, timeout, or command execution errors), so you can adjust and retest.
 
 
@@ -128,7 +128,7 @@ There are no alerts configured by default for this integration.
 
 On top of the **generic SNMP baseline** (the *Generic SNMP Device* integration — interfaces, system, IP/TCP/UDP, host resources), this Cisco UC Virtual Machine profile adds the metrics below. Each is collected **only where the device exposes the matching OID** — inclusion means the profile requests it; availability depends on the device model and software.
 
-**173 metrics** in 26 groups; each row is a chart context usable in alerts.
+**164 metrics** in 26 groups; each row is a chart context usable in alerts.
 
 | Group | Metrics |
 |---|---|
@@ -152,7 +152,7 @@ On top of the **generic SNMP baseline** (the *Generic SNMP Device* integration �
 | System / Process | 3 |
 | System / Uptime | 1 |
 | System / VirtualSwitch | 1 |
-| Uncategorized | 21 |
+| Uncategorized | 12 |
 | Voice / CCA | 4 |
 | Voice / CVP | 8 |
 | Voice / DialPeer | 6 |
@@ -391,15 +391,6 @@ On top of the **generic SNMP baseline** (the *Generic SNMP Device* integration �
 
 | Metric (chart context) | Unit | Scope | Description |
 |---|---|---|---|
-| `snmp.device_prof_cdpGlobalDeviceId` | — | device |  |
-| `snmp.device_prof_cdpGlobalDeviceIdFormat` | — | device |  |
-| `snmp.device_prof_cdpGlobalHoldTime` | — | device |  |
-| `snmp.device_prof_cdpGlobalLastChange` | — | device |  |
-| `snmp.device_prof_cdpGlobalMessageInterval` | — | device |  |
-| `snmp.device_prof_cdpGlobalRun` | — | device |  |
-| `snmp.device_prof_cdpInterfaceEnable` | — | per cdp_if_index |  |
-| `snmp.device_prof_cdpInterfaceMessageInterval` | — | per cdp_if_index |  |
-| `snmp.device_prof_cdpInterfaceName` | — | per cdp_if_index |  |
 | `snmp.device_prof_lldpStatsRemTablesAgeouts` | — | device |  |
 | `snmp.device_prof_lldpStatsRemTablesDeletes` | — | device |  |
 | `snmp.device_prof_lldpStatsRemTablesDrops` | — | device |  |
@@ -461,3 +452,13 @@ On top of the **generic SNMP baseline** (the *Generic SNMP Device* integration �
 | `snmp.device_prof_ccmRegisteredPhones` | `{phone}` | device | Number of phones that are registered and actively in communication with the local call manager. |
 | `snmp.device_prof_ccmRejectedPhones` | `{reject}` | device | Number of phones whose registration requests were rejected by the local call manager. |
 | `snmp.device_prof_ccmUnregisteredPhones` | `{phone}` | device | Number of phone that are unregistered or have lost contact with the local call manager. |
+
+
+
+## Troubleshooting
+
+### Other Problems
+
+#### Collect Diagnostics for Netdata Support
+
+For SNMP metrics, BGP, licensing, or topology issues, follow [Collect SNMP troubleshooting data](https://github.com/netdata/netdata/blob/master/docs/npm/device-metrics/collect-snmp-troubleshooting-data.md) to include built-in diagnostics in a support bundle. SNMP evidence is unsanitized; share the bundle through a restricted Netdata Support ticket.

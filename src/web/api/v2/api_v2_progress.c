@@ -22,7 +22,7 @@ int api_v2_progress(RRDHOST *host __maybe_unused, struct web_client *w, char *ur
     nd_uuid_t tr = {0};
     uuid_parse_flexi(transaction, tr);
 
-    rrd_function_call_progresser(&tr);
+    nrpc_call_request_progress(&tr);
 
     return web_api_v2_report_progress(&tr, w->response.data);
 }

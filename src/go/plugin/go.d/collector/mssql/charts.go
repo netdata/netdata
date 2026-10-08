@@ -978,42 +978,41 @@ func (c *Collector) addLockStatsCharts(resourceType string) {
 	}
 }
 
-func (c *Collector) addJobCharts(job sqlAgentJob) {
-	c.removeObsoleteJobCharts(job.chartID)
-
-	charts := &collectorapi.Charts{
-		jobStatusChartTmpl.Copy(),
-		jobLastExecutionStatusChartTmpl.Copy(),
-		jobLastExecutionDurationChartTmpl.Copy(),
-		jobLastExecutionAgeChartTmpl.Copy(),
-		jobCurrentExecutionTimeChartTmpl.Copy(),
-	}
-
-	labels := []collectorapi.Label{
-		{Key: "job_name", Value: job.name},
-	}
-	for _, chart := range *charts {
-		chart.ID = fmt.Sprintf(chart.ID, job.chartID)
-		chart.Labels = labels
-		for _, dim := range chart.Dims {
-			dim.ID = fmt.Sprintf(dim.ID, job.chartID)
-		}
-	}
-
-	if err := c.Charts().Add(*charts...); err != nil {
-		c.Warning(err)
-	}
+func (c *Collector) ensureJobStatusChart(job sqlAgentJob) {
+	c.ensureJobChart(job, jobStatusChartTmpl)
 }
 
-func (c *Collector) removeObsoleteJobCharts(chartID string) {
-	for _, id := range jobChartIDs(chartID) {
-		chart := c.Charts().Get(id)
-		if chart == nil || !chart.IsRemoved() {
-			continue
+func (c *Collector) ensureJobExecutionCharts(job sqlAgentJob) {
+	c.ensureJobChart(job, jobLastExecutionStatusChartTmpl)
+	c.ensureJobChart(job, jobLastExecutionDurationChartTmpl)
+	c.ensureJobChart(job, jobLastExecutionAgeChartTmpl)
+	c.ensureJobChart(job, jobCurrentExecutionTimeChartTmpl)
+}
+
+func (c *Collector) ensureJobChart(job sqlAgentJob, template collectorapi.Chart) {
+	id := fmt.Sprintf(template.ID, job.chartID)
+	if chart := c.Charts().Get(id); chart != nil {
+		if !chart.IsRemoved() {
+			return
 		}
 		if err := c.Charts().Remove(id); err != nil {
 			c.Warningf("remove obsolete job chart '%s': %v", id, err)
+			return
 		}
+	}
+
+	chart := template.Copy()
+	labels := []collectorapi.Label{
+		{Key: "job_name", Value: job.name},
+	}
+	chart.ID = fmt.Sprintf(chart.ID, job.chartID)
+	chart.Labels = labels
+	for _, dim := range chart.Dims {
+		dim.ID = fmt.Sprintf(dim.ID, job.chartID)
+	}
+
+	if err := c.Charts().Add(chart); err != nil {
+		c.Warning(err)
 	}
 }
 
@@ -1045,9 +1044,25 @@ func (c *Collector) removeJobCharts(chartID string) {
 	}
 }
 
+func (c *Collector) removeJobExecutionCharts(chartID string) {
+	for _, id := range jobExecutionChartIDs(chartID) {
+		chart := c.Charts().Get(id)
+		if chart == nil {
+			continue
+		}
+		chart.MarkRemove()
+		chart.MarkNotCreated()
+	}
+}
+
 func jobChartIDs(chartID string) []string {
-	return []string{
+	return append([]string{
 		fmt.Sprintf(jobStatusChartTmpl.ID, chartID),
+	}, jobExecutionChartIDs(chartID)...)
+}
+
+func jobExecutionChartIDs(chartID string) []string {
+	return []string{
 		fmt.Sprintf(jobLastExecutionStatusChartTmpl.ID, chartID),
 		fmt.Sprintf(jobLastExecutionDurationChartTmpl.ID, chartID),
 		fmt.Sprintf(jobLastExecutionAgeChartTmpl.ID, chartID),
@@ -1403,7 +1418,7 @@ func (c *Collector) addAGCharts(agName string) {
 		agRecoveryHealthChartTmpl.Copy(),
 	}
 
-	if c.majorVersion >= 15 { // SQL Server 2019+
+	if c.currentMajorVersion() >= 15 { // SQL Server 2019+
 		*charts = append(*charts, agThreadsChartTmpl.Copy())
 	}
 
@@ -1464,7 +1479,7 @@ func (c *Collector) addAGDatabaseReplicaCharts(agName, replicaServer, dbName str
 		agDBJoinedChartTmpl.Copy(),
 	}
 
-	if c.majorVersion >= 13 { // SQL Server 2016+
+	if c.currentMajorVersion() >= 13 { // SQL Server 2016+
 		*charts = append(*charts, agDBSecondaryLagChartTmpl.Copy())
 	}
 

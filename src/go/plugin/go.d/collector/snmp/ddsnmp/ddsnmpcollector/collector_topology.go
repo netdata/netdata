@@ -13,34 +13,49 @@ type topologyMetricLookupKey struct {
 }
 
 func (c *Collector) collectTopologyMetrics(prof *ddsnmp.Profile, stats *ddsnmp.CollectionStats) ([]ddsnmp.Metric, error) {
-	if prof.Definition == nil || len(prof.Definition.Topology) == 0 {
+	topologyProfile, kinds := buildTopologyProfile(prof)
+	if topologyProfile == nil {
 		return nil, nil
-	}
-
-	metricsConfig, kinds := topologyRowsAsMetrics(prof.Definition.Topology)
-	topologyProfile := &ddsnmp.Profile{
-		SourceFile: prof.SourceFile,
-		Definition: &ddprofiledefinition.ProfileDefinition{
-			Metrics: metricsConfig,
-		},
 	}
 
 	scalarMetrics, err := c.scalarCollector.collect(topologyProfile, stats)
 	if err != nil {
 		return nil, err
 	}
-	tableMetrics, err := c.tableCollector.collect(topologyProfile, stats)
+	session := newTableCollectionSession(c.tableCollector, c.tableIdentity)
+	scope := session.addScope(topologyProfile, tableSymbolModePresence, stats)
+	session.resolve()
+	tableMetrics, err := session.collectScope(scope)
 	if err != nil {
 		return nil, err
 	}
 
 	topologyMetrics := append(scalarMetrics, tableMetrics...)
-	for i := range topologyMetrics {
-		key := topologyMetricLookupKey{table: topologyMetrics[i].Table, name: topologyMetrics[i].Name}
-		topologyMetrics[i].TopologyKind = kinds[key]
+	assignTopologyKinds(topologyMetrics, kinds)
+	return topologyMetrics, nil
+}
+
+func buildTopologyProfile(
+	prof *ddsnmp.Profile,
+) (*ddsnmp.Profile, map[topologyMetricLookupKey]ddprofiledefinition.TopologyKind) {
+	if prof.Definition == nil || len(prof.Definition.Topology) == 0 {
+		return nil, nil
 	}
 
-	return topologyMetrics, nil
+	metricsConfig, kinds := topologyRowsAsMetrics(prof.Definition.Topology)
+	return &ddsnmp.Profile{
+		SourceFile: prof.SourceFile,
+		Definition: &ddprofiledefinition.ProfileDefinition{
+			Metrics: metricsConfig,
+		},
+	}, kinds
+}
+
+func assignTopologyKinds(metrics []ddsnmp.Metric, kinds map[topologyMetricLookupKey]ddprofiledefinition.TopologyKind) {
+	for i := range metrics {
+		key := topologyMetricLookupKey{table: metrics[i].Table, name: metrics[i].Name}
+		metrics[i].TopologyKind = kinds[key]
+	}
 }
 
 func topologyRowsAsMetrics(topology []ddprofiledefinition.TopologyConfig) ([]ddprofiledefinition.MetricsConfig, map[topologyMetricLookupKey]ddprofiledefinition.TopologyKind) {

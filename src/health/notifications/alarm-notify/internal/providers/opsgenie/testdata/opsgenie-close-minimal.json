@@ -1,0 +1,5 @@
+{
+  "source": "node",
+  "user": "Netdata",
+  "note": "summary\nNode: node\nAlert: alert\nStatus: CLEAR\nTime: 2026-09-14T12:00:00Z\n\nEvent: {\"version\":1,\"incident_id\":\"test-incident\",\"timestamp\":\"2026-09-14T12:00:00Z\",\"node\":\"node\",\"alert\":\"alert\",\"status\":\"CLEAR\",\"summary\":\"summary\",\"value\":null,\"previous_value\":null}"
+}

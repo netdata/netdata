@@ -878,8 +878,18 @@ fn test_receive_timeout() {
 
     // No client sends anything, so receive must timeout
     let mut buf = [0u8; 1024];
-    let result = server.receive(&mut buf, 50); // 50ms timeout
-    assert_eq!(result.unwrap_err(), ShmError::Timeout);
+    server.spin_tries = 0;
+    for timeout_ms in [100, 1100] {
+        let start = std::time::Instant::now();
+        let result = server.receive(&mut buf, timeout_ms);
+        let elapsed = start.elapsed();
+        assert_eq!(result.unwrap_err(), ShmError::Timeout);
+        assert!(
+            elapsed >= Duration::from_millis(timeout_ms as u64),
+            "{elapsed:?}"
+        );
+        assert!(elapsed < Duration::from_secs(6), "{elapsed:?}");
+    }
 
     server.destroy();
     cleanup_shm(svc, sid);
@@ -1339,9 +1349,11 @@ fn test_cleanup_stale_invalid_entries() {
         !short_path.exists(),
         "short invalid entry should be removed"
     );
-    assert!(!build_shm_path(TEST_RUN_DIR, svc, magic_sid)
-        .unwrap()
-        .exists());
+    assert!(
+        !build_shm_path(TEST_RUN_DIR, svc, magic_sid)
+            .unwrap()
+            .exists()
+    );
     // An unreadable entry at a matching name is junk: it cannot be a live
     // endpoint we can verify, so cleanup reclaims it (under root chmod 000
     // has no effect and the file is opened, inspected, and removed instead).

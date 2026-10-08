@@ -317,8 +317,8 @@ func newTestVNodeBindingWithDiagnostics(
 		source = "file=test"
 	}
 	configured, err := agentdiscovery.NewVNodeConfigurationWithInitial(
-		map[string]*vnodes.VirtualNode{
-			"db": {Name: "db", Hostname: "db", GUID: testVNodeGUID, Source: source, SourceType: sourceType},
+		map[string]*vnodes.Config{
+			"db": {VirtualNode: vnodes.VirtualNode{Name: "db", Hostname: "db", GUID: testVNodeGUID, Source: source, SourceType: sourceType}},
 		},
 	)
 	require.NoError(t, err)

@@ -31,7 +31,7 @@ combining the results into a single table grouped by transport protocol and IP f
 
 This collector is only supported on the following platforms:
 
-- windows
+- Windows
 
 This collector only supports collecting metrics from a single instance of this integration.
 

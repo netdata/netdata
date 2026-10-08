@@ -11,10 +11,8 @@ struct pid_on_target2 {
     int updated;
 
     netdata_publish_swap_t swap;
-    netdata_publish_fd_stat_t fd;
     netdata_publish_vfs_t vfs;
     ebpf_publish_process_t ps;
-    netdata_dcstat_pid_t dc;
     netdata_publish_shm_t shm;
 
     struct pid_on_target2 *next;
@@ -23,18 +21,14 @@ struct pid_on_target2 {
 enum ebpf_cgroup_flags {
     NETDATA_EBPF_CGROUP_HAS_PROCESS_CHART = 1,
     NETDATA_EBPF_CGROUP_HAS_SWAP_CHART = 1 << 2,
-    NETDATA_EBPF_CGROUP_HAS_FD_CHART = 1 << 4,
     NETDATA_EBPF_CGROUP_HAS_VFS_CHART = 1 << 5,
     NETDATA_EBPF_CGROUP_HAS_OOMKILL_CHART = 1 << 6,
-    NETDATA_EBPF_CGROUP_HAS_DC_CHART = 1 << 8,
     NETDATA_EBPF_CGROUP_HAS_SHM_CHART = 1 << 9,
 
     NETDATA_EBPF_SERVICES_HAS_PROCESS_CHART = 1 << 16,
     NETDATA_EBPF_SERVICES_HAS_SWAP_CHART = 1 << 17,
-    NETDATA_EBPF_SERVICES_HAS_FD_CHART = 1 << 19,
     NETDATA_EBPF_SERVICES_HAS_VFS_CHART = 1 << 20,
     NETDATA_EBPF_SERVICES_HAS_OOMKILL_CHART = 1 << 21,
-    NETDATA_EBPF_SERVICES_HAS_DC_CHART = 1 << 23,
     NETDATA_EBPF_SERVICES_HAS_SHM_CHART = 1 << 24
 };
 
@@ -46,10 +40,8 @@ typedef struct ebpf_cgroup_target {
     uint32_t updated;
 
     netdata_publish_swap_t publish_systemd_swap;
-    netdata_publish_fd_stat_t publish_systemd_fd;
     netdata_publish_vfs_t publish_systemd_vfs;
     ebpf_publish_process_t publish_systemd_ps;
-    netdata_publish_dcstat_t publish_dc;
     int oomkill;
     netdata_publish_shm_t publish_shm;
 

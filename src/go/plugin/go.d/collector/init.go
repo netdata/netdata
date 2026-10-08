@@ -3,8 +3,12 @@
 package collector
 
 import (
+	"maps"
+
+	"github.com/netdata/netdata/go/plugins/plugin/framework/collectorapi"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp/ddsnmp"
+	snmpdiag "github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp/diagnostics"
 	snmptopology "github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_topology"
 	snmptraps "github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_traps"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/reversedns"
@@ -15,6 +19,7 @@ import (
 	_ "github.com/netdata/netdata/go/plugins/plugin/go.d/collector/apache"
 	_ "github.com/netdata/netdata/go/plugins/plugin/go.d/collector/apcupsd"
 	_ "github.com/netdata/netdata/go/plugins/plugin/go.d/collector/azure_monitor"
+
 	// _ "github.com/netdata/netdata/go/plugins/plugin/go.d/collector/as400" // Moved to ibm.d.plugin (requires CGO)
 	_ "github.com/netdata/netdata/go/plugins/plugin/go.d/collector/beanstalk"
 	_ "github.com/netdata/netdata/go/plugins/plugin/go.d/collector/bind"
@@ -50,7 +55,6 @@ import (
 	_ "github.com/netdata/netdata/go/plugins/plugin/go.d/collector/freeradius"
 	_ "github.com/netdata/netdata/go/plugins/plugin/go.d/collector/gearman"
 	_ "github.com/netdata/netdata/go/plugins/plugin/go.d/collector/geth"
-	_ "github.com/netdata/netdata/go/plugins/plugin/go.d/collector/haproxy"
 	_ "github.com/netdata/netdata/go/plugins/plugin/go.d/collector/hddtemp"
 	_ "github.com/netdata/netdata/go/plugins/plugin/go.d/collector/hdfs"
 	_ "github.com/netdata/netdata/go/plugins/plugin/go.d/collector/hpssa"
@@ -59,6 +63,7 @@ import (
 	_ "github.com/netdata/netdata/go/plugins/plugin/go.d/collector/intelgpu"
 	_ "github.com/netdata/netdata/go/plugins/plugin/go.d/collector/ipfs"
 	_ "github.com/netdata/netdata/go/plugins/plugin/go.d/collector/isc_dhcpd"
+	_ "github.com/netdata/netdata/go/plugins/plugin/go.d/collector/jetson"
 	_ "github.com/netdata/netdata/go/plugins/plugin/go.d/collector/k8s_apiserver"
 	_ "github.com/netdata/netdata/go/plugins/plugin/go.d/collector/k8s_kubelet"
 	_ "github.com/netdata/netdata/go/plugins/plugin/go.d/collector/k8s_kubeproxy"
@@ -107,13 +112,16 @@ import (
 	_ "github.com/netdata/netdata/go/plugins/plugin/go.d/collector/pulsar"
 	_ "github.com/netdata/netdata/go/plugins/plugin/go.d/collector/puppet"
 	_ "github.com/netdata/netdata/go/plugins/plugin/go.d/collector/rabbitmq"
+	_ "github.com/netdata/netdata/go/plugins/plugin/go.d/collector/redfish"
 	_ "github.com/netdata/netdata/go/plugins/plugin/go.d/collector/redis"
 	_ "github.com/netdata/netdata/go/plugins/plugin/go.d/collector/rethinkdb"
 	_ "github.com/netdata/netdata/go/plugins/plugin/go.d/collector/riakkv"
 	_ "github.com/netdata/netdata/go/plugins/plugin/go.d/collector/rspamd"
+	_ "github.com/netdata/netdata/go/plugins/plugin/go.d/collector/s3check"
 	_ "github.com/netdata/netdata/go/plugins/plugin/go.d/collector/samba"
 	_ "github.com/netdata/netdata/go/plugins/plugin/go.d/collector/scaleio"
 	_ "github.com/netdata/netdata/go/plugins/plugin/go.d/collector/smartctl"
+	_ "github.com/netdata/netdata/go/plugins/plugin/go.d/collector/smbios_memory"
 	_ "github.com/netdata/netdata/go/plugins/plugin/go.d/collector/spigotmc"
 	_ "github.com/netdata/netdata/go/plugins/plugin/go.d/collector/sql"
 	_ "github.com/netdata/netdata/go/plugins/plugin/go.d/collector/squid"
@@ -144,7 +152,10 @@ import (
 	_ "github.com/netdata/netdata/go/plugins/plugin/go.d/collector/zookeeper"
 )
 
-func init() {
+// NewRegistry gives each Agent its own shared SNMP state and publisher.
+func NewRegistry(varLibDir string) (collectorapi.Registry, *snmpdiag.Publisher) {
+	registry := maps.Clone(collectorapi.DefaultRegistry)
+
 	// These collectors share SNMP state; wire them together here instead of
 	// exposing package-global registries from the individual collector packages.
 	deviceStore := ddsnmp.NewDeviceStore()
@@ -157,7 +168,9 @@ func init() {
 		MaxConcurrent: reversedns.DefaultMaxConcurrent,
 	})
 
-	snmp.Register(deviceStore)
-	snmptopology.Register(deviceStore, trapEnrichment, reverseDNS)
-	snmptraps.Register(deviceStore, trapEnrichment, reverseDNS)
+	publisher := snmpdiag.NewPublisher(deviceStore, varLibDir)
+	registry["snmp"] = snmp.Creator(deviceStore, publisher)
+	registry["snmp_topology"] = snmptopology.Creator(deviceStore, trapEnrichment, reverseDNS, publisher)
+	registry["snmp_traps"] = snmptraps.Creator(deviceStore, trapEnrichment, reverseDNS)
+	return registry, publisher
 }

@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"strings"
 
+	"context"
 	"github.com/netdata/netdata/go/plugins/pkg/prometheus"
 )
 
@@ -16,8 +17,8 @@ const (
 	srvTypeSQL     = "ysql"
 )
 
-func (c *Collector) collect() (map[string]int64, error) {
-	mfs, err := c.prom.Scrape()
+func (c *Collector) collect(ctx context.Context) (map[string]int64, error) {
+	mfs, err := c.prom.ScrapeContext(ctx)
 	if err != nil {
 		return nil, err
 	}

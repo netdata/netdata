@@ -2,6 +2,9 @@
 
 import fnmatch
 import re
+import shlex
+import subprocess
+import tempfile
 import unittest
 from pathlib import Path, PurePosixPath
 
@@ -9,6 +12,7 @@ from pathlib import Path, PurePosixPath
 ROOT = Path(__file__).resolve().parents[2]
 REVIEW_WORKFLOW = ROOT / ".github/workflows/review.yml"
 GO_TESTS_WORKFLOW = ROOT / ".github/workflows/go-tests.yml"
+SOW_WORKFLOW = ROOT / ".github/workflows/sow.yml"
 BUILD_WORKFLOW_STEPS = (
     (ROOT / ".github/workflows/build.yml", "Check build files"),
     (ROOT / ".github/workflows/docker.yml", "Check build system files"),
@@ -75,6 +79,52 @@ def literal_block(step: list[str], key: str) -> set[str]:
 
 
 class WorkflowFileSelectionTest(unittest.TestCase):
+    def test_public_skill_changes_trigger_sow_workflow(self) -> None:
+        workflow = SOW_WORKFLOW.read_text(encoding="utf-8")
+        paths_block = workflow.split("    paths:\n", 1)[1].split("\n\n", 1)[0]
+        patterns = [line.strip()[2:].strip('"\'') for line in paths_block.splitlines()]
+        # Require recursive directory coverage; a single '*' does not cross '/' in GitHub path filters.
+        recursive_prefixes = [pattern[:-2] for pattern in patterns if pattern.endswith("/**")]
+
+        for path in (
+            "docs/netdata-ai/skills/query-netdata-agents/SKILL.md",
+            "docs/netdata-ai/skills/query-netdata-cloud/how-tos/INDEX.md",
+            "docs/netdata-ai/skills/query-snmp-traps/scripts/helper.sh",
+        ):
+            with self.subTest(path=path):
+                self.assertTrue(any(path.startswith(prefix) for prefix in recursive_prefixes))
+
+    def test_sow_scanner_selects_canonical_public_skills(self) -> None:
+        workflow = SOW_WORKFLOW.read_text(encoding="utf-8")
+        step = "\n".join(workflow_step(workflow, "Scan changed durable artifacts for sensitive data"))
+        selection = re.search(r'git diff --name-only --diff-filter=ACMR "\$base\.\.\.\$head" -- (.*?)\|',
+                              step, re.DOTALL)
+        self.assertIsNotNone(selection)
+        pathspecs = shlex.split(selection.group(1).replace("\\\n", " "))
+        expected = {
+            "AGENTS.md",
+            ".agents/skills/repo-pr-reviews/SKILL.md",
+            ".agents/sow/SOW.template.md",
+            "docs/netdata-ai/skills/query-netdata-agents/SKILL.md",
+            "docs/netdata-ai/skills/query-netdata-cloud/how-tos/INDEX.md",
+            "docs/netdata-ai/skills/query-snmp-traps/scripts/helper.sh",
+        }
+        unrelated = {"docs/operator-guide.md", "src/example.c"}
+
+        with tempfile.TemporaryDirectory(prefix="sow-file-selection-") as directory:
+            root = Path(directory)
+            subprocess.run(["git", "init", "--quiet", directory], check=True, capture_output=True)
+            for path in expected | unrelated:
+                file = root / path
+                file.parent.mkdir(parents=True, exist_ok=True)
+                file.write_text("Benign routing fixture.\n", encoding="utf-8")
+            subprocess.run(["git", "add", "--", *sorted(expected | unrelated)], cwd=root, check=True)
+            selected = subprocess.check_output(
+                ["git", "diff", "--cached", "--name-only", "--diff-filter=ACMR", "--", *pathspecs],
+                cwd=root, text=True,
+            )
+            self.assertEqual(set(selected.splitlines()), expected)
+
     def test_literal_block_ignores_indentation_and_blank_lines(self) -> None:
         workflow = """
   - name: Example

@@ -4,6 +4,9 @@ version: v1
 profile: process_runtime
 match: 'process_*'
 namespace: process_runtime
+documentation:
+  title: Process runtime
+  summary: Curated CPU, memory, file-descriptor, and lifecycle metrics exported by the monitored process.
 composition:
   supports: {}
 entities:

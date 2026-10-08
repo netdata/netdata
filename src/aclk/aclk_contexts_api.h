@@ -14,7 +14,6 @@ void aclk_update_node_info(struct update_node_info *info, struct aclk_sync_compl
 void aclk_update_node_instance_manifest(
     struct update_node_instance_manifest *manifest,
     const char *machine_guid,
-    uint64_t suppression_key,
     uint64_t token);
 
 #endif /* ACLK_CONTEXTS_API_H */

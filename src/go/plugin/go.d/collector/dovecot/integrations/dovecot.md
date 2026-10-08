@@ -30,7 +30,7 @@ It reads the server's response to the `EXPORT\tglobal\n` command.
 
 This collector is supported on all platforms.
 
-This collector supports collecting metrics from multiple instances of this integration, including remote instances.
+This collector supports collecting metrics from multiple instances of this integration.
 
 
 ### Default Behavior
@@ -72,7 +72,7 @@ UI configuration requires paid Netdata Cloud plan.
 
 #### Enable old_stats plugin
 
-To enable `old_stats` plugin, see [Old Statistics](https://doc.dovecot.org/configuration_manual/stats/old_statistics/#old-statistics).
+To enable `old_stats` plugin, see [Old Statistics](https://doc.dovecot.org/2.3/configuration_manual/stats/old_statistics/#old-statistics).
 
 
 
@@ -91,7 +91,7 @@ The following options can be defined globally: update_every, autodetection_retry
 |:------|:-----|:------------|:--------|:---------:|
 | **Collection** | update_every | Data collection interval (seconds). | 1 | no |
 |  | autodetection_retry | Autodetection retry interval (seconds). Set 0 to disable. | 0 | no |
-| **Target** | address | Dovecot socket address (Unix or TCP). Used by the [old_stats](https://doc.dovecot.org/configuration_manual/stats/old_statistics/#old-statistics) plugin. | 127.0.0.1:24242 | yes |
+| **Target** | address | Dovecot socket address (Unix or TCP). Used by the [old_stats](https://doc.dovecot.org/2.3/configuration_manual/stats/old_statistics/#old-statistics) plugin. | 127.0.0.1:24242 | yes |
 |  | timeout | Connection, read, write, and name resolution timeout (seconds). | 1 | no |
 | **Virtual Node** | vnode | Associates this data collection job with a [Virtual Node](https://learn.netdata.cloud/docs/netdata-agent/configuration/organize-systems-metrics-and-alerts#virtual-nodes). |  | no |
 
@@ -109,7 +109,7 @@ Configure the **dovecot** collector from the Netdata web interface:
 4. In the Search box, type _dovecot_ (or scroll the list) to locate the **dovecot** collector.
 5. Click the **+** next to the **dovecot** collector to add a new job.
 6. Fill in the job fields, then click **Test** to verify the configuration and **Submit** to save.
-    - **Test** runs the job with the provided settings and shows whether data can be collected.
+    - **Test** validates the provided settings and checks the collector's startup prerequisites. Successful validation does not guarantee that every metric will be available during collection.
     - If it fails, an error message appears with details (for example, connection refused, timeout, or command execution errors), so you can adjust and retest.
 
 
@@ -227,7 +227,9 @@ Metrics:
 
 ## Troubleshooting
 
-### Debug Mode
+### Diagnostics
+
+#### Debug Mode
 
 **Important**: Debug mode is not supported for data collection jobs created via the UI using the Dyncfg feature.
 
@@ -259,14 +261,14 @@ should give you clues as to why the collector isn't working.
   ./go.d.plugin -d -m dovecot -j jobName
   ```
 
-### Getting Logs
+#### Getting Logs
 
 If you're encountering problems with the `dovecot` collector, follow these steps to retrieve logs and identify potential issues:
 
 - **Run the command** specific to your system (systemd, non-systemd, or Docker container).
 - **Examine the output** for any warnings or error messages that might indicate issues.  These messages should provide clues about the root cause of the problem.
 
-#### System with systemd
+##### System with systemd
 
 Use the following command to view logs generated since the last Netdata service restart:
 
@@ -274,7 +276,7 @@ Use the following command to view logs generated since the last Netdata service 
 journalctl _SYSTEMD_INVOCATION_ID="$(systemctl show --value --property=InvocationID netdata)" --namespace=netdata --grep dovecot
 ```
 
-#### System without systemd
+##### System without systemd
 
 Locate the collector log file, typically at `/var/log/netdata/collector.log`, and use `grep` to filter for collector's name:
 
@@ -284,7 +286,7 @@ grep dovecot /var/log/netdata/collector.log
 
 **Note**: This method shows logs from all restarts. Focus on the **latest entries** for troubleshooting current issues.
 
-#### Docker Container
+##### Docker Container
 
 If your Netdata runs in a Docker container named "netdata" (replace if different), use this command:
 

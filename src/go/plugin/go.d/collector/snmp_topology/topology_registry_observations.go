@@ -10,34 +10,12 @@ import (
 	topologyengine "github.com/netdata/netdata/go/plugins/pkg/l2topology"
 )
 
-func (r *topologyRegistry) activeCaches() []*topologyCache {
-	if r == nil {
+func topologyObservationSnapshots(generation *topologyGeneration) []topologymodel.ObservationSnapshot {
+	if generation == nil {
 		return nil
 	}
 
-	r.mu.RLock()
-	caches := make([]*topologyCache, 0, len(r.caches))
-	for cache := range r.caches {
-		caches = append(caches, cache)
-	}
-	r.mu.RUnlock()
-	return caches
-}
-
-func (r *topologyRegistry) observationSnapshots() []topologymodel.ObservationSnapshot {
-	caches := r.activeCaches()
-	if len(caches) == 0 {
-		return nil
-	}
-
-	snapshots := make([]topologymodel.ObservationSnapshot, 0, len(caches))
-	for _, cache := range caches {
-		snapshot, ok := cache.snapshotEngineObservations()
-		if !ok {
-			continue
-		}
-		snapshots = append(snapshots, snapshot)
-	}
+	snapshots := generation.observationSnapshots()
 	if len(snapshots) == 0 {
 		return nil
 	}
@@ -98,9 +76,6 @@ func aggregateTopologyObservationSnapshots(snapshots []topologymodel.Observation
 		aggregate.L3Interfaces = append(aggregate.L3Interfaces, snapshot.L3Interfaces...)
 		aggregate.OSPFNeighbors = append(aggregate.OSPFNeighbors, snapshot.OSPFNeighbors...)
 		aggregate.BGPPeers = append(aggregate.BGPPeers, snapshot.BGPPeers...)
-		if aggregate.LocalDeviceID == "" {
-			aggregate.LocalDeviceID = snapshot.LocalDeviceID
-		}
 		if aggregate.AgentID == "" && snapshot.AgentID != "" {
 			aggregate.AgentID = snapshot.AgentID
 		}

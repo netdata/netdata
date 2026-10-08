@@ -6,22 +6,26 @@ licensing:
       name: licensingTable
     identity:
       id:
-        OID: 1.3.6.1.4.1.2620.1.6.18.1.1.2
-        name: licensingID
+        symbol:
+          OID: 1.3.6.1.4.1.2620.1.6.18.1.1.2
+          name: licensingID
       name:
-        OID: 1.3.6.1.4.1.2620.1.6.18.1.1.4
-        name: licensingBladeName
+        symbol:
+          OID: 1.3.6.1.4.1.2620.1.6.18.1.1.4
+          name: licensingBladeName
       component:
         value: blade
     descriptors:
       type:
         value: subscription
       impact:
-        OID: 1.3.6.1.4.1.2620.1.6.18.1.1.7
-        name: licensingImpact
+        symbol:
+          OID: 1.3.6.1.4.1.2620.1.6.18.1.1.7
+          name: licensingImpact
     state:
-      OID: 1.3.6.1.4.1.2620.1.6.18.1.1.5
-      name: licensingState
+      symbol:
+        OID: 1.3.6.1.4.1.2620.1.6.18.1.1.5
+        name: licensingState
       mapping:
         # MIB-documented hyphenated tokens
         valid: "0"
@@ -43,13 +47,16 @@ licensing:
     signals:
       expiry:
         timestamp:
-          OID: 1.3.6.1.4.1.2620.1.6.18.1.1.6
-          name: licensingExpirationDate
+          symbol:
+            OID: 1.3.6.1.4.1.2620.1.6.18.1.1.6
+            name: licensingExpirationDate
           sentinel: [timer_u32_max]
       usage:
         used:
-          OID: 1.3.6.1.4.1.2620.1.6.18.1.1.10
-          name: licensingUsedQuota
+          symbol:
+            OID: 1.3.6.1.4.1.2620.1.6.18.1.1.10
+            name: licensingUsedQuota
         capacity:
-          OID: 1.3.6.1.4.1.2620.1.6.18.1.1.9
-          name: licensingTotalQuota
+          symbol:
+            OID: 1.3.6.1.4.1.2620.1.6.18.1.1.9
+            name: licensingTotalQuota

@@ -7,6 +7,11 @@ extends:
   - _cisco-catalyst.yaml
   - _cisco-catalyst-poe.yaml
   - _std-lag-mib.yaml
+  - _std-topology-interface-mib.yaml
+  - _std-topology-fdb-mib.yaml
+  - _std-topology-stp-mib.yaml
+  - _std-topology-arp-mib.yaml
+  - _std-topology-cisco-vtp-mib.yaml
 
 metadata:
   device:
@@ -19,6 +24,8 @@ metadata:
 selector:
   - sysobjectid:
       include:
+        - 1.3.6.1.4.1.9.1.2683 # ciscoIE3200
+        - 1.3.6.1.4.1.9.1.3155 # ciscoC9500X
         - 1.3.6.1.4.1.9.1.111 # ciscoCatalyst3500
         - 1.3.6.1.4.1.9.1.150 # catalyst116T
         - 1.3.6.1.4.1.9.1.151 # catalyst116C

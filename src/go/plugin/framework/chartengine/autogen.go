@@ -14,7 +14,33 @@ import (
 
 const (
 	autogenTemplatePrefix = "__autogen__:"
+	// counterRawSuffix follows the metric name in the chart ID and context of a
+	// counter's raw-value chart (AutogenPolicy.CounterRawCharts).
+	counterRawSuffix = ".raw"
+	// counterRawTemplatePrefix gives raw charts their own template identity, so a
+	// series whose own chart ID equals a raw chart ID is a rejected collision
+	// instead of a dimension merged into the raw chart.
+	counterRawTemplatePrefix = autogenTemplatePrefix + "raw:"
 )
+
+// Autogen output also depends on current reader metadata and flattened kinds;
+// series identity and template revision alone do not validate these routes.
+type autogenRouteGuard struct {
+	source      autogenSource
+	metadata    metrix.MetricMeta
+	hasMetadata bool
+	kind        metrix.MetricKind
+	sourceKind  metrix.MetricKind
+	role        metrix.FlattenRole
+}
+
+func (g *autogenRouteGuard) valid(reader metrix.Reader, meta metrix.SeriesMeta) bool {
+	if g == nil || g.kind != meta.Kind || g.sourceKind != meta.SourceKind || g.role != meta.FlattenRole {
+		return false
+	}
+	mm, ok := autogenMetricMeta(reader, g.source)
+	return ok == g.hasMetadata && mm == g.metadata
+}
 
 type autogenRoute struct {
 	chartID           string
@@ -102,7 +128,8 @@ func (e *Engine) resolveAutogenRouteWithReason(
 	if !ok {
 		return nil, false, PlanRouteReasonAutogenBuildRejected, -1, nil
 	}
-	if metricMeta, ok := autogenMetricMeta(reader, source); ok {
+	metricMeta, hasMetadata := autogenMetricMeta(reader, source)
+	if hasMetadata {
 		route = applyAutogenMetricMeta(route, metricMeta, meta)
 	}
 	route.priority = effectiveChartPriority(route.priority)
@@ -110,8 +137,16 @@ func (e *Engine) resolveAutogenRouteWithReason(
 	if title == "" {
 		title = getAutogenChartTitle(route.chartName)
 	}
-	return []routeBinding{
+	routes := []routeBinding{
 		{
+			autogenGuard: &autogenRouteGuard{
+				source:      source,
+				metadata:    metricMeta,
+				hasMetadata: hasMetadata,
+				kind:        meta.Kind,
+				sourceKind:  meta.SourceKind,
+				role:        meta.FlattenRole,
+			},
 			ChartTemplateID:   autogenTemplatePrefix + route.chartID,
 			ChartID:           route.chartID,
 			DimensionIndex:    0,
@@ -136,7 +171,50 @@ func (e *Engine) resolveAutogenRouteWithReason(
 			},
 			Lifecycle: autogenLifecyclePolicy(policy),
 		},
-	}, true, "", -1, nil
+	}
+	// Most series are not selected scalar counters; check that before building anything.
+	if isScalarCounter(meta) && e.state.cfg.autogenCounterRaw.Selects(source.seriesName) {
+		routes = e.appendCounterRawAutogenRoute(routes, source.seriesName, labels, &metricMeta, hasMetadata)
+	}
+	return routes, true, "", -1, nil
+}
+
+func isScalarCounter(meta metrix.SeriesMeta) bool {
+	return meta.Kind == metrix.MetricKindCounter &&
+		meta.SourceKind == metrix.MetricKindCounter &&
+		meta.FlattenRole == metrix.FlattenRoleNone
+}
+
+// appendCounterRawAutogenRoute appends the raw-value chart of a scalar counter
+// selected by AutogenPolicy.CounterRawCharts to its rate route (routes[0]). The raw
+// chart reads the same series and keeps the rate chart's dimension, family,
+// priority and lifecycle, but charts the value as absolute under the ".raw" chart
+// ID and context. A raw chart ID over the type.id budget skips only the raw chart.
+func (e *Engine) appendCounterRawAutogenRoute(
+	routes []routeBinding,
+	metricName string,
+	labels metrix.LabelView,
+	metricMeta *metrix.MetricMeta,
+	hasMetadata bool,
+) []routeBinding {
+	chartID := buildJoinedLabelAutogenID(metricName+counterRawSuffix, labels, nil)
+	if !fitsTypeIDBudget(e.state.cfg.autogen.MaxTypeIDLen, e.state.cfg.autogenTypeID, chartID) {
+		return routes
+	}
+	units := getAutogenGaugeUnits(metricName)
+	if unit := strings.TrimSpace(metricMeta.Unit); hasMetadata && unit != "" {
+		units = normalizeAutogenUnitByAlgorithm(unit, program.AlgorithmAbsolute)
+	}
+
+	raw := routes[0]
+	raw.ChartTemplateID = counterRawTemplatePrefix + chartID
+	raw.ChartID = chartID
+	raw.Algorithm = program.AlgorithmAbsolute
+	raw.Meta.Title += " (raw)"
+	raw.Meta.Context += counterRawSuffix
+	raw.Meta.Units = units
+	raw.Meta.Algorithm = program.AlgorithmAbsolute
+	return append(routes, raw)
 }
 
 func autogenRulesSelect(rules []charttpl.ValidatedAutogenRule, metricName string, labels metrix.LabelView) bool {

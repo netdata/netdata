@@ -1,9 +1,10 @@
-//! `sfsq-cli trace` / `attributes` / `attribute-values` — the traces
-//! query engine from the terminal, without a running agent: the
-//! dev/real-use front door of `sfsq::traces` (phases 4a/4b). Point any
-//! subcommand at a mix of sealed SFSTs and traces WALs; `trace` merges
-//! one trace through the shared combiner, `attributes` /
-//! `attribute-values` enumerate the key vocabulary off the dictionaries.
+//! `sfsq-cli trace` / `attributes` / `attribute-values` / `search` — the
+//! `sfsq::traces` engine from the terminal, without a running agent. Each
+//! subcommand takes an explicit file list (`--sfst` sealed files, `--wal`
+//! traces WALs) instead of the logs front door's directory discovery;
+//! `trace` reconstructs one trace through the shared combiner,
+//! `attributes` / `attribute-values` enumerate the key vocabulary off the
+//! dictionaries, `search` filters whole traces.
 //!
 //! WAL inputs are served as tail scans over the file's full frame range —
 //! right for shut-down or recovered WALs (the dev case); an actively
@@ -21,10 +22,10 @@ use anyhow::{Context, Result, bail};
 use tokio_util::sync::CancellationToken;
 
 use sfsq::traces::{
+    AttributeKey, AttributeNamesQuery, AttributeOwner, AttributeValuesQuery, BuiltinField,
     CompareOp, Condition, Predicate, PredicateTarget, PredicateValue, QueryStatus, SearchQuery,
-    SearchSources, SourceId, AttributeKey, AttributeNamesQuery, AttributeOwner, AttributeValuesQuery, TimeWindow,
-    BuiltinField, TraceQuery, TraceSfstCandidate, TraceSource, TraceWalTail, WalCoverage,
-    search, attribute_names, attribute_values, trace_by_id,
+    SearchSources, SourceId, TimeWindow, TraceQuery, TraceSfstCandidate, TraceSource, TraceWalTail,
+    WalCoverage, attribute_names, attribute_values, search, trace_by_id,
 };
 
 /// Reconstruct one trace across sealed SFSTs and traces WALs.
@@ -68,11 +69,11 @@ fn build_sources(sfsts: &[PathBuf], wals: &[PathBuf]) -> Result<Vec<TraceSource>
         bail!("provide at least one --sfst or --wal source");
     }
     // Source identity is the path STRING (SourceId, wal_id), so the same
-    // file through two aliases (symlink, relative vs absolute) would pass
-    // the engine's DuplicateSource check and be scanned twice, inflating
-    // UNSET-span counts. Canonicalize so aliases collide and the duplicate
-    // is rejected — BEST-EFFORT: a path canonicalize cannot resolve keeps
-    // its user-supplied identity, so deleted-but-open files through
+    // file under two aliases (symlink, relative vs absolute) would pass
+    // the engine's DuplicateSource check and be scanned twice, doubling
+    // UNSET-span-id spans. Canonicalize so aliases collide into one
+    // identity — best-effort: a path canonicalize cannot resolve keeps
+    // its user-supplied spelling, so deleted-but-open files through
     // `/proc/<pid>/fd/N` (a forensic staple) still open, and nonexistent
     // paths surface the per-kind errors below instead of a generic one.
     let canonical = |path: &PathBuf| path.canonicalize().unwrap_or_else(|_| path.clone());
@@ -100,13 +101,11 @@ fn build_sources(sfsts: &[PathBuf], wals: &[PathBuf]) -> Result<Vec<TraceSource>
             );
         }
         // The bounded reader treats a frame crossing its end bound as an
-        // expected torn tail — designed for `end = valid_up_to`, not a
-        // physical file length. Scan the frame headers first so a
-        // truncated tail is SURFACED and only complete frames are read
-        // (the `discover` module's convention; corrupt data never drops
-        // silently under a `complete` status).
-        // Content corruption is a PER-SOURCE failure (warn + skip, the
-        // discover convention) — one corrupt WAL must not abort a
+        // expected torn tail (designed for `end = valid_up_to`, not a
+        // physical file length), so scan the frame headers first: a
+        // truncated tail is SURFACED and only complete frames are read.
+        // Content corruption is a PER-SOURCE failure — warn + skip, the
+        // `discover` convention — so one corrupt WAL cannot abort a
         // multi-source query. Path-level problems (nonexistent, shorter
         // than a header) stay hard errors above: those are argument
         // typos, not data problems.
@@ -156,6 +155,10 @@ pub fn run_trace(args: &TraceArgs, out: &mut dyn std::io::Write) -> Result<()> {
     if let Some(cap) = args.span_cap {
         query = query.span_cap(cap);
     }
+    // Fresh uncancelled token + throwaway progress counter — the engine
+    // signature's other two arguments. This CLI never cancels and never
+    // surfaces progress (the logs front door's `run_query` does the
+    // same); every subcommand below repeats the pattern.
     let data = trace_by_id(
         sources,
         query,
@@ -216,7 +219,7 @@ pub fn run_trace(args: &TraceArgs, out: &mut dyn std::io::Write) -> Result<()> {
     Ok(())
 }
 
-// ── Key enumeration (phase 4b) ─────────────────────────────────────────
+// ── Key enumeration (attributes / attribute-values) ───────────────────
 
 /// An [`AttributeOwner`] as a CLI word (this tool's rendering, not a
 /// wire contract). `Any` is deliberately absent: it exists for
@@ -245,14 +248,19 @@ impl From<OwnerArg> for AttributeOwner {
 }
 
 /// The CLI spelling of each builtin field (kebab-case), used by
-/// `--key` under `--owner builtin` and by the output rendering.
+/// `--key` under `--owner builtin` and by the output rendering. Must
+/// stay 1:1 with the engine's `BuiltinField::ALL` — pinned by the
+/// `every_builtin_has_a_cli_word` test below.
 const BUILTIN_WORDS: [(&str, BuiltinField); 17] = [
     ("name", BuiltinField::Name),
     ("kind", BuiltinField::Kind),
     ("status", BuiltinField::Status),
     ("status-message", BuiltinField::StatusMessage),
     ("instrumentation-name", BuiltinField::InstrumentationName),
-    ("instrumentation-version", BuiltinField::InstrumentationVersion),
+    (
+        "instrumentation-version",
+        BuiltinField::InstrumentationVersion,
+    ),
     ("event-name", BuiltinField::EventName),
     ("duration", BuiltinField::Duration),
     ("span-id", BuiltinField::SpanId),
@@ -308,11 +316,15 @@ fn parse_key(owner: AttributeOwner, key: &str) -> Result<AttributeKey> {
         .map(|(_, i)| AttributeKey::Builtin(*i))
         .ok_or_else(|| {
             let words: Vec<&str> = BUILTIN_WORDS.iter().map(|(w, _)| *w).collect();
-            anyhow::anyhow!("unknown builtin field {key:?}; one of: {}", words.join(", "))
+            anyhow::anyhow!(
+                "unknown builtin field {key:?}; one of: {}",
+                words.join(", ")
+            )
         })
 }
 
-/// Both-or-neither `--start-ns`/`--end-ns` into an engine window.
+/// Both-or-neither `--start-ns`/`--end-ns` into an engine window (the
+/// engine also rejects `start >= end`).
 fn parse_window(start_ns: Option<i64>, end_ns: Option<i64>) -> Result<Option<TimeWindow>> {
     match (start_ns, end_ns) {
         (None, None) => Ok(None),
@@ -424,7 +436,10 @@ pub struct AttributeValuesArgs {
     pub end_ns: Option<i64>,
 }
 
-pub fn run_attribute_values(args: &AttributeValuesArgs, out: &mut dyn std::io::Write) -> Result<()> {
+pub fn run_attribute_values(
+    args: &AttributeValuesArgs,
+    out: &mut dyn std::io::Write,
+) -> Result<()> {
     let owner: AttributeOwner = args.owner.into();
     let key = parse_key(owner, &args.key)?;
     let sources = build_sources(&args.sfsts, &args.wals)?;
@@ -458,7 +473,7 @@ pub fn run_attribute_values(args: &AttributeValuesArgs, out: &mut dyn std::io::W
     Ok(())
 }
 
-// ── Search (phase 4c) ──────────────────────────────────────────────────
+// ── Search ─────────────────────────────────────────────────────────────
 
 /// Search for traces across sealed SFSTs and traces WALs.
 #[derive(Debug, clap::Args)]
@@ -508,10 +523,10 @@ pub struct SearchArgs {
     pub end_ns: Option<i64>,
 }
 
-/// Parse one `--where` condition: `TARGET <op> VALUE` (multi-char ops
-/// checked first so `=~` never parses as `=` with a `~value`, `>=`
-/// never as `>` with `=value`). Ordering ops take numeric values;
-/// `=`/`!=`/`=~`/`!~` take text.
+/// Parse one `--where` condition: `TARGET <op> VALUE`. The op match is
+/// leftmost, longest-symbol first, so `>=` never parses as `>` with a
+/// `=value` and `=~` never as `=` with a `~value`. Ordering ops take
+/// numeric values; `=`/`!=`/`=~`/`!~` take text.
 fn parse_condition(spec: &str) -> Result<Condition> {
     const OPS: [(&str, CompareOp); 8] = [
         ("=~", CompareOp::Regex),
@@ -525,10 +540,7 @@ fn parse_condition(spec: &str) -> Result<Condition> {
     ];
     let (target_word, op, value) = OPS
         .iter()
-        .filter_map(|(sym, op)| {
-            spec.find(sym)
-                .map(|at| (at, sym.len(), *op))
-        })
+        .filter_map(|(sym, op)| spec.find(sym).map(|at| (at, sym.len(), *op)))
         .min_by_key(|&(at, len, _)| (at, std::cmp::Reverse(len)))
         .map(|(at, len, op)| (&spec[..at], op, &spec[at + len..]))
         .ok_or_else(|| anyhow::anyhow!("--where must be TARGET<op>VALUE, got {spec:?}"))?;
@@ -577,7 +589,10 @@ fn parse_target(word: &str) -> Result<PredicateTarget> {
     };
     // `.KEY` = the any-owner attribute (resource ∪ span disjunction).
     if let Some(key) = word.strip_prefix('.') {
-        return Ok(PredicateTarget::Attribute(AttributeOwner::Any, non_empty(key)?));
+        return Ok(PredicateTarget::Attribute(
+            AttributeOwner::Any,
+            non_empty(key)?,
+        ));
     }
     for (owner_name, owner) in [
         ("resource", AttributeOwner::Resource),
@@ -586,7 +601,10 @@ fn parse_target(word: &str) -> Result<PredicateTarget> {
         ("event", AttributeOwner::Event),
         ("link", AttributeOwner::Link),
     ] {
-        if let Some(key) = word.strip_prefix(owner_name).and_then(|r| r.strip_prefix('.')) {
+        if let Some(key) = word
+            .strip_prefix(owner_name)
+            .and_then(|r| r.strip_prefix('.'))
+        {
             return Ok(PredicateTarget::Attribute(owner, non_empty(key)?));
         }
     }
@@ -634,9 +652,9 @@ pub fn run_search(args: &SearchArgs, out: &mut dyn std::io::Write) -> Result<()>
         query = query.spans_per_trace(spans_per_trace);
     }
 
-    // The dev shape: one flat set of paths serves both roles (window =
-    // completion — trivially a subset). Built ONCE — TraceSource clones
-    // cheaply, and build_sources now scans every WAL's frame boundaries.
+    // The dev shape: the same source list fills both roles — the engine
+    // requires window ⊆ completion, and identical lists satisfy that
+    // trivially. Built once; `TraceSource` clones cheaply.
     let window = build_sources(&args.sfsts, &args.wals)?;
     let sources = SearchSources {
         completion: window.clone(),
@@ -649,6 +667,8 @@ pub fn run_search(args: &SearchArgs, out: &mut dyn std::io::Write) -> Result<()>
         Arc::new(AtomicUsize::new(0)),
     )?;
 
+    // `[inexact]` marks a trace whose assembly was capped or degraded —
+    // its summary numbers may undercount (the engine's `exact` flag).
     for t in &data.traces {
         writeln!(
             out,
@@ -696,7 +716,10 @@ mod tests {
     fn where_targets_reject_empty_keys_but_keep_dotted_ones() {
         for bad in [".", "span.", "resource.", "event."] {
             let err = parse_target(bad).expect_err(bad);
-            assert!(err.to_string().contains("empty attribute key"), "{bad}: {err}");
+            assert!(
+                err.to_string().contains("empty attribute key"),
+                "{bad}: {err}"
+            );
         }
         assert!(matches!(
             parse_target("..foo"),
@@ -796,7 +819,11 @@ mod tests {
             .expect("one WAL");
 
         let range_of = |p: &PathBuf| -> wal::FrameRange {
-            match build_sources(&[], std::slice::from_ref(p)).unwrap().pop().unwrap() {
+            match build_sources(&[], std::slice::from_ref(p))
+                .unwrap()
+                .pop()
+                .unwrap()
+            {
                 TraceSource::Tail(t) => t.coverage.range,
                 _ => panic!("expected a tail source"),
             }
@@ -811,12 +838,19 @@ mod tests {
         f.set_len(len - 1).unwrap();
         let clamped = range_of(&path);
         assert!(clamped.end() < len - 1, "tail dropped, prefix kept");
-        assert_eq!(clamped.end(), wal::HEADER_SIZE as u64, "one-frame file: prefix is empty");
+        assert_eq!(
+            clamped.end(),
+            wal::HEADER_SIZE as u64,
+            "one-frame file: prefix is empty"
+        );
 
         // Header-only: empty range, no error.
         f.set_len(wal::HEADER_SIZE as u64).unwrap();
         let empty = range_of(&path);
-        assert_eq!((empty.start(), empty.end()), (wal::HEADER_SIZE as u64, wal::HEADER_SIZE as u64));
+        assert_eq!(
+            (empty.start(), empty.end()),
+            (wal::HEADER_SIZE as u64, wal::HEADER_SIZE as u64)
+        );
     }
 
     /// The CLI word table must stay in lockstep with the engine's

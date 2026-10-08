@@ -83,8 +83,10 @@ func (e *Engine) load(spec *charttpl.Spec, validation charttpl.Validation, revis
 	e.mu.Lock()
 	e.state.cfg.autogen = policy.autogen
 	e.state.cfg.autogenRules = policy.autogenRules
+	e.state.cfg.autogenCounterRaw = policy.autogenCounterRaw
 	e.state.cfg.selector = policy.selector
 	e.state.cfg.autogenContextNamespace = spec.ContextNamespace
+	e.state.templateSet = nil
 	e.state.program = compiled
 	e.state.matchIndex = buildMatchIndex(compiled.Charts())
 	// Template revision change resets routing/materialization internals.

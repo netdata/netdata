@@ -19,12 +19,24 @@
 //! front (no row materialization — `start_ns` from the timestamps column,
 //! `kind` from the low-card `_kind` facet bitmaps), full spans only when
 //! the merge accepts (or must tie-break) them.
+//!
+//! Fallibility is per-source, never a panic: a file contradicting its
+//! own bounds raises `CorruptIndex` (position ≥ `record_count`, no
+//! stream batch for a position, a row past its batch's length, a
+//! missing timestamp or column value); the combiner records it in
+//! `CombineOutcome::failures` and drops that source's remaining
+//! candidates, and `trace_by_id` — one file being the whole result —
+//! propagates it. The plan (`trace_plan.rs`) mirrors these re-checks on
+//! its side (column lengths against each range). `span_refs` alone
+//! raises `UnsetTraceId` — this module holds the variant's only raise
+//! site; `trace_by_id` resolves UNSET to the documented empty before
+//! any session is opened.
 
 use std::collections::HashMap;
 
+use crate::TraceId;
 use crate::index_reader::{IndexReader, TraceEvent, TraceLink, TraceSpan, kv_attr, kv_value};
 use crate::trace_combine::{SpanRef, SpanSource};
-use crate::TraceId;
 
 /// The bloom gate, resolved once per session.
 enum BloomGate {
@@ -61,7 +73,8 @@ pub struct TraceFileSession<'r, 'a> {
     bloom: BloomGate,
     columns: Option<Columns>,
     extras: Option<Extras>,
-    /// Stream-batch cache, sized on first materialization.
+    /// Stream-batch cache, pre-sized to the file's batch count on the
+    /// first `batch` call; each batch decodes on first touch.
     batches: Vec<Option<crate::StreamBatch>>,
     /// KvId → `key=value` string, accumulated across materializations.
     strings: HashMap<u32, String>,
@@ -111,6 +124,8 @@ impl<'r, 'a> TraceFileSession<'r, 'a> {
         }
     }
 
+    /// The shared per-row columns, decoding them on the first lookup
+    /// that passes the bloom gate.
     fn columns(&mut self) -> Result<&Columns, crate::Error> {
         if self.columns.is_none() {
             let reader = self.reader;
@@ -128,6 +143,8 @@ impl<'r, 'a> TraceFileSession<'r, 'a> {
         Ok(self.columns.as_ref().expect("just populated"))
     }
 
+    /// The event/link indexes, decoding them on the first
+    /// materialization.
     fn extras(&mut self) -> Result<&Extras, crate::Error> {
         if self.extras.is_none() {
             let reader = self.reader;
@@ -156,7 +173,9 @@ impl<'r, 'a> TraceFileSession<'r, 'a> {
             )));
         }
         if self.batches.is_empty() {
-            self.batches = (0..self.reader.num_stream_batches()).map(|_| None).collect();
+            self.batches = (0..self.reader.num_stream_batches())
+                .map(|_| None)
+                .collect();
         }
         let b = (pos / crate::stream_batch_size(total)) as usize;
         if self.batches.get(b).is_none() {
@@ -202,9 +221,10 @@ impl SpanSource for TraceFileSession<'_, '_> {
 
         // `kind` per position from the low-card `_kind` facet bitmaps
         // (materialize_field on a low field never touches stream
-        // batches). Absent field / value → 0 (UNSPECIFIED is skipped at
-        // flatten). A corrupt multi-valued row takes the first value —
-        // deterministic, and impossible from the production flattener.
+        // batches). Absent field / value → 0 (files written before
+        // UNSPECIFIED was stored skip it). A corrupt multi-valued row
+        // takes the first value — deterministic, and impossible from the
+        // production flattener.
         let missing: Vec<u32> = positions
             .iter()
             .copied()
@@ -323,8 +343,14 @@ impl SpanSource for TraceFileSession<'_, '_> {
                 .collect(),
             None => Vec::new(),
         };
-        let dropped_events_count = extras.events.as_ref().map_or(0, |ev| ev.row_dropped_count(pos));
-        let dropped_links_count = extras.links.as_ref().map_or(0, |lk| lk.row_dropped_count(pos));
+        let dropped_events_count = extras
+            .events
+            .as_ref()
+            .map_or(0, |ev| ev.row_dropped_count(pos));
+        let dropped_links_count = extras
+            .links
+            .as_ref()
+            .map_or(0, |lk| lk.row_dropped_count(pos));
 
         // `kind`: from the facet map when `span_refs` populated it (the
         // combiner always calls span_refs first); the field parse is the

@@ -27,7 +27,7 @@ Send notifications to Pushbullet using Netdata's Agent alert notification featur
 
 #### 
 
-- A Pushbullet access token that can be created in your [account settings](https://www.pushbullet.com/#settings/account).
+- A Pushbullet access token. See the [Pushbullet API documentation](https://docs.pushbullet.com/).
 - Access to the terminal where Netdata Agent is running
 
 

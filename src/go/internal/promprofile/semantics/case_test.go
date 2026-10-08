@@ -56,6 +56,7 @@ func TestEvaluateCaseEnvironmentDerivesConditionalSupportClosure(t *testing.T) {
 
 	design := strings.Replace(validProfileDesignV1, "supports: {}", `supports:
     runtime:
+      activation: Included when runtime instrumentation is enabled.
       when: {any: [{all: [{axis: mode, op: eq, value: enabled}]}]}`, 1)
 	design = strings.Replace(design, "signal: requests", "signal: runtime/requests", 1)
 	source := strings.Replace(validSourceSemanticsV1, "environment:\n", `  mode_availability:

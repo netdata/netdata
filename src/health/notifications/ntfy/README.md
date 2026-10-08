@@ -29,7 +29,7 @@ You can send alerts to an ntfy server using Netdata's Agent alert notification f
 #### 
 
 - (Optional) A [self-hosted ntfy server](https://docs.ntfy.sh/faq/#can-i-self-host-it), in case you don't want to use https://ntfy.sh
-- A new [topic](https://ntfy.sh/#subscribe) for the notifications to be published to
+- A new [topic](https://docs.ntfy.sh/#step-1-get-the-app) for the notifications to be published to
 - Access to the terminal where Netdata Agent is running
 
 

@@ -223,12 +223,14 @@ jobs:
 
 ## Troubleshooting
 
-### Find the exact error
+### Other Problems
+
+#### Find the exact error
 
 Check the Netdata Agent logs when the collector starts or restarts. Azure resolver errors include messages such as `invalid vault name`, `invalid secret name`, or `Azure Key Vault returned HTTP 403`.
 
 
-### Azure authentication fails
+#### Azure authentication fails
 
 Check the selected `mode` and the credentials it requires.
 
@@ -237,11 +239,11 @@ Check the selected `mode` and the credentials it requires.
 - For `default`, confirm that one of the Azure SDK credential sources is available to the Netdata process.
 
 
-### Secret lookup fails
+#### Secret lookup fails
 
 Check the operand format. It must be `vault-name/secret-name`, and both names must use only letters, numbers, and hyphens.
 
 
-### Access denied
+#### Access denied
 
 Make sure the Azure identity used by Netdata can read secret values from the target vault.

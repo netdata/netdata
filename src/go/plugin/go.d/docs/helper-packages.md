@@ -18,11 +18,12 @@ already owns the behavior.
 | Need | Start with |
 |---|---|
 | V2 metrics, metric stores, host scopes | `src/go/pkg/metrix` |
-| Duration and tri-state config option types | `src/go/pkg/confopt` |
+| Duration, tri-state and enum config option types | `src/go/pkg/confopt` |
 | HTTP request/client config | `src/go/pkg/web` |
 | TLS config outside HTTP | `src/go/pkg/tlscfg` |
-| Bounded configured-file reads | `src/go/pkg/safefile` |
+| Configured credential-file reads | `src/go/pkg/credentialfile` |
 | Prometheus exposition parsing | `src/go/pkg/prometheus` |
+| Metric name/label replacement and filtering | [`src/go/pkg/relabel`](/src/go/pkg/relabel/README.md) |
 | User selector/matcher grammar | `src/go/pkg/matcher` |
 | Collector logging and log limiting | `src/go/logger` |
 | Function request/response helpers | `src/go/pkg/funcapi` |
@@ -30,6 +31,7 @@ already owns the behavior.
 | Agent API / chart emission payloads | `src/go/pkg/netdataapi` |
 | TCP/UDP/Unix line-protocol clients | `src/go/plugin/go.d/pkg/socket` |
 | Command execution | `src/go/plugin/go.d/pkg/ndexec` |
+| Long-running sampling commands | `src/go/plugin/go.d/pkg/streamexec` |
 | Log-file readers/parsers | `src/go/plugin/go.d/pkg/logs` |
 | IP range parsing | `src/go/plugin/go.d/pkg/iprange` |
 | Shared reverse-DNS lookup/cache | `src/go/plugin/go.d/pkg/reversedns` |
@@ -38,6 +40,7 @@ already owns the behavior.
 | Profile-catalog loading (YAML profiles, stock/user dirs) | `src/go/plugin/go.d/pkg/profilecatalog` |
 | Ping probing | `src/go/plugin/go.d/pkg/pinger` |
 | SNMP utilities | `src/go/plugin/go.d/pkg/snmputils` |
+| SNMP device identity and profile metadata | `src/go/plugin/go.d/collector/snmp/ddsnmp` |
 | Kubernetes client helpers | `src/go/plugin/go.d/pkg/k8sclient` |
 | Docker host helpers | `src/go/plugin/go.d/pkg/dockerhost` |
 | Test helpers for collectors | `src/go/plugin/go.d/pkg/collecttest` |
@@ -51,12 +54,14 @@ When:
 
 - users configure durations that should accept strings such as `5s`, `30m`, or numeric seconds;
 - users need explicit `auto` / `enabled` / `disabled` behavior instead of a plain boolean;
+- an option takes one of a fixed set of string values, with a default that an empty or omitted value means;
 - a migration needs to preserve legacy pointer-boolean semantics without keeping pointer plumbing in new code.
 
 Why:
 
 - `confopt.Duration` and `confopt.LongDuration` centralize YAML/JSON duration parsing and formatting;
 - `confopt.AutoBool` makes tri-state behavior explicit and schema-friendly;
+- `confopt.Enum` decodes and encodes an empty value as its default, and `Validate` reports the allowed values;
 - collectors avoid ad hoc parsers and inconsistent boolean defaults.
 
 ## HTTP Collectors
@@ -73,8 +78,10 @@ When:
 Why:
 
 - `web.HTTPConfig` embeds `web.RequestConfig` and `web.ClientConfig` so HTTP collectors expose the same option surface;
-- `web.NewHTTPClient(c.ClientConfig)` applies timeout, TLS, proxy, redirect, and HTTP/2 behavior consistently;
-- `web.NewHTTPRequest(c.RequestConfig)` and `web.NewHTTPRequestWithPath(c.RequestConfig, path)` apply user agent,
+- `web.NewHTTPClient(ctx, c.ClientConfig)` applies timeout, TLS, proxy, redirect, and HTTP/2
+  behavior consistently;
+- `web.NewHTTPRequest(ctx, c.RequestConfig)` and
+  `web.NewHTTPRequestWithPath(ctx, c.RequestConfig, path)` apply user agent,
   authentication, headers, body, and safe path joining.
 
 Pattern:
@@ -90,12 +97,33 @@ x509-style checks. HTTP collectors should get TLS behavior through `web.HTTPConf
 
 ### Configured credential and TLS files
 
-`web` bearer-token files and `tlscfg` CA files use `src/go/pkg/safefile`; certificate and key files use it when both are
-configured. The helper opens the path once, verifies the opened object is a regular file, reads at most 1 MiB, and closes
-it. Symlinks to regular files are supported; non-regular objects and larger files are rejected.
+HTTP helpers handle credential files internally. `web.NewHTTPClient(ctx, cfg)` returns a standard `*http.Client`;
+`web.NewHTTPRequest(ctx, cfg)` and `web.NewHTTPRequestWithPath(ctx, cfg, path)` return standard requests. Callers do not
+pass or own a reader. Ordinary test/custom transports can be passed directly to clients and `web.DoHTTP`.
+Keep `web.DoHTTP(client)` response/parsing helpers per use; their `OnNokCode` callback is mutable.
 
-Use `safefile.Read` for new bounded credential or key-material paths that share this contract. Do not add a separate
-preflight followed by `os.ReadFile`: that checks a different filesystem object and leaves the production read unbounded.
+Each configured file operation uses its own reduced-authority helper on Unix. Requests without a bearer file start no
+helper process. `tlscfg.NewTLSConfig(ctx, cfg)` reads each configured CA/cert/key file independently. SDK/RPC HTTP consumers
+use the same `web.NewHTTPClient` constructor. Cookie collection calls `Stat` and conditionally `Open`/parse; it closes the
+stream before returning. No helper process is retained between operations.
+
+On Unix the operation uses a reduced-authority helper. Windows retains the service account's file authority. Helpers
+fail closed and never fall back to elevated local reads. Pass the current Init, collection or Function context before
+reading a file. Do not retain reader state in a job, HTTP client, configuration or context, or cache bearer contents.
+
+Bearer tokens are read on every request. CA files, and certificate/key files when both are configured, retain the
+`safefile` contract: validate the opened object as regular, accept symlinks to regular files and read at most 1 MiB.
+`ReadAll` and streaming `Open` support existing unbounded input policies; they do not implicitly adopt that limit. Cookie
+files retain per-collection `Stat`, reload on mtime changes and streaming parsing. Errors must not contain file contents
+or parser fragments derived from credential input.
+
+Use `credentialfile.Read`/`ReadAll` for new configurable credential paths. `safefile` is descriptor validation, not a
+privilege boundary. Do not add preflight checks followed by `os.ReadFile`. Unit tests may use private stateless
+read seams and `testutil.New()` from `pkg/credentialfile/testutil` for synthetic fixtures; public APIs use the real
+credential-file boundary.
+
+This boundary covers explicit native credential-file options. SDK default credential chains and database DSN processing
+retain their existing behavior.
 
 ## Prometheus Endpoints
 
@@ -113,7 +141,18 @@ Why:
 - it handles Prometheus text parsing and gzip responses;
 - selectors avoid parsing or processing metric families the collector will not use.
 
+Pass the HTTP client to `prometheus.New(client, request)` or
+`prometheus.NewWithSelector(client, request, selector)`. Use `ScrapeContext(ctx)`, `ScrapeSeries(ctx)` or
+`ScrapeSamples(ctx)` so cancellation reaches the bearer read as well as the HTTP request.
+
 Do not hand-roll text exposition parsing in a collector.
+
+## Metric Relabeling
+
+Use `pkg/relabel` for Prometheus-compatible transformations of metric names and labels. Its `Record` excludes
+values and types, which remain owned by the caller. Reuse a compiled `Processor` or name-matched `Pipeline`
+serially; retain collector-specific validation and typed-family integrity checks at the caller boundary.
+See the [shared relabel contract](/src/go/pkg/relabel/README.md) for ownership, drop behavior, and rule syntax.
 
 ## Selectors And Matchers
 
@@ -210,11 +249,146 @@ Why:
 Use:
 
 - `RunUnprivileged` / `RunUnprivilegedWithOptions...` for unprivileged commands;
+- `UnprivilegedCommandContext` when callers need to own stdio and output limits, such as secret file reads;
 - `RunNDSudo` for commands exposed through `ndsudo`;
 - `RunDirect` only when direct execution is intentionally required;
 - `FindBinary` for PATH/default-path discovery.
 
 Do not call `exec.Command` directly unless the helper cannot support the case and the reason is documented.
+
+`UnprivilegedCommandContext` returns an unstarted `*exec.Cmd` using the same helper discovery and cancellation
+as the Run APIs. The caller MUST configure stdio and call Start/Wait (or Run), and MUST supply a context deadline
+when execution needs a timeout. Construction does not log arguments or output. Secret consumers MUST bound stdout
+and discard stderr: the Run APIs buffer stdout and include stderr snippets in errors, so they are unsuitable for
+secret output without caller-owned handling.
+
+For a command that must own descendant cleanup, one-shot or persistent, use `StartUnprivilegedProcess` with
+`ProcessOptions` file descriptors. Nil stdio uses the null device. The caller owns its pipe ends; the returned
+`Process` exclusively owns cancellation, termination and reaping. Call `Wait` to join it or `Close` to terminate
+and join; both permit repeated/concurrent calls. Completion joins the leader and termination requests, not each
+descendant independently. End of output and `Wait` completion are unordered: the leader's exit usually closes its
+pipe end first, while a descendant still holding it can keep the pipe open after `Wait` returns. A caller reporting why
+a streaming command stopped takes the cause from `Wait`, not from the end of output. Leader exit also requests
+termination of contained descendants. Do not build
+this contract by calling a raw command's `Cancel` after `Wait`: a reaped Unix PID/process-group ID can be reused.
+
+`RunNDSudo` keeps its timeout even though ndsudo runs the command as root, which an unprivileged plugin cannot signal:
+
+- at the timeout it terminates the command where permitted and closes its output, so a command that keeps writing
+  dies of SIGPIPE, unless it handles SIGPIPE or EPIPE itself;
+- it returns the timeout error (`context.DeadlineExceeded`) at most 250 ms later, even if the command still runs;
+  that command is reaped when it ends;
+- from the timeout until that command exits, a new call with the same command and arguments fails at once with
+  `ErrPreviousRunNotExited`, so a command that hangs on every call does not accumulate root processes. Calls already
+  running and other command lines are not affected;
+- where the plugin may signal root processes, descendants that outlive the command end with it, as with
+  `StartNDSudoProcess`.
+
+For a long-running command exposed through `ndsudo`, use `StartNDSudoProcess`. It gives the same ownership, but
+ndsudo runs the command as root, and an unprivileged plugin cannot signal it:
+
+- the kernel-denied termination is not reported as an error;
+- with a pipe as `Stdout` whose read end only the caller holds, the command ends when it exits or dies of SIGPIPE at
+  its next write after the caller closes that read end (ndsudo restores the default SIGPIPE disposition before exec).
+  A command that handles SIGPIPE or EPIPE itself, or stops writing, keeps running as root;
+- root descendants that outlive the command are neither terminated nor reported;
+- until the command ends, `Wait` and `Close` block, so the caller MUST close that read end and bound its own wait;
+- a plugin allowed to signal root processes terminates the command and its descendants as `StartUnprivilegedProcess`
+  does.
+
+Unix tests reproduce the unprivileged case with a same-user fake through `DenyNDSudoSignalsForTests`, which sets
+process-wide state.
+
+The owned API supports Linux, macOS, FreeBSD and Windows 10 or later. Unix exit observation keeps the group leader
+unreaped until group termination is permanently disarmed. Descendants MUST remain in that process group; this is
+lifecycle containment, not a sandbox against a script deliberately creating another session/group. Windows uses a
+Job Object assigned during process creation, with no breakaway permission. Containment/setup failures fail startup
+without an uncontained fallback. File stdio avoids copier goroutines waiting on a descendant's inherited stream.
+The existing `exec.Cmd` constructors retain their existing behavior; they do not provide this ownership guarantee.
+
+For Linux commands that may create detached groups, use `StartUnprivilegedProcessTree` instead. It uses an
+opt-in per-run `nd-run` subreaper which stays alive independently of the command, terminates remaining children
+when the command exits or cancellation is requested, and reaps adopted descendants. Before launch the supervisor
+sets and verifies inherited `no_new_privs`, so setuid/setgid exec and file capabilities cannot regain privileges
+that prevent it from signaling the payload. Failure refuses launch. `Wait` returns a `TreeResult`:
+`Err` includes command, cancellation, setup, supervisor and completion-protocol failures; it is not exclusively the
+payload result. `Drained` records verified descendant cleanup independently of `Err`. A failed
+command can still be drained. Command stdout/stderr never supplies completion evidence; a private descriptor carries
+the helper's terminal frame and the Go owner also joins the helper. The payload cannot inherit control/status descriptors.
+
+A caller MUST retain its resource/admission ownership when `Drained` is false and stop further execution, rather than
+retry or release files as though the tree finished. `ErrTreeNotDrained` identifies missing/invalid completion evidence.
+Unexpected supervisor loss is a fatal containment failure, not a guarantee that survivors have stopped. Fail-stop does
+not prevent a service manager restarting alongside those survivors; this is lifecycle ownership for trusted commands,
+not hostile-script isolation or restart-proof containment.
+
+Context cancellation and `Close` request drainage without killing the supervisor. Concurrent/repeated `Wait` and
+`Close` return the same result. Cleanup has no artificial success timeout: a live uninterruptible descendant can keep
+it unfinished. A host shutdown deadline must handle this as incomplete cleanup/fail-stop. Stdio follows `ProcessOptions`
+and remains caller-owned. Existing `Process` and command constructors retain their previous contracts.
+
+The stronger API is Linux-only and requires supported subreaper/wait behavior, readable procfs child enumeration
+(`CONFIG_PROC_CHILDREN`), readable self-descriptor enumeration, and a procfs PID namespace compatible with the caller. The helper validates those prerequisites
+before starting the payload. Child enumeration discovers signal candidates; only kernel wait exhaustion proves drain.
+A verified setup refusal before payload launch returns `ErrTreeSupervisionUnavailable` with `Drained=true`.
+Unverifiable setup or an incompatible/older helper returns `ErrTreeNotDrained`; no payload completion is assumed.
+Unsupported platforms return `ErrTreeSupervisionUnsupported`, and a missing helper fails at Start. There is no
+signal-only fallback. The target uses the existing minimal environment and privilege reduction policy.
+
+On Unix, `nd-run` uses a minimal environment by default. Passing `Env` to a Run API changes the helper's input
+but does not enable preservation. Use `UnprivilegedCommandContextWithPreservedEnv` when the target requires inherited
+application variables, such as authentication tokens or explicit tool configuration. It invokes
+`nd-run --preserve-env -- command [args...]`; a missing helper or one without this option fails without direct fallback.
+Both constructors leave `Cmd.Env` unset to inherit the caller's environment; callers may set it explicitly before Start.
+
+Both modes replace USER, LOGNAME and HOME with the selected account's values, SHELL with `/bin/sh`, and LC_ALL with `C`.
+The helper selects the configured Netdata user (fallback `nobody`); an unprivileged caller that cannot switch users
+retains its current identity. Capability clearing is performed by the helper when built with capability support.
+Windows callers need an explicit platform path when this Unix privilege-drop behavior does not apply.
+
+The Unix file secret provider uses the default constructor; the command secret provider uses the preserving constructor.
+Both keep their own bounded output and secret-safe error handling. Windows providers retain direct execution.
+
+## Streaming Commands
+
+Use `src/go/plugin/go.d/pkg/streamexec` for a collector that keeps a sampling command running and publishes its latest
+output, such as a vendor tool printing one record per interval.
+
+A `streamexec.Source` owns:
+
+- start through the collector's `StartFunc`, which MUST use an owned `ndexec` constructor (`StartUnprivilegedProcess`
+  or `StartNDSudoProcess`) given the context it receives (canceling that context is how the source terminates a
+  process);
+- line reading with a per-line memory bound (`bufio.MaxScanTokenSize`, terminator included; a longer line is
+  discarded) and a fresh `Decoder` per process, so a replacement never inherits partial record state. A decoder's
+  record MUST NOT share memory with the line or with buffers the decoder reuses; a line that completes no record does
+  not reset the stall timer;
+- publication of each record with its read time; `Latest` returns it only while it is younger than `MaxSampleAge`, so a
+  stale record becomes a gap;
+- replacement of a process that exits or produces no record for `StallTimeout`, after exponential backoff between
+  `RestartDelayMin` and `RestartDelayMax`; the backoff resets after a process produced records for a stall period;
+- termination that waits at most `StallTimeout` for the exit. The source cancels the process and closes its output,
+  so a command it cannot signal (an ndsudo command of an unprivileged plugin) dies of SIGPIPE at its next write,
+  unless it handles SIGPIPE or EPIPE itself. One that has not exited by then is left running with a warning;
+- no overlap: every start, including the first one of a later `Run` or `Background`, waits for the source's previous
+  process to exit;
+- a warning for each failed process or restart attempt, limited to one per minute per command name.
+
+`Run(ctx, started)` returns a failure to start the first process and calls `started` once it runs, so a V2 collector
+delegates its `CollectorV2Runner.Run` to it. Later failures are recovered inside `Run`, which returns nil after
+cancellation once the process has exited, or after the `StallTimeout` wait.
+
+A collector without a managed runner (framework V1) uses `Background(ctx)` instead: it runs the same supervision on its
+own goroutine and returns once the first record arrives, with `ctx` bounding only that wait. It fails without a restart,
+and without waiting for `ctx` to end, when the first process ends (exits or stalls) before producing a record; the error
+is that process's failure.
+Call it from `Check`, whose failures follow `autodetection_retry`, and call the returned `stop` from `Cleanup`.
+
+Tests use `streamexec/streamexectest`: the test binary doubles as the fake command (`RunIfFake` in `TestMain`), and each
+started fake reports its arguments and prints, spawns or exits as the test instructs. A fake's connection closes only when
+its process exits, so tests can check exit ordering. `NewFake` routes both nd-run and ndsudo starts to the fake; combine
+it with `ndexec.DenyNDSudoSignalsForTests` to test an ndsudo command the plugin cannot signal. The harness is Unix-only;
+Windows behavior is unverified.
 
 ## Log File Collectors
 
@@ -342,6 +516,43 @@ Create the resolver at the composition root and inject the same pointer into its
 MUST NOT close, sweep, or replace it during per-job lifecycle. Keep collector-specific address eligibility, candidate
 selection, display precedence, and audit mapping in collector-owned adapters rather than adding those policies to the
 generic package.
+
+## SNMP Device Identity
+
+Use `ddsnmp.AcquireDeviceIdentity` in `src/go/plugin/go.d/collector/snmp/ddsnmp` to obtain a device's GUID,
+hostname, and labels independently of an SNMP metrics job. The result does not publish a vnode or register a device.
+
+The caller composes the existing acquisition steps:
+
+1. Obtain system information with `snmputils.GetSysInfo` using a connected `snmputils.ScalarClient`. An unusable
+   `sysObjectID` value (not a valid numeric OID) does not fail acquisition; it leaves `SysObjectID` empty.
+2. Resolve profiles with `ddsnmp.Catalog.Resolve`. Choose the appropriate profile projection and no-profile policy
+   for the consumer; those decisions do not belong to identity assembly.
+3. Construct `ddsnmpcollector.New` with the selected profiles, system object ID, client, and logger, or reuse the
+   caller's existing engine. Pass it to `AcquireDeviceIdentity` together with the system information and options.
+   A nil metadata source obtains identity from system information alone.
+
+`ddsnmpcollector` is a library engine. Construction creates its metric and metadata helpers, but does not start a
+metrics job or background work. Identity acquisition calls only `CollectDeviceMetadata`, once per invocation. It
+returns acquisition errors unchanged and does not return a partial identity on error. The caller owns connection
+lifetime, timeout/retry settings, attempt diagnostics, and any subsequent refresh or publication. Engine state is
+mutable; the caller must serialize its use.
+
+Identity defaults preserve the SNMP collector's existing behavior:
+
+- GUID is the SHA1 UUID in the DNS namespace derived from the raw configured address, unless overridden. Address
+  normalization, DNS resolution, port, credentials, and descriptive metadata do not participate in that calculation.
+- Hostname uses the configured override, then system name, then `snmp-device`.
+- System labels include the SNMP vnode marker, address, and system information. Policy defaults supplied through
+  `BaseLabels` precede system labels. Profile metadata fills empty labels or replaces them on an exact match,
+  except `sys_object_id`, which keeps the system value used for profile selection; configured `Labels` override all
+  previous values, including with empty values.
+- Input maps and system information remain unchanged; the returned labels belong to the caller.
+
+The SNMP metrics collector keeps its availability timeout calculation and device publication locally. It passes its
+existing engine so acquisition retains missing-OID and diagnostic state. Initial identity acquisition does not seed
+the engine's metric preparation cache: the first metrics collection still reads metadata again. Keep that behavior
+when extracting or changing callers unless a separate change explicitly revises the request/cache contract.
 
 ## Legacy V1 Helpers
 

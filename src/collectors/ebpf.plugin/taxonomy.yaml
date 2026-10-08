@@ -1,5 +1,5 @@
 taxonomy_version: 1
 plugin_name: ebpf.plugin
-module_name: filedescriptor
+module_name: processes
 taxonomy_optout:
-  reason: ebpf.plugin metrics are served through legacy eBPF charts and the network-protocols on-demand function; collector taxonomy is not yet authored for these contexts.
+  reason: ebpf.plugin covers heterogeneous Linux kernel subsystems (process lifecycle, disk and filesystem latency, hard and soft IRQ latency, md flush, swap, OOM kills, shared memory, mount, VFS) across independent eBPF collection modules, and the plugin is being migrated module by module to ebpf-go.plugin. Dashboard taxonomy placement for these contexts has not yet been defined.

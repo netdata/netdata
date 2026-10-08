@@ -144,6 +144,14 @@ func TestSNMPTopologyScenarioSemantics(t *testing.T) {
 	}
 }
 
+func TestSNMPTopologyScenarioCountsAllManagedDevicesAsDiscovered(t *testing.T) {
+	scenario := newLLDPDirectScenario()
+	data := topologyv1test.NormalizeData(t, scenario.render(t))
+
+	assertScenarioStatEquals(t, data, "devices_total", len(scenario.devs))
+	assertScenarioStatEquals(t, data, "devices_discovered", len(scenario.devs))
+}
+
 func TestSNMPTopologyScenarioGoldens(t *testing.T) {
 	dir, ok := topologyScenarioGoldenDir(t)
 	if !ok {
@@ -381,8 +389,8 @@ func newL3P2P30Scenario() *topologyScenario {
 	})
 	routerA := s.Router("p2p30-router-a", "192.0.2.111", "02:00:00:00:0b:01", "192.0.2.211", "65111")
 	routerB := s.Router("p2p30-router-b", "192.0.2.112", "02:00:00:00:0b:02", "192.0.2.212", "65112")
-	routerA.Port("wan0", 1).IPv4("198.51.100.21/30")
-	routerB.Port("wan0", 1).IPv4("198.51.100.22/30")
+	routerA.Port("wan0", 1).ModernIPv4("198.51.100.21/30")
+	routerB.Port("wan0", 1).ModernIPv4("198.51.100.22/30")
 	return s
 }
 

@@ -9,11 +9,23 @@ import "gopkg.in/yaml.v2"
 // explicit empty allowlist during a template round-trip.
 func (d ChartDefaults) MarshalYAML() (any, error) {
 	fields := yaml.MapSlice{}
+	if d.Priority != 0 {
+		fields = append(fields, yaml.MapItem{
+			Key:   "priority",
+			Value: d.Priority,
+		})
+	}
 	if d.LabelPromoted != nil {
-		fields = append(fields, yaml.MapItem{Key: "label_promotion", Value: d.LabelPromoted})
+		fields = append(fields, yaml.MapItem{
+			Key:   "label_promotion",
+			Value: d.LabelPromoted,
+		})
 	}
 	if d.Instances != nil {
-		fields = append(fields, yaml.MapItem{Key: "instances", Value: d.Instances})
+		fields = append(fields, yaml.MapItem{
+			Key:   "instances",
+			Value: d.Instances,
+		})
 	}
 	return fields, nil
 }
@@ -23,7 +35,10 @@ func (d ChartDefaults) MarshalYAML() (any, error) {
 func (c Chart) MarshalYAML() (any, error) {
 	fields := yaml.MapSlice{}
 	appendField := func(key string, value any) {
-		fields = append(fields, yaml.MapItem{Key: key, Value: value})
+		fields = append(fields, yaml.MapItem{
+			Key:   key,
+			Value: value,
+		})
 	}
 	if c.ID != "" {
 		appendField("id", c.ID)

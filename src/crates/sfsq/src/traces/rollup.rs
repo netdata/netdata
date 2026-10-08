@@ -3,9 +3,12 @@
 //! consume from BOTH source kinds:
 //!
 //! - **Sealed files / chunks** carry the `TRSU` rollup chunk
-//!   ([`sfst::TraceRollup`]); [`sealed_trace_aggregates`] resolves its
-//!   interner refs through the validating [`sfst::RollupRootResolver`]
-//!   (a corrupt ref fails the source, never renders a wrong root).
+//!   ([`sfst::TraceRollup`], folded per file by the indexer's span
+//!   walk — `src/crates/ng-index/src/sfst_build.rs`).
+//!   [`sealed_trace_aggregates`] resolves its interner refs through the
+//!   validating [`sfst::RollupRootResolver`] (a corrupt ref fails the
+//!   source, never renders a wrong root); [`sealed_trace_envelopes`] is
+//!   the roots-free view the grid path uses.
 //! - **WAL tails** have no interner; [`tail_trace_aggregates`] folds the
 //!   scan's decoded spans directly, with the SAME pinned semantics the
 //!   seal accumulator applies:
@@ -16,8 +19,11 @@
 //!   - the all-zero UNSET trace id excluded,
 //!   - envelope end saturating.
 //!
-//! Parity contract (test-pinned): folding a tail equals reading the
-//! `TRSU` of sealing the same data.
+//! Parity contract (test-pinned, `tests/traces_rollup_tail.rs`):
+//! folding a tail equals reading the `TRSU` of sealing the same data.
+//! The shared fold (`fold.rs`) picks the sealed view per caller —
+//! envelopes for the overview grid, the root-resolving view for
+//! slowest and the overview's root facets.
 
 use std::collections::HashMap;
 
@@ -36,8 +42,9 @@ pub struct TraceAggregate {
     pub span_count: u64,
     /// Of those, spans with ERROR status.
     pub error_count: u64,
-    /// The TRUE root's fields, when this source stored one;
-    /// `None` is honest absence — never synthesize a root from it.
+    /// The TRUE root's fields, when this source can claim one;
+    /// `None` is no claim — honest absence OR an ambiguous tie
+    /// abstaining. Never synthesize a root from it.
     pub root: Option<TraceRootInfo>,
 }
 
@@ -96,17 +103,17 @@ pub fn tail_trace_aggregates(scan: &TraceWalScan) -> Vec<TraceAggregate> {
         });
         acc.min_start_ns = acc.min_start_ns.min(span.start_ns);
         acc.max_end_ns = acc.max_end_ns.max(end_ns);
-        // Counts clamp at u32::MAX — the sealed rows' width — so the
-        // parity contract holds even at the (astronomical) wrap point.
+        // Counts clamp at u32::MAX — the TRSU count columns' width,
+        // where the seal saturates too — so the parity contract holds
+        // even at the (astronomical) wrap point.
         acc.span_count = (acc.span_count + 1).min(u64::from(u32::MAX));
         if span_field(span, status_field) == Some("ERROR") {
             acc.error_count = (acc.error_count + 1).min(u64::from(u32::MAX));
         }
-        // The seal accumulator's exact rule: earliest unset-parent
-        // span wins; equal starts tie-break by ascending span id; a
-        // FULL-key tie with differing facets ABSTAINS (mirrors the
-        // seal's ambiguity state machine — the tail/seal parity
-        // contract covers the abstention too).
+        // The seal accumulator's exact root rule — sfst's
+        // `TraceRollupRows::record_span`: earliest unset-parent span
+        // wins, equal starts tie-break by ascending span id, and a
+        // FULL-key tie with differing facets ABSTAINS — parity covers it.
         if span.parent_span_id.is_unset() {
             let key = (span.start_ns, span.span_id);
             let candidate = || TraceRootInfo {
@@ -149,8 +156,9 @@ pub fn tail_trace_aggregates(scan: &TraceWalScan) -> Vec<TraceAggregate> {
 /// The envelope-and-counts view of a sealed file's `TRSU` rows — the
 /// grid path. `root` is always `None` here (UNRESOLVED, not honest-absent):
 /// resolving roots needs the root-field dictionaries decoded, and the
-/// overview grid discards roots anyway. Root-consuming callers (slowest,
-/// facets) use [`sealed_trace_aggregates`].
+/// overview grid discards roots anyway. Root-consuming callers
+/// (slowest, the overview's root-facet lists) use
+/// [`sealed_trace_aggregates`].
 ///
 /// Precondition: `rollup` comes from `IndexReader::trace_rollup()` (the
 /// validating accessor) — the struct-of-arrays fields are indexed in
@@ -176,6 +184,11 @@ pub fn sealed_trace_envelopes(rollup: &sfst::TraceRollup) -> Vec<TraceAggregate>
 /// so the caller marks the source failed (never a silently wrong or
 /// absent root — a bare string-table lookup here would render another
 /// field's value as the root on a corrupted in-range ref).
+///
+/// Only [`sfst::ROOT_CLAIM_TRUE`] rows yield a root: [`sfst::ROOT_CLAIM_NONE`]
+/// and [`sfst::ROOT_CLAIM_WITHHELD`] both collapse to `root: None` —
+/// this shape feeds the merge, which only consumes root candidates;
+/// distinguishing withheld from absent stays the gate's job.
 ///
 /// Precondition: `rollup` comes from `IndexReader::trace_rollup()` (the
 /// validating accessor) — the struct-of-arrays fields are indexed in

@@ -9,7 +9,6 @@ autogen:
     - haproxy_process_node
     - haproxy_process_start_time_seconds
 template:
-  family: HAProxy
   context_namespace: haproxy
   groups:
   - family: Process

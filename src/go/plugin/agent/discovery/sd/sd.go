@@ -8,6 +8,7 @@ import (
 	"io"
 	"log/slog"
 	"sync"
+	"time"
 
 	"github.com/netdata/netdata/go/plugins/pkg/netdataapi"
 	"github.com/netdata/netdata/go/plugins/plugin/agent/discovery/sd/pipeline"
@@ -15,7 +16,6 @@ import (
 	"github.com/netdata/netdata/go/plugins/plugin/agent/policy"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/confgroup"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/dyncfg"
-	"github.com/netdata/netdata/go/plugins/plugin/framework/functions"
 
 	"github.com/netdata/netdata/go/plugins/logger"
 	"github.com/netdata/netdata/go/plugins/pkg/multipath"
@@ -29,7 +29,7 @@ type Config struct {
 	RunModePolicy  policy.RunModePolicy
 	DyncfgOutput   dyncfg.Output
 	ConfDir        multipath.MultiPath
-	FnReg          functions.Registry
+	FnReg          dyncfg.PreparedRegistry
 	Discoverers    Registry
 }
 
@@ -61,13 +61,14 @@ func NewServiceDiscovery(cfg Config) (*ServiceDiscovery, error) {
 		dyncfgApi:      dyncfg.NewResponder(output),
 		seen:           dyncfg.NewSeenCache[sdConfig](),
 		exposed:        dyncfg.NewExposedCache[sdConfig](),
-		dyncfgCh:       make(chan dyncfg.Function, 1),
-		dyncfgPending:  make(map[string]pendingDyncfgFunction),
+		actorCommands:  make(chan sdActorCommand),
 	}
 	d.newPipeline = func(config pipeline.Config) (sdPipeline, error) {
 		return pipeline.New(config, d.newDiscoverersFromRegistry)
 	}
-	d.sdCb = &sdCallbacks{sd: d}
+	d.sdCb = &sdCallbacks{
+		sd: d,
+	}
 	d.handler = dyncfg.NewHandler(dyncfg.HandlerOpts[sdConfig]{
 		API:       d.dyncfgApi,
 		Seen:      d.seen,
@@ -104,19 +105,16 @@ type (
 		configDefaults confgroup.Registry
 		pluginName     string
 		runModePolicy  policy.RunModePolicy
-		fnReg          functions.Registry
+		fnReg          dyncfg.PreparedRegistry
 		discoverers    Registry
 		dyncfgApi      *dyncfg.Responder
 		seen           *dyncfg.SeenCache[sdConfig]
 		exposed        *dyncfg.ExposedCache[sdConfig]
 		handler        *dyncfg.Handler[sdConfig]
 		sdCb           *sdCallbacks
-		dyncfgCh       chan dyncfg.Function
-		dyncfgMu       sync.Mutex
-		dyncfgPending  map[string]pendingDyncfgFunction
-		dyncfgClosed   bool
 		newPipeline    func(config pipeline.Config) (sdPipeline, error)
-		pending        *pendingPipelineIndex
+		actorCommands  chan sdActorCommand
+		output         chan<- []*confgroup.Group
 
 		ctx context.Context
 		mgr *PipelineManager
@@ -137,18 +135,10 @@ func (d *ServiceDiscovery) Run(ctx context.Context, in chan<- []*confgroup.Group
 
 	// Store context for dyncfg commands
 	d.ctx = ctx
-	d.pending = newPendingPipelineIndex(ctx)
+	d.output = in
 
-	// Create pipeline manager with send function that forwards to output channel
-	// NOTE: Must be created BEFORE registering dyncfg templates, as dyncfg commands use mgr
-	send := func(ctx context.Context, groups []*confgroup.Group) {
-		select {
-		case <-ctx.Done():
-		case in <- groups:
-		}
-	}
-
-	d.mgr = NewPipelineManager(d.Logger, send)
+	d.mgr = NewPipelineManager(d.Logger)
+	d.mgr.bind(d)
 
 	// Register dyncfg templates for discoverer types
 	// NOTE: Must be AFTER mgr creation, as dyncfg commands use mgr
@@ -160,54 +150,62 @@ func (d *ServiceDiscovery) Run(ctx context.Context, in chan<- []*confgroup.Group
 
 	wg.Go(func() { d.run(ctx) })
 
-	wg.Go(func() { d.mgr.RunGracePeriodCleanup(ctx) })
-
 	wg.Wait()
-	d.pending.wait()
 
 	// Cleanup all pipelines on shutdown
 	d.mgr.StopAll()
 }
 
 func (d *ServiceDiscovery) run(ctx context.Context) {
-	defer d.failPendingDyncfg()
-	var pendingRetries <-chan pendingPipelineToken
-	if d.pending != nil {
-		pendingRetries = d.pending.retry
+	if d.actorCommands == nil {
+		d.actorCommands = make(chan sdActorCommand)
 	}
+	d.mgr.bind(d)
+	grace := time.NewTicker(5 * time.Second)
+	defer grace.Stop()
 	for {
-		if d.handler.WaitingForDecision() {
-			fn, ok := d.handler.NextWaitDecision(ctx, d.dyncfgCh)
-			if !ok {
+		var configs <-chan confFile
+		if !d.handler.WaitingForDecision() {
+			configs = d.confProv.configs()
+		}
+		groups, sent := d.mgr.nextOutput()
+		var output chan<- []*confgroup.Group
+		if len(groups) > 0 {
+			output = d.output
+		}
+		select {
+		case <-ctx.Done():
+			d.mgr.StopAll()
+			return
+		case request := <-d.actorCommands:
+			if !d.applyActorCommand(ctx, request) {
 				return
 			}
-			d.dyncfgSeqExec(fn)
-			d.completeDyncfg(fn)
-			continue
-		} else {
-			select {
-			case <-ctx.Done():
-				return
-			case cfg := <-d.confProv.configs():
-				if cfg.source == "" {
-					continue
-				}
-				if len(cfg.content) == 0 {
-					d.removePipeline(cfg)
-				} else {
-					d.addPipeline(ctx, cfg)
-				}
-			case fn := <-d.dyncfgCh:
-				d.dyncfgSeqExec(fn)
-				d.completeDyncfg(fn)
-			case token := <-pendingRetries:
-				d.retryPendingPipeline(token)
+		case cfg := <-configs:
+			if cfg.source == "" {
+				continue
 			}
+			if len(cfg.content) == 0 {
+				d.removePipeline(cfg)
+			} else {
+				d.addPipeline(ctx, cfg)
+			}
+		case event := <-d.mgr.events:
+			cfg, status := d.mgr.handle(event)
+			if cfg != nil && d.handler.SetStatus(cfg, status) {
+				d.handler.NotifyConfigStatus(cfg, status)
+			}
+		case output <- groups:
+			sent()
+		case <-grace.C:
+			d.mgr.processGracePeriodRemovals(ctx)
 		}
 	}
 }
 
 func (d *ServiceDiscovery) removePipeline(conf confFile) {
+	// Origin ownership survives a failed rename even when its old cache entry is gone.
+	d.mgr.Stop(pipelineKeyFromSource(conf.source))
 	// Collect configs from this source (can't call Remove inside ForEach)
 	var seenCfgs []sdConfig
 	d.seen.ForEach(func(_ string, cfg sdConfig) bool {
@@ -224,7 +222,6 @@ func (d *ServiceDiscovery) removePipeline(conf confFile) {
 	d.Infof("removing %d config(s) from source '%s'", len(seenCfgs), conf.source)
 
 	for _, scfg := range seenCfgs {
-		d.cancelPendingPipeline(scfg)
 		// Remove from seen/exposed caches if this config is currently tracked.
 		_, ok := d.handler.RemoveDiscoveredConfig(scfg)
 		if !ok {
@@ -233,9 +230,7 @@ func (d *ServiceDiscovery) removePipeline(conf confFile) {
 		}
 
 		// This was the exposed config - stop pipeline and remove from dyncfg
-		if d.mgr.IsRunning(scfg.PipelineKey()) {
-			d.mgr.Stop(scfg.PipelineKey())
-		}
+		d.mgr.Stop(scfg.PipelineKey())
 
 		d.handler.NotifyConfigRemove(scfg)
 	}
@@ -268,7 +263,11 @@ func (d *ServiceDiscovery) addPipeline(ctx context.Context, conf confFile) {
 	}
 	if !d.hasDiscovererType(scfg.DiscovererType()) {
 		if scfg.SourceType() != confgroup.TypeStock {
-			d.Warningf("config '%s' uses unsupported discoverer type '%s', skipping", conf.source, scfg.DiscovererType())
+			d.Warningf(
+				"config '%s' uses unsupported discoverer type '%s', skipping",
+				conf.source,
+				scfg.DiscovererType(),
+			)
 		}
 		return
 	}
@@ -328,9 +327,7 @@ func (d *ServiceDiscovery) addConfig(ctx context.Context, scfg sdConfig) {
 	// New config wins - stop existing if running
 	d.Infof("config '%s': replacing existing (priority: existing=%d new=%d)", scfg.ExposedKey(), ep, sp)
 
-	if entry.Status == dyncfg.StatusRunning {
-		d.mgr.Stop(entry.Cfg.PipelineKey())
-	}
+	d.mgr.Stop(entry.Cfg.PipelineKey())
 
 	// Replace in exposed cache
 	d.handler.AddDiscoveredConfig(scfg, dyncfg.StatusAccepted)
@@ -349,7 +346,7 @@ func (d *ServiceDiscovery) addConfig(ctx context.Context, scfg sdConfig) {
 // removeOldConfigsFromSource removes configs from the same source that have a different key.
 // This handles the case where a file's config name changes.
 // Note: We don't stop the pipeline here - the new config will stop it when it starts via
-// PipelineManager.StartPrepared (which stops any existing pipeline with the same key).
+// successful activation (which retires the same origin's incumbent).
 // This ensures that if the new config fails to start, the old pipeline keeps running.
 func (d *ServiceDiscovery) removeOldConfigsFromSource(source, newKey string) {
 	// Collect configs from this source (can't call Remove inside ForEach)
@@ -365,7 +362,6 @@ func (d *ServiceDiscovery) removeOldConfigsFromSource(source, newKey string) {
 		if oldCfg.ExposedKey() == newKey {
 			continue // Same config, skip
 		}
-		d.cancelPendingPipeline(oldCfg)
 
 		// Different config from same source - remove from caches
 		// If it was exposed, remove from exposed cache and dyncfg.

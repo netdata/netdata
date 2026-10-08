@@ -909,7 +909,7 @@ This guide demonstrates how to use Netdata's StatsD to visualize metrics from [k
 <br/> 
 
 - A node with [Netdata](https://github.com/netdata/netdata/blob/master/packaging/installer/README.md) installed
-- [k6](https://k6.io/docs/getting-started/installation) installed
+- [k6](https://grafana.com/docs/k6/latest/set-up/install-k6/) installed
 
 </details>
 

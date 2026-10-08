@@ -56,9 +56,9 @@ func TestFuncDepsAdapterSnapshotUsesCachedReverseDNSWithoutLiveLookup(t *testing
 	registry.reverseDNS = dns.resolver
 	registry.reverseDNSWarmer = dns.topologyReverseDNSWarmer
 
-	cache := newTopologyCache()
+	cache := newTopologyBuilder()
 	seedPublishedEndpointSnapshot(cache)
-	registry.register(cache)
+	publishTestTopologyBuilder(registry, cache)
 
 	data, ok, err := (funcDepsAdapter{registry: registry}).Snapshot(topologyoptions.QueryOptions{})
 	require.NoError(t, err)
@@ -86,9 +86,9 @@ func TestFuncDepsAdapterSnapshotEnqueuesReverseDNSWarmCandidates(t *testing.T) {
 	registry.reverseDNSWarmer = dns.topologyReverseDNSWarmer
 	registry.setReverseDNSWarmContext(context.Background())
 
-	cache := newTopologyCache()
+	cache := newTopologyBuilder()
 	seedPublishedEndpointSnapshot(cache)
-	registry.register(cache)
+	publishTestTopologyBuilder(registry, cache)
 
 	_, ok, err := (funcDepsAdapter{registry: registry}).Snapshot(topologyoptions.QueryOptions{})
 	require.NoError(t, err)

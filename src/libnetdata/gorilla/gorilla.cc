@@ -59,8 +59,6 @@ static void bit_buffer_write(uint32_t *buf, size_t pos, uint32_t v, size_t nbits
     const size_t index = pos / bit_size<uint32_t>();
     const size_t offset = pos % bit_size<uint32_t>();
 
-    pos += nbits;
-
     if (offset == 0) {
         gorilla_data_word_store(&buf[index], v);
     } else {
@@ -86,8 +84,6 @@ static void bit_buffer_read(const uint32_t *buf, size_t pos, uint32_t *v, size_t
 
     const size_t index = pos / bit_size<uint32_t>();
     const size_t offset = pos % bit_size<uint32_t>();
-
-    pos += nbits;
 
     if (offset == 0) {
         uint32_t word = gorilla_data_word_load(&buf[index]);

@@ -81,7 +81,7 @@ type fatalDeviceSource struct {
 	t *testing.T
 }
 
-func (s fatalDeviceSource) Devices() []ddsnmp.DeviceConnectionInfo {
+func (s fatalDeviceSource) Entries() []ddsnmp.DeviceEntry {
 	s.t.Helper()
 	s.t.Fatal("Collect must not poll SNMP devices")
 	return nil

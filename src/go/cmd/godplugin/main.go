@@ -11,12 +11,7 @@ import (
 
 	"github.com/netdata/netdata/go/plugins/cmd/internal/agenthost"
 	"github.com/netdata/netdata/go/plugins/cmd/internal/discoveryproviders"
-	"github.com/netdata/netdata/go/plugins/plugin/agent"
-	"github.com/netdata/netdata/go/plugins/plugin/agent/discovery"
-	"github.com/netdata/netdata/go/plugins/plugin/agent/policy"
-	"go.uber.org/automaxprocs/maxprocs"
-	"golang.org/x/net/http/httpproxy"
-
+	"github.com/netdata/netdata/go/plugins/cmd/internal/secretproviders"
 	"github.com/netdata/netdata/go/plugins/logger"
 	"github.com/netdata/netdata/go/plugins/pkg/buildinfo"
 	"github.com/netdata/netdata/go/plugins/pkg/cli"
@@ -24,9 +19,16 @@ import (
 	"github.com/netdata/netdata/go/plugins/pkg/hostinfo"
 	"github.com/netdata/netdata/go/plugins/pkg/pluginconfig"
 	"github.com/netdata/netdata/go/plugins/pkg/terminal"
+	"github.com/netdata/netdata/go/plugins/plugin/agent"
+	"github.com/netdata/netdata/go/plugins/plugin/agent/discovery"
+	"github.com/netdata/netdata/go/plugins/plugin/agent/jobmgr/composition"
+	"github.com/netdata/netdata/go/plugins/plugin/agent/policy"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/collectorapi"
-	_ "github.com/netdata/netdata/go/plugins/plugin/go.d/collector"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/discovery/sdext"
+	govnode "github.com/netdata/netdata/go/plugins/plugin/go.d/vnode"
+	"go.uber.org/automaxprocs/maxprocs"
+	"golang.org/x/net/http/httpproxy"
 )
 
 func init() {
@@ -59,11 +61,23 @@ func main() {
 	}
 	isTerminal := terminal.IsTerminal()
 	isInsideK8s := hostinfo.IsInsideK8sCluster()
-	moduleRegistry := moduleRegistryWithSystemdPolicy(collectorapi.DefaultRegistry, hostinfo.SystemdVersion)
+	baseRegistry, publisher := collector.NewRegistry(pluginconfig.VarLibDir())
+	moduleRegistry := moduleRegistryWithSystemdPolicy(baseRegistry, hostinfo.SystemdVersion)
+	var services []composition.ProcessService
+	if !isTerminal {
+		services = append(services, publisher)
+	}
 
 	runModePolicy := policy.Agent(isTerminal)
 
+	secrets, err := secretproviders.Default()
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "initializing secrets: %v\n", err)
+		os.Exit(1)
+	}
 	a := agent.New(agent.Config{
+		Secrets:                   secrets,
+		SNMPVnodeAcquirer:         govnode.SNMP{},
 		Name:                      executable.Name,
 		PluginConfigDir:           pluginconfig.ConfigDir(),
 		CollectorsConfigDir:       pluginconfig.CollectorsDir(),
@@ -71,6 +85,7 @@ func main() {
 		CollectorsConfigWatchPath: pluginconfig.CollectorsConfigWatchPaths(),
 		VarLibDir:                 pluginconfig.VarLibDir(),
 		ModuleRegistry:            moduleRegistry,
+		Services:                  services,
 		IsInsideK8s:               isInsideK8s,
 		RunModePolicy:             runModePolicy,
 		DiscoveryProviders: []discovery.ProviderFactory{
@@ -94,9 +109,13 @@ func main() {
 	a.Infof("directories → config: %s | collectors: %s | sd: %s | varlib: %s",
 		a.ConfigDir, a.CollectorsConfDir, a.ServiceDiscoveryConfigDir, a.VarLibDir)
 
-	if err := agenthost.Run(a); err != nil {
-		a.Errorf("plugin exiting after Agent failure: %v", err)
+	result := agenthost.Run(a)
+	if result.Err != nil {
+		a.Errorf("plugin exiting after Agent failure: %v", result.Err)
 		os.Exit(1)
+	}
+	if result.ExitRequired {
+		os.Exit(0)
 	}
 }
 

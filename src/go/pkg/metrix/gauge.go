@@ -112,7 +112,7 @@ func (c *storeCore) recordGaugeSet(desc *instrumentDescriptor, scope HostScope, 
 			labelsKey:    labelsKey,
 			desc:         desc,
 		}
-		c.active.gauges[key] = entry
+		stageEntry(&c.active.gauges, key, entry)
 	}
 	entry.value = value
 }
@@ -161,7 +161,7 @@ func (c *storeCore) recordGaugeAdd(desc *instrumentDescriptor, scope HostScope, 
 			desc:         desc,
 			value:        baseline,
 		}
-		c.active.gauges[key] = entry
+		stageEntry(&c.active.gauges, key, entry)
 	}
 	entry.value += delta
 }

@@ -164,6 +164,7 @@ func loadProfileWithExtendsMap(filename string, extendsPaths multipath.MultiPath
 		prof.SourceFile, _ = filepath.Abs(filename)
 	}
 	originID := profileOriginID(filename, extendsPaths)
+	prof.sourceOrigin = profileSource(filename, extendsPaths)
 	setLicensingOriginProfileID(&prof, originID)
 	setBGPOriginProfileID(&prof, originID)
 
@@ -175,12 +176,18 @@ func loadProfileWithExtendsMap(filename string, extendsPaths multipath.MultiPath
 		return &prof, nil
 	}
 
+	prof.Definition.Normalize()
+
 	prof.extensionHierarchy = make([]*extensionInfo, 0, len(prof.Definition.Extends))
 	mergedBases := make([]*Profile, 0, len(prof.Definition.Extends))
 
 	for _, name := range prof.Definition.Extends {
 		if slices.Contains(stack, name) {
-			return nil, fmt.Errorf("circular extends detected: '%s' already included (in file: %s)", name, prof.SourceFile)
+			return nil, fmt.Errorf(
+				"circular extends detected: '%s' already included (in file: %s)",
+				name,
+				prof.SourceFile,
+			)
 		}
 
 		extPath, err := extendsPaths.Find(name)
@@ -195,6 +202,7 @@ func loadProfileWithExtendsMap(filename string, extendsPaths multipath.MultiPath
 
 		extInfo := &extensionInfo{
 			name:       name,
+			origin:     mergedBase.sourceOrigin,
 			sourceFile: mergedBase.SourceFile,
 			extensions: mergedBase.extensionHierarchy,
 		}
@@ -204,8 +212,8 @@ func loadProfileWithExtendsMap(filename string, extendsPaths multipath.MultiPath
 
 	// Merge in reverse so later extends override earlier ones while the
 	// current profile still keeps the highest precedence.
-	for i := len(mergedBases) - 1; i >= 0; i-- {
-		if err := prof.merge(mergedBases[i]); err != nil {
+	for _, mergedBase := range slices.Backward(mergedBases) {
+		if err := prof.merge(mergedBase); err != nil {
 			return nil, err
 		}
 	}
@@ -261,7 +269,6 @@ func prepareLoadedProfile(profile *Profile) error {
 	if err := CompileTransforms(profile); err != nil {
 		return err
 	}
-	profile.removeConstantMetrics()
 	enrichProfile(profile)
 	handleCrossTableTagsWithoutMetrics(profile)
 	return nil

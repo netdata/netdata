@@ -30,7 +30,7 @@ This collector is only supported on the following platforms:
 
 - Linux
 
-This collector supports collecting metrics from multiple instances of this integration, including remote instances.
+This collector supports collecting metrics from multiple instances of this integration.
 
 The plugin needs setuid because it loads data inside kernel. Netada sets necessary permission during installation time.
 
@@ -166,14 +166,16 @@ Metrics:
 
 ## Troubleshooting
 
-### update every
+### Other Problems
+
+#### update every
 
 Data collection frequency.
 
-### ebpf load mode
+#### ebpf load mode
 
 Define whether plugin will monitor the call (`entry`) for the functions or it will also monitor the return (`return`).
 
-### lifetime
+#### lifetime
 
 Set default lifetime for thread when enabled by cloud.

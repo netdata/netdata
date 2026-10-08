@@ -119,7 +119,7 @@ func TestNagiosCollectorJobV2(t *testing.T) {
 
 			startDone := make(chan struct{})
 			go func() {
-				state.job.StartManaged(make(chan struct{}))
+				state.job.StartManaged(jobruntime.NewManagedRun(context.Background(), nil))
 				close(startDone)
 			}()
 

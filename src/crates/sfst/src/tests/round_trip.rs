@@ -1,8 +1,31 @@
-//! Format round-trip tests: write a file via the buffer-all
-//! [`FixtureWriter`] / [`pack`] (looser than the public
-//! [`ChunkWriter`], so partial files — no SUMR, no META — can pin
-//! reader behavior), read it back via [`ChunkReader`], assert the chunks
-//! decode to the values we put in.
+//! Writer↔reader round-trip tests: files built chunk-by-chunk with the
+//! buffer-all [`FixtureWriter`] + `writer::pack` (deliberately looser
+//! than the public [`ChunkWriter`], so partial files — no SUMR, no META —
+//! and multi-field/multi-batch layouts are expressible), read back
+//! through [`ChunkReader`] (once via [`IndexReader`]) and asserted to
+//! decode exactly what was written. The container-integrity section
+//! instead byte-patches a valid minimal file.
+//!
+//! Pins:
+//!
+//! - every chunk kind round-trips: SUMR, META (histogram, id ranges,
+//!   schema tree), PRIM, TIMS, mid/high field chunks, stream batches;
+//! - chunk addressing is per-tier (`mid_field(i)` / `high_field(i)` map
+//!   to the `MF0{i}` / `HF0{i}` chunks); out-of-range indices surface
+//!   as `Error::ChunkNotFound(i)`, an absent named chunk (no SUMR) as
+//!   `Error::Toc`;
+//! - stream-batch layout: N logs split by the `num_stream_batches` /
+//!   `stream_batch_size` rule into equal batches that each decode back
+//!   to their slice, high-card batch masks surviving bit-for-bit;
+//! - `cold_region` is `[end of PRIM's span, EOF)`: mid/high field chunks
+//!   and stream batches inside, the hot prefix strictly before;
+//! - `open` validates header + TOC only: a patched version rejects at
+//!   open; a flipped CRC trailer or payload byte fails lazily on first
+//!   access as `Error::CorruptIndex`, untouched chunks still decoding.
+//!
+//! Not pinned here: the header/TOC parser itself (`reader/tests.rs`,
+//! chunk-file's container tests), and the layers above the format
+//! (`query.rs`, `trace_plan.rs`, `materialize.rs`).
 
 use super::fixture::FixtureWriter;
 use crate::PrefixMap;
@@ -58,6 +81,9 @@ fn sample_metadata() -> Metadata {
 
 #[test]
 fn round_trip_primary_only() {
+    // A partial file — no SUMR, no META — opens and decodes: both
+    // `has_*` flags are false, and the written PRIM keys come back
+    // while an unwritten key misses.
     let primary = build_primary(&["alpha", "beta", "gamma"]);
 
     let mut writer = FixtureWriter::new();
@@ -85,6 +111,8 @@ fn round_trip_primary_only() {
 
 #[test]
 fn round_trip_summary() {
+    // The optional summary chunk round-trips exactly as written, with
+    // `has_summary` flipping on and metadata still absent.
     let summary = sample_summary();
     let primary = build_primary(&["a"]);
 
@@ -105,6 +133,8 @@ fn round_trip_summary() {
 
 #[test]
 fn round_trip_metadata() {
+    // Same contract for the optional META chunk: histogram, id ranges,
+    // and the default tree decode back identical.
     let metadata = sample_metadata();
     let primary = build_primary(&["a", "b"]);
 
@@ -193,7 +223,7 @@ fn round_trip_fields_and_secondary_chunks() {
 
     assert_eq!(reader.fields().unwrap().len(), 4);
 
-    // Mid-card chunks.
+    // Mid-card chunks, addressed by per-tier index (0 = first added).
     let m0 = reader.mid_field(0).unwrap();
     assert!(m0.get(b"host=h1").is_some());
     let m1 = reader.mid_field(1).unwrap();
@@ -203,7 +233,7 @@ fn round_trip_fields_and_secondary_chunks() {
     let h0 = reader.high_field(0).unwrap();
     assert_eq!(h0, high_trace);
 
-    // Timestamps chunk.
+    // Timestamps chunk round-trips to the exact nanosecond values.
     assert_eq!(reader.timestamps().unwrap(), timestamps);
 
     // Stream-batch chunk: the only batch (index 0) carries everything.
@@ -224,7 +254,6 @@ fn round_trip_fields_and_secondary_chunks() {
         let off = raw.as_ptr() as usize - buf.as_ptr() as usize;
         off..off + raw.len()
     };
-    // The cold suffix covers the mid/high field chunks and the stream batch.
     for raw in [
         reader.mid_field_raw(0).unwrap(),
         reader.mid_field_raw(1).unwrap(),
@@ -237,7 +266,7 @@ fn round_trip_fields_and_secondary_chunks() {
             "chunk {s:?} not inside cold region {cold:?}"
         );
     }
-    // The hot prefix (PRIM, TIMS) precedes the cold suffix.
+    // The hot prefix (PRIM and TIMS here) ends before the cold suffix starts.
     for raw in [
         reader.primary_raw().unwrap(),
         reader.timestamps_raw().unwrap(),
@@ -253,8 +282,9 @@ fn round_trip_fields_and_secondary_chunks() {
 #[test]
 fn cold_region_is_the_stream_batch_tail_without_mid_or_high() {
     // No mid/high field chunks: the cold suffix is just the stream
-    // batch(es) right after PRIM. Regression: computing it must not
-    // underflow.
+    // batch(es) right after PRIM — the region still runs from PRIM's
+    // span end to EOF. Regression: the suffix math must not underflow
+    // when the cold suffix holds nothing but batches.
     let mut writer = FixtureWriter::new();
     writer.set_metadata(pack(&sample_metadata(), 1).unwrap());
     writer.set_primary(pack(&build_primary(&["level=info"]), 1).unwrap());
@@ -276,6 +306,8 @@ fn cold_region_is_the_stream_batch_tail_without_mid_or_high() {
 
 #[test]
 fn mid_field_out_of_range_errors() {
+    // One mid field in the file: index 0 decodes; index 1 is past the
+    // end and surfaces as `Error::ChunkNotFound(1)`.
     let primary = build_primary(&["k"]);
     let mid = build_primary(&["host=h"]);
 
@@ -295,6 +327,8 @@ fn mid_field_out_of_range_errors() {
 
 #[test]
 fn full_file_round_trip() {
+    // Every chunk kind set at once — SUMR, META, PRIM, TIMS, one stream
+    // batch — round-trips as a unit.
     let summary = sample_summary();
     let mut metadata = sample_metadata();
     metadata.tree = SchemaTree::flat(
@@ -428,7 +462,8 @@ fn round_trip_multi_batch_stream() {
 
 // ── Container integrity ──────────────────────────────────────────
 
-/// Minimal valid file: primary + timestamps + one stream batch.
+/// Minimal valid file — primary + timestamps + one stream batch — and
+/// the byte-patch base for the corruption tests below.
 fn minimal_file() -> Vec<u8> {
     let mut writer = FixtureWriter::new();
     writer.set_primary(pack(&build_primary(&["alpha"]), 1).unwrap());
@@ -441,9 +476,10 @@ fn minimal_file() -> Vec<u8> {
 
 #[test]
 fn other_version_file_is_rejected_on_open() {
-    // Exactly one version is readable. Any other value — zero, the next
-    // version up, or far future — must reject at the version check, not
-    // surface a later bincode decode error against a mismatched layout.
+    // Exactly one version is readable (header bytes 4..8, little-endian).
+    // Any other value — zero, the next version up, or far future — must
+    // reject at the version check, not surface a later bincode decode
+    // error against a mismatched layout.
     for v in [0u32, 2, 999] {
         let mut buf = minimal_file();
         buf[4..8].copy_from_slice(&v.to_le_bytes());

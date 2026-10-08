@@ -2,6 +2,9 @@
 
 Publishing documentation to [Learn](https://github.com/netdata/learn) involves a few key steps. Follow this guide carefully to avoid broken links or failed builds.
 
+Place in the documentation set: the runtime skill `.agents/skills/docs-learn-site-structure` cites sections of this
+file by heading anchor, so renaming or removing a heading here fails `.agents/sow/audit.sh` until that skill is updated.
+
 :warning: **Before You Begin**
 
 - If you plan to unpublish a file, see [Unpublishing Files](#unpublishing-files) first. It requires extra steps.
@@ -35,9 +38,11 @@ Each node is either:
 |-----------------|-------------------------------------------------------------------------------|--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
 | **label**       | The label shown in the sidebar.                                               | For category overview pages, this should match the sidebar position. Categories are defined by having `items`.                                                                             |
 | **path**        | Single path segment override (optional).                                      | Used when the document's Learn path segment differs from the tree structure. Example: `OpenTelemetry` (not a full path). If omitted, the path is derived from the tree hierarchy.          |
-| **edit_url**    | Full GitHub **Edit** link for the file. Used for the "Edit this page" button. | Must use the full link (supports repos beyond `netdata/netdata`). Can be omitted only for nodes with `integration_placeholder` children (the integrations themselves will have edit URLs). |
+| **edit_url**    | Full GitHub **Edit** link for the file. Used for the "Edit this page" button. | Must use the full link (supports repos beyond `netdata/netdata`). Can be omitted only for a category node (one with `items`), which then has no page of its own; a node with `integration_placeholder` children omits it because the integrations themselves have edit URLs. |
 | **keywords**    | List of keywords for search.                                                  | Example: `["install", "linux"]`                                                                                                                                                            |
 | **description** | Page description used by Learn metadata, search, and social previews.          | Write an accurate plain-text summary. Generated integration descriptions are not authored in this map; their metadata sources and validation contract are documented in [Integration description authoring](../../.agents/skills/integrations-lifecycle/description-authoring.md).          |
+
+For hand-authored pages without an explicit `description`, Docusaurus uses the introductory text. Keep that introduction specific to the page: putting the same cross-link paragraph first on multiple pages can create duplicate search descriptions and fail Learn's post-build gate. Place shared cross-links after each page's own introduction.
 
 #### Path Reconstruction
 
@@ -72,11 +77,18 @@ Before merging, **always test the map file**.
 
 1. Clone [Learn](https://github.com/netdata/learn) locally.
 2. Prepare environment and dependencies (see [ingest instructions](https://github.com/netdata/learn#ingest-and-process-documentation-files)).
-3. Run the ingest command:
+3. Run ingest against the local checkout that contains your documentation and `map.yaml` changes. Replace
+   `/path/to/netdata` with the absolute path to that checkout:
 
    ```bash
-   python3 ingest/ingest.py --repos OWNEROFREPO/netdata:YOURBRANCH
+   python3 ingest/ingest.py \
+     --local-repo netdata:/path/to/netdata \
+     --ignore-on-prem-repo \
+     --fail-links-netdata
    ```
+
+   Local-source mode also derives the kickstart checksum from the selected checkout. A full ingest that selects a remote
+   `OWNER/REPO:BRANCH` instead must pass that branch's 32-character checksum with `--kickstart-checksum`.
 
 4. Inspect the ingested changes.
 5. (Optional, advanced) [Deploy Learn](https://github.com/netdata/learn#local-deploy-of-learn) locally to confirm it builds correctly.
@@ -104,7 +116,8 @@ Once your docs PR is merged:
 
 If you **delete**, **move**, or **unpublish** a file, redirects may break.
 
-1. Open [LegacyLearnCorrelateLinksWithGHURLs.json](https://github.com/netdata/learn/blob/master/LegacyLearnCorrelateLinksWithGHURLs.json).
-2. Search (`Ctrl+F`) for the old GitHub link.
-3. Update the entry to a relevant new location.
-4. If no suitable replacement exists → remove the entry.
+1. Update the file's node in `map.yaml`: set `edit_url` to the file's new path, or remove the node if the page is retired. The docs PR check runs `validate_map_schema.py`, which fails while a `netdata/netdata` `edit_url` names a file that does not exist.
+2. Open [LegacyLearnCorrelateLinksWithGHURLs.json](https://github.com/netdata/learn/blob/master/LegacyLearnCorrelateLinksWithGHURLs.json).
+3. Search (`Ctrl+F`) for the old GitHub link.
+4. Update the entry to a relevant new location.
+5. If no suitable replacement exists → remove the entry.

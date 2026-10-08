@@ -22,7 +22,7 @@ Module: nvme
 
 ## Overview
 
-This collector monitors the health of NVMe devices. It relies on the [`nvme`](https://github.com/linux-nvme/nvme-cli#nvme-cli) CLI tool but avoids directly executing the binary. Instead, it utilizes `ndsudo`, a Netdata helper specifically designed to run privileged commands securely within the Netdata environment. This approach eliminates the need to use `sudo`, improving security and potentially simplifying permission management.
+This collector monitors the health of NVMe devices. It relies on the [`nvme`](https://github.com/linux-nvme/nvme-cli#nvme-cli-and-libnvme) CLI tool but avoids directly executing the binary. Instead, it utilizes `ndsudo`, a Netdata helper specifically designed to run privileged commands securely within the Netdata environment. This approach eliminates the need to use `sudo`, improving security and potentially simplifying permission management.
 
 
 
@@ -32,7 +32,7 @@ This collector is only supported on the following platforms:
 - Linux
 - BSD
 
-This collector supports collecting metrics from multiple instances of this integration, including remote instances.
+This collector supports collecting metrics from multiple instances of this integration.
 
 
 ### Default Behavior
@@ -70,7 +70,7 @@ UI configuration requires paid Netdata Cloud plan.
 
 #### Install nvme-cli
 
-See [Distro Support](https://github.com/linux-nvme/nvme-cli#distro-support). Install `nvme-cli` using your distribution's package manager.
+See [Quick start](https://github.com/linux-nvme/nvme-cli#quick-start). Install `nvme-cli` using your distribution's package manager.
 
 
 #### For Netdata running in a Docker container: grant NVMe device access
@@ -129,7 +129,7 @@ Configure the **nvme** collector from the Netdata web interface:
 4. In the Search box, type _nvme_ (or scroll the list) to locate the **nvme** collector.
 5. Click the **+** next to the **nvme** collector to add a new job.
 6. Fill in the job fields, then click **Test** to verify the configuration and **Submit** to save.
-    - **Test** runs the job with the provided settings and shows whether data can be collected.
+    - **Test** validates the provided settings and checks the collector's startup prerequisites. Successful validation does not guarantee that every metric will be available during collection.
     - If it fails, an error message appears with details (for example, connection refused, timeout, or command execution errors), so you can adjust and retest.
 
 
@@ -228,7 +228,9 @@ Metrics:
 
 ## Troubleshooting
 
-### Debug Mode
+### Diagnostics
+
+#### Debug Mode
 
 **Important**: Debug mode is not supported for data collection jobs created via the UI using the Dyncfg feature.
 
@@ -260,14 +262,14 @@ should give you clues as to why the collector isn't working.
   ./go.d.plugin -d -m nvme -j jobName
   ```
 
-### Getting Logs
+#### Getting Logs
 
 If you're encountering problems with the `nvme` collector, follow these steps to retrieve logs and identify potential issues:
 
 - **Run the command** specific to your system (systemd, non-systemd, or Docker container).
 - **Examine the output** for any warnings or error messages that might indicate issues.  These messages should provide clues about the root cause of the problem.
 
-#### System with systemd
+##### System with systemd
 
 Use the following command to view logs generated since the last Netdata service restart:
 
@@ -275,7 +277,7 @@ Use the following command to view logs generated since the last Netdata service 
 journalctl _SYSTEMD_INVOCATION_ID="$(systemctl show --value --property=InvocationID netdata)" --namespace=netdata --grep nvme
 ```
 
-#### System without systemd
+##### System without systemd
 
 Locate the collector log file, typically at `/var/log/netdata/collector.log`, and use `grep` to filter for collector's name:
 
@@ -285,7 +287,7 @@ grep nvme /var/log/netdata/collector.log
 
 **Note**: This method shows logs from all restarts. Focus on the **latest entries** for troubleshooting current issues.
 
-#### Docker Container
+##### Docker Container
 
 If your Netdata runs in a Docker container named "netdata" (replace if different), use this command:
 

@@ -57,6 +57,23 @@ future_inputs:
   service_identity:
     name: ceph_service_unique_id_future_service
     type: gauge
+  rgw_topic_identity:
+    name: ceph_rgw_topic_futuretopic_persistent_topic_len
+    type: gauge
+    labels:
+      topic: futuretopic
+  rgw_topic_size_identity:
+    name: ceph_rgw_topic_futuretopic_persistent_topic_size
+    type: gauge
+    labels:
+      topic: futuretopic
+  rgw_sync_delta_identity:
+    name: ceph_rgw_sync_delta_future_local_future_source_99_sync_delta
+    type: gauge
+    labels:
+      local_zone_id: future_local
+      source_zone_id: future_source
+      shard_id: "99"
 cases:
   reef_ceph_exporter_limit11:
     environment:
@@ -78,10 +95,36 @@ cases:
         perf_priority_limit: 11
         mgr_perf_counters: enabled
         mgr_rbd_stats: enabled
-    fixture: fixtures/ceph_reef_mgr_limit11.prom
     coverage: true
-    expected:
-      verdict: PASS
+    steps:
+      - fixture: fixtures/ceph_reef_mgr_limit11.prom
+        expected:
+          verdict: PASS
+        observations:
+          control_plane.monitor.cluster_summary#total:
+            state: current
+            predicates: {membership: establish, aggregate: matches_reducer, identity: establish}
+          control_plane.monitor.cluster_summary#in_quorum:
+            state: current
+            predicates: {membership: establish, aggregate: matches_reducer, identity: establish}
+          health.cluster_status.state#value:
+            state: current
+            predicates: {membership: establish, aggregate: matches_reducer, identity: establish}
+          health.daemon_health.item_count#value:
+            state: current
+            predicates: {membership: establish, aggregate: matches_reducer, identity: establish}
+          health.health_checks.state#value:
+            state: current
+            predicates: {membership: establish, aggregate: matches_reducer, identity: establish}
+          health.slow_operations.current_operations#value:
+            state: current
+            predicates: {membership: establish, aggregate: matches_reducer, identity: establish}
+          osd_capacity_and_state.osd_state.cluster_summary#total:
+            state: current
+            predicates: {membership: establish, aggregate: matches_reducer, identity: establish}
+          osd_capacity_and_state.osd_state.cluster_summary#up:
+            state: current
+            predicates: {membership: establish, aggregate: matches_reducer, identity: establish}
   squid_ceph_exporter_limit11:
     environment:
       ceph:
@@ -102,10 +145,36 @@ cases:
         perf_priority_limit: 11
         mgr_perf_counters: enabled
         mgr_rbd_stats: enabled
-    fixture: fixtures/ceph_squid_mgr_limit11.prom
     coverage: true
-    expected:
-      verdict: PASS
+    steps:
+      - fixture: fixtures/ceph_squid_mgr_limit11.prom
+        expected:
+          verdict: PASS
+        observations:
+          control_plane.monitor.cluster_summary#total:
+            state: current
+            predicates: {membership: establish, aggregate: matches_reducer, identity: establish}
+          control_plane.monitor.cluster_summary#in_quorum:
+            state: current
+            predicates: {membership: establish, aggregate: matches_reducer, identity: establish}
+          health.cluster_status.state#value:
+            state: current
+            predicates: {membership: establish, aggregate: matches_reducer, identity: establish}
+          health.daemon_health.item_count#value:
+            state: current
+            predicates: {membership: establish, aggregate: matches_reducer, identity: establish}
+          health.health_checks.state#value:
+            state: current
+            predicates: {membership: establish, aggregate: matches_reducer, identity: establish}
+          health.slow_operations.current_operations#value:
+            state: current
+            predicates: {membership: establish, aggregate: matches_reducer, identity: establish}
+          osd_capacity_and_state.osd_state.cluster_summary#total:
+            state: current
+            predicates: {membership: establish, aggregate: matches_reducer, identity: establish}
+          osd_capacity_and_state.osd_state.cluster_summary#up:
+            state: current
+            predicates: {membership: establish, aggregate: matches_reducer, identity: establish}
   tentacle_ceph_exporter_limit11:
     environment:
       ceph:
@@ -126,10 +195,51 @@ cases:
         perf_priority_limit: 11
         mgr_perf_counters: enabled
         mgr_rbd_stats: enabled
-    fixture: fixtures/ceph_tentacle_mgr_limit11.prom
     coverage: true
-    expected:
-      verdict: PASS
+    steps:
+      - fixture: fixtures/ceph_tentacle_mgr_limit11.prom
+        expected:
+          verdict: PASS
+        observations:
+          node_hardware.health.state#value:
+            state: current
+            predicates: {membership: establish, aggregate: matches_reducer, identity: establish}
+          placement_groups_and_recovery.healthy_state.pg_state#active:
+            state: current
+            predicates: {membership: establish, aggregate: matches_reducer, identity: establish}
+          placement_groups_and_recovery.healthy_state.pg_state#clean:
+            state: current
+            predicates: {membership: establish, aggregate: matches_reducer, identity: establish}
+          placement_groups_and_recovery.healthy_state.pg_state#pg_total:
+            state: current
+            predicates: {membership: establish, aggregate: matches_reducer, identity: establish}
+          node_hardware.temperature.temperature#value:
+            state: current
+            predicates: {membership: establish, aggregate: matches_reducer, identity: establish}
+          control_plane.monitor.cluster_summary#total:
+            state: current
+            predicates: {membership: establish, aggregate: matches_reducer, identity: establish}
+          control_plane.monitor.cluster_summary#in_quorum:
+            state: current
+            predicates: {membership: establish, aggregate: matches_reducer, identity: establish}
+          health.cluster_status.state#value:
+            state: current
+            predicates: {membership: establish, aggregate: matches_reducer, identity: establish}
+          health.daemon_health.item_count#value:
+            state: current
+            predicates: {membership: establish, aggregate: matches_reducer, identity: establish}
+          health.health_checks.state#value:
+            state: current
+            predicates: {membership: establish, aggregate: matches_reducer, identity: establish}
+          health.slow_operations.current_operations#value:
+            state: current
+            predicates: {membership: establish, aggregate: matches_reducer, identity: establish}
+          osd_capacity_and_state.osd_state.cluster_summary#total:
+            state: current
+            predicates: {membership: establish, aggregate: matches_reducer, identity: establish}
+          osd_capacity_and_state.osd_state.cluster_summary#up:
+            state: current
+            predicates: {membership: establish, aggregate: matches_reducer, identity: establish}
   nvmeof:
     environment:
       ceph:
@@ -138,10 +248,15 @@ cases:
         perf_priority_limit: 0
         mgr_perf_counters: disabled
         mgr_rbd_stats: disabled
-    fixture: fixtures/ceph_nvmeof.prom
     coverage: true
-    expected:
-      verdict: PASS
+    steps:
+      - fixture: fixtures/ceph_nvmeof.prom
+        expected:
+          verdict: PASS
+        observations:
+          nvme_of.gateways.time_accumulation#value:
+            state: current
+            predicates: {membership: establish, aggregate: matches_reducer, identity: establish}
   reef_ceph_exporter_limit0:
     environment:
       ceph:
@@ -164,6 +279,54 @@ cases:
         mgr_rbd_stats: disabled
     fixture: fixtures/ceph_reef_ceph_exporter_limit1.prom
     coverage: true
+    expected:
+      verdict: PASS
+  squid_mgr_simple_throttle_gauge_reset:
+    environment:
+      ceph:
+        source: mgr
+        release: squid
+        perf_priority_limit: 11
+        mgr_perf_counters: enabled
+        mgr_rbd_stats: enabled
+    coverage: false
+    steps:
+      - fixture: fixtures/ceph_squid_mgr_limit11.prom
+        expected:
+          verdict: PASS
+        observations:
+          object_gateway_scheduling.simple_throttler_rejections#throttled:
+            state: current
+            predicates: {membership: establish, aggregate: matches_reducer, identity: establish}
+      - fixture: fixtures/ceph_squid_mgr_simple_throttle_reset.prom
+        expected:
+          verdict: PASS
+        observations:
+          object_gateway_scheduling.simple_throttler_rejections#throttled:
+            state: current
+            predicates: {membership: unchanged, aggregate: decreased, identity: unchanged}
+  squid_ceph_exporter_connection_no_instance:
+    environment:
+      ceph:
+        source: ceph_exporter
+        release: squid
+        perf_priority_limit: 11
+        mgr_perf_counters: enabled
+        mgr_rbd_stats: enabled
+    coverage: true
+    fixture: fixtures/ceph_squid_ceph_exporter_connection_no_instance.prom
+    expected:
+      verdict: PASS
+  tentacle_ceph_exporter_connection_no_instance:
+    environment:
+      ceph:
+        source: ceph_exporter
+        release: tentacle
+        perf_priority_limit: 11
+        mgr_perf_counters: enabled
+        mgr_rbd_stats: enabled
+    coverage: false
+    fixture: fixtures/ceph_tentacle_ceph_exporter_connection_no_instance.prom
     expected:
       verdict: PASS
   reef_mgr_features_disabled:

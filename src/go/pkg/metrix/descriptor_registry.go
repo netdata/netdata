@@ -168,7 +168,7 @@ func (c *storeCore) registerInstrument(name string, kind metricKind, mode metric
 			return dedupDescriptor(pending, candidate), nil
 		}
 	}
-	c.active.pendingInstruments[name] = append(c.active.pendingInstruments[name], candidate)
+	stageEntry(&c.active.pendingInstruments, name, append(c.active.pendingInstruments[name], candidate))
 	return candidate, nil
 }
 

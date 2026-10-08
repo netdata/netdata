@@ -3,7 +3,10 @@
 #ifndef NETDATA_SQLITE_ACLK_H
 #define NETDATA_SQLITE_ACLK_H
 
-#define ACLK_MAX_ALERT_UPDATES  "50"
+// numeric first: the drain loops buffer one batch of consumed rows on the stack, and the SQL needs the
+// same value as a string literal
+#define ACLK_MAX_ALERT_UPDATES_N  50
+#define ACLK_MAX_ALERT_UPDATES    TOSTRING(ACLK_MAX_ALERT_UPDATES_N)
 #define ACLK_SYNC_QUERY_SIZE 512
 
 static inline int uuid_parse_fix(char *in, nd_uuid_t uuid)
@@ -97,8 +100,10 @@ typedef struct aclk_sync_cfg_t {
     // its content. A 0 token means nothing is outstanding, which is what callocz() leaves and what a
     // drop restores, so the first manifest of a config always sends.
     //
-    // The key folds the ACLK session into the content hash because publishing is never acked - a new
-    // session re-sends once, which is also what a cloud that lost the manifest needs.
+    // The key folds the ACLK session into the content hash because publishing is never acked, so a
+    // new session can no longer be suppressed by what the previous one recorded - which is what a
+    // cloud that lost the manifest needs. It only removes the suppression, though; something still
+    // has to arm the rebuild. See aclk_arm_node_manifest_all_hosts().
     uint64_t node_manifest_sent_key;   // manifest_publication_key() of the newest manifest enqueued
     uint64_t node_manifest_sent_token; // its per-enqueue token; 0 when nothing is outstanding
 } aclk_sync_cfg_t;

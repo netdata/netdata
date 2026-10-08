@@ -94,7 +94,7 @@ func TestTopologyCache_RealSnmprecForwardingFixtures(t *testing.T) {
 	}
 }
 
-func replaySnmprecForwardingFixture(t *testing.T, fixture string, data snmprecForwardingFixture) *topologyCache {
+func replaySnmprecForwardingFixture(t *testing.T, fixture string, data snmprecForwardingFixture) *topologyBuilder {
 	t.Helper()
 
 	cache := newTestTopologyCache(ddsnmp.DeviceConnectionInfo{
@@ -136,7 +136,7 @@ func replaySnmprecForwardingFixture(t *testing.T, fixture string, data snmprecFo
 	for _, tags := range data.arpEntries {
 		cache.updateTopologyCacheEntry(ddsnmp.Metric{TopologyKind: ddsnmp.KindArpEntry, Tags: tags})
 	}
-	cache.finalizeTopologyCache()
+	cache.finalize()
 
 	return cache
 }
@@ -255,6 +255,7 @@ func parseSnmprecForwardingFixture(t *testing.T, path string) snmprecForwardingF
 
 		if suffix, ok := parseOIDSuffix(oid, "1.3.6.1.2.1.4.20.1.1"); ok {
 			entry := ensureTagMap(data.ipIfEntries, suffix)
+			entry[tagTopoIPSource] = topoIPSourceLegacy
 			entry[tagTopoIPAddr] = val
 			continue
 		}

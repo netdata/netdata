@@ -41,6 +41,10 @@ enum ebpf_pids_index {
     NETDATA_EBPF_PIDS_DCSTAT_IDX,
     NETDATA_EBPF_PIDS_SWAP_IDX,
     NETDATA_EBPF_PIDS_VFS_IDX,
+    // Retained slot: the fd module moved to ebpf-go.plugin, but this enum indexes
+    // the legacy ebpf.plugin shared-memory `threads` bitmask, so renumbering it
+    // would change what every surviving module's bit means.  Same treatment as
+    // NETDATA_EBPF_PIDS_DCSTAT_IDX.
     NETDATA_EBPF_PIDS_FD_IDX,
     NETDATA_EBPF_PIDS_SHM_IDX,
 
@@ -112,34 +116,6 @@ typedef struct netdata_socket {
         uint64_t udp_bytes_received;
     } udp;
 } netdata_socket_t;
-
-typedef struct netdata_publish_dcstat_pid {
-    uint64_t cache_access;
-    uint64_t file_system;
-    uint64_t not_found;
-} netdata_publish_dcstat_pid_t;
-
-typedef struct netdata_publish_dcstat {
-    uint64_t ct;
-
-    long long ratio;
-    long long cache_access;
-
-    netdata_publish_dcstat_pid_t curr;
-    netdata_publish_dcstat_pid_t prev;
-} netdata_publish_dcstat_t;
-
-typedef struct netdata_dcstat_pid {
-    uint64_t ct;
-    uint32_t tgid;
-    uint32_t uid;
-    uint32_t gid;
-    char name[TASK_COMM_LEN];
-
-    uint64_t cache_access;
-    uint64_t file_system;
-    uint64_t not_found;
-} netdata_dcstat_pid_t;
 
 typedef struct __attribute__((packed)) netdata_publish_swap {
     uint64_t ct;
@@ -223,32 +199,6 @@ typedef struct netdata_ebpf_vfs {
     uint32_t create_err;
 } netdata_ebpf_vfs_t;
 
-typedef struct netdata_publish_fd_stat {
-    uint64_t ct;
-
-    uint32_t open_call;  // Open syscalls (open and openat)
-    uint32_t close_call; // Close syscall (close)
-
-    // Errors
-    uint32_t open_err;
-    uint32_t close_err;
-} netdata_publish_fd_stat_t;
-
-typedef struct netdata_fd_stat {
-    uint64_t ct;
-    uint32_t tgid;
-    uint32_t uid;
-    uint32_t gid;
-    char name[TASK_COMM_LEN];
-
-    uint32_t open_call;  // Open syscalls (open and openat)
-    uint32_t close_call; // Close syscall (close)
-
-    // Errors
-    uint32_t open_err;
-    uint32_t close_err;
-} netdata_fd_stat_t;
-
 typedef struct netdata_publish_shm {
     uint64_t ct;
 
@@ -276,10 +226,8 @@ typedef struct netdata_ebpf_pid_stats {
     uint32_t pid;
 
     ebpf_publish_process_t process;
-    netdata_publish_dcstat_t directory_cache;
     netdata_publish_swap_t swap;
     netdata_publish_vfs_t vfs;
-    netdata_publish_fd_stat_t fd;
     netdata_publish_shm_t shm;
 } netdata_ebpf_pid_stats_t;
 

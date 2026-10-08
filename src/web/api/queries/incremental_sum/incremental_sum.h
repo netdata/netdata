@@ -59,9 +59,9 @@ static inline NETDATA_DOUBLE tg_incremental_sum_flush(RRDR *r, RRDR_VALUE_FLAGS 
     }
     else {
         value = g->last - g->first;
+        g->first = g->last;
     }
 
-    g->first = g->last;
     g->last = NAN;
     g->count = 0;
 

@@ -54,6 +54,7 @@ static struct {
     NETDATA_DOUBLE (*flush)(struct rrdresult *r, RRDR_VALUE_FLAGS *rrdr_value_options_ptr);
 
     TIER_QUERY_FETCH tier_query_fetch;
+    QUERY_POINT_MODE point_mode;
 } api_v1_data_groups[] = {
     {.name = "average",
      .hash  = 0,
@@ -497,7 +498,8 @@ static struct {
      .free  = tg_sum_free,
      .add   = tg_sum_add,
      .flush = tg_sum_flush,
-     .tier_query_fetch = TIER_QUERY_FETCH_SUM
+     .tier_query_fetch = TIER_QUERY_FETCH_SUM,
+     .point_mode = QUERY_POINT_MODE_TOTAL
     },
 
     // standard deviation
@@ -722,6 +724,7 @@ void rrdr_set_grouping_function(RRDR *r, RRDR_TIME_GROUPING group_method) {
             r->time_grouping.add     = api_v1_data_groups[i].add;
             r->time_grouping.flush   = api_v1_data_groups[i].flush;
             r->time_grouping.tier_query_fetch = api_v1_data_groups[i].tier_query_fetch;
+            r->time_grouping.point_mode = api_v1_data_groups[i].point_mode;
             r->time_grouping.add_flush = api_v1_data_groups[i].add_flush;
             found = 1;
         }
@@ -735,6 +738,7 @@ void rrdr_set_grouping_function(RRDR *r, RRDR_TIME_GROUPING group_method) {
         r->time_grouping.add     = tg_average_add;
         r->time_grouping.flush   = tg_average_flush;
         r->time_grouping.tier_query_fetch = TIER_QUERY_FETCH_AVERAGE;
+        r->time_grouping.point_mode = QUERY_POINT_MODE_LINEAR;
         r->time_grouping.add_flush = RRDR_GROUPING_AVERAGE;
     }
 }

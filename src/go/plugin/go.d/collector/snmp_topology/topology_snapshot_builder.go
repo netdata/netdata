@@ -30,20 +30,22 @@ func buildLocalTopologyDevice(dev ddsnmp.DeviceConnectionInfo) topologymodel.Dev
 	if len(dev.VnodeLabels) > 0 {
 		device.Labels = cloneTopologyLabels(dev.VnodeLabels)
 	}
+	device.Vendor, device.Model = ddsnmp.ResolveDeviceIdentity(device.Vendor, device.Model, nil, device.Labels)
+	metadata := newTopologyMetadataIndex(device.Labels)
 
-	if value := topologyMetadataValue(device.Labels, topologyMetadataAliasSysDescr); value != "" && device.SysDescr == "" {
+	if value := metadata.value(topologyMetadataAliasSysDescr); value != "" && device.SysDescr == "" {
 		device.SysDescr = value
 	}
-	if value := topologyMetadataValue(device.Labels, topologyMetadataAliasSysContact); value != "" && device.SysContact == "" {
+	if value := metadata.value(topologyMetadataAliasSysContact); value != "" && device.SysContact == "" {
 		device.SysContact = value
 	}
-	if value := topologyMetadataValue(device.Labels, topologyMetadataAliasSysLocation); value != "" && device.SysLocation == "" {
+	if value := metadata.value(topologyMetadataAliasSysLocation); value != "" && device.SysLocation == "" {
 		device.SysLocation = value
 	}
-	if value := topologyMetadataValue(device.Labels, topologyMetadataAliasVendor); value != "" && device.Vendor == "" {
+	if value := metadata.value(topologyMetadataAliasVendor); value != "" && device.Vendor == "" {
 		device.Vendor = value
 	}
-	if value := topologyMetadataValue(device.Labels, topologyMetadataAliasModel); value != "" && device.Model == "" {
+	if value := metadata.value(topologyMetadataAliasModel); value != "" && device.Model == "" {
 		device.Model = value
 	}
 	if value := topologyutil.NormalizeTopologyRouterID(device.Labels[tagOSPFRouterID]); value != "" {
@@ -51,24 +53,24 @@ func buildLocalTopologyDevice(dev ddsnmp.DeviceConnectionInfo) topologymodel.Dev
 		setTopologyMetadataLabelIfMissing(device.Labels, tagOSPFRouterID, value)
 	}
 
-	if value := topologyMetadataValue(device.Labels, topologyMetadataAliasSysUptime); value != "" {
+	if value := metadata.value(topologyMetadataAliasSysUptime); value != "" {
 		if uptime := topologyutil.ParsePositiveInt64(value); uptime > 0 {
 			device.SysUptime = uptime
 		}
 	}
-	if value := topologyMetadataValue(device.Labels, topologyMetadataAliasSerial); value != "" {
+	if value := metadata.value(topologyMetadataAliasSerial); value != "" {
 		device.SerialNumber = value
 		setTopologyMetadataLabelIfMissing(device.Labels, "serial_number", value)
 	}
-	if value := topologyMetadataValue(device.Labels, topologyMetadataAliasSoftware); value != "" {
+	if value := metadata.value(topologyMetadataAliasSoftware); value != "" {
 		device.SoftwareVersion = value
 		setTopologyMetadataLabelIfMissing(device.Labels, "software_version", value)
 	}
-	if value := topologyMetadataValue(device.Labels, topologyMetadataAliasFirmware); value != "" {
+	if value := metadata.value(topologyMetadataAliasFirmware); value != "" {
 		device.FirmwareVersion = value
 		setTopologyMetadataLabelIfMissing(device.Labels, "firmware_version", value)
 	}
-	if value := topologyMetadataValue(device.Labels, topologyMetadataAliasHardware); value != "" {
+	if value := metadata.value(topologyMetadataAliasHardware); value != "" {
 		device.HardwareVersion = value
 		setTopologyMetadataLabelIfMissing(device.Labels, "hardware_version", value)
 	}

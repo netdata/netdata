@@ -21,7 +21,8 @@ char *url_encode(const char *str);
 
 char *url_decode_r(char *to, const char *url, size_t size);
 
-bool url_is_request_complete_and_extract_payload(const char *begin, const char *end, size_t length, BUFFER **post_payload);
+bool url_is_request_complete_and_extract_payload(
+    const char *begin, const char *end, size_t length, BUFFER **post_payload, size_t *expected_size);
 char *url_find_protocol(char *s, const char *end);
 
 #endif /* NETDATA_URL_H */

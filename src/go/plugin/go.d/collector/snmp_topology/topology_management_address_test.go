@@ -3,9 +3,13 @@
 package snmptopology
 
 import (
+	"fmt"
 	"net/netip"
+	"runtime"
 	"testing"
+	"time"
 
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp/ddsnmp"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_topology/internal/topologymodel"
 	"github.com/stretchr/testify/require"
 )
@@ -124,16 +128,6 @@ func TestNormalizeManagementAddressHonorsProtocolFamilies(t *testing.T) {
 	}
 }
 
-func TestReconstructLldpRemMgmtAddrHex_FromOctets(t *testing.T) {
-	require.Equal(t, "0a14043c", reconstructLldpRemMgmtAddrHex(map[string]string{
-		tagLldpRemMgmtAddrLen:             "4",
-		tagLldpRemMgmtAddrOctetPref + "1": "10",
-		tagLldpRemMgmtAddrOctetPref + "2": "20",
-		tagLldpRemMgmtAddrOctetPref + "3": "4",
-		tagLldpRemMgmtAddrOctetPref + "4": "60",
-	}))
-}
-
 func TestAppendManagementAddressFiltersUnusableIPsAndKeepsNonIPFamilies(t *testing.T) {
 	var addrs []topologymodel.ManagementAddress
 	for _, address := range []string{
@@ -160,6 +154,117 @@ func TestAppendManagementAddressFiltersUnusableIPsAndKeepsNonIPFamilies(t *testi
 		{Address: "192.0.2.10", AddressType: "ipv4", Source: "test"},
 		{Address: "opaque-management-address", Source: "test"},
 	}, addrs)
+}
+
+func TestTopologyCacheManagementAddressIngestionRejectsAmbiguousIPMIBCandidate(t *testing.T) {
+	cache := newTopologyBuilder()
+	cache.updateTime = time.Now()
+	cache.ingestTopologyProfileMetrics([]*ddsnmp.ProfileMetrics{{TopologyMetrics: []ddsnmp.Metric{
+		{TopologyKind: ddsnmp.KindIpIfIndex, Tags: map[string]string{
+			tagTopoIPSource: topoIPSourceLegacy,
+			tagTopoIfIndex:  "7",
+			tagTopoIPAddr:   "192.0.2.10",
+			tagTopoIPMask:   "255.255.255.0",
+		}},
+		{TopologyKind: ddsnmp.KindIpIfIndex, Tags: map[string]string{
+			tagTopoIPSource: topoIPSourceLegacy,
+			tagTopoIfIndex:  "8",
+			tagTopoIPAddr:   "::ffff:192.0.2.10",
+			tagTopoIPMask:   "255.255.255.0",
+		}},
+		{TopologyKind: ddsnmp.KindLldpLocManAddr, Tags: map[string]string{
+			tagLldpLocMgmtAddr:          "c000020a",
+			tagLldpLocMgmtAddrSubtype:   "1",
+			tagLldpLocMgmtAddrIfSubtype: "2",
+			tagLldpLocMgmtAddrIfID:      "7",
+			tagLldpLocMgmtAddrOID:       "1.3.6.1.2.1.2.2.1.1.7",
+		}},
+		{TopologyKind: ddsnmp.KindLldpLocManAddr, Tags: map[string]string{
+			tagLldpLocMgmtAddr:          "c000020a",
+			tagLldpLocMgmtAddrSubtype:   "1",
+			tagLldpLocMgmtAddrIfSubtype: "3",
+			tagLldpLocMgmtAddrIfID:      "99",
+			tagLldpLocMgmtAddrOID:       "1.3.6.1.2.1.2.2.1.1.99",
+		}},
+		{TopologyKind: ddsnmp.KindIpIfIndex, Tags: map[string]string{
+			tagTopoIPSource: topoIPSourceLegacy,
+			tagTopoIfIndex:  "9",
+			tagTopoIPAddr:   "198.51.100.20",
+			tagTopoIPMask:   "255.255.255.0",
+		}},
+	}}})
+	cache.finalize()
+
+	require.Equal(t, []topologymodel.ManagementAddress{
+		{
+			Address:     "192.0.2.10",
+			AddressType: "ipv4",
+			Source:      "lldp_local",
+			IfSubtype:   "2",
+			IfID:        "7",
+			OID:         "1.3.6.1.2.1.2.2.1.1.7",
+		},
+		{Address: "198.51.100.20", AddressType: "ipv4", Source: "ip_mib"},
+	}, cache.localDevice.ManagementAddresses)
+
+	require.Nil(t, cache.localManagementAddressKeys)
+}
+
+func BenchmarkTopologyCacheIPManagementAddressLifecycle(b *testing.B) {
+	for _, rows := range []int{256, 1024, 4096, 65536} {
+		b.Run(fmt.Sprintf("rows=%d", rows), func(b *testing.B) {
+			metrics := make([]ddsnmp.Metric, rows)
+			for i := range metrics {
+				metrics[i] = ddsnmp.Metric{
+					TopologyKind: ddsnmp.KindIpIfIndex,
+					Tags: map[string]string{
+						tagTopoIPSource: topoIPSourceLegacy,
+						tagTopoIfIndex:  fmt.Sprintf("%d", i+1),
+						tagTopoIPAddr:   fmt.Sprintf("10.%d.%d.%d", (i>>16)&255, (i>>8)&255, i&255),
+						tagTopoIPMask:   "255.255.255.255",
+					},
+				}
+			}
+			pms := []*ddsnmp.ProfileMetrics{{TopologyMetrics: metrics}}
+			b.ReportAllocs()
+			b.ResetTimer()
+			for range b.N {
+				cache := newTopologyBuilder()
+				cache.ingestTopologyProfileMetrics(pms)
+				cache.finalize()
+				runtime.KeepAlive(cache)
+			}
+		})
+	}
+}
+
+func BenchmarkTopologyCacheModernIPAddressLifecycle(b *testing.B) {
+	for _, rows := range []int{256, 1024, 4096, 65536} {
+		b.Run(fmt.Sprintf("rows=%d", rows), func(b *testing.B) {
+			metrics := make([]ddsnmp.Metric, rows)
+			for i := range metrics {
+				ip := fmt.Sprintf("10.%d.%d.%d", (i>>16)&255, (i>>8)&255, i&255)
+				ifIndex := fmt.Sprintf("%d", i+1)
+				metrics[i] = ddsnmp.Metric{
+					TopologyKind: ddsnmp.KindIpIfIndex,
+					Tags: modernIPv4Tags(
+						ip,
+						ifIndex,
+						fmt.Sprintf("%s.%s.1.4.%s.32", ipAddressPrefixOriginOID, ifIndex, ip),
+					),
+				}
+			}
+			pms := []*ddsnmp.ProfileMetrics{{TopologyMetrics: metrics}}
+			b.ReportAllocs()
+			b.ResetTimer()
+			for range b.N {
+				cache := newTopologyBuilder()
+				cache.ingestTopologyProfileMetrics(pms)
+				cache.finalize()
+				runtime.KeepAlive(cache)
+			}
+		})
+	}
 }
 
 func TestPickManagementIPUsesSourceScopeAndNumericPrecedence(t *testing.T) {

@@ -645,7 +645,7 @@ independent per-selection query policies in one rule.
 
 ## Credentials, Targets, And Account Identity
 
-`internal/awsauth` is collector-local. A named credential source is either the
+`plugin/go.d/pkg/awsauth` is shared by go.d collectors that use AWS identities. A named credential source is either the
 AWS SDK default chain (environment, shared config, EC2 instance profile, EKS
 IRSA) or explicit static/session credentials. A target uses one source directly
 or layers one `AssumeRole` provider over it, so static credentials can bootstrap
@@ -833,7 +833,7 @@ not separately document pagination billing semantics.
   labels, float hint): `query_emit.go`.
 - **Change chart generation** (namespace or template assembly): `chart.go`, plus
   the profile `template`.
-- **Change auth**: `internal/awsauth` (collector-local; extract to a shared package only when a second AWS consumer appears).
+- **Change auth**: `plugin/go.d/pkg/awsauth` (shared by AWS-consuming go.d collectors).
 - **Add or change a config option**: `config.go` + `config_schema.json` +
   `metadata.yaml` + stock `cloudwatch.conf` + regenerated `integrations/` docs
   (collector consistency). Prefer internal constants over new options unless the

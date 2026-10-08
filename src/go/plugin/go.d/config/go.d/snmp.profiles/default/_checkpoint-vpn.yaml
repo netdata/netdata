@@ -262,9 +262,9 @@ metrics:
         family: 'Network/VPN/IPSec/IKE/SA/Attempts'
         unit: "{attempt}/s"
   - MIB: CHECKPOINT-MIB
-    metric_type: gauge
     symbol:
       OID: 1.3.6.1.4.1.2620.1.2.9.1.10.0
+      metric_type: gauge
       name: cpvIKEMaxConncurSAs
       chart_meta:
         description: Peak concurrent IKE Security Associations

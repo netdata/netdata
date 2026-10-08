@@ -1,8 +1,40 @@
+//! Unit tests for the logs step-2 page pieces that are testable at the
+//! value level (the parent `page` module): the `PageShard` merge/fold
+//! (reduce), `finalize_page` (root), and the `beyond_boundary`
+//! early-termination check. Fixtures are plain `Cursor` values — one
+//! `file_seq`/`part` throughout, so timestamp order alone decides cursor
+//! order; no WAL/SFST bytes are read.
+//!
+//! Pins:
+//!
+//! - `PageShard::merge` pools candidates, re-orders them
+//!   closest-to-anchor first, truncates to the nearest `bound`, and ORs
+//!   `has_opposite`; `finalize_page` takes the nearest `limit` as the
+//!   page (newest-first in both directions) and derives the has-more
+//!   flags: one candidate beyond the page -> more rows in `direction`,
+//!   `has_opposite` -> more on the other side.
+//! - `merge_into` matches `merge`: folding shards one at a time
+//!   (pairwise and across three) equals the all-at-once merge, in both
+//!   directions, bounded or not — what lets `paginate` fold sources
+//!   sequentially instead of pooling them.
+//! - `beyond_boundary` skips a candidate file only when its entire
+//!   second-granular range lies strictly beyond the page boundary
+//!   (backward: strictly older; forward: strictly newer) — the
+//!   second→nanosecond gap can never skip a file that could contribute.
+//!
+//! Not pinned here: `PageShard::evaluate` (needs a real SFST reader),
+//! the anchor split in `from_cursors` (value-testable, untested),
+//! `materialize`, and `paginate` itself (WAL-before-SFST seeding, early
+//! termination over real files). Whole queries over real files run in
+//! `tests/ng_wal_equivalence.rs`, which does not page from an anchor.
 use super::*;
 // Explicit (not via the `use super::*` glob) so the tests don't depend on
 // `page.rs` happening to import these.
 use crate::logs::cursor::{NS_PER_S, Part};
 
+/// Fixed-identity cursor (`file_seq` 1, `Part::Indexed(0)`, `position =
+/// ts as u32`): within these fixtures only the timestamp distinguishes
+/// cursors.
 fn cursor_at(ts: i64) -> Cursor {
     Cursor {
         timestamp_ns: ts,
@@ -12,14 +44,19 @@ fn cursor_at(ts: i64) -> Cursor {
     }
 }
 
+/// Timestamp projection the assertions compare against expected orders.
 fn timestamps(cursors: &[Cursor]) -> Vec<i64> {
     cursors.iter().map(|c| c.timestamp_ns).collect()
 }
 
 #[test]
 fn page_merge_backward_keeps_nearest_and_finalize_flags_more() {
-    // Backward: closest-to-anchor is the largest (newest) cursor. With
-    // limit 2 the bound is 3; merge keeps the nearest 3, finalize takes 2.
+    // Backward path pinned end-to-end: `merge` keeps the candidates
+    // nearest the anchor (newest first), truncated to `bound`, and ORs
+    // `has_opposite`; `finalize_page` takes the nearest `limit` as the
+    // page, reading the extra candidate as `has_older` and `has_opposite`
+    // as `has_newer`. `bound = limit + 1` mirrors the `page_bound`
+    // `paginate` itself passes.
     let a = PageShard {
         cursors: vec![cursor_at(50), cursor_at(20)],
         has_opposite: false,
@@ -48,8 +85,9 @@ fn page_merge_backward_keeps_nearest_and_finalize_flags_more() {
 
 #[test]
 fn page_merge_into_matches_merge_pairwise() {
-    // The incremental fold must match the all-at-once merge of the same
-    // two shards (same per-step order + bound), in both directions and
+    // Pins the equivalence `merge_into`'s contract claims: folding one
+    // shard into another must equal the all-at-once merge of the same
+    // two (same per-step re-order + bound), in both directions and
     // bounded or not.
     let shards = || {
         (
@@ -85,9 +123,11 @@ fn page_merge_into_matches_merge_pairwise() {
 
 #[test]
 fn page_merge_into_multi_fold_matches_merge() {
-    // `paginate` folds N sources sequentially; folding three shards
-    // left-to-right with `merge_into` must match the all-at-once merge of
-    // all three (associative up to the bound).
+    // `paginate` folds every source's shard through `merge_into`, bounded
+    // at each step; that must equal the all-at-once merge of all shards.
+    // The per-step bound can't change the outcome: a candidate truncated
+    // at one fold is already beaten by `bound` nearer candidates the
+    // final merge keeps ahead of it.
     let shards = || {
         [
             PageShard {
@@ -124,8 +164,11 @@ fn page_merge_into_multi_fold_matches_merge() {
 
 #[test]
 fn page_merge_forward_orders_oldest_first_and_outputs_newest_first() {
-    // Forward: closest-to-anchor is the smallest (oldest) cursor; the page
-    // is reversed to newest-first for output, and the flags swap sides.
+    // Forward mirror of the backward test: closest-to-anchor is the
+    // smallest (oldest) cursor, so `merge`'s output is oldest-first and
+    // `finalize_page` reverses the page to newest-first, swapping the
+    // flag sides (extra candidate -> `has_newer`, `has_opposite` ->
+    // `has_older`).
     let a = PageShard {
         cursors: vec![cursor_at(50), cursor_at(20)],
         has_opposite: true,
@@ -154,12 +197,15 @@ fn page_merge_forward_orders_oldest_first_and_outputs_newest_first() {
 
 #[test]
 fn beyond_boundary_backward_skips_strictly_older_files() {
-    // Boundary at t = 100s. Backward looks for cursors *newer* than the
-    // boundary, so a file is skippable only if its whole range is older.
+    // Boundary at t = 100s (only its `timestamp_ns` is consulted).
+    // Backward looks for cursors *newer* than the boundary, so a
+    // second-granular file range is skippable only if its whole range is
+    // older — even the newest possible cursor fails to beat it.
     let boundary = cursor_at(100 * NS_PER_S);
     // Ends at 99s → newest possible cursor < 100s → can't beat → skip.
     assert!(beyond_boundary(Direction::Backward, boundary, 0, 99));
-    // Ends at 100s → could tie within the boundary second → keep.
+    // Ends at 100s → a row inside second 100 can still sit at/past the
+    // boundary → keep.
     assert!(!beyond_boundary(Direction::Backward, boundary, 0, 100));
     // Ends at 101s → clearly overlaps → keep.
     assert!(!beyond_boundary(Direction::Backward, boundary, 0, 101));
@@ -168,11 +214,14 @@ fn beyond_boundary_backward_skips_strictly_older_files() {
 #[test]
 fn beyond_boundary_forward_skips_strictly_newer_files() {
     // Boundary at t = 100s. Forward looks for cursors *older* than the
-    // boundary, so a file is skippable only if its whole range is newer.
+    // boundary, so a second-granular file range is skippable only if its
+    // whole range is newer — even the oldest possible cursor must be
+    // strictly past it.
     let boundary = cursor_at(100 * NS_PER_S);
     // Starts at 101s → oldest possible cursor > 100s → can't beat → skip.
     assert!(beyond_boundary(Direction::Forward, boundary, 101, u32::MAX));
-    // Starts at 100s → could tie within the boundary second → keep.
+    // Starts at 100s → its oldest row could sit exactly at the boundary
+    // (not strictly newer) → keep.
     assert!(!beyond_boundary(
         Direction::Forward,
         boundary,

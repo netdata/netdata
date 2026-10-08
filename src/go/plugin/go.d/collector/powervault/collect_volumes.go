@@ -2,8 +2,10 @@
 
 package powervault
 
-func (c *Collector) collectVolumeStats() {
-	stats, err := c.client.VolumeStatistics()
+import "context"
+
+func (c *Collector) collectVolumeStats(ctx context.Context) {
+	stats, err := c.client.VolumeStatistics(ctx)
 	if err != nil {
 		c.Warningf("error collecting volume statistics: %v", err)
 		return

@@ -54,15 +54,22 @@ static bool rrdhost_update_is_parent_label(RRDLABELS *labels, uint32_t (*count_r
     return changed;
 }
 
+// The complete reaction to a change of a host's label set: persist it, re-match alerts, refresh the
+// Cloud node info and forward the set to our parent. Call it when the set changed, or may have (a reload).
+// The node info request is immediate: label changes are rare, and a debounced request would postpone
+// an immediate one already pending (e.g. the one queued when a child connects).
+void rrdhost_labels_changed(RRDHOST *host) {
+    rrdhost_flag_set(host, RRDHOST_FLAG_METADATA_LABELS | RRDHOST_FLAG_METADATA_UPDATE | RRDHOST_FLAG_PENDING_LABEL_RECHECK);
+    aclk_queue_node_info(host, true);
+    stream_send_host_labels(host);
+}
+
 void rrdhost_set_is_parent_label(void) {
     if (!localhost || !localhost->rrdlabels)
         return;
 
-    if (rrdhost_update_is_parent_label(localhost->rrdlabels, stream_receivers_currently_connected, false)) {
-        rrdhost_flag_set(localhost, RRDHOST_FLAG_PENDING_LABEL_RECHECK);
-
-        aclk_queue_node_info(localhost, false);
-    }
+    if (rrdhost_update_is_parent_label(localhost->rrdlabels, stream_receivers_currently_connected, false))
+        rrdhost_labels_changed(localhost);
 }
 
 // expand ${VAR} and ${VAR:-default} patterns in src, writing result to dst
@@ -149,14 +156,7 @@ static bool config_label_cb(void *data __maybe_unused, const char *name, const c
 }
 
 static void rrdhost_load_config_labels(void) {
-    int status = inicfg_load(&netdata_config, NULL, 1, CONFIG_SECTION_HOST_LABEL);
-    if(!status) {
-        char *filename = CONFIG_DIR "/" CONFIG_FILENAME;
-        nd_log(NDLS_DAEMON, NDLP_WARNING,
-               "RRDLABEL: Cannot reload the configuration file '%s', using labels in memory",
-               filename);
-    }
-
+    netdata_conf_reload_section(CONFIG_SECTION_HOST_LABEL);
     inicfg_foreach_value_in_section(&netdata_config, CONFIG_SECTION_HOST_LABEL, config_label_cb, NULL);
 }
 
@@ -261,10 +261,7 @@ void reload_host_labels(void) {
     // RRDLABEL_FLAG_DONT_DELETE entries are preserved.
     rrdlabels_remove_all_unmarked(localhost->rrdlabels);
 
-    rrdhost_flag_set(localhost,
-                     RRDHOST_FLAG_METADATA_LABELS | RRDHOST_FLAG_METADATA_UPDATE | RRDHOST_FLAG_PENDING_LABEL_RECHECK);
-
-    stream_send_host_labels(localhost);
+    rrdhost_labels_changed(localhost);
 }
 
 // ----------------------------------------------------------------------------
@@ -370,6 +367,73 @@ static int is_parent_label_unittest(void) {
     rrdlabels_destroy(labels);
 
     return errors;
+}
+
+static int os_metadata_labels_unittest(void) {
+    struct rrdhost_system_info *system_info = rrdhost_system_info_create();
+    RRDLABELS *labels = rrdlabels_create();
+    int errors = 0;
+    char value[RRDLABELS_MAX_VALUE_LENGTH + 1];
+
+    (void)rrdhost_system_info_set_by_name(system_info, "NETDATA_HOST_OS_LABEL_NAME", "Ubuntu");
+    (void)rrdhost_system_info_set_by_name(system_info, "NETDATA_HOST_OS_LABEL_VERSION", "24.04");
+    (void)rrdhost_system_info_set_by_name(system_info, "NETDATA_HOST_OS_LABEL_RELEASE", "24.04");
+    (void)rrdhost_system_info_set_by_name(system_info, "NETDATA_HOST_OS_LABEL_CODENAME", "noble");
+    (void)rrdhost_system_info_set_by_name(system_info, "NETDATA_HOST_OS_VERSION", "Ubuntu 24.04.3 LTS");
+    rrdhost_system_info_to_rrdlabels(system_info, labels);
+
+    const struct {
+        const char *name;
+        const char *expected;
+    } cases[] = {
+        { "_os_name", "Ubuntu" },
+        { "_os_version", "Ubuntu 24.04.3 LTS" },
+        { "_os_marketing_version", "24.04" },
+        { "_os_release", "24.04" },
+        { "_os_codename", "noble" },
+    };
+
+    for(size_t i = 0; i < sizeof(cases) / sizeof(cases[0]); i++) {
+        rrdlabels_get_value_strcpyz(labels, value, sizeof(value), cases[i].name);
+        int err = strcmp(value, cases[i].expected) != 0;
+        fprintf(stderr, "  os metadata %s: %s, expected '%s', got '%s'\n", cases[i].name,
+                err ? "FAILED" : "OK", cases[i].expected, value);
+        errors += err;
+    }
+
+    rrdlabels_destroy(labels);
+    rrdhost_system_info_free(system_info);
+    return errors;
+}
+
+static int streamed_windows_system_info_unittest(void) {
+    RRDLABELS *labels = rrdlabels_create();
+    rrdlabels_add(labels, "_os", "windows", RRDLABEL_SRC_AUTO);
+    rrdlabels_add(labels, "_os_name", "Windows", RRDLABEL_SRC_AUTO);
+    rrdlabels_add(labels, "_os_version", "Microsoft Windows 11 Home", RRDLABEL_SRC_AUTO);
+    rrdlabels_add(labels, "_os_marketing_version", "11", RRDLABEL_SRC_AUTO);
+
+    struct rrdhost_system_info *system_info = rrdhost_system_info_from_host_labels(labels);
+    CLEAN_BUFFER *wb = buffer_create(0, NULL);
+    buffer_json_initialize(wb, "\"", "\"", 0, true, BUFFER_JSON_OPTIONS_DEFAULT);
+    rrdhost_system_info_to_json_v1(wb, system_info);
+
+    RRDLABELS *roundtrip = rrdlabels_create();
+    rrdhost_system_info_to_rrdlabels(system_info, roundtrip);
+    char version[RRDLABELS_MAX_VALUE_LENGTH + 1];
+    char marketing_version[RRDLABELS_MAX_VALUE_LENGTH + 1];
+    rrdlabels_get_value_strcpyz(roundtrip, version, sizeof(version), "_os_version");
+    rrdlabels_get_value_strcpyz(roundtrip, marketing_version, sizeof(marketing_version), "_os_marketing_version");
+
+    int err = !strstr(buffer_tostring(wb), "Microsoft Windows") ||
+              !strstr(buffer_tostring(wb), "Microsoft Windows 11 Home") ||
+              strcmp(version, "Microsoft Windows 11 Home") || strcmp(marketing_version, "11");
+    fprintf(stderr, "  streamed Windows OS labels and public metadata: %s\n", err ? "FAILED" : "OK");
+
+    rrdlabels_destroy(roundtrip);
+    rrdhost_system_info_free(system_info);
+    rrdlabels_destroy(labels);
+    return err;
 }
 
 int rrdhost_labels_unittest(void) {
@@ -506,6 +570,8 @@ int rrdhost_labels_unittest(void) {
     unsetenv("ND_TEST_NESTED");
 
     errors += is_parent_label_unittest();
+    errors += os_metadata_labels_unittest();
+    errors += streamed_windows_system_info_unittest();
 
     fprintf(stderr, "%s: %d errors\n", __FUNCTION__, errors);
     return errors;

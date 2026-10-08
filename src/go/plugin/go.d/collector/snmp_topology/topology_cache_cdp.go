@@ -5,10 +5,10 @@ package snmptopology
 import "github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp/ddsnmp"
 
 func init() {
-	registerTopologyMetricHandler(ddsnmp.KindCdpCache, (*topologyCache).updateCdpRemote)
+	registerTopologyMetricHandler(ddsnmp.KindCdpCache, (*topologyBuilder).updateCdpRemote)
 }
 
-func (c *topologyCache) updateCdpRemote(tags map[string]string) {
+func (c *topologyBuilder) updateCdpRemote(tags map[string]string) {
 	ifIndex := tags[tagCdpIfIndex]
 	if ifIndex == "" {
 		return

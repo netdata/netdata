@@ -7,8 +7,9 @@ selector:
         - 1.3.6.1.4.1.2011.2.*
 
 metric_tags:
-  - OID: 1.3.6.1.4.1.2011.5.25.31.6.5.0
-    symbol: hwEntitySystemModel
+  - symbol:
+      OID: 1.3.6.1.4.1.2011.5.25.31.6.5.0
+      name: hwEntitySystemModel
     tag: huawei_hw_entity_system_model
 
 # - HUAWEI-ENTITY-EXTENT-MIB

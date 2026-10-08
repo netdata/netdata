@@ -116,30 +116,35 @@ static void parse_query_string(char *url, discovery_params *out) {
 
 // Concatenate URL params + form body so both contribute. URL takes
 // precedence on conflicts because that's the Phase 1 convention.
-static char *combined_params(struct web_client *w, char *url, char *buf, size_t buf_size) {
+//
+// When a body is present the result is heap-allocated into *owned (the
+// caller frees it): the web server accepts bodies up to
+// NETDATA_WEB_REQUEST_MAX_SIZE, and a fixed buffer would silently truncate
+// the selector. URL decoding never grows its input, so the body length
+// bounds the decoded size.
+static char *combined_params(struct web_client *w, char *url, char **owned) {
+    *owned = NULL;
     bool have_url = url && *url;
     bool have_body = w->payload && buffer_strlen(w->payload) > 0;
     if (have_url && !have_body)
         return url;
     if (!have_url && !have_body)
         return NULL;
-    if (!have_url) {
-        url_decode_r(buf, buffer_tostring(w->payload), buf_size);
-        buf[buf_size - 1] = '\0';
-        return buf;
-    }
-    // Both: decode body first, then append URL params (URL wins on
-    // duplicate-key lookups via "last write wins" in parse, so we put it
-    // last).
-    url_decode_r(buf, buffer_tostring(w->payload), buf_size);
-    buf[buf_size - 1] = '\0';
-    size_t body_len = strlen(buf);
-    if (body_len + 1 < buf_size) {
+
+    size_t body_size = buffer_strlen(w->payload) + 1;
+    size_t url_len = have_url ? strlen(url) : 0;
+    char *buf = mallocz(body_size + (have_url ? url_len + 1 : 0));
+    buf[0] = '\0';
+    url_decode_r(buf, buffer_tostring(w->payload), body_size);
+    buf[body_size - 1] = '\0';
+    *owned = buf;
+
+    // Both: body first, then URL params, so the URL wins on duplicate keys
+    // via "last write wins" in parse.
+    if (have_url) {
+        size_t body_len = strlen(buf);
         buf[body_len] = '&';
-        size_t url_len = strlen(url);
-        if (body_len + 1 + url_len < buf_size) {
-            memcpy(buf + body_len + 1, url, url_len + 1);
-        }
+        memcpy(buf + body_len + 1, url, url_len + 1);
     }
     return buf;
 }
@@ -280,13 +285,8 @@ static const char *extract_label_name(const char *path) {
     return p;
 }
 
-int api_v1_promql_discovery(RRDHOST *host __maybe_unused, struct web_client *w, char *url) {
+static int promql_discovery_dispatch(struct web_client *w, char *params) {
     const char *path = buffer_tostring(w->url_path_decoded);
-
-    char params_buf[NETDATA_WEB_REQUEST_URL_SIZE + 2];
-    char *params = combined_params(w, url, params_buf, sizeof(params_buf));
-    if (!params)
-        params = "";
 
     // Order matters: longer prefixes first. `label/` vs `labels` would
     // collide otherwise.
@@ -326,4 +326,13 @@ not_found:
         "\"error\":\"unknown discovery endpoint\"}");
     w->response.data->content_type = CT_APPLICATION_JSON;
     return HTTP_RESP_NOT_FOUND;
+}
+
+int api_v1_promql_discovery(RRDHOST *host __maybe_unused, struct web_client *w, char *url) {
+    // `owned` must outlive dispatch: the handlers tokenize params in place.
+    char *owned;
+    char *params = combined_params(w, url, &owned);
+    int rc = promql_discovery_dispatch(w, params ? params : "");
+    freez(owned);
+    return rc;
 }

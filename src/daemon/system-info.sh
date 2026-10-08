@@ -118,6 +118,111 @@ CONTAINER_VERSION="unknown"
 CONTAINER_VERSION_ID="unknown"
 CONTAINER_ID="unknown"
 CONTAINER_ID_LIKE="unknown"
+CONTAINER_VERSION_CODENAME=""
+CONTAINER_VARIANT=""
+CONTAINER_BUILD_ID=""
+
+# os-release(5) requires backslashes, quotes and other shell metacharacters inside
+# double-quoted values to be escaped. Decode them, since we parse instead of sourcing.
+os_release_unescape() {
+  os_release_unescaped=""
+  os_release_rest="$1"
+
+  while :; do
+    case "${os_release_rest}" in
+      *\\*) ;;
+      *) os_release_unescaped="${os_release_unescaped}${os_release_rest}"; break ;;
+    esac
+    os_release_unescaped="${os_release_unescaped}${os_release_rest%%\\*}"
+    os_release_rest="${os_release_rest#*\\}"
+    # keep the escaped character verbatim; a trailing lone backslash consumes nothing
+    os_release_unescaped="${os_release_unescaped}${os_release_rest%"${os_release_rest#?}"}"
+    os_release_rest="${os_release_rest#?}"
+  done
+}
+
+load_os_release() {
+  os_release_scope="$1"
+  os_release_file="$2"
+
+  # an existing but unreadable file must not shadow the next candidate path
+  if [ -z "${os_release_file}" ] || [ ! -f "${os_release_file}" ] || [ ! -r "${os_release_file}" ]; then
+    return 1
+  fi
+
+  while IFS= read -r os_release_line || [ -n "${os_release_line}" ]; do
+    case "${os_release_line}" in
+      NAME=*|ID=*|ID_LIKE=*|VERSION=*|VERSION_ID=*|VERSION_CODENAME=*|VARIANT=*|BUILD_ID=*)
+        os_release_key="${os_release_line%%=*}"
+        os_release_value="${os_release_line#*=}"
+        case "${os_release_value}" in
+          \"*\")
+            os_release_value="${os_release_value#\"}"
+            os_release_value="${os_release_value%\"}"
+            os_release_unescape "${os_release_value}"
+            os_release_value="${os_release_unescaped}"
+            ;;
+          \'*\') os_release_value="${os_release_value#\'}"; os_release_value="${os_release_value%\'}" ;;
+          *) ;;
+        esac
+        case "${os_release_scope}:${os_release_key}" in
+          CONTAINER:NAME) CONTAINER_NAME="${os_release_value}" ;;
+          CONTAINER:ID) CONTAINER_ID="${os_release_value}" ;;
+          CONTAINER:ID_LIKE) CONTAINER_ID_LIKE="${os_release_value}" ;;
+          CONTAINER:VERSION) CONTAINER_VERSION="${os_release_value}" ;;
+          CONTAINER:VERSION_ID) CONTAINER_VERSION_ID="${os_release_value}" ;;
+          CONTAINER:VERSION_CODENAME) CONTAINER_VERSION_CODENAME="${os_release_value}" ;;
+          CONTAINER:VARIANT) CONTAINER_VARIANT="${os_release_value}" ;;
+          CONTAINER:BUILD_ID) CONTAINER_BUILD_ID="${os_release_value}" ;;
+          HOST:NAME) HOST_NAME="${os_release_value}" ;;
+          HOST:ID) HOST_ID="${os_release_value}" ;;
+          HOST:ID_LIKE) HOST_ID_LIKE="${os_release_value}" ;;
+          HOST:VERSION) HOST_VERSION="${os_release_value}" ;;
+          HOST:VERSION_ID) HOST_VERSION_ID="${os_release_value}" ;;
+          HOST:VERSION_CODENAME) HOST_VERSION_CODENAME="${os_release_value}" ;;
+          HOST:VARIANT) HOST_VARIANT="${os_release_value}" ;;
+          HOST:BUILD_ID) HOST_BUILD_ID="${os_release_value}" ;;
+          *) ;;
+        esac
+        ;;
+      *) ;;
+    esac
+  done < "${os_release_file}"
+
+  return 0
+}
+
+load_lsb_release() {
+  lsb_release_file="$1"
+
+  # an existing but unreadable file must not shadow the next candidate path
+  if [ -z "${lsb_release_file}" ] || [ ! -f "${lsb_release_file}" ] || [ ! -r "${lsb_release_file}" ]; then
+    return 1
+  fi
+
+  while IFS= read -r lsb_release_line || [ -n "${lsb_release_line}" ]; do
+    case "${lsb_release_line}" in
+      DISTRIB_ID=*|DISTRIB_RELEASE=*|DISTRIB_CODENAME=*)
+        lsb_release_key="${lsb_release_line%%=*}"
+        lsb_release_value="${lsb_release_line#*=}"
+        case "${lsb_release_value}" in
+          \"*\") lsb_release_value="${lsb_release_value#\"}"; lsb_release_value="${lsb_release_value%\"}" ;;
+          \'*\') lsb_release_value="${lsb_release_value#\'}"; lsb_release_value="${lsb_release_value%\'}" ;;
+          *) ;;
+        esac
+        case "${lsb_release_key}" in
+          DISTRIB_ID) DISTRIB_ID="${lsb_release_value}" ;;
+          DISTRIB_RELEASE) DISTRIB_RELEASE="${lsb_release_value}" ;;
+          DISTRIB_CODENAME) DISTRIB_CODENAME="${lsb_release_value}" ;;
+          *) ;;
+        esac
+        ;;
+      *) ;;
+    esac
+  done < "${lsb_release_file}"
+
+  return 0
+}
 
 if [ "${KERNEL_NAME}" = "Darwin" ]; then
   CONTAINER_ID=$(sw_vers -productName)
@@ -133,26 +238,28 @@ elif [ "${KERNEL_NAME}" = "FreeBSD" ]; then
   CONTAINER_VERSION=$(uname -r)
   KERNEL_VERSION=$(uname -K)
 else
-  if [ -f "/etc/os-release" ]; then
-    eval "$(grep -E "^(NAME|ID|ID_LIKE|VERSION|VERSION_ID)=" </etc/os-release | sed 's/^/CONTAINER_/')"
+  if load_os_release CONTAINER /etc/os-release; then
     CONTAINER_OS_DETECTION="/etc/os-release"
+  elif load_os_release CONTAINER /usr/lib/os-release; then
+    CONTAINER_OS_DETECTION="/usr/lib/os-release"
   fi
 
   # shellcheck disable=SC2153
   if [ "${CONTAINER_NAME}" = "unknown" ] || [ "${CONTAINER_VERSION}" = "unknown" ] || [ "${CONTAINER_ID}" = "unknown" ]; then
     if [ -f "/etc/lsb-release" ]; then
-      if [ "${CONTAINER_OS_DETECTION}" = "unknown" ]; then
-        CONTAINER_OS_DETECTION="/etc/lsb-release"
-      else
-        CONTAINER_OS_DETECTION="Mixed"
-      fi
       DISTRIB_ID="unknown"
       DISTRIB_RELEASE="unknown"
       DISTRIB_CODENAME="unknown"
-      eval "$(grep -E "^(DISTRIB_ID|DISTRIB_RELEASE|DISTRIB_CODENAME)=" </etc/lsb-release)"
-      if [ "${CONTAINER_NAME}" = "unknown" ]; then CONTAINER_NAME="${DISTRIB_ID}"; fi
-      if [ "${CONTAINER_VERSION}" = "unknown" ]; then CONTAINER_VERSION="${DISTRIB_RELEASE}"; fi
-      if [ "${CONTAINER_ID}" = "unknown" ]; then CONTAINER_ID="${DISTRIB_CODENAME}"; fi
+      if load_lsb_release /etc/lsb-release; then
+        if [ "${CONTAINER_OS_DETECTION}" = "unknown" ]; then
+          CONTAINER_OS_DETECTION="/etc/lsb-release"
+        else
+          CONTAINER_OS_DETECTION="Mixed"
+        fi
+        if [ "${CONTAINER_NAME}" = "unknown" ]; then CONTAINER_NAME="${DISTRIB_ID}"; fi
+        if [ "${CONTAINER_VERSION}" = "unknown" ]; then CONTAINER_VERSION="${DISTRIB_RELEASE}"; fi
+        if [ "${CONTAINER_ID}" = "unknown" ]; then CONTAINER_ID="${DISTRIB_CODENAME}"; fi
+      fi
     fi
     if [ -n "$(command -v lsb_release 2>/dev/null)" ]; then
       if [ "${CONTAINER_OS_DETECTION}" = "unknown" ]; then
@@ -174,32 +281,37 @@ HOST_VERSION="unknown"
 HOST_VERSION_ID="unknown"
 HOST_ID="unknown"
 HOST_ID_LIKE="unknown"
+HOST_VERSION_CODENAME=""
+HOST_VARIANT=""
+HOST_BUILD_ID=""
 
 # 'systemd-detect-virt' returns 'none' if there is no hardware/container virtualization.
 if [ "${CONTAINER}" = "unknown" ] || [ "${CONTAINER}" = "none" ]; then
-  for v in NAME ID ID_LIKE VERSION VERSION_ID OS_DETECTION; do
+  for v in NAME ID ID_LIKE VERSION VERSION_ID VERSION_CODENAME VARIANT BUILD_ID OS_DETECTION; do
     eval "HOST_$v=\$CONTAINER_$v; CONTAINER_$v=none"
   done
 else
   # Otherwise try and use a user-supplied bind-mount into the container to resolve the host details
-  if [ -e "/host/etc/os-release" ]; then
-    eval "$(grep -E "^(NAME|ID|ID_LIKE|VERSION|VERSION_ID)=" </host/etc/os-release | sed 's/^/HOST_/')"
+  if load_os_release HOST /host/etc/os-release; then
     HOST_OS_DETECTION="/host/etc/os-release"
+  elif load_os_release HOST /host/usr/lib/os-release; then
+    HOST_OS_DETECTION="/host/usr/lib/os-release"
   fi
   if [ "${HOST_NAME}" = "unknown" ] || [ "${HOST_VERSION}" = "unknown" ] || [ "${HOST_ID}" = "unknown" ]; then
     if [ -f "/host/etc/lsb-release" ]; then
-      if [ "${HOST_OS_DETECTION}" = "unknown" ]; then
-        HOST_OS_DETECTION="/etc/lsb-release"
-      else
-        HOST_OS_DETECTION="Mixed"
-      fi
       DISTRIB_ID="unknown"
       DISTRIB_RELEASE="unknown"
       DISTRIB_CODENAME="unknown"
-      eval "$(grep -E "^(DISTRIB_ID|DISTRIB_RELEASE|DISTRIB_CODENAME)=" </etc/lsb-release)"
-      if [ "${HOST_NAME}" = "unknown" ]; then HOST_NAME="${DISTRIB_ID}"; fi
-      if [ "${HOST_VERSION}" = "unknown" ]; then HOST_VERSION="${DISTRIB_RELEASE}"; fi
-      if [ "${HOST_ID}" = "unknown" ]; then HOST_ID="${DISTRIB_CODENAME}"; fi
+      if load_lsb_release /host/etc/lsb-release; then
+        if [ "${HOST_OS_DETECTION}" = "unknown" ]; then
+          HOST_OS_DETECTION="/host/etc/lsb-release"
+        else
+          HOST_OS_DETECTION="Mixed"
+        fi
+        if [ "${HOST_NAME}" = "unknown" ]; then HOST_NAME="${DISTRIB_ID}"; fi
+        if [ "${HOST_VERSION}" = "unknown" ]; then HOST_VERSION="${DISTRIB_RELEASE}"; fi
+        if [ "${HOST_ID}" = "unknown" ]; then HOST_ID="${DISTRIB_CODENAME}"; fi
+      fi
     fi
   fi
 fi
@@ -214,6 +326,33 @@ if [ -d "/etc/pve" ] &&
   HOST_VERSION_ID="$(echo "${HOST_VERSION}" | cut -f 1 -d '.')"
   HOST_OS_DETECTION="pveversion"
 fi
+
+# Label-only OS metadata uses standard os-release keys. Do not infer an edition,
+# codename, or point release when the operating system does not provide one.
+filter_host_os_label_version() {
+  # Linux has no separate marketing-version source here. Avoid emitting the
+  # same value under two labels while retaining the release label.
+  if [ "${KERNEL_NAME}" = "Linux" ] && [ "${HOST_OS_LABEL_VERSION}" = "${HOST_OS_LABEL_RELEASE}" ]; then
+    HOST_OS_LABEL_VERSION=""
+  fi
+}
+
+set_host_os_label_versions() {
+  if [ -n "${HOST_VERSION_ID}" ] && [ "${HOST_VERSION_ID}" != "unknown" ] && [ "${HOST_VERSION_ID}" != "none" ]; then
+    HOST_OS_LABEL_VERSION="${HOST_VERSION_ID}"
+    HOST_OS_LABEL_RELEASE="${HOST_VERSION_ID}"
+  else
+    HOST_OS_LABEL_VERSION="${HOST_VERSION}"
+    HOST_OS_LABEL_RELEASE="${HOST_VERSION}"
+  fi
+  filter_host_os_label_version
+}
+
+HOST_OS_LABEL_NAME="${HOST_NAME}"
+set_host_os_label_versions
+HOST_OS_LABEL_CODENAME="${HOST_VERSION_CODENAME}"
+HOST_OS_LABEL_EDITION="${HOST_VARIANT}"
+HOST_OS_LABEL_BUILD="${HOST_BUILD_ID}"
 
 # -------------------------------------------------------------------------------------------------
 # Detect information about the CPU
@@ -686,19 +825,25 @@ get_default_interface_ip() {
 
 get_default_interface_ip -4
 
-echo "NETDATA_CONTAINER_OS_NAME=${CONTAINER_NAME}"
-echo "NETDATA_CONTAINER_OS_ID=${CONTAINER_ID}"
-echo "NETDATA_CONTAINER_OS_ID_LIKE=${CONTAINER_ID_LIKE}"
-echo "NETDATA_CONTAINER_OS_VERSION=${CONTAINER_VERSION}"
-echo "NETDATA_CONTAINER_OS_VERSION_ID=${CONTAINER_VERSION_ID}"
-echo "NETDATA_CONTAINER_OS_DETECTION=${CONTAINER_OS_DETECTION}"
-echo "NETDATA_CONTAINER_IS_OFFICIAL_IMAGE=${CONTAINER_IS_OFFICIAL_IMAGE}"
-echo "NETDATA_HOST_OS_NAME=${HOST_NAME}"
-echo "NETDATA_HOST_OS_ID=${HOST_ID}"
-echo "NETDATA_HOST_OS_ID_LIKE=${HOST_ID_LIKE}"
-echo "NETDATA_HOST_OS_VERSION=${HOST_VERSION}"
-echo "NETDATA_HOST_OS_VERSION_ID=${HOST_VERSION_ID}"
-echo "NETDATA_HOST_OS_DETECTION=${HOST_OS_DETECTION}"
+printf 'NETDATA_CONTAINER_OS_NAME=%s\n' "${CONTAINER_NAME}"
+printf 'NETDATA_CONTAINER_OS_ID=%s\n' "${CONTAINER_ID}"
+printf 'NETDATA_CONTAINER_OS_ID_LIKE=%s\n' "${CONTAINER_ID_LIKE}"
+printf 'NETDATA_CONTAINER_OS_VERSION=%s\n' "${CONTAINER_VERSION}"
+printf 'NETDATA_CONTAINER_OS_VERSION_ID=%s\n' "${CONTAINER_VERSION_ID}"
+printf 'NETDATA_CONTAINER_OS_DETECTION=%s\n' "${CONTAINER_OS_DETECTION}"
+printf 'NETDATA_CONTAINER_IS_OFFICIAL_IMAGE=%s\n' "${CONTAINER_IS_OFFICIAL_IMAGE}"
+printf 'NETDATA_HOST_OS_NAME=%s\n' "${HOST_NAME}"
+printf 'NETDATA_HOST_OS_ID=%s\n' "${HOST_ID}"
+printf 'NETDATA_HOST_OS_ID_LIKE=%s\n' "${HOST_ID_LIKE}"
+printf 'NETDATA_HOST_OS_VERSION=%s\n' "${HOST_VERSION}"
+printf 'NETDATA_HOST_OS_VERSION_ID=%s\n' "${HOST_VERSION_ID}"
+printf 'NETDATA_HOST_OS_DETECTION=%s\n' "${HOST_OS_DETECTION}"
+for label_field in NAME VERSION RELEASE CODENAME EDITION BUILD; do
+  eval "label_value=\${HOST_OS_LABEL_${label_field}}"
+  if [ -n "${label_value}" ] && [ "${label_value}" != "unknown" ] && [ "${label_value}" != "none" ]; then
+    printf 'NETDATA_HOST_OS_LABEL_%s=%s\n' "${label_field}" "${label_value}"
+  fi
+done
 echo "NETDATA_HOST_IS_K8S_NODE=${HOST_IS_K8S_NODE}"
 echo "NETDATA_SYSTEM_KERNEL_NAME=${KERNEL_NAME}"
 echo "NETDATA_SYSTEM_KERNEL_VERSION=${KERNEL_VERSION}"

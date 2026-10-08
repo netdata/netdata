@@ -4,6 +4,8 @@ extends:
   - _system-base.yaml
   - _cisco-base.yaml
   - _cisco-bgp4-mib.yaml
+  - _std-topology-interface-mib.yaml
+  - _std-topology-arp-mib.yaml
 
 metadata:
   device:
@@ -16,4 +18,5 @@ metadata:
 selector:
   - sysobjectid:
       include:
+        - 1.3.6.1.4.1.9.1.2571 # ciscoNCS55A2
         - 1.3.6.1.4.1.9.1.2984 # ciscoNCS540L

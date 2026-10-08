@@ -140,6 +140,16 @@ func (adri *autoDetectionRetryIndex) cancel(id string) {
 	adri.removeLocked(id, retry)
 }
 
+// Source removal may arrive after failed stock discovery already removed the
+// graph entry. Cancel only that source's desired config, not a later winner.
+func (adri *autoDetectionRetryIndex) cancelConfig(id, uid string) {
+	adri.mu.Lock()
+	defer adri.mu.Unlock()
+	if retry := adri.entries[id]; retry != nil && retry.token.uid == uid {
+		adri.removeLocked(id, retry)
+	}
+}
+
 func (adri *autoDetectionRetryIndex) cancelToken(id string, token autoDetectionRetryToken) {
 	if adri == nil || id == "" || token.generation == 0 {
 		return

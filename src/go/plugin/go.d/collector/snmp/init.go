@@ -16,11 +16,11 @@ import (
 
 func (c *Collector) validateConfig() error {
 	if c.Hostname == "" {
-		return errors.New("SNMP hostname is required")
+		return snmputils.WithFailure(errors.New("SNMP hostname is required"), "configuration", "missing_hostname")
 	}
-	if c.Vnode.GUID != "" {
-		if err := uuid.Validate(c.Vnode.GUID); err != nil {
-			return fmt.Errorf("invalid Vnode GUID: %v", err)
+	if c.Vnode == "" && c.LocalVnode.GUID != "" {
+		if err := uuid.Validate(c.LocalVnode.GUID); err != nil {
+			return snmputils.WithFailure(fmt.Errorf("invalid Vnode GUID: %v", err), "configuration", "invalid_vnode_id")
 		}
 	}
 	return nil
@@ -32,7 +32,7 @@ func (c *Collector) initSNMPClient() (gosnmp.Handler, error) {
 		return nil, err
 	}
 
-	c.Info(snmputils.SnmpClientConnInfo(client))
+	c.Infof("SNMP client target=%q port=%d version=%s context=%q", client.Target(), client.Port(), client.Version(), client.ContextName())
 
 	return client, nil
 }
@@ -59,7 +59,7 @@ func (c *Collector) newConfiguredSNMPClient() (gosnmp.Handler, error) {
 		client.SetVersion(gosnmp.Version2c)
 	case gosnmp.Version3:
 		if c.User.Name == "" {
-			return nil, errors.New("username is required for SNMPv3")
+			return nil, snmputils.WithFailure(errors.New("username is required for SNMPv3"), "client", "missing_v3_username")
 		}
 		client.SetVersion(gosnmp.Version3)
 		client.SetSecurityModel(gosnmp.UserSecurityModel)
@@ -76,7 +76,7 @@ func (c *Collector) newConfiguredSNMPClient() (gosnmp.Handler, error) {
 		// devices). Empty string means the default context.
 		client.SetContextName(c.User.ContextName)
 	default:
-		return nil, fmt.Errorf("invalid SNMP version: %s", c.Options.Version)
+		return nil, snmputils.WithFailure(fmt.Errorf("invalid SNMP version: %s", c.Options.Version), "client", "invalid_snmp_version")
 	}
 
 	return client, nil

@@ -22,7 +22,7 @@ import (
 
 func TestTopologyFunctionAdapter_MethodParamsUsesRegistryFocusTargets(t *testing.T) {
 	registry := newTopologyRegistry()
-	registry.register(newTestTopologyCacheLLDP(
+	publishTestTopologyBuilder(registry, newTestTopologyCacheLLDP(
 		"agent-test",
 		time.Now().UTC(),
 		"00:11:22:33:44:55",
@@ -56,7 +56,7 @@ func TestTopologyFunctionAdapter_MethodParamsUsesRegistryFocusTargets(t *testing
 
 func TestTopologyFunctionAdapter_HandleDefaultManagedFabric(t *testing.T) {
 	registry := newTopologyRegistry()
-	registry.register(newTestTopologyCacheLLDP(
+	publishTestTopologyBuilder(registry, newTestTopologyCacheLLDP(
 		"agent-test",
 		time.Now().UTC(),
 		"00:11:22:33:44:55",
@@ -100,7 +100,7 @@ func TestTopologyFunctionAdapter_HandleDefaultManagedFabric(t *testing.T) {
 
 func TestTopologyFunctionAdapter_HandleSelectorParams(t *testing.T) {
 	registry := newTopologyRegistry()
-	registry.register(newTestTopologyCacheLLDP(
+	publishTestTopologyBuilder(registry, newTestTopologyCacheLLDP(
 		"agent-test",
 		time.Now().UTC(),
 		"00:11:22:33:44:55",
@@ -135,7 +135,7 @@ func TestTopologyFunctionAdapter_HandleSelectorParams(t *testing.T) {
 
 func TestTopologyFunctionAdapter_HandleUnknownSelectorsFallbackToDefaults(t *testing.T) {
 	registry := newTopologyRegistry()
-	registry.register(newTestTopologyCacheLLDP(
+	publishTestTopologyBuilder(registry, newTestTopologyCacheLLDP(
 		"agent-test",
 		time.Now().UTC(),
 		"00:11:22:33:44:55",
@@ -1489,8 +1489,8 @@ func newTestTopologyCacheLLDP(
 	ts time.Time,
 	localChassis, localSysName, localMgmtIP, localPortID string,
 	remoteChassis, remoteSysName, remoteMgmtIP, remotePortID string,
-) *topologyCache {
-	cache := newTopologyCache()
+) *topologyBuilder {
+	cache := newTopologyBuilder()
 	cache.updateTime = ts
 	cache.lastUpdate = ts
 	cache.agentID = agentID

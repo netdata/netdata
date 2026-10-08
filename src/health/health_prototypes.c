@@ -410,55 +410,49 @@ void health_prototype_hash_id(RRD_ALERT_PROTOTYPE *ap) {
     }
 }
 
-bool health_prototype_add(RRD_ALERT_PROTOTYPE *ap, char **msg) {
-    if(!ap->match.is_template) {
-        if(!ap->match.on.chart) {
-            netdata_log_error(
-                "HEALTH: alert '%s' does not define a instance (parameter 'on'). Source: %s",
-                string2str(ap->config.name), string2str(ap->config.source));
-            if(msg)
-                *msg = "missing match 'on' parameter for instance";
-            return false;
-        }
+// Alerts sharing a name are kept as a chain of rules (one per OS, per label set, ...).
+// Every rule has to stand on its own, because health_prototype_matches_rrdset() and the health
+// loop only ever look at the single rule they are given. Validating just the head of the chain let
+// a rule with no 'on' through, and such a rule then attached the alert to every chart of the host
+// (netdata/netdata#23483).
+static const char *health_prototype_rule_validate(RRD_ALERT_PROTOTYPE *t) {
+    if(t->match.is_template) {
+        if(!t->match.on.context)
+            return "missing match 'on' parameter for context";
     }
-    else {
-        if(!ap->match.on.context) {
-            netdata_log_error(
-                "HEALTH: alert '%s' does not define a context (parameter 'on'). Source: %s",
-                string2str(ap->config.name), string2str(ap->config.source));
-            if(msg)
-                *msg = "missing match 'on' parameter for context";
-            return false;
-        }
-    }
+    else if(!t->match.on.chart)
+        return "missing match 'on' parameter for instance";
 
-    if(ap->config.update_every <= 0) {
+    if(t->config.update_every <= 0)
+        return "missing update frequency";
+
+    if(!RRDCALC_HAS_DB_LOOKUP(t) && !t->config.calculation && !t->config.warning && !t->config.critical)
+        return "no db lookup, calculation and warning/critical conditions";
+
+    if(!isfinite(t->config.delay_multiplier))
+        return "non-finite delay multiplier";
+
+    return NULL;
+}
+
+bool health_prototype_add(RRD_ALERT_PROTOTYPE *ap, const char **msg) {
+    size_t rule = 0;
+    for(RRD_ALERT_PROTOTYPE *t = ap; t; t = t->_internal.next, rule++) {
+        const char *reason = health_prototype_rule_validate(t);
+        if(!reason)
+            continue;
+
+        // config.source is set only for prototypes loaded from a health .conf file
+        // (health_config.c); a dyncfg payload never carries one.
         netdata_log_error(
-            "HEALTH: alert '%s' has no frequency (parameter 'every'). Source: %s",
-            string2str(ap->config.name), string2str(ap->config.source));
-        if(msg)
-            *msg = "missing update frequency";
-        return false;
-    }
+            "HEALTH: alert '%s' rule %zu is invalid: %s. Source: %s",
+            string2str(ap->config.name), rule, reason,
+            string2str(t->config.source));
 
-    if(!RRDCALC_HAS_DB_LOOKUP(ap) && !ap->config.calculation && !ap->config.warning && !ap->config.critical) {
-        netdata_log_error(
-            "HEALTH: alert '%s' is useless (no db lookup, no calculation, no warning and no critical expressions). Source: %s",
-            string2str(ap->config.name), string2str(ap->config.source));
         if(msg)
-            *msg = "no db lookup, calculation and warning/critical conditions";
-        return false;
-    }
+            *msg = reason;
 
-    for(RRD_ALERT_PROTOTYPE *t = ap; t; t = t->_internal.next) {
-        if(!isfinite(t->config.delay_multiplier)) {
-            netdata_log_error(
-                "HEALTH: alert '%s' has a non-finite delay multiplier. Source: %s",
-                string2str(t->config.name), string2str(t->config.source));
-            if(msg)
-                *msg = "non-finite delay multiplier";
-            return false;
-        }
+        return false;
     }
 
     // activate the match patterns in it
@@ -540,15 +534,17 @@ static bool prototype_matches_host(RRDHOST *host, RRD_ALERT_PROTOTYPE *ap) {
     return true;
 }
 
-static bool prototype_matches_rrdset(RRDSET *st, RRD_ALERT_PROTOTYPE *ap) {
-    // match the chart id
-    if(!ap->match.is_template && ap->match.on.chart &&
-        ap->match.on.chart != st->id && ap->match.on.chart != st->name)
-        return false;
-
-    // match the chart context
-    if(ap->match.is_template && ap->match.on.context &&
-        ap->match.on.context != st->context)
+bool health_prototype_matches_rrdset(RRDSET *st, RRD_ALERT_PROTOTYPE *ap) {
+    // A template is defined by its context and an instance alert by its chart, so a rule without
+    // one matches nothing. This must fail closed: treating a missing 'on' as "no constraint" turned
+    // such a rule into a host-wide alert, attaching e.g. the system.cpu 10min_cpu_usage template to
+    // every chart of the node (netdata/netdata#23483).
+    if(ap->match.is_template) {
+        if(!ap->match.on.context || ap->match.on.context != st->context)
+            return false;
+    }
+    else if(!ap->match.on.chart ||
+             (ap->match.on.chart != st->id && ap->match.on.chart != st->name))
         return false;
 
     if (st->rrdlabels && ap->match.chart_labels_pattern &&
@@ -641,7 +637,7 @@ static void health_prototype_apply_to_rrdset(RRDSET *st, RRD_ALERT_PROTOTYPE *ap
             if (!prototype_matches_host(st->rrdhost, t))
                 continue;
 
-            if (!prototype_matches_rrdset(st, t))
+            if (!health_prototype_matches_rrdset(st, t))
                 continue;
 
             rrdcalc_add_from_prototype(st->rrdhost, st, t);

@@ -8,9 +8,9 @@ import (
 	"github.com/go-ldap/ldap/v3"
 )
 
-func (c *Collector) collect() (map[string]int64, error) {
+func (c *Collector) collect(ctx context.Context) (map[string]int64, error) {
 	if c.conn == nil {
-		conn, err := c.establishConn()
+		conn, err := c.establishConn(ctx)
 		if err != nil {
 			return nil, err
 		}
@@ -46,10 +46,10 @@ func (c *Collector) doSearchRequest(req *ldap.SearchRequest, fn func(*ldap.Entry
 	return nil
 }
 
-func (c *Collector) establishConn() (ldapConn, error) {
+func (c *Collector) establishConn(ctx context.Context) (ldapConn, error) {
 	conn := c.newConn(c.Config)
 
-	if err := conn.connect(); err != nil {
+	if err := conn.connect(ctx); err != nil {
 		return nil, err
 	}
 

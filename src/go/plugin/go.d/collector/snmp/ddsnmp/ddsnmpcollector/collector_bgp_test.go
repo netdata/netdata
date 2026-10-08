@@ -142,7 +142,7 @@ func TestCollector_Collect_BGPRowsFromTableBGPConfig(t *testing.T) {
 			require.True(t, row.Connection.EstablishedUptime.Has)
 			assert.EqualValues(t, 7200, row.Connection.EstablishedUptime.Value)
 			assert.EqualValues(t, 1, pm.Stats.Metrics.BGP)
-			assert.EqualValues(t, 1, pm.Stats.TableCache.Misses)
+			assert.Zero(t, pm.Stats.TableCache.Misses, "BGP rows are not table-cache participants")
 			assert.EqualValues(t, 1, pm.Stats.SNMP.TablesWalked)
 		})
 	}

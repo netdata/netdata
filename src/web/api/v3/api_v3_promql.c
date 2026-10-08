@@ -170,20 +170,28 @@ int api_v3_promql(RRDHOST *host __maybe_unused, struct web_client *w, char *url)
     // params we copy the payload through `url_decode_r` (the body arrives
     // as raw x-www-form-urlencoded bytes) and parse it the same way.
     //
-    // `params_buf` must live until the handler returns: handle_instant /
-    // handle_range mutate it in place via `strsep_skip_consecutive_separators`.
-    char params_buf[NETDATA_WEB_REQUEST_URL_SIZE + 2];
+    // The buffer is sized from the body rather than fixed: the web server
+    // accepts bodies up to NETDATA_WEB_REQUEST_MAX_SIZE, and URL decoding
+    // never grows its input. It must live until the handler returns:
+    // handle_instant / handle_range mutate it in place via
+    // `strsep_skip_consecutive_separators`.
     char *params = url;
+    char *params_buf = NULL;
     if ((!url || !*url) && w->payload && buffer_strlen(w->payload) > 0) {
-        url_decode_r(params_buf, buffer_tostring(w->payload), sizeof(params_buf));
-        params_buf[NETDATA_WEB_REQUEST_URL_SIZE + 1] = '\0';
+        size_t size = buffer_strlen(w->payload) + 1;
+        params_buf = mallocz(size);
+        params_buf[0] = '\0';
+        url_decode_r(params_buf, buffer_tostring(w->payload), size);
+        params_buf[size - 1] = '\0';
         params = params_buf;
     }
 
-    if (is_range)
-        return handle_range(w, params);
-    if (is_instant)
-        return handle_instant(w, params);
+    if (is_range || is_instant) {
+        int rc = is_range ? handle_range(w, params) : handle_instant(w, params);
+        freez(params_buf);
+        return rc;
+    }
+    freez(params_buf);
 
     buffer_flush(w->response.data);
     buffer_strcat(w->response.data,

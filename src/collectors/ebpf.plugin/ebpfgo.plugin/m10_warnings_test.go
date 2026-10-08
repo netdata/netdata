@@ -7,7 +7,7 @@
 //   - parseMinimalFunctionLine
 //   - handleNetworkProtocols (via netdataapi buffer)
 //   - buildNetworkProtocolsJSON JSON schema (golden output)
-//   - applySocketDataLocked and the SHM flag round-trip
+//   - rebuildEntriesLocked and the SHM flag round-trip
 //   - UpdateSocketApps flag semantics (nil vs non-nil, per-cycle clear)
 //   - runSocketGlobalCollector and runDNSGlobalCollector start-time guards
 //   - DNS fallback loader sequencing (plan builder / flavor selection)
@@ -187,7 +187,7 @@ func mustIndexString(v any) string {
 // TestUpdateSocketApps_SetsFlag verifies that UpdateSocketApps sets the SOCKET
 // flag when called with a non-nil, non-empty slice.
 func TestUpdateSocketApps_SetsFlag(t *testing.T) {
-	store := NewCachestatSharedMemoryStore()
+	store := NewEbpfSharedMemoryStore()
 	store.UpdateSocketApps([]libbpfloader.SocketPIDEntry{{PID: 1, BytesSent: 1}}, 10)
 	if store.activeModules&ebpfgoSHMFlagSocket == 0 {
 		t.Fatal("UpdateSocketApps did not set the SOCKET flag")
@@ -198,7 +198,7 @@ func TestUpdateSocketApps_SetsFlag(t *testing.T) {
 // (clearSocketApps passes nil) does not set the SOCKET flag; the caller is
 // responsible for clearing it via MarkSocketInactive before calling here.
 func TestUpdateSocketApps_NilDoesNotSetFlag(t *testing.T) {
-	store := NewCachestatSharedMemoryStore()
+	store := NewEbpfSharedMemoryStore()
 	store.UpdateSocketApps(nil, 0)
 	if store.activeModules&ebpfgoSHMFlagSocket != 0 {
 		t.Fatal("UpdateSocketApps(nil) set the SOCKET flag; it must not")
@@ -209,7 +209,7 @@ func TestUpdateSocketApps_NilDoesNotSetFlag(t *testing.T) {
 // does not disturb a flag that was already set by a prior successful cycle.
 // The flag persists until MarkSocketInactive() clears it.
 func TestUpdateSocketApps_NilDoesNotClearExistingFlag(t *testing.T) {
-	store := NewCachestatSharedMemoryStore()
+	store := NewEbpfSharedMemoryStore()
 	store.UpdateSocketApps([]libbpfloader.SocketPIDEntry{{PID: 1, BytesSent: 1}}, 10)
 	store.UpdateSocketApps(nil, 0) // simulate a failed cycle without prior MarkSocketInactive
 	if store.activeModules&ebpfgoSHMFlagSocket == 0 {
@@ -218,7 +218,7 @@ func TestUpdateSocketApps_NilDoesNotClearExistingFlag(t *testing.T) {
 }
 
 func TestSHMFlagRoundTrip_ResetsAfterPublish(t *testing.T) {
-	store := NewCachestatSharedMemoryStore()
+	store := NewEbpfSharedMemoryStore()
 	// The SOCKET flag is set by UpdateSocketApps when called with real data.
 	store.UpdateSocketApps([]libbpfloader.SocketPIDEntry{{PID: 1, BytesSent: 100}}, 10)
 	store.UpdateApps([]libbpfloader.CachestatAppSnapshot{
@@ -233,7 +233,7 @@ func TestSHMFlagRoundTrip_ResetsAfterPublish(t *testing.T) {
 
 	// Publish clears the CACHESTAT bit each cycle; the SOCKET bit persists
 	// until MarkSocketInactive() is called when the socket goroutine exits.
-	if err := store.Publish(nil); err != nil {
+	if err := store.Publish(nil, ebpfgoSHMFlagCachestat); err != nil {
 		t.Fatalf("Publish(nil): %v", err)
 	}
 	if store.activeModules&ebpfgoSHMFlagCachestat != 0 {
@@ -250,10 +250,10 @@ func TestSHMFlagRoundTrip_ResetsAfterPublish(t *testing.T) {
 	}
 }
 
-// ---- M10: applySocketDataLocked direct coverage ---------------------------
+// ---- M10: rebuildEntriesLocked direct coverage ---------------------------
 
-func TestApplySocketDataLocked_ZeroesSocketForPIDsGone(t *testing.T) {
-	store := NewCachestatSharedMemoryStore()
+func TestRebuildEntries_ZeroesSocketForPIDsGone(t *testing.T) {
+	store := NewEbpfSharedMemoryStore()
 	// First, populate both cachestat and socket for PID 10.
 	store.UpdateApps([]libbpfloader.CachestatAppSnapshot{
 		{Pid: 10, Ppid: 1, Ct: 100, MarkPageAccessed: 50},
@@ -268,7 +268,7 @@ func TestApplySocketDataLocked_ZeroesSocketForPIDsGone(t *testing.T) {
 		{Pid: 10, Ppid: 1, Ct: 101, MarkPageAccessed: 55},
 	})
 
-	// applySocketDataLocked must have zeroed the socket field on the existing
+	// rebuildEntriesLocked must leave the socket field zero on the existing
 	// entry because socketData no longer contains PID 10.
 	snap := store.Snapshot()
 	if len(snap) != 1 {
@@ -279,8 +279,8 @@ func TestApplySocketDataLocked_ZeroesSocketForPIDsGone(t *testing.T) {
 	}
 }
 
-func TestApplySocketDataLocked_AppendsSocketOnlyPIDs(t *testing.T) {
-	store := NewCachestatSharedMemoryStore()
+func TestRebuildEntries_AppendsSocketOnlyPIDs(t *testing.T) {
+	store := NewEbpfSharedMemoryStore()
 	// Cycle 1: establish raw-counter baseline (deltas suppressed on first cycle).
 	store.UpdateSocketApps([]libbpfloader.SocketPIDEntry{
 		{PID: 30, BytesSent: 0, CallUDPSent: 0},

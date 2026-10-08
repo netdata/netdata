@@ -179,6 +179,16 @@ To remove Netdata from the node entirely instead, see [Uninstall Netdata](/packa
 
 **Node reappears after removal**: The agent may still be running and configured to reconnect. Stop the agent and clear claim configuration.
 
+## Node Decommissioning
+
+You can mark nodes as pending for decommissioning to avoid getting notifications about them. This action can also be performed in bulk, and it can be undone if needed.
+
+**Steps**:
+
+1. In Netdata Cloud, go to **Space Settings > Nodes** (click the ⚙️ cog icon below the spaces list)
+2. Multi-Select the nodes for which you want to toggle commissioning status or act on each node separately (⏻ / ↪)
+3. In the dialog that appears, click **Yes, continue** to verify the action
+
 ## Additional Resources
 
 For a complete reference on node states and transitions, see [Node States and Transitions](/docs/netdata-cloud/node-states-and-transitions.md).

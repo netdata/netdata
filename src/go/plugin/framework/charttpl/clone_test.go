@@ -65,6 +65,7 @@ func richGroup() Group {
 		ContextNamespace: "ns",
 		Metrics:          []string{"metric_a"},
 		ChartDefaults: &ChartDefaults{
+			Priority:      100,
 			LabelPromoted: []string{"region"},
 			Instances: &Instances{
 				ByLabels:         []string{"resource_uid"},
@@ -86,13 +87,21 @@ func richGroup() Group {
 				Lifecycle: &Lifecycle{
 					MaxInstances:      10,
 					ExpireAfterCycles: 5,
-					Dimensions:        &DimensionLifecycle{MaxDims: 100, ExpireAfterCycles: 3},
+					Dimensions: &DimensionLifecycle{
+						MaxDims:           100,
+						ExpireAfterCycles: 3,
+					},
 				},
 				Dimensions: []Dimension{
 					{
 						Selector: "metric_a",
 						Name:     "a",
-						Options:  &DimensionOptions{Multiplier: 2, Divisor: 1000, Hidden: true, Float: true},
+						Options: &DimensionOptions{
+							Multiplier: 2,
+							Divisor:    1000,
+							Hidden:     true,
+							Float:      true,
+						},
 					},
 				},
 			},
@@ -111,7 +120,9 @@ func richGroup() Group {
 							{
 								Selector: "metric_c",
 								Name:     "b",
-								Options:  &DimensionOptions{Divisor: 10},
+								Options: &DimensionOptions{
+									Divisor: 10,
+								},
 							},
 						},
 					},

@@ -29,7 +29,7 @@ This collector monitors web servers by parsing their log files.
 
 This collector is supported on all platforms.
 
-This collector supports collecting metrics from multiple instances of this integration, including remote instances.
+This collector supports collecting metrics from multiple instances of this integration.
 
 
 ### Default Behavior
@@ -130,7 +130,19 @@ Notes:
 |  | [ltsv_config.mapping](#option-parser-ltsv-config-mapping) | LTSV fields mapping to **known fields**. |  | yes |
 |  | json_config | JSON log parser config. |  | no |
 |  | [json_config.mapping](#option-parser-json-config-mapping) | JSON fields mapping to **known fields**. |  | yes |
-|  | regexp_config | RegExp log parser config. |  | no |
+| **Custom fields** | custom_fields | List of custom text fields to collect per request. | [] | no |
+|  | custom_fields.name | Field name used for lookup in the parsed log and chart dimensions. |  | yes |
+|  | custom_fields.patterns.name | Dimension name for a custom-field pattern. |  | yes |
+|  | custom_fields.patterns.match | Pattern matched against the custom-field value. Match syntax in [matcher](https://github.com/netdata/netdata/blob/master/src/go/pkg/matcher/README.md#supported-format). |  | yes |
+|  | custom_time_fields | List of custom duration fields to collect per request. | [] | no |
+|  | custom_time_fields.name | Field name used for lookup in the parsed log. |  | yes |
+|  | custom_time_fields.histogram | Histogram buckets, in seconds. Summary charts always render milliseconds. | [] | no |
+|  | custom_numeric_fields | List of custom numeric fields to collect per request. | [] | no |
+|  | custom_numeric_fields.name | Field name used for lookup in the parsed log. |  | yes |
+|  | custom_numeric_fields.units | Units rendered on the custom numeric-field charts. |  | yes |
+|  | custom_numeric_fields.multiplier | Multiplier applied to the custom numeric field. | 1 | no |
+|  | custom_numeric_fields.divisor | Divisor applied to the custom numeric field. | 1 | no |
+| **Parser** | regexp_config | RegExp log parser config. |  | no |
 |  | [regexp_config.pattern](#option-parser-regexp-config-pattern) | RegExp pattern with named groups. |  | yes |
 
 <a id="option-customization-url-patterns"></a>
@@ -276,7 +288,7 @@ Configure the **web_log** collector from the Netdata web interface:
 4. In the Search box, type _web_log_ (or scroll the list) to locate the **web_log** collector.
 5. Click the **+** next to the **web_log** collector to add a new job.
 6. Fill in the job fields, then click **Test** to verify the configuration and **Submit** to save.
-    - **Test** runs the job with the provided settings and shows whether data can be collected.
+    - **Test** validates the provided settings and checks the collector's startup prerequisites. Successful validation does not guarantee that every metric will be available during collection.
     - If it fails, an error message appears with details (for example, connection refused, timeout, or command execution errors), so you can adjust and retest.
 
 
@@ -302,7 +314,31 @@ sudo ./edit-config go.d/web_log.conf
 ```
 
 ##### Examples
-There are no configuration examples.
+
+###### Ceph RGW access log
+
+Parse a Ceph RGW access log and expose its numeric total_time field explicitly as milliseconds.
+
+<details open><summary>Config</summary>
+
+```yaml
+jobs:
+  - name: ceph_rgw_access_log
+    path: /var/log/ceph/rgw/access.log
+    log_type: json
+    json_config:
+      mapping:
+        remote_addr: remote_addr
+        uri: request
+        http_status: status
+        bytes_sent: bytes_sent
+        total_time: total_time
+    custom_numeric_fields:
+      - name: total_time
+        units: milliseconds
+
+```
+</details>
 
 
 
@@ -415,7 +451,9 @@ Metrics:
 
 ## Troubleshooting
 
-### Debug Mode
+### Diagnostics
+
+#### Debug Mode
 
 **Important**: Debug mode is not supported for data collection jobs created via the UI using the Dyncfg feature.
 
@@ -447,14 +485,14 @@ should give you clues as to why the collector isn't working.
   ./go.d.plugin -d -m web_log -j jobName
   ```
 
-### Getting Logs
+#### Getting Logs
 
 If you're encountering problems with the `web_log` collector, follow these steps to retrieve logs and identify potential issues:
 
 - **Run the command** specific to your system (systemd, non-systemd, or Docker container).
 - **Examine the output** for any warnings or error messages that might indicate issues.  These messages should provide clues about the root cause of the problem.
 
-#### System with systemd
+##### System with systemd
 
 Use the following command to view logs generated since the last Netdata service restart:
 
@@ -462,7 +500,7 @@ Use the following command to view logs generated since the last Netdata service 
 journalctl _SYSTEMD_INVOCATION_ID="$(systemctl show --value --property=InvocationID netdata)" --namespace=netdata --grep web_log
 ```
 
-#### System without systemd
+##### System without systemd
 
 Locate the collector log file, typically at `/var/log/netdata/collector.log`, and use `grep` to filter for collector's name:
 
@@ -472,7 +510,7 @@ grep web_log /var/log/netdata/collector.log
 
 **Note**: This method shows logs from all restarts. Focus on the **latest entries** for troubleshooting current issues.
 
-#### Docker Container
+##### Docker Container
 
 If your Netdata runs in a Docker container named "netdata" (replace if different), use this command:
 
@@ -480,7 +518,9 @@ If your Netdata runs in a Docker container named "netdata" (replace if different
 docker logs netdata 2>&1 | grep web_log
 ```
 
-### High percentage of unparsed log lines (web_log_1m_unmatched alert)
+### Other Problems
+
+#### High percentage of unparsed log lines (web_log_1m_unmatched alert)
 
 This alert indicates that more than 1% of log lines could not be parsed by the web_log collector over the last minute.
 
@@ -509,7 +549,7 @@ This alert indicates that more than 1% of log lines could not be parsed by the w
   - For LTSV logs: set `log_type: ltsv` and configure `ltsv_config.mapping`
 
 
-### Unmatched lines due to non-standard log fields or extra columns
+#### Unmatched lines due to non-standard log fields or extra columns
 
 Persistent unmatched entries appear even with auto-detection enabled.
 
@@ -520,7 +560,7 @@ The log format includes fields not in the known-fields list (for example, custom
 Set `log_type: csv` explicitly and specify `csv_config.format` using the known field variables that match the log's column order. Alternatively, use `log_type: regexp` with a `regexp_config.pattern` that captures only the known fields and ignores extras.
 
 
-### Suppressing the alert for known benign unmatched lines
+#### Suppressing the alert for known benign unmatched lines
 
 The web_log_1m_unmatched alert fires continuously but the unmatched lines are intentional (for example, health check logs in a different format).
 

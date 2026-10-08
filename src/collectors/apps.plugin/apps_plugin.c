@@ -5,18 +5,11 @@
 #include "apps-lookup-netipc.h"
 #include "libnetdata/parsers/duration.h"
 
-#define APPS_PLUGIN_FUNCTIONS() do { \
-    fprintf(stdout, PLUGINSD_KEYWORD_FUNCTION " \"processes\" %d \"%s\" \"top\" "HTTP_ACCESS_FORMAT" %d\n",         \
-            PLUGINS_FUNCTIONS_TIMEOUT_DEFAULT, APPS_PLUGIN_PROCESSES_FUNCTION_DESCRIPTION,                          \
-            (HTTP_ACCESS_FORMAT_CAST)(HTTP_ACCESS_SIGNED_ID|HTTP_ACCESS_SAME_SPACE|HTTP_ACCESS_SENSITIVE_DATA),     \
-            RRDFUNCTIONS_PRIORITY_DEFAULT / 10);                                                                    \
-} while(0)
-
 #define APPS_PLUGIN_GLOBAL_FUNCTIONS() do { \
     fprintf(stdout, PLUGINSD_KEYWORD_FUNCTION " GLOBAL \"processes\" %d \"%s\" \"top\" "HTTP_ACCESS_FORMAT" %d\n",  \
             PLUGINS_FUNCTIONS_TIMEOUT_DEFAULT, APPS_PLUGIN_PROCESSES_FUNCTION_DESCRIPTION,                          \
             (HTTP_ACCESS_FORMAT_CAST)(HTTP_ACCESS_SIGNED_ID|HTTP_ACCESS_SAME_SPACE|HTTP_ACCESS_SENSITIVE_DATA),     \
-            RRDFUNCTIONS_PRIORITY_DEFAULT / 10);                                                                    \
+            NRPC_PRIORITY_DEFAULT / 10);                                                                    \
 } while(0)
 
 // ----------------------------------------------------------------------------
@@ -216,7 +209,7 @@ static void normalize_utilization(struct target *root) {
     // of course, either way, we disable it just for a single iteration.
 
     kernel_uint_t max_time = os_get_system_cpus() * NSEC_PER_SEC;
-    kernel_uint_t utime = 0, cutime = 0, stime = 0, cstime = 0, gtime = 0, cgtime = 0, minflt = 0, cminflt = 0, majflt = 0, cmajflt = 0;
+    kernel_uint_t utime = 0, cutime = 0, stime = 0, cstime = 0, gtime = 0, cgtime = 0;
 
     if(global_utime > max_time) global_utime = max_time;
     if(global_stime > max_time) global_stime = max_time;
@@ -231,11 +224,6 @@ static void normalize_utilization(struct target *root) {
         cutime  += w->values[PDF_CUTIME];
         cstime  += w->values[PDF_CSTIME];
         cgtime  += w->values[PDF_CGTIME];
-
-        minflt  += w->values[PDF_MINFLT];
-        majflt  += w->values[PDF_MAJFLT];
-        cminflt += w->values[PDF_CMINFLT];
-        cmajflt += w->values[PDF_CMAJFLT];
     }
 
     if(global_utime || global_stime || global_gtime) {
@@ -899,6 +887,10 @@ int main(int argc, char **argv) {
 #if defined(OS_LINUX)
         if (apps_ebpf_cachestat_is_available())
             apps_ebpf_accumulate_cachestat();
+        if (apps_ebpf_dcstat_is_available())
+            apps_ebpf_accumulate_dcstat();
+        if (apps_ebpf_fd_is_available())
+            apps_ebpf_accumulate_fd();
 #endif
 
         __atomic_add_fetch(&apps_collection_generation, 1, __ATOMIC_RELEASE);

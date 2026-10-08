@@ -8,7 +8,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestTopologyMetadataValue_CanonicalizesAliasKeys(t *testing.T) {
+func TestTopologyMetadataIndex_CanonicalizesAliasKeys(t *testing.T) {
 	labels := map[string]string{
 		"Serial Number":    "SN-123",
 		"software.version": "17.9.4",
@@ -26,7 +26,7 @@ func TestTopologyMetadataValue_CanonicalizesAliasKeys(t *testing.T) {
 
 	for name, tc := range tests {
 		t.Run(name, func(t *testing.T) {
-			require.Equal(t, tc.want, topologyMetadataValue(labels, tc.keys))
+			require.Equal(t, tc.want, newTopologyMetadataIndex(labels).value(tc.keys))
 		})
 	}
 }
@@ -41,7 +41,7 @@ func TestSetTopologyMetadataLabelIfMissing_PreservesExistingValue(t *testing.T) 
 	require.Equal(t, "1.2.3", labels["firmware_version"])
 }
 
-func TestTopologyMetadataValue_DeterministicAcrossCanonicalKeyCollisions(t *testing.T) {
+func TestTopologyMetadataIndex_DeterministicAcrossCanonicalKeyCollisions(t *testing.T) {
 	tests := map[string]struct {
 		labels map[string]string
 	}{
@@ -61,7 +61,7 @@ func TestTopologyMetadataValue_DeterministicAcrossCanonicalKeyCollisions(t *test
 
 	for name, tc := range tests {
 		t.Run(name, func(t *testing.T) {
-			require.Equal(t, "SN-100", topologyMetadataValue(tc.labels, []string{"serial_number"}))
+			require.Equal(t, "SN-100", newTopologyMetadataIndex(tc.labels).value([]string{"serial_number"}))
 		})
 	}
 }

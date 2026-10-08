@@ -1,3 +1,25 @@
+//! Unit tests for the cross-file merge helpers (the parent `merge`
+//! module): the pure folds behind `LogsShard::merge` — facet values,
+//! timeline buckets, and field tables. Fixtures are hand-built `sfst`
+//! values; nothing is read from disk.
+//!
+//! Pins:
+//!
+//! - `merge_facet_results` — fields union by name and per-value counts
+//!   sum across files; fields and values come out lexicographic
+//!   (BTreeMap order, matching each file's FST iteration order) whatever
+//!   the input order; empty input stays empty; a union over
+//!   `MAX_FACET_VALUES` keeps the top-count values
+//!   (lexicographically-first among ties), bounding the wire payload.
+//! - `merge_timelines` — dimensions union in sorted order and each
+//!   file's counts are reindexed onto the union columns before the
+//!   bucket-wise sum (`unset` sums too); the merged grid is the inputs'
+//!   shared grid; empty input yields `None`. Mismatched grids are never
+//!   fed in — that precondition remains a runtime `assert` in the merge.
+//! - `merge_field_tables` — every field is kept: a field high-card in
+//!   any input is marked `High` instead of dropped (nested merges and
+//!   the root `available_fields` drop must still see it), and the
+//!   merged cardinality is the max across inputs.
 use super::*;
 use crate::logs::cursor::NS_PER_S;
 
@@ -10,7 +32,8 @@ fn bucket(counts: Vec<u64>, unset: u64) -> sfst::Bucket {
 fn merge_facet_results_unions_fields_and_sums_counts() {
     // File A: level={info:3, error:1}, service={api:4}
     // File B: level={info:2, warn:5}, host={a:1}
-    // Merged: level={error:1, info:5, warn:5}, service={api:4}, host={a:1}
+    // Counts sum per value across files; the union comes out sorted by
+    // field and by value (BTreeMap order) although A's values aren't.
     let file_a = vec![
         sfst::FacetResult {
             field: "level".into(),
@@ -34,7 +57,6 @@ fn merge_facet_results_unions_fields_and_sums_counts() {
 
     let merged = merge_facet_results(vec![file_a, file_b]);
 
-    // Output fields sorted lexicographically by BTreeMap iteration.
     let field_names: Vec<&str> = merged.iter().map(|f| f.field.as_str()).collect();
     assert_eq!(field_names, vec!["host", "level", "service"]);
 
@@ -90,16 +112,14 @@ fn merge_timelines_unions_dimensions_and_sums_buckets() {
     assert_eq!(merged.grid.bucket_width_ns, width);
     assert_eq!(merged.dimensions, vec!["debug", "error", "info"]);
 
-    // Bucket 0: a[error=1, info=2], b[debug=5, info=0]
-    //         → merged[debug=5, error=1, info=2]; unset 1+0
+    // File A stores its counts as [error, info] but the union is
+    // [debug, error, info]: each file is reindexed onto the union
+    // columns before the bucket-wise sum, so adding by position would
+    // scramble the counts. `unset` sums too.
     assert_eq!(merged.buckets[0].counts, vec![5, 1, 2]);
     assert_eq!(merged.buckets[0].unset, 1);
-    // Bucket 1: a[error=0, info=3], b[debug=1, info=1]
-    //         → merged[debug=1, error=0, info=4]; unset 0+3
     assert_eq!(merged.buckets[1].counts, vec![1, 0, 4]);
     assert_eq!(merged.buckets[1].unset, 3);
-    // Bucket 2: a[error=4, info=0], b[debug=0, info=0]
-    //         → merged[debug=0, error=4, info=0]; unset 2+0
     assert_eq!(merged.buckets[2].counts, vec![0, 4, 0]);
     assert_eq!(merged.buckets[2].unset, 2);
 }

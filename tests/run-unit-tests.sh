@@ -25,23 +25,50 @@ c_unit_tests() {
   "$HOME"/netdata/usr/sbin/netdata -W unittest
 }
 
+system_info_unit_test() {
+  echo "Running system-info shell tests"
+  /bin/sh "$(dirname "$0")/system-info-test.sh"
+}
+
+kickstart_path_unit_test() {
+  echo "Running kickstart path shell tests"
+  /bin/sh "$(dirname "$0")/kickstart-path-sanitizer-test.sh"
+}
+
 spawn_server_unit_tests() {
-  echo "Running spawn-server unit tests"
+  # Shared with the macOS CI job, which builds netdata and then runs only this suite.
+  bash "$(dirname "$0")/spawn-server-tests.sh"
+}
 
-  local run_dir
-  run_dir="$(mktemp -d "${TMPDIR:-/tmp}/netdata-spawn-tester.XXXXXX")" || return 1
-
-  NETDATA_RUN_DIR="${run_dir}" \
-  ASAN_OPTIONS=detect_leaks=0 \
-  "${NETDATA_BUILD_DIR:-./build}/spawn-tester" test
-  local ret=$?
-
-  rm -rf -- "${run_dir}"
-  return "${ret}"
+acl_tests() {
+  echo "Running ACL and bearer protection shell tests"
+  # The build does not install developer test scripts, so render acl.sh from its
+  # template against the install made above.
+  acl_script="$(mktemp)" || return 1
+  sed -e "s|@varlibdir_POST@|$HOME/netdata/var/lib/netdata|g" \
+      -e "s|@sbindir_POST@|$HOME/netdata/usr/sbin|g" \
+      "$(dirname "$0")/acls/acl.sh.in" > "$acl_script" || return 1
+  if grep -q '@[A-Za-z_]*@' "$acl_script"; then
+    echo "acl.sh.in has a placeholder this runner does not substitute" >&2
+    return 1
+  fi
+  # acl.sh reads its netdata.cfg templates from the working directory
+  (cd "$(dirname "$0")/acls" &&
+    ASAN_OPTIONS=detect_leaks=0 \
+    bash "$acl_script")
+  rc=$?
+  rm -f "$acl_script"
+  return $rc
 }
 
 install_netdata || exit 1
 
 c_unit_tests || exit 1
 
+system_info_unit_test || exit 1
+
+kickstart_path_unit_test || exit 1
+
 spawn_server_unit_tests || exit 1
+
+acl_tests || exit 1

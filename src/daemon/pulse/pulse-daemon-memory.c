@@ -104,7 +104,7 @@ void pulse_daemon_memory_do(bool extended __maybe_unused) {
             netdata_buffers_statistics.rrdset_done_rda_size +
             netdata_buffers_statistics.buffers_aclk +
             netdata_buffers_statistics.buffers_api +
-            netdata_buffers_statistics.buffers_functions +
+            nrpc_buffers_functions +
             netdata_buffers_statistics.buffers_sqlite +
             netdata_buffers_statistics.buffers_exporters +
             netdata_buffers_statistics.buffers_health +
@@ -150,7 +150,8 @@ void pulse_daemon_memory_do(bool extended __maybe_unused) {
                               (collected_number)dictionary_stats_memory_total(dictionary_stats_category_rrdhealth));
 
         rrddim_set_by_pointer(st_memory, rd_functions,
-                              (collected_number)dictionary_stats_memory_total(dictionary_stats_category_functions));
+                              (collected_number)dictionary_stats_memory_total(dictionary_stats_category_functions) +
+                              (collected_number)nrpc_methods_functions);
 
         rrddim_set_by_pointer(st_memory, rd_replication,
                               (collected_number)dictionary_stats_memory_total(dictionary_stats_category_replication) + replication_sender_allocated_memory());
@@ -163,6 +164,7 @@ void pulse_daemon_memory_do(bool extended __maybe_unused) {
             dictionary_stats_category_rrdcontext.memory.dict + dictionary_stats_category_rrdcontext.memory.index +
             dictionary_stats_category_rrdhealth.memory.dict + dictionary_stats_category_rrdhealth.memory.index +
             dictionary_stats_category_functions.memory.dict + dictionary_stats_category_functions.memory.index +
+            nrpc_methods_functions +
             dictionary_stats_category_replication.memory.dict + dictionary_stats_category_replication.memory.index +
             netdata_buffers_statistics.rrdhost_allocations_size +
             replication_sender_allocated_memory();
@@ -268,7 +270,7 @@ void pulse_daemon_memory_do(bool extended __maybe_unused) {
         rrddim_set_by_pointer(st_memory_buffers, rd_collectors, (collected_number)netdata_buffers_statistics.rrdset_done_rda_size);
         rrddim_set_by_pointer(st_memory_buffers, rd_buffers_aclk, (collected_number)netdata_buffers_statistics.buffers_aclk);
         rrddim_set_by_pointer(st_memory_buffers, rd_buffers_api, (collected_number)netdata_buffers_statistics.buffers_api);
-        rrddim_set_by_pointer(st_memory_buffers, rd_buffers_functions, (collected_number)netdata_buffers_statistics.buffers_functions);
+        rrddim_set_by_pointer(st_memory_buffers, rd_buffers_functions, (collected_number)nrpc_buffers_functions);
         rrddim_set_by_pointer(st_memory_buffers, rd_buffers_sqlite, (collected_number)netdata_buffers_statistics.buffers_sqlite);
         rrddim_set_by_pointer(st_memory_buffers, rd_buffers_exporters, (collected_number)netdata_buffers_statistics.buffers_exporters);
         rrddim_set_by_pointer(st_memory_buffers, rd_buffers_health, (collected_number)netdata_buffers_statistics.buffers_health);

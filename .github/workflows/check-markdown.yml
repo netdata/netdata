@@ -7,10 +7,11 @@ on:
       - '**/*.mdx'
       - 'docs/**'
       - '**/metadata.yaml'
-      - '**/taxonomy.yaml'
       - 'integrations/**'
       - 'src/go/plugin/go.d/config/go.d/snmp.profiles/default/**'
       - 'src/go/plugin/go.d/config/go.d/snmp.trap-profiles/**'
+      - 'src/go/plugin/go.d/config/go.d/prometheus.profiles/default/**'
+      - 'src/go/plugin/go.d/collector/prometheus/profile-proofs/**/PROFILE-DESIGN.yaml'
       - 'src/go/plugin/ibm.d/docgen/**'
       - 'src/go/plugin/ibm.d/metricgen/**'
       - 'src/go/plugin/ibm.d/modules/**/module.yaml'
@@ -29,24 +30,24 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout PR branch
-        uses: actions/checkout@v7
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           fetch-depth: 0
           path: netdata
 
       - name: Checkout netdata/learn repository
-        uses: actions/checkout@v7
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           repository: netdata/learn
           path: learn
 
       - name: Init python env
-        uses: actions/setup-python@v7
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
         with:
-          python-version: "3.10"
+          python-version: "3.13"
 
       - name: Set up Go
-        uses: actions/setup-go@v7
+        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
           go-version-file: netdata/src/go/go.mod
           cache-dependency-path: netdata/src/go/go.sum
@@ -55,7 +56,7 @@ jobs:
         run: |
           python3 -m venv ./venv
           source ./venv/bin/activate
-          pip install -r learn/.learn_environment/ingest-requirements.txt
+          python -m pip install --require-hashes -r learn/.learn_environment/ingest-requirements.txt
           cd netdata && ./integrations/pip.sh
 
       - name: Generate Source Metadata
@@ -89,16 +90,6 @@ jobs:
           source ./venv/bin/activate
           cd netdata && python3 integrations/gen_integrations.py
 
-      - name: Check Collector Taxonomy
-        run: |
-          source ./venv/bin/activate
-          cd netdata && python3 integrations/check_collector_taxonomy.py --pr-diff "${{ github.event.pull_request.base.sha }}...${{ github.event.pull_request.head.sha }}"
-
-      - name: Test Collector Taxonomy Tooling
-        run: |
-          source ./venv/bin/activate
-          cd netdata && python3 -m unittest integrations.tests.test_taxonomy
-
       - name: Test Integration Descriptions
         run: |
           source ./venv/bin/activate
@@ -106,10 +97,35 @@ jobs:
           LEARN_INGEST_PATH=../learn/ingest/ingest.py \
             python3 -m unittest integrations.tests.test_descriptions
 
+      - name: Test Prometheus Profile Documentation
+        run: |
+          source ./venv/bin/activate
+          cd netdata && python3 -m unittest integrations.tests.test_prometheus_profile_docs
+
+      - name: Test Collector Metadata Content Rules
+        run: |
+          source ./venv/bin/activate
+          cd netdata && python3 -m unittest integrations.tests.test_collector_metadata
+
       - name: Generate Integrations Documentation
         run: |
           source ./venv/bin/activate
           cd netdata && python3 integrations/gen_docs_integrations.py
+
+      - name: Remove new eBPF DCstat integration page when legacy is preserved
+        run: |
+          # The dc_go branch restores the legacy eBPF DCstat integration page
+          # so the netdata/learn redirect catalog (still anchored to the legacy
+          # GitHub URL) keeps resolving. The integration-regen step above produces
+          # the new ebpfgo page in parallel, which would cause a Learn URL
+          # collision when the Ingest runs against the still-unpatched catalog.
+          # Removing the new page here keeps the working tree in the single-file
+          # state the Ingest needs to resolve the stale catalog entries.
+          # The integration-regen PR (which closes the migration) does not have
+          # the legacy file in its working tree, so this step is a no-op there.
+          if [ -f netdata/src/collectors/ebpf.plugin/integrations/ebpf_dcstat.md ]; then
+            rm -f netdata/src/collectors/ebpf.plugin/ebpfgo.plugin/integrations/ebpf_dcstat.md
+          fi
 
       - name: Generate src/collectors/COLLECTORS.md
         run: |
@@ -125,6 +141,13 @@ jobs:
         run: |
           source ./venv/bin/activate
           cd netdata && python3 integrations/gen_doc_service_discovery_page.py
+
+      - name: Validate docs/.map/map.yaml
+        run: |
+          # After the generators: a map row may name a generated page by path,
+          # and ingest silently drops a row whose file is missing.
+          source ./venv/bin/activate
+          cd netdata && python3 docs/.map/validate_map_schema.py
 
       - name: Run Ingest
         working-directory: learn

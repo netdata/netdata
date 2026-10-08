@@ -27,7 +27,7 @@ Reads host and domain statistics directly from the local Xen hypervisor through 
 
 This collector is supported on all platforms.
 
-This collector supports collecting metrics from multiple instances of this integration, including remote instances.
+This collector supports collecting metrics from multiple instances of this integration.
 
 The plugin needs setuid.
 
@@ -198,7 +198,9 @@ Metrics:
 
 ## Troubleshooting
 
-### Xen XCP-ng host or domain metrics are not appearing
+### Other Problems
+
+#### Xen XCP-ng host or domain metrics are not appearing
 
 **Cause:** The Netdata Agent is installed inside a guest VM or on a non-Xen host instead of the Xen hypervisor host (dom0). The plugin reads the local Xen hypervisor only, so a guest VM cannot report the host or other domains, and there is no remote-collection option.
 

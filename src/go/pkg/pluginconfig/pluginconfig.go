@@ -10,6 +10,7 @@ package pluginconfig
 import (
 	"fmt"
 	"os"
+	"path"
 	"path/filepath"
 	"slices"
 	"strings"
@@ -28,13 +29,15 @@ var (
 )
 
 type envData struct {
-	cygwinBase string
-	hostPrefix string
-	userDir    string
-	stockDir   string
-	varLibDir  string
-	watchPath  string
-	logLevel   string
+	cygwinBase   string
+	hostPrefix   string
+	userDir      string
+	stockDir     string
+	varLibDir    string
+	cacheDir     string
+	stockDataDir string
+	watchPath    string
+	logLevel     string
 }
 
 type directories struct {
@@ -53,6 +56,8 @@ type directories struct {
 	// Misc
 	collectorsWatch []string
 	varLibDir       string
+	cacheDir        string
+	stockDataDir    string
 }
 
 // InitInput is the minimal CLI-derived input required to initialize paths.
@@ -102,6 +107,8 @@ func ServiceDiscoveryDir() multipath.MultiPath      { return dirs.serviceDiscove
 
 func CollectorsConfigWatchPaths() []string { return slices.Clone(dirs.collectorsWatch) }
 func VarLibDir() string                    { return dirs.varLibDir }
+func CacheDir() string                     { return dirs.cacheDir }
+func StockDataDir() string                 { return dirs.stockDataDir }
 
 func (d *directories) userConfigDirsClone() multipath.MultiPath {
 	return slices.Clone(d.userConfigDirs)
@@ -131,6 +138,7 @@ func (d *directories) build(input InitInput, env envData, execName, execDir stri
 	d.deriveServiceDiscovery(execName)
 	d.initWatchPaths(input, env)
 	d.initVarLib(env)
+	d.initDataRoots(env, execDir)
 	return d.validate()
 }
 
@@ -249,6 +257,18 @@ func (d *directories) initVarLib(env envData) {
 	d.varLibDir = env.varLibDir
 }
 
+// Keep configured roots even when absent: data may be provisioned after startup.
+func (d *directories) initDataRoots(env envData, execDir string) {
+	d.cacheDir = env.cacheDir
+	if d.cacheDir == "" {
+		d.cacheDir = safePathClean(handleDirOnWin(env.cygwinBase, buildinfo.CacheDir, execDir))
+	}
+	d.stockDataDir = env.stockDataDir
+	if d.stockDataDir == "" {
+		d.stockDataDir = safePathClean(handleDirOnWin(env.cygwinBase, buildinfo.StockDataDir, execDir))
+	}
+}
+
 func (d *directories) validate() error {
 	if len(d.userConfigDirs) == 0 {
 		return fmt.Errorf("pluginconfig: user config dirs not initialized")
@@ -275,18 +295,22 @@ var isTerm = terminal.IsTerminal()
 
 func readEnvFromOS(execDir string) envData {
 	e := envData{
-		cygwinBase: os.Getenv("NETDATA_CYGWIN_BASE_PATH"),
-		hostPrefix: os.Getenv("NETDATA_HOST_PREFIX"),
-		userDir:    os.Getenv("NETDATA_USER_CONFIG_DIR"),
-		stockDir:   os.Getenv("NETDATA_STOCK_CONFIG_DIR"),
-		watchPath:  os.Getenv("NETDATA_PLUGINS_GOD_WATCH_PATH"),
-		varLibDir:  os.Getenv("NETDATA_LIB_DIR"),
-		logLevel:   os.Getenv("NETDATA_LOG_LEVEL"),
+		cygwinBase:   os.Getenv("NETDATA_CYGWIN_BASE_PATH"),
+		hostPrefix:   os.Getenv("NETDATA_HOST_PREFIX"),
+		userDir:      os.Getenv("NETDATA_USER_CONFIG_DIR"),
+		stockDir:     os.Getenv("NETDATA_STOCK_CONFIG_DIR"),
+		watchPath:    os.Getenv("NETDATA_PLUGINS_GOD_WATCH_PATH"),
+		varLibDir:    os.Getenv("NETDATA_LIB_DIR"),
+		cacheDir:     os.Getenv("NETDATA_CACHE_DIR"),
+		stockDataDir: os.Getenv("NETDATA_STOCK_DATA_DIR"),
+		logLevel:     os.Getenv("NETDATA_LOG_LEVEL"),
 	}
 	e.hostPrefix = handleDirOnWin(e.cygwinBase, safePathClean(e.hostPrefix), execDir)
 	e.userDir = handleDirOnWin(e.cygwinBase, safePathClean(e.userDir), execDir)
 	e.stockDir = handleDirOnWin(e.cygwinBase, safePathClean(e.stockDir), execDir)
 	e.varLibDir = handleDirOnWin(e.cygwinBase, safePathClean(e.varLibDir), execDir)
+	e.cacheDir = safePathClean(handleDirOnWin(e.cygwinBase, e.cacheDir, execDir))
+	e.stockDataDir = safePathClean(handleDirOnWin(e.cygwinBase, e.stockDataDir, execDir))
 	e.watchPath = handleDirOnWin(e.cygwinBase, safePathClean(e.watchPath), execDir)
 
 	if isTerm {
@@ -315,7 +339,8 @@ func handleDirOnWin(base, p string, execDir string) string {
 	if base == "" || !strings.HasPrefix(p, "/") {
 		return p
 	}
-	return filepath.Join(base, strings.TrimPrefix(p, "/"))
+	// Clean in POSIX space first: parent components cannot traverse above its root.
+	return filepath.Join(base, strings.TrimPrefix(path.Clean(p), "/"))
 }
 
 func registryUniqueIDVarLibDir() string {

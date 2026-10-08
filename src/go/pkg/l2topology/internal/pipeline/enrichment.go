@@ -89,6 +89,11 @@ func reconcileDeviceIdentityAliases(
 	if len(devices) == 0 {
 		return stats
 	}
+	// Direct observation ownership is finalized during registration. Without remote
+	// management claims or ARP/ND enrichment there is nothing left to reconcile.
+	if len(remoteManagementByDeviceID) == 0 && len(enrichments) == 0 {
+		return stats
+	}
 
 	ownersByIP := make(map[string]map[string]struct{}, len(directOwnersByIP))
 	for ip, owners := range directOwnersByIP {

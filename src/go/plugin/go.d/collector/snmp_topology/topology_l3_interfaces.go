@@ -10,20 +10,35 @@ import (
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_topology/internal/topologyutil"
 )
 
-func (c *topologyCache) snapshotL3Interfaces(localDeviceID string) []topologymodel.L3Interface {
-	if c == nil || len(c.l3InterfacesByIP) == 0 {
+func (c *topologyBuilder) snapshotL3Interfaces(localDeviceID string) []topologymodel.L3Interface {
+	if c == nil || len(c.ipAddressesByIP) == 0 {
 		return nil
 	}
 
-	ips := make([]string, 0, len(c.l3InterfacesByIP))
-	for ip := range c.l3InterfacesByIP {
-		ips = append(ips, ip)
+	count := 0
+	for _, resolved := range c.ipAddressesByIP {
+		if resolved.netmask != "" {
+			count++
+		}
+	}
+	if count == 0 {
+		return nil
+	}
+
+	ips := make([]string, 0, count)
+	for ip, resolved := range c.ipAddressesByIP {
+		if resolved.netmask != "" {
+			ips = append(ips, ip)
+		}
 	}
 	sort.Strings(ips)
 
 	rows := make([]topologymodel.L3Interface, 0, len(ips))
 	for _, ip := range ips {
-		row := c.l3InterfacesByIP[ip]
+		row, ok := c.ipL3Interface(ip)
+		if !ok {
+			continue
+		}
 		row.DeviceID = strings.TrimSpace(localDeviceID)
 		row.IfIndex = strings.TrimSpace(row.IfIndex)
 		row.IP = topologyutil.NormalizeIPAddress(row.IP)

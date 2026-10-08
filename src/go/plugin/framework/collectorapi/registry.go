@@ -54,13 +54,19 @@ type (
 	// modules that set these fields can expose data functions to the UI.
 	Creator struct {
 		Defaults
-		Create          func() CollectorV1
-		CreateV2        func() CollectorV2
-		JobConfigSchema string
-		Config          func() any
+		Create             func() CollectorV1
+		CreateV2           func() CollectorV2
+		JobConfigSchema    string
+		Config             func() any
+		JobConfigLifecycle JobConfigLifecycle
 
 		// InstancePolicy defaults to InstancePolicyPerJob when omitted.
 		InstancePolicy InstancePolicy
+
+		// StoreFirst enables the Agent's store_first option for all collector-produced
+		// V2 charts. It is fixed for all jobs of this collector and defaults to false.
+		// V1 charts and framework self-metrics retain their own options.
+		StoreFirst bool
 
 		// Optional: SharedFunctions declares static job-backed Functions shared
 		// by all jobs of this module. InstancePolicy controls whether they are

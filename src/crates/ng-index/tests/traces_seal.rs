@@ -1,14 +1,19 @@
-//! Oracle for the traces seal + trace-by-id read (SOW-20260630 Step 4).
+//! End-to-end traces oracle: synthetic OTLP requests ingested through the
+//! shared flatten recipe (the `seal()` helper below), sealed by the real
+//! `ng_index::build_sfst_traces_file`, and read back through the real
+//! `sfst::IndexReader::trace_by_id`. Two layers:
+//!  1. hand-built fixtures pin the tree-build edge cases (missing parents,
+//!     multiple roots, parent cycles, duplicate/unset span ids, clock skew,
+//!     large fan-out) — these can't be triggered reliably in real data —
+//!     plus the seal's additive chunks (EVNB/LNKB, TBLM, TRSU) and the
+//!     lossless field round trip;
+//!  2. a `#[ignore]`d self-consistency oracle runs against a WAL captured
+//!     from the real receiver (`ng-ingest-traces`): independently decode it,
+//!     then assert a sampled slice of its traces reconstructs via
+//!     `trace_by_id` to exactly their decoded span-id set.
 //!
-//! Drives the real pipeline — `ng-ingest::write_trace_request` (flatten + fill
-//! hashes + WAL) → `ng_index::build_sfst_traces_file` (seal) →
-//! `sfst::IndexReader::trace_by_id` (lookup + tree). Two layers, per DECISION 13:
-//!  1. hand-built fixtures pin the tree-build edge cases (missing parents, multiple
-//!     roots, duplicate span ids, clock skew, large fan-out) — these can't be
-//!     triggered reliably in real data;
-//!  2. a `#[ignore]`d self-consistency check runs against the re-captured real WAL:
-//!     independently decode it, then assert every trace reconstructs to exactly its
-//!     decoded span-id set.
+//! Not pinned here: the format layer (`tests/sfst_build_spike.rs`) and the
+//! logs pipeline (`tests/count.rs`).
 
 use std::collections::{HashMap, HashSet};
 use std::sync::Arc;
@@ -29,6 +34,7 @@ fn kv(k: &str, v: &str) -> KeyValue {
         value: Some(AnyValue {
             value: Some(Av::StringValue(v.into())),
         }),
+        key_strindex: 0,
     }
 }
 
@@ -37,6 +43,7 @@ fn kv_any(k: &str, v: Av) -> KeyValue {
     KeyValue {
         key: k.into(),
         value: Some(AnyValue { value: Some(v) }),
+        key_strindex: 0,
     }
 }
 
@@ -69,6 +76,7 @@ fn req(spans: Vec<Span>) -> ExportTraceServiceRequest {
     }
 }
 
+/// Total spans in the request — the value stored as the WAL frame's `entry_count`.
 fn count_spans(req: &ExportTraceServiceRequest) -> usize {
     req.resource_spans
         .iter()
@@ -80,8 +88,9 @@ fn count_spans(req: &ExportTraceServiceRequest) -> usize {
 /// Ingest the requests into a traces WAL, then seal it into an SFST and return the
 /// sealed bytes. Mirrors `ng-ingest::write_trace_request` inline (normalize → flatten
 /// → emit-time hashes → encode → WAL frame), keeping the test self-contained; the
-/// real `write_trace_request` is exercised end-to-end by the `#[ignore]`d real-WAL
-/// oracle below.
+/// real writer path is exercised by the `#[ignore]`d real-WAL oracle below. Rotation
+/// is disabled so every request lands in one `.wal` file — the seal consumes a
+/// single WAL file.
 fn seal(reqs: Vec<ExportTraceServiceRequest>) -> Vec<u8> {
     let dir = tempfile::tempdir().unwrap();
     let seq = Arc::new(wal::SeqAllocator::ephemeral(0));
@@ -117,11 +126,10 @@ fn seal(reqs: Vec<ExportTraceServiceRequest>) -> Vec<u8> {
         // The production content_meta: the version-tagged empty-ServiceStream
         // blob the unattributed stream carries (not a bare empty slice), so
         // the seal is exercised against production-shaped WAL headers.
-        let content_meta =
-            otel_logs_identity::encode_content_meta(&otel_logs_identity::ServiceStream::new(
-                "", "",
-            ))
-            .expect("the empty identity always encodes");
+        let content_meta = otel_logs_identity::encode_content_meta(
+            &otel_logs_identity::ServiceStream::new("", ""),
+        )
+        .expect("the empty identity always encodes");
         writer
             .write_frame(
                 0,
@@ -195,6 +203,9 @@ fn traces_build_refuses_logs_payload_format() {
 
 const ROOT_PARENT: [u8; 8] = [0u8; 8]; // unset parent = root
 
+/// A root → child → grandchild chain assembles into one tree: a single root,
+/// the parent/child edges wired, spans in chronological order, and the span
+/// `name` materialized as a facet.
 #[test]
 fn trace_by_id_builds_linear_tree() {
     let t = [0xA1u8; 16];
@@ -211,7 +222,6 @@ fn trace_by_id_builds_linear_tree() {
 
     assert_eq!(tr.spans.len(), 3);
     assert_eq!(tr.roots.len(), 1);
-    // Sorted by start time: root(100), child(110), grand(120).
     assert_eq!(tr.spans[0].span_id, SpanId::from(root));
     assert_eq!(tr.spans[tr.roots[0]].span_id, SpanId::from(root));
     let kids = |sid: [u8; 8]| {
@@ -441,7 +451,10 @@ fn trace_by_id_self_parent_is_a_root() {
         .unwrap();
     assert_eq!(tr.spans.len(), 1);
     assert_eq!(tr.roots.len(), 1, "self-parent treated as root");
-    assert!(tr.children.iter().all(|kids| kids.is_empty()), "no self-edge");
+    assert!(
+        tr.children.iter().all(|kids| kids.is_empty()),
+        "no self-edge"
+    );
 }
 
 #[test]
@@ -460,6 +473,7 @@ fn trace_by_id_surfaces_flags_and_dropped_count() {
     assert_eq!(tr.spans[0].dropped_attributes_count, 3);
 }
 
+/// A trace id absent from the file resolves to an empty `Trace`, not an error.
 #[test]
 fn trace_by_id_absent_is_empty() {
     let t = [0xF6u8; 16];
@@ -480,7 +494,8 @@ fn trace_by_id_absent_is_empty() {
 
 #[test]
 fn trace_by_id_separates_interleaved_traces() {
-    // Two traces interleaved across one batch: each reconstructs only its own spans.
+    // Two traces interleaved across one batch, reusing the same span ids:
+    // each lookup reconstructs only its own trace's spans.
     let (ta, tb) = ([0x1au8; 16], [0x2bu8; 16]);
     let bytes = seal(vec![req(vec![
         span(ta, [1u8; 8], ROOT_PARENT, 100, 200, "a-root"),
@@ -494,7 +509,7 @@ fn trace_by_id_separates_interleaved_traces() {
     assert_eq!(b.spans.len(), 1);
 }
 
-/// Self-consistency oracle against the re-captured real traces WAL (DECISION 13).
+/// Self-consistency oracle against the re-captured real traces WAL.
 /// Ignored by default (CI has no WAL); run with:
 ///   `cargo test -p ng-index --test traces_seal -- --ignored`
 /// after re-capturing with `ng-ingest-traces`.
@@ -539,9 +554,10 @@ fn oracle_real_wal_self_consistency() {
     let bytes = std::fs::read(&sfst_path).unwrap();
     let index = IndexReader::open(&bytes).unwrap();
 
-    // Check a bounded, deterministic sample of traces: `trace_by_id` rebuilds the
-    // reverse string table per call, so checking every distinct id would be far too
-    // slow at 500K. A sorted sample of a few hundred still surfaces any systemic
+    // Check a bounded, deterministic sample of traces: each `trace_by_id` call
+    // opens a fresh session (columns, string resolutions and batches decode
+    // from scratch), so checking every distinct id would be far too slow at
+    // 500K. A sorted sample of a few hundred still surfaces any systemic
     // seal/index/materialize bug (they'd fail uniformly, not per-trace).
     const SAMPLE: usize = 500;
     let mut ids: Vec<[u8; 16]> = truth.keys().copied().collect();
@@ -668,7 +684,7 @@ fn events_links_and_deferred_scalars_round_trip() {
     let root = &tr.spans[1];
     assert_eq!(root.span_id, SpanId::from([1; 8]));
 
-    // Scalars (Decision 2A) are row facets.
+    // The deferred scalars come back as row facets.
     let field = |s: &sfst::TraceSpan, k: &str| -> Vec<String> {
         s.fields
             .iter()
@@ -686,7 +702,11 @@ fn events_links_and_deferred_scalars_round_trip() {
     assert_eq!(root.events.len(), 2);
     let ev = &root.events[0];
     assert_eq!(
-        (ev.time_unix_nano, ev.name.as_str(), ev.dropped_attributes_count),
+        (
+            ev.time_unix_nano,
+            ev.name.as_str(),
+            ev.dropped_attributes_count
+        ),
         (2_100, "exception", 7)
     );
     assert_eq!(
@@ -733,7 +753,10 @@ fn events_links_and_deferred_scalars_round_trip() {
     assert_eq!(child.events.len(), 1);
     assert_eq!(child.events[0].name, "cache-miss");
     assert!(child.links.is_empty());
-    assert_eq!((child.dropped_events_count, child.dropped_links_count), (0, 0));
+    assert_eq!(
+        (child.dropped_events_count, child.dropped_links_count),
+        (0, 0)
+    );
 
     // Flat search tokens exist in the field table (searchable) but are excluded
     // from the reconstructed span's facet list (represented structurally).
@@ -744,7 +767,11 @@ fn events_links_and_deferred_scalars_round_trip() {
             .iter()
             .any(|f| f.name == "events.attributes.exception.stacktrace")
     );
-    assert!(fields.iter().any(|f| f.name == "links.attributes.messaging.operation"));
+    assert!(
+        fields
+            .iter()
+            .any(|f| f.name == "links.attributes.messaging.operation")
+    );
     assert!(
         root.fields.iter().all(|(k, _)| !k.starts_with("events.")),
         "flat events.* tokens excluded from the structured span"
@@ -761,12 +788,7 @@ fn events_links_and_deferred_scalars_round_trip() {
 fn no_events_no_links_no_chunks() {
     let trace = [0xE2u8; 16];
     let bytes = seal(vec![req(vec![span(
-        trace,
-        [1; 8],
-        [0; 8],
-        1_000,
-        2_000,
-        "plain",
+        trace, [1; 8], [0; 8], 1_000, 2_000, "plain",
     )])]);
     let index = IndexReader::open(&bytes).unwrap();
     assert!(!index.has_event_index());
@@ -840,12 +862,7 @@ fn seal_writes_the_trace_rollup_with_honest_roots_and_stored_counts() {
     let a_root = span([0xA; 16], [1; 8], [0; 8], 1_000, 2_000, "root-op");
     let a_child = span([0xA; 16], [2; 8], [1; 8], 1_200, 1_500, "child-op");
     let b_orphan = span([0xB; 16], [3; 8], [9; 8], 5_000, 6_000, "orphan-op");
-    let bytes = seal(vec![req(vec![
-        a_root,
-        a_child.clone(),
-        a_child,
-        b_orphan,
-    ])]);
+    let bytes = seal(vec![req(vec![a_root, a_child.clone(), a_child, b_orphan])]);
 
     let reader = IndexReader::open(&bytes).unwrap();
     assert!(reader.has_trace_rollup());
@@ -869,7 +886,10 @@ fn seal_writes_the_trace_rollup_with_honest_roots_and_stored_counts() {
     assert_eq!(resolve(rollup.root_name_refs[0]), "name=root-op");
 
     assert_eq!(rollup.trace_ids.get(1), TraceId::from([0xB; 16]));
-    assert_eq!(rollup.root_is_true_root[1], 0, "no true root → honest absence");
+    assert_eq!(
+        rollup.root_is_true_root[1], 0,
+        "no true root → honest absence"
+    );
     assert!(rollup.root_span_ids.get(1).is_unset());
     assert_eq!(rollup.root_service_refs[1], sfst::ROLLUP_NO_REF);
 
@@ -893,7 +913,14 @@ fn rollup_captures_error_status_kind_and_service_absence() {
     });
     let child = span([0xC; 16], [2; 8], [1; 8], 1_100, 1_200, "ok-child");
 
-    let mut svcless = req(vec![span([0xD; 16], [3; 8], [0; 8], 9_000, 9_100, "svcless-root")]);
+    let mut svcless = req(vec![span(
+        [0xD; 16],
+        [3; 8],
+        [0; 8],
+        9_000,
+        9_100,
+        "svcless-root",
+    )]);
     svcless.resource_spans[0].resource = Some(Resource::default());
 
     let bytes = seal(vec![req(vec![root, child]), svcless]);

@@ -28,6 +28,7 @@ Every SD file has the same shape:
 
 ```yaml
 disabled: no                  # set to yes to disable this pipeline
+trust_discovered_targets: no  # keep secret-reference syntax literal in generated jobs
 
 discoverer:
   <kind>:                     # discoverer kind (must match filename)
@@ -41,6 +42,9 @@ services:
 ```
 
 - `disabled: yes` keeps the file on disk but turns the pipeline off.
+- `trust_discovered_targets` defaults to `no`. Setting it to `yes` lets generated collector jobs resolve `${env:...}`, `${file:...}`, `${cmd:...}` and `${store:...}`, including references in target-controlled values copied by service rules. Those references can make Netdata read local files, run commands, or fetch stored secrets with the secret providers' permissions; collectors may send the results back to a target.
+- Enable only if you control and trust every target this pipeline can discover. Enabling accepts that risk for the whole pipeline: one untrusted target is enough to abuse it. Other pipelines remain unchanged.
+- Trust the inputs used by your service rules: Docker container metadata and commands, local process command lines, Kubernetes workload labels/annotations/environment, HTTP response items, or SNMP device system information. Custom rules can expose additional target-controlled values. The option does not resolve credentials used by the discoverer itself; SNMP scanning still requires literal credentials.
 - Editing a stock file requires restarting the agent. UI-managed pipelines apply live.
 - Where each discoverer's stock conf ships (with the Netdata package, with the Helm chart, or not at all) is documented on its per-discoverer page.
 
@@ -128,7 +132,7 @@ Custom helpers added to the SD template engine:
   - `"dstar"` — [doublestar](https://github.com/bmatcuk/doublestar) glob (supports `**` for path-style matching).
 - `glob VALUE PATTERN [PATTERN...]` — Shortcut for `match "glob" VALUE PATTERN...`.
 - `promPort PORT` — Returns the well-known Prometheus exporter module name registered for `PORT`, or the empty string. `net_listeners`-specific.
-- `toYaml VALUE` — Serialize `VALUE` as a YAML string. Used by `http` discoverer rules that pass through items as collector job configs.
+- `toYaml VALUE` — Serialize the complete value as YAML. Strings retain their exact contents and type; maps and sequences remain collections. Used by `http` discoverer rules that pass through items as collector job configs.
 
 **Notes:**
 
@@ -143,6 +147,8 @@ Custom helpers added to the SD template engine:
 
 
 ## config_template rendering
+
+By default, discovered jobs treat `${env:...}`, `${file:...}`, `${cmd:...}`, and `${store:...}` as literal text, even when a reference comes from an operator-authored discovery rule or credential. A pipeline with `trust_discovered_targets: yes` allows these references in all its generated collector jobs. Alternatively, adopt an individual collector job through Dynamic Configuration and review its complete configuration before saving.
 
 When a template rule matches, its `config_template` is executed with the target as the dot context. The rendered output is parsed as YAML to produce one or more collector jobs.
 
@@ -207,4 +213,4 @@ Look for `failed to execute services[N]->config_template on target` in the log. 
 
 ### YAML parse error after rendering
 
-`failed to parse services[N] template data` means the rendered output is not valid YAML. Common cause: a discovered string field contains a colon, hash, or other YAML special character. YAML-quote dynamic values (`name: "{{ .X }}"`) when they may be irregular.
+`failed to parse services[N] template data` means the rendered output is not valid YAML. Common cause: a discovered string field contains a colon, hash, or other YAML special character. Serialize complete dynamic values with `toYaml`, for example `name: {{ .X | toYaml }}`. Adding quotes around raw template text does not escape embedded quotes or newlines.

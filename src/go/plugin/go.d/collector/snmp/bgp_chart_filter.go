@@ -4,7 +4,7 @@ package snmp
 
 import "github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp/ddsnmp"
 
-func filterChartMetrics(metrics []ddsnmp.Metric) []ddsnmp.Metric {
+func filterChartMetrics(metrics []ddsnmp.Metric, onFiltered func(ddsnmp.Metric)) []ddsnmp.Metric {
 	if len(metrics) == 0 {
 		return nil
 	}
@@ -12,6 +12,9 @@ func filterChartMetrics(metrics []ddsnmp.Metric) []ddsnmp.Metric {
 	filtered := make([]ddsnmp.Metric, 0, len(metrics))
 	for _, metric := range metrics {
 		if shouldHideBGPDiagnosticMetric(metric.Name) {
+			if onFiltered != nil {
+				onFiltered(metric)
+			}
 			continue
 		}
 		filtered = append(filtered, metric)

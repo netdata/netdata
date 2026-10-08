@@ -4,6 +4,8 @@
 
 #if defined(OS_LINUX)
 static void send_cachestat_data_to_netdata(struct target *w, const char *type, usec_t dt);
+static void send_dcstat_data_to_netdata(struct target *w, const char *type, usec_t dt);
+static void send_fd_data_to_netdata(struct target *w, const char *type, usec_t dt);
 #endif
 
 static inline void send_BEGIN(const char *type, const char *name,const char *metric,  usec_t usec) {
@@ -123,6 +125,10 @@ void send_collected_data_to_netdata(struct target *root, const char *type, usec_
 #if defined(OS_LINUX)
         if (apps_ebpf_cachestat_data_ready())
             send_cachestat_data_to_netdata(w, type, dt);
+        if (apps_ebpf_dcstat_data_ready())
+            send_dcstat_data_to_netdata(w, type, dt);
+        if (apps_ebpf_fd_data_ready())
+            send_fd_data_to_netdata(w, type, dt);
 #endif
 
         if (unlikely(!w->values[PDF_PROCESSES]))
@@ -303,50 +309,136 @@ static void send_file_charts_to_netdata(struct target *w, const char *type, cons
 }
 
 #if defined(OS_LINUX)
-static void send_cachestat_charts_to_netdata(struct target *w, const char *type, const char *lbl_name) {
+/* One per-application eBPFGo chart definition.  cachestat, dcstat and fd differ
+ * only in their tables and in which target fields they read, so all three drive
+ * the same pair of emitters instead of carrying a copy of each loop. */
+struct apps_ebpf_chart {
+    const char *suffix; /* context suffix: app.<suffix> */
+    const char *title;
+    const char *units;
+    const char *style;
+    int         priority;
+    const char *dim;
+    const char *algo;
+    /* Chart-id suffix, used when it differs from the context suffix; NULL means
+     * the two are identical.  The C dcstat module shipped two charts whose id did
+     * NOT match their context (_ebpf_not_cache with app.ebpf_dc_not_cache, and
+     * _ebpf_not_found with app.ebpf_dc_not_found).  Chart ids are the per-app
+     * instance identity, so deriving them from the context suffix would rename
+     * them and split each instance on upgrade.  The mismatch is preserved
+     * deliberately. */
+    const char *id_suffix;
+    /* Charts that exist only when the producing module reports errors.  fd counts
+     * open/close errors on every mode but the C module exposed those charts only
+     * with `ebpf load mode = return`, so the gate travels through the
+     * EBPFGO_SHM_FLAG_FD_ERRORS header bit and lands here.  cachestat and dcstat
+     * have no such charts. */
+    bool errors_only;
+};
+
+/* The chart-id suffix, falling back to the context suffix when no override is set. */
+static inline const char *apps_ebpf_chart_id(const struct apps_ebpf_chart *chart)
+{
+    return chart->id_suffix ? chart->id_suffix : chart->suffix;
+}
+
+/* with_errors selects whether the errors_only charts are included.  It MUST hold
+ * the same value here and in send_ebpf_data_to_netdata for a given module: a SET
+ * to a chart that was never declared makes pluginsd log an error every cycle. */
+static void send_ebpf_charts_to_netdata(
+    struct target *w,
+    const char *type,
+    const char *lbl_name,
+    const char *family,
+    const struct apps_ebpf_chart *charts,
+    size_t count,
+    bool with_errors)
+{
     if (strcmp(type, NETDATA_APP_FAMILY) != 0)
         return;
 
-    static const struct {
-        const char *suffix;
-        const char *title;
-        const char *units;
-        const char *style;
-        int         priority;
-        const char *dim;
-        const char *algo;
-    } charts[] = {
-        { "ebpf_cachestat_hit_ratio",   "Hit ratio",                "%",        "line",    20260, "ratio",  "absolute"    },
-        { "ebpf_cachestat_dirty_pages", "Number of dirty pages",    "page/s",   "stacked", 20261, "pages",  "incremental" },
-        { "ebpf_cachestat_access",      "Number of accessed files", "hits/s",   "stacked", 20262, "hits",   "incremental" },
-        { "ebpf_cachestat_misses",      "Files out of page cache",  "misses/s", "stacked", 20263, "misses", "incremental" },
-    };
-
-    const char *name  = string2str(w->clean_name);
+    const char *name = string2str(w->clean_name);
     const char *wname = string2str(w->name);
-    for (size_t i = 0; i < sizeof(charts) / sizeof(charts[0]); i++) {
-        fprintf(stdout, "CHART %s.%s_%s '' '%s' '%s' page_cache %s.%s %s %d %d\n",
-                type, name, charts[i].suffix, charts[i].title, charts[i].units,
+    for (size_t i = 0; i < count; i++) {
+        if (charts[i].errors_only && !with_errors)
+            continue;
+
+        fprintf(stdout, "CHART %s.%s_%s '' '%s' '%s' %s %s.%s %s %d %d\n",
+                type, name, apps_ebpf_chart_id(&charts[i]), charts[i].title, charts[i].units, family,
                 type, charts[i].suffix, charts[i].style, charts[i].priority, update_every);
         send_CLABEL_COMMIT(lbl_name, wname);
         fprintf(stdout, "DIMENSION %s '' %s 1 1\n", charts[i].dim, charts[i].algo);
     }
 }
 
-static void send_cachestat_data_to_netdata(struct target *w, const char *type, usec_t dt) {
+/* values[] is parallel to charts[]: one value per chart, written to that chart's
+ * single dimension.  Skipped charts leave their values[] slot unread, so the
+ * arrays stay index-aligned. */
+static void send_ebpf_data_to_netdata(
+    struct target *w,
+    const char *type,
+    usec_t dt,
+    const struct apps_ebpf_chart *charts,
+    const kernel_uint_t *values,
+    size_t count,
+    bool with_errors)
+{
     if (strcmp(type, NETDATA_APP_FAMILY) != 0)
         return;
 
-    static const struct {
-        const char *chart;
-        const char *dim;
-    } entries[] = {
-        { "ebpf_cachestat_hit_ratio",   "ratio"  },
-        { "ebpf_cachestat_dirty_pages", "pages"  },
-        { "ebpf_cachestat_access",      "hits"   },
-        { "ebpf_cachestat_misses",      "misses" },
-    };
+    const char *name = string2str(w->clean_name);
+    for (size_t i = 0; i < count; i++) {
+        if (charts[i].errors_only && !with_errors)
+            continue;
 
+        send_BEGIN(type, name, apps_ebpf_chart_id(&charts[i]), dt);
+        send_SET(charts[i].dim, values[i]);
+        send_END();
+    }
+}
+
+static const struct apps_ebpf_chart apps_cachestat_charts[] = {
+    { "ebpf_cachestat_hit_ratio",   "Hit ratio",                "%",        "line",    20260, "ratio",  "absolute",    NULL, false },
+    { "ebpf_cachestat_dirty_pages", "Number of dirty pages",    "page/s",   "stacked", 20261, "pages",  "incremental", NULL, false },
+    { "ebpf_cachestat_access",      "Number of accessed files", "hits/s",   "stacked", 20262, "hits",   "incremental", NULL, false },
+    { "ebpf_cachestat_misses",      "Files out of page cache",  "misses/s", "stacked", 20263, "misses", "incremental", NULL, false },
+};
+
+/* Chart ids, contexts, dimensions, and priorities match the ones the C dcstat
+ * module published, so existing per-app chart instances and dashboards keep
+ * resolving.  Two ids need the id_suffix override because the C module did not
+ * derive them from the context.
+ *
+ * Values are pre-computed interval totals, matching the C collector's `files`
+ * units and `absolute` algorithm. */
+static const struct apps_ebpf_chart apps_dcstat_charts[] = {
+    { "ebpf_dc_hit",       "Percentage of directory lookups resolved by the cache.", "%",       "line",    20265, "ratio", "absolute",    NULL, false },
+    { "ebpf_dc_reference", "Count file access.",                          "files", "stacked", 20266, "files", "absolute", NULL, false },
+    { "ebpf_dc_not_cache", "Files not present inside directory cache.",   "files", "stacked", 20267, "files", "absolute", "ebpf_not_cache", false },
+    { "ebpf_dc_not_found", "Files not found.",                            "files", "stacked", 20268, "files", "absolute", "ebpf_not_found", false },
+};
+
+/* Chart ids, contexts, dimensions, units, algorithms and priorities match the
+ * ones the C filedescriptor module published, so existing per-app chart instances
+ * and dashboards keep resolving.  Ids and contexts agree here, so no id_suffix
+ * override is needed.
+ *
+ * Values are monotonic running totals and the algorithm is incremental, exactly
+ * as before: the Go plugin publishes per-interval deltas and
+ * apps_ebpf_accumulate_fd() sums them. */
+static const struct apps_ebpf_chart apps_fd_charts[] = {
+    { "ebpf_file_open",        "Number of open files",  "calls/s", "stacked", 20220, "calls", "incremental", NULL, false },
+    { "ebpf_file_open_error",  "Fails to open files.",  "calls/s", "stacked", 20221, "calls", "incremental", NULL, true  },
+    { "ebpf_file_closed",      "Files closed.",         "calls/s", "stacked", 20222, "calls", "incremental", NULL, false },
+    { "ebpf_file_close_error", "Fails to close files.", "calls/s", "stacked", 20223, "calls", "incremental", NULL, true  },
+};
+
+static void send_cachestat_charts_to_netdata(struct target *w, const char *type, const char *lbl_name) {
+    send_ebpf_charts_to_netdata(w, type, lbl_name, "page_cache",
+                                apps_cachestat_charts, _countof(apps_cachestat_charts), true);
+}
+
+static void send_cachestat_data_to_netdata(struct target *w, const char *type, usec_t dt) {
     const kernel_uint_t values[] = {
         (kernel_uint_t)w->cachestat.ratio,
         (kernel_uint_t)w->cachestat.dirty,
@@ -354,12 +446,41 @@ static void send_cachestat_data_to_netdata(struct target *w, const char *type, u
         (kernel_uint_t)w->cachestat.miss,
     };
 
-    const char *name = string2str(w->clean_name);
-    for (size_t i = 0; i < sizeof(entries) / sizeof(entries[0]); i++) {
-        send_BEGIN(type, name, entries[i].chart, dt);
-        send_SET(entries[i].dim, values[i]);
-        send_END();
-    }
+    send_ebpf_data_to_netdata(w, type, dt, apps_cachestat_charts, values, _countof(values), true);
+}
+
+static void send_dcstat_charts_to_netdata(struct target *w, const char *type, const char *lbl_name) {
+    send_ebpf_charts_to_netdata(w, type, lbl_name, "directory_cache",
+                                apps_dcstat_charts, _countof(apps_dcstat_charts), true);
+}
+
+static void send_dcstat_data_to_netdata(struct target *w, const char *type, usec_t dt) {
+    const kernel_uint_t values[] = {
+        (kernel_uint_t)w->dcstat_totals.ratio,
+        (kernel_uint_t)w->dcstat_totals.reference,
+        (kernel_uint_t)w->dcstat_totals.slow,
+        (kernel_uint_t)w->dcstat_totals.not_found,
+    };
+
+    send_ebpf_data_to_netdata(w, type, dt, apps_dcstat_charts, values, _countof(values), true);
+}
+
+static void send_fd_charts_to_netdata(struct target *w, const char *type, const char *lbl_name) {
+    send_ebpf_charts_to_netdata(w, type, lbl_name, "fds",
+                                apps_fd_charts, _countof(apps_fd_charts),
+                                apps_ebpf_fd_errors_are_available());
+}
+
+static void send_fd_data_to_netdata(struct target *w, const char *type, usec_t dt) {
+    const kernel_uint_t values[] = {
+        (kernel_uint_t)w->fd_totals.open_call,
+        (kernel_uint_t)w->fd_totals.open_err,
+        (kernel_uint_t)w->fd_totals.close_call,
+        (kernel_uint_t)w->fd_totals.close_err,
+    };
+
+    send_ebpf_data_to_netdata(w, type, dt, apps_fd_charts, values, _countof(values),
+                              apps_ebpf_fd_errors_are_available());
 }
 #endif
 
@@ -478,6 +599,10 @@ void send_charts_updates_to_netdata(struct target *root, const char *type, const
 #if defined(OS_LINUX)
         if (apps_ebpf_cachestat_is_available())
             send_cachestat_charts_to_netdata(w, type, lbl_name);
+        if (apps_ebpf_dcstat_is_available())
+            send_dcstat_charts_to_netdata(w, type, lbl_name);
+        if (apps_ebpf_fd_is_available())
+            send_fd_charts_to_netdata(w, type, lbl_name);
 #endif
 
         fprintf(stdout, "CHART %s.%s_uptime '' '%s uptime' 'seconds' uptime %s.uptime line 20250 %d\n",
@@ -508,6 +633,36 @@ void send_charts_updates_to_netdata(struct target *root, const char *type, const
             send_cachestat_charts_to_netdata(w, type, lbl_name);
         }
         cachestat_charts_announced = true;
+    }
+
+    static bool dcstat_charts_announced = false;
+    if (!dcstat_charts_announced && apps_ebpf_dcstat_is_available() && strcmp(type, NETDATA_APP_FAMILY) == 0) {
+        for (w = root; w; w = w->next) {
+            if (!w->exposed) continue;
+            send_dcstat_charts_to_netdata(w, type, lbl_name);
+        }
+        dcstat_charts_announced = true;
+    }
+
+    /* fd needs two latches, not one.  The error charts are announced only while
+     * the producer reports EBPFGO_SHM_FLAG_FD_ERRORS, and that bit can arrive
+     * after the base charts were already announced — an operator switching
+     * `ebpf load mode` from entry to return restarts ebpf-go.plugin while
+     * apps.plugin keeps running.  Without the second latch the announcement stays
+     * done, send_fd_data_to_netdata() starts SETting the error dimensions, and
+     * pluginsd logs an error for every SET to a chart that was never declared. */
+    static bool fd_charts_announced = false;
+    static bool fd_error_charts_announced = false;
+    if (apps_ebpf_fd_is_available() && strcmp(type, NETDATA_APP_FAMILY) == 0) {
+        bool fd_errors = apps_ebpf_fd_errors_are_available();
+        if (!fd_charts_announced || (fd_errors && !fd_error_charts_announced)) {
+            for (w = root; w; w = w->next) {
+                if (!w->exposed) continue;
+                send_fd_charts_to_netdata(w, type, lbl_name);
+            }
+            fd_charts_announced = true;
+            fd_error_charts_announced = fd_errors;
+        }
     }
 #endif
 }

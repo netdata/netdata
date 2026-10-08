@@ -141,12 +141,12 @@ static bool rrdmetric_conflict_callback(const DICTIONARY_ITEM *item __maybe_unus
         }
 
         internal_error(true,
-                       "RRDMETRIC: '%s' of instance '%s' of host '%s' changed UUID from '%s' (retention %ld to %ld, %ld secs) to '%s' (retention %ld to %ld, %ld secs)"
+                       "RRDMETRIC: '%s' of instance '%s' of host '%s' changed UUID from '%s' (retention %" PRId64 " to %" PRId64 ", %" PRId64 " secs) to '%s' (retention %" PRId64 " to %" PRId64 ", %" PRId64 " secs)"
                        , string2str(rm->id)
                        , string2str(rm->ri->id)
                        , rrdhost_hostname(rm->ri->rc->rrdhost)
-                       , uuid1, old_first_time_s, old_last_time_s, old_last_time_s - old_first_time_s
-                       , uuid2, new_first_time_s, new_last_time_s, new_last_time_s - new_first_time_s
+                       , uuid1, (int64_t)old_first_time_s, (int64_t)old_last_time_s, (int64_t)(old_last_time_s - old_first_time_s)
+                       , uuid2, (int64_t)new_first_time_s, (int64_t)new_last_time_s, (int64_t)(new_last_time_s - new_first_time_s)
                        );
 #endif
 
@@ -265,6 +265,15 @@ void rrdmetric_from_rrddim(RRDDIM *rd) {
     };
 
     RRDMETRIC_ACQUIRED *rma = (RRDMETRIC_ACQUIRED *)dictionary_set_and_acquire_item(ri->rrdmetrics, string2str(trm.id), &trm, sizeof(trm));
+    if(unlikely(!rma)) {
+        // the metrics dictionary is being destroyed; the insert callback never
+        // ran, so free what we duplicated above (mirrors rrdmetric_free()) and
+        // keep the existing link untouched
+        string_freez(trm.id);
+        string_freez(trm.name);
+        uuidmap_free(trm.uuid);
+        return;
+    }
 
     if(rd->rrdcontexts.rrdmetric)
         rrdmetric_release(rd->rrdcontexts.rrdmetric);

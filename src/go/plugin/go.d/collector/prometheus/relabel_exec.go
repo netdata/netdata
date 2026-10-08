@@ -12,7 +12,7 @@ import (
 	"github.com/prometheus/prometheus/model/labels"
 
 	prompkg "github.com/netdata/netdata/go/plugins/pkg/prometheus"
-	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/prometheus/relabel"
+	"github.com/netdata/netdata/go/plugins/pkg/relabel"
 )
 
 type relabelStage struct {
@@ -174,7 +174,9 @@ func (c *Collector) applyObservedPipeline(
 		if pipeline == nil {
 			return raw, relabel.DropInfo{}
 		}
-		return pipeline.Apply(raw)
+		record, drop := pipeline.Apply(relabel.Record{Name: raw.Name, Labels: raw.Labels})
+		raw.Name, raw.Labels = record.Name, record.Labels
+		return raw, drop
 	}
 
 	source := prompkg.IdentifySampleSeries(raw)
@@ -200,8 +202,9 @@ func (c *Collector) applyObservedPipeline(
 	dropMetricName := sample.Name
 	dropBlockIndex := -1
 	if pipeline != nil {
-		sample, drop = pipeline.ApplyWithObserver(
-			raw,
+		var record relabel.Record
+		record, drop = pipeline.ApplyWithObserver(
+			relabel.Record{Name: raw.Name, Labels: raw.Labels},
 			func(fact relabel.BlockDiagnostic) {
 				dropBlockIndex = fact.BlockIndex
 				c.observePipeline(PipelineDiagnostic{
@@ -239,6 +242,7 @@ func (c *Collector) applyObservedPipeline(
 				})
 			},
 		)
+		sample.Name, sample.Labels = record.Name, record.Labels
 	}
 	if drop.Dropped() {
 		c.observePipeline(PipelineDiagnostic{

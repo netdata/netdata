@@ -36,12 +36,17 @@ func exposedCacheCount(c *ExposedCache[testConfig]) int {
 }
 
 func lookupSeenByUID(c *SeenCache[testConfig], uid string) (testConfig, bool) {
-	return c.Lookup(testConfig{uid: uid})
+	return c.Lookup(testConfig{
+		uid: uid,
+	})
 }
 
 func TestSeenCache_AddAndLookup(t *testing.T) {
 	c := NewSeenCache[testConfig]()
-	cfg := testConfig{uid: "uid1", key: "key1"}
+	cfg := testConfig{
+		uid: "uid1",
+		key: "key1",
+	}
 
 	c.Add(cfg)
 
@@ -52,7 +57,10 @@ func TestSeenCache_AddAndLookup(t *testing.T) {
 
 func TestSeenCache_Remove(t *testing.T) {
 	c := NewSeenCache[testConfig]()
-	cfg := testConfig{uid: "uid1", key: "key1"}
+	cfg := testConfig{
+		uid: "uid1",
+		key: "key1",
+	}
 
 	c.Add(cfg)
 	c.Remove(cfg)
@@ -63,8 +71,16 @@ func TestSeenCache_Remove(t *testing.T) {
 
 func TestSeenCache_AddOverwrites(t *testing.T) {
 	c := NewSeenCache[testConfig]()
-	cfg1 := testConfig{uid: "uid1", key: "key1", hash: 100}
-	cfg2 := testConfig{uid: "uid1", key: "key1", hash: 200}
+	cfg1 := testConfig{
+		uid:  "uid1",
+		key:  "key1",
+		hash: 100,
+	}
+	cfg2 := testConfig{
+		uid:  "uid1",
+		key:  "key1",
+		hash: 200,
+	}
 
 	c.Add(cfg1)
 	c.Add(cfg2)
@@ -76,7 +92,9 @@ func TestSeenCache_AddOverwrites(t *testing.T) {
 
 func TestSeenCache_RemoveNonexistent(t *testing.T) {
 	c := NewSeenCache[testConfig]()
-	cfg := testConfig{uid: "uid1"}
+	cfg := testConfig{
+		uid: "uid1",
+	}
 
 	// Should not panic.
 	c.Remove(cfg)
@@ -84,8 +102,14 @@ func TestSeenCache_RemoveNonexistent(t *testing.T) {
 
 func TestExposedCache_AddAndLookup(t *testing.T) {
 	c := NewExposedCache[testConfig]()
-	cfg := testConfig{uid: "uid1", key: "key1"}
-	entry := &Entry[testConfig]{Cfg: cfg, Status: StatusAccepted}
+	cfg := testConfig{
+		uid: "uid1",
+		key: "key1",
+	}
+	entry := &Entry[testConfig]{
+		Cfg:    cfg,
+		Status: StatusAccepted,
+	}
 
 	c.Add(entry)
 
@@ -104,8 +128,14 @@ func TestExposedCache_LookupByKey_NotFound(t *testing.T) {
 
 func TestExposedCache_Remove(t *testing.T) {
 	c := NewExposedCache[testConfig]()
-	cfg := testConfig{uid: "uid1", key: "key1"}
-	entry := &Entry[testConfig]{Cfg: cfg, Status: StatusAccepted}
+	cfg := testConfig{
+		uid: "uid1",
+		key: "key1",
+	}
+	entry := &Entry[testConfig]{
+		Cfg:    cfg,
+		Status: StatusAccepted,
+	}
 
 	c.Add(entry)
 	c.Remove(cfg)
@@ -116,10 +146,22 @@ func TestExposedCache_Remove(t *testing.T) {
 
 func TestExposedCache_AddOverwritesByKey(t *testing.T) {
 	c := NewExposedCache[testConfig]()
-	cfg1 := testConfig{uid: "uid1", key: "key1"}
-	cfg2 := testConfig{uid: "uid2", key: "key1"} // same Key, different UID
-	entry1 := &Entry[testConfig]{Cfg: cfg1, Status: StatusRunning}
-	entry2 := &Entry[testConfig]{Cfg: cfg2, Status: StatusAccepted}
+	cfg1 := testConfig{
+		uid: "uid1",
+		key: "key1",
+	}
+	cfg2 := testConfig{
+		uid: "uid2",
+		key: "key1",
+	} // same Key, different UID
+	entry1 := &Entry[testConfig]{
+		Cfg:    cfg1,
+		Status: StatusRunning,
+	}
+	entry2 := &Entry[testConfig]{
+		Cfg:    cfg2,
+		Status: StatusAccepted,
+	}
 
 	c.Add(entry1)
 	c.Add(entry2)
@@ -130,18 +172,29 @@ func TestExposedCache_AddOverwritesByKey(t *testing.T) {
 	assert.Equal(t, StatusAccepted, got.Status)
 }
 
-func TestExposedCache_PointerMutationVisible(t *testing.T) {
+func TestExposedCache_ReplacementPreservesPreviousSnapshot(t *testing.T) {
 	c := NewExposedCache[testConfig]()
-	cfg := testConfig{uid: "uid1", key: "key1"}
-	entry := &Entry[testConfig]{Cfg: cfg, Status: StatusAccepted}
+	cfg := testConfig{
+		uid: "uid1",
+		key: "key1",
+	}
+	entry := &Entry[testConfig]{
+		Cfg:    cfg,
+		Status: StatusAccepted,
+	}
 
 	c.Add(entry)
 
 	got, ok := c.LookupByKey("key1")
 	require.True(t, ok)
 
-	// Mutating through the returned pointer updates the cache.
-	got.Status = StatusRunning
+	// Writers publish a replacement, so existing readers retain their snapshot.
+	c.Add(&Entry[testConfig]{
+		Cfg:     cfg,
+		Status:  StatusRunning,
+		Enabled: true,
+	})
+	assert.Equal(t, StatusAccepted, got.Status)
 
 	got2, _ := c.LookupByKey("key1")
 	assert.Equal(t, StatusRunning, got2.Status)

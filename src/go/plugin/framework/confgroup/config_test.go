@@ -358,3 +358,39 @@ func TestConfig_FunctionOnly(t *testing.T) {
 		})
 	}
 }
+
+func TestConfigTrustIdentity(t *testing.T) {
+	for _, source := range []string{TypeDiscovered, TypeUser, TypeStock, TypeDyncfg, "", "unknown"} {
+		t.Run(source, func(t *testing.T) {
+			config := Config{"module": "module", "name": "job"}.SetSourceType(source)
+			originalHash, originalUID := config.Hash(), config.UID()
+			config.SetDiscoveryPipelineID("pipeline-a")
+			config.SetTrustDiscoveredTargets(false)
+			assert.Equal(t, originalHash, config.Hash())
+			assert.Equal(t, originalUID, config.UID())
+			config.SetTrustDiscoveredTargets(true)
+			if source == TypeDiscovered {
+				assert.NotEqual(t, originalHash, config.Hash())
+				assert.NotEqual(t, originalUID, config.UID())
+			} else {
+				assert.Equal(t, originalHash, config.Hash())
+				assert.Equal(t, originalUID, config.UID())
+			}
+			trustedHash, trustedUID := config.Hash(), config.UID()
+			config.SetDiscoveryPipelineID("pipeline-b")
+			if source == TypeDiscovered {
+				assert.NotEqual(t, trustedHash, config.Hash())
+				assert.NotEqual(t, trustedUID, config.UID())
+			} else {
+				assert.Equal(t, trustedHash, config.Hash())
+				assert.Equal(t, trustedUID, config.UID())
+			}
+			cloned, err := config.Clone()
+			assert.NoError(t, err)
+			assert.Equal(t, config.Hash(), cloned.Hash())
+			assert.Equal(t, "pipeline-b", cloned.DiscoveryPipelineID())
+			config.SetTrustDiscoveredTargets(false)
+			assert.Equal(t, originalHash, config.Hash())
+		})
+	}
+}

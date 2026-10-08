@@ -4,7 +4,7 @@ Configure OpenAI's Codex CLI to access your Netdata infrastructure through MCP f
 
 ## Transport Support
 
-Codex CLI supports both stdio launchers and direct Streamable HTTP when the RMCP client is enabled (https://github.com/openai/codex/blob/main/docs/config.md#mcp-servers).
+Codex CLI supports both stdio launchers and direct Streamable HTTP when the RMCP client is enabled. See the [Codex MCP documentation](https://developers.openai.com/codex/mcp/).
 
 | Transport | Support | Netdata Version | Notes |
 |-----------|---------|-----------------|-------|
@@ -295,7 +295,7 @@ tool_timeout_sec = 180     # Time limit for individual tool calls
 ## Documentation Links
 
 - [OpenAI Codex CLI GitHub Repository](https://github.com/openai/codex)
-- [Codex CLI Configuration Documentation](https://github.com/openai/codex/blob/main/docs/config.md)
-- [Codex CLI Installation Guide](https://github.com/openai/codex#installation)
+- [Codex CLI Documentation](https://developers.openai.com/codex/cli/)
+- [Codex MCP Documentation](https://developers.openai.com/codex/mcp/)
 - [Netdata MCP Setup](/docs/netdata-ai/mcp/README.md)
 - [AI DevOps Best Practices](/docs/netdata-ai/mcp/mcp-clients/ai-devops-copilot.md)

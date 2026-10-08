@@ -7,6 +7,10 @@ profiles. The framework is intentionally split between the
 [`netdata/netdata`](https://github.com/netdata/netdata) and
 [`netdata/testdata`](https://github.com/netdata/testdata) repositories.
 
+**Place in the documentation set.** The project skill `.agents/skills/collectors-prometheus-profiles/SKILL.md` cites
+sections of this document by heading anchor, and `.agents/sow/audit.sh` fails when a cited heading no longer exists, so
+renaming or removing a heading here updates the skill in the same change.
+
 Field-level schemas, production behavior, and command syntax remain with their executable owners. This document owns the
 system boundary, authority model, dependency direction, and extension rules that connect those owners.
 
@@ -91,7 +95,7 @@ and compiling disagreements into failures.
 | Claim | Authority | Enforcement |
 |---|---|---|
 | Exporter registrations, types, components, label domains, lifecycle, availability, units, and source relationships | `SOURCE-SEMANTICS.yaml`, plus the optional mechanical source registry and its pinned public upstream evidence | Strict semantic load and static compilation |
-| Operator questions, entity grain, identity, label treatment, reductions, exclusions, units, and presentation intent | `PROFILE-DESIGN.yaml` | Strict semantic load, static compilation, and production reconciliation |
+| Profile documentation, internal operator questions, entity grain, identity, label treatment, reductions, exclusions, units, and presentation intent | `PROFILE-DESIGN.yaml` | Strict semantic load, static compilation, production reconciliation, and integration-documentation projection of the public subset |
 | Human rationale for the design | `OPERATOR-MODEL.md` | Human review; exact machine claims belong in the YAML contracts |
 | Realizable input environments, fixtures, lifecycle sequences, expected verdicts/findings, and coverage participation | `proof.yaml` | Strict proof descriptor load and replay verification |
 | Profile parsing, selection, relabeling, assembly, writer behavior, chart routing, and public wire identities | Production Prometheus, metrix, chartengine, and chartemit packages | Real production execution with opt-in structured facts |
@@ -103,7 +107,11 @@ Important boundaries:
 - A fixture proves that a declared producer state is realizable; it does not define universal source semantics by itself.
 - A source registry is mechanical registration truth. Its generator groupings are extraction conveniences, not semantic
   signal or chart ownership.
-- `PROFILE-DESIGN.yaml` is research-backed design input, not a serialization of the resulting profile.
+- `PROFILE-DESIGN.yaml` is research-backed design input, not a serialization of the resulting profile. Its `documentation`
+  block owns the operator-facing profile title and summary used by generated integration documentation.
+- A view's `question` is internal authoring rationale. Generated integration documentation MUST NOT publish it. Public
+  coverage is rendered as ordinary tables grouped by each profile's top-level family. Every metric-to-chart row contains
+  the Prometheus metric, full Netdata family and chart title, dimension, unit, and entity scope.
 - `proof.yaml` contains independent expectations, not generated snapshots, counts, or content digests.
 - Production code is authoritative for behavior. Semantic contracts state what that behavior must mean for the profile.
 
@@ -251,7 +259,8 @@ Support composition exists for metrics that are exported with the candidate but 
 such as language/runtime process metrics.
 
 - `PROFILE-DESIGN.yaml` is the single declaration owner through `composition.supports`.
-- A support entry includes the environment in which that profile is available.
+- A support entry includes the environment in which that profile is available and an operator-facing `activation`
+  explanation for generated integration documentation.
 - The catalog compiler resolves the complete closure and rejects missing bundles or cycles.
 - Each proof case declares environments for the candidate and every active support; the compiler derives the active set.
 - The production collector selects all active profiles automatically and applies them in normal profile order.
@@ -353,8 +362,8 @@ existing owner cannot express the required invariant and that limitation is demo
 - [Stock proof artifact and checkout contract](../../plugin/go.d/collector/prometheus/profile-proofs/README.md)
 - [Proof CLI behavior](../../tools/prometheus-profile-proof/README.md)
 - [Standalone validator behavior and findings](../../tools/prometheus-profile-validation/README.md)
-- [Profile and proof authoring workflow](../../../../.agents/skills/project-prometheus-profiles/SKILL.md)
-- [Strict proof authoring reference](../../../../.agents/skills/project-prometheus-profiles/proof-authoring.md)
+- [Profile and proof authoring workflow](../../../../.agents/skills/collectors-prometheus-profiles/SKILL.md)
+- [Strict proof authoring reference](../../../../.agents/skills/collectors-prometheus-profiles/proof-authoring.md)
 - [Testdata-side artifact and generator operation](https://github.com/netdata/testdata/blob/master/prometheus/README.md)
 
 Executable field authorities are the strict types and validators in `proof`, `semantics`, and `validation`, plus the

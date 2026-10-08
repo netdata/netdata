@@ -409,7 +409,7 @@ sanitize_path() {
   if [ -z "${_path_replace}" ]; then
     _path_replace="$(printf "%$(printf "%s" "${_path_unsafe}" | wc -m)s" | tr " " "_")"
   fi
-  r="$(printf '%s\n' "$1" | tr "${_path_unsafe}" "${_path_replace}")"
+  r="$(printf '%s' "$1" | tr "${_path_unsafe}" "${_path_replace}")"
   [ "${v}" = "${r}" ] || warning "Unsafe characters found in path, sanitized to ${r}"
   echo "${r}"
 }
@@ -2161,20 +2161,24 @@ try_static_install() {
 set_source_archive_urls() {
   if [ "$1" = "stable" ]; then
     if [ -n "${INSTALL_VERSION}" ]; then
-      export NETDATA_SOURCE_ARCHIVE_URL="https://github.com/netdata/netdata/releases/download/v${INSTALL_VERSION}/netdata-v${INSTALL_VERSION}.tar.gz"
+      export NETDATA_SOURCE_ARCHIVE_BASE_NAME="netdata-v${INSTALL_VERSION}.tar"
+      export NETDATA_SOURCE_ARCHIVE_BASEURL="https://github.com/netdata/netdata/releases/download/v${INSTALL_VERSION}/${NETDATA_SOURCE_ARCHIVE_BASE_NAME}"
       export NETDATA_SOURCE_ARCHIVE_CHECKSUM_URL="https://github.com/netdata/netdata/releases/download/v${INSTALL_VERSION}/sha256sums.txt"
     else
       latest="$(get_redirect "https://github.com/netdata/netdata/releases/latest")"
-      export NETDATA_SOURCE_ARCHIVE_URL="https://github.com/netdata/netdata/releases/download/${latest}/netdata-${latest}.tar.gz"
+      export NETDATA_SOURCE_ARCHIVE_BASE_NAME="netdata-${latest}.tar"
+      export NETDATA_SOURCE_ARCHIVE_BASEURL="https://github.com/netdata/netdata/releases/download/${latest}/${NETDATA_SOURCE_ARCHIVE_BASE_NAME}"
       export NETDATA_SOURCE_ARCHIVE_CHECKSUM_URL="https://github.com/netdata/netdata/releases/download/${latest}/sha256sums.txt"
     fi
   else
+    export NETDATA_SOURCE_ARCHIVE_BASE_NAME="netdata-latest.tar"
+
     if [ -n "${INSTALL_VERSION}" ]; then
-      export NETDATA_SOURCE_ARCHIVE_URL="${NETDATA_TARBALL_BASEURL}/download/v${INSTALL_VERSION}/netdata-latest.tar.gz"
+      export NETDATA_SOURCE_ARCHIVE_BASEURL="${NETDATA_TARBALL_BASEURL}/download/v${INSTALL_VERSION}/${NETDATA_SOURCE_ARCHIVE_BASE_NAME}"
       export NETDATA_SOURCE_ARCHIVE_CHECKSUM_URL="${NETDATA_TARBALL_BASEURL}/download/v${INSTALL_VERSION}/sha256sums.txt"
     else
       tag="$(get_redirect "${NETDATA_TARBALL_BASEURL}/latest")"
-      export NETDATA_SOURCE_ARCHIVE_URL="${NETDATA_TARBALL_BASEURL}/download/${tag}/netdata-latest.tar.gz"
+      export NETDATA_SOURCE_ARCHIVE_BASEURL="${NETDATA_TARBALL_BASEURL}/download/${tag}/${NETDATA_SOURCE_ARCHIVE_BASE_NAME}"
       export NETDATA_SOURCE_ARCHIVE_CHECKSUM_URL="${NETDATA_TARBALL_BASEURL}/download/${tag}/sha256sums.txt"
     fi
   fi
@@ -2265,12 +2269,26 @@ try_build_install() {
   fi
 
   set_source_archive_urls "${SELECTED_RELEASE_CHANNEL}"
+  zstd="$(command -v zstd 2>/dev/null || true)"
+  archive_name=""
 
-  if [ -n "${INSTALL_VERSION}" ]; then
-    if ! download "${NETDATA_SOURCE_ARCHIVE_URL}" "./netdata-v${INSTALL_VERSION}.tar.gz"; then
-      fatal "Failed to download source tarball for local build. ${BADNET_MSG}." F000B
+  if [ -n "${zstd}" ]; then
+    if download "${NETDATA_SOURCE_ARCHIVE_BASEURL}.zst" "${NETDATA_SOURCE_ARCHIVE_BASE_NAME}.zst"; then
+      archive_name="${NETDATA_SOURCE_ARCHIVE_BASE_NAME}.zst"
+      decompress="${zstd} -dcf"
+    else
+      warning "Unable to fetch zstd compressed source tarball, trying gzip compressed tarball instead."
     fi
-  elif ! download "${NETDATA_SOURCE_ARCHIVE_URL}" "./netdata-latest.tar.gz"; then
+  fi
+
+  if [ -z "${archive_name}" ]; then
+    if download "${NETDATA_SOURCE_ARCHIVE_BASEURL}.gz" "${NETDATA_SOURCE_ARCHIVE_BASE_NAME}.gz"; then
+      archive_name="${NETDATA_SOURCE_ARCHIVE_BASE_NAME}.gz"
+      decompress="$(command -v gzip 2>/dev/null) -dc"
+    fi
+  fi
+
+  if [ -z "${archive_name}" ]; then
     fatal "Failed to download source tarball for local build. ${BADNET_MSG}." F000B
   fi
 
@@ -2281,22 +2299,14 @@ try_build_install() {
   if [ "${DRY_RUN}" -eq 1 ]; then
     progress "Would validate SHA256 checksum of downloaded source archive."
   else
-    if [ -z "${INSTALL_VERSION}" ]; then
-      # shellcheck disable=SC2086
-      if ! grep netdata-latest.tar.gz "./sha256sum.txt" | safe_sha256sum -c - > /dev/null 2>&1; then
-        bad_sums_report="$(report_bad_sha256sum netdata-latest.tar.gz "./sha256sum.txt")"
-        fatal "Tarball checksum validation failed.\n${bad_sums_report}\n${BADCACHE_MSG}." F0005
-      fi
+    if ! grep "${archive_name}" ./sha256sum.txt | safe_sha256sum -c - > /dev/null 2>&1; then
+      bad_sums_report="$(report_bad_sha256sum "${archive_name}" ./sha256sum.txt)"
+      fatal "Tarball checksum validation failed.\n${bad_sums_report}\n${BADCACHE_MSG}." F0005
     fi
   fi
 
-  if [ -n "${INSTALL_VERSION}" ]; then
-    run tar -xf "./netdata-v${INSTALL_VERSION}.tar.gz" -C "${tmpdir}"
-    rm -rf "./netdata-v${INSTALL_VERSION}.tar.gz" > /dev/null 2>&1
-  else
-    run tar -xf "./netdata-latest.tar.gz" -C "${tmpdir}"
-    rm -rf "./netdata-latest.tar.gz" > /dev/null 2>&1
-  fi
+  run sh -c '${0} "${1}" | tar -xf - -C "${2}"' "${decompress}" "${archive_name}" "${tmpdir}"
+  rm -rf "${archive_name}" > /dev/null 2>&1
 
   if [ "${DRY_RUN}" -ne 1 ]; then
     netdata_src_dir="$(find "${tmpdir}" -mindepth 1 -maxdepth 1 -type d -name 'netdata-*' | head -n 1)"
@@ -2390,11 +2400,14 @@ prepare_offline_install_source() {
     progress "Verifying checksums."
 
     failed_files=""
-    for file in $(find . -name '*.gz.run'); do
+    while IFS= read -r file; do
+      [ -n "${file}" ] || continue
       if ! grep -e "${file}" sha256sums.txt | safe_sha256sum -c -; then
         failed_files="${failed_files}\n${file}\n$(report_bad_sha256sum "${file}" sha256sums.txt)"
       fi
-    done
+    done <<EOF
+$(find . -name '*.gz.run')
+EOF
 
     if [ -n "${failed_files}" ]; then
       fatal "Checksums for offline install files are incorrect.\n${failed_files}\n${BADCACHE_MSG}." F0507
@@ -2714,7 +2727,6 @@ parse_args() {
         warning "Cloud is always required"
         ;;
       "--dont-start-it")
-        NETDATA_NO_START=1
         NETDATA_INSTALLER_OPTIONS="${NETDATA_INSTALLER_OPTIONS} --dont-start-it"
         ;;
       "--disable-telemetry")

@@ -7,13 +7,21 @@ on:
       - master
     paths:
       - 'CMakeLists.txt'
+      - 'src/**/CMakeLists.txt'
+      - '**.cmake'
       - '**.c'
       - '**.h'
+      - 'tests/acls/**'
+      - 'tests/run-unit-tests.sh'
   pull_request:
     paths:
       - 'CMakeLists.txt'
+      - 'src/**/CMakeLists.txt'
+      - '**.cmake'
       - '**.c'
       - '**.h'
+      - 'tests/acls/**'
+      - 'tests/run-unit-tests.sh'
 env:
   DISABLE_TELEMETRY: 1
 concurrency:
@@ -25,7 +33,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@v7
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           submodules: recursive
       - name: Prepare environment

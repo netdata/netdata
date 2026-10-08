@@ -125,9 +125,10 @@ class RunInfo(BaseModel):
     state: str = Field(description="declared | building | starting | ready | stopped | failed | unknown | error")
     profile: str | None = None
     worktree: str | None = None
-    port: int | None = Field(default=None, description="Assigned loopback port.")
+    port: int | None = Field(default=None, description="Loopback web port: the declared one, else assigned at start.")
     url: str | None = Field(default=None, description="http://127.0.0.1:<port> once the agent is ready.")
-    otlp_endpoint: str | None = Field(default=None, description="Where the otel plugin listens for OTLP/gRPC data (host:port); send test logs here.")
+    otlp_endpoint: str | None = Field(default=None, description="Where the otel plugin listens for OTLP/gRPC data (ip:port); send test logs here. Null until the agent has started.")
+    otlp_http_endpoint: str | None = Field(default=None, description="Where the otel plugin listens for OTLP/HTTP data (ip:port; POST /v1/logs, /v1/traces, /v1/metrics). Null until the agent has started, and when the listener is disabled.")
     current_phase: str | None = Field(default=None, description="configure | install | launch.")
     elapsed_seconds: float = 0.0
     returncode: int | None = Field(default=None, description="netdata's exit code once a launched agent has stopped/failed (negative = killed by signal).")
@@ -195,6 +196,7 @@ def run_info(run: Run, *, message: str = "") -> RunInfo:
         port=run.port,
         url=(f"http://127.0.0.1:{run.port}" if ready else None),
         otlp_endpoint=run.otlp_endpoint or None,
+        otlp_http_endpoint=run.otlp_http_endpoint or None,
         current_phase=run.current_phase,
         elapsed_seconds=round(run.elapsed(), 1),
         returncode=run.returncode,
@@ -208,7 +210,10 @@ def run_info(run: Run, *, message: str = "") -> RunInfo:
 
 
 def agent_declared(spec: AgentSpec, *, message: str = "") -> RunInfo:
-    return RunInfo(agent_id=spec.agent_id, state="declared", profile=spec.profile, worktree=spec.worktree, message=message)
+    return RunInfo(
+        agent_id=spec.agent_id, state="declared", profile=spec.profile, worktree=spec.worktree,
+        port=spec.port, message=message,
+    )
 
 
 def unknown_agent(agent_id: str) -> RunInfo:

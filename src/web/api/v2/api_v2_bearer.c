@@ -71,13 +71,17 @@ int api_v2_bearer_protection(RRDHOST *host __maybe_unused, struct web_client *w 
 
 int bearer_get_token_json_response(BUFFER *wb, RRDHOST *host, const char *claim_id, const char *machine_guid, const char *node_id, HTTP_USER_ROLE user_role, HTTP_ACCESS access, nd_uuid_t cloud_account_id, const char *client_name) {
     if(!claim_id_matches_any(claim_id))
-        return rrd_call_function_error(wb, "The request is for a different agent", HTTP_RESP_BAD_REQUEST);
+        return nrpc_call_error(wb, "The request is for a different agent", HTTP_RESP_BAD_REQUEST);
 
     if(!verify_host_uuids(host, machine_guid, node_id))
-        return rrd_call_function_error(wb, "The request is missing or not matching local node UUIDs", HTTP_RESP_BAD_REQUEST);
+        return nrpc_call_error(wb, "The request is missing or not matching local node UUIDs", HTTP_RESP_BAD_REQUEST);
 
     nd_uuid_t uuid;
     time_t expires_s = bearer_create_token(&uuid, user_role, access, cloud_account_id, client_name);
+    if(!expires_s)
+        // the token could not be stored (the bearer tokens dictionary is being
+        // destroyed) - never hand out a token that was not registered
+        return nrpc_call_error(wb, "Failed to create a bearer token", HTTP_RESP_INTERNAL_SERVER_ERROR);
 
     buffer_reset(wb);
     buffer_json_initialize(wb, "\"", "\"", 0, true, BUFFER_JSON_OPTIONS_MINIFY);

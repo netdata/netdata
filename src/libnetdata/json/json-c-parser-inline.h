@@ -709,7 +709,7 @@ static inline bool jsonc_double_fits_integer_destination(double value, size_t si
 } while(0)
 
 typedef bool (*json_parse_function_payload_t)(json_object *jobj, void *data, BUFFER *error);
-int rrd_call_function_error(BUFFER *wb, const char *msg, int code);
+int nrpc_call_error(BUFFER *wb, const char *msg, int code);
 struct json_object *json_parse_function_payload_or_error(BUFFER *output, BUFFER *payload, int *code, json_parse_function_payload_t cb, void *cb_data);
 
 // return HTTP response code
