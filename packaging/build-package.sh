@@ -259,7 +259,6 @@ case "${PKG_TYPE}" in
     *) echo "Unrecognized package type ${PKG_TYPE}." ; exit 1 ;;
 esac
 
-
 if [ "${ENABLE_SENTRY}" = "true" ]; then
     if [ -z "${SENTRY_DSN}" ]; then
         echo "ERROR: Sentry enabled but no DSN specified, exiting."
