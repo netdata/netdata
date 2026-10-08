@@ -30,7 +30,7 @@ func TestSiteInstallURLUsesOnlyExplicitConfiguration(t *testing.T) {
 				Serving:   true,
 				PublicURL: tc.receiver,
 			})
-			defer revoke()
+			defer revoke.Close()
 			cfg := config.Site{
 				Name:      "shop",
 				PublicURL: tc.site,
@@ -73,7 +73,13 @@ func TestSiteEvidencePersistsAfterAcceptanceAndResetsWithGeneration(t *testing.T
 	response := httptest.NewRecorder()
 	handler.ServeHTTP(response, request)
 	require.Equal(t, http.StatusForbidden, response.Code)
-	request = httptest.NewRequest(http.MethodPost, "/rum/shop/collect", strings.NewReader(`{"meta":{"page":{"id":"document","url":"https://example.org/accepted"},"session":{"id":"session"}},"events":[{"name":"document_activated","attributes":{"observation_id":"document","observation_sequence":"1"}}]}`))
+	request = httptest.NewRequest(
+		http.MethodPost,
+		"/rum/shop/collect",
+		strings.NewReader(
+			`{"meta":{"page":{"id":"document","url":"https://example.org/accepted"},"session":{"id":"session"}},"events":[{"name":"document_activated","attributes":{"observation_id":"document","observation_sequence":"1"}}]}`,
+		),
+	)
 	request.Header.Set("Origin", "https://example.org")
 	request.Header.Set("User-Agent", "Mozilla/5.0 Chrome/120.0.0.0 Safari/537.36")
 	response = httptest.NewRecorder()

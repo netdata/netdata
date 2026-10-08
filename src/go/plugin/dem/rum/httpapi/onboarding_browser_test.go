@@ -95,7 +95,8 @@ func TestOnboardingBrowser(t *testing.T) {
 			requestsMu.Unlock()
 		}()
 		for _, prefix := range []string{"/coherent", "/bootstrap-only"} {
-			if strings.HasPrefix(r.URL.Path, prefix+"/rum/") && strings.HasSuffix(r.URL.Path, ".js") && !strings.Contains(r.URL.Path, "/assets/") {
+			if strings.HasPrefix(r.URL.Path, prefix+"/rum/") && strings.HasSuffix(r.URL.Path, ".js") &&
+				!strings.Contains(r.URL.Path, "/assets/") {
 				http.Redirect(recorded, r, "/proxy"+strings.TrimPrefix(r.URL.Path, prefix), http.StatusFound)
 				return
 			}
@@ -113,7 +114,7 @@ func TestOnboardingBrowser(t *testing.T) {
 		Serving:   true,
 		PublicURL: receiver.URL + "/proxy",
 	})
-	t.Cleanup(unpublish)
+	t.Cleanup(unpublish.Close)
 
 	// This page server is a different origin from the receiver. Only actual
 	// browser-created telemetry enters the production handler and aggregator.
@@ -162,16 +163,22 @@ func TestOnboardingBrowser(t *testing.T) {
 		w.Header().Set("Content-Type", "text/html; charset=utf-8")
 		// script-src-elem deliberately overrides script-src, exercising browser CSP
 		// enforcement rather than a server-side approximation of the policy.
-		w.Header().Set("Content-Security-Policy", "default-src 'none'; script-src 'none'; script-src-elem "+scripts+"; connect-src "+receiverURL)
+		w.Header().
+			Set("Content-Security-Policy", "default-src 'none'; script-src 'none'; script-src-elem "+scripts+"; connect-src "+receiverURL)
 		tag := `<script async` + nonce + extra + ` src="` + html.EscapeString(src) + `"></script>`
 		if key == "dynamic" {
 			encoded, _ := json.Marshal(src)
-			tag = `<script nonce="fixture-nonce">const s=document.createElement('script');s.async=true;s.nonce='fixture-nonce';s.src=` + string(encoded) + `;document.head.appendChild(s);</script>`
+			tag = `<script nonce="fixture-nonce">const s=document.createElement('script');s.async=true;s.nonce='fixture-nonce';s.src=` + string(
+				encoded,
+			) + `;document.head.appendChild(s);</script>`
 		}
 		if key == "clobbered-script" {
 			tag = `<img name="currentScript" src="/injected/rum/site.js">` + tag
 		}
-		_, _ = fmt.Fprint(w, "<!doctype html><meta charset=utf-8><title>RUM onboarding fixture</title>"+tag+"<h1>Browser installation fixture</h1>")
+		_, _ = fmt.Fprint(
+			w,
+			"<!doctype html><meta charset=utf-8><title>RUM onboarding fixture</title>"+tag+"<h1>Browser installation fixture</h1>",
+		)
 	}))
 	t.Cleanup(website.Close)
 

@@ -129,7 +129,9 @@ func TestOptionalExportsThroughNativeJobs(t *testing.T) {
 			site.EventLogs.Enabled, site.EventLogs.IncludeConsoleLogs = tc.logs, true
 			site.EventLogs.Destination.Endpoint = new(logEndpoint)
 			site.Tracing.Enabled, site.Tracing.Destination.Endpoint = tc.traces, new(traceEndpoint)
-			recv := receiver.New(hub)
+			recv := receiver.New(receiver.Dependencies{
+				Registry: hub,
+			})
 			recv.Listen = "127.0.0.1:0"
 			startJob(t, "receiver", "receiver", recv)
 			job, out, stop := startJob(t, "rum", "shop", site)
@@ -148,7 +150,13 @@ func TestOptionalExportsThroughNativeJobs(t *testing.T) {
 			meta := body["meta"].(map[string]any)
 			meta["session"] = map[string]any{"id": "export-contract"}
 			meta["page"] = map[string]any{"id": "checkout-document", "url": "https://example.org/checkout"}
-			body["events"] = append(body["events"].([]any), map[string]any{"name": "document_activated", "attributes": map[string]string{"observation_id": "checkout-document", "observation_sequence": "1"}})
+			body["events"] = append(
+				body["events"].([]any),
+				map[string]any{
+					"name":       "document_activated",
+					"attributes": map[string]string{"observation_id": "checkout-document", "observation_sequence": "1"},
+				},
+			)
 			body["logs"] = []map[string]any{
 				{"message": "payment slow", "level": "warn", "timestamp": time.Now().UTC().Format(time.RFC3339Nano)},
 			}
@@ -205,7 +213,9 @@ func TestOTLPReceiverStorageSmoke(t *testing.T) {
 	site, hub, store := contractSite(t)
 	site.EventLogs.Enabled, site.EventLogs.IncludeConsoleLogs = true, true
 	site.EventLogs.Destination.Endpoint = new(endpoint)
-	recv := receiver.New(hub)
+	recv := receiver.New(receiver.Dependencies{
+		Registry: hub,
+	})
 	recv.Listen = "127.0.0.1:0"
 	startJob(t, "receiver", "receiver", recv)
 	_, _, stop := startJob(t, "rum", "shop", site)
@@ -237,7 +247,9 @@ func TestEventExportRecoveryKeepsNativeHistory(t *testing.T) {
 	site, hub, store := contractSite(t)
 	site.EventLogs.Enabled = true
 	site.EventLogs.Destination.Endpoint = new(endpoint)
-	recv := receiver.New(hub)
+	recv := receiver.New(receiver.Dependencies{
+		Registry: hub,
+	})
 	recv.Listen = "127.0.0.1:0"
 	startJob(t, "receiver", "receiver", recv)
 	_, _, stop := startJob(t, "rum", "shop", site)

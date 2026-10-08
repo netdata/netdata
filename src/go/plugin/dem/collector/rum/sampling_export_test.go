@@ -36,9 +36,15 @@ func samplingExportBeacon(t *testing.T, session, page string, hasError bool) []b
 		event["timestamp"] = now.Format(time.RFC3339Nano)
 		event["attributes"].(map[string]any)["session.id"] = session
 	}
-	body["events"] = append(events,
-		map[string]any{"name": "document_activated", "timestamp": now.Format(time.RFC3339Nano), "attributes": map[string]string{"observation_id": page, "observation_sequence": "1"}},
-		map[string]any{"name": page + "-action", "timestamp": now.Format(time.RFC3339Nano)})
+	body["events"] = append(
+		events,
+		map[string]any{
+			"name":       "document_activated",
+			"timestamp":  now.Format(time.RFC3339Nano),
+			"attributes": map[string]string{"observation_id": page, "observation_sequence": "1"},
+		},
+		map[string]any{"name": page + "-action", "timestamp": now.Format(time.RFC3339Nano)},
+	)
 	for _, rawResource := range body["traces"].(map[string]any)["resourceSpans"].([]any) {
 		for _, rawScope := range rawResource.(map[string]any)["scopeSpans"].([]any) {
 			for _, rawSpan := range rawScope.(map[string]any)["spans"].([]any) {
@@ -86,7 +92,9 @@ func TestSamplingDetailThroughNativeJobs(t *testing.T) {
 			}
 			site.EventLogs.Enabled, site.EventLogs.Destination.Endpoint = true, new(endpoint)
 			site.Tracing.Enabled, site.Tracing.Destination.Endpoint = true, new(endpoint)
-			recv := receiver.New(hub)
+			recv := receiver.New(receiver.Dependencies{
+				Registry: hub,
+			})
 			recv.Listen = "127.0.0.1:0"
 			startJob(t, "receiver", "receiver", recv)
 			_, _, stop := startJob(t, "rum", "shop", site)
@@ -122,7 +130,12 @@ func TestSamplingDetailThroughNativeJobs(t *testing.T) {
 				assert.Zero(t, counters[counter], counter)
 			}
 			live, _ := a.Live(0, 10)
-			assert.Len(t, live, observations+1, "document activations and the error have separate live rows, independent of detail sampling")
+			assert.Len(
+				t,
+				live,
+				observations+1,
+				"document activations and the error have separate live rows, independent of detail sampling",
+			)
 			documents, errorsLive := 0, 0
 			for _, row := range live {
 				switch row.Kind {
@@ -179,7 +192,9 @@ func TestDisabledCollectionKeepsDiagnosticsWithoutTrafficCharts(t *testing.T) {
 		t.Run(fmt.Sprint(rate), func(t *testing.T) {
 			site, hub, _ := contractSite(t)
 			site.MeasureSampleRate = new(rate)
-			recv := receiver.New(hub)
+			recv := receiver.New(receiver.Dependencies{
+				Registry: hub,
+			})
 			recv.Listen = "127.0.0.1:0"
 			startJob(t, "receiver", "receiver", recv)
 			job, out, stop := startJob(t, "rum", "shop", site)

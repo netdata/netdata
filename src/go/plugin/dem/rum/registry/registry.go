@@ -12,6 +12,7 @@ import (
 	redact "github.com/netdata/netdata/go/plugins/plugin/dem/internal/redact"
 	"github.com/netdata/netdata/go/plugins/plugin/dem/rum/aggregate"
 	"github.com/netdata/netdata/go/plugins/plugin/dem/rum/diagnostics"
+	"github.com/netdata/netdata/go/plugins/plugin/dem/rum/geoip"
 	"github.com/netdata/netdata/go/plugins/plugin/dem/rum/httpapi"
 )
 
@@ -27,6 +28,7 @@ type Availability struct {
 	Listen    string
 	Serving   bool
 	PublicURL string
+	GeoIP     geoip.Status
 }
 type registration struct {
 	data   *Site
@@ -46,6 +48,12 @@ type Registry struct {
 func New() *Registry {
 	return &Registry{
 		sites: map[string]*registration{},
+		lastReceiver: Availability{
+			GeoIP: geoip.Status{
+				State:  "unavailable",
+				Reason: "receiver_stopped",
+			},
+		},
 	}
 }
 
@@ -102,7 +110,14 @@ func (h *Registry) Keys() []string {
 	}
 	return keys
 }
-func (h *Registry) PublishReceiver(state Availability) func() {
+
+// ReceiverRegistration fences diagnostic updates and retirement to one receiver.
+type ReceiverRegistration struct {
+	registry *Registry
+	entry    *receiver
+}
+
+func (h *Registry) PublishReceiver(state Availability) *ReceiverRegistration {
 	entry := &receiver{
 		availability: state,
 	}
@@ -110,12 +125,31 @@ func (h *Registry) PublishReceiver(state Availability) func() {
 	h.receiver = entry
 	h.lastReceiver = state
 	h.mu.Unlock()
-	return func() {
-		h.mu.Lock()
-		defer h.mu.Unlock()
-		if h.receiver == entry {
-			h.receiver = nil
-			h.lastReceiver.Serving = false
+	return &ReceiverRegistration{
+		registry: h,
+		entry:    entry,
+	}
+}
+func (r *ReceiverRegistration) SetGeoIP(status geoip.Status) {
+	h := r.registry
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	if h.receiver == r.entry {
+		r.entry.availability.GeoIP = status
+		h.lastReceiver = r.entry.availability
+	}
+}
+func (r *ReceiverRegistration) Close() {
+	h := r.registry
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	if h.receiver == r.entry {
+		h.receiver = nil
+		h.lastReceiver.Serving = false
+		h.lastReceiver.GeoIP = geoip.Status{
+			Selection: h.lastReceiver.GeoIP.Selection,
+			State:     "unavailable",
+			Reason:    "receiver_stopped",
 		}
 	}
 }
