@@ -68,8 +68,18 @@ else()
 endif()
 
 if(DEFINED ENV{GOROOT} AND NOT "$ENV{GOROOT}" STREQUAL "")
+  set(_go_explicit_root TRUE)
   set(_go_candidates "$ENV{GOROOT}/bin/${_go_executable_name}")
+  # MSYS2's native UCRT Go package keeps GOROOT under lib/go while placing
+  # go.exe in the UCRT64 bin directory. Honor GOROOT, but also probe PATH for
+  # that package layout.
+  unset(_go_path_candidate CACHE)
+  find_program(_go_path_candidate "${_go_executable_name}")
+  if(_go_path_candidate)
+    list(APPEND _go_candidates "${_go_path_candidate}")
+  endif()
 elseif(OS_WINDOWS)
+  set(_go_explicit_root FALSE)
   if(CMAKE_SYSTEM_NAME STREQUAL "Windows")
     set(_go_candidates C:/go/bin/${_go_executable_name}
                        "C:/Program Files/go/bin/${_go_executable_name}")
@@ -81,6 +91,7 @@ elseif(OS_WINDOWS)
     list(APPEND _go_candidates "${_go_path_candidate}")
   endif()
 else()
+  set(_go_explicit_root FALSE)
   file(GLOB _go_versioned_candidates LIST_DIRECTORIES FALSE
        /usr/lib64/go*/go/bin/go
        /usr/lib/go*/bin/go
@@ -108,6 +119,9 @@ foreach(_go_candidate IN LISTS _go_candidates)
     set(GO_EXECUTABLE "${_go_candidate}")
     set(GO_VERSION_STRING "${_go_candidate_version}")
     set(GO_ROOT "${_go_candidate_root}")
+  endif()
+  if(_go_explicit_root)
+    break()
   endif()
 endforeach()
 

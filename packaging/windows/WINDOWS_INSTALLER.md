@@ -63,7 +63,7 @@ Netdata Cloud UI.
 
 Install Netdata and connect to your Cloud Space:
 
-```bash
+```
 msiexec /qn /i netdata-x64.msi TOKEN="<YOUR_TOKEN>" ROOMS="<YOUR_ROOMS>"
 ```
 
@@ -74,7 +74,7 @@ Replace:
 
 To connect the node without assigning it to specific Rooms, pass the token alone:
 
-```bash
+```
 msiexec /qn /i netdata-x64.msi TOKEN="<YOUR_TOKEN>"
 ```
 
@@ -282,15 +282,15 @@ Instead of daily updates, you might prefer:
 
 ## Working with Netdata on Windows
 
-The Windows installer provides a **Netdata → Edit Netdata Configuration** Start Menu shortcut. It opens the Windows configuration file in the default application associated with `.conf` files, with Notepad as a fallback.
+The Windows installer provides a **Netdata → Edit Netdata Configuration** Start Menu shortcut. It requests administrator approval because Netdata stores configuration under `Program Files`, then opens the selected file in the default application associated with `.conf` files, with Notepad as a fallback. The first run copies the stock file into the user configuration directory when it is missing.
 
 The helper copies a stock file into `C:\Program Files\Netdata\etc\netdata` the first time it is opened. For example, to edit the main configuration from PowerShell:
 
 ```powershell
-& "C:\Program Files\Netdata\usr\libexec\netdata\edit-config.ps1" netdata.conf
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File "C:\Program Files\Netdata\usr\libexec\netdata\edit-config.ps1" netdata.conf -PauseOnError
 ```
 
-Pass a file name relative to the Netdata configuration directory to open another supported configuration. For the complete configuration workflow and directory layout, see [Netdata Agent Configuration](/docs/netdata-agent/configuration/README.md#edit-configuration-files).
+Pass a file name relative to the Netdata configuration directory to open another supported configuration. Without a file name, the helper lists available configuration files. For the complete configuration workflow and directory layout, see [Netdata Agent Configuration](/docs/netdata-agent/configuration/README.md#edit-configuration-files).
 
 ### Migrating an existing MSYS2 development environment
 

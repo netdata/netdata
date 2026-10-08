@@ -10,7 +10,7 @@ if ($Mode -eq 'install') {
     if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 }
 
-$env:BUILD_DIR = if ($env:BUILD_DIR) { $env:BUILD_DIR } else { Join-Path $repoRoot 'build' }
+$env:BUILD_DIR = if ($env:BUILD_DIR) { Resolve-WindowsBuildDirectory $env:BUILD_DIR $repoRoot } else { Join-Path $repoRoot 'build' }
 & (Join-Path $windowsDir 'build.ps1')
 if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
@@ -27,6 +27,7 @@ if ($Mode -eq 'service') {
     if (-not $msysRoot) { throw 'MSYS2 UCRT64 is not installed.' }
     $env:NETDATA_WINDOWS_RUNTIME_DLL_DIR = Join-Path $msysRoot 'ucrt64\bin'
     $cmake = Join-Path $msysRoot 'ucrt64\bin\cmake.exe'
+    Clear-WindowsInstallStage $env:BUILD_DIR $repoRoot
     & $cmake --install $env:BUILD_DIR
     if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 }

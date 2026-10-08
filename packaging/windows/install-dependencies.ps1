@@ -82,12 +82,13 @@ if ($LASTEXITCODE -ne 0) {
 }
 
 $packages = @(
-    'base-devel', 'cmake', 'git', 'ninja', 'python', 'msys2-devel',
     'ucrt64/mingw-w64-ucrt-x86_64-rust',
     'ucrt64/mingw-w64-ucrt-x86_64-toolchain',
+    'ucrt64/mingw-w64-ucrt-x86_64-tcl',
     'ucrt64/mingw-w64-ucrt-x86_64-brotli',
     'ucrt64/mingw-w64-ucrt-x86_64-cmake',
     'ucrt64/mingw-w64-ucrt-x86_64-curl',
+    'ucrt64/mingw-w64-ucrt-x86_64-git',
     'ucrt64/mingw-w64-ucrt-x86_64-go',
     'ucrt64/mingw-w64-ucrt-x86_64-headers',
     'ucrt64/mingw-w64-ucrt-x86_64-libuv',
@@ -95,10 +96,10 @@ $packages = @(
     'ucrt64/mingw-w64-ucrt-x86_64-lld',
     'ucrt64/mingw-w64-ucrt-x86_64-lz4',
     'ucrt64/mingw-w64-ucrt-x86_64-ninja',
-    'ucrt64/mingw-w64-ucrt-x86_64-nsis',
     'ucrt64/mingw-w64-ucrt-x86_64-openssl',
     'ucrt64/mingw-w64-ucrt-x86_64-pcre2',
     'ucrt64/mingw-w64-ucrt-x86_64-protobuf',
+    'ucrt64/mingw-w64-ucrt-x86_64-python',
     'ucrt64/mingw-w64-ucrt-x86_64-zlib',
     'ucrt64/mingw-w64-ucrt-x86_64-zstd'
 )
@@ -109,23 +110,41 @@ if ($LASTEXITCODE -ne 0) {
 
 $wixVersion = "5.0.2"
 
-Write-Host "Installing WiX toolset"
-dotnet tool install -g wix --version $wixVersion
+$globalTools = & dotnet tool list --global
+if ($LASTEXITCODE -ne 0) { throw 'Could not query globally installed .NET tools.' }
+$wixToolLine = $globalTools | Where-Object { $_ -match '^\s*wix\s+' } | Select-Object -First 1
+$installedWixVersion = if ($wixToolLine -match '^\s*wix\s+([^\s]+)') { $Matches[1] } else { $null }
 
-if ($LastExitcode -ne 0) {
-    exit 1
+if (-not $installedWixVersion) {
+    Write-Host "Installing WiX $wixVersion"
+    & dotnet tool install --global wix --version $wixVersion
+} elseif ($installedWixVersion -ne $wixVersion) {
+    Write-Host "Updating WiX from $installedWixVersion to $wixVersion"
+    & dotnet tool update --global wix --version $wixVersion
+} else {
+    Write-Host "WiX $wixVersion is already installed"
 }
+if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
-Write-Host "Adding WiX extensions"
+$wix = Join-Path $env:USERPROFILE '.dotnet\tools\wix.exe'
+if (-not (Test-Path $wix)) { throw "WiX executable was not found after installation: $wix" }
 
-wix extension -g add WixToolset.Util.wixext/$wixVersion
-
-if ($LastExitcode -ne 0) {
-    exit 1
-}
-
-wix extension -g add WixToolset.UI.wixext/$wixVersion
-
-if ($LastExitcode -ne 0) {
-    exit 1
+$extensions = @(
+    "WixToolset.Util.wixext/$wixVersion",
+    "WixToolset.UI.wixext/$wixVersion"
+)
+$installedExtensions = & $wix extension list --global
+if ($LASTEXITCODE -ne 0) { throw 'Could not query globally installed WiX extensions.' }
+foreach ($extension in $extensions) {
+    $extensionId, $extensionVersion = $extension -split '/', 2
+    $found = $installedExtensions | Where-Object {
+        $_ -match ('^\s*' + [regex]::Escape($extensionId) + '\s+' + [regex]::Escape($extensionVersion) + '(\s|$)')
+    } | Select-Object -First 1
+    if (-not $found) {
+        Write-Host "Adding WiX extension $extension"
+        & $wix extension add --global $extension
+        if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+    } else {
+        Write-Host "WiX extension $extension is already installed"
+    }
 }

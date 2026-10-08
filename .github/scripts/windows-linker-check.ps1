@@ -3,30 +3,27 @@
 $ErrorActionPreference = "Stop"
 
 $ndPath = "C:\Program Files\Netdata\usr\bin\netdata.exe"
-$lddPath = "C:\Program Files\Netdata\usr\bin\ldd.exe"
+$runtimePath = "C:\Program Files\Netdata\usr\bin"
 
-if (Test-Path -Path $ndPath) {
-    Write-Output "$ndPath found, attempting to check linking"
-
-    if (Test-Path -Path $lddPath) {
-        & $lddPath $ndPath | Tee-Object -Variable lddResult
-
-        if ($LastExitCode -ne 0) {
-            Write-Output "Exit Code: $LastExitCode"
-            exit 1
-        }
-
-        if ($lddResult -match 'missing|not found') {
-            Write-Output "Libraries missing from install"
-            exit 1
-        } else {
-            Write-Output "Linking OK"
-        }
-    } else {
-        Write-Output "$lddPath not found, unable to check linking"
-        exit 2
-    }
-} else {
+if (-not (Test-Path -LiteralPath $ndPath -PathType Leaf)) {
     Write-Output "$ndPath does not exist"
     exit 1
 }
+
+$env:PATH = "$runtimePath;$env:PATH"
+Write-Output "$ndPath found, checking that Windows can load and run it"
+
+try {
+    & $ndPath -W buildinfo
+    $exitCode = $LASTEXITCODE
+} catch {
+    Write-Output "Windows could not load netdata.exe: $_"
+    exit 1
+}
+
+if ($exitCode -ne 0) {
+    Write-Output "netdata.exe buildinfo exited with code $exitCode"
+    exit 1
+}
+
+Write-Output "Windows loaded netdata.exe and buildinfo completed successfully"

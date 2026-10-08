@@ -111,11 +111,11 @@ the certificate must be in PEM or DER format with a `.crt` extension.
 
 ## Using custom certificates on Windows
 
-Currently, Netdata does not provide integration for most components with the system certificate store on
-Windows. Instead, certificates must be installed into the bundled MSYS2 environment shipped as part of Netdata
-using the following instructions:
+Netdata uses the Windows certificate stores for TLS trust. To make a custom CA available to the Windows
+service, import it into **Local Computer → Trusted Root Certification Authorities**. For an interactive
+agent running as the current user, import it into **Current User → Trusted Root Certification Authorities**.
+Use the Certificates MMC snap-in (`certlm.msc` for the local computer store or `certmgr.msc` for the current
+user store), or import the certificate with the Windows certificate-management tools.
 
-1. Ensure the certificate file to be installed is in PEM or DER format.
-2. Copy the certificate file to `C:\Program Files\Netdata\etc\pki\ca-trust\source\anchors`. You may need to create
-   this directory.
-3. In an administrative command prompt, run `C:\Program Files\Netdata\usr\bin\update-ca-trust.exe`
+Certificates previously installed only in Netdata's bundled MSYS2 CA directory are no longer used. Import
+those certificates into the appropriate Windows Trusted Root store when upgrading.

@@ -19,7 +19,7 @@ function(netdata_bundle_libbacktrace)
                         message(FATAL_ERROR "The Windows compiler must provide _Unwind_GetIPInfo for libbacktrace")
                 endif()
 
-                # Match the source revision already used by the current Windows build.
+                # Pin the native Windows build to a known upstream revision.
                 FetchContent_Declare(netdata_libbacktrace_source
                         GIT_REPOSITORY https://github.com/ianlancetaylor/libbacktrace.git
                         GIT_TAG 0b9b49cf4a2c9229fc052d6716e1528b2f23e91a)
@@ -30,7 +30,9 @@ function(netdata_bundle_libbacktrace)
 
                 set(_backtrace_source "${netdata_libbacktrace_source_SOURCE_DIR}")
                 set(_backtrace_generated "${CMAKE_BINARY_DIR}/libbacktrace-generated")
+                set(_backtrace_public "${CMAKE_BINARY_DIR}/libbacktrace-public")
                 file(MAKE_DIRECTORY "${_backtrace_generated}")
+                file(MAKE_DIRECTORY "${_backtrace_public}")
                 file(WRITE "${_backtrace_generated}/config.h"
                         "#define BACKTRACE_ELF_SIZE unused\n"
                         "#define BACKTRACE_XCOFF_SIZE unused\n"
@@ -48,6 +50,10 @@ function(netdata_bundle_libbacktrace)
                         "#define BACKTRACE_SUPPORTS_THREADS 1\n"
                         "#define BACKTRACE_SUPPORTS_DATA 0\n"
                         "#define BACKTRACE_SUPPORTS_MOREDATA 1\n")
+                configure_file("${_backtrace_source}/backtrace.h"
+                        "${_backtrace_public}/backtrace.h" COPYONLY)
+                configure_file("${_backtrace_generated}/backtrace-supported.h"
+                        "${_backtrace_public}/backtrace-supported.h" COPYONLY)
 
                 add_library(libbacktrace_library STATIC
                         "${_backtrace_source}/atomic.c"
@@ -63,10 +69,11 @@ function(netdata_bundle_libbacktrace)
                         "${_backtrace_source}/state.c"
                         "${_backtrace_source}/alloc.c")
                 target_compile_definitions(libbacktrace_library PRIVATE HAVE_CONFIG_H)
-                target_include_directories(libbacktrace_library PUBLIC
-                        "${_backtrace_generated}" "${_backtrace_source}")
+                target_include_directories(libbacktrace_library
+                        PRIVATE "${_backtrace_generated}" "${_backtrace_source}"
+                        PUBLIC "${_backtrace_public}")
                 add_custom_target(libbacktrace DEPENDS libbacktrace_library)
-                set(NETDATA_LIBBACKTRACE_INCLUDE_DIRS "${_backtrace_generated};${_backtrace_source}" PARENT_SCOPE)
+                set(NETDATA_LIBBACKTRACE_INCLUDE_DIRS "${_backtrace_public}" PARENT_SCOPE)
                 set(NETDATA_LIBBACKTRACE_LIBRARIES libbacktrace_library PARENT_SCOPE)
                 set(HAVE_LIBBACKTRACE TRUE PARENT_SCOPE)
                 message(STATUS "Finished preparing native Windows libbacktrace")

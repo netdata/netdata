@@ -224,9 +224,10 @@
             <Component Id="EditNetdataConfigShortcut" Directory="NetdataProgramMenuFolder" Guid="a1e5e77f-9122-44aa-b8e0-57c26f586ff1">
                 <Shortcut Id="EditNetdataConfig" Name="Edit Netdata Configuration"
                           Target="[System64Folder]WindowsPowerShell\v1.0\powershell.exe"
-                          Arguments="-NoProfile -ExecutionPolicy Bypass -File &quot;[USRLIBEXECNETDATADIR]edit-config.ps1&quot; netdata.conf"
+                          Arguments="-NoProfile -ExecutionPolicy Bypass -File &quot;[USRLIBEXECNETDATADIR]edit-config.ps1&quot; netdata.conf -PauseOnError"
                           WorkingDirectory="[USRLIBEXECNETDATADIR]" />
                 <RegistryValue Root="HKLM" Key="Software\Netdata\Installer" Name="EditConfigShortcut" Type="integer" Value="1" KeyPath="yes" />
+                <RemoveFolder Id="NetdataProgramMenuFolder" On="uninstall" />
             </Component>
 
             <Component Id="NetdataVarCache" Directory="VARCACHEDIR" Guid="a41bc888-60d4-4d99-bb4f-da92614a8f72">

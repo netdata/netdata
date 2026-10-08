@@ -2684,6 +2684,9 @@ if(OS_WINDOWS)
                                 message(FATAL_ERROR "${_wevt_tool} is required to generate Windows ETW resources; initialize the Windows SDK and Visual Studio tool environments")
                         endif()
                 endforeach()
+                if(NOT WEVT_LINK_EXECUTABLE MATCHES "[\\\\/]VC[\\\\/]Tools[\\\\/]MSVC[\\\\/]")
+                        message(FATAL_ERROR "WEVT_LINK_EXECUTABLE must be the Visual Studio linker under VC/Tools/MSVC; found '${WEVT_LINK_EXECUTABLE}'")
+                endif()
 
                 set(WEVT_MC_FILE "${CMAKE_BINARY_DIR}/wevt_netdata.mc")
                 set(WEVT_MAN_FILE "${CMAKE_BINARY_DIR}/wevt_netdata_manifest.xml")
@@ -2720,6 +2723,9 @@ if(OS_WINDOWS)
                         COMMAND "${WEVT_LINK_EXECUTABLE}" /dll /noentry /machine:x64
                                 "/out:${WEVT_DLL_FILE}" "${WEVT_RES_FILE}"
                         DEPENDS "${WEVT_GEN_SRC_C_FILE}" "${WEVT_GEN_SRC_H_FILE}" "${WEVT_GENERATOR_SCRIPT}"
+                                "${CMAKE_SOURCE_DIR}/packaging/cmake/AppendManifestResource.cmake"
+                        BYPRODUCTS "${WEVT_GEN_BIN_FILE}" "${WEVT_MC_FILE}" "${WEVT_MAN_COPY}"
+                                   "${WEVT_RC_FILE}" "${WEVT_RESOURCE_RC}" "${WEVT_RES_FILE}"
                         COMMENT "Compiling ${WEVT_MC_FILE} to generate ${WEVT_MC_H_FILE} and ${WEVT_DLL_FILE}"
                 )
 
@@ -4469,6 +4475,9 @@ if(OS_WINDOWS)
         install(FILES packaging/windows/edit-config.ps1
                 COMPONENT netdata
                 DESTINATION usr/libexec/netdata)
+        install(FILES system/netdata.conf
+                COMPONENT netdata
+                DESTINATION usr/lib/netdata/conf.d)
 else()
         install(PROGRAMS system/edit-config
                 COMPONENT netdata
@@ -4948,18 +4957,32 @@ endif()
 # Ship CMakeCache.txt as an archive
 #
 
-install(CODE "
-        execute_process(COMMAND gzip -nc \"${CMAKE_BINARY_DIR}/CMakeCache.txt\"
-                        OUTPUT_FILE \"${BUILD_INFO_CMAKE_CACHE_ARCHIVE_NAME}\"
-                        WORKING_DIRECTORY \"${CMAKE_BINARY_DIR}\"
-                        RESULT_VARIABLE result)
-        if(NOT result EQUAL 0)
-                message(WARNING \"Failed to compress CMakeCache.txt\")
-        endif()
-
-        file(INSTALL \"${CMAKE_BINARY_DIR}/${BUILD_INFO_CMAKE_CACHE_ARCHIVE_NAME}\"
-             DESTINATION \"\${CMAKE_INSTALL_PREFIX}/${BUILD_INFO_CMAKE_CACHE_ARCHIVE_PATH}\")
-")
+if(OS_WINDOWS)
+        install(CODE "
+                execute_process(COMMAND powershell.exe -NoProfile -ExecutionPolicy Bypass -File
+                                \"${CMAKE_SOURCE_DIR}/packaging/windows/compress-cmake-cache.ps1\"
+                                \"${CMAKE_BINARY_DIR}/CMakeCache.txt\"
+                                \"${CMAKE_BINARY_DIR}/${BUILD_INFO_CMAKE_CACHE_ARCHIVE_NAME}\"
+                                RESULT_VARIABLE result)
+                if(NOT result EQUAL 0)
+                        message(FATAL_ERROR \"Failed to compress CMakeCache.txt with the native Windows helper\")
+                endif()
+                file(INSTALL \"${CMAKE_BINARY_DIR}/${BUILD_INFO_CMAKE_CACHE_ARCHIVE_NAME}\"
+                     DESTINATION \"\${CMAKE_INSTALL_PREFIX}/${BUILD_INFO_CMAKE_CACHE_ARCHIVE_PATH}\")
+        " COMPONENT netdata)
+else()
+        install(CODE "
+                execute_process(COMMAND gzip -nc \"${CMAKE_BINARY_DIR}/CMakeCache.txt\"
+                                OUTPUT_FILE \"${BUILD_INFO_CMAKE_CACHE_ARCHIVE_NAME}\"
+                                WORKING_DIRECTORY \"${CMAKE_BINARY_DIR}\"
+                                RESULT_VARIABLE result)
+                if(NOT result EQUAL 0)
+                        message(WARNING \"Failed to compress CMakeCache.txt\")
+                endif()
+                file(INSTALL \"${CMAKE_BINARY_DIR}/${BUILD_INFO_CMAKE_CACHE_ARCHIVE_NAME}\"
+                     DESTINATION \"\${CMAKE_INSTALL_PREFIX}/${BUILD_INFO_CMAKE_CACHE_ARCHIVE_PATH}\")
+        ")
+endif()
 
 if(OS_WINDOWS)
         # user-facing support-bundle tool (Windows PowerShell implementation)
@@ -4967,7 +4990,7 @@ if(OS_WINDOWS)
                 COMPONENT netdata
                 DESTINATION usr/libexec/netdata)
 
-        # Make bash & netdata happy
+        # Keep the standard temporary directory in the Windows package layout.
         install(DIRECTORY DESTINATION tmp)
 
         # Windows OpenSSL loads trusted roots from the Windows certificate
@@ -4977,6 +5000,12 @@ if(OS_WINDOWS)
         # Resolve native Windows executable dependencies and copy the UCRT64
         # runtime DLLs beside executables; the service account has no UCRT64 PATH.
         install(CODE [[
+            if(NOT DEFINED ENV{NETDATA_WINDOWS_RUNTIME_DLL_DIR} OR "$ENV{NETDATA_WINDOWS_RUNTIME_DLL_DIR}" STREQUAL "")
+                message(FATAL_ERROR "NETDATA_WINDOWS_RUNTIME_DLL_DIR must point to the UCRT64 bin directory when installing Windows executables.")
+            endif()
+            if(NOT IS_DIRECTORY "$ENV{NETDATA_WINDOWS_RUNTIME_DLL_DIR}")
+                message(FATAL_ERROR "NETDATA_WINDOWS_RUNTIME_DLL_DIR is not a directory: $ENV{NETDATA_WINDOWS_RUNTIME_DLL_DIR}")
+            endif()
             set(_runtime_stage "$ENV{DESTDIR}${CMAKE_INSTALL_PREFIX}")
             file(TO_CMAKE_PATH "${_runtime_stage}" _runtime_stage)
             file(GLOB_RECURSE _runtime_executables LIST_DIRECTORIES FALSE

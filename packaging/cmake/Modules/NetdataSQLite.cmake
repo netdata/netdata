@@ -11,66 +11,109 @@ set(SQLITE_TARBALL_SHA256 "d18fa15aec74d8c17e1463f861095adc01b5ad190256acb4f91d2
 set(SQLITE_AUTOCONF_SHA256 "0e9483900e92cd5de8fd48d16bf9200145a61f7fd5be542a5ac81d8a9516eb9c")
 set(SQLITE_GIT_SHA "b09c88c14082339b66c7b7158d609a771e64ca69")
 
-option(SQLITE_USE_GIT "Fetch SQLite sources via git clone instead of tarball (non-Windows builds)" OFF)
+option(SQLITE_USE_GIT "Fetch SQLite sources via git clone instead of tarball" OFF)
 
 function(netdata_bundle_sqlite3)
         message(STATUS "Preparing SQLite ${SQLITE_VERSION}")
 
-        set(sqlite_SOURCE_DIR "${CMAKE_BINARY_DIR}/sqlite-src")
-        set(sqlite_RECOVERY_SOURCE_DIR "${CMAKE_BINARY_DIR}/sqlite-recovery-src")
-        set(sqlite_BINARY_DIR "${CMAKE_BINARY_DIR}/sqlite-build")
         set(sqlite_OUTPUT_DIR "${CMAKE_BINARY_DIR}/sqlite-output")
         file(MAKE_DIRECTORY "${sqlite_OUTPUT_DIR}")
+        set(_sqlite_outputs
+                "${sqlite_OUTPUT_DIR}/sqlite3.c"
+                "${sqlite_OUTPUT_DIR}/sqlite3.h"
+                "${sqlite_OUTPUT_DIR}/sqlite3recover.c"
+                "${sqlite_OUTPUT_DIR}/sqlite3recover.h"
+                "${sqlite_OUTPUT_DIR}/dbdata.c")
 
-        if(SQLITE_USE_GIT AND NOT OS_WINDOWS)
-                ExternalProject_Add(sqlite_amalgamation
-                        GIT_REPOSITORY https://github.com/sqlite/sqlite.git
-                        GIT_TAG "${SQLITE_GIT_SHA}"
-                        SOURCE_DIR "${sqlite_SOURCE_DIR}"
-                        BINARY_DIR "${sqlite_BINARY_DIR}"
-                        CONFIGURE_COMMAND "${sqlite_SOURCE_DIR}/configure" --enable-update-limit
-                        BUILD_COMMAND ${CMAKE_COMMAND} -E env MAKEFLAGS= make sqlite3.c sqlite3.h
-                        INSTALL_COMMAND ${CMAKE_COMMAND} -E copy
-                                "${sqlite_BINARY_DIR}/sqlite3.c" "${sqlite_BINARY_DIR}/sqlite3.h"
-                                "${sqlite_SOURCE_DIR}/ext/recover/sqlite3recover.c"
-                                "${sqlite_SOURCE_DIR}/ext/recover/sqlite3recover.h"
-                                "${sqlite_SOURCE_DIR}/ext/recover/dbdata.c" "${sqlite_OUTPUT_DIR}"
-                        BUILD_BYPRODUCTS "${sqlite_OUTPUT_DIR}/sqlite3.c" "${sqlite_OUTPUT_DIR}/sqlite3.h"
-                                "${sqlite_OUTPUT_DIR}/sqlite3recover.c" "${sqlite_OUTPUT_DIR}/sqlite3recover.h"
-                                "${sqlite_OUTPUT_DIR}/dbdata.c"
-                        UPDATE_DISCONNECTED ON)
-                add_custom_target(sqlite_project DEPENDS sqlite_amalgamation)
+        if(OS_WINDOWS)
+                # SQLite's UPDATE/DELETE LIMIT grammar is selected when Lemon
+                # generates parse.c, so compiling the amalgamation with the
+                # feature define alone is insufficient.
+                include(FetchContent)
+                if(SQLITE_USE_GIT)
+                        FetchContent_Declare(netdata_sqlite_source
+                                GIT_REPOSITORY https://github.com/sqlite/sqlite.git
+                                GIT_TAG "${SQLITE_GIT_SHA}")
+                else()
+                        FetchContent_Declare(netdata_sqlite_source
+                                URL "https://www.sqlite.org/${SQLITE_VERSION_YEAR}/sqlite-src-${SQLITE_VERSION_NUMBER}.zip"
+                                URL_HASH "SHA256=${SQLITE_TARBALL_SHA256}")
+                endif()
+                FetchContent_GetProperties(netdata_sqlite_source)
+                if(NOT netdata_sqlite_source_POPULATED)
+                        FetchContent_Populate(netdata_sqlite_source)
+                endif()
+                set(sqlite_SOURCE_DIR "${netdata_sqlite_source_SOURCE_DIR}")
+
+                get_filename_component(_sqlite_ucrt_bin "${CMAKE_C_COMPILER}" DIRECTORY)
+                find_program(SQLITE_TCLSH_EXECUTABLE NAMES tclsh.exe HINTS "${_sqlite_ucrt_bin}" NO_DEFAULT_PATH)
+                if(NOT SQLITE_TCLSH_EXECUTABLE)
+                        message(FATAL_ERROR "UCRT64 tclsh.exe is required to generate SQLite; install mingw-w64-ucrt-x86_64-tcl")
+                endif()
+
+                add_executable(sqlite_lemon "${sqlite_SOURCE_DIR}/tool/lemon.c")
+                add_executable(sqlite_mkkeywordhash "${sqlite_SOURCE_DIR}/tool/mkkeywordhash.c")
+                add_executable(sqlite_mksourceid "${sqlite_SOURCE_DIR}/tool/mksourceid.c")
+
+                set(_sqlite_work_dir "${CMAKE_BINARY_DIR}/sqlite-native-build")
+                file(MAKE_DIRECTORY "${_sqlite_work_dir}")
+                add_custom_command(
+                        OUTPUT ${_sqlite_outputs}
+                        COMMAND "${CMAKE_COMMAND}" -E make_directory "${_sqlite_work_dir}"
+                        COMMAND "${CMAKE_COMMAND}"
+                                "-DSQLITE_SOURCE_DIR=${sqlite_SOURCE_DIR}"
+                                "-DSQLITE_WORK_DIR=${_sqlite_work_dir}"
+                                "-DSQLITE_OUTPUT_DIR=${sqlite_OUTPUT_DIR}"
+                                "-DSQLITE_TCLSH=${SQLITE_TCLSH_EXECUTABLE}"
+                                "-DSQLITE_LEMON=$<TARGET_FILE:sqlite_lemon>"
+                                "-DSQLITE_MKKEYWORDHASH=$<TARGET_FILE:sqlite_mkkeywordhash>"
+                                "-DSQLITE_MKSOURCEID=$<TARGET_FILE:sqlite_mksourceid>"
+                                -P "${CMAKE_SOURCE_DIR}/packaging/cmake/GenerateSQLite.cmake"
+                        DEPENDS sqlite_lemon sqlite_mkkeywordhash sqlite_mksourceid
+                                "${CMAKE_SOURCE_DIR}/packaging/cmake/GenerateSQLite.cmake"
+                                "${sqlite_SOURCE_DIR}/main.mk"
+                                "${sqlite_SOURCE_DIR}/tool/mksqlite3c.tcl"
+                                "${sqlite_SOURCE_DIR}/src/parse.y"
+                        BYPRODUCTS "${_sqlite_work_dir}/parse.c" "${_sqlite_work_dir}/parse.h"
+                                   "${_sqlite_work_dir}/fts5parse.c" "${_sqlite_work_dir}/fts5parse.h"
+                                   "${_sqlite_work_dir}/sqlite3.c"
+                        COMMENT "Generating SQLite ${SQLITE_VERSION} amalgamation with UPDATE/DELETE LIMIT grammar")
+                add_custom_target(sqlite_project DEPENDS ${_sqlite_outputs})
         else()
-                # The official autoconf archive contains the generated amalgamation;
-                # the source archive supplies the matching recovery extension sources.
-                ExternalProject_Add(sqlite_amalgamation
-                        URL "https://www.sqlite.org/${SQLITE_VERSION_YEAR}/sqlite-autoconf-${SQLITE_VERSION_NUMBER}.tar.gz"
-                        URL_HASH "SHA256=${SQLITE_AUTOCONF_SHA256}"
-                        SOURCE_DIR "${sqlite_SOURCE_DIR}"
-                        CONFIGURE_COMMAND ""
-                        BUILD_COMMAND ""
-                        INSTALL_COMMAND ${CMAKE_COMMAND} -E copy
-                                "${sqlite_SOURCE_DIR}/sqlite3.c" "${sqlite_SOURCE_DIR}/sqlite3.h"
-                                "${sqlite_OUTPUT_DIR}"
-                        BUILD_BYPRODUCTS "${sqlite_OUTPUT_DIR}/sqlite3.c" "${sqlite_OUTPUT_DIR}/sqlite3.h"
-                        UPDATE_DISCONNECTED ON)
+                set(sqlite_SOURCE_DIR "${CMAKE_BINARY_DIR}/sqlite-src")
+                set(sqlite_BINARY_DIR "${CMAKE_BINARY_DIR}/sqlite-build")
 
-                ExternalProject_Add(sqlite_recovery_sources
-                        URL "https://www.sqlite.org/${SQLITE_VERSION_YEAR}/sqlite-src-${SQLITE_VERSION_NUMBER}.zip"
-                        URL_HASH "SHA256=${SQLITE_TARBALL_SHA256}"
-                        SOURCE_DIR "${sqlite_RECOVERY_SOURCE_DIR}"
-                        CONFIGURE_COMMAND ""
-                        BUILD_COMMAND ""
-                        INSTALL_COMMAND ${CMAKE_COMMAND} -E copy
-                                "${sqlite_RECOVERY_SOURCE_DIR}/ext/recover/sqlite3recover.c"
-                                "${sqlite_RECOVERY_SOURCE_DIR}/ext/recover/sqlite3recover.h"
-                                "${sqlite_RECOVERY_SOURCE_DIR}/ext/recover/dbdata.c"
-                                "${sqlite_OUTPUT_DIR}"
-                        BUILD_BYPRODUCTS "${sqlite_OUTPUT_DIR}/sqlite3recover.c"
-                                "${sqlite_OUTPUT_DIR}/sqlite3recover.h" "${sqlite_OUTPUT_DIR}/dbdata.c"
-                        UPDATE_DISCONNECTED ON)
-
-                add_custom_target(sqlite_project DEPENDS sqlite_amalgamation sqlite_recovery_sources)
+                if(SQLITE_USE_GIT)
+                        ExternalProject_Add(sqlite_project
+                                GIT_REPOSITORY https://github.com/sqlite/sqlite.git
+                                GIT_TAG "${SQLITE_GIT_SHA}"
+                                SOURCE_DIR "${sqlite_SOURCE_DIR}"
+                                BINARY_DIR "${sqlite_BINARY_DIR}"
+                                CONFIGURE_COMMAND "${sqlite_SOURCE_DIR}/configure" --enable-update-limit
+                                BUILD_COMMAND ${CMAKE_COMMAND} -E env MAKEFLAGS= make sqlite3.c sqlite3.h
+                                INSTALL_COMMAND ${CMAKE_COMMAND} -E copy
+                                        "${sqlite_BINARY_DIR}/sqlite3.c" "${sqlite_BINARY_DIR}/sqlite3.h"
+                                        "${sqlite_SOURCE_DIR}/ext/recover/sqlite3recover.c"
+                                        "${sqlite_SOURCE_DIR}/ext/recover/sqlite3recover.h"
+                                        "${sqlite_SOURCE_DIR}/ext/recover/dbdata.c" "${sqlite_OUTPUT_DIR}"
+                                BUILD_BYPRODUCTS ${_sqlite_outputs}
+                                UPDATE_DISCONNECTED ON)
+                else()
+                        ExternalProject_Add(sqlite_project
+                                URL "https://www.sqlite.org/${SQLITE_VERSION_YEAR}/sqlite-src-${SQLITE_VERSION_NUMBER}.zip"
+                                URL_HASH "SHA256=${SQLITE_TARBALL_SHA256}"
+                                SOURCE_DIR "${sqlite_SOURCE_DIR}"
+                                BINARY_DIR "${sqlite_BINARY_DIR}"
+                                CONFIGURE_COMMAND "${sqlite_SOURCE_DIR}/configure" --enable-update-limit
+                                BUILD_COMMAND ${CMAKE_COMMAND} -E env MAKEFLAGS= make sqlite3.c sqlite3.h
+                                INSTALL_COMMAND ${CMAKE_COMMAND} -E copy
+                                        "${sqlite_BINARY_DIR}/sqlite3.c" "${sqlite_BINARY_DIR}/sqlite3.h"
+                                        "${sqlite_SOURCE_DIR}/ext/recover/sqlite3recover.c"
+                                        "${sqlite_SOURCE_DIR}/ext/recover/sqlite3recover.h"
+                                        "${sqlite_SOURCE_DIR}/ext/recover/dbdata.c" "${sqlite_OUTPUT_DIR}"
+                                BUILD_BYPRODUCTS ${_sqlite_outputs}
+                                UPDATE_DISCONNECTED ON)
+                endif()
         endif()
 
         set(SQLITE_SOURCES "${sqlite_OUTPUT_DIR}/sqlite3.c"

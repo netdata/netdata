@@ -46,7 +46,32 @@ function Initialize-WindowsBuildTools {
         }
     }
 
-    foreach ($tool in @('mc.exe', 'rc.exe', 'link.exe')) {
+    foreach ($tool in @('mc.exe', 'rc.exe')) {
         if (-not (Get-Command $tool -ErrorAction SilentlyContinue)) { throw "Required Windows build tool not found on PATH: $tool" }
     }
+
+    $linkCommand = Get-Command 'link.exe' -ErrorAction SilentlyContinue
+    if (-not $linkCommand -or $linkCommand.Source -notmatch '[\\/]VC[\\/]Tools[\\/]MSVC[\\/]') {
+        throw 'Visual Studio link.exe from VC\Tools\MSVC is required; an unrelated link.exe was found or no VS linker is available.'
+    }
+}
+
+function Resolve-WindowsBuildDirectory([string]$Path, [string]$RepoRoot) {
+    if ([IO.Path]::IsPathRooted($Path)) { return [IO.Path]::GetFullPath($Path) }
+    return [IO.Path]::GetFullPath((Join-Path $PWD.Path $Path))
+}
+
+function Clear-WindowsInstallStage([string]$BuildDirectory, [string]$RepoRoot) {
+    $buildPath = [IO.Path]::GetFullPath($BuildDirectory).TrimEnd('\', '/')
+    $repoPath = [IO.Path]::GetFullPath($RepoRoot).TrimEnd('\', '/')
+    if ($buildPath -eq $repoPath -or -not (Test-Path -LiteralPath (Join-Path $buildPath 'CMakeCache.txt'))) {
+        throw "Refusing to clean the Windows install stage outside a configured build directory: $buildPath"
+    }
+
+    $stagePath = [IO.Path]::GetFullPath((Join-Path $buildPath 'stage\opt\netdata'))
+    if (-not $stagePath.StartsWith($buildPath + [IO.Path]::DirectorySeparatorChar, [StringComparison]::OrdinalIgnoreCase)) {
+        throw "Refusing to clean a stage path outside the build directory: $stagePath"
+    }
+    if (Test-Path -LiteralPath $stagePath) { Remove-Item -LiteralPath $stagePath -Recurse -Force }
+    New-Item -ItemType Directory -Path $stagePath -Force | Out-Null
 }
