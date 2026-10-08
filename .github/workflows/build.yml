@@ -32,13 +32,13 @@ jobs:
     steps:
       - name: Checkout
         id: checkout
-        uses: actions/checkout@v7
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           fetch-depth: 0
           submodules: recursive
       - name: Check source files
         id: check-source-files
-        uses: step-security/changed-files@v45
+        uses: step-security/changed-files@3dbe17c78367e7d60f00d78ae6781a35be47b4a1 # v45.0.1
         with:
           since_last_remote_commit: ${{ github.event_name != 'pull_request' }}
           files: |
@@ -57,7 +57,7 @@ jobs:
             **/*.md
       - name: Check build files
         id: check-build-files
-        uses: step-security/changed-files@v45
+        uses: step-security/changed-files@3dbe17c78367e7d60f00d78ae6781a35be47b4a1 # v45.0.1
         with:
           since_last_remote_commit: ${{ github.event_name != 'pull_request' }}
           files: |
@@ -86,7 +86,7 @@ jobs:
             src/go/tools/topology-ip-intel-downloader/README.md
       - name: Check static build files
         id: check-static-build-files
-        uses: step-security/changed-files@v45
+        uses: step-security/changed-files@3dbe17c78367e7d60f00d78ae6781a35be47b4a1 # v45.0.1
         with:
           since_last_remote_commit: ${{ github.event_name != 'pull_request' }}
           files: |
@@ -160,7 +160,7 @@ jobs:
       - name: Checkout
         id: checkout
         if: needs.file-check.outputs.run == 'true'
-        uses: actions/checkout@v7
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           fetch-depth: 0
           submodules: recursive
@@ -181,14 +181,14 @@ jobs:
       - name: Store
         id: store
         if: needs.file-check.outputs.run == 'true'
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: dist-tarball
           path: artifacts/*.tar.*
           compression-level: 0
           retention-days: 30
       - name: Failure Notification
-        uses: rtCamp/action-slack-notify@v2
+        uses: rtCamp/action-slack-notify@33ca3be66c6f378fe1610fd1d5258632dbed5e58 # v2.4.0
         env:
           SLACK_COLOR: 'danger'
           SLACK_FOOTER: ''
@@ -222,7 +222,7 @@ jobs:
     steps:
       - name: Checkout
         id: checkout
-        uses: actions/checkout@v7
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - name: Prepare tools
         id: prepare
         run: |
@@ -235,7 +235,7 @@ jobs:
           echo "Generated matrix: ${matrix}"
           echo "matrix=${matrix}" >> "${GITHUB_OUTPUT}"
       - name: Failure Notification
-        uses: rtCamp/action-slack-notify@v2
+        uses: rtCamp/action-slack-notify@33ca3be66c6f378fe1610fd1d5258632dbed5e58 # v2.4.0
         env:
           SLACK_COLOR: 'danger'
           SLACK_FOOTER: ''
@@ -269,14 +269,14 @@ jobs:
       - name: Checkout
         id: checkout
         if: needs.file-check.outputs.run == 'true'
-        uses: actions/checkout@v7
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           fetch-depth: 0
           submodules: recursive
       - name: Setup Go
         id: setup-go
         if: needs.file-check.outputs.run == 'true'
-        uses: actions/setup-go@v7
+        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
           go-version-file: src/go/go.mod
       - name: Prepare synthetic stock payload
@@ -289,7 +289,7 @@ jobs:
       - name: Prepare release stock payload
         id: prepare-release
         if: needs.file-check.outputs.run == 'true' && github.event_name != 'pull_request'
-        uses: nick-invision/retry@ad984534de44a9489a53aefd81eb77f87c70dc60 # v4
+        uses: nick-fields/retry@ad984534de44a9489a53aefd81eb77f87c70dc60 # v4.0.0
         with:
           max_attempts: 3
           retry_wait_seconds: 30
@@ -301,13 +301,13 @@ jobs:
       - name: Upload topology-ip-intel stock payload
         id: upload-stock
         if: needs.file-check.outputs.run == 'true'
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: static-topology-ip-intel-stock
           path: ${{ github.workspace }}/.topology-ip-intel-stock/
           include-hidden-files: true
       - name: Failure Notification
-        uses: rtCamp/action-slack-notify@33ca3be66c6f378fe1610fd1d5258632dbed5e58 # v2
+        uses: rtCamp/action-slack-notify@33ca3be66c6f378fe1610fd1d5258632dbed5e58 # v2.4.0
         env:
           SLACK_COLOR: 'danger'
           SLACK_FOOTER: ''
@@ -349,7 +349,7 @@ jobs:
       - name: Checkout
         id: checkout
         if: needs.file-check.outputs.run == 'true'
-        uses: actions/checkout@v7
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           fetch-depth: 0
           submodules: recursive
@@ -370,7 +370,7 @@ jobs:
       - name: Cache
         if: (github.event_name != 'pull_request' || ! contains(github.event.pull_request.labels.*.name, 'run-ci/no-cache')) && needs.file-check.outputs.run == 'true'
         id: cache
-        uses: actions/cache@v6
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: artifacts/cache
           key: ${{ steps.cache-key.outputs.key }}
@@ -384,7 +384,7 @@ jobs:
       - name: Download topology-ip-intel stock payload
         id: fetch-topology-stock
         if: needs.file-check.outputs.run == 'true' && matrix.arch != 'armv6l'
-        uses: actions/download-artifact@v8
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
           name: static-topology-ip-intel-stock
           path: ${{ github.workspace }}/.topology-ip-intel-stock
@@ -441,14 +441,14 @@ jobs:
       - name: Store
         id: store
         if: needs.file-check.outputs.run == 'true'
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: dist-static-${{ matrix.arch }}
           path: artifacts/*.gz.run
           compression-level: 0
           retention-days: 30
       - name: Failure Notification
-        uses: rtCamp/action-slack-notify@v2
+        uses: rtCamp/action-slack-notify@33ca3be66c6f378fe1610fd1d5258632dbed5e58 # v2.4.0
         env:
           SLACK_COLOR: 'danger'
           SLACK_FOOTER: ''
@@ -486,7 +486,7 @@ jobs:
         if: needs.file-check.outputs.run != 'true'
         run: Write-Output "SKIPPED"
       - name: Checkout
-        uses: actions/checkout@v7
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         id: checkout
         if: needs.file-check.outputs.run == 'true'
         with:
@@ -495,7 +495,7 @@ jobs:
       - name: Set Up Go
         id: golang
         if: needs.file-check.outputs.run == 'true'
-        uses: actions/setup-go@v7
+        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
           go-version: "^1.27"
       - name: Set Up Dependencies
@@ -511,7 +511,7 @@ jobs:
       - name: Sign Agent Code
         id: sign-agent
         if: needs.file-check.outputs.run == 'true' && github.event_name != 'pull_request'
-        uses: azure/artifact-signing-action@v2.0.0
+        uses: azure/artifact-signing-action@c7ab2a863ab5f9a846ddb8265964877ef296ee82 # v2.0.0
         with:
           azure-tenant-id: ${{ secrets.CODE_SIGNING_TENNANT_ID }}
           azure-client-id: ${{ secrets.CODE_SIGNING_CLIENT_ID }}
@@ -534,7 +534,7 @@ jobs:
       - name: Sign Installer
         id: sign-installer
         if: needs.file-check.outputs.run == 'true' && github.event_name != 'pull_request'
-        uses: azure/artifact-signing-action@v2.0.0
+        uses: azure/artifact-signing-action@c7ab2a863ab5f9a846ddb8265964877ef296ee82 # v2.0.0
         with:
           azure-tenant-id: ${{ secrets.CODE_SIGNING_TENNANT_ID }}
           azure-client-id: ${{ secrets.CODE_SIGNING_CLIENT_ID }}
@@ -549,14 +549,14 @@ jobs:
           timestamp-digest: SHA256
       - name: Upload Installer
         id: upload
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: windows-x86_64-installer
           path: packaging\windows\netdata*.msi
           compression-level: 0
           retention-days: 30
       - name: Failure Notification
-        uses: rtCamp/action-slack-notify@v2
+        uses: rtCamp/action-slack-notify@33ca3be66c6f378fe1610fd1d5258632dbed5e58 # v2.4.0
         env:
           SLACK_COLOR: 'danger'
           SLACK_FOOTER: ''
@@ -594,7 +594,7 @@ jobs:
         if: needs.file-check.outputs.run != 'true'
         run: Write-Output "SKIPPED"
       - name: Checkout
-        uses: actions/checkout@v7
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         id: checkout
         if: needs.file-check.outputs.run == 'true'
         with:
@@ -603,7 +603,7 @@ jobs:
       - name: Retrieve Windows Artifacts
         id: fetch-windows
         if: needs.file-check.outputs.run == 'true'
-        uses: actions/download-artifact@v8
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
           pattern: windows-*-installer
           path: dist-artifacts
@@ -624,7 +624,7 @@ jobs:
         if: needs.file-check.outputs.run == 'true'
         run: ./.github/scripts/windows-linker-check.ps1
       - name: Failure Notification
-        uses: rtCamp/action-slack-notify@v2
+        uses: rtCamp/action-slack-notify@33ca3be66c6f378fe1610fd1d5258632dbed5e58 # v2.4.0
         env:
           SLACK_COLOR: 'danger'
           SLACK_FOOTER: ''
@@ -663,7 +663,7 @@ jobs:
       - name: Checkout
         id: checkout
         if: needs.file-check.outputs.run == 'true'
-        uses: actions/checkout@v7
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - name: Prepare Environment
         id: prepare
         if: needs.file-check.outputs.run == 'true'
@@ -671,7 +671,7 @@ jobs:
       - name: Retrieve Build Artifacts
         id: fetch-dist
         if: needs.file-check.outputs.run == 'true'
-        uses: actions/download-artifact@v8
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
           pattern: dist-*
           path: dist-artifacts
@@ -679,7 +679,7 @@ jobs:
       - name: Retrieve Windows Artifacts
         id: fetch-windows
         if: needs.file-check.outputs.run == 'true'
-        uses: actions/download-artifact@v8
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
           pattern: windows-*-installer
           path: dist-artifacts
@@ -687,7 +687,7 @@ jobs:
       - name: Import GPG Keys
         id: import-keys
         if: needs.file-check.outputs.run == 'true' && github.event_name != 'pull_request'
-        uses: crazy-max/ghaction-import-gpg@v7
+        uses: crazy-max/ghaction-import-gpg@2dc316deee8e90f13e1a351ab510b4d5bc0c82cd # v7.0.0
         with:
           gpg_private_key: ${{ secrets.NETDATABOT_PACKAGE_SIGNING_KEY }}
       - name: Prepare Artifacts
@@ -697,7 +697,7 @@ jobs:
       - name: Store GitHub Artifacts
         id: store-github
         if: needs.file-check.outputs.run == 'true'
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: github-artifacts
           path: artifacts/github/*
@@ -706,14 +706,14 @@ jobs:
       - name: Store R2 Artifacts
         id: store-r2
         if: needs.file-check.outputs.run == 'true'
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: r2-artifacts
           path: artifacts/r2/*
           compression-level: 0
           retention-days: 30
       - name: Failure Notification
-        uses: rtCamp/action-slack-notify@v2
+        uses: rtCamp/action-slack-notify@33ca3be66c6f378fe1610fd1d5258632dbed5e58 # v2.4.0
         env:
           SLACK_COLOR: 'danger'
           SLACK_FOOTER: ''
@@ -760,11 +760,11 @@ jobs:
       - name: Checkout
         id: checkout
         if: needs.file-check.outputs.run == 'true'
-        uses: actions/checkout@v7
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - name: Fetch artifacts
         id: fetch
         if: needs.file-check.outputs.run == 'true'
-        uses: actions/download-artifact@v8
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
           name: github-artifacts
           path: artifacts
@@ -784,7 +784,7 @@ jobs:
           NETDATA_TARBALL_BASEURL: http://localhost:8080/
         run: sh -x packaging/installer/kickstart.sh --build-only --dont-start-it --disable-telemetry --dont-wait
       - name: Failure Notification
-        uses: rtCamp/action-slack-notify@v2
+        uses: rtCamp/action-slack-notify@33ca3be66c6f378fe1610fd1d5258632dbed5e58 # v2.4.0
         env:
           SLACK_COLOR: 'danger'
           SLACK_FOOTER: ''
@@ -827,11 +827,11 @@ jobs:
       - name: Checkout
         id: checkout
         if: needs.file-check.outputs.run == 'true'
-        uses: actions/checkout@v7
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - name: Fetch artifacts
         id: fetch-artifacts
         if: needs.file-check.outputs.run == 'true'
-        uses: actions/download-artifact@v8
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
           name: github-artifacts
           path: artifacts
@@ -851,7 +851,7 @@ jobs:
           NETDATA_TARBALL_BASEURL: http://localhost:8080/
         run: sh -x packaging/installer/kickstart.sh --static-only --dont-start-it --disable-telemetry
       - name: Failure Notification
-        uses: rtCamp/action-slack-notify@v2
+        uses: rtCamp/action-slack-notify@33ca3be66c6f378fe1610fd1d5258632dbed5e58 # v2.4.0
         env:
           SLACK_COLOR: 'danger'
           SLACK_FOOTER: ''
@@ -894,11 +894,11 @@ jobs:
       - name: Checkout
         id: checkout
         if: needs.file-check.outputs.run == 'true'
-        uses: actions/checkout@v7
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - name: Fetch artifacts
         id: fetch-artifacts
         if: needs.file-check.outputs.run == 'true'
-        uses: actions/download-artifact@v8
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
           name: github-artifacts
           path: artifacts
@@ -919,7 +919,7 @@ jobs:
                  -v "$PWD":/netdata -w /netdata \
                  ubuntu:latest /bin/sh -x /netdata/.github/scripts/run-updater-check.sh
       - name: Failure Notification
-        uses: rtCamp/action-slack-notify@v2
+        uses: rtCamp/action-slack-notify@33ca3be66c6f378fe1610fd1d5258632dbed5e58 # v2.4.0
         env:
           SLACK_COLOR: 'danger'
           SLACK_FOOTER: ''
@@ -954,19 +954,19 @@ jobs:
     steps:
       - name: Checkout Main Repo
         id: checkout-main
-        uses: actions/checkout@v7
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           path: main
       - name: Checkout Nightly Repo
         id: checkout-nightly
-        uses: actions/checkout@v7
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           repository: netdata/netdata-nightlies
           path: nightlies
           token: ${{ secrets.NETDATABOT_GITHUB_TOKEN }}
       - name: Retrieve Artifacts
         id: fetch
-        uses: actions/download-artifact@v8
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
           name: github-artifacts
           path: final-artifacts
@@ -979,7 +979,7 @@ jobs:
           echo "date=$(date +%F)" >> "${GITHUB_OUTPUT}"
       - name: Create Release
         id: create-release
-        uses: ncipollo/release-action@v1
+        uses: ncipollo/release-action@339a81892b84b4eeb0f6e744e4574d79d0d9b8dd # v1.21.0
         with:
           allowUpdates: false
           artifactErrorsFailBuild: true
@@ -993,11 +993,11 @@ jobs:
           token: ${{ secrets.NETDATABOT_GITHUB_TOKEN }}
       - name: Checkout netdata main Repo # Checkout back to netdata/netdata repo to the update latest packaged versions
         id: checkout-netdata
-        uses: actions/checkout@v7
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           token: ${{ secrets.NETDATABOT_GITHUB_TOKEN }}
       - name: Init python environment for publish release metadata
-        uses: actions/setup-python@v7
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
         id: init-python
         with:
           python-version: "3.12"
@@ -1012,7 +1012,7 @@ jobs:
       - name: SSH setup
         id: ssh-setup
         if: github.event_name == 'workflow_dispatch' && github.repository == 'netdata/netdata' && steps.check-latest-version.outputs.versions_needs_update == 'true'
-        uses: shimataro/ssh-key-action@v2
+        uses: shimataro/ssh-key-action@87a8f067114a8ce263df83e9ed5c849953548bc3 # v2.8.1
         with:
           key: ${{ secrets.NETDATABOT_PACKAGES_SSH_KEY }}
           name: id_ecdsa
@@ -1029,7 +1029,7 @@ jobs:
         run: |
           .github/scripts/upload-new-version-tags.sh packages.netdata.cloud
       - name: Failure Notification
-        uses: rtCamp/action-slack-notify@v2
+        uses: rtCamp/action-slack-notify@33ca3be66c6f378fe1610fd1d5258632dbed5e58 # v2.4.0
         env:
           SLACK_COLOR: 'danger'
           SLACK_FOOTER: ''
@@ -1074,7 +1074,7 @@ jobs:
           sudo apt-get install -y rclone || exit 1
       - name: Retrieve Artifacts
         id: fetch
-        uses: actions/download-artifact@v8
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
           name: r2-artifacts
           path: artifacts
@@ -1092,7 +1092,7 @@ jobs:
           rclone copy --verbose --fast-list --use-server-modtime --header-upload "Cache-Control: no-transform" ./ s3:netdata-agent-artifacts/nightly/ || exit 1
           rclone sync --verbose --fast-list --use-server-modtime --header-upload "Cache-Control: no-transform" ./latest/ s3:netdata-agent-artifacts/nightly/latest/ || exit 1
       - name: Failure Notification
-        uses: rtCamp/action-slack-notify@v2
+        uses: rtCamp/action-slack-notify@33ca3be66c6f378fe1610fd1d5258632dbed5e58 # v2.4.0
         env:
           SLACK_COLOR: 'danger'
           SLACK_FOOTER: ''
@@ -1139,16 +1139,16 @@ jobs:
     steps:
       - name: Checkout
         id: checkout
-        uses: actions/checkout@v7
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - name: Retrieve Artifacts
         id: fetch
-        uses: actions/download-artifact@v8
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
           name: github-artifacts
           path: final-artifacts
       - name: Create Release
         id: create-release
-        uses: ncipollo/release-action@v1
+        uses: ncipollo/release-action@339a81892b84b4eeb0f6e744e4574d79d0d9b8dd # v1.21.0
         with:
           allowUpdates: false
           artifactErrorsFailBuild: true
@@ -1157,7 +1157,7 @@ jobs:
           tag: ${{ needs.normalize-tag.outputs.tag }}
           token: ${{ secrets.NETDATABOT_GITHUB_TOKEN }}
       - name: Failure Notification
-        uses: rtCamp/action-slack-notify@v2
+        uses: rtCamp/action-slack-notify@33ca3be66c6f378fe1610fd1d5258632dbed5e58 # v2.4.0
         env:
           SLACK_COLOR: 'danger'
           SLACK_FOOTER: ''
@@ -1176,7 +1176,7 @@ jobs:
             && github.event_name == 'workflow_dispatch'
           }}
       - name: Success Notification
-        uses: rtCamp/action-slack-notify@v2
+        uses: rtCamp/action-slack-notify@33ca3be66c6f378fe1610fd1d5258632dbed5e58 # v2.4.0
         env:
           SLACK_COLOR: 'good'
           SLACK_FOOTER: ''
@@ -1208,7 +1208,7 @@ jobs:
           sudo apt-get install -y rclone || exit 1
       - name: Retrieve Artifacts
         id: fetch
-        uses: actions/download-artifact@v8
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
           name: r2-artifacts
           path: artifacts
@@ -1226,7 +1226,7 @@ jobs:
           rclone copy --verbose --fast-list --use-server-modtime --header-upload "Cache-Control: no-transform" ./ s3:netdata-agent-artifacts/stable/ || exit 1
           rclone sync --verbose --fast-list --use-server-modtime --header-upload "Cache-Control: no-transform" ./latest/ s3:netdata-agent-artifacts/stable/latest/ || exit 1
       - name: Failure Notification
-        uses: rtCamp/action-slack-notify@v2
+        uses: rtCamp/action-slack-notify@33ca3be66c6f378fe1610fd1d5258632dbed5e58 # v2.4.0
         env:
           SLACK_COLOR: 'danger'
           SLACK_FOOTER: ''
@@ -1256,7 +1256,7 @@ jobs:
     steps:
       - name: Checkout
         id: checkout
-        uses: actions/checkout@v7
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - name: Prepare tools
         id: prepare
         run: |
@@ -1269,7 +1269,7 @@ jobs:
           echo "Generated matrix: ${matrix}"
           echo "matrix=${matrix}" >> "${GITHUB_OUTPUT}"
       - name: Failure Notification
-        uses: rtCamp/action-slack-notify@v2
+        uses: rtCamp/action-slack-notify@33ca3be66c6f378fe1610fd1d5258632dbed5e58 # v2.4.0
         env:
           SLACK_COLOR: 'danger'
           SLACK_FOOTER: ''
@@ -1309,15 +1309,15 @@ jobs:
       - name: Checkout
         id: checkout
         if: needs.file-check.outputs.run == 'true'
-        uses: actions/checkout@v7
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           submodules: recursive
       - name: Setup Buildx
         id: buildx
-        uses: docker/setup-buildx-action@v4
+        uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
       - name: Build test environment
         id: build
-        uses: docker/build-push-action@v7
+        uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
         with:
           push: false
           load: true
@@ -1334,7 +1334,7 @@ jobs:
           docker run --security-opt seccomp=unconfined -w /netdata test:${{ matrix.artifact_key }} \
               /bin/sh -c './netdata-installer.sh --dont-wait --dont-start-it --one-time-build ${{ needs.file-check.outputs.skip-go }}'
       - name: Failure Notification
-        uses: rtCamp/action-slack-notify@v2
+        uses: rtCamp/action-slack-notify@33ca3be66c6f378fe1610fd1d5258632dbed5e58 # v2.4.0
         env:
           SLACK_COLOR: 'danger'
           SLACK_FOOTER: ''
@@ -1378,7 +1378,7 @@ jobs:
         id: skip
         if: needs.file-check.outputs.run != 'true'
         run: echo "SKIPPED"
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         id: checkout
         if: needs.file-check.outputs.run == 'true'
         with:
@@ -1429,7 +1429,7 @@ jobs:
           /usr/local/netdata/usr/sbin/netdata -D > ./netdata.log 2>&1 &
           ./packaging/runtime-check.sh
       - name: Failure Notification
-        uses: rtCamp/action-slack-notify@v2
+        uses: rtCamp/action-slack-notify@33ca3be66c6f378fe1610fd1d5258632dbed5e58 # v2.4.0
         env:
           SLACK_COLOR: 'danger'
           SLACK_FOOTER: ''

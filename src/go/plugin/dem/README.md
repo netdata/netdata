@@ -230,6 +230,59 @@ error text, selectors and explicitly exported attributes can still be identifyin
 and optional capture settings accordingly. Sampling and the independent event-log/trace switches retain their existing
 roles; capture choices do not imply consent or reconstruct evidence that was never collected.
 
+## GeoIP sources and availability
+
+Geography is optional: browser collection continues when no usable database is available. DEM reads local MMDB files;
+Agent packaging, the topology IP intelligence downloader, or the operator owns acquisition and updates. DEM makes no
+GeoIP downloads and does not depend on a running NetFlow plugin. Some installations package the files with NetFlow;
+not every installation includes them or configures database updates.
+
+Receiver `geoip_db` selects the source:
+
+- Empty: try `topology-ip-intel/topology-ip-geo.mmdb` under the Agent cache directory, then its stock data directory.
+  Runtime `NETDATA_CACHE_DIR` and `NETDATA_STOCK_DATA_DIR` take precedence over compiled directory defaults.
+- Explicit path: use only that file, with no automatic cache or stock fallback.
+
+Supported declared database types are `Netdata-Topology-GEO`, `GeoLite2-City`, `GeoLite2-Country`, `GeoIP2-City`,
+`GeoIP2-Country`, `DBIP-City-Lite` and `DBIP-Country-Lite`. ASN and unknown/custom types are rejected. Country-only
+sources remain useful. Neither the filename nor the Netdata database type establishes city coverage.
+
+The receiver checks immediately after listener setup and every 60 seconds, including when the file is initially
+absent. It adopts accepted replacements without a restart. Automatic selection prefers an accepted current cache file,
+then an accepted current stock file; an unreadable or rejected cache file does not hide usable stock data. Only after
+current candidates fail can DEM retain the previous usable snapshot, and only if its source was not confirmed removed.
+Explicit mode can retain a previous snapshot only from its configured source. Confirmed removal revokes that snapshot;
+a detected mapped-memory fault also makes it ineligible for reuse. There is no age-based expiration.
+
+Publish each update as a complete separate file, then atomically rename it over the destination on the same filesystem.
+Atomic replacement is required for consistent lookups. Do not overwrite or truncate the active file. DEM narrowly
+contains detected mapped-memory faults, but this cannot guarantee recovery or detect torn content from every unsupported
+in-place write. Give the Netdata service account read access to the provisioned file and its parent directories.
+
+`rum-sites` exposes copied source evidence in `collector.geoip`, independently of each site's capture policy:
+
+| Field | Meaning |
+|---|---|
+| `selection` | `auto` or `explicit`, matching receiver source selection; omitted until a receiver has been published. |
+| `state` | `loaded`, `unavailable`, or `using_previous`. |
+| `source` | Active `cache`, `stock`, or `explicit` source; omitted without an active source. |
+| `database_type` | Active database's declared supported type; omitted without an active source. |
+| `build_at` | Database metadata build time; omitted when unseen. It is not provider freshness. |
+| `loaded_at` | Time the active snapshot was accepted; unchanged checks and failed refreshes do not advance it. |
+| `last_checked_at` | Most recent source check; omitted before the first check. |
+| `reason` | Bounded source-status code, with no filesystem path or raw error. Load errors are detailed in local Agent logs. |
+| `lookup_errors` | Error count for the active source generation; ordinary unmatched addresses and absent fields are not errors. |
+
+All three timestamps use Unix microseconds and are omitted when unseen. `loaded` means the declared geography format
+is supported and the reader was accepted. It does not mean every record was validated, or establish freshness,
+accuracy or coverage. Per-record decoding or invalid-field errors leave affected fields absent and increment the error
+count; they do not automatically reject the whole database. The worker publishes refresh and fault changes; receiver
+collection updates the copied lookup count, so Function status is not an instantaneous view of every lookup.
+
+Site policy still applies: country is the default, `off` skips lookup, and `city` enables approximate live-only city
+and coordinates. DEM never stores client IP addresses as telemetry, invents locations for unmatched addresses, or
+re-enriches retained history after a database update. Database availability cannot enable capture a site has disabled.
+
 ## Collection and retained detail
 
 RUM has two sampling decisions, both defaulting to 100%. Omitted or `null` rates use that default; explicit zero

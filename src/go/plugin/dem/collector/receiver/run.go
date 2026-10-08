@@ -26,11 +26,7 @@ func (c *Collector) Run(ctx context.Context, ready func()) error {
 	if err != nil {
 		return err
 	}
-	var geo httpapi.CountryResolver
-	if c.geo != nil {
-		geo = c.geo
-	}
-	domain := httpapi.New(&c.Receiver, c.registry, geo)
+	domain := httpapi.New(&c.Receiver, c.registry, c.geo)
 	handler := domain.Handler()
 	var mu sync.Mutex
 	var active sync.WaitGroup
@@ -92,13 +88,25 @@ func (c *Collector) Run(ctx context.Context, ready func()) error {
 			serving <- srv.Serve(ln)
 		}
 	}()
-	revoke := c.registry.PublishReceiver(
+	publication := c.registry.PublishReceiver(
 		rumregistry.Availability{
 			Serving:   true,
 			Listen:    ln.Addr().String(),
 			PublicURL: c.PublicURL,
+			GeoIP:     c.geo.Status(),
 		},
 	)
+	c.publicationMu.Lock()
+	c.publication = publication
+	c.publicationMu.Unlock()
+	workerCtx, stopWorker := context.WithCancel(ctx)
+	workerDone := make(chan struct{})
+	go func() {
+		defer close(workerDone)
+		ticker := time.NewTicker(geoIPRefreshInterval)
+		defer ticker.Stop()
+		c.runGeoIP(workerCtx, ticker.C)
+	}()
 	ready()
 	var serveErr error
 	exited := false
@@ -107,7 +115,12 @@ func (c *Collector) Run(ctx context.Context, ready func()) error {
 	case serveErr = <-serving:
 		exited = true
 	}
-	revoke()
+	publication.Close()
+	stopWorker()
+	<-workerDone
+	c.publicationMu.Lock()
+	c.publication = nil
+	c.publicationMu.Unlock()
 	mu.Lock()
 	accepting = false
 	mu.Unlock()

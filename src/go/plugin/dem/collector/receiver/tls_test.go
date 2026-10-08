@@ -11,7 +11,9 @@ import (
 )
 
 func TestCancelledTLSPreparationHonorsCaller(t *testing.T) {
-	c := New(rumregistry.New())
+	c := New(Dependencies{
+		Registry: rumregistry.New(),
+	})
 	c.TLSCert, c.TLSKey = "synthetic-certificate.pem", "synthetic-key.pem"
 	ctx, cancel := context.WithCancel(context.Background())
 	cancel()

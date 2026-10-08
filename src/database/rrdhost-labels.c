@@ -156,14 +156,7 @@ static bool config_label_cb(void *data __maybe_unused, const char *name, const c
 }
 
 static void rrdhost_load_config_labels(void) {
-    int status = inicfg_load(&netdata_config, NULL, 1, CONFIG_SECTION_HOST_LABEL);
-    if(!status) {
-        char *filename = CONFIG_DIR "/" CONFIG_FILENAME;
-        nd_log(NDLS_DAEMON, NDLP_WARNING,
-               "RRDLABEL: Cannot reload the configuration file '%s', using labels in memory",
-               filename);
-    }
-
+    netdata_conf_reload_section(CONFIG_SECTION_HOST_LABEL);
     inicfg_foreach_value_in_section(&netdata_config, CONFIG_SECTION_HOST_LABEL, config_label_cb, NULL);
 }
 
