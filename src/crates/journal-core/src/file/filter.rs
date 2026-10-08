@@ -6,15 +6,16 @@
 //! expression.
 //!
 //! Data flow: `JournalReader::add_match` feeds a pending [`JournalFilter`]
-//! (field-name remapping happens there); the first
-//! `step` or `build_filter` resolves it against the file and installs the
-//! result on the cursor. From
-//! then on the cursor's filtered path drives the expression one entry at a
-//! time (`JournalCursor::resolve_filter_location`), rewinding with
-//! `head`/`tail` before
-//! resolving a location from scratch, because `next`/`previous` continue
-//! from the scan position instead of seeking
-//! (the resolver's fresh-resolution arms rewind first).
+//! (field-name remapping happens there); group-closing calls
+//! (`add_conjunction`/`add_disjunction`) resolve what they flush right
+//! away, and the first `step` resolves what is left against the file,
+//! installing the result on the cursor, while `build_filter` resolves and
+//! returns it without installing. From then on
+//! the cursor's filtered path drives the expression one entry at a time
+//! (`JournalCursor::resolve_filter_location`), rewinding with `head`/`tail`
+//! before resolving a location from scratch, because `next`/`previous`
+//! continue from the scan position instead of seeking (the resolver's
+//! fresh-resolution arms rewind first).
 //!
 //! A match is an exact, case-sensitive byte match of one full `FIELD=VALUE`
 //! payload: hash lookup in the data hash table plus raw-payload comparison
@@ -28,7 +29,7 @@
 //! one file-global, write-ordered space (every object is appended at
 //! `JournalWriter`'s single growing `append_offset`), so offsets
 //! from different chains are comparable - what the disjunction min/max and
-//! the conjunction fixed-point gallop below rely on.
+//! the conjunction fixed-point iteration below rely on.
 //!
 //! The expression is bound to the file it was built against: data-object
 //! offsets and entry-array positions are followed as-is, with no
@@ -66,9 +67,12 @@ pub enum FilterExpr {
     /// entry chain: the state carried between `next`/`previous` calls.
     /// Built by `JournalFilter::convert_current_matches`.
     Match(NonZeroU64, InlinedCursor),
-    /// AND of sub-expressions: one per distinct matched field name.
+    /// AND of sub-expressions: one per distinct matched field name within a
+    /// group, or per group joined by a repeated AND
+    /// (`JournalFilter::set_operation`).
     Conjunction(Vec<FilterExpr>),
-    /// OR of sub-expressions: the value set of one matched field name.
+    /// OR of sub-expressions: the value set of one matched field name, or
+    /// groups joined by a repeated OR (`JournalFilter::set_operation`).
     Disjunction(Vec<FilterExpr>),
 }
 
@@ -212,7 +216,7 @@ impl FilterExpr {
     /// `JournalCursor::resolve_filter_location` for the consumer side. Per arm:
     /// - `Match`: walks the payload's entry chain forward
     ///   ([`InlinedCursor::next_until`]).
-    /// - `Conjunction`: gallops to a fixed point - sub-expressions advance
+    /// - `Conjunction`: iterates to a fixed point - sub-expressions advance
     ///   in order, ratcheting the needle upward, until a full pass leaves it
     ///   unchanged; the first sub-expression without a later match ends the
     ///   scan with `Ok(None)`. At convergence every cursor rests on the
@@ -273,7 +277,7 @@ impl FilterExpr {
     /// or before `needle_offset`, with the same continuation-and-clamp
     /// contract - an already-satisfying position is returned without moving,
     /// so fresh resolutions rewind with `tail` first. `Conjunction`
-    /// sub-expressions are walked in reverse order and gallop to a fixed
+    /// sub-expressions are walked in reverse order and iterate to a fixed
     /// point; `Disjunction` advances every branch and takes the largest
     /// offset; `None` always yields `Ok(None)`. On `Ok(None)` the exhausted
     /// cursors rest at their chains' starts.
@@ -381,7 +385,8 @@ impl JournalFilter {
     /// The key-sorted list is walked in runs of equal field names: a
     /// single-value run becomes a [`FilterExpr::Match`], a multi-value run a
     /// [`FilterExpr::Disjunction`] over the value set, and the per-key
-    /// results combine in a [`FilterExpr::Conjunction`].
+    /// results combine in a [`FilterExpr::Conjunction`] (a lone result is
+    /// returned unwrapped).
     ///
     /// Every payload is resolved against `journal_file` here: hash it
     /// ([`JournalFile::hash`] reads the header's keyed-hash flag), look
@@ -417,8 +422,6 @@ impl JournalFilter {
                 i += 1;
             }
 
-            // Multiple values for one field name OR together; a single
-            // value stays a plain Match.
             if i - start > 1 {
                 let mut matches = Vec::with_capacity(i - start);
                 for idx in start..i {

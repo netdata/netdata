@@ -1,5 +1,5 @@
 //! Integration tests for query pagination over an indexed journal
-//! (file_index.rs): each test writes a fresh journal file, indexes it
+//! (`src/file_index.rs`): each test writes a fresh journal file, indexes it
 //! with `FileIndexer::index`, and pages through it with
 //! `find_log_entries`.
 //!

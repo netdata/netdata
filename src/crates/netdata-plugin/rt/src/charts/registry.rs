@@ -178,13 +178,9 @@ where
             let token = self.cancellation.child_token();
             let writer = Arc::clone(&self.writer);
 
-            // The batch ticks at the FIRST sampler's interval: every chart in
-            // the batch is sampled on that cadence, whatever interval it was
-            // registered with. A non-first sampler's interval still reaches
-            // its BEGIN update_every, so its cadence can disagree with its
-            // declared period. Batches are cut by count only, so a registered
-            // interval is honored only when its chart opens a batch; the
-            // unwrap_or fallback never fires (batches are never empty).
+            // The batch ticks at the FIRST sampler's interval, whatever
+            // interval the other charts registered with (details on `run`);
+            // the unwrap_or fallback never fires (batches are never empty).
             let interval = batch
                 .first()
                 .map(|s| s.interval())
@@ -194,7 +190,6 @@ where
                 // Reusable batch buffer: cleared each tick, grows past 512KB if needed.
                 let mut batch_buffer = BytesMut::with_capacity(512 * 1024);
                 let mut interval_timer = tokio::time::interval(interval);
-                // Catch up missed ticks (Burst) rather than skipping them.
                 interval_timer.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Burst);
 
                 loop {
@@ -253,7 +248,7 @@ trait ChartSampler: Send + Sync {
     fn interval(&self) -> Duration;
 }
 
-/// One registered chart, sampled once per batch tick as a [`ChartSampler`].
+/// One registered chart, sampled once per batch tick as a `ChartSampler`.
 ///
 /// Used for both singleton and instanced registrations — the name is
 /// historical: instancing is resolved at registration time by

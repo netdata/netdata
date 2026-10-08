@@ -1,7 +1,7 @@
 //! Acceptance suite for sfsq's attribute / attribute-value enumeration —
 //! the phase-4b `attribute_names` / `attribute_values` operations (engine:
-//! src/traces/attributes.rs), driven end to end over real corpora. Every
-//! test writes fresh traces WALs and offers their data in the three source
+//! src/traces/attributes.rs), driven end to end over real corpora. Tests
+//! that need data write fresh traces WALs and offer it in the three source
 //! shapes of tests/common/mod.rs — a sealed SFST file, an in-memory chunk,
 //! and the WAL tail — plus the two failure shapes (a missing file, an
 //! unavailable remote).
@@ -11,32 +11,33 @@
 //! - Keys come back as the typed, wire-neutral vocabulary: sorted,
 //!   partitioned by owner (each key under exactly one), the full static
 //!   builtin set present regardless of data (seeded up front by
-//!   [`sfsq::traces::attribute_names`]), and the internal
+//!   `sfsq::traces::attribute_names`), and the internal
 //!   facets (`_kind`/`_status_code`) plus the bare `trace_state` field
-//!   never surfacing ([`sfsq::traces::storage_to_attribute`]) — while a
+//!   never surfacing (`sfsq::traces::storage_to_attribute`) — while a
 //!   span ATTRIBUTE literally named `trace_state` does.
 //! - Values merge the dictionaries of every tier and the tail's pair
 //!   table: deduplicated, sorted by value bytes, one exact `truncated`
-//!   flag ([`sfsq::traces::attribute_values`]). Merge-then-limit makes
+//!   flag (`sfsq::traces::attribute_values`). Merge-then-limit makes
 //!   source order irrelevant (the same rule in both entry points), so
 //!   results are identical under permutation.
 //! - Cancellation is ALL-OR-EMPTY (pin C2; the cancel checks at the head
-//!   of [`sfsq::traces::attribute_names`] and
-//!   [`sfsq::traces::attribute_values`]): an empty result
+//!   of `sfsq::traces::attribute_names` and
+//!   `sfsq::traces::attribute_values`): an empty result
 //!   with `Cancelled` — even the static builtins are withheld.
-//! - The optional window prunes files by summary overlap, file-granular
-//!   and conservative (pin C3; `pruned` in `src/traces/attributes.rs`);
-//!   the tail is never pruned.
+//! - The optional window prunes sealed files and unavailable sources by
+//!   summary overlap, file-granular and conservative (pin C3; `pruned`
+//!   in `src/traces/attributes.rs` guards both source kinds); the tail
+//!   is never pruned.
 //! - Failure honesty (src/traces/status.rs): a source that fails is a
 //!   `SourceFailure` reason, an in-window unavailable remote a distinct
 //!   `RemoteUnavailable` — never a silent skip; the rest still serve.
 //! - Bad requests (zero limits, pin C4 owner/key pairings, duplicate
 //!   source ids) are errors before anything is queried — the validation
-//!   heads of [`sfsq::traces::attribute_names`] and
-//!   [`sfsq::traces::attribute_values`].
+//!   heads of `sfsq::traces::attribute_names` and
+//!   `sfsq::traces::attribute_values`.
 //! - A null-only attribute stays in the vocabulary, its values carrying
-//!   `kind: None` (pin C1; [`sfsq::traces::storage_to_attribute`] keeps
-//!   the key, [`sfsq::traces::attribute_values`] folds `kind` to `None`).
+//!   `kind: None` (pin C1; `sfsq::traces::storage_to_attribute` keeps
+//!   the key, `sfsq::traces::attribute_values` folds `kind` to `None`).
 //!
 //! Not pinned here: WHICH storage chunks the enumeration reads — the
 //! suite sees results, not access paths (sfst pins per-tier dictionary
@@ -80,7 +81,7 @@ fn names(
     .expect("valid request")
 }
 
-/// Run `attribute_values` under the same terms as [`names`].
+/// Run `attribute_values` under the same terms as `names`.
 fn values(
     sources: Vec<TraceSource>,
     query: AttributeValuesQuery,
@@ -112,10 +113,11 @@ fn owner_attrs(data: &sfsq::traces::AttributeNamesData, owner: AttributeOwner) -
 }
 
 /// Keys spread across every scope and all three source shapes, written
-/// under distinct part_keys (per-WAL meta_tags — the engine must not
-/// care): the key set must partition by owner, include the full static
-/// builtin set, exclude the internal facets and the bare `trace_state`
-/// field, and be identical under source permutations.
+/// as separate WALs under distinct per-WAL meta_tags (content_meta —
+/// the engine must not care): the key set must partition by owner,
+/// include the full static builtin set, exclude the internal facets
+/// and the bare `trace_state` field, and be identical under source
+/// permutations.
 #[test]
 fn keys_partition_scopes_deterministically_under_permutation() {
     let dir = tempfile::tempdir().unwrap();
@@ -391,7 +393,7 @@ fn kinds_coalesce_and_kindless_values_carry_none() {
 
 /// Dictionary-backed builtins serve values as the STORAGE labels
 /// (mapping them to a wire vocabulary is the adapter's job —
-/// [`sfsq::traces::BuiltinField::dictionary_field`]); virtual builtins
+/// `sfsq::traces::BuiltinField::dictionary_field`); virtual builtins
 /// are a request error
 /// (the virtual/dictionary split is static); the builtin key list never
 /// depends on the data — a status-less corpus still lists `Status`.
@@ -664,7 +666,7 @@ fn cancellation_is_all_or_empty() {
 
 /// A key absent from every source is a data condition, not an error:
 /// empty values, `Complete`, not truncated (the engine skips files
-/// without the field — [`sfsq::traces::attribute_values`]).
+/// without the field — `sfsq::traces::attribute_values`).
 #[test]
 fn absent_key_is_a_complete_empty() {
     let dir = tempfile::tempdir().unwrap();
@@ -678,11 +680,11 @@ fn absent_key_is_a_complete_empty() {
     assert_eq!(data.status, QueryStatus::Complete);
 }
 
-/// Request validation: zero limits, an empty or inverted window, the
-/// invalid owner/key pairings of pin C4, and duplicate source ids are
-/// errors — nothing is queried (the validation heads of
-/// [`sfsq::traces::attribute_names`] and
-/// [`sfsq::traces::attribute_values`]).
+/// Request validation: zero limits, the invalid owner/key pairings of
+/// pin C4, and duplicate source ids are errors before anything is
+/// queried (the validation heads of `sfsq::traces::attribute_names` and
+/// `sfsq::traces::attribute_values`); an empty or inverted window is
+/// rejected earlier still, by `TimeWindow::new`.
 #[test]
 fn request_validation_rejects_bad_requests() {
     let cancel = CancellationToken::new;
@@ -790,7 +792,7 @@ fn request_validation_rejects_bad_requests() {
 
 /// An empty source set with a live token is a Complete result: the
 /// static builtin vocabulary does not depend on sources existing
-/// ([`sfsq::traces::attribute_names`] seeds it unconditionally), and
+/// (`sfsq::traces::attribute_names` seeds it unconditionally), and
 /// attribute scopes are simply empty — pinned so a future change
 /// cannot gate the static set on "saw a source".
 #[test]
@@ -831,7 +833,7 @@ fn empty_sources_still_yield_the_static_builtins() {
 /// (`RemoteUnavailable`) beside a missing file's (`SourceFailure`), for
 /// both operations, while the healthy source still serves; alone, it is
 /// never Complete and never a source failure — the two reasons are
-/// distinct ([`sfsq::traces::PartialReason::RemoteUnavailable`]).
+/// distinct (`sfsq::traces::PartialReason::RemoteUnavailable`).
 #[test]
 fn unavailable_sources_are_reported_and_the_rest_served() {
     let dir = tempfile::tempdir().unwrap();

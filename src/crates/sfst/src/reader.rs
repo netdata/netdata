@@ -10,10 +10,11 @@
 //!
 //! Consumers (grep-verified): the query plane —
 //! [`IndexReader`](crate::IndexReader) (`index_reader.rs`) — wraps a
-//! [`ChunkReader`] and is the only user of the crate-internal accessors
-//! (`primary`, `mid_field`, `high_field`); `registry` recovers through
-//! [`read_summary_path`]; [`ChunkReader`] itself is re-exported under
-//! `test-util` for fixtures, the `inspect` example, and `benches/decode.rs`.
+//! [`ChunkReader`] and is the only non-test user of the crate-internal
+//! accessors (`primary`, `mid_field`, `high_field`); `registry` recovers
+//! through [`read_summary_path`]; [`ChunkReader`] itself is re-exported
+//! under `test-util` for fixtures, the `inspect` example, and
+//! `benches/decode.rs`.
 
 use std::cell::OnceCell;
 
@@ -75,13 +76,14 @@ pub(crate) fn unpack<T: DeserializeOwned>(data: &[u8]) -> Result<T, Error> {
 ///
 /// `open` parses only the header and TOC. Typed accessors decode their
 /// chunks on demand. The [`Metadata`] chunk (histogram, id ranges,
-/// schema tree) is cached after first access so the bucketing of
-/// secondary chunks doesn't repeatedly decompress META.
+/// schema tree, per-row column manifest) is cached after first access
+/// so the bucketing of secondary chunks doesn't repeatedly decompress
+/// META.
 pub struct ChunkReader<'a> {
     data: &'a [u8],
     container: Container<'a>,
     /// Lazily-decoded META payload. Populated on first call to any
-    /// method that needs it (`metadata`, `fields`, `num_mid`,
+    /// method that needs it (e.g. `metadata`, `fields`, `num_mid`,
     /// `num_high`).
     metadata: OnceCell<Metadata>,
     /// Flat [`FieldTable`] **derived** from the META schema tree
@@ -132,8 +134,9 @@ impl<'a> ChunkReader<'a> {
 
     // ── META ─────────────────────────────────────────────────────────
 
-    /// Index metadata (histogram + id ranges + schema tree). Decoded on
-    /// first access; cached for the lifetime of this `ChunkReader`.
+    /// Index metadata (histogram + id ranges + schema tree + the
+    /// per-row columns manifest). Decoded on first access; cached for
+    /// the lifetime of this `ChunkReader`.
     pub fn metadata(&self) -> Result<&Metadata, Error> {
         if let Some(m) = self.metadata.get() {
             return Ok(m);
@@ -227,8 +230,8 @@ impl<'a> ChunkReader<'a> {
     // ── PRIM ─────────────────────────────────────────────────────────
 
     /// Decompress and deserialize the primary FST. Crate-internal:
-    /// [`IndexReader`](crate::IndexReader)::open is the only caller, and it
-    /// caches the decode.
+    /// [`IndexReader`](crate::IndexReader)::open is the only non-test
+    /// caller, and it caches the decode.
     pub(crate) fn primary(&self) -> Result<PrefixMap<BitmapValue>, Error> {
         unpack(self.primary_raw()?)
     }
@@ -438,9 +441,9 @@ impl<'a> ChunkReader<'a> {
 
     /// Decode and validate the `trace_id` index (`TIDX`). Errors with
     /// [`Error::CorruptIndex`] if the decoded fanout/permutation is structurally
-    /// inconsistent or references a row beyond `SUMR.record_count`. Callers gate
-    /// on [`has_trace_id_index`](Self::has_trace_id_index); a file without the
-    /// chunk surfaces the container's not-found error.
+    /// inconsistent or references a row beyond `SUMR.record_count`; a file
+    /// without the chunk surfaces the container's not-found error (the
+    /// `From` mapping lands it on [`Error::Toc`]).
     ///
     /// Validation is **panic-safety only** — it does NOT re-verify that
     /// `sort_perm` is actually sorted by `trace_id` (a trusted-producer
@@ -578,8 +581,10 @@ impl<'a> ChunkReader<'a> {
         Ok(num_stream_batches(self.summary()?.record_count))
     }
 
-    /// Resolve a chunk's payload through the shared container — the
-    /// single chokepoint where every access gets crc32 verification.
+    /// Resolve a chunk's payload through the shared container, letting
+    /// container errors convert with `From`. The crc32 check itself
+    /// lives in `Container::chunk`, which the index-addressed accessors
+    /// call directly — every read path stays verified.
     fn chunk_raw_by_id(&self, id: chunk_file::ChunkId) -> Result<&'a [u8], Error> {
         self.container.chunk(id).map_err(Error::from)
     }

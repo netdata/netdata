@@ -1,8 +1,8 @@
 // Differential fuzz target: replays random op sequences on a
 // `treight::RawBitmap` and a `roaring::RoaringBitmap` (the oracle) built
 // from the same values, asserting the two implementations always agree on
-// len, min/max, emptiness, membership, ranges, ascending iteration, set-op
-// results and the serialize roundtrip.
+// len, min/max, emptiness, membership, ranges, ascending iteration and
+// set-op results; the serialize roundtrip checks treight alone.
 //
 // A treight bitmap is a `Copy` descriptor whose tree bytes live in an
 // external blob (src/crates/treight/src/raw.rs `RawBitmap`), so each side
@@ -75,8 +75,6 @@ enum Operation {
     SerializeRoundtrip,
 }
 
-/// Generated input: which universe to use, the two starting value lists and
-/// the op sequence.
 #[derive(Arbitrary, Debug)]
 struct FuzzInput {
     universe_idx: u8,

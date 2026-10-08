@@ -182,7 +182,7 @@ impl Histogram {
     pub fn total_entries(&self) -> usize {
         let last_bucket = self.buckets.last().expect("histogram to have buckets");
         // Not off-by-one: `count` is the 0-based index of the last entry,
-        // so +1 turns it into a total (set to entries - 1 by construction)
+        // so +1 turns it into a total
         last_bucket.count as usize + 1
     }
 
@@ -201,7 +201,8 @@ impl Histogram {
     /// `[start_time, end_time)`.
     ///
     /// The bitmap's bits are entry indices in the same space as the running
-    /// counts (the time-ordered entry list `src/file_indexer.rs` builds).
+    /// counts (the time-ordered entry list `journal-index/src/file_indexer.rs`
+    /// builds).
     ///
     /// # Algorithm
     ///
@@ -217,8 +218,11 @@ impl Histogram {
     ///
     /// Returns `None` when `start_time >= end_time` or either bound is not
     /// a multiple of `bucket_duration`. Otherwise `Some(count)`, including
-    /// `Some(0)` for an empty bitmap, an empty histogram, or a range that
-    /// overlaps no stored bucket.
+    /// `Some(0)` for an empty bitmap, an empty histogram, or a range past
+    /// the last bucket. Quirk: a range ending at or before the first
+    /// bucket's start counts the first bucket instead of returning 0, so
+    /// callers must not query ranges ending before the histogram (the
+    /// engine skips non-overlapping files before calling).
     pub fn count_entries_in_time_range(
         &self,
         bitmap: &Bitmap,
@@ -241,8 +245,7 @@ impl Histogram {
             return Some(0);
         }
 
-        // Binary search over the sorted buckets: the first bucket with
-        // start_time >= start_time
+        // First bucket with start_time >= start_time
         let start_bucket_idx = self.buckets.partition_point(|b| b.start_time < start_time);
 
         // Every bucket starts before start_time: the range is past the histogram

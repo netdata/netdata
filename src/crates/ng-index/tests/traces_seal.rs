@@ -236,7 +236,6 @@ fn trace_by_id_builds_linear_tree() {
     assert_eq!(tr.spans[kids(root)[0]].span_id, SpanId::from(child));
     assert_eq!(tr.spans[kids(child)[0]].span_id, SpanId::from(grand));
     assert!(kids(grand).is_empty());
-    // The `name` facet materialized onto the span.
     assert_eq!(
         tr.spans[tr.roots[0]]
             .fields
@@ -816,9 +815,10 @@ fn dropped_count_alone_preserves_the_chunk() {
     assert_eq!(tr.spans[0].dropped_events_count, 9);
 }
 
-/// Phase-2 bloom: the traces seal writes TBLM; membership answers have no
-/// false negatives, and an absent id resolves to an empty trace via the bloom
-/// pre-check (same observable result as before, cheaper path).
+/// The trace-id bloom (`TBLM`): the traces seal writes it, membership answers
+/// have no false negatives, and an absent id resolves to an empty trace
+/// through the bloom pre-check (same observable result as an exact lookup,
+/// cheaper path).
 #[test]
 fn seal_writes_trace_id_bloom() {
     let traces: Vec<[u8; 16]> = (1..=40u8).map(|i| [i; 16]).collect();
@@ -901,8 +901,8 @@ fn seal_writes_the_trace_rollup_with_honest_roots_and_stored_counts() {
 
 #[test]
 fn rollup_captures_error_status_kind_and_service_absence() {
-    // Coverage for every capture arm: an ERROR-status root with a set
-    // kind, plus a second resource group WITHOUT service.name (the
+    // Coverage for the rollup's capture fields: an ERROR-status root with a
+    // set kind, plus a second resource group WITHOUT service.name (the
     // service ref must be the sentinel, not a neighbor's value).
     use opentelemetry_proto::tonic::trace::v1 as otlp;
     let mut root = span([0xC; 16], [1; 8], [0; 8], 1_000, 2_000, "err-root");

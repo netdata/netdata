@@ -11,8 +11,9 @@ impl Ledger {
     )]
     pub(super) async fn handle_ingestor_msg(&mut self, msg: wal::Message) {
         // `pipeline_id` is a raw u16 stamped by the writer process; decode it
-        // to a `Signal` here — the sole boundary where an unknown id can
-        // appear. Past it, routing is total.
+        // to a `Signal` here — the one spot on this path where an unknown id
+        // can appear (the cleaner and uploader responses decode at their own
+        // boundaries). Past it, routing is total.
         let pipeline_id = msg.event.pipeline_id();
         let signal = match Signal::try_from(pipeline_id) {
             Ok(signal) => signal,

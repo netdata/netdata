@@ -420,7 +420,7 @@ fn cancelled_call_returns_empty_with_the_reason() {
     assert!(data.traces.is_empty(), "all-or-empty");
 }
 
-/// The up-front poll precedes everything: even a zero-source call
+/// The up-front poll precedes any source work: even a zero-source call
 /// reports Cancelled — an already-cancelled call can never pose as
 /// Complete.
 #[test]

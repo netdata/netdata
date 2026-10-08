@@ -12,14 +12,15 @@ use uuid::Uuid;
 #[allow(unused_imports)]
 use tracing::{error, info, instrument};
 
-// Helper function to create a File with archived status
+// Builds an archived journal file name and parses it into a `File`; no file
+// is created on disk.
 fn create_chain_file(
     path: &PathBuf,
     seqnum_id: Uuid,
     head_seqnum: u64,
     head_realtime: u64,
 ) -> Option<repository::File> {
-    // Format the path using the same logic as journal_registry
+    // A name journal_registry parses back into `Status::Archived`.
     let filename = format!(
         "system@{}-{:016x}-{:016x}.journal",
         seqnum_id.simple(),
@@ -35,7 +36,7 @@ fn create_chain_file(
 /// Manages a directory of journal files with automatic cleanup.
 ///
 /// Scans the directory for existing files, tracks their sizes, and enforces retention
-/// policies. Typically not used directly - see [`JournalLog`](crate::JournalLog) instead.
+/// policies. Typically not used directly - see [`Log`](crate::Log) instead.
 #[derive(Debug)]
 pub(super) struct OwnedChain {
     pub(super) path: PathBuf,
@@ -46,6 +47,9 @@ pub(super) struct OwnedChain {
     pub(super) total_size: u64,
 }
 
+/// Result of a retention pass: the files deleted from the chain and the
+/// filesystem, and the first deletion error, if any. Files whose deletion
+/// failed remain in the chain.
 pub(super) struct RetentionOutcome {
     pub(super) deleted_files: Vec<repository::File>,
     pub(super) error: Option<WriterError>,
@@ -92,6 +96,8 @@ impl OwnedChain {
         Ok(chain)
     }
 
+    /// Reads the tail entry seqnum from the newest file's journal header;
+    /// `Ok(0)` when the chain is empty.
     pub(super) fn tail_seqnum(&self) -> Result<u64> {
         let Some(file) = self.inner.back() else {
             return Ok(0);
@@ -103,6 +109,9 @@ impl OwnedChain {
         Ok(jf.journal_header_ref().tail_entry_seqnum)
     }
 
+    /// Reads the tail entry realtime from the newest file's journal header;
+    /// `None` when the chain is empty or the header value is `0` (no
+    /// entries yet).
     pub(super) fn tail_realtime(&self) -> Result<Option<Microseconds>> {
         let Some(file) = self.inner.back() else {
             return Ok(None);
@@ -119,6 +128,9 @@ impl OwnedChain {
         }
     }
 
+    /// Reads the tail entry monotonic clock from the newest file's journal
+    /// header, but only when that file belongs to `boot_id`; `None` for an
+    /// empty chain, a different boot, or a `0` value (no entries yet).
     pub(super) fn tail_monotonic_for_boot(&self, boot_id: Uuid) -> Result<Option<u64>> {
         let Some(file) = self.inner.back() else {
             return Ok(None);
@@ -141,7 +153,9 @@ impl OwnedChain {
         }
     }
 
-    /// Registers a new journal file with the directory.
+    /// Picks the name for a new archived journal file and registers it in
+    /// the chain. Nothing is created on disk; the caller creates the file
+    /// afterwards.
     pub(super) fn create_file(
         &mut self,
         seqnum_id: Uuid,
@@ -228,7 +242,9 @@ impl OwnedChain {
         }
     }
 
-    /// Remove the oldest file
+    /// Removes the oldest file from the chain and the filesystem. A file
+    /// already gone from disk counts as deleted; a failed removal puts the
+    /// file back and leaves the size accounting untouched.
     #[tracing::instrument(skip_all)]
     fn delete_oldest_file(&mut self) -> Result<Option<repository::File>> {
         let Some(file) = self.inner.pop_front() else {
@@ -239,7 +255,6 @@ impl OwnedChain {
 
         let file_size = self.file_sizes.get(&file).copied().unwrap_or(0);
 
-        // Remove from filesystem
         match std::fs::remove_file(file.path()) {
             Ok(()) => {}
             Err(err) if err.kind() == std::io::ErrorKind::NotFound => {
@@ -257,7 +272,10 @@ impl OwnedChain {
         Ok(Some(file))
     }
 
-    /// Remove files older than the specified cutoff time
+    /// Removes files whose rotation timestamp (`head_realtime` for archived
+    /// files, the disposal timestamp for disposed ones) is at or before
+    /// `now - max_entry_age`. The active file is never removed; files that
+    /// fail to delete stay in the chain.
     #[tracing::instrument(skip(self))]
     fn delete_files_older_than(&mut self, max_entry_age: std::time::Duration) -> RetentionOutcome {
         let cutoff_time = Microseconds::now()

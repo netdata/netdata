@@ -2,9 +2,10 @@
 //! ready for a query engine to open.
 //!
 //! Selection happens in `file-lifecycle`, which builds this type in both
-//! of its producers: the per-tenant registry — `Registry::sfst_candidates`,
-//! also returned by `Registry::query_snapshot` — wraps the tenant's local
-//! sealed SFSTs (the path is the SFST registry's derived file path), and
+//! of its producers: the per-tenant registry —
+//! `TenantRegistries::sfst_candidates`, also returned by
+//! `TenantRegistries::query_snapshot` — wraps the tenant's local sealed
+//! SFSTs (the path is the SFST registry's derived file path), and
 //! `remote_read::RemoteRead::fetch` wraps remote catalog entries it
 //! materializes into the shared download cache (path: the cache pin's
 //! path; summary: the catalog's stored one). The active-WAL side of a

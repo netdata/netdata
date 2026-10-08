@@ -1,7 +1,7 @@
 //! Netdata function wire types for `otel-traces`.
 //!
 //! The transport layer between the netdata function protocol and the
-//! wire-neutral [`sfsq::traces`] engine. One Function view plus seven
+//! wire-neutral `sfsq::traces` engine. One Function view plus seven
 //! explicit peer modes, each selected by exactly one top-level
 //! sub-object — `info`, `trace`, `attributes`, `attribute_values`,
 //! `overview`, `slowest`, `search` — the mode's params self-contained
@@ -27,7 +27,7 @@ use sfsq::traces::{PartialReason, QueryStatus};
 // ── Request ─────────────────────────────────────────────────────────
 
 /// Request param names accepted by this function, advertised to the UI
-/// in [`InfoResponse::accepted_params`]. The rule: the list carries
+/// in `InfoResponse::accepted_params`. The rule: the list carries
 /// exactly the TOP-LEVEL keys — the seven mode selectors, `tenant`, and
 /// every field the implicit Functions view reads, its own duration band
 /// and `overview_facets` opt-in included. `selections` is listed for
@@ -117,7 +117,7 @@ struct RawOtelTracesRequest {
     /// Tenant whose data the query reads — a scoping selector supplied
     /// by the caller, not a security boundary; omitted or invalid falls
     /// back to the default tenant
-    /// ([`file_registry::TenantId::resolve_query`]), never an implicit
+    /// (`file_registry::TenantId::resolve_query`), never an implicit
     /// all-tenant union. Top-level because it scopes the CALL in every
     /// data mode (`info` ignores it — capability discovery reads no
     /// data).
@@ -128,7 +128,7 @@ struct RawOtelTracesRequest {
 /// Request payload: exactly one mode, its params self-contained, plus
 /// the optional call-scoping `tenant`. `Deserialize` is manual so the
 /// top level can be held to a JSON object (arrays and scalars are
-/// client errors): the object streams through [`RawOtelTracesRequest`]'s
+/// client errors): the object streams through `RawOtelTracesRequest`'s
 /// derived visitor, keeping TOP-LEVEL duplicate-key and unknown-key
 /// rejection (inside a mode object, duplicates collapse last-wins at
 /// the `Value` capture — a known serde_json DOM property). No
@@ -282,8 +282,10 @@ impl TryFrom<RawOtelTracesRequest> for OtelTracesRequest {
 }
 
 /// Standard Functions parameters for the default trace-search view.
-/// They translate into the native search mode without changing that
-/// mode's request or response contract.
+/// They translate into the native search mode (see
+/// [`Self::search_params`]); the response is that mode's page wrapped
+/// in the Functions envelope, plus the full-window aggregate on a
+/// first page only — an anchored page carries none ([`Self::anchor`]).
 #[derive(Debug, Clone, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct FunctionsParams {
@@ -341,10 +343,11 @@ pub struct FunctionsParams {
 
 impl FunctionsParams {
     /// Translate into the native search params: relative windows
-    /// resolved against `now`, the rest passed through, and
-    /// `spans_per_trace` pinned to 0 — the Functions view attaches no
-    /// matched spans (its `min`/`max` span-duration bounds stay `None`
-    /// too; the view only speaks trace-envelope duration).
+    /// resolved (`before` against `now`, `after` against the resolved
+    /// `before`), the rest passed through, and `spans_per_trace` pinned
+    /// to 0 — the Functions view attaches no matched spans (its
+    /// `min`/`max` span-duration bounds stay `None` too; the view only
+    /// speaks trace-envelope duration).
     pub fn search_params(&self, now: u32) -> Result<SearchParams, String> {
         fn resolve(label: &str, value: i64, base: u32) -> Result<u32, String> {
             let absolute = if value < 0 {
@@ -448,7 +451,7 @@ fn default_limit() -> usize {
 }
 
 /// Wire maximum for [`SearchParams::limit`], mirroring the engine's
-/// [`sfsq::traces::SLOWEST_LIMIT_MAX`] bound on the sibling mode. The
+/// `sfsq::traces::SLOWEST_LIMIT_MAX` bound on the sibling mode. The
 /// cap lives at the wire, not the engine: a cursor walk legitimately
 /// re-runs the engine with `limit = served + limit` (the served prefix
 /// itself capped at 10,000), so the engine-side limit is bounded by
@@ -1006,7 +1009,7 @@ pub struct TraceSummaryWire {
 /// `sum(top[].spans) + other + unattributed == span_count`.
 #[derive(Debug, Serialize)]
 pub struct ServiceBreakdownWire {
-    /// At most [`sfsq::traces::SERVICE_BREAKDOWN_TOP_K`] services — span
+    /// At most `sfsq::traces::SERVICE_BREAKDOWN_TOP_K` services — span
     /// count DESC, name ASC.
     pub top: Vec<ServiceSpansWire>,
     /// Spans in the services beyond `top`.

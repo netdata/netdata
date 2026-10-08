@@ -155,7 +155,7 @@ fn seal(wal: &Path, out: &Path) -> ExitCode {
     }
 }
 
-/// Parse exactly 32 hex chars (16 bytes; case-insensitive) into a [`TraceId`].
+/// Parse exactly 32 hex chars (16 bytes; case-insensitive) into a `TraceId`.
 fn parse_trace_id(hex: &str) -> Option<TraceId> {
     // Every char must be an ASCII hex digit: this rejects non-hex input (a bare
     // `u8::from_str_radix` on a 2-char window would otherwise accept a leading `+`/`-`)

@@ -48,15 +48,12 @@
 //! Nothing here opens journal-file contents (reading entries is journal-core's
 //! job) or locks: mutation goes through `&mut self` only.
 
-// Submodules; the module doc above says what each owns.
 pub mod collection;
 pub mod error;
 pub mod file;
 pub mod metadata;
 
-// Public API: the file model + FileInfo. Also re-exported flat at the crate
-// root (lib.rs); FileInfo ships onward through journal-function
-// (journal-function/src/lib.rs).
+// FileInfo ships onward through journal-function (journal-function/src/lib.rs).
 pub use crate::repository::file::{File, Origin, Source, Status};
 pub use crate::repository::metadata::FileInfo;
 
@@ -64,7 +61,7 @@ pub use crate::repository::metadata::FileInfo;
 // short paths (journal-engine/src/error.rs,
 // journal-log-writer/src/log/chain.rs) and journal-core's glob shim
 // carries them on (journal-core/src/lib.rs). #[doc(hidden)] keeps them
-// out of rustdoc because lib.rs's flat exports (lib.rs) deliberately
+// out of rustdoc because lib.rs's flat exports deliberately
 // omit them; the types remain documented under their defining modules
 // (collection::, error::).
 #[doc(hidden)]
@@ -159,7 +156,6 @@ mod tests {
             files: VecDeque::new(),
         };
 
-        // Add some files
         chain
             .files
             .push_back(create_archived_file(&origin, 100 * USEC_PER_SEC));

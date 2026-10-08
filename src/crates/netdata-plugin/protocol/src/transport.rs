@@ -1,7 +1,7 @@
 //! Framed I/O for the pluginsd protocol: [`MessageReader`] and
 //! [`MessageWriter`] wrap any `AsyncRead`/`AsyncWrite` in `tokio_util::codec`'s
 //! `FramedRead`/`FramedWrite` over the `Decoder`/`Encoder` impls in
-//! `tokio_codec`, and [`Transport`] bundles both around one stdin/stdout pair.
+//! `tokio_codec`, and [`Transport`] bundles both over one stream pair.
 //!
 //! Direction is fixed at construction and never re-checked: `MessageReader`
 //! decodes with `MessageParser::input()` (the agent-to-plugin direction),
@@ -10,7 +10,7 @@
 //! plugin output outside the [`Message`] model (chart protocol lines,
 //! `PLUGIN_KEEPALIVE`) is written verbatim with [`MessageWriter::write_raw`].
 //!
-//! Errors surface as [`NetdataPluginError`]: I/O failures while encoding as
+//! Errors surface as [`NetdataPluginError`]: I/O failures on the write path as
 //! the `Transport` variant, decode failures as the `Protocol` variant; end of
 //! stream yields `None`.
 use crate::message_parser::{Message, MessageParser};
@@ -53,9 +53,9 @@ where
     /// Returns `None` at end of stream. Returns `Some(Err)` when the framed
     /// decoder fails, mapped to `NetdataPluginError::Protocol` whose message is
     /// only the Debug form of the `line_parser` error (`"Io"`) — in practice
-    /// just underlying I/O failures, which include EOF with a trailing partial
-    /// line (the codec's default `decode_eof`). After an error the stream
-    /// yields `None`.
+    /// just underlying read failures and EOF with a trailing partial line,
+    /// which the codec's default `decode_eof` reports as an `io::Error`.
+    /// After an error the stream yields `None`.
     pub async fn recv(&mut self) -> Option<Result<Message>> {
         self.reader.next().await.map(|result| {
             result.map_err(|e| NetdataPluginError::Protocol {
@@ -185,9 +185,9 @@ where
     }
 
     /// Send a message, then return the next inbound message: `Ok(None)` when
-    /// the peer closed first, `Err` on a send or decode failure. Whatever
-    /// arrives next is returned as-is; matching a response to its transaction
-    /// is the caller's job.
+    /// the read stream ends with no response, `Err` on a send or decode
+    /// failure. Whatever arrives next is returned as-is; matching a response
+    /// to its transaction is the caller's job.
     pub async fn request(&mut self, message: Message) -> Result<Option<Message>> {
         self.send(message).await?;
         match self.recv().await {

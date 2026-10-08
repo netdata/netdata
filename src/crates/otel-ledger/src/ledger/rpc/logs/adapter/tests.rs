@@ -1,28 +1,12 @@
-//! Tests for the otel-logs wire adapter ([`super::adapter`]) — the pure
-//! mapping between the netdata function wire types and the [`sfsq::logs`]
-//! engine, consumed by `handler.rs`. Fixtures are synthetic `sfst` values
-//! and JSON request bodies; nothing here touches files or a runtime.
+//! Tests for the otel-logs wire adapter ([`super`]) — the pure
+//! mapping between the netdata function wire types and the
+//! `sfsq::logs` engine; `handler.rs` is its only consumer. Fixtures
+//! are synthetic `sfst` values and JSON request bodies; nothing here
+//! touches files or a runtime.
 //!
-//! Pins:
-//!
-//! - [`OtelLogsRequest::into_query`] mapping and validation: an empty
-//!   histogram falls to the engine's default field, a cursor anchor decodes
-//!   to its four fields (a malformed one degrades to "no anchor"), a µs
-//!   anchor becomes ns, and a bad query regex fails the request at the
-//!   boundary;
-//! - the legacy chart contract on the wire: the `"(unset)"` trailer
-//!   dimension, the leading "time" label, per-dimension `[value, arp, pa]`
-//!   triples, and grid-derived view bounds — including the all-zero
-//!   envelope degenerate handler paths return (`to_result` over
-//!   `LogsData::empty`);
-//! - the row table: fixed `[timestamp_µs, severity, cursor]` columns plus
-//!   one cell per field, with multi-value joining and last-severity-wins;
-//! - the stream selector: `__streams` hex decode (garbage skipped) and the
-//!   all-preselected multiselect built from decoded stream identities.
-//!
-//! Not pinned here: `effective_window`'s system-time fallback, `to_result`
-//! over a non-empty page (its converters are exercised directly instead),
-//! and `humanize_span_s` beyond the one-unit form.
+//! Not pinned here: `effective_window`'s system-time fallback,
+//! `to_result` over a non-empty page (its converters are exercised
+//! directly instead), and `humanize_span_s` beyond the one-unit form.
 use super::*;
 
 #[test]
@@ -60,7 +44,8 @@ fn into_query_wires_and_validates_full_text_query() {
     let req: OtelLogsRequest = serde_json::from_slice(br#"{"query":".*GoDaddy.*"}"#).unwrap();
     assert_eq!(req.into_query().unwrap().query(), Some(".*GoDaddy.*"));
 
-    // An empty `query` (the UI default) carries no query.
+    // An empty `query` (the serde default for an omitted field) carries
+    // no query.
     let req: OtelLogsRequest = serde_json::from_slice(br#"{}"#).unwrap();
     assert_eq!(req.into_query().unwrap().query(), None);
 
@@ -187,12 +172,12 @@ fn histogram_with_zero_buckets_still_well_formed() {
 #[test]
 fn empty_logs_data_shapes_a_full_zero_count_envelope() {
     // The empty envelope every degenerate handler path returns (an
-    // empty source set, a cancelled remote fetch, a failed blocking
-    // task) — shaped by `to_result` over `LogsData::empty`, never
-    // hand-rolled. The chart contract must hold: real id/title,
-    // grid-derived bounds and update_every, the "(unset)" label
-    // invariant, one zero DataPoint per bucket, and the three fixed
-    // table columns.
+    // empty source set via the engine's empty run; a cancelled remote
+    // fetch or failed blocking task via `LogsData::empty`) — always
+    // shaped by `to_result`, never hand-rolled. The chart contract
+    // must hold: real id/title, grid-derived bounds and update_every,
+    // the "(unset)" label invariant, one zero DataPoint per bucket,
+    // and the three fixed table columns.
     let grid = sfst::Grid::new(1_700_000_000 * NS_PER_S, 15 * NS_PER_S, 4);
     let r = to_result(sfsq::logs::LogsData::empty("severity_text", grid), 200);
 
@@ -258,8 +243,9 @@ fn available_histograms_enumerates_fields_in_order() {
 
 /// Multi-valued fields (repeated keys on one row) join into a single cell
 /// in row order with duplicates skipped; the dedicated severity cell takes
-/// the last `severity_text` pair (the indexer interns the projected
-/// top-level severity after all attributes).
+/// the last `severity_text` pair. Rows intern a record's scalars (incl.
+/// the projected severity) before its `attributes.*`, so on a name clash
+/// the attribute's value wins the cell.
 #[test]
 fn build_table_joins_multivalued_fields_and_keeps_last_severity() {
     let cursor = sfsq::logs::Cursor {
@@ -276,7 +262,7 @@ fn build_table_joins_multivalued_fields_and_keeps_last_severity() {
             ("tags".into(), "b".into()),
             ("tags".into(), "a".into()), // duplicate — skipped
             ("plain".into(), "x".into()),
-            ("severity_text".into(), "ERROR".into()), // projected, last
+            ("severity_text".into(), "ERROR".into()), // last severity_text wins
         ],
     };
     let fields = vec!["tags".to_string(), "plain".to_string()];

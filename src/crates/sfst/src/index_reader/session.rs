@@ -268,9 +268,9 @@ impl SpanSource for TraceFileSession<'_, '_> {
         // the session cache in one pass.
         let local = (pos % crate::stream_batch_size(self.reader.summary().record_count)) as usize;
         let batch = self.batch(pos)?;
-        // A CRC-valid but structurally short batch must be a SourceFailure,
-        // not an out-of-bounds panic (the same check the reader's
-        // materialize_rows applies).
+        // A CRC-valid but structurally short batch must surface as
+        // `CorruptIndex`, never an out-of-bounds panic (the same check
+        // the reader's `materialize_rows` applies).
         if local >= batch.num_rows() {
             return Err(crate::Error::CorruptIndex(format!(
                 "trace session: position {pos} row {local} >= batch length {}",

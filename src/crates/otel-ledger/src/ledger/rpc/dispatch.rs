@@ -53,7 +53,7 @@ impl Ledger {
             LedgerRequest::Cancel { transaction } => {
                 // Unknown or already-finished transactions are silently
                 // ignored: the entry is removed when the call's result is
-                // forwarded (handle_outbound_resp), so a late Cancel finds
+                // forwarded (`handle_outbound_resp`), so a late Cancel finds
                 // nothing.
                 if let Some(token) = self.transactions.remove(&transaction) {
                     tracing::info!(transaction = %transaction, "cancelling function call");
@@ -84,13 +84,12 @@ impl Ledger {
     ///
     /// An oversized message is degraded to a per-request failure rather
     /// than propagated: ferryboat checks the size limit *before* writing
-    /// any bytes (`Error::MessageTooLarge`, `ferryboat/src/lib.rs`), so
-    /// the connection is still
-    /// intact, and one outsized function response must not tear down the
-    /// whole ledger (it did — a ~10 MB dashboard response crash-looped the
-    /// plugin). The oversized result is replaced with a small status-500
-    /// result so the agent gets an answer instead of a timeout; every
-    /// other error remains fatal.
+    /// any bytes (`Error::MessageTooLarge`, `ferryboat/src/lib.rs`), so the
+    /// connection is still intact, and one outsized function response must
+    /// not tear down the whole ledger (it did — a ~10 MB dashboard response
+    /// crash-looped the plugin). The oversized result is replaced with a
+    /// small status-500 result so the agent gets an answer instead of a
+    /// timeout; every other error remains fatal.
     pub(in crate::ledger) async fn handle_outbound_resp(
         &mut self,
         resp: LedgerResponse,
@@ -144,9 +143,6 @@ impl Ledger {
         // Route by declared function name (`declaration.name`, surfaced by
         // `Pipeline::function_name`, `file-lifecycle/src/pipeline.rs`) to
         // the owning pipeline.
-        // Each pipeline owns its handler and its pre-handler args→payload
-        // shim (a per-signal provision), so this dispatcher stays
-        // signal-neutral.
         let Some(pipeline) = self.pipelines.iter().find(|p| p.function_name() == name) else {
             // No pipeline answers this name: answer 404 straight onto
             // `outbound_tx` — the same funnel a handler result uses. No

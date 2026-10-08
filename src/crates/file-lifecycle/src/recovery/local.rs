@@ -250,7 +250,7 @@ pub async fn recover_orphaned_wals(
 /// Evict SFST and catalog files that exceed their retention policies, in one
 /// [`batch_recover`] over the shared cleaner.
 ///
-/// - SFSTs: [`sfst::Registry::evaluate_retention`] under the three-knob
+/// - SFSTs: `sfst::Registry::evaluate_retention` under the three-knob
 ///   policy (`max_files` / `max_total_size` / `max_age`, lowered by
 ///   [`crate::helpers::sfst_retention_policy`]). With storage enabled, a seq
 ///   is deferred until its catalog entry is confirmed present on the remote
@@ -261,7 +261,7 @@ pub async fn recover_orphaned_wals(
 /// - Catalogs: files dated strictly older than `today - horizon_days` — the
 ///   window [`crate::helpers::catalog_retention_days`] derives from the
 ///   tenant's remote-archive `horizon` (decoupled from SFST `max_age`), fed
-///   to [`otel_catalog::Registry::evaluate_retention`].
+///   to `otel_catalog::Registry::evaluate_retention`.
 ///
 /// The index-delete confirmation drives [`Registry::evict_seq`] (both the
 /// SFST entry and its identity-keyed lifecycle state); a catalog delete

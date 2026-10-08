@@ -121,8 +121,12 @@ pub fn build_jetstream_url(
     Ok(url.to_string())
 }
 
-/// Connect to Jetstream and send parsed events through the channel.
-/// Returns when the WebSocket connection closes or errors.
+/// Connect to Jetstream and forward each parsed event through the channel
+/// paired with its raw JSON. Malformed events are logged and skipped. Returns
+/// when the WebSocket connection closes or errors (mid-stream errors are
+/// logged and yield `Ok`; only a failed initial connect yields `Err`), or
+/// when the receiver drops the channel — closure is noticed only when
+/// sending the next parsed event.
 pub async fn connect(
     url: &str,
     tx: mpsc::Sender<(Event, serde_json::Value)>,
@@ -151,6 +155,8 @@ pub async fn connect(
 
 pub struct Jetstream;
 
+/// Keys promoted to OTLP attributes (`did`, `kind`) or the record
+/// timestamp (`time_us`); stripped from the body to avoid duplicating them.
 const PROMOTED_ROOT_KEYS: &[&str] = &["did", "kind", "time_us"];
 const PROMOTED_COMMIT_KEYS: &[&str] = &["operation", "collection", "rkey", "rev", "cid"];
 const PROMOTED_IDENTITY_KEYS: &[&str] = &["handle"];

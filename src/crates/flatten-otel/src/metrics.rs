@@ -1,10 +1,10 @@
 //! Flattens an OTel `ExportMetricsServiceRequest` into one JSON map per
-//! metric data point, in encounter order. lib.rs re-exports the entry
-//! point as [`flatten_metrics_request`]; data-point attributes, resource,
-//! and scope flattening reuse the lib.rs helpers, so lib.rs's contracts
-//! (dot-joined keys, object stripping, last-wins duplicates, non-finite
-//! doubles → `0`, bytes → base64, missing values → `null`,
-//! `resource.*`/`scope.*` prefixes) apply here unchanged.
+//! gauge/sum data point or histogram bucket, in encounter order. lib.rs
+//! re-exports the entry point as [`flatten_metrics_request`]; data-point
+//! attributes, resource, and scope flattening reuse the lib.rs helpers, so
+//! lib.rs's contracts (dot-joined keys, object stripping, last-wins
+//! duplicates, non-finite doubles → `0`, bytes → base64, missing values →
+//! `null`, `resource.*`/`scope.*` prefixes) apply here unchanged.
 //!
 //! # Keys
 //!
@@ -38,7 +38,7 @@
 //! a warning printed to stderr.
 //!
 //! [`flatten_metrics_request`] has no in-repo caller today; see the
-//! lib.rs copy for the consumer picture.
+//! lib.rs module docs for the consumer picture.
 use serde_json::{Map as JsonMap, Value as JsonValue, json};
 
 use opentelemetry_proto::tonic::{

@@ -31,10 +31,8 @@ use std::fmt;
 use std::str::FromStr;
 
 bitflags! {
-    /// The dyncfg operations a configuration entry supports, as a bitflag
-    /// set. Carried by [`ConfigDeclaration`](crate::ConfigDeclaration) and
-    /// rendered on the wire by `Display` / [`Self::to_pipe_separated`] (the
-    /// CONFIG line contract is in the module docs).
+    /// Rendered on the wire by `Display` / [`Self::to_pipe_separated`]; the
+    /// wire contract is in the module docs.
     #[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Hash)]
     pub struct DynCfgCmds: u32 {
         const GET = 1 << 0;
@@ -109,7 +107,7 @@ impl DynCfgCmds {
 
             match Self::from_cmd_name(part) {
                 Some(flag) => result |= flag,
-                None => return None, // Invalid command name
+                None => return None,
             }
         }
 
@@ -190,10 +188,7 @@ impl DynCfgCmds {
     }
 }
 
-/// Prints pipe-separated: this is the `cmds` word the protocol CONFIG
-/// encoder writes (passed through its `quote_if_needed`, which quotes it
-/// when it contains spaces) and the string the schema crate emits as the
-/// `configDeclaration.cmds` JSON member.
+/// Prints pipe-separated — the wire `cmds` word (see the module docs).
 impl fmt::Display for DynCfgCmds {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "{}", self.to_pipe_separated())
@@ -210,9 +205,7 @@ impl FromStr for DynCfgCmds {
     }
 }
 
-/// Build from raw bits. The layout matches the agent's `DYNCFG_CMDS` enum
-/// (src/libnetdata/inicfg/dyncfg.h: GET = 1<<0 ... USERCONFIG = 1<<9), so
-/// the values interoperate; unknown bits are silently dropped by
+/// Build from raw bits; unknown bits are silently dropped by
 /// `from_bits_truncate`.
 impl From<u32> for DynCfgCmds {
     fn from(value: u32) -> Self {
@@ -220,8 +213,6 @@ impl From<u32> for DynCfgCmds {
     }
 }
 
-/// The raw bit pattern, identical to the agent's `DYNCFG_CMDS` bitmask for
-/// the same commands.
 impl From<DynCfgCmds> for u32 {
     fn from(cmds: DynCfgCmds) -> Self {
         cmds.bits()

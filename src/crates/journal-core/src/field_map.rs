@@ -154,7 +154,7 @@ mod tests {
         assert!(is_systemd_compatible(b"A1"));
         assert!(is_systemd_compatible(b"A_B_C"));
         assert!(is_systemd_compatible(b"Z9_"));
-        assert!(is_systemd_compatible(b"ND_REMAPPING")); // Our marker field
+        assert!(is_systemd_compatible(b"ND_REMAPPING")); // Field-name part of `REMAPPING_MARKER`
 
         // Invalid field names - lowercase
         assert!(!is_systemd_compatible(b"message"));

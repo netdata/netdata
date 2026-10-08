@@ -1,7 +1,7 @@
 //! Collection type aliases.
 //!
 //! Single import point for the collections shared by the journal crates, so
-//! the hasher behind every hash map and set in the stack is decided in one
+//! the hasher behind the shared hash maps and sets is decided in one
 //! file. `HashMap` and `HashSet` wrap `rustc_hash::FxHasher` (workspace
 //! dependency `rustc-hash`): a fast, non-cryptographic, unseeded polynomial
 //! hash with no HashDoS hardening, unlike std's randomly-seeded SipHash, so
@@ -14,9 +14,10 @@
 //! Adoption is selective, not crate-wide: parts of journal-function and
 //! journal-engine import `std::collections` hash types directly.
 //!
-//! Consumers (grep-verified). Via the `journal_core::collections` re-export
-//! shim (`journal-core/src/collections.rs`): journal-core `field_map.rs`
-//! (HashMap, HashSet), `file/file.rs` (HashMap); journal-index
+//! Consumers (grep-verified). Via the re-export shim
+//! (`journal-core/src/collections.rs`; journal-core's own files reach it as
+//! `crate::collections`): journal-core `field_map.rs` (HashMap, HashSet),
+//! `file/file.rs` (HashMap); journal-index
 //! `file_index.rs`, `file_indexer.rs`; journal-function `netdata/facets.rs`,
 //! `netdata/histogram.rs`; journal-engine `histogram.rs`; journal-log-writer
 //! `log/chain.rs`. Direct `journal_common::collections` imports:

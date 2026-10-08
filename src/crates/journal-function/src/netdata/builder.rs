@@ -49,20 +49,17 @@ fn entry_data_to_table_with_transformations(
     column_names: Vec<String>,
     transformations: &TransformationRegistry,
 ) -> Result<Table> {
-    // Same column layout as the engine's plain table: timestamp at index 0,
-    // then the requested fields.
     let mut all_columns = vec!["timestamp".to_string()];
     all_columns.extend(column_names.clone());
     let mut transformed_table = Table::new(all_columns);
 
-    // Create a mapping from column name to index for fast lookup
     let column_map: HashMap<&str, usize> = column_names
         .iter()
         .enumerate()
         .map(|(idx, name)| (name.as_str(), idx + 1)) // +1 because timestamp is at index 0
         .collect();
 
-    // One row per entry, pre-sized to the full column count.
+    // Rows are pre-filled so cells can be written by index.
     for data in entry_data {
         let num_cols = column_names.len() + 1;
         let mut row = vec![CellValue::new(None); num_cols];
@@ -126,14 +123,12 @@ pub fn build_ui_response(
         return (serde_json::json!({}), serde_json::json!([]));
     }
 
-    // Column names from the histogram's discovered fields (sorted order).
     let field_names: Vec<String> = histogram
         .discovered_fields()
         .iter()
         .map(|f| f.to_string())
         .collect();
     let column_schema = super::columns::generate_column_schema(&field_names);
-    // JSON with keys in index order (required by the UI; `columns_to_sorted_json`)
     let columns = super::columns::columns_to_sorted_json(&column_schema);
 
     // systemd field transforms: PRIORITY names, RFC3339 timestamps, uids, ...
@@ -141,8 +136,6 @@ pub fn build_ui_response(
 
     match entry_data_to_table_with_transformations(log_entries, field_names, &transformations) {
         Ok(table) => {
-            // Render the row arrays: [timestamp_usecs, {severity}, field
-            // values in schema order].
             let ui_data_rows = super::response::table_to_netdata_response(&table, &column_schema);
             (columns, serde_json::json!(ui_data_rows))
         }

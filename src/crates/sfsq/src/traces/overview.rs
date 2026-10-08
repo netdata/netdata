@@ -54,20 +54,18 @@
 //!   population, whose size the visited budget already bounds through
 //!   the merge map.
 //!
-//! Engine contracts mirrored from the siblings (all owned by the shared
-//! fold): sources process in `SourceId` order; a failed source is a
-//! [`SourceFailure`](PartialReason::SourceFailure) and an unavailable
-//! one a [`RemoteUnavailable`](PartialReason::RemoteUnavailable) (the
-//! rest still count); cancellation is polled up front and between sources
-//! (all-or-empty); an OWN visited budget terminates with the
-//! deterministic prefix and
+//! Engine contracts come from the shared fold (`super::fold`): sources
+//! process in `SourceId` order; a failed source is a
+//! [`SourceFailure`](PartialReason::SourceFailure), an unavailable one
+//! a [`RemoteUnavailable`](PartialReason::RemoteUnavailable) (the rest
+//! still count); cancellation is all-or-empty; an OWN visited budget
+//! terminates with the deterministic prefix and
 //! [`OverviewCeiling`](PartialReason::OverviewCeiling). The budget
-//! charges each source shape its actual fold cost — rollup rows
-//! (sealed) or decoded spans (tails) — and is checked BETWEEN sources,
-//! so one source may overshoot it by that source's whole cost:
-//! per-source work stays whole (the result deterministic) at the price
-//! of a bounded overshoot. It bounds WORK, not memory — the merge map
-//! peaks at the processed prefix's distinct traces.
+//! charges each source its fold cost — rollup rows (sealed) or decoded
+//! spans (tails) — and is checked BETWEEN sources, so one source may
+//! overshoot it by that source's whole cost. It bounds WORK, not
+//! memory — the merge map peaks at the processed prefix's distinct
+//! traces.
 
 use std::sync::Arc;
 use std::sync::atomic::AtomicUsize;
@@ -161,8 +159,10 @@ impl OverviewQuery {
 
     /// Bin only the traces owning a stored row that matches `predicate`
     /// (module docs, "Filtered population"). Span-local conditions
-    /// only; the match-all predicate is the unfiltered grid. The
-    /// filter's scans share the visited budget.
+    /// only — `overview` rejects a trace-level one at request time
+    /// ([`OverviewRequestError::TraceLevelCondition`]); the match-all
+    /// predicate is the unfiltered grid. The filter's scans share the
+    /// visited budget.
     pub fn predicate(mut self, predicate: Predicate) -> Self {
         self.predicate = (!predicate.is_all()).then_some(predicate);
         self
@@ -218,9 +218,9 @@ pub struct FacetList {
     pub top: Vec<(String, u64)>,
     /// Traces attributed to values beyond the top K.
     pub other: u64,
-    /// Traces with NO usable value for this dimension: no true root in
-    /// any source (Indeterminate) or a true root lacking the field
-    /// — bucketed explicitly, never attributed to a value.
+    /// Traces with NO usable value for this dimension: no source
+    /// claims a root (absent, or a multi-root tie abstaining) or the
+    /// claimed root lacks the field. Never attributed to a value.
     pub unattributed: u64,
 }
 
@@ -232,7 +232,7 @@ pub struct RootFacets {
     pub operations: FacetList,
 }
 
-/// One overview's grid plus everything needed to interpret it honestly.
+/// One overview's paint plus everything needed to interpret it honestly.
 /// All numbers count TRACES (or their STORED spans — resends count); the wire
 /// labels the unit.
 #[derive(Debug)]

@@ -152,7 +152,8 @@ impl<T> PrefixMap<T> {
         self.map.len() == 0
     }
 
-    /// Size of the serialized FST data in bytes (keys only, not values).
+    /// Size of the serialized FST in bytes (excludes the parallel values
+    /// vec).
     pub fn fst_bytes(&self) -> usize {
         self.map.as_fst().as_bytes().len()
     }
@@ -201,7 +202,7 @@ impl<T> PrefixMap<T> {
         result
     }
 
-    /// Call `f` for each value whose key starts with `prefix`.
+    /// Call `f` for each `(key, value)` pair whose key starts with `prefix`.
     ///
     /// This avoids allocating a temporary `Vec` when you only need to process
     /// each value once. Values are visited in key-sorted order.
@@ -378,7 +379,7 @@ mod tests {
     fn unsorted_input_is_sorted() {
         let m = PrefixMap::build([("cherry", 3u32), ("apple", 1), ("banana", 2)]).unwrap();
 
-        // Values should be in key-sorted order
+        // Values come back in key-sorted order
         assert_eq!(m.values(), &[1, 2, 3]);
         assert_eq!(m.get(b"apple"), Some(&1));
         assert_eq!(m.get(b"banana"), Some(&2));

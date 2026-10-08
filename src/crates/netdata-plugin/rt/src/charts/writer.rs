@@ -14,7 +14,7 @@
 //! (metadata.rs) are an unused alternative rendering; this writer is what the
 //! chart pipeline runs.
 //!
-//! Update cadence is the sampler's decision, not this module's:
+//! Update cadence is the batch scheduler's decision, not this module's:
 //! BEGIN/SET/END are re-emitted on every tick even when values did not
 //! change, so every sample interval carries a datapoint. That is rt's own
 //! choice — the agent obsoletes a plugin's charts only when the plugin exits,
@@ -62,8 +62,8 @@ impl ChartWriter {
     /// Framing: `CHART <type.id> '<name>' '<title>' '<units>' '<family>'
     /// '<context>' <line|area|stacked> <priority> <update_every>`, with
     /// `update_every` in seconds. The id must contain a dot with non-empty
-    /// text on both sides — the agent splits it at the first dot and disables
-    /// the plugin otherwise (`pluginsd_chart`). Quoted fields are not
+    /// text on both sides — the agent splits it at the first dot and aborts
+    /// the run otherwise (`pluginsd_chart`). Quoted fields are not
     /// escaped, so a single quote inside a value would end the field early
     /// and shift every later word on the line. The optional
     /// `options`/`plugin`/`module` CHART arguments the agent accepts are
@@ -137,10 +137,11 @@ impl ChartWriter {
     /// `begin_chart` and `end_chart`.
     ///
     /// `dimension_id` goes to the stream verbatim: no validation against, or
-    /// dedupe with, any DIMENSION definition. The agent resolves the id on
-    /// every SET and disables the plugin when the dimension does not exist
-    /// (`pluginsd_acquire_dimension` → `PLUGINSD_DISABLE_PLUGIN`), so ids
-    /// must match the `DIMENSION` lines `write_chart_definition` emitted.
+    /// dedupe with, any DIMENSION definition. The agent looks the id up on
+    /// every SET and aborts the run when the dimension does not exist
+    /// (`pluginsd_acquire_dimension` → `PLUGINSD_PROTOCOL_ERROR`; the worker
+    /// then restarts with backoff or disables the plugin), so ids must
+    /// match the `DIMENSION` lines `write_chart_definition` emitted.
     /// The known way they can diverge is the `NetdataChart` derive macro: it
     /// writes a SET for every non-instance field even when
     /// `x-dimension-hidden` kept the field out of the chart's dimensions
@@ -276,20 +277,19 @@ mod tests {
     fn test_reusable_buffer() {
         let mut writer = ChartWriter::new();
 
-        // First update
         writer.begin_chart("test.chart", Duration::from_secs(1));
         writer.write_dimension("value", 1);
         writer.end_chart(UNIX_EPOCH + Duration::from_secs(1609459200));
         let len1 = writer.buffer_len();
         writer.clear();
 
-        // Second update (clear() retains the allocation)
         writer.begin_chart("test.chart", Duration::from_secs(1));
         writer.write_dimension("value", 2);
         writer.end_chart(UNIX_EPOCH + Duration::from_secs(1609459201));
         let len2 = writer.buffer_len();
 
-        // both updates emit the same bytes, so the lengths match
+        // both updates emit the same number of bytes, so the lengths match;
+        // allocation retention by clear() is not asserted here
         assert_eq!(len1, len2);
     }
 }

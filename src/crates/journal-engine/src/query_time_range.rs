@@ -94,7 +94,7 @@ impl QueryTimeRange {
         self.bucket_duration
     }
 
-    /// Bucket width as [`Seconds`].
+    /// Bucket width as `Seconds`.
     pub fn bucket_duration_seconds(&self) -> Seconds {
         Seconds(self.bucket_duration)
     }

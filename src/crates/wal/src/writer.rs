@@ -34,10 +34,11 @@
 //!
 //! Consumers (grep-verified): `otel-ingestor` (the logs and traces services:
 //! one writer per tenant, per-frame `write_frame`, one `sync_all` per
-//! request, the periodic idle sweep, `shutdown_all` at plugin shutdown),
-//! `ng-ingest` (dev/bench ingest binaries through the same path), and test
-//! fixtures in `sfsq`, `sfsq-cli`, `ng-index`, `file-lifecycle`, and this
-//! crate's own tests.
+//! request, the periodic idle sweep — no production `shutdown_all`; plugin
+//! shutdown drops the writers), `ng-ingest` (dev/bench ingest binaries
+//! through the same path — the only non-test `shutdown_all` callers), and
+//! test fixtures in `sfsq`, `sfsq-cli`, `ng-index`, `otel-ledger`,
+//! `file-lifecycle`, and this crate's own tests.
 use std::collections::HashMap;
 use std::fs::{File, OpenOptions};
 use std::io::{BufWriter, Write};
@@ -113,7 +114,7 @@ pub struct FrameMeta {
     pub entry_count: usize,
     /// The caller's monotonic timestamp for this frame, stamped into the
     /// frame header on disk. Typically from a single process-wide
-    /// [`file_registry::MonotonicClock`] so frame ordering is consistent
+    /// `file_registry::MonotonicClock` so frame ordering is consistent
     /// across streams — and so the value stays strictly increasing, which
     /// the ingestor also relies on when it reuses this stamp as the
     /// fallback timestamp for records without a usable time.
@@ -190,7 +191,7 @@ impl Stream {
         }
     }
 
-    /// Create a [`FileId`] stamped with this stream's pipeline + partition key.
+    /// Create a `FileId` stamped with this stream's pipeline + partition key.
     fn file_id(&self, seq: u64) -> FileId {
         FileId::new(self.identity, self.stamp.pipeline_id, seq, self.part_key)
     }
@@ -527,7 +528,7 @@ impl Writer {
     /// `identity` is the producer `(machine, instance)` pair stamped into every
     /// file's `FileId`. It comes from the caller (the otel path resolves the
     /// machine GUID from `NETDATA_REGISTRY_UNIQUE_ID` and generates a fresh
-    /// instance id per process); the [`Identity`] newtypes make it non-nil by
+    /// instance id per process); the `Identity` newtypes make it non-nil by
     /// construction, so no nil check is needed here. `seq` is the shared
     /// sequence counter — in the otel path one allocator spans every tenant
     /// and signal writer. The directory is created if it doesn't exist.
@@ -541,8 +542,8 @@ impl Writer {
         stamp: FileStamp,
         identity: Identity,
     ) -> Result<Self> {
-        // A producer stamping the reserved id would write files every reader
-        // rejects — acknowledged but unqueryable data. Refuse at construction.
+        // A producer stamping the reserved id would write files no query-path
+        // decoder accepts — acknowledged but unqueryable data. Refuse at construction.
         if stamp.payload_format == 0 {
             return Err(crate::Error::InvalidHeader(
                 "payload_format 0 is reserved (unspecified); producers must pass their codec's id"
@@ -820,7 +821,7 @@ mod tests {
                 },
             )
             .unwrap();
-        // Clear the writes' Created/Synced so we observe only sweep events.
+        // Clear the writes' `Created` events so we observe only sweep events.
         let _ = writer.take_all_events();
 
         // Sweep: only A's idle file is past `max_duration`.

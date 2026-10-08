@@ -207,7 +207,7 @@
 //! but does not depend on ferryboat; `file-registry`, `otel-catalog`, `wal`,
 //! `sfst` and `sfsq` do not use ferryboat directly. The [`RpcClient`] /
 //! [`RpcServer`] layer and the in-process transport have no production users
-//! in this tree yet — they are exercised by this crate's tests and examples.
+//! in this tree yet — only this crate's integration tests exercise them.
 
 mod mux;
 mod transport;
@@ -317,7 +317,8 @@ fn registry() -> &'static Mutex<HashMap<String, Box<dyn Any + Send + Sync>>> {
 
 // --- Error type ---
 
-/// Errors returned by [`Connection::send`] and [`Connection::recv`].
+/// The crate's error type, returned by every fallible call: [`Connection::send`],
+/// [`Connection::recv`], the builders' `open()`s, and the accept/serve entry points.
 #[derive(Debug, thiserror::Error)]
 pub enum Error {
     /// Transport-level I/O error: socket failures, codec frame-limit
@@ -342,11 +343,12 @@ pub enum Error {
     #[error("connection closed")]
     ConnectionClosed,
 
-    /// Serialized message exceeds the configured limit — checked after
+    /// The message exceeds the configured size limit — checked after
     /// compression on send and after decompression on recv.
     #[error("message too large: {size} bytes exceeds {max} byte limit")]
     MessageTooLarge {
-        /// Actual serialized size in bytes.
+        /// The size that exceeded the limit, in bytes: post-compression on
+        /// send, post-decompression on recv.
         size: usize,
         /// Configured maximum in bytes.
         max: usize,

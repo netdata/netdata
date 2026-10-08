@@ -12,6 +12,7 @@ type collectorMetrics struct {
 	gpcFrequency   metrix.SnapshotGaugeVec
 	emcUtilization metrix.SnapshotGauge
 	emcFrequency   metrix.SnapshotGauge
+	powerRailPower metrix.SnapshotGaugeVec
 }
 
 func newCollectorMetrics(store metrix.CollectorStore) *collectorMetrics {
@@ -22,5 +23,6 @@ func newCollectorMetrics(store metrix.CollectorStore) *collectorMetrics {
 		gpcFrequency:   m.Vec("gpc").Gauge("gpu_gpc_frequency", metrix.WithFloat(true)),
 		emcUtilization: m.Gauge("emc_utilization", metrix.WithFloat(true)),
 		emcFrequency:   m.Gauge("emc_frequency", metrix.WithFloat(true)),
+		powerRailPower: m.Vec("rail").Gauge("power_rail_power", metrix.WithFloat(true)),
 	}
 }

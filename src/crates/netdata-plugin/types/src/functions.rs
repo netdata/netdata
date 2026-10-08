@@ -6,8 +6,8 @@
 //! via the serde derives), the `rt` and `bridge` engines run a [`FunctionCall`]
 //! through a `FunctionHandler` into a [`FunctionResult`], and the otel plugin's
 //! supervisor forwards worker declarations and results to the agent. The agent
-//! side of every contract here is `pluginsd_function*()` in
-//! src/plugins.d/pluginsd_functions.c.
+//! side of every contract here is the `pluginsd_function*()` and
+//! `pluginsd_calls_*()` handlers in src/plugins.d/pluginsd_functions.c.
 use serde::{Deserialize, Serialize};
 
 use crate::HttpAccess;
@@ -137,7 +137,7 @@ pub struct FunctionCancel {
 /// A progress query relayed to the plugin, agent-to-plugin. Wire:
 /// `FUNCTION_PROGRESS transaction`. The agent sends it when a progress query
 /// arrives for the call (nrpc_call_progress in src/nrpc/nrpc-calls.c), which
-/// also extends that call's deadline by 10s
+/// also extends that call's deadline so at least 10s remain
 /// (FUNCTIONS_EXTENDED_TIME_ON_PROGRESS_UT). A plugin may re-report progress
 /// in response; the in-tree runtimes push progress proactively and ignore
 /// the request.

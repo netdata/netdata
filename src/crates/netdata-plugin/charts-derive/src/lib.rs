@@ -2,8 +2,8 @@
 //! proc-macro crate whose only export is the `#[derive(NetdataChart)]` macro
 //! below. It carries no runtime code, and its only direct Cargo dependent is
 //! `rt` (`src/crates/netdata-plugin/rt`), which re-exports the macro at its
-//! crate root so downstream chart structs (netflow-plugin) never depend on
-//! this crate directly.
+//! crate root so downstream chart structs (netflow-plugin,
+//! journal-function) never depend on this crate directly.
 //!
 //! On a named-field struct the derive generates:
 //!
@@ -60,10 +60,11 @@ use syn::{Data, DeriveInput, Fields, parse_macro_input};
 /// so a `= false` occurrence marks the field too, as does a doc comment that
 /// mentions the marker (a doc comment is a `#[doc = ...]` attribute). The
 /// instance field is never written. No other annotation is consumed: the
-/// field name is the dimension id verbatim, so `x-dimension-name` renames
-/// nothing and `x-dimension-hidden` does not drop the SET — the SET then
-/// names a dimension with no DIMENSION line (see the `ChartDimensions` docs
-/// in rt's chart_trait.rs).
+/// field name is the dimension id verbatim, so `x-dimension-name` never
+/// changes the id (rt's extractor applies it to the DIMENSION line's name)
+/// and `x-dimension-hidden` does not drop the SET — the SET then names a
+/// dimension with no DIMENSION line (see the `ChartDimensions` docs in
+/// rt's chart_trait.rs).
 ///
 /// # Output
 ///
@@ -132,7 +133,6 @@ pub fn derive_netdata_chart(input: TokenStream) -> TokenStream {
         // The instance marker is a substring match over each field
         // attribute's rendered tokens; the attribute value is not parsed.
         let is_instance_field = field.attrs.iter().any(|attr| {
-            // Render the attribute's tokens as text and substring-match.
             let attr_str = quote!(#attr).to_string();
             attr_str.contains("x-chart-instance")
         });

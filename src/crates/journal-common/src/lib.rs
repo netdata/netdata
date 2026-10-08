@@ -1,5 +1,5 @@
 //! Shared foundation for the journal stack: time units, collection aliases,
-//! host-identity loaders and MSRV backports.
+//! host-identity loaders and the `compat` shim.
 //!
 //! The lowest crate of the stack — its only dependencies are generic
 //! infrastructure (`nix`, `uuid`, `serde`, `rustc-hash`, optional
@@ -18,8 +18,10 @@
 //!   (per-platform implementations for Linux and macOS).
 //! - `collections` - `rustc_hash::FxHashMap`/`FxHashSet` aliases plus std's
 //!   `VecDeque`; the single file that decides the stack's hasher.
-//! - `compat` - MSRV compatibility backports of newer std APIs; reached via
-//!   the module path, not re-exported here.
+//! - `compat` - the legacy `is_multiple_of` shim; the workspace MSRV (1.91)
+//!   is past the 1.87 std stabilization, so this stays only because its two
+//!   callers (journal-core, journal-index) still use it. Reached via the
+//!   module path, not re-exported here.
 //!
 //! Feature `allocative` gates an `allocative::Allocative` derive on the
 //! [`time`] units [`Seconds`] and [`Microseconds`] (the `cfg_attr` derives on
@@ -34,7 +36,8 @@ pub mod time;
 // The import surface the stack uses for the time types: no consumer
 // references the `journal_common::time` module path.
 // - `Seconds`: journal-registry (time ranges, repositories), journal-engine
-//   (tests, examples); re-exported onward by `journal-index/src/lib.rs`
+//   (tests, examples) and journal-index's integration tests; re-exported
+//   onward by `journal-index/src/lib.rs`
 //   (`pub use journal_common::{Microseconds, Seconds}`).
 // - `Microseconds`: journal-log-writer (entry timestamps); re-exported
 //   onward by journal-index.

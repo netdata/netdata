@@ -146,9 +146,9 @@ impl FileHeader {
         // The writer bounds `content_meta` to `MAX_CONTENT_META_BYTES` before
         // constructing the header (it rejects oversize rather than truncate), so
         // this is always within budget. Enforced in all builds (not just
-        // `debug_assert`): a direct constructor passing an oversized blob would
-        // otherwise truncate the `u16` length and write past the budget — fail
-        // loudly instead.
+        // `debug_assert`): a direct constructor passing an oversized blob
+        // would otherwise panic indexing the fixed page past its end — fail
+        // here instead, with a message naming the breach.
         assert!(
             self.content_meta.len() <= MAX_CONTENT_META_BYTES,
             "WAL content_meta {} exceeds {MAX_CONTENT_META_BYTES}",
@@ -249,8 +249,9 @@ impl FileHeader {
 /// per-row OTel timestamps as supplied by the caller of
 /// `Writer::write_frame`. They are *not* wall-clock frame-arrival times.
 /// `TimestampNs::ZERO` on both means "no log-data timestamps observed
-/// yet" (e.g. all frames so far had logs missing both `time_unix_nano`
-/// and `observed_time_unix_nano`).
+/// yet": no frame so far supplied a range — a file with no frames, or
+/// frames whose caller passed `log_ts_range: None` (the ingestor always
+/// supplies one, synthesizing fallbacks for timestamp-less records).
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum FileEvent {
     Created {
@@ -286,18 +287,21 @@ pub enum FileEvent {
         /// Latest log-data timestamp in this file (final value).
         max_timestamp_ns: TimestampNs,
         size: ByteSize,
-        /// Durable prefix at seal time (== the last `Synced`'s `valid_up_to`).
-        /// Carried so a sealed file's prefix is authoritative even if the final
-        /// `Synced` was reordered or lost in flight to the ledger.
+        /// Durable prefix at seal time: the end of the last frame fsynced
+        /// before the seal. May postdate the last `Synced` (the
+        /// idle-rotation and `Drop` close paths seal without emitting a
+        /// final `Synced`); carried so a sealed file's prefix is
+        /// authoritative even if the final `Synced` was reordered or lost
+        /// in flight to the ledger.
         valid_up_to: ByteSize,
-        /// Total records at seal time (== the last `Synced`'s `entry_count`).
+        /// Log records in that durable prefix at seal time.
         entry_count: u64,
     },
 }
 
 impl FileEvent {
     /// The signal axis (`pipeline_id`) of the file this event concerns. Every
-    /// variant carries a [`FileId`], which carries the pipeline. The ingestor
+    /// variant carries a `FileId`, which carries the pipeline. The ingestor
     /// keys its per-signal `Message::frame_seq` stream by this value, and the
     /// ledger routes the event to the owning pipeline by it (decoding the raw
     /// id via `bridge::signals::Signal::try_from`).

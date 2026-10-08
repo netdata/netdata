@@ -8,7 +8,7 @@
 //! and skips the file; the ~5% false positives each cost one wasted `TIDX`
 //! lookup; false negatives cannot happen.
 //!
-//! The filter is a [`fastbloom::BloomFilter`] serialized verbatim inside the
+//! The filter is a `fastbloom::BloomFilter` serialized verbatim inside the
 //! chunk via serde, so the payload is self-describing: bit length, hash
 //! count, and seeded hasher state all travel with it. The crate is pinned
 //! and audited `unsafe`-free per version (see the workspace `Cargo.toml`).
@@ -250,7 +250,7 @@ mod tests {
 
     #[test]
     fn bincode_round_trip_through_the_chunk_codec() {
-        // The crate tests its serde support with serde_cbor; OUR chunk codec
+        // fastbloom tests its serde support with serde_cbor; OUR chunk codec
         // is bincode+zstd (`writer::pack` / `reader::unpack`). Round-trip
         // through the real codec — seed/hasher state must survive, proven by
         // identical membership answers.

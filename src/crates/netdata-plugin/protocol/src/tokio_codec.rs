@@ -12,22 +12,14 @@
 //! in the `MessageParser` (payload mode in its `LineParser` plus the in-flight
 //! message), so one instance must see the stream in order.
 //!
-//! Encoder semantics: each `Message` is appended to the output buffer as its
-//! newline-terminated keyword line(s). Payload bodies go in raw between the
-//! begin header and the `..._END` marker, with a `\n` appended when the body
-//! does not end in one, so the marker stays alone on its line — the agent
-//! ends a deferred block on the first line whose first word is the end
-//! keyword (`parser_action` in `src/plugins.d/pluginsd_parser.h`) and stops
-//! the plugin when the block exceeds `PLUGINSD_MAX_DEFERRED_SIZE` (100 MiB,
-//! `src/libnetdata/libnetdata.h`).
-//!
-//! The agent-side counterparts of the emitted lines are the keyword handlers
-//! dispatched from `parser_execute` in `src/plugins.d/pluginsd_parser.c`:
-//! `pluginsd_function` and `pluginsd_function_result_begin` (both in
-//! `src/plugins.d/pluginsd_functions.c`), `pluginsd_function_progress`
-//! (FUNCTION_PROGRESS) and `pluginsd_config` (CONFIG,
-//! `src/plugins.d/pluginsd_dyncfg.c`); see the per-variant comments for the
-//! direction each one actually flows in.
+//! Encoder semantics: every `Message` with a wire form is appended to the
+//! output buffer as its newline-terminated keyword line(s). Payload bodies go
+//! in raw between the begin header and the `..._END` marker, with a `\n`
+//! appended when the body does not end in one, so the marker stays alone on
+//! its line — the agent ends a deferred block on the first line whose first
+//! word is the end keyword (`parser_action` in
+//! `src/plugins.d/pluginsd_parser.h`) and stops the plugin when the block
+//! exceeds `PLUGINSD_MAX_DEFERRED_SIZE` (100 MiB, `src/libnetdata/libnetdata.h`).
 
 use crate::message_parser::{Message, MessageParser};
 use bytes::{Buf, BytesMut};
@@ -150,10 +142,11 @@ impl Decoder for MessageParser {
 /// message by value; the parser's direction is irrelevant. Inbound-only
 /// variants encode to nothing.
 ///
-/// Current senders exercise only the declaration, result and progress arms
-/// (`rt`'s event loop, `otel-plugin`'s supervisor and the bridge all go
-/// through `MessageWriter`); see the per-variant comments for which arms have
-/// an agent-side consumer at all.
+/// Current senders exercise only the declaration, result and progress arms:
+/// `rt`'s event loop and `otel-plugin`'s supervisor send them through
+/// `MessageWriter`, while the bridge emits progress over in-process channels
+/// whose drivers translate it into their own progress responses; see the
+/// per-variant comments for which arms have an agent-side consumer at all.
 impl Encoder<Message> for MessageParser {
     type Error = std::io::Error;
 

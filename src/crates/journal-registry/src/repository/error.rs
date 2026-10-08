@@ -26,8 +26,8 @@ pub enum RepositoryError {
     #[error("Failed to parse journal file path: {path}")]
     InvalidPath { path: String },
 
-    /// The file's directory path is not valid UTF-8; produced by
-    /// [`crate::File::dir`] and propagated through
+    /// The directory key resolved by [`crate::File::dir`] is not valid
+    /// UTF-8; the variant carries the file's full path. Propagated through
     /// [`crate::repository::Repository::insert`] and
     /// [`crate::repository::Repository::remove`].
     #[error("Path contains invalid UTF-8: {}", .path.display())]

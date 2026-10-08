@@ -1,10 +1,10 @@
-//! Bitmap-based filter over a prebuilt file index. [`IndexFilterExpr`]
-//! resolves `FIELD=VALUE` matches to roaring bitmaps of entry indices and
-//! combines them with set operations; [`IndexFilter`] accumulates
-//! caller-supplied matches into one such expression - the eager bitmap
-//! analog of file/filter.rs's cursor-based `JournalFilter`/`FilterExpr`
-//! (same builder shape and `LogicalOp`; pre-resolved bitmaps instead of
-//! lazily stepped entry chains; infallible instead of `Result`).
+//! Bitmap-based filter over a prebuilt file index. [`IndexFilter`]
+//! resolves caller-supplied `FIELD=VALUE` matches to roaring bitmaps of
+//! entry indices and accumulates them into one [`IndexFilterExpr`], which
+//! combines the bitmaps with set operations - the eager bitmap analog of
+//! file/filter.rs's cursor-based `JournalFilter`/`FilterExpr` (same
+//! builder shape and `LogicalOp`; pre-resolved bitmaps instead of lazily
+//! stepped entry chains; infallible instead of `Result`).
 //!
 //! Verified status: this file is an uncompiled orphan. No `mod
 //! index_filter` declaration exists anywhere (file/mod.rs declares
@@ -73,7 +73,7 @@ impl IndexFilterExpr {
                 for expr in filter_exprs.iter().skip(1) {
                     result &= expr.matching_indices();
                     if result.is_empty() {
-                        break; // Early termination for empty conjunction
+                        break;
                     }
                 }
                 result
@@ -149,7 +149,7 @@ pub enum LogicalOp {
 }
 
 /// Accumulates `FIELD=VALUE` matches into an [`IndexFilterExpr`],
-/// resolving each pair against a prebuilt [`FileIndex`] when its group
+/// resolving each pair against a prebuilt `FileIndex` when its group
 /// is closed.
 ///
 /// Grouping mirrors systemd-journal match semantics, as in file/filter.rs's
@@ -287,7 +287,6 @@ impl IndexFilter {
     /// ```
     pub fn add_match(&mut self, field_value: &str) {
         if field_value.contains('=') {
-            // Insert in sorted order to group by field name
             let key = Self::extract_key(field_value).unwrap_or("");
             let pos = self
                 .current_matches

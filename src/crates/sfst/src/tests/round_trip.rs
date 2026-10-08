@@ -1,8 +1,8 @@
 //! Writer↔reader round-trip tests: files built chunk-by-chunk with the
 //! buffer-all [`FixtureWriter`] + `writer::pack` (deliberately looser
-//! than the public [`ChunkWriter`], so partial files — no SUMR, no META —
+//! than the public `ChunkWriter`, so partial files — no SUMR, no META —
 //! and multi-field/multi-batch layouts are expressible), read back
-//! through [`ChunkReader`] (once via [`IndexReader`]) and asserted to
+//! through `ChunkReader` (once via [`IndexReader`]) and asserted to
 //! decode exactly what was written. The container-integrity section
 //! instead byte-patches a valid minimal file.
 //!
@@ -240,7 +240,6 @@ fn round_trip_fields_and_secondary_chunks() {
     let batch = reader.stream_batch(0).unwrap();
     assert_eq!(batch.num_rows(), 2);
     assert_eq!(batch.row(0).collect::<Vec<_>>(), vec![KvId(0), KvId(1)]);
-    // Asking for a non-existent batch yields ChunkNotFound.
     assert!(matches!(
         reader.stream_batch(1),
         Err(Error::ChunkNotFound(1))
@@ -266,7 +265,6 @@ fn round_trip_fields_and_secondary_chunks() {
             "chunk {s:?} not inside cold region {cold:?}"
         );
     }
-    // The hot prefix (PRIM and TIMS here) ends before the cold suffix starts.
     for raw in [
         reader.primary_raw().unwrap(),
         reader.timestamps_raw().unwrap(),
@@ -443,7 +441,6 @@ fn round_trip_multi_batch_stream() {
             vec![KvId(u32::from(i) * 1024 + 1023)]
         );
     }
-    // Out-of-range batch fails cleanly.
     assert!(matches!(
         reader.stream_batch(3),
         Err(Error::ChunkNotFound(3))

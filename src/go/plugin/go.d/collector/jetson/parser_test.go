@@ -18,61 +18,125 @@ func TestParseRecordFixtures(t *testing.T) {
 		want sample
 	}{
 		"tx1": {want: sample{
+			PowerRails: map[string]float64{
+				"VDD_IN":  2.532,
+				"VDD_CPU": 0.076,
+				"VDD_GPU": 0.019,
+			},
 			GPUUtilization: measurement(0),
 			GPUFrequency:   measurement(76),
 			EMCUtilization: measurement(7),
 			EMCFrequency:   measurement(408),
 		}},
 		"tx2": {want: sample{
+			PowerRails: map[string]float64{
+				"VDD_SYS_GPU":  0.152,
+				"VDD_SYS_SOC":  0.687,
+				"VDD_4V0_WIFI": 0,
+				"VDD_IN":       3.056,
+				"VDD_SYS_CPU":  0.152,
+				"VDD_SYS_DDR":  0.883,
+			},
 			GPUUtilization: measurement(0),
 			GPUFrequency:   measurement(624),
 			EMCUtilization: measurement(4),
 			EMCFrequency:   measurement(1600),
 		}},
 		"nano": {want: sample{
+			PowerRails: map[string]float64{
+				"POM_5V_IN":  1.022,
+				"POM_5V_GPU": 0,
+				"POM_5V_CPU": 0.204,
+			},
 			GPUUtilization: measurement(0),
 			GPUFrequency:   measurement(76),
 			EMCUtilization: measurement(0),
 			EMCFrequency:   measurement(204),
 		}},
 		"agx-xavier": {want: sample{
+			PowerRails: map[string]float64{
+				"GPU":   0,
+				"CPU":   0.311,
+				"SOC":   0.932,
+				"CV":    0,
+				"VDDRQ": 0.621,
+				"SYS5V": 1.482,
+			},
 			GPUUtilization: measurement(0),
 			GPUFrequency:   measurement(318),
 			EMCUtilization: measurement(0),
 			EMCFrequency:   measurement(665),
 		}},
 		"xavier-nx": {want: sample{
+			PowerRails: map[string]float64{
+				"VDD_IN":         4.067,
+				"VDD_CPU_GPU_CV": 0.738,
+				"VDD_SOC":        1.353,
+			},
 			GPUUtilization: measurement(62),
 			GPUFrequency:   measurement(306),
 			EMCUtilization: measurement(10),
 			EMCFrequency:   measurement(1600),
 		}},
 		"power-units": {want: sample{
+			PowerRails: map[string]float64{
+				"VDD_IN":         5.299,
+				"VDD_CPU_GPU_CV": 0.773,
+				"VDD_SOC":        1.424,
+			},
 			GPUUtilization: measurement(0),
 			GPUFrequency:   measurement(611),
 			EMCUtilization: measurement(0),
 			EMCFrequency:   measurement(2133),
 		}},
 		"orin-r36": {want: sample{
+			PowerRails: map[string]float64{
+				"VDD_GPU_SOC": 3.205,
+				"VDD_CPU_CV":  4.405,
+				"VIN_SYS_5V0": 4.767,
+			},
 			GPUUtilization: measurement(0),
 			GPCFrequencies: []*float64{measurement(305), measurement(305)},
 			EMCUtilization: measurement(1),
 			EMCFrequency:   measurement(2133),
 		}},
 		"orin-utilization": {want: sample{
+			PowerRails: map[string]float64{
+				"VDD_GPU_SOC": 4.94,
+				"VDD_CPU_CV":  0.988,
+				"VIN_SYS_5V0": 4.442,
+			},
 			GPUUtilization: measurement(0),
 		}},
 		"thor-frequency": {want: sample{
+			PowerRails: map[string]float64{
+				"VDD_GPU":         3.132,
+				"VDD_CPU_SOC_MSS": 9.397,
+				"VIN_SYS_5V0":     5.68,
+			},
 			GPCFrequencies: []*float64{measurement(494), measurement(494), measurement(494)},
 			EMCUtilization: measurement(0),
 			EMCFrequency:   measurement(2750),
 		}},
 		"thor-r38.4": {want: sample{
+			PowerRails: map[string]float64{
+				"VDD_GPU":         1.962,
+				"VDD_CPU_SOC_MSS": 5.887,
+				"VIN_SYS_5V0":     5.635,
+				"VIN":             19.78,
+			},
 			GPCFrequencies: []*float64{measurement(314), measurement(314), measurement(314)},
 			EMCUtilization: measurement(0),
 			EMCFrequency:   measurement(2750),
 		}},
-		"thor-no-gpu-emc": {want: sample{}},
+		"thor-no-gpu-emc": {want: sample{
+			PowerRails: map[string]float64{
+				"VDD_GPU":         2.371,
+				"VDD_CPU_SOC_MSS": 8.299,
+				"VIN_SYS_5V0":     7.044,
+				"VIN":             24.83,
+			},
+		}},
 	}
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
@@ -140,7 +204,7 @@ func TestParseRecordReadings(t *testing.T) {
 			EMCUtilization: measurement(30),
 		}},
 		"off":          {fields: "GR3D_FREQ off EMC_FREQ off"},
-		"missing":      {fields: "VDD_GPU 20mW/30mW gpu@45C"},
+		"missing":      {fields: "gpu@45C"},
 		"unavailable":  {fields: "GR3D_FREQ N/A EMC_FREQ N/A"},
 		"nonfinite":    {fields: "GR3D_FREQ NaN%@Inf EMC_FREQ Inf%@NaN"},
 		"negative":     {fields: "GR3D_FREQ -1%@-2 EMC_FREQ -3%@-4"},
@@ -153,7 +217,7 @@ func TestParseRecordReadings(t *testing.T) {
 			EMCUtilization: measurement(30),
 		}},
 		"unrelated fields": {
-			fields: "FUTURE_FREQ 100%@900 GR3D_FREQ 8% GPU 30/40 EMC_FREQ @1500 NEW [1,2,3]",
+			fields: "FUTURE_FREQ 100%@900 GR3D_FREQ 8% FUTURE_PAIR 30/40 EMC_FREQ @1500 NEW [1,2,3]",
 			want: sample{
 				GPUUtilization: measurement(8),
 				EMCFrequency:   measurement(1500),
@@ -204,6 +268,9 @@ func TestSampleHasReadings(t *testing.T) {
 		want   bool
 	}{
 		"empty": {},
+		"zero power only": {sample: sample{
+			PowerRails: map[string]float64{"VDD_GPU": 0},
+		}, want: true},
 		"GPU zero utilization": {sample: sample{
 			GPUUtilization: measurement(0),
 		}, want: true},
@@ -229,3 +296,60 @@ func TestSampleHasReadings(t *testing.T) {
 }
 
 func measurement(value float64) *float64 { return &value }
+
+func TestParseRecordPower(t *testing.T) {
+	tests := map[string]struct {
+		fields string
+		want   map[string]float64
+	}{
+		"current not average": {
+			fields: "VDD_GPU 1200mW/9999mW VDD_CPU_CV 2345/8000",
+			want:   map[string]float64{"VDD_GPU": 1.2, "VDD_CPU_CV": 2.345},
+		},
+		"zero decimal and whitespace": {
+			fields: "VDD_GPU\t0mW/1mW   VIN 125.5mW/500mW",
+			want:   map[string]float64{"VDD_GPU": 0, "VIN": 0.1255},
+		},
+		"legacy CPU after envelope": {
+			fields: "CPU 200/300 GPU 400/500",
+			want:   map[string]float64{"CPU": 0.2, "GPU": 0.4},
+		},
+		"missing value keeps next rail": {
+			fields: "VDD_GPU VDD_CPU_CV 100mW/200mW",
+			want:   map[string]float64{"VDD_CPU_CV": 0.1},
+		},
+		"bad rail keeps valid neighbor": {
+			fields: "VDD_GPU NaNmW/10mW VIN 2000mW/1000mW VDD_CPU_CV -1/20",
+			want:   map[string]float64{"VIN": 2},
+		},
+		"overlapping rails remain separate": {
+			fields: "VIN_SYS_5V0 4000mW/3000mW VDDQ_VDD2_1V8AO 1000mW/500mW VIN 9000mW/8000mW",
+			want:   map[string]float64{"VIN_SYS_5V0": 4, "VDDQ_VDD2_1V8AO": 1, "VIN": 9},
+		},
+		"repeated name is ambiguous": {
+			fields: "VDD_GPU 100/200 VIN 500/600 VDD_GPU 300/400 VDD_GPU 700/800",
+			want:   map[string]float64{"VIN": 0.5},
+		},
+		"malformed repeated name remains ambiguous": {fields: "VDD_GPU NaN/200 VDD_GPU 100/200"},
+		"invalid repeated name withdraws first":     {fields: "VDD_GPU 100/200 VDD_GPU 300/400/500"},
+		"unsupported units":                         {fields: "VDD_GPU 1W/2W VIN 100uW/200uW"},
+		"inconsistent units":                        {fields: "VDD_GPU 100mW/200 VIN 100/200mW"},
+		"nonfinite":                                 {fields: "VDD_GPU NaN/0 VDD_CPU_CV InfmW/0mW VIN 1e999/0"},
+		"negative":                                  {fields: "VDD_GPU -1mW/0mW"},
+		"missing average":                           {fields: "VDD_GPU 100mW/ VIN 100/ VDD_CPU_CV 100"},
+		"malformed average":                         {fields: "VDD_GPU 100/200W VIN 100mW/brokenmW"},
+		"unknown triple":                            {fields: "VDD_GPU 100mW/200mW/300mW VIN 1/2/3"},
+		"unavailable":                               {fields: "VDD_GPU off VIN N/A VDD_CPU_CV N/A/100mW"},
+		"other numeric pairs and placeholders":      {fields: "FUTURE 100/200 NC 0mW/0mW NC 0mW/0mW"},
+		"exact names":                               {fields: "NOT_VDD_GPU 100/200 VDD_ 100/200 VDD_GPU@ 100/200"},
+	}
+	for name, test := range tests {
+		t.Run(name, func(t *testing.T) {
+			got, ok := parseRecord(testRecordPrefix + test.fields)
+			assert.True(t, ok)
+			assert.Equal(t, sample{
+				PowerRails: test.want,
+			}, got)
+		})
+	}
+}
