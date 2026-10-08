@@ -32,7 +32,7 @@ if ($legacyRuntimePaths) {
     throw "Staging tree contains legacy MSYS2 runtime files. Use a fresh BUILD_DIR before packaging: $($legacyRuntimePaths -join ', ')"
 }
 
-$wix = Resolve-WixExecutable $env:WIX_BIN
+$wix = Resolve-WixExecutable $env:WIX_BIN (Get-NetdataWixVersion)
 if (-not $wix) { throw 'WiX v5 is not installed. Run install-dependencies.ps1 first.' }
 
 $wixArch = 'x64'

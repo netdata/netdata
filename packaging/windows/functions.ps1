@@ -33,22 +33,82 @@ function Add-DirectoryToPathIfToolExists([string]$Directory, [string]$Tool) {
     return $false
 }
 
-function Resolve-WixExecutable([string]$Override) {
-    if ($Override) { return $Override }
+function Get-WixExecutableVersion([string]$Executable) {
+    if (-not (Test-Path -LiteralPath $Executable -PathType Leaf)) { return $null }
 
-    foreach ($name in @('wix.exe', 'wix')) {
-        $command = Get-Command $name -ErrorAction SilentlyContinue | Select-Object -First 1
-        if ($command -and $command.Source) { return $command.Source }
+    $previousErrorActionPreference = $ErrorActionPreference
+    try {
+        # Windows PowerShell 5.1 can promote native stderr to a terminating error.
+        $ErrorActionPreference = 'Continue'
+        # Native commands update the global automatic variable, so clear and read it explicitly.
+        $global:LASTEXITCODE = $null
+        $output = & $Executable --version 2>&1
+        $exitCode = $global:LASTEXITCODE
+    } finally {
+        $ErrorActionPreference = $previousErrorActionPreference
     }
 
-    $toolRoots = @()
-    if ($env:DOTNET_CLI_HOME) { $toolRoots += $env:DOTNET_CLI_HOME }
-    if ($env:USERPROFILE) { $toolRoots += $env:USERPROFILE }
-    foreach ($root in $toolRoots) {
-        $candidate = Join-Path (Join-Path $root '.dotnet\tools') 'wix.exe'
-        if (Test-Path -LiteralPath $candidate -PathType Leaf) { return $candidate }
+    if ($null -eq $exitCode -or $exitCode -ne 0) { return $null }
+    $versionText = ($output | ForEach-Object { "$_" }) -join [Environment]::NewLine
+    if ($versionText -match '(?<![0-9.])(?<version>\d+\.\d+\.\d+)(?![0-9.])') {
+        return $Matches.version
+    }
+    return $null
+}
+
+function Get-NetdataWixVersion {
+    return '5.0.2'
+}
+
+function Resolve-WixExecutable([string]$Override, [string]$RequiredVersion) {
+    if (-not $RequiredVersion) { throw 'A required WiX version must be specified.' }
+
+    $candidates = @()
+    if ($Override) {
+        if (Test-Path -LiteralPath $Override -PathType Leaf) {
+            $candidates += (Resolve-Path -LiteralPath $Override).Path
+        } else {
+            $overrideCommand = Get-Command $Override -CommandType Application -ErrorAction SilentlyContinue |
+                Select-Object -First 1
+            if (-not $overrideCommand -or -not $overrideCommand.Source) {
+                throw "WIX_BIN does not resolve to an executable: '$Override'."
+            }
+            $candidates += $overrideCommand.Source
+        }
+    } else {
+        $toolRoots = @()
+        if ($env:DOTNET_CLI_HOME) { $toolRoots += $env:DOTNET_CLI_HOME }
+        if ($env:USERPROFILE) { $toolRoots += $env:USERPROFILE }
+        foreach ($root in $toolRoots) {
+            $candidate = Join-Path (Join-Path $root '.dotnet\tools') 'wix.exe'
+            if ((Test-Path -LiteralPath $candidate -PathType Leaf) -and $candidates -notcontains $candidate) {
+                $candidates += $candidate
+            }
+        }
+
+        foreach ($name in @('wix.exe', 'wix')) {
+            $command = Get-Command $name -CommandType Application -ErrorAction SilentlyContinue |
+                Select-Object -First 1
+            if ($command -and $command.Source -and $candidates -notcontains $command.Source) {
+                $candidates += $command.Source
+            }
+        }
     }
 
+    $mismatches = @()
+    foreach ($candidate in $candidates) {
+        $version = Get-WixExecutableVersion $candidate
+        if ($version -eq $RequiredVersion) { return $candidate }
+        $reportedVersion = if ($version) { $version } else { 'unknown' }
+        $mismatches += "${candidate} ($reportedVersion)"
+    }
+
+    if ($Override) {
+        throw "WIX_BIN must point to WiX $RequiredVersion; '$Override' reports version '$reportedVersion'."
+    }
+    if ($mismatches) {
+        throw "WiX $RequiredVersion is required. Found incompatible executable(s): $($mismatches -join ', ')."
+    }
     return $null
 }
 

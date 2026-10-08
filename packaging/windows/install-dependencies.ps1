@@ -108,7 +108,7 @@ if ($LASTEXITCODE -ne 0) {
     exit $LASTEXITCODE
 }
 
-$wixVersion = "5.0.2"
+$wixVersion = Get-NetdataWixVersion
 
 $globalTools = & dotnet tool list --global
 if ($LASTEXITCODE -ne 0) { throw 'Could not query globally installed .NET tools.' }
@@ -126,7 +126,7 @@ if (-not $installedWixVersion) {
 }
 if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
-$wix = Resolve-WixExecutable
+$wix = Resolve-WixExecutable $null $wixVersion
 if (-not $wix) { throw 'WiX executable was not found in PATH or the global .NET tool locations.' }
 
 $extensions = @(
