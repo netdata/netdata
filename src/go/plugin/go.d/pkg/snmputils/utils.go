@@ -90,17 +90,24 @@ func ParseSNMPv3PrivProtocol(protocol string) gosnmp.SnmpV3PrivProtocol {
 	}
 }
 
+// SnmpClientConnInfo describes the client's connection settings for logging. It omits secrets: the community and
+// the USM passphrases. gosnmp's SecurityParameters().Description() includes both passphrases, so the SNMPv3 part is
+// built from individual fields instead.
 func SnmpClientConnInfo(c gosnmp.Handler) string {
 	var info strings.Builder
-	info.WriteString(fmt.Sprintf("hostname='%s',port='%d',snmp_version='%s'", c.Target(), c.Port(), c.Version()))
-	switch c.Version() {
-	case gosnmp.Version1, gosnmp.Version2c:
-		info.WriteString(fmt.Sprintf(",community='%s'", c.Community()))
-	case gosnmp.Version3:
-		info.WriteString(fmt.Sprintf(",security_level='%d,%s'", c.MsgFlags(), c.SecurityParameters().Description()))
-		if ctx := c.ContextName(); ctx != "" {
-			info.WriteString(fmt.Sprintf(",context_name='%s'", ctx))
-		}
+	fmt.Fprintf(&info, "hostname='%s',port='%d',snmp_version='%s'", c.Target(), c.Port(), c.Version())
+	if c.Version() != gosnmp.Version3 {
+		return info.String()
+	}
+
+	// Connect adds the Reportable flag to SNMPv3 clients; it is not part of the security level.
+	fmt.Fprintf(&info, ",security_level='%s'", c.MsgFlags()&^gosnmp.Reportable)
+	if sp, ok := c.SecurityParameters().(*gosnmp.UsmSecurityParameters); ok {
+		fmt.Fprintf(&info, ",username='%s',auth_protocol='%s',priv_protocol='%s'",
+			sp.UserName, sp.AuthenticationProtocol, sp.PrivacyProtocol)
+	}
+	if ctx := c.ContextName(); ctx != "" {
+		fmt.Fprintf(&info, ",context_name='%s'", ctx)
 	}
 	return info.String()
 }
