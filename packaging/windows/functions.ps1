@@ -60,41 +60,50 @@ function Get-NetdataWixVersion {
     return '5.0.2'
 }
 
-function Resolve-WixExecutable([string]$Override, [string]$RequiredVersion) {
-    if (-not $RequiredVersion) { throw 'A required WiX version must be specified.' }
+function Find-WixPathExecutable([string]$Name) {
+    $command = Get-Command $Name -CommandType Application -ErrorAction SilentlyContinue |
+        Select-Object -First 1
+    if ($command) { return $command.Source }
+    return $null
+}
 
+function Get-WixInstalledToolCandidates {
     $candidates = @()
-    if ($Override) {
-        if (Test-Path -LiteralPath $Override -PathType Leaf) {
-            $candidates += (Resolve-Path -LiteralPath $Override).Path
-        } else {
-            $overrideCommand = Get-Command $Override -CommandType Application -ErrorAction SilentlyContinue |
-                Select-Object -First 1
-            if (-not $overrideCommand -or -not $overrideCommand.Source) {
-                throw "WIX_BIN does not resolve to an executable: '$Override'."
-            }
-            $candidates += $overrideCommand.Source
-        }
-    } else {
-        $toolRoots = @()
-        if ($env:DOTNET_CLI_HOME) { $toolRoots += $env:DOTNET_CLI_HOME }
-        if ($env:USERPROFILE) { $toolRoots += $env:USERPROFILE }
-        foreach ($root in $toolRoots) {
-            $candidate = Join-Path (Join-Path $root '.dotnet\tools') 'wix.exe'
-            if ((Test-Path -LiteralPath $candidate -PathType Leaf) -and $candidates -notcontains $candidate) {
-                $candidates += $candidate
-            }
-        }
-
-        foreach ($name in @('wix.exe', 'wix')) {
-            $command = Get-Command $name -CommandType Application -ErrorAction SilentlyContinue |
-                Select-Object -First 1
-            if ($command -and $command.Source -and $candidates -notcontains $command.Source) {
-                $candidates += $command.Source
-            }
+    $toolRoots = @()
+    if ($env:DOTNET_CLI_HOME) { $toolRoots += $env:DOTNET_CLI_HOME }
+    if ($env:USERPROFILE) { $toolRoots += $env:USERPROFILE }
+    foreach ($root in $toolRoots) {
+        $candidate = Join-Path (Join-Path $root '.dotnet\tools') 'wix.exe'
+        if ((Test-Path -LiteralPath $candidate -PathType Leaf) -and $candidates -notcontains $candidate) {
+            $candidates += $candidate
         }
     }
 
+    foreach ($name in @('wix.exe', 'wix')) {
+        $candidate = Find-WixPathExecutable $name
+        if ($candidate -and $candidates -notcontains $candidate) {
+            $candidates += $candidate
+        }
+    }
+
+    return $candidates
+}
+
+function Get-WixExecutableCandidates([string]$Override) {
+    if (-not $Override) { return (Get-WixInstalledToolCandidates) }
+    if (Test-Path -LiteralPath $Override -PathType Leaf) {
+        return (Resolve-Path -LiteralPath $Override).Path
+    }
+
+    $candidate = Find-WixPathExecutable $Override
+    if (-not $candidate) { throw "WIX_BIN does not resolve to an executable: '$Override'." }
+    return $candidate
+}
+
+function Resolve-WixExecutable([string]$Override, [string]$RequiredVersion) {
+    if (-not $RequiredVersion) { throw 'A required WiX version must be specified.' }
+
+    $candidates = @(Get-WixExecutableCandidates $Override)
     $mismatches = @()
     foreach ($candidate in $candidates) {
         $version = Get-WixExecutableVersion $candidate
