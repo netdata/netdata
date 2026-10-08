@@ -20,7 +20,7 @@ func (c *Collector) collect(ctx context.Context) error {
 		return errors.New("no fresh tegrastats sample")
 	}
 	if !s.hasReadings() {
-		return errors.New("tegrastats sample contains no supported GPU or EMC readings")
+		return errors.New("tegrastats sample contains no supported GPU, EMC or power readings")
 	}
 	c.writeMetrics(s)
 	return nil

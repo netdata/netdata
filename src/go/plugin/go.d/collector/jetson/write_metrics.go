@@ -24,4 +24,7 @@ func (c *Collector) writeMetrics(s sample) {
 	if s.EMCFrequency != nil {
 		c.metrics.emcFrequency.Observe(*s.EMCFrequency)
 	}
+	for rail, power := range s.PowerRails {
+		c.metrics.powerRailPower.WithLabelValues(rail).Observe(power)
+	}
 }

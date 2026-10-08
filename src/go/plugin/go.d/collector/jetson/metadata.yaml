@@ -29,15 +29,16 @@ modules:
     overview:
       data_collection:
         metrics_description: |
-          Monitor GPU and memory controller utilization and clock frequencies on NVIDIA Jetson devices.
+          Monitor GPU and memory controller utilization, clock frequencies, and power rail consumption on NVIDIA Jetson devices.
 
           You get:
 
           - GPU utilization.
           - GPU clock frequency, as one value or, on devices that report it, one value per graphics processing cluster (GPC).
           - External memory controller (EMC) bandwidth utilization and clock frequency. The CPU and GPU share this memory, so high EMC utilization can reveal memory-bandwidth-bound workloads.
+          - Current power consumption for each reported power rail, in watts.
 
-          CPU, memory, and swap usage come from Netdata's standard Linux system monitoring; this collector adds the Jetson GPU and EMC readings those charts do not cover.
+          CPU, memory, and swap usage come from Netdata's standard Linux system monitoring; this collector adds Jetson GPU, EMC, and power rail readings. Power readings help correlate workload activity with power consumption.
         method_description: |
           The collector runs NVIDIA's `tegrastats --interval 1000` on the local host and reads the line of readings it prints every second. One `tegrastats` process runs for as long as the job runs, under the Netdata service account (usually `netdata`); the collector never elevates its privileges.
 
@@ -58,6 +59,8 @@ modules:
         limits:
           description: |
             - The readings depend on the Jetson module, the Jetson Linux release, and permissions. For example, `tegrastats` on Jetson Thor can report GPU clocks without GPU utilization. A reading that `tegrastats` does not report leaves a gap; it is never charted as zero.
+            - Rail names and coverage vary by device. Rails can overlap, so adding their values does not give total device power. On Thor, the total-system `VIN` rail may also appear in Netdata's sensors charts.
+            - Power charts use the current reading from supported current/average pairs. Averages and unfamiliar three-value forms are not collected.
             - If `tegrastats` stops printing readings, the charts show a gap after three seconds instead of repeating the last values.
         performance_impact:
           description: |
@@ -76,7 +79,7 @@ modules:
               sudo -u netdata tegrastats --interval 1000
               ```
 
-              Each line should contain a `GR3D_FREQ` (GPU) or `EMC_FREQ` (memory controller) reading; stop the command with Ctrl+C. Readings missing from this output are also missing from Netdata.
+              Each line should contain a `GR3D_FREQ` (GPU), `EMC_FREQ` (memory controller), or power rail reading such as `VDD_GPU 10687mW/9815mW`; stop the command with Ctrl+C. Readings missing from this output are also missing from Netdata.
 
               If the command is not found, restore `tegrastats` with NVIDIA's [tegrastats deployment instructions](https://docs.nvidia.com/jetson/archives/r39.2/DeveloperGuide/AT/JetsonLinuxDevelopmentTools/TegrastatsUtility.html#re-deploying-tegrastats). Netdata searches its own `PATH`, which adds `/sbin`, `/usr/sbin`, `/usr/local/bin`, and `/usr/local/sbin` to the `PATH` it starts with. If `tegrastats` is in another directory, set `PATH` in the `[environment variables]` section of `netdata.conf` to a list that includes it, then restart Netdata.
       configuration:
@@ -120,9 +123,9 @@ modules:
           - error: no fresh tegrastats sample
             cause: Netdata has not received a complete `tegrastats` line in the last three seconds, usually because `tegrastats` is starting, has stopped, or is being restarted.
             fix: If the error persists, look for `tegrastats source unavailable` messages in the collector log (see Diagnostics) and run the check in Prerequisites.
-          - error: tegrastats sample contains no supported GPU or EMC readings
-            cause: The latest `tegrastats` line has neither a valid `GR3D_FREQ` (GPU) nor `EMC_FREQ` (memory controller) reading. Which readings `tegrastats` prints depends on the Jetson module, the Jetson Linux release, and the account that runs it.
-            fix: Run the check in Prerequisites. If its output has no `GR3D_FREQ` or `EMC_FREQ` readings, this collector has nothing to chart on this device.
+          - error: tegrastats sample contains no supported GPU, EMC or power readings
+            cause: The latest `tegrastats` line has no valid `GR3D_FREQ` (GPU), `EMC_FREQ` (memory controller), or supported power rail reading. Which readings `tegrastats` prints depends on the Jetson module, the Jetson Linux release, and the account that runs it.
+            fix: Run the check in Prerequisites. If its output has no supported GPU, memory controller, or power rail readings, this collector has nothing to chart on this device.
     alerts: []
     metrics:
       folding:
@@ -172,3 +175,15 @@ modules:
               chart_type: line
               dimensions:
                 - name: frequency
+        - name: power rail
+          description: One power rail reported by `tegrastats` with a valid current/average milliwatt pair.
+          labels:
+            - name: rail
+              description: NVIDIA's power rail name, such as VDD_GPU, VDD_CPU_CV, or VIN; a rail can supply several components.
+          metrics:
+            - name: jetson.power_rail_power
+              description: Power Rail Consumption
+              unit: Watts
+              chart_type: line
+              dimensions:
+                - name: power
