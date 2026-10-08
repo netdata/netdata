@@ -115,10 +115,10 @@ write. Keep that order: the preflight and the input read MUST stay before cleanu
 catalog cannot delete the committed tree. `-c plugin/module` scopes cleanup and writes to one collector but still
 validates the whole corpus; an unknown collector is an error, never an empty run. CI never uses `-c`.
 
-`cleanup()` removes every `**/integrations` directory it owns, then restores the paths in `PRESERVE_FILES` (today
-`src/collectors/ebpf.plugin/integrations/ebpf_dcstat.md`, kept so Learn's redirect catalog keeps resolving after the
-dcstat move to ebpfgo). `check-markdown.yml` complements this with a step that deletes the new ebpfgo dcstat page while
-the legacy one exists, to avoid a Learn URL collision during ingest. Drop both when the Learn catalog is republished.
+`cleanup()` removes every `**/integrations` directory it owns. Pages are then generated only from the current catalog;
+CI validates that same output. Before removing a migrated producer, update Learn's legacy catalogue to retain every
+published route under its surviving source identity. Do not preserve obsolete output or delete its replacement only
+in CI to conceal an incomplete catalogue migration.
 
 Per page (`build_readme_from_integration`, `write_to_file`):
 

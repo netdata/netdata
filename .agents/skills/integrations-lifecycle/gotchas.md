@@ -35,9 +35,8 @@ cost someone a debugging session. Citations name symbols; open the file to find 
   anywhere.
 - The community badge is chosen by key presence (`"community" in integration["meta"]`), not by value: a `community`
   key set to `false` still renders the Community badge. Every current use is `true`.
-- `PRESERVE_FILES` in `gen_docs_integrations.py` and the dcstat removal step in `check-markdown.yml` are a coupled pair
-  around one Learn redirect migration (`pipeline.md`, Stage 2). A local full regeneration therefore keeps a page whose
-  source directory no longer produces it; that is intended until the Learn catalog is republished.
+- Removing a generated producer does not migrate its Learn URLs automatically. Repoint its legacy catalogue entries
+  and retain any published canonical aliases before source removal (`pipeline.md`, Stage 2).
 
 ## Validation traps
 
