@@ -49,7 +49,10 @@ case "${BUILDARCH}" in
     aarch64) # Baseline ARMv8 CPU
         QEMU_ARCH="aarch64"
         QEMU_CPU="cortex-a53"
-        TUNING_FLAGS="-march=armv8-a"
+        # Work around Cortex-A53 errata 835769 and 843419 (Raspberry Pi 3, ODROID-C2, ...). The builder's GCC enables
+        # neither by default, and QEMU does not model them. The 843419 fix happens at link time, so the jobs also pass
+        # $(errata_ldflags) to every final link.
+        TUNING_FLAGS="-march=armv8-a -mfix-cortex-a53-835769 -mfix-cortex-a53-843419"
         GOARM64="v8.0"
         GOARCH="arm64"
         ;;

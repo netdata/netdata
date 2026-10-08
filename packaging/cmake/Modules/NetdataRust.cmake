@@ -76,11 +76,18 @@ if(ENABLE_NETDATA_JOURNAL_FILE_READER OR ENABLE_PLUGIN_OTEL OR ENABLE_PLUGIN_NET
                                CRATES ${_WORKSPACE_CRATES})
     endif()
 
+    # Cargo links the Rust executables through the bare compiler driver, so CMAKE_EXE_LINKER_FLAGS never reach those
+    # links. Forward the Cortex-A53 erratum 843419 linker workaround when the build asks for it (static aarch64).
+    set(_nd_rust_link_flags "")
+    if(CMAKE_EXE_LINKER_FLAGS MATCHES "--fix-cortex-a53-843419")
+        list(APPEND _nd_rust_link_flags "-Clink-arg=-Wl,--fix-cortex-a53-843419")
+    endif()
+
     if(ENABLE_PLUGIN_OTEL)
       if(STATIC_BUILD)
-        corrosion_add_target_rustflags(otel-plugin --cfg=tracing_unstable "-C" "target-feature=+crt-static")
+        corrosion_add_target_rustflags(otel-plugin --cfg=tracing_unstable "-C" "target-feature=+crt-static" ${_nd_rust_link_flags})
       else()
-        corrosion_add_target_rustflags(otel-plugin --cfg=tracing_unstable)
+        corrosion_add_target_rustflags(otel-plugin --cfg=tracing_unstable ${_nd_rust_link_flags})
       endif()
 
       # The workspace release profile propagates fat LTO, single-codegen-unit,
@@ -126,10 +133,14 @@ if(ENABLE_NETDATA_JOURNAL_FILE_READER OR ENABLE_PLUGIN_OTEL OR ENABLE_PLUGIN_NET
         list(APPEND NETFLOW_PLUGIN_RUSTFLAGS "-C" "target-feature=+crt-static")
       endif()
 
+      list(APPEND NETFLOW_PLUGIN_RUSTFLAGS ${_nd_rust_link_flags})
+
       if(NETFLOW_PLUGIN_RUSTFLAGS)
         corrosion_add_target_rustflags(netflow-plugin ${NETFLOW_PLUGIN_RUSTFLAGS})
       endif()
 
       corrosion_set_env_vars(netflow-plugin ${NETFLOW_PLUGIN_ENV_VARS})
     endif()
+
+    unset(_nd_rust_link_flags)
 endif()

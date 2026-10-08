@@ -448,6 +448,36 @@ jobs:
           path: artifacts/*.gz.run
           compression-level: 0
           retention-days: 30
+      - name: Check Cortex-A53 erratum workarounds
+        id: check-a53-errata
+        if: needs.file-check.outputs.run == 'true' && matrix.arch == 'aarch64'
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          # QEMU does not model CPU errata, so the runtime checks of the build cannot see a binary linked without the
+          # Cortex-A53 erratum 843419 workaround; scan the shipped executables instead.
+          archive="$(find "${GITHUB_WORKSPACE}/artifacts" \
+            -maxdepth 1 \
+            -type f \
+            -name 'netdata-aarch64-*.gz.run' \
+            ! -name '*-latest.gz.run' \
+            -print \
+            -quit)"
+          if [ -z "${archive}" ]; then
+            printf >&2 'ERROR: static archive for aarch64 was not produced\n'
+            exit 1
+          fi
+
+          extract_dir="$(mktemp -d)"
+          trap 'rm -rf -- "${extract_dir}"' EXIT
+          (
+            cd "${extract_dir}"
+            sh "${archive}" --tar xf
+          )
+
+          python3 .github/scripts/test-check-a53-erratum-843419.py
+          python3 .github/scripts/check-a53-erratum-843419.py "${extract_dir}"
       - name: Failure Notification
         uses: rtCamp/action-slack-notify@33ca3be66c6f378fe1610fd1d5258632dbed5e58 # v2.4.0
         env:
@@ -466,6 +496,7 @@ jobs:
               Build: ${{ steps.build.outcome }}
               Verify topology stock payload: ${{ steps.verify-topology-stock.outcome }}
               Store: ${{ steps.store.outcome }}
+              Check Cortex-A53 erratum workarounds: ${{ steps.check-a53-errata.outcome }}
           SLACK_WEBHOOK: ${{ secrets.SLACK_WEBHOOK_URL }}
         if: >-
           ${{

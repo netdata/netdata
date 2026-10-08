@@ -40,6 +40,15 @@ set -euo pipefail
 
 # -----------------------------------------------------------------------------
 
+# Linker flags for the CPU errata workarounds of the target architecture, for the LDFLAGS of every job that links an
+# executable. Cortex-A53 erratum 843419 is fixed by the linker, which the compiler driver asks for only when the
+# -mfix-cortex-a53-843419 compile flag reaches the link command too; this does not rely on that.
+errata_ldflags() {
+  if [ "${BUILDARCH:-}" = "aarch64" ]; then
+    echo "-Wl,--fix-cortex-a53-843419"
+  fi
+}
+
 cache_path() {
   local key="${1}"
   echo "${NETDATA_SOURCE_PATH}/artifacts/cache/${BUILDARCH}/${key}"
