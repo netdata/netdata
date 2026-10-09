@@ -1,0 +1,884 @@
+{
+  "resourceMetrics": [
+    {
+      "resource": {
+        "attributes": [
+          {
+            "key": "service.instance.id",
+            "value": {
+              "stringValue": "fixture-instance"
+            }
+          },
+          {
+            "key": "service.name",
+            "value": {
+              "stringValue": "fixture-service"
+            }
+          },
+          {
+            "key": "process.runtime.version",
+            "value": {
+              "stringValue": "21.0.12+1"
+            }
+          },
+          {
+            "key": "process.command_args",
+            "value": {
+              "arrayValue": {
+                "values": [
+                  {
+                    "stringValue": "java"
+                  },
+                  {
+                    "stringValue": "fixture.jar"
+                  }
+                ]
+              }
+            }
+          }
+        ]
+      },
+      "scopeMetrics": [
+        {
+          "scope": {
+            "name": "sanitized-java-fixture"
+          },
+          "metrics": [
+            {
+              "name": "jvm.memory.used",
+              "description": "Measure of memory used.",
+              "unit": "By",
+              "sum": {
+                "dataPoints": [
+                  {
+                    "attributes": [
+                      {
+                        "key": "jvm.memory.pool.name",
+                        "value": {
+                          "stringValue": "Survivor Space"
+                        }
+                      },
+                      {
+                        "key": "jvm.memory.type",
+                        "value": {
+                          "stringValue": "heap"
+                        }
+                      }
+                    ],
+                    "startTimeUnixNano": "1791539988119005880",
+                    "timeUnixNano": "1791539989118868759",
+                    "asInt": "0"
+                  },
+                  {
+                    "attributes": [
+                      {
+                        "key": "jvm.memory.pool.name",
+                        "value": {
+                          "stringValue": "Tenured Gen"
+                        }
+                      },
+                      {
+                        "key": "jvm.memory.type",
+                        "value": {
+                          "stringValue": "heap"
+                        }
+                      }
+                    ],
+                    "startTimeUnixNano": "1791539988119005880",
+                    "timeUnixNano": "1791539989118868759",
+                    "asInt": "25622768"
+                  },
+                  {
+                    "attributes": [
+                      {
+                        "key": "jvm.memory.pool.name",
+                        "value": {
+                          "stringValue": "CodeHeap 'profiled nmethods'"
+                        }
+                      },
+                      {
+                        "key": "jvm.memory.type",
+                        "value": {
+                          "stringValue": "non_heap"
+                        }
+                      }
+                    ],
+                    "startTimeUnixNano": "1791539988119005880",
+                    "timeUnixNano": "1791539989118868759",
+                    "asInt": "10216192"
+                  },
+                  {
+                    "attributes": [
+                      {
+                        "key": "jvm.memory.pool.name",
+                        "value": {
+                          "stringValue": "Eden Space"
+                        }
+                      },
+                      {
+                        "key": "jvm.memory.type",
+                        "value": {
+                          "stringValue": "heap"
+                        }
+                      }
+                    ],
+                    "startTimeUnixNano": "1791539988119005880",
+                    "timeUnixNano": "1791539989118868759",
+                    "asInt": "825808"
+                  },
+                  {
+                    "attributes": [
+                      {
+                        "key": "jvm.memory.pool.name",
+                        "value": {
+                          "stringValue": "CodeHeap 'non-nmethods'"
+                        }
+                      },
+                      {
+                        "key": "jvm.memory.type",
+                        "value": {
+                          "stringValue": "non_heap"
+                        }
+                      }
+                    ],
+                    "startTimeUnixNano": "1791539988119005880",
+                    "timeUnixNano": "1791539989118868759",
+                    "asInt": "1417344"
+                  },
+                  {
+                    "attributes": [
+                      {
+                        "key": "jvm.memory.pool.name",
+                        "value": {
+                          "stringValue": "Metaspace"
+                        }
+                      },
+                      {
+                        "key": "jvm.memory.type",
+                        "value": {
+                          "stringValue": "non_heap"
+                        }
+                      }
+                    ],
+                    "startTimeUnixNano": "1791539988119005880",
+                    "timeUnixNano": "1791539989118868759",
+                    "asInt": "60506400"
+                  },
+                  {
+                    "attributes": [
+                      {
+                        "key": "jvm.memory.pool.name",
+                        "value": {
+                          "stringValue": "CodeHeap 'non-profiled nmethods'"
+                        }
+                      },
+                      {
+                        "key": "jvm.memory.type",
+                        "value": {
+                          "stringValue": "non_heap"
+                        }
+                      }
+                    ],
+                    "startTimeUnixNano": "1791539988119005880",
+                    "timeUnixNano": "1791539989118868759",
+                    "asInt": "2658944"
+                  },
+                  {
+                    "attributes": [
+                      {
+                        "key": "jvm.memory.pool.name",
+                        "value": {
+                          "stringValue": "Compressed Class Space"
+                        }
+                      },
+                      {
+                        "key": "jvm.memory.type",
+                        "value": {
+                          "stringValue": "non_heap"
+                        }
+                      }
+                    ],
+                    "startTimeUnixNano": "1791539988119005880",
+                    "timeUnixNano": "1791539989118868759",
+                    "asInt": "7536256"
+                  }
+                ],
+                "aggregationTemporality": 2
+              }
+            },
+            {
+              "name": "netdata.spike.hikari.limit",
+              "unit": "{connection}",
+              "gauge": {
+                "dataPoints": [
+                  {
+                    "attributes": [
+                      {
+                        "key": "pool.id",
+                        "value": {
+                          "stringValue": "1"
+                        }
+                      },
+                      {
+                        "key": "pool.name",
+                        "value": {
+                          "stringValue": "HikariPool-1"
+                        }
+                      }
+                    ],
+                    "startTimeUnixNano": "1791539997118883003",
+                    "timeUnixNano": "1791539998118835767",
+                    "asInt": "10"
+                  }
+                ]
+              }
+            },
+            {
+              "name": "netdata.spike.hikari.connections",
+              "unit": "{connection}",
+              "gauge": {
+                "dataPoints": [
+                  {
+                    "attributes": [
+                      {
+                        "key": "pool.id",
+                        "value": {
+                          "stringValue": "1"
+                        }
+                      },
+                      {
+                        "key": "pool.name",
+                        "value": {
+                          "stringValue": "HikariPool-1"
+                        }
+                      },
+                      {
+                        "key": "state",
+                        "value": {
+                          "stringValue": "active"
+                        }
+                      }
+                    ],
+                    "startTimeUnixNano": "1791539997118883003",
+                    "timeUnixNano": "1791539998118835767",
+                    "asInt": "0"
+                  },
+                  {
+                    "attributes": [
+                      {
+                        "key": "pool.id",
+                        "value": {
+                          "stringValue": "1"
+                        }
+                      },
+                      {
+                        "key": "pool.name",
+                        "value": {
+                          "stringValue": "HikariPool-1"
+                        }
+                      },
+                      {
+                        "key": "state",
+                        "value": {
+                          "stringValue": "idle"
+                        }
+                      }
+                    ],
+                    "startTimeUnixNano": "1791539997118883003",
+                    "timeUnixNano": "1791539998118835767",
+                    "asInt": "10"
+                  }
+                ]
+              }
+            },
+            {
+              "name": "netdata.spike.hikari.pending_requests",
+              "unit": "{request}",
+              "gauge": {
+                "dataPoints": [
+                  {
+                    "attributes": [
+                      {
+                        "key": "pool.id",
+                        "value": {
+                          "stringValue": "1"
+                        }
+                      },
+                      {
+                        "key": "pool.name",
+                        "value": {
+                          "stringValue": "HikariPool-1"
+                        }
+                      }
+                    ],
+                    "startTimeUnixNano": "1791539997118883003",
+                    "timeUnixNano": "1791539998118835767",
+                    "asInt": "0"
+                  }
+                ]
+              }
+            },
+            {
+              "name": "http.server.request.duration",
+              "description": "Duration of HTTP server requests.",
+              "unit": "s",
+              "histogram": {
+                "dataPoints": [
+                  {
+                    "attributes": [
+                      {
+                        "key": "error.type",
+                        "value": {
+                          "stringValue": "503"
+                        }
+                      },
+                      {
+                        "key": "http.request.method",
+                        "value": {
+                          "stringValue": "GET"
+                        }
+                      },
+                      {
+                        "key": "http.response.status_code",
+                        "value": {
+                          "intValue": "503"
+                        }
+                      },
+                      {
+                        "key": "http.route",
+                        "value": {
+                          "stringValue": "/work"
+                        }
+                      },
+                      {
+                        "key": "network.protocol.version",
+                        "value": {
+                          "stringValue": "1.1"
+                        }
+                      },
+                      {
+                        "key": "url.scheme",
+                        "value": {
+                          "stringValue": "http"
+                        }
+                      }
+                    ],
+                    "startTimeUnixNano": "1791539997871105280",
+                    "timeUnixNano": "1791539998118835767",
+                    "count": "7",
+                    "sum": 0.429736986,
+                    "bucketCounts": [
+                      "4",
+                      "0",
+                      "0",
+                      "0",
+                      "1",
+                      "0",
+                      "2",
+                      "0",
+                      "0",
+                      "0",
+                      "0",
+                      "0",
+                      "0",
+                      "0",
+                      "0"
+                    ],
+                    "explicitBounds": [
+                      0.005,
+                      0.01,
+                      0.025,
+                      0.05,
+                      0.075,
+                      0.1,
+                      0.25,
+                      0.5,
+                      0.75,
+                      1,
+                      2.5,
+                      5,
+                      7.5,
+                      10
+                    ],
+                    "exemplars": [
+                      {
+                        "filteredAttributes": [
+                          {
+                            "key": "client.address",
+                            "value": {
+                              "stringValue": "127.0.0.1"
+                            }
+                          },
+                          {
+                            "key": "network.peer.address",
+                            "value": {
+                              "stringValue": "127.0.0.1"
+                            }
+                          },
+                          {
+                            "key": "network.peer.port",
+                            "value": {
+                              "intValue": "43808"
+                            }
+                          },
+                          {
+                            "key": "server.address",
+                            "value": {
+                              "stringValue": "127.0.0.1"
+                            }
+                          },
+                          {
+                            "key": "server.port",
+                            "value": {
+                              "intValue": "49517"
+                            }
+                          },
+                          {
+                            "key": "url.path",
+                            "value": {
+                              "stringValue": "/work"
+                            }
+                          },
+                          {
+                            "key": "url.query",
+                            "value": {
+                              "stringValue": "holdMs=0&fail=true"
+                            }
+                          },
+                          {
+                            "key": "user_agent.original",
+                            "value": {
+                              "stringValue": "Java-http-client/21.0.12.1"
+                            }
+                          }
+                        ],
+                        "timeUnixNano": "1791539998063000000",
+                        "asDouble": 0.002748338,
+                        "traceId": "ef114a4bc3eaf65f326413ee3e622fd6",
+                        "spanId": "ba35795136cb5c0e"
+                      },
+                      {
+                        "filteredAttributes": [
+                          {
+                            "key": "client.address",
+                            "value": {
+                              "stringValue": "127.0.0.1"
+                            }
+                          },
+                          {
+                            "key": "network.peer.address",
+                            "value": {
+                              "stringValue": "127.0.0.1"
+                            }
+                          },
+                          {
+                            "key": "network.peer.port",
+                            "value": {
+                              "intValue": "43668"
+                            }
+                          },
+                          {
+                            "key": "server.address",
+                            "value": {
+                              "stringValue": "127.0.0.1"
+                            }
+                          },
+                          {
+                            "key": "server.port",
+                            "value": {
+                              "intValue": "49517"
+                            }
+                          },
+                          {
+                            "key": "url.path",
+                            "value": {
+                              "stringValue": "/work"
+                            }
+                          },
+                          {
+                            "key": "url.query",
+                            "value": {
+                              "stringValue": "holdMs=0&fail=true"
+                            }
+                          },
+                          {
+                            "key": "user_agent.original",
+                            "value": {
+                              "stringValue": "Java-http-client/21.0.12.1"
+                            }
+                          }
+                        ],
+                        "timeUnixNano": "1791539997960000000",
+                        "asDouble": 0.051003865,
+                        "traceId": "cd00e2ea60c91b8ff200e0511f3b1b9e",
+                        "spanId": "6c36b1b984c302c9"
+                      },
+                      {
+                        "filteredAttributes": [
+                          {
+                            "key": "client.address",
+                            "value": {
+                              "stringValue": "127.0.0.1"
+                            }
+                          },
+                          {
+                            "key": "network.peer.address",
+                            "value": {
+                              "stringValue": "127.0.0.1"
+                            }
+                          },
+                          {
+                            "key": "network.peer.port",
+                            "value": {
+                              "intValue": "43724"
+                            }
+                          },
+                          {
+                            "key": "server.address",
+                            "value": {
+                              "stringValue": "127.0.0.1"
+                            }
+                          },
+                          {
+                            "key": "server.port",
+                            "value": {
+                              "intValue": "49517"
+                            }
+                          },
+                          {
+                            "key": "url.path",
+                            "value": {
+                              "stringValue": "/work"
+                            }
+                          },
+                          {
+                            "key": "url.query",
+                            "value": {
+                              "stringValue": "holdMs=0&fail=true"
+                            }
+                          },
+                          {
+                            "key": "user_agent.original",
+                            "value": {
+                              "stringValue": "Java-http-client/21.0.12.1"
+                            }
+                          }
+                        ],
+                        "timeUnixNano": "1791539997871000000",
+                        "asDouble": 0.184311239,
+                        "traceId": "f1732b52a88e3baa7edbe4f494ef2965",
+                        "spanId": "0eb53f810ae956f6"
+                      }
+                    ],
+                    "min": 0.001756719,
+                    "max": 0.184735678
+                  },
+                  {
+                    "attributes": [
+                      {
+                        "key": "http.request.method",
+                        "value": {
+                          "stringValue": "GET"
+                        }
+                      },
+                      {
+                        "key": "http.response.status_code",
+                        "value": {
+                          "intValue": "200"
+                        }
+                      },
+                      {
+                        "key": "http.route",
+                        "value": {
+                          "stringValue": "/work"
+                        }
+                      },
+                      {
+                        "key": "network.protocol.version",
+                        "value": {
+                          "stringValue": "1.1"
+                        }
+                      },
+                      {
+                        "key": "url.scheme",
+                        "value": {
+                          "stringValue": "http"
+                        }
+                      }
+                    ],
+                    "startTimeUnixNano": "1791539997871040260",
+                    "timeUnixNano": "1791539998118835767",
+                    "count": "62",
+                    "sum": 3.2292959800000003,
+                    "bucketCounts": [
+                      "37",
+                      "0",
+                      "0",
+                      "3",
+                      "8",
+                      "0",
+                      "14",
+                      "0",
+                      "0",
+                      "0",
+                      "0",
+                      "0",
+                      "0",
+                      "0",
+                      "0"
+                    ],
+                    "explicitBounds": [
+                      0.005,
+                      0.01,
+                      0.025,
+                      0.05,
+                      0.075,
+                      0.1,
+                      0.25,
+                      0.5,
+                      0.75,
+                      1,
+                      2.5,
+                      5,
+                      7.5,
+                      10
+                    ],
+                    "exemplars": [
+                      {
+                        "filteredAttributes": [
+                          {
+                            "key": "client.address",
+                            "value": {
+                              "stringValue": "127.0.0.1"
+                            }
+                          },
+                          {
+                            "key": "network.peer.address",
+                            "value": {
+                              "stringValue": "127.0.0.1"
+                            }
+                          },
+                          {
+                            "key": "network.peer.port",
+                            "value": {
+                              "intValue": "43718"
+                            }
+                          },
+                          {
+                            "key": "server.address",
+                            "value": {
+                              "stringValue": "127.0.0.1"
+                            }
+                          },
+                          {
+                            "key": "server.port",
+                            "value": {
+                              "intValue": "49517"
+                            }
+                          },
+                          {
+                            "key": "url.path",
+                            "value": {
+                              "stringValue": "/work"
+                            }
+                          },
+                          {
+                            "key": "url.query",
+                            "value": {
+                              "stringValue": "holdMs=0&fail=false"
+                            }
+                          },
+                          {
+                            "key": "user_agent.original",
+                            "value": {
+                              "stringValue": "Java-http-client/21.0.12.1"
+                            }
+                          }
+                        ],
+                        "timeUnixNano": "1791539998115000000",
+                        "asDouble": 0.002186159,
+                        "traceId": "6db18a8386dff2963499c1dadc67c47c",
+                        "spanId": "5898de8c0515844f"
+                      },
+                      {
+                        "filteredAttributes": [
+                          {
+                            "key": "client.address",
+                            "value": {
+                              "stringValue": "127.0.0.1"
+                            }
+                          },
+                          {
+                            "key": "network.peer.address",
+                            "value": {
+                              "stringValue": "127.0.0.1"
+                            }
+                          },
+                          {
+                            "key": "network.peer.port",
+                            "value": {
+                              "intValue": "43778"
+                            }
+                          },
+                          {
+                            "key": "server.address",
+                            "value": {
+                              "stringValue": "127.0.0.1"
+                            }
+                          },
+                          {
+                            "key": "server.port",
+                            "value": {
+                              "intValue": "49517"
+                            }
+                          },
+                          {
+                            "key": "url.path",
+                            "value": {
+                              "stringValue": "/work"
+                            }
+                          },
+                          {
+                            "key": "url.query",
+                            "value": {
+                              "stringValue": "holdMs=0&fail=false"
+                            }
+                          },
+                          {
+                            "key": "user_agent.original",
+                            "value": {
+                              "stringValue": "Java-http-client/21.0.12.1"
+                            }
+                          }
+                        ],
+                        "timeUnixNano": "1791539998061000000",
+                        "asDouble": 0.047371066,
+                        "traceId": "e562151236db94581ae6d82f0cbc477f",
+                        "spanId": "b3957f81f6d22316"
+                      },
+                      {
+                        "filteredAttributes": [
+                          {
+                            "key": "client.address",
+                            "value": {
+                              "stringValue": "127.0.0.1"
+                            }
+                          },
+                          {
+                            "key": "network.peer.address",
+                            "value": {
+                              "stringValue": "127.0.0.1"
+                            }
+                          },
+                          {
+                            "key": "network.peer.port",
+                            "value": {
+                              "intValue": "43690"
+                            }
+                          },
+                          {
+                            "key": "server.address",
+                            "value": {
+                              "stringValue": "127.0.0.1"
+                            }
+                          },
+                          {
+                            "key": "server.port",
+                            "value": {
+                              "intValue": "49517"
+                            }
+                          },
+                          {
+                            "key": "url.path",
+                            "value": {
+                              "stringValue": "/work"
+                            }
+                          },
+                          {
+                            "key": "url.query",
+                            "value": {
+                              "stringValue": "holdMs=0&fail=false"
+                            }
+                          },
+                          {
+                            "key": "user_agent.original",
+                            "value": {
+                              "stringValue": "Java-http-client/21.0.12.1"
+                            }
+                          }
+                        ],
+                        "timeUnixNano": "1791539998061000000",
+                        "asDouble": 0.053362173,
+                        "traceId": "fc9772924b1c8851f24fb4cb53f0e292",
+                        "spanId": "e8ae9f288a212b97"
+                      },
+                      {
+                        "filteredAttributes": [
+                          {
+                            "key": "client.address",
+                            "value": {
+                              "stringValue": "127.0.0.1"
+                            }
+                          },
+                          {
+                            "key": "network.peer.address",
+                            "value": {
+                              "stringValue": "127.0.0.1"
+                            }
+                          },
+                          {
+                            "key": "network.peer.port",
+                            "value": {
+                              "intValue": "43758"
+                            }
+                          },
+                          {
+                            "key": "server.address",
+                            "value": {
+                              "stringValue": "127.0.0.1"
+                            }
+                          },
+                          {
+                            "key": "server.port",
+                            "value": {
+                              "intValue": "49517"
+                            }
+                          },
+                          {
+                            "key": "url.path",
+                            "value": {
+                              "stringValue": "/work"
+                            }
+                          },
+                          {
+                            "key": "url.query",
+                            "value": {
+                              "stringValue": "holdMs=0&fail=false"
+                            }
+                          },
+                          {
+                            "key": "user_agent.original",
+                            "value": {
+                              "stringValue": "Java-http-client/21.0.12.1"
+                            }
+                          }
+                        ],
+                        "timeUnixNano": "1791539997873000000",
+                        "asDouble": 0.183591798,
+                        "traceId": "0e8075ac71420cdcff138ff02cbbe2c2",
+                        "spanId": "7fb4e345c102f462"
+                      }
+                    ],
+                    "min": 0.001630279,
+                    "max": 0.184912508
+                  }
+                ],
+                "aggregationTemporality": 2
+              }
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}
