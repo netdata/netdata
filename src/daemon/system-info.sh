@@ -1,5 +1,7 @@
 #!/usr/bin/env sh
 
+SYSTEM_INFO_MODE="${1:-}"
+
 # -------------------------------------------------------------------------------------------------
 # detect the kernel
 
@@ -694,9 +696,11 @@ get_default_interface_ip() {
   # Optional parameter for IP version: "-4" (default) or "-6"
   ip_version="${1:--4}"
 
-  # Check if timeout command is available
+  # GNU timeout creates its own process group. Under Agent supervision the outer
+  # deadline owns cleanup, so keep every probe in the script's process group.
   timeout_cmd=""
-  if command -v timeout >/dev/null 2>&1; then
+  if [ "${SYSTEM_INFO_MODE:-}" != --runtime ] && [ "${SYSTEM_INFO_MODE:-}" != --bounded ] &&
+    command -v timeout >/dev/null 2>&1; then
     timeout_cmd="timeout 2"
   fi
 

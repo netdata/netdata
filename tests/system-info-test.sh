@@ -11,6 +11,7 @@ system_info_script="${script_dir}/../src/daemon/system-info.sh"
 functions_script="${test_dir}/functions.sh"
 
 sed -n \
+    -e '/^SYSTEM_INFO_MODE=/p' \
     -e '/^os_release_unescape()/,/^}/p' \
     -e '/^load_os_release()/,/^}/p' \
     -e '/^load_lsb_release()/,/^}/p' \
@@ -89,6 +90,7 @@ sed -n -e '/^get_default_interface_ip()/,/^}/p' -e '/^emit_runtime_field()/,/^}/
 mkdir "${test_dir}/bin"
 cat > "${test_dir}/bin/timeout" <<'EOF'
 #!/bin/sh
+if [ -n "${TIMEOUT_TEST_LOG:-}" ]; then printf '%s\n' invoked >> "${TIMEOUT_TEST_LOG}"; fi
 shift
 exec "$@"
 EOF
@@ -114,6 +116,21 @@ case "$NETWORK_TEST" in
 esac
 EOF
 chmod +x "${test_dir}/bin/"*
+for agent_mode in --bounded --runtime; do
+    : > "${test_dir}/timeout.log"
+    PATH="${test_dir}/bin:${PATH}" NETWORK_TEST=present TIMEOUT_TEST_LOG="${test_dir}/timeout.log" /bin/sh -c '
+        functions_file=$1
+        set -- "$2"
+        . "$functions_file"
+        KERNEL_NAME=Darwin
+        get_default_interface_ip -4
+        [ "$NETWORK_STATUS" = V ]
+    ' sh "${functions_script}" "${agent_mode}"
+    [ ! -s "${test_dir}/timeout.log" ] || {
+        printf 'Agent mode %s must keep probes in the supervised process group\n' "${agent_mode}" >&2
+        exit 1
+    }
+done
 for network_case in present absent failed address-failed; do
     network_output=$(PATH="${test_dir}/bin:${PATH}" NETWORK_TEST="${network_case}" /bin/sh -c '
         . "$1"

@@ -468,7 +468,7 @@ static bool system_info_cancelled(void) {
 static char *system_info_read_script(bool runtime) {
     CLEAN_BUFFER *script = buffer_create(0, NULL);
     buffer_sprintf(script, "%s/system-info.sh", netdata_configured_primary_plugins_dir);
-    const char *argv[] = { buffer_tostring(script), runtime ? "--runtime" : NULL, NULL };
+    const char *argv[] = { buffer_tostring(script), runtime ? "--runtime" : "--bounded", NULL };
     return system_info_read_argv(argv, runtime ? system_info_cancelled : NULL, 30000);
 }
 
