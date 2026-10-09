@@ -223,7 +223,11 @@ def read_sections(data):
 
 
 def check_elf(data):
-    """Return (is_go, [hit addresses]) for an AArch64 ELF image, or None if it is not an AArch64 program to check."""
+    """Return (is_go, [hit addresses]) for an AArch64 ELF image, or None if it is not an AArch64 program to check.
+
+    Each executable output section is scanned as a whole. The linkers scan input sections, so they cannot patch a
+    sequence that straddles two input sections; such a sequence would be reported here. Like inline data in code
+    sections, it would need investigating rather than a relaxed rule."""
     if data[4:6] != b'\x02\x01':
         return None  # only ELF64 little-endian can be AArch64 code
     e_type, e_machine = struct.unpack_from('<HH', data, 0x10)
@@ -241,49 +245,61 @@ def check_elf(data):
     return is_go, hits
 
 
+def regular_files(top, errors):
+    """Yield the regular files under top in a stable order; directories that cannot be read go to errors."""
+    for root, dirs, files in os.walk(top, onerror=errors.append):
+        dirs.sort()
+        for name in sorted(files):
+            path = os.path.join(root, name)
+            if not os.path.islink(path) and os.path.isfile(path):
+                yield path
+
+
+def check_file(path):
+    """Return check_elf()'s result for an ELF file, or None for anything else."""
+    with open(path, 'rb') as f:
+        if f.read(4) != b'\x7fELF':
+            return None
+        f.seek(0)
+        return check_elf(f.read())
+
+
+def report(rel, is_go, hits):
+    """Print the hits of one executable; return True if they fail the check."""
+    if not hits:
+        return False
+    addrs = ', '.join(f'{a:#x}' for a in hits[:8]) + (', ...' if len(hits) > 8 else '')
+    if is_go:
+        print(f'NOTICE: {rel}: {len(hits)} sequence(s) in a Go binary (no Go linker workaround): {addrs}')
+        return False
+    print(f'ERROR: {rel}: {len(hits)} sequence(s), linked without --fix-cortex-a53-843419: {addrs}')
+    return True
+
+
 def main(argv):
     if len(argv) != 2 or not os.path.isdir(argv[1]):
         print(f'usage: {argv[0]} <directory>', file=sys.stderr)
         return 2
+    top = argv[1]
 
     failed = False
     checked = 0
-
-    def walk_error(e):
-        nonlocal failed
-        print(f'ERROR: {os.path.relpath(e.filename, argv[1])}: {e.strerror}')
-        failed = True
-
-    for root, dirs, files in os.walk(argv[1], onerror=walk_error):
-        dirs.sort()
-        for name in sorted(files):
-            path = os.path.join(root, name)
-            if os.path.islink(path) or not os.path.isfile(path):
-                continue
-            rel = os.path.relpath(path, argv[1])
-            try:
-                with open(path, 'rb') as f:
-                    if f.read(4) != b'\x7fELF':
-                        continue
-                    f.seek(0)
-                    data = f.read()
-                result = check_elf(data)
-            except (OSError, ElfError, struct.error) as e:
-                print(f'ERROR: {rel}: {e}')
-                failed = True
-                continue
-            if result is None:
-                continue
+    walk_errors = []
+    for path in regular_files(top, walk_errors):
+        rel = os.path.relpath(path, top)
+        try:
+            result = check_file(path)
+        except (OSError, ElfError, struct.error) as e:
+            print(f'ERROR: {rel}: {e}')
+            failed = True
+            continue
+        if result is not None:
             checked += 1
-            is_go, hits = result
-            if not hits:
-                continue
-            addrs = ', '.join(f'{a:#x}' for a in hits[:8]) + (', ...' if len(hits) > 8 else '')
-            if is_go:
-                print(f'NOTICE: {rel}: {len(hits)} sequence(s) in a Go binary (no Go linker workaround): {addrs}')
-            else:
-                print(f'ERROR: {rel}: {len(hits)} sequence(s), linked without --fix-cortex-a53-843419: {addrs}')
-                failed = True
+            failed |= report(rel, *result)
+
+    for e in walk_errors:
+        print(f'ERROR: {os.path.relpath(e.filename, top)}: {e.strerror}')
+        failed = True
 
     if checked == 0:
         print('ERROR: no AArch64 executables found')

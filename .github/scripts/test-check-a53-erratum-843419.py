@@ -87,6 +87,9 @@ class SequenceTests(unittest.TestCase):
     def test_three_instruction_sequence_at_0xffc(self):
         self.assertEqual(self.hits(0xffc, [ADRP_X12, STR_X1_SP, LDR_X0_X12]), [TEXT_ADDR + 0xffc])
 
+    def test_four_instruction_sequence_at_0xff8(self):
+        self.assertEqual(self.hits(0xff8, [ADRP_X12, STR_X1_SP, NOP, LDR_X0_X12]), [TEXT_ADDR + 0xff8])
+
     def test_four_instruction_sequence_at_0xffc(self):
         self.assertEqual(self.hits(0xffc, [ADRP_X12, STR_X1_SP, NOP, LDR_X0_X12]), [TEXT_ADDR + 0xffc])
 
@@ -124,6 +127,11 @@ class ElfTests(unittest.TestCase):
     def test_clean_binary_passes(self):
         rc, out = self.run_dir({'prog': make_elf(self.GOOD)})
         self.assertEqual(rc, 0, out)
+
+    def test_exposed_static_executable_fails(self):
+        rc, out = self.run_dir({'prog': make_elf(self.BAD, e_type=check.ET_EXEC)})
+        self.assertEqual(rc, 1)
+        self.assertIn('ERROR: prog: 1 sequence(s)', out)
 
     def test_exposed_binary_fails(self):
         rc, out = self.run_dir({'prog': make_elf(self.BAD), 'ok': make_elf(self.GOOD)})
