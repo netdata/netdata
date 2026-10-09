@@ -1,0 +1,168 @@
+{
+  "automatic": {
+    "automatic_attachments": 3,
+    "distinct_successful_uids": [
+      10001,
+      10002
+    ],
+    "duplicate_attempts_after_monitor_restart": 0,
+    "explicit_failures": [
+      "dynamic agent loading disabled",
+      "target /tmp read-only"
+    ],
+    "fresh_contexts_after_app_restart": [
+      "otel.http.server.request.duration.bucket",
+      "otel.http.server.request.duration.count",
+      "otel.jvm.memory.used",
+      "otel.netdata.spike.hikari.connections",
+      "otel.netdata.spike.hikari.limit",
+      "otel.netdata.spike.hikari.pending_requests"
+    ],
+    "monitor_memory": "72.2MiB / 7.748GiB"
+  },
+  "cost": {
+    "runs": {
+      "cost-1-baseline": {
+        "rss_mib": 322.84375,
+        "cpu_ms_per_request": 0.42,
+        "p95_ms": 1.872,
+        "schedule_lag_p95_ms": 0.838,
+        "attach_seconds": null
+      },
+      "cost-1-full": {
+        "rss_mib": 449.9296875,
+        "cpu_ms_per_request": 0.5244444444444445,
+        "p95_ms": 1.673,
+        "schedule_lag_p95_ms": 0.817,
+        "attach_seconds": 1.9085082095116377
+      },
+      "cost-1-narrow": {
+        "rss_mib": 424.15625,
+        "cpu_ms_per_request": 0.4922222222222222,
+        "p95_ms": 1.959,
+        "schedule_lag_p95_ms": 0.825,
+        "attach_seconds": 1.1377956671640277
+      },
+      "cost-2-narrow": {
+        "rss_mib": 421.28515625,
+        "cpu_ms_per_request": 0.4388888888888889,
+        "p95_ms": 1.711,
+        "schedule_lag_p95_ms": 0.831,
+        "attach_seconds": 1.0221824580803514
+      },
+      "cost-2-baseline": {
+        "rss_mib": 322.51171875,
+        "cpu_ms_per_request": 0.4811111111111111,
+        "p95_ms": 2.013,
+        "schedule_lag_p95_ms": 0.851,
+        "attach_seconds": null
+      },
+      "cost-2-full": {
+        "rss_mib": 448.265625,
+        "cpu_ms_per_request": 0.5222222222222223,
+        "p95_ms": 1.595,
+        "schedule_lag_p95_ms": 0.833,
+        "attach_seconds": 1.8711297074332833
+      },
+      "cost-3-full": {
+        "rss_mib": 444.29296875,
+        "cpu_ms_per_request": 0.4444444444444444,
+        "p95_ms": 1.427,
+        "schedule_lag_p95_ms": 0.803,
+        "attach_seconds": 1.7064766250550747
+      },
+      "cost-3-narrow": {
+        "rss_mib": 423.4453125,
+        "cpu_ms_per_request": 0.4311111111111111,
+        "p95_ms": 1.417,
+        "schedule_lag_p95_ms": 0.814,
+        "attach_seconds": 0.993407167494297
+      },
+      "cost-3-baseline": {
+        "rss_mib": 318.36328125,
+        "cpu_ms_per_request": 0.38,
+        "p95_ms": 1.478,
+        "schedule_lag_p95_ms": 0.821,
+        "attach_seconds": null
+      }
+    },
+    "aggregate": {
+      "baseline": {
+        "rss_mib": {
+          "median": 322.51171875,
+          "min": 318.36328125,
+          "max": 322.84375
+        },
+        "cpu_ms_per_request": {
+          "median": 0.42,
+          "min": 0.38,
+          "max": 0.4811111111111111
+        },
+        "p95_ms": {
+          "median": 1.872,
+          "min": 1.478,
+          "max": 2.013
+        },
+        "schedule_lag_p95_ms": {
+          "median": 0.838,
+          "min": 0.821,
+          "max": 0.851
+        }
+      },
+      "full": {
+        "rss_mib": {
+          "median": 448.265625,
+          "min": 444.29296875,
+          "max": 449.9296875
+        },
+        "cpu_ms_per_request": {
+          "median": 0.5222222222222223,
+          "min": 0.4444444444444444,
+          "max": 0.5244444444444445
+        },
+        "p95_ms": {
+          "median": 1.595,
+          "min": 1.427,
+          "max": 1.673
+        },
+        "schedule_lag_p95_ms": {
+          "median": 0.817,
+          "min": 0.803,
+          "max": 0.833
+        },
+        "attach_seconds": {
+          "median": 1.8711297074332833,
+          "min": 1.7064766250550747,
+          "max": 1.9085082095116377
+        }
+      },
+      "narrow": {
+        "rss_mib": {
+          "median": 423.4453125,
+          "min": 421.28515625,
+          "max": 424.15625
+        },
+        "cpu_ms_per_request": {
+          "median": 0.4388888888888889,
+          "min": 0.4311111111111111,
+          "max": 0.4922222222222222
+        },
+        "p95_ms": {
+          "median": 1.711,
+          "min": 1.417,
+          "max": 1.959
+        },
+        "schedule_lag_p95_ms": {
+          "median": 0.825,
+          "min": 0.814,
+          "max": 0.831
+        },
+        "attach_seconds": {
+          "median": 1.0221824580803514,
+          "min": 0.993407167494297,
+          "max": 1.1377956671640277
+        }
+      }
+    }
+  }
+}

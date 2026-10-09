@@ -37,7 +37,7 @@ to clean up this experiment.
   Sixteen clients generate traffic, with approximately one request in ten returning 503.
 - Readiness requests and ten seconds of warmup establish that the pool already exists and has served requests before
   the local JMX probe or late agent attachment runs. Startup attachment is a separate positive control.
-- All applications run as UID 10001 with a 128–256 MiB Java heap. The normal probe runs as that same UID.
+- The original comparison applications run as UID 10001 with a 128–256 MiB Java heap. The normal probe uses that UID.
 - The JMX probe starts the JVM's local management agent, inventories all registered MBeans and reads JVM attributes.
   It does not enable Spring/Hikari MBeans or set up a remote JMX port. JMX data is recorded, not forwarded to Netdata.
 - The OTel probe calls `VirtualMachine.loadAgent` with monitoring configuration supplied at attachment time. A
@@ -80,7 +80,8 @@ Boundary checks use a separate JDK helper with the JRE target's PID and network 
 This tests that the target need not contain JDK client tools. The agent JAR is already staged at `/lab/otel.jar` in
 the target image: secure delivery into an arbitrary existing container is not implemented. Application restarts use
 the startup-agent positive control; discovery and automatic reattachment after a late-attached JVM restarts are not
-implemented. Reattaching the same agent is not evidence of compatibility with third-party APM agents. `--coexistence`
+implemented by `run.py`; the separate automatic-attachment experiment below tests a bounded implementation.
+Reattaching the same agent is not evidence of compatibility with third-party APM agents. `--coexistence`
 downloads Datadog Java agent 1.67.1, verifies its release SHA256, starts the fixture with it, then attaches OTel after
 warmup. Datadog tracing stays enabled but its exporter targets an unused loopback port; remote configuration, telemetry,
 profiling, AppSec, data streams and JMXFetch are disabled. This bounded smoke check cannot establish full Datadog
@@ -154,3 +155,58 @@ independent Hikari class loaders, cap exhaustion, garbage-collection cleanup and
 are not established by this experiment. Close/removal means that source observations cease; Netdata chart retirement
 is a separate lifecycle question. The synchronized registry adds work to connection borrowing; the short HTTP runs
 cannot establish its production cost.
+
+## Automatic attachment and narrower instrumentation
+
+After building `netdata-java-spike:21` with the original Dockerfile, run:
+
+```sh
+python3 tests/java-monitoring-spike/automation_checks.py --build --automatic \
+  --output .local/java-monitoring-spike/automatic
+python3 tests/java-monitoring-spike/automation_checks.py --cost-rounds 3 \
+  --output .local/java-monitoring-spike/cost
+python3 tests/java-monitoring-spike/summarize_automation.py \
+  --automatic .local/java-monitoring-spike/automatic --cost .local/java-monitoring-spike/cost
+python3 tests/java-monitoring-spike/summarize_automation.py --self-test
+```
+
+`Dockerfile.automation` builds a plain JRE image containing only the unchanged application, plus a separate monitor
+image with the JDK, pinned agent, extension and experimental discovery helper. Four synthetic applications share one
+**task-owned PID namespace** while retaining separate filesystems and network namespaces. The monitor also joins that
+PID namespace; Docker orchestration supplies this visibility. It never uses the host PID namespace or Docker socket.
+
+`Scout` scans `/proc` for the exact fixture command `-jar /app/app.jar`, without receiving target PIDs. Root plus
+`CAP_SYS_PTRACE` gives the scanner visibility across the fixture UIDs. Each attachment child drops to the target's
+UID/GID, clears supplementary groups and enables `no_new_privs`. It creates a fresh directory in target `/tmp` through
+`/proc/<pid>/root`, copies the jars, and calls the bundled JDK's Attach API. The target needs no monitoring arguments,
+remote JMX port, exporter or JDK. The scanner itself is a lab program, not a production privilege boundary: **never run
+it in a host PID namespace or against existing applications**. Its environment guard is an accidental-use check.
+
+Attempts are keyed by PID/start time and journaled before launch. The journal survives restarting this monitor container;
+it does not implement recovery after monitor-container replacement, uncertain attach reconciliation or safe upgrades.
+The cap is 64 lifetime attempts and each helper has a 30-second deadline. Failed/uncertain attempts are not retried for
+the same process identity. Artifacts persist until the target containers are removed. Service names derived from UID
+are fixture identities, not a production service-discovery design.
+
+The automatic run checks two UIDs, explicit dynamic-agent-loading denial, read-only target `/tmp`, duplicate suppression
+after monitor restart, and automatic reattachment after an exact identified application child exits. Both successful
+applications have served requests before initial attachment. The restart may attach during application startup. The
+replay requires fresh stored JVM, HTTP and pool contexts belonging to the new process identity, beyond the restart time.
+See [the results and limitations](AUTOMATION_RESULTS.md).
+
+The cost study uses the original JDK 21 fixture for all modes. `baseline` has no agent or JMX probe. `full` uses stock
+instrumentation plus the Hikari extension, with stock Hikari instrumentation disabled. `narrow` disables default
+instrumentation and enables only `runtime-telemetry`, `servlet`, `tomcat`, `spring-webmvc` and `netdata-spike-hikari`.
+These options are monitor-owned; they are not proposed app-owner configuration. Traces/log exporters are disabled in
+both instrumented modes; that does not disable all internal tracing work.
+
+Three blocks rotate baseline/full/narrow ordering. Each fresh application gets a two-CPU quota, 128–256 MiB heap,
+10 seconds before attachment and 20 seconds after attachment of warmup, then 30 seconds of measurement. A separate
+Java HTTP client shares only its target's network namespace, sends 300 requests/second with connection reuse and
+`holdMs=0`, and records dispatch lag, response latency and exact status counts. This avoids the earlier host forwarding
+and intentional pool-wait bottlenecks. CPU comes from target `/proc/1/stat` deltas around the measurement command;
+RSS is sampled at the end. These are repeated synthetic observations, not production overhead bounds or long-run
+memory estimates. The load generator restarts per phase, so client warmup remains a limitation.
+
+`automatic-results.json`, `cost-results.json`, raw OTLP, chart/data captures and logs support replay. The cost verifier
+requires all nine balanced cases; one `--cost-rounds` block is a diagnostic run and cannot satisfy the full verifier.

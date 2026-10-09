@@ -7,3 +7,5 @@
 !extension/**
 !lifecycle
 !lifecycle/**
+!Scout.java
+!HttpLoad.java

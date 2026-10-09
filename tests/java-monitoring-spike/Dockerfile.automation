@@ -1,0 +1,13 @@
+FROM netdata-java-spike:21 AS artifacts
+
+# Application image contains only a JRE and the unchanged ordinary application.
+FROM eclipse-temurin:21-jre@sha256:cff19e6215689161eb6162c11b86b0c60ddf802164f2eaf48d570f8fb79a36c5 AS application
+COPY --from=artifacts /lab/app.jar /app/app.jar
+USER 10001:10001
+ENTRYPOINT ["/bin/bash", "-c", "while true; do java -Xms128m -Xmx256m \"$@\" -jar /app/app.jar; sleep 1; done", "fixture-supervisor"]
+
+FROM artifacts AS monitor
+USER 0:0
+COPY Scout.java HttpLoad.java /lab/
+RUN javac --release 17 /lab/Scout.java /lab/HttpLoad.java && mkdir /state
+ENTRYPOINT ["java", "-Xms16m", "-Xmx64m", "-cp", "/lab", "Scout"]
