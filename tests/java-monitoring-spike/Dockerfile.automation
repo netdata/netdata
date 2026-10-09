@@ -1,4 +1,5 @@
-FROM netdata-java-spike:21 AS artifacts
+ARG ARTIFACT_IMAGE=netdata-java-spike:21
+FROM ${ARTIFACT_IMAGE} AS artifacts
 
 # Application image contains only a JRE and the unchanged ordinary application.
 FROM eclipse-temurin:21-jre@sha256:cff19e6215689161eb6162c11b86b0c60ddf802164f2eaf48d570f8fb79a36c5 AS application

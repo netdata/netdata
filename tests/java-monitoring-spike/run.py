@@ -147,8 +147,9 @@ def lifecycle_test():
 
 
 class Lab:
-    def __init__(self, output):
+    def __init__(self, output, fixture_image="netdata-java-spike:21"):
         self.output = output
+        self.fixture_image = fixture_image
         self.token = uuid.uuid4().hex[:12]
         self.containers = []
         self.network = None
@@ -198,7 +199,7 @@ class Lab:
             "--mount", f"type=bind,src={self.recording_dir},dst=/evidence", COLLECTOR, "--config=/collector.yaml"])
         self.docker("cp", str(ROOT / "collector.yaml"), self.collector + ":/collector.yaml")
         self.start(self.collector)
-        images = self.docker("image", "inspect", NETDATA, COLLECTOR, "netdata-java-spike:21").stdout
+        images = self.docker("image", "inspect", NETDATA, COLLECTOR, self.fixture_image).stdout
         self.save("images.json", [{key: image.get(key) for key in ("Id", "RepoDigests", "Architecture", "Os")}
                                    for image in json.loads(images)])
 

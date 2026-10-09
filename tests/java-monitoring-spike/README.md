@@ -180,7 +180,8 @@ PID namespace; Docker orchestration supplies this visibility. It never uses the 
 UID/GID, clears supplementary groups and enables `no_new_privs`. It creates a fresh directory in target `/tmp` through
 `/proc/<pid>/root`, copies the jars, and calls the bundled JDK's Attach API. The target needs no monitoring arguments,
 remote JMX port, exporter or JDK. The scanner itself is a lab program, not a production privilege boundary: **never run
-it in a host PID namespace or against existing applications**. Its environment guard is an accidental-use check.
+it in a host PID namespace using this mode, or against existing applications**. Its environment guard is an
+accidental-use check. The separately admitted host experiment below adds a cgroup boundary before process inspection.
 
 Attempts are keyed by PID/start time and journaled before launch. The journal survives restarting this monitor container;
 it does not implement recovery after monitor-container replacement, uncertain attach reconciliation or safe upgrades.
@@ -210,3 +211,54 @@ memory estimates. The load generator restarts per phase, so client warmup remain
 
 `automatic-results.json`, `cost-results.json`, raw OTLP, chart/data captures and logs support replay. The cost verifier
 requires all nine balanced cases; one `--cost-rounds` block is a diagnostic run and cannot satisfy the full verifier.
+
+## Authorized native Linux host experiment
+
+`host_checks.py` extends the same scanner to a native Linux host and ordinary independent container PID namespaces.
+The verified run and its boundaries are recorded in [HOST_RESULTS.md](HOST_RESULTS.md).
+It requires explicit authorization for that host, passwordless sudo, Docker with its systemd cgroup driver, cgroup v2,
+systemd and unused numeric fixture UIDs 61001–61005. It installs no packages/accounts or persistent unit files.
+Do not point it at existing applications. Use a new directory named `/var/tmp/nd-java-spike-<12 hex digits>` and copy
+this lab's source there. The runner's argument must be that exact base path; an existing nonempty evidence directory
+is rejected. Build and runtime operations use the existing logged, argument-array command wrapper.
+
+```sh
+# On the explicitly authorized host, after copying source to the new task directory:
+python3 /var/tmp/nd-java-spike-012345abcdef/source/host_checks.py \
+  /var/tmp/nd-java-spike-012345abcdef --build
+# Replay locally or on the host; this performs no runtime operations:
+python3 tests/java-monitoring-spike/host_checks.py /path/to/copied/evidence --verify
+```
+
+Replace the example token with a fresh random 12-digit hexadecimal token. Docker builds use unique task image tags;
+the private x86_64/arm64 runtime comes from the matching pinned image, not a host Java installation. The bundle and
+its parent become root-owned to protect the executable payload. The source/evidence subdirectories retain their
+existing owner. An interrupted/retried run must preserve the previous evidence and provide an empty evidence directory
+owned by the invoking user; root ownership of the parent prevents silently replacing the bundle.
+
+Native host mode requires `SCOUT_LAB_SCOPE=owned-host-cgroup` and a 12-digit run token. It admits only processes in
+`/ndjavaspike<TOKEN>.slice` or its descendants **before reading executable/arguments**, then applies the existing exact
+fixture-jar filter. The same-UID attachment child repeats the cgroup/identity checks. There is no PID list and no
+container PID namespace sharing or namespace entry. The cgroup placement is lab admission control, not a proposed
+application setup requirement or proof of unrestricted production discovery.
+
+The runner creates resource-limited transient units (two-CPU quota, 768 MiB memory, 256 tasks, 15-minute maximum) and
+task-labelled containers. `setpriv` runs native fixtures under unused numeric UIDs without creating accounts; systemd
+`User=` would require resolving those UIDs through NSS. Native applications use private temporary directories, with
+the bundle explicitly bound read-only because `PrivateTmp` also hides `/var/tmp`. The root monitor's capability bound
+contains only `CAP_SYS_PTRACE`, `CAP_SETUID` and `CAP_SETGID`, with `NoNewPrivileges=yes`. A read-only scanner with an
+empty capability set is a negative control. An identical owned application outside the admitted slice tests exclusion.
+
+One host application and two containers must provide exact HTTP counts/routes/buckets and actual stored JVM/pool/HTTP
+data. Monitor restart must preserve attempt suppression. Host application restart and replacement of a container with
+a new ID/PID namespace must produce all six required contexts under fresh identities. Replacement uses a rolling
+handover: compare namespace identities while both processes are alive, then stop the old container before collecting
+the replacement workload. Namespace inode numbers can be reused after exit. The replay independently checks
+all five phases, scope metadata, capability denial, excluded-app silence and cleanup. This is a lifecycle/coverage
+experiment, not another overhead benchmark.
+
+`units.json` and `ownership.json` record exact owned resources. Cleanup checks unit descriptions and Docker labels
+before stopping/removing them, then checks the slice is empty and stops it. It compares pre-existing container process
+identities/start times/restart counts before and after. It never prunes Docker or changes existing services, firewall
+policy, sysctls or packages. Copy evidence before removing the task directory. Its image tags and downloaded Docker
+image/build cache remain separate from runtime cleanup; never use a global prune to remove them.
