@@ -134,6 +134,18 @@ def metrics_summary(path, service):
     return {"metrics": found, "resources": resources}
 
 
+def fresh_application_identity(before, after, restarted_at):
+    return any(instance not in before and timestamp > restarted_at for instance, timestamp in after.items())
+
+
+def lifecycle_test():
+    before = {"previous-process": 90}
+    assert not fresh_application_identity(before, {"previous-process": 110}, 100)
+    assert not fresh_application_identity(before, {"new-process": 99}, 100)
+    assert fresh_application_identity(before, {"previous-process": 110, "new-process": 115}, 100)
+    print("restart identity checks passed")
+
+
 class Lab:
     def __init__(self, output):
         self.output = output
@@ -226,8 +238,15 @@ class Lab:
             raise RuntimeError("Netdata has charts but raw telemetry recording is missing")
         sample_times = [row[0] for item in data.values() for row in item["response"].get("data", [])
                         if any(value is not None for value in row[1:])]
+        by_instance = {}
+        for key, item in data.items():
+            instance = matching[key]["chart_labels"].get("resource.attributes.service.instance.id")
+            for row in item["response"].get("data", []):
+                if instance and any(value is not None for value in row[1:]):
+                    by_instance[instance] = max(by_instance.get(instance, 0), row[0])
         return {"metrics": sorted(summary["metrics"]), "netdata_charts": len(matching),
                 "latest_sample_time": max(sample_times, default=0),
+                "latest_sample_by_instance": by_instance,
                 "contexts": sorted({chart["context"] for chart in matching.values()}),
                 "charts_with_samples": sum(any(any(value is not None for value in row[1:])
                     for row in item["response"].get("data", [])) for item in data.values())}
@@ -346,6 +365,10 @@ class Lab:
         for stage, stamp in (("after_netdata_restart", "netdata_restart_at"), ("after_app_restart", "app_restart_at")):
             if results[name][stage]["latest_sample_time"] <= results[name][stamp]:
                 raise RuntimeError("lifecycle check failed: no fresh stored samples " + stage)
+        if not fresh_application_identity(results[name]["before_restart"]["latest_sample_by_instance"],
+                                          results[name]["after_app_restart"]["latest_sample_by_instance"],
+                                          results[name]["app_restart_at"]):
+            raise RuntimeError("lifecycle check failed: no fresh samples from the restarted application identity")
 
     def coexistence_check(self):
         # The application already has a real tracing agent before OTel attaches.
@@ -413,6 +436,7 @@ def main():
     args = parser.parse_args()
     if args.self_test:
         wrapper_test()
+        lifecycle_test()
         return
     output = (args.output or ROOT.parents[1] / ".local/java-monitoring-spike" / time.strftime("%Y%m%d-%H%M%S")).resolve()
     output.mkdir(parents=True, exist_ok=False)

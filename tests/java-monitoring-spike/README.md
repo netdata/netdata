@@ -108,3 +108,5 @@ python3 tests/java-monitoring-spike/summarize.py .local/java-monitoring-spike/<r
 The verifier checks exact generated-versus-observed HTTP response counts in late-attachment runs, histogram bucket
 counts, startup pool controls and non-null Netdata samples. The runner's lifecycle checks additionally require stored
 sample timestamps later than each restart; retained chart metadata alone cannot pass them.
+After application restart, the samples must also belong to a new service-instance identity. Late-arriving samples
+from the previous process cannot establish recovery.
