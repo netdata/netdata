@@ -46,6 +46,8 @@ type appState struct {
 type Store struct {
 	mu   sync.Mutex
 	apps map[string]*appState
+	// Retired source times remain rejected without retaining per-series tombstones.
+	discardBefore uint64
 	// Bounds stay pinned for the receiver lifetime: metrix descriptors can outlive
 	// an application's last live sample, including after Remove.
 	bounds    []float64
@@ -66,19 +68,32 @@ func (s *Store) Admit(instance, application string) {
 }
 func (s *Store) Remove(instance string) { s.mu.Lock(); defer s.mu.Unlock(); delete(s.apps, instance) }
 
-// Snapshot returns owned copies, omitting each stale point independently. LastSeen
+// Snapshot returns owned copies and retires stale gauge state. LastSeen
 // is the newest source observation, never the most recent HTTP receipt.
 func (s *Store) Snapshot(now time.Time, maxAge time.Duration) []Application {
 	s.mu.Lock()
 	defer s.mu.Unlock()
+	// Retired exports cannot become live again after wall-clock rollback. Fresh
+	// source timestamps must catch up to the last observed freshness cutoff.
+	if cutoff := now.Add(-maxAge).UnixNano(); cutoff > 0 {
+		s.discardBefore = max(s.discardBefore, uint64(cutoff))
+	}
+
 	var out []Application
 	for instance, a := range s.apps {
 		result := Application{Application: a.name, Instance: instance, Runtime: a.runtime}
-		for _, e := range a.points {
+		for key, e := range a.points {
 			observed := time.Unix(0, int64(e.sample.SourceTime))
-			if observed.After(now) || now.Sub(observed) > maxAge {
+			if e.sample.SourceTime < s.discardBefore || observed.After(now) || now.Sub(observed) > maxAge {
+				// Pool gauges disappear when their callbacks close. HTTP is synchronous
+				// cumulative: retain its latest comparison watermark until Remove so a
+				// pause cannot admit an older epoch or regressed counter as a new baseline.
+				if e.sample.Histogram == nil && e.sample.SourceTime < s.discardBefore {
+					delete(a.points, key)
+				}
 				continue
 			}
+
 			result.Samples = append(result.Samples, clone(e.sample))
 			if observed.After(result.LastSeen) {
 				result.LastSeen = observed
@@ -128,7 +143,7 @@ func (s *Store) Ingest(req *collectorv1.ExportMetricsServiceRequest, now time.Ti
 					continue
 				}
 				for _, p := range points {
-					if p == nil || !valid || app == nil || attrs["service.name"] == "" || !validTime(p.sample, now) {
+					if p == nil || !valid || app == nil || attrs["service.name"] == "" || !validTime(p.sample, now) || p.sample.SourceTime < s.discardBefore {
 						result.Rejected++
 						continue
 					}

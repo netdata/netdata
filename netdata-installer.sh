@@ -1087,7 +1087,8 @@ if [ "$(id -u)" -eq 0 ]; then
 
   if [ -f "${NETDATA_PREFIX}/usr/libexec/netdata/plugins.d/java-helper" ]; then
     run chown "root:${NETDATA_GROUP}" "${NETDATA_PREFIX}/usr/libexec/netdata/plugins.d/java-helper"
-    run chmod 0750 "${NETDATA_PREFIX}/usr/libexec/netdata/plugins.d/java-helper"
+    # The helper re-executes itself after dropping to the application UID.
+    run chmod 0755 "${NETDATA_PREFIX}/usr/libexec/netdata/plugins.d/java-helper"
   fi
 
   if [ -f "${NETDATA_PREFIX}/usr/libexec/netdata/plugins.d/ndsudo" ]; then

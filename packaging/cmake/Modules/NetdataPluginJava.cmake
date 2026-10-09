@@ -39,5 +39,13 @@ if(ENABLE_PLUGIN_JAVA)
             FILES_MATCHING PATTERN "*.conf")
     install(DIRECTORY "${JAVA_BUNDLE_DIR}/install/"
             COMPONENT plugin-java DESTINATION ${STOCK_DATA_DEST}/java
-            USE_SOURCE_PERMISSIONS)
+            FILE_PERMISSIONS OWNER_READ OWNER_WRITE GROUP_READ WORLD_READ
+            DIRECTORY_PERMISSIONS OWNER_READ OWNER_WRITE OWNER_EXECUTE GROUP_READ GROUP_EXECUTE WORLD_READ WORLD_EXECUTE
+            PATTERN "runtime" EXCLUDE)
+    # Preserve the pinned JDK executable modes, not the build user's umask for
+    # generated bundle files. The privileged helper rejects writable artifacts.
+    install(DIRECTORY "${JAVA_BUNDLE_DIR}/install/runtime"
+            COMPONENT plugin-java DESTINATION ${STOCK_DATA_DEST}/java
+            USE_SOURCE_PERMISSIONS
+            DIRECTORY_PERMISSIONS OWNER_READ OWNER_WRITE OWNER_EXECUTE GROUP_READ GROUP_EXECUTE WORLD_READ WORLD_EXECUTE)
 endif()

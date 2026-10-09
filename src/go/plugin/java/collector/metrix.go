@@ -8,40 +8,44 @@ import (
 )
 
 type instruments struct {
-	memory, connections, pending, limit metrix.SnapshotGaugeVec
-	http                                metrix.SnapshotHistogramVec
+	meter                               metrix.SnapshotMeter
+	memory, connections, pending, limit metrix.SnapshotGauge
+	http                                metrix.SnapshotHistogram
 }
 
 func newInstruments(store metrix.CollectorStore) instruments {
 	m := store.Write().SnapshotMeter("")
 	return instruments{
-		memory: m.Vec("application", "instance", "application_name", "memory_type", "memory_pool").Gauge(
-			"jvm_memory_used_bytes", metrix.WithUnit("bytes")),
-		connections: m.Vec("application", "instance", "application_name", "pool_name", "pool_id", "state").Gauge(
-			"hikari_connections", metrix.WithUnit("connections")),
-		pending: m.Vec("application", "instance", "application_name", "pool_name", "pool_id").Gauge(
-			"hikari_pending_requests", metrix.WithUnit("requests")),
-		limit: m.Vec("application", "instance", "application_name", "pool_name", "pool_id").Gauge(
-			"hikari_limit", metrix.WithUnit("connections")),
-		http: m.Vec("application", "instance", "application_name", "method", "route", "status", "source_epoch").Histogram(
-			"http_server_request_duration_seconds", metrix.WithUnit("seconds")),
+		meter:       m,
+		memory:      m.Gauge("jvm_memory_used_bytes", metrix.WithUnit("bytes")),
+		connections: m.Gauge("hikari_connections", metrix.WithUnit("connections")),
+		pending:     m.Gauge("hikari_pending_requests", metrix.WithUnit("requests")),
+		limit:       m.Gauge("hikari_limit", metrix.WithUnit("connections")),
+		http:        m.Histogram("http_server_request_duration_seconds", metrix.WithUnit("seconds")),
 	}
 }
 
 func (m instruments) write(app ingest.Application, display string) {
+	// Instances, pools and source epochs churn. Dynamic labels avoid Vec's
+	// permanent per-value handle cache; committed series use store retention.
 	for _, sample := range app.Samples {
-		l := sample.Labels
+		labels := make([]metrix.Label, 0, 3+len(sample.Labels))
+		labels = append(labels, metrix.Label{Key: "application", Value: app.Application}, metrix.Label{Key: "instance", Value: app.Instance}, metrix.Label{Key: "application_name", Value: display})
+		for key, value := range sample.Labels {
+			labels = append(labels, metrix.Label{Key: key, Value: value})
+		}
+		set := m.meter.LabelSet(labels...)
 		switch sample.Name {
 		case "jvm_memory_used_bytes":
-			m.memory.WithLabelValues(app.Application, app.Instance, display, l["memory_type"], l["memory_pool"]).Observe(sample.Value)
+			m.memory.Observe(sample.Value, set)
 		case "hikari_connections":
-			m.connections.WithLabelValues(app.Application, app.Instance, display, l["pool_name"], l["pool_id"], l["state"]).Observe(sample.Value)
+			m.connections.Observe(sample.Value, set)
 		case "hikari_pending_requests":
-			m.pending.WithLabelValues(app.Application, app.Instance, display, l["pool_name"], l["pool_id"]).Observe(sample.Value)
+			m.pending.Observe(sample.Value, set)
 		case "hikari_limit":
-			m.limit.WithLabelValues(app.Application, app.Instance, display, l["pool_name"], l["pool_id"]).Observe(sample.Value)
+			m.limit.Observe(sample.Value, set)
 		case "http_server_request_duration_seconds":
-			m.http.WithLabelValues(app.Application, app.Instance, display, l["method"], l["route"], l["status"], l["source_epoch"]).ObservePoint(*sample.Histogram)
+			m.http.ObservePoint(*sample.Histogram, set)
 		}
 	}
 }

@@ -3,6 +3,7 @@
 package ingest
 
 import (
+	"fmt"
 	"math"
 	"os"
 	"sync"
@@ -304,4 +305,59 @@ func TestPinnedJavaFixture(t *testing.T) {
 		families[sample.Name] = true
 	}
 	assert.Len(t, families, 5)
+}
+
+func TestSnapshotRetiresChurnAndRejectsExpiredReplay(t *testing.T) {
+	s := New()
+	s.Admit("a", "orders")
+	for i := 0; i < 40; i++ {
+		observed := now.Add(time.Duration(i) * 2 * time.Second)
+		m := memory()
+		p := m.GetSum().DataPoints[0]
+		p.TimeUnixNano = uint64(observed.UnixNano())
+		p.Attributes = attrs("jvm.memory.type", "heap", "jvm.memory.pool.name", fmt.Sprintf("pool-%d", i))
+		_, err := s.Ingest(request("a", m), observed)
+		require.NoError(t, err)
+		require.Len(t, s.Snapshot(observed, time.Second), 1)
+		assert.Empty(t, s.Snapshot(observed.Add(2*time.Second), time.Second))
+		require.Empty(t, s.apps["a"].points, "source silence must release retired label state")
+		result, err := s.Ingest(request("a", m), observed.Add(3*time.Second))
+		require.Error(t, err, "expired exports must not restore retired state")
+		assert.Equal(t, Result{Rejected: 1}, result)
+	}
+	// Wall-clock rollback must not reopen the retired source-time interval.
+	assert.Empty(t, s.Snapshot(now, time.Second))
+	_, err := s.Ingest(request("a", memory()), now)
+	require.Error(t, err)
+}
+
+func TestHistogramWatermarkSurvivesSourceSilence(t *testing.T) {
+	s := New()
+	s.Admit("a", "orders")
+	_, err := s.Ingest(request("a", httpMetric()), now)
+	require.NoError(t, err)
+	first := s.Snapshot(now, time.Second)[0].Samples[0]
+	assert.Empty(t, s.Snapshot(now.Add(3*time.Second), time.Second))
+	require.Len(t, s.apps["a"].points, 1, "keep cumulative validation state while the process remains admitted")
+	resumed := httpMetric()
+	p := resumed.GetHistogram().DataPoints[0]
+	p.TimeUnixNano = uint64(now.Add(4 * time.Second).UnixNano())
+	p.Count = 1
+	p.BucketCounts = []uint64{0, 1, 0}
+	sum := 0.2
+	p.Sum = &sum
+	_, err = s.Ingest(request("a", resumed), now.Add(4*time.Second))
+	require.Error(t, err, "source silence must not allow a same-epoch cumulative regression")
+	resumed = httpMetric()
+	p = resumed.GetHistogram().DataPoints[0]
+	p.TimeUnixNano = uint64(now.Add(4 * time.Second).UnixNano())
+	_, err = s.Ingest(request("a", resumed), now.Add(4*time.Second))
+	require.NoError(t, err)
+	after := s.Snapshot(now.Add(4*time.Second), time.Second)[0].Samples[0]
+	assert.Equal(t, first.Labels["source_epoch"], after.Labels["source_epoch"])
+	assert.Equal(t, first.Histogram.Count, after.Histogram.Count)
+	_, err = s.Ingest(request("a", resumed), now.Add(5*time.Second))
+	require.Error(t, err, "duplicate exports remain rejected after recovery")
+	s.Remove("a")
+	require.Empty(t, s.apps, "process retirement releases its cumulative watermarks")
 }

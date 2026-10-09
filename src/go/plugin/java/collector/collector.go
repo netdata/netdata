@@ -94,11 +94,9 @@ func (c *Collector) Collect(context.Context) error {
 	for _, app := range c.ingress.Snapshot(c.now(), sourceMaxAge) {
 		c.metrics.write(app, c.displayName(app.Application))
 		c.mu.Lock()
-		for key, target := range c.targets {
-			if target.Instance() == app.Instance {
-				target.LastSeen, target.Runtime = app.LastSeen, app.Runtime
-				c.targets[key] = target
-			}
+		if target, exists := c.targets[app.Instance]; exists {
+			target.LastSeen, target.Runtime = app.LastSeen, app.Runtime
+			c.targets[app.Instance] = target
 		}
 		c.mu.Unlock()
 	}
