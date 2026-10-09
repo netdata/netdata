@@ -110,3 +110,47 @@ counts, startup pool controls and non-null Netdata samples. The runner's lifecyc
 sample timestamps later than each restart; retained chart metadata alone cannot pass them.
 After application restart, the samples must also belong to a new service-instance identity. Late-arriving samples
 from the previous process cannot establish recovery.
+
+## Existing-pool extension experiment
+
+See [EXTENSION_RESULTS.md](EXTENSION_RESULTS.md) for measured results and limitations.
+
+The separate `extension/` JAR uses the upstream OTel 2.32.0 instrumentation SPI; the upstream agent and ordinary Spring
+application are unchanged. It observes `HikariDataSource.getConnection()` and reads public pool accessors. Entry advice
+discovers existing pools before a borrow can block; exit advice handles pools initialized by that call. Close advice
+removes observation. It never replaces a metrics tracker or enables JMX registration.
+
+```sh
+python3 tests/java-monitoring-spike/run.py --build \
+  --images netdata-java-spike:17 netdata-java-spike:21 netdata-java-spike:25 \
+  --modes baseline late extension --output .local/java-monitoring-spike/extension-comparison
+python3 tests/java-monitoring-spike/summarize.py .local/java-monitoring-spike/extension-comparison
+python3 tests/java-monitoring-spike/pool_checks.py \
+  --images netdata-java-spike:17 netdata-java-spike:21 netdata-java-spike:25 \
+  --output .local/java-monitoring-spike/pool-lifecycle
+python3 tests/java-monitoring-spike/pool_checks.py --verify .local/java-monitoring-spike/pool-lifecycle
+```
+
+`extension` mode supplies `otel.javaagent.extensions` and disables upstream Hikari instrumentation, making the extension
+the sole pool-metric producer. Other upstream instrumentation stays enabled. Its experimental gauges are
+`netdata.spike.hikari.connections` (active/idle), `netdata.spike.hikari.pending_requests` and
+`netdata.spike.hikari.limit`. This deliberately bounded test does not implement acquisition/use/creation durations.
+Names and attributes are experimental, not a proposed public Netdata metric contract.
+
+The separate `lifecycle/` fixture provides control endpoints and an independent source oracle. It creates and uses two
+pools before attachment, with a counting metrics tracker already installed. The verifier checks idle discovery limits,
+sixteen concurrent discovery calls, exact held-connection/waiter values, release, close, lazy recreation and repeated
+recreation. It verifies tracker counts, absent JMX registrations, fresh OTLP observations and actual Netdata samples.
+These control endpoints are lab apparatus; the ordinary Spring coverage case needs none of them.
+
+`pool-checks.json` records operations' stable observation windows and source readings; `pool-verification.json` records
+the verified result. Replaying the verifier requires the raw recording and saved chart/data captures. HTTP data-query
+failures are retained as errors, never converted into samples. `summarize.py` also verifies exact HTTP counts and stored
+pool data for extension runs.
+
+The prototype bounds live registrations to 128 per instrumented Hikari class loader and uses weak source references.
+Discovery requires a connection request after attachment; a pool that remains unused is invisible. Concurrent
+independent Hikari class loaders, cap exhaustion, garbage-collection cleanup and broad library-version compatibility
+are not established by this experiment. Close/removal means that source observations cease; Netdata chart retirement
+is a separate lifecycle question. The synchronized registry adds work to connection borrowing; the short HTTP runs
+cannot establish its production cost.

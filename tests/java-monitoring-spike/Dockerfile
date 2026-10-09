@@ -4,6 +4,10 @@ WORKDIR /build
 COPY pom.xml .
 COPY src ./src
 RUN mvn -B -ntp package
+COPY extension ./extension
+RUN mvn -B -ntp -f extension/pom.xml package
+COPY lifecycle ./lifecycle
+RUN mvn -B -ntp -f lifecycle/pom.xml package
 COPY Probe.java .
 RUN javac --release 17 Probe.java
 ADD https://github.com/open-telemetry/opentelemetry-java-instrumentation/releases/download/v2.32.0/opentelemetry-javaagent.jar /build/otel.jar
@@ -14,6 +18,9 @@ WORKDIR /lab
 COPY --from=build /build/target/java-monitoring-fixture-1.0.jar /lab/app.jar
 COPY --from=build /build/Probe.class /lab/Probe.class
 COPY --from=build /build/otel.jar /lab/otel.jar
+COPY --from=build /build/extension/target/hikari-extension-1.0.jar /lab/hikari-extension.jar
+COPY --from=build /build/lifecycle/target/pool-lifecycle-fixture-1.0.jar /lab/lifecycle.jar
+COPY --from=build /build/lifecycle/target/dependency /lab/lib
 RUN chmod 644 /lab/otel.jar
 USER 10001:10001
 ENTRYPOINT ["java", "-Xms128m", "-Xmx256m"]

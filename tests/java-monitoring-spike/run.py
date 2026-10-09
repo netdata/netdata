@@ -202,10 +202,14 @@ class Lab:
         self.save("images.json", [{key: image.get(key) for key in ("Id", "RepoDigests", "Architecture", "Os")}
                                    for image in json.loads(images)])
 
-    def agent_options(self, service):
-        return ";".join([f"otel.service.name={service}", "otel.exporter.otlp.endpoint=http://telemetry:4318",
+    def agent_options(self, service, extension=False):
+        options = [f"otel.service.name={service}", "otel.exporter.otlp.endpoint=http://telemetry:4318",
             "otel.exporter.otlp.protocol=http/protobuf", "otel.traces.exporter=none", "otel.logs.exporter=none",
-            "otel.metric.export.interval=1000", "otel.exporter.otlp.metrics.default.histogram.aggregation=explicit_bucket_histogram"])
+            "otel.metric.export.interval=1000", "otel.exporter.otlp.metrics.default.histogram.aggregation=explicit_bucket_histogram"]
+        if extension:
+            options.extend(["otel.javaagent.extensions=/lab/hikari-extension.jar",
+                            "otel.instrumentation.hikaricp.enabled=false"])
+        return ";".join(options)
 
     def probe(self, cid, mode, *args, user="10001:10001"):
         start = time.monotonic()
@@ -227,12 +231,14 @@ class Lab:
         data = {}
         wanted = ("otel.jvm.memory.used", "otel.http.server.request.duration.count",
                   "otel.http.server.request.duration.bucket", "otel.db.client.connections.usage",
-                  "otel.db.client.connections.pending_requests")
+                  "otel.db.client.connections.pending_requests", "otel.netdata.spike.hikari.connections",
+                  "otel.netdata.spike.hikari.pending_requests", "otel.netdata.spike.hikari.limit")
         for key, chart in matching.items():
             if chart["context"] in wanted:
                 query = urllib.parse.urlencode({"chart": key, "after": -30, "points": 30, "format": "json"})
                 status, body = request(self.netdata_url + "/api/v1/data?" + query)
-                data[key] = {"status": status, "context": chart["context"], "response": json.loads(body)}
+                response = json.loads(body) if status == 200 else {"error": body.decode(errors="replace")}
+                data[key] = {"status": status, "context": chart["context"], "response": response}
         self.save(artifact_name + "-data.json", data)
         if matching and not summary["metrics"]:
             raise RuntimeError("Netdata has charts but raw telemetry recording is missing")
@@ -253,7 +259,7 @@ class Lab:
 
     def scenario(self, mode, image, extra_flags=()):
         name = mode + "-" + image.rsplit(":", 1)[-1]
-        opts = self.agent_options(name)
+        opts = self.agent_options(name, extension=mode == "extension")
         flags = list(extra_flags)
         if mode == "startup":
             flags.append("-javaagent:/lab/otel.jar=" + opts)
@@ -266,7 +272,7 @@ class Lab:
         result["java_version"] = self.docker("exec", cid, "java", "-version").stderr
         # The HTTP readiness request and warmup both borrow from the already-created Hikari pool.
         result["jmx"] = self.probe(cid, "jmx")
-        if mode == "late":
+        if mode in ("late", "extension"):
             result["attach"] = self.probe(cid, "agent", "/lab/otel.jar", opts)
         result["after_attach"] = self.snapshot(cid)
         result["workload"] = load(url, 20)
@@ -282,6 +288,12 @@ class Lab:
             if missing or result["coverage"]["charts_with_samples"] == 0:
                 self.save(name + "-failed-control.json", result)
                 raise RuntimeError(f"startup positive control failed: missing={sorted(missing)}")
+        if mode == "extension":
+            required = {"jvm.memory.used", "http.server.request.duration", "netdata.spike.hikari.connections",
+                        "netdata.spike.hikari.pending_requests", "netdata.spike.hikari.limit"}
+            if result["attach"]["status"] != 0 or not required <= set(result["coverage"]["metrics"]):
+                self.save(name + "-failed-extension.json", result)
+                raise RuntimeError("extension did not provide the required metric families")
         self.results[name] = result
         self.save("results.json", self.results)
         self.docker("stop", "--time", "10", cid)
@@ -424,11 +436,32 @@ class Lab:
             self.docker("network", "rm", self.network, check=False)
 
 
+def capture_error_test():
+    from unittest.mock import patch
+
+    lab = Lab(Path("unused"))
+    lab.netdata_url = "http://fixture.invalid"
+    lab.recording_dir = Path("unused")
+    saved = {}
+    lab.save = lambda name, value: saved.update({name: value})
+    chart = {"context": "otel.jvm.memory.used", "chart_labels": {"resource.attributes.service.name": "test"}}
+    with patch(__name__ + ".metrics_summary", return_value={"metrics": {"jvm.memory.used": {}}, "resources": []}):
+        with patch(__name__ + ".request", side_effect=[(200, json.dumps({"charts": {"test": chart}}).encode()),
+                                                       (404, b"No metrics yet")]):
+            result = lab.capture("test")
+    assert result["charts_with_samples"] == 0 and result["latest_sample_time"] == 0
+    assert saved["test-data.json"]["test"]["status"] == 404
+    assert saved["test-data.json"]["test"]["response"] == {"error": "No metrics yet"}
+    print("HTTP data-error preservation check passed")
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--self-test", action="store_true")
     parser.add_argument("--output", type=Path)
     parser.add_argument("--images", nargs="*", default=["netdata-java-spike:21"])
+    parser.add_argument("--modes", nargs="+", choices=("baseline", "late", "startup", "extension"),
+                        default=["baseline", "late", "startup"])
     parser.add_argument("--boundaries", action="store_true")
     parser.add_argument("--build", action="store_true", help="build all four pinned fixture images before running")
     parser.add_argument("--coexistence", action="store_true")
@@ -437,6 +470,7 @@ def main():
     if args.self_test:
         wrapper_test()
         lifecycle_test()
+        capture_error_test()
         return
     output = (args.output or ROOT.parents[1] / ".local/java-monitoring-spike" / time.strftime("%Y%m%d-%H%M%S")).resolve()
     output.mkdir(parents=True, exist_ok=False)
@@ -448,7 +482,7 @@ def main():
                            ".", timeout=900)
         lab.setup()
         for image in args.images:
-            for mode in ("baseline", "late", "startup"):
+            for mode in args.modes:
                 lab.scenario(mode, image)
         if args.boundaries:
             lab.boundary_checks()

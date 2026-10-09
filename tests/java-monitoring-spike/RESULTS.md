@@ -4,6 +4,9 @@ Measured on 2026-10-09. **The managed-agent direction is viable, but stock OTel 
 first complete-coverage milestone.** JVM and HTTP monitoring work; an already-initialized Hikari pool remains invisible.
 Startup attachment supplies all three. This is evidence for the next design decision, not a production-readiness claim.
 
+The subsequent [extension experiment](EXTENSION_RESULTS.md) recovers the missing gauges for pools used after attachment.
+This report preserves the original unmodified-agent comparison.
+
 ## What actually worked
 
 The same Spring Boot 3.5.7 application ran with Tomcat 10.1.48, HikariCP 6.3.3 and H2 2.3.232. It had no Actuator,

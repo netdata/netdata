@@ -3,3 +3,7 @@
 !Probe.java
 !src
 !src/**
+!extension
+!extension/**
+!lifecycle
+!lifecycle/**

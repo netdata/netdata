@@ -30,7 +30,8 @@ def summarize(directory):
                   "workload": result["workload"],
                   "rss_mib": int(re.search(r"VmRSS:\s+(\d+)",
                       result["after_workload"]["proc_status"]).group(1)) / 1024}
-        if name.startswith("late-"):
+        attached_late = name.startswith(("late-", "extension-"))
+        if attached_late:
             assert result["attach"]["status"] == 0, name + ": agent attachment failed"
             record["attach_seconds"] = result["attach"]["seconds"]
         if not name.startswith("baseline-"):
@@ -39,7 +40,7 @@ def summarize(directory):
             record["http_status_counts"] = {str(attributes(p["attributes"])["http.response.status_code"]):
                                             int(p["count"]) for p in points(http)}
             assert all(record["http_status_counts"].get(code, 0) > 0 for code in ("200", "503"))
-            if name.startswith("late-"):
+            if attached_late:
                 assert record["http_status_counts"] == result["workload"]["statuses"], name + ": HTTP count mismatch"
             assert all(sum(map(int, p["bucketCounts"])) == int(p["count"]) for p in points(http))
             record["identity_fields"] = sorted(payload["resources"][0])
@@ -52,6 +53,15 @@ def summarize(directory):
             if name.startswith("startup-"):
                 assert {"db.client.connections.usage", "db.client.connections.pending_requests"} <= metrics.keys()
                 assert {"otel.db.client.connections.usage", "otel.db.client.connections.pending_requests"} <= stored_contexts
+            if name.startswith("extension-"):
+                required = {"netdata.spike.hikari.connections", "netdata.spike.hikari.pending_requests",
+                            "netdata.spike.hikari.limit"}
+                assert required <= metrics.keys()
+                assert {"otel." + metric for metric in required} <= stored_contexts
+                usage = points(metrics["netdata.spike.hikari.connections"])
+                assert len(usage) == 2
+                assert {attributes(p["attributes"])["state"] for p in usage} == {"active", "idle"}
+                assert len({attributes(p["attributes"])["pool.id"] for p in usage}) == 1
         output[name] = record
     return output
 
