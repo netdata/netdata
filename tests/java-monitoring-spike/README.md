@@ -1,5 +1,7 @@
 # Java monitoring feasibility lab
 
+The latest phase is the [Go framework and UI experiment](GO_RESULTS.md).
+
 This experiment compares local JMX with late and startup attachment of the same OpenTelemetry Java agent.
 It tests whether an ordinary, already-running Java application can acquire useful Netdata monitoring without
 application-owner configuration. It is an experimental harness, not a shipped collector or an installation procedure.
@@ -262,3 +264,36 @@ before stopping/removing them, then checks the slice is empty and stops it. It c
 identities/start times/restart counts before and after. It never prunes Docker or changes existing services, firewall
 policy, sysctls or packages. Copy evidence before removing the task directory. Its image tags and downloaded Docker
 image/build cache remain separate from runtime cleanup; never use a global prune to remove them.
+
+## Go framework and UI experiment
+
+Build the existing `netdata-java-spike:monitor` and `netdata-java-spike:plain-jre` images using the automatic-attachment
+instructions above. Then, from the repository root (use `GOARCH=amd64` for an x86 Docker engine):
+
+```sh
+mkdir -p .local/java-monitoring-spike/go-build
+CGO_ENABLED=0 GOOS=linux GOARCH=arm64 go -C src/go build \
+  -o ../../.local/java-monitoring-spike/go-build/javaspike.plugin ./cmd/javaspikeplugin
+cp tests/java-monitoring-spike/plugin-proxy .local/java-monitoring-spike/go-build/plugin-proxy
+docker build -f tests/java-monitoring-spike/Dockerfile.go -t netdata-java-spike:go \
+  .local/java-monitoring-spike/go-build
+python3 tests/java-monitoring-spike/go_checks.py \
+  --output .local/java-monitoring-spike/go-new-run --hold-seconds 240
+```
+
+The output directory must be new. `live.json` contains the temporary loopback dashboard URL. During the final hold,
+visit Metrics → java and Live → Java → Applications. Creating `continue` in the output directory ends that hold.
+The harness captures evidence and removes its exact owned containers/network even on failure. It changes no host
+Java installation, Netdata configuration or unrelated container. Build images/cache remain for reuse.
+
+The lab-only `plugin-proxy` records plugins.d stdout so a local administrator can validate DynCfg using the running
+plugin's input pipe. It does not disable Agent HTTP authorization or expose a control port. Authenticated DynCfg form
+rendering requires a separate appropriately authorized Agent/UI session.
+
+Run the focused Go checks with:
+
+```sh
+go -C src/go test -race -count=1 ./tools/java-monitoring-spike/... ./cmd/javaspikeplugin
+go -C src/go vet ./tools/java-monitoring-spike/... ./cmd/javaspikeplugin
+python3 tests/java-monitoring-spike/summarize_go.py .local/java-monitoring-spike/go-new-run
+```
