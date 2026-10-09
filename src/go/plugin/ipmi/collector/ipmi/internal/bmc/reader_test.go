@@ -46,6 +46,7 @@ func TestReader_CheckAndCollect(t *testing.T) {
 func TestReader_Collect_ReadingAvailability(t *testing.T) {
 	tests := map[string]struct {
 		reading  []byte
+		wantErr  bool
 		want     Sensor
 		warnings []string
 	}{
@@ -69,9 +70,8 @@ func TestReader_Collect_ReadingAvailability(t *testing.T) {
 			warnings: []string{readingWarning},
 		},
 		"malformed response": {
-			reading:  []byte{25},
-			want:     wantCPUTemp(StateUnknown, nil),
-			warnings: []string{readingWarning},
+			reading: []byte{25},
+			wantErr: true,
 		},
 	}
 
@@ -84,6 +84,12 @@ func TestReader_Collect_ReadingAvailability(t *testing.T) {
 
 			fake.readings[10] = tc.reading
 			got, err := r.Collect(t.Context(), false)
+			if tc.wantErr {
+				require.Error(t, err)
+				assert.Nil(t, got)
+				assert.Equal(t, 1, fake.closes, "malformed responses disconnect")
+				return
+			}
 			require.NoError(t, err)
 
 			assert.Equal(t, &Snapshot{
@@ -363,7 +369,7 @@ func TestReader_Check(t *testing.T) {
 			prepare: func(fake *fakeBMC, _ context.CancelFunc) {
 				fake.closeErr = errors.New("bad descriptor")
 			},
-			wantErrMsg:   "close IPMI device: bad descriptor",
+			wantErrMsg:   "close IPMI connection: bad descriptor",
 			wantRequests: 1,
 		},
 		"connect fails": {

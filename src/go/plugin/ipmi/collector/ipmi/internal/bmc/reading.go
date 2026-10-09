@@ -110,8 +110,9 @@ func (r *Reader) readValue(ctx context.Context, d descriptor, raw uint8) (float6
 // isCompletionCodeError reports whether the BMC answered with a failure
 // completion code, as opposed to a transport or context failure.
 func isCompletionCodeError(err error) bool {
-	_, ok := types.IsResponseError(err)
-	return ok
+	responseErr, ok := types.IsResponseError(err)
+	// The SDK also uses code zero for malformed successful response payloads.
+	return ok && responseErr.CompletionCode() != 0
 }
 
 // convertReading applies the SDR conversion formula. Reserved and OEM
@@ -125,14 +126,7 @@ func convertReading(
 	if !unit.IsAnalog() || linearization > types.LinearizationFunc_CBRT {
 		return 0, false
 	}
-	var value float64
-	if linearization == types.LinearizationFunc_EXP10 {
-		// The pinned SDK truncates the fractional EXP10 exponent (math.Pow10(int(x))).
-		// Remove this after upgrading to a release that uses math.Pow(10, x).
-		value = math.Pow(10, types.ConvertReading(raw, unit.AnalogDataFormat, factors, types.LinearizationFunc_Linear))
-	} else {
-		value = types.ConvertReading(raw, unit.AnalogDataFormat, factors, linearization)
-	}
+	value := types.ConvertReading(raw, unit.AnalogDataFormat, factors, linearization)
 	if math.IsNaN(value) || math.IsInf(value, 0) {
 		return 0, false
 	}
