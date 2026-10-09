@@ -221,7 +221,7 @@ pub fn run_trace(args: &TraceArgs, out: &mut dyn std::io::Write) -> Result<()> {
 
 // ── Key enumeration (attributes / attribute-values) ───────────────────
 
-/// An [`AttributeOwner`] as a CLI word (this tool's rendering, not a
+/// An `AttributeOwner` as a CLI word (this tool's rendering, not a
 /// wire contract). `Any` is deliberately absent: it exists for
 /// predicates (`--where .key=...`), not enumeration.
 #[derive(Debug, Clone, Copy, clap::ValueEnum)]
@@ -248,9 +248,10 @@ impl From<OwnerArg> for AttributeOwner {
 }
 
 /// The CLI spelling of each builtin field (kebab-case), used by
-/// `--key` under `--owner builtin` and by the output rendering. Must
-/// stay 1:1 with the engine's `BuiltinField::ALL` — pinned by the
-/// `every_builtin_has_a_cli_word` test below.
+/// `--key` under `--owner builtin`, by `--where` builtin targets, and
+/// by the output rendering. Must stay 1:1 with the engine's
+/// `BuiltinField::ALL` — pinned by the `every_builtin_has_a_cli_word`
+/// test below.
 const BUILTIN_WORDS: [(&str, BuiltinField); 17] = [
     ("name", BuiltinField::Name),
     ("kind", BuiltinField::Kind),

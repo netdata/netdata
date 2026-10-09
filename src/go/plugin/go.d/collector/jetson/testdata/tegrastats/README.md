@@ -22,3 +22,20 @@ hyphenated date and time prefix. Those fields remain present across this corpus,
 GPU nor EMC. This distinguishes records from warnings and isolated metric fragments; it does not claim support for
 unobserved future changes to the record envelope. Unsupported and unavailable measurements are omitted, including
 `off`; explicit numeric zero remains a measurement.
+
+Power uses the first value of each current/average pair, converted from milliwatts to watts.
+The [NVIDIA R32.7.6 glossary](https://docs.nvidia.com/jetson/archives/l4t-archived/l4t-3276/Tegra%20Linux%20Driver%20Package%20Development%20Guide/AppendixTegraStats.html)
+defines the older unitless pairs and includes the legacy `GPU`, `CPU`, `SOC`, `CV`, `VDDRQ`, and `SYS5V` names.
+The R39.2 glossary above defines the explicit `mW/mW` form. Supported rail families also include `VDD_`, `VDDQ_`,
+`VIN_`, `POM_`, and `VIN`, as documented or observed in this corpus. Other numeric pairs are not assumed to be power.
+Both members must form a valid nonnegative finite milliwatt pair. Only current power is published; the average
+window and newer three-value meanings are not established. Duplicate power pairs with the same rail name are
+omitted because their identity is ambiguous. `NC` placeholders are not collected.
+
+Rail names remain unchanged and rails are never summed. The
+[NVIDIA Orin R36.4.4 power guide](https://docs.nvidia.com/jetson/archives/r36.4.4/DeveloperGuide/SD/PlatformPowerAndPerformance/JetsonOrinNanoSeriesJetsonOrinNxSeriesAndJetsonAgxOrinSeries.html)
+shows overlapping rails (`VIN_SYS_5V0` includes `VDDQ_VDD2_1V8AO`). It documents INA3221 voltage/current files,
+which do not expose a power feature for Netdata's libsensors collector. On
+[Thor](https://docs.nvidia.com/jetson/archives/r39.2/DeveloperGuide/SD/PlatformPowerAndPerformance/JetsonThor.html),
+INA3221 component rails have the same gap; the INA238 total-system `VIN` rail can also appear through sensors.
+The collector keeps that source-reported rail rather than guessing whether another collector has discovered it.

@@ -1,6 +1,8 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 # Functions and macros for handling of JSON-C
 
+include_guard()
+
 # Handle bundling of json-c.
 #
 # This pulls it in as a sub-project using FetchContent functionality.
@@ -18,15 +20,13 @@ function(netdata_bundle_jsonc)
                 set(FETCHCONTENT_TRY_FIND_PACKAGE_MODE NEVER)
         endif()
 
-        set(FETCHCONTENT_FULLY_DISCONNECTED Off)
-
         # JSON-C supports older versions of CMake than we do, so set
         # the correct values for the few policies we actually need.
         set(CMAKE_POLICY_DEFAULT_CMP0077 NEW)
 
         # JSON-C's build system does string comparisons against option
         # values instead of treating them as booleans, so we need to use
-        # proper strings for option values instead of just setting them
+        # proper strings for option values instead of setting them
         # to true or false.
         set(DISABLE_BSYMBOLIC ON)
         set(DISABLE_WERROR ON)
@@ -42,14 +42,12 @@ function(netdata_bundle_jsonc)
                 FetchContent_Declare(json-c
                         GIT_REPOSITORY ${repo}
                         GIT_TAG ${tag}
-                        CMAKE_ARGS ${NETDATA_CMAKE_PROPAGATE_TOOLCHAIN_ARGS}
                         EXCLUDE_FROM_ALL
                 )
         else()
                 FetchContent_Declare(json-c
                         GIT_REPOSITORY ${repo}
                         GIT_TAG ${tag}
-                        CMAKE_ARGS ${NETDATA_CMAKE_PROPAGATE_TOOLCHAIN_ARGS}
                 )
         endif()
 
@@ -61,7 +59,7 @@ endfunction()
 # Handle setup of json-c for the build.
 #
 # This will attempt to find json-c using pkg_check_modules. If it finds
-# a usable copy, that will be used. If not, it will bundle a vendored copy
+# a usable copy, that will be used. If not, it will build the bundled copy
 # as a sub-project.
 #
 # Irrespective of how json-c is to be included, library names,
@@ -72,7 +70,9 @@ macro(netdata_detect_jsonc)
                 pkg_check_modules(JSONC json-c>=0.14)
         endif()
 
-        if(NOT JSONC_FOUND)
+        # JSONC_FOUND is cached by pkg_check_modules, so a reused build tree
+        # still has it set after the bundled copy is forced.
+        if(ENABLE_BUNDLED_JSONC OR NOT JSONC_FOUND)
                 set(ENABLE_BUNDLED_JSONC True)
                 netdata_bundle_jsonc()
                 set(NETDATA_JSONC_LDFLAGS json-c)
@@ -104,7 +104,7 @@ endmacro()
 
 # Add json-c as a public link dependency of the specified target.
 #
-# The specified target must already exist, and the netdata_detect_json-c
+# The specified target must already exist, and the netdata_detect_jsonc
 # macro must have already been run at least once for this to work correctly.
 function(netdata_add_jsonc_to_target _target)
         if(ENABLE_BUNDLED_JSONC)

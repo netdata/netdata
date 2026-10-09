@@ -152,7 +152,11 @@ func (h *Handler) HandleRaw(ctx context.Context, req funcapi.RawMethodRequest) *
 	case "rum-sites":
 		var receiver query.Receiver
 		rows, receiver, err = h.sitesRows(ctx, now)
-		response["collector"] = map[string]any{"public_url": receiver.PublicURL, "ingress_available": receiver.Serving}
+		response["collector"] = map[string]any{
+			"public_url":        receiver.PublicURL,
+			"ingress_available": receiver.Serving,
+			"geoip":             receiver.GeoIP,
+		}
 	case "rum-pages":
 		rows, err = h.pagesRows(ctx, args["site"])
 	case "rum-live":

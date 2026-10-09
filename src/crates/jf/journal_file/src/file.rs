@@ -110,7 +110,6 @@ pub fn load_boot_id() -> Result<[u8; 16]> {
     if output.status.success() {
         let output_str = String::from_utf8_lossy(&output.stdout);
         // Parse "{ sec = 1753988677, usec = 131097 } Thu Jul 31 22:04:37 2025"
-        // Extract sec and usec values
         if let (Some(sec_start), Some(usec_start)) =
             (output_str.find("sec = "), output_str.find("usec = "))
         {
@@ -123,12 +122,11 @@ pub fn load_boot_id() -> Result<[u8; 16]> {
             let usec_str = &usec_str[..usec_end].trim();
 
             if let (Ok(sec), Ok(usec)) = (sec_str.parse::<u64>(), usec_str.parse::<u64>()) {
-                // Create a deterministic UUID from boot time
+                // Build a deterministic 16-byte boot id from the boot time
                 // Use sec in first 8 bytes, usec in next 4 bytes, pad remaining with zeros
                 let mut bytes = [0u8; 16];
                 bytes[0..8].copy_from_slice(&sec.to_be_bytes());
                 bytes[8..12].copy_from_slice(&(usec as u32).to_be_bytes());
-                // bytes[12..16] remain zero-filled for consistency
                 return Ok(bytes);
             }
         }
@@ -142,7 +140,7 @@ pub fn load_boot_id() -> Result<[u8; 16]> {
     Err(JournalError::UuidSerde)
 }
 
-// Size to pad objects to (8 bytes)
+// Journal objects are padded to multiples of this size; window sizes must be multiples too.
 const OBJECT_ALIGNMENT: u64 = 8;
 
 pub trait BucketVisitor<'a> {
@@ -160,6 +158,8 @@ struct PayloadMatcher<'data, T> {
     _phantom: PhantomData<T>,
 }
 
+/// Matches DATA objects against a target payload, decompressing the stored payload
+/// when it is compressed.
 struct DataPayloadMatcher<'data> {
     payload: &'data [u8],
     hash: u64,
@@ -327,8 +327,7 @@ impl BucketUtilization {
     }
 }
 
-///
-/// A reader for systemd journal files that efficiently maps small regions of the file into memory.
+/// A reader and writer for systemd journal files that maps small regions of the file into memory.
 ///
 /// # Memory Management
 ///
@@ -342,7 +341,7 @@ impl BucketUtilization {
 ///
 /// - The window manager is wrapped in an `UnsafeCell` to allow mutation through a shared reference.
 /// - A single `RefCell<bool>` guards access to ensure only one object can be active at a time.
-/// - Methods like `data_object()` return a `ValueGuard<T>` that automatically releases the lock
+/// - Methods like `data_ref()` return a `ValueGuard<T>` that automatically releases the lock
 ///   when dropped.
 ///
 /// This design ensures that memory safety is maintained even though references to memory-mapped
@@ -365,6 +364,7 @@ pub struct JournalFile<M: MemoryMap> {
     backtrace: RefCell<Backtrace>,
 }
 
+/// Maps a hash table object, including the `ObjectHeader` that precedes its bucket array.
 fn map_hash_table<M: MemoryMap>(
     file: &File,
     offset: Option<NonZeroU64>,
@@ -387,6 +387,8 @@ fn map_hash_table<M: MemoryMap>(
 }
 
 impl<M: MemoryMap> JournalFile<M> {
+    /// Visits each object in the bucket chain for `hash`, returning the first non-`None`
+    /// visitor output.
     pub fn visit_bucket<'a, H, V>(
         &'a self,
         hash_table: Option<H>,
@@ -417,7 +419,6 @@ impl<M: MemoryMap> JournalFile<M> {
     pub fn open(path: impl AsRef<Path>, window_size: u64) -> Result<Self> {
         debug_assert_eq!(window_size % OBJECT_ALIGNMENT, 0);
 
-        // Open file and check its size
         let file = OpenOptions::new().read(true).write(false).open(&path)?;
 
         // Create a memory map for the header
@@ -520,7 +521,6 @@ impl<M: MemoryMap> JournalFile<M> {
     where
         T: JournalObject<&'a [u8]>,
     {
-        // Check if any object is already in use
         let mut is_in_use = self.object_in_use.borrow_mut();
         if *is_in_use {
             #[cfg(debug_assertions)]
@@ -554,7 +554,6 @@ impl<M: MemoryMap> JournalFile<M> {
             return Err(JournalError::ZerocopyFailure);
         };
 
-        // Mark as in use
         *is_in_use = true;
 
         Ok(ValueGuard::new(offset, value, &self.object_in_use))
@@ -619,10 +618,8 @@ impl<M: MemoryMap> JournalFile<M> {
 
     /// Creates an iterator over all field objects in the field hash table
     pub fn fields(&self) -> FieldIterator<'_, M> {
-        // Get the field hash table
         let field_hash_table = self.field_hash_table_ref();
 
-        // Initialize with the first bucket
         let mut iterator = FieldIterator {
             journal: self,
             field_hash_table,
@@ -630,7 +627,6 @@ impl<M: MemoryMap> JournalFile<M> {
             next_field_offset: None,
         };
 
-        // Find the first non-empty bucket
         iterator.advance_to_next_nonempty_bucket();
 
         iterator
@@ -641,7 +637,6 @@ impl<M: MemoryMap> JournalFile<M> {
         &'a self,
         field_name: &'a [u8],
     ) -> Result<FieldDataIterator<'a, M>> {
-        // Find the field offset by name
         let field_hash = self.hash(field_name);
         let Some(field_offset) = self.find_field_offset(field_hash, field_name)? else {
             return Ok(FieldDataIterator {
@@ -650,11 +645,9 @@ impl<M: MemoryMap> JournalFile<M> {
             });
         };
 
-        // Get the field object to access its head_data_offset
         let field_guard = self.field_ref(field_offset)?;
         let head_data_offset = field_guard.header.head_data_offset;
 
-        // Create the iterator
         Ok(FieldDataIterator {
             journal: self,
             current_data_offset: head_data_offset,
@@ -663,16 +656,13 @@ impl<M: MemoryMap> JournalFile<M> {
 
     /// Creates an iterator over all DATA objects for a specific entry
     pub fn entry_data_objects(&self, entry_offset: NonZeroU64) -> Result<EntryDataIterator<'_, M>> {
-        // Get the entry object to determine how many data items it has
         let entry_guard = self.entry_ref(entry_offset)?;
 
-        // Get the total number of items
         let total_items = match &entry_guard.items {
             EntryItemsType::Regular(items) => items.len(),
             EntryItemsType::Compact(items) => items.len(),
         };
 
-        // Create the iterator
         Ok(EntryDataIterator {
             journal: self,
             entry_offset: Some(entry_offset),
@@ -717,35 +707,33 @@ impl<M: MemoryMapMut> JournalFile<M> {
             .write(true)
             .open(&path)?;
 
-        // Calculate hash table sizes
         let data_hash_table_size =
             options.data_hash_table_buckets * std::mem::size_of::<HashItem>();
         let field_hash_table_size =
             options.field_hash_table_buckets * std::mem::size_of::<HashItem>();
 
-        // Calculate hash table offsets
+        // The two hash tables are the file's only initial objects. Each is stored as a
+        // journal object: an `ObjectHeader` followed by its bucket array.
         let data_hash_table_offset = std::mem::size_of::<JournalHeader>() as u64
             + std::mem::size_of::<ObjectHeader>() as u64;
         let field_hash_table_offset = data_hash_table_offset
             + data_hash_table_size as u64
             + std::mem::size_of::<ObjectHeader>() as u64;
 
-        // Create header with options configuration
         let mut header = JournalHeader::default();
         header.signature = *b"LPKSHHRH";
 
-        // Set flags based on options configuration
         if options.enable_keyed_hash {
             header.incompatible_flags |= HeaderIncompatibleFlags::KeyedHash as u32;
         }
 
-        // Set hash table configuration
         header.data_hash_table_offset = NonZeroU64::new(data_hash_table_offset);
         header.data_hash_table_size = NonZeroU64::new(data_hash_table_size as u64);
         header.field_hash_table_offset = NonZeroU64::new(field_hash_table_offset);
         header.field_hash_table_size = NonZeroU64::new(field_hash_table_size as u64);
 
-        // Set other header fields
+        // The field hash table is the tail object; the arena spans from the header's end
+        // to the field table's end, and `n_objects` counts the two hash-table objects.
         header.tail_object_offset =
             NonZeroU64::new(data_hash_table_offset + data_hash_table_size as u64);
         header.header_size = std::mem::size_of::<JournalHeader>() as u64;
@@ -753,13 +741,11 @@ impl<M: MemoryMapMut> JournalFile<M> {
         header.arena_size =
             field_hash_table_offset + field_hash_table_size as u64 - header.header_size;
 
-        // Set IDs from options
         header.machine_id = options.machine_id;
         header.tail_entry_boot_id = options.boot_id;
         header.file_id = options.file_id;
         header.seqnum_id = options.seqnum_id;
 
-        // Create memory maps for hash tables
         let data_hash_table_map = map_hash_table(
             &file,
             header.data_hash_table_offset,
@@ -771,7 +757,6 @@ impl<M: MemoryMapMut> JournalFile<M> {
             header.field_hash_table_size,
         )?;
 
-        // Create header memory map and write header
         let header_size = std::mem::size_of::<JournalHeader>() as u64;
         let mut header_map = M::create(&file, 0, header_size)?;
         {
@@ -868,7 +853,6 @@ impl<M: MemoryMapMut> JournalFile<M> {
     where
         T: JournalObjectMut<&'a mut [u8]>,
     {
-        // Check if any object is already in use
         let mut is_in_use = self.object_in_use.borrow_mut();
         if *is_in_use {
             #[cfg(debug_assertions)]
@@ -911,7 +895,6 @@ impl<M: MemoryMapMut> JournalFile<M> {
         let data = self.object_data_mut(offset, size_needed)?;
         let value = T::from_data_mut(data, is_compact).ok_or(JournalError::ZerocopyFailure)?;
 
-        // Mark as in use
         *is_in_use = true;
         Ok(ValueGuard::new(offset, value, &self.object_in_use))
     }
@@ -1042,14 +1025,12 @@ pub struct FieldIterator<'a, M: MemoryMap> {
 impl<M: MemoryMap> FieldIterator<'_, M> {
     /// Advances to the next non-empty bucket
     fn advance_to_next_nonempty_bucket(&mut self) {
-        // If we don't have a hash table, there's nothing to iterate
         let Some(hash_table) = &self.field_hash_table else {
             return;
         };
 
         let items = &hash_table.items;
 
-        // Find the next non-empty bucket
         while self.current_bucket_index < items.len() {
             let bucket = items[self.current_bucket_index];
             if bucket.head_hash_offset.is_some() {
@@ -1059,7 +1040,6 @@ impl<M: MemoryMap> FieldIterator<'_, M> {
             self.current_bucket_index += 1;
         }
 
-        // No more non-empty buckets
         self.next_field_offset = None;
     }
 }
@@ -1075,7 +1055,6 @@ impl<'a, M: MemoryMap> Iterator for FieldIterator<'a, M> {
                 // Get the next field offset before we return the guard
                 self.next_field_offset = field_guard.header.next_hash_offset;
 
-                // If we've reached the end of the chain, move to the next bucket
                 if self.next_field_offset.is_none() {
                     self.current_bucket_index += 1;
                     self.advance_to_next_nonempty_bucket();
@@ -1131,12 +1110,10 @@ impl<'a, M: MemoryMap> Iterator for EntryDataIterator<'a, M> {
     fn next(&mut self) -> Option<Self::Item> {
         let entry_offset = self.entry_offset?;
 
-        // If we've reached the end of the data indices, return None
         if self.current_index >= self.total_items {
             return None;
         }
 
-        // Get the entry object to access the data offset
         match self.journal.entry_ref(entry_offset) {
             Ok(entry_guard) => {
                 let idx = self.current_index;
@@ -1162,7 +1139,6 @@ impl<'a, M: MemoryMap> Iterator for EntryDataIterator<'a, M> {
                 // Drop the entry guard before obtaining the data object
                 drop(entry_guard);
 
-                // Try to get the data object
                 match self.journal.data_ref(data_offset) {
                     Ok(data_guard) => Some(Ok(data_guard)),
                     Err(e) => Some(Err(e)),

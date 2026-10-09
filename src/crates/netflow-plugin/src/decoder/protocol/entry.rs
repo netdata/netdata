@@ -1,6 +1,7 @@
 use super::*;
 
 pub(crate) fn is_sflow_payload(payload: &[u8]) -> bool {
+    // sFlow datagrams start with a big-endian version field; only v5 is detected.
     if payload.len() < 4 {
         return false;
     }
@@ -121,6 +122,8 @@ pub(crate) fn decode_netflow_result(
                     );
                 } else {
                     batch.stats.disabled_protocol_packets += 1;
+                    // Flow generation is skipped, but the flow sets are still
+                    // accounted so per-version stats stay complete.
                     account_v9_packet(&v9, &mut batch.stats);
                 }
             }
@@ -138,6 +141,8 @@ pub(crate) fn decode_netflow_result(
                     );
                 } else {
                     batch.stats.disabled_protocol_packets += 1;
+                    // Flow generation is skipped, but the flow sets are still
+                    // accounted so per-version stats stay complete.
                     account_ipfix_packet(&ipfix, &mut batch.stats);
                 }
             }
@@ -147,9 +152,10 @@ pub(crate) fn decode_netflow_result(
 
     if let Some(err) = result.error {
         if is_template_error(&err.to_string()) {
-            // Most missing templates are represented by an exact NoTemplate
-            // Set above. A parser-level template error has no Set object, so
-            // account for one unresolved Set only when none was returned.
+            // Missing templates usually arrive as explicit `NoTemplate` flow
+            // sets, already accounted while processing the packets above. A
+            // parser-level template error has no Set object, so count one
+            // unresolved Set only when none was counted yet.
             if batch.stats.missing_template_sets == 0 {
                 batch.stats.missing_template_sets = 1;
             }

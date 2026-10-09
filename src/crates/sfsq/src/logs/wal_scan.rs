@@ -25,12 +25,12 @@
 //!
 //! - the *rows* are identical by construction: the tail and the sealed
 //!   `ng-index` build render every row from the **same** ng-flatten frame
-//!   through the **same** [`ng_flatten::build_kv`] renderer, timestamped
-//!   by the **same** frozen `Record.ts`;
+//!   through the **same** `ng_flatten::build_kv` renderer, timestamped
+//!   by the **same** stored `Record.ts`;
 //! - filter patterns anchor identically: both compile through
-//!   [`sfst::compile_pattern`] / [`sfst::compile_query`];
+//!   `sfst::compile_pattern` / `sfst::compile_query`;
 //! - field tables classify identically: same distinct-pair cardinality
-//!   rule, same [`sfst::DEFAULT_CARDINALITY_THRESHOLD`].
+//!   rule, same `sfst::DEFAULT_CARDINALITY_THRESHOLD`.
 //!
 //! What this module re-implements — and what the equivalence tests must
 //! hold against the SFST engine — is the *evaluation*: OR-within-field /
@@ -142,7 +142,7 @@ impl WalScan {
     /// an active file, use [`scan_flattened_range`](Self::scan_flattened_range).
     ///
     /// Renders each typed entry to its canonical `key=value` via
-    /// [`ng_flatten::build_kv`] and uses `Record.ts` as the row timestamp,
+    /// `ng_flatten::build_kv` and uses `Record.ts` as the row timestamp,
     /// mirroring `ng-index`'s sealed build (`build_sfst`) exactly — same
     /// resource→scope→record token assembly, same per-occurrence rendering —
     /// so a scan and an SFST built from the same frames agree by construction.
@@ -153,7 +153,7 @@ impl WalScan {
     /// Range counterpart of [`scan_flattened`](Self::scan_flattened):
     /// decodes only `[start, end)`. Production queries pass the active-WAL
     /// tail — the end of the last indexed chunk to the durable bound, both
-    /// frame-aligned (see [`wal::FrameRange`] / [`wal::Reader::open_range`]
+    /// frame-aligned (see `wal::FrameRange` / `wal::Reader::open_range`
     /// and `wal::prefix::tail_start`). An empty range yields a zero-row
     /// scan.
     pub fn scan_flattened_range(
@@ -395,7 +395,7 @@ impl WalScan {
     /// The tokens of `field` whose value matches any of `matchers` —
     /// the row-scan analogue of `field_values_or`: exact values resolve
     /// by full-string lookup, patterns anchor via
-    /// [`sfst::compile_pattern`] and test the value bytes of each of the
+    /// `sfst::compile_pattern` and test the value bytes of each of the
     /// field's distinct values. An absent field yields the empty set
     /// (so its conjunct matches nothing).
     fn field_matches(&self, field: &str, matchers: &[Matcher]) -> Result<TokenSet, sfst::Error> {
@@ -477,8 +477,6 @@ impl ScanSink {
         t
     }
 
-    /// One decoded row: its timestamp and the pair tokens in stream order
-    /// (duplicates preserved).
     fn row(&mut self, ts_ns: i64, tokens: &[u32]) {
         self.rows.push(Row {
             ts_ns,
@@ -545,7 +543,7 @@ impl ScanSink {
 }
 
 /// Intern a flattened-frame entry slice into [`ScanSink`] tokens, rendering each
-/// entry's `key=value` via [`ng_flatten::build_kv`] — the same renderer the sealed
+/// entry's `key=value` via `ng_flatten::build_kv` — the same renderer the sealed
 /// `ng-index` builder uses, which is what makes the pair strings (and thus the query
 /// results) match. [`ScanSink`] dedups by full string, so the entry's pre-computed
 /// hash is not needed here (unlike the builder's `lookup_hash` fast path).
@@ -775,8 +773,9 @@ impl TimelineAcc {
         }
     }
 
-    /// Fold one matching row into its bucket; a degraded timeline
-    /// (`state: None`) or a row outside the grid contributes nothing.
+    /// Fold one row into its bucket if it matches the full filter; a
+    /// degraded timeline (`state: None`) or a row outside the grid
+    /// contributes nothing.
     fn accumulate(&mut self, ts_ns: i64, conjuncts: &RowMatch, distinct_tokens: &[u32]) {
         let Some(state) = &mut self.state else { return };
         let grid = state.grid;
@@ -804,7 +803,7 @@ impl TimelineAcc {
         }
     }
 
-    /// Transpose the accumulators into per-bucket [`sfst::Bucket`]s — a
+    /// Transpose the accumulators into per-bucket `sfst::Bucket`s — a
     /// bucket's `unset` is its full-filter matches that carried none of
     /// the field's values (`bucket_total - with_field`).
     fn finish(self) -> Option<Timeline> {

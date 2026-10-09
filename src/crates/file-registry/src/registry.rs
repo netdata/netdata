@@ -21,7 +21,7 @@
 //! fallible work (directory scans, header reads) lives in the consumers'
 //! recovery paths.
 //!
-//! Consumers, grep-verified: `wal::registry` and `sfst::registry`, each
+//! Consumers: `wal::registry` and `sfst::registry`, each
 //! holding a `FileRegistry<File>`, composed per tenant into
 //! `file_lifecycle::registry::Registry`.
 use std::collections::BTreeMap;

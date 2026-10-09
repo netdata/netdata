@@ -20,7 +20,7 @@ jobs:
     steps:
       - name: Checkout
         id: checkout
-        uses: actions/checkout@v7
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           fetch-depth: 1
       - name: Install Rclone
@@ -40,7 +40,7 @@ jobs:
         run: |
           rclone copyto --verbose --fast-list --use-server-modtime --header-upload "Cache-Control: no-transform" packaging/installer/netdata-updater.sh s3:netdata-agent-artifacts/netdata-updater.sh
       - name: Failure Notification
-        uses: rtCamp/action-slack-notify@v2
+        uses: rtCamp/action-slack-notify@33ca3be66c6f378fe1610fd1d5258632dbed5e58 # v2.4.0
         env:
           SLACK_COLOR: 'danger'
           SLACK_FOOTER: ''

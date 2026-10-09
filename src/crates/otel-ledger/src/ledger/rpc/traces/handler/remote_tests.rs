@@ -5,7 +5,7 @@
 //! Fixtures come from the traces suite's shared `fixtures` module: real
 //! seals, either installed as local SFSTs or stored as remote objects
 //! behind `TestRemote`'s `fs://` store and download cache. One corpus
-//! carries the file: files 1-2 under one test identity, traces A/B/C/E
+//! carries the tests: files 1-2 under one test identity, traces A/B/C/E
 //! across a 100 s window. The mode contracts themselves — page and
 //! aggregate semantics, pagination, error shapes — are pinned in
 //! `tests.rs`; nothing here re-tests them.
@@ -315,7 +315,7 @@ async fn a_local_copy_is_served_and_not_downloaded() {
 
 #[tokio::test]
 async fn another_identitys_file_at_the_same_seq_is_downloaded() {
-    // A prior process instance used the same seq: its remote file is a
+    // A different identity used the same seq: its remote file is a
     // different file, and the local one does not mask it.
     let registries = make_registries();
     let remote = TestRemote::new(64 * MIB);

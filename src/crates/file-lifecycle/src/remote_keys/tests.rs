@@ -1,20 +1,21 @@
-//! Tests for the remote object-storage keys: each constructor is checked
-//! against its layout and each parser against the shapes it must accept and
-//! reject, pinning the parent module's contract — builders and parsers share
-//! `SCHEMA_VERSION`, so the strings a caller builds and parses cannot drift
-//! apart.
+//! Tests for the remote object-storage keys: the constructors are checked
+//! against their layouts and each parser against the shapes it must accept
+//! and reject, pinning the parent module's contract — builders and parsers
+//! share `SCHEMA_VERSION`, so the strings a caller builds and parses cannot
+//! drift apart.
 //!
 //! - `sfst`/`catalog` stamp the v2 shapes (version, signal, umbrella, date,
 //!   tenant segments; `.sfst`/`.catalog` extensions) and `sfst_prefix` carries
 //!   the trailing `/` a LIST needs; the `{signal}` segment scopes both shapes
 //!   at the root, so two signals never share a prefix.
-//! - Every parser rejects a shape deviation with `None` (the caller warns and
-//!   skips): segment count, the literal version/umbrella/signal segments —
-//!   `parse_catalog_key`/`parse_sfst_key` must match the `expected_signal` the
-//!   caller LISTed — a parseable date, and a tenant through
-//!   `validate_path_segment`, whose charset excludes `/`, rejects `.`/`..`,
-//!   and admits the stored auth-off `default` tenant (the auth-off restore
-//!   blackout regression).
+//! - `parse_catalog_key`/`parse_sfst_key` reject any shape deviation with
+//!   `None` (the caller warns and skips): segment count, the literal
+//!   version/umbrella/signal segments — the signal must match the
+//!   `expected_signal` the caller LISTed — a parseable date, and a tenant
+//!   through `validate_path_segment`, whose charset excludes `/`, rejects
+//!   `.`/`..`, and admits the stored auth-off `default` tenant (the
+//!   auth-off restore blackout regression). `parse_sfst_date` checks only
+//!   the version/`tenants`/`sfst` literals and the date.
 //! - The extension guard is pinned from both sides: an `.sfst` key never
 //!   parses as a catalog and a `.catalog` key never as an SFST (stem parsing
 //!   strips any extension, so the explicit check does the work).

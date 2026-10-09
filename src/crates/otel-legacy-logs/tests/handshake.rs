@@ -10,26 +10,21 @@
 //! Pinned contracts (worker side: `src/lib.rs` `run_worker`):
 //!
 //! - Journal dir absent -> `Disabled`, then the worker future completes
-//!   cleanly: no idle process lingers for the plugin's lifetime
-//!   (`run_worker`'s absent-directory branch).
-//! - Handler init failure -> `Disabled` and a clean exit too, exactly
-//!   like the absent-dir path: the legacy viewer is best-effort and
-//!   must not take the plugin down (`run_worker`'s handler-init-failure
-//!   branch; init builds the foyer disk cache, `src/handler.rs`
-//!   `LegacyLogsHandler::new`).
+//!   cleanly: no idle process lingers for the plugin's lifetime.
+//! - Handler init failure -> `Disabled` and a clean exit too: the legacy
+//!   viewer is best-effort and must not take the plugin down. Init builds
+//!   the foyer disk cache (`src/handler.rs` `LegacyLogsHandler::new`).
 //! - An existing-but-empty journal dir still serves: `Ready` carrying
 //!   exactly one declaration, the `legacy-otel-logs` function
-//!   (`src/lib.rs` `FUNCTION_NAME` + `declaration()`), because the handler
-//!   watches the directory (`src/handler.rs` `LegacyLogsHandler::new`) and
+//!   (`FUNCTION_NAME`), because the handler watches the directory and
 //!   journal files restored into it later are picked up.
-//! - `Shutdown` ends the event loop and the worker exits cleanly
-//!   (`src/lib.rs` `LegacyLogs::run`, `LegacyLogs::handle_req`).
+//! - `Shutdown` ends the event loop and the worker exits cleanly.
 //!
 //! Not pinned here: Call/Cancel/Progress traffic, the oversized-response
-//! degradation (`src/lib.rs` `LegacyLogs::handle_outbound_resp`), late
-//! `Configure` (`LegacyLogs::handle_req`), and the supervisor's Disabled
-//! bookkeeping - the `legacy_alive` flip and child reap
-//! (`otel-plugin/src/supervisor.rs` `disable_legacy` + `reap_legacy`).
+//! degradation (`LegacyLogs::handle_outbound_resp`), late `Configure`
+//! (`LegacyLogs::handle_req`), and the supervisor's Disabled bookkeeping -
+//! the `legacy_alive` flip and child reap (`disable_legacy` +
+//! `reap_legacy`).
 
 use std::time::Duration;
 
@@ -42,7 +37,7 @@ use tokio::task::JoinHandle;
 /// client, and return the accepted connection plus the worker's join
 /// handle. The 10 s accept timeout pins that the worker connects
 /// promptly; the message-size limit mirrors the worker's own
-/// (`run_worker`'s `bridge::IPC_MAX_MESSAGE_SIZE`).
+/// `bridge::IPC_MAX_MESSAGE_SIZE`.
 async fn start(
     sock: &str,
 ) -> (
@@ -106,7 +101,7 @@ async fn reports_disabled_and_exits_when_handler_init_fails() {
     let journal_dir = dir.path().join("journal");
     std::fs::create_dir_all(&journal_dir).unwrap();
     // A cache path nested under a regular file makes handler init fail:
-    // the cache build runs create_dir_all on it
+    // the cache build runs `create_dir_all` on the cache path
     // (`journal-engine/src/indexing.rs` `FileIndexCacheBuilder::build`, via
     // `src/handler.rs` `LegacyLogsHandler::new`).
     let blocker = dir.path().join("blocker");

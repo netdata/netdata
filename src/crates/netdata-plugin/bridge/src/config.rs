@@ -40,8 +40,8 @@ use crate::signals::Signal;
 /// [`base_dir`](Self::base_dir) roots everything, and each signal's WAL, index
 /// and catalog live under `{base_dir}/{signal}/...` (see
 /// [`lifecycle_for`](Self::lifecycle_for)). Remote storage, its download cache
-/// and tenant auth are global (one policy for the process); only
-/// rotation/retention/crc tuning is per signal.
+/// and tenant auth are global (one policy for the process); each signal's
+/// tuning (rotation, retention, crc/compression, catalog, ingest) is separate.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct PluginConfig {
@@ -60,7 +60,7 @@ pub struct PluginConfig {
     /// the process, applied on both transports).
     #[serde(default)]
     pub auth: AuthConfig,
-    /// Per-signal tuning for logs (rotation, retention, catalog rotation count,
+    /// Per-signal tuning for logs (rotation, retention, catalog, ingest,
     /// crc/compression). Carries no dirs (derived from `base_dir`) and no
     /// storage (global).
     pub logs: SignalConfig,
@@ -82,7 +82,7 @@ pub struct PluginConfig {
     /// distinct identity). Runtime-only: `None` after YAML load; the supervisor
     /// resolves the machine GUID and generates the instance id, setting this to
     /// `Some` before configuring any worker. Workers therefore always observe
-    /// `Some`. The [`Identity`](file_registry::Identity) newtypes make the pair
+    /// `Some`. The `file_registry::Identity` newtypes make the pair
     /// non-nil and un-transposable by construction.
     #[serde(default)]
     pub identity: Option<file_registry::Identity>,
@@ -169,8 +169,8 @@ pub struct LegacyLogsConfig {
     /// Max distinct values indexed per field; fields exceeding the cap have
     /// their value indexing truncated (cardinality cap).
     pub max_unique_values_per_field: usize,
-    /// Max field-value payload size (bytes) that gets indexed; larger values
-    /// (and compressed ones) are skipped.
+    /// Max field-value payload size (bytes) that gets indexed; values at or
+    /// above the cap (and compressed ones) are skipped.
     pub max_field_payload_size: usize,
 }
 
@@ -1240,7 +1240,7 @@ traces:
     }
 }
 
-/// Serde for a required `Duration`, dual-mode like [`opt_duration`]: a humantime
+/// Serde for a required `Duration`, dual-mode like `opt_duration`: a humantime
 /// string in human-readable formats (YAML), a `(secs, nanos)` tuple otherwise
 /// (bincode IPC — a humantime string would not round-trip through bincode).
 mod duration {
@@ -1268,7 +1268,7 @@ mod duration {
     }
 }
 
-/// Serde for an optional `Duration`, dual-mode like [`duration`]: a humantime
+/// Serde for an optional `Duration`, dual-mode like `duration`: a humantime
 /// string in human-readable formats (YAML), a `(secs, nanos)` tuple otherwise
 /// (bincode IPC — a humantime string would not round-trip through bincode).
 mod opt_duration {

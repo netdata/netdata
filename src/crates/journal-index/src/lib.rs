@@ -19,14 +19,16 @@
 //! field_types.rs, with failures reported through error.rs.
 //!
 //! Consumers (grep-verified): journal-engine builds, caches and queries the
-//! indexes and folds `IndexError` into its error enum (`journal-engine/src/
-//! indexing.rs`, `journal-engine/src/cache.rs`, `journal-engine/src/logs/
-//! query.rs`, `journal-engine/src/error.rs`);
-//! journal-function's facets/histogram/types code and otel-legacy-logs' log
-//! handler import the field types, `Filter` and the time units directly
-//! (`journal-function/src/netdata/facets.rs`;
-//! `otel-legacy-logs/src/handler.rs`); the crate's integration tests drive `FileIndexer`
-//! directly (tests/filter_evaluation.rs, tests/pagination.rs,
+//! indexes and folds `IndexError` into its error enum
+//! (`journal-engine/src/indexing.rs`, `journal-engine/src/cache.rs`,
+//! `journal-engine/src/logs/query.rs`, `journal-engine/src/error.rs`);
+//! journal-function's facets/histogram/types code imports the field types
+//! and `Direction` (`journal-function/src/netdata/facets.rs`,
+//! `journal-function/src/netdata/histogram.rs`,
+//! `journal-function/src/netdata/types.rs`); otel-legacy-logs' log handler
+//! imports the field types, `Filter` and the time units
+//! (`otel-legacy-logs/src/handler.rs`); the crate's integration tests drive
+//! `FileIndexer` directly (tests/filter_evaluation.rs, tests/pagination.rs,
 //! tests/remapping_indexing.rs).
 //!
 //! The `allocative` feature (`Cargo.toml`) adds `allocative::Allocative`
@@ -52,18 +54,19 @@ pub use error::{IndexError, Result};
 
 // Sparse running-count time histogram over epoch-aligned buckets: the
 // time-coverage core of every index. The crate's modules import it through
-// this root (`src/file_index.rs`, `src/file_indexer.rs`); outside the crate the
-// engine reads FileIndex's accessors instead (`journal-engine/src/
-// histogram.rs`), so Bucket/Histogram have no direct external importer.
+// this root (`src/file_index.rs`, `src/file_indexer.rs`); outside the crate
+// the engine reads FileIndex's accessors instead
+// (`journal-engine/src/histogram.rs`), so Bucket/Histogram have no direct
+// external importer.
 pub mod histogram;
 pub use histogram::{Bucket, Histogram};
 
 // The per-file index and the query contract around it: FileIndex (histogram,
 // entry offsets in time order, per-pair bitmaps) plus the Anchor/Direction
 // vocabulary, the LogQueryParams builder and the LogEntryId results. The
-// engine's query path imports all six flat (`journal-engine/src/logs/
-// query.rs`); otel-legacy-logs drives FileIndex/Direction/Anchor directly
-// (`otel-legacy-logs/src/handler.rs`).
+// engine's query path imports all six flat
+// (`journal-engine/src/logs/query.rs`); otel-legacy-logs drives
+// FileIndex/Direction/Anchor directly (`otel-legacy-logs/src/handler.rs`).
 pub mod file_index;
 pub use file_index::{
     Anchor, Direction, FileIndex, LogEntryId, LogQueryParams, LogQueryParamsBuilder,

@@ -13,9 +13,10 @@
 //! monitor needs no runtime). Dropping the receiver turns every later send
 //! into the `warn!` in `new`, losing events. All three fallible calls
 //! propagate `notify::Error` as [`crate::RegistryError::Notify`].
-//! Consumers: otel-legacy-logs drives the
-//! watch → process_event → find_files_in_range loop
-//! (`otel-legacy-logs/src/handler.rs`) and journal-function
+//! Consumers: otel-legacy-logs calls `watch_directory` once at
+//! setup, `process_event` in the receiver task, and
+//! `find_files_in_range` per query
+//! (`otel-legacy-logs/src/handler.rs`); journal-function
 //! re-exports `Monitor` (`journal-function/src/lib.rs`).
 use super::error::Result;
 use notify::{Event, RecommendedWatcher, RecursiveMode, Watcher};

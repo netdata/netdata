@@ -694,6 +694,33 @@ declare -A pkg_json_c_dev=(
   ['default']="json-c-devel"
 )
 
+declare -A pkg_protobuf_dev=(
+  ['alpine']="protobuf-dev"
+  ['arch']="protobuf"
+  ['debian']="libprotobuf-dev"
+  ['gentoo']="dev-libs/protobuf"
+  ['sabayon']="dev-libs/protobuf"
+  ['suse']="protobuf-devel"
+  ['freebsd']="protobuf"
+  ['macos']="protobuf"
+  ['clearlinux']="WARNING|"
+  ['default']="protobuf-devel"
+)
+
+# protoc; a separate package only where the dev package does not provide it.
+declare -A pkg_protobuf_compiler=(
+  ['alpine']="protobuf"
+  ['arch']="NOTREQUIRED"
+  ['debian']="protobuf-compiler"
+  ['gentoo']="NOTREQUIRED"
+  ['sabayon']="NOTREQUIRED"
+  ['suse']="NOTREQUIRED"
+  ['freebsd']="NOTREQUIRED"
+  ['macos']="NOTREQUIRED"
+  ['clearlinux']="WARNING|"
+  ['default']="protobuf-compiler"
+)
+
 #TODO:: clearlinux ?
 declare -A pkg_libyaml_dev=(
   ['alpine']="yaml-dev"

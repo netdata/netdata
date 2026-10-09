@@ -1,19 +1,21 @@
 //! Cleaner response handling.
 //!
 //! The ledger's half of the shared-cleaner contract: a `*Deleted` response
-//! means the file is gone from disk, and this mirrors that into the owning
-//! pipeline's tenant registries — WAL → `wal.remove_by_seq`; SFST →
-//! `evict_seq` (all per-seq state) plus `forget_seq` (the seq→tenant route);
-//! catalog → `catalog_files.remove` (path-keyed, scanned across tenants). A
-//! `*Failed` response only logs, then clears the entry's `pending_deletion`
-//! flag (SFST/catalog) so the file becomes an eviction candidate again; the
-//! WAL registry has no pending flag, so a failed WAL delete needs no
-//! rollback.
+//! means the file is gone from disk (or never was), and this mirrors that
+//! into the owning pipeline's tenant registries — WAL → `wal.remove_by_seq`;
+//! SFST → `evict_seq` (all per-seq state) plus `forget_seq` (the seq→tenant
+//! route); catalog → `catalog_files.remove` (path-keyed, scanned across
+//! tenants). A `*Failed` response only logs, then clears the entry's
+//! `pending_deletion` flag (SFST/catalog) so the file becomes an eviction
+//! candidate again; the WAL registry has no pending flag, so a failed WAL
+//! delete needs no rollback.
 //!
-//! Senders: the indexer (WAL deletes once a WAL is indexed; an empty WAL also
-//! deletes its empty index) and retention (`retention.rs`: SFST and catalog
-//! evictions). Responses arrive on the run-loop's `CleanerResp` arm — this is
-//! their only handler.
+//! Senders: the indexer-response handler (`ledger/indexer.rs`: WAL deletes
+//! once a WAL is indexed; an empty WAL also deletes its empty index),
+//! retention (`retention.rs`: SFST and catalog evictions), and startup
+//! recovery (`file-lifecycle/src/recovery/local.rs`), which drains its own
+//! responses before this run loop starts. Responses arrive on the run-loop's
+//! `CleanerResp` arm — this is their only steady-state handler.
 
 use bridge::signals::Signal;
 use file_lifecycle::ipc::CleanerResponse;
@@ -43,18 +45,20 @@ impl Ledger {
         let mut registries = self.pipelines.get(signal).registries().write().await;
         match resp {
             CleanerResponse::WalFileDeleted { sequence, .. } => {
-                // The seq→tenant route stays: this seq's SFST is still live
-                // and its later responses (upload confirms) still route by
-                // bare seq; the route is dropped at the index eviction below.
+                // The seq→tenant route stays: an index eviction for this seq
+                // may still follow (an empty WAL deletes its empty index right
+                // behind the WAL), and a still-live SFST's upload confirms
+                // route by bare seq — until the index eviction below drops it.
                 if let Some((_, registry)) = registries.for_seq_mut(sequence) {
                     registry.wal.remove_by_seq(sequence);
                 }
                 tracing::info!("WAL file deleted seq={sequence}");
             }
             CleanerResponse::IndexFileDeleted { sequence, .. } => {
-                // Route by bare seq (the routing table only maps
-                // locally-present files), but evict the exact identity the
-                // confirmation names; then drop the seq→tenant route.
+                // Route by bare seq (the routing table holds only seqs this
+                // process instance routed, where a seq is locally unique), but
+                // evict the exact identity the confirmation names; then drop
+                // the seq→tenant route.
                 if let Some((_, registry)) = registries.for_seq_mut(sequence.seq) {
                     registry.evict_seq(sequence);
                 }

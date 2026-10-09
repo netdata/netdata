@@ -5,14 +5,14 @@
 //! `#[repr]` changes the file format, and the near-twin
 //! src/crates/jf/journal_file/src/object.rs has to change with it (its
 //! `HashableObject` is thinner - `get_payload`, no `is_compressed`/
-//! `decompress` - and its `JournalState` lacks `TryFrom`/`Display`).
+//! `decompress` - and its `JournalState` lacks `Display`).
 //!
 //! Shape, shared by every stored object: a 16-byte [`ObjectHeader`] (type
 //! byte, per-object flags, reserved, size), the family header, then the
 //! payload. Objects sit at 8-byte-aligned offsets in the arena after the
 //! file header (the `OBJECT_ALIGNMENT` checks in `file/file.rs`), and
-//! `size` covers the whole object,
-//! rounded up to 8 ([`ObjectHeader::aligned_size`]). [`JournalHeader`] is
+//! `size` covers the whole object; the footprint
+//! rounds up to 8 ([`ObjectHeader::aligned_size`]). [`JournalHeader`] is
 //! only the leading prefix of systemd's header: `open()` maps exactly
 //! `size_of::<JournalHeader>()` bytes and checks the magic, so files whose
 //! on-disk `header_size` is larger (see the commented-out fields below)
@@ -76,7 +76,8 @@ pub trait HashableObject {
     /// match a fresh uncompressed payload.
     fn raw_payload(&self) -> &[u8];
 
-    /// Check if the payload is compressed
+    /// Whether the object's header flags mark the payload compressed
+    /// (xz/lz4/zstd)
     fn is_compressed(&self) -> bool;
 
     /// Decompress the payload into the provided buffer.
@@ -87,8 +88,8 @@ pub trait HashableObject {
     /// `None` at the chain end.
     fn next_hash_offset(&self) -> Option<NonZeroU64>;
 
-    /// The object type byte this family stamps and validates
-    /// (stamped/required by `JournalFile::journal_object_mut`).
+    /// The object type byte `JournalFile::journal_object_mut` stamps on
+    /// append and requires back on reopen.
     fn object_type() -> ObjectType;
 }
 
@@ -417,10 +418,10 @@ impl std::fmt::Display for JournalState {
 /// on-disk `header_size` is larger
 /// - systemd appended fields over the years, see the block below - still
 /// parses; arena bounds use the on-disk value (read by
-/// `journal_object_ref`/`journal_object_mut`). At
-/// create the writer lays out header, data hash table, field hash table
-/// and sets `header_size` to this struct's size
-/// ([`JournalFile::create`](crate::file::JournalFile::create)).
+/// `journal_object_ref`/`journal_object_mut`). At create,
+/// [`JournalFile::create`](crate::file::JournalFile::create) lays out
+/// header, data hash table, field hash table and sets `header_size` to
+/// this struct's size.
 /// The writer resumes appends from `tail_object_offset`
 /// ([`JournalWriter::new`](crate::file::JournalWriter::new)).
 #[derive(Default, Debug, Clone, Copy, FromBytes, IntoBytes, Immutable, KnownLayout)]
@@ -441,7 +442,7 @@ pub struct JournalHeader {
     pub data_hash_table_size: Option<NonZeroU64>,   // buckets * sizeof(HashItem)
     pub field_hash_table_offset: Option<NonZeroU64>, // field hash table offset (laid out by JournalFile::create)
     pub field_hash_table_size: Option<NonZeroU64>,   // buckets * sizeof(HashItem)
-    pub tail_object_offset: Option<NonZeroU64>, // last object (committed by JournalWriter::new)
+    pub tail_object_offset: Option<NonZeroU64>, // last object (committed per entry by JournalWriter)
     pub n_objects: u64, // object count (committed per entry by JournalWriter)
     pub n_entries: u64, // entry count (committed per entry by JournalWriter)
     pub tail_entry_seqnum: u64, // newest entry's seqnum (stamped per entry)
@@ -493,10 +494,9 @@ pub enum ObjectFlags {
 }
 
 /// The type byte at the head of every object ([`ObjectHeader::type_`]),
-/// matching systemd's OBJECT_* values. Each family's accessors stamp it on
-/// append and require it back on reopen
-/// (`JournalFile::journal_object_mut`); unknown
-/// values are rejected by the `TryFrom` below.
+/// matching systemd's OBJECT_* values. `JournalFile::journal_object_mut`
+/// stamps it on append (from the family's `object_type`) and requires it
+/// back on reopen; unknown values are rejected by the `TryFrom` below.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 #[repr(u8)]
 pub enum ObjectType {
@@ -642,8 +642,9 @@ impl<B: SplitByteSliceMut> JournalObjectMut<B> for FieldObject<B> {
 
 /// The offset slots of an entry-array object: u64 offsets in regular
 /// files, u32 in compact ones (the header COMPACT flag). A zero slot reads
-/// as `None` - the format's unset pointer - and ends iteration there
-/// (unset slots are skipped by `file/offset_array.rs`'s collects).
+/// as `None` - the format's unset pointer - and is skipped, not
+/// iteration-ending: the collects in `file/offset_array.rs` filter unset
+/// slots out and keep walking.
 pub enum OffsetsType<B: ByteSlice> {
     Regular(Ref<B, [Option<NonZeroU64>]>),
     Compact(Ref<B, [Option<NonZeroU32>]>),
@@ -842,7 +843,8 @@ pub struct RegularEntryItem {
 }
 
 /// One item of a compact entry object: only the referenced object's
-/// offset, as u32 - `EntryItemsType::set` panics on larger offsets.
+/// offset, as u32 - `EntryItemsType::set` panics on offsets past the
+/// u32 slot.
 #[derive(Debug, Copy, Clone, FromBytes, IntoBytes, KnownLayout, Immutable)]
 #[repr(C)]
 pub struct CompactEntryItem {
@@ -859,7 +861,8 @@ pub enum EntryItemsType<B: ByteSlice> {
 impl<B: ByteSliceMut> EntryItemsType<B> {
     /// Writer-side item store. Regular items take `(offset, Some(hash))` -
     /// the hash is unwrapped, `None` panics. Compact items take
-    /// `(offset, None)` and panic on offsets past the u32 slot.
+    /// `(offset, None)` (debug-asserted) and panic on offsets past the
+    /// u32 slot.
     pub fn set(&mut self, index: usize, object_offset: NonZeroU64, hash: Option<u64>) {
         match self {
             EntryItemsType::Regular(entry_items) => {

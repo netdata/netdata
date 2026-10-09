@@ -75,11 +75,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     if files.is_empty() {
         return Ok(());
     }
-    // Debug toggle: keep only the first file (uncomment).
 
     // Foyer hybrid cache (`indexing.rs` `FileIndexCacheBuilder`): 1000 in-memory entries + 2 GiB disk cache; the disk path persists across runs.
     let cache = FileIndexCacheBuilder::new()
-        // Alternative: keep the disk cache on the slow disk too (swap with the line below).
+        // Alternative: keep the disk cache on the slow disk too (change the path below).
         .with_cache_path("/tmp/foyer-cache")
         .with_memory_capacity(1000)
         .with_disk_capacity(2048 * 1024 * 1024)
@@ -104,7 +103,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         })
         .collect();
 
-    // Index only the last 24h; QueryTimeRange derives the aligned bucket duration (`query_time_range.rs` `QueryTimeRange::new`).
+    // The 24h window selects granularity, not what gets indexed: `batch_compute_file_indexes` uses only the range's bucket duration, and each miss's file is indexed whole (`query_time_range.rs` `QueryTimeRange::new`).
     let now = std::time::SystemTime::now()
         .duration_since(std::time::UNIX_EPOCH)?
         .as_secs() as u32;

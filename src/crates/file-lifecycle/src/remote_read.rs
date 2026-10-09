@@ -5,8 +5,8 @@
 //! needs the data fetches it back through here. [`RemoteRead::fetch`] is
 //! signal-neutral: it takes the remote-only catalog entries a
 //! [`crate::query::RemotePlan`] has selected, downloads their objects into
-//! the process's shared download cache ([`file_cache::FileCache`]) and
-//! returns them as [`file_registry::SelectedFile`]s (path = the cache pin's
+//! the process's shared download cache (`file_cache::FileCache`) and
+//! returns them as `file_registry::SelectedFile`s (path = the cache pin's
 //! path; summary = the catalog's stored one — `file-registry`'s
 //! `selection.rs` documents the type), the entries it could not obtain, and
 //! the pins that keep the downloaded files from being evicted while a query
@@ -82,7 +82,7 @@ pub(crate) fn download_deadline(size: u64) -> Duration {
 /// The outcome of one [`RemoteRead::fetch`].
 pub struct RemoteFetch {
     /// The entries obtained, in request order, as
-    /// [`file_registry::SelectedFile`]s: identity and summary from the
+    /// `file_registry::SelectedFile`s: identity and summary from the
     /// catalog entry, path = the cache pin's path (that type's remote-origin
     /// contract, documented in `file-registry`'s `selection.rs`).
     pub files: Vec<SelectedFile>,
@@ -131,9 +131,9 @@ impl<S: Storage> RemoteRead<S> {
     /// `entries.len()` gets an upper bound.
     ///
     /// Per-entry failures are reported in [`RemoteFetch::failed`]. The only
-    /// errors are query-wide: [`CacheError::TooLarge`] (the planned files'
-    /// total size exceeds the cache), [`CacheError::EvictionFailed`] (the
-    /// cache directory cannot free room) and [`CacheError::Cancelled`].
+    /// errors are query-wide: `CacheError::TooLarge` (the planned files'
+    /// total size exceeds the cache), `CacheError::EvictionFailed` (the
+    /// cache directory cannot free room) and `CacheError::Cancelled`.
     ///
     /// Called off the registry read lock: the entries come from a remote
     /// plan built after the snapshot dropped the lock
@@ -223,7 +223,7 @@ impl<S: Storage> RemoteRead<S> {
 
 /// Download one object under its deadline. `size` is the catalog's declared
 /// size and only sets the deadline — the cache separately checks the
-/// returned byte count against [`Want::size`].
+/// returned byte count against `Want::size`.
 async fn download<S: Storage>(storage: &S, key: &str, size: u64) -> anyhow::Result<Vec<u8>> {
     let deadline = download_deadline(size);
     match tokio::time::timeout(deadline, storage.read(key)).await {

@@ -367,13 +367,16 @@ pub(super) struct Page {
 /// materialized. `cancel` is polled before each SFST is opened (see
 /// [`open_and_evaluate_sfsts`]); the WAL-tail scans don't poll.
 ///
-/// The `anchor` (from a prior page's cursor) is only an exclusive
-/// comparison boundary — it is never itself materialized. So the source it
-/// once came from need not be in `sources`; only the *page rows'* sources
-/// must be, and they always are, since every page cursor is produced by a
-/// source evaluated in this same call. A stale anchor pointing at a now-
-/// absent source (e.g. a WAL since sealed) is therefore harmless here; the
-/// only cross-request artifact is the documented WAL→SFST cursor seam.
+/// The `anchor` (a prior page's cursor, or a timestamp resolved to a
+/// synthetic boundary cursor) is only an exclusive comparison boundary — it
+/// is never itself materialized. So the source it once came from need not
+/// be in `sources`; only the *page rows'* sources must be, and they always
+/// are, since every page cursor is produced by a source evaluated in this
+/// same call. A stale anchor pointing at a now-absent source (e.g. a WAL
+/// since sealed) is therefore harmless here; the only cross-request
+/// artifact is the WAL→SFST cursor seam — a tail cursor's `position` is an
+/// insertion index that stays meaningful only while the row remains in the
+/// tail.
 pub(super) fn paginate(
     sources: &[LogSource],
     mapped: &[Option<Mapped>],
@@ -390,9 +393,12 @@ pub(super) fn paginate(
 
     // Seed the merge with the WAL tails *before* the SFSTs: the early-
     // termination below samples `merged.cursors[limit - 1]` as its
-    // boundary, which must already include every tail cursor — adding tails
-    // later can only push the boundary older, letting `beyond_boundary`
-    // wrongly skip an SFST whose rows belong on the page.
+    // boundary, and the tails usually hold the cursors closest to the
+    // anchor, so folding them in first lets `beyond_boundary` skip later
+    // files as early as it validly can. (Skipping is safe in any fold
+    // order — the sampled boundary is never nearer the anchor than the
+    // final page boundary — so the ordering only decides how many files
+    // get opened.)
     let tail_scans = scan_tails(&wal_tails, query, anchor, page_bound, &mut merged);
 
     // SFSTs (on-disk + in-memory chunks): order the pre-resolved

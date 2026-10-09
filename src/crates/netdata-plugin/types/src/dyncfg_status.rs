@@ -31,8 +31,8 @@ use std::fmt;
 use std::str::FromStr;
 
 /// The lifecycle state of a dyncfg configuration entry, as carried in
-/// [`ConfigDeclaration::status`](crate::ConfigDeclaration::status) and
-/// reported in flight with `CONFIG <id> status` lines.
+/// [`ConfigDeclaration::status`](crate::ConfigDeclaration::status) and by
+/// `CONFIG <id> status` update lines.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum DynCfgStatus {
     /// Nothing reported: value 0 and the agent's parse fallback —
@@ -47,7 +47,8 @@ pub enum DynCfgStatus {
     /// The plugin runs the accepted configuration; the agent derives it
     /// from a 200 add/update response.
     Running,
-    /// The plugin fails to run the accepted configuration.
+    /// The plugin fails to run the accepted configuration. Like incomplete,
+    /// the agent never assigns it — only plugins report it.
     Failed,
     /// The configuration is disabled by a user; the agent also sets it when
     /// a plugin acknowledges a disable command.

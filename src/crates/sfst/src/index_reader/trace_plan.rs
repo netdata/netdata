@@ -74,8 +74,8 @@
 //!
 //! # Failure modes
 //!
-//! Errors mean the FILE contradicts its own metadata, never the query:
-//! a bad regex source raises `InvalidPattern` (via
+//! Errors are malformed input, never an empty result: a bad regex
+//! source raises `InvalidPattern` (via
 //! [`crate::query::compile_pattern`]); a SPAN/PSPN/DURN column shorter
 //! than the caller's range end raises `CorruptIndex` — the plan-side
 //! mirrors of the session's bound checks (`index_reader/session.rs`),
@@ -354,13 +354,14 @@ impl IndexReader<'_> {
     /// range `[lo, hi)` (the caller's window; pass `(0, record_count)`
     /// for the whole file). See the module docs for the term algebra,
     /// tier resolution, and work accounting. `Ok(None)` = the visited
-    /// budget ran out inside the shared stream-batch scan; a truncated
-    /// plan is never returned (it would under-approximate).
+    /// budget ran out inside a budgeted pass — the shared stream-batch
+    /// scan or a subgroup refine; a truncated plan is never returned
+    /// (it would under-approximate).
     ///
     /// The compiled plan answers `count_in_range`/`newest_in_range`/
     /// `matched_in_range` correctly only for sub-ranges of `[lo, hi)`
-    /// (duration and id-column positions outside it were never
-    /// collected).
+    /// (duration, id-column and subgroup-refine positions outside it
+    /// were never collected).
     pub fn compile_trace_plan(
         &self,
         plan: &TracePlan,

@@ -134,8 +134,9 @@ pub fn flatten_log_into(
                     // ordering sane.
                     ts: i64::try_from(r.time_unix_nano).unwrap_or(i64::MAX),
                     observed_ts: i64::try_from(r.observed_time_unix_nano).unwrap_or(i64::MAX),
-                    // Wrong-length ids (normalization clears them to empty) fail
-                    // from_bytes → UNSET; garbage bytes can never land here.
+                    // Wrong-length ids fail from_bytes → UNSET (normalization
+                    // clears them to empty first); a right-length id is stored
+                    // byte-for-byte.
                     trace_id: TraceId::from_bytes(&r.trace_id).unwrap_or_default(),
                     span_id: SpanId::from_bytes(&r.span_id).unwrap_or_default(),
                     flags: r.flags,
@@ -251,7 +252,7 @@ pub fn normalize_log_request(
                     out.bad_ids.span += 1;
                 }
                 // The immutable borrow of `r.body` must end before reassignment,
-                // so parse in its own step (decision 1B).
+                // so parse in its own step.
                 let parsed_body = match &r.body {
                     Some(AnyValue {
                         value: Some(Av::StringValue(s)),
@@ -282,16 +283,16 @@ pub fn normalize_log_request(
 }
 
 /// Try to interpret a log body STRING as a JSON object, returning the
-/// equivalent OTLP [`AnyValue`] (always a `KvlistValue`) so the flattener can
+/// equivalent OTLP `AnyValue` (always a `KvlistValue`) so the flattener can
 /// explode it into typed `body.*` columns. Returns `None` — leaving the body a
 /// verbatim string — unless all of these hold:
 ///
 /// - the trimmed text starts with `{` and ends with `}`: a cheap pre-check
-///   that skips the parse for common non-JSON bodies (guard decision 3A;
-///   `serde_json`'s default recursion limit still bounds nesting);
+///   that skips the parse for common non-JSON bodies (`serde_json`'s default
+///   recursion limit still bounds nesting);
 /// - `serde_json` parses it; and
 /// - it parses to an object (numbers, bools, arrays, null, and bare strings
-///   stay verbatim — object-only gate, decision 2A).
+///   stay verbatim — object-only gate).
 ///
 /// Only the top level is gated on being an object; nested values convert by
 /// their own JSON type via `json_to_any_value`.
@@ -307,14 +308,14 @@ fn try_parse_json_body(s: &str) -> Option<AnyValue> {
     Some(json_to_any_value(value))
 }
 
-/// Convert a [`serde_json::Value`] into the OTLP [`AnyValue`] the flattener
+/// Convert a `serde_json::Value` into the OTLP `AnyValue` the flattener
 /// consumes — one-to-one by JSON type. Recurses through arrays and objects; a
-/// string value is carried verbatim, never re-parsed as JSON (decision 2A: no
-/// recursive re-parse).
+/// string value is carried verbatim, never re-parsed as JSON (no recursive
+/// re-parse).
 ///
 /// Object keys keep `serde_json`'s `Map` order: insertion order when any crate
 /// in the build graph enables `preserve_order` (`otel-ingestor`, `otel-ledger`,
-/// `journal-function` do), else sorted. Key order MUST NOT be relied on for
+/// `journal-function`, `netflow-plugin` do), else sorted. Key order MUST NOT be relied on for
 /// frame byte-stability; column identity is unaffected (nodes intern by path +
 /// kind, independent of entry order).
 fn json_to_any_value(value: serde_json::Value) -> AnyValue {
@@ -341,18 +342,19 @@ fn json_to_any_value(value: serde_json::Value) -> AnyValue {
 }
 
 /// Map a JSON number onto an OTLP scalar. Integers that fit `i64` stay an
-/// `IntValue`; a `u64` past `i64::MAX` becomes a `DoubleValue` (decision 4B —
-/// stays numeric, accepting precision loss above 2^53); a fractional number is
-/// a `DoubleValue`.
+/// `IntValue`; a `u64` past `i64::MAX` becomes a `DoubleValue` (stays numeric,
+/// accepting precision loss above 2^53); a fractional number is a
+/// `DoubleValue`.
 fn json_number_to_value(n: serde_json::Number) -> Av {
     if let Some(i) = n.as_i64() {
         Av::IntValue(i)
     } else if let Some(u) = n.as_u64() {
         Av::DoubleValue(u as f64)
     } else {
-        // Neither `as_i64` nor `as_u64` matched, so this is a fractional
-        // number — its only remaining `serde_json::Number` shape. `as_f64` is
-        // infallible for it (no `arbitrary_precision` feature in this workspace).
+        // Neither `as_i64` nor `as_u64` matched, so this is a float — the only
+        // remaining `serde_json::Number` shape (integer-valued floats like
+        // `1e30` land here too). `as_f64` is infallible for it (no
+        // `arbitrary_precision` feature in this workspace).
         Av::DoubleValue(n.as_f64().expect("fractional JSON number is always f64"))
     }
 }

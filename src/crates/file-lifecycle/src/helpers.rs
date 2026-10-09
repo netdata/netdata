@@ -87,9 +87,9 @@ pub fn catalog_retention_days(retention: &bridge::config::RetentionConfig) -> u3
 /// 1:1; `max_total_size` is re-wrapped from bridge's `bytesize::ByteSize`
 /// into [`file_registry::ByteSize`]. The
 /// `retention_policy_maps_fields_one_to_one` test pins the mapping — the
-/// evict-all recovery tests (`recovery/tests.rs`, all running
-/// `max_files: 0`) evict everything regardless of the other two limits and
-/// cannot catch a cross-wired field.
+/// evict-all recovery tests (`recovery/tests.rs`, the `evict_all_retention`
+/// fixture's `max_files: 0`) evict everything regardless of the other two
+/// limits and cannot catch a cross-wired field.
 ///
 /// Consumers (grep-verified): the retention passes hand the result to
 /// `sfst::Registry::evaluate_retention` (otel-ledger's `ledger/retention.rs`;
@@ -173,10 +173,10 @@ mod tests {
     use super::*;
 
     /// Pin the config→policy field mapping 1:1. The evict-all recovery tests
-    /// (`recovery/tests.rs`, all running `max_files: 0`) evict everything
-    /// regardless of the other two limits, so they cannot catch a cross-wired
-    /// field; a literal swap would not even compile, since the three fields
-    /// have distinct types.
+    /// (`recovery/tests.rs`, the `evict_all_retention` fixture's
+    /// `max_files: 0`) evict everything regardless of the other two limits,
+    /// so they cannot catch a cross-wired field; a literal swap would not
+    /// even compile, since the three fields have distinct types.
     #[test]
     fn retention_policy_maps_fields_one_to_one() {
         let cfg = bridge::config::RetentionConfig {

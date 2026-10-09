@@ -301,8 +301,8 @@ pub async fn batch_compute_file_indexes(
     for (key, cache_lookup_result) in cache_lookup_results {
         match cache_lookup_result {
             Ok(Some(file_index)) => {
-                // Reuse gate: `is_fresh` covers still-active files,
-                // whose cached index goes stale after 1s
+                // Reuse gate: `is_fresh` covers files that were online
+                // when indexed — such a cached index goes stale after 1s
                 // (`journal-index/src/file_index.rs` `FileIndex::is_fresh`); the bucket
                 // check covers query granularity — a finer index serves
                 // a coarser query because the histogram engine sums
@@ -315,7 +315,6 @@ pub async fn batch_compute_file_indexes(
                     && bucket_duration.is_multiple_of(file_index.bucket_duration());
 
                 if fresh && bucket_ok {
-                    // Fresh and bucket-compatible: serve from cache.
                     cache_hits += 1;
                     responses.push((key, file_index));
                 } else {

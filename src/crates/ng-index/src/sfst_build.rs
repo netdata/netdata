@@ -1,6 +1,6 @@
 //! Build SFST index data from ng-flatten WAL frames — the producer side of the
-//! SFST build. [`sfst::RowIndex`] is Phase 1 (in-memory accumulation; see
-//! `sfst::row_index`), [`sfst::IndexWriter`] is Phase 2 (tiering, time-sort,
+//! SFST build. `sfst::RowIndex` is Phase 1 (in-memory accumulation; see
+//! `sfst::row_index`), `sfst::IndexWriter` is Phase 2 (tiering, time-sort,
 //! FST build, chunk packing), so this file owns only the extract-and-fill step.
 //!
 //! One pass over the WAL per signal: decode each frame, render every typed
@@ -40,7 +40,7 @@ use crate::{
     Entry, Error, FlattenedLogRequest, Metrics, NodeId, build_kv, decode_log_frame, sole_wal_file,
 };
 
-/// Map a flatten [`ng_flatten::Kind`] to the format crate's [`sfst::ValueKind`].
+/// Map a flatten `ng_flatten::Kind` to the format crate's `sfst::ValueKind`.
 /// Identical variant sets; the conversion keeps `sfst` independent of
 /// `ng-flatten` (the format crate owns its own kind enum).
 fn to_value_kind(kind: ng_flatten::Kind) -> sfst::ValueKind {
@@ -59,8 +59,8 @@ fn to_value_kind(kind: ng_flatten::Kind) -> sfst::ValueKind {
     }
 }
 
-/// Convert a flatten [`ng_flatten::SchemaTree`] into the format crate's
-/// [`sfst::SchemaTree`] node-by-node (ids preserved, parents precede
+/// Convert a flatten `ng_flatten::SchemaTree` into the format crate's
+/// `sfst::SchemaTree` node-by-node (ids preserved, parents precede
 /// children). Leaf stats are left unset here — the SFST build fills them from
 /// the per-field cardinality/tier. Public as the CANONICAL boundary
 /// conversion: the `sfsq` traces tail scan derives its field→kind map through
@@ -187,9 +187,9 @@ fn populate_row_index(
     // to `row_index.row(...)`. Stored as the optional SFST column chunks
     // (`OBTS`/`TRCE`/`SPAN`/`FLAG`/`DRAC`), not FST facets. trace_id/span_id
     // are never interned — columns only (see `ng_flatten::flatten_record`).
-    // The ingest boundary validated id lengths (16/8 or empty); the pushes
-    // below map each raw id to the typed `TraceId`/`SpanId` (empty/malformed
-    // → the all-zero `UNSET`).
+    // Ingest normalization validated id lengths (16/8 or empty) and the
+    // flattener mapped absent/malformed ids to the all-zero `UNSET` typed id;
+    // the pushes below are byte copies of those already-typed ids.
     let mut observed_ts: Vec<i64> = Vec::new();
     let mut trace_ids = TraceIds::default();
     let mut span_ids = SpanIds::default();
@@ -319,7 +319,7 @@ pub fn build_sfst(flat_dir: &Path, out_path: &Path, metrics: &Metrics) -> Result
 }
 
 /// Build an SFST index file from a single flattened WAL **file** (not a directory),
-/// returning the registry-facing [`sfst::Summary`] + the written file size. The
+/// returning the registry-facing `sfst::Summary` + the written file size. The
 /// production seal-time entry point `otel-ledger` calls with a concrete WAL path.
 /// Same typed tree + per-row columns as [`build_sfst`]; it just skips the
 /// `sole_wal_file` directory probe.
@@ -340,10 +340,10 @@ pub fn build_sfst_file(
 }
 
 /// Build an **in-memory** SFST over a frame-aligned `range` of an active flattened
-/// WAL, returning its [`sfst::Summary`] plus the serialized bytes (openable with
-/// [`sfst::IndexReader::open`]). The in-memory counterpart of [`build_sfst`] — the
+/// WAL, returning its `sfst::Summary` plus the serialized bytes (openable with
+/// `sfst::IndexReader::open`). The in-memory counterpart of [`build_sfst`] — the
 /// on-query chunk build over an active WAL's durable-unindexed prefix. Reads only the
-/// frames in `range` via [`wal::Reader::open_range`] (see [`wal::FrameRange`] for the
+/// frames in `range` via `wal::Reader::open_range` (see `wal::FrameRange` for the
 /// frame-boundary / durable-prefix soundness checks); the typed tree + per-row columns
 /// are identical to the file build, so the chunks are byte-identical to a file build
 /// over the same frames. The caller cross-checks `summary.record_count` against the
@@ -648,7 +648,7 @@ fn populate_trace_row_index(
 
 /// Build an SFST index file from a single flattened **traces** WAL file — the traces
 /// analog of [`build_sfst_file`]. Populates the span per-row columns and builds the
-/// `trace_id` index; returns the [`sfst::Summary`] + written file size.
+/// `trace_id` index; returns the `sfst::Summary` + written file size.
 pub fn build_sfst_traces_file(
     wal_path: &Path,
     out_path: &Path,

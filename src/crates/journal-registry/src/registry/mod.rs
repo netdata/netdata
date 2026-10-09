@@ -148,7 +148,6 @@ impl Repository {
                             time_range: TimeRange::Unknown,
                         });
 
-                // The overlay: keep or drop each base result by its indexed bounds.
                 let include = match file_info.time_range {
                     TimeRange::Unknown => {
                         // Not indexed yet; dropping it would hide the file's entries from queries.
@@ -260,7 +259,6 @@ impl Registry {
         inner.monitor.watch_directory(path)?;
         inner.watched_directories.insert(String::from(path));
 
-        // Seed the scanned files: each enters at Unknown; failures are logged and skipped.
         for file in files {
             trace!("adding file to repository: {:?}", file.path());
 
@@ -304,9 +302,10 @@ impl Registry {
     /// Feed every event the monitor's receiver yields. Creates insert files,
     /// removes drop them (indexed bounds go with the file), and renames remove
     /// the old path then insert the new one - so a renamed file does not
-    /// inherit the old entry's bounds and is re-indexed. Paths that do not
-    /// parse as journal files are warned and skipped; per-file failures are
-    /// only logged, so this always returns `Ok`.
+    /// inherit the old entry's bounds and is re-indexed. Unparseable paths
+    /// are skipped - warned in the create/remove arms, silently in the rename
+    /// arm - and per-file failures are only logged, so this always returns
+    /// `Ok`.
     pub fn process_event(&self, event: Event) -> Result<()> {
         let mut inner = self.inner.write();
 

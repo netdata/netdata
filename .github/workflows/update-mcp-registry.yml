@@ -27,7 +27,7 @@ jobs:
           exit 1
       - name: Checkout
         id: checkout
-        uses: actions/checkout@v7
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       - name: Update server.json version
         id: update_version
@@ -66,7 +66,7 @@ jobs:
         run: mcp-publisher publish server.json
 
       - name: Failure Notification
-        uses: rtCamp/action-slack-notify@v2
+        uses: rtCamp/action-slack-notify@33ca3be66c6f378fe1610fd1d5258632dbed5e58 # v2.4.0
         if: failure()
         env:
           SLACK_COLOR: 'danger'

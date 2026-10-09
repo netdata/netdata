@@ -2817,6 +2817,95 @@ static int test_inicfg_double_values(void) {
     return rc;
 }
 
+static bool inicfg_section_dump_cb(void *data, const char *name, const char *value) {
+    BUFFER *wb = data;
+    buffer_sprintf(wb, "%s%s=%s", buffer_strlen(wb) ? "," : "", name, value);
+    return false;
+}
+
+static int inicfg_section_check(struct config *cfg, const char *section, const char *expected, const char *step) {
+    CLEAN_BUFFER *wb = buffer_create(0, NULL);
+    inicfg_foreach_value_in_section(cfg, section, inicfg_section_dump_cb, wb);
+    if(strcmp(buffer_tostring(wb), expected) != 0) {
+        fprintf(stderr, "test_inicfg_section_reload: %s: [%s] is '%s', expected '%s'\n",
+                step, section, buffer_tostring(wb), expected);
+        return 1;
+    }
+    return 0;
+}
+
+// rewrites the fixture mkstemp() created; never creates a file, so a missing fixture is a failure
+static int inicfg_section_write_file(const char *filename, const char *contents) {
+    int fd = open(filename, O_WRONLY | O_TRUNC);
+    FILE *fp = (fd == -1) ? NULL : fdopen(fd, "w");
+    if(!fp) {
+        if(fd != -1)
+            close(fd);
+        fprintf(stderr, "test_inicfg_section_reload: cannot write '%s'\n", filename);
+        return 1;
+    }
+    bool written = fputs(contents, fp) >= 0;
+    if(fclose(fp) != 0 || !written) {
+        fprintf(stderr, "test_inicfg_section_reload: cannot write '%s'\n", filename);
+        return 1;
+    }
+    return 0;
+}
+
+static int test_inicfg_section_reload(void) {
+    fprintf(stderr, "%s() running...\n", __FUNCTION__);
+
+    // reloading one section (as reload-labels does) must leave it exactly as the file has it now,
+    // and must not touch the other sections
+    const char *tmpdir = getenv("TMPDIR");
+    if(!tmpdir || !*tmpdir)
+        tmpdir = P_tmpdir;
+
+    char filename[FILENAME_MAX + 1];
+    snprintfz(filename, sizeof(filename), "%s/netdata-unittest-inicfg-XXXXXX", tmpdir);
+    int fd = mkstemp(filename);
+    if(fd == -1) {
+        fprintf(stderr, "%s: cannot create the fixture in '%s'\n", __FUNCTION__, tmpdir);
+        return 1;
+    }
+    close(fd);
+
+    // never created, so loading it fails
+    char missing[FILENAME_MAX + 1];
+    snprintfz(missing, sizeof(missing), "%s.missing", filename);
+
+    struct config cfg = APPCONFIG_INITIALIZER;
+    int rc = 0;
+
+    rc += inicfg_section_write_file(filename, "[target]\na = 1\nb = 2\n[other]\nx = 1\n");
+    inicfg_load(&cfg, filename, 0, NULL);
+    rc += inicfg_section_check(&cfg, "target", "a=1,b=2", "full load");
+
+    rc += inicfg_section_write_file(filename, "[target]\na = 1\n[other]\nx = 2\n");
+    inicfg_load(&cfg, filename, 1, "target");
+    rc += inicfg_section_check(&cfg, "target", "a=1", "option removed");
+    rc += inicfg_section_check(&cfg, "other", "x=1", "option removed");
+
+    rc += inicfg_section_write_file(filename, "[target]\na = 1\n[other]\nx = 2\n[target]\nc = 3\n");
+    inicfg_load(&cfg, filename, 1, "target");
+    rc += inicfg_section_check(&cfg, "target", "a=1,c=3", "section repeated");
+
+    if(inicfg_load(&cfg, missing, 1, "target")) {
+        fprintf(stderr, "%s: loading a missing file succeeded\n", __FUNCTION__);
+        rc++;
+    }
+    rc += inicfg_section_check(&cfg, "target", "a=1,c=3", "file missing");
+
+    rc += inicfg_section_write_file(filename, "[other]\nx = 2\n");
+    inicfg_load(&cfg, filename, 1, "target");
+    rc += inicfg_section_check(&cfg, "target", "", "section removed");
+    rc += inicfg_section_check(&cfg, "other", "x=1", "section removed");
+
+    unlink(filename);
+    inicfg_free(&cfg);
+    return rc ? 1 : 0;
+}
+
 static int test_rrdr_relative_window_extreme_values(void) {
     fprintf(stderr, "%s() running...\n", __FUNCTION__);
 
@@ -3163,6 +3252,9 @@ int run_all_mockup_tests(void)
         return 1;
 
     if(test_inicfg_double_values())
+        return 1;
+
+    if(test_inicfg_section_reload())
         return 1;
 
     if(test_query_window_resampling_boundaries())

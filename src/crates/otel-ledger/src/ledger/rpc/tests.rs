@@ -4,8 +4,8 @@
 //! traces pipeline's strict-shape variant (wired per-signal in
 //! pipeline.rs / traces_pipeline.rs). Pure functions over
 //! `(args, payload)`, so there are no fixtures: each test calls a
-//! shim directly and parses the synthesized bytes back to a
-//! `serde_json::Value`.
+//! shim directly (the synthesis cases parse the bytes back to a
+//! `serde_json::Value`).
 //!
 //! Each test pins one synthesis contract, commented inline. Not
 //! pinned here: parsing of the synthesized shapes into each signal's
@@ -87,9 +87,10 @@ fn traces_shim_synthesizes_only_the_strict_info_object() {
 #[test]
 fn traces_shim_synthesizes_nothing_for_data_gets() {
     let args = |a: &[&str]| a.iter().map(|s| s.to_string()).collect::<Vec<_>>();
-    // No info token: no payload. The bridge deserializes an absent
-    // payload from `{}`, which the strict one-mode traces request
-    // rejects — a 400 client error, never a silent default query.
+    // No info token: no payload. The bridge then deserializes the
+    // absent payload from `{}` into the selector-less Functions view
+    // with default params — a default query; the GET's window args
+    // are dropped, not rejected with a 400.
     assert!(patch_traces_args_into_payload(&args(&[]), None).is_none());
     assert!(patch_traces_args_into_payload(&args(&["after:100", "before:200"]), None).is_none());
     // The payload guard is load-bearing: dispatch gives synthesized

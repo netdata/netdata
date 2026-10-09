@@ -1,7 +1,6 @@
-//! Materialization and value-enumeration correctness over whole files
-//! this module builds with the crate's own writer ([`RowIndex`] +
-//! [`IndexWriter::write_into`] — not the byte-level `fixture.rs`
-//! helpers).
+//! Materialization and value-enumeration correctness over whole files.
+//! Files are built with the crate's own writer ([`RowIndex`] +
+//! [`IndexWriter::write_into`]) — not the byte-level `fixture.rs` helpers.
 //!
 //! The recurring hazard: one field name dot-extends another (`a` vs
 //! `a.b`). The primary FST's global key sort then disagrees with the
@@ -21,7 +20,8 @@
 //! - [`IndexReader::field_values`]: per-tier enumeration, sorted, prefix
 //!   stripped by LENGTH, `UnknownField` for an absent field;
 //! - `field_values` reads dictionary chunks only — with every stream
-//!   batch corrupted, enumeration still succeeds while row access fails.
+//!   batch corrupted, enumeration still succeeds while loading any
+//!   batch fails.
 //!
 //! Not pinned here: projecting a field this file lacks (absent-field
 //! columns), `materialize_rows`' corruption error paths, chunk-level
@@ -139,7 +139,7 @@ fn kv_id_paths_agree_for_prefix_field_families() {
     // Regex select on one value per field (exercises the pattern scans;
     // a pattern anchors to the whole value, so "v0*1" hits v001 only).
     for field in ["a", "a.b", "m", "m.n", "h", "h.i"] {
-        let f = crate::Filter::new().select_pattern(field, "v0*1"); // matches v001 only
+        let f = crate::Filter::new().select_pattern(field, "v0*1");
         let bf = idx.compile_filter(&f, None).unwrap();
         let pos = expected
             .iter()
@@ -236,7 +236,8 @@ fn field_values_per_tier_prefix_stripped_by_length() {
 /// Access-pattern proof for [`IndexReader::field_values`]: with EVERY
 /// stream-batch chunk payload corrupted (crc32 mismatch on access), value
 /// enumeration across all tiers still returns exact results — it reads
-/// only dictionary chunks — while any row access fails loudly.
+/// only dictionary chunks — while every batch load (the row-access
+/// primitive) fails loudly.
 #[test]
 fn field_values_never_touch_stream_batches() {
     let (bytes, expected) = prefix_family_fixture();

@@ -36,7 +36,7 @@ RUM processing is separate from investigation queries and Function presentation:
 | `rum/diagnostics` | Last rejected-origin observation owned by one site runtime |
 | `rum/aggregate` | One site's rolling measurements and investigation state, behind one lock |
 | `rum/otlp` | RUM log/span mapping, export queues, transport and drainage |
-| `rum/geoip` | Receiver-owned MMDB reader and RUM location policy |
+| `rum/geoip` | Receiver-owned geographic sources, snapshots and validated lookups |
 
 The top-level `config/` directory holds installed configuration files, not a Go package. Configuration policy does
 not read the hostname or generate UI prose; diagnostics derives fallback addresses and Functions owns presentation.
@@ -85,6 +85,29 @@ create none of these resources. The destinations have identical security options
 These objects have no site inventory or reconfiguration API. The registry admits references to those exact owners;
 it does not construct them. The route records address/rejection observations in the separate diagnostic state.
 Aggregation and each exporter reject an observation for another site before changing state.
+
+The receiver owns one stable `rum/geoip` resolver, including while no database is available. Composition injects the
+Agent cache and stock data roots through `pluginconfig`; the resolver and collector do not read environment variables.
+`Init` and `Check` validate configuration without database I/O. `Run` checks sources after listener setup, then every
+60 seconds, and joins its worker before `Cleanup` releases readers. HTTP lookup does no filesystem or network work.
+Candidate opens occur outside lookup locks; publication and reader retirement use the resolver's RWMutex.
+
+The resolver accepts only the documented geographic database types with framing/metadata checks, then validates
+fields during lookup without scanning every record at load. Source selection prefers accepted current cache, then
+stock, then a previous snapshot whose source was not confirmed removed; explicit mode remains within its configured
+source. File identity, size and modification time detect replacements. An unchanged accepted source is not reopened.
+Missing or rejected sources are retried and do not prevent receiver startup. New receiver generations never adopt an
+old configuration's snapshot. Source status is copied into the registry with generation fencing and projected through
+query/Functions; retirement clears current availability. The worker publishes refresh/fault changes and collection
+publishes source-generation lookup counts. Neither copied status nor database build time proves freshness or coverage.
+
+MMDB mappings are privately owned before reader construction. Only mapped construction/lookup reads use
+`SetPanicOnFault`, with the prior goroutine-local setting restored on exit. Recovery is limited to runtime faults whose
+address is inside the owned mapping; unrelated panics propagate. A fault discards partial output and taints the snapshot
+before releasing the lookup read lock. A nonblocking wakeup prompts worker fallback; tainted mappings cannot be retained
+as previous snapshots. Windows opens permit delete sharing for atomic replacement. Atomic replacement remains the
+required consistency contract: fault containment cannot detect readable torn content or guarantee all in-place writes
+are recoverable. DEM owns no downloader, network acquisition or runtime NetFlow dependency.
 
 Each site owns immutable capture policy. Config materializes country-only geolocation and disabled frustration
 heuristics without mutating the stored input. Browser bootstrap limits instrumentation and outgoing metadata; the

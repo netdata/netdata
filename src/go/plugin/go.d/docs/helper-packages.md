@@ -272,6 +272,18 @@ a streaming command stopped takes the cause from `Wait`, not from the end of out
 termination of contained descendants. Do not build
 this contract by calling a raw command's `Cancel` after `Wait`: a reaped Unix PID/process-group ID can be reused.
 
+`RunNDSudo` keeps its timeout even though ndsudo runs the command as root, which an unprivileged plugin cannot signal:
+
+- at the timeout it terminates the command where permitted and closes its output, so a command that keeps writing
+  dies of SIGPIPE, unless it handles SIGPIPE or EPIPE itself;
+- it returns the timeout error (`context.DeadlineExceeded`) at most 250 ms later, even if the command still runs;
+  that command is reaped when it ends;
+- from the timeout until that command exits, a new call with the same command and arguments fails at once with
+  `ErrPreviousRunNotExited`, so a command that hangs on every call does not accumulate root processes. Calls already
+  running and other command lines are not affected;
+- where the plugin may signal root processes, descendants that outlive the command end with it, as with
+  `StartNDSudoProcess`.
+
 For a long-running command exposed through `ndsudo`, use `StartNDSudoProcess`. It gives the same ownership, but
 ndsudo runs the command as root, and an unprivileged plugin cannot signal it:
 

@@ -7,7 +7,7 @@
 //! sealed SFSTs; each active WAL's durable prefix as chunk images plus a
 //! row-scanned tail, built OFF the registry lock through the shared
 //! singleflight [`ChunkCache`] (the traces seal:
-//! [`ng_index::build_sfst_traces_range`]); and — with remote storage —
+//! `ng_index::build_sfst_traces_range`); and — with remote storage —
 //! the range's remote-only files, planned from catalogs read off the
 //! same lock and downloaded once through the shared download cache. A
 //! remote file whose bytes could not be obtained, and each unreadable
@@ -82,10 +82,11 @@ struct ResolvedChunk {
 }
 
 /// One capture: a source vector per requested range — `sets[i]` answers
-/// the caller's `ranges[i]`, so copies over identical ranges share one
-/// vector — and the download-cache pins that keep captured remote files
-/// in place. The pins MUST live until the engine has read the sources —
-/// move them into the blocking closure that runs it.
+/// the caller's `ranges[i]`, identical ranges scanned once (each copy
+/// gets its own clone of the vector; the chunk byte images are
+/// `Arc`-shared) — and the download-cache pins that keep captured remote
+/// files in place. The pins MUST live until the engine has read the
+/// sources — move them into the blocking closure that runs it.
 pub(crate) struct Capture {
     pub(crate) sets: Vec<Vec<TraceSource>>,
     pub(crate) pins: Vec<file_cache::CachedFile>,
@@ -156,8 +157,9 @@ impl TracesSourceSupplier {
 
     /// One snapshot, one source vector per entry in `ranges` —
     /// [`Capture::sets`] keeps the caller's order, and identical ranges
-    /// are scanned once and share their vector. Each range is pruned by
-    /// its own range through the registry's file-granular predicate.
+    /// are scanned once, each copy getting its own clone of the vector.
+    /// Each range is pruned by its own range through the registry's
+    /// file-granular predicate.
     ///
     /// Per-range pruning exists because a merged trace envelope is a
     /// function of WHICH FILES were captured (the engine's

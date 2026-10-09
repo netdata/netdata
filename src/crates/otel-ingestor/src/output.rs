@@ -4,16 +4,17 @@
 //! DIMENSION, BEGIN, SET, END).
 //!
 //! These bytes are the ingestor's agent-facing output: chart.rs renders them
-//! into a String buffer, lib.rs's tick loop forwards the buffer as
-//! `IngestorResponse::ChartData` over ferryboat IPC, and the otel-plugin
-//! supervisor writes it raw to stdout
+//! into a String buffer, the lib.rs tick loop hands the buffer to the main
+//! loop, and the main loop forwards it as `IngestorResponse::ChartData` over
+//! ferryboat IPC; the otel-plugin supervisor then writes it raw to stdout
 //! (`netdata-plugin/protocol/src/transport.rs` `write_raw` bypasses the IPC
 //! framing). Line order here is wire order, every line must be
-//! newline-terminated, and a malformed command makes the agent disable the
-//! plugin.
+//! newline-terminated, and a malformed command stops the agent's parser: the
+//! plugin is disabled outright if it never collected data, and otherwise
+//! restarted with backoff until it is disabled (src/plugins.d/plugins_d.c).
 //!
-//! Consumers: chart.rs uses everything here; metrics_service.rs only
-//! [`ChartType`].
+//! Consumers: chart.rs uses everything here but `PRECISION_DIVISOR`;
+//! metrics_service.rs only [`ChartType`].
 
 use std::fmt::{self, Write as _};
 
@@ -21,7 +22,7 @@ use std::fmt::{self, Write as _};
 ///
 /// The agent recognizes line, area, stacked and heatmap; this ingestor emits
 /// only line and heatmap — line for every chart except the histogram bucket
-/// charts, which are heatmap (metrics_service.rs). [`fmt::Display`] writes
+/// charts, which are heatmap (metrics_service.rs). `fmt::Display` writes
 /// the agent's exact keywords.
 #[derive(Debug, Clone, Copy, Default)]
 pub enum ChartType {
@@ -54,8 +55,9 @@ pub const PRECISION_DIVISOR: i64 = 1000;
 /// delimiters, with only incomplete escape support
 /// (src/libnetdata/line_splitter/line_splitter.h), and commands are
 /// newline-delimited: an embedded newline would split one command in two,
-/// and a malformed command makes the agent disable the plugin
-/// (src/plugins.d/pluginsd_internals.c). Nothing can be escaped, so `'` is
+/// and a malformed command stops the agent's parser
+/// (src/plugins.d/pluginsd_internals.c — the module header records the
+/// disable policy). Nothing can be escaped, so `'` is
 /// rewritten as `"` and `\n`/`\r` as their literal two-character forms.
 struct SanitizedQuote<'a>(&'a str);
 

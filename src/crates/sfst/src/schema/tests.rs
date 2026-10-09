@@ -29,8 +29,8 @@
 /// The high-card string arena (`HighField`, the `HF{i}` chunk body)
 /// round-trips through bincode, and after `rebuild_offsets` — what the
 /// reader does on load, since `offsets` is `#[serde(skip)]` — its keys are
-/// reachable again: `key(i)`, sorted-order `binary_search` hit and miss,
-/// and the per-key masks all survive.
+/// reachable again (`key(i)`, sorted-order `binary_search` hit and miss);
+/// the per-key masks round-trip with the arena.
 #[test]
 fn high_field_arena_round_trips() {
     let keys = ["alpha", "bravo", "charlie"];
@@ -99,7 +99,7 @@ fn serde_bytes_is_wire_compatible_with_plain_vec_u8() {
     }
 
     // A 1000-byte payload, so the bincode length prefix is a multi-byte
-    // varint — the shape a corrupt length would have to lie about.
+    // varint.
     let data: Vec<u8> = (0..1000u32).map(|i| (i % 251) as u8).collect();
     let cfg = bincode::config::standard();
 
