@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Netdata's distribution definition for the macOS package, configured by
+     NetdataMacOSPackage.cmake and consumed by packaging/macos/create-pkg.sh.
+
+     It expresses what the tools cannot: the Apple Silicon requirement and
+     the macOS version floor, both refused by Installer with a clear dialog
+     instead of a broken install. The pkg-ref names the component package
+     build-pkg.sh creates; its identifier is the upgrade identity and must
+     never change once a package has shipped. -->
+<installer-gui-script minSpecVersion="1.08">
+    <title>Netdata</title>
+    <readme file="ReadMe.txt"/>
+    <license file="License.txt"/>
+    <options customize="never" require-scripts="false" hostArchitectures="arm64"/>
+    <domains enable_anywhere="false" enable_currentUserHome="false" enable_localSystem="true"/>
+    <volume-check>
+        <allowed-os-versions>
+            <os-version min="@NETDATA_PKG_MINIMUM_OS@"/>
+        </allowed-os-versions>
+    </volume-check>
+    <choices-outline>
+        <line choice="default"/>
+    </choices-outline>
+    <choice id="default" title="Netdata Agent" visible="false">
+        <pkg-ref id="@NETDATA_PKG_IDENTIFIER@"/>
+    </choice>
+    <pkg-ref id="@NETDATA_PKG_IDENTIFIER@" version="@NETDATA_PKG_VERSION@" onConclusion="none">netdata-agent.pkg</pkg-ref>
+</installer-gui-script>
