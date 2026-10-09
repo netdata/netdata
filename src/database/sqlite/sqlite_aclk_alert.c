@@ -739,9 +739,9 @@ static bool rebuild_host_alert_version_table(RRDHOST *host)
         goto done;
     }
 
-    int rc = sqlite3_step_monitored(res_delete);
+    int rc = execute_insert(res_delete);
     if (rc == SQLITE_DONE)
-        rc = sqlite3_step_monitored(res_insert);
+        rc = execute_insert(res_insert);
 
     if (rc == SQLITE_DONE && sqlite3_exec(db_meta, "RELEASE rebuild_alert_version", NULL, NULL, NULL) == SQLITE_OK)
         rebuilt = true;
