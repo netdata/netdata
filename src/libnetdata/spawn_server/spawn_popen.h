@@ -13,6 +13,10 @@ typedef struct popen_instance POPEN_INSTANCE;
 
 POPEN_INSTANCE *spawn_popen_run(const char *cmd);
 POPEN_INSTANCE *spawn_popen_run_argv(const char **argv);
+// Unix nofork backend only; other backends return NULL/ENOTSUP. Signals are failures, including
+// SIGTERM/SIGPIPE. Group cleanup is owned by the spawn server; final signals precede leader reaping.
+// This covers trusted tools that retain their process group, not deliberately daemonizing tools.
+POPEN_INSTANCE *spawn_popen_run_argv_group(const char **argv);
 POPEN_INSTANCE *spawn_popen_run_variadic(const char *cmd, ...);
 int spawn_popen_wait(POPEN_INSTANCE *pi);
 

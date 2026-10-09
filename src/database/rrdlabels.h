@@ -85,6 +85,11 @@ void rrdlabels_to_buffer_json_members(RRDLABELS *labels, BUFFER *wb);
 // DONT_DELETE entries and unchanged RRDLABEL_SRC bits can still differ).
 bool rrdlabels_migrate_to_these(RRDLABELS *dst, RRDLABELS *src);
 
+// Atomically replace the selected keys, preserving every other label. src must contain only
+// keys owned by this publisher. Source changes count as changes; the destination version is monotonic.
+bool rrdlabels_replace_subset(RRDLABELS *dst, RRDLABELS *src,
+                              bool (*owns)(const char *name, RRDLABEL_SRC source, void *data), void *data);
+
 // finalize a CLABEL stream commit: remove unmarked entries and report whether
 // the resulting label set differs from the pre-commit set (added, removed, or
 // value-changed entries).

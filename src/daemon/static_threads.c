@@ -16,8 +16,14 @@ void service_main(void *ptr);
 void statsd_main(void *ptr);
 void profile_main(void *ptr);
 void replication_thread_main(void *ptr);
+void system_info_main(void *ptr);
 
 const struct netdata_static_thread static_threads_common[] = {
+    {
+        .name = "SYSTEM_INFO",
+        .enabled = 1,
+        .start_routine = system_info_main
+    },
     {
         .name = "P[idlejitter]",
         .config_section = CONFIG_SECTION_PLUGINS,

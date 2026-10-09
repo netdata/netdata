@@ -83,4 +83,102 @@ label_output=$(/bin/sh -c '
     exit 1
 }
 
+# Exercise the network probe with command outcomes, not fixture state mutation.
+sed -n -e '/^get_default_interface_ip()/,/^}/p' -e '/^emit_runtime_field()/,/^}/p' \
+    "${system_info_script}" >> "${functions_script}"
+mkdir "${test_dir}/bin"
+cat > "${test_dir}/bin/timeout" <<'EOF'
+#!/bin/sh
+shift
+exec "$@"
+EOF
+cat > "${test_dir}/bin/route" <<'EOF'
+#!/bin/sh
+case "$NETWORK_TEST" in
+  present|address-failed) printf 'interface: test0\n' ;;
+  *) exit 1 ;;
+esac
+EOF
+cat > "${test_dir}/bin/netstat" <<'EOF'
+#!/bin/sh
+case "$NETWORK_TEST" in
+  absent) printf 'Destination Gateway Flags Netif\n' ;;
+  *) exit 1 ;;
+esac
+EOF
+cat > "${test_dir}/bin/ifconfig" <<'EOF'
+#!/bin/sh
+case "$NETWORK_TEST" in
+  present) printf 'inet 192.0.2.4 netmask 0xffffff00\n' ;;
+  *) exit 1 ;;
+esac
+EOF
+chmod +x "${test_dir}/bin/"*
+for network_case in present absent failed address-failed; do
+    network_output=$(PATH="${test_dir}/bin:${PATH}" NETWORK_TEST="${network_case}" /bin/sh -c '
+        . "$1"
+        KERNEL_NAME=Darwin
+        get_default_interface_ip -4
+        printf "%s|%s|%s\n" "$NETWORK_STATUS" "$DEFAULT_INTERFACE_NAME" "$DEFAULT_INTERFACE_IP"
+    ' sh "${functions_script}")
+    case "${network_case}" in
+        present) expected='V|test0|192.0.2.4' ;;
+        absent) expected='A|unknown|unknown' ;;
+        *) expected='F|unknown|unknown' ;;
+    esac
+    [ "${network_output}" = "${expected}" ] || {
+        printf 'network %s: expected %s, got %s\n' "${network_case}" "${expected}" "${network_output}" >&2
+        exit 1
+    }
+done
+
+# Recovery must use new output rather than a prior failed or absent probe.
+network_output=$(PATH="${test_dir}/bin:${PATH}" /bin/sh -c '
+    . "$1"
+    KERNEL_NAME=Darwin
+    export NETWORK_TEST=failed
+    get_default_interface_ip -4
+    [ "$NETWORK_STATUS" = F ] || exit 1
+    NETWORK_TEST=present
+    get_default_interface_ip -4
+    printf "%s|%s|%s\n" "$NETWORK_STATUS" "$DEFAULT_INTERFACE_NAME" "$DEFAULT_INTERFACE_IP"
+' sh "${functions_script}")
+[ "${network_output}" = 'V|test0|192.0.2.4' ]
+
+# Optional labels clear only when the OS probe succeeded.
+label_output=$(/bin/sh -c '
+    . "$1"
+    HOST_OS_DETECTION=/etc/os-release
+    emit_runtime_field NETDATA_HOST_OS_LABEL_CODENAME ""
+    HOST_OS_DETECTION=unknown
+    emit_runtime_field NETDATA_HOST_OS_LABEL_CODENAME ""
+' sh "${functions_script}")
+[ "${label_output}" = "$(printf 'A\tNETDATA_HOST_OS_LABEL_CODENAME\t\nF\tNETDATA_HOST_OS_LABEL_CODENAME\t')" ]
+
+# A matching kubelet process must not inject its PID into the detector protocol.
+sed -n '/^HOST_IS_K8S_NODE="false"/,/^fi/p' "${system_info_script}" > "${test_dir}/kubernetes.sh"
+kubernetes_output=$(/bin/sh -c '
+    pgrep() { printf "12345\n"; }
+    KUBERNETES_SERVICE_HOST="" KUBERNETES_SERVICE_PORT=""
+    . "$1"
+    printf "%s\n" "$HOST_IS_K8S_NODE"
+' sh "${test_dir}/kubernetes.sh")
+[ "${kubernetes_output}" = true ]
+
+# A failed process enumeration must not publish a false Kubernetes result.
+kubernetes_output=$(/bin/sh -c '
+    pgrep() { return 2; }
+    KUBERNETES_SERVICE_HOST="" KUBERNETES_SERVICE_PORT=""
+    . "$1"
+    printf "%s\n" "$K8S_STATUS"
+' sh "${test_dir}/kubernetes.sh")
+[ "${kubernetes_output}" = F ]
+
+sed -n '/^sum_disk_sizes()/,/^}/p' "${system_info_script}" >> "${functions_script}"
+disk_output=$(/bin/sh -c '. "$1"; printf "12\n34\n" | sum_disk_sizes 1024' sh "${functions_script}")
+[ "${disk_output}" = 47104 ]
+disk_output=$(/bin/sh -c '. "$1"; printf "" | sum_disk_sizes 1024' sh "${functions_script}")
+[ "${disk_output}" = 0 ]
+/bin/sh -c '. "$1"; ! printf "12\ninvalid\n" | sum_disk_sizes 1024' sh "${functions_script}"
+
 printf '%s\n' 'system-info shell tests: OK'

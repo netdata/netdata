@@ -3,9 +3,9 @@
 # -------------------------------------------------------------------------------------------------
 # detect the kernel
 
-KERNEL_NAME="$(uname -s)"
-KERNEL_VERSION="$(uname -r)"
-ARCHITECTURE="$(uname -m)"
+KERNEL_NAME="$(uname -s)" || KERNEL_NAME="unknown"
+KERNEL_VERSION="$(uname -r)" || KERNEL_VERSION="unknown"
+ARCHITECTURE="$(uname -m)" || ARCHITECTURE="unknown"
 
 # -------------------------------------------------------------------------------------------------
 # detect the virtualization and possibly the container technology
@@ -101,7 +101,7 @@ if [ "${CONTAINER}" = "unknown" ]; then
     CONT_DETECTION="kubernetes"
   fi
 
-  if [ "${KERNEL_NAME}" = FreeBSD ] && command -v sysctl && sysctl security.jail.jailed 2>/dev/null | grep -q "1$"; then
+  if [ "${KERNEL_NAME}" = FreeBSD ] && command -v sysctl >/dev/null 2>&1 && sysctl security.jail.jailed 2>/dev/null | grep -q "1$"; then
     CONTAINER="jail"
     CONT_DETECTION="sysctl"
   fi
@@ -236,7 +236,7 @@ elif [ "${KERNEL_NAME}" = "FreeBSD" ]; then
   CONTAINER_NAME="FreeBSD"
   CONTAINER_OS_DETECTION="uname"
   CONTAINER_VERSION=$(uname -r)
-  KERNEL_VERSION=$(uname -K)
+  KERNEL_VERSION=$(uname -K) || KERNEL_VERSION="unknown"
 else
   if load_os_release CONTAINER /etc/os-release; then
     CONTAINER_OS_DETECTION="/etc/os-release"
@@ -371,7 +371,7 @@ dmidecode="$(command -v dmidecode)"
 dmidecode_output=""
 
 if [ -n "${lscpu}" ] && lscpu >/dev/null 2>&1; then
-  lscpu_output="$(LC_NUMERIC=C ${lscpu} 2>/dev/null)"
+  lscpu_output="$(LC_NUMERIC=C ${lscpu} 2>/dev/null)" || lscpu_output=""
   CPU_INFO_SOURCE="lscpu"
   LCPU_COUNT="$(echo "${lscpu_output}" | grep "^CPU(s):" | cut -f 2 -d ':' | sed -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//')"
   CPU_VENDOR="$(echo "${lscpu_output}" | grep "^Vendor ID:" | cut -f 2 -d ':' | sed -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//')"
@@ -388,7 +388,7 @@ if [ -n "${lscpu}" ] && lscpu >/dev/null 2>&1; then
   fi
   [ -n "$possible_cpu_freq" ] && possible_cpu_freq="${possible_cpu_freq} MHz"
 elif [ -n "${dmidecode}" ] && dmidecode -t processor >/dev/null 2>&1; then
-  dmidecode_output="$(${dmidecode} -t processor 2>/dev/null)"
+  dmidecode_output="$(${dmidecode} -t processor 2>/dev/null)" || dmidecode_output=""
   CPU_INFO_SOURCE="dmidecode"
   LCPU_COUNT="$(echo "${dmidecode_output}" | grep -F "Thread Count:" | cut -f 2 -d ':' | sed -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//')"
   CPU_VENDOR="$(echo "${dmidecode_output}" | grep -F "Manufacturer:" | cut -f 2 -d ':' | sed -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//')"
@@ -398,7 +398,7 @@ else
   # Check OS-specific methods FIRST, then fall back to generic methods
   if [ "${KERNEL_NAME}" = FreeBSD ]; then
     CPU_INFO_SOURCE="sysctl"
-    LCPU_COUNT="$(sysctl -n kern.smp.cpus)"
+    LCPU_COUNT="$(sysctl -n kern.smp.cpus)" || LCPU_COUNT="unknown"
     # Try dev.cpu.0.freq first (what freebsd.plugin uses, returns MHz)
     if possible_cpu_freq=$(sysctl -n dev.cpu.0.freq 2>/dev/null); then
       possible_cpu_freq="${possible_cpu_freq} MHz"
@@ -410,10 +410,10 @@ else
     fi
   elif [ "${KERNEL_NAME}" = Darwin ]; then
     CPU_INFO_SOURCE="sysctl"
-    LCPU_COUNT="$(sysctl -n hw.logicalcpu)"
+    LCPU_COUNT="$(sysctl -n hw.logicalcpu)" || LCPU_COUNT="unknown"
   elif [ -n "${nproc}" ]; then
     CPU_INFO_SOURCE="nproc"
-    LCPU_COUNT="$(${nproc})"
+    LCPU_COUNT="$(${nproc})" || LCPU_COUNT="unknown"
   elif [ -d /sys/devices/system/cpu ]; then
     CPU_INFO_SOURCE="sysfs"
     # This is potentially more accurate than checking `/proc/cpuinfo`.
@@ -424,23 +424,23 @@ else
   fi
 
   if [ "${KERNEL_NAME}" = Darwin ]; then
-    CPU_MODEL="$(sysctl -n machdep.cpu.brand_string)"
+    CPU_MODEL="$(sysctl -n machdep.cpu.brand_string)" || CPU_MODEL="unknown"
     if [ "${ARCHITECTURE}" = "x86_64" ]; then
-      CPU_VENDOR="$(sysctl -n machdep.cpu.vendor)"
+      CPU_VENDOR="$(sysctl -n machdep.cpu.vendor)" || CPU_VENDOR="unknown"
     else
       CPU_VENDOR="Apple"
     fi
     echo "${CPU_INFO_SOURCE}" | grep -qv sysctl && CPU_INFO_SOURCE="${CPU_INFO_SOURCE} sysctl"
   elif uname --version 2>/dev/null | grep -qF 'GNU coreutils'; then
     CPU_INFO_SOURCE="${CPU_INFO_SOURCE} uname"
-    CPU_MODEL="$(uname -p)"
-    CPU_VENDOR="$(uname -i)"
+    CPU_MODEL="$(uname -p)" || CPU_MODEL="unknown"
+    CPU_VENDOR="$(uname -i)" || CPU_VENDOR="unknown"
   elif [ "${KERNEL_NAME}" = FreeBSD ]; then
     if (echo "${CPU_INFO_SOURCE}" | grep -qv sysctl); then
       CPU_INFO_SOURCE="${CPU_INFO_SOURCE} sysctl"
     fi
 
-    CPU_MODEL="$(sysctl -n hw.model)"
+    CPU_MODEL="$(sysctl -n hw.model)" || CPU_MODEL="unknown"
   elif [ -r /proc/cpuinfo ]; then
     if (echo "${CPU_INFO_SOURCE}" | grep -qv procfs); then
       CPU_INFO_SOURCE="${CPU_INFO_SOURCE} procfs"
@@ -452,7 +452,7 @@ else
 fi
 
 if [ "${KERNEL_NAME}" = Darwin ] && [ "${ARCHITECTURE}" = "x86_64" ]; then
-  CPU_FREQ="$(sysctl -n hw.cpufrequency)"
+  CPU_FREQ="$(sysctl -n hw.cpufrequency)" || CPU_FREQ="unknown"
 elif [ -r /sys/devices/system/cpu/cpu0/cpufreq/base_frequency ]; then
   if (echo "${CPU_INFO_SOURCE}" | grep -qv sysfs); then
     CPU_INFO_SOURCE="${CPU_INFO_SOURCE} sysfs"
@@ -504,10 +504,10 @@ RAM_DETECTION="none"
 
 if [ "${KERNEL_NAME}" = FreeBSD ]; then
   RAM_DETECTION="sysctl"
-  TOTAL_RAM="$(sysctl -n hw.physmem)"
+  TOTAL_RAM="$(sysctl -n hw.physmem)" || TOTAL_RAM="unknown"
 elif [ "${KERNEL_NAME}" = Darwin ]; then
   RAM_DETECTION="sysctl"
-  TOTAL_RAM="$(sysctl -n hw.memsize)"
+  TOTAL_RAM="$(sysctl -n hw.memsize)" || TOTAL_RAM="unknown"
 elif [ -r /proc/meminfo ]; then
   RAM_DETECTION="procfs"
   TOTAL_RAM="$(grep -F MemTotal /proc/meminfo | cut -f 2 -d ':' | sed -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//' | cut -f 1 -d ' ')"
@@ -528,40 +528,57 @@ is_inside_lxc_container() {
   return $?
 }
 
+# Sum only validated rows; empty successful enumeration is a zero total.
+sum_disk_sizes() {
+  disk_total=0
+  while IFS= read -r disk_size; do
+    case "${disk_size}" in ''|*[!0-9]*) return 1 ;; esac
+    disk_total=$((disk_total + disk_size * $1))
+  done
+  printf '%s\n' "${disk_total}"
+}
+
 DISK_SIZE="unknown"
 DISK_DETECTION="none"
+DISK_STATUS=V
 
 if [ "${KERNEL_NAME}" = "Darwin" ]; then
-  if DISK_SIZE=$(diskutil info / 2>/dev/null | awk '/Disk Size/ {total += substr($5,2,length($5))} END { print total }') &&
+  if disk_output=$(diskutil info / 2>/dev/null) &&
+    DISK_SIZE=$(printf '%s\n' "${disk_output}" | awk '/Disk Size/ {total += substr($5,2,length($5))} END { print total }') &&
     [ -n "$DISK_SIZE" ] && [ "$DISK_SIZE" != "0" ]; then
     DISK_DETECTION="diskutil"
   else
     types='hfs'
+    vfs_output=$(lsvfs) || DISK_STATUS=F
 
-    if (lsvfs | grep -q apfs); then
+    if (printf '%s\n' "${vfs_output}" | grep -q apfs); then
       types="${types},apfs"
     fi
 
-    if (lsvfs | grep -q ufs); then
+    if (printf '%s\n' "${vfs_output}" | grep -q ufs); then
       types="${types},ufs"
     fi
 
     DISK_DETECTION="df"
-    DISK_SIZE=$(($(/bin/df -k -t ${types} | tail -n +2 | sed -E 's/\/dev\/disk([[:digit:]]*)s[[:digit:]]*/\/dev\/disk\1/g' | sort -k 1 | awk -F ' ' '{s=$NF;for(i=NF-1;i>=1;i--)s=s FS $i;print s}' | uniq -f 9 | awk '{print $8}' | tr '\n' '+' | rev | cut -f 2- -d '+' | rev) * 1024))
+    disk_output=$(/bin/df -k -t ${types}) || DISK_STATUS=F
+    DISK_SIZE=$(printf '%s\n' "${disk_output}" | tail -n +2 | sed -E 's/\/dev\/disk([[:digit:]]*)s[[:digit:]]*/\/dev\/disk\1/g' | sort -k 1 | awk -F ' ' '{s=$NF;for(i=NF-1;i>=1;i--)s=s FS $i;print s}' | uniq -f 9 | awk '{print $8}' | sum_disk_sizes 1024) || DISK_STATUS=F
   fi
 elif [ "${KERNEL_NAME}" = FreeBSD ]; then
   types='ufs'
+  vfs_output=$(lsvfs) || DISK_STATUS=F
 
-  if (lsvfs | grep -q zfs); then
+  if (printf '%s\n' "${vfs_output}" | grep -q zfs); then
     types="${types},zfs"
   fi
 
   DISK_DETECTION="df"
-  total="$(df -t ${types} -c -k | tail -n 1 | awk '{print $2}')"
-  DISK_SIZE="$((total * 1024))"
+  disk_output=$(df -t ${types} -c -k) || DISK_STATUS=F
+  total="$(printf '%s\n' "${disk_output}" | tail -n 1 | awk '{print $2}')"
+  case "${total}" in ''|*[!0-9]*) DISK_STATUS=F ;; *) DISK_SIZE="$((total * 1024))" ;; esac
 else
   if [ -d /sys/block ] && [ -r /proc/devices ] && ! is_inside_lxc_container; then
     dev_major_whitelist=''
+    devices_output=$(cat /proc/devices) || DISK_STATUS=F
 
     # This is a list of device names used for block storage devices.
     # These translate to the prefixs of files in `/dev` indicating the device type.
@@ -570,28 +587,33 @@ else
     device_names='hd sd mfm ad ftl pd nftl dasd intfl mmcblk mmc ub xvd rfd vbd nvme virtblk blkext'
 
     for name in ${device_names}; do
-      if grep -qE " ${name}\$" /proc/devices; then
-        dev_major_whitelist="${dev_major_whitelist}:$(grep -E "${name}\$" /proc/devices | sed -e 's/^[[:space:]]*//' | cut -f 1 -d ' ' | tr '\n' ':'):"
+      if printf '%s\n' "${devices_output}" | grep -qE " ${name}\$"; then
+        dev_major_whitelist="${dev_major_whitelist}:$(printf '%s\n' "${devices_output}" | grep -E "${name}\$" | sed -e 's/^[[:space:]]*//' | cut -f 1 -d ' ' | tr '\n' ':'):"
       fi
     done
 
     DISK_DETECTION="sysfs"
     DISK_SIZE="0"
     for disk in /sys/block/*; do
-      if [ -r "${disk}/size" ] &&
-        (echo "${dev_major_whitelist}" | grep -q ":$(cut -f 1 -d ':' "${disk}/dev"):") &&
-        grep -qv 1 "${disk}/removable"; then
-        size="$(($(cat "${disk}/size") * 512))"
-        DISK_SIZE="$((DISK_SIZE + size))"
-      fi
+      [ -e "${disk}" ] || continue
+      if ! disk_major=$(cut -f 1 -d ':' "${disk}/dev"); then DISK_STATUS=F; continue; fi
+      echo "${dev_major_whitelist}" | grep -q ":${disk_major}:" || continue
+      if ! removable=$(cat "${disk}/removable"); then DISK_STATUS=F; continue; fi
+      [ "${removable}" = 0 ] || continue
+      if ! sectors=$(cat "${disk}/size"); then DISK_STATUS=F; continue; fi
+      case "${sectors}" in ''|*[!0-9]*) DISK_STATUS=F; continue ;; esac
+      size="$((sectors * 512))"
+      DISK_SIZE="$((DISK_SIZE + size))"
     done
   elif df --version 2>/dev/null | grep -qF "GNU coreutils"; then
     DISK_DETECTION="df"
-    DISK_SIZE=$(($(df -x tmpfs -x devtmpfs -x squashfs -l -B1 --output=source,size | tail -n +2 | sort -u -k 1 | awk '{print $2}' | tr '\n' '+' | head -c -1)))
+    disk_output=$(df -x tmpfs -x devtmpfs -x squashfs -l -B1 --output=source,size) || DISK_STATUS=F
+    DISK_SIZE=$(printf '%s\n' "${disk_output}" | tail -n +2 | sort -u -k 1 | awk '{print $2}' | sum_disk_sizes 1) || DISK_STATUS=F
   else
     DISK_DETECTION="df"
     include_fs_types="ext*|btrfs|xfs|jfs|reiser*|zfs"
-    DISK_SIZE=$(($(df -T -P | tail -n +2 | sort -u -k 1 | grep -E "${include_fs_types}" | awk '{print $3}' | tr '\n' '+' | head -c -1) * 1024))
+    disk_output=$(df -T -P) || DISK_STATUS=F
+    DISK_SIZE=$(printf '%s\n' "${disk_output}" | tail -n +2 | sort -u -k 1 | grep -E "${include_fs_types}" | awk '{print $3}' | sum_disk_sizes 1024) || DISK_STATUS=F
   fi
 fi
 
@@ -599,13 +621,16 @@ fi
 # Detect whether the node is kubernetes node
 
 HOST_IS_K8S_NODE="false"
+K8S_STATUS=V
 
 if [ -n "${KUBERNETES_SERVICE_HOST}" ] && [ -n "${KUBERNETES_SERVICE_PORT}" ]; then
   # These env vars are set for every container managed by k8s.
   HOST_IS_K8S_NODE="true"
-elif pgrep "kubelet"; then
+elif pgrep "kubelet" >/dev/null 2>&1; then
   # The kubelet is the primary "node agent" that runs on each node.
   HOST_IS_K8S_NODE="true"
+else
+  [ "$?" -eq 1 ] || K8S_STATUS=F
 fi
 
 # ------------------------------------------------------------------------------------------------
@@ -623,11 +648,11 @@ if [ "${VIRTUALIZATION}" != "none" ] && command -v curl >/dev/null 2>&1; then
   if [ "$ret" != 28 ]; then
     # Try AWS IMDSv2
     if [ "${CLOUD_TYPE}" = "unknown" ]; then
-      AWS_IMDS_TOKEN="$(curl --fail -s --connect-timeout 1 -m 3 --noproxy "*" -X PUT "http://169.254.169.254/latest/api/token" -H "X-aws-ec2-metadata-token-ttl-seconds: 21600")"
+      AWS_IMDS_TOKEN="$(curl --fail -s --connect-timeout 1 -m 3 --noproxy "*" -X PUT "http://169.254.169.254/latest/api/token" -H "X-aws-ec2-metadata-token-ttl-seconds: 21600")" || AWS_IMDS_TOKEN=""
       if [ -n "${AWS_IMDS_TOKEN}" ]; then
         CLOUD_TYPE="AWS"
-        CLOUD_INSTANCE_TYPE="$(curl --fail -s --connect-timeout 1 -m 3 --noproxy "*" -H "X-aws-ec2-metadata-token: $AWS_IMDS_TOKEN" -v "http://169.254.169.254/latest/meta-data/instance-type" 2>/dev/null)"
-        CLOUD_INSTANCE_REGION="$(curl --fail -s --connect-timeout 1 -m 3 --noproxy "*" -H "X-aws-ec2-metadata-token: $AWS_IMDS_TOKEN" -v "http://169.254.169.254/latest/meta-data/placement/region" 2>/dev/null)"
+        CLOUD_INSTANCE_TYPE="$(curl --fail -s --connect-timeout 1 -m 3 --noproxy "*" -H "X-aws-ec2-metadata-token: $AWS_IMDS_TOKEN" -v "http://169.254.169.254/latest/meta-data/instance-type" 2>/dev/null)" || CLOUD_INSTANCE_TYPE="unknown"
+        CLOUD_INSTANCE_REGION="$(curl --fail -s --connect-timeout 1 -m 3 --noproxy "*" -H "X-aws-ec2-metadata-token: $AWS_IMDS_TOKEN" -v "http://169.254.169.254/latest/meta-data/placement/region" 2>/dev/null)" || CLOUD_INSTANCE_REGION="unknown"
       fi
     fi
 
@@ -635,20 +660,20 @@ if [ "${VIRTUALIZATION}" != "none" ] && command -v curl >/dev/null 2>&1; then
     if [ "${CLOUD_TYPE}" = "unknown" ]; then
       if curl --fail -s --connect-timeout 1 -m 3 --noproxy "*" -H "Metadata-Flavor: Google" "http://metadata.google.internal/computeMetadata/v1" | grep -sq computeMetadata; then
         CLOUD_TYPE="GCP"
-        CLOUD_INSTANCE_TYPE="$(curl --fail -s --connect-timeout 1 -m 3 --noproxy "*" -H "Metadata-Flavor: Google" "http://metadata.google.internal/computeMetadata/v1/instance/machine-type")"
+        CLOUD_INSTANCE_TYPE="$(curl --fail -s --connect-timeout 1 -m 3 --noproxy "*" -H "Metadata-Flavor: Google" "http://metadata.google.internal/computeMetadata/v1/instance/machine-type")" || CLOUD_INSTANCE_TYPE="unknown"
         [ -n "$CLOUD_INSTANCE_TYPE" ] && CLOUD_INSTANCE_TYPE=$(basename "$CLOUD_INSTANCE_TYPE")
-        CLOUD_INSTANCE_REGION="$(curl --fail -s --connect-timeout 1 -m 3 --noproxy "*" -H "Metadata-Flavor: Google" "http://metadata.google.internal/computeMetadata/v1/instance/zone")"
+        CLOUD_INSTANCE_REGION="$(curl --fail -s --connect-timeout 1 -m 3 --noproxy "*" -H "Metadata-Flavor: Google" "http://metadata.google.internal/computeMetadata/v1/instance/zone")" || CLOUD_INSTANCE_REGION="unknown"
         [ -n "$CLOUD_INSTANCE_REGION" ] && CLOUD_INSTANCE_REGION=$(basename "$CLOUD_INSTANCE_REGION") && CLOUD_INSTANCE_REGION=${CLOUD_INSTANCE_REGION%-*}
       fi
     fi
 
     # Try Azure IMDS
     if [ "${CLOUD_TYPE}" = "unknown" ]; then
-      AZURE_IMDS_DATA="$(curl --fail -s --connect-timeout 1 -m 3 -H "Metadata: true" --noproxy "*" "http://169.254.169.254/metadata/instance?api-version=2021-10-01")"
+      AZURE_IMDS_DATA="$(curl --fail -s --connect-timeout 1 -m 3 -H "Metadata: true" --noproxy "*" "http://169.254.169.254/metadata/instance?api-version=2021-10-01")" || AZURE_IMDS_DATA=""
       if [ -n "${AZURE_IMDS_DATA}" ] && echo "${AZURE_IMDS_DATA}" | grep -sq azEnvironment; then
         CLOUD_TYPE="Azure"
-        CLOUD_INSTANCE_TYPE="$(curl --fail -s --connect-timeout 1 -m 3 -H "Metadata: true" --noproxy "*" "http://169.254.169.254/metadata/instance/compute/vmSize?api-version=2021-10-01&format=text")"
-        CLOUD_INSTANCE_REGION="$(curl --fail -s --connect-timeout 1 -m 3 -H "Metadata: true" --noproxy "*" "http://169.254.169.254/metadata/instance/compute/location?api-version=2021-10-01&format=text")"
+        CLOUD_INSTANCE_TYPE="$(curl --fail -s --connect-timeout 1 -m 3 -H "Metadata: true" --noproxy "*" "http://169.254.169.254/metadata/instance/compute/vmSize?api-version=2021-10-01&format=text")" || CLOUD_INSTANCE_TYPE="unknown"
+        CLOUD_INSTANCE_REGION="$(curl --fail -s --connect-timeout 1 -m 3 -H "Metadata: true" --noproxy "*" "http://169.254.169.254/metadata/instance/compute/location?api-version=2021-10-01&format=text")" || CLOUD_INSTANCE_REGION="unknown"
       fi
     fi
   fi
@@ -658,6 +683,10 @@ fi
 # Detect the IP address of the interface on the default route
 
 get_default_interface_ip() {
+  NETWORK_STATUS=F
+  route_seen=false
+  address_seen=false
+  ip_addr=""
   DEFAULT_INTERFACE_IP="unknown"
   DEFAULT_INTERFACE_NAME="unknown"
   DEFAULT_INTERFACE_DETECTION="none"
@@ -679,12 +708,12 @@ get_default_interface_ip() {
       # Ultra-safe: Try /proc first (never hangs - just file reading)
       if [ "${ip_version}" = "-4" ] && [ -r /proc/net/route ]; then
         # Default route has destination 00000000
-        default_if=$(awk '$2 == "00000000" && $1 != "lo" {print $1; exit}' /proc/net/route)
+        if default_if=$(awk '$2 == "00000000" && $1 != "lo" {print $1; exit}' /proc/net/route); then route_seen=true; fi
         [ -n "${default_if}" ] && DEFAULT_INTERFACE_DETECTION="procfs"
       elif [ "${ip_version}" = "-6" ] && [ -r /proc/net/ipv6_route ]; then
         # IPv6 default route - field 10 is the interface
         # Look for ::/0 route (all zeros with prefix 00) that's not on lo
-        default_if=$(awk '$1 == "00000000000000000000000000000000" && $2 == "00" && $10 != "lo" {print $10; exit}' /proc/net/ipv6_route)
+        if default_if=$(awk '$1 == "00000000000000000000000000000000" && $2 == "00" && $10 != "lo" {print $10; exit}' /proc/net/ipv6_route); then route_seen=true; fi
         [ -n "${default_if}" ] && DEFAULT_INTERFACE_DETECTION="procfs"
       fi
 
@@ -692,11 +721,15 @@ get_default_interface_ip() {
       if [ -z "${default_if}" ] && command -v ip >/dev/null 2>&1; then
         if [ "${ip_version}" = "-4" ]; then
           # Extract interface after "dev" keyword
-          default_if=$(${timeout_cmd} ip -o -4 route list default 2>/dev/null | \
-            awk '{for(i=1;i<=NF;i++) if($i=="dev") {print $(i+1); exit}}')
+          if network_output=$(${timeout_cmd} ip -o -4 route list default 2>/dev/null); then
+            route_seen=true
+            default_if=$(printf '%s\n' "${network_output}" | awk '{for(i=1;i<=NF;i++) if($i=="dev") {print $(i+1); exit}}')
+          fi
         else
-          default_if=$(${timeout_cmd} ip -o -6 route list default 2>/dev/null | \
-            awk '{for(i=1;i<=NF;i++) if($i=="dev") {print $(i+1); exit}}')
+          if network_output=$(${timeout_cmd} ip -o -6 route list default 2>/dev/null); then
+            route_seen=true
+            default_if=$(printf '%s\n' "${network_output}" | awk '{for(i=1;i<=NF;i++) if($i=="dev") {print $(i+1); exit}}')
+          fi
         fi
         [ -n "${default_if}" ] && DEFAULT_INTERFACE_DETECTION="iproute2"
       fi
@@ -704,11 +737,15 @@ get_default_interface_ip() {
       # Last resort: netstat (if available)
       if [ -z "${default_if}" ] && command -v netstat >/dev/null 2>&1; then
         if [ "${ip_version}" = "-4" ]; then
-          default_if=$(${timeout_cmd} netstat -rn 2>/dev/null | \
-            awk '$1 == "0.0.0.0" && $2 != "0.0.0.0" {print $NF; exit}')
+          if network_output=$(${timeout_cmd} netstat -rn 2>/dev/null); then
+            route_seen=true
+            default_if=$(printf '%s\n' "${network_output}" | awk '$1 == "0.0.0.0" && $2 != "0.0.0.0" {print $NF; exit}')
+          fi
         else
-          default_if=$(${timeout_cmd} netstat -rn -A inet6 2>/dev/null | \
-            awk '$1 == "::/0" {print $NF; exit}')
+          if network_output=$(${timeout_cmd} netstat -rn -A inet6 2>/dev/null); then
+            route_seen=true
+            default_if=$(printf '%s\n' "${network_output}" | awk '$1 == "::/0" {print $NF; exit}')
+          fi
         fi
         [ -n "${default_if}" ] && DEFAULT_INTERFACE_DETECTION="netstat"
       fi
@@ -718,25 +755,33 @@ get_default_interface_ip() {
       # macOS specific handling
       if [ "${ip_version}" = "-4" ]; then
         # Try route first
-        default_if=$(${timeout_cmd} route -n get default 2>/dev/null | \
-          awk '/interface:/ {print $2; exit}')
+        if network_output=$(${timeout_cmd} route -n get default 2>/dev/null); then
+          route_seen=true
+          default_if=$(printf '%s\n' "${network_output}" | awk '/interface:/ {print $2; exit}')
+        fi
         [ -n "${default_if}" ] && DEFAULT_INTERFACE_DETECTION="route"
 
         # Fallback to netstat
         if [ -z "${default_if}" ]; then
-          default_if=$(${timeout_cmd} netstat -rnf inet 2>/dev/null | \
-            awk '/^default/ {print $4; exit}')
+          if network_output=$(${timeout_cmd} netstat -rnf inet 2>/dev/null); then
+            route_seen=true
+            default_if=$(printf '%s\n' "${network_output}" | awk '/^default/ {print $4; exit}')
+          fi
           [ -n "${default_if}" ] && DEFAULT_INTERFACE_DETECTION="netstat"
         fi
       else
         # IPv6 - route doesn't work, use netstat
         # Note: may have multiple defaults (utun interfaces)
-        default_if=$(${timeout_cmd} netstat -rnf inet6 2>/dev/null | \
-          awk '/^default/ && $4 !~ /^utun/ {print $4; exit}')
+        if network_output=$(${timeout_cmd} netstat -rnf inet6 2>/dev/null); then
+          route_seen=true
+          default_if=$(printf '%s\n' "${network_output}" | awk '/^default/ && $4 !~ /^utun/ {print $4; exit}')
+        fi
         if [ -z "${default_if}" ]; then
           # If no non-utun default, take first one
-          default_if=$(${timeout_cmd} netstat -rnf inet6 2>/dev/null | \
-            awk '/^default/ {print $4; exit}')
+          if network_output=$(${timeout_cmd} netstat -rnf inet6 2>/dev/null); then
+            route_seen=true
+            default_if=$(printf '%s\n' "${network_output}" | awk '/^default/ {print $4; exit}')
+          fi
         fi
         [ -n "${default_if}" ] && DEFAULT_INTERFACE_DETECTION="netstat"
       fi
@@ -748,18 +793,24 @@ get_default_interface_ip() {
       [ "${ip_version}" = "-6" ] && inet_flag="-inet6"
 
       # route with -n to prevent DNS lookups
-      default_if=$(${timeout_cmd} route -n get ${inet_flag} default 2>/dev/null | \
-        awk '/interface:/ {print $2; exit}')
+      if network_output=$(${timeout_cmd} route -n get ${inet_flag} default 2>/dev/null); then
+        route_seen=true
+        default_if=$(printf '%s\n' "${network_output}" | awk '/interface:/ {print $2; exit}')
+      fi
       [ -n "${default_if}" ] && DEFAULT_INTERFACE_DETECTION="route"
 
       # Fallback to netstat
       if [ -z "${default_if}" ]; then
         if [ "${ip_version}" = "-4" ]; then
-          default_if=$(${timeout_cmd} netstat -rnf inet 2>/dev/null | \
-            awk '/^default/ {print $4; exit}')
+          if network_output=$(${timeout_cmd} netstat -rnf inet 2>/dev/null); then
+            route_seen=true
+            default_if=$(printf '%s\n' "${network_output}" | awk '/^default/ {print $4; exit}')
+          fi
         else
-          default_if=$(${timeout_cmd} netstat -rnf inet6 2>/dev/null | \
-            awk '/^default/ {print $4; exit}')
+          if network_output=$(${timeout_cmd} netstat -rnf inet6 2>/dev/null); then
+            route_seen=true
+            default_if=$(printf '%s\n' "${network_output}" | awk '/^default/ {print $4; exit}')
+          fi
         fi
         [ -n "${default_if}" ] && DEFAULT_INTERFACE_DETECTION="netstat"
       fi
@@ -772,6 +823,7 @@ get_default_interface_ip() {
     if [ "${KERNEL_NAME}" = "Linux" ] && [ -r "/sys/class/net/${default_if}/operstate" ]; then
       state=$(cat "/sys/class/net/${default_if}/operstate" 2>/dev/null)
       if [ "${state}" = "down" ]; then
+        NETWORK_STATUS=A
         return
       fi
     fi
@@ -781,14 +833,18 @@ get_default_interface_ip() {
       # Try ip command first on Linux
       if [ "${KERNEL_NAME}" = "Linux" ] && command -v ip >/dev/null 2>&1; then
         # With -o flag, inet is field 3, IP is field 4
-        ip_addr=$(${timeout_cmd} ip -o -4 addr show dev "${default_if}" 2>/dev/null | \
-          awk '$3 == "inet" && $0 !~ /secondary/ {gsub(/\/.*/, "", $4); print $4; exit}')
+        if network_output=$(${timeout_cmd} ip -o -4 addr show dev "${default_if}" 2>/dev/null); then
+          address_seen=true
+          ip_addr=$(printf '%s\n' "${network_output}" | awk '$3 == "inet" && $0 !~ /secondary/ {gsub(/\/.*/, "", $4); print $4; exit}')
+        fi
       fi
 
       # Fallback to ifconfig (if available)
       if [ -z "${ip_addr}" ] && command -v ifconfig >/dev/null 2>&1; then
-        ip_addr=$(${timeout_cmd} ifconfig "${default_if}" 2>/dev/null | \
-          awk '/inet / && !/127.0.0.1/ {gsub(/addr:/, "", $2); print $2; exit}')
+        if network_output=$(${timeout_cmd} ifconfig "${default_if}" 2>/dev/null); then
+          address_seen=true
+          ip_addr=$(printf '%s\n' "${network_output}" | awk '/inet / && !/127.0.0.1/ {gsub(/addr:/, "", $2); print $2; exit}')
+        fi
       fi
 
       # Validate IPv4
@@ -797,20 +853,25 @@ get_default_interface_ip() {
            echo "${ip_addr}" | awk -F. '$1<=255 && $2<=255 && $3<=255 && $4<=255 {exit 0} {exit 1}'; then
           DEFAULT_INTERFACE_IP="${ip_addr}"
           DEFAULT_INTERFACE_NAME="${default_if}"
+          NETWORK_STATUS=V
         fi
       fi
     else
       # IPv6 handling
       if [ "${KERNEL_NAME}" = "Linux" ] && command -v ip >/dev/null 2>&1; then
         # Get global scope IPv6, not link-local
-        ip_addr=$(${timeout_cmd} ip -o -6 addr show dev "${default_if}" scope global 2>/dev/null | \
-          awk '$3 == "inet6" && $0 !~ /deprecated/ {gsub(/\/.*/, "", $4); print $4; exit}')
+        if network_output=$(${timeout_cmd} ip -o -6 addr show dev "${default_if}" scope global 2>/dev/null); then
+          address_seen=true
+          ip_addr=$(printf '%s\n' "${network_output}" | awk '$3 == "inet6" && $0 !~ /deprecated/ {gsub(/\/.*/, "", $4); print $4; exit}')
+        fi
       fi
 
       if [ -z "${ip_addr}" ] && command -v ifconfig >/dev/null 2>&1; then
         # Skip fe80:: (link-local) and ::1 (loopback)
-        ip_addr=$(${timeout_cmd} ifconfig "${default_if}" 2>/dev/null | \
-          awk '/inet6 / && !/fe80:/ && !/::1/ {sub(/%.*/, "", $2); print $2; exit}')
+        if network_output=$(${timeout_cmd} ifconfig "${default_if}" 2>/dev/null); then
+          address_seen=true
+          ip_addr=$(printf '%s\n' "${network_output}" | awk '/inet6 / && !/fe80:/ && !/::1/ {sub(/%.*/, "", $2); print $2; exit}')
+        fi
       fi
 
       # Basic IPv6 validation
@@ -818,12 +879,101 @@ get_default_interface_ip() {
          echo "${ip_addr}" | grep -q ':'; then
         DEFAULT_INTERFACE_IP="${ip_addr}"
         DEFAULT_INTERFACE_NAME="${default_if}"
+        NETWORK_STATUS=V
       fi
     fi
+    if [ "${NETWORK_STATUS}" != V ] && [ "${address_seen}" = true ] && [ -z "${ip_addr}" ]; then
+      NETWORK_STATUS=A
+    fi
+  elif [ "${route_seen}" = true ]; then
+    NETWORK_STATUS=A
   fi
 }
 
 get_default_interface_ip -4
+
+# Runtime protocol is private to the Agent. A record is value (V), absent (A),
+# failed (F), or unsupported (U). Failed probes preserve the previous snapshot.
+emit_runtime_field() {
+  runtime_key="$1"
+  runtime_value="$2"
+  runtime_status=V
+  case "${runtime_key}" in
+    NETDATA_SYSTEM_DEFAULT_INTERFACE_*) runtime_status="${NETWORK_STATUS}" ;;
+    NETDATA_SYSTEM_TOTAL_DISK_SIZE)
+      runtime_status="${DISK_STATUS}"
+      case "${runtime_value}" in ''|unknown) runtime_status=F ;; esac
+      ;;
+    NETDATA_HOST_IS_K8S_NODE) runtime_status="${K8S_STATUS}" ;;
+    NETDATA_SYSTEM_VIRT_DETECTION)
+      case "${VIRTUALIZATION}" in ''|unknown) runtime_status=F ;; esac
+      ;;
+    NETDATA_SYSTEM_CONTAINER_DETECTION)
+      case "${CONTAINER}" in ''|unknown) runtime_status=F ;; esac
+      ;;
+    NETDATA_HOST_OS_LABEL_*)
+      if [ "${HOST_OS_DETECTION}" = unknown ] || [ -z "${HOST_OS_DETECTION}" ]; then
+        runtime_status=F
+      else
+        case "${runtime_value}" in ''|unknown|none) runtime_status=A ;; esac
+      fi
+      ;;
+    *) case "${runtime_value}" in ''|unknown) runtime_status=F ;; esac ;;
+  esac
+  case "${runtime_key}" in
+    NETDATA_SYSTEM_CPU_LOGICAL_CPU_COUNT|NETDATA_SYSTEM_CPU_FREQ|NETDATA_SYSTEM_TOTAL_RAM|NETDATA_SYSTEM_TOTAL_DISK_SIZE)
+      case "${runtime_value}" in ''|*[!0-9]*) runtime_status=F ;; esac
+      if [ "${runtime_key}" != NETDATA_SYSTEM_TOTAL_DISK_SIZE ]; then
+        case "${runtime_value}" in *[1-9]*) ;; *) runtime_status=F ;; esac
+      fi
+      ;;
+  esac
+  if [ "${runtime_status}" != V ]; then runtime_value=""; fi
+  printf '%s\t%s\t%s\n' "${runtime_status}" "${runtime_key}" "${runtime_value}"
+}
+
+if [ "${1:-}" = --runtime ]; then
+  printf '%s\n' NETDATA_SYSTEM_INFO_V1
+  emit_runtime_field NETDATA_CONTAINER_OS_NAME "${CONTAINER_NAME}"
+  emit_runtime_field NETDATA_CONTAINER_OS_ID "${CONTAINER_ID}"
+  emit_runtime_field NETDATA_CONTAINER_OS_ID_LIKE "${CONTAINER_ID_LIKE}"
+  emit_runtime_field NETDATA_CONTAINER_OS_VERSION "${CONTAINER_VERSION}"
+  emit_runtime_field NETDATA_CONTAINER_OS_VERSION_ID "${CONTAINER_VERSION_ID}"
+  emit_runtime_field NETDATA_CONTAINER_OS_DETECTION "${CONTAINER_OS_DETECTION}"
+  emit_runtime_field NETDATA_HOST_OS_NAME "${HOST_NAME}"
+  emit_runtime_field NETDATA_HOST_OS_ID "${HOST_ID}"
+  emit_runtime_field NETDATA_HOST_OS_ID_LIKE "${HOST_ID_LIKE}"
+  emit_runtime_field NETDATA_HOST_OS_VERSION "${HOST_VERSION}"
+  emit_runtime_field NETDATA_HOST_OS_VERSION_ID "${HOST_VERSION_ID}"
+  emit_runtime_field NETDATA_HOST_OS_DETECTION "${HOST_OS_DETECTION}"
+  emit_runtime_field NETDATA_HOST_IS_K8S_NODE "${HOST_IS_K8S_NODE}"
+  emit_runtime_field NETDATA_SYSTEM_KERNEL_NAME "${KERNEL_NAME}"
+  emit_runtime_field NETDATA_SYSTEM_KERNEL_VERSION "${KERNEL_VERSION}"
+  emit_runtime_field NETDATA_SYSTEM_ARCHITECTURE "${ARCHITECTURE}"
+  emit_runtime_field NETDATA_SYSTEM_VIRTUALIZATION "${VIRTUALIZATION}"
+  emit_runtime_field NETDATA_SYSTEM_VIRT_DETECTION "${VIRT_DETECTION}"
+  emit_runtime_field NETDATA_SYSTEM_CONTAINER "${CONTAINER}"
+  emit_runtime_field NETDATA_SYSTEM_CONTAINER_DETECTION "${CONT_DETECTION}"
+  emit_runtime_field NETDATA_SYSTEM_CPU_LOGICAL_CPU_COUNT "${LCPU_COUNT}"
+  emit_runtime_field NETDATA_SYSTEM_CPU_MODEL "${CPU_MODEL}"
+  emit_runtime_field NETDATA_SYSTEM_CPU_FREQ "${CPU_FREQ}"
+  emit_runtime_field NETDATA_SYSTEM_TOTAL_RAM "${TOTAL_RAM}"
+  emit_runtime_field NETDATA_SYSTEM_TOTAL_DISK_SIZE "${DISK_SIZE}"
+  emit_runtime_field NETDATA_INSTANCE_CLOUD_TYPE "${CLOUD_TYPE}"
+  emit_runtime_field NETDATA_INSTANCE_CLOUD_INSTANCE_TYPE "${CLOUD_INSTANCE_TYPE}"
+  emit_runtime_field NETDATA_INSTANCE_CLOUD_INSTANCE_REGION "${CLOUD_INSTANCE_REGION}"
+  emit_runtime_field NETDATA_SYSTEM_DEFAULT_INTERFACE_NAME "${DEFAULT_INTERFACE_NAME}"
+  emit_runtime_field NETDATA_SYSTEM_DEFAULT_INTERFACE_IP "${DEFAULT_INTERFACE_IP}"
+  emit_runtime_field NETDATA_SYSTEM_DEFAULT_INTERFACE_DETECTION "${DEFAULT_INTERFACE_DETECTION}"
+  emit_runtime_field NETDATA_HOST_OS_LABEL_NAME "${HOST_OS_LABEL_NAME}"
+  emit_runtime_field NETDATA_HOST_OS_LABEL_VERSION "${HOST_OS_LABEL_VERSION}"
+  emit_runtime_field NETDATA_HOST_OS_LABEL_RELEASE "${HOST_OS_LABEL_RELEASE}"
+  emit_runtime_field NETDATA_HOST_OS_LABEL_CODENAME "${HOST_OS_LABEL_CODENAME}"
+  emit_runtime_field NETDATA_HOST_OS_LABEL_EDITION "${HOST_OS_LABEL_EDITION}"
+  emit_runtime_field NETDATA_HOST_OS_LABEL_BUILD "${HOST_OS_LABEL_BUILD}"
+  printf '%s\n' NETDATA_SYSTEM_INFO_END
+  exit 0
+fi
 
 printf 'NETDATA_CONTAINER_OS_NAME=%s\n' "${CONTAINER_NAME}"
 printf 'NETDATA_CONTAINER_OS_ID=%s\n' "${CONTAINER_ID}"

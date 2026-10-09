@@ -26,6 +26,23 @@ netdata -h
 | `-v`, `-V`    | Display version and exit          | -                           |
 | `-W options`  | Advanced options (see below)      | -                           |
 
+## System Information Refresh
+
+The Agent detects system information at startup and refreshes it in a background thread every five minutes after the
+previous check finishes. Checks do not overlap. Changed values update the cached host information and automatic host labels,
+including CPU, RAM, and the OS default network interface, and propagate through streaming to Parents.
+
+On Unix, `system-info.sh` has a 30-second execution deadline after spawning. Failed executions, malformed output, and
+incomplete responses are discarded. Failed individual probes retain their previous values; successful absence clears the
+corresponding optional values. Cancellation terminates the probe's process group. Runtime refresh does not rewrite the
+process environment exported during startup.
+
+On Windows, runtime refresh uses native CPU, RAM, disk, and network probes. OS, virtualization, and container detection
+remain startup operations. Native Windows calls do not use the Unix subprocess deadline.
+
+See [automatic host labels](/docs/netdata-agent/configuration/organize-systems-metrics-and-alerts.md#use-automatic-labels)
+for label semantics and Parent upgrade requirements.
+
 ## Logging
 
 For details about Netdata's logging system and configuration, see [Netdata Logging](/src/libnetdata/log/README.md).

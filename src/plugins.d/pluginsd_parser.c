@@ -816,9 +816,17 @@ static inline PARSER_RC pluginsd_overwrite(char **words __maybe_unused, size_t n
 
     netdata_log_debug(D_PLUGINSD, "requested to OVERWRITE host labels");
 
+    if (!parser->user.new_host_labels)
+        parser->user.new_host_labels = rrdlabels_create();
+
+    spinlock_lock(&host->rrdhost_update_lock);
     if(unlikely(!host->rrdlabels))
         host->rrdlabels = rrdlabels_create();
 
+    // The handshake may have replaced system_info even when this label batch is unchanged.
+    // Local plugins do not own the real localhost's detected system information.
+    bool info_changed = host != localhost &&
+        rrdhost_system_info_update_from_labels(host->system_info, host->rrdlabels, parser->user.new_host_labels);
     bool labels_changed = rrdlabels_migrate_to_these(host->rrdlabels, parser->user.new_host_labels);
     labels_changed |= pluginsd_update_host_ephemerality(host);
 
@@ -829,7 +837,13 @@ static inline PARSER_RC pluginsd_overwrite(char **words __maybe_unused, size_t n
     if(!rrdlabels_exist(host->rrdlabels, "_hostname"))
         labels_changed |= rrdlabels_add_changed(host->rrdlabels, "_hostname", string2str(host->hostname), RRDLABEL_SRC_AUTO);
 
-    if(labels_changed)
+    if (info_changed)
+        rrdhost_flag_set(host, RRDHOST_FLAG_METADATA_INFO | RRDHOST_FLAG_METADATA_UPDATE);
+    spinlock_unlock(&host->rrdhost_update_lock);
+
+    // Reconnects can restore old handshake metadata while retaining identical labels.
+    // Forward the corrected snapshot so every parent can reconcile its cache.
+    if(labels_changed || info_changed)
         rrdhost_labels_changed(host);
 
     rrdlabels_destroy(parser->user.new_host_labels);
@@ -1808,6 +1822,100 @@ static int pluginsd_parser_unittest_read_timeout(void) {
         }
     }
     return 0;
+}
+
+static int pluginsd_system_info_test_line(PARSER *parser, const char *line) {
+    char input[PLUGINSD_LINE_MAX + 1];
+    strncpyz(input, line, sizeof(input) - 1);
+    return parser_action(parser, input) != PARSER_RC_OK;
+}
+
+static bool pluginsd_system_info_test_value(RRDHOST *host, const char *name, const char *expected) {
+    RRDLABELS *labels = rrdlabels_create();
+    rrdhost_system_info_to_rrdlabels(host->system_info, labels);
+    char value[RRDLABELS_MAX_VALUE_LENGTH + 1];
+    rrdlabels_get_value_strcpyz(labels, value, sizeof(value), name);
+    bool ok = expected ? !strcmp(value, expected) : !rrdlabels_exist(labels, name);
+    rrdlabels_destroy(labels);
+    return ok;
+}
+
+// Called by rrdhostlabelstest, which initializes the labels allocator.
+int pluginsd_system_info_unittest(void) {
+    int errors = 0;
+#define STREAM_INFO_CHECK(expr) do { if (!(expr)) { \
+    fprintf(stderr, "  streamed system-info FAILED at line %d: %s\n", __LINE__, #expr); errors++; \
+} } while (0)
+    RRDHOST host = { 0 };
+    spinlock_init(&host.rrdhost_update_lock);
+    host.system_info = rrdhost_system_info_create();
+    host.rrdlabels = rrdlabels_create();
+    host.os = string_strdupz("linux");
+    host.hostname = string_strdupz("test-child");
+    rrdhost_system_info_hops_set(host.system_info, 4);
+    rrdhost_system_info_ml_enabled_set(host.system_info, true);
+    rrdhost_system_info_ml_capable_set(host.system_info, true);
+    rrdhost_system_info_mc_version_set(host.system_info, 3);
+    rrdhost_system_info_set_by_name(host.system_info, "NETDATA_HOST_OS_ID", "handshake-os");
+    rrdhost_system_info_set_by_name(host.system_info, "NETDATA_SYSTEM_CPU_LOGICAL_CPU_COUNT", "8");
+    rrdhost_system_info_set_by_name(host.system_info, "NETDATA_SYSTEM_TOTAL_RAM", "1024");
+    struct parser_user_object user = { .host = &host };
+    PARSER *parser = parser_init(&user, -1, -1, PARSER_INPUT_SPLIT, NULL);
+    pluginsd_keywords_init(parser, PARSER_INIT_STREAMING);
+    const char *batch[] = {
+        "LABEL _system_ram_total = 1 2048",
+        "LABEL _net_default_iface = 1 eth1",
+        "LABEL _net_default_iface_ip = 1 192.0.2.1",
+        "LABEL _stream_egress_iface = 1 wan0",
+        "LABEL _os = 1 linux",
+        "LABEL _hostname = 1 test-child",
+        "LABEL _is_ephemeral = 2 false",
+        "OVERWRITE labels",
+    };
+    for (size_t i = 0; i < _countof(batch); i++)
+        STREAM_INFO_CHECK(!pluginsd_system_info_test_line(parser, batch[i]));
+    STREAM_INFO_CHECK(pluginsd_system_info_test_value(&host, "_system_ram_total", "2048"));
+    STREAM_INFO_CHECK(pluginsd_system_info_test_value(&host, "_net_default_iface", "eth1"));
+    STREAM_INFO_CHECK(pluginsd_system_info_test_value(&host, "_system_cores", "8"));
+    STREAM_INFO_CHECK(rrdhost_flag_check(&host, RRDHOST_FLAG_METADATA_INFO));
+
+    RRDHOST_FLAGS flags = RRDHOST_FLAG_METADATA_INFO | RRDHOST_FLAG_METADATA_LABELS |
+        RRDHOST_FLAG_METADATA_UPDATE | RRDHOST_FLAG_PENDING_LABEL_RECHECK;
+    rrdhost_flag_clear(&host, flags);
+    for (size_t i = 0; i < _countof(batch); i++)
+        STREAM_INFO_CHECK(!pluginsd_system_info_test_line(parser, batch[i]));
+    STREAM_INFO_CHECK(!rrdhost_flag_check(&host, flags));
+
+    // A reconnect can install an older handshake while retaining the same label set.
+    rrdhost_system_info_set_by_name(host.system_info, "NETDATA_SYSTEM_TOTAL_RAM", "1024");
+    for (size_t i = 0; i < _countof(batch); i++)
+        STREAM_INFO_CHECK(!pluginsd_system_info_test_line(parser, batch[i]));
+    STREAM_INFO_CHECK(pluginsd_system_info_test_value(&host, "_system_ram_total", "2048"));
+    STREAM_INFO_CHECK(rrdhost_flag_check(&host, RRDHOST_FLAG_METADATA_INFO));
+    STREAM_INFO_CHECK(rrdhost_flag_check(&host, RRDHOST_FLAG_METADATA_LABELS));
+
+    // Empty OVERWRITE removes fields previously advertised, but not older-peer handshake-only fields.
+    STREAM_INFO_CHECK(!pluginsd_system_info_test_line(parser, "OVERWRITE labels"));
+    STREAM_INFO_CHECK(pluginsd_system_info_test_value(&host, "_system_ram_total", NULL));
+    STREAM_INFO_CHECK(pluginsd_system_info_test_value(&host, "_net_default_iface", NULL));
+    STREAM_INFO_CHECK(pluginsd_system_info_test_value(&host, "_net_default_iface_ip", NULL));
+    STREAM_INFO_CHECK(pluginsd_system_info_test_value(&host, "_system_cores", "8"));
+    STREAM_INFO_CHECK(rrdhost_system_info_hops(host.system_info) == 4);
+    CLEAN_BUFFER *wb = buffer_create(0, NULL);
+    rrdhost_system_info_to_url_encode_stream(wb, host.system_info);
+    STREAM_INFO_CHECK(strstr(buffer_tostring(wb), "NETDATA_SYSTEM_OS_ID=handshake-os"));
+    STREAM_INFO_CHECK(strstr(buffer_tostring(wb), "&ml_capable=1&ml_enabled=1&mc_version=3"));
+
+    rrdlabels_destroy(parser->user.new_host_labels);
+    parser->user.new_host_labels = NULL;
+    parser_destroy(parser);
+    rrdhost_system_info_free(host.system_info);
+    rrdlabels_destroy(host.rrdlabels);
+    string_freez(host.os);
+    string_freez(host.hostname);
+    fprintf(stderr, "  streamed system-info LABEL/OVERWRITE: %s\n", errors ? "FAILED" : "OK");
+#undef STREAM_INFO_CHECK
+    return errors;
 }
 
 int pluginsd_parser_unittest(void) {

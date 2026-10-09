@@ -339,6 +339,12 @@ static bool spawn_external_command(SPAWN_SERVER *server __maybe_unused, SPAWN_RE
     }
 
     short flags = POSIX_SPAWN_SETSIGMASK | POSIX_SPAWN_SETSIGDEF;
+    if(rq->type == SPAWN_INSTANCE_TYPE_EXEC_GROUP) {
+        // A zero pgroup creates a private group whose ID is the new child PID, atomically.
+        if(posix_spawnattr_setpgroup(&attr, 0) != 0)
+            goto cleanup_attr;
+        flags |= POSIX_SPAWN_SETPGROUP;
+    }
     if (posix_spawnattr_setflags(&attr, flags) != 0) {
         nd_log(NDLS_COLLECTORS, NDLP_ERR, "SPAWN PARENT: posix_spawnattr_setflags() failed: %s", rq->cmdline);
         goto cleanup_attr;
@@ -526,6 +532,7 @@ static bool spawn_server_run_callback(SPAWN_SERVER *server __maybe_unused, SPAWN
 static void spawn_server_execute_request(SPAWN_SERVER *server, SPAWN_REQUEST *rq) {
     bool done;
     switch(rq->type) {
+        case SPAWN_INSTANCE_TYPE_EXEC_GROUP:
         case SPAWN_INSTANCE_TYPE_EXEC:
             done = spawn_external_command(server, rq);
             break;
@@ -1031,7 +1038,8 @@ static void spawn_server_receive_request(int sock, SPAWN_SERVER *server) {
         goto cleanup;
     }
 
-    if(type == SPAWN_INSTANCE_TYPE_EXEC && !(server->options & SPAWN_SERVER_OPTION_EXEC)) {
+    if((type == SPAWN_INSTANCE_TYPE_EXEC || type == SPAWN_INSTANCE_TYPE_EXEC_GROUP) &&
+       !(server->options & SPAWN_SERVER_OPTION_EXEC)) {
         nd_log(NDLS_COLLECTORS, NDLP_ERR,
             "SPAWN SERVER: Request %zu wants to exec, but exec is not allowed for this spawn server. "
             "Rejecting request.",
@@ -1152,14 +1160,35 @@ static void spawn_server_process_sigchld(void) {
     int status;
     pid_t pid;
 
-    // Loop to check for exited child processes
-    while ((pid = waitpid((pid_t)(-1), &status, WNOHANG)) != 0) {
-        if(pid == -1)
+    // Observe without reaping: an owned zombie pins its PID/group identity until cleanup.
+    for(;;) {
+        siginfo_t info = { 0 };
+        if(waitid(P_ALL, 0, &info, WEXITED | WNOHANG | WNOWAIT) == -1) {
+            if(errno == EINTR) continue;
             break;
-
-        errno_clear();
-
+        }
+        if(!info.si_pid) break;
+        pid = info.si_pid;
         SPAWN_REQUEST *rq = find_request_by_pid(pid);
+        if(rq && rq->type == SPAWN_INSTANCE_TYPE_EXEC_GROUP) {
+            // The leader can exit with descendants still holding stdout. Kill them before
+            // releasing its identity; never signal a saved numeric PGID after waitpid().
+            if(!rq->group_kill_sent && kill(-pid, SIGKILL) != 0 && errno != ESRCH) {
+                ND_LOG_FIELD_PRIORITY priority = NDLP_ERR;
+#if defined(OS_MACOS)
+                // Darwin returns EPERM for a group containing only its zombie leader.
+                // Live-group TERM/KILL failures remain errors in the cancellation path.
+                if(errno == EPERM) priority = NDLP_DEBUG;
+#endif
+                nd_log(NDLS_COLLECTORS, priority,
+                       "SPAWN SERVER: cannot clean group %d for request %zu: %s",
+                       pid, rq->request_id, strerror(errno));
+            }
+        }
+        pid_t reaped;
+        do { reaped = waitpid(pid, &status, 0); } while(reaped == -1 && errno == EINTR);
+        if(reaped != pid) break;
+        errno_clear();
         size_t request_id = rq ? rq->request_id : 0;
         bool send_report_remove_request = false;
 
@@ -1215,9 +1244,37 @@ static void spawn_server_process_sigchld(void) {
     }
 }
 
+// A half-close on the request's own socket asks for cancellation. The server alone owns
+// both signalling and reaping, so a delayed cancellation can never target a recycled PID.
+static void spawn_server_cancel_groups(void) {
+    usec_t now = now_monotonic_usec();
+    for(SPAWN_REQUEST *rq = spawn_server_requests; rq; rq = rq->next) {
+        if(rq->type != SPAWN_INSTANCE_TYPE_EXEC_GROUP || rq->group_kill_sent)
+            continue;
+        if(!rq->group_kill_deadline_ut) {
+            char unused;
+            ssize_t rc = recv(rq->sock, &unused, 1, MSG_DONTWAIT);
+            if(rc < 0 && (errno == EAGAIN || errno == EWOULDBLOCK || errno == EINTR))
+                continue;
+            if(kill(-rq->pid, SIGTERM) != 0 && errno != ESRCH)
+                nd_log(NDLS_COLLECTORS, NDLP_ERR,
+                       "SPAWN SERVER: cannot terminate group %d for request %zu: %s",
+                       rq->pid, rq->request_id, strerror(errno));
+            rq->group_kill_deadline_ut = now + SPAWN_KILL_DEFAULT_GRACE_MS * USEC_PER_MS;
+        }
+        else if(now >= rq->group_kill_deadline_ut) {
+            if(kill(-rq->pid, SIGKILL) != 0 && errno != ESRCH)
+                nd_log(NDLS_COLLECTORS, NDLP_ERR,
+                       "SPAWN SERVER: cannot kill group %d for request %zu: %s",
+                       rq->pid, rq->request_id, strerror(errno));
+            rq->group_kill_sent = true;
+        }
+    }
+}
+
 static void spawn_server_signal_all_children(int signo) {
     for(SPAWN_REQUEST *rq = spawn_server_requests; rq ; rq = rq->next) {
-        if(kill(rq->pid, signo) != 0)
+        if(kill(rq->type == SPAWN_INSTANCE_TYPE_EXEC_GROUP ? -rq->pid : rq->pid, signo) != 0)
             nd_log(NDLS_COLLECTORS, signo == SIGKILL ? NDLP_ERR : NDLP_WARNING,
                    "SPAWN SERVER: failed to send signal %d to child pid %d (request %zu): %s",
                    signo, rq->pid, rq->request_id, strerror(errno));
@@ -1283,6 +1340,7 @@ static int spawn_server_event_loop(SPAWN_SERVER *server) {
     fds[1].events = POLLHUP | POLLERR;
 
     while(!spawn_server_exit) {
+        spawn_server_cancel_groups();
         int ret = poll(fds, 2, 500);
         if (spawn_server_sigchld || ret == 0) {
             spawn_server_process_sigchld();
@@ -1592,7 +1650,7 @@ static void spawn_server_log_kill_failure(SPAWN_INSTANCE *instance, int signo) {
 }
 
 void spawn_server_exec_destroy(SPAWN_INSTANCE *instance) {
-    if(instance->child_pid && kill(instance->child_pid, SIGTERM) != 0)
+    if(!instance->process_group && instance->child_pid && kill(instance->child_pid, SIGTERM) != 0)
         spawn_server_log_kill_failure(instance, SIGTERM);
     if(instance->write_fd != -1) close(instance->write_fd);
     if(instance->read_fd != -1) close(instance->read_fd);
@@ -1695,15 +1753,33 @@ int spawn_server_exec_wait(SPAWN_SERVER *server __maybe_unused, SPAWN_INSTANCE *
     return rc;
 }
 
-// NOTE on pid safety: every kill below can in principle hit a recycled pid. Our spawn server reaps
+// NOTE on pid safety: the legacy single-process kills below can hit a recycled pid. Our spawn server reaps
 // the child and only then writes the status report, and it writes none at all if the pid is not in
 // its request list - so "no report yet" (SPAWN_TIMEDWAIT_RUNNING) does not mean the pid is still
 // ours. The pre-kill grace makes this worse by discarding its poll result and signalling regardless.
 // Closing the window needs the signalling to move into the spawn server, keyed by request id, so the
-// process that reaps is the one that signals; until then this is a known, accepted race.
+// process that reaps is the one that signals. Opt-in group requests already use this ownership;
+// the legacy single-process mode retains its existing race.
 int spawn_server_exec_kill(SPAWN_SERVER *server, SPAWN_INSTANCE *instance, int timeout_ms) {
     if(instance->write_fd != -1) { close(instance->write_fd); instance->write_fd = -1; }
     if(instance->read_fd != -1) { close(instance->read_fd); instance->read_fd = -1; }
+
+    if(instance->process_group) {
+        int status;
+        if(timeout_ms > 0 &&
+           spawn_server_exec_timedwait(server, instance, timeout_ms, &status) == SPAWN_TIMEDWAIT_EXITED)
+            return status;
+
+        // No PID crosses this cancellation boundary. Half-close is nonblocking and leaves
+        // the status direction open while the server terminates its owned group.
+        (void)shutdown(instance->sock, SHUT_WR);
+        if(spawn_server_exec_timedwait(server, instance, 2 * SPAWN_KILL_DEFAULT_GRACE_MS, &status) == SPAWN_TIMEDWAIT_EXITED)
+            return status;
+
+        // Broken server or uninterruptible child: reclaim locally without unsafe PID signalling.
+        spawn_server_exec_destroy(instance);
+        return -1;
+    }
 
     if(timeout_ms > 0) {
         short revents;
@@ -1757,6 +1833,7 @@ SPAWN_INSTANCE* spawn_server_exec(SPAWN_SERVER *server, int stderr_fd, int custo
     SPAWN_INSTANCE *instance = callocz(1, sizeof(SPAWN_INSTANCE));
     instance->read_fd = -1;
     instance->write_fd = -1;
+    instance->process_group = type == SPAWN_INSTANCE_TYPE_EXEC_GROUP;
 
     if(argv) {
         CLEAN_BUFFER *wb = argv_to_cmdline_buffer(argv);
