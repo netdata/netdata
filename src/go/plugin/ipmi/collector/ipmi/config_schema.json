@@ -4,6 +4,17 @@
     "title": "IPMI collector configuration.",
     "type": "object",
     "properties": {
+      "driver": {
+        "title": "Driver",
+        "description": "IPMI transport: local Linux OpenIPMI, IPMI 1.5 LAN or IPMI 2.0 LAN+.",
+        "type": "string",
+        "enum": [
+          "open",
+          "lan",
+          "lanplus"
+        ],
+        "default": "open"
+      },
       "update_every": {
         "title": "Update every",
         "description": "Data collection frequency in seconds.",
@@ -11,18 +22,9 @@
         "minimum": 5,
         "default": 5
       },
-      "driver": {
-        "title": "Driver",
-        "description": "Local Linux OpenIPMI transport. Only open is supported.",
-        "type": "string",
-        "enum": [
-          "open"
-        ],
-        "default": "open"
-      },
       "timeout": {
         "title": "Timeout",
-        "description": "Receive timeout for each IPMI command. Stopping a job can wait for an in-flight receive to finish.",
+        "description": "Timeout for session setup and for each IPMI command.",
         "type": "string",
         "default": "5s"
       },
@@ -32,24 +34,110 @@
         "type": "boolean",
         "default": true
       },
-      "device": {
-        "title": "Device number",
-        "description": "Local OpenIPMI device number.",
-        "type": "integer",
-        "minimum": 0,
-        "default": 0
+      "vnode": {
+        "title": "Virtual node",
+        "description": "Associates this job with a [Virtual Node](https://learn.netdata.cloud/docs/netdata-agent/configuration/organize-systems-metrics-and-alerts#virtual-nodes).",
+        "type": "string"
+      }
+    },
+    "dependencies": {
+      "driver": {
+        "oneOf": [
+          {
+            "title": "Local device",
+            "properties": {
+              "driver": {
+                "const": "open"
+              },
+              "device": {
+                "title": "Device number",
+                "description": "Local OpenIPMI device number.",
+                "type": "integer",
+                "minimum": 0,
+                "default": 0
+              }
+            }
+          },
+          {
+            "title": "Remote BMC",
+            "properties": {
+              "driver": {
+                "enum": [
+                  "lan",
+                  "lanplus"
+                ]
+              },
+              "hostname": {
+                "title": "BMC address",
+                "description": "BMC hostname or IP address for LAN/LAN+, without a URL scheme or port.",
+                "type": "string",
+                "minLength": 1
+              },
+              "port": {
+                "title": "BMC port",
+                "description": "BMC UDP port for LAN/LAN+.",
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 65535,
+                "default": 623
+              },
+              "username": {
+                "title": "Username",
+                "description": "BMC account for LAN/LAN+. Leave empty only for anonymous access.",
+                "type": "string"
+              },
+              "password": {
+                "title": "Password",
+                "description": "BMC account password for LAN/LAN+. Leave empty only if the account has no password.",
+                "type": "string"
+              },
+              "privilege_level": {
+                "title": "Privilege level",
+                "description": "Session privilege requested from the BMC. User privilege is sufficient for standard sensor and SEL commands.",
+                "type": "string",
+                "enum": [
+                  "user",
+                  "operator",
+                  "administrator"
+                ],
+                "default": "user"
+              }
+            },
+            "required": [
+              "hostname"
+            ]
+          }
+        ]
       }
     }
   },
   "uiSchema": {
     "ui:flavour": "tabs",
+    "ui:order": [
+      "driver",
+      "device",
+      "hostname",
+      "port",
+      "username",
+      "password",
+      "privilege_level",
+      "update_every",
+      "timeout",
+      "collect_sel",
+      "vnode"
+    ],
     "ui:options": {
       "tabs": [
         {
           "title": "Connection",
           "fields": [
             "driver",
-            "device"
+            "device",
+            "hostname",
+            "port",
+            "username",
+            "password",
+            "privilege_level"
           ]
         },
         {
@@ -59,8 +147,48 @@
             "timeout",
             "collect_sel"
           ]
+        },
+        {
+          "title": "Virtual Node",
+          "fields": [
+            "vnode"
+          ]
         }
       ]
+    },
+    "driver": {
+      "ui:widget": "radio",
+      "ui:options": {
+        "inline": true,
+        "enumNames": [
+          "Local OpenIPMI",
+          "LAN (IPMI 1.5)",
+          "LAN+ (IPMI 2.0)"
+        ]
+      },
+      "ui:help": "Use Local OpenIPMI for a kernel IPMI device on this Agent. Prefer LAN+ for remote BMCs; use LAN for devices that require IPMI 1.5."
+    },
+    "hostname": {
+      "ui:placeholder": "bmc.example",
+      "ui:help": "Enter IPv6 addresses without brackets. Set the UDP port separately."
+    },
+    "username": {
+      "ui:help": "IPMI usernames are limited to 16 bytes."
+    },
+    "password": {
+      "ui:widget": "password",
+      "ui:help": "IPMI 1.5 LAN passwords are limited to 16 bytes. Secret references such as `${env:IPMI_PASSWORD}` are resolved before connection."
+    },
+    "privilege_level": {
+      "ui:widget": "radio",
+      "ui:options": {
+        "inline": true
+      },
+      "ui:help": "Use a higher privilege only when required by your BMC access policy. The account must allow the selected privilege."
+    },
+    "vnode": {
+      "ui:placeholder": "server-node",
+      "ui:help": "Charts of this job appear under the Virtual Node instead of this host. Define the Virtual Node in `vnodes.conf` first, then enter its name here."
     }
   }
 }

@@ -43,15 +43,6 @@ func (t *openTransport) Connect(ctx context.Context) error {
 }
 
 func (t *openTransport) Exchange(ctx context.Context, req types.Request, res types.Response) error {
-	timeout, err := receiveTimeout(ctx, t.cfg.Timeout)
-	if err != nil {
-		return err
-	}
-	// The SDK's receive ignores the context, so its timeout also carries the
-	// remaining budget. Reader serializes commands and the local interface has
-	// no keepalive, so the temporary setting cannot race.
-	t.sdk.WithTimeout(timeout)
-	defer t.sdk.WithTimeout(t.cfg.Timeout)
 	return t.sdk.Exchange(ctx, req, res)
 }
 
@@ -60,18 +51,40 @@ func (t *openTransport) Close(ctx context.Context) error {
 	return t.sdk.Close(ctx)
 }
 
-// receiveTimeout returns the configured timeout capped by the context's remaining budget.
-func receiveTimeout(ctx context.Context, configured time.Duration) (time.Duration, error) {
-	if err := ctx.Err(); err != nil {
-		return 0, err
+// lanTransport owns one remote session and its SDK keepalive.
+type lanTransport struct {
+	sdk *client.Client
+}
+
+func newTransport(cfg Config) (transport, error) {
+	if cfg.Driver == "" || cfg.Driver == "open" {
+		return newOpenTransport(cfg)
 	}
-	deadline, ok := ctx.Deadline()
-	if !ok {
-		return configured, nil
+	sdk, err := client.NewClient(cfg.Hostname, cfg.Port, cfg.Username, cfg.Password)
+	if err != nil {
+		return nil, fmt.Errorf("create IPMI client: %w", err)
 	}
-	remaining := time.Until(deadline)
-	if remaining <= 0 {
-		return 0, context.DeadlineExceeded
-	}
-	return min(configured, remaining), nil
+	privilege := map[string]types.PrivilegeLevel{
+		"user":          types.PrivilegeLevelUser,
+		"operator":      types.PrivilegeLevelOperator,
+		"administrator": types.PrivilegeLevelAdministrator,
+	}[cfg.PrivilegeLevel]
+	sdk.WithInterface(client.Interface(cfg.Driver)).WithTimeout(cfg.Timeout).
+		WithRetry(0).WithMaxPrivilegeLevel(privilege)
+	return &lanTransport{sdk: sdk}, nil
+}
+
+func (t *lanTransport) Connect(ctx context.Context) error {
+	return t.sdk.Connect(ctx)
+}
+
+func (t *lanTransport) Exchange(ctx context.Context, req types.Request, res types.Response) error {
+	return t.sdk.Exchange(ctx, req, res)
+}
+
+func (t *lanTransport) Close(ctx context.Context) error {
+	// A failed or canceled operation still needs to release its BMC session.
+	cleanupCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), 2*time.Second)
+	defer cancel()
+	return t.sdk.Close(cleanupCtx)
 }

@@ -37,6 +37,7 @@ func TestCollector_Init(t *testing.T) {
 	}{
 		"defaults": {
 			wantReader: bmc.Config{
+				Driver:  driverOpen,
 				Device:  0,
 				Timeout: 5 * time.Second,
 			},
@@ -47,11 +48,24 @@ func TestCollector_Init(t *testing.T) {
 				c.Timeout = confopt.Duration(3 * time.Second)
 			},
 			wantReader: bmc.Config{
+				Driver:  driverOpen,
 				Device:  2,
 				Timeout: 3 * time.Second,
 			},
 		},
-		"invalid config": {
+		"remote defaults": {
+			config:     func(c *Config) { c.Driver, c.Hostname, c.Device = driverLANPlus, " bmc.example ", -1 },
+			wantReader: bmc.Config{Driver: driverLANPlus, Hostname: "bmc.example", Port: 623, PrivilegeLevel: "user", Timeout: 5 * time.Second},
+		},
+		"remote overrides": {
+			config: func(c *Config) {
+				c.Driver, c.Hostname, c.Port = driverLAN, "192.0.2.1", 9623
+				c.Username, c.Password, c.PrivilegeLevel = "monitor", "test-secret", "operator"
+				c.Timeout = confopt.Duration(3 * time.Second)
+			},
+			wantReader: bmc.Config{Driver: driverLAN, Hostname: "192.0.2.1", Port: 9623, Username: "monitor", Password: "test-secret", PrivilegeLevel: "operator", Timeout: 3 * time.Second},
+		},
+		"remote hostname missing": {
 			config:  func(c *Config) { c.Driver = "lanplus" },
 			wantErr: true,
 		},
