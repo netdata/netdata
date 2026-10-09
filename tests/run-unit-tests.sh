@@ -30,6 +30,11 @@ system_info_unit_test() {
   /bin/sh "$(dirname "$0")/system-info-test.sh"
 }
 
+system_info_windows_unit_test() {
+  echo "Running Windows system-info source/stub tests"
+  python3 "$(dirname "$0")/system-info-windows-test.py"
+}
+
 kickstart_path_unit_test() {
   echo "Running kickstart path shell tests"
   /bin/sh "$(dirname "$0")/kickstart-path-sanitizer-test.sh"
@@ -66,6 +71,8 @@ install_netdata || exit 1
 c_unit_tests || exit 1
 
 system_info_unit_test || exit 1
+
+system_info_windows_unit_test || exit 1
 
 kickstart_path_unit_test || exit 1
 

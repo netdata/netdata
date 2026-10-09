@@ -1,44 +1,64 @@
 #!/usr/bin/env sh
 
 SYSTEM_INFO_MODE="${1:-}"
-KERNEL_NAME="$(uname -s)" || KERNEL_NAME="unknown"
+KERNEL_NAME="$(uname -s)"
 
-# Count CPUs without probing model or frequency in runtime mode. Startup can
-# reuse its inventory output; runtime uses the OS count, including offline CPUs
-# where nproc supports it, while preserving lxcfs's container-visible count.
+# Count the kernel's comma-separated CPU ranges without expanding every CPU ID.
+count_cpu_list() {
+  awk -F, '
+    NR != 1 { invalid=1; next }
+    {
+      previous=-1
+      for (i=1; i<=NF; i++) {
+        if ($i !~ /^[0-9]+(-[0-9]+)?$/) { invalid=1; break }
+        n=split($i, bounds, "-")
+        first=bounds[1]+0
+        last=(n == 2 ? bounds[2]+0 : first)
+        if (first <= previous || last < first) { invalid=1; break }
+        total+=last-first+1
+        previous=last
+      }
+    }
+    END { if (NR != 1 || invalid || total < 1) exit 1; printf "%.0f\n", total }
+  '
+}
+
+# Both modes use the same sources. Present CPUs exclude empty hot-plug slots;
+# lxcfs supplies the container-visible count instead of the host's sysfs view.
 detect_cpu_count() {
   LCPU_COUNT="unknown"
   CPU_COUNT_SOURCE="none"
-  if { [ "${SYSTEM_INFO_MODE}" = --runtime ] || [ -n "${lscpu_output:-}" ]; } &&
-    grep -q "^lxcfs /proc" /proc/self/mounts 2>/dev/null &&
-    count=$(grep -c ^processor /proc/cpuinfo 2>/dev/null); then
-    LCPU_COUNT="$count"
-    CPU_COUNT_SOURCE="procfs"
-  elif [ "${SYSTEM_INFO_MODE}" != --runtime ] && [ -n "${lscpu_output:-}" ]; then
-    LCPU_COUNT="$(printf '%s\n' "${lscpu_output}" | grep "^CPU(s):" | cut -f 2 -d ':' | sed -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//')"
-    CPU_COUNT_SOURCE="lscpu"
-  elif [ "${SYSTEM_INFO_MODE}" != --runtime ] && [ -n "${dmidecode_output:-}" ]; then
-    LCPU_COUNT="$(printf '%s\n' "${dmidecode_output}" | grep -F "Thread Count:" | cut -f 2 -d ':' | sed -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//')"
-    CPU_COUNT_SOURCE="dmidecode"
-  elif [ "${KERNEL_NAME}" = FreeBSD ]; then
+  if [ "${KERNEL_NAME}" = FreeBSD ]; then
     CPU_COUNT_SOURCE="sysctl"
     LCPU_COUNT="$(sysctl -n kern.smp.cpus)" || LCPU_COUNT="unknown"
+    return
   elif [ "${KERNEL_NAME}" = Darwin ]; then
     CPU_COUNT_SOURCE="sysctl"
     LCPU_COUNT="$(sysctl -n hw.logicalcpu)" || LCPU_COUNT="unknown"
+    return
+  elif [ "${KERNEL_NAME}" = Linux ]; then
+    if is_inside_lxc_container; then
+      CPU_COUNT_SOURCE="procfs"
+      LCPU_COUNT="$(grep -c ^processor /proc/cpuinfo 2>/dev/null)" || LCPU_COUNT="unknown"
+      return
+    fi
+    if cpu_list=$(cat /sys/devices/system/cpu/present 2>/dev/null) &&
+      LCPU_COUNT=$(printf '%s\n' "${cpu_list}" | count_cpu_list); then
+      CPU_COUNT_SOURCE="sysfs"
+      return
+    fi
+  fi
+
+  if [ -d /sys/devices/system/cpu ] &&
+    LCPU_COUNT=$(find /sys/devices/system/cpu -mindepth 1 -maxdepth 1 -type d -name 'cpu[0-9]*' 2>/dev/null | grep -cE '/cpu[0-9]+$'); then
+    CPU_COUNT_SOURCE="sysfs"
+  elif LCPU_COUNT=$(grep -c ^processor /proc/cpuinfo 2>/dev/null); then
+    CPU_COUNT_SOURCE="procfs"
   elif command -v nproc >/dev/null 2>&1; then
     CPU_COUNT_SOURCE="nproc"
-    if [ "${SYSTEM_INFO_MODE}" = --runtime ]; then
-      LCPU_COUNT="$(nproc --all)" || LCPU_COUNT="unknown"
-    else
-      LCPU_COUNT="$(nproc)" || LCPU_COUNT="unknown"
-    fi
-  elif [ -d /sys/devices/system/cpu ]; then
-    CPU_COUNT_SOURCE="sysfs"
-    LCPU_COUNT="$(find /sys/devices/system/cpu -mindepth 1 -maxdepth 1 -type d -name 'cpu*' | grep -cEv 'idle|freq')"
-  elif [ -r /proc/cpuinfo ]; then
-    CPU_COUNT_SOURCE="procfs"
-    LCPU_COUNT="$(grep -c ^processor /proc/cpuinfo)"
+    LCPU_COUNT="$(nproc)" || LCPU_COUNT="unknown"
+  else
+    LCPU_COUNT="unknown"
   fi
 }
 
@@ -176,7 +196,7 @@ get_default_interface_ip() {
   # Optional parameter for IP version: "-4" (default) or "-6"
   ip_version="${1:--4}"
 
-  # GNU timeout creates its own process group. Under Agent supervision the outer
+  # Plain GNU timeout creates its own process group. Under Agent supervision the outer
   # deadline owns cleanup, so keep every probe in the script's process group.
   timeout_cmd=""
   if [ "${SYSTEM_INFO_MODE:-}" != --runtime ] && [ "${SYSTEM_INFO_MODE:-}" != --bounded ] &&
@@ -435,8 +455,8 @@ fi
 # -------------------------------------------------------------------------------------------------
 # detect the kernel
 
-KERNEL_VERSION="$(uname -r)" || KERNEL_VERSION="unknown"
-ARCHITECTURE="$(uname -m)" || ARCHITECTURE="unknown"
+KERNEL_VERSION="$(uname -r)"
+ARCHITECTURE="$(uname -m)"
 
 # -------------------------------------------------------------------------------------------------
 # detect the virtualization and possibly the container technology
@@ -667,7 +687,7 @@ elif [ "${KERNEL_NAME}" = "FreeBSD" ]; then
   CONTAINER_NAME="FreeBSD"
   CONTAINER_OS_DETECTION="uname"
   CONTAINER_VERSION=$(uname -r)
-  KERNEL_VERSION=$(uname -K) || KERNEL_VERSION="unknown"
+  KERNEL_VERSION=$(uname -K)
 else
   if load_os_release CONTAINER /etc/os-release; then
     CONTAINER_OS_DETECTION="/etc/os-release"
@@ -794,6 +814,9 @@ CPU_VENDOR="unknown"
 CPU_FREQ="unknown"
 CPU_INFO_SOURCE="none"
 
+detect_cpu_count
+CPU_INFO_SOURCE="${CPU_COUNT_SOURCE}"
+
 possible_cpu_freq=""
 lscpu="$(command -v lscpu)"
 lscpu_output=""
@@ -801,9 +824,8 @@ dmidecode="$(command -v dmidecode)"
 dmidecode_output=""
 
 if [ -n "${lscpu}" ] && lscpu >/dev/null 2>&1; then
-  lscpu_output="$(LC_NUMERIC=C ${lscpu} 2>/dev/null)" || lscpu_output=""
-  CPU_INFO_SOURCE="lscpu"
-  detect_cpu_count
+  lscpu_output="$(LC_NUMERIC=C ${lscpu} 2>/dev/null)"
+  CPU_INFO_SOURCE="${CPU_INFO_SOURCE} lscpu"
   CPU_VENDOR="$(echo "${lscpu_output}" | grep "^Vendor ID:" | cut -f 2 -d ':' | sed -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//')"
   CPU_MODEL="$(echo "${lscpu_output}" | grep "^Model name:" | cut -f 2 -d ':' | sed -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//')"
   possible_cpu_freq="$(echo "${lscpu_output}" | grep -F "CPU max MHz:" | cut -f 2 -d ':' | sed -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//' | grep -o '^[0-9]*')"
@@ -815,15 +837,12 @@ if [ -n "${lscpu}" ] && lscpu >/dev/null 2>&1; then
   fi
   [ -n "$possible_cpu_freq" ] && possible_cpu_freq="${possible_cpu_freq} MHz"
 elif [ -n "${dmidecode}" ] && dmidecode -t processor >/dev/null 2>&1; then
-  dmidecode_output="$(${dmidecode} -t processor 2>/dev/null)" || dmidecode_output=""
-  CPU_INFO_SOURCE="dmidecode"
-  detect_cpu_count
+  dmidecode_output="$(${dmidecode} -t processor 2>/dev/null)"
+  CPU_INFO_SOURCE="${CPU_INFO_SOURCE} dmidecode"
   CPU_VENDOR="$(echo "${dmidecode_output}" | grep -F "Manufacturer:" | cut -f 2 -d ':' | sed -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//')"
   CPU_MODEL="$(echo "${dmidecode_output}" | grep -F "Version:" | cut -f 2 -d ':' | sed -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//')"
   possible_cpu_freq="$(echo "${dmidecode_output}" | grep -F "Current Speed:" | cut -f 2 -d ':' | sed -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//')"
 else
-  detect_cpu_count
-  CPU_INFO_SOURCE="${CPU_COUNT_SOURCE}"
   if [ "${KERNEL_NAME}" = FreeBSD ]; then
     # Try dev.cpu.0.freq first (what freebsd.plugin uses, returns MHz)
     if possible_cpu_freq=$(sysctl -n dev.cpu.0.freq 2>/dev/null); then
@@ -837,23 +856,23 @@ else
   fi
 
   if [ "${KERNEL_NAME}" = Darwin ]; then
-    CPU_MODEL="$(sysctl -n machdep.cpu.brand_string)" || CPU_MODEL="unknown"
+    CPU_MODEL="$(sysctl -n machdep.cpu.brand_string)"
     if [ "${ARCHITECTURE}" = "x86_64" ]; then
-      CPU_VENDOR="$(sysctl -n machdep.cpu.vendor)" || CPU_VENDOR="unknown"
+      CPU_VENDOR="$(sysctl -n machdep.cpu.vendor)"
     else
       CPU_VENDOR="Apple"
     fi
     echo "${CPU_INFO_SOURCE}" | grep -qv sysctl && CPU_INFO_SOURCE="${CPU_INFO_SOURCE} sysctl"
   elif uname --version 2>/dev/null | grep -qF 'GNU coreutils'; then
     CPU_INFO_SOURCE="${CPU_INFO_SOURCE} uname"
-    CPU_MODEL="$(uname -p)" || CPU_MODEL="unknown"
-    CPU_VENDOR="$(uname -i)" || CPU_VENDOR="unknown"
+    CPU_MODEL="$(uname -p)"
+    CPU_VENDOR="$(uname -i)"
   elif [ "${KERNEL_NAME}" = FreeBSD ]; then
     if (echo "${CPU_INFO_SOURCE}" | grep -qv sysctl); then
       CPU_INFO_SOURCE="${CPU_INFO_SOURCE} sysctl"
     fi
 
-    CPU_MODEL="$(sysctl -n hw.model)" || CPU_MODEL="unknown"
+    CPU_MODEL="$(sysctl -n hw.model)"
   elif [ -r /proc/cpuinfo ]; then
     if (echo "${CPU_INFO_SOURCE}" | grep -qv procfs); then
       CPU_INFO_SOURCE="${CPU_INFO_SOURCE} procfs"
@@ -865,7 +884,7 @@ else
 fi
 
 if [ "${KERNEL_NAME}" = Darwin ] && [ "${ARCHITECTURE}" = "x86_64" ]; then
-  CPU_FREQ="$(sysctl -n hw.cpufrequency)" || CPU_FREQ="unknown"
+  CPU_FREQ="$(sysctl -n hw.cpufrequency)"
 elif [ -r /sys/devices/system/cpu/cpu0/cpufreq/base_frequency ]; then
   if (echo "${CPU_INFO_SOURCE}" | grep -qv sysfs); then
     CPU_INFO_SOURCE="${CPU_INFO_SOURCE} sysfs"
@@ -943,11 +962,11 @@ if [ "${VIRTUALIZATION}" != "none" ] && command -v curl >/dev/null 2>&1; then
   if [ "$ret" != 28 ]; then
     # Try AWS IMDSv2
     if [ "${CLOUD_TYPE}" = "unknown" ]; then
-      AWS_IMDS_TOKEN="$(curl --fail -s --connect-timeout 1 -m 3 --noproxy "*" -X PUT "http://169.254.169.254/latest/api/token" -H "X-aws-ec2-metadata-token-ttl-seconds: 21600")" || AWS_IMDS_TOKEN=""
+      AWS_IMDS_TOKEN="$(curl --fail -s --connect-timeout 1 -m 3 --noproxy "*" -X PUT "http://169.254.169.254/latest/api/token" -H "X-aws-ec2-metadata-token-ttl-seconds: 21600")"
       if [ -n "${AWS_IMDS_TOKEN}" ]; then
         CLOUD_TYPE="AWS"
-        CLOUD_INSTANCE_TYPE="$(curl --fail -s --connect-timeout 1 -m 3 --noproxy "*" -H "X-aws-ec2-metadata-token: $AWS_IMDS_TOKEN" -v "http://169.254.169.254/latest/meta-data/instance-type" 2>/dev/null)" || CLOUD_INSTANCE_TYPE="unknown"
-        CLOUD_INSTANCE_REGION="$(curl --fail -s --connect-timeout 1 -m 3 --noproxy "*" -H "X-aws-ec2-metadata-token: $AWS_IMDS_TOKEN" -v "http://169.254.169.254/latest/meta-data/placement/region" 2>/dev/null)" || CLOUD_INSTANCE_REGION="unknown"
+        CLOUD_INSTANCE_TYPE="$(curl --fail -s --connect-timeout 1 -m 3 --noproxy "*" -H "X-aws-ec2-metadata-token: $AWS_IMDS_TOKEN" -v "http://169.254.169.254/latest/meta-data/instance-type" 2>/dev/null)"
+        CLOUD_INSTANCE_REGION="$(curl --fail -s --connect-timeout 1 -m 3 --noproxy "*" -H "X-aws-ec2-metadata-token: $AWS_IMDS_TOKEN" -v "http://169.254.169.254/latest/meta-data/placement/region" 2>/dev/null)"
       fi
     fi
 
@@ -955,20 +974,20 @@ if [ "${VIRTUALIZATION}" != "none" ] && command -v curl >/dev/null 2>&1; then
     if [ "${CLOUD_TYPE}" = "unknown" ]; then
       if curl --fail -s --connect-timeout 1 -m 3 --noproxy "*" -H "Metadata-Flavor: Google" "http://metadata.google.internal/computeMetadata/v1" | grep -sq computeMetadata; then
         CLOUD_TYPE="GCP"
-        CLOUD_INSTANCE_TYPE="$(curl --fail -s --connect-timeout 1 -m 3 --noproxy "*" -H "Metadata-Flavor: Google" "http://metadata.google.internal/computeMetadata/v1/instance/machine-type")" || CLOUD_INSTANCE_TYPE="unknown"
+        CLOUD_INSTANCE_TYPE="$(curl --fail -s --connect-timeout 1 -m 3 --noproxy "*" -H "Metadata-Flavor: Google" "http://metadata.google.internal/computeMetadata/v1/instance/machine-type")"
         [ -n "$CLOUD_INSTANCE_TYPE" ] && CLOUD_INSTANCE_TYPE=$(basename "$CLOUD_INSTANCE_TYPE")
-        CLOUD_INSTANCE_REGION="$(curl --fail -s --connect-timeout 1 -m 3 --noproxy "*" -H "Metadata-Flavor: Google" "http://metadata.google.internal/computeMetadata/v1/instance/zone")" || CLOUD_INSTANCE_REGION="unknown"
+        CLOUD_INSTANCE_REGION="$(curl --fail -s --connect-timeout 1 -m 3 --noproxy "*" -H "Metadata-Flavor: Google" "http://metadata.google.internal/computeMetadata/v1/instance/zone")"
         [ -n "$CLOUD_INSTANCE_REGION" ] && CLOUD_INSTANCE_REGION=$(basename "$CLOUD_INSTANCE_REGION") && CLOUD_INSTANCE_REGION=${CLOUD_INSTANCE_REGION%-*}
       fi
     fi
 
     # Try Azure IMDS
     if [ "${CLOUD_TYPE}" = "unknown" ]; then
-      AZURE_IMDS_DATA="$(curl --fail -s --connect-timeout 1 -m 3 -H "Metadata: true" --noproxy "*" "http://169.254.169.254/metadata/instance?api-version=2021-10-01")" || AZURE_IMDS_DATA=""
+      AZURE_IMDS_DATA="$(curl --fail -s --connect-timeout 1 -m 3 -H "Metadata: true" --noproxy "*" "http://169.254.169.254/metadata/instance?api-version=2021-10-01")"
       if [ -n "${AZURE_IMDS_DATA}" ] && echo "${AZURE_IMDS_DATA}" | grep -sq azEnvironment; then
         CLOUD_TYPE="Azure"
-        CLOUD_INSTANCE_TYPE="$(curl --fail -s --connect-timeout 1 -m 3 -H "Metadata: true" --noproxy "*" "http://169.254.169.254/metadata/instance/compute/vmSize?api-version=2021-10-01&format=text")" || CLOUD_INSTANCE_TYPE="unknown"
-        CLOUD_INSTANCE_REGION="$(curl --fail -s --connect-timeout 1 -m 3 -H "Metadata: true" --noproxy "*" "http://169.254.169.254/metadata/instance/compute/location?api-version=2021-10-01&format=text")" || CLOUD_INSTANCE_REGION="unknown"
+        CLOUD_INSTANCE_TYPE="$(curl --fail -s --connect-timeout 1 -m 3 -H "Metadata: true" --noproxy "*" "http://169.254.169.254/metadata/instance/compute/vmSize?api-version=2021-10-01&format=text")"
+        CLOUD_INSTANCE_REGION="$(curl --fail -s --connect-timeout 1 -m 3 -H "Metadata: true" --noproxy "*" "http://169.254.169.254/metadata/instance/compute/location?api-version=2021-10-01&format=text")"
       fi
     fi
   fi

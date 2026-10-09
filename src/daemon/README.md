@@ -34,6 +34,11 @@ Checks do not overlap. Changed values update the cached host information and aut
 streaming to Parents. CPU model and frequency, OS/kernel details, and cloud/container/virtualization identity remain
 startup-only on every platform.
 
+Startup and refresh use the same CPU-count sources. On Linux, the count prefers present logical CPUs, excluding empty
+hot-plug slots and independent of the Agent's CPU affinity. In lxcfs containers it uses the virtualized `/proc/cpuinfo`
+count. If the kernel's present-CPU list is unavailable, detection falls back to CPU directories in sysfs, `/proc/cpuinfo`,
+then the CPUs available to the process from `nproc`.
+
 On Unix, `system-info.sh` has a 30-second execution deadline after spawning. Failed executions, malformed output, and
 incomplete responses are discarded and logged with a reason. Failed individual probes retain their previous values; successful absence clears the
 corresponding optional values. Cancellation terminates the probe's process group. Runtime refresh does not rewrite the
@@ -42,7 +47,7 @@ process environment exported during startup.
 On Windows, runtime refresh uses native probes for the same fields. Native Windows calls do not use the Unix subprocess deadline.
 
 See [automatic host labels](/docs/netdata-agent/configuration/organize-systems-metrics-and-alerts.md#use-automatic-labels)
-for label semantics and Parent upgrade requirements.
+for label semantics and compatibility during gradual upgrades.
 
 ## Logging
 

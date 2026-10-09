@@ -90,6 +90,8 @@ On every platform, Netdata refreshes CPU count, total RAM, disk capacity, and th
 every five minutes after the previous check finishes. Runtime changes such as VM CPU or RAM resizing and a changed default
 route update these labels without a restart. CPU model and frequency, OS/kernel details, and cloud/container/virtualization
 identity remain startup-only.
+On Linux, `_system_cores` prefers present logical CPUs, excluding empty hot-plug slots and independent of Agent CPU affinity.
+With lxcfs, it uses the container's virtualized CPU count. Startup and refresh use the same sources and fallback order.
 Only changed values trigger label updates. Failed detection preserves the last known values; a successful check that finds
 no default route removes the default-interface labels. Custom labels and Kubernetes labels keep their existing reload behavior.
 
@@ -98,6 +100,8 @@ interface together. `_stream_egress_iface` reports the interface detected for th
 which can differ from the OS default. It is retained while disconnected and updated when the next connection's interface is detected.
 Older Parents still interpret `_net_default_iface` as the streaming interface in disconnect diagnostics; upgrade the Parent
 to use `_stream_egress_iface` for those diagnostics.
+Older children can still overwrite `_net_default_iface` with their streaming egress interface, even when connected to an
+upgraded Parent; their interface name and OS-default IP can therefore describe different interfaces until the child is upgraded.
 
 View your automatic labels at `http://HOST-IP:19999/api/v1/info`:
 
@@ -197,7 +201,14 @@ Remove a custom label you no longer need.
 
 ### Stream labels from Child to Parent
 
-In Parent-Child setups, host labels automatically stream from children to the parent node. A label change on a child, such as one applied with `netdatacli reload-labels`, reaches its parent and every Parent above it without reconnecting. Parents with periodic system-info refresh support also update the six runtime fields in their cached system information from these labels. Other structured system information retains its handshake values. Older Parents can receive updated labels while their structured system information remains stale; upgrade every Parent in the chain for consistent API and Cloud metadata. Access any child's labels through the parent at:
+In Parent-Child setups, host labels automatically stream from children to the parent node. A label change on a child, such as one applied with `netdatacli reload-labels`, reaches its parent and every Parent above it without reconnecting. Parents with periodic system-info refresh support also update the six runtime fields in their cached system information from these labels. Other structured system information retains its handshake values.
+
+Mixed-version setups continue streaming during gradual upgrades. An upgraded child sends refreshed labels to older Parents,
+but those Parents retain their handshake values in structured system information until reconnect. An older child still needs
+an upgrade to detect runtime changes. Upgrading Parents first enables consistent refreshed API and Cloud metadata as children
+are upgraded; upgrading in this order is recommended, not required for streaming compatibility.
+
+Access any child's labels through the parent at:
 `http://localhost:19999/host/CHILD_HOSTNAME/api/v1/info`
 
 :::warning

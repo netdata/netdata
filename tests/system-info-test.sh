@@ -179,7 +179,8 @@ probe=${0##*/}
 printf '%s %s\n' "$probe" "$*" >> "$RUNTIME_PROBE_LOG"
 case "$probe:$*" in
     uname:-s) printf '%s\n' "${TEST_KERNEL:-Darwin}" ;;
-    uname:-m) printf 'x86_64\n' ;;
+    uname:-m) [ "${TEST_KERNEL_METADATA_FAIL:-false}" = false ] || exit 1; printf 'x86_64\n' ;;
+    uname:-r|uname:-K) [ "${TEST_KERNEL_METADATA_FAIL:-false}" = false ] || exit 1; printf 'test-kernel\n' ;;
     uname:*) printf 'test-kernel\n' ;;
     sysctl:'-n hw.logicalcpu'|sysctl:'-n kern.smp.cpus')
         [ "${TEST_CPU_FAIL:-false}" = false ] || exit 1
@@ -187,7 +188,9 @@ case "$probe:$*" in
     sysctl:'-n hw.memsize'|sysctl:'-n hw.physmem')
         [ "${TEST_RAM_FAIL:-false}" = false ] || exit 1
         printf '%b\n' "${TEST_RAM:-1073741824}" ;;
-    sysctl:*) printf '%s\n' "${TEST_FREQUENCY:-2000000000}" ;;
+    sysctl:*)
+        [ "${TEST_METADATA_FAIL:-false}" = false ] || exit 1
+        printf '%s\n' "${TEST_FREQUENCY:-2000000000}" ;;
     diskutil:*) printf 'Disk Size: 1 GB (1073741824 Bytes)\n' ;;
     lsvfs:*) printf 'ufs\n' ;;
     df:*)
@@ -204,11 +207,24 @@ case "$probe:$*" in
         [ "${NETWORK_TEST:-present}" != address-failed ] || exit 1
         [ "${NETWORK_TEST:-present}" != no-address ] || exit 0
         printf 'inet 192.0.2.4 netmask 0xffffff00\n' ;;
-    lscpu:*) printf 'CPU(s): 8\nModel name: Cortex-A55\nModel name: Cortex-A76\nCPU MHz: %s\n' "${TEST_FREQUENCY:-1800}" ;;
+    lscpu:*)
+        [ "${TEST_INVENTORY_FAIL:-false}" = false ] || exit 1
+        printf 'CPU(s): %s\nModel name: Cortex-A55\nModel name: Cortex-A76\nCPU MHz: %s\n' "${TEST_INVENTORY_CPU:-32}" "${TEST_FREQUENCY:-1800}" ;;
     nproc:*)
-        [ "$*" = --all ] || exit 1
         [ "${TEST_CPU_FAIL:-false}" = false ] || exit 1
-        printf '%b\n' "${TEST_CPU:-8}" ;;
+        case "$*" in
+            --all) printf '64\n' ;;
+            '') printf '%s\n' "${TEST_USABLE_CPU:-1}" ;;
+            *) exit 1 ;;
+        esac ;;
+    cat:/sys/devices/system/cpu/present)
+        [ "${TEST_CPU_FAIL:-false}" = false ] && [ "${TEST_PRESENT_FAIL:-false}" = false ] || exit 1
+        printf '%b\n' "${TEST_PRESENT_CPUS:-0-7}" ;;
+    cat:*) exec "$SYSTEM_INFO_TEST_CAT" "$@" ;;
+    find:/sys/devices/system/cpu*)
+        [ "${TEST_CPU_FAIL:-false}" = false ] && [ "${TEST_SYSFS_FAIL:-false}" = false ] || exit 1
+        printf '/sys/devices/system/cpu/cpu0\n/sys/devices/system/cpu/cpu1\n' ;;
+    find:*) exec "$SYSTEM_INFO_TEST_FIND" "$@" ;;
     ip:*)
         case "${NETWORK_TEST:-present}:$*" in
             absent:*) exit 0 ;;
@@ -219,9 +235,9 @@ case "$probe:$*" in
         esac ;;
     grep:*)
         case "$*" in
-            '-q ^lxcfs /proc /proc/self/mounts')
-                [ "${TEST_LXCFS:-false}" = true ] ;;
-            '-c ^processor /proc/cpuinfo') printf '3\n' ;;
+            '-c ^processor /proc/cpuinfo')
+                [ "${TEST_CPU_FAIL:-false}" = false ] && [ "${TEST_PROC_CPU_FAIL:-false}" = false ] || exit 1
+                printf '3\n' ;;
             '-F MemTotal /proc/meminfo')
                 [ "${TEST_RAM_FAIL:-false}" = false ] || exit 1
                 printf 'MemTotal: %s kB\n' "${TEST_RAM_KB:-1048576}" ;;
@@ -229,6 +245,7 @@ case "$probe:$*" in
         esac ;;
     awk:*)
         case "$*" in
+            *'/proc/self/mounts') [ "${TEST_LXCFS:-false}" = true ] ;;
             *'/proc/net/route')
                 case "${NETWORK_TEST:-present}" in
                     present|address-failed) printf 'test0\n' ;;
@@ -239,17 +256,24 @@ case "$probe:$*" in
         esac ;;
     systemd-detect-virt:*) printf 'none\n' ;;
     pgrep:*) exit 1 ;;
-    curl:*) exit 28 ;;
+    curl:*)
+        [ "${TEST_CLOUD_FAILURE:-false}" = true ] || exit 28
+        case "$*" in
+            *latest/api/token*) printf 'synthetic-test-token\n' ;;
+            *latest/meta-data/*) exit 22 ;;
+        esac ;;
     *) exit 1 ;;
 esac
 EOF
-for probe in uname sysctl diskutil lsvfs df route netstat ifconfig lscpu nproc ip grep awk systemd-detect-virt pgrep curl dmidecode sw_vers; do
+for probe in uname sysctl diskutil lsvfs df route netstat ifconfig lscpu nproc ip cat find grep awk systemd-detect-virt pgrep curl dmidecode sw_vers; do
     ln -s probe "${test_dir}/runtime-bin/${probe}"
 done
 chmod +x "${test_dir}/runtime-bin/probe"
 SYSTEM_INFO_TEST_GREP=$(command -v grep)
 SYSTEM_INFO_TEST_AWK=$(command -v awk)
-export SYSTEM_INFO_TEST_GREP SYSTEM_INFO_TEST_AWK
+SYSTEM_INFO_TEST_CAT=$(command -v cat)
+SYSTEM_INFO_TEST_FIND=$(command -v find)
+export SYSTEM_INFO_TEST_GREP SYSTEM_INFO_TEST_AWK SYSTEM_INFO_TEST_CAT SYSTEM_INFO_TEST_FIND
 : > "${test_dir}/runtime-probes.log"
 runtime_output=$(PATH="${test_dir}/runtime-bin:${PATH}" RUNTIME_PROBE_LOG="${test_dir}/runtime-probes.log" \
     /bin/sh "${system_info_script}" --runtime)
@@ -282,7 +306,29 @@ run_runtime() {
         exit 1
     fi
 }
+assert_cpu_modes() {
+    expected_cpu=$1
+    shift
+    run_runtime "$@"
+    assert_record V NETDATA_SYSTEM_CPU_LOGICAL_CPU_COUNT "$expected_cpu"
+    startup_output=$(env PATH="${test_dir}/runtime-bin:${PATH}" RUNTIME_PROBE_LOG="${test_dir}/runtime-probes.log" \
+        "$@" /bin/sh "${system_info_script}" --bounded)
+    actual_cpu=$(printf '%s\n' "$startup_output" | sed -n 's/^NETDATA_SYSTEM_CPU_LOGICAL_CPU_COUNT=//p')
+    [ "$actual_cpu" = "$expected_cpu" ] || {
+        printf 'CPU source mismatch: startup=%s runtime=%s\n' "$actual_cpu" "$expected_cpu" >&2
+        exit 1
+    }
+    if grep -Fx 'nproc --all' "${test_dir}/runtime-probes.log"; then
+        printf 'CPU count used possible hot-plug slots\n' >&2
+        exit 1
+    fi
+}
 assert_runtime_frame "$runtime_output"
+assert_cpu_modes 8 TEST_KERNEL=Darwin
+assert_cpu_modes 8 TEST_KERNEL=FreeBSD
+assert_cpu_modes 14 TEST_KERNEL=Linux TEST_PRESENT_CPUS=0-13
+assert_cpu_modes 7 TEST_KERNEL=Linux TEST_PRESENT_CPUS=0-3,8,10-11
+assert_cpu_modes 14 TEST_KERNEL=Linux TEST_PRESENT_CPUS=0-13 TEST_INVENTORY_FAIL=true
 run_runtime
 assert_record V NETDATA_SYSTEM_CPU_LOGICAL_CPU_COUNT 8
 assert_record V NETDATA_SYSTEM_TOTAL_RAM 1073741824
@@ -312,13 +358,24 @@ for unsafe in '12\r' '12\tbad'; do
     assert_record F NETDATA_SYSTEM_CPU_LOGICAL_CPU_COUNT ''
     assert_record V NETDATA_SYSTEM_TOTAL_RAM 1073741824
 done
-for network_case in absent failed address-failed unsafe no-address; do
+for network_case in absent failed address-failed no-address; do
     run_runtime NETWORK_TEST="$network_case"
     case "$network_case" in absent|no-address) network_status=A ;; *) network_status=F ;; esac
     for field in NAME IP DETECTION; do
         assert_record "$network_status" "NETDATA_SYSTEM_DEFAULT_INTERFACE_$field" ''
     done
 done
+# Some awk implementations strip the trailing CR while parsing route output.
+# Either reject that tuple or publish the fully normalized, valid tuple.
+run_runtime NETWORK_TEST=unsafe
+if printf '%s\n' "$runtime_output" | grep -Fx "$(printf 'V\tNETDATA_SYSTEM_DEFAULT_INTERFACE_NAME\ttest0')" >/dev/null; then
+    assert_record V NETDATA_SYSTEM_DEFAULT_INTERFACE_IP 192.0.2.4
+    assert_record V NETDATA_SYSTEM_DEFAULT_INTERFACE_DETECTION route
+else
+    for field in NAME IP DETECTION; do
+        assert_record F "NETDATA_SYSTEM_DEFAULT_INTERFACE_$field" ''
+    done
+fi
 
 # FreeBSD uses only the count sysctl, with disk failure independent of RAM.
 run_runtime TEST_KERNEL=FreeBSD TEST_FREQUENCY=2400
@@ -331,17 +388,23 @@ run_runtime TEST_KERNEL=FreeBSD TEST_DISK_FAIL=true
 assert_record F NETDATA_SYSTEM_TOTAL_DISK_SIZE ''
 assert_record V NETDATA_SYSTEM_TOTAL_RAM 1073741824
 
-# Check Linux count behavior on either host; procfs cases need a Linux host.
+# Kernel present CPUs are independent of inventory, affinity and possible slots.
 run_runtime TEST_KERNEL=Linux
 assert_record V NETDATA_SYSTEM_CPU_LOGICAL_CPU_COUNT 8
-grep -Fx 'nproc --all' "${test_dir}/runtime-probes.log" >/dev/null
 if [ -r /proc/meminfo ] && [ -r /proc/net/route ]; then
-    run_runtime TEST_KERNEL=Linux TEST_CPU=16 TEST_RAM_KB=2097152
+    run_runtime TEST_KERNEL=Linux TEST_PRESENT_CPUS=0-15 TEST_RAM_KB=2097152
     assert_record V NETDATA_SYSTEM_CPU_LOGICAL_CPU_COUNT 16
     assert_record V NETDATA_SYSTEM_TOTAL_RAM 2147483648
     assert_record V NETDATA_SYSTEM_DEFAULT_INTERFACE_IP 192.0.2.4
-    run_runtime TEST_KERNEL=Linux TEST_LXCFS=true
-    assert_record V NETDATA_SYSTEM_CPU_LOGICAL_CPU_COUNT 3
+    assert_cpu_modes 3 TEST_KERNEL=Linux TEST_LXCFS=true
+    assert_cpu_modes 3 TEST_KERNEL=Linux TEST_LXCFS=true TEST_INVENTORY_FAIL=true
+    assert_cpu_modes 2 TEST_KERNEL=Linux TEST_PRESENT_FAIL=true
+    assert_cpu_modes 3 TEST_KERNEL=Linux TEST_PRESENT_FAIL=true TEST_SYSFS_FAIL=true
+    assert_cpu_modes 1 TEST_KERNEL=Linux TEST_PRESENT_FAIL=true TEST_SYSFS_FAIL=true TEST_PROC_CPU_FAIL=true
+    # A failed virtualized count must not fall back to the host's CPU inventory.
+    run_runtime TEST_KERNEL=Linux TEST_LXCFS=true TEST_PROC_CPU_FAIL=true
+    assert_record F NETDATA_SYSTEM_CPU_LOGICAL_CPU_COUNT ''
+    assert_cpu_modes 2 TEST_KERNEL=Linux TEST_PRESENT_CPUS=invalid
     run_runtime TEST_KERNEL=Linux TEST_CPU_FAIL=true TEST_RAM_FAIL=true
     assert_record F NETDATA_SYSTEM_CPU_LOGICAL_CPU_COUNT ''
     assert_record F NETDATA_SYSTEM_TOTAL_RAM ''
@@ -369,6 +432,31 @@ for record in NAME=unknown IP=unknown DETECTION=route; do
     printf '%s\n' "$startup_output" | grep -Fx "NETDATA_SYSTEM_DEFAULT_INTERFACE_${record}" >/dev/null
 done
 
+# Startup-only failed probes retain their original empty output, not "unknown".
+assert_startup_record() {
+    printf '%s\n' "$startup_output" | grep -Fx "$1=$2" >/dev/null || {
+        printf 'missing startup record %s=%s\n' "$1" "$2" >&2
+        exit 1
+    }
+}
+startup_output=$(PATH="${test_dir}/runtime-bin:${PATH}" RUNTIME_PROBE_LOG="${test_dir}/runtime-probes.log" \
+    TEST_METADATA_FAIL=true TEST_INVENTORY_FAIL=true /bin/sh "${system_info_script}" --bounded)
+for field in CPU_MODEL CPU_VENDOR CPU_FREQ; do
+    assert_startup_record "NETDATA_SYSTEM_$field" ''
+done
+assert_startup_record NETDATA_SYSTEM_CPU_LOGICAL_CPU_COUNT 8
+for kernel in Darwin FreeBSD; do
+    startup_output=$(PATH="${test_dir}/runtime-bin:${PATH}" RUNTIME_PROBE_LOG="${test_dir}/runtime-probes.log" \
+        TEST_KERNEL="$kernel" TEST_KERNEL_METADATA_FAIL=true /bin/sh "${system_info_script}" --bounded)
+    assert_startup_record NETDATA_SYSTEM_KERNEL_VERSION ''
+    assert_startup_record NETDATA_SYSTEM_ARCHITECTURE ''
+done
+startup_output=$(PATH="${test_dir}/runtime-bin:${PATH}" RUNTIME_PROBE_LOG="${test_dir}/runtime-probes.log" \
+    TEST_CLOUD_FAILURE=true VIRTUALIZATION=kvm /bin/sh "${system_info_script}" --bounded)
+assert_startup_record NETDATA_INSTANCE_CLOUD_TYPE AWS
+assert_startup_record NETDATA_INSTANCE_CLOUD_INSTANCE_TYPE ''
+assert_startup_record NETDATA_INSTANCE_CLOUD_INSTANCE_REGION ''
+
 # A matching kubelet process must not inject its PID into the detector protocol.
 sed -n '/^HOST_IS_K8S_NODE="false"/,/^fi/p' "${system_info_script}" > "${test_dir}/kubernetes.sh"
 kubernetes_output=$(/bin/sh -c '
@@ -385,5 +473,15 @@ disk_output=$(/bin/sh -c '. "$1"; printf "12\n34\n" | sum_disk_sizes 1024' sh "$
 disk_output=$(/bin/sh -c '. "$1"; printf "" | sum_disk_sizes 1024' sh "${functions_script}")
 [ "${disk_output}" = 0 ]
 /bin/sh -c '. "$1"; ! printf "12\ninvalid\n" | sum_disk_sizes 1024' sh "${functions_script}"
+
+# Parse sparse present-CPU lists and reject malformed or overlapping ranges.
+sed -n '/^count_cpu_list()/,/^}/p' "${system_info_script}" >> "${functions_script}"
+cpu_output=$(/bin/sh -c '. "$1"; printf "0-3,8,10-11\n" | count_cpu_list' sh "${functions_script}")
+[ "$cpu_output" = 7 ]
+cpu_output=$(/bin/sh -c '. "$1"; printf "4\n" | count_cpu_list' sh "${functions_script}")
+[ "$cpu_output" = 1 ]
+for cpu_list in '' '4-2' '0-3,3-5' '2,1' '0,,2' '0-2,' '0-1-2' '0-2 bad' '0-2\n4-5'; do
+    /bin/sh -c '. "$1"; ! printf "%b\n" "$2" | count_cpu_list' sh "${functions_script}" "$cpu_list"
+done
 
 printf '%s\n' 'system-info shell tests: OK'
