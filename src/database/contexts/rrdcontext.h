@@ -148,7 +148,8 @@ typedef struct query_plan_entry {
     time_t before;
 } QUERY_PLAN_ENTRY;
 
-#define QUERY_PLANS_MAX (RRD_STORAGE_TIERS)
+// Nested retention ranges can use the same tier on both sides of another tier.
+#define QUERY_PLANS_MAX (2 * RRD_STORAGE_TIERS - 1)
 
 typedef struct query_metrics_counts {   // counts the number of metrics related to an object
     size_t selected;                    // selected to be queried
