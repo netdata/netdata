@@ -34,6 +34,8 @@ if(ENABLE_PLUGIN_JAVA)
             COMPONENT plugin-java DESTINATION ${PLUGINS_DEST})
     install(FILES src/go/plugin/java/config/java.conf
             COMPONENT plugin-java DESTINATION ${LIBCONFIG_DEST})
+    install(FILES src/collectors/java.plugin/otel.properties
+            COMPONENT plugin-java DESTINATION ${STOCK_DATA_DEST}/java)
     install(DIRECTORY src/go/plugin/java/config/java
             COMPONENT plugin-java DESTINATION ${LIBCONFIG_DEST}
             FILES_MATCHING PATTERN "*.conf")

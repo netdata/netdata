@@ -3,6 +3,7 @@
 import com.sun.tools.attach.VirtualMachine;
 import java.io.BufferedReader;
 import java.io.InputStreamReader;
+import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -49,6 +50,62 @@ public final class NetdataAttach {
         }
     }
 
+    static void checkAttachArgument(String agent, String options) {
+        // HotSpot's Attach listener limits each argument to 1024 bytes. The Java
+        // Attach client passes the agent path and its options as one argument.
+        if ((agent + "=" + options).getBytes(StandardCharsets.UTF_8).length > 1024) {
+            throw new IllegalArgumentException();
+        }
+    }
+
+    static String agentOptions(String pid, String start, String boot, String application,
+            String token, String port, String directory) {
+        String options = "otel.service.name=" + application
+                + ";otel.resource.attributes=service.instance.id=" + boot + "-" + pid + ":" + start
+                + ";otel.exporter.otlp.metrics.endpoint=http://127.0.0.1:" + port + "/v1/metrics"
+                + ";otel.exporter.otlp.metrics.headers=x-netdata-java-token=" + token
+                + ";otel.metrics.exporter=otlp;otel.traces.exporter=none;otel.logs.exporter=none"
+                + ";otel.exporter.otlp.metrics.protocol=http/protobuf"
+                + ";otel.metric.export.interval=1000"
+                + ";otel.exporter.otlp.metrics.temporality.preference=cumulative"
+                + ";otel.exporter.otlp.metrics.default.histogram.aggregation=explicit_bucket_histogram"
+                + ";otel.javaagent.extensions=" + directory + "/hikari-extension.jar"
+                + ";otel.javaagent.configuration-file=" + directory + "/otel.properties";
+        checkAttachArgument(directory + "/otel.jar", options);
+        return options;
+    }
+
+    static String readEnvironment(InputStream input) throws Exception {
+        // Bound target-controlled input within the helper's 64 MiB heap budget.
+        // Normal Linux exec argument/environment limits fit within this allowance.
+        int limit = 8 * 1024 * 1024;
+        byte[] bytes = input.readNBytes(limit + 1);
+        if (bytes.length > limit) throw new IllegalArgumentException();
+        return new String(bytes, StandardCharsets.ISO_8859_1);
+    }
+
+    static boolean compatibleConfiguration(Properties fixed, Properties system, String environment) {
+        for (String key : fixed.stringPropertyNames()) {
+            if (!key.startsWith("otel.instrumentation.")) continue;
+            String expected = fixed.getProperty(key).trim();
+            String actual = system.getProperty(key);
+            if (actual == null) {
+                String envKey = key.toUpperCase(java.util.Locale.ROOT).replace('.', '_').replace('-', '_') + "=";
+                for (int offset = 0; offset < environment.length();) {
+                    int end = environment.indexOf('\u0000', offset);
+                    if (end < 0) end = environment.length();
+                    if (offset + envKey.length() <= end && environment.startsWith(envKey, offset)) {
+                        actual = environment.substring(offset + envKey.length(), end);
+                        break;
+                    }
+                    offset = end + 1;
+                }
+            }
+            if (actual != null && !actual.trim().equalsIgnoreCase(expected)) return false;
+        }
+        return true;
+    }
+
     public static void main(String[] args) {
         boolean loading = false;
         try {
@@ -64,32 +121,25 @@ public final class NetdataAttach {
                     || !directory.matches("/[A-Za-z0-9._/-]+")) {
                 throw new IllegalArgumentException();
             }
+            String options = agentOptions(pid, start, boot, application, token, port, directory);
             identity(pid, start, boot, uid, gid);
             VirtualMachine vm = VirtualMachine.attach(pid);
             try {
                 Properties properties = vm.getSystemProperties();
+                Properties fixed = new Properties();
+                try (InputStream config = Files.newInputStream(Path.of(directory, "otel.properties"))) {
+                    fixed.load(config);
+                }
+                String environment;
+                try (InputStream input = Files.newInputStream(Path.of("/proc", pid, "environ"))) {
+                    environment = readEnvironment(input);
+                }
+                if (!compatibleConfiguration(fixed, properties, environment)) throw new IllegalStateException();
                 int version = Integer.parseInt(properties.getProperty("java.specification.version", "0"));
                 if (version < 17 || properties.containsKey("otel.javaagent.version")) {
                     throw new IllegalStateException();
                 }
                 identity(pid, start, boot, uid, gid);
-                String options = "otel.service.name=" + application
-                        + ";otel.resource.attributes=service.instance.id=" + boot + "-" + pid + ":" + start
-                        + ";otel.exporter.otlp.endpoint=http://127.0.0.1:" + port
-                        + ";otel.exporter.otlp.protocol=http/protobuf"
-                        + ";otel.exporter.otlp.headers=x-netdata-java-token=" + token
-                        + ";otel.metrics.exporter=otlp;otel.traces.exporter=none;otel.logs.exporter=none"
-                        + ";otel.metric.export.interval=1000"
-                        + ";otel.exporter.otlp.metrics.temporality.preference=cumulative"
-                        + ";otel.exporter.otlp.metrics.default.histogram.aggregation=explicit_bucket_histogram"
-                        + ";otel.javaagent.extensions=" + directory + "/hikari-extension.jar"
-                        + ";otel.instrumentation.hikaricp.enabled=false"
-                        + ";otel.instrumentation.common.default-enabled=false"
-                        + ";otel.instrumentation.runtime-telemetry.enabled=true"
-                        + ";otel.instrumentation.servlet.enabled=true"
-                        + ";otel.instrumentation.tomcat.enabled=true"
-                        + ";otel.instrumentation.spring-webmvc.enabled=true"
-                        + ";otel.instrumentation.netdata-hikari.enabled=true";
                 loading = true;
                 vm.loadAgent(directory + "/otel.jar", options);
                 System.out.println("ACK");

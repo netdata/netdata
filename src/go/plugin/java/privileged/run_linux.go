@@ -143,7 +143,7 @@ func attach(req protocol.AttachRequest) protocol.AttachResult {
 	if err != nil {
 		return result(protocol.Blocked, err.Error())
 	}
-	for _, name := range []string{"runtime/bin/java", "helper/NetdataAttach.class", "otel.jar", "hikari-extension.jar"} {
+	for _, name := range []string{"runtime/bin/java", "helper/NetdataAttach.class", "otel.jar", "hikari-extension.jar", "otel.properties"} {
 		if err := trusted(filepath.Join(bundle(), name)); err != nil {
 			return result(protocol.Blocked, err.Error())
 		}
@@ -307,9 +307,9 @@ func runWorker(input io.Reader, output io.Writer) error {
 	if err != nil || p.UID != uint32(os.Getuid()) || p.GID != uint32(os.Getgid()) || *p != w.Process {
 		return json.NewEncoder(output).Encode(result(protocol.Blocked, "Process identity or credentials changed before attachment"))
 	}
-	// Native targets share the root filesystem. Require both JARs to resolve to
+	// Native targets share the root filesystem. Require the JARs and configuration to resolve to
 	// the bundled files in the target's mount namespace (including PrivateTmp).
-	for _, name := range []string{"otel.jar", "hikari-extension.jar"} {
+	for _, name := range []string{"otel.jar", "hikari-extension.jar", "otel.properties"} {
 		path := filepath.Join(bundle(), name)
 		file, err := os.Open(path)
 		if err != nil {

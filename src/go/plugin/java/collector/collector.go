@@ -90,8 +90,14 @@ func (c *Collector) Check(context.Context) error { return c.Config.validate() }
 
 func (c *Collector) Run(ctx context.Context, ready func()) error { return c.run(ctx, ready) }
 
-func (c *Collector) Collect(context.Context) error {
+func (c *Collector) Collect(ctx context.Context) error {
+	if err := ctx.Err(); err != nil {
+		return err
+	}
 	for _, app := range c.ingress.Snapshot(c.now(), sourceMaxAge) {
+		if err := ctx.Err(); err != nil {
+			return err
+		}
 		c.metrics.write(app, c.displayName(app.Application))
 		c.mu.Lock()
 		if target, exists := c.targets[app.Instance]; exists {
@@ -100,7 +106,7 @@ func (c *Collector) Collect(context.Context) error {
 		}
 		c.mu.Unlock()
 	}
-	return nil
+	return ctx.Err()
 }
 
 // Run joins its receiver and discovery workers before framework cleanup.

@@ -186,3 +186,10 @@ func TestApplicationCoverageAndStaleness(t *testing.T) {
 	var schema map[string]any
 	require.NoError(t, json.Unmarshal([]byte(configSchema), &schema))
 }
+
+func TestCollectCanceled(t *testing.T) {
+	c := New(RuntimeConfig{})
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+	require.ErrorIs(t, c.Collect(ctx), context.Canceled)
+}

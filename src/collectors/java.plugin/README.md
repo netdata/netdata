@@ -50,8 +50,10 @@ remains until that application restarts.
   The bundle and its parent directories must be root-owned and not writable by other users.
 - Root-owned JVMs and different PID, user or network namespaces/root filesystems are shown as unsupported.
   Container monitoring is a later capability; mounting host procfs into a container is not sufficient.
-- A disabled Attach mechanism, hidden bundle paths, mixed process credentials or recognizable existing OpenTelemetry
-  instrumentation prevents attachment. An application does not need a restart for initial supported attachment.
+- A disabled Attach mechanism, hidden bundle paths, mixed process credentials, recognizable existing OpenTelemetry
+  instrumentation or conflicting instrumentation settings prevents attachment. An application does not need a restart
+  for initial supported attachment. Extremely long installation paths can exceed HotSpot's Attach argument limit and
+  are rejected before loading instrumentation.
 - Existing Hikari pools become visible after their next connection borrow. A pool with no subsequent borrow is not
   discovered by this extension. HTTP instrumentation depends on the supported OTel servlet/Tomcat/Spring integrations.
 
@@ -83,6 +85,8 @@ terminal runs refuse attachment so they cannot compete with the service's persis
 
 Source timestamps control freshness. Series disappear after five seconds without a fresh export; chart retirement
 then follows the normal Go chart-engine lifecycle. Cumulative HTTP counter epochs remain separate across resets.
+Expired gauge state is released. HTTP keeps its latest cumulative comparison per producer series until the process
+retires, so a pause cannot make an older or regressed counter valid again.
 
 ## Where metrics and UI are defined
 
@@ -91,7 +95,7 @@ then follows the normal Go chart-engine lifecycle. Cumulative HTTP counter epoch
 | JVM/HTTP instrumentation | Pinned stock OpenTelemetry Java agent |
 | Hikari instrumentation | `extension/src/main/java/org/netdata/spike/hikari/` |
 | Privileged discovery and Attach supervision | `src/go/plugin/java/privileged/` |
-| Fixed Java Attach options | `src/collectors/java.plugin/NetdataAttach.java` |
+| Fixed Java Attach options and instrumentation selection | `src/collectors/java.plugin/NetdataAttach.java`, `otel.properties` |
 | Accepted metrics, units, labels and source semantics | `src/go/plugin/java/ingest/store.go` |
 | Typed Netdata instruments | `src/go/plugin/java/collector/metrix.go` |
 | Chart titles, groups, dimensions and labels | `src/go/plugin/java/collector/charts.yaml` |
