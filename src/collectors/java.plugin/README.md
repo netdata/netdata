@@ -107,3 +107,26 @@ An additional metric supported by the agent needs an explicit Go mapping, instru
 Java-side measurement can be added to the bundled extension without replacing the Go orchestration approach. The
 private Hikari metric/package names retain their spike prefix for compatibility with captured regression fixtures;
 user-facing chart contexts use `java.*`.
+
+## Development validation
+
+Run the plugin's Go regression tests from the repository root:
+
+```sh
+go -C src/go test -race -count=1 ./plugin/java/... ./cmd/javaplugin ./cmd/javahelper
+go -C src/go vet ./plugin/java/... ./cmd/javaplugin ./cmd/javahelper
+```
+
+The recorded OTLP fixture in `src/go/plugin/java/ingest/testdata` covers ingestion and chart publication. Linux helper
+tests cover process eligibility, dropped credentials/capabilities, deadlines and worker reaping. The standalone
+`tests/NetdataAttachTest.java`, compiled alongside `NetdataAttach.java`, checks Attach argument limits and configuration
+precedence/aliases without attaching to an application.
+
+Native acceptance testing used the actual CMake-built daemon and installed plugin component on Debian 13 amd64,
+with two non-root application UIDs and systemd `PrivateTmp`. Both applications supplied fresh samples for all six
+contexts. Tests also verified blocked/root-owned JVM status, Netdata restart, stable chart IDs after display-name
+changes, exclusions and application replacement. Dashboard navigation and chart metadata were inspected.
+
+This evidence does not establish production overhead or broad runtime/library compatibility. The complete source
+installer and authenticated DynCfg form were not exercised; installer wiring/syntax and configuration replacement
+were checked. Native live coverage was amd64; arm64 was compiled.
