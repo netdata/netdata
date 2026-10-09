@@ -50,10 +50,11 @@
 //!
 //! All layout decisions live in this module — constructors and the inverse
 //! `parse_*` functions sit together so a shape change must touch both. The
-//! parsers are full-shape matchers: exact segment count, the literal
-//! version/umbrella/signal segments, and the expected extension (stem
-//! parsing strips any extension, so the explicit check is what keeps an `.sfst` key
-//! from parsing as a catalog and vice versa). Any deviation returns `None`
+//! full-shape matchers are [`parse_catalog_key`] and [`parse_sfst_key`]:
+//! exact segment count, the literal version/umbrella/signal segments, and
+//! the expected extension (stem parsing strips any extension, so the explicit
+//! check is what keeps an `.sfst` key from parsing as a catalog and vice
+//! versa). Any deviation returns `None`
 //! and the caller warns and skips — garbage keys never reach an install or
 //! a fetch. The filename vocabulary is not defined here: catalog filenames
 //! come from `otel_catalog::filename`, SFST filenames from
@@ -235,9 +236,10 @@ pub fn parse_sfst_key(key: &str, expected_signal: &str) -> Option<(FileId, Tenan
 ///
 /// Expected shape:
 /// `v2/{signal}/tenants/{tenant_id}/sfst/{YYYY-MM-DD}/{file_id}.sfst`.
-/// Returns `None` if the key doesn't match this shape. The `{signal}`
-/// segment is skipped — callers already know the signal from the LIST
-/// prefix they issued.
+/// Returns `None` if the segments up to the date don't match this shape;
+/// anything after the date is ignored, and the `{signal}`/`{tenant_id}`
+/// segments are accepted as-is — a caller listing a signal/tenant/date-scoped
+/// prefix already knows them.
 ///
 /// No production caller: the recovery LIST knows each date from the prefix
 /// it issued (one LIST per day) and parses the trailing filename with

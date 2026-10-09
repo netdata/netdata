@@ -35,7 +35,7 @@ func BenchmarkCollect(b *testing.B) {
 			revoke := hub.PublishReceiver(rumregistry.Availability{
 				Serving: true,
 			})
-			defer revoke()
+			defer revoke.Close()
 			c := New(Dependencies{
 				Registry: hub,
 				History:  rumhistory.NewStore(db),
@@ -63,7 +63,10 @@ func BenchmarkCollect(b *testing.B) {
 					Device:       "desktop",
 					Country:      "GR",
 					Received:     time.Now(),
-					Vitals:       []beacon.Vital{{Name: beacon.LCP, ID: "lcp", Revision: 2, Value: 1200}, {Name: beacon.CLS, ID: "cls", Revision: 3, Value: 0}},
+					Vitals: []beacon.Vital{
+						{Name: beacon.LCP, ID: "lcp", Revision: 2, Value: 1200},
+						{Name: beacon.CLS, ID: "cls", Revision: 3, Value: 0},
+					},
 				})
 			}
 			if measured {
@@ -91,7 +94,9 @@ func BenchmarkCollect(b *testing.B) {
 }
 
 func BenchmarkReceiverCollect(b *testing.B) {
-	c := receiver.New(rumregistry.New())
+	c := receiver.New(receiver.Dependencies{
+		Registry: rumregistry.New(),
+	})
 	managed, ok := metrix.AsCycleManagedStore(c.MetricStore())
 	require.True(b, ok)
 	cycle := managed.CycleController()

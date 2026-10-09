@@ -9,7 +9,8 @@
 //!   everything is local, filename-only high-water seeding, hostile-key and
 //!   invalid-body skipping, and `Err` on every LIST/transport/timeout failure
 //!   (never a partial high-water write). The `validate_catalog_*` tests pin
-//!   the install oracle's per-entry arm priority and a real builder-rotation
+//!   the install oracle's per-entry arm priority;
+//!   `rotated_catalog_passes_validate_catalog` pins a real builder-rotation
 //!   round-trip.
 //! - `local` (per-tenant replay): `recover_unindexed_*` pins skip-and-orphan
 //!   on a failed seal plus the `holds_seq` routing predicate;
@@ -328,7 +329,7 @@ async fn seed_after_heal_reboots_with_zero_downloads() {
 /// fires before the full envelope parse, so the other fields need only be
 /// well-typed JSON.
 fn future_version_catalog_bytes(version: u32) -> Vec<u8> {
-    // Hand-built JSON: the crate has no serde_json dependency.
+    // Hand-built JSON: this crate has no serde_json dependency.
     let json = format!(
         r#"{{"version":{version},"tenant_id":"tenant1","date":"2026-04-17","machine_id":"{m}","instance_id":"{i}","entries":[]}}"#,
         m = machine().as_uuid(),
@@ -465,8 +466,9 @@ fn validate_one_entry_key(remote_key: String) -> Result<(), String> {
 
 /// Each per-entry rejection arm fires, AND the documented diagnostic priority
 /// (foreign-machine > wrong-tenant > FileId-mismatch > wrong-date > malformed)
-/// holds: every crafted key ALSO trips a lower-priority arm, so the asserted
-/// reason proves the higher-priority arm won.
+/// holds: the foreign-machine, wrong-tenant, and FileId-mismatch keys are
+/// crafted to ALSO match a lower-priority arm, so their asserted reason proves
+/// the higher-priority arm won.
 #[test]
 fn validate_catalog_rejection_arm_priority() {
     use crate::remote_keys::sfst;
@@ -478,8 +480,9 @@ fn validate_catalog_rejection_arm_priority() {
     let own_id = file_registry::FileId::new(ident(), 0, 5, pk); // the entry's own id
     let foreign = file_registry::Identity::new(machine2(), instance());
 
-    // (name, remote_key, expected-substring). Each key is crafted to also match a
-    // LOWER-priority arm, so the asserted substring proves the priority order.
+    // (name, remote_key, expected-substring). The first three keys are crafted
+    // to also match a LOWER-priority arm, so their asserted substring proves
+    // the priority order.
     let cases: Vec<(&str, String, &str)> = vec![
         // foreign machine + wrong FileId (seq 6) → arm 1 must win over arm 3.
         (
@@ -1122,7 +1125,8 @@ async fn reconcile_local_catalog_uploads_confirms_present_via_mock() {
 /// Retention whose `horizon` rounds to a 0-day catalog window, so
 /// `reconcile_remote_uploads` issues exactly one LIST (today) — keeps these
 /// single-day tests focused on one prefix. (`reconcile_remote_uploads` bounds
-/// its LIST window by `catalog_retention_days`, which is horizon-driven.)
+/// its LIST window by the horizon-derived `catalog_retention_days`, clamped by
+/// `ingest.reconcile_days`.)
 fn today_window_retention() -> bridge::config::RetentionConfig {
     bridge::config::RetentionConfig {
         max_files: 100,
@@ -1251,7 +1255,8 @@ async fn reconcile_remote_uploads_skips_when_local_sfst_missing() {
     let catalog_dir = tempfile::tempdir().unwrap();
     let mut reg = make_registry(catalog_dir.path());
 
-    // Remote has the SFST, but it is NOT tracked locally (no header to rebuild).
+    // Remote has the SFST, but it is NOT tracked locally (no registry summary to
+    // rebuild its catalog entry from).
     let (_id, key) = remote_sfst_key(10);
 
     let storage = crate::storage::MockStorage {
@@ -1836,8 +1841,9 @@ async fn reconcile_local_catalog_floor_is_per_identity() {
 }
 
 /// A confirmed prior-instance catalog marks its seqs under ITS OWN identity, not
-/// the running process's — the CatalogUploaded identity round-trip at the
-/// reconcile layer.
+/// the running process's — the stat-confirm arm keys `mark_remote_cataloged` on
+/// the catalog file's own identity (the same one a re-upload's `UploadCatalog`
+/// request would carry).
 #[tokio::test]
 async fn reconcile_local_catalog_marks_under_catalog_own_identity() {
     let catalog_dir = tempfile::tempdir().unwrap();
@@ -1954,7 +1960,8 @@ fn d(day: u32) -> NaiveDate {
 /// own-machine catalogs, plus a foreign-machine catalog and a garbage key, are
 /// synced from EMPTY local dirs. Uses a REAL OpendalStorage over nested
 /// date/tenant dirs — this is the recursive-LIST regression guard: a
-/// silently-non-recursive `list()` returns nothing below the prefix and fails it.
+/// silently-non-recursive `list()` surfaces only the top-level date-dir
+/// placeholders, not the nested object keys, so every install assert fails.
 #[tokio::test]
 async fn startup_sync_restores_after_wipe() {
     let (op, _op_tmp) = fs_operator();

@@ -10,24 +10,24 @@
 //! `find_log_entries` uses, and the `LogEntryId` results.
 //!
 //! Lifecycle: journal-engine caches built indexes in a foyer HybridCache
-//! keyed by (file, facets, source timestamp field, schema version)
+//! keyed by (file, facets, source timestamp field, cache version)
 //! (`journal-engine/src/cache.rs`). A cached index is reused only
 //! while `is_fresh` holds and its histogram granularity divides the
 //! query's bucket duration (`journal-engine/src/indexing.rs` reuse gate);
 //! after each build the engine feeds `start_time`/`end_time`/
 //! `indexed_at`/`online` back into the registry's per-file time-range
 //! overlay (`journal-engine/src/indexing.rs`). Queries therefore
-//! run in two stages: the registry picks files by their recorded time
-//! ranges (`journal-registry/src/registry/mod.rs` `find_files_in_range`),
-//! then each
-//! surviving file's index answers `find_log_entries` and the caller
-//! merges results in time order (`journal-engine/src/logs/query.rs`
-//! `LogQuery`). otel-legacy-logs drives the same stages through the
-//! engine's `LogQuery` (`otel-legacy-logs/src/handler.rs`).
+//! run in two stages: the registry picks files by their recorded time ranges
+//! (`journal-registry/src/registry/mod.rs` `find_files_in_range`), then each
+//! surviving file's index answers `find_log_entries` and the caller merges
+//! results in time order (`journal-engine/src/logs/query.rs` `LogQuery`).
+//! otel-legacy-logs drives the same stages through the engine's `LogQuery`
+//! (`otel-legacy-logs/src/handler.rs`).
 //!
 //! Serialization: the struct derives `Serialize`/`Deserialize` for the
-//! engine's cache; bitmaps ride along serde-transparently (bitmap.rs),
-//! field names and pairs as plain strings (field_types.rs), and the
+//! engine's cache; bitmaps ride along serde-transparently
+//! (src/bitmap.rs), field names and pairs as plain strings
+//! (src/field_types.rs), and the
 //! `File` identity through its hand-written serde impl
 //! (`journal-registry/src/repository/file.rs`). Under the crate's
 //! `allocative` feature the struct also derives `allocative::Allocative`.
@@ -122,12 +122,10 @@ impl FileIndex {
         Seconds(self.histogram.bucket_duration.get())
     }
 
-    /// Get a reference to the journal file this index represents.
     pub fn file(&self) -> &File {
         &self.file
     }
 
-    /// Get the timestamp when this index was created.
     pub fn indexed_at(&self) -> Seconds {
         self.indexed_at
     }
@@ -148,7 +146,6 @@ impl FileIndex {
             let age = now.get().saturating_sub(self.indexed_at.get());
             age < 1
         } else {
-            // Archived/offline file: always fresh
             true
         }
     }
@@ -165,7 +162,6 @@ impl FileIndex {
         self.histogram.end_time()
     }
 
-    /// Get the number of time buckets.
     pub fn num_buckets(&self) -> usize {
         self.histogram.num_buckets()
     }
@@ -244,9 +240,7 @@ pub enum Anchor {
 /// (`journal-engine/src/logs/query.rs` `LogQuery`).
 #[derive(Debug, Clone)]
 pub struct LogQueryParams {
-    /// Starting point for the query
     anchor: Anchor,
-    /// Direction to iterate through entries
     direction: Direction,
     /// Maximum number of entries to return (None means unlimited)
     limit: Option<usize>,
@@ -272,47 +266,38 @@ pub struct LogQueryParams {
 }
 
 impl LogQueryParams {
-    /// Get the anchor point for the query
     pub fn anchor(&self) -> Anchor {
         self.anchor
     }
 
-    /// Get the direction for iterating through entries
     pub fn direction(&self) -> Direction {
         self.direction
     }
 
-    /// Get the maximum number of entries to return
     pub fn limit(&self) -> Option<usize> {
         self.limit
     }
 
-    /// Get the source timestamp field
     pub fn source_timestamp_field(&self) -> Option<&super::FieldName> {
         self.source_timestamp_field.as_ref()
     }
 
-    /// Get the filter to apply to entries
     pub fn filter(&self) -> Option<&super::Filter> {
         self.filter.as_ref()
     }
 
-    /// Get the lower time boundary
     pub fn after(&self) -> Option<Microseconds> {
         self.after
     }
 
-    /// Get the upper time boundary
     pub fn before(&self) -> Option<Microseconds> {
         self.before
     }
 
-    /// Get the resume position for pagination
     pub fn resume_position(&self) -> Option<usize> {
         self.resume_position
     }
 
-    /// Get the regex pattern for free text search
     pub fn regex(&self) -> Option<&Regex> {
         self.regex.as_ref()
     }
@@ -337,11 +322,6 @@ pub struct LogQueryParamsBuilder {
 
 impl LogQueryParamsBuilder {
     /// Create a new builder with required fields
-    ///
-    /// # Arguments
-    ///
-    /// * `anchor` - Starting point for the query
-    /// * `direction` - Direction to iterate through entries
     pub fn new(anchor: Anchor, direction: Direction) -> Self {
         Self {
             anchor,
@@ -356,7 +336,6 @@ impl LogQueryParamsBuilder {
         }
     }
 
-    /// Set the maximum number of entries to return
     pub fn with_limit(mut self, limit: usize) -> Self {
         self.limit = Some(limit);
         self
@@ -369,25 +348,21 @@ impl LogQueryParamsBuilder {
         self
     }
 
-    /// Set the filter
     pub fn with_filter(mut self, filter: super::Filter) -> Self {
         self.filter = Some(filter);
         self
     }
 
-    /// Set the lower time boundary
     pub fn with_after(mut self, after: Microseconds) -> Self {
         self.after = Some(after);
         self
     }
 
-    /// Set the upper time boundary
     pub fn with_before(mut self, before: Microseconds) -> Self {
         self.before = Some(before);
         self
     }
 
-    /// Set the resume position for pagination
     pub fn with_resume_position(mut self, position: usize) -> Self {
         self.resume_position = Some(position);
         self
@@ -410,14 +385,12 @@ impl LogQueryParamsBuilder {
     /// `after >= before` with `InvalidQueryTimeRange` and compiles the
     /// `with_regex` pattern, failing with `InvalidRegex` otherwise.
     pub fn build(self) -> Result<LogQueryParams> {
-        // Validate time boundaries if both are set
         if let (Some(after), Some(before)) = (self.after, self.before) {
             if after >= before {
                 return Err(IndexError::InvalidQueryTimeRange);
             }
         }
 
-        // Compile regex pattern if provided
         let regex = if let Some(pattern) = self.regex_pattern {
             trace!("compiling regex pattern for log query: {:?}", pattern);
             match Regex::new(&pattern) {
@@ -486,7 +459,6 @@ fn get_entry_timestamp(
     source_timestamp_field: Option<&super::FieldName>,
     entry_offset: NonZeroU64,
 ) -> Result<u64> {
-    // Try to read the source timestamp field if specified
     if let Some(field_name) = source_timestamp_field {
         match get_timestamp_field(journal_file, field_name, entry_offset) {
             Ok(timestamp) => return Ok(timestamp),
@@ -551,16 +523,13 @@ fn entry_matches_regex(
     data_offsets_scratch: &mut Vec<NonZeroU64>,
     scratch_buffer: &mut Vec<u8>,
 ) -> Result<bool> {
-    // Collect all data object offsets for this entry
     data_offsets_scratch.clear();
     {
         let entry = journal_file.entry_ref(entry_offset)?;
         entry.collect_offsets(data_offsets_scratch)?;
     }
 
-    // Check each data object offset
     for data_offset in data_offsets_scratch.iter().copied() {
-        // Check cache first
         if let Some(&matches) = data_match_cache.get(&data_offset) {
             if matches {
                 return Ok(true);
@@ -568,7 +537,6 @@ fn entry_matches_regex(
             continue;
         }
 
-        // Cache miss - load the data object and check if it matches
         let data_object = journal_file.data_ref(data_offset)?;
 
         let payload_bytes = if data_object.is_compressed() {
@@ -584,7 +552,6 @@ fn entry_matches_regex(
             false
         };
 
-        // Update cache
         data_match_cache.insert(data_offset, matches);
 
         if matches {
@@ -606,7 +573,8 @@ pub struct LogEntryId {
     pub timestamp: Microseconds,
     /// Index into this query's candidate entry list (the bitmap-selected
     /// entry offsets). Pagination feeds it back as `resume_position` to
-    /// continue at the exact position (`journal-engine/src/logs/query.rs`).
+    /// resume just after (Forward) or just before (Backward) it
+    /// (`journal-engine/src/logs/query.rs`).
     pub position: usize,
 }
 
@@ -619,8 +587,12 @@ impl FileIndex {
     /// (`Timestamp` as given, `Head`/`Tail` to this index's start/end
     /// time), a binary search positions the scan, and the time boundaries,
     /// regex and limit are applied per candidate entry during iteration —
-    /// those checks touch the file and cost I/O, unlike the bitmap
-    /// pre-selection.
+    /// that pass reads each entry's timestamp (and its data objects for
+    /// the regex) from the file, unlike the bitmap pre-selection.
+    ///
+    /// With `params.resume_position` set, anchor resolution and the binary
+    /// search are skipped: iteration resumes just after (Forward) or just
+    /// before (Backward) that candidate position.
     ///
     /// # Arguments
     ///
@@ -662,7 +634,6 @@ impl FileIndex {
             .unwrap_or_else(|| Bitmap::insert_range(0..self.entry_offsets.len() as u32));
 
         if bitmap.is_empty() {
-            // Nothing matches
             return Ok(Vec::new());
         }
 
@@ -711,9 +682,7 @@ impl FileIndex {
 
         match params.direction() {
             Direction::Forward => {
-                // Determine starting index: use resume_position or binary search
                 let start_idx = if let Some(resume_pos) = params.resume_position() {
-                    // Resume from next position after the last returned entry
                     resume_pos + 1
                 } else {
                     // Partition point: first entry with timestamp >= anchor
@@ -748,7 +717,6 @@ impl FileIndex {
                         entry_offset,
                     )?;
 
-                    // Enforce time boundaries
                     if let Some(after) = params.after() {
                         if timestamp < after.get() {
                             continue;
@@ -756,11 +724,10 @@ impl FileIndex {
                     }
                     if let Some(before) = params.before() {
                         if timestamp >= before.get() {
-                            break; // Stop when we hit or exceed upper boundary
+                            break; // time-ordered: all later entries are past the boundary too
                         }
                     }
 
-                    // Check regex filter if present
                     if let Some(regex) = params.regex() {
                         if !entry_matches_regex(
                             &journal_file,
@@ -782,21 +749,16 @@ impl FileIndex {
                         position: start_idx + idx,
                     });
 
-                    // Stop when we reach the limit
                     if log_entry_ids.len() >= limit {
                         break;
                     }
                 }
             }
             Direction::Backward => {
-                // Determine starting index: use resume_position or binary search
                 let start_idx = if let Some(resume_pos) = params.resume_position() {
-                    // Resume from previous position before the last returned entry
                     if resume_pos == 0 {
-                        // No more entries to return
                         return Ok(log_entry_ids);
                     }
-                    // Out-of-bounds resume position yields nothing
                     if resume_pos >= entry_offsets.len() {
                         return Ok(log_entry_ids);
                     }
@@ -826,17 +788,14 @@ impl FileIndex {
                         return Ok(log_entry_ids);
                     }
 
-                    // Start at the last entry <= anchor
                     partition_idx - 1
                 };
 
                 // Check bounds before slicing to avoid panic
                 if start_idx >= entry_offsets.len() {
-                    // No entries to return
                     return Ok(log_entry_ids);
                 }
 
-                // Iterate backwards: from start_idx down to 0
                 for (idx, &entry_offset) in entry_offsets[..=start_idx].iter().rev().enumerate() {
                     let timestamp = get_entry_timestamp(
                         &journal_file,
@@ -844,7 +803,6 @@ impl FileIndex {
                         entry_offset,
                     )?;
 
-                    // Enforce time boundaries
                     if let Some(before) = params.before() {
                         if timestamp >= before.get() {
                             continue;
@@ -852,11 +810,10 @@ impl FileIndex {
                     }
                     if let Some(after) = params.after() {
                         if timestamp < after.get() {
-                            break; // Stop when we go below lower boundary
+                            break; // time-ordered: all earlier entries are below the boundary too
                         }
                     }
 
-                    // Check regex filter if present
                     if let Some(regex) = params.regex() {
                         if !entry_matches_regex(
                             &journal_file,
@@ -878,7 +835,6 @@ impl FileIndex {
                         position: start_idx - idx,
                     });
 
-                    // Stop when we reach the limit
                     if log_entry_ids.len() >= limit {
                         break;
                     }
@@ -886,7 +842,6 @@ impl FileIndex {
             }
         }
 
-        // Log regex filtering statistics if regex was used
         if params.regex().is_some() {
             trace!(
                 "regex filtering complete: {} entries matched, {} entries filtered out",

@@ -522,9 +522,9 @@ impl Cursor {
     }
 
     /// The next chain position: the following slot, or the next
-    /// array's first slot; `None` at the chain's end. Stepping
-    /// within an array is cheap; crossing into the next array
-    /// re-reads its header.
+    /// array's first slot; `None` at the chain's end. Every call
+    /// re-reads the current array through the file; crossing into
+    /// the next array re-reads that one's header as well.
     pub fn next<M: MemoryMap>(&self, journal_file: &JournalFile<M>) -> Result<Option<Self>> {
         let array_node = self.node(journal_file)?;
 
@@ -643,9 +643,9 @@ impl std::fmt::Debug for Cursor {
 /// A data object's entry chain as a step cursor: the inlined first
 /// entry (`DataObjectHeader::entry_offset`) plus, when the object
 /// holds more than one entry, a [`Cursor`] over the linked array
-/// with the rest (linked by `DataObjectHeader::inlined_cursor`).
-/// `at_inlined_offset`
-/// says which side it is parked on; `value` switches accordingly.
+/// with the rest; `DataObjectHeader::inlined_cursor` assembles the
+/// pair from the header's links. `at_inlined_offset` says which
+/// side it is parked on; `value` switches accordingly.
 ///
 /// `Copy`, so callers can detach it from a borrowed data object and
 /// step it after the borrow is dropped - journal-index does

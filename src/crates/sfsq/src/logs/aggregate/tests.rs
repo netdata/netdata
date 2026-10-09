@@ -12,16 +12,15 @@
 //! - `LogsShard::merge` — `matched` sums; a facet is dropped when its
 //!   field is high-card in any shard, keeping the facet set consistent
 //!   with the offerable `available_fields`; and the default shard is
-//!   the monoid identity, both alone and interspersed among real
-//!   shards (`engine::run` folds a failed source's default shard into
-//!   the merge).
+//!   the monoid identity: an empty fold stays empty and defaults
+//!   interspersed among real shards change nothing (`engine::run` folds
+//!   a failed source's default shard into the merge).
 use super::*;
 
 #[test]
 fn eligible_facet_fields_honors_explicit_request() {
-    // An explicit selection goes through the same eligibility filter —
-    // kept when present and not high-card, with no numeric cap — so a
-    // mid-card field the user asked for survives.
+    // No special case for an explicit ask: the same rule keeps a
+    // mid-card field.
     let fields: sfst::FieldTable = vec![sfst::FieldEntry {
         name: "noisy".into(),
         cardinality: 500,
@@ -34,8 +33,6 @@ fn eligible_facet_fields_honors_explicit_request() {
 
 #[test]
 fn eligible_facet_fields_drops_high_card_and_unknown() {
-    // A high-card field would make facets() error; an unknown field has
-    // no entry. Both are dropped, leaving only the usable one.
     let fields: sfst::FieldTable = vec![
         sfst::FieldEntry {
             name: "trace_id".into(),
@@ -62,11 +59,10 @@ fn eligible_facet_fields_drops_high_card_and_unknown() {
 
 #[test]
 fn merge_sums_matched_and_drops_facet_high_card_in_any_shard() {
-    // Shard A computed a `level` facet (Low here); shard B has `level`
-    // High and produced no facet for it. The merge sums matched, marks
-    // `level` High in the merged table (high-card in any shard wins),
-    // and drops the facet — offering it would contradict the
-    // high-card-free `available_fields` the result advertises.
+    // Shard B has `level` High and no facet for it; the merged table
+    // marks the field high-card (high in any shard wins), so A's facet
+    // is dropped — offering it would contradict the high-card-free
+    // `available_fields` the result advertises.
     let shard_a = LogsShard {
         matched: 3,
         facets: vec![sfst::FacetResult {

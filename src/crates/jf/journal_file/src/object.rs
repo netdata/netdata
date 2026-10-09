@@ -61,7 +61,6 @@ pub struct FieldHashTable<B: ByteSlice> {
     pub items: Ref<B, [HashItem]>,
 }
 
-// Implement HashTable for DataHashTable
 impl<B: ByteSlice> HashTable for DataHashTable<B> {
     type Object = DataObject<B>;
 
@@ -75,7 +74,6 @@ impl<B: ByteSlice> HashTable for DataHashTable<B> {
     }
 }
 
-// Implement HashTable for FieldHashTable
 impl<B: ByteSlice> HashTable for FieldHashTable<B> {
     type Object = FieldObject<B>;
 
@@ -89,7 +87,6 @@ impl<B: ByteSlice> HashTable for FieldHashTable<B> {
     }
 }
 
-// Implement HashTableMut for DataHashTable
 impl<B: ByteSliceMut> HashTableMut for DataHashTable<B> {
     fn hash_item_mut(&mut self, hash: u64) -> &mut HashItem {
         let bucket_index = hash as usize % self.items.len();
@@ -97,7 +94,6 @@ impl<B: ByteSliceMut> HashTableMut for DataHashTable<B> {
     }
 }
 
-// Implement HashTableMut for FieldHashTable
 impl<B: ByteSliceMut> HashTableMut for FieldHashTable<B> {
     fn hash_item_mut(&mut self, hash: u64) -> &mut HashItem {
         let bucket_index = hash as usize % self.items.len();
@@ -105,7 +101,6 @@ impl<B: ByteSliceMut> HashTableMut for FieldHashTable<B> {
     }
 }
 
-// Implement JournalObject for DataHashTable
 impl<B: SplitByteSlice> JournalObject<B> for DataHashTable<B> {
     fn from_data(data: B, _is_compact: bool) -> Option<Self> {
         let (header_data, items_data) = data.split_at(std::mem::size_of::<ObjectHeader>()).ok()?;
@@ -117,7 +112,6 @@ impl<B: SplitByteSlice> JournalObject<B> for DataHashTable<B> {
     }
 }
 
-// Implement JournalObjectMut for DataHashTable
 impl<B: SplitByteSliceMut> JournalObjectMut<B> for DataHashTable<B> {
     fn from_data_mut(data: B, _is_compact: bool) -> Option<Self> {
         let (header_data, items_data) = data.split_at(std::mem::size_of::<ObjectHeader>()).ok()?;
@@ -129,7 +123,6 @@ impl<B: SplitByteSliceMut> JournalObjectMut<B> for DataHashTable<B> {
     }
 }
 
-// Implement JournalObject for FieldHashTable
 impl<B: SplitByteSlice> JournalObject<B> for FieldHashTable<B> {
     fn from_data(data: B, _is_compact: bool) -> Option<Self> {
         let (header_data, items_data) = data.split_at(std::mem::size_of::<ObjectHeader>()).ok()?;
@@ -141,7 +134,6 @@ impl<B: SplitByteSlice> JournalObject<B> for FieldHashTable<B> {
     }
 }
 
-// Implement JournalObjectMut for FieldHashTable
 impl<B: SplitByteSliceMut> JournalObjectMut<B> for FieldHashTable<B> {
     fn from_data_mut(data: B, _is_compact: bool) -> Option<Self> {
         let (header_data, items_data) = data.split_at(std::mem::size_of::<ObjectHeader>()).ok()?;
@@ -218,12 +210,14 @@ impl HashableObjectMut for DataObject<&mut [u8]> {
 
 /// Trait to standardize creation of journal objects from byte slices
 pub trait JournalObject<B: SplitByteSlice>: Sized {
-    /// Create a new journal object from a byte slice
+    /// Interpret a byte slice as this journal object. `is_compact` selects the compact layout
+    /// (the journal header's `Compact` incompatible flag) for object types that have one; the
+    /// others ignore it.
     fn from_data(data: B, is_compact: bool) -> Option<Self>;
 }
 
 pub trait JournalObjectMut<B: SplitByteSliceMut>: JournalObject<B> {
-    /// Create a new journal object from a byte slice
+    /// Mutable variant of [`JournalObject::from_data`].
     fn from_data_mut(data: B, is_compact: bool) -> Option<Self>;
 }
 
@@ -264,29 +258,29 @@ impl TryFrom<u8> for JournalState {
 #[repr(C)]
 pub struct JournalHeader {
     pub signature: [u8; 8],                          // "LPKSHHRH"
-    pub compatible_flags: u32,                       // Compatible extension flags
-    pub incompatible_flags: u32,                     // Incompatible extension flags
+    pub compatible_flags: u32,
+    pub incompatible_flags: u32,
     pub state: u8,                                   // File state (offline=0, online=1, archived=2)
-    pub reserved: [u8; 7],                           // Reserved space
-    pub file_id: [u8; 16],                           // Unique ID for this file
-    pub machine_id: [u8; 16],                        // Machine ID this belongs to
-    pub tail_entry_boot_id: [u8; 16],                // Boot ID of the last entry
-    pub seqnum_id: [u8; 16],                         // Sequence number ID
-    pub header_size: u64,                            // Size of the header
-    pub arena_size: u64,                             // Size of the data arena
-    pub data_hash_table_offset: Option<NonZeroU64>,  // Offset of the data hash table
-    pub data_hash_table_size: Option<NonZeroU64>,    // Size of the data hash table
-    pub field_hash_table_offset: Option<NonZeroU64>, // Offset of the field hash table
-    pub field_hash_table_size: Option<NonZeroU64>,   // Size of the field hash table
-    pub tail_object_offset: Option<NonZeroU64>,      // Offset of the last object
-    pub n_objects: u64,                              // Number of objects
-    pub n_entries: u64,                              // Number of entries
-    pub tail_entry_seqnum: u64,                      // Sequence number of the last entry
-    pub head_entry_seqnum: u64,                      // Sequence number of the first entry
-    pub entry_array_offset: Option<NonZeroU64>,      // Offset of the entry array
-    pub head_entry_realtime: u64,                    // Realtime timestamp of the first entry
-    pub tail_entry_realtime: u64,                    // Realtime timestamp of the last entry
-    pub tail_entry_monotonic: u64,                   // Monotonic timestamp of the last entry
+    pub reserved: [u8; 7],
+    pub file_id: [u8; 16],
+    pub machine_id: [u8; 16],
+    pub tail_entry_boot_id: [u8; 16],
+    pub seqnum_id: [u8; 16],
+    pub header_size: u64,
+    pub arena_size: u64,
+    pub data_hash_table_offset: Option<NonZeroU64>,
+    pub data_hash_table_size: Option<NonZeroU64>,
+    pub field_hash_table_offset: Option<NonZeroU64>,
+    pub field_hash_table_size: Option<NonZeroU64>,
+    pub tail_object_offset: Option<NonZeroU64>,
+    pub n_objects: u64,
+    pub n_entries: u64,
+    pub tail_entry_seqnum: u64,
+    pub head_entry_seqnum: u64,
+    pub entry_array_offset: Option<NonZeroU64>,
+    pub head_entry_realtime: u64,
+    pub tail_entry_realtime: u64,
+    pub tail_entry_monotonic: u64,
 }
 
 /*
@@ -381,6 +375,7 @@ impl ObjectHeader {
         self.zstd_compressed() | self.lz4_compressed() | self.xz_compressed()
     }
 
+    /// Object size rounded up to the next multiple of 8.
     pub fn aligned_size(&self) -> u64 {
         (self.size + 7) & !7
     }
@@ -474,6 +469,8 @@ impl<B: ByteSlice> OffsetArrayObject<B> {
         }
     }
 
+    /// Number of items in this node that are in use: the array's capacity, clamped to
+    /// `remaining_items` (the items left for this array and any later arrays in the chain).
     pub fn len(&self, remaining_items: usize) -> usize {
         self.capacity().min(remaining_items)
     }
@@ -563,7 +560,7 @@ pub struct EntryObjectHeader {
     pub seqnum: u64,
     pub realtime: u64,
     pub monotonic: u64,
-    pub boot_id: [u8; 16], // UUID/128-bit ID
+    pub boot_id: [u8; 16], // Boot ID of the entry
     pub xor_hash: u64,
 }
 
@@ -724,6 +721,9 @@ impl DataObjectHeader {
         self.object_header.is_compressed()
     }
 
+    /// Cursor over the entries referencing this data object: the first entry is stored directly at
+    /// `entry_offset`; with more than one entry (`n_entries`), the rest are enumerated by the
+    /// entry array at `entry_array_offset`.
     pub fn inlined_cursor(&self) -> Option<InlinedCursor> {
         let inlined_offset = self.entry_offset?;
         let cursor = match self.n_entries?.get() {
@@ -773,7 +773,6 @@ impl<B: ByteSlice> std::fmt::Debug for DataPayloadType<B> {
     }
 }
 
-// Complete Data Object structure
 pub struct DataObject<B: ByteSlice> {
     pub header: Ref<B, DataObjectHeader>,
     pub payload: DataPayloadType<B>,
@@ -788,6 +787,8 @@ fn read_limited_to_end<R: std::io::Read>(reader: R, buf: &mut Vec<u8>) -> Result
     read_limited_to_end_with_cap(reader, buf, MAX_UNCOMPRESSED_DATA_OBJECT_SIZE)
 }
 
+/// Reads `reader` to EOF into `buf`, replacing its contents. On any read failure or output that
+/// would exceed `max_size`, empties `buf` and returns `DecompressorError`.
 fn read_limited_to_end_with_cap<R: std::io::Read>(
     mut reader: R,
     buf: &mut Vec<u8>,
@@ -1200,7 +1201,6 @@ impl<B: SplitByteSliceMut> JournalObjectMut<B> for TagObject<B> {
 }
 
 impl<B: ByteSlice> TagObject<B> {
-    // Helper function to format tag as hex string
     pub fn tag_as_hex(&self) -> String {
         self.header
             .tag

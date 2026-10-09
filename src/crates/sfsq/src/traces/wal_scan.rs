@@ -4,7 +4,7 @@
 //! [`TraceWalScan`] decodes a WAL's trace frames
 //! (`ng_flatten::FlattenedTraceRequest`, payload format 3) into spans
 //! once and serves them from memory — to the shared combiner as a
-//! [`SpanSource`](sfst::SpanSource) (trace-by-id) and directly to the
+//! `sfst::SpanSource` (trace-by-id) and directly to the
 //! other operations: the cross-source aggregates fold, search, and the
 //! attribute enumerations. It exists for data the indexer hasn't
 //! reached yet — the bounded, un-indexed *tail* of an active WAL — so a
@@ -15,7 +15,7 @@
 //! file's schema tree and value dictionaries (`field_kinds`,
 //! `pair_table`) alongside the spans.
 //!
-//! Two plumbing facts: reads go through the buffered [`wal::Reader`]
+//! Two plumbing facts: reads go through the buffered `wal::Reader`
 //! (never an mmap — that is the sealed-SFST candidate path,
 //! `crate::source`), and the scan takes no cancellation token —
 //! operations poll cancellation BETWEEN sources, so a started scan
@@ -27,7 +27,7 @@
 //! SFST sealed over the same frames (the split-many-ways acceptance
 //! criterion). The shared guarantees:
 //!
-//! - fields render through the same [`ng_flatten::build_kv`] in the same
+//! - fields render through the same `ng_flatten::build_kv` in the same
 //!   order (resource ++ scope ++ span entries); the sealed path's flat
 //!   `events.`/`links.` tokens are filtered out of its fields when the
 //!   structure exists, and here the event/link entries are never mixed
@@ -43,7 +43,7 @@
 //! Corruption is all-or-nothing at the decode boundary: a CRC mismatch
 //! or an undecodable payload fails the WHOLE scan (the engine reports
 //! the source failed; never a silent truncation). A torn frame is
-//! different: [`wal::Reader::open_range`] never reads past the range's
+//! different: `wal::Reader::open_range` never reads past the range's
 //! durable bound, so a torn tail just ends the stream (the expected
 //! active-WAL case, not a failure). Structural validation of
 //! successfully DECODED frames follows the platform-wide trust model
@@ -81,16 +81,17 @@ pub enum TraceScanError {
     TooManySpans(usize),
 }
 
-/// One decoded span plus its trace id — the key [`SpanSource::span_refs`]
+/// One decoded span plus its trace id — the key `SpanSource::span_refs`
 /// matches on; the span materializes by scan index.
 struct DecodedSpan {
     trace_id: sfst::TraceId,
     span: TraceSpan,
 }
 
-/// The decoded spans of one WAL range. Build once with
-/// [`scan_range`](Self::scan_range); serve any number of trace lookups
-/// (the [`SpanSource`] impl, plus the accessors below).
+/// The decoded spans of one WAL range. Build with
+/// [`scan_range`](Self::scan_range) (or its whole-file counterpart
+/// `scan`); serve any number of trace lookups (the `SpanSource` impl,
+/// plus the accessors below).
 pub struct TraceWalScan {
     spans: Vec<DecodedSpan>,
     /// Field → coalesced scalar kind over the scanned frames, derived
@@ -106,14 +107,14 @@ pub struct TraceWalScan {
     /// same as for sealed field tables) PLUS the structured
     /// `events.name`, `events.attributes.*`, `links.attributes.*` under
     /// their storage prefixes. Values render through the same
-    /// [`ng_flatten::build_kv`] as the sealed dictionaries, so tail and
+    /// `ng_flatten::build_kv` as the sealed dictionaries, so tail and
     /// sealed value bytes agree by construction.
     pair_table: BTreeMap<String, BTreeSet<String>>,
 }
 
 impl TraceWalScan {
     /// Decode every trace frame in `range` (frame boundaries; half-open —
-    /// see [`wal::FrameRange`]). Production callers pass the tail's
+    /// see `wal::FrameRange`). Production callers pass the tail's
     /// validated coverage range (`WalCoverage`, `super::sources`) — the
     /// durable, not-yet-indexed part of an active WAL. An empty range
     /// yields a zero-span scan.
@@ -182,8 +183,9 @@ impl TraceWalScan {
                     })
                     .collect()
             };
-            // An attribute entry rendered with its scope prefix stripped —
-            // the tail counterpart of the sealed path's `kv_attr`.
+            // An attribute entry rendered with its owner prefix
+            // (`events.attributes.` / `links.attributes.`) stripped — the
+            // tail counterpart of the sealed path's `kv_attr`.
             let render_attr = |e: &ng_flatten::Entry,
                                prefix: &str,
                                kv: &mut String,

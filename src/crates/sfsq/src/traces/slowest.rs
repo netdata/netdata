@@ -1,10 +1,10 @@
 //! Duration-ranked top-K traces — the UI's explicit "Slowest" sort
 //! mode.
 //!
-//! The SAME cross-source merge as the overview (the shared fold,
-//! fold.rs: envelopes widen, stored-row counts saturate) but KEEPING
+//! The SAME cross-source merge as the overview (the shared fold:
+//! envelopes widen, stored-row counts saturate) but KEEPING
 //! roots: the list rows display root service/name, so the sealed side
-//! pays for the root-resolving [`sealed_trace_aggregates`] view
+//! pays for the root-resolving `sealed_trace_aggregates` view
 //! (root-field dictionary decodes the visited budget deliberately does
 //! not charge) that the grid path skips. Merged traces clip by
 //! envelope-start (the alignment rule shared with the overview), then
@@ -20,7 +20,7 @@
 //!   EXCLUDED and marked
 //!   [`RollupAbsent`](PartialReason::RollupAbsent) — identical to the
 //!   overview.
-//! - **Cross-source root pick** (fold.rs owns the rule): among the
+//! - **Cross-source root pick** (the fold owns the rule): among the
 //!   sources' `Some(root)` candidates the SMALLEST root `span_id` wins
 //!   — `TRSU` carries no root start, so "earliest" is not computable
 //!   across sources. Exact except for genuinely multi-root straddles,

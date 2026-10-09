@@ -232,7 +232,7 @@ struct Entry {
 }
 
 /// Mutable cache state, guarded by a single mutex. The mutex is held only for
-/// short, panic-free critical sections and never across `.await`; the one
+/// short critical sections and never across `.await`; the one
 /// synchronous I/O under the lock is the bounded per-victim `remove_file` in
 /// `make_room` (acceptable because the cache directory is local — see crate docs).
 struct State {
@@ -389,8 +389,8 @@ impl State {
 
         // Feasible in principle; actually free the headroom. If eviction falls
         // short (e.g. an unlink failed and the bytes stay accounted), do NOT
-        // commit — that would push `total + reserved` over capacity. Wait and let
-        // the caller retry on the next notify.
+        // commit — that would push `total + reserved` over capacity. The
+        // shortfall surfaces as `EvictionFailed` (see below).
         let target = self.capacity - self.reserved - need;
         if !self.make_room(dir, target, &hit_set) {
             // The feasibility check above proved enough evictable bytes exist, so
@@ -644,10 +644,11 @@ impl FileCache {
     /// traversal) and duplicate filenames are dropped/collapsed with a warning
     /// rather than failing the call.
     ///
-    /// Cancellation is honored at fetch boundaries (before/after each object),
-    /// not mid-write: the durable write of an already-fetched object runs to
-    /// completion on a detached blocking thread before the next cancellation
-    /// check. This is bounded by local disk speed and never leaks budget, but a
+    /// Cancellation is honored while each object downloads (the fetch races the
+    /// token) and between objects, not mid-write: the durable write of an
+    /// already-fetched object runs to completion on a detached blocking thread
+    /// before the next cancellation check. This is bounded by local disk speed
+    /// and never leaks budget, but a
     /// cancelled call may finish one in-flight write after its reservation is
     /// released — and because that clears the single-flight marker, a second
     /// call can re-admit the same filename and write the same temp path
@@ -737,7 +738,7 @@ impl FileCache {
             // Phase 2a — fetch the objects this query reserved. The guard releases
             // the reservation of any object that is neither registered nor
             // explicitly released, on every exit path (the release is idempotent —
-            // see [`State::release_unfetched`] — so success and degrade are safe).
+            // see `State::release_unfetched` — so success and degrade are safe).
             let guard = ReserveGuard::new(self.shared.clone(), plan.mine);
             for want in guard.items() {
                 if cancel.is_cancelled() {
@@ -987,7 +988,7 @@ mod tests {
         (calls, f)
     }
 
-    /// Minimal ready-future helper so tests don't pull an async dep.
+    /// Minimal ready-future helper so the tests need no futures-style dependency.
     mod futures_ready {
         use std::future::Future;
         use std::pin::Pin;

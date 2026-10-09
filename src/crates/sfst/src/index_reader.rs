@@ -10,8 +10,8 @@
 //!    high-card `HF{hi}{lo}` columnar chunk).
 //! 4. Load stream batches (`SB0{N}`) for attribute resolution.
 //!
-//! Consumers (grep-verified): the ledger's log/trace query paths open one
-//! reader per file (src/crates/otel-ledger/src/ledger/rpc/logs/handler.rs,
+//! Consumers: the ledger's log/trace query paths open one reader per file
+//! (src/crates/otel-ledger/src/ledger/rpc/logs/handler.rs,
 //! src/crates/otel-ledger/src/ledger/rpc/traces/sources.rs), and the sfsq
 //! traces search wraps them in trace sessions
 //! (src/crates/sfsq/src/traces/search.rs).
@@ -222,14 +222,15 @@ impl<'a> IndexReader<'a> {
         &self.summary
     }
 
-    /// The heavy index metadata (histogram + id_ranges + field table).
+    /// The heavy index metadata (histogram + id_ranges + schema tree +
+    /// column manifest).
     pub fn metadata(&self) -> &Metadata {
         self.sfst
             .metadata()
             .expect("metadata cached at IndexReader::open")
     }
 
-    /// Total number of log entries in this index.
+    /// Total records (rows) in this index.
     pub fn total_logs(&self) -> u32 {
         self.summary.record_count
     }
@@ -266,11 +267,10 @@ impl<'a> IndexReader<'a> {
         &self.metadata().tree
     }
 
-    /// Byte span of the cold suffix (optional per-row columns + optional
-    /// `trace_id` index, trace-id bloom, and span event/link structures +
-    /// mid/high field chunks + stream batches) a query releases from the page
-    /// cache once done — advising it away also evicts the small `TBLM` chunk.
-    /// See the chunk reader's cold-region rule.
+    /// Byte span of the cold suffix (optional per-row columns + the optional
+    /// trace chunks `TIDX`/`TBLM`/`EVNB`/`LNKB`/`TRSU` + mid/high field
+    /// chunks + stream batches) for a query to release from the page cache
+    /// once done. See the chunk reader's cold-region rule.
     pub fn cold_region(&self) -> Option<(usize, usize)> {
         self.sfst.cold_region()
     }
@@ -517,8 +517,8 @@ impl<'a> IndexReader<'a> {
 
     /// Enumerate the distinct stored values of one field, in the
     /// dictionary's sorted order, with the `field=` prefix stripped by
-    /// LENGTH (values may themselves contain `=`; splitting on the first
-    /// `=` would truncate them).
+    /// LENGTH (values may themselves contain `=`; the strip removes exactly
+    /// the separator after the name, keeping embedded `=` bytes intact).
     ///
     /// Reads only the field's own dictionary chunk (primary FST prefix
     /// scan, MF FST, or HF arena) — never stream batches, per-row
@@ -1006,7 +1006,7 @@ impl<'a> IndexReader<'a> {
     /// (`[start, end)`), via `partition_point` on the chronological
     /// timestamps. Clamps naturally when the window extends past the
     /// file's range; the windowed query paths use it to count directly on
-    /// the on-disk bitmaps via [`treight::Bitmap::range_cardinality`].
+    /// the on-disk bitmaps via `treight::Bitmap::range_cardinality`.
     pub fn range_positions(
         &self,
         window_ns: std::ops::Range<i64>,
@@ -1592,7 +1592,7 @@ impl<'a> IndexReader<'a> {
 /// Per-bucket set-position counts for one value's on-disk bitmap.
 ///
 /// Fast path (`fast` — nothing else constrains the scope): count directly
-/// on the [`treight::Bitmap`] via `range_cardinality`. Slow path: intersect
+/// on `treight::Bitmap` via `range_cardinality`. Slow path: intersect
 /// the value with `scope`, then count each bucket on the result.
 ///
 /// TODO(perf): this calls `range_cardinality` once per bucket, re-walking the
@@ -1681,9 +1681,9 @@ impl BitmapFilter {
     }
 
     /// The filter scope with `field`'s own selection excluded — the AND of
-    /// the *other* fields and the query. For a facet on a field
-    /// that is itself filtered and has siblings (otherwise it's
-    /// [`is_unconstrained`]).
+    /// the *other* fields and the query. For a facet on a field that is
+    /// itself filtered while other constraints remain (sibling fields or a
+    /// full-text query — otherwise it's [`is_unconstrained`]).
     ///
     /// [`is_unconstrained`]: Self::is_unconstrained
     fn without(&self, field: &str) -> PosSet {
@@ -1709,7 +1709,7 @@ impl BitmapFilter {
 }
 
 /// A set of log positions within one file, backed by a native
-/// [`treight::Bitmap`] (a `Copy` descriptor plus its external tree bytes).
+/// `treight::Bitmap` (a `Copy` descriptor plus its external tree bytes).
 /// The whole query path operates on these — on-disk value bitmaps are used
 /// as-is, and unions/intersections stay native (no Roaring round-trip). The
 /// universe (position upper bound) is the file's `record_count`; every set

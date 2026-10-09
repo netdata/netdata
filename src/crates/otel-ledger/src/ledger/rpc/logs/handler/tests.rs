@@ -4,7 +4,7 @@
 //! fetches evicted SFSTs back from object storage.
 //!
 //! Fixtures are real SFST bytes written in memory by the production
-//! [`sfst::ChunkWriter`] and installed into a real [`TenantRegistries`]
+//! `sfst::ChunkWriter` and installed into a real `TenantRegistries`
 //! over throwaway temp dirs; WAL and catalog state is driven through
 //! the registry event APIs, and remote fixtures are real files behind
 //! an `fs://` storage backend. What the engine and adapter already pin
@@ -143,10 +143,11 @@ fn write_test_sfst(path: &std::path::Path, min_s: u32) {
     std::fs::write(path, &buf).unwrap();
 }
 
-/// Install one 6-log SFST under tenant `t` at sequence `seq`. The
-/// fixed part key (7) never matters here: these tests never select a
-/// stream, so the query's partition filter stays empty. (The remote
-/// tests below do select — hence their stream-derived ids.)
+/// Install one 6-log SFST under `tenant` at sequence `seq`. The fixed
+/// part key (7) never affects a query here: these tests never select
+/// a stream, so the query's partition filter stays empty. (The remote
+/// tests below use stream-derived ids instead: `track_remote_catalog`
+/// enforces production's part_key = ns_hash pairing.)
 fn install_sfst(tr: &mut TenantRegistries, tenant: &str, seq: u64, min_s: u32) {
     let id = FileId::new(test_identity(), 0, seq, 7);
 
@@ -385,7 +386,7 @@ async fn files_request_returns_inventory_with_upload_state() {
     // sorted by seq
     assert_eq!(sfst[0]["seq"], 1);
     assert_eq!(sfst[1]["seq"], 2);
-    // summary + stream fields lifted from the SFST
+    // summary + stream fields from the tracked summary, not the file
     assert_eq!(sfst[0]["total_logs"], 6);
     assert_eq!(sfst[0]["min_ts_s"], 1_700_000_000u64);
     assert_eq!(sfst[0]["stream"]["namespace"], "ns");
@@ -491,7 +492,7 @@ async fn files_request_includes_wal_and_catalog_entries() {
     assert_eq!(wal[1]["status"], "archived");
     assert_eq!(wal[1]["size"], 1234u64);
 
-    // Catalog: basename + ISO date + max_seq + pending_deletion.
+    // Catalog: basename, ISO date, max_seq, min_ts_s, pending_deletion.
     let catalog = t["catalog"].as_array().unwrap();
     assert_eq!(catalog.len(), 1);
     assert_eq!(catalog[0]["file"], "cat-0000000007.catalog");
@@ -587,7 +588,7 @@ async fn populated_response_carries_facets_and_histogram() {
     let v = serde_json::to_value(&resp).unwrap();
     assert_eq!(v["status"], 200);
 
-    // Empty request → exactly one default facet, `severity_text`.
+    // No `facets` requested → exactly one default facet, `severity_text`.
     // `service` is a low-card field too but isn't auto-surfaced; the
     // user adds it via the UI's "+ Add Filter Field" control.
     let facets = v["facets"].as_array().unwrap();
@@ -659,10 +660,10 @@ async fn selection_filter_narrows_facet_counts_with_self_exclusion() {
     let h = make_handler(tr);
 
     // Filter `service=api` (positions 0,1,2). The `severity_text` facet
-    // should reflect that filter: info=2 (pos 0,2), error=1 (pos 1).
-    // The `service` facet, by self-exclusion, should still see both
-    // values at their full counts. Both facets are requested
-    // explicitly (the default set is just `severity_text`).
+    // reflects that filter: info=2 (pos 0,2), error=1 (pos 1). The
+    // `service` facet, by self-exclusion, still sees both values at
+    // their full counts. Both facets are requested explicitly (the
+    // default set is just `severity_text`).
     let payload = format!(
         r#"{{"info": false, "tenant": "tenant-a", "after": {a}, "before": {b}, "facets": ["severity_text", "service"], "selections": {{"service": ["api"]}}}}"#,
         a = min_s,
@@ -718,11 +719,11 @@ async fn only_overlapping_file_contributes() {
 #[tokio::test]
 async fn multiple_overlapping_files_merge_counts_and_facets() {
     // Two SFSTs in the same tenant whose spans both fall inside the
-    // request window. The planner returns both; the handler should
-    // sum `matched` and union facet counts.
+    // request window. The planner returns both; the handler sums
+    // `matched` and unions facet counts.
     //
-    // Each file has 6 logs (3 info, 3 error; 3 api, 3 worker) so
-    // the merged response should show 12 logs total.
+    // Each file has 6 logs (3 info, 3 error; 3 api, 3 worker), so the
+    // merged response shows 12 logs total.
     let mut tr = make_tenant_registries();
     let earlier = 1_700_000_000u32;
     let later = earlier + 100; // 6-second spans don't touch each other
@@ -829,9 +830,9 @@ async fn file_without_histogram_field_routes_logs_to_unset() {
 #[tokio::test]
 async fn no_time_bound_falls_back_to_recent_window() {
     // `(after=0, before=0)` is the legacy "no time bound" sentinel.
-    // The effective-window helper should fall back to the last 15
-    // minutes, so an SFST installed in that range produces a
-    // populated response (rather than an empty stub).
+    // The effective-window helper falls back to the last 15 minutes,
+    // so an SFST installed in that range produces a populated
+    // response (rather than an empty stub).
     let now_s = std::time::SystemTime::now()
         .duration_since(std::time::UNIX_EPOCH)
         .unwrap()
@@ -846,7 +847,7 @@ async fn no_time_bound_falls_back_to_recent_window() {
         serde_json::from_slice(br#"{"info": false, "tenant": "tenant-a"}"#).unwrap();
     let resp = h.on_call(make_ctx("t1"), req).await.unwrap();
     let v = serde_json::to_value(&resp).unwrap();
-    // Fixture has 6 logs — all should match (the file's range
+    // Fixture has 6 logs — all match (the file's range
     // [recent, recent+5] sits inside the 15-min fallback window).
     assert_eq!(v["items"]["matched"], 6);
 }
@@ -886,8 +887,8 @@ fn row_ts_cursor(row: &Value) -> (i64, String) {
 
 /// Backward paging: page 2 anchors at page 1's oldest row, the anchor
 /// row itself is excluded (no overlap) and pos 2 follows it directly
-/// (no gap), with `items.after`/`before` reporting the rows remaining
-/// on each side.
+/// (no gap), with `items.after`/`before` flagging whether older/newer
+/// rows exist (0/1, not row counts).
 #[tokio::test]
 async fn backward_pagination_pages_without_overlap_or_gap() {
     let mut tr = make_tenant_registries();
@@ -954,7 +955,7 @@ async fn forward_pagination_returns_newer_rows_newest_first() {
     assert_eq!(row_ts_cursor(&d[0]).0, ts_us(min_s, 5));
     assert_eq!(row_ts_cursor(&d[1]).0, ts_us(min_s, 4));
     assert_eq!(row_ts_cursor(&d[2]).0, ts_us(min_s, 3));
-    assert_eq!(v["items"]["after"], 1); // pos 0,1,2 are older
+    assert_eq!(v["items"]["after"], 1); // older rows exist (pos 0,1,2)
     assert_eq!(v["items"]["before"], 0); // pos 5 is the newest row
 }
 
@@ -1065,7 +1066,7 @@ async fn tenant_scoping_isolates_unions_nothing_and_defaults() {
     assert_eq!(v["status"], 200);
     assert_eq!(matched(&v), 0);
 
-    // Empty tenant string falls back to "default" (light hygiene).
+    // Empty tenant string falls back to "default", same as an omitted tenant.
     let req: OtelLogsRequest =
         serde_json::from_slice(format!(r#"{{"info":false,"tenant":"",{win}}}"#).as_bytes())
             .unwrap();
@@ -1291,9 +1292,9 @@ async fn a_failed_download_does_not_hide_the_other_remote_files() {
     let min_s = 1_700_000_000u32;
     let mut tr = make_tenant_registries();
     let remote_dir = tempfile::tempdir().unwrap().keep();
-    // Seq 1 downloads first and fails with a storage error, not as a missing
-    // object: its catalog names a directory-style key, which the storage
-    // client refuses at once, without retries.
+    // Seq 1's read fails with a storage error, not as a missing object: its
+    // catalog names a directory-style key, which the storage client refuses
+    // at once.
     let broken_key = "v2/logs/tenants/default/sfst/seq1/";
     track_remote_catalog(
         &mut tr,
@@ -1363,7 +1364,6 @@ async fn remote_fetch_failure_degrades() {
         .as_bytes(),
     )
     .unwrap();
-    // Degrades: the unreadable remote source is omitted, the query still answers.
     let v = serde_json::to_value(&h.on_call(make_ctx("t1"), req).await.unwrap()).unwrap();
     assert_eq!(
         v["items"]["matched"], 0,
@@ -1434,7 +1434,7 @@ async fn catalogs_are_read_off_the_registry_lock() {
     // when the test ends, so a failure cannot hang the runtime's shutdown.
     let _unblock = crate::test_helpers::FifoUnblocker(catalog.clone());
 
-    // The query is now blocked reading the catalog.
+    // The query is now blocked on the catalog FIFO.
     let deadline = std::time::Duration::from_secs(10);
     let mut writer = crate::test_helpers::open_fifo_writer(&catalog, deadline).await;
     let write_lock = tokio::time::timeout(deadline, registries.write())

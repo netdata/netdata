@@ -47,7 +47,6 @@ Dockerfile* @netdata/agent-sre
 .codacy.yml @netdata/agent-sre
 .yamllint.yml @netdata/agent-sre
 CMakeLists.txt @netdata/agent-sre @vkalintiris
-netdata.spec.in @netdata/agent-sre
 netdata-installer.sh @netdata/agent-sre
 packaging/version @netdatabot @netdata/agent-sre
 packaging/repoconfig/CMakelists.txt @netdata/agent-sre

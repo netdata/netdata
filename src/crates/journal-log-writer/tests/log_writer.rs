@@ -1,9 +1,14 @@
-//! Integration tests for journal log writer
+//! Integration tests for the journal log writer
 //!
 //! Tests cover:
-//! - Basic entry writing
-//! - File rotation (size-based, count-based)
-//! - Retention policies
+//! - Entry writing, rotation (entry count, file size) and retention
+//!   (file count, total data size)
+//! - Timestamp overrides clamped to strict monotonic progression
+//! - Machine-id subdirectory layout, `_BOOT_ID` injection, lifecycle
+//!   observer events and journal-directory path validation
+//!
+//! Assertions that read entries back through `journalctl` are skipped when
+//! the binary is unavailable.
 
 use journal_common::{Microseconds, load_machine_id, monotonic_now};
 use journal_log_writer::{
@@ -32,7 +37,7 @@ fn test_config() -> Config {
     )
 }
 
-/// Helper to count journal files in a directory
+/// Counts journal files under the directory's machine-id subdirectory
 fn count_journal_files(dir: &TempDir) -> usize {
     let machine_id = load_machine_id().unwrap();
     let journal_dir = dir.path().join(machine_id.as_simple().to_string());
@@ -157,7 +162,6 @@ fn test_write_single_entry() {
     log.write_entry(&entry, None).unwrap();
     log.sync().unwrap();
 
-    // Verify file was created
     assert_eq!(count_journal_files(&dir), 1);
 }
 
@@ -177,7 +181,7 @@ fn test_write_multiple_entries() {
 
     log.sync().unwrap();
 
-    // Should still be 1 file
+    // Default policies set no limits, so nothing rotates or is deleted
     assert_eq!(count_journal_files(&dir), 1);
 }
 
@@ -185,7 +189,6 @@ fn test_write_multiple_entries() {
 fn test_rotation_by_entry_count() {
     let dir = TempDir::new().unwrap();
 
-    // Rotate after 5 entries
     let rotation = RotationPolicy::default().with_number_of_entries(5);
     let config = test_config().with_rotation_policy(rotation);
 
@@ -234,7 +237,6 @@ fn test_rotation_by_file_size() {
 fn test_retention_by_file_count() {
     let dir = TempDir::new().unwrap();
 
-    // Rotate after 3 entries, keep max 2 files
     let rotation = RotationPolicy::default().with_number_of_entries(3);
     let retention = RetentionPolicy::default().with_number_of_journal_files(2);
     let config = test_config()
@@ -243,7 +245,7 @@ fn test_retention_by_file_count() {
 
     let mut log = Log::new(dir.path(), config).unwrap();
 
-    // Write 10 entries (should create 4 files, but keep only 2)
+    // Write 10 entries (creates 4 files; each retention pass keeps 2)
     for i in 0..10 {
         let message = format!("MESSAGE=Entry {}", i);
         let entry = [message.as_bytes(), b"PRIORITY=6"];
@@ -252,8 +254,8 @@ fn test_retention_by_file_count() {
 
     log.sync().unwrap();
 
-    // Retention is enforced during rotation, so there might be 1 extra file
-    // (the active file + retention limit). Check that we're at or near the limit.
+    // Retention runs before each rotation creates the next file, so the
+    // active file can sit on top of the retention limit.
     let file_count = count_journal_files(&dir);
     assert!(
         file_count <= 3,
@@ -266,9 +268,9 @@ fn test_retention_by_file_count() {
 fn test_retention_by_total_size() {
     let dir = TempDir::new().unwrap();
 
-    // Rotate after 5 entries, keep max 2 files based on actual data size
-    // Note: Journal files pre-allocate space (sparse files), but retention
-    // is based on actual data written (append_offset), not logical file size
+    // Rotate after 5 entries; retention caps total retained data at 12KB
+    // Note: journal files pre-allocate space (sparse files), but retention
+    // counts actual data written (append_offset), not logical file size
     let rotation = RotationPolicy::default().with_number_of_entries(5);
 
     // Each small entry is ~50-100 bytes, plus journal overhead (~4KB per file)
@@ -308,11 +310,11 @@ fn test_empty_entry() {
 
     let mut log = Log::new(dir.path(), config).unwrap();
 
-    // Write empty entry (should be no-op)
+    // Write an empty entry (the writer no-ops on empty input)
     let entry: [&[u8]; 0] = [];
     log.write_entry(&entry, None).unwrap();
 
-    // Should not create any files (no rotation triggered)
+    // Nothing was written, so not even a first file exists
     assert_eq!(count_journal_files(&dir), 0);
 }
 
@@ -330,7 +332,6 @@ fn test_boot_id_injection() {
 
     let mut log = Log::new(dir.path(), config).unwrap();
 
-    // Write a single entry
     let entry = [b"MESSAGE=Test entry" as &[u8], b"PRIORITY=6"];
     log.write_entry(&entry, None).unwrap();
     log.sync().unwrap();
@@ -372,7 +373,6 @@ fn test_boot_id_injection() {
 
     let output_str = String::from_utf8_lossy(&output.stdout);
 
-    // Check that the output contains the expected _BOOT_ID field
     let boot_id_field = format!("\"_BOOT_ID\":\"{}\"", expected_boot_id);
     assert!(
         output_str.contains(&boot_id_field),
@@ -578,7 +578,7 @@ fn test_monotonic_override_remains_strict_after_restart() {
     {
         let mut log = Log::new(dir.path(), test_config()).unwrap();
         let second = [b"MESSAGE=restart-second" as &[u8], b"PRIORITY=6"];
-        // Equal monotonic override must still be bumped above the persisted tail value.
+        // An equal monotonic override is bumped above the persisted tail value.
         let ts = EntryTimestamps::default()
             .with_entry_realtime_usec(1)
             .with_entry_monotonic_usec(first_monotonic);
@@ -770,14 +770,14 @@ fn test_lifecycle_observer_reports_missing_retention_deletions() {
 
 #[test]
 fn relative_journal_dir_is_rejected_before_any_io() {
-    // A relative journal directory must fail fast at construction with a clear,
-    // actionable error that names the offending value, and must create no
-    // directory (validation happens before any filesystem mutation).
+    // A relative journal directory fails fast at construction with an error
+    // that names the offending value, and creates no directory (validation
+    // happens before any filesystem mutation).
     let root = "relative-journal-dir-rejected";
     let dir = format!("{root}/otel/v1");
 
     // Clean any leftover from a prior run. A real removal error (e.g. permission
-    // denied) must surface rather than mask a spurious assertion below; only a
+    // denied) surfaces rather than masking a spurious assertion below; only a
     // missing directory is the expected, ignorable case.
     match fs::remove_dir_all(root) {
         Ok(()) => {}
@@ -819,7 +819,7 @@ fn absolute_journal_dir_is_accepted() {
 #[test]
 fn nonexistent_absolute_journal_dir_is_created_and_accepted() {
     // Common production case: the configured absolute directory does not yet
-    // exist on first run and must be created.
+    // exist on first run and is created by Log::new.
     let tmp = TempDir::new().expect("create temp dir");
     let fresh = tmp.path().join("not-yet-created/otel/v1");
     assert!(!fresh.exists());

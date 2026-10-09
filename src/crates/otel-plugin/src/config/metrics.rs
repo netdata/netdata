@@ -1,5 +1,5 @@
 //! The `metrics:` override section of the plugin's layered configuration:
-//! the partial (all-`Option`) mirror of [`bridge::config::MetricsConfig`]
+//! the partial (all-`Option`) mirror of `bridge::config::MetricsConfig`
 //! used to patch the effective metrics config from the user `otel.yaml` and
 //! the `NETDATA_OTEL_CFG_METRICS_*` environment variables. Layering lives in
 //! `mod.rs` (stock file → user file → env; later layers win per field); this
@@ -9,7 +9,7 @@
 //! Nothing defaults or validates here. Defaults come from the shipped stock
 //! `otel.yaml` (`configs/otel.yaml.in`), which must carry the whole section
 //! because `PluginConfig.metrics` has no serde default and only the stock
-//! file is parsed directly into [`bridge::config::MetricsConfig`]. Semantic
+//! file is parsed directly into `bridge::config::MetricsConfig`. Semantic
 //! validation of the resulting timing happens downstream in the ingestor's
 //! `ChartConfigManager` (`otel-ingestor/src/chart_config.rs`), the consumer
 //! of the resolved config sent to workers over IPC.
@@ -18,7 +18,7 @@ use serde::Deserialize;
 
 /// The user-layer `metrics:` section: every field optional, with `None`
 /// meaning "keep the value from the previous layer". Field names and units
-/// mirror [`bridge::config::MetricsConfig`]; unknown keys are rejected, not
+/// mirror `bridge::config::MetricsConfig`; unknown keys are rejected, not
 /// ignored.
 #[derive(Debug, Default, Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -38,7 +38,7 @@ pub(super) struct MetricsOverride {
     #[serde(default)]
     pub(super) expiry_duration_secs: Option<u64>,
     /// New charts allowed per export request — the cardinality guard. The
-    /// only non-`Option` field in [`MetricsConfig`], so the stock file must
+    /// only non-`Option` field in `MetricsConfig`, so the stock file must
     /// always provide it; override layers can only replace the value.
     #[serde(default)]
     pub(super) max_new_charts_per_request: Option<usize>,

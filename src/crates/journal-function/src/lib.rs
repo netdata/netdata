@@ -75,7 +75,7 @@ pub use charts::{
 
 // Flat subset of journal-registry's re-export list
 // (`journal-registry/src/lib.rs`): the Monitor/Registry runtime pair
-// the consumer drives as watch → process_event → find_files_in_range
+// the consumer drives as watch_directory → process_event → find_files_in_range
 // (`otel-legacy-logs/src/handler.rs`), plus File,
 // FileInfo and TimeRange, which have no external importer (grep-verified).
 pub use journal_registry::{File, FileInfo, Monitor, Registry, TimeRange};

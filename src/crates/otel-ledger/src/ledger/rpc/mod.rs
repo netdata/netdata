@@ -49,8 +49,9 @@ pub(crate) use traces::OtelTracesHandler;
 /// (`rpc/dispatch.rs` `dispatch_function_call`) keeps the original.
 ///
 /// LOGS-ONLY: the logs request has top-level `info`/`after`/`before`
-/// fields, so this shape parses there. The strict traces request (one
-/// mode object, no top-level window) takes its own shim,
+/// fields, so this shape parses there. The traces request reads
+/// top-level window fields too, but its `info` is the strict
+/// `{"info": {}}` selector, not a flag, so it takes its own shim,
 /// [`patch_traces_args_into_payload`] — a change here affects only the
 /// logs Function's GET behavior.
 pub(crate) fn patch_args_into_payload(args: &[String], payload: Option<&[u8]>) -> Option<Vec<u8>> {
@@ -83,14 +84,16 @@ pub(crate) fn patch_args_into_payload(args: &[String], payload: Option<&[u8]>) -
 /// [`build_traces_pipeline`](super::traces_pipeline::build_traces_pipeline).
 /// PRESENCE of the literal `info` token synthesizes the strict `{"info": {}}`
 /// selector regardless of any other tokens; anything else synthesizes
-/// NOTHING — a traces GET data call has no body to express a mode, so
-/// it surfaces as the bridge's absent-payload client error rather than
-/// a silent default query (`netdata-plugin/bridge/src/function.rs`
-/// `HandlerAdapter::handle_raw`). Data calls are
-/// POST-only by design. The `payload.is_some()` guard is load-bearing:
-/// dispatch gives synthesized content priority (`rpc/dispatch.rs`
-/// `dispatch_function_call`), so
-/// without it an `info` URL arg would overwrite a POST body.
+/// NOTHING — a traces GET data call reaches the bridge with no payload,
+/// which it deserializes from `{}` (`netdata-plugin/bridge/src/function.rs`
+/// `HandlerAdapter::handle_raw`) into the selector-less
+/// `TracesMode::Functions` default view (every param has a serde
+/// default, `last` via a custom `default_limit` fn), silently dropping
+/// the GET's window args. The
+/// `payload.is_some()` guard is load-bearing: dispatch gives synthesized
+/// content priority (`rpc/dispatch.rs`
+/// `dispatch_function_call`), so without it an `info` URL arg would
+/// overwrite a POST body.
 pub(crate) fn patch_traces_args_into_payload(
     args: &[String],
     payload: Option<&[u8]>,

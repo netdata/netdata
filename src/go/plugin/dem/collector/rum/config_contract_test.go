@@ -358,7 +358,10 @@ func TestNativeRUMCaptureConfigurationAndReload(t *testing.T) {
 		t.Run(tc.suffix, func(t *testing.T) {
 			factory, last := nativeRUMConfigFactory(t)
 			var input confgroup.Config
-			require.NoError(t, yaml.Unmarshal([]byte("name: shop\nallowed_origins: [https://shop.example.org]\n"+tc.suffix), &input))
+			require.NoError(
+				t,
+				yaml.Unmarshal([]byte("name: shop\nallowed_origins: [https://shop.example.org]\n"+tc.suffix), &input),
+			)
 			input.SetModule("rum").SetSourceType(confgroup.TypeUser)
 			payload, err := factory.Configuration(context.Background(), input)
 			require.NoError(t, err)
@@ -383,11 +386,19 @@ func TestCaptureFrustrationChartsFollowPolicy(t *testing.T) {
 		t.Run(fmt.Sprint(enabled), func(t *testing.T) {
 			site, hub, _ := contractSite(t)
 			site.Capture.FrustrationSignals = enabled
-			recv := receiver.New(hub)
+			recv := receiver.New(receiver.Dependencies{
+				Registry: hub,
+			})
 			recv.Listen = "127.0.0.1:0"
 			startJob(t, "receiver", "receiver", recv)
 			job, out, stop := startJob(t, "rum", "shop", site)
-			sendContractBeacon(t, hub, []byte(`{"meta":{"page":{"id":"cart-document","url":"https://example.org/cart"},"session":{"id":"capture-session"}},"events":[{"name":"document_activated","attributes":{"observation_id":"cart-document","observation_sequence":"1"}},{"name":"rage_click"}]}`))
+			sendContractBeacon(
+				t,
+				hub,
+				[]byte(
+					`{"meta":{"page":{"id":"cart-document","url":"https://example.org/cart"},"session":{"id":"capture-session"}},"events":[{"name":"document_activated","attributes":{"observation_id":"cart-document","observation_sequence":"1"}},{"name":"rage_click"}]}`,
+				),
+			)
 			tickUntil(t, job, out, "SET 'document_views' = 1")
 			stop()
 			if enabled {

@@ -45,7 +45,7 @@ jobs:
           - shell: busybox
             awk: busybox
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       - name: Install Unix validation tools
         run: sudo apt-get update && sudo apt-get install -y busybox gawk mawk shellcheck
@@ -77,7 +77,7 @@ jobs:
     name: POSIX end-to-end bundle
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       - name: Build and validate a fixture bundle
         run: |
@@ -188,7 +188,7 @@ jobs:
     name: macOS POSIX sanitization
     runs-on: macos-latest
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - name: Parse and run adversarial self-test
         env:
           ND_SUPPORT_BUNDLE_DEMOTED: '1'
@@ -202,7 +202,7 @@ jobs:
     name: PowerShell 7 sanitization
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - name: Run adversarial self-test
         shell: pwsh
         run: ./packaging/installer/netdata-support-bundle.ps1 -SelfTest
@@ -215,7 +215,7 @@ jobs:
     name: Windows PowerShell 5.1 sanitization
     runs-on: windows-latest
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - name: Run adversarial self-test
         shell: powershell
         run: .\packaging\installer\netdata-support-bundle.ps1 -SelfTest

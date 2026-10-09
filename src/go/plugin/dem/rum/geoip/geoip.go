@@ -1,10 +1,8 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-// Package geoip resolves client IPs to ISO country codes plus city-level
-// location from an mmdb the Netdata Agent already maintains: the
-// topology IP-intel database first, legacy GeoLite2 locations after it.
-// Coordinates are rounded before leaving the resolver; client IPs
-// are never stored.
+// Package geoip consumes optional, locally provisioned geographic databases for
+// RUM. The receiver owns refresh and shutdown; lookups never perform file I/O.
+// Coordinates lose precision before leaving this package; client IPs are not retained.
 package geoip
 
 import (
@@ -13,66 +11,211 @@ import (
 	"math"
 	"net"
 	"os"
+	"path/filepath"
 	"regexp"
-	"strings"
 	"sync"
-
-	"github.com/oschwald/maxminddb-golang"
+	"sync/atomic"
+	"time"
 )
 
-// DefaultPaths is the search order when rum.geoip_db is not set:
-// the downloader's refreshed copy first, then the stock copy netdata
-// packages ship under /usr/share (netflow-plugin's own default paths,
-// src/crates/netflow-plugin/src/plugin_config/defaults.rs +
-// process_maps.rs, read the same two locations), then legacy GeoLite2
-// Country fallbacks (country only: no city or map position).
-var DefaultPaths = []string{
-	"/var/cache/netdata/topology-ip-intel/topology-ip-geo.mmdb",
-	"/usr/share/netdata/topology-ip-intel/topology-ip-geo.mmdb",
-	"/var/lib/netdata/geoip/GeoLite2-Country.mmdb",
-	"/usr/share/GeoIP/GeoLite2-Country.mmdb",
-}
+// Paths are injected from the Agent's runtime or compiled data roots.
+type Paths struct{ Cache, Stock string }
 
-// ErrNotFound means no candidate database exists (GeoIP simply stays off).
-var ErrNotFound = errors.New("geoip: no database found")
-
-// Resolve picks the database path: an explicit override must exist (a
-// typo must not silently fall back), otherwise the first existing
-// candidate wins.
-func Resolve(override string, candidates []string) (string, error) {
-	if override != "" {
-		if _, err := os.Stat(override); err != nil {
-			return "", fmt.Errorf("geoip: configured database %s: %w", override, err)
+func AgentPaths(cacheDir, stockDir string) Paths {
+	path := func(root string) string {
+		if root == "" {
+			return ""
 		}
-		return override, nil
+		return filepath.Join(root, "topology-ip-intel", "topology-ip-geo.mmdb")
 	}
-	for _, p := range candidates {
-		if st, err := os.Stat(p); err == nil && !st.IsDir() {
-			return p, nil
-		}
+	return Paths{
+		Cache: path(cacheDir),
+		Stock: path(stockDir),
 	}
-	return "", ErrNotFound
 }
 
-// Open resolves and opens the database. A nil resolver with ErrNotFound
-// means "run without GeoIP".
-func Open(override string) (*Resolver, error) {
-	p, err := Resolve(override, DefaultPaths)
-	if err != nil {
-		return nil, err
-	}
-	return New(p)
+// Status is source evidence, independent of any site's capture policy. Times are
+// Unix microseconds, omitted before the corresponding event. No paths or IPs escape.
+type Status struct {
+	Selection     string `json:"selection,omitempty"`
+	State         string `json:"state"`
+	Source        string `json:"source,omitempty"`
+	DatabaseType  string `json:"database_type,omitempty"`
+	BuildAt       int64  `json:"build_at,omitempty"`
+	LoadedAt      int64  `json:"loaded_at,omitempty"`
+	LastCheckedAt int64  `json:"last_checked_at,omitempty"`
+	Reason        string `json:"reason,omitempty"`
+	LookupErrors  uint64 `json:"lookup_errors"`
 }
 
-// Resolver provides IP → country lookups from a GeoLite2-layout mmdb.
+type source struct{ kind, path string }
+type snapshot struct {
+	source   source
+	info     os.FileInfo
+	db       *database
+	loadedAt int64
+	tainted  atomic.Bool
+	errors   atomic.Uint64
+}
+
+// Resolver serializes refresh/close separately from lookups. Candidate loading
+// does not block current lookups; publication waits for their mapped reads to end.
 type Resolver struct {
-	mu sync.RWMutex
-	db *maxminddb.Reader
+	refreshMu sync.Mutex
+	mu        sync.RWMutex
+	sources   []source
+	current   *snapshot
+	status    Status
+	closed    bool
+	wake      chan struct{}
 }
 
-// geoRecord decodes the fields this package reads from a GeoLite2/DB-IP
-// City-layout mmdb: DB-IP Lite and GeoLite2 City both
-// key the English city name and coordinates the same way.
+func New(explicit string, paths Paths) *Resolver {
+	r := &Resolver{
+		wake: make(chan struct{}, 1),
+		status: Status{
+			Selection: "auto",
+			State:     "unavailable",
+			Reason:    "not_checked",
+		},
+	}
+	if explicit != "" {
+		r.status.Selection = "explicit"
+		r.sources = []source{{kind: "explicit", path: explicit}}
+	} else {
+		r.sources = []source{{kind: "cache", path: paths.Cache}, {kind: "stock", path: paths.Stock}}
+	}
+	return r
+}
+
+// Faults wakes the receiver worker after a contained fault. It carries no IP data.
+func (r *Resolver) Faults() <-chan struct{} { return r.wake }
+
+// Refresh checks current candidates in priority order, then considers retaining
+// a previous readable snapshot. Missing sources and optional load failures never
+// become receiver startup failures. Returned errors are for local diagnostics only.
+func (r *Resolver) Refresh() error {
+	r.refreshMu.Lock()
+	defer r.refreshMu.Unlock()
+	if r.closed {
+		return nil
+	}
+	r.mu.RLock()
+	previous := r.current
+	r.mu.RUnlock()
+	var selected *snapshot
+	var problems []error
+	reason := ""
+	previousRemoved := false
+	for _, src := range r.sources {
+		if src.path == "" {
+			continue
+		}
+		info, err := os.Stat(src.path)
+		if errors.Is(err, os.ErrNotExist) {
+			if previous != nil && previous.source == src {
+				previousRemoved = true
+			}
+			continue
+		}
+		if err == nil && previous != nil && previous.source == src && sameFile(previous.info, info) &&
+			!previous.tainted.Load() {
+			selected = previous
+			break
+		}
+		// An in-place change affects the old mapping too; it cannot be last-good data.
+		if err == nil && previous != nil && previous.source == src && os.SameFile(previous.info, info) &&
+			!sameFile(previous.info, info) {
+			previous.tainted.Store(true)
+		}
+		var db *database
+		var opened os.FileInfo
+		if err == nil {
+			db, opened, err = openDatabase(src.path)
+			if err == nil {
+				after, statErr := os.Stat(src.path)
+				if errors.Is(statErr, os.ErrNotExist) && previous != nil && previous.source == src {
+					previousRemoved = true
+				}
+				if statErr != nil || !sameFile(info, opened) || !sameFile(opened, after) {
+					db.close()
+					db = nil
+					err = errors.New("database changed during opening")
+				}
+			}
+		}
+		if err != nil {
+			if errors.Is(err, os.ErrNotExist) && previous != nil && previous.source == src {
+				previousRemoved = true
+			}
+			if reason == "" {
+				reason = src.kind + "_load_failed"
+				if errors.Is(err, errMappedFault) {
+					reason = src.kind + "_mapped_fault"
+				}
+			}
+			problems = append(problems, fmt.Errorf("%s database %q: %w", src.kind, src.path, err))
+			continue
+		}
+		selected = &snapshot{
+			source:   src,
+			info:     opened,
+			db:       db,
+			loadedAt: time.Now().UnixMicro(),
+		}
+		break
+	}
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	state := "loaded"
+	if selected != nil && selected.tainted.Load() {
+		selected = nil
+	}
+	if selected == nil && previous != nil && !previousRemoved && !previous.tainted.Load() {
+		selected = previous
+		state = "using_previous"
+	}
+	if selected == nil {
+		state = "unavailable"
+		if reason == "" {
+			reason = "missing"
+		}
+	}
+	if previous != nil && previous != selected {
+		previous.db.close()
+	}
+	r.current = selected
+	r.status = Status{
+		Selection:     r.status.Selection,
+		State:         state,
+		LastCheckedAt: time.Now().UnixMicro(),
+		Reason:        reason,
+	}
+	return errors.Join(problems...)
+}
+
+func sameFile(a, b os.FileInfo) bool {
+	return a != nil && b != nil && os.SameFile(a, b) && a.Size() == b.Size() && a.ModTime() == b.ModTime()
+}
+
+func (r *Resolver) Status() Status {
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+	status := r.status
+	if current := r.current; current != nil {
+		status.LookupErrors = current.errors.Load()
+		if current.tainted.Load() {
+			status.State, status.Reason = "unavailable", "unsafe_snapshot"
+			return status
+		}
+		status.Source = current.source.kind
+		status.DatabaseType = current.db.reader.Metadata.DatabaseType
+		status.BuildAt = int64(current.db.reader.Metadata.BuildEpoch) * 1000000
+		status.LoadedAt = current.loadedAt
+	}
+	return status
+}
+
 type geoRecord struct {
 	Country struct {
 		ISOCode string `maxminddb:"iso_code"`
@@ -83,97 +226,58 @@ type geoRecord struct {
 		} `maxminddb:"names"`
 	} `maxminddb:"city"`
 	Location struct {
-		Latitude  float64 `maxminddb:"latitude"`
-		Longitude float64 `maxminddb:"longitude"`
+		Latitude  *float64 `maxminddb:"latitude"`
+		Longitude *float64 `maxminddb:"longitude"`
 	} `maxminddb:"location"`
 }
 
-func New(dbPath string) (*Resolver, error) {
-	r := &Resolver{}
-	if err := r.Load(dbPath); err != nil {
-		return nil, err
-	}
-	return r, nil
-}
-
-// Load opens or replaces the database file.
-func (r *Resolver) Load(dbPath string) error {
-	if dbPath == "" {
-		return nil
-	}
-	if _, err := os.Stat(dbPath); os.IsNotExist(err) {
-		return fmt.Errorf("geoip db not found: %s", dbPath)
-	}
-	db, err := maxminddb.Open(dbPath)
-	if err != nil {
-		return fmt.Errorf("geoip open: %w", err)
-	}
-	r.mu.Lock()
-	if r.db != nil {
-		_ = r.db.Close()
-	}
-	r.db = db
-	r.mu.Unlock()
-	return nil
-}
-
-// DatabaseType is the mmdb's declared type, e.g. "GeoLite2-City".
-func (r *Resolver) DatabaseType() string {
-	r.mu.RLock()
-	defer r.mu.RUnlock()
-	if r.db == nil {
-		return ""
-	}
-	return r.db.Metadata.DatabaseType
-}
-
-// CountryOnly reports a Country-edition database: countries resolve, but
-// cities and map positions stay empty.
-func (r *Resolver) CountryOnly() bool { return countryOnlyType(r.DatabaseType()) }
-
-func countryOnlyType(dbType string) bool {
-	return strings.Contains(strings.ToLower(dbType), "country")
-}
-
-// Country returns the ISO country code for an IP (empty if unknown).
-func (r *Resolver) Country(ipStr string) string {
-	country, _, _, _, _ := r.Lookup(ipStr)
-	return country
-}
-
-// Lookup resolves country plus city-level location for an IP in a single
-// mmdb read. Coordinates are rounded to 1 decimal
-// degree before they leave this package; this reduces precision, not database error. The IP itself is never
-// stored or returned. hasGeo is false when the record carries no
-// location block — private ranges, some hosting/anycast allocations, or
-// no database at all — city/lat/lon are then the zero value.
-//
-// Coordinates that decode to exactly (0,0) are treated as "no location"
-// (hasGeo=false): the maxminddb decoder cannot distinguish a genuinely
-// absent location field from one that happens to be the zero value, and
-// no real visitor traffic is expected from Null Island.
+// Lookup returns only validated fields. A record decode failure loses this lookup,
+// not the entire source; a mapped-read fault retires the unsafe source instead.
 func (r *Resolver) Lookup(ipStr string) (country, city string, lat, lon float64, hasGeo bool) {
 	ip := net.ParseIP(ipStr)
 	if ip == nil {
-		return "", "", 0, 0, false
+		return
 	}
 	r.mu.RLock()
 	defer r.mu.RUnlock()
-	if r.db == nil {
-		return "", "", 0, 0, false
+	current := r.current
+	if current == nil || current.tainted.Load() || (current.db.reader.Metadata.IPVersion == 4 && ip.To4() == nil) {
+		return
 	}
 	var rec geoRecord
-	if err := r.db.Lookup(ip, &rec); err != nil {
-		return "", "", 0, 0, false
+	if err := current.db.lookup(ip, &rec); err != nil {
+		current.errors.Add(1)
+		if errors.Is(err, errMappedFault) {
+			current.tainted.Store(true)
+			select {
+			case r.wake <- struct{}{}:
+			default:
+			}
+		}
+		return
 	}
+	invalid := false
 	country = rec.Country.ISOCode
-	city = trimCityAnnex(rec.City.Names.En)
-	if rec.Location.Latitude != 0 || rec.Location.Longitude != 0 {
-		lat = round1(rec.Location.Latitude)
-		lon = round1(rec.Location.Longitude)
-		hasGeo = true
+	if country != "" &&
+		(len(country) != 2 || country[0] < 'A' || country[0] > 'Z' || country[1] < 'A' || country[1] > 'Z') {
+		country = ""
+		invalid = true
 	}
-	return country, city, lat, lon, hasGeo
+	city = trimCityAnnex(rec.City.Names.En)
+	if rec.Location.Latitude != nil && rec.Location.Longitude != nil {
+		a, b := *rec.Location.Latitude, *rec.Location.Longitude
+		if !math.IsNaN(a) && !math.IsInf(a, 0) && a >= -90 && a <= 90 && !math.IsNaN(b) && !math.IsInf(b, 0) &&
+			b >= -180 &&
+			b <= 180 {
+			lat, lon, hasGeo = round1(a), round1(b), true
+		} else {
+			invalid = true
+		}
+	}
+	if invalid {
+		current.errors.Add(1)
+	}
+	return
 }
 
 // round1 rounds to 1 decimal degree before coordinates leave the resolver.
@@ -203,12 +307,16 @@ func trimCityAnnex(name string) string {
 	return name
 }
 
-// Close releases the database.
+// Close joins refresh and mapped reads before releasing the current database.
 func (r *Resolver) Close() {
+	r.refreshMu.Lock()
+	defer r.refreshMu.Unlock()
 	r.mu.Lock()
 	defer r.mu.Unlock()
-	if r.db != nil {
-		_ = r.db.Close()
-		r.db = nil
+	r.closed = true
+	if r.current != nil {
+		r.current.db.close()
+		r.current = nil
 	}
+	r.status.State, r.status.Reason = "unavailable", "closed"
 }

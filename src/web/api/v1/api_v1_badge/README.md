@@ -10,11 +10,11 @@ Given that Netdata collects from **1.000** to **5.000** metrics per server (depe
 
 For each metric/dimension and for arbitrary time-frames badges can show **min**, **max** or **average** value, but also **sum** or **incremental-sum** to have their **volume**.
 
-For example, there is [a chart in Netdata that shows the current requests/s of nginx](http://london.my-netdata.io/#nginx_local_nginx). Using this chart alone we can show the following badges (we could add more time-frames, like **today**, **yesterday**, etc):
+For example, there is a chart in Netdata that shows the current requests/s of nginx. Using this chart alone we can show the following badges (we could add more time-frames, like **today**, **yesterday**, etc):
 
 <a href="https://registry.my-netdata.io/"><img alt="Netdata badge: nginx active connections now" src="https://registry.my-netdata.io/api/v1/badge.svg?chart=nginx_local.connections&dimensions=active&value_color=grey:null%7Cblue&label=nginx%20active%20connections%20now&units=null&precision=0"/></a>  <a href="https://registry.my-netdata.io/"><img alt="Netdata badge: last hour average" src="https://registry.my-netdata.io/api/v1/badge.svg?chart=nginx_local.connections&dimensions=active&after=-3600&value_color=orange&label=last%20hour%20average&units=null&options=unaligned&precision=0"/></a> <a href="https://registry.my-netdata.io/"><img alt="Netdata badge: last hour max" src="https://registry.my-netdata.io/api/v1/badge.svg?chart=nginx_local.connections&dimensions=active&group=max&after=-3600&value_color=red&label=last%20hour%20max&units=null&options=unaligned&precision=0"/></a>
 
-Similarly, there is [a chart that shows outbound bandwidth per class](http://london.my-netdata.io/#tc_eth0), using QoS data. So it shows `kilobits/s` per class. Using this chart we can show:
+Similarly, there is a chart that shows outbound bandwidth per class, using QoS data. So it shows `kilobits/s` per class. Using this chart we can show:
 
 <a href="https://registry.my-netdata.io/"><img alt="Netdata badge: web server sends now" src="https://registry.my-netdata.io/api/v1/badge.svg?chart=tc.world_out&dimensions=web_server&value_color=green&label=web%20server%20sends%20now&units=kbps"/></a> <a href="https://registry.my-netdata.io/"><img alt="Netdata badge: web server sent today" src="https://registry.my-netdata.io/api/v1/badge.svg?chart=tc.world_out&dimensions=web_server&after=-86400&options=unaligned&group=sum&divide=8388608&value_color=blue&label=web%20server%20sent%20today&units=GB"/></a>
 

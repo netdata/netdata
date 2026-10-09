@@ -3,7 +3,7 @@
 //! `[after, before)` window — no bucket geometry — so each signal's
 //! adapter canonicalizes the window, then derives everything else
 //! through here: a "nice" bucket width, the window snapped outward to
-//! wall-clock multiples, and the exact [`sfst::Grid`] the engine
+//! wall-clock multiples, and the exact `sfst::Grid` the engine
 //! queries against.
 //!
 //! Consumers: the logs adapter's `into_query` (`rpc/logs/adapter.rs`),
@@ -64,9 +64,9 @@ pub(crate) fn align_window(after: u32, before: u32, width_s: u32) -> (u32, u32) 
 }
 
 /// Derive the whole grid for a canonicalized second-granular window:
-/// nice width, outward alignment, exact [`sfst::Grid`]. Also returns
-/// the aligned `(after, before)` seconds — alignment moves both ends
-/// outward, so capture and file-pruning windows come from the pair (or
+/// nice width, outward alignment, exact `sfst::Grid`. Also returns
+/// the aligned `(after, before)` seconds — the grid spans the aligned
+/// pair, so capture and file-pruning windows come from the pair (or
 /// the grid's own range), never the raw request.
 ///
 /// `after < before` is the caller's job; the wire adapters' window

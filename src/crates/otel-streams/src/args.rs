@@ -19,11 +19,13 @@ pub struct CommonArgs {
     #[arg(long)]
     pub tenant_id: Option<String>,
 
-    /// Tracing log level
+    /// Tracing log filter directive (EnvFilter); invalid values fall back to "info"
     #[arg(long, default_value = "info")]
     pub log_level: String,
 }
 
+/// Install the process-global rustls crypto provider and initialize tracing.
+/// Panics if called twice in one process (rustls allows one default provider).
 pub fn init_tls_and_logging(log_level: &str) {
     rustls::crypto::ring::default_provider()
         .install_default()

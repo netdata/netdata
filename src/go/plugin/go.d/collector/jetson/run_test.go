@@ -74,6 +74,47 @@ func TestCollectionTransitions(t *testing.T) {
 	collecttest.AssertChartCoverage(t, c, collecttest.ChartCoverageExpectation{})
 }
 
+func TestPowerCollectionTransitions(t *testing.T) {
+	c, fake := newCollectorWithFake(t)
+	startRun(t, c)
+	conn := fake.Accept(t)
+	data, err := os.ReadFile("testdata/tegrastats/thor-no-gpu-emc.txt")
+	require.NoError(t, err)
+	conn.Line(t, string(bytes.TrimSpace(data)))
+	waitSample(t, c, func(s sample) bool { return len(s.PowerRails) == 4 })
+	want := map[string]metrix.SampleValue{
+		`power_rail_power{rail="VDD_GPU"}`:         2.371,
+		`power_rail_power{rail="VDD_CPU_SOC_MSS"}`: 8.299,
+		`power_rail_power{rail="VIN_SYS_5V0"}`:     7.044,
+		`power_rail_power{rail="VIN"}`:             24.830,
+	}
+	assertCollected(t, c, want)
+	assertCollected(t, c, want)
+	collecttest.AssertChartCoverage(t, c, collecttest.ChartCoverageExpectation{})
+
+	// The new record drops absent rails and the invalid rail, while preserving zero.
+	sendRecord(t, conn, "GR3D_FREQ 10% VIN 0mW/1000mW VDD_GPU NaNmW/100mW")
+	waitSample(t, c, func(s sample) bool { return s.GPUUtilization != nil })
+	assertCollected(t, c, map[string]metrix.SampleValue{
+		"gpu_utilization":              10,
+		`power_rail_power{rail="VIN"}`: 0,
+	})
+	collecttest.AssertChartCoverage(t, c, collecttest.ChartCoverageExpectation{})
+
+	sendRecord(t, conn, "GR3D_FREQ 20%")
+	waitSample(t, c, func(s sample) bool { return s.GPUUtilization != nil && *s.GPUUtilization == 20 })
+	assertCollected(t, c, map[string]metrix.SampleValue{"gpu_utilization": 20})
+
+	sendRecord(t, conn, "VDD_GPU 100mW/200mW/300mW")
+	waitSample(t, c, func(s sample) bool { return !s.hasReadings() })
+	_, err = collecttest.CollectScalarSeries(c)
+	require.ErrorContains(t, err, "no supported GPU, EMC or power readings")
+
+	sendRecord(t, conn, "VDD_GPU 0/10")
+	waitSample(t, c, func(s sample) bool { return len(s.PowerRails) == 1 })
+	assertCollected(t, c, map[string]metrix.SampleValue{`power_rail_power{rail="VDD_GPU"}`: 0})
+}
+
 func TestManagedRuntime(t *testing.T) {
 	c, fake := newCollectorWithFake(t)
 	c.timing.MaxSampleAge = time.Hour // only withdrawal, not age, can remove the record after stop

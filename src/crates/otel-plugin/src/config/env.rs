@@ -43,8 +43,8 @@ pub(super) type EnvMap = HashMap<String, OsString>;
 
 /// Collect the `NETDATA_OTEL_CFG_*` environment into an [`EnvMap`] — the one
 /// full-environment scan in the plugin. Every other env read elsewhere in the
-/// crate (config dirs in `mod.rs`, identity in `supervisor.rs`) targets a
-/// single named variable.
+/// crate (config dirs in `mod.rs`, identity via `rt::NetdataEnv` in
+/// `supervisor.rs`) targets a single named variable.
 pub(super) fn otel_env_from_process() -> EnvMap {
     otel_env_from_iter(std::env::vars_os())
 }

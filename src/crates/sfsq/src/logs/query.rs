@@ -96,8 +96,8 @@ impl LogsQuery {
 
 /// Builder for [`LogsQuery`]. Start from the histogram [`grid`](LogsQuery::grid)
 /// (the one required input); every other field defaults — empty filter
-/// (matches everything), the engine's default histogram and facet field, no
-/// anchor, [`Direction::Backward`], and a zero `limit`.
+/// (matches everything), no full-text query, the engine's default histogram
+/// and facet field, no anchor, [`Direction::Backward`], and a zero `limit`.
 /// [`build`](Self::build) applies those defaults, so the engine always
 /// sees a fully-specified query.
 #[derive(Debug, Clone)]
@@ -129,8 +129,8 @@ impl LogsQueryBuilder {
 
     /// Set the match filter from a `field -> values` selection map (OR
     /// within a field, AND across fields). Fields with an empty value list
-    /// are dropped — see [`Filter::from`]. Exact matchers only; for regex
-    /// patterns build a [`Filter`] and use [`filter`](Self::filter).
+    /// are dropped — see `Filter::from`. Exact matchers only; for regex
+    /// patterns build a `Filter` and use [`filter`](Self::filter).
     ///
     /// Mutually exclusive with [`filter`](Self::filter) — both assign the
     /// filter, so the last call wins.
@@ -140,7 +140,7 @@ impl LogsQueryBuilder {
     }
 
     /// Set the match filter directly — the general form, supporting exact
-    /// values and regex patterns ([`Filter::select_pattern`]). Mutually
+    /// values and regex patterns (`Filter::select_pattern`). Mutually
     /// exclusive with [`selections`](Self::selections); the last call wins.
     pub fn filter(mut self, filter: Filter) -> Self {
         self.filter = filter;

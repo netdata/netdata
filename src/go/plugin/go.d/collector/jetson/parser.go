@@ -24,7 +24,7 @@ var (
 )
 
 // parseRecord parses one line of tegrastats output. It reports false for a line
-// that is not a record; a record without valid GPU or EMC readings yields an
+// that is not a record; a record without supported readings yields an
 // empty sample, which still replaces the previous one.
 func parseRecord(line string) (sample, bool) {
 	line = strings.TrimSpace(line)
@@ -56,6 +56,7 @@ func parseRecord(line string) (sample, bool) {
 			s.EMCFrequency = parseNonNegative(freq)
 		}
 	}
+	s.PowerRails = parsePowerRails(line)
 	return s, true
 }
 
@@ -93,4 +94,72 @@ func parseNonNegative(s string) *float64 {
 		return nil
 	}
 	return &v
+}
+
+// parsePowerRails reads instantaneous/average milliwatt pairs. Rail keys come
+// from NVIDIA's documented families and the attributed legacy fixtures.
+func parsePowerRails(line string) map[string]float64 {
+	var rails map[string]float64
+	seen := make(map[string]bool)
+	var name string
+	for value := range strings.FieldsSeq(line) {
+		if isPowerRail(name) && strings.Contains(value, "/") {
+			if seen[name] {
+				// The name cannot identify two rails; choosing one would hide ambiguity.
+				delete(rails, name)
+			} else {
+				seen[name] = true
+				if watts := parsePower(value); watts != nil {
+					if rails == nil {
+						rails = make(map[string]float64)
+					}
+					rails[name] = *watts
+				}
+			}
+		}
+		name = value
+	}
+	if len(rails) == 0 {
+		return nil
+	}
+	return rails
+}
+
+func isPowerRail(name string) bool {
+	switch name {
+	case "VIN", "GPU", "CPU", "SOC", "CV", "VDDRQ", "SYS5V":
+		return true
+	}
+	for _, prefix := range []string{"VDD_", "VDDQ_", "VIN_", "POM_"} {
+		suffix, ok := strings.CutPrefix(name, prefix)
+		if !ok || suffix == "" {
+			continue
+		}
+		for _, ch := range suffix {
+			if !(ch >= 'A' && ch <= 'Z' || ch >= '0' && ch <= '9' || ch == '_') {
+				return false
+			}
+		}
+		return true
+	}
+	return false
+}
+
+// parsePower returns only the current value. The source's average window is
+// unknown; unfamiliar units and three-value forms are deliberately unsupported.
+func parsePower(value string) *float64 {
+	current, average, ok := strings.Cut(value, "/")
+	if !ok || average == "" || strings.Contains(average, "/") {
+		return nil
+	}
+	current, currentUnit := strings.CutSuffix(current, "mW")
+	average, averageUnit := strings.CutSuffix(average, "mW")
+	if currentUnit != averageUnit || parseNonNegative(average) == nil {
+		return nil
+	}
+	if power := parseNonNegative(current); power != nil {
+		*power /= 1000
+		return power
+	}
+	return nil
 }

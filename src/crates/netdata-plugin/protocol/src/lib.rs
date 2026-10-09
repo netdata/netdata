@@ -7,9 +7,10 @@
 //! (function keyword handlers in `src/plugins.d/pluginsd_functions.c`, keyword
 //! table in `src/plugins.d/gperf-hashtable.h`): newline-terminated lines of one
 //! uppercase keyword followed by space-separated arguments, with `'`/`"`
-//! quoting and backslash escapes kept verbatim — the same splitting as the
+//! quoting and backslash escapes kept verbatim. `word_iterator` ports the
 //! agent's `quoted_strings_splitter`
-//! (`src/libnetdata/line_splitter/line_splitter.h`).
+//! (`src/libnetdata/line_splitter/line_splitter.h`), with the differences its
+//! module docs list.
 //!
 //! Only the pluginsd function traffic is modeled as [`Message`]s. The
 //! agent→plugin stream a [`MessageReader`] parses carries only: a `FUNCTION`
@@ -18,7 +19,9 @@
 //! writer encodes, for plugin→agent output: function declarations,
 //! `FUNCTION_RESULT_BEGIN`..`FUNCTION_RESULT_END` result blocks,
 //! `FUNCTION_PROGRESS` responses, `FUNCTION_CANCEL` and dyncfg `CONFIG`
-//! declarations.
+//! declarations. `FunctionCall` has a wire form too (`FUNCTION` or
+//! `FUNCTION_PAYLOAD`), but no in-tree code sends one and the agent side has
+//! no consumer for it.
 //!
 //! Payload-block headers (`FUNCTION_RESULT_BEGIN`, `FUNCTION_PAYLOAD`, `JSON`)
 //! switch the parser into a state that passes raw bytes through until their
@@ -69,8 +72,10 @@ mod message_parser;
 mod tokio_codec;
 mod transport;
 
-// Payload structs carried by `Message` variants; defined in netdata-plugin-types,
-// which has no codec dependencies, so struct users can depend on that crate alone.
+// Payload structs carried by `Message` variants, plus the field types those
+// structs use (`HttpAccess`, the dyncfg vocabulary); defined in
+// netdata-plugin-types, which has no codec dependencies, so struct users can
+// depend on that crate alone.
 pub use netdata_plugin_types::{
     ConfigDeclaration, DynCfgCmds, DynCfgSourceType, DynCfgStatus, DynCfgType, FunctionCall,
     FunctionCancel, FunctionDeclaration, FunctionProgressRequest, FunctionProgressResponse,
@@ -84,6 +89,6 @@ pub use message_parser::Message;
 pub use netdata_plugin_error::{NetdataPluginError, Result};
 /// [`MessageReader`] and [`MessageWriter`] wrap any `AsyncRead`/`AsyncWrite`
 /// (typically a plugin process's stdin/stdout); [`Transport`] is the legacy
-/// stdin/stdout pair wrapping both, and [`TransportError`] is an alias of
+/// bundle of both over one stream pair, and [`TransportError`] is an alias of
 /// [`NetdataPluginError`].
 pub use transport::{MessageReader, MessageWriter, Transport, TransportError};

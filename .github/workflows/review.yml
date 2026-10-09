@@ -23,7 +23,7 @@ jobs:
       yamllint: ${{ steps.yamllint.outputs.run }}
     steps:
       - name: Clone repository
-        uses: actions/checkout@v7
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           submodules: recursive
           fetch-depth: 0
@@ -112,12 +112,12 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Git clone repository
-        uses: actions/checkout@v7
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           submodules: recursive
           fetch-depth: 0
       - name: Run actionlint
-        uses: reviewdog/action-actionlint@v1
+        uses: reviewdog/action-actionlint@1758727be30241166609dad4c97588b6ad411f32 # v1.79.1
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
           reporter: github-pr-check
@@ -164,16 +164,16 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Git clone repository
-        uses: actions/checkout@v7
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           submodules: recursive
           fetch-depth: 0
       - name: Setup Python
-        uses: actions/setup-python@v7
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
         with:
           python-version: "3.10"
       - name: Run flake8
-        uses: reviewdog/action-flake8@v3
+        uses: reviewdog/action-flake8@b65981e158319f08cb7d0132f28bc0081e110adc # v3.15.2
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
           reporter: github-pr-check
@@ -189,9 +189,9 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@v7
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - name: Run golangci-lint
-        uses: reviewdog/action-golangci-lint@v2
+        uses: reviewdog/action-golangci-lint@284129a3ac23bc5d8ac1522e0b6511df74a8836d # v2.10.2
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
           reporter: github-pr-check
@@ -205,11 +205,11 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Git clone repository
-        uses: actions/checkout@v7
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           fetch-depth: 0
       - name: Run hadolint
-        uses: reviewdog/action-hadolint@v1
+        uses: reviewdog/action-hadolint@1df92335c6c70880e301926d46148aeb27de1912 # v1.55.0
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
           reporter: github-pr-check
@@ -221,12 +221,12 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Git clone repository
-        uses: actions/checkout@v7
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           submodules: recursive
           fetch-depth: 0
       - name: Run shellcheck
-        uses: reviewdog/action-shellcheck@v1
+        uses: reviewdog/action-shellcheck@d0b8d5fd7fad6afdb6e1b6ce1778892be4d1f427 # v1.34.1
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
           reporter: github-pr-check
@@ -247,12 +247,12 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Git clone repository
-        uses: actions/checkout@v7
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           submodules: recursive
           fetch-depth: 0
       - name: Run yamllint
-        uses: reviewdog/action-yamllint@v1
+        uses: reviewdog/action-yamllint@5dd4640db975e4cac6f4e775a401695bafc28068 # v1.25.1
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
           reporter: github-pr-check

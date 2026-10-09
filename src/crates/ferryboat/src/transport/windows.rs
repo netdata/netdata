@@ -97,9 +97,6 @@ impl Listener {
     }
 }
 
-// Named pipes have no filesystem entry: the OS reclaims the pipe name when its
-// last handle closes, so no unlink or `Drop` is needed (unlike unix.rs).
-
 /// Opens the client end of the pipe in one synchronous attempt. Fails when no
 /// server instance is available to connect to at `path`; retries live above,
 /// in [`ConnectionBuilder`](crate::ConnectionBuilder).

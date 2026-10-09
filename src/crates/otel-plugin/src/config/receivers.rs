@@ -9,7 +9,7 @@
 //! `env.rs`). [`apply`] merges one layer into the effective
 //! [`ReceiversConfig`]; the merged result is validated in `mod.rs`
 //! (`validate`: at least one listener enabled, host:port shape, TLS
-//! cert/key pairing, distinct listener addresses).
+//! cert/key pairing, non-overlapping listener sockets).
 //!
 //! The user file may still carry the gRPC-only `endpoint:` section of the
 //! first release ([`DeprecatedEndpointOverride`]); its keys fold onto the
@@ -68,8 +68,8 @@ pub(super) fn resolve_deprecated<T>(
 /// The user file's deprecated `endpoint:` section: exactly the four keys of
 /// the first release. Unknown keys are a parse error, so names that were never
 /// released (`grpc_path`, `http_path`, ...) are rejected too. A key set to
-/// `null` carries no value and is ignored, so a copy of the former stock file
-/// needs no edit.
+/// `null` carries no value and is ignored, so a copy of the first release's
+/// stock file needs no edit.
 #[derive(Debug, Default, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub(super) struct DeprecatedEndpointOverride {

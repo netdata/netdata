@@ -46,8 +46,9 @@ impl FlowEnricher {
         true
     }
 
-    /// Enrich a FlowRecord in place. Same logic as enrich_fields but operates
-    /// on native typed fields — no string parsing or formatting on the hot path.
+    /// Enrich a `FlowRecord` in place. Mirrors the test-only `enrich_fields`
+    /// pipeline, but reads and writes the record's typed fields directly.
+    /// Returns false only when a classifier rejects the exporter or an interface.
     pub(crate) fn enrich_record(&mut self, rec: &mut FlowRecord) -> bool {
         let Some(exporter_ip) = rec.exporter_ip else {
             return true;

@@ -14,6 +14,7 @@ import (
 	"github.com/netdata/netdata/go/plugins/plugin/dem/collector/rum"
 	"github.com/netdata/netdata/go/plugins/plugin/dem/journal"
 	rumfunctions "github.com/netdata/netdata/go/plugins/plugin/dem/rum/functions"
+	"github.com/netdata/netdata/go/plugins/plugin/dem/rum/geoip"
 	rumhistory "github.com/netdata/netdata/go/plugins/plugin/dem/rum/history"
 	rumquery "github.com/netdata/netdata/go/plugins/plugin/dem/rum/query"
 	rumregistry "github.com/netdata/netdata/go/plugins/plugin/dem/rum/registry"
@@ -33,6 +34,7 @@ type Executor interface {
 }
 
 type Dependencies struct {
+	GeoIPPaths     geoip.Paths
 	History        *journal.Store
 	Artifacts      *artifacts.Store
 	Executor       Executor
@@ -62,7 +64,13 @@ func New(deps Dependencies, cfg Config) Components {
 		History:  rumHistory,
 	})
 	collectors := collectorapi.Registry{}
-	collectors.Register("receiver", receiver.Creator(rumRegistry))
+	collectors.Register(
+		"receiver",
+		receiver.Creator(receiver.Dependencies{
+			Registry:   rumRegistry,
+			GeoIPPaths: deps.GeoIPPaths,
+		}),
+	)
 	collectors.Register("rum", site)
 	syntheticRegistry := syntheticregistry.New()
 	var captures syntheticquery.Artifacts

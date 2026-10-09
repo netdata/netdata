@@ -3,9 +3,10 @@
 //! (node.rs/ops.rs match the fid.c routines they port). Each internal node
 //! is one byte whose 8 bits say which of its 8 children exist, and empty
 //! subtrees are pruned entirely. The serialized form IS the in-memory form
-//! (`raw.rs`'s blob-shape contract): queries walk the stored bytes directly in O(levels),
-//! and the blob is canonical — exactly [`estimate_data_size`] bytes for
-//! the values it holds, whichever mutation path built it.
+//! (`raw.rs`'s blob-shape contract): queries walk the stored bytes
+//! directly, with no decode or copy step, and the blob is canonical —
+//! exactly [`estimate_data_size`] bytes for the values it holds, whichever
+//! mutation path built it.
 //!
 //! API shape: every bitmap is a `Copy` descriptor (universe size + level
 //! count) whose tree bytes live in an external `&[u8]` / `&mut Vec<u8>`
@@ -92,9 +93,9 @@ pub fn ceil_log8(universe_size: u32) -> u32 {
 ///
 /// The count is one byte per distinct tree node: each node byte in the
 /// pre-order serialization corresponds to one (level, node index) pair on
-/// the values' paths, with the root (index 0 for every value) contributing
-/// the final byte. An empty value list yields 0, matching the empty blob
-/// `from_sorted_iter` leaves behind.
+/// the values' paths, with the root (index 0 for every value) always
+/// contributing one byte. An empty value list yields 0, matching the
+/// empty blob `from_sorted_iter` leaves behind.
 ///
 /// The values **must** be yielded in ascending order, duplicates tolerated
 /// (as roaring iterators do). Use it to weigh converting a roaring bitmap
