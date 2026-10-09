@@ -1,11 +1,10 @@
 # IPMI command adapter
 
-This experimental adapter uses the published `bougou/go-ipmi` revision `1462645b281c34c91d1a7c78298e46a54479e9e5`. It
+This experimental adapter uses the published `bougou/go-ipmi` revision `b3670df57943628499e930a09cff21f24c2cda0f`. It
 reads the SDR repository, sensor readings, and optionally one SEL entry-count response. It does not write BMC
-configuration. The only transport is Linux OpenIPMI using ordinary process/device permissions. The adapter accepts a
-device number and command timeout, constructs `NewOpenClient`, and serializes its calls. LAN/LAN+ are deferred until
-upstream session concurrency fixes are available; the pinned SDK's automatic keepalive can race between sequence capture
-and request construction.
+configuration. Local OpenIPMI uses `NewOpenClient` and ordinary process/device permissions. LAN/LAN+ uses `NewClient`
+with the configured address, credentials and privilege. One Reader serializes commands for one connection; the SDK
+serializes remote exchanges with its automatic keepalive. SDK UDP retries are disabled.
 
 ## Discovery and missing data
 
@@ -30,16 +29,15 @@ record with a one-byte offset. Transport failures are not retried; they fail the
 A disabled scanner or unavailable reading produces unknown state and no numeric sample. A missing status byte produces
 unknown state even when the independent numeric reading is valid. Completion-code errors for individual sensors leave
 healthy sensors collectable. Inventory failures, other sensor command failures and caller cancellation fail collection
-and close the connection. Closing the device closes its descriptor with the caller's context; it sends no IPMI command
-and does not depend on the configured command timeout. Optional SEL failures omit its sample; no previous value or zero
+and close the connection. A response decoding error is fatal even when the SDK wraps it in a `ResponseError` with
+completion code zero. Closing a local device releases its descriptor without sending an IPMI command. Optional SEL failures omit its sample; no previous value or zero
 substitute is returned. Each requested SEL collection performs a real, single `Get SEL Info` command rather than
 rereading the log. Warnings are counts in four fixed categories, never an unbounded list of records.
 
 Supported numeric units are Celsius, Fahrenheit, volts, amps, RPM, watts, and unitless percentages. Other unit
 combinations retain status but omit numeric samples. Signed readings and standard linearizations are supported.
 Nonlinear code `0x70` fetches conversion factors for that exact raw reading; OEM nonlinear codes, failed factor reads,
-NaN, and infinity produce gaps. A narrow EXP10 workaround computes `10^x` after linear conversion because the pinned SDK
-truncates fractional exponents. Remove it when a published dependency contains the upstream fix.
+NaN, and infinity produce gaps. The SDK performs standard linearizations, including fractional EXP10 exponents.
 
 Keys use the C collector's healthy-reading identity: `i<record>_n<number>_t<legacy-reading-type>_u<legacy-unit>_<name>`.
 They intentionally remain stable when a reading becomes unavailable: the C library changes reading/unit enums on that
@@ -48,15 +46,17 @@ collector's default shared-sensor/name handling. Type labels follow the C collec
 case-insensitive name patterns, Other fallback, and fixed sensor-type overrides. This is not a complete FreeIPMI
 compatibility layer.
 
-## Local receive deadline limitation
+## Cancellation and cleanup
 
-The pinned Linux SDK does not observe context cancellation during its blocking receive. The adapter checks cancellation
-around every command and passes `min(configured timeout, remaining caller budget)` as the SDK receive timeout. This
-temporary SDK setting is restored after each serialized command. It improves deadline fidelity without changing the
-public timeout option or replacing the transport.
+The Reader applies the configured timeout to the whole connection setup and to each command. The SDK observes caller
+cancellation during local response waits and remote UDP exchanges. The SDK owns and joins its remote keepalive on close.
+Local kernel ioctl execution itself is not interruptible by a Go context.
 
-Each receive is bounded by that timeout, but cancellation after receive begins cannot interrupt it. The SDK starts its
-relative receive deadline after command send overhead, so the caller's deadline is not an exact wall-clock guarantee.
+Remote Close uses one detached two-second context budget so a canceled or expired collection can still send Close
+Session. The same path handles failed setup, failed collection, Check and explicit Cleanup. A lost Close Session
+response can leave the BMC's session until its own expiry, but the client releases its local socket and goroutine.
+The budget covers SDK shutdown after acquiring the Reader mutex, not time waiting for an ongoing Reader operation.
+Closing a local device sends no command and needs no detached cleanup budget.
 
 ## State policy and source ownership
 
@@ -80,5 +80,6 @@ local FreeIPMI configuration overrides, bridged satellites, and device-only SDR 
 
 Tests exercise actual command-response decoding through a narrow fake transport, Reader collection/recovery/refresh, the
 complete source-derived discrete fixture, threshold flags, missing bytes, ownership, sharing, unit/sign conversion,
-nonlinear factors, and the pinned EXP10 workaround. They do not establish live-hardware parity for any particular
-vendor; separate live OpenIPMI evidence is required.
+nonlinear factors, and fractional EXP10 conversion. Real UDP tests use the upstream reference BMC with a User account
+for both LAN and LAN+: Check cleanup, sensor/SEL collection, session reuse, malformed responses, cancellation and failed
+setup recovery. These fixtures do not establish live-hardware parity for any particular vendor.

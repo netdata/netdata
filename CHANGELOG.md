@@ -82,6 +82,18 @@
 - Regenerate integrations docs ([#24190](https://github.com/netdata/netdata/issues/24190))
 - Docs: add alt text to the badge examples on the badges page ([#24191](https://github.com/netdata/netdata/issues/24191))
 - Build(deps): bump github.com/tidwall/gjson from 1.19.0 to 1.19.1 in /src/go ([#24193](https://github.com/netdata/netdata/issues/24193))
+- Feat(dem): refresh GeoIP sources and expose availability ([#24192](https://github.com/netdata/netdata/issues/24192))
+- Reload host labels from the Agent’s active config file ([#24117](https://github.com/netdata/netdata/issues/24117))
+- Dcgm: drop PCIe throughput fields removed in DCGM 4.7 from the exporter profile ([#23964](https://github.com/netdata/netdata/issues/23964))
+- Docs: AI Co-Engineer in the product description, OTLP/HTTP and traces on the evaluation page ([#24198](https://github.com/netdata/netdata/issues/24198))
+- Ci: pin GitHub Actions to commit SHAs ([#24197](https://github.com/netdata/netdata/issues/24197))
+- Build(deps): bump github.com/tidwall/gjson from 1.19.1 to 1.20.0 in /src/go ([#24199](https://github.com/netdata/netdata/issues/24199))
+- Build(deps): bump aurelien-baudet/workflow-dispatch from 2.1.1 to 4.0.0 ([#24201](https://github.com/netdata/netdata/issues/24201))
+- Build(deps): bump step-security/changed-files from 45.0.1 to 47.0.5 ([#24200](https://github.com/netdata/netdata/issues/24200))
+- Fix(go.d/ndexec): keep RunNDSudo's timeout for root commands that cannot be signaled ([#24189](https://github.com/netdata/netdata/issues/24189))
+- Build: restructure the CMake build system ([#23589](https://github.com/netdata/netdata/issues/23589))
+- Feat(go.d/jetson): collect current power per rail ([#24204](https://github.com/netdata/netdata/issues/24204))
+- Docs: comment-only documentation pass over src/crates ([#24195](https://github.com/netdata/netdata/issues/24195))
 
 ## [2.12.0] - 2026-09-30
 
