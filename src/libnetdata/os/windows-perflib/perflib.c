@@ -14,32 +14,38 @@
 // the buffer size in a loop until RegQueryValueEx does not return ERROR_MORE_DATA.
 static RW_SPINLOCK performance_data_lock = RW_SPINLOCK_INITIALIZER;
 
-static LPBYTE getPerformanceData(const char *pwszSource, DWORD *bytes_used) {
-    static __thread DWORD size = 0;
+static LPBYTE getPerformanceData(const char *pwszSource, DWORD *bytes_used)
+{
+    static __thread DWORD capacity = 0;
     static __thread LPBYTE buffer = NULL;
 
-    if(bytes_used)
+    if (bytes_used)
         *bytes_used = 0;
 
-    if(pwszSource == (const char *)0x01) {
+    if (pwszSource == (const char *)0x01) {
         freez(buffer);
         buffer = NULL;
-        size = 0;
+        capacity = 0;
         return NULL;
     }
 
-    if(!size) {
-        size = 32 * 1024;
-        buffer = mallocz(size);
+    if (!capacity) {
+        capacity = 32 * 1024;
+        buffer = mallocz(capacity);
     }
 
     rw_spinlock_read_lock(&performance_data_lock);
 
     LONG status = ERROR_SUCCESS;
-    while ((status = RegQueryValueEx(HKEY_PERFORMANCE_DATA, pwszSource,
-                                     NULL, NULL, buffer, &size)) == ERROR_MORE_DATA) {
-        size *= 2;
-        buffer = reallocz(buffer, size);
+    DWORD query_size;
+    while (true) {
+        query_size = capacity;
+        status = RegQueryValueEx(HKEY_PERFORMANCE_DATA, pwszSource, NULL, NULL, buffer, &query_size);
+        if (status != ERROR_MORE_DATA)
+            break;
+
+        capacity *= 2;
+        buffer = reallocz(buffer, capacity);
     }
 
     rw_spinlock_read_unlock(&performance_data_lock);
@@ -50,8 +56,8 @@ static LPBYTE getPerformanceData(const char *pwszSource, DWORD *bytes_used) {
         return NULL;
     }
 
-    if(bytes_used)
-        *bytes_used = size;
+    if (bytes_used)
+        *bytes_used = query_size;
 
     return buffer;
 }

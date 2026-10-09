@@ -85,10 +85,10 @@ iis_extra_aggregate_percentage(COUNTER_DATA *aggregate, const COUNTER_DATA *samp
         return;
     }
 
-    aggregate->current.Data += perflib_counter_delta(
-        sample->previous.Data, sample->current.Data, perflib_counter_type_is_32bit(sample->current.CounterType));
+    const bool is_32bit = perflib_counter_type_is_32bit(sample->current.CounterType);
+    aggregate->current.Data += perflib_counter_delta(sample->previous.Data, sample->current.Data, is_32bit);
     aggregate->current.Time +=
-        (LONGLONG)perflib_counter_delta((uint64_t)sample->previous.Time, (uint64_t)sample->current.Time, true);
+        (LONGLONG)perflib_counter_delta((uint64_t)sample->previous.Time, (uint64_t)sample->current.Time, is_32bit);
     aggregate->current.CounterType = sample->current.CounterType;
     aggregate->updated = true;
 }
@@ -475,6 +475,17 @@ static const struct iis_extra_chart_definition worker_definitions[] = {
      worker_websocket_rejected_dimensions,
      IIS_EXTRA_ARRAY_SIZE(worker_websocket_rejected_dimensions)},
 };
+
+static enum perflib_aggregate_mode
+iis_extra_worker_aggregate_mode(const struct iis_extra_dimension_definition *dimension, uint32_t counter_type)
+{
+    // Capacity limits are per process, so the app-pool chart reports the largest worker limit.
+    if (dimension == &worker_maximum_threads_dimensions[0] || dimension == &worker_file_cache_max_memory_dimensions[0])
+        return PERFLIB_AGGREGATE_MAXIMUM;
+
+    return iis_extra_counter_is_incremental(dimension, counter_type) ? PERFLIB_AGGREGATE_INCREMENTAL :
+                                                                       PERFLIB_AGGREGATE_SUM;
+}
 
 static const struct iis_extra_dimension_definition cache_active_flushed_entries_dimensions[] = {
     {"Active Flushed Entries", "entries", false, false},
@@ -1119,8 +1130,9 @@ static enum iis_extra_group_result do_iis_extra_group(
                 if (dimension->percentage)
                     iis_extra_aggregate_percentage(&value->first, sample, &has_sample[n]);
                 else {
-                    const bool incremental = iis_extra_counter_is_incremental(dimension, sample->current.CounterType);
-                    perflib_aggregate_instance_sample(&value->first, sample, &has_sample[n], incremental);
+                    const enum perflib_aggregate_mode mode =
+                        iis_extra_worker_aggregate_mode(dimension, sample->current.CounterType);
+                    perflib_aggregate_instance_sample(&value->first, sample, &has_sample[n], mode);
                 }
             } else
                 perflibGetInstanceCounter(data, object, pi, &value->first);

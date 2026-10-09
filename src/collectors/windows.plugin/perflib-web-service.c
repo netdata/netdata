@@ -1414,8 +1414,8 @@ static inline void app_pool_uptime(
                     update_every,
                     RRDSET_TYPE_LINE);
 
-                p->rd_app_application_pool_uptime =
-                    rrddim_add(p->st_app_application_pool_uptime, "uptime", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+                p->rd_app_application_pool_uptime = perflib_rrddim_add(
+                    p->st_app_application_pool_uptime, "uptime", NULL, 1, 1, &p->APPTotalApplicationPoolUptime);
                 rrdlabels_add(
                     p->st_app_application_pool_uptime->rrdlabels, "app_pool", windows_shared_buffer, RRDLABEL_SRC_AUTO);
             }
@@ -1642,7 +1642,7 @@ static bool do_app_pool(PERF_DATA_BLOCK *pDataBlock, int update_every)
 
         if (!getInstanceName(pDataBlock, pObjectType, pi, windows_shared_buffer, sizeof(windows_shared_buffer))) {
             complete = false;
-            break;
+            continue;
         }
 
         // We are not ploting _Total here, because cloud will group the sites
@@ -2168,7 +2168,7 @@ static bool do_W3SCV_W3WP(PERF_DATA_BLOCK *pDataBlock, int update_every)
 
     DICTIONARY *current_worker_instances =
         app_pool_snapshot_complete ? NULL : iis_w3svc_worker_instance_names(pDataBlock, pObjectType);
-    bool worker_expired = do_PerflibWebServiceExtraWorker(pDataBlock, update_every, current_worker_instances);
+    do_PerflibWebServiceExtraWorker(pDataBlock, update_every, current_worker_instances);
 
     struct ws3svc_w3wp_data *existing;
     dfe_start_write(w3svc_w3wp_service, existing) existing->seen = false;
@@ -2241,7 +2241,10 @@ static bool do_W3SCV_W3WP(PERF_DATA_BLOCK *pDataBlock, int update_every)
             }
 
             perflib_aggregate_instance_sample(
-                counter, process_counter, &has_sample[n], w3svc_w3wp_counter_is_incremental(n));
+                counter,
+                process_counter,
+                &has_sample[n],
+                w3svc_w3wp_counter_is_incremental(n) ? PERFLIB_AGGREGATE_INCREMENTAL : PERFLIB_AGGREGATE_SUM);
         }
     }
 

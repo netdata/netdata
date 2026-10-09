@@ -72,14 +72,18 @@ void perflib_aggregate_instance_sample(
     COUNTER_DATA *aggregate,
     const COUNTER_DATA *sample,
     bool *has_previous,
-    bool incremental)
+    enum perflib_aggregate_mode mode)
 {
-    if (incremental) {
+    if (mode == PERFLIB_AGGREGATE_INCREMENTAL) {
         if (*has_previous)
             aggregate->current.Data += perflib_counter_delta(
                 sample->previous.Data,
                 sample->current.Data,
                 perflib_counter_type_is_32bit(sample->current.CounterType));
+        *has_previous = true;
+    } else if (mode == PERFLIB_AGGREGATE_MAXIMUM) {
+        if (!aggregate->updated || sample->current.Data > aggregate->current.Data)
+            aggregate->current.Data = sample->current.Data;
         *has_previous = true;
     } else
         aggregate->current.Data += sample->current.Data;
@@ -259,6 +263,7 @@ RRDDIM *perflib_rrddim_add(
         case PERF_ELAPSED_TIME:
             // (D0 - N0) / F
             algorithm = RRD_ALGORITHM_ABSOLUTE;
+            divider *= COLLECTED_NUMBER_PRECISION;
             break;
 
         case PERF_COUNTER_TEXT:
@@ -393,7 +398,7 @@ collected_number perflib_rrddim_set_by_pointer(RRDSET *st, RRDDIM *rd, COUNTER_D
             if (!cd->current.Frequency || !cd->current.Data || cd->current.Time < (LONGLONG)cd->current.Data)
                 return 0;
             doubleValue = (double)(cd->current.Time - cd->current.Data) / (double)cd->current.Frequency;
-            value = (collected_number)doubleValue;
+            value = (collected_number)(doubleValue * COLLECTED_NUMBER_PRECISION);
             break;
 
         default:
