@@ -35,6 +35,10 @@ int netdata_win_default_network(char **iface, char **ipaddr)
             break;
     }
     int result = -1;
+    if (rc == ERROR_NO_DATA) {
+        result = 0;
+        goto done;
+    }
     if (rc != NO_ERROR)
         goto done;
 

@@ -285,7 +285,7 @@ static bool system_info_parse_runtime(struct rrdhost_system_info *si, char *outp
 
 #if !defined(OS_WINDOWS)
 static char *system_info_read_argv(const char **argv, bool (*cancelled)(void), unsigned timeout_ms);
-static void system_info_parse_startup(struct rrdhost_system_info *system_info, char *output);
+static bool system_info_parse_startup(struct rrdhost_system_info *system_info, char *output);
 static bool system_info_test_cancelled(void) { return true; }
 #endif
 
@@ -384,6 +384,11 @@ int rrdhost_system_info_unittest(void) {
     buffer_free(b);
 #if !defined(OS_WINDOWS)
     struct rrdhost_system_info *startup = rrdhost_system_info_create();
+    char unusable_startup[] = "malformed\n=empty-name\nUNKNOWN_SYSTEM_INFO_KEY=value\nNETDATA_SYSTEM_TOTAL_RAM=\n";
+    SI_CHECK(!system_info_parse_startup(startup, unusable_startup));
+    SI_CHECK(!startup->host_ram_total);
+    char empty_startup[] = "\n";
+    SI_CHECK(!system_info_parse_startup(startup, empty_startup));
     const char *network_keys[] = {
         "NETDATA_SYSTEM_DEFAULT_INTERFACE_NAME", "NETDATA_SYSTEM_DEFAULT_INTERFACE_IP",
         "NETDATA_SYSTEM_DEFAULT_INTERFACE_DETECTION",
@@ -391,6 +396,11 @@ int rrdhost_system_info_unittest(void) {
     char *saved_env[_countof(network_keys)];
     for (size_t i = 0; i < _countof(network_keys); i++)
         saved_env[i] = system_info_strdupz(getenv(network_keys[i]));
+    char partial_startup[] = "NETDATA_SYSTEM_DEFAULT_INTERFACE_NAME=test0\n"
+                            "NETDATA_SYSTEM_DEFAULT_INTERFACE_IP=\nUNKNOWN_SYSTEM_INFO_KEY=value\nmalformed\n";
+    SI_CHECK(system_info_parse_startup(startup, partial_startup));
+    SI_CHECK(startup->network_default_iface && !strcmp(startup->network_default_iface, "test0"));
+    SI_CHECK(!startup->network_default_iface_ip);
     struct rrdhost_system_info *absent = rrdhost_system_info_create();
     for (size_t i = 0; i < _countof(network_keys); i++)
         SI_CHECK(rrdhost_system_info_detected_set(absent, network_keys[i], NULL));
@@ -401,7 +411,7 @@ int rrdhost_system_info_unittest(void) {
         snprintfz(no_network, sizeof(no_network), "NETDATA_SYSTEM_DEFAULT_INTERFACE_NAME=unknown\n"
                   "NETDATA_SYSTEM_DEFAULT_INTERFACE_IP=unknown\n"
                   "NETDATA_SYSTEM_DEFAULT_INTERFACE_DETECTION=%s\n", absence_methods[m]);
-        system_info_parse_startup(startup, no_network);
+        SI_CHECK(system_info_parse_startup(startup, no_network));
         SI_CHECK(!startup->network_default_iface && !startup->network_default_iface_ip &&
                  !startup->network_default_iface_detection);
         for (size_t i = 0; i < _countof(network_keys); i++)
@@ -476,7 +486,7 @@ static void system_info_log_failure(const char *reason, int status) {
 }
 
 // Read through EOF, including buffered data delivered together with POLLHUP.
-// The deadline starts after spawn; the owned group is reclaimed before its leader is reaped.
+// The deadline starts after spawn; the spawn server owns group cleanup before reaping its leader.
 static char *system_info_read_argv(const char **argv, bool (*cancelled)(void), unsigned timeout_ms) {
     POPEN_INSTANCE *pi = spawn_popen_run_argv_group(argv);
     if (!pi) {
@@ -558,22 +568,34 @@ static char *system_info_read_argv(const char **argv, bool (*cancelled)(void), u
     }
     return output;
 }
-static void system_info_parse_startup(struct rrdhost_system_info *system_info, char *output) {
+static bool system_info_parse_startup(struct rrdhost_system_info *system_info, char *output) {
     char *cursor = output;
     char *line;
+    unsigned applied = 0, discarded = 0;
     while ((line = strsep(&cursor, "\n"))) {
         char *value = strchr(line, '=');
-        if (!value)
+        if (!value) {
+            if (*line) discarded++;
             continue;
+        }
         *value++ = '\0';
         char *cr = strchr(value, '\r');
         if (cr) *cr = '\0';
-        if (!*line || !*value)
+        if (!*line) {
+            discarded++;
+            continue;
+        }
+        // Optional startup fields legitimately have empty values.
+        if (!*value)
             continue;
         coverity_remove_taint(line);
         coverity_remove_taint(value);
-        if (!rrdhost_system_info_set_by_name(system_info, line, value))
+        if (!rrdhost_system_info_set_by_name(system_info, line, value)) {
             nd_setenv(line, value, 1);
+            applied++;
+        }
+        else
+            discarded++;
     }
 
     // A known route can still lack a usable interface/address. Preserve legacy
@@ -584,6 +606,13 @@ static void system_info_parse_startup(struct rrdhost_system_info *system_info, c
         system_info_replace(&system_info->network_default_iface_ip, NULL);
         system_info_replace(&system_info->network_default_iface_detection, NULL);
     }
+    if (!applied || discarded) {
+        nd_log_limit_static_global_var(startup_limit, 60, 0);
+        nd_log_limit(&startup_limit, NDLS_DAEMON, NDLP_WARNING,
+                     "SYSTEM INFO: startup response applied %u values and discarded %u malformed or unknown records",
+                     applied, discarded);
+    }
+    return applied != 0;
 }
 
 static bool system_info_cancelled(void) {
@@ -657,9 +686,9 @@ int rrdhost_system_info_detect(struct rrdhost_system_info *system_info) {
     char *output = system_info_read_script(false);
     if (!output)
         return 1;
-    system_info_parse_startup(system_info, output);
+    bool ok = system_info_parse_startup(system_info, output);
     freez(output);
-    return 0;
+    return ok ? 0 : 1;
 #else
     netdata_windows_get_system_info(system_info);
     return 0;

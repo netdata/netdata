@@ -85,8 +85,9 @@ void rrdlabels_to_buffer_json_members(RRDLABELS *labels, BUFFER *wb);
 // DONT_DELETE entries and unchanged RRDLABEL_SRC bits can still differ).
 bool rrdlabels_migrate_to_these(RRDLABELS *dst, RRDLABELS *src);
 
-// Atomically replace the selected keys, preserving every other label. src must contain only
-// keys owned by this publisher. Source changes count as changes; the destination version is monotonic.
+// Atomically reconcile keys selected by owns, ignoring other source keys and preserving other
+// destination labels. Selected DONT_DELETE entries survive when absent from src.
+// Source changes count as changes; the destination version is monotonic.
 bool rrdlabels_replace_subset(RRDLABELS *dst, RRDLABELS *src,
                               bool (*owns)(const char *name, RRDLABEL_SRC source, void *data), void *data);
 

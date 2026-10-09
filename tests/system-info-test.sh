@@ -6,7 +6,7 @@ set -eu
 test_dir=$(mktemp -d "${TMPDIR:-/tmp}/netdata-system-info-test.XXXXXX")
 trap 'rm -rf "${test_dir}"' EXIT HUP INT TERM
 
-script_dir=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
+script_dir=$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd)
 system_info_script="${script_dir}/../src/daemon/system-info.sh"
 functions_script="${test_dir}/functions.sh"
 
@@ -20,6 +20,8 @@ sed -n \
     "${system_info_script}" > "${functions_script}"
 
 os_release_file="${test_dir}/os-release"
+# The command substitution is literal fixture data and must never execute.
+# shellcheck disable=SC2016
 printf '%s\n' \
     'NAME="literal $(printf not-executed)"' \
     'VERSION="a\\bc\\d"' \
@@ -33,6 +35,7 @@ os_release_output=$(/bin/sh -c '
     printf "%s|%s|%s\n" "$HOST_NAME" "$HOST_VERSION" "$HOST_VERSION_ID"
 ' sh "${functions_script}" "${os_release_file}")
 
+# shellcheck disable=SC2016
 expected_output='literal $(printf not-executed)|a\bc\d|24.04'
 [ "${os_release_output}" = "${expected_output}" ] || {
     printf 'unexpected os-release output: %s\n' "${os_release_output}" >&2

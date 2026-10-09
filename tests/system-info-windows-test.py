@@ -38,6 +38,7 @@ PRELUDE = r'''
 #include <arpa/inet.h>
 typedef unsigned int DWORD;
 typedef unsigned long ULONG;
+typedef unsigned int UINT;
 typedef unsigned long long ULONGLONG;
 typedef int HANDLE;
 #define INVALID_HANDLE_VALUE -1
@@ -46,6 +47,7 @@ typedef int HANDLE;
 #define OPEN_EXISTING 1
 #define IOCTL_DISK_GET_LENGTH_INFO 1
 #define DRIVE_FIXED 3
+#define DRIVE_UNKNOWN 0
 #define CP_UTF8 65001
 #define ERROR_HOST_UNREACHABLE 1
 #define ERROR_NETWORK_UNREACHABLE 2
@@ -153,6 +155,10 @@ static void disk_tests(void) {
     netdata_windows_get_total_disk_size(&si, true);
     assert(si.writes == 1 && !strcmp(si.value, "3072"));
     assert(opened == 2 && closed == 2);
+    drive_types[5] = DRIVE_UNKNOWN;
+    netdata_windows_get_total_disk_size(&si, true);
+    assert(si.writes == 1 && !strcmp(si.value, "3072"));
+    drive_types[5] = DRIVE_FIXED;
     fail_open = 5;
     netdata_windows_get_total_disk_size(&si, true);
     assert(si.writes == 1 && !strcmp(si.value, "3072"));
@@ -166,6 +172,10 @@ static void disk_tests(void) {
     drive_mask = 0;
     netdata_windows_get_total_disk_size(&si, true);
     assert(si.writes == 1);
+    /* Successful enumeration with no eligible fixed drives is a real zero. */
+    drive_mask = (1U << 3) | (1U << 4);
+    netdata_windows_get_total_disk_size(&si, true);
+    assert(si.writes == 2 && !strcmp(si.value, "0"));
 }
 static void startup_disk_tests(void) {
     struct rrdhost_system_info si = { .value = "previous" };
@@ -231,6 +241,10 @@ static void network_tests(void) {
     assert(netdata_win_default_network(&iface, &ip) == -1 && !iface && !ip);
     route_rc = 0; adapters_rc = ERROR_BUFFER_OVERFLOW; adapter_calls = 0;
     assert(netdata_win_default_network(&iface, &ip) == -1 && !iface && !ip && adapter_calls == 3);
+    adapters_rc = ERROR_NO_DATA;
+    assert(netdata_win_default_network(&iface, &ip) == 0 && !iface && !ip);
+    adapters_rc = 99;
+    assert(netdata_win_default_network(&iface, &ip) == -1 && !iface && !ip);
 }
 int main(void) {
     struct rrdhost_system_info si = {0};

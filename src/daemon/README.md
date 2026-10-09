@@ -39,9 +39,11 @@ hot-plug slots and independent of the Agent's CPU affinity. In lxcfs containers 
 count. If the kernel's present-CPU list is unavailable, detection falls back to CPU directories in sysfs, `/proc/cpuinfo`,
 then the CPUs available to the process from `nproc`.
 
-On Unix, `system-info.sh` has a 30-second execution deadline after spawning. Failed executions, malformed output, and
-incomplete responses are discarded and logged with a reason. Failed individual probes retain their previous values; successful absence clears the
-corresponding optional values. Cancellation terminates the probe's process group. Runtime refresh does not rewrite the
+On Unix, `system-info.sh` has a 30-second execution deadline after spawning. Failed executions and invalid or incomplete
+runtime responses are discarded and logged with a reason. Startup keeps recognized non-empty values and warns when records
+are malformed or unknown, or no usable values were returned. Failed individual runtime probes retain their previous values; successful absence clears the
+corresponding optional values. Cancellation asks the spawn server to terminate the probe's process group; abrupt spawn-server
+failure can prevent process cleanup. Remaining descendants are terminated when the script leader exits. Runtime refresh does not rewrite the
 process environment exported during startup.
 
 On Windows, runtime refresh uses native probes for the same fields. Native Windows calls do not use the Unix subprocess deadline.

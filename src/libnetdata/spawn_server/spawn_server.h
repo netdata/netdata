@@ -10,7 +10,8 @@
 typedef enum __attribute__((packed)) {
     SPAWN_INSTANCE_TYPE_EXEC = 0,
     SPAWN_INSTANCE_TYPE_CALLBACK = 1,
-    // Trusted, non-daemonizing tools: private group, cleaned before the leader is reaped.
+    // Trusted, non-daemonizing tools: the spawn server cleans the private group before reaping its leader.
+    // Abrupt server failure can prevent cleanup.
     SPAWN_INSTANCE_TYPE_EXEC_GROUP = 2
 } SPAWN_INSTANCE_TYPE;
 

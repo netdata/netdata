@@ -253,14 +253,19 @@ static bool reload_owns_label(const char *name, RRDLABEL_SRC source, void *data)
 // Commit staged external inputs against the current cache under the publication lock.
 static void rrdhost_commit_reloaded_labels(RRDHOST *host, RRDLABELS *labels,
                                          RRDLABELS *k8s_labels, bool k8s_loaded) {
+    RRDLABELS *aclk_labels = rrdlabels_create();
+    add_aclk_host_labels(aclk_labels);
     if (k8s_loaded)
         rrdlabels_copy(labels, k8s_labels);
     spinlock_lock(&host->rrdhost_update_lock);
     spinlock_lock(&is_parent_label_commit_spinlock);
     rrdhost_load_auto_labels(host, labels);
     (void)rrdlabels_replace_subset(host->rrdlabels, labels, reload_owns_label, &k8s_loaded);
+    // ACLK owns these values even when configuration or Kubernetes supplies the same keys.
+    rrdlabels_copy(host->rrdlabels, aclk_labels);
     spinlock_unlock(&is_parent_label_commit_spinlock);
     spinlock_unlock(&host->rrdhost_update_lock);
+    rrdlabels_destroy(aclk_labels);
 }
 
 void reload_host_labels(void) {
@@ -268,7 +273,6 @@ void reload_host_labels(void) {
     RRDLABELS *k8s_labels = rrdlabels_create();
     rrdhost_load_config_labels(labels);
     bool k8s_loaded = rrdhost_load_kubernetes_labels(k8s_labels);
-    add_aclk_host_labels();
 
     // Scripts and configuration reads happen before taking locks. Derive automatic labels from
     // the current cache at commit time, so a slow reload cannot roll back a periodic refresh.
@@ -620,6 +624,8 @@ static int reloaded_labels_unittest(void) {
     RRDLABELS *config = rrdlabels_create();
     RRDLABELS *k8s = rrdlabels_create();
     rrdlabels_add(config, "new-config", "new", RRDLABEL_SRC_CONFIG);
+    rrdlabels_add(config, "_aclk_available", "false", RRDLABEL_SRC_CONFIG);
+    rrdlabels_add(config, "_mqtt_version", "wrong", RRDLABEL_SRC_CONFIG);
     rrdlabels_add(k8s, "k8s", "partial-failed-output", RRDLABEL_SRC_AUTO | RRDLABEL_SRC_K8S);
     struct rrdhost_system_info *candidate = rrdhost_system_info_create();
     rrdhost_system_info_detected_set(candidate, "NETDATA_SYSTEM_TOTAL_RAM", "2048");
@@ -634,6 +640,8 @@ static int reloaded_labels_unittest(void) {
     RELOAD_CHECK(refresh_test_label(host.rrdlabels, "k8s", "keep"));
     RELOAD_CHECK(refresh_test_label(host.rrdlabels, "_stream_egress_iface", "wan1"));
     RELOAD_CHECK(refresh_test_label(host.rrdlabels, "_aclk_test", "live"));
+    RELOAD_CHECK(refresh_test_label(host.rrdlabels, "_aclk_available", "true"));
+    RELOAD_CHECK(refresh_test_label(host.rrdlabels, "_mqtt_version", "5"));
     RELOAD_CHECK(refresh_test_label(host.rrdlabels, "_is_parent",
         stream_receivers_currently_connected() ? "true" : "false"));
     rrdlabels_destroy(config);

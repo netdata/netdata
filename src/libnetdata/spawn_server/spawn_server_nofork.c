@@ -1701,7 +1701,8 @@ SPAWN_TIMEDWAIT_RESULT spawn_server_exec_timedwait(SPAWN_SERVER *server, SPAWN_I
         // (that could leak a still-alive child). But this is terminal, not a transient "still
         // running" state, so we must NOT report RUNNING either (a caller looping on RUNNING with a
         // 0/"wait forever" timeout would spin forever). Report ERROR: the caller keeps the instance
-        // and reclaims it by killing it.
+        // and reclaims it via spawn_server_exec_kill(). For group instances, a dead server
+        // prevents guaranteed termination: the client cannot safely reuse a numeric PGID.
         nd_log(NDLS_COLLECTORS, NDLP_ERR,
                "SPAWN PARENT: status socket error for request No %zu, pid %d",
                instance->request_id, instance->child_pid);
