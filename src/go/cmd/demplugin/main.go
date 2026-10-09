@@ -25,7 +25,6 @@ import (
 	"github.com/netdata/netdata/go/plugins/plugin/agent/policy"
 	"github.com/netdata/netdata/go/plugins/plugin/dem"
 	demjournal "github.com/netdata/netdata/go/plugins/plugin/dem/journal"
-	"github.com/netdata/netdata/go/plugins/plugin/dem/rum/geoip"
 	"github.com/netdata/netdata/go/plugins/plugin/dem/synthetic/artifacts"
 	synthetichistory "github.com/netdata/netdata/go/plugins/plugin/dem/synthetic/history"
 	"github.com/netdata/netdata/go/plugins/plugin/dem/synthetic/runner"
@@ -110,7 +109,6 @@ func main() {
 	components := dem.New(
 		dem.Dependencies{
 			History:        history,
-			GeoIPPaths:     geoip.AgentPaths(pluginconfig.CacheDir(), pluginconfig.StockDataDir()),
 			Artifacts:      captures,
 			Executor:       executor,
 			ConfigProvider: func() (dem.Config, error) { return dem.LoadConfig(pluginconfig.ConfigDir()) },

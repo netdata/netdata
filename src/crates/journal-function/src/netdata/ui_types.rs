@@ -40,7 +40,7 @@ pub struct AvailableHistogram {
 /// One facet filter for the logs UI: a field with its filterable values.
 /// `id`/`name` are the raw field name (identical, not registry-transformed),
 /// `order` the field's alphabetical position, `options` its values sorted
-/// alphabetically (as built by [`crate::netdata::facets::facets`]).
+/// alphabetically (by [`crate::netdata::facets::facets`]).
 #[derive(Debug, Serialize, Deserialize)]
 #[cfg_attr(feature = "allocative", derive(allocative::Allocative))]
 pub struct Facet {
@@ -95,12 +95,13 @@ pub struct Chart {
 }
 
 impl Chart {
+    /// Delegates to `ChartResult::count`.
     pub fn count(&self) -> usize {
         self.result.count()
     }
 }
 
-/// Display metadata, filled by `chart_view_from_histogram`
+/// Display metadata, filled with fixed strings by `chart_view_from_histogram`
 /// (`netdata/histogram.rs`): title "Events distribution by {field}",
 /// `after`/`before` the histogram's time span (first bucket start / last
 /// bucket end) in seconds, `update_every` the bucket width in seconds,
@@ -162,8 +163,10 @@ impl ChartResult {
 /// Indexes into each item's [value, arp, pa] triple: 0 = event count,
 /// 1 = anomaly rate, 2 = point annotation. The chart builder only ever
 /// writes [count, 0, 0] (`chart_result_from_histogram` in
-/// `netdata/histogram.rs`); the field meanings come from the former C
-/// implementation's histogram point emit (`src/libnetdata/facets/facets.c`).
+/// `netdata/histogram.rs`); the field meanings
+/// come from the former C implementation
+/// (`src/libnetdata/facets/facets.c` histogram point emit:
+/// `arp` anomaly rate, `pa` point annotation).
 #[derive(Debug, Serialize, Deserialize)]
 #[cfg_attr(feature = "allocative", derive(allocative::Allocative))]
 pub struct ChartPoint {
@@ -199,8 +202,10 @@ impl Serialize for DataPoint {
         // Pre-sized: one timestamp element + one triple per item
         let mut seq = serializer.serialize_seq(Some(1 + self.items.len()))?;
 
+        // Timestamp first
         seq.serialize_element(&self.timestamp)?;
 
+        // Then one [value, arp, pa] triple per item
         for item in &self.items {
             seq.serialize_element(item)?;
         }
@@ -229,10 +234,12 @@ impl<'de> Deserialize<'de> for DataPoint {
             where
                 A: SeqAccess<'de>,
             {
+                // Timestamp first
                 let timestamp = seq
                     .next_element()?
                     .ok_or_else(|| serde::de::Error::invalid_length(0, &self))?;
 
+                // Remaining elements: one [value, arp, pa] triple per item
                 let mut items = Vec::new();
                 while let Some(item) = seq.next_element()? {
                     items.push(item);

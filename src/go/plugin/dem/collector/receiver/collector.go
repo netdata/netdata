@@ -7,7 +7,6 @@ import (
 	"crypto/tls"
 	_ "embed"
 	"errors"
-	"sync"
 	"sync/atomic"
 
 	"github.com/netdata/netdata/go/plugins/pkg/metrix"
@@ -27,38 +26,30 @@ type Config struct {
 	UpdateEvery     int `yaml:"update_every,omitempty" json:"update_every"`
 	config.Receiver `    yaml:",inline"                json:""`
 }
-type Dependencies struct {
-	Registry   *rumregistry.Registry
-	GeoIPPaths geoip.Paths
-}
-
 type Collector struct {
 	collectorapi.Base
-	Config        `yaml:",inline" json:""`
-	registry      *rumregistry.Registry
-	store         metrix.CollectorStore
-	metrics       collectorMetrics
-	tlsConfig     *tls.Config
-	geo           *geoip.Resolver
-	geoPaths      geoip.Paths
-	publicationMu sync.Mutex
-	publication   *rumregistry.ReceiverRegistration
-	requests      [3]atomic.Uint64
+	Config    `yaml:",inline" json:""`
+	registry  *rumregistry.Registry
+	store     metrix.CollectorStore
+	metrics   collectorMetrics
+	tlsConfig *tls.Config
+	geo       *geoip.Resolver
+	requests  [3]atomic.Uint64
 }
 
-func Creator(deps Dependencies) collectorapi.Creator {
+func Creator(registry *rumregistry.Registry) collectorapi.Creator {
 	return collectorapi.Creator{
 		Defaults: collectorapi.Defaults{
 			UpdateEvery: 10,
 		},
 		InstancePolicy:  collectorapi.InstancePolicySingle,
-		CreateV2:        func() collectorapi.CollectorV2 { return New(deps) },
+		CreateV2:        func() collectorapi.CollectorV2 { return New(registry) },
 		Config:          func() any { return &Config{} },
 		JobConfigSchema: schema,
 		StoreFirst:      true,
 	}
 }
-func New(deps Dependencies) *Collector {
+func New(registry *rumregistry.Registry) *Collector {
 	c := &Collector{
 		Config: Config{
 			Receiver: config.Receiver{
@@ -70,8 +61,7 @@ func New(deps Dependencies) *Collector {
 				},
 			},
 		},
-		registry: deps.Registry,
-		geoPaths: deps.GeoIPPaths,
+		registry: registry,
 		store:    metrix.NewCollectorStore(),
 	}
 	c.metrics = newCollectorMetrics(c.store.Write().SnapshotMeter(""))

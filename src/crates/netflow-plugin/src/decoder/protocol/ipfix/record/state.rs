@@ -39,7 +39,7 @@ impl IPFixRecordBuildState {
             return;
         }
 
-        // Session counters replace the RFC reverse counter values; other reverse metadata stays.
+        // Keep one coherent counter model while retaining RFC reverse metadata.
         self.reverse_overrides.remove("BYTES");
         self.reverse_overrides.remove("PACKETS");
         if let Some(bytes) = self.session_reverse_bytes.take() {
@@ -126,9 +126,6 @@ pub(super) fn track_reverse_ipfix_time(
     value: &FieldValue,
     export_usec: u64,
 ) {
-    // SysUpTime reverse values are stored raw and converted at finalize, when
-    // `system_init_millis` has its final value: `SystemInitTimeMilliseconds`
-    // may follow the reverse fields in the same record.
     match reverse_field {
         ReverseInformationElement::ReverseFlowStartSysUpTime => {
             state.reverse_flow_start_sysuptime_millis = field_value_unsigned(value);

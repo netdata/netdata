@@ -45,6 +45,7 @@ _PLUGINS_OFF = {
     # exporters / optional
     "ENABLE_EXPORTER_MONGODB": "Off",
     "ENABLE_EXPORTER_PROMETHEUS_REMOTE_WRITE": "Off",
+    "ENABLE_MIMALLOC": "Off",
     "ENABLE_WEBRTC": "Off",
     "ENABLE_SENTRY": "Off",
 }

@@ -98,7 +98,8 @@ async fn main() -> anyhow::Result<()> {
         scope_name: "synth",
         scope_version: "1.0",
     };
-    // `Sender::new` retries connect failures forever; the timeout bounds it here.
+    // Bound the connect: the shared Sender retries forever (right for live
+    // streams), but this one-shot tool must fail fast on a bad/unready endpoint.
     let mut sender = match time::timeout(
         Duration::from_secs(args.connect_timeout_secs),
         Sender::new(config, rx),

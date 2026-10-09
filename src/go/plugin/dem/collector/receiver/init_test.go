@@ -13,9 +13,7 @@ import (
 func TestInitValidatesListenPort(t *testing.T) {
 	for _, listen := range []string{"127.0.0.1:65536", "127.0.0.1:-1", "127.0.0.1:not-a-tcp-service"} {
 		t.Run(listen, func(t *testing.T) {
-			c := New(Dependencies{
-				Registry: rumregistry.New(),
-			})
+			c := New(rumregistry.New())
 			c.Listen = listen
 			t.Cleanup(func() { c.Cleanup(context.Background()) })
 			require.ErrorContains(t, c.Init(context.Background()), "listen")
@@ -23,9 +21,7 @@ func TestInitValidatesListenPort(t *testing.T) {
 	}
 	for _, listen := range []string{"127.0.0.1:0", "127.0.0.1:65535", "127.0.0.1:http", "[::1]:19938"} {
 		t.Run(listen, func(t *testing.T) {
-			c := New(Dependencies{
-				Registry: rumregistry.New(),
-			})
+			c := New(rumregistry.New())
 			c.Listen = listen
 			t.Cleanup(func() { c.Cleanup(context.Background()) })
 			require.NoError(t, c.Init(context.Background()))
@@ -34,9 +30,7 @@ func TestInitValidatesListenPort(t *testing.T) {
 }
 
 func TestInitRejectsPublicURLWithoutHostname(t *testing.T) {
-	c := New(Dependencies{
-		Registry: rumregistry.New(),
-	})
+	c := New(rumregistry.New())
 	c.PublicURL = "http://:19938"
 	t.Cleanup(func() { c.Cleanup(context.Background()) })
 	require.ErrorContains(t, c.Init(context.Background()), "public_url")
@@ -45,9 +39,7 @@ func TestInitRejectsPublicURLWithoutHostname(t *testing.T) {
 func TestCancelledPlaintextPreparationAndRun(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	cancel()
-	c := New(Dependencies{
-		Registry: rumregistry.New(),
-	})
+	c := New(rumregistry.New())
 	c.Listen = "127.0.0.1:0"
 	t.Cleanup(func() { c.Cleanup(context.Background()) })
 	assert.ErrorIs(t, c.Init(ctx), context.Canceled)

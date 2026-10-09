@@ -40,7 +40,7 @@ impl Signal {
 
     /// The remote-key segment for this signal (`v2/{segment}/...`), also the
     /// name of its local `{base_dir}/{segment}/` subtree (derived in
-    /// [`PluginConfig::lifecycle_for`](crate::config::PluginConfig::lifecycle_for)).
+    /// [`PluginConfig::lifecycle_for`](crate::config::PluginConfig)).
     pub const fn segment(self) -> &'static str {
         match self {
             Signal::Logs => "logs",

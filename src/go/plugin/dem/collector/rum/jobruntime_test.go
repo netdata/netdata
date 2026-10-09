@@ -109,9 +109,7 @@ func TestNativeJobsIngressReplacementAndHistory(t *testing.T) {
 	tickUntil(t, siteJob, siteOut, "SET 'unavailable' = 1")
 	assert.NotContains(t, siteOut.String(), "'rum.lcp'", "no browser percentile sample has been observed")
 	newReceiver := func() (*jobruntime.JobV2, *output, func()) {
-		c := receiver.New(receiver.Dependencies{
-			Registry: hub,
-		})
+		c := receiver.New(hub)
 		c.Listen = "127.0.0.1:0"
 		return startJob(t, "receiver", "receiver", c)
 	}
@@ -201,9 +199,7 @@ func TestIndependentSitesSurviveReceiverReplacementAndRetirement(t *testing.T) {
 	}
 	stopAlpha, stopBeta := startSite("alpha"), startSite("beta")
 	startReceiver := func() func() {
-		c := receiver.New(receiver.Dependencies{
-			Registry: hub,
-		})
+		c := receiver.New(hub)
 		c.Listen = "127.0.0.1:0"
 		_, _, stop := startJob(t, "receiver", "receiver", c)
 		return stop
@@ -272,9 +268,7 @@ func TestOversizedChunkedUploadRespondsPromptlyAndDisablesKeepAlive(t *testing.T
 	site.Name = "shop"
 	site.AllowedOrigins = []string{"https://example.org"}
 	startJob(t, "rum", "shop", site)
-	listener := receiver.New(receiver.Dependencies{
-		Registry: hub,
-	})
+	listener := receiver.New(hub)
 	listener.Listen = "127.0.0.1:0"
 	listener.MaxBodyBytes = 32
 	startJob(t, "receiver", "receiver", listener)

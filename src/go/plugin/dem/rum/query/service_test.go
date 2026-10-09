@@ -183,11 +183,7 @@ func TestSessionEventsMergePendingAndPersistedWithoutDuplicates(t *testing.T) {
 			SessionID:    "session",
 			PageGroup:    "/first",
 			ExperienceID: "first",
-			Events: []beacon.Event{
-				{Kind: beacon.EventDocument, ID: "first", Revision: 1},
-				{Name: "[REDACTED]"},
-				{Name: "[REDACTED]"},
-			},
+			Events:       []beacon.Event{{Kind: beacon.EventDocument, ID: "first", Revision: 1}, {Name: "[REDACTED]"}, {Name: "[REDACTED]"}},
 		},
 	)
 	pending := request()
@@ -393,7 +389,7 @@ func TestFunctionsDescribeCurrentSamplingPolicy(t *testing.T) {
 			hub := rumregistry.New()
 			t.Cleanup(hub.PublishReceiver(rumregistry.Availability{
 				Serving: true,
-			}).Close)
+			}))
 			a := aggregate.New(5*time.Minute, aggregate.SiteCfg{
 				Name: "shop",
 			})

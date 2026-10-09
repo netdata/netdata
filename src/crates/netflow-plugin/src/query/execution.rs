@@ -39,9 +39,6 @@ impl QueryExecutionPlan {
         Self::new(setup, 2, ctx)
     }
 
-    // Flow queries scan the spans once; timeseries queries scan them twice — first to
-    // rank groups, then to build the series for the top ones. The runtime sends no
-    // progress while the total is zero, hence the `.max(1)` on `total_seconds`.
     fn new(setup: &QuerySetup, pass_count: usize, ctx: QueryExecutionContext) -> Self {
         let mut span_after_seconds = Vec::with_capacity(setup.spans.len());
         let mut span_prefix_seconds = Vec::with_capacity(setup.spans.len());
@@ -113,8 +110,7 @@ impl QueryExecutionPlan {
         let span_seconds = self.span_duration_seconds(span_index);
 
         // Convert the current entry timestamp to whole seconds within the current span.
-        // The offset is clamped to [0, span duration] so progress stays inside this
-        // span's slice; report_done() keeps the reported value from going backwards.
+        // We clamp aggressively to keep progress monotonic and bounded.
         let span_after = self.current_span_after_seconds(span_index);
         let timestamp_seconds = (timestamp_usec / 1_000_000) as usize;
         let within_span = timestamp_seconds

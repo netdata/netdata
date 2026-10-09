@@ -1,7 +1,6 @@
 //! Crate-wide error type for journal indexing: the `Result` alias at the
 //! bottom of this file is the return type of the crate's fallible calls -
 //! [`crate::FileIndexer::index`],
-//! [`crate::FileIndex::find_log_entries`],
 //! [`crate::Histogram::from_timestamp_offset_pairs`],
 //! [`crate::LogQueryParamsBuilder::build`] and
 //! [`crate::field_types::parse_timestamp`] - and lib.rs re-exports both
@@ -29,8 +28,8 @@ use thiserror::Error;
 #[derive(Error, Debug)]
 pub enum IndexError {
     /// [`crate::Histogram::from_timestamp_offset_pairs`] got a zero
-    /// `bucket_duration`; the only non-test caller is the indexer's
-    /// histogram step (`build_histogram` in `src/file_indexer.rs`).
+    /// `bucket_duration`; the only caller is the indexer's histogram step
+    /// (`build_histogram` in `src/file_indexer.rs`).
     #[error("bucket duration must not be zero")]
     ZeroBucketDuration,
 
@@ -43,7 +42,7 @@ pub enum IndexError {
     InvalidQueryTimeRange,
 
     /// `build()` failed to compile the [`crate::LogQueryParamsBuilder::with_regex`]
-    /// pattern; note the stray trailing colon in the Display string.
+    /// pattern set; note the stray trailing colon in the Display string.
     #[error("invalid regex pattern:")]
     InvalidRegex,
 

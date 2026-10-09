@@ -71,9 +71,6 @@ impl MaterializedTierWriters {
         Ok(())
     }
 
-    /// Convert the tier writers into their commit workers. Array order must
-    /// stay aligned with `MATERIALIZED_TIERS`: the enumerated index is the
-    /// worker's handoff slot index on both sides of the protocol.
     fn into_workers(
         self,
         tier_flow_indexes: &Arc<RwLock<TierFlowIndexStore>>,

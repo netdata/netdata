@@ -11,11 +11,11 @@ pub enum WriterError {
     #[error("invalid path: {0}")]
     InvalidPath(String),
 
-    /// Path is not a directory, or could not be canonicalized
+    /// Path is not a directory
     #[error("not a directory: {0}")]
     NotADirectory(String),
 
-    /// Failed to create a new journal file in the chain (generated name could not be parsed)
+    /// Failed to create journal file
     #[error("failed to create journal file: {0}")]
     FileCreation(String),
 

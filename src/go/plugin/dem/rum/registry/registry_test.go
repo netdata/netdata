@@ -10,8 +10,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/netdata/netdata/go/plugins/plugin/dem/rum/geoip"
-
 	"github.com/netdata/netdata/go/plugins/plugin/dem/rum/beacon"
 	"github.com/netdata/netdata/go/plugins/plugin/dem/rum/diagnostics"
 
@@ -152,31 +150,10 @@ func TestReceiverAvailabilityIsGenerationFenced(t *testing.T) {
 		Serving:   true,
 		PublicURL: "https://next.example",
 	})
-	next.SetGeoIP(
-		geoip.Status{
-			Selection:    "explicit",
-			State:        "loaded",
-			Source:       "explicit",
-			DatabaseType: "GeoLite2-Country",
-			LookupErrors: 3,
-		},
-	)
-	old.SetGeoIP(geoip.Status{
-		State:  "using_previous",
-		Source: "cache",
-	})
-	old.Close()
-	assert.Equal(t, "explicit", hub.Availability().GeoIP.Source)
-	assert.Equal(t, uint64(3), hub.Availability().GeoIP.LookupErrors)
+	old()
 	assert.Equal(t, "https://next.example", hub.Availability().PublicURL)
 	assert.True(t, hub.Availability().Serving)
-	next.Close()
-	next.SetGeoIP(geoip.Status{
-		State: "loaded",
-	})
-	assert.Equal(t, "unavailable", hub.Availability().GeoIP.State)
-	assert.Equal(t, "receiver_stopped", hub.Availability().GeoIP.Reason)
-	assert.Empty(t, hub.Availability().GeoIP.DatabaseType)
+	next()
 	assert.False(t, hub.Availability().Serving)
 	assert.Equal(t, "https://next.example", hub.Availability().PublicURL)
 }

@@ -18,17 +18,17 @@ pub use writer::JournalWriter;
 pub use cursor::Location;
 pub use offset_array::Direction;
 
-// Cursor stepping and entry filtering (advanced usage)
+// Advanced filtering (for users who need it)
 pub use cursor::JournalCursor;
 pub use filter::{FilterExpr, JournalFilter, LogicalOp};
 
-// Trait for reading hash-chained journal objects (advanced usage)
+// For FFI compatibility and advanced object manipulation
 pub use object::HashableObject;
 
 // Re-export commonly needed external types
 pub use memmap2::{Mmap, MmapMut};
 
-// Journal payload hashing (keyed SipHash-2-4, otherwise Jenkins lookup3)
+// Internal utilities that might be needed
 pub use crate::hash::journal_hash_data;
 
 // Internal re-exports needed by the crate itself (not part of public API)

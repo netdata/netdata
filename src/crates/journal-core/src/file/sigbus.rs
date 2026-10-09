@@ -20,9 +20,7 @@
 //! flag. mmap(2) is not on POSIX's async-signal-safe list
 //! (signal-safety(7)); the direct syscall path is what makes this work, not
 //! a POSIX guarantee. The 4 KiB page size is hardcoded, matching `PAGE_SIZE`
-//! in file/mmap.rs, and assumes a 4 KiB kernel page: on larger-page kernels
-//! most remap addresses violate the MAP_FIXED alignment requirement, the
-//! mmap fails, and the fault loops back into this handler forever.
+//! in file/mmap.rs.
 //!
 //! Deployment (grep-verified): nothing in this repo installs this copy or
 //! calls [`signalled`]; lib.rs re-exports [`install_handler`] as
@@ -73,8 +71,8 @@ extern "C" fn sigbus_handler(
     }
 }
 
-// Sticky, never cleared: true once this handler has run for any SIGBUS,
-// whether or not the remap fixed the fault.
+// Sticky, never cleared: true once any SIGBUS has been recovered in this
+// process.
 pub fn signalled() -> bool {
     SIGBUS_OCCURRED.load(Ordering::Relaxed)
 }

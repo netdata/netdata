@@ -42,8 +42,7 @@ pub trait CrossSlotContext: Default + std::fmt::Debug {
     /// its delta baseline.
     fn finalize(&mut self, slot: Self::Slot) -> Option<f64>;
 
-    /// Value to emit when a slot has no data for this dimension; takes `&self`,
-    /// so it never mutates cross-slot state.
+    /// Value to emit when a slot has no data for this dimension; stateless (`&self`).
     fn gap_fill(&self) -> f64;
 
     /// Reset all cross-slot state. No production caller today; tests use it
@@ -122,7 +121,8 @@ impl CrossSlotContext for GaugeContext {
 
 /// Per-slot state for Delta Sum metrics.
 ///
-/// Sums every recorded point, ignoring timestamps.
+/// Sums every recorded point; timestamps are ignored, so record order does
+/// not matter.
 #[derive(Debug, Default)]
 pub struct DeltaSumSlot {
     accumulated: f64,

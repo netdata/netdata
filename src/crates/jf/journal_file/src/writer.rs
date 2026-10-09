@@ -23,36 +23,27 @@ struct EntryItem {
     hash: u64,
 }
 
-/// Appends entries, and the data/field/entry-array objects they need, to an open journal file.
 pub struct JournalWriter {
     tail_object_offset: NonZeroU64,
-    /// Offset where the next object will be written.
     append_offset: NonZeroU64,
     next_seqnum: u64,
-    /// Objects written since the last committed entry; `entry_added` folds them
-    /// into the header's `n_objects` and resets this to zero.
     num_written_objects: u64,
     entry_items: Vec<EntryItem>,
     first_entry_monotonic: Option<u64>,
 }
 
 impl JournalWriter {
-    /// Get the offset where the next object will be written (the current end of the file).
+    /// Get current file size in bytes
     pub fn current_file_size(&self) -> u64 {
         self.append_offset.get()
     }
 
-    /// Get the monotonic timestamp of the first entry written by this writer, or `None`
-    /// if it has not added any entries yet.
+    /// Get the monotonic timestamp of the first entry written to this file
     pub fn first_entry_monotonic(&self) -> Option<u64> {
         self.first_entry_monotonic
     }
 
-    /// Create a writer positioned at the file's current tail, continuing its sequence
-    /// numbers.
     pub fn new(journal_file: &mut JournalFile<MmapMut>) -> Result<Self> {
-        // Resume appending after the file's last object, and sequence numbers after
-        // its last entry.
         let (append_offset, next_seqnum) = {
             let header = journal_file.journal_header_ref();
 
@@ -81,13 +72,6 @@ impl JournalWriter {
         })
     }
 
-    /// Append one entry referencing the given data payloads.
-    ///
-    /// Timestamps are in microseconds. Each item is stored as (or deduplicated to) a
-    /// data object; an item containing `=` also updates the field index with the
-    /// part before the `=`.
-    ///
-    /// Panics if the file does not use the keyed hash.
     pub fn add_entry(
         &mut self,
         journal_file: &mut JournalFile<MmapMut>,
@@ -114,12 +98,9 @@ impl JournalWriter {
                 let entry_item = EntryItem { offset, hash };
                 self.entry_items.push(entry_item);
 
-                // Unkeyed (no file id): a plain Jenkins hash, not the keyed data-object hash.
                 xor_hash ^= journal_hash_data(payload, true, None);
             }
 
-            // Repeated payloads resolve to the same data object; sort by
-            // offset and drop the duplicates.
             self.entry_items.sort_unstable_by_key(|a| a.offset);
             self.entry_items.dedup_by(|a, b| a.offset == b.offset);
         }
@@ -127,7 +108,6 @@ impl JournalWriter {
         // write the entry itself
         let entry_offset = self.append_offset;
         let entry_size = {
-            // 16 bytes per item: u64 object offset + u64 hash (regular entry layout)
             let size = Some(self.entry_items.len() as u64 * 16);
             let mut entry_guard = journal_file.entry_mut(entry_offset, size)?;
 
@@ -137,6 +117,7 @@ impl JournalWriter {
             entry_guard.header.monotonic = monotonic;
             entry_guard.header.realtime = realtime;
 
+            // set each entry item
             for (index, entry_item) in self.entry_items.iter().enumerate() {
                 entry_guard
                     .items
@@ -209,7 +190,8 @@ impl JournalWriter {
         match journal_file.find_data_offset(hash, payload)? {
             Some(data_offset) => Ok(data_offset),
             None => {
-                // Write the new data object at the current append offset
+                // We will have to write the new data object at the current
+                // tail offset
                 let data_offset = self.append_offset;
                 let data_size = {
                     let mut data_guard =
@@ -222,14 +204,14 @@ impl JournalWriter {
 
                 self.object_added(data_offset, data_size);
 
-                // Append the data object to its hash bucket's chain
+                // Update hash table
                 journal_file.data_hash_table_set_tail_offset(hash, data_offset)?;
 
-                // If the payload is a `FIELD=value` pair, add its field object
+                // Add the field object, if we have any
                 if let Some(equals_pos) = payload.iter().position(|&b| b == b'=') {
                     let field_offset = self.add_field(journal_file, &payload[..equals_pos])?;
 
-                    // Point the new data object at the field's current list head
+                    // Link data object to the linked-list
                     {
                         let head_data_offset = {
                             let field_guard = journal_file.field_ref(field_offset)?;
@@ -240,7 +222,7 @@ impl JournalWriter {
                         data_guard.header.next_field_offset = head_data_offset;
                     }
 
-                    // Make the new data object the head of the field's list
+                    // Link field to the head of the linked list
                     {
                         let mut field_guard = journal_file.field_mut(field_offset, None)?;
                         field_guard.header.head_data_offset = Some(data_offset);
@@ -262,7 +244,8 @@ impl JournalWriter {
         match journal_file.find_field_offset(hash, payload)? {
             Some(field_offset) => Ok(field_offset),
             None => {
-                // Write the new field object at the current append offset
+                // We will have to write the new field object at the current
+                // tail offset
                 let field_offset = self.append_offset;
                 let field_size = {
                     let mut field_guard =
@@ -274,10 +257,10 @@ impl JournalWriter {
                 };
                 self.object_added(field_offset, field_size);
 
-                // Append the field object to its hash bucket's chain
+                // Update hash table
                 journal_file.field_hash_table_set_tail_offset(hash, field_offset)?;
 
-                // Return the offset of the newly added field object
+                // Return the offset where we wrote the newly added data object
                 Ok(field_offset)
             }
         }
@@ -288,6 +271,7 @@ impl JournalWriter {
         journal_file: &JournalFile<MmapMut>,
         capacity: NonZeroU64,
     ) -> Result<NonZeroU64> {
+        // let new_capacity = previous_capacity.saturating_mul(NonZeroU64::new(2).unwrap());
 
         let array_offset = self.append_offset;
         let array_size = {
@@ -381,7 +365,7 @@ impl JournalWriter {
             array_offset = next_offset;
         }
 
-        // Append to the tail array, or start a new one when it is full
+        // Try to add to the tail array
         let tail_capacity = {
             let tail_guard = journal_file.offset_array_ref(tail_offset)?;
             tail_guard.capacity() as u64
@@ -394,8 +378,8 @@ impl JournalWriter {
             let mut tail_guard = journal_file.offset_array_mut(tail_offset, None)?;
             tail_guard.set(entries_in_tail as usize, entry_offset)?;
         } else {
-            // The tail array is full; start a new one
-            let new_capacity = NonZeroU64::new(tail_capacity * 2).unwrap();
+            // Need to create a new array
+            let new_capacity = NonZeroU64::new(tail_capacity * 2).unwrap(); // Double the size
             let new_array_offset = self.allocate_new_array(journal_file, new_capacity)?;
 
             // Link the old tail to the new array
@@ -437,7 +421,7 @@ impl JournalWriter {
                         let array_capacity = NonZeroU64::new(64).unwrap();
                         let array_offset = self.allocate_new_array(journal_file, array_capacity)?;
 
-                        // Store the new entry offset in the array's first slot
+                        // Load new array and set its first entry offset
                         {
                             let mut array_guard =
                                 journal_file.offset_array_mut(array_offset, None)?;
@@ -450,8 +434,7 @@ impl JournalWriter {
                         data_guard.header.n_entries = NonZeroU64::new(2);
                     }
                     x => {
-                        // There's already an entry array; it holds every entry
-                        // but the first, which stays inlined in the data header.
+                        // There's already an entry array, append to it
                         let current_count = x - 1;
                         let array_offset = data_guard.header.entry_array_offset.unwrap();
 
@@ -466,6 +449,7 @@ impl JournalWriter {
                             current_count,
                         )?;
 
+                        // Update the count
                         let mut data_guard = journal_file.data_mut(data_offset, None)?;
                         data_guard.header.n_entries = NonZeroU64::new(x + 1);
                     }
@@ -554,6 +538,7 @@ mod tests {
             let hdr = journal_file.journal_header_ref();
             println!("Header: {:#?}", hdr);
 
+            // Start from the head
             reader.set_location(Location::Head);
 
             let mut entries_read = 0;

@@ -3,14 +3,13 @@ use std::time::Duration;
 
 /// Controls when journal files should be rotated
 ///
-/// A file rotates when the size or entry-count limit is reached. The duration limit
-/// is currently not enforced. If neither enforced limit is set, files never rotate
-/// automatically.
+/// A file rotates when *any* configured limit is exceeded. If all fields are `None`,
+/// files never rotate automatically.
 #[derive(Debug, Copy, Clone, Default)]
 pub struct RotationPolicy {
     /// Maximum file size
     pub size_of_journal_file: Option<u64>,
-    /// Maximum duration of head/tail entries (currently not enforced by rotation)
+    /// Maximum duration of head/tail entries
     pub duration_of_journal_file: Option<Duration>,
     /// Maximum number of log entries
     pub number_of_entries: Option<usize>,
@@ -23,9 +22,7 @@ impl RotationPolicy {
         self
     }
 
-    /// Specifies the maximum duration between head/tail entries.
-    ///
-    /// Currently has no effect; see `duration_of_journal_file`.
+    /// Specifies the maximum duration between head/tail entry.
     pub fn with_duration_of_journal_file(mut self, duration_of_journal_file: Duration) -> Self {
         self.duration_of_journal_file = Some(duration_of_journal_file);
         self

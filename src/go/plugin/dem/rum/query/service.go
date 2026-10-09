@@ -29,7 +29,6 @@ func (s *Service) Receiver() Receiver {
 	return Receiver{
 		Serving:   state.Serving,
 		PublicURL: state.PublicURL,
-		GeoIP:     state.GeoIP,
 	}
 }
 

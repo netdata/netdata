@@ -1,8 +1,6 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 # Handling for eBPF legacy programs
 
-include_guard()
-
 include(ExternalProject)
 include(NetdataUtil)
 
@@ -13,9 +11,6 @@ set(ebpf-legacy_BUILD_DIR "${CMAKE_BINARY_DIR}/ebpf-legacy-build")
 function(netdata_fetch_legacy_ebpf_code)
     netdata_identify_libc(_libc)
 
-    # The root file forces BUILD_SHARED_LIBS off, so every current build takes
-    # the static arm and its one libc-independent tarball; the glibc/musl arms
-    # stay for the day that changes.
     if(DEFINED BUILD_SHARED_LIBS)
         if(NOT BUILD_SHARED_LIBS)
             set(need_static TRUE)
@@ -46,8 +41,6 @@ endfunction()
 
 function(netdata_install_legacy_ebpf_code)
     install(DIRECTORY ${ebpf-legacy_BUILD_DIR}/ebpf.d
-            DESTINATION ${PLUGINS_DEST}
+            DESTINATION usr/libexec/netdata/plugins.d
             COMPONENT ebpf-code-legacy)
-
-    netdata_add_deb_copyright(ebpf-code-legacy netdata-ebpf-code-legacy)
 endfunction()

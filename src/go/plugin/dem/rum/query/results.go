@@ -5,7 +5,6 @@ import (
 	"time"
 
 	"github.com/netdata/netdata/go/plugins/plugin/dem/rum/aggregate"
-	"github.com/netdata/netdata/go/plugins/plugin/dem/rum/geoip"
 	"github.com/netdata/netdata/go/plugins/plugin/dem/rum/history"
 )
 
@@ -13,7 +12,6 @@ import (
 type Receiver struct {
 	Serving   bool
 	PublicURL string
-	GeoIP     geoip.Status
 }
 
 // Site contains only the copied observations needed to investigate one site.

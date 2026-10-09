@@ -61,6 +61,10 @@ func (c *Collector) Init(ctx context.Context) error {
 		tlsConfig.MinVersion = tls.VersionTLS12
 		c.tlsConfig = tlsConfig
 	}
-	c.geo = geoip.New(c.GeoIPDB, c.geoPaths)
+	resolver, err := geoip.Open(c.GeoIPDB)
+	if err != nil && !errors.Is(err, geoip.ErrNotFound) {
+		c.Warningf("GeoIP unavailable: %v", err)
+	}
+	c.geo = resolver
 	return nil
 }

@@ -15,8 +15,7 @@ pub(super) fn opt_ip_to_string(ip: Option<IpAddr>) -> String {
     }
 }
 
-/// Format prefix as "IP/mask" (CIDR), or "IP" if mask is 0, or an empty
-/// string if there is no IP.
+/// Format prefix as "IP/mask" (CIDR) or just "IP" if mask is 0.
 pub(super) fn format_prefix(ip: Option<IpAddr>, mask: u8) -> String {
     match ip {
         Some(addr) if mask > 0 => format!("{}/{}", addr, mask),

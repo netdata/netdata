@@ -45,8 +45,7 @@ pub fn available_histograms(histogram_response: &QueryHistogram) -> Vec<Availabl
 ///
 /// # Arguments
 /// * `histogram_response` - The engine's bucket histogram (QueryHistogram)
-/// * `field` - The field to chart (the handler's `histogram` request param,
-///   or PRIORITY when it is empty)
+/// * `field` - The field to chart (the handler's `histogram` request param)
 /// * `transformations` - Registry turning raw values into display labels
 pub fn histogram(
     histogram_response: &QueryHistogram,

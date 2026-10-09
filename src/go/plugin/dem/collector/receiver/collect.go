@@ -7,7 +7,6 @@ import (
 )
 
 func (c *Collector) Collect(context.Context) error {
-	c.publishGeoIP()
 	state := "unavailable"
 	if c.registry.Availability().Serving {
 		state = "serving"

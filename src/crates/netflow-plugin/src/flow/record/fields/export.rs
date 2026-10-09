@@ -21,9 +21,8 @@ use headers::*;
 use interfaces::*;
 
 impl FlowRecord {
-    /// Materialize the record as a `FlowFields` map (a `BTreeMap` of field name to
-    /// string value), the inverse of `from_fields`. Every caller is test code; no
-    /// production path calls this.
+    /// Convert to FlowFields (BTreeMap) for backward compatibility.
+    /// Used during the transition period while tiering/encode still expect FlowFields.
     #[cfg(test)]
     pub(crate) fn to_fields(&self) -> FlowFields {
         let mut fields = FlowFields::new();

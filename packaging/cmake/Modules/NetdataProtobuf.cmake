@@ -1,9 +1,7 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 # Macros and functions for handling of Protobuf
 
-include_guard()
-
-# Handle bundling of Protobuf for use with Netdata.
+# Prepare a vendored copy of Protobuf for use with Netdata.
 function(netdata_bundle_protobuf)
         include(FetchContent)
         include(NetdataFetchContentExtra)
@@ -21,6 +19,9 @@ function(netdata_bundle_protobuf)
 
         string(REPLACE "-fsanitize=address" "" CMAKE_C_FLAGS "${CMAKE_C_FLAGS}")
         string(REPLACE "-fsanitize=address" "" CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS}")
+
+        # ignore debhelper
+        set(FETCHCONTENT_FULLY_DISCONNECTED Off)
 
         if(NEED_ABSL)
                 set(ABSL_PROPAGATE_CXX_STD On)
@@ -40,6 +41,7 @@ function(netdata_bundle_protobuf)
                             PATCH_COMMAND ${CMAKE_SOURCE_DIR}/packaging/cmake/patches/apply-patches.sh
                                         ${absl_SOURCE_DIR}
                                         ${CMAKE_SOURCE_DIR}/packaging/cmake/patches/abseil
+                            CMAKE_ARGS ${NETDATA_CMAKE_PROPAGATE_TOOLCHAIN_ARGS}
                             EXCLUDE_FROM_ALL
                     )
                 else()
@@ -50,6 +52,7 @@ function(netdata_bundle_protobuf)
                             PATCH_COMMAND ${CMAKE_SOURCE_DIR}/packaging/cmake/patches/apply-patches.sh
                                         ${absl_SOURCE_DIR}
                                         ${CMAKE_SOURCE_DIR}/packaging/cmake/patches/abseil
+                            CMAKE_ARGS ${NETDATA_CMAKE_PROPAGATE_TOOLCHAIN_ARGS}
                     )
                 endif()
                 FetchContent_MakeAvailable_NoInstall(absl)
@@ -67,12 +70,14 @@ function(netdata_bundle_protobuf)
                 FetchContent_Declare(protobuf
                         GIT_REPOSITORY ${protobuf_repo}
                         GIT_TAG ${PROTOBUF_TAG}
+                        CMAKE_ARGS ${NETDATA_CMAKE_PROPAGATE_TOOLCHAIN_ARGS}
                         EXCLUDE_FROM_ALL
                 )
         else()
                 FetchContent_Declare(protobuf
                         GIT_REPOSITORY ${protobuf_repo}
                         GIT_TAG ${PROTOBUF_TAG}
+                        CMAKE_ARGS ${NETDATA_CMAKE_PROPAGATE_TOOLCHAIN_ARGS}
                 )
         endif()
         FetchContent_MakeAvailable_NoInstall(protobuf)

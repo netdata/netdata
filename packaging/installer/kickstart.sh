@@ -2400,14 +2400,11 @@ prepare_offline_install_source() {
     progress "Verifying checksums."
 
     failed_files=""
-    while IFS= read -r file; do
-      [ -n "${file}" ] || continue
+    for file in $(find . -name '*.gz.run'); do
       if ! grep -e "${file}" sha256sums.txt | safe_sha256sum -c -; then
         failed_files="${failed_files}\n${file}\n$(report_bad_sha256sum "${file}" sha256sums.txt)"
       fi
-    done <<EOF
-$(find . -name '*.gz.run')
-EOF
+    done
 
     if [ -n "${failed_files}" ]; then
       fatal "Checksums for offline install files are incorrect.\n${failed_files}\n${BADCACHE_MSG}." F0507
@@ -2727,6 +2724,7 @@ parse_args() {
         warning "Cloud is always required"
         ;;
       "--dont-start-it")
+        NETDATA_NO_START=1
         NETDATA_INSTALLER_OPTIONS="${NETDATA_INSTALLER_OPTIONS} --dont-start-it"
         ;;
       "--disable-telemetry")

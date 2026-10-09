@@ -17,6 +17,7 @@
 
 // required compilation options
 
+#cmakedefine HAVE_FEXCEPTIONS
 
 // checked headers
 
@@ -49,6 +50,7 @@
 
 #cmakedefine HAVE_CAPABILITY
 #cmakedefine HAVE_PROTOBUF
+#cmakedefine BUNDLED_PROTOBUF
 #cmakedefine HAVE_MONGOC
 #cmakedefine HAVE_LIBDATACHANNEL
 
@@ -70,6 +72,7 @@
 #cmakedefine HAVE_SETENV
 #cmakedefine HAVE_DLSYM
 
+#cmakedefine HAVE_LIBCURL
 #cmakedefine HAVE_LIBICONV
 
 #cmakedefine HAVE_SETRESUID
@@ -115,6 +118,7 @@
 #cmakedefine HAVE_C_MALLINFO2
 #cmakedefine HAVE_SETNS
 #cmakedefine HAVE_STRNDUP
+#cmakedefine SSL_HAS_PENDING
 
 #cmakedefine HAVE_FUNC_ATTRIBUTE_FORMAT_GNU_PRINTF
 #cmakedefine HAVE_FUNC_ATTRIBUTE_FORMAT_PRINTF
@@ -123,15 +127,19 @@
 #cmakedefine HAVE_FUNC_ATTRIBUTE_NORETURN
 #cmakedefine HAVE_FUNC_ATTRIBUTE_RETURNS_NONNULL
 #cmakedefine HAVE_FUNC_ATTRIBUTE_WARN_UNUSED_RESULT
+#cmakedefine HAVE_JEMALLOC_ARENA_API
 
 // enabled features
 
 #cmakedefine ENABLE_ML
+#cmakedefine ENABLE_EXPORTING_MONGODB
 #cmakedefine ENABLE_DBENGINE
 #cmakedefine ENABLE_LZ4
 #cmakedefine ENABLE_ZSTD
 #cmakedefine ENABLE_BROTLI
 
+#cmakedefine ENABLE_LOGSMANAGEMENT
+#cmakedefine ENABLE_LOGSMANAGEMENT_TESTS
 #cmakedefine ENABLE_PROMETHEUS_REMOTE_WRITE
 
 // enabled plugins
@@ -162,6 +170,7 @@
 #cmakedefine ENABLE_BUNDLED_JSONC
 #cmakedefine ENABLE_BUNDLED_YAML
 #cmakedefine ENABLE_BUNDLED_PROTOBUF
+#cmakedefine ENABLE_MIMALLOC
 
 // directory paths
 

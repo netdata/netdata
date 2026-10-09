@@ -48,10 +48,9 @@ impl IndexWriter {
     /// Stream an SFST into `sink` (positioned at offset 0), returning the
     /// sink plus the [`Summary`] / [`Metadata`] the file carries — the
     /// in-memory builds feed a `Cursor` and open the resulting bytes with
-    /// [`IndexReader::open`](crate::IndexReader::open). Beyond the
-    /// [`RowIndex`] itself, the stream-batch stage materialises every
-    /// row's translated id list before writing the batch chunks; the
-    /// file itself is streamed, never buffered whole.
+    /// [`IndexReader::open`](crate::IndexReader::open). Peak memory beyond
+    /// the [`RowIndex`] itself is a single packed chunk, not the whole
+    /// compressed file.
     pub fn write_into<W: Write + Seek>(
         row_index: &RowIndex,
         sink: W,
