@@ -111,7 +111,7 @@ static bool cloud_status_matches(int64_t health_log_id, RRDCALC_STATUS status)
     bool send = false;
 
     int param = 0;
-    SQLITE_BIND_FAIL(done, sqlite3_bind_int(res, ++param, health_log_id));
+    SQLITE_BIND_FAIL(done, sqlite3_bind_int64(res, ++param, health_log_id));
 
     param = 0;
     int rc = sqlite3_step_monitored(res);
@@ -588,7 +588,15 @@ static void aclk_push_alert_event(RRDHOST *host, sqlite3_stmt **res, sqlite3_stm
     struct aclk_sync_cfg_t *aclk_host_config = __atomic_load_n(&host->aclk_host_config, __ATOMIC_ACQUIRE);
     while (sqlite3_step_monitored(*res) == SQLITE_ROW) {
         health_alarm_log_populate(&alarm_log, *res, host, &status);
-        aclk_send_alarm_log_entry(&alarm_log);
+
+        // A send the mqtt layer did not accept right now is not a delivery: leave this row and the ones after it
+        // queued, with their version untouched, and retry on the next pass. A message that can never be sent
+        // (cannot be built, too big for the server) is consumed as before, so one bad row cannot block the queue.
+        if (aclk_send_alarm_log_entry(&alarm_log) == ACLK_ALARM_LOG_SEND_FAILED) {
+            destroy_alarm_log_entry(&alarm_log);
+            rrdhost_flag_set(host, RRDHOST_FLAG_ACLK_STREAM_ALERTS);
+            break;
+        }
 
         nd_uuid_t hash_id;
         if (alarm_log.config_hash && !uuid_parse(alarm_log.config_hash, hash_id))
@@ -691,38 +699,65 @@ done:
 #define SQL_DELETE_HOST_ALERT_VERSION_TABLE                                                                            \
     "DELETE FROM alert_version WHERE health_log_id IN (SELECT health_log_id FROM health_log WHERE host_id = @host_id)"
 
-void rebuild_host_alert_version_table(RRDHOST *host)
+// The DELETE and the INSERT must look like one step to the other threads using db_meta:
+// cloud_status_matches() and calculate_node_alert_version() read alert_version on the same connection, and seeing it
+// empty would re-queue transitions or schedule a needless snapshot. A transaction does not isolate threads that share
+// a connection, so hold the connection mutex across both statements; the savepoint makes them all-or-nothing.
+// When another transaction is already open on db_meta (metadata_scan_host), a savepoint would only nest inside it, so
+// the rebuild is deferred to the next pass.
+//
+// Returns true when the table was rebuilt.
+static bool rebuild_host_alert_version_table(RRDHOST *host)
 {
-    sqlite3_stmt *res = NULL;
-
-    if (!PREPARE_STATEMENT(db_meta, SQL_DELETE_HOST_ALERT_VERSION_TABLE, &res))
-        return;
-
+    sqlite3_stmt *res_delete = NULL;
+    sqlite3_stmt *res_insert = NULL;
+    bool rebuilt = false;
     int param = 0;
-    SQLITE_BIND_FAIL(done, sqlite3_bind_blob(res, ++param, &host->host_id.uuid, sizeof(host->host_id.uuid), SQLITE_STATIC));
 
+    if (!PREPARE_STATEMENT(db_meta, SQL_DELETE_HOST_ALERT_VERSION_TABLE, &res_delete))
+        return false;
+
+    if (!PREPARE_STATEMENT(db_meta, SQL_REBUILD_HOST_ALERT_VERSION_TABLE, &res_insert))
+        goto done;
+
+    SQLITE_BIND_FAIL(done, sqlite3_bind_blob(res_delete, ++param, &host->host_id.uuid, sizeof(host->host_id.uuid), SQLITE_STATIC));
     param = 0;
-    int rc = execute_insert(res);
-    if (rc != SQLITE_DONE) {
-        netdata_log_error("Failed to delete the host alert version table");
+    SQLITE_BIND_FAIL(done, sqlite3_bind_blob(res_insert, ++param, &host->host_id.uuid, sizeof(host->host_id.uuid), SQLITE_STATIC));
+    param = 0;
+
+    sqlite3_mutex *db_mutex = sqlite3_db_mutex(db_meta);
+    sqlite3_mutex_enter(db_mutex);
+
+    if (!sqlite3_get_autocommit(db_meta)) {
+        sqlite3_mutex_leave(db_mutex);
         goto done;
     }
 
-    SQLITE_FINALIZE(res);
-    if (!PREPARE_STATEMENT(db_meta, SQL_REBUILD_HOST_ALERT_VERSION_TABLE, &res))
-        return;
+    if (sqlite3_exec(db_meta, "SAVEPOINT rebuild_alert_version", NULL, NULL, NULL) != SQLITE_OK) {
+        sqlite3_mutex_leave(db_mutex);
+        error_report("Failed to start rebuilding the host alert version table");
+        goto done;
+    }
 
-    param = 0;
-    SQLITE_BIND_FAIL(done, sqlite3_bind_blob(res, ++param, &host->host_id.uuid, sizeof(host->host_id.uuid), SQLITE_STATIC));
+    int rc = sqlite3_step_monitored(res_delete);
+    if (rc == SQLITE_DONE)
+        rc = sqlite3_step_monitored(res_insert);
 
-    param = 0;
-    rc = execute_insert(res);
-    if (rc != SQLITE_DONE)
-        netdata_log_error("Failed to rebuild the host alert version table");
+    if (rc == SQLITE_DONE && sqlite3_exec(db_meta, "RELEASE rebuild_alert_version", NULL, NULL, NULL) == SQLITE_OK)
+        rebuilt = true;
+    else {
+        (void)sqlite3_exec(db_meta, "ROLLBACK TO rebuild_alert_version", NULL, NULL, NULL);
+        (void)sqlite3_exec(db_meta, "RELEASE rebuild_alert_version", NULL, NULL, NULL);
+        error_report("Failed to rebuild the host alert version table, rc = %d", rc);
+    }
+
+    sqlite3_mutex_leave(db_mutex);
 
 done:
-    REPORT_BIND_FAIL(res, param);
-    SQLITE_FINALIZE(res);
+    REPORT_BIND_FAIL(res_delete, param);
+    SQLITE_FINALIZE(res_delete);
+    SQLITE_FINALIZE(res_insert);
+    return rebuilt;
 }
 
 #define SQL_PROCESS_ALERT_PENDING_QUEUE                                                                                \
@@ -907,7 +942,10 @@ void aclk_push_alert_events_for_all_hosts(void)
             // the snapshot itself is rebuilt from the health log, not from what is still queued, so a capped
             // drain cannot make it stale; the flag is already set on this path for the remainder
             (void)commit_alert_events(host);
-            rebuild_host_alert_version_table(host);
+            // the flag is already set on this path, so a deferred or failed rebuild is retried on the next pass,
+            // and the snapshot is only sent from a rebuilt table
+            if (!rebuild_host_alert_version_table(host))
+                continue;
             send_alert_snapshot_to_cloud(host);
             aclk_host_config->snapshot_count++;
             aclk_alert_snapshot_complete(aclk_host_config);
@@ -1205,37 +1243,11 @@ static void schedule_alert_snapshot_if_needed(struct aclk_sync_cfg_t *aclk_host_
     aclk_host_config->checkpoint_count++;
 }
 
-#define SQL_COUNT_SNAPSHOT_ENTRIES                                                                                     \
-    "SELECT COUNT(1) FROM alert_version av, health_log hl "                                                            \
-    "WHERE hl.host_id = @host_id AND hl.health_log_id = av.health_log_id AND av.status <> -2"
-
-static int calculate_alert_snapshot_entries(nd_uuid_t *host_uuid)
-{
-    int count = 0;
-
-    sqlite3_stmt *res = NULL;
-
-    if (!PREPARE_STATEMENT(db_meta, SQL_COUNT_SNAPSHOT_ENTRIES, &res))
-        return 0;
-
-    int param = 0;
-    SQLITE_BIND_FAIL(done, sqlite3_bind_blob(res, ++param, host_uuid, sizeof(*host_uuid), SQLITE_STATIC));
-
-    param = 0;
-    int rc = sqlite3_step_monitored(res);
-    if (rc == SQLITE_ROW)
-        count = sqlite3_column_int(res, 0);
-    else
-        error_report("Failed to select snapshot count");
-
-done:
-    REPORT_BIND_FAIL(res, param);
-    SQLITE_FINALIZE(res);
-
-    return count;
-}
-
+// The snapshot rows and their count come from ONE statement: two statements on the shared db_meta connection are not
+// isolated from the other threads writing to it, so a separate COUNT could disagree with the rows sent, telling the
+// cloud to expect chunks it never receives (or sending a chunk number twice).
 #define SQL_GET_SNAPSHOT_ENTRIES                                                                                       \
+    " WITH snapshot AS MATERIALIZED ("                                                                                 \
     " SELECT 0, hld.unique_id, hld.alarm_id, hl.config_hash_id, hld.updated_by_id, hld.when_key, "                     \
     " hld.duration, hld.non_clear_duration, hld.flags, hld.exec_run_timestamp, hld.delay_up_to_timestamp, hl.name,  "  \
     " hl.chart, hl.exec, hl.recipient, ah.source, hl.units, hld.info, hld.exec_code, hld.new_status,  "                \
@@ -1244,7 +1256,10 @@ done:
     " FROM health_log hl, alert_hash ah, health_log_detail hld, alert_version av "                                     \
     " WHERE hl.config_hash_id = ah.hash_id"                                                                            \
     " AND hl.host_id = @host_id AND hl.health_log_id = hld.health_log_id "                                             \
-    " AND hld.health_log_id = av.health_log_id AND av.unique_id = hld.unique_id AND av.status <> -2"
+    " AND hld.health_log_id = av.health_log_id AND av.unique_id = hld.unique_id AND av.status <> -2)"                  \
+    " SELECT snapshot.*, COUNT(*) OVER () FROM snapshot"
+
+#define SNAPSHOT_ENTRIES_COUNT_COLUMN 32
 
 #define ALARM_EVENTS_PER_CHUNK 1000
 void send_alert_snapshot_to_cloud(RRDHOST *host __maybe_unused)
@@ -1265,17 +1280,19 @@ void send_alert_snapshot_to_cloud(RRDHOST *host __maybe_unused)
     char node_id[UUID_STR_LEN];
     aclk_node_id_copy(aclk_host_config, node_id);
 
-    // Check the database for this node to see how many alerts we will need to put in the snapshot
-    int cnt = calculate_alert_snapshot_entries(&host->host_id.uuid);
-    if (!cnt)
-        return;
-
     sqlite3_stmt *res = NULL;
     if (!PREPARE_STATEMENT(db_meta, SQL_GET_SNAPSHOT_ENTRIES, &res))
         return;
 
     int param = 0;
     SQLITE_BIND_FAIL(done, sqlite3_bind_blob(res, ++param, &host->host_id.uuid, sizeof(host->host_id.uuid), SQLITE_STATIC));
+
+    param = 0;
+    // the first row carries the number of alerts in the snapshot; no row means there is nothing to send
+    if (sqlite3_step_monitored(res) != SQLITE_ROW)
+        goto done;
+
+    int cnt = sqlite3_column_int(res, SNAPSHOT_ENTRIES_COUNT_COLUMN);
 
     nd_uuid_t local_snapshot_uuid;
     char snapshot_uuid_str[UUID_STR_LEN];
@@ -1305,10 +1322,9 @@ void send_alert_snapshot_to_cloud(RRDHOST *host __maybe_unused)
     alarm_log.claim_id = claim_id.str;
 
     cnt = 0;
-    param = 0;
     uint64_t version = 0;
     int total_count = 0;
-    while (sqlite3_step_monitored(res) == SQLITE_ROW) {
+    do {
         cnt++;
         total_count++;
 
@@ -1333,8 +1349,9 @@ void send_alert_snapshot_to_cloud(RRDHOST *host __maybe_unused)
             }
         }
         destroy_alarm_log_entry(&alarm_log);
-    }
-    if (cnt)
+    } while (sqlite3_step_monitored(res) == SQLITE_ROW);
+
+    if (cnt && aclk_online_for_alerts())
         aclk_send_alarm_snapshot(snapshot_proto);
     else
         destroy_alarm_snapshot_proto(snapshot_proto);

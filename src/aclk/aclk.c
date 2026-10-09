@@ -1142,9 +1142,9 @@ void aclk_send_node_instances()
     dfe_done(host);
 }
 
-void aclk_send_bin_msg(char *msg, size_t msg_len, enum aclk_topics subtopic, const char *msgname)
+int aclk_send_bin_msg(char *msg, size_t msg_len, enum aclk_topics subtopic, const char *msgname)
 {
-    (void)aclk_send_bin_message_subtopic_pid(mqttwss_client, msg, msg_len, subtopic, msgname, NULL);
+    return aclk_send_bin_message_subtopic_pid(mqttwss_client, msg, msg_len, subtopic, msgname, NULL);
 }
 
 static void fill_alert_status_for_host(BUFFER *wb, RRDHOST *host)
