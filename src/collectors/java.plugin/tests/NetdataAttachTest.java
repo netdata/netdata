@@ -53,17 +53,35 @@ public final class NetdataAttachTest {
         fixed.setProperty("otel.instrumentation.common.default-enabled", "false");
         fixed.setProperty("otel.instrumentation.runtime-telemetry.enabled", "true");
         Properties system = new Properties();
+        system.setProperty("otel.traces.exporter", "otlp");
+        require(NetdataAttach.compatibleAgentOptions(options, system));
+        system.setProperty("OTEL.TRACES.EXPORTER", "otlp");
+        require(!NetdataAttach.compatibleAgentOptions(options, system));
+        system.setProperty("OTEL.TRACES.EXPORTER", "none");
+        require(NetdataAttach.compatibleAgentOptions(options, system));
+        system.setProperty("OTEL.EXPORTER.OTLP.METRICS.ENDPOINT", "http://unrelated.invalid");
+        require(!NetdataAttach.compatibleAgentOptions(options, system));
+        system.clear();
         require(NetdataAttach.compatibleConfiguration(fixed, system, "UNRELATED=value\u0000"));
-        require(NetdataAttach.compatibleConfiguration(fixed, system,
+        require(!NetdataAttach.compatibleConfiguration(fixed, system,
                 "OTEL_INSTRUMENTATION_RUNTIME_TELEMETRY_ENABLED= TRUE \u0000"));
         require(!NetdataAttach.compatibleConfiguration(fixed, system,
                 "OTEL_INSTRUMENTATION_RUNTIME_TELEMETRY_ENABLED=false\u0000"));
         system.setProperty("otel.instrumentation.common.default-enabled", "true");
         require(!NetdataAttach.compatibleConfiguration(fixed, system, ""));
-        system.setProperty("otel.instrumentation.common.default-enabled", " FALSE ");
+        system.setProperty("otel.instrumentation.common.default-enabled", "FALSE");
         // A matching system property has precedence over a conflicting environment value.
         require(NetdataAttach.compatibleConfiguration(fixed, system,
                 "OTEL_INSTRUMENTATION_COMMON_DEFAULT_ENABLED=true\u0000"));
+        system.setProperty("otel.instrumentation.runtime.telemetry.enabled", "false");
+        require(!NetdataAttach.compatibleConfiguration(fixed, system, ""));
+        system.setProperty("otel.instrumentation.runtime-telemetry.enabled", "true");
+        require(!NetdataAttach.compatibleConfiguration(fixed, system, ""));
+        system.clear();
+        require(!NetdataAttach.compatibleConfiguration(fixed, system,
+                "otel_instrumentation_runtime_telemetry_enabled=false\u0000"));
+        require(NetdataAttach.compatibleConfiguration(fixed, system,
+                "otel_instrumentation_runtime_telemetry_enabled=TRUE\u0000"));
         String environment = "OTEL_INSTRUMENTATION_RUNTIME_TELEMETRY_ENABLED=true\u0000";
         require(NetdataAttach.readEnvironment(new ByteArrayInputStream(
                 environment.getBytes(StandardCharsets.ISO_8859_1))).equals(environment));

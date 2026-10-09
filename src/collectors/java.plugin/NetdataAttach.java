@@ -84,24 +84,52 @@ public final class NetdataAttach {
         return new String(bytes, StandardCharsets.ISO_8859_1);
     }
 
+    static String normalizedProperty(String key) {
+        return key.toLowerCase(java.util.Locale.ROOT).replace('-', '.');
+    }
+
+    static boolean compatibleAgentOptions(String options, Properties system) {
+        for (String option : options.split(";")) {
+            int separator = option.indexOf('=');
+            String key = option.substring(0, separator);
+            String expected = option.substring(separator + 1);
+            for (String candidate : system.stringPropertyNames()) {
+                // The agent overwrites exact keys. Other normalized spellings
+                // would survive and compete when the SDK merges properties.
+                if (!candidate.equals(key) && normalizedProperty(candidate).equals(normalizedProperty(key))
+                        && !system.getProperty(candidate).equals(expected)) return false;
+            }
+        }
+        return true;
+    }
+
     static boolean compatibleConfiguration(Properties fixed, Properties system, String environment) {
         for (String key : fixed.stringPropertyNames()) {
             if (!key.startsWith("otel.instrumentation.")) continue;
-            String expected = fixed.getProperty(key).trim();
-            String actual = system.getProperty(key);
-            if (actual == null) {
-                String envKey = key.toUpperCase(java.util.Locale.ROOT).replace('.', '_').replace('-', '_') + "=";
-                for (int offset = 0; offset < environment.length();) {
-                    int end = environment.indexOf('\u0000', offset);
-                    if (end < 0) end = environment.length();
-                    if (offset + envKey.length() <= end && environment.startsWith(envKey, offset)) {
-                        actual = environment.substring(offset + envKey.length(), end);
-                        break;
-                    }
-                    offset = end + 1;
+            String normalized = normalizedProperty(key);
+            String expected = fixed.getProperty(key);
+            boolean haveSystem = false;
+            // OTel merges normalized keys, but does not trim boolean values.
+            // Conflicting aliases must not depend on Properties iteration order.
+            for (String candidate : system.stringPropertyNames()) {
+                if (normalizedProperty(candidate).equals(normalized)) {
+                    haveSystem = true;
+                    if (!system.getProperty(candidate).equalsIgnoreCase(expected)) return false;
                 }
             }
-            if (actual != null && !actual.trim().equalsIgnoreCase(expected)) return false;
+            if (haveSystem) continue;
+            for (int offset = 0; offset < environment.length();) {
+                int end = environment.indexOf('\u0000', offset);
+                if (end < 0) end = environment.length();
+                int separator = environment.indexOf('=', offset);
+                if (separator >= offset && separator < end) {
+                    String candidate = environment.substring(offset, separator)
+                            .toLowerCase(java.util.Locale.ROOT).replace('_', '.');
+                    if (candidate.equals(normalized)
+                            && !environment.substring(separator + 1, end).equalsIgnoreCase(expected)) return false;
+                }
+                offset = end + 1;
+            }
         }
         return true;
     }
@@ -126,6 +154,7 @@ public final class NetdataAttach {
             VirtualMachine vm = VirtualMachine.attach(pid);
             try {
                 Properties properties = vm.getSystemProperties();
+                if (!compatibleAgentOptions(options, properties)) throw new IllegalStateException();
                 Properties fixed = new Properties();
                 try (InputStream config = Files.newInputStream(Path.of(directory, "otel.properties"))) {
                     fixed.load(config);
