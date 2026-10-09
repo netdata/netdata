@@ -200,9 +200,9 @@ sqlite3 *db_meta = NULL;
     "ON CONFLICT(dim_id) DO UPDATE SET id=excluded.id, name=excluded.name, multiplier=excluded.multiplier, "           \
     "divisor=excluded.divisor, algorithm=excluded.algorithm, options=excluded.options"
 
-#define SELECT_DIMENSION_LIST "SELECT dim_id, rowid FROM dimension WHERE rowid > @row_id"
-#define SELECT_CHART_LIST "SELECT chart_id, rowid FROM chart WHERE rowid > @row_id"
-#define SELECT_CHART_LABEL_LIST "SELECT chart_id, rowid FROM chart_label WHERE rowid > @row_id"
+#define SELECT_DIMENSION_LIST "SELECT dim_id, rowid FROM dimension WHERE rowid > @row_id AND rowid <= @max_row_id"
+#define SELECT_CHART_LIST "SELECT chart_id, rowid FROM chart WHERE rowid > @row_id AND rowid <= @max_row_id"
+#define SELECT_CHART_LABEL_LIST "SELECT chart_id, rowid FROM chart_label WHERE rowid > @row_id AND rowid <= @max_row_id"
 
 #define SQL_STORE_HOST_SYSTEM_INFO_VALUES                                                                              \
     "INSERT OR REPLACE INTO host_info (host_id, system_key, system_value, date_created) VALUES "                       \
@@ -1345,6 +1345,7 @@ static bool dimension_can_be_deleted(nd_uuid_t *dim_uuid __maybe_unused, sqlite3
 #endif
 }
 
+// Returns true when the scan reached the end of the snapshot (no rows left up to max_row_id)
 static bool run_cleanup_loop(
     sqlite3_stmt *res,
     struct meta_config_s *config,
@@ -1353,28 +1354,38 @@ static bool run_cleanup_loop(
     uint32_t *total_checked,
     uint32_t *total_deleted,
     uint64_t *row_id,
+    uint64_t max_row_id,
     sqlite3_stmt **check_stmt,
     sqlite3_stmt **action_stmt,
     bool check_flag,
     bool action_flag)
 {
     if (unlikely(SHUTDOWN_REQUESTED(config)))
-        return true;
+        return false;
 
     int rc = sqlite3_bind_int64(res, 1, (sqlite3_int64) *row_id);
+    if (likely(rc == SQLITE_OK))
+        rc = sqlite3_bind_int64(res, 2, (sqlite3_int64) max_row_id);
     if (unlikely(rc != SQLITE_OK))
-        return true;
+        return false;
 
     time_t start_running = now_monotonic_sec();
     bool time_expired = false;
+    bool reached_end = false;
 
     uint32_t l_checked = 0;
     uint32_t l_deleted = 0;
-    while (!time_expired && sqlite3_step_monitored(res) == SQLITE_ROW) {
+    while (!time_expired) {
         nd_uuid_t uuid = {0};
 
         if (unlikely(SHUTDOWN_REQUESTED(config)))
             break;
+
+        rc = sqlite3_step_monitored(res);
+        if (rc != SQLITE_ROW) {
+            reached_end = (rc == SQLITE_DONE);
+            break;
+        }
 
         *row_id = sqlite3_column_int64(res, 1);
         if (unlikely(!sqlite3_column_uuid_copy(res, 0, uuid)))
@@ -1393,7 +1404,7 @@ static bool run_cleanup_loop(
 
     (*total_checked) += l_checked;
     (*total_deleted) += l_deleted;
-    return time_expired;
+    return reached_end;
 }
 
 
@@ -1505,7 +1516,7 @@ static uint64_t get_rowid_from_statement(const char *sql)
 //   else                  -> run one cleanup_loop slice and re-arm short timer
 struct cleanup_cycle {
     // descriptor (immutable)
-    const char *select_sql;        // SELECT id, rowid FROM <table> WHERE rowid > ?
+    const char *select_sql;        // SELECT id, rowid FROM <table> WHERE rowid > ? AND rowid <= ?
     const char *max_rowid_sql;     // SELECT MAX(rowid) FROM <table>
     bool (*check_cb)(nd_uuid_t *, sqlite3_stmt **, bool);
     void (*action_cb)(nd_uuid_t *, sqlite3_stmt **, bool);
@@ -1582,13 +1593,18 @@ static bool run_cleanup_cycle(struct cleanup_cycle *c, struct meta_config_s *wc)
     sqlite3_stmt *check_res = NULL;
     sqlite3_stmt *action_res = NULL;
 
-    (void) run_cleanup_loop(
+    bool reached_end = run_cleanup_loop(
         res, wc,
         c->check_cb, c->action_cb,
         &total_checked, &total_deleted,
-        &c->last_row_id,
+        &c->last_row_id, c->max_row_id,
         &check_res, &action_res,
         c->check_flag, c->action_flag);
+
+    // The rows up to the snapshot are done even when the last ones were deleted
+    // before the scan reached them; without this the pass would never complete.
+    if (reached_end)
+        c->last_row_id = c->max_row_id;
 
     SQLITE_FINALIZE(check_res);
     SQLITE_FINALIZE(action_res);
@@ -1757,11 +1773,15 @@ void vacuum_database(sqlite3 *database, const char *db_alias, int threshold, int
 #define SQL_SELECT_HOST_CTX_CHART_DIM_LIST                                                                             \
     "SELECT d.dim_id, d.rowid FROM chart c, dimension d WHERE c.chart_id = d.chart_id AND c.rowid = @rowid"
 
+// The deletions grow the WAL; check its size every this many dimensions, not on every one
+#define METADATA_WAL_CHECK_ROWS (256)
+
+// Returns true when every dimension of the chart was checked
 static bool clean_host_chart_dimensions(sqlite3_stmt **res, int64_t chart_row_id, size_t *checked, size_t *deleted)
 {
     struct meta_config_s *config = &meta_config;
 
-    bool can_continue = false;
+    bool completed = false;
 
     if (!*res) {
         if (!PREPARE_STATEMENT(db_meta, SQL_SELECT_HOST_CTX_CHART_DIM_LIST, res))
@@ -1773,10 +1793,12 @@ static bool clean_host_chart_dimensions(sqlite3_stmt **res, int64_t chart_row_id
 
     sqlite3_stmt *dim_del_stmt = NULL;
 
-    can_continue = true;
-    while (can_continue && sqlite3_step_monitored(*res) == SQLITE_ROW) {
-        nd_uuid_t dim_uuid;
+    int rc;
+    while ((rc = sqlite3_step_monitored(*res)) == SQLITE_ROW) {
+        if (SHUTDOWN_REQUESTED(config))
+            break;
 
+        nd_uuid_t dim_uuid;
         if (!sqlite3_column_uuid_copy(*res, 0, dim_uuid))
             continue;
 
@@ -1787,14 +1809,17 @@ static bool clean_host_chart_dimensions(sqlite3_stmt **res, int64_t chart_row_id
             (*deleted)++;
         }
         (*checked)++;
-        can_continue = (!SHUTDOWN_REQUESTED(config)) && sql_metadata_wal_size_acceptable();
+
+        if ((*checked % METADATA_WAL_CHECK_ROWS) == 0 && !sql_metadata_wal_size_acceptable())
+            break;
     }
+    completed = (rc == SQLITE_DONE);
     SQLITE_FINALIZE(dim_del_stmt);
 
 done:
     REPORT_BIND_FAIL(*res, param);
     SQLITE_RESET(*res);
-    return can_continue;
+    return completed;
 }
 
 #define SQL_SELECT_HOST_CTX_CHART_LIST "SELECT rowid, context FROM chart WHERE host_id = @host"
@@ -1829,28 +1854,41 @@ static void cleanup_host_context_metadata(Pvoid_t CTX_JudyL, void *data)
     size_t deleted = 0;
     size_t checked = 0;
 
-    bool can_continue = true;
-    while (can_continue && sqlite3_step_monitored(res) == SQLITE_ROW) {
+    int rc;
+    while ((rc = sqlite3_step_monitored(res)) == SQLITE_ROW) {
+        if (SHUTDOWN_REQUESTED(config))
+            break;
+
         chart_row_id = sqlite3_column_int64(res, 0);
         const char *context = (char *)sqlite3_column_text(res, 1);
         STRING *ctx = string_strdupz(context);
         Pvalue = JudyLGet(CTX_JudyL, (Word_t)ctx, PJE0);
-        if (Pvalue) {
-            can_continue = clean_host_chart_dimensions(&dimension_res, chart_row_id, &checked, &deleted);
-            ctx_delete_metadata_cleanup_context(&context_res, &host->host_id.uuid, context);
-        }
         string_freez(ctx);
-        can_continue = can_continue && (!SHUTDOWN_REQUESTED(config)) && sql_metadata_wal_size_acceptable();
+
+        if (Pvalue && !clean_host_chart_dimensions(&dimension_res, chart_row_id, &checked, &deleted))
+            break;
     }
     SQLITE_FINALIZE(dimension_res);
+
+    // A context can have more charts further down the walk, so the queued
+    // contexts are removed only after all the charts of the host were checked;
+    // an interrupted walk leaves them queued for the next run.
+    bool completed = (rc == SQLITE_DONE);
+    if (completed) {
+        bool first = true;
+        Word_t Index = 0;
+        while ((Pvalue = JudyLFirstThenNext(CTX_JudyL, &Index, &first)))
+            ctx_delete_metadata_cleanup_context(&context_res, &host->host_id.uuid, string2str((STRING *)Index));
+    }
     SQLITE_FINALIZE(context_res);
 
     nd_log_daemon(
         NDLP_DEBUG,
-        "Verified the contexts of host %s (Checked %zu metrics and removed %zu)",
+        "Verified the contexts of host %s (Checked %zu metrics and removed %zu)%s",
         rrdhost_hostname(host),
         checked,
-        deleted);
+        deleted,
+        completed ? "" : ", interrupted");
 
 done:
     REPORT_BIND_FAIL(res, param);
@@ -2248,8 +2286,6 @@ static void after_metadata_hosts(uv_work_t *req, int status __maybe_unused)
         if(!__atomic_load_n(&ae->pending_save_count, __ATOMIC_RELAXED)) {
             health_alarm_log_free_one_nochecks_nounlink(ae);
             (void) JudyLDel(&config->ae_DelJudyL, Index, PJE0);
-            first = true;
-            Index = 0;
         }
     }
 
@@ -2338,8 +2374,11 @@ static void metadata_scan_host(struct meta_config_s *config, RRDHOST *host, bool
                 worker_is_busy(UV_EVENT_STORE_CHART);
 
             rc = check_and_update_chart_labels(st, work_buffer);
-            if (unlikely(rc))
+            if (unlikely(rc)) {
+                host_need_recheck = true;
+                rrdset_flag_set(st, RRDSET_FLAG_METADATA_UPDATE);
                 error_report("METADATA: 'host:%s': Failed to update labels for chart %s", rrdhost_hostname(host), rrdset_name(st));
+            }
 
             rc = store_chart_metadata(st, &store_chart);
             if (unlikely(rc)) {
