@@ -87,8 +87,8 @@ Netdata automatically generates host labels when it starts, capturing:
 | Infrastructure | Virtualization layer, Parent-child streaming status                                         |
 
 On every platform, Netdata refreshes CPU count, total RAM, disk capacity, and the default-interface name/IP/detection labels
-every five minutes after the previous check finishes. Runtime changes such as VM CPU or RAM resizing and a changed default
-route update these labels without a restart. CPU model and frequency, OS/kernel details, and cloud/container/virtualization
+five minutes after startup, then thirty minutes after the previous check finishes. Runtime changes such as VM CPU or RAM
+resizing and a changed default route update these labels without a restart. CPU model and frequency, OS/kernel details, and cloud/container/virtualization
 identity remain startup-only.
 On Linux, `_system_cores` prefers present logical CPUs, excluding empty hot-plug slots and independent of Agent CPU affinity.
 With lxcfs, it uses the container's virtualized CPU count. Startup and refresh use the same sources and fallback order.

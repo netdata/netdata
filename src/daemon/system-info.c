@@ -13,8 +13,9 @@ void system_info_main(void *ptr) {
     worker_register_job_name(0, "detect");
     worker_register_job_name(1, "publish");
 
-    const usec_t interval = 5 * 60 * USEC_PER_SEC;
-    usec_t next = now_monotonic_usec() + interval;
+    const usec_t initial_delay = 5 * 60 * USEC_PER_SEC;
+    const usec_t interval = 30 * 60 * USEC_PER_SEC;
+    usec_t next = now_monotonic_usec() + initial_delay;
     heartbeat_t hb;
     heartbeat_init(&hb, USEC_PER_SEC);
 

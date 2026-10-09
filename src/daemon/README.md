@@ -29,7 +29,8 @@ netdata -h
 ## System Information Refresh
 
 The Agent detects full system information at startup. A background thread refreshes CPU count, total RAM, disk capacity,
-and the OS default interface name, IP address, and detection method every five minutes after the previous check finishes.
+and the OS default interface name, IP address, and detection method. The first refresh runs five minutes after startup;
+subsequent refreshes run thirty minutes after the previous check finishes.
 Checks do not overlap. Changed values update the cached host information and automatic host labels and propagate through
 streaming to Parents. CPU model and frequency, OS/kernel details, and cloud/container/virtualization identity remain
 startup-only on every platform.
