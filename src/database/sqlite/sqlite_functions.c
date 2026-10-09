@@ -285,12 +285,14 @@ static bool mark_database_to_recover(sqlite3_stmt *res, sqlite3 *database, int r
 // A corrupt metadata database is only found by whatever statement happens to read the damaged pages, and most of
 // them are SELECTs that never went through execute_insert() or db_execute(). Mark it from any step, as the init batch
 // does: SQLITE_CORRUPT schedules a recovery and SQLITE_NOTADB a reset (the file is renamed to netdata-meta.bad) on the
-// next start. Only the first attempt per process does any work; the latch, the marker and the log line are taken
-// together under the lock.
+// next start. One thread at a time writes the marker, outside the lock; once it is written no one tries again, and a
+// failed write is retried by the next corrupt step but logged only once.
 static void mark_database_to_recover_once(sqlite3_stmt *stmt, int rc)
 {
     static SPINLOCK spinlock = SPINLOCK_INITIALIZER;
-    static bool attempted = false;
+    static bool marked = false;
+    static bool in_progress = false;
+    static bool failure_logged = false;
 
     sqlite3 *database = sqlite3_db_handle(stmt);
     if (database != db_meta)
@@ -302,18 +304,32 @@ static void mark_database_to_recover_once(sqlite3_stmt *stmt, int rc)
         return;
 
     spinlock_lock(&spinlock);
-    if (!attempted) {
-        attempted = true;
-        if (mark_database_to_recover(stmt, database, rc))
-            nd_log(NDLS_DAEMON, NDLP_ERR,
-                   "SQLite reported %s (rc=%d) on the metadata database; it will be %s on the next start",
-                   sqlite3_errstr(rc), rc, rc == SQLITE_CORRUPT ? "recovered" : "reset");
-        else
-            nd_log(NDLS_DAEMON, NDLP_ERR,
-                   "SQLite reported %s (rc=%d) on the metadata database, but it could not be marked for %s",
-                   sqlite3_errstr(rc), rc, rc == SQLITE_CORRUPT ? "recovery" : "reset");
-    }
+    bool skip = marked || in_progress;
+    if (!skip)
+        in_progress = true;
     spinlock_unlock(&spinlock);
+
+    if (skip)
+        return;
+
+    bool ok = mark_database_to_recover(stmt, database, rc);
+
+    spinlock_lock(&spinlock);
+    marked = ok;
+    in_progress = false;
+    bool log_failure = !ok && !failure_logged;
+    if (log_failure)
+        failure_logged = true;
+    spinlock_unlock(&spinlock);
+
+    if (ok)
+        nd_log(NDLS_DAEMON, NDLP_ERR,
+               "SQLite reported %s (rc=%d) on the metadata database; it will be %s on the next start",
+               sqlite3_errstr(rc), rc, rc == SQLITE_CORRUPT ? "recovered" : "reset");
+    else if (log_failure)
+        nd_log(NDLS_DAEMON, NDLP_ERR,
+               "SQLite reported %s (rc=%d) on the metadata database, but it could not be marked for %s",
+               sqlite3_errstr(rc), rc, rc == SQLITE_CORRUPT ? "recovery" : "reset");
 }
 
 SQLITE_API int sqlite3_step_monitored(sqlite3_stmt *stmt) {
