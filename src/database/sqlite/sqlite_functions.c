@@ -261,34 +261,6 @@ SQLITE_API int sqlite3_exec_monitored(
     return rc;
 }
 
-SQLITE_API int sqlite3_step_monitored(sqlite3_stmt *stmt) {
-    internal_fatal(!nd_thread_runs_sql(), "THIS THREAD CANNOT RUN SQL");
-
-    int rc;
-    int cnt = 0;
-
-    while (cnt++ < SQL_MAX_RETRY) {
-        rc = sqlite3_step(stmt);
-        switch (rc) {
-            case SQLITE_DONE:
-                pulse_sqlite3_query_completed(1, 0, 0);
-                break;
-            case SQLITE_ROW:
-                pulse_sqlite3_row_completed();
-                break;
-            case SQLITE_BUSY:
-            case SQLITE_LOCKED:
-                pulse_sqlite3_query_completed(false, rc == SQLITE_BUSY, rc == SQLITE_LOCKED);
-                sleep_usec(SQLITE_INSERT_DELAY * USEC_PER_MS);
-                continue;
-            default:
-                break;
-        }
-        break;
-    }
-    return rc;
-}
-
 static bool mark_database_to_recover(sqlite3_stmt *res, sqlite3 *database, int rc)
 {
 
@@ -310,14 +282,71 @@ static bool mark_database_to_recover(sqlite3_stmt *res, sqlite3 *database, int r
     return false;
 }
 
-int execute_insert(sqlite3_stmt *res) {
-    int rc;
-    rc =  sqlite3_step_monitored(res);
-    if (rc == SQLITE_CORRUPT) {
-        (void)mark_database_to_recover(res, NULL, rc);
-        error_report("SQLite error %d", rc);
+// A corrupt metadata database is only found by whatever statement happens to read the damaged pages, and most of
+// them are SELECTs that never went through execute_insert() or db_execute(). Mark it from any step, as the init batch
+// does: SQLITE_CORRUPT schedules a recovery and SQLITE_NOTADB a reset (the file is renamed to netdata-meta.bad) on the
+// next start. Only the first attempt per process does any work; the latch, the marker and the log line are taken
+// together under the lock.
+static void mark_database_to_recover_once(sqlite3_stmt *stmt, int rc)
+{
+    static SPINLOCK spinlock = SPINLOCK_INITIALIZER;
+    static bool attempted = false;
+
+    sqlite3 *database = sqlite3_db_handle(stmt);
+    if (database != db_meta)
+        return;
+
+    // an in-memory metadata database has no file to recover
+    const char *filename = sqlite3_db_filename(database, "main");
+    if (!filename || !*filename)
+        return;
+
+    spinlock_lock(&spinlock);
+    if (!attempted) {
+        attempted = true;
+        if (mark_database_to_recover(stmt, database, rc))
+            nd_log(NDLS_DAEMON, NDLP_ERR,
+                   "SQLite reported %s (rc=%d) on the metadata database; it will be %s on the next start",
+                   sqlite3_errstr(rc), rc, rc == SQLITE_CORRUPT ? "recovered" : "reset");
+        else
+            nd_log(NDLS_DAEMON, NDLP_ERR,
+                   "SQLite reported %s (rc=%d) on the metadata database, but it could not be marked for %s",
+                   sqlite3_errstr(rc), rc, rc == SQLITE_CORRUPT ? "recovery" : "reset");
     }
+    spinlock_unlock(&spinlock);
+}
+
+SQLITE_API int sqlite3_step_monitored(sqlite3_stmt *stmt) {
+    internal_fatal(!nd_thread_runs_sql(), "THIS THREAD CANNOT RUN SQL");
+
+    int rc;
+    int cnt = 0;
+
+    while (cnt++ < SQL_MAX_RETRY) {
+        rc = sqlite3_step(stmt);
+        if (rc != SQLITE_BUSY && rc != SQLITE_LOCKED)
+            break;
+        sleep_usec(SQLITE_INSERT_DELAY * USEC_PER_MS);
+    }
+
+    // one count per call, from the final result: a retry that later succeeds is not a failed query,
+    // and errors other than busy/locked are failures too
+    if (rc == SQLITE_ROW)
+        pulse_sqlite3_row_completed();
+    else if (rc == SQLITE_DONE)
+        pulse_sqlite3_query_completed(true, false, false);
+    else {
+        pulse_sqlite3_query_completed(false, rc == SQLITE_BUSY, rc == SQLITE_LOCKED);
+        if (rc == SQLITE_CORRUPT || rc == SQLITE_NOTADB)
+            mark_database_to_recover_once(stmt, rc);
+    }
+
     return rc;
+}
+
+int execute_insert(sqlite3_stmt *res) {
+    // sqlite3_step_monitored() marks a corrupt metadata database for recovery
+    return sqlite3_step_monitored(res);
 }
 
 int configure_sqlite_database(sqlite3 *database, int target_version, const char *description)
@@ -914,11 +943,11 @@ int sqlite_library_init(void)
         (void) sqlite3_soft_heap_limit64(SQLITE_HEAP_SOFT_LIMIT);
         int64_t soft_limit_bytes = sqlite3_soft_heap_limit64(-1);
 
-        const char sqlite_hard_limit_mb[32];
-        size_snprintf_bytes((char *)sqlite_hard_limit_mb, sizeof(sqlite_hard_limit_mb), hard_limit_bytes);
+        char sqlite_hard_limit_mb[32];
+        size_snprintf_bytes(sqlite_hard_limit_mb, sizeof(sqlite_hard_limit_mb), hard_limit_bytes);
 
-        const char sqlite_soft_limit_mb[32];
-        size_snprintf_bytes((char *)sqlite_soft_limit_mb, sizeof(sqlite_soft_limit_mb), soft_limit_bytes);
+        char sqlite_soft_limit_mb[32];
+        size_snprintf_bytes(sqlite_soft_limit_mb, sizeof(sqlite_soft_limit_mb), soft_limit_bytes);
 
         nd_log_daemon(
             NDLP_INFO, "SQLITE: heap memory hard limit %s, soft limit %s", sqlite_hard_limit_mb, sqlite_soft_limit_mb);
