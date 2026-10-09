@@ -302,7 +302,8 @@ def main(argv):
         failed = True
 
     if checked == 0:
-        print('ERROR: no AArch64 executables found')
+        if not walk_errors:  # otherwise the walk errors above are the cause
+            print('ERROR: no AArch64 executables found')
         return 1
     print(f'checked {checked} AArch64 executable(s): {"FAILED" if failed else "OK"}')
     return 1 if failed else 0

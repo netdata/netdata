@@ -144,6 +144,22 @@ class ElfTests(unittest.TestCase):
         self.assertEqual(rc, 0, out)
         self.assertIn('NOTICE: go-prog', out)
 
+    @unittest.skipIf(os.geteuid() == 0, 'root can read any directory')
+    def test_unreadable_top_directory_reports_the_cause(self):
+        with tempfile.TemporaryDirectory() as d:
+            top = Path(d, 'top')
+            top.mkdir()
+            top.chmod(0)
+            try:
+                out = io.StringIO()
+                with contextlib.redirect_stdout(out):
+                    rc = check.main(['check', str(top)])
+            finally:
+                top.chmod(0o700)
+        self.assertEqual(rc, 1)
+        self.assertIn('ERROR: .: Permission denied', out.getvalue())
+        self.assertNotIn('no AArch64 executables found', out.getvalue())
+
     def test_go_build_id_note_alone_is_not_go(self):
         not_go = make_elf(self.BAD, extra_sections=[('.note.go.buildid', b'\0' * 16)])
         rc, out = self.run_dir({'prog': not_go})
