@@ -547,6 +547,11 @@ def top_level_heading_count(markdown):
     return len(re.findall(r"^# (?!#)", remove_fenced_code(markdown), flags=re.MULTILINE))
 
 
+def workflow_action(step):
+    """Return a workflow step's action without its ref; refs are SHA-pinned and bumped by Dependabot."""
+    return step.get("uses", "").split("@", 1)[0]
+
+
 def parse_description_with_learn_legacy_parser(description_line):
     """Apply the description-relevant behavior of Learn ingest's read_metadata()."""
     value = description_line.split(": ", 1)[1]
@@ -1396,7 +1401,7 @@ class DocumentationSourceRegressionTest(unittest.TestCase):
                     names.index("Generate Integrations"),
                     names.index("Generate src/collectors/SERVICE-DISCOVERY.md"),
                 )
-                self.assertTrue(any(step.get("uses") == "actions/setup-go@v7" for step in steps))
+                self.assertTrue(any(workflow_action(step) == "actions/setup-go" for step in steps))
 
                 environment = "virtualenv" if workflow.name == "generate-integrations.yml" else "venv"
                 documentation_steps = {
@@ -1425,7 +1430,7 @@ class DocumentationSourceRegressionTest(unittest.TestCase):
         post_merge_by_name = {step["name"]: step for step in post_merge_steps}
         cleanup = post_merge_by_name["Clean Up Temporary Data"]["run"]
         self.assertIn("src/go/plugin/go.d/collector/snmp/npm-catalog/metrics-metadata-gaps.txt", cleanup)
-        self.assertEqual(post_merge_by_name["Create PR"]["uses"], "peter-evans/create-pull-request@v8")
+        self.assertEqual(workflow_action(post_merge_by_name["Create PR"]), "peter-evans/create-pull-request")
 
     def test_map_descriptions_are_present_valid_and_unique(self):
         map_data = yaml.load((REPO_ROOT / "docs/.map/map.yaml").read_text(encoding="utf-8"))
