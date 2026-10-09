@@ -310,3 +310,32 @@ Run the focused checks with:
 go -C src/go test -race -count=1 ./plugin/java/... ./cmd/javaplugin ./cmd/javahelper
 go -C src/go vet ./plugin/java/... ./cmd/javaplugin ./cmd/javahelper
 ```
+
+### Native Linux acceptance
+
+`native_plugin_checks.py` exercises the installed artifacts on a Linux host with passwordless sudo and a `netdata`
+account. It refuses to start if any Java process already exists, because the installed plugin discovers the host.
+Use a separate, root-owned installation prefix and a Netdata binary built for that prefix, including dashboard files.
+The existing system Netdata service is not used or restarted. Prepare the Spring fixture JAR and `HttpLoad.class`
+from this directory using the private build tools described by the plugin build.
+
+```sh
+python3 tests/java-monitoring-spike/native_plugin_checks.py \
+  --prefix /opt/netdata-java-test \
+  --netdata /opt/netdata-java-test/usr/sbin/netdata \
+  --app /opt/netdata-java-test/fixtures/app.jar \
+  --load /opt/netdata-java-test/fixtures \
+  --output .local/java-monitoring-spike/native-run
+```
+
+The output directory must be new. The harness checks installed plugin execution as `netdata`, creates uniquely named,
+resource-limited systemd units, uses two non-root fixture UIDs, and verifies every chart dimension has fresh stored
+samples. It also tests PrivateTmp, blocked/root-owned JVMs, persisted attachment state, renaming, exclusion and
+application replacement. Cleanup stops only units with its exact ownership description. Generated files remain in the
+private prefix for inspection. `--hold-seconds 180` leaves the successful test running briefly for dashboard inspection;
+creating `continue` in the output directory ends the hold. `environment.json` supplies its loopback dashboard address.
+
+Run `native_plugin_checks.py --self-test` for command-status/redaction and unit-ownership guards. The standalone
+`src/collectors/java.plugin/tests/NetdataAttachTest.java` compiles alongside `NetdataAttach.java` and verifies Attach
+argument and OpenTelemetry configuration boundaries without attaching to a JVM. Native results and limitations are
+recorded in [NATIVE_PLUGIN_RESULTS.md](NATIVE_PLUGIN_RESULTS.md).
