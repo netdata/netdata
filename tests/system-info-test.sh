@@ -195,13 +195,14 @@ case "$probe:$*" in
         printf 'total %s\n' "${TEST_DISK_KB:-1048576}" ;;
     route:*)
         case "${NETWORK_TEST:-present}" in
-            present|address-failed) printf 'interface: test0\n' ;;
+            present|address-failed|no-address) printf 'interface: test0\n' ;;
             unsafe) printf 'interface: test0\r\n' ;;
             *) exit 1 ;;
         esac ;;
     netstat:*) [ "${NETWORK_TEST:-present}" = absent ] || exit 1 ;;
     ifconfig:*)
         [ "${NETWORK_TEST:-present}" != address-failed ] || exit 1
+        [ "${NETWORK_TEST:-present}" != no-address ] || exit 0
         printf 'inet 192.0.2.4 netmask 0xffffff00\n' ;;
     lscpu:*) printf 'CPU(s): 8\nModel name: Cortex-A55\nModel name: Cortex-A76\nCPU MHz: %s\n' "${TEST_FREQUENCY:-1800}" ;;
     nproc:*)
@@ -311,9 +312,9 @@ for unsafe in '12\r' '12\tbad'; do
     assert_record F NETDATA_SYSTEM_CPU_LOGICAL_CPU_COUNT ''
     assert_record V NETDATA_SYSTEM_TOTAL_RAM 1073741824
 done
-for network_case in absent failed address-failed unsafe; do
+for network_case in absent failed address-failed unsafe no-address; do
     run_runtime NETWORK_TEST="$network_case"
-    case "$network_case" in absent) network_status=A ;; *) network_status=F ;; esac
+    case "$network_case" in absent|no-address) network_status=A ;; *) network_status=F ;; esac
     for field in NAME IP DETECTION; do
         assert_record "$network_status" "NETDATA_SYSTEM_DEFAULT_INTERFACE_$field" ''
     done
@@ -362,6 +363,11 @@ done
 plain_output=$(PATH="${test_dir}/runtime-bin:${PATH}" RUNTIME_PROBE_LOG="${test_dir}/runtime-probes.log" \
     NETWORK_TEST=absent /bin/sh "${system_info_script}")
 [ "$plain_output" = "$startup_output" ]
+startup_output=$(PATH="${test_dir}/runtime-bin:${PATH}" RUNTIME_PROBE_LOG="${test_dir}/runtime-probes.log" \
+    NETWORK_TEST=no-address /bin/sh "${system_info_script}" --bounded)
+for record in NAME=unknown IP=unknown DETECTION=route; do
+    printf '%s\n' "$startup_output" | grep -Fx "NETDATA_SYSTEM_DEFAULT_INTERFACE_${record}" >/dev/null
+done
 
 # A matching kubelet process must not inject its PID into the detector protocol.
 sed -n '/^HOST_IS_K8S_NODE="false"/,/^fi/p' "${system_info_script}" > "${test_dir}/kubernetes.sh"

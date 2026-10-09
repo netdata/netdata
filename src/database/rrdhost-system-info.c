@@ -391,21 +391,28 @@ int rrdhost_system_info_unittest(void) {
     char *saved_env[_countof(network_keys)];
     for (size_t i = 0; i < _countof(network_keys); i++)
         saved_env[i] = system_info_strdupz(getenv(network_keys[i]));
-    char no_route[] = "NETDATA_SYSTEM_DEFAULT_INTERFACE_NAME=unknown\n"
-                      "NETDATA_SYSTEM_DEFAULT_INTERFACE_IP=unknown\n"
-                      "NETDATA_SYSTEM_DEFAULT_INTERFACE_DETECTION=none\n";
-    system_info_parse_startup(startup, no_route);
-    SI_CHECK(!startup->network_default_iface && !startup->network_default_iface_ip &&
-             !startup->network_default_iface_detection);
     struct rrdhost_system_info *absent = rrdhost_system_info_create();
-    for (size_t i = 0; i < _countof(network_keys); i++) {
+    for (size_t i = 0; i < _countof(network_keys); i++)
         SI_CHECK(rrdhost_system_info_detected_set(absent, network_keys[i], NULL));
-        SI_CHECK(getenv(network_keys[i]) && !strcmp(getenv(network_keys[i]), i == 2 ? "none" : "unknown"));
+    // A route can exist while its interface is down or has no usable IPv4 address.
+    const char *absence_methods[] = { "none", "route", "procfs", "iproute2" };
+    for (size_t m = 0; m < _countof(absence_methods); m++) {
+        char no_network[256];
+        snprintfz(no_network, sizeof(no_network), "NETDATA_SYSTEM_DEFAULT_INTERFACE_NAME=unknown\n"
+                  "NETDATA_SYSTEM_DEFAULT_INTERFACE_IP=unknown\n"
+                  "NETDATA_SYSTEM_DEFAULT_INTERFACE_DETECTION=%s\n", absence_methods[m]);
+        system_info_parse_startup(startup, no_network);
+        SI_CHECK(!startup->network_default_iface && !startup->network_default_iface_ip &&
+                 !startup->network_default_iface_detection);
+        for (size_t i = 0; i < _countof(network_keys); i++)
+            SI_CHECK(getenv(network_keys[i]) && !strcmp(getenv(network_keys[i]), i == 2 ? absence_methods[m] : "unknown"));
+        SI_CHECK(!rrdhost_system_info_update(startup, absent));
+    }
+    for (size_t i = 0; i < _countof(network_keys); i++) {
         if (saved_env[i]) nd_setenv(network_keys[i], saved_env[i], 1);
         else unsetenv(network_keys[i]);
         freez(saved_env[i]);
     }
-    SI_CHECK(!rrdhost_system_info_update(startup, absent));
     rrdhost_system_info_free(startup);
     rrdhost_system_info_free(absent);
     bool own_server = !netdata_main_spawn_server;
@@ -569,10 +576,10 @@ static void system_info_parse_startup(struct rrdhost_system_info *system_info, c
             nd_setenv(line, value, 1);
     }
 
-    // Export the historical environment values, but keep absence identical to runtime.
+    // A known route can still lack a usable interface/address. Preserve legacy
+    // environment values while keeping every unknown tuple identical to runtime absence.
     if (system_info->network_default_iface && !strcmp(system_info->network_default_iface, "unknown") &&
-        system_info->network_default_iface_ip && !strcmp(system_info->network_default_iface_ip, "unknown") &&
-        system_info->network_default_iface_detection && !strcmp(system_info->network_default_iface_detection, "none")) {
+        system_info->network_default_iface_ip && !strcmp(system_info->network_default_iface_ip, "unknown")) {
         system_info_replace(&system_info->network_default_iface, NULL);
         system_info_replace(&system_info->network_default_iface_ip, NULL);
         system_info_replace(&system_info->network_default_iface_detection, NULL);
