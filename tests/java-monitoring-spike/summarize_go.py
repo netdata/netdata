@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Replay owned Go-spike evidence; assertions fail if a claimed contract is absent."""
+"""Replay historical spike or current native-plugin container regression evidence."""
 import argparse
 import json
 import math
@@ -13,7 +13,15 @@ def summarize(root):
     initial, renamed, excluded, restarted, stale, final = (
         read(name) for name in ("initial", "renamed", "excluded", "job-restarted", "stale", "app-restarted"))
     checks = read("checks")
-    assert checks == {"passed": True, "initial_attempts": 3, "final_attempts": 4}
+    native = checks.get("evidence_version") == 2
+    if native:
+        assert checks == {"passed": True, "evidence_version": 2,
+                          "state_preserved_across_reconfiguration": True}
+        assert len(initial["journal"]) == 3
+        assert initial["journal"] == renamed["journal"] == restarted["journal"]
+    else:
+        assert checks == {"passed": True, "initial_attempts": 3, "final_attempts": 4}
+    prefix = "java." if native else "java_spike."
     assert read("test-response")["status"] == 200
     assert set(initial["charts"]) == set(renamed["charts"])
     for chart in renamed["charts"].values():
@@ -32,7 +40,7 @@ def summarize(root):
     assert blocked["Status"] == "Blocked"
     assert all(blocked[k] == "Not observed" for k in ("JVM", "HTTP", "Pools"))
 
-    expected = {"java_spike." + x for x in ("jvm_memory_used", "http_requests", "http_request_duration",
+    expected = {prefix + x for x in ("jvm_memory_used", "http_requests", "http_request_duration",
                                            "pool_connections", "pool_pending_requests", "pool_connection_limit")}
     apps = {}
     for name in ("checkout", "inventory"):
@@ -46,20 +54,34 @@ def summarize(root):
             for index in range(1, len(sample["labels"])):
                 latest = max(row[0] for row in sample["data"] if row[index] is not None)
                 assert 0 <= final["time"] - latest <= 10
-            if c["context"] == "java_spike.http_request_duration":
+            if c["context"] == prefix + "http_request_duration":
                 assert c["chart_type"] == "heatmap"
                 assert c["units"] == "observations/s"
-            if c["context"] == "java_spike.pool_connection_limit":
+            if c["context"] == prefix + "pool_connection_limit":
                 assert all(v == 10 for v in values)
         rates = {}
         for key, c in initial["charts"].items():
-            if c["context"] == "java_spike.http_requests" and c["chart_labels"]["application"] == name:
+            if c["context"] == prefix + "http_requests" and c["chart_labels"]["application"] == name:
                 sample = initial["samples"][key]
                 for index, status in enumerate(sample["labels"][1:], 1):
                     values = [row[index] for row in sample["data"] if row[index] is not None]
                     rates[status] = round(max(values), 3)
         assert set(rates) == {"200", "503"} and all(v > 0 for v in rates.values())
         apps[name] = {"stored_contexts": sorted(expected), "active_charts": len(charts), "peak_request_rates": rates}
+
+    for workload in [*read("initial-workloads").values(), read("restart-workload")]:
+        assert workload["requests"] == 1500 and workload["errors"] == 0
+        assert workload["statuses"] == {"200": 1350, "503": 150}
+    if native:
+        return {"evidence_version": 2, "environment": "owned container with same-rootfs fixture JVMs",
+                "applications": apps, "client_http_counts_per_workload": {"200": 1350, "503": 150},
+                "stored_cumulative_http_count_equivalence_verified": False,
+                "rename_preserves_chart_identity": True, "job_restart_preserves_process_identity": True,
+                "durable_state_preserved_across_reconfiguration": True,
+                "exclusion_removes_active_charts": True, "stale_source_removes_coverage_and_active_charts": True,
+                "application_restart_changes_identity": True, "all_final_dimensions_have_samples_within_seconds": 10,
+                "dyncfg_preflight_passed": True, "dyncfg_transport": "owned local plugins.d input pipe",
+                "authenticated_form_rendering_verified": False, "native_vm_verified": False}
 
     # Compare full cumulative counters, independently of Netdata's sampled rates.
     totals = {}

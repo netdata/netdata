@@ -4,8 +4,10 @@ The existing Go framework can own the Java-monitoring lifecycle and presentation
 running JRE applications, attaches bundled Java instrumentation, accepts OTLP metrics in Go, and publishes curated
 Netdata charts plus a Java application inventory. No shared framework changes or new Go dependencies were needed.
 
-This is an uninstalled experimental command. It discovers only the owned fixture in a private container PID namespace.
-The earlier native-host experiment remains the evidence for host-to-container attachment; this phase tests Go and UI.
+These are historical results for commit `072604a2a3`, when the Go command selected only owned fixtures in a private
+container PID namespace. The code has since moved into the installed `java.plugin`; current setup and definitions
+are documented in [the plugin guide](../../src/collectors/java.plugin/README.md). The recorded evidence below remains
+unchanged and does not by itself establish the native installed plugin's behavior.
 
 ## What the user sees
 
@@ -26,14 +28,14 @@ and lifecycle are validated; authenticated form rendering and Cloud authorizatio
 | Responsibility | Source |
 |---|---|
 | JVM and HTTP measurement | Pinned stock OpenTelemetry Java agent |
-| Existing Hikari pool measurement | `extension/src/main/java/org/netdata/spike/hikari/PoolObserver.java` |
-| Accepted metric names, types, units, labels and source-time rules | `src/go/tools/java-monitoring-spike/ingest/store.go` |
-| Typed Netdata metric instruments | `src/go/tools/java-monitoring-spike/collector/metrix.go` |
-| Chart titles, groups, units, dimensions and instance labels | `src/go/tools/java-monitoring-spike/collector/charts.yaml` |
-| Operator fields and help | `src/go/tools/java-monitoring-spike/collector/config_schema.json` |
-| Application table and coverage | `collector/collector.go` and `javafunc/router.go` under the Go spike directory |
-| Discovery, admission, attachment and attempt journal | `collector/discovery.go` under the Go spike directory |
-| Process composition | `src/go/cmd/javaspikeplugin/main.go` |
+| Existing Hikari pool measurement | `src/collectors/java.plugin/extension/src/main/java/org/netdata/spike/hikari/PoolObserver.java` |
+| Accepted metric names, types, units, labels and source-time rules | `src/go/plugin/java/ingest/store.go` |
+| Typed Netdata metric instruments | `src/go/plugin/java/collector/metrix.go` |
+| Chart titles, groups, units, dimensions and instance labels | `src/go/plugin/java/collector/charts.yaml` |
+| Operator fields and help | `src/go/plugin/java/collector/config_schema.json` |
+| Application table and coverage | `collector/collector.go` and `javafunc/router.go` under `src/go/plugin/java` |
+| Discovery, admission, attachment and attempt journal | `collector/discovery.go` under `src/go/plugin/java` |
+| Process composition | `src/go/cmd/javaplugin/main.go` |
 
 Extending coverage does not require replacing orchestration. A supported OTel metric needs a deliberate Go mapping,
 instrument and chart definition. A measurement the stock agent cannot produce needs Java-side work, such as the

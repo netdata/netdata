@@ -199,7 +199,7 @@ See [the results and limitations](AUTOMATION_RESULTS.md).
 
 The cost study uses the original JDK 21 fixture for all modes. `baseline` has no agent or JMX probe. `full` uses stock
 instrumentation plus the Hikari extension, with stock Hikari instrumentation disabled. `narrow` disables default
-instrumentation and enables only `runtime-telemetry`, `servlet`, `tomcat`, `spring-webmvc` and `netdata-spike-hikari`.
+instrumentation and enables only `runtime-telemetry`, `servlet`, `tomcat`, `spring-webmvc` and `netdata-hikari`.
 These options are monitor-owned; they are not proposed app-owner configuration. Traces/log exporters are disabled in
 both instrumented modes; that does not disable all internal tracing work.
 
@@ -265,35 +265,48 @@ identities/start times/restart counts before and after. It never prunes Docker o
 policy, sysctls or packages. Copy evidence before removing the task directory. Its image tags and downloaded Docker
 image/build cache remain separate from runtime cleanup; never use a global prune to remove them.
 
-## Go framework and UI experiment
+## Installed Java plugin
 
-Build the existing `netdata-java-spike:monitor` and `netdata-java-spike:plain-jre` images using the automatic-attachment
-instructions above. Then, from the repository root (use `GOARCH=amd64` for an x86 Docker engine):
+The reusable implementation now lives in `src/go/plugin/java`, with the fixed Attach helper and extension under
+`src/collectors/java.plugin`. See [the plugin guide](../../src/collectors/java.plugin/README.md) for normal Linux host
+installation, supported applications, definitions and recovery behavior. The original Go/UI evidence is retained in
+[GO_RESULTS.md](GO_RESULTS.md); it predates the native installed plugin.
+
+### Container regression
+
+The current Go harness uses the actual installed plugin, ndsudo, native helper and private Java bundle. Fixture JVMs
+run as non-root users inside the monitor container's namespaces and root filesystem. This tests installed-plugin
+integration under isolation; native-host validation is separate.
+
+Build the existing `netdata-java-spike:monitor` artifact image using the automatic-attachment instructions above.
+Create a Linux CMake build with `-DCMAKE_INSTALL_PREFIX=/ -DENABLE_PLUGIN_JAVA=ON`, then stage it without installing
+on the build host:
 
 ```sh
-mkdir -p .local/java-monitoring-spike/go-build
-CGO_ENABLED=0 GOOS=linux GOARCH=arm64 go -C src/go build \
-  -o ../../.local/java-monitoring-spike/go-build/javaspike.plugin ./cmd/javaspikeplugin
-cp tests/java-monitoring-spike/plugin-proxy .local/java-monitoring-spike/go-build/plugin-proxy
-docker build -f tests/java-monitoring-spike/Dockerfile.go -t netdata-java-spike:go \
-  .local/java-monitoring-spike/go-build
+cmake --build build-java --target java-plugin ndsudo
+DESTDIR="$PWD/.local/java-monitoring-spike/package" cmake --install build-java --component plugin-java
+# ndsudo belongs to the main Agent install component; stage the built file for this isolated harness.
+install -m 0755 build-java/ndsudo .local/java-monitoring-spike/package/usr/libexec/netdata/plugins.d/ndsudo
+docker build -f tests/java-monitoring-spike/Dockerfile.go \
+  --build-context java-package="$PWD/.local/java-monitoring-spike/package" \
+  -t netdata-java-spike:go tests/java-monitoring-spike
 python3 tests/java-monitoring-spike/go_checks.py \
   --output .local/java-monitoring-spike/go-new-run --hold-seconds 240
+python3 tests/java-monitoring-spike/summarize_go.py .local/java-monitoring-spike/go-new-run
 ```
 
-The output directory must be new. `live.json` contains the temporary loopback dashboard URL. During the final hold,
-visit Metrics → java and Live → Java → Applications. Creating `continue` in the output directory ends that hold.
-The harness captures evidence and removes its exact owned containers/network even on failure. It changes no host
-Java installation, Netdata configuration or unrelated container. Build images/cache remain for reuse.
+The architecture of the staged runtime and binaries must match the Docker engine. The output directory must be new.
+`live.json` contains the temporary loopback dashboard URL. During the final hold, visit Metrics → java and Live →
+Java → Applications. Creating `continue` in the output directory ends that hold. Cleanup checks resource ownership
+before removing the exact test containers/network. Images and build caches remain for reuse.
 
-The lab-only `plugin-proxy` records plugins.d stdout so a local administrator can validate DynCfg using the running
-plugin's input pipe. It does not disable Agent HTTP authorization or expose a control port. Authenticated DynCfg form
-rendering requires a separate appropriately authorized Agent/UI session.
+The lab-only `plugin-proxy` records plugins.d output so a local administrator can validate DynCfg using its input
+pipe. It does not disable Agent authorization or expose a control port. Authenticated DynCfg form rendering requires
+an appropriately authorized Agent/UI session. Persistent receiver credentials are never written to evidence.
 
-Run the focused Go checks with:
+Run the focused checks with:
 
 ```sh
-go -C src/go test -race -count=1 ./tools/java-monitoring-spike/... ./cmd/javaspikeplugin
-go -C src/go vet ./tools/java-monitoring-spike/... ./cmd/javaspikeplugin
-python3 tests/java-monitoring-spike/summarize_go.py .local/java-monitoring-spike/go-new-run
+go -C src/go test -race -count=1 ./plugin/java/... ./cmd/javaplugin ./cmd/javahelper
+go -C src/go vet ./plugin/java/... ./cmd/javaplugin ./cmd/javahelper
 ```

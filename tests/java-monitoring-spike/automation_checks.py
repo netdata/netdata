@@ -13,7 +13,7 @@ from summarize import attributes, points
 
 MONITOR = "netdata-java-spike:monitor"
 PLAIN = "netdata-java-spike:plain-jre"
-MODULES = ("runtime-telemetry", "servlet", "tomcat", "spring-webmvc", "netdata-spike-hikari")
+MODULES = ("runtime-telemetry", "servlet", "tomcat", "spring-webmvc", "netdata-hikari")
 REQUIRED = {"jvm.memory.used", "http.server.request.duration", "netdata.spike.hikari.connections",
             "netdata.spike.hikari.pending_requests", "netdata.spike.hikari.limit"}
 

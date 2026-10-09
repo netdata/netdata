@@ -1,8 +1,10 @@
 #!/usr/bin/env python3
-"""Exercise the experimental Go plugin in an owned, isolated PID namespace."""
+"""Exercise installed java.plugin in an owned container; native-host proof is separate."""
 import argparse
 import concurrent.futures
 import json
+import hashlib
+import shlex
 from pathlib import Path
 import time
 import urllib.parse
@@ -25,7 +27,7 @@ class GoLab(Lab):
         # The unclaimed Agent deliberately rejects authenticated DynCfg HTTP calls.
         # As the lab's local administrator, drive its existing plugin input pipe.
         transaction = "lab-" + uuid.uuid4().hex
-        function = f'config javaspike:collector:java {action}'
+        function = f'config java:collector:java {action}'
         if action == "test":
             function += " java"
         if body is None:
@@ -37,7 +39,7 @@ class GoLab(Lab):
         path.write_text(frame)
         self.docker("cp", str(path), self.netdata + ":/state/control.txt")
         pid = self.docker("exec", self.netdata, "sh", "-c",
-            'for p in /proc/[0-9]*/exe; do if [ "$(readlink "$p")" = /lab/javaspike.bin ]; then '
+            'for p in /proc/[0-9]*/exe; do if [ "$(readlink "$p")" = /lab/java.bin ]; then '
             'p=${p%/exe}; printf "%s\\n" "${p##*/}"; fi; done').stdout.strip()
         if not pid.isdecimal():
             raise RuntimeError("expected one owned Go plugin")
@@ -63,7 +65,8 @@ class GoLab(Lab):
     def rows(self):
         data = self.applications()
         columns = sorted(data["columns"], key=lambda k: data["columns"][k]["index"])
-        return [dict(zip(columns, row)) for row in data["data"]]
+        return [r for row in data["data"] if (r := dict(zip(columns, row)))["Application"] in
+                {"checkout", "Checkout API", "inventory", "blocked"}]
 
     def wait_rows(self, condition, seconds=90):
         deadline = time.monotonic() + seconds
@@ -81,20 +84,13 @@ class GoLab(Lab):
     def setup(self):
         self.network = self.docker("network", "create", "--label", f"{LABEL}={self.token}",
                                    f"nd-java-{self.token}").stdout.strip()
-        self.anchor = self.create("anchor", ["--network", self.network, "--entrypoint", "sleep",
-                                            "netdata-java-spike:plain-jre", "infinity"])
-        self.start(self.anchor)
-        self.apps = {}
-        for name in ("checkout", "inventory", "blocked"):
-            self.apps[name] = self.application(name, disabled=name == "blocked")
-        (self.output / "java-spike-run").write_text(self.token + "\n")
         (self.output / "netdata.conf").write_text("""[global]
-  run as user = root
+  run as user = netdata
 [db]
   mode = ram
 [plugins]
   enable running new plugins = no
-  javaspike = yes
+  java = yes
   proc = no
   diskspace = no
   cgroups = no
@@ -106,42 +102,67 @@ class GoLab(Lab):
   allow management from = *
   bearer token protection = no
 """)
-        (self.output / "javaspike.conf").write_text("enabled: yes\ndefault_run: no\nmodules:\n  java: yes\n")
-        (self.output / "java.conf").write_text("jobs:\n  - name: java\n")
-        self.netdata = self.create("monitor", ["--network", self.network, "--network-alias", "java-monitor",
-            "--pid", "container:" + self.anchor, "--cap-add", "SYS_PTRACE", "-p", "127.0.0.1::19999",
-            "-e", "DO_NOT_TRACK=1", "-e", "NETDATA_DISABLE_CLOUD=1",
-            "-e", "SCOUT_LAB_SCOPE=owned-fixture-pid-namespace", "-e", "JAVASPIKE_RUN=" + self.token,
-            "-e", "JAVASPIKE_ENDPOINT=http://java-monitor:4318", "netdata-java-spike:go"])
-        for source, dest in (("java-spike-run", "/lab/java-spike-run"), ("netdata.conf", "/etc/netdata/netdata.conf"),
-                             ("javaspike.conf", "/etc/netdata/javaspike.conf"), ("java.conf", "/etc/netdata/javaspike/java.conf")):
+        (self.output / "java.conf").write_text("enabled: yes\ndefault_run: no\nmodules:\n  java: yes\n")
+        (self.output / "java-job.conf").write_text("jobs:\n  - name: java\n")
+        self.netdata = self.create("monitor", ["--network", self.network,
+            "--cap-add", "SYS_PTRACE", "-p", "127.0.0.1::19999",
+            "-p", "127.0.0.1::18081", "-p", "127.0.0.1::18082", "-p", "127.0.0.1::18083",
+            "-e", "DO_NOT_TRACK=1", "-e", "NETDATA_DISABLE_CLOUD=1", "netdata-java-spike:go"])
+        for source, dest in (("netdata.conf", "/etc/netdata/netdata.conf"),
+                             ("java.conf", "/etc/netdata/java.conf"), ("java-job.conf", "/etc/netdata/java/java.conf")):
             self.docker("cp", str(self.output / source), self.netdata + ":" + dest)
         self.start(self.netdata)
         self.netdata_url = self.base_url(self.netdata, 19999)
         wait_http(self.netdata_url + "/api/v1/info")
-        self.save("live.json", {"url": self.netdata_url, "run": self.token, "monitor": self.netdata})
+        self.apps = {}
+        for name in ("checkout", "inventory", "blocked"):
+            self.application(name, disabled=name == "blocked")
+        self.save("live.json", {"url": self.netdata_url, "run": self.token, "monitor": self.netdata,
+                               "environment": "owned container with same-rootfs fixture JVMs"})
 
     def application(self, name, disabled=False):
-        args = ["--network", self.network, "--network-alias", name, "--pid", "container:" + self.anchor,
-                "-p", "127.0.0.1::8080", "--entrypoint", "java", "netdata-java-spike:plain-jre", "-Xms128m", "-Xmx256m"]
+        port = {"checkout": 18081, "inventory": 18082, "blocked": 18083}[name]
+        args = ["/usr/share/netdata/java/runtime/bin/java", "-Xms128m", "-Xmx256m"]
         if disabled:
             args.append("-XX:+DisableAttachMechanism")
-        cid = self.create(name, [*args, "-jar", "/app/app.jar", "--spring.application.name=" + name])
-        self.start(cid)
-        wait_http(self.base_url(cid, 8080) + "/work")
-        return cid
+        args += ["-jar", "/lab/app.jar", "--spring.application.name=" + name, "--server.port=" + str(port)]
+        # Capture $! immediately. Keep the supervisor alive to reap the owned JVM.
+        script = (shlex.join(args) + " > /fixtures/" + name + ".log 2>&1 & "
+                  "fixture_pid=$!; printf '%s\\n' \"$fixture_pid\" > /fixtures/" + name + ".pid; wait \"$fixture_pid\"")
+        self.docker("exec", "-d", "--user", "10001:10001", self.netdata, "sh", "-c", script)
+        wait_http(self.base_url(self.netdata, port) + "/work")
+        pid = int(self.docker("exec", self.netdata, "cat", "/fixtures/" + name + ".pid").stdout)
+        stat = self.docker("exec", self.netdata, "cat", f"/proc/{pid}/stat").stdout
+        start_time = stat.rsplit(") ", 1)[1].split()[19]
+        self.apps[name] = {"pid": pid, "start_time": start_time, "port": port}
+        self.save("fixture-processes.json", self.apps)
+
+    def signal_application(self, name, signal):
+        assert signal in {"STOP", "CONT", "TERM"}
+        process = self.apps[name]
+        pid = process["pid"]
+        stat = self.docker("exec", self.netdata, "cat", f"/proc/{pid}/stat").stdout
+        argv = self.docker("exec", self.netdata, "cat", f"/proc/{pid}/cmdline").stdout.split("\0")
+        if stat.rsplit(") ", 1)[1].split()[19] != process["start_time"] or "--spring.application.name=" + name not in argv:
+            raise RuntimeError("Owned fixture process identity changed; refusing to signal")
+        self.docker("exec", "--user", "10001:10001", self.netdata, "kill", "-" + signal, str(pid))
 
     def workload(self, name, seconds=15):
-        result = self.docker("exec", self.netdata, "/lab/jdk/bin/java", "-Xms16m", "-Xmx64m", "-cp", "/lab",
-                             "HttpLoad", "http://" + name + ":8080", str(seconds), "100", timeout=seconds+80)
+        result = self.docker("exec", self.netdata, "/usr/share/netdata/java/runtime/bin/java", "-Xms16m", "-Xmx64m", "-cp", "/lab",
+                             "HttpLoad", "http://127.0.0.1:" + str(self.apps[name]["port"]), str(seconds), "100", timeout=seconds+80)
         return json.loads(result.stdout)
 
     def journal(self):
-        return [json.loads(line) for line in self.docker("exec", self.netdata, "cat", "/state/attempts.jsonl").stdout.splitlines()]
+        state = json.loads(self.docker("exec", self.netdata, "cat", "/var/lib/netdata/java/state.json").stdout)
+        # Never persist attachment credentials in the regression evidence.
+        return {key: {"process": value["process"], "status": value["status"],
+                      "credential_fingerprint": hashlib.sha256(value["token"].encode()).hexdigest()}
+                for key, value in state["attempts"].items()
+                if value["process"]["application"] in {"checkout", "inventory", "blocked"}}
 
     def capture(self, stage):
         charts = self.api("/api/v1/charts")["charts"]
-        charts = {key: chart for key, chart in charts.items() if chart["context"].startswith("java_spike.")}
+        charts = {key: chart for key, chart in charts.items() if chart["context"].startswith("java.")}
         samples = {}
         for key in charts:
             samples[key] = self.api("/api/v1/data?" + urllib.parse.urlencode({"chart": key, "after": -45,
@@ -163,9 +184,10 @@ class GoLab(Lab):
         self.save("schema.json", self.config("schema"))
         self.save("config-tree.json", self.api("/api/v3/config?action=tree&path=/"))
         self.save("config-initial.json", self.config("get"))
-        initial_attempts = len([a for a in self.journal() if a["Status"] == "Unknown"])
+        initial_state = self.journal()
+        assert len(initial_state) == 3
         self.save("test-response.json", self.config("test", {"name": "java", "update_every": 1}))
-        assert len([a for a in self.journal() if a["Status"] == "Unknown"]) == initial_attempts
+        assert self.journal() == initial_state
         self.save("rename-response.json", self.config("update", {"name": "java", "update_every": 1,
                                                "application_names": {"checkout": "Checkout API"}}))
         self.wait_rows(lambda rows: any(r["Application"] == "Checkout API" and r["Status"] == "Collecting" for r in rows))
@@ -176,7 +198,7 @@ class GoLab(Lab):
                    for c in renamed["charts"].values() if c["chart_labels"].get("application") == "checkout")
         before = {r["Instance"] for r in initial["rows"]}
         assert before == {r["Instance"] for r in renamed["rows"]}
-        assert len([a for a in self.journal() if a["Status"] == "Unknown"]) == initial_attempts
+        assert self.journal() == initial_state
         self.save("exclude-response.json", self.config("update", {"name": "java", "update_every": 1,
                                                "exclude_applications": ["inventory"]}))
         self.wait_rows(lambda rows: any(r["Application"] == "inventory" and r["Status"] == "Excluded" for r in rows))
@@ -185,32 +207,37 @@ class GoLab(Lab):
         assert not any(c["chart_labels"].get("application") == "inventory" for c in excluded["charts"].values())
         self.config("update", {"name": "java", "update_every": 1})
         self.wait_rows(lambda rows: sum(r["Status"] == "Collecting" for r in rows) == 2)
-        assert len([a for a in self.journal() if a["Status"] == "Unknown"]) == initial_attempts
+        assert self.journal() == initial_state
         self.save("restart-response.json", self.config("restart", {}))
         self.wait_rows(lambda rows: sum(r["Status"] == "Collecting" for r in rows) == 2)
-        assert len([a for a in self.journal() if a["Status"] == "Unknown"]) == initial_attempts
+        assert self.journal() == initial_state
         self.capture("job-restarted")
-        # Freeze only the task-owned inventory container to stop source exports.
-        self.docker("pause", self.apps["inventory"])
+        # Freeze only the task-owned inventory JVM to stop source exports.
+        self.signal_application("inventory", "STOP")
         try:
             self.wait_rows(lambda rows: any(r["Application"] == "inventory" and r["Status"] == "No fresh data" for r in rows))
             time.sleep(12)
             stale = self.capture("stale")
             assert not any(c["chart_labels"].get("application") == "inventory" for c in stale["charts"].values())
         finally:
-            self.docker("unpause", self.apps["inventory"])
+            self.signal_application("inventory", "CONT")
         self.wait_rows(lambda rows: sum(r["Status"] == "Collecting" for r in rows) == 2)
-        # Restart only this owned application's container; identity must change.
-        self.docker("restart", "--time", "10", self.apps["checkout"])
-        wait_http(self.base_url(self.apps["checkout"], 8080) + "/work")
+        # Restart only this owned JVM; identity must change.
+        self.signal_application("checkout", "TERM")
+        deadline = time.monotonic() + 30
+        while self.docker("exec", self.netdata, "test", "-e", f"/proc/{self.apps['checkout']['pid']}", check=False).returncode == 0:
+            if time.monotonic() >= deadline:
+                raise RuntimeError("Owned checkout JVM did not terminate")
+            time.sleep(.2)
+        self.application("checkout")
         self.wait_rows(lambda rows: any(r["Application"] == "checkout" and r["Instance"] not in before for r in rows))
         time.sleep(5)
         self.save("restart-workload.json", self.workload("checkout"))
         self.wait_rows(lambda rows: sum(r["Status"] == "Collecting" for r in rows) == 2)
         time.sleep(6)
         self.capture("app-restarted")
-        self.save("checks.json", {"passed": True, "initial_attempts": initial_attempts,
-                                   "final_attempts": len([a for a in self.journal() if a["Status"] == "Unknown"])})
+        self.save("checks.json", {"passed": True, "evidence_version": 2,
+                                   "state_preserved_across_reconfiguration": True})
         deadline = time.monotonic() + hold
         while time.monotonic() < deadline and not (self.output / "continue").exists():
             time.sleep(1)

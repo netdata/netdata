@@ -291,13 +291,14 @@ include(NetdataMSI)
 
 # The developer-only Go notifier, then the Go and Rust plugins: go.d (with the
 # snmp trap profile generator and the nd-mcp bridge), scripts.d, statsd, ipmi,
-# dem, ibm.d, the OTel collector, and the NetFlow/IPFIX/sFlow analyser with the
+# java, dem, ibm.d, the OTel collector, and the NetFlow/IPFIX/sFlow analyser with the
 # topology-ip-intel downloader that ships beside it.
 include(NetdataAlarmNotifyGo)
 include(NetdataPluginGo)
 include(NetdataPluginScripts)
 include(NetdataPluginStatsd)
 include(NetdataPluginIPMI)
+include(NetdataPluginJava)
 include(NetdataPluginDem)
 include(NetdataIBMPlugin)
 include(NetdataPluginOTel)

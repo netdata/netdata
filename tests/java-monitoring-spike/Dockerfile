@@ -4,7 +4,7 @@ WORKDIR /build
 COPY pom.xml .
 COPY src ./src
 RUN mvn -B -ntp package
-COPY extension ./extension
+COPY --from=java-extension / ./extension
 RUN mvn -B -ntp -f extension/pom.xml package
 COPY lifecycle ./lifecycle
 RUN mvn -B -ntp -f lifecycle/pom.xml package

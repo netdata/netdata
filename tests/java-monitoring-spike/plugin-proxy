@@ -2,9 +2,9 @@
 # Lab-only protocol recording; the Go binary still receives Netdata's real stdin.
 set -o pipefail
 printf '+ ' >&2
-printf '%q ' /lab/javaspike.bin "$@" >&2
+printf '%q ' /lab/java.bin "$@" >&2
 printf '| tee /state/protocol.out\n' >&2
-/lab/javaspike.bin "$@" | tee /state/protocol.out
+/lab/java.bin "$@" | tee /state/protocol.out
 status=$?
 if [ "$status" -ne 0 ]; then
     printf 'Java lab protocol pipeline failed: cwd=%q status=%s\n' "$PWD" "$status" >&2

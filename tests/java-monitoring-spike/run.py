@@ -156,6 +156,10 @@ class Lab:
         self.results = {}
 
     def docker(self, *args, **kwargs):
+        if args and args[0] == "build" and "--build-context" not in args:
+            # The extension is production source, outside the lab build context.
+            extension = ROOT.parents[1] / "src/collectors/java.plugin/extension"
+            args = ("build", "--build-context", "java-extension=" + str(extension), *args[1:])
         return command(["docker", *args], **kwargs)
 
     def save(self, name, value):
