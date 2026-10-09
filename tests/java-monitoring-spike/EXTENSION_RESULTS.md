@@ -29,7 +29,7 @@ and one limit series for the existing pool, with actual stored Netdata samples. 
 |---|---:|---:|---:|---:|
 | 17 | 389 MiB | 518 MiB | 525 MiB | 1.73 s |
 | 21 | 409 MiB | 512 MiB | 518 MiB | 1.52 s |
-| 25 | 403 MiB | 519 MiB | 524 MiB | 1.64 s |
+| 25 | 402 MiB | 519 MiB | 523 MiB | 1.64 s |
 
 Across these runs, throughput was 1,795–1,853 requests/s and p95 latency was 10.83–11.08 ms. Extension-run RSS was
 4–7 MiB above the corresponding stock run, but these are single-run observations, not an isolated extension-overhead

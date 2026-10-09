@@ -34,8 +34,12 @@ def samples(directory, service, since, until):
 
 def verify(directory):
     runs = json.loads((directory / "pool-checks.json").read_text())
+    assert runs, "no lifecycle runs recorded"
+    required_phases = {"idle_after_attach", "discovered", "saturated", "released", "idle_discovered", "closed",
+                       "recreated", "repeated_recreation", "all_closed"}
     report = {}
     for service, run in runs.items():
+        assert set(run["phases"]) == required_phases, service + ": incomplete lifecycle phases"
         assert run["attach"]["status"] == 0
         assert run["before"]["tracker_acquired"] == run["before"]["tracker_used"] == 2
         identities = {}
