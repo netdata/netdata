@@ -28,17 +28,18 @@ netdata -h
 
 ## System Information Refresh
 
-The Agent detects system information at startup and refreshes it in a background thread every five minutes after the
-previous check finishes. Checks do not overlap. Changed values update the cached host information and automatic host labels,
-including CPU, RAM, and the OS default network interface, and propagate through streaming to Parents.
+The Agent detects full system information at startup. A background thread refreshes CPU count, total RAM, disk capacity,
+and the OS default interface name, IP address, and detection method every five minutes after the previous check finishes.
+Checks do not overlap. Changed values update the cached host information and automatic host labels and propagate through
+streaming to Parents. CPU model and frequency, OS/kernel details, and cloud/container/virtualization identity remain
+startup-only on every platform.
 
 On Unix, `system-info.sh` has a 30-second execution deadline after spawning. Failed executions, malformed output, and
-incomplete responses are discarded. Failed individual probes retain their previous values; successful absence clears the
+incomplete responses are discarded and logged with a reason. Failed individual probes retain their previous values; successful absence clears the
 corresponding optional values. Cancellation terminates the probe's process group. Runtime refresh does not rewrite the
 process environment exported during startup.
 
-On Windows, runtime refresh uses native CPU, RAM, disk, and network probes. OS, virtualization, and container detection
-remain startup operations. Native Windows calls do not use the Unix subprocess deadline.
+On Windows, runtime refresh uses native probes for the same fields. Native Windows calls do not use the Unix subprocess deadline.
 
 See [automatic host labels](/docs/netdata-agent/configuration/organize-systems-metrics-and-alerts.md#use-automatic-labels)
 for label semantics and Parent upgrade requirements.

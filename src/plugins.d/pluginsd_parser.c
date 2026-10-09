@@ -825,8 +825,15 @@ static inline PARSER_RC pluginsd_overwrite(char **words __maybe_unused, size_t n
 
     // The handshake may have replaced system_info even when this label batch is unchanged.
     // Local plugins do not own the real localhost's detected system information.
-    bool info_changed = host != localhost &&
-        rrdhost_system_info_update_from_labels(host->system_info, host->rrdlabels, parser->user.new_host_labels);
+    bool info_changed = false;
+    if (host != localhost) {
+        if (SERVING_PLUGINSD(parser) && IS_VIRTUAL_HOST_OS(host))
+            info_changed = rrdhost_system_info_update_all_from_labels(
+                host->system_info, host->rrdlabels, parser->user.new_host_labels);
+        else
+            info_changed = rrdhost_system_info_update_from_labels(
+                host->system_info, host->rrdlabels, parser->user.new_host_labels);
+    }
     bool labels_changed = rrdlabels_migrate_to_these(host->rrdlabels, parser->user.new_host_labels);
     labels_changed |= pluginsd_update_host_ephemerality(host);
 
@@ -843,8 +850,10 @@ static inline PARSER_RC pluginsd_overwrite(char **words __maybe_unused, size_t n
 
     // Reconnects can restore old handshake metadata while retaining identical labels.
     // Forward the corrected snapshot so every parent can reconcile its cache.
-    if(labels_changed || info_changed)
+    if(labels_changed)
         rrdhost_labels_changed(host);
+    else if (info_changed)
+        rrdhost_system_info_changed(host);
 
     rrdlabels_destroy(parser->user.new_host_labels);
     parser->user.new_host_labels = NULL;
@@ -1857,6 +1866,7 @@ int pluginsd_system_info_unittest(void) {
     rrdhost_system_info_ml_capable_set(host.system_info, true);
     rrdhost_system_info_mc_version_set(host.system_info, 3);
     rrdhost_system_info_set_by_name(host.system_info, "NETDATA_HOST_OS_ID", "handshake-os");
+    rrdhost_system_info_set_by_name(host.system_info, "NETDATA_HOST_OS_NAME", "Pop!_OS");
     rrdhost_system_info_set_by_name(host.system_info, "NETDATA_SYSTEM_CPU_LOGICAL_CPU_COUNT", "8");
     rrdhost_system_info_set_by_name(host.system_info, "NETDATA_SYSTEM_TOTAL_RAM", "1024");
     struct parser_user_object user = { .host = &host };
@@ -1868,6 +1878,7 @@ int pluginsd_system_info_unittest(void) {
         "LABEL _net_default_iface_ip = 1 192.0.2.1",
         "LABEL _stream_egress_iface = 1 wan0",
         "LABEL _os = 1 linux",
+        "LABEL _os_name = 1 Pop!_OS",
         "LABEL _hostname = 1 test-child",
         "LABEL _is_ephemeral = 2 false",
         "OVERWRITE labels",
@@ -1892,7 +1903,22 @@ int pluginsd_system_info_unittest(void) {
         STREAM_INFO_CHECK(!pluginsd_system_info_test_line(parser, batch[i]));
     STREAM_INFO_CHECK(pluginsd_system_info_test_value(&host, "_system_ram_total", "2048"));
     STREAM_INFO_CHECK(rrdhost_flag_check(&host, RRDHOST_FLAG_METADATA_INFO));
-    STREAM_INFO_CHECK(rrdhost_flag_check(&host, RRDHOST_FLAG_METADATA_LABELS));
+    STREAM_INFO_CHECK(!rrdhost_flag_check(&host, RRDHOST_FLAG_METADATA_LABELS | RRDHOST_FLAG_PENDING_LABEL_RECHECK));
+
+    CLEAN_BUFFER *raw = buffer_create(0, NULL);
+    buffer_json_initialize(raw, "\"", "\"", 0, true, BUFFER_JSON_OPTIONS_DEFAULT);
+    rrdhost_system_info_to_json_v1(raw, host.system_info);
+    STREAM_INFO_CHECK(strstr(buffer_tostring(raw), "Pop!_OS"));
+
+    // Exercise the actual localhost guard through the parser, with a fresh label batch.
+    RRDHOST *saved_localhost = localhost;
+    localhost = &host;
+    STREAM_INFO_CHECK(!pluginsd_system_info_test_line(parser, "LABEL _system_ram_total = 1 8192"));
+    STREAM_INFO_CHECK(!pluginsd_system_info_test_line(parser, "OVERWRITE labels"));
+    STREAM_INFO_CHECK(pluginsd_system_info_test_value(&host, "_system_ram_total", "2048"));
+    localhost = saved_localhost;
+    for (size_t i = 0; i < _countof(batch); i++)
+        STREAM_INFO_CHECK(!pluginsd_system_info_test_line(parser, batch[i]));
 
     // Empty OVERWRITE removes fields previously advertised, but not older-peer handshake-only fields.
     STREAM_INFO_CHECK(!pluginsd_system_info_test_line(parser, "OVERWRITE labels"));
@@ -1905,6 +1931,27 @@ int pluginsd_system_info_unittest(void) {
     rrdhost_system_info_to_url_encode_stream(wb, host.system_info);
     STREAM_INFO_CHECK(strstr(buffer_tostring(wb), "NETDATA_SYSTEM_OS_ID=handshake-os"));
     STREAM_INFO_CHECK(strstr(buffer_tostring(wb), "&ml_capable=1&ml_enabled=1&mc_version=3"));
+
+    // A local virtual host has no OS detector/handshake owner: its full label import remains valid.
+    parser_destroy(parser);
+    string_freez(host.os);
+    host.os = string_strdupz(NETDATA_VIRTUAL_HOST);
+    rrdhost_flag_set(&host, RRDHOST_FLAG_VIRTUAL_HOST);
+    RRDLABELS *vnode_labels = rrdlabels_create();
+    rrdlabels_add(vnode_labels, "_os_name", "DeviceOS", RRDLABEL_SRC_AUTO);
+    rrdlabels_add(vnode_labels, "_system_cpu_model", "device-cpu", RRDLABEL_SRC_AUTO);
+    rrdhost_system_info_free(host.system_info);
+    host.system_info = rrdhost_system_info_from_host_labels(vnode_labels);
+    rrdlabels_destroy(vnode_labels);
+    STREAM_INFO_CHECK(pluginsd_system_info_test_value(&host, "_os_name", "DeviceOS"));
+    STREAM_INFO_CHECK(pluginsd_system_info_test_value(&host, "_system_cpu_model", "device-cpu"));
+    parser = parser_init(&user, -1, -1, PARSER_INPUT_SPLIT, NULL);
+    pluginsd_keywords_init(parser, PARSER_INIT_PLUGINSD);
+    STREAM_INFO_CHECK(!pluginsd_system_info_test_line(parser, "LABEL _os_name = 1 NewDeviceOS"));
+    STREAM_INFO_CHECK(!pluginsd_system_info_test_line(parser, "LABEL _system_cpu_model = 1 new-device-cpu"));
+    STREAM_INFO_CHECK(!pluginsd_system_info_test_line(parser, "OVERWRITE labels"));
+    STREAM_INFO_CHECK(pluginsd_system_info_test_value(&host, "_os_name", "NewDeviceOS"));
+    STREAM_INFO_CHECK(pluginsd_system_info_test_value(&host, "_system_cpu_model", "new-device-cpu"));
 
     rrdlabels_destroy(parser->user.new_host_labels);
     parser->user.new_host_labels = NULL;

@@ -77,7 +77,7 @@ Host labels help you:
 
 ### Use automatic labels
 
-Netdata automatically generates host labels when it starts and refreshes system information every five minutes, capturing:
+Netdata automatically generates host labels when it starts, capturing:
 
 | Label Category | Information Captured                                                                        |
 |----------------|---------------------------------------------------------------------------------------------|
@@ -86,15 +86,18 @@ Netdata automatically generates host labels when it starts and refreshes system 
 | Environment    | Container details, Kubernetes node status                                                   |
 | Infrastructure | Virtualization layer, Parent-child streaming status                                         |
 
-Runtime changes such as VM CPU or RAM resizing and a changed default route update the automatic labels without a restart.
+On every platform, Netdata refreshes CPU count, total RAM, disk capacity, and the default-interface name/IP/detection labels
+every five minutes after the previous check finishes. Runtime changes such as VM CPU or RAM resizing and a changed default
+route update these labels without a restart. CPU model and frequency, OS/kernel details, and cloud/container/virtualization
+identity remain startup-only.
 Only changed values trigger label updates. Failed detection preserves the last known values; a successful check that finds
 no default route removes the default-interface labels. Custom labels and Kubernetes labels keep their existing reload behavior.
-On Windows, periodic detection refreshes CPU, RAM, disk capacity, and the default network interface; other system information
-is detected at startup.
 
 `_net_default_iface`, `_net_default_iface_ip`, and `_net_default_iface_detection` describe the operating system's default
 interface together. `_stream_egress_iface` reports the interface detected for the most recent successful streaming connection,
 which can differ from the OS default. It is retained while disconnected and updated when the next connection's interface is detected.
+Older Parents still interpret `_net_default_iface` as the streaming interface in disconnect diagnostics; upgrade the Parent
+to use `_stream_egress_iface` for those diagnostics.
 
 View your automatic labels at `http://HOST-IP:19999/api/v1/info`:
 
@@ -194,7 +197,7 @@ Remove a custom label you no longer need.
 
 ### Stream labels from Child to Parent
 
-In Parent-Child setups, host labels automatically stream from children to the parent node. A label change on a child, such as one applied with `netdatacli reload-labels`, reaches its parent and every Parent above it without reconnecting. Parents with periodic system-info refresh support also update their cached system information from these labels. Older Parents can receive updated labels while their structured system information remains stale; upgrade every Parent in the chain for consistent API and Cloud metadata. Access any child's labels through the parent at:
+In Parent-Child setups, host labels automatically stream from children to the parent node. A label change on a child, such as one applied with `netdatacli reload-labels`, reaches its parent and every Parent above it without reconnecting. Parents with periodic system-info refresh support also update the six runtime fields in their cached system information from these labels. Other structured system information retains its handshake values. Older Parents can receive updated labels while their structured system information remains stale; upgrade every Parent in the chain for consistent API and Cloud metadata. Access any child's labels through the parent at:
 `http://localhost:19999/host/CHILD_HOSTNAME/api/v1/info`
 
 :::warning

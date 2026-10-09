@@ -84,6 +84,9 @@ bool rrdhost_system_info_detected_set(struct rrdhost_system_info *si, const char
 bool rrdhost_system_info_update(struct rrdhost_system_info *dst, struct rrdhost_system_info *candidate);
 bool rrdhost_system_info_update_from_labels(struct rrdhost_system_info *dst, RRDLABELS *old_labels, RRDLABELS *new_labels);
 bool rrdhost_system_info_label_is_owned(const char *name);
+bool rrdhost_system_info_label_is_runtime(const char *name);
+// Full label import is for locally managed virtual hosts, not streamed host handshakes.
+bool rrdhost_system_info_update_all_from_labels(struct rrdhost_system_info *dst, RRDLABELS *old_labels, RRDLABELS *new_labels);
 int rrdhost_system_info_unittest(void);
 
 // import from host rrdlabels

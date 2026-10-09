@@ -81,31 +81,34 @@ static void netdata_windows_cpu_from_system_info(struct rrdhost_system_info *sys
     (void)snprintf(cpuData, 255, "%d", sysInfo.dwNumberOfProcessors);
     netdata_windows_runtime_set(systemInfo, "NETDATA_SYSTEM_CPU_LOGICAL_CPU_COUNT", cpuData, runtime);
 
+    if (runtime)
+        return;
+
     char *arch = netdata_windows_arch(sysInfo.wProcessorArchitecture);
-    netdata_windows_runtime_set(systemInfo, "NETDATA_SYSTEM_ARCHITECTURE", arch, runtime);
+    rrdhost_system_info_set_by_name(systemInfo, "NETDATA_SYSTEM_ARCHITECTURE", arch);
 
     // GetSystemInfo() cannot fail, so CPU info (arch, logical count) is always gathered here.
     // Record the detection method unconditionally, independent of the optional registry probe
     // (freq/vendor/model) that may fail. Not stored in the struct; consumed from the environment
     // by anonymous-statistics.sh (mirrors the Linux system-info.sh dispatch, and the RAM/disk
     // detection pattern in this file).
-    netdata_windows_runtime_set(systemInfo, "NETDATA_SYSTEM_CPU_DETECTION", NETDATA_WIN_DETECTION_METHOD, runtime);
-    if (!runtime) nd_setenv("NETDATA_SYSTEM_CPU_DETECTION", NETDATA_WIN_DETECTION_METHOD, 1);
+    rrdhost_system_info_set_by_name(systemInfo, "NETDATA_SYSTEM_CPU_DETECTION", NETDATA_WIN_DETECTION_METHOD);
+    nd_setenv("NETDATA_SYSTEM_CPU_DETECTION", NETDATA_WIN_DETECTION_METHOD, 1);
 }
 
 static void netdata_windows_cpu_vendor_model(struct rrdhost_system_info *systemInfo,
                                                     HKEY lKey,
                                                     char *variable,
-                                                    char *key, bool runtime)
+                                                    char *key)
 {
     char cpuData[256];
     long ret = netdata_registry_get_string_from_open_key(cpuData, 255, lKey, key);
-    netdata_windows_runtime_set(systemInfo,
+    rrdhost_system_info_set_by_name(systemInfo,
                                            variable,
-                                           (ret == ERROR_SUCCESS) ? cpuData : NETDATA_DEFAULT_SYSTEM_INFO_VALUE_UNKNOWN, runtime);
+                                           (ret == ERROR_SUCCESS) ? cpuData : NETDATA_DEFAULT_SYSTEM_INFO_VALUE_UNKNOWN);
 }
 
-static void netdata_windows_cpu_from_registry(struct rrdhost_system_info *systemInfo, bool runtime)
+static void netdata_windows_cpu_from_registry(struct rrdhost_system_info *systemInfo)
 {
     HKEY lKey;
     long ret = RegOpenKeyEx(HKEY_LOCAL_MACHINE,
@@ -121,12 +124,12 @@ static void netdata_windows_cpu_from_registry(struct rrdhost_system_info *system
     if (cpuFreq)
         (void)snprintf(cpuData, 255, "%llu", cpuFreq);
 
-    netdata_windows_runtime_set(systemInfo,
+    rrdhost_system_info_set_by_name(systemInfo,
                                            "NETDATA_SYSTEM_CPU_FREQ",
-                                           (!cpuFreq) ? NETDATA_DEFAULT_SYSTEM_INFO_VALUE_UNKNOWN : cpuData, runtime);
+                                           (!cpuFreq) ? NETDATA_DEFAULT_SYSTEM_INFO_VALUE_UNKNOWN : cpuData);
 
-    netdata_windows_cpu_vendor_model(systemInfo, lKey, "NETDATA_SYSTEM_CPU_VENDOR", "VendorIdentifier", runtime);
-    netdata_windows_cpu_vendor_model(systemInfo, lKey, "NETDATA_SYSTEM_CPU_MODEL", "ProcessorNameString", runtime);
+    netdata_windows_cpu_vendor_model(systemInfo, lKey, "NETDATA_SYSTEM_CPU_VENDOR", "VendorIdentifier");
+    netdata_windows_cpu_vendor_model(systemInfo, lKey, "NETDATA_SYSTEM_CPU_MODEL", "ProcessorNameString");
     RegCloseKey(lKey);
 }
 
@@ -134,7 +137,8 @@ static void netdata_windows_get_cpu(struct rrdhost_system_info *systemInfo, bool
 {
     netdata_windows_cpu_from_system_info(systemInfo, runtime);
 
-    netdata_windows_cpu_from_registry(systemInfo, runtime);
+    if (!runtime)
+        netdata_windows_cpu_from_registry(systemInfo);
 }
 
 static void netdata_windows_get_mem(struct rrdhost_system_info *systemInfo, bool runtime)
@@ -151,8 +155,10 @@ static void netdata_windows_get_mem(struct rrdhost_system_info *systemInfo, bool
                                            "NETDATA_SYSTEM_TOTAL_RAM",
                                            (!size) ? NETDATA_DEFAULT_SYSTEM_INFO_VALUE_UNKNOWN : memSize, runtime);
     // Not stored in the struct; consumed from the environment by anonymous-statistics.sh.
-    netdata_windows_runtime_set(systemInfo, "NETDATA_SYSTEM_RAM_DETECTION", NETDATA_WIN_DETECTION_METHOD, runtime);
-    if (!runtime) nd_setenv("NETDATA_SYSTEM_RAM_DETECTION", NETDATA_WIN_DETECTION_METHOD, 1);
+    if (!runtime) {
+        netdata_windows_runtime_set(systemInfo, "NETDATA_SYSTEM_RAM_DETECTION", NETDATA_WIN_DETECTION_METHOD, false);
+        nd_setenv("NETDATA_SYSTEM_RAM_DETECTION", NETDATA_WIN_DETECTION_METHOD, 1);
+    }
 }
 
 static ULONGLONG netdata_windows_get_disk_size(char *cVolume)
@@ -177,6 +183,7 @@ static ULONGLONG netdata_windows_get_disk_size(char *cVolume)
 static void netdata_windows_get_total_disk_size(struct rrdhost_system_info *systemInfo, bool runtime)
 {
     ULONGLONG total = 0;
+    char root[] = "C:\\";
     char cVolume[8];
     snprintf(cVolume, 7, "\\\\.\\C:");
 
@@ -189,6 +196,10 @@ static void netdata_windows_get_total_disk_size(struct rrdhost_system_info *syst
 #define ND_POSSIBLE_VOLUMES 26
     for (i = 0; i < ND_POSSIBLE_VOLUMES; i++) {
         if (!(lDrives & 1 << i))
+            continue;
+
+        root[0] = 'A' + i;
+        if (GetDriveTypeA(root) != DRIVE_FIXED)
             continue;
 
         cVolume[4] = 'A' + i;
@@ -204,8 +215,10 @@ static void netdata_windows_get_total_disk_size(struct rrdhost_system_info *syst
     netdata_windows_runtime_set(systemInfo, "NETDATA_SYSTEM_TOTAL_DISK_SIZE", diskSize, runtime);
 
     // Not stored in the struct; consumed from the environment by anonymous-statistics.sh.
-    netdata_windows_runtime_set(systemInfo, "NETDATA_SYSTEM_DISK_DETECTION", NETDATA_WIN_DETECTION_METHOD, runtime);
-    if (!runtime) nd_setenv("NETDATA_SYSTEM_DISK_DETECTION", NETDATA_WIN_DETECTION_METHOD, 1);
+    if (!runtime) {
+        netdata_windows_runtime_set(systemInfo, "NETDATA_SYSTEM_DISK_DETECTION", NETDATA_WIN_DETECTION_METHOD, false);
+        nd_setenv("NETDATA_SYSTEM_DISK_DETECTION", NETDATA_WIN_DETECTION_METHOD, 1);
+    }
 }
 
 // Host

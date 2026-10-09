@@ -30,51 +30,52 @@ static const struct system_info_field {
     const char *label;
     size_t offset;
     bool numeric;
+    bool runtime;
 } system_info_fields[] = {
-    { "NETDATA_INSTANCE_CLOUD_TYPE", "_cloud_provider_type", offsetof(struct rrdhost_system_info, cloud_provider_type), false },
-    { "NETDATA_INSTANCE_CLOUD_INSTANCE_TYPE", "_cloud_instance_type", offsetof(struct rrdhost_system_info, cloud_instance_type), false },
-    { "NETDATA_INSTANCE_CLOUD_INSTANCE_REGION", "_cloud_instance_region", offsetof(struct rrdhost_system_info, cloud_instance_region), false },
-    { "NETDATA_HOST_OS_NAME", NULL, offsetof(struct rrdhost_system_info, host_os_name), false },
-    { "NETDATA_HOST_OS_ID", NULL, offsetof(struct rrdhost_system_info, host_os_id), false },
-    { "NETDATA_HOST_OS_ID_LIKE", NULL, offsetof(struct rrdhost_system_info, host_os_id_like), false },
-    { "NETDATA_HOST_OS_VERSION", "_os_version", offsetof(struct rrdhost_system_info, host_os_version), false },
-    { "NETDATA_HOST_OS_VERSION_ID", NULL, offsetof(struct rrdhost_system_info, host_os_version_id), false },
-    { "NETDATA_HOST_OS_DETECTION", NULL, offsetof(struct rrdhost_system_info, host_os_detection), false },
-    { "NETDATA_HOST_OS_LABEL_NAME", "_os_name", offsetof(struct rrdhost_system_info, host_os_label_name), false },
-    { "NETDATA_HOST_OS_LABEL_VERSION", "_os_marketing_version", offsetof(struct rrdhost_system_info, host_os_label_version), false },
-    { "NETDATA_HOST_OS_LABEL_RELEASE", "_os_release", offsetof(struct rrdhost_system_info, host_os_label_release), false },
-    { "NETDATA_HOST_OS_LABEL_CODENAME", "_os_codename", offsetof(struct rrdhost_system_info, host_os_label_codename), false },
-    { "NETDATA_HOST_OS_LABEL_EDITION", "_os_edition", offsetof(struct rrdhost_system_info, host_os_label_edition), false },
-    { "NETDATA_HOST_OS_LABEL_BUILD", "_os_build", offsetof(struct rrdhost_system_info, host_os_label_build), false },
-    { "NETDATA_SYSTEM_CPU_LOGICAL_CPU_COUNT", "_system_cores", offsetof(struct rrdhost_system_info, host_cores), true },
-    { "NETDATA_SYSTEM_CPU_FREQ", "_system_cpu_freq", offsetof(struct rrdhost_system_info, host_cpu_freq), true },
-    { "NETDATA_SYSTEM_CPU_MODEL", "_system_cpu_model", offsetof(struct rrdhost_system_info, host_cpu_model), false },
-    { "NETDATA_SYSTEM_TOTAL_RAM", "_system_ram_total", offsetof(struct rrdhost_system_info, host_ram_total), true },
-    { "NETDATA_SYSTEM_TOTAL_DISK_SIZE", "_system_disk_space", offsetof(struct rrdhost_system_info, host_disk_space), true },
-    { "NETDATA_CONTAINER_OS_NAME", NULL, offsetof(struct rrdhost_system_info, container_os_name), false },
-    { "NETDATA_CONTAINER_OS_ID", NULL, offsetof(struct rrdhost_system_info, container_os_id), false },
-    { "NETDATA_CONTAINER_OS_ID_LIKE", NULL, offsetof(struct rrdhost_system_info, container_os_id_like), false },
-    { "NETDATA_CONTAINER_OS_VERSION", NULL, offsetof(struct rrdhost_system_info, container_os_version), false },
-    { "NETDATA_CONTAINER_OS_VERSION_ID", NULL, offsetof(struct rrdhost_system_info, container_os_version_id), false },
-    { "NETDATA_CONTAINER_OS_DETECTION", NULL, offsetof(struct rrdhost_system_info, container_os_detection), false },
-    { "NETDATA_SYSTEM_KERNEL_NAME", NULL, offsetof(struct rrdhost_system_info, kernel_name), false },
-    { "NETDATA_SYSTEM_KERNEL_VERSION", "_kernel_version", offsetof(struct rrdhost_system_info, kernel_version), false },
-    { "NETDATA_SYSTEM_ARCHITECTURE", "_architecture", offsetof(struct rrdhost_system_info, architecture), false },
-    { "NETDATA_SYSTEM_VIRTUALIZATION", "_virtualization", offsetof(struct rrdhost_system_info, virtualization), false },
-    { "NETDATA_SYSTEM_VIRT_DETECTION", "_virt_detection", offsetof(struct rrdhost_system_info, virt_detection), false },
-    { "NETDATA_SYSTEM_CONTAINER", "_container", offsetof(struct rrdhost_system_info, container), false },
-    { "NETDATA_SYSTEM_CONTAINER_DETECTION", "_container_detection", offsetof(struct rrdhost_system_info, container_detection), false },
-    { "NETDATA_HOST_IS_K8S_NODE", "_is_k8s_node", offsetof(struct rrdhost_system_info, is_k8s_node), false },
-    { NULL, "_install_type", offsetof(struct rrdhost_system_info, install_type), false },
-    { NULL, "_prebuilt_arch", offsetof(struct rrdhost_system_info, prebuilt_arch), false },
-    { NULL, "_prebuilt_dist", offsetof(struct rrdhost_system_info, prebuilt_dist), false },
-    { "NETDATA_SYSTEM_DEFAULT_INTERFACE_NAME", "_net_default_iface", offsetof(struct rrdhost_system_info, network_default_iface), false },
-    { "NETDATA_SYSTEM_DEFAULT_INTERFACE_IP", "_net_default_iface_ip", offsetof(struct rrdhost_system_info, network_default_iface_ip), false },
-    { "NETDATA_SYSTEM_DEFAULT_INTERFACE_DETECTION", "_net_default_iface_detection", offsetof(struct rrdhost_system_info, network_default_iface_detection), false },
-    { NULL, "_hw_product_id", offsetof(struct rrdhost_system_info, hw_product_id), false },
-    { NULL, "_hw_product_name", offsetof(struct rrdhost_system_info, hw_product_name), false },
-    { NULL, "_hw_sys_vendor", offsetof(struct rrdhost_system_info, hw_sys_vendor), false },
-    { NULL, "_hw_product_type", offsetof(struct rrdhost_system_info, hw_product_type), false },
+    { "NETDATA_INSTANCE_CLOUD_TYPE", "_cloud_provider_type", offsetof(struct rrdhost_system_info, cloud_provider_type), false, false },
+    { "NETDATA_INSTANCE_CLOUD_INSTANCE_TYPE", "_cloud_instance_type", offsetof(struct rrdhost_system_info, cloud_instance_type), false, false },
+    { "NETDATA_INSTANCE_CLOUD_INSTANCE_REGION", "_cloud_instance_region", offsetof(struct rrdhost_system_info, cloud_instance_region), false, false },
+    { "NETDATA_HOST_OS_NAME", NULL, offsetof(struct rrdhost_system_info, host_os_name), false, false },
+    { "NETDATA_HOST_OS_ID", NULL, offsetof(struct rrdhost_system_info, host_os_id), false, false },
+    { "NETDATA_HOST_OS_ID_LIKE", NULL, offsetof(struct rrdhost_system_info, host_os_id_like), false, false },
+    { "NETDATA_HOST_OS_VERSION", "_os_version", offsetof(struct rrdhost_system_info, host_os_version), false, false },
+    { "NETDATA_HOST_OS_VERSION_ID", NULL, offsetof(struct rrdhost_system_info, host_os_version_id), false, false },
+    { "NETDATA_HOST_OS_DETECTION", NULL, offsetof(struct rrdhost_system_info, host_os_detection), false, false },
+    { "NETDATA_HOST_OS_LABEL_NAME", "_os_name", offsetof(struct rrdhost_system_info, host_os_label_name), false, false },
+    { "NETDATA_HOST_OS_LABEL_VERSION", "_os_marketing_version", offsetof(struct rrdhost_system_info, host_os_label_version), false, false },
+    { "NETDATA_HOST_OS_LABEL_RELEASE", "_os_release", offsetof(struct rrdhost_system_info, host_os_label_release), false, false },
+    { "NETDATA_HOST_OS_LABEL_CODENAME", "_os_codename", offsetof(struct rrdhost_system_info, host_os_label_codename), false, false },
+    { "NETDATA_HOST_OS_LABEL_EDITION", "_os_edition", offsetof(struct rrdhost_system_info, host_os_label_edition), false, false },
+    { "NETDATA_HOST_OS_LABEL_BUILD", "_os_build", offsetof(struct rrdhost_system_info, host_os_label_build), false, false },
+    { "NETDATA_SYSTEM_CPU_LOGICAL_CPU_COUNT", "_system_cores", offsetof(struct rrdhost_system_info, host_cores), true, true },
+    { "NETDATA_SYSTEM_CPU_FREQ", "_system_cpu_freq", offsetof(struct rrdhost_system_info, host_cpu_freq), true, false },
+    { "NETDATA_SYSTEM_CPU_MODEL", "_system_cpu_model", offsetof(struct rrdhost_system_info, host_cpu_model), false, false },
+    { "NETDATA_SYSTEM_TOTAL_RAM", "_system_ram_total", offsetof(struct rrdhost_system_info, host_ram_total), true, true },
+    { "NETDATA_SYSTEM_TOTAL_DISK_SIZE", "_system_disk_space", offsetof(struct rrdhost_system_info, host_disk_space), true, true },
+    { "NETDATA_CONTAINER_OS_NAME", NULL, offsetof(struct rrdhost_system_info, container_os_name), false, false },
+    { "NETDATA_CONTAINER_OS_ID", NULL, offsetof(struct rrdhost_system_info, container_os_id), false, false },
+    { "NETDATA_CONTAINER_OS_ID_LIKE", NULL, offsetof(struct rrdhost_system_info, container_os_id_like), false, false },
+    { "NETDATA_CONTAINER_OS_VERSION", NULL, offsetof(struct rrdhost_system_info, container_os_version), false, false },
+    { "NETDATA_CONTAINER_OS_VERSION_ID", NULL, offsetof(struct rrdhost_system_info, container_os_version_id), false, false },
+    { "NETDATA_CONTAINER_OS_DETECTION", NULL, offsetof(struct rrdhost_system_info, container_os_detection), false, false },
+    { "NETDATA_SYSTEM_KERNEL_NAME", NULL, offsetof(struct rrdhost_system_info, kernel_name), false, false },
+    { "NETDATA_SYSTEM_KERNEL_VERSION", "_kernel_version", offsetof(struct rrdhost_system_info, kernel_version), false, false },
+    { "NETDATA_SYSTEM_ARCHITECTURE", "_architecture", offsetof(struct rrdhost_system_info, architecture), false, false },
+    { "NETDATA_SYSTEM_VIRTUALIZATION", "_virtualization", offsetof(struct rrdhost_system_info, virtualization), false, false },
+    { "NETDATA_SYSTEM_VIRT_DETECTION", "_virt_detection", offsetof(struct rrdhost_system_info, virt_detection), false, false },
+    { "NETDATA_SYSTEM_CONTAINER", "_container", offsetof(struct rrdhost_system_info, container), false, false },
+    { "NETDATA_SYSTEM_CONTAINER_DETECTION", "_container_detection", offsetof(struct rrdhost_system_info, container_detection), false, false },
+    { "NETDATA_HOST_IS_K8S_NODE", "_is_k8s_node", offsetof(struct rrdhost_system_info, is_k8s_node), false, false },
+    { NULL, "_install_type", offsetof(struct rrdhost_system_info, install_type), false, false },
+    { NULL, "_prebuilt_arch", offsetof(struct rrdhost_system_info, prebuilt_arch), false, false },
+    { NULL, "_prebuilt_dist", offsetof(struct rrdhost_system_info, prebuilt_dist), false, false },
+    { "NETDATA_SYSTEM_DEFAULT_INTERFACE_NAME", "_net_default_iface", offsetof(struct rrdhost_system_info, network_default_iface), false, true },
+    { "NETDATA_SYSTEM_DEFAULT_INTERFACE_IP", "_net_default_iface_ip", offsetof(struct rrdhost_system_info, network_default_iface_ip), false, true },
+    { "NETDATA_SYSTEM_DEFAULT_INTERFACE_DETECTION", "_net_default_iface_detection", offsetof(struct rrdhost_system_info, network_default_iface_detection), false, true },
+    { NULL, "_hw_product_id", offsetof(struct rrdhost_system_info, hw_product_id), false, false },
+    { NULL, "_hw_product_name", offsetof(struct rrdhost_system_info, hw_product_name), false, false },
+    { NULL, "_hw_sys_vendor", offsetof(struct rrdhost_system_info, hw_sys_vendor), false, false },
+    { NULL, "_hw_product_type", offsetof(struct rrdhost_system_info, hw_product_type), false, false },
 };
 _Static_assert(sizeof(system_info_fields) / sizeof(system_info_fields[0]) <= 64, "system-info validity bitmap exhausted");
 
@@ -136,19 +137,27 @@ bool rrdhost_system_info_label_is_owned(const char *name) {
     return false;
 }
 
+bool rrdhost_system_info_label_is_runtime(const char *name) {
+    for (size_t i = 0; i < _countof(system_info_fields); i++)
+        if (system_info_fields[i].runtime && !strcmp(name, system_info_fields[i].label))
+            return true;
+    return false;
+}
+
 bool rrdhost_system_info_update(struct rrdhost_system_info *dst, struct rrdhost_system_info *candidate) {
     bool changed = false;
     for (size_t i = 0; i < _countof(system_info_fields); i++)
-        if (candidate->detected_fields & (UINT64_C(1) << i))
+        if (system_info_fields[i].runtime && (candidate->detected_fields & (UINT64_C(1) << i)))
             changed |= system_info_replace(system_info_field_ptr(dst, i), *system_info_field_ptr(candidate, i));
     return changed;
 }
 
-bool rrdhost_system_info_update_from_labels(struct rrdhost_system_info *dst, RRDLABELS *old_labels, RRDLABELS *new_labels) {
+static bool system_info_update_from_labels(struct rrdhost_system_info *dst, RRDLABELS *old_labels,
+                                           RRDLABELS *new_labels, bool runtime_only) {
     bool changed = false;
     for (size_t i = 0; i < _countof(system_info_fields); i++) {
         const char *label = system_info_fields[i].label;
-        if (!label)
+        if (!label || (runtime_only && !system_info_fields[i].runtime))
             continue;
         char *value = NULL, *old = NULL;
         rrdlabels_get_value_strdup_or_null(new_labels, &value, label);
@@ -170,10 +179,18 @@ bool rrdhost_system_info_update_from_labels(struct rrdhost_system_info *dst, RRD
     return changed;
 }
 
+bool rrdhost_system_info_update_from_labels(struct rrdhost_system_info *dst, RRDLABELS *old_labels, RRDLABELS *new_labels) {
+    return system_info_update_from_labels(dst, old_labels, new_labels, true);
+}
+
+bool rrdhost_system_info_update_all_from_labels(struct rrdhost_system_info *dst, RRDLABELS *old_labels, RRDLABELS *new_labels) {
+    return system_info_update_from_labels(dst, old_labels, new_labels, false);
+}
+
 struct rrdhost_system_info *rrdhost_system_info_from_host_labels(RRDLABELS *labels) {
     struct rrdhost_system_info *info = rrdhost_system_info_create();
     info->hops = 1;
-    rrdhost_system_info_update_from_labels(info, NULL, labels);
+    rrdhost_system_info_update_all_from_labels(info, NULL, labels);
     char family[32];
     rrdlabels_get_value_strcpyz(labels, family, sizeof(family), "_os");
     if (!strcasecmp(family, "windows"))
@@ -194,7 +211,7 @@ void rrdhost_system_info_to_rrdlabels(struct rrdhost_system_info *si, RRDLABELS 
 // NULL is successful absence. Failed/unsupported probes never call this function.
 bool rrdhost_system_info_detected_set(struct rrdhost_system_info *si, const char *key, const char *value) {
     int i = system_info_field_index(key);
-    if (i < 0)
+    if (i < 0 || !system_info_fields[i].runtime)
         return false;
     if (value) {
         if (!*value || !strcmp(value, "unknown"))
@@ -219,7 +236,7 @@ bool rrdhost_system_info_detected_set(struct rrdhost_system_info *si, const char
     return true;
 }
 
-// Every stored detector key occurs exactly once, even when its probe failed.
+// Every runtime key occurs exactly once, even when its probe failed.
 static bool system_info_parse_runtime(struct rrdhost_system_info *si, char *output) {
     static const char header[] = "NETDATA_SYSTEM_INFO_V1\n";
     if (strncmp(output, header, sizeof(header) - 1))
@@ -228,7 +245,7 @@ static bool system_info_parse_runtime(struct rrdhost_system_info *si, char *outp
     uint64_t seen = 0, expected = 0;
     char network_status = 0;
     for (size_t i = 0; i < _countof(system_info_fields); i++)
-        if (system_info_fields[i].key)
+        if (system_info_fields[i].runtime)
             expected |= UINT64_C(1) << i;
     while (*line) {
         char *end = strchr(line, '\n');
@@ -245,7 +262,7 @@ static bool system_info_parse_runtime(struct rrdhost_system_info *si, char *outp
             return false;
         *value++ = '\0';
         int i = system_info_field_index(key);
-        if (i < 0 || (seen & (UINT64_C(1) << i)) || strchr(value, '\r') || strchr(value, '\t'))
+        if (i < 0 || !system_info_fields[i].runtime || (seen & (UINT64_C(1) << i)) || strchr(value, '\r') || strchr(value, '\t'))
             return false;
         seen |= UINT64_C(1) << i;
         if (!strncmp(key, "NETDATA_SYSTEM_DEFAULT_INTERFACE_", sizeof("NETDATA_SYSTEM_DEFAULT_INTERFACE_") - 1)) {
@@ -268,6 +285,7 @@ static bool system_info_parse_runtime(struct rrdhost_system_info *si, char *outp
 
 #if !defined(OS_WINDOWS)
 static char *system_info_read_argv(const char **argv, bool (*cancelled)(void), unsigned timeout_ms);
+static void system_info_parse_startup(struct rrdhost_system_info *system_info, char *output);
 static bool system_info_test_cancelled(void) { return true; }
 #endif
 
@@ -275,7 +293,7 @@ static BUFFER *system_info_test_response(const char *key, char status, const cha
     BUFFER *b = buffer_create(0, NULL);
     buffer_strcat(b, "NETDATA_SYSTEM_INFO_V1\n");
     for (size_t i = 0; i < _countof(system_info_fields); i++) {
-        if (!system_info_fields[i].key)
+        if (!system_info_fields[i].runtime)
             continue;
         bool selected = key && !strcmp(key, system_info_fields[i].key);
         buffer_sprintf(b, "%c\t%s\t%s\n", selected ? status : 'F', system_info_fields[i].key,
@@ -354,7 +372,42 @@ int rrdhost_system_info_unittest(void) {
     SI_CHECK(!strcmp(dst->host_cpu_freq, "2000000000"));
     SI_CHECK(rrdhost_system_info_label_is_owned("_net_default_iface"));
     SI_CHECK(!rrdhost_system_info_label_is_owned("_stream_egress_iface"));
+    SI_CHECK(!rrdhost_system_info_detected_set(candidate, "NETDATA_SYSTEM_CPU_FREQ", "3000000000"));
+    SI_CHECK(!rrdhost_system_info_detected_set(candidate, "NETDATA_SYSTEM_CPU_MODEL", "new model"));
+    SI_CHECK(!rrdhost_system_info_label_is_runtime("_os_name"));
+    SI_CHECK(!rrdhost_system_info_label_is_runtime("_system_cpu_freq"));
+    SI_CHECK(rrdhost_system_info_label_is_runtime("_system_cores"));
+    b = system_info_test_response("NETDATA_SYSTEM_TOTAL_RAM", 'F', NULL);
+    buffer_flush(b);
+    buffer_strcat(b, "NETDATA_SYSTEM_INFO_V1\nV\tNETDATA_SYSTEM_CPU_FREQ\t3000000000\nNETDATA_SYSTEM_INFO_END\n");
+    SI_CHECK(!system_info_parse_runtime(candidate, (char *)buffer_tostring(b)));
+    buffer_free(b);
 #if !defined(OS_WINDOWS)
+    struct rrdhost_system_info *startup = rrdhost_system_info_create();
+    const char *network_keys[] = {
+        "NETDATA_SYSTEM_DEFAULT_INTERFACE_NAME", "NETDATA_SYSTEM_DEFAULT_INTERFACE_IP",
+        "NETDATA_SYSTEM_DEFAULT_INTERFACE_DETECTION",
+    };
+    char *saved_env[_countof(network_keys)];
+    for (size_t i = 0; i < _countof(network_keys); i++)
+        saved_env[i] = system_info_strdupz(getenv(network_keys[i]));
+    char no_route[] = "NETDATA_SYSTEM_DEFAULT_INTERFACE_NAME=unknown\n"
+                      "NETDATA_SYSTEM_DEFAULT_INTERFACE_IP=unknown\n"
+                      "NETDATA_SYSTEM_DEFAULT_INTERFACE_DETECTION=none\n";
+    system_info_parse_startup(startup, no_route);
+    SI_CHECK(!startup->network_default_iface && !startup->network_default_iface_ip &&
+             !startup->network_default_iface_detection);
+    struct rrdhost_system_info *absent = rrdhost_system_info_create();
+    for (size_t i = 0; i < _countof(network_keys); i++) {
+        SI_CHECK(rrdhost_system_info_detected_set(absent, network_keys[i], NULL));
+        SI_CHECK(getenv(network_keys[i]) && !strcmp(getenv(network_keys[i]), i == 2 ? "none" : "unknown"));
+        if (saved_env[i]) nd_setenv(network_keys[i], saved_env[i], 1);
+        else unsetenv(network_keys[i]);
+        freez(saved_env[i]);
+    }
+    SI_CHECK(!rrdhost_system_info_update(startup, absent));
+    rrdhost_system_info_free(startup);
+    rrdhost_system_info_free(absent);
     bool own_server = !netdata_main_spawn_server;
     SI_CHECK(netdata_main_spawn_server_init("system-info-test", 0, NULL));
     if (netdata_main_spawn_server) {
@@ -406,21 +459,38 @@ int rrdhost_system_info_unittest(void) {
 }
 
 #if !defined(OS_WINDOWS)
+static void system_info_log_failure(const char *reason, int status) {
+    nd_log_limit_static_global_var(limit, 60, 0);
+    if (status >= 0)
+        nd_log_limit(&limit, NDLS_DAEMON, NDLP_WARNING,
+                     "SYSTEM INFO: detection failed: %s (exit status %d)", reason, status);
+    else
+        nd_log_limit(&limit, NDLS_DAEMON, NDLP_WARNING, "SYSTEM INFO: detection failed: %s", reason);
+}
+
 // Read through EOF, including buffered data delivered together with POLLHUP.
 // The deadline starts after spawn; the owned group is reclaimed before its leader is reaped.
 static char *system_info_read_argv(const char **argv, bool (*cancelled)(void), unsigned timeout_ms) {
     POPEN_INSTANCE *pi = spawn_popen_run_argv_group(argv);
-    if (!pi)
+    if (!pi) {
+        system_info_log_failure("unable to spawn script", -1);
         return NULL;
+    }
+    const char *failure = "execution deadline exceeded";
+    int exit_status = -1;
+    bool was_cancelled = false;
     usec_t deadline = now_monotonic_usec() + (usec_t)timeout_ms * USEC_PER_MS;
     const size_t limit = 64 * 1024;
     char *output = mallocz(limit + 1);
     size_t used = 0;
     int fd = spawn_popen_read_fd(pi);
     bool eof = false, ok = fd >= 0;
+    if (!ok)
+        failure = "invalid script output descriptor";
     while (ok && !eof && used < limit && now_monotonic_usec() < deadline) {
         if (cancelled && cancelled()) {
             ok = false;
+            was_cancelled = true;
             break;
         }
         struct pollfd pfd = { .fd = fd, .events = POLLIN };
@@ -428,39 +498,87 @@ static char *system_info_read_argv(const char **argv, bool (*cancelled)(void), u
         if (rc < 0) {
             if (errno == EINTR) continue;
             ok = false;
+            failure = "polling script output failed";
         }
         else if (rc && (pfd.revents & (POLLIN | POLLHUP))) {
             ssize_t n = read(fd, output + used, limit - used);
             if (n > 0) used += (size_t)n;
             else if (!n) eof = true;
-            else if (errno != EINTR) ok = false;
+            else if (errno != EINTR) {
+                ok = false;
+                failure = "reading script output failed";
+            }
         }
-        else if (rc && (pfd.revents & (POLLERR | POLLNVAL)))
+        else if (rc && (pfd.revents & (POLLERR | POLLNVAL))) {
             ok = false;
+            failure = "script output pipe failed";
+        }
     }
+    if (used >= limit)
+        failure = "script output reached the 64 KiB limit";
+    else if (memchr(output, '\0', used))
+        failure = "script output contains a NUL byte";
     ok = ok && eof && used < limit && !memchr(output, '\0', used);
     output[used] = '\0';
     while (ok && now_monotonic_usec() < deadline) {
-        if (cancelled && cancelled()) break;
+        if (cancelled && cancelled()) {
+            was_cancelled = true;
+            break;
+        }
         int code = 1;
         SPAWN_TIMEDWAIT_RESULT rc = spawn_popen_timedwait(pi, 100, &code);
         if (rc == SPAWN_TIMEDWAIT_EXITED) {
             pi = NULL;
             ok = code == 0;
+            exit_status = code;
+            failure = "script exited unsuccessfully";
             break;
         }
-        if (rc == SPAWN_TIMEDWAIT_ERROR) break;
+        if (rc == SPAWN_TIMEDWAIT_ERROR) {
+            failure = "waiting for script exit failed";
+            break;
+        }
     }
     if (pi) {
         spawn_popen_kill(pi, 1000);
         ok = false;
     }
     if (!ok) {
+        if (!was_cancelled)
+            system_info_log_failure(failure, exit_status);
         freez(output);
         return NULL;
     }
     return output;
 }
+static void system_info_parse_startup(struct rrdhost_system_info *system_info, char *output) {
+    char *cursor = output;
+    char *line;
+    while ((line = strsep(&cursor, "\n"))) {
+        char *value = strchr(line, '=');
+        if (!value)
+            continue;
+        *value++ = '\0';
+        char *cr = strchr(value, '\r');
+        if (cr) *cr = '\0';
+        if (!*line || !*value)
+            continue;
+        coverity_remove_taint(line);
+        coverity_remove_taint(value);
+        if (!rrdhost_system_info_set_by_name(system_info, line, value))
+            nd_setenv(line, value, 1);
+    }
+
+    // Export the historical environment values, but keep absence identical to runtime.
+    if (system_info->network_default_iface && !strcmp(system_info->network_default_iface, "unknown") &&
+        system_info->network_default_iface_ip && !strcmp(system_info->network_default_iface_ip, "unknown") &&
+        system_info->network_default_iface_detection && !strcmp(system_info->network_default_iface_detection, "none")) {
+        system_info_replace(&system_info->network_default_iface, NULL);
+        system_info_replace(&system_info->network_default_iface_ip, NULL);
+        system_info_replace(&system_info->network_default_iface_detection, NULL);
+    }
+}
+
 static bool system_info_cancelled(void) {
     return nd_thread_signaled_to_cancel() || exit_initiated_get();
 }
@@ -487,8 +605,10 @@ bool rrdhost_system_info_detect_runtime(struct rrdhost_system_info *candidate) {
         return false;
     bool ok = system_info_parse_runtime(candidate, output);
     freez(output);
-    if (!ok)
+    if (!ok) {
         candidate->detected_fields = 0;
+        system_info_log_failure("malformed or incomplete runtime response", -1);
+    }
     return ok;
 #endif
 }
@@ -530,22 +650,7 @@ int rrdhost_system_info_detect(struct rrdhost_system_info *system_info) {
     char *output = system_info_read_script(false);
     if (!output)
         return 1;
-    char *cursor = output;
-    char *line;
-    while ((line = strsep(&cursor, "\n"))) {
-        char *value = strchr(line, '=');
-        if (!value)
-            continue;
-        *value++ = '\0';
-        char *cr = strchr(value, '\r');
-        if (cr) *cr = '\0';
-        if (!*line || !*value)
-            continue;
-        coverity_remove_taint(line);
-        coverity_remove_taint(value);
-        if (!rrdhost_system_info_set_by_name(system_info, line, value))
-            nd_setenv(line, value, 1);
-    }
+    system_info_parse_startup(system_info, output);
     freez(output);
     return 0;
 #else

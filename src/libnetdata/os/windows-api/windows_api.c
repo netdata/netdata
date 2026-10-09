@@ -50,11 +50,12 @@ int netdata_win_default_network(char **iface, char **ipaddr)
             result = -1;
             if (!aa->FriendlyName)
                 goto done;
-            size_t size = wcstombs(NULL, aa->FriendlyName, 0);
-            if (!size || size == (size_t)-1)
+            // FriendlyName is UTF-16; conversion must not depend on the process locale.
+            int size = WideCharToMultiByte(CP_UTF8, 0, aa->FriendlyName, -1, NULL, 0, NULL, NULL);
+            if (size <= 1)
                 goto done;
-            *iface = malloc(size + 1);
-            if (!*iface || wcstombs(*iface, aa->FriendlyName, size + 1) == (size_t)-1)
+            *iface = malloc(size);
+            if (!*iface || !WideCharToMultiByte(CP_UTF8, 0, aa->FriendlyName, -1, *iface, size, NULL, NULL))
                 goto done;
             char address[INET_ADDRSTRLEN];
             struct sockaddr_in *sa = (struct sockaddr_in *)ua->Address.lpSockaddr;
