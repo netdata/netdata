@@ -1378,7 +1378,9 @@ jobs:
 
   macos-pkg: # Build the native macOS package and store it as an artifact.
     name: Build macOS Package
-    runs-on: macos-14
+    # The macOS 14 floor comes from the deployment target, not the runner;
+    # the macos-14 image is retired on 2026-11-02.
+    runs-on: macos-15
     if: github.event_name != 'workflow_dispatch'
     needs:
       - file-check
