@@ -1,8 +1,8 @@
 # Experimental Go IPMI plugin
 
-This plugin is an opt-in replacement candidate for `freeipmi.plugin`. It is excluded from production builds. The initial
-executable supports Linux amd64 and arm64. FreeIPMI remains available for production use and capabilities not yet
-supported by the experiment.
+This plugin is an opt-in replacement candidate for `freeipmi.plugin`. It is excluded from production builds. The executable
+supports Linux architectures supported by the Go toolchain, including 32-bit x86 and ARM. FreeIPMI remains available
+for production use and capabilities not yet supported by the experiment.
 
 ## Build and configure
 
@@ -19,6 +19,10 @@ needs no C compiler:
 cd src/go
 CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -o /tmp/ipmi.plugin ./cmd/ipmiplugin
 ```
+
+Set `GOARCH` for the target system; use `GOARCH=arm GOARM=6` or `GOARM=7` for ARM32. Cross-compilation verifies a
+binary can be built, while local device access also requires kernel OpenIPMI support and suitable hardware. Upstream
+validates the Linux ABI against target kernel headers; this does not establish physical BMC compatibility on every CPU.
 
 No jobs start until configured. In the Netdata configuration directory, add `ipmi/ipmi.conf`:
 

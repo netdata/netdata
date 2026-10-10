@@ -4,8 +4,8 @@
 # include()d from the root file, so paths resolve against the repository and
 # build roots; nothing here may use CMAKE_CURRENT_LIST_DIR.
 #
-# The option's guard in NetdataOptions.cmake limits the plugin to Linux on
-# 64-bit x86 or ARM, so the binary name carries no Windows .exe variant.
+# The option's guard in NetdataOptions.cmake limits the plugin to Linux,
+# so the binary name carries no Windows .exe variant.
 
 include_guard()
 
