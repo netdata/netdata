@@ -48,6 +48,16 @@ typedef struct {
     std::vector<ml_worker_t> workers;
     std::atomic<bool> training_stop;
 
+    // The one create-model / add-model queue all training threads consume (see ml_queue.h). Created by ml_init(),
+    // before any host can enqueue, and freed by ml_workers_free().
+    ml_queue_t *training_queue;
+
+    // Models installed by any training thread and not yet written to ml.db, in install order. Appended under
+    // pending_models_spinlock while the installing thread holds the dimension's slock; swapped out under the
+    // database mutex by ml_flush_pending_models(), so every dimension's models reach the database in install order.
+    std::vector<ml_model_info_t> pending_models;
+    SPINLOCK pending_models_spinlock;
+
     size_t suppression_window;
     size_t suppression_threshold;
 

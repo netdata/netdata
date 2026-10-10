@@ -49,6 +49,10 @@ enum ml_worker_result {
     // Acquired a null dimension
     ML_WORKER_RESULT_NULL_ACQUIRED_DIMENSION,
 
+    // The dimension exists but cannot be used right now (its host is orphan or archived, or its chart is obsolete);
+    // unlike a null dimension, the item is requeued, because a reconnect or revival does not enqueue it again.
+    ML_WORKER_RESULT_DIMENSION_UNAVAILABLE,
+
     // Chart is under replication
     ML_WORKER_RESULT_CHART_UNDER_REPLICATION,
 

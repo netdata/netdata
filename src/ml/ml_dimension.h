@@ -26,7 +26,6 @@ struct ml_dimension_t {
     std::vector<calculated_number_t> cns;
 
     std::vector<ml_kmeans_inlined_t> km_contexts;
-    ml_kmeans_t kmeans;
     DSample feature;
 };
 
@@ -88,7 +87,7 @@ private:
 
 class AcquiredDimension {
 public:
-    AcquiredDimension(const DimensionLookupInfo &DLI) : AcqRH(nullptr), AcqRS(nullptr), AcqRD(nullptr), Dim(nullptr)
+    explicit AcquiredDimension(const DimensionLookupInfo &DLI)
     {
         rrd_rdlock();
 
@@ -96,7 +95,9 @@ public:
         if (AcqRH) {
             RRDHOST *RH = rrdhost_acquired_to_rrdhost(AcqRH);
             if (RH && !rrdhost_flag_check(RH, RRDHOST_FLAG_ORPHAN | RRDHOST_FLAG_ARCHIVED)) {
-                AcqRS = rrdset_find_and_acquire(RH, DLI.chartId(), false);
+                // obsolete charts are found too, so they are told apart from deleted ones below; their access
+                // time is left alone, or the retries of a queued dimension would keep the chart from being freed
+                AcqRS = rrdset_find_and_acquire_obsolete_untouched(RH, DLI.chartId());
                 if (AcqRS) {
                     RRDSET *RS = rrdset_acquired_to_rrdset(AcqRS);
                     if (RS && !rrdset_flag_check(RS, RRDSET_FLAG_OBSOLETE)) {
@@ -113,14 +114,18 @@ public:
                         else
                             acquire_failure_reason = "can't find dimension";
                     }
-                    else
+                    else {
                         acquire_failure_reason = "chart is obsolete";
+                        temporarily_unavailable = true;
+                    }
                 }
                 else
                     acquire_failure_reason = "can't find chart";
             }
-            else
+            else {
                 acquire_failure_reason = "host is orphan or archived";
+                temporarily_unavailable = true;
+            }
         }
         else
             acquire_failure_reason = "can't find host";
@@ -142,6 +147,11 @@ public:
         return acquire_failure_reason;
     }
 
+    // not acquired, but the dimension still exists and can come back (a child reconnects, a chart is revived)
+    bool unavailable_temporarily() const {
+        return temporarily_unavailable;
+    }
+
     AcquiredMLHost host() const {
         assert(acquired());
         return AcquiredMLHost(rrdhost_acquired_to_rrdhost(AcqRH));
@@ -150,6 +160,12 @@ public:
     ml_dimension_t *dimension() const {
         assert(acquired());
         return Dim;
+    }
+
+    // the acquired RRDDIM itself, valid whether or not ML state exists for it
+    RRDDIM *rrddim() const {
+        assert(acquired());
+        return rrddim_acquired_to_rrddim(AcqRD);
     }
 
     ~AcquiredDimension()
@@ -166,10 +182,11 @@ public:
 
 private:
     const char *acquire_failure_reason;
-    RRDHOST_ACQUIRED *AcqRH;
-    RRDSET_ACQUIRED *AcqRS;
-    RRDDIM_ACQUIRED *AcqRD;
-    ml_dimension_t *Dim;
+    bool temporarily_unavailable = false;
+    RRDHOST_ACQUIRED *AcqRH = nullptr;
+    RRDSET_ACQUIRED *AcqRS = nullptr;
+    RRDDIM_ACQUIRED *AcqRD = nullptr;
+    ml_dimension_t *Dim = nullptr;
 };
 
 #endif /* ML_LOOKUP_H */

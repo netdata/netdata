@@ -214,7 +214,9 @@ static inline void check_and_fix_mrg_update_every(struct rrdeng_collect_handle *
               (uint32_t)(handle->update_every_ut / USEC_PER_SEC), mrg_metric_get_update_every_s(main_mrg, handle->metric));
 
         if(unlikely(!handle->update_every_ut))
-            handle->update_every_ut = (usec_t)mrg_metric_get_update_every_s(main_mrg, handle->metric) * USEC_PER_SEC;
+            __atomic_store_n(&handle->update_every_ut,
+                             (usec_t)mrg_metric_get_update_every_s(main_mrg, handle->metric) * USEC_PER_SEC,
+                             __ATOMIC_RELAXED);
         else
             mrg_metric_set_update_every(main_mrg, handle->metric, (uint32_t)(handle->update_every_ut / USEC_PER_SEC));
     }
@@ -321,7 +323,7 @@ STORAGE_COLLECT_HANDLE *rrdeng_store_metric_init(STORAGE_METRIC_HANDLE *smh, uin
 
     time_t db_first_time_s, db_last_time_s;
     mrg_metric_get_retention(main_mrg, metric, &db_first_time_s, &db_last_time_s, NULL);
-    handle->page_end_time_ut = (usec_t)db_last_time_s * USEC_PER_SEC;
+    __atomic_store_n(&handle->page_end_time_ut, (usec_t)db_last_time_s * USEC_PER_SEC, __ATOMIC_RELAXED);
 
     return (STORAGE_COLLECT_HANDLE *)handle;
 }
@@ -345,10 +347,10 @@ void rrdeng_store_metric_flush_current_page(STORAGE_COLLECT_HANDLE *sch) {
 
     mrg_metric_set_hot_latest_time_s(main_mrg, handle->metric, 0);
 
-    handle->pgc_page = NULL;
+    __atomic_store_n(&handle->pgc_page, NULL, __ATOMIC_RELAXED);
     handle->page_flags = 0;
     handle->page_position = 0;
-    handle->page_entries_max = 0;
+    __atomic_store_n(&handle->page_entries_max, 0, __ATOMIC_RELAXED);
     handle->page_data = NULL;
 
     // important!
@@ -414,11 +416,14 @@ static void rrdeng_store_metric_create_new_page(struct rrdeng_collect_handle *ha
         pgc_page = pgc_page_add_and_acquire(main_cache, page_entry, &added);
     }
 
-    handle->page_entries_max = pgd_capacity(data);
-    handle->page_start_time_ut = point_in_time_ut;
-    handle->page_end_time_ut = point_in_time_ut;
+    // page_entries_max, page_start_time_ut, page_end_time_ut and pgc_page are read without the collector's
+    // cooperation by rrdeng_store_metric_page_time_to_close_s(); store them atomically so that reader sees whole
+    // values.
+    __atomic_store_n(&handle->page_entries_max, pgd_capacity(data), __ATOMIC_RELAXED);
+    __atomic_store_n(&handle->page_start_time_ut, point_in_time_ut, __ATOMIC_RELAXED);
+    __atomic_store_n(&handle->page_end_time_ut, point_in_time_ut, __ATOMIC_RELAXED);
     handle->page_position = 1; // zero is already in our data
-    handle->pgc_page = pgc_page;
+    __atomic_store_n(&handle->pgc_page, pgc_page, __ATOMIC_RELAXED);
     handle->page_flags = conflicts? RRDENG_PAGE_CONFLICT : 0;
 
     if(point_in_time_s > max_acceptable_collected_time())
@@ -535,7 +540,7 @@ static ALWAYS_INLINE_HOT void rrdeng_store_metric_append_point(STORAGE_COLLECT_H
         // update an existing page
         pgc_page_hot_set_end_time_s(main_cache, handle->pgc_page,
                                     (time_t) (point_in_time_ut / USEC_PER_SEC), additional_bytes);
-        handle->page_end_time_ut = point_in_time_ut;
+        __atomic_store_n(&handle->page_end_time_ut, point_in_time_ut, __ATOMIC_RELAXED);
 
         rrdeng_store_metric_first_retention(handle);
 
@@ -718,7 +723,32 @@ void rrdeng_store_metric_change_collection_frequency(STORAGE_COLLECT_HANDLE *sch
     handle->page_flags |= RRDENG_PAGE_UPDATE_EVERY_CHANGE;
     rrdeng_store_metric_flush_current_page(sch);
     mrg_metric_set_update_every(main_mrg, metric, update_every);
-    handle->update_every_ut = update_every_ut;
+    __atomic_store_n(&handle->update_every_ut, update_every_ut, __ATOMIC_RELAXED);
+}
+
+time_t rrdeng_store_metric_page_time_to_close_s(STORAGE_COLLECT_HANDLE *sch) {
+    struct rrdeng_collect_handle *handle = (struct rrdeng_collect_handle *)sch;
+
+    if(!__atomic_load_n(&handle->pgc_page, __ATOMIC_RELAXED))
+        return -1;
+
+    uint32_t entries_max = __atomic_load_n(&handle->page_entries_max, __ATOMIC_RELAXED);
+    usec_t update_every_ut = __atomic_load_n(&handle->update_every_ut, __ATOMIC_RELAXED);
+    usec_t start_ut = __atomic_load_n(&handle->page_start_time_ut, __ATOMIC_RELAXED);
+    usec_t last_ut = __atomic_load_n(&handle->page_end_time_ut, __ATOMIC_RELAXED);
+
+    if(!entries_max || !update_every_ut || !start_ut || last_ut < start_ut)
+        return -1;
+
+    // the page flushes when its entries_max-th point arrives (rrdeng_store_metric_next()), so the last point
+    // of a full page is at start + (entries_max - 1) * update_every
+    usec_t close_ut = start_ut + (usec_t)(entries_max - 1) * update_every_ut;
+
+    // a read racing a page change can mix the fields of two pages
+    if(close_ut < last_ut)
+        return -1;
+
+    return (time_t)((close_ut - last_ut) / USEC_PER_SEC);
 }
 
 // ----------------------------------------------------------------------------

@@ -22,14 +22,10 @@ static void ml_host_clear_context_anomaly_rate(ml_host_t *host)
 
 static void ml_dimension_enqueue_create_model(RRDHOST *rh, RRDDIM *rd)
 {
-    ml_queue_t *queue;
     {
         AcquiredMLHost acquired_host(rh);
-        ml_host_t *host = acquired_host.get();
-        if (!host)
+        if (!acquired_host.get())
             return;
-
-        queue = host->queue;
     }
 
     ml_dimension_t *dim = (ml_dimension_t *) rd->ml_dimension;
@@ -55,7 +51,7 @@ static void ml_dimension_enqueue_create_model(RRDHOST *rh, RRDDIM *rd)
         rd->id
     );
 
-    ml_queue_push(queue, item);
+    ml_queue_push(Cfg.training_queue, item);
 }
 
 bool ml_capable()
@@ -93,12 +89,6 @@ void ml_host_new(RRDHOST *rh)
     host->mls = ml_machine_learning_stats_t();
     host->host_anomaly_rate = 0.0;
     host->anomaly_rate_rs = NULL;
-
-    static std::atomic<size_t> times_called(0);
-    // Borrowed pointer into Cfg.workers[]. It is never invalidated: the worker
-    // queues are freed only by ml_workers_free(), long after every producer is
-    // gone. See the comment on ml_workers_free().
-    host->queue = Cfg.workers[times_called++ % Cfg.num_worker_threads].queue;
 
     netdata_mutex_init(&host->mutex);
     netdata_mutex_init(&host->start_stop_mutex);
@@ -236,7 +226,7 @@ void ml_host_stop(RRDHOST *rh) {
             dim->km_contexts.clear();
             dim->has_received_downstream_model = false;
             // create_new_model_queued not reset here: stop does not drain the
-            // worker queue, so pending CREATE_NEW_MODEL items remain valid.
+            // training queue, so pending CREATE_NEW_MODEL items remain valid.
             dim->reset_generation++;
 
             spinlock_unlock(&dim->slock);
@@ -422,8 +412,6 @@ void ml_dimension_new(RRDDIM *rd)
     dim->reset_generation = 0;
     dim->cns_head = 0;
 
-    ml_kmeans_init(&dim->kmeans);
-
     if (simple_pattern_matches(Cfg.sp_charts_to_skip, rrdset_name(rd->rrdset)))
         dim->mls = MACHINE_LEARNING_STATUS_DISABLED_DUE_TO_EXCLUDED_CHART;
     else
@@ -535,6 +523,12 @@ void ml_init()
     for (size_t Idx = 0; Idx != Cfg.max_training_vectors; Idx++)
         Cfg.random_nums.push_back(Gen());
 
+    // the queue and the pending-model list shared by all training threads
+    Cfg.training_queue = ml_queue_init();
+    ml_queue_set_pass_key_fn(Cfg.training_queue, ml_queue_dimension_pass_key, nullptr);
+    spinlock_init(&Cfg.pending_models_spinlock);
+    Cfg.pending_models.reserve(Cfg.flush_models_batch_size);
+
     // init training thread-specific data
     Cfg.workers.resize(Cfg.num_worker_threads);
     for (size_t idx = 0; idx != Cfg.num_worker_threads; idx++) {
@@ -548,7 +542,6 @@ void ml_init()
         worker->scratch_training_cns = new calculated_number_t[max_elements_needed_for_training]();
 
         worker->id = idx;
-        worker->queue = ml_queue_init();
         worker->pending_model_info.reserve(Cfg.flush_models_batch_size);
         netdata_mutex_init(&worker->nd_mutex);
 
@@ -765,11 +758,8 @@ void ml_stop_threads()
     nd_thread_join(Cfg.detection_thread);
     Cfg.detection_thread = 0;
 
-    // signal the worker queue of each thread
-    for (size_t idx = 0; idx != Cfg.workers.size(); idx++) {
-        ml_worker_t *worker = &Cfg.workers[idx];
-        ml_queue_signal(worker->queue);
-    }
+    // wake every training thread blocked on the shared queue
+    ml_queue_signal(Cfg.training_queue);
 
     // join worker threads
     for (size_t idx = 0; idx != Cfg.workers.size(); idx++) {
@@ -787,9 +777,9 @@ void ml_stop_threads()
 // netdata_cleanup_and_exit()). A collector that misses that deadline keeps
 // running and can still create dimensions, reaching ml_queue_push() through
 // rrddim_insert_callback() -> ml_dimension_enqueue_create_model(). Destroying
-// worker->queue there left that producer locking a destroyed mutex (SIGABRT).
+// the training queue there left that producer locking a destroyed mutex (SIGABRT).
 //
-// The queues therefore outlive every producer on a normal shutdown, and are
+// The queue therefore outlives every producer on a normal shutdown, and is
 // released only from the FSANITIZE_ADDRESS teardown block in
 // netdata_cleanup_and_exit(), after rrdhost_free_all() has removed all producers.
 // Same reasoning as ml_fini(), which is likewise deferred to a later step.
@@ -803,13 +793,15 @@ void ml_workers_free()
 
         delete[] worker->training_cns;
         delete[] worker->scratch_training_cns;
-        ml_queue_destroy(worker->queue);
         netdata_mutex_destroy(&worker->nd_mutex);
 
         // Free reusable buffers
         buffer_free(worker->stream_payload_buffer);
         buffer_free(worker->stream_wb_buffer);
     }
+
+    ml_queue_destroy(Cfg.training_queue);
+    Cfg.training_queue = nullptr;
 }
 
 bool ml_model_received_from_child(RRDHOST *host, const char *json)

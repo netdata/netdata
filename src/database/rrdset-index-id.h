@@ -70,6 +70,7 @@ RRDSET *rrdset_find(RRDHOST *host, const char *id, bool include_obsolete);
 RRDSET *rrdset_find_bytype(RRDHOST *host, const char *type, const char *id, bool include_obsolete);
 
 RRDSET_ACQUIRED *rrdset_find_and_acquire(RRDHOST *host, const char *id, bool include_obsolete);
+RRDSET_ACQUIRED *rrdset_find_and_acquire_obsolete_untouched(RRDHOST *host, const char *id);
 
 void rrdset_acquired_release(RRDSET_ACQUIRED *rsa);
 RRDSET *rrdset_acquired_to_rrdset(RRDSET_ACQUIRED *rsa);
