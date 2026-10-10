@@ -60,7 +60,12 @@ install(DIRECTORY COMPONENT netdata DESTINATION ${CACHE_DEST})
 install(DIRECTORY COMPONENT netdata DESTINATION ${LOG_DEST})
 install(DIRECTORY COMPONENT netdata DESTINATION ${VARLIB_DEST}/registry)
 install(DIRECTORY COMPONENT netdata DESTINATION ${VARLIB_DEST}/cloud.d)
+# The daemon self-provisions its run directory at startup (run_dir.c; on
+# macOS /private/var/run/netdata, recreated on every boot), so the macOS
+# package does not stage one - the same posture RPM already takes.
+if(NOT NETDATA_PACKAGE_KIND STREQUAL "pkg")
 install(DIRECTORY COMPONENT netdata DESTINATION ${RUN_DEST})
+endif()
 install(DIRECTORY COMPONENT netdata DESTINATION ${CONFIG_DEST})
 install(DIRECTORY COMPONENT netdata DESTINATION ${CONFIG_DEST}/custom-plugins.d)
 install(DIRECTORY COMPONENT netdata DESTINATION ${CONFIG_DEST}/health.d)
@@ -153,10 +158,14 @@ install(FILES
 #
 # ioping.plugin
 #
+# The wrapper expects an ioping binary no macOS rule has ever built, so the
+# macOS package ships neither the wrapper nor its config.
+if(NOT NETDATA_PACKAGE_KIND STREQUAL "pkg")
 install(FILES
         src/collectors/ioping.plugin/ioping.conf
         COMPONENT netdata
         DESTINATION ${LIBCONFIG_DEST})
+endif()
 
 #
 # streaming
@@ -346,10 +355,37 @@ install(FILES
         COMPONENT netdata
         DESTINATION ${LIBCONFIG_DEST}/vnodes)
 
-install(FILES
-        system/.install-type
-        COMPONENT netdata
-        DESTINATION ${CONFIG_DEST})
+if(NETDATA_PACKAGE_KIND STREQUAL "pkg")
+  # netdata-updater.sh dispatches on INSTALL_TYPE and validates the package
+  # it downloads against the identifier and architecture recorded here. A pkg
+  # install has no .environment file, so this also carries the two facts the
+  # updater's shared plumbing reads from there: the installing uid (root -
+  # installer(8) runs as root) and the runtime prefix. It also carries the
+  # release channel the updater follows, which a source or binpkg install
+  # records elsewhere: release builds follow stable, everything else nightly.
+  if(NETDATA_VERSION_TYPE STREQUAL "stable")
+    set(_macos_pkg_channel "stable")
+  else()
+    set(_macos_pkg_channel "nightly")
+  endif()
+  file(WRITE "${CMAKE_BINARY_DIR}/system/.install-type"
+       "INSTALL_TYPE='macos-pkg'
+INSTALL_UID='0'
+RELEASE_CHANNEL='${_macos_pkg_channel}'
+PREBUILT_ARCH='${CMAKE_SYSTEM_PROCESSOR}'
+NETDATA_PREFIX='${NETDATA_RUNTIME_PREFIX}'
+NETDATA_MACOS_PKG_IDENTIFIER='${NETDATA_PKG_IDENTIFIER}'
+")
+  install(FILES
+          "${CMAKE_BINARY_DIR}/system/.install-type"
+          COMPONENT netdata
+          DESTINATION ${CONFIG_DEST})
+else()
+  install(FILES
+          system/.install-type
+          COMPONENT netdata
+          DESTINATION ${CONFIG_DEST})
+endif()
 
 install(PROGRAMS
         system/edit-config
@@ -416,20 +452,32 @@ if(NOT OS_WINDOWS)
           COMPONENT netdata
           DESTINATION "${BINDIR}")
 
-  install(FILES
-          system/netdata.conf
-          system/netdata-updater.conf
-          COMPONENT netdata
-          DESTINATION ${NETDATA_CONF_DEST})
-
-  if(NETDATA_PACKAGE_KIND STREQUAL "rpm")
-    # RPMs ship the stock copies under /usr/lib/netdata/conf.d in addition to
-    # the %config(noreplace) ones in /etc/netdata.
+  if(NETDATA_PACKAGE_KIND STREQUAL "pkg")
+    # macOS Installer replaces payload files wholesale on upgrade, so a stock
+    # config in etc/netdata would clobber user edits. Ship the stock copies
+    # only under usr/lib/netdata/conf.d; postinstall copies them into
+    # etc/netdata when absent (the noreplace semantics of the other formats).
     install(FILES
             system/netdata.conf
             system/netdata-updater.conf
             COMPONENT netdata
             DESTINATION ${LIBCONFIG_DEST})
+  else()
+    install(FILES
+            system/netdata.conf
+            system/netdata-updater.conf
+            COMPONENT netdata
+            DESTINATION ${NETDATA_CONF_DEST})
+
+    if(NETDATA_PACKAGE_KIND STREQUAL "rpm")
+      # RPMs ship the stock copies under /usr/lib/netdata/conf.d in addition to
+      # the %config(noreplace) ones in /etc/netdata.
+      install(FILES
+              system/netdata.conf
+              system/netdata-updater.conf
+              COMPONENT netdata
+              DESTINATION ${LIBCONFIG_DEST})
+    endif()
   endif()
 
   if(NETDATA_STAGE_SERVICE_TOOLBOX)
@@ -621,10 +669,13 @@ endif()
 #
 # ioping.plugin
 #
+# Excluded from the macOS package for the same reason as its config above.
+if(NOT NETDATA_PACKAGE_KIND STREQUAL "pkg")
 configure_file(src/collectors/ioping.plugin/ioping.plugin.in src/collectors/ioping.plugin/ioping.plugin @ONLY)
 install(PROGRAMS ${CMAKE_BINARY_DIR}/src/collectors/ioping.plugin/ioping.plugin
         COMPONENT netdata
         DESTINATION ${PLUGINS_DEST})
+endif()
 
 #
 # go.d.plugin

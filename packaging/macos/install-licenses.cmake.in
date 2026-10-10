@@ -1,0 +1,38 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
+#
+# Executed by cmake --install for macOS package builds (configured by
+# NetdataMacOSPackage.cmake). Static linking carries the bundled libraries'
+# licence obligations into the shipped package, so every bundled component's
+# licence text is staged into the payload together with an inventory file.
+#
+# The manifest is built at configure time from the components this build
+# actually bundled. A missing licence file for a listed component is a hard
+# error: fail closed rather than ship without a notice.
+
+set(dest "$ENV{DESTDIR}@CMAKE_INSTALL_PREFIX@/usr/share/netdata/licenses")
+
+# component=absolute-path-of-its-licence-file
+set(manifest "@NETDATA_PKG_LICENSE_MANIFEST@")
+
+file(MAKE_DIRECTORY "${dest}")
+
+set(inventory "Third-party components distributed inside this package.\n")
+string(APPEND inventory "Each component's licence text is in this directory, named <component>.txt.\n")
+string(APPEND inventory "Upstream sources and pinned versions are recorded in the Netdata source tree\n")
+string(APPEND inventory "under packaging/cmake/Modules/ (the module that bundles each component).\n\n")
+
+foreach(entry IN LISTS manifest)
+    string(REPLACE "=" ";" pair "${entry}")
+    list(GET pair 0 component)
+    list(GET pair 1 licence)
+
+    if(NOT EXISTS "${licence}")
+        message(FATAL_ERROR "licence file for bundled component '${component}' not found at ${licence}; refusing to stage a package without its notices")
+    endif()
+
+    file(COPY_FILE "${licence}" "${dest}/${component}.txt")
+    string(APPEND inventory "${component}\n")
+endforeach()
+
+file(WRITE "${dest}/inventory.txt" "${inventory}")
+message(STATUS "Staged third-party licence notices to ${dest}")
