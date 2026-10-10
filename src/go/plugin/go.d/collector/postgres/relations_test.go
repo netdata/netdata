@@ -73,6 +73,10 @@ func TestRelationSelectionWarmup(t *testing.T) {
 	small.choose(rows, "", now, 2)
 	assert.Len(t, small.selected, 2)
 	assert.True(t, small.warmed)
+	var largeLimit relationSelection
+	largeLimit.choose(rows, "", now, 1<<40)
+	assert.Len(t, largeLimit.selected, 2)
+	assert.True(t, largeLimit.warmed)
 }
 
 // pgx accepts oid arrays; sqlmock's default database/sql converter does not.
@@ -290,6 +294,57 @@ func TestSlowRelationMetricsDatabaseOwnership(t *testing.T) {
 	mock.ExpectQuery(queryBloat(false)).WillReturnError(errors.New("timeout"))
 	require.Error(t, c.doDBQueryBloat(one))
 	assert.False(t, m.bloatValid)
+	assert.NoError(t, mock.ExpectationsWereMet())
+}
+
+func TestSlowRelationMetricsDetailGap(t *testing.T) {
+	c := New()
+	require.NoError(t, c.Init(context.Background()))
+	db, mock := newRelationsMock(t)
+	c.db = db
+	c.MaxDBTables, c.MaxDBIndexes = 0, 0
+	stats := func() {
+		mock.ExpectQuery(queryStatUserTables(false)).WillReturnRows(tableDetails(1, "t", 100, 20))
+		require.NoError(t, c.doDBQueryStatUserTables(db))
+		mock.ExpectQuery(queryStatUserIndexes(false)).WillReturnRows(sqlmock.NewRows([]string{"datname", "indexrelid", "schemaname", "relname", "indexrelname", "idx_scan", "size"}).AddRow("db", 11, "public", "t", "i", 10, 1000))
+		require.NoError(t, c.doDBQueryStatUserIndexes(db))
+	}
+	slow := func() {
+		mock.ExpectQuery(queryBloat(false)).WillReturnRows(sqlmock.NewRows([]string{"db", "schemaname", "tablename", "wastedbytes", "iname", "wastedibytes"}).AddRow("db", "public", "t", 100, "i", 50))
+		require.NoError(t, c.doDBQueryBloat(db))
+		mock.ExpectQuery(queryColumnsStats(false)).WillReturnRows(sqlmock.NewRows([]string{"datname", "schemaname", "relname", "null_percent"}).AddRow("db", "public", "t", 100))
+		require.NoError(t, c.doDBQueryColumns(db))
+	}
+	stats()
+	slow()
+	c.collectMetrics(make(map[string]int64))
+	c.resetMetrics()
+	// A slow observation can succeed while the current detail/size sample is missing.
+	mock.ExpectQuery(queryStatUserTables(false)).WillReturnError(errors.New("timeout"))
+	require.Error(t, c.doDBQueryStatUserTables(db))
+	mock.ExpectQuery(queryStatUserIndexes(false)).WillReturnError(errors.New("timeout"))
+	require.Error(t, c.doDBQueryStatUserIndexes(db))
+	slow()
+	table := c.getTableMetrics("t", "db", "public")
+	index := c.getIndexMetrics("i", "t", "db", "public")
+	assert.Equal(t, int64(100), *table.bloatSize)
+	assert.Equal(t, int64(50), *index.bloatSize)
+	assert.False(t, table.bloatValid)
+	assert.False(t, index.bloatValid)
+	assert.False(t, table.nullValid)
+	stats()
+	mx := make(map[string]int64)
+	c.collectMetrics(mx)
+	assert.NotContains(t, mx, "table_t_db_db_schema_public_bloat_size")
+	assert.NotContains(t, mx, "index_i_table_t_db_db_schema_public_bloat_size")
+	assert.NotContains(t, mx, "table_t_db_db_schema_public_null_columns")
+	// Only the next complete slow refresh restores these samples.
+	slow()
+	mx = make(map[string]int64)
+	c.collectMetrics(mx)
+	assert.Equal(t, int64(100), mx["table_t_db_db_schema_public_bloat_size"])
+	assert.Equal(t, int64(50), mx["index_i_table_t_db_db_schema_public_bloat_size"])
+	assert.Equal(t, int64(1), mx["table_t_db_db_schema_public_null_columns"])
 	assert.NoError(t, mock.ExpectationsWereMet())
 }
 

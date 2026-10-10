@@ -69,8 +69,9 @@ func (c *Collector) doDBQueryBloat(db *sql.DB) error {
 	}
 	for _, m := range c.mx.tables {
 		if m.owner == db {
-			m.bloatValid = true
-			if m.bloatSize == nil {
+			// A missing detail sample cannot supply the size for this observation.
+			m.bloatValid = m.updated
+			if !m.updated || m.bloatSize == nil {
 				continue
 			}
 			m.bloatSize, m.bloatSizePerc = new(int64(0)), new(int64(0))
@@ -78,8 +79,8 @@ func (c *Collector) doDBQueryBloat(db *sql.DB) error {
 	}
 	for _, m := range c.mx.indexes {
 		if m.owner == db {
-			m.bloatValid = true
-			if m.bloatSize == nil {
+			m.bloatValid = m.updated
+			if !m.updated || m.bloatSize == nil {
 				continue
 			}
 			m.bloatSize, m.bloatSizePerc = new(int64(0)), new(int64(0))
