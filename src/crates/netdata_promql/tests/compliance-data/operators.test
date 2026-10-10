@@ -1,0 +1,1019 @@
+load 5m
+	http_requests_total{job="api-server", instance="0", group="production"}	0+10x10
+	http_requests_total{job="api-server", instance="1", group="production"}	0+20x10
+	http_requests_total{job="api-server", instance="0", group="canary"}	0+30x10
+	http_requests_total{job="api-server", instance="1", group="canary"}	0+40x10
+	http_requests_total{job="app-server", instance="0", group="production"}	0+50x10
+	http_requests_total{job="app-server", instance="1", group="production"}	0+60x10
+	http_requests_total{job="app-server", instance="0", group="canary"}	0+70x10
+	http_requests_total{job="app-server", instance="1", group="canary"}	0+80x10
+    http_requests_histogram{job="app-server", instance="1", group="production"} {{schema:1 sum:15 count:10 buckets:[3 2 5 7 9]}}x11
+
+load 5m
+	vector_matching_a{l="x"} 0+1x100
+	vector_matching_a{l="y"} 0+2x50
+	vector_matching_b{l="x"} 0+4x25
+
+
+eval instant at 50m SUM(http_requests_total) BY (job) - COUNT(http_requests_total) BY (job)
+	{job="api-server"} 996
+	{job="app-server"} 2596
+
+eval instant at 50m 2 - SUM(http_requests_total) BY (job)
+	{job="api-server"} -998
+	{job="app-server"} -2598
+
+eval instant at 50m -http_requests_total{job="api-server",instance="0",group="production"}
+  {job="api-server",instance="0",group="production"} -100
+
+eval instant at 50m +http_requests_total{job="api-server",instance="0",group="production"}
+  http_requests_total{job="api-server",instance="0",group="production"} 100
+
+eval instant at 50m - - - SUM(http_requests_total) BY (job)
+	{job="api-server"} -1000
+	{job="app-server"} -2600
+
+eval instant at 50m - - - 1
+  -1
+
+eval instant at 50m -2^---1*3
+  -1.5
+
+eval instant at 50m 2/-2^---1*3+2
+  -10
+
+eval instant at 50m -10^3 * - SUM(http_requests_total) BY (job) ^ -1
+	{job="api-server"} 1
+	{job="app-server"} 0.38461538461538464
+
+eval instant at 50m 1000 / SUM(http_requests_total) BY (job)
+	{job="api-server"} 1
+	{job="app-server"} 0.38461538461538464
+
+eval instant at 50m SUM(http_requests_total) BY (job) - 2
+	{job="api-server"} 998
+	{job="app-server"} 2598
+
+eval instant at 50m SUM(http_requests_total) BY (job) % 3
+	{job="api-server"} 1
+	{job="app-server"} 2
+
+eval instant at 50m SUM(http_requests_total) BY (job) % 0.3
+	{job="api-server"} 0.1
+	{job="app-server"} 0.2
+
+eval instant at 50m SUM(http_requests_total) BY (job) ^ 2
+	{job="api-server"} 1000000
+	{job="app-server"} 6760000
+
+eval instant at 50m SUM(http_requests_total) BY (job) % 3 ^ 2
+	{job="api-server"} 1
+	{job="app-server"} 8
+
+eval instant at 50m SUM(http_requests_total) BY (job) % 2 ^ (3 ^ 2)
+	{job="api-server"} 488
+	{job="app-server"} 40
+
+eval instant at 50m SUM(http_requests_total) BY (job) % 2 ^ 3 ^ 2
+	{job="api-server"} 488
+	{job="app-server"} 40
+
+eval instant at 50m SUM(http_requests_total) BY (job) % 2 ^ 3 ^ 2 ^ 2
+	{job="api-server"} 1000
+	{job="app-server"} 2600
+
+eval instant at 50m COUNT(http_requests_total) BY (job) ^ COUNT(http_requests_total) BY (job)
+	{job="api-server"} 256
+	{job="app-server"} 256
+
+eval instant at 50m SUM(http_requests_total) BY (job) / 0
+	{job="api-server"} +Inf
+	{job="app-server"} +Inf
+
+eval instant at 50m http_requests_total{group="canary", instance="0", job="api-server"} / 0
+	{group="canary", instance="0", job="api-server"} +Inf
+
+eval instant at 50m -1 * http_requests_total{group="canary", instance="0", job="api-server"} / 0
+	{group="canary", instance="0", job="api-server"} -Inf
+
+eval instant at 50m 0 * http_requests_total{group="canary", instance="0", job="api-server"} / 0
+	{group="canary", instance="0", job="api-server"} NaN
+
+eval instant at 50m 0 * http_requests_total{group="canary", instance="0", job="api-server"} % 0
+	{group="canary", instance="0", job="api-server"} NaN
+
+eval instant at 50m SUM(http_requests_total) BY (job) + SUM(http_requests_total) BY (job)
+	{job="api-server"} 2000
+	{job="app-server"} 5200
+
+eval instant at 50m (SUM((http_requests_total)) BY (job)) + SUM(http_requests_total) BY (job)
+	{job="api-server"} 2000
+	{job="app-server"} 5200
+
+eval instant at 50m http_requests_total{job="api-server", group="canary"}
+	http_requests_total{group="canary", instance="0", job="api-server"} 300
+	http_requests_total{group="canary", instance="1", job="api-server"} 400
+
+eval instant at 50m http_requests_total{job="api-server", group="canary"} + rate(http_requests_total{job="api-server"}[10m]) * 5 * 60
+	{group="canary", instance="0", job="api-server"} 330
+	{group="canary", instance="1", job="api-server"} 440
+
+eval instant at 50m rate(http_requests_total[25m]) * 25 * 60
+  {group="canary", instance="0", job="api-server"} 150
+  {group="canary", instance="0", job="app-server"} 350
+  {group="canary", instance="1", job="api-server"} 200
+  {group="canary", instance="1", job="app-server"} 400
+  {group="production", instance="0", job="api-server"} 50
+  {group="production", instance="0", job="app-server"} 249.99999999999997
+  {group="production", instance="1", job="api-server"} 100
+  {group="production", instance="1", job="app-server"} 300
+
+eval instant at 50m (rate((http_requests_total[25m])) * 25) * 60
+  {group="canary", instance="0", job="api-server"} 150
+  {group="canary", instance="0", job="app-server"} 350
+  {group="canary", instance="1", job="api-server"} 200
+  {group="canary", instance="1", job="app-server"} 400
+  {group="production", instance="0", job="api-server"} 50
+  {group="production", instance="0", job="app-server"} 249.99999999999997
+  {group="production", instance="1", job="api-server"} 100
+  {group="production", instance="1", job="app-server"} 300
+
+
+eval instant at 50m http_requests_total{group="canary"} and http_requests_total{instance="0"}
+	http_requests_total{group="canary", instance="0", job="api-server"} 300
+	http_requests_total{group="canary", instance="0", job="app-server"} 700
+
+eval instant at 50m (http_requests_total{group="canary"} + 1) and http_requests_total{instance="0"}
+	{group="canary", instance="0", job="api-server"} 301
+	{group="canary", instance="0", job="app-server"} 701
+
+eval instant at 50m (http_requests_total{group="canary"} + 1) and on(instance, job) http_requests_total{instance="0", group="production"}
+	{group="canary", instance="0", job="api-server"} 301
+	{group="canary", instance="0", job="app-server"} 701
+
+eval instant at 50m (http_requests_total{group="canary"} + 1) and on(instance) http_requests_total{instance="0", group="production"}
+	{group="canary", instance="0", job="api-server"} 301
+	{group="canary", instance="0", job="app-server"} 701
+
+eval instant at 50m (http_requests_total{group="canary"} + 1) and ignoring(group) http_requests_total{instance="0", group="production"}
+	{group="canary", instance="0", job="api-server"} 301
+	{group="canary", instance="0", job="app-server"} 701
+
+eval instant at 50m (http_requests_total{group="canary"} + 1) and ignoring(group, job) http_requests_total{instance="0", group="production"}
+	{group="canary", instance="0", job="api-server"} 301
+	{group="canary", instance="0", job="app-server"} 701
+
+eval instant at 50m http_requests_total{group="canary"} or http_requests_total{group="production"}
+	http_requests_total{group="canary", instance="0", job="api-server"} 300
+	http_requests_total{group="canary", instance="0", job="app-server"} 700
+	http_requests_total{group="canary", instance="1", job="api-server"} 400
+	http_requests_total{group="canary", instance="1", job="app-server"} 800
+	http_requests_total{group="production", instance="0", job="api-server"} 100
+	http_requests_total{group="production", instance="0", job="app-server"} 500
+	http_requests_total{group="production", instance="1", job="api-server"} 200
+	http_requests_total{group="production", instance="1", job="app-server"} 600
+
+# On overlap the rhs samples must be dropped.
+eval instant at 50m (http_requests_total{group="canary"} + 1) or http_requests_total{instance="1"}
+	{group="canary", instance="0", job="api-server"} 301
+	{group="canary", instance="0", job="app-server"} 701
+	{group="canary", instance="1", job="api-server"} 401
+	{group="canary", instance="1", job="app-server"} 801
+	http_requests_total{group="production", instance="1", job="api-server"} 200
+	http_requests_total{group="production", instance="1", job="app-server"} 600
+
+
+# Matching only on instance excludes everything that has instance=0/1 but includes
+# entries without the instance label.
+eval instant at 50m (http_requests_total{group="canary"} + 1) or on(instance) (http_requests_total or cpu_count or vector_matching_a)
+	{group="canary", instance="0", job="api-server"} 301
+	{group="canary", instance="0", job="app-server"} 701
+	{group="canary", instance="1", job="api-server"} 401
+	{group="canary", instance="1", job="app-server"} 801
+	vector_matching_a{l="x"} 10
+	vector_matching_a{l="y"} 20
+
+eval instant at 50m (http_requests_total{group="canary"} + 1) or ignoring(l, group, job) (http_requests_total or cpu_count or vector_matching_a)
+	{group="canary", instance="0", job="api-server"} 301
+	{group="canary", instance="0", job="app-server"} 701
+	{group="canary", instance="1", job="api-server"} 401
+	{group="canary", instance="1", job="app-server"} 801
+	vector_matching_a{l="x"} 10
+	vector_matching_a{l="y"} 20
+
+eval instant at 50m http_requests_total{group="canary"} unless http_requests_total{instance="0"}
+	http_requests_total{group="canary", instance="1", job="api-server"} 400
+	http_requests_total{group="canary", instance="1", job="app-server"} 800
+
+eval instant at 50m http_requests_total{group="canary"} unless on(job) http_requests_total{instance="0"}
+
+eval instant at 50m http_requests_total{group="canary"} unless on(job, instance) http_requests_total{instance="0"}
+	http_requests_total{group="canary", instance="1", job="api-server"} 400
+	http_requests_total{group="canary", instance="1", job="app-server"} 800
+
+eval instant at 50m http_requests_total{group="canary"} / on(instance,job) http_requests_total{group="production"}
+	{instance="0", job="api-server"} 3
+	{instance="0", job="app-server"} 1.4
+	{instance="1", job="api-server"} 2
+	{instance="1", job="app-server"} 1.3333333333333333
+
+eval instant at 50m http_requests_total{group="canary"} unless ignoring(group, instance) http_requests_total{instance="0"}
+
+eval instant at 50m http_requests_total{group="canary"} unless ignoring(group) http_requests_total{instance="0"}
+	http_requests_total{group="canary", instance="1", job="api-server"} 400
+	http_requests_total{group="canary", instance="1", job="app-server"} 800
+
+eval instant at 50m http_requests_total{group="canary"} / ignoring(group) http_requests_total{group="production"}
+	{instance="0", job="api-server"} 3
+	{instance="0", job="app-server"} 1.4
+	{instance="1", job="api-server"} 2
+	{instance="1", job="app-server"} 1.3333333333333333
+
+# https://github.com/prometheus/prometheus/issues/1489
+eval instant at 50m http_requests_total AND ON (dummy) vector(1)
+	http_requests_total{group="canary", instance="0", job="api-server"} 300
+	http_requests_total{group="canary", instance="0", job="app-server"} 700
+	http_requests_total{group="canary", instance="1", job="api-server"} 400
+	http_requests_total{group="canary", instance="1", job="app-server"} 800
+	http_requests_total{group="production", instance="0", job="api-server"} 100
+	http_requests_total{group="production", instance="0", job="app-server"} 500
+	http_requests_total{group="production", instance="1", job="api-server"} 200
+	http_requests_total{group="production", instance="1", job="app-server"} 600
+
+eval instant at 50m http_requests_total AND IGNORING (group, instance, job) vector(1)
+	http_requests_total{group="canary", instance="0", job="api-server"} 300
+	http_requests_total{group="canary", instance="0", job="app-server"} 700
+	http_requests_total{group="canary", instance="1", job="api-server"} 400
+	http_requests_total{group="canary", instance="1", job="app-server"} 800
+	http_requests_total{group="production", instance="0", job="api-server"} 100
+	http_requests_total{group="production", instance="0", job="app-server"} 500
+	http_requests_total{group="production", instance="1", job="api-server"} 200
+	http_requests_total{group="production", instance="1", job="app-server"} 600
+
+
+# Comparisons.
+eval instant at 50m SUM(http_requests_total) BY (job) > 1000
+	{job="app-server"} 2600
+
+eval instant at 50m 1000 < SUM(http_requests_total) BY (job)
+	{job="app-server"} 2600
+
+eval instant at 50m SUM(http_requests_total) BY (job) <= 1000
+	{job="api-server"} 1000
+
+eval instant at 50m SUM(http_requests_total) BY (job) != 1000
+	{job="app-server"} 2600
+
+eval instant at 50m SUM(http_requests_total) BY (job) == 1000
+	{job="api-server"} 1000
+
+eval instant at 50m SUM(http_requests_total) BY (job) == bool 1000
+	{job="api-server"} 1
+	{job="app-server"} 0
+
+eval instant at 50m SUM(http_requests_total) BY (job) == bool SUM(http_requests_total) BY (job)
+	{job="api-server"} 1
+	{job="app-server"} 1
+
+eval instant at 50m SUM(http_requests_total) BY (job) != bool SUM(http_requests_total) BY (job)
+	{job="api-server"} 0
+	{job="app-server"} 0
+
+eval instant at 50m 0 == bool 1
+	0
+
+eval instant at 50m 1 == bool 1
+	1
+
+eval instant at 50m http_requests_total{job="api-server", instance="0", group="production"} == bool 100
+	{job="api-server", instance="0", group="production"} 1
+
+# The histogram is ignored here so the result doesn't change but it has an info annotation now.
+eval instant at 5m {job="app-server"} == 80
+    expect info
+    http_requests_total{group="canary", instance="1", job="app-server"} 80
+
+eval instant at 5m http_requests_histogram != 80
+  expect info
+
+eval instant at 5m http_requests_histogram > 80
+  expect info
+
+eval instant at 5m http_requests_histogram < 80
+  expect info
+
+eval instant at 5m http_requests_histogram >= 80
+  expect info
+
+eval instant at 5m http_requests_histogram <= 80
+  expect info
+
+# Should produce valid results in case of (in)equality between two histograms.
+eval instant at 5m http_requests_histogram == http_requests_histogram
+    expect no_info
+    http_requests_histogram{job="app-server", instance="1", group="production"} {{schema:1 sum:15 count:10 buckets:[3 2 5 7 9]}}
+
+eval instant at 5m http_requests_histogram != http_requests_histogram
+    expect no_info
+
+clear
+
+# Check that we track many-to-one vector matching errors even when all but 0 or 1
+# series on the "many" side are filtered away.
+load 5m
+  many_side{label="foo",job="test"} 0
+  many_side{label="bar",job="test"} 1
+  one_side{job="test"} 1
+
+# Check 0 series surviving the filtering producing an error.
+eval instant at 0m many_side > on(job) one_side
+  expect fail
+
+# Check 1 series surviving the filtering producing an error.
+eval instant at 0m many_side >= on(job) one_side
+  expect fail
+
+# Check 2 series surviving the filtering producing an error.
+eval instant at 0m many_side <= on(job) one_side
+  expect fail
+
+# group_left/group_right.
+
+clear
+
+load 5m
+  node_var{instance="abc",job="node"} 2
+  node_role{instance="abc",job="node",role="prometheus"} 1
+
+load 5m
+  node_cpu{instance="abc",job="node",mode="idle"} 3
+  node_cpu{instance="abc",job="node",mode="user"} 1
+  node_cpu{instance="def",job="node",mode="idle"} 8
+  node_cpu{instance="def",job="node",mode="user"} 2
+
+load 5m
+  random{foo="bar"} 1
+
+load 5m
+  threshold{instance="abc",job="node",target="a@b.com"} 0
+
+# Copy machine role to node variable.
+eval instant at 1m node_role * on (instance) group_right (role) node_var
+  {instance="abc",job="node",role="prometheus"} 2
+
+eval instant at 1m node_var * on (instance) group_left (role) node_role
+  {instance="abc",job="node",role="prometheus"} 2
+
+eval instant at 1m node_var * ignoring (role) group_left (role) node_role
+  {instance="abc",job="node",role="prometheus"} 2
+
+eval instant at 1m node_role * ignoring (role) group_right (role) node_var
+  {instance="abc",job="node",role="prometheus"} 2
+
+# Copy machine role to node variable with instrumentation labels.
+eval instant at 1m node_cpu * ignoring (role, mode) group_left (role) node_role
+  {instance="abc",job="node",mode="idle",role="prometheus"} 3
+  {instance="abc",job="node",mode="user",role="prometheus"} 1
+
+eval instant at 1m node_cpu * on (instance) group_left (role) node_role
+  {instance="abc",job="node",mode="idle",role="prometheus"} 3
+  {instance="abc",job="node",mode="user",role="prometheus"} 1
+
+
+# Ratio of total.
+eval instant at 1m node_cpu / on (instance) group_left sum by (instance,job)(node_cpu)
+  {instance="abc",job="node",mode="idle"} .75
+  {instance="abc",job="node",mode="user"} .25
+  {instance="def",job="node",mode="idle"} .80
+  {instance="def",job="node",mode="user"} .20
+
+eval instant at 1m sum by (mode, job)(node_cpu) / on (job) group_left sum by (job)(node_cpu)
+  {job="node",mode="idle"} 0.7857142857142857
+  {job="node",mode="user"} 0.21428571428571427
+
+eval instant at 1m sum(sum by (mode, job)(node_cpu) / on (job) group_left sum by (job)(node_cpu))
+  {} 1.0
+
+
+eval instant at 1m node_cpu / ignoring (mode) group_left sum without (mode)(node_cpu)
+  {instance="abc",job="node",mode="idle"} .75
+  {instance="abc",job="node",mode="user"} .25
+  {instance="def",job="node",mode="idle"} .80
+  {instance="def",job="node",mode="user"} .20
+
+eval instant at 1m node_cpu / ignoring (mode) group_left(dummy) sum without (mode)(node_cpu)
+  {instance="abc",job="node",mode="idle"} .75
+  {instance="abc",job="node",mode="user"} .25
+  {instance="def",job="node",mode="idle"} .80
+  {instance="def",job="node",mode="user"} .20
+
+eval instant at 1m sum without (instance)(node_cpu) / ignoring (mode) group_left sum without (instance, mode)(node_cpu)
+  {job="node",mode="idle"} 0.7857142857142857
+  {job="node",mode="user"} 0.21428571428571427
+
+eval instant at 1m sum(sum without (instance)(node_cpu) / ignoring (mode) group_left sum without (instance, mode)(node_cpu))
+  {} 1.0
+
+
+# Copy over label from metric with no matching labels, without having to list cross-job target labels ('job' here).
+eval instant at 1m node_cpu + on(dummy) group_left(foo) random*0
+  {instance="abc",job="node",mode="idle",foo="bar"} 3
+  {instance="abc",job="node",mode="user",foo="bar"} 1
+  {instance="def",job="node",mode="idle",foo="bar"} 8
+  {instance="def",job="node",mode="user",foo="bar"} 2
+
+
+# Use threshold from metric, and copy over target.
+eval instant at 1m node_cpu > on(job, instance) group_left(target) threshold
+  node_cpu{instance="abc",job="node",mode="idle",target="a@b.com"} 3
+  node_cpu{instance="abc",job="node",mode="user",target="a@b.com"} 1
+
+# Use threshold from metric, and a default (1) if it's not present.
+eval instant at 1m node_cpu > on(job, instance) group_left(target) (threshold or on (job, instance) (sum by (job, instance)(node_cpu) * 0 + 1))
+  node_cpu{instance="abc",job="node",mode="idle",target="a@b.com"} 3
+  node_cpu{instance="abc",job="node",mode="user",target="a@b.com"} 1
+  node_cpu{instance="def",job="node",mode="idle"} 8
+  node_cpu{instance="def",job="node",mode="user"} 2
+
+
+# Check that binops drop the metric name.
+eval instant at 1m node_cpu + 2
+  {instance="abc",job="node",mode="idle"} 5
+  {instance="abc",job="node",mode="user"} 3
+  {instance="def",job="node",mode="idle"} 10
+  {instance="def",job="node",mode="user"} 4
+
+eval instant at 1m node_cpu - 2
+  {instance="abc",job="node",mode="idle"} 1
+  {instance="abc",job="node",mode="user"} -1
+  {instance="def",job="node",mode="idle"} 6
+  {instance="def",job="node",mode="user"} 0
+
+eval instant at 1m node_cpu / 2
+  {instance="abc",job="node",mode="idle"} 1.5
+  {instance="abc",job="node",mode="user"} 0.5
+  {instance="def",job="node",mode="idle"} 4
+  {instance="def",job="node",mode="user"} 1
+
+eval instant at 1m node_cpu * 2
+  {instance="abc",job="node",mode="idle"} 6
+  {instance="abc",job="node",mode="user"} 2
+  {instance="def",job="node",mode="idle"} 16
+  {instance="def",job="node",mode="user"} 4
+
+eval instant at 1m node_cpu ^ 2
+  {instance="abc",job="node",mode="idle"} 9
+  {instance="abc",job="node",mode="user"} 1
+  {instance="def",job="node",mode="idle"} 64
+  {instance="def",job="node",mode="user"} 4
+
+eval instant at 1m node_cpu % 2
+  {instance="abc",job="node",mode="idle"} 1
+  {instance="abc",job="node",mode="user"} 1
+  {instance="def",job="node",mode="idle"} 0
+  {instance="def",job="node",mode="user"} 0
+
+
+clear
+
+load 5m
+  random{foo="bar"} 2
+  metricA{baz="meh"} 3
+  metricB{baz="meh"} 4
+
+# On with no labels, for metrics with no common labels.
+eval instant at 1m random + on() metricA
+  {} 5
+
+# Ignoring with no labels is the same as no ignoring.
+eval instant at 1m metricA + ignoring() metricB
+  {baz="meh"} 7
+
+eval instant at 1m metricA + metricB
+  {baz="meh"} 7
+
+clear
+
+# Test duplicate labelset in promql output.
+load 5m
+  testmetric1{src="a",dst="b"} 0
+  testmetric2{src="a",dst="b"} 1
+
+eval instant at 0m -{__name__=~'testmetric1|testmetric2'}
+    expect fail
+
+clear
+
+load 5m
+    test_total{instance="localhost"} 50
+    test_smaller{instance="localhost"} 10
+
+eval instant at 1m test_total > bool test_smaller
+    {instance="localhost"} 1
+
+eval instant at 1m test_total > test_smaller
+    test_total{instance="localhost"} 50
+
+eval instant at 1m test_total < bool test_smaller
+    {instance="localhost"} 0
+
+eval instant at 1m test_total < test_smaller
+
+clear
+
+# Testing atan2.
+load 5m
+    trigy{} 10
+    trigx{} 20
+    trigNaN{} NaN
+
+eval instant at 1m trigy atan2 trigx
+    {} 0.4636476090008061
+
+eval instant at 1m trigy atan2 trigNaN
+    {} NaN
+
+eval instant at 1m 10 atan2 20
+    0.4636476090008061
+
+eval instant at 1m 10 atan2 NaN
+    NaN
+
+clear
+
+# Test comparison operations with floats and histograms.
+load 6m
+  left_floats  1 2 _ _ 3 stale 4  5  NaN Inf -Inf
+  right_floats 4 _ _ 5 3 7     -1 20 NaN Inf -Inf
+  left_histograms  {{schema:3 sum:4 count:4 buckets:[1 2 1]}} {{schema:3 sum:4.5 count:5 buckets:[1 3 1]}} _                                          _ {{schema:3 sum:4.5 count:5 buckets:[1 3 1]}}
+  right_histograms {{schema:3 sum:4 count:4 buckets:[1 2 1]}} {{schema:3 sum:4 count:4 buckets:[1 2 1]}}   {{schema:3 sum:4 count:4 buckets:[1 2 1]}} _ _
+  right_floats_for_histograms 0 -1 2 3 4
+
+eval range from 0 to 60m step 6m left_floats == right_floats
+  expect no_info
+  left_floats _ _ _ _ 3 _ _ _ _ Inf -Inf
+
+eval range from 0 to 60m step 6m left_floats == bool right_floats
+  expect no_info
+  {} 0 _ _ _ 1 _ 0 0 0 1 1
+
+eval range from 0 to 60m step 6m left_floats == does_not_match
+  expect no_info
+  # No results.
+
+eval range from 0 to 24m step 6m left_histograms == right_histograms
+  expect no_info
+  left_histograms {{schema:3 sum:4 count:4 buckets:[1 2 1]}} _ _ _ _
+
+eval range from 0 to 24m step 6m left_histograms == bool right_histograms
+  expect no_info
+  {} 1 0 _ _ _
+
+eval range from 0 to 24m step 6m left_histograms == right_floats_for_histograms
+  expect info
+  # No results.
+
+eval range from 0 to 24m step 6m left_histograms == bool right_floats_for_histograms
+  expect info
+  # No results.
+
+eval range from 0 to 60m step 6m left_floats != right_floats
+  expect no_info
+  left_floats 1 _ _ _ _ _ 4 5 NaN _ _
+
+eval range from 0 to 60m step 6m left_floats != bool right_floats
+  expect no_info
+  {} 1 _ _ _ 0 _ 1 1 1 0 0
+
+eval range from 0 to 24m step 6m left_histograms != right_histograms
+  expect no_info
+  left_histograms _ {{schema:3 sum:4.5 count:5 buckets:[1 3 1]}} _ _ _
+
+eval range from 0 to 24m step 6m left_histograms != bool right_histograms
+  expect no_info
+  {} 0 1 _ _ _
+
+eval range from 0 to 24m step 6m left_histograms != right_floats_for_histograms
+  expect info
+  # No results.
+
+eval range from 0 to 24m step 6m left_histograms != bool right_floats_for_histograms
+  expect info
+  # No results.
+
+eval range from 0 to 60m step 6m left_floats > right_floats
+  expect no_info
+  left_floats _ _ _ _ _ _ 4 _ _ _ _
+
+eval range from 0 to 60m step 6m left_floats > bool right_floats
+  expect no_info
+  {} 0 _ _ _ 0 _ 1 0 0 0 0
+
+eval range from 0 to 24m step 6m left_histograms > right_histograms
+  expect info
+  # No results.
+
+eval range from 0 to 24m step 6m left_histograms > bool right_histograms
+  expect info
+  # No results.
+
+eval range from 0 to 24m step 6m left_histograms > right_floats_for_histograms
+  expect info
+  # No results.
+
+eval range from 0 to 24m step 6m left_histograms > bool right_floats_for_histograms
+  expect info
+  # No results.
+
+eval range from 0 to 60m step 6m left_floats >= right_floats
+  expect no_info
+  left_floats _ _ _ _ 3 _ 4 _ _ Inf -Inf
+
+eval range from 0 to 60m step 6m left_floats >= bool right_floats
+  expect no_info
+  {} 0 _ _ _ 1 _ 1 0 0 1 1
+
+eval range from 0 to 24m step 6m left_histograms >= right_histograms
+  expect info
+  # No results.
+
+eval range from 0 to 24m step 6m left_histograms >= bool right_histograms
+  expect info
+  # No results.
+
+eval range from 0 to 24m step 6m left_histograms >= right_floats_for_histograms
+  expect info
+  # No results.
+
+eval range from 0 to 24m step 6m left_histograms >= bool right_floats_for_histograms
+  expect info
+  # No results.
+
+eval range from 0 to 60m step 6m left_floats < right_floats
+  expect no_info
+  left_floats 1 _ _ _ _ _ _ 5 _ _ _
+
+eval range from 0 to 60m step 6m left_floats < bool right_floats
+  expect no_info
+  {} 1 _ _ _ 0 _ 0 1 0 0 0
+
+eval range from 0 to 24m step 6m left_histograms < right_histograms
+  expect info
+  # No results.
+
+eval range from 0 to 24m step 6m left_histograms < bool right_histograms
+  expect info
+  # No results.
+
+eval range from 0 to 24m step 6m left_histograms < right_floats_for_histograms
+  expect info
+  # No results.
+
+eval range from 0 to 24m step 6m left_histograms < bool right_floats_for_histograms
+  expect info
+  # No results.
+
+eval range from 0 to 60m step 6m left_floats <= right_floats
+  expect no_info
+  left_floats 1 _ _ _ 3 _ _ 5 _ Inf -Inf
+
+eval range from 0 to 60m step 6m left_floats <= bool right_floats
+  expect no_info
+  {} 1 _ _ _ 1 _ 0 1 0 1 1
+
+eval range from 0 to 24m step 6m left_histograms <= right_histograms
+  expect info
+  # No results.
+
+eval range from 0 to 24m step 6m left_histograms <= bool right_histograms
+  expect info
+  # No results.
+
+eval range from 0 to 24m step 6m left_histograms <= right_floats_for_histograms
+  expect info
+  # No results.
+
+eval range from 0 to 24m step 6m left_histograms <= bool right_floats_for_histograms
+  expect info
+  # No results.
+
+# Vector / scalar combinations with scalar on right side
+eval range from 0 to 60m step 6m left_floats == 3
+  expect no_info
+  left_floats _ _ _ _ 3 _ _ _ _ _ _
+
+eval range from 0 to 60m step 6m left_floats != 3
+  expect no_info
+  left_floats 1 2 _ _ _ _ 4 5 NaN Inf -Inf
+
+eval range from 0 to 60m step 6m left_floats > 3
+  expect no_info
+  left_floats _ _ _ _ _ _ 4 5 _ Inf _
+
+eval range from 0 to 60m step 6m left_floats >= 3
+  expect no_info
+  left_floats _ _ _ _ 3 _ 4 5 _ Inf _
+
+eval range from 0 to 60m step 6m left_floats < 3
+  expect no_info
+  left_floats 1 2 _ _ _ _ _ _ _ _ -Inf
+
+eval range from 0 to 60m step 6m left_floats <= 3
+  expect no_info
+  left_floats 1 2 _ _ 3 _ _ _ _ _ -Inf
+
+eval range from 0 to 60m step 6m left_floats == bool 3
+  expect no_info
+  {} 0 0 _ _ 1 _ 0 0 0 0 0
+
+eval range from 0 to 60m step 6m left_floats == Inf
+  expect no_info
+  left_floats _ _ _ _ _ _ _ _ _ Inf _
+
+eval range from 0 to 60m step 6m left_floats == bool Inf
+  expect no_info
+  {} 0 0 _ _ 0 _ 0 0 0 1 0
+
+eval range from 0 to 60m step 6m left_floats == NaN
+  expect no_info
+  # No results.
+
+eval range from 0 to 60m step 6m left_floats == bool NaN
+  expect no_info
+  {} 0 0 _ _ 0 _ 0 0 0 0 0
+
+eval range from 0 to 24m step 6m left_histograms == 3
+  expect info
+  # No results.
+
+eval range from 0 to 24m step 6m left_histograms == 0
+  expect info
+  # No results.
+
+eval range from 0 to 24m step 6m left_histograms != 3
+  expect info
+  # No results.
+
+eval range from 0 to 24m step 6m left_histograms != 0
+  expect info
+  # No results.
+
+eval range from 0 to 24m step 6m left_histograms > 3
+  expect info
+  # No results.
+
+eval range from 0 to 24m step 6m left_histograms > 0
+  expect info
+  # No results.
+
+eval range from 0 to 24m step 6m left_histograms >= 3
+  expect info
+  # No results.
+
+eval range from 0 to 24m step 6m left_histograms >= 0
+  expect info
+  # No results.
+
+eval range from 0 to 24m step 6m left_histograms < 3
+  expect info
+  # No results.
+
+eval range from 0 to 24m step 6m left_histograms < 0
+  expect info
+  # No results.
+
+eval range from 0 to 24m step 6m left_histograms <= 3
+  expect info
+  # No results.
+
+eval range from 0 to 24m step 6m left_histograms <= 0
+  expect info
+  # No results.
+
+eval range from 0 to 24m step 6m left_histograms == bool 3
+  expect info
+  # No results.
+
+eval range from 0 to 24m step 6m left_histograms == bool 0
+  expect info
+  # No results.
+
+eval range from 0 to 24m step 6m left_histograms != bool 3
+  expect info
+  # No results.
+
+eval range from 0 to 24m step 6m left_histograms != bool 0
+  expect info
+  # No results.
+
+eval range from 0 to 24m step 6m left_histograms > bool 3
+  expect info
+  # No results.
+
+eval range from 0 to 24m step 6m left_histograms > bool 0
+  expect info
+  # No results.
+
+eval range from 0 to 24m step 6m left_histograms >= bool 3
+  expect info
+  # No results.
+
+eval range from 0 to 24m step 6m left_histograms >= bool 0
+  expect info
+  # No results.
+
+eval range from 0 to 24m step 6m left_histograms < bool 3
+  expect info
+  # No results.
+
+eval range from 0 to 24m step 6m left_histograms < bool 0
+  expect info
+  # No results.
+
+eval range from 0 to 24m step 6m left_histograms <= bool 3
+  expect info
+  # No results.
+
+eval range from 0 to 24m step 6m left_histograms <= bool 0
+  expect info
+  # No results.
+
+# Vector / scalar combinations with scalar on left side
+eval range from 0 to 60m step 6m 3 == left_floats
+  expect no_info
+  left_floats _ _ _ _ 3 _ _ _ _ _ _
+
+eval range from 0 to 60m step 6m 3 != left_floats
+  expect no_info
+  left_floats 1 2 _ _ _ _ 4 5 NaN Inf -Inf
+
+eval range from 0 to 60m step 6m 3 < left_floats
+  expect no_info
+  left_floats _ _ _ _ _ _ 4 5 _ Inf _
+
+eval range from 0 to 60m step 6m 3 <= left_floats
+  expect no_info
+  left_floats _ _ _ _ 3 _ 4 5 _ Inf _
+
+eval range from 0 to 60m step 6m 3 > left_floats
+  expect no_info
+  left_floats 1 2 _ _ _ _ _ _ _ _ -Inf
+
+eval range from 0 to 60m step 6m 3 >= left_floats
+  expect no_info
+  left_floats 1 2 _ _ 3 _ _ _ _ _ -Inf
+
+eval range from 0 to 60m step 6m 3 == bool left_floats
+  expect no_info
+  {} 0 0 _ _ 1 _ 0 0 0 0 0
+
+eval range from 0 to 60m step 6m Inf == left_floats
+  expect no_info
+  left_floats _ _ _ _ _ _ _ _ _ Inf _
+
+eval range from 0 to 60m step 6m Inf == bool left_floats
+  expect no_info
+  {} 0 0 _ _ 0 _ 0 0 0 1 0
+
+eval range from 0 to 60m step 6m NaN == left_floats
+  expect no_info
+  expect no_warn
+  # No results.
+
+eval range from 0 to 60m step 6m NaN == bool left_floats
+  expect no_info
+  {} 0 0 _ _ 0 _ 0 0 0 0 0
+
+eval range from 0 to 24m step 6m 3 == left_histograms
+  expect info
+  # No results.
+
+eval range from 0 to 24m step 6m 0 == left_histograms
+  expect info
+  # No results.
+
+eval range from 0 to 24m step 6m 3 != left_histograms
+  expect info
+  # No results.
+
+eval range from 0 to 24m step 6m 0 != left_histograms
+  expect info
+  # No results.
+
+eval range from 0 to 24m step 6m 3 < left_histograms
+  expect info
+  # No results.
+
+eval range from 0 to 24m step 6m 0 < left_histograms
+  expect info
+  # No results.
+
+eval range from 0 to 24m step 6m 3 < left_histograms
+  expect info
+  # No results.
+
+eval range from 0 to 24m step 6m 0 < left_histograms
+  expect info
+  # No results.
+
+eval range from 0 to 24m step 6m 3 > left_histograms
+  expect info
+  # No results.
+
+eval range from 0 to 24m step 6m 0 > left_histograms
+  expect info
+  # No results.
+
+eval range from 0 to 24m step 6m 3 >= left_histograms
+  expect info
+  # No results.
+
+eval range from 0 to 24m step 6m 0 >= left_histograms
+  expect info
+  # No results.
+
+clear
+
+# Test completely discarding or completely including series in results with "and on"
+load_with_nhcb 5m
+	testhistogram_bucket{le="0.1", id="1"}	0+5x10
+	testhistogram_bucket{le="0.2", id="1"}	0+7x10
+	testhistogram_bucket{le="+Inf", id="1"}	0+12x10
+	testhistogram_bucket{le="0.1", id="2"}	0+4x10
+	testhistogram_bucket{le="0.2", id="2"}	0+6x10
+	testhistogram_bucket{le="+Inf", id="2"}	0+11x10
+
+# Include all series when "and on" with non-empty vector.
+eval instant at 10m (testhistogram_bucket) and on() (vector(1) == 1)
+  {__name__="testhistogram_bucket", le="0.1", id="1"} 10.0
+	{__name__="testhistogram_bucket", le="0.2", id="1"} 14.0
+	{__name__="testhistogram_bucket", le="+Inf", id="1"} 24.0
+	{__name__="testhistogram_bucket", le="0.1", id="2"} 8.0
+	{__name__="testhistogram_bucket", le="0.2", id="2"} 12.0
+	{__name__="testhistogram_bucket", le="+Inf", id="2"} 22.0
+
+eval range from 0 to 10m step 5m (testhistogram_bucket) and on() (vector(1) == 1)
+  {__name__="testhistogram_bucket", le="0.1", id="1"} 0.0 5.0 10.0
+	{__name__="testhistogram_bucket", le="0.2", id="1"} 0.0 7.0 14.0
+	{__name__="testhistogram_bucket", le="+Inf", id="1"} 0.0 12.0 24.0
+	{__name__="testhistogram_bucket", le="0.1", id="2"} 0.0 4.0 8.0
+	{__name__="testhistogram_bucket", le="0.2", id="2"} 0.0 6.0 12.0
+	{__name__="testhistogram_bucket", le="+Inf", id="2"} 0.0 11.0 22.0
+
+# Exclude all series when "and on" with empty vector.
+eval instant at 10m (testhistogram_bucket) and on() (vector(-1) == 1)
+
+eval range from 0 to 10m step 5m (testhistogram_bucket) and on() (vector(-1) == 1)
+
+# Include all native histogram series when "and on" with non-empty vector.
+eval instant at 10m (testhistogram) and on() (vector(1) == 1)
+  {__name__="testhistogram", id="1"} {{schema:-53 sum:0 count:24 buckets:[10 4 10] custom_values:[0.1 0.2]}}
+	{__name__="testhistogram", id="2"} {{schema:-53 sum:0 count:22 buckets:[8 4 10] custom_values:[0.1 0.2]}}
+
+eval range from 0 to 10m step 5m (testhistogram) and on() (vector(1) == 1)
+	{__name__="testhistogram", id="1"} {{schema:-53 sum:0 count:0 custom_values:[0.1 0.2]}} {{schema:-53 sum:0 count:12 buckets:[5 2 5] custom_values:[0.1 0.2]}} {{schema:-53 sum:0 count:24 buckets:[10 4 10] custom_values:[0.1 0.2]}}
+	{__name__="testhistogram", id="2"} {{schema:-53 sum:0 count:0 custom_values:[0.1 0.2]}} {{schema:-53 sum:0 count:11 buckets:[4 2 5] custom_values:[0.1 0.2]}} {{schema:-53 sum:0 count:22 buckets:[8 4 10] custom_values:[0.1 0.2]}}
+
+# Exclude all native histogram series when "and on" with empty vector.
+eval instant at 10m (testhistogram) and on() (vector(-1) == 1)
+
+eval range from 0 to 10m step 5m (testhistogram) and on() (vector(-1) == 1)
+
+clear
+
+# Test unary negation with non-overlapping series that have different metric names.
+# After negation, the __name__ label is dropped, so series with different names
+# but same other labels should merge if they don't overlap in time.
+load 20m
+  http_requests{job="api"} 2 _
+  http_errors{job="api"} _ 4
+
+eval instant at 0 -{job="api"}
+  {job="api"} -2
+
+eval instant at 20m -{job="api"}
+  {job="api"} -4
+
+eval range from 0 to 20m step 20m -{job="api"}
+  {job="api"} -2 -4
+
+# Test unary negation failure with overlapping timestamps (same labelset at same time).
+clear
+load 1m
+  http_requests{job="api"} 1
+  http_errors{job="api"} 2
+
+eval_fail instant at 0 -{job="api"}
+
+clear
+
+# Test unary negation with "or" operator combining metrics with removed names.
+load 10m
+    metric_a   1  _
+    metric_b   3  4
+
+# Use "-" unary operator as a simple way to remove the metric name.
+eval range from 0 to 20m step 10m -metric_a or -metric_b
+    {} -1  -4
+
+clear

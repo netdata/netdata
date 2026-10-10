@@ -1,0 +1,200 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+//
+// Top-level evaluator: dispatches one Plan node against an EvalContext.
+
+use crate::plan::{FuncKind, Plan};
+
+use super::context::EvalContext;
+use super::select::{eval_matrix_select, eval_vector_select};
+use super::subquery::eval_subquery;
+use super::types::{EvalError, EvalResult, Sample, Series, labels_signature};
+
+/// Evaluate one plan node at `ctx.at_ms()`.
+pub fn eval(ctx: &EvalContext, plan: &Plan) -> Result<EvalResult, EvalError> {
+    match plan {
+        Plan::Number(v) => Ok(EvalResult::Scalar(*v)),
+
+        Plan::VectorSelect {
+            matchers,
+            offset_ms,
+            at,
+        } => eval_vector_select(ctx, matchers, *offset_ms, at.as_ref()),
+
+        Plan::MatrixSelect {
+            matchers,
+            range_ms,
+            offset_ms,
+            at,
+        } => eval_matrix_select(ctx, matchers, *range_ms, *offset_ms, at.as_ref()),
+
+        Plan::UnaryMinus(inner) => {
+            let r = eval(ctx, inner)?;
+            Ok(super::unary::negate(r))
+        }
+
+        Plan::Binop {
+            op,
+            return_bool,
+            matching,
+            lhs,
+            rhs,
+        } => {
+            let l = eval(ctx, lhs)?;
+            let r = eval(ctx, rhs)?;
+            super::binop::apply_binop(*op, *return_bool, matching.as_ref(), l, r)
+        }
+
+        Plan::Aggregate {
+            op,
+            grouping,
+            param,
+            param_string,
+            expr,
+        } => {
+            // Parametrized aggregators (topk/bottomk/quantile) take a
+            // scalar param. Evaluate it before the inner vector so we
+            // can fail fast on a malformed parameter expression.
+            // `count_values` takes a string param that already lived
+            // in the Plan IR -- no evaluation step needed.
+            let param_value = match param {
+                Some(p) => {
+                    let r = eval(ctx, p)?;
+                    match r {
+                        super::types::EvalResult::Scalar(v) => Some(v),
+                        other => {
+                            return Err(super::types::EvalError::Type {
+                                context: "aggregation parameter",
+                                expected: crate::plan::ValueType::Scalar,
+                                got: other.value_type(),
+                            });
+                        }
+                    }
+                }
+                None => None,
+            };
+            let inner = eval(ctx, expr)?;
+            super::aggregation::apply_aggregate(
+                *op,
+                grouping.as_ref(),
+                param_value,
+                param_string.as_deref(),
+                inner,
+            )
+        }
+
+        Plan::Call { func, args } => {
+            // `time()` and `vector(s)` need the eval-context timestamp to
+            // produce their output; the rest go through the
+            // context-aware dispatcher in `functions::apply_call`.
+            // Keeping the special cases here avoids threading the
+            // grid through every per-sample helper.
+            match func {
+                FuncKind::Time => {
+                    if !args.is_empty() {
+                        return Err(EvalError::Other("time() expects no arguments".to_string()));
+                    }
+                    return Ok(EvalResult::Scalar(ctx.at_ms() as f64 / 1000.0));
+                }
+                FuncKind::Vector => {
+                    if args.len() != 1 {
+                        return Err(EvalError::Other(
+                            "vector expects exactly 1 argument".to_string(),
+                        ));
+                    }
+                    let v = match eval(ctx, &args[0])? {
+                        EvalResult::Scalar(v) => v,
+                        other => {
+                            return Err(EvalError::Type {
+                                context: "vector",
+                                expected: crate::plan::ValueType::Scalar,
+                                got: other.value_type(),
+                            });
+                        }
+                    };
+                    let series = Series::scalar(Vec::new(), ctx.at_ms(), v);
+                    return Ok(EvalResult::InstantVector(vec![series]));
+                }
+                _ => {}
+            }
+            // Rollup functions need the range window so they can
+            // two-pointer-window per grid point. The window comes
+            // from the first argument when it is a matrix selector or
+            // a subquery; otherwise None.
+            let range_ms: Option<i64> = args.first().and_then(|a| match a {
+                Plan::MatrixSelect { range_ms, .. } => Some(*range_ms),
+                Plan::Subquery { range_ms, .. } => Some(*range_ms),
+                _ => None,
+            });
+            let mut evaled = Vec::with_capacity(args.len());
+            for a in args {
+                evaled.push(eval(ctx, a)?);
+            }
+            super::functions::apply_call(ctx, *func, evaled, range_ms)
+        }
+
+        Plan::Subquery {
+            expr,
+            range_ms,
+            step_ms,
+            offset_ms,
+            at,
+        } => eval_subquery(ctx, expr, *range_ms, *step_ms, *offset_ms, at.as_ref()),
+
+        Plan::LabelOp { op, expr } => {
+            let inner = eval(ctx, expr)?;
+            super::labelops::apply_label_op(op, inner)
+        }
+
+        Plan::Absent { labels, expr } => {
+            let inner = eval(ctx, expr)?;
+            super::absent::eval_absent(ctx, labels, inner)
+        }
+
+        Plan::FusedAggrRollup {
+            aggr,
+            grouping,
+            rollup,
+            source,
+        } => {
+            use crate::plan::FusedSource;
+            // The lowering layer guarantees both aggr and rollup are on
+            // the supported list, but defense in depth.
+            let Some(fusable_aggr) = super::fused::FusableAggrKind::try_from_aggr(*aggr) else {
+                return Err(super::types::EvalError::Other(format!(
+                    "fused IR carries unsupported aggregator {aggr:?}"
+                )));
+            };
+            let Some(rollup_kind) = super::fused::RollupKind::try_from_func(*rollup) else {
+                return Err(super::types::EvalError::Other(format!(
+                    "fused IR carries unsupported rollup {rollup:?}"
+                )));
+            };
+            match source {
+                FusedSource::Matrix {
+                    matchers,
+                    range_ms,
+                    offset_ms,
+                    at,
+                } => super::fused::eval_fused_aggr_rollup(
+                    ctx,
+                    fusable_aggr,
+                    grouping.as_ref(),
+                    rollup_kind,
+                    matchers,
+                    *range_ms,
+                    *offset_ms,
+                    at.as_ref(),
+                ),
+                FusedSource::Subquery { .. } => {
+                    // Subquery in fused position: not yet wired through
+                    // (the inner expression needs to drive the
+                    // two-pointer instead of raw storage samples).
+                    // Tracked as a follow-up; rare in practice.
+                    Err(super::types::EvalError::NotYetImplemented(
+                        "fused aggr/rollup over subquery".to_string(),
+                    ))
+                }
+            }
+        }
+    }
+}

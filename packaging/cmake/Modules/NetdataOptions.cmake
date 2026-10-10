@@ -233,6 +233,12 @@ mark_as_advanced(FORCE_LEGACY_LIBBPF)
 
 cmake_dependent_option(ENABLE_NETDATA_JOURNAL_FILE_READER "Enable netdata's journal file reader implementation" False "ENABLE_PLUGIN_SYSTEMD_JOURNAL" False)
 
+# Enable the PromQL evaluator and /api/v3/promql/* + Prometheus mirror
+# endpoints. Disabling this removes the netdata_promql Rust crate, the
+# C data-source shim, the v3 promql handler, and the v1 query/query_range
+# dispatch entries from the build. See SOW-0017.
+option(ENABLE_PROMQL "Enable the PromQL evaluator and /api/v3/promql/* endpoints" ON)
+
 # Knobs whose only readers live inside a single module. They are declared here
 # anyway: where a knob is read is a detail, where it is declared is the contract.
 option(SQLITE_USE_GIT "Fetch SQLite sources via git clone instead of tarball" OFF)

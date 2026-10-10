@@ -1,0 +1,967 @@
+load 5m
+  http_requests{job="api-server", instance="0", group="production"} 0+10x10
+  http_requests{job="api-server", instance="1", group="production"} 0+20x10
+  http_requests{job="api-server", instance="0", group="canary"}   0+30x10
+  http_requests{job="api-server", instance="1", group="canary"}   0+40x10
+  http_requests{job="app-server", instance="0", group="production"} 0+50x10
+  http_requests{job="app-server", instance="1", group="production"} 0+60x10
+  http_requests{job="app-server", instance="0", group="canary"}   0+70x10
+  http_requests{job="app-server", instance="1", group="canary"}   0+80x10
+
+load 5m
+  foo{job="api-server", instance="0", region="europe"} 0+90x10
+  foo{job="api-server"} 0+100x10
+
+# Simple sum.
+eval instant at 50m SUM BY (group) (http_requests{job="api-server"})
+  {group="canary"} 700
+  {group="production"} 300
+
+eval instant at 50m SUM BY (group) (((http_requests{job="api-server"})))
+  {group="canary"} 700
+  {group="production"} 300
+
+# Test alternative "by"-clause order.
+eval instant at 50m sum by (group) (http_requests{job="api-server"})
+  {group="canary"} 700
+  {group="production"} 300
+
+# Simple average.
+eval instant at 50m avg by (group) (http_requests{job="api-server"})
+  {group="canary"} 350
+  {group="production"} 150
+
+# Simple count.
+eval instant at 50m count by (group) (http_requests{job="api-server"})
+  {group="canary"} 2
+  {group="production"} 2
+
+# Simple without.
+eval instant at 50m sum without (instance) (http_requests{job="api-server"})
+  {group="canary",job="api-server"} 700
+  {group="production",job="api-server"} 300
+
+# Empty by.
+eval instant at 50m sum by () (http_requests{job="api-server"})
+  {} 1000
+
+# No by/without.
+eval instant at 50m sum(http_requests{job="api-server"})
+  {} 1000
+
+# Empty without.
+eval instant at 50m sum without () (http_requests{job="api-server",group="production"})
+  {group="production",job="api-server",instance="0"} 100
+  {group="production",job="api-server",instance="1"} 200
+
+# Without with mismatched and missing labels. Do not do this.
+eval instant at 50m sum without (instance) (http_requests{job="api-server"} or foo)
+  {group="canary",job="api-server"} 700
+  {group="production",job="api-server"} 300
+  {region="europe",job="api-server"} 900
+  {job="api-server"} 1000
+
+# Lower-cased aggregation operators should work too.
+eval instant at 50m sum(http_requests) by (job) + min(http_requests) by (job) + max(http_requests) by (job) + avg(http_requests) by (job)
+  {job="app-server"} 4550
+  {job="api-server"} 1750
+
+# Test alternative "by"-clause order.
+eval instant at 50m sum by (group) (http_requests{job="api-server"})
+  {group="canary"} 700
+  {group="production"} 300
+
+# Test both alternative "by"-clause orders in one expression.
+# Public health warning: stick to one form within an expression (or even
+# in an organization), or risk serious user confusion.
+eval instant at 50m sum(sum by (group) (http_requests{job="api-server"})) by (job)
+  {} 1000
+
+eval instant at 50m SUM(http_requests)
+	{} 3600
+
+eval instant at 50m SUM(http_requests{instance="0"}) BY(job)
+	{job="api-server"} 400
+	{job="app-server"} 1200
+
+eval instant at 50m SUM(http_requests) BY (job)
+	{job="api-server"} 1000
+	{job="app-server"} 2600
+
+# Non-existent labels mentioned in BY-clauses shouldn't propagate to output.
+eval instant at 50m SUM(http_requests) BY (job, nonexistent)
+	{job="api-server"} 1000
+	{job="app-server"} 2600
+
+eval instant at 50m COUNT(http_requests) BY (job)
+	{job="api-server"} 4
+	{job="app-server"} 4
+
+eval instant at 50m SUM(http_requests) BY (job, group)
+	{group="canary", job="api-server"} 700
+	{group="canary", job="app-server"} 1500
+	{group="production", job="api-server"} 300
+	{group="production", job="app-server"} 1100
+
+eval instant at 50m AVG(http_requests) BY (job)
+	{job="api-server"} 250
+	{job="app-server"} 650
+
+eval instant at 50m MIN(http_requests) BY (job)
+	{job="api-server"} 100
+	{job="app-server"} 500
+
+eval instant at 50m MAX(http_requests) BY (job)
+	{job="api-server"} 400
+	{job="app-server"} 800
+
+eval instant at 50m abs(-1 * http_requests{group="production",job="api-server"})
+	{group="production", instance="0", job="api-server"} 100
+	{group="production", instance="1", job="api-server"} 200
+
+eval instant at 50m floor(0.004 * http_requests{group="production",job="api-server"})
+	{group="production", instance="0", job="api-server"} 0
+	{group="production", instance="1", job="api-server"} 0
+
+eval instant at 50m ceil(0.004 * http_requests{group="production",job="api-server"})
+	{group="production", instance="0", job="api-server"} 1
+	{group="production", instance="1", job="api-server"} 1
+
+eval instant at 50m round(0.004 * http_requests{group="production",job="api-server"})
+	{group="production", instance="0", job="api-server"} 0
+	{group="production", instance="1", job="api-server"} 1
+
+# Round should correctly handle negative numbers.
+eval instant at 50m round(-1 * (0.004 * http_requests{group="production",job="api-server"}))
+	{group="production", instance="0", job="api-server"} 0
+	{group="production", instance="1", job="api-server"} -1
+
+# Round should round half up.
+eval instant at 50m round(0.005 * http_requests{group="production",job="api-server"})
+	{group="production", instance="0", job="api-server"} 1
+	{group="production", instance="1", job="api-server"} 1
+
+eval instant at 50m round(-1 * (0.005 * http_requests{group="production",job="api-server"}))
+	{group="production", instance="0", job="api-server"} 0
+	{group="production", instance="1", job="api-server"} -1
+
+eval instant at 50m round(1 + 0.005 * http_requests{group="production",job="api-server"})
+	{group="production", instance="0", job="api-server"} 2
+	{group="production", instance="1", job="api-server"} 2
+
+eval instant at 50m round(-1 * (1 + 0.005 * http_requests{group="production",job="api-server"}))
+	{group="production", instance="0", job="api-server"} -1
+	{group="production", instance="1", job="api-server"} -2
+
+# Round should accept the number to round nearest to.
+eval instant at 50m round(0.0005 * http_requests{group="production",job="api-server"}, 0.1)
+	{group="production", instance="0", job="api-server"} 0.1
+	{group="production", instance="1", job="api-server"} 0.1
+
+eval instant at 50m round(2.1 + 0.0005 * http_requests{group="production",job="api-server"}, 0.1)
+	{group="production", instance="0", job="api-server"} 2.2
+	{group="production", instance="1", job="api-server"} 2.2
+
+eval instant at 50m round(5.2 + 0.0005 * http_requests{group="production",job="api-server"}, 0.1)
+	{group="production", instance="0", job="api-server"} 5.3
+	{group="production", instance="1", job="api-server"} 5.3
+
+# Round should work correctly with negative numbers and multiple decimal places.
+eval instant at 50m round(-1 * (5.2 + 0.0005 * http_requests{group="production",job="api-server"}), 0.1)
+	{group="production", instance="0", job="api-server"} -5.2
+	{group="production", instance="1", job="api-server"} -5.3
+
+# Round should work correctly with big toNearests.
+eval instant at 50m round(0.025 * http_requests{group="production",job="api-server"}, 5)
+	{group="production", instance="0", job="api-server"} 5
+	{group="production", instance="1", job="api-server"} 5
+
+eval instant at 50m round(0.045 * http_requests{group="production",job="api-server"}, 5)
+	{group="production", instance="0", job="api-server"} 5
+	{group="production", instance="1", job="api-server"} 10
+
+# Standard deviation and variance.
+eval instant at 50m stddev(http_requests)
+  {} 229.12878474779
+
+eval instant at 50m stddev by (instance)(http_requests)
+  {instance="0"} 223.60679774998
+  {instance="1"} 223.60679774998
+
+eval instant at 50m stdvar(http_requests)
+  {} 52500
+
+eval instant at 50m stdvar by (instance)(http_requests)
+  {instance="0"} 50000
+  {instance="1"} 50000
+
+# Float precision test for standard deviation and variance
+clear
+load 5m
+  http_requests{job="api-server", instance="0", group="production"} 0+1.33x10
+  http_requests{job="api-server", instance="1", group="production"} 0+1.33x10
+  http_requests{job="api-server", instance="0", group="canary"} 0+1.33x10
+
+eval instant at 50m stddev(http_requests)
+  {} 0.0
+
+eval instant at 50m stdvar(http_requests)
+  {} 0.0
+
+
+# Regression test for missing separator byte in labelsToGroupingKey.
+clear
+load 5m
+  label_grouping_test{a="aa", b="bb"} 0+10x10
+  label_grouping_test{a="a", b="abb"} 0+20x10
+
+eval instant at 50m sum(label_grouping_test) by (a, b)
+  {a="a", b="abb"} 200
+  {a="aa", b="bb"} 100
+
+
+
+# Tests for min/max.
+clear
+load 5m
+  http_requests{job="api-server", instance="0", group="production"}	1
+  http_requests{job="api-server", instance="1", group="production"}	2
+  http_requests{job="api-server", instance="0", group="canary"}		NaN
+  http_requests{job="api-server", instance="1", group="canary"}		3
+  http_requests{job="api-server", instance="2", group="canary"}		4
+  http_requests_histogram{job="api-server", instance="3", group="canary"} {{schema:2 count:4 sum:10 buckets:[1 0 0 0 1 0 0 1 1]}}
+
+eval instant at 0m max(http_requests)
+  expect no_info
+  {} 4
+
+# The histogram is ignored here so the result doesn't change but it has an info annotation now.
+eval instant at 0m max({job="api-server"})
+  expect info
+  {} 4
+
+# The histogram is ignored here so there is no result but it has an info annotation now.
+eval instant at 0m max(http_requests_histogram)
+  expect info
+
+eval instant at 0m min(http_requests)
+  expect no_info
+  {} 1
+
+# The histogram is ignored here so the result doesn't change but it has an info annotation now.
+eval instant at 0m min({job="api-server"})
+  expect info
+  {} 1
+
+# The histogram is ignored here so there is no result but it has an info annotation now.
+eval instant at 0m min(http_requests_histogram)
+  expect info
+
+eval instant at 0m max by (group) (http_requests)
+  expect no_info
+  {group="production"} 2
+  {group="canary"} 4
+
+eval instant at 0m min by (group) (http_requests)
+  expect no_info
+  {group="production"} 1
+  {group="canary"} 3
+
+clear
+
+# Tests for topk/bottomk.
+load 5m
+	http_requests{job="api-server", instance="0", group="production"}	0+10x10
+	http_requests{job="api-server", instance="1", group="production"}	0+20x10
+	http_requests{job="api-server", instance="2", group="production"}	NaN NaN NaN NaN NaN NaN NaN NaN NaN NaN NaN
+	http_requests{job="api-server", instance="0", group="canary"}		0+30x10
+	http_requests{job="api-server", instance="1", group="canary"}		0+40x10
+	http_requests{job="app-server", instance="0", group="production"}	0+50x10
+	http_requests{job="app-server", instance="1", group="production"}	0+60x10
+	http_requests{job="app-server", instance="0", group="canary"}		0+70x10
+	http_requests{job="app-server", instance="1", group="canary"}		0+80x10
+	http_requests_histogram{job="app-server", instance="2", group="canary"}		{{schema:0 sum:10 count:10}}x11
+	http_requests_histogram{job="api-server", instance="3", group="production"}	{{schema:0 sum:20 count:20}}x11
+	foo 1+1x9 3
+
+eval instant at 50m topk(3, http_requests)
+	expect ordered
+	http_requests{group="canary", instance="1", job="app-server"} 800
+	http_requests{group="canary", instance="0", job="app-server"} 700
+	http_requests{group="production", instance="1", job="app-server"} 600
+
+eval instant at 50m topk((3), (http_requests))
+	expect ordered
+	http_requests{group="canary", instance="1", job="app-server"} 800
+	http_requests{group="canary", instance="0", job="app-server"} 700
+	http_requests{group="production", instance="1", job="app-server"} 600
+
+eval instant at 50m topk(5, http_requests{group="canary",job="app-server"})
+	expect ordered
+	http_requests{group="canary", instance="1", job="app-server"} 800
+	http_requests{group="canary", instance="0", job="app-server"} 700
+
+eval instant at 50m bottomk(3, http_requests)
+	expect ordered
+	http_requests{group="production", instance="0", job="api-server"} 100
+	http_requests{group="production", instance="1", job="api-server"} 200
+	http_requests{group="canary", instance="0", job="api-server"} 300
+
+eval instant at 50m bottomk(5, http_requests{group="canary",job="app-server"})
+	expect ordered
+	http_requests{group="canary", instance="0", job="app-server"} 700
+	http_requests{group="canary", instance="1", job="app-server"} 800
+
+eval instant at 50m topk by (group) (1, http_requests)
+  http_requests{group="production", instance="1", job="app-server"} 600
+  http_requests{group="canary", instance="1", job="app-server"} 800
+
+eval instant at 50m bottomk by (group) (2, http_requests)
+  http_requests{group="canary", instance="0", job="api-server"} 300
+  http_requests{group="canary", instance="1", job="api-server"} 400
+  http_requests{group="production", instance="0", job="api-server"} 100
+  http_requests{group="production", instance="1", job="api-server"} 200
+
+eval instant at 50m bottomk by (group) (2, http_requests{group="production"})
+  expect ordered
+  http_requests{group="production", instance="0", job="api-server"} 100
+  http_requests{group="production", instance="1", job="api-server"} 200
+
+# Test NaN is sorted away from the top/bottom.
+eval instant at 50m topk(3, http_requests{job="api-server",group="production"})
+	expect ordered
+	http_requests{job="api-server", instance="1", group="production"}	200
+	http_requests{job="api-server", instance="0", group="production"}	100
+	http_requests{job="api-server", instance="2", group="production"}	NaN
+
+eval instant at 50m bottomk(3, http_requests{job="api-server",group="production"})
+	expect ordered
+	http_requests{job="api-server", instance="0", group="production"}	100
+	http_requests{job="api-server", instance="1", group="production"}	200
+	http_requests{job="api-server", instance="2", group="production"}	NaN
+
+# Test topk and bottomk allocate min(k, input_vector) for results vector
+eval instant at 50m bottomk(9999999999, http_requests{job="app-server",group="canary"})
+	expect ordered
+	http_requests{group="canary", instance="0", job="app-server"} 700
+	http_requests{group="canary", instance="1", job="app-server"} 800
+
+eval instant at 50m topk(9999999999, http_requests{job="api-server",group="production"})
+	expect ordered
+	http_requests{job="api-server", instance="1", group="production"}	200
+	http_requests{job="api-server", instance="0", group="production"}	100
+	http_requests{job="api-server", instance="2", group="production"}	NaN
+
+# Bug #5276.
+eval instant at 50m topk(scalar(foo), http_requests)
+	expect ordered
+	http_requests{group="canary", instance="1", job="app-server"} 800
+	http_requests{group="canary", instance="0", job="app-server"} 700
+	http_requests{group="production", instance="1", job="app-server"} 600
+
+# Bug #15971.
+eval range from 0m to 50m step 5m count(topk(scalar(foo), http_requests))
+	{} 1 2 3 4 5 6 7 8 9 9 3
+
+eval range from 0m to 50m step 5m count(bottomk(scalar(foo), http_requests))
+	{} 1 2 3 4 5 6 7 8 9 9 3
+
+# Tests for histogram: should ignore histograms.
+eval instant at 50m topk(100, http_requests_histogram)
+    expect info
+    #empty
+
+eval range from 0 to 50m step 5m topk(100, http_requests_histogram)
+    expect info
+    #empty
+
+eval instant at 50m topk(1, {__name__=~"http_requests(_histogram)?"})
+    expect info
+    {__name__="http_requests", group="canary", instance="1", job="app-server"} 800
+
+eval instant at 50m count(topk(1000, {__name__=~"http_requests(_histogram)?"}))
+    expect info
+    {} 9
+
+eval range from 0 to 50m step 5m count(topk(1000, {__name__=~"http_requests(_histogram)?"}))
+    expect info
+    {} 9x10
+
+eval instant at 50m topk by (instance) (1, {__name__=~"http_requests(_histogram)?"})
+    expect info
+    {__name__="http_requests", group="canary", instance="0", job="app-server"} 700
+    {__name__="http_requests", group="canary", instance="1", job="app-server"} 800
+    {__name__="http_requests", group="production", instance="2", job="api-server"} NaN
+
+eval instant at 50m bottomk(100, http_requests_histogram)
+    expect info
+    #empty
+
+eval range from 0 to 50m step 5m bottomk(100, http_requests_histogram)
+    expect info
+    #empty
+
+eval instant at 50m bottomk(1, {__name__=~"http_requests(_histogram)?"})
+    expect info
+    {__name__="http_requests", group="production", instance="0", job="api-server"} 100
+
+eval instant at 50m count(bottomk(1000, {__name__=~"http_requests(_histogram)?"}))
+    expect info
+    {} 9
+
+eval range from 0 to 50m step 5m count(bottomk(1000, {__name__=~"http_requests(_histogram)?"}))
+    expect info
+    {} 9x10
+
+eval instant at 50m bottomk by (instance) (1, {__name__=~"http_requests(_histogram)?"})
+    expect info
+    {__name__="http_requests", group="production", instance="0", job="api-server"} 100
+    {__name__="http_requests", group="production", instance="1", job="api-server"} 200
+    {__name__="http_requests", group="production", instance="2", job="api-server"} NaN
+
+eval instant at 50m topk(NaN, non_existent)
+    expect fail msg: Parameter value is NaN
+
+eval instant at 50m limitk(NaN, non_existent)
+    expect fail msg: Parameter value is NaN
+
+eval instant at 50m limit_ratio(NaN, non_existent)
+    expect fail msg: Ratio value is NaN
+
+clear
+
+# Tests for count_values.
+load 5m
+	version{job="api-server", instance="0", group="production"}	6
+	version{job="api-server", instance="1", group="production"}	6
+	version{job="api-server", instance="2", group="production"}	6
+	version{job="api-server", instance="0", group="canary"}		8
+	version{job="api-server", instance="1", group="canary"}		8
+	version{job="app-server", instance="0", group="production"}	6
+	version{job="app-server", instance="1", group="production"}	6
+	version{job="app-server", instance="0", group="canary"}		7
+	version{job="app-server", instance="1", group="canary"}		7
+	version{job="app-server", instance="2", group="canary"}		{{schema:0 sum:10 count:20 z_bucket_w:0.001 z_bucket:2 buckets:[1 2] n_buckets:[1 2]}}
+	version{job="app-server", instance="3", group="canary"}		{{schema:0 sum:10 count:20 z_bucket_w:0.001 z_bucket:2 buckets:[1 2] n_buckets:[1 2]}}
+
+eval instant at 1m count_values("version", version)
+	{version="6"} 5
+	{version="7"} 2
+	{version="8"} 2
+    {version="{count:20, sum:10, [-2,-1):2, [-1,-0.5):1, [-0.001,0.001]:2, (0.5,1]:1, (1,2]:2}"} 2
+
+eval instant at 1m count_values(((("version"))), version)
+    {version="6"} 5
+    {version="7"} 2
+    {version="8"} 2
+    {version="{count:20, sum:10, [-2,-1):2, [-1,-0.5):1, [-0.001,0.001]:2, (0.5,1]:1, (1,2]:2}"} 2
+
+eval instant at 1m count_values without (instance)("version", version)
+	{job="api-server", group="production", version="6"} 3
+	{job="api-server", group="canary", version="8"} 2
+	{job="app-server", group="production", version="6"} 2
+	{job="app-server", group="canary", version="7"} 2
+    {job="app-server", group="canary", version="{count:20, sum:10, [-2,-1):2, [-1,-0.5):1, [-0.001,0.001]:2, (0.5,1]:1, (1,2]:2}"} 2
+
+# Overwrite label with output. Don't do this.
+eval instant at 1m count_values without (instance)("job", version)
+	{job="6", group="production"} 5
+	{job="8", group="canary"} 2
+	{job="7", group="canary"} 2
+    {job="{count:20, sum:10, [-2,-1):2, [-1,-0.5):1, [-0.001,0.001]:2, (0.5,1]:1, (1,2]:2}", group="canary"} 2
+
+# Overwrite label with output. Don't do this.
+eval instant at 1m count_values by (job, group)("job", version)
+	{job="6", group="production"} 5
+	{job="8", group="canary"} 2
+	{job="7", group="canary"} 2
+    {job="{count:20, sum:10, [-2,-1):2, [-1,-0.5):1, [-0.001,0.001]:2, (0.5,1]:1, (1,2]:2}", group="canary"} 2
+
+# Test an invalid label value.
+eval instant at 0 count_values("a\xc5z", version)
+  expect fail msg:invalid label name "a\xc5z"
+
+# Tests for quantile.
+clear
+
+load 10s
+	data{test="two samples",point="a"} 0
+	data{test="two samples",point="b"} 1
+	data{test="three samples",point="a"} 0
+	data{test="three samples",point="b"} 1
+	data{test="three samples",point="c"} 2
+	data{test="uneven samples",point="a"} 0
+	data{test="uneven samples",point="b"} 1
+	data{test="uneven samples",point="c"} 4
+	data{test="NaN sample",point="a"} 0
+	data{test="NaN sample",point="b"} 1
+	data{test="NaN sample",point="c"} NaN
+	data_histogram{test="histogram sample", point="c"} {{schema:2 count:4 sum:10 buckets:[1 0 0 0 1 0 0 1 1]}}
+	foo 0 1 0 1 0 1 0.8
+
+# 80th percentile.
+# The NaN sample is treated as the smallest possible value.
+eval instant at 1m quantile without(point)(0.8, data)
+	expect no_info
+	{test="two samples"} 0.8
+	{test="three samples"} 1.6
+	{test="uneven samples"} 2.8
+	{test="NaN sample"} 0.6
+
+# 20th percentile.
+# A quantile between NaN and 0 is interpolated as NaN.
+eval instant at 1m quantile without(point)(0.2, data)
+	{test="two samples"} 0.2
+	{test="three samples"} 0.4
+	{test="uneven samples"} 0.4
+	{test="NaN sample"} NaN
+
+# The histogram is ignored here so the result doesn't change but it has an info annotation now.
+eval instant at 1m quantile without(point)(0.8, {__name__=~"data(_histogram)?"})
+	expect info
+	{test="two samples"} 0.8
+	{test="three samples"} 1.6
+	{test="uneven samples"} 2.8
+	{test="NaN sample"} 0.6
+
+# The histogram is ignored here so there is no result but it has an info annotation now.
+eval instant at 1m quantile(0.8, data_histogram)
+  expect info
+
+# Bug #5276.
+eval instant at 1m quantile without(point)(scalar(foo), data)
+	{test="two samples"} 0.8
+	{test="three samples"} 1.6
+	{test="uneven samples"} 2.8
+	{test="NaN sample"} 0.6
+
+eval instant at 1m quantile without(point)((scalar(foo)), data)
+	{test="two samples"} 0.8
+	{test="three samples"} 1.6
+	{test="uneven samples"} 2.8
+	{test="NaN sample"} 0.6
+
+eval instant at 1m quantile without(point)(NaN, data)
+	expect warn msg: PromQL warning: quantile value should be between 0 and 1, got NaN
+	{test="two samples"} NaN
+	{test="three samples"} NaN
+	{test="uneven samples"} NaN
+	{test="NaN sample"} NaN
+
+# Bug #15971.
+eval range from 0m to 1m step 10s quantile without(point) (scalar(foo), data)
+	{test="two samples"} 0 1 0 1 0 1 0.8
+	{test="three samples"} 0 2 0 2 0 2 1.6
+	{test="uneven samples"} 0 4 0 4 0 4 2.8
+	{test="NaN sample"} NaN 1 NaN 1 NaN 1 0.6
+
+# Tests for group.
+clear
+
+load 10s
+	data{test="two samples",point="a"} 0
+	data{test="two samples",point="b"} 1
+	data{test="three samples",point="a"} 0
+	data{test="three samples",point="b"} 1
+	data{test="three samples",point="c"} 2
+	data{test="uneven samples",point="a"} 0
+	data{test="uneven samples",point="b"} 1
+	data{test="uneven samples",point="c"} 4
+	data{test="histogram sample",point="c"} {{schema:0 sum:0 count:0}}
+	foo .8
+
+eval instant at 1m group without(point)(data)
+	{test="two samples"} 1
+	{test="three samples"} 1
+	{test="uneven samples"} 1
+    {test="histogram sample"} 1
+
+eval instant at 1m group(foo)
+	{} 1
+
+# Tests for avg.
+clear
+
+load 10s
+	data{test="ten",point="a"} 8
+	data{test="ten",point="b"} 10
+	data{test="ten",point="c"} 12
+	data{test="inf",point="a"} 0
+	data{test="inf",point="b"} Inf
+	data{test="inf",point="d"} Inf
+	data{test="inf",point="c"} 0
+	data{test="-inf",point="a"} -Inf
+	data{test="-inf",point="b"} -Inf
+	data{test="-inf",point="c"} 0
+	data{test="inf2",point="a"} Inf
+	data{test="inf2",point="b"} 0
+	data{test="inf2",point="c"} Inf
+	data{test="-inf2",point="a"} -Inf
+	data{test="-inf2",point="b"} 0
+	data{test="-inf2",point="c"} -Inf
+	data{test="inf3",point="b"} Inf
+	data{test="inf3",point="d"} Inf
+	data{test="inf3",point="c"} Inf
+	data{test="inf3",point="d"} -Inf
+	data{test="-inf3",point="b"} -Inf
+	data{test="-inf3",point="d"} -Inf
+	data{test="-inf3",point="c"} -Inf
+	data{test="-inf3",point="c"} Inf
+	data{test="nan",point="a"} -Inf
+	data{test="nan",point="b"} 0
+	data{test="nan",point="c"} Inf
+	data{test="big",point="a"} 9.988465674311579e+307
+	data{test="big",point="b"} 9.988465674311579e+307
+	data{test="big",point="c"} 9.988465674311579e+307
+	data{test="big",point="d"} 9.988465674311579e+307
+	data{test="-big",point="a"} -9.988465674311579e+307
+	data{test="-big",point="b"} -9.988465674311579e+307
+	data{test="-big",point="c"} -9.988465674311579e+307
+	data{test="-big",point="d"} -9.988465674311579e+307
+	data{test="bigzero",point="a"} -9.988465674311579e+307
+	data{test="bigzero",point="b"} -9.988465674311579e+307
+	data{test="bigzero",point="c"} 9.988465674311579e+307
+	data{test="bigzero",point="d"} 9.988465674311579e+307
+	data{test="value is nan"} NaN
+
+eval instant at 1m avg(data{test="ten"})
+	{} 10
+
+eval instant at 1m avg(data{test="inf"})
+	{} Inf
+
+eval instant at 1m avg(data{test="inf2"})
+	{} Inf
+
+eval instant at 1m avg(data{test="inf3"})
+	{} NaN
+
+eval instant at 1m avg(data{test="-inf"})
+	{} -Inf
+
+eval instant at 1m avg(data{test="-inf2"})
+	{} -Inf
+
+eval instant at 1m avg(data{test="-inf3"})
+	{} NaN
+
+eval instant at 1m avg(data{test="nan"})
+	{} NaN
+
+eval instant at 1m avg(data{test="big"})
+	{} 9.988465674311579e+307
+
+eval instant at 1m avg(data{test="-big"})
+	{} -9.988465674311579e+307
+
+eval instant at 1m avg(data{test="bigzero"})
+	{} 0
+
+# If NaN is in the mix, the result is NaN.
+eval instant at 1m avg(data)
+	{} NaN
+
+# Test summing and averaging extreme values.
+clear
+
+load 10s
+	data{test="ten",point="a"} 2
+	data{test="ten",point="b"} 8
+	data{test="ten",point="c"} 1e+100
+	data{test="ten",point="d"} -1e100
+	data{test="pos_inf",group="1",point="a"} Inf
+	data{test="pos_inf",group="1",point="b"} 2
+	data{test="pos_inf",group="2",point="a"} 2
+	data{test="pos_inf",group="2",point="b"} Inf
+	data{test="neg_inf",group="1",point="a"} -Inf
+	data{test="neg_inf",group="1",point="b"} 2
+	data{test="neg_inf",group="2",point="a"} 2
+	data{test="neg_inf",group="2",point="b"} -Inf
+	data{test="inf_inf",point="a"} Inf
+	data{test="inf_inf",point="b"} -Inf
+	data{test="nan",group="1",point="a"} NaN
+	data{test="nan",group="1",point="b"} 2
+	data{test="nan",group="2",point="a"} 2
+	data{test="nan",group="2",point="b"} NaN
+
+eval instant at 1m sum(data{test="ten"})
+	{} 10
+
+# Plain addition doesn't use Kahan summation, so operations involving very large magnitudes
+# (±1e+100) lose precision. The smaller values are absorbed, leading to an incorrect result.
+# eval instant at 1m sum(data{test="ten",point="a"}) + sum(data{test="ten",point="b"}) + sum(data{test="ten",point="c"}) + sum(data{test="ten",point="d"})
+#	{} 10
+
+eval instant at 1m avg(data{test="ten"})
+	{} 2.5
+
+eval instant at 1m sum by (group) (data{test="pos_inf"})
+	{group="1"} Inf
+	{group="2"} Inf
+
+eval instant at 1m avg by (group) (data{test="pos_inf"})
+	{group="1"} Inf
+	{group="2"} Inf
+
+eval instant at 1m sum by (group) (data{test="neg_inf"})
+	{group="1"} -Inf
+	{group="2"} -Inf
+
+eval instant at 1m avg by (group) (data{test="neg_inf"})
+	{group="1"} -Inf
+	{group="2"} -Inf
+
+eval instant at 1m sum(data{test="inf_inf"})
+	{} NaN
+
+eval instant at 1m avg(data{test="inf_inf"})
+	{} NaN
+
+eval instant at 1m sum by (group) (data{test="nan"})
+	{group="1"} NaN
+	{group="2"} NaN
+
+eval instant at 1m avg by (group) (data{test="nan"})
+	{group="1"} NaN
+	{group="2"} NaN
+
+clear
+
+# Demonstrate robustness of direct mean calculation vs. incremental mean calculation.
+# The tests below are prone to small inaccuracies with incremental mean calculation.
+# The exact number of aggregated values that trigger an inaccuracy depends on the
+# hardware.
+# See also discussion in https://github.com/prometheus/prometheus/issues/16714
+load 5m
+  foo{idx="0"} 52
+  foo{idx="1"} 52
+  foo{idx="2"} 52
+  foo{idx="3"} 52
+  foo{idx="4"} 52
+  foo{idx="5"} 52
+  foo{idx="6"} 52
+  foo{idx="7"} 52
+  foo{idx="8"} 52
+  foo{idx="9"} 52
+  foo{idx="10"} 52
+  foo{idx="11"} 52
+
+eval instant at 0 avg(foo) - 52
+  {} 0
+
+eval instant at 0 avg(topk(11, foo)) - 52
+  {} 0
+
+eval instant at 0 avg(topk(10, foo)) - 52
+  {} 0
+
+eval instant at 0 avg(topk(9, foo)) - 52
+  {} 0
+
+eval instant at 0 avg(topk(8, foo)) - 52
+  {} 0
+
+# The following tests do not utilize the tolerance built into the
+# testing framework but rely on the exact equality implemented in
+# PromQL. They currently pass, but we should keep in mind that this is
+# not a hard requirement, and generally it is a bad idea in practice
+# to rely on exact equality like this in alerting rules etc.
+
+eval instant at 0 avg(foo) == 52
+  {} 52
+
+eval instant at 0 avg(topk(11, foo)) == 52
+  {} 52
+
+eval instant at 0 avg(topk(10, foo)) == 52
+  {} 52
+
+eval instant at 0 avg(topk(9, foo)) == 52
+  {} 52
+
+eval instant at 0 avg(topk(8, foo)) == 52
+  {} 52
+
+clear
+
+# Test that aggregations are deterministic.
+# Commented because it is flaky in range mode.
+#load 10s
+#	up{job="prometheus"} 1
+#	up{job="prometheus2"} 1
+#
+#eval instant at 1m count(topk(1,max(up) without()) == topk(1,max(up) without()) == topk(1,max(up) without()) == topk(1,max(up) without()) == topk(1,max(up) without()))
+#	{} 1
+
+clear
+
+# Test stddev produces consistent results regardless the order the data is loaded in.
+load 5m
+	series{label="a"} 1
+	series{label="b"} 2
+	series{label="c"} {{schema:1 sum:15 count:10 buckets:[3 2 5 7 9]}}
+
+# The histogram is ignored here so the result doesn't change but it has an info annotation now.
+eval instant at 0m stddev(series)
+	expect info
+	{} 0.5
+
+eval instant at 0m stdvar(series)
+	expect info
+	{} 0.25
+
+# The histogram is ignored here so there is no result but it has an info annotation now.
+eval instant at 0m stddev({label="c"})
+  expect info
+
+eval instant at 0m stdvar({label="c"})
+  expect info
+
+eval instant at 0m stddev by (label) (series)
+	expect info
+	{label="a"} 0
+	{label="b"} 0
+
+eval instant at 0m stdvar by (label) (series)
+	expect info
+	{label="a"} 0
+	{label="b"} 0
+
+clear
+
+load 5m
+	series{label="a"} {{schema:1 sum:15 count:10 buckets:[3 2 5 7 9]}}
+	series{label="b"} 1
+	series{label="c"} 2
+
+eval instant at 0m stddev(series)
+	expect info
+	{} 0.5
+
+eval instant at 0m stdvar(series)
+	expect info
+	{} 0.25
+
+eval instant at 0m stddev by (label) (series)
+	expect info
+	{label="b"} 0
+	{label="c"} 0
+
+eval instant at 0m stdvar by (label) (series)
+	expect info
+	{label="b"} 0
+	{label="c"} 0
+
+clear
+
+load 5m
+	series{label="a"} 1
+	series{label="b"} 2
+	series{label="c"} NaN
+
+eval instant at 0m stddev(series)
+	{} NaN
+
+eval instant at 0m stdvar(series)
+	{} NaN
+
+eval instant at 0m stddev by (label) (series)
+	{label="a"} 0
+	{label="b"} 0
+	{label="c"} NaN
+
+eval instant at 0m stdvar by (label) (series)
+	{label="a"} 0
+	{label="b"} 0
+	{label="c"} NaN
+
+clear
+
+load 5m
+	series{label="a"} NaN
+	series{label="b"} 1
+	series{label="c"} 2
+
+eval instant at 0m stddev(series)
+	{} NaN
+
+eval instant at 0m stdvar(series)
+	{} NaN
+
+eval instant at 0m stddev by (label) (series)
+	{label="a"} NaN
+	{label="b"} 0
+	{label="c"} 0
+
+eval instant at 0m stdvar by (label) (series)
+	{label="a"} NaN
+	{label="b"} 0
+	{label="c"} 0
+
+clear
+
+load 5m
+	series NaN
+
+eval instant at 0m stddev(series)
+	{} NaN
+
+eval instant at 0m stdvar(series)
+	{} NaN
+
+clear
+
+load 5m
+	series{label="a"} 1
+	series{label="b"} 2
+	series{label="c"} inf
+
+eval instant at 0m stddev (series)
+	{} NaN
+
+eval instant at 0m stdvar (series)
+	{} NaN
+
+eval instant at 0m stddev by (label) (series)
+	{label="a"} 0
+	{label="b"} 0
+	{label="c"} NaN
+
+eval instant at 0m stdvar by (label) (series)
+	{label="a"} 0
+	{label="b"} 0
+	{label="c"} NaN
+
+clear
+
+load 5m
+	series{label="a"} inf
+	series{label="b"} 1
+	series{label="c"} 2
+
+eval instant at 0m stddev(series)
+	{} NaN
+
+eval instant at 0m stdvar(series)
+	{} NaN
+
+eval instant at 0m stddev by (label) (series)
+	{label="a"} NaN
+	{label="b"} 0
+	{label="c"} 0
+
+eval instant at 0m stdvar by (label) (series)
+	{label="a"} NaN
+	{label="b"} 0
+	{label="c"} 0
+
+clear
+
+load 5m
+	series inf
+
+eval instant at 0m stddev(series)
+	{} NaN
+
+eval instant at 0m stdvar(series)
+	{} NaN

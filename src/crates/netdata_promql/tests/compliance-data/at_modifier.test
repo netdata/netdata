@@ -1,0 +1,310 @@
+load 10s
+  metric{job="1"} 0+1x1000
+  metric{job="2"} 0+2x1000
+
+load 1ms
+  metric_ms 0+1x10000
+
+# Instant vector selectors.
+eval instant at 10s metric @ 100
+  metric{job="1"} 10
+  metric{job="2"} 20
+
+eval instant at 10s metric @ 100s
+  metric{job="1"} 10
+  metric{job="2"} 20
+
+eval instant at 10s metric @ 1m40s
+  metric{job="1"} 10
+  metric{job="2"} 20
+
+eval instant at 10s metric @ 100 offset 50s
+  metric{job="1"} 5
+  metric{job="2"} 10
+
+eval instant at 10s metric @ 100 offset 50
+  metric{job="1"} 5
+  metric{job="2"} 10
+
+eval instant at 10s metric offset 50s @ 100
+  metric{job="1"} 5
+  metric{job="2"} 10
+
+eval instant at 10s metric offset 50 @ 100
+  metric{job="1"} 5
+  metric{job="2"} 10
+
+eval instant at 10s metric @ 0 offset -50s
+  metric{job="1"} 5
+  metric{job="2"} 10
+
+eval instant at 10s metric @ 0 offset -50
+  metric{job="1"} 5
+  metric{job="2"} 10
+
+eval instant at 10s metric offset -50s @ 0
+  metric{job="1"} 5
+  metric{job="2"} 10
+
+eval instant at 10s metric offset -50 @ 0
+  metric{job="1"} 5
+  metric{job="2"} 10
+
+eval instant at 10s metric @ 0 offset -50s
+  metric{job="1"} 5
+  metric{job="2"} 10
+
+eval instant at 10s metric @ 0 offset -50
+  metric{job="1"} 5
+  metric{job="2"} 10
+
+eval instant at 10s -metric @ 100
+  {job="1"} -10
+  {job="2"} -20
+
+eval instant at 10s ---metric @ 100
+  {job="1"} -10
+  {job="2"} -20
+
+# Millisecond precision.
+eval instant at 100s metric_ms @ 1.234
+  metric_ms 1234
+
+# Range vector selectors.
+eval instant at 25s sum_over_time(metric{job="1"}[100s] @ 100)
+  {job="1"} 55
+
+eval instant at 25s sum_over_time(metric{job="1"}[100s] @ 100 offset 50s)
+  {job="1"} 15
+
+eval instant at 25s sum_over_time(metric{job="1"}[100s] offset 50s @ 100)
+  {job="1"} 15
+
+eval instant at 25s sum_over_time(metric{job="1"}[100] @ 100 offset 50)
+  {job="1"} 15
+
+eval instant at 25s sum_over_time(metric{job="1"}[100] offset 50s @ 100)
+  {job="1"} 15
+
+# Different timestamps.
+eval instant at 25s metric{job="1"} @ 50 + metric{job="1"} @ 100
+  {job="1"} 15
+
+eval instant at 25s rate(metric{job="1"}[100s] @ 100) + label_replace(rate(metric{job="2"}[123s] @ 200), "job", "1", "", "")
+  {job="1"} 0.3
+
+eval instant at 25s sum_over_time(metric{job="1"}[100s] @ 100) + label_replace(sum_over_time(metric{job="2"}[100s] @ 100), "job", "1", "", "")
+  {job="1"} 165
+
+eval instant at 25s sum_over_time(metric{job="1"}[100] @ 100) + label_replace(sum_over_time(metric{job="2"}[100] @ 100), "job", "1", "", "")
+  {job="1"} 165
+
+# Subqueries.
+
+# 10*(1+2+...+9) + 10.
+eval instant at 25s sum_over_time(metric{job="1"}[100s:1s] @ 100)
+  {job="1"} 460
+
+# 10*(1+2+...+7) + 8.
+eval instant at 25s sum_over_time(metric{job="1"}[100s:1s] @ 100 offset 20s)
+  {job="1"} 288
+
+# 10*(1+2+...+7) + 8.
+eval instant at 25s sum_over_time(metric{job="1"}[100s:1s] offset 20s @ 100)
+  {job="1"} 288
+
+# 10*(1+2+...+7) + 8.
+eval instant at 25s sum_over_time(metric{job="1"}[100:1] offset 20 @ 100)
+  {job="1"} 288
+
+# Subquery with different timestamps.
+
+# Since vector selector has timestamp, the result value does not depend on the timestamp of subqueries.
+# Inner most sum=1+2+...+10=55.
+# With [100s:25s] subquery, it's 55*4.
+eval instant at 100s sum_over_time(sum_over_time(metric{job="1"}[100s] @ 100)[100s:25s] @ 50)
+  {job="1"} 220
+
+# Nested subqueries with different timestamps on both.
+
+# Since vector selector has timestamp, the result value does not depend on the timestamp of subqueries.
+# Sum of innermost subquery is 220 as above. The outer subquery repeats it 3 times.
+eval instant at 0s sum_over_time(sum_over_time(sum_over_time(metric{job="1"}[100s] @ 100)[100s:25s] @ 50)[3s:1s] @ 3000)
+  {job="1"} 660
+
+# Testing the inner subquery timestamp since vector selector does not have @.
+
+# Inner sum for subquery [100s:25s] @ 50 are
+#   at -50 nothing, at -25 nothing, at 0=0, at 25=2, at 50=5.
+# This sum of 7 is repeated 3 times by outer subquery.
+eval instant at 0s sum_over_time(sum_over_time(sum_over_time(metric{job="1"}[10s])[100s:25s] @ 50)[3s:1s] @ 200)
+  {job="1"} 21
+
+# Inner sum for subquery [100s:25s] @ 200 are
+#   at 125=12, at 150=15, at 175=17, at 200=20.
+# This sum of 64 is repeated 3 times by outer subquery.
+eval instant at 0s sum_over_time(sum_over_time(sum_over_time(metric{job="1"}[10s])[100s:25s] @ 200)[3s:1s] @ 50)
+  {job="1"} 192
+
+# Nested subqueries with timestamp only on outer subquery.
+# Outer most subquery:
+#   at 925=360
+#     inner subquery: at 905=90+89, at 915=91+90
+#   at 950=372
+#     inner subquery: at 930=93+92, at 940=94+93
+#   at 975=380
+#     inner subquery: at 955=95+94, at 965=96+95
+#   at 1000=392
+#     inner subquery: at 980=98+97, at 990=99+98
+eval instant at 0s sum_over_time(sum_over_time(sum_over_time(metric{job="1"}[20s])[20s:10s] offset 10s)[100s:25s] @ 1000)
+  {job="1"} 1504
+
+# minute is counted on the value of the sample.
+eval instant at 10s minute(metric @ 1500)
+  {job="1"} 2
+  {job="2"} 5
+
+# timestamp() takes the time of the sample and not the evaluation time.
+eval instant at 10m timestamp(metric{job="1"} @ 10)
+  {job="1"} 10
+
+# The result of inner timestamp() will have the timestamp as the
+# eval time, hence entire expression is not step invariant and depends on eval time.
+eval instant at 10m timestamp(timestamp(metric{job="1"} @ 10))
+  {job="1"} 600
+
+eval instant at 15m timestamp(timestamp(metric{job="1"} @ 10))
+  {job="1"} 900
+
+# Time functions inside a subquery.
+
+# minute is counted on the value of the sample.
+eval instant at 0s sum_over_time(minute(metric @ 1500)[100s:10s])
+  {job="1"} 20
+  {job="2"} 50
+
+# If nothing passed, minute() takes eval time.
+# Here the eval time is determined by the subquery.
+# [50m:1m] at 6000, i.e. 100m, is 50m to 100m.
+# sum=51+52+...+59+0+1+2+...+40.
+eval instant at 0s sum_over_time(minute()[50m:1m] @ 6000)
+  {} 1315
+
+# sum=46+47+...+59+0+1+2+...+35.
+eval instant at 0s sum_over_time(minute()[50m:1m] @ 6000 offset 5m)
+  {} 1365
+
+# time() is the eval time which is determined by subquery here.
+# 2901+...+3000 = (3000*3001 - 2899*2900)/2.
+eval instant at 0s sum_over_time(vector(time())[100s:1s] @ 3000)
+  {} 295050
+
+# 2301+...+2400 = (2400*2401 - 2299*2300)/2.
+eval instant at 0s sum_over_time(vector(time())[100s:1s] @ 3000 offset 600s)
+  {} 235050
+
+# timestamp() takes the time of the sample and not the evaluation time.
+eval instant at 0s sum_over_time(timestamp(metric{job="1"} @ 10)[100s:10s] @ 3000)
+  {job="1"} 100
+
+# The result of inner timestamp() will have the timestamp as the
+# eval time, hence entire expression is not step invariant and depends on eval time.
+# Here eval time is determined by the subquery.
+eval instant at 0s sum_over_time(timestamp(timestamp(metric{job="1"} @ 999))[10s:1s] @ 10)
+  {job="1"} 55
+
+
+clear
+
+# Tests for @ modifier with empty data.
+# Data only at 0s, 10s, 20s. Eval at timestamp with no data.
+load 10s
+  up 1 2 3
+
+# Functions that should return empty results when @ modifier points to timestamp with no data.
+# These were panicking before the fix.
+
+eval instant at 1111111s quantile_over_time(scalar(up) + 1, {__name__="up"}[1h:1m] @ 1111111)
+
+eval instant at 1111111s predict_linear({__name__="up"}[1h:1m] @ 1111111, 0.1)
+
+eval instant at 1111111s deriv({__name__="up"}[1h:1m] @ 1111111)
+
+eval instant at 1111111s changes({__name__="up"}[1h:1m] @ 1111111)
+
+eval instant at 1111111s resets({__name__="up"}[1h:1m] @ 1111111)
+
+eval instant at 1111111s first_over_time({__name__="up"}[1h:1m] @ 1111111)
+
+eval instant at 1111111s last_over_time({__name__="up"}[1h:1m] @ 1111111)
+
+eval instant at 1111111s sum_over_time({__name__="up"}[1h:1m] @ 1111111)
+
+eval instant at 1111111s avg_over_time({__name__="up"}[1h:1m] @ 1111111)
+
+eval instant at 1111111s min_over_time({__name__="up"}[1h:1m] @ 1111111)
+
+eval instant at 1111111s max_over_time({__name__="up"}[1h:1m] @ 1111111)
+
+eval instant at 1111111s count_over_time({__name__="up"}[1h:1m] @ 1111111)
+
+eval instant at 1111111s stddev_over_time({__name__="up"}[1h:1m] @ 1111111)
+
+eval instant at 1111111s stdvar_over_time({__name__="up"}[1h:1m] @ 1111111)
+
+eval instant at 1111111s mad_over_time({__name__="up"}[1h:1m] @ 1111111)
+
+clear
+
+# Additional tests specific to timestamp() and @ modifier usage.
+load 10s
+  metric 0+1x10
+  metric_missing 0 _ 2 _ 4 _ 5 _ 6
+
+# Return a vector where each sample is set to the metric value at T=11.
+# Since T=11 falls within the [10s,20s) scrap window the sample value at T=10s is returned.
+eval range from 0 to 60s step 10s metric @ 11
+  {__name__="metric"} 1 1 1 1 1 1 1
+
+eval range from 0 to 60s step 10s abs(metric @ 11)
+ {} 1 1 1 1 1 1 1
+
+# Return a vector where each sample's value is set to the timestamp of each sample in the given metric series
+eval range from 0 to 60s step 10s timestamp(metric)
+ {} 0 10 20 30 40 50 60
+
+# Return a vector where each sample's value is set to the timestamp for the metric's sample used at T=11s.
+# The result is 10 since the metric at T=11s falls within the [10s,20s) scrape window.
+# The result is the timestamp of the sample at T=10s
+eval range from 0 to 60s step 10s timestamp(metric @ 11)
+ {} 10 10 10 10 10 10 10
+
+# As above - illustrating the sample used at the upper end of the [10s,20s) scrape window.
+eval range from 0 to 60s step 10s timestamp(metric @ 19)
+ {} 10 10 10 10 10 10 10
+
+# As above - illustrating the transition to the next scrap window.
+eval range from 0 to 60s step 10s timestamp(metric @ 20)
+ {} 20 20 20 20 20 20 20
+
+eval range from 0 to 60s step 10s timestamp(metric_missing @ 0)
+ {} 0 0 0 0 0 0 0
+
+# The timestamp of 0 is returned since the sample is missing from the [10s,20s) scrape window.
+# As such, the previous sample from T=0s is returned.
+eval range from 0 to 60s step 10s timestamp(metric_missing @ 10)
+ {} 0 0 0 0 0 0 0
+
+eval range from 0 to 60s step 10s timestamp(metric_missing @ 20)
+ {} 20 20 20 20 20 20 20
+
+# The timestamps for each step are returned since abs() returns a new vector with new [T,V] samples.
+# Each sample in this vector has its value set to the absolute value of the sample value at T=10s, and its timestamp aligned to the step interval.
+# This is unlike the above tests where timestamp() is operating on a vector with the original series samples.
+eval range from 0 to 60s step 10s timestamp(abs(metric @ 11))
+ {} 0 10 20 30 40 50 60
+
+eval range from 0 to 60s step 10s timestamp(abs(metric_missing @ 11))
+ {} 0 10 20 30 40 50 60
+
+clear
