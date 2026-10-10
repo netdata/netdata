@@ -597,10 +597,14 @@ procfile *procfile_reopen(procfile *ff, const char *filename, const char *separa
     }
     ff->stats.opens++;
 
-    // IMPORTANT: 'filename' parameter must not be used after this point
+    // Keep the cached name when reopening that same name (the rewind of a non-seekable file),
+    // so that it is not resolved again with readlink() on every read.
+    // IMPORTANT: otherwise, 'filename' must not be used after this point,
     // as it may point to ff->filename which we're about to free
-    freez(ff->filename);
-    ff->filename = NULL;
+    if(filename != ff->filename) {
+        freez(ff->filename);
+        ff->filename = NULL;
+    }
     ff->flags = flags;
 
     // do not do the separators again if NULL is given
