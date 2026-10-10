@@ -112,6 +112,7 @@ func (c *Collector) collect() (map[string]int64, error) {
 			return nil, err
 		}
 	}
+	c.refreshRelations(now)
 	if err := c.doQueryTablesMetrics(); err != nil {
 		return nil, err
 	}

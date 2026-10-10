@@ -11,7 +11,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/jackc/pgx/v5/stdlib"
 	"github.com/netdata/netdata/go/plugins/pkg/confopt"
 	"github.com/netdata/netdata/go/plugins/pkg/matcher"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/collectorapi"
@@ -114,8 +113,9 @@ type (
 		addXactQueryRunningTimeChartsOnce *sync.Once
 		addWALFilesChartsOnce             *sync.Once
 
-		db      *sql.DB
-		dbConns map[string]*dbConn
+		db        *sql.DB
+		dbConns   map[string]*dbConn
+		relations map[*sql.DB]*databaseRelations
 
 		superUser               *bool
 		canExecutePgLsDir       *bool
@@ -222,18 +222,16 @@ func (c *Collector) Cleanup(ctx context.Context) {
 	if c.db == nil {
 		return
 	}
+	c.retireDatabaseRelations(c.db)
 	if err := c.db.Close(); err != nil {
-		c.Warningf("cleanup: error on closing the Postgres database [%s]: %v", c.DSN, err)
+		c.Warningf("cleanup: error closing the primary PostgreSQL connection: %v", err)
 	}
 	c.db = nil
 
+	c.relations = nil
 	for dbname, conn := range c.dbConns {
+		c.retireDatabaseRelations(conn.db)
 		delete(c.dbConns, dbname)
-		if conn.connStr != "" {
-			stdlib.UnregisterConnConfig(conn.connStr)
-		}
-		if conn.db != nil {
-			_ = conn.db.Close()
-		}
+		closeDBAndUnregisterConnConfig(conn.db, conn.connStr)
 	}
 }
