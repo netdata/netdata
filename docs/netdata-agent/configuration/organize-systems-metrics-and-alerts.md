@@ -65,6 +65,8 @@ Virtual nodes let you split multi-component systems into distinct, monitorable u
 
 See [Virtual Nodes (vnodes)](/docs/learn/node-identities.md#virtual-nodes-vnodes) for the full reference: how to define a vnode via YAML or the dynamic configuration GUI, and how to attach it to a collector job.
 
+For vSphere collector configuration with virtual nodes, see the [VMware vCenter Server integration examples](/src/go/plugin/go.d/collector/vsphere/README.md#examples).
+
 ## Host labels
 
 ### Tag your systems for smarter monitoring
