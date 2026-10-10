@@ -7,6 +7,7 @@
 include_guard()
 
 if(OS_WINDOWS)
+        file(TO_NATIVE_PATH "${CMAKE_INSTALL_PREFIX}" NETDATA_INSTALL_PREFIX_WIX)
         configure_file(packaging/windows/netdata.wxs.in netdata.wxs @ONLY)
         configure_file(packaging/windows/NetdataWhite.ico NetdataWhite.ico COPYONLY)
         configure_file(packaging/windows/eula.rtf eula.rtf COPYONLY)

@@ -9,6 +9,7 @@ $ErrorActionPreference = "Stop"
 . "$PSScriptRoot\functions.ps1"
 
 $msysprefix = Get-MSYS2Prefix
+$env:MSYSTEM = 'UCRT64'
 
 function Check-FileHash {
     $file_path = $args[0]
@@ -68,40 +69,98 @@ if (-Not ($msysprefix)) {
     $msysprefix = Install-MSYS2
 }
 
-$msysbash = Get-MSYS2Bash "$msysprefix"
+$pacman = Join-Path $msysprefix 'usr\bin\pacman.exe'
+$env:MSYSTEM = 'UCRT64'
 $env:CHERE_INVOKING = 'yes'
+$env:PATH = "$msysprefix\ucrt64\bin;$msysprefix\usr\bin;$env:PATH"
 
-& $msysbash -l "$PSScriptRoot\msys2-dependencies.sh"
+& $pacman -Syuu --noconfirm
+if ($LASTEXITCODE -ne 0) {
+    Write-Host "The first package database update failed; retrying after the runtime update."
+    & $pacman -Syuu --noconfirm
+    if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+}
 
-if ($LastExitcode -ne 0) {
-    Write-Host "First update attempt failed. This is expected if the msys-runtime package needed updated, trying again."
+$packages = @(
+    'ucrt64/mingw-w64-ucrt-x86_64-rust',
+    'ucrt64/mingw-w64-ucrt-x86_64-toolchain',
+    'ucrt64/mingw-w64-ucrt-x86_64-tcl',
+    'ucrt64/mingw-w64-ucrt-x86_64-brotli',
+    'ucrt64/mingw-w64-ucrt-x86_64-cmake',
+    'ucrt64/mingw-w64-ucrt-x86_64-curl',
+    'ucrt64/mingw-w64-ucrt-x86_64-git',
+    'ucrt64/mingw-w64-ucrt-x86_64-go',
+    'ucrt64/mingw-w64-ucrt-x86_64-headers',
+    'ucrt64/mingw-w64-ucrt-x86_64-libuv',
+    'ucrt64/mingw-w64-ucrt-x86_64-libyaml',
+    'ucrt64/mingw-w64-ucrt-x86_64-lld',
+    'ucrt64/mingw-w64-ucrt-x86_64-lz4',
+    'ucrt64/mingw-w64-ucrt-x86_64-ninja',
+    'ucrt64/mingw-w64-ucrt-x86_64-openssl',
+    'ucrt64/mingw-w64-ucrt-x86_64-pcre2',
+    'ucrt64/mingw-w64-ucrt-x86_64-protobuf',
+    'ucrt64/mingw-w64-ucrt-x86_64-python',
+    'ucrt64/mingw-w64-ucrt-x86_64-zlib',
+    'ucrt64/mingw-w64-ucrt-x86_64-zstd'
+)
+& $pacman -S --noconfirm --needed @packages
+if ($LASTEXITCODE -ne 0) {
+    exit $LASTEXITCODE
+}
 
-    & $msysbash -l "$PSScriptRoot\msys2-dependencies.sh"
+$wixVersion = Get-NetdataWixVersion
 
-    if ($LastExitcode -ne 0) {
-        exit 1
+$globalTools = & dotnet tool list --global
+if ($LASTEXITCODE -ne 0) { throw 'Could not query globally installed .NET tools.' }
+$wixToolLine = $globalTools | Where-Object { $_ -match '^\s*wix\s+' } | Select-Object -First 1
+$installedWixVersion = if ($wixToolLine -match '^\s*wix\s+([^\s]+)') { $Matches[1] } else { $null }
+
+if (-not $installedWixVersion) {
+    Write-Host "Installing WiX $wixVersion"
+    & dotnet tool install --global wix --version $wixVersion
+} elseif ($installedWixVersion -ne $wixVersion) {
+    Write-Host "Updating WiX from $installedWixVersion to $wixVersion"
+    & dotnet tool update --global wix --version $wixVersion
+} else {
+    Write-Host "WiX $wixVersion is already installed"
+}
+if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
+$wix = Resolve-WixExecutable $null $wixVersion
+if (-not $wix) { throw 'WiX executable was not found in PATH or the global .NET tool locations.' }
+
+$extensions = @(
+    "WixToolset.Util.wixext/$wixVersion",
+    "WixToolset.UI.wixext/$wixVersion"
+)
+$previousErrorActionPreference = $ErrorActionPreference
+try {
+    # PowerShell 5.1 can promote native stderr to a terminating error when the preference is Stop.
+    $ErrorActionPreference = 'Continue'
+    $extensionListOutput = @(& $wix extension list --global 2>&1)
+    $extensionListExitCode = $LASTEXITCODE
+} finally {
+    $ErrorActionPreference = $previousErrorActionPreference
+}
+$extensionListText = ($extensionListOutput | ForEach-Object { "$_" }) -join [Environment]::NewLine
+$hasExtensionEntries = $extensionListText -match '(?m)^\s*\S+\s+\d+\.\d+'
+$extensionListHasError = $extensionListText -match '(?i)\b(error|exception|fatal)\b|\bWIX\d{4}\b'
+# WiX returns 2 for an empty extension list; the add commands below populate it.
+$emptyExtensionCache = $extensionListExitCode -eq 2 -and -not $hasExtensionEntries -and -not $extensionListHasError
+if ($extensionListExitCode -ne 0 -and -not $emptyExtensionCache) {
+    throw "Could not query globally installed WiX extensions (exit code $extensionListExitCode). $extensionListText"
+}
+$installedExtensions = @($extensionListText -split '\r?\n')
+foreach ($extension in $extensions) {
+    $extensionId, $extensionVersion = $extension -split '/', 2
+    $found = $installedExtensions | Where-Object {
+        $_ -match ('^\s*' + [regex]::Escape($extensionId) + '\s+' + [regex]::Escape($extensionVersion) + '(\s|$)')
+    } | Select-Object -First 1
+    if (-not $found) {
+        Write-Host "Adding WiX extension $extension"
+        & $wix extension add --global $extension
+        if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+    } else {
+        Write-Host "WiX extension $extension is already installed"
     }
-}
-
-$wixVersion = "5.0.2"
-
-Write-Host "Installing WiX toolset"
-dotnet tool install -g wix --version $wixVersion
-
-if ($LastExitcode -ne 0) {
-    exit 1
-}
-
-Write-Host "Adding WiX extensions"
-
-wix extension -g add WixToolset.Util.wixext/$wixVersion
-
-if ($LastExitcode -ne 0) {
-    exit 1
-}
-
-wix extension -g add WixToolset.UI.wixext/$wixVersion
-
-if ($LastExitcode -ne 0) {
-    exit 1
 }

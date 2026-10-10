@@ -105,23 +105,73 @@ struct pipe_header {
     };
 };
 
+_Static_assert(sizeof(struct pipe_header) == 8, "websocket command header layout changed");
+
 static void websocket_thread_close_command_pipe(WEBSOCKET_THREAD *wth) {
     if(wth->cmd.pipe[PIPE_READ] != -1) {
+        if(wth->ndpl && !nd_poll_del(wth->ndpl, wth->cmd.pipe[PIPE_READ]))
+            netdata_log_error("WEBSOCKET[%zu]: Failed to remove command socket from poll", wth->id);
+
+#if defined(OS_WINDOWS)
+        sock_close(wth->cmd.pipe[PIPE_READ]);
+#else
         close(wth->cmd.pipe[PIPE_READ]);
+#endif
         wth->cmd.pipe[PIPE_READ] = -1;
     }
 
     if(wth->cmd.pipe[PIPE_WRITE] != -1) {
+#if defined(OS_WINDOWS)
+        sock_close(wth->cmd.pipe[PIPE_WRITE]);
+#else
         close(wth->cmd.pipe[PIPE_WRITE]);
+#endif
         wth->cmd.pipe[PIPE_WRITE] = -1;
     }
+    wth->cmd.partial_header_bytes = 0;
 }
 
 static void websocket_thread_close_command_pipe_write(WEBSOCKET_THREAD *wth) {
     if(wth->cmd.pipe[PIPE_WRITE] != -1) {
+#if defined(OS_WINDOWS)
+        sock_close(wth->cmd.pipe[PIPE_WRITE]);
+#else
         close(wth->cmd.pipe[PIPE_WRITE]);
+#endif
         wth->cmd.pipe[PIPE_WRITE] = -1;
     }
+}
+
+static ssize_t websocket_wakeup_send(int fd, const void *buffer, size_t size) {
+#if defined(OS_WINDOWS)
+    if (size > INT_MAX)
+        return -1;
+    int rc = send((SOCKET)(uintptr_t)(unsigned)fd, buffer, (int)size, 0);
+    if (rc == SOCKET_ERROR) {
+        int error = WSAGetLastError();
+        errno = error == WSAEWOULDBLOCK ? EAGAIN : error == WSAEINTR ? EINTR : EIO;
+        return -1;
+    }
+    return rc;
+#else
+    return write(fd, buffer, size);
+#endif
+}
+
+static ssize_t websocket_wakeup_recv(int fd, void *buffer, size_t size) {
+#if defined(OS_WINDOWS)
+    if (size > INT_MAX)
+        size = INT_MAX;
+    int rc = recv((SOCKET)(uintptr_t)(unsigned)fd, buffer, (int)size, 0);
+    if (rc == SOCKET_ERROR) {
+        int error = WSAGetLastError();
+        errno = error == WSAEWOULDBLOCK ? EAGAIN : error == WSAEINTR ? EINTR : EIO;
+        return -1;
+    }
+    return rc;
+#else
+    return read(fd, buffer, size);
+#endif
 }
 
 static ssize_t write_pipe_block(int fd, const void *buffer, size_t size) {
@@ -129,7 +179,7 @@ static ssize_t write_pipe_block(int fd, const void *buffer, size_t size) {
     ssize_t total_written = 0;
 
     while (total_written < (ssize_t) size) {
-        ssize_t bytes = write(fd, buf + total_written, size - total_written);
+        ssize_t bytes = websocket_wakeup_send(fd, buf + total_written, size - total_written);
 
         if (bytes < 0) {
             if (errno == EINTR)
@@ -238,7 +288,7 @@ static ssize_t read_pipe_block(int fd, void *buffer, size_t size) {
     ssize_t total_read = 0;
 
     while (total_read < (ssize_t) size) {
-        ssize_t bytes = read(fd, buf + total_read, size - total_read);
+        ssize_t bytes = websocket_wakeup_recv(fd, buf + total_read, size - total_read);
 
         if (bytes < 0) {
             if (errno == EAGAIN || errno == EWOULDBLOCK) {
@@ -261,7 +311,7 @@ static ssize_t read_pipe_block(int fd, void *buffer, size_t size) {
 
 static ssize_t read_pipe_available(int fd, void *buffer, size_t size) {
     for(;;) {
-        ssize_t bytes = read(fd, buffer, size);
+        ssize_t bytes = websocket_wakeup_recv(fd, buffer, size);
         if(bytes < 0 && errno == EINTR)
             continue;
 
@@ -371,18 +421,32 @@ static void websocket_thread_process_commands(WEBSOCKET_THREAD *wth) {
 
         worker_is_busy(WORKERS_WEBSOCKET_CMD_READ);
 
-        ssize_t bytes = read_pipe_block(wth->cmd.pipe[PIPE_READ], &header, sizeof(header));
-        if(bytes <= 0) {
-            if(bytes < 0 && errno != EAGAIN && errno != EWOULDBLOCK) {
+        ssize_t bytes = read_pipe_available(
+            wth->cmd.pipe[PIPE_READ],
+            wth->cmd.partial_header + wth->cmd.partial_header_bytes,
+            sizeof(header) - wth->cmd.partial_header_bytes);
+        if(bytes < 0) {
+            if(errno != EAGAIN && errno != EWOULDBLOCK) {
                 netdata_log_error("WEBSOCKET[%zu]: Failed to read command header from pipe", wth->id);
             }
             break;
         }
 
-        if(bytes != sizeof(header)) {
-            netdata_log_error("WEBSOCKET[%zu]: Read partial command header (%zd/%zu bytes)", wth->id, bytes, sizeof(header));
+        if(bytes == 0) {
+            if(wth->cmd.partial_header_bytes) {
+                netdata_log_error("WEBSOCKET[%zu]: Command pipe closed during a partial header (%zu/%zu bytes)",
+                                  wth->id, wth->cmd.partial_header_bytes, sizeof(header));
+                websocket_thread_close_command_pipe(wth);
+            }
             break;
         }
+
+        wth->cmd.partial_header_bytes += (size_t)bytes;
+        if(wth->cmd.partial_header_bytes != sizeof(header))
+            break;
+
+        memcpy(&header, wth->cmd.partial_header, sizeof(header));
+        wth->cmd.partial_header_bytes = 0;
 
         // Process command
         switch(header.cmd) {
@@ -433,7 +497,8 @@ static void websocket_thread_process_commands(WEBSOCKET_THREAD *wth) {
                 uint32_t message_len = header.len - sizeof(WEBSOCKET_OPCODE);
                 if(message_len > WS_MAX_OUTGOING_FRAME_SIZE) {
                     netdata_log_error("WEBSOCKET[%zu]: Broadcast message too large: %u bytes", wth->id, message_len);
-                    websocket_thread_drain_command_payload(wth, header.len);
+                    if(!websocket_thread_drain_command_payload(wth, header.len))
+                        return;
                     continue;
                 }
                 if(header.len + 1 > wth->cmd.buffer_size) {

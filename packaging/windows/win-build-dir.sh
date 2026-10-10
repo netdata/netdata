@@ -1,16 +1,15 @@
-#!/bin/bash
+#!/usr/bin/env bash
 
-if [ -n "${BUILD_DIR}" ]; then
+if [[ -z "${REPO_ROOT:-}" ]]; then
+    REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd -P)"
+fi
+
+if [[ -n "${BUILD_DIR:-}" ]]; then
     build="$(cygpath -u "${BUILD_DIR}")"
-elif [ -n "${OSTYPE}" ]; then
-    if [ -n "${MSYSTEM}" ]; then
-        build="${REPO_ROOT}/build-${OSTYPE}-${MSYSTEM}"
-    else
-        build="${REPO_ROOT}/build-${OSTYPE}"
+    if [[ "${build}" != /* ]]; then
+        build="${REPO_ROOT}/${build}"
     fi
-elif [ "$USER" = "vk" ]; then
-    build="${REPO_ROOT}/build"
 else
-    # shellcheck disable=SC2034
     build="${REPO_ROOT}/build"
 fi
+

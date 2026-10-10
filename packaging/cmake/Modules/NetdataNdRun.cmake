@@ -10,6 +10,7 @@
 
 include_guard()
 
+if(NOT OS_WINDOWS)
 set(NDRUN_FILES
     src/collectors/utils/nd-run.c
     src/collectors/utils/nd-process-tree.c
@@ -33,3 +34,4 @@ target_include_directories(nd-run PRIVATE ${CMAKE_BINARY_DIR})
 install(TARGETS nd-run
         COMPONENT netdata
         DESTINATION "${BINDIR}")
+endif()

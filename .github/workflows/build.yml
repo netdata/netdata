@@ -526,14 +526,6 @@ jobs:
           file-digest: SHA256
           timestamp-rfc3161: "http://timestamp.acs.microsoft.com"
           timestamp-digest: SHA256
-      - name: Cache Patched MSYS2 Runtime
-        id: msys2-runtime-cache
-        # Not on dispatch: published installers always rebuild the runtime from the pinned sources.
-        if: needs.file-check.outputs.run == 'true' && github.event_name != 'workflow_dispatch'
-        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
-        with:
-          path: C:\msys64\msys2-runtime
-          key: msys2-runtime-${{ hashFiles('packaging/windows/msys2-runtime/**') }}
       - name: Package Netdata
         id: package
         if: needs.file-check.outputs.run == 'true'
@@ -564,15 +556,6 @@ jobs:
           path: packaging\windows\netdata*.msi
           compression-level: 0
           retention-days: 30
-      - name: Upload MSYS2 Runtime Debug Symbols
-        id: upload-msys2-runtime-debug
-        if: needs.file-check.outputs.run == 'true'
-        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
-        with:
-          name: windows-msys2-runtime-debug
-          path: C:\msys64\msys2-runtime\*\msys-2.0.dbg
-          if-no-files-found: error
-          retention-days: 90
       - name: Failure Notification
         uses: rtCamp/action-slack-notify@33ca3be66c6f378fe1610fd1d5258632dbed5e58 # v2.4.0
         env:

@@ -11,7 +11,7 @@ include_guard()
 
 # Wanted by the Go-based collectors, which shell out to it for privileged
 # commands, and on macOS. Derived here because this is its only consumer.
-if(OS_MACOS OR ENABLE_PLUGIN_GO OR ENABLE_PLUGIN_SCRIPTS)
+if(NOT OS_WINDOWS AND (OS_MACOS OR ENABLE_PLUGIN_GO OR ENABLE_PLUGIN_SCRIPTS))
     set(NDSUDO_FILES src/collectors/utils/ndsudo.c)
 
     add_executable(ndsudo ${NDSUDO_FILES} src/collectors/utils/exec-signals.h)

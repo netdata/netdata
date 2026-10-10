@@ -151,7 +151,7 @@ Navigate to your [Netdata config directory](/docs/netdata-agent/configuration/RE
 
 :::note
 
-**On Windows:** the stock (default) alert templates ship at `C:\Program Files\Netdata\usr\lib\netdata\conf.d\health.d\` — browse them to see which alerts ship with Netdata. Place your overrides in `C:\Program Files\Netdata\etc\netdata\health.d\` instead, so they survive Agent updates. Edit files there using `edit-config` from the bundled MSYS2 shell — see [On Windows](/docs/netdata-agent/configuration/README.md#on-windows) in the Agent configuration guide.
+**On Windows:** the stock (default) alert templates ship at `C:\Program Files\Netdata\usr\lib\netdata\conf.d\health.d\` — browse them to see which alerts ship with Netdata. Place your overrides in `C:\Program Files\Netdata\etc\netdata\health.d\` instead, so they survive Agent updates. The **Netdata → Edit Netdata Configuration** Start Menu shortcut opens `netdata.conf`; to edit an alert override, pass its relative path to the PowerShell helper, for example `edit-config.ps1 health.d\cpu.conf`, as described in [On Windows](/docs/netdata-agent/configuration/README.md#on-windows).
 
 :::
 
@@ -711,7 +711,7 @@ to: ROLE1 ROLE2 ROLE3 ...
 **How It Works:**
 
 - First parameter passed to the `exec` script
-- Default script (`alarm-notify.sh`) treats this as a space-separated list of roles
+- Default script (`alarm-notify.sh`) treats this as a space-separated list of roles on non-Windows systems
 - Roles are consulted to find exact recipients per notification method
 
 #### Alert Line `exec`
@@ -724,7 +724,7 @@ exec: SCRIPT
 
 **Default Behavior:**
 
-- Default script is Netdata's `alarm-notify.sh`
+- Default script is Netdata's `alarm-notify.sh` on non-Windows systems; Windows requires a native executable
 - Supports all notification methods Netdata supports
 - Includes custom hooks
 

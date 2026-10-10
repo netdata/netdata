@@ -49,13 +49,8 @@ static ND_LOG_METHOD nd_logger_select_output(ND_LOG_SOURCES source, FILE **fpp, 
             }
             break;
 
-#if defined(OS_WINDOWS) && (defined(HAVE_ETW) || defined(HAVE_WEL))
-#if defined(HAVE_ETW)
+#if defined(OS_WINDOWS) && defined(HAVE_ETW)
         case NDLM_ETW:
-#endif
-#if defined(HAVE_WEL)
-        case NDLM_WEL:
-#endif
             if(unlikely(!nd_log.eventlog.initialized)) {
                 output = NDLM_FILE;
                 *fpp = stderr;
@@ -213,17 +208,6 @@ static void nd_logger_log_fields(FILE *fp, int fd, netdata_mutex_t *mutex, bool 
         }
     }
 #endif
-#if defined(HAVE_WEL)
-    if(output == NDLM_WEL) {
-        if(!nd_logger_wel(source, fields, fields_max)) {
-            // we can't log to windows events, let's log to stderr
-            output = NDLM_FILE;
-            fp = stderr;
-            fd = STDERR_FILENO;
-            mutex = nd_logger_stderr_mutex();
-        }
-    }
-#endif
 #endif
 
     if(output == NDLM_SYSLOG)
@@ -294,21 +278,6 @@ static void nd_logger(const char *file, const char *function, const unsigned lon
 
     if(likely(!thread_log_fields[NDF_LOG_SOURCE].entry.set))
         thread_log_fields[NDF_LOG_SOURCE].entry = ND_LOG_FIELD_TXT(NDF_LOG_SOURCE, nd_log_id2source(source));
-    else {
-        ND_LOG_SOURCES src = source;
-
-        if(thread_log_fields[NDF_LOG_SOURCE].entry.type == NDFT_TXT)
-            src = nd_log_source2id(thread_log_fields[NDF_LOG_SOURCE].entry.txt, source);
-        else if(thread_log_fields[NDF_LOG_SOURCE].entry.type == NDFT_U64)
-            src = thread_log_fields[NDF_LOG_SOURCE].entry.u64;
-
-        if(src != source && src < _NDLS_MAX) {
-            source = src;
-            output = nd_logger_select_output(source, &fp, &fd, &mutex);
-            if(output != NDLM_FILE && output != NDLM_JOURNAL && output != NDLM_SYSLOG)
-                return;
-        }
-    }
 
     if(likely(!thread_log_fields[NDF_SYSLOG_IDENTIFIER].entry.set))
         thread_log_fields[NDF_SYSLOG_IDENTIFIER].entry = ND_LOG_FIELD_TXT(NDF_SYSLOG_IDENTIFIER, program_name);
@@ -434,14 +403,15 @@ void netdata_logger(ND_LOG_SOURCES source, ND_LOG_FIELD_PRIORITY priority, const
 #endif
 
     source = nd_log_validate_source(source);
+    bool limit;
+    source = nd_log_resolve_source_with_flood_protection(source, &limit);
 
     if (source != NDLS_DEBUG && priority > nd_log.sources[source].min_priority)
         return;
 
     va_list args;
     va_start(args, fmt);
-    nd_logger(file, function, line, source, priority,
-              source == NDLS_DAEMON || source == NDLS_COLLECTORS,
+    nd_logger(file, function, line, source, priority, limit,
               saved_errno, saved_winerror, fmt, args);
     va_end(args);
 }
@@ -456,6 +426,8 @@ void netdata_logger_with_limit(ERROR_LIMIT *erl, ND_LOG_SOURCES source, ND_LOG_F
 #endif
 
     source = nd_log_validate_source(source);
+    bool limit;
+    source = nd_log_resolve_source_with_flood_protection(source, &limit);
 
     if (source != NDLS_DEBUG && priority > nd_log.sources[source].min_priority)
         return;
@@ -479,8 +451,7 @@ void netdata_logger_with_limit(ERROR_LIMIT *erl, ND_LOG_SOURCES source, ND_LOG_F
 
     va_list args;
     va_start(args, fmt);
-    nd_logger(file, function, line, source, priority,
-            source == NDLS_DAEMON || source == NDLS_COLLECTORS,
+    nd_logger(file, function, line, source, priority, limit,
             saved_errno, saved_winerror, fmt, args);
     va_end(args);
     erl->last_logged = now;
@@ -573,12 +544,19 @@ void netdata_logger_fatal(const char *file, const char *function, const unsigned
 
         ND_LOG_SOURCES source = NDLS_DAEMON;
         source = nd_log_validate_source(source);
+        bool limit;
+        source = nd_log_resolve_source_with_flood_protection(source, &limit);
 
         va_list args;
         va_start(args, fmt);
-        nd_logger(file, function, line, source, NDLP_ALERT, true, saved_errno, saved_winerror, fmt, args);
+        nd_logger(file, function, line, source, NDLP_ALERT, limit, saved_errno, saved_winerror, fmt, args);
         va_end(args);
     }
+
+#if defined(OS_WINDOWS) && defined(HAVE_ETW)
+    // Deliver the fatal entry before callbacks; atexit drains callback logs.
+    nd_log_flush_windows_async();
+#endif
 
 #if defined(FSANITIZE_ADDRESS)
     fprintf(stderr, "FATAL: %04lu@%s:%s, errno = %d\n", line, file, function, saved_errno);

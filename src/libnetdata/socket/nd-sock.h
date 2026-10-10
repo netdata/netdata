@@ -68,7 +68,14 @@ static void nd_sock_close(ND_SOCK *s) {
     netdata_ssl_close(&s->ssl);
 
     if(s->fd != -1) {
+#if defined(OS_WINDOWS)
+        if (fd_is_socket(s->fd))
+            sock_close(s->fd);
+        else
+            close(s->fd);
+#else
         close(s->fd);
+#endif
         s->fd = -1;
     }
 
@@ -121,28 +128,35 @@ static ssize_t nd_sock_write_persist(ND_SOCK *s, const void *buf, const size_t n
     return bytes;
 }
 
-ALWAYS_INLINE
+// MSG_DONTWAIT is a POSIX extension absent from Winsock2. On Windows, sockets are
+// set non-blocking via ioctlsocket(), so passing 0 achieves the same "return
+// immediately if no data" semantics.
+#ifndef MSG_DONTWAIT
+#define MSG_DONTWAIT 0
+#endif
+
+ALWAYS_INLINE __attribute__((nonnull(1, 2)))
 static ssize_t nd_sock_revc_nowait(ND_SOCK *s, void *buf, size_t num) {
     if (nd_sock_is_ssl(s))
         return netdata_ssl_read(&s->ssl, buf, num);
     else
-        return recv(s->fd, buf, num, MSG_DONTWAIT);
+        return recv(s->fd, (char *)buf, num, MSG_DONTWAIT);
 }
 
-ALWAYS_INLINE
+ALWAYS_INLINE __attribute__((nonnull(1, 2)))
 static ssize_t nd_sock_peek_nowait(ND_SOCK *s, void *buf, size_t num) {
     if (nd_sock_is_ssl(s))
         return netdata_ssl_peek(&s->ssl, buf, num);
     else
-        return recv(s->fd, buf, num, MSG_PEEK | MSG_DONTWAIT);
+        return recv(s->fd, (char *)buf, num, MSG_PEEK | MSG_DONTWAIT);
 }
 
-ALWAYS_INLINE
+ALWAYS_INLINE __attribute__((nonnull(1, 2)))
 static ssize_t nd_sock_send_nowait(ND_SOCK *s, void *buf, size_t num) {
     if (nd_sock_is_ssl(s))
         return netdata_ssl_write(&s->ssl, buf, num);
     else
-        return send(s->fd, buf, num, MSG_DONTWAIT);
+        return send(s->fd, (const char *)buf, num, MSG_DONTWAIT);
 }
 
 ssize_t nd_sock_send_timeout(ND_SOCK *s, void *buf, size_t len, int flags, time_t timeout);

@@ -8,11 +8,8 @@ include_guard()
 macro(_nd_windows_config)
   set(OS_WINDOWS True)
 
-  # The Windows packaging scripts hardcode the prefix: compile-on-windows.sh
-  # passes it and package-windows.sh stages the payload from /opt/netdata
-  # paths, so anything else breaks the MSI layout downstream.
-  if(NOT "${CMAKE_INSTALL_PREFIX}" STREQUAL "/opt/netdata")
-    message(FATAL_ERROR "CMAKE_INSTALL_PREFIX must be set to /opt/netdata, but it is set to ${CMAKE_INSTALL_PREFIX}")
+  if(NOT "${CMAKE_INSTALL_PREFIX}" MATCHES "[/\\\\]opt[/\\\\]netdata$")
+    message(FATAL_ERROR "CMAKE_INSTALL_PREFIX must end with /opt/netdata, but it is set to ${CMAKE_INSTALL_PREFIX}")
   endif()
 
   set(BINDIR usr/bin)

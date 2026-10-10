@@ -21,7 +21,11 @@ if(OS_WINDOWS)
         set_target_properties(netdata_driver PROPERTIES LIBRARY_OUTPUT_NAME "netdata_driver")
         set_target_properties(netdata_driver PROPERTIES PREFIX "")
         set_target_properties(netdata_driver PROPERTIES SUFFIX ".sys")
-        target_include_directories(netdata_driver PRIVATE BEFORE "/mingw64/include/ddk" "${CMAKE_SOURCE_DIR}/src/collectors/windows.plugin" "${CMAKE_SOURCE_DIR}/src/collectors/windows.plugin/driver")
+        get_filename_component(_ucrt64_root "${CMAKE_C_COMPILER}" DIRECTORY)
+        get_filename_component(_ucrt64_root "${_ucrt64_root}" DIRECTORY)
+        target_include_directories(netdata_driver BEFORE PRIVATE "${_ucrt64_root}/include/ddk"
+                "${CMAKE_SOURCE_DIR}/src/collectors/windows.plugin"
+                "${CMAKE_SOURCE_DIR}/src/collectors/windows.plugin/driver")
         target_compile_options(netdata_driver PRIVATE
                 -Wall
                 -Wextra
@@ -33,7 +37,7 @@ if(OS_WINDOWS)
                 -mno-red-zone
         )
         target_link_options(netdata_driver PRIVATE
-                -Wl,--entry,DriverEntry@8
+                -Wl,--entry,DriverEntry
                 -nostdlib
                 -Wl,--subsystem,native
                 -Wl,--image-base,0x10000

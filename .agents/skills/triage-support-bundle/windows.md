@@ -4,8 +4,7 @@ A Windows bundle is produced by a different implementation with different capabi
 that you have one - the manifest tool version carries a Windows suffix - before applying any POSIX
 expectation.
 
-Owners: `src/libnetdata/log/README.md#using-event-tracing-for-windows-etw` and
-`src/libnetdata/log/README.md#channels` for where the agent logs;
+Owners: `src/libnetdata/log/README.md#using-event-tracing-for-windows-etw` for where the agent logs;
 `src/libnetdata/log/README.md#windows-using-event-viewer-to-view-netdata-logs` for reading it
 interactively; `packaging/windows/WINDOWS_INSTALLER.md#working-with-netdata-on-windows` for the
 installed layout and `packaging/windows/WINDOWS_INSTALLER.md#where-the-claim-settings-are-stored`

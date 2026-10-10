@@ -81,8 +81,18 @@ static void stream_thread_send_pipe_signal(struct stream_thread *sth) {
         // we will process all the events shortly
         return;
 
-    if(sth->pipe.fds[PIPE_WRITE] != -1 &&
-        write(sth->pipe.fds[PIPE_WRITE], " ", 1) != 1) {
+    if (sth->pipe.fds[PIPE_WRITE] == -1)
+        return;
+
+#if defined(OS_WINDOWS)
+    int sent = send((SOCKET)(uintptr_t)(unsigned)sth->pipe.fds[PIPE_WRITE], " ", 1, 0);
+    if (sent == 1 || (sent == SOCKET_ERROR && WSAGetLastError() == WSAEWOULDBLOCK))
+        return;
+#else
+    if (write(sth->pipe.fds[PIPE_WRITE], " ", 1) == 1)
+        return;
+#endif
+    {
         nd_log_limit_static_global_var(erl, 1, 1 * USEC_PER_MS);
         nd_log_limit(&erl, NDLS_DAEMON, NDLP_ERR,
                      "STREAM THREAD[%zu]: cannot write to signal pipe", sth->id);
@@ -285,7 +295,13 @@ bool stream_thread_process_opcodes(struct stream_thread *sth, struct pollfd_meta
 static void stream_thread_read_pipe_messages(struct stream_thread *sth) {
     internal_fatal(sth->tid != gettid_cached(), "Function %s() should only be used by the dispatcher thread", __FUNCTION__ );
 
+#if defined(OS_WINDOWS)
+    int received = recv((SOCKET)(uintptr_t)(unsigned)sth->pipe.fds[PIPE_READ],
+                        sth->pipe.buffer, (int)(sth->pipe.size * sizeof(*sth->pipe.buffer)), 0);
+    if(received <= 0)
+#else
     if(read(sth->pipe.fds[PIPE_READ], sth->pipe.buffer, sth->pipe.size * sizeof(*sth->pipe.buffer)) <= 0)
+#endif
         nd_log(NDLS_DAEMON, NDLP_ERR, "STREAM THREAD[%zu]: signal pipe read error", sth->id);
 
     stream_thread_process_opcodes(sth, NULL);
@@ -389,6 +405,15 @@ static bool stream_thread_process_poll_slot(struct stream_thread *sth, nd_poll_r
     return false;
 }
 
+static void stream_thread_startup_failed(struct stream_thread *sth) {
+    // The creator stores the thread handle while holding this lock. Clearing it
+    // under the same lock lets a later opcode retry the slot after startup fails.
+    spinlock_lock(&stream_thread_globals.assign.spinlock);
+    sth->thread = NULL;
+    sth->tid = 0;
+    spinlock_unlock(&stream_thread_globals.assign.spinlock);
+}
+
 void stream_thread(void *ptr) {
     struct stream_thread *sth = ptr;
 
@@ -486,16 +511,36 @@ void stream_thread(void *ptr) {
                                       WORKER_METRIC_INCREMENTAL_TOTAL);
 
 
+#if defined(OS_WINDOWS)
+    if (!sock_create_loopback_pair(sth->pipe.fds)) {
+#else
     if(pipe(sth->pipe.fds) != 0) {
+#endif
         nd_log(NDLS_DAEMON, NDLP_ERR, "STREAM THREAD[%zu]: cannot create required pipe.", sth->id);
         sth->pipe.fds[PIPE_READ] = -1;
         sth->pipe.fds[PIPE_WRITE] = -1;
+        stream_thread_startup_failed(sth);
         return;
     }
+#if defined(OS_WINDOWS)
+    if (sock_setnonblock(sth->pipe.fds[PIPE_READ], true) != 1) {
+        sock_close(sth->pipe.fds[PIPE_READ]);
+        sock_close(sth->pipe.fds[PIPE_WRITE]);
+        sth->pipe.fds[PIPE_READ] = -1;
+        sth->pipe.fds[PIPE_WRITE] = -1;
+        nd_log(NDLS_DAEMON, NDLP_ERR, "STREAM THREAD[%zu]: cannot set wakeup socket non-blocking.", sth->id);
+        stream_thread_startup_failed(sth);
+        return;
+    }
+#endif
 
     sth->tid = gettid_cached();
 
+#if defined(OS_WINDOWS)
+    sth->pipe.size = 65536;
+#else
     sth->pipe.size = set_pipe_size(sth->pipe.fds[PIPE_READ], 65536 * sizeof(*sth->pipe.buffer)) / sizeof(*sth->pipe.buffer);
+#endif
     sth->pipe.buffer = mallocz(sth->pipe.size * sizeof(*sth->pipe.buffer));
 
     usec_t last_check_replication_ut, last_check_all_nodes_ut, last_dequeue_ut;
@@ -646,8 +691,13 @@ void stream_thread(void *ptr) {
     nd_poll_destroy(sth->run.ndpl);
     sth->run.ndpl = NULL;
 
+#if defined(OS_WINDOWS)
+    sock_close(sth->pipe.fds[PIPE_READ]);
+    sock_close(sth->pipe.fds[PIPE_WRITE]);
+#else
     close(sth->pipe.fds[PIPE_READ]);
     close(sth->pipe.fds[PIPE_WRITE]);
+#endif
     sth->pipe.fds[PIPE_READ] = -1;
     sth->pipe.fds[PIPE_WRITE] = -1;
 

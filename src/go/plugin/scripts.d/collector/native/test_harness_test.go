@@ -92,8 +92,12 @@ func startTestJob(t *testing.T, c collectorapi.CollectorV2, out io.Writer) (*job
 }
 
 func tickUntil(t *testing.T, job *jobruntime.JobV2, condition func() bool) {
+	tickUntilWithin(t, job, 3*time.Second, condition)
+}
+
+func tickUntilWithin(t *testing.T, job *jobruntime.JobV2, timeout time.Duration, condition func() bool) {
 	t.Helper()
-	require.Eventually(t, func() bool { job.Tick(1); return condition() }, 3*time.Second, 100*time.Millisecond)
+	require.Eventually(t, func() bool { job.Tick(1); return condition() }, timeout, 100*time.Millisecond)
 }
 
 // testRuntime runs Collector.Run directly, without the job runtime.

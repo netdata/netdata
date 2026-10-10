@@ -31,7 +31,6 @@ set(LIBJUDY_NEXT_FILES
 
 set(LIBJUDY_FILES
         libjudy/vendored/Judy.h
-        libjudy/vendored/JudyCommon/JudyMalloc.c
         libjudy/vendored/JudyCommon/JudyPrivate.h
         libjudy/vendored/JudyCommon/JudyPrivate1L.h
         libjudy/vendored/JudyCommon/JudyPrivateBranch.h
@@ -280,6 +279,7 @@ set(LIBNETDATA_FILES
         parsers/size.h
         libjudy/judy-malloc.c
         libjudy/judy-malloc.h
+        libjudy/judy-unittest.c
         facets/logs_query_status.h
         os/timestamps.c
         os/timestamps.h

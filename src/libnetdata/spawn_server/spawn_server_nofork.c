@@ -1249,7 +1249,7 @@ static int spawn_server_event_loop(SPAWN_SERVER *server) {
     int wanted_signals[] = {SIGTERM, SIGCHLD};
     signals_unblock(wanted_signals, _countof(wanted_signals));
 
-    // Set up the signal handler for SIGCHLD and SIGTERM
+    // Set up signal handlers for child completion and server shutdown.
     struct sigaction sa;
     sa.sa_handler = spawn_server_sigchld_handler;
     sigemptyset(&sa.sa_mask);

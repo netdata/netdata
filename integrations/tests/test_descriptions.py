@@ -1453,7 +1453,20 @@ class DocumentationSourceRegressionTest(unittest.TestCase):
                     names.index("Generate Integrations"),
                     names.index("Generate src/collectors/SERVICE-DISCOVERY.md"),
                 )
-                self.assertTrue(any(workflow_action(step) == "actions/setup-go" for step in steps))
+                setup_go_steps = [
+                    index
+                    for index, step in enumerate(steps)
+                    if workflow_action(step) == "actions/setup-go"
+                ]
+                self.assertEqual(len(setup_go_steps), 1)
+                self.assertRegex(
+                    steps[setup_go_steps[0]].get("uses", ""),
+                    r"^actions/setup-go@[0-9a-f]{40}$",
+                )
+                self.assertLess(
+                    setup_go_steps[0],
+                    names.index("Generate Source Metadata"),
+                )
 
                 environment = "virtualenv" if workflow.name == "generate-integrations.yml" else "venv"
                 documentation_steps = {
@@ -1482,7 +1495,12 @@ class DocumentationSourceRegressionTest(unittest.TestCase):
         post_merge_by_name = {step["name"]: step for step in post_merge_steps}
         cleanup = post_merge_by_name["Clean Up Temporary Data"]["run"]
         self.assertIn("src/go/plugin/go.d/collector/snmp/npm-catalog/metrics-metadata-gaps.txt", cleanup)
+        create_pr_uses = post_merge_by_name["Create PR"].get("uses", "")
         self.assertEqual(workflow_action(post_merge_by_name["Create PR"]), "peter-evans/create-pull-request")
+        self.assertRegex(
+            create_pr_uses,
+            r"^peter-evans/create-pull-request@[0-9a-f]{40}$",
+        )
 
     def test_map_descriptions_are_present_valid_and_unique(self):
         map_data = yaml.load((REPO_ROOT / "docs/.map/map.yaml").read_text(encoding="utf-8"))

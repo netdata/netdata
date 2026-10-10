@@ -63,7 +63,7 @@ Netdata Cloud UI.
 
 Install Netdata and connect to your Cloud Space:
 
-```bash
+```
 msiexec /qn /i netdata-x64.msi TOKEN="<YOUR_TOKEN>" ROOMS="<YOUR_ROOMS>"
 ```
 
@@ -74,7 +74,7 @@ Replace:
 
 To connect the node without assigning it to specific Rooms, pass the token alone:
 
-```bash
+```
 msiexec /qn /i netdata-x64.msi TOKEN="<YOUR_TOKEN>"
 ```
 
@@ -282,57 +282,58 @@ Instead of daily updates, you might prefer:
 
 ## Working with Netdata on Windows
 
-Netdata on Windows includes a bundled MSYS2 environment for working with Netdata configuration files and other internals.
+The Windows installer provides a **Netdata → Edit Netdata Configuration** Start Menu shortcut. It requests administrator approval because Netdata stores configuration under `Program Files`, then opens the selected file in the default application associated with `.conf` files, with Notepad as a fallback. The first run copies the stock file into the user configuration directory when it is missing.
 
-### Open the MSYS2 environment
+The helper copies a stock file into `C:\Program Files\Netdata\etc\netdata` the first time it is opened. For example, to edit the main configuration from PowerShell:
 
-Launch the bundled MSYS2 shell using one of these methods (the paths below assume Netdata is installed in the default location):
-
-- **Windows Run dialog**: Press `Win + R`, enter `"C:\Program Files\Netdata\msys2.exe"`, and press `Enter`.
-- **PowerShell**: `& "C:\Program Files\Netdata\msys2.exe"`
-- **Command Prompt**: `"C:\Program Files\Netdata\msys2.exe"`
-
-When `msys2.exe` starts, it opens a shell environment for working with the Netdata files installed on your system.
-
-### Writing Windows paths in MSYS format
-
-Netdata configuration files consumed from the MSYS side require MSYS-style paths instead of native Windows drive-letter format.
-
-Conversion pattern:
-
-- Replace the drive letter with its lowercase equivalent preceded by `/` (e.g., `C:` → `/c`, `D:` → `/d`)
-- Replace backslashes `\` with forward slashes `/`
-- Keep spaces in the path, but quote or escape the full path when using it in shell commands
-
-Examples:
-
-| Windows path                                   | MSYS-style path                                |
-|------------------------------------------------|------------------------------------------------|
-| `C:\Program Files\Netdata\etc\netdata`         | `/c/Program Files/Netdata/etc/netdata/`        |
-| `C:\Program Files\Netdata\usr\bin\netdata.exe` | `/c/Program Files/Netdata/usr/bin/netdata.exe` |
-
-### Editing configuration files
-
-Inside the MSYS2 environment, use the `edit-config` helper to edit Netdata configuration files:
-
-```bash
-cd /etc/netdata
-./edit-config netdata.conf
+```powershell
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File "C:\Program Files\Netdata\usr\libexec\netdata\edit-config.ps1" netdata.conf -PauseOnError
 ```
 
-For the complete `edit-config` workflow and configuration directory layout, see [Netdata Agent Configuration](/docs/netdata-agent/configuration/README.md#edit-configuration-files).
+Pass a file name relative to the Netdata configuration directory to open another supported configuration. Without a file name, the helper lists available configuration files. For the complete configuration workflow and directory layout, see [Netdata Agent Configuration](/docs/netdata-agent/configuration/README.md#edit-configuration-files).
 
-On Windows, `edit-config` opens files with the `nano` editor.
+### Migrating an existing MSYS2 development environment
 
-### Basic nano commands
+The installer no longer ships an MSYS2 shell. Build hosts still use an MSYS2 installation to provision the UCRT64 compiler and libraries with `pacman`; keep the MSYS2 base packages required by `pacman`.
 
-| Action                | Keybinding                                     |
-|-----------------------|------------------------------------------------|
-| Edit text             | Type normally, use arrow keys to navigate      |
-| Search                | `Ctrl + W`, type search text, `Enter`          |
-| Save                  | `Ctrl + O`, `Enter` to confirm filename        |
-| Exit                  | `Ctrl + X`                                     |
-| Exit with save prompt | `Ctrl + X`, then `Y` to save or `N` to discard |
+If an existing developer machine has obsolete MINGW64 packages, first review its installed package list:
+
+```powershell
+& 'C:\msys64\usr\bin\pacman.exe' -Q | Select-String 'mingw-w64-x86_64'
+```
+
+Then preview a removal command for the specific obsolete package names you identified:
+
+```powershell
+& 'C:\msys64\usr\bin\pacman.exe' -Rns --print mingw-w64-x86_64-gcc
+```
+
+`--print` shows the requested targets; when you run the interactive `pacman -Rns` command, review its full transaction summary and answer `N` if it proposes removing anything you still need. Do not remove the MSYS2 base, `pacman`, or packages still required by another toolchain. Netdata does not uninstall packages automatically. See the [MSYS2 package management guide](https://www.msys2.org/docs/package-management/) for package and removal behavior.
+
+## Building Netdata on Windows
+
+Both build workflows require the UCRT64 dependencies installed by `packaging/windows/install-dependencies.ps1`, the Windows SDK message/resource compilers (`mc.exe` and `rc.exe`), and Visual Studio C++ x64 build tools including `link.exe`. WiX 5.0.2 is required to create the MSI and is installed by the dependency script.
+
+### PowerShell workflow
+
+Run these commands from the repository root:
+
+```powershell
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File packaging/windows/build.ps1
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File packaging/windows/package.ps1
+```
+
+### UCRT64 terminal workflow
+
+Run these commands from the repository root in an MSYS2 UCRT64 terminal (`MSYSTEM=UCRT64`):
+
+```bash
+./packaging/windows/compile-on-windows.sh
+./packaging/windows/package-windows.sh
+./packaging/windows/wix-installer.sh
+```
+
+The terminal workflow uses UCRT64 CMake, Ninja, GCC, Go, Rust, and WiX. The packaging script recreates only `build/stage/opt/netdata`, and the final script writes `packaging/windows/netdata-x64.msi`. Both workflows keep the MSYS2 runtime out of the installed product.
 
 ## Uninstalling Netdata on Windows
 

@@ -54,7 +54,6 @@ use sfsq::traces::{
 fn grid() -> sfst::Grid {
     sfst::Grid::new(0, 1_000_000_000, 10)
 }
-
 /// The request boundary refuses a grid whose width × count overflows
 /// i64 with its OWN variant (`GridOverflow`), never the empty-grid
 /// one — the two failure modes stay distinguishable to the caller.
@@ -1115,7 +1114,6 @@ fn filtered_grid_agrees_with_search_on_a_canonical_corpus() {
         );
     }
 }
-
 /// An unavailable source reports its own reason beside a missing file's
 /// while the healthy source still counts; alone, it is never Complete
 /// and never a source failure.
