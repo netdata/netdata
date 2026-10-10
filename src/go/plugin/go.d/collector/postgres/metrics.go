@@ -2,7 +2,11 @@
 
 package postgres
 
-import "github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/oldmetrix"
+import (
+	"database/sql"
+	"github.com/netdata/netdata/go/plugins/plugin/framework/collectorapi"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/oldmetrix"
+)
 
 type pgMetrics struct {
 	srvMetrics
@@ -154,10 +158,15 @@ type replSlotMetrics struct {
 }
 
 type tableMetrics struct {
-	name       string
-	parentName string
-	db         string
-	schema     string
+	charts                                        []*collectorapi.Chart
+	owner                                         *sql.DB
+	oid                                           uint32
+	ioUpdated, sampled, ioSampled, hasBloatCharts bool
+	bloatValid, nullValid                         bool
+	name                                          string
+	parentName                                    string
+	db                                            string
+	schema                                        string
 
 	updated                  bool
 	hasCharts                bool
@@ -208,11 +217,16 @@ type tableMetrics struct {
 }
 
 type indexMetrics struct {
-	name        string
-	db          string
-	schema      string
-	table       string
-	parentTable string
+	charts         []*collectorapi.Chart
+	owner          *sql.DB
+	oid            uint32
+	hasBloatCharts bool
+	bloatValid     bool
+	name           string
+	db             string
+	schema         string
+	table          string
+	parentTable    string
 
 	updated   bool
 	hasCharts bool

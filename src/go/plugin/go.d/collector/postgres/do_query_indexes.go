@@ -15,26 +15,29 @@ func (c *Collector) doQueryIndexesMetrics() error {
 }
 
 func (c *Collector) doQueryStatUserIndexes() error {
-	if err := c.doDBQueryStatUserIndexes(c.db); err != nil {
-		c.Warning(err)
-	}
-	for _, conn := range c.dbConns {
-		if conn.db == nil {
-			continue
-		}
-		if err := c.doDBQueryStatUserIndexes(conn.db); err != nil {
-			c.Warning(err)
-		}
-	}
-	return nil
+	return c.queryEachDatabase("index statistics", c.doDBQueryStatUserIndexes)
 }
 
 func (c *Collector) doDBQueryStatUserIndexes(db *sql.DB) error {
-	q := queryStatUserIndexes()
+	filtered := c.MaxDBIndexes > 0
+	var args []any
+	if filtered {
+		ids := c.relationsFor(db).indexes.oids()
+		if len(ids) == 0 {
+			return nil
+		}
+		args = []any{ids}
+	}
+	q := queryStatUserIndexes(filtered)
 
 	var dbname, schema, table, name string
-	return c.doDBQuery(db, q, func(column, value string, _ bool) {
+	var oid uint32
+	var m *indexMetrics
+	var staged []*indexMetrics
+	err := c.doDBQuery(db, q, func(column, value string, rowEnd bool) {
 		switch column {
+		case "indexrelid":
+			oid = uint32(parseInt(value))
 		case "datname":
 			dbname = value
 		case "schemaname":
@@ -43,17 +46,44 @@ func (c *Collector) doDBQueryStatUserIndexes(db *sql.DB) error {
 			table = value
 		case "indexrelname":
 			name = removeSpaces(value)
-			c.getIndexMetrics(name, table, dbname, schema).updated = true
+			m = &indexMetrics{owner: db, oid: oid, db: dbname, schema: schema, name: name, table: table}
+			if old, ok := c.mx.indexes[name+"_"+table+"_"+dbname+"_"+schema]; ok && old.owner == db && old.oid == oid {
+				*m = *old
+			}
+			m.updated = true
 		case "parent_relname":
-			c.getIndexMetrics(name, table, dbname, schema).parentTable = value
+			m.parentTable = value
 		case "idx_scan":
-			c.getIndexMetrics(name, table, dbname, schema).idxScan = parseInt(value)
+			m.idxScan = parseInt(value)
 		case "idx_tup_read":
-			c.getIndexMetrics(name, table, dbname, schema).idxTupRead = parseInt(value)
+			m.idxTupRead = parseInt(value)
 		case "idx_tup_fetch":
-			c.getIndexMetrics(name, table, dbname, schema).idxTupFetch = parseInt(value)
+			m.idxTupFetch = parseInt(value)
 		case "size":
-			c.getIndexMetrics(name, table, dbname, schema).size = parseInt(value)
+			m.size = parseInt(value)
 		}
-	})
+		if rowEnd {
+			staged = append(staged, m)
+		}
+	}, args...)
+	if err != nil {
+
+		return err
+	}
+	seen := make(map[string]bool, len(staged))
+	for _, m := range staged {
+		key := m.name + "_" + m.table + "_" + m.db + "_" + m.schema
+		if old := c.mx.indexes[key]; old != nil && (old.owner != db || old.oid != m.oid) {
+			c.removeIndexCharts(old)
+		}
+		c.mx.indexes[key] = m
+		seen[key] = true
+	}
+	for key, m := range c.mx.indexes {
+		if m.owner == db && !seen[key] {
+			c.removeIndexCharts(m)
+			delete(c.mx.indexes, key)
+		}
+	}
+	return nil
 }
