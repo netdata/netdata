@@ -1,0 +1,71 @@
+version: v1
+context_namespace: java
+groups:
+  - family: JVM
+    metrics: [jvm_memory_used_bytes]
+    chart_defaults:
+      instances:
+        by_labels: [application, instance]
+      label_promotion: [application_name]
+    charts:
+      - id: memory
+        title: JVM memory in use
+        context: jvm_memory_used
+        units: bytes
+        type: stacked
+        dimensions:
+          - selector: 'jvm_memory_used_bytes{memory_type="heap"}'
+            name: heap
+          - selector: 'jvm_memory_used_bytes{memory_type="non_heap"}'
+            name: non_heap
+  - family: HTTP
+    metrics: [http_server_request_duration_seconds_count, http_server_request_duration_seconds_bucket]
+    chart_defaults:
+      instances:
+        by_labels: [application, instance, source_epoch, method, route, status]
+      label_promotion: [application_name]
+    charts:
+      - id: requests
+        title: HTTP requests by response status
+        context: http_requests
+        units: requests/s
+        type: stacked
+        dimensions:
+          - selector: http_server_request_duration_seconds_count
+            name_from_label: status
+      - id: duration
+        title: HTTP request duration distribution
+        context: http_request_duration
+        units: observations/s
+        dimensions:
+          - selector: http_server_request_duration_seconds_bucket
+            name_from_label: le
+  - family: Connection pools
+    metrics: [hikari_connections, hikari_pending_requests, hikari_limit]
+    chart_defaults:
+      instances:
+        by_labels: [application, instance, pool_id]
+      label_promotion: [application_name, pool_name]
+    charts:
+      - id: connections
+        title: Pool connections
+        context: pool_connections
+        units: connections
+        type: stacked
+        dimensions:
+          - selector: hikari_connections
+            name_from_label: state
+      - id: pending
+        title: Requests waiting for a pool connection
+        context: pool_pending_requests
+        units: requests
+        dimensions:
+          - selector: hikari_pending_requests
+            name: waiting
+      - id: limit
+        title: Maximum pool connections
+        context: pool_connection_limit
+        units: connections
+        dimensions:
+          - selector: hikari_limit
+            name: limit
