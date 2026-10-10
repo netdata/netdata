@@ -12,6 +12,9 @@ func (c *Collector) validateConfig() error {
 	if c.DSN == "" {
 		return errors.New("DSN not set")
 	}
+	if c.MaxDBTables < 0 || c.MaxDBIndexes < 0 {
+		return errors.New("max_db_tables and max_db_indexes must be non-negative")
+	}
 	return nil
 }
 

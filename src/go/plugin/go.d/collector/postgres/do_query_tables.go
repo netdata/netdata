@@ -4,144 +4,222 @@ package postgres
 
 import (
 	"database/sql"
+	"errors"
+	"fmt"
 	"strings"
 )
 
 func (c *Collector) doQueryTablesMetrics() error {
-	if err := c.doQueryStatUserTable(); err != nil {
-		return err
-	}
-	if err := c.doQueryStatIOUserTables(); err != nil {
-		return err
-	}
-
-	return nil
+	return c.queryEachDatabase("table metrics", c.doDBQueryTablesMetrics)
 }
 
-func (c *Collector) doQueryStatUserTable() error {
-	if err := c.doDBQueryStatUserTables(c.db); err != nil {
-		c.Warning(err)
+func (c *Collector) doDBQueryTablesMetrics(db *sql.DB) error {
+	statsErr := c.doDBQueryStatUserTables(db)
+	ioErr := c.doDBQueryStatIOUserTables(db, statsErr == nil)
+	if statsErr != nil {
+		statsErr = fmt.Errorf("statistics: %w", statsErr)
 	}
-	for _, conn := range c.dbConns {
-		if conn.db == nil {
-			continue
-		}
-		if err := c.doDBQueryStatUserTables(conn.db); err != nil {
-			c.Warning(err)
-		}
+	if ioErr != nil {
+		ioErr = fmt.Errorf("I/O statistics: %w", ioErr)
 	}
-	return nil
-}
-
-func (c *Collector) doQueryStatIOUserTables() error {
-	if err := c.doDBQueryStatIOUserTables(c.db); err != nil {
-		c.Warning(err)
-	}
-	for _, conn := range c.dbConns {
-		if conn.db == nil {
-			continue
-		}
-		if err := c.doDBQueryStatIOUserTables(conn.db); err != nil {
-			c.Warning(err)
-		}
-	}
-	return nil
+	return errors.Join(statsErr, ioErr)
 }
 
 func (c *Collector) doDBQueryStatUserTables(db *sql.DB) error {
-	q := queryStatUserTables()
+	filtered := c.MaxDBTables > 0
+	var args []any
+	if filtered {
+		ids := c.relationsFor(db).tables.oids()
+		if len(ids) == 0 {
+			return nil
+		}
+		args = []any{ids}
+	}
+	q := queryStatUserTables(filtered)
 
 	var dbname, schema, name string
-	return c.doDBQuery(db, q, func(column, value string, _ bool) {
+	var oid uint32
+	var m *tableMetrics
+	var staged []*tableMetrics
+	err := c.doDBQuery(db, q, func(column, value string, rowEnd bool) {
 		if value == "" && strings.HasPrefix(column, "last_") {
 			value = "-1"
 		}
 		switch column {
+		case "relid":
+			oid = uint32(parseInt(value))
 		case "datname":
 			dbname = value
 		case "schemaname":
 			schema = value
 		case "relname":
 			name = value
-			c.getTableMetrics(name, dbname, schema).updated = true
+			m = newTableMetrics(db, oid, name, dbname, schema)
+			if old, ok := c.mx.tables[name+"_"+dbname+"_"+schema]; ok && old.owner == db && old.oid == oid {
+				*m = *old
+			}
+			m.updated = true
 		case "parent_relname":
-			c.getTableMetrics(name, dbname, schema).parentName = value
+			m.parentName = value
 		case "seq_scan":
-			c.getTableMetrics(name, dbname, schema).seqScan = parseInt(value)
+			m.seqScan = parseInt(value)
 		case "seq_tup_read":
-			c.getTableMetrics(name, dbname, schema).seqTupRead = parseInt(value)
+			m.seqTupRead = parseInt(value)
 		case "idx_scan":
-			c.getTableMetrics(name, dbname, schema).idxScan = parseInt(value)
+			m.idxScan = parseInt(value)
 		case "idx_tup_fetch":
-			c.getTableMetrics(name, dbname, schema).idxTupFetch = parseInt(value)
+			m.idxTupFetch = parseInt(value)
 		case "n_tup_ins":
-			c.getTableMetrics(name, dbname, schema).nTupIns = parseInt(value)
+			m.nTupIns = parseInt(value)
 		case "n_tup_upd":
-			c.getTableMetrics(name, dbname, schema).nTupUpd.last = parseInt(value)
+			m.nTupUpd.last = parseInt(value)
 		case "n_tup_del":
-			c.getTableMetrics(name, dbname, schema).nTupDel = parseInt(value)
+			m.nTupDel = parseInt(value)
 		case "n_tup_hot_upd":
-			c.getTableMetrics(name, dbname, schema).nTupHotUpd.last = parseInt(value)
+			m.nTupHotUpd.last = parseInt(value)
 		case "n_live_tup":
-			c.getTableMetrics(name, dbname, schema).nLiveTup = parseInt(value)
+			m.nLiveTup = parseInt(value)
 		case "n_dead_tup":
-			c.getTableMetrics(name, dbname, schema).nDeadTup = parseInt(value)
+			m.nDeadTup = parseInt(value)
 		case "last_vacuum":
-			c.getTableMetrics(name, dbname, schema).lastVacuumAgo = parseFloat(value)
+			m.lastVacuumAgo = parseFloat(value)
 		case "last_autovacuum":
-			c.getTableMetrics(name, dbname, schema).lastAutoVacuumAgo = parseFloat(value)
+			m.lastAutoVacuumAgo = parseFloat(value)
 		case "last_analyze":
-			c.getTableMetrics(name, dbname, schema).lastAnalyzeAgo = parseFloat(value)
+			m.lastAnalyzeAgo = parseFloat(value)
 		case "last_autoanalyze":
-			c.getTableMetrics(name, dbname, schema).lastAutoAnalyzeAgo = parseFloat(value)
+			m.lastAutoAnalyzeAgo = parseFloat(value)
 		case "vacuum_count":
-			c.getTableMetrics(name, dbname, schema).vacuumCount = parseInt(value)
+			m.vacuumCount = parseInt(value)
 		case "autovacuum_count":
-			c.getTableMetrics(name, dbname, schema).autovacuumCount = parseInt(value)
+			m.autovacuumCount = parseInt(value)
 		case "analyze_count":
-			c.getTableMetrics(name, dbname, schema).analyzeCount = parseInt(value)
+			m.analyzeCount = parseInt(value)
 		case "autoanalyze_count":
-			c.getTableMetrics(name, dbname, schema).autoAnalyzeCount = parseInt(value)
+			m.autoAnalyzeCount = parseInt(value)
 		case "total_relation_size":
-			c.getTableMetrics(name, dbname, schema).totalSize = parseInt(value)
+			m.totalSize = parseInt(value)
 		}
-	})
+		if rowEnd {
+			staged = append(staged, m)
+		}
+	}, args...)
+	if err != nil {
+		for _, m := range c.mx.tables {
+			if m.owner == db {
+				m.sampled = false
+			}
+		}
+		return err
+	}
+	seen := make(map[string]bool, len(staged))
+	for _, m := range staged {
+		key := m.name + "_" + m.db + "_" + m.schema
+		if old := c.mx.tables[key]; old != nil && (old.owner != db || old.oid != m.oid) {
+			c.removeTableCharts(old)
+		}
+		c.mx.tables[key] = m
+		seen[key] = true
+	}
+	for key, m := range c.mx.tables {
+		if m.owner == db && !seen[key] {
+			c.removeTableCharts(m)
+			delete(c.mx.tables, key)
+		}
+	}
+	return nil
 }
 
-func (c *Collector) doDBQueryStatIOUserTables(db *sql.DB) error {
-	q := queryStatIOUserTables()
+func (c *Collector) doDBQueryStatIOUserTables(db *sql.DB, statsComplete bool) error {
+	filtered := c.MaxDBTables > 0
+	var args []any
+	if filtered {
+		ids := c.relationsFor(db).tables.oids()
+		if len(ids) == 0 {
+			return nil
+		}
+		args = []any{ids}
+	}
+	q := queryStatIOUserTables(filtered)
 
 	var dbname, schema, name string
-	return c.doDBQuery(db, q, func(column, value string, rowEnd bool) {
+	var m *tableMetrics
+	var oid uint32
+	staged := make(map[uint32]*tableMetrics)
+	var accepted bool
+	err := c.doDBQuery(db, q, func(column, value string, rowEnd bool) {
 		if value == "" && column != "parent_relname" {
 			value = "-1"
 		}
 		switch column {
+		case "relid":
+			oid = uint32(parseInt(value))
 		case "datname":
 			dbname = value
 		case "schemaname":
 			schema = value
 		case "relname":
 			name = value
-			c.getTableMetrics(name, dbname, schema).updated = true
+			m = newTableMetrics(db, oid, name, dbname, schema)
+			old := c.mx.tables[name+"_"+dbname+"_"+schema]
+			matches := old != nil && old.owner == db && old.oid == oid
+			// A successful stats observation owns this cycle's identity. Otherwise
+			// this complete I/O observation can establish an identity independently.
+			accepted = !statsComplete || (matches && old.updated)
+			if matches {
+				*m = *old
+			}
+			m.ioUpdated = true
 		case "parent_relname":
-			c.getTableMetrics(name, dbname, schema).parentName = value
+			m.parentName = value
 		case "heap_blks_read_bytes":
-			c.getTableMetrics(name, dbname, schema).heapBlksRead.last = parseInt(value)
+			m.heapBlksRead.last = parseInt(value)
 		case "heap_blks_hit_bytes":
-			c.getTableMetrics(name, dbname, schema).heapBlksHit.last = parseInt(value)
+			m.heapBlksHit.last = parseInt(value)
 		case "idx_blks_read_bytes":
-			c.getTableMetrics(name, dbname, schema).idxBlksRead.last = parseInt(value)
+			m.idxBlksRead.last = parseInt(value)
 		case "idx_blks_hit_bytes":
-			c.getTableMetrics(name, dbname, schema).idxBlksHit.last = parseInt(value)
+			m.idxBlksHit.last = parseInt(value)
 		case "toast_blks_read_bytes":
-			c.getTableMetrics(name, dbname, schema).toastBlksRead.last = parseInt(value)
+			m.toastBlksRead.last = parseInt(value)
 		case "toast_blks_hit_bytes":
-			c.getTableMetrics(name, dbname, schema).toastBlksHit.last = parseInt(value)
+			m.toastBlksHit.last = parseInt(value)
 		case "tidx_blks_read_bytes":
-			c.getTableMetrics(name, dbname, schema).tidxBlksRead.last = parseInt(value)
+			m.tidxBlksRead.last = parseInt(value)
 		case "tidx_blks_hit_bytes":
-			c.getTableMetrics(name, dbname, schema).tidxBlksHit.last = parseInt(value)
+			m.tidxBlksHit.last = parseInt(value)
 		}
-	})
+		if rowEnd && accepted {
+			staged[oid] = m
+		}
+	}, args...)
+	if err != nil {
+		for _, m := range c.mx.tables {
+			if m.owner == db {
+				m.ioSampled = false
+			}
+		}
+		return err
+	}
+	for _, m := range staged {
+		key := m.name + "_" + m.db + "_" + m.schema
+		if old := c.mx.tables[key]; old != nil && (old.owner != db || old.oid != m.oid) {
+			c.removeTableCharts(old)
+		}
+		c.mx.tables[key] = m
+	}
+	for key, m := range c.mx.tables {
+		if m.owner != db {
+			continue
+		}
+		if current := staged[m.oid]; current != nil && (current.name != m.name || current.schema != m.schema) {
+			c.removeTableCharts(m)
+			delete(c.mx.tables, key)
+			continue
+		}
+		if !m.ioUpdated {
+			m.ioSampled = false
+		}
+	}
+	return nil
 }
