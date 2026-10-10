@@ -114,6 +114,51 @@ chmod +x ./netdata-uninstaller.sh
 
 :::
 
+### Troubleshooting
+
+#### dpkg errors during package purge
+
+If you installed Netdata via the native DEB `netdata` package, its
+post-removal (`postrm`) script may fail during `purge` with output similar to
+the following:
+
+```text
+dpkg-statoverride: warning: no override present
+dpkg: error processing package netdata (--purge):
+ installed netdata package post-removal script subprocess returned error exit status 2
+Errors were encountered while processing:
+ netdata
+E: Sub-process /usr/bin/dpkg returned an error code (1)
+```
+
+The postrm script references `dpkg-statoverride` entries or file paths that no
+longer exist on the system, typically after a partial removal or manual
+cleanup. When this happens, the package is left in a half-configured state. To
+resolve this, remove any stale Netdata `dpkg-statoverride` entries and then
+retry the purge:
+
+   ```bash
+   dpkg-statoverride --list | grep netdata
+   ```
+
+   For each path listed, remove the override:
+
+   ```bash
+   sudo dpkg-statoverride --remove <path>
+   ```
+
+```bash
+sudo apt-get purge netdata
+```
+
+:::note
+
+These steps apply to native DEB installs of the main `netdata` package. If you
+are unsure how Netdata was installed, see the **Native Package Users** note
+above and the [installation type guidance](/packaging/installer/UPDATE.md).
+
+:::
+
 <br/>
 </details>
 
