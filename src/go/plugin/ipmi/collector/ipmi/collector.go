@@ -50,7 +50,7 @@ func New() *Collector {
 	return c
 }
 
-// sensorReader is the BMC access the collector needs. Check leaves the device
+// sensorReader is the BMC access the collector needs. Check leaves the connection
 // closed; Collect opens it on demand and Close releases it.
 type sensorReader interface {
 	Check(ctx context.Context) error
@@ -76,12 +76,19 @@ type Collector struct {
 func (c *Collector) Configuration() any { return c.Config }
 
 func (c *Collector) Init(context.Context) error {
+	c.Config.normalize()
 	if err := c.Config.validate(); err != nil {
 		return err
 	}
 	c.reader = c.newReader(bmc.Config{
-		Device:  c.Device,
-		Timeout: c.Timeout.Duration(),
+		Driver:         c.Driver,
+		Hostname:       c.Hostname,
+		Port:           c.Port,
+		Username:       c.Username,
+		Password:       c.Password,
+		PrivilegeLevel: c.PrivilegeLevel,
+		Device:         c.Device,
+		Timeout:        c.Timeout.Duration(),
 	})
 	return nil
 }
@@ -97,7 +104,7 @@ func (c *Collector) Cleanup(ctx context.Context) {
 		return
 	}
 	if err := c.reader.Close(ctx); err != nil {
-		c.Debugf("close IPMI device: %v", err)
+		c.Debugf("close IPMI connection: %v", err)
 	}
 }
 

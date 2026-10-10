@@ -547,6 +547,11 @@ def top_level_heading_count(markdown):
     return len(re.findall(r"^# (?!#)", remove_fenced_code(markdown), flags=re.MULTILINE))
 
 
+def workflow_action(step):
+    """Return a workflow step's action without its ref; refs are SHA-pinned and bumped by Dependabot."""
+    return step.get("uses", "").split("@", 1)[0]
+
+
 def parse_description_with_learn_legacy_parser(description_line):
     """Apply the description-relevant behavior of Learn ingest's read_metadata()."""
     value = description_line.split(": ", 1)[1]
@@ -1399,9 +1404,13 @@ class DocumentationSourceRegressionTest(unittest.TestCase):
                 setup_go_steps = [
                     index
                     for index, step in enumerate(steps)
-                    if re.fullmatch(r"actions/setup-go@[0-9a-f]{40}", step.get("uses", ""))
+                    if workflow_action(step) == "actions/setup-go"
                 ]
                 self.assertEqual(len(setup_go_steps), 1)
+                self.assertRegex(
+                    steps[setup_go_steps[0]].get("uses", ""),
+                    r"^actions/setup-go@[0-9a-f]{40}$",
+                )
                 self.assertLess(
                     setup_go_steps[0],
                     names.index("Generate Source Metadata"),
@@ -1434,8 +1443,10 @@ class DocumentationSourceRegressionTest(unittest.TestCase):
         post_merge_by_name = {step["name"]: step for step in post_merge_steps}
         cleanup = post_merge_by_name["Clean Up Temporary Data"]["run"]
         self.assertIn("src/go/plugin/go.d/collector/snmp/npm-catalog/metrics-metadata-gaps.txt", cleanup)
+        create_pr_uses = post_merge_by_name["Create PR"].get("uses", "")
+        self.assertEqual(workflow_action(post_merge_by_name["Create PR"]), "peter-evans/create-pull-request")
         self.assertRegex(
-            post_merge_by_name["Create PR"]["uses"],
+            create_pr_uses,
             r"^peter-evans/create-pull-request@[0-9a-f]{40}$",
         )
 

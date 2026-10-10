@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-// Package bmc reads the sensors and the System Event Log size of the local BMC
-// through Linux OpenIPMI. It never changes BMC configuration.
+// Package bmc reads the sensors and the System Event Log size of a BMC
+// through local OpenIPMI or remote LAN/LAN+. It never changes BMC configuration.
 package bmc
 
 import (
@@ -15,16 +15,22 @@ import (
 	"github.com/bougou/go-ipmi/pkg/types"
 )
 
-// Config selects the local device and bounds each IPMI command. The caller validates it.
+// Config selects the connection and bounds each IPMI command. The caller validates it.
 type Config struct {
+	Driver         string
+	Hostname       string
+	Port           int
+	Username       string
+	Password       string
+	PrivilegeLevel string
 	// Device is the OpenIPMI device number (/dev/ipmi<N>).
 	Device int32
-	// Timeout bounds each command, including the SDK's blocking receive.
+	// Timeout bounds connection setup and each command.
 	Timeout time.Duration
 }
 
 // Reader reads the BMC one call at a time because the SDK client owns mutable
-// state. Collect opens the device on demand and reopens it after a failure;
+// state. Collect opens the connection on demand and reopens it after a failure;
 // Check closes it again after its probe.
 type Reader struct {
 	mu  sync.Mutex
@@ -45,12 +51,12 @@ func New(cfg Config) *Reader {
 	return &Reader{
 		cfg:          cfg,
 		now:          time.Now,
-		newTransport: func() (transport, error) { return newOpenTransport(cfg) },
+		newTransport: func() (transport, error) { return newTransport(cfg) },
 	}
 }
 
-// Check opens the device, probes the BMC with Get Device ID and closes the
-// device again, so a probe leaves nothing to release.
+// Check opens the connection, probes the BMC with Get Device ID and closes the
+// connection again, so a probe leaves nothing to release.
 func (r *Reader) Check(ctx context.Context) error {
 	r.mu.Lock()
 	defer r.mu.Unlock()
@@ -64,7 +70,7 @@ func (r *Reader) Check(ctx context.Context) error {
 		return fmt.Errorf("get IPMI device ID: %w", probeErr)
 	}
 	if closeErr != nil {
-		return fmt.Errorf("close IPMI device: %w", closeErr)
+		return fmt.Errorf("close IPMI connection: %w", closeErr)
 	}
 	return nil
 }
@@ -73,7 +79,7 @@ func (r *Reader) Check(ctx context.Context) error {
 // count. A completion-code error or an unusable reading of one sensor, and any
 // SEL failure, degrade only that data and are summarized in Snapshot.Warnings.
 // Inventory failures, other sensor command failures and cancellation fail the
-// collection and close the device.
+// collection and close the connection.
 func (r *Reader) Collect(ctx context.Context, collectSEL bool) (_ *Snapshot, err error) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
@@ -117,7 +123,7 @@ func (r *Reader) Collect(ctx context.Context, collectSEL bool) (_ *Snapshot, err
 	return snapshot, nil
 }
 
-// Close closes the device. It is safe to call more than once.
+// Close closes the connection. It is safe to call more than once.
 func (r *Reader) Close(ctx context.Context) error {
 	r.mu.Lock()
 	defer r.mu.Unlock()
@@ -125,7 +131,7 @@ func (r *Reader) Close(ctx context.Context) error {
 	return r.disconnect(ctx)
 }
 
-// connect opens the device unless it is already open.
+// connect opens the connection unless it is already open.
 func (r *Reader) connect(ctx context.Context) error {
 	if err := ctx.Err(); err != nil {
 		return err
@@ -151,8 +157,8 @@ func (r *Reader) connect(ctx context.Context) error {
 	return nil
 }
 
-// disconnect closes the device. The next connection rediscovers the inventory,
-// because it may have changed while the device was closed.
+// disconnect closes the connection. The next connection rediscovers the inventory,
+// because it may have changed while the connection was closed.
 func (r *Reader) disconnect(ctx context.Context) error {
 	r.inventoryReadAt = time.Time{}
 	if r.conn == nil {

@@ -62,6 +62,15 @@ DEM is experimental and opt-in. Build Netdata with `-DENABLE_PLUGIN_DEM=ON`, or 
 
 Expose the listener through an HTTPS reverse proxy before sending traffic from remote websites. Set `public_url` and restrict `trusted_proxies` to that proxy. The default listener is local to this host.
 
+#### Provision optional geography data
+
+Geography is optional. Provision an MMDB readable by the Netdata service account through Agent packaging, the topology IP intelligence downloader, or your own database update process. Some installations package these files with NetFlow; they are not present in every installation, and DEM does not require a running NetFlow plugin or download databases itself.
+
+Supported database types are `Netdata-Topology-GEO`, `GeoLite2-City`, `GeoLite2-Country`, `GeoIP2-City`, `GeoIP2-Country`, `DBIP-City-Lite` and `DBIP-Country-Lite`. ASN and other database types are rejected. A country database supplies countries without city coordinates; an accepted type does not guarantee coverage for an address.
+
+Publish updates by writing a separate complete file and atomically renaming it over the destination. Do not truncate or overwrite the active file: atomic replacement is required for consistent lookups. Check `collector.geoip` in `rum-sites` after provisioning.
+
+
 
 ### Configuration
 
@@ -85,7 +94,13 @@ Options apply to the canonical receiver.
 |  | rate_limit.per_ip_per_min | Maximum requests per client IP per minute. | 120 | no |
 |  | rate_limit.per_site_per_sec | Maximum requests per site per second. | 500 | no |
 | **Collection** | update_every | Data collection interval, in seconds. | 10 | no |
-|  | geoip_db | MaxMind city database file. Leave empty to use the Agent IP intelligence database; unavailable data produces unknown locations. |  | no |
+|  | [geoip_db](#option-collection-geoip-db) | Geographic MMDB file; an explicit path uses only that file. Leave empty to try the Agent cache and then stock IP intelligence database; unavailable geography does not stop collection. |  | no |
+
+<a id="option-collection-geoip-db"></a>
+##### geoip_db
+
+With an empty path, DEM tries `topology-ip-intel/topology-ip-geo.mmdb` under the Agent cache directory, then under its stock data directory. A rejected cache file does not hide an accepted stock file. An explicit path disables this automatic fallback. Sources are checked when the receiver starts and every 60 seconds, so a later provision or atomic replacement is adopted without restarting the receiver.
+
 
 
 </details>
@@ -154,6 +169,21 @@ Metrics:
 
 
 ## Troubleshooting
+
+### Known Errors
+
+#### Missing or unexpected geography
+
+**Cause**
+
+A site's capture policy can disable geography or limit it to country. The selected database may be unavailable, lack a matching address or field, or contain a record that cannot be decoded.
+
+**Fix**
+
+Check the site's `capture.geolocation` and `collector.geoip` in `rum-sites`. `loaded` means a supported declared database type and available reader, not full record validation, freshness, accuracy or coverage. `using_previous` means current candidates failed and a previous usable snapshot remains; confirmed source removal revokes it. `unavailable` does not stop browser collection.
+
+Use `reason` and the local Agent logs to identify source failures. Make a supported MMDB readable by the Netdata service account, then publish it by atomic rename. A snapshot with a detected mapped-memory fault is never reused. `lookup_errors` counts errors for the active source generation, not unmatched addresses or missing fields. Refresh and fault changes are published by the receiver worker; lookup counts update at the receiver collection interval.
+
 
 ### Other Problems
 
