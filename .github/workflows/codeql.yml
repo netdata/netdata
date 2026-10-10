@@ -189,6 +189,10 @@ jobs:
         uses: github/codeql-action/init@2892aa5e19bbd11bc0cff5427e3b750a04d9e3c2 # v4.38.2
         with:
           languages: go
+      - name: Install CGO system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y unixodbc-dev
       - name: Autobuild
         uses: github/codeql-action/autobuild@2892aa5e19bbd11bc0cff5427e3b750a04d9e3c2 # v4.38.2
         with:
