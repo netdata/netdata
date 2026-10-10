@@ -94,6 +94,14 @@
 - Build: restructure the CMake build system ([#23589](https://github.com/netdata/netdata/issues/23589))
 - Feat(go.d/jetson): collect current power per rail ([#24204](https://github.com/netdata/netdata/issues/24204))
 - Docs: comment-only documentation pass over src/crates ([#24195](https://github.com/netdata/netdata/issues/24195))
+- Fix label filters when a bare key matches a label name ([#24202](https://github.com/netdata/netdata/issues/24202))
+- Fix(go.d/snmputils): keep SNMP secrets out of the connection-info string ([#24217](https://github.com/netdata/netdata/issues/24217))
+- Feat(ipmi): enable LAN and LAN+ collection with updated SDK ([#24216](https://github.com/netdata/netdata/issues/24216))
+- Test(integrations): match workflow actions by name, not by ref ([#24218](https://github.com/netdata/netdata/issues/24218))
+- Regenerate integrations docs ([#24194](https://github.com/netdata/netdata/issues/24194))
+- Build(deps): bump github.com/stmcginnis/gofish from 0.26.0 to 0.27.0 in /src/go ([#24220](https://github.com/netdata/netdata/issues/24220))
+- Build(deps): bump github.com/redis/go-redis/v9 from 9.22.0 to 9.23.0 in /src/go ([#24219](https://github.com/netdata/netdata/issues/24219))
+- Installer: stop install-required-packages.sh from installing system protobuf ([#24214](https://github.com/netdata/netdata/issues/24214))
 
 ## [2.12.0] - 2026-09-30
 
