@@ -75,7 +75,8 @@ are read only by this tooling.
 
 ## What is enforced today
 
-- `gen_integrations.py` validates each `metadata.yaml` against its JSON Schema only (fatal on any warning).
+- `gen_integrations.py` validates each `metadata.yaml` against its JSON Schema (fatal on any warning) and every page
+  meta description (`pipeline.md`, "Stage 1: outputs").
 - `integrations/tests/test_collector_metadata.py` (both integration workflows): a collector named by a service-discovery
   rule has nonempty auto-detection text, with explicit exceptions; selected prose fields pass common Markdown-pattern
   checks. This is not factual verification or a complete MDX build.

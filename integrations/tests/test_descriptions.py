@@ -46,6 +46,7 @@ from gen_docs_integrations import (  # noqa: E402
     read_integrations_js,
 )
 from gen_doc_collector_page import get_integration_description  # noqa: E402
+from gen_integrations import attach_descriptions  # noqa: E402
 from gen_npm_catalog import (  # noqa: E402
     PAGE_DESCRIPTIONS,
     build_device_modules,
@@ -884,6 +885,23 @@ class GeneratedDocumentationDescriptionTest(unittest.TestCase):
             self.assertFalse(description.endswith("…"), integration_id)
             self.assertFalse(description.endswith("..."), integration_id)
 
+    def test_catalog_artifacts_carry_the_page_description(self):
+        with open(INTEGRATIONS_DIR / "integrations.json", encoding="utf-8") as file:
+            clean_by_id = {integration["id"]: integration for integration in json.load(file)["integrations"]}
+
+        mismatches = []
+        for integration in self.integrations:
+            if integration["integration_type"] in DOCUMENTATION_TYPES:
+                expected = get_integration_meta_description(integration)
+            else:
+                expected = None
+            actual = (integration.get("description"), clean_by_id[integration["id"]].get("description"))
+            if actual != (expected, expected):
+                mismatches.append(integration["id"])
+
+        self.assertEqual(mismatches, [])
+        self.assertEqual(len(clean_by_id), len(self.integrations))
+
     def test_scoped_generation_rejects_a_collision_outside_the_selection(self):
         description = (
             "Monitor duplicate service latency and availability across reliable production systems."
@@ -1246,6 +1264,40 @@ class DescriptionSchemaGeneratorEquivalenceTest(unittest.TestCase):
             self.assertFalse(accepts(value), repr(value))
             if iteration < 16:
                 self._assert_contract(value, False, f"seeded Unicode separator {iteration}")
+
+
+class CatalogArtifactDescriptionTest(unittest.TestCase):
+    def test_documentation_records_in_both_variants_get_the_page_description(self):
+        description = "Monitor example service latency and availability across production systems."
+        meta = {"monitored_instance": {"description": description}}
+        integrations = [
+            {"id": "one", "integration_type": "collector", "meta": meta},
+            {"id": "two", "integration_type": "deploy", "meta": {}},
+        ]
+        clean_integrations = copy.deepcopy(integrations)
+
+        attach_descriptions(integrations, clean_integrations)
+
+        expected = [
+            {"id": "one", "integration_type": "collector", "meta": meta, "description": description},
+            {"id": "two", "integration_type": "deploy", "meta": {}},
+        ]
+        self.assertEqual(integrations, expected)
+        self.assertEqual(clean_integrations, expected)
+
+    def test_invalid_corpus_fails_without_attaching_anything(self):
+        description = "Monitor duplicate service latency and availability across production systems."
+        integrations = [
+            {"id": "one", "integration_type": "logs", "meta": {"description": description}},
+            {"id": "two", "integration_type": "logs", "meta": {"description": description}},
+        ]
+        clean_integrations = copy.deepcopy(integrations)
+
+        with self.assertRaisesRegex(ValueError, "Duplicate generated descriptions"):
+            attach_descriptions(integrations, clean_integrations)
+
+        attached = [integration.get("description") for integration in integrations + clean_integrations]
+        self.assertEqual(attached, [None] * 4)
 
 
 class GeneratorInputFailureTest(unittest.TestCase):

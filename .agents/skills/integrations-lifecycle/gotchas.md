@@ -55,7 +55,7 @@ cost someone a debugging session. Citations name symbols; open the file to find 
   nested module directory needs the same treatment or it is silently skipped (`pipeline.md`, sources table).
 - `integrations/pip.sh` and `packaging/cmake/Modules/NetdataRenderDocs.cmake` list the same Python packages and MUST be
   changed together (`pip.sh` says so in a comment). `markdown-it-py` is a runtime dependency of generation, not a
-  test-only one: `gen_integrations.py` imports `_common`, which imports `descriptions`, which imports `markdown_it`.
+  test-only one: `gen_integrations.py` imports `descriptions`, which imports `markdown_it`.
 - `integrations/templates/README.md` predates `setup-service_discovery.md` and does not list it.
 
 ## Rendering into MDX
