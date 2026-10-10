@@ -711,7 +711,7 @@ jobs:
       - name: Prepare Artifacts
         id: consolidate
         if: needs.file-check.outputs.run == 'true'
-        run: .github/scripts/prepare-artifacts.sh dist-artifacts ${{ steps.import-keys.outputs.fingerprint }}
+        run: .github/scripts/prepare-artifacts.sh dist-artifacts "${{ steps.import-keys.outputs.fingerprint }}" "${{ github.event_name }}" "${{ github.event.inputs.type }}"
       - name: Store GitHub Artifacts
         id: store-github
         if: needs.file-check.outputs.run == 'true'
@@ -1107,8 +1107,9 @@ jobs:
           RCLONE_CONFIG_S3_REGION: "auto"
         working-directory: artifacts
         run: |
-          rclone copy --verbose --fast-list --use-server-modtime --header-upload "Cache-Control: no-transform" ./ s3:netdata-agent-artifacts/nightly/ || exit 1
-          rclone sync --verbose --fast-list --use-server-modtime --header-upload "Cache-Control: no-transform" ./latest/ s3:netdata-agent-artifacts/nightly/latest/ || exit 1
+          for dir in */ ; do
+            rclone sync --verbose --fast-list --use-server-modtime --header-upload "Cache-Control: no-transform" "${dir}" "s3:netdata-agent-artifacts/nightly/${dir}" || exit 1
+          done
       - name: Failure Notification
         uses: rtCamp/action-slack-notify@33ca3be66c6f378fe1610fd1d5258632dbed5e58 # v2.4.0
         env:
@@ -1241,8 +1242,9 @@ jobs:
           RCLONE_CONFIG_S3_REGION: "auto"
         working-directory: artifacts
         run: |
-          rclone copy --verbose --fast-list --use-server-modtime --header-upload "Cache-Control: no-transform" ./ s3:netdata-agent-artifacts/stable/ || exit 1
-          rclone sync --verbose --fast-list --use-server-modtime --header-upload "Cache-Control: no-transform" ./latest/ s3:netdata-agent-artifacts/stable/latest/ || exit 1
+          for dir in */ ; do
+            rclone sync --verbose --fast-list --use-server-modtime --header-upload "Cache-Control: no-transform" "${dir}" "s3:netdata-agent-artifacts/stable/${dir}" || exit 1
+          done
       - name: Failure Notification
         uses: rtCamp/action-slack-notify@33ca3be66c6f378fe1610fd1d5258632dbed5e58 # v2.4.0
         env:
