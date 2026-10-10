@@ -17,6 +17,8 @@ fetch "${build_dir}" "${IOPING_SOURCE}/archive/refs/tags/v${IOPING_VERSION}.tar.
 
 export CFLAGS="${TUNING_FLAGS} -static -pipe"
 export CXXFLAGS="${CFLAGS}"
+LDFLAGS="$(errata_ldflags)"
+export LDFLAGS
 
 if [ "${CACHE_HIT:-0}" -eq 0 ]; then
     run make clean

@@ -12,7 +12,8 @@ else
   export CFLAGS="${TUNING_FLAGS} -O1 -pipe -ggdb -Wall -Wextra -Wformat-signedness -DNETDATA_INTERNAL_CHECKS=1 -I/openssl-static/include -I/libnetfilter-acct-static/include/libnetfilter_acct -I/curl-local/include/curl -I/usr/include/libmnl"
 fi
 
-export LDFLAGS="-Wl,--gc-sections -L/openssl-static/lib64 -L/libnetfilter-acct-static/lib -lnetfilter_acct -L/usr/lib -lmnl -L/usr/lib -lzstd -L/curl-local/lib"
+LDFLAGS="-Wl,--gc-sections -L/openssl-static/lib64 -L/libnetfilter-acct-static/lib -lnetfilter_acct -L/usr/lib -lmnl -L/usr/lib -lzstd -L/curl-local/lib $(errata_ldflags)"
+export LDFLAGS
 export PKG_CONFIG_PATH="/openssl-static/lib64/pkgconfig:/libnetfilter-acct-static/lib/pkgconfig:/usr/lib/pkgconfig:/curl-local/lib/pkgconfig"
 
 # We export this to 'yes', installer sets this to .environment.
