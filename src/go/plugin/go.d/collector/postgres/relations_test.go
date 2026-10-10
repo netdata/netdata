@@ -379,7 +379,7 @@ func TestRelationIOUnavailablePairSeedsBaseline(t *testing.T) {
 	}
 	io := func(read, hit any) {
 		mock.ExpectQuery(queryStatIOUserTables(false)).WillReturnRows(sqlmock.NewRows([]string{"datname", "relid", "schemaname", "relname", "heap_blks_read_bytes", "heap_blks_hit_bytes", "idx_blks_read_bytes", "idx_blks_hit_bytes"}).AddRow("db", 1, "public", "t1", 0, 10, read, hit))
-		require.NoError(t, c.doDBQueryStatIOUserTables(db))
+		require.NoError(t, c.doDBQueryStatIOUserTables(db, true))
 	}
 	stats()
 	io(nil, nil)

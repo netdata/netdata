@@ -31,6 +31,8 @@ func TestRelationSelectionPostgreSQL(t *testing.T) {
 	db, err := sql.Open("pgx", dsn)
 	require.NoError(t, err)
 	t.Cleanup(func() { _ = db.Close() })
+	var primaryName string
+	require.NoError(t, db.QueryRow(`SELECT current_database()`).Scan(&primaryName))
 	_, err = db.Exec(`DROP DATABASE IF EXISTS netdata_top_secondary WITH (FORCE)`)
 	require.NoError(t, err)
 	_, err = db.Exec(`DROP TABLE IF EXISTS a,b,c`)
@@ -99,9 +101,9 @@ func TestRelationSelectionPostgreSQL(t *testing.T) {
 	}
 	assert.Contains(t, mx, "table_c_db_netdata_top_secondary_schema_public_n_tup_ins")
 	assert.NotContains(t, mx, "table_a_db_netdata_top_secondary_schema_public_n_tup_ins")
-	assert.Contains(t, mx, "table_b_db_postgres_schema_public_n_tup_ins")
-	assert.NotContains(t, mx, "table_a_db_postgres_schema_public_n_tup_ins")
-	assert.Contains(t, mx, "index_a_pkey_table_a_db_postgres_schema_public_size")
+	assert.Contains(t, mx, "table_b_db_"+primaryName+"_schema_public_n_tup_ins")
+	assert.NotContains(t, mx, "table_a_db_"+primaryName+"_schema_public_n_tup_ins")
+	assert.Contains(t, mx, "index_a_pkey_table_a_db_"+primaryName+"_schema_public_size")
 	// Exercise real bound SQL, including bloat for selected indexes on unselected tables.
 	require.NoError(t, c.doDBQueryBloat(c.db))
 	require.NoError(t, c.doDBQueryColumns(c.db))

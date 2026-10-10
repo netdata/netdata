@@ -243,3 +243,22 @@ type indexMetrics struct {
 type incDelta struct{ prev, last int64 }
 
 func (pc *incDelta) delta() int64 { return pc.last - pc.prev }
+
+// Unknown I/O pairs stay unavailable until a complete source observation.
+func newTableMetrics(owner *sql.DB, oid uint32, name, db, schema string) *tableMetrics {
+	return &tableMetrics{
+		owner:         owner,
+		oid:           oid,
+		name:          name,
+		db:            db,
+		schema:        schema,
+		heapBlksRead:  incDelta{last: -1},
+		heapBlksHit:   incDelta{last: -1},
+		idxBlksRead:   incDelta{last: -1},
+		idxBlksHit:    incDelta{last: -1},
+		toastBlksRead: incDelta{last: -1},
+		toastBlksHit:  incDelta{last: -1},
+		tidxBlksRead:  incDelta{last: -1},
+		tidxBlksHit:   incDelta{last: -1},
+	}
+}

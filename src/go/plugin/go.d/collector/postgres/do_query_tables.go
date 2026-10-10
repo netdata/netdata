@@ -4,26 +4,25 @@ package postgres
 
 import (
 	"database/sql"
+	"errors"
+	"fmt"
 	"strings"
 )
 
 func (c *Collector) doQueryTablesMetrics() error {
-	if err := c.doQueryStatUserTable(); err != nil {
-		return err
-	}
-	if err := c.doQueryStatIOUserTables(); err != nil {
-		return err
-	}
-
-	return nil
+	return c.queryEachDatabase("table metrics", c.doDBQueryTablesMetrics)
 }
 
-func (c *Collector) doQueryStatUserTable() error {
-	return c.queryEachDatabase("table statistics", c.doDBQueryStatUserTables)
-}
-
-func (c *Collector) doQueryStatIOUserTables() error {
-	return c.queryEachDatabase("table I/O statistics", c.doDBQueryStatIOUserTables)
+func (c *Collector) doDBQueryTablesMetrics(db *sql.DB) error {
+	statsErr := c.doDBQueryStatUserTables(db)
+	ioErr := c.doDBQueryStatIOUserTables(db, statsErr == nil)
+	if statsErr != nil {
+		statsErr = fmt.Errorf("statistics: %w", statsErr)
+	}
+	if ioErr != nil {
+		ioErr = fmt.Errorf("I/O statistics: %w", ioErr)
+	}
+	return errors.Join(statsErr, ioErr)
 }
 
 func (c *Collector) doDBQueryStatUserTables(db *sql.DB) error {
@@ -55,17 +54,11 @@ func (c *Collector) doDBQueryStatUserTables(db *sql.DB) error {
 			schema = value
 		case "relname":
 			name = value
-			m = &tableMetrics{owner: db, oid: oid, db: dbname, schema: schema, name: name}
+			m = newTableMetrics(db, oid, name, dbname, schema)
 			if old, ok := c.mx.tables[name+"_"+dbname+"_"+schema]; ok && old.owner == db && old.oid == oid {
 				*m = *old
 			}
 			m.updated = true
-			if !m.ioSampled {
-				m.heapBlksRead.last, m.heapBlksHit.last = -1, -1
-				m.idxBlksRead.last, m.idxBlksHit.last = -1, -1
-				m.toastBlksRead.last, m.toastBlksHit.last = -1, -1
-				m.tidxBlksRead.last, m.tidxBlksHit.last = -1, -1
-			}
 		case "parent_relname":
 			m.parentName = value
 		case "seq_scan":
@@ -114,7 +107,7 @@ func (c *Collector) doDBQueryStatUserTables(db *sql.DB) error {
 	if err != nil {
 		for _, m := range c.mx.tables {
 			if m.owner == db {
-				m.sampled, m.ioSampled = false, false
+				m.sampled = false
 			}
 		}
 		return err
@@ -137,7 +130,7 @@ func (c *Collector) doDBQueryStatUserTables(db *sql.DB) error {
 	return nil
 }
 
-func (c *Collector) doDBQueryStatIOUserTables(db *sql.DB) error {
+func (c *Collector) doDBQueryStatIOUserTables(db *sql.DB, statsComplete bool) error {
 	filtered := c.MaxDBTables > 0
 	var args []any
 	if filtered {
@@ -152,7 +145,8 @@ func (c *Collector) doDBQueryStatIOUserTables(db *sql.DB) error {
 	var dbname, schema, name string
 	var m *tableMetrics
 	var oid uint32
-	staged := make(map[string]*tableMetrics)
+	staged := make(map[uint32]*tableMetrics)
+	var accepted bool
 	err := c.doDBQuery(db, q, func(column, value string, rowEnd bool) {
 		if value == "" && column != "parent_relname" {
 			value = "-1"
@@ -166,8 +160,13 @@ func (c *Collector) doDBQueryStatIOUserTables(db *sql.DB) error {
 			schema = value
 		case "relname":
 			name = value
-			m = &tableMetrics{}
-			if old := c.mx.tables[name+"_"+dbname+"_"+schema]; old != nil && old.owner == db && old.updated && old.oid == oid {
+			m = newTableMetrics(db, oid, name, dbname, schema)
+			old := c.mx.tables[name+"_"+dbname+"_"+schema]
+			matches := old != nil && old.owner == db && old.oid == oid
+			// A successful stats observation owns this cycle's identity. Otherwise
+			// this complete I/O observation can establish an identity independently.
+			accepted = !statsComplete || (matches && old.updated)
+			if matches {
 				*m = *old
 			}
 			m.ioUpdated = true
@@ -190,8 +189,8 @@ func (c *Collector) doDBQueryStatIOUserTables(db *sql.DB) error {
 		case "tidx_blks_hit_bytes":
 			m.tidxBlksHit.last = parseInt(value)
 		}
-		if rowEnd && m.owner == db {
-			staged[name+"_"+dbname+"_"+schema] = m
+		if rowEnd && accepted {
+			staged[oid] = m
 		}
 	}, args...)
 	if err != nil {
@@ -202,11 +201,23 @@ func (c *Collector) doDBQueryStatIOUserTables(db *sql.DB) error {
 		}
 		return err
 	}
-	for key, m := range staged {
+	for _, m := range staged {
+		key := m.name + "_" + m.db + "_" + m.schema
+		if old := c.mx.tables[key]; old != nil && (old.owner != db || old.oid != m.oid) {
+			c.removeTableCharts(old)
+		}
 		c.mx.tables[key] = m
 	}
-	for _, m := range c.mx.tables {
-		if m.owner == db && !m.ioUpdated {
+	for key, m := range c.mx.tables {
+		if m.owner != db {
+			continue
+		}
+		if current := staged[m.oid]; current != nil && (current.name != m.name || current.schema != m.schema) {
+			c.removeTableCharts(m)
+			delete(c.mx.tables, key)
+			continue
+		}
+		if !m.ioUpdated {
 			m.ioSampled = false
 		}
 	}

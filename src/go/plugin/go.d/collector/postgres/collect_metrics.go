@@ -134,135 +134,12 @@ func (c *Collector) collectMetrics(mx map[string]int64) {
 	mx["locks_utilization"] = calcPercentage(locksHeld, c.mx.maxLocksHeld)
 
 	for _, m := range c.mx.tables {
-		if !m.updated {
+		if !m.updated && !m.ioUpdated {
 			continue
 		}
-		if !m.hasCharts {
-			m.hasCharts = true
-			m.hasBloatCharts = m.bloatSize != nil
-			c.addNewTableCharts(m)
-		}
-		if !m.hasLastAutoVacuumChart && m.lastAutoVacuumAgo > 0 {
-			m.hasLastAutoVacuumChart = true
-			c.addTableLastAutoVacuumAgoChart(m)
-		}
-		if !m.hasLastVacuumChart && m.lastVacuumAgo > 0 {
-			m.hasLastVacuumChart = true
-			c.addTableLastVacuumAgoChart(m)
-		}
-		if !m.hasLastAutoAnalyzeChart && m.lastAutoAnalyzeAgo > 0 {
-			m.hasLastAutoAnalyzeChart = true
-			c.addTableLastAutoAnalyzeAgoChart(m)
-		}
-		if !m.hasLastAnalyzeChart && m.lastAnalyzeAgo > 0 {
-			m.hasLastAnalyzeChart = true
-			c.addTableLastAnalyzeAgoChart(m)
-		}
-		if !m.hasTableIOCharts && m.ioUpdated && m.heapBlksRead.last != -1 {
-			m.hasTableIOCharts = true
-			c.addTableIOChartsCharts(m)
-		}
-		if !m.hasTableIdxIOCharts && m.ioUpdated && m.idxBlksRead.last != -1 {
-			m.hasTableIdxIOCharts = true
-			c.addTableIndexIOCharts(m)
-		}
-		if !m.hasTableTOASTIOCharts && m.ioUpdated && m.toastBlksRead.last != -1 {
-			m.hasTableTOASTIOCharts = true
-			c.addTableTOASTIOCharts(m)
-		}
-		if !m.hasTableTOASTIdxIOCharts && m.ioUpdated && m.tidxBlksRead.last != -1 {
-			m.hasTableTOASTIdxIOCharts = true
-			c.addTableTOASTIndexIOCharts(m)
-		}
-
-		if !m.hasBloatCharts && m.bloatSize != nil {
-			m.hasBloatCharts = true
-			c.addTableBloatCharts(m)
-		}
 		px := fmt.Sprintf("table_%s_db_%s_schema_%s_", m.name, m.db, m.schema)
-
-		mx[px+"seq_scan"] = m.seqScan
-		mx[px+"seq_tup_read"] = m.seqTupRead
-		mx[px+"idx_scan"] = m.idxScan
-		mx[px+"idx_tup_fetch"] = m.idxTupFetch
-		mx[px+"n_live_tup"] = m.nLiveTup
-		mx[px+"n_dead_tup"] = m.nDeadTup
-		mx[px+"n_dead_tup_perc"] = calcPercentage(m.nDeadTup, m.nDeadTup+m.nLiveTup)
-		mx[px+"n_tup_ins"] = m.nTupIns
-		mx[px+"n_tup_upd"] = m.nTupUpd.last
-		mx[px+"n_tup_del"] = m.nTupDel
-		mx[px+"n_tup_hot_upd"] = m.nTupHotUpd.last
-		if m.lastAutoVacuumAgo != -1 {
-			mx[px+"last_autovacuum_ago"] = m.lastAutoVacuumAgo
-		}
-		if m.lastVacuumAgo != -1 {
-			mx[px+"last_vacuum_ago"] = m.lastVacuumAgo
-		}
-		if m.lastAutoAnalyzeAgo != -1 {
-			mx[px+"last_autoanalyze_ago"] = m.lastAutoAnalyzeAgo
-		}
-		if m.lastAnalyzeAgo != -1 {
-			mx[px+"last_analyze_ago"] = m.lastAnalyzeAgo
-		}
-		mx[px+"total_size"] = m.totalSize
-		if m.bloatValid && m.bloatSize != nil && m.bloatSizePerc != nil {
-			mx[px+"bloat_size"] = *m.bloatSize
-			mx[px+"bloat_size_perc"] = *m.bloatSizePerc
-		}
-		if m.nullValid && m.nullColumns != nil {
-			mx[px+"null_columns"] = *m.nullColumns
-		}
-
-		if m.sampled && m.nTupHotUpd.delta() >= 0 && m.nTupUpd.delta() >= 0 {
-			mx[px+"n_tup_hot_upd_perc"] = calcPercentage(m.nTupHotUpd.delta(), m.nTupUpd.delta())
-		}
-		m.sampled = true
-		m.nTupHotUpd.prev, m.nTupUpd.prev = m.nTupHotUpd.last, m.nTupUpd.last
-
-		if m.ioUpdated && m.heapBlksRead.last >= 0 && m.heapBlksHit.last >= 0 {
-			mx[px+"heap_blks_read"] = m.heapBlksRead.last
-			mx[px+"heap_blks_hit"] = m.heapBlksHit.last
-			if m.ioSampled && m.heapBlksRead.prev >= 0 && m.heapBlksHit.prev >= 0 && m.heapBlksRead.delta() >= 0 && m.heapBlksHit.delta() >= 0 {
-				mx[px+"heap_blks_read_perc"] = calcDeltaPercentage(m.heapBlksRead, m.heapBlksHit)
-			}
-			m.heapBlksHit.prev, m.heapBlksRead.prev = m.heapBlksHit.last, m.heapBlksRead.last
-		} else {
-			m.heapBlksHit.prev, m.heapBlksRead.prev = -1, -1
-		}
-
-		if m.ioUpdated && m.idxBlksRead.last >= 0 && m.idxBlksHit.last >= 0 {
-			mx[px+"idx_blks_read"] = m.idxBlksRead.last
-			mx[px+"idx_blks_hit"] = m.idxBlksHit.last
-			if m.ioSampled && m.idxBlksRead.prev >= 0 && m.idxBlksHit.prev >= 0 && m.idxBlksRead.delta() >= 0 && m.idxBlksHit.delta() >= 0 {
-				mx[px+"idx_blks_read_perc"] = calcDeltaPercentage(m.idxBlksRead, m.idxBlksHit)
-			}
-			m.idxBlksHit.prev, m.idxBlksRead.prev = m.idxBlksHit.last, m.idxBlksRead.last
-		} else {
-			m.idxBlksHit.prev, m.idxBlksRead.prev = -1, -1
-		}
-
-		if m.ioUpdated && m.toastBlksRead.last >= 0 && m.toastBlksHit.last >= 0 {
-			mx[px+"toast_blks_read"] = m.toastBlksRead.last
-			mx[px+"toast_blks_hit"] = m.toastBlksHit.last
-			if m.ioSampled && m.toastBlksRead.prev >= 0 && m.toastBlksHit.prev >= 0 && m.toastBlksRead.delta() >= 0 && m.toastBlksHit.delta() >= 0 {
-				mx[px+"toast_blks_read_perc"] = calcDeltaPercentage(m.toastBlksRead, m.toastBlksHit)
-			}
-			m.toastBlksHit.prev, m.toastBlksRead.prev = m.toastBlksHit.last, m.toastBlksRead.last
-		} else {
-			m.toastBlksHit.prev, m.toastBlksRead.prev = -1, -1
-		}
-
-		if m.ioUpdated && m.tidxBlksRead.last >= 0 && m.tidxBlksHit.last >= 0 {
-			mx[px+"tidx_blks_read"] = m.tidxBlksRead.last
-			mx[px+"tidx_blks_hit"] = m.tidxBlksHit.last
-			if m.ioSampled && m.tidxBlksRead.prev >= 0 && m.tidxBlksHit.prev >= 0 && m.tidxBlksRead.delta() >= 0 && m.tidxBlksHit.delta() >= 0 {
-				mx[px+"tidx_blks_read_perc"] = calcDeltaPercentage(m.tidxBlksRead, m.tidxBlksHit)
-			}
-			m.tidxBlksHit.prev, m.tidxBlksRead.prev = m.tidxBlksHit.last, m.tidxBlksRead.last
-		} else {
-			m.tidxBlksHit.prev, m.tidxBlksRead.prev = -1, -1
-		}
-		m.ioSampled = m.ioUpdated
+		c.collectTableStatsMetrics(mx, m, px)
+		c.collectTableIOMetrics(mx, m, px)
 	}
 
 	for _, m := range c.mx.indexes {
@@ -369,4 +246,144 @@ func (c *Collector) resetMetrics() {
 			hasCharts: m.hasCharts,
 		}
 	}
+}
+
+// Each source advances only its own measurements and derivative baselines.
+func (c *Collector) collectTableStatsMetrics(mx map[string]int64, m *tableMetrics, px string) {
+	if !m.updated {
+		m.sampled = false
+		return
+	}
+	if !m.hasCharts {
+		m.hasCharts = true
+		m.hasBloatCharts = m.bloatSize != nil
+		c.addNewTableCharts(m)
+	}
+	if !m.hasLastAutoVacuumChart && m.lastAutoVacuumAgo > 0 {
+		m.hasLastAutoVacuumChart = true
+		c.addTableLastAutoVacuumAgoChart(m)
+	}
+	if !m.hasLastVacuumChart && m.lastVacuumAgo > 0 {
+		m.hasLastVacuumChart = true
+		c.addTableLastVacuumAgoChart(m)
+	}
+	if !m.hasLastAutoAnalyzeChart && m.lastAutoAnalyzeAgo > 0 {
+		m.hasLastAutoAnalyzeChart = true
+		c.addTableLastAutoAnalyzeAgoChart(m)
+	}
+	if !m.hasLastAnalyzeChart && m.lastAnalyzeAgo > 0 {
+		m.hasLastAnalyzeChart = true
+		c.addTableLastAnalyzeAgoChart(m)
+	}
+
+	if !m.hasBloatCharts && m.bloatSize != nil {
+		m.hasBloatCharts = true
+		c.addTableBloatCharts(m)
+	}
+
+	mx[px+"seq_scan"] = m.seqScan
+	mx[px+"seq_tup_read"] = m.seqTupRead
+	mx[px+"idx_scan"] = m.idxScan
+	mx[px+"idx_tup_fetch"] = m.idxTupFetch
+	mx[px+"n_live_tup"] = m.nLiveTup
+	mx[px+"n_dead_tup"] = m.nDeadTup
+	mx[px+"n_dead_tup_perc"] = calcPercentage(m.nDeadTup, m.nDeadTup+m.nLiveTup)
+	mx[px+"n_tup_ins"] = m.nTupIns
+	mx[px+"n_tup_upd"] = m.nTupUpd.last
+	mx[px+"n_tup_del"] = m.nTupDel
+	mx[px+"n_tup_hot_upd"] = m.nTupHotUpd.last
+	if m.lastAutoVacuumAgo != -1 {
+		mx[px+"last_autovacuum_ago"] = m.lastAutoVacuumAgo
+	}
+	if m.lastVacuumAgo != -1 {
+		mx[px+"last_vacuum_ago"] = m.lastVacuumAgo
+	}
+	if m.lastAutoAnalyzeAgo != -1 {
+		mx[px+"last_autoanalyze_ago"] = m.lastAutoAnalyzeAgo
+	}
+	if m.lastAnalyzeAgo != -1 {
+		mx[px+"last_analyze_ago"] = m.lastAnalyzeAgo
+	}
+	mx[px+"total_size"] = m.totalSize
+	if m.bloatValid && m.bloatSize != nil && m.bloatSizePerc != nil {
+		mx[px+"bloat_size"] = *m.bloatSize
+		mx[px+"bloat_size_perc"] = *m.bloatSizePerc
+	}
+	if m.nullValid && m.nullColumns != nil {
+		mx[px+"null_columns"] = *m.nullColumns
+	}
+
+	if m.sampled && m.nTupHotUpd.delta() >= 0 && m.nTupUpd.delta() >= 0 {
+		mx[px+"n_tup_hot_upd_perc"] = calcPercentage(m.nTupHotUpd.delta(), m.nTupUpd.delta())
+	}
+	m.sampled = true
+	m.nTupHotUpd.prev, m.nTupUpd.prev = m.nTupHotUpd.last, m.nTupUpd.last
+}
+
+func (c *Collector) collectTableIOMetrics(mx map[string]int64, m *tableMetrics, px string) {
+	if !m.ioUpdated {
+		m.ioSampled = false
+		return
+	}
+	if !m.hasTableIOCharts && m.heapBlksRead.last != -1 {
+		m.hasTableIOCharts = true
+		c.addTableIOChartsCharts(m)
+	}
+	if !m.hasTableIdxIOCharts && m.idxBlksRead.last != -1 {
+		m.hasTableIdxIOCharts = true
+		c.addTableIndexIOCharts(m)
+	}
+	if !m.hasTableTOASTIOCharts && m.toastBlksRead.last != -1 {
+		m.hasTableTOASTIOCharts = true
+		c.addTableTOASTIOCharts(m)
+	}
+	if !m.hasTableTOASTIdxIOCharts && m.tidxBlksRead.last != -1 {
+		m.hasTableTOASTIdxIOCharts = true
+		c.addTableTOASTIndexIOCharts(m)
+	}
+
+	if m.heapBlksRead.last >= 0 && m.heapBlksHit.last >= 0 {
+		mx[px+"heap_blks_read"] = m.heapBlksRead.last
+		mx[px+"heap_blks_hit"] = m.heapBlksHit.last
+		if m.ioSampled && m.heapBlksRead.prev >= 0 && m.heapBlksHit.prev >= 0 && m.heapBlksRead.delta() >= 0 && m.heapBlksHit.delta() >= 0 {
+			mx[px+"heap_blks_read_perc"] = calcDeltaPercentage(m.heapBlksRead, m.heapBlksHit)
+		}
+		m.heapBlksHit.prev, m.heapBlksRead.prev = m.heapBlksHit.last, m.heapBlksRead.last
+	} else {
+		m.heapBlksHit.prev, m.heapBlksRead.prev = -1, -1
+	}
+
+	if m.idxBlksRead.last >= 0 && m.idxBlksHit.last >= 0 {
+		mx[px+"idx_blks_read"] = m.idxBlksRead.last
+		mx[px+"idx_blks_hit"] = m.idxBlksHit.last
+		if m.ioSampled && m.idxBlksRead.prev >= 0 && m.idxBlksHit.prev >= 0 && m.idxBlksRead.delta() >= 0 && m.idxBlksHit.delta() >= 0 {
+			mx[px+"idx_blks_read_perc"] = calcDeltaPercentage(m.idxBlksRead, m.idxBlksHit)
+		}
+		m.idxBlksHit.prev, m.idxBlksRead.prev = m.idxBlksHit.last, m.idxBlksRead.last
+	} else {
+		m.idxBlksHit.prev, m.idxBlksRead.prev = -1, -1
+	}
+
+	if m.toastBlksRead.last >= 0 && m.toastBlksHit.last >= 0 {
+		mx[px+"toast_blks_read"] = m.toastBlksRead.last
+		mx[px+"toast_blks_hit"] = m.toastBlksHit.last
+		if m.ioSampled && m.toastBlksRead.prev >= 0 && m.toastBlksHit.prev >= 0 && m.toastBlksRead.delta() >= 0 && m.toastBlksHit.delta() >= 0 {
+			mx[px+"toast_blks_read_perc"] = calcDeltaPercentage(m.toastBlksRead, m.toastBlksHit)
+		}
+		m.toastBlksHit.prev, m.toastBlksRead.prev = m.toastBlksHit.last, m.toastBlksRead.last
+	} else {
+		m.toastBlksHit.prev, m.toastBlksRead.prev = -1, -1
+	}
+
+	if m.tidxBlksRead.last >= 0 && m.tidxBlksHit.last >= 0 {
+		mx[px+"tidx_blks_read"] = m.tidxBlksRead.last
+		mx[px+"tidx_blks_hit"] = m.tidxBlksHit.last
+		if m.ioSampled && m.tidxBlksRead.prev >= 0 && m.tidxBlksHit.prev >= 0 && m.tidxBlksRead.delta() >= 0 && m.tidxBlksHit.delta() >= 0 {
+			mx[px+"tidx_blks_read_perc"] = calcDeltaPercentage(m.tidxBlksRead, m.tidxBlksHit)
+		}
+		m.tidxBlksHit.prev, m.tidxBlksRead.prev = m.tidxBlksHit.last, m.tidxBlksRead.last
+	} else {
+		m.tidxBlksHit.prev, m.tidxBlksRead.prev = -1, -1
+	}
+	m.ioSampled = true
 }
