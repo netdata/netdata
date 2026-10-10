@@ -50,10 +50,13 @@ func (c *Collector) doDBQueryColumns(db *sql.DB) error {
 		return err
 	}
 	for key, m := range c.mx.tables {
-		if m.owner != db || !m.updated {
+		if m.owner != db {
 			continue
 		}
-		m.nullValid = true
+		m.nullValid = m.updated
+		if !m.updated {
+			continue
+		}
 		count := counts[key]
 		if count > 0 || m.nullColumns != nil {
 			m.nullColumns = new(count)

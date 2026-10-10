@@ -140,7 +140,7 @@ func (s *relationSelection) choose(rows map[uint32]relationActivity, reset strin
 	})
 	selected := make(map[uint32]relationActivity)
 	// A first observation cannot establish recent activity in an oversized database.
-	if len(rows) <= int(limit) || !s.observed.IsZero() {
+	if int64(len(rows)) <= limit || !s.observed.IsZero() {
 		for i, row := range ranked {
 			if int64(i) >= limit {
 				break
@@ -148,7 +148,7 @@ func (s *relationSelection) choose(rows map[uint32]relationActivity, reset strin
 			selected[row.oid] = row.relationActivity
 		}
 	}
-	s.warmed = !s.observed.IsZero() || len(rows) <= int(limit)
+	s.warmed = !s.observed.IsZero() || int64(len(rows)) <= limit
 	s.previous, s.selected, s.reset, s.observed = rows, selected, reset, now
 }
 
