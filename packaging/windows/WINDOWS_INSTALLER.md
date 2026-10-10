@@ -292,27 +292,6 @@ powershell.exe -NoProfile -ExecutionPolicy Bypass -File "C:\Program Files\Netdat
 
 Pass a file name relative to the Netdata configuration directory to open another supported configuration. Without a file name, the helper lists available configuration files. For the complete configuration workflow and directory layout, see [Netdata Agent Configuration](/docs/netdata-agent/configuration/README.md#edit-configuration-files).
 
-### Building from a Windows development environment
-
-The Windows build supports both the native PowerShell scripts and direct commands from an MSYS2 UCRT64 terminal. Install the UCRT64 dependencies first by running `packaging/windows/install-dependencies.ps1` in PowerShell, then use either workflow from the repository root.
-
-PowerShell workflow:
-
-```powershell
-powershell.exe -NoProfile -ExecutionPolicy Bypass -File packaging/windows/build.ps1
-powershell.exe -NoProfile -ExecutionPolicy Bypass -File packaging/windows/package.ps1
-```
-
-UCRT64 terminal workflow:
-
-```bash
-./packaging/windows/compile-on-windows.sh
-./packaging/windows/package-windows.sh
-./packaging/windows/wix-installer.sh
-```
-
-The terminal workflow requires `MSYSTEM=UCRT64`, the UCRT64 CMake, Ninja, GCC, Go, Rust, and WiX 5.0.2 tools, plus the Windows SDK message/resource compilers and Visual Studio C++ linker. Run `install-dependencies.ps1` first for the UCRT64 packages and WiX; install the Windows SDK and Visual Studio C++ build tools on the build host. The packaging script recreates only `build/stage/opt/netdata`, and the final script writes `packaging/windows/netdata-x64.msi`. Both workflows keep the MSYS2 runtime out of the installed product.
-
 ### Migrating an existing MSYS2 development environment
 
 The installer no longer ships an MSYS2 shell. Build hosts still use an MSYS2 installation to provision the UCRT64 compiler and libraries with `pacman`; keep the MSYS2 base packages required by `pacman`.
@@ -330,6 +309,31 @@ Then preview a removal command for the specific obsolete package names you ident
 ```
 
 `--print` shows the requested targets; when you run the interactive `pacman -Rns` command, review its full transaction summary and answer `N` if it proposes removing anything you still need. Do not remove the MSYS2 base, `pacman`, or packages still required by another toolchain. Netdata does not uninstall packages automatically. See the [MSYS2 package management guide](https://www.msys2.org/docs/package-management/) for package and removal behavior.
+
+## Building Netdata on Windows
+
+Both build workflows require the UCRT64 dependencies installed by `packaging/windows/install-dependencies.ps1`, the Windows SDK message/resource compilers (`mc.exe` and `rc.exe`), and Visual Studio C++ x64 build tools including `link.exe`. WiX 5.0.2 is required to create the MSI and is installed by the dependency script.
+
+### PowerShell workflow
+
+Run these commands from the repository root:
+
+```powershell
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File packaging/windows/build.ps1
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File packaging/windows/package.ps1
+```
+
+### UCRT64 terminal workflow
+
+Run these commands from the repository root in an MSYS2 UCRT64 terminal (`MSYSTEM=UCRT64`):
+
+```bash
+./packaging/windows/compile-on-windows.sh
+./packaging/windows/package-windows.sh
+./packaging/windows/wix-installer.sh
+```
+
+The terminal workflow uses UCRT64 CMake, Ninja, GCC, Go, Rust, and WiX. The packaging script recreates only `build/stage/opt/netdata`, and the final script writes `packaging/windows/netdata-x64.msi`. Both workflows keep the MSYS2 runtime out of the installed product.
 
 ## Uninstalling Netdata on Windows
 

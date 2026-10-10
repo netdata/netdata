@@ -15,11 +15,13 @@ $cmake = Join-Path $toolBin 'cmake.exe'
 if (-not (Test-Path (Join-Path $buildDir 'cmake_install.cmake'))) {
     throw "No configured CMake build found at $buildDir. Run build.ps1 first."
 }
+$stageMarker = Join-Path $buildDir '.netdata-package-stage-ready'
+if (Test-Path -LiteralPath $stageMarker) { Remove-Item -LiteralPath $stageMarker -Force }
 Clear-WindowsInstallStage $buildDir $repoRoot
-& $cmake --install $buildDir
+$packageRoot = Join-Path $buildDir 'stage\opt\netdata'
+& $cmake --install $buildDir --prefix $packageRoot
 if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
-$packageRoot = Join-Path $buildDir 'stage\opt\netdata'
 Copy-Item -LiteralPath (Join-Path $PSScriptRoot 'copy_files.ps1') -Destination (Join-Path $packageRoot 'usr\libexec\netdata\copy_files.ps1') -Force
 
 $legacyRuntimePaths = @(
@@ -31,6 +33,7 @@ if (Test-Path (Join-Path $packageRoot 'msys64')) { $legacyRuntimePaths += (Join-
 if ($legacyRuntimePaths) {
     throw "Staging tree contains legacy MSYS2 runtime files. Use a fresh BUILD_DIR before packaging: $($legacyRuntimePaths -join ', ')"
 }
+New-Item -ItemType File -Path $stageMarker -Force | Out-Null
 
 $wix = Resolve-WixExecutable $env:WIX_BIN (Get-NetdataWixVersion)
 if (-not $wix) { throw 'WiX v5 is not installed. Run install-dependencies.ps1 first.' }

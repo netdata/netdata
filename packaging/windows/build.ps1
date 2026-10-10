@@ -49,8 +49,12 @@ $configureArgs = @(
 )
 if ($WindowsPathPrefix) { $configureArgs += "-DNETDATA_WINDOWS_PATH_PREFIX=$WindowsPathPrefix" }
 if ($env:EXTRA_CMAKE_OPTIONS) { $configureArgs += ConvertFrom-WindowsCommandLine $env:EXTRA_CMAKE_OPTIONS }
+# WiX embeds this configure-time prefix, so caller options must not redirect it.
+$configureArgs += "-DCMAKE_INSTALL_PREFIX=$installPrefix"
 
 New-Item -ItemType Directory -Force -Path $buildDir | Out-Null
+$stageMarker = Join-Path $buildDir '.netdata-package-stage-ready'
+if (Test-Path -LiteralPath $stageMarker) { Remove-Item -LiteralPath $stageMarker -Force }
 try {
     & $cmake @configureArgs
     $configureExitCode = $LASTEXITCODE
@@ -59,7 +63,7 @@ try {
 }
 if ($configureExitCode -ne 0) { exit $configureExitCode }
 
-& $cmake --build $buildDir -- -k 1
+& $cmake --build $buildDir
 $buildExitCode = $LASTEXITCODE
 if ($buildExitCode -ne 0) {
     Write-Host "CMake build failed with exit code $buildExitCode. Inspect the first FAILED target above." -ForegroundColor Red

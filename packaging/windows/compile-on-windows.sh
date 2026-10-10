@@ -106,6 +106,10 @@ else
 fi
 
 mkdir -p "${build}"
+# Use the physical path so the WiX source prefix matches package-windows.sh's stage.
+build="$(cd -- "${build}" && pwd -P)"
+stage_marker="${build}/.netdata-package-stage-ready"
+rm -f -- "${stage_marker}"
 build_win="$(cygpath -aw "${build}")"
 repo_win="$(cygpath -aw "${repo_root}")"
 prefix_win="$(cygpath -aw /ucrt64)"
@@ -142,9 +146,11 @@ fi
 if ((${#extra_cmake_options[@]})); then
     cmake_args+=("${extra_cmake_options[@]}")
 fi
+# WiX embeds this configure-time prefix, so caller options must not redirect it.
+cmake_args+=("-DCMAKE_INSTALL_PREFIX=${install_prefix_win}")
 
 CFLAGS="${build_cflags}" /ucrt64/bin/cmake.exe "${cmake_args[@]}"
-/ucrt64/bin/cmake.exe --build "${build_win}" -- -k 1
+/ucrt64/bin/cmake.exe --build "${build_win}"
 if [[ ! -x "${build}/netdata.exe" ]]; then
     echo "Build returned success but ${build}/netdata.exe was not produced." >&2
     exit 1

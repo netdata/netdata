@@ -23,18 +23,31 @@ if [[ "${build_root}" == "${repo_root}" || ! -f "${build_root}/CMakeCache.txt" ]
     echo "Refusing to clean install stage outside a configured build directory: ${build_root}" >&2
     exit 1
 fi
-stage_dir="${build_root}/stage/opt/netdata"
+stage_root="${build_root}/stage"
+stage_opt="${stage_root}/opt"
+stage_dir="${stage_opt}/netdata"
+stage_marker="${build_root}/.netdata-package-stage-ready"
 case "${stage_dir}/" in
     "${build_root}/"*) ;;
     *) echo "Refusing to clean install stage outside build directory: ${stage_dir}" >&2; exit 1 ;;
 esac
+
+rm -f -- "${stage_marker}"
+for component in "${stage_root}" "${stage_opt}" "${stage_dir}"; do
+    if [[ -L "${component}" ]]; then
+        echo "Refusing to clean install stage through symlink: ${component}" >&2
+        exit 1
+    fi
+done
 
 if [[ -e "${stage_dir}" ]]; then
     printf 'Recreating generated install stage: %s\n' "${stage_dir}"
     rm -rf -- "${stage_dir}"
 fi
 mkdir -p "${stage_dir}"
-/ucrt64/bin/cmake.exe --install "$(cygpath -aw "${build_root}")"
+build_root_win="$(cygpath -aw "${build_root}")"
+stage_dir_win="$(cygpath -aw "${stage_dir}")"
+/ucrt64/bin/cmake.exe --install "${build_root_win}" --prefix "${stage_dir_win}"
 
 package_root="${stage_dir}"
 copy_helper="${package_root}/usr/libexec/netdata/copy_files.ps1"
@@ -53,4 +66,5 @@ if [[ -n "${legacy_runtime_paths}" ]]; then
     printf '%s\n' "${legacy_runtime_paths}" >&2
     exit 1
 fi
+touch -- "${stage_marker}"
 echo "Install tree staged at ${package_root}"

@@ -43,7 +43,7 @@ for candidate in "${wix_candidates[@]}"; do
         fi
     fi
     version_output="$("${candidate}" --version 2>&1)" || continue
-    if grep -Eq "(^|[^0-9.])${required_wix_version}([^0-9.]|$)" <<<"${version_output}"; then
+    if grep -Eq "(^|[^0-9.])${required_wix_version//./\\.}([^0-9.]|$)" <<<"${version_output}"; then
         wix="${candidate}"
         break
     fi
@@ -52,6 +52,8 @@ if [[ -z "${wix}" ]]; then
     echo "WiX ${required_wix_version} was not found. Run install-dependencies.ps1 or set WIX_BIN to that version." >&2
     exit 1
 fi
+wix_dir="$(cd -- "$(dirname -- "${wix}")" && pwd -P)"
+wix="${wix_dir}/$(basename -- "${wix}")"
 
 if [[ "${WIX_ARCH:-x64}" != "x64" ]]; then
     echo "This build produces x64 binaries; WIX_ARCH must be x64." >&2
@@ -59,6 +61,18 @@ if [[ "${WIX_ARCH:-x64}" != "x64" ]]; then
 fi
 if [[ ! -f "${build}/netdata.wxs" ]]; then
     echo "No generated ${build}/netdata.wxs found. Run compile-on-windows.sh first." >&2
+    exit 1
+fi
+stage_dir="${build}/stage/opt/netdata"
+stage_marker="${build}/.netdata-package-stage-ready"
+for component in "${build}/stage" "${build}/stage/opt" "${stage_dir}"; do
+    if [[ -L "${component}" ]]; then
+        echo "Install stage contains a symlink: ${component}. Run package-windows.sh to recreate it." >&2
+        exit 1
+    fi
+done
+if [[ ! -d "${stage_dir}" || ! -f "${stage_marker}" || -L "${stage_marker}" ]]; then
+    echo "No completed install stage found at ${stage_dir}. Run package-windows.sh first." >&2
     exit 1
 fi
 

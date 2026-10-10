@@ -209,6 +209,17 @@ function Clear-WindowsInstallStage([string]$BuildDirectory, [string]$RepoRoot) {
     if (-not $stagePath.StartsWith($buildPath + [IO.Path]::DirectorySeparatorChar, [StringComparison]::OrdinalIgnoreCase)) {
         throw "Refusing to clean a stage path outside the build directory: $stagePath"
     }
+    $stageComponents = @(
+        (Join-Path $buildPath 'stage'),
+        (Join-Path $buildPath 'stage\opt'),
+        $stagePath
+    )
+    foreach ($component in $stageComponents) {
+        $item = Get-Item -LiteralPath $component -Force -ErrorAction SilentlyContinue
+        if ($item -and ($item.Attributes -band [IO.FileAttributes]::ReparsePoint)) {
+            throw "Refusing to clean install stage through a reparse point: $component"
+        }
+    }
     if (Test-Path -LiteralPath $stagePath) { Remove-Item -LiteralPath $stagePath -Recurse -Force }
     New-Item -ItemType Directory -Path $stagePath -Force | Out-Null
 }
