@@ -5,10 +5,10 @@ package journal
 import (
 	"context"
 	"encoding/binary"
-	"fmt"
 	"os"
 	"path/filepath"
 	"testing"
+	"testing/synctest"
 	"time"
 
 	"github.com/netdata/systemd-journal-sdk/go/journal"
@@ -116,57 +116,46 @@ func TestPrivateCleanup(t *testing.T) {
 	assert.ErrorIs(t, err, os.ErrNotExist)
 }
 
-// A short SDK age models an archive crossing the old limit between sweeps.
-// Relaxing retention must preserve it under the newly loaded policy.
-func TestRelaxedRetentionDoesNotApplyPreviousAge(t *testing.T) {
+func TestPrivateCleanupPreservesUnsafeFiles(t *testing.T) {
 	ctx := context.Background()
-	root := t.TempDir()
-	saved := time.Now()
-	host, err := journalhost.Load(journalhost.LoadOptions{
-		StateDir: filepath.Join(root, "identity"),
-	})
+	s, err := Open(ctx, "")
 	require.NoError(t, err)
-	config := journal.LogConfig{
-		Source:              "dem",
-		StrictSystemdNaming: true,
-		Options: journal.Options{
-			MachineID: host.MachineID(),
-			BootID:    host.BootID(),
-			Compact:   true,
-		},
-	}
-	log, err := journal.NewLog(root, config)
-	require.NoError(t, err)
-	opts := host.EntryOptions()
-	opts.RealtimeUsec = uint64(saved.UnixMicro())
-	fields, err := appendEnvelope(testFields())
-	require.NoError(t, err)
-	require.NoError(t, log.Append(fields, opts))
-	require.NoError(t, log.Close())
-	config.OpenMode = journal.LogOpenEager
-	config.RetentionPolicy = journal.RetentionPolicy{}.WithMaxAge(time.Second).WithMaxBytes(1 << 30)
-	log, err = journal.NewLog(root, config)
-	require.NoError(t, err)
-	s := &Store{
-		gate:   make(chan struct{}, 1),
-		root:   root,
-		host:   host,
-		config: config,
-		log:    log,
-	}
-	t.Cleanup(func() { require.NoError(t, s.Close()) })
-	require.Equal(t, 1, countEntries(t, s))
-	appendEntry(t, s)
-	time.Sleep(time.Until(saved.Add(time.Second + 50*time.Millisecond)))
+	t.Cleanup(func() { _ = s.Close(); require.NoError(t, os.RemoveAll(s.root)) })
 	require.NoError(t, s.EnforceHistoryRetention(ctx, 30, 1<<30))
-	assert.Equal(t, 2, countEntries(t, s), "an increased allowance must not enforce the retired shorter age")
+	appendEntry(t, s)
+	damaged := filepath.Join(filepath.Dir(s.log.ActivePath()), "dem@damaged.journal~")
+	require.NoError(t, os.WriteFile(damaged, []byte("preserve evidence"), 0600))
+	require.Error(t, s.EnforceHistoryRetention(ctx, 30, 1<<30))
+	require.Error(t, s.Close())
+	data, err := os.ReadFile(damaged)
+	require.NoError(t, err)
+	assert.Equal(t, "preserve evidence", string(data))
 }
 
-func TestIdleRetentionLeavesWriterLazy(t *testing.T) {
+func TestRelaxedRetentionDoesNotApplyPreviousAge(t *testing.T) {
+	synctest.Test(t, func(t *testing.T) {
+		ctx := context.Background()
+		s := newTestStore(t)
+		require.NoError(t, s.EnforceHistoryRetention(ctx, 1, 1<<30))
+		appendEntry(t, s)
+		time.Sleep(2 * 24 * time.Hour)
+		require.NoError(t, s.EnforceHistoryRetention(ctx, 30, 1<<30))
+		assert.Equal(t, 1, countEntries(t, s), "a relaxed policy must not enforce the retired shorter age")
+	})
+}
+
+func TestOrdinaryRetentionPreservesActiveFile(t *testing.T) {
 	s := newTestStore(t)
+	ctx := context.Background()
+	require.NoError(t, s.EnforceHistoryRetention(ctx, 30, 1<<30))
 	appendEntry(t, s)
-	require.NoError(t, s.EnforceHistoryRetention(context.Background(), 30, 1<<30))
-	assert.Empty(t, s.log.ActivePath(), "idle sweep must leave the new chain lazy")
+	active := s.log.ActivePath()
+	require.NotEmpty(t, active)
+	require.NoError(t, s.EnforceHistoryRetention(ctx, 30, 1<<30))
+	assert.Equal(t, active, s.log.ActivePath())
+	files, err := filepath.Glob(filepath.Join(s.root, "*", "*.journal"))
+	require.NoError(t, err)
+	assert.Equal(t, []string{active}, files)
 }
 
 func TestAppendEnvelopeRejectsIncompatibleFieldsBeforeAttempt(t *testing.T) {
@@ -288,32 +277,42 @@ func TestStartupRejectsUnversionedArchiveWithoutRemoval(t *testing.T) {
 }
 
 func TestFailedJournalRejectsQueriesAndRetention(t *testing.T) {
-	s, err := Open(context.Background(), "")
+	ctx := context.Background()
+	s, err := Open(ctx, "")
 	require.NoError(t, err)
 	t.Cleanup(func() { _ = s.Close(); require.NoError(t, os.RemoveAll(s.root)) })
+	require.NoError(t, s.EnforceHistoryRetention(ctx, 30, 1<<30))
 	appendEntry(t, s)
 	active := s.log.ActivePath()
-	reader, err := journal.OpenFile(active)
-	require.NoError(t, err)
-	header := reader.Header()
-	archive := filepath.Join(filepath.Dir(active), fmt.Sprintf("dem@%s-%016x-%016x.journal", header.SeqnumID().String(), header.HeadEntrySeqnum(), header.HeadEntryRealtime()))
-	require.NoError(t, reader.Close())
-	// A directory at the target produces an actual archive-rename failure after
-	// the SDK has mutated/synced the active file. Cleanup must preserve that state.
-	require.NoError(t, os.Mkdir(archive, 0700))
-	err = s.EnforceHistoryRetention(context.Background(), 1, 1)
+	dir := filepath.Dir(active)
+	// Readable metadata lets preflight succeed, while a non-writable directory
+	// makes the archive rename fail after its header has been finalized/synced.
+	probe := filepath.Join(dir, "permission-probe")
+	require.NoError(t, os.WriteFile(probe, nil, 0600))
+	require.NoError(t, os.Chmod(dir, 0550))
+	t.Cleanup(func() { require.NoError(t, os.Chmod(dir, 0750)) })
+	if err := os.Rename(probe, probe+"-renamed"); err == nil {
+		t.Skip("filesystem/user does not enforce directory write permissions")
+	} else {
+		require.ErrorIs(t, err, os.ErrPermission)
+	}
+	err = s.EnforceHistoryRetention(ctx, 30, MinHistoryBytes)
 	require.ErrorIs(t, err, journal.ErrWriterFailed)
 	before, err := os.ReadFile(active)
 	require.NoError(t, err)
-	_, _, err = s.OpenReader(context.Background())
+	_, _, err = s.OpenReader(ctx)
 	assert.ErrorIs(t, err, journal.ErrWriterFailed)
-	attempted, err := s.Append(context.Background(), testFields())
+	attempted, err := s.Append(ctx, testFields())
 	assert.False(t, attempted)
 	assert.ErrorIs(t, err, journal.ErrWriterFailed)
-	assert.ErrorIs(t, s.Sync(context.Background()), journal.ErrWriterFailed)
-	assert.ErrorIs(t, s.EnforceHistoryRetention(context.Background(), 1, 1), journal.ErrWriterFailed)
-	// SDK cleanup is idempotent after the failed archive has already closed it.
-	require.NoError(t, s.Close())
+	assert.ErrorIs(t, s.Sync(ctx), journal.ErrWriterFailed)
+	assert.ErrorIs(t, s.EnforceHistoryRetention(ctx, 30, MinHistoryBytes), journal.ErrWriterFailed)
+	status, err := s.Status(ctx)
+	require.NoError(t, err)
+	assert.NotEmpty(t, status.WriterError)
+	assert.NotEmpty(t, status.Cleanup.Error)
+	// Closing a failed writer releases resources and preserves uncertain bytes.
+	assert.ErrorIs(t, s.Close(), journal.ErrWriterFailed)
 	after, err := os.ReadFile(active)
 	require.NoError(t, err, "failed private history is preserved")
 	assert.Equal(t, before, after, "close must not rewrite uncertain metadata")

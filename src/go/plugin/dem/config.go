@@ -6,30 +6,31 @@ import (
 	"os"
 
 	"github.com/netdata/netdata/go/plugins/pkg/multipath"
+	"github.com/netdata/netdata/go/plugins/plugin/dem/journal"
 	"github.com/netdata/netdata/go/plugins/plugin/dem/synthetic/runner"
 	"gopkg.in/yaml.v2"
 )
 
-type HistoryConfig struct {
+type RetentionConfig struct {
 	Days     int   `yaml:"days"`
 	MaxBytes int64 `yaml:"max_bytes"`
 }
 type Config struct {
-	History   HistoryConfig `yaml:"history"`
-	Artifacts HistoryConfig `yaml:"artifacts"`
-	Runtime   runner.Config `yaml:"runtime"`
+	History   RetentionConfig `yaml:"history"`
+	Artifacts RetentionConfig `yaml:"artifacts"`
+	Runtime   runner.Config   `yaml:"runtime"`
 }
 
 func DefaultConfig() Config {
 	return Config{
-		Artifacts: HistoryConfig{
+		Artifacts: RetentionConfig{
 			Days:     7,
 			MaxBytes: 2 << 30,
 		},
 		Runtime: runner.Config{
 			NodePath: "/usr/bin/node",
 		},
-		History: HistoryConfig{
+		History: RetentionConfig{
 			Days:     30,
 			MaxBytes: 1 << 30,
 		},
@@ -54,21 +55,21 @@ func LoadConfig(paths multipath.MultiPath) (Config, error) {
 	if err = yaml.Unmarshal(data, &cfg); err != nil {
 		return cfg, fmt.Errorf("read dem.conf: %w", err)
 	}
-	if err = cfg.History.validate(); err != nil {
+	if err = cfg.History.validate(journal.MinHistoryBytes); err != nil {
 		return cfg, fmt.Errorf("history.%w", err)
 	}
-	if err = cfg.Artifacts.validate(); err != nil {
+	if err = cfg.Artifacts.validate(1); err != nil {
 		return cfg, fmt.Errorf("artifacts.%w", err)
 	}
 	return cfg, nil
 }
 
-func (c HistoryConfig) validate() error {
+func (c RetentionConfig) validate(minBytes int64) error {
 	if c.Days < 1 || c.Days > 365 {
 		return fmt.Errorf("days must be between 1 and 365")
 	}
-	if c.MaxBytes <= 0 {
-		return fmt.Errorf("max_bytes must be positive")
+	if c.MaxBytes < minBytes {
+		return fmt.Errorf("max_bytes must be at least %d", minBytes)
 	}
 	return nil
 }
