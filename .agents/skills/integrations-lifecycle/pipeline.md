@@ -95,6 +95,10 @@ includes.
 
 ## Stage 1: outputs
 
+Before writing, `attach_descriptions` resolves the page meta description of every documentation-type record with
+`build_description_index` (`description-authoring.md`) and sets it as `description` on both variants; deploy entries get
+none. An invalid or duplicate description prints `Error: ...` and exits 1 before either file is written.
+
 - `integrations/integrations.js`: the `integrations/templates/integrations.js` shell with a two-line `// DO NOT EDIT
   THIS FILE DIRECTLY` banner and `export const categories = [...]; export const integrations = [...]`, holding the rich
   variant. `convert_local_links` rewrites every `](/` to `](https://github.com/netdata/netdata/blob/master/` first, so a

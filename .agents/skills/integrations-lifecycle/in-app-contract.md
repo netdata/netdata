@@ -40,7 +40,8 @@ export const categories = [
 export const integrations = [
   /* flat array; each object carries integration_type, id, meta, keywords, and the rendered section keys of its type
      (for collectors: alerts, metrics, functions, overview, related_resources, setup, troubleshooting) as Markdown
-     strings; integrations.json carries the same objects with the clean variant of those strings */
+     strings; integrations.json carries the same objects with the clean variant of those strings. Every record except
+     deploy also carries `description`: the page meta description as one plain-text line, identical in both files */
 ];
 ```
 
@@ -56,8 +57,11 @@ is why `integrations.js` carries them (`pipeline.md`, "Stage 1: outputs", for th
    render-key list (`how-tos/adding-new-integration-type.md`).
 2. Treat `integrations.js` as a published artifact: the two named exports and the per-integration keys are a contract.
    Coordinate with the cloud-frontend team before renaming or removing a key.
-3. The frontend markers (`{% details %}`, `{% relatedResource %}`, `{% if %}`) are part of the contract. Test a new
+3. A dashboard surface that needs a one-line description SHOULD read `description` instead of deriving one from the
+   `overview` Markdown; it is validated for display alone in a list, card, or search result
+   (`description-authoring.md`).
+4. The frontend markers (`{% details %}`, `{% relatedResource %}`, `{% if %}`) are part of the contract. Test a new
    marker against both the dashboard and the tracked pages before relying on it.
-4. `deploy` entries live only in `integrations.js` (no page), sorted by `quick_start`; a negative value hides the entry
+5. `deploy` entries live only in `integrations.js` (no page), sorted by `quick_start`; a negative value hides the entry
    from the "Add Nodes" dialog.
-5. Never commit `integrations.js` or `integrations.json` here; the dashboard pulls fresh on each build.
+6. Never commit `integrations.js` or `integrations.json` here; the dashboard pulls fresh on each build.
