@@ -13,6 +13,7 @@ import (
 
 	"github.com/netdata/netdata/go/plugins/cmd/internal/agenthost"
 	"github.com/netdata/netdata/go/plugins/cmd/internal/discoveryproviders"
+	"github.com/netdata/netdata/go/plugins/cmd/internal/secretproviders"
 	"github.com/netdata/netdata/go/plugins/logger"
 	"github.com/netdata/netdata/go/plugins/pkg/buildinfo"
 	"github.com/netdata/netdata/go/plugins/pkg/cli"
@@ -58,7 +59,13 @@ func main() {
 	}
 	isTerminal := terminal.IsTerminal()
 
+	secrets, err := secretproviders.Default()
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "initializing secrets: %v\n", err)
+		os.Exit(1)
+	}
 	a := agent.New(agent.Config{
+		Secrets:                   secrets,
 		Name:                      executable.Name,
 		PluginConfigDir:           pluginconfig.ConfigDir(),
 		CollectorsConfigDir:       pluginconfig.CollectorsDir(),

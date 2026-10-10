@@ -24,7 +24,7 @@ Module: ipmi
 
 Monitor hardware sensor readings, sensor health and System Event Log entries through IPMI.
 
-Queries the local Linux OpenIPMI device. The collector reads sensors and SEL metadata; it does not change BMC configuration or clear the event log.
+Queries a local Linux OpenIPMI device or a remote BMC over IPMI 1.5 LAN or IPMI 2.0 LAN+ using the configured account. The collector reads sensors and SEL metadata; it does not change BMC configuration or clear the event log.
 
 This collector is only supported on the following platforms:
 
@@ -32,7 +32,14 @@ This collector is only supported on the following platforms:
 
 This collector supports collecting metrics from multiple instances of this integration.
 
-Local collection requires read/write access to the selected OpenIPMI device. Installation grants no setuid mode, capabilities or device permissions.
+| Permission | Needed when |
+|------------|-------------|
+| Read/write access to the selected OpenIPMI device | Collecting locally with `driver: open`. |
+| BMC account with User privilege and LAN access | Collecting remotely with `driver: lan` or `driver: lanplus`. Some BMC policies require a higher session privilege. |
+
+Installation grants no setuid mode, capabilities or device permissions. Remote collection requires no
+elevated privileges on the Agent host.
+
 
 ### Default Behavior
 
@@ -42,7 +49,7 @@ No jobs start by default. Build the experimental plugin explicitly and configure
 
 #### Limits
 
-This experimental plugin requires Linux amd64 or arm64 and supports local OpenIPMI only. Keep FreeIPMI for legacy direct drivers, OEM interpretation or custom FreeIPMI interpretation files. Unknown or unavailable sensor readings leave gaps. Default FreeIPMI policy treats non-critical threshold assertions as nominal. Do not run both IPMI plugins against the same host with the canonical ipmi job name because chart IDs overlap. The Go collector uses separate ipmi_go.* contexts and the ipmi-go-sensors Function.
+This experimental plugin requires Linux amd64 or arm64. Keep FreeIPMI for legacy direct drivers, OEM interpretation or custom FreeIPMI interpretation files. Unknown or unavailable sensor readings leave gaps. Default FreeIPMI policy treats non-critical threshold assertions as nominal. Do not run both IPMI plugins against the same host with the canonical ipmi job name because chart IDs overlap. The Go collector uses separate ipmi_go.* contexts and the ipmi-go-sensors Function.
 
 #### Performance Impact
 
@@ -59,24 +66,34 @@ Run `sudo ./netdata-installer.sh --enable-plugin-ipmi` from a source checkout. T
 
 #### Select one IPMI plugin
 
-Before activating a Go IPMI job, set `freeipmi = no` in the `[plugins]` section of netdata.conf. Use a trusted configuration and explicit sudo invocation for local debugging when the device is root-only. For normal Agent execution, arrange device access according to the host security policy.
+Before collecting the same host with the canonical ipmi job name, set `freeipmi = no` in the `[plugins]` section of netdata.conf. Use a trusted configuration and explicit sudo invocation for local debugging when the device is root-only. For normal Agent execution, arrange device access according to the host security policy.
+
+#### Enable remote BMC access
+
+For LAN/LAN+, enable IPMI over LAN on the BMC, configure an account with User privilege, and allow UDP traffic from the Agent to the BMC port (623 by default). Select a higher privilege only if the BMC access policy requires it.
 
 
 ### Configuration
 
 #### Options
 
-Options apply to each local IPMI job. Remote LAN/LAN+ is not supported in this experimental build.
+Options apply to each IPMI job. Configure one local device or remote BMC per job.
 
 
 
 | Group | Option | Description | Default | Required |
 |:------|:-----|:------------|:--------|:---------:|
-| **Connection** | driver | Local Linux OpenIPMI transport. Only open is supported. | open | no |
+| **Connection** | driver | IPMI transport: local Linux OpenIPMI, IPMI 1.5 LAN or IPMI 2.0 LAN+. | open | no |
 |  | device | Local OpenIPMI device number. | 0 | no |
+|  | hostname | BMC hostname or IP address for LAN/LAN+, without a URL scheme or port. |  | yes |
+|  | port | BMC UDP port for LAN/LAN+. | 623 | no |
+|  | username | BMC account for LAN/LAN+. Leave empty only for anonymous access. |  | no |
+|  | password | BMC account password for LAN/LAN+. Leave empty only if the account has no password. |  | no |
+|  | privilege_level | Session privilege requested from the BMC. User privilege is sufficient for standard sensor and SEL commands. | user | no |
 | **Collection** | update_every | Data collection frequency in seconds. | 5 | no |
-|  | timeout | Receive timeout for each IPMI command. Stopping a job can wait for an in-flight receive to finish. | 5s | no |
+|  | timeout | Timeout for session setup and for each IPMI command. | 5s | no |
 |  | collect_sel | Collect the System Event Log entry count. | yes | no |
+| **Virtual Node** | vnode | Associates this job with a [Virtual Node](https://learn.netdata.cloud/docs/netdata-agent/configuration/organize-systems-metrics-and-alerts#virtual-nodes). |  | no |
 
 
 
@@ -104,6 +121,33 @@ Monitor the first kernel IPMI device.
 jobs:
   - name: ipmi
     driver: open
+
+```
+###### Remote BMC
+
+Monitor a remote BMC using IPMI 2.0. Use driver lan for BMCs that require IPMI 1.5.
+
+```yaml
+jobs:
+  - name: server-bmc
+    driver: lanplus
+    hostname: bmc.example
+    username: monitor
+    password: '${env:IPMI_PASSWORD}'
+
+```
+###### Attach a remote BMC to a virtual node
+
+Define server-node in vnodes.conf first. Without vnode, metrics belong to the Agent host.
+
+```yaml
+jobs:
+  - name: server-bmc
+    driver: lanplus
+    hostname: bmc.example
+    username: monitor
+    password: '${env:IPMI_PASSWORD}'
+    vnode: server-node
 
 ```
 

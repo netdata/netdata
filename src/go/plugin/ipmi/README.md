@@ -38,11 +38,27 @@ device number). For a controlled test on a root-only device, invoke the binary w
 directory. Normal Agent execution requires device access arranged by the operator. Do not grant broader privileges to
 `go.d.plugin`.
 
-Only local Linux OpenIPMI is supported in this build. LAN/LAN+ will be added after upstream session concurrency and
-shutdown fixes are available. The production FreeIPMI plugin continues to support remote BMCs.
+Remote collection uses an ordinary UDP connection to the BMC and needs no local device permissions. Prefer LAN+
+(IPMI 2.0); use `driver: lan` for BMCs that require IPMI 1.5. For example:
 
-The command timeout defaults to five seconds. The pinned library cannot interrupt an in-flight local receive on
-cancellation; stopping a job can wait for that receive timeout. Cancellation is checked between commands.
+```yaml
+jobs:
+  - name: server-bmc
+    driver: lanplus
+    hostname: bmc.example
+    username: monitor
+    password: '${env:IPMI_PASSWORD}'
+```
+
+The default UDP port is 623 and the requested session privilege is `user`, which permits standard sensor and SEL reads.
+Set `privilege_level: operator` or `administrator` only if required by the BMC policy. IPMI usernames and LAN passwords
+are limited to 16 bytes. The BMC must have IPMI over LAN enabled and permit the configured account to connect.
+
+Metrics belong to the Agent host by default. To attach a remote job to a different host, define a named virtual node in
+`vnodes.conf` and add `vnode: server-node` to the job. Give each BMC a distinct job name.
+
+The command and session setup timeout defaults to five seconds. Cancellation interrupts local response waits and remote
+UDP exchanges. Remote session cleanup gets a separate two-second budget, including after a canceled collection.
 
 ## Compatibility
 
@@ -59,5 +75,6 @@ cancellation; stopping a job can wait for that receive timeout. Cancellation is 
   custom interpretation files and OEM health policy remain covered by FreeIPMI. Kernel-backed local KCS/SSIF is accessed
   through OpenIPMI.
 
-The hardware baseline proves the pinned upstream library can read one local Linux BMC. It does not establish full
-FreeIPMI parity.
+The hardware baseline covers one local Linux BMC with an earlier SDK revision. Automated loopback BMC tests exercise
+LAN/LAN+ authentication, collection, cancellation and session cleanup with the current pin. Physical remote BMC
+compatibility and full FreeIPMI parity remain unverified.
