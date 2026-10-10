@@ -453,6 +453,15 @@ var (
 			{ID: "url_ptn_%s_req_proc_time_avg", Name: "avg", Div: 1000},
 		},
 	}
+	// dimensions are added in runtime, one per HTTP method (average processing time)
+	urlPatternReqMethodProcTime = Chart{
+		ID:       "url_pattern_%s_http_method_request_processing_time",
+		Title:    "Request Processing Time By HTTP Method",
+		Units:    "milliseconds",
+		Fam:      "url ptn %s",
+		Ctx:      "web_log.url_pattern_http_method_request_processing_time",
+		Priority: prioURLPatternStats + 4,
+	}
 )
 
 func newReqProcTimeHistChart(histogram []float64) (*Chart, error) {
@@ -545,6 +554,13 @@ func newURLPatternReqProcTimeChart(name string) *Chart {
 	for _, d := range chart.Dims {
 		d.ID = fmt.Sprintf(d.ID, name)
 	}
+	return chart
+}
+
+func newURLPatternReqMethodProcTimeChart(name string) *Chart {
+	chart := urlPatternReqMethodProcTime.Copy()
+	chart.ID = fmt.Sprintf(chart.ID, name)
+	chart.Fam = fmt.Sprintf(chart.Fam, name)
 	return chart
 }
 
@@ -698,7 +714,7 @@ func (c *Collector) createCharts(line *logLine) error {
 		}
 	}
 	if line.hasReqProcTime() {
-		if err := addReqProcTimeCharts(charts, c.Histogram, c.URLPatterns); err != nil {
+		if err := addReqProcTimeCharts(charts, c.Histogram, c.URLPatterns, line.hasReqMethod()); err != nil {
 			return err
 		}
 	}
@@ -820,7 +836,7 @@ func addBandwidthCharts(charts *Charts, patterns []userPattern) error {
 	return nil
 }
 
-func addReqProcTimeCharts(charts *Charts, histogram []float64, patterns []userPattern) error {
+func addReqProcTimeCharts(charts *Charts, histogram []float64, patterns []userPattern, hasReqMethod bool) error {
 	if err := charts.Add(reqProcTime.Copy()); err != nil {
 		return err
 	}
@@ -828,6 +844,11 @@ func addReqProcTimeCharts(charts *Charts, histogram []float64, patterns []userPa
 		chart := newURLPatternReqProcTimeChart(p.Name)
 		if err := charts.Add(chart); err != nil {
 			return err
+		}
+		if hasReqMethod {
+			if err := charts.Add(newURLPatternReqMethodProcTimeChart(p.Name)); err != nil {
+				return err
+			}
 		}
 	}
 	if len(histogram) == 0 {
