@@ -67,6 +67,7 @@ aclk_query_t *aclk_query_new(aclk_query_type_t type)
     aclk_query_t *query = get_query();
     query->type = type;
     now_monotonic_high_precision_timeval(&query->created_tv);
+    query->created = now_realtime_usec();
     return query;
 }
 
