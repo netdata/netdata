@@ -409,7 +409,7 @@ static void test_kmeans_scoring()
     calculated_number_t score_far = ml_kmeans_anomaly_score(&km, far_away);
     ML_TEST_ASSERT_DOUBLE_EQ(score_far, 100.0, 1e-9, "far away sample should be capped at 100");
 
-    // When min_dist == max_dist, score should be 0
+    // When min_dist == max_dist, the model is flat and abstains (NaN)
     ml_kmeans_inlined_t km_equal;
     km_equal.cluster_centers[0].set_size(6);
     km_equal.cluster_centers[1].set_size(6);
@@ -421,14 +421,14 @@ static void test_kmeans_scoring()
     km_equal.max_dist = 5.0;
 
     calculated_number_t score_eq = ml_kmeans_anomaly_score(&km_equal, at_mid);
-    ML_TEST_ASSERT_DOUBLE_EQ(score_eq, 0.0, 1e-9, "equal min/max should return 0");
+    ML_TEST_ASSERT(std::isnan(score_eq), "equal min/max should abstain (NaN)");
 }
 
-// Test: a model whose min/max spread is only rounding must score 0.
+// Test: a model whose min/max spread is only rounding must abstain (score NaN).
 // When every training point sits on a centre (a sparse dimension: zeros plus
 // one repeated spike), every point is |C0 - C1| / 2 from the centres on
 // average, so max_dist - min_dist is 0 or a few ULP. Dividing by a ULP made
-// any sample off the C0-C1 segment score 100.
+// any sample off the C0-C1 segment score 100. Predict skips NaN scores.
 static void test_kmeans_flat_spread_scores_zero()
 {
     fprintf(stderr, "  test_kmeans_flat_spread_scores_zero...\n");
@@ -455,7 +455,7 @@ static void test_kmeans_flat_spread_scores_zero()
     km.max_dist = std::nextafter(km.min_dist, 100.0);
 
     calculated_number_t score = ml_kmeans_anomaly_score(&km, blip);
-    ML_TEST_ASSERT(score == 0.0, "1-ULP spread model should score 0 for a tiny blip");
+    ML_TEST_ASSERT(std::isnan(score), "1-ULP spread model should abstain for a tiny blip");
 
     // The same kind of model produced by training.
     std::vector<DSample> training;
@@ -476,10 +476,10 @@ static void test_kmeans_flat_spread_scores_zero()
 
     ml_kmeans_inlined_t trained_inlined(trained);
     score = ml_kmeans_anomaly_score(&trained_inlined, blip);
-    ML_TEST_ASSERT(score == 0.0, "trained flat model should score 0 for a tiny blip");
+    ML_TEST_ASSERT(std::isnan(score), "trained flat model should abstain for a tiny blip");
     for (const auto &s : training) {
         score = ml_kmeans_anomaly_score(&trained_inlined, s);
-        ML_TEST_ASSERT(score == 0.0, "trained flat model should score 0 for its training samples");
+        ML_TEST_ASSERT(std::isnan(score), "trained flat model should abstain for its training samples");
     }
 
     // A small but real spread is still scored, not treated as flat.
@@ -502,12 +502,18 @@ static void test_kmeans_flat_spread_scores_zero()
     score = ml_kmeans_anomaly_score(&narrow, half);
     ML_TEST_ASSERT_DOUBLE_EQ(score, 50.0, 1e-3, "a 1e-6 relative spread should still be scored");
 
-    // Non-finite bounds (accepted from children) keep their previous scores.
+    // A negative spread is not flat: it keeps its previous score.
+    narrow.min_dist = 2.0;
+    narrow.max_dist = 1.0;
+    score = ml_kmeans_anomaly_score(&narrow, half);
+    ML_TEST_ASSERT_DOUBLE_EQ(score, 100.0, 1e-3, "negative spread should keep its prior score");
+
+    // Non-finite bounds (accepted from children).
     const calculated_number_t inf = std::numeric_limits<calculated_number_t>::infinity();
     narrow.min_dist = inf;
     narrow.max_dist = inf;
     score = ml_kmeans_anomaly_score(&narrow, half);
-    ML_TEST_ASSERT(score == 0.0, "min_dist == max_dist == inf should score 0");
+    ML_TEST_ASSERT(std::isnan(score), "min_dist == max_dist == inf is flat and should abstain");
 
     narrow.min_dist = -inf;
     score = ml_kmeans_anomaly_score(&narrow, half);
