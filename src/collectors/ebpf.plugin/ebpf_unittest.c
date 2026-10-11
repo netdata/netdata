@@ -51,18 +51,28 @@ static uint32_t ebpf_ut_map_value_size(const struct bpf_map *map)
 
 static int test_disk_kernel_variants(void)
 {
-    if (NETDATA_V5_17 != (1u << NETDATA_IDX_V5_17) || NETDATA_V6_8 != (1u << NETDATA_IDX_V6_8) ||
+    if (NETDATA_V5_16 != (1u << NETDATA_IDX_V5_16) || NETDATA_V5_17 != (1u << NETDATA_IDX_V5_17) ||
+        NETDATA_V6_8 != (1u << NETDATA_IDX_V6_8) || NETDATA_V6_12 != (1u << NETDATA_IDX_V6_12) ||
         NETDATA_V7_0 != (1u << NETDATA_IDX_V7_0))
         return 0;
 
     for (size_t i = 0; ebpf_modules[i].info.thread_name; i++) {
         if (!strcmp(ebpf_modules[i].info.thread_name, "disk")) {
-            const uint32_t expected = NETDATA_V5_11 | NETDATA_V5_17 | NETDATA_V6_8;
+            const uint32_t expected = NETDATA_V5_11 | NETDATA_V5_16 | NETDATA_V5_17 | NETDATA_V6_8;
             return (ebpf_modules[i].kernels & expected) == expected;
         }
     }
 
     return 0;
+}
+
+static int test_redhat_release_version_parser(void)
+{
+    return ebpf_parse_redhat_release_version("Red Hat Enterprise Linux release 10.0 (Coughlan)") == 2560 &&
+           ebpf_parse_redhat_release_version("CentOS Stream release 9") == 2304 &&
+           ebpf_parse_redhat_release_version("CentOS Linux release 7.9.2009 (Core)") == 1801 &&
+           ebpf_parse_redhat_release_version("AlmaLinux release 9.6 (Sage Margay)") == 2310 &&
+           ebpf_parse_redhat_release_version("not a Red Hat release") == -1;
 }
 
 static int ebpf_ut_percpu_lookup_fits_nprocs(struct bpf_object *obj)
@@ -147,7 +157,8 @@ void ebpf_ut_initialize_structure(netdata_run_mode_t mode)
     test_em.info.thread_name = strdupz("process");
     test_em.info.config_name = test_em.info.thread_name;
     test_em.kernels =
-        NETDATA_V3_10 | NETDATA_V4_14 | NETDATA_V4_16 | NETDATA_V4_18 | NETDATA_V5_4 | NETDATA_V5_10 | NETDATA_V5_14;
+        NETDATA_V3_10 | NETDATA_V4_14 | NETDATA_V4_16 | NETDATA_V4_18 | NETDATA_V5_4 | NETDATA_V5_10 |
+        NETDATA_V5_14 | NETDATA_V6_12 | NETDATA_V7_0;
     test_em.pid_map_size = ND_EBPF_DEFAULT_PID_SIZE;
     test_em.apps_level = NETDATA_APPS_LEVEL_REAL_PARENT;
     test_em.mode = mode;
@@ -172,8 +183,8 @@ void ebpf_ut_cleanup_memory()
  */
 static int ebpf_ut_load_binary()
 {
-    if (!test_disk_kernel_variants()) {
-        fprintf(stderr, ">>> FAILED: disk kernel variant selectors are inconsistent\n");
+    if (!test_disk_kernel_variants() || !test_redhat_release_version_parser()) {
+        fprintf(stderr, ">>> FAILED: kernel version parsing or disk selectors are inconsistent\n");
         return -1;
     }
 

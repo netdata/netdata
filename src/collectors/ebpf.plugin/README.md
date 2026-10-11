@@ -613,7 +613,7 @@ This will create the chart `disk_latency_io` for each disk on the host. The foll
 
 On generic kernels 6.16 and newer, disk latency is unavailable when the plugin must use legacy BPF objects. The
 plugin refuses the older 6.8 disk object because its compiled kernel structure offsets are not validated for these
-kernels. Generic legacy objects are built for 5.11, 5.17 and 6.8 kernel layouts. On builds with CO-RE support,
+kernels. Generic legacy objects are built for 5.11, 5.16, 5.17 and 6.8 kernel layouts. On builds with CO-RE support,
 kernel BTF allows the plugin to use the CO-RE object instead.
 
 Disk Latency is the single most important metric to focus on when it comes to storage performance, under most circumstances.
