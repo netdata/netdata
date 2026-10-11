@@ -1,0 +1,33 @@
+{
+  "format": 1,
+  "version": "2026.10.11.1",
+  "source_date_epoch": 1791676800,
+  "donor": "mcr.microsoft.com/playwright@sha256:eff16c30e6f3f4af0a03fa4b706120d5e9b0891c344a27d64559aff5900a4a27",
+  "node_version": "24.20.0",
+  "patchelf_version": "0.15.0",
+  "interpreter_capacity": 4096,
+  "architectures": {
+    "arm64": {
+      "donor_manifest": "sha256:a0f4498920a5dbac63196d9140ed738ef00470f27e2e74029abd8850b7bd5717",
+      "node_arch": "arm64",
+      "node_sha256": "5f4ddab610c1ab2016b3c227cebdbf6d9495161487e4739c7b90090595f465f7",
+      "patchelf_arch": "aarch64",
+      "patchelf_sha256": "03f8ad07dbd8fbdb5f47a9c168684be9d10b900a73b2df3f408fb0228e05fe6a",
+      "triplet": "aarch64-linux-gnu",
+      "loader": "ld-linux-aarch64.so.1",
+      "chrome_directory": "chrome-linux-arm64",
+      "elf_machine": 183
+    },
+    "amd64": {
+      "donor_manifest": "sha256:bc6ab0d6d44ff4826e4cb8c1e6d801e185bfc42bb0753f8e2a30efc70db054c7",
+      "node_arch": "x64",
+      "node_sha256": "2f2c0da162318f0de47665410c7c8c2ed3d36c8f3105de4bbc61176c70a7cbf2",
+      "patchelf_arch": "x86_64",
+      "patchelf_sha256": "0b9b93da52f51b3262f783596421a0d1376893d5f865d93f1493da293bd1d4b5",
+      "triplet": "x86_64-linux-gnu",
+      "loader": "ld-linux-x86-64.so.2",
+      "chrome_directory": "chrome-linux64",
+      "elf_machine": 62
+    }
+  }
+}
