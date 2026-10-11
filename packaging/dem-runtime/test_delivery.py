@@ -21,7 +21,8 @@ import sources
 class DeliveryTests(unittest.TestCase):
     def test_invalid_prefix_fails_before_acquisition(self):
         for prefix in ('https://:443', 'https://host:bad', 'https://host:99999',
-                       'https://host/base?', 'https://host/base#', 'https://[broken'):
+                       'https://host/base?', 'https://host/base#', 'https://[broken',
+                       'https://@host/base', 'https://:@host/base'):
             with self.subTest(prefix=prefix), tempfile.TemporaryDirectory() as directory:
                 argv = ['build.py', '--arch', 'arm64', '--output', directory, '--url-prefix', prefix]
                 with patch.object(sys, 'argv', argv), redirect_stderr(io.StringIO()), \
@@ -115,7 +116,8 @@ class DeliveryTests(unittest.TestCase):
         record = {'name': 'input', 'url': 'https://example.invalid/input',
                   'sha256': hashlib.sha256(b'x').hexdigest(), 'bytes': 1}
         # Drive the real redirect handler with an HTTP response, without network.
-        for target in ('http://example.invalid/clear', 'ftp://example.invalid/file'):
+        for target in ('http://example.invalid/clear', 'ftp://example.invalid/file',
+                       'https://@example.invalid/file', 'https://:@example.invalid/file'):
             with self.subTest(target=target):
                 opener = urllib.request.build_opener(locked.HTTPSRedirectHandler())
                 with patch.object(opener, 'open', side_effect=AssertionError('target opened')):

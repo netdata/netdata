@@ -6,7 +6,7 @@ import re
 import tempfile
 import urllib.request
 
-from bundle import display_argument, run
+from bundle import credential_free_https, display_argument, run
 
 
 DOWNLOAD_TIMEOUT_SECONDS = 60
@@ -14,8 +14,7 @@ DOWNLOAD_TIMEOUT_SECONDS = 60
 
 class HTTPSRedirectHandler(urllib.request.HTTPRedirectHandler):
     def redirect_request(self, request, response, code, message, headers, url):
-        parsed = urllib.parse.urlsplit(url)
-        if parsed.scheme != 'https' or not parsed.hostname or parsed.username or parsed.password:
+        if not credential_free_https(url):
             raise ValueError('download redirected outside credential-free HTTPS')
         return super().redirect_request(request, response, code, message, headers, url)
 
@@ -83,7 +82,7 @@ def download(record, directory):
     from urllib.parse import urlsplit
     url = record['url']
     parsed = urlsplit(url)
-    if parsed.scheme != 'https' or not parsed.hostname or parsed.username or parsed.password:
+    if not credential_free_https(url):
         raise ValueError('source download must use credential-free HTTPS')
     name = record.get('name', Path(parsed.path).name)
     if Path(name).name != name or name in ('', '.', '..'):

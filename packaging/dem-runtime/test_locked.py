@@ -26,6 +26,8 @@ class LockedInputTests(unittest.TestCase):
         cases = {'valid': (data, record, None), 'corrupt': (b'wrong', record, ValueError),
                  'wrong_size': (data, dict(record, bytes=len(data) + 1), ValueError),
                  'credentials': (data, dict(record, url='https://user:secret@example.invalid/input.deb'), ValueError),
+                 'empty_user': (data, dict(record, url='https://@example.invalid/input.deb'), ValueError),
+                 'empty_password': (data, dict(record, url='https://:@example.invalid/input.deb'), ValueError),
                  'http': (data, dict(record, url='http://example.invalid/input.deb'), ValueError),
                  'unsafe_name': (data, dict(record, name='../outside'), ValueError)}
         for name, (payload, selected, error) in cases.items():

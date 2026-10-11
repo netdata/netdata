@@ -183,16 +183,17 @@ func TestDownloadRedirectRefreshesInactivity(t *testing.T) {
 }
 
 func TestDownloadCloseCannotCancelFollowingRequest(t *testing.T) {
+	const idle = time.Second
 	server := inactivityServer(t, func(w http.ResponseWriter, r *http.Request) { io.WriteString(w, "ok") })
 	for i := 0; i < 5; i++ {
-		source, err := openDownload(context.Background(), server.URL, 30*time.Millisecond)
+		source, err := openDownload(context.Background(), server.URL, idle)
 		require.NoError(t, err)
 		require.NoError(t, source.Close())
 	}
-	source, err := openDownload(context.Background(), server.URL, time.Second)
+	source, err := openDownload(context.Background(), server.URL, idle)
 	require.NoError(t, err)
 	defer source.Close()
-	time.Sleep(80 * time.Millisecond)
+	time.Sleep(idle + 100*time.Millisecond)
 	data, err := io.ReadAll(source)
 	require.NoError(t, err)
 	require.Equal(t, "ok", string(data))

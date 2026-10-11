@@ -21,17 +21,19 @@ from urllib.parse import urlsplit, urlunsplit
 RESERVED = {'chrome', 'fonts.conf', 'prepared.json'}
 
 
-def validate_url_prefix(value):
-    if not value:
-        return
+def credential_free_https(value):
     try:
         url = urlsplit(value)
-        valid = (url.scheme == 'https' and url.hostname and not url.username and not url.password
-                 and '?' not in value and '#' not in value)
+        valid = (url.scheme == 'https' and url.hostname and url.username is None
+                 and url.password is None)
         url.port  # Parsing the authority alone does not validate its port.
+        return bool(valid)
     except ValueError:
-        valid = False
-    if not valid:
+        return False
+
+
+def validate_url_prefix(value):
+    if value and (not credential_free_https(value) or '?' in value or '#' in value):
         raise ValueError('--url-prefix must be an HTTPS base without credentials, query or fragment')
 
 
