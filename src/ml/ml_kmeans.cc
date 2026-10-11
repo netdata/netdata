@@ -85,19 +85,29 @@ ml_kmeans_train(ml_kmeans_t *kmeans, const std::vector<DSample> &preprocessed_fe
     }
 }
 
+// A model is flat when all its training points were the same mean distance
+// from the centres, e.g. when every point sat on a centre (zeros plus one
+// repeated spike). Its spread is then zero or a few ULP of rounding, and
+// dividing by that turns the score into noise, so a flat model never flags
+// an anomaly. Measured on a large parent, rounding-only spreads stay below
+// ~1e-11 of max_dist and real ones start above ~1e-8.
+#define ML_KMEANS_FLAT_RELATIVE_SPREAD 1e-9
+
 calculated_number_t
 ml_kmeans_anomaly_score(const ml_kmeans_inlined_t *inlined_km, const DSample &DS)
 {
+    calculated_number_t spread = inlined_km->max_dist - inlined_km->min_dist;
+    if (inlined_km->max_dist == inlined_km->min_dist ||
+        (spread > 0.0 && spread < ML_KMEANS_FLAT_RELATIVE_SPREAD * std::abs(inlined_km->max_dist)))
+        return 0.0;
+
     calculated_number_t mean_dist = 0.0;
     for (const auto &CC: inlined_km->cluster_centers)
         mean_dist += dlib::length(CC - DS);
 
     mean_dist /= inlined_km->cluster_centers.size();
 
-    if (inlined_km->max_dist == inlined_km->min_dist)
-        return 0.0;
-
-    calculated_number_t anomaly_score = 100.0 * std::abs((mean_dist - inlined_km->min_dist) / (inlined_km->max_dist - inlined_km->min_dist));
+    calculated_number_t anomaly_score = 100.0 * std::abs((mean_dist - inlined_km->min_dist) / spread);
     return (anomaly_score > 100.0) ? 100.0 : anomaly_score;
 }
 
