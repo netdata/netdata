@@ -129,10 +129,8 @@ static int aclk_handle_cloud_http_request_v2(struct aclk_request *cloud_to_agent
         goto error;
     }
 
-    if (unlikely(aclk_v2_payload_validate(query->data.http_api_v2.payload))) {
-        netdata_log_error("Could not extract payload from query");
+    if (unlikely(aclk_v2_payload_validate(query->data.http_api_v2.payload)))
         goto error;
-    }
 
     if (unlikely(!cloud_to_agent->callback_topic)) {
         netdata_log_error("Missing callback_topic");

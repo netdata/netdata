@@ -206,7 +206,7 @@ void aclk_http_msg_v2_err(mqtt_wss_client client, const char *topic, const char 
     BUFFER *hdr = aclk_http_msg_err_hdr(msg_id, http_code, ec, emsg);
 
     if (aclk_http_msg_send(client, topic, hdr, payload, payload_len, NULL, 0)) {
-        netdata_log_error("Failed to send cancellation message for http reply %zu %s", payload_len, payload);
+        netdata_log_error("Failed to send cancellation message for http reply %zu %s", payload_len, payload ? payload : "");
     }
 }
 
@@ -371,9 +371,12 @@ int aclk_http_msg_unittest(void)
             BUFFER *hdr = shape == 0 ? aclk_http_msg_reply_hdr(ids[i], t_exec, t_rx, 200)
                                      : aclk_http_msg_err_hdr(ids[i], 504, CLOUD_EC_SND_TIMEOUT, CLOUD_EMSG_SND_TIMEOUT);
 
+            ACLK_HTTP_MSG_TEST(!strchr(buffer_tostring(hdr), '\n'), "header is not minified", i);
+
             json_object *o = json_tokener_parse(buffer_tostring(hdr));
             ACLK_HTTP_MSG_TEST(o && json_object_is_type(o, json_type_object), "header is not a JSON object", i);
-            if (!o) {
+            if (!o || !json_object_is_type(o, json_type_object)) {
+                json_object_put(o);
                 buffer_free(hdr);
                 continue;
             }
@@ -399,11 +402,11 @@ int aclk_http_msg_unittest(void)
             ACLK_HTTP_MSG_TEST(json_object_object_get_ex(o, "type", &v) &&
                                    strcmp(json_object_get_string(v), "http") == 0, "type is not http", i);
 
-            ACLK_HTTP_MSG_TEST(json_object_object_get_ex(o, "msg-id", &v) && json_object_is_type(v, json_type_string),
-                               "msg-id is not a string", i);
-            if (ids[i])
+            bool has_msg_id = json_object_object_get_ex(o, "msg-id", &v) && json_object_is_type(v, json_type_string);
+            ACLK_HTTP_MSG_TEST(has_msg_id, "msg-id is not a string", i);
+            if (has_msg_id && ids[i])
                 ACLK_HTTP_MSG_TEST(strcmp(json_object_get_string(v), ids[i]) == 0, "msg-id did not round-trip", i);
-            else {
+            else if (has_msg_id) {
                 nd_uuid_t uuid;
                 ACLK_HTTP_MSG_TEST(uuid_parse(json_object_get_string(v), uuid) == 0, "generated msg-id is not a uuid", i);
             }
