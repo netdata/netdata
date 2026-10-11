@@ -17,6 +17,69 @@ type claimRecord struct {
 	Generation string `json:"generation"`
 }
 
+// StartupGuard protects a selected identity while accepted demand is being
+// reconciled. It neither establishes demand nor proves execution lifetime.
+// Close only after reconciliation is proven complete or process work has joined;
+// incomplete reconciliation keeps the guard for the process lifetime.
+type StartupGuard struct {
+	store  *Store
+	name   string
+	lock   *flock.Flock
+	mu     sync.Mutex
+	closed bool
+}
+
+// GuardStartup protects a new run's selected identity on an existing store.
+// Acquire it before releasing the previous run's guard or accepted demand so
+// concurrent reclamation cannot enter the handoff. Acquisition leaves generation
+// timestamps unchanged and does not require the identity to be prepared.
+func (s *Store) GuardStartup(id string) (*StartupGuard, error) {
+	var guard *StartupGuard
+	err := s.withLock(func() error {
+		var err error
+		guard, err = s.guardStartupLocked(id)
+		return err
+	})
+	if err != nil {
+		if guard != nil {
+			err = errors.Join(err, guard.lock.Close())
+		}
+		return nil, err
+	}
+	return guard, nil
+}
+
+func (s *Store) guardStartupLocked(id string) (*StartupGuard, error) {
+	if !validID(id) {
+		return nil, errors.New("invalid startup runtime identity")
+	}
+	name, lock, err := s.newOwner("startup", claimRecord{Generation: id})
+	if err != nil {
+		return nil, err
+	}
+	return &StartupGuard{store: s, name: name, lock: lock}, nil
+}
+
+// Close releases startup protection without changing generation timestamps.
+// A failed close may be retried; owner loss also permits eventual reclamation.
+func (g *StartupGuard) Close() error {
+	g.mu.Lock()
+	defer g.mu.Unlock()
+	if g.closed {
+		return nil
+	}
+	err := g.store.withLock(func() error {
+		if err := g.lock.Close(); err != nil {
+			return err
+		}
+		return g.store.removeOwned(g.name)
+	})
+	if err == nil {
+		g.closed = true
+	}
+	return err
+}
+
 // Claim protects accepted demand, including demand awaiting preparation. It does
 // not prove execution lifetime; exiting the owner releases only this claim.
 type Claim struct {
@@ -235,7 +298,8 @@ func (s *Store) removeOwned(name string) error {
 	return err
 }
 
-// ownerAlive is only for in-process claims/preparation, never for execution pins.
+// ownerAlive is only for process-owned startup guards, claims and preparation,
+// never for execution pins.
 func (s *Store) ownerAlive(name string) (bool, error) {
 	info, err := s.root.Lstat(filepath.Join(name, "owner.lock"))
 	if err != nil || !info.Mode().IsRegular() || info.Mode().Perm() != 0600 || info.Size() != 0 {

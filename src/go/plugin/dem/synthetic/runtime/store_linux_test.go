@@ -328,10 +328,6 @@ func TestRuntimeOwnerProcess(t *testing.T) {
 	if mode == "" {
 		return
 	}
-	s, err := Open(DefaultConfig(os.Getenv("DEM_RUNTIME_OWNER_STORE")))
-	if err != nil {
-		t.Fatal(err)
-	}
 	data, err := os.ReadFile(os.Getenv("DEM_RUNTIME_OWNER_MANIFEST"))
 	if err != nil {
 		t.Fatal(err)
@@ -340,8 +336,18 @@ func TestRuntimeOwnerProcess(t *testing.T) {
 	if err := json.Unmarshal(data, &m); err != nil {
 		t.Fatal(err)
 	}
+	config := DefaultConfig(os.Getenv("DEM_RUNTIME_OWNER_STORE"))
+	var s *Store
+	if mode == "startup" {
+		s, _, err = OpenWithStartupGuard(config, m.Archive.SHA256)
+	} else {
+		s, err = Open(config)
+	}
+	require.NoError(t, err)
 	ready := func() { fmt.Println("ready"); _, _ = io.Copy(io.Discard, os.Stdin); os.Exit(0) }
-	if mode == "claim" {
+	if mode == "startup" {
+		ready()
+	} else if mode == "claim" {
 		if _, err := s.Demand(m.Archive.SHA256); err != nil {
 			t.Fatal(err)
 		}

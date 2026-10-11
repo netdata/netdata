@@ -32,9 +32,28 @@ locks, rename and directory fsync. It must never be copied to another host or
 shared over a network filesystem. The same trusted-account boundary as `nd-run`
 applies: this is not isolation against malicious service-account code.
 
+- `OpenWithStartupGuard(config, id)` opens the store and protects the selected
+  archive identity during initial accepted-demand reconciliation. Publication
+  occurs inside Open's first coordination-lock transaction, before returning the
+  store. Every later sweep and acquisition-pressure decision observes the guard,
+  including other processes. Reclamation that won the lock first may already
+  have removed the generation; the guard permits an absent identity and does not
+  prepare it. Plain `Open` remains appropriate for administrative consumers.
+- For an in-process run replacement, call `Store.GuardStartup(id)` before
+  retiring the old run's guard or accepted demand. Each guard has independent
+  ownership; releasing the old run cannot release the new run's protection.
+  Acquisition on an existing store uses the same coordinated owner publication
+  and does not change generation timestamps.
+- The process owner closes its `StartupGuard` only after proven complete initial
+  reconciliation or after joining process work at shutdown. Incomplete replay
+  keeps it for the process lifetime and may prevent another preparation fitting
+  the allowance. Creation and release do not change `Unneeded` or `LastUsed`.
+  The guard is separate from accepted demand and execution pins: an unlocked
+  startup owner permits crash recovery without implying any execution completed.
 - `Demand` protects a generation selected by accepted configuration, including
   one that is not prepared yet. A process-lifetime lock releases demand after
-  owner exit. Reconcile startup demand before the first `Sweep`.
+  owner exit. Actual demand acquisition and release retain their idle policy;
+  a startup guard must never be represented by artificial demand.
 - `BeginUse` publishes a unique durable execution pin before returning paths.
   Pass its `Completion` to **one** `ndexec` tree invocation and join that helper
   before `Finish`. Version probes use the same protocol. A caller that never
@@ -63,7 +82,8 @@ contract, not something PID namespaces or machine-id can prove.
 Defaults are 4 GiB logical owned regular-file bytes, seven days for one most
 recently used previous generation while browser demand exists, and thirty days
 for the last generation without demand. Grace deadlines persist across restarts.
-Soft graces yield to acquisition pressure. Demand and execution pins never do.
+Soft graces yield to acquisition pressure. Startup guards, demand and execution
+pins never do.
 An uncertain pin can retain files indefinitely and prevent a later acquisition.
 
 Archives, staging, lifecycle records and trash count as managed bytes. Active
@@ -74,7 +94,8 @@ preloads are separate. ENOSPC still needs handling.
 
 `Inspect` is read-only and never launches or prepares a runtime. It reports
 protected and reclaimable bytes, written preparation/trash bytes, and overlapping
-generation byte totals for demand, execution and uncertain execution. These
+generation byte totals for startup protection, demand, execution and uncertain
+execution. Startup guard counts include selections not yet prepared. These
 categories explain ownership; they must not be added together as extra disk use.
 Allowance errors report needed, used, reserved, protected and reclaimable bytes.
 Reclaimable bytes may still occupy failed-deletion trash; they are not free space.
@@ -92,7 +113,9 @@ its retirement paths. The integration stage provides their trusted resolution.
 
 Unit tests cover archive integrity/bounds, extraction types and path handling,
 binding/encoding, demand/graces, pressure and uncertain-use protection, interrupted
-preparation using real exiting processes, read-only status and boot provenance.
+preparation and startup-guard recovery using real exiting processes, timestamp
+preservation through empty restarts, fail-closed guard inventory, read-only status
+and boot provenance.
 `DEM_RUNTIME_TEST_HELPER` enables the real `nd-run` persistent-receipt recovery
 integration test. `DEM_RUNTIME_TEST_MANIFEST` and `DEM_RUNTIME_TEST_ARCHIVE`
 add real-bundle import, inventory timing and supervised Node/browser/re-execution

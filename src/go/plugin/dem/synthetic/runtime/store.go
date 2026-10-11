@@ -55,8 +55,8 @@ func DefaultConfig(path string) Config {
 	return Config{Path: path, MaxBytes: DefaultMaxBytes, PreviousRetention: DefaultPreviousRetention, IdleRetention: DefaultIdleRetention}
 }
 
-// Store coordinates local processes. Owners must reconcile accepted demand
-// before the first Sweep, and must not launch from generation paths except via Use.
+// Store coordinates local processes. Owners awaiting startup reconciliation use
+// OpenWithStartupGuard and must not launch from generation paths except via Use.
 // The directory must remain on one host and may not be copied or network-shared.
 type Store struct {
 	completedUses map[string]bool
@@ -83,6 +83,34 @@ type Paths struct {
 }
 
 func Open(config Config) (*Store, error) {
+	return openStore(config, nil)
+}
+
+// OpenWithStartupGuard protects the selected identity before releasing Open's
+// first coordination lock. All later reclamation observes this guard, including
+// acquisition pressure from other stores. Reclamation that wins that lock first
+// may already have removed the generation; absence is allowed.
+// The caller must release the guard before closing the returned store.
+func OpenWithStartupGuard(config Config, id string) (*Store, *StartupGuard, error) {
+	if !validID(id) {
+		return nil, nil, errors.New("invalid startup runtime identity")
+	}
+	var guard *StartupGuard
+	s, err := openStore(config, func(s *Store) error {
+		var err error
+		guard, err = s.guardStartupLocked(id)
+		return err
+	})
+	if err != nil {
+		if guard != nil {
+			err = errors.Join(err, guard.lock.Close())
+		}
+		return nil, nil, err
+	}
+	return s, guard, nil
+}
+
+func openStore(config Config, initializeLocked func(*Store) error) (*Store, error) {
 	if goruntime.GOOS != "linux" || (goruntime.GOARCH != "amd64" && goruntime.GOARCH != "arm64") {
 		return nil, errors.New("managed browser runtimes require Linux amd64 or arm64")
 	}
@@ -113,7 +141,7 @@ func Open(config Config) (*Store, error) {
 	}
 	s.lock = flock.New(filepath.Join(path, "coordination.lock"))
 	err = s.withLock(func() error {
-		for _, dir := range []string{"generations", "claims", "uses", "staging", "trash", "initializing"} {
+		for _, dir := range []string{"generations", "claims", "startup", "uses", "staging", "trash", "initializing"} {
 			if err := root.Mkdir(dir, 0700); err != nil && !errors.Is(err, os.ErrExist) {
 				return err
 			}
@@ -122,7 +150,13 @@ func Open(config Config) (*Store, error) {
 				return fmt.Errorf("invalid runtime store directory: %s", dir)
 			}
 		}
-		return syncDirectory(root, ".")
+		if err := syncDirectory(root, "."); err != nil {
+			return err
+		}
+		if initializeLocked != nil {
+			return initializeLocked(s)
+		}
+		return nil
 	})
 	if err != nil {
 		s.Close()
@@ -131,8 +165,8 @@ func Open(config Config) (*Store, error) {
 	return s, nil
 }
 
-// Close requires the caller to have joined preparation and released its claims
-// and use handles. It does not manufacture completion for retained pins.
+// Close requires the caller to have joined preparation and released its startup
+// guard, claims and use handles. It does not manufacture completion for retained pins.
 func (s *Store) Close() error {
 	return errors.Join(s.lock.Close(), s.root.Close())
 }

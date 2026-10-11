@@ -23,6 +23,7 @@ type reservation struct {
 type inventory struct {
 	generations        map[string]generation
 	demand             map[string]int
+	startup            map[string]int
 	uses               map[string]int
 	uncertain          map[string]int
 	reservations       map[string]reservation
@@ -34,9 +35,9 @@ type inventory struct {
 // Status describes logical managed files and protection. ReservedBytes is the
 // unwritten remainder of active reservations, not additional used disk bytes.
 // ProtectedBytes and ReclaimableBytes count each owned file once. DemandBytes,
-// ExecutionBytes and UncertainBytes describe overlapping generation protection;
-// uncertain bytes are a subset of execution bytes. PreparingBytes and TrashBytes
-// describe written workspace, not extra disk usage.
+// StartupBytes, ExecutionBytes and UncertainBytes describe overlapping generation
+// protection; uncertain bytes are a subset of execution bytes. PreparingBytes and
+// TrashBytes describe written workspace, not extra disk usage.
 type Status struct {
 	UsedBytes             int64  `json:"used_bytes"`
 	ReservedBytes         int64  `json:"reserved_bytes"`
@@ -44,11 +45,13 @@ type Status struct {
 	ProtectedBytes        int64  `json:"protected_bytes"`
 	ReclaimableBytes      int64  `json:"reclaimable_bytes"`
 	DemandBytes           int64  `json:"demand_bytes"`
+	StartupBytes          int64  `json:"startup_bytes"`
 	ExecutionBytes        int64  `json:"execution_bytes"`
 	UncertainBytes        int64  `json:"uncertain_bytes"`
 	PreparingBytes        int64  `json:"preparing_bytes"`
 	TrashBytes            int64  `json:"trash_bytes"`
 	DemandGenerations     int    `json:"demand_generations"`
+	StartupGuards         int    `json:"startup_guards"`
 	ExecutionPins         int    `json:"execution_pins"`
 	UncertainPins         int    `json:"uncertain_pins"`
 	BootRecoveryAvailable bool   `json:"boot_recovery_available"`
@@ -56,7 +59,7 @@ type Status struct {
 }
 
 func (s *Store) inventoryLocked(reconcile bool) (inventory, error) {
-	inv := inventory{generations: make(map[string]generation), demand: make(map[string]int), uses: make(map[string]int), uncertain: make(map[string]int), reservations: make(map[string]reservation), protectedRecords: make(map[string]bool), reclaimableRecords: make(map[string]bool)}
+	inv := inventory{generations: make(map[string]generation), demand: make(map[string]int), startup: make(map[string]int), uses: make(map[string]int), uncertain: make(map[string]int), reservations: make(map[string]reservation), protectedRecords: make(map[string]bool), reclaimableRecords: make(map[string]bool)}
 	// Live completion proof also survives a successful rename followed by a
 	// failed directory sync. Retry these names even if enumeration cannot see
 	// the original record anymore.
@@ -82,34 +85,41 @@ func (s *Store) inventoryLocked(reconcile bool) (inventory, error) {
 			return inv, err
 		}
 	}
-	claims, err := s.childDirectories("claims")
-	if err != nil {
-		return inv, err
-	}
-	for _, name := range claims {
-		alive, err := s.ownerAlive(name)
+	for _, owners := range []struct {
+		parent string
+		counts map[string]int
+	}{
+		{parent: "claims", counts: inv.demand},
+		{parent: "startup", counts: inv.startup},
+	} {
+		names, err := s.childDirectories(owners.parent)
 		if err != nil {
 			return inv, err
 		}
-		if !alive {
-			inv.reclaimableRecords[name] = true
-			if !reconcile {
-				continue
-			}
-			if err := s.removeOwned(name); err != nil {
+		for _, name := range names {
+			alive, err := s.ownerAlive(name)
+			if err != nil {
 				return inv, err
 			}
-			continue
+			if !alive {
+				inv.reclaimableRecords[name] = true
+				if reconcile {
+					if err := s.removeOwned(name); err != nil {
+						return inv, err
+					}
+				}
+				continue
+			}
+			var claim claimRecord
+			if err := readJSON(s.root, filepath.Join(name, "owner.json"), &claim); err != nil {
+				return inv, err
+			}
+			if !validID(claim.Generation) {
+				return inv, errors.New("invalid runtime protection binding")
+			}
+			owners.counts[claim.Generation]++
+			inv.protectedRecords[name] = true
 		}
-		var claim claimRecord
-		if err := readJSON(s.root, filepath.Join(name, "owner.json"), &claim); err != nil {
-			return inv, err
-		}
-		if !validID(claim.Generation) {
-			return inv, errors.New("invalid runtime demand binding")
-		}
-		inv.demand[claim.Generation]++
-		inv.protectedRecords[name] = true
 	}
 	uses, err := s.childDirectories("uses")
 	if err != nil {
@@ -240,17 +250,23 @@ func (s *Store) statusLocked(inv inventory) (Status, error) {
 		if inv.demand[id] > 0 {
 			status.DemandBytes += size
 		}
+		if inv.startup[id] > 0 {
+			status.StartupBytes += size
+		}
 		if inv.uses[id] > 0 {
 			status.ExecutionBytes += size
 		}
 		if inv.uncertain[id] > 0 {
 			status.UncertainBytes += size
 		}
-		if inv.demand[id] > 0 || inv.uses[id] > 0 {
+		if inv.demand[id] > 0 || inv.startup[id] > 0 || inv.uses[id] > 0 {
 			status.ProtectedBytes += size
 		} else {
 			status.ReclaimableBytes += size
 		}
+	}
+	for _, count := range inv.startup {
+		status.StartupGuards += count
 	}
 	for id, count := range inv.uses {
 		status.ExecutionPins += count
@@ -274,7 +290,8 @@ func (s *Store) Inspect() (Status, error) {
 	return status, err
 }
 
-// Sweep runs after startup demand reconciliation and periodically thereafter.
+// Sweep reconciles ownership and reclaims eligible generations. Startup guards
+// protect unreconciled selections independently of the caller running Sweep.
 // Failed cleanup is separate from the ability to use a matching runtime.
 func (s *Store) Sweep() error {
 	err := s.withLock(func() error {
@@ -297,7 +314,7 @@ func (s *Store) Sweep() error {
 func (s *Store) candidates(inv inventory, pressure bool) []string {
 	var ids []string
 	for id := range inv.generations {
-		if inv.demand[id] == 0 && inv.uses[id] == 0 {
+		if inv.demand[id] == 0 && inv.startup[id] == 0 && inv.uses[id] == 0 {
 			ids = append(ids, id)
 		}
 	}
@@ -377,7 +394,7 @@ func (s *Store) flushTrash() error {
 		if err != nil {
 			return err
 		}
-		for _, parent := range []string{"generations", "uses", "claims", "staging", "trash", "initializing"} {
+		for _, parent := range []string{"generations", "uses", "claims", "startup", "staging", "trash", "initializing"} {
 			if err := syncDirectory(s.root, parent); err != nil {
 				return err
 			}
