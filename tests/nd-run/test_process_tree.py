@@ -36,7 +36,7 @@ def compile_binary(output, sources, *flags, config=None):
 
 
 class TreeTests(unittest.TestCase):
-    def start(self, args, *, launcher=False, helper=None, alias=None, completion=None, path_only=None):
+    def start(self, args, *, launcher=False, helper=None, alias=None, completion=None, path_only=None, lost_stderr=False):
         control_read, control_write = os.pipe()
         status_read, status_write = os.pipe()
         os.set_blocking(status_read, False)
@@ -61,9 +61,16 @@ class TreeTests(unittest.TestCase):
         extra_fd = os.dup(alias_target) if alias else None
         inherited = ((control_read, status_write) + ((record_fd,) if record_fd is not None else ())
                      + ((extra_fd,) if alias else ()))
-        process = subprocess.Popen(command, pass_fds=inherited,
-                                   stdin=subprocess.DEVNULL, stdout=subprocess.PIPE,
-                                   stderr=subprocess.PIPE)
+        stderr = subprocess.PIPE
+        if lost_stderr:
+            stderr_read, stderr = os.pipe()
+            os.close(stderr_read)
+        try:
+            process = subprocess.Popen(command, pass_fds=inherited,
+                                       stdin=subprocess.DEVNULL, stdout=subprocess.PIPE, stderr=stderr)
+        finally:
+            if lost_stderr:
+                os.close(stderr)
         os.close(control_read)
         os.close(status_write)
         if record_fd is not None:
@@ -71,7 +78,8 @@ class TreeTests(unittest.TestCase):
         if extra_fd is not None:
             os.close(extra_fd)
         self.addCleanup(process.stdout.close)
-        self.addCleanup(process.stderr.close)
+        if process.stderr is not None:
+            self.addCleanup(process.stderr.close)
         self.addCleanup(self.cleanup, process, control_write, status_read)
         return process, control_write, status_read
 
@@ -210,6 +218,17 @@ class TreeTests(unittest.TestCase):
                 self.assertEqual(process.stdout.read(), b"")
                 self.assertEqual(os.read(status, 256), b"")
                 self.assertIn(b"private protocol descriptors", process.stderr.read())
+                self.assert_receipt(record)
+
+    def test_prelaunch_receipt_survives_lost_diagnostic_reader(self):
+        for helper, alias in ((HELPER, "control"), (BUILD / "no-children", None),
+                              (BUILD / "fork-failed", None)):
+            with self.subTest(helper=helper, alias=alias):
+                record = self.new_completion()
+                process, _, _ = self.start([PROBE, "detached"], helper=helper, alias=alias,
+                                           completion=record, lost_stderr=True)
+                process.wait(timeout=10)
+                self.assertEqual(process.stdout.read(), b"")
                 self.assert_receipt(record)
 
     def test_receipt_failure_does_not_change_live_drainage_proof(self):

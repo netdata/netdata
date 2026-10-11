@@ -254,14 +254,15 @@ int nd_process_tree_run(int control_fd, int status_fd, int completion_fd, const 
         return 126;
     }
     if (!protocol_pipes(control_fd, status_fd, &completion)) {
-        fprintf(stderr, "nd-run: tree supervision requires private protocol descriptors\n");
         (void)completion_finish_if_childless(&completion);
         completion_close(&completion);
+        fprintf(stderr, "nd-run: tree supervision requires private protocol descriptors\n");
         return 126;
     }
     if (!compatible_procfs()) {
+        int result = setup_unavailable(control_fd, status_fd, &completion);
         fprintf(stderr, "nd-run: tree supervision requires compatible procfs with children and NSpid support\n");
-        return setup_unavailable(control_fd, status_fd, &completion);
+        return result;
     }
 
     // Block before fork: a fast child exit cannot be lost between wait and poll.
@@ -410,9 +411,13 @@ int nd_process_tree_run(int control_fd, int status_fd, int completion_fd, const 
         }
     }
 
-setup_failed:
+setup_failed: {
+    int setup_error = errno;
+    int result = setup_unavailable(control_fd, status_fd, &completion);
+    errno = setup_error;
     perror("nd-run: tree supervision setup");
-    return setup_unavailable(control_fd, status_fd, &completion);
+    return result;
+}
 }
 
 #else
