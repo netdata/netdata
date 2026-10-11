@@ -84,11 +84,8 @@ cmake_dependent_option(ENABLE_ND_MCP "Build nd-mcp stdio-to-websocket bridge for
 option(ENABLE_PLUGIN_SCRIPTS "Enable the experimental scripts plugin (Nagios compatibility module)" ON)
 option(ENABLE_PLUGIN_STATSD "Enable the experimental Go StatsD plugin (statsd.plugin)" OFF)
 option(ENABLE_PLUGIN_IPMI "Enable the experimental Go IPMI plugin (ipmi.plugin)" OFF)
-if(ENABLE_PLUGIN_IPMI)
-  if(NOT OS_LINUX OR NOT CMAKE_SIZEOF_VOID_P EQUAL 8 OR
-     NOT (CPU_X86_64 OR CPU_ARM64))
-    message(FATAL_ERROR "The experimental Go IPMI plugin requires Linux amd64 or arm64")
-  endif()
+if(ENABLE_PLUGIN_IPMI AND NOT OS_LINUX)
+  message(FATAL_ERROR "The experimental Go IPMI plugin requires Linux")
 endif()
 option(ENABLE_PLUGIN_DEM "Enable the experimental digital experience monitoring plugin" OFF)
 cmake_dependent_option(ENABLE_PLUGIN_OTEL "Enable collection of OpenTelemetry metrics and logs" ${DEFAULT_FEATURE_STATE} "OS_LINUX OR OS_MACOS" False)

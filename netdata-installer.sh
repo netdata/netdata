@@ -229,7 +229,7 @@ USAGE: ${PROGRAM} [options]
   --disable-plugin-dem       Explicitly disable the DEM plugin.
   --enable-plugin-statsd     Enable the experimental Go StatsD plugin. Default: disabled.
   --disable-plugin-statsd    Explicitly disable the Go StatsD plugin.
-  --enable-plugin-ipmi       Enable the experimental Go IPMI plugin (Linux amd64/arm64). Default: disabled.
+  --enable-plugin-ipmi       Enable the experimental Go IPMI plugin (Linux). Default: disabled.
   --disable-plugin-ipmi      Explicitly disable the Go IPMI plugin.
   --enable-exporting-kinesis Enable AWS Kinesis exporting connector. Default: enable it when libaws_cpp_sdk_kinesis
                              and its dependencies are available.
