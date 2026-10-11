@@ -102,6 +102,9 @@
 - Build(deps): bump github.com/stmcginnis/gofish from 0.26.0 to 0.27.0 in /src/go ([#24220](https://github.com/netdata/netdata/issues/24220))
 - Build(deps): bump github.com/redis/go-redis/v9 from 9.22.0 to 9.23.0 in /src/go ([#24219](https://github.com/netdata/netdata/issues/24219))
 - Installer: stop install-required-packages.sh from installing system protobuf ([#24214](https://github.com/netdata/netdata/issues/24214))
+- Remove the completed DCstat documentation migration workaround ([#24208](https://github.com/netdata/netdata/issues/24208))
+- Regenerate integrations docs ([#24232](https://github.com/netdata/netdata/issues/24232))
+- Integrations: ship the page description in integrations.js ([#24231](https://github.com/netdata/netdata/issues/24231))
 
 ## [2.12.0] - 2026-09-30
 
