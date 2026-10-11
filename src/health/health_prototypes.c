@@ -634,8 +634,8 @@ static void health_prototype_apply_to_rrdset(RRDSET *st, RRD_ALERT_PROTOTYPE *ap
             if (is_template != want_template)
                 continue;
 
-            // the chart selector is interned-pointer compares and rejects almost every prototype,
-            // so it runs before the host checks, which pattern-match the name and the host labels
+            // the chart selector rejects almost every prototype with pointer compares, before any chart
+            // label match, so it runs before the host checks, which pattern-match the name and the host labels
             if (!health_prototype_matches_rrdset(st, t))
                 continue;
 
