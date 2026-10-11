@@ -8,6 +8,18 @@
 #include <string.h>
 #include <sys/prctl.h>
 #include <unistd.h>
+#include <time.h>
+
+static void delay_ms(long milliseconds) {
+    struct timespec remaining = {
+        .tv_sec = milliseconds / 1000,
+        .tv_nsec = (milliseconds % 1000) * 1000000L,
+    };
+    while (nanosleep(&remaining, &remaining) != 0) {
+        if (errno != EINTR)
+            _exit(14);
+    }
+}
 
 extern char **environ;
 int main(int argc, char **argv) {
@@ -45,7 +57,7 @@ int main(int argc, char **argv) {
             leaf = getpid();
             if (write(ready[1], &leaf, sizeof(leaf)) != sizeof(leaf)) _exit(9);
             close(ready[1]);
-            if (!strcmp(mode, "escaped")) { sleep(2); _exit(0); }
+            if (!strcmp(mode, "escaped")) { delay_ms(2000); _exit(0); }
             alarm(20);
             for (;;) pause();
         }
@@ -56,11 +68,11 @@ int main(int argc, char **argv) {
     printf("%d %d %d %d %d %d %s %d\n", getpid(), getppid(), getuid(), getgid(), extra, env, cwd, leaf);
     fflush(stdout);
     if (!strcmp(mode, "loss")) {
-        usleep(200000);
+        delay_ms(200);
         if (kill(getppid(), SIGKILL)) return 11;
     }
     if (!strcmp(mode, "signal")) {
-        usleep(200000);
+        delay_ms(200);
         if (kill(getppid(), SIGTERM)) return 13;
     }
     if (!strcmp(mode, "exit")) return 0;

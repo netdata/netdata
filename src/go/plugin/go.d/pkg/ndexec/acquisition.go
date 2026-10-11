@@ -94,6 +94,8 @@ func (p *acquisitionProcess) release() error {
 // invalid cleanup evidence retains admission even after Wait returns an error.
 // Only ErrSupervisedUnavailable permits a caller to consider unprivileged fallback;
 // it proves the helper never started a payload and ownership has been released.
+// This route is Linux-only; other platforms return ErrSupervisedUnsupported.
+// Callers needing unprivileged execution there should use StartUnprivileged directly.
 func (a *Acquisition) StartNDSudo(ctx context.Context, opts ProcessOptions, command string) (*Process, error) {
 	lease, err := a.acquire()
 	if err != nil {

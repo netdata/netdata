@@ -63,18 +63,19 @@ func fakeSupervisedHelper(t *testing.T, text string) string {
 }
 
 func TestSupervisedUnavailableAndUnverified(t *testing.T) {
-	for _, tc := range []struct {
-		name, script string
-		safe         bool
+	tests := map[string]struct {
+		script         string
+		safe, released bool
 	}{
-		{"missing-helper", "", true},
-		{"refused", "printf 'NDSUP1 refused privilege\\n' >&4\nexit 126\n", true},
-		{"old-helper-stdout-spoof", "printf 'NDSUP1 refused privilege\\n'\nexit 126\n", false},
-		{"wrong-exit", "printf 'NDSUP1 refused missing\\n' >&4\nexit 0\n", false},
-		{"extra-data", "printf 'NDSUP1 refused missing\\nextra\\n' >&4\nexit 126\n", false},
-		{"unsafe", "printf 'NDSUP1 refused unsafe\\n' >&4\nexit 126\n", false},
-	} {
-		t.Run(tc.name, func(t *testing.T) {
+		"missing-helper":          {safe: true, released: true},
+		"refused":                 {script: "printf 'NDSUP1 refused privilege\\n' >&4\nexit 126\n", safe: true, released: true},
+		"old-helper-stdout-spoof": {script: "printf 'NDSUP1 refused privilege\\n'\nexit 126\n"},
+		"wrong-exit":              {script: "printf 'NDSUP1 refused missing\\n' >&4\nexit 0\n"},
+		"extra-data":              {script: "printf 'NDSUP1 refused missing\\nextra\\n' >&4\nexit 126\n"},
+		"unsafe":                  {script: "printf 'NDSUP1 refused unsafe\\n' >&4\nexit 126\n", released: true},
+	}
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) {
 			path := filepath.Join(t.TempDir(), "absent")
 			if tc.script != "" {
 				path = fakeSupervisedHelper(t, tc.script)
@@ -86,7 +87,7 @@ func TestSupervisedUnavailableAndUnverified(t *testing.T) {
 			require.Nil(t, p)
 			require.Error(t, err)
 			require.Equal(t, tc.safe, errors.Is(err, ErrSupervisedUnavailable))
-			if tc.safe || tc.name == "unsafe" {
+			if tc.released {
 				l, err := a.acquire()
 				require.NoError(t, err)
 				l.release()
@@ -170,7 +171,7 @@ func TestSupervisedPrivilegeBoundary(t *testing.T) {
 	require.NoError(t, os.WriteFile(client, data, 0755))
 	forward := filepath.Join(build, "nd-run")
 	require.NoError(t, os.WriteFile(forward, []byte("#!/bin/sh\nexec \"$@\"\n"), 0755))
-	for _, mode := range []string{"silent", "blocked", "group", "adopted", "escaped", "spoof", "exit", "loss", "missing", "privilege", "unsafe", "symlink", "exec-failed", "script", "owner", "directory", "arguments", "status-loss", "parent-loss", "signal"} {
+	for _, mode := range []string{"silent", "blocked", "group", "adopted", "escaped", "spoof", "exit", "loss", "missing", "privilege", "unsafe", "symlink", "exec-failed", "script", "owner", "directory", "arguments", "status-loss", "parent-loss", "signal", "opath-control", "opath-status"} {
 		t.Run(mode, func(t *testing.T) {
 			require.NoError(t, os.WriteFile(modePath, []byte(mode), 0644))
 			require.NoError(t, os.WriteFile("/usr/bin/tegrastats", probeData, 0755))
@@ -233,7 +234,7 @@ func TestSupervisedBoundaryClient(t *testing.T) {
 	require.Equal(t, 65534, os.Geteuid())
 	defer SetRunnerPathsForTests(os.Getenv("NDSUDO_BOUNDARY_FORWARD"), helper)()
 	mode := os.Getenv("NDSUDO_BOUNDARY_MODE")
-	if mode == "arguments" || mode == "status-loss" {
+	if mode == "arguments" || mode == "status-loss" || strings.HasPrefix(mode, "opath-") {
 		rawSupervisedBoundary(t, helper, mode)
 		return
 	}
@@ -331,6 +332,17 @@ func rawSupervisedBoundary(t *testing.T, helper, mode string) {
 	sr, sw, err := os.Pipe()
 	require.NoError(t, err)
 	defer sr.Close()
+	if strings.HasPrefix(mode, "opath-") {
+		endpoint := &cr
+		if mode == "opath-status" {
+			endpoint = &sw
+		}
+		fd, err := unix.Open(fmt.Sprintf("/proc/self/fd/%d", (*endpoint).Fd()), unix.O_PATH|unix.O_CLOEXEC, 0)
+		require.NoError(t, err)
+		require.NoError(t, (*endpoint).Close())
+		*endpoint = os.NewFile(uintptr(fd), "opath-endpoint")
+	}
+
 	out, writer, err := os.Pipe()
 	require.NoError(t, err)
 	defer out.Close()
@@ -346,6 +358,18 @@ func rawSupervisedBoundary(t *testing.T, helper, mode string) {
 	require.NoError(t, sw.Close())
 	require.NoError(t, writer.Close())
 	require.NoError(t, sr.SetReadDeadline(time.Now().Add(3*time.Second)))
+	if strings.HasPrefix(mode, "opath-") {
+		data, err := io.ReadAll(sr)
+		require.NoError(t, err)
+		require.Error(t, cmd.Wait())
+		require.Equal(t, 126, cmd.ProcessState.ExitCode())
+		require.Empty(t, data, "invalid pipes must be rejected before payload startup")
+		data, err = io.ReadAll(out)
+		require.NoError(t, err)
+		require.Empty(t, data, "invalid pipes must not execute the payload")
+		return
+	}
+
 	if mode == "arguments" {
 		data, err := io.ReadAll(sr)
 		require.NoError(t, err)

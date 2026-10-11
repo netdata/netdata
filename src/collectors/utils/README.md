@@ -155,8 +155,8 @@ Linux `ndsudo tegrastats` is a private supervised command. It accepts no additio
 legacy PATH/template execution path (`--test tegrastats` is not supported). It runs only
 `/usr/bin/tegrastats --interval 1000`. Existing ndsudo commands retain their behavior.
 
-The root-owned regular ELF and every directory in `/usr/bin/tegrastats` must reject group/world writes. Symlinks,
-scripts, setuid/setgid modes and file capabilities are rejected. Directory traversal uses pinned descriptors and
+The regular ELF and every directory component in `/usr/bin/tegrastats` must be root-owned and reject group/world writes.
+Symlinks, scripts, setuid/setgid modes and file capabilities are rejected. Directory traversal uses pinned descriptors and
 `O_NOFOLLOW`; descriptor execution pins the checked file through exec. This deliberately supports the fixed vendor
 installation rather than arbitrary relocated wrappers. Real/effective/saved IDs become root, supplementary groups
 are cleared, cwd is `/`, and the payload receives an empty environment and only its standard descriptors.
@@ -184,7 +184,7 @@ The versioned private status stream is one of:
 Missing, malformed or contradictory evidence means unverified cleanup, even if the helper exits successfully.
 No command-output text is part of this protocol. Exec acknowledgement does not prove usable telemetry or full fields.
 
-The Go `ndexec.Acquisition` adapter returns the existing `Process` interface. Its immutable namespace/job owner excludes
+The Go `ndexec.Acquisition` adapter returns the existing `*Process` type. Its immutable namespace/job owner excludes
 simultaneous starts across both supervised and unprivileged routes within the plugin. It retains ownership while
 privileged cleanup is unfinished or unverified; valid late completion releases it. Unprivileged runs retain their
 existing weaker group-signal/leader-reap contract. Separate names and renamed jobs are independent. These in-memory

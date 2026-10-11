@@ -21,7 +21,9 @@ static inline bool supervisor_protocol_pipes(int control_fd, int status_fd) {
         return false;
     int control_flags = fcntl(control_fd, F_GETFL);
     int status_flags = fcntl(status_fd, F_GETFL);
+    // O_PATH reports O_RDONLY access bits but cannot provide pipe I/O.
     if (control_flags < 0 || status_flags < 0 ||
+        ((control_flags | status_flags) & O_PATH) ||
         (control_flags & O_ACCMODE) != O_RDONLY || (status_flags & O_ACCMODE) != O_WRONLY)
         return false;
 

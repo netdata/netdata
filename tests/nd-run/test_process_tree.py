@@ -34,10 +34,18 @@ def compile_binary(output, sources, *flags, config=None):
 
 
 class TreeTests(unittest.TestCase):
-    def start(self, args, *, launcher=False, helper=None, alias=None):
+    def start(self, args, *, launcher=False, helper=None, alias=None, path_only=None):
         control_read, control_write = os.pipe()
         status_read, status_write = os.pipe()
         os.set_blocking(status_read, False)
+        if path_only:
+            endpoint = control_read if path_only == "control" else status_write
+            path_fd = os.open(f"/proc/self/fd/{endpoint}", os.O_PATH | os.O_CLOEXEC)
+            os.close(endpoint)
+            if path_only == "control":
+                control_read = path_fd
+            else:
+                status_write = path_fd
         command = [str(helper or HELPER), "--supervise-tree", str(control_read),
                    str(status_write), "--", *map(str, args)]
         if launcher:
@@ -149,6 +157,16 @@ class TreeTests(unittest.TestCase):
         for alias in ("control", "status"):
             with self.subTest(alias=alias):
                 process, _, status = self.start([PROBE, "detached"], alias=alias)
+                process.wait(timeout=10)
+                self.assertEqual(process.returncode, 126)
+                self.assertEqual(process.stdout.read(), b"")
+                self.assertEqual(os.read(status, 256), b"")
+                self.assertIn(b"distinct private protocol pipes", process.stderr.read())
+
+    def test_path_only_pipes_are_rejected_before_launch(self):
+        for endpoint in ("control", "status"):
+            with self.subTest(endpoint=endpoint):
+                process, _, status = self.start([PROBE, "fds"], path_only=endpoint)
                 process.wait(timeout=10)
                 self.assertEqual(process.returncode, 126)
                 self.assertEqual(process.stdout.read(), b"")
