@@ -19,17 +19,19 @@ const pipelineSendEvery = 2 * time.Second
 type PipelineGeneration struct {
 	mu sync.Mutex
 
-	providers map[string]*pipelineProvider
-	enabled   []string
-	disabled  []string
-	sendEvery time.Duration
-	run       bool
+	providers      map[string]*pipelineProvider
+	enabled        []string
+	disabled       []string
+	sendEvery      time.Duration
+	run            bool
+	initialApplied func() error
 }
 
 type pipelineProvider struct {
 	discoverer Discoverer
 	updates    chan []*confgroup.Group
 	started    bool
+	initial    chan struct{}
 }
 
 type PipelineApply func(
@@ -51,7 +53,8 @@ func NewPipelineGeneration(
 			map[string]*pipelineProvider,
 			config.Providers.Len(),
 		),
-		sendEvery: pipelineSendEvery,
+		sendEvery:      pipelineSendEvery,
+		initialApplied: config.InitialApplied,
 	}
 	for _, name := range config.Providers.Names() {
 		factory, ok := config.Providers.Lookup(name)
@@ -84,6 +87,12 @@ func NewPipelineGeneration(
 		generation.providers[name] = &pipelineProvider{
 			discoverer: discoverer,
 			updates:    make(chan []*confgroup.Group),
+		}
+		if config.InitialApplied != nil {
+			if _, ok := discoverer.(InitialDiscoverer); !ok {
+				return nil, fmt.Errorf("discovery pipeline provider %q has no finite initial snapshot", name)
+			}
+			generation.providers[name].initial = make(chan struct{})
 		}
 		generation.enabled = append(generation.enabled, name)
 	}
@@ -147,7 +156,16 @@ func (generation *PipelineGeneration) RunProvider(
 	}
 	provider.started = true
 	generation.mu.Unlock()
-	provider.discoverer.Run(ctx, provider.updates)
+	if provider.initial != nil {
+		var once sync.Once
+		provider.discoverer.(InitialDiscoverer).RunInitial(ctx, provider.updates, func() {
+			if ctx.Err() == nil {
+				once.Do(func() { close(provider.initial) })
+			}
+		})
+	} else {
+		provider.discoverer.Run(ctx, provider.updates)
+	}
 	return nil
 }
 
@@ -191,11 +209,44 @@ func (generation *PipelineGeneration) Run(
 		})
 	}
 
+	initialStart := len(cases)
+	initialRemaining := 0
+	if generation.initialApplied != nil {
+		for _, provider := range providers {
+			cases = append(cases, reflect.SelectCase{Dir: reflect.SelectRecv, Chan: reflect.ValueOf(provider.initial)})
+			initialRemaining++
+		}
+	}
+
 	cache := newCache()
 	pending := false
 	sent := false
 	for {
 		index, value, ok := reflect.Select(cases)
+		if index >= initialStart {
+			cases[index].Chan = reflect.Value{}
+			initialRemaining--
+			if initialRemaining != 0 {
+				continue
+			}
+			if pending {
+				if err := apply(ctx, cache.groups()); err != nil {
+					if ctx.Err() != nil {
+						return nil
+					}
+					return fmt.Errorf("discovery pipeline initial apply: %w", err)
+				}
+				cache.reset()
+				pending = false
+			}
+			if ctx.Err() != nil {
+				return nil
+			}
+			if err := generation.initialApplied(); err != nil {
+				return fmt.Errorf("discovery pipeline initial completion: %w", err)
+			}
+			continue
+		}
 		switch index {
 		case 0:
 			return nil

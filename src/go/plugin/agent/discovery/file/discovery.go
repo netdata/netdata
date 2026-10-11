@@ -41,6 +41,7 @@ type (
 	}
 	discoverer interface {
 		Run(ctx context.Context, in chan<- []*confgroup.Group)
+		RunInitial(ctx context.Context, in chan<- []*confgroup.Group, initial func())
 	}
 )
 
@@ -58,16 +59,30 @@ func (d *Discovery) registerDiscoverers(cfg Config) error {
 }
 
 func (d *Discovery) Run(ctx context.Context, in chan<- []*confgroup.Group) {
+	d.RunInitial(ctx, in, nil)
+}
+
+func (d *Discovery) RunInitial(ctx context.Context, in chan<- []*confgroup.Group, initial func()) {
 	d.Info("instance is started")
 	defer func() { d.Info("instance is stopped") }()
 
 	var wg sync.WaitGroup
+	var initialMu sync.Mutex
+	remaining := len(d.discoverers)
+	onInitial := func() {
+		initialMu.Lock()
+		defer initialMu.Unlock()
+		remaining--
+		if remaining == 0 && initial != nil && ctx.Err() == nil {
+			initial()
+		}
+	}
 
 	for _, dd := range d.discoverers {
 		wg.Add(1)
 		go func(dd discoverer) {
 			defer wg.Done()
-			d.runDiscoverer(ctx, dd, in)
+			d.runDiscoverer(ctx, dd, in, onInitial)
 		}(dd)
 	}
 
@@ -75,15 +90,31 @@ func (d *Discovery) Run(ctx context.Context, in chan<- []*confgroup.Group) {
 	<-ctx.Done()
 }
 
-func (d *Discovery) runDiscoverer(ctx context.Context, dd discoverer, in chan<- []*confgroup.Group) {
+func (d *Discovery) runDiscoverer(ctx context.Context, dd discoverer, in chan<- []*confgroup.Group, initial func()) {
 	updates := make(chan []*confgroup.Group)
-	go dd.Run(ctx, updates)
+	ready := make(chan struct{})
+	done := make(chan struct{})
+	go func() {
+		defer close(done)
+		dd.RunInitial(ctx, updates, func() { close(ready) })
+	}()
+	defer func() { <-done }()
 	for {
 		select {
 		case <-ctx.Done():
 			return
+		case <-ready:
+			ready = nil
+			initial()
 		case groups, ok := <-updates:
 			if !ok {
+				if ready != nil {
+					select {
+					case <-ready:
+						initial()
+					default:
+					}
+				}
 				return
 			}
 			select {

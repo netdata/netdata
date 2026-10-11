@@ -34,12 +34,19 @@ type Discovery struct {
 }
 
 func (d *Discovery) Run(ctx context.Context, in chan<- []*confgroup.Group) {
+	d.RunInitial(ctx, in, nil)
+}
+
+func (d *Discovery) RunInitial(ctx context.Context, in chan<- []*confgroup.Group, initial func()) {
 	d.Info("instance is started")
 	defer func() { d.Info("instance is stopped") }()
 
 	select {
 	case <-ctx.Done():
 	case in <- d.groups():
+		if initial != nil && ctx.Err() == nil {
+			initial()
+		}
 	}
 
 	close(in)

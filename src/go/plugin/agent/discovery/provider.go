@@ -14,6 +14,14 @@ type Discoverer interface {
 	Run(ctx context.Context, in chan<- []*confgroup.Group)
 }
 
+// InitialDiscoverer explicitly marks the end of its finite initial snapshot.
+// Call initial only after sending every initial update; do not call it on
+// cancellation or incomplete discovery. Later updates remain valid. Arbitrary
+// service discovery is not assumed to have a complete initial target set.
+type InitialDiscoverer interface {
+	RunInitial(ctx context.Context, in chan<- []*confgroup.Group, initial func())
+}
+
 // ProviderFactory builds optional discoverers from a shared build context.
 type ProviderFactory interface {
 	Name() string

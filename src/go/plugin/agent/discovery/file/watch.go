@@ -49,6 +49,10 @@ func NewWatcher(reg confgroup.Registry, paths []string) *Watcher {
 }
 
 func (w *Watcher) Run(ctx context.Context, in chan<- []*confgroup.Group) {
+	w.RunInitial(ctx, in, nil)
+}
+
+func (w *Watcher) RunInitial(ctx context.Context, in chan<- []*confgroup.Group, initial func()) {
 	w.Info("instance is started")
 	defer func() { w.Info("instance is stopped") }()
 
@@ -61,6 +65,9 @@ func (w *Watcher) Run(ctx context.Context, in chan<- []*confgroup.Group) {
 	w.watcher = watcher
 	defer w.stop()
 	w.refresh(ctx, in)
+	if initial != nil && ctx.Err() == nil {
+		initial()
+	}
 
 	tk := time.NewTicker(w.refreshEvery)
 	defer tk.Stop()

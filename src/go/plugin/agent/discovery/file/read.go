@@ -37,12 +37,19 @@ type Reader struct {
 }
 
 func (r *Reader) Run(ctx context.Context, in chan<- []*confgroup.Group) {
+	r.RunInitial(ctx, in, nil)
+}
+
+func (r *Reader) RunInitial(ctx context.Context, in chan<- []*confgroup.Group, initial func()) {
 	r.Info("instance is started")
 	defer func() { r.Info("instance is stopped") }()
 
 	select {
 	case <-ctx.Done():
 	case in <- r.groups():
+		if initial != nil && ctx.Err() == nil {
+			initial()
+		}
 	}
 
 	close(in)
