@@ -75,7 +75,7 @@ An uncertain pin can retain files indefinitely and prevent a later acquisition.
 Archives, staging, lifecycle records and trash count as managed bytes. Active
 preparation reserves its unwritten remainder; byte accounting uses the same
 observation for used and reserved bytes while writers are active. This is an
-allowance, not a physical-disk quota; filesystem metadata/allocation and external
+allowance, not a physical-disk quota; filesystem metadata/allocation and protected
 preloads are separate. ENOSPC still needs handling.
 
 `Inspect` is read-only and never launches or prepares a runtime. It reports
