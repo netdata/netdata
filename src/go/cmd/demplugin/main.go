@@ -40,6 +40,13 @@ func init() {
 }
 func main() {
 	_, _ = maxprocs.Set(maxprocs.Logger(func(string, ...any) {}))
+	if handled, err := runRuntimeCommand(context.Background(), os.Args[1:], os.Stdout, os.Stderr); handled {
+		if err != nil {
+			fmt.Fprintln(os.Stderr, err)
+			os.Exit(1)
+		}
+		return
+	}
 	opts, err := cli.Parse(os.Args)
 	if err != nil {
 		if cli.IsHelp(err) {
@@ -104,18 +111,24 @@ func main() {
 		// Process maintenance retries it, and the catalogue exposes its status.
 		fmt.Fprintf(os.Stderr, "initial DEM artifact cleanup failed: %v\n", err)
 	}
-	cfg.Runtime.AssetsPath = filepath.Join(executable.Directory, "dem")
-	executor := runner.New(cfg.Runtime, synthetichistory.NewStore(history), captures)
+	assetsPath := filepath.Join(executable.Directory, "dem")
+	runtimeHandle := dem.OpenRuntime(cfg.Runtime, assetsPath, pluginconfig.VarLibDir())
+	executor := runner.New(assetsPath, runtimeHandle.Source, synthetichistory.NewStore(history), captures)
 	components := dem.New(
 		dem.Dependencies{
 			History:        history,
 			GeoIPPaths:     geoip.AgentPaths(pluginconfig.CacheDir(), pluginconfig.StockDataDir()),
 			Artifacts:      captures,
 			Executor:       executor,
+			Runtime:        runtimeHandle.Host,
 			ConfigProvider: func() (dem.Config, error) { return dem.LoadConfig(pluginconfig.ConfigDir()) },
 		},
 		cfg,
 	)
+	services := []composition.ProcessService{components.Retention}
+	if runtimeHandle.Host != nil {
+		services = append(services, runtimeHandle.Host)
+	}
 	a := agent.New(agent.Config{
 		Name:                      executable.Name,
 		PluginConfigDir:           pluginconfig.ConfigDir(),
@@ -124,7 +137,7 @@ func main() {
 		VarLibDir:                 pluginconfig.VarLibDir(),
 		ModuleRegistry:            components.Collectors,
 		ProcessFunctions:          components.Functions,
-		Services:                  []composition.ProcessService{components.Retention},
+		Services:                  services,
 		Secrets:                   secrets,
 		IsInsideK8s:               hostinfo.IsInsideK8sCluster(),
 		RunModePolicy:             policy.Agent(isTerminal),
@@ -159,6 +172,10 @@ func main() {
 	}
 	if result.ExitRequired {
 		os.Exit(0)
+	}
+	if err := runtimeHandle.Close(); err != nil {
+		a.Errorf("closing DEM runtime: %v", err)
+		os.Exit(1)
 	}
 	if err := captures.Close(); err != nil {
 		a.Errorf("closing DEM artifacts: %v", err)

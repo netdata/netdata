@@ -1,0 +1,84 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+
+package main
+
+import (
+	"bytes"
+	"context"
+	"encoding/json"
+	"os"
+	"path/filepath"
+	"testing"
+
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+)
+
+func runtimeCommand(t *testing.T, args ...string) (runtimeCommandReport, error) {
+	t.Helper()
+	var out, diagnostic bytes.Buffer
+	handled, err := runRuntimeCommand(context.Background(), args, &out, &diagnostic)
+	require.True(t, handled)
+	var report runtimeCommandReport
+	if out.Len() > 0 {
+		require.NoError(t, json.Unmarshal(out.Bytes(), &report), out.String())
+	}
+	return report, err
+}
+func TestRuntimeDispatchAndBadArguments(t *testing.T) {
+	for _, args := range [][]string{nil, {"-d"}, {"--version"}} {
+		var out bytes.Buffer
+		handled, err := runRuntimeCommand(context.Background(), args, &out, &out)
+		require.NoError(t, err)
+		assert.False(t, handled)
+		assert.Empty(t, out.String())
+	}
+	for _, args := range [][]string{
+		{"runtime"}, {"runtime", "unknown"}, {"runtime", "status", "stray"}, {"runtime", "prepare", "--url", "https://arbitrary.invalid"},
+		{"runtime", "import"}, {"runtime", "preload"}, {"runtime", "status", "--archive", "/tmp/archive"},
+		{"runtime", "prepare", "--root", "/tmp/root"}, {"runtime", "preload", "--root", "/tmp/root", "--cache", "/tmp/cache"},
+		{"runtime", "status", "--assets", "relative"}, {"runtime", "import", "--archive", "relative"},
+	} {
+		t.Run(args[len(args)-1], func(t *testing.T) { _, err := runtimeCommand(t, args...); require.Error(t, err) })
+	}
+}
+func TestRuntimeMissingManifestNeverInitializesCache(t *testing.T) {
+	for _, command := range []string{"prepare", "status", "qualify", "import"} {
+		t.Run(command, func(t *testing.T) {
+			root := t.TempDir()
+			cache := filepath.Join(root, "cache")
+			args := []string{"runtime", command, "--config-dir", root, "--manifest", filepath.Join(root, "missing.json"), "--cache", cache}
+			if command == "import" {
+				args = append(args, "--archive", filepath.Join(root, "archive.tar.gz"))
+			}
+			report, err := runtimeCommand(t, args...)
+			require.ErrorContains(t, err, "installed runtime manifest")
+			assert.Equal(t, "unavailable", report.State)
+			assert.NotEmpty(t, report.SetupError)
+			require.Nil(t, report.Qualification)
+			_, err = os.Stat(cache)
+			assert.True(t, os.IsNotExist(err))
+		})
+	}
+}
+func TestRuntimeExternalStatusDoesNotClaimQualification(t *testing.T) {
+	dir := t.TempDir()
+	require.NoError(t, os.WriteFile(filepath.Join(dir, "dem.conf"), []byte("runtime: {mode: external, node_path: /absent/node, dependencies_path: /absent/dependencies, browser_path: /absent/chrome}"), 0600))
+	report, err := runtimeCommand(t, "runtime", "status", "--config-dir", dir)
+	require.NoError(t, err)
+	assert.Equal(t, "external_unverified", report.State)
+	require.Nil(t, report.Qualification)
+	report, err = runtimeCommand(t, "runtime", "qualify", "--config-dir", dir)
+	require.Error(t, err)
+	require.NotNil(t, report.Qualification)
+	assert.False(t, report.Qualification.VersionsAndAssets)
+	assert.False(t, report.Qualification.SandboxedLocalJourney)
+	for _, command := range []string{"prepare", "import"} {
+		args := []string{"runtime", command, "--config-dir", dir}
+		if command == "import" {
+			args = append(args, "--archive", "/unused")
+		}
+		_, err = runtimeCommand(t, args...)
+		require.ErrorContains(t, err, "mode: managed")
+	}
+}

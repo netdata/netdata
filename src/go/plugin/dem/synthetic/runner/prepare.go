@@ -29,16 +29,16 @@ func runtimeAllowed() error {
 	return nil
 }
 
-func (e *Engine) checkFiles(kind synthetic.Kind) error {
+func (e *Engine) checkFiles(kind synthetic.Kind, paths Paths) error {
 	if kind != synthetic.Journey && kind != synthetic.Lighthouse {
 		return errors.New("unsupported synthetic kind")
 	}
-	for name, value := range map[string]string{"node_path": e.config.NodePath, "dependencies_path": e.config.DependenciesPath, "browser_path": e.config.BrowserPath, "assets_path": e.config.AssetsPath} {
+	for name, value := range map[string]string{"node_path": paths.Node, "dependencies_path": paths.Dependencies, "browser_path": paths.Browser, "assets_path": e.assetsPath} {
 		if !filepath.IsAbs(value) {
 			return fmt.Errorf("prepared %s must be an absolute path", name)
 		}
 	}
-	for name, value := range map[string]string{"node": e.config.NodePath, "browser": e.config.BrowserPath} {
+	for name, value := range map[string]string{"node": paths.Node, "browser": paths.Browser} {
 		info, err := os.Stat(value)
 		if err != nil {
 			return fmt.Errorf("prepared %s: %w", name, err)
@@ -48,7 +48,7 @@ func (e *Engine) checkFiles(kind synthetic.Kind) error {
 		}
 	}
 	for _, name := range []string{"run.mjs", "reporter.cjs", "protocol.cjs", "lighthouse.mjs"} {
-		f, err := os.Open(filepath.Join(e.config.AssetsPath, name))
+		f, err := os.Open(filepath.Join(e.assetsPath, name))
 		if err != nil {
 			return fmt.Errorf("prepared runner asset %s: %w", name, err)
 		}
@@ -62,7 +62,7 @@ func (e *Engine) checkFiles(kind synthetic.Kind) error {
 		}
 	}
 	for name, pin := range requiredRuntime.Packages {
-		raw, err := os.ReadFile(filepath.Join(e.config.DependenciesPath, "node_modules", name, "package.json"))
+		raw, err := os.ReadFile(filepath.Join(paths.Dependencies, "node_modules", name, "package.json"))
 		if err != nil {
 			return fmt.Errorf("prepared %s package: %w", name, err)
 		}
@@ -88,16 +88,15 @@ func (e *Engine) Check(ctx context.Context, kind synthetic.Kind) error {
 	if err := e.platform(); err != nil {
 		return err
 	}
-	if err := e.checkFiles(kind); err != nil {
-		return err
-	}
 	checkCtx, cancel := context.WithTimeout(ctx, 10*time.Second)
 	defer cancel()
 	node, err := e.probe(
-		checkCtx,
-		[]string{
-			"-e",
-			"process.stdout.write(JSON.stringify({version:process.versions.node,uid:process.getuid(),gid:process.getgid()}))",
+		checkCtx, kind,
+		func(Paths) []string {
+			return []string{
+				"-e",
+				"process.stdout.write(JSON.stringify({version:process.versions.node,uid:process.getuid(),gid:process.getgid()}))",
+			}
 		},
 	)
 	if err != nil {
@@ -121,7 +120,7 @@ func (e *Engine) Check(ctx context.Context, kind synthetic.Kind) error {
 	// execFileSync is confined to a version query. It runs under the same tree
 	// supervisor; cancellation still drains any descendant it creates.
 	script := "require('node:child_process').execFileSync(process.argv[1],['--version'],{stdio:['ignore',1,2]})"
-	browser, err := e.probe(checkCtx, []string{"-e", script, e.config.BrowserPath})
+	browser, err := e.probe(checkCtx, kind, func(paths Paths) []string { return []string{"-e", script, paths.Browser} })
 	if err != nil {
 		return fmt.Errorf("prepared Chromium check: %w", err)
 	}
@@ -134,11 +133,29 @@ func (e *Engine) Check(ctx context.Context, kind synthetic.Kind) error {
 	return nil
 }
 
-func (e *Engine) probe(ctx context.Context, args []string) ([]byte, error) {
+func (e *Engine) beginUse() (Use, error) {
+	if e.source == nil {
+		return nil, errors.New("runtime source is unavailable")
+	}
+	return e.source.BeginUse()
+}
+
+func (e *Engine) probe(ctx context.Context, kind synthetic.Kind, arguments func(Paths) []string) ([]byte, error) {
+	use, err := e.beginUse()
+	if err != nil {
+		return nil, err
+	}
+	drained := true
+	defer func() { _ = use.Finish(drained) }()
+	paths := use.Paths()
+	if err := e.checkFiles(kind, paths); err != nil {
+		return nil, err
+	}
+
 	var output []byte
 	var parseErr error
 	var diagnostic string
-	result, err := e.executeProcess(ctx, args, nil, func(reader io.Reader) error {
+	result, err := e.executeProcess(ctx, paths, use.Completion(), arguments(paths), nil, func(reader io.Reader) error {
 		output, parseErr = io.ReadAll(io.LimitReader(reader, 4097))
 		if len(output) > 4096 {
 			parseErr = errors.New("runtime version response exceeds 4096 bytes")
@@ -152,7 +169,8 @@ func (e *Engine) probe(ctx context.Context, args []string) ([]byte, error) {
 	if err != nil {
 		return nil, err
 	}
-	if !result.Drained {
+	drained = result.Drained
+	if !drained {
 		return nil, ndexec.ErrTreeNotDrained
 	}
 	if parseErr != nil {

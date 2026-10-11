@@ -122,12 +122,12 @@ func testEngine(t *testing.T) (*Engine, *fakeHistory, *observedArtifacts) {
 		Store: store,
 	}
 	engine := New(
-		Config{
-			NodePath:         bin,
-			BrowserPath:      bin,
-			AssetsPath:       assets,
-			DependenciesPath: filepath.Join(base, "deps"),
-		},
+		assets,
+		ExternalRuntime{Paths: Paths{
+			Node:         bin,
+			Browser:      bin,
+			Dependencies: filepath.Join(base, "deps"),
+		}},
 		history,
 		owner,
 	)
@@ -737,7 +737,7 @@ func TestCheckRequiresQualifiedBrowserIdentity(t *testing.T) {
 
 func TestCheckRejectsUnqualifiedPackageBeforeStarting(t *testing.T) {
 	e, _, _ := testEngine(t)
-	metadata := filepath.Join(e.config.DependenciesPath, "node_modules", "playwright", "package.json")
+	metadata := filepath.Join(e.source.(ExternalRuntime).Paths.Dependencies, "node_modules", "playwright", "package.json")
 	require.NoError(t, os.WriteFile(metadata, []byte(`{"version":"0.0.0"}`), 0600))
 	e.start = func(context.Context, ndexec.TreeOptions, string, ...string) (treeProcess, error) {
 		t.Fatal("unqualified package started a version probe")

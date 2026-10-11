@@ -20,6 +20,8 @@ creates and closes shared resources across framework generations.
 | `synthetic/functions` | Function declarations, arguments, permissions, columns and response serialization |
 | `synthetic/runner` | Prepared browser execution, admission, process supervision and private reporter protocol |
 | `synthetic/runner/assets` | Immutable Node adapters and pinned dependency manifests |
+| `synthetic/runtime` | Trusted bundle verification, shared cache inventory, demand/use pins and automatic retirement |
+| `synthetic/runtimehost` | Accepted enabled demand, asynchronous preparation, readiness notifications and process maintenance |
 | `synthetic/artifacts` | Work directories, verified publication, immutable captures, reads and retention |
 | `journal` | Shared root policy, SDK admission and inventory, independent snapshots, retention status and close |
 | `historyfunc` | Read-only process history status presentation behind a narrow store dependency |
@@ -278,6 +280,22 @@ stops the process even if cancellation already finished `Run`. Framework schedul
 the execution admission slot, artifact store and journal. Process Functions are registered through separate process
 providers and published independently of collector selection. Their narrow source copies active snapshots before
 independent history I/O; no Function acquires browser admission.
+
+The process runtime host owns accepted enabled browser configuration independently of collector activation. Graph
+transactions reserve demand before adoption, then commit or abort it; disabled/passive configuration never downloads.
+A process worker prepares the selected trusted bundle, retries failures and polls for offline imports. Run-scoped
+subscriptions wake the existing named dependency scheduler. RUM and configuration mutation do not wait for a download.
+
+The managed store serializes reservations, generation publication and retirement across consumers. Accepted demand
+and each invocation's durable use pin protect files independently. The runner acquires a use before inspecting runtime
+files, passes its completion handle to `nd-run`, and releases it after supervised drainage and local reader joins.
+Unknown execution completion retains protection across restart. Preparation/maintenance errors do not alter website
+outcomes. Administrator-owned external paths bypass cache ownership and require stopped consumers for replacement.
+
+Startup does not wait for a saved-configuration replay marker. Unneeded cached files may expire or yield to pressure
+before saved enables arrive; this permits a cache miss, not unsafe deletion during execution. A controlled offline
+preload uses explicit external paths outside cache retirement. Command shutdown closes the host and store only after
+jobs have joined; fail-stop paths retain the existing execution evidence.
 
 The real Node adapter selects exactly one configured entry with explicit config/tsconfig and a private reporter pipe.
 Standard import mappings target real pinned package entries, never a fake test harness. Retry overrides fail before a

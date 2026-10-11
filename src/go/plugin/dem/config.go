@@ -7,7 +7,6 @@ import (
 
 	"github.com/netdata/netdata/go/plugins/pkg/multipath"
 	"github.com/netdata/netdata/go/plugins/plugin/dem/journal"
-	"github.com/netdata/netdata/go/plugins/plugin/dem/synthetic/runner"
 	"gopkg.in/yaml.v2"
 )
 
@@ -18,7 +17,7 @@ type RetentionConfig struct {
 type Config struct {
 	History   RetentionConfig `yaml:"history"`
 	Artifacts RetentionConfig `yaml:"artifacts"`
-	Runtime   runner.Config   `yaml:"runtime"`
+	Runtime   RuntimeConfig   `yaml:"runtime"`
 }
 
 func DefaultConfig() Config {
@@ -27,9 +26,7 @@ func DefaultConfig() Config {
 			Days:     7,
 			MaxBytes: 2 << 30,
 		},
-		Runtime: runner.Config{
-			NodePath: "/usr/bin/node",
-		},
+		Runtime: DefaultRuntimeConfig(),
 		History: RetentionConfig{
 			Days:     30,
 			MaxBytes: 1 << 30,
@@ -60,6 +57,9 @@ func LoadConfig(paths multipath.MultiPath) (Config, error) {
 	}
 	if err = cfg.Artifacts.validate(1); err != nil {
 		return cfg, fmt.Errorf("artifacts.%w", err)
+	}
+	if err = cfg.Runtime.validate(); err != nil {
+		return cfg, fmt.Errorf("runtime.%w", err)
 	}
 	return cfg, nil
 }

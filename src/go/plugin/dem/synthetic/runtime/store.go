@@ -55,8 +55,8 @@ func DefaultConfig(path string) Config {
 	return Config{Path: path, MaxBytes: DefaultMaxBytes, PreviousRetention: DefaultPreviousRetention, IdleRetention: DefaultIdleRetention}
 }
 
-// Store coordinates local processes. Owners must reconcile accepted demand
-// before the first Sweep, and must not launch from generation paths except via Use.
+// Store coordinates local processes. Reserved/accepted demand and execution pins
+// protect cached generations; owners must execute through BeginUse.
 // The directory must remain on one host and may not be copied or network-shared.
 type Store struct {
 	completedUses map[string]bool
@@ -271,4 +271,16 @@ func checkContext(ctx context.Context) error {
 		return nil
 	}
 	return ctx.Err()
+}
+
+// Available verifies prepared identity without acquiring execution ownership or
+// changing idle timestamps. BeginUse must still precede every executable access.
+func (s *Store) Available(m Manifest) error {
+	if err := m.Validate(); err != nil {
+		return err
+	}
+	return s.withLock(func() error {
+		_, err := s.prepared(m)
+		return err
+	})
 }

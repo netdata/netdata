@@ -3,9 +3,10 @@
 The browser runtime requires an unprivileged plugin process on Linux. Root RUM
 operation does not enable browser jobs. These immutable assets adapt prepared
 Node 24+, Playwright Test 1.63.0 and
-Lighthouse 13.4.1 to the DEM execution protocol. Install the dependencies from
-`package-lock.json` into a separate prepared directory with `npm ci`; the plugin
-never downloads packages, modifies the installed assets or updates the browser.
+Lighthouse 13.4.1 to the DEM execution protocol. Managed setup downloads a verified
+portable runtime into its separate cache. Administrator-managed setup can install
+`package-lock.json` dependencies into a separate directory with `npm ci`.
+Execution never modifies these installed assets or its prepared runtime.
 The qualified full browser is unbranded Chromium 154.0.8037.92 from Debian
 package `154.0.8037.92-1~deb13u1`. Netdata qualifies this exact browser/Playwright
 pair; Playwright's bundled browser revision is not the runtime delivery identity.

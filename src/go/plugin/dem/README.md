@@ -446,32 +446,93 @@ Journey defaults to 900 seconds between attempts and a 120-second admitted timeo
 One plugin-wide admission slot serializes expensive runs. Waiting time is separate from execution time; cancellation
 while waiting starts no browser. A fresh browser is created for each run.
 
-Browser jobs currently require Linux amd64 or arm64 and an unprivileged plugin identity. Prepare Node 24 or newer,
-full Chromium, its system libraries and compatible sandbox support. Chromium sandboxing stays enabled; setup refusal
-appears as execution inability. Containers need namespace/seccomp support for the sandbox. The plugin does not install
-packages or download browsers. Restart the plugin after changing `runtime` paths in `dem.conf`.
+Browser jobs require Linux amd64 or arm64 and an unprivileged plugin identity. Chromium sandboxing stays enabled;
+containers need compatible namespace/seccomp support. RUM does not require a browser runtime.
 
-The installed `plugins.d/dem/package.json` and `package-lock.json` pin `@playwright/test`/Playwright 1.63.0,
-Lighthouse 13.4.1 and Chrome Launcher 1.2.1. Copy both files into a prepared dependency directory, then run `npm ci
---omit=dev --ignore-scripts` there with the compatible Node version. The qualified full browser is unbranded
-Chromium 154.0.8037.92 from Debian packages `chromium` and `chromium-common` version `154.0.8037.92-1~deb13u1`.
-Netdata qualifies this exact browser/Playwright pair. Lighthouse needs the full browser. On Debian 13, install these
-exact browser packages with their dependencies; the [portable bundle recipe](../../../../packaging/dem-runtime/README.md)
-provides pinned private libraries and fonts for other supported Linux userlands. Bundle publication and automatic
-runtime setup are still under development. Make the prepared dependency and browser files readable/executable by
-the service account, then set absolute paths:
+### Runtime setup and retirement
+
+Managed mode is the default. Accepting an enabled journey or Lighthouse configuration requests its exact runtime;
+validation and disabled configurations do not download it. Preparation runs separately from website monitoring.
+An unavailable runtime leaves the monitor waiting for its dependency; it does not produce website failure measurements.
+Downloads can be disabled by the administrator:
 
 ```yaml
 runtime:
+  mode: managed
+  allow_download: false
+  max_bytes: 4294967296
+  previous_retention_days: 7
+  idle_retention_days: 30
+```
+
+The Agent installs a trusted `plugins.d/dem/runtime-<architecture>.json` manifest identifying the archive, digest,
+size limits and executable layout. Monitor configuration cannot choose a download URL. Publication of these manifests,
+archives and corresponding sources is still pending release qualification and a confirmed public URL. A checkout or
+package without that manifest reports setup unavailability; it does not guess a source or fetch a different browser.
+
+The cache defaults to `NETDATA_LIB_DIR/dem/runtime`. Its 4 GiB allowance includes preparation reservations. Known
+enabled monitors protect their runtime; every probe and browser invocation also has an independent execution pin.
+Unneeded previous generations get a 7-day grace and idle runtimes 30 days, with hourly cleanup. Storage pressure can
+shorten either grace. Protected demand and executions can exceed the allowance. If child completion cannot be proved,
+the plugin stops and retains the execution's protection; an arbitrary timeout is not permission to remove its files.
+
+This is an ordinary cache: startup cleanup or another consumer can remove an expired generation before saved monitor
+enables arrive. Online setup can download it again; offline setup reports unavailability. For guaranteed offline
+availability across that gap, use an administrator-owned preload as described below. Restart the plugin after changing
+runtime configuration; an Agent upgrade requiring a new runtime needs that exact archive available online or imported.
+
+Run administration commands as the consuming service account, with the same configuration and library directory:
+
+```sh
+dem.plugin runtime status
+dem.plugin runtime prepare
+dem.plugin runtime import --archive /absolute/path/runtime.tar.gz
+dem.plugin runtime qualify
+```
+
+`status` reports cache inventory and whether the selected archive is prepared, without downloading or launching a
+browser. `prepare` uses only the installed manifest's URL; `import` verifies an offline archive against that same trust.
+`qualify` runs a local sandboxed Playwright journey through the actual supervisor and reports qualification separately
+from preparation. It does not download missing files. `--config-dir`, `--manifest`, `--cache` and `--assets` support
+explicit installation paths; paths must be absolute. Cache inventory and maintenance errors remain separate from
+monitor outcomes. CLI inventory is a storage observation, not the running plugin's live preparation status.
+
+Native packages, Docker, static installations and source builds use the same managed owner. The portable runtime
+brings private Node, Chromium libraries, fonts and JavaScript dependencies; it does not install host packages or
+modify installed adapters. Persist the cache in Docker if it should survive container replacement. An image can
+instead include a preload at its final path:
+
+```sh
+dem.plugin runtime preload --root /opt/netdata-dem-runtime --archive /absolute/path/runtime.tar.gz
+```
+
+The root must be new or empty. Use the returned `runtime.mode: external` configuration and exact paths; do not move
+the preload or configure it as a managed cache. Keep it privately owned by the consuming service account. Preloaded
+files are outside automatic retirement; stop every consumer before replacing or removing them. This mode supports
+controlled offline images and read-only deployments. Qualification still needs to run under the target service's
+sandbox and security policy; a successful image build does not establish host compatibility.
+
+### Administrator-managed runtime
+
+External mode also supports a manually prepared runtime. The installed `plugins.d/dem/package.json` and
+`package-lock.json` pin Playwright 1.63.0, Lighthouse 13.4.1 and Chrome Launcher 1.2.1. Copy them to a prepared dependency
+directory and run `npm ci --omit=dev --ignore-scripts` using Node 24 or newer. The qualified full browser is unbranded
+Chromium 154.0.8037.92 from Debian packages `chromium` and `chromium-common` version `154.0.8037.92-1~deb13u1`.
+Netdata qualifies this exact browser/Playwright pair. Lighthouse requires the full browser, not headless-shell.
+The [portable bundle recipe](../../../../packaging/dem-runtime/README.md) supplies pinned private libraries and fonts.
+Make all files readable/executable by the service account and configure absolute paths:
+
+```yaml
+runtime:
+  mode: external
   node_path: /usr/bin/node
   dependencies_path: /opt/netdata-dem
   browser_path: /usr/bin/chromium
 ```
 
-The browser executable's directory varies by architecture and installation location; use the actual full Chromium
-path. Do not configure the headless-shell executable. Check validates preparation without executing a workflow.
-Prepared packages and installed runner assets are read-only during execution; generated config, caches, profiles and
-output are confined to a private run directory.
+Prepared packages and installed adapters remain read-only during execution. Generated configuration, caches, profiles
+and output are confined to a private run directory. External paths are borrowed for the process lifetime, so stop
+all consumers before replacing their files.
 
 Configure exactly one of inline `script` or absolute `script_path` in `dem/journey.conf`. Standard named imports from
 `@playwright/test` and destructured CommonJS `require` use the real pinned package. JS/TS, mjs/mts and cjs/cts entries,

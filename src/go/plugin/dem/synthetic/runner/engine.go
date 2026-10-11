@@ -39,7 +39,8 @@ type ArtifactStore interface {
 }
 
 type Engine struct {
-	config     Config
+	assetsPath string
+	source     Source
 	history    historyWriter
 	artifacts  ArtifactStore
 	admission  chan struct{}
@@ -50,15 +51,16 @@ type Engine struct {
 	platform   func() error
 }
 
-func New(config Config, history historyWriter, artifacts ArtifactStore) *Engine {
+func New(assetsPath string, source Source, history historyWriter, artifacts ArtifactStore) *Engine {
 	return &Engine{
-		config:    config,
-		history:   history,
-		artifacts: artifacts,
-		admission: make(chan struct{}, 1),
-		fatal:     make(chan error, 1),
-		poisoned:  make(chan struct{}),
-		platform:  runtimeAllowed,
+		assetsPath: assetsPath,
+		source:     source,
+		history:    history,
+		artifacts:  artifacts,
+		admission:  make(chan struct{}, 1),
+		fatal:      make(chan error, 1),
+		poisoned:   make(chan struct{}),
+		platform:   runtimeAllowed,
 		start: func(ctx context.Context, opts ndexec.TreeOptions, bin string, args ...string) (treeProcess, error) {
 			return ndexec.StartUnprivilegedProcessTree(ctx, opts, bin, args...)
 		},
@@ -155,7 +157,13 @@ func (e *Engine) Execute(ctx context.Context, request synthetic.Request, state f
 	if err := e.platform(); err != nil {
 		return finishUnstarted(err, true)
 	}
-	if err := e.checkFiles(request.Kind); err != nil {
+	use, err := e.beginUse()
+	if err != nil {
+		return finishUnstarted(err, true)
+	}
+	defer func() { _ = use.Finish(drained) }()
+	paths := use.Paths()
+	if err := e.checkFiles(request.Kind, paths); err != nil {
 		return finishUnstarted(err, true)
 	}
 	if e.artifacts == nil {
@@ -175,8 +183,8 @@ func (e *Engine) Execute(ctx context.Context, request synthetic.Request, state f
 		Version:          1,
 		Kind:             request.Kind,
 		RunID:            run.ID,
-		DependenciesPath: e.config.DependenciesPath,
-		BrowserPath:      e.config.BrowserPath,
+		DependenciesPath: paths.Dependencies,
+		BrowserPath:      paths.Browser,
 		WorkDir:          work,
 		Script:           request.Script,
 		ScriptPath:       request.ScriptPath,
@@ -204,7 +212,9 @@ func (e *Engine) Execute(ctx context.Context, request synthetic.Request, state f
 	}
 	result, startErr := e.executeProcess(
 		attempt,
-		[]string{filepath.Join(e.config.AssetsPath, "run.mjs")},
+		paths,
+		use.Completion(),
+		[]string{filepath.Join(e.assetsPath, "run.mjs")},
 		raw,
 		sink.consume,
 		sink.stderr,

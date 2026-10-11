@@ -15,42 +15,82 @@ import (
 
 type claimRecord struct {
 	Generation string `json:"generation"`
+	Pending    bool   `json:"pending,omitempty"`
 }
 
-// Claim protects accepted demand, including demand awaiting preparation. It does
-// not prove execution lifetime; exiting the owner releases only this claim.
+// Claim protects a pending or accepted configuration, including a runtime not
+// prepared yet. It is process-owned, never execution-lifetime evidence.
 type Claim struct {
-	store  *Store
-	name   string
-	lock   *flock.Flock
-	mu     sync.Mutex
-	closed bool
+	store         *Store
+	name          string
+	generation    string
+	lock          *flock.Flock
+	mu            sync.Mutex
+	closed        bool
+	commitStarted bool
 }
 
-func (s *Store) Demand(id string) (*Claim, error) {
+// ReserveDemand protects an identity without changing generation timestamps.
+// Call Commit only after configuration adoption; Close aborts unused reservations.
+func (s *Store) ReserveDemand(id string) (*Claim, error) {
 	if !validID(id) {
 		return nil, errors.New("invalid requested runtime identity")
 	}
 	var claim *Claim
 	err := s.withLock(func() error {
-		name, lock, err := s.newOwner("claims", claimRecord{Generation: id})
+		name, lock, err := s.newOwner("claims", claimRecord{Generation: id, Pending: true})
+		if err == nil {
+			claim = &Claim{store: s, name: name, generation: id, lock: lock}
+		}
+		return err
+	})
+	if err != nil {
+		if claim != nil {
+			err = errors.Join(err, claim.lock.Close())
+		}
+		return nil, err
+	}
+	return claim, nil
+}
+
+// Commit promotes reserved protection to accepted demand. An I/O failure retains
+// ownership, so the accepted caller can retry without exposing files to eviction.
+func (c *Claim) Commit() error {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	if c.closed {
+		return errors.New("runtime demand is closed")
+	}
+	c.commitStarted = true
+	return c.store.withLock(func() error {
+		if err := saveJSON(c.store.root, filepath.Join(c.name, "owner.json"), claimRecord{Generation: c.generation}); err != nil {
+			return err
+		}
+		g, err := c.store.loadGeneration(c.generation)
+		if errors.Is(err, ErrUnavailable) {
+			return nil
+		}
 		if err != nil {
 			return err
 		}
-		claim = &Claim{store: s, name: name, lock: lock}
-		if g, err := s.loadGeneration(id); err == nil {
-			g.Unneeded = time.Time{}
-			if err := saveJSON(s.root, filepath.Join("generations", id, "prepared.json"), g); err != nil {
-				lock.Close()
-				return errors.Join(err, s.removeOwned(name))
-			}
-		} else if !errors.Is(err, ErrUnavailable) {
-			lock.Close()
-			return errors.Join(err, s.removeOwned(name))
+		if g.Unneeded.IsZero() {
+			return nil
 		}
-		return nil
+		g.Unneeded = time.Time{}
+		return saveJSON(c.store.root, filepath.Join("generations", c.generation, "prepared.json"), g)
 	})
-	return claim, err
+}
+
+// Demand is the immediate reservation/commit path for explicit preparation.
+func (s *Store) Demand(id string) (*Claim, error) {
+	claim, err := s.ReserveDemand(id)
+	if err != nil {
+		return nil, err
+	}
+	if err := claim.Commit(); err != nil {
+		return nil, errors.Join(err, claim.Close())
+	}
+	return claim, nil
 }
 
 func (c *Claim) Close() error {
@@ -59,19 +99,23 @@ func (c *Claim) Close() error {
 	if c.closed {
 		return nil
 	}
-	c.closed = true
-	return c.store.withLock(func() error {
-		// No metadata writer remains when the owner lock is released.
-		err := c.lock.Close()
-		if err != nil {
+	err := c.store.withLock(func() error {
+		if err := c.lock.Close(); err != nil {
 			return err
 		}
 		if err := c.store.removeOwned(c.name); err != nil {
 			return err
 		}
-		_, err = c.store.inventoryLocked(true)
+		if !c.commitStarted {
+			return nil
+		}
+		_, err := c.store.inventoryLocked(true)
 		return err
 	})
+	if err == nil {
+		c.closed = true
+	}
+	return err
 }
 
 func (s *Store) newOwner(parent string, record any) (string, *flock.Flock, error) {

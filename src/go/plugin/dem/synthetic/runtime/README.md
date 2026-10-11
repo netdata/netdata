@@ -1,8 +1,8 @@
 # Managed browser runtimes
 
 This package owns the portable DEM runtime format, preparation and lifetime. It is
-not wired into job admission yet; the Q11 integration stage supplies that process
-owner and installation workflows. It does not install host packages or run npm.
+used by the process owner in `../runtimehost` for accepted enabled configuration
+and asynchronous preparation. It does not install host packages or run npm.
 
 ## Trust and preparation
 
@@ -32,9 +32,14 @@ locks, rename and directory fsync. It must never be copied to another host or
 shared over a network filesystem. The same trusted-account boundary as `nd-run`
 applies: this is not isolation against malicious service-account code.
 
-- `Demand` protects a generation selected by accepted configuration, including
-  one that is not prepared yet. A process-lifetime lock releases demand after
-  owner exit. Reconcile startup demand before the first `Sweep`.
+- `ReserveDemand` protects a pending configuration without downloading or changing
+  generation timestamps. `Claim.Commit` promotes it to accepted demand; an I/O
+  failure retains the claim for retry. `Close` on an unused reservation does not
+  change idle timestamps. Pending protection is excluded from retirement and
+  reported separately from accepted demand.
+- `Demand` immediately reserves and commits demand for explicit preparation.
+  Accepted configuration uses the transaction above. A process-lifetime lock
+  releases these claims after owner exit; it is never execution evidence.
 - `BeginUse` publishes a unique durable execution pin before returning paths.
   Pass its `Completion` to **one** `ndexec` tree invocation and join that helper
   before `Finish`. Version probes use the same protocol. A caller that never
@@ -63,7 +68,8 @@ contract, not something PID namespaces or machine-id can prove.
 Defaults are 4 GiB logical owned regular-file bytes, seven days for one most
 recently used previous generation while browser demand exists, and thirty days
 for the last generation without demand. Grace deadlines persist across restarts.
-Soft graces yield to acquisition pressure. Demand and execution pins never do.
+Soft graces yield to acquisition pressure. Pending/accepted demand and execution
+pins never do.
 An uncertain pin can retain files indefinitely and prevent a later acquisition.
 
 Archives, staging, lifecycle records and trash count as managed bytes. Active
@@ -74,12 +80,18 @@ preloads are separate. ENOSPC still needs handling.
 
 `Inspect` is read-only and never launches or prepares a runtime. It reports
 protected and reclaimable bytes, written preparation/trash bytes, and overlapping
-generation byte totals for demand, execution and uncertain execution. These
-categories explain ownership; they must not be added together as extra disk use.
+generation byte totals for pending/accepted demand, execution and uncertain
+execution. These categories explain ownership; they must not be added together as extra disk use.
 Allowance errors report needed, used, reserved, protected and reclaimable bytes.
 Reclaimable bytes may still occupy failed-deletion trash; they are not free space.
 
-`Sweep` reconciles ownership and cleans eligible state; the process owner must run it at startup,
+Cached generations may be reclaimed at startup before saved enabled configuration
+arrives, including after a long shutdown or under shared-store acquisition pressure.
+A later accepted job can need another download; offline cache hits are not guaranteed.
+Use administrator-managed protected preloads for controlled offline availability.
+There is no global replay barrier or process-selection pin.
+
+`Sweep` reconciles ownership and cleans eligible state; the process owner runs it at startup,
 before preparation and hourly, including when no browser jobs remain. Retired
 objects move to owned trash. Source and trash parents are synced before deletion,
 including successor recovery. Deletion runs outside coordination exclusion and

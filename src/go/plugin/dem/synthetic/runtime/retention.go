@@ -23,6 +23,7 @@ type reservation struct {
 type inventory struct {
 	generations        map[string]generation
 	demand             map[string]int
+	pending            map[string]int
 	uses               map[string]int
 	uncertain          map[string]int
 	reservations       map[string]reservation
@@ -33,7 +34,8 @@ type inventory struct {
 
 // Status describes logical managed files and protection. ReservedBytes is the
 // unwritten remainder of active reservations, not additional used disk bytes.
-// ProtectedBytes and ReclaimableBytes count each owned file once. DemandBytes,
+// ProtectedBytes and ReclaimableBytes count each owned file once. PendingBytes,
+// DemandBytes,
 // ExecutionBytes and UncertainBytes describe overlapping generation protection;
 // uncertain bytes are a subset of execution bytes. PreparingBytes and TrashBytes
 // describe written workspace, not extra disk usage.
@@ -43,6 +45,8 @@ type Status struct {
 	LimitBytes            int64  `json:"limit_bytes"`
 	ProtectedBytes        int64  `json:"protected_bytes"`
 	ReclaimableBytes      int64  `json:"reclaimable_bytes"`
+	PendingBytes          int64  `json:"pending_bytes"`
+	PendingClaims         int    `json:"pending_claims"`
 	DemandBytes           int64  `json:"demand_bytes"`
 	ExecutionBytes        int64  `json:"execution_bytes"`
 	UncertainBytes        int64  `json:"uncertain_bytes"`
@@ -56,7 +60,7 @@ type Status struct {
 }
 
 func (s *Store) inventoryLocked(reconcile bool) (inventory, error) {
-	inv := inventory{generations: make(map[string]generation), demand: make(map[string]int), uses: make(map[string]int), uncertain: make(map[string]int), reservations: make(map[string]reservation), protectedRecords: make(map[string]bool), reclaimableRecords: make(map[string]bool)}
+	inv := inventory{generations: make(map[string]generation), demand: make(map[string]int), pending: make(map[string]int), uses: make(map[string]int), uncertain: make(map[string]int), reservations: make(map[string]reservation), protectedRecords: make(map[string]bool), reclaimableRecords: make(map[string]bool)}
 	// Live completion proof also survives a successful rename followed by a
 	// failed directory sync. Retry these names even if enumeration cannot see
 	// the original record anymore.
@@ -108,7 +112,11 @@ func (s *Store) inventoryLocked(reconcile bool) (inventory, error) {
 		if !validID(claim.Generation) {
 			return inv, errors.New("invalid runtime demand binding")
 		}
-		inv.demand[claim.Generation]++
+		if claim.Pending {
+			inv.pending[claim.Generation]++
+		} else {
+			inv.demand[claim.Generation]++
+		}
 		inv.protectedRecords[name] = true
 	}
 	uses, err := s.childDirectories("uses")
@@ -235,8 +243,14 @@ func (s *Store) statusLocked(inv inventory) (Status, error) {
 			status.TrashBytes += size
 		}
 	}
+	for _, count := range inv.pending {
+		status.PendingClaims += count
+	}
 	for id := range inv.generations {
 		size := bytesByRecord[filepath.Join("generations", id)]
+		if inv.pending[id] > 0 {
+			status.PendingBytes += size
+		}
 		if inv.demand[id] > 0 {
 			status.DemandBytes += size
 		}
@@ -246,7 +260,7 @@ func (s *Store) statusLocked(inv inventory) (Status, error) {
 		if inv.uncertain[id] > 0 {
 			status.UncertainBytes += size
 		}
-		if inv.demand[id] > 0 || inv.uses[id] > 0 {
+		if inv.demand[id] > 0 || inv.pending[id] > 0 || inv.uses[id] > 0 {
 			status.ProtectedBytes += size
 		} else {
 			status.ReclaimableBytes += size
@@ -274,7 +288,8 @@ func (s *Store) Inspect() (Status, error) {
 	return status, err
 }
 
-// Sweep runs after startup demand reconciliation and periodically thereafter.
+// Sweep runs at startup and periodically. Cached files may expire before saved
+// enabled configuration is accepted; only known ownership prevents reclamation.
 // Failed cleanup is separate from the ability to use a matching runtime.
 func (s *Store) Sweep() error {
 	err := s.withLock(func() error {
@@ -297,7 +312,7 @@ func (s *Store) Sweep() error {
 func (s *Store) candidates(inv inventory, pressure bool) []string {
 	var ids []string
 	for id := range inv.generations {
-		if inv.demand[id] == 0 && inv.uses[id] == 0 {
+		if inv.demand[id] == 0 && inv.pending[id] == 0 && inv.uses[id] == 0 {
 			ids = append(ids, id)
 		}
 	}
