@@ -15,7 +15,7 @@ creates and closes shared resources across framework generations.
 | `rum/functions` | Function declarations, arguments, permissions, columns and response serialization |
 | `synthetic` | Shared request, run, event and artifact values plus request validation |
 | `synthetic/registry` | Copied active-job observations, generation fencing and freshness |
-| `synthetic/query` | Active-first run lookup, retained runs and recorded-artifact membership/availability |
+| `synthetic/query` | Active-first run lookup, retained runs and manifest-owned artifact membership/availability |
 | `synthetic/history` | Synthetic record encoding and run reduction |
 | `synthetic/functions` | Function declarations, arguments, permissions, columns and response serialization |
 | `synthetic/runner` | Prepared browser execution, admission, process supervision and private reporter protocol |
@@ -301,6 +301,15 @@ Artifact publication starts only after verified tree/reader completion. A Go-own
 permission; work without it remains protected across restart. Captures are constrained beneath output and copied into
 synced immutable manifests with actual size/digest. Final publication, fetch, retention and close serialize at the store.
 Failed publication remains protected for the current owner; a later owner reconciles only marked drained leftovers.
-Expiry removes complete finalized directories without everlasting tombstones. Journal metadata missing its backing
-file is reported as expired_or_unavailable. Filesystem traversal/retention is linear in files plus finalized-run sorting;
-no metrics collection path scans artifact bytes.
+Nonempty publication records Go-owned JobID, RunID, publication time and artifact membership. Empty captures leave
+no persistent manifest. Catalogue and fetch use that ownership independently of journal survival; history only explains
+absent sets. Catalogue reads metadata and logical file lengths, sorts by publication time/RunID, and exposes bounded
+keyset pages plus an unfiltered global storage snapshot. Unknown byte categories carry errors rather than zeroes.
+
+The shared allowance counts retained payload and manifest bytes only. Age expiry precedes size pressure, which removes
+older non-preferred sets before each JobID's newest eligible set. If preferred sets exceed the allowance, they expire
+oldest first as well. Workspace, unclassified files and pending deletion are separate observations, not eviction pressure.
+Eviction renames complete sets into `deleting/`, syncs both parents before removal, then syncs the deletion parent again.
+Recovery retries this transition without needing surviving manifest bytes; uncertain ownership blocks deletion.
+Filesystem traversal/retention is linear in files plus finalized-set sorting, without a rescan per victim. Publication
+and current-check Functions do not recursively inventory artifact storage; no metrics collection path scans artifact bytes.

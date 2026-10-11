@@ -10,10 +10,10 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
+	"strings"
 	"sync"
 
 	"github.com/gofrs/flock"
-	"github.com/netdata/netdata/go/plugins/plugin/dem/synthetic"
 )
 
 const FetchMaxBytes int64 = 5 << 20
@@ -24,23 +24,21 @@ var (
 	ErrTooLarge       = errors.New("artifact exceeds the 5 MiB fetch limit")
 	ErrInvalidCapture = errors.New("invalid artifact capture")
 	ErrInvalidID      = errors.New("invalid artifact or run ID")
+	ErrOwnerMismatch  = errors.New("artifact owner does not match")
 	ErrExists         = errors.New("artifact run already exists")
 	ErrLocked         = errors.New("artifact store is already owned")
 	runIDPattern      = regexp.MustCompile(`^[0-9a-f]{32}$`)
 	artifactIDPattern = regexp.MustCompile(`^[a-zA-Z0-9][a-zA-Z0-9_-]{0,127}$`)
 )
 
-type Stats struct {
-	RetainedBytes  int64  `json:"retained_bytes"`
-	ProtectedBytes int64  `json:"protected_bytes"`
-	CleanupErrors  uint64 `json:"cleanup_errors"`
+type manifest struct {
+	Version int `json:"version"`
+	Manifest
 }
 
-type manifest struct {
-	Version   int                  `json:"version"`
-	RunID     string               `json:"run_id"`
-	CreatedUS int64                `json:"created_us"`
-	Artifacts []synthetic.Artifact `json:"artifacts"`
+func validJobID(id string) bool {
+	kind, name, ok := strings.Cut(id, ":")
+	return ok && (kind == "journey" || kind == "lighthouse") && strings.TrimSpace(name) != ""
 }
 
 // Store serializes publication, fetch, expiry and close. Work may only be
@@ -53,9 +51,11 @@ type Store struct {
 	temporary bool
 	lock      *flock.Flock
 	closed    bool
-	active    map[string]bool
+	active    map[string]string
 	uncertain map[string]bool
-	stats     Stats
+	policy    *Policy
+	cleanup   Cleanup
+	eviction  evictionIO
 }
 
 // Open takes one lifetime filesystem lock. Empty path creates a private store.
@@ -99,7 +99,7 @@ func Open(name string) (_ *Store, retErr error) {
 		root:      root,
 		path:      name,
 		temporary: temporary,
-		active:    make(map[string]bool),
+		active:    make(map[string]string),
 		uncertain: make(map[string]bool),
 	}
 	defer func() {
@@ -118,7 +118,7 @@ func Open(name string) (_ *Store, retErr error) {
 	if !locked {
 		return nil, ErrLocked
 	}
-	for _, dir := range []string{"work", "staging", "runs", "drained"} {
+	for _, dir := range []string{"work", "staging", "runs", "drained", "deleting"} {
 		if err = root.MkdirAll(dir, 0700); err != nil {
 			return nil, err
 		}
@@ -145,21 +145,12 @@ func Open(name string) (_ *Store, retErr error) {
 	if err != nil {
 		return nil, err
 	}
-	if err = s.refresh(); err != nil {
-		return nil, err
+	s.eviction = evictionIO{
+		rename:    root.Rename,
+		removeAll: root.RemoveAll,
+		sync:      func(dir string) error { return syncDir(root, dir) },
 	}
 	return s, nil
-}
-
-func (s *Store) Stats() Stats {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	if !s.closed {
-		if err := s.refresh(); err != nil {
-			s.stats.CleanupErrors++
-		}
-	}
-	return s.stats
 }
 
 func (s *Store) Close() error {
@@ -173,11 +164,24 @@ func (s *Store) Close() error {
 		// Only an empty work/staging/drained set permits deleting a temporary root.
 		// A previous owner may have left an unverified live process behind.
 		removable := true
-		for _, dir := range []string{"work", "staging", "drained"} {
+		for _, dir := range []string{"work", "staging", "drained", "deleting"} {
 			entries, e := fs.ReadDir(s.root.FS(), dir)
 			err = errors.Join(err, e)
 			if e != nil || len(entries) != 0 {
 				removable = false
+			}
+		}
+		if removable {
+			entries, e := fs.ReadDir(s.root.FS(), "runs")
+			err = errors.Join(err, e)
+			if e != nil {
+				removable = false
+			}
+			for _, entry := range entries {
+				if _, e := s.readManifest(entry.Name()); e != nil {
+					removable = false
+					break
+				}
 			}
 		}
 		if removable {

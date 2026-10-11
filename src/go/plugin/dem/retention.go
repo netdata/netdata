@@ -16,7 +16,7 @@ type historyRetention interface {
 }
 
 type artifactRetention interface {
-	Enforce(context.Context, int, int64) (artifacts.Stats, error)
+	Enforce(context.Context, int, int64) (artifacts.Status, error)
 }
 
 // Retention is process-owned so disabling every collector cannot stop history
@@ -53,13 +53,10 @@ func (r *Retention) Run(ctx context.Context) {
 		}
 		if r.artifactStore != nil && (!now.Before(artifactsDue) || r.artifactPolicy != artifactPolicy) {
 			delay := time.Hour
-			stats, err := r.artifactStore.Enforce(ctx, r.artifactPolicy.Days, r.artifactPolicy.MaxBytes)
+			_, err := r.artifactStore.Enforce(ctx, r.artifactPolicy.Days, r.artifactPolicy.MaxBytes)
 			if err != nil && ctx.Err() == nil {
 				r.log.Warningf("DEM artifact retention failed: %v", err)
 				delay = 5 * time.Second
-			}
-			if err == nil && stats.ProtectedBytes > r.artifactPolicy.MaxBytes {
-				r.log.Warningf("DEM protected run files exceed artifact budget: %d bytes", stats.ProtectedBytes)
 			}
 			artifactsDue = time.Now().Add(delay)
 		}

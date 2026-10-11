@@ -34,7 +34,7 @@ type historyWriter interface {
 }
 
 type ArtifactStore interface {
-	Begin(string) (string, error)
+	Begin(string, string) (string, error)
 	Finalize(context.Context, string, []synthetic.Capture) ([]synthetic.Artifact, error)
 }
 
@@ -162,7 +162,7 @@ func (e *Engine) Execute(ctx context.Context, request synthetic.Request, state f
 		return finishUnstarted(errors.New("artifact owner is unavailable"), true)
 	}
 	e.save(attempt, "start", &run, redact)
-	work, err := e.artifacts.Begin(run.ID)
+	work, err := e.artifacts.Begin(run.ID, run.JobID)
 	if err != nil {
 		run.Error = redact.text("create run work directory: " + err.Error())
 		e.complete(&run, nil, redact)

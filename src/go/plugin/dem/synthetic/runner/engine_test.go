@@ -178,7 +178,12 @@ func TestSuccessfulExecutionJoinsAndFinalizes(t *testing.T) {
 	require.NotNil(t, execution.Run.DurationMS)
 	assert.Equal(t, []string{"waiting", "running"}, states)
 	assert.Equal(t, int32(1), a.finalized.Load())
-	assert.Zero(t, a.Stats().ProtectedBytes)
+	page, err := a.Catalogue(context.Background(), artifacts.Filter{
+		Limit: 1,
+	})
+	require.NoError(t, err)
+	require.NotNil(t, page.Status.Inventory.Workspace.Bytes)
+	assert.Zero(t, *page.Status.Inventory.Workspace.Bytes)
 	assert.Equal(t, []string{"start", "complete"}, h.phases)
 	assert.Equal(t, 2, h.syncCalls)
 	assert.Nil(t, h.runs[0].Tests)

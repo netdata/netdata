@@ -78,7 +78,6 @@ func New(deps Dependencies, cfg Config) Components {
 	if deps.Artifacts != nil {
 		captures = deps.Artifacts
 	}
-	syntheticQueries := syntheticquery.New(syntheticRegistry, syntheticHistory, captures)
 	workflow := journey.Creator(journey.Dependencies{
 		Registry: syntheticRegistry,
 		Executor: deps.Executor,
@@ -94,6 +93,7 @@ func New(deps Dependencies, cfg Config) Components {
 		loadConfig:     deps.ConfigProvider,
 		log:            logger.New(),
 	}
+	syntheticQueries := syntheticquery.New(syntheticRegistry, syntheticHistory, captures, retention.PolicyError)
 	var historyStatus historyfunc.Deps
 	if deps.History != nil {
 		historyStatus = deps.History

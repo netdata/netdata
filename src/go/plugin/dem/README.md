@@ -515,7 +515,8 @@ enabled.
 ## Synthetic diagnosis and captures
 
 Process Functions use the regular Netdata transport: `synthetics-checks` for active observations, `synthetics-runs`
-for retained history, `synthetics-run` for one run's full diagnosis, and `synthetics-artifact` for capture metadata or bytes.
+for retained history, `synthetics-run` for one run's full diagnosis, `synthetics-artifacts` for retained capture sets and
+storage status, and `synthetics-artifact` for one set's metadata or bytes.
 Use the advertised `job_id`, `run_id` and other parameters. Disabled/failed-startup jobs remain in native configuration
 status. Current-generation last success/failure and freshness do not reconstruct a historical incident. A running or
 waiting attempt does not refresh its previous result. Run summaries are capped at 2000 rows with an explicit truncation
@@ -540,13 +541,26 @@ Playwright APIs. Optional failure PNG screenshots and Lighthouse HTML reports ar
 `screenshot_on_failure` or `save_report` before an incident if these captures are needed. Forced browser termination
 can prevent capture. Trace, HAR, video and filmstrip are not initial capabilities.
 
-Captures live under `${NETDATA_LIB_DIR}/dem/artifacts` with a separate plugin-wide default of up to seven days subject
-to 2 GiB. Oldest finalized runs expire together; active or unverified work is protected, so this is a soft disk target.
-The inventory exposes retained/protected bytes and cleanup errors. Capture states distinguish disabled, not needed,
-unavailable and published evidence. Retained history may outlive its files; absent recorded files mean “expired or
-unavailable”. Metadata presence alone does not verify file availability; fetch verifies the manifest, size and digest.
-Captures exceeding 5 MiB are marked unavailable and are not published.
-Downloads require administrator-equivalent caller permissions and are limited to 5 MiB; HTML is returned as base64 data.
+Captures live under `${NETDATA_LIB_DIR}/dem/artifacts` with one shared default allowance of seven days and 2 GiB
+for retained capture sets. Each set contains the screenshots or reports published for one run. The newest eligible
+capture for each monitor is preferred under size pressure, then older captures are removed first if even those sets
+do not fit. Age still expires preferred captures; this does not guarantee one capture per monitor or a complete incident
+history. A later Lighthouse report can replace an earlier poor-score report; a journey recovery without a screenshot
+leaves its previous failure capture eligible. Disabled or deleted monitors retain the same preference, and renaming a
+monitor creates a separate group until its old captures expire.
+
+Active or unverified workspace, unclassified files and pending deletions are reported separately and do not consume the
+retained-capture allowance. Total disk use can exceed the allowance, including growth between sweeps; sizes are logical
+file lengths, not allocated disk space. `synthetics-artifacts` reports global storage observations, effective policy,
+cleanup status and policy reload errors even when `job_id` filters its rows. Its newest-first list accepts an optional
+`limit` from 1 to 2000 and a returned `next` cursor as `before`; captures can expire between pages.
+
+Capture discovery and downloads remain available after run history expires and after a monitor is disabled or deleted.
+Capture states distinguish disabled, not needed, unavailable and published evidence. Retained history may also outlive
+its files; absent recorded files mean “expired or unavailable”. Metadata presence alone does not verify file integrity;
+fetch verifies size and digest. Capture metadata requires member-equivalent permissions. Downloads require
+administrator-equivalent permissions and are limited to 5 MiB; HTML is returned as base64 data. A capture exceeding
+5 MiB makes that run's capture publication unavailable; no partial set or truncated file is published.
 
 The runner retains admission and private files until Linux supervision proves the entire child tree is reaped.
 Unverified completion stops further admission and exits the plugin without deleting shared state. Unexpected supervisor

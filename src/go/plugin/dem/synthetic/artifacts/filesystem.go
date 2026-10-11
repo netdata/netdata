@@ -21,9 +21,12 @@ func syncExternalDir(name string) error {
 	return errors.Join(file.Sync(), file.Close())
 }
 
-func treeBytes(root *os.Root, dir string) (int64, error) {
+func treeBytesContext(ctx context.Context, root *os.Root, dir string) (int64, error) {
 	var bytes int64
 	err := fs.WalkDir(root.FS(), dir, func(_ string, entry fs.DirEntry, err error) error {
+		if contextErr := ctx.Err(); contextErr != nil {
+			return contextErr
+		}
 		if err != nil {
 			return err
 		}
