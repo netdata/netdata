@@ -215,15 +215,19 @@ func (s *Store) removeOwned(name string) error {
 	if err != nil {
 		return err
 	}
-	if filepath.Dir(name) == "staging" {
+	if _, err := s.root.Lstat(name); err != nil && !errors.Is(err, os.ErrNotExist) {
+		return err
+	} else if err == nil && filepath.Dir(name) == "staging" {
 		// Make a possible payload publication durable before abandoning its owner.
 		if err := errors.Join(syncDirectory(s.root, name), syncDirectory(s.root, "generations")); err != nil {
 			return err
 		}
 	}
-	if err := s.root.Rename(name, filepath.Join("trash", id)); err != nil {
+	if err := s.root.Rename(name, filepath.Join("trash", id)); err != nil && !errors.Is(err, os.ErrNotExist) {
 		return err
 	}
+	// A successor may already have retired this record. Re-sync both parents
+	// even when the source vanished, including retry after a failed fsync.
 	err = errors.Join(syncDirectory(s.root, filepath.Dir(name)), syncDirectory(s.root, "trash"))
 	if err == nil {
 		delete(s.completedUses, name)

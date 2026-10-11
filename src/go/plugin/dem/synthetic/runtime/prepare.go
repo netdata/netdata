@@ -89,28 +89,8 @@ func (s *Store) prepare(ctx context.Context, m Manifest, open func() (io.ReadClo
 	// Cleanup errors are exposed independently; a matching prepared runtime
 	// remains usable. New reservations still require a complete inventory.
 	_ = s.Sweep()
-	var ready bool
-	err = s.withLock(func() error {
-		_, err := s.prepared(m)
-		if errors.Is(err, ErrUnavailable) {
-			return nil
-		}
-		if err != nil {
-			return err
-		}
-		g, err := s.loadGeneration(m.Archive.SHA256)
-		if err != nil {
-			return err
-		}
-		g.LastUsed = s.now().UTC()
-		ready = true
-		return saveJSON(s.root, filepath.Join("generations", m.Archive.SHA256, "prepared.json"), g)
-	})
-	if err != nil || ready {
-		return err
-	}
 	name, owner, err := s.reserve(m)
-	if err != nil {
+	if err != nil || owner == nil {
 		return err
 	}
 	defer func() {
@@ -203,6 +183,18 @@ func (s *Store) reserve(m Manifest) (string, *flock.Flock, error) {
 		var owner *flock.Flock
 		progress := false
 		err := s.withLock(func() error {
+			// Publication and reservation share one decision. A concurrent
+			// preparer may have finished since this caller established demand.
+			if _, err := s.prepared(m); err == nil {
+				g, err := s.loadGeneration(m.Archive.SHA256)
+				if err != nil {
+					return err
+				}
+				g.LastUsed = s.now().UTC()
+				return saveJSON(s.root, filepath.Join("generations", m.Archive.SHA256, "prepared.json"), g)
+			} else if !errors.Is(err, ErrUnavailable) {
+				return err
+			}
 			inv, err := s.inventoryLocked(true)
 			if err != nil {
 				return err

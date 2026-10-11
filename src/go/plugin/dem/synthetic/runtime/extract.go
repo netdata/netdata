@@ -40,6 +40,7 @@ func extractArchive(src io.Reader, root *os.Root, a Archive) error {
 	bounded := &io.LimitedReader{R: gz, N: a.TarBytes + 1}
 	reader := tar.NewReader(bounded)
 	seen := make(map[string]bool)
+	var links []string
 	var expanded int64
 	entries := 0
 	for {
@@ -80,6 +81,7 @@ func extractArchive(src io.Reader, root *os.Root, a Archive) error {
 				return errors.New("runtime symlink escapes its generation")
 			}
 			err = root.Symlink(h.Linkname, name)
+			links = append(links, name)
 		default:
 			return errors.New("runtime archive contains unsupported file type")
 		}
@@ -93,6 +95,14 @@ func extractArchive(src io.Reader, root *os.Root, a Archive) error {
 	}
 	if bounded.N != 1 || entries != a.Entries || expanded != a.ExpandedBytes {
 		return errors.New("runtime archive does not match declared extraction bounds")
+	}
+	// Lexical checks alone miss escapes through a chain containing "..".
+	// Resolve every finished link with the same confinement as extraction.
+	// Dangling and cyclic links are not usable runtime dependencies either.
+	for _, name := range links {
+		if _, err := root.Stat(name); err != nil {
+			return fmt.Errorf("runtime symlink target is unavailable inside its generation: %s: %w", name, err)
+		}
 	}
 	return nil
 }

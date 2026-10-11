@@ -110,6 +110,7 @@ func TestArchiveRejectsUnsafeAndMismatchedInput(t *testing.T) {
 		"absolute":         {{name: "/outside", contents: []byte("no"), mode: 0600}},
 		"hardlink":         {{name: "alias", link: "file", kind: tar.TypeLink}},
 		"external-symlink": {{name: "alias", link: "../outside", kind: tar.TypeSymlink}},
+		"chained-escape":   {{name: "d", kind: tar.TypeDir}, {name: "other", kind: tar.TypeDir}, {name: "d/alias", link: "../other", kind: tar.TypeSymlink}, {name: "escape", link: "d/alias/../../outside", kind: tar.TypeSymlink}},
 		"symlink-parent":   {{name: "alias", link: "inside", kind: tar.TypeSymlink}, {name: "alias/file", contents: []byte("no"), mode: 0600}},
 		"duplicate":        {{name: "file", contents: []byte("first"), mode: 0600}, {name: "file", contents: []byte("last"), mode: 0600}},
 		"device":           {{name: "device", kind: tar.TypeChar, mode: 0600}},

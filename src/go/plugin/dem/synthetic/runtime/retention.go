@@ -44,6 +44,16 @@ type Status struct {
 
 func (s *Store) inventoryLocked(reconcile bool) (inventory, error) {
 	inv := inventory{generations: make(map[string]generation), demand: make(map[string]int), uses: make(map[string]int), uncertain: make(map[string]int), reservations: make(map[string]reservation)}
+	// Live completion proof also survives a successful rename followed by a
+	// failed directory sync. Retry these names even if enumeration cannot see
+	// the original record anymore.
+	if reconcile {
+		for name := range s.completedUses {
+			if err := s.removeOwned(name); err != nil {
+				inv.cleanupError = errors.Join(inv.cleanupError, err)
+			}
+		}
+	}
 	initializing, err := s.childDirectories("initializing")
 	if err != nil {
 		return inv, err

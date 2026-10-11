@@ -155,6 +155,36 @@ func TestPersistentSupervisorCompletionReleasesPin(t *testing.T) {
 	require.Zero(t, status.ExecutionPins)
 }
 
+func TestCallerFinishesAfterReceiptReconciliation(t *testing.T) {
+	helper := os.Getenv("DEM_RUNTIME_TEST_HELPER")
+	if helper == "" {
+		t.Skip("real-helper integration requires DEM_RUNTIME_TEST_HELPER")
+	}
+	t.Cleanup(ndexec.SetRunnerPathsForTests(helper, ""))
+	s, _ := testStore(t)
+	m := importFixture(t, s, "receipt-race")
+	use, err := s.BeginUse(m)
+	require.NoError(t, err)
+	process, err := ndexec.StartUnprivilegedProcessTree(context.Background(), ndexec.TreeOptions{Completion: use.Completion}, "/bin/true")
+	require.NoError(t, err)
+	require.True(t, process.Wait().Drained)
+	require.NoError(t, s.Sweep())
+	require.NoError(t, use.Finish(true), "a receipt may be reconciled before its caller finishes")
+	require.Empty(t, s.completedUses)
+}
+
+func TestReservationReusesPublishedGeneration(t *testing.T) {
+	s, _ := testStore(t)
+	m := importFixture(t, s, "published")
+	name, owner, err := s.reserve(m)
+	require.NoError(t, err)
+	if owner != nil {
+		defer owner.Close()
+	}
+	require.Empty(t, name, "publication must be checked in the same transaction as reservation")
+	require.Nil(t, owner)
+}
+
 // The child exits without Go cleanup to exercise process-lifetime ownership.
 func TestRuntimeOwnerProcess(t *testing.T) {
 	mode := os.Getenv("DEM_RUNTIME_OWNER_MODE")
