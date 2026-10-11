@@ -25,6 +25,9 @@ func saveArchive(src io.Reader, dst *os.File, a Archive) error {
 	}
 	var extra [1]byte
 	more, extraErr := io.ReadFull(src, extra[:])
+	if extraErr != nil && extraErr != io.EOF {
+		return fmt.Errorf("read runtime archive ending: %w", extraErr)
+	}
 	if n != a.Bytes || more != 0 || extraErr != io.EOF || hex.EncodeToString(hash.Sum(nil)) != a.SHA256 {
 		return errors.New("runtime archive size or SHA256 mismatch")
 	}

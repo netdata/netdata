@@ -10,7 +10,6 @@ import (
 	"io"
 	"io/fs"
 	"math"
-	"net/http"
 	"os"
 	"path/filepath"
 	goruntime "runtime"
@@ -29,38 +28,6 @@ func (s *Store) Import(ctx context.Context, m Manifest, archive string) error {
 			return nil, fmt.Errorf("offline runtime archive: %w", err)
 		}
 		return file, nil
-	})
-}
-
-// Download must only be called by the process owner for accepted demand and
-// administrator-allowed downloads. No collector check or status read calls it.
-func (s *Store) Download(ctx context.Context, m Manifest) error {
-	if ctx == nil {
-		ctx = context.Background()
-	}
-	if m.Archive.URL == "" {
-		return errors.New("runtime manifest has no download source")
-	}
-	return s.prepare(ctx, m, func() (io.ReadCloser, error) {
-		request, err := http.NewRequestWithContext(ctx, http.MethodGet, m.Archive.URL, nil)
-		if err != nil {
-			return nil, errors.New("invalid runtime download request")
-		}
-		client := &http.Client{CheckRedirect: func(req *http.Request, via []*http.Request) error {
-			if len(via) >= 10 || req.URL.Scheme != "https" || req.URL.User != nil {
-				return errDownloadRedirect
-			}
-			return nil
-		}}
-		response, err := client.Do(request)
-		if err != nil {
-			return nil, downloadFailure(err)
-		}
-		if response.StatusCode != http.StatusOK {
-			response.Body.Close()
-			return nil, fmt.Errorf("runtime download returned HTTP %d", response.StatusCode)
-		}
-		return response.Body, nil
 	})
 }
 

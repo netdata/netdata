@@ -10,6 +10,13 @@ An Agent-installed format-1 `Manifest` pins architecture, compressed SHA256 and
 size, tar size, entry count, expanded regular-file bytes, layout and interpreter
 bindings. An archive cannot provide its own trust anchor. Downloads use the
 installed HTTPS URL; offline import verifies the identical digest and bounds.
+HTTP acquisition and each response-body read have a 60-second network inactivity
+timeout. Followed redirects refresh acquisition progress; ongoing body progress
+has no overall transfer deadline. The timer is stopped during local archive writes
+and preparation. Inactivity is an acquisition failure and uses the existing retry
+backoff; voluntary demand cancellation remains distinct and permits immediate
+preparation when demand returns. Closing the response cancels outstanding network
+I/O and stops its timer.
 The independent release pipeline must supply real pinned artifacts before an
 installed download manifest is enabled.
 
