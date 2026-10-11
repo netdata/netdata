@@ -453,17 +453,19 @@ packages or download browsers. Restart the plugin after changing `runtime` paths
 
 The installed `plugins.d/dem/package.json` and `package-lock.json` pin `@playwright/test`/Playwright 1.63.0,
 Lighthouse 13.4.1 and Chrome Launcher 1.2.1. Copy both files into a prepared dependency directory, then run `npm ci
---omit=dev --ignore-scripts` there with the compatible Node version. Prepare the full Chromium revision 1243
-(version 153.0.8010.12) from that Playwright release; Lighthouse needs the full browser rather than only its headless
-shell. The pinned CLI supports `node node_modules/playwright/cli.js install --no-shell chromium` for operator-managed
-installation. Install system libraries using the release's documented platform prerequisites. Make the dependency and
-browser files readable/executable by the service account, then set absolute paths:
+--omit=dev --ignore-scripts` there with the compatible Node version. The qualified full browser is unbranded
+Chromium 154.0.8037.92 from Debian packages `chromium` and `chromium-common` version `154.0.8037.92-1~deb13u1`.
+Netdata qualifies this exact browser/Playwright pair. Lighthouse needs the full browser. On Debian 13, install these
+exact browser packages with their dependencies; the [portable bundle recipe](../../../../packaging/dem-runtime/README.md)
+provides pinned private libraries and fonts for other supported Linux userlands. Bundle publication and automatic
+runtime setup are still under development. Make the prepared dependency and browser files readable/executable by
+the service account, then set absolute paths:
 
 ```yaml
 runtime:
   node_path: /usr/bin/node
   dependencies_path: /opt/netdata-dem
-  browser_path: /opt/netdata-dem/browsers/chromium-1243/chrome-linux64/chrome
+  browser_path: /usr/bin/chromium
 ```
 
 The browser executable's directory varies by architecture and installation location; use the actual full Chromium

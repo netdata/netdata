@@ -9,21 +9,13 @@ import (
 	"io"
 	"os"
 	"path/filepath"
-	"regexp"
 	"runtime"
+	"strings"
 	"time"
 
 	"github.com/netdata/netdata/go/plugins/plugin/dem/synthetic"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/ndexec"
 )
-
-var packagePins = map[string]string{
-	"@playwright/test": "1.63.0",
-	"playwright":       "1.63.0",
-	"playwright-core":  "1.63.0",
-	"lighthouse":       "13.4.1",
-	"chrome-launcher":  "1.2.1",
-}
 
 func runtimeAllowed() error {
 	if runtime.GOOS != "linux" || (runtime.GOARCH != "amd64" && runtime.GOARCH != "arm64") {
@@ -69,7 +61,7 @@ func (e *Engine) checkFiles(kind synthetic.Kind) error {
 			return fmt.Errorf("prepared runner asset %s is not regular", name)
 		}
 	}
-	for name, pin := range packagePins {
+	for name, pin := range requiredRuntime.Packages {
 		raw, err := os.ReadFile(filepath.Join(e.config.DependenciesPath, "node_modules", name, "package.json"))
 		if err != nil {
 			return fmt.Errorf("prepared %s package: %w", name, err)
@@ -120,8 +112,8 @@ func (e *Engine) Check(ctx context.Context, kind synthetic.Kind) error {
 		return fmt.Errorf("invalid prepared Node version response")
 	}
 	var major int
-	if _, err = fmt.Sscanf(actual.Version, "%d.", &major); err != nil || major < 24 {
-		return errors.New("prepared Node must be version 24 or newer")
+	if _, err = fmt.Sscanf(actual.Version, "%d.", &major); err != nil || major < requiredRuntime.NodeMajorMin {
+		return fmt.Errorf("prepared Node must be version %d or newer", requiredRuntime.NodeMajorMin)
 	}
 	if actual.UID == 0 || actual.UID != os.Geteuid() || actual.GID != os.Getegid() {
 		return errors.New("nd-run must preserve the plugin's unprivileged identity for private run directories")
@@ -133,8 +125,11 @@ func (e *Engine) Check(ctx context.Context, kind synthetic.Kind) error {
 	if err != nil {
 		return fmt.Errorf("prepared Chromium check: %w", err)
 	}
-	if !regexp.MustCompile(`\b153\.0\.8010\.12\b`).Match(browser) {
-		return errors.New("prepared full Chromium must be version 153.0.8010.12 (Playwright revision 1243)")
+	// Debian's launcher may append its distribution name after the version.
+	// Compare complete identity fields, not a version substring from any brand.
+	identity := strings.Fields(string(browser))
+	if len(identity) < 2 || identity[0] != "Chromium" || identity[1] != requiredRuntime.Chromium.Version {
+		return fmt.Errorf("prepared full Chromium must be version %s", requiredRuntime.Chromium.Version)
 	}
 	return nil
 }

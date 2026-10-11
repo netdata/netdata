@@ -6,7 +6,12 @@ Node 24+, Playwright Test 1.63.0 and
 Lighthouse 13.4.1 to the DEM execution protocol. Install the dependencies from
 `package-lock.json` into a separate prepared directory with `npm ci`; the plugin
 never downloads packages, modifies the installed assets or updates the browser.
-The prepared full Chromium is Playwright revision 1243, version 153.0.8010.12.
+The qualified full browser is unbranded Chromium 154.0.8037.92 from Debian
+package `154.0.8037.92-1~deb13u1`. Netdata qualifies this exact browser/Playwright
+pair; Playwright's bundled browser revision is not the runtime delivery identity.
+`manifest.json` supplies both the bundle builder and the compiled Go version checks.
+The private bundle recipe and exact binary/source inputs live in
+[`packaging/dem-runtime`](../../../../../../../packaging/dem-runtime/README.md).
 Browser sandboxing remains enabled and requires a compatible Linux namespace and
 container security policy. The manifest describes the supported target; the Go
 owner validates runtime availability and owns execution completion.

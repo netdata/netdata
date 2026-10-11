@@ -97,7 +97,7 @@ func testEngine(t *testing.T) (*Engine, *fakeHistory, *observedArtifacts) {
 	require.NoError(t, err)
 	assets, err := filepath.Abs("assets")
 	require.NoError(t, err)
-	for name, pin := range packagePins {
+	for name, pin := range requiredRuntime.Packages {
 		dir := filepath.Join(base, "deps", "node_modules", name)
 		require.NoError(t, os.MkdirAll(dir, 0700))
 		require.NoError(t, os.WriteFile(filepath.Join(dir, "package.json"), []byte(`{"version":"`+pin+`"}`), 0600))
@@ -520,7 +520,7 @@ func TestCheckVersionProbeIsSupervisedAndDoesNotLoadWorkflow(t *testing.T) {
 		if calls == 1 {
 			fmt.Fprintf(out, `{"version":"24.20.0","uid":%d,"gid":%d}`, os.Geteuid(), os.Getegid())
 		} else {
-			fmt.Fprint(out, "Chromium 153.0.8010.12")
+			fmt.Fprint(out, "Chromium 154.0.8037.92")
 		}
 		return ndexec.TreeResult{
 			Drained: true,
@@ -692,4 +692,90 @@ func TestWhitespaceScriptRejectedBeforeExecution(t *testing.T) {
 	require.True(t, got.Drained)
 	assert.Equal(t, synthetic.Error, got.Run.Outcome)
 	assert.Equal(t, "script must not be blank", got.Run.Error)
+}
+
+func TestCheckRequiresQualifiedBrowserIdentity(t *testing.T) {
+	if os.Geteuid() == 0 {
+		t.Skip("the prepared runtime explicitly requires unprivileged plugin identity")
+	}
+	for _, tc := range []struct {
+		name    string
+		version string
+		valid   bool
+	}{
+		{name: "qualified binary", version: "Chromium 154.0.8037.92 \n", valid: true},
+		{name: "Debian launcher", version: "Chromium 154.0.8037.92 built on Debian GNU/Linux 13 (trixie)\n", valid: true},
+		{name: "previous browser", version: "Chromium 153.0.8010.12"},
+		{name: "new unqualified version", version: "Chromium 154.0.8037.93"},
+		{name: "version substring", version: "Chromium 154.0.8037.920"},
+		{name: "Chrome for Testing", version: "Google Chrome for Testing 154.0.8037.92"},
+		{name: "unrelated output", version: "diagnostic: Chromium 154.0.8037.92"},
+		{name: "empty response"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			e, _, _ := testEngine(t)
+			calls := 0
+			e.start = starter(t, func(_ context.Context, _ []string, _ []byte, out, _ *os.File) ndexec.TreeResult {
+				calls++
+				if calls == 1 {
+					fmt.Fprintf(out, `{"version":"24.20.0","uid":%d,"gid":%d}`, os.Geteuid(), os.Getegid())
+				} else {
+					fmt.Fprint(out, tc.version)
+				}
+				return ndexec.TreeResult{Drained: true}
+			})
+			err := e.Check(context.Background(), synthetic.Journey)
+			if tc.valid {
+				require.NoError(t, err)
+			} else {
+				require.ErrorContains(t, err, "prepared full Chromium must be version 154.0.8037.92")
+			}
+			assert.Equal(t, 2, calls)
+		})
+	}
+}
+
+func TestCheckRejectsUnqualifiedPackageBeforeStarting(t *testing.T) {
+	e, _, _ := testEngine(t)
+	metadata := filepath.Join(e.config.DependenciesPath, "node_modules", "playwright", "package.json")
+	require.NoError(t, os.WriteFile(metadata, []byte(`{"version":"0.0.0"}`), 0600))
+	e.start = func(context.Context, ndexec.TreeOptions, string, ...string) (treeProcess, error) {
+		t.Fatal("unqualified package started a version probe")
+		return nil, errors.New("unexpected process")
+	}
+	require.ErrorContains(t, e.Check(context.Background(), synthetic.Journey), "prepared playwright must be version 1.63.0")
+}
+
+func TestCheckPreservesNodeMinimumFromManifest(t *testing.T) {
+	if os.Geteuid() == 0 {
+		t.Skip("the prepared runtime explicitly requires unprivileged plugin identity")
+	}
+	for _, tc := range []struct {
+		version string
+		valid   bool
+	}{
+		{version: "23.11.0"}, {version: "24.20.0", valid: true}, {version: "25.0.0", valid: true},
+	} {
+		t.Run(tc.version, func(t *testing.T) {
+			e, _, _ := testEngine(t)
+			calls := 0
+			e.start = starter(t, func(_ context.Context, _ []string, _ []byte, out, _ *os.File) ndexec.TreeResult {
+				calls++
+				if calls == 1 {
+					fmt.Fprintf(out, `{"version":%q,"uid":%d,"gid":%d}`, tc.version, os.Geteuid(), os.Getegid())
+				} else {
+					fmt.Fprint(out, "Chromium 154.0.8037.92")
+				}
+				return ndexec.TreeResult{Drained: true}
+			})
+			err := e.Check(context.Background(), synthetic.Journey)
+			if tc.valid {
+				require.NoError(t, err)
+				assert.Equal(t, 2, calls)
+			} else {
+				require.ErrorContains(t, err, "prepared Node must be version 24 or newer")
+				assert.Equal(t, 1, calls)
+			}
+		})
+	}
 }
