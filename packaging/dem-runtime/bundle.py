@@ -221,7 +221,7 @@ def donor_notices(root, files):
             raise ValueError('missing package copyright: ' + owner)
         shutil.copyfile(copyright_path, notices / (name + '.copyright'))
         components.append({'type': 'library', 'name': name, 'version': version,
-                           'purl': f'pkg:deb/ubuntu/{name}@{version}?arch={architecture}&distro=noble',
+                           'purl': f'pkg:deb/debian/{name}@{version}?arch={architecture}&distro=trixie',
                            'properties': [{'name': 'source-package', 'value': source},
                                           {'name': 'source-version', 'value': source_version}]})
     return components
@@ -229,9 +229,14 @@ def donor_notices(root, files):
 
 def prepare(args):
     recipe, assets, output = Path('/recipe'), Path('/assets'), Path('/out')
+    from locked import check_inventory, source_key
     inputs = json.loads((recipe / 'inputs.json').read_text())
+    debian_lock = json.loads((recipe / 'locks' / (args.arch + '.json')).read_text())
+    check_inventory(debian_lock)
     arch = inputs['architectures'][args.arch]
     contract = json.loads((assets / 'manifest.json').read_text())
+    if contract['chromium'] != debian_lock['chromium'] or contract['chromium']['source'] != 'debian':
+        raise ValueError('Debian browser lock differs from the runner contract')
     if int(inputs['node_version'].split('.')[0]) < contract['node_major_min']:
         raise ValueError('Node input is below runner contract')
     work = Path('/tmp/dem-build')
@@ -261,12 +266,12 @@ def prepare(args):
                PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD='1', npm_config_cache=str(work / 'npm-cache'))
     run([node / 'bin/npm', 'ci', '--omit=dev', '--ignore-scripts', '--no-audit', '--no-fund'], cwd=dependencies, env=env)
     components = []
-    lock = json.loads((assets / 'package-lock.json').read_text())
+    npm_lock = json.loads((assets / 'package-lock.json').read_text())
     for name, version in contract['packages'].items():
         installed = json.loads((dependencies / 'node_modules' / name / 'package.json').read_text())
         if installed['version'] != version:
             raise ValueError('npm contract mismatch: ' + name)
-    for path, info in sorted(lock['packages'].items()):
+    for path, info in sorted(npm_lock['packages'].items()):
         if not path or info.get('dev'):
             continue
         name = path.rsplit('node_modules/', 1)[1]
@@ -277,24 +282,18 @@ def prepare(args):
                            'externalReferences': [{'type': 'distribution', 'url': info['resolved']}]})
     browsers = root / 'browsers'
     browsers.mkdir()
-    browser_name = 'chromium-' + contract['chromium']['revision']
-    source_browser = Path('/ms-playwright') / browser_name
+    browser_name = 'chromium-debian'
+    source_browser = Path('/usr/lib/chromium')
     shutil.copytree(source_browser, browsers / browser_name, symlinks=True)
-    browser = browsers / browser_name / arch['chrome_directory'] / 'chrome'
+    browser = browsers / browser_name / 'chromium'
     version = run([browser, '--version'], capture=True).strip()
-    if contract['chromium']['version'] not in version:
-        raise ValueError('donor Chromium differs from runner contract')
-    # FFmpeg is part of Playwright's browser artifact set, pinned by the donor image.
-    registry = json.loads((dependencies / 'node_modules/playwright-core/browsers.json').read_text())
-    for item in registry['browsers']:
-        if item['name'] == 'chromium' and (item['revision'] != contract['chromium']['revision'] or item['browserVersion'] != contract['chromium']['version']):
-            raise ValueError('Playwright browser revision differs from runner contract')
-        if item['name'] == 'ffmpeg':
-            ffmpeg = 'ffmpeg-' + item['revision']
-            components.append({'type': 'application', 'name': 'playwright-ffmpeg',
-                               'version': item['revision'],
-                               'properties': [{'name': 'version-kind', 'value': 'Playwright artifact revision'}]})
-            shutil.copytree(Path('/ms-playwright') / ffmpeg, browsers / ffmpeg, symlinks=True)
+    if version != 'Chromium ' + contract['chromium']['version']:
+        raise ValueError('unexpected Debian Chromium identity: ' + version)
+    forbidden = [str(p) for p in source_browser.rglob('*') if 'widevine' in p.name.lower() or 'screen_ai' in p.name.lower()]
+    if forbidden:
+        raise ValueError('unexpected opaque component payload: ' + repr(forbidden))
+    # DEM disables video recording; no FFmpeg artifact is shipped.
+    browser_sources = regular_files(source_browser)
     (root / 'node/bin').mkdir(parents=True)
     shutil.copyfile(node / 'bin/node', root / 'node/bin/node')
     (root / 'node/bin/node').chmod(0o755)
@@ -307,8 +306,18 @@ def prepare(args):
         destination.parent.mkdir(parents=True, exist_ok=True)
         shutil.copyfile(source, destination)
     closure = copy_libraries(root, arch['elf_machine'], arch['triplet'])
-    components.extend(donor_notices(root, list(closure.values()) + font_files))
+    components.extend(donor_notices(root, list(closure.values()) + font_files + browser_sources + regular_files(Path('/usr/share/common-licenses'))))
     notices = root / 'notices'
+    shutil.copytree('/usr/share/common-licenses', notices / 'common-licenses', symlinks=False)
+    required_sources = {}
+    for component in components:
+        if component.get('purl', '').startswith('pkg:deb/'):
+            properties = {p['name']: p['value'] for p in component['properties']}
+            key = source_key(properties['source-package'], properties['source-version'])
+            if key not in debian_lock['sources']:
+                raise ValueError('missing exact redistributed source record: ' + key)
+            required_sources[key] = debian_lock['sources'][key]
+    write_json(output / 'sources-required.json', required_sources)
     # Read the embedded Chromium notices before relocation. The root-only build
     # donor uses no sandbox solely to export chrome://credits; runtime launches
     # remain sandboxed and this operation is not execution qualification.
@@ -352,7 +361,7 @@ def prepare(args):
             stream.write(target.ljust(capacity, b'\0'))
     if run([probe / layout['node'], '--version'], capture=True).strip() != 'v' + inputs['node_version']:
         raise ValueError('prepared Node execution mismatch')
-    if contract['chromium']['version'] not in run([probe / layout['browser'], '--version'], capture=True):
+    if run([probe / layout['browser'], '--version'], capture=True).strip() != 'Chromium ' + contract['chromium']['version']:
         raise ValueError('prepared Chromium execution mismatch')
     reexec = "const cp=require('node:child_process');if(cp.execFileSync(process.execPath,['--version'],{encoding:'utf8'}).trim()!==process.version)process.exit(1)"
     run([probe / layout['node'], '-e', reexec])
@@ -383,12 +392,12 @@ def prepare(args):
             stream.write(target)
     run([probe / layout['node'], '-e', reexec])
     run([probe / layout['browser'], '--version'])
-    components.extend([{'type': 'application', 'name': 'node', 'version': inputs['node_version']},
-                       {'type': 'application', 'name': 'chromium', 'version': contract['chromium']['version']}])
+    components.append({'type': 'application', 'name': 'node', 'version': inputs['node_version']})
     write_json(root / 'sbom.cdx.json', {'bomFormat': 'CycloneDX', 'specVersion': '1.5', 'version': 1, 'components': components})
     provenance = {'inputs': inputs, 'platform': 'linux/' + args.arch,
                   'runner_manifest': contract, 'source_sha256': {name: sha256(assets / name) for name in ('manifest.json', 'package.json', 'package-lock.json')},
-                  'recipe_sha256': {name: sha256(recipe / name) for name in ('build.py', 'bundle.py', 'inputs.json')},
+                  'recipe_sha256': {name: sha256(recipe / name) for name in ('build.py', 'bundle.py', 'locked.py', 'sources.py', 'refresh-lock.py', 'inputs.json', 'Dockerfile', 'locks/' + args.arch + '.json')},
+                  'debian_sources': required_sources,
                   'library_sources': {name: {'path': str(source), 'sha256': sha256(source)} for name, source in sorted(closure.items())}}
     write_json(root / 'provenance.json', provenance)
     write_json(root / 'files.json', {path.relative_to(root).as_posix(): {'sha256': sha256(path), 'bytes': path.stat().st_size} for path in regular_files(root)})

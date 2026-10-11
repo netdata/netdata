@@ -7,15 +7,19 @@ import os
 from pathlib import Path
 import subprocess
 import sys
+import shutil
+import tempfile
 from urllib.parse import urlsplit
 
 from bundle import run
+from locked import download
 
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--arch', required=True, choices=('amd64', 'arm64'))
     parser.add_argument('--output', required=True, type=Path)
+    parser.add_argument('--cache', type=Path, help='reusable hash-verified binary input cache')
     parser.add_argument('--url-prefix', default='', help='approved HTTPS base; empty creates an offline-only manifest')
     args = parser.parse_args()
     if args.url_prefix:
@@ -30,7 +34,24 @@ def main():
         parser.error('--output must be empty (artifacts are never overwritten)')
     inputs = json.loads((recipe / 'inputs.json').read_text())
     arch = inputs['architectures'][args.arch]
-    donor = inputs['donor'].split('@')[0] + '@' + arch['donor_manifest']
+    lock = json.loads((recipe / 'locks' / (args.arch + '.json')).read_text())
+    donor = inputs['base'].split('@')[0] + '@' + arch['base_manifest']
+    if lock['base_image'] != donor or lock['architecture'] != args.arch:
+        raise ValueError('Debian lock differs from selected immutable base')
+    cache = (args.cache or output.parent / 'binary-inputs').resolve()
+    with tempfile.TemporaryDirectory(prefix='dem-runtime-build-') as temporary:
+        context = Path(temporary)
+        debs = context / 'debs'
+        debs.mkdir()
+        for record in lock['binary_packages']:
+            record = dict(record, name=record['file'])
+            source = download(record, cache / record['sha256'])
+            shutil.copyfile(source, debs / record['name'])
+        shutil.copyfile(recipe / 'Dockerfile', context / 'Dockerfile')
+        image_id = context / 'image-id'
+        run(['docker', 'build', '--platform', 'linux/' + args.arch, '--build-arg', 'BASE=' + donor,
+             '--iidfile', image_id, context])
+        donor = image_id.read_text().strip()
     # Only these read-only sources and the requested output are visible to the build.
     command = ['docker', 'run', '--rm', '--platform', 'linux/' + args.arch,
                '--cap-drop=ALL', '--cap-add=CHOWN', '--security-opt=no-new-privileges', '--shm-size=1g',

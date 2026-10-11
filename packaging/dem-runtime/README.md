@@ -1,125 +1,163 @@
 # DEM portable runtime bundle
 
-This experimental builder prepares one private Linux runtime for `amd64` or
-`arm64`. The current pinned donor is Google Chrome for Testing and includes
-Widevine CDM with a separate-license restriction. Its redistribution has not been
-established. These outputs MUST NOT be published as Netdata runtime releases;
-the browser source and complete inventory need resolution first. The SBOM's
-current `chromium` entry does not yet identify that proprietary component.
+This builder produces one private Linux runtime for `amd64` or `arm64`: Node,
+locked production npm dependencies, Debian's unbranded Chromium, the private ELF
+loader/library closure, fonts, and notices. Agent adapters and `nd-run` remain
+outside the bundle. DEM disables video recording, so no Playwright FFmpeg artifact
+is shipped. The qualified Chromium/Playwright pair is an exact contract, not
+permission to substitute an arbitrary system browser.
 
-Node, locked production npm dependencies, the browser, FFmpeg, the private ELF
-loader/library closure, fonts, and notices travel together. Agent
-runner adapters and `nd-run` remain outside the bundle.
+## Build from reviewed inputs
 
-Run from the repository root with Python 3.9 or newer and Docker:
+From the repository root, with Python 3.9 or newer and Docker with BuildKit:
 
 ```sh
 python3 packaging/dem-runtime/build.py --arch arm64 \
-  --output .local/audits/dem-runtime-delivery/build-arm64
+  --output .local/audits/dem-runtime-delivery/build-arm64 \
+  --cache .local/audits/dem-runtime-delivery/binary-inputs
 python3 -m unittest discover -s packaging/dem-runtime -v
 ```
 
-The output directory MUST be empty. The builder runs a disposable, architecture
-selected Docker container; it installs nothing on the host. Building another
-architecture requires a compatible Docker worker or emulation. An emulated build
-is not native execution acceptance. Downloads and npm execute only during the
-release build. Consumers MUST NOT run apt, npm, or upstream browser installers.
+The output directory MUST be empty. No packages are installed on the host. An
+architecture-compatible Docker worker or emulation is required; an emulated
+build does not establish native execution acceptance.
 
-## Inputs and release identity
+`inputs.json` pins the independent runtime version, deterministic timestamp,
+Debian base image and architecture manifests, Node and patchelf binary hashes,
+and their source hashes. Generated `locks/<architecture>.json` files record the
+immutable base inventory, complete resulting Debian inventory, exact additional
+binary archive URLs/sizes/SHA256s, and source records. The base image owns unchanged
+packages; every changed or added package comes from a locked binary archive.
 
-`inputs.json` pins an independent runtime version, deterministic timestamp,
-architecture-specific immutable donor image manifests, Node release checksums,
-and patchelf release checksums. The Playwright donor provides browser artifacts,
-libraries, fonts, Python, and build utilities; no mutable apt repositories are
-consulted. Node comes from its checksum-verified official release. npm uses
-`src/go/plugin/dem/synthetic/runner/assets/package-lock.json`, with lifecycle
-scripts, auditing, and funding network requests disabled. The builder verifies
-installed versions and Chromium revision against the runner's `manifest.json`.
-The two manifests and the npm lock are repository-owned inputs; changes require
-rebuilding and requalifying the runtime.
+Ordinary builds MUST NOT resolve current apt candidates. The host fetches only
+locked `.deb` files and verifies their hashes/sizes. Docker's bootstrap transaction
+uses only those local files with empty apt sources, no remote package indexes,
+and BuildKit networking disabled. Local file acquisition remains enabled because
+apt must copy supplied archives into its transaction cache. The container verifies the entire installed
+inventory against the lock before assembling the runtime. A missing old archive
+fails acquisition; it never silently selects a newer package. Preserve verified
+binary caches or establish an approved immutable mirror for long-term rebuilding.
+
+Node comes from its checksum-verified official release. `npm ci` uses the runner's
+repository-owned `package-lock.json`, with lifecycle scripts, auditing and funding
+requests disabled. The builder verifies Node minimum, exact npm versions, Debian
+source/package identity, and exact browser output against
+`src/go/plugin/dem/synthetic/runner/assets/manifest.json`. Playwright's internal
+browser revision is not the runtime delivery identity. These installed inputs
+perform no apt, npm, or browser downloads when the Agent prepares a runtime.
 
 The output contains:
 
-- `<sha256>.tar.gz`: deterministic sorted tar entries, normalized owner/mode/time,
-  gzip with fixed timestamp and no original filename;
-- `manifest.json`: format 1 runtime identity, exact compressed/tar/regular-file
-  bytes, entry count, layout, and authenticated ELF bindings;
-- `provenance.json`: source/recipe hashes, complete lock inputs, and original
-  private-library sources/hashes;
-- `sbom.cdx.json`: CycloneDX 1.5 inventory of Node, Chromium, npm integrity pins,
-  and copied Debian library/font package versions and source package identities.
+- `<sha256>.tar.gz`: sorted entries with normalized ownership/mode/time and fixed
+  gzip timestamp, excluding source trees;
+- `manifest.json`: format 1 identity, exact compressed/tar/regular-file byte bounds,
+  entry count, layout, and authenticated ELF bindings;
+- `provenance.json`: runner/recipe hashes, exact input locks, original copied
+  library hashes, and exact redistributed Debian source records;
+- `sbom.cdx.json`: CycloneDX 1.5 inventory of actual Debian browser/library/font
+  packages with source versions, Node, and locked npm packages;
+- `sources-required.json`: the source records needed for the copied Debian
+  components, excluding unrelated build-only tools.
 
-The archive includes the SBOM/provenance, hashes and sizes for its other regular
-files (`files.json`), Node's bundled license, npm's original notices, Chromium's
-embedded third-party credits, and the owning distro packages' copyright files.
-Fontconfig generates its own user cache; donor-generated X11 indexes are omitted.
-The Chromium credits export runs in the root build container with Playwright's
-build-time sandbox disabled. It only extracts embedded notices and MUST NOT be
-counted as sandbox qualification. The prepared runtime launcher never disables
-the browser sandbox.
+The runtime archive includes the SBOM/provenance, regular-file hashes (`files.json`),
+Node's license, npm's original notices, Chromium's embedded third-party credits,
+Debian package copyright files, and full referenced `/usr/share/common-licenses`
+texts. Fontconfig builds its user cache; generated donor X11 indexes are omitted.
+Chromium credits are exported in the root build container with Playwright's
+build-time sandbox disabled. This reads embedded notices and MUST NOT count as
+sandbox qualification. Runtime launchers never disable the browser sandbox.
 
-Without `--url-prefix`, the manifest is offline-only (`archive.url` is empty).
-After release owners establish an approved HTTPS endpoint, this explicit argument
-constructs `<prefix>/dem-runtime/<version>/<architecture>/<digest>.tar.gz`.
-The builder neither publishes artifacts nor overwrites remote objects. Review and
-install the manifest with the Agent: a manifest fetched beside an archive MUST
-NOT become the trust anchor. Archive identity excludes the publication URL.
-Release publication, retention, security rebuild ownership, and a public endpoint
-must be established separately before shipping download-enabled manifests.
+Without `--url-prefix`, `archive.url` remains empty for offline import. An explicit
+approved HTTPS base constructs
+`<prefix>/dem-runtime/<version>/<architecture>/<digest>.tar.gz`. The builder does
+not publish anything. Install the reviewed manifest with the Agent; a manifest
+fetched beside an archive MUST NOT become the trust anchor.
 
-## ELF preparation contract
+## Refresh Debian locks
 
-The builder uses patchelf 0.15.0. Newer tested versions (0.18 and 0.19.1) corrupted
-the pinned arm64 Node program-header layout in the portability investigation.
-Version 0.15.0 is checksum-pinned and its output is checked; changing it requires
-repeating execution qualification on both architectures.
+Refresh is a deliberate maintainer action that uses mutable, signed Debian
+indexes. It is separate from ordinary builds and does not change tracked locks
+automatically. First update the exact qualified browser contract and, if needed,
+the immutable base/tool pins. Then generate candidates for both architectures:
 
-Every dynamic payload object receives `$ORIGIN`-relative private library search
-paths. The loader and libc themselves retain their donor ABI layout; libc is a
-library, not a runtime execution entry point. Runtime-loaded NSS modules are
-included explicitly in addition to the transitive `ldd` closure. Unresolved
-libraries and colliding library basenames fail the build. Statically linked
-FFmpeg requires no private dynamic-library closure.
+```sh
+python3 packaging/dem-runtime/refresh-lock.py --arch arm64 \
+  --output .local/audits/dem-runtime-delivery/lock-arm64
+python3 packaging/dem-runtime/refresh-lock.py --arch amd64 \
+  --output .local/audits/dem-runtime-delivery/lock-amd64
+```
 
-Interpreter-bearing executables receive an exact **4096-byte PT_INTERP slot**.
-Linux's `PATH_MAX` bounds the encoded absolute interpreter pathname to 4095 bytes
-plus its terminating NUL. This deliberately accounts for the entire final
-prefix, generation digest, `lib/`, and loader filename; individual path components
-still have filesystem limits. The build parses ELF64 program headers, checks
-architecture, file bounds and PHDR coverage by LOAD, then records the actual
-PT_INTERP offset and complete expected bytes as base64. String searching cannot
-select a binding. The build executes Node, Node re-execution, and Chromium after
-binding copies under a prefix containing spaces/quotes and at the exact 4095-byte
-interpreter-path limit. This isolates loader capacity; it does not establish a
-4095-byte usable generation prefix. The Go preparer also checks every payload's
-final absolute pathname, including the longer browser and dependency paths.
-These are executable integrity checks, not sandbox tests.
+The disposable base container authenticates apt indexes using its pinned archive
+keyring, upgrades the base, installs exact Chromium and the stated tools/fonts,
+and records binary/source metadata and authenticated InRelease hashes. Review
+both generated JSON files, particularly browser version, package changes, source
+coverage and architecture differences, before copying them into `locks/`. A binary
+rebuild suffix such as `+b2` is preserved on the binary version; Debian's
+`${source:Version}` identifies the corresponding source without that suffix.
 
-The Agent verifies the archive's installed digest/bounds before extraction and
-replaces only these exact slots with the FINAL immutable generation's loader
-path, padded with NUL bytes. A longer path MUST fail before publication. No ELF
-rearrangement, package installation, or arbitrary patching occurs on the host.
-`chrome`, `fonts.conf`, and `prepared.json` are reserved generated files and MUST
-NOT occur in the archive. The runtime store generates safely quoted/escaped final
-prefix configuration. Internal symlinks are permitted; escaping links, special
-files and privileged modes are not emitted.
+A refresh MAY record unavailable source metadata for unused base/tools as a
+warning. Runtime assembly MUST fail if any actually redistributed Debian component
+lacks its exact source record. Updating lock inputs requires a new runtime version,
+clean builds, a byte-for-byte repeat, and qualification of the exact browser/
+Playwright pair. Verify Node and patchelf releases against their official release
+checksums when changing those separately maintained pins.
 
-## Qualification and maintenance
+## Assemble release sources
 
-Unit tests cover deterministic archive metadata, independent size accounting,
-reserved paths, escaping symlinks, true ELF offsets, malformed ELF bounds and the
-known PHDR failure class. The command wrapper is checked for success, original
-failure status, metacharacters/spaces, and synthetic credential redaction.
+Keep sources outside the end-user runtime. From the exact recipe and runner assets
+used to produce a bundle, assemble a separate release source directory:
 
-A release MUST also exercise the built archive through the actual runtime store,
-Engine, and supervised `nd-run`, with sandbox enabled, on native amd64 and arm64.
-Verify the supported kernel floor, native Ubuntu AppArmor/systemd context, all
-installation methods, offline/read-only preloads, custom prefixes, and node/browser
-re-execution. Docker tests establish their userland/kernel context only. Check
-SBOM/notices and source availability obligations when updating any dependency;
-retaining notices alone does not establish every redistribution obligation.
+```sh
+python3 packaging/dem-runtime/sources.py \
+  --runtime-output .local/audits/dem-runtime-delivery/build-arm64 \
+  --output .local/audits/dem-runtime-delivery/release-sources-arm64
+```
 
-Repeat a build in the same pinned environment and compare archive/manifests to
-establish reproducibility. A dependency security rebuild updates the independent
-runtime version and affected pins, repeats qualification, and ships a new Agent
-manifest. Existing immutable archives MUST NOT be replaced in place.
+This fetches and hash-verifies every selected Debian `.dsc` and ALL its companions,
+including Chromium's upstream, pre-generated and Debian packaging archives. The
+original signed descriptor is preserved; its identity and full companion hash/size
+set must match the reviewed lock. The lock derives from authenticated apt Sources
+metadata, rather than trusting a descriptor downloaded beside an archive. This
+route does not independently verify the descriptor's OpenPGP signature.
+
+The assembly also verifies Node sources, patchelf sources, and exact npm published
+source archives using their integrity pins. It retains the complete packaging/ELF
+modification recipe, locks, runner assets, runtime identity/provenance/SBOM, and a
+`source-assembly.json` file inventory. Existing downloads are reverified on rerun.
+Debian source sets can be unpacked with `dpkg-source -x <descriptor>` using their
+preserved filenames. Actual source availability and applicable redistribution
+obligations still require packaging/legal review; names, links and notices alone
+are not completed source delivery. Release owners must publish the required
+source material through the approved source-delivery channel.
+
+## ELF preparation and qualification
+
+patchelf 0.15.0 is checksum-pinned. Versions 0.18 and 0.19.1 corrupted the tested
+arm64 Node PHDR/LOAD layout; changing tools requires both-architecture validation.
+Dynamic objects receive `$ORIGIN`-relative private library search paths. Loader
+and libc retain their donor ABI layout; libc is not an execution entry point.
+Runtime-loaded NSS modules supplement the transitive library closure. Missing
+libraries or conflicting private-library basenames fail construction.
+
+Executable PT_INTERP slots are exactly 4096 bytes: Linux's maximum 4095-byte
+interpreter pathname plus NUL. ELF64 headers determine the actual offset; the
+builder checks architecture, segment bounds, PHDR coverage and exact original
+slot bytes. Real Node, Node re-execution and Chromium probes exercise spaces/quotes
+and the maximum interpreter path using separate, never-repatched executable
+copies. These checks establish executable integrity, not browser sandbox support.
+The runtime store additionally bounds every full archive path; a long descendant
+can impose a shorter usable installation prefix than the interpreter alone.
+
+The Agent verifies digest/bounds and fills only declared slots with the FINAL
+immutable generation path. There is no host-side ELF rearrangement. `chrome`,
+`fonts.conf`, and `prepared.json` are reserved generated files and MUST NOT occur
+in the archive. Only internal, resolvable symlinks and ordinary files/directories
+are permitted; privileged modes are removed.
+
+Before publication, qualify the archive through the actual Store, Engine and
+supervised `nd-run`, with sandbox enabled, on native amd64 and arm64. Verify the
+kernel floor, native Ubuntu AppArmor/systemd, all installation methods, offline/
+read-only preloads, and browser/Node re-execution. Container evidence applies only
+to its tested kernel/userland. Native qualification, source/license delivery,
+security rebuild ownership and SRE-confirmed public hosting remain publication
+gates. Immutable archives MUST NOT be overwritten during dependency rebuilds.
