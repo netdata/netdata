@@ -709,21 +709,29 @@ static void get_disk_config(struct disk *d) {
     }
 }
 
-static struct disk *get_disk(unsigned long major, unsigned long minor, char *disk) {
+// cursor is the disk matched for the previous line of /proc/diskstats in this pass (NULL at the start of a pass).
+// The kernel lists disks in a stable order and we append them in read order, so the next line is almost always
+// cursor->next - this keeps a pass linear instead of quadratic.
+static struct disk *get_disk(unsigned long major, unsigned long minor, char *disk, struct disk **cursor) {
     static struct mountinfo *disk_mountinfo_root = NULL;
 
     struct disk *d;
 
     uint32_t hash = simple_hash(disk);
 
-    // search for it in our RAM list.
-    // this is sequential, but since we just walk through
-    // and the number of disks / partitions in a system
-    // should not be that many, it should be acceptable
-    for(d = disk_root; d ; d = d->next){
+    // search for it in our RAM list, from the last position to the end,
+    // then wrap from the start up to the last position
+    struct disk *start = (*cursor && (*cursor)->next) ? (*cursor)->next : disk_root;
+    for(d = start; d ; ) {
         if (unlikely(
-                d->major == major && d->minor == minor && d->hash == hash && !strcmp(d->device, disk)))
+                d->major == major && d->minor == minor && d->hash == hash && !strcmp(d->device, disk))) {
+            *cursor = d;
             return d;
+        }
+
+        d = d->next ? d->next : disk_root;
+        if(d == start)
+            break;
     }
 
     // not found
@@ -753,6 +761,8 @@ static struct disk *get_disk(unsigned long major, unsigned long minor, char *dis
         for(last = disk_root; last->next ;last = last->next);
         last->next = d;
     }
+
+    *cursor = d;
 
     d->chart_id = strdupz(d->device);
 
@@ -1440,6 +1450,7 @@ int do_proc_diskstats(int update_every, usec_t dt) {
 
     netdata_mutex_lock(&diskstats_dev_mutex);
 
+    struct disk *cursor = NULL;
     for(l = 0; l < lines ;l++) {
         // --------------------------------------------------------------------------
         // Read parameters
@@ -1543,7 +1554,7 @@ int do_proc_diskstats(int update_every, usec_t dt) {
         // --------------------------------------------------------------------------
         // get a disk structure for the disk
 
-        struct disk *d = get_disk(major, minor, disk);
+        struct disk *d = get_disk(major, minor, disk, &cursor);
         d->updated = 1;
 
         // --------------------------------------------------------------------------
