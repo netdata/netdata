@@ -589,7 +589,7 @@ static void aclk_push_alert_event(RRDHOST *host, sqlite3_stmt **res, sqlite3_stm
     while (sqlite3_step_monitored(*res) == SQLITE_ROW) {
         health_alarm_log_populate(&alarm_log, *res, host, &status);
 
-        // A send the mqtt layer did not accept right now is not a delivery: leave this row and the ones after it
+        // A message the MQTT layer did not accept right now is not a delivery: leave this row and the ones after it
         // queued, with their version untouched, and retry on the next pass. A message that can never be sent
         // (cannot be built, too big for the server) is consumed as before, so one bad row cannot block the queue.
         if (aclk_send_alarm_log_entry(&alarm_log) == ACLK_ALARM_LOG_SEND_FAILED) {
