@@ -1474,6 +1474,9 @@ int do_proc_diskstats(int update_every, usec_t dt) {
         // discard fields were added in kernel 4.18 (18 words), flush fields in 5.5 (20 words)
         int do_dc_stats = 0, do_fl_stats = 0;
 
+        // the flush await needs the previous flush counters, so it waits until both counters have a sample
+        bool flush_ops_had_sample = false, flush_iotime_had_sample = false;
+
         major           = str2ul(procfile_lineword(ff, l, 0));
         minor           = str2ul(procfile_lineword(ff, l, 1));
         disk            = procfile_lineword(ff, l, 2);
@@ -1655,7 +1658,9 @@ int do_proc_diskstats(int update_every, usec_t dt) {
 
             last_discards = rrddim_set_by_pointer(d->st_ext_ops, d->rd_ops_discards, discards);
             if (do_fl_stats) {
-                if (unlikely(!d->rd_ops_flushes))
+                if (likely(d->rd_ops_flushes))
+                    flush_ops_had_sample = true;
+                else
                     d->rd_ops_flushes = rrddim_add(d->st_ext_ops, "flushes", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
                 last_flushes = rrddim_set_by_pointer(d->st_ext_ops, d->rd_ops_flushes, flushes);
             }
@@ -1829,7 +1834,9 @@ int do_proc_diskstats(int update_every, usec_t dt) {
 
             last_discardms = rrddim_set_by_pointer(d->st_ext_iotime, d->rd_iotime_discards, discardms);
             if (do_fl_stats) {
-                if (unlikely(!d->rd_iotime_flushes))
+                if (likely(d->rd_iotime_flushes))
+                    flush_iotime_had_sample = true;
+                else
                     d->rd_iotime_flushes = rrddim_add(d->st_ext_iotime, "flushes", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
                 last_flushms = rrddim_set_by_pointer(d->st_ext_iotime, d->rd_iotime_flushes, flushms);
             }
@@ -1886,7 +1893,7 @@ int do_proc_diskstats(int update_every, usec_t dt) {
 
                 rrddim_set_by_pointer(d->st_ext_await, d->rd_await_discards, (collected_number)(discard_avg * 1000));
 
-                if (do_fl_stats) {
+                if (do_fl_stats && flush_ops_had_sample && flush_iotime_had_sample) {
                     if (unlikely(!d->rd_await_flushes))
                         d->rd_await_flushes = rrddim_add(d->st_ext_await, "flushes", NULL, 1, 1000, RRD_ALGORITHM_ABSOLUTE);
                     rrddim_set_by_pointer(d->st_ext_await, d->rd_await_flushes, (collected_number)(flushe_avg * 1000));
