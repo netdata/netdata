@@ -891,8 +891,8 @@ typedef enum {
 
 // Structure to hold a single label entry for collection
 struct label_entry {
-    char *name;
-    char *value;
+    STRING *name;
+    STRING *value;
     RRDLABEL_SRC ls;
 };
 
@@ -909,7 +909,7 @@ struct label_collect_ctx {
 #define LABEL_BATCH_SIZE (1024)
 
 // Callback to collect labels into an array (no SQLite I/O while spinlock is held)
-static int collect_label_callback(const char *name, const char *value, RRDLABEL_SRC ls, void *data)
+static int collect_label_callback(STRING *name, STRING *value, RRDLABEL_SRC ls, void *data)
 {
     struct label_collect_ctx *ctx = data;
 
@@ -922,9 +922,9 @@ static int collect_label_callback(const char *name, const char *value, RRDLABEL_
         ctx->entries = reallocz(ctx->entries, ctx->capacity * sizeof(*ctx->entries));
     }
 
-    // Copy label data
-    ctx->entries[ctx->count].name = strdupz(name);
-    ctx->entries[ctx->count].value = strdupz(value);
+    // Keep a reference to the interned label strings (no copies)
+    ctx->entries[ctx->count].name = string_dup(name);
+    ctx->entries[ctx->count].value = string_dup(value);
     ctx->entries[ctx->count].ls = ls;
     ctx->count++;
 
@@ -974,8 +974,10 @@ static int store_label_batch(
     for (size_t i = 0; i < count; i++) {
         SQLITE_BIND_FAIL(bind_fail, sqlite3_bind_blob(stmt, ++param, uuid, sizeof(*uuid), SQLITE_STATIC));
         SQLITE_BIND_FAIL(bind_fail, sqlite3_bind_int(stmt, ++param, (int)(entries[i].ls & ~(RRDLABEL_FLAG_INTERNAL))));
-        SQLITE_BIND_FAIL(bind_fail, sqlite3_bind_text(stmt, ++param, entries[i].name, -1, SQLITE_STATIC));
-        SQLITE_BIND_FAIL(bind_fail, sqlite3_bind_text(stmt, ++param, entries[i].value, -1, SQLITE_STATIC));
+        SQLITE_BIND_FAIL(bind_fail, sqlite3_bind_text64(stmt, ++param, string2str(entries[i].name),
+                                                        string_strlen(entries[i].name), SQLITE_STATIC, SQLITE_UTF8));
+        SQLITE_BIND_FAIL(bind_fail, sqlite3_bind_text64(stmt, ++param, string2str(entries[i].value),
+                                                        string_strlen(entries[i].value), SQLITE_STATIC, SQLITE_UTF8));
     }
     param = 0;
 
@@ -1008,7 +1010,7 @@ static int store_labels(nd_uuid_t *uuid, RRDLABELS *labels, label_store_type_t t
         .capacity = LABEL_COLLECT_INITIAL_CAPACITY,
     };
 
-    rrdlabels_walkthrough_read(labels, collect_label_callback, &collect_ctx);
+    rrdlabels_walkthrough_read_string(labels, collect_label_callback, &collect_ctx);
     // Spinlock is now released
 
     // Phase 2: Execute SQLite operations in batches (no spinlock held)
@@ -1037,8 +1039,8 @@ static int store_labels(nd_uuid_t *uuid, RRDLABELS *labels, label_store_type_t t
 
     // Cleanup collected labels
     for (size_t i = 0; i < collect_ctx.count; i++) {
-        freez(collect_ctx.entries[i].name);
-        freez(collect_ctx.entries[i].value);
+        string_freez(collect_ctx.entries[i].name);
+        string_freez(collect_ctx.entries[i].value);
     }
     freez(collect_ctx.entries);
 
