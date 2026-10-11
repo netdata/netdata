@@ -66,7 +66,7 @@ require (
 	github.com/mitchellh/go-homedir v1.1.0
 	github.com/moby/moby/api v1.56.1
 	github.com/moby/moby/client v0.6.1
-	github.com/netdata/systemd-journal-sdk/go v0.9.0
+	github.com/netdata/systemd-journal-sdk/go v0.10.0
 	github.com/oschwald/maxminddb-golang v1.13.1
 	github.com/prometheus-community/pro-bing v0.9.1
 	github.com/prometheus/client_model v0.6.3
