@@ -34,7 +34,7 @@ func TestRuntimeConfigDefaultsAndOverrides(t *testing.T) {
 }
 
 func TestRuntimeConfigRejectsAmbiguousAndInvalidPolicy(t *testing.T) {
-	for _, body := range []string{"mode: auto", "max_bytes: 0", "previous_retention_days: -1", "idle_retention_days: 36501", "node_path: /usr/bin/node"} {
+	for _, body := range []string{"mode: auto", "max_bytes: 0", "previous_retention_days: -1", "idle_retention_days: 36501"} {
 		t.Run(body, func(t *testing.T) {
 			dir := t.TempDir()
 			require.NoError(t, os.WriteFile(filepath.Join(dir, "dem.conf"), []byte("runtime: {"+body+"}"), 0600))
@@ -59,9 +59,9 @@ func TestRuntimePathsHaveNoImplicitWorkingDirectory(t *testing.T) {
 	assert.Equal(t, cfg.CachePath, store.Path)
 }
 
-func TestExternalMissingPathsAreSetupUnavailable(t *testing.T) {
+func TestPreloadedMissingPathIsSetupUnavailable(t *testing.T) {
 	dir := t.TempDir()
-	require.NoError(t, os.WriteFile(filepath.Join(dir, "dem.conf"), []byte("runtime: {mode: external, node_path: relative}"), 0600))
+	require.NoError(t, os.WriteFile(filepath.Join(dir, "dem.conf"), []byte("runtime: {mode: preloaded, preload_path: relative}"), 0600))
 	cfg, err := LoadConfig(multipath.New(dir))
 	require.NoError(t, err)
 	handle := OpenRuntime(cfg.Runtime, "/installed/dem", "")
@@ -70,4 +70,15 @@ func TestExternalMissingPathsAreSetupUnavailable(t *testing.T) {
 	_, err = handle.Source.BeginUse()
 	require.Error(t, err)
 	require.NoError(t, handle.Close())
+}
+
+func TestRuntimeConfigRejectsRemovedComponentsAndUnknownSettings(t *testing.T) {
+	for _, body := range []string{"mode: external", "node_path: /usr/bin/node", "browser_path: /usr/bin/chromium", "dependencies_path: /opt/deps", "allow_downlaod: false", "mode: managed, preload_path: /bundle", "mode: preloaded, preload_path: /bundle, cache_path: /cache"} {
+		t.Run(body, func(t *testing.T) {
+			dir := t.TempDir()
+			require.NoError(t, os.WriteFile(filepath.Join(dir, "dem.conf"), []byte("enabled: true\nruntime: {"+body+"}\n"), 0600))
+			_, err := LoadConfig(multipath.New(dir))
+			require.ErrorContains(t, err, "runtime")
+		})
+	}
 }

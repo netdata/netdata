@@ -290,11 +290,12 @@ The managed store serializes reservations, generation publication and retirement
 and each invocation's durable use pin protect files independently. The runner acquires a use before inspecting runtime
 files, passes its completion handle to `nd-run`, and releases it after supervised drainage and local reader joins.
 Unknown execution completion retains protection across restart. Preparation/maintenance errors do not alter website
-outcomes. Administrator-owned external paths bypass cache ownership and require stopped consumers for replacement.
+outcomes. Administrator-owned preloaded bundles use installed trust and stay outside cache retirement; replacement requires stopped consumers.
 
 Startup does not wait for a saved-configuration replay marker. Unneeded cached files may expire or yield to pressure
 before saved enables arrive; this permits a cache miss, not unsafe deletion during execution. A controlled offline
-preload uses explicit external paths outside cache retirement. Command shutdown closes the host and store only after
+preload selects one protected bundle root, validated against installed trust and its final location.
+Preloaded roots are read-only during use and refused by managed-cache operations. Independent component paths are unsupported. Command shutdown closes the host and store only after
 jobs have joined; fail-stop paths retain the existing execution evidence.
 
 The real Node adapter selects exactly one configured entry with explicit config/tsconfig and a private reporter pipe.

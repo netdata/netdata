@@ -104,7 +104,7 @@ func runRuntimeCommand(ctx context.Context, args []string, stdout, stderr io.Wri
 		encoder.SetIndent("", "  ")
 		retErr = errors.Join(retErr, encoder.Encode(report))
 	}()
-	if cfg.Mode == "external" && command != "preload" {
+	if cfg.Mode == "preloaded" && command != "preload" {
 		if command != "status" && command != "qualify" {
 			return true, errors.New("prepare/import require runtime.mode: managed")
 		}
@@ -113,7 +113,10 @@ func runRuntimeCommand(ctx context.Context, args []string, stdout, stderr io.Wri
 		if handle.SetupError != nil {
 			return true, handle.SetupError
 		}
-		report.State = "external_unverified"
+		report.ManifestPath = dem.RuntimeManifestPath(cfg, *assets)
+		report.Generation = handle.Manifest.Archive.SHA256
+		report.PreloadPath = cfg.PreloadPath
+		report.State = "prepared"
 		if command == "qualify" {
 			report.Qualification, retErr = qualifyRuntime(ctx, *assets, handle.Source)
 			if retErr == nil {
@@ -163,7 +166,12 @@ func runRuntimeCommand(ctx context.Context, args []string, stdout, stderr io.Wri
 	if err != nil {
 		return true, err
 	}
+	sealed := false
 	defer func() {
+		if sealed {
+			retErr = errors.Join(retErr, store.Close())
+			return
+		}
 		status, err := store.Inspect()
 		report.Storage = &status
 		report.StorageError = errorString(err)
@@ -200,15 +208,14 @@ func runRuntimeCommand(ctx context.Context, args []string, stdout, stderr io.Wri
 		}
 		report.State = "qualified"
 	case "preload":
-		use, err := store.BeginUse(*trusted)
-		if err != nil {
+		if err = store.SealPreload(*trusted); err != nil {
 			return true, err
 		}
-		report.ExternalConfig = map[string]any{"runtime": map[string]any{"mode": "external", "node_path": use.Paths.Node, "dependencies_path": use.Paths.Dependencies, "browser_path": use.Paths.Browser}}
-		if err = use.Finish(true); err != nil {
-			return true, err
-		}
-		report.Notice = "Preload paths are bound to this final root. Keep it outside managed-cache configuration; external files are not automatically retired. Run under the consuming service account and keep permissions private. Stop all consumers before replacing or removing this root. Prepared does not mean browser-qualified; run qualify as the service account."
+		sealed = true
+		report.CachePath = ""
+		report.PreloadPath = storeConfig.Path
+		report.PreloadedConfig = map[string]any{"runtime": map[string]any{"mode": "preloaded", "preload_path": storeConfig.Path, "manifest_path": report.ManifestPath}}
+		report.Notice = "Preload is bound to this final root and checked against the installed manifest. It is outside automatic retirement. Run under the consuming service account and keep permissions private. Stop all consumers before replacing or removing this root. Prepared does not mean browser-qualified; run qualify as the service account."
 	}
 	return true, nil
 }
@@ -225,7 +232,8 @@ type runtimeCommandReport struct {
 	Storage         *runtime.Status       `json:"storage,omitempty"`
 	StorageError    string                `json:"storage_error,omitempty"`
 	Qualification   *runtimeQualification `json:"qualification,omitempty"`
-	ExternalConfig  map[string]any        `json:"external_config,omitempty"`
+	PreloadedConfig map[string]any        `json:"preloaded_config,omitempty"`
+	PreloadPath     string                `json:"preload_path,omitempty"`
 	Notice          string                `json:"notice,omitempty"`
 }
 

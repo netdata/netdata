@@ -10,7 +10,6 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/netdata/netdata/go/plugins/plugin/dem/synthetic/runner"
 	runtime "github.com/netdata/netdata/go/plugins/plugin/dem/synthetic/runtime"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -66,23 +65,18 @@ func TestDefaultInstalledManifestAndUnavailableRUMSetup(t *testing.T) {
 	require.NoError(t, handle.Close())
 	require.NoError(t, handle.Close())
 }
-func TestExternalRuntimeDoesNotOpenCacheOrManifest(t *testing.T) {
+func TestPreloadedRuntimeRequiresInstalledTrust(t *testing.T) {
 	cfg := DefaultRuntimeConfig()
-	cfg.Mode = "external"
-	cfg.NodePath = "/prepared/node"
-	cfg.DependenciesPath = "/prepared/dependencies"
-	cfg.BrowserPath = "/prepared/chrome"
-	cfg.CachePath = filepath.Join(t.TempDir(), "not-created")
+	cfg.Mode = "preloaded"
+	cfg.PreloadPath = filepath.Join(t.TempDir(), "not-created")
 	cfg.ManifestPath = "/not-installed/manifest.json"
 	handle := OpenRuntime(cfg, "/installed/dem", "")
-	require.NoError(t, handle.SetupError)
+	require.Error(t, handle.SetupError)
 	require.Nil(t, handle.Host)
 	require.Nil(t, handle.Store)
-	use, err := handle.Source.BeginUse()
-	require.NoError(t, err)
-	assert.Equal(t, runner.Paths{Node: cfg.NodePath, Dependencies: cfg.DependenciesPath, Browser: cfg.BrowserPath}, use.Paths())
-	require.NoError(t, use.Finish(true))
+	_, err := handle.Source.BeginUse()
+	require.Error(t, err)
 	require.NoError(t, handle.Close())
-	_, err = os.Stat(cfg.CachePath)
+	_, err = os.Stat(cfg.PreloadPath)
 	require.True(t, os.IsNotExist(err))
 }

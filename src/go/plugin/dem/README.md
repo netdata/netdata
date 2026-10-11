@@ -506,33 +506,27 @@ instead include a preload at its final path:
 dem.plugin runtime preload --root /opt/netdata-dem-runtime --archive /absolute/path/runtime.tar.gz
 ```
 
-The root must be new or empty. Use the returned `runtime.mode: external` configuration and exact paths; do not move
-the preload or configure it as a managed cache. Keep it privately owned by the consuming service account. Preloaded
-files are outside automatic retirement; stop every consumer before replacing or removing them. This mode supports
-controlled offline images and read-only deployments. Qualification still needs to run under the target service's
-sandbox and security policy; a successful image build does not establish host compatibility.
-
-### Administrator-managed runtime
-
-External mode also supports a manually prepared runtime. The installed `plugins.d/dem/package.json` and
-`package-lock.json` pin Playwright 1.63.0, Lighthouse 13.4.1 and Chrome Launcher 1.2.1. Copy them to a prepared dependency
-directory and run `npm ci --omit=dev --ignore-scripts` using Node 24 or newer. The qualified full browser is unbranded
-Chromium 154.0.8037.92 from Debian packages `chromium` and `chromium-common` version `154.0.8037.92-1~deb13u1`.
-Netdata qualifies this exact browser/Playwright pair. Lighthouse requires the full browser, not headless-shell.
-The [portable bundle recipe](../../../../packaging/dem-runtime/README.md) supplies pinned private libraries and fonts.
-Make all files readable/executable by the service account and configure absolute paths:
+The root must be new or empty. Use the returned `runtime.mode: preloaded` configuration:
 
 ```yaml
 runtime:
-  mode: external
-  node_path: /usr/bin/node
-  dependencies_path: /opt/netdata-dem
-  browser_path: /usr/bin/chromium
+  mode: preloaded
+  preload_path: /opt/netdata-dem-runtime
 ```
 
-Prepared packages and installed adapters remain read-only during execution. Generated configuration, caches, profiles
-and output are confined to a private run directory. External paths are borrowed for the process lifetime, so stop
-all consumers before replacing their files.
+Both modes require the installed trusted runtime manifest. If the preload command uses an explicit `--manifest`,
+its returned configuration includes that `manifest_path`. A preload must match the required bundle and remain at its
+final path; moving it or upgrading to an Agent requiring a different bundle makes it unavailable. Prepare the new
+bundle at a new final path and switch configuration after stopping all consumers of the old preload.
+
+Preloads are outside automatic retirement, and managed-cache operations refuse their roots. Keep the directory
+privately owned by the consuming service account. It may be mounted read-only for execution. Stop every consumer
+before replacing or removing its files. This supports controlled offline images and read-only deployments while
+using the same qualified bundle as managed mode. Separately installed Node, npm packages or browsers cannot be selected.
+
+`runtime status` checks prepared identity without starting a browser; `runtime qualify` tests a local sandboxed
+browser under its calling account. Qualification still needs to run under the target service's sandbox and security
+policy; a successful image build does not establish host compatibility.
 
 Configure exactly one of inline `script` or absolute `script_path` in `dem/journey.conf`. Standard named imports from
 `@playwright/test` and destructured CommonJS `require` use the real pinned package. JS/TS, mjs/mts and cjs/cts entries,

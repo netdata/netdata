@@ -14,9 +14,11 @@ import (
 	goruntime "runtime"
 	"testing"
 
+	"github.com/netdata/netdata/go/plugins/plugin/dem"
 	runtime "github.com/netdata/netdata/go/plugins/plugin/dem/synthetic/runtime"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"gopkg.in/yaml.v2"
 )
 
 // This authenticated fixture proves archive plumbing and final-path binding, not
@@ -96,15 +98,40 @@ func TestRuntimeOfflinePreloadUsesFinalRootAndRejectsReplacement(t *testing.T) {
 	args := []string{"runtime", "preload", "--config-dir", root, "--manifest", manifest, "--archive", archive, "--root", final, "--allow-download=false"}
 	report, err := runtimeCommand(t, args...)
 	require.NoError(t, err)
-	require.NotNil(t, report.ExternalConfig)
-	cfg := report.ExternalConfig["runtime"].(map[string]any)
-	assert.Equal(t, "external", cfg["mode"])
-	for _, name := range []string{"node_path", "dependencies_path", "browser_path"} {
-		path := cfg[name].(string)
-		assert.Contains(t, path, filepath.Join(final, "generations", report.Generation))
-		_, err := os.Stat(path)
-		require.NoError(t, err)
-	}
+	require.NotNil(t, report.PreloadedConfig)
+	cfg := report.PreloadedConfig["runtime"].(map[string]any)
+	assert.Equal(t, "preloaded", cfg["mode"])
+	assert.Equal(t, final, cfg["preload_path"])
+	assert.NotContains(t, cfg, "node_path")
+	body, err := yaml.Marshal(report.PreloadedConfig)
+	require.NoError(t, err)
+	require.NoError(t, os.WriteFile(filepath.Join(root, "dem.conf"), body, 0600))
+	// The actual emitted configuration must resolve the preload without opening a
+	// managed store or adding lifecycle records, even with a read-only directory.
+	require.NoError(t, os.Chmod(final, 0500))
+	t.Cleanup(func() { require.NoError(t, os.Chmod(final, 0700)) })
+	loaded := dem.DefaultConfig()
+	require.NoError(t, yaml.Unmarshal(body, &loaded))
+	handle := dem.OpenRuntime(loaded.Runtime, "/unused/assets", "/unused/cache")
+	require.NoError(t, handle.SetupError)
+	require.Nil(t, handle.Store)
+	require.Nil(t, handle.Host)
+	use, err := handle.Source.BeginUse()
+	require.NoError(t, err)
+	assert.Contains(t, use.Paths().Node, filepath.Join(final, "generations", report.Generation))
+	require.NoError(t, use.Finish(true))
+	require.NoError(t, handle.Close())
+	status, err := runtimeCommand(t, "runtime", "status", "--config-dir", root)
+	require.NoError(t, err)
+	assert.Equal(t, "prepared", status.State)
+	assert.Equal(t, report.Generation, status.Generation)
+	assert.Nil(t, status.Storage)
+	assert.Nil(t, status.Qualification)
+	// This archive is structurally prepared but is not an executable browser.
+	status, err = runtimeCommand(t, "runtime", "qualify", "--config-dir", root)
+	require.Error(t, err)
+	require.NotNil(t, status.Qualification)
+	assert.NotEqual(t, "qualified", status.State)
 	assert.Contains(t, report.Notice, "Stop all consumers")
 	_, err = runtimeCommand(t, args...)
 	require.ErrorContains(t, err, "preload root must be empty")

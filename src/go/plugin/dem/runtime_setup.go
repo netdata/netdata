@@ -15,6 +15,7 @@ import (
 	"github.com/netdata/netdata/go/plugins/plugin/dem/synthetic/runner"
 	runtime "github.com/netdata/netdata/go/plugins/plugin/dem/synthetic/runtime"
 	"github.com/netdata/netdata/go/plugins/plugin/dem/synthetic/runtimehost"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/ndexec"
 )
 
 // LoadRuntimeManifest reads installed administrator-controlled trust. An archive,
@@ -78,24 +79,27 @@ func OpenRuntime(cfg RuntimeConfig, assetsPath, varLibPath string) *RuntimeHandl
 	if err := cfg.validate(); err != nil {
 		result.SetupError = err
 	}
-	if cfg.Mode == "external" {
-		for name, path := range map[string]string{"node_path": cfg.NodePath, "dependencies_path": cfg.DependenciesPath, "browser_path": cfg.BrowserPath} {
-			if !filepath.IsAbs(path) {
-				result.SetupError = errors.Join(result.SetupError, fmt.Errorf("runtime.%s must be absolute in external mode", name))
+	if cfg.Mode == "preloaded" && !filepath.IsAbs(cfg.PreloadPath) {
+		result.SetupError = errors.Join(result.SetupError, errors.New("runtime.preload_path must be absolute"))
+	}
+	if goruntime.GOOS != "linux" || (goruntime.GOARCH != "amd64" && goruntime.GOARCH != "arm64") {
+		result.SetupError = errors.Join(result.SetupError, errors.New("browser runtime requires Linux amd64 or arm64"))
+	}
+	if result.SetupError == nil {
+		result.Manifest, result.SetupError = LoadRuntimeManifest(RuntimeManifestPath(cfg, assetsPath))
+	}
+	if cfg.Mode == "preloaded" {
+		if result.SetupError == nil {
+			var paths runtime.Paths
+			paths, result.SetupError = runtime.ReadPreload(cfg.PreloadPath, *result.Manifest)
+			if result.SetupError == nil {
+				result.Source = preloadedRuntime{paths: runner.Paths{Node: paths.Node, Dependencies: paths.Dependencies, Browser: paths.Browser}}
 			}
 		}
 		if result.SetupError != nil {
 			result.Source = unavailableRuntime{result.SetupError}
-		} else {
-			result.Source = runner.ExternalRuntime{Paths: runner.Paths{Node: cfg.NodePath, Dependencies: cfg.DependenciesPath, Browser: cfg.BrowserPath}}
 		}
 		return result
-	}
-	if goruntime.GOOS != "linux" || (goruntime.GOARCH != "amd64" && goruntime.GOARCH != "arm64") {
-		result.SetupError = errors.Join(result.SetupError, errors.New("managed browser runtime requires Linux amd64 or arm64"))
-	}
-	if result.SetupError == nil {
-		result.Manifest, result.SetupError = LoadRuntimeManifest(RuntimeManifestPath(cfg, assetsPath))
 	}
 	if result.SetupError == nil {
 		storeConfig, err := cfg.StoreConfig(varLibPath)
@@ -124,3 +128,14 @@ func (h *RuntimeHandle) Close() error {
 type unavailableRuntime struct{ err error }
 
 func (s unavailableRuntime) BeginUse() (runner.Use, error) { return nil, s.err }
+
+// A verified preload remains owned by the administrator, outside managed GC.
+type preloadedRuntime struct{ paths runner.Paths }
+
+func (s preloadedRuntime) BeginUse() (runner.Use, error) { return preloadedUse{s.paths}, nil }
+
+type preloadedUse struct{ paths runner.Paths }
+
+func (u preloadedUse) Paths() runner.Paths                { return u.paths }
+func (u preloadedUse) Completion() *ndexec.TreeCompletion { return nil }
+func (u preloadedUse) Finish(bool) error                  { return nil }

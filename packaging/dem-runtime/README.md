@@ -81,8 +81,9 @@ After qualification and publication, name each reviewed builder manifest
 available manifests beside the DEM adapters in the `plugin-dem` component.
 Native packages, Docker images and static/source installations use this same
 CMake installation path. The bundle itself stays outside the base installation.
-A source build without manifests reports managed setup unavailable; explicit
-external mode still supports administrator-owned runtimes.
+Both managed and preloaded modes require the installed trusted manifest. A source
+build without one reports runtime setup unavailable; separately assembled Node,
+npm dependencies and browser installations are not supported.
 
 The installed manifest MUST match the qualified archive and its published immutable
 URL. Never derive installed trust from an arbitrary downloaded manifest. Offline

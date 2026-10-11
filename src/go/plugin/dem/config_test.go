@@ -55,7 +55,7 @@ func TestLoadConfigUsesHighestPriorityFile(t *testing.T) {
 
 func TestArtifactDefaultsAndIndependentPolicy(t *testing.T) {
 	dir := t.TempDir()
-	require.NoError(t, os.WriteFile(filepath.Join(dir, "dem.conf"), []byte("runtime: {mode: external, node_path: /prepared/node, dependencies_path: /prepared, browser_path: /prepared/chrome}\nartifacts: {days: 2, max_bytes: 1024}"), 0600))
+	require.NoError(t, os.WriteFile(filepath.Join(dir, "dem.conf"), []byte("runtime: {mode: preloaded, preload_path: /prepared}\nartifacts: {days: 2, max_bytes: 1024}"), 0600))
 	cfg, err := LoadConfig(multipath.New(dir))
 	require.NoError(t, err)
 	assert.Equal(t, DefaultConfig().History, cfg.History)
@@ -63,7 +63,7 @@ func TestArtifactDefaultsAndIndependentPolicy(t *testing.T) {
 		Days:     2,
 		MaxBytes: 1024,
 	}, cfg.Artifacts)
-	assert.Equal(t, "/prepared/node", cfg.Runtime.NodePath)
+	assert.Equal(t, "/prepared", cfg.Runtime.PreloadPath)
 	// Runtime availability is checked by its owner; RUM configuration remains independent.
 	require.NoError(t, os.WriteFile(filepath.Join(dir, "dem.conf"), []byte("artifacts: {days: 0}"), 0600))
 	_, err = LoadConfig(multipath.New(dir))

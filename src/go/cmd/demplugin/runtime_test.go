@@ -61,24 +61,21 @@ func TestRuntimeMissingManifestNeverInitializesCache(t *testing.T) {
 		})
 	}
 }
-func TestRuntimeExternalStatusDoesNotClaimQualification(t *testing.T) {
+func TestRuntimePreloadedCommandsRequirePreparedBundle(t *testing.T) {
 	dir := t.TempDir()
-	require.NoError(t, os.WriteFile(filepath.Join(dir, "dem.conf"), []byte("runtime: {mode: external, node_path: /absent/node, dependencies_path: /absent/dependencies, browser_path: /absent/chrome}"), 0600))
-	report, err := runtimeCommand(t, "runtime", "status", "--config-dir", dir)
-	require.NoError(t, err)
-	assert.Equal(t, "external_unverified", report.State)
-	require.Nil(t, report.Qualification)
-	report, err = runtimeCommand(t, "runtime", "qualify", "--config-dir", dir)
-	require.Error(t, err)
-	require.NotNil(t, report.Qualification)
-	assert.False(t, report.Qualification.VersionsAndAssets)
-	assert.False(t, report.Qualification.SandboxedLocalJourney)
+	require.NoError(t, os.WriteFile(filepath.Join(dir, "dem.conf"), []byte("runtime: {mode: preloaded, preload_path: /absent/bundle}"), 0600))
+	for _, command := range []string{"status", "qualify"} {
+		report, err := runtimeCommand(t, "runtime", command, "--config-dir", dir)
+		require.Error(t, err)
+		assert.Equal(t, "unavailable", report.State)
+		require.Nil(t, report.Qualification)
+	}
 	for _, command := range []string{"prepare", "import"} {
 		args := []string{"runtime", command, "--config-dir", dir}
 		if command == "import" {
 			args = append(args, "--archive", "/unused")
 		}
-		_, err = runtimeCommand(t, args...)
+		_, err := runtimeCommand(t, args...)
 		require.ErrorContains(t, err, "mode: managed")
 	}
 }

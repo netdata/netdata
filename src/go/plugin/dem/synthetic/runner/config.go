@@ -20,14 +20,3 @@ type Use interface {
 	Completion() *ndexec.TreeCompletion
 	Finish(drained bool) error
 }
-
-// ExternalRuntime borrows administrator-owned files, outside managed-store GC.
-type ExternalRuntime struct{ Paths Paths }
-
-func (r ExternalRuntime) BeginUse() (Use, error) { return &externalUse{paths: r.Paths}, nil }
-
-type externalUse struct{ paths Paths }
-
-func (u *externalUse) Paths() Paths                       { return u.paths }
-func (u *externalUse) Completion() *ndexec.TreeCompletion { return nil }
-func (u *externalUse) Finish(bool) error                  { return nil }

@@ -25,6 +25,17 @@ func privateDirectory(path string) error {
 	return nil
 }
 
+func privatePreloadDirectory(path string) error {
+	var st unix.Stat_t
+	if err := unix.Lstat(path, &st); err != nil {
+		return err
+	}
+	if st.Mode&unix.S_IFMT != unix.S_IFDIR || st.Mode&0077 != 0 || st.Mode&0500 != 0500 || st.Uid != uint32(os.Geteuid()) {
+		return errors.New("preload must be a private directory owned by the service account")
+	}
+	return nil
+}
+
 func hostBoot() bootIdentity {
 	const source = "/proc/sys/kernel/random/boot_id"
 	fd, err := unix.Open(source, unix.O_RDONLY|unix.O_NOFOLLOW|unix.O_CLOEXEC, 0)

@@ -48,7 +48,7 @@ func (u *observedUse) finished() []bool {
 
 func TestExecuteAcquiresRuntimeBeforeInspectionAndPassesCompletion(t *testing.T) {
 	e, _, _ := testEngine(t)
-	u := &observedUse{paths: e.source.(ExternalRuntime).Paths}
+	u := &observedUse{paths: e.source.(fixtureRuntime).Paths}
 	u.paths.Node = filepath.Join(t.TempDir(), "prepared-node")
 	e.source = sourceFunc(func() (Use, error) {
 		// The source makes its protected files available only after acquiring use.
@@ -81,7 +81,7 @@ func TestRuntimeUseFinishesWithActualDrainage(t *testing.T) {
 		for _, probe := range []bool{false, true} {
 			t.Run(fmt.Sprintf("%s/probe=%t", name, probe), func(t *testing.T) {
 				e, _, _ := testEngine(t)
-				u := &observedUse{paths: e.source.(ExternalRuntime).Paths}
+				u := &observedUse{paths: e.source.(fixtureRuntime).Paths}
 				if tc.badFiles {
 					u.paths.Node = filepath.Join(t.TempDir(), "absent")
 				}
@@ -140,7 +140,7 @@ func TestCheckUsesDistinctRuntimeHandlesAndPaths(t *testing.T) {
 		t.Skip("Check requires preserved nonroot identity")
 	}
 	e, _, _ := testEngine(t)
-	paths := e.source.(ExternalRuntime).Paths
+	paths := e.source.(fixtureRuntime).Paths
 	var uses []*observedUse
 	e.source = sourceFunc(func() (Use, error) {
 		if len(uses) > 0 {
@@ -184,7 +184,7 @@ func TestCheckUsesDistinctRuntimeHandlesAndPaths(t *testing.T) {
 
 func TestRuntimeUseWaitsForLocalReaderJoin(t *testing.T) {
 	e, _, _ := testEngine(t)
-	u := &observedUse{paths: e.source.(ExternalRuntime).Paths}
+	u := &observedUse{paths: e.source.(fixtureRuntime).Paths}
 	e.source = sourceFunc(func() (Use, error) { return u, nil })
 	waited := make(chan struct{})
 	var held *os.File
@@ -245,7 +245,7 @@ func TestConcurrentCheckAndExecutionKeepDistinctRuntimeUses(t *testing.T) {
 		t.Skip("Check requires preserved nonroot identity")
 	}
 	e, _, _ := testEngine(t)
-	paths := e.source.(ExternalRuntime).Paths
+	paths := e.source.(fixtureRuntime).Paths
 	var mu sync.Mutex
 	var uses []*observedUse
 	byCompletion := make(map[*ndexec.TreeCompletion]*observedUse)

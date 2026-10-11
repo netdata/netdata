@@ -77,7 +77,7 @@ func TestPreparedLinuxRuntime(t *testing.T) {
 		Dependencies: values[1],
 		Browser:      values[2],
 	}
-	engine := runner.New(assets, runner.ExternalRuntime{Paths: paths}, synthetichistory.NewStore(history), captures)
+	engine := runner.New(assets, fixtureRuntime{Paths: paths}, synthetichistory.NewStore(history), captures)
 	require.NoError(t, engine.Check(context.Background(), synthetic.Journey))
 
 	var mu sync.Mutex
@@ -223,7 +223,7 @@ func TestPreparedLinuxRuntime(t *testing.T) {
 	t.Run("setup-inability", func(t *testing.T) {
 		missing := paths
 		missing.Browser = filepath.Join(base, "missing-browser")
-		unavailable := runner.New(assets, runner.ExternalRuntime{Paths: missing}, synthetichistory.NewStore(history), captures)
+		unavailable := runner.New(assets, fixtureRuntime{Paths: missing}, synthetichistory.NewStore(history), captures)
 		require.Error(t, unavailable.Check(context.Background(), synthetic.Journey))
 		got := unavailable.Execute(
 			context.Background(),
@@ -361,3 +361,13 @@ func readProcIdentity(pid int) (procIdentity, error) {
 		state:     fields[0],
 	}, nil
 }
+
+type fixtureRuntime struct{ Paths runner.Paths }
+
+func (r fixtureRuntime) BeginUse() (runner.Use, error) { return fixtureUse{r.Paths}, nil }
+
+type fixtureUse struct{ paths runner.Paths }
+
+func (u fixtureUse) Paths() runner.Paths                { return u.paths }
+func (u fixtureUse) Completion() *ndexec.TreeCompletion { return nil }
+func (u fixtureUse) Finish(bool) error                  { return nil }

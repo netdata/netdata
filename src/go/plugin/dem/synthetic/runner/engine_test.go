@@ -123,7 +123,7 @@ func testEngine(t *testing.T) (*Engine, *fakeHistory, *observedArtifacts) {
 	}
 	engine := New(
 		assets,
-		ExternalRuntime{Paths: Paths{
+		fixtureRuntime{Paths: Paths{
 			Node:         bin,
 			Browser:      bin,
 			Dependencies: filepath.Join(base, "deps"),
@@ -737,7 +737,7 @@ func TestCheckRequiresQualifiedBrowserIdentity(t *testing.T) {
 
 func TestCheckRejectsUnqualifiedPackageBeforeStarting(t *testing.T) {
 	e, _, _ := testEngine(t)
-	metadata := filepath.Join(e.source.(ExternalRuntime).Paths.Dependencies, "node_modules", "playwright", "package.json")
+	metadata := filepath.Join(e.source.(fixtureRuntime).Paths.Dependencies, "node_modules", "playwright", "package.json")
 	require.NoError(t, os.WriteFile(metadata, []byte(`{"version":"0.0.0"}`), 0600))
 	e.start = func(context.Context, ndexec.TreeOptions, string, ...string) (treeProcess, error) {
 		t.Fatal("unqualified package started a version probe")
@@ -779,3 +779,13 @@ func TestCheckPreservesNodeMinimumFromManifest(t *testing.T) {
 		})
 	}
 }
+
+type fixtureRuntime struct{ Paths Paths }
+
+func (r fixtureRuntime) BeginUse() (Use, error) { return fixtureUse{r.Paths}, nil }
+
+type fixtureUse struct{ paths Paths }
+
+func (u fixtureUse) Paths() Paths                       { return u.paths }
+func (u fixtureUse) Completion() *ndexec.TreeCompletion { return nil }
+func (u fixtureUse) Finish(bool) error                  { return nil }

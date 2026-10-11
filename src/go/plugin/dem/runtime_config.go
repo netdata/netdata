@@ -8,11 +8,13 @@ import (
 	"path/filepath"
 	"time"
 
+	"gopkg.in/yaml.v2"
+
 	runtime "github.com/netdata/netdata/go/plugins/plugin/dem/synthetic/runtime"
 )
 
 // RuntimeConfig is administrator-owned process configuration, never monitor input.
-// External paths are borrowed for the process lifetime and are outside cache GC.
+// Protected preloads are borrowed for the process lifetime and are outside cache GC.
 type RuntimeConfig struct {
 	Mode                  string `yaml:"mode" json:"mode"`
 	AllowDownload         bool   `yaml:"allow_download" json:"allow_download"`
@@ -21,9 +23,7 @@ type RuntimeConfig struct {
 	MaxBytes              int64  `yaml:"max_bytes" json:"max_bytes"`
 	PreviousRetentionDays int    `yaml:"previous_retention_days" json:"previous_retention_days"`
 	IdleRetentionDays     int    `yaml:"idle_retention_days" json:"idle_retention_days"`
-	NodePath              string `yaml:"node_path" json:"node_path,omitempty"`
-	DependenciesPath      string `yaml:"dependencies_path" json:"dependencies_path,omitempty"`
-	BrowserPath           string `yaml:"browser_path" json:"browser_path,omitempty"`
+	PreloadPath           string `yaml:"preload_path" json:"preload_path,omitempty"`
 }
 
 func DefaultRuntimeConfig() RuntimeConfig {
@@ -32,8 +32,8 @@ func DefaultRuntimeConfig() RuntimeConfig {
 }
 
 func (c RuntimeConfig) validate() error {
-	if c.Mode != "managed" && c.Mode != "external" {
-		return errors.New("mode must be managed or external")
+	if c.Mode != "managed" && c.Mode != "preloaded" {
+		return errors.New("mode must be managed or preloaded")
 	}
 	if c.MaxBytes <= 0 {
 		return errors.New("max_bytes must be positive")
@@ -43,8 +43,11 @@ func (c RuntimeConfig) validate() error {
 			return fmt.Errorf("%s must be between 0 and 36500", name)
 		}
 	}
-	if c.Mode == "managed" && (c.NodePath != "" || c.DependenciesPath != "" || c.BrowserPath != "") {
-		return errors.New("explicit executable paths require mode: external")
+	if c.Mode == "managed" && c.PreloadPath != "" {
+		return errors.New("preload_path requires mode: preloaded")
+	}
+	if c.Mode == "preloaded" && c.CachePath != "" {
+		return errors.New("cache_path is only valid in managed mode")
 	}
 	return nil
 }
@@ -65,4 +68,24 @@ func (c RuntimeConfig) StoreConfig(varLibPath string) (runtime.Config, error) {
 	return runtime.Config{Path: path, MaxBytes: c.MaxBytes,
 		PreviousRetention: time.Duration(c.PreviousRetentionDays) * 24 * time.Hour,
 		IdleRetention:     time.Duration(c.IdleRetentionDays) * 24 * time.Hour}, nil
+}
+
+// UnmarshalYAML rejects unsupported runtime settings while leaving framework
+// settings in dem.conf to their existing owner. Preserve defaults on partial input.
+func (c *RuntimeConfig) UnmarshalYAML(unmarshal func(any) error) error {
+	var fields yaml.MapSlice
+	if err := unmarshal(&fields); err != nil {
+		return err
+	}
+	raw, err := yaml.Marshal(fields)
+	if err != nil {
+		return err
+	}
+	type plain RuntimeConfig
+	value := plain(*c)
+	if err := yaml.UnmarshalStrict(raw, &value); err != nil {
+		return fmt.Errorf("runtime: %w", err)
+	}
+	*c = RuntimeConfig(value)
+	return nil
 }

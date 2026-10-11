@@ -109,6 +109,10 @@ func Open(config Config) (*Store, error) {
 		return nil, err
 	}
 	s := &Store{completedUses: make(map[string]bool), config: config, path: path, root: root, now: time.Now, boot: hostBoot()}
+	if err := requireManaged(root); err != nil {
+		root.Close()
+		return nil, err
+	}
 	if err := ensureLock(root, "coordination.lock"); err != nil {
 		root.Close()
 		return nil, err
@@ -145,7 +149,10 @@ func (s *Store) withLock(fn func() error) error {
 	if err := s.lock.Lock(); err != nil {
 		return err
 	}
-	err := fn()
+	err := requireManaged(s.root)
+	if err == nil {
+		err = fn()
+	}
 	return errors.Join(err, s.lock.Unlock())
 }
 
@@ -227,19 +234,23 @@ func saveJSON(root *os.Root, name string, value any) error {
 }
 
 func (s *Store) loadGeneration(id string) (generation, error) {
+	return loadGeneration(s.root, id)
+}
+
+func loadGeneration(root *os.Root, id string) (generation, error) {
 	var g generation
 	if !validID(id) {
 		return g, errors.New("invalid generation identity")
 	}
 	name := filepath.Join("generations", id)
-	info, err := s.root.Lstat(name)
+	info, err := root.Lstat(name)
 	if errors.Is(err, os.ErrNotExist) {
 		return g, ErrUnavailable
 	}
 	if err != nil || !info.IsDir() {
 		return g, errors.New("invalid generation directory")
 	}
-	if err := readJSON(s.root, filepath.Join(name, "prepared.json"), &g); err != nil {
+	if err := readJSON(root, filepath.Join(name, "prepared.json"), &g); err != nil {
 		return g, err
 	}
 	if err := g.Manifest.Validate(); err != nil || g.Manifest.Archive.SHA256 != id || g.LastUsed.IsZero() {
@@ -257,14 +268,18 @@ func sameManifest(a, b Manifest) bool {
 }
 
 func (s *Store) prepared(m Manifest) (Paths, error) {
-	g, err := s.loadGeneration(m.Archive.SHA256)
+	return preparedPaths(s.root, s.path, m)
+}
+
+func preparedPaths(root *os.Root, path string, m Manifest) (Paths, error) {
+	g, err := loadGeneration(root, m.Archive.SHA256)
 	if err != nil {
 		return Paths{}, err
 	}
 	if !sameManifest(g.Manifest, m) {
 		return Paths{}, errors.New("prepared runtime manifest differs from installed requirement")
 	}
-	base := filepath.Join(s.path, "generations", m.Archive.SHA256)
+	base := filepath.Join(path, "generations", m.Archive.SHA256)
 	return Paths{Node: filepath.Join(base, m.Layout.Node), Dependencies: filepath.Join(base, m.Layout.Dependencies), Browser: filepath.Join(base, "chrome")}, nil
 }
 
@@ -285,4 +300,11 @@ func (s *Store) Available(m Manifest) error {
 		_, err := s.prepared(m)
 		return err
 	})
+}
+
+func requireManaged(root *os.Root) error {
+	if _, err := root.Lstat("preload.json"); !errors.Is(err, os.ErrNotExist) {
+		return errors.Join(errors.New("protected preload cannot be opened as a managed cache"), err)
+	}
+	return nil
 }
