@@ -37,7 +37,9 @@ class BuilderTests(unittest.TestCase):
         secret = 'https://user:synthetic-secret@example.invalid/path?token=synthetic-secret'
         stderr = io.StringIO()
         with redirect_stderr(stderr):
-            result = bundle.run([sys.executable, '-c', 'import json,sys;print(json.dumps(sys.argv[1:]))', argument, secret], capture=True)
+            result = bundle.run(
+                [sys.executable, '-c', 'import json,sys;print(json.dumps(sys.argv[1:]))', argument, secret],
+                capture=True)
         self.assertEqual(json.loads(result), [argument, secret])
         self.assertNotIn('synthetic-secret', stderr.getvalue())
         self.assertIn('<redacted>', stderr.getvalue())
@@ -52,7 +54,8 @@ class BuilderTests(unittest.TestCase):
             (root / 'data').write_bytes(b'data')
             (root / 'bin/link').symlink_to('tool')
             first, second = Path(directory) / 'first', Path(directory) / 'second'
-            first.mkdir(); second.mkdir()
+            first.mkdir()
+            second.mkdir()
             a, ma = bundle.package_archive(root, first, 12345)
             # Source mtimes/ownership cannot affect the release identity.
             os.utime(root / 'data', (9999, 9999))
@@ -61,7 +64,7 @@ class BuilderTests(unittest.TestCase):
             self.assertEqual(ma, mb)
             raw = gzip.decompress(a.read_bytes())
             self.assertEqual(ma, {'sha256': bundle.sha256(a), 'bytes': a.stat().st_size,
-                                 'tar_bytes': len(raw), 'expanded_bytes': 11, 'entries': 4})
+                                  'tar_bytes': len(raw), 'expanded_bytes': 11, 'entries': 4})
             with tarfile.open(a) as archive:
                 members = archive.getmembers()
                 self.assertEqual([m.name for m in members], ['bin', 'bin/link', 'bin/tool', 'data'])
@@ -70,16 +73,18 @@ class BuilderTests(unittest.TestCase):
 
     def test_archive_refuses_reserved_names_and_escape(self):
         cases = {'chrome': None, 'fonts.conf': None, 'prepared.json': None,
-                 'escape': '/etc/passwd', 'relative_escape': '../../outside', 'dangling': 'missing'}
+                 'escape': '/etc/passwd', 'relative_escape': '../outside', 'dangling': 'missing'}
         for name, target in cases.items():
             with self.subTest(name=name), tempfile.TemporaryDirectory() as directory:
                 root, output = Path(directory) / 'root', Path(directory) / 'output'
-                root.mkdir(); output.mkdir()
+                root.mkdir()
+                output.mkdir()
+                (Path(directory) / 'outside').write_text('outside payload')
                 if target:
                     (root / name).symlink_to(target)
                 else:
                     (root / name).write_text('forbidden')
-                with self.assertRaises((ValueError, FileNotFoundError)):
+                with self.assertRaises(FileNotFoundError if name == 'dangling' else ValueError):
                     bundle.package_archive(root, output, 0)
 
     def elf(self, root, *, bad_phdr=False, offset=4096, machine=183):
@@ -106,7 +111,7 @@ class BuilderTests(unittest.TestCase):
             path, expected = self.elf(root)
             binding = bundle.interpreter_binding(path, root, 183, expected)
             self.assertEqual(binding, {'path': 'executable', 'offset': 4096,
-                                      'expected': base64.b64encode(expected).decode()})
+                                       'expected': base64.b64encode(expected).decode()})
             # Linux PATH_MAX permits 4095 path bytes plus terminating NUL.
             self.assertEqual(len(base64.b64decode(binding['expected'])), 4096)
             with self.assertRaisesRegex(ValueError, 'slot mismatch'):

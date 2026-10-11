@@ -21,6 +21,20 @@ from urllib.parse import urlsplit, urlunsplit
 RESERVED = {'chrome', 'fonts.conf', 'prepared.json'}
 
 
+def validate_url_prefix(value):
+    if not value:
+        return
+    try:
+        url = urlsplit(value)
+        valid = (url.scheme == 'https' and url.hostname and not url.username and not url.password
+                 and '?' not in value and '#' not in value)
+        url.port  # Parsing the authority alone does not validate its port.
+    except ValueError:
+        valid = False
+    if not valid:
+        raise ValueError('--url-prefix must be an HTTPS base without credentials, query or fragment')
+
+
 def display_argument(value):
     # Commands use original argv. Only displays redact credentials/query values.
     value = str(value)
@@ -60,14 +74,6 @@ def write_json(path, value):
     Path(path).write_text(json.dumps(value, sort_keys=True, indent=2) + '\n')
 
 
-def fetch(url, digest, output):
-    # curl and TLS trust are supplied by the pinned image, hashes by inputs.json.
-    run(['curl', '--fail', '--location', '--silent', '--show-error', '--retry', '3',
-         '--proto', '=https', '--proto-redir', '=https', '--output', output, url])
-    if sha256(output) != digest:
-        raise ValueError('source SHA256 mismatch: ' + Path(output).name)
-
-
 def elf_headers(path, machine):
     """Parse and validate actual ELF64 program headers, never search binary strings."""
     size = path.stat().st_size
@@ -91,8 +97,8 @@ def elf_headers(path, machine):
         # patchelf >=0.18 corrupted this invariant on the pinned Node arm64 input.
         for item in headers:
             if item[0] == 6 and not any(load[0] == 1 and
-                    load[3] <= item[3] and item[3] + item[6] <= load[3] + load[6]
-                    for load in headers):
+                                        load[3] <= item[3] and item[3] + item[6] <= load[3] + load[6]
+                                        for load in headers):
                 raise ValueError('ELF PHDR not covered by LOAD: ' + str(path))
         interps = [item for item in headers if item[0] == 3]
         if len(interps) > 1:
@@ -136,7 +142,8 @@ def package_archive(root, output, epoch):
             info.mtime = epoch
             if path.is_symlink():
                 target = os.readlink(path)
-                if os.path.isabs(target) or any(c in target for c in '\\\r\n\x00') or not path.resolve(strict=True).is_relative_to(root.resolve()):
+                if os.path.isabs(target) or any(c in target for c in '\\\r\n\x00') or not path.resolve(
+                        strict=True).is_relative_to(root.resolve()):
                     raise ValueError('escaping archive symlink: ' + name)
                 info.type, info.mode, info.linkname = tarfile.SYMTYPE, 0o777, target
                 archive.addfile(info)
@@ -214,7 +221,10 @@ def donor_notices(root, files):
     notices.mkdir(parents=True)
     components = []
     for owner in sorted(owners):
-        fields = run(['dpkg-query', '-W', '-f=${Package}\t${Version}\t${Architecture}\t${source:Package}\t${source:Version}', owner], capture=True).split('\t')
+        fields = run(
+            ['dpkg-query', '-W',
+             '-f=${Package}\t${Version}\t${Architecture}\t${source:Package}\t${source:Version}', owner],
+            capture=True).split('\t')
         name, version, architecture, source, source_version = fields
         copyright_path = Path('/usr/share/doc', name, 'copyright')
         if not copyright_path.is_file():
@@ -228,8 +238,9 @@ def donor_notices(root, files):
 
 
 def prepare(args):
+    validate_url_prefix(args.url_prefix)
     recipe, assets, output = Path('/recipe'), Path('/assets'), Path('/out')
-    from locked import check_inventory, source_key
+    from locked import check_inventory, download, source_key
     inputs = json.loads((recipe / 'inputs.json').read_text())
     debian_lock = json.loads((recipe / 'locks' / (args.arch + '.json')).read_text())
     check_inventory(debian_lock)
@@ -245,12 +256,15 @@ def prepare(args):
     root.mkdir()
     node_name = f'node-v{inputs["node_version"]}-linux-{arch["node_arch"]}'
     node_tar = work / 'node.tar.xz'
-    fetch(f'https://nodejs.org/dist/v{inputs["node_version"]}/{node_name}.tar.xz', arch['node_sha256'], node_tar)
+    download({'url': f'https://nodejs.org/dist/v{inputs["node_version"]}/{node_name}.tar.xz',
+              'sha256': arch['node_sha256'], 'name': node_tar.name}, work)
     with tarfile.open(node_tar) as source:
         source.extractall(work, filter='data')
     node = work / node_name
     patch_tar = work / 'patchelf.tar.gz'
-    fetch(f'https://github.com/NixOS/patchelf/releases/download/{inputs["patchelf_version"]}/patchelf-{inputs["patchelf_version"]}-{arch["patchelf_arch"]}.tar.gz', arch['patchelf_sha256'], patch_tar)
+    download({'url': f'https://github.com/NixOS/patchelf/releases/download/{inputs["patchelf_version"]}/'
+                     f'patchelf-{inputs["patchelf_version"]}-{arch["patchelf_arch"]}.tar.gz',
+              'sha256': arch['patchelf_sha256'], 'name': patch_tar.name}, work)
     patch_dir = work / 'patchelf'
     patch_dir.mkdir()
     with tarfile.open(patch_tar) as source:
@@ -264,7 +278,8 @@ def prepare(args):
         shutil.copyfile(assets / name, dependencies / name)
     env = dict(os.environ, PATH=str(node / 'bin') + ':' + os.environ['PATH'],
                PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD='1', npm_config_cache=str(work / 'npm-cache'))
-    run([node / 'bin/npm', 'ci', '--omit=dev', '--ignore-scripts', '--no-audit', '--no-fund'], cwd=dependencies, env=env)
+    run([node / 'bin/npm', 'ci', '--omit=dev', '--ignore-scripts', '--no-audit', '--no-fund'],
+        cwd=dependencies, env=env)
     components = []
     npm_lock = json.loads((assets / 'package-lock.json').read_text())
     for name, version in contract['packages'].items():
@@ -289,7 +304,8 @@ def prepare(args):
     version = run([browser, '--version'], capture=True).strip()
     if version != 'Chromium ' + contract['chromium']['version']:
         raise ValueError('unexpected Debian Chromium identity: ' + version)
-    forbidden = [str(p) for p in source_browser.rglob('*') if 'widevine' in p.name.lower() or 'screen_ai' in p.name.lower()]
+    forbidden = [str(p) for p in source_browser.rglob(
+        '*') if 'widevine' in p.name.lower() or 'screen_ai' in p.name.lower()]
     if forbidden:
         raise ValueError('unexpected opaque component payload: ' + repr(forbidden))
     # DEM disables video recording; no FFmpeg artifact is shipped.
@@ -300,13 +316,15 @@ def prepare(args):
     shutil.copyfile(node / 'LICENSE', root / 'node/LICENSE')
     font_root = Path('/usr/share/fonts')
     font_files = [path for path in regular_files(font_root)
-                  if path.name.lower().endswith(('.ttf', '.ttc', '.otf', '.pfa', '.pfb', '.afm', '.pcf', '.pcf.gz', '.bdf'))]
+                  if path.name.lower().endswith(('.ttf', '.ttc', '.otf', '.pfa', '.pfb', '.afm',
+                                                '.pcf', '.pcf.gz', '.bdf'))]
     for source in font_files:
         destination = root / 'fonts' / source.relative_to(font_root)
         destination.parent.mkdir(parents=True, exist_ok=True)
         shutil.copyfile(source, destination)
     closure = copy_libraries(root, arch['elf_machine'], arch['triplet'])
-    components.extend(donor_notices(root, list(closure.values()) + font_files + browser_sources + regular_files(Path('/usr/share/common-licenses'))))
+    components.extend(donor_notices(root, list(closure.values()) + font_files +
+                      browser_sources + regular_files(Path('/usr/share/common-licenses'))))
     notices = root / 'notices'
     shutil.copytree('/usr/share/common-licenses', notices / 'common-licenses', symlinks=False)
     required_sources = {}
@@ -322,12 +340,21 @@ def prepare(args):
     # donor uses no sandbox solely to export chrome://credits; runtime launches
     # remain sandboxed and this operation is not execution qualification.
     credits_script = work / 'credits.cjs'
-    credits_script.write_text("const {chromium}=require(process.argv[2]); (async()=>{const b=await chromium.launch({executablePath:process.argv[3],headless:true});const p=await b.newPage();await p.goto('chrome://credits');console.log(await p.content());await b.close();})().catch(e=>{console.error(e);process.exit(1)});\n")
+    credits_script.write_text(
+        'const {chromium}=require(process.argv[2]); '
+        '(async()=>{const b=await chromium.launch({executablePath:process.argv[3],headless:true});'
+        "const p=await b.newPage();await p.goto('chrome://credits');"
+        'console.log(await p.content());await b.close();})()'
+        '.catch(e=>{console.error(e);process.exit(1)});\n')
     credits = run([node / 'bin/node', credits_script, dependencies / 'node_modules/playwright', browser], capture=True)
     if 'licens' not in credits.lower() or len(credits) < 10000:
         raise ValueError('Chromium third-party notices export is incomplete')
     (notices / 'chromium-credits.html').write_text(credits)
-    (notices / 'README').write_text('Node licenses: node/LICENSE. npm notices remain in dependencies/node_modules.\nChromium embedded third-party licenses: notices/chromium-credits.html.\nPrivate library/font copyrights and source-package identities: notices/debian and sbom.cdx.json.\nThe runtime does not contain patchelf, npm CLI, compilers, or donor package managers.\n')
+    (notices / 'README').write_text(
+        'Node licenses: node/LICENSE. npm notices remain in dependencies/node_modules.\n'
+        'Chromium embedded third-party licenses: notices/chromium-credits.html.\n'
+        'Private library/font copyrights and source-package identities: notices/debian and sbom.cdx.json.\n'
+        'The runtime does not contain patchelf, npm CLI, compilers, or donor package managers.\n')
     capacity = inputs['interpreter_capacity']
     if capacity != 4096:
         raise ValueError('unsupported interpreter capacity')
@@ -361,9 +388,13 @@ def prepare(args):
             stream.write(target.ljust(capacity, b'\0'))
     if run([probe / layout['node'], '--version'], capture=True).strip() != 'v' + inputs['node_version']:
         raise ValueError('prepared Node execution mismatch')
-    if run([probe / layout['browser'], '--version'], capture=True).strip() != 'Chromium ' + contract['chromium']['version']:
+    if run([probe / layout['browser'], '--version'],
+           capture=True).strip() != 'Chromium ' + contract['chromium']['version']:
         raise ValueError('prepared Chromium execution mismatch')
-    reexec = "const cp=require('node:child_process');if(cp.execFileSync(process.execPath,['--version'],{encoding:'utf8'}).trim()!==process.version)process.exit(1)"
+    reexec = (
+        "const cp=require('node:child_process');"
+        "if(cp.execFileSync(process.execPath,['--version'],{encoding:'utf8'}).trim()!==process.version)"
+        'process.exit(1)')
     run([probe / layout['node'], '-e', reexec])
     # Exercise the kernel's exact 4095-byte interpreter path limit. Components
     # stay below NAME_MAX; only the final absolute path consumes PATH_MAX.
@@ -393,14 +424,22 @@ def prepare(args):
     run([probe / layout['node'], '-e', reexec])
     run([probe / layout['browser'], '--version'])
     components.append({'type': 'application', 'name': 'node', 'version': inputs['node_version']})
-    write_json(root / 'sbom.cdx.json', {'bomFormat': 'CycloneDX', 'specVersion': '1.5', 'version': 1, 'components': components})
+    write_json(root / 'sbom.cdx.json', {'bomFormat': 'CycloneDX',
+               'specVersion': '1.5', 'version': 1, 'components': components})
     provenance = {'inputs': inputs, 'platform': 'linux/' + args.arch,
-                  'runner_manifest': contract, 'source_sha256': {name: sha256(assets / name) for name in ('manifest.json', 'package.json', 'package-lock.json')},
-                  'recipe_sha256': {name: sha256(recipe / name) for name in ('build.py', 'bundle.py', 'locked.py', 'sources.py', 'refresh-lock.py', 'inputs.json', 'Dockerfile', 'locks/' + args.arch + '.json')},
+                  'runner_manifest': contract,
+                  'source_sha256': {name: sha256(assets / name)
+                                    for name in ('manifest.json', 'package.json', 'package-lock.json')},
+                  'recipe_sha256': {name: sha256(recipe / name) for name in
+                                    ('build.py', 'bundle.py', 'locked.py', 'sources.py', 'refresh-lock.py',
+                                     'inputs.json', 'Dockerfile', 'locks/' + args.arch + '.json')},
                   'debian_sources': required_sources,
-                  'library_sources': {name: {'path': str(source), 'sha256': sha256(source)} for name, source in sorted(closure.items())}}
+                  'library_sources': {name: {'path': str(source), 'sha256': sha256(source)}
+                                      for name, source in sorted(closure.items())}}
     write_json(root / 'provenance.json', provenance)
-    write_json(root / 'files.json', {path.relative_to(root).as_posix(): {'sha256': sha256(path), 'bytes': path.stat().st_size} for path in regular_files(root)})
+    write_json(root / 'files.json',
+               {path.relative_to(root).as_posix(): {'sha256': sha256(path),
+                                                    'bytes': path.stat().st_size} for path in regular_files(root)})
     compressed, archive = package_archive(root, output, inputs['source_date_epoch'])
     relative = f'dem-runtime/{inputs["version"]}/{args.arch}/{archive["sha256"]}.tar.gz'
     archive['url'] = args.url_prefix.rstrip('/') + '/' + relative if args.url_prefix else ''

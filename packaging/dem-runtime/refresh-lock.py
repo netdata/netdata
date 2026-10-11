@@ -28,9 +28,11 @@ def capture(args):
         name, version = package['name'], package['version']
         if original.get((name, package['architecture'])) != version:
             records = paragraphs(run(['apt-cache', 'show', name + '=' + version], capture=True))
-            record = next(r for r in records if r.get('Version') == version and r.get('Architecture') == package['architecture'])
+            record = next(r for r in records if r.get('Version') ==
+                          version and r.get('Architecture') == package['architecture'])
             binaries.append(dict(package, name=name, file=Path(record['Filename']).name,
-                                 url=repository_url(record['Filename']), bytes=int(record['Size']), sha256=record['SHA256']))
+                                 url=repository_url(record['Filename']), bytes=int(record['Size']),
+                                 sha256=record['SHA256']))
         key = source_key(package['source'], package['source_version'])
         if key in sources:
             continue
@@ -91,8 +93,16 @@ printf '%s\\n' '+ apt-get upgrade --no-install-recommends' >&2
 DEBIAN_FRONTEND=noninteractive apt-get upgrade -y --no-install-recommends
 printf '%s\\n' '+ apt-get install exact Chromium and build inputs' >&2
 DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends ''' + shlex.join(packages) + '''
-python3 -c 'import json;from pathlib import Path;p=Path("/out/base.tsv");Path("/out/base.json").write_text(json.dumps([dict(zip(("name","version","architecture","source","source_version"),l.split("\\t"))) for l in sorted(p.read_text().splitlines())]))'
-exec python3 /recipe/refresh-lock.py --capture --arch ''' + shlex.quote(args.arch) + ' --base-image ' + shlex.quote(image)
+python3 - <<'PYTHON'
+import json
+from pathlib import Path
+p = Path("/out/base.tsv")
+fields = ("name", "version", "architecture", "source", "source_version")
+rows = [dict(zip(fields, line.split("\\t"))) for line in sorted(p.read_text().splitlines())]
+Path("/out/base.json").write_text(json.dumps(rows))
+PYTHON
+exec python3 /recipe/refresh-lock.py --capture --arch ''' + shlex.quote(args.arch) + ' --base-image ' + \
+        shlex.quote(image)
     run(['docker', 'run', '--rm', '--platform', 'linux/' + args.arch,
          '--mount', f'type=bind,src={recipe},dst=/recipe,readonly',
          '--mount', f'type=bind,src={assets},dst=/assets,readonly',

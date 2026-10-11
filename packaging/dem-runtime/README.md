@@ -38,7 +38,10 @@ inventory against the lock before assembling the runtime. A missing old archive
 fails acquisition; it never silently selects a newer package. Preserve verified
 binary caches or establish an approved immutable mirror for long-term rebuilding.
 
-Node comes from its checksum-verified official release. `npm ci` uses the runner's
+Node comes from its checksum-verified official release. Binary and source acquisition
+share HTTPS-only redirect handling, a socket timeout, hash verification, and any
+byte bounds recorded in the input lock. The reviewed donor inventory retains curl
+until the next intentional lock refresh; ordinary builds do not invoke it. `npm ci` uses the runner's
 repository-owned `package-lock.json`, with lifecycle scripts, auditing and funding
 requests disabled. The builder verifies Node minimum, exact npm versions, Debian
 source/package identity, and exact browser output against
@@ -141,7 +144,9 @@ route does not independently verify the descriptor's OpenPGP signature.
 The assembly also verifies Node sources, patchelf sources, and exact npm published
 source archives using their integrity pins. It retains the complete packaging/ELF
 modification recipe, locks, runner assets, runtime identity/provenance/SBOM, and a
-`source-assembly.json` file inventory. Existing downloads are reverified on rerun.
+`source-assembly.json` file inventory. Existing downloads are reverified on rerun. The output must stay outside the recipe
+directory; unexpected existing files are rejected and preserved, not included in
+the verified inventory.
 Debian source sets can be unpacked with `dpkg-source -x <descriptor>` using their
 preserved filenames. Actual source availability and applicable redistribution
 obligations still require packaging/legal review; names, links and notices alone

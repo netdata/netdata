@@ -1,13 +1,26 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 """Small readers for the reviewed Debian input lock; no package resolution."""
 import hashlib
-import json
 from pathlib import Path
 import re
 import tempfile
 import urllib.request
 
-from bundle import display_argument, run, sha256, write_json
+from bundle import display_argument, run
+
+
+DOWNLOAD_TIMEOUT_SECONDS = 60
+
+
+class HTTPSRedirectHandler(urllib.request.HTTPRedirectHandler):
+    def redirect_request(self, request, response, code, message, headers, url):
+        parsed = urllib.parse.urlsplit(url)
+        if parsed.scheme != 'https' or not parsed.hostname or parsed.username or parsed.password:
+            raise ValueError('download redirected outside credential-free HTTPS')
+        return super().redirect_request(request, response, code, message, headers, url)
+
+
+HTTPS_OPENER = urllib.request.build_opener(HTTPSRedirectHandler())
 
 
 def paragraphs(text):
@@ -30,7 +43,9 @@ def paragraphs(text):
 
 
 def inventory():
-    text = run(['dpkg-query', '-W', '-f=${Package}\t${Version}\t${Architecture}\t${source:Package}\t${source:Version}\n'], capture=True)
+    text = run(
+        ['dpkg-query', '-W', '-f=${Package}\t${Version}\t${Architecture}\t${source:Package}\t${source:Version}\n'],
+        capture=True)
     return [dict(zip(('name', 'version', 'architecture', 'source', 'source_version'), line.split('\t')))
             for line in sorted(text.splitlines())]
 
@@ -57,7 +72,8 @@ def checksums(record):
 
 
 def repository_url(path):
-    base = 'https://security.debian.org/debian-security/' if path.startswith('pool/updates/') else 'https://deb.debian.org/debian/'
+    base = 'https://security.debian.org/debian-security/' if path.startswith(
+        'pool/updates/') else 'https://deb.debian.org/debian/'
     return base + path
 
 
@@ -76,6 +92,7 @@ def download(record, directory):
     target = directory / name
     algorithm = record.get('algorithm', 'sha256')
     expected = record.get('digest', record.get('sha256'))
+
     def verify(path):
         digest = hashlib.new(algorithm)
         with path.open('rb') as stream:
@@ -91,13 +108,17 @@ def download(record, directory):
     with tempfile.TemporaryDirectory(prefix='.download-', dir=directory) as scratch:
         temporary = Path(scratch) / name
         print('+ download ' + display_argument(url) + ' -> ' + display_argument(target), file=sys.stderr, flush=True)
-        with urllib.request.urlopen(url) as response, temporary.open('wb') as output:
+        with HTTPS_OPENER.open(url, timeout=DOWNLOAD_TIMEOUT_SECONDS) as response, temporary.open('wb') as output:
             if urlsplit(response.url).scheme != 'https':
                 raise ValueError('download redirected outside HTTPS')
+            received = 0
             while True:
                 chunk = response.read(1024 * 1024)
                 if not chunk:
                     break
+                received += len(chunk)
+                if 'bytes' in record and received > record['bytes']:
+                    raise ValueError('download exceeds locked byte count: ' + name)
                 output.write(chunk)
         if not verify(temporary):
             raise ValueError('download hash/size mismatch: ' + name)

@@ -9,9 +9,8 @@ import subprocess
 import sys
 import shutil
 import tempfile
-from urllib.parse import urlsplit
 
-from bundle import run
+from bundle import run, validate_url_prefix
 from locked import download
 
 
@@ -22,10 +21,10 @@ def main():
     parser.add_argument('--cache', type=Path, help='reusable hash-verified binary input cache')
     parser.add_argument('--url-prefix', default='', help='approved HTTPS base; empty creates an offline-only manifest')
     args = parser.parse_args()
-    if args.url_prefix:
-        url = urlsplit(args.url_prefix)
-        if url.scheme != 'https' or not url.netloc or url.username or url.password or url.query or url.fragment:
-            parser.error('--url-prefix must be an HTTPS base without credentials, query or fragment')
+    try:
+        validate_url_prefix(args.url_prefix)
+    except ValueError as error:
+        parser.error(str(error))
     recipe = Path(__file__).resolve().parent
     repo = recipe.parent.parent
     output = args.output.resolve()
@@ -54,7 +53,8 @@ def main():
         donor = image_id.read_text().strip()
     # Only these read-only sources and the requested output are visible to the build.
     command = ['docker', 'run', '--rm', '--platform', 'linux/' + args.arch,
-               '--cap-drop=ALL', '--cap-add=CHOWN', '--security-opt=no-new-privileges', '--shm-size=1g',
+               '--cap-drop=ALL', '--cap-add=CHOWN', '--cap-add=DAC_OVERRIDE',
+               '--security-opt=no-new-privileges', '--shm-size=1g',
                '--mount', f'type=bind,src={recipe},dst=/recipe,readonly',
                '--mount', f'type=bind,src={repo / "src/go/plugin/dem/synthetic/runner/assets"},dst=/assets,readonly',
                '--mount', f'type=bind,src={output},dst=/out',

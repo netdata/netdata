@@ -31,21 +31,23 @@ class LockedInputTests(unittest.TestCase):
         for name, (payload, selected, error) in cases.items():
             with self.subTest(name=name), tempfile.TemporaryDirectory() as directory:
                 root = Path(directory)
-                with patch('urllib.request.urlopen', return_value=self.response(payload)):
+                with patch('locked.HTTPS_OPENER.open', return_value=self.response(payload)):
                     if error:
                         with self.assertRaises(error):
                             locked.download(selected, root)
-                        self.assertEqual(list(root.iterdir()), [], 'failed acquisition must clean its private temporary files')
+                        self.assertEqual(list(root.iterdir()), [],
+                                         'failed acquisition must clean its private temporary files')
                     else:
                         self.assertEqual(locked.download(selected, root).read_bytes(), data)
                 if not error:
                     # Cache reuse still validates bytes and must not perform I/O.
-                    with patch('urllib.request.urlopen', side_effect=AssertionError('network')):
+                    with patch('locked.HTTPS_OPENER.open', side_effect=AssertionError('network')):
                         self.assertEqual(locked.download(selected, root).read_bytes(), data)
                     (root / 'input.deb').write_bytes(b'corrupt cache')
                     with self.assertRaisesRegex(ValueError, 'cached input'):
                         locked.download(selected, root)
-        with tempfile.TemporaryDirectory() as directory, patch('urllib.request.urlopen', return_value=self.response(data, 'http://example.invalid/archive')):
+        with tempfile.TemporaryDirectory() as directory, \
+                patch('locked.HTTPS_OPENER.open', return_value=self.response(data, 'http://example.invalid/archive')):
             with self.assertRaisesRegex(ValueError, 'redirected'):
                 locked.download(record, Path(directory))
 
@@ -66,7 +68,7 @@ class LockedInputTests(unittest.TestCase):
 
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
-            with patch('urllib.request.urlopen', side_effect=lambda url: OverlappingResponse(data)):
+            with patch('locked.HTTPS_OPENER.open', side_effect=lambda url, **kwargs: OverlappingResponse(data)):
                 with ThreadPoolExecutor(max_workers=2) as workers:
                     futures = [workers.submit(locked.download, record, root) for _ in range(2)]
                     paths = [future.result(timeout=10) for future in futures]
@@ -85,8 +87,10 @@ class LockedInputTests(unittest.TestCase):
 
     def test_source_descriptor_preserves_all_companions(self):
         companions = [{'name': name, 'sha256': hashlib.sha256(name.encode()).hexdigest(), 'bytes': len(name)}
-                      for name in ('example_2.0.orig.tar.xz', 'example_2.0.orig-pre-gen.tar.xz', 'example_2.0-3.debian.tar.xz')]
-        body = '-----BEGIN PGP SIGNED MESSAGE-----\nHash: SHA512\n\nFormat: 3.0 (quilt)\nSource: example\nVersion: 1:2.0-3\nChecksums-Sha256:\n'
+                      for name in ('example_2.0.orig.tar.xz', 'example_2.0.orig-pre-gen.tar.xz',
+                                   'example_2.0-3.debian.tar.xz')]
+        body = ('-----BEGIN PGP SIGNED MESSAGE-----\nHash: SHA512\n\nFormat: 3.0 (quilt)\n'
+                'Source: example\nVersion: 1:2.0-3\nChecksums-Sha256:\n')
         body += ''.join(f' {p["sha256"]} {p["bytes"]} {p["name"]}\n' for p in companions)
         body += '\n-----BEGIN PGP SIGNATURE-----\nsynthetic\n'
         record = {'name': 'example', 'version': '1:2.0-3', 'files': companions + [{'name': 'example_2.0-3.dsc'}]}
@@ -110,7 +114,8 @@ class LockedInputTests(unittest.TestCase):
                 self.assertEqual(lock['architecture'], architecture)
                 for package in lock['binary_packages']:
                     key = package['name'], package['architecture']
-                    state[key] = {field: package[field] for field in ('name', 'architecture', 'version', 'source', 'source_version')}
+                    state[key] = {field: package[field]
+                                  for field in ('name', 'architecture', 'version', 'source', 'source_version')}
                     self.assertRegex(package['sha256'], '^[a-f0-9]{64}$')
                     self.assertGreater(package['bytes'], 0)
                     self.assertTrue(package['url'].startswith('https://'))
