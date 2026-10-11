@@ -81,7 +81,7 @@ require (
 	github.com/tidwall/gjson v1.20.0
 	github.com/valyala/fastjson v1.6.10
 	github.com/vmware/govmomi v0.56.0
-	go.mongodb.org/mongo-driver/v2 v2.9.1
+	go.mongodb.org/mongo-driver/v2 v2.9.2
 	go.opentelemetry.io/proto/otlp v1.11.1
 	go.uber.org/automaxprocs v1.6.0
 	go4.org/netipx v0.0.0-20231129151722-fdeea329fbba
