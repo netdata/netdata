@@ -57,8 +57,8 @@ Query time ranges still use original observation/run time, so saved-time retenti
 The byte target is not a physical disk cap: active growth, allocation rounding and admitted appends can exceed it;
 open query readers can keep removed files allocated. Unsafe files and failed cleanup can leave excess until resolved.
 Hourly sweeps do not force archives; idle active files are sealed when needed for expiry. Valid policy edits apply at the
-next sweep. Invalid edits retain the last valid policy and report a warning and status error. Artifacts retain their
-separate 7-day/2-GiB policy.
+next sweep. Invalid edits retain the last valid policy and report a warning and status error. Artifacts have a separate
+retention policy, defaulting to 7 days and 2 GiB.
 
 `dem-history-status` reports the effective policy, sampled file bytes/count, observation time, latest cleanup attempt,
 last successful cleanup, and separate inventory, cleanup, writer and policy reload errors. It is a read-only member
