@@ -1,0 +1,27 @@
+{
+  "jsonSchema": {
+    "$schema": "http://json-schema.org/draft-07/schema#",
+    "title": "Java application monitoring.",
+    "type": "object",
+    "properties": {
+      "exclude_applications": {
+        "title": "Excluded applications",
+        "description": "Applications to leave unmonitored, using the exact discovered names shown in Java applications. Leave empty to monitor all eligible applications.",
+        "type": "array",
+        "items": {"type": "string", "title": "Application", "minLength": 1}
+      },
+      "application_names": {
+        "title": "Display names",
+        "description": "Optional display names keyed by discovered application name. Leave empty to keep the discovered names; changing a display name preserves application identity.",
+        "type": "object",
+        "additionalProperties": {"type": "string"}
+      }
+    }
+  },
+  "uiSchema": {
+    "ui:order": ["exclude_applications", "application_names"],
+    "exclude_applications": {
+      "ui:help": "Excluding an application stops new attachment and metric publication. Instrumentation already loaded into a running JVM remains until that application restarts."
+    }
+  }
+}

@@ -11,10 +11,14 @@ include_guard()
 
 # Wanted by the Go-based collectors, which shell out to it for privileged
 # commands, and on macOS. Derived here because this is its only consumer.
-if(OS_MACOS OR ENABLE_PLUGIN_GO OR ENABLE_PLUGIN_SCRIPTS)
+if(OS_MACOS OR ENABLE_PLUGIN_GO OR ENABLE_PLUGIN_SCRIPTS OR ENABLE_PLUGIN_JAVA)
     set(NDSUDO_FILES src/collectors/utils/ndsudo.c)
 
     add_executable(ndsudo ${NDSUDO_FILES} src/collectors/utils/exec-signals.h)
+
+    if(ENABLE_PLUGIN_JAVA)
+        target_compile_definitions(ndsudo PRIVATE ENABLE_PLUGIN_JAVA NDSUDO_JAVA_HELPER="${PLUGINS_DIR}/java-helper")
+    endif()
 
     install(TARGETS ndsudo
             COMPONENT netdata

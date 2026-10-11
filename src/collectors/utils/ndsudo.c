@@ -22,6 +22,18 @@ struct command {
     const char *params;
     const char *search[MAX_SEARCH];
 } allowed_commands[] = {
+#ifdef ENABLE_PLUGIN_JAVA
+    {
+        .name = "java-discover",
+        .params = "discover",
+        .search = {NDSUDO_JAVA_HELPER, NULL},
+    },
+    {
+        .name = "java-attach",
+        .params = "attach",
+        .search = {NDSUDO_JAVA_HELPER, NULL},
+    },
+#endif
     {
         .name = "ethtool-module-info",
         .params = "-m {{devname}}",
