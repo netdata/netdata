@@ -47,10 +47,10 @@ int rrdset_reset_name(RRDSET *st, const char *name) {
     // an unchanged name skips rrdset_fix_name(); sanitized, truncated or suffixed names still take the slow path
     const char *current = rrdset_name(st);
     const char *type = rrdset_parts_type(st);
-    size_t type_len = strlen(type);
+    size_t type_len = string_strlen(st->parts.type);
     if(likely(st->name && name &&
               type_len + 1 < RRD_ID_LENGTH_MAX &&
-              strlen(current) < RRD_ID_LENGTH_MAX &&
+              string_strlen(st->name) < RRD_ID_LENGTH_MAX &&
               strncmp(current, type, type_len) == 0 &&
               current[type_len] == '.' &&
               strcmp(current + type_len + 1, name) == 0))
