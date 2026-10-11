@@ -83,6 +83,10 @@ static void ml_features_lag(ml_features_t *features, std::vector<DSample> &prepr
 
         preprocessed_features.emplace_back();
         DSample &DS = preprocessed_features[sample_idx++];
+        // Unused rows MUST be zero, as in ml_features_preprocess_predict():
+        // emplace_back() leaves them holding whatever the reused vector
+        // storage held, and they would end up in the cluster centers.
+        DS = 0;
         DS.set_size(features->lag_n + 1);
 
         for (size_t feature_idx = 0; feature_idx != features->lag_n + 1; feature_idx++)

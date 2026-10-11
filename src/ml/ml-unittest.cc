@@ -209,8 +209,8 @@ static void test_features_zero_smooth_matches_one()
 
 // Regression: DSample is a fixed 6-row matrix whose constructor leaves the rows
 // uninitialized, and set_size() does not resize it. With lag_n < 5 feature
-// extraction writes only lag_n + 1 rows, but the anomaly score is computed over
-// all 6, so the unused rows must be zero.
+// extraction writes only lag_n + 1 rows, but training and scoring use all 6,
+// so the unused rows must be zero in both the training and prediction samples.
 //
 // The sample is poisoned with NaN first, so a row that is not explicitly zeroed
 // fails here instead of passing by luck of a zeroed stack.
@@ -238,6 +238,26 @@ static void test_features_unused_rows_are_zero()
             char msg[128];
             snprintf(msg, sizeof(msg), "prediction sample row %ld must be zero with lag_n=%zu", row, lag_n);
             ML_TEST_ASSERT(sample(row) == 0.0, msg);
+        }
+
+        // Training: the worker reuses one vector across dimensions, so
+        // emplace_back() constructs into storage that still holds the previous
+        // samples. Poison that storage the same way.
+        memcpy(src, input, sizeof(src));
+        memcpy(dst, input, sizeof(dst));
+        std::vector<DSample> pf(n);
+        for (auto &ds : pf)
+            ds = NAN;
+        pf.clear();
+        ml_features_preprocess(&features, pf, 1.0);
+
+        ML_TEST_ASSERT(!pf.empty(), "training must produce at least one sample");
+        for (size_t i = 0; i < pf.size(); i++) {
+            for (long row = (long)lag_n + 1; row < pf[i].nr(); row++) {
+                char msg[128];
+                snprintf(msg, sizeof(msg), "training sample %zu row %ld must be zero with lag_n=%zu", i, row, lag_n);
+                ML_TEST_ASSERT(pf[i](row) == 0.0, msg);
+            }
         }
     }
 }
