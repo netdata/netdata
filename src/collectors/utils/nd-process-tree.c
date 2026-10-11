@@ -118,8 +118,7 @@ static bool completion_open(struct tree_completion *completion) {
         !S_ISDIR(st.st_mode) || st.st_uid != geteuid() || (st.st_mode & 0777) != 0700)
         return false;
     completion->lock = openat(completion->directory, "publication.lock", O_RDWR | O_NOFOLLOW | O_CLOEXEC);
-    if (completion->lock < 0 || !private_regular(completion->lock) ||
-        flock(completion->lock, LOCK_EX | LOCK_NB) != 0)
+    if (completion->lock < 0 || !private_regular(completion->lock))
         return false;
     // A used invocation may never launch again, even with the same token.
     if (fstatat(completion->directory, "complete", &st, AT_SYMLINK_NOFOLLOW) == 0 || errno != ENOENT)
@@ -152,7 +151,14 @@ static bool completion_open(struct tree_completion *completion) {
     valid = fsync(started) == 0;
     if (close(started) != 0)
         valid = false;
-    return valid && fsync(completion->directory) == 0;
+    if (!valid || fsync(completion->directory) != 0)
+        return false;
+    // The exclusive claim rejects reuse; readers may only delay first launch.
+    int locked;
+    do {
+        locked = flock(completion->lock, LOCK_EX);
+    } while (locked < 0 && errno == EINTR);
+    return locked == 0;
 }
 
 static bool sync_fd(int fd) {

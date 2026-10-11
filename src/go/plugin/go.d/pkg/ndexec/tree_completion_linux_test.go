@@ -9,6 +9,7 @@ import (
 	"strconv"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -44,6 +45,60 @@ func TestTreeCompletionActualSupervisor(t *testing.T) {
 			require.False(t, repeated.Wait().Drained)
 		})
 	}
+}
+
+// Model a completion reader paused inside its publication-lock critical section.
+// Startup must wait, while the invocation claim still excludes a second helper.
+func TestTreeCompletionReaderCannotRejectLaunch(t *testing.T) {
+	helper := compileTreeHelper(t)
+	path := filepath.Join(t.TempDir(), "execution")
+	completion, err := CreateTreeCompletion(path)
+	require.NoError(t, err)
+	defer completion.Close()
+	lock, err := os.OpenFile(filepath.Join(path, "publication.lock"), os.O_RDWR, 0)
+	require.NoError(t, err)
+	defer lock.Close()
+	require.NoError(t, unix.Flock(int(lock.Fd()), unix.LOCK_EX))
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	process, err := startProcessTree(ctx, helper, TreeOptions{Completion: completion}, "/bin/true")
+	require.NoError(t, err)
+	done := make(chan TreeResult, 1)
+	go func() { done <- process.Wait() }()
+	waited := false
+	defer func() {
+		_ = unix.Flock(int(lock.Fd()), unix.LOCK_UN)
+		cancel()
+		if !waited {
+			<-done
+		}
+	}()
+	ticker := time.NewTicker(time.Millisecond)
+	defer ticker.Stop()
+	for {
+		if _, err := os.Stat(filepath.Join(path, "started")); err == nil {
+			break
+		}
+		select {
+		case result := <-done:
+			waited = true
+			t.Fatalf("reader rejected launch: %+v", result)
+		case <-ctx.Done():
+			t.Fatal("helper did not claim invocation while reader held publication lock")
+		case <-ticker.C:
+		}
+	}
+	repeated, err := startProcessTree(ctx, helper, TreeOptions{Completion: completion}, "/bin/true")
+	require.NoError(t, err)
+	require.False(t, repeated.Wait().Drained, "duplicate invocation must refuse while first waits")
+	require.NoError(t, unix.Flock(int(lock.Fd()), unix.LOCK_UN))
+	result := <-done
+	waited = true
+	require.True(t, result.Drained, "%v", result.Err)
+	require.NoError(t, result.Err)
+	complete, err := ReadTreeCompletion(path, completion.ID())
+	require.NoError(t, err)
+	require.True(t, complete)
 }
 
 func TestTreeCompletionRecoveryRejectsUncertainRecords(t *testing.T) {
