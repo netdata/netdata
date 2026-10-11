@@ -199,18 +199,18 @@ static inline size_t svc_rrdhost_cleanup_charts_marked_obsolete(RRDHOST *host) {
     if(full_archives != full_candidates)
         rrdhost_flag_set(host, RRDHOST_FLAG_PENDING_OBSOLETE_CHARTS);
 
-    // Charts held by someone else, directly or through their dimensions, are retried on the next sweep,
-    // so a steady non-zero count here is the only symptom of a holder that never releases - the charts
-    // simply stop being reclaimed and memory grows with nothing else to see. Rate-limited because a busy
-    // parent legitimately shows a few per sweep while a query or a health evaluation is in flight (and a
-    // pending dimension may also just be waiting for its idle time or a busy lock).
+    // These counts cover only the obsolete charts that passed the replication, idle-time and destroy_lock
+    // checks: charts still referenced, directly or through their dimensions, are kept for the next sweep,
+    // and a holder that never releases shows up here as a steady non-zero count. Rate-limited because a
+    // busy parent legitimately shows a few per sweep while a query or a health evaluation is in flight
+    // (and a pending dimension may also just be waiting for its idle time or a busy lock).
     if(full_referenced || full_dims_pending) {
         nd_log_limit_static_global_var(erl, 600, 0);
         nd_log_limit(&erl, NDLS_DAEMON, NDLP_INFO,
-                     "SERVICE: host '%s': of %zu obsolete charts, %zu are still referenced and %zu still have "
-                     "dimensions pending archive (may overlap); those charts were not reclaimed and will be "
-                     "retried on the next sweep.",
-                     rrdhost_hostname(host), full_candidates, full_referenced, full_dims_pending);
+                     "SERVICE: host '%s': %zu obsolete charts are still referenced and %zu have dimensions "
+                     "pending archive (may overlap); they were not reclaimed and will be retried on the next "
+                     "sweep.",
+                     rrdhost_hostname(host), full_referenced, full_dims_pending);
     }
 
     return archived_items;
