@@ -1450,6 +1450,16 @@ jobs:
           sudo grep -q "INSTALL_TYPE='macos-pkg'" /opt/netdata/etc/netdata/.install-type
           sudo grep -qE "RELEASE_CHANNEL='(stable|nightly)'" /opt/netdata/etc/netdata/.install-type
           sudo test -x /opt/netdata/usr/libexec/netdata/plugins.d/macos-logs.plugin
+          # The Agent spawns plugins as the netdata user; checking as root
+          # cannot catch a plugin that account is not allowed to execute.
+          fail=0
+          for p in $(sudo find /opt/netdata/usr/libexec/netdata/plugins.d -type f -perm -u+x); do
+            if ! sudo -u netdata test -x "${p}"; then
+              echo "not executable by netdata: ${p}"
+              fail=1
+            fi
+          done
+          if [ "${fail}" -ne 0 ]; then exit 1; fi
       - name: Reinstall over the existing install
         id: reinstall-pkg
         if: needs.file-check.outputs.run == 'true'
