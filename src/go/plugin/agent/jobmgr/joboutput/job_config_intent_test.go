@@ -159,7 +159,7 @@ func TestConfigIntentPassiveEnableDisposeAndRetirement(t *testing.T) {
 }
 
 func TestConfigIntentEnableFailureAndApplyRollback(t *testing.T) {
-	for _, mode := range []string{"prepare failure", "apply rollback", "abort failure"} {
+	for _, mode := range []string{"prepare failure", "nil-context apply rollback", "abort failure"} {
 		t.Run(mode, func(t *testing.T) {
 			controller, graph, _, _, _ := newDynCfgJobTestHarness(t)
 			owner := &intentTestOwner{}

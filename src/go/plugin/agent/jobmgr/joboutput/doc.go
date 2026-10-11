@@ -4,9 +4,9 @@
 // generations, runtime output, and vnode snapshots to Job Manager ports.
 //
 // Committed enabled intent is separate from graph health and transient accepted
-// activation. Optional collectorapi.JobConfigIntentOwner reservations are made
-// only for adopted changes, committed after graph adoption and before activation
-// or reply, and aborted on rollback. Running/Failed/retry retain the same intent.
+// activation. Optional collectorapi.JobConfigIntentOwner reservations are prepared
+// before graph adoption, committed after adoption and before activation or reply,
+// and aborted on rollback. Running/Failed/retry retain the same intent.
 // Composition retires these resources with FinalizeJobConfigIntents only after
 // the run joins. Successor runs restore demand as accepted configuration arrives;
 // cached dependencies may expire before that, independently of execution safety.

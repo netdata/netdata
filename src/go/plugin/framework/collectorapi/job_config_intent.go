@@ -27,6 +27,8 @@ type JobConfigIntentOwner interface {
 // setup/storage failures must retain reserved protection and remain visible as
 // unavailable dependency state; they must not silently discard enabled demand.
 // Abort releases only the uncommitted reservation and preserves incumbent intent.
+// If Abort fails, the owner remains responsible for unreleased resources and
+// recovery; the framework consumes the reservation and will not call Abort again.
 // Both operations must be bounded; Commit may enqueue asynchronous preparation.
 type PreparedJobConfigIntent interface {
 	Commit()

@@ -746,7 +746,8 @@ Collectors with `JobConfigIntentOwner` reserve resources only after structural v
 identity. This admission gate covers discovery, Enable and failure adoption, independently of missing dependencies
 or a quarantined candidate. It reuses pure configuration validation in a separate contained operation, outside the
 graph claim, so validation cannot supersede a candidate awaiting handoff. Unchanged identity and retirement do not
-repeat collector callbacks. Operational failure/retry retains valid intent. The owning discovery pipeline can still
+repeat validation callbacks. Retirement calls the intent owner's Prepare with a zero next identity, then Commit to
+release intent. Operational failure/retry retains valid intent. The owning discovery pipeline can still
 revoke trust with an invalid postimage; that Failed adoption retires both the incumbent and acquisition intent.
 
 If admission validation is busy or times out, discovery retains unaccepted desired work until that exact validation
