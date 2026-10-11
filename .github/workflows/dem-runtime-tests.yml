@@ -9,8 +9,10 @@ on:
       - 'src/collectors/utils/nd-process-tree.*'
       - 'src/collectors/utils/nd-file-reader.*'
       - 'src/collectors/utils/exec-signals.h'
-      - 'src/go/plugin/dem/synthetic/runtime/**'
-      - 'src/go/plugin/dem/synthetic/runner/**'
+      - 'src/go/cmd/demplugin/**'
+      - 'src/go/plugin/dem/**'
+      - 'src/go/plugin/agent/jobmgr/**'
+      - 'src/go/plugin/framework/collectorapi/**'
       - 'src/go/plugin/go.d/pkg/ndexec/**'
       - 'src/go/go.mod'
       - 'src/go/go.sum'
@@ -23,8 +25,10 @@ on:
       - 'src/collectors/utils/nd-process-tree.*'
       - 'src/collectors/utils/nd-file-reader.*'
       - 'src/collectors/utils/exec-signals.h'
-      - 'src/go/plugin/dem/synthetic/runtime/**'
-      - 'src/go/plugin/dem/synthetic/runner/**'
+      - 'src/go/cmd/demplugin/**'
+      - 'src/go/plugin/dem/**'
+      - 'src/go/plugin/agent/jobmgr/**'
+      - 'src/go/plugin/framework/collectorapi/**'
       - 'src/go/plugin/go.d/pkg/ndexec/**'
       - 'src/go/go.mod'
       - 'src/go/go.sum'
@@ -64,5 +68,5 @@ jobs:
       - name: Store lifecycle and supervisor integration
         working-directory: src/go
         run: |
-          go test -race -count=1 ./plugin/dem/synthetic/runtime ./plugin/dem/synthetic/runner ./plugin/go.d/pkg/ndexec
-          go vet ./plugin/dem/synthetic/runtime ./plugin/dem/synthetic/runner ./plugin/go.d/pkg/ndexec
+          go test -race -count=1 ./plugin/dem/... ./cmd/demplugin ./plugin/go.d/pkg/ndexec ./plugin/agent/jobmgr/composition
+          go vet ./plugin/dem/... ./cmd/demplugin ./plugin/go.d/pkg/ndexec ./plugin/agent/jobmgr/composition

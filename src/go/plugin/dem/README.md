@@ -465,7 +465,7 @@ runtime:
   idle_retention_days: 30
 ```
 
-The Agent installs a trusted `plugins.d/dem/runtime-<architecture>.json` manifest identifying the archive, digest,
+Managed setup reads a trusted `plugins.d/dem/runtime-<architecture>.json` manifest identifying the archive, digest,
 size limits and executable layout. Monitor configuration cannot choose a download URL. Publication of these manifests,
 archives and corresponding sources is still pending release qualification and a confirmed public URL. A checkout or
 package without that manifest reports setup unavailability; it does not guess a source or fetch a different browser.
@@ -566,7 +566,7 @@ start are distinct from a failed target. A workflow failure means a declared che
 The static `dem_journey_failed` template warns on the latest fresh failed/timed-out observation. A new successful
 observation clears it. Unknown, inconclusive, execution error, cancellation and observations older than two native
 intervals are UNDEFINED, not recovery. Replacement/restart begins unknown until a new observation. Critical escalation
-and configurable sensitivity are left for a separate alert-policy decision. Native job status shows preparation errors;
+and configurable sensitivity are left for a separate alert-policy decision. Native job status identifies unavailable dependencies; plugin logs explain runtime preparation errors.
 Functions show current execution and retained diagnosis.
 
 Lighthouse performance is a desktop lab score in points from 0 to 100; FCP, LCP, TBT and Speed Index are milliseconds,

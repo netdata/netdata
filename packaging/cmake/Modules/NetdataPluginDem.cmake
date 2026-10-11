@@ -30,6 +30,24 @@ if(ENABLE_PLUGIN_DEM)
             src/go/plugin/dem/synthetic/runner/assets/package.json
             src/go/plugin/dem/synthetic/runner/assets/package-lock.json
             COMPONENT plugin-dem DESTINATION ${PLUGINS_DEST}/dem)
+    # Release packaging supplies reviewed trust separately from downloaded payloads.
+    # A source build without manifests remains usable in explicit external mode.
+    set(DEM_RUNTIME_MANIFEST_DIR "" CACHE PATH "Directory of reviewed DEM runtime-<arch>.json manifests")
+    if(DEM_RUNTIME_MANIFEST_DIR)
+        set(DEM_RUNTIME_MANIFESTS)
+        foreach(arch amd64 arm64)
+            set(manifest "${DEM_RUNTIME_MANIFEST_DIR}/runtime-${arch}.json")
+            if(EXISTS "${manifest}")
+                list(APPEND DEM_RUNTIME_MANIFESTS "${manifest}")
+            endif()
+        endforeach()
+        if(NOT DEM_RUNTIME_MANIFESTS)
+            message(FATAL_ERROR "DEM_RUNTIME_MANIFEST_DIR contains no runtime-amd64.json or runtime-arm64.json")
+        endif()
+        install(FILES ${DEM_RUNTIME_MANIFESTS}
+                COMPONENT plugin-dem DESTINATION ${PLUGINS_DEST}/dem)
+    endif()
+
     install(FILES src/go/plugin/dem/config/dem.conf
             COMPONENT plugin-dem DESTINATION ${LIBCONFIG_DEST})
     install(DIRECTORY src/go/plugin/dem/config/dem

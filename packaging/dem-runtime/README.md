@@ -73,6 +73,23 @@ approved HTTPS base constructs
 not publish anything. Install the reviewed manifest with the Agent; a manifest
 fetched beside an archive MUST NOT become the trust anchor.
 
+## Install runtime trust
+
+After qualification and publication, name each reviewed builder manifest
+`runtime-amd64.json` or `runtime-arm64.json`. Configure the Agent build with
+`-DDEM_RUNTIME_MANIFEST_DIR=/absolute/path/to/reviewed-manifests` to install the
+available manifests beside the DEM adapters in the `plugin-dem` component.
+Native packages, Docker images and static/source installations use this same
+CMake installation path. The bundle itself stays outside the base installation.
+A source build without manifests reports managed setup unavailable; explicit
+external mode still supports administrator-owned runtimes.
+
+The installed manifest MUST match the qualified archive and its published immutable
+URL. Never derive installed trust from an arbitrary downloaded manifest. Offline
+installations may use a reviewed manifest with an empty URL and `runtime import`.
+Publication and source delivery remain release prerequisites; this installation
+hook does not establish a download endpoint or platform qualification.
+
 ## Refresh Debian locks
 
 Refresh is a deliberate maintainer action that uses mutable, signed Debian
