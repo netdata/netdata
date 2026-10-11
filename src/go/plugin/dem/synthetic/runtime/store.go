@@ -59,17 +59,17 @@ func DefaultConfig(path string) Config {
 // protect cached generations; owners must execute through BeginUse.
 // The directory must remain on one host and may not be copied or network-shared.
 type Store struct {
-	completedUses      map[string]bool
-	config             Config
-	path               string
-	root               *os.Root
-	mu                 sync.Mutex
-	lock               *flock.Flock
-	now                func() time.Time
-	boot               bootIdentity
-	cleanupError       error
-	finishError        error
-	finishErrorVersion uint64
+	completedUses       map[string]bool
+	releasingOwners     map[io.Closer]struct{} // Failed local lock closes only; dead records belong to inventory.
+	config              Config
+	path                string
+	root                *os.Root
+	mu                  sync.Mutex
+	lock                *flock.Flock
+	now                 func() time.Time
+	boot                bootIdentity
+	cleanupError        error
+	cleanupErrorVersion uint64
 }
 
 type generation struct {
@@ -108,7 +108,7 @@ func Open(config Config) (*Store, error) {
 	if err != nil {
 		return nil, err
 	}
-	s := &Store{completedUses: make(map[string]bool), config: config, path: path, root: root, now: time.Now, boot: hostBoot()}
+	s := &Store{completedUses: make(map[string]bool), releasingOwners: make(map[io.Closer]struct{}), config: config, path: path, root: root, now: time.Now, boot: hostBoot()}
 	if err := requireManaged(root); err != nil {
 		root.Close()
 		return nil, err
@@ -140,7 +140,12 @@ func Open(config Config) (*Store, error) {
 // Close requires the caller to have joined preparation and released its claims
 // and use handles. It does not manufacture completion for retained pins.
 func (s *Store) Close() error {
-	return errors.Join(s.lock.Close(), s.root.Close())
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if err := errors.Join(s.retryOwnerReleasesLocked(), s.lock.Close()); err != nil {
+		return err
+	}
+	return s.root.Close()
 }
 
 func (s *Store) withLock(fn func() error) error {

@@ -744,16 +744,21 @@ current resource distinguish enabled intent; a passive registration never starts
 
 Collectors with `JobConfigIntentOwner` reserve resources only after structural validation of each changed enabled
 identity. This admission gate covers discovery, Enable and failure adoption, independently of missing dependencies
-or a quarantined candidate. It reuses pure configuration validation in a separate contained operation, outside the
-graph claim, so validation cannot supersede a candidate awaiting handoff. Unchanged identity and retirement do not
+or a quarantined candidate. Pure configuration validation and owner reservation run in the same separate contained
+operation outside the graph claim, so neither supersedes a candidate awaiting handoff. The stage owns its reservation
+until graph claims are reacquired and the result is taken. Cancellation, rejection and failed claim reacquisition
+abort a late or untaken reservation inside the physical attempt; process shutdown joins that cleanup. Same-job
+mutations remain serialized while unrelated graph work can proceed. Unchanged identity and retirement do not
 repeat validation callbacks. Retirement calls the intent owner's Prepare with a zero next identity, then Commit to
-release intent. Operational failure/retry retains valid intent. The owning discovery pipeline can still
+release intent. Retirement preparation, Commit and Abort perform bounded in-memory ownership changes. The owner may
+queue physical cleanup on its maintenance worker; cleanup failures remain visible through owner health and final
+joined close. Operational failure/retry retains valid intent. The owning discovery pipeline can still
 revoke trust with an invalid postimage; that Failed adoption retires both the incumbent and acquisition intent.
 
-If admission validation is busy or times out, discovery retains unaccepted desired work until that exact validation
-attempt releases, preserving the incumbent. A quarantined validation identity rejects that revision. Interactive
-commands reject unavailable validation without changing state. Neither path grants acquisition before validation
-completes. No dependency lookup, reference resolution, Init or Check is part of this admission proof.
+If admission validation or reservation is busy or times out, discovery retains unaccepted desired work until that
+exact admission attempt releases, preserving the incumbent. A quarantined admission identity rejects that revision.
+Interactive commands reject unavailable admission without changing state. Neither path grants acquisition before
+validation completes. No dependency lookup, reference resolution, Init or Check is part of this admission proof.
 
 - A short accepted mutation arms `{run epoch, config UID, activation generation}` only after commit. The worker builds
   and probes outside the Function request, graph claim, and resource lane. Fresh construction waits for predecessor

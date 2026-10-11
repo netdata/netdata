@@ -47,7 +47,7 @@ func TestOlderSweepDoesNotClearConcurrentFinishFailure(t *testing.T) {
 	// older sweep publishes its result after deleting trash.
 	var version uint64
 	require.NoError(t, s.withLock(func() error {
-		version = s.finishErrorVersion
+		version = s.cleanupErrorVersion
 		_, err := s.inventoryLocked(true)
 		return err
 	}))

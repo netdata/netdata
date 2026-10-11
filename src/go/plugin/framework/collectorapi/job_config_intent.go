@@ -11,12 +11,16 @@ package collectorapi
 // raw structure and literal field types without resolving references or checking
 // dependency readiness. Operational Init/Check failure does not revoke that proof.
 //
-// Prepare reserves protection without starting work, downloading dependencies or
+// Prepare reserves protection without starting collection, downloading dependencies or
 // changing idle timestamps. Zero previous/next identities mean no enabled intent.
 // Config is the borrowed raw next configuration (nil when next is zero); it must
 // not be retained. An error leaves the previous intent intact and returns no
 // reservation. Calls for different jobs may overlap; implementations must be safe
-// for concurrent use. Preparation must be bounded and must not wait for downloads.
+// for concurrent use. Changed-enabled preparation runs in process containment
+// outside graph claims: callers can cancel while local reservation work finishes,
+// and the framework aborts late results before releasing physical ownership.
+// Prepare must not wait for downloads. A zero next identity must prepare retirement
+// using bounded in-memory work; final retirement runs after containment joins.
 type JobConfigIntentOwner interface {
 	Prepare(previous, next JobConfigIdentity, config map[string]any) (PreparedJobConfigIntent, error)
 }
@@ -29,7 +33,11 @@ type JobConfigIntentOwner interface {
 // Abort releases only the uncommitted reservation and preserves incumbent intent.
 // If Abort fails, the owner remains responsible for unreleased resources and
 // recovery; the framework consumes the reservation and will not call Abort again.
-// Both operations must be bounded; Commit may enqueue asynchronous preparation.
+// Both operations must perform bounded in-memory ownership changes without
+// waiting for filesystem coordination or external cleanup. Commit may enqueue
+// asynchronous preparation; Abort may transfer cleanup to the owner's existing
+// maintenance worker. Deferred cleanup failures must remain visible through owner
+// health and final joined close.
 type PreparedJobConfigIntent interface {
 	Commit()
 	Abort() error

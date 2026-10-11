@@ -4,6 +4,7 @@ package runtimehost
 
 import (
 	"errors"
+
 	runtime "github.com/netdata/netdata/go/plugins/plugin/dem/synthetic/runtime"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/collectorapi"
 )
@@ -17,10 +18,13 @@ type transition struct {
 
 func (h *Host) Prepare(previous, next collectorapi.JobConfigIdentity, _ map[string]any) (collectorapi.PreparedJobConfigIntent, error) {
 	h.mu.Lock()
-	defer h.mu.Unlock()
-	if h.closed {
+	closed := h.closed
+	h.mu.Unlock()
+	if closed {
 		return nil, errors.New("browser runtime owner is closed")
 	}
+	// The process owns and joins this preparation before Close. Filesystem
+	// coordination must not block readiness or logical intent transitions.
 	var claim *runtime.Claim
 	if next.Valid() && h.unavailable == nil {
 		var err error
@@ -30,7 +34,9 @@ func (h *Host) Prepare(previous, next collectorapi.JobConfigIdentity, _ map[stri
 		}
 	}
 	t := &transition{host: h, previous: previous, next: next, claim: claim}
+	h.mu.Lock()
 	h.reservations[t] = claim
+	h.mu.Unlock()
 	return t, nil
 }
 
@@ -75,16 +81,7 @@ func (t *transition) Abort() error {
 		h.retired[t.claim] = struct{}{}
 	}
 	h.mu.Unlock()
-	if t.claim == nil {
-		return nil
-	}
-	err := t.claim.Close()
-	if err == nil {
-		h.mu.Lock()
-		delete(h.retired, t.claim)
-		h.mu.Unlock()
-	} else {
-		h.signal()
-	}
-	return err
+	// The process worker (or final Close after it joins) owns physical release.
+	h.signal()
+	return nil
 }

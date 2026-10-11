@@ -125,11 +125,6 @@ func (dcjc *DynCfgJobController) prepareJobConfigIntent(
 	if previous.identity == next.identity {
 		return nil, nil
 	}
-	if next.identity.Valid() {
-		if _, err := dcjc.runConfigOperation(ctx, config, configOperationValidateIntent, true); err != nil {
-			return nil, &configIntentAdmissionError{cause: err}
-		}
-	}
 	owner := next.owner
 	if owner == nil {
 		owner = previous.owner
@@ -137,16 +132,33 @@ func (dcjc *DynCfgJobController) prepareJobConfigIntent(
 	if owner == nil {
 		return nil, nil
 	}
-	reservation, err := prepareConfigIntentOwner(owner, previous.identity, next.identity, config)
-	if err != nil {
-		return nil, err
+	prepare := func(config confgroup.Config) configOperationResult {
+		reservation, err := prepareConfigIntentOwner(owner, previous.identity, next.identity, config)
+		if err != nil {
+			return configOperationResult{err: err}
+		}
+		return configOperationResult{intent: &preparedJobConfigIntent{
+			index: &dcjc.configIntents, id: id, next: next, reservation: reservation,
+		}}
 	}
-	return &preparedJobConfigIntent{
-		index:       &dcjc.configIntents,
-		id:          id,
-		next:        next,
-		reservation: reservation,
-	}, nil
+	if !next.identity.Valid() {
+		result := prepare(config)
+		return result.intent, result.err
+	}
+	result, err := dcjc.runPreparedConfigOperation(ctx, config, configOperationValidateIntent, true,
+		func(ctx context.Context, config confgroup.Config) configOperationResult {
+			if err := dcjc.factory.ValidateConfig(ctx, config); err != nil {
+				return configOperationResult{err: &configIntentAdmissionError{cause: err}}
+			}
+			if cause := context.Cause(ctx); cause != nil {
+				return configOperationResult{err: &configIntentAdmissionError{cause: cause}}
+			}
+			return prepare(config)
+		})
+	if err != nil {
+		return nil, &configIntentAdmissionError{cause: err}
+	}
+	return result.intent, result.err
 }
 
 func prepareConfigIntentOwner(

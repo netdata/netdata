@@ -23,6 +23,7 @@ type intentTestOwner struct {
 	prepared, committed, aborted int
 	prepareErr, abortErr         error
 	onCommit                     func(collectorapi.JobConfigIdentity)
+	onPrepare                    func()
 }
 
 type intentTestReservation struct {
@@ -34,6 +35,9 @@ func (o *intentTestOwner) Prepare(
 	previous, next collectorapi.JobConfigIdentity,
 	_ map[string]any,
 ) (collectorapi.PreparedJobConfigIntent, error) {
+	if o.onPrepare != nil {
+		o.onPrepare()
+	}
 	o.mu.Lock()
 	defer o.mu.Unlock()
 	if o.prepareErr != nil {

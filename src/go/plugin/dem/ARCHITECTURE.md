@@ -282,13 +282,19 @@ providers and published independently of collector selection. Their narrow sourc
 independent history I/O; no Function acquires browser admission.
 
 The process runtime host owns accepted enabled browser configuration independently of collector activation. Graph
-transactions reserve demand before adoption, then commit or abort it; disabled/passive configuration never downloads.
+transactions use contained process work to validate and reserve demand before adoption, outside graph claims and
+host state locks. Commit and Abort only transfer in-memory ownership; the existing process worker releases aborted
+claims and reports physical cleanup failures through maintenance health and final Close. Late contained results abort
+once and remain process-owned until joined. Disabled/passive configuration never downloads.
 A process worker prepares the selected trusted bundle, retries failures and polls for offline imports. Run-scoped
 subscriptions wake the existing named dependency scheduler. RUM and configuration mutation do not wait for a download.
 
 The managed store serializes reservations, generation publication and retirement across consumers. Accepted demand
 and each invocation's durable use pin protect files independently. The runner acquires a use before inspecting runtime
 files, passes its completion handle to `nd-run`, and releases it after supervised drainage and local reader joins.
+Completed preparation releases its local claim and staging locks before coordinated record reclamation. Failed local
+lock closes remain owned for maintenance/final-close retry; released records are reclaimed by the existing dead-owner
+inventory. Cleanup health survives coordination failures and cannot be cleared by an older sweep.
 Unknown execution completion retains protection across process restart. A positively verified host reboot may
 release the old execution pin because its children cannot remain alive. Preparation/maintenance errors do not alter website
 outcomes. Administrator-owned preloaded bundles use installed trust and stay outside cache retirement; replacement requires stopped consumers.
@@ -297,7 +303,7 @@ Startup does not wait for a saved-configuration replay marker. Unneeded cached f
 before saved enables arrive; this permits a cache miss, not unsafe deletion during execution. A controlled offline
 preload selects one protected bundle root, validated against installed trust and its final location.
 Preloaded roots are read-only during use and refused by managed-cache operations. Independent component paths are unsupported. Command shutdown closes the host and store only after
-jobs have joined; fail-stop paths retain the existing execution evidence.
+jobs and contained configuration work have joined; fail-stop paths retain the existing execution evidence.
 
 The real Node adapter selects exactly one configured entry with explicit config/tsconfig and a private reporter pipe.
 Standard import mappings target real pinned package entries, never a fake test harness. Retry overrides fail before a

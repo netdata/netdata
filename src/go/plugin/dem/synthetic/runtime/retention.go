@@ -214,7 +214,7 @@ func (s *Store) inventoryLocked(reconcile bool) (inventory, error) {
 
 func (s *Store) statusLocked(inv inventory) (Status, error) {
 	status := Status{LimitBytes: s.config.MaxBytes, DemandGenerations: len(inv.demand), BootRecoveryAvailable: s.boot.Verified}
-	if err := errors.Join(inv.cleanupError, s.cleanupError, s.finishError); err != nil {
+	if err := errors.Join(inv.cleanupError, s.cleanupError); err != nil {
 		status.CleanupError = err.Error()
 	}
 	var err error
@@ -292,9 +292,12 @@ func (s *Store) Inspect() (Status, error) {
 // enabled configuration is accepted; only known ownership prevents reclamation.
 // Failed cleanup is separate from the ability to use a matching runtime.
 func (s *Store) Sweep() error {
-	var finishVersion uint64
+	var cleanupVersion uint64
 	err := s.withLock(func() error {
-		finishVersion = s.finishErrorVersion
+		cleanupVersion = s.cleanupErrorVersion
+		if err := s.retryOwnerReleasesLocked(); err != nil {
+			return err
+		}
 		inv, err := s.inventoryLocked(true)
 		if err != nil {
 			return err
@@ -307,18 +310,19 @@ func (s *Store) Sweep() error {
 		return inv.cleanupError
 	})
 	result := errors.Join(err, s.flushTrash())
-	s.finishSweep(finishVersion, result)
+	s.finishSweep(cleanupVersion, result)
 	return result
 }
 
 // finishSweep publishes health after trash deletion, outside coordination
-// exclusion. A concurrent Finish failure belongs to a later cleanup attempt.
-func (s *Store) finishSweep(finishVersion uint64, result error) {
+// exclusion. A newer finalizer or sweep failure cannot be cleared by this sweep.
+func (s *Store) finishSweep(cleanupVersion uint64, result error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	s.cleanupError = result
-	if result == nil && s.finishErrorVersion == finishVersion {
-		s.finishError = nil
+	if result != nil {
+		s.recordCleanupErrorLocked(result)
+	} else if s.cleanupErrorVersion == cleanupVersion {
+		s.cleanupError = nil
 	}
 }
 

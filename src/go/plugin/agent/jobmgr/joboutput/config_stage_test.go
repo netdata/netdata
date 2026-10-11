@@ -4,6 +4,7 @@ package joboutput
 
 import (
 	"context"
+	"errors"
 	"sync"
 	"sync/atomic"
 	"testing"
@@ -13,7 +14,9 @@ import (
 	"github.com/netdata/netdata/go/plugins/plugin/agent/jobmgr/containment"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/collectorapi"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/confgroup"
+	"github.com/netdata/netdata/go/plugins/plugin/framework/dyncfg"
 	"github.com/stretchr/testify/require"
+	"gopkg.in/yaml.v2"
 )
 
 func TestDynCfgTestContainsNonCooperativeCollectorPerRawConfigIdentity(t *testing.T) {
@@ -136,14 +139,30 @@ func TestContainedConfigValidationYieldsGraphClaimForAllCallbacks(t *testing.T) 
 			config.SetSourceType(confgroup.TypeDyncfg)
 			config.SetSource("user=test")
 			config.SetProvider(confgroup.TypeDyncfg)
-			_, err := controller.runConfigOperation(
-				context.Background(),
-				config,
-				kind,
-				true,
-			)
-			require.NoError(t, err)
-			require.EqualValues(t, 2, callbacks.Load())
+			expectedCallbacks := int32(2)
+			if kind == configOperationValidateIntent {
+				owner := &intentTestOwner{onPrepare: func() {
+					callbacks.Add(1)
+					if !outsideClaim.Load() {
+						violations.Add(1)
+					}
+				}}
+				installIntentTestOwner(controller, owner)
+				payload, err := yaml.Marshal(config)
+				require.NoError(t, err)
+				intent, err := controller.prepareJobConfigIntent(t.Context(), config.FullName(), &dyncfg.GraphConfig{
+					Module: config.Module(), Name: config.Name(), Payload: payload,
+					Status: dyncfg.StatusAccepted.String(),
+				}, jobConfigIntentEnable)
+				require.NoError(t, err)
+				require.NotNil(t, intent)
+				require.NoError(t, intent.abort())
+				expectedCallbacks++
+			} else {
+				_, err := controller.runConfigOperation(t.Context(), config, kind, true)
+				require.NoError(t, err)
+			}
+			require.Equal(t, expectedCallbacks, callbacks.Load())
 			require.Zero(t, violations.Load())
 		})
 	}
@@ -162,9 +181,9 @@ func TestConfigOperationAwaitDoesNotStartAfterCallerCancellation(t *testing.T) {
 		factory,
 		factoryTestConfig(false),
 		configOperationTest,
-		func(context.Context, confgroup.Config) ([]byte, error) {
+		func(context.Context, confgroup.Config) configOperationResult {
 			calls.Add(1)
-			return nil, nil
+			return configOperationResult{}
 		},
 	)
 	require.NoError(t, err)
@@ -220,10 +239,10 @@ func TestConfigOperationRejectsSuccessReturnedAfterLogicalCut(t *testing.T) {
 		factory,
 		config,
 		configOperationTest,
-		func(context.Context, confgroup.Config) ([]byte, error) {
+		func(context.Context, confgroup.Config) configOperationResult {
 			close(entered)
 			<-release
-			return []byte(`{"accepted":true}`), nil
+			return configOperationResult{payload: []byte(`{"accepted":true}`)}
 		},
 	)
 	require.NoError(t, err)
@@ -238,9 +257,9 @@ func TestConfigOperationRejectsSuccessReturnedAfterLogicalCut(t *testing.T) {
 	stage.Cancel(jobmgr.ErrProcessAttemptSuperseded)
 	close(release)
 	require.NoError(t, stage.Await(context.Background()))
-	payload, err := stage.take()
-	require.ErrorIs(t, err, jobmgr.ErrProcessAttemptSuperseded)
-	require.Nil(t, payload)
+	result, err := stage.take()
+	require.ErrorIs(t, errors.Join(err, result.err), jobmgr.ErrProcessAttemptSuperseded)
+	require.Nil(t, result.payload)
 	stage.Release()
 }
 

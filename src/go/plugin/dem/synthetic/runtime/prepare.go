@@ -81,26 +81,18 @@ func (s *Store) prepare(ctx context.Context, m Manifest, open func() (io.ReadClo
 	if err != nil {
 		return err
 	}
-	defer claim.Close()
+	defer claim.Close() // Close records cleanup health independently of preparation.
 	// Cleanup errors are exposed independently; a matching prepared runtime
 	// remains usable. New reservations still require a complete inventory.
 	_ = s.Sweep()
 	name, owner, err := s.reserve(m)
+	if owner != nil {
+		// Installed before checking err: coordination unlock may fail after reserve.
+		defer s.finishPreparation(name, owner)
+	}
 	if err != nil || owner == nil {
 		return err
 	}
-	defer func() {
-		s.withLock(func() error {
-			err := owner.Close()
-			if err == nil {
-				err = s.removeOwned(name)
-			}
-			s.cleanupError = errors.Join(s.cleanupError, err)
-			return nil
-		})
-		cleanupErr := s.flushTrash()
-		s.withLock(func() error { s.cleanupError = errors.Join(s.cleanupError, cleanupErr); return nil })
-	}()
 	source, err := open()
 	if err != nil {
 		return err
