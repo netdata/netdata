@@ -127,8 +127,9 @@ mode `0600` regular files `publication.lock` (empty) and `pending` (`NDTREE1 pen
 hexadecimal characters, unique to this invocation. Persist the files, directory entry and resource-to-ID binding
 before launch. Pass an already-open directory descriptor, never a payload-selected path.
 
-The helper exclusively locks `publication.lock`, validates the expected pending record, and durably creates a
-`started` marker before forking. A started/used invocation cannot run again, even after supervisor loss. Protocol
+The helper validates the expected pending record and exclusively creates and persists a `started` marker, then
+acquires the exclusive `publication.lock` before forking. The marker claims this invocation even while a recovery
+reader delays launch by holding the lock. A started/used invocation cannot run again, even after supervisor loss. Protocol
 aliases are rejected, and all record handles are closed in the payload. Only after `waitpid` establishes ECHILD does
 the helper write/fsync `complete.pending`, atomically publish `complete` (`NDTREE1 drained <id>\n`), sync the directory,
 and release the publication lock. This happens before status-pipe delivery and also after a verified prelaunch setup

@@ -216,22 +216,29 @@ static bool write_frame(int status_fd, const char *frame, size_t length) {
     return written == (ssize_t)length;
 }
 
+// Prelaunch refusals can release ownership too, but only a wait result proves
+// absence of children; neither rejected descriptors nor procfs are that proof.
+static bool completion_finish_if_childless(struct tree_completion *completion) {
+    pid_t result;
+    do {
+        result = waitpid(-1, NULL, WNOHANG | __WALL);
+    } while (result < 0 && errno == EINTR);
+    if (result >= 0 || errno != ECHILD)
+        return false;
+    completion_finish(completion);
+    return true;
+}
+
 static int setup_unavailable(int control_fd, int status_fd, struct tree_completion *completion) {
     // Only used with validated private pipes and before a successful fork.
     // Capability refusal is distinct from losing a supervisor after launch.
     // Even here, absence of children must come from wait, not procfs discovery.
+    bool childless = completion_finish_if_childless(completion);
     struct sigaction ignore_pipe = { .sa_handler = SIG_IGN };
     sigemptyset(&ignore_pipe.sa_mask);
-    if (sigaction(SIGPIPE, &ignore_pipe, NULL) == 0) {
-        pid_t result;
-        do {
-            result = waitpid(-1, NULL, WNOHANG | __WALL);
-        } while (result < 0 && errno == EINTR);
-        if (result < 0 && errno == ECHILD) {
-            completion_finish(completion);
-            static const char unavailable[] = "NDTREE1 unavailable\n";
-            (void)write_frame(status_fd, unavailable, sizeof(unavailable) - 1);
-        }
+    if (childless && sigaction(SIGPIPE, &ignore_pipe, NULL) == 0) {
+        static const char unavailable[] = "NDTREE1 unavailable\n";
+        (void)write_frame(status_fd, unavailable, sizeof(unavailable) - 1);
     }
     completion_close(completion);
     close(control_fd);
@@ -248,6 +255,7 @@ int nd_process_tree_run(int control_fd, int status_fd, int completion_fd, const 
     }
     if (!protocol_pipes(control_fd, status_fd, &completion)) {
         fprintf(stderr, "nd-run: tree supervision requires private protocol descriptors\n");
+        (void)completion_finish_if_childless(&completion);
         completion_close(&completion);
         return 126;
     }

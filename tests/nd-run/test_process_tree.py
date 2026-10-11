@@ -59,7 +59,8 @@ class TreeTests(unittest.TestCase):
             command = [str(PROBE), "ignored-launcher", *command]
         alias_target = record_fd if alias == "completion" else control_read if alias == "control" else status_write
         extra_fd = os.dup(alias_target) if alias else None
-        inherited = (control_read, status_write) + ((record_fd,) if record_fd is not None else ()) + ((extra_fd,) if alias else ())
+        inherited = ((control_read, status_write) + ((record_fd,) if record_fd is not None else ())
+                     + ((extra_fd,) if alias else ()))
         process = subprocess.Popen(command, pass_fds=inherited,
                                    stdin=subprocess.DEVNULL, stdout=subprocess.PIPE,
                                    stderr=subprocess.PIPE)
@@ -157,13 +158,13 @@ class TreeTests(unittest.TestCase):
         self.assert_receipt(record)
 
     def test_receipt_on_failed_command_and_setup_refusal(self):
-        for helper, args in ((HELPER, ["/bin/sh", "-c", "exit 23"]),
-                             (BUILD / "fork-failed", [PROBE, "detached"])):
+        for helper, args, expected in ((HELPER, ["/bin/sh", "-c", "exit 23"], 23),
+                                       (BUILD / "fork-failed", [PROBE, "detached"], 126)):
             with self.subTest(helper=helper):
                 record = self.new_completion()
                 process, _, _ = self.start(args, helper=helper, completion=record)
                 process.wait(timeout=10)
-                self.assertIn(process.returncode, (23, 126))
+                self.assertEqual(process.returncode, expected)
                 self.assert_receipt(record)
 
     def test_completion_handles_are_not_inherited(self):
@@ -173,7 +174,7 @@ class TreeTests(unittest.TestCase):
         self.assert_receipt(record)
 
     def test_invalid_completion_refuses_execution(self):
-        for kind in ("mismatch", "partial", "alias", "symlink", "fifo", "reused"):
+        for kind in ("mismatch", "partial", "symlink", "fifo", "reused"):
             with self.subTest(kind=kind):
                 record = self.new_completion()
                 directory, token = record
@@ -191,14 +192,25 @@ class TreeTests(unittest.TestCase):
                     first, _, _ = self.start(["/bin/true"], completion=record)
                     first.wait(timeout=10)
                     self.assert_receipt(record)
-                process, _, status = self.start([PROBE, "detached"], completion=record,
-                                               alias="completion" if kind == "alias" else None)
+                process, _, status = self.start([PROBE, "detached"], completion=record)
                 process.wait(timeout=10)
                 self.assertEqual(process.returncode, 126)
                 self.assertEqual(process.stdout.read(), b"")
                 self.assertEqual(os.read(status, 256), b"")
                 if kind != "reused":
                     self.assertFalse((directory / "complete").exists())
+
+    def test_receipt_on_protocol_refusal(self):
+        for alias in ("control", "status", "completion"):
+            with self.subTest(alias=alias):
+                record = self.new_completion()
+                process, _, status = self.start([PROBE, "detached"], completion=record, alias=alias)
+                process.wait(timeout=10)
+                self.assertEqual(process.returncode, 126)
+                self.assertEqual(process.stdout.read(), b"")
+                self.assertEqual(os.read(status, 256), b"")
+                self.assertIn(b"private protocol descriptors", process.stderr.read())
+                self.assert_receipt(record)
 
     def test_receipt_failure_does_not_change_live_drainage_proof(self):
         record = self.new_completion()
@@ -316,12 +328,17 @@ class TreeTests(unittest.TestCase):
         expected = f"-1 {account.pw_uid} {account.pw_uid} {account.pw_uid} 1\n".encode()
         self.assertEqual(process.stdout.read(), expected)
 
-    def test_unavailable_without_echild_has_no_frame(self):
-        process, _, status = self.start([PROBE, "detached"], helper=BUILD / "wait-not-empty")
-        process.wait(timeout=10)
-        self.assertEqual(process.returncode, 126)
-        self.assertEqual(process.stdout.read(), b"")
-        self.assertEqual(os.read(status, 256), b"")
+    def test_unavailable_without_echild_has_no_frame_or_receipt(self):
+        for alias in (None, "control"):
+            with self.subTest(alias=alias):
+                record = self.new_completion()
+                process, _, status = self.start([PROBE, "detached"], helper=BUILD / "wait-not-empty",
+                                                completion=record, alias=alias)
+                process.wait(timeout=10)
+                self.assertEqual(process.returncode, 126)
+                self.assertEqual(process.stdout.read(), b"")
+                self.assertEqual(os.read(status, 256), b"")
+                self.assertFalse((record[0] / "complete").exists())
 
     def test_unavailable_lost_reader_does_not_die_of_sigpipe(self):
         process, _, status = self.start([PROBE, "detached"], helper=BUILD / "no-children")
