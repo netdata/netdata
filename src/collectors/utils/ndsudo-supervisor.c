@@ -104,7 +104,8 @@ static void child_fail(int fd) {
 }
 
 int ndsudo_supervise_tegrastats(int argc) {
-    if (!supervisor_protocol_pipes(CONTROL_FD, STATUS_FD)) {
+    const int protocol_fds[] = {CONTROL_FD, STATUS_FD};
+    if (!supervisor_protocol_pipes(protocol_fds, 2)) {
         fprintf(stderr, "ndsudo: tegrastats requires private control/status pipes on fd 3/4\n");
         return 126;
     }

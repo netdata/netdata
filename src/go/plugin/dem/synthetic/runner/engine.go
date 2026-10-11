@@ -59,7 +59,7 @@ func New(config Config, history historyWriter, artifacts ArtifactStore) *Engine 
 		fatal:     make(chan error, 1),
 		poisoned:  make(chan struct{}),
 		platform:  runtimeAllowed,
-		start: func(ctx context.Context, opts ndexec.ProcessOptions, bin string, args ...string) (treeProcess, error) {
+		start: func(ctx context.Context, opts ndexec.TreeOptions, bin string, args ...string) (treeProcess, error) {
 			return ndexec.StartUnprivilegedProcessTree(ctx, opts, bin, args...)
 		},
 	}

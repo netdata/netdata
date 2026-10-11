@@ -310,7 +310,7 @@ For Linux commands that may create detached groups, use `StartUnprivilegedProces
 opt-in per-run `nd-run` subreaper which stays alive independently of the command, terminates remaining children
 when the command exits or cancellation is requested, and reaps adopted descendants. Before launch the supervisor
 sets and verifies inherited `no_new_privs`, so setuid/setgid exec and file capabilities cannot regain privileges
-that prevent it from signaling the payload. Failure refuses launch. `Wait` returns a `TreeResult`:
+that prevent it from signaling the payload. Failure refuses launch. `StartUnprivilegedProcessTree` takes `TreeOptions` (stdio plus optional `Completion`). `Wait` returns a `TreeResult`:
 `Err` includes command, cancellation, setup, supervisor and completion-protocol failures; it is not exclusively the
 payload result. `Drained` records verified descendant cleanup independently of `Err`. A failed
 command can still be drained. Command stdout/stderr never supplies completion evidence; a private descriptor carries
@@ -334,6 +334,17 @@ A verified setup refusal before payload launch returns `ErrTreeSupervisionUnavai
 Unverifiable setup or an incompatible/older helper returns `ErrTreeNotDrained`; no payload completion is assumed.
 Unsupported platforms return `ErrTreeSupervisionUnsupported`, and a missing helper fails at Start. There is no
 signal-only fallback. The target uses the existing minimal environment and privilege reduction policy.
+
+For restart-persistent resource ownership, Linux callers can use `CreateTreeCompletion(path)` to create a fresh,
+durable private directory and unique invocation ID. Persist the resource-to-`ID()` binding before passing it in
+`TreeOptions.Completion`. Close the caller's handle after Start; the supervisor holds its own descriptor. The helper
+publishes matching completion only after ECHILD, before writing the status pipe, and prevents invocation reuse.
+`ReadTreeCompletion(path, id)` returns true only for matching proof after the helper has finished record I/O. False
+means pending/publishing; any error means uncertainty. None permits releasing ownership. A true result permits
+resource/record retirement under the caller's own coordination. The helper must live outside the retained resource.
+The record is not a command result, lease expiry or hostile-same-account security boundary. Partial creation errors
+leave files for the caller to account/clean, with no execution started. Never retry an invocation with the same record.
+The C protocol and lost-proof limitations are documented in `src/collectors/utils/README.md`.
 
 For the explicitly supervised privileged allowlist (currently only `tegrastats`), create an immutable
 `ndexec.NewAcquisition(collectorNamespace, normalizedJobName)` once per job. An empty name has a distinct anonymous

@@ -8,6 +8,8 @@ process-group signals are used. Capability fixtures wrap only procfs reads.
 
 import ctypes
 import errno
+import fcntl
+import secrets
 import os
 from pathlib import Path
 import pwd
@@ -34,7 +36,7 @@ def compile_binary(output, sources, *flags, config=None):
 
 
 class TreeTests(unittest.TestCase):
-    def start(self, args, *, launcher=False, helper=None, alias=None, path_only=None):
+    def start(self, args, *, launcher=False, helper=None, alias=None, completion=None, path_only=None):
         control_read, control_write = os.pipe()
         status_read, status_write = os.pipe()
         os.set_blocking(status_read, False)
@@ -46,17 +48,25 @@ class TreeTests(unittest.TestCase):
                 control_read = path_fd
             else:
                 status_write = path_fd
-        command = [str(helper or HELPER), "--supervise-tree", str(control_read),
-                   str(status_write), "--", *map(str, args)]
+        command = [str(helper or HELPER), "--supervise-tree", str(control_read), str(status_write)]
+        record_fd = None
+        if completion:
+            directory, token = completion
+            record_fd = os.open(directory, os.O_RDONLY | os.O_DIRECTORY)
+            command += ["--completion", str(record_fd), token]
+        command += ["--", *map(str, args)]
         if launcher:
             command = [str(PROBE), "ignored-launcher", *command]
-        extra_fd = os.dup(control_read if alias == "control" else status_write) if alias else None
-        inherited = (control_read, status_write) + ((extra_fd,) if alias else ())
+        alias_target = record_fd if alias == "completion" else control_read if alias == "control" else status_write
+        extra_fd = os.dup(alias_target) if alias else None
+        inherited = (control_read, status_write) + ((record_fd,) if record_fd is not None else ()) + ((extra_fd,) if alias else ())
         process = subprocess.Popen(command, pass_fds=inherited,
                                    stdin=subprocess.DEVNULL, stdout=subprocess.PIPE,
                                    stderr=subprocess.PIPE)
         os.close(control_read)
         os.close(status_write)
+        if record_fd is not None:
+            os.close(record_fd)
         if extra_fd is not None:
             os.close(extra_fd)
         self.addCleanup(process.stdout.close)
@@ -108,6 +118,101 @@ class TreeTests(unittest.TestCase):
         for pid in pids:
             with self.assertRaises(ProcessLookupError):
                 os.kill(pid, 0)
+
+    def new_completion(self):
+        directory = Path(tempfile.mkdtemp(prefix="completion-", dir=BUILD))
+        token = secrets.token_hex(32)
+        for name, data in (("pending", f"NDTREE1 pending {token}\n".encode()), ("publication.lock", b"")):
+            fd = os.open(directory / name, os.O_CREAT | os.O_EXCL | os.O_WRONLY, 0o600)
+            try:
+                os.write(fd, data)
+                os.fsync(fd)
+            finally:
+                os.close(fd)
+        fd = os.open(directory, os.O_RDONLY | os.O_DIRECTORY)
+        os.fsync(fd)
+        os.close(fd)
+        return directory, token
+
+    def assert_receipt(self, record):
+        directory, token = record
+        self.assertEqual((directory / "complete").read_bytes(), f"NDTREE1 drained {token}\n".encode())
+        with open(directory / "publication.lock", "r+b") as lock:
+            fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        self.assertFalse((directory / "complete.pending").exists())
+
+    def test_receipt_after_draining_with_lost_parent_channels(self):
+        record = self.new_completion()
+        process, control, status = self.start([PROBE, "doublefork"], completion=record)
+        pids = self.ready(process)
+        self.assertFalse((record[0] / "complete").exists())
+        with open(record[0] / "publication.lock", "r+b") as lock:
+            with self.assertRaises(BlockingIOError):
+                fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        # Model plugin loss: both private parent ends vanish before helper exit.
+        os.close(status)
+        os.close(control)
+        process.wait(timeout=10)
+        self.assert_gone(pids)
+        self.assert_receipt(record)
+
+    def test_receipt_on_failed_command_and_setup_refusal(self):
+        for helper, args in ((HELPER, ["/bin/sh", "-c", "exit 23"]),
+                             (BUILD / "fork-failed", [PROBE, "detached"])):
+            with self.subTest(helper=helper):
+                record = self.new_completion()
+                process, _, _ = self.start(args, helper=helper, completion=record)
+                process.wait(timeout=10)
+                self.assertIn(process.returncode, (23, 126))
+                self.assert_receipt(record)
+
+    def test_completion_handles_are_not_inherited(self):
+        record = self.new_completion()
+        process, _, status = self.start([PROBE, "fds"], completion=record)
+        self.complete(process, status, 0)
+        self.assert_receipt(record)
+
+    def test_invalid_completion_refuses_execution(self):
+        for kind in ("mismatch", "partial", "alias", "symlink", "fifo", "reused"):
+            with self.subTest(kind=kind):
+                record = self.new_completion()
+                directory, token = record
+                if kind == "mismatch":
+                    record = directory, "f" * 64
+                elif kind == "partial":
+                    (directory / "pending").write_text("NDTREE1 pending ")
+                elif kind == "symlink":
+                    (directory / "pending").rename(directory / "other")
+                    (directory / "pending").symlink_to("other")
+                elif kind == "fifo":
+                    (directory / "pending").rename(directory / "other")
+                    os.mkfifo(directory / "pending", 0o600)
+                elif kind == "reused":
+                    first, _, _ = self.start(["/bin/true"], completion=record)
+                    first.wait(timeout=10)
+                    self.assert_receipt(record)
+                process, _, status = self.start([PROBE, "detached"], completion=record,
+                                               alias="completion" if kind == "alias" else None)
+                process.wait(timeout=10)
+                self.assertEqual(process.returncode, 126)
+                self.assertEqual(process.stdout.read(), b"")
+                self.assertEqual(os.read(status, 256), b"")
+                if kind != "reused":
+                    self.assertFalse((directory / "complete").exists())
+
+    def test_receipt_failure_does_not_change_live_drainage_proof(self):
+        record = self.new_completion()
+        process, control, status = self.start([PROBE, "detached"], completion=record)
+        pids = self.ready(process)
+        # Force publication failure after successful setup without disk-wide faults.
+        (record[0] / "complete.pending").mkdir()
+        os.close(control)
+        process.wait(timeout=10)
+        self.assertEqual(os.read(status, 256), f"NDTREE1 {signal.SIGKILL}\n".encode())
+        self.assertEqual(process.returncode, 128 + signal.SIGKILL)
+        self.assertIn(b"cannot persist tree completion", process.stderr.read())
+        self.assert_gone(pids)
+        self.assertFalse((record[0] / "complete").exists())
 
     def test_exit_drains_detached_doublefork_and_clone_children(self):
         for mode in ("detached", "doublefork", "clone", "clone-parent"):
@@ -161,7 +266,7 @@ class TreeTests(unittest.TestCase):
                 self.assertEqual(process.returncode, 126)
                 self.assertEqual(process.stdout.read(), b"")
                 self.assertEqual(os.read(status, 256), b"")
-                self.assertIn(b"distinct private protocol pipes", process.stderr.read())
+                self.assertIn(b"private protocol descriptors", process.stderr.read())
 
     def test_path_only_pipes_are_rejected_before_launch(self):
         for endpoint in ("control", "status"):
@@ -171,7 +276,7 @@ class TreeTests(unittest.TestCase):
                 self.assertEqual(process.returncode, 126)
                 self.assertEqual(process.stdout.read(), b"")
                 self.assertEqual(os.read(status, 256), b"")
-                self.assertIn(b"distinct private protocol pipes", process.stderr.read())
+                self.assertIn(b"private protocol descriptors", process.stderr.read())
 
     def test_exec_failure_has_verified_empty_tree(self):
         process, _, status = self.start([BUILD / "missing-executable"])
@@ -230,12 +335,19 @@ class TreeTests(unittest.TestCase):
         # can safely adopt, kill and reap its own recorded descendants afterwards.
         libc = ctypes.CDLL(None, use_errno=True)
         self.assertEqual(libc.prctl(36, 1, 0, 0, 0), 0)  # PR_SET_CHILD_SUBREAPER
-        process, _, status = self.start([PROBE, "detached"])
+        record = self.new_completion()
+        process, _, status = self.start([PROBE, "detached"], completion=record)
         pids = self.ready(process)
         process.kill()
         process.wait(timeout=10)
         try:
             self.assertEqual(os.read(status, 256), b"")
+            self.assertFalse((record[0] / "complete").exists())
+            # Reusing an uncertain invocation must not certify its old children.
+            reused, _, _ = self.start(["/bin/true"], completion=record)
+            reused.wait(timeout=10)
+            self.assertEqual(reused.returncode, 126)
+            self.assertFalse((record[0] / "complete").exists())
         finally:
             # Kill/reap leader first; after its join the descendant is our child.
             # Each identity stays unreaped until its final signal, preventing reuse.

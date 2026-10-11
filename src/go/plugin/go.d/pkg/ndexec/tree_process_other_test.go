@@ -12,7 +12,7 @@ import (
 )
 
 func TestProcessTreeUnsupportedHasNoFallback(t *testing.T) {
-	process, err := StartUnprivilegedProcessTree(context.Background(), ProcessOptions{}, "unused")
+	process, err := StartUnprivilegedProcessTree(context.Background(), TreeOptions{}, "unused")
 	assert.Nil(t, process)
 	assert.ErrorIs(t, err, ErrTreeSupervisionUnsupported)
 }

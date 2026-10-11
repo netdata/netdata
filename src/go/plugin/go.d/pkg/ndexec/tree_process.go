@@ -20,6 +20,27 @@ var (
 	ErrTreeNotDrained             = errors.New("process tree cleanup was not verified")
 )
 
+// TreeOptions supplies owned child stdio and optional persistent drainage proof.
+// The caller keeps ownership of all files and may close them after Start returns.
+// Nil stdio uses the null device; Completion is never inherited by the payload.
+type TreeOptions struct {
+	Stdin      *os.File
+	Stdout     *os.File
+	Stderr     *os.File
+	Completion *TreeCompletion
+}
+
+// TreeCompletion binds one invocation to a fresh private record directory.
+// The resource owner must persist its binding to this ID before starting work.
+// Never reuse an invocation, including after a failed or interrupted launch.
+type TreeCompletion struct {
+	directory *os.File
+	id        string
+}
+
+func (c *TreeCompletion) ID() string   { return c.id }
+func (c *TreeCompletion) Close() error { return c.directory.Close() }
+
 // TreeResult records command, cancellation, setup and supervisor/protocol errors
 // independently of verified descendant cleanup. A failed or canceled command can
 // be Drained. A false Drained requires the caller to retain

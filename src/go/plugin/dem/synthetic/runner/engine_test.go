@@ -70,7 +70,7 @@ type payload func(context.Context, []string, []byte, *os.File, *os.File) ndexec.
 
 func starter(t *testing.T, body payload) startFunc {
 	t.Helper()
-	return func(ctx context.Context, opts ndexec.ProcessOptions, _ string, args ...string) (treeProcess, error) {
+	return func(ctx context.Context, opts ndexec.TreeOptions, _ string, args ...string) (treeProcess, error) {
 		dup := func(file *os.File) *os.File {
 			fd, err := unix.Dup(int(file.Fd()))
 			require.NoError(t, err)
@@ -395,7 +395,7 @@ func TestQueuedCancellationNeverStartsAChild(t *testing.T) {
 func TestUnverifiedDrainPoisonsBeforeReaderJoin(t *testing.T) {
 	e, _, a := testEngine(t)
 	held := make(chan struct{})
-	e.start = func(_ context.Context, opts ndexec.ProcessOptions, _ string, _ ...string) (treeProcess, error) {
+	e.start = func(_ context.Context, opts ndexec.TreeOptions, _ string, _ ...string) (treeProcess, error) {
 		outFD, err := unix.Dup(int(opts.Stdout.Fd()))
 		require.NoError(t, err)
 		out := os.NewFile(uintptr(outFD), "unknown-test-survivor")
@@ -494,7 +494,7 @@ func TestHistoryUncertaintyIsNotReplayed(t *testing.T) {
 }
 func TestOversizeRequestNeverStartsWorkflow(t *testing.T) {
 	e, _, a := testEngine(t)
-	e.start = func(context.Context, ndexec.ProcessOptions, string, ...string) (treeProcess, error) {
+	e.start = func(context.Context, ndexec.TreeOptions, string, ...string) (treeProcess, error) {
 		t.Error("oversize request started a child")
 		return nil, errors.New("unexpected start")
 	}
@@ -682,7 +682,7 @@ func TestLighthouseTargetRedactionBeforeHistory(t *testing.T) {
 
 func TestWhitespaceScriptRejectedBeforeExecution(t *testing.T) {
 	e, _, _ := testEngine(t)
-	e.start = func(context.Context, ndexec.ProcessOptions, string, ...string) (treeProcess, error) {
+	e.start = func(context.Context, ndexec.TreeOptions, string, ...string) (treeProcess, error) {
 		t.Error("invalid script started a child")
 		return nil, errors.New("unexpected process start")
 	}
