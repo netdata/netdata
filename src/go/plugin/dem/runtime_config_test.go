@@ -85,23 +85,73 @@ func TestRuntimeConfigRejectsRemovedComponentsAndUnknownSettings(t *testing.T) {
 
 func TestRuntimeConfigErrorsReferToOriginalInput(t *testing.T) {
 	for name, tc := range map[string]struct {
-		body, want string
-		synthetic  bool
+		body, line, detail string
 	}{
-		"unknown":   {"allow_downlaod: false", `runtime: unknown setting "allow_downlaod"`, true},
-		"duplicate": {"allow_download: true\n  allow_download: false", `runtime: duplicate setting "allow_download"`, true},
-		"type":      {"allow_download: [false]", "line 4:", false},
+		"unknown":   {"allow_downlaod: false", "line 4:", "field allow_downlaod not found"},
+		"duplicate": {"allow_download: true\n  allow_download: false", "line 5:", "field allow_download already set"},
+		"type":      {"allow_download: [false]", "line 4:", "cannot unmarshal !!seq into bool"},
 	} {
 		t.Run(name, func(t *testing.T) {
 			dir := t.TempDir()
 			body := "enabled: true\n# original configuration\nruntime:\n  " + tc.body + "\n"
 			require.NoError(t, os.WriteFile(filepath.Join(dir, "dem.conf"), []byte(body), 0600))
 			_, err := LoadConfig(multipath.New(dir))
-			require.ErrorContains(t, err, tc.want)
+			require.ErrorContains(t, err, tc.line)
+			require.ErrorContains(t, err, tc.detail)
 			require.NotContains(t, err.Error(), "dem.plain")
-			if tc.synthetic {
-				require.NotContains(t, err.Error(), "line ")
-			}
+		})
+	}
+}
+
+func TestRuntimeConfigMergeValidation(t *testing.T) {
+	for name, body := range map[string]string{
+		"merged unknown":   "runtime:\n  <<: {node_path: /tmp/node}\n",
+		"merged duplicate": "runtime:\n  <<: {allow_download: false, allow_download: true}\n",
+		"alias unknown":    "base: &base {allow_downlaod: false}\nruntime: {<<: *base}\n",
+		"alias duplicate":  "base: &base {mode: managed, mode: preloaded}\nruntime: {<<: *base}\n",
+		"top duplicate":    "enabled: true\nenabled: false\nruntime: {allow_download: false}\n",
+	} {
+		t.Run(name, func(t *testing.T) {
+			dir := t.TempDir()
+			require.NoError(t, os.WriteFile(filepath.Join(dir, "dem.conf"), []byte(body), 0600))
+			_, err := LoadConfig(multipath.New(dir))
+			require.Error(t, err)
+		})
+	}
+}
+
+func TestRuntimeConfigLegitimateMergesPreserveDefaults(t *testing.T) {
+	for name, body := range map[string]string{
+		"override":  "runtime: {<<: {allow_download: true}, allow_download: false}\n",
+		"sequence":  "runtime: {<<: [{allow_download: false}, {allow_download: true}]}\n",
+		"alias":     "base: &base {allow_download: false}\nruntime: {<<: *base}\n",
+		"top merge": "base: &base {runtime: {allow_download: false}}\n<<: *base\n",
+	} {
+		t.Run(name, func(t *testing.T) {
+			dir := t.TempDir()
+			require.NoError(t, os.WriteFile(filepath.Join(dir, "dem.conf"), []byte(body), 0600))
+			cfg, err := LoadConfig(multipath.New(dir))
+			require.NoError(t, err)
+			expected := DefaultRuntimeConfig()
+			expected.AllowDownload = false
+			require.Equal(t, expected, cfg.Runtime)
+		})
+	}
+}
+
+func TestRuntimeConfigMergeErrorsUseOriginalSourceLines(t *testing.T) {
+	for name, tc := range map[string]struct{ source, line, detail string }{
+		"unknown":   {"defaults: &defaults\n  node_path: /tmp/node\n\nruntime: {<<: *defaults}\n", "line 2:", "node_path"},
+		"duplicate": {"defaults: &defaults\n  allow_download: true\n  allow_download: false\n\nruntime: {<<: *defaults}\n", "line 3:", "allow_download"},
+		"type":      {"defaults: &defaults\n  allow_download: [false]\n\nruntime: {<<: *defaults}\n", "line 2:", "bool"},
+	} {
+		t.Run(name, func(t *testing.T) {
+			dir := t.TempDir()
+			require.NoError(t, os.WriteFile(filepath.Join(dir, "dem.conf"), []byte(tc.source), 0600))
+			_, err := LoadConfig(multipath.New(dir))
+			require.ErrorContains(t, err, tc.line)
+			require.ErrorContains(t, err, tc.detail)
+			require.NotContains(t, err.Error(), "dem.plain")
 		})
 	}
 }

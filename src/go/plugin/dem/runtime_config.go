@@ -6,11 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"path/filepath"
-	"reflect"
-	"strings"
 	"time"
-
-	"gopkg.in/yaml.v2"
 
 	runtime "github.com/netdata/netdata/go/plugins/plugin/dem/synthetic/runtime"
 )
@@ -70,41 +66,4 @@ func (c RuntimeConfig) StoreConfig(varLibPath string) (runtime.Config, error) {
 	return runtime.Config{Path: path, MaxBytes: c.MaxBytes,
 		PreviousRetention: time.Duration(c.PreviousRetentionDays) * 24 * time.Hour,
 		IdleRetention:     time.Duration(c.IdleRetentionDays) * 24 * time.Hour}, nil
-}
-
-// UnmarshalYAML rejects unsupported runtime settings while leaving framework
-// settings in dem.conf to their existing owner. Preserve defaults on partial input.
-func (c *RuntimeConfig) UnmarshalYAML(unmarshal func(any) error) error {
-	type plain RuntimeConfig
-	value := plain(*c)
-	// Decode types against the original input so semantic errors retain real lines.
-	if err := unmarshal(&value); err != nil {
-		return err
-	}
-	var fields yaml.MapSlice
-	if err := unmarshal(&fields); err != nil {
-		return err
-	}
-	known := make(map[string]bool)
-	typ := reflect.TypeOf(value)
-	for i := 0; i < typ.NumField(); i++ {
-		name, _, _ := strings.Cut(typ.Field(i).Tag.Get("yaml"), ",")
-		known[name] = true
-	}
-	seen := make(map[string]bool)
-	for _, field := range fields {
-		name, ok := field.Key.(string)
-		if !ok {
-			return errors.New("runtime: setting names must be strings")
-		}
-		if !known[name] {
-			return fmt.Errorf("runtime: unknown setting %q", name)
-		}
-		if seen[name] {
-			return fmt.Errorf("runtime: duplicate setting %q", name)
-		}
-		seen[name] = true
-	}
-	*c = RuntimeConfig(value)
-	return nil
 }

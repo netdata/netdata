@@ -34,6 +34,11 @@ func DefaultConfig() Config {
 	}
 }
 
+// Runtime validation must not decode settings owned by other configuration readers.
+type opaqueConfigValue struct{}
+
+func (*opaqueConfigValue) UnmarshalYAML(func(any) error) error { return nil }
+
 // LoadConfig reads the same highest-priority dem.conf as the Agent. Framework
 // fields are decoded by the Agent; this owner decodes process runtime and retention policy.
 func LoadConfig(paths multipath.MultiPath) (Config, error) {
@@ -49,9 +54,19 @@ func LoadConfig(paths multipath.MultiPath) (Config, error) {
 	if err != nil {
 		return cfg, err
 	}
+	// Decode the original document strictly for runtime settings, including merges
+	// and aliases, while leaving other sections opaque to this schema.
+	runtimeInput := struct {
+		Runtime RuntimeConfig                `yaml:"runtime"`
+		Other   map[string]opaqueConfigValue `yaml:",inline"`
+	}{Runtime: cfg.Runtime}
+	if err = yaml.UnmarshalStrict(data, &runtimeInput); err != nil {
+		return cfg, fmt.Errorf("read dem.conf runtime settings: %w", err)
+	}
 	if err = yaml.Unmarshal(data, &cfg); err != nil {
 		return cfg, fmt.Errorf("read dem.conf: %w", err)
 	}
+	cfg.Runtime = runtimeInput.Runtime
 	if err = cfg.History.validate(journal.MinHistoryBytes); err != nil {
 		return cfg, fmt.Errorf("history.%w", err)
 	}
