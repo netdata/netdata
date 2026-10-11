@@ -19,6 +19,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/netdata/netdata/go/plugins/logger"
 	runtime "github.com/netdata/netdata/go/plugins/plugin/dem/synthetic/runtime"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/collectorapi"
 	"github.com/stretchr/testify/require"
@@ -115,6 +116,10 @@ func TestIntentAbortAndCommitUseRealStore(t *testing.T) {
 	enabled := enable(t, h, 0, 1)
 	enabled.Commit()
 	waitReady(t, h)
+	require.Eventually(t, func() bool {
+		status, err := s.Inspect()
+		return err == nil && status.DemandGenerations == 1 && status.PendingClaims == 0
+	}, time.Second, 5*time.Millisecond)
 	status, err = s.Inspect()
 	require.NoError(t, err)
 	require.Equal(t, 1, status.DemandGenerations)
@@ -274,12 +279,15 @@ func TestAcceptedCommitFailureRetainsIntentUntilStorageRecovers(t *testing.T) {
 	require.NoError(t, os.Rename(owner, owner+".saved"))
 	require.NoError(t, os.Mkdir(owner, 0700))
 	candidate.Commit()
-	require.Eventually(t, func() bool { return h.Status().State == StateUnavailable }, time.Second, 5*time.Millisecond)
+	require.Eventually(t, func() bool { return h.Status().MaintenanceError != "" }, time.Second, 5*time.Millisecond)
 	require.Equal(t, 1, h.Status().Enabled)
-	require.Error(t, h.Ready())
+	require.NoError(t, h.Ready())
+	use, err := h.BeginUse()
+	require.NoError(t, err)
+	require.NoError(t, use.Finish(true))
 	require.NoError(t, os.Rename(owner, owner+".failed"))
 	require.NoError(t, os.Rename(owner+".saved", owner))
-	waitReady(t, h)
+	require.Eventually(t, func() bool { return h.Status().MaintenanceError == "" }, time.Second, 5*time.Millisecond)
 	status, err := s.Inspect()
 	require.NoError(t, err)
 	require.Equal(t, 1, status.DemandGenerations)
@@ -299,4 +307,66 @@ func TestMaintenanceRetiresIdleRuntimeWithoutJobs(t *testing.T) {
 	require.Eventually(t, func() bool { return errors.Is(s.Available(m), runtime.ErrUnavailable) }, 3*time.Second, 5*time.Millisecond)
 	require.Eventually(t, func() bool { return h.Status().State == StateMissing }, time.Second, 5*time.Millisecond)
 	require.Zero(t, h.Status().Enabled)
+}
+
+func TestSecondEnabledIntentDoesNotInterruptPreparedRuntime(t *testing.T) {
+	h, s, m, data := testHost(t, Config{})
+	importBundle(t, s, m, data)
+	enable(t, h, 0, 1).Commit()
+	ready, release := make(chan struct{}), make(chan struct{})
+	var called atomic.Bool
+	h.SubscribeDependencies(func(string, string) {
+		if h.Ready() == nil && called.CompareAndSwap(false, true) {
+			close(ready)
+			<-release
+		}
+	})
+	startHost(t, h)
+	defer close(release)
+	select {
+	case <-ready:
+	case <-time.After(time.Second):
+		t.Fatal("runtime did not become ready")
+	}
+	// The worker is blocked after verified readiness, so B's asynchronous claim
+	// conversion cannot hide an immediate execution interruption for A.
+	enable(t, h, 0, 2).Commit()
+	use, err := h.BeginUse()
+	require.NoError(t, err)
+	require.NoError(t, use.Finish(true))
+}
+
+func TestExecutionFinishErrorIsMaintenanceNotReadiness(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "store")
+	store, err := runtime.Open(runtime.DefaultConfig(path))
+	require.NoError(t, err)
+	h, s, m, data := testHost(t, Config{Store: store})
+	var logs healthLog
+	h.log = logger.NewWithWriter(&logs)
+	importBundle(t, s, m, data)
+	startHost(t, h)
+	waitReady(t, h)
+	use, err := h.BeginUse()
+	require.NoError(t, err)
+	trash := filepath.Join(path, "trash")
+	require.NoError(t, os.Rename(trash, trash+".saved"))
+	require.NoError(t, os.WriteFile(trash, []byte("blocked"), 0600))
+	finishErr := use.Finish(true)
+	require.NoError(t, os.Rename(trash, trash+".failed"))
+	require.NoError(t, os.Rename(trash+".saved", trash))
+	require.Error(t, finishErr)
+	require.NotEmpty(t, h.Status().MaintenanceError)
+	require.Contains(t, logs.String(), "execution completion failed")
+	require.NoError(t, h.Ready())
+	// A healthy invocation must not hide the earlier unresolved retirement.
+	other, err := h.BeginUse()
+	require.NoError(t, err)
+	require.NoError(t, other.Finish(true))
+	require.NotEmpty(t, h.Status().MaintenanceError)
+	h.sweep()
+	require.Empty(t, h.Status().MaintenanceError)
+	require.Contains(t, logs.String(), "execution completion recovered")
+	status, err := s.Inspect()
+	require.NoError(t, err)
+	require.Zero(t, status.ExecutionPins)
 }

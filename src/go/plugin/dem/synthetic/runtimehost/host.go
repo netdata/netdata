@@ -9,6 +9,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/netdata/netdata/go/plugins/logger"
 	"github.com/netdata/netdata/go/plugins/plugin/dem/synthetic/runner"
 	runtime "github.com/netdata/netdata/go/plugins/plugin/dem/synthetic/runtime"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/collectorapi"
@@ -64,7 +65,11 @@ type Host struct {
 	nextSubscriber                             uint64
 	state                                      string
 	setupErr                                   error
-	maintenanceErr                             error
+	maintenance                                map[string]error
+	finishVersion                              uint64
+	reportedSetup                              string
+	stopping                                   bool
+	log                                        *logger.Logger
 	started, closed                            bool
 	cancel                                     context.CancelFunc
 	done                                       chan struct{}
@@ -80,6 +85,7 @@ func New(config Config) *Host {
 		store: config.Store, unavailable: config.Unavailable, allowDownload: config.AllowDownload,
 		accepted: make(map[collectorapi.JobConfigIdentity][]*demand), reservations: make(map[*transition]*runtime.Claim),
 		retired: make(map[*runtime.Claim]struct{}), subscribers: make(map[uint64]func(string, string)),
+		maintenance: make(map[string]error), log: logger.New(),
 		state: StateMissing, done: make(chan struct{}), wake: make(chan struct{}, 1),
 		pollInterval: 5 * time.Second, retryInterval: time.Minute, sweepInterval: time.Hour,
 	}
@@ -140,15 +146,6 @@ func (h *Host) SubscribeDependencies(notify func(kind, name string)) func() {
 
 func (h *Host) setState(state string, err error) {
 	h.mu.Lock()
-	if state == StateReady {
-		for _, entries := range h.accepted {
-			for _, entry := range entries {
-				if !entry.committed && entry.claim != nil {
-					state = StateMissing
-				}
-			}
-		}
-	}
 	changed := h.state != state || errorText(h.setupErr) != errorText(err)
 	h.state, h.setupErr = state, err
 	var callbacks []func(string, string)
@@ -157,7 +154,16 @@ func (h *Host) setState(state string, err error) {
 			callbacks = append(callbacks, callback)
 		}
 	}
+	setupMessage := ""
+	if len(h.accepted) > 0 && !h.closed && !h.stopping {
+		setupMessage = errorText(err)
+	}
+	logSetup := setupMessage != "" && setupMessage != h.reportedSetup
+	h.reportedSetup = setupMessage
 	h.mu.Unlock()
+	if logSetup {
+		h.log.Warningf("DEM runtime setup unavailable: %s", setupMessage)
+	}
 	for _, callback := range callbacks {
 		callback(DependencyKind, DependencyName)
 	}
@@ -178,7 +184,7 @@ func (h *Host) signal() {
 
 func (h *Host) Status() Snapshot {
 	h.mu.Lock()
-	result := Snapshot{State: h.state, DownloadAllowed: h.allowDownload, SetupError: errorText(h.setupErr), MaintenanceError: errorText(h.maintenanceErr)}
+	result := Snapshot{State: h.state, DownloadAllowed: h.allowDownload, SetupError: errorText(h.setupErr), MaintenanceError: errorText(h.maintenanceErrorLocked())}
 	if h.manifest != nil {
 		result.Identity = h.manifest.Archive.SHA256
 	}
@@ -204,16 +210,25 @@ func (h *Host) BeginUse() (runner.Use, error) {
 		h.signal()
 		return nil, err
 	}
-	return managedUse{use}, nil
+	return managedUse{use: use, host: h}, nil
 }
 
-type managedUse struct{ use *runtime.Use }
+type managedUse struct {
+	use  *runtime.Use
+	host *Host
+}
 
 func (u managedUse) Paths() runner.Paths {
 	return runner.Paths{Node: u.use.Paths.Node, Dependencies: u.use.Paths.Dependencies, Browser: u.use.Paths.Browser}
 }
 func (u managedUse) Completion() *ndexec.TreeCompletion { return u.use.Completion }
-func (u managedUse) Finish(drained bool) error          { return u.use.Finish(drained) }
+func (u managedUse) Finish(drained bool) error {
+	err := u.use.Finish(drained)
+	if err != nil {
+		u.host.recordFinishError(err)
+	}
+	return err
+}
 
 // Run owns maintenance and one cancellable preparation. It handles operational
 // errors locally and joins the downloader before returning on cancellation.
@@ -240,6 +255,9 @@ func (h *Host) Run(ctx context.Context) {
 			cancelDownload()
 			<-download
 		}
+		h.mu.Lock()
+		h.stopping = true
+		h.mu.Unlock()
 		h.setState(StateUnavailable, errors.New("browser runtime owner stopped"))
 	}()
 	h.sweep()
@@ -261,16 +279,12 @@ func (h *Host) Run(ctx context.Context) {
 		if ctx.Err() != nil {
 			return
 		}
-		enabled, claimErr := h.reconcileClaims()
+		enabled := h.reconcileClaims()
 		if enabled == 0 && cancelDownload != nil {
 			cancelDownload()
 		}
 		if h.unavailable != nil {
 			h.setState(StateUnavailable, h.unavailable)
-			continue
-		}
-		if claimErr != nil {
-			h.setState(StateUnavailable, claimErr)
 			continue
 		}
 		err := h.store.Available(*h.manifest)
@@ -326,13 +340,24 @@ func (h *Host) sweep() {
 	if h.store == nil {
 		return
 	}
-	err := h.store.Sweep()
 	h.mu.Lock()
-	h.maintenanceErr = err
+	version := h.finishVersion
 	h.mu.Unlock()
+	err := h.store.Sweep()
+	h.setMaintenance("cleanup", err)
+	h.mu.Lock()
+	// Sweep retries completed-use retirement. A newer Finish failure must not be
+	// cleared by a sweep that began before that failure was recorded.
+	recovered := err == nil && version == h.finishVersion
+	var change healthChange
+	if recovered {
+		change = h.updateMaintenanceLocked("execution completion", nil)
+	}
+	h.mu.Unlock()
+	h.logHealth(change)
 }
 
-func (h *Host) reconcileClaims() (int, error) {
+func (h *Host) reconcileClaims() int {
 	h.mu.Lock()
 	var entries []*demand
 	for _, active := range h.accepted {
@@ -357,34 +382,35 @@ func (h *Host) reconcileClaims() (int, error) {
 		}
 		h.mu.Unlock()
 	}
+	var releaseErrors []error
 	for _, claim := range retired {
 		if err := claim.Close(); err == nil {
 			h.mu.Lock()
 			delete(h.retired, claim)
 			h.mu.Unlock()
 		} else {
-			h.mu.Lock()
-			h.maintenanceErr = err
-			h.mu.Unlock()
+			releaseErrors = append(releaseErrors, err)
 		}
 	}
+	h.setMaintenance("demand release", stableErrors(releaseErrors))
 	h.mu.Lock()
-	defer h.mu.Unlock()
 	var count int
-	var result error
+	var commitErrors []error
 	for _, active := range h.accepted {
 		for _, entry := range active {
 			count++
 			if !entry.committed {
 				if entry.err != nil {
-					result = errors.Join(result, entry.err)
-				} else if entry.claim != nil {
-					result = errors.Join(result, errors.New("browser runtime demand is awaiting commit"))
+					commitErrors = append(commitErrors, entry.err)
 				}
 			}
 		}
 	}
-	return count, result
+	result := stableErrors(commitErrors)
+	change := h.updateMaintenanceLocked("demand commit", result)
+	h.mu.Unlock()
+	h.logHealth(change)
+	return count
 }
 
 // Close is called after jobs and configuration transitions have joined. It joins

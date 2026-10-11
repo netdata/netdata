@@ -245,13 +245,21 @@ func (u *Use) Finish(drained bool) error {
 	}
 	u.finished = true
 	err := errors.Join(u.Completion.Close(), u.lock.Close())
-	if !drained {
-		return err
+	if drained {
+		err = errors.Join(err, u.store.withLock(func() error {
+			u.store.completedUses[u.name] = true
+			return u.store.removeOwned(u.name)
+		}))
 	}
-	return errors.Join(err, u.store.withLock(func() error {
-		u.store.completedUses[u.name] = true
-		return u.store.removeOwned(u.name)
-	}))
+	if err != nil {
+		// Health is process-local and must remain observable even when acquiring
+		// the filesystem coordination lock itself failed. Sweep retries cleanup.
+		u.store.mu.Lock()
+		u.store.finishError = err
+		u.store.finishErrorVersion++
+		u.store.mu.Unlock()
+	}
+	return err
 }
 
 func (s *Store) removeOwned(name string) error {

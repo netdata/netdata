@@ -57,9 +57,6 @@ func (t *transition) Commit() {
 	}
 	if t.next.Valid() {
 		h.accepted[t.next] = append(h.accepted[t.next], &demand{claim: t.claim, active: true})
-		if h.unavailable == nil {
-			h.state, h.setupErr = StateMissing, nil
-		}
 	}
 	h.mu.Unlock()
 	h.signal()

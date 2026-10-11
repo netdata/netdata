@@ -59,15 +59,17 @@ func DefaultConfig(path string) Config {
 // protect cached generations; owners must execute through BeginUse.
 // The directory must remain on one host and may not be copied or network-shared.
 type Store struct {
-	completedUses map[string]bool
-	config        Config
-	path          string
-	root          *os.Root
-	mu            sync.Mutex
-	lock          *flock.Flock
-	now           func() time.Time
-	boot          bootIdentity
-	cleanupError  error
+	completedUses      map[string]bool
+	config             Config
+	path               string
+	root               *os.Root
+	mu                 sync.Mutex
+	lock               *flock.Flock
+	now                func() time.Time
+	boot               bootIdentity
+	cleanupError       error
+	finishError        error
+	finishErrorVersion uint64
 }
 
 type generation struct {
