@@ -21,7 +21,9 @@ func processDependencySources(services []ProcessService) []DependencySource {
 // Bound at run startup, closed after its jobs and activation attempts have joined.
 // Each run has distinct subscriptions even though the source survives restarts.
 type dependencySubscriptions struct {
-	once        sync.Once
+	mu          sync.Mutex
+	closed      bool
+	done        chan struct{}
 	unsubscribe []func()
 	err         error
 }
@@ -36,8 +38,23 @@ func (s *dependencySubscriptions) bind(sources []DependencySource, notify func(s
 		}
 	}()
 	for _, source := range sources {
+		s.mu.Lock()
+		closed := s.closed
+		s.mu.Unlock()
+		if closed {
+			return errors.New("dependency subscriptions closed")
+		}
 		if unsubscribe := source.SubscribeDependencies(notify); unsubscribe != nil {
-			s.unsubscribe = append(s.unsubscribe, unsubscribe)
+			s.mu.Lock()
+			closed = s.closed
+			if !closed {
+				s.unsubscribe = append(s.unsubscribe, unsubscribe)
+			}
+			s.mu.Unlock()
+			if closed {
+				// Registration may return after the run's finalizer has finished.
+				return errors.Join(errors.New("dependency subscriptions closed"), unsubscribeDependency(unsubscribe))
+			}
 		}
 	}
 	return nil
@@ -46,13 +63,27 @@ func (s *dependencySubscriptions) close() error {
 	if s == nil {
 		return nil
 	}
-	s.once.Do(func() {
-		for _, unsubscribe := range s.unsubscribe {
-			s.err = errors.Join(s.err, unsubscribeDependency(unsubscribe))
-		}
-		s.unsubscribe = nil
-	})
-	return s.err
+	s.mu.Lock()
+	if s.closed {
+		done := s.done
+		s.mu.Unlock()
+		<-done
+		return s.err
+	}
+	s.closed = true
+	s.done = make(chan struct{})
+	unsubscribe := s.unsubscribe
+	s.unsubscribe = nil
+	s.mu.Unlock()
+
+	// Provider code must run outside the subscription owner's lock.
+	var err error
+	for _, fn := range unsubscribe {
+		err = errors.Join(err, unsubscribeDependency(fn))
+	}
+	s.err = err
+	close(s.done)
+	return err
 }
 func unsubscribeDependency(unsubscribe func()) (err error) {
 	defer func() {
