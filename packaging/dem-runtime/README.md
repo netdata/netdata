@@ -1,8 +1,14 @@
 # DEM portable runtime bundle
 
-This release-owned builder produces one private Linux runtime for `amd64` or
-`arm64`. Node, locked production npm dependencies, full Chromium, FFmpeg, the
-private ELF loader/library closure, fonts, and notices travel together. Agent
+This experimental builder prepares one private Linux runtime for `amd64` or
+`arm64`. The current pinned donor is Google Chrome for Testing and includes
+Widevine CDM with a separate-license restriction. Its redistribution has not been
+established. These outputs MUST NOT be published as Netdata runtime releases;
+the browser source and complete inventory need resolution first. The SBOM's
+current `chromium` entry does not yet identify that proprietary component.
+
+Node, locked production npm dependencies, the browser, FFmpeg, the private ELF
+loader/library closure, fonts, and notices travel together. Agent
 runner adapters and `nd-run` remain outside the bundle.
 
 Run from the repository root with Python 3.9 or newer and Docker:
@@ -84,7 +90,10 @@ architecture, file bounds and PHDR coverage by LOAD, then records the actual
 PT_INTERP offset and complete expected bytes as base64. String searching cannot
 select a binding. The build executes Node, Node re-execution, and Chromium after
 binding copies under a prefix containing spaces/quotes and at the exact 4095-byte
-interpreter-path limit. These are executable integrity checks, not sandbox tests.
+interpreter-path limit. This isolates loader capacity; it does not establish a
+4095-byte usable generation prefix. The Go preparer also checks every payload's
+final absolute pathname, including the longer browser and dependency paths.
+These are executable integrity checks, not sandbox tests.
 
 The Agent verifies the archive's installed digest/bounds before extraction and
 replaces only these exact slots with the FINAL immutable generation's loader

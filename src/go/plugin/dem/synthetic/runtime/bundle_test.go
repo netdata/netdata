@@ -177,3 +177,24 @@ func TestBindingRejectsOutOfBoundsAndWrongBytes(t *testing.T) {
 		})
 	}
 }
+
+func TestBindingRejectsPayloadBeyondAbsolutePathLimit(t *testing.T) {
+	m, _ := bundleFixture(t, "long-prefix")
+	root, err := os.OpenRoot(t.TempDir())
+	require.NoError(t, err)
+	defer root.Close()
+	for i := range m.Bindings {
+		m.Bindings[i].Expected = make([]byte, 4096)
+		require.NoError(t, plainParents(root, m.Bindings[i].Path))
+		require.NoError(t, writeNewFile(root, m.Bindings[i].Path, append(make([]byte, 32), m.Bindings[i].Expected...), 0500))
+	}
+	require.NoError(t, root.Mkdir("lib", 0700))
+	require.NoError(t, writeNewFile(root, m.Layout.Loader, []byte("loader"), 0500))
+	require.NoError(t, root.Mkdir("fonts", 0700))
+	require.NoError(t, root.Mkdir("dependencies", 0700))
+	require.NoError(t, writeNewFile(root, "dependencies/a-longer-required-file.js", []byte("module.exports={}"), 0400))
+	length := 4095 - len("/"+m.Layout.Loader)
+	prefix := strings.Repeat("/"+strings.Repeat("p", 99), length/100) + strings.Repeat("p", length%100)
+	require.Len(t, prefix+"/"+m.Layout.Loader, 4095)
+	require.ErrorContains(t, bindPrefix(root, prefix, m), "absolute path limit")
+}

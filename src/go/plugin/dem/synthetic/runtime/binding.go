@@ -8,6 +8,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"io/fs"
 	"os"
 	"path/filepath"
 	"strings"
@@ -19,6 +20,25 @@ import (
 func bindPrefix(root *os.Root, final string, m Manifest) error {
 	if !filepath.IsAbs(final) || filepath.Clean(final) != final || strings.ContainsAny(final, "\x00\r\n") || !utf8.ValidString(final) {
 		return errors.New("runtime prefix must be a clean absolute UTF-8 path")
+	}
+	// os.Root can traverse paths longer than Linux's absolute pathname limit.
+	// Node and the launcher later open absolute names, so every delivered file
+	// must fit, not just the shorter PT_INTERP loader name.
+	if err := fs.WalkDir(root.FS(), ".", func(name string, _ fs.DirEntry, err error) error {
+		if err != nil {
+			return err
+		}
+		if len(filepath.Join(final, name)) >= 4096 {
+			return errors.New("runtime payload exceeds Linux absolute path limit")
+		}
+		return nil
+	}); err != nil {
+		return err
+	}
+	for _, name := range []string{"chrome", "fonts.conf"} {
+		if len(filepath.Join(final, name)) >= 4096 {
+			return errors.New("runtime payload exceeds Linux absolute path limit")
+		}
 	}
 	interpreter := []byte(filepath.Join(final, filepath.FromSlash(m.Layout.Loader)))
 	for _, binding := range m.Bindings {
