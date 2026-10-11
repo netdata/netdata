@@ -429,9 +429,9 @@ static void test_kmeans_scoring()
 // one repeated spike), every point is |C0 - C1| / 2 from the centres on
 // average, so max_dist - min_dist is 0 or a few ULP. Dividing by a ULP made
 // any sample off the C0-C1 segment score 100. Predict skips NaN scores.
-static void test_kmeans_flat_spread_scores_zero()
+static void test_kmeans_flat_spread_abstains()
 {
-    fprintf(stderr, "  test_kmeans_flat_spread_scores_zero...\n");
+    fprintf(stderr, "  test_kmeans_flat_spread_abstains...\n");
 
     // Spike vector taken from a degenerate model found on a production parent.
     const calculated_number_t spike[6] = { 16.40203, 0.9567466666666675, -16.40203, -16.40203, -0.9567466666666675, 0.0 };
@@ -500,12 +500,14 @@ static void test_kmeans_flat_spread_scores_zero()
     half(0) = 1.0 + 0.5e-6;
 
     score = ml_kmeans_anomaly_score(&narrow, half);
+    ML_TEST_ASSERT(!std::isnan(score), "score should not be NaN");
     ML_TEST_ASSERT_DOUBLE_EQ(score, 50.0, 1e-3, "a 1e-6 relative spread should still be scored");
 
     // A negative spread is not flat: it keeps its previous score.
     narrow.min_dist = 2.0;
     narrow.max_dist = 1.0;
     score = ml_kmeans_anomaly_score(&narrow, half);
+    ML_TEST_ASSERT(!std::isnan(score), "score should not be NaN");
     ML_TEST_ASSERT_DOUBLE_EQ(score, 100.0, 1e-3, "negative spread should keep its prior score");
 
     // Non-finite bounds (accepted from children).
@@ -1499,7 +1501,7 @@ extern "C" int ml_unittest()
     test_features_zero_smooth_matches_one();
     test_features_unused_rows_are_zero();
     test_kmeans_scoring();
-    test_kmeans_flat_spread_scores_zero();
+    test_kmeans_flat_spread_abstains();
     test_full_pipeline();
     test_kmeans_inlined_empty_source_is_zero_initialized();
     test_features_preprocess_below_min_for_kmeans();
