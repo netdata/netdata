@@ -90,7 +90,16 @@ func TestTreeCompletionReaderCannotRejectLaunch(t *testing.T) {
 	}
 	repeated, err := startProcessTree(ctx, helper, TreeOptions{Completion: completion}, "/bin/true")
 	require.NoError(t, err)
-	require.False(t, repeated.Wait().Drained, "duplicate invocation must refuse while first waits")
+	duplicateDone := make(chan TreeResult, 1)
+	go func() { duplicateDone <- repeated.Wait() }()
+	select {
+	case result := <-duplicateDone:
+		require.False(t, result.Drained, "duplicate invocation must refuse while first waits")
+	case <-ctx.Done():
+		_ = unix.Flock(int(lock.Fd()), unix.LOCK_UN)
+		<-duplicateDone
+		t.Fatal("duplicate invocation waited for publication lock")
+	}
 	require.NoError(t, unix.Flock(int(lock.Fd()), unix.LOCK_UN))
 	result := <-done
 	waited = true
