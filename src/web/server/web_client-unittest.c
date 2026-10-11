@@ -113,6 +113,19 @@ int web_client_request_size_unittest(void)
     WEB_CLIENT_TEST(
         web_client_decode_path_and_query_string(w, small_target) == HTTP_VALIDATION_OK, "small target was rejected after a malformed one");
 
+    HTTP_REQUEST_MODE original_mode = w->mode;
+    w->mode = HTTP_REQUEST_MODE_STREAM;
+    WEB_CLIENT_TEST(
+        web_client_decode_path_and_query_string(w, "key=abc&hostname=a%zz") == HTTP_VALIDATION_MALFORMED_URL,
+        "malformed percent escape in a stream request was accepted");
+    WEB_CLIENT_TEST(
+        web_client_decode_path_and_query_string(w, "key=abc&hostname=a%20b") == HTTP_VALIDATION_OK,
+        "valid stream request was rejected");
+    WEB_CLIENT_TEST(
+        strcmp(buffer_tostring(w->url_query_string_decoded), "key=abc&hostname=a b") == 0,
+        "stream request decoded incorrectly");
+    w->mode = original_mode;
+
     char *retained = w->url_decode_buffer;
     web_client_reuse_from_cache(w);
     WEB_CLIENT_TEST(w->url_decode_buffer == retained, "cached 4 KiB buffer was not retained");
