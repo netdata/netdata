@@ -878,6 +878,17 @@ stream_receive_and_process(struct stream_thread *sth, struct receiver_state *rpt
     return rc;
 }
 
+static void stream_receiver_set_wanted(struct stream_thread *sth, struct receiver_state *rpt, nd_poll_event_t wanted) {
+    if(rpt->thread.wanted == wanted)
+        return;
+
+    rpt->thread.wanted = wanted;
+    if(!nd_poll_upd(sth->run.ndpl, rpt->sock.fd, rpt->thread.wanted))
+        nd_log(NDLS_DAEMON, NDLP_ERR,
+               "STREAM RCV[%zu] '%s' [from [%s]:%s]: failed to update nd_poll().",
+               sth->id, rrdhost_hostname(rpt->host), rpt->remote_ip, rpt->remote_port);
+}
+
 bool stream_receiver_send_data(struct stream_thread *sth, struct receiver_state *rpt, usec_t now_ut, bool process_opcodes_and_enable_removal) {
     internal_fatal(sth->tid != gettid_cached(), "Function %s() should only be used by the dispatcher thread", __FUNCTION__ );
 
@@ -907,12 +918,7 @@ bool stream_receiver_send_data(struct stream_thread *sth, struct receiver_state 
             if(likely(rpt->host))
                 single_writer_atomic_add(&rpt->host->stream.rcv.status.bytes_out, (uint64_t)rc);
             if (!stats->bytes_outstanding) {
-                rpt->thread.wanted = ND_POLL_READ;
-                if (!nd_poll_upd(sth->run.ndpl, rpt->sock.fd, rpt->thread.wanted))
-                    nd_log(NDLS_DAEMON, NDLP_ERR,
-                           "STREAM RCV[%zu] '%s' [from [%s]:%s]: cannot update nd_poll()",
-                           sth->id, rrdhost_hostname(rpt->host), rpt->remote_ip, rpt->remote_port);
-
+                // we sent them all - ND_POLL_WRITE is removed after the loop
                 // recreate the circular buffer if we have to
                 stream_circular_buffer_recreate_timed_unsafe(rpt->thread.send_to_child.scb, now_ut, false);
                 status = EVLOOP_STATUS_NO_MORE_DATA;
@@ -976,6 +982,16 @@ bool stream_receiver_send_data(struct stream_thread *sth, struct receiver_state 
                  stream_thread_process_opcodes(sth, &rpt->thread.meta))
             status = EVLOOP_STATUS_OPCODE_ON_ME;
     }
+
+    // ND_POLL_WRITE only while there are data the socket did not take, or we could not lock them.
+    // After a failure in the opcode path, it lets the poll loop retry and remove the receiver.
+    // Do not touch the receiver in the other cases: it may have been removed.
+    if(status == EVLOOP_STATUS_NO_MORE_DATA)
+        stream_receiver_set_wanted(sth, rpt, ND_POLL_READ);
+    else if(status == EVLOOP_STATUS_SOCKET_FULL || status == EVLOOP_STATUS_CANT_GET_LOCK ||
+             (!process_opcodes_and_enable_removal &&
+              (status == EVLOOP_STATUS_SOCKET_ERROR || status == EVLOOP_STATUS_SOCKET_CLOSED)))
+        stream_receiver_set_wanted(sth, rpt, ND_POLL_READ | ND_POLL_WRITE);
 
     return EVLOOP_STATUS_STILL_ALIVE(status);
 }
@@ -1221,18 +1237,7 @@ void stream_receiver_check_all_nodes_from_poll(struct stream_thread *sth, usec_t
             continue;
         }
 
-        nd_poll_event_t wanted = ND_POLL_READ | (stats.bytes_outstanding ? ND_POLL_WRITE : 0);
-        if(unlikely(rpt->thread.wanted != wanted)) {
-//            nd_log(NDLS_DAEMON, NDLP_DEBUG,
-//                   "STREAM RCV[%zu] '%s' [from %s]: nd_poll() wanted events mismatch.",
-//                   sth->id, rrdhost_hostname(rpt->host), rpt->remote_ip);
-
-            rpt->thread.wanted = wanted;
-            if(!nd_poll_upd(sth->run.ndpl, rpt->sock.fd, rpt->thread.wanted))
-                nd_log(NDLS_DAEMON, NDLP_ERR,
-                       "STREAM RCV[%zu] '%s' [from %s]: failed to update nd_poll().",
-                       sth->id, rrdhost_hostname(rpt->host), rpt->remote_ip);
-        }
+        stream_receiver_set_wanted(sth, rpt, ND_POLL_READ | (stats.bytes_outstanding ? ND_POLL_WRITE : 0));
     }
 }
 

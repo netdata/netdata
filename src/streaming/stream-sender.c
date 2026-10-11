@@ -500,6 +500,17 @@ static void stream_sender_move_running_to_connector_or_remove_internal(struct st
         s, reconnect && !stream_connector_is_signaled_to_stop(s) ? STRCNT_CMD_CONNECT : STRCNT_CMD_REMOVE);
 }
 
+static void stream_sender_set_wanted(struct stream_thread *sth, struct sender_state *s, nd_poll_event_t wanted) {
+    if(s->thread.wanted == wanted)
+        return;
+
+    s->thread.wanted = wanted;
+    if(!nd_poll_upd(sth->run.ndpl, s->sock.fd, s->thread.wanted))
+        nd_log(NDLS_DAEMON, NDLP_ERR,
+               "STREAM SND[%zu] '%s' [to %s]: failed to update nd_poll().",
+               sth->id, rrdhost_hostname(s->host), s->remote_ip);
+}
+
 void stream_sender_check_all_nodes_from_poll(struct stream_thread *sth, usec_t now_ut) {
     internal_fatal(sth->tid != gettid_cached(), "Function %s() should only be used by the dispatcher thread", __FUNCTION__ );
 
@@ -565,18 +576,7 @@ void stream_sender_check_all_nodes_from_poll(struct stream_thread *sth, usec_t n
         bytes_compressed += stats.bytes_added;
         bytes_uncompressed += stats.bytes_uncompressed;
 
-        nd_poll_event_t wanted = ND_POLL_READ | (stats.bytes_outstanding ? ND_POLL_WRITE : 0);
-        if(unlikely(s->thread.wanted != wanted)) {
-//            nd_log(NDLS_DAEMON, NDLP_DEBUG,
-//                   "STREAM SND[%zu] '%s' [to %s]: nd_poll() wanted events mismatch.",
-//                   sth->id, rrdhost_hostname(s->host), s->remote_ip);
-
-            s->thread.wanted = wanted;
-            if(!nd_poll_upd(sth->run.ndpl, s->sock.fd, s->thread.wanted))
-                nd_log(NDLS_DAEMON, NDLP_ERR,
-                       "STREAM SND[%zu] '%s' [to %s]: failed to update nd_poll().",
-                       sth->id, rrdhost_hostname(s->host), s->remote_ip);
-        }
+        stream_sender_set_wanted(sth, s, ND_POLL_READ | (stats.bytes_outstanding ? ND_POLL_WRITE : 0));
     }
 
     if (bytes_compressed && bytes_uncompressed) {
@@ -717,13 +717,7 @@ bool stream_sender_send_data(struct stream_thread *sth, struct sender_state *s, 
             sth->snd.bytes_sent += rc;
 
             if (!stats->bytes_outstanding) {
-                // we sent them all - remove ND_POLL_WRITE
-                s->thread.wanted = ND_POLL_READ;
-                if (!nd_poll_upd(sth->run.ndpl, s->sock.fd, s->thread.wanted))
-                    nd_log(NDLS_DAEMON, NDLP_ERR,
-                           "STREAM SND[%zu] '%s' [to %s]: failed to update nd_poll().",
-                           sth->id, rrdhost_hostname(s->host), s->remote_ip);
-
+                // we sent them all - ND_POLL_WRITE is removed after the loop
                 // recreate the circular buffer if we have to
                 stream_circular_buffer_recreate_timed_unsafe(s->scb, now_ut, false);
                 status = EVLOOP_STATUS_NO_MORE_DATA;
@@ -789,6 +783,16 @@ bool stream_sender_send_data(struct stream_thread *sth, struct sender_state *s, 
                  stream_thread_process_opcodes(sth, &s->thread.meta))
             status = EVLOOP_STATUS_OPCODE_ON_ME;
     }
+
+    // ND_POLL_WRITE only while there are data the socket did not take.
+    // After a failure in the opcode path, it lets the poll loop retry and remove the sender.
+    // Do not touch the sender in the other cases: it may have been removed.
+    if(status == EVLOOP_STATUS_NO_MORE_DATA)
+        stream_sender_set_wanted(sth, s, ND_POLL_READ);
+    else if(status == EVLOOP_STATUS_SOCKET_FULL ||
+             (!process_opcodes_and_enable_removal &&
+              (status == EVLOOP_STATUS_SOCKET_ERROR || status == EVLOOP_STATUS_SOCKET_CLOSED)))
+        stream_sender_set_wanted(sth, s, ND_POLL_READ | ND_POLL_WRITE);
 
     return EVLOOP_STATUS_STILL_ALIVE(status);
 }
