@@ -90,7 +90,7 @@ func (dcjc *DynCfgJobController) prepareCandidateAdoption(
 		preparedJobConfigLifecycle{
 			identity: result.candidate.jobConfigIdentity,
 			snapshot: result.candidate.jobConfigSnapshot,
-		},
+		}, jobConfigIntentEnable,
 		nil, nil,
 	)
 	if err != nil {

@@ -90,7 +90,7 @@ func (dcjc *DynCfgJobController) planAutoDetectionRetry(
 					internalReply(),
 					cleanup,
 					token,
-					func() { dcjc.scheduler.accepted.arm(spec) },
+					func() { dcjc.scheduler.accepted.arm(spec) }, jobConfigIntentEnable,
 				)
 			},
 		},
@@ -261,7 +261,7 @@ func (dcjc *DynCfgJobController) prepareDiscovered(
 			reply,
 			dcjc.configDeleteCleanup(dcjc.configID(change.Config.Module(), change.Config.Name())),
 			autoDetectionRetryToken{},
-			dcjc.pendingDesiredSettlement(change.Config, change.pending),
+			dcjc.pendingDesiredSettlement(change.Config, change.pending), jobConfigIntentDisable,
 		)
 	}
 	if exists &&
@@ -304,7 +304,7 @@ func (dcjc *DynCfgJobController) prepareDiscovered(
 			reply,
 			cleanup,
 			autoDetectionRetryToken{},
-			dcjc.pendingDesiredSettlement(change.Config, change.pending),
+			dcjc.pendingDesiredSettlement(change.Config, change.pending), jobConfigIntentDisable,
 		)
 	}
 	if exists &&
@@ -378,7 +378,7 @@ func (dcjc *DynCfgJobController) prepareDiscovered(
 					dcjc.configType(dcjc.modules[change.Config.Module()]),
 				),
 				autoDetectionRetryToken{},
-				pendingSettlement,
+				pendingSettlement, jobConfigIntentEnable,
 				jobConfigFailure(err, "activation"),
 			)
 		case activationFailureBusy, activationFailureStaleStore:
@@ -437,7 +437,7 @@ func (dcjc *DynCfgJobController) prepareDiscovered(
 					func() {
 						dcjc.scheduleAutoDetectionRetry(change.Config, failure)
 					},
-				),
+				), jobConfigIntentEnable,
 				jobConfigFailure(err, "activation"),
 			)
 		default:
@@ -535,7 +535,7 @@ func (dcjc *DynCfgJobController) prepareDiscoveredActivationWait(
 			dcjc.configType(dcjc.modules[change.Config.Module()]),
 		),
 		autoDetectionRetryToken{},
-		composeAfterApply(settle, activate),
+		composeAfterApply(settle, activate), jobConfigIntentEnable,
 		jobConfigFailure(cause, "activation"),
 	)
 }

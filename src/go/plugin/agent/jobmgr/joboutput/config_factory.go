@@ -94,6 +94,9 @@ func (cmf *ConfigModuleFactory) Test(ctx context.Context, config confgroup.Confi
 	if err != nil {
 		return err
 	}
+	if err := cmf.checkNamedDependencies(config); err != nil {
+		return err
+	}
 	probe.module.GetBase().Logger = cmf.moduleLogger(config, redactLifecycle)
 	if err := probe.module.Init(ctx); err != nil {
 		if redactLifecycle {

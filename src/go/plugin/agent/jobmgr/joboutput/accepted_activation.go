@@ -801,7 +801,7 @@ func (dcjc *DynCfgJobController) prepareAcceptedActivationError(
 			composeAfterApply(
 				func() { dcjc.completeActivationRestart(attempt.token, rejectedResult(testFailure(err))) },
 				attempt.markApplied(),
-			),
+			), jobConfigIntentPreserve,
 			jobConfigFailure(err, "activation"),
 		)
 	case activationFailureDeadline, activationFailureTransient:
@@ -819,7 +819,7 @@ func (dcjc *DynCfgJobController) prepareAcceptedActivationError(
 			composeAfterApply(func() {
 				dcjc.completeActivationRestart(attempt.token, rejectedResult(testFailure(err)))
 				dcjc.scheduleAutoDetectionRetry(config, failure)
-			}, attempt.markApplied()),
+			}, attempt.markApplied()), jobConfigIntentPreserve,
 			jobConfigFailure(err, "activation"),
 		)
 	default:
@@ -867,7 +867,7 @@ func (dcjc *DynCfgJobController) prepareAcceptedActivationWait(
 		composeAfterApply(
 			func() { dcjc.scheduler.accepted.waitFor(scope.ID, attempt.token, release) },
 			attempt.markApplied(),
-		),
+		), jobConfigIntentPreserve,
 		jobConfigFailure(cause, "activation"),
 	)
 }

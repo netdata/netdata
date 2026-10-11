@@ -64,6 +64,7 @@ type DynCfgJobController struct {
 	diagnostics      jobmgr.DiagnosticObserver // operational log sink
 	commands         jobmgr.PreparedCommandPort
 	restartObservers restartObservers
+	configIntents    jobConfigIntentIndex
 	scheduler        *Scheduler // tick + retry scheduler
 }
 

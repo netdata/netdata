@@ -90,7 +90,7 @@ func (dcjc *DynCfgJobController) PlanSecretDependentStop(id string) (jobmgr.Work
 				return dcjc.prepareMutationWithRetryAfterApply(
 					scope, current, nil, permit, resourceRemovalDisposition(current), &postimage,
 					internalReply(), dcjc.configStatusCleanup(id, dyncfg.StatusAccepted), autoDetectionRetryToken{},
-					composeAfterApply(func() { dcjc.scheduler.accepted.pause(spec) }, state.markStopped),
+					composeAfterApply(func() { dcjc.scheduler.accepted.pause(spec) }, state.markStopped), jobConfigIntentPreserve,
 				)
 			},
 		},

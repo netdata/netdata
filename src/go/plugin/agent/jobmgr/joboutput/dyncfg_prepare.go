@@ -210,7 +210,7 @@ func (dcjc *DynCfgJobController) prepareEnable(
 	}
 	status := dyncfg.Status(record.Status)
 	if status == dyncfg.StatusRunning {
-		return dcjc.satisfy(scope, current, permit, status, nil)
+		return dcjc.satisfyWithEnabledIntent(scope, current, permit, record, nil)
 	}
 	config, err := graphRecordConfig(record)
 	if err != nil {
@@ -225,13 +225,14 @@ func (dcjc *DynCfgJobController) prepareEnable(
 		if current != nil {
 			activate = nil // The installed generation already owns startup.
 		}
-		return dcjc.satisfy(scope, current, permit, status, activate)
+		return dcjc.satisfyWithEnabledIntent(scope, current, permit, record, activate)
 	}
 	postimage := graphConfig(record, dyncfg.StatusAccepted)
 	return dcjc.prepareMutationWithRetryAfterApply(
 		scope, current, nil, permit, resourceRemovalDisposition(current), &postimage,
 		adoptedReply(dyncfg.CommandEnable, dyncfg.StatusAccepted, jobFailure{}),
 		dcjc.configStatusCleanup(scope.ID, dyncfg.StatusAccepted), autoDetectionRetryToken{}, activate,
+		jobConfigIntentEnable,
 	)
 }
 
