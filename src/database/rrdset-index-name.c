@@ -43,7 +43,20 @@ STRING *rrdset_fix_name(RRDHOST *host, const char *chart_full_id, const char *ty
 }
 
 int rrdset_reset_name(RRDSET *st, const char *name) {
-    if(unlikely(!strcmp(rrdset_name(st), name)))
+    // re-registrations pass the short name, while the stored name is "type.name": compare against that form, so
+    // an unchanged name skips rrdset_fix_name(); sanitized, truncated or suffixed names still take the slow path
+    const char *current = rrdset_name(st);
+    const char *type = rrdset_parts_type(st);
+    size_t type_len = strlen(type);
+    if(likely(st->name && name &&
+              type_len + 1 < RRD_ID_LENGTH_MAX &&
+              strlen(current) < RRD_ID_LENGTH_MAX &&
+              strncmp(current, type, type_len) == 0 &&
+              current[type_len] == '.' &&
+              strcmp(current + type_len + 1, name) == 0))
+        return 1;
+
+    if(unlikely(!strcmp(current, name)))
         return 1;
 
     RRDHOST *host = st->rrdhost;
