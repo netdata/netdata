@@ -37,9 +37,6 @@ type (
 type PipelineConfig struct {
 	BuildContext BuildContext
 	Providers    *ProviderCatalog
-	// InitialApplied runs after all finite initial snapshots have been applied.
-	// When set, every enabled provider must implement InitialDiscoverer.
-	InitialApplied func() error
 }
 
 func validatePipelineConfig(cfg PipelineConfig) error {
