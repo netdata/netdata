@@ -3,15 +3,16 @@
 package dem
 
 import (
+	"bytes"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
-	"os"
 	"path/filepath"
 	goruntime "runtime"
 	"sync"
 
+	"github.com/netdata/netdata/go/plugins/pkg/safefile"
 	"github.com/netdata/netdata/go/plugins/plugin/dem/synthetic/runner"
 	runtime "github.com/netdata/netdata/go/plugins/plugin/dem/synthetic/runtime"
 	"github.com/netdata/netdata/go/plugins/plugin/dem/synthetic/runtimehost"
@@ -24,19 +25,11 @@ func LoadRuntimeManifest(path string) (*runtime.Manifest, error) {
 	if !filepath.IsAbs(path) {
 		return nil, errors.New("runtime manifest path must be absolute")
 	}
-	file, err := os.Open(path)
+	data, err := safefile.Read(path)
 	if err != nil {
 		return nil, fmt.Errorf("installed runtime manifest: %w", err)
 	}
-	defer file.Close()
-	info, err := file.Stat()
-	if err != nil {
-		return nil, err
-	}
-	if !info.Mode().IsRegular() || info.Size() > 1<<20 {
-		return nil, errors.New("installed runtime manifest must be a regular file no larger than 1 MiB")
-	}
-	decoder := json.NewDecoder(io.LimitReader(file, 1<<20+1))
+	decoder := json.NewDecoder(bytes.NewReader(data))
 	decoder.DisallowUnknownFields()
 	var manifest runtime.Manifest
 	if err := decoder.Decode(&manifest); err != nil {

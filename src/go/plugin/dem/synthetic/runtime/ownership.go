@@ -244,10 +244,16 @@ func (u *Use) Finish(drained bool) error {
 		return nil
 	}
 	u.finished = true
+	if drained {
+		// Callers finish only once. Retain their proof before filesystem cleanup,
+		// including failure to acquire coordination, so Sweep can retry it.
+		u.store.mu.Lock()
+		u.store.completedUses[u.name] = true
+		u.store.mu.Unlock()
+	}
 	err := errors.Join(u.Completion.Close(), u.lock.Close())
 	if drained {
 		err = errors.Join(err, u.store.withLock(func() error {
-			u.store.completedUses[u.name] = true
 			return u.store.removeOwned(u.name)
 		}))
 	}

@@ -82,3 +82,26 @@ func TestRuntimeConfigRejectsRemovedComponentsAndUnknownSettings(t *testing.T) {
 		})
 	}
 }
+
+func TestRuntimeConfigErrorsReferToOriginalInput(t *testing.T) {
+	for name, tc := range map[string]struct {
+		body, want string
+		synthetic  bool
+	}{
+		"unknown":   {"allow_downlaod: false", `runtime: unknown setting "allow_downlaod"`, true},
+		"duplicate": {"allow_download: true\n  allow_download: false", `runtime: duplicate setting "allow_download"`, true},
+		"type":      {"allow_download: [false]", "line 4:", false},
+	} {
+		t.Run(name, func(t *testing.T) {
+			dir := t.TempDir()
+			body := "enabled: true\n# original configuration\nruntime:\n  " + tc.body + "\n"
+			require.NoError(t, os.WriteFile(filepath.Join(dir, "dem.conf"), []byte(body), 0600))
+			_, err := LoadConfig(multipath.New(dir))
+			require.ErrorContains(t, err, tc.want)
+			require.NotContains(t, err.Error(), "dem.plain")
+			if tc.synthetic {
+				require.NotContains(t, err.Error(), "line ")
+			}
+		})
+	}
+}

@@ -274,7 +274,12 @@ func (h *Host) Run(ctx context.Context) {
 			cancelDownload()
 			cancelDownload, download = nil, nil
 			preparationErr = err
-			retryAt = time.Now().Add(h.retryInterval)
+			retryAt = time.Time{}
+			if errors.Is(err, context.Canceled) {
+				preparationErr = nil
+			} else if err != nil {
+				retryAt = time.Now().Add(h.retryInterval)
+			}
 		}
 		if ctx.Err() != nil {
 			return

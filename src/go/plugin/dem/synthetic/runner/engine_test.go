@@ -71,12 +71,11 @@ type payload func(context.Context, []string, []byte, *os.File, *os.File) ndexec.
 func starter(t *testing.T, body payload) startFunc {
 	t.Helper()
 	return func(ctx context.Context, opts ndexec.TreeOptions, _ string, args ...string) (treeProcess, error) {
-		dup := func(file *os.File) *os.File {
-			fd, err := unix.Dup(int(file.Fd()))
-			require.NoError(t, err)
-			return os.NewFile(uintptr(fd), "test-owned-child-pipe")
+		pipes, err := duplicatePipes(opts.Stdin, opts.Stdout, opts.Stderr)
+		if err != nil {
+			return nil, err
 		}
-		input, output, stderr := dup(opts.Stdin), dup(opts.Stdout), dup(opts.Stderr)
+		input, output, stderr := pipes[0], pipes[1], pipes[2]
 		process := &fakeTree{
 			done: make(chan ndexec.TreeResult, 1),
 		}
@@ -90,6 +89,21 @@ func starter(t *testing.T, body payload) startFunc {
 		return process, nil
 	}
 }
+func duplicatePipes(files ...*os.File) ([]*os.File, error) {
+	var pipes []*os.File
+	for _, file := range files {
+		fd, err := unix.Dup(int(file.Fd()))
+		if err != nil {
+			for _, opened := range pipes {
+				opened.Close()
+			}
+			return nil, err
+		}
+		pipes = append(pipes, os.NewFile(uintptr(fd), "test-owned-child-pipe"))
+	}
+	return pipes, nil
+}
+
 func testEngine(t *testing.T) (*Engine, *fakeHistory, *observedArtifacts) {
 	t.Helper()
 	base := t.TempDir()
@@ -396,15 +410,11 @@ func TestUnverifiedDrainPoisonsBeforeReaderJoin(t *testing.T) {
 	e, _, a := testEngine(t)
 	held := make(chan struct{})
 	e.start = func(_ context.Context, opts ndexec.TreeOptions, _ string, _ ...string) (treeProcess, error) {
-		outFD, err := unix.Dup(int(opts.Stdout.Fd()))
-		require.NoError(t, err)
-		out := os.NewFile(uintptr(outFD), "unknown-test-survivor")
-		errFD, err := unix.Dup(int(opts.Stderr.Fd()))
-		require.NoError(t, err)
-		stderr := os.NewFile(uintptr(errFD), "unknown-test-survivor-stderr")
-		inFD, err := unix.Dup(int(opts.Stdin.Fd()))
-		require.NoError(t, err)
-		input := os.NewFile(uintptr(inFD), "unknown-test-survivor-input")
+		pipes, err := duplicatePipes(opts.Stdin, opts.Stdout, opts.Stderr)
+		if err != nil {
+			return nil, err
+		}
+		input, out, stderr := pipes[0], pipes[1], pipes[2]
 		t.Cleanup(func() { close(held); _ = out.Close(); _ = stderr.Close(); _ = input.Close() })
 		p := &fakeTree{
 			done: make(chan ndexec.TreeResult, 1),
@@ -442,7 +452,9 @@ func TestSecretInputRedactionAndDiagnosticBounds(t *testing.T) {
 	e.start = starter(t, func(_ context.Context, args []string, raw []byte, out, _ *os.File) ndexec.TreeResult {
 		assert.NotContains(t, strings.Join(args, " "), "long-secret")
 		var sent wireRequest
-		require.NoError(t, json.Unmarshal(raw, &sent))
+		if err := json.Unmarshal(raw, &sent); err != nil {
+			return ndexec.TreeResult{Drained: true, Err: err}
+		}
 		assert.Equal(t, request.Secrets, sent.Secrets)
 		for i := 0; i < EventLimit+4; i++ {
 			emit(

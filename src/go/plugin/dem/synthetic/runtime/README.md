@@ -102,8 +102,8 @@ with a `preload.json` record identifying the bundle and final location. Managed
 operations refuse sealed roots, including through stores opened before sealing.
 `ReadPreload` checks that record and prepared identity against the installed manifest
 without locks, claims, writes or browser launches. It supports read-only mounts.
-These files are owned by the administrator, who must stop all consumers before
-replacing or removing them. Component paths and ordinary unsealed caches cannot
+The administrator manages these files, but their private root must be owned by
+the consuming service account. Stop all consumers before replacing or removing them. Component paths and ordinary unsealed caches cannot
 be selected as preloads. Neither mode promises integrity against malicious code
 running as the service account; verification of the archive occurs at preparation.
 

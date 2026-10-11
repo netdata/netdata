@@ -6,6 +6,8 @@ import (
 	"errors"
 	"fmt"
 	"path/filepath"
+	"reflect"
+	"strings"
 	"time"
 
 	"gopkg.in/yaml.v2"
@@ -73,18 +75,35 @@ func (c RuntimeConfig) StoreConfig(varLibPath string) (runtime.Config, error) {
 // UnmarshalYAML rejects unsupported runtime settings while leaving framework
 // settings in dem.conf to their existing owner. Preserve defaults on partial input.
 func (c *RuntimeConfig) UnmarshalYAML(unmarshal func(any) error) error {
+	type plain RuntimeConfig
+	value := plain(*c)
+	// Decode types against the original input so semantic errors retain real lines.
+	if err := unmarshal(&value); err != nil {
+		return err
+	}
 	var fields yaml.MapSlice
 	if err := unmarshal(&fields); err != nil {
 		return err
 	}
-	raw, err := yaml.Marshal(fields)
-	if err != nil {
-		return err
+	known := make(map[string]bool)
+	typ := reflect.TypeOf(value)
+	for i := 0; i < typ.NumField(); i++ {
+		name, _, _ := strings.Cut(typ.Field(i).Tag.Get("yaml"), ",")
+		known[name] = true
 	}
-	type plain RuntimeConfig
-	value := plain(*c)
-	if err := yaml.UnmarshalStrict(raw, &value); err != nil {
-		return fmt.Errorf("runtime: %w", err)
+	seen := make(map[string]bool)
+	for _, field := range fields {
+		name, ok := field.Key.(string)
+		if !ok {
+			return errors.New("runtime: setting names must be strings")
+		}
+		if !known[name] {
+			return fmt.Errorf("runtime: unknown setting %q", name)
+		}
+		if seen[name] {
+			return fmt.Errorf("runtime: duplicate setting %q", name)
+		}
+		seen[name] = true
 	}
 	*c = RuntimeConfig(value)
 	return nil

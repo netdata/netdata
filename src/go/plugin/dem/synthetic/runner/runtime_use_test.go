@@ -191,14 +191,24 @@ func TestRuntimeUseWaitsForLocalReaderJoin(t *testing.T) {
 	child := starter(t, resultPayload(success()))
 	e.start = func(ctx context.Context, opts ndexec.TreeOptions, bin string, args ...string) (treeProcess, error) {
 		fd, err := unix.Dup(int(opts.Stdout.Fd()))
-		require.NoError(t, err)
+		if err != nil {
+			return nil, err
+		}
 		held = os.NewFile(uintptr(fd), "held-reader-join-fixture")
 		process, err := child(ctx, opts, bin, args...)
-		return &notifyingTree{treeProcess: process, waited: waited}, err
+		if err != nil {
+			held.Close()
+			return nil, err
+		}
+		return &notifyingTree{treeProcess: process, waited: waited}, nil
 	}
 	result := make(chan synthetic.Execution, 1)
 	go func() { result <- e.Execute(context.Background(), journey(), nil) }()
-	<-waited
+	select {
+	case <-waited:
+	case got := <-result:
+		t.Fatalf("execution returned before starting the reader-join fixture: %+v", got)
+	}
 	defer held.Close()
 	assert.Empty(t, u.finished())
 	select {
@@ -252,7 +262,9 @@ func TestConcurrentCheckAndExecutionKeepDistinctRuntimeUses(t *testing.T) {
 	e.source = sourceFunc(func() (Use, error) {
 		invocation := paths
 		invocation.Node = filepath.Join(t.TempDir(), "node")
-		require.NoError(t, os.WriteFile(invocation.Node, []byte("fixture"), 0700))
+		if err := os.WriteFile(invocation.Node, []byte("fixture"), 0700); err != nil {
+			return nil, err
+		}
 		u := &observedUse{paths: invocation}
 		mu.Lock()
 		uses = append(uses, u)
@@ -265,7 +277,9 @@ func TestConcurrentCheckAndExecutionKeepDistinctRuntimeUses(t *testing.T) {
 		mu.Lock()
 		u := byCompletion[opts.Completion]
 		mu.Unlock()
-		require.NotNil(t, u)
+		if u == nil {
+			return nil, errors.New("invocation has no matching runtime use")
+		}
 		assert.Equal(t, u.paths.Node, bin)
 		return starter(t, func(ctx context.Context, args []string, raw []byte, out, errOut *os.File) ndexec.TreeResult {
 			if len(args) == 1 {
@@ -284,7 +298,11 @@ func TestConcurrentCheckAndExecutionKeepDistinctRuntimeUses(t *testing.T) {
 	}
 	done := make(chan synthetic.Execution, 1)
 	go func() { done <- e.Execute(context.Background(), journey(), nil) }()
-	<-running
+	select {
+	case <-running:
+	case got := <-done:
+		t.Fatalf("execution returned before starting the concurrent fixture: %+v", got)
+	}
 	checkErr := e.Check(context.Background(), synthetic.Journey)
 	close(release)
 	got := <-done

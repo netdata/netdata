@@ -289,7 +289,8 @@ subscriptions wake the existing named dependency scheduler. RUM and configuratio
 The managed store serializes reservations, generation publication and retirement across consumers. Accepted demand
 and each invocation's durable use pin protect files independently. The runner acquires a use before inspecting runtime
 files, passes its completion handle to `nd-run`, and releases it after supervised drainage and local reader joins.
-Unknown execution completion retains protection across restart. Preparation/maintenance errors do not alter website
+Unknown execution completion retains protection across process restart. A positively verified host reboot may
+release the old execution pin because its children cannot remain alive. Preparation/maintenance errors do not alter website
 outcomes. Administrator-owned preloaded bundles use installed trust and stay outside cache retirement; replacement requires stopped consumers.
 
 Startup does not wait for a saved-configuration replay marker. Unneeded cached files may expire or yield to pressure

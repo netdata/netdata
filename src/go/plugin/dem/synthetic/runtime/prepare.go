@@ -17,22 +17,18 @@ import (
 	"time"
 
 	"github.com/gofrs/flock"
+	"github.com/netdata/netdata/go/plugins/pkg/safefile"
 )
 
 // Import uses the same trusted digest/format as network preparation. The archive
 // is an offline input, not a replacement for the installed trust manifest.
 func (s *Store) Import(ctx context.Context, m Manifest, archive string) error {
 	return s.prepare(ctx, m, func() (io.ReadCloser, error) {
-		f, err := os.Open(archive)
+		file, err := safefile.Open(archive)
 		if err != nil {
-			return nil, err
+			return nil, fmt.Errorf("offline runtime archive: %w", err)
 		}
-		info, err := f.Stat()
-		if err != nil || !info.Mode().IsRegular() {
-			f.Close()
-			return nil, errors.New("offline runtime archive must be a regular file")
-		}
-		return f, nil
+		return file, nil
 	})
 }
 
@@ -52,13 +48,13 @@ func (s *Store) Download(ctx context.Context, m Manifest) error {
 		}
 		client := &http.Client{CheckRedirect: func(req *http.Request, via []*http.Request) error {
 			if len(via) >= 10 || req.URL.Scheme != "https" || req.URL.User != nil {
-				return errors.New("unsafe runtime download redirect")
+				return errDownloadRedirect
 			}
 			return nil
 		}}
 		response, err := client.Do(request)
 		if err != nil {
-			return nil, errors.Join(errors.New("runtime download failed"), ctx.Err())
+			return nil, downloadFailure(err)
 		}
 		if response.StatusCode != http.StatusOK {
 			response.Body.Close()
@@ -152,8 +148,10 @@ func (s *Store) prepare(ctx context.Context, m Manifest, open func() (io.ReadClo
 		return err
 	}
 	return s.withLock(func() error {
-		if _, err := s.loadGeneration(m.Archive.SHA256); !errors.Is(err, ErrUnavailable) {
+		if _, err := s.loadGeneration(m.Archive.SHA256); err == nil {
 			return errors.New("runtime generation appeared during preparation")
+		} else if !errors.Is(err, ErrUnavailable) {
+			return err
 		}
 		if err := s.root.Rename(filepath.Join(name, "payload"), filepath.Join("generations", m.Archive.SHA256)); err != nil {
 			return err

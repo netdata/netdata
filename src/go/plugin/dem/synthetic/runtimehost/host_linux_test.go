@@ -22,6 +22,7 @@ import (
 	"github.com/netdata/netdata/go/plugins/logger"
 	runtime "github.com/netdata/netdata/go/plugins/plugin/dem/synthetic/runtime"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/collectorapi"
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
@@ -154,15 +155,15 @@ func TestSharedStoreImportWakesOverlappingSubscribers(t *testing.T) {
 	h, _, m, data := testHost(t, Config{Store: store})
 	var oldCalls, newCalls atomic.Int32
 	unsub := h.SubscribeDependencies(func(kind, name string) {
-		require.Equal(t, DependencyKind, kind)
-		require.Equal(t, DependencyName, name)
+		assert.Equal(t, DependencyKind, kind)
+		assert.Equal(t, DependencyName, name)
 		_ = h.Ready()
 		oldCalls.Add(1)
 	})
 	h.SubscribeDependencies(func(string, string) { newCalls.Add(1) })
 	startHost(t, h)
 	enable(t, h, 0, 1).Commit()
-	require.Eventually(t, func() bool { return h.Status().State == StateUnavailable }, time.Second, 5*time.Millisecond)
+	require.Eventually(t, func() bool { return h.Status().State == StateUnavailable && oldCalls.Load() > 0 }, time.Second, 5*time.Millisecond)
 	unsub()
 	oldBefore := oldCalls.Load()
 	other, err := runtime.Open(runtime.DefaultConfig(path))
@@ -369,4 +370,36 @@ func TestExecutionFinishErrorIsMaintenanceNotReadiness(t *testing.T) {
 	status, err := s.Inspect()
 	require.NoError(t, err)
 	require.Zero(t, status.ExecutionPins)
+}
+
+func TestCanceledPreparationRestartsWithoutFailureBackoff(t *testing.T) {
+	m, _ := testBundle(t)
+	started := make(chan struct{}, 2)
+	server := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		started <- struct{}{}
+		<-r.Context().Done()
+	}))
+	oldTransport := http.DefaultTransport
+	http.DefaultTransport = server.Client().Transport
+	t.Cleanup(func() { http.DefaultTransport = oldTransport })
+	h, _, _, _ := testHost(t, Config{AllowDownload: true})
+	defer func() { require.NoError(t, h.Close()); server.Close() }()
+	h.retryInterval = time.Minute
+	m.Archive.URL = server.URL
+	h.manifest = &m
+	startHost(t, h)
+	enable(t, h, 0, 1).Commit()
+	select {
+	case <-started:
+	case <-time.After(3 * time.Second):
+		t.Fatal("initial preparation did not start")
+	}
+	enable(t, h, 1, 0).Commit()
+	require.Eventually(t, func() bool { return h.Status().State == StateMissing }, time.Second, time.Millisecond)
+	enable(t, h, 0, 2).Commit()
+	select {
+	case <-started:
+	case <-time.After(time.Second):
+		t.Fatal("voluntary cancellation imposed preparation failure backoff")
+	}
 }

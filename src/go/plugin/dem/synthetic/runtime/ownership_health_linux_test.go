@@ -70,3 +70,23 @@ func TestOlderSweepDoesNotClearConcurrentFinishFailure(t *testing.T) {
 	require.Empty(t, status.CleanupError)
 	require.Zero(t, status.ExecutionPins)
 }
+
+func TestFinishCoordinationFailureRetainsDrainedProof(t *testing.T) {
+	s, _ := testStore(t)
+	manifest := importFixture(t, s, "finish-coordination")
+	use, err := s.BeginUse(manifest)
+	require.NoError(t, err)
+	coordination := filepath.Join(s.path, "coordination.lock")
+	require.NoError(t, os.Rename(coordination, coordination+".saved"))
+	require.NoError(t, os.Mkdir(coordination, 0700))
+	finishErr := use.Finish(true) // No child was launched, so no receipt exists.
+	require.NoError(t, os.Rename(coordination, coordination+".blocked"))
+	require.NoError(t, os.Rename(coordination+".saved", coordination))
+	require.Error(t, finishErr)
+	// Production callers discard the handle after their one Finish call.
+	require.NoError(t, s.Sweep())
+	status, err := s.Inspect()
+	require.NoError(t, err)
+	require.Zero(t, status.ExecutionPins)
+	require.Empty(t, status.CleanupError)
+}
