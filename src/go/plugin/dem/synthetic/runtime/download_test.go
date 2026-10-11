@@ -115,11 +115,15 @@ func TestDownloadExplicitCancellationAndCloseInterruptRead(t *testing.T) {
 	for _, closeBody := range []bool{false, true} {
 		t.Run(map[bool]string{false: "cancel", true: "close"}[closeBody], func(t *testing.T) {
 			stopped := make(chan struct{})
+			release := make(chan struct{})
+			defer close(release)
 			server := inactivityServer(t, func(w http.ResponseWriter, r *http.Request) {
-				defer close(stopped)
 				w.WriteHeader(http.StatusOK)
 				w.(http.Flusher).Flush()
 				<-r.Context().Done()
+				close(stopped)
+				// Keep a normal response EOF from racing the interrupted read.
+				<-release
 			})
 			ctx, cancel := context.WithCancel(context.Background())
 			defer cancel()
