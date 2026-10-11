@@ -221,6 +221,7 @@ int clocks_unittest(void);
 int ws_client_unittest(void);
 int mqtt_ng_unittest(void);
 int aclk_timeout_unittest(void);
+int aclk_http_msg_unittest(void);
 int https_client_timeout_unittest(void);
 int mqtt_wss_client_timeout_unittest(void);
 int pgc_unittest(void);
@@ -520,6 +521,7 @@ int netdata_main(int argc, char **argv) {
                             if (clocks_unittest()) return 1;
                             if (ws_client_unittest()) return 1;
                             if (mqtt_ng_unittest()) return 1;
+                            if (aclk_http_msg_unittest()) return 1;
                             // summed, not short-circuited: this is the path CI runs, so one
                             // failing suite must not hide the other two
                             if (aclk_timeout_unittest() + https_client_timeout_unittest() +
@@ -682,6 +684,10 @@ int netdata_main(int argc, char **argv) {
                         else if(strcmp(optarg, "mqttngtest") == 0) {
                             unittest_running = true;
                             return mqtt_ng_unittest();
+                        }
+                        else if(strcmp(optarg, "aclkhttpmsgtest") == 0) {
+                            unittest_running = true;
+                            return aclk_http_msg_unittest() ? 1 : 0;
                         }
                         else if(strcmp(optarg, "aclktimeouttest") == 0) {
                             unittest_running = true;

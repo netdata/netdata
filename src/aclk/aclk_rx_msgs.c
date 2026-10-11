@@ -20,13 +20,10 @@ struct aclk_request {
     // Heap-allocated string fields below are owned by the local instance in
     // aclk_handle_cloud_cmd_message. On the v2 success path, msg_id and
     // callback_topic are transferred into the query and released by
-    // aclk_query_free; payload is not consumed by v2 (the HTTP body is
-    // re-derived from the raw frame) and must be freed by the caller on both
-    // success and error paths. Any new owned field added here must extend
-    // both cleanup paths to preserve this invariant.
+    // aclk_query_free; on the error path the caller frees them. Any new owned
+    // field added here must extend both paths to preserve this invariant.
     char *msg_id;
     char *callback_topic;
-    char *payload;
     int version;
     int timeout;
     int min_version;
@@ -53,15 +50,6 @@ static int cloud_to_agent_parse(JSON_ENTRY *e)
             }
             if (!strcmp(e->name, "callback-topic")) {
                 data->callback_topic = e->data.string ? strdupz(e->data.string) : NULL;
-                break;
-            }
-            if (!strcmp(e->name, "payload")) {
-                if (likely(e->data.string)) {
-                    size_t len = strlen(e->data.string);
-                    data->payload = mallocz(len+1);
-                    if (!url_decode_r(data->payload, e->data.string, len + 1))
-                        strcpy(data->payload, e->data.string);
-                }
                 break;
             }
             break;
@@ -104,30 +92,21 @@ static inline int aclk_extract_v2_data(char *payload, char **data)
     return 0;
 }
 
-static inline int aclk_v2_payload_get_query(const char *payload, char **query_url)
+// the web client parses the request itself; this only refuses what the cloud must never send
+static inline int aclk_v2_payload_validate(const char *payload)
 {
-    const char *start, *end;
-
-    if(strncmp(payload, "GET /", 5) == 0 || strncmp(payload, "PUT /", 5) == 0)
-        start = payload + 4;
-    else if(strncmp(payload, "POST /", 6) == 0)
-        start = payload + 5;
-    else if(strncmp(payload, "DELETE /", 8) == 0)
-        start = payload + 7;
-    else {
+    if(strncmp(payload, "GET /", 5) != 0 && strncmp(payload, "PUT /", 5) != 0 &&
+       strncmp(payload, "POST /", 6) != 0 && strncmp(payload, "DELETE /", 8) != 0) {
         errno_clear();
         netdata_log_error("Only accepting requests that start with GET, POST, PUT, DELETE from CLOUD.");
         return 1;
     }
 
-    if(!(end = strstr(payload, HTTP_1_1 HTTP_ENDL))) {
+    if(!strstr(payload, HTTP_1_1 HTTP_ENDL)) {
         errno_clear();
         netdata_log_error("Doesn't look like HTTP GET request.");
         return 1;
     }
-
-    *query_url = mallocz((end - start) + 1);
-    strncpyz(*query_url, start, end - start);
 
     return 0;
 }
@@ -150,7 +129,7 @@ static int aclk_handle_cloud_http_request_v2(struct aclk_request *cloud_to_agent
         goto error;
     }
 
-    if (unlikely(aclk_v2_payload_get_query(query->data.http_api_v2.payload, &query->dedup_id))) {
+    if (unlikely(aclk_v2_payload_validate(query->data.http_api_v2.payload))) {
         netdata_log_error("Could not extract payload from query");
         goto error;
     }
@@ -168,9 +147,6 @@ static int aclk_handle_cloud_http_request_v2(struct aclk_request *cloud_to_agent
     // aclk_queue_query takes ownership of data pointer
     query->callback_topic = cloud_to_agent->callback_topic;
     query->timeout = cloud_to_agent->timeout;
-    // for clarity and code readability as when we process the request
-    // it would be strange to get URL from `dedup_id`
-    query->data.http_api_v2.query = query->dedup_id;
     query->msg_id = cloud_to_agent->msg_id;
     aclk_execute_query(query);
     return 0;
@@ -211,18 +187,11 @@ int aclk_handle_cloud_cmd_message(char *payload)
         goto err_cleanup;
     }
 
-    if (likely(!aclk_handle_cloud_http_request_v2(&cloud_to_agent, payload))) {
-        // aclk_handle_cloud_http_request_v2 takes ownership of msg_id and
-        // callback_topic on success. The JSON-parsed payload field is not
-        // consumed by v2 (the HTTP body comes from the raw frame), so free
-        // it here to avoid leaking when the cmd JSON included a "payload" key.
-        freez(cloud_to_agent.payload);
+    // aclk_handle_cloud_http_request_v2 takes ownership of msg_id and callback_topic on success
+    if (likely(!aclk_handle_cloud_http_request_v2(&cloud_to_agent, payload)))
         return 0;
-    }
 
 err_cleanup:
-    if (cloud_to_agent.payload)
-        freez(cloud_to_agent.payload);
     if (cloud_to_agent.msg_id)
         freez(cloud_to_agent.msg_id);
     if (cloud_to_agent.callback_topic)
