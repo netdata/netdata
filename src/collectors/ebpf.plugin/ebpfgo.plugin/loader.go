@@ -14,6 +14,7 @@ const (
 	minimumKernelVersion       = 4<<16 + 11<<8
 	minimumKernelVersionBuffer = 5<<16 + 10<<8
 	minimumKernelVersionArena  = 6<<16 + 12<<8
+	minimumKernelVersionSeven  = 7 << 16
 	minimumRHVersion           = 7*256 + 5
 )
 
@@ -276,6 +277,7 @@ func SelectKernelName(selector uint32) string {
 		"5.16",
 		"6.8",
 		"6.12",
+		"7.0",
 	}
 
 	if selector >= uint32(len(kernelNames)) {
@@ -300,6 +302,8 @@ func SelectMaxIndex(isRHF int, kver uint32) int {
 	}
 
 	switch {
+	case kver >= minimumKernelVersionSeven:
+		return 12
 	case kver >= minimumKernelVersionArena:
 		return 11
 	case kver >= 395264:

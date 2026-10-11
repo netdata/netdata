@@ -366,7 +366,9 @@ static char *ebpf_select_kernel_name(uint32_t selector)
         NETDATA_IDX_STR_V5_14,
         NETDATA_IDX_STR_V5_15,
         NETDATA_IDX_STR_V5_16,
-        NETDATA_IDX_STR_V6_8};
+        NETDATA_IDX_STR_V5_17,
+        NETDATA_IDX_STR_V6_8,
+        NETDATA_IDX_STR_V7_0};
 
     return kernel_names[selector];
 }
@@ -391,8 +393,12 @@ static int ebpf_select_max_index(int is_rhf, uint32_t kver)
         else if (kver >= NETDATA_EBPF_KERNEL_4_11)
             return NETDATA_IDX_V4_18;
     } else { // Kernels from kernel.org
-        if (kver >= NETDATA_EBPF_KERNEL_6_8)
+        if (kver >= NETDATA_EBPF_KERNEL_7_0)
+            return NETDATA_IDX_V7_0;
+        else if (kver >= NETDATA_EBPF_KERNEL_6_8)
             return NETDATA_IDX_V6_8;
+        else if (kver >= NETDATA_EBPF_KERNEL_5_17)
+            return NETDATA_IDX_V5_17;
         else if (kver >= NETDATA_EBPF_KERNEL_5_16)
             return NETDATA_IDX_V5_16;
         else if (kver >= NETDATA_EBPF_KERNEL_5_15)
@@ -965,6 +971,11 @@ struct bpf_link **ebpf_load_program(char *plugins_dir, ebpf_module_t *em, int kv
     em->load |= EBPF_LOAD_LEGACY;
 
     *obj = bpf_object__open_file(lpath, NULL);
+    if ((!*obj || libbpf_get_error(*obj)) && is_rhf != -1) {
+        *obj = NULL;
+        ebpf_mount_name(lpath, sizeof(lpath), plugins_dir, idx, em->info.thread_name, em->mode, -1);
+        *obj = bpf_object__open_file(lpath, NULL);
+    }
     // A failed open leaves nothing to close: libbpf 1.x returns NULL, older versions an error pointer.
     if (!*obj || libbpf_get_error(*obj)) {
         *obj = NULL;

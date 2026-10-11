@@ -49,6 +49,22 @@ static uint32_t ebpf_ut_map_value_size(const struct bpf_map *map)
         }                                                                                                              \
     } while (0)
 
+static int test_disk_kernel_variants(void)
+{
+    if (NETDATA_V5_17 != (1u << NETDATA_IDX_V5_17) || NETDATA_V6_8 != (1u << NETDATA_IDX_V6_8) ||
+        NETDATA_V7_0 != (1u << NETDATA_IDX_V7_0))
+        return 0;
+
+    for (size_t i = 0; ebpf_modules[i].info.thread_name; i++) {
+        if (!strcmp(ebpf_modules[i].info.thread_name, "disk")) {
+            const uint32_t expected = NETDATA_V5_11 | NETDATA_V5_17 | NETDATA_V6_8;
+            return (ebpf_modules[i].kernels & expected) == expected;
+        }
+    }
+
+    return 0;
+}
+
 static int ebpf_ut_percpu_lookup_fits_nprocs(struct bpf_object *obj)
 {
     const int possible_cpus = libbpf_num_possible_cpus();
@@ -156,6 +172,11 @@ void ebpf_ut_cleanup_memory()
  */
 static int ebpf_ut_load_binary()
 {
+    if (!test_disk_kernel_variants()) {
+        fprintf(stderr, ">>> FAILED: disk kernel variant selectors are inconsistent\n");
+        return -1;
+    }
+
     test_em.probe_links = ebpf_load_program(ebpf_plugin_dir, &test_em, running_on_kernel, isrh, &test_em.objects);
     if (!test_em.probe_links)
         return -1;

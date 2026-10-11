@@ -9,10 +9,10 @@ import (
 // fdKernelMask offers every selector index, as the other migrated collectors do.
 // It is deliberately wider than the C module's `.kernels`
 // (V3_10|V4_14|V4_16|V4_18|V5_4|V5_11|V5_14): the buffer and arena objects ship
-// for kernels up to 6.12, so SelectIndex has to be able to reach selector 11.
+// for kernels up to 7.0, so SelectIndex has to be able to reach selector 12.
 // The base flavor is bounded by fdMaxBaseSelector instead, which is where the
 // real object-availability limit lives.
-const fdKernelMask uint32 = (1 << 12) - 1
+const fdKernelMask uint32 = (1 << 13) - 1
 
 const fdDefaultPIDTableSize uint32 = 32768
 

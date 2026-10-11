@@ -4,7 +4,7 @@ import (
 	"github.com/netdata/netdata/src/collectors/ebpf.plugin/ebpfgo.plugin/libbpfloader"
 )
 
-const dcstatKernelMask uint32 = (1 << 12) - 1
+const dcstatKernelMask uint32 = (1 << 13) - 1
 const dcstatDefaultPIDTableSize uint32 = 32768
 
 // dcstatMaxBaseSelector is the highest SelectKernelName index for which a

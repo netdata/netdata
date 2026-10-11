@@ -848,14 +848,14 @@ static int ebpf_disk_load_bpf(ebpf_module_t *em)
 {
     int ret = 0;
     if (em->load & EBPF_LOAD_LEGACY) {
-        // The generic disk object set has no validated artifact for this kernel range. Do not load its 5.4
-        // fallback with baked-in structure offsets, which can attach successfully but silently collect nothing.
-        if (isrh == -1 && running_on_kernel >= NETDATA_EBPF_KERNEL_6_8) {
+        // The generic disk object set has no 6.16+ artifact. Do not load its 6.8 fallback with baked-in
+        // structure offsets, which can attach successfully but silently collect nothing.
+        if (isrh == -1 && running_on_kernel >= NETDATA_EBPF_KERNEL_6_16) {
             unsigned int kernel_major = (unsigned int)running_on_kernel >> 16;
             unsigned int kernel_minor = ((unsigned int)running_on_kernel >> 8) & 0xff;
             netdata_log_error(
                 "Disk latency is unavailable: no compatible generic legacy BPF object for kernel %u.%u; refusing "
-                "the 5.4 fallback. Use kernel BTF with CO-RE or a compatible legacy object.",
+                "the 6.8 fallback. Use kernel BTF with CO-RE or a compatible legacy object.",
                 kernel_major,
                 kernel_minor);
             return -1;
