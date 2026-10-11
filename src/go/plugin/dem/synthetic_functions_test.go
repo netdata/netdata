@@ -47,7 +47,7 @@ func TestRegistryPublishesSyntheticHistoryWithoutActiveJobs(t *testing.T) {
 	}, dem.DefaultConfig())
 	require.Contains(t, components.Collectors, "journey")
 	require.Contains(t, components.Collectors, "lighthouse")
-	require.Len(t, components.Functions[1].Functions(), 4)
+	require.Len(t, components.Functions[1].Functions(), 5)
 	handler := components.Functions[1].NewHandler().(*syntheticfunctions.Handler)
 	checks := handler.HandleRaw(ctx, funcapi.RawMethodRequest{
 		Method:      "synthetics-checks",

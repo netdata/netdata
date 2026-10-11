@@ -47,7 +47,7 @@ func columns(fields ...column) map[string]any {
 	return out
 }
 
-var methods = []method{checksMethod, runsMethod, runMethod, artifactMethod}
+var methods = []method{checksMethod, runsMethod, runMethod, artifactsMethod, artifactMethod}
 
 func Declarations() []funcapi.FunctionConfig {
 	out := make([]funcapi.FunctionConfig, 0, len(methods))

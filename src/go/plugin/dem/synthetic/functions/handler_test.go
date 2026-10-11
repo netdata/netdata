@@ -38,11 +38,8 @@ type source struct {
 	fetchErr  error
 }
 
-func (s *source) Stats() artifacts.Stats {
-	if s.artifacts == nil {
-		return artifacts.Stats{}
-	}
-	return s.artifacts.Stats()
+func (s *source) Catalogue(ctx context.Context, filter artifacts.Filter) (artifacts.Page, error) {
+	return s.artifacts.Catalogue(ctx, filter)
 }
 
 func (s *source) Snapshot(now time.Time) []syntheticregistry.Job {
@@ -63,14 +60,17 @@ func (s *source) GetRun(ctx context.Context, jobID, runID string) (model.Run, er
 	}
 	return r, nil
 }
-func (s *source) Manifest(ctx context.Context, runID string) ([]model.Artifact, error) {
-	return s.artifacts.Manifest(ctx, runID)
+func (s *source) Manifest(ctx context.Context, jobID, runID string) (artifacts.Manifest, error) {
+	if s.artifacts == nil {
+		return artifacts.Manifest{}, artifacts.ErrNotFound
+	}
+	return s.artifacts.Manifest(ctx, jobID, runID)
 }
-func (s *source) Fetch(ctx context.Context, runID, artifactID string) (model.Artifact, []byte, error) {
+func (s *source) Fetch(ctx context.Context, jobID, runID, artifactID string) (model.Artifact, []byte, error) {
 	if s.fetchErr != nil {
 		return model.Artifact{}, nil, s.fetchErr
 	}
-	return s.artifacts.Fetch(ctx, runID, artifactID)
+	return s.artifacts.Fetch(ctx, jobID, runID, artifactID)
 }
 func newHandler(s *source) *syntheticfunctions.Handler {
 	if s == nil {
@@ -80,7 +80,7 @@ func newHandler(s *source) *syntheticfunctions.Handler {
 	if s.hub != nil {
 		active = s.hub
 	}
-	return syntheticfunctions.New(query.New(active, s, s))
+	return syntheticfunctions.New(query.New(active, s, s, nil))
 }
 
 func ptr(n float64) *float64 { return &n }
@@ -458,7 +458,7 @@ func TestArtifactAccessAndExpiryThroughRealStore(t *testing.T) {
 	require.NoError(t, err)
 	defer store.Close()
 	const runID = "0123456789abcdef0123456789abcdef"
-	dir, err := store.Begin(runID)
+	dir, err := store.Begin(runID, "lighthouse:home")
 	require.NoError(t, err)
 	require.NoError(t, os.Mkdir(filepath.Join(dir, "output"), 0700))
 	html := []byte("<html><script>privateReport()</script></html>")
@@ -481,7 +481,7 @@ func TestArtifactAccessAndExpiryThroughRealStore(t *testing.T) {
 	}
 	h := newHandler(src)
 	inventory := call(h, "synthetics-checks")
-	assert.Equal(t, query.ArtifactStats(store.Stats()), inventory.RawResponse["artifacts"])
+	assert.NotContains(t, inventory.RawResponse, "artifacts")
 	args := []string{"job_id:lighthouse:home", "run_id:" + runID}
 	index := h.HandleRaw(
 		context.Background(),
@@ -546,7 +546,7 @@ func TestHistoryExplicitEpochBoundThroughJournal(t *testing.T) {
 	run.CompletedUS = run.StartedUS + 1
 	_, err = synthetichistory.NewStore(journal).AppendRun(ctx, "complete", run)
 	require.NoError(t, err)
-	h := syntheticfunctions.New(query.New(nil, synthetichistory.NewStore(journal), nil))
+	h := syntheticfunctions.New(query.New(nil, synthetichistory.NewStore(journal), nil, nil))
 	require.Len(t, responseData(t, call(h, "synthetics-runs")), 1)
 	got := call(h, "synthetics-runs", "before:0")
 	assert.Empty(t, responseData(t, got), "Unix epoch upper bound must exclude contemporary records")
@@ -563,10 +563,16 @@ func TestHistoryPickerUsesStartAndLatestCompletionThroughFunction(t *testing.T) 
 	require.NoError(t, err)
 	t.Cleanup(func() { require.NoError(t, journal.Close()) })
 	retained := synthetichistory.NewStore(journal)
-	run := model.Run{ID: "past-attempt", JobID: "journey:past", Kind: model.Journey, StartedUS: 100999999, Outcome: model.Unknown}
+	run := model.Run{
+		ID:        "past-attempt",
+		JobID:     "journey:past",
+		Kind:      model.Journey,
+		StartedUS: 100999999,
+		Outcome:   model.Unknown,
+	}
 	_, err = retained.AppendRun(ctx, "start", run)
 	require.NoError(t, err)
-	h := syntheticfunctions.New(query.New(nil, retained, nil))
+	h := syntheticfunctions.New(query.New(nil, retained, nil, nil))
 	beforeCompletion := call(h, "synthetics-runs", "after:100", "before:100", "outcome:unknown")
 	require.Len(t, responseData(t, beforeCompletion), 1)
 	validate(t, beforeCompletion)

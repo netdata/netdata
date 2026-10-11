@@ -186,12 +186,12 @@ func TestRetentionRetriesTransientFailureBeforeHourlySweep(t *testing.T) {
 
 type observedArtifactRetention struct{ sweeps chan RetentionConfig }
 
-func (r *observedArtifactRetention) Enforce(_ context.Context, days int, bytes int64) (artifacts.Stats, error) {
+func (r *observedArtifactRetention) Enforce(_ context.Context, days int, bytes int64) (artifacts.Status, error) {
 	r.sweeps <- RetentionConfig{
 		Days:     days,
 		MaxBytes: bytes,
 	}
-	return artifacts.Stats{}, nil
+	return artifacts.Status{}, nil
 }
 func TestArtifactSweepStillRunsWhenJournalSweepFails(t *testing.T) {
 	artifact := &observedArtifactRetention{
@@ -224,9 +224,9 @@ func (f historyRetentionFunc) EnforceHistoryRetention(ctx context.Context, days 
 	return f(ctx, days, maxBytes)
 }
 
-type artifactRetentionFunc func(context.Context, int, int64) (artifacts.Stats, error)
+type artifactRetentionFunc func(context.Context, int, int64) (artifacts.Status, error)
 
-func (f artifactRetentionFunc) Enforce(ctx context.Context, days int, maxBytes int64) (artifacts.Stats, error) {
+func (f artifactRetentionFunc) Enforce(ctx context.Context, days int, maxBytes int64) (artifacts.Status, error) {
 	return f(ctx, days, maxBytes)
 }
 func TestRetentionRetriesOnlyFailedStore(t *testing.T) {
@@ -242,12 +242,12 @@ func TestRetentionRetriesOnlyFailedStore(t *testing.T) {
 						}
 						return nil
 					}),
-					artifactStore: artifactRetentionFunc(func(context.Context, int, int64) (artifacts.Stats, error) {
+					artifactStore: artifactRetentionFunc(func(context.Context, int, int64) (artifacts.Status, error) {
 						artifactCalls.Add(1)
 						if failedStore == "artifacts" {
-							return artifacts.Stats{}, errors.New("artifacts unavailable")
+							return artifacts.Status{}, errors.New("artifacts unavailable")
 						}
-						return artifacts.Stats{}, nil
+						return artifacts.Status{}, nil
 					}),
 					policy:         DefaultConfig().History,
 					artifactPolicy: DefaultConfig().Artifacts,
@@ -272,16 +272,21 @@ func TestRetentionRetriesOnlyFailedStore(t *testing.T) {
 		})
 	}
 }
-func TestRetentionBudgetWarningRequiresSuccessfulSweep(t *testing.T) {
+func TestRetentionDoesNotTreatWorkspaceAsCaptureBudget(t *testing.T) {
 	for _, failed := range []bool{false, true} {
 		t.Run(map[bool]string{false: "fresh", true: "stale"}[failed], func(t *testing.T) {
 			synctest.Test(t, func(t *testing.T) {
 				var logs bytes.Buffer
 				service := &Retention{
 					store: historyRetentionFunc(func(context.Context, int, int64) error { return nil }),
-					artifactStore: artifactRetentionFunc(func(context.Context, int, int64) (artifacts.Stats, error) {
-						stats := artifacts.Stats{
-							ProtectedBytes: DefaultConfig().Artifacts.MaxBytes + 1,
+					artifactStore: artifactRetentionFunc(func(context.Context, int, int64) (artifacts.Status, error) {
+						workspace := DefaultConfig().Artifacts.MaxBytes + 1
+						stats := artifacts.Status{
+							Inventory: artifacts.Inventory{
+								Workspace: artifacts.ByteObservation{
+									Bytes: &workspace,
+								},
+							},
 						}
 						if failed {
 							return stats, errors.New("artifact sweep failed")
@@ -300,7 +305,7 @@ func TestRetentionBudgetWarningRequiresSuccessfulSweep(t *testing.T) {
 					assert.Contains(t, logs.String(), "DEM artifact retention failed")
 					assert.NotContains(t, logs.String(), "protected run files exceed artifact budget")
 				} else {
-					assert.Contains(t, logs.String(), "protected run files exceed artifact budget")
+					assert.NotContains(t, logs.String(), "protected run files exceed artifact budget")
 				}
 			})
 		})
@@ -312,9 +317,9 @@ func TestRetentionMaintainsHourlySweep(t *testing.T) {
 		var historyCalls, artifactCalls atomic.Int32
 		service := &Retention{
 			store: historyRetentionFunc(func(context.Context, int, int64) error { historyCalls.Add(1); return nil }),
-			artifactStore: artifactRetentionFunc(func(context.Context, int, int64) (artifacts.Stats, error) {
+			artifactStore: artifactRetentionFunc(func(context.Context, int, int64) (artifacts.Status, error) {
 				artifactCalls.Add(1)
-				return artifacts.Stats{}, nil
+				return artifacts.Status{}, nil
 			}),
 			policy:         DefaultConfig().History,
 			artifactPolicy: DefaultConfig().Artifacts,

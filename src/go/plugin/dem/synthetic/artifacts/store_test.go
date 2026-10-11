@@ -51,7 +51,7 @@ func store(t *testing.T) (*artifacts.Store, string) {
 }
 func captured(t *testing.T, s *artifacts.Store, id string, content []byte) (string, synthetic.Capture) {
 	t.Helper()
-	work, err := s.Begin(id)
+	work, err := s.Begin(id, "lighthouse:test")
 	require.NoError(t, err)
 	require.NoError(t, os.Mkdir(filepath.Join(work, "output"), 0700))
 	require.NoError(t, os.WriteFile(filepath.Join(work, "output", "report.html"), content, 0600))
@@ -76,23 +76,23 @@ func TestPublishFetchAndRestart(t *testing.T) {
 	assert.Equal(t, hex.EncodeToString(hash[:]), out[0].SHA256)
 	_, err = os.Stat(work)
 	assert.ErrorIs(t, err, os.ErrNotExist)
-	meta, got, err := s.Fetch(ctx, run1, c.ID)
+	meta, got, err := s.Fetch(ctx, "lighthouse:test", run1, c.ID)
 	require.NoError(t, err)
 	assert.Equal(t, out[0], meta)
 	assert.Equal(t, payload, got)
-	assert.Positive(t, s.Stats().RetainedBytes)
-	assert.Zero(t, s.Stats().ProtectedBytes)
-	index, err := s.Manifest(ctx, run1)
+	assert.Positive(t, *observedStatus(t, s).Inventory.Retained.Bytes)
+	assert.Zero(t, *observedStatus(t, s).Inventory.Workspace.Bytes)
+	index, err := s.Manifest(ctx, "lighthouse:test", run1)
 	require.NoError(t, err)
-	assert.Equal(t, out, index)
+	assert.Equal(t, out, index.Artifacts)
 	require.NoError(t, s.Close())
 	reopened, err := artifacts.Open(root)
 	require.NoError(t, err)
 	defer reopened.Close()
-	_, got, err = reopened.Fetch(ctx, run1, c.ID)
+	_, got, err = reopened.Fetch(ctx, "lighthouse:test", run1, c.ID)
 	require.NoError(t, err)
 	assert.Equal(t, payload, got)
-	_, err = reopened.Begin(run1)
+	_, err = reopened.Begin(run1, "lighthouse:test")
 	assert.ErrorIs(t, err, artifacts.ErrExists)
 }
 func TestStrictCapturePathsAndKinds(t *testing.T) {
@@ -142,13 +142,13 @@ func TestStrictCapturePathsAndKinds(t *testing.T) {
 			got, err := os.ReadFile(outside)
 			require.NoError(t, err)
 			assert.Equal(t, "outside remains", string(got))
-			assert.Zero(t, s.Stats().ProtectedBytes)
+			assert.Zero(t, *observedStatus(t, s).Inventory.Workspace.Bytes)
 		})
 	}
 }
 func TestPNGCapture(t *testing.T) {
 	s, _ := store(t)
-	work, err := s.Begin(run1)
+	work, err := s.Begin(run1, "lighthouse:test")
 	require.NoError(t, err)
 	require.NoError(t, os.Mkdir(filepath.Join(work, "output"), 0700))
 	require.NoError(t, os.WriteFile(filepath.Join(work, "output", "capture.png"), png, 0600))
@@ -160,7 +160,7 @@ func TestPNGCapture(t *testing.T) {
 	}
 	_, err = s.Finalize(context.Background(), run1, []synthetic.Capture{c})
 	require.NoError(t, err)
-	_, got, err := s.Fetch(context.Background(), run1, c.ID)
+	_, got, err := s.Fetch(context.Background(), "lighthouse:test", run1, c.ID)
 	require.NoError(t, err)
 	assert.Equal(t, png, got)
 }
@@ -176,9 +176,9 @@ func TestFetchBoundAndCorruption(t *testing.T) {
 	}
 	_, err := s.Finalize(context.Background(), run1, []synthetic.Capture{small, c})
 	require.ErrorIs(t, err, artifacts.ErrTooLarge)
-	_, _, err = s.Fetch(context.Background(), run1, c.ID)
+	_, _, err = s.Fetch(context.Background(), "lighthouse:test", run1, c.ID)
 	assert.ErrorIs(t, err, artifacts.ErrNotFound)
-	assert.Zero(t, s.Stats().ProtectedBytes)
+	assert.Zero(t, *observedStatus(t, s).Inventory.Workspace.Bytes)
 	for _, dir := range []string{"work", "staging", "drained", "runs"} {
 		_, err = os.Lstat(filepath.Join(root, dir, run1))
 		assert.ErrorIs(t, err, os.ErrNotExist, dir)
@@ -189,7 +189,7 @@ func TestFetchBoundAndCorruption(t *testing.T) {
 	_, err = s.Finalize(context.Background(), run2, []synthetic.Capture{c})
 	require.NoError(t, err)
 	require.NoError(t, os.WriteFile(filepath.Join(root, "runs", run2, c.ID), []byte("bad!"), 0600))
-	_, _, err = s.Fetch(context.Background(), run2, c.ID)
+	_, _, err = s.Fetch(context.Background(), "lighthouse:test", run2, c.ID)
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "manifest")
 }
@@ -198,17 +198,17 @@ func TestRetentionAndProtectedWork(t *testing.T) {
 	_, c := captured(t, s, run1, []byte("retained report"))
 	_, err := s.Finalize(context.Background(), run1, []synthetic.Capture{c})
 	require.NoError(t, err)
-	work, err := s.Begin(run2)
+	work, err := s.Begin(run2, "lighthouse:test")
 	require.NoError(t, err)
 	require.NoError(t, os.WriteFile(filepath.Join(work, "profile"), []byte("unverified browser state"), 0600))
 	stats, err := s.Enforce(context.Background(), 7, 2<<30)
 	require.NoError(t, err)
-	assert.Positive(t, stats.ProtectedBytes)
-	_, _, err = s.Fetch(context.Background(), run1, c.ID)
+	assert.Positive(t, *stats.Inventory.Workspace.Bytes)
+	_, _, err = s.Fetch(context.Background(), "lighthouse:test", run1, c.ID)
 	require.NoError(t, err, "fresh capture remains inside policy")
 	_, err = s.Enforce(context.Background(), 7, 1)
 	require.NoError(t, err)
-	_, _, err = s.Fetch(context.Background(), run1, c.ID)
+	_, _, err = s.Fetch(context.Background(), "lighthouse:test", run1, c.ID)
 	assert.ErrorIs(t, err, artifacts.ErrNotFound)
 	require.NoError(t, s.Close())
 	reopened, err := artifacts.Open(root)
@@ -218,7 +218,7 @@ func TestRetentionAndProtectedWork(t *testing.T) {
 	require.NoError(t, err)
 	_, err = os.Stat(work)
 	assert.NoError(t, err, "age, budget and restart never prove drainage")
-	_, _, err = reopened.Fetch(context.Background(), run1, c.ID)
+	_, _, err = reopened.Fetch(context.Background(), "lighthouse:test", run1, c.ID)
 	assert.ErrorIs(t, err, artifacts.ErrNotFound)
 }
 func TestDrainedFailedCaptureCleanupRetries(t *testing.T) {
@@ -233,7 +233,7 @@ func TestDrainedFailedCaptureCleanupRetries(t *testing.T) {
 	_, err = s.Finalize(context.Background(), run1, []synthetic.Capture{c})
 	require.ErrorIs(t, err, artifacts.ErrInvalidCapture)
 	assert.Contains(t, err.Error(), "ownership does not match")
-	assert.Positive(t, s.Stats().CleanupErrors)
+	assert.NotEmpty(t, observedStatus(t, s).Cleanup.Error)
 	_, err = os.Stat(filepath.Join(root, "drained", run1))
 	require.NoError(t, err)
 	// Restore this fixture's alias and retry in the same owner, without restart.
@@ -243,7 +243,7 @@ func TestDrainedFailedCaptureCleanupRetries(t *testing.T) {
 	require.NoError(t, err)
 	_, err = os.Lstat(work)
 	assert.ErrorIs(t, err, os.ErrNotExist)
-	assert.Zero(t, s.Stats().ProtectedBytes)
+	assert.Zero(t, *observedStatus(t, s).Inventory.Workspace.Bytes)
 }
 
 func TestFetchExpiryRace(t *testing.T) {
@@ -257,7 +257,7 @@ func TestFetchExpiryRace(t *testing.T) {
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
-			_, got, err := s.Fetch(context.Background(), run1, c.ID)
+			_, got, err := s.Fetch(context.Background(), "lighthouse:test", run1, c.ID)
 			if err == nil {
 				assert.Equal(t, payload, got)
 			} else {
@@ -275,12 +275,12 @@ func TestOwnershipIDsAndClose(t *testing.T) {
 	assert.Nil(t, other)
 	assert.ErrorIs(t, err, artifacts.ErrLocked)
 	for _, id := range []string{"../escape", "ABCDEF", "short", "0000000000000000000000000000000g"} {
-		_, err = s.Begin(id)
+		_, err = s.Begin(id, "lighthouse:test")
 		assert.ErrorIs(t, err, artifacts.ErrInvalidID)
 	}
-	_, err = s.Begin(run1)
+	_, err = s.Begin(run1, "lighthouse:test")
 	require.NoError(t, err)
-	_, err = s.Begin(run1)
+	_, err = s.Begin(run1, "lighthouse:test")
 	assert.ErrorIs(t, err, artifacts.ErrExists)
 	ctx, cancel := context.WithCancel(context.Background())
 	cancel()
@@ -288,17 +288,17 @@ func TestOwnershipIDsAndClose(t *testing.T) {
 	assert.ErrorIs(t, err, context.Canceled)
 	_, err = s.Finalize(context.Background(), run1, nil)
 	require.NoError(t, err)
-	_, _, err = s.Fetch(context.Background(), run1, "absent")
+	_, _, err = s.Fetch(context.Background(), "lighthouse:test", run1, "absent")
 	assert.ErrorIs(t, err, artifacts.ErrNotFound)
 	require.NoError(t, s.Close())
 	require.NoError(t, s.Close())
-	_, err = s.Begin(run2)
+	_, err = s.Begin(run2, "lighthouse:test")
 	assert.ErrorIs(t, err, artifacts.ErrClosed)
 }
 func TestTemporaryClosePreservesUnverifiedWork(t *testing.T) {
 	s, err := artifacts.Open("")
 	require.NoError(t, err)
-	work, err := s.Begin(run1)
+	work, err := s.Begin(run1, "lighthouse:test")
 	require.NoError(t, err)
 	actual, err := os.Readlink(work)
 	require.NoError(t, err)
@@ -310,7 +310,7 @@ func TestTemporaryClosePreservesUnverifiedWork(t *testing.T) {
 	require.NoError(t, os.RemoveAll(filepath.Dir(filepath.Dir(actual))))
 	s, err = artifacts.Open("")
 	require.NoError(t, err)
-	work, err = s.Begin(run1)
+	work, err = s.Begin(run1, "lighthouse:test")
 	require.NoError(t, err)
 	actual, err = os.Readlink(work)
 	require.NoError(t, err)
@@ -344,8 +344,8 @@ func TestInvalidDrainMarkerCannotAuthorizeCleanup(t *testing.T) {
 	defer reopened.Close()
 	stats, err := reopened.Enforce(context.Background(), 7, 1)
 	require.Error(t, err)
-	assert.Positive(t, stats.CleanupErrors)
-	assert.Positive(t, stats.ProtectedBytes)
+	assert.NotEmpty(t, stats.Cleanup.Error)
+	assert.Positive(t, *stats.Inventory.Workspace.Bytes)
 	_, err = os.Stat(work)
 	assert.NoError(t, err)
 }
@@ -355,7 +355,7 @@ func TestFetchExactSizeBoundary(t *testing.T) {
 	_, c := captured(t, s, run1, payload)
 	_, err := s.Finalize(context.Background(), run1, []synthetic.Capture{c})
 	require.NoError(t, err)
-	_, got, err := s.Fetch(context.Background(), run1, c.ID)
+	_, got, err := s.Fetch(context.Background(), "lighthouse:test", run1, c.ID)
 	require.NoError(t, err)
 	assert.Equal(t, payload, got)
 }
@@ -374,7 +374,7 @@ func TestShortAliasKeepsLongPrivateWork(t *testing.T) {
 	require.NoError(t, err)
 	_, err = os.Lstat(work)
 	assert.ErrorIs(t, err, os.ErrNotExist)
-	_, raw, err := s.Fetch(context.Background(), run1, c.ID)
+	_, raw, err := s.Fetch(context.Background(), "lighthouse:test", run1, c.ID)
 	require.NoError(t, err)
 	assert.Equal(t, "long-path report", string(raw))
 }
@@ -384,7 +384,7 @@ func TestExistingAliasIsNeverAdoptedOrRemoved(t *testing.T) {
 	unrelated := t.TempDir()
 	require.NoError(t, os.Symlink(unrelated, alias))
 	defer os.Remove(alias)
-	_, err := s.Begin(run1)
+	_, err := s.Begin(run1, "lighthouse:test")
 	require.Error(t, err)
 	_, err = s.Enforce(context.Background(), 7, 1)
 	require.NoError(t, err)
@@ -406,10 +406,10 @@ func TestMismatchedAliasBlocksDrainedCleanup(t *testing.T) {
 	published, err := s.Finalize(context.Background(), run1, []synthetic.Capture{c})
 	require.NoError(t, err, "owned-work cleanup does not undo durable publication")
 	require.Len(t, published, 1)
-	_, raw, err := s.Fetch(context.Background(), run1, c.ID)
+	_, raw, err := s.Fetch(context.Background(), "lighthouse:test", run1, c.ID)
 	require.NoError(t, err)
 	assert.Equal(t, "candidate", string(raw))
-	assert.Positive(t, s.Stats().CleanupErrors)
+	assert.NotEmpty(t, observedStatus(t, s).Cleanup.Error)
 	_, err = s.Enforce(context.Background(), 7, 2<<30)
 	require.Error(t, err)
 	target, err := os.Readlink(work)
@@ -430,8 +430,8 @@ func TestMismatchedAliasBlocksDrainedCleanup(t *testing.T) {
 	require.NoError(t, os.Symlink(actual, work))
 	_, err = reopened.Enforce(context.Background(), 7, 2<<30)
 	require.NoError(t, err)
-	assert.Zero(t, reopened.Stats().ProtectedBytes)
-	_, raw, err = reopened.Fetch(context.Background(), run1, c.ID)
+	assert.Zero(t, *observedStatus(t, reopened).Inventory.Workspace.Bytes)
+	_, raw, err = reopened.Fetch(context.Background(), "lighthouse:test", run1, c.ID)
 	require.NoError(t, err)
 	assert.Equal(t, "candidate", string(raw))
 }
@@ -464,7 +464,7 @@ func TestFailedPublicationAttemptStaysProtectedUntilRestart(t *testing.T) {
 	require.NoError(t, err)
 	_, err = os.Stat(work)
 	require.NoError(t, err, "uncertain publication preserves original work")
-	_, err = s.Manifest(context.Background(), run1)
+	_, err = s.Manifest(context.Background(), "lighthouse:test", run1)
 	require.ErrorContains(t, err, "uncertain")
 	require.NoError(t, s.Close())
 	reopened, err := artifacts.Open(root)
@@ -474,9 +474,9 @@ func TestFailedPublicationAttemptStaysProtectedUntilRestart(t *testing.T) {
 	require.NoError(t, err)
 	_, err = os.Lstat(work)
 	assert.ErrorIs(t, err, os.ErrNotExist)
-	_, _, err = reopened.Fetch(context.Background(), run1, c.ID)
+	_, _, err = reopened.Fetch(context.Background(), "lighthouse:test", run1, c.ID)
 	assert.ErrorIs(t, err, artifacts.ErrNotFound)
-	assert.Zero(t, reopened.Stats().ProtectedBytes)
+	assert.Zero(t, *observedStatus(t, reopened).Inventory.Workspace.Bytes)
 }
 
 // Grow the fixture at the copy's first cancellation check, after its initial Stat.
@@ -513,7 +513,7 @@ func TestCaptureGrowingPastFetchLimitIsNotPublished(t *testing.T) {
 		_, err = os.Lstat(filepath.Join(root, dir, run1))
 		assert.ErrorIs(t, err, os.ErrNotExist, dir)
 	}
-	assert.Zero(t, s.Stats().ProtectedBytes)
+	assert.Zero(t, *observedStatus(t, s).Inventory.Workspace.Bytes)
 }
 
 // Return the admission result, then cancel: a deadline can expire immediately
@@ -533,7 +533,7 @@ func (c *cancelAfterAdmissionContext) Err() error {
 func TestCancelledEmptyFinalizeCleansDrainedWorkWithoutPublishing(t *testing.T) {
 	s, root := store(t)
 	id := fixtureRunID()
-	alias, err := s.Begin(id)
+	alias, err := s.Begin(id, "lighthouse:test")
 	require.NoError(t, err)
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
@@ -549,5 +549,16 @@ func TestCancelledEmptyFinalizeCleansDrainedWorkWithoutPublishing(t *testing.T) 
 	}
 	_, err = os.Lstat(alias)
 	assert.ErrorIs(t, err, os.ErrNotExist)
-	assert.Zero(t, s.Stats().ProtectedBytes)
+	assert.Zero(t, *observedStatus(t, s).Inventory.Workspace.Bytes)
+}
+
+func observedStatus(t *testing.T, s *artifacts.Store) artifacts.Status {
+	t.Helper()
+	page, err := s.Catalogue(context.Background(), artifacts.Filter{
+		Limit: 1,
+	})
+	require.NoError(t, err)
+	require.NotNil(t, page.Status.Inventory.Retained.Bytes)
+	require.NotNil(t, page.Status.Inventory.Workspace.Bytes)
+	return page.Status
 }

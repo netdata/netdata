@@ -31,19 +31,47 @@ a missing published capture. Unmarked work is never cleaned based on age or PID.
 Even a temporary store is preserved on close when unverified work remains.
 Same-UID or root tampering with the private store is outside the ownership model.
 
-Retention removes complete published run directories in age order, accounting
-for both payload and manifest bytes. Protected work counts toward total bytes
-but cannot be evicted, so the shared policy is not a hard disk ceiling. Statistics
-expose retained bytes, protected bytes and cumulative cleanup errors. Cleanup
-failures after durable publication do not hide the published metadata or captures;
-retention retries the marked work cleanup. A sweep is
-linear in stored files plus sorting the published runs; it does not rescan the
-whole store after every eviction.
+A nonempty publication writes a Go-authored manifest containing `job_id`, `run_id`,
+`published_us` and artifact membership. No-capture finalization cleans drained work
+without creating a persistent empty manifest. `Manifest` and `Fetch` require the
+owning JobID; the manifest authorizes membership independently of journal history.
+History is only a fallback explanation for an absent capture set, never byte access.
+
+Retention first expires sets by publication age and rejects sets larger than the
+whole allowance. It then evicts oldest non-preferred sets before the newest
+eligible set per JobID; if those preferred sets do not fit, they expire oldest
+first too. Publication time and RunID break ties deterministically. All logical
+file lengths inside each trusted published set directory count toward the shared
+retained-only allowance, including its manifest; eviction removes that whole directory.
+Unclassified published entries have no trusted set identity. They, active or
+unverified workspace, and pending deletions remain separate from the allowance.
+No preference bypasses age or guarantees one retained set per job. Disabled jobs
+keep their preference; renamed jobs form separate groups.
+
+Eviction renames a complete set from `runs/` to `deleting/`. Both parent directories
+must sync before recursive removal is authorized, including retries after restart.
+The deleting parent syncs again after removal. Partial cleanup remains retryable
+without depending on surviving manifest bytes. Conflicting or uncertain ownership
+blocks deletion. Unknown work is never deleted through age or PID inference.
+
+`Catalogue` reads metadata and file sizes, not payload contents. It returns sets
+newest first with `(published_us, run_id)` keyset pagination; retention may remove
+sets between pages. Its global storage snapshot is independent of filters and
+pages: effective policy, observation time, retained/workspace/unclassified/deleting
+byte observations, known set/job counts, and cleanup attempt/success/error state.
+Unreadable categories return unknown bytes plus an error, not a misleading zero.
+A trusted set whose size cannot be measured makes retained bytes unknown and defers
+retention selection until a complete inventory succeeds. Unclassified or workspace
+errors do not prevent selection from a complete retained inventory.
+`synthetics-artifacts` reports the last policy-reload error in its `storage` block.
+A sweep is linear in stored files plus
+sorting the published sets, with no rescan per eviction. Publication and current
+check inventory do not recursively scan storage.
 
 `Manifest` reads metadata without loading content. `Fetch` verifies content
 against its manifest, caps returned content at 5 MiB and serializes with expiry.
-Missing records return `ErrNotFound`; the history-backed Function identifies
-these as expired or unavailable. No tombstones grow independently of retention.
+Missing records return `ErrNotFound`; retained run evidence can explain these as
+expired or unavailable. No tombstones grow independently of retention.
 Publication rejects captures exceeding the same 5 MiB limit with `ErrTooLarge`,
 without publishing a partial run or truncated artifact. The copy is bounded even
 if a source grows after its initial size check. Fetch retains its size guard for

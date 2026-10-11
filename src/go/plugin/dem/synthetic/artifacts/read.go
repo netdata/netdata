@@ -15,7 +15,7 @@ import (
 	"github.com/netdata/netdata/go/plugins/plugin/dem/synthetic"
 )
 
-func (s *Store) Fetch(ctx context.Context, runID, artifactID string) (synthetic.Artifact, []byte, error) {
+func (s *Store) Fetch(ctx context.Context, jobID, runID, artifactID string) (synthetic.Artifact, []byte, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	if s.closed {
@@ -27,7 +27,7 @@ func (s *Store) Fetch(ctx context.Context, runID, artifactID string) (synthetic.
 	if !runIDPattern.MatchString(runID) || !artifactIDPattern.MatchString(artifactID) {
 		return synthetic.Artifact{}, nil, ErrInvalidID
 	}
-	m, err := s.readManifest(runID)
+	m, err := s.readOwnedManifest(jobID, runID)
 	if err != nil {
 		return synthetic.Artifact{}, nil, err
 	}
@@ -70,32 +70,40 @@ func (s *Store) Fetch(ctx context.Context, runID, artifactID string) (synthetic.
 }
 
 // Manifest returns immutable metadata without reading capture contents.
-func (s *Store) Manifest(ctx context.Context, runID string) ([]synthetic.Artifact, error) {
+func (s *Store) Manifest(ctx context.Context, jobID, runID string) (Manifest, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	if s.closed {
-		return nil, ErrClosed
+		return Manifest{}, ErrClosed
 	}
 	if err := ctx.Err(); err != nil {
-		return nil, err
+		return Manifest{}, err
 	}
 	if !runIDPattern.MatchString(runID) {
-		return nil, ErrInvalidID
+		return Manifest{}, ErrInvalidID
 	}
-	m, err := s.readManifest(runID)
+	m, err := s.readOwnedManifest(jobID, runID)
 	if err != nil {
-		return nil, err
+		return Manifest{}, err
 	}
-	return m.Artifacts, nil
+	return m.Manifest, nil
 }
 
 func (s *Store) readManifest(id string) (manifest, error) {
 	if s.uncertain[id] {
 		return manifest{}, fmt.Errorf("artifact publication is uncertain")
 	}
+	if !runIDPattern.MatchString(id) {
+		return manifest{}, ErrInvalidID
+	}
+	if _, err := s.root.Lstat("runs/" + id); errors.Is(err, fs.ErrNotExist) {
+		return manifest{}, ErrNotFound
+	} else if err != nil {
+		return manifest{}, err
+	}
 	file, err := openRegular(s.root, "runs/"+id+"/manifest.json")
 	if errors.Is(err, fs.ErrNotExist) {
-		return manifest{}, ErrNotFound
+		return manifest{}, fmt.Errorf("invalid artifact manifest: %w", err)
 	}
 	if err != nil {
 		return manifest{}, err
@@ -105,7 +113,7 @@ func (s *Store) readManifest(id string) (manifest, error) {
 	if err != nil {
 		return manifest{}, err
 	}
-	if m.Version != 1 || m.RunID != id || m.CreatedUS <= 0 {
+	if m.Version != 2 || m.RunID != id || !validJobID(m.JobID) || m.PublishedUS <= 0 || len(m.Artifacts) == 0 {
 		return manifest{}, fmt.Errorf("invalid artifact manifest")
 	}
 	ids := make(map[string]bool)
@@ -115,6 +123,20 @@ func (s *Store) readManifest(id string) (manifest, error) {
 			return manifest{}, fmt.Errorf("invalid artifact manifest entry")
 		}
 		ids[a.ID] = true
+	}
+	return m, nil
+}
+
+func (s *Store) readOwnedManifest(jobID, runID string) (manifest, error) {
+	if !validJobID(jobID) {
+		return manifest{}, ErrInvalidID
+	}
+	m, err := s.readManifest(runID)
+	if err != nil {
+		return manifest{}, err
+	}
+	if m.JobID != jobID {
+		return manifest{}, ErrOwnerMismatch
 	}
 	return m, nil
 }

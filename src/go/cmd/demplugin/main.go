@@ -100,10 +100,9 @@ func main() {
 		os.Exit(1)
 	}
 	if _, err = captures.Enforce(context.Background(), cfg.Artifacts.Days, cfg.Artifacts.MaxBytes); err != nil {
-		_ = captures.Close()
-		_ = history.Close()
-		fmt.Fprintf(os.Stderr, "initializing DEM artifact policy: %v\n", err)
-		os.Exit(1)
+		// Inventory/cleanup failure does not invalidate the owned store or stop runs.
+		// Process maintenance retries it, and the catalogue exposes its status.
+		fmt.Fprintf(os.Stderr, "initial DEM artifact cleanup failed: %v\n", err)
 	}
 	cfg.Runtime.AssetsPath = filepath.Join(executable.Directory, "dem")
 	executor := runner.New(cfg.Runtime, synthetichistory.NewStore(history), captures)

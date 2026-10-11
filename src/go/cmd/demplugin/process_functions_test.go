@@ -23,6 +23,7 @@ import (
 	demjournal "github.com/netdata/netdata/go/plugins/plugin/dem/journal"
 	rumhistory "github.com/netdata/netdata/go/plugins/plugin/dem/rum/history"
 	"github.com/netdata/netdata/go/plugins/plugin/dem/synthetic"
+	"github.com/netdata/netdata/go/plugins/plugin/dem/synthetic/artifacts"
 	synthetichistory "github.com/netdata/netdata/go/plugins/plugin/dem/synthetic/history"
 	"github.com/santhosh-tekuri/jsonschema/v6"
 	"github.com/stretchr/testify/assert"
@@ -115,8 +116,12 @@ func TestDEMHistoryFunctionsIndependentOfCollectorSelection(t *testing.T) {
 			}
 			_, err = synthetichistory.NewStore(history).AppendRun(ctx, "complete", run)
 			require.NoError(t, err)
+			captures, err := artifacts.Open(t.TempDir())
+			require.NoError(t, err)
+			t.Cleanup(func() { require.NoError(t, captures.Close()) })
 			components := dem.New(dem.Dependencies{
-				History: history,
+				Artifacts: captures,
+				History:   history,
 			}, dem.DefaultConfig())
 			var created atomic.Int32
 			var handlersMu sync.Mutex
@@ -171,10 +176,15 @@ func TestDEMHistoryFunctionsIndependentOfCollectorSelection(t *testing.T) {
 			require.Eventually(t, func() bool {
 				return strings.Contains(output.String(), `FUNCTION GLOBAL "rum-sessions"`) &&
 					strings.Contains(output.String(), `FUNCTION GLOBAL "synthetics-run"`) &&
+					strings.Contains(output.String(), `FUNCTION GLOBAL "synthetics-artifacts"`) &&
 					strings.Contains(output.String(), `FUNCTION GLOBAL "dem-history-status"`)
 			}, 3*time.Second, time.Millisecond)
 			for generation := 0; generation < 2; generation++ {
 				suffix := fmt.Sprint(generation)
+				catalogue := output.call(t, writer, "catalogue"+suffix, "synthetics-artifacts")
+				require.NoError(t, schema.Validate(catalogue))
+				assert.Empty(t, catalogue["data"])
+				assert.Contains(t, catalogue, "storage")
 				status := output.call(t, writer, "status"+suffix, "dem-history-status")
 				require.NoError(t, schema.Validate(status))
 				statusRows := status["data"].([]any)
