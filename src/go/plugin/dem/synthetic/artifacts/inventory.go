@@ -15,7 +15,7 @@ func (s *Store) inventory(ctx context.Context) ([]Set, Inventory) {
 	var sets []Set
 	var retained, workspace, unclassified int64
 	var retainedErr, workspaceErr, unclassifiedErr, classificationErr error
-	entries, err := fs.ReadDir(s.root.FS(), "runs")
+	entries, err := fs.ReadDir(s.inventoryFS, "runs")
 	if err != nil {
 		retainedErr = err
 		unclassifiedErr = err
@@ -28,7 +28,7 @@ func (s *Store) inventory(ctx context.Context) ([]Set, Inventory) {
 			break
 		}
 		id := entry.Name()
-		size, sizeErr := treeBytesContext(ctx, s.root, "runs/"+id)
+		size, sizeErr := treeBytesContext(ctx, s.inventoryFS, "runs/"+id)
 		if s.uncertain[id] {
 			workspace += size
 			workspaceErr = errors.Join(workspaceErr, sizeErr)
@@ -41,10 +41,16 @@ func (s *Store) inventory(ctx context.Context) ([]Set, Inventory) {
 		} else {
 			m, readErr = s.readManifest(id)
 		}
-		if readErr != nil || sizeErr != nil {
+		if readErr != nil {
 			unclassified += size
 			unclassifiedErr = errors.Join(unclassifiedErr, sizeErr)
 			classificationErr = errors.Join(classificationErr, readErr, sizeErr)
+			continue
+		}
+		if sizeErr != nil {
+			// Failed measurement does not erase ownership. Selection needs the
+			// complete retained population to preserve each job's newest set.
+			retainedErr = errors.Join(retainedErr, sizeErr)
 			continue
 		}
 		sets = append(
@@ -61,11 +67,11 @@ func (s *Store) inventory(ctx context.Context) ([]Set, Inventory) {
 		jobs[m.JobID] = true
 	}
 	for _, dir := range []string{"work", "staging", "drained"} {
-		size, err := treeBytesContext(ctx, s.root, dir)
+		size, err := treeBytesContext(ctx, s.inventoryFS, dir)
 		workspace += size
 		workspaceErr = errors.Join(workspaceErr, err)
 	}
-	pending, pendingErr := treeBytesContext(ctx, s.root, "deleting")
+	pending, pendingErr := treeBytesContext(ctx, s.inventoryFS, "deleting")
 	inv := Inventory{
 		ObservedUS:   time.Now().UnixMicro(),
 		Retained:     observation(retained, retainedErr),

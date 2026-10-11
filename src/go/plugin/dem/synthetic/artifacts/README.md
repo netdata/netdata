@@ -40,9 +40,11 @@ History is only a fallback explanation for an absent capture set, never byte acc
 Retention first expires sets by publication age and rejects sets larger than the
 whole allowance. It then evicts oldest non-preferred sets before the newest
 eligible set per JobID; if those preferred sets do not fit, they expire oldest
-first too. Publication time and RunID break ties deterministically. Payload and
-manifest logical lengths count toward the shared retained-only allowance. Active
-or unverified workspace, unclassified files and pending deletions remain separate.
+first too. Publication time and RunID break ties deterministically. All logical
+file lengths inside each trusted published set directory count toward the shared
+retained-only allowance, including its manifest; eviction removes that whole directory.
+Unclassified published entries have no trusted set identity. They, active or
+unverified workspace, and pending deletions remain separate from the allowance.
 No preference bypasses age or guarantees one retained set per job. Disabled jobs
 keep their preference; renamed jobs form separate groups.
 
@@ -58,7 +60,11 @@ sets between pages. Its global storage snapshot is independent of filters and
 pages: effective policy, observation time, retained/workspace/unclassified/deleting
 byte observations, known set/job counts, and cleanup attempt/success/error state.
 Unreadable categories return unknown bytes plus an error, not a misleading zero.
-The Function adds policy reload errors. A sweep is linear in stored files plus
+A trusted set whose size cannot be measured makes retained bytes unknown and defers
+retention selection until a complete inventory succeeds. Unclassified or workspace
+errors do not prevent selection from a complete retained inventory.
+`synthetics-artifacts` reports the last policy-reload error in its `storage` block.
+A sweep is linear in stored files plus
 sorting the published sets, with no rescan per eviction. Publication and current
 check inventory do not recursively scan storage.
 

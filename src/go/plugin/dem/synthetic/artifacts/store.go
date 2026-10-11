@@ -56,6 +56,8 @@ type Store struct {
 	policy    *Policy
 	cleanup   Cleanup
 	eviction  evictionIO
+	// Inventory uses the same rooted filesystem; tests can fail enumeration alone.
+	inventoryFS fs.FS
 }
 
 // Open takes one lifetime filesystem lock. Empty path creates a private store.
@@ -96,11 +98,12 @@ func Open(name string) (_ *Store, retErr error) {
 		return nil, err
 	}
 	s := &Store{
-		root:      root,
-		path:      name,
-		temporary: temporary,
-		active:    make(map[string]string),
-		uncertain: make(map[string]bool),
+		root:        root,
+		path:        name,
+		temporary:   temporary,
+		active:      make(map[string]string),
+		uncertain:   make(map[string]bool),
+		inventoryFS: root.FS(),
 	}
 	defer func() {
 		if retErr != nil {

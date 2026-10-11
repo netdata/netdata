@@ -306,9 +306,11 @@ no persistent manifest. Catalogue and fetch use that ownership independently of 
 absent sets. Catalogue reads metadata and logical file lengths, sorts by publication time/RunID, and exposes bounded
 keyset pages plus an unfiltered global storage snapshot. Unknown byte categories carry errors rather than zeroes.
 
-The shared allowance counts retained payload and manifest bytes only. Age expiry precedes size pressure, which removes
-older non-preferred sets before each JobID's newest eligible set. If preferred sets exceed the allowance, they expire
-oldest first as well. Workspace, unclassified files and pending deletion are separate observations, not eviction pressure.
+The shared allowance counts all logical file lengths inside trusted published set directories, including manifests;
+eviction removes whole set directories. Unclassified published entries lack trusted set identity and remain separate,
+along with workspace and pending deletion. An unreadable trusted set makes retained bytes unknown and defers retention
+selection until the retained inventory is complete. Age expiry precedes size pressure, which removes older non-preferred
+sets before each JobID's newest eligible set. If preferred sets exceed the allowance, they expire oldest first as well.
 Eviction renames complete sets into `deleting/`, syncs both parents before removal, then syncs the deletion parent again.
 Recovery retries this transition without needing surviving manifest bytes; uncertain ownership blocks deletion.
 Filesystem traversal/retention is linear in files plus finalized-set sorting, without a rescan per victim. Publication
