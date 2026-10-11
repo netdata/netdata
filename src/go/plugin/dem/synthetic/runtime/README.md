@@ -72,8 +72,14 @@ observation for used and reserved bytes while writers are active. This is an
 allowance, not a physical-disk quota; filesystem metadata/allocation and external
 preloads are separate. ENOSPC still needs handling.
 
-`Inspect` is read-only and never launches or prepares a runtime. `Sweep` reconciles
-ownership and cleans eligible state; the process owner must run it at startup,
+`Inspect` is read-only and never launches or prepares a runtime. It reports
+protected and reclaimable bytes, written preparation/trash bytes, and overlapping
+generation byte totals for demand, execution and uncertain execution. These
+categories explain ownership; they must not be added together as extra disk use.
+Allowance errors report needed, used, reserved, protected and reclaimable bytes.
+Reclaimable bytes may still occupy failed-deletion trash; they are not free space.
+
+`Sweep` reconciles ownership and cleans eligible state; the process owner must run it at startup,
 before preparation and hourly, including when no browser jobs remain. Retired
 objects move to owned trash. Source and trash parents are synced before deletion,
 including successor recovery. Deletion runs outside coordination exclusion and
@@ -88,5 +94,7 @@ Unit tests cover archive integrity/bounds, extraction types and path handling,
 binding/encoding, demand/graces, pressure and uncertain-use protection, interrupted
 preparation using real exiting processes, read-only status and boot provenance.
 `DEM_RUNTIME_TEST_HELPER` enables the real `nd-run` persistent-receipt recovery
-integration test. Run Linux tests with `-race`; tests do not simulate power loss
+integration test. `DEM_RUNTIME_TEST_MANIFEST` and `DEM_RUNTIME_TEST_ARCHIVE`
+add real-bundle import, inventory timing and supervised Node/browser/re-execution
+qualification. Run Linux tests with `-race`; tests do not simulate power loss
 or establish native AppArmor/browser support.

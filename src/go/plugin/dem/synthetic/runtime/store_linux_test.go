@@ -6,7 +6,9 @@ import (
 	"bufio"
 	"bytes"
 	"context"
+	"crypto/rand"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -185,6 +187,141 @@ func TestReservationReusesPublishedGeneration(t *testing.T) {
 	require.Nil(t, owner)
 }
 
+func TestConcurrentPreparationAccountingAndReuse(t *testing.T) {
+	s, _ := testStore(t)
+	other, err := Open(s.config)
+	require.NoError(t, err)
+	defer other.Close()
+	payload := make([]byte, 64<<10)
+	_, err = rand.Read(payload)
+	require.NoError(t, err)
+	m, archive := bundleFixture(t, string(payload))
+	started, resume := make(chan struct{}), make(chan struct{})
+	result := make(chan error, 1)
+	finished := make(chan struct{})
+	go func() {
+		defer close(finished)
+		result <- s.prepare(context.Background(), m, func() (io.ReadCloser, error) {
+			return io.NopCloser(io.MultiReader(bytes.NewReader(archive[:len(archive)/2]), &resumeReader{ready: started, resume: resume, tail: bytes.NewReader(archive[len(archive)/2:])})), nil
+		})
+	}()
+	t.Cleanup(func() {
+		select {
+		case <-resume:
+		default:
+			close(resume)
+		}
+		<-finished
+	})
+	select {
+	case <-started:
+	case <-time.After(10 * time.Second):
+		t.Fatal("preparation did not reach archive midpoint")
+	}
+	status, err := other.Inspect()
+	require.NoError(t, err)
+	needed, err := s.preparationBytes(m)
+	require.NoError(t, err)
+	require.Positive(t, status.PreparingBytes)
+	require.GreaterOrEqual(t, status.UsedBytes+status.ReservedBytes, needed)
+	require.Equal(t, status.UsedBytes, status.ProtectedBytes)
+	require.Zero(t, status.ReclaimableBytes)
+	require.ErrorIs(t, other.Import(context.Background(), m, "/must-not-open"), ErrPreparing)
+	require.NoError(t, other.Sweep())
+	close(resume)
+	require.NoError(t, <-result)
+	// A successor reuses the published result without touching its input.
+	require.NoError(t, other.Import(context.Background(), m, "/must-not-open"))
+	status, err = other.Inspect()
+	require.NoError(t, err)
+	require.Zero(t, status.ReservedBytes)
+	require.Zero(t, status.ProtectedBytes)
+	require.Equal(t, status.UsedBytes, status.ReclaimableBytes)
+}
+
+type resumeReader struct {
+	ready   chan struct{}
+	resume  <-chan struct{}
+	tail    io.Reader
+	resumed bool
+}
+
+func (r *resumeReader) Read(p []byte) (int, error) {
+	if !r.resumed {
+		close(r.ready)
+		<-r.resume
+		r.resumed = true
+	}
+	return r.tail.Read(p)
+}
+
+func TestAllowanceExplainsProtectedGenerationBytes(t *testing.T) {
+	s, _ := testStore(t)
+	s.config.MaxBytes = 128 << 10
+	m := importFixture(t, s, strings.Repeat("a", 80<<10))
+	claim, err := s.Demand(m.Archive.SHA256)
+	require.NoError(t, err)
+	defer claim.Close()
+	use, err := s.BeginUse(m)
+	require.NoError(t, err)
+	require.NoError(t, use.Finish(false))
+	next, _ := bundleFixture(t, strings.Repeat("b", 80<<10))
+	err = s.Import(context.Background(), next, "/must-not-open")
+	var allowance *AllowanceError
+	require.True(t, errors.As(err, &allowance))
+	require.Positive(t, allowance.NeededBytes)
+	require.GreaterOrEqual(t, allowance.Status.DemandBytes, m.Archive.ExpandedBytes)
+	require.Equal(t, allowance.Status.DemandBytes, allowance.Status.ExecutionBytes)
+	require.Equal(t, allowance.Status.ExecutionBytes, allowance.Status.UncertainBytes)
+	require.Equal(t, allowance.Status.UsedBytes, allowance.Status.ProtectedBytes)
+	require.Zero(t, allowance.Status.ReclaimableBytes)
+}
+
+// Set the manifest/archive environment only in bundle qualification. This uses
+// the same Store and supervisor API as the service, not an alternate extractor.
+func TestRealBundlePreparation(t *testing.T) {
+	manifestPath := os.Getenv("DEM_RUNTIME_TEST_MANIFEST")
+	if manifestPath == "" {
+		t.Skip("real bundle qualification requires a manifest/archive")
+	}
+	helper := os.Getenv("DEM_RUNTIME_TEST_HELPER")
+	require.NotEmpty(t, helper)
+	t.Cleanup(ndexec.SetRunnerPathsForTests(helper, ""))
+	data, err := os.ReadFile(manifestPath)
+	require.NoError(t, err)
+	var m Manifest
+	require.NoError(t, json.Unmarshal(data, &m))
+	s, _ := testStore(t)
+	start := time.Now()
+	require.NoError(t, s.Import(context.Background(), m, os.Getenv("DEM_RUNTIME_TEST_ARCHIVE")))
+	t.Logf("prepared archive_bytes=%d expanded_bytes=%d entries=%d duration=%s", m.Archive.Bytes, m.Archive.ExpandedBytes, m.Archive.Entries, time.Since(start))
+	for i := 0; i < 6; i++ {
+		start = time.Now()
+		status, err := s.Inspect()
+		require.NoError(t, err)
+		t.Logf("inspect duration=%s used_bytes=%d", time.Since(start), status.UsedBytes)
+	}
+	for _, command := range []string{"node", "browser", "reexec"} {
+		use, err := s.BeginUse(m)
+		require.NoError(t, err)
+		program, args := use.Paths.Node, []string{"--version"}
+		if command == "browser" {
+			program = use.Paths.Browser
+		}
+		if command == "reexec" {
+			args = []string{"-e", "require('node:child_process').execFileSync(process.execPath,['--version'],{stdio:'inherit'})"}
+		}
+		ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
+		process, err := ndexec.StartUnprivilegedProcessTree(ctx, ndexec.TreeOptions{Completion: use.Completion, Stdout: os.Stdout, Stderr: os.Stderr}, program, args...)
+		require.NoError(t, err)
+		result := process.Wait()
+		cancel()
+		require.True(t, result.Drained)
+		require.NoError(t, use.Finish(result.Drained))
+		require.NoError(t, result.Err)
+	}
+}
+
 // The child exits without Go cleanup to exercise process-lifetime ownership.
 func TestRuntimeOwnerProcess(t *testing.T) {
 	mode := os.Getenv("DEM_RUNTIME_OWNER_MODE")
@@ -209,13 +346,24 @@ func TestRuntimeOwnerProcess(t *testing.T) {
 			t.Fatal(err)
 		}
 		ready()
-	} else if mode == "prepare" {
-		err := s.prepare(context.Background(), m, func() (io.ReadCloser, error) { ready(); return io.NopCloser(bytes.NewReader(nil)), nil })
+	} else if mode == "prepare" || mode == "partial" {
+		err := s.prepare(context.Background(), m, func() (io.ReadCloser, error) {
+			if mode == "prepare" {
+				ready()
+			}
+			fixture, archive := bundleFixture(t, "incoming")
+			require.Equal(t, m.Archive.SHA256, fixture.Archive.SHA256)
+			return io.NopCloser(io.MultiReader(bytes.NewReader(archive[:len(archive)/2]), readFunc(func([]byte) (int, error) { ready(); return 0, io.EOF }))), nil
+		})
 		if err != nil {
 			t.Fatal(err)
 		}
 	}
 }
+
+type readFunc func([]byte) (int, error)
+
+func (f readFunc) Read(p []byte) (int, error) { return f(p) }
 
 func startRuntimeOwner(t *testing.T, s *Store, m Manifest, mode string) func() {
 	t.Helper()
@@ -265,7 +413,13 @@ func TestAbandonedPreparationAndProcessDemand(t *testing.T) {
 	_, err := s.BeginUse(first)
 	require.ErrorIs(t, err, ErrUnavailable)
 	second, _ := bundleFixture(t, "incoming")
-	stop = startRuntimeOwner(t, s, second, "prepare")
+	stop = startRuntimeOwner(t, s, second, "partial")
+	partials, err := filepath.Glob(filepath.Join(s.path, "staging", "*", "archive.tar.gz"))
+	require.NoError(t, err)
+	require.Len(t, partials, 1)
+	partial, err := os.Stat(partials[0])
+	require.NoError(t, err)
+	require.Positive(t, partial.Size(), "owner must exit after actual archive writes")
 	status, err := s.Inspect()
 	require.NoError(t, err)
 	require.Positive(t, status.ReservedBytes)

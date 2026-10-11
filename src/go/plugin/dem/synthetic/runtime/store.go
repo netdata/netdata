@@ -31,6 +31,19 @@ var (
 	ErrAllowance   = errors.New("managed runtime allowance cannot accommodate preparation")
 )
 
+// AllowanceError reports the coordinated inventory at the failed reservation.
+// ReclaimableBytes may include trash whose deletion failed; it is not free space.
+type AllowanceError struct {
+	NeededBytes int64
+	Status      Status
+}
+
+func (e *AllowanceError) Error() string {
+	return fmt.Sprintf("%s: need %d bytes, limit %d, used %d, reserved %d, protected %d, reclaimable %d", ErrAllowance, e.NeededBytes, e.Status.LimitBytes, e.Status.UsedBytes, e.Status.ReservedBytes, e.Status.ProtectedBytes, e.Status.ReclaimableBytes)
+}
+
+func (e *AllowanceError) Unwrap() error { return ErrAllowance }
+
 type Config struct {
 	Path              string
 	MaxBytes          int64

@@ -1,0 +1,66 @@
+---
+name: DEM Runtime Tests
+on:
+  pull_request:
+    paths:
+      - '.github/workflows/dem-runtime-tests.yml'
+      - 'packaging/dem-runtime/**'
+      - 'src/collectors/utils/nd-run.c'
+      - 'src/collectors/utils/nd-process-tree.*'
+      - 'src/collectors/utils/nd-file-reader.*'
+      - 'src/collectors/utils/exec-signals.h'
+      - 'src/go/plugin/dem/synthetic/runtime/**'
+      - 'src/go/plugin/go.d/pkg/ndexec/**'
+      - 'src/go/go.mod'
+      - 'src/go/go.sum'
+  push:
+    branches: [master]
+    paths:
+      - '.github/workflows/dem-runtime-tests.yml'
+      - 'packaging/dem-runtime/**'
+      - 'src/collectors/utils/nd-run.c'
+      - 'src/collectors/utils/nd-process-tree.*'
+      - 'src/collectors/utils/nd-file-reader.*'
+      - 'src/collectors/utils/exec-signals.h'
+      - 'src/go/plugin/dem/synthetic/runtime/**'
+      - 'src/go/plugin/go.d/pkg/ndexec/**'
+      - 'src/go/go.mod'
+      - 'src/go/go.sum'
+permissions:
+  contents: read
+concurrency:
+  group: dem-runtime-tests-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  contracts:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: src/go/go.mod
+          cache-dependency-path: src/go/go.sum
+      - name: Bundle format and build-tool tests
+        run: python3 -m unittest discover -s packaging/dem-runtime -v
+      - name: Build the real supervisor
+        shell: bash
+        run: |
+          set -euxo pipefail
+          helper_dir="$(mktemp -d /tmp/netdata-dem-runtime-ci.XXXXXX)"
+          cat > "$helper_dir/config.h" <<'CONFIG'
+          #define _GNU_SOURCE 1
+          #define NETDATA_USER "nobody"
+          #define HAVE_SETRESUID 1
+          #define HAVE_SETRESGID 1
+          CONFIG
+          cc -std=gnu11 -Wall -Wextra -Werror \
+            -I "$helper_dir" -I src/collectors/utils \
+            src/collectors/utils/nd-run.c src/collectors/utils/nd-file-reader.c \
+            src/collectors/utils/nd-process-tree.c -o "$helper_dir/nd-run"
+          echo "DEM_RUNTIME_TEST_HELPER=$helper_dir/nd-run" >> "$GITHUB_ENV"
+      - name: Store lifecycle and supervisor integration
+        working-directory: src/go
+        run: |
+          go test -race -count=1 ./plugin/dem/synthetic/runtime ./plugin/go.d/pkg/ndexec
+          go vet ./plugin/dem/synthetic/runtime ./plugin/go.d/pkg/ndexec

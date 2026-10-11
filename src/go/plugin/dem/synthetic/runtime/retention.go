@@ -21,20 +21,33 @@ type reservation struct {
 }
 
 type inventory struct {
-	generations  map[string]generation
-	demand       map[string]int
-	uses         map[string]int
-	uncertain    map[string]int
-	reservations map[string]reservation
-	cleanupError error
+	generations        map[string]generation
+	demand             map[string]int
+	uses               map[string]int
+	uncertain          map[string]int
+	reservations       map[string]reservation
+	cleanupError       error
+	protectedRecords   map[string]bool
+	reclaimableRecords map[string]bool
 }
 
 // Status describes logical managed files and protection. ReservedBytes is the
 // unwritten remainder of active reservations, not additional used disk bytes.
+// ProtectedBytes and ReclaimableBytes count each owned file once. DemandBytes,
+// ExecutionBytes and UncertainBytes describe overlapping generation protection;
+// uncertain bytes are a subset of execution bytes. PreparingBytes and TrashBytes
+// describe written workspace, not extra disk usage.
 type Status struct {
 	UsedBytes             int64  `json:"used_bytes"`
 	ReservedBytes         int64  `json:"reserved_bytes"`
 	LimitBytes            int64  `json:"limit_bytes"`
+	ProtectedBytes        int64  `json:"protected_bytes"`
+	ReclaimableBytes      int64  `json:"reclaimable_bytes"`
+	DemandBytes           int64  `json:"demand_bytes"`
+	ExecutionBytes        int64  `json:"execution_bytes"`
+	UncertainBytes        int64  `json:"uncertain_bytes"`
+	PreparingBytes        int64  `json:"preparing_bytes"`
+	TrashBytes            int64  `json:"trash_bytes"`
 	DemandGenerations     int    `json:"demand_generations"`
 	ExecutionPins         int    `json:"execution_pins"`
 	UncertainPins         int    `json:"uncertain_pins"`
@@ -43,7 +56,7 @@ type Status struct {
 }
 
 func (s *Store) inventoryLocked(reconcile bool) (inventory, error) {
-	inv := inventory{generations: make(map[string]generation), demand: make(map[string]int), uses: make(map[string]int), uncertain: make(map[string]int), reservations: make(map[string]reservation)}
+	inv := inventory{generations: make(map[string]generation), demand: make(map[string]int), uses: make(map[string]int), uncertain: make(map[string]int), reservations: make(map[string]reservation), protectedRecords: make(map[string]bool), reclaimableRecords: make(map[string]bool)}
 	// Live completion proof also survives a successful rename followed by a
 	// failed directory sync. Retry these names even if enumeration cannot see
 	// the original record anymore.
@@ -61,6 +74,7 @@ func (s *Store) inventoryLocked(reconcile bool) (inventory, error) {
 	// Constructors hold coordination exclusion and expose no paths until the
 	// initialized record is durably moved to its final ownership namespace.
 	for _, name := range initializing {
+		inv.reclaimableRecords[name] = true
 		if !reconcile {
 			continue
 		}
@@ -78,6 +92,7 @@ func (s *Store) inventoryLocked(reconcile bool) (inventory, error) {
 			return inv, err
 		}
 		if !alive {
+			inv.reclaimableRecords[name] = true
 			if !reconcile {
 				continue
 			}
@@ -94,6 +109,7 @@ func (s *Store) inventoryLocked(reconcile bool) (inventory, error) {
 			return inv, errors.New("invalid runtime demand binding")
 		}
 		inv.demand[claim.Generation]++
+		inv.protectedRecords[name] = true
 	}
 	uses, err := s.childDirectories("uses")
 	if err != nil {
@@ -109,6 +125,7 @@ func (s *Store) inventoryLocked(reconcile bool) (inventory, error) {
 		}
 		done, proofErr := ndexec.ReadTreeCompletion(filepath.Join(s.path, name), use.Invocation)
 		if done || s.boot.supersedes(use.Boot) || s.completedUses[name] {
+			inv.reclaimableRecords[name] = true
 			if !reconcile {
 				continue
 			}
@@ -118,6 +135,7 @@ func (s *Store) inventoryLocked(reconcile bool) (inventory, error) {
 			continue
 		}
 		inv.uses[use.Generation]++
+		inv.protectedRecords[name] = true
 		alive, ownerErr := s.ownerAlive(name)
 		if ownerErr != nil || !alive {
 			inv.uncertain[use.Generation]++
@@ -137,6 +155,7 @@ func (s *Store) inventoryLocked(reconcile bool) (inventory, error) {
 			return inv, err
 		}
 		if !alive {
+			inv.reclaimableRecords[name] = true
 			if !reconcile {
 				continue
 			}
@@ -153,6 +172,7 @@ func (s *Store) inventoryLocked(reconcile bool) (inventory, error) {
 			return inv, errors.New("invalid runtime reservation")
 		}
 		inv.reservations[name] = r
+		inv.protectedRecords[name] = true
 		inv.demand[r.Generation]++
 	}
 	generations, err := s.childDirectories("generations")
@@ -190,17 +210,46 @@ func (s *Store) statusLocked(inv inventory) (Status, error) {
 		status.CleanupError = err.Error()
 	}
 	var err error
-	var stagingBytes map[string]int64
-	status.UsedBytes, stagingBytes, err = s.diskByteCounts(".")
+	var bytesByRecord map[string]int64
+	status.UsedBytes, bytesByRecord, err = s.diskByteCounts(".")
 	if err != nil {
 		return status, err
 	}
 	for name, r := range inv.reservations {
 		// Use the SAME observation for used and reserved bytes: writers run
 		// outside exclusion, so two scans could undercount a growing operation.
-		written := stagingBytes[name]
+		written := bytesByRecord[name]
+		status.PreparingBytes += written
 		if r.Bytes > written {
 			status.ReservedBytes += r.Bytes - written
+		}
+	}
+	for name, size := range bytesByRecord {
+		if inv.protectedRecords[name] {
+			status.ProtectedBytes += size
+		}
+		if inv.reclaimableRecords[name] || strings.HasPrefix(name, "trash/") {
+			status.ReclaimableBytes += size
+		}
+		if strings.HasPrefix(name, "trash/") {
+			status.TrashBytes += size
+		}
+	}
+	for id := range inv.generations {
+		size := bytesByRecord[filepath.Join("generations", id)]
+		if inv.demand[id] > 0 {
+			status.DemandBytes += size
+		}
+		if inv.uses[id] > 0 {
+			status.ExecutionBytes += size
+		}
+		if inv.uncertain[id] > 0 {
+			status.UncertainBytes += size
+		}
+		if inv.demand[id] > 0 || inv.uses[id] > 0 {
+			status.ProtectedBytes += size
+		} else {
+			status.ReclaimableBytes += size
 		}
 	}
 	for id, count := range inv.uses {
@@ -286,7 +335,7 @@ func (s *Store) diskByteCounts(name string) (int64, map[string]int64, error) {
 		return 0, nil, err
 	}
 	defer root.Close()
-	staging := make(map[string]int64)
+	records := make(map[string]int64)
 	var total int64
 	err = fs.WalkDir(root.FS(), ".", func(path string, entry fs.DirEntry, err error) error {
 		if err != nil {
@@ -306,15 +355,16 @@ func (s *Store) diskByteCounts(name string) (int64, map[string]int64, error) {
 			return errors.New("runtime byte accounting overflow")
 		}
 		total += info.Size()
-		if strings.HasPrefix(path, "staging/") {
-			id, _, found := strings.Cut(strings.TrimPrefix(path, "staging/"), "/")
-			if found {
-				staging["staging/"+id] += info.Size()
+		parent, rest, found := strings.Cut(path, "/")
+		if found {
+			id, _, child := strings.Cut(rest, "/")
+			if child {
+				records[parent+"/"+id] += info.Size()
 			}
 		}
 		return nil
 	})
-	return total, staging, err
+	return total, records, err
 }
 
 // Every source parent is synced again before successor deletion. Visibility of

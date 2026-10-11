@@ -214,7 +214,7 @@ func (s *Store) reserve(m Manifest) (string, *flock.Flock, error) {
 			}
 			ids := s.candidates(inv, true)
 			if len(ids) == 0 {
-				return errors.Join(ErrAllowance, cleanupErr)
+				return errors.Join(&AllowanceError{NeededBytes: needed, Status: status}, cleanupErr)
 			}
 			if err := s.removeOwned(filepath.Join("generations", ids[0])); err != nil {
 				return err
