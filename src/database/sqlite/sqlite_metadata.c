@@ -1872,13 +1872,22 @@ static void cleanup_host_context_metadata(Pvoid_t CTX_JudyL, void *data)
 
     // A context can have more charts further down the walk, so the queued
     // contexts are removed only after all the charts of the host were checked;
-    // an interrupted walk leaves them queued for the next run.
+    // an interrupted walk leaves them queued for the next run. The deletions
+    // stop on shutdown or a full WAL too; the rest stay queued.
     bool completed = (rc == SQLITE_DONE);
     if (completed) {
         bool first = true;
         Word_t Index = 0;
-        while ((Pvalue = JudyLFirstThenNext(CTX_JudyL, &Index, &first)))
+        size_t removed = 0;
+        while ((Pvalue = JudyLFirstThenNext(CTX_JudyL, &Index, &first))) {
+            if (SHUTDOWN_REQUESTED(config) ||
+                ((removed % METADATA_WAL_CHECK_ROWS) == 0 && !sql_metadata_wal_size_acceptable())) {
+                completed = false;
+                break;
+            }
             ctx_delete_metadata_cleanup_context(&context_res, &host->host_id.uuid, string2str((STRING *)Index));
+            removed++;
+        }
     }
     SQLITE_FINALIZE(context_res);
 
