@@ -14,17 +14,22 @@ import (
 func TestLoadConfig(t *testing.T) {
 	for name, tc := range map[string]struct {
 		body string
-		want HistoryConfig
+		want RetentionConfig
 		fail bool
 	}{
-		"partial overrides": {"enabled: yes\nhistory:\n  days: 7\n", HistoryConfig{
+		"partial overrides": {"enabled: yes\nhistory:\n  days: 7\n", RetentionConfig{
 			Days:     7,
 			MaxBytes: 1 << 30,
 		}, false},
-		"zero days":        {"history: {days: 0}", HistoryConfig{}, true},
-		"too many days":    {"history: {days: 366}", HistoryConfig{}, true},
-		"zero byte budget": {"history: {max_bytes: 0}", HistoryConfig{}, true},
-		"malformed":        {"history: [", HistoryConfig{}, true},
+		"zero days":                {"history: {days: 0}", RetentionConfig{}, true},
+		"too many days":            {"history: {days: 366}", RetentionConfig{}, true},
+		"zero byte budget":         {"history: {max_bytes: 0}", RetentionConfig{}, true},
+		"below allocation quantum": {"history: {max_bytes: 8388607}", RetentionConfig{}, true},
+		"allocation quantum": {"history: {max_bytes: 8388608}", RetentionConfig{
+			Days:     30,
+			MaxBytes: 8388608,
+		}, false},
+		"malformed": {"history: [", RetentionConfig{}, true},
 	} {
 		t.Run(name, func(t *testing.T) {
 			dir := t.TempDir()
@@ -54,7 +59,10 @@ func TestArtifactDefaultsAndIndependentPolicy(t *testing.T) {
 	cfg, err := LoadConfig(multipath.New(dir))
 	require.NoError(t, err)
 	assert.Equal(t, DefaultConfig().History, cfg.History)
-	assert.Equal(t, HistoryConfig{Days: 2, MaxBytes: 1024}, cfg.Artifacts)
+	assert.Equal(t, RetentionConfig{
+		Days:     2,
+		MaxBytes: 1024,
+	}, cfg.Artifacts)
 	assert.Equal(t, "/prepared/node", cfg.Runtime.NodePath)
 	// Preparation belongs to browser Check; RUM-only configuration needs no runtime.
 	require.NoError(t, os.WriteFile(filepath.Join(dir, "dem.conf"), []byte("artifacts: {days: 0}"), 0600))

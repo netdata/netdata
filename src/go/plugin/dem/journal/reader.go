@@ -9,7 +9,6 @@ import (
 	"os"
 	"path/filepath"
 	"strconv"
-	"strings"
 	"sync"
 
 	"github.com/netdata/systemd-journal-sdk/go/journal"
@@ -29,7 +28,7 @@ func (s *Store) OpenReader(ctx context.Context) (*Snapshot, func(), error) {
 	if s.failure != nil {
 		return nil, nil, s.failure
 	}
-	paths, err := s.journalPaths(ctx, false)
+	paths, err := s.journalPaths(ctx)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -69,51 +68,37 @@ func openSnapshot(ctx context.Context, path string) (*journal.IndexedSnapshot, e
 	return file, nil
 }
 
-// Explicit enumeration preserves directory I/O failures. Glob and SDK directory
-// readers can silently skip unavailable files and produce incomplete aggregates.
-func (s *Store) journalPaths(ctx context.Context, allowMissingCurrent bool) ([]string, error) {
-	entries, err := os.ReadDir(s.root)
+// Queries, startup and cleanup share the SDK's validated file ownership rules.
+// Inventory reads headers only; no entry vectors or payload scans are needed.
+func (s *Store) journalPaths(ctx context.Context) ([]string, error) {
+	inventory, err := s.inventory(ctx)
 	if err != nil {
-		return nil, fmt.Errorf("read history root: %w", err)
+		return nil, fmt.Errorf("inspect history root: %w", err)
 	}
-	current := s.host.MachineID().String()
-	machines := []string{current}
-	for _, entry := range entries {
-		if entry.Name() == current {
-			continue
-		}
-		if _, err := journal.ParseUUID(entry.Name()); err == nil {
-			machines = append(machines, entry.Name())
-		}
-	}
-	var paths []string
-	for _, machine := range machines {
-		if err := ctx.Err(); err != nil {
-			return nil, err
-		}
-		dir := filepath.Join(s.root, machine)
-		files, err := os.ReadDir(dir)
-		if allowMissingCurrent && machine == current && errors.Is(err, os.ErrNotExist) {
-			continue
-		}
-		if err != nil {
-			return nil, fmt.Errorf("read history machine directory: %w", err)
-		}
-		for _, file := range files {
-			name := file.Name()
-			if name != "dem.journal" && name != "dem.journal~" && !strings.HasPrefix(name, "dem@") {
-				continue
-			}
-			path := filepath.Join(dir, name)
-			if strings.HasSuffix(name, ".journal~") {
-				return nil, fmt.Errorf("history contains damaged journal %q; operator recovery is required", path)
-			}
-			if strings.HasSuffix(name, ".journal") {
-				paths = append(paths, path)
-			}
-		}
+	paths := make([]string, 0, len(inventory.Files))
+	for _, file := range inventory.Files {
+		paths = append(paths, file.Path)
 	}
 	return paths, nil
+}
+
+// Startup has no Log yet. Runtime inventory also checks the SDK's live file so
+// a missing/replaced directory cannot masquerade as empty history.
+func (s *Store) inventory(ctx context.Context) (journal.RootRetentionInventory, error) {
+	if err := ctx.Err(); err != nil {
+		return journal.RootRetentionInventory{}, err
+	}
+	var inventory journal.RootRetentionInventory
+	var err error
+	if s.log == nil {
+		inventory, err = journal.InspectRootRetention(s.root, "dem")
+	} else {
+		inventory, err = s.log.InspectRootRetention()
+	}
+	if ctx.Err() != nil {
+		return journal.RootRetentionInventory{}, ctx.Err()
+	}
+	return inventory, err
 }
 
 // Snapshot owns independent single-consumer SDK readers until release. Callers

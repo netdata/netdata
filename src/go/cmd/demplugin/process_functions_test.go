@@ -24,6 +24,7 @@ import (
 	rumhistory "github.com/netdata/netdata/go/plugins/plugin/dem/rum/history"
 	"github.com/netdata/netdata/go/plugins/plugin/dem/synthetic"
 	synthetichistory "github.com/netdata/netdata/go/plugins/plugin/dem/synthetic/history"
+	"github.com/santhosh-tekuri/jsonschema/v6"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -71,6 +72,15 @@ func (w *functionWire) call(t *testing.T, input io.Writer, id, command string) m
 	return response
 }
 func TestDEMHistoryFunctionsIndependentOfCollectorSelection(t *testing.T) {
+	raw, err := os.ReadFile("../../../plugins.d/FUNCTION_UI_SCHEMA.json")
+	require.NoError(t, err)
+	var doc any
+	require.NoError(t, json.Unmarshal(raw, &doc))
+	compiler := jsonschema.NewCompiler()
+	require.NoError(t, compiler.AddResource("schema.json", doc))
+	schema, err := compiler.Compile("schema.json")
+	require.NoError(t, err)
+
 	tests := map[string]struct{ config, module string }{
 		"all collectors disabled":  {config: "modules:\n  receiver: no\n  rum: no\n  journey: no\n  lighthouse: no\n"},
 		"RUM and journey disabled": {config: "modules:\n  receiver: no\n  rum: no\n  journey: no\n  lighthouse: yes\n"},
@@ -82,6 +92,8 @@ func TestDEMHistoryFunctionsIndependentOfCollectorSelection(t *testing.T) {
 			history, err := demjournal.Open(ctx, "")
 			require.NoError(t, err)
 			t.Cleanup(func() { require.NoError(t, history.Close()) })
+			cfg := dem.DefaultConfig()
+			require.NoError(t, history.EnforceHistoryRetention(ctx, cfg.History.Days, cfg.History.MaxBytes))
 			now := time.Now().UnixMicro()
 			_, err = rumhistory.NewStore(history).AppendEvent(ctx, rumhistory.EventRecord{
 				Site:       "retired",
@@ -158,10 +170,18 @@ func TestDEMHistoryFunctionsIndependentOfCollectorSelection(t *testing.T) {
 			})
 			require.Eventually(t, func() bool {
 				return strings.Contains(output.String(), `FUNCTION GLOBAL "rum-sessions"`) &&
-					strings.Contains(output.String(), `FUNCTION GLOBAL "synthetics-run"`)
+					strings.Contains(output.String(), `FUNCTION GLOBAL "synthetics-run"`) &&
+					strings.Contains(output.String(), `FUNCTION GLOBAL "dem-history-status"`)
 			}, 3*time.Second, time.Millisecond)
 			for generation := 0; generation < 2; generation++ {
 				suffix := fmt.Sprint(generation)
+				status := output.call(t, writer, "status"+suffix, "dem-history-status")
+				require.NoError(t, schema.Validate(status))
+				statusRows := status["data"].([]any)
+				require.Len(t, statusRows, 1)
+				assert.Equal(t, float64(30), statusRows[0].([]any)[0])
+				assert.Equal(t, float64(1<<30), statusRows[0].([]any)[1])
+				assert.Equal(t, false, status["has_history"])
 				response := output.call(t, writer, "rum"+suffix, "rum-sessions site:retired")
 				rows := response["data"].([]any)
 				require.Len(t, rows, 1)
@@ -186,10 +206,10 @@ func TestDEMHistoryFunctionsIndependentOfCollectorSelection(t *testing.T) {
 			defer stop()
 			require.NoError(t, a.Terminate(stopCtx))
 			require.NoError(t, <-done)
-			require.EqualValues(t, 4, created.Load())
+			require.EqualValues(t, 6, created.Load())
 			handlersMu.Lock()
 			defer handlersMu.Unlock()
-			require.Len(t, handlers, 2)
+			require.Len(t, handlers, 3)
 			for _, instances := range handlers {
 				require.Len(t, instances, 2)
 				assert.NotSame(t, instances[0], instances[1])

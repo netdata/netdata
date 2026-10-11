@@ -3,9 +3,11 @@ package dem
 
 import (
 	"context"
+	"sync"
 	"time"
 
 	"github.com/netdata/netdata/go/plugins/logger"
+	"github.com/netdata/netdata/go/plugins/plugin/dem/journal"
 	"github.com/netdata/netdata/go/plugins/plugin/dem/synthetic/artifacts"
 )
 
@@ -21,11 +23,13 @@ type artifactRetention interface {
 // expiry. It never releases the store: jobs retire after process services join.
 type Retention struct {
 	store          historyRetention
-	policy         HistoryConfig
+	policy         RetentionConfig
 	artifactStore  artifactRetention
-	artifactPolicy HistoryConfig
+	artifactPolicy RetentionConfig
 	loadConfig     func() (Config, error)
 	log            *logger.Logger
+	policyErrorMu  sync.RWMutex
+	policyError    string
 }
 
 func (r *Retention) Run(ctx context.Context) {
@@ -42,7 +46,7 @@ func (r *Retention) Run(ctx context.Context) {
 			if err := r.store.EnforceHistoryRetention(ctx, r.policy.Days, r.policy.MaxBytes); err != nil &&
 				ctx.Err() == nil {
 				r.log.Warningf("DEM history retention failed: %v", err)
-				// A partial close/reopen can suspend writes; retry on the history flush cadence.
+				// Retry cleanup promptly; healthy appends remain independent.
 				delay = 5 * time.Second
 			}
 			historyDue = time.Now().Add(delay)
@@ -81,15 +85,28 @@ func (r *Retention) reloadPolicy() {
 	}
 	cfg, err := r.loadConfig()
 	if err == nil {
-		err = cfg.History.validate()
+		err = cfg.History.validate(journal.MinHistoryBytes)
 		if err == nil {
-			err = cfg.Artifacts.validate()
+			err = cfg.Artifacts.validate(1)
 		}
 	}
+	r.policyErrorMu.Lock()
+	r.policyError = ""
+	if err != nil {
+		r.policyError = err.Error()
+	}
+	r.policyErrorMu.Unlock()
 	if err != nil {
 		r.log.Warningf("reloading DEM retention policies failed; retaining previous policy: %v", err)
 		return
 	}
 	r.policy = cfg.History
 	r.artifactPolicy = cfg.Artifacts
+}
+
+// PolicyError reports the last reload failure, cleared by a valid reload.
+func (r *Retention) PolicyError() string {
+	r.policyErrorMu.RLock()
+	defer r.policyErrorMu.RUnlock()
+	return r.policyError
 }

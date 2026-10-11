@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"github.com/netdata/netdata/go/plugins/logger"
+	"github.com/netdata/netdata/go/plugins/pkg/funcapi"
 	"github.com/netdata/netdata/go/plugins/pkg/multipath"
 	demjournal "github.com/netdata/netdata/go/plugins/plugin/dem/journal"
 	rumhistory "github.com/netdata/netdata/go/plugins/plugin/dem/rum/history"
@@ -48,7 +49,7 @@ func TestRetentionWithoutSitesAndAfterServiceShutdown(t *testing.T) {
 	components := New(Dependencies{
 		History: st,
 	}, Config{
-		History: HistoryConfig{
+		History: RetentionConfig{
 			Days:     1,
 			MaxBytes: 1 << 30,
 		},
@@ -121,17 +122,17 @@ func TestRetentionReloadsValidPolicyAndRetainsItOnInvalidConfig(t *testing.T) {
 		DefaultConfig(),
 	)
 	service := components.Retention
-	require.NoError(t, os.WriteFile(path, []byte("history: {days: 7, max_bytes: 4096}"), 0600))
+	require.NoError(t, os.WriteFile(path, []byte("history: {days: 7, max_bytes: 8388608}"), 0600))
 	service.reloadPolicy()
-	assert.Equal(t, HistoryConfig{
+	assert.Equal(t, RetentionConfig{
 		Days:     7,
-		MaxBytes: 4096,
+		MaxBytes: 8388608,
 	}, service.policy)
-	require.NoError(t, os.WriteFile(path, []byte("history: {days: 14, max_bytes: 8192}"), 0600))
+	require.NoError(t, os.WriteFile(path, []byte("history: {days: 14, max_bytes: 16777216}"), 0600))
 	service.reloadPolicy()
-	assert.Equal(t, HistoryConfig{
+	assert.Equal(t, RetentionConfig{
 		Days:     14,
-		MaxBytes: 8192,
+		MaxBytes: 16777216,
 	}, service.policy)
 	for name, body := range map[string]string{
 		"invalid value":  "history: {days: 0, max_bytes: 1}",
@@ -140,12 +141,16 @@ func TestRetentionReloadsValidPolicyAndRetainsItOnInvalidConfig(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			require.NoError(t, os.WriteFile(path, []byte(body), 0600))
 			service.reloadPolicy()
-			assert.Equal(t, HistoryConfig{
+			assert.NotEmpty(t, service.PolicyError())
+			assert.Equal(t, RetentionConfig{
 				Days:     14,
-				MaxBytes: 8192,
+				MaxBytes: 16777216,
 			}, service.policy)
 		})
 	}
+	require.NoError(t, os.WriteFile(path, []byte("history: {days: 14, max_bytes: 16777216}"), 0600))
+	service.reloadPolicy()
+	assert.Empty(t, service.PolicyError())
 }
 
 type transientRetention struct{ calls chan int }
@@ -175,14 +180,14 @@ func TestRetentionRetriesTransientFailureBeforeHourlySweep(t *testing.T) {
 	select {
 	case <-backend.calls:
 	case <-time.After(6 * time.Second):
-		t.Fatal("transient failure stalled retention and writer recovery until the hourly sweep")
+		t.Fatal("transient failure stalled retention until the hourly sweep")
 	}
 }
 
-type observedArtifactRetention struct{ sweeps chan HistoryConfig }
+type observedArtifactRetention struct{ sweeps chan RetentionConfig }
 
 func (r *observedArtifactRetention) Enforce(_ context.Context, days int, bytes int64) (artifacts.Stats, error) {
-	r.sweeps <- HistoryConfig{
+	r.sweeps <- RetentionConfig{
 		Days:     days,
 		MaxBytes: bytes,
 	}
@@ -190,7 +195,7 @@ func (r *observedArtifactRetention) Enforce(_ context.Context, days int, bytes i
 }
 func TestArtifactSweepStillRunsWhenJournalSweepFails(t *testing.T) {
 	artifact := &observedArtifactRetention{
-		sweeps: make(chan HistoryConfig, 1),
+		sweeps: make(chan RetentionConfig, 1),
 	}
 	service := &Retention{
 		store: &transientRetention{
@@ -328,4 +333,61 @@ func TestRetentionMaintainsHourlySweep(t *testing.T) {
 		assert.Equal(t, int32(2), historyCalls.Load())
 		assert.Equal(t, int32(2), artifactCalls.Load())
 	})
+}
+
+func TestStatusReportsAppliedPolicyAndReloadErrors(t *testing.T) {
+	ctx := context.Background()
+	store, err := demjournal.Open(ctx, "")
+	require.NoError(t, err)
+	t.Cleanup(func() { require.NoError(t, store.Close()) })
+	initial := DefaultConfig()
+	require.NoError(t, store.EnforceHistoryRetention(ctx, initial.History.Days, initial.History.MaxBytes))
+	var reloadErr error
+	edited := initial
+	edited.History.Days = 7
+	components := New(Dependencies{
+		History:        store,
+		ConfigProvider: func() (Config, error) { return edited, reloadErr },
+	}, initial)
+	var handler funcapi.RawMethodHandler
+	for _, provider := range components.Functions {
+		if provider.ID == "dem-history" {
+			handler = provider.NewHandler().(funcapi.RawMethodHandler)
+		}
+	}
+	require.NotNil(t, handler)
+	read := func() []any {
+		response := handler.HandleRaw(ctx, funcapi.RawMethodRequest{
+			Method:      "dem-history-status",
+			Permissions: "0x1b",
+		})
+		require.Equal(t, 200, response.Status)
+		return response.Data.([][]any)[0]
+	}
+	components.Retention.reloadPolicy()
+	assert.Equal(t, 30, read()[0], "loading a policy alone does not make it effective")
+	require.NoError(t, store.EnforceHistoryRetention(ctx, edited.History.Days, edited.History.MaxBytes))
+	assert.Equal(t, 7, read()[0])
+	reloadErr = errors.New("invalid retention edit")
+	components.Retention.reloadPolicy()
+	assert.Equal(t, "invalid retention edit", read()[10])
+	assert.Equal(t, 7, read()[0])
+	reloadErr = nil
+	components.Retention.reloadPolicy()
+	assert.Nil(t, read()[10])
+}
+
+func TestStatusWithoutHistoryDependencyIsUnavailable(t *testing.T) {
+	components := New(Dependencies{}, DefaultConfig())
+	for _, provider := range components.Functions {
+		if provider.ID == "dem-history" {
+			handler := provider.NewHandler().(funcapi.RawMethodHandler)
+			assert.Equal(t, 503, handler.HandleRaw(context.Background(), funcapi.RawMethodRequest{
+				Method:      "dem-history-status",
+				Permissions: "0x1b",
+			}).Status)
+			return
+		}
+	}
+	t.Fatal("history status provider missing")
 }

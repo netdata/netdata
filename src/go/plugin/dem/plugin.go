@@ -12,6 +12,7 @@ import (
 	"github.com/netdata/netdata/go/plugins/plugin/dem/collector/lighthouse"
 	"github.com/netdata/netdata/go/plugins/plugin/dem/collector/receiver"
 	"github.com/netdata/netdata/go/plugins/plugin/dem/collector/rum"
+	"github.com/netdata/netdata/go/plugins/plugin/dem/historyfunc"
 	"github.com/netdata/netdata/go/plugins/plugin/dem/journal"
 	rumfunctions "github.com/netdata/netdata/go/plugins/plugin/dem/rum/functions"
 	"github.com/netdata/netdata/go/plugins/plugin/dem/rum/geoip"
@@ -93,7 +94,9 @@ func New(deps Dependencies, cfg Config) Components {
 		loadConfig:     deps.ConfigProvider,
 		log:            logger.New(),
 	}
+	var historyStatus historyfunc.Deps
 	if deps.History != nil {
+		historyStatus = deps.History
 		retention.store = deps.History
 	}
 	if deps.Artifacts != nil {
@@ -111,6 +114,11 @@ func New(deps Dependencies, cfg Config) Components {
 				ID:         "synthetics",
 				Functions:  syntheticfunctions.Declarations,
 				NewHandler: func() funcapi.MethodHandler { return syntheticfunctions.New(syntheticQueries) },
+			},
+			{
+				ID:         "dem-history",
+				Functions:  historyfunc.Declarations,
+				NewHandler: func() funcapi.MethodHandler { return historyfunc.New(historyStatus, retention.PolicyError) },
 			},
 		},
 		Retention: retention,

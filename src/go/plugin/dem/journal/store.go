@@ -5,11 +5,11 @@ package journal
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
 	"sync"
+	"time"
 
 	"github.com/netdata/systemd-journal-sdk/go/journal"
 	"github.com/netdata/systemd-journal-sdk/go/journalhost"
@@ -23,7 +23,6 @@ type Store struct {
 	gate            chan struct{}
 	root, temporary string
 	host            *journalhost.Provider
-	config          journal.LogConfig
 	log             *journal.Log
 	closed          bool
 	failure         error
@@ -71,11 +70,13 @@ func Open(ctx context.Context, path string) (*Store, error) {
 		return nil, fmt.Errorf("load journal identity: %w", err)
 	}
 	st.host = host
-	st.config = journal.LogConfig{
+	config := journal.LogConfig{
 		Source:              "dem",
 		StrictSystemdNaming: true,
 		IdentityMode:        journal.LogIdentityStrict,
-		OpenMode:            journal.LogOpenEager,
+		OpenMode:            journal.LogOpenLazy,
+		RootRetention:       true,
+		RotationPolicy:      journal.RotationPolicy{}.WithMaxDuration(24 * time.Hour),
 		Options: journal.Options{
 			MachineID: host.MachineID(),
 			BootID:    host.BootID(),
@@ -88,7 +89,7 @@ func Open(ctx context.Context, path string) (*Store, error) {
 	if err := st.verifyStartup(ctx); err != nil {
 		return nil, err
 	}
-	st.log, err = journal.NewLog(path, st.config)
+	st.log, err = journal.NewLog(path, config)
 	if err != nil {
 		return nil, fmt.Errorf("open history journal: %w", err)
 	}
@@ -120,10 +121,15 @@ func (s *Store) Close() error {
 	s.readers.Wait()
 	var err error
 	if s.log != nil {
-		err = s.log.Close()
+		err = s.log.CloseWithoutRetention()
 	}
 	if s.temporary != "" && s.failure == nil && err == nil {
-		err = errors.Join(err, os.RemoveAll(s.temporary))
+		// Preserve unsafe files even when a safe maintenance error did not fail
+		// the writer. Temporary storage must follow the same recovery contract.
+		_, err = journal.InspectRootRetention(s.root, "dem")
+		if err == nil {
+			err = os.RemoveAll(s.temporary)
+		}
 	}
 	return err
 }

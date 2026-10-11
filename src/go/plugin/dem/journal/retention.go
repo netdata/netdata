@@ -11,11 +11,13 @@ import (
 	"github.com/netdata/systemd-journal-sdk/go/journal"
 )
 
-// EnforceHistoryRetention applies SDK whole-file policies. Closing and
-// lazily reopening archives idle activity, so age expiry also runs without
-// new events. The active file remains protected, so maxBytes is not a hard cap.
-// MaxBytes measures committed journal bytes, excluding filesystem preallocation.
-// Age is measured from each file's saved-time head, not from each event.
+// MinHistoryBytes is the SDK's minimum file allocation, including preallocation.
+const MinHistoryBytes = 8 << 20
+
+// EnforceHistoryRetention applies one policy to all retained machine identities.
+// Full file lengths count toward the allowance. Whole files expire by their newest
+// saved record; ordinary sweeps preserve the active file. This is neither an exact
+// record TTL nor a hard disk cap. Safe cleanup errors do not fail healthy appends.
 func (s *Store) EnforceHistoryRetention(ctx context.Context, days int, maxBytes int64) error {
 	if err := s.acquire(ctx); err != nil {
 		return err
@@ -27,37 +29,20 @@ func (s *Store) EnforceHistoryRetention(ctx context.Context, days int, maxBytes 
 	if s.failure != nil {
 		return s.failure
 	}
-	policy := journal.RetentionPolicy{}
-	if days > 0 {
-		const maxDays = int64(^uint64(0)>>1) / int64(24*time.Hour)
-		if int64(days) > maxDays {
-			return fmt.Errorf("history retention days overflow: %d", days)
-		}
-		policy = policy.WithMaxAge(time.Duration(days) * 24 * time.Hour)
+	if days < 1 || days > 365 {
+		return fmt.Errorf("history retention days must be between 1 and 365: %d", days)
 	}
-	if maxBytes > 0 {
-		policy = policy.WithMaxBytes(uint64(maxBytes))
+	if maxBytes < MinHistoryBytes {
+		return fmt.Errorf("history retention max_bytes must be at least %d: %d", MinHistoryBytes, maxBytes)
 	}
-	// Reopening applies the new policy; closing must not run stale limits.
-	if s.log != nil {
-		if err := s.log.CloseWithoutRetention(); err != nil {
-			return fmt.Errorf("archive history journal: %w", s.recordFailure(err))
-		}
-		s.log = nil
+	policy := journal.RetentionPolicy{}.
+		WithMaxAge(time.Duration(days) * 24 * time.Hour).
+		WithMaxBytes(uint64(maxBytes))
+	if err := s.log.SetRootRetentionPolicy(policy); err != nil {
+		return fmt.Errorf("set history retention policy: %w", s.recordFailure(err))
 	}
-	s.config.RetentionPolicy = policy
-	// NewLog derives rotation thresholds from the retention budget. Keep its
-	// writer lazy, and own the log before retention can fail. Idle sweeps need
-	// no new active file; the next append creates one with a fresh time head.
-	config := s.config
-	config.OpenMode = journal.LogOpenLazy
-	log, err := journal.NewLog(s.root, config)
-	if err != nil {
-		return fmt.Errorf("reopen history journal: %w", err)
-	}
-	s.log = log
-	if err := s.log.EnforceRetention(); err != nil {
-		return fmt.Errorf("enforce history retention: %w", err)
+	if _, err := s.log.MaintainRootRetention(time.Now()); err != nil {
+		return fmt.Errorf("enforce history retention: %w", s.recordFailure(err))
 	}
 	return nil
 }

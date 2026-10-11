@@ -5,7 +5,6 @@ package journal
 import (
 	"context"
 	"errors"
-	"fmt"
 	"os"
 
 	"github.com/netdata/systemd-journal-sdk/go/journal"
@@ -25,9 +24,6 @@ func (s *Store) Append(ctx context.Context, fields []journal.Field) (attempted b
 	}
 	if s.failure != nil {
 		return false, s.failure
-	}
-	if s.log == nil {
-		return false, fmt.Errorf("history journal unavailable after reopen failure")
 	}
 	if err := ctx.Err(); err != nil {
 		return false, err
@@ -51,9 +47,6 @@ func (s *Store) Sync(ctx context.Context) error {
 	}
 	if s.failure != nil {
 		return s.failure
-	}
-	if s.log == nil {
-		return fmt.Errorf("history journal unavailable after reopen failure")
 	}
 	return s.recordFailure(s.log.Sync())
 }
