@@ -4,6 +4,7 @@ import hashlib
 import json
 from pathlib import Path
 import re
+import tempfile
 import urllib.request
 
 from bundle import display_argument, run, sha256, write_json
@@ -85,17 +86,20 @@ def download(record, directory):
         if not verify(target):
             raise ValueError('cached input hash/size mismatch: ' + name)
         return target
-    temporary = target.with_name(target.name + '.partial')
-    print('+ download ' + display_argument(url) + ' -> ' + display_argument(target), file=sys.stderr, flush=True)
-    with urllib.request.urlopen(url) as response, temporary.open('wb') as output:
-        if urlsplit(response.url).scheme != 'https':
-            raise ValueError('download redirected outside HTTPS')
-        while True:
-            chunk = response.read(1024 * 1024)
-            if not chunk:
-                break
-            output.write(chunk)
-    if not verify(temporary):
-        raise ValueError('download hash/size mismatch: ' + name)
-    temporary.rename(target)
+    # Parallel architecture builds share common package inputs. Only verified
+    # entries share a pathname; each writer owns and cleans its temporary files.
+    with tempfile.TemporaryDirectory(prefix='.download-', dir=directory) as scratch:
+        temporary = Path(scratch) / name
+        print('+ download ' + display_argument(url) + ' -> ' + display_argument(target), file=sys.stderr, flush=True)
+        with urllib.request.urlopen(url) as response, temporary.open('wb') as output:
+            if urlsplit(response.url).scheme != 'https':
+                raise ValueError('download redirected outside HTTPS')
+            while True:
+                chunk = response.read(1024 * 1024)
+                if not chunk:
+                    break
+                output.write(chunk)
+        if not verify(temporary):
+            raise ValueError('download hash/size mismatch: ' + name)
+        temporary.replace(target)
     return target

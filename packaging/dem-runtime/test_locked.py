@@ -1,9 +1,11 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
+from concurrent.futures import ThreadPoolExecutor
 import hashlib
 import io
 import json
 from pathlib import Path
 import tempfile
+import threading
 import unittest
 from unittest.mock import patch
 
@@ -33,7 +35,7 @@ class LockedInputTests(unittest.TestCase):
                     if error:
                         with self.assertRaises(error):
                             locked.download(selected, root)
-                        self.assertFalse((root / 'input.deb').exists())
+                        self.assertEqual(list(root.iterdir()), [], 'failed acquisition must clean its private temporary files')
                     else:
                         self.assertEqual(locked.download(selected, root).read_bytes(), data)
                 if not error:
@@ -46,6 +48,31 @@ class LockedInputTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as directory, patch('urllib.request.urlopen', return_value=self.response(data, 'http://example.invalid/archive')):
             with self.assertRaisesRegex(ValueError, 'redirected'):
                 locked.download(record, Path(directory))
+
+    def test_concurrent_downloads_share_only_verified_cache_entry(self):
+        data = b'shared all-architecture package bytes'
+        record = {'name': 'shared.deb', 'url': 'https://example.invalid/shared.deb',
+                  'sha256': hashlib.sha256(data).hexdigest(), 'bytes': len(data)}
+        opened = threading.Barrier(2)
+
+        class OverlappingResponse(io.BytesIO):
+            url = record['url']
+
+            def read(self, size=-1):
+                if self.tell() == 0:
+                    # Both calls have opened their output before either writes.
+                    opened.wait(timeout=5)
+                return super().read(size)
+
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            with patch('urllib.request.urlopen', side_effect=lambda url: OverlappingResponse(data)):
+                with ThreadPoolExecutor(max_workers=2) as workers:
+                    futures = [workers.submit(locked.download, record, root) for _ in range(2)]
+                    paths = [future.result(timeout=10) for future in futures]
+            self.assertEqual(paths, [root / 'shared.deb'] * 2)
+            self.assertEqual(paths[0].read_bytes(), data)
+            self.assertEqual(sorted(p.name for p in root.iterdir()), ['shared.deb'])
 
     def test_exact_inventory_including_binary_source_versions(self):
         packages = [{'name': 'libexample1', 'version': '1:2.0-3+b2', 'architecture': 'arm64',
