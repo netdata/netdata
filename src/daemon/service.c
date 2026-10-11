@@ -112,6 +112,7 @@ static inline size_t svc_rrdhost_cleanup_charts_marked_obsolete(RRDHOST *host) {
     size_t full_candidates = 0;
     size_t full_archives = 0;
     size_t full_referenced = 0;
+    size_t full_dims_pending = 0;
     size_t partial_candidates = 0;
     size_t partial_archives = 0;
     // Total archived metadata items (RRDMETRIC + RRDINSTANCE). Used by the
@@ -170,7 +171,13 @@ static inline size_t svc_rrdhost_cleanup_charts_marked_obsolete(RRDHOST *host) {
                 if(referenced)
                     full_referenced++;
 
-                if(!rrdset_flag_check(st, RRDSET_FLAG_OBSOLETE_DIMENSIONS) && !referenced) {
+                // A dimension that could not be archived (still referenced, not idle long enough, or its
+                // destroy_lock busy) keeps the chart too, and is otherwise invisible: count it.
+                bool dims_pending = rrdset_flag_check(st, RRDSET_FLAG_OBSOLETE_DIMENSIONS);
+                if(dims_pending)
+                    full_dims_pending++;
+
+                if(!dims_pending && !referenced) {
                     full_archives++;
                     archived_items++;       // rrdset_free archives the RRDINSTANCE
 
@@ -192,16 +199,18 @@ static inline size_t svc_rrdhost_cleanup_charts_marked_obsolete(RRDHOST *host) {
     if(full_archives != full_candidates)
         rrdhost_flag_set(host, RRDHOST_FLAG_PENDING_OBSOLETE_CHARTS);
 
-    // Charts held by someone else are retried on the next sweep, so a steady non-zero count here is
-    // the only symptom of a holder that never releases - the charts simply stop being reclaimed and
-    // memory grows with nothing else to see. Rate-limited because a busy parent legitimately shows a
-    // few per sweep while a query or a health evaluation is in flight.
-    if(full_referenced) {
+    // Charts held by someone else, directly or through their dimensions, are retried on the next sweep,
+    // so a steady non-zero count here is the only symptom of a holder that never releases - the charts
+    // simply stop being reclaimed and memory grows with nothing else to see. Rate-limited because a busy
+    // parent legitimately shows a few per sweep while a query or a health evaluation is in flight (and a
+    // pending dimension may also just be waiting for its idle time or a busy lock).
+    if(full_referenced || full_dims_pending) {
         nd_log_limit_static_global_var(erl, 600, 0);
         nd_log_limit(&erl, NDLS_DAEMON, NDLP_INFO,
-                     "SERVICE: host '%s': %zu of %zu obsolete charts are still referenced and were "
-                     "not reclaimed; they will be retried on the next sweep.",
-                     rrdhost_hostname(host), full_referenced, full_candidates);
+                     "SERVICE: host '%s': of %zu obsolete charts, %zu are still referenced and %zu still have "
+                     "dimensions pending archive (may overlap); those charts were not reclaimed and will be "
+                     "retried on the next sweep.",
+                     rrdhost_hostname(host), full_candidates, full_referenced, full_dims_pending);
     }
 
     return archived_items;
