@@ -31,7 +31,7 @@ if(ENABLE_PLUGIN_DEM)
             src/go/plugin/dem/synthetic/runner/assets/package-lock.json
             COMPONENT plugin-dem DESTINATION ${PLUGINS_DEST}/dem)
     # Release packaging supplies reviewed trust separately from downloaded payloads.
-    # A source build without manifests remains usable in explicit external mode.
+    # Without a trusted manifest browser setup is unavailable; RUM remains independent.
     set(DEM_RUNTIME_MANIFEST_DIR "" CACHE PATH "Directory of reviewed DEM runtime-<arch>.json manifests")
     if(DEM_RUNTIME_MANIFEST_DIR)
         set(DEM_RUNTIME_MANIFESTS)

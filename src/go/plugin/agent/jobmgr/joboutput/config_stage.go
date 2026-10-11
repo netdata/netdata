@@ -17,6 +17,8 @@ const (
 	configOperationValidate configOperationKind = iota + 1
 	configOperationTest
 	configOperationGet
+	// Intent admission must not supersede a candidate retained for adoption.
+	configOperationValidateIntent
 )
 
 type configOperationResult struct {
@@ -256,7 +258,7 @@ func (dcjc *DynCfgJobController) runConfigOperation(
 	}
 	var operation func(context.Context, confgroup.Config) ([]byte, error)
 	switch kind {
-	case configOperationValidate:
+	case configOperationValidate, configOperationValidateIntent:
 		operation = func(ctx context.Context, config confgroup.Config) ([]byte, error) {
 			return nil, dcjc.factory.ValidateConfig(ctx, config)
 		}

@@ -300,13 +300,20 @@ func (dcjc *DynCfgJobController) retainPendingAfterApply(
 	namespace jobmgr.ProcessAttemptNamespace,
 	baselineUID string,
 ) func() {
+	return dcjc.retainPendingAttemptAfterApply(config, jobAttemptIdentity(namespace, config.FullName()), baselineUID)
+}
+
+func (dcjc *DynCfgJobController) retainPendingAttemptAfterApply(
+	config confgroup.Config,
+	identity jobmgr.ProcessAttemptIdentity,
+	baselineUID string,
+) func() {
 	return func() {
 		if dcjc == nil || dcjc.scheduler == nil || dcjc.scheduler.pending == nil ||
 			dcjc.factory == nil || dcjc.factory.config.Attempts == nil ||
 			config == nil || config.FullName() == "" {
 			return
 		}
-		identity := jobAttemptIdentity(namespace, config.FullName())
 		release, ok := dcjc.factory.config.Attempts.ProcessAttemptReleased(identity)
 		if !ok {
 			immediate := make(chan struct{})

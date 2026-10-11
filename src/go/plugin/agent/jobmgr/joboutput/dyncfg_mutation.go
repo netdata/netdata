@@ -15,6 +15,7 @@ import (
 )
 
 func (dcjc *DynCfgJobController) prepareMutation(
+	ctx context.Context,
 	scope lifecycle.ResourceTransactionScope,
 	current lifecycle.ReadyResource,
 	successor lifecycle.PreparedResource,
@@ -25,6 +26,7 @@ func (dcjc *DynCfgJobController) prepareMutation(
 	cleanup lifecycle.TaskCleanup,
 ) (lifecycle.PreparedResourceTransaction, error) {
 	return dcjc.prepareMutationWithRetry(
+		ctx,
 		scope,
 		current,
 		successor,
@@ -38,6 +40,7 @@ func (dcjc *DynCfgJobController) prepareMutation(
 }
 
 func (dcjc *DynCfgJobController) prepareMutationWithRetry(
+	ctx context.Context,
 	scope lifecycle.ResourceTransactionScope,
 	current lifecycle.ReadyResource,
 	successor lifecycle.PreparedResource,
@@ -49,6 +52,7 @@ func (dcjc *DynCfgJobController) prepareMutationWithRetry(
 	retry autoDetectionRetryToken,
 ) (lifecycle.PreparedResourceTransaction, error) {
 	return dcjc.prepareMutationWithRetryAfterApply(
+		ctx,
 		scope,
 		current,
 		successor,
@@ -63,6 +67,7 @@ func (dcjc *DynCfgJobController) prepareMutationWithRetry(
 }
 
 func (dcjc *DynCfgJobController) prepareMutationWithRetryAfterApply(
+	ctx context.Context,
 	scope lifecycle.ResourceTransactionScope,
 	current lifecycle.ReadyResource,
 	successor lifecycle.PreparedResource,
@@ -83,6 +88,7 @@ func (dcjc *DynCfgJobController) prepareMutationWithRetryAfterApply(
 		jobConfig.failure = failures[0]
 	}
 	return dcjc.prepareMutationWithRetryAfterApplyAndFallback(
+		ctx,
 		scope,
 		current,
 		successor,
@@ -100,6 +106,7 @@ func (dcjc *DynCfgJobController) prepareMutationWithRetryAfterApply(
 }
 
 func (dcjc *DynCfgJobController) prepareMutationWithRetryAfterApplyAndFallback(
+	ctx context.Context,
 	scope lifecycle.ResourceTransactionScope,
 	current lifecycle.ReadyResource,
 	successor lifecycle.PreparedResource,
@@ -148,7 +155,7 @@ func (dcjc *DynCfgJobController) prepareMutationWithRetryAfterApplyAndFallback(
 		}
 	}
 	dependencyCommit = composeAfterApply(dependencyCommit, jobConfigReconcile)
-	configIntent, err := dcjc.prepareJobConfigIntent(scope.ID, postimage, intent)
+	configIntent, err := dcjc.prepareJobConfigIntent(ctx, scope.ID, postimage, intent)
 	if err != nil {
 		if successor != nil {
 			err = rollbackSuccessorMutation(successor, err)
@@ -170,7 +177,7 @@ func (dcjc *DynCfgJobController) prepareMutationWithRetryAfterApplyAndFallback(
 		if fallback == nil {
 			continue
 		}
-		fallback.configIntent, err = dcjc.prepareJobConfigIntent(scope.ID, fallback.Change.Config, intent)
+		fallback.configIntent, err = dcjc.prepareJobConfigIntent(ctx, scope.ID, fallback.Change.Config, intent)
 		if err != nil {
 			if successor != nil {
 				err = rollbackSuccessorMutation(successor, err)
@@ -284,6 +291,7 @@ type activationFallbackPlan struct {
 }
 
 func (dcjc *DynCfgJobController) prepareMutationWithActivationFallbacks(
+	ctx context.Context,
 	scope lifecycle.ResourceTransactionScope,
 	current lifecycle.ReadyResource,
 	successor lifecycle.PreparedResource,
@@ -322,6 +330,7 @@ func (dcjc *DynCfgJobController) prepareMutationWithActivationFallbacks(
 		return nil, rollbackSuccessorMutation(successor, err)
 	}
 	return dcjc.prepareMutationWithRetryAfterApplyAndFallback(
+		ctx,
 		scope,
 		current,
 		successor,
@@ -390,6 +399,7 @@ func (dcjc *DynCfgJobController) scheduleAutoDetectionRetry(config confgroup.Con
 }
 
 func (dcjc *DynCfgJobController) prepareTransientConstructionFailure(
+	ctx context.Context,
 	scope lifecycle.ResourceTransactionScope,
 	current lifecycle.ReadyResource,
 	permit lifecycle.LongLivedPermit,
@@ -402,6 +412,7 @@ func (dcjc *DynCfgJobController) prepareTransientConstructionFailure(
 ) (lifecycle.PreparedResourceTransaction, error) {
 	failure := transientActivationFailure(config, err)
 	return dcjc.prepareMutationWithRetryAfterApply(
+		ctx,
 		scope,
 		current,
 		nil,
@@ -419,6 +430,7 @@ func (dcjc *DynCfgJobController) prepareTransientConstructionFailure(
 }
 
 func (dcjc *DynCfgJobController) prepareProbeFailure(
+	ctx context.Context,
 	scope lifecycle.ResourceTransactionScope,
 	current lifecycle.ReadyResource,
 	permit lifecycle.LongLivedPermit,
@@ -446,6 +458,7 @@ func (dcjc *DynCfgJobController) prepareProbeFailure(
 		}
 	}
 	return dcjc.prepareMutationWithRetryAfterApplyAndFallback(
+		ctx,
 		scope,
 		current,
 		nil,

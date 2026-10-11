@@ -37,7 +37,7 @@ func (dcjc *DynCfgJobController) planAutoDetectionRetry(
 		NoResponse: true,
 		Transaction: &jobmgr.ResourceTransactionPlan{
 			ID: config.FullName(),
-			Prepare: func(_ context.Context, current lifecycle.ReadyResource, scope lifecycle.ResourceTransactionScope, permit lifecycle.LongLivedPermit) (lifecycle.PreparedResourceTransaction, error) {
+			Prepare: func(ctx context.Context, current lifecycle.ReadyResource, scope lifecycle.ResourceTransactionScope, permit lifecycle.LongLivedPermit) (lifecycle.PreparedResourceTransaction, error) {
 				settle := dcjc.retrySettlement(scope.ID, token)
 				record, exists := dcjc.graph.Lookup(scope.ID)
 				if !dcjc.scheduler.retries.isCurrent(scope.ID, token) || current != nil {
@@ -81,6 +81,7 @@ func (dcjc *DynCfgJobController) planAutoDetectionRetry(
 					)
 				}
 				return dcjc.prepareMutationWithRetryAfterApply(
+					ctx,
 					scope,
 					current,
 					nil,
@@ -197,6 +198,10 @@ func (dcjc *DynCfgJobController) prepareDiscovered(
 	resultErr error,
 ) {
 	defer func() {
+		var admission *configIntentAdmissionError
+		if errors.As(resultErr, &admission) && ctx.Err() == nil && !lifecycle.OwnershipRetained(resultErr) {
+			transaction, resultErr = dcjc.prepareDiscoveredAdmissionFailure(ctx, change, current, scope, permit, resultErr)
+		}
 		if resultErr != nil && change.pending.version != 0 {
 			dcjc.scheduler.pending.settle(scope.ID, change.pending)
 		}
@@ -252,6 +257,7 @@ func (dcjc *DynCfgJobController) prepareDiscovered(
 			)
 		}
 		return dcjc.prepareMutationWithRetryAfterApply(
+			ctx,
 			scope,
 			current,
 			nil,
@@ -295,6 +301,7 @@ func (dcjc *DynCfgJobController) prepareDiscovered(
 	)
 	if change.Status == dyncfg.StatusAccepted {
 		return dcjc.prepareMutationWithRetryAfterApply(
+			ctx,
 			scope,
 			current,
 			nil,
@@ -337,6 +344,7 @@ func (dcjc *DynCfgJobController) prepareDiscovered(
 		}
 		if dcjc.configModules.activationWaitsForDependency(change.Config, err) {
 			return dcjc.prepareDiscoveredActivationWait(
+				ctx,
 				change,
 				current,
 				scope,
@@ -349,38 +357,15 @@ func (dcjc *DynCfgJobController) prepareDiscovered(
 		}
 		switch activation.kind {
 		case activationFailureQuarantined, activationFailureProposal:
+			intent := jobConfigIntentEnable
 			if activation.kind == activationFailureProposal {
-				trustRevoked := incumbent.SourceType() == confgroup.TypeDiscovered &&
-					incumbent.TrustDiscoveredTargets() &&
-					incumbent.DiscoveryPipelineID() != "" &&
-					incumbent.DiscoveryPipelineID() == change.Config.DiscoveryPipelineID() &&
-					change.Config.SourceType() == confgroup.TypeDiscovered &&
-					!change.Config.TrustDiscoveredTargets()
-				if !trustRevoked {
+				if !discoveredTrustRevoked(incumbent, change.Config) {
 					return nil, jobmgr.RejectProposal(err)
 				}
-				// Only the owning pipeline can revoke trust despite invalid literal fields.
+				// Revoke trust even for invalid literals, without granting acquisition.
+				intent = jobConfigIntentDisable
 			}
-			failedPostimage := postimage
-			failedPostimage.Status = dyncfg.StatusFailed.String()
-			return dcjc.prepareMutationWithRetryAfterApply(
-				scope,
-				current,
-				nil,
-				permit,
-				resourceRemovalDisposition(current),
-				&failedPostimage,
-				reply,
-				dcjc.configCreateCleanup(
-					failedPostimage,
-					change.Config.SourceType(),
-					change.Config.Source(),
-					dcjc.configType(dcjc.modules[change.Config.Module()]),
-				),
-				autoDetectionRetryToken{},
-				pendingSettlement, jobConfigIntentEnable,
-				jobConfigFailure(err, "activation"),
-			)
+			return dcjc.prepareDiscoveredFailure(ctx, change, current, scope, permit, postimage, err, intent)
 		case activationFailureBusy, activationFailureStaleStore:
 			baselineUID := ""
 			if exists {
@@ -404,6 +389,7 @@ func (dcjc *DynCfgJobController) prepareDiscovered(
 			return dcjc.noopWithAfterApply(scope, current, permit, result, settlement)
 		case activationFailureDeadline:
 			return dcjc.prepareDiscoveredActivationWait(
+				ctx,
 				change,
 				current,
 				scope,
@@ -418,6 +404,7 @@ func (dcjc *DynCfgJobController) prepareDiscovered(
 			failedPostimage.Status = dyncfg.StatusFailed.String()
 			failure := transientActivationFailure(change.Config, err)
 			return dcjc.prepareMutationWithRetryAfterApply(
+				ctx,
 				scope,
 				current,
 				nil,
@@ -469,6 +456,7 @@ func (dcjc *DynCfgJobController) prepareDiscovered(
 	if probeFailure != nil {
 		if dcjc.configModules.activationWaitsForDependency(change.Config, probeFailure) {
 			return dcjc.prepareDiscoveredActivationWait(
+				ctx,
 				change,
 				current,
 				scope,
@@ -480,6 +468,7 @@ func (dcjc *DynCfgJobController) prepareDiscovered(
 			)
 		}
 		return dcjc.prepareProbeFailure(
+			ctx,
 			scope,
 			current,
 			permit,
@@ -496,12 +485,14 @@ func (dcjc *DynCfgJobController) prepareDiscovered(
 		dcjc.configType(dcjc.modules[change.Config.Module()]),
 	)
 	return dcjc.prepareCandidateAdoption(
+		ctx,
 		scope, current, permit, stage, change.Config, &postimage, reply, cleanup,
 		dcjc.pendingDesiredSettlement(change.Config, change.pending),
 	)
 }
 
 func (dcjc *DynCfgJobController) prepareDiscoveredActivationWait(
+	ctx context.Context,
 	change DiscoveredJobChange,
 	current lifecycle.ReadyResource,
 	scope lifecycle.ResourceTransactionScope,
@@ -521,6 +512,7 @@ func (dcjc *DynCfgJobController) prepareDiscoveredActivationWait(
 	}
 	postimage.Status = dyncfg.StatusAccepted.String()
 	return dcjc.prepareMutationWithRetryAfterApply(
+		ctx,
 		scope,
 		current,
 		nil,
@@ -537,5 +529,81 @@ func (dcjc *DynCfgJobController) prepareDiscoveredActivationWait(
 		autoDetectionRetryToken{},
 		composeAfterApply(settle, activate), jobConfigIntentEnable,
 		jobConfigFailure(cause, "activation"),
+	)
+}
+
+// Admission containment may outlive a discovery transaction. Keep its desired
+// configuration pending without replacing the incumbent or acquiring resources.
+func (dcjc *DynCfgJobController) prepareDiscoveredAdmissionFailure(
+	ctx context.Context,
+	change DiscoveredJobChange,
+	current lifecycle.ReadyResource,
+	scope lifecycle.ResourceTransactionScope,
+	permit lifecycle.LongLivedPermit,
+	cause error,
+) (lifecycle.PreparedResourceTransaction, error) {
+	switch classifyActivationError(cause).kind {
+	case activationFailureProposal:
+		if record, exists := dcjc.graph.Lookup(scope.ID); exists {
+			incumbent, err := graphRecordConfig(record)
+			if err != nil {
+				return nil, err
+			}
+			if discoveredTrustRevoked(incumbent, change.Config) {
+				payload, err := yaml.Marshal(change.Config)
+				if err != nil {
+					return nil, err
+				}
+				postimage := dyncfg.GraphConfig{
+					ID: scope.ID, Module: change.Config.Module(), Name: change.Config.Name(), Payload: payload,
+				}
+				return dcjc.prepareDiscoveredFailure(ctx, change, current, scope, permit, postimage, cause, jobConfigIntentDisable)
+			}
+		}
+		return nil, jobmgr.RejectProposal(cause)
+	case activationFailureQuarantined:
+		return nil, jobmgr.RejectProposal(cause)
+	case activationFailureBusy, activationFailureDeadline:
+		var baselineUID string
+		if record, exists := dcjc.graph.Lookup(scope.ID); exists {
+			config, err := graphRecordConfig(record)
+			if err != nil {
+				return nil, err
+			}
+			baselineUID = config.UID()
+		}
+		return dcjc.noopWithAfterApply(scope, current, permit, noResponseResult(), composeAfterApply(
+			dcjc.pendingSettlement(scope.ID, change.pending),
+			dcjc.retainPendingAttemptAfterApply(change.Config,
+				jobTestAttemptIdentity(configOperationValidateIntent, change.Config), baselineUID),
+		))
+	default:
+		return nil, cause
+	}
+}
+
+func discoveredTrustRevoked(incumbent, next confgroup.Config) bool {
+	return incumbent.SourceType() == confgroup.TypeDiscovered && incumbent.TrustDiscoveredTargets() &&
+		incumbent.DiscoveryPipelineID() != "" && incumbent.DiscoveryPipelineID() == next.DiscoveryPipelineID() &&
+		next.SourceType() == confgroup.TypeDiscovered && !next.TrustDiscoveredTargets()
+}
+
+func (dcjc *DynCfgJobController) prepareDiscoveredFailure(
+	ctx context.Context,
+	change DiscoveredJobChange,
+	current lifecycle.ReadyResource,
+	scope lifecycle.ResourceTransactionScope,
+	permit lifecycle.LongLivedPermit,
+	postimage dyncfg.GraphConfig,
+	cause error,
+	intent jobConfigIntentTransition,
+) (lifecycle.PreparedResourceTransaction, error) {
+	postimage.Status = dyncfg.StatusFailed.String()
+	return dcjc.prepareMutationWithRetryAfterApply(
+		ctx, scope, current, nil, permit, resourceRemovalDisposition(current), &postimage, internalReply(),
+		dcjc.configCreateCleanup(
+			postimage, change.Config.SourceType(), change.Config.Source(), dcjc.configType(dcjc.modules[change.Config.Module()]),
+		),
+		autoDetectionRetryToken{}, dcjc.pendingSettlement(scope.ID, change.pending), intent, jobConfigFailure(cause, "activation"),
 	)
 }

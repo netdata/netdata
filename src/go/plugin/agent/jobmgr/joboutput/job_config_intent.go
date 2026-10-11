@@ -3,6 +3,7 @@
 package joboutput
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"sync"
@@ -21,6 +22,13 @@ const (
 	jobConfigIntentEnable
 	jobConfigIntentDisable
 )
+
+// Admission failures are separate from resource-owner failures so callers can
+// reject malformed input or retry containment without granting acquisition.
+type configIntentAdmissionError struct{ cause error }
+
+func (e *configIntentAdmissionError) Error() string { return e.cause.Error() }
+func (e *configIntentAdmissionError) Unwrap() error { return e.cause }
 
 type enabledJobConfigIntent struct {
 	identity collectorapi.JobConfigIdentity
@@ -78,6 +86,7 @@ func (p *preparedJobConfigIntent) abort() (err error) {
 }
 
 func (dcjc *DynCfgJobController) prepareJobConfigIntent(
+	ctx context.Context,
 	id string,
 	postimage *dyncfg.GraphConfig,
 	transition jobConfigIntentTransition,
@@ -115,6 +124,11 @@ func (dcjc *DynCfgJobController) prepareJobConfigIntent(
 	}
 	if previous.identity == next.identity {
 		return nil, nil
+	}
+	if next.identity.Valid() {
+		if _, err := dcjc.runConfigOperation(ctx, config, configOperationValidateIntent, true); err != nil {
+			return nil, &configIntentAdmissionError{cause: err}
+		}
 	}
 	owner := next.owner
 	if owner == nil {
@@ -177,7 +191,7 @@ func (dcjc *DynCfgJobController) FinalizeJobConfigIntents() error {
 	dcjc.configIntents.mu.Unlock()
 	var result error
 	for _, id := range ids {
-		prepared, err := dcjc.prepareJobConfigIntent(id, nil, jobConfigIntentDisable)
+		prepared, err := dcjc.prepareJobConfigIntent(context.Background(), id, nil, jobConfigIntentDisable)
 		if err != nil {
 			result = errors.Join(result, err)
 			continue
@@ -190,6 +204,7 @@ func (dcjc *DynCfgJobController) FinalizeJobConfigIntents() error {
 // Satisfied Enable still adopts enabled intent. Preserve the existing no-op
 // diagnostic and retry behavior: graph equality alone is not an intent commit.
 func (dcjc *DynCfgJobController) satisfyWithEnabledIntent(
+	ctx context.Context,
 	scope lifecycle.ResourceTransactionScope,
 	current lifecycle.ReadyResource,
 	permit lifecycle.LongLivedPermit,
@@ -198,7 +213,7 @@ func (dcjc *DynCfgJobController) satisfyWithEnabledIntent(
 ) (lifecycle.PreparedResourceTransaction, error) {
 	status := dyncfg.Status(record.Status)
 	postimage := graphConfig(record, status)
-	intent, err := dcjc.prepareJobConfigIntent(scope.ID, &postimage, jobConfigIntentEnable)
+	intent, err := dcjc.prepareJobConfigIntent(ctx, scope.ID, &postimage, jobConfigIntentEnable)
 	if err != nil {
 		return nil, err
 	}

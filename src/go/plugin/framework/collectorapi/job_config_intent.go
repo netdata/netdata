@@ -7,6 +7,10 @@ package collectorapi
 // Running, Failed and retry transitions retain intent until disable, removal,
 // replacement or final joined run retirement.
 //
+// Before Prepare receives a changed nonzero next identity, the framework validates
+// raw structure and literal field types without resolving references or checking
+// dependency readiness. Operational Init/Check failure does not revoke that proof.
+//
 // Prepare reserves protection without starting work, downloading dependencies or
 // changing idle timestamps. Zero previous/next identities mean no enabled intent.
 // Config is the borrowed raw next configuration (nil when next is zero); it must

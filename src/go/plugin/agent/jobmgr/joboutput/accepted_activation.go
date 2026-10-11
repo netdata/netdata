@@ -662,6 +662,7 @@ func (dcjc *DynCfgJobController) prepareAcceptedActivation(
 	}
 	if attempt.stage == nil {
 		return dcjc.prepareAcceptedActivationError(
+			ctx,
 			attempt,
 			current,
 			scope,
@@ -671,7 +672,7 @@ func (dcjc *DynCfgJobController) prepareAcceptedActivation(
 	}
 	successor, probeFailure, err := dcjc.factory.prepareCandidate(scope.Successor, permit, attempt.stage)
 	if err != nil {
-		return dcjc.prepareAcceptedActivationError(attempt, current, scope, permit, classifyActivationError(err))
+		return dcjc.prepareAcceptedActivationError(ctx, attempt, current, scope, permit, classifyActivationError(err))
 	}
 	failedPostimage := graphConfig(record, dyncfg.StatusFailed)
 	failurePlan := probeFailurePlan{
@@ -697,9 +698,10 @@ func (dcjc *DynCfgJobController) prepareAcceptedActivation(
 	}
 	if probeFailure != nil {
 		if dcjc.configModules.activationWaitsForDependency(config, probeFailure) {
-			return dcjc.prepareAcceptedActivationWait(attempt, current, scope, permit, probeFailure, nil)
+			return dcjc.prepareAcceptedActivationWait(ctx, attempt, current, scope, permit, probeFailure, nil)
 		}
 		return dcjc.prepareProbeFailure(
+			ctx,
 			scope,
 			current,
 			permit,
@@ -710,6 +712,7 @@ func (dcjc *DynCfgJobController) prepareAcceptedActivation(
 	}
 	acceptedPostimage := graphConfig(record, dyncfg.StatusAccepted)
 	return dcjc.prepareMutationWithActivationFallbacks(
+		ctx,
 		scope,
 		current,
 		successor,
@@ -755,6 +758,7 @@ func (dcjc *DynCfgJobController) prepareAcceptedActivation(
 }
 
 func (dcjc *DynCfgJobController) prepareAcceptedActivationError(
+	ctx context.Context,
 	attempt acceptedActivationAttempt,
 	current lifecycle.ReadyResource,
 	scope lifecycle.ResourceTransactionScope,
@@ -779,16 +783,17 @@ func (dcjc *DynCfgJobController) prepareAcceptedActivationError(
 	failedPostimage := graphConfig(record, dyncfg.StatusFailed)
 	config := attempt.spec.config
 	if dcjc.configModules.activationWaitsForDependency(config, err) {
-		return dcjc.prepareAcceptedActivationWait(attempt, current, scope, permit, err, nil)
+		return dcjc.prepareAcceptedActivationWait(ctx, attempt, current, scope, permit, err, nil)
 	}
 	if activation.kind == activationFailureBusy || activation.kind == activationFailureStaleStore ||
 		activation.kind == activationFailureSuperseded {
-		return dcjc.prepareAcceptedActivationWait(attempt, current, scope, permit, err,
+		return dcjc.prepareAcceptedActivationWait(ctx, attempt, current, scope, permit, err,
 			dcjc.activationRelease(scope.ID, jobmgr.ProcessAttemptJob))
 	}
 	switch activation.kind {
 	case activationFailureQuarantined, activationFailureProposal:
 		return dcjc.prepareMutationWithRetryAfterApply(
+			ctx,
 			scope,
 			current,
 			nil,
@@ -807,6 +812,7 @@ func (dcjc *DynCfgJobController) prepareAcceptedActivationError(
 	case activationFailureDeadline, activationFailureTransient:
 		failure := transientActivationFailure(config, err)
 		return dcjc.prepareMutationWithRetryAfterApply(
+			ctx,
 			scope,
 			current,
 			nil,
@@ -842,6 +848,7 @@ func (dcjc *DynCfgJobController) activationRelease(
 }
 
 func (dcjc *DynCfgJobController) prepareAcceptedActivationWait(
+	ctx context.Context,
 	attempt acceptedActivationAttempt,
 	current lifecycle.ReadyResource,
 	scope lifecycle.ResourceTransactionScope,
@@ -855,6 +862,7 @@ func (dcjc *DynCfgJobController) prepareAcceptedActivationWait(
 	}
 	postimage := graphConfig(record, dyncfg.StatusAccepted)
 	return dcjc.prepareMutationWithRetryAfterApply(
+		ctx,
 		scope,
 		current,
 		nil,

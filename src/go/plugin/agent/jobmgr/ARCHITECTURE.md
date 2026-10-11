@@ -722,7 +722,9 @@ the plugin restarts. Echo replies update status or record rejection without repl
   hold the reply. The accepted replacement has no incumbent fallback. An identical running DynCfg payload retains its
   current runtime and returns `200`.
 - **ENABLE.** Running is already satisfied (`200`). Other stored configurations accept enabled intent (`202`) through
-  a short transaction. Construction, readiness and resulting health settle afterward. Repeated ENABLE coalesces.
+  a short transaction. If the collector declares a configuration-intent resource owner, new acquisition authority
+  first requires pure raw validation (`400` for malformed input, `503` if validation is unavailable). Construction,
+  readiness and resulting health settle afterward. Repeated ENABLE coalesces.
 - **Other mutations.** Disabled UPDATE, DISABLE and REMOVE return `200` when applied. Runtime quarantine discovered
   after an accepted UPDATE is reported through later failed status and diagnostics; the mutation reply remains `202`.
 - **Informative commands.** TEST preserves its validation/error codes. RESTART runs a response-free resource transaction
@@ -739,6 +741,18 @@ cancellation, and deadlines through the actual kernel.
 
 `accepted` covers passive registration and enabled work that is staging, waiting, or starting. The activation index and
 current resource distinguish enabled intent; a passive registration never starts merely because a dependency appears.
+
+Collectors with `JobConfigIntentOwner` reserve resources only after structural validation of each changed enabled
+identity. This admission gate covers discovery, Enable and failure adoption, independently of missing dependencies
+or a quarantined candidate. It reuses pure configuration validation in a separate contained operation, outside the
+graph claim, so validation cannot supersede a candidate awaiting handoff. Unchanged identity and retirement do not
+repeat collector callbacks. Operational failure/retry retains valid intent. The owning discovery pipeline can still
+revoke trust with an invalid postimage; that Failed adoption retires both the incumbent and acquisition intent.
+
+If admission validation is busy or times out, discovery retains unaccepted desired work until that exact validation
+attempt releases, preserving the incumbent. A quarantined validation identity rejects that revision. Interactive
+commands reject unavailable validation without changing state. Neither path grants acquisition before validation
+completes. No dependency lookup, reference resolution, Init or Check is part of this admission proof.
 
 - A short accepted mutation arms `{run epoch, config UID, activation generation}` only after commit. The worker builds
   and probes outside the Function request, graph claim, and resource lane. Fresh construction waits for predecessor

@@ -55,6 +55,7 @@ func (a *candidateAdoption) Dispose(ctx context.Context) (lifecycle.ReadyResourc
 }
 
 func (dcjc *DynCfgJobController) prepareCandidateAdoption(
+	ctx context.Context,
 	scope lifecycle.ResourceTransactionScope,
 	current lifecycle.ReadyResource,
 	permit lifecycle.LongLivedPermit,
@@ -85,6 +86,7 @@ func (dcjc *DynCfgJobController) prepareCandidateAdoption(
 			dcjc.activationRelease(scope.ID, jobmgr.ProcessAttemptJobRuntime), nil, stage)
 	}
 	prepared, err := dcjc.prepareMutationWithRetryAfterApplyAndFallback(
+		ctx,
 		scope, current, nil, permit, resourceRemovalDisposition(current), postimage, reply, cleanup,
 		autoDetectionRetryToken{}, composeAfterApply(afterApply, handoff),
 		preparedJobConfigLifecycle{

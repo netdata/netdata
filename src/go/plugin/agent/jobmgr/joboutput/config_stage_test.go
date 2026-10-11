@@ -96,50 +96,57 @@ func TestDynCfgTestContainsNonCooperativeCollectorPerRawConfigIdentity(t *testin
 }
 
 func TestContainedConfigValidationYieldsGraphClaimForAllCallbacks(t *testing.T) {
-	controller, _, _, _, _ := newDynCfgJobTestHarness(t)
-	var outsideClaim atomic.Bool
-	var callbacks atomic.Int32
-	var violations atomic.Int32
-	creator := controller.modules["module"]
-	creator.Create = func() collectorapi.CollectorV1 {
-		callbacks.Add(1)
-		if !outsideClaim.Load() {
-			violations.Add(1)
-		}
-		module := &collectorapi.MockCollectorV1{}
-		module.CleanupFunc = func(context.Context) {
-			callbacks.Add(1)
-			if !outsideClaim.Load() {
-				violations.Add(1)
+	for name, kind := range map[string]configOperationKind{
+		"passive": configOperationValidate,
+		"intent":  configOperationValidateIntent,
+	} {
+		t.Run(name, func(t *testing.T) {
+			controller, _, _, _, _ := newDynCfgJobTestHarness(t)
+			var outsideClaim atomic.Bool
+			var callbacks atomic.Int32
+			var violations atomic.Int32
+			creator := controller.modules["module"]
+			creator.Create = func() collectorapi.CollectorV1 {
+				callbacks.Add(1)
+				if !outsideClaim.Load() {
+					violations.Add(1)
+				}
+				module := &collectorapi.MockCollectorV1{}
+				module.CleanupFunc = func(context.Context) {
+					callbacks.Add(1)
+					if !outsideClaim.Load() {
+						violations.Add(1)
+					}
+				}
+				return module
 			}
-		}
-		return module
-	}
-	controller.modules["module"] = creator
-	controller.factory.config.Modules = controller.modules
-	controller.configModules.config.Modules = controller.modules
-	controller.factory.runWithoutClaims = func(
-		ctx context.Context,
-		work func(context.Context) error,
-	) (error, error) {
-		outsideClaim.Store(true)
-		defer outsideClaim.Store(false)
-		return work(ctx), nil
-	}
+			controller.modules["module"] = creator
+			controller.factory.config.Modules = controller.modules
+			controller.configModules.config.Modules = controller.modules
+			controller.factory.runWithoutClaims = func(
+				ctx context.Context,
+				work func(context.Context) error,
+			) (error, error) {
+				outsideClaim.Store(true)
+				defer outsideClaim.Store(false)
+				return work(ctx), nil
+			}
 
-	config := factoryTestConfig(false)
-	config.SetSourceType(confgroup.TypeDyncfg)
-	config.SetSource("user=test")
-	config.SetProvider(confgroup.TypeDyncfg)
-	_, err := controller.runConfigOperation(
-		context.Background(),
-		config,
-		configOperationValidate,
-		true,
-	)
-	require.NoError(t, err)
-	require.EqualValues(t, 2, callbacks.Load())
-	require.Zero(t, violations.Load())
+			config := factoryTestConfig(false)
+			config.SetSourceType(confgroup.TypeDyncfg)
+			config.SetSource("user=test")
+			config.SetProvider(confgroup.TypeDyncfg)
+			_, err := controller.runConfigOperation(
+				context.Background(),
+				config,
+				kind,
+				true,
+			)
+			require.NoError(t, err)
+			require.EqualValues(t, 2, callbacks.Load())
+			require.Zero(t, violations.Load())
+		})
+	}
 }
 
 func TestConfigOperationAwaitDoesNotStartAfterCallerCancellation(t *testing.T) {

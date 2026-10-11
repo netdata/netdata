@@ -66,7 +66,7 @@ func (dcjc *DynCfgJobController) PlanSecretDependentStop(id string) (jobmgr.Work
 		NoResponse: true,
 		Transaction: &jobmgr.ResourceTransactionPlan{
 			ID: id,
-			Prepare: func(_ context.Context, current lifecycle.ReadyResource, scope lifecycle.ResourceTransactionScope, permit lifecycle.LongLivedPermit) (lifecycle.PreparedResourceTransaction, error) {
+			Prepare: func(ctx context.Context, current lifecycle.ReadyResource, scope lifecycle.ResourceTransactionScope, permit lifecycle.LongLivedPermit) (lifecycle.PreparedResourceTransaction, error) {
 				if permit.Valid() || scope.ID != id {
 					return nil, errors.New("job output: invalid dependent stop scope")
 				}
@@ -88,6 +88,7 @@ func (dcjc *DynCfgJobController) PlanSecretDependentStop(id string) (jobmgr.Work
 				}
 				postimage := graphConfig(record, dyncfg.StatusAccepted)
 				return dcjc.prepareMutationWithRetryAfterApply(
+					ctx,
 					scope, current, nil, permit, resourceRemovalDisposition(current), &postimage,
 					internalReply(), dcjc.configStatusCleanup(id, dyncfg.StatusAccepted), autoDetectionRetryToken{},
 					composeAfterApply(func() { dcjc.scheduler.accepted.pause(spec) }, state.markStopped), jobConfigIntentPreserve,

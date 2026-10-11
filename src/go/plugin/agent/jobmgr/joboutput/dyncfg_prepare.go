@@ -66,6 +66,7 @@ func (dcjc *DynCfgJobController) prepareAdd(
 		Payload: payload,
 	}
 	return dcjc.prepareMutation(
+		ctx,
 		scope,
 		current,
 		nil,
@@ -164,6 +165,7 @@ func (dcjc *DynCfgJobController) prepareUpdate(
 			return dcjc.rejectKeeping(scope, current, permit, rejection, status)
 		}
 		return dcjc.prepareMutation(
+			ctx,
 			scope,
 			current,
 			nil,
@@ -210,7 +212,7 @@ func (dcjc *DynCfgJobController) prepareEnable(
 	}
 	status := dyncfg.Status(record.Status)
 	if status == dyncfg.StatusRunning {
-		return dcjc.satisfyWithEnabledIntent(scope, current, permit, record, nil)
+		return dcjc.satisfyWithEnabledIntent(ctx, scope, current, permit, record, nil)
 	}
 	config, err := graphRecordConfig(record)
 	if err != nil {
@@ -225,10 +227,11 @@ func (dcjc *DynCfgJobController) prepareEnable(
 		if current != nil {
 			activate = nil // The installed generation already owns startup.
 		}
-		return dcjc.satisfyWithEnabledIntent(scope, current, permit, record, activate)
+		return dcjc.satisfyWithEnabledIntent(ctx, scope, current, permit, record, activate)
 	}
 	postimage := graphConfig(record, dyncfg.StatusAccepted)
 	return dcjc.prepareMutationWithRetryAfterApply(
+		ctx,
 		scope, current, nil, permit, resourceRemovalDisposition(current), &postimage,
 		adoptedReply(dyncfg.CommandEnable, dyncfg.StatusAccepted, jobFailure{}),
 		dcjc.configStatusCleanup(scope.ID, dyncfg.StatusAccepted), autoDetectionRetryToken{}, activate,
@@ -359,6 +362,7 @@ func (dcjc *DynCfgJobController) prepareCandidate(
 			return dcjc.rejectKeeping(scope, current, permit, failure, kept)
 		}
 		return dcjc.prepareTransientConstructionFailure(
+			ctx,
 			scope,
 			current,
 			permit,
@@ -391,11 +395,12 @@ func (dcjc *DynCfgJobController) prepareCandidate(
 				kept,
 			)
 		}
-		return dcjc.prepareProbeFailure(scope, current, permit, autoDetectionRetryToken{}, probeFailure, failurePlan)
+		return dcjc.prepareProbeFailure(ctx, scope, current, permit, autoDetectionRetryToken{}, probeFailure, failurePlan)
 	}
 	acceptedPostimage := cmd.postimage
 	acceptedPostimage.Status = dyncfg.StatusAccepted.String()
 	return dcjc.prepareCandidateAdoption(
+		ctx,
 		scope, current, permit, stage, cmd.config, &acceptedPostimage,
 		adoptedReply(cmd.command, dyncfg.StatusAccepted, jobFailure{}),
 		cmd.cleanup(acceptedPostimage, dyncfg.StatusAccepted), nil,
@@ -403,6 +408,7 @@ func (dcjc *DynCfgJobController) prepareCandidate(
 }
 
 func (dcjc *DynCfgJobController) prepareDisable(
+	ctx context.Context,
 	target dynCfgTarget,
 	record dyncfg.GraphRecord,
 	exists bool,
@@ -421,6 +427,7 @@ func (dcjc *DynCfgJobController) prepareDisable(
 	}
 	postimage := graphConfig(record, dyncfg.StatusDisabled)
 	return dcjc.prepareMutation(
+		ctx,
 		scope,
 		current,
 		nil,
@@ -433,6 +440,7 @@ func (dcjc *DynCfgJobController) prepareDisable(
 }
 
 func (dcjc *DynCfgJobController) prepareRemove(
+	ctx context.Context,
 	target dynCfgTarget,
 	record dyncfg.GraphRecord,
 	exists bool,
@@ -466,6 +474,7 @@ func (dcjc *DynCfgJobController) prepareRemove(
 		})
 	}
 	return dcjc.prepareMutation(
+		ctx,
 		scope,
 		current,
 		nil,
