@@ -635,7 +635,8 @@ static void health_prototype_apply_to_rrdset(RRDSET *st, RRD_ALERT_PROTOTYPE *ap
                 continue;
 
             // the chart selector rejects almost every prototype with pointer compares, before any chart
-            // label match, so it runs before the host checks, which pattern-match the name and the host labels
+            // label match, so it runs before the host checks, which pattern-match the name and, when
+            // configured, the host labels
             if (!health_prototype_matches_rrdset(st, t))
                 continue;
 
