@@ -45,6 +45,13 @@ type ProcessService interface {
 	Run(context.Context)
 }
 
+// DependencySource publishes process-owned prerequisite changes. Subscriptions
+// belong to one run generation; unsubscribe must be bounded and idempotent.
+// Notifications may overlap unsubscription and must not carry configuration data.
+type DependencySource interface {
+	SubscribeDependencies(notify func(kind, name string)) func()
+}
+
 // ProcessServiceFinalizer optionally saves pending state after Run has joined,
 // before jobs are retired. Finalize is called once with the process shutdown
 // budget. It must honor cancellation; the process stops waiting at the deadline.
@@ -211,8 +218,9 @@ func NewProcess(config Config) (*Process, error) {
 			RunJob:       slices.Clone(config.RunJob),
 			AutoEnable:   config.AutoEnable,
 		},
-		FinalizeOutput: finalizeOutput,
-		Diagnostics:    newProcessDiagnosticLogger(),
+		DependencySources: processDependencySources(config.Services),
+		FinalizeOutput:    finalizeOutput,
+		Diagnostics:       newProcessDiagnosticLogger(),
 	})
 	if err != nil {
 		return nil, err
