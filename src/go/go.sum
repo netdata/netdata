@@ -129,8 +129,8 @@ github.com/clbanning/rfile/v2 v2.0.0-20231024120205-ac3fca974b0e h1:Iw4JdD/TlCUv
 github.com/clbanning/rfile/v2 v2.0.0-20231024120205-ac3fca974b0e/go.mod h1:Y53jAgtl30vLWEnRWkZFT+CpwLNsrQJb0F5AwHieNGs=
 github.com/clipperhouse/uax29/v2 v2.7.0 h1:+gs4oBZ2gPfVrKPthwbMzWZDaAFPGYK72F0NJv2v7Vk=
 github.com/clipperhouse/uax29/v2 v2.7.0/go.mod h1:EFJ2TJMRUaplDxHKj1qAEhCtQPW2tJSwu5BF98AuoVM=
-github.com/cloudflare/cfssl v1.7.0 h1:ZHKw+FhbqRbnVrgYIq9mKsZu6uglwJdWQxUoWhWSiIk=
-github.com/cloudflare/cfssl v1.7.0/go.mod h1:WLpD4XaYgn44qgQ4W+tvGJEr59/snfQn6LwUrXloxx0=
+github.com/cloudflare/cfssl v1.7.1 h1:nMC84ouypIM/AXrrY24ql70cEtkelfxq4NZ67Ur8pG8=
+github.com/cloudflare/cfssl v1.7.1/go.mod h1:WLpD4XaYgn44qgQ4W+tvGJEr59/snfQn6LwUrXloxx0=
 github.com/containerd/errdefs v1.0.0 h1:tg5yIfIlQIrxYtu9ajqY42W3lpS19XqdxRQeEwYG8PI=
 github.com/containerd/errdefs v1.0.0/go.mod h1:+YBYIdtsnF4Iw6nWZhJcqGSg/dwvV7tyJ/kCkyJ2k+M=
 github.com/containerd/errdefs/pkg v0.3.0 h1:9IKJ06FvyNlexW690DXuQNx2KA2cUJXx151Xdx3ZPPE=

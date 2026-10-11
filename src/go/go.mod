@@ -33,7 +33,7 @@ require (
 	github.com/catonetworks/cato-go-sdk v0.4.2
 	github.com/cespare/xxhash/v2 v2.3.0
 	github.com/clbanning/rfile/v2 v2.0.0-20231024120205-ac3fca974b0e
-	github.com/cloudflare/cfssl v1.7.0
+	github.com/cloudflare/cfssl v1.7.1
 	github.com/coreos/go-systemd/v22 v22.7.0
 	github.com/docker/go-units v0.5.0
 	github.com/facebook/time v0.0.0-20250211113239-e3e1421a0980
