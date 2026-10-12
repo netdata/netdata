@@ -216,7 +216,7 @@ modules:
             - name: sensor
               description: Source sensor name, preserved as cpu, gpu, soc0, soc1, soc2, or tj.
           metrics:
-            - name: jetson.temperature
+            - name: jetson.sensor_temperature
               description: SoC Temperature
               unit: Celsius
               chart_type: line

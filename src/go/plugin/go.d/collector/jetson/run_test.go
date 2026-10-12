@@ -90,9 +90,9 @@ func TestPowerCollectionTransitions(t *testing.T) {
 		`power_rail_power{rail="VDD_CPU_SOC_MSS"}`: 8.299,
 		`power_rail_power{rail="VIN_SYS_5V0"}`:     7.044,
 		`power_rail_power{rail="VIN"}`:             24.830,
-		`temperature{sensor="cpu"}`:                35.468,
-		`temperature{sensor="gpu"}`:                37.062,
-		`temperature{sensor="tj"}`:                 37.062,
+		`sensor_temperature{sensor="cpu"}`:         35.468,
+		`sensor_temperature{sensor="gpu"}`:         37.062,
+		`sensor_temperature{sensor="tj"}`:          37.062,
 	}
 	assertCollected(t, c, want)
 	assertCollected(t, c, want)
@@ -321,12 +321,12 @@ func TestCorrectedOrinCaptures(t *testing.T) {
 		want map[string]metrix.SampleValue
 	}{
 		{"orin-r36.5-15w-root", map[string]metrix.SampleValue{
-			`temperature{sensor="cpu"}`:  39.312,
-			`temperature{sensor="gpu"}`:  34.562,
-			`temperature{sensor="soc0"}`: 36.625,
-			`temperature{sensor="soc1"}`: 36.437,
-			`temperature{sensor="soc2"}`: 35.75,
-			`temperature{sensor="tj"}`:   39.312,
+			`sensor_temperature{sensor="cpu"}`:  39.312,
+			`sensor_temperature{sensor="gpu"}`:  34.562,
+			`sensor_temperature{sensor="soc0"}`: 36.625,
+			`sensor_temperature{sensor="soc1"}`: 36.437,
+			`sensor_temperature{sensor="soc2"}`: 35.75,
+			`sensor_temperature{sensor="tj"}`:   39.312,
 
 			"gpu_utilization": 0, `gpu_gpc_frequency{gpc="0"}`: 305, `gpu_gpc_frequency{gpc="1"}`: 0,
 			"emc_utilization": 1, "emc_frequency": 2133,
@@ -334,12 +334,12 @@ func TestCorrectedOrinCaptures(t *testing.T) {
 			`power_rail_power{rail="VIN_SYS_5V0"}`: 4.745,
 		}},
 		{"orin-r36.5-50w-root", map[string]metrix.SampleValue{
-			`temperature{sensor="cpu"}`:  39.812,
-			`temperature{sensor="gpu"}`:  35.593,
-			`temperature{sensor="soc0"}`: 37.437,
-			`temperature{sensor="soc1"}`: 36.968,
-			`temperature{sensor="soc2"}`: 36.312,
-			`temperature{sensor="tj"}`:   39.812,
+			`sensor_temperature{sensor="cpu"}`:  39.812,
+			`sensor_temperature{sensor="gpu"}`:  35.593,
+			`sensor_temperature{sensor="soc0"}`: 37.437,
+			`sensor_temperature{sensor="soc1"}`: 36.968,
+			`sensor_temperature{sensor="soc2"}`: 36.312,
+			`sensor_temperature{sensor="tj"}`:   39.812,
 
 			"gpu_utilization": 0, `gpu_gpc_frequency{gpc="0"}`: 1300, `gpu_gpc_frequency{gpc="1"}`: 1300,
 			"emc_utilization": 0, "emc_frequency": 3199,
@@ -347,12 +347,12 @@ func TestCorrectedOrinCaptures(t *testing.T) {
 			`power_rail_power{rail="VIN_SYS_5V0"}`: 4.745,
 		}},
 		{"orin-r36.5-maxn-root", map[string]metrix.SampleValue{
-			`temperature{sensor="cpu"}`:  39.531,
-			`temperature{sensor="gpu"}`:  34.906,
-			`temperature{sensor="soc0"}`: 36.718,
-			`temperature{sensor="soc1"}`: 36.562,
-			`temperature{sensor="soc2"}`: 35.812,
-			`temperature{sensor="tj"}`:   39.531,
+			`sensor_temperature{sensor="cpu"}`:  39.531,
+			`sensor_temperature{sensor="gpu"}`:  34.906,
+			`sensor_temperature{sensor="soc0"}`: 36.718,
+			`sensor_temperature{sensor="soc1"}`: 36.562,
+			`sensor_temperature{sensor="soc2"}`: 35.812,
+			`sensor_temperature{sensor="tj"}`:   39.531,
 
 			"gpu_utilization": 0, `gpu_gpc_frequency{gpc="0"}`: 305, `gpu_gpc_frequency{gpc="1"}`: 305,
 			"emc_utilization": 1, "emc_frequency": 2133,
@@ -360,12 +360,12 @@ func TestCorrectedOrinCaptures(t *testing.T) {
 			`power_rail_power{rail="VIN_SYS_5V0"}`: 4.644,
 		}},
 		{"orin-r36.5-15w-account", map[string]metrix.SampleValue{
-			`temperature{sensor="cpu"}`:  39.218,
-			`temperature{sensor="gpu"}`:  34.593,
-			`temperature{sensor="soc0"}`: 36.656,
-			`temperature{sensor="soc1"}`: 36.312,
-			`temperature{sensor="soc2"}`: 35.656,
-			`temperature{sensor="tj"}`:   39.218,
+			`sensor_temperature{sensor="cpu"}`:  39.218,
+			`sensor_temperature{sensor="gpu"}`:  34.593,
+			`sensor_temperature{sensor="soc0"}`: 36.656,
+			`sensor_temperature{sensor="soc1"}`: 36.312,
+			`sensor_temperature{sensor="soc2"}`: 35.656,
+			`sensor_temperature{sensor="tj"}`:   39.218,
 
 			"gpu_utilization":                      0,
 			`power_rail_power{rail="VDD_GPU_SOC"}`: 2.403, `power_rail_power{rail="VDD_CPU_CV"}`: 0,
@@ -395,12 +395,12 @@ func TestTemperatureCollectionTransitions(t *testing.T) {
 	sendRecord(t, conn, "cpu@39.312C gpu@34.562C soc0@36.625C soc1@36.437C soc2@35.75C tj@39.312C")
 	waitSample(t, c, func(s sample) bool { return len(s.Temperatures) == 6 })
 	assertCollected(t, c, map[string]metrix.SampleValue{
-		`temperature{sensor="cpu"}`:  39.312,
-		`temperature{sensor="gpu"}`:  34.562,
-		`temperature{sensor="soc0"}`: 36.625,
-		`temperature{sensor="soc1"}`: 36.437,
-		`temperature{sensor="soc2"}`: 35.75,
-		`temperature{sensor="tj"}`:   39.312,
+		`sensor_temperature{sensor="cpu"}`:  39.312,
+		`sensor_temperature{sensor="gpu"}`:  34.562,
+		`sensor_temperature{sensor="soc0"}`: 36.625,
+		`sensor_temperature{sensor="soc1"}`: 36.437,
+		`sensor_temperature{sensor="soc2"}`: 35.75,
+		`sensor_temperature{sensor="tj"}`:   39.312,
 	})
 	collecttest.AssertChartCoverage(t, c, collecttest.ChartCoverageExpectation{})
 
@@ -408,17 +408,17 @@ func TestTemperatureCollectionTransitions(t *testing.T) {
 	sendRecord(t, conn, "cpu@0C gpu@-256C soc0@NaNC soc1@40C/41C soc2@40C soc2@41C GR3D_FREQ 10% VIN 1000/2000")
 	waitSample(t, c, func(s sample) bool { return s.GPUUtilization != nil })
 	assertCollected(t, c, map[string]metrix.SampleValue{
-		`temperature{sensor="cpu"}`:    0,
-		"gpu_utilization":              10,
-		`power_rail_power{rail="VIN"}`: 1,
+		`sensor_temperature{sensor="cpu"}`: 0,
+		"gpu_utilization":                  10,
+		`power_rail_power{rail="VIN"}`:     1,
 	})
 
 	// Reordering does not change identity; a recovered sensor has no cached value.
 	sendRecord(t, conn, "gpu@-12.5C cpu@0C")
 	waitSample(t, c, func(s sample) bool { return len(s.Temperatures) == 2 })
 	assertCollected(t, c, map[string]metrix.SampleValue{
-		`temperature{sensor="gpu"}`: -12.5,
-		`temperature{sensor="cpu"}`: 0,
+		`sensor_temperature{sensor="gpu"}`: -12.5,
+		`sensor_temperature{sensor="cpu"}`: 0,
 	})
 	collecttest.AssertChartCoverage(t, c, collecttest.ChartCoverageExpectation{})
 
@@ -431,7 +431,7 @@ func TestTemperatureCollectionTransitions(t *testing.T) {
 
 	sendRecord(t, conn, "tj@41.125C")
 	waitSample(t, c, func(s sample) bool { return len(s.Temperatures) == 1 })
-	assertCollected(t, c, map[string]metrix.SampleValue{`temperature{sensor="tj"}`: 41.125})
+	assertCollected(t, c, map[string]metrix.SampleValue{`sensor_temperature{sensor="tj"}`: 41.125})
 	stop()
 	_, err = collecttest.CollectScalarSeries(c)
 	require.ErrorContains(t, err, "no fresh")
