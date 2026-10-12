@@ -91,9 +91,10 @@ chown -R "${NETDATA_USER}:${NETDATA_USER}" \
 chown -R "root:${NETDATA_USER}" "${PREFIX}/etc/netdata"
 chmod 0750 "${PREFIX}/etc/netdata"
 find "${PREFIX}/etc/netdata" -type d -exec chmod 0750 {} +
-find "${PREFIX}/etc/netdata" -type f -exec chmod 0640 {} +
-# edit-config is a tool, not configuration.
-chmod 0750 "${PREFIX}/etc/netdata/edit-config" 2>/dev/null || true
+# Executables keep their execute bit: edit-config, and the operator's own
+# plugins in custom-plugins.d, which the Agent spawns as the service account.
+find "${PREFIX}/etc/netdata" -type f -perm -u+x -exec chmod 0750 {} +
+find "${PREFIX}/etc/netdata" -type f ! -perm -u+x -exec chmod 0640 {} +
 
 #
 # Privileged plugins: setuid root, executable only by the service group.
