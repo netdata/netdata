@@ -226,6 +226,7 @@ typedef struct query_target_locals {
     long long before;
     bool match_ids;
     bool match_names;
+    size_t instances_version;
 
     size_t metrics_skipped_due_to_not_matching_timeframe;
 
@@ -838,7 +839,7 @@ static bool query_instance_add(QUERY_TARGET_LOCALS *qtl, QUERY_NODE *qn, QUERY_C
 
     if(queryable_instance && filter_instances)
         queryable_instance = (SP_MATCHED_POSITIVE == query_instance_matches(
-                ria, ri, qt->instances.pattern, qtl->match_ids, qtl->match_names, qt->request.version,
+                ria, ri, qt->instances.pattern, qtl->match_ids, qtl->match_names, qtl->instances_version,
                 qtl->host_hostname, qtl->host_node_id_str));
 
     // chart_label_key has no scope variant: the scope checks before this call already applied it
@@ -927,7 +928,7 @@ static ssize_t query_scope_foreach_instance(QUERY_TARGET_LOCALS *qtl, QUERY_NODE
         if(qt->instances.scope_pattern) {
             SIMPLE_PATTERN_RESULT ret = query_instance_matches(qt->request.ria, ri,
                 qt->instances.scope_pattern, qtl->match_ids, qtl->match_names,
-                qt->request.version, qtl->host_hostname, qtl->host_node_id_str);
+                qtl->instances_version, qtl->host_hostname, qtl->host_node_id_str);
             if(ret != SP_MATCHED_POSITIVE)
                 return 0;
         }
@@ -956,7 +957,7 @@ static ssize_t query_scope_foreach_instance(QUERY_TARGET_LOCALS *qtl, QUERY_NODE
         if(qt->instances.scope_pattern) {
             SIMPLE_PATTERN_RESULT ret = query_instance_matches(ria, ri,
                 qt->instances.scope_pattern, qtl->match_ids, qtl->match_names, 
-                qt->request.version, qtl->host_hostname, qtl->host_node_id_str);
+                qtl->instances_version, qtl->host_hostname, qtl->host_node_id_str);
             if(ret != SP_MATCHED_POSITIVE) {
                 rrdinstance_release(ria);
                 return 0;
@@ -991,7 +992,7 @@ static ssize_t query_scope_foreach_instance(QUERY_TARGET_LOCALS *qtl, QUERY_NODE
             if(qt->instances.scope_pattern) {
                 SIMPLE_PATTERN_RESULT ret = query_instance_matches(ria, ri,
                     qt->instances.scope_pattern, qtl->match_ids, qtl->match_names, 
-                    qt->request.version, qtl->host_hostname, qtl->host_node_id_str);
+                    qtl->instances_version, qtl->host_hostname, qtl->host_node_id_str);
                 if(ret != SP_MATCHED_POSITIVE)
                     continue;
             }
@@ -1090,7 +1091,7 @@ static ssize_t query_node_add(void *data, RRDHOST *host, bool queryable_host) {
     qtl->qn = qn;
 
     RRDHOST_IDENTITY host_identity = { 0 };
-    if(qt->request.version >= 2 && qtl->match_names &&
+    if(qtl->instances_version >= 2 && qtl->match_names &&
        (qt->instances.scope_pattern || qt->instances.pattern))
         host_identity = rrdhost_identity_acquire(host);
     qtl->host_hostname = host_identity.hostname;
@@ -1320,6 +1321,9 @@ QUERY_TARGET *query_target_create(QUERY_TARGET_REQUEST *qtr) {
     qtl.match_names = qt->request.options & RRDR_OPTION_MATCH_NAMES;
     if(likely(!qtl.match_ids && !qtl.match_names))
         qtl.match_ids = qtl.match_names = true;
+
+    // the instance names matched may be newer than the response shape (see weights)
+    qtl.instances_version = qt->request.instances_version ? qt->request.instances_version : qt->request.version;
 
     // verify that the chart belongs to the host we are interested
     if(qtl.st) {
