@@ -22,6 +22,7 @@ func nativeEntry(id, chartID, metric string) TemplateEntry {
 
 func TestTemplateSetOwnsNormalizedInput(t *testing.T) {
 	entry := nativeEntry("profile", "requests", "requests")
+	entry.Groups[0].Charts[0].Lifecycle = &charttpl.Lifecycle{ExpireAfterCycles: new(0)}
 	entry.Groups[0].ChartDefaults = &charttpl.ChartDefaults{
 		Priority: 42,
 		Instances: &charttpl.Instances{
@@ -43,9 +44,13 @@ func TestTemplateSetOwnsNormalizedInput(t *testing.T) {
 	entry.Groups[0].ChartDefaults.Instances.ByLabels[0] = "changed"
 	entry.Groups[0].Charts[0].Dimensions[0].Selector = "changed"
 	entry.AutogenRules[0].Selector.Deny[0] = "changed"
+	*entry.Groups[0].Charts[0].Lifecycle.ExpireAfterCycles = 7
+	*entries[0].Groups[0].Charts[0].Lifecycle.ExpireAfterCycles = 9
 	entries[0].Groups[0].Charts[0].Instances.ByLabels[0] = "also_changed"
 	entries[0].AutogenRules[0].Selector.Deny[0] = "also_changed"
 	got := set.Entries()[0]
+	assert.Equal(t, new(0), got.Groups[0].Charts[0].Lifecycle.ExpireAfterCycles)
+	assert.Zero(t, set.program.Charts()[0].Lifecycle.ExpireAfterCycles)
 	assert.Equal(t, []string{"node"}, got.Groups[0].Charts[0].Instances.ByLabels)
 	assert.Equal(t, "requests", got.Groups[0].Charts[0].Dimensions[0].Selector)
 	assert.Equal(t, []string{"*"}, got.AutogenRules[0].Selector.Deny)

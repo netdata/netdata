@@ -67,7 +67,7 @@ type SemanticChartPolicy struct {
 	DeclaredType        string
 	MaxInstances        int
 	MaxDimensions       int
-	ExpireAfterCycles   int
+	ExpireAfterCycles   *int
 	DimensionExpiry     int
 	Dimensions          []SemanticDimensionPolicy
 }

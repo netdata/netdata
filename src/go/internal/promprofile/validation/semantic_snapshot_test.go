@@ -41,6 +41,7 @@ template:
     - title: Value
       context: value
       units: values
+      lifecycle: {expire_after_cycles: 0}
       label_promotion: []
       instances:
         by_labels: [instance]
@@ -73,6 +74,9 @@ template:
 		snapshot.Profiles[0].FallbackRules[0].RuntimePath != "fallback_type.gauge[0]" ||
 		len(snapshot.Profiles[0].Charts) != 1 || snapshot.Profiles[0].Charts[0].Priority != 100 {
 		t.Fatalf("unexpected static profile facts: %#v", snapshot.Profiles)
+	}
+	if expiry := snapshot.Profiles[0].Charts[0].ExpireAfterCycles; expiry == nil || *expiry != 0 {
+		t.Fatalf("explicit zero expiry was lost: %v", expiry)
 	}
 	if len(snapshot.Sources) != 1 {
 		t.Fatalf("source count: got %d, want 1", len(snapshot.Sources))

@@ -381,6 +381,7 @@
         },
         "expire_after_cycles": {
           "type": "integer",
+          "description": "Omitted: expire after 5 successful collection cycles without a measurement. Zero: disable chart expiry. Positive: expire after this many successful cycles.",
           "minimum": 0
         },
         "dimensions": {
