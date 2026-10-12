@@ -34,7 +34,9 @@ You get:
 CPU, memory, and swap usage come from Netdata's standard Linux system monitoring; this collector adds Jetson GPU, EMC, and power rail readings. Power readings help correlate workload activity with power consumption.
 
 
-The collector runs NVIDIA's `tegrastats --interval 1000` on the local host and reads the line of readings it prints every second. One `tegrastats` process runs for as long as the job runs, under the Netdata service account (usually `netdata`); the collector never elevates its privileges.
+The collector runs NVIDIA's `tegrastats --interval 1000` on the local host and reads the line of readings it prints every second. One `tegrastats` process runs for as long as the job runs. By default, Netdata's restricted `ndsudo` helper runs `/usr/bin/tegrastats` as root to recover readings that may be unavailable to the Netdata service account, including GPU clocks and EMC activity.
+
+If privileged execution is unavailable before the first producer starts, the collector logs a warning and uses `tegrastats` from Netdata's `PATH` under its service account (usually `netdata`). Set `allow_privileged: false` to use only this unprivileged mode. The selected mode remains in use until the job is recreated.
 
 It stops only the `tegrastats` process it started; other instances on the host, such as one you run in a terminal, are not affected.
 
@@ -45,14 +47,16 @@ This collector is only supported on the following platforms:
 
 This collector only supports collecting metrics from a single instance of this integration.
 
-The Netdata service account must be able to run `tegrastats`. Because the collector never elevates privileges, a reading that your Jetson Linux release shows only to root is not collected.
+Privileged collection requires Netdata's installed `ndsudo` helper and NVIDIA's native executable at `/usr/bin/tegrastats`. For this route, the executable and its parent directories must be root-owned, must not be writable by other users, and must not be symlinks. The helper accepts no custom command path or arguments.
+
+Unprivileged collection requires the Netdata service account to be able to run `tegrastats` from its `PATH`. Readings that your Jetson Linux release shows only to root are then unavailable.
 
 
 ### Default Behavior
 
 #### Auto-Detection
 
-The stock configuration runs one job named `localhost`, which looks for `tegrastats` in Netdata's `PATH` and starts collecting when it is found.
+The stock configuration runs one job named `localhost`, which looks for `tegrastats` in Netdata's `PATH` or, when `allow_privileged` is enabled, at `/usr/bin/tegrastats`. Detection does not execute the utility; collection starts after detection succeeds.
 If `tegrastats` is missing when Netdata starts, the job does not start; restart Netdata after making it available.
 
 
@@ -66,7 +70,7 @@ If `tegrastats` is missing when Netdata starts, the job does not start; restart 
 
 #### Performance Impact
 
-Each job keeps one `tegrastats --interval 1000` process running, the same load as running that command yourself. Netdata parses one line of its output per second.
+Each job keeps one `tegrastats --interval 1000` process running, plus a supervising helper in privileged mode. Netdata parses one line of its output per second. CPU and memory overhead have not been measured on Jetson hardware.
 A longer `update_every` reduces how often Netdata stores readings, not how often `tegrastats` samples.
 
 
@@ -93,15 +97,17 @@ UI configuration requires paid Netdata Cloud plan.
 
 The collector needs Netdata installed natively on the Jetson device and the `tegrastats` utility that NVIDIA Jetson Linux (installed with JetPack) provides. Netdata running in a container is not supported.
 
-Check that the Netdata service account can run it:
+To inspect the readings available with the default privileged mode, run:
 
 ```bash
-sudo -u netdata tegrastats --interval 1000
+sudo /usr/bin/tegrastats --interval 1000
 ```
 
-Each line should contain a `GR3D_FREQ` (GPU), `EMC_FREQ` (memory controller), or power rail reading such as `VDD_GPU 10687mW/9815mW`; stop the command with Ctrl+C. Readings missing from this output are also missing from Netdata.
+Each line should contain a `GR3D_FREQ` (GPU), `EMC_FREQ` (memory controller), or power rail reading such as `VDD_GPU 10687mW/9815mW`; stop the command with Ctrl+C. Readings missing from this output cannot be collected by this integration. This manual command checks the vendor utility; it does not verify Netdata's packaged helper.
 
-If the command is not found, restore `tegrastats` with NVIDIA's [tegrastats deployment instructions](https://docs.nvidia.com/jetson/archives/r39.2/DeveloperGuide/AT/JetsonLinuxDevelopmentTools/TegrastatsUtility.html#re-deploying-tegrastats). Netdata searches its own `PATH`, which adds `/sbin`, `/usr/sbin`, `/usr/local/bin`, and `/usr/local/sbin` to the `PATH` it starts with. If `tegrastats` is in another directory, set `PATH` in the `[environment variables]` section of `netdata.conf` to a list that includes it, then restart Netdata.
+For unprivileged mode or fallback, compare the output of `sudo -u netdata tegrastats --interval 1000`. GPU clocks and EMC readings may be absent in that output.
+
+If the command is not found, restore `tegrastats` with NVIDIA's [tegrastats deployment instructions](https://docs.nvidia.com/jetson/archives/r39.2/DeveloperGuide/AT/JetsonLinuxDevelopmentTools/TegrastatsUtility.html#re-deploying-tegrastats). Netdata searches its own `PATH`, which adds `/sbin`, `/usr/sbin`, `/usr/local/bin`, and `/usr/local/sbin` to the `PATH` it starts with. Privileged execution always uses `/usr/bin/tegrastats`; changing `PATH` affects only unprivileged execution. If `tegrastats` is in another directory, set `PATH` in the `[environment variables]` section of `netdata.conf` to a list that includes it, then restart Netdata.
 
 
 
@@ -109,7 +115,7 @@ If the command is not found, restore `tegrastats` with NVIDIA's [tegrastats depl
 
 #### Options
 
-The option can be set globally or per job. One job covers the whole Jetson device.
+The options can be set globally or per job. One job covers the whole Jetson device.
 
 
 <details open><summary>Config options</summary>
@@ -119,6 +125,15 @@ The option can be set globally or per job. One job covers the whole Jetson devic
 | Option | Description | Default | Required |
 |:-----|:------------|:--------|:---------:|
 | update_every | Data collection interval, in seconds. `tegrastats` samples once per second regardless; a longer interval charts the latest reading, not an average. | 1 | no |
+| [allow_privileged](#option-allow-privileged) | Allow restricted privileged execution of tegrastats to collect readings that require root, such as GPU clocks and EMC activity. | yes | no |
+
+<a id="option-allow-privileged"></a>
+##### allow_privileged
+
+Enabled by default. If the helper or fixed vendor executable is unavailable before the first producer starts, the collector warns once and uses unprivileged collection for the lifetime of that job. Recreate the job or restart Netdata to retry privileged collection after repairing the installation.
+
+Unsafe executable permissions, helper protocol/setup errors, and failures after privileged startup do not trigger fallback. Set this option to `false` to avoid privileged execution entirely; root-only readings may then be missing.
+
 
 
 </details>
@@ -318,7 +333,7 @@ docker logs netdata 2>&1 | grep jetson
 
 **Cause**
 
-No executable named `tegrastats` is in Netdata's `PATH`. This is expected on Linux hosts that are not Jetson devices, and when Netdata runs in a container.
+No executable named `tegrastats` is in Netdata's `PATH`, and the privileged fixed-path candidate is missing or disabled. This is expected on Linux hosts that are not Jetson devices, and when Netdata runs in a container.
 
 **Fix**
 
@@ -329,17 +344,38 @@ On a Jetson device, make `tegrastats` available as described in Prerequisites, t
 
 **Cause**
 
-Netdata could not start `tegrastats` through its unprivileged command helper, `nd-run`.
+Netdata could not acquire or start its `tegrastats` producer.
 
 **Fix**
 
-Read the error text. If `nd-run` is missing or cannot be executed, repair or reinstall Netdata.
+Read the error text. Repair or reinstall Netdata if a packaged helper is missing or incompatible. For unsafe vendor executable errors, restore the native NVIDIA installation and its permissions; these failures do not trigger fallback.
+
+#### restricted privileged tegrastats unavailable (`error`); selected unprivileged collection; GPU clocks and EMC readings may be missing
+
+**Cause**
+
+The initial privileged attempt could not start a producer, so the job selected unprivileged collection. GPU clocks and EMC readings may be missing.
+
+**Fix**
+
+Restore the packaged Netdata helper and native NVIDIA utility, then recreate the job or restart Netdata to retry privileged collection. Set `allow_privileged: false` if unprivileged collection is intentional.
+
+
+#### previous acquisition still owns this job
+
+**Cause**
+
+An earlier producer for the same job has not completed verified cleanup. Replacement collection is blocked even when privileged execution is disabled.
+
+**Fix**
+
+Inspect the collector log and the earlier producer. Collection can resume after verified cleanup. Changing the job name bypasses the shared ownership check and can create a second producer; do not use a rename to work around this error.
 
 #### tegrastats source unavailable: `error`
 
 **Cause**
 
-The running `tegrastats` exited or stopped printing readings. Netdata keeps restarting it, at most 30 seconds apart.
+The running `tegrastats` exited or stopped printing readings. Netdata retries with a delay of up to 30 seconds; replacement remains blocked while earlier cleanup is incomplete.
 
 **Fix**
 
