@@ -252,10 +252,11 @@ void rrdcalc_update_info_using_rrdset_labels(RRDCALC *rc) {
         }
     }
 
-    if(!rc->summary)
+    // without config text there is nothing to fall back to: skip the write lock that would store NULL over NULL
+    if(!rc->summary && rc->config.summary)
         rrdcalc_runtime_string_replace(rc, &rc->summary, string_dup(rc->config.summary));
 
-    if(!rc->info)
+    if(!rc->info && rc->config.info)
         rrdcalc_runtime_string_replace(rc, &rc->info, string_dup(rc->config.info));
 }
 
@@ -307,15 +308,6 @@ static void rrdcalc_link_to_rrdset(RRDCALC *rc) {
     rw_spinlock_write_lock(&st->alerts.spinlock);
     DOUBLE_LINKED_LIST_APPEND_ITEM_UNSAFE(st->alerts.base, rc, prev, next);
     rw_spinlock_write_unlock(&st->alerts.spinlock);
-
-    char buf[RRDVAR_MAX_LENGTH + 1];
-    snprintfz(buf, RRDVAR_MAX_LENGTH, "%s.%s", rrdset_name(st), rrdcalc_name(rc));
-    STRING *rrdset_name_rrdcalc_name = string_strdupz(buf);
-    snprintfz(buf, RRDVAR_MAX_LENGTH, "%s.%s", rrdset_id(st), rrdcalc_name(rc));
-    STRING *rrdset_id_rrdcalc_name = string_strdupz(buf);
-
-    string_freez(rrdset_id_rrdcalc_name);
-    string_freez(rrdset_name_rrdcalc_name);
 
     time_t now = now_realtime_sec();
     ALARM_ENTRY *ae = health_create_alarm_entry(
