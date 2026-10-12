@@ -49,7 +49,7 @@ int rrdset_reset_name(RRDSET *st, const char *name) {
     const char *current = rrdset_name(st);
     const char *type = rrdset_parts_type(st);
     size_t type_len = string_strlen(st->parts.type);
-    if(likely(st->name && name &&
+    if(likely(st->name &&
               rrdset_flag_check(st, RRDSET_FLAG_INDEXED_NAME) &&
               type_len + 1 < RRD_ID_LENGTH_MAX &&
               string_strlen(st->name) < RRD_ID_LENGTH_MAX &&
