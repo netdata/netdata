@@ -411,6 +411,10 @@ its process exits, so tests can check exit ordering. `NewFake` routes both nd-ru
 it with `ndexec.DenyNDSudoSignalsForTests` to test an ndsudo command the plugin cannot signal. The harness is Unix-only;
 Windows behavior is unverified.
 
+A started process may still be initializing before its fake socket connection arrives. Do not shorten `StallTimeout`
+to bound shutdown while also requiring a new Go fake to connect before that same timer expires. For pending-cleanup
+scenarios, observe the supervisor's post-`Wait` state and withhold terminal evidence until the test releases it.
+
 ## Log File Collectors
 
 Use `src/go/plugin/go.d/pkg/logs` for collectors that parse application log files.

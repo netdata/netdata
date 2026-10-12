@@ -67,6 +67,11 @@ func runSupervisedPeer(dir string) int {
 		return 126
 	}
 	child := exec.Command(os.Args[0], "--interval", "1000")
+	if mode == "hold" {
+		// Pending cleanup needs an idle producer, not a socket handshake that
+		// can race the collector's short stall timeout during Go startup.
+		child = exec.Command("/bin/sleep", "60")
+	}
 	child.Stdout, child.Stderr = os.Stdout, os.Stderr
 	if err := child.Start(); err != nil {
 		return 125
@@ -81,6 +86,10 @@ func runSupervisedPeer(dir string) int {
 	case <-done:
 	}
 	if mode == "hold" {
+		// This marker is emitted only after Wait confirms the child exited.
+		if err := os.WriteFile(filepath.Join(dir, "cleanup-pending"), nil, 0600); err != nil {
+			return 125
+		}
 		// Model late verified cleanup, bounded even if the parent test fails.
 		deadline := time.Now().Add(10 * time.Second)
 		for time.Now().Before(deadline) {
@@ -293,9 +302,11 @@ func TestPendingCleanupBlocksUnprivilegedReplacement(t *testing.T) {
 	original := policyCollector(t, fake)
 	original.timing.StallTimeout = 40 * time.Millisecond
 	stop := startRun(t, original)
-	conn := fake.Accept(t)
 	stop() // Source's bounded wait ends before the helper's cleanup evidence.
-	conn.RequireExited(t)
+	require.Eventually(t, func() bool {
+		_, err := os.Stat(filepath.Join(peer.dir, "cleanup-pending"))
+		return err == nil
+	}, 3*time.Second, 5*time.Millisecond, "supervisor must reap the child before holding cleanup evidence")
 
 	replacement := policyCollector(t, fake)
 	replacement.AllowPrivileged = false
