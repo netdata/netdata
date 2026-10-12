@@ -48,8 +48,8 @@ a *leaf* is the innermost family that holds charts.
 
 - A template MUST NOT restate a framework default; readers take every key as a deliberate deviation. The defaults
   and their owners:
-  - `lifecycle`: `src/go/plugin/framework/chartengine/lifecycle_defaults.go`; deviate only for observed churn
-    (`./SKILL.md#chart-label-identity`).
+  - `lifecycle`: `src/go/plugin/framework/charttpl/README.md#lifecycle` owns omission versus disabled expiry;
+    deviate only for observed churn (`./SKILL.md#chart-label-identity`).
   - chart `type`: `defaultChartType` in `src/go/plugin/framework/charttpl/defaults.go`.
   - `algorithm`: resolved from the runtime metric kind (`./SKILL.md#metrics-and-charts`).
   - `id`: derived from the composed context.
@@ -161,6 +161,9 @@ a *leaf* is the innermost family that holds charts.
 - **Coverage.** `collecttest.AssertChartCoverage` (`src/go/plugin/go.d/pkg/collecttest/chart_coverage.go`) derives the
   expected charts and dimensions from the live static or native provider and store, per host scope; do not add
   `RequiredContexts` that repeat it.
+- **Lifecycle.** Chart coverage creates a fresh planner per call. Expiry/recovery tests MUST reuse a planner across
+  successful missing-data cycles beyond the configured expiry and metric-store retention, then verify retirement
+  or retained gaps and recovery through plan actions or emitted protocol.
 - **Refactor proof.** To show a template change alters nothing, a throwaway local test writes every metric definition
   once into a store, builds the plan with `chartengine.New`, `Engine.LoadYAML` and `Engine.PreparePlan`, and diffs the
   plan actions before and after, normalizing only the field the change was meant to affect. No shipped helper does

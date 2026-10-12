@@ -760,6 +760,14 @@ Controls cardinality limits and expiry for chart instances and dimensions.
 | `dimensions.max_dims`            | int  | `0` (disabled) | Best-effort cap on dimensions per chart instance.                                    |
 | `dimensions.expire_after_cycles` | int  | `0` (disabled) | Remove dimensions not seen for N successful collection cycles.                       |
 
+Omitting `expire_after_cycles`, including inside an otherwise present `lifecycle` block, keeps the default of five
+successful collection cycles. Explicit `expire_after_cycles: 0` disables chart expiry; positive values select that many
+cycles and negative values are invalid. Native Go templates use `nil` for omission and `new(0)` to disable expiry.
+
+Disabled expiry retains a chart definition, not its last measurement: missing values still produce gaps. Use it for
+bounded identities that may become temporarily unavailable. Dimension expiry and best-effort cardinality caps remain
+independent; zero chart expiry does not prevent cap-driven retirement or removal of a native template entry.
+
 **How lifecycle caps work**:
 
 - Caps are **best-effort** — instances/dimensions actively seen in the current cycle are never evicted.

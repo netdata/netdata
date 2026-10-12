@@ -183,10 +183,10 @@ func benchmarkProfileMetricCatalog() *staticTestCatalog {
 		},
 	}
 	charts := []catalog.MetricChart{
-		{ID: "bench_config_changes", Title: "Benchmark config changes", Context: "snmp.trap.bench.config.changes", Units: "events/s", Algorithm: "incremental", Type: "line", Lifecycle: &charttpl.Lifecycle{MaxInstances: catalog.DefaultMetricChartMaxInstances, ExpireAfterCycles: 256}},
-		{ID: "bench_terminal_type", Title: "Benchmark terminal type", Context: "snmp.trap.bench.terminal.type", Units: "type", Algorithm: "absolute", Type: "line", Lifecycle: &charttpl.Lifecycle{MaxInstances: catalog.DefaultMetricChartMaxInstances, ExpireAfterCycles: 256}},
-		{ID: "bench_console_state", Title: "Benchmark console state", Context: "snmp.trap.bench.console.state", Units: "state", Algorithm: "absolute", Type: "line", Lifecycle: &charttpl.Lifecycle{MaxInstances: catalog.DefaultMetricChartMaxInstances, ExpireAfterCycles: 256}},
-		{ID: "bench_port_security", Title: "Benchmark port security", Context: "snmp.trap.bench.port.security", Units: "events/s", Algorithm: "incremental", Type: "line", Lifecycle: &charttpl.Lifecycle{MaxInstances: catalog.DefaultMetricChartMaxInstances, ExpireAfterCycles: 256}},
+		{ID: "bench_config_changes", Title: "Benchmark config changes", Context: "snmp.trap.bench.config.changes", Units: "events/s", Algorithm: "incremental", Type: "line", Lifecycle: &charttpl.Lifecycle{MaxInstances: catalog.DefaultMetricChartMaxInstances, ExpireAfterCycles: new(256)}},
+		{ID: "bench_terminal_type", Title: "Benchmark terminal type", Context: "snmp.trap.bench.terminal.type", Units: "type", Algorithm: "absolute", Type: "line", Lifecycle: &charttpl.Lifecycle{MaxInstances: catalog.DefaultMetricChartMaxInstances, ExpireAfterCycles: new(256)}},
+		{ID: "bench_console_state", Title: "Benchmark console state", Context: "snmp.trap.bench.console.state", Units: "state", Algorithm: "absolute", Type: "line", Lifecycle: &charttpl.Lifecycle{MaxInstances: catalog.DefaultMetricChartMaxInstances, ExpireAfterCycles: new(256)}},
+		{ID: "bench_port_security", Title: "Benchmark port security", Context: "snmp.trap.bench.port.security", Units: "events/s", Algorithm: "incremental", Type: "line", Lifecycle: &charttpl.Lifecycle{MaxInstances: catalog.DefaultMetricChartMaxInstances, ExpireAfterCycles: new(256)}},
 	}
 	return newStaticTestCatalog(traps, rules, charts)
 }

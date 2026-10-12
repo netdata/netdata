@@ -364,7 +364,7 @@ func TestSpecValidateScenarios(t *testing.T) {
 								Context: "queries_total",
 								Units:   "queries/s",
 								Lifecycle: &Lifecycle{
-									ExpireAfterCycles: -1,
+									ExpireAfterCycles: new(-1),
 								},
 								Dimensions: []Dimension{
 									{Selector: "mysql_queries_total", Name: "total"},
