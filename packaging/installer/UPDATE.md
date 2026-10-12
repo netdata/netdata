@@ -189,7 +189,7 @@ Pass `--no-updates` to the kickstart script to skip setting up auto-updates enti
 wget -O /tmp/netdata-kickstart.sh https://get.netdata.cloud/kickstart.sh && sh /tmp/netdata-kickstart.sh --no-updates
 ```
 
-To explicitly control the scheduling method, use `--auto-update-type` with one of `systemd`, `interval`, or `crontab`. (The native macOS package defaults to `launchd`; kickstart selects it automatically.)
+To explicitly control the scheduling method, use `--auto-update-type` with one of `systemd`, `interval`, or `crontab`. (The native macOS package always uses its own `launchd` job instead.)
 
 ```bash
 wget -O /tmp/netdata-kickstart.sh https://get.netdata.cloud/kickstart.sh && sh /tmp/netdata-kickstart.sh --auto-update-type systemd
@@ -209,7 +209,7 @@ This takes effect immediately — the systemd timer is stopped and any cron entr
 If you prefer to disable the scheduler manually:
 
 - **systemd:** `sudo systemctl disable --now netdata-updater.timer` (stops and disables the timer unit).
-- **macOS native package:** `sudo launchctl bootout system/com.github.netdata.updater && sudo launchctl disable system/com.github.netdata.updater` (the `--disable-auto-updates` command above does the same).
+- **macOS native package:** `sudo launchctl bootout system/com.github.netdata.updater; sudo launchctl disable system/com.github.netdata.updater` (the `--disable-auto-updates` command above does the same).
 - **non-systemd (cron):** remove the entry your installer created. Remove whichever exists:
   ```bash
   sudo rm -f /etc/cron.daily/netdata-updater /etc/cron.daily/netdata-updater.sh
