@@ -140,9 +140,26 @@ func treeCompletion(data []byte, waitErr error) TreeResult {
 		}
 	}
 	rawText := strings.TrimSuffix(strings.TrimPrefix(frame, prefix), "\n")
+	if !validCommandCompletion(rawText, waitErr) {
+		return invalid()
+	}
+	return TreeResult{Err: waitErr, Drained: true}
+}
+
+// Both private supervisor protocols carry the payload's raw wait status and
+// mirror it in the helper exit code. Neither source alone proves completion.
+func validCommandCompletion(rawText string, waitErr error) bool {
+	actualExit := 0
+	if waitErr != nil {
+		var exitErr *exec.ExitError
+		if !errors.As(waitErr, &exitErr) {
+			return false
+		}
+		actualExit = exitErr.ExitCode()
+	}
 	raw, err := strconv.ParseUint(rawText, 10, 16)
 	if err != nil || strconv.FormatUint(raw, 10) != rawText {
-		return invalid()
+		return false
 	}
 	exitCode := 0
 	switch {
@@ -151,15 +168,12 @@ func treeCompletion(data []byte, waitErr error) TreeResult {
 	case raw & ^uint64(0xff) == 0 && raw&0x7f > 0 && raw&0x7f < 0x7f:
 		exitCode = 128 + int(raw&0x7f)
 	default:
-		return invalid()
+		return false
 	}
 	if actualExit != exitCode {
-		return invalid()
+		return false
 	}
-	return TreeResult{
-		Err:     waitErr,
-		Drained: true,
-	}
+	return true
 }
 
 // The helper's location is inherited from normal ndexec discovery. Errors never
