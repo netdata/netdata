@@ -84,26 +84,38 @@ done
 # keeps its content and ends up 0640 root:netdata like every other file
 # there.
 #
-# These trees are writable by the service account, so root must not let a
-# link planted there steer its chown: -execdir with -h never follows a
-# symlink, in the last path component or above it. On install and upgrade
-# only the directories need the account back - Installer resets the
-# payload's, and everything else inside already belongs to the account.
-# Files are re-owned only when restoring state an uninstall left root-owned
-# (marked by the uninstaller); multiply-linked files are skipped there, as
-# a planted hard link would otherwise hand a root-owned file to the account.
+# These trees are writable by the service account, so no chown below may
+# act on an entry the account can swap (for a symlink or a hard link to a
+# root-owned file) while root works on it. Each step only touches entries
+# whose parent directory is root-owned at that moment; -h never follows a
+# symlink.
 RETAINED_MARKER="${PREFIX}/.macos-pkg-retained"
-for dir in "${PREFIX}/var/cache/netdata" "${PREFIX}/var/log/netdata" "${PREFIX}/var/lib/netdata"; do
-    # The starting directory is handled on its own: find's -execdir runs it
-    # from the current directory, not from its parent. Its own path is
-    # root-owned up to the prefix.
-    chown -h "${NETDATA_USER}:${NETDATA_USER}" "${dir}"
-    find "${dir}" -mindepth 1 -type d -execdir chown -h "${NETDATA_USER}:${NETDATA_USER}" {} +
-    if [ -f "${RETAINED_MARKER}" ]; then
-        find "${dir}" -mindepth 1 -type f -links 1 -execdir chown -h "${NETDATA_USER}:${NETDATA_USER}" {} +
-    fi
-done
-rm -f "${RETAINED_MARKER}"
+if [ -f "${RETAINED_MARKER}" ]; then
+    # Restoring state an uninstall left root-owned throughout (it marks this
+    # case): handing ownership out deepest-first gives the account each
+    # directory only after its contents are done. Multiply-linked files keep
+    # their owner, so a planted hard link cannot be handed over either.
+    for dir in "${PREFIX}/var/cache/netdata" "${PREFIX}/var/log/netdata" "${PREFIX}/var/lib/netdata"; do
+        find "${dir}" -depth -mindepth 1 \( -type d -o \( -type f -links 1 \) \) \
+            -execdir chown -h "${NETDATA_USER}:${NETDATA_USER}" {} +
+        chown -h "${NETDATA_USER}:${NETDATA_USER}" "${dir}"
+    done
+    rm -f "${RETAINED_MARKER}"
+else
+    # Install and upgrade: everything inside already belongs to the account,
+    # only the payload's own directories (NetdataSystemFiles.cmake) need it.
+    # Take the top ones back first, so their parents are root-owned while the
+    # nested ones are checked, then hand them out deepest-first.
+    for d in var/cache/netdata var/log/netdata var/lib/netdata; do
+        p="${PREFIX}/${d}"
+        if [ -d "${p}" ] && [ ! -L "${p}" ]; then chown -h root:wheel "${p}"; fi
+    done
+    for d in var/lib/netdata/registry var/lib/netdata/cloud.d \
+             var/lib/netdata var/cache/netdata var/log/netdata; do
+        p="${PREFIX}/${d}"
+        if [ -d "${p}" ] && [ ! -L "${p}" ]; then chown -h "${NETDATA_USER}:${NETDATA_USER}" "${p}"; fi
+    done
+fi
 chown -R "root:${NETDATA_USER}" "${PREFIX}/etc/netdata"
 chmod 0750 "${PREFIX}/etc/netdata"
 find "${PREFIX}/etc/netdata" -type d -exec chmod 0750 {} +

@@ -154,19 +154,19 @@ if [ "${PURGE}" -eq 1 ]; then
     rm -rf "${PREFIX:?}/etc/netdata" \
            "${PREFIX}/var/lib/netdata" \
            "${PREFIX}/var/cache/netdata"
+    rm -f "${RETAINED_MARKER}"
 else
     for dir in "${PREFIX}/etc/netdata" \
                "${PREFIX}/var/lib/netdata" \
                "${PREFIX}/var/cache/netdata"; do
         if [ -d "${dir}" ]; then
-            # Never follows symlinks (-execdir with -h) and skips
-            # multiply-linked files, which the service account could have
-            # planted to have root take over other files.
-            # The starting directory goes separately: -execdir runs it from
-            # the current directory, not from its parent.
+            # The top directory first (its parent is root-owned), closed to
+            # the account before the walk. The walk never follows symlinks
+            # (-execdir with -h) and skips multiply-linked files, which the
+            # account could have planted to have root take over other files.
             chown -h root:wheel "${dir}"
-            find "${dir}" -mindepth 1 \( -type d -o \( -type f -links 1 \) \) -execdir chown -h root:wheel {} +
             chmod 0700 "${dir}"
+            find "${dir}" -mindepth 1 \( -type d -o \( -type f -links 1 \) \) -execdir chown -h root:wheel {} +
             retained_any=1
         fi
     done
