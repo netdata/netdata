@@ -426,9 +426,10 @@ enable_netdata_updater() {
 }
 
 disable_netdata_updater() {
-  if [ "$(uname -s)" = "Darwin" ]; then
-    # The disable override persists in launchd's database, so the job stays
-    # off across reboots even though the plist remains on disk.
+  if [ "$(uname -s)" = "Darwin" ] && [ -f /Library/LaunchDaemons/com.github.netdata.updater.plist ]; then
+    # Only the native package installs this job. The disable override
+    # persists in launchd's database, so the job stays off across reboots
+    # even though the plist remains on disk.
     launchctl bootout system/com.github.netdata.updater 2>/dev/null || true
     launchctl disable system/com.github.netdata.updater 2>/dev/null || true
   fi
