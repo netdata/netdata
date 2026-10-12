@@ -39,3 +39,23 @@ which do not expose a power feature for Netdata's libsensors collector. On
 [Thor](https://docs.nvidia.com/jetson/archives/r39.2/DeveloperGuide/SD/PlatformPowerAndPerformance/JetsonThor.html),
 INA3221 component rails have the same gap; the INA238 total-system `VIN` rail can also appear through sensors.
 The collector keeps that source-reported rail rather than guessing whether another collector has discovered it.
+
+## Corrected AGX Orin R36.5.0 captures
+
+Public attachments to [issue #24165](https://github.com/netdata/netdata/issues/24165)
+contain paired root (`tegrastats-caller.stdout`) and Netdata-account
+(`tegrastats-collector.stdout`) captures from one AGX Orin running Jetson Linux R36.5.0:
+
+- `orin-r36.5-15w-root.txt`: attachment 33305200, caller line 1, from the
+  [corrected 15W capture](https://github.com/netdata/netdata/issues/24165#issuecomment-6110123951).
+  GPC 1 explicitly reports zero.
+- `orin-r36.5-15w-account.txt`: the same attachment, collector line 9. GPU clocks and EMC are absent;
+  CPU/CV current power is zero even though its running average is nonzero.
+- `orin-r36.5-50w-root.txt`: attachment 33305375, caller line 1, from the
+  [corrected 50W capture](https://github.com/netdata/netdata/issues/24165#issuecomment-6110210682).
+- `orin-r36.5-maxn-root.txt`: attachment 33305418, caller line 1, from the
+  [corrected MAXN capture](https://github.com/netdata/netdata/issues/24165#issuecomment-6110239232).
+
+Only raw telemetry lines were copied. These samples verify decoding, zero preservation, and missing-field
+withdrawal through the collector; they do not establish packaged Netdata privilege, shutdown, or performance
+behavior on Jetson hardware. The captures are sequential, so their values are not simultaneous comparisons.
