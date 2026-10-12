@@ -201,7 +201,7 @@ func TestSafeInitialFallbackIsSticky(t *testing.T) {
 			fake.Accept(t)
 			stop()
 			assert.Equal(t, before, peer.attempts())
-			assert.Equal(t, 1, strings.Count(logs.String(), "using unprivileged collection"))
+			assert.Equal(t, 1, strings.Count(logs.String(), "selected unprivileged collection"))
 			// Reconstructing the job retries the privileged path.
 			t.Cleanup(ndexec.SetRunnerPathsForTests("", fake.Binary))
 			replacement := policyCollector(t, fake)
@@ -216,9 +216,13 @@ func TestSafeInitialFallbackIsSticky(t *testing.T) {
 func TestFallbackFailureRetainsSelection(t *testing.T) {
 	peer, fake := newSupervisedPeer(t, "privilege")
 	c := policyCollector(t, fake)
+	logs := &lockedBuffer{}
+	c.Logger = logger.NewWithWriter(logs)
 	c.findTegrastats = func() (string, error) { return "", errors.New("no PATH candidate") }
 	c.fixedTegrastatsExists = func() bool { return true }
 	requireStartError(t, c, nil, "unprivileged tegrastats unavailable")
+	assert.Contains(t, logs.String(), "selected unprivileged collection")
+	assert.NotContains(t, logs.String(), "using unprivileged collection")
 	peer.setMode(t, "success")
 	// After repairing PATH, this instance still uses the selected unprivileged route.
 	c.findTegrastats = func() (string, error) { return fake.Binary, nil }

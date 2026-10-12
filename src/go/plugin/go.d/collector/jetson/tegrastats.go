@@ -28,6 +28,7 @@ const (
 	tegrastatsUnprivileged
 )
 
+// Discovery checks presence only; ndsudo validates the candidate and reports unsafe installations.
 func fixedTegrastatsExists() bool {
 	_, err := os.Lstat("/usr/bin/tegrastats")
 	return err == nil
@@ -70,7 +71,7 @@ func (c *Collector) startTegrastats(ctx context.Context, opts ndexec.ProcessOpti
 			return nil, err
 		}
 		c.mode = tegrastatsUnprivileged
-		c.Warningf("restricted privileged tegrastats unavailable (%v); using unprivileged collection; GPU clocks and EMC readings may be missing", err)
+		c.Warningf("restricted privileged tegrastats unavailable (%v); selected unprivileged collection; GPU clocks and EMC readings may be missing", err)
 	}
 	if lookupErr != nil {
 		return nil, fmt.Errorf("unprivileged tegrastats unavailable: %w", lookupErr)

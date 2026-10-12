@@ -55,18 +55,18 @@ func configuredCollector(t *testing.T, fake *streamexectest.Fake, config confgro
 }
 
 func TestConfigurationFactoryDefaultsAndReload(t *testing.T) {
-	for _, tc := range []struct {
-		name, field string
-		want        bool
+	for name, tc := range map[string]struct {
+		field string
+		want  bool
 	}{
-		{"omitted", "", true},
-		{"true", "allow_privileged: true\n", true},
-		{"false", "allow_privileged: false\n", false},
+		"omitted": {"", true},
+		"true":    {"allow_privileged: true\n", true},
+		"false":   {"allow_privileged: false\n", false},
 		// Existing scalar YAML decoding maps explicit null to false.
 		// The public schema accepts only booleans; this is not a new null option.
-		{"null", "allow_privileged: null\n", false},
+		"null": {"allow_privileged: null\n", false},
 	} {
-		t.Run(tc.name, func(t *testing.T) {
+		t.Run(name, func(t *testing.T) {
 			peer, fake := newSupervisedPeer(t, "success")
 			factory, current := configFactory(t, fake)
 			var cfg confgroup.Config
@@ -133,15 +133,15 @@ func TestAnonymousAndNamedOwnersAreDistinct(t *testing.T) {
 
 func TestUserConfigExportAndReload(t *testing.T) {
 	for _, format := range []string{"application/json", "application/yaml"} {
-		for _, tc := range []struct {
-			name, json, yaml string
-			want             bool
+		for name, tc := range map[string]struct {
+			json, yaml string
+			want       bool
 		}{
-			{"omitted", `{"update_every":1}`, "update_every: 1\n", true},
-			{"true", `{"allow_privileged":true}`, "allow_privileged: true\n", true},
-			{"false", `{"allow_privileged":false}`, "allow_privileged: false\n", false},
+			"omitted": {`{"update_every":1}`, "update_every: 1\n", true},
+			"true":    {`{"allow_privileged":true}`, "allow_privileged: true\n", true},
+			"false":   {`{"allow_privileged":false}`, "allow_privileged: false\n", false},
 		} {
-			t.Run(format+"/"+tc.name, func(t *testing.T) {
+			t.Run(format+"/"+name, func(t *testing.T) {
 				peer, fake := newSupervisedPeer(t, "success")
 				factory, _ := configFactory(t, fake)
 				graph, err := dyncfg.NewGraph(nil)

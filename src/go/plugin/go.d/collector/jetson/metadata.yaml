@@ -130,7 +130,7 @@ modules:
           - error: "start tegrastats: `error`"
             cause: Netdata could not acquire or start its `tegrastats` producer.
             fix: Read the error text. Repair or reinstall Netdata if a packaged helper is missing or incompatible. For unsafe vendor executable errors, restore the native NVIDIA installation and its permissions; these failures do not trigger fallback.
-          - error: "restricted privileged tegrastats unavailable (`error`); using unprivileged collection; GPU clocks and EMC readings may be missing"
+          - error: "restricted privileged tegrastats unavailable (`error`); selected unprivileged collection; GPU clocks and EMC readings may be missing"
             cause: The initial privileged attempt could not start a producer, so the job selected unprivileged collection. GPU clocks and EMC readings may be missing.
             fix: |
               Restore the packaged Netdata helper and native NVIDIA utility, then recreate the job or restart Netdata to retry privileged collection. Set `allow_privileged: false` if unprivileged collection is intentional.
