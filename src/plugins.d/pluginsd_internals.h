@@ -86,10 +86,10 @@ static inline void pluginsd_clear_scope_chart(PARSER *parser, const char *keywor
 
     // An obsolete chart must not leave the scope holding cached dimension references: the reaper frees
     // a dimension only when nobody else references it, and an obsolete chart that is not scoped again
-    // gets its cache released only when it is freed - so it would be kept forever. Marking a chart
-    // obsolete unslots it, but a later scope can repopulate the cache without reviving the chart (a
-    // replication RBEGIN/RSET/REND for a chart the child has already obsoleted), and
-    // pluginsd_set_scope_chart() resets cleanup_slots.
+    // gets its cache released only when the child reconnects - so it would be kept for as long as the
+    // child stays connected. Marking a chart obsolete unslots it, but a later scope can repopulate the
+    // cache without reviving the chart (a replication RBEGIN/RSET/REND for a chart the child has already
+    // obsoleted), and pluginsd_set_scope_chart() resets cleanup_slots.
     if(st && (parser->user.cleanup_slots || rrdset_flag_check(st, RRDSET_FLAG_OBSOLETE)))
         rrdset_pluginsd_receive_unslot(st);
 
