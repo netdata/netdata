@@ -39,7 +39,7 @@ function(netdata_add_macos_package_target)
                 DESTINATION /Library/LaunchDaemons)
 
         # The auto-updater's calendar daemon. postinstall bootstraps it only
-        # when auto-updates are not opted out (D15b) and never while the
+        # when auto-updates are not opted out and never while the
         # updater itself is mid-transaction.
         configure_file("${CMAKE_SOURCE_DIR}/packaging/macos/netdata-updater.plist.in"
                        "${pkg_dir}/com.github.netdata.updater.plist" @ONLY)

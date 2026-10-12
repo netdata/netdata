@@ -72,6 +72,22 @@ if ! /usr/sbin/pkgutil --pkg-info "${IDENTIFIER}" >/dev/null 2>&1; then
         fi
     fi
 
+    # The same holds for an existing group of that name: its members could
+    # run the setuid helpers and read the configuration, including the claim
+    # token. Only the service account may belong to it, either listed or by
+    # primary group.
+    if dscl . -read "/Groups/${NETDATA_USER}" PrimaryGroupID >/dev/null 2>&1; then
+        gid="$(dscl . -read "/Groups/${NETDATA_USER}" PrimaryGroupID 2>/dev/null | awk '{print $2}')"
+        members="$( {
+            dscl . -read "/Groups/${NETDATA_USER}" GroupMembership 2>/dev/null | sed 's/^GroupMembership://'
+            dscl . -list /Users PrimaryGroupID 2>/dev/null | awk -v gid="${gid}" '$2 == gid {print $1}'
+        } | tr ' ' '\n' | grep -vx -e '' -e "${NETDATA_USER}" | sort -u | tr '\n' ' ')"
+        if [ -n "${members}" ]; then
+            add_finding "the existing group '${NETDATA_USER}' has other members (${members% })" \
+                "remove them from that group, then retry"
+        fi
+    fi
+
     # Something else holding the Agent's port. Running netdata binaries are
     # reported above; this catches everything else squatting on ${PORT}.
     listeners="$(/usr/sbin/lsof -nP "-iTCP:${PORT}" -sTCP:LISTEN 2>/dev/null \

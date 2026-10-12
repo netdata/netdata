@@ -14,8 +14,9 @@ LABEL="com.github.netdata"
 PLIST="/Library/LaunchDaemons/${LABEL}.plist"
 
 # Marker recording that this package created the service account, so
-# uninstall removes only an account it owns.
-ACCOUNT_MARKER="${PREFIX}/var/lib/netdata/.macos-pkg-created-account"
+# uninstall removes only an account it owns. It lives in the root-owned
+# prefix directory, where the service account cannot forge it.
+ACCOUNT_MARKER="${PREFIX}/.macos-pkg-created-account"
 
 log() {
     echo "netdata postinstall: $*"
@@ -61,7 +62,6 @@ if ! dscl . -read "/Users/${NETDATA_USER}" UniqueID >/dev/null 2>&1; then
     dscl . -create "/Users/${NETDATA_USER}" RealName "Netdata Agent"
     dscl . -create "/Users/${NETDATA_USER}" IsHidden 1
     dscl . -create "/Users/${NETDATA_USER}" Password '*'
-    mkdir -p "${PREFIX}/var/lib/netdata"
     touch "${ACCOUNT_MARKER}"
 fi
 dseditgroup -o edit -a "${NETDATA_USER}" -t user "${NETDATA_USER}" 2>/dev/null || true
@@ -84,10 +84,12 @@ done
 # keeps its content and ends up 0640 root:netdata like every other file
 # there.
 #
-chown -R "${NETDATA_USER}:${NETDATA_USER}" \
-    "${PREFIX}/var/cache/netdata" \
-    "${PREFIX}/var/log/netdata" \
-    "${PREFIX}/var/lib/netdata"
+# These trees are writable by the service account, so the recursive change
+# skips symlinks and multiply-linked files: a hard link planted there would
+# otherwise hand a root-owned file to that account.
+for dir in "${PREFIX}/var/cache/netdata" "${PREFIX}/var/log/netdata" "${PREFIX}/var/lib/netdata"; do
+    find "${dir}" \( -type d -o \( -type f -links 1 \) \) -exec chown -h "${NETDATA_USER}:${NETDATA_USER}" {} +
+done
 chown -R "root:${NETDATA_USER}" "${PREFIX}/etc/netdata"
 chmod 0750 "${PREFIX}/etc/netdata"
 find "${PREFIX}/etc/netdata" -type d -exec chmod 0750 {} +
@@ -122,6 +124,16 @@ for plugin in otel-plugin netflow-plugin; do
 done
 
 #
+# launchd opens the jobs' stdout/stderr files as root, so they live in a
+# root-owned directory rather than in the service account's log directory,
+# where a planted link could redirect root's writes.
+#
+LAUNCHD_LOG_DIR="/Library/Logs/Netdata"
+mkdir -p "${LAUNCHD_LOG_DIR}"
+chown root:wheel "${LAUNCHD_LOG_DIR}"
+chmod 0755 "${LAUNCHD_LOG_DIR}"
+
+#
 # launchd: replace whatever registration exists and start the daemon.
 # preinstall booted out a running job; an upgrade may still have the label
 # registered from the old payload, and teardown is asynchronous - a
@@ -152,7 +164,7 @@ while :; do
 done
 
 #
-# Auto-updater daemon. Opt-out (D15b): a pre-staged or user-edited
+# Auto-updater daemon. Opt-out: a pre-staged or user-edited
 # netdata-updater.conf with NETDATA_MACOS_AUTO_UPDATES='0' - stock config is
 # copy-if-absent, so a pre-staged file survives the install. The opt-out
 # uses launchctl disable, which persists in launchd's override database:

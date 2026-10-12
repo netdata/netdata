@@ -35,8 +35,8 @@
     <key>WorkingDirectory</key>
     <string>@NETDATA_RUNTIME_PREFIX@</string>
     <key>StandardOutPath</key>
-    <string>@NETDATA_RUNTIME_PREFIX@/var/log/netdata/updater.log</string>
+    <string>/Library/Logs/Netdata/updater.log</string>
     <key>StandardErrorPath</key>
-    <string>@NETDATA_RUNTIME_PREFIX@/var/log/netdata/updater.log</string>
+    <string>/Library/Logs/Netdata/updater.log</string>
 </dict>
 </plist>
