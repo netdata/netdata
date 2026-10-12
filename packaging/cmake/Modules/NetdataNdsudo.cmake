@@ -20,6 +20,12 @@ if(OS_MACOS OR ENABLE_PLUGIN_GO OR ENABLE_PLUGIN_SCRIPTS)
 
     add_executable(ndsudo ${NDSUDO_FILES} src/collectors/utils/exec-signals.h)
 
+    # The native macOS package restricts ndsudo's search path to Apple-owned
+    # directories (see ndsudo.c); macOS source installs keep Homebrew's.
+    if(NETDATA_PACKAGE_KIND STREQUAL "pkg")
+        target_compile_definitions(ndsudo PRIVATE NDSUDO_APPLE_DIRS_ONLY)
+    endif()
+
     install(TARGETS ndsudo
             COMPONENT netdata
             DESTINATION ${PLUGINS_DEST})

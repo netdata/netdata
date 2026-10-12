@@ -1491,6 +1491,11 @@ jobs:
             fi
           done
           if [ "${fail}" -ne 0 ]; then exit 1; fi
+      - name: Test ndsudo search path
+        id: test-ndsudo
+        if: needs.file-check.outputs.run == 'true'
+        run: |
+          ./tests/ndsudo-macos-pkg.sh /opt/netdata/usr/libexec/netdata/plugins.d/ndsudo
       - name: Reinstall over the existing install
         id: reinstall-pkg
         if: needs.file-check.outputs.run == 'true'

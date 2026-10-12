@@ -53,7 +53,7 @@ For managed deployments (MDM, Munki, or any flow where the package is installed 
 ### Known limitations
 
 - **Certificate authorities added in Keychain Access are not trusted by the native package.** The package carries its own TLS library, which reads the certificate bundle macOS ships at `/etc/ssl/cert.pem`. That file does not include authorities you add through Keychain Access, such as an internal company CA. Connections the Agent makes itself, for example to Netdata Cloud or to a streaming parent, fail when the server's certificate is issued by such an authority.
-- **Collectors cannot run Homebrew tools that need root.** This applies to every macOS install, not only the native package. For security, the helper that runs privileged commands for collectors only looks in the directories macOS itself owns: `/bin`, `/sbin`, `/usr/bin` and `/usr/sbin`. Tools installed with Homebrew, such as `smartctl`, `chronyc` and `nvme`, are not found there, and the collectors that need them report the tool as not available.
+- **Collectors in the native package cannot run Homebrew tools that need root.** For security, the package's helper that runs privileged commands for collectors only looks in the directories macOS itself owns: `/bin`, `/sbin`, `/usr/bin` and `/usr/sbin`. Tools installed with Homebrew, such as `smartctl`, `chronyc` and `nvme`, are not found there, and the collectors that need them report the tool as not available. Source installs still find them.
 
 ### Uninstall the native package
 
