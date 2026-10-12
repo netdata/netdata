@@ -397,7 +397,6 @@ typedef struct query_target {
         SIMPLE_PATTERN *scope_labels_pattern;
         SIMPLE_PATTERN *alerts_pattern;
         SIMPLE_PATTERN *chart_label_key_pattern;
-        SIMPLE_PATTERN *scope_chart_label_key_pattern;
         struct pattern_array *labels_pa;
         struct pattern_array *scope_labels_pa;
     } instances;

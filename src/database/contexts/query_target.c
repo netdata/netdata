@@ -84,9 +84,6 @@ void query_target_release(QUERY_TARGET *qt) {
     simple_pattern_free(qt->instances.chart_label_key_pattern);
     qt->instances.chart_label_key_pattern = NULL;
 
-    simple_pattern_free(qt->instances.scope_chart_label_key_pattern);
-    qt->instances.scope_chart_label_key_pattern = NULL;
-
     simple_pattern_free(qt->instances.labels_pattern);
     qt->instances.labels_pattern = NULL;
 
@@ -844,11 +841,9 @@ static bool query_instance_add(QUERY_TARGET_LOCALS *qtl, QUERY_NODE *qn, QUERY_C
                 ria, ri, qt->instances.pattern, qtl->match_ids, qtl->match_names, qt->request.version,
                 qtl->host_hostname, qtl->host_node_id_str));
 
+    // chart_label_key has no scope variant: the scope checks before this call already applied it
     if(queryable_instance)
-        queryable_instance = query_instance_matches_labels(
-            ri,
-            qt->instances.chart_label_key_pattern,
-            qt->instances.labels_pa);
+        queryable_instance = query_instance_matches_labels(ri, NULL, qt->instances.labels_pa);
 
     if(queryable_instance) {
         if(qt->instances.alerts_pattern && !query_target_match_alert_pattern(ria, qt->instances.alerts_pattern))
@@ -938,9 +933,9 @@ static ssize_t query_scope_foreach_instance(QUERY_TARGET_LOCALS *qtl, QUERY_NODE
         }
         
         // Check scope_labels
-        if(qt->instances.scope_labels_pa || qt->instances.scope_chart_label_key_pattern) {
+        if(qt->instances.scope_labels_pa || qt->instances.chart_label_key_pattern) {
             if(!query_instance_matches_labels(ri,
-                qt->instances.scope_chart_label_key_pattern,
+                qt->instances.chart_label_key_pattern,
                 qt->instances.scope_labels_pa))
                 return 0;
         }
@@ -969,9 +964,9 @@ static ssize_t query_scope_foreach_instance(QUERY_TARGET_LOCALS *qtl, QUERY_NODE
         }
         
         // Check scope_labels
-        if(qt->instances.scope_labels_pa || qt->instances.scope_chart_label_key_pattern) {
+        if(qt->instances.scope_labels_pa || qt->instances.chart_label_key_pattern) {
             if(!query_instance_matches_labels(ri,
-                qt->instances.scope_chart_label_key_pattern,
+                qt->instances.chart_label_key_pattern,
                 qt->instances.scope_labels_pa)) {
                 rrdinstance_release(ria);
                 return 0;
@@ -1002,9 +997,9 @@ static ssize_t query_scope_foreach_instance(QUERY_TARGET_LOCALS *qtl, QUERY_NODE
             }
             
             // Check scope_labels
-            if(qt->instances.scope_labels_pa || qt->instances.scope_chart_label_key_pattern) {
+            if(qt->instances.scope_labels_pa || qt->instances.chart_label_key_pattern) {
                 if(!query_instance_matches_labels(ri,
-                    qt->instances.scope_chart_label_key_pattern,
+                    qt->instances.chart_label_key_pattern,
                     qt->instances.scope_labels_pa))
                     continue;
             }
@@ -1311,7 +1306,6 @@ QUERY_TARGET *query_target_create(QUERY_TARGET_REQUEST *qtr) {
     qt->query.pattern = string_to_simple_pattern(qtl.dimensions);
     qt->dimensions.scope_pattern = string_to_simple_pattern(qtl.scope_dimensions);
     qt->instances.chart_label_key_pattern = string_to_simple_pattern(qtl.chart_label_key);
-    qt->instances.scope_chart_label_key_pattern = string_to_simple_pattern(qtl.chart_label_key);  // For now, using same as non-scope
     qt->instances.labels_pattern = string_to_simple_pattern(qtl.labels);
     qt->instances.scope_labels_pattern = string_to_simple_pattern(qtl.scope_labels);
     qt->instances.alerts_pattern = string_to_simple_pattern(qtl.alerts);
