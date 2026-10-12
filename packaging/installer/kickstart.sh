@@ -2124,7 +2124,12 @@ set_static_archive_urls() {
     arch="${2}"
   fi
 
-  if [ -n "${NETDATA_OFFLINE_INSTALL_SOURCE}" ]; then
+  prefix_set="0"
+
+  if [ -n "${NETDATA_ARTIFACT_URL_PREFIX}" ]; then
+    prefix_set="1"
+    NETDATA_STATIC_ARCHIVE_URL_PREFIX="${NETDATA_ARTIFACT_URL_PREFIX}"
+  elif [ -n "${NETDATA_OFFLINE_INSTALL_SOURCE}" ]; then
     NETDATA_STATIC_ARCHIVE_URL_PREFIX="file://${NETDATA_OFFLINE_INSTALL_SOURCE}"
   elif [ -n "${INSTALL_VERSION}" ]; then
     NETDATA_STATIC_ARCHIVE_URL_PREFIX="${RELEASE_ARTIFACT_URL_PREFIX}/${1}/v${INSTALL_VERSION}"
@@ -2137,36 +2142,43 @@ set_static_archive_urls() {
   case $? in
     0) NETDATA_MANIFEST_INSTALL=1 ;;
     1)
-      if [ "${1}" = "stable" ]; then
-        if [ -n "${INSTALL_VERSION}" ]; then
-          version="v${INSTALL_VERSION}"
+      if [ "${prefix_set}" -eq 0 ]; then
+        if [ "${1}" = "stable" ]; then
+          if [ -n "${INSTALL_VERSION}" ]; then
+            version="v${INSTALL_VERSION}"
+          else
+            version="$(get_redirect "https://github.com/netdata/netdata/releases/latest")"
+          fi
+          NETDATA_STATIC_ARCHIVE_URL_PREFIX="https://github.com/netdata/netdata/releases/download/${version}"
         else
-          version="$(get_redirect "https://github.com/netdata/netdata/releases/latest")"
+          if [ -n "${INSTALL_VERSION}" ]; then
+            version="v${INSTALL_VERSION}"
+          else
+            version="$(get_redirect "${NETDATA_TARBALL_BASEURL}/releases/latest")"
+          fi
+          NETDATA_STATIC_ARCHIVE_URL_PREFIX="${NETDATA_TARBALL_BASEURL}/releases/${version}"
         fi
-        NETDATA_STATIC_ARCHIVE_URL_PREFIX="https://github.com/netdata/netdata/releases/download/${version}"
+
+        check_for_remote_file "${NETDATA_STATIC_ARCHIVE_URL_PREFIX}/Manifest"
+
+        case $? in
+          0) NETDATA_MANIFEST_INSTALL=1 ;;
+          1)
+            NETDATA_MANIFEST_INSTALL=0
+            NETDATA_STATIC_ARCHIVE_NAME="netdata-${arch}-${version}.gz.run"
+            NETDATA_STATIC_ARCHIVE_URL="${NETDATA_STATIC_ARCHIVE_URL_PREFIX}/${NETDATA_STATIC_ARCHIVE_NAME}"
+            NETDATA_STATIC_ARCHIVE_CHECKSUM_URL="${NETDATA_STATIC_ARCHIVE_URL_PREFIX}/sha256sums.txt"
+            ;;
+          *)
+            warning "Unable to communicate with GitHub. ${GITHUB_BADNET_MSG}"
+            return 1
+        esac
       else
-        if [ -n "${INSTALL_VERSION}" ]; then
-          version="v${INSTALL_VERSION}"
-        else
-          version="$(get_redirect "${NETDATA_TARBALL_BASEURL}/releases/latest")"
-        fi
-        NETDATA_STATIC_ARCHIVE_URL_PREFIX="${NETDATA_TARBALL_BASEURL}/releases/${version}"
+        NETDATA_MANIFEST_INSTALL=0
+        NETDATA_STATIC_ARCHIVE_NAME="netdata-${arch}-${version}.gz.run"
+        NETDATA_STATIC_ARCHIVE_URL="${NETDATA_STATIC_ARCHIVE_URL_PREFIX}/${NETDATA_STATIC_ARCHIVE_NAME}"
+        NETDATA_STATIC_ARCHIVE_CHECKSUM_URL="${NETDATA_STATIC_ARCHIVE_URL_PREFIX}/sha256sums.txt"
       fi
-
-      check_for_remote_file "${NETDATA_STATIC_ARCHIVE_URL_PREFIX}/Manifest"
-
-      case $? in
-        0) NETDATA_MANIFEST_INSTALL=1 ;;
-        1)
-          NETDATA_MANIFEST_INSTALL=0
-          NETDATA_STATIC_ARCHIVE_NAME="netdata-${arch}-${version}.gz.run"
-          NETDATA_STATIC_ARCHIVE_URL="${NETDATA_STATIC_ARCHIVE_URL_PREFIX}/${NETDATA_STATIC_ARCHIVE_NAME}"
-          NETDATA_STATIC_ARCHIVE_CHECKSUM_URL="${NETDATA_STATIC_ARCHIVE_URL_PREFIX}/sha256sums.txt"
-          ;;
-        *)
-          warning "Unable to communicate with GitHub. ${GITHUB_BADNET_MSG}"
-          return 1
-      esac
 
       check_for_remote_file "${NETDATA_STATIC_ARCHIVE_URL_PREFIX}"
 
@@ -2275,7 +2287,12 @@ try_static_install() {
 # Local build install code
 
 set_source_archive_urls() {
-  if [ -n "${INSTALL_VERSION}" ]; then
+  prefix_set="0"
+
+  if [ -n "${NETDATA_ARTIFACT_URL_PREFIX}" ]; then
+    prefix_set="1"
+    NETDATA_SOURCE_ARCHIVE_URL_PREFIX="${NETDATA_ARTIFACT_URL_PREFIX}"
+  elif [ -n "${INSTALL_VERSION}" ]; then
     NETDATA_SOURCE_ARCHIVE_URL_PREFIX="${RELEASE_ARTIFACT_URL_PREFIX}/${1}/v${INSTALL_VERSION}"
   else
     NETDATA_SOURCE_ARCHIVE_URL_PREFIX="${RELEASE_ARTIFACT_URL_PREFIX}/${1}/latest"
@@ -2286,36 +2303,43 @@ set_source_archive_urls() {
   case $? in
     0) NETDATA_MANIFEST_INSTALL=1 ;;
     1)
-      if [ "${1}" = "stable" ]; then
-        if [ -n "${INSTALL_VERSION}" ]; then
-          version="v${INSTALL_VERSION}"
+      if [ "${prefix_set}" -eq 0 ]; then
+        if [ "${1}" = "stable" ]; then
+          if [ -n "${INSTALL_VERSION}" ]; then
+            version="v${INSTALL_VERSION}"
+          else
+            version="$(get_redirect "https://github.com/netdata/netdata/releases/latest")"
+          fi
+          NETDATA_SOURCE_ARCHIVE_URL_PREFIX="https://github.com/netdata/netdata/releases/download/${version}"
         else
-          version="$(get_redirect "https://github.com/netdata/netdata/releases/latest")"
+          if [ -n "${INSTALL_VERSION}" ]; then
+            version="v${INSTALL_VERSION}"
+          else
+            version="$(get_redirect "${NETDATA_TARBALL_BASEURL}/releases/latest")"
+          fi
+          NETDATA_SOURCE_ARCHIVE_URL_PREFIX="${NETDATA_TARBALL_BASEURL}/releases/${version}"
         fi
-        NETDATA_SOURCE_ARCHIVE_URL_PREFIX="https://github.com/netdata/netdata/releases/download/${version}"
+
+        check_for_remote_file "${NETDATA_SOURCE_ARCHIVE_URL_PREFIX}/Manifest"
+
+        case $? in
+          0) NETDATA_MANIFEST_INSTALL=1 ;;
+          1)
+            NETDATA_MANIFEST_INSTALL=0
+            NETDATA_SOURCE_ARCHIVE_BASE_NAME="netdata-${version}.tar"
+            NETDATA_SOURCE_ARCHIVE_BASEURL="${NETDATA_SOURCE_ARCHIVE_URL_PREFIX}/${NETDATA_SOURCE_ARCHIVE_BASE_NAME}"
+            NETDATA_SOURCE_ARCHIVE_CHECKSUM_URL="${NETDATA_SOURCE_ARCHIVE_URL_PREFIX}/sha256sums.txt"
+            ;;
+          *)
+            warning "Unable to communicate with GitHub. ${GITHUB_BADNET_MSG}"
+            return 1
+        esac
       else
-        if [ -n "${INSTALL_VERSION}" ]; then
-          version="v${INSTALL_VERSION}"
-        else
-          version="$(get_redirect "${NETDATA_TARBALL_BASEURL}/releases/latest")"
-        fi
-        NETDATA_SOURCE_ARCHIVE_URL_PREFIX="${NETDATA_TARBALL_BASEURL}/releases/${version}"
+        NETDATA_MANIFEST_INSTALL=0
+        NETDATA_SOURCE_ARCHIVE_BASE_NAME="netdata-${version}.tar"
+        NETDATA_SOURCE_ARCHIVE_BASEURL="${NETDATA_SOURCE_ARCHIVE_URL_PREFIX}/${NETDATA_SOURCE_ARCHIVE_BASE_NAME}"
+        NETDATA_SOURCE_ARCHIVE_CHECKSUM_URL="${NETDATA_SOURCE_ARCHIVE_URL_PREFIX}/sha256sums.txt"
       fi
-
-      check_for_remote_file "${NETDATA_SOURCE_ARCHIVE_URL_PREFIX}/Manifest"
-
-      case $? in
-        0) NETDATA_MANIFEST_INSTALL=1 ;;
-        1)
-          NETDATA_MANIFEST_INSTALL=0
-          NETDATA_SOURCE_ARCHIVE_BASE_NAME="netdata-${version}.tar"
-          NETDATA_SOURCE_ARCHIVE_BASEURL="${NETDATA_SOURCE_ARCHIVE_URL_PREFIX}/${NETDATA_SOURCE_ARCHIVE_BASE_NAME}"
-          NETDATA_SOURCE_ARCHIVE_CHECKSUM_URL="${NETDATA_SOURCE_ARCHIVE_URL_PREFIX}/sha256sums.txt"
-          ;;
-        *)
-          warning "Unable to communicate with GitHub. ${GITHUB_BADNET_MSG}"
-          return 1
-      esac
 
       check_for_remote_file "${NETDATA_SOURCE_ARCHIVE_URL_PREFIX}"
 
@@ -2538,7 +2562,7 @@ prepare_offline_install_source() {
           fatal "Unable to download release manifest file. ${BADNET_MSG}" F0526
         fi
 
-        if ! download "${NETDATA_STATIC_ARCHIVE_URL_PREFIX}/Version"
+        if ! download "${NETDATA_STATIC_ARCHIVE_URL_PREFIX}/Version" ; then
           fatal "Unable to download release Version file. ${BADNET_MSG}" F0526
         fi
 
