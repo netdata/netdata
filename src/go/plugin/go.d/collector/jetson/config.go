@@ -11,3 +11,8 @@ type Config struct {
 	UpdateEvery     int    `yaml:"update_every,omitempty" json:"update_every"`
 	AllowPrivileged bool   `yaml:"allow_privileged" json:"allow_privileged"`
 }
+
+// Both running collectors and DynCfg YAML export must apply the same defaults.
+func newConfig() *Config {
+	return &Config{UpdateEvery: defaultUpdateEvery, AllowPrivileged: true}
+}

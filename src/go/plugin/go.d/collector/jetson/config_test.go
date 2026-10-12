@@ -5,7 +5,9 @@
 package jetson
 
 import (
+	"bytes"
 	"encoding/json"
+	"strings"
 	"testing"
 	"time"
 
@@ -14,9 +16,11 @@ import (
 	"gopkg.in/yaml.v2"
 
 	"github.com/netdata/netdata/go/plugins/plugin/agent/jobmgr/joboutput"
+	"github.com/netdata/netdata/go/plugins/plugin/agent/jobmgr/lifecycle"
 	secretconfig "github.com/netdata/netdata/go/plugins/plugin/agent/secrets"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/collectorapi"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/confgroup"
+	"github.com/netdata/netdata/go/plugins/plugin/framework/dyncfg"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/ndexec"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/streamexec/streamexectest"
 )
@@ -125,4 +129,68 @@ func TestAnonymousAndNamedOwnersAreDistinct(t *testing.T) {
 	stopNamed()
 	stop()
 	assert.Zero(t, peer.attempts())
+}
+
+func TestUserConfigExportAndReload(t *testing.T) {
+	for _, format := range []string{"application/json", "application/yaml"} {
+		for _, tc := range []struct {
+			name, json, yaml string
+			want             bool
+		}{
+			{"omitted", `{"update_every":1}`, "update_every: 1\n", true},
+			{"true", `{"allow_privileged":true}`, "allow_privileged: true\n", true},
+			{"false", `{"allow_privileged":false}`, "allow_privileged: false\n", false},
+		} {
+			t.Run(format+"/"+tc.name, func(t *testing.T) {
+				peer, fake := newSupervisedPeer(t, "success")
+				factory, _ := configFactory(t, fake)
+				graph, err := dyncfg.NewGraph(nil)
+				require.NoError(t, err)
+				output := &bytes.Buffer{}
+				frames, err := lifecycle.NewFrameOwner(output)
+				require.NoError(t, err)
+				controller, err := joboutput.NewDynCfgJobController(joboutput.DynCfgJobControllerConfig{
+					PluginName: "go.d", Modules: collectorapi.Registry{"jetson": collectorapi.DefaultRegistry["jetson"]},
+					Defaults: confgroup.Registry{}, ConfigModules: factory, Graph: graph, Frames: frames,
+					// USERCONFIG only exports the registered config. Job activation is unused.
+					Factory: &joboutput.Factory{},
+				})
+				require.NoError(t, err)
+				payload := tc.json
+				if format == "application/yaml" {
+					payload = tc.yaml
+				}
+				result, err := controller.Handle(t.Context(), joboutput.DynCfgJobRequest{
+					Args:        []string{"go.d:collector:jetson", string(dyncfg.CommandUserconfig), "exported"},
+					ContentType: format, HasPayload: true, Payload: []byte(payload),
+				})
+				require.NoError(t, err)
+				frame, err := lifecycle.PrepareFrame("export", result, 1)
+				require.NoError(t, err)
+				require.NoError(t, frames.Commit(frame))
+				header, rest, ok := strings.Cut(output.String(), "\n")
+				require.True(t, ok)
+				require.Contains(t, header, "200 application/yaml")
+				body, _, ok := strings.Cut(rest, "\nFUNCTION_RESULT_END")
+				require.True(t, ok)
+				var exported struct {
+					Jobs []confgroup.Config `yaml:"jobs"`
+				}
+				require.NoError(t, yaml.Unmarshal([]byte(body), &exported))
+				require.Len(t, exported.Jobs, 1)
+				require.Contains(t, exported.Jobs[0], "allow_privileged")
+				require.Equal(t, tc.want, exported.Jobs[0]["allow_privileged"])
+				c := configuredCollector(t, fake, exported.Jobs[0])
+				require.Equal(t, "exported", c.Name)
+				stop := startRun(t, c)
+				fake.Accept(t)
+				stop()
+				wantAttempts := 0
+				if tc.want {
+					wantAttempts = 1
+				}
+				assert.Equal(t, wantAttempts, peer.attempts())
+			})
+		}
+	}
 }

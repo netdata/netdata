@@ -175,6 +175,7 @@ func TestManagedRuntime(t *testing.T) {
 
 func TestRunStartupFailure(t *testing.T) {
 	c, _ := newCollectorWithFake(t)
+	require.NoError(t, c.Init(t.Context()))
 	require.NoError(t, c.Check(t.Context()))
 	t.Cleanup(ndexec.SetRunnerPathsForTests(filepath.Join(t.TempDir(), "missing-wrapper"), ""))
 
@@ -182,6 +183,7 @@ func TestRunStartupFailure(t *testing.T) {
 	select {
 	case err := <-done:
 		require.ErrorContains(t, err, "start tegrastats")
+		require.ErrorIs(t, err, os.ErrNotExist)
 	case <-time.After(3 * time.Second):
 		t.Fatal("startup failure not returned")
 	}

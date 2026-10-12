@@ -29,17 +29,14 @@ func init() {
 			UpdateEvery: defaultUpdateEvery,
 		},
 		CreateV2: func() collectorapi.CollectorV2 { return New() },
-		Config:   func() any { return &Config{} },
+		Config:   func() any { return newConfig() },
 	})
 }
 
 func New() *Collector {
 	store := metrix.NewCollectorStore()
 	return &Collector{
-		Config: Config{
-			UpdateEvery:     defaultUpdateEvery,
-			AllowPrivileged: true,
-		},
+		Config:                *newConfig(),
 		store:                 store,
 		metrics:               newCollectorMetrics(store),
 		findTegrastats:        lookupTegrastats,
