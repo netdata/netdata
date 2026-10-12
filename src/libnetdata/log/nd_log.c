@@ -344,15 +344,25 @@ static void nd_logger(const char *file, const char *function, const unsigned lon
     if(saved_winerror != 0 && !thread_log_fields[NDF_WINERROR].entry.set)
         thread_log_fields[NDF_WINERROR].entry = ND_LOG_FIELD_U64(NDF_WINERROR, saved_winerror);
 
-    CLEAN_BUFFER *wb = NULL;
-    if(fmt && !thread_log_fields[NDF_MESSAGE].entry.set) {
-        wb = buffer_create(1024, NULL);
-        buffer_vsprintf(wb, fmt, ap);
-        thread_log_fields[NDF_MESSAGE].entry = ND_LOG_FIELD_TXT(NDF_MESSAGE, buffer_tostring(wb));
+    // check the flood protection before formatting, so that dropped messages are not formatted; a fatal event keeps
+    // the limit for nd_logger_log_fields(), because the fatal hook there needs the message and runs before the limit
+    bool dropped = false;
+    if(limit && !nd_log_fatal_event) {
+        dropped = nd_log_limit_reached(&nd_log.sources[source]);
+        limit = false;
     }
 
-    nd_logger_log_fields(fp, fd, mutex, limit, priority, output, &nd_log.sources[source],
-                         thread_log_fields, THREAD_FIELDS_MAX);
+    CLEAN_BUFFER *wb = NULL;
+    if(!dropped) {
+        if(fmt && !thread_log_fields[NDF_MESSAGE].entry.set) {
+            wb = buffer_create(1024, NULL);
+            buffer_vsprintf(wb, fmt, ap);
+            thread_log_fields[NDF_MESSAGE].entry = ND_LOG_FIELD_TXT(NDF_MESSAGE, buffer_tostring(wb));
+        }
+
+        nd_logger_log_fields(fp, fd, mutex, limit, priority, output, &nd_log.sources[source],
+                             thread_log_fields, THREAD_FIELDS_MAX);
+    }
 
     const char *pending_msg = NULL;
 
