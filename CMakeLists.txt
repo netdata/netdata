@@ -52,13 +52,17 @@ if(NOT CMAKE_BUILD_TYPE)
   set(CMAKE_BUILD_TYPE "RelWithDebInfo")
 endif()
 
-# The macOS support floor (packaging/PLATFORM_SUPPORT.md). Without this every
-# Mach-O silently targets the build host's OS version, so a binary built on a
-# newer macOS refuses to load on the versions we claim to support. It must be
-# set before project() so every toolchain and every bundled subproject
-# inherits it; packaging/macos/artifact-gate.sh verifies the result on the
-# produced binaries, which also catches a subproject overriding it.
-if(CMAKE_HOST_APPLE AND NOT DEFINED CMAKE_OSX_DEPLOYMENT_TARGET AND NOT DEFINED ENV{MACOSX_DEPLOYMENT_TARGET})
+# The native macOS package's support floor (packaging/PLATFORM_SUPPORT.md).
+# Without this every Mach-O silently targets the build host's OS version, so a
+# package built on a newer macOS refuses to load on the versions it claims to
+# support. Source builds run where they are built and keep targeting the host.
+# It must be set before project() so every toolchain and every bundled
+# subproject inherits it; packaging/macos/artifact-gate.sh verifies the result
+# on the produced binaries, which also catches a subproject overriding it.
+# NETDATA_PACKAGE_KIND is read as the raw cache value; NetdataOptions declares
+# and validates it.
+if(CMAKE_HOST_APPLE AND "${NETDATA_PACKAGE_KIND}" STREQUAL "pkg"
+   AND NOT DEFINED CMAKE_OSX_DEPLOYMENT_TARGET AND NOT DEFINED ENV{MACOSX_DEPLOYMENT_TARGET})
   set(CMAKE_OSX_DEPLOYMENT_TARGET "14.0" CACHE STRING "Minimum macOS version the build targets")
 endif()
 
