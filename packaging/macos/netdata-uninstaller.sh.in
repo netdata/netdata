@@ -9,7 +9,7 @@
 # --purge: also delete configuration, the metrics database, and the claim
 # identity. Destructive; asks for confirmation unless --yes is given.
 #
-# Ownership and retention table (decision D13):
+# Ownership and retention table:
 #
 #   /Library/LaunchDaemons/com.github.netdata.plist           remove
 #   /Library/LaunchDaemons/com.github.netdata.updater.plist   remove
@@ -17,6 +17,8 @@
 #   PREFIX/bin                  bundled bash (payload)        remove
 #   PREFIX/var/log/netdata      logs (transient)              remove
 #   PREFIX/var/run              runtime state (transient)     remove
+#   PREFIX/.macos-pkg-created-account   account marker       remove
+#   /Library/Logs/Netdata       launchd job output            remove
 #   PREFIX/etc/netdata          user config, claim.conf       retain*
 #   PREFIX/var/lib/netdata      claim identity, registry      retain*
 #   PREFIX/var/cache/netdata    metrics database (dbengine)   retain*
@@ -36,7 +38,8 @@ NETDATA_USER="@NETDATA_USER@"
 IDENTIFIER="@NETDATA_PKG_IDENTIFIER@"
 LABEL="com.github.netdata"
 UPDATER_LABEL="com.github.netdata.updater"
-ACCOUNT_MARKER="${PREFIX}/var/lib/netdata/.macos-pkg-created-account"
+ACCOUNT_MARKER="${PREFIX}/.macos-pkg-created-account"
+LAUNCHD_LOG_DIR="/Library/Logs/Netdata"
 
 PURGE=0
 ASSUME_YES=0
@@ -91,7 +94,7 @@ if [ "${PURGE}" -eq 1 ] && [ "${ASSUME_YES}" -ne 1 ]; then
 fi
 
 # Whether this package created the service account is decided before
-# anything is deleted - the marker lives inside a directory --purge removes.
+# anything is deleted - the marker itself is removed with the payload.
 account_is_ours=0
 [ -f "${ACCOUNT_MARKER}" ] && account_is_ours=1
 
@@ -136,6 +139,7 @@ log "removing the payload under ${PREFIX}/usr"
 rm -rf "${PREFIX:?}/usr"
 rm -rf "${PREFIX:?}/bin"
 rm -rf "${PREFIX:?}/var/log/netdata"
+rm -rf "${LAUNCHD_LOG_DIR:?}"
 rm -rf "${PREFIX:?}/var/run"
 rm -f "${ACCOUNT_MARKER}"
 
@@ -152,7 +156,9 @@ else
                "${PREFIX}/var/lib/netdata" \
                "${PREFIX}/var/cache/netdata"; do
         if [ -d "${dir}" ]; then
-            chown -R root:wheel "${dir}"
+            # Skips symlinks and multiply-linked files, which the service
+            # account could have planted to have root take over other files.
+            find "${dir}" \( -type d -o \( -type f -links 1 \) \) -exec chown -h root:wheel {} +
             chmod 0700 "${dir}"
         fi
     done

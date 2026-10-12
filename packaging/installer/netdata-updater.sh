@@ -368,7 +368,7 @@ enable_netdata_updater() {
         launchctl bootstrap system /Library/LaunchDaemons/com.github.netdata.updater.plist 2>/dev/null || true
 
         info "Auto-updating has been ENABLED using a launchd calendar daemon.\n"
-        info "If the update process fails, the failure will be logged to the updater log in Netdata's log directory."
+        info "If the update process fails, the failure will be logged to /Library/Logs/Netdata/updater.log."
       else
         error "launchd-based auto-update scheduling requested, but the updater LaunchDaemon is not installed. Auto-updates have NOT been enabled."
         return 1

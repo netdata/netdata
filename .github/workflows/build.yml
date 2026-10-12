@@ -1492,6 +1492,7 @@ jobs:
           if sudo launchctl print system/com.github.netdata > /dev/null 2>&1; then echo "agent job still registered"; exit 1; fi
           if sudo launchctl print system/com.github.netdata.updater > /dev/null 2>&1; then echo "updater job still registered"; exit 1; fi
           if [ -e /opt/netdata ]; then echo "/opt/netdata still present"; exit 1; fi
+          if [ -e /Library/Logs/Netdata ]; then echo "/Library/Logs/Netdata still present"; exit 1; fi
 
   macos-build: # Test building on macOS
     name: Test building on macOS

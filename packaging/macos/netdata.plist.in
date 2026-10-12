@@ -25,8 +25,8 @@
     <key>WorkingDirectory</key>
     <string>@NETDATA_RUNTIME_PREFIX@</string>
     <key>StandardOutPath</key>
-    <string>@NETDATA_RUNTIME_PREFIX@/var/log/netdata/launchd.log</string>
+    <string>/Library/Logs/Netdata/launchd.log</string>
     <key>StandardErrorPath</key>
-    <string>@NETDATA_RUNTIME_PREFIX@/var/log/netdata/launchd.log</string>
+    <string>/Library/Logs/Netdata/launchd.log</string>
 </dict>
 </plist>
