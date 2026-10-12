@@ -56,3 +56,15 @@ groups:
         dimensions:
           - selector: power_rail_power
             name: power
+  - family: Temperature
+    metrics:
+      - temperature
+    charts:
+      - title: SoC Temperature
+        context: temperature
+        units: Celsius
+        instances:
+          by_labels: [sensor]
+        dimensions:
+          - selector: temperature
+            name: temperature

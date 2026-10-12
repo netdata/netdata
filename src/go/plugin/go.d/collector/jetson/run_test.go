@@ -90,6 +90,9 @@ func TestPowerCollectionTransitions(t *testing.T) {
 		`power_rail_power{rail="VDD_CPU_SOC_MSS"}`: 8.299,
 		`power_rail_power{rail="VIN_SYS_5V0"}`:     7.044,
 		`power_rail_power{rail="VIN"}`:             24.830,
+		`temperature{sensor="cpu"}`:                35.468,
+		`temperature{sensor="gpu"}`:                37.062,
+		`temperature{sensor="tj"}`:                 37.062,
 	}
 	assertCollected(t, c, want)
 	assertCollected(t, c, want)
@@ -111,7 +114,7 @@ func TestPowerCollectionTransitions(t *testing.T) {
 	sendRecord(t, conn, "VDD_GPU 100mW/200mW/300mW")
 	waitSample(t, c, func(s sample) bool { return !s.hasReadings() })
 	_, err = collecttest.CollectScalarSeries(c)
-	require.ErrorContains(t, err, "no supported GPU, EMC or power readings")
+	require.ErrorContains(t, err, "no supported GPU, EMC, power or temperature readings")
 
 	sendRecord(t, conn, "VDD_GPU 0/10")
 	waitSample(t, c, func(s sample) bool { return len(s.PowerRails) == 1 })
@@ -161,6 +164,16 @@ func TestManagedRuntime(t *testing.T) {
 		job.Tick(1)
 		return setUtilization.MatchString(out.String())
 	}, 3*time.Second, 20*time.Millisecond)
+
+	// A temperature-only record must reach the real chart emitter without rounding.
+	sendRecord(t, conn, "cpu@39.218C")
+	waitSample(t, c, func(s sample) bool { return len(s.Temperatures) == 1 })
+	setTemperature := regexp.MustCompile(`(?m)^SET '[^']+' = 39\.218$`)
+	require.Eventually(t, func() bool {
+		job.Tick(1)
+		return setTemperature.MatchString(out.String())
+	}, 3*time.Second, 20*time.Millisecond)
+	assert.Contains(t, out.String(), "CLABEL 'sensor' 'cpu' '1'\n")
 
 	run.Stop(nil)
 	select {
@@ -308,24 +321,52 @@ func TestCorrectedOrinCaptures(t *testing.T) {
 		want map[string]metrix.SampleValue
 	}{
 		{"orin-r36.5-15w-root", map[string]metrix.SampleValue{
+			`temperature{sensor="cpu"}`:  39.312,
+			`temperature{sensor="gpu"}`:  34.562,
+			`temperature{sensor="soc0"}`: 36.625,
+			`temperature{sensor="soc1"}`: 36.437,
+			`temperature{sensor="soc2"}`: 35.75,
+			`temperature{sensor="tj"}`:   39.312,
+
 			"gpu_utilization": 0, `gpu_gpc_frequency{gpc="0"}`: 305, `gpu_gpc_frequency{gpc="1"}`: 0,
 			"emc_utilization": 1, "emc_frequency": 2133,
 			`power_rail_power{rail="VDD_GPU_SOC"}`: 2.403, `power_rail_power{rail="VDD_CPU_CV"}`: 0.400,
 			`power_rail_power{rail="VIN_SYS_5V0"}`: 4.745,
 		}},
 		{"orin-r36.5-50w-root", map[string]metrix.SampleValue{
+			`temperature{sensor="cpu"}`:  39.812,
+			`temperature{sensor="gpu"}`:  35.593,
+			`temperature{sensor="soc0"}`: 37.437,
+			`temperature{sensor="soc1"}`: 36.968,
+			`temperature{sensor="soc2"}`: 36.312,
+			`temperature{sensor="tj"}`:   39.812,
+
 			"gpu_utilization": 0, `gpu_gpc_frequency{gpc="0"}`: 1300, `gpu_gpc_frequency{gpc="1"}`: 1300,
 			"emc_utilization": 0, "emc_frequency": 3199,
 			`power_rail_power{rail="VDD_GPU_SOC"}`: 4.006, `power_rail_power{rail="VDD_CPU_CV"}`: 0.400,
 			`power_rail_power{rail="VIN_SYS_5V0"}`: 4.745,
 		}},
 		{"orin-r36.5-maxn-root", map[string]metrix.SampleValue{
+			`temperature{sensor="cpu"}`:  39.531,
+			`temperature{sensor="gpu"}`:  34.906,
+			`temperature{sensor="soc0"}`: 36.718,
+			`temperature{sensor="soc1"}`: 36.562,
+			`temperature{sensor="soc2"}`: 35.812,
+			`temperature{sensor="tj"}`:   39.531,
+
 			"gpu_utilization": 0, `gpu_gpc_frequency{gpc="0"}`: 305, `gpu_gpc_frequency{gpc="1"}`: 305,
 			"emc_utilization": 1, "emc_frequency": 2133,
 			`power_rail_power{rail="VDD_GPU_SOC"}`: 2.403, `power_rail_power{rail="VDD_CPU_CV"}`: 0.400,
 			`power_rail_power{rail="VIN_SYS_5V0"}`: 4.644,
 		}},
 		{"orin-r36.5-15w-account", map[string]metrix.SampleValue{
+			`temperature{sensor="cpu"}`:  39.218,
+			`temperature{sensor="gpu"}`:  34.593,
+			`temperature{sensor="soc0"}`: 36.656,
+			`temperature{sensor="soc1"}`: 36.312,
+			`temperature{sensor="soc2"}`: 35.656,
+			`temperature{sensor="tj"}`:   39.218,
+
 			"gpu_utilization":                      0,
 			`power_rail_power{rail="VDD_GPU_SOC"}`: 2.403, `power_rail_power{rail="VDD_CPU_CV"}`: 0,
 			`power_rail_power{rail="VIN_SYS_5V0"}`: 4.543,
@@ -343,4 +384,55 @@ func TestCorrectedOrinCaptures(t *testing.T) {
 			collecttest.AssertChartCoverage(t, c, collecttest.ChartCoverageExpectation{})
 		})
 	}
+}
+
+func TestTemperatureCollectionTransitions(t *testing.T) {
+	c, fake := newCollectorWithFake(t)
+	c.timing.MaxSampleAge = 250 * time.Millisecond
+	stop := startRun(t, c)
+	conn := fake.Accept(t)
+
+	sendRecord(t, conn, "cpu@39.312C gpu@34.562C soc0@36.625C soc1@36.437C soc2@35.75C tj@39.312C")
+	waitSample(t, c, func(s sample) bool { return len(s.Temperatures) == 6 })
+	assertCollected(t, c, map[string]metrix.SampleValue{
+		`temperature{sensor="cpu"}`:  39.312,
+		`temperature{sensor="gpu"}`:  34.562,
+		`temperature{sensor="soc0"}`: 36.625,
+		`temperature{sensor="soc1"}`: 36.437,
+		`temperature{sensor="soc2"}`: 35.75,
+		`temperature{sensor="tj"}`:   39.312,
+	})
+	collecttest.AssertChartCoverage(t, c, collecttest.ChartCoverageExpectation{})
+
+	// Missing, unavailable, invalid, paired and ambiguous readings all withdraw independently.
+	sendRecord(t, conn, "cpu@0C gpu@-256C soc0@NaNC soc1@40C/41C soc2@40C soc2@41C GR3D_FREQ 10% VIN 1000/2000")
+	waitSample(t, c, func(s sample) bool { return s.GPUUtilization != nil })
+	assertCollected(t, c, map[string]metrix.SampleValue{
+		`temperature{sensor="cpu"}`:    0,
+		"gpu_utilization":              10,
+		`power_rail_power{rail="VIN"}`: 1,
+	})
+
+	// Reordering does not change identity; a recovered sensor has no cached value.
+	sendRecord(t, conn, "gpu@-12.5C cpu@0C")
+	waitSample(t, c, func(s sample) bool { return len(s.Temperatures) == 2 })
+	assertCollected(t, c, map[string]metrix.SampleValue{
+		`temperature{sensor="gpu"}`: -12.5,
+		`temperature{sensor="cpu"}`: 0,
+	})
+	collecttest.AssertChartCoverage(t, c, collecttest.ChartCoverageExpectation{})
+
+	require.Eventually(t, func() bool {
+		_, err := collecttest.CollectScalarSeries(c)
+		return err != nil
+	}, 3*time.Second, 5*time.Millisecond)
+	_, err := collecttest.CollectScalarSeries(c)
+	require.ErrorContains(t, err, "no fresh")
+
+	sendRecord(t, conn, "tj@41.125C")
+	waitSample(t, c, func(s sample) bool { return len(s.Temperatures) == 1 })
+	assertCollected(t, c, map[string]metrix.SampleValue{`temperature{sensor="tj"}`: 41.125})
+	stop()
+	_, err = collecttest.CollectScalarSeries(c)
+	require.ErrorContains(t, err, "no fresh")
 }
