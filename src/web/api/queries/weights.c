@@ -620,8 +620,6 @@ void query_weights_worker_thread(void *arg)
             break;
         }
 
-        local_qwd.host_snapshot = weights_host_snapshot_get(local_qwd.host_snapshots, host);
-
         // Hosts were already filtered by the counting pass; only queryable ones are in hosts_array
         ssize_t ret = weights_do_node_callback(&local_qwd, host, true);
         if (ret < 0)
