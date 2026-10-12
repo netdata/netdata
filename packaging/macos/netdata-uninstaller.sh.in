@@ -19,6 +19,7 @@
 #   PREFIX/var/run              runtime state (transient)     remove
 #   PREFIX/.macos-pkg-created-account   account marker       remove
 #   /Library/Logs/Netdata       launchd job output            remove
+#   PREFIX/.macos-pkg-retained  marks re-owned retained state  kept with it
 #   PREFIX/etc/netdata          user config, claim.conf       retain*
 #   PREFIX/var/lib/netdata      claim identity, registry      retain*
 #   PREFIX/var/cache/netdata    metrics database (dbengine)   retain*
@@ -40,6 +41,8 @@ LABEL="com.github.netdata"
 UPDATER_LABEL="com.github.netdata.updater"
 ACCOUNT_MARKER="${PREFIX}/.macos-pkg-created-account"
 LAUNCHD_LOG_DIR="/Library/Logs/Netdata"
+RETAINED_MARKER="${PREFIX}/.macos-pkg-retained"
+retained_any=0
 
 PURGE=0
 ASSUME_YES=0
@@ -156,12 +159,19 @@ else
                "${PREFIX}/var/lib/netdata" \
                "${PREFIX}/var/cache/netdata"; do
         if [ -d "${dir}" ]; then
-            # Skips symlinks and multiply-linked files, which the service
-            # account could have planted to have root take over other files.
-            find "${dir}" \( -type d -o \( -type f -links 1 \) \) -exec chown -h root:wheel {} +
+            # Never follows symlinks (-execdir with -h) and skips
+            # multiply-linked files, which the service account could have
+            # planted to have root take over other files.
+            # The starting directory goes separately: -execdir runs it from
+            # the current directory, not from its parent.
+            chown -h root:wheel "${dir}"
+            find "${dir}" -mindepth 1 \( -type d -o \( -type f -links 1 \) \) -execdir chown -h root:wheel {} +
             chmod 0700 "${dir}"
+            retained_any=1
         fi
     done
+    # Tells the next install's postinstall to restore file ownership too.
+    [ "${retained_any}" -eq 1 ] && touch "${RETAINED_MARKER}"
 fi
 
 #
@@ -199,6 +209,7 @@ else
                "${PREFIX}/var/cache/netdata"; do
         [ -d "${dir}" ] && { echo "  ${dir}"; retained="${retained} ${dir}"; }
     done
+    [ -n "${retained}" ] && retained="${retained} ${RETAINED_MARKER}"
     # This script is part of the payload and no longer exists at this point,
     # so name the exact command instead of suggesting a --purge re-run.
     [ -n "${retained}" ] && log "to delete them: sudo rm -rf${retained}"
