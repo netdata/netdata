@@ -10,6 +10,12 @@
         "type": "integer",
         "minimum": 1,
         "default": 1
+      },
+      "allow_privileged": {
+        "title": "Allow privileged execution",
+        "description": "Allow restricted privileged execution of tegrastats to collect readings that require root, such as GPU clocks and EMC activity.",
+        "type": "boolean",
+        "default": true
       }
     }
   },

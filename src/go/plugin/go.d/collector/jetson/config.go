@@ -7,5 +7,7 @@ package jetson
 const defaultUpdateEvery = 1
 
 type Config struct {
-	UpdateEvery int `yaml:"update_every,omitempty" json:"update_every"`
+	Name            string `yaml:"name,omitempty" json:"name,omitempty"`
+	UpdateEvery     int    `yaml:"update_every,omitempty" json:"update_every"`
+	AllowPrivileged bool   `yaml:"allow_privileged" json:"allow_privileged"`
 }

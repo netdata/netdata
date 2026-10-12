@@ -12,6 +12,7 @@ import (
 
 	"github.com/netdata/netdata/go/plugins/pkg/metrix"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/collectorapi"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/ndexec"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/streamexec"
 )
 
@@ -36,11 +37,13 @@ func New() *Collector {
 	store := metrix.NewCollectorStore()
 	return &Collector{
 		Config: Config{
-			UpdateEvery: defaultUpdateEvery,
+			UpdateEvery:     defaultUpdateEvery,
+			AllowPrivileged: true,
 		},
-		store:          store,
-		metrics:        newCollectorMetrics(store),
-		findTegrastats: lookupTegrastats,
+		store:                 store,
+		metrics:               newCollectorMetrics(store),
+		findTegrastats:        lookupTegrastats,
+		fixedTegrastatsExists: fixedTegrastatsExists,
 		timing: streamexec.Timing{
 			MaxSampleAge:    3 * tegrastatsInterval,
 			StallTimeout:    10 * tegrastatsInterval,
@@ -57,9 +60,14 @@ type Collector struct {
 	store   metrix.CollectorStore
 	metrics *collectorMetrics
 
-	// findTegrastats resolves the executable in Check; tests inject a fake.
-	findTegrastats func() (string, error)
-	timing         streamexec.Timing
+	// Discovery checks candidates without executing them.
+	findTegrastats        func() (string, error)
+	fixedTegrastatsExists func() bool
+	timing                streamexec.Timing
+
+	// Init captures the owner and policy once; only Run selects a source mode.
+	acquisition *ndexec.Acquisition
+	mode        tegrastatsMode
 
 	// source supervises tegrastats once Check has resolved it; Run drives it.
 	source *streamexec.Source[sample]
@@ -67,18 +75,26 @@ type Collector struct {
 
 func (c *Collector) Configuration() any { return c.Config }
 
-func (c *Collector) Init(context.Context) error { return nil }
+func (c *Collector) Init(context.Context) error {
+	if c.acquisition == nil {
+		c.acquisition = ndexec.NewAcquisition("jetson", c.Name)
+		if !c.AllowPrivileged {
+			c.mode = tegrastatsUnprivileged
+		}
+	}
+	return nil
+}
 
 func (c *Collector) Check(ctx context.Context) error {
 	if err := ctx.Err(); err != nil {
 		return err
 	}
 	c.source = nil
-	path, err := c.findTegrastats()
-	if err != nil {
-		return err
+	path, lookupErr := c.findTegrastats()
+	if lookupErr != nil && (c.mode == tegrastatsUnprivileged || !c.fixedTegrastatsExists()) {
+		return lookupErr
 	}
-	source, err := c.newTegrastatsSource(path)
+	source, err := c.newTegrastatsSource(path, lookupErr)
 	if err != nil {
 		return err
 	}
@@ -97,7 +113,8 @@ func (c *Collector) Run(ctx context.Context, ready func()) error {
 	return c.source.Run(ctx, ready)
 }
 
-// Cleanup has nothing to release: Run owns tegrastats and returns before Cleanup is called.
+// Run requests shutdown; acquisition admission remains held while privileged cleanup is pending.
+// Cleanup must not release that ownership or start another producer.
 func (c *Collector) Cleanup(context.Context) {}
 
 func (c *Collector) MetricStore() metrix.CollectorStore { return c.store }
