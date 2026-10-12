@@ -66,7 +66,7 @@ modules:
             - The readings depend on the Jetson module, the Jetson Linux release, and permissions. For example, `tegrastats` on Jetson Thor can report GPU clocks without GPU utilization. A reading that `tegrastats` does not report leaves a gap; it is never charted as zero.
             - Rail names and coverage vary by device. Rails can overlap, so adding their values does not give total device power. On Thor, the total-system `VIN` rail may also appear in Netdata's sensors charts.
             - Power charts use the current reading from supported current/average pairs. Averages and unfamiliar three-value forms are not collected.
-            - Temperature charts retain the six supported source names and fractional values. Unavailable sensors, including the documented `-256C` sentinel, leave gaps. Other names and multi-value temperature forms are not collected.
+            - Temperature charts retain the six supported source names and fractional values. Once observed, these sensor charts are retained when readings are unavailable, including the documented `-256C` sentinel. Missing readings leave gaps. Other names and multi-value temperature forms are not collected.
             - If `tegrastats` stops printing readings, the charts show a gap after three seconds instead of repeating the last values.
         performance_impact:
           description: |

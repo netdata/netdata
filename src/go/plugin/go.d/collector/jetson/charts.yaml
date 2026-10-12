@@ -63,6 +63,8 @@ groups:
       - title: SoC Temperature
         context: temperature
         units: Celsius
+        lifecycle:
+          expire_after_cycles: 0
         instances:
           by_labels: [sensor]
         dimensions:
