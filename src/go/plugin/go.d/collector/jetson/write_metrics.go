@@ -25,7 +25,7 @@ func (c *Collector) writeMetrics(s sample) {
 		c.metrics.emcFrequency.Observe(*s.EMCFrequency)
 	}
 	for sensor, temperature := range s.Temperatures {
-		c.metrics.temperature.WithLabelValues(sensor).Observe(temperature)
+		c.metrics.sensorTemperature.WithLabelValues(sensor).Observe(temperature)
 	}
 	for rail, power := range s.PowerRails {
 		c.metrics.powerRailPower.WithLabelValues(rail).Observe(power)

@@ -58,15 +58,15 @@ groups:
             name: power
   - family: Temperature
     metrics:
-      - temperature
+      - sensor_temperature
     charts:
       - title: SoC Temperature
-        context: temperature
+        context: sensor_temperature
         units: Celsius
         lifecycle:
           expire_after_cycles: 0
         instances:
           by_labels: [sensor]
         dimensions:
-          - selector: temperature
+          - selector: sensor_temperature
             name: temperature

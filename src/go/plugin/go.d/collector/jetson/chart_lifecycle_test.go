@@ -44,9 +44,9 @@ func TestTemperatureChartsSurviveUnavailableSensor(t *testing.T) {
 		for cycle := range tc.cycles {
 			got, err := collecttest.CollectScalarSeries(c)
 			require.NoError(t, err)
-			want := map[string]metrix.SampleValue{`temperature{sensor="cpu"}`: 39.218}
+			want := map[string]metrix.SampleValue{`sensor_temperature{sensor="cpu"}`: 39.218}
 			if tc.gpu != nil {
-				want[`temperature{sensor="gpu"}`] = *tc.gpu
+				want[`sensor_temperature{sensor="gpu"}`] = *tc.gpu
 			}
 			assert.Equal(t, want, got)
 
