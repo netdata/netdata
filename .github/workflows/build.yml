@@ -1452,8 +1452,11 @@ jobs:
           sudo test -x /opt/netdata/usr/libexec/netdata/plugins.d/macos-logs.plugin
           # The Agent spawns plugins as the netdata user; checking as root
           # cannot catch a plugin that account is not allowed to execute.
+          # A failed or empty find must not let the loop pass vacuously.
+          plugins="$(sudo find /opt/netdata/usr/libexec/netdata/plugins.d -type f -perm -u+x)"
+          if [ -z "${plugins}" ]; then echo "no plugins found"; exit 1; fi
           fail=0
-          for p in $(sudo find /opt/netdata/usr/libexec/netdata/plugins.d -type f -perm -u+x); do
+          for p in ${plugins}; do
             if ! sudo -u netdata test -x "${p}"; then
               echo "not executable by netdata: ${p}"
               fail=1
