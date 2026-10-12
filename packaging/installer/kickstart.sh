@@ -2545,6 +2545,11 @@ set_macos_pkg_urls() {
   fi
 }
 
+# Releases do not ship the native package yet, so the default install path
+# does not look for it: every lookup would fail and fall back to a source
+# build. Only --native-only tries it. Set to 1 once releases publish the .pkg.
+MACOS_PKG_BY_DEFAULT=0
+
 macos_pkg_supported() {
   # The native package is Apple Silicon only and sets a macOS 14 floor.
   [ "${SYSARCH}" = "arm64" ] || return 1
@@ -2634,7 +2639,7 @@ install_on_macos() {
       esac
       ;;
     *)
-      if macos_pkg_supported && [ -z "${INSTALL_VERSION}" ] && [ -z "${USER_SET_INSTALL_PREFIX}" ]; then
+      if [ "${MACOS_PKG_BY_DEFAULT}" -eq 1 ] && macos_pkg_supported && [ -z "${INSTALL_VERSION}" ] && [ -z "${USER_SET_INSTALL_PREFIX}" ]; then
         SELECTED_INSTALL_METHOD="native"
         INSTALL_TYPE="macos-pkg"
         if try_macos_pkg_install; then
