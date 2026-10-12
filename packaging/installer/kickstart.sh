@@ -720,7 +720,7 @@ handle_curl_result() {
 
   case "${ret}" in
     0) return 0 ;;
-    22|78)
+    22|56|78)
       status="$(tail -n 1 "${dl_log}")"
       [ -n "${dest}" ] && rm -f "${dest}"
       handle_http_status "${status}" "${url}" "${action}"
