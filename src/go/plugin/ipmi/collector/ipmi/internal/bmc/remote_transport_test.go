@@ -12,6 +12,7 @@ import (
 	"time"
 
 	ipmibmc "github.com/bougou/go-ipmi/pkg/bmc"
+	"github.com/bougou/go-ipmi/pkg/clock"
 	"github.com/bougou/go-ipmi/pkg/hal/mock"
 	"github.com/bougou/go-ipmi/pkg/handlers"
 	"github.com/bougou/go-ipmi/pkg/server"
@@ -219,6 +220,13 @@ type remoteFixture struct {
 	releaseOnce      sync.Once
 }
 
+// The SDK simulator derives SDR mutation timestamps from Now on every read.
+// This fixture never changes its repository; keep those dates fixed while
+// retaining real timers for transport and session lifecycle tests.
+type remoteFixtureClock struct{ clock.Clock }
+
+func (remoteFixtureClock) Now() time.Time { return testNow }
+
 func newRemoteFixture(t *testing.T) *remoteFixture {
 	t.Helper()
 	f := &remoteFixture{
@@ -228,7 +236,8 @@ func newRemoteFixture(t *testing.T) *remoteFixture {
 	}
 	hardware := mock.New()
 	require.NoError(t, hardware.Storage().SDR().Write(context.Background(), 1, fullRecord(1, 10, "CPU Temp")))
-	f.bmc = ipmibmc.New(ipmibmc.DeviceInfo{DeviceID: 32, IPMIVersion: 0x20}, [16]byte{}, hardware)
+	f.bmc = ipmibmc.New(ipmibmc.DeviceInfo{DeviceID: 32, IPMIVersion: 0x20}, [16]byte{}, hardware,
+		ipmibmc.WithClock(remoteFixtureClock{Clock: clock.Real}))
 	user, err := f.bmc.Users.Add(2, "monitor")
 	require.NoError(t, err)
 	user.SetPassword([]byte("password"))
