@@ -18,9 +18,10 @@ var (
 	reRecordHeader = regexp.MustCompile(
 		`^(?:[0-9]+-[0-9]+-[0-9]+\s+[0-9]+:[0-9]+:[0-9]+\s+)?RAM\s+[0-9]+/[0-9]+MB\s+\(lfb\s+[0-9]+x[0-9]+MB\)`,
 	)
-	reRecordCPU    = regexp.MustCompile(`\sCPU\s+\[[^\]\r\n]+\](?:\s|@|$)`)
-	reReadingKey   = regexp.MustCompile(`(?:^|\s)(GR3D_FREQ|EMC_FREQ)\b`)
-	reReadingValue = regexp.MustCompile(`^\s+(\S*\[[^\]\r\n]*\]\S*|\S+)`)
+	reRecordCPU        = regexp.MustCompile(`\sCPU\s+\[[^\]\r\n]+\](?:\s|@|$)`)
+	reReadingKey       = regexp.MustCompile(`(?:^|\s)(GR3D_FREQ|EMC_FREQ)\b`)
+	reReadingValue     = regexp.MustCompile(`^\s+(\S*\[[^\]\r\n]*\]\S*|\S+)`)
+	reTemperatureValue = regexp.MustCompile(`^-?[0-9]+(?:\.[0-9]+)?C$`)
 )
 
 // parseRecord parses one line of tegrastats output. It reports false for a line
@@ -57,6 +58,7 @@ func parseRecord(line string) (sample, bool) {
 		}
 	}
 	s.PowerRails = parsePowerRails(line)
+	s.Temperatures = parseTemperatures(line)
 	return s, true
 }
 
@@ -162,4 +164,43 @@ func parsePower(value string) *float64 {
 		return power
 	}
 	return nil
+}
+
+// parseTemperatures reads the six SoC sensors established by the corrected Orin
+// captures. Match complete scalar values; paired readings have unproven meanings.
+func parseTemperatures(line string) map[string]float64 {
+	var temperatures map[string]float64
+	seen := make(map[string]bool)
+	for field := range strings.FieldsSeq(line) {
+		name, value, ok := strings.Cut(field, "@")
+		if !ok {
+			continue
+		}
+		switch name {
+		case "cpu", "gpu", "soc0", "soc1", "soc2", "tj":
+		default:
+			continue
+		}
+		if seen[name] {
+			delete(temperatures, name)
+			continue
+		}
+		seen[name] = true
+		if !reTemperatureValue.MatchString(value) {
+			continue
+		}
+		celsius, err := strconv.ParseFloat(strings.TrimSuffix(value, "C"), 64)
+		// NVIDIA documents -256C for unavailable powered-off GPU/CV sensors.
+		if err != nil || celsius == -256 {
+			continue
+		}
+		if temperatures == nil {
+			temperatures = make(map[string]float64)
+		}
+		temperatures[name] = celsius
+	}
+	if len(temperatures) == 0 {
+		return nil
+	}
+	return temperatures
 }

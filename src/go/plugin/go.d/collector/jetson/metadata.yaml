@@ -29,7 +29,7 @@ modules:
     overview:
       data_collection:
         metrics_description: |
-          Monitor GPU and memory controller utilization, clock frequencies, and power rail consumption on NVIDIA Jetson devices.
+          Monitor GPU and memory controller activity, power consumption, and SoC temperatures on NVIDIA Jetson devices.
 
           You get:
 
@@ -37,8 +37,9 @@ modules:
           - GPU clock frequency, as one value or, on devices that report it, one value per graphics processing cluster (GPC).
           - External memory controller (EMC) bandwidth utilization and clock frequency. The CPU and GPU share this memory, so high EMC utilization can reveal memory-bandwidth-bound workloads.
           - Current power consumption for each reported power rail, in watts.
+          - SoC temperatures for `cpu`, `gpu`, `soc0`, `soc1`, `soc2`, and `tj`, in degrees Celsius when reported as single values.
 
-          CPU, memory, and swap usage come from Netdata's standard Linux system monitoring; this collector adds Jetson GPU, EMC, and power rail readings. Power readings help correlate workload activity with power consumption.
+          CPU, memory, and swap usage come from Netdata's standard Linux system monitoring; this collector adds Jetson GPU, EMC, power rail, and SoC temperature readings. Power and temperature readings help correlate workload activity with power consumption and heating. Existing generic sensor monitoring remains available.
         method_description: |
           The collector runs NVIDIA's `tegrastats --interval 1000` on the local host and reads the line of readings it prints every second. One `tegrastats` process runs for as long as the job runs. By default, Netdata's restricted `ndsudo` helper runs `/usr/bin/tegrastats` as root to recover readings that may be unavailable to the Netdata service account, including GPU clocks and EMC activity.
 
@@ -65,6 +66,7 @@ modules:
             - The readings depend on the Jetson module, the Jetson Linux release, and permissions. For example, `tegrastats` on Jetson Thor can report GPU clocks without GPU utilization. A reading that `tegrastats` does not report leaves a gap; it is never charted as zero.
             - Rail names and coverage vary by device. Rails can overlap, so adding their values does not give total device power. On Thor, the total-system `VIN` rail may also appear in Netdata's sensors charts.
             - Power charts use the current reading from supported current/average pairs. Averages and unfamiliar three-value forms are not collected.
+            - Temperature charts retain the six supported source names and fractional values. Once observed, these sensor charts are retained when readings are unavailable, including the documented `-256C` sentinel. Missing readings leave gaps. Other names and multi-value temperature forms are not collected.
             - If `tegrastats` stops printing readings, the charts show a gap after three seconds instead of repeating the last values.
         performance_impact:
           description: |
@@ -83,7 +85,7 @@ modules:
               sudo /usr/bin/tegrastats --interval 1000
               ```
 
-              Each line should contain a `GR3D_FREQ` (GPU), `EMC_FREQ` (memory controller), or power rail reading such as `VDD_GPU 10687mW/9815mW`; stop the command with Ctrl+C. Readings missing from this output cannot be collected by this integration. This manual command checks the vendor utility; it does not verify Netdata's packaged helper.
+              Each line should contain a `GR3D_FREQ` (GPU), `EMC_FREQ` (memory controller), a power rail reading such as `VDD_GPU 10687mW/9815mW`, or a supported temperature such as `cpu@39.218C`; stop the command with Ctrl+C. Readings missing from this output cannot be collected by this integration. This manual command checks the vendor utility; it does not verify Netdata's packaged helper.
 
               For unprivileged mode or fallback, compare the output of `sudo -u netdata tegrastats --interval 1000`. GPU clocks and EMC readings may be absent in that output.
 
@@ -144,9 +146,9 @@ modules:
           - error: no fresh tegrastats sample
             cause: Netdata has not received a complete `tegrastats` line in the last three seconds, usually because `tegrastats` is starting, has stopped, or is being restarted.
             fix: If the error persists, look for `tegrastats source unavailable` messages in the collector log (see Diagnostics) and run the check in Prerequisites.
-          - error: tegrastats sample contains no supported GPU, EMC or power readings
-            cause: The latest `tegrastats` line has no valid `GR3D_FREQ` (GPU), `EMC_FREQ` (memory controller), or supported power rail reading. Which readings `tegrastats` prints depends on the Jetson module, the Jetson Linux release, and the account that runs it.
-            fix: Run the check in Prerequisites. If its output has no supported GPU, memory controller, or power rail readings, this collector has nothing to chart on this device.
+          - error: tegrastats sample contains no supported GPU, EMC, power or temperature readings
+            cause: The latest `tegrastats` line has no valid `GR3D_FREQ` (GPU), `EMC_FREQ` (memory controller), supported power rail reading, or supported scalar temperature. Which readings `tegrastats` prints depends on the Jetson module, the Jetson Linux release, and the account that runs it.
+            fix: Run the check in Prerequisites. If its output has no supported GPU, memory controller, power rail, or temperature readings, this collector has nothing to chart on this device.
     alerts: []
     metrics:
       folding:
@@ -208,3 +210,15 @@ modules:
               chart_type: line
               dimensions:
                 - name: power
+        - name: temperature sensor
+          description: One of the supported SoC sensors with a valid scalar Celsius reading in the latest tegrastats record.
+          labels:
+            - name: sensor
+              description: Source sensor name, preserved as cpu, gpu, soc0, soc1, soc2, or tj.
+          metrics:
+            - name: jetson.temperature
+              description: SoC Temperature
+              unit: Celsius
+              chart_type: line
+              dimensions:
+                - name: temperature

@@ -13,6 +13,7 @@ type collectorMetrics struct {
 	emcUtilization metrix.SnapshotGauge
 	emcFrequency   metrix.SnapshotGauge
 	powerRailPower metrix.SnapshotGaugeVec
+	temperature    metrix.SnapshotGaugeVec
 }
 
 func newCollectorMetrics(store metrix.CollectorStore) *collectorMetrics {
@@ -24,5 +25,6 @@ func newCollectorMetrics(store metrix.CollectorStore) *collectorMetrics {
 		emcUtilization: m.Gauge("emc_utilization", metrix.WithFloat(true)),
 		emcFrequency:   m.Gauge("emc_frequency", metrix.WithFloat(true)),
 		powerRailPower: m.Vec("rail").Gauge("power_rail_power", metrix.WithFloat(true)),
+		temperature:    m.Vec("sensor").Gauge("temperature", metrix.WithFloat(true)),
 	}
 }
