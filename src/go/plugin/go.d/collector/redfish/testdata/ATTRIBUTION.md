@@ -71,6 +71,29 @@ Swordfish resource referenced by the DMTF Volume schema and therefore has schema
 The embedded fixture is independently authored from the public Redfish property shapes and uses synthetic identities and values.
 It preserves the structural distinction between addressable resource links and embedded redundancy/leak-detection components.
 
+## Manager PortCollection regression responses
+
+- Public mockup: `DMTF/Redfish-Mockup-Server @ 23d21f9a3610f6b6fbb71ffc941296b159a524d2`
+- Reviewed paths:
+  - `public-rackmount1/Managers/BMC/index.json`
+  - `public-rackmount1/Managers/BMC/DedicatedNetworkPorts/index.json`
+  - `public-rackmount1/Managers/BMC/DedicatedNetworkPorts/1/index.json`
+- Official schema references:
+  - [Manager.v1_25_0](https://redfish.dmtf.org/schemas/v1/Manager.v1_25_0.json): both manager network-port properties
+    reference PortCollection; shared members also reference ports subordinate to NetworkAdapter resources.
+  - [Port.v1_12_3](https://redfish.dmtf.org/schemas/v1/Port.v1_12_3.json): LinkStatus vocabulary, CurrentSpeedGbps,
+    Metrics and EnvironmentMetrics.
+  - [NetworkAdapter.v1_14_0](https://redfish.dmtf.org/schemas/v1/NetworkAdapter.v1_14_0.json): legacy NetworkPorts
+    references NetworkPortCollection, while Ports references PortCollection.
+- Vendor evidence: [HPE iLO 6 1.79 other resource definitions](https://servermanagementportal.ext.hpe.com/docs/redfishservices/ilos/ilo6/ilo6_179/ilo6_other_resourcedefns179)
+  documents Port.v1_12_0 members under manager DedicatedNetworkPorts and SharedNetworkPorts paths.
+
+`manager_ports_test.go` independently authors synthetic HTTP responses from these property shapes. The DMTF public
+mockup supplies the representative LinkUp and fractional CurrentSpeedGbps shape; shared adapter membership, linked
+metrics, changing values and trailing-slash identities are synthetic scenarios derived from the schema/vendor contracts.
+No source code or literal payload is copied. The tests replay the real collector and hardware Function; they do not
+require physical BMC access.
+
 ## Scope of evidence
 
 Fixture replay proves schema/type decoding and semantic normalization of these reviewed shapes only. It does not prove live TLS,
