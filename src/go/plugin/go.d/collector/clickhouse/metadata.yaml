@@ -702,61 +702,61 @@ modules:
                 - name: outdated
                 - name: wide
                 - name: compact
-            - name: distributed_connections
+            - name: clickhouse.distributed_connections
               description: Active distributed connection
               unit: connections
               chart_type: line
               dimensions:
                 - name: active
-            - name: distributed_connections_attempts
+            - name: clickhouse.distributed_connections_attempts
               description: Distributed connection attempts
               unit: attempts/s
               chart_type: line
               dimensions:
                 - name: connection
-            - name: distributed_connections_fail_retries
+            - name: clickhouse.distributed_connections_fail_retries
               description: Distributed connection fails with retry
               unit: fails/s
               chart_type: line
               dimensions:
                 - name: connection_retry
-            - name: distributed_connections_fail_exhausted_retries
+            - name: clickhouse.distributed_connections_fail_exhausted_retries
               description: Distributed connection fails after all retries finished
               unit: fails/s
               chart_type: line
               dimensions:
                 - name: connection_retry_exhausted
-            - name: distributed_files_to_insert
+            - name: clickhouse.distributed_files_to_insert
               description: Pending files to process for asynchronous insertion into Distributed tables
               unit: files
               chart_type: line
               dimensions:
                 - name: pending_insertions
-            - name: distributed_rejected_inserts
+            - name: clickhouse.distributed_rejected_inserts
               description: Rejected INSERTs to a Distributed table
               unit: inserts/s
               chart_type: line
               dimensions:
                 - name: rejected
-            - name: distributed_delayed_inserts
+            - name: clickhouse.distributed_delayed_inserts
               description: Delayed INSERTs to a Distributed table
               unit: inserts/s
               chart_type: line
               dimensions:
                 - name: delayed
-            - name: distributed_delayed_inserts_latency
+            - name: clickhouse.distributed_delayed_inserts_latency
               description: Time spent while the INSERT of a block to a Distributed table was throttled
               unit: milliseconds
               chart_type: line
               dimensions:
                 - name: delayed_time
-            - name: distributed_sync_insertion_timeout_exceeded
+            - name: clickhouse.distributed_sync_insertion_timeout_exceeded
               description: Distributed table sync insertions timeouts
               unit: timeouts/s
               chart_type: line
               dimensions:
                 - name: sync_insertion
-            - name: distributed_async_insertions_failures
+            - name: clickhouse.distributed_async_insertions_failures
               description: Distributed table async insertion failures
               unit: failures/s
               chart_type: line

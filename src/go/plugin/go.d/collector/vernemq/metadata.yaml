@@ -308,7 +308,7 @@ modules:
             - name: node
               description: The value of this label is identical to the value of the "node" label exposed by VerneMQ.
           metrics:
-            - name: vernemq.node_socket
+            - name: vernemq.node_sockets
               description: Open Sockets
               unit: sockets
               chart_type: line
@@ -607,7 +607,7 @@ modules:
                 - name: quota_exceeded
                 - name: administrative_action
                 - name: payload_format_invalid
-            - name: node_mqtt_disconnect_sent_by_reason_code
+            - name: vernemq.node_mqtt_disconnect_sent_by_reason_code
               description: MQTT DISCONNECT Sent by Reason
               unit: packets/s
               chart_type: stacked
@@ -808,7 +808,7 @@ modules:
               dimensions:
                 - name: success
                 - name: packet_id_not_found
-            - name: vernemq.node_mqtt_pubcomp_sent_by_reason_cod
+            - name: vernemq.node_mqtt_pubcomp_sent_by_reason_code
               description: MQTT PUBCOMP QoS 2 Sent by Reason
               unit: packets/s
               chart_type: stacked

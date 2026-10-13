@@ -1718,7 +1718,7 @@ modules:
             - name: size
               description: The amount of memory in megabytes that this memory module manages.
           metrics:
-            - name: mem.edac_mc_errors
+            - name: mem.edac_mc_dimm_errors
               description: DIMM Error Detection And Correction (EDAC) Errors
               unit: errors
               chart_type: line

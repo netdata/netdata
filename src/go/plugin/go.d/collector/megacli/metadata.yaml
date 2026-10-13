@@ -136,13 +136,13 @@ modules:
             - name: drive_type
               description: Type (e.g. SATA)
           metrics:
-            - name: megacli.phys_drive_media_errors_rate
+            - name: megacli.phys_drive_media_errors
               description: Physical Drive media errors rate
               unit: errors/s
               chart_type: line
               dimensions:
                 - name: media_errors
-            - name: megacli.phys_drive_predictive_failures_rate
+            - name: megacli.phys_drive_predictive_failures
               description: Physical Drive predictive failures rate
               unit: failures/s
               chart_type: line
