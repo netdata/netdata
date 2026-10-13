@@ -309,6 +309,7 @@ class AlertOwnershipTest(unittest.TestCase):
         subjects = [
             alert_subject('ok', 'proc.plugin', 'm', ['system.cpu'], excluded=['cpu_usage']),
             alert_subject('not derived', 'proc.plugin', 'm', ['system.cpu'], excluded=['load_bsd']),
+            alert_subject('filtered', 'proc.plugin', 'm', ['system.load'], excluded=['load_bsd']),
             alert_subject('unknown', 'proc.plugin', 'm', ['system.cpu'], excluded=['gone']),
             alert_subject('listed', 'ipmi.plugin', 'm', [], ['sel_events'], excluded=['sel_events']),
         ]
@@ -316,6 +317,7 @@ class AlertOwnershipTest(unittest.TestCase):
 
         self.assertEqual(check_listed_names(self.RULES, subjects), [
             f"not derived: excluded alert 'load_bsd' {not_derived}",
+            f"filtered: excluded alert 'load_bsd' {not_derived}",
             f"unknown: excluded alert 'gone' {not_derived}",
             "listed: excluded alert 'sel_events' is also listed",
         ])

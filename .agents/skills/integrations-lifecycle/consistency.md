@@ -93,7 +93,8 @@ are read only by this tooling.
   between `config_schema.json` and `metadata.yaml`.
 - `collecttest` artifact checks (opt-in, per collector test;
   `.agents/skills/collectors-go-framework-v2/chart-template.md#tests`): metric rows against the chart template, and
-  stock alert targets, units and lookup dimensions against the documented metrics.
+  stock alert targets, units, lookup dimensions and the dimensions their expressions read against the documented
+  metrics.
 - The ibm.d runtime-output drift gate ("Delivery boundary" above).
 - Not enforced anywhere: metric rows against the code and option names against the schema for collectors that have
   not opted in, stock conf defaults against the schema. `check-markdown.yml` checks that generated links resolve on
@@ -121,8 +122,8 @@ Review follows `AGENTS.md#skill-selection` and does not itself regenerate or pub
    `.agents/skills/collectors-metadata-yaml/setup.md`.
 3. **Alerts keep an owner.** An alert added, removed, or retargeted in `health.d` reaches the pages by derivation: its
    `on:` context is declared in the owning collector's `metadata.yaml` metrics, or the alert is listed by name where
-   the context cannot be declared, or excluded by name where the monitored instance lacks the data it reads. Rule:
-   `.agents/skills/collectors-metadata-yaml/alerts-and-meta.md` section 1.
+   the context cannot be declared. An integration whose monitored instance lacks the data an alert reads excludes it
+   by name (`excluded_alerts`). Rule: `.agents/skills/collectors-metadata-yaml/alerts-and-meta.md` section 1.
 4. **README handling.** A plugin directory with one integration has a README symlinked to the generated
    `integrations/<slug>.md`, which follows `metadata.yaml`. A directory with several integrations has a hand-written
    README the author updates. `agent_notification` is special: the README itself is the generated artifact (no

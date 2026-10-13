@@ -1375,7 +1375,8 @@ def alert_subjects(items):
 
 
 def attach_alerts(rules, *groups):
-    """Replace each item's listed alert names with its page rows; return the owners of each alert name."""
+    """Replace each item's listed alert names with its page rows and drop its excluded names; return the owners of each
+    alert name."""
     items = [item for group in groups for item in group]
     subjects = alert_subjects(items)
     ownership = alert_ownership(rules, subjects)
