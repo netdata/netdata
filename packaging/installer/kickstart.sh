@@ -2242,7 +2242,7 @@ try_static_install() {
       fatal "Unable to download static build archive for ${SYSARCH}. ${BADNET_MSG}." F0208
     fi
 
-    if ! download "${NETDATA_STATIC_ARCHIVE_CHECKSUM_URL}" "./sha256sum.txt"; then
+    if ! download "${NETDATA_STATIC_ARCHIVE_CHECKSUM_URL}" "./sha256sums.txt"; then
       fatal "Unable to fetch checksums to verify static build archive. ${BADNET_MSG}." F0206
     fi
   fi
@@ -2510,7 +2510,7 @@ try_build_install() {
       fatal "Failed to download source tarball for local build. ${BADNET_MSG}." F000B
     fi
 
-    if ! download "${NETDATA_SOURCE_ARCHIVE_CHECKSUM_URL}" "./sha256sum.txt"; then
+    if ! download "${NETDATA_SOURCE_ARCHIVE_CHECKSUM_URL}" "./sha256sums.txt"; then
       fatal "Failed to download checksums for source tarball verification. ${BADNET_MSG}." F000C
     fi
   fi
