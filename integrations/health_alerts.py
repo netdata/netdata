@@ -72,38 +72,49 @@ PLUGIN_PLATFORMS = {
 # Alerts on the Agent's own charts belong to no integration.
 AGENT_INTERNAL_PREFIXES = ('netdata.', 'anomaly_detection.')
 
-# Variables the Agent resolves before chart dimensions (src/health/health_variable.c), plus green and red, which the
-# configuration loader substitutes (health_config.c).
+# Variables the Agent resolves before chart dimensions (src/health/health_variable.c). `green` and `red` are
+# substituted by the configuration loader only in a rule that sets them (health_config.c, replace_green_red).
 HEALTH_BUILTIN_VARIABLES = frozenset({
     'this', 'now', 'after', 'before', 'status', 'REMOVED', 'UNINITIALIZED', 'UNDEFINED', 'CLEAR', 'WARNING', 'CRITICAL',
-    'last_collected_t', 'update_every', 'green', 'red',
+    'last_collected_t', 'update_every',
 })
+THRESHOLD_FIELDS = ('green', 'red')
 
 # A $name or ${name} reference, as the expression lexer reads it (src/libnetdata/eval/re2c_lemon/lexer.re).
 _VARIABLE = re.compile(r'\$\{([^}]*)\}|\$([^\s&|!><=%+\-*/?(){}]+)')
 
-# Chart and host variables stock alerts read, by the context of the alert's target. Collectors define them with
-# VARIABLE lines (C) or chart Vars (go.d), which metadata.yaml does not document. Producers:
-# cgroups.plugin sys_fs_cgroup.c (memory_limit); proc.plugin proc_stat.c and windows.plugin perflib-processor.c
-# (active_processors), proc_net_dev.c and perflib-network.c (nic_speed_max), ipc.c (ipc_*), proc_net_stat_conntrack.c
-# (netfilter_conntrack_max), proc_loadavg.c (pidmax), proc_net_netstat.c (tcp_max_connections), proc_net_sockstat.c
-# (tcp_mem_*, tcp_max_orphans); go.d cockroachdb, postgres and whoisquery charts.go.
+# Host variables stock alerts read (rrdvar host variables); they resolve from any chart. Each maps to the files that
+# define it. metadata.yaml documents dimensions only, so variables are listed here.
+HOST_VARIABLES = {
+    'active_processors': ('src/collectors/proc.plugin/proc_stat.c', 'src/collectors/windows.plugin/perflib-processor.c'),
+    'ipc_semaphores_arrays_max': ('src/collectors/proc.plugin/ipc.c',),
+    'ipc_semaphores_max': ('src/collectors/proc.plugin/ipc.c',),
+    'netfilter_conntrack_max': ('src/collectors/proc.plugin/proc_net_stat_conntrack.c',),
+    'tcp_max_connections': ('src/collectors/proc.plugin/proc_net_netstat.c',),
+    'tcp_max_orphans': ('src/collectors/proc.plugin/proc_net_sockstat.c',),
+    'tcp_mem_high': ('src/collectors/proc.plugin/proc_net_sockstat.c',),
+    'tcp_mem_pressure': ('src/collectors/proc.plugin/proc_net_sockstat.c',),
+}
+
+# Chart variables stock alerts read (C VARIABLE lines, go.d chart Vars), by the context of the chart that defines
+# them, each with the files that define it.
+_CGROUP_MEMORY = {'memory_limit': ('src/collectors/cgroups.plugin/sys_fs_cgroup.c',)}
 CHART_VARIABLES = {
-    'cgroup.mem_usage': ('memory_limit',),
-    'k8s.cgroup.mem_usage': ('memory_limit',),
-    'system.load': ('active_processors',),
-    'net.net': ('nic_speed_max',),
-    'system.ipc_semaphores': ('ipc_semaphores_max',),
-    'system.ipc_semaphore_arrays': ('ipc_semaphores_arrays_max',),
-    'netfilter.conntrack_sockets': ('netfilter_conntrack_max',),
-    'system.active_processes': ('pidmax',),
-    'ip.tcpsock': ('tcp_max_connections',),
-    'ipv4.sockstat_tcp_mem': ('tcp_mem_high', 'tcp_mem_pressure'),
-    'ipv4.sockstat_tcp_sockets': ('tcp_max_orphans',),
-    'cockroachdb.process_file_descriptors': ('sys_fd_softlimit',),
-    'postgres.table_bloat_size_perc': ('table_size',),
-    'postgres.index_bloat_size_perc': ('index_size',),
-    'whoisquery.time_until_expiration': ('days_until_expiration_warning', 'days_until_expiration_critical'),
+    'cgroup.mem_usage': _CGROUP_MEMORY,
+    'k8s.cgroup.mem_usage': _CGROUP_MEMORY,
+    'net.net': {
+        'nic_speed_max': ('src/collectors/proc.plugin/proc_net_dev.c', 'src/collectors/windows.plugin/perflib-network.c'),
+    },
+    'system.active_processes': {'pidmax': ('src/collectors/proc.plugin/proc_loadavg.c',)},
+    'cockroachdb.process_file_descriptors': {
+        'sys_fd_softlimit': ('src/go/plugin/go.d/collector/cockroachdb/metrics.go',),
+    },
+    'postgres.table_bloat_size_perc': {'table_size': ('src/go/plugin/go.d/collector/postgres/charts.go',)},
+    'postgres.index_bloat_size_perc': {'index_size': ('src/go/plugin/go.d/collector/postgres/charts.go',)},
+    'whoisquery.time_until_expiration': {
+        'days_until_expiration_warning': ('src/go/plugin/go.d/collector/whoisquery/charts.go',),
+        'days_until_expiration_critical': ('src/go/plugin/go.d/collector/whoisquery/charts.go',),
+    },
 }
 
 
@@ -165,7 +176,7 @@ def parse_health_config(text: str, source: str = '') -> List[dict]:
             rule['on'] = value
         elif key in EXPORTED_FIELDS:
             rule[key] = _strip_quotes(value)
-        elif key in EXPRESSION_FIELDS:
+        elif key in EXPRESSION_FIELDS or key in THRESHOLD_FIELDS:
             rule[key] = value
         elif key in HOST_LABEL_KEYS:
             _add_pattern(rule, 'host_labels', HOST_LABEL_KEYS[key], value)
@@ -372,41 +383,66 @@ def check_listed_names(rules: Sequence[dict], subjects: Iterable[dict]) -> List[
 
 
 def expression_variables(rule: dict) -> List[str]:
-    """The variables of a rule's calc, warn and crit expressions that must resolve on its own chart: not health built-ins
-    and not qualified chart.dimension references. The _raw and _last_collected_t suffixes select a dimension's raw value
-    and collection time, so they are removed."""
+    """The variables of a rule's calc, warn and crit expressions, in order, without health built-ins and without the
+    green and red thresholds the rule sets."""
+    skip = HEALTH_BUILTIN_VARIABLES | {field for field in THRESHOLD_FIELDS if field in rule}
     variables = []
     for field in EXPRESSION_FIELDS:
         for braced, bare in _VARIABLE.findall(rule.get(field, '')):
-            name = braced or bare
-            if name in HEALTH_BUILTIN_VARIABLES or '.' in name:
-                continue
-            for suffix in ('_raw', '_last_collected_t'):
-                name = name.removesuffix(suffix)
-            variables.append(name)
+            if (braced or bare) not in skip:
+                variables.append(braced or bare)
     return list(dict.fromkeys(variables))
 
 
-def check_expression_variables(rules: Sequence[dict], dimensions: Mapping[str, Iterable[str]],
-                               chart_variables: Mapping[str, Iterable[str]] = CHART_VARIABLES) -> List[str]:
-    """Problems with the variables stock alerts read. On a target whose dimensions an integration documents, each
-    variable must be one of those dimension names, an alert name, or a chart or host variable listed for the target.
+def _dimension_of(variable: str) -> str:
+    """The dimension a variable names: the _raw and _last_collected_t suffixes select a dimension's raw value and
+    collection time."""
+    for suffix in ('_raw', '_last_collected_t'):
+        if variable.endswith(suffix):
+            return variable[:-len(suffix)]
+    return variable
 
-    The Agent matches a variable against a dimension's ID or name, and go.d sends the dimension name as the ID, so a
-    collector's internal metric key never resolves. Targets that no integration documents are not checked.
+
+def _qualified_references(dimension: str) -> List[Tuple[str, str]]:
+    """The (context, dimension) pairs the Agent tries for a name with two or more dots, splitting from the last dot."""
+    pairs, end = [], len(dimension)
+    while True:
+        dot = dimension.rfind('.', 0, end)
+        if dot < 0 or '.' not in dimension[:dot]:
+            return pairs
+        pairs.append((dimension[:dot], dimension[dot + 1:]))
+        end = dot
+
+
+def check_expression_variables(rules: Sequence[dict], dimensions: Mapping[str, Iterable[str]],
+                               chart_variables: Mapping[str, Mapping[str, Sequence[str]]] = CHART_VARIABLES,
+                               host_variables: Mapping[str, Sequence[str]] = HOST_VARIABLES) -> List[str]:
+    """Problems with the variables stock alerts read, checked in the Agent's resolution order (health_variable.c): a
+    dimension of the alert's chart, a chart variable, a host variable, an alert name, then a dimension of another
+    context for a name with two or more dots.
+
+    Only rules whose target an integration documents in `metrics.scopes` are checked, and a qualified reference to an
+    undocumented context is accepted. The Agent matches a dimension by ID or name, and go.d sends the dimension name as
+    the ID, so a collector's internal metric key never resolves.
     """
     names = {rule['name'] for rule in rules}
     problems = []
 
     for rule in rules:
-        documented = dimensions.get(rule.get('on'))
+        target = rule.get('on')
+        documented = dimensions.get(target)
         if documented is None:
             continue
-        known = set(documented) | set(chart_variables.get(rule['on'], ())) | names
         for variable in expression_variables(rule):
-            if variable not in known:
-                problems.append(f'{rule["source"]}: {rule["name"]} reads ${{{variable}}}, which is not a documented '
-                                f'dimension or a listed variable of {rule["on"]}')
+            dimension = _dimension_of(variable)
+            if (dimension in documented or variable in chart_variables.get(target, {}) or variable in host_variables
+                    or variable in names):
+                continue
+            if any(context not in dimensions or name in dimensions[context]
+                   for context, name in _qualified_references(dimension)):
+                continue
+            problems.append(f'{rule["source"]}: {rule["name"]} reads ${{{variable}}}, which is no documented dimension, '
+                            f'listed variable or alert of {target}')
 
     return problems
 

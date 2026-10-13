@@ -7,6 +7,7 @@ package isc_dhcpd
 import (
 	"cmp"
 	"context"
+	"net/netip"
 	"os"
 	"testing"
 
@@ -132,26 +133,32 @@ func TestCollector_Charts(t *testing.T) {
 	assert.NotNil(t, collr.Charts())
 }
 
-// The utilization charts are in percent: the stored value, scaled by each dimension's multiplier and divisor, never
-// exceeds 100 (a pool in the IPv4 fixture holds 2 leases of 126 addresses).
+// A pool's utilization chart shows its active leases as a percentage of the pool's addresses, scaled by each
+// dimension's multiplier and divisor. The expected value comes from the fixture's pool networks, not the collector.
 func TestCollector_PoolUtilizationChartsArePercent(t *testing.T) {
 	collr := prepareDHCPdLeasesIPv4()
 	require.NoError(t, collr.Init(context.Background()))
 	mx := collr.Collect(context.Background())
 	require.NotEmpty(t, mx)
 
-	var checked int
+	got, want := make(map[string]float64), make(map[string]float64)
+	for _, pool := range collr.Pools {
+		prefix := netip.MustParsePrefix(pool.Networks)
+		size := float64(uint64(1) << (prefix.Addr().BitLen() - prefix.Bits()))
+		want[pool.Name] = float64(mx["dhcp_pool_"+pool.Name+"_active_leases"]) * 100 / size
+	}
 	for _, chart := range *collr.Charts() {
-		if chart.Units != "percent" {
+		if chart.Ctx != "isc_dhcpd.dhcp_pool_utilization" {
 			continue
 		}
 		for _, dim := range chart.Dims {
-			value := float64(mx[dim.ID]) * float64(cmp.Or(dim.Mul, 1)) / float64(cmp.Or(dim.Div, 1))
-			assert.LessOrEqualf(t, value, 100.0, "%s: %s", chart.ID, dim.ID)
-			checked++
+			got[chart.Labels[0].Value] = float64(mx[dim.ID]) * float64(cmp.Or(dim.Mul, 1)) / float64(cmp.Or(dim.Div, 1))
 		}
 	}
-	assert.Equal(t, len(collr.Pools), checked)
+	require.Len(t, got, len(want))
+	for name, percent := range want {
+		assert.InDeltaf(t, percent, got[name], 0.05, "pool %s", name)
+	}
 }
 
 func TestCollector_Collect(t *testing.T) {

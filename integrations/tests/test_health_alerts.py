@@ -27,6 +27,7 @@ from health_alerts import (  # noqa: E402
     ALERT_TYPES,
     CHART_VARIABLES,
     HEALTH_CONFIG_DIR,
+    HOST_VARIABLES,
     PLUGIN_PLATFORMS,
     agent_internal_alerts,
     alert_owners,
@@ -342,24 +343,42 @@ class AlertOwnershipTest(unittest.TestCase):
 
 
 class ExpressionVariablesTest(unittest.TestCase):
-    def test_reads_the_variables_a_chart_must_resolve(self):
+    def test_reads_variables_like_the_lexer(self):
         expressions = rule('a', 'app.x', calc='$used * 100 / ($used + ${free space}) + $this',
-                           warn='$this > $other_alert + ${app.y.z} + $used_raw',
-                           crit='$now - $used_last_collected_t > $update_every')
+                           warn='$this > $other_alert + ${app.y.z} + $used_raw + $a?$b:$c',
+                           crit='$now - $used_last_collected_t > $update_every + $green + $red', red='90')
 
-        self.assertEqual(expression_variables(expressions), ['used', 'free space', 'other_alert'])
+        self.assertEqual(expression_variables(expressions), [
+            'used', 'free space', 'other_alert', 'app.y.z', 'used_raw', 'a', 'b:$c', 'used_last_collected_t', 'green',
+        ])
 
-    def test_variables_are_documented_dimensions_alert_names_or_listed_variables(self):
+    def test_variables_resolve_in_the_agent_order(self):
+        dimensions = {'app.x': {'used', 'quantile_0.5'}, 'app.y': {'free'}}
+        chart_variables = {'app.x': {'limit': ('a.c',)}, 'app.z': {'other_limit': ('a.c',)}}
         rules = [
-            rule('ok', 'app.x', calc='$used / $limit', warn='$this > $helper'),
+            rule('resolved', 'app.x', calc='$used_raw / $limit + $cpus + $helper + ${quantile_0.5}',
+                 warn='$this > ${app.y.free} + ${unknown.context.value} + $green', green='1'),
             rule('helper', 'app.x', calc='$used'),
             rule('metric_key', 'app.x', calc='$used_bytes_total'),
-            rule('undocumented_target', 'app.y', calc='$anything'),
+            rule('suffixed_variable', 'app.x', calc='$limit_raw'),
+            rule('other_chart_variable', 'app.x', calc='$other_limit'),
+            rule('one_dot', 'app.x', calc='${quantile_0.95}'),
+            rule('qualified_missing', 'app.x', calc='${app.y.used}'),
+            rule('unset_threshold', 'app.x', calc='$red'),
+            rule('undocumented_target', 'app.w', calc='$anything'),
         ]
 
-        self.assertEqual(check_expression_variables(rules, {'app.x': {'used'}}, {'app.x': ('limit',)}), [
-            'src/health/health.d/x.conf: metric_key reads ${used_bytes_total}, which is not a documented dimension or '
-            'a listed variable of app.x',
+        def problem(name, variable):
+            return (f'src/health/health.d/x.conf: {name} reads ${{{variable}}}, which is no documented dimension, '
+                    f'listed variable or alert of app.x')
+
+        self.assertEqual(check_expression_variables(rules, dimensions, chart_variables, {'cpus': ('a.c',)}), [
+            problem('metric_key', 'used_bytes_total'),
+            problem('suffixed_variable', 'limit_raw'),
+            problem('other_chart_variable', 'other_limit'),
+            problem('one_dot', 'quantile_0.95'),
+            problem('qualified_missing', 'app.y.used'),
+            problem('unset_threshold', 'red'),
         ])
 
 
@@ -401,7 +420,7 @@ class BuildAlertIndexTest(unittest.TestCase):
     def test_one_entry_per_name_with_every_target_and_its_owners(self):
         rules = [
             {'name': 'ram_in_use', 'template': False, 'source': 'a.conf', 'on': 'system.ram', 'class': 'Utilization',
-             'summary': 'RAM'},
+             'summary': 'RAM', 'calc': '$used', 'warn': '$this > $red', 'red': '90'},
             {'name': 'disk', 'template': True, 'source': 'b.conf', 'on': 'disk.space'},
             {'name': 'ram_in_use', 'template': False, 'source': 'c.conf', 'on': 'mem.available', 'class': 'Other'},
             {'name': 'ram_in_use', 'template': False, 'source': 'c.conf', 'on': 'system.ram'},
@@ -520,12 +539,24 @@ class StockAlertOwnershipTest(unittest.TestCase):
 
         self.assertEqual(problems, [], '\n'.join(problems))
 
-    def test_every_listed_chart_variable_is_read_and_undocumented(self):
+    def test_every_listed_variable_is_read_and_defined_by_its_producers(self):
         read = {(rule['on'], variable) for rule in self.rules for variable in expression_variables(rule)}
-        listed = {(context, variable) for context, variables in CHART_VARIABLES.items() for variable in variables}
+        defined = {
+            (scope, variable): producers
+            for scope, variables in [*CHART_VARIABLES.items(), ('host', HOST_VARIABLES)]
+            for variable, producers in variables.items()
+        }
+        problems = []
+        for (scope, variable), producers in defined.items():
+            if not any(variable == name and scope in ('host', context) for context, name in read):
+                problems.append(f'{scope} {variable}: no stock alert reads it')
+            if variable in self.dimensions.get(scope, ()):
+                problems.append(f'{scope} {variable}: a documented dimension')
+            for path in producers:
+                if f'"{variable}"' not in (REPO_ROOT / path).read_text(encoding='utf-8', errors='replace'):
+                    problems.append(f'{scope} {variable}: not defined in {path}')
 
-        self.assertEqual(sorted(listed - read), [])
-        self.assertEqual(sorted(pair for pair in listed if pair[1] in self.dimensions.get(pair[0], ())), [])
+        self.assertEqual(problems, [])
 
     def test_listed_alert_names_are_stock_and_not_derivable(self):
         problems = check_listed_names(self.rules, self.subjects)

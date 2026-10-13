@@ -89,7 +89,8 @@ are read only by this tooling.
   `alerts` export parser to `health.d`, requires every stock alert to set `class` and `type` from the vocabulary in
   `health_alerts.py` and a `component` without case or plural spelling variants, keeps that vocabulary equal to the
   `src/health/REFERENCE.md` tables, and requires every `calc`, `warn` and `crit` variable on a documented target to
-  be a documented dimension name, an alert name or a listed chart or host variable (`CHART_VARIABLES`).
+  be a documented dimension name, an alert name, a listed chart or host variable (`CHART_VARIABLES`,
+  `HOST_VARIABLES`) or a resolvable qualified reference.
 - `collecttest.AssertConfigSchemaMatchesMetadata` (opt-in, per collector test): option descriptions and tabs agree
   between `config_schema.json` and `metadata.yaml`.
 - `collecttest` artifact checks (opt-in, per collector test;

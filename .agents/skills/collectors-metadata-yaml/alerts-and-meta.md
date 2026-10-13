@@ -20,9 +20,9 @@ integration.", which MUST be true.
   admits the plugin and module. Owner: `integrations/health_alerts.py` (`rule_admits`, `alert_rows`, and the
   `PLUGIN_PLATFORMS` table for plugins built for some platforms only).
 - Declared contexts MUST be the contexts the collector creates at runtime: a wrong or missing one drops alerts from the
-  page or lists one that never attaches, and CI fails when a stock alert has no owner. CI also checks each alert's
-  expression variables against the documented dimension names (`metrics.md`), which MUST be the names the chart
-  shows.
+  page or lists one that never attaches, and CI fails when a stock alert has no owner. CI also checks the expression
+  variables of the alerts on these contexts against the documented dimension names (`metrics.md`), which MUST be the
+  names the chart shows.
 - `alerts` in `metadata.yaml` is an optional list of alert names for alerts the page owns although no declared context
   derives them: charts created at runtime from profiles (CloudWatch, SNMP BGP) or an alarm on a chart id that the
   collector keeps under another context (`ipmi_events` on FreeIPMI and Go IPMI). A comment above the list says why.
