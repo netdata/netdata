@@ -141,6 +141,12 @@ Metrics:
 | iis.website_logon_attempts_rate | Website logon attempts | logon | attempts/s |
 | iis.website_errors_rate | Website errors | document_locked, document_not_found | errors/s |
 | iis.website_uptime | Website uptime | uptime | seconds |
+| iis.website_blocked_async_io_requests | Website blocked async I/O requests | blocked | requests |
+| iis.website_cgi_requests | Website active CGI requests | active | requests |
+| iis.website_users_total_rate | Website total user counts | anonymous, non_anonymous | users/s |
+| iis.website_blocked_async_io_requests_rate | Website total blocked async I/O requests | requests | requests/s |
+| iis.website_cgi_requests_rate | Website CGI requests | requests | requests/s |
+| iis.website_rejected_async_io_requests_rate | Website rejected async I/O requests | requests | requests/s |
 
 
 ### Per IIS Application Pool
@@ -151,7 +157,7 @@ Labels:
 
 | Label      | Description     |
 |:-----------|:----------------|
-| app | The name of the Application Pool. |
+| app_pool | The name of the Application Pool. |
 
 Metrics:
 
@@ -165,6 +171,8 @@ Metrics:
 | iis.application_pool_worker_process_failures | IIS App Pool worker process crashes | crash, ping, startup, shutdown | failures/s |
 | iis.application_pool_recycles | IIS App Pool recycles | recycles | recycles/s |
 | iis.application_pool_uptime | IIS App Pool uptime | uptime | seconds |
+| iis.application_pool_current_uptime | IIS App Pool current uptime | uptime | seconds |
+| iis.application_pool_time_since_last_worker_process_failure | Time since the last IIS worker process failure | seconds | seconds |
 
 
 ### Per IIS W3SCV W3MP
@@ -181,7 +189,7 @@ Metrics:
 
 | Metric | Description | Dimensions | Unit |
 |:------|:------------|:----------|:----|
-| iis.w3svc_w3wp_active_threads | Threads actively processing requests in the worker process | threads | threads |
+| iis.w3svc_w3wp_active_threads | Threads actively processing requests in the worker process | active | threads |
 | iis.w3svc_w3wp_requests_total | HTTP requests served by the worker process | requests | requests/s |
 | iis.w3svc_w3wp_requests_active | Current number of requests being processed by the worker process | requests | requests |
 | iis.w3svc_w3wp_file_cache_mem_usage | Current memory usage by the worker process | used | bytes |
@@ -193,4 +201,83 @@ Metrics:
 | iis.w3svc_w3wp_total_metadata_flushed | User-mode metadata cache flushes | metadata_blocks | flushes/s |
 | iis.w3svc_w3wp_output_cache_active_flushed_items | Items flushed but still in memory for active responses | used | items |
 | iis.w3svc_w3wp_output_cache_memory_usage | Current number of bytes used by output cache | used | bytes |
-| iis.w3svc_w3wp_output_cache_flushed_total | Flushes of output cache | output_cache_entries | flushes |
+| iis.w3svc_w3wp_output_cache_flushed_total | Flushes of output cache | output_cache_entries | flushes/s |
+
+
+### Per IIS W3SVC W3WP Worker Process
+
+These metrics describe app-pool totals across IIS worker processes, including activity, caches, and WebSocket requests.
+
+Labels:
+
+| Label      | Description     |
+|:-----------|:----------------|
+| app | Application pool name. |
+
+Metrics:
+
+| Metric | Description | Dimensions | Unit |
+|:------|:------------|:----------|:----|
+| iis.w3svc_w3wp_maximum_threads | Maximum worker threads | threads | threads |
+| iis.w3svc_w3wp_active_flushed_entries | Worker cache entries pending flush | entries | entries |
+| iis.w3svc_w3wp_file_cache_max_memory | Maximum worker file cache memory | used | bytes |
+| iis.w3svc_w3wp_file_cache_flushes | Worker file cache flushes | flushes | flushes/s |
+| iis.w3svc_w3wp_file_cache_queries | Worker file cache hits and misses | hits, misses | queries/s |
+| iis.w3svc_w3wp_files_cached | Files currently in the worker file cache | files | files |
+| iis.w3svc_w3wp_uri_cache_queries | Worker URI cache hits and misses | hits, misses | queries/s |
+| iis.w3svc_w3wp_uris_cached | URIs currently in the worker cache | uris | uris |
+| iis.w3svc_w3wp_metadata_cache_queries | Worker metadata cache hits and misses | hits, misses | queries/s |
+| iis.w3svc_w3wp_metadata_cached | Metadata currently in the worker cache | blocks | blocks |
+| iis.w3svc_w3wp_metadata_cache_flushes | Worker metadata cache flushes | flushes | flushes/s |
+| iis.w3svc_w3wp_output_cache_items | Items currently in the worker output cache | items | items |
+| iis.w3svc_w3wp_output_cache_queries | Worker output cache hits and misses | hits, misses | queries/s |
+| iis.w3svc_w3wp_output_cache_flushed_items | Worker output cache items flushed | items | items/s |
+| iis.w3svc_w3wp_http_responses | Worker HTTP responses by status | 401, 403, 404, 500 | percentage |
+| iis.w3svc_w3wp_websocket_active_requests | Active worker WebSocket requests | active | requests |
+| iis.w3svc_w3wp_websocket_connection_attempts | Worker WebSocket connection attempts | attempts | connections/s |
+| iis.w3svc_w3wp_websocket_connections_accepted | Worker WebSocket connections accepted | accepted | connections/s |
+| iis.w3svc_w3wp_websocket_connections_rejected | Worker WebSocket connections rejected | rejected | connections/s |
+
+
+### Per IIS Web Service Cache
+
+IIS server cache metrics.
+
+This scope has no labels.
+
+Metrics:
+
+| Metric | Description | Dimensions | Unit |
+|:------|:------------|:----------|:----|
+| iis.server_cache_active_flushed_entries | IIS server cache entries pending flush | entries | entries |
+| iis.server_file_cache_memory | IIS server file cache memory | used, maximum | bytes |
+| iis.server_file_cache_flushes | IIS server file cache flushes | flushes | flushes/s |
+| iis.server_file_cache_queries | IIS server file cache hits and misses | hits, misses | queries/s |
+| iis.server_files_cached | Files in the IIS server cache | files | files |
+| iis.server_files_cache_rate | IIS server files added to and removed from cache | cached, flushed | files/s |
+| iis.server_metadata_cached | Metadata blocks in the IIS cache | blocks | blocks |
+| iis.server_metadata_flushes | IIS metadata cache flushes | flushes | flushes/s |
+| iis.server_metadata_queries | IIS metadata cache hits and misses | hits, misses | queries/s |
+| iis.server_metadata_cache_rate | IIS metadata blocks added to and removed from cache | cached, flushed | blocks/s |
+| iis.server_output_cache_items | IIS output cache items | flushed, current | items |
+| iis.server_output_cache_memory | IIS output cache memory | used | bytes |
+| iis.server_output_cache_queries | IIS output cache hits and misses | hits, misses | queries/s |
+| iis.server_output_cache_flushed | IIS output cache items flushed | items | items/s |
+| iis.server_output_cache_flushes | IIS output cache flushes | flushes | flushes/s |
+
+
+### Per IIS URI Cache
+
+IIS URI cache metrics split between user and kernel modes.
+
+This scope has no labels.
+
+Metrics:
+
+| Metric | Description | Dimensions | Unit |
+|:------|:------------|:----------|:----|
+| iis.server_uri_cache_flushes | IIS URI cache flushes | user, kernel | flushes/s |
+| iis.server_uri_cache_queries | IIS URI cache hits and misses | user_hits, kernel_hits, user_misses, kernel_misses | queries/s |
+| iis.server_uris_cached | URIs in the IIS cache | user, kernel | uris |
+| iis.server_uris_cached_rate | IIS URI cache additions | user, kernel | uris/s |
+| iis.server_uris_flushed_rate | IIS URI cache removals | user, kernel | uris/s |
