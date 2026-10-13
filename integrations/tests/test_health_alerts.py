@@ -44,12 +44,10 @@ from prometheus_profile_docs import project_prometheus_profile_coverage  # noqa:
 RULE_LINE = re.compile(r'^\s*(alarm|template)\s*:\s*(\S+)', re.IGNORECASE)
 HEALTH_REFERENCE = REPO_ROOT / 'src' / 'health' / 'REFERENCE.md'
 
-# Stock alerts no integration owns yet: no integration documents the proc.plugin charts the first two target
-# (`/proc/sys/fs/file-nr`, `/run/reboot_required`), and no collector produces the DB2 context the last two target.
-# Remove an entry when its alert gets an owner; the test fails while a listed alert has one.
+# Stock alerts no integration owns yet: no integration documents the proc.plugin charts they target (the
+# `/proc/sys/fs/file-nr` and `/run/reboot_required` modules have no metadata). Remove an entry when its alert gets an
+# owner; the test fails while a listed alert has one.
 UNOWNED = frozenset({
-    'db2_buffer_pool_data_hit_ratio_low',
-    'db2_buffer_pool_index_hit_ratio_low',
     'system_file_descriptors_utilization',
     'system_post_update_reboot_status',
 })
