@@ -49,9 +49,10 @@ export const integrations = [
 
 export const alerts = {
   /* keyed by stock alert name: template (bool), on (targets in file order: contexts for a template, chart ids or names
-     for an alarm), class, type, component, units, summary, info (each only when the conf sets it; summary and info may
-     hold unresolved `${label:...}` and other `${...}` variables), source (repository path of the conf), integrations
-     (ids of the records whose metadata lists the alert); identical in integrations.json under `alerts` */
+     for an alarm), class, type, component (always set), units, summary, info (each only when the conf sets it;
+     summary and info may hold unresolved `${label:...}` and other `${...}` variables), source (repository path of the
+     conf), integrations (ids of the records whose metadata lists the alert); identical in integrations.json under
+     `alerts` */
 };
 ```
 
@@ -77,4 +78,7 @@ is why `integrations.js` carries them (`pipeline.md`, "Stage 1: outputs", for th
 6. Never commit `integrations.js` or `integrations.json` here; the dashboard pulls fresh on each build.
 7. `alerts` covers stock alerts only, as `src/health/health.d` defines them on master. Custom alerts, user edits of
    stock alerts and alerts of other Agent versions are absent or differ; a dashboard surface MUST treat a missing name
-   as "no catalogue data", not as an error. The Dyncfg Health workspace is its consumer.
+   as "no catalogue data", not as an error. The Dyncfg Health workspace is its consumer. Stock `class` and `type` values
+   come from the closed vocabulary in `integrations/health_alerts.py` (`ALERT_CLASSES`, `ALERT_TYPES`; defined in
+   `src/health/REFERENCE.md`), so a surface may group by them; other values come only from custom alerts or other Agent
+   versions.

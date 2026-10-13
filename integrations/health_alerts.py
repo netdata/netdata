@@ -2,7 +2,8 @@
 """Stock health alert metadata for the integrations catalogue.
 
 Reads ``src/health/health.d/*.conf`` with the line rules of the Agent's ``health_readfile`` and builds the ``alerts``
-export of ``integrations.js``/``integrations.json``, and checks the ``alerts`` rows of integration metadata against it.
+export of ``integrations.js``/``integrations.json``, checks the ``alerts`` rows of integration metadata against it, and
+checks the stock alerts' ``class``, ``type`` and ``component`` against the classification vocabulary.
 Text values drop quotes that wrap the whole value and turn inner double quotes into spaces; single quotes stay.
 """
 
@@ -18,6 +19,16 @@ CONF_LINK_PREFIX = f'https://github.com/{AGENT_REPO}/blob/master/'
 
 RULE_KEYS = ('alarm', 'template')
 EXPORTED_FIELDS = ('class', 'type', 'component', 'units', 'summary', 'info')
+
+# Stock alert classification vocabulary. src/health/REFERENCE.md ("Alert Line `class`", "Alert Line `type`") defines
+# each value; a test keeps those tables equal to these tuples. Components follow rules, not a list (REFERENCE.md,
+# "Alert Line `component`").
+CLASSIFICATION_FIELDS = ('class', 'type', 'component')
+ALERT_CLASSES = ('Availability', 'Errors', 'Latency', 'Utilization', 'Workload')
+ALERT_TYPES = (
+    'Application', 'Containers', 'Database', 'DHCP', 'DNS', 'GPU', 'Hardware', 'Kubernetes', 'Messaging', 'Netdata',
+    'Network', 'Storage', 'Synthetic', 'System', 'Virtual Machine', 'Web Server',
+)
 
 
 def _trim_all(text: str) -> str:
@@ -110,6 +121,40 @@ def build_alert_index(rules: Iterable[dict], owners: Optional[Mapping[str, Itera
 
 def conf_link(source: str) -> str:
     return CONF_LINK_PREFIX + source
+
+
+def _components_collide(first: str, second: str) -> bool:
+    first, second = first.casefold(), second.casefold()
+    return first == second or any(first == second + suffix or second == first + suffix for suffix in ('s', 'es'))
+
+
+def check_classification(rules: Iterable[dict]) -> List[str]:
+    """Problems with the ``class``, ``type`` and ``component`` of stock rules.
+
+    Every rule sets all three; class and type come from the vocabulary; one component is never spelled two ways that
+    differ only in case or a plural ending.
+    """
+    problems = []
+    spellings: Dict[str, str] = {}
+
+    for rule in rules:
+        where = f'{rule.get("source", "?")}: {rule["name"]}'
+        for field in CLASSIFICATION_FIELDS:
+            if field not in rule:
+                problems.append(f'{where}: no {field}')
+        if 'class' in rule and rule['class'] not in ALERT_CLASSES:
+            problems.append(f'{where}: class {rule["class"]!r} is not one of {", ".join(ALERT_CLASSES)}')
+        if 'type' in rule and rule['type'] not in ALERT_TYPES:
+            problems.append(f'{where}: type {rule["type"]!r} is not one of {", ".join(ALERT_TYPES)}')
+        component = rule.get('component')
+        if component is None or component in spellings:
+            continue
+        for seen, seen_where in spellings.items():
+            if _components_collide(component, seen):
+                problems.append(f'{where}: component {component!r} collides with {seen!r} ({seen_where})')
+        spellings[component] = where
+
+    return problems
 
 
 def check_alert_rows(

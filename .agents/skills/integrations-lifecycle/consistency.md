@@ -85,7 +85,9 @@ are read only by this tooling.
 - `integrations/tests/test_health_alerts.py` (both workflows; `check-markdown.yml` also runs on `src/health/health.d/**`
   changes): every `metadata.yaml` alert row names a stock alert, links the conf that defines it, and has `metric` equal
   to the alert's `on:` (an alarm whose chart id differs from the documented context is listed in `METRIC_ELSEWHERE`);
-  it also pins the `alerts` export parser to `health.d`.
+  it also pins the `alerts` export parser to `health.d`, requires every stock alert to set `class` and `type` from the
+  vocabulary in `health_alerts.py` and a `component` without case or plural spelling variants, and keeps that vocabulary
+  equal to the `src/health/REFERENCE.md` tables.
 - `collecttest.AssertConfigSchemaMatchesMetadata` (opt-in, per collector test): option descriptions and tabs agree
   between `config_schema.json` and `metadata.yaml`.
 - The ibm.d runtime-output drift gate ("Delivery boundary" above).
