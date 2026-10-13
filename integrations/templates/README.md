@@ -30,5 +30,5 @@ type in `gen_integrations.py`:
 - `setup-secretstore.md` for secretstore integrations
 
 The `integrations.js` template is used to compose the final file. It gets
-passed the JSON-formatted category and integration data using the names
-`categories` and `integrations` respectively.
+passed the JSON-formatted category, integration and stock alert data using the
+names `categories`, `integrations` and `alerts` respectively.

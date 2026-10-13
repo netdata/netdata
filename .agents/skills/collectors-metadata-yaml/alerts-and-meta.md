@@ -20,8 +20,8 @@ integration.", which MUST be true.
 - `name` is the alert or template name as written in the conf. `metric` is a template's `on:` context, or for an
   alarm the context of the chart its `on:` names. `info` is the conf's `info` line verbatim: same words, same case,
   same punctuation. `link` is the conf file on the master branch
-  (`https://github.com/netdata/netdata/blob/master/src/health/health.d/<file>.conf`). `os` is present only when the
-  conf restricts the alert by operating system (`host labels: _os=...`), with the same values.
+  (`https://github.com/netdata/netdata/blob/master/src/health/health.d/<file>.conf`). `os` repeats the conf's
+  operating-system restriction (`host labels: _os=...`) with the same values; `*` marks an alert without one.
 - No alert prose is written here. If the `info` reads badly for the page, fix the conf; the page copies it.
 - Rows are ordered as they appear in the conf, so a reader can follow the link and find them in order.
 - CI checks `name`, `link` and `metric` (`../integrations-lifecycle/consistency.md`, "What is enforced today"); `info`,
