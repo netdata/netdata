@@ -155,7 +155,10 @@ size_t dictionary_pending_deletes(DICTIONARY *dict) {
     if(unlikely(!dict)) return 0;
 
     long int pending = DICTIONARY_PENDING_DELETES_GET(dict);
-    return pending > 0 ? (size_t)pending : 0;
+    if(pending < 0)
+        fatal("DICTIONARY: pending deletes is negative: %ld", pending);
+
+    return pending;
 }
 
 void dictionary_version_increment(DICTIONARY *dict) {
