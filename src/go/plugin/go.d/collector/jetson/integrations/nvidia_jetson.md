@@ -273,7 +273,7 @@ Metrics:
 
 | Metric | Description | Dimensions | Unit |
 |:------|:------------|:----------|:----|
-| jetson.temperature | SoC Temperature | temperature | Celsius |
+| jetson.sensor_temperature | SoC Temperature | temperature | Celsius |
 
 
 
