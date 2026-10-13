@@ -109,8 +109,8 @@ none. An invalid or duplicate description prints `Error: ...` and exits 1 before
   dashboard's drift check reads it from `raw.githubusercontent.com` (`in-app-contract.md`).
 - `alerts` is the same in both files: one entry per stock alert name, built by `build_alert_index` in
   `health_alerts.py` from `health.d` and, for `integrations`, the names each integration's `metadata.yaml` lists
-  (`alert_owners`, computed before rendering turns `alerts` into Markdown). Text values follow the Agent's
-  `health_strip_quotes` (wrapping quotes removed, inner double quotes become spaces).
+  (`alert_owners`, computed before rendering turns `alerts` into Markdown). Text values drop quotes that wrap the
+  whole value and turn inner double quotes into spaces; single quotes stay.
 
 Three content variants therefore exist: rich markers in `.js`, markers stripped in `.json`, and, in the tracked pages,
 markers converted to HTML `<details>` by `clean_and_write` in `gen_docs_integrations.py`, which reads the rich keys.

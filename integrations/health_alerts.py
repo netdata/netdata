@@ -3,7 +3,7 @@
 
 Reads ``src/health/health.d/*.conf`` with the line rules of the Agent's ``health_readfile`` and builds the ``alerts``
 export of ``integrations.js``/``integrations.json``, and checks the ``alerts`` rows of integration metadata against it.
-Text values follow the Agent's ``health_strip_quotes``: wrapping quotes are removed, inner double quotes become spaces.
+Text values drop quotes that wrap the whole value and turn inner double quotes into spaces; single quotes stay.
 """
 
 from __future__ import annotations
