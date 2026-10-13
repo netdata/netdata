@@ -345,21 +345,21 @@ modules:
                 - name: "95"
                 - name: "99"
                 - name: "100"
-            - name: riak.vm
+            - name: riak.vm.processes.count
               description: Total processes running in the Erlang VM
-              unit: "total"
+              unit: "processes"
               chart_type: line
               dimensions:
                 - name: processes
-            - name: riak.vm.memory.processes
+            - name: riak.vm.processes.memory
               description: Memory allocated & used by Erlang processes
-              unit: "MB"
+              unit: "bytes"
               chart_type: line
               dimensions:
                 - name: allocated
                 - name: used
             - name: riak.kv.siblings_encountered.get
-              description: Number of siblings encountered during GET operations by this node during the past minute
+              description: Siblings encountered during GET operations by this node during the past minute
               unit: "siblings"
               chart_type: line
               dimensions:
@@ -370,7 +370,7 @@ modules:
                 - name: "100"
             - name: riak.kv.objsize.get
               description: Object size encountered by this node during the past minute
-              unit: "KB"
+              unit: "bytes"
               chart_type: line
               dimensions:
                 - name: mean
@@ -379,7 +379,7 @@ modules:
                 - name: "99"
                 - name: "100"
             - name: riak.search.vnodeq_size
-              description: Number of unprocessed messages in the vnode message queues of Search on this node in the past minute
+              description: Unprocessed messages in the vnode message queues of Search in the past minute
               unit: "messages"
               chart_type: line
               dimensions:
@@ -388,7 +388,7 @@ modules:
                 - name: "95"
                 - name: "99"
                 - name: "100"
-            - name: riak.search.index
+            - name: riak.search.index.errors
               description: Errors encountered by Search
               unit: "errors"
               chart_type: line
@@ -415,8 +415,8 @@ modules:
               dimensions:
                 - name: get
                 - name: put
-                - name: secondary index
-                - name: list keys
+                - name: secondary_index
+                - name: list_keys
             - name: riak.core.fsm_rejected
               description: Finite state machines being rejected by Sidejobs overload protection
               unit: "fsms"
