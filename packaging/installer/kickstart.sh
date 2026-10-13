@@ -2470,7 +2470,7 @@ try_build_install() {
       fi
     fi
 
-    if [ -z "${archive_name}" ] && [ -n "${gzip_name}" ]; then
+    if [ -z "${archive_name}" ] && [ -n "${gzip_info}" ]; then
       if [ "$(echo "${gzip_info}" | wc -l)" -gt 1 ]; then
         gzip_info="$(echo "${gzip_info}" | grep -v ".*-latest.*" | tail -n 1)"
       fi
