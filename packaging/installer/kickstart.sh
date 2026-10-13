@@ -2208,7 +2208,7 @@ try_static_install() {
   fi
 
   if [ "${NETDATA_MANIFEST_INSTALL}" -eq 1 ]; then
-    if ! download "${NETDATA_STATIC_ARCHIVE_URL_PREFIX}/Manifest" "./Manifest" "force"; then
+    if ! download "${NETDATA_SOURCE_ARCHIVE_URL_PREFIX}/Manifest" "./Manifest" "force"; then
       fatal "Unable to download release manifest file. ${BADNET_MSG}" F0526
     fi
 
