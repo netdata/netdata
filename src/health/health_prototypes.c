@@ -634,10 +634,13 @@ static void health_prototype_apply_to_rrdset(RRDSET *st, RRD_ALERT_PROTOTYPE *ap
             if (is_template != want_template)
                 continue;
 
-            if (!prototype_matches_host(st->rrdhost, t))
+            // the chart selector rejects almost every prototype with pointer compares, before any chart
+            // label match, so it runs before the host checks, which pattern-match the name and, when
+            // configured, the host labels
+            if (!health_prototype_matches_rrdset(st, t))
                 continue;
 
-            if (!health_prototype_matches_rrdset(st, t))
+            if (!prototype_matches_host(st->rrdhost, t))
                 continue;
 
             rrdcalc_add_from_prototype(st->rrdhost, st, t);
