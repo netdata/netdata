@@ -207,14 +207,6 @@ modules:
         metric: k8s_kubelet.kubelet_token_requests
         info: "number of failed Token() requests to the alternate token source"
         link: https://github.com/netdata/netdata/blob/master/src/health/health.d/kubelet.conf
-      - name: kubelet_operations_error
-        metric: k8s_kubelet.kubelet_operations_errors
-        info: number of Docker or runtime operation errors
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/kubelet.conf
-      - name: kubelet_operations_error
-        metric: k8s_kubelet.kubelet_operations_errors
-        info: number of Docker or runtime operation errors
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/kubelet.conf
     metrics:
       folding:
         title: Metrics

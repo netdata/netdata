@@ -220,7 +220,7 @@ modules:
         info: number of datanodes which are currently dead
         link: https://github.com/netdata/netdata/blob/master/src/health/health.d/hdfs.conf
       - name: hdfs_num_failed_volumes
-        metric: hdfs.num_failed_volumes
+        metric: hdfs.datanode_failed_volumes
         info: number of failed volumes
         link: https://github.com/netdata/netdata/blob/master/src/health/health.d/hdfs.conf
     metrics:
