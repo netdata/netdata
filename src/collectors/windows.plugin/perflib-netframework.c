@@ -422,11 +422,6 @@ static bool netframework_add_raw_sample(RAW_DATA *total, const RAW_DATA *sample,
     return true;
 }
 
-static bool netframework_is_32bit_rate_counter(uint32_t counter_type)
-{
-    return counter_type == PERF_COUNTER_COUNTER || counter_type == PERF_SAMPLE_COUNTER;
-}
-
 enum netframework_aggregation {
     NETFRAMEWORK_AGGREGATE_SUM,
     NETFRAMEWORK_AGGREGATE_MAX,
@@ -466,13 +461,7 @@ static uint64_t netframework_add_group_sample(const COUNTER_DATA *counter, const
             netframework_current_process->counter_history_generation[netframework_current_object]) {
         uint32_t previous = history->previous_value;
         uint32_t current = history->current_value;
-        delta = current >= previous ? (uint64_t)(current - previous)
-                                    : (uint64_t)UINT32_MAX - previous + current + 1;
-
-        // A membership reset can look like a modulo-32-bit wrap. Reject an implausibly large
-        // interval delta instead of publishing a spike; the next sample establishes the baseline.
-        if (delta >= (UINT64_C(1) << 31))
-            delta = 0;
+        delta = perflib_counter_delta(previous, current, true);
     }
 
     history->previous_value = history->current_value;
@@ -516,9 +505,9 @@ static bool netframework_get_instance_counter_with_aggregation(
         return false;
     }
 
-    bool use_instance_delta = aggregation == NETFRAMEWORK_AGGREGATE_DELTA32 ||
-                               (aggregation == NETFRAMEWORK_AGGREGATE_SUM &&
-                                netframework_is_32bit_rate_counter(sample.current.CounterType));
+    bool use_instance_delta =
+        aggregation == NETFRAMEWORK_AGGREGATE_DELTA32 ||
+        (aggregation == NETFRAMEWORK_AGGREGATE_SUM && perflib_counter_type_is_32bit_rate(sample.current.CounterType));
     if (use_instance_delta) {
         uint64_t delta = netframework_add_group_sample(counter, &sample.current);
 

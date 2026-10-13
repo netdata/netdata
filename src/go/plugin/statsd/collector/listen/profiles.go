@@ -176,8 +176,8 @@ func resolveLifecycles(group *charttpl.Group) (uint64, error) {
 			chart.Lifecycle = &charttpl.Lifecycle{}
 		}
 		lc := chart.Lifecycle
-		if lc.ExpireAfterCycles == 0 {
-			lc.ExpireAfterCycles = defaultChartExpiry
+		if lc.ExpireAfterCycles == nil || *lc.ExpireAfterCycles == 0 {
+			lc.ExpireAfterCycles = new(defaultChartExpiry)
 		}
 		if lc.Dimensions == nil {
 			lc.Dimensions = &charttpl.DimensionLifecycle{
@@ -186,7 +186,7 @@ func resolveLifecycles(group *charttpl.Group) (uint64, error) {
 		} else if lc.Dimensions.ExpireAfterCycles <= 0 {
 			return 0, fmt.Errorf("chart %q: 'lifecycle.dimensions.expire_after_cycles' must be positive", chart.Context)
 		}
-		longest = max(longest, lc.ExpireAfterCycles, lc.Dimensions.ExpireAfterCycles)
+		longest = max(longest, *lc.ExpireAfterCycles, lc.Dimensions.ExpireAfterCycles)
 	}
 	for i := range group.Groups {
 		nested, err := resolveLifecycles(&group.Groups[i])

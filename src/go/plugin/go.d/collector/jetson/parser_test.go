@@ -7,6 +7,7 @@ package jetson
 import (
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -79,6 +80,7 @@ func TestParseRecordFixtures(t *testing.T) {
 			EMCFrequency:   measurement(1600),
 		}},
 		"power-units": {want: sample{
+			Temperatures: map[string]float64{"tj": 48.875},
 			PowerRails: map[string]float64{
 				"VDD_IN":         5.299,
 				"VDD_CPU_GPU_CV": 0.773,
@@ -90,6 +92,7 @@ func TestParseRecordFixtures(t *testing.T) {
 			EMCFrequency:   measurement(2133),
 		}},
 		"orin-r36": {want: sample{
+			Temperatures: map[string]float64{"cpu": 53.062, "gpu": 47.812, "soc0": 48.843, "soc1": 48.968, "soc2": 48.25, "tj": 53.062},
 			PowerRails: map[string]float64{
 				"VDD_GPU_SOC": 3.205,
 				"VDD_CPU_CV":  4.405,
@@ -101,6 +104,7 @@ func TestParseRecordFixtures(t *testing.T) {
 			EMCFrequency:   measurement(2133),
 		}},
 		"orin-utilization": {want: sample{
+			Temperatures: map[string]float64{"cpu": 42, "gpu": 37.75, "soc0": 39.187, "soc1": 37.937, "soc2": 37.843, "tj": 42},
 			PowerRails: map[string]float64{
 				"VDD_GPU_SOC": 4.94,
 				"VDD_CPU_CV":  0.988,
@@ -109,6 +113,7 @@ func TestParseRecordFixtures(t *testing.T) {
 			GPUUtilization: measurement(0),
 		}},
 		"thor-frequency": {want: sample{
+			Temperatures: map[string]float64{"cpu": 35.875, "gpu": 34.562, "tj": 35.875},
 			PowerRails: map[string]float64{
 				"VDD_GPU":         3.132,
 				"VDD_CPU_SOC_MSS": 9.397,
@@ -119,6 +124,7 @@ func TestParseRecordFixtures(t *testing.T) {
 			EMCFrequency:   measurement(2750),
 		}},
 		"thor-r38.4": {want: sample{
+			Temperatures: map[string]float64{"cpu": 37.343, "gpu": 38.875, "tj": 38.875},
 			PowerRails: map[string]float64{
 				"VDD_GPU":         1.962,
 				"VDD_CPU_SOC_MSS": 5.887,
@@ -130,6 +136,7 @@ func TestParseRecordFixtures(t *testing.T) {
 			EMCFrequency:   measurement(2750),
 		}},
 		"thor-no-gpu-emc": {want: sample{
+			Temperatures: map[string]float64{"cpu": 35.468, "gpu": 37.062, "tj": 37.062},
 			PowerRails: map[string]float64{
 				"VDD_GPU":         2.371,
 				"VDD_CPU_SOC_MSS": 8.299,
@@ -204,7 +211,7 @@ func TestParseRecordReadings(t *testing.T) {
 			EMCUtilization: measurement(30),
 		}},
 		"off":          {fields: "GR3D_FREQ off EMC_FREQ off"},
-		"missing":      {fields: "gpu@45C"},
+		"missing":      {fields: "TEMP@45C"},
 		"unavailable":  {fields: "GR3D_FREQ N/A EMC_FREQ N/A"},
 		"nonfinite":    {fields: "GR3D_FREQ NaN%@Inf EMC_FREQ Inf%@NaN"},
 		"negative":     {fields: "GR3D_FREQ -1%@-2 EMC_FREQ -3%@-4"},
@@ -267,7 +274,8 @@ func TestSampleHasReadings(t *testing.T) {
 		sample sample
 		want   bool
 	}{
-		"empty": {},
+		"empty":                 {},
+		"zero temperature only": {sample: sample{Temperatures: map[string]float64{"cpu": 0}}, want: true},
 		"zero power only": {sample: sample{
 			PowerRails: map[string]float64{"VDD_GPU": 0},
 		}, want: true},
@@ -350,6 +358,56 @@ func TestParseRecordPower(t *testing.T) {
 			assert.Equal(t, sample{
 				PowerRails: test.want,
 			}, got)
+		})
+	}
+}
+
+func TestParseRecordTemperatures(t *testing.T) {
+	tests := map[string]struct {
+		fields string
+		want   map[string]float64
+	}{
+		"all six with decimals and whitespace": {
+			fields: "cpu@39.312C\tgpu@34.562C soc0@36.625C soc1@36.437C soc2@35.75C  tj@39.312C",
+			want:   map[string]float64{"cpu": 39.312, "gpu": 34.562, "soc0": 36.625, "soc1": 36.437, "soc2": 35.75, "tj": 39.312},
+		},
+		"signed decimals and zero": {
+			fields: "cpu@-12.5C gpu@0C tj@0.125C",
+			want:   map[string]float64{"cpu": -12.5, "gpu": 0, "tj": 0.125},
+		},
+		"unavailable sentinel keeps neighbor": {
+			fields: "gpu@-256C soc0@-256.000C cpu@39C",
+			want:   map[string]float64{"cpu": 39},
+		},
+		"no undocumented range heuristic": {
+			fields: "cpu@-256.125C tj@150C",
+			want:   map[string]float64{"cpu": -256.125, "tj": 150},
+		},
+		"malformed sensor keeps neighbor": {
+			fields: "cpu@ gpu@40C soc0@brokenC",
+			want:   map[string]float64{"gpu": 40},
+		},
+		"exact names":                        {fields: "CPU@40C GPU@40C PMIC@100C SOC0@40C soc012@40C soc345@40C xtj@40C tj_extra@40C"},
+		"paired and triple values":           {fields: "cpu@50.5C/50.718C gpu@40/41C tj@40C/41C/42C"},
+		"unavailable":                        {fields: "cpu@N/A gpu@off soc0@-256C"},
+		"nonfinite":                          {fields: "cpu@NaNC gpu@InfC soc0@-InfC"},
+		"overflow":                           {fields: "cpu@" + strings.Repeat("9", 400) + "C"},
+		"other numeric notation":             {fields: "cpu@1e2C gpu@+40C soc0@.5C soc1@40.C soc2@0x1p2C"},
+		"malformed units and suffixes":       {fields: "cpu@40 gpu@40F soc0@40c soc1@40CC soc2@40Cjunk tj@40C@41C"},
+		"duplicate withdraws sensor":         {fields: "cpu@40C cpu@41C cpu@42C"},
+		"invalid duplicate withdraws sensor": {fields: "cpu@40C cpu@N/A"},
+		"invalid first remains ambiguous":    {fields: "cpu@N/A cpu@40C"},
+		"duplicate keeps neighbor": {
+			fields: "cpu@40C gpu@42C cpu@41C",
+			want:   map[string]float64{"gpu": 42},
+		},
+		"no temperatures": {fields: "FUTURE@42C"},
+	}
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) {
+			got, ok := parseRecord(testRecordPrefix + tc.fields)
+			require.True(t, ok)
+			assert.Equal(t, sample{Temperatures: tc.want}, got)
 		})
 	}
 }

@@ -41,6 +41,16 @@ int do_PerflibMemory(int update_every, usec_t dt);
 int do_PerflibObjects(int update_every, usec_t dt);
 int do_PerflibThermalZone(int update_every, usec_t dt);
 int do_PerflibWebService(int update_every, usec_t dt);
+int do_PerflibHttpService(int update_every, usec_t dt);
+void do_PerflibWebServiceExtraWeb(PERF_DATA_BLOCK *data, int update_every);
+bool do_PerflibWebServiceExtraWorker(PERF_DATA_BLOCK *data, int update_every, DICTIONARY *current_worker_instances);
+void do_PerflibWebServiceExtraCache(PERF_DATA_BLOCK *data, int update_every);
+const char *iis_worker_app_name(
+    const char *name,
+    const char *pid,
+    DICTIONARY *current_worker_instances,
+    char *buffer,
+    size_t buffer_size);
 int do_PerflibNetFramework(int update_every, usec_t dt);
 int do_PerflibAD(int update_every, usec_t dt);
 int do_PerflibADCS(int update_every, usec_t dt);
@@ -381,7 +391,6 @@ enum PERFLIB_PRIO {
     PRIO_SMB_SERVER_SHARES_FILES_OPENED,
 
     PRIO_TERMINAL_SERVICES_SESSIONS,
-
     PRIO_DNS_QUERIES,
     PRIO_DNS_RESPONSES,
     PRIO_DNS_QUERY_HANDLING,
@@ -402,7 +411,14 @@ enum PERFLIB_PRIO {
     PRIO_DNS_MEMORY_USED,
     PRIO_DNS_UNMATCHED_RESPONSES,
     PRIO_DNS_WINS_LOOKUPS,
-    PRIO_DNS_WINS_RESPONSES
+    PRIO_DNS_WINS_RESPONSES,
+
+    PRIO_IIS_EXTRA_WEBSITE = 25000,
+    PRIO_IIS_EXTRA_WORKER = 25100,
+    PRIO_HTTP_SERVICE_QUEUE = 25200,
+    PRIO_IIS_EXTRA_CACHE = 25300,
+    PRIO_IIS_APP_POOL_CURRENT_UPTIME = 25400,
+    PRIO_IIS_APP_POOL_TIME_SINCE_FAILURE = 25401,
 };
 
 #endif //NETDATA_WINDOWS_PLUGIN_H

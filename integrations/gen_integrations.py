@@ -22,6 +22,7 @@ from _common import (
     make_validator,
     warn,
 )
+from descriptions import build_description_index
 from prometheus_profile_docs import project_prometheus_profile_coverage
 
 TEMPLATE_PATH = INTEGRATIONS_PATH / 'templates'
@@ -1351,6 +1352,14 @@ def convert_local_links(text, prefix):
     return text.replace("](/", f"]({prefix}/")
 
 
+def attach_descriptions(integrations, clean_integrations):
+    descriptions = build_description_index(integrations)
+
+    for item in integrations + clean_integrations:
+        if item['id'] in descriptions:
+            item['description'] = descriptions[item['id']]
+
+
 def render_integrations(categories, integrations):
     template = get_jinja_env().get_template('integrations.js')
     data = template.render(
@@ -1400,11 +1409,17 @@ def main():
 
     integrations = (collectors + deploy + exporters + agent_notifications + cloud_notifications
                     + logs + flows + devices + authentications + secretstores + service_discoveries)
-    render_integrations(categories, integrations)
-
     clean_integrations = (clean_collectors + clean_deploy + clean_exporters + clean_agent_notifications
                           + clean_cloud_notifications + clean_logs + clean_flows + clean_devices
                           + clean_authentications + clean_secretstores + clean_service_discoveries)
+
+    try:
+        attach_descriptions(integrations, clean_integrations)
+    except ValueError as error:
+        print(f'Error: {error}', file=sys.stderr)
+        return 1
+
+    render_integrations(categories, integrations)
     render_json(categories, clean_integrations)
 
     return fail_on_warnings()

@@ -729,7 +729,8 @@ static SIMPLE_PATTERN_RESULT rrdlabels_walkthrough_read_sp(RRDLABELS *labels, SI
 // rrdlabels_migrate_to_these()
 // migrate an existing label list to a new list
 
-bool rrdlabels_migrate_to_these(RRDLABELS *dst, RRDLABELS *src) {
+static bool rrdlabels_migrate(RRDLABELS *dst, RRDLABELS *src,
+                              bool (*owns)(const char *name, RRDLABEL_SRC source, void *data), void *data) {
     if (!dst || !src || (dst == src))
         return false;
 
@@ -742,10 +743,20 @@ bool rrdlabels_migrate_to_these(RRDLABELS *dst, RRDLABELS *src) {
     Pvoid_t *PValue;
     size_t added = 0;
     size_t cleaned = 0;
+    size_t sources_changed = 0;
 
     RRDLABEL_SRC ls;
+    if (owns) {
+        lfe_start_nolock(dst, label, ls) {
+            if (!owns(string2str(label->index.key), ls, data))
+                *((RRDLABEL_SRC *)_PValue) |= RRDLABEL_FLAG_OLD;
+        }
+        lfe_done_nolock();
+    }
     lfe_start_nolock(src, label, ls)
     {
+        if (owns && !owns(string2str(label->index.key), ls, data))
+            continue;
         JudyAllocThreadPulseGetAndReset();
 
         // labels->JudyL is keyed by the deduplicated RRDLABEL pointer produced by
@@ -765,6 +776,13 @@ bool rrdlabels_migrate_to_these(RRDLABELS *dst, RRDLABELS *src) {
             int64_t judy_mem = JudyAllocThreadPulseGetAndReset();
             RRDLABELS_MEMORY_DELTA(&dictionary_stats_category_rrdlabels, judy_mem, 0);
             added++;
+        }
+        else if (owns) {
+            RRDLABEL_SRC old = *((RRDLABEL_SRC *)PValue);
+            if ((old & ~RRDLABEL_FLAG_INTERNAL) != (ls & ~RRDLABEL_FLAG_INTERNAL))
+                sources_changed++;
+            *((RRDLABEL_SRC *)PValue) = (ls & ~RRDLABEL_FLAG_INTERNAL) |
+                (old & RRDLABEL_FLAG_DONT_DELETE) | RRDLABEL_FLAG_OLD;
         }
         else
             *((RRDLABEL_SRC *)PValue) |= RRDLABEL_FLAG_OLD;
@@ -792,8 +810,15 @@ bool rrdlabels_migrate_to_these(RRDLABELS *dst, RRDLABELS *src) {
     lfe_done_nolock();
 
     size_t removed = rrdlabels_remove_all_unmarked_unsafe(dst);
-    uint32_t src_version = __atomic_load_n(&src->version, __ATOMIC_RELAXED);
-    __atomic_store_n(&dst->version, src_version, __ATOMIC_RELAXED);
+    bool changed = added || removed || cleaned || sources_changed;
+    if (owns) {
+        if (changed)
+            __atomic_add_fetch(&dst->version, 1, __ATOMIC_RELAXED);
+    }
+    else {
+        uint32_t src_version = __atomic_load_n(&src->version, __ATOMIC_RELAXED);
+        __atomic_store_n(&dst->version, src_version, __ATOMIC_RELAXED);
+    }
 
     spinlock_unlock(&src->spinlock);
     spinlock_unlock(&dst->spinlock);
@@ -803,7 +828,16 @@ bool rrdlabels_migrate_to_these(RRDLABELS *dst, RRDLABELS *src) {
     // (key,value) was already present would mutate dst silently -- callers
     // gating on this return (e.g. rrdset_update_rrdlabels setting
     // RRDSET_FLAG_PENDING_LABEL_RECHECK) would miss the change.
-    return (added > 0) || (removed > 0) || (cleaned > 0);
+    return changed;
+}
+
+bool rrdlabels_migrate_to_these(RRDLABELS *dst, RRDLABELS *src) {
+    return rrdlabels_migrate(dst, src, NULL, NULL);
+}
+
+bool rrdlabels_replace_subset(RRDLABELS *dst, RRDLABELS *src,
+                              bool (*owns)(const char *name, RRDLABEL_SRC source, void *data), void *data) {
+    return owns && rrdlabels_migrate(dst, src, owns, data);
 }
 
 //
@@ -2152,6 +2186,60 @@ int rrdlabels_unittest_sanitization() {
     return errors;
 }
 
+static bool rrdlabels_unittest_owns_system(const char *name, RRDLABEL_SRC source __maybe_unused,
+                                          void *data __maybe_unused) {
+    return !strncmp(name, "_system_", 8);
+}
+
+static int rrdlabels_unittest_subset(void) {
+    int errors = 0;
+#define UT_EXPECT(condition, message) do { \
+    if (!(condition)) { fprintf(stderr, "rrdlabels subset: %s\n", message); errors++; } \
+} while (0)
+    RRDLABELS *dst = rrdlabels_create();
+    RRDLABELS *src = rrdlabels_create();
+    rrdlabels_add(dst, "custom", "keep", RRDLABEL_SRC_CONFIG);
+    rrdlabels_add(dst, "_stream_egress_iface", "eth1", RRDLABEL_SRC_AUTO);
+    rrdlabels_add(dst, "_system_ram", "1024", RRDLABEL_SRC_AUTO);
+    rrdlabels_add(dst, "_system_iface", "eth0", RRDLABEL_SRC_AUTO);
+    rrdlabels_add(src, "_system_ram", "2048", RRDLABEL_SRC_AUTO);
+    rrdlabels_add(src, "custom", "must-not-replace", RRDLABEL_SRC_CONFIG);
+    uint32_t version = rrdlabels_version(dst);
+    UT_EXPECT(rrdlabels_replace_subset(dst, src, rrdlabels_unittest_owns_system, NULL),
+              "owned changes must be reported");
+    UT_EXPECT(rrdlabels_version(dst) > version, "subset replacement must advance destination version");
+    UT_EXPECT(!rrdlabels_exist(dst, "_system_iface"), "absent owned label must be removed");
+    char value[64];
+    rrdlabels_get_value_strcpyz(dst, value, sizeof(value), "_system_ram");
+    UT_EXPECT(!strcmp(value, "2048"), "owned value must be replaced");
+    rrdlabels_get_value_strcpyz(dst, value, sizeof(value), "custom");
+    UT_EXPECT(!strcmp(value, "keep"), "non-owned config label must be retained");
+    rrdlabels_get_value_strcpyz(dst, value, sizeof(value), "_stream_egress_iface");
+    UT_EXPECT(!strcmp(value, "eth1"), "non-owned runtime label must be retained");
+    version = rrdlabels_version(dst);
+    UT_EXPECT(!rrdlabels_replace_subset(dst, src, rrdlabels_unittest_owns_system, NULL),
+              "identical subset must be a no-op");
+    UT_EXPECT(rrdlabels_version(dst) == version, "no-op must preserve version");
+    rrdlabels_add(src, "_system_ram", "2048", RRDLABEL_SRC_CONFIG);
+    UT_EXPECT(rrdlabels_replace_subset(dst, src, rrdlabels_unittest_owns_system, NULL),
+              "source-only change must be reported");
+    RRDLABEL_SRC source = 0;
+    rrdlabels_find_label_with_key(dst, "_system_ram", &source);
+    UT_EXPECT((source & ~RRDLABEL_FLAG_INTERNAL) == RRDLABEL_SRC_CONFIG,
+              "owned source flags must be replaced");
+    UT_EXPECT(!rrdlabels_replace_subset(dst, src, rrdlabels_unittest_owns_system, NULL),
+              "source-only replacement must converge");
+    rrdlabels_destroy(src);
+    src = rrdlabels_create();
+    UT_EXPECT(rrdlabels_replace_subset(dst, src, rrdlabels_unittest_owns_system, NULL),
+              "empty subset must remove remaining owned labels");
+    UT_EXPECT(rrdlabels_entries(dst) == 2, "empty subset must retain every non-owned label");
+    rrdlabels_destroy(src);
+    rrdlabels_destroy(dst);
+    return errors;
+#undef UT_EXPECT
+}
+
 int rrdlabels_unittest(void) {
     int errors = 0;
 
@@ -2163,6 +2251,7 @@ int rrdlabels_unittest(void) {
     errors += rrdlabels_unittest_migrate_check();
     errors += rrdlabels_unittest_mark_source_as_old();
     errors += rrdlabels_unittest_change_detection();
+    errors += rrdlabels_unittest_subset();
     errors += rrdlabels_unittest_pattern_check();
 
     fprintf(stderr, "%d errors found\n", errors);

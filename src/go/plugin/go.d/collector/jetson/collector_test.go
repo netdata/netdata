@@ -19,7 +19,11 @@ import (
 )
 
 func TestConfiguration(t *testing.T) {
-	collecttest.TestConfigurationSerialize(t, New(), []byte(`{"update_every":5}`), []byte("update_every: 5\n"))
+	cfgJSON, err := os.ReadFile("testdata/config.json")
+	require.NoError(t, err)
+	cfgYAML, err := os.ReadFile("testdata/config.yaml")
+	require.NoError(t, err)
+	collecttest.TestConfigurationSerialize(t, New(), cfgJSON, cfgYAML)
 }
 
 func TestCheckOnlyResolvesExecutable(t *testing.T) {
@@ -32,6 +36,8 @@ func TestCheckOnlyResolvesExecutable(t *testing.T) {
 	} {
 		t.Run(name, func(t *testing.T) {
 			c := New()
+			c.AllowPrivileged = false
+			c.fixedTegrastatsExists = func() bool { t.Fatal("disabled privilege performed fixed-path discovery"); return false }
 			calls := 0
 			c.findTegrastats = func() (string, error) {
 				calls++

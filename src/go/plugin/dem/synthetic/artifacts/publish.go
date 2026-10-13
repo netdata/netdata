@@ -38,12 +38,12 @@ func (s *Store) Finalize(
 	if !runIDPattern.MatchString(runID) {
 		return nil, ErrInvalidID
 	}
-	if !s.active[runID] {
+	jobID := s.active[runID]
+	if jobID == "" {
 		return nil, ErrNotFound
 	}
 	delete(s.active, runID)
 	s.uncertain[runID] = true
-	defer func() { _ = s.refresh() }()
 	if err := writeSync(s.root, "drained/"+runID, []byte("1\n")); err != nil {
 		return nil, err
 	}
@@ -54,11 +54,20 @@ func (s *Store) Finalize(
 	defer func() {
 		if retErr != nil && !s.uncertain[runID] {
 			if err := s.cleanupDrained(runID); err != nil {
-				s.stats.CleanupErrors++
+				s.recordCleanupError(err)
 				retErr = errors.Join(retErr, err)
 			}
 		}
 	}()
+	if err := ctx.Err(); err != nil {
+		return nil, err
+	}
+	if len(captures) == 0 {
+		if err := s.cleanupDrained(runID); err != nil {
+			s.recordCleanupError(err)
+		}
+		return nil, nil
+	}
 	stage := "staging/" + runID
 	if err := s.root.Mkdir(stage, 0700); err != nil {
 		return nil, err
@@ -72,10 +81,13 @@ func (s *Store) Finalize(
 	}
 	defer work.Close()
 	m := manifest{
-		Version:   1,
-		RunID:     runID,
-		CreatedUS: time.Now().UnixMicro(),
-		Artifacts: []synthetic.Artifact{},
+		Version: 2,
+		Manifest: Manifest{
+			JobID:       jobID,
+			RunID:       runID,
+			PublishedUS: time.Now().UnixMicro(),
+			Artifacts:   []synthetic.Artifact{},
+		},
 	}
 	ids := make(map[string]bool)
 	for _, capture := range captures {
@@ -178,7 +190,7 @@ func (s *Store) Finalize(
 	delete(s.uncertain, runID)
 	// Work includes scripts, browser profiles and any unselected attachments.
 	if err = s.cleanupDrained(runID); err != nil {
-		s.stats.CleanupErrors++
+		s.recordCleanupError(err)
 	}
 	return m.Artifacts, nil
 }

@@ -11,6 +11,7 @@ import (
 
 	"github.com/netdata/netdata/go/plugins/pkg/funcapi"
 	model "github.com/netdata/netdata/go/plugins/plugin/dem/synthetic"
+	"github.com/netdata/netdata/go/plugins/plugin/dem/synthetic/artifacts"
 	"github.com/netdata/netdata/go/plugins/plugin/dem/synthetic/query"
 )
 
@@ -18,7 +19,7 @@ import (
 // admission or a second desired-configuration registry.
 type Deps interface {
 	Jobs(time.Time) []query.Job
-	ArtifactStats() query.ArtifactStats
+	Catalogue(context.Context, artifacts.Filter) (query.CataloguePage, error)
 	Runs(context.Context, query.RunFilter) (query.RunPage, error)
 	Run(context.Context, string, string) (model.Run, error)
 	Evidence(context.Context, string, string, string) (query.Evidence, error)
@@ -99,6 +100,8 @@ func (h *Handler) HandleRaw(ctx context.Context, req funcapi.RawMethodRequest) *
 		return h.runs(ctx, args, response)
 	case "synthetics-run":
 		return h.run(ctx, args, response)
+	case "synthetics-artifacts":
+		return h.artifacts(ctx, args, response)
 	case "synthetics-artifact":
 		if args["job_id"] == "" || args["run_id"] == "" {
 			return funcapi.ErrorResponse(400, "job_id and run_id are required")

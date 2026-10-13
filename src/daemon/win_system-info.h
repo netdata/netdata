@@ -49,6 +49,7 @@ typedef struct netdata_windows_os_labels {
 
 void netdata_windows_get_system_info(struct rrdhost_system_info *system_info);
 void netdata_windows_get_wmi_system_info(struct rrdhost_system_info *system_info);
+void netdata_windows_get_runtime_system_info(struct rrdhost_system_info *system_info);
 
 const char *netdata_windows_normalize_virt_string(const char *raw);
 const char *netdata_windows_resolve_virt_detection(const char *wmi, const char *smbios, const char *registry);

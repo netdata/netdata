@@ -85,7 +85,7 @@ func TestProfileMetricRuntimeSampleWherePredicate(t *testing.T) {
 
 func TestProfileMetricRuntimeSampleEmitsContinuouslyUntilLifecycleExpiry(t *testing.T) {
 	idx := newPopulatedTestCatalog(t)
-	idx = idx.withChartLifecycle("cisco_terminal_type", charttpl.Lifecycle{MaxInstances: 10, ExpireAfterCycles: 3})
+	idx = idx.withChartLifecycle("cisco_terminal_type", charttpl.Lifecycle{MaxInstances: 10, ExpireAfterCycles: new(3)})
 	rt := newTestProfileMetricRuntime(t, idx, []string{"cisco.config.terminal_type"})
 	entry := ciscoConfigTrapEntry("profile-job")
 	store := metrix.NewCollectorStore()
@@ -165,7 +165,7 @@ func TestProfileMetricRuntimeConvertsTimeTicksSamplesToSeconds(t *testing.T) {
 		Type:      "line",
 		Lifecycle: &charttpl.Lifecycle{
 			MaxInstances:      catalog.DefaultMetricChartMaxInstances,
-			ExpireAfterCycles: catalog.DefaultMetricExpireAfterCycles,
+			ExpireAfterCycles: new(catalog.DefaultMetricExpireAfterCycles),
 		},
 	}})
 	rt := newTestProfileMetricRuntime(t, idx, []string{"cisco.config.sysuptime_seconds"})

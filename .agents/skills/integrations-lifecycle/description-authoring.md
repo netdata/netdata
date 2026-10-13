@@ -65,6 +65,9 @@ The generator resolves each description in this order:
      rejects that incomplete result, so its source record needs a complete explicit override.
 3. Fail generation when the result is missing, invalid, or duplicated by another generated page.
 
+`gen_integrations.py` ships the same description as the `description` key of `integrations.js` and `integrations.json`
+(`pipeline.md`, "Stage 1: outputs"), so a description defect already fails catalog generation.
+
 An explicit description MUST:
 
 - be 50–160 characters;

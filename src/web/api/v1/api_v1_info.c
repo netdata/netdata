@@ -123,13 +123,15 @@ static int web_client_api_request_v1_info_fill_buffer(RRDHOST *host, BUFFER *wb)
 
     web_client_api_request_v1_info_summary_alarm_statuses(host, wb, "alarms");
 
-    spinlock_lock(&host->rrdhost_update_lock);
-    struct rrdhost_system_info *system_info = rrdhost_system_info_dup(host->system_info);
-    spinlock_unlock(&host->rrdhost_update_lock);
+    RRDLABELS *labels;
+    struct rrdhost_system_info *system_info = rrdhost_system_info_labels_snapshot(host, &labels);
     rrdhost_system_info_to_json_v1(wb, system_info);
     rrdhost_system_info_free(system_info);
 
-    host_labels2json(host, wb, "host_labels");
+    buffer_json_member_add_object(wb, "host_labels");
+    rrdlabels_to_buffer_json_members(labels, wb);
+    buffer_json_object_close(wb);
+    rrdlabels_destroy(labels);
     nrpc_catalog_host2json(rrdhost_nrpc_owner(host), wb);
     host_collectors(host, wb);
 

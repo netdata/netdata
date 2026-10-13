@@ -114,7 +114,7 @@ void aclk_send_bin_msg(char *msg, size_t msg_len, enum aclk_topics subtopic, con
 
 char *aclk_state(void);
 char *aclk_state_json(void);
-void add_aclk_host_labels(void);
+void add_aclk_host_labels(RRDLABELS *labels);
 
 struct mqtt_wss_stats aclk_statistics(void);
 void aclk_status_set(ACLK_STATUS status);

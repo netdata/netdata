@@ -108,7 +108,7 @@ func checkChartGroups(check checkDefinition) []charttpl.Group {
 			Instances:     instances,
 			LabelPromoted: append([]string{}, check.ByLabels...),
 			Lifecycle: &charttpl.Lifecycle{
-				ExpireAfterCycles: 1,
+				ExpireAfterCycles: new(1),
 			},
 			Dimensions: []charttpl.Dimension{{
 				Selector:      metric,

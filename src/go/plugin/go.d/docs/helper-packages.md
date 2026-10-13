@@ -335,6 +335,27 @@ Unverifiable setup or an incompatible/older helper returns `ErrTreeNotDrained`; 
 Unsupported platforms return `ErrTreeSupervisionUnsupported`, and a missing helper fails at Start. There is no
 signal-only fallback. The target uses the existing minimal environment and privilege reduction policy.
 
+For the explicitly supervised privileged allowlist (currently only `tegrastats`), create an immutable
+`ndexec.NewAcquisition(collectorNamespace, normalizedJobName)` once per job. An empty name has a distinct anonymous
+identity; do not invent a named sentinel or recompute the key from mutable configuration. Both
+`Acquisition.StartNDSudo(ctx, opts, command)` and `Acquisition.StartUnprivileged(ctx, opts, path, args...)` acquire the
+same process-local owner before spawning. Newly constructed objects with the same key get `ErrAcquisitionBusy`
+until the previous run's cleanup is established. Different names, namespaces and renamed jobs remain independent.
+
+The restricted start returns `*Process` only after private exec acknowledgement (five-second startup budget), not
+first telemetry. Only `errors.Is(err, ndexec.ErrSupervisedUnavailable)` establishes a safe pre-payload absence and
+released owner: missing/non-executable helper, or a joined helper's validated missing-privilege/fixed-binary refusal.
+Fallback policy belongs to the collector. All other errors, including a mismatched helper, unsafe path, exec failure,
+startup timeout and busy/unverified ownership, MUST NOT trigger fallback. Both routes MUST use the same Acquisition.
+
+Cancellation closes a control pipe so the root supervisor can terminate the owned group; it never attempts to kill
+the supervisor. `Wait`/`Close` have no artificial success timeout. A caller may bound its wait, but ownership remains
+held while cleanup is pending. `ErrSupervisedNotDrained` retains ownership even after Wait returns; a normal nonzero
+payload exit with verified cleanup releases it. Protocol/cleanup state is private to ndexec, not a streaming decoder
+responsibility. The unprivileged route retains its existing group-signal/leader-reap guarantee. These leases do not
+prevent overlap across plugin restarts after supervisor loss, separate named jobs or renames, and do not claim
+arbitrary escaped-descendant termination. See [the restricted helper contract](/src/collectors/utils/README.md#restricted-privileged-tegrastats-supervision).
+
 On Unix, `nd-run` uses a minimal environment by default. Passing `Env` to a Run API changes the helper's input
 but does not enable preservation. Use `UnprivilegedCommandContextWithPreservedEnv` when the target requires inherited
 application variables, such as authentication tokens or explicit tool configuration. It invokes
@@ -357,7 +378,7 @@ output, such as a vendor tool printing one record per interval.
 A `streamexec.Source` owns:
 
 - start through the collector's `StartFunc`, which MUST use an owned `ndexec` constructor (`StartUnprivilegedProcess`
-  or `StartNDSudoProcess`) given the context it receives (canceling that context is how the source terminates a
+  or `StartNDSudoProcess`, or the corresponding `Acquisition` method) given the context it receives (canceling that context is how the source terminates a
   process);
 - line reading with a per-line memory bound (`bufio.MaxScanTokenSize`, terminator included; a longer line is
   discarded) and a fresh `Decoder` per process, so a replacement never inherits partial record state. A decoder's
@@ -389,6 +410,10 @@ started fake reports its arguments and prints, spawns or exits as the test instr
 its process exits, so tests can check exit ordering. `NewFake` routes both nd-run and ndsudo starts to the fake; combine
 it with `ndexec.DenyNDSudoSignalsForTests` to test an ndsudo command the plugin cannot signal. The harness is Unix-only;
 Windows behavior is unverified.
+
+A started process may still be initializing before its fake socket connection arrives. Do not shorten `StallTimeout`
+to bound shutdown while also requiring a new Go fake to connect before that same timer expires. For pending-cleanup
+scenarios, observe the supervisor's post-`Wait` state and withhold terminal evidence until the test releases it.
 
 ## Log File Collectors
 

@@ -13,6 +13,9 @@ on:
       - '**.h'
       - 'tests/acls/**'
       - 'tests/run-unit-tests.sh'
+      - 'src/daemon/system-info.sh'
+      - 'tests/system-info-test.sh'
+      - 'tests/system-info-windows-test.py'
   pull_request:
     paths:
       - 'CMakeLists.txt'
@@ -22,6 +25,9 @@ on:
       - '**.h'
       - 'tests/acls/**'
       - 'tests/run-unit-tests.sh'
+      - 'src/daemon/system-info.sh'
+      - 'tests/system-info-test.sh'
+      - 'tests/system-info-windows-test.py'
 env:
   DISABLE_TELEMETRY: 1
 concurrency:
@@ -41,7 +47,7 @@ jobs:
           ./packaging/installer/install-required-packages.sh --dont-wait --non-interactive netdata-all
           sudo apt-get install -y libjson-c-dev libyaml-dev libipmimonitoring-dev libcups2-dev libsnappy-dev \
                                   libprotobuf-dev libprotoc-dev libssl-dev protobuf-compiler \
-                                  libnetfilter-acct-dev
+                                  libnetfilter-acct-dev python3 gcc libc6-dev
       - name: Run ./tests/run-unit-tests.sh
         env:
           CFLAGS: "-O1 -DNETDATA_INTERNAL_CHECKS=1 -DNETDATA_VERIFY_LOCKS=1"
