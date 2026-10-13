@@ -24,10 +24,8 @@ integration.", which MUST be true.
   conf restricts the alert by operating system (`host labels: _os=...`), with the same values.
 - No alert prose is written here. If the `info` reads badly for the page, fix the conf; the page copies it.
 - Rows are ordered as they appear in the conf, so a reader can follow the link and find them in order.
-- CI (`integrations/tests/test_health_alerts.py`) fails on a row whose `name` is not a stock alert, whose `link` is not
-  the conf that defines it, or whose `metric` is not the alert's `on:`. An alarm documented under a context that
-  differs from its chart id (the Go IPMI SEL chart) is listed in the test's `METRIC_ELSEWHERE`. `info`, `os`, order and
-  completeness remain review checks.
+- CI checks `name`, `link` and `metric` (`../integrations-lifecycle/consistency.md`, "What is enforced today"); `info`,
+  `os`, order and completeness are review checks.
 
 ## 2. `meta.monitored_instance`: The Product Identity
 
