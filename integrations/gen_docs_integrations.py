@@ -190,7 +190,7 @@ def read_integrations_js(path_to_file: str):
         integrations = json.loads(integrations_str)
     except FileNotFoundError as error:
         raise RuntimeError(f"Missing generated integrations input: {path_to_file}") from error
-    except (IndexError, ValueError, json.JSONDecodeError) as error:
+    except (IndexError, ValueError) as error:
         raise RuntimeError(f"Malformed generated integrations input: {path_to_file}") from error
 
     if not isinstance(categories, list) or not categories:
