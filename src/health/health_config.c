@@ -468,7 +468,7 @@ char *health_edit_command_from_source(const char *source)
 
 
 // Remove the quotes that wrap a whole value and keep inner single quotes (apostrophes). Inner double quotes become
-// spaces: alarm-notify.sh interpolates alert text into JSON payloads without escaping.
+// spaces: alarm-notify.sh and the /api/v1/alarms JSON interpolate alert text without escaping.
 void health_strip_quotes(char *s) {
     size_t len = strlen(s);
     if(len >= 2 && (s[0] == '\'' || s[0] == '"') && s[len - 1] == s[0]) {
@@ -478,6 +478,13 @@ void health_strip_quotes(char *s) {
 
     for(; *s; s++)
         if(*s == '"')
+            *s = ' ';
+}
+
+// Roles are identifiers: alarm-notify.sh looks each one up as a variable name, so no quote may remain.
+static inline void health_quotes_to_spaces(char *s) {
+    for(; *s; s++)
+        if(*s == '\'' || *s == '"')
             *s = ' ';
 }
 
@@ -859,7 +866,7 @@ int health_readfile(const char *filename, void *data __maybe_unused, bool stock_
             PARSE_HEALTH_CONFIG_LINE_STRING(ac, exec);
         }
         else if(hash == hash_recipient && !strcasecmp(key, HEALTH_RECIPIENT_KEY)) {
-            health_strip_quotes(value);
+            health_quotes_to_spaces(value);
             PARSE_HEALTH_CONFIG_LINE_STRING(ac, recipient);
         }
         else if(hash == hash_units && !strcasecmp(key, HEALTH_UNITS_KEY)) {

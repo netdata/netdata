@@ -713,6 +713,62 @@ static int test_strip_quotes(int *passed) {
     return failed;
 }
 
+static int test_file_quotes(int *passed) {
+    const char *tmpdir = getenv("TMPDIR");
+    if(!tmpdir || !*tmpdir)
+        tmpdir = P_tmpdir;
+
+    char filename[FILENAME_MAX + 1];
+    snprintfz(filename, sizeof(filename), "%s/netdata-health-config-unittest-XXXXXX", tmpdir);
+    int fd = mkstemp(filename);
+    if(fd == -1) {
+        fprintf(stderr, "FAILED [file quotes]: cannot create fixture\n");
+        return 1;
+    }
+
+    FILE *fp = fdopen(fd, "w");
+    if(!fp) {
+        fprintf(stderr, "FAILED [file quotes]: cannot open fixture\n");
+        close(fd);
+        unlink(filename);
+        return 1;
+    }
+
+    fputs(
+        "template: unittest_quotes\n"
+        "on: system.cpu\n"
+        "every: 1s\n"
+        "calc: 1\n"
+        "summary: \"wrapped summary\"\n"
+        "info: the instance's page cache is 'full'\n"
+        "to: 'sysadmin' 'dba'\n",
+        fp);
+    fclose(fp);
+
+    health_init_prototypes();
+    dictionary_flush(health_globals.prototypes.dict);
+
+    int failed = 0;
+    // healthconfigtest does not initialize db_meta, so prototype persistence logs SQLITE_MISUSE.
+    bool loaded = health_readfile(filename, NULL, false) == 1;
+    RRD_ALERT_PROTOTYPE *ap = dictionary_get(health_globals.prototypes.dict, "unittest_quotes");
+    const char *summary = ap ? string2str(ap->config.summary) : "";
+    const char *info = ap ? string2str(ap->config.info) : "";
+    const char *recipient = ap ? string2str(ap->config.recipient) : "";
+
+    if(!loaded || !ap || strcmp(summary, "wrapped summary") != 0 ||
+       strcmp(info, "the instance's page cache is 'full'") != 0 || strcmp(recipient, " sysadmin   dba ") != 0) {
+        fprintf(stderr, "FAILED [file quotes]: summary '%s', info '%s', to '%s'\n", summary, info, recipient);
+        failed++;
+    }
+    else
+        (*passed)++;
+
+    dictionary_flush(health_globals.prototypes.dict);
+    unlink(filename);
+    return failed;
+}
+
 static int test_delay_parser_multiplier_boundaries(int *passed) {
     static const struct {
         const char *input;
@@ -1239,6 +1295,7 @@ int health_config_unittest(void) {
     failed += test_dyncfg_integer_destination_boundaries(&passed);
     failed += test_dyncfg_delay_multiplier_boundaries(&passed);
     failed += test_strip_quotes(&passed);
+    failed += test_file_quotes(&passed);
     failed += test_delay_parser_multiplier_boundaries(&passed);
     failed += test_delay_multiplier_runtime_boundaries(&passed);
     failed += test_prototype_rejects_non_finite_delay_multiplier(&passed);
