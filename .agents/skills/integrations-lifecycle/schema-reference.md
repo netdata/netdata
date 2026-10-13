@@ -45,7 +45,9 @@ Behavior not visible in the schema:
   `monitored_instance_name` is set. It is the only `dependencies` use in the repository's schemas. Resolution is the
   cascading lookup in `pipeline.md`; an unresolvable reference is a fatal warning.
 - `info_provided_to_referring_integrations.description` is rendered on OTHER pages that reference this module.
-- `alerts[].metric` is not checked against `metrics.scopes[].metrics[].name`.
+- `alerts[]` holds alert names only. Whether each name is a stock alert that no declared context derives is checked by
+  `integrations/tests/test_health_alerts.py`, not by the schema; the alert table itself is derived
+  (`.agents/skills/collectors-metadata-yaml/alerts-and-meta.md#1-alerts-derived-from-the-health-configuration`).
 - `metrics.dynamic_context_prefixes[]` and `metrics.dynamic_collect_plugins[]` are read only by the dormant taxonomy
   tooling (`consistency.md`, "The dormant collector taxonomy"); nothing renders them.
 - `profile_coverage.modules.<meta.id>[]` is allowed only in the Prometheus collector's metadata file, and

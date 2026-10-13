@@ -50,7 +50,9 @@ schema file does not show; the facts an author hits most:
 - Stock `.conf`: minimal but representative; show every common option with a comment.
 - `config_schema.json`: each stock-conf option SHOULD have an entry with the same default; form rules in
   `.agents/skills/collectors-go-design/config-schema.md`.
-- `health.d/<name>.conf`: each alert SHOULD have a matching row under `metadata.yaml` `alerts[]`.
+- `health.d/<name>.conf`: each alert's `on:` context MUST be a context `metadata.yaml` declares, so the page derives the
+  alert (`.agents/skills/collectors-metadata-yaml/alerts-and-meta.md`, section 1); `test_health_alerts` fails on an
+  alert without an owner.
 
 ## 4. Validate locally
 
