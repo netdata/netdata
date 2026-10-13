@@ -132,7 +132,8 @@ detect_disk() {
   elif [ "${KERNEL_NAME}" = FreeBSD ]; then
     # Like Linux /sys/block: sum the raw size of the GEOM DISK providers (the base disks;
     # md, zvols, partitions and mirrors are other classes), skipping optical drives.
-    # GEOM has no removable flag, so USB disks count; a jail sees the host's disks.
+    # GEOM has no removable flag, so USB disks count; a jail sees the host's disks;
+    # a multipath disk counts once per path.
     # Not df: each ZFS dataset reports its used space plus the pool's free space, so the
     # total counts free space once per dataset and changes on every write.
     DISK_DETECTION="geom"
