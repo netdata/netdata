@@ -45,6 +45,7 @@ struct rrdhost_system_info {
     char *container;
     char *container_detection;
     char *is_k8s_node;
+    uint64_t detected_fields; // candidate fields with an explicit successful value or absence
     int16_t hops;
     bool ml_capable;
     bool ml_enabled;
@@ -76,6 +77,17 @@ void rrdhost_system_info_free(struct rrdhost_system_info *system_info);
 
 // detect system info on current system
 int rrdhost_system_info_detect(struct rrdhost_system_info *system_info);
+// Detect into a private candidate; no process environment changes. False discards the whole response.
+bool rrdhost_system_info_detect_runtime(struct rrdhost_system_info *candidate);
+bool rrdhost_system_info_detected_set(struct rrdhost_system_info *si, const char *key, const char *value);
+// Publication callers hold the host update lock. Only detected candidate fields are copied.
+bool rrdhost_system_info_update(struct rrdhost_system_info *dst, struct rrdhost_system_info *candidate);
+bool rrdhost_system_info_update_from_labels(struct rrdhost_system_info *dst, RRDLABELS *old_labels, RRDLABELS *new_labels);
+bool rrdhost_system_info_label_is_owned(const char *name);
+bool rrdhost_system_info_label_is_runtime(const char *name);
+// Full label import is for locally managed virtual hosts, not streamed host handshakes.
+bool rrdhost_system_info_update_all_from_labels(struct rrdhost_system_info *dst, RRDLABELS *old_labels, RRDLABELS *new_labels);
+int rrdhost_system_info_unittest(void);
 
 // import from host rrdlabels
 struct rrdhost_system_info *rrdhost_system_info_from_host_labels(RRDLABELS *labels);

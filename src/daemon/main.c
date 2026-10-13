@@ -546,6 +546,8 @@ int netdata_main(int argc, char **argv) {
                             if (aral_unittest(10000)) return 1;
                             if (rrdlabels_unittest()) return 1;
                             if (rrdhost_labels_unittest()) return 1;
+                            if (rrdhost_system_info_unittest()) return 1;
+                            if (build_info_system_info_unittest()) return 1;
                             if (ctx_unittest()) return 1;
                             if (query_plan_unittest()) return 1;
                             if (uuid_unittest()) return 1;
@@ -649,6 +651,14 @@ int netdata_main(int argc, char **argv) {
                             unittest_running = true;
                             rrdlabels_aral_init(true);
                             int rc = rrdlabels_unittest();
+                            rrdlabels_aral_destroy(true);
+                            return rc;
+                        }
+                        else if(strcmp(optarg, "systeminfotest") == 0) {
+                            unittest_running = true;
+                            rrdlabels_aral_init(true);
+                            int rc = rrdhost_system_info_unittest();
+                            rc += build_info_system_info_unittest();
                             rrdlabels_aral_destroy(true);
                             return rc;
                         }

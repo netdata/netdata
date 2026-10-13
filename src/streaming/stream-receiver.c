@@ -709,8 +709,11 @@ static void stream_receiver_remove_internal(struct stream_thread *sth, struct re
     spinlock_unlock(&rpt->thread.send_to_child.spinlock);
 
     char iface[64] = "";
-    if(rpt->host && rpt->host->rrdlabels)
-        rrdlabels_get_value_strcpyz(rpt->host->rrdlabels, iface, sizeof(iface), "_net_default_iface");
+    if(rpt->host && rpt->host->rrdlabels) {
+        rrdlabels_get_value_strcpyz(rpt->host->rrdlabels, iface, sizeof(iface), "_stream_egress_iface");
+        if (!iface[0])
+            rrdlabels_get_value_strcpyz(rpt->host->rrdlabels, iface, sizeof(iface), "_net_default_iface");
+    }
 
     time_t connected_s = rpt->connected_since_s ?
         nd_time_t_elapsed_saturating(now_realtime_sec(), rpt->connected_since_s) : 0;

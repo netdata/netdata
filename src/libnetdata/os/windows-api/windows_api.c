@@ -10,95 +10,75 @@
 #include <stdbool.h>
 
 
-struct netdata_windows_ip_labels {
-    char *local_iface;
-    char *ipaddr;
-    bool initialized;
-} default_ip = {
-    .local_iface = NULL,
-    .ipaddr = NULL,
-    .initialized = false
-};
-
-int netdata_fill_default_ip()
+// Caller owns both strings. Return 1 for a complete tuple, 0 for successful
+// absence, and -1 for failure; no failed probe can poison a process-wide cache.
+int netdata_win_default_network(char **iface, char **ipaddr)
 {
-    if (default_ip.initialized)
-        return 0;
-
-    default_ip.initialized = true;
-
+    *iface = NULL;
+    *ipaddr = NULL;
     MIB_IPFORWARDROW route;
-    DWORD dest = 0;
-    if (GetBestRoute(dest, 0, &route) != NO_ERROR) {
+    DWORD rc = GetBestRoute(0, 0, &route);
+    if (rc == ERROR_HOST_UNREACHABLE || rc == ERROR_NETWORK_UNREACHABLE || rc == ERROR_NO_DATA)
+        return 0;
+    if (rc != NO_ERROR)
         return -1;
-    }
 
-    DWORD ifIndex = route.dwForwardIfIndex;
-
-    ULONG bufLen = 15000;
-    PIP_ADAPTER_ADDRESSES adapters = (PIP_ADAPTER_ADDRESSES)malloc(bufLen);
-    if (!adapters) {
-        return 1;
-    }
-
-    int ret = GetAdaptersAddresses(AF_INET, GAA_FLAG_INCLUDE_PREFIX, NULL, adapters, &bufLen);
-    if (ret != NO_ERROR) {
-        goto end_ip_detection;
-    }
-
-    PIP_ADAPTER_ADDRESSES aa = adapters;
-    while (aa) {
-        if (aa->IfIndex == ifIndex) {
-            if (aa->FriendlyName) {
-                size_t required_size = wcstombs(NULL, aa->FriendlyName, 0);
-                if (required_size != (size_t)-1) {
-                    char *iface = malloc(required_size + 1);
-                    if (iface) {
-                        size_t converted = wcstombs(iface, aa->FriendlyName, required_size + 1);
-                        if (converted != (size_t)-1 && converted <= required_size) {
-                            iface[converted] = '\0';
-                            default_ip.local_iface = iface;
-                        }
-                        else
-                            free(iface);
-                    }
-                }
-            }
-
-            PIP_ADAPTER_UNICAST_ADDRESS ua = aa->FirstUnicastAddress;
-            while (ua) {
-                if (ua->Address.lpSockaddr->sa_family == AF_INET) {
-                    char ipstr[INET_ADDRSTRLEN];
-                    struct sockaddr_in *sa_in = (struct sockaddr_in *)ua->Address.lpSockaddr;
-                    inet_ntop(AF_INET, &(sa_in->sin_addr), ipstr, sizeof(ipstr));
-                    default_ip.ipaddr = strdup(ipstr);
-                    goto end_ip_detection;
-                }
-                ua = ua->Next;
-            }
+    ULONG length = 15000;
+    PIP_ADAPTER_ADDRESSES adapters = NULL;
+    for (unsigned attempt = 0; attempt < 3; attempt++) {
+        free(adapters);
+        adapters = malloc(length);
+        if (!adapters)
+            return -1;
+        rc = GetAdaptersAddresses(AF_INET, GAA_FLAG_INCLUDE_PREFIX, NULL, adapters, &length);
+        if (rc != ERROR_BUFFER_OVERFLOW)
             break;
-        }
-        aa = aa->Next;
     }
+    int result = -1;
+    if (rc == ERROR_NO_DATA) {
+        result = 0;
+        goto done;
+    }
+    if (rc != NO_ERROR)
+        goto done;
 
-    ret = NO_ERROR;
-end_ip_detection:
+    for (PIP_ADAPTER_ADDRESSES aa = adapters; aa; aa = aa->Next) {
+        if (aa->IfIndex != route.dwForwardIfIndex)
+            continue;
+        // A route/adaptor race is a failed probe. A present adapter without a
+        // usable IPv4 address is a successfully observed absence.
+        result = 0;
+        for (PIP_ADAPTER_UNICAST_ADDRESS ua = aa->FirstUnicastAddress; ua; ua = ua->Next) {
+            if (!ua->Address.lpSockaddr || ua->Address.lpSockaddr->sa_family != AF_INET)
+                continue;
+            result = -1;
+            if (!aa->FriendlyName)
+                goto done;
+            // FriendlyName is UTF-16; conversion must not depend on the process locale.
+            int size = WideCharToMultiByte(CP_UTF8, 0, aa->FriendlyName, -1, NULL, 0, NULL, NULL);
+            if (size <= 1)
+                goto done;
+            *iface = malloc(size);
+            if (!*iface || !WideCharToMultiByte(CP_UTF8, 0, aa->FriendlyName, -1, *iface, size, NULL, NULL))
+                goto done;
+            char address[INET_ADDRSTRLEN];
+            struct sockaddr_in *sa = (struct sockaddr_in *)ua->Address.lpSockaddr;
+            if (!inet_ntop(AF_INET, &sa->sin_addr, address, sizeof(address)))
+                goto done;
+            *ipaddr = strdup(address);
+            if (*ipaddr)
+                result = 1;
+            goto done;
+        }
+        break;
+    }
+done:
     free(adapters);
-    return ret;
-}
-
-char *netdata_win_local_interface()
-{
-    if (!default_ip.initialized)
-        netdata_fill_default_ip();
-
-    return default_ip.local_iface;
-}
-
-char *netdata_win_local_ip()
-{
-    if (!default_ip.initialized)
-        netdata_fill_default_ip();
-
-    return default_ip.ipaddr;
+    if (result != 1) {
+        free(*iface);
+        free(*ipaddr);
+        *iface = NULL;
+        *ipaddr = NULL;
+    }
+    return result;
 }

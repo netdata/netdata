@@ -4,6 +4,7 @@
 #include "rrdhost-system-info.h"
 #include "aclk/schema-wrappers/node_info.h"
 #include "daemon/win_system-info.h"
+#include "daemon/daemon-service.h"
 
 // coverity[ +tainted_string_sanitize_content : arg-0 ]
 static inline void coverity_remove_taint(char *s __maybe_unused) {
@@ -23,332 +24,629 @@ void rrdhost_system_info_swap(struct rrdhost_system_info *a, struct rrdhost_syst
 // ----------------------------------------------------------------------------
 // RRDHOST - set system info from environment variables
 // system_info fields must be heap allocated or NULL
-int rrdhost_system_info_set_by_name(struct rrdhost_system_info *system_info, const char *name, const char *value) {
-    int res = 0;
+// The field table owns detection keys, label ownership and runtime merge semantics.
+static const struct system_info_field {
+    const char *key;
+    const char *label;
+    size_t offset;
+    bool numeric;
+    bool runtime;
+} system_info_fields[] = {
+    { "NETDATA_INSTANCE_CLOUD_TYPE", "_cloud_provider_type", offsetof(struct rrdhost_system_info, cloud_provider_type), false, false },
+    { "NETDATA_INSTANCE_CLOUD_INSTANCE_TYPE", "_cloud_instance_type", offsetof(struct rrdhost_system_info, cloud_instance_type), false, false },
+    { "NETDATA_INSTANCE_CLOUD_INSTANCE_REGION", "_cloud_instance_region", offsetof(struct rrdhost_system_info, cloud_instance_region), false, false },
+    { "NETDATA_HOST_OS_NAME", NULL, offsetof(struct rrdhost_system_info, host_os_name), false, false },
+    { "NETDATA_HOST_OS_ID", NULL, offsetof(struct rrdhost_system_info, host_os_id), false, false },
+    { "NETDATA_HOST_OS_ID_LIKE", NULL, offsetof(struct rrdhost_system_info, host_os_id_like), false, false },
+    { "NETDATA_HOST_OS_VERSION", "_os_version", offsetof(struct rrdhost_system_info, host_os_version), false, false },
+    { "NETDATA_HOST_OS_VERSION_ID", NULL, offsetof(struct rrdhost_system_info, host_os_version_id), false, false },
+    { "NETDATA_HOST_OS_DETECTION", NULL, offsetof(struct rrdhost_system_info, host_os_detection), false, false },
+    { "NETDATA_HOST_OS_LABEL_NAME", "_os_name", offsetof(struct rrdhost_system_info, host_os_label_name), false, false },
+    { "NETDATA_HOST_OS_LABEL_VERSION", "_os_marketing_version", offsetof(struct rrdhost_system_info, host_os_label_version), false, false },
+    { "NETDATA_HOST_OS_LABEL_RELEASE", "_os_release", offsetof(struct rrdhost_system_info, host_os_label_release), false, false },
+    { "NETDATA_HOST_OS_LABEL_CODENAME", "_os_codename", offsetof(struct rrdhost_system_info, host_os_label_codename), false, false },
+    { "NETDATA_HOST_OS_LABEL_EDITION", "_os_edition", offsetof(struct rrdhost_system_info, host_os_label_edition), false, false },
+    { "NETDATA_HOST_OS_LABEL_BUILD", "_os_build", offsetof(struct rrdhost_system_info, host_os_label_build), false, false },
+    { "NETDATA_SYSTEM_CPU_LOGICAL_CPU_COUNT", "_system_cores", offsetof(struct rrdhost_system_info, host_cores), true, true },
+    { "NETDATA_SYSTEM_CPU_FREQ", "_system_cpu_freq", offsetof(struct rrdhost_system_info, host_cpu_freq), true, false },
+    { "NETDATA_SYSTEM_CPU_MODEL", "_system_cpu_model", offsetof(struct rrdhost_system_info, host_cpu_model), false, false },
+    { "NETDATA_SYSTEM_TOTAL_RAM", "_system_ram_total", offsetof(struct rrdhost_system_info, host_ram_total), true, true },
+    { "NETDATA_SYSTEM_TOTAL_DISK_SIZE", "_system_disk_space", offsetof(struct rrdhost_system_info, host_disk_space), true, true },
+    { "NETDATA_CONTAINER_OS_NAME", NULL, offsetof(struct rrdhost_system_info, container_os_name), false, false },
+    { "NETDATA_CONTAINER_OS_ID", NULL, offsetof(struct rrdhost_system_info, container_os_id), false, false },
+    { "NETDATA_CONTAINER_OS_ID_LIKE", NULL, offsetof(struct rrdhost_system_info, container_os_id_like), false, false },
+    { "NETDATA_CONTAINER_OS_VERSION", NULL, offsetof(struct rrdhost_system_info, container_os_version), false, false },
+    { "NETDATA_CONTAINER_OS_VERSION_ID", NULL, offsetof(struct rrdhost_system_info, container_os_version_id), false, false },
+    { "NETDATA_CONTAINER_OS_DETECTION", NULL, offsetof(struct rrdhost_system_info, container_os_detection), false, false },
+    { "NETDATA_SYSTEM_KERNEL_NAME", NULL, offsetof(struct rrdhost_system_info, kernel_name), false, false },
+    { "NETDATA_SYSTEM_KERNEL_VERSION", "_kernel_version", offsetof(struct rrdhost_system_info, kernel_version), false, false },
+    { "NETDATA_SYSTEM_ARCHITECTURE", "_architecture", offsetof(struct rrdhost_system_info, architecture), false, false },
+    { "NETDATA_SYSTEM_VIRTUALIZATION", "_virtualization", offsetof(struct rrdhost_system_info, virtualization), false, false },
+    { "NETDATA_SYSTEM_VIRT_DETECTION", "_virt_detection", offsetof(struct rrdhost_system_info, virt_detection), false, false },
+    { "NETDATA_SYSTEM_CONTAINER", "_container", offsetof(struct rrdhost_system_info, container), false, false },
+    { "NETDATA_SYSTEM_CONTAINER_DETECTION", "_container_detection", offsetof(struct rrdhost_system_info, container_detection), false, false },
+    { "NETDATA_HOST_IS_K8S_NODE", "_is_k8s_node", offsetof(struct rrdhost_system_info, is_k8s_node), false, false },
+    { NULL, "_install_type", offsetof(struct rrdhost_system_info, install_type), false, false },
+    { NULL, "_prebuilt_arch", offsetof(struct rrdhost_system_info, prebuilt_arch), false, false },
+    { NULL, "_prebuilt_dist", offsetof(struct rrdhost_system_info, prebuilt_dist), false, false },
+    { "NETDATA_SYSTEM_DEFAULT_INTERFACE_NAME", "_net_default_iface", offsetof(struct rrdhost_system_info, network_default_iface), false, true },
+    { "NETDATA_SYSTEM_DEFAULT_INTERFACE_IP", "_net_default_iface_ip", offsetof(struct rrdhost_system_info, network_default_iface_ip), false, true },
+    { "NETDATA_SYSTEM_DEFAULT_INTERFACE_DETECTION", "_net_default_iface_detection", offsetof(struct rrdhost_system_info, network_default_iface_detection), false, true },
+    { NULL, "_hw_product_id", offsetof(struct rrdhost_system_info, hw_product_id), false, false },
+    { NULL, "_hw_product_name", offsetof(struct rrdhost_system_info, hw_product_name), false, false },
+    { NULL, "_hw_sys_vendor", offsetof(struct rrdhost_system_info, hw_sys_vendor), false, false },
+    { NULL, "_hw_product_type", offsetof(struct rrdhost_system_info, hw_product_type), false, false },
+};
+_Static_assert(sizeof(system_info_fields) / sizeof(system_info_fields[0]) <= 64, "system-info validity bitmap exhausted");
 
-    if (unlikely(!name || !value))
+static char **system_info_field_ptr(struct rrdhost_system_info *si, size_t i) {
+    return (char **)((char *)si + system_info_fields[i].offset);
+}
+
+static bool system_info_replace(char **dst, const char *value) {
+    if ((!*dst && !value) || (*dst && value && !strcmp(*dst, value)))
+        return false;
+    char *copy = system_info_strdupz(value);
+    freez(*dst);
+    *dst = copy;
+    return true;
+}
+
+static int system_info_field_index(const char *key) {
+    for (size_t i = 0; i < _countof(system_info_fields); i++)
+        if (system_info_fields[i].key && !strcmp(key, system_info_fields[i].key))
+            return (int)i;
+    return -1;
+}
+
+int rrdhost_system_info_set_by_name(struct rrdhost_system_info *si, const char *name, const char *value) {
+    if (!si || !name || !value)
         return 1;
 
-    if (!strcmp(name, "NETDATA_PROTOCOL_VERSION"))
-        return res;
-
-    else if(!strcmp(name, "NETDATA_INSTANCE_CLOUD_TYPE")){
-        freez(system_info->cloud_provider_type);
-        system_info->cloud_provider_type = strdupz(value);
-    }
-    else if(!strcmp(name, "NETDATA_INSTANCE_CLOUD_INSTANCE_TYPE")){
-        freez(system_info->cloud_instance_type);
-        system_info->cloud_instance_type = strdupz(value);
-    }
-    else if(!strcmp(name, "NETDATA_INSTANCE_CLOUD_INSTANCE_REGION")){
-        freez(system_info->cloud_instance_region);
-        system_info->cloud_instance_region = strdupz(value);
-    }
-    else if(!strcmp(name, "NETDATA_CONTAINER_OS_NAME")){
-        freez(system_info->container_os_name);
-        system_info->container_os_name = strdupz(value);
-    }
-    else if(!strcmp(name, "NETDATA_CONTAINER_OS_ID")){
-        freez(system_info->container_os_id);
-        system_info->container_os_id = strdupz(value);
-    }
-    else if(!strcmp(name, "NETDATA_CONTAINER_OS_ID_LIKE")){
-        freez(system_info->container_os_id_like);
-        system_info->container_os_id_like = strdupz(value);
-    }
-    else if(!strcmp(name, "NETDATA_CONTAINER_OS_VERSION")){
-        freez(system_info->container_os_version);
-        system_info->container_os_version = strdupz(value);
-    }
-    else if(!strcmp(name, "NETDATA_CONTAINER_OS_VERSION_ID")){
-        freez(system_info->container_os_version_id);
-        system_info->container_os_version_id = strdupz(value);
-    }
-    else if(!strcmp(name, "NETDATA_CONTAINER_OS_DETECTION")){
-        freez(system_info->container_os_detection);
-        system_info->container_os_detection = strdupz(value);
-    }
-    else if(!strcmp(name, "NETDATA_HOST_OS_NAME")){
-        freez(system_info->host_os_name);
-        size_t len = strlen(value);
-        size_t dst_size = (len * 2) + 1;
-        system_info->host_os_name = mallocz(dst_size);
-        text_sanitize((unsigned char *)system_info->host_os_name, (const unsigned char *)value,
-                      dst_size, rrd_string_allowed_chars, true, "", NULL);
-    }
-    else if(!strcmp(name, "NETDATA_HOST_OS_ID")){
-        freez(system_info->host_os_id);
-        system_info->host_os_id = strdupz(value);
-    }
-    else if(!strcmp(name, "NETDATA_HOST_OS_ID_LIKE")){
-        freez(system_info->host_os_id_like);
-        system_info->host_os_id_like = strdupz(value);
-    }
-    else if(!strcmp(name, "NETDATA_HOST_OS_VERSION")){
-        freez(system_info->host_os_version);
-        system_info->host_os_version = strdupz(value);
-    }
-    else if(!strcmp(name, "NETDATA_HOST_OS_VERSION_ID")){
-        freez(system_info->host_os_version_id);
-        system_info->host_os_version_id = strdupz(value);
-    }
-    else if(!strcmp(name, "NETDATA_HOST_OS_DETECTION")){
-        freez(system_info->host_os_detection);
-        system_info->host_os_detection = strdupz(value);
-    }
-    else if(!strcmp(name, "NETDATA_HOST_OS_LABEL_NAME")){
-        freez(system_info->host_os_label_name);
-        system_info->host_os_label_name = strdupz(value);
-    }
-    else if(!strcmp(name, "NETDATA_HOST_OS_LABEL_VERSION")){
-        freez(system_info->host_os_label_version);
-        system_info->host_os_label_version = strdupz(value);
-    }
-    else if(!strcmp(name, "NETDATA_HOST_OS_LABEL_RELEASE")){
-        freez(system_info->host_os_label_release);
-        system_info->host_os_label_release = strdupz(value);
-    }
-    else if(!strcmp(name, "NETDATA_HOST_OS_LABEL_CODENAME")){
-        freez(system_info->host_os_label_codename);
-        system_info->host_os_label_codename = strdupz(value);
-    }
-    else if(!strcmp(name, "NETDATA_HOST_OS_LABEL_EDITION")){
-        freez(system_info->host_os_label_edition);
-        system_info->host_os_label_edition = strdupz(value);
-    }
-    else if(!strcmp(name, "NETDATA_HOST_OS_LABEL_BUILD")){
-        freez(system_info->host_os_label_build);
-        system_info->host_os_label_build = strdupz(value);
-    }
-    else if(!strcmp(name, "NETDATA_SYSTEM_KERNEL_NAME")){
-        freez(system_info->kernel_name);
-        system_info->kernel_name = strdupz(value);
-    }
-    else if(!strcmp(name, "NETDATA_SYSTEM_CPU_LOGICAL_CPU_COUNT")){
-        freez(system_info->host_cores);
-        system_info->host_cores = strdupz(value);
-    }
-    else if(!strcmp(name, "NETDATA_SYSTEM_CPU_FREQ")){
-        freez(system_info->host_cpu_freq);
-        system_info->host_cpu_freq = strdupz(value);
-    }
-    else if (!strcmp(name, "NETDATA_SYSTEM_CPU_MODEL")){
-        freez(system_info->host_cpu_model);
-        system_info->host_cpu_model = strdupz(value);
-    }
-    else if(!strcmp(name, "NETDATA_SYSTEM_TOTAL_RAM")){
-        freez(system_info->host_ram_total);
-        system_info->host_ram_total = strdupz(value);
-    }
-    else if(!strcmp(name, "NETDATA_SYSTEM_TOTAL_DISK_SIZE")){
-        freez(system_info->host_disk_space);
-        system_info->host_disk_space = strdupz(value);
-    }
-    else if(!strcmp(name, "NETDATA_SYSTEM_KERNEL_VERSION")){
-        freez(system_info->kernel_version);
-        system_info->kernel_version = strdupz(value);
-    }
-    else if(!strcmp(name, "NETDATA_SYSTEM_ARCHITECTURE")){
-        freez(system_info->architecture);
-        system_info->architecture = strdupz(value);
-    }
-    else if(!strcmp(name, "NETDATA_SYSTEM_VIRTUALIZATION")){
-        freez(system_info->virtualization);
-        system_info->virtualization = strdupz(value);
-    }
-    else if(!strcmp(name, "NETDATA_SYSTEM_VIRT_DETECTION")){
-        freez(system_info->virt_detection);
-        system_info->virt_detection = strdupz(value);
-    }
-    else if(!strcmp(name, "NETDATA_SYSTEM_CONTAINER")){
-        freez(system_info->container);
-        system_info->container = strdupz(value);
-    }
-    else if(!strcmp(name, "NETDATA_SYSTEM_CONTAINER_DETECTION")){
-        freez(system_info->container_detection);
-        system_info->container_detection = strdupz(value);
-    }
-    else if(!strcmp(name, "NETDATA_HOST_IS_K8S_NODE")){
-        freez(system_info->is_k8s_node);
-        system_info->is_k8s_node = strdupz(value);
-    }
-    else if(!strcmp(name, "NETDATA_SYSTEM_DEFAULT_INTERFACE_NAME")){
-        freez(system_info->network_default_iface);
-        system_info->network_default_iface = strdupz(value);
-    }
-    else if(!strcmp(name, "NETDATA_SYSTEM_DEFAULT_INTERFACE_IP")){
-        freez(system_info->network_default_iface_ip);
-        system_info->network_default_iface_ip = strdupz(value);
-    }
-    else if(!strcmp(name, "NETDATA_SYSTEM_DEFAULT_INTERFACE_DETECTION")){
-        freez(system_info->network_default_iface_detection);
-        system_info->network_default_iface_detection = strdupz(value);
-    }
-    else if (!strcmp(name, "NETDATA_SYSTEM_CPU_VENDOR"))
-        return res;
-    else if (!strcmp(name, "NETDATA_SYSTEM_CPU_DETECTION"))
-        return res;
-    else if (!strcmp(name, "NETDATA_SYSTEM_RAM_DETECTION"))
-        return res;
-    else if (!strcmp(name, "NETDATA_SYSTEM_DISK_DETECTION"))
-        return res;
-    else if (!strcmp(name, "NETDATA_CONTAINER_IS_OFFICIAL_IMAGE"))
-        return res;
-    else {
-        res = 1;
+    int i = system_info_field_index(name);
+    if (i >= 0) {
+        char **dst = system_info_field_ptr(si, i);
+        if (system_info_fields[i].offset == offsetof(struct rrdhost_system_info, host_os_name)) {
+            size_t size = strlen(value) * 2 + 1;
+            char *clean = mallocz(size);
+            text_sanitize((unsigned char *)clean, (const unsigned char *)value, size,
+                          rrd_string_allowed_chars, true, "", NULL);
+            system_info_replace(dst, clean);
+            freez(clean);
+        }
+        else
+            system_info_replace(dst, value);
+        return 0;
     }
 
-    return res;
+    // Recognized startup environment exports that have no stored system-info member.
+    static const char *auxiliary[] = {
+        "NETDATA_PROTOCOL_VERSION", "NETDATA_SYSTEM_CPU_VENDOR", "NETDATA_SYSTEM_CPU_DETECTION",
+        "NETDATA_SYSTEM_RAM_DETECTION", "NETDATA_SYSTEM_DISK_DETECTION", "NETDATA_CONTAINER_IS_OFFICIAL_IMAGE",
+    };
+    for (size_t n = 0; n < _countof(auxiliary); n++)
+        if (!strcmp(name, auxiliary[n]))
+            return 0;
+    return 1;
+}
+
+bool rrdhost_system_info_label_is_owned(const char *name) {
+    for (size_t i = 0; i < _countof(system_info_fields); i++)
+        if (system_info_fields[i].label && !strcmp(name, system_info_fields[i].label))
+            return true;
+    return false;
+}
+
+bool rrdhost_system_info_label_is_runtime(const char *name) {
+    for (size_t i = 0; i < _countof(system_info_fields); i++)
+        if (system_info_fields[i].runtime && !strcmp(name, system_info_fields[i].label))
+            return true;
+    return false;
+}
+
+bool rrdhost_system_info_update(struct rrdhost_system_info *dst, struct rrdhost_system_info *candidate) {
+    bool changed = false;
+    for (size_t i = 0; i < _countof(system_info_fields); i++)
+        if (system_info_fields[i].runtime && (candidate->detected_fields & (UINT64_C(1) << i)))
+            changed |= system_info_replace(system_info_field_ptr(dst, i), *system_info_field_ptr(candidate, i));
+    return changed;
+}
+
+static bool system_info_update_from_labels(struct rrdhost_system_info *dst, RRDLABELS *old_labels,
+                                           RRDLABELS *new_labels, bool runtime_only) {
+    bool changed = false;
+    for (size_t i = 0; i < _countof(system_info_fields); i++) {
+        const char *label = system_info_fields[i].label;
+        if (!label || (runtime_only && !system_info_fields[i].runtime))
+            continue;
+        char *value = NULL, *old = NULL;
+        rrdlabels_get_value_strdup_or_null(new_labels, &value, label);
+        if (old_labels)
+            rrdlabels_get_value_strdup_or_null(old_labels, &old, label);
+        // Re-apply even unchanged labels: a reconnect may have installed a fresh handshake snapshot.
+        if (value || old) {
+            changed |= system_info_replace(system_info_field_ptr(dst, i), value);
+            if (!strcmp(label, "_os_name")) {
+                char family[32];
+                rrdlabels_get_value_strcpyz(new_labels, family, sizeof(family), "_os");
+                changed |= system_info_replace(&dst->host_os_name,
+                    value && !strcasecmp(family, "windows") ? "Microsoft Windows" : value);
+            }
+        }
+        freez(value);
+        freez(old);
+    }
+    return changed;
+}
+
+bool rrdhost_system_info_update_from_labels(struct rrdhost_system_info *dst, RRDLABELS *old_labels, RRDLABELS *new_labels) {
+    return system_info_update_from_labels(dst, old_labels, new_labels, true);
+}
+
+bool rrdhost_system_info_update_all_from_labels(struct rrdhost_system_info *dst, RRDLABELS *old_labels, RRDLABELS *new_labels) {
+    return system_info_update_from_labels(dst, old_labels, new_labels, false);
 }
 
 struct rrdhost_system_info *rrdhost_system_info_from_host_labels(RRDLABELS *labels) {
     struct rrdhost_system_info *info = rrdhost_system_info_create();
     info->hops = 1;
-
-    rrdlabels_get_value_strdup_or_null(labels, &info->cloud_provider_type, "_cloud_provider_type");
-    rrdlabels_get_value_strdup_or_null(labels, &info->cloud_instance_type, "_cloud_instance_type");
-    rrdlabels_get_value_strdup_or_null(labels, &info->cloud_instance_region, "_cloud_instance_region");
-    char os_family[RRDLABELS_MAX_VALUE_LENGTH + 1];
-    rrdlabels_get_value_strcpyz(labels, os_family, sizeof(os_family), "_os");
-    // Accept "windows", "Windows", "WINDOWS" and similar case variants of the
-    // OS family. The lowercase form is the canonical value produced by
-    // src/libnetdata/os/os.c (os_type = "linux"/"windows"/"freebsd"/"macos");
-    // case-insensitive match keeps the override robust against labels that
-    // round-trip through pluginsd or streaming without canonicalisation.
-    if (!strcasecmp(os_family, "windows"))
-        info->host_os_name = strdupz("Microsoft Windows");
-    else
-        rrdlabels_get_value_strdup_or_null(labels, &info->host_os_name, "_os_name");
-    rrdlabels_get_value_strdup_or_null(labels, &info->host_os_version, "_os_version");
-    rrdlabels_get_value_strdup_or_null(labels, &info->host_os_label_name, "_os_name");
-    rrdlabels_get_value_strdup_or_null(labels, &info->host_os_label_version, "_os_marketing_version");
-    rrdlabels_get_value_strdup_or_null(labels, &info->host_os_label_release, "_os_release");
-    rrdlabels_get_value_strdup_or_null(labels, &info->host_os_label_codename, "_os_codename");
-    rrdlabels_get_value_strdup_or_null(labels, &info->host_os_label_edition, "_os_edition");
-    rrdlabels_get_value_strdup_or_null(labels, &info->host_os_label_build, "_os_build");
-    rrdlabels_get_value_strdup_or_null(labels, &info->kernel_version, "_kernel_version");
-    rrdlabels_get_value_strdup_or_null(labels, &info->host_cores, "_system_cores");
-    rrdlabels_get_value_strdup_or_null(labels, &info->host_cpu_freq, "_system_cpu_freq");
-    rrdlabels_get_value_strdup_or_null(labels, &info->host_cpu_model, "_system_cpu_model");
-    rrdlabels_get_value_strdup_or_null(labels, &info->host_ram_total, "_system_ram_total");
-    rrdlabels_get_value_strdup_or_null(labels, &info->host_disk_space, "_system_disk_space");
-    rrdlabels_get_value_strdup_or_null(labels, &info->architecture, "_architecture");
-    rrdlabels_get_value_strdup_or_null(labels, &info->virtualization, "_virtualization");
-    rrdlabels_get_value_strdup_or_null(labels, &info->container, "_container");
-    rrdlabels_get_value_strdup_or_null(labels, &info->container_detection, "_container_detection");
-    rrdlabels_get_value_strdup_or_null(labels, &info->virt_detection, "_virt_detection");
-    rrdlabels_get_value_strdup_or_null(labels, &info->is_k8s_node, "_is_k8s_node");
-    rrdlabels_get_value_strdup_or_null(labels, &info->install_type, "_install_type");
-    rrdlabels_get_value_strdup_or_null(labels, &info->prebuilt_arch, "_prebuilt_arch");
-    rrdlabels_get_value_strdup_or_null(labels, &info->prebuilt_dist, "_prebuilt_dist");
-    rrdlabels_get_value_strdup_or_null(labels, &info->network_default_iface, "_net_default_iface");
-    rrdlabels_get_value_strdup_or_null(labels, &info->network_default_iface_ip, "_net_default_iface_ip");
-    rrdlabels_get_value_strdup_or_null(labels, &info->network_default_iface_detection, "_net_default_iface_detection");
-    rrdlabels_get_value_strdup_or_null(labels, &info->hw_product_id, "_hw_product_id");
-    rrdlabels_get_value_strdup_or_null(labels, &info->hw_product_name, "_hw_product_name");
-    rrdlabels_get_value_strdup_or_null(labels, &info->hw_sys_vendor, "_hw_sys_vendor");
-    rrdlabels_get_value_strdup_or_null(labels, &info->hw_product_type, "_hw_product_type");
+    rrdhost_system_info_update_all_from_labels(info, NULL, labels);
+    char family[32];
+    rrdlabels_get_value_strcpyz(labels, family, sizeof(family), "_os");
+    if (!strcasecmp(family, "windows"))
+        system_info_replace(&info->host_os_name, "Microsoft Windows");
     return info;
 }
 
-void rrdhost_system_info_to_rrdlabels(struct rrdhost_system_info *system_info, RRDLABELS *labels) {
-    if (system_info->cloud_provider_type)
-        rrdlabels_add(labels, "_cloud_provider_type", system_info->cloud_provider_type, RRDLABEL_SRC_AUTO);
+void rrdhost_system_info_to_rrdlabels(struct rrdhost_system_info *si, RRDLABELS *labels) {
+    for (size_t i = 0; i < _countof(system_info_fields); i++) {
+        const char *value = *system_info_field_ptr(si, i);
+        if (system_info_fields[i].offset == offsetof(struct rrdhost_system_info, host_os_label_name) && !value)
+            value = si->host_os_name;
+        if (value && system_info_fields[i].label)
+            rrdlabels_add(labels, system_info_fields[i].label, value, RRDLABEL_SRC_AUTO);
+    }
+}
 
-    if (system_info->cloud_instance_type)
-        rrdlabels_add(labels, "_cloud_instance_type", system_info->cloud_instance_type, RRDLABEL_SRC_AUTO);
+// NULL is successful absence. Failed/unsupported probes never call this function.
+bool rrdhost_system_info_detected_set(struct rrdhost_system_info *si, const char *key, const char *value) {
+    int i = system_info_field_index(key);
+    if (i < 0 || !system_info_fields[i].runtime)
+        return false;
+    if (value) {
+        if (!*value || !strcmp(value, "unknown"))
+            return false;
+        if (system_info_fields[i].numeric) {
+            uint64_t number = 0;
+            for (const unsigned char *p = (const unsigned char *)value; *p; p++) {
+                if (*p < '0' || *p > '9' || number > (UINT64_MAX - (*p - '0')) / 10)
+                    return false;
+                number = number * 10 + (*p - '0');
+            }
+            if (!strcmp(key, "NETDATA_SYSTEM_CPU_LOGICAL_CPU_COUNT") && number > UINT32_MAX)
+                return false;
+            if (!number && strcmp(key, "NETDATA_SYSTEM_TOTAL_DISK_SIZE"))
+                return false;
+        }
+        rrdhost_system_info_set_by_name(si, key, value);
+    }
+    else
+        system_info_replace(system_info_field_ptr(si, i), NULL);
+    si->detected_fields |= UINT64_C(1) << i;
+    return true;
+}
 
-    if (system_info->cloud_instance_region)
-        rrdlabels_add(labels, "_cloud_instance_region", system_info->cloud_instance_region, RRDLABEL_SRC_AUTO);
+// Every runtime key occurs exactly once, even when its probe failed.
+static bool system_info_parse_runtime(struct rrdhost_system_info *si, char *output) {
+    static const char header[] = "NETDATA_SYSTEM_INFO_V1\n";
+    if (strncmp(output, header, sizeof(header) - 1))
+        return false;
+    char *line = output + sizeof(header) - 1;
+    uint64_t seen = 0, expected = 0;
+    char network_status = 0;
+    for (size_t i = 0; i < _countof(system_info_fields); i++)
+        if (system_info_fields[i].runtime)
+            expected |= UINT64_C(1) << i;
+    while (*line) {
+        char *end = strchr(line, '\n');
+        if (!end)
+            return false;
+        *end = '\0';
+        if (!strcmp(line, "NETDATA_SYSTEM_INFO_END"))
+            return !end[1] && seen == expected;
+        if (!line[0] || line[1] != '\t')
+            return false;
+        char status = line[0];
+        char *key = line + 2, *value = strchr(key, '\t');
+        if (!value)
+            return false;
+        *value++ = '\0';
+        int i = system_info_field_index(key);
+        if (i < 0 || !system_info_fields[i].runtime || (seen & (UINT64_C(1) << i)) || strchr(value, '\r') || strchr(value, '\t'))
+            return false;
+        seen |= UINT64_C(1) << i;
+        if (!strncmp(key, "NETDATA_SYSTEM_DEFAULT_INTERFACE_", sizeof("NETDATA_SYSTEM_DEFAULT_INTERFACE_") - 1)) {
+            if (network_status && status != network_status)
+                return false;
+            network_status = status;
+        }
+        if (status == 'V') {
+            if (!rrdhost_system_info_detected_set(si, key, value))
+                return false;
+        }
+        else if (*value || (status != 'A' && status != 'F' && status != 'U'))
+            return false;
+        else if (status == 'A')
+            rrdhost_system_info_detected_set(si, key, NULL);
+        line = end + 1;
+    }
+    return false;
+}
 
-    if (system_info->host_os_label_name)
-        rrdlabels_add(labels, "_os_name", system_info->host_os_label_name, RRDLABEL_SRC_AUTO);
-    else if (system_info->host_os_name)
-        rrdlabels_add(labels, "_os_name", system_info->host_os_name, RRDLABEL_SRC_AUTO);
+#if !defined(OS_WINDOWS)
+static char *system_info_read_argv(const char **argv, bool (*cancelled)(void), unsigned timeout_ms);
+static bool system_info_parse_startup(struct rrdhost_system_info *system_info, char *output);
+static bool system_info_test_cancelled(void) { return true; }
+#endif
 
-    if (system_info->host_os_version)
-        rrdlabels_add(labels, "_os_version", system_info->host_os_version, RRDLABEL_SRC_AUTO);
+static BUFFER *system_info_test_response(const char *key, char status, const char *value) {
+    BUFFER *b = buffer_create(0, NULL);
+    buffer_strcat(b, "NETDATA_SYSTEM_INFO_V1\n");
+    for (size_t i = 0; i < _countof(system_info_fields); i++) {
+        if (!system_info_fields[i].runtime)
+            continue;
+        bool selected = key && !strcmp(key, system_info_fields[i].key);
+        buffer_sprintf(b, "%c\t%s\t%s\n", selected ? status : 'F', system_info_fields[i].key,
+                       selected && value ? value : "");
+    }
+    buffer_strcat(b, "NETDATA_SYSTEM_INFO_END\n");
+    return b;
+}
 
-    if (system_info->host_os_label_version)
-        rrdlabels_add(labels, "_os_marketing_version", system_info->host_os_label_version, RRDLABEL_SRC_AUTO);
+int rrdhost_system_info_unittest(void) {
+    int errors = 0;
+#define SI_CHECK(condition) do { if (!(condition)) { fprintf(stderr, "system-info test failed at %s:%d: %s\n", __FILE__, __LINE__, #condition); errors++; } } while (0)
+    struct rrdhost_system_info *dst = rrdhost_system_info_create();
+    struct rrdhost_system_info *candidate = rrdhost_system_info_create();
+    rrdhost_system_info_set_by_name(dst, "NETDATA_SYSTEM_TOTAL_RAM", "1024");
+    dst->hops = 7;
+    dst->ml_enabled = true;
+    dst->ml_capable = true;
+    dst->mc_version = 3;
+    dst->install_type = strdupz("fixture");
+    dst->kernel_name = strdupz("Linux");
+    BUFFER *b = system_info_test_response("NETDATA_SYSTEM_TOTAL_RAM", 'V', "2048");
+    SI_CHECK(system_info_parse_runtime(candidate, (char *)buffer_tostring(b)));
+    SI_CHECK(rrdhost_system_info_update(dst, candidate));
+    SI_CHECK(!strcmp(dst->host_ram_total, "2048"));
+    SI_CHECK(!rrdhost_system_info_update(dst, candidate));
+    SI_CHECK(dst->hops == 7 && dst->ml_enabled && dst->ml_capable && dst->mc_version == 3);
+    SI_CHECK(!strcmp(dst->install_type, "fixture") && !strcmp(dst->kernel_name, "Linux"));
+    buffer_free(b);
 
-    if (system_info->host_os_label_release)
-        rrdlabels_add(labels, "_os_release", system_info->host_os_label_release, RRDLABEL_SRC_AUTO);
+    const char *invalid[] = { "-1", "1.5", "18446744073709551616", "0", "unknown", "" };
+    for (size_t i = 0; i < _countof(invalid); i++) {
+        b = system_info_test_response("NETDATA_SYSTEM_TOTAL_RAM", 'V', invalid[i]);
+        SI_CHECK(!system_info_parse_runtime(candidate, (char *)buffer_tostring(b)));
+        buffer_free(b);
+    }
+    candidate->detected_fields = 0;
+    b = system_info_test_response("NETDATA_SYSTEM_TOTAL_RAM", 'F', NULL);
+    SI_CHECK(system_info_parse_runtime(candidate, (char *)buffer_tostring(b)));
+    SI_CHECK(!rrdhost_system_info_update(dst, candidate));
+    SI_CHECK(!strcmp(dst->host_ram_total, "2048"));
+    buffer_free(b);
+    b = system_info_test_response("NETDATA_SYSTEM_TOTAL_RAM", 'A', NULL);
+    SI_CHECK(system_info_parse_runtime(candidate, (char *)buffer_tostring(b)));
+    SI_CHECK(rrdhost_system_info_update(dst, candidate) && !dst->host_ram_total);
+    buffer_free(b);
+    b = system_info_test_response("NETDATA_SYSTEM_TOTAL_RAM", 'F', "unexpected");
+    SI_CHECK(!system_info_parse_runtime(candidate, (char *)buffer_tostring(b)));
+    buffer_free(b);
+    b = system_info_test_response("NETDATA_SYSTEM_DEFAULT_INTERFACE_NAME", 'A', NULL);
+    SI_CHECK(!system_info_parse_runtime(candidate, (char *)buffer_tostring(b))); // incoherent tuple
+    buffer_free(b);
+    char incomplete[] = "NETDATA_SYSTEM_INFO_V1\nF\tNETDATA_SYSTEM_TOTAL_RAM\t\n";
+    char duplicate[] = "NETDATA_SYSTEM_INFO_V1\nF\tNETDATA_SYSTEM_TOTAL_RAM\t\nF\tNETDATA_SYSTEM_TOTAL_RAM\t\n";
+    char malformed[] = "NETDATA_SYSTEM_INFO_V1\nPID123\n";
+    char unknown[] = "NETDATA_SYSTEM_INFO_V1\nF\tUNRECOGNIZED\t\n";
+    SI_CHECK(!system_info_parse_runtime(candidate, incomplete));
+    SI_CHECK(!system_info_parse_runtime(candidate, duplicate));
+    SI_CHECK(!system_info_parse_runtime(candidate, malformed));
+    SI_CHECK(!system_info_parse_runtime(candidate, unknown));
 
-    if (system_info->host_os_label_codename)
-        rrdlabels_add(labels, "_os_codename", system_info->host_os_label_codename, RRDLABEL_SRC_AUTO);
+    RRDLABELS *old = rrdlabels_create(), *fresh = rrdlabels_create();
+    rrdlabels_add(old, "_system_ram_total", "4096", RRDLABEL_SRC_AUTO);
+    rrdlabels_add(fresh, "_system_ram_total", "4096", RRDLABEL_SRC_AUTO);
+    rrdhost_system_info_set_by_name(dst, "NETDATA_SYSTEM_TOTAL_RAM", "1024");
+    rrdhost_system_info_set_by_name(dst, "NETDATA_SYSTEM_CPU_FREQ", "2000000000");
+    SI_CHECK(rrdhost_system_info_update_from_labels(dst, old, fresh));
+    SI_CHECK(!strcmp(dst->host_ram_total, "4096")); // unchanged labels override new handshake
+    SI_CHECK(!rrdhost_system_info_update_from_labels(dst, old, fresh));
+    SI_CHECK(!strcmp(dst->host_cpu_freq, "2000000000")); // never advertised
+    SI_CHECK(dst->hops == 7 && dst->ml_enabled && !strcmp(dst->kernel_name, "Linux"));
+    rrdlabels_destroy(fresh);
+    fresh = rrdlabels_create();
+    SI_CHECK(rrdhost_system_info_update_from_labels(dst, old, fresh));
+    SI_CHECK(!dst->host_ram_total); // previously advertised then deleted
+    SI_CHECK(!strcmp(dst->host_cpu_freq, "2000000000"));
+    SI_CHECK(rrdhost_system_info_label_is_owned("_net_default_iface"));
+    SI_CHECK(!rrdhost_system_info_label_is_owned("_stream_egress_iface"));
+    SI_CHECK(!rrdhost_system_info_detected_set(candidate, "NETDATA_SYSTEM_CPU_FREQ", "3000000000"));
+    SI_CHECK(!rrdhost_system_info_detected_set(candidate, "NETDATA_SYSTEM_CPU_MODEL", "new model"));
+    SI_CHECK(!rrdhost_system_info_label_is_runtime("_os_name"));
+    SI_CHECK(!rrdhost_system_info_label_is_runtime("_system_cpu_freq"));
+    SI_CHECK(rrdhost_system_info_label_is_runtime("_system_cores"));
+    b = system_info_test_response("NETDATA_SYSTEM_TOTAL_RAM", 'F', NULL);
+    buffer_flush(b);
+    buffer_strcat(b, "NETDATA_SYSTEM_INFO_V1\nV\tNETDATA_SYSTEM_CPU_FREQ\t3000000000\nNETDATA_SYSTEM_INFO_END\n");
+    SI_CHECK(!system_info_parse_runtime(candidate, (char *)buffer_tostring(b)));
+    buffer_free(b);
+#if !defined(OS_WINDOWS)
+    struct rrdhost_system_info *startup = rrdhost_system_info_create();
+    char unusable_startup[] = "malformed\n=empty-name\nUNKNOWN_SYSTEM_INFO_KEY=value\nNETDATA_SYSTEM_TOTAL_RAM=\n";
+    SI_CHECK(!system_info_parse_startup(startup, unusable_startup));
+    SI_CHECK(!startup->host_ram_total);
+    char empty_startup[] = "\n";
+    SI_CHECK(!system_info_parse_startup(startup, empty_startup));
+    const char *network_keys[] = {
+        "NETDATA_SYSTEM_DEFAULT_INTERFACE_NAME", "NETDATA_SYSTEM_DEFAULT_INTERFACE_IP",
+        "NETDATA_SYSTEM_DEFAULT_INTERFACE_DETECTION",
+    };
+    char *saved_env[_countof(network_keys)];
+    for (size_t i = 0; i < _countof(network_keys); i++)
+        saved_env[i] = system_info_strdupz(getenv(network_keys[i]));
+    char partial_startup[] = "NETDATA_SYSTEM_DEFAULT_INTERFACE_NAME=test0\n"
+                            "NETDATA_SYSTEM_DEFAULT_INTERFACE_IP=\nUNKNOWN_SYSTEM_INFO_KEY=value\nmalformed\n";
+    SI_CHECK(system_info_parse_startup(startup, partial_startup));
+    SI_CHECK(startup->network_default_iface && !strcmp(startup->network_default_iface, "test0"));
+    SI_CHECK(!startup->network_default_iface_ip);
+    struct rrdhost_system_info *absent = rrdhost_system_info_create();
+    for (size_t i = 0; i < _countof(network_keys); i++)
+        SI_CHECK(rrdhost_system_info_detected_set(absent, network_keys[i], NULL));
+    // A route can exist while its interface is down or has no usable IPv4 address.
+    const char *absence_methods[] = { "none", "route", "procfs", "iproute2" };
+    for (size_t m = 0; m < _countof(absence_methods); m++) {
+        char no_network[256];
+        snprintfz(no_network, sizeof(no_network), "NETDATA_SYSTEM_DEFAULT_INTERFACE_NAME=unknown\n"
+                  "NETDATA_SYSTEM_DEFAULT_INTERFACE_IP=unknown\n"
+                  "NETDATA_SYSTEM_DEFAULT_INTERFACE_DETECTION=%s\n", absence_methods[m]);
+        SI_CHECK(system_info_parse_startup(startup, no_network));
+        SI_CHECK(!startup->network_default_iface && !startup->network_default_iface_ip &&
+                 !startup->network_default_iface_detection);
+        for (size_t i = 0; i < _countof(network_keys); i++)
+            SI_CHECK(getenv(network_keys[i]) && !strcmp(getenv(network_keys[i]), i == 2 ? absence_methods[m] : "unknown"));
+        SI_CHECK(!rrdhost_system_info_update(startup, absent));
+    }
+    for (size_t i = 0; i < _countof(network_keys); i++) {
+        if (saved_env[i]) nd_setenv(network_keys[i], saved_env[i], 1);
+        else unsetenv(network_keys[i]);
+        freez(saved_env[i]);
+    }
+    rrdhost_system_info_free(startup);
+    rrdhost_system_info_free(absent);
+    bool own_server = !netdata_main_spawn_server;
+    SI_CHECK(netdata_main_spawn_server_init("system-info-test", 0, NULL));
+    if (netdata_main_spawn_server) {
+        b = system_info_test_response("NETDATA_SYSTEM_TOTAL_RAM", 'V', "8192");
+        const char *valid_argv[] = { "/bin/sh", "-c", "printf '%s' \"$1\"", "sh", buffer_tostring(b), NULL };
+        char *output = system_info_read_argv(valid_argv, NULL, 2000);
+        SI_CHECK(output && system_info_parse_runtime(candidate, output));
+        freez(output);
+        const char *failure_argv[] = { "/bin/sh", "-c", "printf '%s' \"$1\"; exit 7", "sh", buffer_tostring(b), NULL };
+        output = system_info_read_argv(failure_argv, NULL, 2000);
+        SI_CHECK(!output);
+        freez(output);
+        buffer_free(b);
+        const char *drain_argv[] = { "/bin/sh", "-c", "printf '%065535d' 0", NULL };
+        output = system_info_read_argv(drain_argv, NULL, 2000);
+        SI_CHECK(output && strlen(output) == 65535);
+        freez(output);
+        const char *overflow_argv[] = { "/bin/sh", "-c", "printf '%065536d' 0", NULL };
+        output = system_info_read_argv(overflow_argv, NULL, 2000);
+        SI_CHECK(!output);
+        freez(output);
+        const char *timeout_argv[] = { "/bin/sh", "-c", "sleep 10", NULL };
+        usec_t started = now_monotonic_usec();
+        output = system_info_read_argv(timeout_argv, NULL, 50);
+        SI_CHECK(!output && now_monotonic_usec() - started < 3 * USEC_PER_SEC);
+        freez(output);
+        const char *descendant_argv[] = { "/bin/sh", "-c", "sleep 10 & exit 0", NULL };
+        started = now_monotonic_usec();
+        output = system_info_read_argv(descendant_argv, NULL, 50);
+        SI_CHECK((!output || !*output) && now_monotonic_usec() - started < 3 * USEC_PER_SEC);
+        freez(output);
+        output = system_info_read_argv(timeout_argv, system_info_test_cancelled, 2000);
+        SI_CHECK(!output);
+        freez(output);
+        const char *signal_argv[] = { "/bin/sh", "-c", "kill -TERM $$", NULL };
+        output = system_info_read_argv(signal_argv, NULL, 2000);
+        SI_CHECK(!output);
+        freez(output);
+    }
+    if (own_server)
+        netdata_main_spawn_server_cleanup();
+#endif
+    rrdlabels_destroy(old);
+    rrdlabels_destroy(fresh);
+    rrdhost_system_info_free(dst);
+    rrdhost_system_info_free(candidate);
+#undef SI_CHECK
+    return errors;
+}
 
-    if (system_info->host_os_label_edition)
-        rrdlabels_add(labels, "_os_edition", system_info->host_os_label_edition, RRDLABEL_SRC_AUTO);
+#if !defined(OS_WINDOWS)
+static void system_info_log_failure(const char *reason, int status) {
+    nd_log_limit_static_global_var(limit, 60, 0);
+    if (status >= 0)
+        nd_log_limit(&limit, NDLS_DAEMON, NDLP_WARNING,
+                     "SYSTEM INFO: detection failed: %s (exit status %d)", reason, status);
+    else
+        nd_log_limit(&limit, NDLS_DAEMON, NDLP_WARNING, "SYSTEM INFO: detection failed: %s", reason);
+}
 
-    if (system_info->host_os_label_build)
-        rrdlabels_add(labels, "_os_build", system_info->host_os_label_build, RRDLABEL_SRC_AUTO);
+// Read through EOF, including buffered data delivered together with POLLHUP.
+// The deadline starts after spawn; the spawn server owns group cleanup before reaping its leader.
+static char *system_info_read_argv(const char **argv, bool (*cancelled)(void), unsigned timeout_ms) {
+    POPEN_INSTANCE *pi = spawn_popen_run_argv_group(argv);
+    if (!pi) {
+        system_info_log_failure("unable to spawn script", -1);
+        return NULL;
+    }
+    const char *failure = "execution deadline exceeded";
+    int exit_status = -1;
+    bool was_cancelled = false;
+    usec_t deadline = now_monotonic_usec() + (usec_t)timeout_ms * USEC_PER_MS;
+    const size_t limit = 64 * 1024;
+    char *output = mallocz(limit + 1);
+    size_t used = 0;
+    int fd = spawn_popen_read_fd(pi);
+    bool eof = false, ok = fd >= 0;
+    if (!ok)
+        failure = "invalid script output descriptor";
+    while (ok && !eof && used < limit && now_monotonic_usec() < deadline) {
+        if (cancelled && cancelled()) {
+            ok = false;
+            was_cancelled = true;
+            break;
+        }
+        struct pollfd pfd = { .fd = fd, .events = POLLIN };
+        int rc = poll(&pfd, 1, 100);
+        if (rc < 0) {
+            if (errno == EINTR) continue;
+            ok = false;
+            failure = "polling script output failed";
+        }
+        else if (rc && (pfd.revents & (POLLIN | POLLHUP))) {
+            ssize_t n = read(fd, output + used, limit - used);
+            if (n > 0) used += (size_t)n;
+            else if (!n) eof = true;
+            else if (errno != EINTR) {
+                ok = false;
+                failure = "reading script output failed";
+            }
+        }
+        else if (rc && (pfd.revents & (POLLERR | POLLNVAL))) {
+            ok = false;
+            failure = "script output pipe failed";
+        }
+    }
+    if (used >= limit)
+        failure = "script output reached the 64 KiB limit";
+    else if (memchr(output, '\0', used))
+        failure = "script output contains a NUL byte";
+    ok = ok && eof && used < limit && !memchr(output, '\0', used);
+    output[used] = '\0';
+    while (ok && now_monotonic_usec() < deadline) {
+        if (cancelled && cancelled()) {
+            was_cancelled = true;
+            break;
+        }
+        int code = 1;
+        SPAWN_TIMEDWAIT_RESULT rc = spawn_popen_timedwait(pi, 100, &code);
+        if (rc == SPAWN_TIMEDWAIT_EXITED) {
+            pi = NULL;
+            ok = code == 0;
+            exit_status = code;
+            failure = "script exited unsuccessfully";
+            break;
+        }
+        if (rc == SPAWN_TIMEDWAIT_ERROR) {
+            failure = "waiting for script exit failed";
+            break;
+        }
+    }
+    if (pi) {
+        spawn_popen_kill(pi, 1000);
+        ok = false;
+    }
+    if (!ok) {
+        if (!was_cancelled)
+            system_info_log_failure(failure, exit_status);
+        freez(output);
+        return NULL;
+    }
+    return output;
+}
+static bool system_info_parse_startup(struct rrdhost_system_info *system_info, char *output) {
+    char *cursor = output;
+    char *line;
+    unsigned applied = 0, discarded = 0;
+    while ((line = strsep(&cursor, "\n"))) {
+        char *value = strchr(line, '=');
+        if (!value) {
+            if (*line) discarded++;
+            continue;
+        }
+        *value++ = '\0';
+        char *cr = strchr(value, '\r');
+        if (cr) *cr = '\0';
+        if (!*line) {
+            discarded++;
+            continue;
+        }
+        // Optional startup fields legitimately have empty values.
+        if (!*value)
+            continue;
+        coverity_remove_taint(line);
+        coverity_remove_taint(value);
+        if (!rrdhost_system_info_set_by_name(system_info, line, value)) {
+            nd_setenv(line, value, 1);
+            applied++;
+        }
+        else
+            discarded++;
+    }
 
-    if (system_info->kernel_version)
-        rrdlabels_add(labels, "_kernel_version", system_info->kernel_version, RRDLABEL_SRC_AUTO);
+    // A known route can still lack a usable interface/address. Preserve legacy
+    // environment values while keeping every unknown tuple identical to runtime absence.
+    if (system_info->network_default_iface && !strcmp(system_info->network_default_iface, "unknown") &&
+        system_info->network_default_iface_ip && !strcmp(system_info->network_default_iface_ip, "unknown")) {
+        system_info_replace(&system_info->network_default_iface, NULL);
+        system_info_replace(&system_info->network_default_iface_ip, NULL);
+        system_info_replace(&system_info->network_default_iface_detection, NULL);
+    }
+    if (!applied || discarded) {
+        nd_log_limit_static_global_var(startup_limit, 60, 0);
+        nd_log_limit(&startup_limit, NDLS_DAEMON, NDLP_WARNING,
+                     "SYSTEM INFO: startup response applied %u values and discarded %u malformed or unknown records",
+                     applied, discarded);
+    }
+    return applied != 0;
+}
 
-    if (system_info->host_cores)
-        rrdlabels_add(labels, "_system_cores", system_info->host_cores, RRDLABEL_SRC_AUTO);
+static bool system_info_cancelled(void) {
+    return nd_thread_signaled_to_cancel() || exit_initiated_get();
+}
 
-    if (system_info->host_cpu_freq)
-        rrdlabels_add(labels, "_system_cpu_freq", system_info->host_cpu_freq, RRDLABEL_SRC_AUTO);
+static char *system_info_read_script(bool runtime) {
+    CLEAN_BUFFER *script = buffer_create(0, NULL);
+    buffer_sprintf(script, "%s/system-info.sh", netdata_configured_primary_plugins_dir);
+    const char *argv[] = { buffer_tostring(script), runtime ? "--runtime" : "--bounded", NULL };
+    return system_info_read_argv(argv, runtime ? system_info_cancelled : NULL, 30000);
+}
 
-    if (system_info->host_cpu_model)
-        rrdlabels_add(labels, "_system_cpu_model", system_info->host_cpu_model, RRDLABEL_SRC_AUTO);
+#endif
 
-    if (system_info->host_ram_total)
-        rrdlabels_add(labels, "_system_ram_total", system_info->host_ram_total, RRDLABEL_SRC_AUTO);
-
-    if (system_info->host_disk_space)
-        rrdlabels_add(labels, "_system_disk_space", system_info->host_disk_space, RRDLABEL_SRC_AUTO);
-
-    if (system_info->architecture)
-        rrdlabels_add(labels, "_architecture", system_info->architecture, RRDLABEL_SRC_AUTO);
-
-    if (system_info->virtualization)
-        rrdlabels_add(labels, "_virtualization", system_info->virtualization, RRDLABEL_SRC_AUTO);
-
-    if (system_info->container)
-        rrdlabels_add(labels, "_container", system_info->container, RRDLABEL_SRC_AUTO);
-
-    if (system_info->container_detection)
-        rrdlabels_add(labels, "_container_detection", system_info->container_detection, RRDLABEL_SRC_AUTO);
-
-    if (system_info->virt_detection)
-        rrdlabels_add(labels, "_virt_detection", system_info->virt_detection, RRDLABEL_SRC_AUTO);
-
-    if (system_info->is_k8s_node)
-        rrdlabels_add(labels, "_is_k8s_node", system_info->is_k8s_node, RRDLABEL_SRC_AUTO);
-
-    if (system_info->install_type)
-        rrdlabels_add(labels, "_install_type", system_info->install_type, RRDLABEL_SRC_AUTO);
-
-    if (system_info->prebuilt_arch)
-        rrdlabels_add(labels, "_prebuilt_arch", system_info->prebuilt_arch, RRDLABEL_SRC_AUTO);
-
-    if (system_info->prebuilt_dist)
-        rrdlabels_add(labels, "_prebuilt_dist", system_info->prebuilt_dist, RRDLABEL_SRC_AUTO);
-
-    if (system_info->network_default_iface)
-        rrdlabels_add(labels, "_net_default_iface", system_info->network_default_iface, RRDLABEL_SRC_AUTO);
-
-    if (system_info->network_default_iface_ip)
-        rrdlabels_add(labels, "_net_default_iface_ip", system_info->network_default_iface_ip, RRDLABEL_SRC_AUTO);
-
-    if (system_info->network_default_iface_detection)
-        rrdlabels_add(labels, "_net_default_iface_detection", system_info->network_default_iface_detection, RRDLABEL_SRC_AUTO);
-
-    if (system_info->hw_product_id)
-        rrdlabels_add(labels, "_hw_product_id", system_info->hw_product_id, RRDLABEL_SRC_AUTO);
-
-    if (system_info->hw_product_name)
-        rrdlabels_add(labels, "_hw_product_name", system_info->hw_product_name, RRDLABEL_SRC_AUTO);
-
-    if (system_info->hw_sys_vendor)
-        rrdlabels_add(labels, "_hw_sys_vendor", system_info->hw_sys_vendor, RRDLABEL_SRC_AUTO);
-
-    if (system_info->hw_product_type)
-        rrdlabels_add(labels, "_hw_product_type", system_info->hw_product_type, RRDLABEL_SRC_AUTO);
+bool rrdhost_system_info_detect_runtime(struct rrdhost_system_info *candidate) {
+    if (!candidate)
+        return false;
+    candidate->detected_fields = 0;
+#if defined(OS_WINDOWS)
+    netdata_windows_get_runtime_system_info(candidate);
+    return true;
+#else
+    char *output = system_info_read_script(true);
+    if (!output)
+        return false;
+    bool ok = system_info_parse_runtime(candidate, output);
+    freez(output);
+    if (!ok) {
+        candidate->detected_fields = 0;
+        system_info_log_failure("malformed or incomplete runtime response", -1);
+    }
+    return ok;
+#endif
 }
 
 int rrdhost_system_info_detect(struct rrdhost_system_info *system_info) {
@@ -385,92 +683,12 @@ int rrdhost_system_info_detect(struct rrdhost_system_info *system_info) {
     }
 
 #if !defined(OS_WINDOWS)
-    CLEAN_BUFFER *script = buffer_create(0, NULL);
-    buffer_sprintf(script, "%s/system-info.sh", netdata_configured_primary_plugins_dir);
-
-    POPEN_INSTANCE *instance = NULL;
-    int ret = 1;
-
-    // Check if script exists and is readable
-    if (unlikely(access(buffer_tostring(script), R_OK) != 0)) {
-        netdata_log_error("SYSTEM INFO: System info script %s not found or not readable.",
-                          buffer_tostring(script));
-        goto cleanup;
-    }
-
-    // Run the script
-    instance = spawn_popen_run(buffer_tostring(script));
-    if (unlikely(!instance)) {
-        netdata_log_error("SYSTEM INFO: Failed to execute system info script %s.",
-                          buffer_tostring(script));
-        goto cleanup;
-    }
-
-    char line[1024];
-    FILE *fp = spawn_popen_stdout(instance);
-    if (unlikely(!fp)) {
-        netdata_log_error("SYSTEM INFO: Failed to get stdout from system info script.");
-        goto cleanup;
-    }
-
-    // Process each line from the script output
-    while (fgets(line, sizeof(line) - 1, fp) != NULL) {
-        // Ensure null-termination
-        line[sizeof(line) - 1] = '\0';
-
-        // Find the equals sign separator
-        char *value = strchr(line, '=');
-        if (unlikely(!value)) {
-            // Skip lines without an equal sign
-            nd_log(NDLS_DAEMON, NDLP_ERR,
-                   "SYSTEM INFO: Skipping malformed line from system-info.sh (no '=' found): '%s'",
-                   line);
-            continue;
-        }
-
-        // Split the name and value
-        *value = '\0';
-        value++;
-
-        // Trim any trailing newline from the value
-        char *end = strchr(value, '\n');
-        if (end) *end = '\0';
-
-        // Remove any carriage return that might be present (especially for macOS)
-        end = strchr(value, '\r');
-        if (end) *end = '\0';
-
-        // Validate name and value
-        if (unlikely(!*line || !*value)) {
-            nd_log(NDLS_DAEMON, NDLP_WARNING,
-                   "SYSTEM INFO: Skipping empty name or value from system-info.sh: '%s=%s'",
-                   line, value);
-            continue;
-        }
-
-        // Process the name-value pair
-        coverity_remove_taint(line);
-        coverity_remove_taint(value);
-
-        if (unlikely(rrdhost_system_info_set_by_name(system_info, line, value))) {
-            nd_log(NDLS_DAEMON, NDLP_ERR,
-                   "SYSTEM INFO: Unexpected variable '%s=%s'",
-                   line, value);
-        } else {
-            // Only set as environment variable if it was successfully processed
-            nd_setenv(line, value, 1);
-        }
-    }
-
-    // Everything succeeded
-    ret = 0;
-
-cleanup:
-    // Clean up resources
-    if (instance)
-        spawn_popen_wait(instance);
-
-    return ret;
+    char *output = system_info_read_script(false);
+    if (!output)
+        return 1;
+    bool ok = system_info_parse_startup(system_info, output);
+    freez(output);
+    return ok ? 0 : 1;
 #else
     netdata_windows_get_system_info(system_info);
     return 0;
@@ -575,6 +793,7 @@ struct rrdhost_system_info *rrdhost_system_info_dup(struct rrdhost_system_info *
     copy->container = system_info_strdupz(system_info->container);
     copy->container_detection = system_info_strdupz(system_info->container_detection);
     copy->is_k8s_node = system_info_strdupz(system_info->is_k8s_node);
+    copy->detected_fields = system_info->detected_fields;
     copy->hops = system_info->hops;
     copy->ml_capable = system_info->ml_capable;
     copy->ml_enabled = system_info->ml_enabled;

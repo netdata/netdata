@@ -26,6 +26,32 @@ netdata -h
 | `-v`, `-V`    | Display version and exit          | -                           |
 | `-W options`  | Advanced options (see below)      | -                           |
 
+## System Information Refresh
+
+The Agent detects full system information at startup. A background thread refreshes CPU count, total RAM, disk capacity,
+and the OS default interface name, IP address, and detection method. The first refresh runs five minutes after startup;
+subsequent refreshes run thirty minutes after the previous check finishes.
+Checks do not overlap. Changed values update the cached host information and automatic host labels and propagate through
+streaming to Parents. CPU model and frequency, OS/kernel details, and cloud/container/virtualization identity remain
+startup-only on every platform.
+
+Startup and refresh use the same CPU-count sources. On Linux, the count prefers present logical CPUs, excluding empty
+hot-plug slots and independent of the Agent's CPU affinity. In lxcfs containers it uses the virtualized `/proc/cpuinfo`
+count. If the kernel's present-CPU list is unavailable, detection falls back to CPU directories in sysfs, `/proc/cpuinfo`,
+then the CPUs available to the process from `nproc`.
+
+On Unix, `system-info.sh` has a 30-second execution deadline after spawning. Failed executions and invalid or incomplete
+runtime responses are discarded and logged with a reason. Startup keeps recognized non-empty values and warns when records
+are malformed or unknown, or no usable values were returned. Failed individual runtime probes retain their previous values; successful absence clears the
+corresponding optional values. Cancellation asks the spawn server to terminate the probe's process group; abrupt spawn-server
+failure can prevent process cleanup. Remaining descendants are terminated when the script leader exits. Runtime refresh does not rewrite the
+process environment exported during startup.
+
+On Windows, runtime refresh uses native probes for the same fields. Native Windows calls do not use the Unix subprocess deadline.
+
+See [automatic host labels](/docs/netdata-agent/configuration/organize-systems-metrics-and-alerts.md#use-automatic-labels)
+for label semantics and compatibility during gradual upgrades.
+
 ## Logging
 
 For details about Netdata's logging system and configuration, see [Netdata Logging](/src/libnetdata/log/README.md).
