@@ -561,8 +561,11 @@ component: MySQL
 
 The stock alerts follow these rules:
 
-- With `type: System` or `type: Netdata`, `component` names the subsystem, such as `CPU`, `Memory`, `Disk`, `Filesystem`, `Network`, `Processes`, `DB engine` or `Plugins`.
-- With any other type, `component` names the product, managed service or vendor-neutral protocol the alert is about, written the way its vendor writes it, such as `PostgreSQL`, `Azure Cosmos DB`, `Amazon RDS`, `Redfish` or `BGP`.
+- With `type: System` or `type: Netdata`, `component` names the subsystem, such as `CPU`, `Memory`, `Disk`, `Filesystem`, `Network` or `Systemd units` for the host, and `DB engine`, `Plugins` or `Streaming` for the Netdata Agent. A remotely monitored operating system uses its product name, such as `IBM i`.
+- With `type: Kubernetes`, `component` names the Kubernetes component or object kind, such as `API Server`, `Kubelet` or `Deployment`, or the managed service, such as `Azure Kubernetes Service`.
+- With `type: Hardware`, `component` names the management interface, such as `IPMI` or `Redfish`, or the device class, such as `UPS`, `RAID` or `Battery`.
+- With `type: Synthetic`, `component` names the kind of check, such as `HTTP endpoint`, `Ping` or `X.509 certificate`, or the checking product, such as `Nagios`.
+- With any other type, `component` names the product, managed service or protocol the alert is about, written the way its vendor writes it, such as `PostgreSQL`, `Azure Cosmos DB`, `Amazon RDS` or `BGP`. Where no product, service or protocol applies, it names the monitored feature, such as `Web log`, `Licensing`, `Real User Monitoring` or `cgroups` (Linux control groups).
 - One product or subsystem has one spelling across all alerts.
 
 :::note
@@ -573,12 +576,13 @@ As with the `class` and `type` lines, if `component` is missing from the configu
 
 #### Values Used By Earlier Stock Alerts
 
-Stock alerts of earlier Netdata versions used other `class` and `type` values, and product names without their vendor (for example `Cosmos DB` instead of `Azure Cosmos DB`). Your own alert configurations keep the values you gave them; update filters and notification rules that match the old stock values.
+Stock alerts of earlier Netdata versions used other `class` and `type` values, and product names without their vendor (for example `Cosmos DB` instead of `Azure Cosmos DB`). Many stock alerts also changed `class` within the five values above to follow the definitions; most health, state and status checks moved from `Errors` to `Availability`. The 14 stock alerts that had no `class`, `type` or `component` now set all three. Your own alert configurations keep the values you gave them; review filters and notification rules that match stock `class`, `type` or `component` values.
 
 | Earlier value                                                                         | Current value                                                                                                                                          |
 |---------------------------------------------------------------------------------------|--------------------------------------------------------------------------------------------------------------------------------------------------------|
-| class `Error`                                                                         | `Errors`                                                                                                                                               |
-| class `Performance`, `Backup`                                                         | `Utilization`, `Workload`, `Latency`, `Availability` or `Errors`, per alert                                                                            |
+| class `Error`                                                                         | `Errors` or `Availability`, per alert                                                                                                                  |
+| class `Performance`                                                                   | `Utilization`, `Workload` or `Latency`, per alert                                                                                                      |
+| class `Backup`                                                                        | `Latency` (backup age) or `Errors` (failed backup)                                                                                                     |
 | type `Ad Filtering`                                                                   | `DNS`                                                                                                                                                  |
 | type `Application Server`                                                             | `Application`                                                                                                                                          |
 | type `Certificates`                                                                   | `Synthetic` (X.509 certificate checks), `Application` (Azure Key Vault)                                                                                |
@@ -596,6 +600,8 @@ Stock alerts of earlier Netdata versions used other `class` and `type` values, a
 | type `System` (Azure virtual machines and scale sets, VMware vSphere hosts)           | `Virtual Machine`                                                                                                                                      |
 | type `System` (Redfish, IPMI, RAID controllers)                                       | `Hardware`                                                                                                                                             |
 | type `System` (FortiGate)                                                             | `Network`                                                                                                                                              |
+| type `System` (Netdata machine learning)                                              | `Netdata`                                                                                                                                              |
+| type `System` (web log)                                                               | `Web Server`                                                                                                                                           |
 | type `DNS`, `Web Server`, `Storage` (DNS query, HTTP endpoint and S3 endpoint checks) | `Synthetic`                                                                                                                                            |
 | type `Database`, `Messaging`, `Web Server` (IBM WebSphere)                            | `Application`                                                                                                                                          |
 | type `Database` (IBM i)                                                               | `System`                                                                                                                                               |

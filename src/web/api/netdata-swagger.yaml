@@ -2280,7 +2280,7 @@ paths:
         - f_type: Filter by alert type (e.g., "System", "Database", "Network")
         - f_role: Filter by recipient role (who should be notified)
         - f_class: Filter by alert classification
-        - f_component: Filter by system component
+        - f_component: Filter by alert component
         - f_node: Filter by specific node hostname
         - f_alert: Filter by alert name
         - f_instance: Filter by chart instance name
@@ -2288,7 +2288,7 @@ paths:
 
         **Examples:**
         1. Recent critical transitions: `?last=100&f_status=CRITICAL`
-        2. Database alerts: `?f_component=Database&after=-86400`
+        2. Database alerts: `?f_type=Database&after=-86400`
         3. Specific alert history: `?f_alert=disk_space_usage&last=50`
         4. Node-specific transitions: `?f_node=web-server-01&after=-604800`
 
@@ -2597,16 +2597,16 @@ paths:
           description: |
             **Facet Filter:** Filter transitions by alert type.
 
-            Alert types categorize alerts by what they monitor (e.g., "System", "Database", "Web Server").
+            Alert types categorize alerts by the technology domain they monitor (e.g., "System", "Database", "Web Server").
 
             **Format:** Comma-separated list of alert type names
 
             **Common Alert Types:**
-            - `System` - System-level alerts (CPU, RAM, load)
-            - `Database` - Database monitoring alerts
-            - `Web Server` - Web server alerts (Nginx, Apache)
-            - `Network` - Network-related alerts
-            - `Storage` - Storage and disk alerts
+            - `System` - Host operating system resources (CPU, memory, disks, filesystems, host networking)
+            - `Database` - Databases, key-value stores and search engines
+            - `Web Server` - Web servers, proxies and gateways (NGINX, Apache)
+            - `Network` - Network devices and network infrastructure services
+            - `Storage` - Storage systems and storage services (Ceph, HDFS, object storage)
 
             **Examples:**
             - `f_type=System` - Only system alerts
@@ -2617,7 +2617,7 @@ paths:
             - Filter by technology stack (databases, web servers, etc.)
             - Team-specific alert filtering
 
-            **Note:** The exact type values depend on your alert configurations. Query `/api/v3/alerts` to see available types in your installation.
+            **Note:** Stock alerts use the types documented in the health configuration reference (`src/health/REFERENCE.md`); your own alert configurations may use other values. Query `/api/v3/alerts` to see the types in your installation.
 
             When not specified, transitions of all types are included.
           required: false
@@ -2689,18 +2689,18 @@ paths:
         - name: f_component
           in: query
           description: |
-            **Facet Filter:** Filter transitions by system component.
+            **Facet Filter:** Filter transitions by alert component.
 
-            Components identify which part of the system the alert relates to (e.g., "Network", "Disk", "Memory").
+            Components narrow the alert type: the host subsystem for `System` alerts (e.g., "Network", "Disk", "Memory"), otherwise the product, service or protocol (e.g., "PostgreSQL", "Redis", "BGP").
 
             **Format:** Comma-separated list of component names
 
             **Common Components:**
-            - `Network` - Network-related alerts
-            - `Disk` - Disk/storage alerts
+            - `Network` - Host networking alerts
+            - `Disk` - Disk alerts
             - `Memory` - Memory alerts
             - `CPU` - CPU alerts
-            - `Database` - Database component alerts
+            - `PostgreSQL` - PostgreSQL alerts
 
             **Examples:**
             - `f_component=Disk` - Only disk-related transitions

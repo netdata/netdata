@@ -78,7 +78,7 @@
       "configComponent": {
         "type": "string",
         "title": "Alert Component",
-        "description": "Narrows the Alert Type: the host subsystem for System and Netdata alerts ('CPU', 'Memory', 'Disk', 'Network'), otherwise the product or service ('PostgreSQL', 'Redis', 'Azure SQL Database')."
+        "description": "Narrows the Alert Type: the host subsystem for System alerts ('CPU', 'Memory', 'Disk'), the Agent subsystem for Netdata alerts ('DB engine', 'Streaming'), the kind of check for Synthetic alerts ('HTTP endpoint'), otherwise the product, service or protocol ('PostgreSQL', 'Azure SQL Database', 'Redfish', 'BGP')."
       },
       "configClassification": {
         "type": "string",

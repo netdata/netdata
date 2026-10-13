@@ -163,14 +163,23 @@ class CheckClassificationTest(unittest.TestCase):
             rule('ok', **{'class': 'Errors', 'type': 'System', 'component': 'Process'}),
             rule('ok_same_component', **{'class': 'Latency', 'type': 'System', 'component': 'Process'}),
             rule('no_component', **{'class': 'Errors', 'type': 'System'}),
+            rule('blank_type', **{'class': 'Errors', 'type': '  ', 'component': 'CPU'}),
             rule('unknown_class', **{'class': 'Error', 'type': 'System', 'component': 'CPU'}),
             rule('unknown_type', **{'class': 'Errors', 'type': 'Other', 'component': 'CPU'}),
             rule('plural', **{'class': 'Errors', 'type': 'System', 'component': 'Processes'}),
             rule('case', **{'class': 'Errors', 'type': 'System', 'component': 'cpu'}),
         ]
 
-        self.assertEqual([problem.split(':')[1].strip() for problem in check_classification(rules)],
-                         ['no_component', 'unknown_class', 'unknown_type', 'plural', 'case'])
+        problems = [problem.split(': ', 1)[1].split(' is not one of ')[0] for problem in check_classification(rules)]
+
+        self.assertEqual(problems, [
+            'no_component: no component',
+            'blank_type: no type',
+            "unknown_class: class 'Error'",
+            "unknown_type: type 'Other'",
+            "plural: component 'Processes' collides with 'Process' (x.conf: ok)",
+            "case: component 'cpu' collides with 'CPU' (x.conf: blank_type)",
+        ])
 
 
 class CheckAlertRowsTest(unittest.TestCase):

@@ -131,23 +131,24 @@ def _components_collide(first: str, second: str) -> bool:
 def check_classification(rules: Iterable[dict]) -> List[str]:
     """Problems with the ``class``, ``type`` and ``component`` of stock rules.
 
-    Every rule sets all three; class and type come from the vocabulary; one component is never spelled two ways that
-    differ only in case or a plural ending.
+    Every rule sets all three (an empty or whitespace-only value counts as missing); class and type come from the
+    vocabulary; one component is never spelled two ways that differ only in case or a plural ending.
     """
     problems = []
     spellings: Dict[str, str] = {}
 
     for rule in rules:
         where = f'{rule.get("source", "?")}: {rule["name"]}'
-        for field in CLASSIFICATION_FIELDS:
-            if field not in rule:
+        values = {field: (rule.get(field) or '').strip() for field in CLASSIFICATION_FIELDS}
+        for field, value in values.items():
+            if not value:
                 problems.append(f'{where}: no {field}')
-        if 'class' in rule and rule['class'] not in ALERT_CLASSES:
-            problems.append(f'{where}: class {rule["class"]!r} is not one of {", ".join(ALERT_CLASSES)}')
-        if 'type' in rule and rule['type'] not in ALERT_TYPES:
-            problems.append(f'{where}: type {rule["type"]!r} is not one of {", ".join(ALERT_TYPES)}')
-        component = rule.get('component')
-        if component is None or component in spellings:
+        if values['class'] and values['class'] not in ALERT_CLASSES:
+            problems.append(f'{where}: class {values["class"]!r} is not one of {", ".join(ALERT_CLASSES)}')
+        if values['type'] and values['type'] not in ALERT_TYPES:
+            problems.append(f'{where}: type {values["type"]!r} is not one of {", ".join(ALERT_TYPES)}')
+        component = values['component']
+        if not component or component in spellings:
             continue
         for seen, seen_where in spellings.items():
             if _components_collide(component, seen):
