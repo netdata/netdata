@@ -183,13 +183,14 @@ def read_integrations_js(path_to_file: str):
     """
     try:
         data = Path(path_to_file).read_text(encoding="utf-8")
-        categories_str = data.split("export const categories = ")[1].split("export const integrations = ")[0]
-        integrations_str = data.split("export const categories = ")[1].split("export const integrations = ")[1]
+        after_categories = data.split("export const categories = ", 1)[1]
+        categories_str, after_integrations = after_categories.split("export const integrations = ", 1)
+        integrations_str = re.split(r"\n\s*export const ", after_integrations, maxsplit=1)[0]
         categories = json.loads(categories_str)
         integrations = json.loads(integrations_str)
     except FileNotFoundError as error:
         raise RuntimeError(f"Missing generated integrations input: {path_to_file}") from error
-    except (IndexError, json.JSONDecodeError) as error:
+    except (IndexError, ValueError, json.JSONDecodeError) as error:
         raise RuntimeError(f"Malformed generated integrations input: {path_to_file}") from error
 
     if not isinstance(categories, list) or not categories:

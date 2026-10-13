@@ -1,0 +1,138 @@
+#!/usr/bin/env python3
+"""Stock health alert metadata for the integrations catalogue.
+
+Reads ``src/health/health.d/*.conf`` with the line rules of the Agent's ``health_readfile`` and builds the ``alerts``
+export of ``integrations.js``/``integrations.json``, and checks the ``alerts`` rows of integration metadata against it.
+Text values keep their authored quotes (the Agent turns every quote into a space); only wrapping quotes are removed.
+"""
+
+from __future__ import annotations
+
+from pathlib import Path
+from typing import Dict, Iterable, List, Mapping, Optional
+
+from _common import AGENT_REPO, REPO_PATH
+
+HEALTH_CONFIG_DIR = REPO_PATH / 'src' / 'health' / 'health.d'
+CONF_LINK_PREFIX = f'https://github.com/{AGENT_REPO}/blob/master/'
+
+RULE_KEYS = ('alarm', 'template')
+EXPORTED_FIELDS = ('class', 'type', 'component', 'units', 'summary', 'info')
+
+
+def _trim_all(text: str) -> str:
+    return ' '.join(text.split())
+
+
+def _unquote(text: str) -> str:
+    if len(text) >= 2 and text[0] == text[-1] and text[0] in '"\'':
+        return text[1:-1].strip()
+    return text
+
+
+def _logical_lines(text: str) -> Iterable[str]:
+    pending = ''
+    for raw in text.splitlines():
+        line = (pending + raw).strip()
+        pending = ''
+        if not line or line.startswith('#'):
+            continue
+        if line.endswith('\\'):
+            pending = line[:-1] + ' '
+            continue
+        yield line
+    if pending.strip():
+        yield pending.strip()
+
+
+def parse_health_config(text: str, source: str = '') -> List[dict]:
+    """Return the rules of one health configuration file, in file order."""
+    rules = []
+    rule = None
+
+    for line in _logical_lines(text):
+        key, sep, value = line.partition(':')
+        if not sep:
+            continue
+
+        key = _trim_all(key).lower()
+        value = _trim_all(value)
+        if not key or not value:
+            continue
+
+        if key in RULE_KEYS:
+            rule = {'name': value, 'template': key == 'template', 'source': source}
+            rules.append(rule)
+        elif rule is None:
+            continue
+        elif key == 'on':
+            rule['on'] = value
+        elif key in EXPORTED_FIELDS:
+            rule[key] = _unquote(value)
+
+    return rules
+
+
+def load_stock_rules(directory: Path = HEALTH_CONFIG_DIR) -> List[dict]:
+    rules = []
+    for path in sorted(directory.glob('*.conf')):
+        rules.extend(parse_health_config(path.read_text(errors='replace'), path.relative_to(REPO_PATH).as_posix()))
+    return rules
+
+
+def rules_by_name(rules: Iterable[dict]) -> Dict[str, List[dict]]:
+    grouped: Dict[str, List[dict]] = {}
+    for rule in rules:
+        grouped.setdefault(rule['name'], []).append(rule)
+    return grouped
+
+
+def build_alert_index(rules: Iterable[dict], owners: Optional[Mapping[str, Iterable[str]]] = None) -> Dict[str, dict]:
+    """One entry per alert name: the first rule supplies the fields, `on` lists every rule's target."""
+    owners = owners or {}
+    index = {}
+
+    for name, group in sorted(rules_by_name(rules).items()):
+        first = group[0]
+        entry = {'template': first['template']}
+        targets = [rule['on'] for rule in group if rule.get('on')]
+        entry['on'] = list(dict.fromkeys(targets))
+        for field in EXPORTED_FIELDS:
+            if field in first:
+                entry[field] = first[field]
+        entry['source'] = first['source']
+        entry['integrations'] = sorted(set(owners.get(name, ())))
+        index[name] = entry
+
+    return index
+
+
+def conf_link(source: str) -> str:
+    return CONF_LINK_PREFIX + source
+
+
+def check_alert_rows(rows: Iterable[tuple], rules: Iterable[dict]) -> List[str]:
+    """Problems with metadata ``alerts`` rows, given as ``(where, row)`` pairs.
+
+    A row must name a stock alert and link a file that defines it; a template row's ``metric`` must be one of the
+    template's ``on`` contexts (an alarm's ``on`` is a chart id, which the row's context cannot be compared with).
+    """
+    grouped = rules_by_name(rules)
+    problems = []
+
+    for where, row in rows:
+        name = row.get('name')
+        group = grouped.get(name)
+        if not group:
+            problems.append(f'{where}: alert {name!r} is not defined in {HEALTH_CONFIG_DIR.relative_to(REPO_PATH)}')
+            continue
+
+        links = sorted({conf_link(rule['source']) for rule in group})
+        if row.get('link') not in links:
+            problems.append(f'{where}: alert {name!r} link {row.get("link")!r} is not {" or ".join(links)}')
+
+        contexts = sorted({rule['on'] for rule in group if rule['template'] and rule.get('on')})
+        if contexts and row.get('metric') not in contexts:
+            problems.append(f'{where}: alert {name!r} metric {row.get("metric")!r} is not {" or ".join(contexts)}')
+
+    return problems

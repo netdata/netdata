@@ -82,12 +82,17 @@ are read only by this tooling.
   checks. This is not factual verification or a complete MDX build.
 - `integrations/tests/test_descriptions.py` (both workflows): the generated page meta descriptions
   (`description-authoring.md`) resolve, validate, and are unique.
+- `integrations/tests/test_health_alerts.py` (both workflows; `check-markdown.yml` also runs on `src/health/health.d/**`
+  changes): every `metadata.yaml` alert row names a stock alert, links the conf that defines it, and, for a template,
+  has `metric` equal to its `on:` context (an alarm's `on:` is a chart id, so its metric is not compared); it also
+  pins the `alerts` export parser to `health.d`.
 - `collecttest.AssertConfigSchemaMatchesMetadata` (opt-in, per collector test): option descriptions and tabs agree
   between `config_schema.json` and `metadata.yaml`.
 - The ibm.d runtime-output drift gate ("Delivery boundary" above).
-- Not enforced anywhere: metric rows against the code, alert rows against `health.d/*.conf`, option names against the
-  schema for collectors that have not opted in, stock conf defaults against the schema. `check-markdown.yml` checks that
-  generated links resolve on Learn, not that sources are in sync. `integrations/check_collector_metadata.py` is broken
+- Not enforced anywhere: metric rows against the code, alert rows beyond name, link and template metric (`info`
+  verbatim, `os`, order, completeness), option names against the schema for collectors that have not opted in, stock
+  conf defaults against the schema. `check-markdown.yml` checks that generated links resolve on Learn, not that
+  sources are in sync. `integrations/check_collector_metadata.py` is broken
   and unused (`gotchas.md`). Until such checks exist, these are review-time checks.
 - ibm.d modules are the exception: docgen generates `metadata.yaml` and `config_schema.json` from `contexts.yaml`,
   `config.go`, and `module.yaml`, so those agree by construction; the stock `.conf` and `health.d/<...>.conf` still need

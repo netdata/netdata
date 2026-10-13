@@ -383,7 +383,9 @@ items below:
 5. Run collector/profile validation when the alert depends on a collector or profile change. Include source absence and
    collision-bearing labels where relevant.
 6. Search for same-incident alerts, duplicate contexts, old names, fallback overlap, and generated artifacts. Record the
-   result in the SOW.
+   result in the SOW. An added, renamed or removed alert updates the collector `metadata.yaml` `alerts` rows in the same
+   change (`.agents/skills/collectors-metadata-yaml/alerts-and-meta.md`); `integrations/tests/test_health_alerts.py`
+   fails on a stale name.
 7. For an externally sourced alert pack, commit a source-pinned mapping that records the original condition, scope,
    severity, persistence intent, supported releases, Netdata owner, adaptation, and known differences. Tests MUST consume
    that mapping rather than restating the intended result independently.

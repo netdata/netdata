@@ -23,6 +23,7 @@ from _common import (
     warn,
 )
 from descriptions import build_description_index
+from health_alerts import build_alert_index, load_stock_rules
 from prometheus_profile_docs import project_prometheus_profile_coverage
 
 TEMPLATE_PATH = INTEGRATIONS_PATH / 'templates'
@@ -1360,20 +1361,33 @@ def attach_descriptions(integrations, clean_integrations):
             item['description'] = descriptions[item['id']]
 
 
-def render_integrations(categories, integrations):
+def alert_owners(*groups):
+    owners = {}
+
+    for items in groups:
+        for item in items:
+            for alert in item.get('alerts') or []:
+                owners.setdefault(alert['name'], set()).add(make_id(item['meta']))
+
+    return owners
+
+
+def render_integrations(categories, integrations, alerts, output_path=OUTPUT_PATH):
     template = get_jinja_env().get_template('integrations.js')
     data = template.render(
         categories=json.dumps(categories, indent=4),
         integrations=json.dumps(integrations, indent=4),
+        alerts=json.dumps(alerts, indent=4),
     )
     data = convert_local_links(data, "https://github.com/netdata/netdata/blob/master")
-    OUTPUT_PATH.write_text(data)
+    output_path.write_text(data)
 
 
-def render_json(categories, integrations):
+def render_json(categories, integrations, alerts):
     JSON_PATH.write_text(json.dumps({
         'categories': categories,
         'integrations': integrations,
+        'alerts': alerts,
     }, indent=4))
 
 
@@ -1391,6 +1405,8 @@ def main():
     authentications = load_authentications()
     secretstores = load_secretstores()
     service_discoveries = load_service_discoveries()
+
+    alerts = build_alert_index(load_stock_rules(), alert_owners(collectors, flows, devices))
 
     collectors, clean_collectors, ids = render_collectors(categories, collectors, dict())
     deploy, clean_deploy, ids = render_deploy(distros, categories, deploy, ids)
@@ -1419,8 +1435,8 @@ def main():
         print(f'Error: {error}', file=sys.stderr)
         return 1
 
-    render_integrations(categories, integrations)
-    render_json(categories, clean_integrations)
+    render_integrations(categories, integrations, alerts)
+    render_json(categories, clean_integrations, alerts)
 
     return fail_on_warnings()
 

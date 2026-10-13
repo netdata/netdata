@@ -43,6 +43,12 @@ export const integrations = [
      strings; integrations.json carries the same objects with the clean variant of those strings. Every record except
      deploy also carries `description`: the page meta description as one plain-text line, identical in both files */
 ];
+
+export const alerts = {
+  /* keyed by stock alert name: template (bool), on (targets in file order), class, type, component, units, summary,
+     info (each only when the conf sets it), source (repository path of the conf), integrations (ids of the records
+     whose metadata lists the alert); identical in integrations.json under `alerts` */
+};
 ```
 
 The dashboard's renderer interprets the `{% details %}` / `{% /details %}` markers embedded in the rich strings, which
@@ -65,3 +71,6 @@ is why `integrations.js` carries them (`pipeline.md`, "Stage 1: outputs", for th
 5. `deploy` entries live only in `integrations.js` (no page), sorted by `quick_start`; a negative value hides the entry
    from the "Add Nodes" dialog.
 6. Never commit `integrations.js` or `integrations.json` here; the dashboard pulls fresh on each build.
+7. `alerts` covers stock alerts only, as `src/health/health.d` defines them on master. Custom alerts, user edits of
+   stock alerts and alerts of other Agent versions are absent or differ; a dashboard surface MUST treat a missing name
+   as "no catalogue data", not as an error. The Dyncfg Health workspace is its consumer.

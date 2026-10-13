@@ -1,8 +1,8 @@
 # Integrations pipeline
 
 The scripts in this directory turn every `metadata.yaml` in the repository into the integrations catalog
-(`integrations.js`, `integrations.json`), one documentation page per integration, and the umbrella pages under
-`src/collectors/`. How the pipeline works, what is generated, and how changes are delivered is documented for
+(`integrations.js`, `integrations.json`, which also carry the stock alerts of `src/health/health.d/`), one
+documentation page per integration, and the umbrella pages under `src/collectors/`. How the pipeline works, what is generated, and how changes are delivered is documented for
 maintainers in `.agents/skills/integrations-lifecycle/`; this file is the local-run reference.
 
 ## Requirements

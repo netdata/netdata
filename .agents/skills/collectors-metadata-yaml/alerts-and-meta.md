@@ -23,6 +23,9 @@ integration.", which MUST be true.
   conf restricts the alert with `os:`, with the same value.
 - No alert prose is written here. If the `info` reads badly for the page, fix the conf; the page copies it.
 - Rows are ordered as they appear in the conf, so a reader can follow the link and find them in order.
+- CI (`integrations/tests/test_health_alerts.py`) fails on a row whose `name` is not a stock alert, whose `link` is not
+  the conf that defines it, or, for a template, whose `metric` is not its `on:` context. An `alarm:` `on:` is a chart
+  id, not a context, so an alarm row's `metric` is a review check, like `info`, `os`, order and completeness.
 
 ## 2. `meta.monitored_instance`: The Product Identity
 
