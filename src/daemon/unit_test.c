@@ -1973,6 +1973,65 @@ static int test_rrddim_divisor_normalization(void) {
     return rc;
 }
 
+// Freeing a chart must not garbage collect the chart name index. That index is a dictionary view and
+// collecting a view walks all its items under the lock chart creation needs, so a cleanup sweep freeing
+// N charts cost N full walks and stalled data collection on parents with churning children. The sweep
+// collects it once instead.
+static int test_rrdset_free_does_not_collect_name_index_per_chart(void) {
+    fprintf(stderr, "%s() running...\n", __FUNCTION__);
+
+    RRD_DB_MODE old_default_rrd_memory_mode = default_rrd_memory_mode;
+    default_rrd_memory_mode = RRD_DB_MODE_ALLOC;
+
+    int rc = 0;
+    RRDSET *charts[100];
+    const size_t n = sizeof(charts) / sizeof(charts[0]);
+
+    for(size_t i = 0; i < n; i++) {
+        char id[64];
+        snprintfz(id, sizeof(id), "unittest-name-gc-%zu", i);
+        charts[i] = rrdset_create_localhost(
+            "netdata", id, id, "netdata", NULL,
+            "Unit Testing", "x", "unittest", NULL, 1, nd_profile.update_every, RRDSET_TYPE_LINE);
+
+        if(!charts[i]) {
+            fprintf(stderr, "%s: could not create chart '%s'\n", __FUNCTION__, id);
+            for(size_t j = 0; j < i; j++)
+                rrdset_free(charts[j]);
+            default_rrd_memory_mode = old_default_rrd_memory_mode;
+            return 1;
+        }
+    }
+
+    DICTIONARY *names = localhost->rrdset_root_index_name;
+    size_t pending_before = dictionary_pending_deletes(names);
+
+    for(size_t i = 0; i < n; i++)
+        rrdset_free(charts[i]);
+
+    // a collection reclaims every pending item, so if freeing collected, nothing is left pending
+    size_t pending_after_free = dictionary_pending_deletes(names);
+    if(pending_after_free != pending_before + n) {
+        fprintf(stderr, "%s: freeing %zu charts left %zu deleted names pending (%zu before), expected %zu more - "
+                        "freeing collected the name index\n",
+                __FUNCTION__, n, pending_after_free, pending_before, n);
+        rc = 1;
+    }
+
+    // what the cleanup sweep does after freeing charts
+    dictionary_garbage_collect(names);
+    dictionary_garbage_collect(localhost->rrdset_root_index);
+
+    if(dictionary_pending_deletes(names)) {
+        fprintf(stderr, "%s: collecting the name index left %zu deleted names pending\n",
+                __FUNCTION__, dictionary_pending_deletes(names));
+        rc = 1;
+    }
+
+    default_rrd_memory_mode = old_default_rrd_memory_mode;
+    return rc;
+}
+
 static int test_rrdset_rejects_invalid_update_every(void) {
     fprintf(stderr, "%s() running...\n", __FUNCTION__);
 
@@ -3232,6 +3291,9 @@ int run_all_mockup_tests(void)
         return 1;
 
     if(test_rrdset_rejects_invalid_update_every())
+        return 1;
+
+    if(test_rrdset_free_does_not_collect_name_index_per_chart())
         return 1;
 
     // These cover one invariant between them, so run them all and report every failure rather than
