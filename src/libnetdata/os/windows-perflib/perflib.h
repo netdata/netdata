@@ -48,6 +48,7 @@ typedef struct _counterdata {
     uint16_t backoff;           // when parked, cycles remaining until the next re-probe (fits in struct padding)
     const char *key;
     DWORD OverwriteCounterType; // if set, the counter type will be overwritten once read
+    bool elapsed_time_uses_wall_clock;
     RAW_DATA current;
     RAW_DATA previous;
 } COUNTER_DATA;
