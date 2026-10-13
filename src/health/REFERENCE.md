@@ -406,8 +406,8 @@ template: ram_avail_now
 |-----------------------------------------------------|-----------------|--------------------------------------------------------------------------------------|
 | [`alarm`/`template`](#alert-line-alarm-or-template) | yes             | Name of the alert/template                                                           |
 | [`on`](#alert-line-on)                              | yes             | The chart this alert should attach to                                                |
-| [`class`](#alert-line-class)                        | no              | The general alert classification                                                     |
-| [`type`](#alert-line-type)                          | no              | What area of the system the alert monitors                                           |
+| [`class`](#alert-line-class)                        | no              | The kind of problem the alert detects                                                |
+| [`type`](#alert-line-type)                          | no              | The technology domain of the monitored component                                     |
 | [`component`](#alert-line-component)                | no              | Specific component of the type of the alert                                          |
 | [`lookup`](#alert-line-lookup)                      | yes             | The database lookup to find and process metrics for the chart specified through `on` |
 | [`calc`](#alert-line-calc)                          | yes (see above) | A calculation to apply to the value found via `lookup` or another variable           |
@@ -486,7 +486,7 @@ If you create a template using the `disk.io` context, it will apply an alert to 
 
 #### Alert Line `class`
 
-**Purpose:** This indicates the type of error (or general problem area) that the alert or template applies to.
+**Purpose:** This indicates the kind of problem the alert detects, independent of what it monitors.
 
 **Example Use:** `Latency` can be used for alerts that trigger on latency issues on network interfaces, web servers, or database systems.
 
@@ -496,12 +496,13 @@ class: Latency
 
 **Available Classes:**
 
-| Class       | Use Case                       |
-|-------------|--------------------------------|
-| Errors      | Error rate monitoring          |
-| Latency     | Response time issues           |
-| Utilization | Resource usage monitoring      |
-| Workload    | Load and throughput monitoring |
+| Class        | Use Case                                                                                                                       |
+|--------------|--------------------------------------------------------------------------------------------------------------------------------|
+| Availability | Whether something is up, reachable, healthy or in its expected state (up/down, health and state checks, sessions, replication) |
+| Errors       | Counts or rates of errors, failures, drops, rejections and corruption                                                          |
+| Latency      | Time-based measures: response and processing time, lag, delay, time since the last success                                     |
+| Utilization  | Use of a finite capacity: CPU, memory, space, pools, connections or quotas against their limit, saturation, hit ratios         |
+| Workload     | Volume of work: request, traffic, throughput and event rates, queue and backlog sizes, rate anomalies                          |
 
 :::note
 
@@ -511,9 +512,9 @@ class: Latency
 
 #### Alert Line `type`
 
-**Purpose:** You can use `type` to indicate the broader area of the system that the alert applies to.
+**Purpose:** You can use `type` to indicate the technology domain of the component the alert monitors. The domain does not depend on how the data is collected (agent plugin, SNMP, cloud API, exporter) or where the component runs (self-hosted or a managed cloud service).
 
-**Example:** Under the general `Database` type, you can group together alerts that operate on various database systems, like `MySQL`, `CockroachDB`, `CouchDB`, etc.
+**Example:** Under the general `Database` type, you can group together alerts that operate on various database systems, like `MySQL`, `PostgreSQL` or `Azure SQL Database`.
 
 ```text
 type: Database
@@ -521,31 +522,24 @@ type: Database
 
 **Available Types:**
 
-| Type            | Description                                                                                    |
-|-----------------|------------------------------------------------------------------------------------------------|
-| Ad Filtering    | Services related to Ad Filtering (like pi-hole)                                                |
-| Certificates    | Certificate monitoring related                                                                 |
-| Cgroups         | Alerts for CPU and memory usage of control groups                                              |
-| Computing       | Alerts for shared computing applications (e.g. boinc)                                          |
-| Containers      | Container related alerts (e.g. docker instances)                                               |
-| Database        | Database systems (e.g. MySQL, PostgreSQL, etc)                                                 |
-| Data Sharing    | Used to group together alerts for data sharing applications                                    |
-| DHCP            | Alerts for DHCP related services                                                               |
-| DNS             | Alerts for DNS related services                                                                |
-| Kubernetes      | Alerts for kubernetes nodes monitoring                                                         |
-| KV Storage      | Key-Value pairs services alerts (e.g. memcached)                                               |
-| Linux           | Services specific to Linux (e.g. systemd)                                                      |
-| Messaging       | Alerts for message passing services (e.g. vernemq)                                             |
-| Netdata         | Internal Netdata components monitoring                                                         |
-| Other           | When an alert doesn't fit in other types                                                       |
-| Power Supply    | Alerts from power supply related services (e.g. apcupsd)                                       |
-| Search engine   | Alerts for search services (e.g. elasticsearch)                                                |
-| Storage         | Class for alerts dealing with storage services (storage devices typically live under `System`) |
-| System          | General system alerts (e.g. CPU, network, etc.)                                                |
-| Virtual Machine | Virtual Machine software                                                                       |
-| Web Proxy       | Web proxy software (e.g. squid)                                                                |
-| Web Server      | Web server software (e.g. Apache, nginx, etc.)                                                 |
-| Windows         | Alerts for monitoring Windows services                                                         |
+| Type            | Description                                                                                                                                                                     |
+|-----------------|---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| Application     | Application platforms and application-level services that fit no other type (application servers, service discovery, workflow, AI and analytics services, real user monitoring) |
+| Containers      | Container runtimes, control groups and managed container services                                                                                                               |
+| Database        | Databases, key-value stores, caches and search engines, self-hosted or managed                                                                                                  |
+| DHCP            | DHCP servers                                                                                                                                                                    |
+| DNS             | DNS servers and DNS filtering                                                                                                                                                   |
+| GPU             | GPUs and their management services                                                                                                                                              |
+| Hardware        | Physical device health reported by the device or its controller (IPMI, Redfish, RAID controllers, UPS, batteries)                                                               |
+| Kubernetes      | Kubernetes control plane, nodes, workloads and managed clusters                                                                                                                 |
+| Messaging       | Message brokers, queues, event streams, publish/subscribe and notification services                                                                                             |
+| Netdata         | The Netdata Agent's own subsystems                                                                                                                                              |
+| Network         | Network devices and network infrastructure services (SNMP devices and traps, routers, switches, firewalls, BGP, VPN, NAT, layer-4 load balancers)                               |
+| Storage         | Storage systems and storage services (distributed filesystems, object and block storage)                                                                                        |
+| Synthetic       | Active checks of endpoints from outside (HTTP, TCP, ping, DNS queries, certificate and domain expiration, browser journeys)                                                     |
+| System          | The host operating system and its resources and services (CPU, memory, load, disks, filesystems, host networking, processes)                                                    |
+| Virtual Machine | Hypervisors and virtual machines, including managed virtual machines                                                                                                            |
+| Web Server      | Web servers, proxies, layer-7 load balancers and gateways, content delivery networks, application hosting, web logs                                                             |
 
 :::note
 
@@ -557,17 +551,52 @@ If an alert configuration is missing the `type` line, its value will default to 
 
 **Purpose:** You can use `component` to narrow down what the previous `type` value specifies for each alert or template.
 
-**Example:** Continuing from the previous example, `component` might include `MySQL`, `CockroachDB`, `MongoDB`, all under the same `Database` type.
+**Example:** Continuing from the previous example, `component` might include `MySQL`, `PostgreSQL`, `Azure SQL Database`, all under the same `Database` type.
 
 ```text
 component: MySQL
 ```
+
+The stock alerts follow these rules:
+
+- With `type: System` or `type: Netdata`, `component` names the subsystem, such as `CPU`, `Memory`, `Disk`, `Filesystem`, `Network`, `Processes`, `DB engine` or `Plugins`.
+- With any other type, `component` names the product, managed service or vendor-neutral protocol the alert is about, written the way its vendor writes it, such as `PostgreSQL`, `Azure Cosmos DB`, `Amazon RDS`, `Redfish` or `BGP`.
+- One product or subsystem has one spelling across all alerts.
 
 :::note
 
 As with the `class` and `type` lines, if `component` is missing from the configuration, its value will default to `Unknown`.
 
 :::
+
+#### Values Used By Earlier Stock Alerts
+
+Stock alerts of earlier Netdata versions used other `class` and `type` values, and product names without their vendor (for example `Cosmos DB` instead of `Azure Cosmos DB`). Your own alert configurations keep the values you gave them; update filters and notification rules that match the old stock values.
+
+| Earlier value                                                                         | Current value                                                                                                                                          |
+|---------------------------------------------------------------------------------------|--------------------------------------------------------------------------------------------------------------------------------------------------------|
+| class `Error`                                                                         | `Errors`                                                                                                                                               |
+| class `Performance`, `Backup`                                                         | `Utilization`, `Workload`, `Latency`, `Availability` or `Errors`, per alert                                                                            |
+| type `Ad Filtering`                                                                   | `DNS`                                                                                                                                                  |
+| type `Application Server`                                                             | `Application`                                                                                                                                          |
+| type `Certificates`                                                                   | `Synthetic` (X.509 certificate checks), `Application` (Azure Key Vault)                                                                                |
+| type `Cgroups`                                                                        | `Containers`                                                                                                                                           |
+| type `Computing`                                                                      | `Application`                                                                                                                                          |
+| type `Data Sharing`                                                                   | `Storage` (IPFS), `Application` (Retroshare)                                                                                                           |
+| type `KV Storage`, `SearchEngine`                                                     | `Database`                                                                                                                                             |
+| type `Linux`                                                                          | `System`                                                                                                                                               |
+| type `Message Queue`                                                                  | `Messaging`                                                                                                                                            |
+| type `NetworkDevice`, `Switch`                                                        | `Network`                                                                                                                                              |
+| type `Other`                                                                          | the domain of each service: `Application`, `Containers`, `Database`, `Messaging`, `Network`, `Storage`, `Synthetic`, `Virtual Machine` or `Web Server` |
+| type `Power Supply`                                                                   | `Hardware`                                                                                                                                             |
+| type `RUM`, `ServiceMesh`, `ethereum_node`                                            | `Application`                                                                                                                                          |
+| type `Streaming`                                                                      | `Netdata`                                                                                                                                              |
+| type `System` (Azure virtual machines and scale sets, VMware vSphere hosts)           | `Virtual Machine`                                                                                                                                      |
+| type `System` (Redfish, IPMI, RAID controllers)                                       | `Hardware`                                                                                                                                             |
+| type `System` (FortiGate)                                                             | `Network`                                                                                                                                              |
+| type `DNS`, `Web Server`, `Storage` (DNS query, HTTP endpoint and S3 endpoint checks) | `Synthetic`                                                                                                                                            |
+| type `Database`, `Messaging`, `Web Server` (IBM WebSphere)                            | `Application`                                                                                                                                          |
+| type `Database` (IBM i)                                                               | `System`                                                                                                                                               |
 
 #### Alert Line `lookup`
 
