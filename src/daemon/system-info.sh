@@ -137,8 +137,7 @@ detect_disk() {
     # total counts free space once per dataset and changes on every write.
     DISK_DETECTION="geom"
     if geom_output=$(sysctl -n kern.geom.conftxt) &&
-      disk_size=$(printf '%s\n' "${geom_output}" | awk '$2 == "DISK" && $3 !~ /^cd[0-9]/ { print $4 }' | sum_disk_sizes 1) &&
-      [ "${disk_size}" != 0 ]; then
+      disk_size=$(printf '%s\n' "${geom_output}" | awk '$2 == "DISK" && $3 !~ /^cd[0-9]/ { print $4 }' | sum_disk_sizes 1); then
       DISK_SIZE="${disk_size}"
     else
       DISK_STATUS=F
