@@ -2555,10 +2555,6 @@ modules:
       problems:
         list: []
     alerts:
-      - name: mdstat_last_collected
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/mdstat.conf
-        metric: md.disks
-        info: number of seconds since the last successful data collection
       - name: mdstat_disks
         link: https://github.com/netdata/netdata/blob/master/src/health/health.d/mdstat.conf
         metric: md.disks
