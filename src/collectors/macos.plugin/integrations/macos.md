@@ -279,6 +279,8 @@ The following alerts are available:
 | Alert name  | On metric | Description |
 |:------------|:----------|:------------|
 | [ interface_speed ](https://github.com/netdata/netdata/blob/master/src/health/health.d/net.conf) | net.net | network interface ${label:device} current speed |
+| [ 1m_ipv4_tcp_resets_received ](https://github.com/netdata/netdata/blob/master/src/health/health.d/tcp_resets.conf) | ipv4.tcphandshake | average number of failed TCP connection attempts over the last minute |
+| [ 10s_ipv4_tcp_resets_received ](https://github.com/netdata/netdata/blob/master/src/health/health.d/tcp_resets.conf) | ipv4.tcphandshake | average number of failed TCP connection attempts (reset or timed out before being established) over the last 10 seconds. This can be an indication that a service this host needs is down or unreachable. Netdata will not send a clear notification for this alarm. |
 
 
 
