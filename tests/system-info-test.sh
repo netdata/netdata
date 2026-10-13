@@ -191,14 +191,16 @@ case "$probe:$*" in
     sysctl:'-n hw.memsize'|sysctl:'-n hw.physmem')
         [ "${TEST_RAM_FAIL:-false}" = false ] || exit 1
         printf '%b\n' "${TEST_RAM:-1073741824}" ;;
+    sysctl:'-n kern.geom.conftxt')
+        [ "${TEST_DISK_FAIL:-false}" = false ] || exit 1
+        printf '%b\n' "${TEST_GEOM_CONFTXT:-0 DISK ada0 1073741824 512 hd 16 sc 63\n1 PART ada0p1 1073707008 512 i 1\n0 DISK cd0 734003200 2048\n0 MD md0 1048576 512}" ;;
     sysctl:*)
         [ "${TEST_METADATA_FAIL:-false}" = false ] || exit 1
         printf '%s\n' "${TEST_FREQUENCY:-2000000000}" ;;
     diskutil:*) printf 'Disk Size: 1 GB (1073741824 Bytes)\n' ;;
-    lsvfs:*) printf 'ufs\n' ;;
     df:*)
         [ "${TEST_DISK_FAIL:-false}" = false ] || exit 1
-        printf 'total %s\n' "${TEST_DISK_KB:-1048576}" ;;
+        printf 'total 1048576\n' ;;
     route:*)
         case "${NETWORK_TEST:-present}" in
             present|address-failed|no-address) printf 'interface: test0\n' ;;
@@ -268,7 +270,7 @@ case "$probe:$*" in
     *) exit 1 ;;
 esac
 EOF
-for probe in uname sysctl diskutil lsvfs df route netstat ifconfig lscpu nproc ip cat find grep awk systemd-detect-virt pgrep curl dmidecode sw_vers; do
+for probe in uname sysctl diskutil df route netstat ifconfig lscpu nproc ip cat find grep awk systemd-detect-virt pgrep curl dmidecode sw_vers; do
     ln -s probe "${test_dir}/runtime-bin/${probe}"
 done
 chmod +x "${test_dir}/runtime-bin/probe"
@@ -381,12 +383,17 @@ else
 fi
 
 # FreeBSD uses only the count sysctl, with disk failure independent of RAM.
+# Disk size counts only DISK providers: not cd*, partitions or md.
 run_runtime TEST_KERNEL=FreeBSD TEST_FREQUENCY=2400
 assert_record V NETDATA_SYSTEM_CPU_LOGICAL_CPU_COUNT 8
 assert_record V NETDATA_SYSTEM_TOTAL_RAM 1073741824
 assert_record V NETDATA_SYSTEM_TOTAL_DISK_SIZE 1073741824
-run_runtime TEST_KERNEL=FreeBSD TEST_DISK_KB=0
+run_runtime TEST_KERNEL=FreeBSD TEST_GEOM_CONFTXT='0 DISK ada0 1073741824 512\n0 DISK nvd0 2147483648 512'
+assert_record V NETDATA_SYSTEM_TOTAL_DISK_SIZE 3221225472
+run_runtime TEST_KERNEL=FreeBSD TEST_GEOM_CONFTXT='0 DISK cd0 734003200 2048\n0 MD md0 1048576 512'
 assert_record V NETDATA_SYSTEM_TOTAL_DISK_SIZE 0
+run_runtime TEST_KERNEL=FreeBSD TEST_GEOM_CONFTXT='0 DISK ada0 12x4 512'
+assert_record F NETDATA_SYSTEM_TOTAL_DISK_SIZE ''
 run_runtime TEST_KERNEL=FreeBSD TEST_DISK_FAIL=true
 assert_record F NETDATA_SYSTEM_TOTAL_DISK_SIZE ''
 assert_record V NETDATA_SYSTEM_TOTAL_RAM 1073741824
@@ -454,6 +461,14 @@ for kernel in Darwin FreeBSD; do
     assert_startup_record NETDATA_SYSTEM_KERNEL_VERSION ''
     assert_startup_record NETDATA_SYSTEM_ARCHITECTURE ''
 done
+startup_output=$(PATH="${test_dir}/runtime-bin:${PATH}" RUNTIME_PROBE_LOG="${test_dir}/runtime-probes.log" \
+    TEST_KERNEL=FreeBSD /bin/sh "${system_info_script}" --bounded)
+assert_startup_record NETDATA_SYSTEM_TOTAL_DISK_SIZE 1073741824
+assert_startup_record NETDATA_SYSTEM_DISK_DETECTION geom
+startup_output=$(PATH="${test_dir}/runtime-bin:${PATH}" RUNTIME_PROBE_LOG="${test_dir}/runtime-probes.log" \
+    TEST_KERNEL=FreeBSD TEST_DISK_FAIL=true /bin/sh "${system_info_script}" --bounded)
+assert_startup_record NETDATA_SYSTEM_TOTAL_DISK_SIZE unknown
+assert_startup_record NETDATA_SYSTEM_DISK_DETECTION geom
 startup_output=$(PATH="${test_dir}/runtime-bin:${PATH}" RUNTIME_PROBE_LOG="${test_dir}/runtime-probes.log" \
     TEST_CLOUD_FAILURE=true VIRTUALIZATION=kvm /bin/sh "${system_info_script}" --bounded)
 assert_startup_record NETDATA_INSTANCE_CLOUD_TYPE AWS

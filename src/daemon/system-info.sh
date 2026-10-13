@@ -130,17 +130,19 @@ detect_disk() {
       DISK_SIZE=$(printf '%s\n' "${disk_output}" | tail -n +2 | sed -E 's/\/dev\/disk([[:digit:]]*)s[[:digit:]]*/\/dev\/disk\1/g' | sort -k 1 | awk -F ' ' '{s=$NF;for(i=NF-1;i>=1;i--)s=s FS $i;print s}' | uniq -f 9 | awk '{print $8}' | sum_disk_sizes 1024) || DISK_STATUS=F
     fi
   elif [ "${KERNEL_NAME}" = FreeBSD ]; then
-    types='ufs'
-    vfs_output=$(lsvfs) || DISK_STATUS=F
-
-    if (printf '%s\n' "${vfs_output}" | grep -q zfs); then
-      types="${types},zfs"
+    # Like Linux /sys/block: sum the raw size of the GEOM DISK providers (the base disks;
+    # md, zvols, partitions and mirrors are other classes), skipping optical drives.
+    # GEOM has no removable flag, so USB disks count; a jail sees the host's disks;
+    # a multipath disk counts once per path.
+    # Not df: each ZFS dataset reports its used space plus the pool's free space, so the
+    # total counts free space once per dataset and changes on every write.
+    DISK_DETECTION="geom"
+    if geom_output=$(sysctl -n kern.geom.conftxt) &&
+      disk_size=$(printf '%s\n' "${geom_output}" | awk '$2 == "DISK" && $3 !~ /^cd[0-9]/ { print $4 }' | sum_disk_sizes 1); then
+      DISK_SIZE="${disk_size}"
+    else
+      DISK_STATUS=F
     fi
-
-    DISK_DETECTION="df"
-    disk_output=$(df -t ${types} -c -k) || DISK_STATUS=F
-    total="$(printf '%s\n' "${disk_output}" | tail -n 1 | awk '{print $2}')"
-    case "${total}" in ''|*[!0-9]*) DISK_STATUS=F ;; *) DISK_SIZE="$((total * 1024))" ;; esac
   else
     if [ -d /sys/block ] && [ -r /proc/devices ] && ! is_inside_lxc_container; then
       dev_major_whitelist=''
