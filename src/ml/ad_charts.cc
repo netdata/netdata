@@ -245,12 +245,12 @@ void ml_update_dimensions_chart(ml_host_t *host, const ml_machine_learning_stats
         }
 
         rrddim_set_by_pointer(host->ml_running_rs,
-                              host->ml_running_rd, host->ml_running);
+                              host->ml_running_rd, ml_running_load(host->rh));
         rrdset_done(host->ml_running_rs);
     }
 }
 
-void ml_update_host_and_detection_rate_charts(ml_host_t *host, collected_number AnomalyRate) {
+void ml_update_host_and_detection_rate_charts(ml_host_t *host, collected_number anomaly_rate, ONEWAYALLOC *owa) {
     /*
      * Host anomaly rate
     */
@@ -283,7 +283,7 @@ void ml_update_host_and_detection_rate_charts(ml_host_t *host, collected_number 
                 rrddim_add(host->anomaly_rate_rs, "anomaly_rate", NULL, 1, 100, RRD_ALGORITHM_ABSOLUTE);
         }
 
-        rrddim_set_by_pointer(host->anomaly_rate_rs, host->anomaly_rate_rd, AnomalyRate);
+        rrddim_set_by_pointer(host->anomaly_rate_rs, host->anomaly_rate_rd, anomaly_rate);
 
         rrdset_done(host->anomaly_rate_rs);
     }
@@ -377,15 +377,18 @@ void ml_update_host_and_detection_rate_charts(ml_host_t *host, collected_number 
         /*
          * Compute the values of the dimensions based on the host rate chart
         */
-        if (host->ml_running) {
-            ONEWAYALLOC *OWA = onewayalloc_create(0);
+        if (ml_running_load(host->rh)) {
+            // Reclaim the previous host's query scratch before starting the
+            // next one. Cheap no-op on the first iteration of a fresh arena.
+            onewayalloc_reset(owa);
+
             time_t Now = now_realtime_sec();
             time_t Before = Now - host->rh->rrd_update_every;
             time_t After = Before - Cfg.anomaly_detection_query_duration;
             RRDR_OPTIONS Options = static_cast<RRDR_OPTIONS>(0x00000000);
 
             RRDR *R = rrd2rrdr_legacy(
-                    OWA,
+                    owa,
                     host->anomaly_rate_rs,
                     1 /* points wanted */,
                     After,
@@ -415,10 +418,8 @@ void ml_update_host_and_detection_rate_charts(ml_host_t *host, collected_number 
                     rrdset_done(host->detector_events_rs);
                 }
 
-                rrdr_free(OWA, R);
+                rrdr_free(owa, R);
             }
-
-            onewayalloc_destroy(OWA);
         } else {
             rrddim_set_by_pointer(host->detector_events_rs,
                                   host->detector_events_above_threshold_rd, 0);
@@ -627,7 +628,8 @@ void ml_update_global_statistics_charts(uint64_t models_consulted,
                                         uint64_t models_deserialization_failures,
                                         uint64_t memory_consumption,
                                         uint64_t memory_new,
-                                        uint64_t memory_delete)
+                                        uint64_t memory_delete,
+                                        uint64_t memory_unmatched_free)
 {
     if (!Cfg.enable_statistics_charts)
         return;
@@ -728,6 +730,7 @@ void ml_update_global_statistics_charts(uint64_t models_consulted,
         static RRDSET *st = NULL;
         static RRDDIM *rd_memory_new = NULL;
         static RRDDIM *rd_memory_delete = NULL;
+        static RRDDIM *rd_memory_unmatched_free = NULL;
 
         if (unlikely(!st)) {
             st = rrdset_create_localhost(
@@ -747,10 +750,12 @@ void ml_update_global_statistics_charts(uint64_t models_consulted,
 
             rd_memory_new = rrddim_add(st, "new", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
             rd_memory_delete = rrddim_add(st, "delete", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+            rd_memory_unmatched_free = rrddim_add(st, "unmatched_free", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
         }
 
         rrddim_set_by_pointer(st, rd_memory_new, (collected_number) memory_new);
         rrddim_set_by_pointer(st, rd_memory_delete, (collected_number) memory_delete);
+        rrddim_set_by_pointer(st, rd_memory_unmatched_free, (collected_number) memory_unmatched_free);
         rrdset_done(st);
     }
 }

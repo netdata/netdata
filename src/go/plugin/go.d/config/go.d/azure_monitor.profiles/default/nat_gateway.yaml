@@ -1,115 +1,114 @@
 ---
-id: nat_gateway
-name: Azure NAT Gateway
+display_name: Azure NAT Gateway
 resource_type: Microsoft.Network/natGateways
 metrics:
-- id: datapath_availability
-  azure_name: DatapathAvailability
-  time_grain: PT1M
-  series:
-  - aggregation: average
-    kind: gauge
-- id: byte_count
-  azure_name: ByteCount
-  time_grain: PT1M
-  series:
-  - aggregation: total
-    kind: counter
-- id: packet_count
-  azure_name: PacketCount
-  time_grain: PT1M
-  series:
-  - aggregation: total
-    kind: counter
-- id: packet_drop_count
-  azure_name: PacketDropCount
-  time_grain: PT1M
-  series:
-  - aggregation: total
-    kind: counter
-- id: snat_connection_count
-  azure_name: SNATConnectionCount
-  time_grain: PT1M
-  series:
-  - aggregation: total
-    kind: gauge
-- id: total_connection_count
-  azure_name: TotalConnectionCount
-  time_grain: PT1M
-  series:
-  - aggregation: total
-    kind: gauge
+  - id: datapath_availability
+    azure_name: DatapathAvailability
+    time_grain: PT1M
+    series:
+      - aggregation: average
+        kind: gauge
+  - id: byte_count
+    azure_name: ByteCount
+    time_grain: PT1M
+    series:
+      - aggregation: total
+        kind: counter
+  - id: packet_count
+    azure_name: PacketCount
+    time_grain: PT1M
+    series:
+      - aggregation: total
+        kind: counter
+  - id: packet_drop_count
+    azure_name: PacketDropCount
+    time_grain: PT1M
+    series:
+      - aggregation: total
+        kind: counter
+  - id: snat_connection_count
+    azure_name: SNATConnectionCount
+    time_grain: PT1M
+    series:
+      - aggregation: total
+        kind: gauge
+  - id: total_connection_count
+    azure_name: TotalConnectionCount
+    time_grain: PT1M
+    series:
+      - aggregation: total
+        kind: gauge
 template:
   family: Azure NAT Gateway
   context_namespace: nat_gateway
   chart_defaults:
     label_promotion:
-    - resource_name
-    - resource_group
-    - region
-    - resource_type
-    - profile
+      - resource_name
+      - resource_group
+      - region
+      - resource_type
+      - profile
     instances:
       by_labels:
-      - resource_uid
+        - resource_uid
   charts:
-  - id: am_azure_nat_gateway__datapath_availability
-    title: Azure NAT Gateway Datapath Availability
-    context: datapath_availability
-    family: Availability
-    type: line
-    units: percentage
-    algorithm: absolute
-    dimensions:
-    - selector: nat_gateway.datapath_availability_average
-      name: average
-  - id: am_azure_nat_gateway__byte_throughput
-    title: Azure NAT Gateway Byte Throughput
-    context: byte_throughput
-    family: Throughput
-    type: line
-    units: bytes/s
-    algorithm: incremental
-    dimensions:
-    - selector: nat_gateway.byte_count_total
-      name: total
-  - id: am_azure_nat_gateway__packet_throughput
-    title: Azure NAT Gateway Packet Throughput
-    context: packet_throughput
-    family: Throughput
-    type: line
-    units: packets/s
-    algorithm: incremental
-    dimensions:
-    - selector: nat_gateway.packet_count_total
-      name: total
-  - id: am_azure_nat_gateway__dropped_packets
-    title: Azure NAT Gateway Dropped Packets
-    context: dropped_packets
-    family: Errors
-    type: line
-    units: packets/s
-    algorithm: incremental
-    dimensions:
-    - selector: nat_gateway.packet_drop_count_total
-      name: total
-  - id: am_azure_nat_gateway__snat_connections
-    title: Azure NAT Gateway SNAT Connections
-    context: snat_connections
-    family: Connections
-    type: line
-    units: connections
-    algorithm: absolute
-    dimensions:
-    - selector: nat_gateway.snat_connection_count_total
-      name: total
-  - id: am_azure_nat_gateway__total_connections
-    title: Azure NAT Gateway Total SNAT Connections
-    context: total_connections
-    family: Connections
-    type: line
-    units: connections
-    algorithm: absolute
-    dimensions:
-    - selector: nat_gateway.total_connection_count_total
-      name: total
+    - id: am_azure_nat_gateway__datapath_availability
+      title: Azure NAT Gateway Datapath Availability
+      context: datapath_availability
+      family: Availability
+      type: line
+      units: percentage
+      algorithm: absolute
+      dimensions:
+        - selector: datapath_availability_average
+          name: average
+    - id: am_azure_nat_gateway__byte_throughput
+      title: Azure NAT Gateway Byte Throughput
+      context: byte_throughput
+      family: Throughput
+      type: line
+      units: bytes/s
+      algorithm: incremental
+      dimensions:
+        - selector: byte_count_total
+          name: total
+    - id: am_azure_nat_gateway__packet_throughput
+      title: Azure NAT Gateway Packet Throughput
+      context: packet_throughput
+      family: Throughput
+      type: line
+      units: packets/s
+      algorithm: incremental
+      dimensions:
+        - selector: packet_count_total
+          name: total
+    - id: am_azure_nat_gateway__dropped_packets
+      title: Azure NAT Gateway Dropped Packets
+      context: dropped_packets
+      family: Errors
+      type: line
+      units: packets/s
+      algorithm: incremental
+      dimensions:
+        - selector: packet_drop_count_total
+          name: total
+    - id: am_azure_nat_gateway__snat_connections
+      title: Azure NAT Gateway SNAT Connections
+      context: snat_connections
+      family: Connections
+      type: line
+      units: connections
+      algorithm: absolute
+      dimensions:
+        - selector: snat_connection_count_total
+          name: total
+    - id: am_azure_nat_gateway__total_connections
+      title: Azure NAT Gateway Total SNAT Connections
+      context: total_connections
+      family: Connections
+      type: line
+      units: connections
+      algorithm: absolute
+      dimensions:
+        - selector: total_connection_count_total
+          name: total

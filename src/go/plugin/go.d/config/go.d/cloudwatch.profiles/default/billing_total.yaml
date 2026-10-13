@@ -1,0 +1,34 @@
+---
+# AWS publishes worldwide month-to-date estimated charges in us-east-1. Billing
+# metrics must be enabled in the payer or standalone account before data appears.
+version: v1
+display_name: AWS Billing Total Estimated Charges
+namespace: AWS/Billing
+supported_regions: [us-east-1]
+disabled: true
+query:
+  period: 10m
+  lookback: 24h
+instance:
+  dimensions:
+    - name: Currency
+      constant: USD
+metrics:
+  - id: estimated_charges
+    metric_name: EstimatedCharges
+    statistics: [maximum]
+template:
+  family: Billing
+  context_namespace: billing_total
+  chart_defaults:
+    instances:
+      by_labels: [account_id, region]
+  charts:
+    - id: aws_cloudwatch_billing_total_estimated_charges
+      context: estimated_charges
+      title: Latest AWS Estimated Charges (Worldwide MTD)
+      units: USD
+      algorithm: absolute
+      dimensions:
+        - selector: estimated_charges_maximum
+          name: estimated_charges

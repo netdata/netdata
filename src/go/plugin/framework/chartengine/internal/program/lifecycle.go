@@ -19,7 +19,5 @@ type DimensionLifecyclePolicy struct {
 }
 
 func (p LifecyclePolicy) clone() LifecyclePolicy {
-	out := p
-	out.Dimensions = p.Dimensions
-	return out
+	return p
 }

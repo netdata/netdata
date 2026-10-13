@@ -17,15 +17,13 @@ func newThrottledCaller(limit int) *throttledCaller {
 }
 
 func (t *throttledCaller) call(job func()) {
-	t.wg.Add(1)
-	go func() {
-		defer t.wg.Done()
+	t.wg.Go(func() {
 		t.limit <- struct{}{}
 		defer func() {
 			<-t.limit
 		}()
 		job()
-	}()
+	})
 }
 
 func (t *throttledCaller) wait() {

@@ -10,6 +10,7 @@ modules:
         categories:
           - data-collection.databases
         icon_filename: "ibm.svg"
+        description: Monitor IBM DB2 connections, locking, buffer pool efficiency, tablespace capacity, and workload performance through system catalog views.
       related_resources:
         integrations:
           list: []

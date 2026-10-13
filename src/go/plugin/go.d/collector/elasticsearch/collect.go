@@ -3,6 +3,7 @@
 package elasticsearch
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"slices"
@@ -23,16 +24,16 @@ const (
 	urlPathClusterStats   = "/_cluster/stats"
 )
 
-func (c *Collector) collect() (map[string]int64, error) {
+func (c *Collector) collect(ctx context.Context) (map[string]int64, error) {
 	if c.clusterName == "" {
-		name, err := c.getClusterName()
+		name, err := c.getClusterName(ctx)
 		if err != nil {
 			return nil, err
 		}
 		c.clusterName = name
 	}
 
-	ms := c.scrapeElasticsearch()
+	ms := c.scrapeElasticsearch(ctx)
 	if ms.empty() {
 		return nil, nil
 	}
@@ -130,32 +131,28 @@ func (c *Collector) collectLocalIndicesStats(mx map[string]int64, ms *esMetrics)
 	}
 }
 
-func (c *Collector) scrapeElasticsearch() *esMetrics {
+func (c *Collector) scrapeElasticsearch(ctx context.Context) *esMetrics {
 	ms := &esMetrics{}
 	wg := &sync.WaitGroup{}
 
 	if c.DoNodeStats {
-		wg.Add(1)
-		go func() { defer wg.Done(); c.scrapeNodesStats(ms) }()
+		wg.Go(func() { c.scrapeNodesStats(ctx, ms) })
 	}
 	if c.DoClusterHealth {
-		wg.Add(1)
-		go func() { defer wg.Done(); c.scrapeClusterHealth(ms) }()
+		wg.Go(func() { c.scrapeClusterHealth(ctx, ms) })
 	}
 	if c.DoClusterStats {
-		wg.Add(1)
-		go func() { defer wg.Done(); c.scrapeClusterStats(ms) }()
+		wg.Go(func() { c.scrapeClusterStats(ctx, ms) })
 	}
 	if !c.ClusterMode && c.DoIndicesStats {
-		wg.Add(1)
-		go func() { defer wg.Done(); c.scrapeLocalIndicesStats(ms) }()
+		wg.Go(func() { c.scrapeLocalIndicesStats(ctx, ms) })
 	}
 	wg.Wait()
 
 	return ms
 }
 
-func (c *Collector) scrapeNodesStats(ms *esMetrics) {
+func (c *Collector) scrapeNodesStats(ctx context.Context, ms *esMetrics) {
 	var p string
 	if c.ClusterMode {
 		p = urlPathNodesStats
@@ -163,7 +160,11 @@ func (c *Collector) scrapeNodesStats(ms *esMetrics) {
 		p = urlPathLocalNodeStats
 	}
 
-	req, _ := web.NewHTTPRequestWithPath(c.RequestConfig, p)
+	req, err := web.NewHTTPRequestWithPath(ctx, c.RequestConfig, p)
+	if err != nil {
+		c.Warning(err)
+		return
+	}
 
 	var stats esNodesStats
 	if err := web.DoHTTP(c.httpClient).RequestJSON(req, &stats); err != nil {
@@ -174,8 +175,12 @@ func (c *Collector) scrapeNodesStats(ms *esMetrics) {
 	ms.NodesStats = &stats
 }
 
-func (c *Collector) scrapeClusterHealth(ms *esMetrics) {
-	req, _ := web.NewHTTPRequestWithPath(c.RequestConfig, urlPathClusterHealth)
+func (c *Collector) scrapeClusterHealth(ctx context.Context, ms *esMetrics) {
+	req, err := web.NewHTTPRequestWithPath(ctx, c.RequestConfig, urlPathClusterHealth)
+	if err != nil {
+		c.Warning(err)
+		return
+	}
 
 	var health esClusterHealth
 	if err := web.DoHTTP(c.httpClient).RequestJSON(req, &health); err != nil {
@@ -186,8 +191,12 @@ func (c *Collector) scrapeClusterHealth(ms *esMetrics) {
 	ms.ClusterHealth = &health
 }
 
-func (c *Collector) scrapeClusterStats(ms *esMetrics) {
-	req, _ := web.NewHTTPRequestWithPath(c.RequestConfig, urlPathClusterStats)
+func (c *Collector) scrapeClusterStats(ctx context.Context, ms *esMetrics) {
+	req, err := web.NewHTTPRequestWithPath(ctx, c.RequestConfig, urlPathClusterStats)
+	if err != nil {
+		c.Warning(err)
+		return
+	}
 
 	var stats esClusterStats
 	if err := web.DoHTTP(c.httpClient).RequestJSON(req, &stats); err != nil {
@@ -198,8 +207,12 @@ func (c *Collector) scrapeClusterStats(ms *esMetrics) {
 	ms.ClusterStats = &stats
 }
 
-func (c *Collector) scrapeLocalIndicesStats(ms *esMetrics) {
-	req, _ := web.NewHTTPRequestWithPath(c.RequestConfig, urlPathIndicesStats)
+func (c *Collector) scrapeLocalIndicesStats(ctx context.Context, ms *esMetrics) {
+	req, err := web.NewHTTPRequestWithPath(ctx, c.RequestConfig, urlPathIndicesStats)
+	if err != nil {
+		c.Warning(err)
+		return
+	}
 	req.URL.RawQuery = "local=true&format=json"
 
 	var stats []esIndexStats
@@ -211,8 +224,8 @@ func (c *Collector) scrapeLocalIndicesStats(ms *esMetrics) {
 	ms.LocalIndicesStats = removeSystemIndices(stats)
 }
 
-func (c *Collector) getClusterName() (string, error) {
-	req, err := web.NewHTTPRequest(c.RequestConfig)
+func (c *Collector) getClusterName(ctx context.Context) (string, error) {
+	req, err := web.NewHTTPRequest(ctx, c.RequestConfig)
 	if err != nil {
 		return "", err
 	}

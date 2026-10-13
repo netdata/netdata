@@ -3,6 +3,7 @@
 package client
 
 import (
+	"context"
 	"crypto/md5"
 	"crypto/sha256"
 	"encoding/json"
@@ -16,8 +17,8 @@ import (
 )
 
 // New creates a new PowerVault MCI REST API client.
-func New(client web.ClientConfig, request web.RequestConfig, digest string) (*Client, error) {
-	httpClient, err := web.NewHTTPClient(client)
+func New(ctx context.Context, client web.ClientConfig, request web.RequestConfig, digest string) (*Client, error) {
+	httpClient, err := web.NewHTTPClient(ctx, client)
 	if err != nil {
 		return nil, err
 	}
@@ -42,8 +43,8 @@ type Client struct {
 
 // Login authenticates with the PowerVault API.
 // Hashes "username_password" with SHA-256 or MD5, then GET /api/login/<hash>.
-func (c *Client) Login() error {
-	key, err := c.login()
+func (c *Client) Login(ctx context.Context) error {
+	key, err := c.login(ctx)
 	if err != nil {
 		return err
 	}
@@ -52,12 +53,12 @@ func (c *Client) Login() error {
 }
 
 // login authenticates and returns the session key without publishing it.
-func (c *Client) login() (string, error) {
+func (c *Client) login(ctx context.Context) (string, error) {
 	hash := c.authHash()
 
 	req := c.newRequest("/api/login/" + hash)
 
-	resp, err := c.doOK(req)
+	resp, err := c.doOK(ctx, req)
 	defer web.CloseBody(resp)
 	if err != nil {
 		return "", fmt.Errorf("login failed: %v", err)
@@ -86,106 +87,106 @@ func (c *Client) setSessionKey(key string) {
 }
 
 // SetLocale sets the CLI output to English to prevent locale-dependent parsing.
-func (c *Client) SetLocale() error {
+func (c *Client) SetLocale(ctx context.Context) error {
 	req := c.newSessionRequest("/api/set/cli-parameters/locale/English")
-	resp, err := c.doOK(req)
+	resp, err := c.doOK(ctx, req)
 	web.CloseBody(resp)
 	return err
 }
 
 // setLocale sets the CLI locale to English using the given session key.
-func (c *Client) setLocale(sessionKey string) error {
+func (c *Client) setLocale(ctx context.Context, sessionKey string) error {
 	req := c.newRequest("/api/set/cli-parameters/locale/English")
 	if sessionKey != "" {
 		req.Headers["sessionKey"] = sessionKey
 	}
-	resp, err := c.doOK(req)
+	resp, err := c.doOK(ctx, req)
 	web.CloseBody(resp)
 	return err
 }
 
 // System returns system information.
-func (c *Client) System() ([]SystemInfo, error) {
-	return doShow[SystemInfo](c, "/api/show/system", "system")
+func (c *Client) System(ctx context.Context) ([]SystemInfo, error) {
+	return doShow[SystemInfo](ctx, c, "/api/show/system", "system")
 }
 
 // Controllers returns all controllers.
-func (c *Client) Controllers() ([]Controller, error) {
-	return doShow[Controller](c, "/api/show/controllers", "controllers")
+func (c *Client) Controllers(ctx context.Context) ([]Controller, error) {
+	return doShow[Controller](ctx, c, "/api/show/controllers", "controllers")
 }
 
 // Drives returns all drives.
-func (c *Client) Drives() ([]Drive, error) {
-	return doShow[Drive](c, "/api/show/disks", "drives")
+func (c *Client) Drives(ctx context.Context) ([]Drive, error) {
+	return doShow[Drive](ctx, c, "/api/show/disks", "drives")
 }
 
 // Fans returns all fans.
-func (c *Client) Fans() ([]Fan, error) {
-	return doShow[Fan](c, "/api/show/fans", "fan")
+func (c *Client) Fans(ctx context.Context) ([]Fan, error) {
+	return doShow[Fan](ctx, c, "/api/show/fans", "fan")
 }
 
 // PowerSupplies returns all power supplies.
-func (c *Client) PowerSupplies() ([]PowerSupply, error) {
-	return doShow[PowerSupply](c, "/api/show/power-supplies", "power-supplies")
+func (c *Client) PowerSupplies(ctx context.Context) ([]PowerSupply, error) {
+	return doShow[PowerSupply](ctx, c, "/api/show/power-supplies", "power-supplies")
 }
 
 // Sensors returns all sensor readings.
-func (c *Client) Sensors() ([]Sensor, error) {
-	return doShow[Sensor](c, "/api/show/sensor-status", "sensors")
+func (c *Client) Sensors(ctx context.Context) ([]Sensor, error) {
+	return doShow[Sensor](ctx, c, "/api/show/sensor-status", "sensors")
 }
 
 // FRUs returns all Field Replaceable Units.
-func (c *Client) FRUs() ([]FRU, error) {
-	return doShow[FRU](c, "/api/show/frus", "enclosure-fru")
+func (c *Client) FRUs(ctx context.Context) ([]FRU, error) {
+	return doShow[FRU](ctx, c, "/api/show/frus", "enclosure-fru")
 }
 
 // Volumes returns all volumes.
-func (c *Client) Volumes() ([]Volume, error) {
-	return doShow[Volume](c, "/api/show/volumes", "volumes")
+func (c *Client) Volumes(ctx context.Context) ([]Volume, error) {
+	return doShow[Volume](ctx, c, "/api/show/volumes", "volumes")
 }
 
 // Pools returns all storage pools.
-func (c *Client) Pools() ([]Pool, error) {
-	return doShow[Pool](c, "/api/show/pools", "pools")
+func (c *Client) Pools(ctx context.Context) ([]Pool, error) {
+	return doShow[Pool](ctx, c, "/api/show/pools", "pools")
 }
 
 // Ports returns all host ports.
-func (c *Client) Ports() ([]Port, error) {
-	return doShow[Port](c, "/api/show/ports", "port")
+func (c *Client) Ports(ctx context.Context) ([]Port, error) {
+	return doShow[Port](ctx, c, "/api/show/ports", "port")
 }
 
 // ControllerStatistics returns performance stats for all controllers.
-func (c *Client) ControllerStatistics() ([]ControllerStats, error) {
-	return doShow[ControllerStats](c, "/api/show/controller-statistics", "controller-statistics")
+func (c *Client) ControllerStatistics(ctx context.Context) ([]ControllerStats, error) {
+	return doShow[ControllerStats](ctx, c, "/api/show/controller-statistics", "controller-statistics")
 }
 
 // VolumeStatistics returns performance stats for all volumes.
-func (c *Client) VolumeStatistics() ([]VolumeStats, error) {
-	return doShow[VolumeStats](c, "/api/show/volume-statistics", "volume-statistics")
+func (c *Client) VolumeStatistics(ctx context.Context) ([]VolumeStats, error) {
+	return doShow[VolumeStats](ctx, c, "/api/show/volume-statistics", "volume-statistics")
 }
 
 // PortStatistics returns I/O stats for all host ports.
-func (c *Client) PortStatistics() ([]PortStats, error) {
-	return doShow[PortStats](c, "/api/show/host-port-statistics", "host-port-statistics")
+func (c *Client) PortStatistics(ctx context.Context) ([]PortStats, error) {
+	return doShow[PortStats](ctx, c, "/api/show/host-port-statistics", "host-port-statistics")
 }
 
 // PhyStatistics returns SAS PHY error stats.
-func (c *Client) PhyStatistics() ([]PhyStats, error) {
-	return doShow[PhyStats](c, "/api/show/host-phy-statistics", "sas-host-phy-statistics")
+func (c *Client) PhyStatistics(ctx context.Context) ([]PhyStats, error) {
+	return doShow[PhyStats](ctx, c, "/api/show/host-phy-statistics", "sas-host-phy-statistics")
 }
 
 // doShow fetches a /api/show/<command> endpoint and extracts the named array from the response.
 // Re-authenticates once on 401 (session expiry), including locale reset.
-func doShow[T any](c *Client, urlPath, key string) ([]T, error) {
+func doShow[T any](ctx context.Context, c *Client, urlPath, key string) ([]T, error) {
 	req := c.newSessionRequest(urlPath)
 
-	resp, err := c.doOK(req)
+	resp, err := c.doOK(ctx, req)
 	if err != nil && resp != nil && resp.StatusCode == http.StatusUnauthorized {
-		if loginErr := c.reAuth(); loginErr != nil {
+		if loginErr := c.reAuth(ctx); loginErr != nil {
 			return nil, fmt.Errorf("%s: session expired and re-auth failed: %v", urlPath, loginErr)
 		}
 		req = c.newSessionRequest(urlPath)
-		resp, err = c.doOK(req)
+		resp, err = c.doOK(ctx, req)
 	}
 	defer web.CloseBody(resp)
 	if err != nil {
@@ -225,14 +226,14 @@ func doShow[T any](c *Client, urlPath, key string) ([]T, error) {
 // Serialized so concurrent 401 retries don't race on session state.
 // The new session key is published only after locale setup, preventing
 // concurrent requests from seeing a session with non-English locale.
-func (c *Client) reAuth() error {
+func (c *Client) reAuth(ctx context.Context) error {
 	c.authMu.Lock()
 	defer c.authMu.Unlock()
-	key, err := c.login()
+	key, err := c.login(ctx)
 	if err != nil {
 		return err
 	}
-	if err := c.setLocale(key); err != nil {
+	if err := c.setLocale(ctx, key); err != nil {
 		return err
 	}
 	c.setSessionKey(key)
@@ -275,8 +276,8 @@ func (c *Client) newSessionRequest(urlPath string) web.RequestConfig {
 	return req
 }
 
-func (c *Client) doOK(req web.RequestConfig) (*http.Response, error) {
-	httpReq, err := web.NewHTTPRequest(req)
+func (c *Client) doOK(ctx context.Context, req web.RequestConfig) (*http.Response, error) {
+	httpReq, err := web.NewHTTPRequest(ctx, req)
 	if err != nil {
 		return nil, fmt.Errorf("error creating request to %s: %v", req.URL, err)
 	}

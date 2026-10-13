@@ -9,11 +9,38 @@ import (
 
 	"github.com/netdata/netdata/go/plugins/pkg/metrix"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/chartengine/internal/program"
+	"github.com/netdata/netdata/go/plugins/plugin/framework/charttpl"
 )
 
 const (
 	autogenTemplatePrefix = "__autogen__:"
+	// counterRawSuffix follows the metric name in the chart ID and context of a
+	// counter's raw-value chart (AutogenPolicy.CounterRawCharts).
+	counterRawSuffix = ".raw"
+	// counterRawTemplatePrefix gives raw charts their own template identity, so a
+	// series whose own chart ID equals a raw chart ID is a rejected collision
+	// instead of a dimension merged into the raw chart.
+	counterRawTemplatePrefix = autogenTemplatePrefix + "raw:"
 )
+
+// Autogen output also depends on current reader metadata and flattened kinds;
+// series identity and template revision alone do not validate these routes.
+type autogenRouteGuard struct {
+	source      autogenSource
+	metadata    metrix.MetricMeta
+	hasMetadata bool
+	kind        metrix.MetricKind
+	sourceKind  metrix.MetricKind
+	role        metrix.FlattenRole
+}
+
+func (g *autogenRouteGuard) valid(reader metrix.Reader, meta metrix.SeriesMeta) bool {
+	if g == nil || g.kind != meta.Kind || g.sourceKind != meta.SourceKind || g.role != meta.FlattenRole {
+		return false
+	}
+	mm, ok := autogenMetricMeta(reader, g.source)
+	return ok == g.hasMetadata && mm == g.metadata
+}
 
 type autogenRoute struct {
 	chartID           string
@@ -21,7 +48,6 @@ type autogenRoute struct {
 	title             string
 	dimensionName     string
 	dimensionKeyLabel string
-	algorithm         program.Algorithm
 	units             string
 	chartType         program.ChartType
 	family            string
@@ -31,8 +57,14 @@ type autogenRoute struct {
 	float             bool
 }
 
+type autogenSource struct {
+	seriesName   string
+	familyName   string
+	measureField string
+}
+
 type autogenSourceBuilder func(
-	metricName string,
+	source autogenSource,
 	labels metrix.LabelView,
 	meta metrix.SeriesMeta,
 	policy AutogenPolicy,
@@ -40,7 +72,7 @@ type autogenSourceBuilder func(
 ) (autogenRoute, bool, error)
 
 type autogenRoleBuilder func(
-	metricName string,
+	source autogenSource,
 	labels metrix.LabelView,
 	policy AutogenPolicy,
 	typeIDPrefix string,
@@ -65,28 +97,39 @@ var summaryRoleBuilders = map[metrix.FlattenRole]autogenRoleBuilder{
 	metrix.FlattenRoleSummarySum:      buildSummarySumAutogenRoute,
 }
 
-func (e *Engine) resolveAutogenRoute(
+func (e *Engine) resolveAutogenRouteWithReason(
 	reader metrix.Reader,
 	metricName string,
 	labels metrix.LabelView,
 	meta metrix.SeriesMeta,
-) ([]routeBinding, bool, error) {
+) ([]routeBinding, bool, PlanRouteReason, int, error) {
 	if e == nil {
-		return nil, false, fmt.Errorf("chartengine: nil engine")
+		return nil, false, "", -1, fmt.Errorf("chartengine: nil engine")
 	}
 	policy := e.state.cfg.autogen
 	if !policy.Enabled {
-		return nil, false, nil
+		return nil, false, PlanRouteReasonAutogenDisabled, -1, nil
 	}
 
-	route, ok, err := buildAutogenRoute(metricName, labels, meta, policy, e.state.cfg.autogenTypeID)
+	source, ok := resolveAutogenSource(metricName, labels, meta)
+	if !ok {
+		return nil, false, PlanRouteReasonAutogenSourceUnsupported, -1, nil
+	}
+	if ruleIndex, rejected := firstRejectingAutogenRule(e.state.cfg.autogenRules, source.familyName, labels); rejected {
+		return nil, false, PlanRouteReasonAutogenRuleRejected, ruleIndex, nil
+	}
+
+	namespace := e.state.cfg.autogenContextNamespace
+
+	route, ok, err := buildAutogenRoute(source, labels, meta, policy, e.state.cfg.autogenTypeID)
 	if err != nil {
-		return nil, false, err
+		return nil, false, "", -1, err
 	}
 	if !ok {
-		return nil, false, nil
+		return nil, false, PlanRouteReasonAutogenBuildRejected, -1, nil
 	}
-	if metricMeta, ok := autogenMetricMeta(reader, metricName, meta); ok {
+	metricMeta, hasMetadata := autogenMetricMeta(reader, source)
+	if hasMetadata {
 		route = applyAutogenMetricMeta(route, metricMeta, meta)
 	}
 	route.priority = effectiveChartPriority(route.priority)
@@ -94,14 +137,22 @@ func (e *Engine) resolveAutogenRoute(
 	if title == "" {
 		title = getAutogenChartTitle(route.chartName)
 	}
-	return []routeBinding{
+	routes := []routeBinding{
 		{
+			autogenGuard: &autogenRouteGuard{
+				source:      source,
+				metadata:    metricMeta,
+				hasMetadata: hasMetadata,
+				kind:        meta.Kind,
+				sourceKind:  meta.SourceKind,
+				role:        meta.FlattenRole,
+			},
 			ChartTemplateID:   autogenTemplatePrefix + route.chartID,
 			ChartID:           route.chartID,
 			DimensionIndex:    0,
 			DimensionName:     route.dimensionName,
 			DimensionKeyLabel: route.dimensionKeyLabel,
-			Algorithm:         route.algorithm,
+			Algorithm:         program.AlgorithmAuto,
 			Hidden:            false,
 			Multiplier:        1,
 			Divisor:           1,
@@ -112,39 +163,103 @@ func (e *Engine) resolveAutogenRoute(
 			Meta: program.ChartMeta{
 				Title:     title,
 				Family:    route.family,
-				Context:   getAutogenChartContext(route.contextName),
+				Context:   getAutogenChartContext(namespace, route.contextName),
 				Units:     route.units,
-				Algorithm: route.algorithm,
+				Algorithm: program.AlgorithmAuto,
 				Type:      route.chartType,
 				Priority:  route.priority,
 			},
 			Lifecycle: autogenLifecyclePolicy(policy),
 		},
-	}, true, nil
+	}
+	// Most series are not selected scalar counters; check that before building anything.
+	if isScalarCounter(meta) && e.state.cfg.autogenCounterRaw.Selects(source.seriesName) {
+		routes = e.appendCounterRawAutogenRoute(routes, source.seriesName, labels, &metricMeta, hasMetadata)
+	}
+	return routes, true, "", -1, nil
+}
+
+func isScalarCounter(meta metrix.SeriesMeta) bool {
+	return meta.Kind == metrix.MetricKindCounter &&
+		meta.SourceKind == metrix.MetricKindCounter &&
+		meta.FlattenRole == metrix.FlattenRoleNone
+}
+
+// appendCounterRawAutogenRoute appends the raw-value chart of a scalar counter
+// selected by AutogenPolicy.CounterRawCharts to its rate route (routes[0]). The raw
+// chart reads the same series and keeps the rate chart's dimension, family,
+// priority and lifecycle, but charts the value as absolute under the ".raw" chart
+// ID and context. A raw chart ID over the type.id budget skips only the raw chart.
+func (e *Engine) appendCounterRawAutogenRoute(
+	routes []routeBinding,
+	metricName string,
+	labels metrix.LabelView,
+	metricMeta *metrix.MetricMeta,
+	hasMetadata bool,
+) []routeBinding {
+	chartID := buildJoinedLabelAutogenID(metricName+counterRawSuffix, labels, nil)
+	if !fitsTypeIDBudget(e.state.cfg.autogen.MaxTypeIDLen, e.state.cfg.autogenTypeID, chartID) {
+		return routes
+	}
+	units := getAutogenGaugeUnits(metricName)
+	if unit := strings.TrimSpace(metricMeta.Unit); hasMetadata && unit != "" {
+		units = normalizeAutogenUnitByAlgorithm(unit, program.AlgorithmAbsolute)
+	}
+
+	raw := routes[0]
+	raw.ChartTemplateID = counterRawTemplatePrefix + chartID
+	raw.ChartID = chartID
+	raw.Algorithm = program.AlgorithmAbsolute
+	raw.Meta.Title += " (raw)"
+	raw.Meta.Context += counterRawSuffix
+	raw.Meta.Units = units
+	raw.Meta.Algorithm = program.AlgorithmAbsolute
+	return append(routes, raw)
+}
+
+func autogenRulesSelect(rules []charttpl.ValidatedAutogenRule, metricName string, labels metrix.LabelView) bool {
+	_, rejected := firstRejectingAutogenRule(rules, metricName, labels)
+	return !rejected
+}
+
+func diagnosticMetricFamilyName(metricName string, labels metrix.LabelView, meta metrix.SeriesMeta) string {
+	source, ok := resolveAutogenSource(metricName, labels, meta)
+	if !ok || source.familyName == "" {
+		return metricName
+	}
+	return source.familyName
+}
+
+func firstRejectingAutogenRule(rules []charttpl.ValidatedAutogenRule, metricName string, labels metrix.LabelView) (int, bool) {
+	for i, rule := range rules {
+		if rule.ScopeMatches(metricName) && !rule.Selects(metricName, labels) {
+			return i, true
+		}
+	}
+	return -1, false
 }
 
 func buildAutogenRoute(
-	metricName string,
+	source autogenSource,
 	labels metrix.LabelView,
 	meta metrix.SeriesMeta,
 	policy AutogenPolicy,
 	typeIDPrefix string,
 ) (autogenRoute, bool, error) {
-	if strings.TrimSpace(metricName) == "" {
+	if strings.TrimSpace(source.seriesName) == "" {
 		return autogenRoute{}, false, nil
 	}
-	builder := buildScalarAutogenRoute
-	if knownBuilder, ok := autogenSourceBuilders[meta.SourceKind]; ok {
-		builder = knownBuilder
+	if builder, ok := autogenSourceBuilders[meta.SourceKind]; ok {
+		return builder(source, labels, meta, policy, typeIDPrefix)
 	}
-	return builder(metricName, labels, meta, policy, typeIDPrefix)
+	return buildScalarAutogenRoute(source.seriesName, labels, meta, policy, typeIDPrefix)
 }
 
-func autogenMetricMeta(reader metrix.Reader, metricName string, meta metrix.SeriesMeta) (metrix.MetricMeta, bool) {
+func autogenMetricMeta(reader metrix.Reader, source autogenSource) (metrix.MetricMeta, bool) {
 	if reader == nil {
 		return metrix.MetricMeta{}, false
 	}
-	for _, name := range sourceMetricNames(metricName, meta) {
+	for _, name := range sourceMetricNames(source) {
 		if name == "" {
 			continue
 		}
@@ -155,12 +270,33 @@ func autogenMetricMeta(reader metrix.Reader, metricName string, meta metrix.Seri
 	return metrix.MetricMeta{}, false
 }
 
-func sourceMetricNames(metricName string, meta metrix.SeriesMeta) []string {
-	source := sourceMetricName(metricName, meta)
-	if source == "" || source == metricName {
-		return []string{metricName}
+func sourceMetricNames(source autogenSource) []string {
+	if source.familyName == "" || source.familyName == source.seriesName {
+		return []string{source.seriesName}
 	}
-	return []string{source, metricName}
+	return []string{source.familyName, source.seriesName}
+}
+
+func resolveAutogenSource(metricName string, labels metrix.LabelView, meta metrix.SeriesMeta) (autogenSource, bool) {
+	if strings.TrimSpace(metricName) == "" {
+		return autogenSource{}, false
+	}
+
+	source := autogenSource{
+		seriesName: metricName,
+		familyName: sourceMetricName(metricName, meta),
+	}
+	if meta.SourceKind != metrix.MetricKindMeasureSet {
+		return source, true
+	}
+
+	familyName, fieldName, ok := resolveMeasureSetAutogenSource(metricName, labels)
+	if !ok {
+		return autogenSource{}, false
+	}
+	source.familyName = familyName
+	source.measureField = fieldName
+	return source, true
 }
 
 func sourceMetricName(metricName string, meta metrix.SeriesMeta) string {
@@ -168,21 +304,29 @@ func sourceMetricName(metricName string, meta metrix.SeriesMeta) string {
 	case metrix.MetricKindHistogram:
 		switch meta.FlattenRole {
 		case metrix.FlattenRoleHistogramBucket:
-			return strings.TrimSuffix(metricName, "_bucket")
+			return trimAutogenSourceSuffix(metricName, "_bucket")
 		case metrix.FlattenRoleHistogramCount:
-			return strings.TrimSuffix(metricName, "_count")
+			return trimAutogenSourceSuffix(metricName, "_count")
 		case metrix.FlattenRoleHistogramSum:
-			return strings.TrimSuffix(metricName, "_sum")
+			return trimAutogenSourceSuffix(metricName, "_sum")
 		}
 	case metrix.MetricKindSummary:
 		switch meta.FlattenRole {
 		case metrix.FlattenRoleSummaryCount:
-			return strings.TrimSuffix(metricName, "_count")
+			return trimAutogenSourceSuffix(metricName, "_count")
 		case metrix.FlattenRoleSummarySum:
-			return strings.TrimSuffix(metricName, "_sum")
+			return trimAutogenSourceSuffix(metricName, "_sum")
 		}
 	}
 	return metricName
+}
+
+func trimAutogenSourceSuffix(metricName, suffix string) string {
+	sourceName := strings.TrimSuffix(metricName, suffix)
+	if sourceName == "" {
+		return metricName
+	}
+	return sourceName
 }
 
 func applyAutogenMetricMeta(route autogenRoute, meta metrix.MetricMeta, seriesMeta metrix.SeriesMeta) autogenRoute {
@@ -196,7 +340,8 @@ func applyAutogenMetricMeta(route autogenRoute, meta metrix.MetricMeta, seriesMe
 		route.priority = meta.ChartPriority
 	}
 	if unit := strings.TrimSpace(meta.Unit); unit != "" && allowAutogenUnitOverride(seriesMeta) {
-		route.units = normalizeAutogenUnitByAlgorithm(unit, route.algorithm)
+		effectiveAlgorithm := resolveRuntimeAlgorithm(program.AlgorithmAuto, seriesMeta.Kind)
+		route.units = normalizeAutogenUnitByAlgorithm(unit, effectiveAlgorithm)
 		route.chartType = chartTypeFromUnits(route.units)
 	}
 	route.float = meta.Float
@@ -236,7 +381,7 @@ func normalizeAutogenUnitByAlgorithm(unit string, alg program.Algorithm) string 
 }
 
 func buildHistogramAutogenRoute(
-	metricName string,
+	source autogenSource,
 	labels metrix.LabelView,
 	meta metrix.SeriesMeta,
 	policy AutogenPolicy,
@@ -246,11 +391,11 @@ func buildHistogramAutogenRoute(
 	if !ok {
 		return autogenRoute{}, false, nil
 	}
-	return builder(metricName, labels, policy, typeIDPrefix)
+	return builder(source, labels, policy, typeIDPrefix)
 }
 
 func buildSummaryAutogenRoute(
-	metricName string,
+	source autogenSource,
 	labels metrix.LabelView,
 	meta metrix.SeriesMeta,
 	policy AutogenPolicy,
@@ -260,19 +405,16 @@ func buildSummaryAutogenRoute(
 	if !ok {
 		return autogenRoute{}, false, nil
 	}
-	return builder(metricName, labels, policy, typeIDPrefix)
+	return builder(source, labels, policy, typeIDPrefix)
 }
 
 func buildHistogramBucketAutogenRoute(
-	metricName string,
+	source autogenSource,
 	labels metrix.LabelView,
 	policy AutogenPolicy,
 	typeIDPrefix string,
 ) (autogenRoute, bool, error) {
-	baseName := strings.TrimSuffix(metricName, "_bucket")
-	if baseName == "" {
-		baseName = metricName
-	}
+	baseName := source.familyName
 	upperBound, ok := labels.Get(metrix.HistogramBucketLabel)
 	if !ok || strings.TrimSpace(upperBound) == "" {
 		return autogenRoute{}, false, nil
@@ -286,11 +428,10 @@ func buildHistogramBucketAutogenRoute(
 	return autogenRoute{
 		chartID:           chartID,
 		chartName:         baseName,
-		dimensionName:     "bucket_" + upperBound,
+		dimensionName:     upperBound,
 		dimensionKeyLabel: metrix.HistogramBucketLabel,
-		algorithm:         program.AlgorithmIncremental,
 		units:             "observations/s",
-		chartType:         program.ChartTypeLine,
+		chartType:         program.ChartTypeHeatmap,
 		family:            getAutogenChartFamily(baseName),
 		contextName:       baseName,
 		staticDimension:   false,
@@ -298,33 +439,32 @@ func buildHistogramBucketAutogenRoute(
 }
 
 func buildHistogramCountAutogenRoute(
-	metricName string,
+	source autogenSource,
 	labels metrix.LabelView,
 	policy AutogenPolicy,
 	typeIDPrefix string,
 ) (autogenRoute, bool, error) {
-	baseName := strings.TrimSuffix(metricName, "_count")
-	if baseName == "" {
-		baseName = metricName
-	}
-	return buildCounterComponentAutogenRoute(baseName, "_count", labels, policy, typeIDPrefix, "events/s")
+	return buildCounterComponentAutogenRoute(source.familyName, "_count", labels, policy, typeIDPrefix, "events/s")
 }
 
 func buildHistogramSumAutogenRoute(
-	metricName string,
+	source autogenSource,
 	labels metrix.LabelView,
 	policy AutogenPolicy,
 	typeIDPrefix string,
 ) (autogenRoute, bool, error) {
-	baseName := strings.TrimSuffix(metricName, "_sum")
-	if baseName == "" {
-		baseName = metricName
-	}
-	return buildCounterComponentAutogenRoute(baseName, "_sum", labels, policy, typeIDPrefix, getAutogenCounterUnits(baseName))
+	return buildCounterComponentAutogenRoute(
+		source.familyName,
+		"_sum",
+		labels,
+		policy,
+		typeIDPrefix,
+		getAutogenCounterUnits(source.familyName),
+	)
 }
 
 func buildSummaryQuantileAutogenRoute(
-	metricName string,
+	source autogenSource,
 	labels metrix.LabelView,
 	policy AutogenPolicy,
 	typeIDPrefix string,
@@ -333,51 +473,49 @@ func buildSummaryQuantileAutogenRoute(
 	if !ok || strings.TrimSpace(quantile) == "" {
 		return autogenRoute{}, false, nil
 	}
-	chartID := buildJoinedLabelAutogenID(metricName, labels, map[string]struct{}{
+	chartID := buildJoinedLabelAutogenID(source.familyName, labels, map[string]struct{}{
 		metrix.SummaryQuantileLabel: {},
 	})
 	if !fitsTypeIDBudget(policy.MaxTypeIDLen, typeIDPrefix, chartID) {
 		return autogenRoute{}, false, nil
 	}
-	units := getAutogenSummaryUnits(metricName)
+	units := getAutogenSummaryUnits(source.familyName)
 	return autogenRoute{
 		chartID:           chartID,
-		chartName:         metricName,
+		chartName:         source.familyName,
 		dimensionName:     "quantile_" + quantile,
 		dimensionKeyLabel: metrix.SummaryQuantileLabel,
-		algorithm:         program.AlgorithmAbsolute,
 		units:             units,
 		chartType:         chartTypeFromUnits(units),
-		family:            getAutogenChartFamily(metricName),
-		contextName:       metricName,
+		family:            getAutogenChartFamily(source.familyName),
+		contextName:       source.familyName,
 		staticDimension:   false,
 	}, true, nil
 }
 
 func buildSummaryCountAutogenRoute(
-	metricName string,
+	source autogenSource,
 	labels metrix.LabelView,
 	policy AutogenPolicy,
 	typeIDPrefix string,
 ) (autogenRoute, bool, error) {
-	baseName := strings.TrimSuffix(metricName, "_count")
-	if baseName == "" {
-		baseName = metricName
-	}
-	return buildCounterComponentAutogenRoute(baseName, "_count", labels, policy, typeIDPrefix, "events/s")
+	return buildCounterComponentAutogenRoute(source.familyName, "_count", labels, policy, typeIDPrefix, "events/s")
 }
 
 func buildSummarySumAutogenRoute(
-	metricName string,
+	source autogenSource,
 	labels metrix.LabelView,
 	policy AutogenPolicy,
 	typeIDPrefix string,
 ) (autogenRoute, bool, error) {
-	baseName := strings.TrimSuffix(metricName, "_sum")
-	if baseName == "" {
-		baseName = metricName
-	}
-	return buildCounterComponentAutogenRoute(baseName, "_sum", labels, policy, typeIDPrefix, getAutogenCounterUnits(baseName))
+	return buildCounterComponentAutogenRoute(
+		source.familyName,
+		"_sum",
+		labels,
+		policy,
+		typeIDPrefix,
+		getAutogenCounterUnits(source.familyName),
+	)
 }
 
 func buildCounterComponentAutogenRoute(
@@ -397,7 +535,6 @@ func buildCounterComponentAutogenRoute(
 		chartID:         chartID,
 		chartName:       baseName,
 		dimensionName:   autogenDimensionName(chartName),
-		algorithm:       program.AlgorithmIncremental,
 		units:           units,
 		chartType:       chartTypeFromUnits(units),
 		family:          getAutogenChartFamily(baseName),
@@ -407,7 +544,7 @@ func buildCounterComponentAutogenRoute(
 }
 
 func buildStateSetAutogenRoute(
-	metricName string,
+	source autogenSource,
 	labels metrix.LabelView,
 	meta metrix.SeriesMeta,
 	policy AutogenPolicy,
@@ -416,32 +553,31 @@ func buildStateSetAutogenRoute(
 	if meta.FlattenRole != metrix.FlattenRoleStateSetState {
 		return autogenRoute{}, false, nil
 	}
-	state, ok := labels.Get(metricName)
+	state, ok := labels.Get(source.familyName)
 	if !ok || strings.TrimSpace(state) == "" {
 		return autogenRoute{}, false, nil
 	}
-	chartID := buildJoinedLabelAutogenID(metricName, labels, map[string]struct{}{
-		metricName: {},
+	chartID := buildJoinedLabelAutogenID(source.familyName, labels, map[string]struct{}{
+		source.familyName: {},
 	})
 	if !fitsTypeIDBudget(policy.MaxTypeIDLen, typeIDPrefix, chartID) {
 		return autogenRoute{}, false, nil
 	}
 	return autogenRoute{
 		chartID:           chartID,
-		chartName:         metricName,
+		chartName:         source.familyName,
 		dimensionName:     state,
-		dimensionKeyLabel: metricName,
-		algorithm:         program.AlgorithmAbsolute,
+		dimensionKeyLabel: source.familyName,
 		units:             "state",
 		chartType:         program.ChartTypeLine,
-		family:            getAutogenChartFamily(metricName),
-		contextName:       metricName,
+		family:            getAutogenChartFamily(source.familyName),
+		contextName:       source.familyName,
 		staticDimension:   false,
 	}, true, nil
 }
 
 func buildMeasureSetAutogenRoute(
-	metricName string,
+	source autogenSource,
 	labels metrix.LabelView,
 	meta metrix.SeriesMeta,
 	policy AutogenPolicy,
@@ -450,32 +586,28 @@ func buildMeasureSetAutogenRoute(
 	if meta.FlattenRole != metrix.FlattenRoleMeasureSetField {
 		return autogenRoute{}, false, nil
 	}
-	sourceName, fieldName, ok := resolveMeasureSetAutogenSource(metricName, labels)
-	if !ok {
+	if source.familyName == "" || source.measureField == "" {
 		return autogenRoute{}, false, nil
 	}
-	chartID := buildJoinedLabelAutogenID(sourceName, labels, map[string]struct{}{
+	chartID := buildJoinedLabelAutogenID(source.familyName, labels, map[string]struct{}{
 		metrix.MeasureSetFieldLabel: {},
 	})
 	if !fitsTypeIDBudget(policy.MaxTypeIDLen, typeIDPrefix, chartID) {
 		return autogenRoute{}, false, nil
 	}
-	algorithm := program.AlgorithmAbsolute
-	units := getAutogenGaugeUnits(sourceName)
+	units := getAutogenGaugeUnits(source.familyName)
 	if meta.Kind == metrix.MetricKindCounter {
-		algorithm = program.AlgorithmIncremental
-		units = getAutogenCounterUnits(sourceName)
+		units = getAutogenCounterUnits(source.familyName)
 	}
 	return autogenRoute{
 		chartID:           chartID,
-		chartName:         sourceName,
-		dimensionName:     fieldName,
+		chartName:         source.familyName,
+		dimensionName:     source.measureField,
 		dimensionKeyLabel: metrix.MeasureSetFieldLabel,
-		algorithm:         algorithm,
 		units:             units,
 		chartType:         chartTypeFromUnits(units),
-		family:            getAutogenChartFamily(sourceName),
-		contextName:       sourceName,
+		family:            getAutogenChartFamily(source.familyName),
+		contextName:       source.familyName,
 		staticDimension:   false,
 	}, true, nil
 }
@@ -516,17 +648,14 @@ func buildScalarAutogenRoute(
 	if !fitsTypeIDBudget(policy.MaxTypeIDLen, typeIDPrefix, chartID) {
 		return autogenRoute{}, false, nil
 	}
-	algorithm := program.AlgorithmAbsolute
 	units := getAutogenGaugeUnits(metricName)
 	if meta.Kind == metrix.MetricKindCounter {
-		algorithm = program.AlgorithmIncremental
 		units = getAutogenCounterUnits(metricName)
 	}
 	return autogenRoute{
 		chartID:         chartID,
 		chartName:       metricName,
 		dimensionName:   autogenDimensionName(metricName),
-		algorithm:       algorithm,
 		units:           units,
 		chartType:       chartTypeFromUnits(units),
 		family:          getAutogenChartFamily(metricName),
@@ -545,7 +674,7 @@ func fitsTypeIDBudget(maxLen int, typeIDPrefix, chartID string) bool {
 	return len(typeIDPrefix)+1+len(chartID) <= maxLen
 }
 
-func buildJoinedLabelAutogenID(metricName string, labels metrix.LabelView, exclude map[string]struct{}) string {
+func buildJoinedLabelAutogenID(metricName string, labels metrix.LabelView, skipKeys map[string]struct{}) string {
 	var b strings.Builder
 	b.Grow(len(metricName) + labels.Len()*8)
 	b.WriteString(metricName)
@@ -553,7 +682,7 @@ func buildJoinedLabelAutogenID(metricName string, labels metrix.LabelView, exclu
 		if key == "" || value == "" {
 			return true
 		}
-		if _, skip := exclude[key]; skip {
+		if _, skip := skipKeys[key]; skip {
 			return true
 		}
 		b.WriteByte('-')
@@ -601,10 +730,16 @@ func getAutogenChartTitle(metricName string) string {
 	return fmt.Sprintf("Metric \"%s\"", metricName)
 }
 
-func getAutogenChartContext(metricName string) string {
+// getAutogenChartContext builds an autogen chart context, prefixed by the spec's root
+// context_namespace when set ("prometheus" + "foo" -> "prometheus.foo"), matching the
+// template compiler's "." join. Empty namespace -> the bare metric name (unchanged).
+func getAutogenChartContext(namespace, metricName string) string {
 	metricName = strings.TrimSpace(metricName)
 	if metricName == "" {
-		return "metric"
+		metricName = "metric"
+	}
+	if namespace = strings.TrimSpace(namespace); namespace != "" {
+		return namespace + "." + metricName
 	}
 	return metricName
 }
@@ -658,7 +793,7 @@ func getAutogenCounterUnits(metric string) string {
 }
 
 func getAutogenSummaryUnits(metric string) string {
-	return getAutogenCounterUnits(metric)
+	return getAutogenGaugeUnits(metric)
 }
 
 func getAutogenMetricUnits(metric string) string {

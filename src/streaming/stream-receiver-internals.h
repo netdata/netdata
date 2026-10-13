@@ -19,6 +19,21 @@ void stream_receiver_log_payload(struct receiver_state *rpt, const char *payload
 #include "database/rrd.h"
 #include "plugins.d/plugins_d.h"
 
+static inline bool stream_receiver_parse_hops(const char *value, int16_t *hops) {
+    if(!value || !hops)
+        return false;
+
+    char *endptr;
+    errno = 0;
+    long parsed = strtol(value, &endptr, 0);
+
+    if(errno != 0 || endptr == value || *endptr != '\0' || parsed < 1 || parsed > INT16_MAX)
+        return false;
+
+    *hops = (int16_t)parsed;
+    return true;
+}
+
 struct parser;
 
 struct receiver_state {
@@ -74,6 +89,8 @@ struct receiver_state {
 
         nd_poll_event_t wanted;
         usec_t last_traffic_ut;
+        size_t bytes_received;          // raw socket bytes received on this connection (diagnostics)
+        bool keepalive_initialized;
         struct pollfd_meta meta;
     } thread;
 
@@ -91,6 +108,7 @@ struct receiver_state {
     } exit;
 
     struct stream_receiver_config config;
+    int handshake_update_every;
 
 #ifdef NETDATA_LOG_STREAM_RECEIVER
     struct {
@@ -101,12 +119,20 @@ struct receiver_state {
 #endif
 };
 
-bool rrdhost_set_receiver(RRDHOST *host, struct receiver_state *rpt);
+typedef enum {
+    RRDHOST_SET_RECEIVER_OK,                // attached
+    RRDHOST_SET_RECEIVER_ALREADY_ATTACHED,  // another receiver already attached
+    RRDHOST_SET_RECEIVER_CLEANUP_BUSY,      // obsolete-all cleanup is running; caller should answer BUSY_TRY_LATER
+    RRDHOST_SET_RECEIVER_VNODE_IS_LOCAL,    // the host is collected locally as a vnode; caller should answer LOCAL_VNODE
+} RRDHOST_SET_RECEIVER_RESULT;
+
+RRDHOST_SET_RECEIVER_RESULT rrdhost_set_receiver(RRDHOST *host, struct receiver_state *rpt);
 void rrdhost_clear_receiver(struct receiver_state *rpt, STREAM_HANDSHAKE reason);
 void stream_receiver_log_status(struct receiver_state *rpt, const char *msg, STREAM_HANDSHAKE reason, ND_LOG_FIELD_PRIORITY priority);
 
 void stream_receiver_free(struct receiver_state *rpt);
 bool stream_receiver_signal_to_stop_and_wait(RRDHOST *host, STREAM_HANDSHAKE reason);
+void stream_receiver_reconcile_keepalive(struct receiver_state *rpt);
 
 void stream_receiver_send_opcode(struct receiver_state *rpt, struct stream_opcode msg);
 void stream_receiver_handle_op(struct stream_thread *sth, struct receiver_state *rpt, struct stream_opcode *msg);

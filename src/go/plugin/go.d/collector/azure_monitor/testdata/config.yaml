@@ -11,8 +11,8 @@ discovery:
 profiles:
   mode: exact
   mode_exact:
-    names:
-      - sql_managed_instance
+    entries:
+      - name: sql_managed_instance
 query_offset: 180
 timeout: 30
 limits:

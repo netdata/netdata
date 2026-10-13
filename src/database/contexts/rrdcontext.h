@@ -44,9 +44,9 @@ bool rrdinstance_acquired_has_name(RRDINSTANCE_ACQUIRED *ria);
 const char *rrdinstance_acquired_units(RRDINSTANCE_ACQUIRED *ria);
 STRING *rrdinstance_acquired_units_dup(RRDINSTANCE_ACQUIRED *ria);
 RRDLABELS *rrdinstance_acquired_labels(RRDINSTANCE_ACQUIRED *ria);
-DICTIONARY *rrdinstance_acquired_functions(RRDINSTANCE_ACQUIRED *ria);
-RRDHOST *rrdinstance_acquired_rrdhost(RRDINSTANCE_ACQUIRED *ria);
 RRDSET *rrdinstance_acquired_rrdset(RRDINSTANCE_ACQUIRED *ria);
+RRDHOST *rrdinstance_acquired_rrdhost(RRDINSTANCE_ACQUIRED *ria);
+RRDSET_ACQUIRED *rrdinstance_acquired_rrdset_acquire(RRDINSTANCE_ACQUIRED *ria);
 
 bool rrdinstance_acquired_belongs_to_context(RRDINSTANCE_ACQUIRED *ria, RRDCONTEXT_ACQUIRED *rca);
 time_t rrdinstance_acquired_update_every(RRDINSTANCE_ACQUIRED *ria);
@@ -79,7 +79,7 @@ typedef enum {
     RRDCONTEXT_OPTION_SHOW_UUIDS         = (1 << 7),
     RRDCONTEXT_OPTION_SHOW_HIDDEN        = (1 << 8),
     RRDCONTEXT_OPTION_RFC3339            = (1 << 9),  // Return timestamps in RFC3339 format
-    RRDCONTEXT_OPTION_SKIP_ID            = (1 << 31), // internal use
+    RRDCONTEXT_OPTION_SKIP_ID            = (1U << 31), // internal use
 } RRDCONTEXT_TO_JSON_OPTIONS;
 
 #define RRDCONTEXT_OPTIONS_ALL (RRDCONTEXT_OPTION_SHOW_METRICS|RRDCONTEXT_OPTION_SHOW_INSTANCES|RRDCONTEXT_OPTION_SHOW_LABELS|RRDCONTEXT_OPTION_SHOW_QUEUED|RRDCONTEXT_OPTION_SHOW_FLAGS|RRDCONTEXT_OPTION_SHOW_DELETED|RRDCONTEXT_OPTION_SHOW_UUIDS|RRDCONTEXT_OPTION_SHOW_HIDDEN)
@@ -121,12 +121,14 @@ int rrdcontext_find_chart_uuid(RRDSET *st, nd_uuid_t *store_uuid);
 
 void rrdcontext_hub_checkpoint_command(void *cmd);
 void rrdcontext_hub_stop_streaming_command(void *cmd);
+void rrdcontext_hub_pending_checkpoint_replay(RRDHOST *host);
 
 
 // ----------------------------------------------------------------------------
 // public API for threads
 
 void rrdcontext_db_rotation(void);
+void rrdcontext_request_full_gc(void);
 void rrdcontext_main(void *);
 
 // ----------------------------------------------------------------------------
@@ -212,6 +214,7 @@ typedef struct _query_dimension {
 
 typedef struct _query_metric {
     RRDR_DIMENSION_FLAGS status;
+    bool values_stored_as_rates;
 
     struct query_metric_tier {
         STORAGE_METRIC_HANDLE *smh;
@@ -347,7 +350,7 @@ typedef struct query_target {
 
     struct {
         time_t now;                         // the current timestamp, the absolute max for any query timestamp
-        bool relative;                      // true when the request made with relative timestamps, true if it was absolute
+        bool relative;                      // true when the request was made with relative timestamps
         bool aligned;
         time_t after;                       // the absolute timestamp this query is about
         time_t before;                      // the absolute timestamp this query is about
@@ -601,7 +604,7 @@ static inline const char *query_metric_name(QUERY_TARGET *qt, QUERY_METRIC *qm) 
 struct storage *query_metric_storage_engine(QUERY_TARGET *qt, QUERY_METRIC *qm, size_t tier);
 
 STRING *query_instance_id_fqdn(QUERY_INSTANCE *qi, size_t version);
-STRING *query_instance_name_fqdn(QUERY_INSTANCE *qi, size_t version);
+STRING *query_instance_name_fqdn(QUERY_INSTANCE *qi, size_t version, const STRING *host_hostname);
 
 void query_target_free(void);
 void query_target_release(QUERY_TARGET *qt);
@@ -679,7 +682,7 @@ int rrdcontext_to_json_v2(BUFFER *wb, struct api_v2_contexts_request *req, CONTE
 
 RRDCONTEXT_TO_JSON_OPTIONS rrdcontext_to_json_parse_options(char *o);
 void buffer_json_agents_v2(BUFFER *wb, struct query_timings *timings, time_t now_s, bool info, bool array, CONTEXTS_OPTIONS options);
-void buffer_json_node_add_v2(BUFFER *wb, RRDHOST *host, size_t ni, usec_t duration_ut, bool status);
+void buffer_json_node_add_v2(BUFFER *wb, RRDHOST *host, const RRDHOST_IDENTITY *identity, size_t ni, usec_t duration_ut, bool status);
 void buffer_json_query_timings(BUFFER *wb, const char *key, struct query_timings *timings);
 void buffer_json_cloud_timings(BUFFER *wb, const char *key, struct query_timings *timings);
 void buffer_json_agent_status_id(BUFFER *wb, size_t ai, usec_t duration_ut);

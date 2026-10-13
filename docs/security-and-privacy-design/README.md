@@ -77,17 +77,7 @@ Netdata Cloud operates in isolated environments with Infrastructure as Code (IaC
 
 ### Security Vulnerability Response
 
-Netdata handles vulnerabilities with a clear process:
-
-- Full investigation of reported issues
-- Mitigation typically within one week
-- Immediate patch releases when necessary
-
-:::tip
-
-Stay updated by subscribing to [Netdata’s GitHub releases](https://github.com/netdata/netdata/security/policy).
-
-:::
+Netdata handles security vulnerabilities with a structured response process. See [Netdata’s GitHub Security Policy](https://github.com/netdata/netdata/security/policy) for details.
 
 ## Compliance with Regulations
 
@@ -135,30 +125,7 @@ Netdata continuously updates its policies and technical controls to stay aligned
 
 ## Anonymous Statistics
 
-Netdata collects anonymous installation and telemetry statistics to improve its services.
-
-| **Collected**                                                 | **Used For**                                          |
-|:--------------------------------------------------------------|:------------------------------------------------------|
-| Installation info (plugins, operating systems, feature usage) | Guide product development and prioritize improvements |
-| Telemetry events (errors, performance metrics)                | Identify issues and enhance stability                 |
-
-- Observability data (metrics and logs) is never collected.
-- Metadata is anonymized before storage.
-
-### Opting Out
-
-You can disable anonymous telemetry:
-
-- During installation
-- Anytime after, by removing the telemetry opt-in file
-
-:::tip
-
-See [installation documentation](https://learn.netdata.cloud/docs/netdata-agent/anonymous-telemetry-events#opt-out) for detailed opt-out steps.
-
-:::
-
-Netdata does not sell or share anonymous statistics with any third parties.
+Netdata collects anonymous usage information from the Agent to guide product development and improve stability. Observability data (metrics and logs) is never collected, and metadata is anonymized before transmission. Netdata does not sell or share this data with third parties. See [Anonymous telemetry events](/docs/netdata-agent/configuration/anonymous-telemetry-events.md) for the full details and all opt-out methods.
 
 ## Internal Security Measures
 

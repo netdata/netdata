@@ -20,7 +20,5 @@ var defaultChartLifecyclePolicy = program.LifecyclePolicy{
 }
 
 func defaultChartLifecyclePolicyCopy() program.LifecyclePolicy {
-	out := defaultChartLifecyclePolicy
-	out.Dimensions = defaultChartLifecyclePolicy.Dimensions
-	return out
+	return defaultChartLifecyclePolicy
 }

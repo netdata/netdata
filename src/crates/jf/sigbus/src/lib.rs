@@ -1,6 +1,6 @@
 use error::{JournalError, Result};
-use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::OnceLock;
+use std::sync::atomic::{AtomicBool, Ordering};
 
 static SIGBUS_OCCURRED: AtomicBool = AtomicBool::new(false);
 static HANDLER_INSTALLED: OnceLock<i32> = OnceLock::new();
@@ -37,7 +37,7 @@ pub fn install_handler() -> Result<()> {
         let mut sa: libc::sigaction = std::mem::zeroed();
 
         sa.sa_flags = libc::SA_SIGINFO;
-        sa.sa_sigaction = sigbus_handler as usize;
+        sa.sa_sigaction = sigbus_handler as *const () as usize;
 
         libc::sigaction(libc::SIGBUS, &sa, std::ptr::null_mut())
     });

@@ -10,8 +10,6 @@ struct web_client;
 
 extern int web_enable_gzip, web_gzip_level, web_gzip_strategy;
 
-#define HTTP_REQ_MAX_HEADER_FETCH_TRIES 100
-
 extern int respect_web_browser_do_not_track_policy;
 extern const char *web_x_frame_options;
 
@@ -21,7 +19,8 @@ typedef enum __attribute__((packed)) {
     HTTP_VALIDATION_TOO_MANY_READ_RETRIES,
     HTTP_VALIDATION_MALFORMED_URL,
     HTTP_VALIDATION_INCOMPLETE,
-    HTTP_VALIDATION_REDIRECT
+    HTTP_VALIDATION_REDIRECT,
+    HTTP_VALIDATION_URI_TOO_LONG
 } HTTP_VALIDATION;
 
 typedef enum __attribute__((packed)) {
@@ -70,9 +69,15 @@ typedef enum __attribute__((packed)) {
     WEB_CLIENT_FLAG_ACCEPT_SSE              = (1 << 26),
     WEB_CLIENT_FLAG_ACCEPT_TEXT             = (1 << 27),
     WEB_CLIENT_FLAG_MCP_PREVIEW_KEY         = (1 << 28), // Authorization header matched MCP preview key
+    WEB_CLIENT_FLAG_PATH_IS_MCP             = (1 << 29), // URL path is /mcp[/...] or /sse[/...] — set during URL decoding so it's also available for OPTIONS preflights (which skip the URL dispatcher)
+    WEB_CLIENT_FLAG_SSL_CHECKED             = (1 << 30), // the initial TCP bytes have been classified as TLS or plain HTTP
 } WEB_CLIENT_FLAGS;
 
 #define WEB_CLIENT_FLAG_PATH_WITH_VERSION (WEB_CLIENT_FLAG_PATH_IS_V0|WEB_CLIENT_FLAG_PATH_IS_V1|WEB_CLIENT_FLAG_PATH_IS_V2|WEB_CLIENT_FLAG_PATH_IS_V3)
+// PATH_IS_MCP is intentionally *not* in the reset mask: it is set during
+// URL decoding, not during URL dispatch, so resetting it here (which runs
+// after decoding but before dispatch on POST/GET/etc.) would wipe it
+// before the response builder could read it.
 #define web_client_reset_path_flags(w) (w)->flags &= ~(WEB_CLIENT_FLAG_PATH_WITH_VERSION|WEB_CLIENT_FLAG_PATH_HAS_TRAILING_SLASH|WEB_CLIENT_FLAG_PATH_HAS_FILE_EXTENSION)
 
 #define web_client_flag_check(w, flag) ((w)->flags & (flag))
@@ -114,6 +119,9 @@ typedef enum __attribute__((packed)) {
 #define web_client_set_mcp_preview_key(w) web_client_flag_set(w, WEB_CLIENT_FLAG_MCP_PREVIEW_KEY)
 #define web_client_clear_mcp_preview_key(w) web_client_flag_clear(w, WEB_CLIENT_FLAG_MCP_PREVIEW_KEY)
 
+#define web_client_has_ssl_checked(w) web_client_flag_check(w, WEB_CLIENT_FLAG_SSL_CHECKED)
+#define web_client_set_ssl_checked(w) web_client_flag_set(w, WEB_CLIENT_FLAG_SSL_CHECKED)
+
 #define web_client_check_conn_unix(w) web_client_flag_check(w, WEB_CLIENT_FLAG_CONN_UNIX)
 #define web_client_check_conn_tcp(w) web_client_flag_check(w, WEB_CLIENT_FLAG_CONN_TCP)
 #define web_client_check_conn_cloud(w) web_client_flag_check(w, WEB_CLIENT_FLAG_CONN_CLOUD)
@@ -136,14 +144,27 @@ void web_client_set_conn_unix(struct web_client *w);
 void web_client_set_conn_cloud(struct web_client *w);
 void web_client_set_conn_webrtc(struct web_client *w);
 
-#define NETDATA_WEB_REQUEST_URL_SIZE 65536              // static allocation
-
 #define NETDATA_WEB_RESPONSE_ZLIB_CHUNK_SIZE 16384
 
 #define NETDATA_WEB_RESPONSE_HEADER_INITIAL_SIZE 4096
 #define NETDATA_WEB_RESPONSE_INITIAL_SIZE 8192
 #define NETDATA_WEB_REQUEST_INITIAL_SIZE 8192
-#define NETDATA_WEB_REQUEST_MAX_SIZE (128 * 1024)
+#define NETDATA_WEB_REQUEST_MAX_SIZE (1024 * 1024)
+
+// Number of parse attempts (i.e. receive events) a request may consume while it
+// is still incomplete. Completeness is checked before exhaustion, so a request
+// that completes on the attempt that would have exceeded this budget is still
+// served; only requests that remain incomplete are disconnected.
+//
+// Budgeted as one receive per 512 bytes of the maximum request size: a chosen
+// fragmentation allowance, not a guaranteed minimum receive size. A 1 MiB
+// request delivered in 1460-byte TCP segments needs ~719 receives, so this
+// leaves ~2.8x headroom. Requests fragmented more finely than the allowance are
+// rejected on purpose.
+#define HTTP_REQ_MAX_HEADER_FETCH_TRIES ((NETDATA_WEB_REQUEST_MAX_SIZE + 511) / 512)
+
+#define NETDATA_WEB_REQUEST_URL_DECODE_INITIAL_SIZE (4 * 1024)
+#define NETDATA_WEB_REQUEST_URL_DECODE_CACHE_MAX_SIZE (64 * 1024)
 #define NETDATA_WEB_DECODED_URL_INITIAL_SIZE 512
 
 struct response {
@@ -158,6 +179,11 @@ struct response {
     z_stream zstream;                                    // zlib stream for sending compressed output to client
     size_t zsent;                                        // the compressed bytes we have sent to the client
     size_t zhave;                                        // the compressed bytes that we have received from zlib
+    size_t zchunk_header_len;                            // bytes in zchunk_header pending before zbuffer
+    size_t zchunk_header_sent;                           // chunk header bytes already sent
+    size_t zchunk_suffix_sent;                           // chunk suffix bytes already sent
+    size_t zchunk_finalize_sent;                         // final chunk marker bytes already sent
+    char zchunk_header[24];                              // hex chunk-size header plus CRLF
     Bytef zbuffer[NETDATA_WEB_RESPONSE_ZLIB_CHUNK_SIZE]; // temporary buffer for storing compressed output
 };
 
@@ -177,6 +203,7 @@ struct web_client {
     HTTP_ACCESS access;                 // the access permissions of the client
     size_t header_parse_tries;
     size_t header_parse_last_size;
+    size_t header_parse_expected_size;  // POST/PUT total; SIZE_MAX means invalid framing
 
     int fd;
 
@@ -188,6 +215,8 @@ struct web_client {
     BUFFER *url_as_received;            // the entire URL as received, used for logging - DO NOT MODIFY
     BUFFER *url_path_decoded;           // the path, decoded - it is incrementally parsed and altered
     BUFFER *url_query_string_decoded;   // the query string, decoded - it is incrementally parsed and altered
+    char *url_decode_buffer;            // reusable URL-decoding scratch space
+    size_t url_decode_buffer_size;
 
     // THESE NEED TO BE FREED
     char *auth_bearer_token;            // the Bearer auth token (if sent)
@@ -195,6 +224,7 @@ struct web_client {
     char *forwarded_host;               // the X-Forwarded-Host: header
     char *origin;                       // the Origin: header
     char *user_agent;                   // the User-Agent: header
+    nd_uuid_t mcp_session_id;            // the Mcp-Session-Id: header (MCP HTTP transport)
 
     // WebSocket related data - NEED TO BE FREED
     struct {
@@ -260,7 +290,8 @@ void web_client_free(struct web_client *w);
 #include "web/api/web_api_v2.h"
 #include "database/rrd.h"
 
-void web_client_decode_path_and_query_string(struct web_client *w, const char *path_and_query_string);
+bool web_client_decode_path_and_query_string(struct web_client *w, const char *path_and_query_string);
+void web_client_trim_url_decode_buffer_for_cache(struct web_client *w);
 int web_client_api_request(RRDHOST *host, struct web_client *w, char *url_path_fragment);
 int web_client_api_request_with_node_selection(RRDHOST *host, struct web_client *w, char *decoded_url_path);
 

@@ -3,6 +3,7 @@
 #include "libnetdata/libnetdata.h"
 
 static time_t cached_boottime = 0;
+static bool cached_boottime_available = false;
 static SPINLOCK spinlock = SPINLOCK_INITIALIZER;
 
 #if defined(OS_LINUX)
@@ -110,16 +111,20 @@ static time_t get_stable_boottime(void) {
 }
 
 time_t os_boottime(void) {
-    // Fast path - return cached value if available
-    if(cached_boottime > 0)
+    if(__atomic_load_n(&cached_boottime_available, __ATOMIC_ACQUIRE))
         return cached_boottime;
 
     spinlock_lock(&spinlock);
 
-    // Check again under lock in case another thread set it
-    if(cached_boottime == 0)
-        cached_boottime = get_stable_boottime();
+    time_t boottime = cached_boottime;
+    if(boottime == 0) {
+        boottime = get_stable_boottime();
+        cached_boottime = boottime;
+
+        if(boottime > 0)
+            __atomic_store_n(&cached_boottime_available, true, __ATOMIC_RELEASE);
+    }
 
     spinlock_unlock(&spinlock);
-    return cached_boottime;
+    return boottime;
 }

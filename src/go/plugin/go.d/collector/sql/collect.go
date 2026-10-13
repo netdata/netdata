@@ -315,8 +315,8 @@ func redactDSN(dsn string) string {
 	}
 
 	// If there's a colon, treat text before first ':' as user and the rest as password.
-	if colon := strings.IndexByte(userinfo, ':'); colon >= 0 {
-		user := userinfo[:colon]
+	if before, _, ok := strings.Cut(userinfo, ":"); ok {
+		user := before
 		// Keep user, redact password
 		redacted := user + ":****"
 		return dsn[:authStart] + redacted + dsn[at:]

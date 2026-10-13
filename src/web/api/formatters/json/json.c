@@ -8,6 +8,21 @@
 #define JSON_DATES_JS 1
 #define JSON_DATES_TIMESTAMP 2
 
+// the google visualization flavor (datatable + google_json) emits labels as
+// single-quoted JavaScript strings - escape the delimiter and the backslash;
+// control characters become \u escapes, which JavaScript accepts too
+static void rrdr2json_single_quoted_strcat(BUFFER *wb, const char *txt) {
+    for(const unsigned char *t = (const unsigned char *)txt; *t ; t++) {
+        if(unlikely(*t < ' '))
+            buffer_sprintf(wb, "\\u%04X", (unsigned)*t);
+        else {
+            if(unlikely(*t == '\\' || *t == '\''))
+                buffer_putc(wb, '\\');
+            buffer_putc(wb, (char)*t);
+        }
+    }
+}
+
 void rrdr2json(RRDR *r, BUFFER *wb, RRDR_OPTIONS options, int datatable) {
     json_keys_init((options & RRDR_OPTION_LONG_JSON_KEYS) ? JSON_KEYS_OPTION_LONG_KEYS : 0);
     
@@ -121,7 +136,13 @@ void rrdr2json(RRDR *r, BUFFER *wb, RRDR_OPTIONS options, int datatable) {
             continue;
 
         buffer_fast_strcat(wb, pre_label, pre_label_len);
-        buffer_strcat(wb, string2str(r->dn[c]));
+        // dimension names can carry any character (label values become
+        // names under group_by=label) - escape them or the JSON breaks;
+        // the escaping must match the active string quote
+        if(unlikely(sq[0] == '\''))
+            rrdr2json_single_quoted_strcat(wb, string2str(r->dn[c]));
+        else
+            buffer_json_strcat(wb, string2str(r->dn[c]));
         buffer_fast_strcat(wb, post_label, post_label_len);
         i++;
     }
@@ -241,8 +262,14 @@ void rrdr2json(RRDR *r, BUFFER *wb, RRDR_OPTIONS options, int datatable) {
 
             buffer_fast_strcat(wb, pre_value, pre_value_len);
 
-            if(unlikely( options & RRDR_OPTION_OBJECTSROWS ))
-                buffer_sprintf(wb, "%s%s%s: ", kq, string2str(r->dn[c]), kq);
+            if(unlikely( options & RRDR_OPTION_OBJECTSROWS )) {
+                // the row object keys repeat the dimension names - escape them
+                // like the header (datatable clears this option, so the key
+                // quote is always ")
+                buffer_fast_strcat(wb, "\"", 1);
+                buffer_json_strcat(wb, string2str(r->dn[c]));
+                buffer_fast_strcat(wb, "\": ", 3);
+            }
 
             if(co[c] & RRDR_VALUE_EMPTY && !(options & (RRDR_OPTION_INTERNAL_AR))) {
                 if(unlikely(options & RRDR_OPTION_NULL2ZERO))
@@ -267,7 +294,9 @@ void rrdr2json_v2(RRDR *r, BUFFER *wb) {
     QUERY_TARGET *qt = r->internal.qt;
     RRDR_OPTIONS options = qt->window.options;
 
-    bool send_count = query_target_aggregatable(qt);
+    // aggregatable results need the per-point counts, but an RRDR without
+    // group-by (a v1 query) has no gbc array to read them from
+    bool send_count = query_target_aggregatable(qt) && r->gbc;
     bool send_hidden = send_count && r->vh && query_has_group_by_aggregation_percentage(qt);
 
     buffer_json_member_add_object(wb, "result");
@@ -316,7 +345,7 @@ void rrdr2json_v2(RRDR *r, BUFFER *wb) {
             NETDATA_DOUBLE *ch = send_hidden ? &r->vh[i * r->d ] : NULL;
             RRDR_VALUE_FLAGS *co = &r->o[ i * r->d ];
             NETDATA_DOUBLE *ar = &r->ar[ i * r->d ];
-            uint32_t *gbc = &r->gbc [ i * r->d ];
+            uint32_t *gbc = r->gbc ? &r->gbc[ i * r->d ] : NULL;
             time_t now = r->t[i];
 
             buffer_json_add_array_item_array(wb); // row

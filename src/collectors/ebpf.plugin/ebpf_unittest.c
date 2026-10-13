@@ -10,7 +10,6 @@
 #include <netinet/in.h>
 #include "libbpf_api/ebpf_library.h"
 #include "ebpf.h"
-#include "ebpf_socket.h"
 
 extern uint32_t integration_with_collectors;
 extern int running_on_kernel;
@@ -22,6 +21,24 @@ ebpf_module_t test_em;
 
 static int tests_failed = 0;
 
+static enum bpf_map_type ebpf_ut_map_type(const struct bpf_map *map)
+{
+#ifdef LIBBPF_MAJOR_VERSION
+    return bpf_map__type(map);
+#else
+    return bpf_map__def(map)->type;
+#endif
+}
+
+static uint32_t ebpf_ut_map_value_size(const struct bpf_map *map)
+{
+#ifdef LIBBPF_MAJOR_VERSION
+    return bpf_map__value_size(map);
+#else
+    return bpf_map__def(map)->value_size;
+#endif
+}
+
 #define EBPF_UT_ASSERT(test, msg)                                                                                      \
     do {                                                                                                               \
         if (!(test)) {                                                                                                 \
@@ -31,6 +48,77 @@ static int tests_failed = 0;
             fprintf(stderr, ">>> PASSED: %s\n", msg);                                                                  \
         }                                                                                                              \
     } while (0)
+
+static int ebpf_ut_percpu_lookup_fits_nprocs(struct bpf_object *obj)
+{
+    const int possible_cpus = libbpf_num_possible_cpus();
+    if (possible_cpus < 1) {
+        fprintf(stderr, ">>> FAILED: cannot determine possible CPU count for per-CPU lookup test\n");
+        return -1;
+    }
+
+    struct bpf_map *map = bpf_object__find_map_by_name(obj, "tbl_total_stats");
+    if (!map || ebpf_ut_map_type(map) != BPF_MAP_TYPE_PERCPU_ARRAY) {
+        fprintf(stderr, ">>> FAILED: process tbl_total_stats per-CPU array is unavailable\n");
+        return -1;
+    }
+
+    const size_t value_size = ebpf_ut_map_value_size(map);
+    const size_t stride = (value_size + sizeof(uint64_t) - 1) & ~(sizeof(uint64_t) - 1);
+    if (!stride || (size_t)possible_cpus > (SIZE_MAX - 2 * sizeof(uint64_t)) / stride) {
+        fprintf(stderr, ">>> FAILED: invalid per-CPU map value size\n");
+        return -1;
+    }
+
+    const size_t values_size = stride * (size_t)possible_cpus;
+    uint8_t *values = mallocz(values_size + 2 * sizeof(uint64_t));
+    if (!values) {
+        fprintf(stderr, ">>> FAILED: cannot allocate guarded per-CPU lookup buffer\n");
+        return -1;
+    }
+
+    const uint64_t physical_guard = UINT64_C(0x9f6b3d21c7a548e0);
+    const size_t checked_cpus = (ebpf_nprocs > 0 && ebpf_nprocs < possible_cpus) ? (size_t)ebpf_nprocs
+                                                                                   : (size_t)possible_cpus;
+    const uint64_t logical_guard = UINT64_C(0x7a1c5e93b4d286f0);
+    memcpy(values + values_size, &physical_guard, sizeof(physical_guard));
+    uint8_t *logical_guard_ptr = checked_cpus < (size_t)possible_cpus ? values + checked_cpus * stride
+                                                                      : values + values_size + sizeof(uint64_t);
+    memcpy(logical_guard_ptr, &logical_guard, sizeof(logical_guard));
+
+    uint32_t key = 0;
+    const int lookup_result = bpf_map_lookup_elem(bpf_map__fd(map), &key, values);
+
+    uint64_t observed_physical_guard;
+    uint64_t observed_logical_guard;
+    memcpy(&observed_physical_guard, values + values_size, sizeof(observed_physical_guard));
+    memcpy(&observed_logical_guard, logical_guard_ptr, sizeof(observed_logical_guard));
+    freez(values);
+
+    if (lookup_result) {
+        fprintf(stderr, ">>> FAILED: per-CPU map lookup failed (%d)\n", lookup_result);
+        return -1;
+    }
+
+    if (observed_physical_guard != physical_guard) {
+        fprintf(stderr, ">>> FAILED: per-CPU lookup wrote beyond %d possible CPU values\n", possible_cpus);
+        return -1;
+    }
+
+    if (ebpf_nprocs < possible_cpus || observed_logical_guard != logical_guard) {
+        fprintf(stderr,
+                ">>> FAILED: per-CPU lookup wrote %d values, buffers sized with ebpf_nprocs hold %d\n",
+                possible_cpus,
+                ebpf_nprocs);
+        return -1;
+    }
+
+    fprintf(stderr,
+            ">>> PASSED: per-CPU lookup wrote %d values, buffers sized with ebpf_nprocs hold %d\n",
+            possible_cpus,
+            ebpf_nprocs);
+    return 0;
+}
 
 /**
  * Initialize structure
@@ -72,9 +160,10 @@ static int ebpf_ut_load_binary()
     if (!test_em.probe_links)
         return -1;
 
+    int ret = ebpf_ut_percpu_lookup_fits_nprocs(test_em.objects);
     ebpf_unload_legacy_code(test_em.objects, test_em.probe_links);
 
-    return 0;
+    return ret;
 }
 
 /**
@@ -174,76 +263,6 @@ static void test_ebpf_write_chart_obsolete(void)
 }
 
 /**
- * Test ebpf_clean_ip_structure
- *
- * Tests the ebpf_clean_ip_structure function to ensure it correctly
- * frees allocated IP list structures and clears the list pointer.
- */
-static void test_ebpf_clean_ip_structure(void)
-{
-    fprintf(stderr, "\n=== Testing ebpf_clean_ip_structure ===\n");
-
-    ebpf_network_viewer_ip_list_t *list = NULL;
-    ebpf_network_viewer_ip_list_t *item1, *item2;
-
-    item1 = callocz(1, sizeof(ebpf_network_viewer_ip_list_t));
-    item1->value = strdupz("192.168.1.1");
-    item1->ver = AF_INET;
-    item1->next = NULL;
-
-    item2 = callocz(1, sizeof(ebpf_network_viewer_ip_list_t));
-    item2->value = strdupz("10.0.0.1");
-    item2->ver = AF_INET;
-    item2->next = NULL;
-
-    list = item1;
-    item1->next = item2;
-
-    EBPF_UT_ASSERT(list != NULL, "List should not be NULL before cleaning");
-    EBPF_UT_ASSERT(list->next != NULL, "List should have two items before cleaning");
-
-    ebpf_clean_ip_structure(&list);
-
-    EBPF_UT_ASSERT(list == NULL, "List should be NULL after cleaning");
-}
-
-/**
- * Test ebpf_clean_port_structure
- *
- * Tests the ebpf_clean_port_structure function to ensure it correctly
- * frees allocated port list structures and clears the list pointer.
- */
-static void test_ebpf_clean_port_structure(void)
-{
-    fprintf(stderr, "\n=== Testing ebpf_clean_port_structure ===\n");
-
-    ebpf_network_viewer_port_list_t *list = NULL;
-    ebpf_network_viewer_port_list_t *item1, *item2;
-
-    item1 = callocz(1, sizeof(ebpf_network_viewer_port_list_t));
-    item1->value = strdupz("80");
-    item1->first = htons(80);
-    item1->last = htons(80);
-    item1->next = NULL;
-
-    item2 = callocz(1, sizeof(ebpf_network_viewer_port_list_t));
-    item2->value = strdupz("443");
-    item2->first = htons(443);
-    item2->last = htons(443);
-    item2->next = NULL;
-
-    list = item1;
-    item1->next = item2;
-
-    EBPF_UT_ASSERT(list != NULL, "Port list should not be NULL before cleaning");
-    EBPF_UT_ASSERT(list->next != NULL, "Port list should have two items before cleaning");
-
-    ebpf_clean_port_structure(&list);
-
-    EBPF_UT_ASSERT(list == NULL, "Port list should be NULL after cleaning");
-}
-
-/**
  * Test ebpf_how_to_load
  *
  * Tests the ebpf_how_to_load function to ensure it correctly parses
@@ -322,15 +341,25 @@ static void test_ebpf_set_ipc_value(void)
         integration_with_collectors == NETDATA_EBPF_INTEGRATION_SHM,
         "Integration should be NETDATA_EBPF_INTEGRATION_SHM");
 
-    ebpf_set_ipc_value("socket");
-    EBPF_UT_ASSERT(
-        integration_with_collectors == NETDATA_EBPF_INTEGRATION_SOCKET,
-        "Integration should be NETDATA_EBPF_INTEGRATION_SOCKET");
-
     ebpf_set_ipc_value("disabled");
     EBPF_UT_ASSERT(
         integration_with_collectors == NETDATA_EBPF_INTEGRATION_DISABLED,
         "Integration should be NETDATA_EBPF_INTEGRATION_DISABLED");
+
+    ebpf_set_ipc_value("shm");
+    EBPF_UT_ASSERT(
+        integration_with_collectors == NETDATA_EBPF_INTEGRATION_SHM,
+        "Integration should be NETDATA_EBPF_INTEGRATION_SHM before removed socket fallback");
+
+    ebpf_set_ipc_value("socket");
+    EBPF_UT_ASSERT(
+        integration_with_collectors == NETDATA_EBPF_INTEGRATION_DISABLED,
+        "Removed socket integration should be treated as disabled");
+
+    ebpf_set_ipc_value("shm");
+    EBPF_UT_ASSERT(
+        integration_with_collectors == NETDATA_EBPF_INTEGRATION_SHM,
+        "Integration should be NETDATA_EBPF_INTEGRATION_SHM before invalid fallback");
 
     ebpf_set_ipc_value("invalid");
     EBPF_UT_ASSERT(
@@ -449,98 +478,6 @@ static void test_ebpf_global_labels(void)
     EBPF_UT_ASSERT(pio[0].dimension == dim[0], "pio[0].dimension should be dim[0]");
     EBPF_UT_ASSERT(pio[1].dimension == dim[1], "pio[1].dimension should be dim[1]");
     EBPF_UT_ASSERT(pio[2].dimension == dim[2], "pio[2].dimension should be dim[2]");
-}
-
-/**
- * Test ebpf_parse_ports basic
- *
- * Tests the ebpf_parse_ports function with basic port numbers
- * to ensure it correctly parses and creates port list entries.
- */
-static void test_ebpf_parse_ports_basic(void)
-{
-    fprintf(stderr, "\n=== Testing ebpf_parse_ports (basic) ===\n");
-
-    network_viewer_opt.included_port = NULL;
-    network_viewer_opt.excluded_port = NULL;
-
-    ebpf_parse_ports("80 443");
-
-    EBPF_UT_ASSERT(network_viewer_opt.included_port != NULL, "Port list should not be NULL after parsing '80 443'");
-
-    ebpf_clean_port_structure(&network_viewer_opt.included_port);
-    network_viewer_opt.included_port = NULL;
-}
-
-/**
- * Test ebpf_parse_ports with range
- *
- * Tests the ebpf_parse_ports function with port ranges
- * to ensure it correctly parses and creates port range entries.
- */
-static void test_ebpf_parse_ports_with_range(void)
-{
-    fprintf(stderr, "\n=== Testing ebpf_parse_ports with range ===\n");
-
-    network_viewer_opt.included_port = NULL;
-
-    ebpf_parse_ports("8000-9000");
-
-    EBPF_UT_ASSERT(network_viewer_opt.included_port != NULL, "Port list should not be NULL after parsing range");
-
-    if (network_viewer_opt.included_port) {
-        uint16_t first = ntohs(network_viewer_opt.included_port->first);
-        uint16_t last = ntohs(network_viewer_opt.included_port->last);
-        EBPF_UT_ASSERT(first == 8000, "First port should be 8000");
-        EBPF_UT_ASSERT(last == 9000, "Last port should be 9000");
-    }
-
-    ebpf_clean_port_structure(&network_viewer_opt.included_port);
-    network_viewer_opt.included_port = NULL;
-}
-
-/**
- * Test ebpf_parse_ips_unsafe basic
- *
- * Tests the ebpf_parse_ips_unsafe function with basic IPv4 addresses
- * to ensure it correctly parses and creates IP list entries.
- */
-static void test_ebpf_parse_ips_basic(void)
-{
-    fprintf(stderr, "\n=== Testing ebpf_parse_ips_unsafe (basic) ===\n");
-
-    network_viewer_opt.included_ips = NULL;
-
-    ebpf_parse_ips_unsafe("192.168.1.1");
-
-    EBPF_UT_ASSERT(network_viewer_opt.included_ips != NULL, "IP list should not be NULL after parsing IP");
-
-    if (network_viewer_opt.included_ips) {
-        EBPF_UT_ASSERT(network_viewer_opt.included_ips->ver == AF_INET, "IP should be IPv4");
-    }
-
-    ebpf_clean_ip_structure(&network_viewer_opt.included_ips);
-    network_viewer_opt.included_ips = NULL;
-}
-
-/**
- * Test ebpf_parse_ips_unsafe with CIDR
- *
- * Tests the ebpf_parse_ips_unsafe function with CIDR notation
- * to ensure it correctly parses and creates IP range entries.
- */
-static void test_ebpf_parse_ips_with_cidr(void)
-{
-    fprintf(stderr, "\n=== Testing ebpf_parse_ips_unsafe with CIDR ===\n");
-
-    network_viewer_opt.included_ips = NULL;
-
-    ebpf_parse_ips_unsafe("192.168.0.0/24");
-
-    EBPF_UT_ASSERT(network_viewer_opt.included_ips != NULL, "IP list should not be NULL after parsing CIDR");
-
-    ebpf_clean_ip_structure(&network_viewer_opt.included_ips);
-    network_viewer_opt.included_ips = NULL;
 }
 
 /**
@@ -697,26 +634,6 @@ static void test_ebpf_enable_chart(void)
 }
 
 /**
- * Test parse_network_viewer_section with NULL
- *
- * Tests the parse_network_viewer_section function with empty config
- * to ensure it sets appropriate default values.
- */
-static void test_parse_network_viewer_section_null(void)
-{
-    fprintf(stderr, "\n=== Testing parse_network_viewer_section (NULL) ===\n");
-
-    struct config cfg;
-    memset(&cfg, 0, sizeof(cfg));
-
-    parse_network_viewer_section(&cfg);
-
-    EBPF_UT_ASSERT(
-        network_viewer_opt.hostname_resolution_enabled == CONFIG_BOOLEAN_NO,
-        "Hostname resolution should be disabled by default");
-}
-
-/**
  * Test ebpf_load_collector_config
  *
  * Tests the ebpf_load_collector_config function with non-existent path
@@ -743,8 +660,6 @@ void ebpf_library_run_unittests(void)
     test_ebpf_write_global_dimension();
     test_ebpf_write_chart_cmd();
     test_ebpf_write_chart_obsolete();
-    test_ebpf_clean_ip_structure();
-    test_ebpf_clean_port_structure();
     test_ebpf_how_to_load();
     test_ebpf_set_apps_mode();
     test_ebpf_set_thread_mode();
@@ -755,17 +670,12 @@ void ebpf_library_run_unittests(void)
     test_write_io_chart();
     test_write_histogram_chart();
     test_ebpf_global_labels();
-    test_ebpf_parse_ports_basic();
-    test_ebpf_parse_ports_with_range();
-    test_ebpf_parse_ips_basic();
-    test_ebpf_parse_ips_with_cidr();
     test_ebpf_print_help();
     test_write_count_chart();
     test_write_err_chart();
     test_ebpf_create_global_dimension();
     test_ebpf_enable_specific_chart();
     test_ebpf_enable_chart();
-    test_parse_network_viewer_section_null();
     test_ebpf_load_collector_config();
 
     fprintf(stderr, "\n");

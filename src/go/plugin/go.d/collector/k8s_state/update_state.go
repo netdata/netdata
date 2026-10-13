@@ -2,6 +2,8 @@
 
 package k8s_state
 
+import "maps"
+
 func (c *Collector) runUpdateState(in <-chan resource) {
 	for {
 		select {
@@ -27,11 +29,10 @@ func (c *Collector) runUpdateState(in <-chan resource) {
 }
 
 func copyLabels(dst, src map[string]string) {
-	for k, v := range src {
-		dst[k] = v
-	}
+	maps.Copy(dst, src)
 }
 
+//go:fix inline
 func ptr[T any](v T) *T {
-	return &v
+	return new(v)
 }

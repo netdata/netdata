@@ -8,6 +8,7 @@ import (
 	"net"
 	"strconv"
 	"strings"
+	"sync"
 
 	"github.com/netdata/netdata/go/plugins/logger"
 	"github.com/netdata/netdata/go/plugins/plugin/agent/discovery/sd/model"
@@ -62,7 +63,9 @@ func newServiceDiscoverer(inf cache.SharedInformer) *serviceDiscoverer {
 		panic("nil service informer")
 	}
 
-	queue := workqueue.NewTypedWithConfig(workqueue.TypedQueueConfig[any]{Name: "service"})
+	queue := workqueue.NewTypedWithConfig(workqueue.TypedQueueConfig[any]{
+		Name: "service",
+	})
 
 	_, _ = inf.AddEventHandler(cache.ResourceEventHandlerFuncs{
 		AddFunc:    func(obj any) { enqueue(queue, obj) },
@@ -84,16 +87,21 @@ func (s *serviceDiscoverer) String() string {
 func (s *serviceDiscoverer) Discover(ctx context.Context, ch chan<- []model.TargetGroup) {
 	s.Info("instance is started")
 	defer s.Info("instance is stopped")
+	var children sync.WaitGroup
+	defer children.Wait()
+	// ShutDown wakes workers blocked in Get; it must happen before joining them.
 	defer s.queue.ShutDown()
 
-	go s.informer.Run(ctx.Done())
+	children.Add(1)
+	go func() { defer children.Done(); s.informer.Run(ctx.Done()) }()
 
 	if !cache.WaitForCacheSync(ctx.Done(), s.informer.HasSynced) {
 		s.Error("failed to sync caches")
 		return
 	}
 
-	go s.run(ctx, ch)
+	children.Add(1)
+	go func() { defer children.Done(); s.run(ctx, ch) }()
 
 	<-ctx.Done()
 }
@@ -124,7 +132,9 @@ func (s *serviceDiscoverer) handleQueueItem(ctx context.Context, in chan<- []mod
 	}
 
 	if !exists {
-		tgg := &serviceTargetGroup{source: serviceSourceFromNsName(namespace, name)}
+		tgg := &serviceTargetGroup{
+			source: serviceSourceFromNsName(namespace, name),
+		}
 		model.SendTargetGroup(ctx, in, tgg)
 		return
 	}

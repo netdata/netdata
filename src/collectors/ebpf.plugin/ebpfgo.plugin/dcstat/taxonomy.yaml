@@ -1,0 +1,5 @@
+taxonomy_version: 1
+plugin_name: ebpf-go.plugin
+module_name: dcstat
+taxonomy_optout:
+  reason: Collector taxonomy is not yet authored for ebpf-go.plugin while the dcstat module migration is still in progress.

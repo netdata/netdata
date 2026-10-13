@@ -141,12 +141,12 @@ static bool rrdmetric_conflict_callback(const DICTIONARY_ITEM *item __maybe_unus
         }
 
         internal_error(true,
-                       "RRDMETRIC: '%s' of instance '%s' of host '%s' changed UUID from '%s' (retention %ld to %ld, %ld secs) to '%s' (retention %ld to %ld, %ld secs)"
+                       "RRDMETRIC: '%s' of instance '%s' of host '%s' changed UUID from '%s' (retention %" PRId64 " to %" PRId64 ", %" PRId64 " secs) to '%s' (retention %" PRId64 " to %" PRId64 ", %" PRId64 " secs)"
                        , string2str(rm->id)
                        , string2str(rm->ri->id)
                        , rrdhost_hostname(rm->ri->rc->rrdhost)
-                       , uuid1, old_first_time_s, old_last_time_s, old_last_time_s - old_first_time_s
-                       , uuid2, new_first_time_s, new_last_time_s, new_last_time_s - new_first_time_s
+                       , uuid1, (int64_t)old_first_time_s, (int64_t)old_last_time_s, (int64_t)(old_last_time_s - old_first_time_s)
+                       , uuid2, (int64_t)new_first_time_s, (int64_t)new_last_time_s, (int64_t)(new_last_time_s - new_first_time_s)
                        );
 #endif
 
@@ -167,6 +167,11 @@ static bool rrdmetric_conflict_callback(const DICTIONARY_ITEM *item __maybe_unus
 
     if(rm->name != rm_new->name) {
         SWAP(rm->name, rm_new->name);
+        rrd_flag_set_updated(rm, RRD_FLAG_UPDATE_REASON_CHANGED_METADATA);
+    }
+
+    if(rrdmetric_algorithm_atomic_load(rm) != rm_new->algorithm) {
+        rrdmetric_algorithm_atomic_store(rm, rm_new->algorithm);
         rrd_flag_set_updated(rm, RRD_FLAG_UPDATE_REASON_CHANGED_METADATA);
     }
 
@@ -227,7 +232,7 @@ void rrdmetric_trigger_updates(RRDMETRIC *rm, const char *function) {
 
     if(rrd_flag_is_updated(rm) || !rrd_flag_check(rm, RRD_FLAG_LIVE_RETENTION)) {
         rrd_flag_set_updated(rm->ri, RRD_FLAG_UPDATE_REASON_TRIGGERED);
-        rrdcontext_queue_for_post_processing(rm->ri->rc, function, rm->flags);
+        rrdcontext_queue_for_post_processing(rm->ri->rc, function, rrd_flags_get(rm));
     }
 }
 
@@ -256,9 +261,19 @@ void rrdmetric_from_rrddim(RRDDIM *rd) {
             .name = string_dup(rd->name),
             .flags = RRD_FLAG_NONE, // no need for atomics
             .rrddim = rd,
+            .algorithm = rd->algorithm,
     };
 
     RRDMETRIC_ACQUIRED *rma = (RRDMETRIC_ACQUIRED *)dictionary_set_and_acquire_item(ri->rrdmetrics, string2str(trm.id), &trm, sizeof(trm));
+    if(unlikely(!rma)) {
+        // the metrics dictionary is being destroyed; the insert callback never
+        // ran, so free what we duplicated above (mirrors rrdmetric_free()) and
+        // keep the existing link untouched
+        string_freez(trm.id);
+        string_freez(trm.name);
+        uuidmap_free(trm.uuid);
+        return;
+    }
 
     if(rd->rrdcontexts.rrdmetric)
         rrdmetric_release(rd->rrdcontexts.rrdmetric);
@@ -309,6 +324,20 @@ inline void rrdmetric_updated_rrddim_flags(RRDDIM *rd) {
     if(unlikely(rrddim_flag_check(rd, RRDDIM_FLAG_OBSOLETE))) {
         if(unlikely(rrd_flag_is_collected(rm)))
             rrdmetric_set_archived(rm);
+    }
+
+    rrdmetric_trigger_updates(rm, __FUNCTION__ );
+}
+
+inline void rrdmetric_updated_rrddim_algorithm(RRDDIM *rd) {
+    rrdmetric_not_collected_rrddim(rd);
+
+    RRDMETRIC *rm = rrddim_get_rrdmetric(rd);
+    if(unlikely(!rm)) return;
+
+    if(rrdmetric_algorithm_atomic_load(rm) != rd->algorithm) {
+        rrdmetric_algorithm_atomic_store(rm, rd->algorithm);
+        rrd_flag_set_updated(rm, RRD_FLAG_UPDATE_REASON_CHANGED_METADATA);
     }
 
     rrdmetric_trigger_updates(rm, __FUNCTION__ );

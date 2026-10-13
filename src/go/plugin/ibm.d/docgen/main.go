@@ -16,12 +16,13 @@ import (
 
 // ModuleInfo contains metadata about a module
 type ModuleInfo struct {
-	Name        string
-	DisplayName string
-	Description string
-	Icon        string
-	Categories  []string
-	Link        string
+	Name            string
+	DisplayName     string
+	Description     string
+	PageDescription string
+	Icon            string
+	Categories      []string
+	Link            string
 }
 
 // Config represents the YAML structure from contexts.yaml
@@ -62,7 +63,7 @@ type ConfigField struct {
 	Title         string
 	ItemsType     string
 	Required      bool
-	Default       interface{}
+	Default       any
 	Description   string
 	Format        string
 	Minimum       *int
@@ -112,7 +113,7 @@ type DocGenerator struct {
 	ConfigFile    string
 	OutputDir     string
 	ModuleInfo    string
-	consts        map[string]interface{}
+	consts        map[string]any
 	hasHTTPConfig bool
 }
 
@@ -187,24 +188,26 @@ func (g *DocGenerator) parseModuleInfo() (*ModuleInfo, error) {
 	}
 
 	var info struct {
-		Name        string   `yaml:"name"`
-		DisplayName string   `yaml:"display_name"`
-		Description string   `yaml:"description"`
-		Icon        string   `yaml:"icon"`
-		Categories  []string `yaml:"categories"`
-		Link        string   `yaml:"link"`
+		Name            string   `yaml:"name"`
+		DisplayName     string   `yaml:"display_name"`
+		Description     string   `yaml:"description"`
+		PageDescription string   `yaml:"page_description"`
+		Icon            string   `yaml:"icon"`
+		Categories      []string `yaml:"categories"`
+		Link            string   `yaml:"link"`
 	}
 	if err := yaml.Unmarshal(data, &info); err != nil {
 		return nil, err
 	}
 
 	return &ModuleInfo{
-		Name:        info.Name,
-		DisplayName: info.DisplayName,
-		Description: info.Description,
-		Icon:        info.Icon,
-		Categories:  info.Categories,
-		Link:        info.Link,
+		Name:            info.Name,
+		DisplayName:     info.DisplayName,
+		Description:     info.Description,
+		PageDescription: info.PageDescription,
+		Icon:            info.Icon,
+		Categories:      info.Categories,
+		Link:            info.Link,
 	}, nil
 }
 
@@ -222,7 +225,7 @@ func (g *DocGenerator) parseConfig() ([]ConfigField, error) {
 	}
 
 	// Ensure standard fields are present even if they come from embedded structs
-	ensureField := func(name string, desc string, defaultKey string, fallback interface{}, fieldType string, uiGroup string, uiWidget string, min *int, max *int) {
+	ensureField := func(name string, desc string, defaultKey string, fallback any, fieldType string, uiGroup string, uiWidget string, min *int, max *int) {
 		for _, f := range fields {
 			if f.JSONName == name {
 				return
@@ -235,7 +238,7 @@ func (g *DocGenerator) parseConfig() ([]ConfigField, error) {
 				defaultVal = val
 			}
 		}
-		fields = append([]ConfigField{ConfigField{
+		fields = append([]ConfigField{{
 			Name:        name,
 			JSONName:    name,
 			Type:        fieldType,
@@ -251,7 +254,7 @@ func (g *DocGenerator) parseConfig() ([]ConfigField, error) {
 		}}, fields...)
 	}
 
-	ensureField("update_every", "Data collection frequency", "UpdateEvery", 10, "integer", "Connection", "", intPtr(1), nil)
+	ensureField("update_every", "Data collection frequency", "UpdateEvery", 10, "integer", "Connection", "", new(1), nil)
 
 	if g.hasHTTPConfig {
 		ensureField("url", "Target URL", "", "", "string", "Connection", "", nil, nil)
@@ -282,7 +285,7 @@ func (g *DocGenerator) getFallbackConfigFields() []ConfigField {
 			Required:    false,
 			Default:     10,
 			Description: "Data collection frequency",
-			Minimum:     intPtr(1),
+			Minimum:     new(1),
 		},
 		{
 			Name:        "reset_statistics",
@@ -311,8 +314,8 @@ func (g *DocGenerator) getFallbackConfigFields() []ConfigField {
 			Required:    false,
 			Default:     5,
 			Description: "Connection timeout in seconds",
-			Minimum:     intPtr(1),
-			Maximum:     intPtr(300),
+			Minimum:     new(1),
+			Maximum:     new(300),
 		},
 		{
 			Name:        "collect_items",
@@ -331,14 +334,15 @@ func (g *DocGenerator) getFallbackConfigFields() []ConfigField {
 			Required:    false,
 			Default:     10,
 			Description: "Maximum number of items to collect",
-			Minimum:     intPtr(1),
-			Maximum:     intPtr(1000),
+			Minimum:     new(1),
+			Maximum:     new(1000),
 		},
 	}
 }
 
+//go:fix inline
 func intPtr(i int) *int {
-	return &i
+	return new(i)
 }
 
 func indent(spaces int, text string) string {
@@ -357,11 +361,33 @@ func indent(spaces int, text string) string {
 	return strings.Join(lines, "\n")
 }
 
+func yamlScalar(value string) (string, error) {
+	data, err := yaml.Marshal(value)
+	if err != nil {
+		return "", err
+	}
+
+	return strings.TrimSuffix(string(data), "\n"), nil
+}
+
+func indentContinuation(spaces int, text string) string {
+	lines := strings.Split(text, "\n")
+	prefix := strings.Repeat(" ", spaces)
+	for i := 1; i < len(lines); i++ {
+		if lines[i] != "" {
+			lines[i] = prefix + lines[i]
+		}
+	}
+	return strings.Join(lines, "\n")
+}
+
 func (g *DocGenerator) generateMetadata(contexts *Config, moduleInfo *ModuleInfo) error {
 	tmpl := template.Must(template.New("metadata").Funcs(template.FuncMap{
-		"lower":  strings.ToLower,
-		"title":  strings.Title,
-		"indent": indent,
+		"lower":              strings.ToLower,
+		"title":              strings.Title,
+		"indent":             indent,
+		"indentContinuation": indentContinuation,
+		"yamlScalar":         yamlScalar,
 	}).Parse(metadataTemplate))
 
 	// Prepare template data
@@ -388,22 +414,22 @@ func (g *DocGenerator) generateMetadata(contexts *Config, moduleInfo *ModuleInfo
 
 func (g *DocGenerator) generateConfigSchema(fields []ConfigField) error {
 	// Create schema manually to avoid template issues
-	schema := map[string]interface{}{
-		"jsonSchema": map[string]interface{}{
+	schema := map[string]any{
+		"jsonSchema": map[string]any{
 			"$schema": "http://json-schema.org/draft-07/schema#",
 			"title":   fmt.Sprintf("%s collector configuration", g.ModuleName),
 			"type":    "object",
 		},
 	}
 
-	properties := make(map[string]interface{})
+	properties := make(map[string]any)
 	var required []string
 	groupOrder := make([]string, 0)
 	groupFields := make(map[string][]string)
-	fieldUIOptions := make(map[string]map[string]interface{})
+	fieldUIOptions := make(map[string]map[string]any)
 
 	for _, field := range fields {
-		prop := map[string]interface{}{
+		prop := map[string]any{
 			"title": field.Title,
 			"type":  field.Type,
 		}
@@ -416,7 +442,7 @@ func (g *DocGenerator) generateConfigSchema(fields []ConfigField) error {
 			if itemsType == "" {
 				itemsType = "string"
 			}
-			prop["items"] = map[string]interface{}{
+			prop["items"] = map[string]any{
 				"type": itemsType,
 			}
 		}
@@ -462,7 +488,7 @@ func (g *DocGenerator) generateConfigSchema(fields []ConfigField) error {
 
 		opts, exists := fieldUIOptions[field.JSONName]
 		if !exists {
-			opts = make(map[string]interface{})
+			opts = make(map[string]any)
 		}
 		if field.UIWidget != "" {
 			opts["ui:widget"] = field.UIWidget
@@ -481,32 +507,32 @@ func (g *DocGenerator) generateConfigSchema(fields []ConfigField) error {
 		}
 	}
 
-	schema["jsonSchema"].(map[string]interface{})["properties"] = properties
+	schema["jsonSchema"].(map[string]any)["properties"] = properties
 	if len(required) > 0 {
-		schema["jsonSchema"].(map[string]interface{})["required"] = required
+		schema["jsonSchema"].(map[string]any)["required"] = required
 	}
 
-	uiSchema := map[string]interface{}{
-		"uiOptions": map[string]interface{}{
+	uiSchema := map[string]any{
+		"uiOptions": map[string]any{
 			"fullPage": true,
 		},
 	}
 	uiSchema["ui:flavour"] = "tabs"
 
 	if len(groupOrder) > 0 {
-		tabs := make([]map[string]interface{}, 0, len(groupOrder))
+		tabs := make([]map[string]any, 0, len(groupOrder))
 		for _, group := range groupOrder {
 			fieldsForGroup := groupFields[group]
 			if len(fieldsForGroup) == 0 {
 				continue
 			}
-			tabs = append(tabs, map[string]interface{}{
+			tabs = append(tabs, map[string]any{
 				"title":  group,
 				"fields": fieldsForGroup,
 			})
 		}
 		if len(tabs) > 0 {
-			uiSchema["ui:options"] = map[string]interface{}{
+			uiSchema["ui:options"] = map[string]any{
 				"tabs": tabs,
 			}
 		}
@@ -571,14 +597,14 @@ modules:
         categories:{{range .ModuleInfo.Categories}}
           - {{.}}{{end}}
         icon_filename: "{{.ModuleInfo.Icon}}"
-      related_resources:
+{{if .ModuleInfo.PageDescription}}        description: {{yamlScalar .ModuleInfo.PageDescription | indentContinuation 8}}
+{{end}}      related_resources:
         integrations:
           list: []
       info_provided_to_referring_integrations:
         description: ""
       keywords:
         - {{.ModuleName}}
-      most_popular: false
     overview:
       data_collection:
         metrics_description: |

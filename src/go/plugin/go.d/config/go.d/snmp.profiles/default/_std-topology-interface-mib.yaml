@@ -1,0 +1,100 @@
+# Supplemental topology profile for interface identity and state.
+# Sources: IF-MIB and EtherLike-MIB.
+
+topology:
+  - kind: if_name
+    MIB: IF-MIB
+    table:
+      OID: 1.3.6.1.2.1.31.1.1
+      name: ifXTable
+    symbols:
+      - OID: 1.3.6.1.2.1.31.1.1.1.15
+        name: if_name
+    metric_tags:
+      - tag: topo_if_index
+        index: 1
+      - tag: topo_if_name
+        symbol:
+          OID: 1.3.6.1.2.1.31.1.1.1.1
+          name: ifName
+      - tag: topo_if_alias
+        symbol:
+          OID: 1.3.6.1.2.1.31.1.1.1.18
+          name: ifAlias
+      - tag: topo_if_high_speed
+        symbol:
+          OID: 1.3.6.1.2.1.31.1.1.1.15
+          name: ifHighSpeed
+
+  - kind: if_status
+    MIB: IF-MIB
+    table:
+      OID: 1.3.6.1.2.1.2.2
+      name: ifTable
+    symbols:
+      - OID: 1.3.6.1.2.1.2.2.1.8
+        name: if_status
+    metric_tags:
+      - tag: topo_if_index
+        index: 1
+      - tag: topo_if_type
+        symbol:
+          OID: 1.3.6.1.2.1.2.2.1.3
+          name: ifType
+      - tag: topo_if_descr
+        symbol:
+          OID: 1.3.6.1.2.1.2.2.1.2
+          name: ifDescr
+      - tag: topo_if_admin_status
+        symbol:
+          OID: 1.3.6.1.2.1.2.2.1.7
+          name: ifAdminStatus
+        mapping:
+          1: up
+          2: down
+          3: testing
+      - tag: topo_if_oper_status
+        symbol:
+          OID: 1.3.6.1.2.1.2.2.1.8
+          name: ifOperStatus
+        mapping:
+          1: up
+          2: down
+          3: testing
+          4: unknown
+          5: dormant
+          6: notPresent
+          7: lowerLayerDown
+      - tag: topo_if_phys_address
+        symbol:
+          OID: 1.3.6.1.2.1.2.2.1.6
+          name: ifPhysAddress
+          format: hex
+      - tag: topo_if_speed
+        symbol:
+          OID: 1.3.6.1.2.1.2.2.1.5
+          name: ifSpeed
+      - tag: topo_if_last_change
+        symbol:
+          OID: 1.3.6.1.2.1.2.2.1.9
+          name: ifLastChange
+
+  - kind: if_duplex
+    MIB: EtherLike-MIB
+    table:
+      OID: 1.3.6.1.2.1.10.7.2
+      name: dot3StatsTable
+    symbols:
+      - OID: 1.3.6.1.2.1.10.7.2.1.19
+        name: if_duplex
+    metric_tags:
+      - tag: topo_if_index
+        index: 1
+      - tag: topo_if_duplex
+        symbol:
+          OID: 1.3.6.1.2.1.10.7.2.1.19
+          name: dot3StatsDuplexStatus
+        mapping:
+          1: unknown
+          2: half
+          3: full

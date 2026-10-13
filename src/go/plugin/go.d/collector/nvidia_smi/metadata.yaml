@@ -62,15 +62,21 @@ modules:
               default_value: 0
               required: false
             - name: binary_path
-              description: Path to nvidia_smi binary. The default is "nvidia_smi" and the executable is looked for in the directories specified in the PATH environment variable.
-              default_value: nvidia_smi
+              description: Path to the `nvidia-smi` binary.
+              detailed_description: |
+                When it is empty or the file does not exist, the collector looks for `nvidia-smi` in the `PATH` directories and, on Windows, in the default NVIDIA install locations.
+              default_value: nvidia-smi
               required: false
             - name: timeout
-              description: The maximum duration, in seconds, to wait for an `nvidia-smi` command to complete. This setting applies differently based on the collector's mode. **Loop Mode:** In loop mode, the timeout primarily determines how long to wait for the initial `nvidia-smi` execution. If the initial query takes longer than the timeout, the collector may report an error. For systems with multiple GPUs, the initial load time can sometimes be significant (e.g., 5-10 seconds). **Regular Mode:** If the collector is in regular mode, the timeout specifies how long to wait for each individual `nvidia-smi` execution.
+              description: Command execution timeout, in seconds. In loop mode, it limits the wait for each `nvidia-smi` sample instead.
+              detailed_description: |
+                In loop mode, the collector waits up to this timeout for the first sample after it starts. Afterwards, a sample that does not arrive within the loop interval plus this timeout leaves a gap in the charts, and `nvidia-smi` is restarted. On hosts with several GPUs, the first sample can take 5 to 10 seconds.
               default_value: 10
               required: false
             - name: loop_mode
-              description: "When enabled, `nvidia-smi` is executed continuously in a separate thread using the `-l` option."
+              description: "Keep `nvidia-smi` running and reading GPU data on a fixed interval (the `-l` option) instead of starting it for every collection."
+              detailed_description: |
+                The loop interval is the data collection interval (`update_every`), at most 5 seconds. Loop mode is not available on Windows: there, each collection runs `nvidia-smi` once.
               default_value: true
               required: false
         examples:

@@ -1,0 +1,12 @@
+{
+  "os": {
+    "discovery": {
+      "devices": [
+        {
+          "sysObjectID": ".1.3.6.1.4.1.6527.1.3.23",
+          "sysDescr": "TiMOS-C-21.10.R2 cpm/x86hops64 Nokia 7250 IXR Copyright (c) 2000-2021 Nokia.\nAll rights reserved. All use subject to applicable license agreements.\r\nBuilt on Wed Dec 15 14:15:11 PST 2021 by builder in /builds/c/2110B/R2/panos/main/sros"
+        }
+      ]
+    }
+  }
+}

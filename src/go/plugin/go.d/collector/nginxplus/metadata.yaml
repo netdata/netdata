@@ -6,6 +6,7 @@ modules:
       module_name: nginxplus
       monitored_instance:
         name: NGINX Plus
+        description: "Monitor NGINX Plus connections, requests, traffic, SSL, server zones, location zones, and upstreams."
         link: https://www.nginx.com/products/nginx/
         icon_filename: nginxplus.svg
         categories:
@@ -191,13 +192,13 @@ modules:
             - name: Multi-instance
               description: |
                 > **Note**: When you define multiple jobs, their names must be unique.
-                
+
                 Collecting metrics from local and remote instances.
               config: |
                 jobs:
                   - name: local
                     url: http://127.0.0.1
-                
+
                   - name: remote
                     url: http://192.0.2.1
     troubleshooting:

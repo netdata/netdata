@@ -18,6 +18,15 @@ ssize_t query_scope_foreach_host(SIMPLE_PATTERN *scope_hosts_sp, SIMPLE_PATTERN 
     uint64_t t_hash = 0;
 
     dfe_start_read(rrdhost_root_index, host) {
+        RRDHOST_IDENTITY identity = { 0 };
+        char host_machine_guid[GUID_LEN + 1] = "";
+
+        if(scope_hosts_sp || hosts_sp)
+            identity = rrdhost_identity_acquire(host);
+
+        if(hosts_sp)
+            strncpyz(host_machine_guid, host->machine_guid, GUID_LEN);
+
         if(!UUIDiszero(host->node_id))
             uuid_unparse_lower(host->node_id.uuid, host_node_id_str);
         else
@@ -25,7 +34,7 @@ ssize_t query_scope_foreach_host(SIMPLE_PATTERN *scope_hosts_sp, SIMPLE_PATTERN 
 
         SIMPLE_PATTERN_RESULT match = SP_MATCHED_POSITIVE;
         if(scope_hosts_sp) {
-            match = simple_pattern_matches_string_extract(scope_hosts_sp, host->hostname, NULL, 0);
+            match = simple_pattern_matches_string_extract(scope_hosts_sp, identity.hostname, NULL, 0);
             if(match == SP_NOT_MATCHED) {
                 match = simple_pattern_matches_extract(scope_hosts_sp, host->machine_guid, NULL, 0);
                 if(match == SP_NOT_MATCHED && *host_node_id_str)
@@ -33,21 +42,24 @@ ssize_t query_scope_foreach_host(SIMPLE_PATTERN *scope_hosts_sp, SIMPLE_PATTERN 
             }
         }
 
-        if(match != SP_MATCHED_POSITIVE)
+        if(match != SP_MATCHED_POSITIVE) {
+            rrdhost_identity_release(&identity);
             continue;
+        }
 
         dfe_unlock(host);
 
         if(hosts_sp) {
-            match = simple_pattern_matches_string_extract(hosts_sp, host->hostname, NULL, 0);
+            match = simple_pattern_matches_string_extract(hosts_sp, identity.hostname, NULL, 0);
             if(match == SP_NOT_MATCHED) {
-                match = simple_pattern_matches_extract(hosts_sp, host->machine_guid, NULL, 0);
+                match = simple_pattern_matches_extract(hosts_sp, host_machine_guid, NULL, 0);
                 if(match == SP_NOT_MATCHED && *host_node_id_str)
                     match = simple_pattern_matches_extract(hosts_sp, host_node_id_str, NULL, 0);
             }
         }
 
         bool queryable_host = (match == SP_MATCHED_POSITIVE);
+        rrdhost_identity_release(&identity);
 
         v_hash += dictionary_version(host->rrdctx.contexts);
         h_hash += rrdcontext_queue_version(&host->rrdctx.hub_queue);
@@ -70,6 +82,13 @@ ssize_t query_scope_foreach_host(SIMPLE_PATTERN *scope_hosts_sp, SIMPLE_PATTERN 
     }
 
     return added;
+}
+
+// A plain context name (no separators, wildcards, negation or escapes) compiles to a pattern
+// that matches only that name, so a dictionary miss for it is final.
+static bool scope_contexts_is_plain_name(const char *scope_contexts, SIMPLE_PATTERN *scope_contexts_sp) {
+    return scope_contexts && *scope_contexts && scope_contexts_sp && !strchr(scope_contexts, '\\') &&
+           !simple_pattern_contains_wildcards(scope_contexts, SIMPLE_PATTERN_DEFAULT_WEB_SEPARATORS);
 }
 
 ssize_t query_scope_foreach_context(RRDHOST *host, const char *scope_contexts, SIMPLE_PATTERN *scope_contexts_sp,
@@ -96,7 +115,7 @@ ssize_t query_scope_foreach_context(RRDHOST *host, const char *scope_contexts, S
 
         rrdcontext_release(rca);
     }
-    else {
+    else if(!scope_contexts_is_plain_name(scope_contexts, scope_contexts_sp)) {
         // Probably it is a pattern, we need to search for it...
         RRDCONTEXT *rc;
         dfe_start_read(host->rrdctx.contexts, rc) {

@@ -5,14 +5,15 @@ package aws
 import (
 	"bytes"
 	"context"
+	"errors"
 	"io"
 	"net/http"
-	"net/http/httptest"
+	"strings"
 	"testing"
-	"time"
 
 	"github.com/netdata/netdata/go/plugins/logger"
 	"github.com/netdata/netdata/go/plugins/plugin/agent/secrets/secretstore"
+	"github.com/netdata/netdata/go/plugins/plugin/agent/secrets/secretstore/internal/httpx"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -45,7 +46,7 @@ func TestSecretsManagerHost(t *testing.T) {
 	}
 }
 
-func TestSecretValue_CustomEndpointUsesSignedHostHeader(t *testing.T) {
+func TestSecretValue_UsesSignedHostHeader(t *testing.T) {
 	tests := map[string]struct {
 		region   string
 		wantHost string
@@ -62,20 +63,16 @@ func TestSecretValue_CustomEndpointUsesSignedHostHeader(t *testing.T) {
 
 	for name, tc := range tests {
 		t.Run(name, func(t *testing.T) {
-			srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-				assert.Equal(t, tc.wantHost, r.Host)
-				w.Header().Set("Content-Type", "application/x-amz-json-1.1")
-				_, _ = w.Write([]byte(`{"SecretString":"value"}`))
-			}))
-			defer srv.Close()
-
 			store := &publishedStore{
-				provider: &provider{
-					apiClient: srv.Client(),
-					endpoint:  srv.URL + "/",
-					now: func() time.Time {
-						return time.Date(2026, time.March, 18, 12, 0, 0, 0, time.UTC)
-					},
+				runtime: &runtime{
+					apiClient: &http.Client{Transport: roundTripFunc(func(r *http.Request) (*http.Response, error) {
+						assert.Equal(t, tc.wantHost, r.Host)
+						return &http.Response{
+							StatusCode: http.StatusOK,
+							Body:       io.NopCloser(bytes.NewBufferString(`{"SecretString":"value"}`)),
+							Header:     make(http.Header),
+						}, nil
+					})},
 				},
 			}
 
@@ -89,23 +86,92 @@ func TestSecretValue_CustomEndpointUsesSignedHostHeader(t *testing.T) {
 	}
 }
 
+func TestSecretValueResponseHandling(t *testing.T) {
+	readErr := errors.New("response read failed")
+	exactValue := strings.Repeat("x", responseBodyLimit-len(`{"SecretString":""}`))
+	tests := map[string]struct {
+		status          int
+		body            string
+		reader          io.Reader
+		wantValueLen    int
+		wantErrContains string
+		wantTooLarge    bool
+	}{
+		"response at limit succeeds": {
+			status:       http.StatusOK,
+			body:         `{"SecretString":"` + exactValue + `"}`,
+			wantValueLen: len(exactValue),
+		},
+		"response above limit fails": {
+			status:          http.StatusOK,
+			body:            strings.Repeat("x", responseBodyLimit+1),
+			wantErrContains: "reading AWS Secrets Manager response",
+			wantTooLarge:    true,
+		},
+		"HTTP status wins over oversized diagnostic body": {
+			status:          http.StatusForbidden,
+			body:            strings.Repeat("x", responseBodyLimit+1),
+			wantErrContains: "AWS Secrets Manager returned HTTP 403",
+		},
+		"read failure fails": {
+			status:          http.StatusOK,
+			reader:          errorReader{err: readErr},
+			wantErrContains: "reading AWS Secrets Manager response",
+		},
+	}
+
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) {
+			reader := tc.reader
+			if reader == nil {
+				reader = strings.NewReader(tc.body)
+			}
+			store := &publishedStore{
+				runtime: &runtime{
+					apiClient: &http.Client{Transport: roundTripFunc(func(*http.Request) (*http.Response, error) {
+						return &http.Response{
+							StatusCode: tc.status,
+							Body:       io.NopCloser(reader),
+							Header:     make(http.Header),
+						}, nil
+					})},
+				},
+			}
+
+			value, err := store.secretValue(context.Background(), &credentials{
+				accessKeyID:     "AKID",
+				secretAccessKey: "SECRET",
+			}, "us-east-1", "db/password", "${store:aws-sm:aws_prod:db/password}")
+
+			if tc.wantErrContains == "" {
+				require.NoError(t, err)
+				assert.Len(t, value, tc.wantValueLen)
+				return
+			}
+			require.ErrorContains(t, err, tc.wantErrContains)
+			if tc.wantTooLarge {
+				require.ErrorIs(t, err, httpx.ErrResponseTooLarge)
+				return
+			}
+			require.NotErrorIs(t, err, httpx.ErrResponseTooLarge)
+		})
+	}
+}
+
 func TestPublishedStoreResolve_LogsDetailedResolution(t *testing.T) {
 	t.Setenv("AWS_ACCESS_KEY_ID", "AKID")
 	t.Setenv("AWS_SECRET_ACCESS_KEY", "SECRET")
 
 	store := &publishedStore{
-		provider: &provider{
+		runtime: &runtime{
 			apiClient: &http.Client{Transport: roundTripFunc(func(req *http.Request) (*http.Response, error) {
+				assert.Equal(t, "secretsmanager.us-east-1.amazonaws.com", req.Host)
 				return &http.Response{
 					StatusCode: http.StatusOK,
 					Body:       io.NopCloser(bytes.NewBufferString(`{"SecretString":"{\"password\":\"secret-value\"}"}`)),
 					Header:     make(http.Header),
 				}, nil
 			})},
-			endpoint: "https://example.test/",
-			now: func() time.Time {
-				return time.Date(2026, time.March, 18, 12, 0, 0, 0, time.UTC)
-			},
 		},
 		mode:        "env",
 		regionValue: "us-east-1",

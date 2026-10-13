@@ -4,25 +4,37 @@ package metrix
 
 // ReadOption controls reader visibility mode.
 type ReadOption interface {
-	applyRead(*readConfig)
+	readOption()
 }
 
-type readOptionFunc func(*readConfig)
+// Options are values resolved by type, so resolving them does not move the
+// read configuration to the heap.
+type (
+	readRawOption       struct{}
+	readFlattenOption   struct{}
+	readHostScopeOption struct{ scopeKey string }
+)
 
-func (f readOptionFunc) applyRead(cfg *readConfig) {
-	f(cfg)
-}
+func (readRawOption) readOption()       {}
+func (readFlattenOption) readOption()   {}
+func (readHostScopeOption) readOption() {}
 
 type readConfig struct {
-	raw     bool
-	flatten bool
+	raw          bool
+	flatten      bool
+	hostScopeKey string
 }
 
 func resolveReadConfig(opts ...ReadOption) readConfig {
 	cfg := readConfig{}
 	for _, opt := range opts {
-		if opt != nil {
-			opt.applyRead(&cfg)
+		switch opt := opt.(type) {
+		case readRawOption:
+			cfg.raw = true
+		case readFlattenOption:
+			cfg.flatten = true
+		case readHostScopeOption:
+			cfg.hostScopeKey = opt.scopeKey
 		}
 	}
 	return cfg
@@ -31,15 +43,17 @@ func resolveReadConfig(opts ...ReadOption) readConfig {
 // ReadRaw enables raw committed-series visibility mode for Read().
 // Without this option, Read() applies freshness filtering.
 func ReadRaw() ReadOption {
-	return readOptionFunc(func(cfg *readConfig) {
-		cfg.raw = true
-	})
+	return readRawOption{}
 }
 
 // ReadFlatten enables flattened scalar-series view mode for Read().
 // Without this option, Read() returns canonical typed-family view.
 func ReadFlatten() ReadOption {
-	return readOptionFunc(func(cfg *readConfig) {
-		cfg.flatten = true
-	})
+	return readFlattenOption{}
+}
+
+// ReadHostScope filters the reader to one host scope. The empty key is the
+// default scope and matches unscoped writes.
+func ReadHostScope(scopeKey string) ReadOption {
+	return readHostScopeOption{scopeKey: scopeKey}
 }

@@ -11,12 +11,14 @@
 
 void stream_compressor_init_lz4(struct compressor_state *state) {
     if(!state->initialized) {
-        state->initialized = true;
         state->stream = LZ4_createStream();
+        if(!state->stream)
+            return;
 
         // LZ4 needs access to the last 64KB of source data
         // so, we keep twice the size of each message
         simple_ring_buffer_make_room(&state->input, 65536 + COMPRESSION_MAX_CHUNK * 2);
+        state->initialized = true;
     }
 }
 
@@ -78,9 +80,12 @@ size_t stream_compress_lz4(struct compressor_state *state, const char *data, siz
 
 void stream_decompressor_init_lz4(struct decompressor_state *state) {
     if(!state->initialized) {
-        state->initialized = true;
         state->stream = LZ4_createStreamDecode();
+        if(!state->stream)
+            return;
+
         simple_ring_buffer_make_room(&state->output, 65536 + COMPRESSION_MAX_CHUNK * 2);
+        state->initialized = true;
     }
 }
 

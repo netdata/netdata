@@ -1,155 +1,154 @@
 ---
-id: load_balancers
-name: Azure Load Balancer
+display_name: Azure Load Balancer
 resource_type: Microsoft.Network/loadBalancers
 metrics:
-- id: vip_availability
-  azure_name: VipAvailability
-  time_grain: PT1M
-  series:
-  - aggregation: average
-    kind: gauge
-- id: dip_availability
-  azure_name: DipAvailability
-  time_grain: PT1M
-  series:
-  - aggregation: average
-    kind: gauge
-- id: global_backend_availability
-  azure_name: GlobalBackendAvailability
-  time_grain: PT1M
-  series:
-  - aggregation: average
-    kind: gauge
-- id: byte_count
-  azure_name: ByteCount
-  time_grain: PT1M
-  series:
-  - aggregation: total
-    kind: counter
-- id: packet_count
-  azure_name: PacketCount
-  time_grain: PT1M
-  series:
-  - aggregation: total
-    kind: counter
-- id: syn_count
-  azure_name: SYNCount
-  time_grain: PT1M
-  series:
-  - aggregation: total
-    kind: counter
-- id: snat_connection_count
-  azure_name: SnatConnectionCount
-  time_grain: PT1M
-  series:
-  - aggregation: total
-    kind: counter
-- id: allocated_snat_ports
-  azure_name: AllocatedSnatPorts
-  time_grain: PT1M
-  series:
-  - aggregation: average
-    kind: gauge
-- id: used_snat_ports
-  azure_name: UsedSnatPorts
-  time_grain: PT1M
-  series:
-  - aggregation: average
-    kind: gauge
+  - id: vip_availability
+    azure_name: VipAvailability
+    time_grain: PT1M
+    series:
+      - aggregation: average
+        kind: gauge
+  - id: dip_availability
+    azure_name: DipAvailability
+    time_grain: PT1M
+    series:
+      - aggregation: average
+        kind: gauge
+  - id: global_backend_availability
+    azure_name: GlobalBackendAvailability
+    time_grain: PT1M
+    series:
+      - aggregation: average
+        kind: gauge
+  - id: byte_count
+    azure_name: ByteCount
+    time_grain: PT1M
+    series:
+      - aggregation: total
+        kind: counter
+  - id: packet_count
+    azure_name: PacketCount
+    time_grain: PT1M
+    series:
+      - aggregation: total
+        kind: counter
+  - id: syn_count
+    azure_name: SYNCount
+    time_grain: PT1M
+    series:
+      - aggregation: total
+        kind: counter
+  - id: snat_connection_count
+    azure_name: SnatConnectionCount
+    time_grain: PT1M
+    series:
+      - aggregation: total
+        kind: counter
+  - id: allocated_snat_ports
+    azure_name: AllocatedSnatPorts
+    time_grain: PT1M
+    series:
+      - aggregation: average
+        kind: gauge
+  - id: used_snat_ports
+    azure_name: UsedSnatPorts
+    time_grain: PT1M
+    series:
+      - aggregation: average
+        kind: gauge
 template:
   family: Azure Load Balancer
   context_namespace: load_balancers
   chart_defaults:
     label_promotion:
-    - resource_name
-    - resource_group
-    - region
-    - resource_type
-    - profile
+      - resource_name
+      - resource_group
+      - region
+      - resource_type
+      - profile
     instances:
       by_labels:
-      - resource_uid
+        - resource_uid
   charts:
-  - id: am_azure_load_balancers__vip_availability
-    title: Azure Load Balancer Data Path Availability
-    context: vip_availability
-    family: Availability
-    type: line
-    units: percentage
-    algorithm: absolute
-    dimensions:
-    - selector: load_balancers.vip_availability_average
-      name: average
-  - id: am_azure_load_balancers__dip_availability
-    title: Azure Load Balancer Health Probe Status
-    context: dip_availability
-    family: Availability
-    type: line
-    units: percentage
-    algorithm: absolute
-    dimensions:
-    - selector: load_balancers.dip_availability_average
-      name: average
-  - id: am_azure_load_balancers__global_backend_availability
-    title: Azure Load Balancer Global Backend Availability
-    context: global_backend_availability
-    family: Availability
-    type: line
-    units: percentage
-    algorithm: absolute
-    dimensions:
-    - selector: load_balancers.global_backend_availability_average
-      name: average
-  - id: am_azure_load_balancers__byte_throughput
-    title: Azure Load Balancer Byte Throughput
-    context: byte_throughput
-    family: Throughput
-    type: line
-    units: bytes/s
-    algorithm: incremental
-    dimensions:
-    - selector: load_balancers.byte_count_total
-      name: total
-  - id: am_azure_load_balancers__packet_throughput
-    title: Azure Load Balancer Packet Throughput
-    context: packet_throughput
-    family: Throughput
-    type: line
-    units: packets/s
-    algorithm: incremental
-    dimensions:
-    - selector: load_balancers.packet_count_total
-      name: total
-  - id: am_azure_load_balancers__syn_count
-    title: Azure Load Balancer SYN Packets
-    context: syn_count
-    family: Throughput
-    type: line
-    units: packets/s
-    algorithm: incremental
-    dimensions:
-    - selector: load_balancers.syn_count_total
-      name: total
-  - id: am_azure_load_balancers__snat_connections
-    title: Azure Load Balancer SNAT Connections
-    context: snat_connections
-    family: SNAT
-    type: line
-    units: connections/s
-    algorithm: incremental
-    dimensions:
-    - selector: load_balancers.snat_connection_count_total
-      name: total
-  - id: am_azure_load_balancers__snat_ports
-    title: Azure Load Balancer SNAT Port Usage
-    context: snat_ports
-    family: SNAT
-    type: line
-    units: ports
-    algorithm: absolute
-    dimensions:
-    - selector: load_balancers.allocated_snat_ports_average
-      name: allocated
-    - selector: load_balancers.used_snat_ports_average
-      name: used
+    - id: am_azure_load_balancers__vip_availability
+      title: Azure Load Balancer Data Path Availability
+      context: vip_availability
+      family: Availability
+      type: line
+      units: percentage
+      algorithm: absolute
+      dimensions:
+        - selector: vip_availability_average
+          name: average
+    - id: am_azure_load_balancers__dip_availability
+      title: Azure Load Balancer Health Probe Status
+      context: dip_availability
+      family: Availability
+      type: line
+      units: percentage
+      algorithm: absolute
+      dimensions:
+        - selector: dip_availability_average
+          name: average
+    - id: am_azure_load_balancers__global_backend_availability
+      title: Azure Load Balancer Global Backend Availability
+      context: global_backend_availability
+      family: Availability
+      type: line
+      units: percentage
+      algorithm: absolute
+      dimensions:
+        - selector: global_backend_availability_average
+          name: average
+    - id: am_azure_load_balancers__byte_throughput
+      title: Azure Load Balancer Byte Throughput
+      context: byte_throughput
+      family: Throughput
+      type: line
+      units: bytes/s
+      algorithm: incremental
+      dimensions:
+        - selector: byte_count_total
+          name: total
+    - id: am_azure_load_balancers__packet_throughput
+      title: Azure Load Balancer Packet Throughput
+      context: packet_throughput
+      family: Throughput
+      type: line
+      units: packets/s
+      algorithm: incremental
+      dimensions:
+        - selector: packet_count_total
+          name: total
+    - id: am_azure_load_balancers__syn_count
+      title: Azure Load Balancer SYN Packets
+      context: syn_count
+      family: Throughput
+      type: line
+      units: packets/s
+      algorithm: incremental
+      dimensions:
+        - selector: syn_count_total
+          name: total
+    - id: am_azure_load_balancers__snat_connections
+      title: Azure Load Balancer SNAT Connections
+      context: snat_connections
+      family: SNAT
+      type: line
+      units: connections/s
+      algorithm: incremental
+      dimensions:
+        - selector: snat_connection_count_total
+          name: total
+    - id: am_azure_load_balancers__snat_ports
+      title: Azure Load Balancer SNAT Port Usage
+      context: snat_ports
+      family: SNAT
+      type: line
+      units: ports
+      algorithm: absolute
+      dimensions:
+        - selector: allocated_snat_ports_average
+          name: allocated
+        - selector: used_snat_ports_average
+          name: used

@@ -2,7 +2,10 @@
 
 package program
 
-import "fmt"
+import (
+	"errors"
+	"fmt"
+)
 
 // SelectorMatcher is the runtime predicate compiled from selector expressions.
 //
@@ -18,6 +21,16 @@ type SelectorLabels interface {
 	Get(key string) (string, bool)
 	Range(fn func(key, value string) bool)
 }
+
+// Aggregation defines how source observations mapped to one dimension combine.
+type Aggregation uint8
+
+const (
+	AggregationSum Aggregation = iota
+	AggregationMin
+	AggregationMax
+	AggregationAvg
+)
 
 // SelectorBinding stores selector expression + compiled runtime matcher metadata.
 type SelectorBinding struct {
@@ -42,6 +55,7 @@ type Dimension struct {
 	// InferNameFromSeriesMeta requests runtime inference based on series origin
 	// metadata (e.g. histogram/state-set flatten semantics).
 	InferNameFromSeriesMeta bool
+	Aggregation             Aggregation
 
 	// Hidden maps to DIMENSION hidden option.
 	Hidden bool
@@ -56,16 +70,22 @@ type Dimension struct {
 }
 
 func validateDimension(dimension Dimension) error {
+	var errs []error
 	if dimension.Selector.Expression == "" {
-		return fmt.Errorf("selector expression is required")
+		errs = append(errs, fmt.Errorf("selector expression is required"))
 	}
 	if dimension.Selector.Matcher == nil {
-		return fmt.Errorf("selector matcher is required")
+		errs = append(errs, fmt.Errorf("selector matcher is required"))
 	}
 	if dimension.NameTemplate.Raw == "" && dimension.NameFromLabel == "" && !dimension.InferNameFromSeriesMeta {
-		return fmt.Errorf("dimension name is required (name template or name_from_label)")
+		errs = append(errs, fmt.Errorf("dimension name is required (name template or name_from_label)"))
 	}
-	return nil
+	switch dimension.Aggregation {
+	case AggregationSum, AggregationMin, AggregationMax, AggregationAvg:
+	default:
+		errs = append(errs, fmt.Errorf("invalid aggregation %d", dimension.Aggregation))
+	}
+	return errors.Join(errs...)
 }
 
 func (d Dimension) clone() Dimension {

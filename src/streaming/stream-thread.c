@@ -29,16 +29,9 @@ static void stream_thread_handle_op(struct stream_thread *sth, struct stream_opc
     {
         if(m->type == POLLFD_TYPE_SENDER) {
             if(msg->opcode & STREAM_OPCODE_SENDER_POLLOUT) {
-                m->s->thread.wanted = ND_POLL_READ | ND_POLL_WRITE;
-                if(!nd_poll_upd(sth->run.ndpl, m->s->sock.fd, m->s->thread.wanted)) {
-                    nd_log_limit_static_global_var(erl, 1, 0);
-                    nd_log_limit(&erl, NDLS_DAEMON, NDLP_DEBUG,
-                                 "STREAM SND[%zu] '%s' [to %s]: cannot enable output on sender socket %d.",
-                                 sth->id, rrdhost_hostname(m->s->host), m->s->remote_ip, m->s->sock.fd);
-                }
-
+                // send_data() enables ND_POLL_WRITE if the socket does not take everything
                 if(!stream_sender_send_data(sth, m->s, now_monotonic_usec(), false))
-                    // sender has been removed
+                    // sending failed - the poll loop will remove the sender
                     return;
 
                 msg->opcode &= ~(STREAM_OPCODE_SENDER_POLLOUT);
@@ -49,16 +42,9 @@ static void stream_thread_handle_op(struct stream_thread *sth, struct stream_opc
         }
         else if(m->type == POLLFD_TYPE_RECEIVER) {
             if (msg->opcode & STREAM_OPCODE_RECEIVER_POLLOUT) {
-                m->rpt->thread.wanted = ND_POLL_READ | ND_POLL_WRITE;
-                if (!nd_poll_upd(sth->run.ndpl, m->rpt->sock.fd, m->rpt->thread.wanted)) {
-                    nd_log_limit_static_global_var(erl, 1, 0);
-                    nd_log_limit(&erl, NDLS_DAEMON, NDLP_ERR,
-                                 "STREAM RCV[%zu] '%s' [from [%s]:%s]: cannot enable output on receiver socket %d.",
-                                 sth->id, rrdhost_hostname(m->rpt->host), m->rpt->remote_ip, m->rpt->remote_port, m->rpt->sock.fd);
-                }
-
+                // send_data() enables ND_POLL_WRITE if the socket does not take everything
                 if(!stream_receiver_send_data(sth, m->rpt, now_monotonic_usec(), false))
-                    // receiver has been removed
+                    // sending failed - the poll loop will remove the receiver
                     return;
 
                 msg->opcode &= ~(STREAM_OPCODE_RECEIVER_POLLOUT);
@@ -519,11 +505,15 @@ void stream_thread(void *ptr) {
     sth->snd.bytes_received = 0;
     sth->snd.bytes_sent = 0;
 
-    rrd_collector_started();
+    nrpc_serving_started();
 
     usec_t now_ut = now_monotonic_usec();
     while(!exit_thread && !nd_thread_signaled_to_cancel() && service_running(SERVICE_STREAMING)) {
-        if(now_ut - last_dequeue_ut >= 100 * USEC_PER_MS) {
+        // The outer dequeue baseline is always the newest of the three.
+        if(unlikely(now_ut && now_ut < last_dequeue_ut))
+            last_check_replication_ut = last_check_all_nodes_ut = last_dequeue_ut = now_ut;
+
+        if(clocks_usec_delta_or_zero(now_ut, last_dequeue_ut) >= 100 * USEC_PER_MS) {
             last_dequeue_ut = now_ut;
 
             worker_is_busy(WORKER_STREAM_JOB_DEQUEUE);
@@ -544,7 +534,7 @@ void stream_thread(void *ptr) {
             // process any opcodes waiting
             stream_thread_process_opcodes(sth, NULL);
 
-            if(now_ut - last_check_all_nodes_ut >= nd_profile.update_every * USEC_PER_SEC) {
+            if(clocks_usec_delta_or_zero(now_ut, last_check_all_nodes_ut) >= nd_profile.update_every * USEC_PER_SEC) {
                 last_check_all_nodes_ut = now_ut;
 
                 worker_is_busy(WORKER_STREAM_JOB_LIST);
@@ -567,7 +557,7 @@ void stream_thread(void *ptr) {
                 sth->snd.bytes_received = 0;
                 sth->snd.bytes_sent = 0;
 
-                if(now_ut - last_check_replication_ut >= 10 * 60 * USEC_PER_SEC) {
+                if(clocks_usec_delta_or_zero(now_ut, last_check_replication_ut) >= 10 * 60 * USEC_PER_SEC) {
                     last_check_replication_ut = now_ut;
 
                     worker_is_busy(WORKER_STREAM_JOB_LIST);
@@ -652,7 +642,7 @@ void stream_thread(void *ptr) {
 
     worker_unregister();
 
-    rrd_collector_finished();
+    nrpc_serving_finished();
 }
 
 // --------------------------------------------------------------------------------------------------------------------

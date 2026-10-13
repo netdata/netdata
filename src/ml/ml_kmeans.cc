@@ -12,6 +12,27 @@ using std::isinf;
 using std::isnan;
 #endif
 
+namespace {
+
+// Guard against out-of-range timestamps when time_t is narrower than int64_t
+// (e.g. 32-bit builds). if constexpr ensures the upper-bound check is elided
+// at compile time on 64-bit platforms, avoiding constant-expression warnings.
+static inline bool ml_int64_fits_nonnegative_time_t(int64_t value)
+{
+    if (value < 0)
+        return false;
+    if constexpr (sizeof(time_t) < sizeof(int64_t)) {
+        // coverity[CONSTANT_EXPRESSION_RESULT] - on 64-bit, Coverity still analyzes
+        // this dead branch; the check is genuinely reachable only on 32-bit builds
+        // where time_t is narrower than int64_t.
+        if (value > (int64_t) std::numeric_limits<time_t>::max())
+            return false;
+    }
+    return true;
+}
+
+}
+
 void
 ml_kmeans_init(ml_kmeans_t *kmeans)
 {
@@ -188,7 +209,7 @@ bool ml_kmeans_deserialize(ml_kmeans_inlined_t *inlined_km, struct json_object *
     }
     int64_t raw_after = json_object_get_int64(value);
     // Timestamps must be non-negative Unix epoch seconds and fit in time_t.
-    if (raw_after < 0 || raw_after > (int64_t) std::numeric_limits<time_t>::max()) {
+    if (!ml_int64_fits_nonnegative_time_t(raw_after)) {
         netdata_log_error("Failed to deserialize kmeans: out-of-range value for 'after': %" PRId64, raw_after);
         return false;
     }
@@ -204,7 +225,7 @@ bool ml_kmeans_deserialize(ml_kmeans_inlined_t *inlined_km, struct json_object *
     }
     int64_t raw_before = json_object_get_int64(value);
     // Same contract as 'after': non-negative and fits in time_t.
-    if (raw_before < 0 || raw_before > (int64_t) std::numeric_limits<time_t>::max()) {
+    if (!ml_int64_fits_nonnegative_time_t(raw_before)) {
         netdata_log_error("Failed to deserialize kmeans: out-of-range value for 'before': %" PRId64, raw_before);
         return false;
     }

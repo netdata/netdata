@@ -115,11 +115,10 @@ func TestVecStoreScenarios(t *testing.T) {
 				cc.BeginCycle()
 				var wg sync.WaitGroup
 				wg.Add(workers)
-				for worker := 0; worker < workers; worker++ {
-					worker := worker
+				for worker := range workers {
 					go func() {
 						defer wg.Done()
-						for i := 0; i < iterations; i++ {
+						for i := range iterations {
 							label := strconv.Itoa((worker*iterations + i) % distinct)
 							vec.WithLabelValues(label).Observe(SampleValue(i))
 						}

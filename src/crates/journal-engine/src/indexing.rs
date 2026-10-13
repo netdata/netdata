@@ -1,8 +1,36 @@
-//! Journal file indexing infrastructure.
+//! Journal file indexing: the cache builder and the batch indexer driver.
 //!
-//! This module provides infrastructure for indexing journal files:
-//! - Batch parallel indexing with time budget enforcement
-//! - Cache builder for file indexes
+//! [`FileIndex`] is the searchable snapshot of one journal file
+//! (in `journal-index/src/file_index.rs`); this module builds and caches
+//! them. Two pieces:
+//!
+//! - [`FileIndexCacheBuilder`] — the only constructor of the
+//!   `FileIndexCache` handle over foyer's hybrid cache
+//!   ([`crate::cache::FileIndexCache`]).
+//! - [`batch_compute_file_indexes`] — the per-query pipeline callers
+//!   drive: look up every key in the cache, reuse fresh hits whose
+//!   bucket duration divides the query's, rayon-index the misses, then
+//!   update the registry and cache with the results.
+//!
+//! Freshness and bucket fit are judged here, not in the cache: both
+//! depend on the query — now vs. indexed-at, and query bucket vs. index
+//! bucket. An online file's cached index goes stale after 1s
+//! (`journal-index/src/file_index.rs` `FileIndex::is_fresh`) and is re-indexed; an
+//! archived one stays fresh until eviction or a `CACHE_VERSION` bump
+//! (`cache.rs` `CACHE_VERSION`).
+//!
+//! Error split: per-file failures and cache-lookup errors are logged
+//! and their files dropped from the batch (both inside
+//! `batch_compute_file_indexes`);
+//! cancellation and pool-build/panic/foyer-build failures propagate
+//! ([`EngineError::Cancelled`] / [`EngineError::Io`] / [`EngineError::Foyer`]).
+//!
+//! Consumers (grep-verified): otel-legacy-logs builds the cache at
+//! handler startup (`otel-legacy-logs/src/handler.rs` `LegacyLogsHandler::new`), finds the
+//! query's files and keys them (`LegacyLogsHandler::on_call`), and calls the
+//! batch through journal-function's re-export
+//! (`journal-function/src/lib.rs`); examples/index.rs is the second
+//! caller (`examples/index.rs` `main`).
 
 use crate::{
     cache::{FileIndexCache, FileIndexKey},
@@ -16,42 +44,52 @@ use std::sync::atomic::AtomicUsize;
 use tokio_util::sync::CancellationToken;
 use tracing::{error, trace};
 
+// Cap on the per-batch rayon pool regardless of core count; sized in
+// `batch_compute_file_indexes`.
+const MAX_BATCH_INDEX_THREADS: usize = 4;
+
 // ============================================================================
 // File Index Cache Builder
 // ============================================================================
 
-/// Builder for constructing a FileIndexCache with custom configuration.
+/// Builder for a file index cache — the only constructor of
+/// `FileIndexCache` in the tree ([`crate::cache::FileIndexCache`] is a bare type alias).
+/// Unset options fall back to the [`FileIndexCacheBuilder::new`]
+/// defaults; the disk tier is on unless
+/// [`FileIndexCacheBuilder::without_disk_cache`] turns it off.
 pub struct FileIndexCacheBuilder {
     cache_path: Option<std::path::PathBuf>,
     memory_capacity: Option<usize>,
     disk_capacity: Option<usize>,
     block_size: Option<usize>,
+    enable_disk_cache: bool,
 }
 
 impl FileIndexCacheBuilder {
-    /// Creates a new builder with no configuration.
+    /// Creates a builder; anything left unset keeps its default:
     ///
-    /// All options use defaults if not explicitly set:
     /// - Cache path: temp directory + "journal-engine-cache"
     /// - Memory capacity: 128 entries
-    /// - Disk capacity: 16 MB
-    /// - Block size: 4 MB
+    /// - Disk capacity: 16 MiB
+    /// - Block size: 4 MiB
+    /// - Disk tier: enabled (see `without_disk_cache`)
     pub fn new() -> Self {
         Self {
             cache_path: None,
             memory_capacity: None,
             disk_capacity: None,
             block_size: None,
+            enable_disk_cache: true,
         }
     }
 
-    /// Sets the cache directory path.
+    /// Sets the disk tier's directory; `build` creates it if missing.
     pub fn with_cache_path(mut self, path: impl Into<std::path::PathBuf>) -> Self {
         self.cache_path = Some(path.into());
         self
     }
 
-    /// Sets the memory capacity (number of items to keep in memory).
+    /// Sets the memory-tier capacity in items (cached indexes).
     pub fn with_memory_capacity(mut self, capacity: usize) -> Self {
         self.memory_capacity = Some(capacity);
         self
@@ -69,22 +107,50 @@ impl FileIndexCacheBuilder {
         self
     }
 
-    /// Builds the FileIndexCache with the configured settings.
+    /// Disables the disk-backed cache and keeps indexes in memory only.
+    pub fn without_disk_cache(mut self) -> Self {
+        self.enable_disk_cache = false;
+        self
+    }
+
+    /// Builds the cache.
+    ///
+    /// Without the disk tier this is a memory-only hybrid cache.
+    /// Otherwise the cache directory is created first
+    /// ([`EngineError::Io`]
+    /// on failure), then a psync I/O engine and a
+    /// block engine on an fs device are stacked over it; foyer failures
+    /// propagate as [`EngineError::Foyer`].
+    ///
+    /// Inserts enter the memory tier immediately and are enqueued for
+    /// the disk tier in the background (the `WriteOnInsertion`
+    /// policy set below); `FileIndexCache::close` flushes pending disk
+    /// writes on shutdown (see `examples/index.rs` `main`).
     pub async fn build(self) -> Result<FileIndexCache> {
+        use foyer::HybridCacheBuilder;
+
+        let memory_capacity = self.memory_capacity.unwrap_or(128);
+        let memory = HybridCacheBuilder::new()
+            .with_name("file-index-cache")
+            .with_policy(foyer::HybridCachePolicy::WriteOnInsertion)
+            .memory(memory_capacity)
+            .with_shards(4);
+
+        if !self.enable_disk_cache {
+            return memory.storage().build().await.map_err(Into::into);
+        }
+
         use foyer::{
-            BlockEngineBuilder, DeviceBuilder, FsDeviceBuilder, HybridCacheBuilder,
-            IoEngineBuilder, PsyncIoEngineBuilder,
+            BlockEngineBuilder, DeviceBuilder, FsDeviceBuilder, IoEngineBuilder,
+            PsyncIoEngineBuilder,
         };
 
-        // Compute defaults
         let cache_path = self
             .cache_path
             .unwrap_or_else(|| std::env::temp_dir().join("journal-engine-cache"));
-        let memory_capacity = self.memory_capacity.unwrap_or(128);
         let disk_capacity = self.disk_capacity.unwrap_or(16 * 1024 * 1024);
         let block_size = self.block_size.unwrap_or(4 * 1024 * 1024);
 
-        // Ensure cache directory exists
         std::fs::create_dir_all(&cache_path).map_err(|e| {
             EngineError::Io(std::io::Error::other(format!(
                 "Failed to create cache directory: {}",
@@ -92,12 +158,7 @@ impl FileIndexCacheBuilder {
             )))
         })?;
 
-        // Build Foyer hybrid cache
-        let cache = HybridCacheBuilder::new()
-            .with_name("file-index-cache")
-            .with_policy(foyer::HybridCachePolicy::WriteOnInsertion)
-            .memory(memory_capacity)
-            .with_shards(4)
+        let cache = memory
             .storage()
             .with_io_engine(PsyncIoEngineBuilder::new().build().await?)
             .with_engine_config(
@@ -121,31 +182,80 @@ impl Default for FileIndexCacheBuilder {
     }
 }
 
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use tempfile::tempdir;
+
+    #[tokio::test(flavor = "current_thread")]
+    async fn build_without_disk_cache_does_not_create_disk_cache_files() {
+        let tmp = tempdir().expect("tempdir");
+        let cache_path = tmp.path().join("foyer-cache");
+        let cache = FileIndexCacheBuilder::new()
+            .with_cache_path(&cache_path)
+            .with_memory_capacity(4)
+            .without_disk_cache()
+            .build()
+            .await
+            .expect("build in-memory file index cache");
+
+        cache
+            .close()
+            .await
+            .expect("close in-memory file index cache");
+        assert!(
+            !cache_path.exists(),
+            "expected memory-only file index cache to avoid creating {}",
+            cache_path.display()
+        );
+    }
+}
+
 // ============================================================================
 // Batch Processing
 // ============================================================================
 
-/// Batch computes file indexes in parallel using rayon, with cache checking and time budget enforcement.
+/// Batch-serves file indexes for `keys`: cache hits when fresh and
+/// bucket-compatible, rayon-parallel indexing for the misses.
 ///
-/// This function:
-/// 1. Checks cache for all keys upfront
-/// 2. Identifies cache misses
-/// 3. Uses tokio::task to compute missing indexes in parallel
-/// 4. Inserts newly computed indexes into cache
-/// 5. Returns all results (cached + newly computed)
+/// Pipeline:
+/// 1. Looks up every key in the cache concurrently; one `tokio::select!`
+///    guards the sweep, so cancellation drops it mid-flight.
+/// 2. Splits the results. A hit is reused only while `FileIndex::is_fresh`
+///    holds and the index's bucket duration divides the query's — a
+///    finer cached histogram serves a coarser query, never the reverse.
+///    Misses and stale or incompatible
+///    hits go to step 3; a cache-backend error is logged and its key
+///    dropped from the batch.
+/// 3. Computes the misses inside one blocking task that installs a
+///    bounded rayon pool; each item re-checks
+///    cancellation and is indexed at the query's bucket duration.
+/// 4. On each success, updates the registry's time-range metadata for
+///    the file (`journal-registry/src/registry/mod.rs` `Registry::update_time_range`) and re-inserts
+///    the index into the cache. Per-file failures are logged and dropped.
 ///
 /// # Arguments
-/// * `cache` - The file index cache
-/// * `registry` - Registry to update with file metadata
-/// * `keys` - Vector of (file, facets, source_timestamp_field) to fetch/compute indexes for
-/// * `time_range` - Query time range for bucket duration calculation
-/// * `cancellation` - Token to signal cancellation from the caller
-/// * `indexing_limits` - Configuration limits for indexing (cardinality, payload size)
-/// * `progress_counter` - Optional atomic counter incremented after each file is indexed
+/// * `cache` - File index cache: read hits from it, fill it with misses.
+/// * `registry` - Updated with each successfully indexed file's time
+///   range, which is what `find_files_in_range` filters on
+///   (`journal-registry/src/registry/mod.rs` `Registry::find_files_in_range`).
+/// * `keys` - One key per (file, facets, source timestamp field); callers
+///   build them with [`FileIndexKey::new`].
+/// * `time_range` - Query range whose bucket duration indexes the misses
+///   and gates the cached hits.
+/// * `cancellation` - Aborts the batch with `EngineError::Cancelled`;
+///   checked around each phase, around each file, and around the compute
+///   task.
+/// * `indexing_limits` - Cardinality and payload caps handed to every
+///   `FileIndexer` (`journal-index/src/file_indexer.rs` `IndexingLimits`).
+/// * `progress_counter` - Incremented once per successfully indexed
+///   file, for caller-side progress bars
+///   (`otel-legacy-logs/src/handler.rs` `LegacyLogsHandler::on_call`).
 ///
 /// # Returns
-/// Vector of responses for each key. Successful responses contain the file index.
-/// If cancelled, returns Cancelled error.
+/// One (key, index) pair per cache hit and per successfully computed
+/// file, hits first; a key whose lookup or indexing failed is absent
+/// (logged, not an error). Cancellation returns `EngineError::Cancelled`.
 pub async fn batch_compute_file_indexes(
     cache: &FileIndexCache,
     registry: &Registry,
@@ -156,7 +266,9 @@ pub async fn batch_compute_file_indexes(
     progress_counter: Option<Arc<AtomicUsize>>,
 ) -> Result<Vec<(FileIndexKey, FileIndex)>> {
     let bucket_duration = time_range.bucket_duration_seconds();
-    // Phase 1: Batch check cache for all keys upfront
+    // The query's histogram granularity, fixed by `QueryTimeRange::new`
+    // (which calls `calculate_bucket_duration`).
+    // Phase 1: look up every key in the cache concurrently.
     let cache_lookup_futures = keys.iter().map(|key| {
         let key_clone = key.clone();
         async move {
@@ -174,23 +286,35 @@ pub async fn batch_compute_file_indexes(
         _ = cancellation.cancelled() => return Err(EngineError::Cancelled),
     };
 
-    // Phase 2: Separate cache hits from misses, check freshness and compatibility
+    // Phase 2: split cache hits from misses under the freshness and
+    // bucket gates.
     let mut responses = Vec::with_capacity(keys.len());
     let mut keys_to_compute = Vec::new();
+    // These counters exist only for the trace! summary below.
     let mut cache_hits = 0;
     let mut cache_misses = 0;
     let mut stale_entries = 0;
     let mut incompatible_bucket = 0;
 
+    // `Err` here means the cache backend itself failed (foyer), not a
+    // miss — `Ok(None)` is the miss.
     for (key, cache_lookup_result) in cache_lookup_results {
         match cache_lookup_result {
             Ok(Some(file_index)) => {
+                // Reuse gate: `is_fresh` covers files that were online
+                // when indexed — such a cached index goes stale after 1s
+                // (`journal-index/src/file_index.rs` `FileIndex::is_fresh`); the bucket
+                // check covers query granularity — a finer index serves
+                // a coarser query because the histogram engine sums
+                // index buckets into query buckets
+                // (`journal-index/src/histogram.rs` `Histogram::count_entries_in_time_range`), while a
+                // coarser or misaligned one cannot be split and would
+                // answer finer buckets with zero, so it is re-indexed.
                 let fresh = file_index.is_fresh();
                 let bucket_ok = file_index.bucket_duration() <= bucket_duration
                     && bucket_duration.is_multiple_of(file_index.bucket_duration());
 
                 if fresh && bucket_ok {
-                    // Cache hit with fresh data and compatible granularity
                     cache_hits += 1;
                     responses.push((key, file_index));
                 } else {
@@ -204,16 +328,20 @@ pub async fn batch_compute_file_indexes(
                 }
             }
             Ok(None) => {
-                // Cache miss - need to compute
+                // Miss: needs a freshly computed index.
                 cache_misses += 1;
                 keys_to_compute.push(key);
             }
             Err(e) => {
+                // Cache-backend failure: logged and the key dropped — it
+                // is neither computed nor returned, so the file is
+                // absent from the batch.
                 error!("cached file index lookup error {}", e);
             }
         }
     }
 
+    // Bail before paying for compute if the caller already cancelled.
     if cancellation.is_cancelled() {
         return Err(EngineError::Cancelled);
     }
@@ -223,11 +351,19 @@ pub async fn batch_compute_file_indexes(
         cache_hits, cache_misses, stale_entries, incompatible_bucket
     );
 
-    // Phase 3: Spawn single blocking task with rayon for parallel computation
+    // Phase 3: compute the misses inside one blocking task.
     //
-    // The cancellation token is cloned into the blocking task so that cancellation
-    // is visible to the per-file check.
+    // The token is cloned in so the per-item check below sees
+    // cancellation without touching async context.
     let cancellation_for_blocking = cancellation.clone();
+    // Pool size: one per remaining key (at least one), capped at
+    // min(cores, MAX_BATCH_INDEX_THREADS).
+    let compute_threads = keys_to_compute.len().max(1).min(
+        std::thread::available_parallelism()
+            .map(|value| value.get())
+            .unwrap_or(1)
+            .min(MAX_BATCH_INDEX_THREADS),
+    );
 
     let compute_task = tokio::task::spawn_blocking(move || {
         use rayon::prelude::*;
@@ -235,41 +371,68 @@ pub async fn batch_compute_file_indexes(
         use std::sync::atomic::{AtomicBool, Ordering};
 
         let cancelled = Arc::new(AtomicBool::new(false));
+        // Sticky cancellation signal: set by the first item that sees the
+        // token fire, checked by every item alongside the token.
 
-        keys_to_compute
-            .into_par_iter()
-            .map(|key| {
-                // Check cancellation before processing
-                if cancellation_for_blocking.is_cancelled() || cancelled.load(Ordering::Relaxed) {
-                    cancelled.store(true, Ordering::Relaxed);
-                    return (key, Err(EngineError::Cancelled));
-                }
+        // A per-call pool instead of rayon's global one: the global pool
+        // would stay alive after the work and keep a full worker set
+        // plus allocator arenas resident in the plugin process.
+        let thread_pool = rayon::ThreadPoolBuilder::new()
+            .num_threads(compute_threads)
+            .build()
+            .map_err(|err| {
+                EngineError::Io(std::io::Error::other(format!(
+                    "failed to build rayon index pool: {}",
+                    err
+                )))
+            })?;
 
-                let mut file_indexer = FileIndexer::new(indexing_limits);
-                let result = file_indexer
-                    .index(
-                        &key.file,
-                        key.source_timestamp_field.as_ref(),
-                        key.facets.as_slice(),
-                        bucket_duration,
-                    )
-                    .map_err(|e| e.into());
+        Ok::<_, EngineError>(thread_pool.install(|| {
+            keys_to_compute
+                .into_par_iter()
+                .map(|key| {
+                    // Every item re-checks cancellation before indexing.
+                    if cancellation_for_blocking.is_cancelled() || cancelled.load(Ordering::Relaxed)
+                    {
+                        cancelled.store(true, Ordering::Relaxed);
+                        return (key, Err(EngineError::Cancelled));
+                    }
 
-                if result.is_ok() {
-                    if let Some(ref counter) = progress_counter {
+                    // A fresh indexer per file, indexing at the query's
+                    // bucket duration so the miss's granularity matches
+                    // this query (`journal-index/src/file_indexer.rs` `FileIndexer::index`).
+                    let mut file_indexer = FileIndexer::new(indexing_limits);
+                    let result = file_indexer
+                        .index(
+                            &key.file,
+                            key.source_timestamp_field.as_ref(),
+                            key.facets.as_slice(),
+                            bucket_duration,
+                        )
+                        .map_err(|e| e.into());
+
+                    // Successful indexes only: the caller derives
+                    // progress from this count.
+                    if result.is_ok()
+                        && let Some(ref counter) = progress_counter
+                    {
                         counter.fetch_add(1, Ordering::Relaxed);
                     }
-                }
 
-                (key, result)
-            })
-            .collect::<Vec<(FileIndexKey, Result<FileIndex>)>>()
+                    (key, result)
+                })
+                .collect::<Vec<(FileIndexKey, Result<FileIndex>)>>()
+        }))
     });
 
+    // Cancellation here drops the blocking task's JoinHandle, which
+    // detaches it (spawn_blocking work cannot be aborted); the rayon
+    // items bail at the per-item check, bounding the wasted work.
     let computed_results = tokio::select! {
         result = compute_task => {
             match result {
-                Ok(results) => results,
+                Ok(Ok(results)) => results,
+                Ok(Err(err)) => return Err(err),
                 Err(e) => {
                     return Err(EngineError::Io(std::io::Error::new(
                         std::io::ErrorKind::Other,
@@ -283,11 +446,16 @@ pub async fn batch_compute_file_indexes(
         }
     };
 
-    // Phase 4: Update registry and cache, then collect responses
+    // Phase 4: publish successes to the registry and cache, collect
+    // responses.
     for (key, response) in computed_results {
         match response {
             Ok(index) => {
-                // Update registry and cache on success
+                // Registry first: this metadata is what
+                // `find_files_in_range` filters on — files with Unknown
+                // or Active ranges are always included, a Bounded one
+                // only when it overlaps the query
+                // (`journal-registry/src/registry/mod.rs` `Registry::find_files_in_range`).
                 registry.update_time_range(
                     &key.file,
                     index.start_time(),
@@ -300,6 +468,9 @@ pub async fn batch_compute_file_indexes(
                 responses.push((key, index));
             }
             Err(e) => {
+                // Per-file failure: logged and skipped — the file is
+                // absent from the response and its registry/cache state
+                // is untouched.
                 error!(
                     "file index computation failed for file={}: {}",
                     key.file.path(),

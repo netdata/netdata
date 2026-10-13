@@ -243,3 +243,18 @@ func perfSourceFromPlugin(pluginPath string) string {
 	}
 	return sanitizeMetricKey(base)
 }
+
+func perfSourceFromCheckName(checkName string) string {
+	trimmed := strings.TrimSpace(checkName)
+	if trimmed == "" {
+		return "check"
+	}
+	return sanitizeMetricKey(trimmed)
+}
+
+func normalizedCheckName(checkName, pluginPath string) string {
+	if strings.TrimSpace(checkName) == "" {
+		return perfSourceFromPlugin(pluginPath)
+	}
+	return perfSourceFromCheckName(checkName)
+}

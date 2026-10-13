@@ -1,0 +1,11 @@
+{
+  "sender": [
+    "+15005550006"
+  ],
+  "receptor": [
+    "+15005550009"
+  ],
+  "message": [
+    "summary\nNode: node\nAlert: alert\nStatus: WARNING\nTime: 2026-09-14T12:00:00Z"
+  ]
+}

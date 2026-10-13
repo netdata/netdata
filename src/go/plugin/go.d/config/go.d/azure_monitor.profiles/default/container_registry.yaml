@@ -1,115 +1,114 @@
 ---
-id: container_registry
-name: Azure Container Registry
+display_name: Azure Container Registry
 resource_type: Microsoft.ContainerRegistry/registries
 metrics:
-- id: storage_used
-  azure_name: StorageUsed
-  time_grain: PT1H
-  series:
-  - aggregation: average
-    kind: gauge
-- id: successful_pull_count
-  azure_name: SuccessfulPullCount
-  time_grain: PT1M
-  series:
-  - aggregation: total
-    kind: counter
-- id: successful_push_count
-  azure_name: SuccessfulPushCount
-  time_grain: PT1M
-  series:
-  - aggregation: total
-    kind: counter
-- id: total_pull_count
-  azure_name: TotalPullCount
-  time_grain: PT1M
-  series:
-  - aggregation: total
-    kind: counter
-- id: total_push_count
-  azure_name: TotalPushCount
-  time_grain: PT1M
-  series:
-  - aggregation: total
-    kind: counter
-- id: agent_pool_cpu_time
-  azure_name: AgentPoolCPUTime
-  time_grain: PT1M
-  series:
-  - aggregation: total
-    kind: counter
-- id: run_duration
-  azure_name: RunDuration
-  time_grain: PT1M
-  series:
-  - aggregation: total
-    kind: counter
+  - id: storage_used
+    azure_name: StorageUsed
+    time_grain: PT1H
+    series:
+      - aggregation: average
+        kind: gauge
+  - id: successful_pull_count
+    azure_name: SuccessfulPullCount
+    time_grain: PT1M
+    series:
+      - aggregation: total
+        kind: counter
+  - id: successful_push_count
+    azure_name: SuccessfulPushCount
+    time_grain: PT1M
+    series:
+      - aggregation: total
+        kind: counter
+  - id: total_pull_count
+    azure_name: TotalPullCount
+    time_grain: PT1M
+    series:
+      - aggregation: total
+        kind: counter
+  - id: total_push_count
+    azure_name: TotalPushCount
+    time_grain: PT1M
+    series:
+      - aggregation: total
+        kind: counter
+  - id: agent_pool_cpu_time
+    azure_name: AgentPoolCPUTime
+    time_grain: PT1M
+    series:
+      - aggregation: total
+        kind: counter
+  - id: run_duration
+    azure_name: RunDuration
+    time_grain: PT1M
+    series:
+      - aggregation: total
+        kind: counter
 template:
   family: Azure Container Registry
   context_namespace: container_registry
   chart_defaults:
     label_promotion:
-    - resource_name
-    - resource_group
-    - region
-    - resource_type
-    - profile
+      - resource_name
+      - resource_group
+      - region
+      - resource_type
+      - profile
     instances:
       by_labels:
-      - resource_uid
+        - resource_uid
   charts:
-  - id: am_azure_container_registry__storage_used
-    title: Azure Container Registry Storage Used
-    context: storage_used
-    family: Storage
-    type: line
-    units: bytes
-    algorithm: absolute
-    dimensions:
-    - selector: container_registry.storage_used_average
-      name: used
-  - id: am_azure_container_registry__pull_count
-    title: Azure Container Registry Image Pulls
-    context: pull_count
-    family: Operations
-    type: line
-    units: pulls/s
-    algorithm: incremental
-    dimensions:
-    - selector: container_registry.successful_pull_count_total
-      name: successful
-    - selector: container_registry.total_pull_count_total
-      name: total
-  - id: am_azure_container_registry__push_count
-    title: Azure Container Registry Image Pushes
-    context: push_count
-    family: Operations
-    type: line
-    units: pushes/s
-    algorithm: incremental
-    dimensions:
-    - selector: container_registry.successful_push_count_total
-      name: successful
-    - selector: container_registry.total_push_count_total
-      name: total
-  - id: am_azure_container_registry__agentpool_cpu_time
-    title: Azure Container Registry AgentPool CPU Time
-    context: agentpool_cpu_time
-    family: Tasks
-    type: line
-    units: seconds/s
-    algorithm: incremental
-    dimensions:
-    - selector: container_registry.agent_pool_cpu_time_total
-      name: cpu_time
-  - id: am_azure_container_registry__run_duration
-    title: Azure Container Registry Task Run Duration
-    context: run_duration
-    family: Tasks
-    type: line
-    units: milliseconds/s
-    algorithm: incremental
-    dimensions:
-    - selector: container_registry.run_duration_total
-      name: duration
+    - id: am_azure_container_registry__storage_used
+      title: Azure Container Registry Storage Used
+      context: storage_used
+      family: Storage
+      type: line
+      units: bytes
+      algorithm: absolute
+      dimensions:
+        - selector: storage_used_average
+          name: used
+    - id: am_azure_container_registry__pull_count
+      title: Azure Container Registry Image Pulls
+      context: pull_count
+      family: Operations
+      type: line
+      units: pulls/s
+      algorithm: incremental
+      dimensions:
+        - selector: successful_pull_count_total
+          name: successful
+        - selector: total_pull_count_total
+          name: total
+    - id: am_azure_container_registry__push_count
+      title: Azure Container Registry Image Pushes
+      context: push_count
+      family: Operations
+      type: line
+      units: pushes/s
+      algorithm: incremental
+      dimensions:
+        - selector: successful_push_count_total
+          name: successful
+        - selector: total_push_count_total
+          name: total
+    - id: am_azure_container_registry__agentpool_cpu_time
+      title: Azure Container Registry AgentPool CPU Time
+      context: agentpool_cpu_time
+      family: Tasks
+      type: line
+      units: seconds/s
+      algorithm: incremental
+      dimensions:
+        - selector: agent_pool_cpu_time_total
+          name: cpu_time
+    - id: am_azure_container_registry__run_duration
+      title: Azure Container Registry Task Run Duration
+      context: run_duration
+      family: Tasks
+      type: line
+      units: milliseconds/s
+      algorithm: incremental
+      dimensions:
+        - selector: run_duration_total
+          name: duration

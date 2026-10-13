@@ -96,7 +96,9 @@ void nd_log_initialize_for_external_plugins(const char *name) {
 
     if(!netdata_configured_host_prefix) {
         s = getenv("NETDATA_HOST_PREFIX");
-        if(s && *s)
+        // this assignment bypasses verify_netdata_host_prefix(), so apply the
+        // same rule here - see netdata_host_prefix_has_format_specifier().
+        if(s && *s && !netdata_host_prefix_has_format_specifier(s))
             netdata_configured_host_prefix = (char *)s;
     }
 
@@ -307,12 +309,12 @@ void nd_log_reopen_log_files(bool log) {
 }
 
 int nd_log_systemd_journal_fd(void) {
-    return nd_log.journal.fd;
+    return __atomic_load_n(&nd_log.journal.fd, __ATOMIC_ACQUIRE);
 }
 
 void nd_log_reopen_log_files_for_spawn_server(const char *name) {
-    nd_log.fatal_hook_cb = NULL;
-    nd_log.fatal_final_cb = NULL;
+    __atomic_store_n(&nd_log.fatal_hook_cb, (log_event_t)NULL, __ATOMIC_RELEASE);
+    __atomic_store_n(&nd_log.fatal_final_cb, (fatal_event_t)NULL, __ATOMIC_RELEASE);
     nd_log.single_threaded_child = true;
 
     gettid_uncached();

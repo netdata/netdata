@@ -30,6 +30,7 @@ int api_v1_data(RRDHOST *host, struct web_client *w, char *url) {
     char *chart_labels_filter = NULL;
     char *group_options = NULL;
     char *cardinality_limit_str = NULL;
+    char *limit_str = NULL;
     size_t tier = 0;
     size_t cardinality_limit = 0;
     RRDR_TIME_GROUPING group = RRDR_GROUPING_AVERAGE;
@@ -66,6 +67,7 @@ int api_v1_data(RRDHOST *host, struct web_client *w, char *url) {
         else if(!strcmp(name, "gtime")) group_time_str = value;
         else if(!strcmp(name, "group_options")) group_options = value;
         else if(!strcmp(name, "cardinality_limit")) cardinality_limit_str = value;
+        else if(!strcmp(name, "limit")) limit_str = value;
         else if(!strcmp(name, "group")) {
             group = time_grouping_parse(value, RRDR_GROUPING_AVERAGE);
         }
@@ -130,6 +132,7 @@ int api_v1_data(RRDHOST *host, struct web_client *w, char *url) {
     fix_google_param(outFileName);
 
     RRDSET *st = NULL;
+    RRDSET_ACQUIRED *rsa = NULL;
     ONEWAYALLOC *owa = onewayalloc_create(0);
     QUERY_TARGET *qt = NULL;
 
@@ -140,8 +143,9 @@ int api_v1_data(RRDHOST *host, struct web_client *w, char *url) {
 
     if(chart && !context) {
         // check if this is a specific chart
-        st = rrdset_find(host, chart, false);
-        if (!st) st = rrdset_find_byname(host, chart);
+        rsa = rrdset_find_and_acquire(host, chart, false);
+        if (!rsa) rsa = rrdset_find_byname_and_acquire(host, chart);
+        st = rrdset_acquired_to_rrdset(rsa);
     }
 
     long long before = (before_str && *before_str)?str2l(before_str):0;
@@ -152,6 +156,13 @@ int api_v1_data(RRDHOST *host, struct web_client *w, char *url) {
     
     if (cardinality_limit_str && *cardinality_limit_str)
         cardinality_limit = str2ul(cardinality_limit_str);
+    else if (limit_str && *limit_str) {
+        // limit=N: top-N dimensions plus the 'remaining' aggregate; ignored
+        // by agents that predate the parameter (see api_v2_data.c)
+        size_t limit = str2ul(limit_str);
+        if (limit)
+            cardinality_limit = (limit < SIZE_MAX) ? limit + 1 : limit;
+    }
 
     QUERY_TARGET_REQUEST qtr = {
         .version = 1,
@@ -247,6 +258,7 @@ int api_v1_data(RRDHOST *host, struct web_client *w, char *url) {
 
 cleanup:
     query_target_release(qt);
+    rrdset_acquired_release(rsa);
     onewayalloc_destroy(owa);
     buffer_free(dimensions);
     return ret;

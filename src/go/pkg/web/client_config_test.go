@@ -17,6 +17,8 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"context"
+
 	"github.com/netdata/netdata/go/plugins/pkg/confopt"
 	"github.com/netdata/netdata/go/plugins/pkg/tlscfg"
 )
@@ -182,7 +184,7 @@ func TestNewHTTPClient(t *testing.T) {
 
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
-			client, err := NewHTTPClient(test.config)
+			client, err := NewHTTPClient(context.Background(), test.config)
 
 			if test.wantErr {
 				assert.Error(t, err)
@@ -212,7 +214,7 @@ func TestHTTP2Transport_RoundTrip(t *testing.T) {
 		},
 	}
 
-	client, err := NewHTTPClient(cfg)
+	client, err := NewHTTPClient(context.Background(), cfg)
 	require.NoError(t, err)
 
 	// Verify the transport is http2Transport
@@ -353,7 +355,7 @@ func TestClientIntegration(t *testing.T) {
 	defer server.Close()
 
 	t.Run("follow redirects", func(t *testing.T) {
-		client, err := NewHTTPClient(ClientConfig{
+		client, err := NewHTTPClient(context.Background(), ClientConfig{
 			NotFollowRedirect: false,
 		})
 		require.NoError(t, err)
@@ -366,7 +368,7 @@ func TestClientIntegration(t *testing.T) {
 	})
 
 	t.Run("not follow redirects", func(t *testing.T) {
-		client, err := NewHTTPClient(ClientConfig{
+		client, err := NewHTTPClient(context.Background(), ClientConfig{
 			NotFollowRedirect: true,
 		})
 		require.NoError(t, err)
@@ -382,7 +384,7 @@ func TestClientIntegration(t *testing.T) {
 	})
 
 	t.Run("timeout", func(t *testing.T) {
-		client, err := NewHTTPClient(ClientConfig{
+		client, err := NewHTTPClient(context.Background(), ClientConfig{
 			Timeout: confopt.Duration(time.Millisecond * 500),
 		})
 		require.NoError(t, err)
@@ -399,7 +401,7 @@ func TestClientIntegration(t *testing.T) {
 
 func TestTransportWithDifferentSchemes(t *testing.T) {
 	// Test that regular transport handles both http and https
-	client, err := NewHTTPClient(ClientConfig{
+	client, err := NewHTTPClient(context.Background(), ClientConfig{
 		TLSConfig: tlscfg.TLSConfig{
 			InsecureSkipVerify: true,
 		},

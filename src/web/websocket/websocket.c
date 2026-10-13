@@ -185,9 +185,9 @@ bool websocket_client_register(WS_CLIENT *wsc) {
     spinlock_lock(&ws_server.spinlock);
     
     int added = WS_CLIENTS_SET(&ws_server.clients, wsc->id, wsc);
-    if (!added) {
+    if (added) {
         ws_server.active_clients++;
-        websocket_debug(wsc, "WebSocket client registered, total clients: %u", ws_server.active_clients);
+        websocket_debug(wsc, "WebSocket client registered, total clients: %zu", ws_server.active_clients);
     }
     
     spinlock_unlock(&ws_server.spinlock);

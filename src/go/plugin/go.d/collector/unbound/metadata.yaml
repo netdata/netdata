@@ -6,6 +6,7 @@ modules:
       module_name: unbound
       monitored_instance:
         name: Unbound
+        description: "Monitor Unbound queries, cache activity, recursion, response codes, request lists, uptime, and memory."
         link: https://nlnetlabs.nl/projects/unbound/about/
         icon_filename: unbound.png
         categories:
@@ -45,20 +46,20 @@ modules:
           - title: Check permissions and adjust if necessary
             description: |
               If using unix socket:
-              
+
               - socket should be readable and writeable by `netdata` user
-              
+
               If using ip socket and TLS is disabled:
-              
+
               - socket should be accessible via network
-              
+
               If TLS is enabled, in addition:
-              
+
               - `control-key-file` should be readable by `netdata` user
               - `control-cert-file` should be readable by `netdata` user
-              
+
               For auto-detection parameters from `unbound.conf`:
-              
+
               - `unbound.conf` should be readable by `netdata` user
               - if you have several configuration files (include feature) all of them should be readable by `netdata` user
       configuration:
@@ -149,13 +150,13 @@ modules:
             - name: Multi-instance
               description: |
                 > **Note**: When you define multiple jobs, their names must be unique.
-                
+
                 Local and remote instances.
               config: |
                 jobs:
                   - name: local
                     address: 127.0.0.1:8953
-                
+
                   - name: remote
                     address: 203.0.113.11:8953
     troubleshooting:

@@ -36,6 +36,8 @@ You can modify web server behavior by editing the `[web]` section in `netdata.co
 | `allow connections by dns`         | `heuristic`                                                                                                                                                                            | See the [access list section](#access-lists) for details on using `allow` settings                                                                                                                                                                                                                                                                                                                      |
 | `allow dashboard from`             | `localhost *`                                                                                                                                                                          | Controls dashboard and API access                                                                                                                                                                                                                                                                                                                                                                       |
 | `allow dashboard by dns`           | `heuristic`                                                                                                                                                                            | DNS resolution setting for dashboard access                                                                                                                                                                                                                                                                                                                                                             |
+| `allow mcp from`                   | (defaults to the value of `allow dashboard from`, or `localhost *` if that is unset)                                                                                                  | Controls MCP access (`/mcp`, `/sse`, MCP WebSocket protocol). When not explicitly set, this option inherits the value of `allow dashboard from` (falling back to `localhost *` only if `allow dashboard from` is unset)                                                                                                                                                                                  |
+| `allow mcp by dns`                 | `heuristic`                                                                                                                                                                            | DNS resolution setting for MCP access                                                                                                                                                                                                                                                                                                                                                                   |
 | `allow badges from`                | `*`                                                                                                                                                                                    | Controls badge API access                                                                                                                                                                                                                                                                                                                                                                               |
 | `allow badges by dns`              | `heuristic`                                                                                                                                                                            | DNS resolution setting for badge access                                                                                                                                                                                                                                                                                                                                                                 |
 | `allow streaming from`             | `*`                                                                                                                                                                                    | Controls metric streaming from child agents                                                                                                                                                                                                                                                                                                                                                             |
@@ -72,6 +74,8 @@ Once a connection is allowed globally, these settings control access to specific
 
 - **`allow dashboard from`** - receives the request and examines if it is a static dashboard file or an API call the dashboards do.
 
+- **`allow mcp from`** - checks if the client is allowed to use MCP endpoints (`/mcp`, `/sse`) and MCP WebSocket protocol.
+
 - **`allow badges from`** - checks if the API request is for a badge. Badges aren't matched by `allow dashboard from`.
 
 - **`allow streaming from`** - checks if the child willing to stream metrics to this Netdata is allowed. This can be controlled per API KEY and MACHINE GUID in `stream.conf`. The setting in `netdata.conf` is checked before the ones in `stream.conf`.
@@ -87,6 +91,7 @@ Once a connection is allowed globally, these settings control access to specific
 [web]
     allow connections from = localhost
     allow dashboard from = localhost
+    allow mcp from = localhost
     allow management from = localhost
 ```
 
@@ -95,6 +100,7 @@ Once a connection is allowed globally, these settings control access to specific
 [web]
     allow connections from = localhost 10.* 192.168.*
     allow dashboard from = localhost 10.* 192.168.*
+    allow mcp from = localhost 10.* 192.168.*
     allow badges from = *
     allow streaming from = *
     allow management from = localhost
@@ -114,6 +120,7 @@ This process can be expensive on a machine that is serving many connections. Eac
 ```text
     allow connections by dns = heuristic
     allow dashboard by dns = heuristic
+    allow mcp by dns = heuristic
     allow badges by dns = heuristic
     allow streaming by dns = heuristic
     allow netdata.conf by dns = no
@@ -145,6 +152,16 @@ Edit the `[web]` section in `netdata.conf` (see [Configure Basic Settings](#conf
 [web]
     mode = none
 ```
+
+Restart your Agent to apply changes. After restart, the Agent's web server (default port `19999`) will no longer accept inbound connections.
+
+
+:::warning
+
+This disables inbound connections, including streams from Child Agents.
+**Do not use this setting on Parent Agents.**
+
+:::
 
 </details>
 
@@ -203,11 +220,12 @@ The option `[web].default port` is used when entries in `[web].bind to` do not s
 
 As shown in the example above, these permissions are optional, with the default permitting all request types on the specified port.
 
-The request types are strings identical to the `allow X from` directives of the access lists, i.e. `dashboard`, `streaming`, `registry`, `netdata.conf`, `badges` and `management`. The access lists themselves and the general setting `allow connections from` in the next section are applied regardless of the ports that are configured to provide these services.
+The request types are strings identical to the `allow X from` directives of the access lists, i.e. `dashboard`, `mcp`, `streaming`, `registry`, `netdata.conf`, `badges` and `management`. The access lists themselves and the general setting `allow connections from` in the next section are applied regardless of the ports that are configured to provide these services.
 
 The API requests are serviced as follows:
 
 - `dashboard` gives access to the UI, the read API and badges API calls.
+- `mcp` gives access to MCP endpoints (`/mcp`, `/sse`) and the MCP WebSocket protocol.
 - `badges` gives access only to the badge API calls.
 - `management` gives access only to the management API calls.
 
@@ -248,6 +266,47 @@ openssl speed rsa2048 rsa4096
 ```
 
 :::
+
+### Obtaining TLS Certificates
+
+Self-signed certificates are suitable for testing and development environments. For production deployments, you should obtain certificates from a trusted Certificate Authority (CA) to ensure proper security and avoid browser warnings.
+
+#### Certificate Acquisition Options
+
+1. **Let's Encrypt (Recommended for public-facing instances)**
+   - Free, automated certificate authority
+   - For HTTP-01/TLS-ALPN-01, requires public DNS plus inbound ports 80/443, or use DNS-01 if those ports aren’t available
+   - Certificates auto-renew with proper configuration
+   - Install using [Certbot](https://certbot.eff.org/) or other ACME clients
+   - Certificates are issued in PEM format, compatible with Netdata
+
+2. **Commercial Certificate Authorities**
+   - Paid certificates from providers like DigiCert, Comodo, or GlobalSign
+   - Various validation levels (DV, OV, EV) available
+   - Suitable for organizations requiring extended validation
+   - Ensure certificates are provided in PEM format or convert them
+
+3. **Internal Certificate Authorities**
+   - For enterprise environments with private PKI infrastructure
+   - Allows complete control over certificate lifecycle
+   - See [Using custom CA certificates with Netdata](/docs/netdata-agent/configuration/using-custom-ca-certificates-with-netdata.md) for configuration details
+   - Requires clients to trust your internal CA
+
+#### Netdata Certificate Requirements
+
+Regardless of the source, ensure your certificates meet these requirements:
+
+- **Format**: PEM format (most common format, used by Let's Encrypt and compatible with OpenSSL)
+- **Full chain**: For CA-issued certificates, `ssl certificate` must include all intermediate certificates to avoid browser warnings. Let's Encrypt issues `fullchain.pem` (certificate + intermediates) and `privkey.pem` (private key) — use these directly.
+- **Location**: Place certificates in `/etc/netdata/ssl/` or another secure directory
+- **Permissions**: Certificate and key files must be readable by the `netdata` user
+- **Paths**: Configure the paths in `netdata.conf`:
+
+```text
+[web]
+    ssl key = /etc/netdata/ssl/privkey.pem
+    ssl certificate = /etc/netdata/ssl/fullchain.pem
+```
 
 </details>
 
@@ -328,4 +387,3 @@ ws://localhost:19999/echo?max_frame_size=32768
 This is particularly useful for resource-constrained devices or network environments with specific limitations.
 
 </details>
-

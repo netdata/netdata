@@ -225,7 +225,7 @@ impl FilterExpr {
         Ok(output)
     }
 
-    /// Helper function for format_data_objects that handles nested expressions and indentation
+    /// Helper for [`Self::dump`]: renders nested expressions with indentation.
     fn dump_internal<M: MemoryMap>(
         &self,
         journal_file: &JournalFile<M>,
@@ -236,23 +236,19 @@ impl FilterExpr {
 
         match self {
             FilterExpr::Match(data_offset, inlined_cursor) => {
-                // Load the data object
                 let Some(data_offset) = NonZeroU64::new(*data_offset) else {
                     return Err(JournalError::InvalidOffset);
                 };
                 let data_object = journal_file.data_ref(data_offset)?;
 
-                // Get the payload as a string if possible
                 let payload_bytes = data_object.payload_bytes();
                 let payload_str = String::from_utf8_lossy(payload_bytes);
 
-                // Format the data offset and payload
                 output.push_str(&format!(
                     "{}Match[offset=0x{:x}]: {}\n",
                     indent, data_offset, payload_str
                 ));
 
-                // Format cursor information if available
                 if let Some(ic) = inlined_cursor {
                     output.push_str(&format!("{}  Cursor: {:?}\n", indent, ic));
                 }
@@ -373,7 +369,8 @@ impl JournalFilter {
             let new_item = kv_pair.to_vec();
             let new_key = Self::extract_key(&new_item).unwrap_or(&[]);
 
-            // Find the insertion position using binary search
+            // Keep current_matches sorted by key: convert_current_matches relies
+            // on equal keys being contiguous when it groups them.
             let pos = self
                 .current_matches
                 .binary_search_by(|item| {
@@ -382,7 +379,6 @@ impl JournalFilter {
                 })
                 .unwrap_or_else(|e| e);
 
-            // Insert at the found position
             self.current_matches.insert(pos, new_item);
         }
     }

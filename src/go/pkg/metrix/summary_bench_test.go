@@ -139,11 +139,11 @@ func BenchmarkSummarySnapshotObservePoint(b *testing.B) {
 	}
 }
 
-func benchmarkCycleController(b *testing.B, s CollectorStore) CycleController {
-	b.Helper()
+func benchmarkCycleController(tb testing.TB, s CollectorStore) CycleController {
+	tb.Helper()
 	managed, ok := AsCycleManagedStore(s)
 	if !ok {
-		b.Fatalf("store does not expose cycle control")
+		tb.Fatalf("store does not expose cycle control")
 	}
 	return managed.CycleController()
 }
@@ -151,7 +151,7 @@ func benchmarkCycleController(b *testing.B, s CollectorStore) CycleController {
 func benchmarkSummaryValues(n int) []SampleValue {
 	vals := make([]SampleValue, n)
 	var x uint64 = 0x9e3779b97f4a7c15
-	for i := 0; i < n; i++ {
+	for i := range n {
 		// Deterministic pseudo-random in [0,1).
 		x ^= x >> 12
 		x ^= x << 25

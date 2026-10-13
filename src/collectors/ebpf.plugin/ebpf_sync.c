@@ -10,6 +10,7 @@ static netdata_syscall_stat_t sync_counter_aggregated_data[NETDATA_SYNC_IDX_END]
 static netdata_publish_syscall_t sync_counter_publish_aggregated[NETDATA_SYNC_IDX_END];
 
 static netdata_idx_t sync_hash_values[NETDATA_SYNC_IDX_END];
+static netdata_idx_t *sync_percpu_values;
 
 static ebpf_local_maps_t sync_maps[NETDATA_SYNC_IDX_END][2];
 
@@ -206,69 +207,11 @@ void ebpf_sync_cleanup_objects()
             w->probe_links = NULL;
         }
     }
+
+    freez(sync_percpu_values);
+    sync_percpu_values = NULL;
 }
 
-/**
- * Obsolete global
- *
- * Obsolete global charts created by thread.
- *
- * @param em a pointer to `struct ebpf_module`
- */
-static void ebpf_obsolete_sync_global(ebpf_module_t *em)
-{
-    if (local_syscalls[NETDATA_SYNC_FSYNC_IDX].enabled && local_syscalls[NETDATA_SYNC_FDATASYNC_IDX].enabled)
-        ebpf_write_chart_obsolete(
-            NETDATA_EBPF_MEMORY_GROUP,
-            NETDATA_EBPF_FILE_SYNC_CHART,
-            "",
-            "Monitor calls to fsync(2) and fdatasync(2).",
-            EBPF_COMMON_UNITS_CALLS_PER_SEC,
-            NETDATA_EBPF_SYNC_SUBMENU,
-            NETDATA_EBPF_CHART_TYPE_LINE,
-            "mem.file_sync",
-            NETDATA_EBPF_FILE_SYNC_CHART_ORDER,
-            em->update_every);
-
-    if (local_syscalls[NETDATA_SYNC_MSYNC_IDX].enabled)
-        ebpf_write_chart_obsolete(
-            NETDATA_EBPF_MEMORY_GROUP,
-            NETDATA_EBPF_MSYNC_CHART,
-            "",
-            "Monitor calls to msync(2).",
-            EBPF_COMMON_UNITS_CALLS_PER_SEC,
-            NETDATA_EBPF_SYNC_SUBMENU,
-            NETDATA_EBPF_CHART_TYPE_LINE,
-            "mem.memory_map",
-            NETDATA_EBPF_MSYNC_CHART_ORDER,
-            em->update_every);
-
-    if (local_syscalls[NETDATA_SYNC_SYNC_IDX].enabled && local_syscalls[NETDATA_SYNC_SYNCFS_IDX].enabled)
-        ebpf_write_chart_obsolete(
-            NETDATA_EBPF_MEMORY_GROUP,
-            NETDATA_EBPF_SYNC_CHART,
-            "",
-            "Monitor calls to sync(2) and syncfs(2).",
-            EBPF_COMMON_UNITS_CALLS_PER_SEC,
-            NETDATA_EBPF_SYNC_SUBMENU,
-            NETDATA_EBPF_CHART_TYPE_LINE,
-            "mem.sync",
-            NETDATA_EBPF_SYNC_CHART_ORDER,
-            em->update_every);
-
-    if (local_syscalls[NETDATA_SYNC_SYNC_FILE_RANGE_IDX].enabled)
-        ebpf_write_chart_obsolete(
-            NETDATA_EBPF_MEMORY_GROUP,
-            NETDATA_EBPF_FILE_SEGMENT_CHART,
-            "",
-            "Monitor calls to sync_file_range(2).",
-            EBPF_COMMON_UNITS_CALLS_PER_SEC,
-            NETDATA_EBPF_SYNC_SUBMENU,
-            NETDATA_EBPF_CHART_TYPE_LINE,
-            "mem.file_segment",
-            NETDATA_EBPF_FILE_SEGMENT_CHART_ORDER,
-            em->update_every);
-}
 
 /**
  * Exit
@@ -288,17 +231,11 @@ static void ebpf_sync_exit(void *pptr)
     if (!em)
         return;
 
-    if (em->enabled == NETDATA_THREAD_EBPF_FUNCTION_RUNNING && !ebpf_plugin_stop()) {
-        netdata_mutex_lock(&lock);
-        ebpf_obsolete_sync_global(em);
-        netdata_mutex_unlock(&lock);
-    }
-
     if (!ebpf_plugin_stop() && em->functions.bpf_unload)
         em->functions.bpf_unload(em);
 
     netdata_mutex_lock(&ebpf_exit_cleanup);
-    em->enabled = NETDATA_THREAD_EBPF_STOPPED;
+    ebpf_module_enabled_set(em, NETDATA_THREAD_EBPF_STOPPED);
     netdata_mutex_unlock(&ebpf_exit_cleanup);
 }
 
@@ -360,6 +297,8 @@ static int ebpf_sync_initialize_syscall(ebpf_module_t *em)
             if (em->load & EBPF_LOAD_LEGACY) {
                 if (ebpf_sync_load_legacy(w, em))
                     errors++;
+                else
+                    ebpf_mark_program_loaded();
 
                 em->info.thread_name = saved_name;
             }
@@ -378,6 +317,8 @@ static int ebpf_sync_initialize_syscall(ebpf_module_t *em)
                             w->sync_obj = NULL;
                             w->enabled = false;
                             errors++;
+                        } else {
+                            ebpf_mark_program_loaded();
                         }
                     }
                 } else {
@@ -414,21 +355,31 @@ static int ebpf_sync_initialize_syscall(ebpf_module_t *em)
  */
 static void ebpf_sync_read_global_table(int maps_per_core)
 {
-    netdata_idx_t stored[NETDATA_MAX_PROCESSOR];
     uint32_t idx = NETDATA_SYNC_CALL;
     int i;
     for (i = 0; i < NETDATA_SYNC_IDX_END; i++) {
         ebpf_sync_syscalls_t *w = &local_syscalls[i];
-        if (w->enabled) {
-            int fd = w->sync_maps[NETDATA_SYNC_GLOBAL_TABLE].map_fd;
-            if (!bpf_map_lookup_elem(fd, &idx, &stored)) {
-                int j, end = (maps_per_core) ? ebpf_nprocs : 1;
-                netdata_idx_t total = 0;
-                for (j = 0; j < end; j++)
-                    total += stored[j];
+        if (!w->enabled)
+            continue;
 
-                sync_hash_values[i] = total;
-            }
+        netdata_idx_t single_value;
+        netdata_idx_t *stored = &single_value;
+        if (maps_per_core) {
+            if (!sync_percpu_values)
+                sync_percpu_values = callocz((size_t)ebpf_nprocs, sizeof(*sync_percpu_values));
+            if (!sync_percpu_values)
+                continue;
+            stored = sync_percpu_values;
+        }
+
+        int fd = w->sync_maps[NETDATA_SYNC_GLOBAL_TABLE].map_fd;
+        if (!bpf_map_lookup_elem(fd, &idx, stored)) {
+            int j, end = maps_per_core ? ebpf_nprocs : 1;
+            netdata_idx_t total = 0;
+            for (j = 0; j < end; j++)
+                total += stored[j];
+
+            sync_hash_values[i] = total;
         }
     }
 }

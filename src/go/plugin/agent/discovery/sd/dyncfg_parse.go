@@ -8,44 +8,76 @@ import (
 
 	"github.com/netdata/netdata/go/plugins/plugin/agent/discovery/sd/pipeline"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/confgroup"
-
-	"gopkg.in/yaml.v2"
+	"github.com/netdata/netdata/go/plugins/plugin/framework/dyncfg"
 )
 
-// parseDyncfgPayload parses a dyncfg JSON payload into a pipeline.Config.
-// Since pipeline.Config now has proper JSON tags matching the schema,
-// we can unmarshal directly without type-specific parsing.
-func parseDyncfgPayload(payload []byte, discovererType string, configDefaults confgroup.Registry, reg Registry, validate bool) (pipeline.Config, error) {
+// parseDyncfgPayload parses a dyncfg JSON payload into a runtime pipeline.Config.
+// The dyncfg job name is authoritative and overrides any serialized payload name.
+func parseDyncfgPayload(payload []byte, discovererType, name string, configDefaults confgroup.Registry, reg Registry, validate bool) (pipeline.Config, error) {
+	cfg, err := parseDyncfgPayloadContent(
+		payload,
+		discovererType,
+		name,
+		configDefaults,
+		reg,
+		validate,
+	)
+	if err != nil {
+		return pipeline.Config{}, newResourceError(resourceErrorConfiguration, err)
+	}
+	return cfg, nil
+}
+
+func parseDyncfgPayloadContent(payload []byte, discovererType, name string, configDefaults confgroup.Registry, reg Registry, validate bool) (pipeline.Config, error) {
 	if reg == nil {
 		return pipeline.Config{}, fmt.Errorf("discoverer registry is not configured")
 	}
 
 	var cfg pipeline.Config
 	if err := json.Unmarshal(payload, &cfg); err != nil {
-		return pipeline.Config{}, fmt.Errorf("unmarshal %s config: %w", discovererType, err)
+		return pipeline.Config{}, dyncfg.NewPublicError(
+			"configuration JSON is invalid",
+			fmt.Errorf("unmarshal %s config: %w", discovererType, err),
+		)
 	}
 
+	cfg.Name = name
 	cfg.ConfigDefaults = configDefaults
 
 	// Validate that the config has the expected discoverer type
 	if got := cfg.Discoverer.Type(); got != discovererType {
 		if got == "" {
-			return pipeline.Config{}, fmt.Errorf("no discoverer configured, expected %q", discovererType)
+			return pipeline.Config{}, dyncfg.NewPublicError(
+				"no discoverer is configured",
+				fmt.Errorf("no discoverer configured, expected %q", discovererType),
+			)
 		}
-		return pipeline.Config{}, fmt.Errorf("config has discoverer type %q, expected %q", got, discovererType)
+		return pipeline.Config{}, dyncfg.NewPublicError(
+			"configured discoverer type does not match the command target",
+			fmt.Errorf("config has discoverer type %q, expected %q", got, discovererType),
+		)
 	}
 	desc, ok := reg.Get(discovererType)
 	if !ok {
-		return pipeline.Config{}, fmt.Errorf("unknown discoverer type %q", discovererType)
+		return pipeline.Config{}, dyncfg.NewPublicError(
+			"configured discoverer type is not supported",
+			fmt.Errorf("unknown discoverer type %q", discovererType),
+		)
 	}
 	if _, err := desc.ParseJSONConfig(cfg.Discoverer.Config); err != nil {
-		return pipeline.Config{}, fmt.Errorf("invalid %q discoverer config: %w", discovererType, err)
+		return pipeline.Config{}, dyncfg.NewPublicError(
+			"discoverer configuration is invalid",
+			err,
+		)
 	}
 
 	if validate {
 		// Perform full semantic validation (name, discoverer, services rules)
 		if err := pipeline.ValidateConfig(cfg); err != nil {
-			return pipeline.Config{}, err
+			return pipeline.Config{}, dyncfg.NewPublicError(
+				"service discovery service rules are invalid",
+				err,
+			)
 		}
 	}
 
@@ -69,33 +101,6 @@ func configToJSON(data []byte) ([]byte, error) {
 	bs, err := json.Marshal(cfg)
 	if err != nil {
 		return nil, fmt.Errorf("marshal json: %w", err)
-	}
-
-	return bs, nil
-}
-
-// userConfigFromPayload converts a JSON payload to YAML format for user editing.
-// It unmarshals JSON into pipeline.Config, then marshals to YAML.
-// If jobName is provided (non-empty), it overrides the name from payload.
-// This ensures consistent field ordering and validates the structure.
-func userConfigFromPayload(payload []byte, discovererType, jobName string) ([]byte, error) {
-	var cfg pipeline.Config
-	if err := json.Unmarshal(payload, &cfg); err != nil {
-		return nil, fmt.Errorf("unmarshal json: %w", err)
-	}
-
-	// Use jobName if provided, otherwise keep name from payload
-	if jobName != "" {
-		cfg.Name = jobName
-	}
-	// If still no name, use default
-	if cfg.Name == "" {
-		cfg.Name = "test"
-	}
-
-	bs, err := yaml.Marshal(cfg)
-	if err != nil {
-		return nil, fmt.Errorf("marshal yaml: %w", err)
 	}
 
 	return bs, nil

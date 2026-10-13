@@ -9,31 +9,31 @@ import (
 
 	"github.com/netdata/netdata/go/plugins/plugin/framework/charttpl"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/azure_monitor/azureprofiles"
-	"gopkg.in/yaml.v3"
 )
 
-func buildCollectorRuntimeFromConfig(profileIDs []string, catalog azureprofiles.Catalog) (*collectorRuntime, error) {
-	profiles, err := catalog.Resolve(profileIDs)
+func buildCollectorRuntimeFromConfig(profileNames []string, profileEntries map[string]ProfileEntryConfig, catalog azureprofiles.Catalog, workloadResourceTagKey string) (*collectorRuntime, error) {
+	profiles, err := catalog.Resolve(profileNames)
 	if err != nil {
 		return nil, err
 	}
 
 	runtime := &collectorRuntime{
-		Profiles: make([]*profileRuntime, 0, len(profiles)),
+		Profiles:               make([]*profileRuntime, 0, len(profiles)),
+		WorkloadResourceTagKey: stringsLowerTrim(workloadResourceTagKey),
 	}
 
-	seenProfileIDs := make(map[string]struct{}, len(profiles))
+	seenProfileNames := make(map[string]struct{}, len(profiles))
 	seenChartIDs := make(map[string]struct{})
 
 	for _, src := range profiles {
-		p, err := buildProfileRuntime(src)
+		p, err := buildProfileRuntime(src, profileEntries[src.Name])
 		if err != nil {
 			return nil, err
 		}
-		if _, ok := seenProfileIDs[p.ID]; ok {
-			return nil, fmt.Errorf("profile id collision for profile %q", src.ID)
+		if _, ok := seenProfileNames[p.Name]; ok {
+			return nil, fmt.Errorf("profile name collision for profile %q", src.Name)
 		}
-		seenProfileIDs[p.ID] = struct{}{}
+		seenProfileNames[p.Name] = struct{}{}
 
 		if err := walkCharts(p.Template, func(chart charttpl.Chart) error {
 			if _, ok := seenChartIDs[chart.ID]; ok {
@@ -57,39 +57,40 @@ func buildCollectorRuntimeFromConfig(profileIDs []string, catalog azureprofiles.
 	return runtime, nil
 }
 
-func buildProfileRuntime(p azureprofiles.Profile) (*profileRuntime, error) {
-	profileID := stringsTrim(p.ID)
-	if profileID == "" {
-		return nil, fmt.Errorf("profile has empty id")
+func buildProfileRuntime(resolved azureprofiles.ResolvedProfile, entry ProfileEntryConfig) (*profileRuntime, error) {
+	profileName := stringsTrim(resolved.Name)
+	if profileName == "" {
+		return nil, fmt.Errorf("profile has empty name")
 	}
 
-	name := stringsTrim(p.DisplayName)
-	if name == "" {
-		return nil, fmt.Errorf("profile %q has empty name", profileID)
+	displayName := stringsTrim(resolved.Config.DisplayName)
+	if displayName == "" {
+		return nil, fmt.Errorf("profile %q has empty display_name", profileName)
 	}
 
-	resourceType := stringsTrim(p.ResourceType)
-	metricNamespace := stringsTrim(p.MetricNamespace)
+	resourceType := stringsTrim(resolved.Config.ResourceType)
+	metricNamespace := stringsTrim(resolved.Config.MetricNamespace)
 	if metricNamespace == "" {
 		metricNamespace = resourceType
 	}
 
 	out := &profileRuntime{
-		ID:              profileID,
-		Name:            name,
+		Name:            profileName,
+		DisplayName:     displayName,
 		ResourceType:    resourceType,
 		MetricNamespace: metricNamespace,
-		Metrics:         make([]*metricRuntime, 0, len(p.Metrics)),
+		Filters:         cloneResourceFilters(entry.Filters),
+		Metrics:         make([]*metricRuntime, 0, len(resolved.Config.Metrics)),
 	}
 
-	for _, m := range p.Metrics {
+	for _, m := range resolved.Config.Metrics {
 		grain := strings.ToUpper(stringsTrim(m.TimeGrain))
 		if grain == "" {
 			grain = "PT1M"
 		}
 		grainEvery, ok := azureprofiles.SupportedTimeGrains[grain]
 		if !ok {
-			return nil, fmt.Errorf("profile %q metric %q has unsupported time grain %q", profileID, m.ID, grain)
+			return nil, fmt.Errorf("profile %q metric %q has unsupported time grain %q", profileName, m.ID, grain)
 		}
 
 		mr := &metricRuntime{
@@ -105,7 +106,7 @@ func buildProfileRuntime(p azureprofiles.Profile) (*profileRuntime, error) {
 			mr.Series = append(mr.Series, &seriesRuntime{
 				Aggregation: aggregation,
 				Kind:        azureprofiles.NormalizeSeriesKind(s.Kind),
-				Instrument:  azureprofiles.ExportedSeriesName(profileID, m.ID, aggregation),
+				Instrument:  azureprofiles.ExportedSeriesName(profileName, m.ID, aggregation),
 			})
 		}
 
@@ -119,7 +120,7 @@ func buildProfileRuntime(p azureprofiles.Profile) (*profileRuntime, error) {
 		return out.Metrics[i].ID < out.Metrics[j].ID
 	})
 
-	out.Template = p.Template
+	out.Template = resolved.Config.Template.Clone()
 	out.Template.Metrics = profileMetricsList(out)
 	return out, nil
 }
@@ -135,15 +136,7 @@ func buildChartTemplate(runtime *collectorRuntime) (string, error) {
 		spec.Groups = append(spec.Groups, p.Template)
 	}
 
-	if err := spec.Validate(); err != nil {
-		return "", err
-	}
-
-	raw, err := yaml.Marshal(spec)
-	if err != nil {
-		return "", err
-	}
-	return string(raw), nil
+	return spec.MarshalTemplate()
 }
 
 func profileMetricsList(p *profileRuntime) []string {

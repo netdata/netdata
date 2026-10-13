@@ -299,8 +299,8 @@ var pgLabelColumnIDs = map[string]bool{
 
 const pgPrimaryLabelID = "database"
 
-func topQueriesMethodConfig() funcapi.MethodConfig {
-	return funcapi.MethodConfig{
+func topQueriesFunctionConfig() funcapi.FunctionConfig {
+	return funcapi.FunctionConfig{
 		ID:           topQueriesMethodID,
 		Name:         "Top Queries",
 		UpdateEvery:  10,
@@ -530,8 +530,8 @@ func (f *funcTopQueries) buildAvailableColumns(availableCols map[string]bool, so
 
 		// Strip array_to_string wrapper FIRST (before table prefix removal)
 		// e.g., "array_to_string(s.relations, ', ')" -> "s.relations"
-		if strings.HasPrefix(colName, "array_to_string(") {
-			colName = strings.TrimPrefix(colName, "array_to_string(")
+		if after, ok := strings.CutPrefix(colName, "array_to_string("); ok {
+			colName = after
 			if idx := strings.Index(colName, ","); idx != -1 {
 				colName = colName[:idx]
 			}

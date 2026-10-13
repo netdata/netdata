@@ -47,33 +47,51 @@ inline int can_send_rrdset(struct instance *instance, RRDSET *st, SIMPLE_PATTERN
             rrdset_flag_set(st, RRDSET_FLAG_EXPORTING_SEND);
         } else {
             rrdset_flag_set(st, RRDSET_FLAG_EXPORTING_IGNORE);
-            netdata_log_debug(
-                D_EXPORTING,
-                "EXPORTING: not sending chart '%s' of host '%s', because it is disabled for exporting.",
-                rrdset_id(st),
-                rrdhost_hostname(host));
+#ifdef NETDATA_INTERNAL_CHECKS
+            if(unlikely(debug_flags & D_EXPORTING)) {
+                RRDHOST_IDENTITY identity = rrdhost_identity_acquire(host);
+                netdata_log_debug(
+                    D_EXPORTING,
+                    "EXPORTING: not sending chart '%s' of host '%s', because it is disabled for exporting.",
+                    rrdset_id(st),
+                    string2str(identity.hostname));
+                rrdhost_identity_release(&identity);
+            }
+#endif
             return 0;
         }
     }
 
     if (unlikely(!rrdset_is_available_for_exporting_and_alarms(st))) {
-        netdata_log_debug(
-            D_EXPORTING,
-            "EXPORTING: not sending chart '%s' of host '%s', because it is not available for exporting.",
-            rrdset_id(st),
-            rrdhost_hostname(host));
+#ifdef NETDATA_INTERNAL_CHECKS
+        if(unlikely(debug_flags & D_EXPORTING)) {
+            RRDHOST_IDENTITY identity = rrdhost_identity_acquire(host);
+            netdata_log_debug(
+                D_EXPORTING,
+                "EXPORTING: not sending chart '%s' of host '%s', because it is not available for exporting.",
+                rrdset_id(st),
+                string2str(identity.hostname));
+            rrdhost_identity_release(&identity);
+        }
+#endif
         return 0;
     }
 
     if (unlikely(
             st->rrd_memory_mode == RRD_DB_MODE_NONE &&
             !(EXPORTING_OPTIONS_DATA_SOURCE(instance->config.options) == EXPORTING_SOURCE_DATA_AS_COLLECTED))) {
-        netdata_log_debug(
-            D_EXPORTING,
-            "EXPORTING: not sending chart '%s' of host '%s' because its memory mode is '%s' and the exporting connector requires database access.",
-            rrdset_id(st),
-            rrdhost_hostname(host),
-            rrd_memory_mode_name(host->rrd_memory_mode));
+#ifdef NETDATA_INTERNAL_CHECKS
+        if(unlikely(debug_flags & D_EXPORTING)) {
+            RRDHOST_IDENTITY identity = rrdhost_identity_acquire(host);
+            netdata_log_debug(
+                D_EXPORTING,
+                "EXPORTING: not sending chart '%s' of host '%s' because its memory mode is '%s' and the exporting connector requires database access.",
+                rrdset_id(st),
+                string2str(identity.hostname),
+                rrd_memory_mode_name(host->rrd_memory_mode));
+            rrdhost_identity_release(&identity);
+        }
+#endif
         return 0;
     }
 
@@ -83,15 +101,37 @@ inline int can_send_rrdset(struct instance *instance, RRDSET *st, SIMPLE_PATTERN
 static struct prometheus_server {
     const char *server;
     uint32_t hash;
-    RRDHOST *host;
+    char machine_guid[GUID_LEN + 1];
     time_t last_access;
     struct prometheus_server *next;
 } *prometheus_server_root = NULL;
 
+static struct prometheus_unit_alias {
+    const char *newunit;
+    uint32_t hash;
+    const char *oldunit;
+} prometheus_unit_aliases[] = {
+    { "KiB/s", 0, "kilobytes/s" },
+    { "MiB/s", 0, "MB/s" },
+    { "GiB/s", 0, "GB/s" },
+    { "KiB", 0, "KB" },
+    { "MiB", 0, "MB" },
+    { "GiB", 0, "GB" },
+    { "inodes", 0, "Inodes" },
+    { "percentage", 0, "percent" },
+    { "faults/s", 0, "page faults/s" },
+    { "KiB/operation", 0, "kilobytes per operation" },
+    { "milliseconds/operation", 0, "ms per operation" },
+    { NULL, 0, NULL },
+};
+
 static netdata_mutex_t prometheus_server_root_mutex;
 
-static void __attribute__((constructor)) init_mutex(void) {
+static void __attribute__((constructor)) init_prometheus(void) {
     netdata_mutex_init(&prometheus_server_root_mutex);
+
+    for(size_t i = 0; prometheus_unit_aliases[i].newunit; i++)
+        prometheus_unit_aliases[i].hash = simple_hash(prometheus_unit_aliases[i].newunit);
 }
 
 static void __attribute__((destructor)) destroy_mutex(void) {
@@ -137,7 +177,9 @@ static inline time_t prometheus_server_last_access(const char *server, RRDHOST *
 
     struct prometheus_server *ps;
     for (ps = prometheus_server_root; ps; ps = ps->next) {
-        if (host == ps->host && hash == ps->hash && !strcmp(server, ps->server)) {
+        if (hash == ps->hash &&
+            !strcmp(server, ps->server) &&
+            !strcmp(host->machine_guid, ps->machine_guid)) {
             time_t last = ps->last_access;
             ps->last_access = now;
             netdata_mutex_unlock(&prometheus_server_root_mutex);
@@ -148,7 +190,7 @@ static inline time_t prometheus_server_last_access(const char *server, RRDHOST *
     ps = callocz(1, sizeof(struct prometheus_server));
     ps->server = strdupz(server);
     ps->hash = hash;
-    ps->host = host;
+    strncpyz(ps->machine_guid, host->machine_guid, sizeof(ps->machine_guid) - 1);
     ps->last_access = now;
     ps->next = prometheus_server_root;
     prometheus_server_root = ps;
@@ -198,38 +240,14 @@ inline char *prometheus_units_copy(char *d, const char *s, size_t usable, int sh
     char *ret = d;
     size_t n;
 
-    // Fix for issue 5227
+    // Legacy unit aliases for pre-v1.12 metric names.
     if (unlikely(showoldunits)) {
-        static struct {
-            const char *newunit;
-            uint32_t hash;
-            const char *oldunit;
-        } units[] = { { "KiB/s", 0, "kilobytes/s" },
-                      { "MiB/s", 0, "MB/s" },
-                      { "GiB/s", 0, "GB/s" },
-                      { "KiB", 0, "KB" },
-                      { "MiB", 0, "MB" },
-                      { "GiB", 0, "GB" },
-                      { "inodes", 0, "Inodes" },
-                      { "percentage", 0, "percent" },
-                      { "faults/s", 0, "page faults/s" },
-                      { "KiB/operation", 0, "kilobytes per operation" },
-                      { "milliseconds/operation", 0, "ms per operation" },
-                      { NULL, 0, NULL } };
-        static int initialized = 0;
-        int i;
-
-        if (unlikely(!initialized)) {
-            for (i = 0; units[i].newunit; i++)
-                units[i].hash = simple_hash(units[i].newunit);
-            initialized = 1;
-        }
-
         uint32_t hash = simple_hash(s);
-        for (i = 0; units[i].newunit; i++) {
-            if (unlikely(hash == units[i].hash && !strcmp(s, units[i].newunit))) {
+        for (size_t i = 0; prometheus_unit_aliases[i].newunit; i++) {
+            if (unlikely(hash == prometheus_unit_aliases[i].hash &&
+                         !strcmp(s, prometheus_unit_aliases[i].newunit))) {
                 // netdata_log_info("matched extension for filename '%s': '%s'", filename, last_dot);
-                s = units[i].oldunit;
+                s = prometheus_unit_aliases[i].oldunit;
                 sorig = s;
                 break;
             }
@@ -239,7 +257,7 @@ inline char *prometheus_units_copy(char *d, const char *s, size_t usable, int sh
     for (n = 1; *s && n < usable; d++, s++, n++) {
         register char c = *s;
 
-        if (!isalnum(c))
+        if (!isalnum((uint8_t)c))
             *d = '_';
         else
             *d = c;
@@ -512,7 +530,7 @@ static void generate_as_collected_from_metric(BUFFER *wb,
 
 static void prometheus_print_os_info(
     BUFFER *wb,
-    RRDHOST *host,
+    const char *hostname,
     PROMETHEUS_OUTPUT_OPTIONS output_options)
 {
     FILE *fp;
@@ -530,7 +548,7 @@ static void prometheus_print_os_info(
         return;
     }
 
-    buffer_sprintf(wb, "netdata_os_info{instance=\"%s\"", rrdhost_hostname(host));
+    buffer_sprintf(wb, "netdata_os_info{instance=\"%s\"", hostname);
 
     while (fgets(buf, BUFSIZ, fp)) {
       char *in, *sanitized;
@@ -844,10 +862,11 @@ static void rrd_stats_api_v1_charts_allmetrics_prometheus(
     PROMETHEUS_OUTPUT_OPTIONS output_options,
     PROM_CONTEXT_OPTIONS_JudyLSet *context_options)
 {
+    RRDHOST_IDENTITY identity = rrdhost_identity_acquire(host);
     SIMPLE_PATTERN *filter = simple_pattern_create(filter_string, NULL, SIMPLE_PATTERN_EXACT, true);
 
     char hostname[PROMETHEUS_ELEMENT_MAX + 1];
-    prometheus_label_copy(hostname, rrdhost_hostname(host), sizeof(hostname));
+    prometheus_label_copy(hostname, string2str(identity.hostname), sizeof(hostname));
 
     format_host_labels_prometheus(instance, host);
 
@@ -855,8 +874,8 @@ static void rrd_stats_api_v1_charts_allmetrics_prometheus(
         wb,
         "netdata_info{instance=\"%s\",application=\"%s\",version=\"%s\"",
         hostname,
-        rrdhost_program_name(host),
-        rrdhost_program_version(host));
+        string2str(identity.prog_name),
+        string2str(identity.prog_version));
 
     if (instance->labels_buffer && *buffer_tostring(instance->labels_buffer)) {
         buffer_sprintf(wb, ",%s", buffer_tostring(instance->labels_buffer));
@@ -876,7 +895,7 @@ static void rrd_stats_api_v1_charts_allmetrics_prometheus(
         buffer_flush(instance->labels_buffer);
 
     if (instance->config.options & EXPORTING_OPTION_SEND_AUTOMATIC_LABELS)
-        prometheus_print_os_info(wb, host, output_options);
+        prometheus_print_os_info(wb, string2str(identity.hostname), output_options);
 
 
     BUFFER *plabels_buffer = buffer_create(0, NULL);
@@ -904,7 +923,10 @@ static void rrd_stats_api_v1_charts_allmetrics_prometheus(
 
     // for each context
     if (!host->rrdctx.contexts) {
-        netdata_log_error("%s(): request for host '%s' that does not have rrdcontexts initialized.", __FUNCTION__, rrdhost_hostname(host));
+        netdata_log_error(
+            "%s(): request for host '%s' that does not have rrdcontexts initialized.",
+            __FUNCTION__,
+            string2str(identity.hostname));
         goto allmetrics_cleanup;
     }
 
@@ -914,6 +936,7 @@ allmetrics_cleanup:
     simple_pattern_free(filter);
     buffer_free(plabels_buffer);
     string_freez(opts.prometheus);
+    rrdhost_identity_release(&identity);
 }
 
 /**
@@ -954,6 +977,24 @@ static inline time_t prometheus_preparation(
     return after;
 }
 
+static inline void prometheus_request_instance_init(
+    struct instance *request_instance,
+    RRDHOST *host,
+    const char *server)
+{
+    *request_instance = (struct instance) {
+        .config = prometheus_exporter_instance->config,
+        .before = now_realtime_sec(),
+    };
+
+    request_instance->after = prometheus_preparation(request_instance, host, server, request_instance->before);
+}
+
+static inline void prometheus_request_instance_cleanup(struct instance *request_instance)
+{
+    buffer_free(request_instance->labels_buffer);
+}
+
 /**
  * Write metrics and auxiliary information for one host to a buffer.
  *
@@ -977,22 +1018,18 @@ void rrd_stats_api_v1_charts_allmetrics_prometheus_single_host(
     if (unlikely(!prometheus_exporter_instance || !prometheus_exporter_instance->config.initialized))
         return;
 
-    prometheus_exporter_instance->before = now_realtime_sec();
-
-    // we start at the point we had stopped before
-    prometheus_exporter_instance->after = prometheus_preparation(
-        prometheus_exporter_instance,
-        host,
-        server,
-        prometheus_exporter_instance->before);
+    // Web requests can run concurrently; keep per-request formatting state local.
+    struct instance request_instance;
+    prometheus_request_instance_init(&request_instance, host, server);
 
     PROM_CONTEXT_OPTIONS_JudyLSet context_options;
     PROM_CONTEXT_OPTIONS_INIT(&context_options);
 
     rrd_stats_api_v1_charts_allmetrics_prometheus(
-        prometheus_exporter_instance, host, filter_string, wb, prefix, exporting_options, 0, output_options, &context_options);
+        &request_instance, host, filter_string, wb, prefix, exporting_options, 0, output_options, &context_options);
 
     PROM_CONTEXT_OPTIONS_FREE(&context_options, PROM_CONTEXT_OPTIONS_free_cb, NULL);
+    prometheus_request_instance_cleanup(&request_instance);
 }
 
 /**
@@ -1018,14 +1055,9 @@ void rrd_stats_api_v1_charts_allmetrics_prometheus_all_hosts(
     if (unlikely(!prometheus_exporter_instance || !prometheus_exporter_instance->config.initialized))
         return;
 
-    prometheus_exporter_instance->before = now_realtime_sec();
-
-    // we start at the point we had stopped before
-    prometheus_exporter_instance->after = prometheus_preparation(
-        prometheus_exporter_instance,
-        host,
-        server,
-        prometheus_exporter_instance->before);
+    // Web requests can run concurrently; keep per-request formatting state local.
+    struct instance request_instance;
+    prometheus_request_instance_init(&request_instance, host, server);
 
     PROM_CONTEXT_OPTIONS_JudyLSet context_options;
     PROM_CONTEXT_OPTIONS_INIT(&context_options);
@@ -1033,9 +1065,10 @@ void rrd_stats_api_v1_charts_allmetrics_prometheus_all_hosts(
     dfe_start_reentrant(rrdhost_root_index, host)
     {
         rrd_stats_api_v1_charts_allmetrics_prometheus(
-            prometheus_exporter_instance, host, filter_string, wb, prefix, exporting_options, 1, output_options, &context_options);
+            &request_instance, host, filter_string, wb, prefix, exporting_options, 1, output_options, &context_options);
     }
     dfe_done(host);
 
     PROM_CONTEXT_OPTIONS_FREE(&context_options, PROM_CONTEXT_OPTIONS_free_cb, NULL);
+    prometheus_request_instance_cleanup(&request_instance);
 }

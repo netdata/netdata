@@ -70,6 +70,7 @@ void buffer_strcat_htmlescape(BUFFER *wb, const char *txt)
         txt++;
     }
 
+    wb->buffer[wb->len] = '\0';
     buffer_overflow_check(wb);
 }
 
@@ -106,8 +107,16 @@ void buffer_vsprintf(BUFFER *wb, const char *fmt, va_list args) {
         va_list args_copy;
         va_copy(args_copy, args);
         // vsnprintf() returns the number of bytes required, even if bigger than the buffer provided
-        full_size_bytes = (size_t) vsnprintf(&wb->buffer[wb->len], space_remaining, fmt, args_copy);
+        int ret = vsnprintf(&wb->buffer[wb->len], space_remaining, fmt, args_copy);
         va_end(args_copy);
+
+        if(unlikely(ret < 0)) {
+            wb->buffer[wb->len] = '\0';
+            buffer_overflow_check(wb);
+            return;
+        }
+
+        full_size_bytes = (size_t)ret;
 
     } while(full_size_bytes >= space_remaining);
 
@@ -171,14 +180,14 @@ void buffer_jsdate(BUFFER *wb, int year, int month, int day, int hours, int minu
     buffer_need_bytes(wb, 30);
 
     char *b = &wb->buffer[wb->len], *p;
-  unsigned int *q = (unsigned int *)b;  
 
   #if __BYTE_ORDER__ == __ORDER_LITTLE_ENDIAN__
-    *q++ = 0x65746144;  // "Date" backwards.
+    const uint32_t date = 0x65746144;  // "Date" backwards.
   #else
-    *q++ = 0x44617465;  // "Date"
+    const uint32_t date = 0x44617465;  // "Date"
   #endif
-  p = (char *)q;
+  memcpy(b, &date, sizeof(date));
+  p = b + sizeof(date);
 
   *p++ = '(';
   *p++ = '0' + year / 1000; year %= 1000;
@@ -201,15 +210,15 @@ void buffer_jsdate(BUFFER *wb, int year, int month, int day, int hours, int minu
   *p   = '0' + seconds / 10; if (*p != '0') p++;
   *p++ = '0' + seconds % 10;
 
-  unsigned short *r = (unsigned short *)p;
-
 #if __BYTE_ORDER__ == __ORDER_LITTLE_ENDIAN__
-    *r++ = 0x0029;  // ")\0" backwards.  
+    const uint16_t terminator = 0x0029;  // ")\0" backwards.
   #else
-    *r++ = 0x2900;  // ")\0"
+    const uint16_t terminator = 0x2900;  // ")\0"
   #endif
+    memcpy(p, &terminator, sizeof(terminator));
+    p += sizeof(terminator);
 
-    wb->len += (size_t)((char *)r - b - 1);
+    wb->len += (size_t)(p - b - 1);
 
     // terminate it
     wb->buffer[wb->len] = '\0';
@@ -469,6 +478,17 @@ static int buffer_int64_roundtrip(BUFFER *wb, NUMBER_ENCODING encoding, int64_t 
     return errors;
 }
 
+static int buffer_int64_parse(const char *encoded, int64_t expected) {
+    int64_t value = str2ll_encoded(encoded);
+
+    if(value == expected)
+        return 0;
+
+    netdata_log_error("BUFFER: string '%s' resolves to %lld, expected %lld",
+                      encoded, (long long)value, (long long)expected);
+    return 1;
+}
+
 static int buffer_double_roundtrip(BUFFER *wb, NUMBER_ENCODING encoding, NETDATA_DOUBLE value, const char *expected) {
     int errors = 0;
     buffer_flush(wb);
@@ -515,6 +535,54 @@ int buffer_unittest(void) {
     buffer_int64_roundtrip(wb, NUMBER_ENCODING_HEX, (int64_t)-9223372036854775807ULL, "-0x7FFFFFFFFFFFFFFF");
     buffer_int64_roundtrip(wb, NUMBER_ENCODING_BASE64, (int64_t)-9223372036854775807ULL, "-#H//////////");
 
+    errors += buffer_int64_roundtrip(wb, NUMBER_ENCODING_DECIMAL, INT64_MIN, "-9223372036854775808");
+    errors += buffer_int64_roundtrip(wb, NUMBER_ENCODING_HEX, INT64_MIN, "-0x8000000000000000");
+    errors += buffer_int64_roundtrip(wb, NUMBER_ENCODING_BASE64, INT64_MIN, "-#IAAAAAAAAAA");
+
+    static const struct {
+        const char *encoded;
+        int64_t expected;
+    } int64_parse_tests[] = {
+        { "0", 0 },
+        { "-0", 0 },
+        { "9223372036854775807", LLONG_MAX },
+        { "0x7FFFFFFFFFFFFFFF", LLONG_MAX },
+        { "#H//////////", LLONG_MAX },
+        { "-9223372036854775808", LLONG_MIN },
+        { "-0x8000000000000000", LLONG_MIN },
+        { "-#IAAAAAAAAAA", LLONG_MIN },
+        { "9223372036854775808", LLONG_MIN },
+        { "0x8000000000000000", LLONG_MIN },
+        { "#IAAAAAAAAAA", LLONG_MIN },
+        { "-9223372036854775809", LLONG_MAX },
+        { "-0x8000000000000001", LLONG_MAX },
+        { "-#IAAAAAAAAAB", LLONG_MAX },
+        { "18446744073709551615", -1 },
+        { "-18446744073709551615", 1 },
+        { "18446744073709551616", 0 },
+        { "0x10000000000000000", 0 },
+        { "#QAAAAAAAAAA", 0 },
+        { " 9223372036854775808", LLONG_MIN },
+        { " -9223372036854775808", 0 },
+        { "- 9223372036854775808", LLONG_MIN },
+        { " 0x8000000000000000", 0 },
+        { "- 0x8000000000000000", 0 },
+        { "-9223372036854775808suffix", LLONG_MIN },
+        { "-0x8000000000000000!suffix", LLONG_MIN },
+        { "-#IAAAAAAAAAA!suffix", LLONG_MIN },
+        { "", 0 },
+        { "-", 0 },
+        { "+1", 0 },
+        { "--1", 0 },
+        { "#", 0 },
+        { "0x", 0 },
+        { "-#", 0 },
+        { "-0x", 0 },
+    };
+
+    for(size_t i = 0; i < _countof(int64_parse_tests); i++)
+        errors += buffer_int64_parse(int64_parse_tests[i].encoded, int64_parse_tests[i].expected);
+
     buffer_double_roundtrip(wb, NUMBER_ENCODING_DECIMAL, 0, "0");
     buffer_double_roundtrip(wb, NUMBER_ENCODING_HEX, 0, "%0");
     buffer_double_roundtrip(wb, NUMBER_ENCODING_BASE64, 0, "@A");
@@ -530,6 +598,19 @@ int buffer_unittest(void) {
     buffer_double_roundtrip(wb, NUMBER_ENCODING_DECIMAL, 9.12345678901234567890123456789e+45, "9.123456789012346128e+45");
     buffer_double_roundtrip(wb, NUMBER_ENCODING_HEX, 9.12345678901234567890123456789e+45, "%497991C25C9E4309");
     buffer_double_roundtrip(wb, NUMBER_ENCODING_BASE64, 9.12345678901234567890123456789e+45, "@El5kcJcnkMJ");
+
+    buffer_flush(wb);
+
+    {
+        char tmp[32];
+        const wchar_t invalid_wide[] = { (wchar_t)0xd800, 0 };
+
+        if(snprintf(tmp, sizeof(tmp), "%ls", invalid_wide) < 0) {
+            buffer_strcat(wb, "prefix");
+            buffer_sprintf(wb, "%ls", invalid_wide);
+            errors += buffer_expect(wb, "prefix");
+        }
+    }
 
     buffer_flush(wb);
 

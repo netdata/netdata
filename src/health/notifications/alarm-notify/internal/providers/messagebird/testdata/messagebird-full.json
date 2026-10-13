@@ -1,0 +1,14 @@
+{
+  "originator": [
+    "+15005550006"
+  ],
+  "recipients": [
+    "+15005550009"
+  ],
+  "body": [
+    "Temperature is high\nA quote: \"hot\"\nUnicode: θερμοκρασία\nNode: test-node\nAlert: test_alert\nStatus: CLEAR → WARNING\nChart: test.chart\nContext: test.context\nValue: 42.5 C\nPrevious value: 0 C\nTime: 2026-09-14T12:00:00Z\nhttps://example.com/alert?id=1&view=chart#details"
+  ],
+  "datacoding": [
+    "auto"
+  ]
+}

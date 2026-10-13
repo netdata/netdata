@@ -13,7 +13,7 @@ We use the statistics gathered from this information for two purposes:
 Netdata collects usage information via two different channels:
 
 - **Agent dashboard**: We use the [PostHog JavaScript integration](https://posthog.com/docs/integrations/js-integration) (with sensitive event attributes overwritten to be anonymized) to send product usage events when you access an [Agent's dashboard](/docs/dashboards-and-charts/README.md).
-- **Agent backend**: The `netdata` daemon executes the [`anonymous-statistics.sh`](https://github.com/netdata/netdata/blob/6469cf92724644f5facf343e4bdd76ac0551a418/daemon/anonymous-statistics.sh.in) script when Netdata starts, stops cleanly, or fails.
+- **Agent backend**: The `netdata` daemon executes the [`anonymous-statistics.sh`](https://github.com/netdata/netdata/blob/master/src/daemon/anonymous-statistics.sh.in) script when Netdata starts, stops cleanly, or fails.
 
 ## What data is collected
 
@@ -35,11 +35,11 @@ window.posthog.register({
 
 In the above snippet, a Netdata PostHog session is initialized and the `ip`, `current_url`, `pathname`, and `host` attributes are set to constant values for all events that may be sent during the session. This way, information like the IP or hostname of the Agent will not be sent as part of the product usage event data.
 
-We have configured the dashboard to trigger the PostHog JavaScript code only when the variable `anonymous_statistics` is true. The value of this variable is controlled via the [opt-out mechanism](#opt-out).
+We have configured the dashboard to trigger the PostHog JavaScript code only when the variable `anonymous_statistics` is true. The value of this variable is controlled via the [opt-out mechanism](#opt-out-methods).
 
 ### Agent Backend - Anonymous Statistics Script
 
-Every time the daemon is started or stopped, and every time a fatal condition is encountered, Netdata uses the anonymous statistics script to collect system information and send it to the Netdata telemetry cloud function via an HTTP call.
+Every time the daemon is started or stopped, and every time a fatal condition is encountered, Netdata uses the anonymous statistics script to collect system information and send it to the Netdata telemetry cloud function via an HTTPS call.
 
 **Information collected for all events:**
 
@@ -62,7 +62,7 @@ The FATAL event sends the Netdata process and thread name, along with the source
 
 :::note
 
-To see exactly what and how is collected, you can review the script template `daemon/anonymous-statistics.sh.in`. The template is converted to a bash script called `anonymous-statistics.sh`, installed under the Netdata `plugins directory`, which is usually `/usr/libexec/netdata/plugins.d`.
+To see exactly what and how is collected, you can review the script template `src/daemon/anonymous-statistics.sh.in`. The template is converted to a bash script called `anonymous-statistics.sh`, installed under the Netdata `plugins directory`, which is usually `/usr/libexec/netdata/plugins.d`.
 
 :::
 
@@ -167,6 +167,12 @@ environment:
   - DISABLE_TELEMETRY=1
 ```
 
+:::note
+
+You can also use `DO_NOT_TRACK=1` as an alternative to `DISABLE_TELEMETRY=1`.
+
+:::
+
 See the [Docker installation guide](/packaging/docker/README.md#create-a-new-netdata-agent-container) for complete configuration.
 
 </details>
@@ -189,6 +195,12 @@ export DISABLE_TELEMETRY=1
 ./kickstart.sh
 ```
 
+:::note
+
+You can also use `DO_NOT_TRACK=1` as an alternative to `DISABLE_TELEMETRY=1` when using Netdata installer scripts.
+
+:::
+
 See the [installation documentation](/packaging/installer/README.md) for available installer scripts.
 
 </details>
@@ -196,7 +208,7 @@ See the [installation documentation](/packaging/installer/README.md) for availab
 ## Installation-specific paths
 
 | Installation Type | Configuration Directory                |
-| ----------------- | -------------------------------------- |
+|-------------------|----------------------------------------|
 | Linux (standard)  | `/etc/netdata`                         |
 | Windows           | `C:\Program Files\Netdata\etc\netdata` |
 | Docker            | N/A (use environment variable)         |
@@ -209,9 +221,13 @@ See the [installation documentation](/packaging/installer/README.md) for availab
 To confirm that telemetry is disabled:
 
 1. Check that the `.opt-out-from-anonymous-statistics` file exists in your config directory, **OR**
-2. Verify that the `DISABLE_TELEMETRY` environment variable is set
+2. Verify that the `DISABLE_TELEMETRY` environment variable is set in the environment used to start the Netdata daemon
 
-The Agent dashboard will no longer send PostHog events, and the backend statistics script will not execute.
+:::note
+
+If you used `DO_NOT_TRACK=1` with Docker or a Netdata installer script, confirm that it resulted in the `.opt-out-from-anonymous-statistics` file being created. The Agent dashboard will no longer send PostHog events, and the backend statistics script will not execute.
+
+:::
 
 ## Related documentation
 

@@ -5,9 +5,10 @@
 
 static char *netdata_random_session_id_filename = NULL;
 static nd_uuid_t netdata_random_session_id = { 0 };
+static SPINLOCK netdata_random_session_id_spinlock = SPINLOCK_INITIALIZER;
 
-bool netdata_random_session_id_generate(void) {
-    static char guid[UUID_STR_LEN] = "";
+static bool netdata_random_session_id_generate_unlocked(void) {
+    char guid[UUID_STR_LEN] = "";
 
     uuid_generate_random(netdata_random_session_id);
     uuid_unparse_lower(netdata_random_session_id, guid);
@@ -20,21 +21,46 @@ bool netdata_random_session_id_generate(void) {
     (void)unlink(filename);
 
     // save it
-    int fd = open(filename, O_WRONLY|O_CREAT|O_TRUNC|O_CLOEXEC, 640);
+    int saved_errno = 0;
+    int fd = open(filename, O_WRONLY|O_CREAT|O_TRUNC|O_CLOEXEC, 0640);
     if(fd == -1) {
+        saved_errno = errno;
         netdata_log_error("Cannot create random session id file '%s'.", filename);
         ret = false;
     }
     else {
-        if (write(fd, guid, UUID_STR_LEN - 1) != UUID_STR_LEN - 1) {
+        ssize_t bytes = write(fd, guid, UUID_STR_LEN - 1);
+        if(bytes != UUID_STR_LEN - 1) {
+            if(bytes >= 0)
+                errno = EIO;
+
+            saved_errno = errno;
             netdata_log_error("Cannot write the random session id file '%s'.", filename);
             ret = false;
-        } else {
-            ssize_t bytes = write(fd, "\n", 1);
-            UNUSED(bytes);
         }
-        close(fd);
+        else {
+            bytes = write(fd, "\n", 1);
+            if(bytes != 1) {
+                if(bytes >= 0)
+                    errno = EIO;
+
+                saved_errno = errno;
+                netdata_log_error("Cannot write the random session id file '%s'.", filename);
+                ret = false;
+            }
+        }
+
+        if(close(fd) == -1) {
+            if(ret)
+                saved_errno = errno;
+
+            netdata_log_error("Cannot close the random session id file '%s'.", filename);
+            ret = false;
+        }
     }
+
+    if(!ret)
+        errno = saved_errno;
 
     if(ret && (!netdata_random_session_id_filename || strcmp(netdata_random_session_id_filename, filename) != 0)) {
         freez(netdata_random_session_id_filename);
@@ -44,26 +70,38 @@ bool netdata_random_session_id_generate(void) {
     return ret;
 }
 
-static const char *netdata_random_session_id_get_filename(void) {
-    if(!netdata_random_session_id_filename)
-        netdata_random_session_id_generate();
+bool netdata_random_session_id_generate(void) {
+    spinlock_lock(&netdata_random_session_id_spinlock);
+    bool ret = netdata_random_session_id_generate_unlocked();
+    spinlock_unlock(&netdata_random_session_id_spinlock);
 
-    return netdata_random_session_id_filename;
+    return ret;
+}
+
+static char *netdata_random_session_id_filename_strdupz(void) {
+    spinlock_lock(&netdata_random_session_id_spinlock);
+
+    if(!netdata_random_session_id_filename)
+        netdata_random_session_id_generate_unlocked();
+
+    char *filename = netdata_random_session_id_filename ? strdupz(netdata_random_session_id_filename) : NULL;
+    spinlock_unlock(&netdata_random_session_id_spinlock);
+
+    return filename;
 }
 
 static bool netdata_random_session_id_matches(const char *guid) {
-    if(uuid_is_null(netdata_random_session_id))
-        return false;
-
     nd_uuid_t uuid;
 
     if(uuid_parse(guid, uuid))
         return false;
 
-    if(uuid_compare(netdata_random_session_id, uuid) == 0)
-        return true;
+    spinlock_lock(&netdata_random_session_id_spinlock);
+    bool ret = !uuid_is_null(netdata_random_session_id) &&
+               uuid_compare(netdata_random_session_id, uuid) == 0;
+    spinlock_unlock(&netdata_random_session_id_spinlock);
 
-    return false;
+    return ret;
 }
 
 static bool check_claim_param(const char *s) {
@@ -104,7 +142,10 @@ typedef enum {
 } CLAIM_RESPONSE;
 
 static void claim_add_user_info_command(BUFFER *wb) {
-    const char *filename = netdata_random_session_id_get_filename();
+    CLEAN_CHAR_P *filename = netdata_random_session_id_filename_strdupz();
+    if(!filename)
+        return;
+
     CLEAN_BUFFER *os_cmd = buffer_create(0, NULL);
 
     const char *os_filename;
@@ -113,9 +154,11 @@ static void claim_add_user_info_command(BUFFER *wb) {
     const char *os_message;
 
 #if defined(OS_WINDOWS)
-    char win_path[MAX_PATH];
-    cygwin_conv_path(CCP_POSIX_TO_WIN_A, filename, win_path, sizeof(win_path));
-    os_filename = win_path;
+    char win_path[FILENAME_MAX];
+    if(cygwin_conv_path(CCP_POSIX_TO_WIN_A, filename, win_path, sizeof(win_path)) == 0)
+        os_filename = win_path;
+    else
+        os_filename = os_translate_path(win_path, filename, sizeof(win_path));
     os_prefix = "more";
     os_message = "We need to verify this Windows server is yours. So, open a Command Prompt on this server to run the command. It will give you a UUID. Copy and paste this UUID to this box:";
 #else
@@ -217,7 +260,6 @@ static int api_claim(uint8_t version, struct web_client *w, char *url) {
 
         if(claim_agent(base_url, token, rooms, cloud_config_proxy_get(), cloud_config_insecure_get())) {
             msg = "ok";
-            can_be_claimed = false;
             claim_reload_and_wait_online();
             response = CLAIM_RESP_ACTION_OK;
         }

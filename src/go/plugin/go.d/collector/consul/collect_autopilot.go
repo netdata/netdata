@@ -6,6 +6,8 @@ import (
 	"net/http"
 	"time"
 
+	"context"
+
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/oldmetrix"
 )
 
@@ -26,8 +28,8 @@ type autopilotHealth struct {
 	}
 }
 
-func (c *Collector) collectAutopilotHealth(mx map[string]int64) error {
-	req, err := c.createRequest(urlPathOperationAutopilotHealth)
+func (c *Collector) collectAutopilotHealth(ctx context.Context, mx map[string]int64) error {
+	req, err := c.createRequest(ctx, urlPathOperationAutopilotHealth)
 	if err != nil {
 		return err
 	}

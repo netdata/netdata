@@ -3,8 +3,10 @@
 package pihole
 
 import (
+	"context"
 	"errors"
 	"fmt"
+	"maps"
 	"time"
 
 	"github.com/netdata/netdata/go/plugins/pkg/stm"
@@ -15,12 +17,12 @@ const (
 	precision = 1000
 )
 
-func (c *Collector) collect() (map[string]int64, error) {
-	if err := c.checkAuthSession(); err != nil {
+func (c *Collector) collect(ctx context.Context) (map[string]int64, error) {
+	if err := c.checkAuthSession(ctx); err != nil {
 		return nil, err
 	}
 	if c.auth == nil {
-		auth, err := c.getAuthSession()
+		auth, err := c.getAuthSession(ctx)
 		if err != nil {
 			return nil, err
 		}
@@ -29,7 +31,7 @@ func (c *Collector) collect() (map[string]int64, error) {
 
 	mx := make(map[string]int64)
 
-	if err := c.collectMetrics(mx); err != nil {
+	if err := c.collectMetrics(ctx, mx); err != nil {
 		if web.IsStatusCode(err, 401) {
 			c.auth = nil
 		}
@@ -39,12 +41,12 @@ func (c *Collector) collect() (map[string]int64, error) {
 	return mx, nil
 }
 
-func (c *Collector) collectMetrics(mx map[string]int64) error {
+func (c *Collector) collectMetrics(ctx context.Context, mx map[string]int64) error {
 	if c.auth == nil {
 		return errors.New("no auth session")
 	}
 
-	req, err := web.NewHTTPRequestWithPath(c.RequestConfig, urlPathAPIStatsSummary)
+	req, err := web.NewHTTPRequestWithPath(ctx, c.RequestConfig, urlPathAPIStatsSummary)
 	if err != nil {
 		return err
 	}
@@ -61,9 +63,7 @@ func (c *Collector) collectMetrics(mx map[string]int64) error {
 		return fmt.Errorf("unexpected response from %s", req.URL)
 	}
 
-	for k, v := range stm.ToMap(resp) {
-		mx[k] = v
-	}
+	maps.Copy(mx, stm.ToMap(resp))
 
 	// 0 if unknown
 	if resp.Gravity.LastUpdate != 0 {

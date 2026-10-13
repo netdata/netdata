@@ -5,10 +5,11 @@ package funcapi
 import (
 	"context"
 	"fmt"
+	"time"
 )
 
-// MethodHandler defines the interface for handling method requests.
-// Methods are defined in Creator.Methods(); this interface handles the requests.
+// MethodHandler defines the interface for handling Function method requests.
+// Functions are declared by collector creators or process providers; this interface handles requests.
 //
 // Example implementation:
 //
@@ -25,7 +26,10 @@ import (
 //	}
 type MethodHandler interface {
 	// MethodParams returns dynamic params for a method.
-	// Return nil to use static params from MethodConfig.RequiredParams.
+	// Return nil to use static params from FunctionConfig.RequiredParams.
+	// It is also called for structured info with an explicit job on shared selectable Functions,
+	// without calling Handle or validating secondary selector values.
+	// RawRequest methods use HandleRaw instead.
 	// The context should be used for timeout/cancellation of database queries.
 	MethodParams(ctx context.Context, method string) ([]ParamConfig, error)
 
@@ -34,8 +38,29 @@ type MethodHandler interface {
 	Handle(ctx context.Context, method string, params ResolvedParams) *FunctionResponse
 
 	// Cleanup releases any resources held by the handler.
-	// Called when the collector is being stopped.
+	// Called when the owning job or run generation is stopped.
+	// Injected process stores remain caller-owned.
 	Cleanup(ctx context.Context)
+}
+
+// RawMethodRequest is the complete Function request for methods that cannot be
+// represented as predeclared selector parameters.
+type RawMethodRequest struct {
+	Method      string
+	Info        bool
+	Args        []string
+	Payload     []byte
+	ContentType string
+	Timeout     time.Duration
+	Permissions string
+	Source      string
+}
+
+// RawMethodHandler handles methods whose request/response contract is owned by
+// the collector or an embedded domain API instead of funcapi's table wrapper.
+type RawMethodHandler interface {
+	MethodHandler
+	HandleRaw(ctx context.Context, req RawMethodRequest) *FunctionResponse
 }
 
 // ErrorResponse creates an error FunctionResponse.
@@ -71,5 +96,12 @@ func InternalErrorResponse(format string, args ...any) *FunctionResponse {
 	return &FunctionResponse{
 		Status:  500,
 		Message: fmt.Sprintf(format, args...),
+	}
+}
+
+// RawResponse returns a complete Function response envelope.
+func RawResponse(resp map[string]any) *FunctionResponse {
+	return &FunctionResponse{
+		RawResponse: resp,
 	}
 }

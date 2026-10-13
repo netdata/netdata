@@ -1,0 +1,92 @@
+# Overlay Transport Virtualization (OTV) metrics for Cisco Nexus.
+# MIB: CISCO-OTV-MIB (1.3.6.1.4.1.9.9.810)
+# Monitors OTV overlay VPN state and adjacency health across datacenter sites.
+# Only populated on Nexus devices with OTV license and active configuration.
+
+metrics:
+  # ---- OTV overlay state (per overlay number) ----
+  - MIB: CISCO-OTV-MIB
+    table:
+      OID: 1.3.6.1.4.1.9.9.810.1.2.1
+      name: cotvOverlayTable
+    symbols:
+      - OID: 1.3.6.1.4.1.9.9.810.1.2.1.1.3
+        name: cotvOverlayVpnState
+        chart_meta:
+          description: Operational state of the OTV overlay VPN
+          family: 'Network/OTV/Overlay/State'
+          unit: "{status}"
+        mapping:
+          0: other
+          1: down
+          2: up
+      - OID: 1.3.6.1.4.1.9.9.810.1.2.1.1.4
+        name: cotvOverlayVpnDownReason
+        chart_meta:
+          description: Reason the OTV overlay is down
+          family: 'Network/OTV/Overlay/DownReason'
+          unit: "{reason}"
+        mapping:
+          0: noError
+          1: configChange
+          2: missingAdjServer
+          3: missingJoinIf
+          4: missingInternalIf
+          5: joinIfDown
+          6: internalIfDown
+          7: siteIdMismatch
+          8: adjServerDown
+          9: adjServerRouteMissing
+          10: dataGroupRangeMissing
+          11: isisControlGroupMissing
+          12: isisAdjDown
+          13: controlGroupRouteDown
+          14: adminDown
+    metric_tags:
+      - tag: otv_overlay
+        index: 1
+      - tag: _otv_vpn_name
+        symbol:
+          OID: 1.3.6.1.4.1.9.9.810.1.2.1.1.2
+          name: cotvOverlayVpnName
+
+  # ---- OTV adjacency database (per overlay + adjacent peer) ----
+  # Index: (cotvOverlayNumber, cotvAdjacentDevAddrType, cotvAdjacentDevAddr)
+  # Same InetAddress index encoding as NVE. IPv4-only transform (start:3 end:6).
+  - MIB: CISCO-OTV-MIB
+    table:
+      OID: 1.3.6.1.4.1.9.9.810.1.3.1
+      name: cotvAdjacencyDatabaseTable
+    symbols:
+      - OID: 1.3.6.1.4.1.9.9.810.1.3.1.1.5
+        name: cotvAdjacentDevState
+        chart_meta:
+          description: State of the OTV adjacency with this remote device
+          family: 'Network/OTV/Adjacency/State'
+          unit: "{status}"
+        mapping:
+          0: other
+          1: up
+          2: down
+      - OID: 1.3.6.1.4.1.9.9.810.1.3.1.1.6
+        name: cotvAdjacentDevUpTime
+        chart_meta:
+          description: Time this OTV adjacency has been up
+          family: 'Network/OTV/Adjacency/Uptime'
+          unit: "s"
+    metric_tags:
+      - tag: otv_overlay
+        index: 1
+      - tag: _otv_adjacent_dev_addr_type
+        index: 2
+      - tag: otv_adjacent_dev_addr
+        symbol:
+          name: adjDevAddrFromIndex
+          format: ip_address
+        index_transform:
+          - start: 3
+            end: 6
+      - tag: _otv_adjacent_dev_name
+        symbol:
+          OID: 1.3.6.1.4.1.9.9.810.1.3.1.1.4
+          name: cotvAdjacentDevName

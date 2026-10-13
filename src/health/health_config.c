@@ -3,7 +3,7 @@
 #include "health.h"
 #include "health_internals.h"
 
-static inline int health_parse_delay(
+int health_parse_delay(
         size_t line, const char *filename, char *string,
         int *delay_up_duration,
         int *delay_down_duration,
@@ -47,6 +47,12 @@ static inline int health_parse_delay(
             if(isnan(*delay_multiplier) || isinf(*delay_multiplier) || islessequal(*delay_multiplier, 0)) {
                 netdata_log_error("Health configuration at line %zu of file '%s': invalid value '%s' for '%s' keyword",
                                   line, filename, value, key);
+
+                // strtof() has already written the rejected value, and unlike the duration keywords
+                // (duration_parse_seconds() writes nothing when it fails) there is no earlier value
+                // left to fall back to. Clearing the flag makes the default below apply, so a second
+                // 'multiplier' token cannot leave a non-finite or non-positive value behind.
+                given_multiplier = 0;
             }
             else given_multiplier = 1;
         }
@@ -73,11 +79,11 @@ static inline int health_parse_delay(
         *delay_multiplier = 1.0;
 
     if(!given_max) {
-        if((*delay_max_duration) < (*delay_up_duration) * (*delay_multiplier))
-            *delay_max_duration = (int)((*delay_up_duration) * (*delay_multiplier));
+        if(health_delay_product_exceeds(*delay_up_duration, *delay_multiplier, *delay_max_duration))
+            *delay_max_duration = health_delay_apply_multiplier(*delay_up_duration, *delay_multiplier, INT_MAX);
 
-        if((*delay_max_duration) < (*delay_down_duration) * (*delay_multiplier))
-            *delay_max_duration = (int)((*delay_down_duration) * (*delay_multiplier));
+        if(health_delay_product_exceeds(*delay_down_duration, *delay_multiplier, *delay_max_duration))
+            *delay_max_duration = health_delay_apply_multiplier(*delay_down_duration, *delay_multiplier, INT_MAX);
     }
 
     return 1;
@@ -112,6 +118,15 @@ static inline ALERT_ACTION_OPTIONS health_parse_options(const char *s) {
     return options;
 }
 
+static inline bool health_parse_update_every(const char *value, int *update_every) {
+    int parsed;
+    if(!duration_parse_seconds(value, &parsed) || parsed < 0)
+        return false;
+
+    *update_every = parsed;
+    return true;
+}
+
 static inline int health_parse_repeat(
         size_t line,
         const char *file,
@@ -139,16 +154,30 @@ static inline int health_parse_repeat(
             return 1;
         }
         if(!strcasecmp(key, "warning")) {
-            if (!duration_parse_seconds(value, (int *)warn_repeat_every)) {
+            int repeat_every;
+            if (!duration_parse_seconds(value, &repeat_every)) {
                 netdata_log_error("Health configuration at line %zu of file '%s': invalid value '%s' for '%s' keyword",
                                   line, file, value, key);
             }
+            else if (repeat_every < 0) {
+                netdata_log_error("Health configuration at line %zu of file '%s': negative value '%s' for '%s' keyword",
+                                  line, file, value, key);
+            }
+            else
+                *warn_repeat_every = (uint32_t)repeat_every;
         }
         else if(!strcasecmp(key, "critical")) {
-            if (!duration_parse_seconds(value, (int *)crit_repeat_every)) {
+            int repeat_every;
+            if (!duration_parse_seconds(value, &repeat_every)) {
                 netdata_log_error("Health configuration at line %zu of file '%s': invalid value '%s' for '%s' keyword",
                                   line, file, value, key);
             }
+            else if (repeat_every < 0) {
+                netdata_log_error("Health configuration at line %zu of file '%s': negative value '%s' for '%s' keyword",
+                                  line, file, value, key);
+            }
+            else
+                *crit_repeat_every = (uint32_t)repeat_every;
         }
     }
 
@@ -295,8 +324,9 @@ int health_parse_db_lookup(size_t line, const char *filename, char *string, stru
         return 0;
     }
 
-    // sane defaults
-    ac->update_every = ABS(ac->after);
+    // derive the default only when its positive magnitude fits in int
+    if(ac->after >= -INT_MAX)
+        ac->update_every = ABS(ac->after);
 
     // now we may have optional parameters
     while(*s) {
@@ -321,7 +351,7 @@ int health_parse_db_lookup(size_t line, const char *filename, char *string, stru
             while(*s && !isspace((uint8_t)*s)) s++;
             while(*s && isspace((uint8_t)*s)) *s++ = '\0';
 
-            if (!duration_parse_seconds(value, &ac->update_every)) {
+            if (!health_parse_update_every(value, &ac->update_every)) {
                 netdata_log_error("Health configuration at line %zu of file '%s': invalid duration '%s' for '%s' keyword",
                                   line, filename, value, key);
                 return 0;
@@ -523,8 +553,12 @@ static void lookup_data_source_from_rrdr_options(RRD_ALERT_PROTOTYPE *ap) {
                                                                                                     \
     if(value) {                                                                                     \
         typeof(ax->member) _old = ax->member;                                                       \
-        char _buf[strlen(value) + string_strlen(_old) + (_label ? strlen(_label) : 0) + 3];         \
-        snprintfz(_buf, sizeof(_buf), "%s%s%s%s%s",                                                 \
+        size_t _label_len = _label ? strlen(_label) : 0;                                            \
+        size_t _value_len = strlen(value);                                                          \
+        size_t _old_len = _old ? string_strlen(_old) : 0;                                           \
+        size_t _buf_len = _label_len + (_label ? 1 : 0) + _value_len + (_old ? 1 : 0) + _old_len + 1; \
+        char *_buf = mallocz(_buf_len);                                                             \
+        snprintfz(_buf, _buf_len, "%s%s%s%s%s",                                                     \
                       _label ? _label : "",                                                         \
                       _label ? "=" : "",                                                            \
                       value,                                                                        \
@@ -532,8 +566,16 @@ static void lookup_data_source_from_rrdr_options(RRD_ALERT_PROTOTYPE *ap) {
                       _old ? string2str(_old) : "");                                                \
         string_freez(_old);                                                                         \
         ax->member = string_strdupz(_buf);                                                          \
+        freez(_buf);                                                                                \
     }                                                                                               \
 } while(0)
+
+static void health_add_file_prototype(RRD_ALERT_PROTOTYPE *ap) {
+    // Static rules are independent members of a same-name chain. health_prototype_add() logs and rejects an
+    // invalid member before it can be appended, preserving valid OS- or label-specific members of the chain.
+    if(!health_prototype_add(ap, NULL))
+        health_prototype_cleanup(ap);
+}
 
 int health_readfile(const char *filename, void *data __maybe_unused, bool stock_config) {
     netdata_log_debug(D_HEALTH, "Health configuration reading file '%s'", filename);
@@ -669,7 +711,7 @@ int health_readfile(const char *filename, void *data __maybe_unused, bool stock_
                 lookup_data_source_from_rrdr_options(ap);
                 dims_grouping_from_rrdr_options(ap);
                 replace_green_red(ap, green, red);
-                health_prototype_add(ap, NULL);
+                health_add_file_prototype(ap);
                 freez(ap);
             }
 
@@ -743,7 +785,7 @@ int health_readfile(const char *filename, void *data __maybe_unused, bool stock_
             health_parse_db_lookup(line, filename, value, ac);
         }
         else if(hash == hash_every && !strcasecmp(key, HEALTH_EVERY_KEY)) {
-            if(!duration_parse_seconds(value, &ac->update_every))
+            if(!health_parse_update_every(value, &ac->update_every))
                 netdata_log_error(
                     "Health configuration at line %zu of file '%s' for alarm '%s' at key '%s' "
                     "cannot parse duration: '%s'.",
@@ -851,7 +893,7 @@ int health_readfile(const char *filename, void *data __maybe_unused, bool stock_
         lookup_data_source_from_rrdr_options(ap);
         dims_grouping_from_rrdr_options(ap);
         replace_green_red(ap, green, red);
-        health_prototype_add(ap, NULL);
+        health_add_file_prototype(ap);
         freez(ap);
     }
 

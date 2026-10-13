@@ -242,8 +242,8 @@ var deadlockColumns = []deadlockColumn{
 	},
 }
 
-func deadlockInfoMethodConfig() funcapi.MethodConfig {
-	return funcapi.MethodConfig{
+func deadlockInfoFunctionConfig() funcapi.FunctionConfig {
+	return funcapi.FunctionConfig{
 		ID:             deadlockInfoMethodID,
 		Name:           "Deadlock Info",
 		UpdateEvery:    10,

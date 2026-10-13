@@ -1,6 +1,16 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 #include "common.h"
+#include "web/api/formatters/rrd2json.h"
+#include "web/api/queries/query-internal.h"
+#include "database/contexts/rrdcontext-internal.h"
+#ifdef OS_WINDOWS
+#include "win_system-info.h"
+#endif
+
+#if defined(OS_LINUX)
+#include "collectors/proc.plugin/plugin_proc.h"
+#endif
 
 static bool cmd_arg_sanitization_test(const char *expected, const char *src, char *dst, size_t dst_size) {
     bool ok = sanitize_command_argument_string(dst, src, dst_size);
@@ -522,6 +532,64 @@ int unit_test_buffer() {
 
     fprintf(stderr, "buffer_sprintf() works as expected.\n");
     buffer_free(wb);
+    return 0;
+}
+
+static int check_jsonwrap_v2_partial_data_trimming_case(RRDR_OPTIONS options, const char *expected) {
+    RRDR r = {
+        .partial_data_trimming = {
+            .max_update_every = 10,
+            .expected_after = 100,
+            .trimmed_after = 101,
+        },
+    };
+
+    BUFFER *wb = buffer_create(0, NULL);
+    buffer_json_initialize(wb, "\"", "\"", 0, true, BUFFER_JSON_OPTIONS_MINIFY);
+    rrdr_json_wrapper_partial_data_trimming_v2(wb, &r, options);
+    buffer_json_finalize(wb);
+
+    const char *actual = buffer_tostring(wb);
+    if(strcmp(actual, expected) != 0) {
+        fprintf(stderr, "rrdr_json_wrapper_partial_data_trimming_v2() generated '%s', expected '%s'\n",
+                actual, expected);
+        buffer_free(wb);
+        return 1;
+    }
+
+    buffer_free(wb);
+    return 0;
+}
+
+static int test_jsonwrap_v2_partial_data_trimming_raw_metadata(void) {
+    const char *expected =
+        "{\"partial_data_trimming\":{\"max_update_every\":10,\"expected_after\":100,\"trimmed_after\":101}}";
+
+    if(check_jsonwrap_v2_partial_data_trimming_case(0, "{}"))
+        return 1;
+
+    if(check_jsonwrap_v2_partial_data_trimming_case(RRDR_OPTION_DEBUG, expected))
+        return 1;
+
+    if(check_jsonwrap_v2_partial_data_trimming_case(RRDR_OPTION_RETURN_RAW, expected))
+        return 1;
+
+    if(check_jsonwrap_v2_partial_data_trimming_case(RRDR_OPTION_DEBUG | RRDR_OPTION_RETURN_RAW, expected))
+        return 1;
+
+    QUERY_TARGET qt = { 0 };
+    qt.window.options = RRDR_OPTION_RETURN_RAW;
+    if(!query_target_aggregatable(&qt)) {
+        fprintf(stderr, "RRDR_OPTION_RETURN_RAW must keep query_target_aggregatable() true\n");
+        return 1;
+    }
+
+    qt.window.options = 0;
+    if(query_target_aggregatable(&qt)) {
+        fprintf(stderr, "query_target_aggregatable() unexpectedly true without RRDR_OPTION_RETURN_RAW\n");
+        return 1;
+    }
+
     return 0;
 }
 
@@ -1453,6 +1521,1676 @@ int check_strdupz_path_subpath() {
     return 0;
 }
 
+static int test_incremental_sum_lookup_respects_update_every(void) {
+    fprintf(stderr, "%s() running...\n", __FUNCTION__);
+
+    const time_t update_every = 10;
+    const collected_number increment = 100;
+    const size_t samples = 6;
+    RRD_DB_MODE old_default_rrd_memory_mode = default_rrd_memory_mode;
+    time_t old_update_every = nd_profile.update_every;
+
+    default_rrd_memory_mode = RRD_DB_MODE_ALLOC;
+    nd_profile.update_every = update_every;
+
+    char name[101];
+    snprintfz(name, sizeof(name) - 1, "unittest-incremental-sum-lookup");
+
+    RRDSET *st = rrdset_create_localhost(
+        "netdata", name, name, "netdata", NULL, "Unit Testing", "requests", "unittest", NULL, 1,
+        update_every, RRDSET_TYPE_LINE);
+    RRDDIM *rd = rrddim_add(st, "requests", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+
+    time_t first_update_s = MAX(2 * API_RELATIVE_TIME_MAX, 200000000);
+    st->last_collected_time.tv_sec = st->last_updated.tv_sec = first_update_s - update_every;
+    st->last_collected_time.tv_usec = st->last_updated.tv_usec = 0;
+    rd->collector.last_collected_time = st->last_collected_time;
+
+    for(size_t i = 0; i <= samples; i++) {
+        struct timeval now = {
+            .tv_sec = first_update_s + (time_t)(i * update_every),
+            .tv_usec = 0,
+        };
+
+        st->usec_since_last_update = update_every * USEC_PER_SEC;
+        rrddim_timed_set_by_pointer(st, rd, now, (collected_number)(i * increment));
+        rrdset_timed_done(st, now, false);
+    }
+
+    time_t before = rrdset_last_entry_s(st);
+    time_t after = before - (time_t)(samples * update_every);
+
+    ONEWAYALLOC *owa = onewayalloc_create(0);
+    NETDATA_DOUBLE value = NAN;
+    int value_is_null = 0;
+    int ret = rrdset2value_api_v1_with_owa(
+        owa, st, NULL, &value, "requests", 1, after, before, RRDR_GROUPING_SUM, NULL, 0,
+        RRDR_OPTION_NOT_ALIGNED | RRDR_OPTION_SELECTED_TIER | RRDR_OPTION_MATCH_IDS, NULL, NULL, NULL, NULL,
+        NULL, &value_is_null, NULL, 0, 0, QUERY_SOURCE_UNITTEST, STORAGE_PRIORITY_SYNCHRONOUS);
+    onewayalloc_destroy(owa);
+
+    NETDATA_DOUBLE expected = (NETDATA_DOUBLE)(samples * increment);
+    int rc = 0;
+    if(ret != HTTP_RESP_OK || value_is_null || fabsndd(value - expected) > 0.000001) {
+        fprintf(
+            stderr,
+            "incremental sum lookup failed: ret=%d, null=%d, expected " NETDATA_DOUBLE_FORMAT
+            ", got " NETDATA_DOUBLE_FORMAT "\n",
+            ret, value_is_null, expected, value);
+        rc = 1;
+    }
+
+    default_rrd_memory_mode = old_default_rrd_memory_mode;
+    nd_profile.update_every = old_update_every;
+    return rc;
+}
+
+static int test_rrdmetric_algorithm_follows_rrddim(void) {
+    fprintf(stderr, "%s() running...\n", __FUNCTION__);
+
+    RRD_DB_MODE old_default_rrd_memory_mode = default_rrd_memory_mode;
+    default_rrd_memory_mode = RRD_DB_MODE_ALLOC;
+
+    RRDSET *st = rrdset_create_localhost(
+        "netdata", "unittest-algo-track", "unittest-algo-track", "netdata", NULL,
+        "Unit Testing", "x", "unittest", NULL, 1,
+        nd_profile.update_every, RRDSET_TYPE_LINE);
+    RRDDIM *rd = rrddim_add(st, "d", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+
+    int rc = 0;
+    RRDMETRIC *rm = rrdmetric_acquired_value(rd->rrdcontexts.rrdmetric);
+    if(!rm || rrdmetric_algorithm_atomic_load(rm) != RRD_ALGORITHM_INCREMENTAL) {
+        fprintf(stderr, "%s: after rrddim_add INCREMENTAL, rm->algorithm = %d (want %d)\n",
+                __FUNCTION__, rm ? (int)rrdmetric_algorithm_atomic_load(rm) : -1,
+                (int)RRD_ALGORITHM_INCREMENTAL);
+        rc = 1;
+    }
+
+    rrddim_set_algorithm(st, rd, RRD_ALGORITHM_ABSOLUTE);
+    rm = rrdmetric_acquired_value(rd->rrdcontexts.rrdmetric);
+    if(!rm || rrdmetric_algorithm_atomic_load(rm) != RRD_ALGORITHM_ABSOLUTE) {
+        fprintf(stderr, "%s: after rrddim_set_algorithm ABSOLUTE, rm->algorithm = %d (want %d)\n",
+                __FUNCTION__, rm ? (int)rrdmetric_algorithm_atomic_load(rm) : -1,
+                (int)RRD_ALGORITHM_ABSOLUTE);
+        rc = 1;
+    }
+
+    default_rrd_memory_mode = old_default_rrd_memory_mode;
+    return rc;
+}
+
+static int test_rrddim_add_does_not_bump_metadata_version(void) {
+    fprintf(stderr, "%s() running...\n", __FUNCTION__);
+
+    RRD_DB_MODE old_default_rrd_memory_mode = default_rrd_memory_mode;
+    default_rrd_memory_mode = RRD_DB_MODE_ALLOC;
+
+    int rc = 0;
+
+    RRDSET *st = rrdset_create_localhost(
+        "netdata", "unittest-metadata-version", "unittest-metadata-version", "netdata", NULL,
+        "Unit Testing", "x", "unittest", NULL, 1,
+        nd_profile.update_every, RRDSET_TYPE_LINE);
+
+    RRDDIM *rd = rrddim_add(st, "dim1", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+
+    // An unchanged rrddim_add() must not bump the chart metadata version: the streaming sender
+    // treats a bump as "re-send the whole chart definition upstream" (rrdset_check_upstream_exposed()).
+    uint32_t before = rrdset_metadata_version(st);
+    for(int i = 0; i < 5 ;i++)
+        rrddim_add(st, "dim1", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+
+    if(rrdset_metadata_version(st) != before) {
+        fprintf(stderr, "%s: repeated rrddim_add() bumped the chart metadata version (%u -> %u)\n",
+                __FUNCTION__, before, rrdset_metadata_version(st));
+        rc = 1;
+    }
+
+    // Marking a live dimension obsolete is a real state transition, so it MUST bump - exactly once.
+    // Asserting the exact delta (not just "it changed") is what pins the contract: a path that
+    // bumped twice would still re-send the chart definition twice.
+    before = rrdset_metadata_version(st);
+    rrddim_is_obsolete___safe_from_collector_thread(st, rd);
+    if(rrdset_metadata_version(st) != before + 1) {
+        fprintf(stderr, "%s: marking a dimension obsolete bumped the version by %u, expected exactly 1\n",
+                __FUNCTION__, rrdset_metadata_version(st) - before);
+        rc = 1;
+    }
+
+    // ...and repeating the obsolete declaration must not bump it again either.
+    before = rrdset_metadata_version(st);
+    for(int i = 0; i < 5 ;i++)
+        rrddim_is_obsolete___safe_from_collector_thread(st, rd);
+    if(rrdset_metadata_version(st) != before) {
+        fprintf(stderr, "%s: repeated rrddim_is_obsolete() bumped the chart metadata version\n", __FUNCTION__);
+        rc = 1;
+    }
+
+    before = rrdset_metadata_version(st);
+
+    rrddim_add(st, "dim1", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+
+    if(rrddim_flag_check(rd, RRDDIM_FLAG_OBSOLETE)) {
+        fprintf(stderr, "%s: obsolete dimension was not revived by rrddim_add()\n", __FUNCTION__);
+        rc = 1;
+    }
+
+    if(rrdset_metadata_version(st) != before + 1) {
+        fprintf(stderr, "%s: reviving an obsolete dimension bumped the version by %u, expected exactly 1\n",
+                __FUNCTION__, rrdset_metadata_version(st) - before);
+        rc = 1;
+    }
+
+    // ...and once revived, further identical adds must go quiet again.
+    before = rrdset_metadata_version(st);
+    rrddim_add(st, "dim1", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+    if(rrdset_metadata_version(st) != before) {
+        fprintf(stderr, "%s: rrddim_add() on a revived dimension bumped the version again\n", __FUNCTION__);
+        rc = 1;
+    }
+
+    rrdset_is_obsolete___safe_from_collector_thread(st);
+    default_rrd_memory_mode = old_default_rrd_memory_mode;
+    return rc;
+}
+
+static int test_rrddim_scale_minimum_magnitude(void) {
+    fprintf(stderr, "%s() running...\n", __FUNCTION__);
+
+    RRD_DB_MODE old_default_rrd_memory_mode = default_rrd_memory_mode;
+    default_rrd_memory_mode = RRD_DB_MODE_ALLOC;
+
+    int rc = 0;
+    if(rrddim_scale_magnitude(INT32_MIN) != (int64_t)INT32_MAX + 1) {
+        fprintf(stderr, "%s: INT32_MIN magnitude is not representable\n", __FUNCTION__);
+        rc = 1;
+    }
+
+    RRDSET *st_insert = rrdset_create_localhost(
+        "netdata", "unittest-scale-min-insert", "unittest-scale-min-insert", "netdata", NULL,
+        "Unit Testing", "x", "unittest", NULL, 1,
+        nd_profile.update_every, RRDSET_TYPE_LINE);
+    RRDDIM *insert_a = rrddim_add(st_insert, "a", NULL, INT32_MIN, INT32_MIN, RRD_ALGORITHM_ABSOLUTE);
+    RRDDIM *insert_b = rrddim_add(st_insert, "b", NULL, INT32_MIN, INT32_MIN, RRD_ALGORITHM_ABSOLUTE);
+
+    if(insert_a->multiplier != INT32_MIN || insert_a->divisor != INT32_MIN ||
+       insert_b->multiplier != INT32_MIN || insert_b->divisor != INT32_MIN ||
+       rrdset_flag_check(st_insert, RRDSET_FLAG_HETEROGENEOUS)) {
+        fprintf(stderr, "%s: identical signed-minimum dimensions were not preserved as homogeneous\n", __FUNCTION__);
+        rc = 1;
+    }
+
+    RRDSET *st_multiplier = rrdset_create_localhost(
+        "netdata", "unittest-scale-min-multiplier", "unittest-scale-min-multiplier", "netdata", NULL,
+        "Unit Testing", "x", "unittest", NULL, 1,
+        nd_profile.update_every, RRDSET_TYPE_LINE);
+    rrddim_add(st_multiplier, "a", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+    rrddim_add(st_multiplier, "b", NULL, INT32_MIN, 1, RRD_ALGORITHM_ABSOLUTE);
+    rrdset_flag_set(st_multiplier, RRDSET_FLAG_HOMOGENEOUS_CHECK);
+    rrdset_update_heterogeneous_flag(st_multiplier);
+    if(!rrdset_flag_check(st_multiplier, RRDSET_FLAG_HETEROGENEOUS)) {
+        fprintf(stderr, "%s: differing signed-minimum multiplier was not heterogeneous\n", __FUNCTION__);
+        rc = 1;
+    }
+
+    RRDSET *st_divisor = rrdset_create_localhost(
+        "netdata", "unittest-scale-min-divisor", "unittest-scale-min-divisor", "netdata", NULL,
+        "Unit Testing", "x", "unittest", NULL, 1,
+        nd_profile.update_every, RRDSET_TYPE_LINE);
+    rrddim_add(st_divisor, "a", NULL, 1, INT32_MIN, RRD_ALGORITHM_ABSOLUTE);
+    rrddim_add(st_divisor, "b", NULL, 1, INT32_MIN, RRD_ALGORITHM_ABSOLUTE);
+    rrdset_flag_set(st_divisor, RRDSET_FLAG_HOMOGENEOUS_CHECK);
+    rrdset_update_heterogeneous_flag(st_divisor);
+    if(rrdset_flag_check(st_divisor, RRDSET_FLAG_HETEROGENEOUS)) {
+        fprintf(stderr, "%s: identical signed-minimum divisors were not homogeneous\n", __FUNCTION__);
+        rc = 1;
+    }
+
+    default_rrd_memory_mode = old_default_rrd_memory_mode;
+    return rc;
+}
+
+static int test_rrddim_collected_minimum_magnitude(void) {
+    fprintf(stderr, "%s() running...\n", __FUNCTION__);
+
+    RRD_DB_MODE old_default_rrd_memory_mode = default_rrd_memory_mode;
+    default_rrd_memory_mode = RRD_DB_MODE_ALLOC;
+
+    RRDSET *st = rrdset_create_localhost(
+        "netdata", "unittest-collected-min-magnitude", "unittest-collected-min-magnitude", "netdata", NULL,
+        "Unit Testing", "x", "unittest", NULL, 1,
+        nd_profile.update_every, RRDSET_TYPE_LINE);
+    RRDDIM *rd_int = rrddim_add(st, "int", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+    RRDDIM *rd_float = rrddim_add(st, "float", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+    memset(&rd_float->collector.collected, 0, sizeof(rd_float->collector.collected));
+    rrddim_option_set(rd_float, RRDDIM_OPTION_VALUE_FLOAT);
+
+    const struct {
+        collected_number value;
+        uint64_t expected_max;
+    } cases[] = {
+        { 0, 0 },
+        { 1, 1 },
+        { -1, 1 },
+        { LLONG_MAX, (uint64_t)LLONG_MAX },
+        { -LLONG_MAX, (uint64_t)LLONG_MAX },
+        { LLONG_MIN, UINT64_C(1) << 63 },
+        { 7, UINT64_C(1) << 63 },
+    };
+
+    int rc = 0;
+    for(size_t i = 0; i < _countof(cases); i++) {
+        rrddim_set_by_pointer(st, rd_int, cases[i].value);
+        uint64_t actual = rrddim_collected_max_as_uint64(rd_int);
+        if(actual != cases[i].expected_max) {
+            fprintf(stderr, "%s: case %zu maximum is %" PRIu64 ", expected %" PRIu64 "\n",
+                    __FUNCTION__, i, actual, cases[i].expected_max);
+            rc = 1;
+        }
+    }
+
+    if(rd_int->collector.collected.i.collected_value_max != INT64_MIN ||
+       rrddim_collected_max_as_double(rd_int) != (NETDATA_DOUBLE)(UINT64_C(1) << 63)) {
+        fprintf(stderr, "%s: integer 2^63 maximum representation was not preserved\n", __FUNCTION__);
+        rc = 1;
+    }
+
+    rrddim_set_by_pointer(st, rd_float, LLONG_MIN);
+    rrddim_set_by_pointer(st, rd_float, 7);
+    if(rd_float->collector.collected.f.collected_value_max != (NETDATA_DOUBLE)(UINT64_C(1) << 63)) {
+        fprintf(stderr, "%s: float lane did not preserve the LLONG_MIN magnitude\n", __FUNCTION__);
+        rc = 1;
+    }
+
+    default_rrd_memory_mode = old_default_rrd_memory_mode;
+    return rc;
+}
+
+static int test_rrdset_homogeneity_multiplier_sign(void) {
+    fprintf(stderr, "%s() running...\n", __FUNCTION__);
+
+    RRD_DB_MODE old_default_rrd_memory_mode = default_rrd_memory_mode;
+    default_rrd_memory_mode = RRD_DB_MODE_ALLOC;
+
+    struct homogeneity_case {
+        const char *name;
+        int32_t multiplier_a;
+        int32_t multiplier_b;
+        int32_t divisor_a;
+        int32_t divisor_b;
+        RRD_ALGORITHM algorithm_a;
+        RRD_ALGORITHM algorithm_b;
+        bool heterogeneous;
+    } cases[] = {
+        { "negative-positive", -1, 1, 1, 1, RRD_ALGORITHM_ABSOLUTE, RRD_ALGORITHM_ABSOLUTE, false },
+        { "negative-negative", -1, -1, 1, 1, RRD_ALGORITHM_ABSOLUTE, RRD_ALGORITHM_ABSOLUTE, false },
+        { "positive-negative", 1, -1, 1, 1, RRD_ALGORITHM_ABSOLUTE, RRD_ALGORITHM_ABSOLUTE, false },
+        { "unequal-magnitude", -1, 2, 1, 1, RRD_ALGORITHM_ABSOLUTE, RRD_ALGORITHM_ABSOLUTE, true },
+        { "unequal-divisor", -1, 1, 1, 2, RRD_ALGORITHM_ABSOLUTE, RRD_ALGORITHM_ABSOLUTE, true },
+        { "unequal-algorithm", -1, 1, 1, 1, RRD_ALGORITHM_ABSOLUTE, RRD_ALGORITHM_INCREMENTAL, true },
+        { "minimum-magnitude", INT32_MIN, INT32_MIN, 1, 1, RRD_ALGORITHM_ABSOLUTE, RRD_ALGORITHM_ABSOLUTE, false },
+        { "minimum-unequal", INT32_MIN, 1, 1, 1, RRD_ALGORITHM_ABSOLUTE, RRD_ALGORITHM_ABSOLUTE, true },
+    };
+
+    int rc = 0;
+    for(size_t i = 0; i < sizeof(cases) / sizeof(cases[0]); i++) {
+        char id[RRD_ID_LENGTH_MAX + 1];
+        snprintfz(id, RRD_ID_LENGTH_MAX, "unittest-homogeneity-%s", cases[i].name);
+
+        RRDSET *st = rrdset_create_localhost(
+            "netdata", id, id, "netdata", NULL, "Unit Testing", "x", "unittest", NULL, 1,
+            nd_profile.update_every, RRDSET_TYPE_LINE);
+        rrddim_add(st, "a", NULL, cases[i].multiplier_a, cases[i].divisor_a, cases[i].algorithm_a);
+        rrddim_add(st, "b", NULL, cases[i].multiplier_b, cases[i].divisor_b, cases[i].algorithm_b);
+
+        bool immediate = rrdset_flag_check(st, RRDSET_FLAG_HETEROGENEOUS);
+        if(immediate != cases[i].heterogeneous) {
+            fprintf(stderr, "%s: %s insertion classified heterogeneous=%d, expected %d\n",
+                    __FUNCTION__, cases[i].name, immediate, cases[i].heterogeneous);
+            rc = 1;
+        }
+
+        rrdset_flag_set(st, RRDSET_FLAG_HOMOGENEOUS_CHECK);
+        rrdset_update_heterogeneous_flag(st);
+        bool deferred = rrdset_flag_check(st, RRDSET_FLAG_HETEROGENEOUS);
+        if(deferred != cases[i].heterogeneous ||
+           rrdset_flag_check(st, RRDSET_FLAG_HOMOGENEOUS_CHECK)) {
+            fprintf(stderr, "%s: %s deferred classified heterogeneous=%d, expected %d (check pending=%u)\n",
+                    __FUNCTION__, cases[i].name, deferred, cases[i].heterogeneous,
+                    rrdset_flag_check(st, RRDSET_FLAG_HOMOGENEOUS_CHECK));
+            rc = 1;
+        }
+    }
+
+    RRDSET *st_single = rrdset_create_localhost(
+        "netdata", "unittest-homogeneity-single", "unittest-homogeneity-single", "netdata", NULL,
+        "Unit Testing", "x", "unittest", NULL, 1, nd_profile.update_every, RRDSET_TYPE_LINE);
+    rrddim_add(st_single, "a", NULL, -1, 1, RRD_ALGORITHM_ABSOLUTE);
+    rrdset_flag_set(st_single, RRDSET_FLAG_HOMOGENEOUS_CHECK);
+    rrdset_update_heterogeneous_flag(st_single);
+    if(rrdset_flag_check(st_single, RRDSET_FLAG_HETEROGENEOUS) ||
+       rrdset_flag_check(st_single, RRDSET_FLAG_HOMOGENEOUS_CHECK)) {
+        fprintf(stderr, "%s: one negative dimension was not homogeneous after deferred recomputation\n", __FUNCTION__);
+        rc = 1;
+    }
+
+    RRDSET *st_update = rrdset_create_localhost(
+        "netdata", "unittest-homogeneity-update", "unittest-homogeneity-update", "netdata", NULL,
+        "Unit Testing", "x", "unittest", NULL, 1, nd_profile.update_every, RRDSET_TYPE_LINE);
+    rrddim_add(st_update, "a", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+    rrddim_add(st_update, "b", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+
+    RRDDIM *first = NULL, *second = NULL, *rd;
+    rrddim_foreach_read(rd, st_update) {
+        if(!first)
+            first = rd;
+        else if(!second)
+            second = rd;
+    }
+    rrddim_foreach_done(rd);
+
+    if(!first || !second) {
+        fprintf(stderr, "%s: failed to locate both metadata-update dimensions\n", __FUNCTION__);
+        rc = 1;
+    }
+    else {
+        rrddim_set_multiplier(st_update, first, -1);
+        if(!rrdset_flag_check(st_update, RRDSET_FLAG_HOMOGENEOUS_CHECK)) {
+            fprintf(stderr, "%s: multiplier metadata update did not request homogeneity recomputation\n", __FUNCTION__);
+            rc = 1;
+        }
+
+        rrdset_update_heterogeneous_flag(st_update);
+        if(rrdset_flag_check(st_update, RRDSET_FLAG_HETEROGENEOUS)) {
+            fprintf(stderr, "%s: equal magnitudes became heterogeneous after first-dimension sign update\n", __FUNCTION__);
+            rc = 1;
+        }
+
+        rrddim_set_multiplier(st_update, second, 2);
+        rrdset_update_heterogeneous_flag(st_update);
+        if(!rrdset_flag_check(st_update, RRDSET_FLAG_HETEROGENEOUS)) {
+            fprintf(stderr, "%s: unequal updated magnitudes were not heterogeneous\n", __FUNCTION__);
+            rc = 1;
+        }
+
+        rrddim_set_multiplier(st_update, second, -1);
+        rrdset_update_heterogeneous_flag(st_update);
+        if(rrdset_flag_check(st_update, RRDSET_FLAG_HETEROGENEOUS)) {
+            fprintf(stderr, "%s: restoring equal negative magnitudes did not clear heterogeneity\n", __FUNCTION__);
+            rc = 1;
+        }
+    }
+
+    default_rrd_memory_mode = old_default_rrd_memory_mode;
+    return rc;
+}
+
+static int test_rrddim_divisor_normalization(void) {
+    fprintf(stderr, "%s() running...\n", __FUNCTION__);
+
+    RRD_DB_MODE old_default_rrd_memory_mode = default_rrd_memory_mode;
+    default_rrd_memory_mode = RRD_DB_MODE_ALLOC;
+
+    RRDSET *st = rrdset_create_localhost(
+        "netdata", "unittest-divisor-normalization", "unittest-divisor-normalization", "netdata", NULL,
+        "Unit Testing", "x", "unittest", NULL, 1,
+        nd_profile.update_every, RRDSET_TYPE_LINE);
+    RRDDIM *rd = rrddim_add(st, "d", NULL, 1, 0, RRD_ALGORITHM_ABSOLUTE);
+
+    int rc = 0;
+    if(rd->divisor != 1) {
+        fprintf(stderr, "%s: construction stored zero divisor as %d instead of 1\n", __FUNCTION__, rd->divisor);
+        rc = 1;
+    }
+
+    if(rrddim_set_divisor(st, rd, 7) != 1 || rd->divisor != 7) {
+        fprintf(stderr, "%s: valid positive divisor was not preserved\n", __FUNCTION__);
+        rc = 1;
+    }
+
+    if(rrddim_set_divisor(st, rd, 0) != 1 || rd->divisor != 1) {
+        fprintf(stderr, "%s: zero divisor update was not normalized to 1\n", __FUNCTION__);
+        rc = 1;
+    }
+
+    if(rrddim_set_divisor(st, rd, 0) != 0 || rd->divisor != 1) {
+        fprintf(stderr, "%s: repeated normalized zero update was not a no-op\n", __FUNCTION__);
+        rc = 1;
+    }
+
+    if(rrddim_set_divisor(st, rd, -7) != 1 || rd->divisor != -7) {
+        fprintf(stderr, "%s: valid negative divisor was not preserved\n", __FUNCTION__);
+        rc = 1;
+    }
+
+    RRDDIM *same_rd = rrddim_add(st, "d", NULL, 1, 0, RRD_ALGORITHM_ABSOLUTE);
+    if(same_rd != rd || rd->divisor != 1) {
+        fprintf(stderr, "%s: conflict update did not preserve identity and normalize zero divisor\n", __FUNCTION__);
+        rc = 1;
+    }
+
+    default_rrd_memory_mode = old_default_rrd_memory_mode;
+    return rc;
+}
+
+static int test_rrdset_rejects_invalid_update_every(void) {
+    fprintf(stderr, "%s() running...\n", __FUNCTION__);
+
+    RRD_DB_MODE old_default_rrd_memory_mode = default_rrd_memory_mode;
+    time_t old_update_every = nd_profile.update_every;
+    const time_t original_update_every = 5;
+
+    default_rrd_memory_mode = RRD_DB_MODE_ALLOC;
+    nd_profile.update_every = original_update_every;
+
+    RRDSET *st = rrdset_create_localhost(
+        "netdata", "unittest-update-every-guard", "unittest-update-every-guard", "netdata", NULL,
+        "Unit Testing", "x", "unittest", NULL, 1,
+        original_update_every, RRDSET_TYPE_LINE);
+
+    uint32_t old_min_update_every =
+        __atomic_load_n(&st->rrdhost->stream.rcv.min_update_every, __ATOMIC_RELAXED);
+    uint32_t old_min_update_every_applied =
+        __atomic_load_n(&st->rrdhost->stream.rcv.min_update_every_applied, __ATOMIC_RELAXED);
+
+    int rc = 0;
+    time_t previous = rrdset_set_update_every_s(st, 0);
+    if(previous != original_update_every || st->update_every != original_update_every) {
+        fprintf(stderr, "%s: zero update every changed chart from %ld to %d\n",
+                __FUNCTION__, (long)previous, st->update_every);
+        rc = 1;
+    }
+
+    previous = rrdset_set_update_every_s(st, -1);
+    if(previous != original_update_every || st->update_every != original_update_every) {
+        fprintf(stderr, "%s: negative update every changed chart from %ld to %d\n",
+                __FUNCTION__, (long)previous, st->update_every);
+        rc = 1;
+    }
+
+    if(sizeof(time_t) > sizeof(int32_t)) {
+        time_t too_large_update_every = (time_t)INT32_MAX;
+        too_large_update_every++;
+        previous = rrdset_set_update_every_s(st, too_large_update_every);
+        if(previous != original_update_every || st->update_every != original_update_every) {
+            fprintf(stderr, "%s: out-of-range update every changed chart from %ld to %d\n",
+                    __FUNCTION__, (long)previous, st->update_every);
+            rc = 1;
+        }
+    }
+
+    const time_t maximum_update_every = INT32_MAX;
+    previous = rrdset_set_update_every_s(st, maximum_update_every);
+    if(previous != original_update_every || st->update_every != maximum_update_every) {
+        fprintf(stderr, "%s: valid update every did not change chart from %ld to %ld; current %d\n",
+                __FUNCTION__, (long)previous, (long)maximum_update_every, st->update_every);
+        rc = 1;
+    }
+
+    if(st->update_every != original_update_every)
+        rrdset_set_update_every_s(st, original_update_every);
+
+    __atomic_store_n(&st->rrdhost->stream.rcv.min_update_every, UINT32_MAX, __ATOMIC_RELAXED);
+    __atomic_store_n(&st->rrdhost->stream.rcv.min_update_every_applied, UINT32_MAX, __ATOMIC_RELAXED);
+
+    const time_t valid_update_every = 300;
+    previous = rrdset_set_update_every_s(st, valid_update_every);
+    if(previous != original_update_every || st->update_every != valid_update_every) {
+        fprintf(stderr, "%s: cadence update every did not change chart from %ld to %ld; current %d\n",
+                __FUNCTION__, (long)previous, (long)valid_update_every, st->update_every);
+        rc = 1;
+    }
+
+    uint32_t min_update_every =
+        __atomic_load_n(&st->rrdhost->stream.rcv.min_update_every, __ATOMIC_RELAXED);
+    if(min_update_every != valid_update_every) {
+        fprintf(stderr, "%s: valid update every selected minimum %u instead of %" PRId64 " seconds\n",
+                __FUNCTION__, min_update_every, (int64_t)valid_update_every);
+        rc = 1;
+    }
+
+    rrdset_set_update_every_s(st, 600);
+    min_update_every = __atomic_load_n(&st->rrdhost->stream.rcv.min_update_every, __ATOMIC_RELAXED);
+    if(min_update_every != valid_update_every) {
+        fprintf(stderr, "%s: receiver minimum increased from %" PRId64 " to %u seconds\n",
+                __FUNCTION__, (int64_t)valid_update_every, min_update_every);
+        rc = 1;
+    }
+
+    if(st->update_every != original_update_every)
+        rrdset_set_update_every_s(st, original_update_every);
+
+    __atomic_store_n(&st->rrdhost->stream.rcv.min_update_every, old_min_update_every, __ATOMIC_RELAXED);
+    __atomic_store_n(
+        &st->rrdhost->stream.rcv.min_update_every_applied, old_min_update_every_applied, __ATOMIC_RELAXED);
+
+    default_rrd_memory_mode = old_default_rrd_memory_mode;
+    nd_profile.update_every = old_update_every;
+    return rc;
+}
+
+// --------------------------------------------------------------------------------------------------------------------
+// Receiver replication counter ownership.
+//
+// The low half of host->stream.rcv.status.replication.charts_started_and_remaining counts charts whose
+// receiver replication is outstanding; the high half counts claims that won the transition in this
+// connection generation. The invariant these tests guard: a chart holds at most one contribution, it
+// holds one exactly while RRDSET_FLAG_RECEIVER_REPLICATION_IN_PROGRESS is set, and it is released
+// exactly once - by whichever of replay completion, the connect/disconnect reset, or chart teardown
+// wins the transition. The outstanding half must never wrap below zero.
+
+// These tests drive the PRODUCTION claim and release (rrdhost_receiver_replication_claim /
+// _release, declared in rrdset.h) rather than a parallel copy, so a change to the ownership sequence
+// cannot silently stop being tested.
+
+// A chart destroyed while its receiver replication is outstanding must release its contribution.
+// Reachable in production: rrdset_is_replicating() (rrdset.h) tests the two directions as one OR-pair,
+// and a chart is created with BOTH *_REPLICATION_FINISHED flags set (rrdset_insert_callback), so a
+// sender-FINISHED bit makes the macro false while receiver replication is still in progress -- and
+// svc_rrdhost_cleanup_charts_marked_obsolete() (daemon/service.c) gates deletion on that macro.
+static int test_receiver_replication_released_on_chart_teardown(void) {
+    fprintf(stderr, "%s() running...\n", __FUNCTION__);
+
+    RRD_DB_MODE old_default_rrd_memory_mode = default_rrd_memory_mode;
+    default_rrd_memory_mode = RRD_DB_MODE_ALLOC;
+
+    int rc = 0;
+
+    RRDSET *st = rrdset_create_localhost(
+        "netdata", "unittest-rcv-repl-teardown", "unittest-rcv-repl-teardown", "netdata", NULL,
+        "Unit Testing", "x", "unittest", NULL, 1, nd_profile.update_every, RRDSET_TYPE_LINE);
+
+    RRDHOST *host = st->rrdhost;
+    uint32_t before = rrdhost_receiver_replicating_charts(host);
+    uint64_t saved_accounting = rrdhost_receiver_replication_accounting(host);
+
+    rrdhost_receiver_replication_claim(st);
+
+    uint32_t claimed = rrdhost_receiver_replicating_charts(host);
+    if(claimed != before + 1) {
+        fprintf(stderr, "%s: claiming receiver replication moved the counter from %u to %u, expected %u\n",
+                __FUNCTION__, before, claimed, before + 1);
+        rc = 1;
+    }
+
+    rrdset_free(st);
+
+    uint32_t after = rrdhost_receiver_replicating_charts(host);
+    if(after != before) {
+        fprintf(stderr,
+                "%s: destroying a chart with receiver replication outstanding left the counter at %u, expected %u\n",
+                __FUNCTION__, after, before);
+        rc = 1;
+    }
+
+    rrdhost_receiver_replication_accounting_restore(host, saved_accounting);
+
+    default_rrd_memory_mode = old_default_rrd_memory_mode;
+    return rc;
+}
+
+// A release that would take the counter below zero must not wrap it to UINT32_MAX and pin the host in
+// `replicating` forever. There are four release sites and the counter is a uint32_t, so a single
+// unowned release is a permanent, host-wide observability failure rather than a transient blip.
+static int test_receiver_replication_counter_does_not_wrap(void) {
+    fprintf(stderr, "%s() running...\n", __FUNCTION__);
+
+    int rc = 0;
+    RRDHOST *host = localhost;
+
+    uint64_t saved_accounting = rrdhost_receiver_replication_accounting(host);
+    rrdhost_receiver_replicating_charts_zero(host);
+
+#ifdef NETDATA_INTERNAL_CHECKS
+    size_t refusals_before = __atomic_load_n(&rrdhost_receiver_replication_refusals, __ATOMIC_RELAXED);
+#endif
+
+    // This deliberate underflow attempt emits one STREAM REPLAY ERROR ... refused line. The line
+    // confirms the guard is working and is not a test failure.
+    fprintf(stderr,
+            "%s: expecting one STREAM REPLAY ERROR ... refused line; it confirms the guard, "
+            "not a test failure\n",
+            __FUNCTION__);
+    uint32_t after = rrdhost_receiver_replicating_charts_minus_one(host);
+    if(after != 0) {
+        fprintf(stderr, "%s: an unbalanced release took the receiver replication counter to %u, expected 0\n",
+                __FUNCTION__, after);
+        rc = 1;
+    }
+
+#ifdef NETDATA_INTERNAL_CHECKS
+    // Assert the refusal was COUNTED, not just that the counter held. The refusal count is the only
+    // observable an over-release leaves behind, and the stress pass asserts it did NOT move - so if
+    // the increment were ever dropped that assertion would pass vacuously. This is its positive case.
+    size_t refusals = __atomic_load_n(&rrdhost_receiver_replication_refusals, __ATOMIC_RELAXED) - refusals_before;
+    if(refusals != 1) {
+        fprintf(stderr, "%s: the refused release was counted %zu times, expected exactly 1\n",
+                __FUNCTION__, refusals);
+        rc = 1;
+    }
+#endif
+
+    // The guard must be exact for BOTH decrement shapes. A release moves the outstanding half alone,
+    // so testing that half is enough for it; the claim's withdrawal moves both, and a cohort of zero
+    // with work outstanding must refuse rather than borrow the cohort down to UINT32_MAX. That state
+    // is the one the completion helper keeps as its corruption diagnostic, so it must survive intact.
+    rrdhost_receiver_replication_accounting_set(host, 0, 1);
+    fprintf(stderr, "%s: expecting a second STREAM REPLAY ERROR ... refused line, for the same reason\n",
+            __FUNCTION__);
+    // The refusal must report the outstanding work it saw, not 0: the claim reads 0 as "nothing left"
+    // and would publish RCV_RUNNING while a contribution is still outstanding.
+    uint32_t withdraw_remaining = rrdhost_receiver_replication_withdraw(host);
+    if(withdraw_remaining != 1) {
+        fprintf(stderr, "%s: a refused withdrawal with one outstanding contribution returned %u, expected 1\n",
+                __FUNCTION__, withdraw_remaining);
+        rc = 1;
+    }
+
+    uint64_t empty_cohort = rrdhost_receiver_replication_accounting(host);
+    if(empty_cohort != rrdhost_receiver_replication_accounting_pack(0, 1)) {
+        fprintf(stderr,
+                "%s: a refused withdrawal against an empty cohort left started=%u remaining=%u, expected 0 and 1\n",
+                __FUNCTION__, rrdhost_receiver_replication_started_of(empty_cohort),
+                rrdhost_receiver_replication_remaining_of(empty_cohort));
+        rc = 1;
+    }
+
+    rrdhost_receiver_replication_accounting_restore(host, saved_accounting);
+
+    return rc;
+}
+
+// Teardown must release a contribution only for a chart that actually holds one, and only once.
+//
+// The reachable states of a chart's receiver replication are: never claimed (created with
+// RECEIVER_REPLICATION_FINISHED set by rrdset_insert_callback), claimed (IN_PROGRESS set, FINISHED
+// clear - the only setter is pluginsd_chart_definition_end), and completed or reset (FINISHED set,
+// IN_PROGRESS clear). Only the middle state holds a contribution. A teardown release that decrements
+// unconditionally, or that infers ownership from something other than the IN_PROGRESS transition it
+// wins, consumes a contribution belonging to another chart.
+//
+// A live claim on a third chart is held throughout, so a stolen release is visible as a drop below it.
+static int test_receiver_replication_release_does_not_steal(void) {
+    fprintf(stderr, "%s() running...\n", __FUNCTION__);
+
+    RRD_DB_MODE old_default_rrd_memory_mode = default_rrd_memory_mode;
+    default_rrd_memory_mode = RRD_DB_MODE_ALLOC;
+
+    int rc = 0;
+
+    RRDSET *owner = rrdset_create_localhost(
+        "netdata", "unittest-rcv-repl-owner", "unittest-rcv-repl-owner", "netdata", NULL,
+        "Unit Testing", "x", "unittest", NULL, 1, nd_profile.update_every, RRDSET_TYPE_LINE);
+
+    RRDHOST *host = owner->rrdhost;
+    uint32_t before = rrdhost_receiver_replicating_charts(host);
+    uint64_t saved_accounting = rrdhost_receiver_replication_accounting(host);
+
+    rrdhost_receiver_replication_claim(owner);
+
+    // (1) never claimed: created with RECEIVER_REPLICATION_FINISHED set, torn down untouched
+    RRDSET *never_claimed = rrdset_create_localhost(
+        "netdata", "unittest-rcv-repl-fresh", "unittest-rcv-repl-fresh", "netdata", NULL,
+        "Unit Testing", "x", "unittest", NULL, 1, nd_profile.update_every, RRDSET_TYPE_LINE);
+
+    rrdset_free(never_claimed);
+
+    uint32_t after_fresh = rrdhost_receiver_replicating_charts(host);
+    if(after_fresh != before + 1) {
+        fprintf(stderr,
+                "%s: destroying a never-claimed chart moved the counter to %u, expected %u - it consumed another chart's claim\n",
+                __FUNCTION__, after_fresh, before + 1);
+        rc = 1;
+    }
+
+    // (2) claimed and already completed: its contribution was released at completion, so teardown
+    //     must not release a second time
+    RRDSET *completed = rrdset_create_localhost(
+        "netdata", "unittest-rcv-repl-completed", "unittest-rcv-repl-completed", "netdata", NULL,
+        "Unit Testing", "x", "unittest", NULL, 1, nd_profile.update_every, RRDSET_TYPE_LINE);
+
+    rrdhost_receiver_replication_claim(completed);
+
+    rrdhost_receiver_replication_release(completed, 0);
+
+    uint32_t after_completion = rrdhost_receiver_replicating_charts(host);
+    if(after_completion != before + 1) {
+        fprintf(stderr, "%s: completing replication moved the counter to %u, expected %u\n",
+                __FUNCTION__, after_completion, before + 1);
+        rc = 1;
+    }
+
+    rrdset_free(completed);
+
+    uint32_t after_completed_teardown = rrdhost_receiver_replicating_charts(host);
+    if(after_completed_teardown != before + 1) {
+        fprintf(stderr,
+                "%s: destroying an already-completed chart moved the counter to %u, expected %u - it released twice\n",
+                __FUNCTION__, after_completed_teardown, before + 1);
+        rc = 1;
+    }
+
+    // (3) claimed and still referenced when freed: dictionary_del() only marks a referenced chart
+    //     deleted and defers its delete callback until the last reference goes. The reset walk skips
+    //     it from then on, so the release must happen in rrdset_free() itself, not later.
+    RRDSET *held = rrdset_create_localhost(
+        "netdata", "unittest-rcv-repl-held", "unittest-rcv-repl-held", "netdata", NULL,
+        "Unit Testing", "x", "unittest", NULL, 1, nd_profile.update_every, RRDSET_TYPE_LINE);
+
+    rrdhost_receiver_replication_claim(held);
+
+    RRDSET_ACQUIRED *held_ref = rrdset_find_and_acquire(host, rrdset_id(held), true);
+    if(!held_ref) {
+        fprintf(stderr, "%s: could not acquire the chart to hold a reference on it\n", __FUNCTION__);
+        rc = 1;
+    }
+
+    rrdset_free(held);
+
+    uint32_t after_held_teardown = rrdhost_receiver_replicating_charts(host);
+    if(after_held_teardown != before + 1) {
+        fprintf(stderr,
+                "%s: freeing a referenced claimed chart left the counter at %u, expected %u - "
+                "its release waited for the deferred delete callback\n",
+                __FUNCTION__, after_held_teardown, before + 1);
+        rc = 1;
+    }
+
+    if(held_ref)
+        rrdset_acquired_release(held_ref);
+
+    // the owner's claim must have survived all of it, and must be released by its own teardown
+    rrdset_free(owner);
+
+    uint32_t after = rrdhost_receiver_replicating_charts(host);
+    if(after != before) {
+        fprintf(stderr, "%s: destroying the owner left the counter at %u, expected %u\n",
+                __FUNCTION__, after, before);
+        rc = 1;
+    }
+
+    rrdhost_receiver_replication_accounting_restore(host, saved_accounting);
+
+    default_rrd_memory_mode = old_default_rrd_memory_mode;
+    return rc;
+}
+
+// The reported receiver-replication completion must be an instance ratio over the connection
+// generation's cohort, and must never read 100 while instances are outstanding - the defect that made
+// 557 stalled hosts report InReplCompletion = 100% in the field.
+//
+// Completion is computed from the counters on every read (rrdhost_receiver_replication_completion),
+// so this drives a synthetic cohort through the counters directly rather than through the parser.
+static int test_receiver_replication_completion_ratio(void) {
+    fprintf(stderr, "%s() running...\n", __FUNCTION__);
+
+    int rc = 0;
+    RRDHOST *host = localhost;
+
+    uint64_t saved_accounting = rrdhost_receiver_replication_accounting(host);
+    rrdhost_receiver_replication_accounting_set(host, 0, 0);
+
+    struct {
+        const char *name;
+        uint32_t started;
+        uint32_t remaining;
+        NETDATA_DOUBLE expected;    // NAN means "expect an explicit unknown"
+        uint32_t expected_instances;
+    } cases[] = {
+        { "idle host, nothing ever claimed",     0,  0,  100.0, 0  },
+        { "cohort fully replicated",            10,  0,  100.0, 0  },
+        { "cohort just claimed, no progress",   10, 10,    0.0, 10 },
+        { "cohort half done",                   10,  5,   50.0, 5  },
+        { "one instance left of a large cohort", 4,  1,   75.0, 1  },
+        { "outstanding with no cohort",          0,  3,    NAN, 3  },
+        { "counters inconsistent",               2,  5,    NAN, 5  },
+    };
+
+    for(size_t i = 0; i < sizeof(cases) / sizeof(cases[0]); i++) {
+        rrdhost_receiver_replication_accounting_set(host, cases[i].started, cases[i].remaining);
+
+        uint32_t instances = UINT32_MAX;
+        NETDATA_DOUBLE got = rrdhost_receiver_replication_completion(host, &instances);
+
+        bool want_unknown = isnan(cases[i].expected);
+        if(want_unknown != (bool)isnan(got) || (!want_unknown && got != cases[i].expected)) {
+            fprintf(stderr, "%s: '%s' (started=%u remaining=%u) reported %.2f, expected %.2f\n",
+                    __FUNCTION__, cases[i].name, cases[i].started, cases[i].remaining,
+                    (double)got, (double)cases[i].expected);
+            rc = 1;
+        }
+
+        if(instances != cases[i].expected_instances) {
+            fprintf(stderr, "%s: '%s' reported %u instances, expected %u\n",
+                    __FUNCTION__, cases[i].name, instances, cases[i].expected_instances);
+            rc = 1;
+        }
+
+        // the defect this criterion exists for: 100 must be impossible while work is outstanding
+        if(cases[i].remaining && got == 100.0) {
+            fprintf(stderr, "%s: '%s' reported 100%% with %u instances outstanding\n",
+                    __FUNCTION__, cases[i].name, cases[i].remaining);
+            rc = 1;
+        }
+    }
+
+    // A single chart finishing must not carry the whole host to 100 - that is exactly what the
+    // replaced host-level scalar did.
+    rrdhost_receiver_replication_accounting_set(host, 100, 99);
+    NETDATA_DOUBLE one_of_a_hundred = rrdhost_receiver_replication_completion(host, NULL);
+    if(one_of_a_hundred != 1.0) {
+        fprintf(stderr, "%s: one chart of a hundred finishing reported %.2f%%, expected 1.00%%\n",
+                __FUNCTION__, (double)one_of_a_hundred);
+        rc = 1;
+    }
+
+    rrdhost_receiver_replication_accounting_restore(host, saved_accounting);
+
+    return rc;
+}
+
+// Shared setup for the tests that start from one chart holding the only claim on `localhost`: ALLOC memory
+// mode, the accounting word saved and zeroed, a new chart, and its first claim. Returns 1 when that claim
+// did not win, as the caller's first failure count. The fixture is armed either way, so the caller MUST
+// always call receiver_replication_fixture_end(), which releases the claim, frees the chart and restores both.
+struct receiver_replication_fixture {
+    RRD_DB_MODE old_default_rrd_memory_mode;
+    uint64_t saved_accounting;
+    RRDHOST *host;
+    RRDSET *st;
+};
+
+static int receiver_replication_fixture_begin(
+    struct receiver_replication_fixture *f, const char *chart_id, const char *test) {
+    f->old_default_rrd_memory_mode = default_rrd_memory_mode;
+    default_rrd_memory_mode = RRD_DB_MODE_ALLOC;
+
+    f->host = localhost;
+    f->saved_accounting = rrdhost_receiver_replication_accounting(f->host);
+    rrdhost_receiver_replication_accounting_set(f->host, 0, 0);
+
+    f->st = rrdset_create_localhost(
+        "netdata", chart_id, chart_id, "netdata", NULL,
+        "Unit Testing", "x", "unittest", NULL, 1, nd_profile.update_every, RRDSET_TYPE_LINE);
+
+    if(!rrdhost_receiver_replication_claim(f->st)) {
+        fprintf(stderr, "%s: initial claim did not win\n", test);
+        return 1;
+    }
+
+    return 0;
+}
+
+static void receiver_replication_fixture_end(struct receiver_replication_fixture *f) {
+    rrdhost_receiver_replication_release(f->st, 0);
+    rrdset_free(f->st);
+    rrdhost_receiver_replication_accounting_restore(f->host, f->saved_accounting);
+    default_rrd_memory_mode = f->old_default_rrd_memory_mode;
+}
+
+// A duplicate CHART_DEFINITION_END for an already-replicating chart must withdraw its entire
+// speculative contribution. It must not alter either accounting half or the derived snapshot.
+static int test_receiver_replication_duplicate_claim_does_not_change_accounting(void) {
+    fprintf(stderr, "%s() running...\n", __FUNCTION__);
+
+    struct receiver_replication_fixture f;
+    int rc = receiver_replication_fixture_begin(&f, "unittest-rcv-repl-duplicate", __FUNCTION__);
+    RRDHOST *host = f.host;
+    RRDSET *st = f.st;
+
+    uint32_t instances_before = UINT32_MAX;
+    NETDATA_DOUBLE completion_before = rrdhost_receiver_replication_completion(host, &instances_before);
+    uint64_t accounting_before = rrdhost_receiver_replication_accounting(host);
+
+    if(rrdhost_receiver_replication_claim(st)) {
+        fprintf(stderr, "%s: duplicate claim won\n", __FUNCTION__);
+        rc = 1;
+    }
+
+    uint32_t instances_after = UINT32_MAX;
+    NETDATA_DOUBLE completion_after = rrdhost_receiver_replication_completion(host, &instances_after);
+    uint64_t accounting_after = rrdhost_receiver_replication_accounting(host);
+
+    if(accounting_before != rrdhost_receiver_replication_accounting_pack(1, 1) ||
+       accounting_after != accounting_before ||
+       rrdhost_receiver_replicating_charts_started(host) != 1 ||
+       rrdhost_receiver_replicating_charts(host) != 1 ||
+       completion_before != 0.0 || completion_after != completion_before ||
+       instances_before != 1 || instances_after != instances_before) {
+        fprintf(stderr,
+                "%s: duplicate changed accounting=%" PRIu64 "->%" PRIu64
+                " started=%u remaining=%u completion=%.2f->%.2f instances=%u->%u; expected 1,1,0.00,1\n",
+                __FUNCTION__, accounting_before, accounting_after,
+                rrdhost_receiver_replicating_charts_started(host), rrdhost_receiver_replicating_charts(host),
+                (double)completion_before, (double)completion_after, instances_before, instances_after);
+        rc = 1;
+    }
+
+    receiver_replication_fixture_end(&f);
+    return rc;
+}
+
+// A child sends CHART_DEFINITION_END after every CHART, including an obsolete one. Marking the chart
+// obsolete mid-replication MUST keep its claim, so that CHART_DEFINITION_END is a duplicate and does not
+// start a second replication while the first one's backfill may still be writing the higher tiers.
+static int test_receiver_replication_obsolete_keeps_claim(void) {
+    fprintf(stderr, "%s() running...\n", __FUNCTION__);
+
+    struct receiver_replication_fixture f;
+    int rc = receiver_replication_fixture_begin(&f, "unittest-rcv-repl-obsolete", __FUNCTION__);
+    RRDHOST *host = f.host;
+    RRDSET *st = f.st;
+
+    rrdset_is_obsolete___safe_from_collector_thread(st);
+
+    if(!rrdset_flag_check(st, RRDSET_FLAG_RECEIVER_REPLICATION_IN_PROGRESS) ||
+       rrdhost_receiver_replicating_charts(host) != 1) {
+        fprintf(stderr, "%s: marking the chart obsolete released its receiver replication (remaining=%u)\n",
+                __FUNCTION__, rrdhost_receiver_replicating_charts(host));
+        rc = 1;
+    }
+
+    if(rrdhost_receiver_replication_claim(st)) {
+        fprintf(stderr, "%s: CHART_DEFINITION_END after an obsolete CHART re-claimed the chart\n", __FUNCTION__);
+        rc = 1;
+    }
+
+    uint64_t accounting = rrdhost_receiver_replication_accounting(host);
+    if(accounting != rrdhost_receiver_replication_accounting_pack(1, 1)) {
+        fprintf(stderr, "%s: accounting after obsolete mark and duplicate claim is %" PRIu64 ", expected %" PRIu64 "\n",
+                __FUNCTION__, accounting, rrdhost_receiver_replication_accounting_pack(1, 1));
+        rc = 1;
+    }
+
+    rrdset_isnot_obsolete___safe_from_collector_thread(st);
+    receiver_replication_fixture_end(&f);
+    return rc;
+}
+
+// A2b: the ownership invariant under real concurrency.
+//
+// Two parts. The first pins the exact interleaving the claim-before-publish ordering exists for, using
+// the NETDATA_INTERNAL_CHECKS pause hook: a claimer is stopped between its accounting increment and its flag
+// publish, a release runs against the same chart while it is stopped, then the claimer is let go. With
+// the fix the counter ends balanced; with the claim reordered back to publish-then-increment the
+// release would see a published flag with no contribution behind it.
+//
+// The second is a stress pass - N threads claiming and releasing the same charts - which cannot prove
+// an ordering but catches interleavings a hand-written one did not think of.
+
+struct receiver_replication_race_thread {
+    ND_THREAD *thread;
+    RRDSET *st;
+    size_t iterations;
+    size_t claims;
+};
+
+static void receiver_replication_claim_thread(void *ptr) {
+    struct receiver_replication_race_thread *t = ptr;
+
+    for(size_t i = 0; i < t->iterations; i++) {
+        if(rrdhost_receiver_replication_claim(t->st))
+            t->claims++;
+
+        // Every iteration releases, including one whose claim lost. That is deliberate and is what the
+        // refusal assertion rests on: a losing claimer's release can still WIN the flag clear and
+        // consume the contribution the winner holds - a legitimate ownership transfer, the same shape
+        // as REPLAY_END releasing a chart it never claimed. Only the transition confers ownership, so
+        // the counter stays balanced either way, and a release that does not win the clear touches
+        // nothing. Releasing only after a won claim would make every release an owned one, drive
+        // refusals to trivially zero, and stop exercising ownership under contention at all.
+        rrdhost_receiver_replication_release(t->st, 0);
+    }
+}
+
+#ifdef NETDATA_INTERNAL_CHECKS
+static void receiver_replication_paused_claim_thread(void *ptr) {
+    struct receiver_replication_race_thread *t = ptr;
+    if(rrdhost_receiver_replication_claim(t->st))
+        t->claims++;
+}
+#endif
+
+static int test_receiver_replication_ownership_under_concurrency(void) {
+    fprintf(stderr, "%s() running...\n", __FUNCTION__);
+
+    RRD_DB_MODE old_default_rrd_memory_mode = default_rrd_memory_mode;
+    default_rrd_memory_mode = RRD_DB_MODE_ALLOC;
+
+    int rc = 0;
+    RRDHOST *host = localhost;
+    uint64_t saved_accounting = rrdhost_receiver_replication_accounting(host);
+
+#ifdef NETDATA_INTERNAL_CHECKS
+    // ---- part 1: the deterministic interleaving ------------------------------------------------
+    {
+        RRDSET *st = rrdset_create_localhost(
+            "netdata", "unittest-rcv-repl-race", "unittest-rcv-repl-race", "netdata", NULL,
+            "Unit Testing", "x", "unittest", NULL, 1, nd_profile.update_every, RRDSET_TYPE_LINE);
+
+        uint32_t before = rrdhost_receiver_replicating_charts(host);
+
+        struct receiver_replication_race_thread claimer = { .st = st };
+
+        rrdhost_receiver_replication_race_hook_arm(st);
+        claimer.thread = nd_thread_create("rcvrepl-race", NETDATA_THREAD_OPTION_DONT_LOG,
+                                          receiver_replication_paused_claim_thread, &claimer);
+
+        if(!claimer.thread) {
+            fprintf(stderr, "%s: could not create the claimer thread\n", __FUNCTION__);
+            rc = 1;
+            rrdhost_receiver_replication_race_hook_disarm();
+            rrdset_free(st);        // nothing ever ran against it
+        }
+        else {
+            // Wait for it to park between its accounting increment and its flag publish. A timeout is a
+            // hard failure, and deliberately so: a claimer that never parks leaves the interleaving
+            // this test exists to pin unexercised, and passing on a test that proved nothing is worse
+            // than failing. The budget is sized so that lag alone cannot reach it - the claimer does
+            // one atomic add before parking, and 60s is far past any scheduling delay a loaded CI
+            // runner produces under ASAN in a Debug build.
+            bool parked = false;
+            for(size_t i = 0; i < 60000 && !parked; i++) {
+                parked = rrdhost_receiver_replication_race_hook_is_waiting();
+                if(!parked) sleep_usec(1000);
+            }
+
+            if(!parked) {
+                fprintf(stderr, "%s: the claimer never reached the race window\n", __FUNCTION__);
+                rc = 1;
+            }
+            else {
+                // The claimer has incremented but not published. A release now must find no published
+                // IN_PROGRESS and therefore release nothing - it must NOT consume the in-flight claim.
+                RRDSET_FLAGS old = rrdhost_receiver_replication_release(st, 0);
+                if(old & RRDSET_FLAG_RECEIVER_REPLICATION_IN_PROGRESS) {
+                    fprintf(stderr, "%s: a release observed IN_PROGRESS while the claim had not published it\n",
+                            __FUNCTION__);
+                    rc = 1;
+                }
+            }
+
+            rrdhost_receiver_replication_race_hook_release();
+
+            if(nd_thread_join(claimer.thread) != 0) {
+                // The join did not prove the claimer stopped, so it may still hold `st` and may still
+                // be parked inside the hook. Leave BOTH alive - disarming clears the hook's chart
+                // pointer and rrdset_free() would be a use-after-free. A leaked chart in an already
+                // failing test is the cheap outcome here. Return the same way the stress pass does
+                // below: continuing would run that pass against a live claimer and end in the
+                // accounting restore, which would overwrite whatever the claimer is still doing.
+                fprintf(stderr, "%s: could not join the claimer thread - leaving the chart and the hook alive\n",
+                        __FUNCTION__);
+                default_rrd_memory_mode = old_default_rrd_memory_mode;
+                return 1;
+            }
+            else {
+                rrdhost_receiver_replication_race_hook_disarm();
+
+                // The claimer published after our release, so the chart holds exactly one contribution.
+                // Release it and the counter must return to where it started - no leak, no double release.
+                rrdhost_receiver_replication_release(st, 0);
+
+                uint32_t after = rrdhost_receiver_replicating_charts(host);
+                if(after != before) {
+                    fprintf(stderr, "%s: after the deterministic race the counter is %u, expected %u\n",
+                            __FUNCTION__, after, before);
+                    rc = 1;
+                }
+
+                rrdset_free(st);
+            }
+        }
+    }
+#else
+    fprintf(stderr, "%s: deterministic part skipped (needs NETDATA_INTERNAL_CHECKS)\n", __FUNCTION__);
+#endif
+
+    // ---- part 2: the stress pass -----------------------------------------------------------------
+    {
+        // Sized for CI, which runs this suite under ASAN in a Debug build
+        // (tests/run-unit-tests.sh). Enough contention to interleave, cheap enough not to matter.
+        enum {
+            threads_count = 8,
+            charts_count = 4,
+        };
+        const size_t iterations = 500;
+
+        RRDSET *charts[charts_count];
+        for(size_t c = 0; c < charts_count; c++) {
+            char id[64];
+            snprintfz(id, sizeof(id), "unittest-rcv-repl-stress-%zu", c);
+            charts[c] = rrdset_create_localhost(
+                "netdata", id, id, "netdata", NULL, "Unit Testing", "x", "unittest", NULL, 1,
+                nd_profile.update_every, RRDSET_TYPE_LINE);
+        }
+
+        uint32_t before = rrdhost_receiver_replicating_charts(host);
+#ifdef NETDATA_INTERNAL_CHECKS
+        size_t refusals_before = __atomic_load_n(&rrdhost_receiver_replication_refusals, __ATOMIC_RELAXED);
+#endif
+
+        struct receiver_replication_race_thread t[threads_count];
+        size_t created = 0;
+        for(size_t i = 0; i < threads_count; i++) {
+            t[i] = (struct receiver_replication_race_thread){
+                .st = charts[i % charts_count], .iterations = iterations };
+            t[i].thread = nd_thread_create("rcvrepl-stress", NETDATA_THREAD_OPTION_DONT_LOG,
+                                           receiver_replication_claim_thread, &t[i]);
+            if(!t[i].thread) {
+                fprintf(stderr, "%s: could not create stress worker %zu of %zu\n",
+                        __FUNCTION__, i + 1, (size_t)threads_count);
+                rc = 1;
+                break;
+            }
+            created++;
+        }
+
+        size_t claims = 0;
+        bool all_joined = true;
+        for(size_t i = 0; i < created; i++) {
+            if(nd_thread_join(t[i].thread) != 0) {
+                fprintf(stderr, "%s: could not join stress worker %zu\n", __FUNCTION__, i + 1);
+                all_joined = false;
+                rc = 1;
+                continue;
+            }
+            claims += t[i].claims;
+        }
+
+        if(!all_joined) {
+            // A worker may still be claiming and releasing against these charts: every assertion below
+            // would read a moving counter, and rrdset_free() would be a use-after-free. Leak the charts,
+            // and leave the host accounting alone - a live worker would fight the restore anyway.
+            default_rrd_memory_mode = old_default_rrd_memory_mode;
+            return 1;
+        }
+
+        // A LEAKED contribution leaves the counter high, and this catches it.
+        uint32_t after = rrdhost_receiver_replicating_charts(host);
+        if(after != before) {
+            fprintf(stderr,
+                    "%s: after %zu threads x %zu iterations the counter is %u, expected %u (%zu claims won)\n",
+                    __FUNCTION__, (size_t)threads_count, iterations, after, before, claims);
+            rc = 1;
+        }
+
+#ifdef NETDATA_INTERNAL_CHECKS
+        // An OVER-release cannot be caught by the counter: rrdhost_receiver_replicating_charts_decrement()
+        // refuses to go below zero, which is precisely what keeps the counter on its baseline and hides
+        // the fault. The refusal count is the only observable, so assert on it.
+        size_t refusals = __atomic_load_n(&rrdhost_receiver_replication_refusals, __ATOMIC_RELAXED)
+                          - refusals_before;
+        if(refusals) {
+            fprintf(stderr, "%s: %zu release(s) were refused as unowned - the invariant broke under contention\n",
+                    __FUNCTION__, refusals);
+            rc = 1;
+        }
+#endif
+
+        // Cleanup is deliberately after the leak and refusal assertions, so it cannot erase a failure
+        // this stress pass is meant to detect. Its own releases are still checked below: a refusal
+        // here is the same over-release the pass hunts, just discovered one step later.
+        for(size_t c = 0; c < charts_count; c++)
+            rrdhost_receiver_replication_release(charts[c], 0);
+
+#ifdef NETDATA_INTERNAL_CHECKS
+        refusals = __atomic_load_n(&rrdhost_receiver_replication_refusals, __ATOMIC_RELAXED) - refusals_before;
+        if(refusals) {
+            fprintf(stderr, "%s: %zu release(s) were refused as unowned, including cleanup - the invariant broke\n",
+                    __FUNCTION__, refusals);
+            rc = 1;
+        }
+#endif
+
+        if(!claims) {
+            fprintf(stderr, "%s: no thread ever won a claim - the stress pass proved nothing\n",
+                    __FUNCTION__);
+            rc = 1;
+        }
+
+        for(size_t c = 0; c < charts_count; c++)
+            rrdset_free(charts[c]);
+    }
+
+    rrdhost_receiver_replication_accounting_restore(host, saved_accounting);
+    default_rrd_memory_mode = old_default_rrd_memory_mode;
+    return rc;
+}
+
+static int test_inicfg_double_values(void) {
+    fprintf(stderr, "%s() running...\n", __FUNCTION__);
+
+    // NETDATA_DOUBLE values are formatted into fixed size buffers before being stored.
+    // Huge magnitudes must not be silently truncated into a completely different number.
+    // 1e92 is the largest magnitude whose fixed-point form still fits; 1e93 is the first that does not.
+    static const NETDATA_DOUBLE values[] = { 1.5, -0.25, 123456.789, 1e30, 1e92, 1e93, 1e100, -1e100 };
+    struct config cfg = APPCONFIG_INITIALIZER;
+    int rc = 0;
+
+    for(size_t i = 0; i < sizeof(values) / sizeof(values[0]); i++) {
+        NETDATA_DOUBLE value = values[i];
+        char name[64];
+
+        // the default value must survive the round-trip through the config
+        snprintfz(name, sizeof(name), "default %zu", i);
+        NETDATA_DOUBLE got = inicfg_get_double(&cfg, "unittest doubles", name, value);
+        if(fabsndd(got - value) > fabsndd(value) * (NETDATA_DOUBLE)0.000001) {
+            fprintf(stderr, "%s: default " NETDATA_DOUBLE_FORMAT_G " returned " NETDATA_DOUBLE_FORMAT_G "\n",
+                    __FUNCTION__, value, got);
+            rc = 1;
+        }
+
+        // and so must a value that was set
+        snprintfz(name, sizeof(name), "set %zu", i);
+        inicfg_set_double(&cfg, "unittest doubles", name, value);
+        got = inicfg_get_double(&cfg, "unittest doubles", name, (NETDATA_DOUBLE)0.0);
+        if(fabsndd(got - value) > fabsndd(value) * (NETDATA_DOUBLE)0.000001) {
+            fprintf(stderr, "%s: set " NETDATA_DOUBLE_FORMAT_G " returned " NETDATA_DOUBLE_FORMAT_G "\n",
+                    __FUNCTION__, value, got);
+            rc = 1;
+        }
+    }
+
+    // a value whose fixed-point form fills the buffer exactly must be kept in fixed-point
+    // (the internal buffer is 100 bytes, so 99 characters is an exact fit, not a truncation)
+    const size_t exact_fit_len = 99;
+    inicfg_set_double(&cfg, "unittest doubles", "exact fit", (NETDATA_DOUBLE)1e92);
+    const char *stored = inicfg_get(&cfg, "unittest doubles", "exact fit", "");
+    size_t stored_len = strnlen(stored, exact_fit_len + 1);
+    if(stored_len != exact_fit_len || strchr(stored, 'e') || strchr(stored, 'E')) {
+        fprintf(stderr, "%s: exact fit stored as '%s' (%zu chars), expected %zu fixed-point characters\n",
+                __FUNCTION__, stored, stored_len, exact_fit_len);
+        rc = 1;
+    }
+
+    // one character more does not fit, so it must switch to the exponential format
+    inicfg_set_double(&cfg, "unittest doubles", "truncated", (NETDATA_DOUBLE)1e93);
+    stored = inicfg_get(&cfg, "unittest doubles", "truncated", "");
+    if(!strchr(stored, 'e') && !strchr(stored, 'E')) {
+        fprintf(stderr, "%s: too long value stored as '%s', expected the exponential format\n",
+                __FUNCTION__, stored);
+        rc = 1;
+    }
+
+    inicfg_free(&cfg);
+    return rc;
+}
+
+static bool inicfg_section_dump_cb(void *data, const char *name, const char *value) {
+    BUFFER *wb = data;
+    buffer_sprintf(wb, "%s%s=%s", buffer_strlen(wb) ? "," : "", name, value);
+    return false;
+}
+
+static int inicfg_section_check(struct config *cfg, const char *section, const char *expected, const char *step) {
+    CLEAN_BUFFER *wb = buffer_create(0, NULL);
+    inicfg_foreach_value_in_section(cfg, section, inicfg_section_dump_cb, wb);
+    if(strcmp(buffer_tostring(wb), expected) != 0) {
+        fprintf(stderr, "test_inicfg_section_reload: %s: [%s] is '%s', expected '%s'\n",
+                step, section, buffer_tostring(wb), expected);
+        return 1;
+    }
+    return 0;
+}
+
+// rewrites the fixture mkstemp() created; never creates a file, so a missing fixture is a failure
+static int inicfg_section_write_file(const char *filename, const char *contents) {
+    int fd = open(filename, O_WRONLY | O_TRUNC);
+    FILE *fp = (fd == -1) ? NULL : fdopen(fd, "w");
+    if(!fp) {
+        if(fd != -1)
+            close(fd);
+        fprintf(stderr, "test_inicfg_section_reload: cannot write '%s'\n", filename);
+        return 1;
+    }
+    bool written = fputs(contents, fp) >= 0;
+    if(fclose(fp) != 0 || !written) {
+        fprintf(stderr, "test_inicfg_section_reload: cannot write '%s'\n", filename);
+        return 1;
+    }
+    return 0;
+}
+
+static int test_inicfg_section_reload(void) {
+    fprintf(stderr, "%s() running...\n", __FUNCTION__);
+
+    // reloading one section (as reload-labels does) must leave it exactly as the file has it now,
+    // and must not touch the other sections
+    const char *tmpdir = getenv("TMPDIR");
+    if(!tmpdir || !*tmpdir)
+        tmpdir = P_tmpdir;
+
+    char filename[FILENAME_MAX + 1];
+    snprintfz(filename, sizeof(filename), "%s/netdata-unittest-inicfg-XXXXXX", tmpdir);
+    int fd = mkstemp(filename);
+    if(fd == -1) {
+        fprintf(stderr, "%s: cannot create the fixture in '%s'\n", __FUNCTION__, tmpdir);
+        return 1;
+    }
+    close(fd);
+
+    // never created, so loading it fails
+    char missing[FILENAME_MAX + 1];
+    snprintfz(missing, sizeof(missing), "%s.missing", filename);
+
+    struct config cfg = APPCONFIG_INITIALIZER;
+    int rc = 0;
+
+    rc += inicfg_section_write_file(filename, "[target]\na = 1\nb = 2\n[other]\nx = 1\n");
+    inicfg_load(&cfg, filename, 0, NULL);
+    rc += inicfg_section_check(&cfg, "target", "a=1,b=2", "full load");
+
+    rc += inicfg_section_write_file(filename, "[target]\na = 1\n[other]\nx = 2\n");
+    inicfg_load(&cfg, filename, 1, "target");
+    rc += inicfg_section_check(&cfg, "target", "a=1", "option removed");
+    rc += inicfg_section_check(&cfg, "other", "x=1", "option removed");
+
+    rc += inicfg_section_write_file(filename, "[target]\na = 1\n[other]\nx = 2\n[target]\nc = 3\n");
+    inicfg_load(&cfg, filename, 1, "target");
+    rc += inicfg_section_check(&cfg, "target", "a=1,c=3", "section repeated");
+
+    if(inicfg_load(&cfg, missing, 1, "target")) {
+        fprintf(stderr, "%s: loading a missing file succeeded\n", __FUNCTION__);
+        rc++;
+    }
+    rc += inicfg_section_check(&cfg, "target", "a=1,c=3", "file missing");
+
+    rc += inicfg_section_write_file(filename, "[other]\nx = 2\n");
+    inicfg_load(&cfg, filename, 1, "target");
+    rc += inicfg_section_check(&cfg, "target", "", "section removed");
+    rc += inicfg_section_check(&cfg, "other", "x=1", "section removed");
+
+    unlink(filename);
+    inicfg_free(&cfg);
+    return rc ? 1 : 0;
+}
+
+static int test_rrdr_relative_window_extreme_values(void) {
+    fprintf(stderr, "%s() running...\n", __FUNCTION__);
+
+    const time_t maximum = (time_t)(((uintmax_t)1 << (sizeof(time_t) * CHAR_BIT - 1)) - 1);
+    const time_t minimum = -maximum - 1;
+    int errors = 0;
+
+#define RRDR_WINDOW_CHECK(condition, message) do {                                  \
+        if(!(condition)) {                                                          \
+            fprintf(stderr, "%s: %s\n", __FUNCTION__, (message));                \
+            errors++;                                                               \
+        }                                                                            \
+    } while(0)
+
+    RRDR_WINDOW_CHECK(rrdr_relative_window_value_is_relative(-API_RELATIVE_TIME_MAX),
+                      "negative relative boundary was classified as absolute");
+    RRDR_WINDOW_CHECK(rrdr_relative_window_value_is_relative(API_RELATIVE_TIME_MAX),
+                      "positive relative boundary was classified as absolute");
+    RRDR_WINDOW_CHECK(!rrdr_relative_window_value_is_relative(-API_RELATIVE_TIME_MAX - 1),
+                      "value below the relative boundary was classified as relative");
+    RRDR_WINDOW_CHECK(!rrdr_relative_window_value_is_relative(API_RELATIVE_TIME_MAX + 1),
+                      "value above the relative boundary was classified as relative");
+    RRDR_WINDOW_CHECK(!rrdr_relative_window_value_is_relative(minimum),
+                      "minimum time_t was classified as relative");
+    RRDR_WINDOW_CHECK(!rrdr_relative_window_value_is_relative(maximum),
+                      "maximum time_t was classified as relative");
+
+    struct {
+        time_t after;
+        time_t before;
+        bool absolute;
+        const char *name;
+    } query_wrapper_cases[] = {
+        { .after = -300, .before = -60, .absolute = false, .name = "relative" },
+        { .after = 0, .before = 0, .absolute = false, .name = "default" },
+        { .after = -300, .before = maximum, .absolute = false, .name = "mixed" },
+        { .after = maximum - 100, .before = maximum, .absolute = true, .name = "future absolute" },
+        { .after = minimum, .before = maximum, .absolute = true, .name = "extreme absolute" },
+    };
+
+    for(size_t i = 0; i < _countof(query_wrapper_cases); i++) {
+        time_t after = query_wrapper_cases[i].after;
+        time_t before = query_wrapper_cases[i].before;
+        bool absolute = rrdr_relative_window_to_absolute_query(&after, &before, NULL, true);
+
+        if(absolute != query_wrapper_cases[i].absolute) {
+            fprintf(stderr, "%s: query wrapper misclassified %s window as %s\n", __FUNCTION__,
+                    query_wrapper_cases[i].name, absolute ? "absolute" : "relative");
+            errors++;
+        }
+    }
+
+    {
+        const time_t now = 2000000000;
+        time_t after = -300;
+        time_t before = -60;
+        bool relative = rrdr_relative_window_to_absolute(&after, &before, now);
+
+        RRDR_WINDOW_CHECK(relative, "ordinary relative window was classified as absolute");
+        RRDR_WINDOW_CHECK(before == now - 60, "ordinary relative before changed");
+        RRDR_WINDOW_CHECK(after == now - 60 - 300 + 1, "ordinary relative after changed");
+    }
+
+    {
+        time_t after = minimum + 100;
+        time_t before = maximum;
+        bool relative = rrdr_relative_window_to_absolute(&after, &before, maximum - 1);
+
+        RRDR_WINDOW_CHECK(!relative, "absolute future window was classified as relative");
+        RRDR_WINDOW_CHECK(before == maximum - 1, "future before was not shifted to now");
+        RRDR_WINDOW_CHECK(after == minimum + 99, "wide intermediate changed a representable shifted after");
+    }
+
+    {
+        time_t after = -3;
+        time_t before = minimum + 1;
+        bool relative = rrdr_relative_window_to_absolute(&after, &before, 123);
+
+        RRDR_WINDOW_CHECK(relative, "mixed relative window was classified as absolute");
+        RRDR_WINDOW_CHECK(before == minimum + 1, "absolute before changed without a future shift");
+        RRDR_WINDOW_CHECK(after == minimum, "unrepresentable relative after did not saturate to time_t minimum");
+    }
+
+    {
+        time_t after = maximum;
+        time_t before = minimum;
+        bool relative = rrdr_relative_window_to_absolute(&after, &before, 123);
+
+        RRDR_WINDOW_CHECK(!relative, "extreme absolute window was classified as relative");
+        RRDR_WINDOW_CHECK(before == 123, "extreme future before was not shifted to now");
+        RRDR_WINDOW_CHECK(after == minimum, "unrepresentable future shift did not saturate to time_t minimum");
+    }
+
+    {
+        time_t after = -1;
+        time_t before = -1;
+        bool relative = rrdr_relative_window_to_absolute(&after, &before, minimum);
+
+        RRDR_WINDOW_CHECK(relative, "minimum-now relative window was classified as absolute");
+        RRDR_WINDOW_CHECK(before == minimum, "minimum-now before did not saturate");
+        RRDR_WINDOW_CHECK(after == minimum, "minimum-now after did not saturate");
+    }
+
+    {
+        time_t after = minimum;
+        time_t before = maximum;
+        time_t now;
+        bool absolute = rrdr_relative_window_to_absolute_query(&after, &before, &now, false);
+        time_t minimum_query_time = now - (10 * 365 * 86400);
+
+        RRDR_WINDOW_CHECK(absolute, "query wrapper changed absolute classification");
+        RRDR_WINDOW_CHECK(before == now, "query wrapper changed shifted before");
+        RRDR_WINDOW_CHECK(after == minimum_query_time, "query wrapper did not apply its existing lower clamp");
+    }
+
+#undef RRDR_WINDOW_CHECK
+
+    return errors;
+}
+
+static void query_window_test_target_init(
+    QUERY_TARGET *qt, time_t after, time_t before, size_t points, time_t resampling_time,
+    RRDR_TIME_GROUPING grouping, RRDR_OPTIONS options, time_t update_every) {
+    *qt = (QUERY_TARGET){
+        .request = {
+            .after = after,
+            .before = before,
+            .points = points,
+            .resampling_time = resampling_time,
+            .time_group_method = grouping,
+        },
+        .window = {
+            .options = options,
+            .after = after,
+            .before = before,
+        },
+        .db = {
+            .first_time_s = 1000000000,
+            .last_time_s = 1000000600,
+            .minimum_latest_update_every_s = update_every,
+        },
+    };
+    snprintfz(qt->id, sizeof(qt->id) - 1, "query-window-unittest");
+}
+
+static int test_query_window_resampling_boundaries(void) {
+    fprintf(stderr, "%s() running...\n", __FUNCTION__);
+
+    const time_t maximum = (time_t)(((uintmax_t)1 << (sizeof(time_t) * CHAR_BIT - 1)) - 1);
+    int errors = 0;
+
+#define QUERY_WINDOW_CHECK(condition, message) do {                                 \
+        if(!(condition)) {                                                          \
+            fprintf(stderr, "%s: %s\n", __FUNCTION__, (message));                \
+            errors++;                                                               \
+        }                                                                            \
+    } while(0)
+
+    for(RRDR_TIME_GROUPING grouping = RRDR_GROUPING_AVERAGE;
+        grouping <= RRDR_GROUPING_LATEST; grouping++) {
+        QUERY_TARGET qt;
+        query_window_test_target_init(
+            &qt, 1000000001, 1000000600, 10, 60, grouping, RRDR_OPTION_NOT_ALIGNED, 1);
+
+        QUERY_WINDOW_CHECK(query_target_calculate_window(&qt), "valid grouping mode was rejected");
+        QUERY_WINDOW_CHECK(qt.window.time_group_method == grouping, "grouping mode changed");
+        QUERY_WINDOW_CHECK(qt.window.after == 1000000001 && qt.window.before == 1000000600,
+                           "unaligned resampling window changed");
+        QUERY_WINDOW_CHECK(qt.window.points == 10 && qt.window.group == 60,
+                           "unaligned resampling point layout changed");
+        QUERY_WINDOW_CHECK(qt.window.resampling_group == 60 && qt.window.resampling_divisor == 1.0,
+                           "unaligned resampling ratio changed");
+    }
+
+    {
+        QUERY_TARGET qt;
+        query_window_test_target_init(&qt, 1000000001, 1000000600, 10, 60, RRDR_GROUPING_AVERAGE, 0, 1);
+        QUERY_WINDOW_CHECK(query_target_calculate_window(&qt), "valid aligned window was rejected");
+        QUERY_WINDOW_CHECK(qt.window.after == 1000000021 && qt.window.before == 1000000620,
+                           "aligned resampling endpoints changed");
+        QUERY_WINDOW_CHECK(qt.window.points == 10 && qt.window.group == 60,
+                           "aligned resampling point layout changed");
+    }
+
+    {
+        QUERY_TARGET qt;
+        query_window_test_target_init(
+            &qt, 1000000001, 1000000600, 10, 60, RRDR_GROUPING_AVERAGE,
+            RRDR_OPTION_NATURAL_POINTS | RRDR_OPTION_NOT_ALIGNED, 5);
+        QUERY_WINDOW_CHECK(query_target_calculate_window(&qt), "valid natural-points window was rejected");
+        QUERY_WINDOW_CHECK(qt.window.after == 1000000005 && qt.window.before == 1000000600,
+                           "natural-points endpoints changed");
+        QUERY_WINDOW_CHECK(qt.window.points == 10 && qt.window.group == 12 &&
+                           qt.window.query_granularity == 5 && qt.window.resampling_group == 12,
+                           "natural-points layout changed");
+    }
+
+    {
+        QUERY_TARGET qt;
+        query_window_test_target_init(
+            &qt, -600, 0, 10, 0, RRDR_GROUPING_AVERAGE, RRDR_OPTION_NOT_ALIGNED, 1);
+        QUERY_WINDOW_CHECK(query_target_calculate_window(&qt), "valid relative window was rejected");
+        QUERY_WINDOW_CHECK(qt.window.relative, "relative window classification changed");
+    }
+
+    if(maximum > INT_MAX) {
+        const time_t large_resampling = (time_t)((uint64_t)INT_MAX + 1);
+        QUERY_TARGET qt;
+        query_window_test_target_init(
+            &qt, 1000000000, 1000000600, 2, large_resampling,
+            RRDR_GROUPING_AVERAGE, RRDR_OPTION_NOT_ALIGNED, 1);
+        QUERY_WINDOW_CHECK(query_target_calculate_window(&qt), "representable cadence above INT_MAX was rejected");
+        QUERY_WINDOW_CHECK(qt.window.group == (size_t)large_resampling,
+                           "cadence above INT_MAX was narrowed");
+        QUERY_WINDOW_CHECK(qt.window.after == (time_t)(1000000600LL - 4294967295LL),
+                           "large representable final window changed");
+
+        time_t timestamps[2] = { 0 };
+        RRDR r = {
+            .n = 2,
+            .t = timestamps,
+            .internal = { .qt = &qt },
+        };
+        rrd2rrdr_set_timestamps(&r);
+        QUERY_WINDOW_CHECK(r.view.update_every == large_resampling,
+                           "RRDR cadence above INT_MAX was narrowed");
+        QUERY_WINDOW_CHECK(timestamps[1] == qt.window.before,
+                           "large representable timestamps did not end at before");
+
+        if(sizeof(time_t) > sizeof(size_t)) {
+            const time_t duration_above_size_max = (time_t)(((uint64_t)INT_MAX + 1) * 5);
+            query_window_test_target_init(
+                &qt, 1000000000, 1000000600, 2, duration_above_size_max,
+                RRDR_GROUPING_AVERAGE,
+                RRDR_OPTION_NATURAL_POINTS | RRDR_OPTION_NOT_ALIGNED, 5);
+            QUERY_WINDOW_CHECK(query_target_calculate_window(&qt),
+                               "representable time64 duration above SIZE_MAX was rejected");
+            QUERY_WINDOW_CHECK(qt.window.group == (size_t)((uint64_t)INT_MAX + 1),
+                               "time64 duration above SIZE_MAX changed its group");
+        }
+    }
+
+    for(size_t i = 0; i < 2; i++) {
+        QUERY_TARGET qt;
+        query_window_test_target_init(
+            &qt, 1000000000, 1000000600, 2, maximum, RRDR_GROUPING_AVERAGE,
+            i ? RRDR_OPTION_NOT_ALIGNED : 0, 1);
+        QUERY_WINDOW_CHECK(!query_target_calculate_window(&qt),
+                           "unrepresentable maximum resampling window was accepted");
+    }
+
+    {
+        RRDSET *st = rrdset_create_localhost(
+            "netdata", "unittest-query-window-resampling", "unittest-query-window-resampling",
+            "netdata", NULL, "Unit Testing", "x", "unittest", NULL, 1, 1, RRDSET_TYPE_LINE);
+        rrddim_add(st, "d", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+
+        QUERY_TARGET_REQUEST request = {
+            .version = 1,
+            .st = st,
+            .after = 1000000000,
+            .before = 1000000600,
+            .points = 2,
+            .resampling_time = maximum,
+            .alerts = "unittest-alert:*",
+            .time_group_method = RRDR_GROUPING_AVERAGE,
+            .options = RRDR_OPTION_NOT_ALIGNED,
+            .query_source = QUERY_SOURCE_UNITTEST,
+            .priority = STORAGE_PRIORITY_SYNCHRONOUS,
+        };
+
+        QUERY_WINDOW_CHECK(!query_target_create(&request),
+                           "query target accepted an unrepresentable resampling window");
+
+        request.resampling_time = 60;
+        QUERY_TARGET *qt = query_target_create(&request);
+        QUERY_WINDOW_CHECK(qt, "query target pool did not recover after rejected window");
+        query_target_release(qt);
+    }
+
+#undef QUERY_WINDOW_CHECK
+
+    return errors;
+}
+
 int run_all_mockup_tests(void)
 {
     fprintf(stderr, "%s() running...\n", __FUNCTION__ );
@@ -1462,7 +3200,64 @@ int run_all_mockup_tests(void)
     if(check_number_printing())
         return 1;
 
+    if(test_jsonwrap_v2_partial_data_trimming_raw_metadata())
+        return 1;
+
     if(check_rrdcalc_comparisons())
+        return 1;
+
+#if defined(OS_LINUX)
+    if(proc_interrupts_unittest())
+        return 1;
+#endif
+    if(test_incremental_sum_lookup_respects_update_every())
+        return 1;
+
+    if(test_rrdmetric_algorithm_follows_rrddim())
+        return 1;
+
+    if(test_rrddim_add_does_not_bump_metadata_version())
+        return 1;
+
+    if(test_rrddim_scale_minimum_magnitude())
+        return 1;
+
+    if(test_rrddim_collected_minimum_magnitude())
+        return 1;
+
+    if(test_rrdset_homogeneity_multiplier_sign())
+        return 1;
+
+    if(test_rrddim_divisor_normalization())
+        return 1;
+
+    if(test_rrdset_rejects_invalid_update_every())
+        return 1;
+
+    // These cover one invariant between them, so run them all and report every failure rather than
+    // short-circuiting on the first - a partial result here is hard to read. Deliberately no count
+    // in this comment: it went stale the first time a test was added.
+    int receiver_replication_failures = 0;
+    receiver_replication_failures += test_receiver_replication_released_on_chart_teardown();
+    receiver_replication_failures += test_receiver_replication_counter_does_not_wrap();
+    receiver_replication_failures += test_receiver_replication_release_does_not_steal();
+    receiver_replication_failures += test_receiver_replication_completion_ratio();
+    receiver_replication_failures += test_receiver_replication_duplicate_claim_does_not_change_accounting();
+    receiver_replication_failures += test_receiver_replication_obsolete_keeps_claim();
+    receiver_replication_failures += test_receiver_replication_ownership_under_concurrency();
+    if(receiver_replication_failures)
+        return 1;
+
+    if(test_rrdr_relative_window_extreme_values())
+        return 1;
+
+    if(test_inicfg_double_values())
+        return 1;
+
+    if(test_inicfg_section_reload())
+        return 1;
+
+    if(test_query_window_resampling_boundaries())
         return 1;
 
     if(!test_variable_renames())
@@ -1676,5 +3471,275 @@ int test_sqlite(void) {
 
     fprintf(stderr,"SQLite is OK\n");
     (void) sqlite3_close_v2(db_mt);
+    return sqlite_lease_unittest();
+}
+
+#ifdef OS_WINDOWS
+int unit_test_windows_os_version(void) {
+    static const struct {
+        const char *product_name;
+        const char *display_version;
+        const char *edition_id;
+        DWORD build;
+        DWORD ubr;
+        bool has_ubr;
+        bool is_server;
+        const char *name;
+        const char *version;
+        const char *release;
+        const char *edition;
+        const char *exact_build;
+    } cases[] = {
+        {"Windows Server 2022 Datacenter", "21H2", "ServerDatacenter", 20348, 2582, true, true,
+         "Windows Server", "2022", "21H2", "Datacenter", "20348.2582"},
+        {"Windows 10 Home", "24H2", "Core", 26100, 2605, true, false,
+         "Windows", "11", "24H2", "Home", "26100.2605"},
+        {"Windows 10 Home", "22H2", "Core", 19045, 0, true, false,
+         "Windows", "10", "22H2", "Home", "19045.0"},
+        {"Microsoft Windows Server 2022 Datacenter: Azure Edition", "23H2", "ServerDatacenter", 20348, 0, true, true,
+         "Windows Server", "2022", "23H2", "Datacenter: Azure Edition", "20348.0"},
+        {NULL, NULL, "Professional", 26100, 0, false, false,
+         "Windows", "11", "", "Professional", ""},
+        {NULL, NULL, "ServerDatacenter", 25000, 0, false, true,
+         "Windows Server", "2022", "", "ServerDatacenter", ""},
+        {NULL, NULL, "ServerDatacenter", 26100, 0, false, true,
+         "Windows Server", "2025", "", "ServerDatacenter", ""},
+    };
+
+    int failures = 0;
+    for(size_t i = 0; i < sizeof(cases) / sizeof(cases[0]); i++) {
+        NETDATA_WINDOWS_OS_LABELS labels;
+        netdata_windows_parse_os_labels(&labels, cases[i].product_name, cases[i].display_version, cases[i].edition_id,
+                                        cases[i].build, cases[i].ubr, cases[i].has_ubr, cases[i].is_server);
+        if(strcmp(labels.name, cases[i].name) || strcmp(labels.version, cases[i].version) ||
+           strcmp(labels.release, cases[i].release) || strcmp(labels.edition, cases[i].edition) ||
+           strcmp(labels.build, cases[i].exact_build)) {
+            fprintf(stderr,
+                    "unit_test_windows_os_version: case '%s' produced name='%s' version='%s' release='%s' edition='%s' build='%s'\n",
+                    cases[i].product_name ? cases[i].product_name : "(NULL)",
+                    labels.name, labels.version, labels.release, labels.edition, labels.build);
+            failures++;
+        }
+    }
+
+    static const struct {
+        const char *product_name;
+        DWORD build;
+        bool is_server;
+        const char *expected;
+    } version_cases[] = {
+        {"Windows 10 Home", 19045, false, "Microsoft Windows 10 Home"},
+        {"Windows 10 Home", 26100, false, "Microsoft Windows 11 Home"},
+        {"Windows Server 2022 Datacenter", 20348, true, "Microsoft Windows Server 2022 Datacenter"},
+    };
+
+    for (size_t i = 0; i < sizeof(version_cases) / sizeof(version_cases[0]); i++) {
+        char version[256];
+        netdata_windows_format_os_version(version, sizeof(version), version_cases[i].product_name,
+                                          version_cases[i].build, version_cases[i].is_server);
+        if (strcmp(version, version_cases[i].expected)) {
+            fprintf(stderr, "unit_test_windows_os_version: formatter case '%s' produced '%s'\n",
+                    version_cases[i].product_name, version);
+            failures++;
+        }
+    }
+
+    static const struct {
+        DWORD build;
+        bool is_server;
+        const char *edition_id;
+        const char *expected;
+    } id_like_cases[] = {
+        {25000, true, "ServerDatacenter", "Windows-Server-2022-ServerDatacenter"},
+        {26100, true, "ServerDatacenter", "Windows-Server-2025-ServerDatacenter"},
+        {9600, true, "ServerDatacenter", "Windows-Server-2012R2-ServerDatacenter"},
+        {26100, false, "Core", "Windows-11-Core"},
+        {19045, false, NULL, "Windows-10"},
+    };
+
+    for (size_t i = 0; i < sizeof(id_like_cases) / sizeof(id_like_cases[0]); i++) {
+        char id_like[256];
+        netdata_windows_format_os_id_like(id_like, sizeof(id_like), id_like_cases[i].build,
+                                          id_like_cases[i].edition_id, id_like_cases[i].is_server);
+        if (strcmp(id_like, id_like_cases[i].expected)) {
+            fprintf(stderr, "unit_test_windows_os_version: id-like build %u produced '%s'\n",
+                    id_like_cases[i].build, id_like);
+            failures++;
+        }
+    }
+
+    if(failures) {
+        fprintf(stderr, "unit_test_windows_os_version: %d failure(s)\n", failures);
+        return 1;
+    }
+
+    fprintf(stderr, "unit_test_windows_os_version: OK (%zu label, %zu formatter, %zu id-like cases)\n",
+            sizeof(cases) / sizeof(cases[0]), sizeof(version_cases) / sizeof(version_cases[0]),
+            sizeof(id_like_cases) / sizeof(id_like_cases[0]));
     return 0;
 }
+
+int unit_test_windows_virt_normalize(void) {
+    static const struct {
+        const char *raw;
+        const char *expected;
+    } cases[] = {
+        {"VMware Virtual Platform",            "vmware"},
+        {"VMware7,1",                          "vmware"},
+        {"VirtualBox",                         "oracle"},
+        {"innotek GmbH VirtualBox",            "oracle"},
+        {"Oracle Corporation VirtualBox",      "oracle"},
+        {"Parallels Software International",   "parallels"},
+        {"QEMU",                               "qemu"},
+        {"QEMU Standard PC (i440FX + PIIX, 1995)", "qemu"},
+        {"KVM",                                "kvm"},
+        {"Standard PC (i440FX + PIIX, 1995)",  "unknown"},
+        {"HVM domU",                           "xen"},
+        {"Amazon EC2",                         "amazon"},
+        {"amazon ec2",                         "amazon"},
+        {"DigitalOcean Droplet",               "digitalocean"},
+        {"Microsoft Hv",                       "microsoft"},
+        {"Virtual Machine",                    "microsoft"},
+        {"Hyper-V",                            "microsoft"},
+        {"Microsoft Corporation",              "unknown"},
+        {"Surface Laptop 5",                   "unknown"},
+        {"HP ProLiant DL380 Gen10",            "unknown"},
+        {"Linode",                             "unknown"},
+        {"OpenStack",                          "unknown"},
+        {"",                                   "none"},
+        {NULL,                                 "none"},
+    };
+
+    int failures = 0;
+    for(size_t i = 0; i < sizeof(cases) / sizeof(cases[0]); i++) {
+        const char *got = netdata_windows_normalize_virt_string(cases[i].raw);
+        if(strcmp(got, cases[i].expected) != 0) {
+            fprintf(stderr,
+                    "unit_test_windows_virt_normalize: case '%s' expected '%s' got '%s'\n",
+                    cases[i].raw ? cases[i].raw : "(NULL)",
+                    cases[i].expected,
+                    got);
+            failures++;
+        }
+    }
+
+    if(failures) {
+        fprintf(stderr, "unit_test_windows_virt_normalize: %d failure(s)\n", failures);
+        return 1;
+    }
+
+    fprintf(stderr, "unit_test_windows_virt_normalize: OK (%zu cases)\n",
+            sizeof(cases) / sizeof(cases[0]));
+    return 0;
+}
+
+int unit_test_windows_virt_resolution(void) {
+    static const struct {
+        const char *wmi;
+        const char *smbios;
+        const char *registry;
+        const char *expected;
+    } cases[] = {
+        {"vmware", "unknown", "oracle", "vmware"},
+        {NULL, "unknown", "vmware", "vmware"},
+        {NULL, "unknown", "oracle", "oracle"},
+        {NULL, "unknown", NULL, "unknown"},
+        {NULL, "kvm", "vmware", "kvm"},
+        {NULL, NULL, "parallels", "parallels"},
+        {NULL, NULL, NULL, "none"},
+    };
+
+    int failures = 0;
+    for(size_t i = 0; i < sizeof(cases) / sizeof(cases[0]); i++) {
+        const char *got = netdata_windows_resolve_virt_detection(
+            cases[i].wmi, cases[i].smbios, cases[i].registry);
+        if(strcmp(got, cases[i].expected) != 0) {
+            fprintf(stderr,
+                    "unit_test_windows_virt_resolution: case %zu expected '%s' got '%s'\n",
+                    i,
+                    cases[i].expected,
+                    got);
+            failures++;
+        }
+    }
+
+    if(failures) {
+        fprintf(stderr, "unit_test_windows_virt_resolution: %d failure(s)\n", failures);
+        return 1;
+    }
+
+    fprintf(stderr, "unit_test_windows_virt_resolution: OK (%zu cases)\n",
+            sizeof(cases) / sizeof(cases[0]));
+    return 0;
+}
+
+int unit_test_windows_container(void) {
+    int failures = 0;
+
+    // Kubernetes env-var probe. NULL expected means "not detected via env, fall back to WMI".
+    static const struct {
+        const char *host;
+        const char *port;
+        const char *expected;
+    } env_cases[] = {
+        {"10.0.0.1", "443",  NETDATA_WIN_CONTAINER_KUBERNETES},
+        {"10.0.0.1", "6443", NETDATA_WIN_CONTAINER_KUBERNETES},
+        {"10.0.0.1", "",     NULL},
+        {"",         "443",  NULL},
+        {"",         "",     NULL},
+        {NULL,       "443",  NULL},
+        {"10.0.0.1", NULL,   NULL},
+        {NULL,       NULL,   NULL},
+    };
+
+    for(size_t i = 0; i < sizeof(env_cases) / sizeof(env_cases[0]); i++) {
+        const char *got = netdata_windows_container_from_env(env_cases[i].host, env_cases[i].port);
+        bool ok = (got == NULL && env_cases[i].expected == NULL) ||
+                  (got != NULL && env_cases[i].expected != NULL && strcmp(got, env_cases[i].expected) == 0);
+        if(!ok) {
+            fprintf(stderr,
+                    "unit_test_windows_container: env case %zu (host='%s' port='%s') expected '%s' got '%s'\n",
+                    i,
+                    env_cases[i].host ? env_cases[i].host : "(NULL)",
+                    env_cases[i].port ? env_cases[i].port : "(NULL)",
+                    env_cases[i].expected ? env_cases[i].expected : "(NULL)",
+                    got ? got : "(NULL)");
+            failures++;
+        }
+    }
+
+    // Container classification -> detection-method mapping.
+    static const struct {
+        const char *container;
+        const char *expected;
+    } map_cases[] = {
+        {NETDATA_WIN_CONTAINER_KUBERNETES, NETDATA_WIN_CONTAINER_KUBERNETES_DETECT},
+        {NETDATA_WIN_CONTAINER_WINDOWS,    NETDATA_WIN_CONTAINER_WINDOWS_DETECT},
+        {NETDATA_WIN_CONTAINER_NONE,       NETDATA_WIN_CONTAINER_NONE},
+        {"unexpected-value",               NETDATA_WIN_CONTAINER_NONE},
+        {NULL,                             NETDATA_WIN_CONTAINER_NONE},
+    };
+
+    for(size_t i = 0; i < sizeof(map_cases) / sizeof(map_cases[0]); i++) {
+        const char *got = netdata_windows_container_detection_method(map_cases[i].container);
+        if(strcmp(got, map_cases[i].expected) != 0) {
+            fprintf(stderr,
+                    "unit_test_windows_container: map case '%s' expected '%s' got '%s'\n",
+                    map_cases[i].container ? map_cases[i].container : "(NULL)",
+                    map_cases[i].expected,
+                    got);
+            failures++;
+        }
+    }
+
+    if(failures) {
+        fprintf(stderr, "unit_test_windows_container: %d failure(s)\n", failures);
+        return 1;
+    }
+
+    fprintf(stderr, "unit_test_windows_container: OK (%zu env + %zu map cases)\n",
+            sizeof(env_cases) / sizeof(env_cases[0]),
+            sizeof(map_cases) / sizeof(map_cases[0]));
+    return 0;
+}
+#endif

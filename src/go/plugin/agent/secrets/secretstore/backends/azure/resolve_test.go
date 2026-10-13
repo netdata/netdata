@@ -90,7 +90,7 @@ func TestPublishedStoreResolve(t *testing.T) {
 			require.NoError(t, err)
 
 			s := &publishedStore{
-				provider: &provider{
+				runtime: &runtime{
 					apiClient: &http.Client{Transport: tc.transport},
 				},
 				tokenProvider: tokenProvider,
@@ -131,7 +131,7 @@ func TestPublishedStoreResolve_LogsDetailedResolution(t *testing.T) {
 	require.NoError(t, err)
 
 	s := &publishedStore{
-		provider: &provider{
+		runtime: &runtime{
 			apiClient: &http.Client{Transport: roundTripFunc(func(req *http.Request) (*http.Response, error) {
 				return &http.Response{
 					StatusCode: http.StatusOK,

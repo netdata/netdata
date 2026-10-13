@@ -4,6 +4,7 @@ package nagios
 
 import (
 	"fmt"
+	"maps"
 	"strings"
 	"time"
 
@@ -78,9 +79,7 @@ func vnodeInfoFromVirtualNode(vn *vnodes.VirtualNode, fallbackHostname string) v
 	if vn.Hostname != "" {
 		info.Hostname = vn.Hostname
 	}
-	for k, v := range vn.Labels {
-		info.Labels[k] = v
-	}
+	maps.Copy(info.Labels, vn.Labels)
 	return info
 }
 

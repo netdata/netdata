@@ -24,7 +24,7 @@ func TestReader_Read(t *testing.T) {
 	numLogs := 5
 	var sum int
 
-	for i := 0; i < 10; i++ {
+	for i := range 10 {
 		appendLogs(t, filename, time.Millisecond*10, numLogs)
 		n, err := r.readUntilEOF()
 		sum += n
@@ -187,7 +187,7 @@ func (r *testReader) readUntilEOF() (n int, err error) {
 
 func (r *testReader) readUntilEOFTimes(times int) (sum int, err error) {
 	var n int
-	for i := 0; i < times; i++ {
+	for range times {
 		n, err = r.readUntilEOF()
 		if err != io.EOF {
 			break
@@ -237,7 +237,7 @@ func appendLogs(t *testing.T, filename string, interval time.Duration, numOfLogs
 	require.NotNil(t, file)
 	defer func() { _ = file.Close() }()
 
-	for i := 0; i < numOfLogs; i++ {
+	for i := range numOfLogs {
 		_, err = fmt.Fprintln(file, "line", i, "filename", base)
 		require.NoError(t, err)
 		time.Sleep(interval)

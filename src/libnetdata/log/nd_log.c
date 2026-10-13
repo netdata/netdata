@@ -150,7 +150,8 @@ static void nd_log_fatal_hook(struct log_field *fields, size_t fields_max __mayb
 
     nd_log_fatal_event = false;
 
-    if(!nd_log.fatal_hook_cb)
+    log_event_t fatal_hook_cb = __atomic_load_n(&nd_log.fatal_hook_cb, __ATOMIC_ACQUIRE);
+    if(!fatal_hook_cb)
         return;
 
     const char *filename = log_field_strdupz(&fields[NDF_FILE]);
@@ -160,17 +161,17 @@ static void nd_log_fatal_hook(struct log_field *fields, size_t fields_max __mayb
     const char *errno_str = log_field_strdupz(&fields[NDF_ERRNO]);
     long line = log_field_to_int64(&fields[NDF_LINE]);
 
-    nd_log.fatal_hook_cb(filename, function, message, errno_str, stack_trace, line);
+    fatal_hook_cb(filename, function, message, errno_str, stack_trace, line);
 }
 
 void nd_log_register_fatal_hook_cb(log_event_t cb) {
-    nd_log.fatal_hook_cb = cb;
+    __atomic_store_n(&nd_log.fatal_hook_cb, cb, __ATOMIC_RELEASE);
 }
 
 // --------------------------------------------------------------------------------------------------------------------
 
 void nd_log_register_fatal_final_cb(fatal_event_t cb) {
-    nd_log.fatal_final_cb = cb;
+    __atomic_store_n(&nd_log.fatal_final_cb, cb, __ATOMIC_RELEASE);
 }
 
 // --------------------------------------------------------------------------------------------------------------------
@@ -353,10 +354,12 @@ static void nd_logger(const char *file, const char *function, const unsigned lon
     nd_logger_log_fields(fp, fd, mutex, limit, priority, output, &nd_log.sources[source],
                          thread_log_fields, THREAD_FIELDS_MAX);
 
-    if(nd_log.sources[source].pending_msg && spinlock_trylock(&nd_log.sources[source].limits.spinlock)) {
+    const char *pending_msg = NULL;
+
+    if(spinlock_trylock(&nd_log.sources[source].limits.spinlock)) {
         // we have to check again if the pending message is still there
 
-        const char *pending_msg = nd_log.sources[source].pending_msg;
+        pending_msg = nd_log.sources[source].pending_msg;
 
         if(pending_msg) {
             nd_logger_unset_all_thread_fields();
@@ -396,13 +399,13 @@ static void nd_logger(const char *file, const char *function, const unsigned lon
         }
 
         spinlock_unlock(&nd_log.sources[source].limits.spinlock);
-
-        if(pending_msg)
-            nd_logger_log_fields(fp, fd, mutex, false, priority, output, &nd_log.sources[source],
-                                 thread_log_fields, THREAD_FIELDS_MAX);
-
-        freez((void *)pending_msg);
     }
+
+    if(pending_msg)
+        nd_logger_log_fields(fp, fd, mutex, false, priority, output, &nd_log.sources[source],
+                             thread_log_fields, THREAD_FIELDS_MAX);
+
+    freez((void *)pending_msg);
 
     errno_clear();
 }
@@ -504,16 +507,51 @@ static void fatal_abort_internal_checks(void) {
 
 NEVER_INLINE
 void netdata_logger_fatal(const char *file, const char *function, const unsigned long line, const char *fmt, ... ) {
-    static size_t already_in_fatal = 0;
+    // Per-thread re-entrancy flag and a process-wide "a fatal is in progress" counter. These detect two different
+    // situations that the previous single
+    // global counter could not tell apart:
+    //  1. Same-thread re-entrancy: this thread called fatal() while already
+    //     handling its own fatal (e.g. an allocation in the logging path below
+    //     failed and re-entered fatal). That is a real bug in the fatal path
+    //     itself; abort with the recursive marker so it is visible.
+    //  2. Concurrency: a DIFFERENT thread is already handling a fatal. This is
+    //     common when a deadlock makes several threads time out and call fatal()
+    //     at once. The first thread owns the fatal record; this one must not
+    //     interleave its output or re-run cleanup, and it must NOT abort via
+    //     recursive_fatal_abort() -- that would surface as a separate crash and
+    //     mask the first (real) fatal. It waits a bounded time for the first to
+    //     finish writing, then exits quietly.
+    static __thread bool this_thread_in_fatal = false;
+    static size_t threads_in_fatal = 0;
 
-    size_t recursion = __atomic_add_fetch(&already_in_fatal, 1, __ATOMIC_SEQ_CST);
-    if(recursion > 1) {
-        // exit immediately, nothing more to be done
-        sleep(2); // give the first fatal the chance to be written
-        fprintf(stderr, "\nRECURSIVE FATAL STATEMENTS, latest from %s() of %lu@%s, EXITING NOW! 23e93dfccbf64e11aac858b9410d8a82\n",
+    // NOTE: the two exit paths below must NOT use stdio (fprintf/fflush). The
+    // first fatal thread is likely holding stderr's stdio lock mid-write, and a
+    // second fprintf(stderr) would block on that lock indefinitely -- defeating
+    // the bounded exit these paths are meant to guarantee. Use a raw write(),
+    // which takes no lock.
+    char msg[512];
+
+    if(this_thread_in_fatal) {
+        // (1) same thread re-entered fatal: the outer fatal is suspended below
+        // us on this stack and cannot make progress, so do not wait for it.
+        int n = snprintf(msg, sizeof(msg),
+                "\nRECURSIVE FATAL STATEMENTS, latest from %s() of %lu@%s, EXITING NOW! 23e93dfccbf64e11aac858b9410d8a82\n",
                 function, line, file);
-        fflush(stderr);
+        if(n > 0 && write(STDERR_FILENO, msg, (size_t)((n < (int)sizeof(msg)) ? n : (int)sizeof(msg) - 1)) < 0) { /* best effort */ }
         recursive_fatal_abort();
+    }
+    this_thread_in_fatal = true;
+
+    if(__atomic_add_fetch(&threads_in_fatal, 1, __ATOMIC_SEQ_CST) > 1) {
+        // (2) another thread is already writing a fatal. Give it a bounded
+        // chance to finish, then exit quietly (not via recursive_fatal_abort,
+        // which would mask the first fatal as a crash of its own).
+        int n = snprintf(msg, sizeof(msg),
+                "\nCONCURRENT FATAL from %s() of %lu@%s, deferring to the first fatal and exiting.\n",
+                function, line, file);
+        if(n > 0 && write(STDERR_FILENO, msg, (size_t)((n < (int)sizeof(msg)) ? n : (int)sizeof(msg) - 1)) < 0) { /* best effort */ }
+        sleep(2); // give the first fatal the chance to be written
+        _exit(1);
     }
 
     // send this event to deamon_status_file
@@ -550,8 +588,9 @@ void netdata_logger_fatal(const char *file, const char *function, const unsigned
     fatal_abort_internal_checks();
 #endif
 
-    if(nd_log.fatal_final_cb)
-        nd_log.fatal_final_cb();
+    fatal_event_t fatal_final_cb = __atomic_load_n(&nd_log.fatal_final_cb, __ATOMIC_ACQUIRE);
+    if(fatal_final_cb)
+        fatal_final_cb();
 
     exit(1);
 }

@@ -1,11 +1,13 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 #include "../libnetdata.h"
+#include "clocks-internals.h"
 
 // defaults are for compatibility
 // call clocks_init() once, to optimize these default settings
 static clockid_t clock_boottime_to_use = CLOCK_MONOTONIC;
 static clockid_t clock_monotonic_to_use = CLOCK_MONOTONIC;
+static netdata_mutex_t uptime_msec_mutex;
 
 // the default clock resolution is 1ms
 #define DEFAULT_CLOCK_RESOLUTION_UT ((usec_t)0 * USEC_PER_SEC + (usec_t)1 * USEC_PER_MS)
@@ -63,6 +65,11 @@ static usec_t get_clock_resolution(clockid_t clock) {
         if(!ret && ts.tv_nsec > 0 && ts.tv_nsec < (long int)NSEC_PER_USEC)
             return (usec_t)1;
 
+        else if(!ret) {
+            nd_log(NDLS_DAEMON, NDLP_ERR, "clock_getres(%d) returned zero usec resolution, using defaults for clock resolution.", (int)clock);
+            return DEFAULT_CLOCK_RESOLUTION_UT;
+        }
+
         else if(ret > MAX_CLOCK_RESOLUTION_UT) {
             nd_log(NDLS_DAEMON, NDLP_ERR, "clock_getres(%d) returned %"PRIu64" usec is out of range, using defaults for clock resolution.", (int)clock, ret);
             return DEFAULT_CLOCK_RESOLUTION_UT;
@@ -79,6 +86,8 @@ static usec_t get_clock_resolution(clockid_t clock) {
 // perform any initializations required for clocks
 
 static __attribute__((constructor)) void clocks_init(void) {
+    fatal_assert(0 == netdata_mutex_init(&uptime_msec_mutex));
+
     os_get_system_HZ();
 
     // monotonic raw has to be tested before boottime
@@ -101,6 +110,7 @@ static __attribute__((destructor)) void clocks_fin(void) {
 #if defined(OS_WINDOWS)
     timeEndPeriod(1);
 #endif
+    netdata_mutex_destroy(&uptime_msec_mutex);
 }
 
 ALWAYS_INLINE time_t now_sec(clockid_t clk_id) {
@@ -254,7 +264,7 @@ void sleep_to_absolute_time(usec_t usec) {
                                       req.tv_nsec);
                 }
             }
-            sleep_usec(usec);
+            break;
         }
     }
 }
@@ -279,7 +289,9 @@ void heartbeat_statistics(usec_t *min_ptr, usec_t *max_ptr, usec_t *average_ptr,
     struct heartbeat_thread_statistics current[HEARTBEAT_ALIGNMENT_STATISTICS_SIZE];
     static struct heartbeat_thread_statistics old[HEARTBEAT_ALIGNMENT_STATISTICS_SIZE] = { 0 };
 
+    spinlock_lock(&heartbeat_alignment_spinlock);
     memcpy(current, heartbeat_alignment_values, sizeof(struct heartbeat_thread_statistics) * HEARTBEAT_ALIGNMENT_STATISTICS_SIZE);
+    spinlock_unlock(&heartbeat_alignment_spinlock);
 
     usec_t min = 0, max = 0, total = 0, average = 0;
     size_t i, count = 0;
@@ -362,10 +374,12 @@ inline void heartbeat_init(heartbeat_t *hb, usec_t step) {
     hb->randomness = heartbeat_randomness(hb->hash);
 
     if(hb->statistics_id < HEARTBEAT_ALIGNMENT_STATISTICS_SIZE) {
+        spinlock_lock(&heartbeat_alignment_spinlock);
         heartbeat_alignment_values[hb->statistics_id].dt = 0;
         heartbeat_alignment_values[hb->statistics_id].sequence = 0;
         heartbeat_alignment_values[hb->statistics_id].randomness = hb->randomness;
         heartbeat_alignment_values[hb->statistics_id].tid = os_gettid();
+        spinlock_unlock(&heartbeat_alignment_spinlock);
     }
 }
 
@@ -390,14 +404,14 @@ usec_t heartbeat_next(heartbeat_t *hb) {
     sleep_usec_with_now(next - now, now);
     spinlock_lock(&heartbeat_alignment_spinlock);
     now = now_realtime_usec();
-    spinlock_unlock(&heartbeat_alignment_spinlock);
 
-    dt = now - hb->realtime;
+    dt = clocks_usec_delta_or_zero(now, hb->realtime);
 
     if(hb->statistics_id < HEARTBEAT_ALIGNMENT_STATISTICS_SIZE) {
-        heartbeat_alignment_values[hb->statistics_id].dt += now - next;
+        heartbeat_alignment_values[hb->statistics_id].dt += clocks_usec_delta_or_zero(now, next);
         heartbeat_alignment_values[hb->statistics_id].sequence++;
     }
+    spinlock_unlock(&heartbeat_alignment_spinlock);
 
     if(unlikely(now < next)) {
         errno_clear();
@@ -446,7 +460,7 @@ void sleep_usec_with_now(usec_t usec, usec_t started_ut __maybe_unused) {
     Sleep(sleep_ms);
 }
 #else
-void sleep_usec_with_now(usec_t usec, usec_t started_ut) {
+void sleep_usec_with_now(usec_t usec, usec_t started_ut __maybe_unused) {
     // we expect microseconds (1.000.000 per second)
     // but timespec is nanoseconds (1.000.000.000 per second)
     struct timespec rem = { 0, 0 }, req = {
@@ -457,10 +471,7 @@ void sleep_usec_with_now(usec_t usec, usec_t started_ut) {
     // make sure errno is not EINTR
     errno_clear();
 
-    if(!started_ut)
-        started_ut = now_realtime_usec();
-
-    usec_t end_ut = started_ut + usec;
+    usec_t started_monotonic_ut = now_monotonic_usec();
 
     while (nanosleep(&req, &rem) != 0) {
         if (likely(errno == EINTR && (rem.tv_sec || rem.tv_nsec))) {
@@ -470,18 +481,9 @@ void sleep_usec_with_now(usec_t usec, usec_t started_ut) {
             // break an infinite loop
             errno_clear();
 
-            usec_t now_ut = now_realtime_usec();
-            if(now_ut >= end_ut)
+            usec_t now_ut = now_monotonic_usec();
+            if(!sleep_usec_prepare_retry_after_eintr(usec, started_monotonic_ut, now_ut, &req))
                 break;
-
-            usec_t remaining_ut = (usec_t)req.tv_sec * USEC_PER_SEC + (usec_t)req.tv_nsec * NSEC_PER_USEC > usec;
-            usec_t check_ut = now_ut - started_ut;
-            if(remaining_ut > check_ut) {
-                req = (struct timespec){
-                    .tv_sec = (time_t) ( check_ut / USEC_PER_SEC),
-                    .tv_nsec = (suseconds_t) ((check_ut % USEC_PER_SEC) * NSEC_PER_USEC)
-                };
-            }
         }
         else {
             netdata_log_error("Cannot nanosleep() for %"PRIu64" microseconds.", usec);
@@ -524,6 +526,9 @@ static inline collected_number read_proc_uptime(const char *filename) {
 
 inline collected_number uptime_msec(const char *filename){
     static int use_boottime = -1;
+    collected_number uptime = 1;
+
+    netdata_mutex_lock(&uptime_msec_mutex);
 
     if(unlikely(use_boottime == -1)) {
         collected_number uptime_boottime = uptime_from_boottime();
@@ -534,6 +539,7 @@ inline collected_number uptime_msec(const char *filename){
 
         if(delta <= 1000 && uptime_boottime != 0) {
             procfile_close(read_proc_uptime_ff);
+            read_proc_uptime_ff = NULL;
             netdata_log_info("Using now_boottime_usec() for uptime (dt is %lld ms)", delta);
             use_boottime = 1;
         }
@@ -543,15 +549,16 @@ inline collected_number uptime_msec(const char *filename){
         }
         else {
             netdata_log_error("Cannot find any way to read uptime on this system.");
-            return 1;
+            goto done;
         }
     }
 
-    collected_number uptime;
     if(use_boottime)
         uptime = uptime_from_boottime();
     else
         uptime = read_proc_uptime(filename);
 
+done:
+    netdata_mutex_unlock(&uptime_msec_mutex);
     return uptime;
 }

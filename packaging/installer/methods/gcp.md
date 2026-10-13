@@ -4,6 +4,8 @@ Netdata is fully compatible with the Google Cloud Platform (GCP).
 You can install Netdata on cloud instances to monitor the apps/services running there, or use
 multiple instances in a [parent-child streaming](/src/streaming/README.md) configuration.
 
+For recommended VM sizing and the resource impact of running Netdata on cloud VMs, see [Impact on Cloud VMs](/docs/impact-on-resources.md).
+
 ## Recommended installation method
 
 The best installation method depends on the instance's operating system, distribution, and version. For Linux instances,

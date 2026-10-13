@@ -1,0 +1,149 @@
+# PoE metrics mixin for Cisco Catalyst devices.
+# Standard POWER-ETHERNET-MIB (RFC 3621) + CISCO-POWER-ETHERNET-EXT-MIB.
+
+metrics:
+  # ---- Chassis-level PoE budget (one row per PSE group/module) ----
+  - MIB: POWER-ETHERNET-MIB
+    table:
+      OID: 1.3.6.1.2.1.105.1.3.1
+      name: pethMainPseTable
+    symbols:
+      - OID: 1.3.6.1.2.1.105.1.3.1.1.2
+        name: pethMainPsePower
+        chart_meta:
+          description: Total inline power available from the PSE
+          family: 'Hardware/PoE/Chassis/Budget'
+          unit: "W"
+      - OID: 1.3.6.1.2.1.105.1.3.1.1.4
+        name: pethMainPseConsumptionPower
+        chart_meta:
+          description: Measured usage power drawn from the PSE
+          family: 'Hardware/PoE/Chassis/Consumption'
+          unit: "W"
+      - OID: 1.3.6.1.2.1.105.1.3.1.1.5
+        name: pethMainPseUsageThreshold
+        chart_meta:
+          description: Usage threshold expressed in percent for comparing the measured power
+          family: 'Hardware/PoE/Chassis/Threshold'
+          unit: "%"
+      - OID: 1.3.6.1.2.1.105.1.3.1.1.3
+        name: pethMainPseOperStatus
+        chart_meta:
+          description: Operational status of the main PSE
+          family: 'Hardware/PoE/Chassis/Status'
+          unit: "{status}"
+        mapping:
+          1: "on"
+          2: "off"
+          3: faulty
+    metric_tags:
+      - tag: pse_group_index
+        index: 1
+
+  # ---- Per-port PoE status (private — exposed via virtual_metrics) ----
+  - MIB: POWER-ETHERNET-MIB
+    table:
+      OID: 1.3.6.1.2.1.105.1.1.1
+      name: pethPsePortTable
+    symbols:
+      - OID: 1.3.6.1.2.1.105.1.1.1.1.6
+        name: pethPsePortDetectionStatus
+        chart_meta:
+          description: Detection status of the PSE port
+          family: 'Hardware/PoE/Port/Detection'
+          unit: "{status}"
+        mapping:
+          1: disabled
+          2: searching
+          3: delivering_power
+          4: fault
+          5: test
+          6: other_fault
+      - OID: 1.3.6.1.2.1.105.1.1.1.1.10
+        name: pethPsePortPowerClassifications
+        chart_meta:
+          description: Power class of the detected powered device
+          family: 'Hardware/PoE/Port/PowerClass'
+          unit: "{class}"
+        mapping:
+          1: class0
+          2: class1
+          3: class2
+          4: class3
+          5: class4
+      - {OID: 1.3.6.1.2.1.105.1.1.1.1.11, name: _pethPsePortInvalidSignatureCounter}
+      - {OID: 1.3.6.1.2.1.105.1.1.1.1.8, name: _pethPsePortMPSAbsentCounter}
+      - {OID: 1.3.6.1.2.1.105.1.1.1.1.13, name: _pethPsePortOverLoadCounter}
+      - {OID: 1.3.6.1.2.1.105.1.1.1.1.12, name: _pethPsePortPowerDeniedCounter}
+    metric_tags:
+      - tag: pse_port_index
+        index: 2
+      - tag: interface
+        table: ifXTable
+        MIB: IF-MIB
+        symbol:
+          OID: 1.3.6.1.2.1.31.1.1.1.1
+          name: ifName
+        index_transform:
+          - start: 1
+            end: 1
+      - tag: _pse_port_priority
+        symbol:
+          OID: 1.3.6.1.2.1.105.1.1.1.1.7
+          name: pethPsePortPowerPriority
+        mapping:
+          1: critical
+          2: high
+          3: low
+
+  # ---- Cisco PoE extension: per-port wattage (private — exposed via virtual_metrics) ----
+  - MIB: CISCO-POWER-ETHERNET-EXT-MIB
+    table:
+      OID: 1.3.6.1.4.1.9.9.402.1.2.1
+      name: cpeExtPsePortTable
+    symbols:
+      - {OID: 1.3.6.1.4.1.9.9.402.1.2.1.1.7, name: _cpeExtPsePortPwrAllocated}
+      - {OID: 1.3.6.1.4.1.9.9.402.1.2.1.1.8, name: _cpeExtPsePortPwrAvailable}
+      - {OID: 1.3.6.1.4.1.9.9.402.1.2.1.1.9, name: _cpeExtPsePortPwrConsumption}
+      - {OID: 1.3.6.1.4.1.9.9.402.1.2.1.1.10, name: _cpeExtPsePortMaxPwrDrawn}
+    metric_tags:
+      - tag: pse_port_index
+        index: 2
+      - tag: interface
+        table: ifXTable
+        MIB: IF-MIB
+        symbol:
+          OID: 1.3.6.1.2.1.31.1.1.1.1
+          name: ifName
+        index_transform:
+          - start: 1
+            end: 1
+
+virtual_metrics:
+  # Consolidate per-port fault counters into a single chart
+  - name: pethPsePortFaults
+    per_row: true
+    group_by: ["interface"]
+    sources:
+      - {metric: _pethPsePortInvalidSignatureCounter, table: pethPsePortTable, as: invalid_signature}
+      - {metric: _pethPsePortMPSAbsentCounter, table: pethPsePortTable, as: mps_absent}
+      - {metric: _pethPsePortOverLoadCounter, table: pethPsePortTable, as: overload}
+      - {metric: _pethPsePortPowerDeniedCounter, table: pethPsePortTable, as: power_denied}
+    chart_meta:
+      description: PoE port fault events
+      family: 'Hardware/PoE/Port/Faults'
+      unit: "{fault}/s"
+
+  # Consolidate per-port Cisco PoE power into a single chart
+  - name: cpeExtPsePortPower
+    per_row: true
+    group_by: ["interface"]
+    sources:
+      - {metric: _cpeExtPsePortPwrAllocated, table: cpeExtPsePortTable, as: allocated}
+      - {metric: _cpeExtPsePortPwrAvailable, table: cpeExtPsePortTable, as: available}
+      - {metric: _cpeExtPsePortPwrConsumption, table: cpeExtPsePortTable, as: consumption}
+      - {metric: _cpeExtPsePortMaxPwrDrawn, table: cpeExtPsePortTable, as: max_drawn}
+    chart_meta:
+      description: Per-port PoE power draw
+      family: 'Hardware/PoE/Port/Power'
+      unit: "mW"

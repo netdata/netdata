@@ -1,5 +1,4 @@
 //go:build cgo
-// +build cgo
 
 package pmi
 
@@ -96,7 +95,7 @@ func (c *Collector) Init(ctx context.Context) error {
 	httpCfg := c.HTTPConfig
 	httpCfg.RequestConfig.URL = strings.TrimSpace(cfg.URL)
 
-	client, err := pmiproto.NewClient(pmiproto.Config{
+	client, err := pmiproto.NewClient(ctx, pmiproto.Config{
 		URL:        httpCfg.RequestConfig.URL,
 		StatsType:  cfg.PMIStatsType,
 		HTTPConfig: httpCfg,

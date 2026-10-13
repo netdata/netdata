@@ -9,7 +9,7 @@ import (
 func (c *Collector) collect() (map[string]int64, error) {
 	mx := make(map[string]int64)
 
-	for _, iface := range strings.Fields(c.OpticInterfaces) {
+	for iface := range strings.FieldsSeq(c.OpticInterfaces) {
 		if c.ignoredOpticIfaces[iface] {
 			continue
 		}

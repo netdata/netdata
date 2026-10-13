@@ -1,91 +1,90 @@
 ---
-id: key_vault
-name: Azure Key Vault
+display_name: Azure Key Vault
 resource_type: Microsoft.KeyVault/vaults
 metrics:
-- id: availability
-  azure_name: Availability
-  time_grain: PT1M
-  series:
-  - aggregation: average
-    kind: gauge
-- id: service_api_latency
-  azure_name: ServiceApiLatency
-  time_grain: PT1M
-  series:
-  - aggregation: average
-    kind: gauge
-- id: saturation_shoebox
-  azure_name: SaturationShoebox
-  time_grain: PT1M
-  series:
-  - aggregation: average
-    kind: gauge
-- id: service_api_hit
-  azure_name: ServiceApiHit
-  time_grain: PT1M
-  series:
-  - aggregation: count
-    kind: counter
-- id: service_api_result
-  azure_name: ServiceApiResult
-  time_grain: PT1M
-  series:
-  - aggregation: count
-    kind: counter
+  - id: availability
+    azure_name: Availability
+    time_grain: PT1M
+    series:
+      - aggregation: average
+        kind: gauge
+  - id: service_api_latency
+    azure_name: ServiceApiLatency
+    time_grain: PT1M
+    series:
+      - aggregation: average
+        kind: gauge
+  - id: saturation_shoebox
+    azure_name: SaturationShoebox
+    time_grain: PT1M
+    series:
+      - aggregation: average
+        kind: gauge
+  - id: service_api_hit
+    azure_name: ServiceApiHit
+    time_grain: PT1M
+    series:
+      - aggregation: count
+        kind: counter
+  - id: service_api_result
+    azure_name: ServiceApiResult
+    time_grain: PT1M
+    series:
+      - aggregation: count
+        kind: counter
 template:
   family: Azure Key Vault
   context_namespace: key_vault
   chart_defaults:
     label_promotion:
-    - resource_name
-    - resource_group
-    - region
-    - resource_type
-    - profile
+      - resource_name
+      - resource_group
+      - region
+      - resource_type
+      - profile
     instances:
       by_labels:
-      - resource_uid
+        - resource_uid
   charts:
-  - id: am_azure_key_vault__availability
-    title: Azure Key Vault Availability
-    context: availability
-    family: Availability
-    type: line
-    units: percentage
-    algorithm: absolute
-    dimensions:
-    - selector: key_vault.availability_average
-      name: average
-  - id: am_azure_key_vault__api_latency
-    title: Azure Key Vault API Latency
-    context: api_latency
-    family: Performance
-    type: line
-    units: milliseconds
-    algorithm: absolute
-    dimensions:
-    - selector: key_vault.service_api_latency_average
-      name: average
-  - id: am_azure_key_vault__saturation
-    title: Azure Key Vault Saturation
-    context: saturation
-    family: Capacity
-    type: line
-    units: percentage
-    algorithm: absolute
-    dimensions:
-    - selector: key_vault.saturation_shoebox_average
-      name: average
-  - id: am_azure_key_vault__api_activity
-    title: Azure Key Vault API Activity
-    context: api_activity
-    family: Operations
-    type: line
-    units: operations/s
-    algorithm: incremental
-    dimensions:
-    - selector: key_vault.service_api_hit_count
-      name: hits
-    - selector: key_vault.service_api_result_count
-      name: results
+    - id: am_azure_key_vault__availability
+      title: Azure Key Vault Availability
+      context: availability
+      family: Availability
+      type: line
+      units: percentage
+      algorithm: absolute
+      dimensions:
+        - selector: availability_average
+          name: average
+    - id: am_azure_key_vault__api_latency
+      title: Azure Key Vault API Latency
+      context: api_latency
+      family: Performance
+      type: line
+      units: milliseconds
+      algorithm: absolute
+      dimensions:
+        - selector: service_api_latency_average
+          name: average
+    - id: am_azure_key_vault__saturation
+      title: Azure Key Vault Saturation
+      context: saturation
+      family: Capacity
+      type: line
+      units: percentage
+      algorithm: absolute
+      dimensions:
+        - selector: saturation_shoebox_average
+          name: average
+    - id: am_azure_key_vault__api_activity
+      title: Azure Key Vault API Activity
+      context: api_activity
+      family: Operations
+      type: line
+      units: operations/s
+      algorithm: incremental
+      dimensions:
+        - selector: service_api_hit_count
+          name: hits
+        - selector: service_api_result_count
+          name: results

@@ -1,459 +1,458 @@
 ---
-id: application_gateway
-name: Azure Application Gateway
+display_name: Azure Application Gateway
 resource_type: Microsoft.Network/applicationGateways
 metrics:
-- id: throughput
-  azure_name: Throughput
-  time_grain: PT1M
-  series:
-  - aggregation: average
-    kind: gauge
-- id: bytes_received
-  azure_name: BytesReceived
-  time_grain: PT1M
-  series:
-  - aggregation: total
-    kind: counter
-- id: bytes_sent
-  azure_name: BytesSent
-  time_grain: PT1M
-  series:
-  - aggregation: total
-    kind: counter
-- id: total_requests
-  azure_name: TotalRequests
-  time_grain: PT1M
-  series:
-  - aggregation: total
-    kind: counter
-- id: failed_requests
-  azure_name: FailedRequests
-  time_grain: PT1M
-  series:
-  - aggregation: total
-    kind: counter
-- id: response_status
-  azure_name: ResponseStatus
-  time_grain: PT1M
-  series:
-  - aggregation: total
-    kind: counter
-- id: backend_response_status
-  azure_name: BackendResponseStatus
-  time_grain: PT1M
-  series:
-  - aggregation: total
-    kind: counter
-- id: healthy_host_count
-  azure_name: HealthyHostCount
-  time_grain: PT1M
-  series:
-  - aggregation: average
-    kind: gauge
-- id: unhealthy_host_count
-  azure_name: UnhealthyHostCount
-  time_grain: PT1M
-  series:
-  - aggregation: average
-    kind: gauge
-- id: avg_request_count_per_healthy_host
-  azure_name: AvgRequestCountPerHealthyHost
-  time_grain: PT1M
-  series:
-  - aggregation: average
-    kind: gauge
-- id: application_gateway_total_time
-  azure_name: ApplicationGatewayTotalTime
-  time_grain: PT1M
-  series:
-  - aggregation: average
-    kind: gauge
-- id: backend_connect_time
-  azure_name: BackendConnectTime
-  time_grain: PT1M
-  series:
-  - aggregation: average
-    kind: gauge
-- id: backend_first_byte_response_time
-  azure_name: BackendFirstByteResponseTime
-  time_grain: PT1M
-  series:
-  - aggregation: average
-    kind: gauge
-- id: backend_last_byte_response_time
-  azure_name: BackendLastByteResponseTime
-  time_grain: PT1M
-  series:
-  - aggregation: average
-    kind: gauge
-- id: client_rtt
-  azure_name: ClientRtt
-  time_grain: PT1M
-  series:
-  - aggregation: average
-    kind: gauge
-- id: current_connections
-  azure_name: CurrentConnections
-  time_grain: PT1M
-  series:
-  - aggregation: total
-    kind: gauge
-- id: new_connections_per_second
-  azure_name: NewConnectionsPerSecond
-  time_grain: PT1M
-  series:
-  - aggregation: average
-    kind: gauge
-- id: capacity_units
-  azure_name: CapacityUnits
-  time_grain: PT1M
-  series:
-  - aggregation: average
-    kind: gauge
-- id: compute_units
-  azure_name: ComputeUnits
-  time_grain: PT1M
-  series:
-  - aggregation: average
-    kind: gauge
-- id: estimated_billed_capacity_units
-  azure_name: EstimatedBilledCapacityUnits
-  time_grain: PT1M
-  series:
-  - aggregation: average
-    kind: gauge
-- id: fixed_billable_capacity_units
-  azure_name: FixedBillableCapacityUnits
-  time_grain: PT1M
-  series:
-  - aggregation: average
-    kind: gauge
-- id: cpu_utilization
-  azure_name: CpuUtilization
-  time_grain: PT1M
-  series:
-  - aggregation: average
-    kind: gauge
-- id: tls_protocol
-  azure_name: TlsProtocol
-  time_grain: PT1M
-  series:
-  - aggregation: total
-    kind: counter
-- id: web_socket_active_connections
-  azure_name: WebSocketActiveConnections
-  time_grain: PT1M
-  series:
-  - aggregation: total
-    kind: gauge
-- id: websocket_specific_close_status_code
-  azure_name: WebsocketSpecificCloseStatusCode
-  time_grain: PT1M
-  series:
-  - aggregation: total
-    kind: counter
-- id: azwaf_total_requests
-  azure_name: AzwafTotalRequests
-  time_grain: PT1M
-  series:
-  - aggregation: total
-    kind: counter
-- id: blocked_count
-  azure_name: BlockedCount
-  time_grain: PT1M
-  series:
-  - aggregation: total
-    kind: counter
-- id: matched_count
-  azure_name: MatchedCount
-  time_grain: PT1M
-  series:
-  - aggregation: total
-    kind: counter
-- id: azwaf_bot_protection
-  azure_name: AzwafBotProtection
-  time_grain: PT1M
-  series:
-  - aggregation: total
-    kind: counter
-- id: azwaf_custom_rule
-  azure_name: AzwafCustomRule
-  time_grain: PT1M
-  series:
-  - aggregation: total
-    kind: counter
-- id: azwaf_sec_rule
-  azure_name: AzwafSecRule
-  time_grain: PT1M
-  series:
-  - aggregation: total
-    kind: counter
-- id: az_waf_captcha_challenge_request_count
-  azure_name: AzWAFCaptchaChallengeRequestCount
-  time_grain: PT1M
-  series:
-  - aggregation: total
-    kind: counter
-- id: az_wafjs_challenge_request_count
-  azure_name: AzWAFJSChallengeRequestCount
-  time_grain: PT1M
-  series:
-  - aggregation: total
-    kind: counter
-- id: azwaf_penalty_box_hits
-  azure_name: AzwafPenaltyBoxHits
-  time_grain: PT1M
-  series:
-  - aggregation: total
-    kind: counter
-- id: azwaf_penalty_box_size
-  azure_name: AzwafPenaltyBoxSize
-  time_grain: PT1M
-  series:
-  - aggregation: average
-    kind: gauge
+  - id: throughput
+    azure_name: Throughput
+    time_grain: PT1M
+    series:
+      - aggregation: average
+        kind: gauge
+  - id: bytes_received
+    azure_name: BytesReceived
+    time_grain: PT1M
+    series:
+      - aggregation: total
+        kind: counter
+  - id: bytes_sent
+    azure_name: BytesSent
+    time_grain: PT1M
+    series:
+      - aggregation: total
+        kind: counter
+  - id: total_requests
+    azure_name: TotalRequests
+    time_grain: PT1M
+    series:
+      - aggregation: total
+        kind: counter
+  - id: failed_requests
+    azure_name: FailedRequests
+    time_grain: PT1M
+    series:
+      - aggregation: total
+        kind: counter
+  - id: response_status
+    azure_name: ResponseStatus
+    time_grain: PT1M
+    series:
+      - aggregation: total
+        kind: counter
+  - id: backend_response_status
+    azure_name: BackendResponseStatus
+    time_grain: PT1M
+    series:
+      - aggregation: total
+        kind: counter
+  - id: healthy_host_count
+    azure_name: HealthyHostCount
+    time_grain: PT1M
+    series:
+      - aggregation: average
+        kind: gauge
+  - id: unhealthy_host_count
+    azure_name: UnhealthyHostCount
+    time_grain: PT1M
+    series:
+      - aggregation: average
+        kind: gauge
+  - id: avg_request_count_per_healthy_host
+    azure_name: AvgRequestCountPerHealthyHost
+    time_grain: PT1M
+    series:
+      - aggregation: average
+        kind: gauge
+  - id: application_gateway_total_time
+    azure_name: ApplicationGatewayTotalTime
+    time_grain: PT1M
+    series:
+      - aggregation: average
+        kind: gauge
+  - id: backend_connect_time
+    azure_name: BackendConnectTime
+    time_grain: PT1M
+    series:
+      - aggregation: average
+        kind: gauge
+  - id: backend_first_byte_response_time
+    azure_name: BackendFirstByteResponseTime
+    time_grain: PT1M
+    series:
+      - aggregation: average
+        kind: gauge
+  - id: backend_last_byte_response_time
+    azure_name: BackendLastByteResponseTime
+    time_grain: PT1M
+    series:
+      - aggregation: average
+        kind: gauge
+  - id: client_rtt
+    azure_name: ClientRtt
+    time_grain: PT1M
+    series:
+      - aggregation: average
+        kind: gauge
+  - id: current_connections
+    azure_name: CurrentConnections
+    time_grain: PT1M
+    series:
+      - aggregation: total
+        kind: gauge
+  - id: new_connections_per_second
+    azure_name: NewConnectionsPerSecond
+    time_grain: PT1M
+    series:
+      - aggregation: average
+        kind: gauge
+  - id: capacity_units
+    azure_name: CapacityUnits
+    time_grain: PT1M
+    series:
+      - aggregation: average
+        kind: gauge
+  - id: compute_units
+    azure_name: ComputeUnits
+    time_grain: PT1M
+    series:
+      - aggregation: average
+        kind: gauge
+  - id: estimated_billed_capacity_units
+    azure_name: EstimatedBilledCapacityUnits
+    time_grain: PT1M
+    series:
+      - aggregation: average
+        kind: gauge
+  - id: fixed_billable_capacity_units
+    azure_name: FixedBillableCapacityUnits
+    time_grain: PT1M
+    series:
+      - aggregation: average
+        kind: gauge
+  - id: cpu_utilization
+    azure_name: CpuUtilization
+    time_grain: PT1M
+    series:
+      - aggregation: average
+        kind: gauge
+  - id: tls_protocol
+    azure_name: TlsProtocol
+    time_grain: PT1M
+    series:
+      - aggregation: total
+        kind: counter
+  - id: web_socket_active_connections
+    azure_name: WebSocketActiveConnections
+    time_grain: PT1M
+    series:
+      - aggregation: total
+        kind: gauge
+  - id: websocket_specific_close_status_code
+    azure_name: WebsocketSpecificCloseStatusCode
+    time_grain: PT1M
+    series:
+      - aggregation: total
+        kind: counter
+  - id: azwaf_total_requests
+    azure_name: AzwafTotalRequests
+    time_grain: PT1M
+    series:
+      - aggregation: total
+        kind: counter
+  - id: blocked_count
+    azure_name: BlockedCount
+    time_grain: PT1M
+    series:
+      - aggregation: total
+        kind: counter
+  - id: matched_count
+    azure_name: MatchedCount
+    time_grain: PT1M
+    series:
+      - aggregation: total
+        kind: counter
+  - id: azwaf_bot_protection
+    azure_name: AzwafBotProtection
+    time_grain: PT1M
+    series:
+      - aggregation: total
+        kind: counter
+  - id: azwaf_custom_rule
+    azure_name: AzwafCustomRule
+    time_grain: PT1M
+    series:
+      - aggregation: total
+        kind: counter
+  - id: azwaf_sec_rule
+    azure_name: AzwafSecRule
+    time_grain: PT1M
+    series:
+      - aggregation: total
+        kind: counter
+  - id: az_waf_captcha_challenge_request_count
+    azure_name: AzWAFCaptchaChallengeRequestCount
+    time_grain: PT1M
+    series:
+      - aggregation: total
+        kind: counter
+  - id: az_wafjs_challenge_request_count
+    azure_name: AzWAFJSChallengeRequestCount
+    time_grain: PT1M
+    series:
+      - aggregation: total
+        kind: counter
+  - id: azwaf_penalty_box_hits
+    azure_name: AzwafPenaltyBoxHits
+    time_grain: PT1M
+    series:
+      - aggregation: total
+        kind: counter
+  - id: azwaf_penalty_box_size
+    azure_name: AzwafPenaltyBoxSize
+    time_grain: PT1M
+    series:
+      - aggregation: average
+        kind: gauge
 template:
   family: Azure Application Gateway
   context_namespace: application_gateway
   chart_defaults:
     label_promotion:
-    - resource_name
-    - resource_group
-    - region
-    - resource_type
-    - profile
+      - resource_name
+      - resource_group
+      - region
+      - resource_type
+      - profile
     instances:
       by_labels:
-      - resource_uid
+        - resource_uid
   charts:
-  - id: am_azure_application_gateway__throughput
-    title: Azure Application Gateway Throughput
-    context: throughput
-    family: Traffic
-    type: line
-    units: bytes/s
-    algorithm: absolute
-    dimensions:
-    - selector: application_gateway.throughput_average
-      name: average
-  - id: am_azure_application_gateway__traffic_volume
-    title: Azure Application Gateway Traffic Volume
-    context: traffic_volume
-    family: Traffic
-    type: line
-    units: bytes/s
-    algorithm: incremental
-    dimensions:
-    - selector: application_gateway.bytes_received_total
-      name: received
-    - selector: application_gateway.bytes_sent_total
-      name: sent
-  - id: am_azure_application_gateway__requests
-    title: Azure Application Gateway Requests
-    context: requests
-    family: Traffic
-    type: line
-    units: requests/s
-    algorithm: incremental
-    dimensions:
-    - selector: application_gateway.total_requests_total
-      name: total
-    - selector: application_gateway.failed_requests_total
-      name: failed
-  - id: am_azure_application_gateway__response_status
-    title: Azure Application Gateway Response Status
-    context: response_status
-    family: Traffic
-    type: line
-    units: responses/s
-    algorithm: incremental
-    dimensions:
-    - selector: application_gateway.response_status_total
-      name: gateway
-    - selector: application_gateway.backend_response_status_total
-      name: backend
-  - id: am_azure_application_gateway__backend_health
-    title: Azure Application Gateway Backend Health
-    context: backend_health
-    family: Backend
-    type: line
-    units: hosts
-    algorithm: absolute
-    dimensions:
-    - selector: application_gateway.healthy_host_count_average
-      name: healthy
-    - selector: application_gateway.unhealthy_host_count_average
-      name: unhealthy
-  - id: am_azure_application_gateway__backend_request_load
-    title: Azure Application Gateway Backend Request Load
-    context: backend_request_load
-    family: Backend
-    type: line
-    units: requests
-    algorithm: absolute
-    dimensions:
-    - selector: application_gateway.avg_request_count_per_healthy_host_average
-      name: per_healthy_host
-  - id: am_azure_application_gateway__backend_latency
-    title: Azure Application Gateway Backend Latency
-    context: backend_latency
-    family: Backend
-    type: line
-    units: milliseconds
-    algorithm: absolute
-    dimensions:
-    - selector: application_gateway.backend_connect_time_average
-      name: connect
-    - selector: application_gateway.backend_first_byte_response_time_average
-      name: first_byte
-    - selector: application_gateway.backend_last_byte_response_time_average
-      name: last_byte
-  - id: am_azure_application_gateway__client_latency
-    title: Azure Application Gateway Client Latency
-    context: client_latency
-    family: Latency
-    type: line
-    units: milliseconds
-    algorithm: absolute
-    dimensions:
-    - selector: application_gateway.application_gateway_total_time_average
-      name: total_time
-    - selector: application_gateway.client_rtt_average
-      name: client_rtt
-  - id: am_azure_application_gateway__current_connections
-    title: Azure Application Gateway Current Connections
-    context: current_connections
-    family: Connections
-    type: line
-    units: connections
-    algorithm: absolute
-    dimensions:
-    - selector: application_gateway.current_connections_total
-      name: current
-  - id: am_azure_application_gateway__new_connections
-    title: Azure Application Gateway New Connections
-    context: new_connections
-    family: Connections
-    type: line
-    units: connections/s
-    algorithm: absolute
-    dimensions:
-    - selector: application_gateway.new_connections_per_second_average
-      name: average
-  - id: am_azure_application_gateway__websocket_connections
-    title: Azure Application Gateway WebSocket Connections
-    context: websocket_connections
-    family: Connections
-    type: line
-    units: connections
-    algorithm: absolute
-    dimensions:
-    - selector: application_gateway.web_socket_active_connections_total
-      name: active
-  - id: am_azure_application_gateway__websocket_close_codes
-    title: Azure Application Gateway WebSocket Close Codes
-    context: websocket_close_codes
-    family: Connections
-    type: line
-    units: connections/s
-    algorithm: incremental
-    dimensions:
-    - selector: application_gateway.websocket_specific_close_status_code_total
-      name: total
-  - id: am_azure_application_gateway__capacity
-    title: Azure Application Gateway Capacity
-    context: capacity
-    family: Capacity
-    type: line
-    units: units
-    algorithm: absolute
-    dimensions:
-    - selector: application_gateway.capacity_units_average
-      name: capacity
-    - selector: application_gateway.compute_units_average
-      name: compute
-    - selector: application_gateway.estimated_billed_capacity_units_average
-      name: billed
-    - selector: application_gateway.fixed_billable_capacity_units_average
-      name: fixed_billed
-  - id: am_azure_application_gateway__cpu
-    title: Azure Application Gateway CPU Utilization
-    context: cpu
-    family: Capacity
-    type: line
-    units: percentage
-    algorithm: absolute
-    dimensions:
-    - selector: application_gateway.cpu_utilization_average
-      name: average
-  - id: am_azure_application_gateway__tls_connections
-    title: Azure Application Gateway TLS Connections
-    context: tls_connections
-    family: Security
-    type: line
-    units: connections/s
-    algorithm: incremental
-    dimensions:
-    - selector: application_gateway.tls_protocol_total
-      name: total
-  - id: am_azure_application_gateway__waf_requests
-    title: Azure Application Gateway WAF Requests
-    context: waf_requests
-    family: WAF
-    type: line
-    units: requests/s
-    algorithm: incremental
-    dimensions:
-    - selector: application_gateway.azwaf_total_requests_total
-      name: total
-    - selector: application_gateway.blocked_count_total
-      name: blocked
-    - selector: application_gateway.matched_count_total
-      name: matched
-  - id: am_azure_application_gateway__waf_rule_matches
-    title: Azure Application Gateway WAF Rule Matches
-    context: waf_rule_matches
-    family: WAF
-    type: line
-    units: matches/s
-    algorithm: incremental
-    dimensions:
-    - selector: application_gateway.azwaf_sec_rule_total
-      name: managed
-    - selector: application_gateway.azwaf_custom_rule_total
-      name: custom
-    - selector: application_gateway.azwaf_bot_protection_total
-      name: bot
-  - id: am_azure_application_gateway__waf_challenges
-    title: Azure Application Gateway WAF Challenges
-    context: waf_challenges
-    family: WAF
-    type: line
-    units: requests/s
-    algorithm: incremental
-    dimensions:
-    - selector: application_gateway.az_waf_captcha_challenge_request_count_total
-      name: captcha
-    - selector: application_gateway.az_wafjs_challenge_request_count_total
-      name: js_challenge
-  - id: am_azure_application_gateway__waf_penalty_box
-    title: Azure Application Gateway WAF Penalty Box
-    context: waf_penalty_box
-    family: WAF
-    type: line
-    units: IPs
-    algorithm: absolute
-    dimensions:
-    - selector: application_gateway.azwaf_penalty_box_size_average
-      name: size
-  - id: am_azure_application_gateway__waf_penalty_box_hits
-    title: Azure Application Gateway WAF Penalty Box Hits
-    context: waf_penalty_box_hits
-    family: WAF
-    type: line
-    units: hits/s
-    algorithm: incremental
-    dimensions:
-    - selector: application_gateway.azwaf_penalty_box_hits_total
-      name: total
+    - id: am_azure_application_gateway__throughput
+      title: Azure Application Gateway Throughput
+      context: throughput
+      family: Traffic
+      type: line
+      units: bytes/s
+      algorithm: absolute
+      dimensions:
+        - selector: throughput_average
+          name: average
+    - id: am_azure_application_gateway__traffic_volume
+      title: Azure Application Gateway Traffic Volume
+      context: traffic_volume
+      family: Traffic
+      type: line
+      units: bytes/s
+      algorithm: incremental
+      dimensions:
+        - selector: bytes_received_total
+          name: received
+        - selector: bytes_sent_total
+          name: sent
+    - id: am_azure_application_gateway__requests
+      title: Azure Application Gateway Requests
+      context: requests
+      family: Traffic
+      type: line
+      units: requests/s
+      algorithm: incremental
+      dimensions:
+        - selector: total_requests_total
+          name: total
+        - selector: failed_requests_total
+          name: failed
+    - id: am_azure_application_gateway__response_status
+      title: Azure Application Gateway Response Status
+      context: response_status
+      family: Traffic
+      type: line
+      units: responses/s
+      algorithm: incremental
+      dimensions:
+        - selector: response_status_total
+          name: gateway
+        - selector: backend_response_status_total
+          name: backend
+    - id: am_azure_application_gateway__backend_health
+      title: Azure Application Gateway Backend Health
+      context: backend_health
+      family: Backend
+      type: line
+      units: hosts
+      algorithm: absolute
+      dimensions:
+        - selector: healthy_host_count_average
+          name: healthy
+        - selector: unhealthy_host_count_average
+          name: unhealthy
+    - id: am_azure_application_gateway__backend_request_load
+      title: Azure Application Gateway Backend Request Load
+      context: backend_request_load
+      family: Backend
+      type: line
+      units: requests
+      algorithm: absolute
+      dimensions:
+        - selector: avg_request_count_per_healthy_host_average
+          name: per_healthy_host
+    - id: am_azure_application_gateway__backend_latency
+      title: Azure Application Gateway Backend Latency
+      context: backend_latency
+      family: Backend
+      type: line
+      units: milliseconds
+      algorithm: absolute
+      dimensions:
+        - selector: backend_connect_time_average
+          name: connect
+        - selector: backend_first_byte_response_time_average
+          name: first_byte
+        - selector: backend_last_byte_response_time_average
+          name: last_byte
+    - id: am_azure_application_gateway__client_latency
+      title: Azure Application Gateway Client Latency
+      context: client_latency
+      family: Latency
+      type: line
+      units: milliseconds
+      algorithm: absolute
+      dimensions:
+        - selector: application_gateway_total_time_average
+          name: total_time
+        - selector: client_rtt_average
+          name: client_rtt
+    - id: am_azure_application_gateway__current_connections
+      title: Azure Application Gateway Current Connections
+      context: current_connections
+      family: Connections
+      type: line
+      units: connections
+      algorithm: absolute
+      dimensions:
+        - selector: current_connections_total
+          name: current
+    - id: am_azure_application_gateway__new_connections
+      title: Azure Application Gateway New Connections
+      context: new_connections
+      family: Connections
+      type: line
+      units: connections/s
+      algorithm: absolute
+      dimensions:
+        - selector: new_connections_per_second_average
+          name: average
+    - id: am_azure_application_gateway__websocket_connections
+      title: Azure Application Gateway WebSocket Connections
+      context: websocket_connections
+      family: Connections
+      type: line
+      units: connections
+      algorithm: absolute
+      dimensions:
+        - selector: web_socket_active_connections_total
+          name: active
+    - id: am_azure_application_gateway__websocket_close_codes
+      title: Azure Application Gateway WebSocket Close Codes
+      context: websocket_close_codes
+      family: Connections
+      type: line
+      units: connections/s
+      algorithm: incremental
+      dimensions:
+        - selector: websocket_specific_close_status_code_total
+          name: total
+    - id: am_azure_application_gateway__capacity
+      title: Azure Application Gateway Capacity
+      context: capacity
+      family: Capacity
+      type: line
+      units: units
+      algorithm: absolute
+      dimensions:
+        - selector: capacity_units_average
+          name: capacity
+        - selector: compute_units_average
+          name: compute
+        - selector: estimated_billed_capacity_units_average
+          name: billed
+        - selector: fixed_billable_capacity_units_average
+          name: fixed_billed
+    - id: am_azure_application_gateway__cpu
+      title: Azure Application Gateway CPU Utilization
+      context: cpu
+      family: Capacity
+      type: line
+      units: percentage
+      algorithm: absolute
+      dimensions:
+        - selector: cpu_utilization_average
+          name: average
+    - id: am_azure_application_gateway__tls_connections
+      title: Azure Application Gateway TLS Connections
+      context: tls_connections
+      family: Security
+      type: line
+      units: connections/s
+      algorithm: incremental
+      dimensions:
+        - selector: tls_protocol_total
+          name: total
+    - id: am_azure_application_gateway__waf_requests
+      title: Azure Application Gateway WAF Requests
+      context: waf_requests
+      family: WAF
+      type: line
+      units: requests/s
+      algorithm: incremental
+      dimensions:
+        - selector: azwaf_total_requests_total
+          name: total
+        - selector: blocked_count_total
+          name: blocked
+        - selector: matched_count_total
+          name: matched
+    - id: am_azure_application_gateway__waf_rule_matches
+      title: Azure Application Gateway WAF Rule Matches
+      context: waf_rule_matches
+      family: WAF
+      type: line
+      units: matches/s
+      algorithm: incremental
+      dimensions:
+        - selector: azwaf_sec_rule_total
+          name: managed
+        - selector: azwaf_custom_rule_total
+          name: custom
+        - selector: azwaf_bot_protection_total
+          name: bot
+    - id: am_azure_application_gateway__waf_challenges
+      title: Azure Application Gateway WAF Challenges
+      context: waf_challenges
+      family: WAF
+      type: line
+      units: requests/s
+      algorithm: incremental
+      dimensions:
+        - selector: az_waf_captcha_challenge_request_count_total
+          name: captcha
+        - selector: az_wafjs_challenge_request_count_total
+          name: js_challenge
+    - id: am_azure_application_gateway__waf_penalty_box
+      title: Azure Application Gateway WAF Penalty Box
+      context: waf_penalty_box
+      family: WAF
+      type: line
+      units: IPs
+      algorithm: absolute
+      dimensions:
+        - selector: azwaf_penalty_box_size_average
+          name: size
+    - id: am_azure_application_gateway__waf_penalty_box_hits
+      title: Azure Application Gateway WAF Penalty Box Hits
+      context: waf_penalty_box_hits
+      family: WAF
+      type: line
+      units: hits/s
+      algorithm: incremental
+      dimensions:
+        - selector: azwaf_penalty_box_hits_total
+          name: total

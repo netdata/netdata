@@ -14,6 +14,7 @@ typedef enum __attribute__((packed)) {
     BIB_PACKAGING_CONFIGURE_OPTIONS,
     BIB_DIR_USER_CONFIG,
     BIB_DIR_STOCK_CONFIG,
+    BIB_DIR_STOCK_DATA,
     BIB_DIR_CACHE,
     BIB_DIR_LIB,
     BIB_DIR_PLUGINS,
@@ -56,6 +57,7 @@ typedef enum __attribute__((packed)) {
     BIB_FEATURE_TIERING,
     BIB_FEATURE_ML,
     BIB_FEATURE_ALLOCATOR,
+    BIB_DB_SQLITE,
     BIB_DB_DBENGINE,
     BIB_DB_ALLOC,
     BIB_DB_RAM,
@@ -86,6 +88,7 @@ typedef enum __attribute__((packed)) {
     BIB_PLUGIN_LINUX_DISKSPACE,
     BIB_PLUGIN_FREEBSD,
     BIB_PLUGIN_MACOS,
+    BIB_PLUGIN_MACOS_LOGS,
     BIB_PLUGIN_WINDOWS,
     BIB_PLUGIN_STATSD,
     BIB_PLUGIN_TIMEX,
@@ -214,6 +217,14 @@ static struct {
                 .print = "Stock Configurations",
                 .json = "stock_config",
                 .value = LIBCONFIG_DIR,
+        },
+        [BIB_DIR_STOCK_DATA] = {
+                .category = BIC_DIRECTORIES,
+                .type = BIT_STRING,
+                .analytics = NULL,
+                .print = "Stock Data Files",
+                .json = "stock_data",
+                .value = STOCK_DATA_DIR,
         },
         [BIB_DIR_CACHE] = {
                 .category = BIC_DIRECTORIES,
@@ -551,6 +562,14 @@ static struct {
                 .json = "allocator",
                 .value = NULL,
         },
+        [BIB_DB_SQLITE] = {
+                .category = BIC_DATABASE,
+                .type = BIT_STRING,
+                .analytics = NULL,
+                .print = "sqlite",
+                .json = "sqlite",
+                .value = "unknown",
+        },
         [BIB_DB_DBENGINE] = {
                 .category = BIC_DATABASE,
                 .type = BIT_BOOLEAN,
@@ -789,6 +808,14 @@ static struct {
                 .analytics = NULL,
                 .print = "macos (monitor MacOS systems)",
                 .json = "macos",
+                .value = NULL,
+        },
+        [BIB_PLUGIN_MACOS_LOGS] = {
+                .category = BIC_PLUGINS,
+                .type = BIT_BOOLEAN,
+                .analytics = "MACOS-LOGS",
+                .print = "macos-logs (monitor macOS unified logs)",
+                .json = "macos-logs",
                 .value = NULL,
         },
         [BIB_PLUGIN_WINDOWS] = {
@@ -1113,7 +1140,7 @@ static void build_info_set_value(BUILD_INFO_SLOT slot, const char *value) {
 static void build_info_append_value(BUILD_INFO_SLOT slot, const char *value) {
     size_t size = BUILD_INFO[slot].value ? strlen(BUILD_INFO[slot].value) + 1 : 0;
     size += strlen(value);
-    char buf[size + 1];
+    CLEAN_CHAR_P *buf = mallocz(size + 1);
 
     if(BUILD_INFO[slot].value) {
         strcpy(buf, BUILD_INFO[slot].value);
@@ -1174,6 +1201,9 @@ __attribute__((constructor)) void initialize_build_info(void) {
     build_info_set_status(BIB_FEATURE_BUILT_FOR, true);
     build_info_set_value(BIB_FEATURE_BUILT_FOR, "MacOS");
     build_info_set_status(BIB_PLUGIN_MACOS, true);
+#ifdef HAVE_OSLOG
+    build_info_set_status(BIB_PLUGIN_MACOS_LOGS, true);
+#endif
 #endif
 #ifdef OS_WINDOWS
     build_info_set_status(BIB_PLUGIN_WINDOWS, true);
@@ -1215,14 +1245,10 @@ __attribute__((constructor)) void initialize_build_info(void) {
     build_info_set_status(BIB_FEATURE_ML, true);
 #endif
 
-#if defined(ENABLE_MIMALLOC)
-    build_info_set_status(BIB_FEATURE_ALLOCATOR, true);
-    build_info_set_value(BIB_FEATURE_ALLOCATOR, "mimalloc");
-#else
     build_info_set_status(BIB_FEATURE_ALLOCATOR, true);
     build_info_set_value(BIB_FEATURE_ALLOCATOR, "system");
-#endif
 
+    build_info_set_value(BIB_DB_SQLITE, sqlite3_libversion());
 
 #ifdef ENABLE_DBENGINE
     build_info_set_status(BIB_DB_DBENGINE, true);
@@ -1265,7 +1291,7 @@ __attribute__((constructor)) void initialize_build_info(void) {
 
 #ifdef HAVE_PROTOBUF
     build_info_set_status(BIB_LIB_PROTOBUF, true);
-#ifdef BUNDLED_PROTOBUF
+#ifdef ENABLE_BUNDLED_PROTOBUF
     build_info_set_value(BIB_LIB_PROTOBUF, "bundled");
 #else
     build_info_set_value(BIB_LIB_PROTOBUF, "system");
@@ -1376,6 +1402,37 @@ __attribute__((constructor)) void initialize_build_info(void) {
 // ----------------------------------------------------------------------------
 // system info
 
+static const char *system_info_build_value(size_t slot, const struct rrdhost_system_info *info) {
+    switch (slot) {
+        case BIB_OS_KERNEL_NAME: return info->kernel_name ? info->kernel_name : "";
+        case BIB_OS_KERNEL_VERSION: return info->kernel_version ? info->kernel_version : "";
+        case BIB_OS_NAME: return info->host_os_name ? info->host_os_name : "";
+        case BIB_OS_ID: return info->host_os_id ? info->host_os_id : "";
+        case BIB_OS_ID_LIKE: return info->host_os_id_like ? info->host_os_id_like : "";
+        case BIB_OS_VERSION: return info->host_os_version ? info->host_os_version : "";
+        case BIB_OS_VERSION_ID: return info->host_os_version_id ? info->host_os_version_id : "";
+        case BIB_OS_DETECTION: return info->host_os_detection ? info->host_os_detection : "";
+        case BIB_HW_CPU_CORES: return info->host_cores ? info->host_cores : "";
+        case BIB_HW_CPU_FREQUENCY: return info->host_cpu_freq ? info->host_cpu_freq : "";
+        case BIB_HW_RAM_SIZE: return info->host_ram_total ? info->host_ram_total : "";
+        case BIB_HW_DISK_SPACE: return info->host_disk_space ? info->host_disk_space : "";
+        case BIB_HW_ARCHITECTURE: return info->architecture ? info->architecture : "";
+        case BIB_HW_VIRTUALIZATION: return info->virtualization ? info->virtualization : "";
+        case BIB_HW_VIRTUALIZATION_DETECTION: return info->virt_detection ? info->virt_detection : "";
+        case BIB_CONTAINER_NAME: return info->container ? info->container : "";
+        case BIB_CONTAINER_DETECTION: return info->container_detection ? info->container_detection : "";
+        case BIB_CONTAINER_OS_NAME: return info->container_os_name ? info->container_os_name : "";
+        case BIB_CONTAINER_OS_ID: return info->container_os_id ? info->container_os_id : "";
+        case BIB_CONTAINER_OS_ID_LIKE: return info->container_os_id_like ? info->container_os_id_like : "";
+        case BIB_CONTAINER_OS_VERSION: return info->container_os_version ? info->container_os_version : "";
+        case BIB_CONTAINER_OS_VERSION_ID: return info->container_os_version_id ? info->container_os_version_id : "";
+        case BIB_CONTAINER_OS_DETECTION: return info->container_os_detection ? info->container_os_detection : "";
+        case BIB_CONTAINER_ORCHESTRATOR:
+            return info->is_k8s_node && !strcmp(info->is_k8s_node, "true") ? "kubernetes" : "none";
+        default: return NULL;
+    }
+}
+
 static void populate_system_info(void) {
     FUNCTION_RUN_ONCE();
 
@@ -1383,7 +1440,10 @@ static void populate_system_info(void) {
     bool free_system_info = false;
 
     if(localhost && localhost->system_info) {
-        system_info = localhost->system_info;
+        spinlock_lock(&localhost->rrdhost_update_lock);
+        system_info = rrdhost_system_info_dup(localhost->system_info);
+        spinlock_unlock(&localhost->rrdhost_update_lock);
+        free_system_info = true;
     }
     else {
         bool started_spawn_server = false;
@@ -1400,35 +1460,11 @@ static void populate_system_info(void) {
             netdata_main_spawn_server_cleanup();
     }
 
-    build_info_set_value_strdupz(BIB_OS_KERNEL_NAME, system_info->kernel_name);
-    build_info_set_value_strdupz(BIB_OS_KERNEL_VERSION, system_info->kernel_version);
-    build_info_set_value_strdupz(BIB_OS_NAME, system_info->host_os_name);
-    build_info_set_value_strdupz(BIB_OS_ID, system_info->host_os_id);
-    build_info_set_value_strdupz(BIB_OS_ID_LIKE, system_info->host_os_id_like);
-    build_info_set_value_strdupz(BIB_OS_VERSION, system_info->host_os_version);
-    build_info_set_value_strdupz(BIB_OS_VERSION_ID, system_info->container_os_version_id);
-    build_info_set_value_strdupz(BIB_OS_DETECTION, system_info->host_os_detection);
-    build_info_set_value_strdupz(BIB_HW_CPU_CORES, system_info->host_cores);
-    build_info_set_value_strdupz(BIB_HW_CPU_FREQUENCY, system_info->host_cpu_freq);
-    build_info_set_value_strdupz(BIB_HW_RAM_SIZE, system_info->host_ram_total);
-    build_info_set_value_strdupz(BIB_HW_DISK_SPACE, system_info->host_disk_space);
-    build_info_set_value_strdupz(BIB_HW_ARCHITECTURE, system_info->architecture);
-    build_info_set_value_strdupz(BIB_HW_VIRTUALIZATION, system_info->virtualization);
-    build_info_set_value_strdupz(BIB_HW_VIRTUALIZATION_DETECTION, system_info->virt_detection);
-    build_info_set_value_strdupz(BIB_CONTAINER_NAME, system_info->container);
-    build_info_set_value_strdupz(BIB_CONTAINER_DETECTION, system_info->container_detection);
-
-    if(system_info->is_k8s_node && !strcmp(system_info->is_k8s_node, "true"))
-        build_info_set_value_strdupz(BIB_CONTAINER_ORCHESTRATOR, "kubernetes");
-    else
-        build_info_set_value_strdupz(BIB_CONTAINER_ORCHESTRATOR, "none");
-
-    build_info_set_value_strdupz(BIB_CONTAINER_OS_NAME, system_info->container_os_name);
-    build_info_set_value_strdupz(BIB_CONTAINER_OS_ID, system_info->container_os_id);
-    build_info_set_value_strdupz(BIB_CONTAINER_OS_ID_LIKE, system_info->container_os_id_like);
-    build_info_set_value_strdupz(BIB_CONTAINER_OS_VERSION, system_info->container_os_version);
-    build_info_set_value_strdupz(BIB_CONTAINER_OS_VERSION_ID, system_info->container_os_version_id);
-    build_info_set_value_strdupz(BIB_CONTAINER_OS_DETECTION, system_info->container_os_detection);
+    for (size_t i = 0; i < BIB_TERMINATOR; i++) {
+        const char *value = system_info_build_value(i, system_info);
+        if (value)
+            build_info_set_value_strdupz(i, value);
+    }
 
     if(free_system_info)
         rrdhost_system_info_free(system_info);
@@ -1532,6 +1568,7 @@ static void populate_packaging_info() {
 static void populate_directories(void) {
     build_info_set_value(BIB_DIR_USER_CONFIG, netdata_configured_user_config_dir);
     build_info_set_value(BIB_DIR_STOCK_CONFIG, netdata_configured_stock_config_dir);
+    build_info_set_value(BIB_DIR_STOCK_DATA, netdata_configured_stock_data_dir);
     build_info_set_value(BIB_DIR_CACHE, netdata_configured_cache_dir);
     build_info_set_value(BIB_DIR_LIB, netdata_configured_varlib_dir);
     build_info_set_value(BIB_DIR_PLUGINS, netdata_configured_primary_plugins_dir);
@@ -1542,12 +1579,43 @@ static void populate_directories(void) {
 
 // ----------------------------------------------------------------------------
 
-static void print_build_info_category_to_json(BUFFER *b, BUILD_INFO_CATEGORY category, const char *key) {
+static const char *build_info_value_for_display(size_t i, char **allocated) {
+    const char *value = BUILD_INFO[i].value;
+
+    if(allocated)
+        *allocated = NULL;
+
+#if defined(OS_WINDOWS)
+    if(BUILD_INFO[i].category == BIC_DIRECTORIES && BUILD_INFO[i].type == BIT_STRING && value) {
+        if(!allocated)
+            return value;
+
+        *allocated = os_translate_msys_to_windows_path(value);
+        return *allocated;
+    }
+#endif
+
+    return value;
+}
+
+static void print_build_info_category_to_json(BUFFER *b, BUILD_INFO_CATEGORY category, const char *key,
+                                             const struct rrdhost_system_info *info) {
     buffer_json_member_add_object(b, key);
     for(size_t i = 0; i < BIB_TERMINATOR ;i++) {
         if(BUILD_INFO[i].category == category && BUILD_INFO[i].json) {
-            if(BUILD_INFO[i].value)
-                buffer_json_member_add_string(b, BUILD_INFO[i].json, BUILD_INFO[i].value);
+#if defined(OS_WINDOWS)
+            CLEAN_CHAR_P *display_path = NULL;
+            const char *value = build_info_value_for_display(i, &display_path);
+#else
+            const char *value = build_info_value_for_display(i, NULL);
+#endif
+
+            const char *current = info ? system_info_build_value(i, info) : NULL;
+            if (current)
+                value = current;
+
+            if(value)
+                buffer_json_member_add_string(b, BUILD_INFO[i].json, value);
             else
                 buffer_json_member_add_boolean(b, BUILD_INFO[i].json, BUILD_INFO[i].status);
         }
@@ -1561,12 +1629,17 @@ static void print_build_info_category_to_console(BUILD_INFO_CATEGORY category, c
         if(BUILD_INFO[i].category == category && BUILD_INFO[i].print) {
             const char *v = BUILD_INFO[i].status ? "YES" : "NO";
             const char *k = BUILD_INFO[i].print;
-            const char *d = BUILD_INFO[i].value;
+#if defined(OS_WINDOWS)
+            CLEAN_CHAR_P *display_path = NULL;
+            const char *d = build_info_value_for_display(i, &display_path);
+#else
+            const char *d = build_info_value_for_display(i, NULL);
+#endif
 
             int padding_length = 60 - strlen(k) - 1;
             if (padding_length < 0) padding_length = 0;
 
-            char padding[padding_length + 1];
+            char padding[61];
             memset(padding, '_', padding_length);
             padding[padding_length] = '\0';
 
@@ -1604,19 +1677,60 @@ void build_info_to_json_object(BUFFER *b) {
     populate_system_info();
     populate_directories();
 
-    print_build_info_category_to_json(b, BIC_PACKAGING, "package");
-    print_build_info_category_to_json(b, BIC_DIRECTORIES, "directories");
-    print_build_info_category_to_json(b, BIC_OPERATING_SYSTEM, "os");
-    print_build_info_category_to_json(b, BIC_HARDWARE, "hw");
-    print_build_info_category_to_json(b, BIC_CONTAINER, "container");
-    print_build_info_category_to_json(b, BIC_FEATURE, "features");
-    print_build_info_category_to_json(b, BIC_DATABASE, "databases");
-    print_build_info_category_to_json(b, BIC_CONNECTIVITY, "connectivity");
-    print_build_info_category_to_json(b, BIC_LIBS, "libs");
-    print_build_info_category_to_json(b, BIC_PLUGINS, "plugins");
-    print_build_info_category_to_json(b, BIC_EXPORTERS, "exporters");
-    print_build_info_category_to_json(b, BIC_DEBUG_DEVEL, "debug-n-devel");
-    print_build_info_category_to_json(b, BIC_RUNTIME, "runtime");
+    struct rrdhost_system_info *info = NULL;
+    if (localhost) {
+        spinlock_lock(&localhost->rrdhost_update_lock);
+        info = rrdhost_system_info_dup(localhost->system_info);
+        spinlock_unlock(&localhost->rrdhost_update_lock);
+    }
+
+    print_build_info_category_to_json(b, BIC_PACKAGING, "package", info);
+    print_build_info_category_to_json(b, BIC_DIRECTORIES, "directories", info);
+    print_build_info_category_to_json(b, BIC_OPERATING_SYSTEM, "os", info);
+    print_build_info_category_to_json(b, BIC_HARDWARE, "hw", info);
+    print_build_info_category_to_json(b, BIC_CONTAINER, "container", info);
+    print_build_info_category_to_json(b, BIC_FEATURE, "features", info);
+    print_build_info_category_to_json(b, BIC_DATABASE, "databases", info);
+    print_build_info_category_to_json(b, BIC_CONNECTIVITY, "connectivity", info);
+    print_build_info_category_to_json(b, BIC_LIBS, "libs", info);
+    print_build_info_category_to_json(b, BIC_PLUGINS, "plugins", info);
+    print_build_info_category_to_json(b, BIC_EXPORTERS, "exporters", info);
+    print_build_info_category_to_json(b, BIC_DEBUG_DEVEL, "debug-n-devel", info);
+    print_build_info_category_to_json(b, BIC_RUNTIME, "runtime", info);
+    rrdhost_system_info_free(info);
+}
+
+int build_info_system_info_unittest(void) {
+    RRDHOST *saved_localhost = localhost;
+    RRDHOST host = {0};
+    spinlock_init(&host.rrdhost_update_lock);
+    host.system_info = rrdhost_system_info_create();
+    localhost = &host;
+    int errors = 0;
+    BUFFER *b = buffer_create(0, NULL);
+    const char *values[] = { "1024", "2048", "2048" };
+    for (size_t i = 0; i < _countof(values); i++) {
+        struct rrdhost_system_info *candidate = rrdhost_system_info_create();
+        rrdhost_system_info_detected_set(candidate, "NETDATA_SYSTEM_TOTAL_RAM", values[i]);
+        spinlock_lock(&host.rrdhost_update_lock);
+        rrdhost_system_info_update(host.system_info, candidate);
+        spinlock_unlock(&host.rrdhost_update_lock);
+        rrdhost_system_info_free(candidate);
+        buffer_flush(b);
+        buffer_json_initialize(b, "\"", "\"", 0, true, BUFFER_JSON_OPTIONS_MINIFY);
+        build_info_to_json_object(b);
+        buffer_json_finalize(b);
+        char expected[64];
+        snprintfz(expected, sizeof(expected), "\"ram\":\"%s\"", values[i]);
+        if (!strstr(buffer_tostring(b), expected)) {
+            fprintf(stderr, "build-info did not expose current RAM %s\n", values[i]);
+            errors++;
+        }
+    }
+    localhost = saved_localhost;
+    rrdhost_system_info_free(host.system_info);
+    buffer_free(b);
+    return errors;
 }
 
 void print_build_info_json(void) {

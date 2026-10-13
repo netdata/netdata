@@ -1,0 +1,960 @@
+# Synthetic full HAProxy PromEx scrape: every source-derived family (449) from the
+# HAProxy source inventory at commit d2c9bf70e5c481658a7d561b58ce94de8b76a212.
+# Values are placeholder 0 (structural fixture only; do not assert specific values).
+# Includes the ?extra-counters H1/H2/SSL/QUIC/H3 (mod) families, which a real scrape
+# emits only with ?extra-counters. TYPE is taken from the inventory type column
+# (some *_total names are gauges; resolver/sticktable families are gauges).
+
+# ── process ──────────────────────────────────────────────────────────────────
+# TYPE haproxy_process_nbthread gauge
+haproxy_process_nbthread 0
+# TYPE haproxy_process_nbproc gauge
+haproxy_process_nbproc 0
+# TYPE haproxy_process_relative_process_id gauge
+haproxy_process_relative_process_id 0
+# TYPE haproxy_process_uptime_seconds gauge
+haproxy_process_uptime_seconds 0
+# TYPE haproxy_process_start_time_seconds gauge
+haproxy_process_start_time_seconds 0
+# TYPE haproxy_process_max_memory_bytes gauge
+haproxy_process_max_memory_bytes 0
+# TYPE haproxy_process_pool_allocated_bytes gauge
+haproxy_process_pool_allocated_bytes 0
+# TYPE haproxy_process_pool_used_bytes gauge
+haproxy_process_pool_used_bytes 0
+# TYPE haproxy_process_pool_failures_total counter
+haproxy_process_pool_failures_total 0
+# TYPE haproxy_process_max_fds gauge
+haproxy_process_max_fds 0
+# TYPE haproxy_process_max_sockets gauge
+haproxy_process_max_sockets 0
+# TYPE haproxy_process_max_connections gauge
+haproxy_process_max_connections 0
+# TYPE haproxy_process_hard_max_connections gauge
+haproxy_process_hard_max_connections 0
+# TYPE haproxy_process_current_connections gauge
+haproxy_process_current_connections 0
+# TYPE haproxy_process_connections_total counter
+haproxy_process_connections_total 0
+# TYPE haproxy_process_requests_total counter
+haproxy_process_requests_total 0
+# TYPE haproxy_process_max_ssl_connections gauge
+haproxy_process_max_ssl_connections 0
+# TYPE haproxy_process_current_ssl_connections gauge
+haproxy_process_current_ssl_connections 0
+# TYPE haproxy_process_ssl_connections_total counter
+haproxy_process_ssl_connections_total 0
+# TYPE haproxy_process_max_pipes gauge
+haproxy_process_max_pipes 0
+# TYPE haproxy_process_pipes_used_total counter
+haproxy_process_pipes_used_total 0
+# TYPE haproxy_process_pipes_free_total counter
+haproxy_process_pipes_free_total 0
+# TYPE haproxy_process_current_connection_rate gauge
+haproxy_process_current_connection_rate 0
+# TYPE haproxy_process_limit_connection_rate gauge
+haproxy_process_limit_connection_rate 0
+# TYPE haproxy_process_max_connection_rate gauge
+haproxy_process_max_connection_rate 0
+# TYPE haproxy_process_current_session_rate gauge
+haproxy_process_current_session_rate 0
+# TYPE haproxy_process_limit_session_rate gauge
+haproxy_process_limit_session_rate 0
+# TYPE haproxy_process_max_session_rate gauge
+haproxy_process_max_session_rate 0
+# TYPE haproxy_process_current_ssl_rate gauge
+haproxy_process_current_ssl_rate 0
+# TYPE haproxy_process_limit_ssl_rate gauge
+haproxy_process_limit_ssl_rate 0
+# TYPE haproxy_process_max_ssl_rate gauge
+haproxy_process_max_ssl_rate 0
+# TYPE haproxy_process_current_frontend_ssl_key_rate gauge
+haproxy_process_current_frontend_ssl_key_rate 0
+# TYPE haproxy_process_max_frontend_ssl_key_rate gauge
+haproxy_process_max_frontend_ssl_key_rate 0
+# TYPE haproxy_process_frontend_ssl_reuse gauge
+haproxy_process_frontend_ssl_reuse 0
+# TYPE haproxy_process_current_backend_ssl_key_rate gauge
+haproxy_process_current_backend_ssl_key_rate 0
+# TYPE haproxy_process_max_backend_ssl_key_rate gauge
+haproxy_process_max_backend_ssl_key_rate 0
+# TYPE haproxy_process_ssl_cache_lookups_total counter
+haproxy_process_ssl_cache_lookups_total 0
+# TYPE haproxy_process_ssl_cache_misses_total counter
+haproxy_process_ssl_cache_misses_total 0
+# TYPE haproxy_process_http_comp_bytes_in_total counter
+haproxy_process_http_comp_bytes_in_total 0
+# TYPE haproxy_process_http_comp_bytes_out_total counter
+haproxy_process_http_comp_bytes_out_total 0
+# TYPE haproxy_process_limit_http_comp gauge
+haproxy_process_limit_http_comp 0
+# TYPE haproxy_process_current_zlib_memory gauge
+haproxy_process_current_zlib_memory 0
+# TYPE haproxy_process_max_zlib_memory gauge
+haproxy_process_max_zlib_memory 0
+# TYPE haproxy_process_current_tasks gauge
+haproxy_process_current_tasks 0
+# TYPE haproxy_process_current_run_queue gauge
+haproxy_process_current_run_queue 0
+# TYPE haproxy_process_idle_time_percent gauge
+haproxy_process_idle_time_percent 0
+# TYPE haproxy_process_node gauge
+haproxy_process_node{node="node1"} 0
+# TYPE haproxy_process_description gauge
+haproxy_process_description{desc="description"} 0
+# TYPE haproxy_process_stopping gauge
+haproxy_process_stopping 0
+# TYPE haproxy_process_jobs gauge
+haproxy_process_jobs 0
+# TYPE haproxy_process_unstoppable_jobs gauge
+haproxy_process_unstoppable_jobs 0
+# TYPE haproxy_process_listeners gauge
+haproxy_process_listeners 0
+# TYPE haproxy_process_active_peers gauge
+haproxy_process_active_peers 0
+# TYPE haproxy_process_connected_peers gauge
+haproxy_process_connected_peers 0
+# TYPE haproxy_process_dropped_logs_total counter
+haproxy_process_dropped_logs_total 0
+# TYPE haproxy_process_busy_polling_enabled gauge
+haproxy_process_busy_polling_enabled 0
+# TYPE haproxy_process_failed_resolutions counter
+haproxy_process_failed_resolutions 0
+# TYPE haproxy_process_bytes_out_total counter
+haproxy_process_bytes_out_total 0
+# TYPE haproxy_process_spliced_bytes_out_total counter
+haproxy_process_spliced_bytes_out_total 0
+# TYPE haproxy_process_bytes_out_rate gauge
+haproxy_process_bytes_out_rate 0
+# TYPE haproxy_process_recv_logs_total counter
+haproxy_process_recv_logs_total 0
+# TYPE haproxy_process_build_info gauge
+haproxy_process_build_info{version="0.0.0-source"} 0
+# TYPE haproxy_process_total_warnings counter
+haproxy_process_total_warnings 0
+# TYPE haproxy_process_patterns_added_total gauge
+haproxy_process_patterns_added_total 0
+# TYPE haproxy_process_patterns_freed_total gauge
+haproxy_process_patterns_freed_total 0
+# TYPE haproxy_process_nb_thread_groups gauge
+haproxy_process_nb_thread_groups 0
+
+# ── frontend (proxy) ───────────────────────────────────────────────────────────
+# TYPE haproxy_frontend_current_sessions gauge
+haproxy_frontend_current_sessions{proxy="px"} 0
+# TYPE haproxy_frontend_max_sessions gauge
+haproxy_frontend_max_sessions{proxy="px"} 0
+# TYPE haproxy_frontend_limit_sessions gauge
+haproxy_frontend_limit_sessions{proxy="px"} 0
+# TYPE haproxy_frontend_sessions_total counter
+haproxy_frontend_sessions_total{proxy="px"} 0
+# TYPE haproxy_frontend_current_session_rate gauge
+haproxy_frontend_current_session_rate{proxy="px"} 0
+# TYPE haproxy_frontend_limit_session_rate gauge
+haproxy_frontend_limit_session_rate{proxy="px"} 0
+# TYPE haproxy_frontend_max_session_rate gauge
+haproxy_frontend_max_session_rate{proxy="px"} 0
+# TYPE haproxy_frontend_bytes_in_total counter
+haproxy_frontend_bytes_in_total{proxy="px"} 0
+# TYPE haproxy_frontend_bytes_out_total counter
+haproxy_frontend_bytes_out_total{proxy="px"} 0
+# TYPE haproxy_frontend_req_bytes_in_total counter
+haproxy_frontend_req_bytes_in_total{proxy="px"} 0
+# TYPE haproxy_frontend_req_bytes_out_total counter
+haproxy_frontend_req_bytes_out_total{proxy="px"} 0
+# TYPE haproxy_frontend_res_bytes_in_total counter
+haproxy_frontend_res_bytes_in_total{proxy="px"} 0
+# TYPE haproxy_frontend_res_bytes_out_total counter
+haproxy_frontend_res_bytes_out_total{proxy="px"} 0
+# TYPE haproxy_frontend_requests_denied_total counter
+haproxy_frontend_requests_denied_total{proxy="px"} 0
+# TYPE haproxy_frontend_responses_denied_total counter
+haproxy_frontend_responses_denied_total{proxy="px"} 0
+# TYPE haproxy_frontend_request_errors_total counter
+haproxy_frontend_request_errors_total{proxy="px"} 0
+# TYPE haproxy_frontend_status gauge
+haproxy_frontend_status{proxy="px",state="DOWN"} 0
+haproxy_frontend_status{proxy="px",state="UP"} 0
+# TYPE haproxy_frontend_http_requests_rate_max gauge
+haproxy_frontend_http_requests_rate_max{proxy="px"} 0
+# TYPE haproxy_frontend_http_requests_total counter
+haproxy_frontend_http_requests_total{proxy="px"} 0
+# TYPE haproxy_frontend_http_responses_total counter
+haproxy_frontend_http_responses_total{proxy="px",code="1xx"} 0
+haproxy_frontend_http_responses_total{proxy="px",code="2xx"} 0
+haproxy_frontend_http_responses_total{proxy="px",code="3xx"} 0
+haproxy_frontend_http_responses_total{proxy="px",code="4xx"} 0
+haproxy_frontend_http_responses_total{proxy="px",code="5xx"} 0
+haproxy_frontend_http_responses_total{proxy="px",code="other"} 0
+# TYPE haproxy_frontend_http_comp_bytes_in_total counter
+haproxy_frontend_http_comp_bytes_in_total{proxy="px"} 0
+# TYPE haproxy_frontend_http_comp_bytes_out_total counter
+haproxy_frontend_http_comp_bytes_out_total{proxy="px"} 0
+# TYPE haproxy_frontend_http_comp_bytes_bypassed_total counter
+haproxy_frontend_http_comp_bytes_bypassed_total{proxy="px"} 0
+# TYPE haproxy_frontend_http_comp_responses_total counter
+haproxy_frontend_http_comp_responses_total{proxy="px"} 0
+# TYPE haproxy_frontend_connections_rate_max gauge
+haproxy_frontend_connections_rate_max{proxy="px"} 0
+# TYPE haproxy_frontend_connections_total counter
+haproxy_frontend_connections_total{proxy="px"} 0
+# TYPE haproxy_frontend_intercepted_requests_total counter
+haproxy_frontend_intercepted_requests_total{proxy="px"} 0
+# TYPE haproxy_frontend_denied_connections_total counter
+haproxy_frontend_denied_connections_total{proxy="px"} 0
+# TYPE haproxy_frontend_denied_sessions_total counter
+haproxy_frontend_denied_sessions_total{proxy="px"} 0
+# TYPE haproxy_frontend_failed_header_rewriting_total counter
+haproxy_frontend_failed_header_rewriting_total{proxy="px"} 0
+# TYPE haproxy_frontend_http_cache_lookups_total counter
+haproxy_frontend_http_cache_lookups_total{proxy="px"} 0
+# TYPE haproxy_frontend_http_cache_hits_total counter
+haproxy_frontend_http_cache_hits_total{proxy="px"} 0
+# TYPE haproxy_frontend_internal_errors_total counter
+haproxy_frontend_internal_errors_total{proxy="px"} 0
+
+# ── backend (proxy) ──────────────────────────────────────────────────────────
+# TYPE haproxy_backend_current_queue gauge
+haproxy_backend_current_queue{proxy="px"} 0
+# TYPE haproxy_backend_max_queue gauge
+haproxy_backend_max_queue{proxy="px"} 0
+# TYPE haproxy_backend_current_sessions gauge
+haproxy_backend_current_sessions{proxy="px"} 0
+# TYPE haproxy_backend_max_sessions gauge
+haproxy_backend_max_sessions{proxy="px"} 0
+# TYPE haproxy_backend_limit_sessions gauge
+haproxy_backend_limit_sessions{proxy="px"} 0
+# TYPE haproxy_backend_sessions_total counter
+haproxy_backend_sessions_total{proxy="px"} 0
+# TYPE haproxy_backend_current_session_rate gauge
+haproxy_backend_current_session_rate{proxy="px"} 0
+# TYPE haproxy_backend_max_session_rate gauge
+haproxy_backend_max_session_rate{proxy="px"} 0
+# TYPE haproxy_backend_bytes_in_total counter
+haproxy_backend_bytes_in_total{proxy="px"} 0
+# TYPE haproxy_backend_bytes_out_total counter
+haproxy_backend_bytes_out_total{proxy="px"} 0
+# TYPE haproxy_backend_req_bytes_in_total counter
+haproxy_backend_req_bytes_in_total{proxy="px"} 0
+# TYPE haproxy_backend_req_bytes_out_total counter
+haproxy_backend_req_bytes_out_total{proxy="px"} 0
+# TYPE haproxy_backend_res_bytes_in_total counter
+haproxy_backend_res_bytes_in_total{proxy="px"} 0
+# TYPE haproxy_backend_res_bytes_out_total counter
+haproxy_backend_res_bytes_out_total{proxy="px"} 0
+# TYPE haproxy_backend_requests_denied_total counter
+haproxy_backend_requests_denied_total{proxy="px"} 0
+# TYPE haproxy_backend_responses_denied_total counter
+haproxy_backend_responses_denied_total{proxy="px"} 0
+# TYPE haproxy_backend_connection_errors_total counter
+haproxy_backend_connection_errors_total{proxy="px"} 0
+# TYPE haproxy_backend_response_errors_total counter
+haproxy_backend_response_errors_total{proxy="px"} 0
+# TYPE haproxy_backend_retry_warnings_total counter
+haproxy_backend_retry_warnings_total{proxy="px"} 0
+# TYPE haproxy_backend_redispatch_warnings_total counter
+haproxy_backend_redispatch_warnings_total{proxy="px"} 0
+# TYPE haproxy_backend_status gauge
+haproxy_backend_status{proxy="px",state="DOWN"} 0
+haproxy_backend_status{proxy="px",state="UP"} 0
+# TYPE haproxy_backend_weight gauge
+haproxy_backend_weight{proxy="px"} 0
+# TYPE haproxy_backend_active_servers gauge
+haproxy_backend_active_servers{proxy="px"} 0
+# TYPE haproxy_backend_backup_servers gauge
+haproxy_backend_backup_servers{proxy="px"} 0
+# TYPE haproxy_backend_check_up_down_total counter
+haproxy_backend_check_up_down_total{proxy="px"} 0
+# TYPE haproxy_backend_check_last_change_seconds gauge
+haproxy_backend_check_last_change_seconds{proxy="px"} 0
+# TYPE haproxy_backend_downtime_seconds_total counter
+haproxy_backend_downtime_seconds_total{proxy="px"} 0
+# TYPE haproxy_backend_loadbalanced_total counter
+haproxy_backend_loadbalanced_total{proxy="px"} 0
+# TYPE haproxy_backend_http_requests_total counter
+haproxy_backend_http_requests_total{proxy="px"} 0
+# TYPE haproxy_backend_http_responses_total counter
+haproxy_backend_http_responses_total{proxy="px",code="1xx"} 0
+haproxy_backend_http_responses_total{proxy="px",code="2xx"} 0
+haproxy_backend_http_responses_total{proxy="px",code="3xx"} 0
+haproxy_backend_http_responses_total{proxy="px",code="4xx"} 0
+haproxy_backend_http_responses_total{proxy="px",code="5xx"} 0
+haproxy_backend_http_responses_total{proxy="px",code="other"} 0
+# TYPE haproxy_backend_client_aborts_total counter
+haproxy_backend_client_aborts_total{proxy="px"} 0
+# TYPE haproxy_backend_server_aborts_total counter
+haproxy_backend_server_aborts_total{proxy="px"} 0
+# TYPE haproxy_backend_http_comp_bytes_in_total counter
+haproxy_backend_http_comp_bytes_in_total{proxy="px"} 0
+# TYPE haproxy_backend_http_comp_bytes_out_total counter
+haproxy_backend_http_comp_bytes_out_total{proxy="px"} 0
+# TYPE haproxy_backend_http_comp_bytes_bypassed_total counter
+haproxy_backend_http_comp_bytes_bypassed_total{proxy="px"} 0
+# TYPE haproxy_backend_http_comp_responses_total counter
+haproxy_backend_http_comp_responses_total{proxy="px"} 0
+# TYPE haproxy_backend_last_session_seconds gauge
+haproxy_backend_last_session_seconds{proxy="px"} 0
+# TYPE haproxy_backend_queue_time_average_seconds gauge
+haproxy_backend_queue_time_average_seconds{proxy="px"} 0
+# TYPE haproxy_backend_connect_time_average_seconds gauge
+haproxy_backend_connect_time_average_seconds{proxy="px"} 0
+# TYPE haproxy_backend_response_time_average_seconds gauge
+haproxy_backend_response_time_average_seconds{proxy="px"} 0
+# TYPE haproxy_backend_total_time_average_seconds gauge
+haproxy_backend_total_time_average_seconds{proxy="px"} 0
+# TYPE haproxy_backend_failed_header_rewriting_total counter
+haproxy_backend_failed_header_rewriting_total{proxy="px"} 0
+# TYPE haproxy_backend_connection_attempts_total counter
+haproxy_backend_connection_attempts_total{proxy="px"} 0
+# TYPE haproxy_backend_connection_reuses_total counter
+haproxy_backend_connection_reuses_total{proxy="px"} 0
+# TYPE haproxy_backend_http_cache_lookups_total counter
+haproxy_backend_http_cache_lookups_total{proxy="px"} 0
+# TYPE haproxy_backend_http_cache_hits_total counter
+haproxy_backend_http_cache_hits_total{proxy="px"} 0
+# TYPE haproxy_backend_max_queue_time_seconds gauge
+haproxy_backend_max_queue_time_seconds{proxy="px"} 0
+# TYPE haproxy_backend_max_connect_time_seconds gauge
+haproxy_backend_max_connect_time_seconds{proxy="px"} 0
+# TYPE haproxy_backend_max_response_time_seconds gauge
+haproxy_backend_max_response_time_seconds{proxy="px"} 0
+# TYPE haproxy_backend_max_total_time_seconds gauge
+haproxy_backend_max_total_time_seconds{proxy="px"} 0
+# TYPE haproxy_backend_internal_errors_total counter
+haproxy_backend_internal_errors_total{proxy="px"} 0
+# TYPE haproxy_backend_uweight gauge
+haproxy_backend_uweight{proxy="px"} 0
+# TYPE haproxy_backend_agg_server_check_status gauge
+haproxy_backend_agg_server_check_status{proxy="px",state="DOWN"} 0
+haproxy_backend_agg_server_check_status{proxy="px",state="UP"} 0
+haproxy_backend_agg_server_check_status{proxy="px",state="MAINT"} 0
+haproxy_backend_agg_server_check_status{proxy="px",state="DRAIN"} 0
+haproxy_backend_agg_server_check_status{proxy="px",state="NOLB"} 0
+# TYPE haproxy_backend_agg_check_status gauge
+haproxy_backend_agg_check_status{proxy="px",state="HANA"} 0
+haproxy_backend_agg_check_status{proxy="px",state="L7OK"} 0
+haproxy_backend_agg_check_status{proxy="px",state="L7STS"} 0
+
+# ── server (proxy, server) ─────────────────────────────────────────────────────
+# TYPE haproxy_server_current_queue gauge
+haproxy_server_current_queue{proxy="px",server="srv1"} 0
+# TYPE haproxy_server_max_queue gauge
+haproxy_server_max_queue{proxy="px",server="srv1"} 0
+# TYPE haproxy_server_current_sessions gauge
+haproxy_server_current_sessions{proxy="px",server="srv1"} 0
+# TYPE haproxy_server_max_sessions gauge
+haproxy_server_max_sessions{proxy="px",server="srv1"} 0
+# TYPE haproxy_server_limit_sessions gauge
+haproxy_server_limit_sessions{proxy="px",server="srv1"} 0
+# TYPE haproxy_server_sessions_total counter
+haproxy_server_sessions_total{proxy="px",server="srv1"} 0
+# TYPE haproxy_server_current_session_rate gauge
+haproxy_server_current_session_rate{proxy="px",server="srv1"} 0
+# TYPE haproxy_server_max_session_rate gauge
+haproxy_server_max_session_rate{proxy="px",server="srv1"} 0
+# TYPE haproxy_server_bytes_in_total counter
+haproxy_server_bytes_in_total{proxy="px",server="srv1"} 0
+# TYPE haproxy_server_bytes_out_total counter
+haproxy_server_bytes_out_total{proxy="px",server="srv1"} 0
+# TYPE haproxy_server_req_bytes_in_total counter
+haproxy_server_req_bytes_in_total{proxy="px",server="srv1"} 0
+# TYPE haproxy_server_req_bytes_out_total counter
+haproxy_server_req_bytes_out_total{proxy="px",server="srv1"} 0
+# TYPE haproxy_server_res_bytes_in_total counter
+haproxy_server_res_bytes_in_total{proxy="px",server="srv1"} 0
+# TYPE haproxy_server_res_bytes_out_total counter
+haproxy_server_res_bytes_out_total{proxy="px",server="srv1"} 0
+# TYPE haproxy_server_responses_denied_total counter
+haproxy_server_responses_denied_total{proxy="px",server="srv1"} 0
+# TYPE haproxy_server_connection_errors_total counter
+haproxy_server_connection_errors_total{proxy="px",server="srv1"} 0
+# TYPE haproxy_server_response_errors_total counter
+haproxy_server_response_errors_total{proxy="px",server="srv1"} 0
+# TYPE haproxy_server_retry_warnings_total counter
+haproxy_server_retry_warnings_total{proxy="px",server="srv1"} 0
+# TYPE haproxy_server_redispatch_warnings_total counter
+haproxy_server_redispatch_warnings_total{proxy="px",server="srv1"} 0
+# TYPE haproxy_server_status gauge
+haproxy_server_status{proxy="px",server="srv1",state="DOWN"} 0
+haproxy_server_status{proxy="px",server="srv1",state="UP"} 0
+haproxy_server_status{proxy="px",server="srv1",state="MAINT"} 0
+haproxy_server_status{proxy="px",server="srv1",state="DRAIN"} 0
+haproxy_server_status{proxy="px",server="srv1",state="NOLB"} 0
+# TYPE haproxy_server_weight gauge
+haproxy_server_weight{proxy="px",server="srv1"} 0
+# TYPE haproxy_server_active gauge
+haproxy_server_active{proxy="px",server="srv1"} 0
+# TYPE haproxy_server_backup gauge
+haproxy_server_backup{proxy="px",server="srv1"} 0
+# TYPE haproxy_server_check_failures_total counter
+haproxy_server_check_failures_total{proxy="px",server="srv1"} 0
+# TYPE haproxy_server_check_up_down_total counter
+haproxy_server_check_up_down_total{proxy="px",server="srv1"} 0
+# TYPE haproxy_server_check_last_change_seconds gauge
+haproxy_server_check_last_change_seconds{proxy="px",server="srv1"} 0
+# TYPE haproxy_server_downtime_seconds_total counter
+haproxy_server_downtime_seconds_total{proxy="px",server="srv1"} 0
+# TYPE haproxy_server_queue_limit gauge
+haproxy_server_queue_limit{proxy="px",server="srv1"} 0
+# TYPE haproxy_server_current_throttle gauge
+haproxy_server_current_throttle{proxy="px",server="srv1"} 0
+# TYPE haproxy_server_loadbalanced_total counter
+haproxy_server_loadbalanced_total{proxy="px",server="srv1"} 0
+# TYPE haproxy_server_check_status gauge
+haproxy_server_check_status{proxy="px",server="srv1",state="HANA"} 0
+haproxy_server_check_status{proxy="px",server="srv1",state="L4CON"} 0
+haproxy_server_check_status{proxy="px",server="srv1",state="L7OK"} 0
+# TYPE haproxy_server_check_code gauge
+haproxy_server_check_code{proxy="px",server="srv1"} 0
+# TYPE haproxy_server_check_duration_seconds gauge
+haproxy_server_check_duration_seconds{proxy="px",server="srv1"} 0
+# TYPE haproxy_server_http_requests_total counter
+haproxy_server_http_requests_total{proxy="px",server="srv1"} 0
+# TYPE haproxy_server_http_responses_total counter
+haproxy_server_http_responses_total{proxy="px",server="srv1",code="1xx"} 0
+haproxy_server_http_responses_total{proxy="px",server="srv1",code="2xx"} 0
+haproxy_server_http_responses_total{proxy="px",server="srv1",code="3xx"} 0
+haproxy_server_http_responses_total{proxy="px",server="srv1",code="4xx"} 0
+haproxy_server_http_responses_total{proxy="px",server="srv1",code="5xx"} 0
+haproxy_server_http_responses_total{proxy="px",server="srv1",code="other"} 0
+# TYPE haproxy_server_client_aborts_total counter
+haproxy_server_client_aborts_total{proxy="px",server="srv1"} 0
+# TYPE haproxy_server_server_aborts_total counter
+haproxy_server_server_aborts_total{proxy="px",server="srv1"} 0
+# TYPE haproxy_server_last_session_seconds gauge
+haproxy_server_last_session_seconds{proxy="px",server="srv1"} 0
+# TYPE haproxy_server_queue_time_average_seconds gauge
+haproxy_server_queue_time_average_seconds{proxy="px",server="srv1"} 0
+# TYPE haproxy_server_connect_time_average_seconds gauge
+haproxy_server_connect_time_average_seconds{proxy="px",server="srv1"} 0
+# TYPE haproxy_server_response_time_average_seconds gauge
+haproxy_server_response_time_average_seconds{proxy="px",server="srv1"} 0
+# TYPE haproxy_server_total_time_average_seconds gauge
+haproxy_server_total_time_average_seconds{proxy="px",server="srv1"} 0
+# TYPE haproxy_server_agent_status gauge
+haproxy_server_agent_status{proxy="px",server="srv1",state="HANA"} 0
+haproxy_server_agent_status{proxy="px",server="srv1",state="L7OK"} 0
+# TYPE haproxy_server_agent_code gauge
+haproxy_server_agent_code{proxy="px",server="srv1"} 0
+# TYPE haproxy_server_agent_duration_seconds gauge
+haproxy_server_agent_duration_seconds{proxy="px",server="srv1"} 0
+# TYPE haproxy_server_failed_header_rewriting_total counter
+haproxy_server_failed_header_rewriting_total{proxy="px",server="srv1"} 0
+# TYPE haproxy_server_connection_attempts_total counter
+haproxy_server_connection_attempts_total{proxy="px",server="srv1"} 0
+# TYPE haproxy_server_connection_reuses_total counter
+haproxy_server_connection_reuses_total{proxy="px",server="srv1"} 0
+# TYPE haproxy_server_idle_connections_current gauge
+haproxy_server_idle_connections_current{proxy="px",server="srv1"} 0
+# TYPE haproxy_server_idle_connections_limit gauge
+haproxy_server_idle_connections_limit{proxy="px",server="srv1"} 0
+# TYPE haproxy_server_max_queue_time_seconds gauge
+haproxy_server_max_queue_time_seconds{proxy="px",server="srv1"} 0
+# TYPE haproxy_server_max_connect_time_seconds gauge
+haproxy_server_max_connect_time_seconds{proxy="px",server="srv1"} 0
+# TYPE haproxy_server_max_response_time_seconds gauge
+haproxy_server_max_response_time_seconds{proxy="px",server="srv1"} 0
+# TYPE haproxy_server_max_total_time_seconds gauge
+haproxy_server_max_total_time_seconds{proxy="px",server="srv1"} 0
+# TYPE haproxy_server_internal_errors_total counter
+haproxy_server_internal_errors_total{proxy="px",server="srv1"} 0
+# TYPE haproxy_server_unsafe_idle_connections_current gauge
+haproxy_server_unsafe_idle_connections_current{proxy="px",server="srv1"} 0
+# TYPE haproxy_server_safe_idle_connections_current gauge
+haproxy_server_safe_idle_connections_current{proxy="px",server="srv1"} 0
+# TYPE haproxy_server_used_connections_current gauge
+haproxy_server_used_connections_current{proxy="px",server="srv1"} 0
+# TYPE haproxy_server_need_connections_current gauge
+haproxy_server_need_connections_current{proxy="px",server="srv1"} 0
+# TYPE haproxy_server_uweight gauge
+haproxy_server_uweight{proxy="px",server="srv1"} 0
+# TYPE haproxy_server_private_idle_connections_current gauge
+haproxy_server_private_idle_connections_current{proxy="px",server="srv1"} 0
+
+# ── listener (proxy, listener) ─────────────────────────────────────────────────
+# TYPE haproxy_listener_current_sessions gauge
+haproxy_listener_current_sessions{proxy="px",listener="listener1"} 0
+# TYPE haproxy_listener_max_sessions gauge
+haproxy_listener_max_sessions{proxy="px",listener="listener1"} 0
+# TYPE haproxy_listener_limit_sessions gauge
+haproxy_listener_limit_sessions{proxy="px",listener="listener1"} 0
+# TYPE haproxy_listener_sessions_total counter
+haproxy_listener_sessions_total{proxy="px",listener="listener1"} 0
+# TYPE haproxy_listener_bytes_in_total counter
+haproxy_listener_bytes_in_total{proxy="px",listener="listener1"} 0
+# TYPE haproxy_listener_bytes_out_total counter
+haproxy_listener_bytes_out_total{proxy="px",listener="listener1"} 0
+# TYPE haproxy_listener_req_bytes_in_total counter
+haproxy_listener_req_bytes_in_total{proxy="px",listener="listener1"} 0
+# TYPE haproxy_listener_req_bytes_out_total counter
+haproxy_listener_req_bytes_out_total{proxy="px",listener="listener1"} 0
+# TYPE haproxy_listener_res_bytes_in_total counter
+haproxy_listener_res_bytes_in_total{proxy="px",listener="listener1"} 0
+# TYPE haproxy_listener_res_bytes_out_total counter
+haproxy_listener_res_bytes_out_total{proxy="px",listener="listener1"} 0
+# TYPE haproxy_listener_requests_denied_total counter
+haproxy_listener_requests_denied_total{proxy="px",listener="listener1"} 0
+# TYPE haproxy_listener_responses_denied_total counter
+haproxy_listener_responses_denied_total{proxy="px",listener="listener1"} 0
+# TYPE haproxy_listener_request_errors_total counter
+haproxy_listener_request_errors_total{proxy="px",listener="listener1"} 0
+# TYPE haproxy_listener_status gauge
+haproxy_listener_status{proxy="px",listener="listener1",state="WAITING"} 0
+haproxy_listener_status{proxy="px",listener="listener1",state="OPEN"} 0
+haproxy_listener_status{proxy="px",listener="listener1",state="FULL"} 0
+# TYPE haproxy_listener_connections_total counter
+haproxy_listener_connections_total{proxy="px",listener="listener1"} 0
+# TYPE haproxy_listener_denied_connections_total counter
+haproxy_listener_denied_connections_total{proxy="px",listener="listener1"} 0
+# TYPE haproxy_listener_denied_sessions_total counter
+haproxy_listener_denied_sessions_total{proxy="px",listener="listener1"} 0
+# TYPE haproxy_listener_failed_header_rewriting_total counter
+haproxy_listener_failed_header_rewriting_total{proxy="px",listener="listener1"} 0
+# TYPE haproxy_listener_internal_errors_total counter
+haproxy_listener_internal_errors_total{proxy="px",listener="listener1"} 0
+
+# ── resolver (resolver, nameserver) — all gauges in source ─────────────────────
+# TYPE haproxy_resolver_sent gauge
+haproxy_resolver_sent{resolver="resolvers1",nameserver="ns1"} 0
+# TYPE haproxy_resolver_send_error gauge
+haproxy_resolver_send_error{resolver="resolvers1",nameserver="ns1"} 0
+# TYPE haproxy_resolver_valid gauge
+haproxy_resolver_valid{resolver="resolvers1",nameserver="ns1"} 0
+# TYPE haproxy_resolver_update gauge
+haproxy_resolver_update{resolver="resolvers1",nameserver="ns1"} 0
+# TYPE haproxy_resolver_cname gauge
+haproxy_resolver_cname{resolver="resolvers1",nameserver="ns1"} 0
+# TYPE haproxy_resolver_cname_error gauge
+haproxy_resolver_cname_error{resolver="resolvers1",nameserver="ns1"} 0
+# TYPE haproxy_resolver_any_err gauge
+haproxy_resolver_any_err{resolver="resolvers1",nameserver="ns1"} 0
+# TYPE haproxy_resolver_nx gauge
+haproxy_resolver_nx{resolver="resolvers1",nameserver="ns1"} 0
+# TYPE haproxy_resolver_timeout gauge
+haproxy_resolver_timeout{resolver="resolvers1",nameserver="ns1"} 0
+# TYPE haproxy_resolver_refused gauge
+haproxy_resolver_refused{resolver="resolvers1",nameserver="ns1"} 0
+# TYPE haproxy_resolver_other gauge
+haproxy_resolver_other{resolver="resolvers1",nameserver="ns1"} 0
+# TYPE haproxy_resolver_invalid gauge
+haproxy_resolver_invalid{resolver="resolvers1",nameserver="ns1"} 0
+# TYPE haproxy_resolver_too_big gauge
+haproxy_resolver_too_big{resolver="resolvers1",nameserver="ns1"} 0
+# TYPE haproxy_resolver_truncated gauge
+haproxy_resolver_truncated{resolver="resolvers1",nameserver="ns1"} 0
+# TYPE haproxy_resolver_outdated gauge
+haproxy_resolver_outdated{resolver="resolvers1",nameserver="ns1"} 0
+
+# ── sticktable (name, type) — all gauges in source ─────────────────────────────
+# TYPE haproxy_sticktable_size gauge
+haproxy_sticktable_size{name="table1",type="ip"} 0
+# TYPE haproxy_sticktable_used gauge
+haproxy_sticktable_used{name="table1",type="ip"} 0
+# TYPE haproxy_sticktable_local_updates gauge
+haproxy_sticktable_local_updates{name="table1",type="ip"} 0
+
+# ── extra-counters: H1 (mod="h1") ───────────────────────────────────────────────
+# TYPE haproxy_frontend_h1_open_connections gauge
+haproxy_frontend_h1_open_connections{proxy="px",mod="h1"} 0
+# TYPE haproxy_backend_h1_open_connections gauge
+haproxy_backend_h1_open_connections{proxy="px",mod="h1"} 0
+# TYPE haproxy_frontend_h1_open_streams gauge
+haproxy_frontend_h1_open_streams{proxy="px",mod="h1"} 0
+# TYPE haproxy_backend_h1_open_streams gauge
+haproxy_backend_h1_open_streams{proxy="px",mod="h1"} 0
+# TYPE haproxy_frontend_h1_total_connections counter
+haproxy_frontend_h1_total_connections{proxy="px",mod="h1"} 0
+# TYPE haproxy_backend_h1_total_connections counter
+haproxy_backend_h1_total_connections{proxy="px",mod="h1"} 0
+# TYPE haproxy_frontend_h1_total_streams counter
+haproxy_frontend_h1_total_streams{proxy="px",mod="h1"} 0
+# TYPE haproxy_backend_h1_total_streams counter
+haproxy_backend_h1_total_streams{proxy="px",mod="h1"} 0
+# TYPE haproxy_frontend_h1_bytes_in counter
+haproxy_frontend_h1_bytes_in{proxy="px",mod="h1"} 0
+# TYPE haproxy_backend_h1_bytes_in counter
+haproxy_backend_h1_bytes_in{proxy="px",mod="h1"} 0
+# TYPE haproxy_frontend_h1_bytes_out counter
+haproxy_frontend_h1_bytes_out{proxy="px",mod="h1"} 0
+# TYPE haproxy_backend_h1_bytes_out counter
+haproxy_backend_h1_bytes_out{proxy="px",mod="h1"} 0
+# TYPE haproxy_frontend_h1_spliced_bytes_in counter
+haproxy_frontend_h1_spliced_bytes_in{proxy="px",mod="h1"} 0
+# TYPE haproxy_backend_h1_spliced_bytes_in counter
+haproxy_backend_h1_spliced_bytes_in{proxy="px",mod="h1"} 0
+# TYPE haproxy_frontend_h1_spliced_bytes_out counter
+haproxy_frontend_h1_spliced_bytes_out{proxy="px",mod="h1"} 0
+# TYPE haproxy_backend_h1_spliced_bytes_out counter
+haproxy_backend_h1_spliced_bytes_out{proxy="px",mod="h1"} 0
+
+# ── extra-counters: H2 (mod="h2") ───────────────────────────────────────────────
+# TYPE haproxy_frontend_h2_headers_rcvd counter
+haproxy_frontend_h2_headers_rcvd{proxy="px",mod="h2"} 0
+# TYPE haproxy_backend_h2_headers_rcvd counter
+haproxy_backend_h2_headers_rcvd{proxy="px",mod="h2"} 0
+# TYPE haproxy_frontend_h2_data_rcvd counter
+haproxy_frontend_h2_data_rcvd{proxy="px",mod="h2"} 0
+# TYPE haproxy_backend_h2_data_rcvd counter
+haproxy_backend_h2_data_rcvd{proxy="px",mod="h2"} 0
+# TYPE haproxy_frontend_h2_settings_rcvd counter
+haproxy_frontend_h2_settings_rcvd{proxy="px",mod="h2"} 0
+# TYPE haproxy_backend_h2_settings_rcvd counter
+haproxy_backend_h2_settings_rcvd{proxy="px",mod="h2"} 0
+# TYPE haproxy_frontend_h2_rst_stream_rcvd counter
+haproxy_frontend_h2_rst_stream_rcvd{proxy="px",mod="h2"} 0
+# TYPE haproxy_backend_h2_rst_stream_rcvd counter
+haproxy_backend_h2_rst_stream_rcvd{proxy="px",mod="h2"} 0
+# TYPE haproxy_frontend_h2_goaway_rcvd counter
+haproxy_frontend_h2_goaway_rcvd{proxy="px",mod="h2"} 0
+# TYPE haproxy_backend_h2_goaway_rcvd counter
+haproxy_backend_h2_goaway_rcvd{proxy="px",mod="h2"} 0
+# TYPE haproxy_frontend_h2_detected_conn_protocol_errors counter
+haproxy_frontend_h2_detected_conn_protocol_errors{proxy="px",mod="h2"} 0
+# TYPE haproxy_backend_h2_detected_conn_protocol_errors counter
+haproxy_backend_h2_detected_conn_protocol_errors{proxy="px",mod="h2"} 0
+# TYPE haproxy_frontend_h2_detected_strm_protocol_errors counter
+haproxy_frontend_h2_detected_strm_protocol_errors{proxy="px",mod="h2"} 0
+# TYPE haproxy_backend_h2_detected_strm_protocol_errors counter
+haproxy_backend_h2_detected_strm_protocol_errors{proxy="px",mod="h2"} 0
+# TYPE haproxy_frontend_h2_rst_stream_resp counter
+haproxy_frontend_h2_rst_stream_resp{proxy="px",mod="h2"} 0
+# TYPE haproxy_backend_h2_rst_stream_resp counter
+haproxy_backend_h2_rst_stream_resp{proxy="px",mod="h2"} 0
+# TYPE haproxy_frontend_h2_goaway_resp counter
+haproxy_frontend_h2_goaway_resp{proxy="px",mod="h2"} 0
+# TYPE haproxy_backend_h2_goaway_resp counter
+haproxy_backend_h2_goaway_resp{proxy="px",mod="h2"} 0
+# TYPE haproxy_frontend_h2_open_connections gauge
+haproxy_frontend_h2_open_connections{proxy="px",mod="h2"} 0
+# TYPE haproxy_backend_h2_open_connections gauge
+haproxy_backend_h2_open_connections{proxy="px",mod="h2"} 0
+# TYPE haproxy_frontend_h2_backend_open_streams gauge
+haproxy_frontend_h2_backend_open_streams{proxy="px",mod="h2"} 0
+# TYPE haproxy_backend_h2_backend_open_streams gauge
+haproxy_backend_h2_backend_open_streams{proxy="px",mod="h2"} 0
+# TYPE haproxy_frontend_h2_total_connections counter
+haproxy_frontend_h2_total_connections{proxy="px",mod="h2"} 0
+# TYPE haproxy_backend_h2_total_connections counter
+haproxy_backend_h2_total_connections{proxy="px",mod="h2"} 0
+# TYPE haproxy_frontend_h2_backend_total_streams counter
+haproxy_frontend_h2_backend_total_streams{proxy="px",mod="h2"} 0
+# TYPE haproxy_backend_h2_backend_total_streams counter
+haproxy_backend_h2_backend_total_streams{proxy="px",mod="h2"} 0
+
+# ── extra-counters: SSL (mod="ssl") ─────────────────────────────────────────────
+# TYPE haproxy_frontend_ssl_sess counter
+haproxy_frontend_ssl_sess{proxy="px",mod="ssl"} 0
+# TYPE haproxy_listener_ssl_sess counter
+haproxy_listener_ssl_sess{proxy="px",listener="listener1",mod="ssl"} 0
+# TYPE haproxy_backend_ssl_sess counter
+haproxy_backend_ssl_sess{proxy="px",mod="ssl"} 0
+# TYPE haproxy_server_ssl_sess counter
+haproxy_server_ssl_sess{proxy="px",server="srv1",mod="ssl"} 0
+# TYPE haproxy_frontend_ssl_reused_sess counter
+haproxy_frontend_ssl_reused_sess{proxy="px",mod="ssl"} 0
+# TYPE haproxy_listener_ssl_reused_sess counter
+haproxy_listener_ssl_reused_sess{proxy="px",listener="listener1",mod="ssl"} 0
+# TYPE haproxy_backend_ssl_reused_sess counter
+haproxy_backend_ssl_reused_sess{proxy="px",mod="ssl"} 0
+# TYPE haproxy_server_ssl_reused_sess counter
+haproxy_server_ssl_reused_sess{proxy="px",server="srv1",mod="ssl"} 0
+# TYPE haproxy_frontend_ssl_failed_handshake counter
+haproxy_frontend_ssl_failed_handshake{proxy="px",mod="ssl"} 0
+# TYPE haproxy_listener_ssl_failed_handshake counter
+haproxy_listener_ssl_failed_handshake{proxy="px",listener="listener1",mod="ssl"} 0
+# TYPE haproxy_backend_ssl_failed_handshake counter
+haproxy_backend_ssl_failed_handshake{proxy="px",mod="ssl"} 0
+# TYPE haproxy_server_ssl_failed_handshake counter
+haproxy_server_ssl_failed_handshake{proxy="px",server="srv1",mod="ssl"} 0
+# TYPE haproxy_frontend_ssl_ocsp_staple counter
+haproxy_frontend_ssl_ocsp_staple{proxy="px",mod="ssl"} 0
+# TYPE haproxy_listener_ssl_ocsp_staple counter
+haproxy_listener_ssl_ocsp_staple{proxy="px",listener="listener1",mod="ssl"} 0
+# TYPE haproxy_backend_ssl_ocsp_staple counter
+haproxy_backend_ssl_ocsp_staple{proxy="px",mod="ssl"} 0
+# TYPE haproxy_server_ssl_ocsp_staple counter
+haproxy_server_ssl_ocsp_staple{proxy="px",server="srv1",mod="ssl"} 0
+# TYPE haproxy_frontend_ssl_failed_ocsp_staple counter
+haproxy_frontend_ssl_failed_ocsp_staple{proxy="px",mod="ssl"} 0
+# TYPE haproxy_listener_ssl_failed_ocsp_staple counter
+haproxy_listener_ssl_failed_ocsp_staple{proxy="px",listener="listener1",mod="ssl"} 0
+# TYPE haproxy_backend_ssl_failed_ocsp_staple counter
+haproxy_backend_ssl_failed_ocsp_staple{proxy="px",mod="ssl"} 0
+# TYPE haproxy_server_ssl_failed_ocsp_staple counter
+haproxy_server_ssl_failed_ocsp_staple{proxy="px",server="srv1",mod="ssl"} 0
+
+# ── extra-counters: QUIC (mod="quic") ───────────────────────────────────────────
+# TYPE haproxy_frontend_quic_rxbuf_full counter
+haproxy_frontend_quic_rxbuf_full{proxy="px",mod="quic"} 0
+# TYPE haproxy_backend_quic_rxbuf_full counter
+haproxy_backend_quic_rxbuf_full{proxy="px",mod="quic"} 0
+# TYPE haproxy_frontend_quic_dropped_pkt counter
+haproxy_frontend_quic_dropped_pkt{proxy="px",mod="quic"} 0
+# TYPE haproxy_backend_quic_dropped_pkt counter
+haproxy_backend_quic_dropped_pkt{proxy="px",mod="quic"} 0
+# TYPE haproxy_frontend_quic_dropped_pkt_bufoverrun counter
+haproxy_frontend_quic_dropped_pkt_bufoverrun{proxy="px",mod="quic"} 0
+# TYPE haproxy_backend_quic_dropped_pkt_bufoverrun counter
+haproxy_backend_quic_dropped_pkt_bufoverrun{proxy="px",mod="quic"} 0
+# TYPE haproxy_frontend_quic_dropped_parsing_pkt counter
+haproxy_frontend_quic_dropped_parsing_pkt{proxy="px",mod="quic"} 0
+# TYPE haproxy_backend_quic_dropped_parsing_pkt counter
+haproxy_backend_quic_dropped_parsing_pkt{proxy="px",mod="quic"} 0
+# TYPE haproxy_frontend_quic_socket_full counter
+haproxy_frontend_quic_socket_full{proxy="px",mod="quic"} 0
+# TYPE haproxy_backend_quic_socket_full counter
+haproxy_backend_quic_socket_full{proxy="px",mod="quic"} 0
+# TYPE haproxy_frontend_quic_sendto_err counter
+haproxy_frontend_quic_sendto_err{proxy="px",mod="quic"} 0
+# TYPE haproxy_backend_quic_sendto_err counter
+haproxy_backend_quic_sendto_err{proxy="px",mod="quic"} 0
+# TYPE haproxy_frontend_quic_sendto_err_unknwn counter
+haproxy_frontend_quic_sendto_err_unknwn{proxy="px",mod="quic"} 0
+# TYPE haproxy_backend_quic_sendto_err_unknwn counter
+haproxy_backend_quic_sendto_err_unknwn{proxy="px",mod="quic"} 0
+# TYPE haproxy_frontend_quic_sent_pkt counter
+haproxy_frontend_quic_sent_pkt{proxy="px",mod="quic"} 0
+# TYPE haproxy_backend_quic_sent_pkt counter
+haproxy_backend_quic_sent_pkt{proxy="px",mod="quic"} 0
+# TYPE haproxy_frontend_quic_lost_pkt counter
+haproxy_frontend_quic_lost_pkt{proxy="px",mod="quic"} 0
+# TYPE haproxy_backend_quic_lost_pkt counter
+haproxy_backend_quic_lost_pkt{proxy="px",mod="quic"} 0
+# TYPE haproxy_frontend_quic_too_short_dgram counter
+haproxy_frontend_quic_too_short_dgram{proxy="px",mod="quic"} 0
+# TYPE haproxy_backend_quic_too_short_dgram counter
+haproxy_backend_quic_too_short_dgram{proxy="px",mod="quic"} 0
+# TYPE haproxy_frontend_quic_retry_sent counter
+haproxy_frontend_quic_retry_sent{proxy="px",mod="quic"} 0
+# TYPE haproxy_backend_quic_retry_sent counter
+haproxy_backend_quic_retry_sent{proxy="px",mod="quic"} 0
+# TYPE haproxy_frontend_quic_retry_validated counter
+haproxy_frontend_quic_retry_validated{proxy="px",mod="quic"} 0
+# TYPE haproxy_backend_quic_retry_validated counter
+haproxy_backend_quic_retry_validated{proxy="px",mod="quic"} 0
+# TYPE haproxy_frontend_quic_retry_error counter
+haproxy_frontend_quic_retry_error{proxy="px",mod="quic"} 0
+# TYPE haproxy_backend_quic_retry_error counter
+haproxy_backend_quic_retry_error{proxy="px",mod="quic"} 0
+# TYPE haproxy_frontend_quic_half_open_conn counter
+haproxy_frontend_quic_half_open_conn{proxy="px",mod="quic"} 0
+# TYPE haproxy_backend_quic_half_open_conn counter
+haproxy_backend_quic_half_open_conn{proxy="px",mod="quic"} 0
+# TYPE haproxy_frontend_quic_hdshk_fail counter
+haproxy_frontend_quic_hdshk_fail{proxy="px",mod="quic"} 0
+# TYPE haproxy_backend_quic_hdshk_fail counter
+haproxy_backend_quic_hdshk_fail{proxy="px",mod="quic"} 0
+# TYPE haproxy_frontend_quic_stless_rst_sent counter
+haproxy_frontend_quic_stless_rst_sent{proxy="px",mod="quic"} 0
+# TYPE haproxy_backend_quic_stless_rst_sent counter
+haproxy_backend_quic_stless_rst_sent{proxy="px",mod="quic"} 0
+# TYPE haproxy_frontend_quic_conn_migration_done counter
+haproxy_frontend_quic_conn_migration_done{proxy="px",mod="quic"} 0
+# TYPE haproxy_backend_quic_conn_migration_done counter
+haproxy_backend_quic_conn_migration_done{proxy="px",mod="quic"} 0
+# TYPE haproxy_frontend_quic_transp_err_no_error counter
+haproxy_frontend_quic_transp_err_no_error{proxy="px",mod="quic"} 0
+# TYPE haproxy_backend_quic_transp_err_no_error counter
+haproxy_backend_quic_transp_err_no_error{proxy="px",mod="quic"} 0
+# TYPE haproxy_frontend_quic_transp_err_internal_error counter
+haproxy_frontend_quic_transp_err_internal_error{proxy="px",mod="quic"} 0
+# TYPE haproxy_backend_quic_transp_err_internal_error counter
+haproxy_backend_quic_transp_err_internal_error{proxy="px",mod="quic"} 0
+# TYPE haproxy_frontend_quic_transp_err_connection_refused counter
+haproxy_frontend_quic_transp_err_connection_refused{proxy="px",mod="quic"} 0
+# TYPE haproxy_backend_quic_transp_err_connection_refused counter
+haproxy_backend_quic_transp_err_connection_refused{proxy="px",mod="quic"} 0
+# TYPE haproxy_frontend_quic_transp_err_flow_control_error counter
+haproxy_frontend_quic_transp_err_flow_control_error{proxy="px",mod="quic"} 0
+# TYPE haproxy_backend_quic_transp_err_flow_control_error counter
+haproxy_backend_quic_transp_err_flow_control_error{proxy="px",mod="quic"} 0
+# TYPE haproxy_frontend_quic_transp_err_stream_limit_error counter
+haproxy_frontend_quic_transp_err_stream_limit_error{proxy="px",mod="quic"} 0
+# TYPE haproxy_backend_quic_transp_err_stream_limit_error counter
+haproxy_backend_quic_transp_err_stream_limit_error{proxy="px",mod="quic"} 0
+# TYPE haproxy_frontend_quic_transp_err_stream_state_error counter
+haproxy_frontend_quic_transp_err_stream_state_error{proxy="px",mod="quic"} 0
+# TYPE haproxy_backend_quic_transp_err_stream_state_error counter
+haproxy_backend_quic_transp_err_stream_state_error{proxy="px",mod="quic"} 0
+# TYPE haproxy_frontend_quic_transp_err_final_size_error counter
+haproxy_frontend_quic_transp_err_final_size_error{proxy="px",mod="quic"} 0
+# TYPE haproxy_backend_quic_transp_err_final_size_error counter
+haproxy_backend_quic_transp_err_final_size_error{proxy="px",mod="quic"} 0
+# TYPE haproxy_frontend_quic_transp_err_frame_encoding_error counter
+haproxy_frontend_quic_transp_err_frame_encoding_error{proxy="px",mod="quic"} 0
+# TYPE haproxy_backend_quic_transp_err_frame_encoding_error counter
+haproxy_backend_quic_transp_err_frame_encoding_error{proxy="px",mod="quic"} 0
+# TYPE haproxy_frontend_quic_transp_err_transport_parameter_error counter
+haproxy_frontend_quic_transp_err_transport_parameter_error{proxy="px",mod="quic"} 0
+# TYPE haproxy_backend_quic_transp_err_transport_parameter_error counter
+haproxy_backend_quic_transp_err_transport_parameter_error{proxy="px",mod="quic"} 0
+# TYPE haproxy_frontend_quic_transp_err_connection_id_limit counter
+haproxy_frontend_quic_transp_err_connection_id_limit{proxy="px",mod="quic"} 0
+# TYPE haproxy_backend_quic_transp_err_connection_id_limit counter
+haproxy_backend_quic_transp_err_connection_id_limit{proxy="px",mod="quic"} 0
+# TYPE haproxy_frontend_quic_transp_err_protocol_violation_error counter
+haproxy_frontend_quic_transp_err_protocol_violation_error{proxy="px",mod="quic"} 0
+# TYPE haproxy_backend_quic_transp_err_protocol_violation_error counter
+haproxy_backend_quic_transp_err_protocol_violation_error{proxy="px",mod="quic"} 0
+# TYPE haproxy_frontend_quic_transp_err_invalid_token counter
+haproxy_frontend_quic_transp_err_invalid_token{proxy="px",mod="quic"} 0
+# TYPE haproxy_backend_quic_transp_err_invalid_token counter
+haproxy_backend_quic_transp_err_invalid_token{proxy="px",mod="quic"} 0
+# TYPE haproxy_frontend_quic_transp_err_application_error counter
+haproxy_frontend_quic_transp_err_application_error{proxy="px",mod="quic"} 0
+# TYPE haproxy_backend_quic_transp_err_application_error counter
+haproxy_backend_quic_transp_err_application_error{proxy="px",mod="quic"} 0
+# TYPE haproxy_frontend_quic_transp_err_crypto_buffer_exceeded counter
+haproxy_frontend_quic_transp_err_crypto_buffer_exceeded{proxy="px",mod="quic"} 0
+# TYPE haproxy_backend_quic_transp_err_crypto_buffer_exceeded counter
+haproxy_backend_quic_transp_err_crypto_buffer_exceeded{proxy="px",mod="quic"} 0
+# TYPE haproxy_frontend_quic_transp_err_key_update_error counter
+haproxy_frontend_quic_transp_err_key_update_error{proxy="px",mod="quic"} 0
+# TYPE haproxy_backend_quic_transp_err_key_update_error counter
+haproxy_backend_quic_transp_err_key_update_error{proxy="px",mod="quic"} 0
+# TYPE haproxy_frontend_quic_transp_err_aead_limit_reached counter
+haproxy_frontend_quic_transp_err_aead_limit_reached{proxy="px",mod="quic"} 0
+# TYPE haproxy_backend_quic_transp_err_aead_limit_reached counter
+haproxy_backend_quic_transp_err_aead_limit_reached{proxy="px",mod="quic"} 0
+# TYPE haproxy_frontend_quic_transp_err_no_viable_path counter
+haproxy_frontend_quic_transp_err_no_viable_path{proxy="px",mod="quic"} 0
+# TYPE haproxy_backend_quic_transp_err_no_viable_path counter
+haproxy_backend_quic_transp_err_no_viable_path{proxy="px",mod="quic"} 0
+# TYPE haproxy_frontend_quic_transp_err_crypto_error counter
+haproxy_frontend_quic_transp_err_crypto_error{proxy="px",mod="quic"} 0
+# TYPE haproxy_backend_quic_transp_err_crypto_error counter
+haproxy_backend_quic_transp_err_crypto_error{proxy="px",mod="quic"} 0
+# TYPE haproxy_frontend_quic_transp_err_unknown_error counter
+haproxy_frontend_quic_transp_err_unknown_error{proxy="px",mod="quic"} 0
+# TYPE haproxy_backend_quic_transp_err_unknown_error counter
+haproxy_backend_quic_transp_err_unknown_error{proxy="px",mod="quic"} 0
+# TYPE haproxy_frontend_quic_data_blocked counter
+haproxy_frontend_quic_data_blocked{proxy="px",mod="quic"} 0
+# TYPE haproxy_backend_quic_data_blocked counter
+haproxy_backend_quic_data_blocked{proxy="px",mod="quic"} 0
+# TYPE haproxy_frontend_quic_stream_data_blocked counter
+haproxy_frontend_quic_stream_data_blocked{proxy="px",mod="quic"} 0
+# TYPE haproxy_backend_quic_stream_data_blocked counter
+haproxy_backend_quic_stream_data_blocked{proxy="px",mod="quic"} 0
+# TYPE haproxy_frontend_quic_streams_blocked_bidi counter
+haproxy_frontend_quic_streams_blocked_bidi{proxy="px",mod="quic"} 0
+# TYPE haproxy_backend_quic_streams_blocked_bidi counter
+haproxy_backend_quic_streams_blocked_bidi{proxy="px",mod="quic"} 0
+# TYPE haproxy_frontend_quic_streams_blocked_uni counter
+haproxy_frontend_quic_streams_blocked_uni{proxy="px",mod="quic"} 0
+# TYPE haproxy_backend_quic_streams_blocked_uni counter
+haproxy_backend_quic_streams_blocked_uni{proxy="px",mod="quic"} 0
+# TYPE haproxy_frontend_quic_ncbuf_gap_limit counter
+haproxy_frontend_quic_ncbuf_gap_limit{proxy="px",mod="quic"} 0
+# TYPE haproxy_backend_quic_ncbuf_gap_limit counter
+haproxy_backend_quic_ncbuf_gap_limit{proxy="px",mod="quic"} 0
+
+# ── extra-counters: H3/QPACK (mod="h3") ─────────────────────────────────────────
+# TYPE haproxy_frontend_h3_data counter
+haproxy_frontend_h3_data{proxy="px",mod="h3"} 0
+# TYPE haproxy_backend_h3_data counter
+haproxy_backend_h3_data{proxy="px",mod="h3"} 0
+# TYPE haproxy_frontend_h3_headers counter
+haproxy_frontend_h3_headers{proxy="px",mod="h3"} 0
+# TYPE haproxy_backend_h3_headers counter
+haproxy_backend_h3_headers{proxy="px",mod="h3"} 0
+# TYPE haproxy_frontend_h3_cancel_push counter
+haproxy_frontend_h3_cancel_push{proxy="px",mod="h3"} 0
+# TYPE haproxy_backend_h3_cancel_push counter
+haproxy_backend_h3_cancel_push{proxy="px",mod="h3"} 0
+# TYPE haproxy_frontend_h3_push_promise counter
+haproxy_frontend_h3_push_promise{proxy="px",mod="h3"} 0
+# TYPE haproxy_backend_h3_push_promise counter
+haproxy_backend_h3_push_promise{proxy="px",mod="h3"} 0
+# TYPE haproxy_frontend_h3_max_push_id counter
+haproxy_frontend_h3_max_push_id{proxy="px",mod="h3"} 0
+# TYPE haproxy_backend_h3_max_push_id counter
+haproxy_backend_h3_max_push_id{proxy="px",mod="h3"} 0
+# TYPE haproxy_frontend_h3_goaway counter
+haproxy_frontend_h3_goaway{proxy="px",mod="h3"} 0
+# TYPE haproxy_backend_h3_goaway counter
+haproxy_backend_h3_goaway{proxy="px",mod="h3"} 0
+# TYPE haproxy_frontend_h3_settings counter
+haproxy_frontend_h3_settings{proxy="px",mod="h3"} 0
+# TYPE haproxy_backend_h3_settings counter
+haproxy_backend_h3_settings{proxy="px",mod="h3"} 0
+# TYPE haproxy_frontend_h3_no_error counter
+haproxy_frontend_h3_no_error{proxy="px",mod="h3"} 0
+# TYPE haproxy_backend_h3_no_error counter
+haproxy_backend_h3_no_error{proxy="px",mod="h3"} 0
+# TYPE haproxy_frontend_h3_general_protocol_error counter
+haproxy_frontend_h3_general_protocol_error{proxy="px",mod="h3"} 0
+# TYPE haproxy_backend_h3_general_protocol_error counter
+haproxy_backend_h3_general_protocol_error{proxy="px",mod="h3"} 0
+# TYPE haproxy_frontend_h3_internal_error counter
+haproxy_frontend_h3_internal_error{proxy="px",mod="h3"} 0
+# TYPE haproxy_backend_h3_internal_error counter
+haproxy_backend_h3_internal_error{proxy="px",mod="h3"} 0
+# TYPE haproxy_frontend_h3_stream_creation_error counter
+haproxy_frontend_h3_stream_creation_error{proxy="px",mod="h3"} 0
+# TYPE haproxy_backend_h3_stream_creation_error counter
+haproxy_backend_h3_stream_creation_error{proxy="px",mod="h3"} 0
+# TYPE haproxy_frontend_h3_closed_critical_stream counter
+haproxy_frontend_h3_closed_critical_stream{proxy="px",mod="h3"} 0
+# TYPE haproxy_backend_h3_closed_critical_stream counter
+haproxy_backend_h3_closed_critical_stream{proxy="px",mod="h3"} 0
+# TYPE haproxy_frontend_h3_frame_unexpected counter
+haproxy_frontend_h3_frame_unexpected{proxy="px",mod="h3"} 0
+# TYPE haproxy_backend_h3_frame_unexpected counter
+haproxy_backend_h3_frame_unexpected{proxy="px",mod="h3"} 0
+# TYPE haproxy_frontend_h3_frame_error counter
+haproxy_frontend_h3_frame_error{proxy="px",mod="h3"} 0
+# TYPE haproxy_backend_h3_frame_error counter
+haproxy_backend_h3_frame_error{proxy="px",mod="h3"} 0
+# TYPE haproxy_frontend_h3_excessive_load counter
+haproxy_frontend_h3_excessive_load{proxy="px",mod="h3"} 0
+# TYPE haproxy_backend_h3_excessive_load counter
+haproxy_backend_h3_excessive_load{proxy="px",mod="h3"} 0
+# TYPE haproxy_frontend_h3_id_error counter
+haproxy_frontend_h3_id_error{proxy="px",mod="h3"} 0
+# TYPE haproxy_backend_h3_id_error counter
+haproxy_backend_h3_id_error{proxy="px",mod="h3"} 0
+# TYPE haproxy_frontend_h3_settings_error counter
+haproxy_frontend_h3_settings_error{proxy="px",mod="h3"} 0
+# TYPE haproxy_backend_h3_settings_error counter
+haproxy_backend_h3_settings_error{proxy="px",mod="h3"} 0
+# TYPE haproxy_frontend_h3_missing_settings counter
+haproxy_frontend_h3_missing_settings{proxy="px",mod="h3"} 0
+# TYPE haproxy_backend_h3_missing_settings counter
+haproxy_backend_h3_missing_settings{proxy="px",mod="h3"} 0
+# TYPE haproxy_frontend_h3_request_rejected counter
+haproxy_frontend_h3_request_rejected{proxy="px",mod="h3"} 0
+# TYPE haproxy_backend_h3_request_rejected counter
+haproxy_backend_h3_request_rejected{proxy="px",mod="h3"} 0
+# TYPE haproxy_frontend_h3_request_cancelled counter
+haproxy_frontend_h3_request_cancelled{proxy="px",mod="h3"} 0
+# TYPE haproxy_backend_h3_request_cancelled counter
+haproxy_backend_h3_request_cancelled{proxy="px",mod="h3"} 0
+# TYPE haproxy_frontend_h3_request_incomplete counter
+haproxy_frontend_h3_request_incomplete{proxy="px",mod="h3"} 0
+# TYPE haproxy_backend_h3_request_incomplete counter
+haproxy_backend_h3_request_incomplete{proxy="px",mod="h3"} 0
+# TYPE haproxy_frontend_h3_message_error counter
+haproxy_frontend_h3_message_error{proxy="px",mod="h3"} 0
+# TYPE haproxy_backend_h3_message_error counter
+haproxy_backend_h3_message_error{proxy="px",mod="h3"} 0
+# TYPE haproxy_frontend_h3_connect_error counter
+haproxy_frontend_h3_connect_error{proxy="px",mod="h3"} 0
+# TYPE haproxy_backend_h3_connect_error counter
+haproxy_backend_h3_connect_error{proxy="px",mod="h3"} 0
+# TYPE haproxy_frontend_h3_version_fallback counter
+haproxy_frontend_h3_version_fallback{proxy="px",mod="h3"} 0
+# TYPE haproxy_backend_h3_version_fallback counter
+haproxy_backend_h3_version_fallback{proxy="px",mod="h3"} 0
+# TYPE haproxy_frontend_pack_decompression_failed counter
+haproxy_frontend_pack_decompression_failed{proxy="px",mod="h3"} 0
+# TYPE haproxy_backend_pack_decompression_failed counter
+haproxy_backend_pack_decompression_failed{proxy="px",mod="h3"} 0
+# TYPE haproxy_frontend_qpack_encoder_stream_error counter
+haproxy_frontend_qpack_encoder_stream_error{proxy="px",mod="h3"} 0
+# TYPE haproxy_backend_qpack_encoder_stream_error counter
+haproxy_backend_qpack_encoder_stream_error{proxy="px",mod="h3"} 0
+# TYPE haproxy_frontend_qpack_decoder_stream_error counter
+haproxy_frontend_qpack_decoder_stream_error{proxy="px",mod="h3"} 0
+# TYPE haproxy_backend_qpack_decoder_stream_error counter
+haproxy_backend_qpack_decoder_stream_error{proxy="px",mod="h3"} 0

@@ -8,24 +8,25 @@ use std::ops::{Deref, DerefMut};
 /// `ValueGuard` enforces that only one journal object can be accessed at a time.
 /// This is necessary because:
 ///
-/// 1. The underlying window manager uses a limited number of memory-mapped windows
+/// 1. The underlying window manager keeps a limited number of memory-mapped windows
 ///    that are shared between all objects.
-/// 2. Creating a new object could invalidate memory references held by previously
-///    created objects, even though the objects themselves are immutable.
+/// 2. Accessing a new object can remap or evict a shared window, invalidating the
+///    references held by previously created objects.
 ///
 /// # Usage
 ///
-/// When a `ValueGuard<T>` is returned from methods like `data_object()`, it provides
-/// read-only access to the underlying object via the `Deref` trait. When the guard
-/// is dropped (goes out of scope), it automatically releases the lock, allowing new
-/// objects to be created.
+/// Reader methods such as `JournalFile::data_ref()` and writer methods such as
+/// `JournalFile::data_mut()` return a `ValueGuard<T>` that derefs to the object via the
+/// `Deref`/`DerefMut` traits. While a guard is alive, any other object access fails with
+/// `JournalError::ValueGuardInUse`; dropping the guard clears the in-use flag.
 ///
 /// # Safety and Interior Mutability
 ///
-/// Although the returned objects are immutable, the window manager that provides
-/// the memory they reference uses interior mutability (via `UnsafeCell`) to reuse
-/// memory-mapped regions. This guard ensures that objects are not accessed after
-/// their underlying memory might have been repurposed.
+/// `JournalFile` wraps the window manager in an `UnsafeCell` so its `&self` methods can
+/// remap windows. This guard makes guarded object access safe: those accessors check the
+/// in-use flag before touching any window, so a live object view cannot be invalidated
+/// through them. Internal helpers such as `object_header_ref` bypass that check and can
+/// still remap or evict windows while a view is live.
 #[derive(Debug)]
 pub struct ValueGuard<'a, T> {
     offset: NonZeroU64,

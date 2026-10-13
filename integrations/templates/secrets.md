@@ -35,6 +35,16 @@
 [% endfor %]
 
 [% endfor %]
+[[ page.uri_encoding.heading ]]
+
+[[ page.uri_encoding.body ]]
+
+[[ page.uri_encoding.example ]]
+
+[% for note in page.uri_encoding.notes %]
+- [[ note ]]
+[% endfor %]
+
 [[ page.store.heading ]]
 
 [[ page.store.body ]]

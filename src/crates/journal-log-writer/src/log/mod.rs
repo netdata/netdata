@@ -5,7 +5,8 @@ mod config;
 pub use config::{Config, RetentionPolicy, RotationPolicy};
 
 use crate::{Result, WriterError};
-use journal_common::{RealtimeClock, load_boot_id, load_machine_id, monotonic_now};
+use itoa::Buffer as ItoaBuffer;
+use journal_common::{Microseconds, RealtimeClock, load_boot_id, load_machine_id, monotonic_now};
 use journal_core::field_map::{
     FieldMap, REMAPPING_MARKER, extract_field_name, is_systemd_compatible,
 };
@@ -13,11 +14,27 @@ use journal_core::file::mmap::MmapMut;
 use journal_core::file::{JournalFile, JournalFileOptions, JournalWriter};
 use journal_registry::repository;
 use std::path::{Path, PathBuf};
+use std::sync::Arc;
 
 #[allow(unused_imports)]
 use tracing::{debug, error, info, instrument, span, warn};
 
+const STACK_ENTRY_REF_LIMIT: usize = 128;
+const SOURCE_REALTIME_PREFIX: &[u8] = b"_SOURCE_REALTIME_TIMESTAMP=";
+
 fn create_chain(path: &Path) -> Result<OwnedChain> {
+    // The journal directory must be absolute: downstream file-path parsing
+    // (`repository::File::from_path`) only accepts absolute paths, so a relative
+    // value would otherwise fail later at first write with a cause-less error.
+    // Checked first, before any I/O, so the rejection is FS-free and the error
+    // names the offending value regardless of machine-id availability.
+    if !path.is_absolute() {
+        return Err(WriterError::InvalidPath(format!(
+            "journal directory must be an absolute path, got: {}",
+            path.display()
+        )));
+    }
+
     let machine_id = load_machine_id()
         .map_err(|e| WriterError::MachineId(format!("failed to load machine ID: {}", e)))?;
 
@@ -89,7 +106,7 @@ impl RotationState {
     }
 }
 
-/// Groups a journal file and its writer together
+/// The repository file, journal file, and writer for the file being written.
 struct ActiveFile {
     repository_file: repository::File,
     journal_file: JournalFile<MmapMut>,
@@ -97,7 +114,7 @@ struct ActiveFile {
 }
 
 impl ActiveFile {
-    /// Creates a new journal file with the given parameters
+    /// Creates a fresh journal file in the chain, starting at `next_seqnum`.
     fn create(
         chain: &mut OwnedChain,
         seqnum_id: uuid::Uuid,
@@ -152,14 +169,12 @@ impl ActiveFile {
         })
     }
 
-    /// Writes a journal entry
     fn write_entry(&mut self, items: &[&[u8]], realtime: u64, monotonic: u64) -> Result<()> {
         self.writer
             .add_entry(&mut self.journal_file, items, realtime, monotonic)?;
         Ok(())
     }
 
-    /// Gets the current file size
     fn current_file_size(&self) -> u64 {
         self.writer.current_file_size()
     }
@@ -175,17 +190,83 @@ pub struct Log {
     current_seqnum: u64,
     remapping_registry: FieldMap,
     clock: RealtimeClock,
+    last_monotonic_usec: u64,
+    lifecycle_observer: Option<Arc<dyn LogLifecycleObserver>>,
+    boot_id_field: Vec<u8>,
+    source_realtime_field: Vec<u8>,
+}
+
+#[derive(Debug, Clone)]
+pub enum LogLifecycleEvent {
+    Rotated {
+        archived: repository::File,
+        active: repository::File,
+    },
+    RetainedDeleted {
+        files: Vec<repository::File>,
+    },
+}
+
+pub trait LogLifecycleObserver: Send + Sync {
+    fn on_event(&self, event: &LogLifecycleEvent);
+}
+
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub struct EntryTimestamps {
+    /// Optional source timestamp for `_SOURCE_REALTIME_TIMESTAMP` field injection.
+    pub source_realtime_usec: Option<u64>,
+    /// Optional journal entry realtime timestamp override.
+    pub entry_realtime_usec: Option<u64>,
+    /// Optional journal entry monotonic timestamp override.
+    pub entry_monotonic_usec: Option<u64>,
+}
+
+impl EntryTimestamps {
+    pub fn with_source_realtime_usec(mut self, ts: u64) -> Self {
+        self.source_realtime_usec = Some(ts);
+        self
+    }
+
+    pub fn with_entry_realtime_usec(mut self, ts: u64) -> Self {
+        self.entry_realtime_usec = Some(ts);
+        self
+    }
+
+    pub fn with_entry_monotonic_usec(mut self, ts: u64) -> Self {
+        self.entry_monotonic_usec = Some(ts);
+        self
+    }
 }
 
 impl Log {
-    /// Captures both realtime and monotonic timestamps, similar to systemd's dual_timestamp_now().
+    /// Returns the (realtime, monotonic) timestamp pair for an entry, using
+    /// `timestamp_override` for either value when set.
     ///
-    /// Returns (realtime_usec, monotonic_usec) where:
-    /// - realtime: microseconds since Unix epoch (CLOCK_REALTIME), monotonically increasing
-    /// - monotonic: microseconds since boot (CLOCK_MONOTONIC)
-    fn capture_dual_timestamp(&self) -> Result<(u64, u64)> {
-        let realtime = self.clock.now().get();
-        let monotonic = monotonic_now().map_err(|e| WriterError::Io(e))?.get();
+    /// Realtime is microseconds since the Unix epoch (via the strictly
+    /// increasing `clock`); monotonic is microseconds since boot. Both are
+    /// clamped to a `last + 1us` floor, so overrides that go backwards are
+    /// bumped forward.
+    fn capture_dual_timestamp(
+        &mut self,
+        timestamp_override: Option<&EntryTimestamps>,
+    ) -> Result<(u64, u64)> {
+        let realtime = match timestamp_override.and_then(|ts| ts.entry_realtime_usec) {
+            Some(ts) => self.clock.observe(Microseconds::new(ts)).get(),
+            None => self.clock.now().get(),
+        };
+
+        let desired_monotonic = match timestamp_override.and_then(|ts| ts.entry_monotonic_usec) {
+            Some(ts) => ts,
+            None => monotonic_now().map_err(WriterError::Io)?.get(),
+        };
+
+        let monotonic = if desired_monotonic > self.last_monotonic_usec {
+            desired_monotonic
+        } else {
+            self.last_monotonic_usec.saturating_add(1)
+        };
+        self.last_monotonic_usec = monotonic;
+
         Ok((realtime, monotonic))
     }
 
@@ -197,6 +278,9 @@ impl Log {
         let boot_id = load_boot_id()?;
         let seqnum_id = uuid::Uuid::new_v4();
         let rotation_state = RotationState::new(&config.rotation_policy);
+        // When there is no tail monotonic timestamp for this boot we start at 0.
+        // The first clamped write becomes 1us if an override asks for 0, preserving strict monotonicity.
+        let last_monotonic_usec = chain.tail_monotonic_for_boot(boot_id)?.unwrap_or(0);
 
         // Initialize clock with last entry timestamp if available
         let clock = if let Some(tail_realtime) = chain.tail_realtime()? {
@@ -215,7 +299,17 @@ impl Log {
             current_seqnum,
             remapping_registry: FieldMap::new(),
             clock,
+            last_monotonic_usec,
+            lifecycle_observer: None,
+            boot_id_field: format!("_BOOT_ID={}", boot_id.as_simple()).into_bytes(),
+            // +20 digits covers any u64 microsecond timestamp.
+            source_realtime_field: Vec::with_capacity(SOURCE_REALTIME_PREFIX.len() + 20),
         })
+    }
+
+    pub fn with_lifecycle_observer(mut self, observer: Arc<dyn LogLifecycleObserver>) -> Self {
+        self.lifecycle_observer = Some(observer);
+        self
     }
 
     /// Writes a journal entry.
@@ -228,97 +322,191 @@ impl Log {
         items: &[&[u8]],
         source_realtime_usec: Option<u64>,
     ) -> Result<()> {
+        self.write_entry_with_timestamps(
+            items,
+            EntryTimestamps {
+                source_realtime_usec,
+                ..EntryTimestamps::default()
+            },
+        )
+    }
+
+    /// Writes a journal entry with optional source and entry timestamp overrides.
+    ///
+    /// Overrides are safe by construction:
+    /// - entry realtime is clamped to strict monotonic progression (`last + 1us` floor)
+    /// - entry monotonic is also clamped to strict monotonic progression (`last + 1us` floor)
+    pub fn write_entry_with_timestamps(
+        &mut self,
+        items: &[&[u8]],
+        timestamps: EntryTimestamps,
+    ) -> Result<()> {
         if items.is_empty() {
             return Ok(());
         }
 
         if self.should_rotate() {
             self.rotate()?;
+            // The new file re-learns its own mappings on the next entry.
             self.remapping_registry.clear();
         }
 
-        // Collect new incompatible field names that need remapping
+        // Collect new incompatible field names that need remapping and track whether
+        // the current entry needs any field-name transformation at all.
         let mut new_mappings: Vec<(Vec<u8>, String)> = Vec::new();
+        let mut remapped_item_count = 0usize;
 
         for item in items {
             if let Some(field_name) = extract_field_name(item) {
-                // Skip if already systemd-compatible
                 if is_systemd_compatible(field_name) {
                     continue;
                 }
 
-                // Skip if already in registry
+                remapped_item_count += 1;
+
                 if self.remapping_registry.contains_otel_name(field_name) {
                     continue;
                 }
 
-                // Generate remapped name and add to list
                 let remapped_name = rdp::encode_full(field_name);
                 new_mappings.push((field_name.to_vec(), remapped_name));
             }
         }
 
-        // Write remapping entry if we have new mappings
         if !new_mappings.is_empty() {
-            self.write_remapping_entry(&new_mappings)?;
+            self.write_remapping_entry(&new_mappings, &timestamps)?;
 
-            // Update registry
             for (otel_name, systemd_name) in new_mappings.iter() {
                 self.remapping_registry
                     .add_otel_mapping(otel_name.clone(), systemd_name.clone());
             }
         }
 
-        // Inject _BOOT_ID field - this is required for journalctl boot filtering to work
-        let boot_id_field = format!("_BOOT_ID={}", self.boot_id.as_simple());
+        let (realtime, monotonic) = self.capture_dual_timestamp(Some(&timestamps))?;
 
-        // Transform items to use remapped field names, prepending _BOOT_ID
-        let mut transformed_items: Vec<Vec<u8>> = Vec::with_capacity(items.len() + 2);
-        let mut items_refs: Vec<&[u8]> = Vec::with_capacity(items.len() + 2);
-
-        // Prepend _BOOT_ID field first
-        transformed_items.push(boot_id_field.into_bytes());
-
-        // Add _SOURCE_REALTIME_TIMESTAMP if provided
-        if let Some(timestamp_usec) = source_realtime_usec {
-            let source_timestamp_field = format!("_SOURCE_REALTIME_TIMESTAMP={}", timestamp_usec);
-            transformed_items.push(source_timestamp_field.into_bytes());
+        if remapped_item_count == 0 {
+            self.write_entry_without_remapping(
+                items,
+                timestamps.source_realtime_usec,
+                realtime,
+                monotonic,
+            )?;
+        } else {
+            self.write_entry_with_remapping(
+                items,
+                timestamps.source_realtime_usec,
+                realtime,
+                monotonic,
+                remapped_item_count,
+            )?;
         }
 
-        for item in items {
-            if let Some(field_name) = extract_field_name(item) {
-                if let Some(remapped_name) = self.remapping_registry.get_systemd_name(field_name) {
-                    // Need to remap: create new item with remapped field name
-                    let equals_pos = item.iter().position(|&b| b == b'=').unwrap();
-                    let value = &item[equals_pos..]; // includes '='
-                    let mut new_item = Vec::with_capacity(remapped_name.len() + value.len());
-                    new_item.extend_from_slice(remapped_name.as_bytes());
-                    new_item.extend_from_slice(value);
-                    transformed_items.push(new_item);
-                } else {
-                    // No remapping needed, use original
-                    transformed_items.push(item.to_vec());
-                }
-            } else {
-                // No field name (shouldn't happen with valid items)
-                transformed_items.push(item.to_vec());
-            }
-        }
-
-        // Build references for the underlying write
-        for item in &transformed_items {
-            items_refs.push(item.as_slice());
-        }
-
-        let (realtime, monotonic) = self.capture_dual_timestamp()?;
-
-        let active_file = self.active_file.as_mut().unwrap();
-        active_file.write_entry(&items_refs, realtime, monotonic)?;
-
+        let active_file = self.active_file.as_ref().unwrap();
         self.rotation_state.update(&active_file.writer);
         self.current_seqnum += 1;
 
         Ok(())
+    }
+
+    fn write_entry_without_remapping(
+        &mut self,
+        items: &[&[u8]],
+        source_realtime_usec: Option<u64>,
+        realtime: u64,
+        monotonic: u64,
+    ) -> Result<()> {
+        let source_field = if let Some(timestamp_usec) = source_realtime_usec {
+            self.prepare_source_realtime_field(timestamp_usec);
+            Some(self.source_realtime_field.as_slice())
+        } else {
+            None
+        };
+
+        let total_items = items.len() + 1 + usize::from(source_field.is_some());
+        // Typical entries stay on the stack; larger ones fall back to a Vec.
+        if total_items <= STACK_ENTRY_REF_LIMIT {
+            let mut refs = [&[] as &[u8]; STACK_ENTRY_REF_LIMIT];
+            let mut len = 0usize;
+            refs[len] = self.boot_id_field.as_slice();
+            len += 1;
+            if let Some(source_field) = source_field {
+                refs[len] = source_field;
+                len += 1;
+            }
+            for item in items {
+                refs[len] = item;
+                len += 1;
+            }
+            self.active_file
+                .as_mut()
+                .unwrap()
+                .write_entry(&refs[..len], realtime, monotonic)?;
+        } else {
+            let mut refs = Vec::with_capacity(total_items);
+            refs.push(self.boot_id_field.as_slice());
+            if let Some(source_field) = source_field {
+                refs.push(source_field);
+            }
+            refs.extend(items.iter().copied());
+            self.active_file
+                .as_mut()
+                .unwrap()
+                .write_entry(&refs, realtime, monotonic)?;
+        }
+
+        Ok(())
+    }
+
+    fn write_entry_with_remapping(
+        &mut self,
+        items: &[&[u8]],
+        source_realtime_usec: Option<u64>,
+        realtime: u64,
+        monotonic: u64,
+        _remapped_item_count: usize,
+    ) -> Result<()> {
+        let mut transformed_items: Vec<Vec<u8>> =
+            Vec::with_capacity(items.len() + 1 + usize::from(source_realtime_usec.is_some()));
+        transformed_items.push(self.boot_id_field.clone());
+        if let Some(timestamp_usec) = source_realtime_usec {
+            self.prepare_source_realtime_field(timestamp_usec);
+            transformed_items.push(self.source_realtime_field.clone());
+        }
+
+        for item in items {
+            if let Some(field_name) = extract_field_name(item)
+                && let Some(remapped_name) = self.remapping_registry.get_systemd_name(field_name)
+            {
+                let equals_pos = item.iter().position(|&b| b == b'=').unwrap();
+                let value = &item[equals_pos..];
+                let mut new_item = Vec::with_capacity(remapped_name.len() + value.len());
+                new_item.extend_from_slice(remapped_name.as_bytes());
+                new_item.extend_from_slice(value);
+                transformed_items.push(new_item);
+            } else {
+                transformed_items.push(item.to_vec());
+            }
+        }
+
+        let items_refs: Vec<&[u8]> = transformed_items
+            .iter()
+            .map(|item| item.as_slice())
+            .collect();
+        self.active_file
+            .as_mut()
+            .unwrap()
+            .write_entry(&items_refs, realtime, monotonic)?;
+
+        Ok(())
+    }
+
+    fn prepare_source_realtime_field(&mut self, timestamp_usec: u64) {
+        self.source_realtime_field.clear();
+        self.source_realtime_field
+            .extend_from_slice(SOURCE_REALTIME_PREFIX);
+        let mut buffer = ItoaBuffer::new();
+        self.source_realtime_field
+            .extend_from_slice(buffer.format(timestamp_usec).as_bytes());
     }
 
     /// Writes a remapping entry containing field name mappings.
@@ -326,20 +514,23 @@ impl Log {
     /// Format:
     /// _BOOT_ID=<boot_id>
     /// ND_REMAPPING=1
-    /// ND_<md5_1>=<otel_key_1>
-    /// ND_<md5_2>=<otel_key_2>
+    /// <remapped_name>=<original_field_name>
     /// ...
-    fn write_remapping_entry(&mut self, mappings: &[(Vec<u8>, String)]) -> Result<()> {
+    ///
+    /// `<remapped_name>` comes from `rdp::encode_full`: a structured `ND...`
+    /// encoding, or an `ND_<md5>` fallback for names it cannot encode.
+    fn write_remapping_entry(
+        &mut self,
+        mappings: &[(Vec<u8>, String)],
+        timestamps: &EntryTimestamps,
+    ) -> Result<()> {
         let mut remapping_items: Vec<Vec<u8>> = Vec::with_capacity(mappings.len() + 2);
 
-        // Inject _BOOT_ID field first
         let boot_id_field = format!("_BOOT_ID={}", self.boot_id.as_simple());
         remapping_items.push(boot_id_field.into_bytes());
 
-        // Add marker field
         remapping_items.push(REMAPPING_MARKER.to_vec());
 
-        // Add each mapping as ND_<md5>=<otel_key>
         for (otel_name, systemd_name) in mappings {
             let mut item = Vec::with_capacity(systemd_name.len() + 1 + otel_name.len());
             item.extend_from_slice(systemd_name.as_bytes());
@@ -348,10 +539,9 @@ impl Log {
             remapping_items.push(item);
         }
 
-        // Build references
         let items_refs: Vec<&[u8]> = remapping_items.iter().map(|v| v.as_slice()).collect();
 
-        let (realtime, monotonic) = self.capture_dual_timestamp()?;
+        let (realtime, monotonic) = self.capture_dual_timestamp(Some(timestamps))?;
 
         let active_file = self.active_file.as_mut().unwrap();
         active_file.write_entry(&items_refs, realtime, monotonic)?;
@@ -373,6 +563,12 @@ impl Log {
         Ok(())
     }
 
+    pub fn active_file(&self) -> Option<&repository::File> {
+        self.active_file
+            .as_ref()
+            .map(|active_file| &active_file.repository_file)
+    }
+
     fn should_rotate(&self) -> bool {
         self.active_file.is_none() || self.rotation_state.should_rotate()
     }
@@ -381,7 +577,7 @@ impl Log {
     fn rotate(&mut self) -> Result<()> {
         use journal_core::file::JournalState;
 
-        // Update chain with current file size before rotating
+        // Record the outgoing file's final size in the chain before replacing it.
         if let Some(active_file) = &self.active_file {
             self.chain.update_file_size(
                 &active_file.repository_file,
@@ -389,33 +585,55 @@ impl Log {
             );
         }
 
-        // Respect retention policy
-        self.chain.retain(&self.config.retention_policy)?;
+        let retention = self.chain.retain(&self.config.retention_policy);
+        let deleted_files = retention.deleted_files;
+        if !deleted_files.is_empty()
+            && let Some(observer) = &self.lifecycle_observer
+        {
+            observer.on_event(&LogLifecycleEvent::RetainedDeleted {
+                files: deleted_files,
+            });
+        }
+        if let Some(error) = retention.error {
+            return Err(error);
+        }
 
-        // Create new file (either initial or rotated)
         let max_file_size = self.config.rotation_policy.size_of_journal_file;
         let head_realtime = self.clock.now().get();
-        let new_file = if let Some(mut old_file) = self.active_file.take() {
+        let (new_file, rotation_event) = if let Some(mut old_file) = self.active_file.take() {
             // Set the old file's state to ARCHIVED before creating successor
             old_file.journal_file.journal_header_mut().state = JournalState::Archived as u8;
             old_file.journal_file.sync()?;
-
-            old_file.rotate(&mut self.chain, max_file_size, head_realtime)?
+            let archived = old_file.repository_file.clone();
+            let new_file = old_file.rotate(&mut self.chain, max_file_size, head_realtime)?;
+            let active = new_file.repository_file.clone();
+            (
+                new_file,
+                Some(LogLifecycleEvent::Rotated { archived, active }),
+            )
         } else {
-            ActiveFile::create(
-                &mut self.chain,
-                self.seqnum_id,
-                self.boot_id,
-                self.current_seqnum + 1,
-                max_file_size,
-                head_realtime,
-            )?
+            (
+                ActiveFile::create(
+                    &mut self.chain,
+                    self.seqnum_id,
+                    self.boot_id,
+                    self.current_seqnum + 1,
+                    max_file_size,
+                    head_realtime,
+                )?,
+                None,
+            )
         };
 
         tracing::Span::current().record("new_file", new_file.repository_file.path());
 
         self.active_file = Some(new_file);
         self.rotation_state.reset();
+        if let Some(event) = rotation_event
+            && let Some(observer) = &self.lifecycle_observer
+        {
+            observer.on_event(&event);
+        }
 
         Ok(())
     }
@@ -477,30 +695,24 @@ impl Log {
     pub fn write_structured<T: serde::Serialize>(&mut self, value: &T) -> Result<()> {
         use flatten_serde_json::flatten;
 
-        // Serialize to JSON value
         let json_value = serde_json::to_value(value).map_err(|e| {
             WriterError::Serialization(format!("failed to serialize to JSON: {}", e))
         })?;
 
-        // Flatten the JSON structure - requires a JSON object (Map)
         let flattened = if let serde_json::Value::Object(map) = json_value {
             flatten(&map)
         } else {
-            // If not an object, return error
             return Err(WriterError::Serialization(
                 "value must be a JSON object, not a primitive or array".to_string(),
             ));
         };
 
-        // Convert to journal field format (KEY=VALUE)
         let mut fields: Vec<Vec<u8>> = Vec::with_capacity(flattened.len());
 
         for (key, value) in flattened.iter() {
-            // Convert key to uppercase and replace dots with underscores
-            // (journal convention)
+            // Journal convention: field names are uppercase with dots as underscores.
             let journal_key = key.to_uppercase().replace('.', "_");
 
-            // Format as KEY=VALUE
             let field = match value {
                 serde_json::Value::String(s) => {
                     format!("{}={}", journal_key, s)
@@ -514,7 +726,7 @@ impl Log {
                 serde_json::Value::Null => {
                     format!("{}=", journal_key)
                 }
-                // Arrays and objects should be flattened already, but just in case
+                // Whatever flatten leaves nested (e.g. arrays) is written as JSON text.
                 _ => {
                     format!("{}={}", journal_key, value)
                 }
@@ -523,7 +735,6 @@ impl Log {
             fields.push(field.into_bytes());
         }
 
-        // Convert Vec<Vec<u8>> to Vec<&[u8]> for write_entry
         let field_refs: Vec<&[u8]> = fields.iter().map(|f| f.as_slice()).collect();
 
         self.write_entry(&field_refs, None)
@@ -535,13 +746,12 @@ impl Drop for Log {
         use journal_core::file::JournalState;
 
         if let Some(ref mut active_file) = self.active_file {
-            // A single file is opened for writing exactly once. Once closed, we
-            // treat them as immutable. We need a custom impl for `Drop` to keep
-            // this invariant true whenever the plugin receives a `SIGTERM` or
-            // a `SIGINT`.
+            // A journal file is opened for writing exactly once; once closed,
+            // it is treated as immutable. The custom `Drop` impl keeps that
+            // invariant when the plugin receives a `SIGTERM` or a `SIGINT`.
             active_file.journal_file.journal_header_mut().state = JournalState::Archived as u8;
 
-            // Best/Last-effort sync just to be on the cautious side.
+            // Best-effort sync; errors are ignored during drop.
             let _ = active_file.journal_file.sync();
         }
     }

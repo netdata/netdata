@@ -1,347 +1,346 @@
 ---
-id: service_bus
-name: Azure Service Bus Namespace
+display_name: Azure Service Bus Namespace
 resource_type: Microsoft.ServiceBus/Namespaces
 metrics:
-- id: incoming_messages
-  azure_name: IncomingMessages
-  time_grain: PT1M
-  series:
-  - aggregation: total
-    kind: counter
-- id: outgoing_messages
-  azure_name: OutgoingMessages
-  time_grain: PT1M
-  series:
-  - aggregation: total
-    kind: counter
-- id: complete_message
-  azure_name: CompleteMessage
-  time_grain: PT1M
-  series:
-  - aggregation: total
-    kind: counter
-- id: abandon_message
-  azure_name: AbandonMessage
-  time_grain: PT1M
-  series:
-  - aggregation: total
-    kind: counter
-- id: active_messages
-  azure_name: ActiveMessages
-  time_grain: PT1M
-  series:
-  - aggregation: average
-    kind: gauge
-- id: deadlettered_messages
-  azure_name: DeadletteredMessages
-  time_grain: PT1M
-  series:
-  - aggregation: average
-    kind: gauge
-- id: scheduled_messages
-  azure_name: ScheduledMessages
-  time_grain: PT1M
-  series:
-  - aggregation: average
-    kind: gauge
-- id: incoming_requests
-  azure_name: IncomingRequests
-  time_grain: PT1M
-  series:
-  - aggregation: total
-    kind: counter
-- id: successful_requests
-  azure_name: SuccessfulRequests
-  time_grain: PT1M
-  series:
-  - aggregation: total
-    kind: counter
-- id: server_errors
-  azure_name: ServerErrors
-  time_grain: PT1M
-  series:
-  - aggregation: total
-    kind: counter
-- id: user_errors
-  azure_name: UserErrors
-  time_grain: PT1M
-  series:
-  - aggregation: total
-    kind: counter
-- id: throttled_requests
-  azure_name: ThrottledRequests
-  time_grain: PT1M
-  series:
-  - aggregation: total
-    kind: counter
-- id: active_connections
-  azure_name: ActiveConnections
-  time_grain: PT1M
-  series:
-  - aggregation: total
-    kind: gauge
-- id: connections_opened
-  azure_name: ConnectionsOpened
-  time_grain: PT1M
-  series:
-  - aggregation: average
-    kind: gauge
-- id: connections_closed
-  azure_name: ConnectionsClosed
-  time_grain: PT1M
-  series:
-  - aggregation: average
-    kind: gauge
-- id: incoming_bytes
-  azure_name: IncomingBytes
-  time_grain: PT1M
-  series:
-  - aggregation: total
-    kind: counter
-- id: outgoing_bytes
-  azure_name: OutgoingBytes
-  time_grain: PT1M
-  series:
-  - aggregation: total
-    kind: counter
-- id: messages
-  azure_name: Messages
-  time_grain: PT1M
-  series:
-  - aggregation: average
-    kind: gauge
-- id: namespace_cpu_usage
-  azure_name: NamespaceCpuUsage
-  time_grain: PT1M
-  series:
-  - aggregation: maximum
-    kind: gauge
-- id: namespace_memory_usage
-  azure_name: NamespaceMemoryUsage
-  time_grain: PT1M
-  series:
-  - aggregation: maximum
-    kind: gauge
-- id: server_send_latency
-  azure_name: ServerSendLatency
-  time_grain: PT1M
-  series:
-  - aggregation: average
-    kind: gauge
-- id: pending_checkpoint_operation_count
-  azure_name: PendingCheckpointOperationCount
-  time_grain: PT1M
-  series:
-  - aggregation: total
-    kind: gauge
-- id: replication_lag_count
-  azure_name: ReplicationLagCount
-  time_grain: PT1M
-  series:
-  - aggregation: maximum
-    kind: gauge
-- id: replication_lag_duration
-  azure_name: ReplicationLagDuration
-  time_grain: PT1M
-  series:
-  - aggregation: maximum
-    kind: gauge
-- id: size
-  azure_name: Size
-  time_grain: PT1M
-  series:
-  - aggregation: average
-    kind: gauge
+  - id: incoming_messages
+    azure_name: IncomingMessages
+    time_grain: PT1M
+    series:
+      - aggregation: total
+        kind: counter
+  - id: outgoing_messages
+    azure_name: OutgoingMessages
+    time_grain: PT1M
+    series:
+      - aggregation: total
+        kind: counter
+  - id: complete_message
+    azure_name: CompleteMessage
+    time_grain: PT1M
+    series:
+      - aggregation: total
+        kind: counter
+  - id: abandon_message
+    azure_name: AbandonMessage
+    time_grain: PT1M
+    series:
+      - aggregation: total
+        kind: counter
+  - id: active_messages
+    azure_name: ActiveMessages
+    time_grain: PT1M
+    series:
+      - aggregation: average
+        kind: gauge
+  - id: deadlettered_messages
+    azure_name: DeadletteredMessages
+    time_grain: PT1M
+    series:
+      - aggregation: average
+        kind: gauge
+  - id: scheduled_messages
+    azure_name: ScheduledMessages
+    time_grain: PT1M
+    series:
+      - aggregation: average
+        kind: gauge
+  - id: incoming_requests
+    azure_name: IncomingRequests
+    time_grain: PT1M
+    series:
+      - aggregation: total
+        kind: counter
+  - id: successful_requests
+    azure_name: SuccessfulRequests
+    time_grain: PT1M
+    series:
+      - aggregation: total
+        kind: counter
+  - id: server_errors
+    azure_name: ServerErrors
+    time_grain: PT1M
+    series:
+      - aggregation: total
+        kind: counter
+  - id: user_errors
+    azure_name: UserErrors
+    time_grain: PT1M
+    series:
+      - aggregation: total
+        kind: counter
+  - id: throttled_requests
+    azure_name: ThrottledRequests
+    time_grain: PT1M
+    series:
+      - aggregation: total
+        kind: counter
+  - id: active_connections
+    azure_name: ActiveConnections
+    time_grain: PT1M
+    series:
+      - aggregation: total
+        kind: gauge
+  - id: connections_opened
+    azure_name: ConnectionsOpened
+    time_grain: PT1M
+    series:
+      - aggregation: average
+        kind: gauge
+  - id: connections_closed
+    azure_name: ConnectionsClosed
+    time_grain: PT1M
+    series:
+      - aggregation: average
+        kind: gauge
+  - id: incoming_bytes
+    azure_name: IncomingBytes
+    time_grain: PT1M
+    series:
+      - aggregation: total
+        kind: counter
+  - id: outgoing_bytes
+    azure_name: OutgoingBytes
+    time_grain: PT1M
+    series:
+      - aggregation: total
+        kind: counter
+  - id: messages
+    azure_name: Messages
+    time_grain: PT1M
+    series:
+      - aggregation: average
+        kind: gauge
+  - id: namespace_cpu_usage
+    azure_name: NamespaceCpuUsage
+    time_grain: PT1M
+    series:
+      - aggregation: maximum
+        kind: gauge
+  - id: namespace_memory_usage
+    azure_name: NamespaceMemoryUsage
+    time_grain: PT1M
+    series:
+      - aggregation: maximum
+        kind: gauge
+  - id: server_send_latency
+    azure_name: ServerSendLatency
+    time_grain: PT1M
+    series:
+      - aggregation: average
+        kind: gauge
+  - id: pending_checkpoint_operation_count
+    azure_name: PendingCheckpointOperationCount
+    time_grain: PT1M
+    series:
+      - aggregation: total
+        kind: gauge
+  - id: replication_lag_count
+    azure_name: ReplicationLagCount
+    time_grain: PT1M
+    series:
+      - aggregation: maximum
+        kind: gauge
+  - id: replication_lag_duration
+    azure_name: ReplicationLagDuration
+    time_grain: PT1M
+    series:
+      - aggregation: maximum
+        kind: gauge
+  - id: size
+    azure_name: Size
+    time_grain: PT1M
+    series:
+      - aggregation: average
+        kind: gauge
 template:
   family: Azure Service Bus Namespace
   context_namespace: service_bus
   chart_defaults:
     label_promotion:
-    - resource_name
-    - resource_group
-    - region
-    - resource_type
-    - profile
+      - resource_name
+      - resource_group
+      - region
+      - resource_type
+      - profile
     instances:
       by_labels:
-      - resource_uid
+        - resource_uid
   charts:
-  - id: am_azure_service_bus__message_flow
-    title: Azure Service Bus Message Flow
-    context: message_flow
-    family: Messages
-    type: line
-    units: messages/s
-    algorithm: incremental
-    dimensions:
-    - selector: service_bus.incoming_messages_total
-      name: in
-    - selector: service_bus.outgoing_messages_total
-      name: out
-  - id: am_azure_service_bus__message_operations
-    title: Azure Service Bus Message Operations
-    context: message_operations
-    family: Messages
-    type: line
-    units: messages/s
-    algorithm: incremental
-    dimensions:
-    - selector: service_bus.complete_message_total
-      name: completed
-    - selector: service_bus.abandon_message_total
-      name: abandoned
-  - id: am_azure_service_bus__queue_depth
-    title: Azure Service Bus Queue Depth
-    context: queue_depth
-    family: Queue
-    type: line
-    units: messages
-    algorithm: absolute
-    dimensions:
-    - selector: service_bus.active_messages_average
-      name: active
-  - id: am_azure_service_bus__problem_messages
-    title: Azure Service Bus Problem Messages
-    context: problem_messages
-    family: Queue
-    type: line
-    units: messages
-    algorithm: absolute
-    dimensions:
-    - selector: service_bus.deadlettered_messages_average
-      name: dead_lettered
-    - selector: service_bus.scheduled_messages_average
-      name: scheduled
-  - id: am_azure_service_bus__total_messages
-    title: Azure Service Bus Total Messages
-    context: total_messages
-    family: Queue
-    type: line
-    units: messages
-    algorithm: absolute
-    dimensions:
-    - selector: service_bus.messages_average
-      name: total
-  - id: am_azure_service_bus__requests
-    title: Azure Service Bus Requests
-    context: requests
-    family: Requests
-    type: line
-    units: requests/s
-    algorithm: incremental
-    dimensions:
-    - selector: service_bus.incoming_requests_total
-      name: incoming
-    - selector: service_bus.successful_requests_total
-      name: successful
-  - id: am_azure_service_bus__errors
-    title: Azure Service Bus Errors
-    context: errors
-    family: Errors
-    type: line
-    units: errors/s
-    algorithm: incremental
-    dimensions:
-    - selector: service_bus.server_errors_total
-      name: server
-    - selector: service_bus.user_errors_total
-      name: user
-    - selector: service_bus.throttled_requests_total
-      name: throttled
-  - id: am_azure_service_bus__connections
-    title: Azure Service Bus Active Connections
-    context: connections
-    family: Connections
-    type: line
-    units: connections
-    algorithm: absolute
-    dimensions:
-    - selector: service_bus.active_connections_total
-      name: active
-  - id: am_azure_service_bus__connection_events
-    title: Azure Service Bus Connection Events
-    context: connection_events
-    family: Connections
-    type: line
-    units: connections
-    algorithm: absolute
-    dimensions:
-    - selector: service_bus.connections_opened_average
-      name: opened
-    - selector: service_bus.connections_closed_average
-      name: closed
-  - id: am_azure_service_bus__namespace_size
-    title: Azure Service Bus Namespace Size
-    context: namespace_size
-    family: Capacity
-    type: line
-    units: bytes
-    algorithm: absolute
-    dimensions:
-    - selector: service_bus.size_average
-      name: average
-  - id: am_azure_service_bus__data_throughput
-    title: Azure Service Bus Data Throughput
-    context: data_throughput
-    family: Messages
-    type: line
-    units: bytes/s
-    algorithm: incremental
-    dimensions:
-    - selector: service_bus.incoming_bytes_total
-      name: in
-    - selector: service_bus.outgoing_bytes_total
-      name: out
-  - id: am_azure_service_bus__namespace_resources
-    title: Azure Service Bus Namespace Resources
-    context: namespace_resources
-    family: Capacity
-    type: line
-    units: percentage
-    algorithm: absolute
-    dimensions:
-    - selector: service_bus.namespace_cpu_usage_maximum
-      name: cpu
-    - selector: service_bus.namespace_memory_usage_maximum
-      name: memory
-  - id: am_azure_service_bus__send_latency
-    title: Azure Service Bus Send Latency
-    context: send_latency
-    family: Performance
-    type: line
-    units: milliseconds
-    algorithm: absolute
-    dimensions:
-    - selector: service_bus.server_send_latency_average
-      name: average
-  - id: am_azure_service_bus__replication_lag
-    title: Azure Service Bus Replication Lag
-    context: replication_lag
-    family: Replication
-    type: line
-    units: messages
-    algorithm: absolute
-    dimensions:
-    - selector: service_bus.replication_lag_count_maximum
-      name: messages
-  - id: am_azure_service_bus__replication_lag_duration
-    title: Azure Service Bus Replication Lag Duration
-    context: replication_lag_duration
-    family: Replication
-    type: line
-    units: seconds
-    algorithm: absolute
-    dimensions:
-    - selector: service_bus.replication_lag_duration_maximum
-      name: duration
-  - id: am_azure_service_bus__checkpoint_operations
-    title: Azure Service Bus Pending Checkpoint Operations
-    context: checkpoint_operations
-    family: Replication
-    type: line
-    units: operations
-    algorithm: absolute
-    dimensions:
-    - selector: service_bus.pending_checkpoint_operation_count_total
-      name: pending
+    - id: am_azure_service_bus__message_flow
+      title: Azure Service Bus Message Flow
+      context: message_flow
+      family: Messages
+      type: line
+      units: messages/s
+      algorithm: incremental
+      dimensions:
+        - selector: incoming_messages_total
+          name: in
+        - selector: outgoing_messages_total
+          name: out
+    - id: am_azure_service_bus__message_operations
+      title: Azure Service Bus Message Operations
+      context: message_operations
+      family: Messages
+      type: line
+      units: messages/s
+      algorithm: incremental
+      dimensions:
+        - selector: complete_message_total
+          name: completed
+        - selector: abandon_message_total
+          name: abandoned
+    - id: am_azure_service_bus__queue_depth
+      title: Azure Service Bus Queue Depth
+      context: queue_depth
+      family: Queue
+      type: line
+      units: messages
+      algorithm: absolute
+      dimensions:
+        - selector: active_messages_average
+          name: active
+    - id: am_azure_service_bus__problem_messages
+      title: Azure Service Bus Problem Messages
+      context: problem_messages
+      family: Queue
+      type: line
+      units: messages
+      algorithm: absolute
+      dimensions:
+        - selector: deadlettered_messages_average
+          name: dead_lettered
+        - selector: scheduled_messages_average
+          name: scheduled
+    - id: am_azure_service_bus__total_messages
+      title: Azure Service Bus Total Messages
+      context: total_messages
+      family: Queue
+      type: line
+      units: messages
+      algorithm: absolute
+      dimensions:
+        - selector: messages_average
+          name: total
+    - id: am_azure_service_bus__requests
+      title: Azure Service Bus Requests
+      context: requests
+      family: Requests
+      type: line
+      units: requests/s
+      algorithm: incremental
+      dimensions:
+        - selector: incoming_requests_total
+          name: incoming
+        - selector: successful_requests_total
+          name: successful
+    - id: am_azure_service_bus__errors
+      title: Azure Service Bus Errors
+      context: errors
+      family: Errors
+      type: line
+      units: errors/s
+      algorithm: incremental
+      dimensions:
+        - selector: server_errors_total
+          name: server
+        - selector: user_errors_total
+          name: user
+        - selector: throttled_requests_total
+          name: throttled
+    - id: am_azure_service_bus__connections
+      title: Azure Service Bus Active Connections
+      context: connections
+      family: Connections
+      type: line
+      units: connections
+      algorithm: absolute
+      dimensions:
+        - selector: active_connections_total
+          name: active
+    - id: am_azure_service_bus__connection_events
+      title: Azure Service Bus Connection Events
+      context: connection_events
+      family: Connections
+      type: line
+      units: connections
+      algorithm: absolute
+      dimensions:
+        - selector: connections_opened_average
+          name: opened
+        - selector: connections_closed_average
+          name: closed
+    - id: am_azure_service_bus__namespace_size
+      title: Azure Service Bus Namespace Size
+      context: namespace_size
+      family: Capacity
+      type: line
+      units: bytes
+      algorithm: absolute
+      dimensions:
+        - selector: size_average
+          name: average
+    - id: am_azure_service_bus__data_throughput
+      title: Azure Service Bus Data Throughput
+      context: data_throughput
+      family: Messages
+      type: line
+      units: bytes/s
+      algorithm: incremental
+      dimensions:
+        - selector: incoming_bytes_total
+          name: in
+        - selector: outgoing_bytes_total
+          name: out
+    - id: am_azure_service_bus__namespace_resources
+      title: Azure Service Bus Namespace Resources
+      context: namespace_resources
+      family: Capacity
+      type: line
+      units: percentage
+      algorithm: absolute
+      dimensions:
+        - selector: namespace_cpu_usage_maximum
+          name: cpu
+        - selector: namespace_memory_usage_maximum
+          name: memory
+    - id: am_azure_service_bus__send_latency
+      title: Azure Service Bus Send Latency
+      context: send_latency
+      family: Performance
+      type: line
+      units: milliseconds
+      algorithm: absolute
+      dimensions:
+        - selector: server_send_latency_average
+          name: average
+    - id: am_azure_service_bus__replication_lag
+      title: Azure Service Bus Replication Lag
+      context: replication_lag
+      family: Replication
+      type: line
+      units: messages
+      algorithm: absolute
+      dimensions:
+        - selector: replication_lag_count_maximum
+          name: messages
+    - id: am_azure_service_bus__replication_lag_duration
+      title: Azure Service Bus Replication Lag Duration
+      context: replication_lag_duration
+      family: Replication
+      type: line
+      units: seconds
+      algorithm: absolute
+      dimensions:
+        - selector: replication_lag_duration_maximum
+          name: duration
+    - id: am_azure_service_bus__checkpoint_operations
+      title: Azure Service Bus Pending Checkpoint Operations
+      context: checkpoint_operations
+      family: Replication
+      type: line
+      units: operations
+      algorithm: absolute
+      dimensions:
+        - selector: pending_checkpoint_operation_count_total
+          name: pending

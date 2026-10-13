@@ -1,419 +1,418 @@
 ---
-id: cosmos_db
-name: Azure Cosmos DB Account
+display_name: Azure Cosmos DB Account
 resource_type: Microsoft.DocumentDB/databaseAccounts
 metrics:
-- id: total_requests
-  azure_name: TotalRequests
-  time_grain: PT1M
-  series:
-  - aggregation: count
-    kind: counter
-- id: total_request_units
-  azure_name: TotalRequestUnits
-  time_grain: PT1M
-  series:
-  - aggregation: total
-    kind: counter
-- id: normalized_ru_consumption
-  azure_name: NormalizedRUConsumption
-  time_grain: PT1M
-  series:
-  - aggregation: maximum
-    kind: gauge
-- id: metadata_requests
-  azure_name: MetadataRequests
-  time_grain: PT1M
-  series:
-  - aggregation: count
-    kind: counter
-- id: server_side_latency_direct
-  azure_name: ServerSideLatencyDirect
-  time_grain: PT1M
-  series:
-  - aggregation: average
-    kind: gauge
-- id: server_side_latency_gateway
-  azure_name: ServerSideLatencyGateway
-  time_grain: PT1M
-  series:
-  - aggregation: average
-    kind: gauge
-- id: replication_latency
-  azure_name: ReplicationLatency
-  time_grain: PT1M
-  series:
-  - aggregation: average
-    kind: gauge
-- id: data_usage
-  azure_name: DataUsage
-  time_grain: PT5M
-  series:
-  - aggregation: maximum
-    kind: gauge
-- id: index_usage
-  azure_name: IndexUsage
-  time_grain: PT5M
-  series:
-  - aggregation: maximum
-    kind: gauge
-- id: document_quota
-  azure_name: DocumentQuota
-  time_grain: PT5M
-  series:
-  - aggregation: total
-    kind: gauge
-- id: document_count
-  azure_name: DocumentCount
-  time_grain: PT5M
-  series:
-  - aggregation: average
-    kind: gauge
-- id: physical_partition_size_info
-  azure_name: PhysicalPartitionSizeInfo
-  time_grain: PT1M
-  series:
-  - aggregation: maximum
-    kind: gauge
-- id: physical_partition_count
-  azure_name: PhysicalPartitionCount
-  time_grain: PT5M
-  series:
-  - aggregation: maximum
-    kind: gauge
-- id: physical_partition_throughput_info
-  azure_name: PhysicalPartitionThroughputInfo
-  time_grain: PT5M
-  series:
-  - aggregation: maximum
-    kind: gauge
-- id: autoscaled_ru
-  azure_name: AutoscaledRU
-  time_grain: PT1M
-  series:
-  - aggregation: maximum
-    kind: gauge
-- id: provisioned_throughput
-  azure_name: ProvisionedThroughput
-  time_grain: PT5M
-  series:
-  - aggregation: maximum
-    kind: gauge
-- id: autoscale_max_throughput
-  azure_name: AutoscaleMaxThroughput
-  time_grain: PT5M
-  series:
-  - aggregation: maximum
-    kind: gauge
-- id: service_availability
-  azure_name: ServiceAvailability
-  time_grain: PT1H
-  series:
-  - aggregation: average
-    kind: gauge
-- id: mongo_requests
-  azure_name: MongoRequests
-  time_grain: PT1M
-  series:
-  - aggregation: count
-    kind: counter
-- id: cassandra_requests
-  azure_name: CassandraRequests
-  time_grain: PT1M
-  series:
-  - aggregation: count
-    kind: counter
-- id: gremlin_requests
-  azure_name: GremlinRequests
-  time_grain: PT1M
-  series:
-  - aggregation: count
-    kind: counter
-- id: mongo_request_charge
-  azure_name: MongoRequestCharge
-  time_grain: PT1M
-  series:
-  - aggregation: total
-    kind: counter
-- id: cassandra_request_charges
-  azure_name: CassandraRequestCharges
-  time_grain: PT1M
-  series:
-  - aggregation: total
-    kind: counter
-- id: gremlin_request_charges
-  azure_name: GremlinRequestCharges
-  time_grain: PT1M
-  series:
-  - aggregation: total
-    kind: counter
-- id: dedicated_gateway_cpu_usage
-  azure_name: DedicatedGatewayCPUUsage
-  time_grain: PT1M
-  series:
-  - aggregation: average
-    kind: gauge
-- id: dedicated_gateway_memory_usage
-  azure_name: DedicatedGatewayMemoryUsage
-  time_grain: PT1M
-  series:
-  - aggregation: average
-    kind: gauge
-- id: dedicated_gateway_requests
-  azure_name: DedicatedGatewayRequests
-  time_grain: PT1M
-  series:
-  - aggregation: count
-    kind: counter
-- id: integrated_cache_item_hit_rate
-  azure_name: IntegratedCacheItemHitRate
-  time_grain: PT5M
-  series:
-  - aggregation: average
-    kind: gauge
-- id: integrated_cache_query_hit_rate
-  azure_name: IntegratedCacheQueryHitRate
-  time_grain: PT5M
-  series:
-  - aggregation: average
-    kind: gauge
-- id: cassandra_connection_closures
-  azure_name: CassandraConnectionClosures
-  time_grain: PT1M
-  series:
-  - aggregation: total
-    kind: counter
+  - id: total_requests
+    azure_name: TotalRequests
+    time_grain: PT1M
+    series:
+      - aggregation: count
+        kind: counter
+  - id: total_request_units
+    azure_name: TotalRequestUnits
+    time_grain: PT1M
+    series:
+      - aggregation: total
+        kind: counter
+  - id: normalized_ru_consumption
+    azure_name: NormalizedRUConsumption
+    time_grain: PT1M
+    series:
+      - aggregation: maximum
+        kind: gauge
+  - id: metadata_requests
+    azure_name: MetadataRequests
+    time_grain: PT1M
+    series:
+      - aggregation: count
+        kind: counter
+  - id: server_side_latency_direct
+    azure_name: ServerSideLatencyDirect
+    time_grain: PT1M
+    series:
+      - aggregation: average
+        kind: gauge
+  - id: server_side_latency_gateway
+    azure_name: ServerSideLatencyGateway
+    time_grain: PT1M
+    series:
+      - aggregation: average
+        kind: gauge
+  - id: replication_latency
+    azure_name: ReplicationLatency
+    time_grain: PT1M
+    series:
+      - aggregation: average
+        kind: gauge
+  - id: data_usage
+    azure_name: DataUsage
+    time_grain: PT5M
+    series:
+      - aggregation: maximum
+        kind: gauge
+  - id: index_usage
+    azure_name: IndexUsage
+    time_grain: PT5M
+    series:
+      - aggregation: maximum
+        kind: gauge
+  - id: document_quota
+    azure_name: DocumentQuota
+    time_grain: PT5M
+    series:
+      - aggregation: total
+        kind: gauge
+  - id: document_count
+    azure_name: DocumentCount
+    time_grain: PT5M
+    series:
+      - aggregation: average
+        kind: gauge
+  - id: physical_partition_size_info
+    azure_name: PhysicalPartitionSizeInfo
+    time_grain: PT1M
+    series:
+      - aggregation: maximum
+        kind: gauge
+  - id: physical_partition_count
+    azure_name: PhysicalPartitionCount
+    time_grain: PT5M
+    series:
+      - aggregation: maximum
+        kind: gauge
+  - id: physical_partition_throughput_info
+    azure_name: PhysicalPartitionThroughputInfo
+    time_grain: PT5M
+    series:
+      - aggregation: maximum
+        kind: gauge
+  - id: autoscaled_ru
+    azure_name: AutoscaledRU
+    time_grain: PT1M
+    series:
+      - aggregation: maximum
+        kind: gauge
+  - id: provisioned_throughput
+    azure_name: ProvisionedThroughput
+    time_grain: PT5M
+    series:
+      - aggregation: maximum
+        kind: gauge
+  - id: autoscale_max_throughput
+    azure_name: AutoscaleMaxThroughput
+    time_grain: PT5M
+    series:
+      - aggregation: maximum
+        kind: gauge
+  - id: service_availability
+    azure_name: ServiceAvailability
+    time_grain: PT1H
+    series:
+      - aggregation: average
+        kind: gauge
+  - id: mongo_requests
+    azure_name: MongoRequests
+    time_grain: PT1M
+    series:
+      - aggregation: count
+        kind: counter
+  - id: cassandra_requests
+    azure_name: CassandraRequests
+    time_grain: PT1M
+    series:
+      - aggregation: count
+        kind: counter
+  - id: gremlin_requests
+    azure_name: GremlinRequests
+    time_grain: PT1M
+    series:
+      - aggregation: count
+        kind: counter
+  - id: mongo_request_charge
+    azure_name: MongoRequestCharge
+    time_grain: PT1M
+    series:
+      - aggregation: total
+        kind: counter
+  - id: cassandra_request_charges
+    azure_name: CassandraRequestCharges
+    time_grain: PT1M
+    series:
+      - aggregation: total
+        kind: counter
+  - id: gremlin_request_charges
+    azure_name: GremlinRequestCharges
+    time_grain: PT1M
+    series:
+      - aggregation: total
+        kind: counter
+  - id: dedicated_gateway_cpu_usage
+    azure_name: DedicatedGatewayCPUUsage
+    time_grain: PT1M
+    series:
+      - aggregation: average
+        kind: gauge
+  - id: dedicated_gateway_memory_usage
+    azure_name: DedicatedGatewayMemoryUsage
+    time_grain: PT1M
+    series:
+      - aggregation: average
+        kind: gauge
+  - id: dedicated_gateway_requests
+    azure_name: DedicatedGatewayRequests
+    time_grain: PT1M
+    series:
+      - aggregation: count
+        kind: counter
+  - id: integrated_cache_item_hit_rate
+    azure_name: IntegratedCacheItemHitRate
+    time_grain: PT5M
+    series:
+      - aggregation: average
+        kind: gauge
+  - id: integrated_cache_query_hit_rate
+    azure_name: IntegratedCacheQueryHitRate
+    time_grain: PT5M
+    series:
+      - aggregation: average
+        kind: gauge
+  - id: cassandra_connection_closures
+    azure_name: CassandraConnectionClosures
+    time_grain: PT1M
+    series:
+      - aggregation: total
+        kind: counter
 template:
   family: Azure Cosmos DB Account
   context_namespace: cosmos_db
   chart_defaults:
     label_promotion:
-    - resource_name
-    - resource_group
-    - region
-    - resource_type
-    - profile
+      - resource_name
+      - resource_group
+      - region
+      - resource_type
+      - profile
     instances:
       by_labels:
-      - resource_uid
+        - resource_uid
   charts:
-  - id: am_azure_cosmos_db__total_requests
-    title: Azure Cosmos DB Total Requests
-    context: total_requests
-    family: Throughput
-    type: line
-    units: requests/s
-    algorithm: incremental
-    dimensions:
-    - selector: cosmos_db.total_requests_count
-      name: count
-  - id: am_azure_cosmos_db__request_units
-    title: Azure Cosmos DB Request Units Consumed
-    context: request_units
-    family: Throughput
-    type: line
-    units: RU/s
-    algorithm: incremental
-    dimensions:
-    - selector: cosmos_db.total_request_units_total
-      name: total
-  - id: am_azure_cosmos_db__normalized_ru_consumption
-    title: Azure Cosmos DB Normalized RU Consumption
-    context: normalized_ru_consumption
-    family: Utilization
-    type: line
-    units: percentage
-    algorithm: absolute
-    dimensions:
-    - selector: cosmos_db.normalized_ru_consumption_maximum
-      name: maximum
-  - id: am_azure_cosmos_db__server_side_latency
-    title: Azure Cosmos DB Server-Side Latency
-    context: server_side_latency
-    family: Latency
-    type: line
-    units: milliseconds
-    algorithm: absolute
-    dimensions:
-    - selector: cosmos_db.server_side_latency_direct_average
-      name: direct
-    - selector: cosmos_db.server_side_latency_gateway_average
-      name: gateway
-  - id: am_azure_cosmos_db__replication_latency
-    title: Azure Cosmos DB Replication Latency
-    context: replication_latency
-    family: Latency
-    type: line
-    units: milliseconds
-    algorithm: absolute
-    dimensions:
-    - selector: cosmos_db.replication_latency_average
-      name: average
-  - id: am_azure_cosmos_db__storage
-    title: Azure Cosmos DB Storage
-    context: storage
-    family: Capacity
-    type: line
-    units: bytes
-    algorithm: absolute
-    dimensions:
-    - selector: cosmos_db.data_usage_maximum
-      name: data
-    - selector: cosmos_db.index_usage_maximum
-      name: index
-    - selector: cosmos_db.document_quota_total
-      name: quota
-  - id: am_azure_cosmos_db__document_count
-    title: Azure Cosmos DB Document Count
-    context: document_count
-    family: Capacity
-    type: line
-    units: documents
-    algorithm: absolute
-    dimensions:
-    - selector: cosmos_db.document_count_average
-      name: average
-  - id: am_azure_cosmos_db__partition_size
-    title: Azure Cosmos DB Physical Partition Size
-    context: partition_size
-    family: Capacity
-    type: line
-    units: bytes
-    algorithm: absolute
-    dimensions:
-    - selector: cosmos_db.physical_partition_size_info_maximum
-      name: maximum
-  - id: am_azure_cosmos_db__partition_count
-    title: Azure Cosmos DB Physical Partition Count
-    context: partition_count
-    family: Capacity
-    type: line
-    units: partitions
-    algorithm: absolute
-    dimensions:
-    - selector: cosmos_db.physical_partition_count_maximum
-      name: maximum
-  - id: am_azure_cosmos_db__provisioned_throughput
-    title: Azure Cosmos DB Provisioned Throughput
-    context: provisioned_throughput
-    family: Throughput
-    type: line
-    units: RU/s
-    algorithm: absolute
-    dimensions:
-    - selector: cosmos_db.provisioned_throughput_maximum
-      name: provisioned
-    - selector: cosmos_db.autoscale_max_throughput_maximum
-      name: autoscale_max
-    - selector: cosmos_db.autoscaled_ru_maximum
-      name: autoscaled
-  - id: am_azure_cosmos_db__partition_throughput
-    title: Azure Cosmos DB Physical Partition Throughput
-    context: partition_throughput
-    family: Throughput
-    type: line
-    units: RU/s
-    algorithm: absolute
-    dimensions:
-    - selector: cosmos_db.physical_partition_throughput_info_maximum
-      name: maximum
-  - id: am_azure_cosmos_db__availability
-    title: Azure Cosmos DB Service Availability
-    context: availability
-    family: Availability
-    type: line
-    units: percentage
-    algorithm: absolute
-    dimensions:
-    - selector: cosmos_db.service_availability_average
-      name: average
-  - id: am_azure_cosmos_db__metadata_requests
-    title: Azure Cosmos DB Metadata Requests
-    context: metadata_requests
-    family: Throughput
-    type: line
-    units: requests/s
-    algorithm: incremental
-    dimensions:
-    - selector: cosmos_db.metadata_requests_count
-      name: count
-  - id: am_azure_cosmos_db__api_requests
-    title: Azure Cosmos DB API Requests
-    context: api_requests
-    family: API
-    type: line
-    units: requests/s
-    algorithm: incremental
-    dimensions:
-    - selector: cosmos_db.mongo_requests_count
-      name: mongo
-    - selector: cosmos_db.cassandra_requests_count
-      name: cassandra
-    - selector: cosmos_db.gremlin_requests_count
-      name: gremlin
-  - id: am_azure_cosmos_db__api_request_charges
-    title: Azure Cosmos DB API Request Charges
-    context: api_request_charges
-    family: API
-    type: line
-    units: RU/s
-    algorithm: incremental
-    dimensions:
-    - selector: cosmos_db.mongo_request_charge_total
-      name: mongo
-    - selector: cosmos_db.cassandra_request_charges_total
-      name: cassandra
-    - selector: cosmos_db.gremlin_request_charges_total
-      name: gremlin
-  - id: am_azure_cosmos_db__cassandra_connections
-    title: Azure Cosmos DB Cassandra Connection Closures
-    context: cassandra_connections
-    family: API
-    type: line
-    units: connections/s
-    algorithm: incremental
-    dimensions:
-    - selector: cosmos_db.cassandra_connection_closures_total
-      name: total
-  - id: am_azure_cosmos_db__dedicated_gateway_cpu
-    title: Azure Cosmos DB Dedicated Gateway CPU Usage
-    context: dedicated_gateway_cpu
-    family: Dedicated Gateway
-    type: line
-    units: percentage
-    algorithm: absolute
-    dimensions:
-    - selector: cosmos_db.dedicated_gateway_cpu_usage_average
-      name: average
-  - id: am_azure_cosmos_db__dedicated_gateway_memory
-    title: Azure Cosmos DB Dedicated Gateway Memory Usage
-    context: dedicated_gateway_memory
-    family: Dedicated Gateway
-    type: line
-    units: bytes
-    algorithm: absolute
-    dimensions:
-    - selector: cosmos_db.dedicated_gateway_memory_usage_average
-      name: average
-  - id: am_azure_cosmos_db__dedicated_gateway_requests
-    title: Azure Cosmos DB Dedicated Gateway Requests
-    context: dedicated_gateway_requests
-    family: Dedicated Gateway
-    type: line
-    units: requests/s
-    algorithm: incremental
-    dimensions:
-    - selector: cosmos_db.dedicated_gateway_requests_count
-      name: count
-  - id: am_azure_cosmos_db__integrated_cache_hit_rate
-    title: Azure Cosmos DB Integrated Cache Hit Rate
-    context: integrated_cache_hit_rate
-    family: Integrated Cache
-    type: line
-    units: percentage
-    algorithm: absolute
-    dimensions:
-    - selector: cosmos_db.integrated_cache_item_hit_rate_average
-      name: item
-    - selector: cosmos_db.integrated_cache_query_hit_rate_average
-      name: query
+    - id: am_azure_cosmos_db__total_requests
+      title: Azure Cosmos DB Total Requests
+      context: total_requests
+      family: Throughput
+      type: line
+      units: requests/s
+      algorithm: incremental
+      dimensions:
+        - selector: total_requests_count
+          name: count
+    - id: am_azure_cosmos_db__request_units
+      title: Azure Cosmos DB Request Units Consumed
+      context: request_units
+      family: Throughput
+      type: line
+      units: RU/s
+      algorithm: incremental
+      dimensions:
+        - selector: total_request_units_total
+          name: total
+    - id: am_azure_cosmos_db__normalized_ru_consumption
+      title: Azure Cosmos DB Normalized RU Consumption
+      context: normalized_ru_consumption
+      family: Utilization
+      type: line
+      units: percentage
+      algorithm: absolute
+      dimensions:
+        - selector: normalized_ru_consumption_maximum
+          name: maximum
+    - id: am_azure_cosmos_db__server_side_latency
+      title: Azure Cosmos DB Server-Side Latency
+      context: server_side_latency
+      family: Latency
+      type: line
+      units: milliseconds
+      algorithm: absolute
+      dimensions:
+        - selector: server_side_latency_direct_average
+          name: direct
+        - selector: server_side_latency_gateway_average
+          name: gateway
+    - id: am_azure_cosmos_db__replication_latency
+      title: Azure Cosmos DB Replication Latency
+      context: replication_latency
+      family: Latency
+      type: line
+      units: milliseconds
+      algorithm: absolute
+      dimensions:
+        - selector: replication_latency_average
+          name: average
+    - id: am_azure_cosmos_db__storage
+      title: Azure Cosmos DB Storage
+      context: storage
+      family: Capacity
+      type: line
+      units: bytes
+      algorithm: absolute
+      dimensions:
+        - selector: data_usage_maximum
+          name: data
+        - selector: index_usage_maximum
+          name: index
+        - selector: document_quota_total
+          name: quota
+    - id: am_azure_cosmos_db__document_count
+      title: Azure Cosmos DB Document Count
+      context: document_count
+      family: Capacity
+      type: line
+      units: documents
+      algorithm: absolute
+      dimensions:
+        - selector: document_count_average
+          name: average
+    - id: am_azure_cosmos_db__partition_size
+      title: Azure Cosmos DB Physical Partition Size
+      context: partition_size
+      family: Capacity
+      type: line
+      units: bytes
+      algorithm: absolute
+      dimensions:
+        - selector: physical_partition_size_info_maximum
+          name: maximum
+    - id: am_azure_cosmos_db__partition_count
+      title: Azure Cosmos DB Physical Partition Count
+      context: partition_count
+      family: Capacity
+      type: line
+      units: partitions
+      algorithm: absolute
+      dimensions:
+        - selector: physical_partition_count_maximum
+          name: maximum
+    - id: am_azure_cosmos_db__provisioned_throughput
+      title: Azure Cosmos DB Provisioned Throughput
+      context: provisioned_throughput
+      family: Throughput
+      type: line
+      units: RU/s
+      algorithm: absolute
+      dimensions:
+        - selector: provisioned_throughput_maximum
+          name: provisioned
+        - selector: autoscale_max_throughput_maximum
+          name: autoscale_max
+        - selector: autoscaled_ru_maximum
+          name: autoscaled
+    - id: am_azure_cosmos_db__partition_throughput
+      title: Azure Cosmos DB Physical Partition Throughput
+      context: partition_throughput
+      family: Throughput
+      type: line
+      units: RU/s
+      algorithm: absolute
+      dimensions:
+        - selector: physical_partition_throughput_info_maximum
+          name: maximum
+    - id: am_azure_cosmos_db__availability
+      title: Azure Cosmos DB Service Availability
+      context: availability
+      family: Availability
+      type: line
+      units: percentage
+      algorithm: absolute
+      dimensions:
+        - selector: service_availability_average
+          name: average
+    - id: am_azure_cosmos_db__metadata_requests
+      title: Azure Cosmos DB Metadata Requests
+      context: metadata_requests
+      family: Throughput
+      type: line
+      units: requests/s
+      algorithm: incremental
+      dimensions:
+        - selector: metadata_requests_count
+          name: count
+    - id: am_azure_cosmos_db__api_requests
+      title: Azure Cosmos DB API Requests
+      context: api_requests
+      family: API
+      type: line
+      units: requests/s
+      algorithm: incremental
+      dimensions:
+        - selector: mongo_requests_count
+          name: mongo
+        - selector: cassandra_requests_count
+          name: cassandra
+        - selector: gremlin_requests_count
+          name: gremlin
+    - id: am_azure_cosmos_db__api_request_charges
+      title: Azure Cosmos DB API Request Charges
+      context: api_request_charges
+      family: API
+      type: line
+      units: RU/s
+      algorithm: incremental
+      dimensions:
+        - selector: mongo_request_charge_total
+          name: mongo
+        - selector: cassandra_request_charges_total
+          name: cassandra
+        - selector: gremlin_request_charges_total
+          name: gremlin
+    - id: am_azure_cosmos_db__cassandra_connections
+      title: Azure Cosmos DB Cassandra Connection Closures
+      context: cassandra_connections
+      family: API
+      type: line
+      units: connections/s
+      algorithm: incremental
+      dimensions:
+        - selector: cassandra_connection_closures_total
+          name: total
+    - id: am_azure_cosmos_db__dedicated_gateway_cpu
+      title: Azure Cosmos DB Dedicated Gateway CPU Usage
+      context: dedicated_gateway_cpu
+      family: Dedicated Gateway
+      type: line
+      units: percentage
+      algorithm: absolute
+      dimensions:
+        - selector: dedicated_gateway_cpu_usage_average
+          name: average
+    - id: am_azure_cosmos_db__dedicated_gateway_memory
+      title: Azure Cosmos DB Dedicated Gateway Memory Usage
+      context: dedicated_gateway_memory
+      family: Dedicated Gateway
+      type: line
+      units: bytes
+      algorithm: absolute
+      dimensions:
+        - selector: dedicated_gateway_memory_usage_average
+          name: average
+    - id: am_azure_cosmos_db__dedicated_gateway_requests
+      title: Azure Cosmos DB Dedicated Gateway Requests
+      context: dedicated_gateway_requests
+      family: Dedicated Gateway
+      type: line
+      units: requests/s
+      algorithm: incremental
+      dimensions:
+        - selector: dedicated_gateway_requests_count
+          name: count
+    - id: am_azure_cosmos_db__integrated_cache_hit_rate
+      title: Azure Cosmos DB Integrated Cache Hit Rate
+      context: integrated_cache_hit_rate
+      family: Integrated Cache
+      type: line
+      units: percentage
+      algorithm: absolute
+      dimensions:
+        - selector: integrated_cache_item_hit_rate_average
+          name: item
+        - selector: integrated_cache_query_hit_rate_average
+          name: query

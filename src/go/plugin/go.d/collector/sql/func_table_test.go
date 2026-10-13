@@ -181,7 +181,7 @@ func TestFuncTable_FindFunction(t *testing.T) {
 	assert.Nil(t, f)
 }
 
-func TestSqlJobMethods(t *testing.T) {
+func TestSqlInstanceFunctions(t *testing.T) {
 	tests := map[string]struct {
 		setupCollector func() *Collector
 		jobName        string
@@ -237,7 +237,7 @@ func TestSqlJobMethods(t *testing.T) {
 				Module:     c,
 				Out:        io.Discard,
 			})
-			methods := sqlJobMethods(job)
+			methods := sqlInstanceFunctions(job)
 
 			assert.Len(t, methods, tc.wantLen)
 			for i, wantID := range tc.wantMethodIDs {
@@ -340,7 +340,7 @@ func TestFuncTable_Handle(t *testing.T) {
 			functionID: "test",
 			prepareMock: func(m sqlmock.Sqlmock) {
 				rows := sqlmock.NewRows([]string{"n"})
-				for i := 0; i < 150; i++ {
+				for i := range 150 {
 					rows.AddRow(i)
 				}
 				m.ExpectQuery("SELECT n").WillReturnRows(rows)

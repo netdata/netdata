@@ -4,7 +4,9 @@ package mssql
 
 // queryVersion retrieves SQL Server version info
 const queryVersion = `
-SELECT SERVERPROPERTY('ProductVersion') AS version;
+SELECT
+  CONVERT(nvarchar(128), SERVERPROPERTY('ProductVersion')) AS version,
+  CONVERT(int, SERVERPROPERTY('EngineEdition')) AS engine_edition;
 `
 
 // queryUserConnections counts user vs system connections
@@ -101,6 +103,26 @@ WHERE object_name LIKE '%Databases%'
   );
 `
 
+// queryDatabaseLogCounters gets per-database transaction log size and activity counters
+const queryDatabaseLogCounters = `
+SELECT
+  RTRIM(pc.instance_name) AS database_name,
+  RTRIM(pc.counter_name) AS counter_name,
+  pc.cntr_value
+FROM sys.dm_os_performance_counters AS pc
+INNER JOIN sys.databases AS d
+  ON d.database_id = DB_ID(RTRIM(pc.instance_name))
+WHERE pc.object_name LIKE '%Databases%'
+  AND pc.instance_name NOT IN ('_Total', 'mssqlsystemresource')
+  AND d.database_id > 4
+  AND pc.counter_name IN (
+    'Log File(s) Size (KB)',
+    'Log File(s) Used Size (KB)',
+    'Log Truncations',
+    'Log Shrinks'
+  );
+`
+
 // queryDatabaseLocks gets per-database lock metrics
 const queryDatabaseLocks = `
 SELECT
@@ -122,7 +144,7 @@ WHERE object_name LIKE '%Locks%'
 const queryDatabaseSize = `
 SELECT
   DB_NAME(database_id) AS database_name,
-  SUM(size) * 8 * 1024 AS size_bytes
+  SUM(CAST(size AS BIGINT)) * 8 * 1024 AS size_bytes
 FROM sys.master_files
 WHERE type = 0 -- data files only
   AND database_id > 4 -- exclude system databases
@@ -186,11 +208,143 @@ WHERE ws.[waiting_tasks_count] > 0
 ORDER BY ws.[wait_time_ms] DESC;
 `
 
-// queryJobs gets SQL Agent job status
+// queryJobs gets SQL Agent job configuration status.
 const queryJobs = `
-SELECT name, enabled
-FROM msdb.dbo.sysjobs;
+SELECT
+  CONVERT(varchar(36), job_id) AS job_id,
+  name,
+  enabled
+FROM msdb.dbo.sysjobs
+ORDER BY name, job_id;
 `
+
+// queryJobLastExecutions gets the latest completed SQL Agent job execution.
+const queryJobLastExecutionsHead = `
+WITH final_summary_rows AS (
+  SELECT
+    sh.job_id,
+    sh.instance_id,
+    sh.run_status,
+    sh.run_date,
+    sh.run_time,
+    sh.run_duration,
+    ROW_NUMBER() OVER (
+      PARTITION BY sh.job_id
+      ORDER BY sh.instance_id DESC
+    ) AS row_num
+  FROM msdb.dbo.sysjobhistory AS sh
+  JOIN msdb.dbo.sysjobs AS j
+    ON j.job_id = sh.job_id
+  WHERE sh.step_id = 0
+    AND sh.run_status IN (0, 1, 3)
+`
+
+const queryJobLastExecutionsTail = `
+),
+latest_final_summary AS (
+  SELECT
+    fs.job_id,
+    fs.instance_id,
+    (
+      SELECT MAX(prev.instance_id)
+      FROM final_summary_rows AS prev
+      WHERE prev.job_id = fs.job_id
+        AND prev.instance_id < fs.instance_id
+    ) AS previous_summary_instance_id,
+    fs.run_status,
+    ((CAST(fs.run_duration AS bigint) / 10000) * 3600)
+      + (((CAST(fs.run_duration AS bigint) % 10000) / 100) * 60)
+      + (CAST(fs.run_duration AS bigint) % 100) AS duration_seconds,
+    DATEADD(
+      second,
+      ((fs.run_time / 10000) * 3600)
+        + (((fs.run_time % 10000) / 100) * 60)
+        + (fs.run_time % 100),
+      CONVERT(
+        datetime,
+        CASE
+          WHEN ISDATE(CONVERT(char(8), NULLIF(fs.run_date, 0))) = 1
+            THEN CONVERT(char(8), fs.run_date)
+          ELSE NULL
+        END,
+        112
+      )
+    ) AS started_at
+  FROM final_summary_rows AS fs
+  WHERE row_num = 1
+),
+failed_steps AS (
+  SELECT
+    ls.job_id,
+    COUNT_BIG(*) AS failed_step_count
+  FROM latest_final_summary AS ls
+  JOIN msdb.dbo.sysjobhistory AS sh
+    ON sh.job_id = ls.job_id
+   AND sh.step_id > 0
+   AND sh.run_status = 0
+   AND sh.instance_id < ls.instance_id
+   AND (
+        ls.previous_summary_instance_id IS NULL
+        OR sh.instance_id > ls.previous_summary_instance_id
+   )
+  GROUP BY ls.job_id
+)
+SELECT
+  CONVERT(varchar(36), ls.job_id) AS job_id,
+  ls.run_status,
+  ls.duration_seconds,
+  CASE
+    WHEN ls.started_at IS NULL THEN NULL
+    WHEN DATEDIFF(
+      second,
+      DATEADD(second, CAST(ls.duration_seconds AS int), ls.started_at),
+      GETDATE()
+    ) < 0 THEN 0
+    ELSE DATEDIFF(
+      second,
+      DATEADD(second, CAST(ls.duration_seconds AS int), ls.started_at),
+      GETDATE()
+    )
+  END AS age_seconds,
+  CASE WHEN COALESCE(fs.failed_step_count, 0) > 0 THEN 1 ELSE 0 END AS has_failed_step
+FROM latest_final_summary AS ls
+LEFT JOIN failed_steps AS fs
+  ON fs.job_id = ls.job_id;
+`
+
+const queryJobLastExecutions = queryJobLastExecutionsHead + `  AND j.enabled = 1
+` + queryJobLastExecutionsTail
+
+const queryJobLastExecutionsAll = queryJobLastExecutionsHead + queryJobLastExecutionsTail
+
+// queryJobCurrentExecutions gets current SQL Agent job execution runtime.
+const queryJobCurrentExecutionsHead = `
+WITH latest_session AS (
+  SELECT MAX(session_id) AS session_id
+  FROM msdb.dbo.sysjobactivity
+)
+SELECT
+  CONVERT(varchar(36), ja.job_id) AS job_id,
+  CASE
+    WHEN ja.start_execution_date IS NOT NULL
+     AND ja.stop_execution_date IS NULL
+     AND DATEDIFF(second, ja.start_execution_date, GETDATE()) > 0
+      THEN DATEDIFF(second, ja.start_execution_date, GETDATE())
+    ELSE 0
+  END AS current_execution_time_seconds
+FROM msdb.dbo.sysjobactivity AS ja
+JOIN msdb.dbo.sysjobs AS j
+  ON j.job_id = ja.job_id
+WHERE ja.session_id = (SELECT session_id FROM latest_session)
+`
+
+const queryJobCurrentExecutionsTail = `;
+`
+
+const queryJobCurrentExecutions = queryJobCurrentExecutionsHead + `  AND j.enabled = 1
+` + queryJobCurrentExecutionsTail
+
+const queryJobCurrentExecutionsAll = queryJobCurrentExecutionsHead + queryJobCurrentExecutionsTail
 
 // querySQLErrors gets SQL error counts from performance counters
 const querySQLErrors = `
@@ -201,107 +355,10 @@ WHERE object_name LIKE '%SQL Errors%'
   AND counter_name = 'Errors/sec';
 `
 
-// querySystemHealthLatestDeadlockEventFile retrieves the latest xml_deadlock_report event
-// from the system_health Extended Events file target.
-const querySystemHealthLatestDeadlockEventFile = `
-SELECT TOP (1)
-  timestamp_utc AS deadlock_time,
-  CONVERT(nvarchar(max), CAST(event_data AS XML).query('(event/data[@name="xml_report"]/value/deadlock)[1]')) AS deadlock_xml
-FROM sys.fn_xe_file_target_read_file('system_health*.xel', NULL, NULL, NULL)
-WHERE object_name = 'xml_deadlock_report'
-ORDER BY timestamp_utc DESC;
-`
-
-// querySystemHealthLatestDeadlockRingBuffer retrieves the latest xml_deadlock_report event
-// from the system_health Extended Events ring buffer.
-// Note: This can be slow with large buffers due to XML parsing overhead.
-const querySystemHealthLatestDeadlockRingBuffer = `
-WITH xevents AS (
-  SELECT CAST(xet.target_data AS XML) AS target_data
-  FROM sys.dm_xe_session_targets AS xet
-  JOIN sys.dm_xe_sessions AS xs ON xs.address = xet.event_session_address
-  WHERE xs.name = 'system_health'
-    AND xet.target_name = 'ring_buffer'
-)
-SELECT TOP (1)
-  xevent.value('@timestamp', 'datetime2(7)') AS deadlock_time,
-  CONVERT(nvarchar(max), xevent.query('(data/value/deadlock)[1]')) AS deadlock_xml
-FROM xevents
-CROSS APPLY target_data.nodes('RingBufferTarget/event[@name="xml_deadlock_report"]') AS T(xevent)
-ORDER BY deadlock_time DESC;
-`
-
 // queryDatabaseStatus gets database state and read-only status
 const queryDatabaseStatus = `
 SELECT name, state, is_read_only
 FROM sys.databases;
-`
-
-// queryDatabaseNamesByID retrieves database_id to name mappings.
-const queryDatabaseNamesByID = `
-SELECT database_id, name
-FROM sys.databases;
-`
-
-// queryMSSQLErrorSessionExists checks for the configured Extended Events session.
-const queryMSSQLErrorSessionExists = `
-SELECT COUNT(*)
-FROM sys.dm_xe_sessions
-WHERE name = @sessionName;
-`
-
-// queryMSSQLErrorSessionHasEventFile verifies that the session has an event_file target.
-const queryMSSQLErrorSessionHasEventFile = `
-SELECT COUNT(*)
-FROM sys.dm_xe_session_targets AS xet
-JOIN sys.dm_xe_sessions AS xs ON xs.address = xet.event_session_address
-WHERE xs.name = @sessionName
-  AND xet.target_name = 'event_file';
-`
-
-// queryMSSQLErrorSessionHasRingBuffer verifies that the session has a ring_buffer target.
-const queryMSSQLErrorSessionHasRingBuffer = `
-SELECT COUNT(*)
-FROM sys.dm_xe_session_targets AS xet
-JOIN sys.dm_xe_sessions AS xs ON xs.address = xet.event_session_address
-WHERE xs.name = @sessionName
-  AND xet.target_name = 'ring_buffer';
-`
-
-// queryMSSQLErrorInfoEventFile reads recent error_reported events from the event_file target.
-const queryMSSQLErrorInfoEventFile = `
-SELECT TOP (@limit)
-  timestamp_utc AS event_time,
-  CAST(event_data AS XML).value('(event/data[@name="error_number"]/value)[1]', 'int') AS error_number,
-  CAST(event_data AS XML).value('(event/data[@name="state"]/value)[1]', 'int') AS error_state,
-  CAST(event_data AS XML).value('(event/data[@name="message"]/value)[1]', 'nvarchar(max)') AS message,
-  CAST(event_data AS XML).value('(event/action[@name="sql_text"]/value)[1]', 'nvarchar(max)') AS sql_text,
-  CONVERT(VARCHAR(64), CAST(event_data AS XML).value('(event/action[@name="query_hash"]/value)[1]', 'varbinary(8)'), 1) AS query_hash
-FROM sys.fn_xe_file_target_read_file(@sessionName + N'*.xel', NULL, NULL, NULL)
-WHERE object_name = 'error_reported'
-ORDER BY event_time DESC;
-`
-
-// queryMSSQLErrorInfoRingBuffer reads recent error_reported events from the ring_buffer target.
-// Note: This can be slow with large buffers due to XML parsing overhead.
-const queryMSSQLErrorInfoRingBuffer = `
-WITH xevents AS (
-  SELECT CAST(xet.target_data AS XML) AS target_data
-  FROM sys.dm_xe_session_targets AS xet
-  JOIN sys.dm_xe_sessions AS xs ON xs.address = xet.event_session_address
-  WHERE xs.name = @sessionName
-    AND xet.target_name = 'ring_buffer'
-)
-SELECT TOP (@limit)
-  xevent.value('@timestamp', 'datetime2(7)') AS event_time,
-  xevent.value('(data[@name="error_number"]/value)[1]', 'int') AS error_number,
-  xevent.value('(data[@name="state"]/value)[1]', 'int') AS error_state,
-  xevent.value('(data[@name="message"]/value)[1]', 'nvarchar(max)') AS message,
-  xevent.value('(action[@name="sql_text"]/value)[1]', 'nvarchar(max)') AS sql_text,
-  CONVERT(VARCHAR(64), xevent.value('(action[@name="query_hash"]/value)[1]', 'varbinary(8)'), 1) AS query_hash
-FROM xevents
-CROSS APPLY target_data.nodes('RingBufferTarget/event[@name="error_reported"]') AS T(xevent)
-ORDER BY event_time DESC;
 `
 
 // queryReplicationStatus gets replication publication status (if configured)

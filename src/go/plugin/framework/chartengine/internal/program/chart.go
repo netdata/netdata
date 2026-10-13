@@ -2,12 +2,17 @@
 
 package program
 
-import "fmt"
+import (
+	"errors"
+	"fmt"
+)
 
 // Algorithm defines how Netdata interprets values on wire.
 type Algorithm string
 
 const (
+	// AlgorithmAuto defers the default until runtime series kind is available.
+	AlgorithmAuto Algorithm = ""
 	// AlgorithmAbsolute sends direct values.
 	AlgorithmAbsolute Algorithm = "absolute"
 	// AlgorithmIncremental sends monotonic totals (Netdata computes rates/deltas).
@@ -24,18 +29,18 @@ const (
 	ChartTypeHeatmap ChartType = "heatmap"
 )
 
-// ReduceOp defines aggregation for series collisions mapped to one dimension.
-type ReduceOp string
-
-const (
-	// ReduceSum is the phase-1 collision reduction rule.
-	ReduceSum ReduceOp = "sum"
-)
-
 // Chart is one compiled chart template in immutable program IR.
 type Chart struct {
 	// TemplateID is compiler-assigned stable ID inside one Program revision.
 	TemplateID string
+	// EntryID and LocalTemplateID identify a chart in a named template set.
+	// They are empty for legacy document programs.
+	EntryID         string
+	LocalTemplateID string
+	// RoutingRank orders unowned collisions in a named template set by compile
+	// order, independently of ownership. Legacy document programs compare
+	// TemplateID instead.
+	RoutingRank int
 
 	Meta      ChartMeta
 	Identity  ChartIdentity
@@ -44,12 +49,10 @@ type Chart struct {
 
 	// Dimensions are declaration-ordered templates.
 	Dimensions []Dimension
-
-	// CollisionReduce is currently fixed to ReduceSum in phase-1.
-	CollisionReduce ReduceOp
 }
 
-// ChartMeta carries user-facing chart metadata after normalization/defaulting.
+// ChartMeta carries normalized chart metadata. Algorithm records the configured
+// chart policy; AlgorithmAuto means dimensions use their runtime series kinds.
 type ChartMeta struct {
 	Title     string
 	Family    string
@@ -70,6 +73,9 @@ type ChartIdentity struct {
 
 	// InstanceByLabels contains resolved explicit identity selectors (if used).
 	InstanceByLabels []InstanceLabelSelector
+	// OptionalByLabels contains declaration-ordered identity keys that
+	// participate only when their runtime value is nonblank.
+	OptionalByLabels []string
 
 	// ContextNamespace holds normalized namespace fragments that participate in
 	// derived context/id building in namespace-based authoring mode.
@@ -80,30 +86,41 @@ type ChartIdentity struct {
 }
 
 func validateChart(chart Chart) error {
+	var errs []error
 	if chart.TemplateID == "" {
-		return fmt.Errorf("template_id is required")
+		errs = append(errs, fmt.Errorf("template_id is required"))
 	}
 	if chart.Meta.Context == "" {
-		return fmt.Errorf("context is required")
+		errs = append(errs, fmt.Errorf("context is required"))
 	}
 	if chart.Meta.Units == "" {
-		return fmt.Errorf("units is required")
+		errs = append(errs, fmt.Errorf("units is required"))
 	}
-	if chart.Meta.Algorithm != AlgorithmAbsolute && chart.Meta.Algorithm != AlgorithmIncremental {
-		return fmt.Errorf("invalid algorithm %q", chart.Meta.Algorithm)
+	if chart.Meta.Algorithm != AlgorithmAuto &&
+		chart.Meta.Algorithm != AlgorithmAbsolute &&
+		chart.Meta.Algorithm != AlgorithmIncremental {
+		errs = append(errs, fmt.Errorf("invalid algorithm %q", chart.Meta.Algorithm))
 	}
-	if chart.CollisionReduce == "" {
-		return fmt.Errorf("collision reduce op is required")
+	switch chart.Meta.Type {
+	case ChartTypeLine, ChartTypeArea, ChartTypeStacked, ChartTypeHeatmap:
+	default:
+		errs = append(errs, fmt.Errorf("invalid chart type %q", chart.Meta.Type))
+	}
+	if err := validateInstanceLabelPolicy(chart.Identity.InstanceByLabels, chart.Identity.OptionalByLabels); err != nil {
+		errs = append(errs, fmt.Errorf("identity: %w", err))
+	}
+	if err := validateLabelPolicy(chart.Labels); err != nil {
+		errs = append(errs, fmt.Errorf("labels: %w", err))
 	}
 	if len(chart.Dimensions) == 0 {
-		return fmt.Errorf("at least one dimension is required")
+		errs = append(errs, fmt.Errorf("at least one dimension is required"))
 	}
 	for i, dim := range chart.Dimensions {
 		if err := validateDimension(dim); err != nil {
-			return fmt.Errorf("dimension[%d]: %w", i, err)
+			errs = append(errs, fmt.Errorf("dimension[%d]: %w", i, err))
 		}
 	}
-	return nil
+	return errors.Join(errs...)
 }
 
 func (c Chart) clone() Chart {
@@ -128,6 +145,7 @@ func (i ChartIdentity) clone() ChartIdentity {
 	for _, selector := range i.InstanceByLabels {
 		out.InstanceByLabels = append(out.InstanceByLabels, selector.clone())
 	}
+	out.OptionalByLabels = append([]string(nil), i.OptionalByLabels...)
 	out.ContextNamespace = append([]string(nil), i.ContextNamespace...)
 	return out
 }

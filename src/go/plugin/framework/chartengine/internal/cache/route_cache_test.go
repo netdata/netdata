@@ -106,6 +106,65 @@ func TestRouteCache(t *testing.T) {
 				assert.False(t, ok)
 			},
 		},
+		"stale build sequence is ignored for store and retain": {
+			run: func(t *testing.T) {
+				rc := NewRouteCache[string]()
+				a := metrix.SeriesIdentity{ID: "a", Hash64: 30}
+				b := metrix.SeriesIdentity{ID: "b", Hash64: 31}
+				c := metrix.SeriesIdentity{ID: "c", Hash64: 32}
+
+				rc.Store(a, 1, 1, []string{"chart-a"})
+				rc.Store(b, 1, 1, []string{"chart-b"})
+				rc.MarkSeenIfPresent(a, 2)
+				rc.Store(c, 1, 1, []string{"chart-c"})
+
+				stats := rc.RetainSeen(1)
+				assert.Equal(t, 2, stats.EntriesBefore)
+				assert.Equal(t, 2, stats.EntriesAfter)
+				assert.Equal(t, 0, stats.Pruned)
+				assert.False(t, stats.FullDrop)
+
+				_, ok := rc.Lookup(c, 1, 2)
+				assert.False(t, ok)
+
+				stats = rc.RetainSeen(2)
+				assert.Equal(t, 2, stats.EntriesBefore)
+				assert.Equal(t, 1, stats.EntriesAfter)
+				assert.Equal(t, 1, stats.Pruned)
+				assert.False(t, stats.FullDrop)
+
+				_, ok = rc.Lookup(a, 1, 2)
+				assert.True(t, ok)
+				_, ok = rc.Lookup(b, 1, 2)
+				assert.False(t, ok)
+			},
+		},
+		"retainSeenEntries clears truncated tail references": {
+			run: func(t *testing.T) {
+				bucket := []routeCacheEntry[string]{
+					{
+						identity:      metrix.SeriesIdentity{ID: "a", Hash64: 40},
+						revision:      1,
+						values:        []string{"chart-a"},
+						lastSeenBuild: 2,
+					},
+					{
+						identity:      metrix.SeriesIdentity{ID: "b", Hash64: 41},
+						revision:      1,
+						values:        []string{"chart-b"},
+						lastSeenBuild: 1,
+					},
+				}
+
+				kept := retainSeenEntries(bucket, 2)
+				assert.Len(t, kept, 1)
+				assert.Equal(t, metrix.SeriesID("a"), kept[0].identity.ID)
+				assert.Equal(t, metrix.SeriesIdentity{}, bucket[1].identity)
+				assert.Zero(t, bucket[1].revision)
+				assert.Nil(t, bucket[1].values)
+				assert.Zero(t, bucket[1].lastSeenBuild)
+			},
+		},
 	}
 
 	for name, tc := range tests {

@@ -7,13 +7,13 @@ import (
 	"time"
 )
 
-func (c *Collector) collectPingLatency(mx map[string]int64) {
+func (c *Collector) collectPingLatency(ctx context.Context, mx map[string]int64) {
 	c.pingSummary.Reset()
 
-	for i := 0; i < c.PingSamples; i++ {
-		now := time.Now()
-		_, err := c.rdb.Ping(context.Background()).Result()
-		elapsed := time.Since(now)
+	for range c.PingSamples {
+		start := time.Now()
+		err := c.rdb.Ping(ctx).Err()
+		elapsed := time.Since(start)
 
 		if err != nil {
 			c.Debug(err)

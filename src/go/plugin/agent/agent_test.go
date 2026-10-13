@@ -5,6 +5,10 @@ package agent
 import (
 	"bytes"
 	"context"
+	"errors"
+	"io"
+	"os"
+	"path/filepath"
 	"sync"
 	"testing"
 	"time"
@@ -12,10 +16,15 @@ import (
 	"github.com/netdata/netdata/go/plugins/pkg/safewriter"
 	"github.com/netdata/netdata/go/plugins/plugin/agent/discovery"
 	"github.com/netdata/netdata/go/plugins/plugin/agent/discovery/dummy"
+	"github.com/netdata/netdata/go/plugins/plugin/agent/jobmgr/composition"
 	"github.com/netdata/netdata/go/plugins/plugin/agent/policy"
+	secretconfig "github.com/netdata/netdata/go/plugins/plugin/agent/secrets"
+	secretresolver "github.com/netdata/netdata/go/plugins/plugin/agent/secrets/resolver"
+	"github.com/netdata/netdata/go/plugins/plugin/agent/secrets/secretstore"
+	"github.com/netdata/netdata/go/plugins/plugin/agent/secrets/secretstore/backends"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/collectorapi"
-
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestNew(t *testing.T) {
@@ -31,65 +40,211 @@ func TestNew(t *testing.T) {
 	})
 }
 
+func TestNormalizeProcessControlErrorChecksEveryLeaf(t *testing.T) {
+	unexpected := errors.New("unexpected")
+	mixed := errors.Join(composition.ErrProcessStopped, unexpected)
+	require.ErrorIs(t, normalizeProcessControlError(composition.ErrProcessStopped), ErrNotRunning)
+	require.Equal(t, mixed, normalizeProcessControlError(mixed))
+}
+
+func TestAgent_serviceDiscoveryEnabled(t *testing.T) {
+	tests := map[string]struct {
+		agent *Agent
+		want  bool
+	}{
+		"non-terminal policy enables service discovery": {
+			agent: &Agent{runModePolicy: policy.Agent(false)},
+			want:  true,
+		},
+		"terminal policy disables service discovery": {
+			agent: &Agent{runModePolicy: policy.Agent(true)},
+			want:  false,
+		},
+		"plugin-level disable wins over policy": {
+			agent: &Agent{
+				runModePolicy:           policy.Agent(false),
+				DisableServiceDiscovery: true,
+			},
+			want: false,
+		},
+	}
+
+	for name, test := range tests {
+		t.Run(name, func(t *testing.T) {
+			require.NotNil(t, test.agent)
+			assert.Equal(t, test.want, test.agent.serviceDiscoveryEnabled())
+		})
+	}
+}
+
+func TestAgent_setupRuntimeService(t *testing.T) {
+	tests := map[string]struct {
+		policy      policy.RunModePolicy
+		wantEnabled bool
+	}{
+		"terminal mode disables runtime service": {
+			policy:      policy.Agent(true),
+			wantEnabled: false,
+		},
+		"non-terminal mode enables runtime service": {
+			policy:      policy.Agent(false),
+			wantEnabled: true,
+		},
+	}
+
+	for name, test := range tests {
+		t.Run(name, func(t *testing.T) {
+			a := New(Config{
+				Name:          "test",
+				RunModePolicy: test.policy,
+			})
+			require.NotNil(t, a)
+			a.Out = io.Discard
+
+			svc := a.setupRuntimeService()
+			if !test.wantEnabled {
+				assert.Nil(t, svc)
+				return
+			}
+
+			require.NotNil(t, svc)
+		})
+	}
+}
+
 func TestAgent_Run(t *testing.T) {
-	a := New(Config{
+	tests := map[string]struct {
+		restarts int
+		secrets  bool
+	}{
+		"collects and terminates with secrets":    {secrets: true},
+		"collects and terminates without secrets": {},
+		"restart without secrets":                 {restarts: 1},
+		"acknowledged restart rotates the complete generation": {
+			restarts: 1,
+			secrets:  true,
+		},
+	}
+	for name, test := range tests {
+		t.Run(name, func(t *testing.T) {
+			a := newLifecycleTestAgent()
+			root := t.TempDir()
+			require.NoError(t, os.MkdirAll(filepath.Join(root, "ss"), 0755))
+			require.NoError(t, os.WriteFile(filepath.Join(root, "ss", "vault.conf"), []byte("jobs:\n  - name: sentinel\n    kind: vault\n"), 0600))
+			a.CollectorsConfDir = []string{root}
+			loads := 0
+			a.loadSecretStores = func(roots []string) ([]secretstore.Config, []error) {
+				loads++
+				return secretstore.LoadFileConfigs(roots)
+			}
+			if test.secrets {
+				resolver, err := secretresolver.NewDefaultAtomicResolver()
+				require.NoError(t, err)
+				creators, err := secretstore.NewCreatorCatalog(backends.Creators())
+				require.NoError(t, err)
+				a.Secrets = &secretconfig.Config{Resolver: resolver, Creators: creators}
+			}
+			var buf bytes.Buffer
+			a.Out = safewriter.New(&buf)
+			reader, writer := io.Pipe()
+			a.In = reader
+
+			var mux sync.Mutex
+			stats := make(map[string]int)
+			a.ModuleRegistry = prepareRegistry(&mux, stats, "module1", "module2")
+
+			runDone := make(chan error, 1)
+			go func() { runDone <- a.run(context.Background()) }()
+			waitForCollection(t, &mux, stats, 1)
+
+			for restart := 0; restart < test.restarts; restart++ {
+				ctx, cancel := context.WithTimeout(context.Background(), 4*time.Second)
+				require.NoError(t, a.Restart(ctx))
+				cancel()
+				waitForCollection(t, &mux, stats, restart+2)
+			}
+
+			ctx, cancel := context.WithTimeout(context.Background(), 4*time.Second)
+			require.NoError(t, a.Terminate(ctx))
+			cancel()
+			require.NoError(t, writer.Close())
+			require.NoError(t, <-runDone)
+			assert.ErrorIs(t, a.Restart(context.Background()), ErrNotRunning)
+			assert.ErrorIs(t, a.Terminate(context.Background()), ErrNotRunning)
+
+			generations := test.restarts + 1
+			for _, module := range []string{"module1", "module2"} {
+				assert.Equalf(t, generations, stats[module+"_init"], "%s init", module)
+				assert.Equalf(t, generations, stats[module+"_check"], "%s check", module)
+				assert.Equalf(t, generations, stats[module+"_charts"], "%s charts", module)
+				assert.Equalf(
+					t,
+					generations,
+					stats[module+"_collect"],
+					"%s collect",
+					module,
+				)
+				assert.Equalf(t, generations, stats[module+"_cleanup"], "%s cleanup", module)
+			}
+			assert.NotEmpty(t, buf.String())
+			if test.secrets {
+				require.Equal(t, 1, loads, "file configurations are process-fixed")
+				require.Contains(t, buf.String(), "test:secretstore:vault")
+			} else {
+				require.Zero(t, loads)
+				require.NotContains(t, buf.String(), "test:secretstore:")
+			}
+		})
+	}
+}
+
+func newLifecycleTestAgent() *Agent {
+	return New(Config{
 		Name: "test",
 		RunModePolicy: policy.RunModePolicy{
-			IsTerminal:               false,
-			AutoEnableDiscovered:     true,
-			UseFileStatusPersistence: true,
+			IsTerminal:           false,
+			AutoEnableDiscovered: true,
+			EnableRuntimeCharts:  true,
 		},
 		DiscoveryProviders: []discovery.ProviderFactory{
-			discovery.NewProviderFactory("dummy", func(ctx discovery.BuildContext) (discovery.Discoverer, bool, error) {
-				if len(ctx.DummyNames) == 0 {
-					return nil, false, nil
-				}
-				d, err := dummy.NewDiscovery(dummy.Config{
-					Registry: ctx.Registry,
-					Names:    ctx.DummyNames,
-				})
-				if err != nil {
-					return nil, false, err
-				}
-				return d, true, nil
-			}),
+			discovery.NewProviderFactory(
+				"dummy",
+				func(ctx discovery.BuildContext) (discovery.Discoverer, bool, error) {
+					if len(ctx.DummyNames) == 0 {
+						return nil, false, nil
+					}
+					d, err := dummy.NewDiscovery(dummy.Config{
+						Registry: ctx.Registry,
+						Names:    ctx.DummyNames,
+					})
+					if err != nil {
+						return nil, false, err
+					}
+					return d, true, nil
+				},
+			),
 		},
 	})
+}
 
-	var buf bytes.Buffer
-	a.Out = safewriter.New(&buf)
-
-	var mux sync.Mutex
-	stats := make(map[string]int)
-	a.ModuleRegistry = prepareRegistry(&mux, stats, "module1", "module2")
-
-	ctx, cancel := context.WithCancel(context.Background())
-	var wg sync.WaitGroup
-
-	wg.Add(1)
-	go func() { defer wg.Done(); a.run(ctx) }()
-
-	time.Sleep(time.Second * 2)
-	cancel()
-	wg.Wait()
-
-	assert.Equalf(t, 1, stats["module1_init"], "module1 init")
-	assert.Equalf(t, 1, stats["module2_init"], "module2 init")
-	assert.Equalf(t, 1, stats["module1_check"], "module1 check")
-	assert.Equalf(t, 1, stats["module2_check"], "module2 check")
-	assert.Equalf(t, 1, stats["module1_charts"], "module1 charts")
-	assert.Equalf(t, 1, stats["module2_charts"], "module2 charts")
-	assert.Truef(t, stats["module1_collect"] > 0, "module1 collect")
-	assert.Truef(t, stats["module2_collect"] > 0, "module2 collect")
-	assert.Equalf(t, 1, stats["module1_cleanup"], "module1 cleanup")
-	assert.Equalf(t, 1, stats["module2_cleanup"], "module2 cleanup")
-	assert.True(t, buf.String() != "")
+func waitForCollection(
+	t *testing.T,
+	mux *sync.Mutex,
+	stats map[string]int,
+	generations int,
+) {
+	t.Helper()
+	require.Eventually(t, func() bool {
+		mux.Lock()
+		defer mux.Unlock()
+		return stats["module1_collect"] >= generations &&
+			stats["module2_collect"] >= generations
+	}, 4*time.Second, 50*time.Millisecond)
 }
 
 func prepareRegistry(mux *sync.Mutex, stats map[string]int, names ...string) collectorapi.Registry {
 	reg := collectorapi.Registry{}
 	for _, name := range names {
-		name := name
 		reg.Register(name, collectorapi.Creator{
 			Create: func() collectorapi.CollectorV1 {
 				return prepareMockModule(name, mux, stats)
@@ -100,6 +255,7 @@ func prepareRegistry(mux *sync.Mutex, stats map[string]int, names ...string) col
 }
 
 func prepareMockModule(name string, mux *sync.Mutex, stats map[string]int) collectorapi.CollectorV1 {
+	var firstCollection sync.Once
 	return &collectorapi.MockCollectorV1{
 		InitFunc: func(context.Context) error {
 			mux.Lock()
@@ -122,9 +278,11 @@ func prepareMockModule(name string, mux *sync.Mutex, stats map[string]int) colle
 			}
 		},
 		CollectFunc: func(context.Context) map[string]int64 {
-			mux.Lock()
-			defer mux.Unlock()
-			stats[name+"_collect"]++
+			firstCollection.Do(func() {
+				mux.Lock()
+				defer mux.Unlock()
+				stats[name+"_collect"]++
+			})
 			return map[string]int64{"id1": 1}
 		},
 		CleanupFunc: func(context.Context) {

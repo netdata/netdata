@@ -1,0 +1,5 @@
+taxonomy_version: 1
+plugin_name: windows.plugin
+module_name: PerflibSMB
+taxonomy_optout:
+  reason: windows.plugin covers many heterogeneous Windows OS subsystems across a large number of independent Perflib modules. Dashboard taxonomy placement for these contexts has not yet been defined.

@@ -10,6 +10,8 @@ import (
 	"time"
 )
 
+const profileNamePattern = "^[a-z][a-z0-9_]*$"
+
 func stringsLowerTrim(v string) string {
 	return strings.ToLower(strings.TrimSpace(v))
 }
@@ -28,4 +30,22 @@ func withOptionalTimeout(ctx context.Context, timeout time.Duration) (context.Co
 		return ctx, func() {}
 	}
 	return context.WithTimeout(ctx, timeout)
+}
+
+func isValidProfileName(v string) bool {
+	v = stringsTrim(v)
+	if len(v) == 0 {
+		return false
+	}
+	if v[0] < 'a' || v[0] > 'z' {
+		return false
+	}
+	for i := 1; i < len(v); i++ {
+		c := v[i]
+		if (c >= 'a' && c <= 'z') || (c >= '0' && c <= '9') || c == '_' {
+			continue
+		}
+		return false
+	}
+	return true
 }

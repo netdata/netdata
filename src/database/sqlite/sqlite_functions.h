@@ -4,7 +4,7 @@
 #define NETDATA_SQLITE_FUNCTIONS_H
 
 #include "database/rrd.h"
-#include "database/sqlite/vendored/sqlite3.h"
+#include "sqlite3.h"
 
 void analytics_set_data_str(char **name, const char *value);
 
@@ -109,6 +109,16 @@ int simple_prepare_statement(sqlite3 *database, const char *query, sqlite3_stmt 
 void finalize_self_prepared_sql_statements();
 void finalize_all_prepared_sql_statements();
 
+// The SQLite teardown latch. Set it from any shutdown path that stops waiting for a SQLite
+// user instead of proving it finished; every teardown entry point (ml_fini(),
+// sqlite_close_databases(), sqlite_library_shutdown()) then skips its destruction and leaks
+// deliberately. One-way within a library lifetime: nothing clears it during a shutdown, and
+// only sqlite_library_init() re-arms it (which in practice means the -W unittest drivers, the
+// sole place the library is re-initialized in one process). See the contract at the top of
+// sqlite_functions.c.
+void sqlite_mark_teardown_unsafe(const char *reason);
+bool sqlite_teardown_is_unsafe(void);
+
 int execute_insert(sqlite3_stmt *res);
 int db_execute(sqlite3 *database, const char *cmd, int *sqlite_rc);
 char *get_database_extented_error(sqlite3 *database, int i, const char *description);
@@ -121,11 +131,57 @@ uint64_t sqlite_get_db_space(sqlite3 *db);
 int get_free_page_count(sqlite3 *database);
 int get_database_page_count(sqlite3 *database);
 
+// Return a pointer to the UUID blob stored in column iCol when the current row
+// contains a BLOB with exactly sizeof(nd_uuid_t) bytes. The caller must pass a
+// valid statement positioned on a row. The returned pointer refers to
+// SQLite-owned memory and is only valid until the statement is stepped, reset,
+// or finalized. Returns NULL for NULL, non-BLOB, or malformed values.
+static inline const nd_uuid_t *sqlite3_column_uuid_ptr(sqlite3_stmt *res, int iCol) {
+    if (sqlite3_column_type(res, iCol) != SQLITE_BLOB)
+        return NULL;
+
+    const void *uuid = sqlite3_column_blob(res, iCol);
+    if (!uuid || sqlite3_column_bytes(res, iCol) != sizeof(nd_uuid_t))
+        return NULL;
+
+    return (const nd_uuid_t *)uuid;
+}
+
+// Copy the UUID stored in column iCol into dst. The caller must pass a valid
+// statement positioned on a row and a writable destination UUID buffer.
+// Returns true on success, false when the column does not contain a valid UUID blob.
+static inline bool sqlite3_column_uuid_copy(sqlite3_stmt *res, int iCol, nd_uuid_t dst) {
+    const nd_uuid_t *uuid = sqlite3_column_uuid_ptr(res, iCol);
+    if (!uuid)
+        return false;
+
+    uuid_copy(dst, *uuid);
+    return true;
+}
+
+// Convert the UUID stored in column iCol to lowercase text in out. The caller
+// must pass a valid statement positioned on a row and a writable buffer large
+// enough for UUID_STR_LEN bytes. Returns true on success, false when the column
+// does not contain a valid UUID blob.
+static inline bool sqlite3_column_uuid_unparse_lower(sqlite3_stmt *res, int iCol, char *out) {
+    const nd_uuid_t *uuid = sqlite3_column_uuid_ptr(res, iCol);
+    if (!uuid)
+        return false;
+
+    uuid_unparse_lower(*uuid, out);
+    return true;
+}
+
 int sqlite_library_init(void);
 void sqlite_library_shutdown(void);
 
 void sql_close_database(sqlite3 *database, const char *database_name);
+void sql_close_thread_db_safe(sqlite3 **database);
 void sqlite_close_databases(void);
+int sqlite_lease_unittest(void);
+// Runs the real sqlite_close_databases() and sqlite_library_shutdown(): it MUST be the last SQLite work of its
+// process (the end of -W unittest, or -W sqlite-lease-test).
+int sqlite_lease_teardown_unittest(void);
 uint64_t get_total_database_space(void);
 int sqlite_release_memory(int bytes);
 #endif //NETDATA_SQLITE_FUNCTIONS_H

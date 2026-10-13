@@ -1,779 +1,778 @@
 ---
-id: machine_learning
-name: Azure Machine Learning Workspace
+display_name: Azure Machine Learning Workspace
 resource_type: Microsoft.MachineLearningServices/workspaces
 metrics:
-- id: agents
-  azure_name: Agents
-  time_grain: PT1M
-  series:
-  - aggregation: total
-    kind: counter
-- id: indexed_files
-  azure_name: IndexedFiles
-  time_grain: PT1M
-  series:
-  - aggregation: total
-    kind: counter
-- id: messages
-  azure_name: Messages
-  time_grain: PT1M
-  series:
-  - aggregation: total
-    kind: counter
-- id: runs
-  azure_name: Runs
-  time_grain: PT1M
-  series:
-  - aggregation: total
-    kind: counter
-- id: threads
-  azure_name: Threads
-  time_grain: PT1M
-  series:
-  - aggregation: total
-    kind: counter
-- id: tokens
-  azure_name: Tokens
-  time_grain: PT1M
-  series:
-  - aggregation: total
-    kind: counter
-- id: tool_calls
-  azure_name: ToolCalls
-  time_grain: PT1M
-  series:
-  - aggregation: total
-    kind: counter
-- id: model_deploy_failed
-  azure_name: Model Deploy Failed
-  time_grain: PT1M
-  series:
-  - aggregation: total
-    kind: counter
-- id: model_deploy_started
-  azure_name: Model Deploy Started
-  time_grain: PT1M
-  series:
-  - aggregation: total
-    kind: counter
-- id: model_deploy_succeeded
-  azure_name: Model Deploy Succeeded
-  time_grain: PT1M
-  series:
-  - aggregation: total
-    kind: counter
-- id: model_register_failed
-  azure_name: Model Register Failed
-  time_grain: PT1M
-  series:
-  - aggregation: total
-    kind: counter
-- id: model_register_succeeded
-  azure_name: Model Register Succeeded
-  time_grain: PT1M
-  series:
-  - aggregation: total
-    kind: counter
-- id: active_cores
-  azure_name: Active Cores
-  time_grain: PT1M
-  series:
-  - aggregation: average
-    kind: gauge
-- id: idle_cores
-  azure_name: Idle Cores
-  time_grain: PT1M
-  series:
-  - aggregation: average
-    kind: gauge
-- id: leaving_cores
-  azure_name: Leaving Cores
-  time_grain: PT1M
-  series:
-  - aggregation: average
-    kind: gauge
-- id: preempted_cores
-  azure_name: Preempted Cores
-  time_grain: PT1M
-  series:
-  - aggregation: average
-    kind: gauge
-- id: unusable_cores
-  azure_name: Unusable Cores
-  time_grain: PT1M
-  series:
-  - aggregation: average
-    kind: gauge
-- id: total_cores
-  azure_name: Total Cores
-  time_grain: PT1M
-  series:
-  - aggregation: average
-    kind: gauge
-- id: active_nodes
-  azure_name: Active Nodes
-  time_grain: PT1M
-  series:
-  - aggregation: average
-    kind: gauge
-- id: idle_nodes
-  azure_name: Idle Nodes
-  time_grain: PT1M
-  series:
-  - aggregation: average
-    kind: gauge
-- id: leaving_nodes
-  azure_name: Leaving Nodes
-  time_grain: PT1M
-  series:
-  - aggregation: average
-    kind: gauge
-- id: preempted_nodes
-  azure_name: Preempted Nodes
-  time_grain: PT1M
-  series:
-  - aggregation: average
-    kind: gauge
-- id: unusable_nodes
-  azure_name: Unusable Nodes
-  time_grain: PT1M
-  series:
-  - aggregation: average
-    kind: gauge
-- id: total_nodes
-  azure_name: Total Nodes
-  time_grain: PT1M
-  series:
-  - aggregation: average
-    kind: gauge
-- id: quota_utilization_percentage
-  azure_name: Quota Utilization Percentage
-  time_grain: PT1M
-  series:
-  - aggregation: average
-    kind: gauge
-- id: cpu_utilization
-  azure_name: CpuUtilization
-  time_grain: PT1M
-  series:
-  - aggregation: average
-    kind: gauge
-- id: cpu_utilization_percentage
-  azure_name: CpuUtilizationPercentage
-  time_grain: PT1M
-  series:
-  - aggregation: average
-    kind: gauge
-- id: cpu_utilization_millicores
-  azure_name: CpuUtilizationMillicores
-  time_grain: PT1M
-  series:
-  - aggregation: average
-    kind: gauge
-- id: cpu_capacity_millicores
-  azure_name: CpuCapacityMillicores
-  time_grain: PT1M
-  series:
-  - aggregation: average
-    kind: gauge
-- id: cpu_memory_utilization_percentage
-  azure_name: CpuMemoryUtilizationPercentage
-  time_grain: PT1M
-  series:
-  - aggregation: average
-    kind: gauge
-- id: cpu_memory_utilization_megabytes
-  azure_name: CpuMemoryUtilizationMegabytes
-  time_grain: PT1M
-  series:
-  - aggregation: average
-    kind: gauge
-- id: cpu_memory_capacity_megabytes
-  azure_name: CpuMemoryCapacityMegabytes
-  time_grain: PT1M
-  series:
-  - aggregation: average
-    kind: gauge
-- id: gpu_utilization
-  azure_name: GpuUtilization
-  time_grain: PT1M
-  series:
-  - aggregation: average
-    kind: gauge
-- id: gpu_utilization_percentage
-  azure_name: GpuUtilizationPercentage
-  time_grain: PT1M
-  series:
-  - aggregation: average
-    kind: gauge
-- id: gpu_utilization_milli_gpus
-  azure_name: GpuUtilizationMilliGPUs
-  time_grain: PT1M
-  series:
-  - aggregation: average
-    kind: gauge
-- id: gpu_capacity_milli_gpus
-  azure_name: GpuCapacityMilliGPUs
-  time_grain: PT1M
-  series:
-  - aggregation: average
-    kind: gauge
-- id: gpu_memory_utilization
-  azure_name: GpuMemoryUtilization
-  time_grain: PT1M
-  series:
-  - aggregation: average
-    kind: gauge
-- id: gpu_memory_utilization_percentage
-  azure_name: GpuMemoryUtilizationPercentage
-  time_grain: PT1M
-  series:
-  - aggregation: average
-    kind: gauge
-- id: gpu_memory_utilization_megabytes
-  azure_name: GpuMemoryUtilizationMegabytes
-  time_grain: PT1M
-  series:
-  - aggregation: average
-    kind: gauge
-- id: gpu_memory_capacity_megabytes
-  azure_name: GpuMemoryCapacityMegabytes
-  time_grain: PT1M
-  series:
-  - aggregation: average
-    kind: gauge
-- id: gpu_energy_joules
-  azure_name: GpuEnergyJoules
-  time_grain: PT1M
-  series:
-  - aggregation: total
-    kind: counter
-- id: disk_used_megabytes
-  azure_name: DiskUsedMegabytes
-  time_grain: PT1M
-  series:
-  - aggregation: average
-    kind: gauge
-- id: disk_avail_megabytes
-  azure_name: DiskAvailMegabytes
-  time_grain: PT1M
-  series:
-  - aggregation: average
-    kind: gauge
-- id: disk_read_megabytes
-  azure_name: DiskReadMegabytes
-  time_grain: PT1M
-  series:
-  - aggregation: total
-    kind: counter
-- id: disk_write_megabytes
-  azure_name: DiskWriteMegabytes
-  time_grain: PT1M
-  series:
-  - aggregation: total
-    kind: counter
-- id: network_input_megabytes
-  azure_name: NetworkInputMegabytes
-  time_grain: PT1M
-  series:
-  - aggregation: total
-    kind: counter
-- id: network_output_megabytes
-  azure_name: NetworkOutputMegabytes
-  time_grain: PT1M
-  series:
-  - aggregation: total
-    kind: counter
-- id: ib_receive_megabytes
-  azure_name: IBReceiveMegabytes
-  time_grain: PT1M
-  series:
-  - aggregation: total
-    kind: counter
-- id: ib_transmit_megabytes
-  azure_name: IBTransmitMegabytes
-  time_grain: PT1M
-  series:
-  - aggregation: total
-    kind: counter
-- id: storage_api_success_count
-  azure_name: StorageAPISuccessCount
-  time_grain: PT1M
-  series:
-  - aggregation: total
-    kind: counter
-- id: storage_api_failure_count
-  azure_name: StorageAPIFailureCount
-  time_grain: PT1M
-  series:
-  - aggregation: total
-    kind: counter
-- id: not_started_runs
-  azure_name: Not Started Runs
-  time_grain: PT1M
-  series:
-  - aggregation: total
-    kind: counter
-- id: starting_runs
-  azure_name: Starting Runs
-  time_grain: PT1M
-  series:
-  - aggregation: total
-    kind: counter
-- id: preparing_runs
-  azure_name: Preparing Runs
-  time_grain: PT1M
-  series:
-  - aggregation: total
-    kind: counter
-- id: provisioning_runs
-  azure_name: Provisioning Runs
-  time_grain: PT1M
-  series:
-  - aggregation: total
-    kind: counter
-- id: queued_runs
-  azure_name: Queued Runs
-  time_grain: PT1M
-  series:
-  - aggregation: total
-    kind: counter
-- id: started_runs
-  azure_name: Started Runs
-  time_grain: PT1M
-  series:
-  - aggregation: total
-    kind: counter
-- id: completed_runs
-  azure_name: Completed Runs
-  time_grain: PT1M
-  series:
-  - aggregation: total
-    kind: counter
-- id: failed_runs
-  azure_name: Failed Runs
-  time_grain: PT1M
-  series:
-  - aggregation: total
-    kind: counter
-- id: cancelled_runs
-  azure_name: Cancelled Runs
-  time_grain: PT1M
-  series:
-  - aggregation: total
-    kind: counter
-- id: cancel_requested_runs
-  azure_name: Cancel Requested Runs
-  time_grain: PT1M
-  series:
-  - aggregation: total
-    kind: counter
-- id: finalizing_runs
-  azure_name: Finalizing Runs
-  time_grain: PT1M
-  series:
-  - aggregation: total
-    kind: counter
-- id: not_responding_runs
-  azure_name: Not Responding Runs
-  time_grain: PT1M
-  series:
-  - aggregation: total
-    kind: counter
-- id: errors
-  azure_name: Errors
-  time_grain: PT1M
-  series:
-  - aggregation: total
-    kind: counter
-- id: warnings
-  azure_name: Warnings
-  time_grain: PT1M
-  series:
-  - aggregation: total
-    kind: counter
+  - id: agents
+    azure_name: Agents
+    time_grain: PT1M
+    series:
+      - aggregation: total
+        kind: counter
+  - id: indexed_files
+    azure_name: IndexedFiles
+    time_grain: PT1M
+    series:
+      - aggregation: total
+        kind: counter
+  - id: messages
+    azure_name: Messages
+    time_grain: PT1M
+    series:
+      - aggregation: total
+        kind: counter
+  - id: runs
+    azure_name: Runs
+    time_grain: PT1M
+    series:
+      - aggregation: total
+        kind: counter
+  - id: threads
+    azure_name: Threads
+    time_grain: PT1M
+    series:
+      - aggregation: total
+        kind: counter
+  - id: tokens
+    azure_name: Tokens
+    time_grain: PT1M
+    series:
+      - aggregation: total
+        kind: counter
+  - id: tool_calls
+    azure_name: ToolCalls
+    time_grain: PT1M
+    series:
+      - aggregation: total
+        kind: counter
+  - id: model_deploy_failed
+    azure_name: Model Deploy Failed
+    time_grain: PT1M
+    series:
+      - aggregation: total
+        kind: counter
+  - id: model_deploy_started
+    azure_name: Model Deploy Started
+    time_grain: PT1M
+    series:
+      - aggregation: total
+        kind: counter
+  - id: model_deploy_succeeded
+    azure_name: Model Deploy Succeeded
+    time_grain: PT1M
+    series:
+      - aggregation: total
+        kind: counter
+  - id: model_register_failed
+    azure_name: Model Register Failed
+    time_grain: PT1M
+    series:
+      - aggregation: total
+        kind: counter
+  - id: model_register_succeeded
+    azure_name: Model Register Succeeded
+    time_grain: PT1M
+    series:
+      - aggregation: total
+        kind: counter
+  - id: active_cores
+    azure_name: Active Cores
+    time_grain: PT1M
+    series:
+      - aggregation: average
+        kind: gauge
+  - id: idle_cores
+    azure_name: Idle Cores
+    time_grain: PT1M
+    series:
+      - aggregation: average
+        kind: gauge
+  - id: leaving_cores
+    azure_name: Leaving Cores
+    time_grain: PT1M
+    series:
+      - aggregation: average
+        kind: gauge
+  - id: preempted_cores
+    azure_name: Preempted Cores
+    time_grain: PT1M
+    series:
+      - aggregation: average
+        kind: gauge
+  - id: unusable_cores
+    azure_name: Unusable Cores
+    time_grain: PT1M
+    series:
+      - aggregation: average
+        kind: gauge
+  - id: total_cores
+    azure_name: Total Cores
+    time_grain: PT1M
+    series:
+      - aggregation: average
+        kind: gauge
+  - id: active_nodes
+    azure_name: Active Nodes
+    time_grain: PT1M
+    series:
+      - aggregation: average
+        kind: gauge
+  - id: idle_nodes
+    azure_name: Idle Nodes
+    time_grain: PT1M
+    series:
+      - aggregation: average
+        kind: gauge
+  - id: leaving_nodes
+    azure_name: Leaving Nodes
+    time_grain: PT1M
+    series:
+      - aggregation: average
+        kind: gauge
+  - id: preempted_nodes
+    azure_name: Preempted Nodes
+    time_grain: PT1M
+    series:
+      - aggregation: average
+        kind: gauge
+  - id: unusable_nodes
+    azure_name: Unusable Nodes
+    time_grain: PT1M
+    series:
+      - aggregation: average
+        kind: gauge
+  - id: total_nodes
+    azure_name: Total Nodes
+    time_grain: PT1M
+    series:
+      - aggregation: average
+        kind: gauge
+  - id: quota_utilization_percentage
+    azure_name: Quota Utilization Percentage
+    time_grain: PT1M
+    series:
+      - aggregation: average
+        kind: gauge
+  - id: cpu_utilization
+    azure_name: CpuUtilization
+    time_grain: PT1M
+    series:
+      - aggregation: average
+        kind: gauge
+  - id: cpu_utilization_percentage
+    azure_name: CpuUtilizationPercentage
+    time_grain: PT1M
+    series:
+      - aggregation: average
+        kind: gauge
+  - id: cpu_utilization_millicores
+    azure_name: CpuUtilizationMillicores
+    time_grain: PT1M
+    series:
+      - aggregation: average
+        kind: gauge
+  - id: cpu_capacity_millicores
+    azure_name: CpuCapacityMillicores
+    time_grain: PT1M
+    series:
+      - aggregation: average
+        kind: gauge
+  - id: cpu_memory_utilization_percentage
+    azure_name: CpuMemoryUtilizationPercentage
+    time_grain: PT1M
+    series:
+      - aggregation: average
+        kind: gauge
+  - id: cpu_memory_utilization_megabytes
+    azure_name: CpuMemoryUtilizationMegabytes
+    time_grain: PT1M
+    series:
+      - aggregation: average
+        kind: gauge
+  - id: cpu_memory_capacity_megabytes
+    azure_name: CpuMemoryCapacityMegabytes
+    time_grain: PT1M
+    series:
+      - aggregation: average
+        kind: gauge
+  - id: gpu_utilization
+    azure_name: GpuUtilization
+    time_grain: PT1M
+    series:
+      - aggregation: average
+        kind: gauge
+  - id: gpu_utilization_percentage
+    azure_name: GpuUtilizationPercentage
+    time_grain: PT1M
+    series:
+      - aggregation: average
+        kind: gauge
+  - id: gpu_utilization_milli_gpus
+    azure_name: GpuUtilizationMilliGPUs
+    time_grain: PT1M
+    series:
+      - aggregation: average
+        kind: gauge
+  - id: gpu_capacity_milli_gpus
+    azure_name: GpuCapacityMilliGPUs
+    time_grain: PT1M
+    series:
+      - aggregation: average
+        kind: gauge
+  - id: gpu_memory_utilization
+    azure_name: GpuMemoryUtilization
+    time_grain: PT1M
+    series:
+      - aggregation: average
+        kind: gauge
+  - id: gpu_memory_utilization_percentage
+    azure_name: GpuMemoryUtilizationPercentage
+    time_grain: PT1M
+    series:
+      - aggregation: average
+        kind: gauge
+  - id: gpu_memory_utilization_megabytes
+    azure_name: GpuMemoryUtilizationMegabytes
+    time_grain: PT1M
+    series:
+      - aggregation: average
+        kind: gauge
+  - id: gpu_memory_capacity_megabytes
+    azure_name: GpuMemoryCapacityMegabytes
+    time_grain: PT1M
+    series:
+      - aggregation: average
+        kind: gauge
+  - id: gpu_energy_joules
+    azure_name: GpuEnergyJoules
+    time_grain: PT1M
+    series:
+      - aggregation: total
+        kind: counter
+  - id: disk_used_megabytes
+    azure_name: DiskUsedMegabytes
+    time_grain: PT1M
+    series:
+      - aggregation: average
+        kind: gauge
+  - id: disk_avail_megabytes
+    azure_name: DiskAvailMegabytes
+    time_grain: PT1M
+    series:
+      - aggregation: average
+        kind: gauge
+  - id: disk_read_megabytes
+    azure_name: DiskReadMegabytes
+    time_grain: PT1M
+    series:
+      - aggregation: total
+        kind: counter
+  - id: disk_write_megabytes
+    azure_name: DiskWriteMegabytes
+    time_grain: PT1M
+    series:
+      - aggregation: total
+        kind: counter
+  - id: network_input_megabytes
+    azure_name: NetworkInputMegabytes
+    time_grain: PT1M
+    series:
+      - aggregation: total
+        kind: counter
+  - id: network_output_megabytes
+    azure_name: NetworkOutputMegabytes
+    time_grain: PT1M
+    series:
+      - aggregation: total
+        kind: counter
+  - id: ib_receive_megabytes
+    azure_name: IBReceiveMegabytes
+    time_grain: PT1M
+    series:
+      - aggregation: total
+        kind: counter
+  - id: ib_transmit_megabytes
+    azure_name: IBTransmitMegabytes
+    time_grain: PT1M
+    series:
+      - aggregation: total
+        kind: counter
+  - id: storage_api_success_count
+    azure_name: StorageAPISuccessCount
+    time_grain: PT1M
+    series:
+      - aggregation: total
+        kind: counter
+  - id: storage_api_failure_count
+    azure_name: StorageAPIFailureCount
+    time_grain: PT1M
+    series:
+      - aggregation: total
+        kind: counter
+  - id: not_started_runs
+    azure_name: Not Started Runs
+    time_grain: PT1M
+    series:
+      - aggregation: total
+        kind: counter
+  - id: starting_runs
+    azure_name: Starting Runs
+    time_grain: PT1M
+    series:
+      - aggregation: total
+        kind: counter
+  - id: preparing_runs
+    azure_name: Preparing Runs
+    time_grain: PT1M
+    series:
+      - aggregation: total
+        kind: counter
+  - id: provisioning_runs
+    azure_name: Provisioning Runs
+    time_grain: PT1M
+    series:
+      - aggregation: total
+        kind: counter
+  - id: queued_runs
+    azure_name: Queued Runs
+    time_grain: PT1M
+    series:
+      - aggregation: total
+        kind: counter
+  - id: started_runs
+    azure_name: Started Runs
+    time_grain: PT1M
+    series:
+      - aggregation: total
+        kind: counter
+  - id: completed_runs
+    azure_name: Completed Runs
+    time_grain: PT1M
+    series:
+      - aggregation: total
+        kind: counter
+  - id: failed_runs
+    azure_name: Failed Runs
+    time_grain: PT1M
+    series:
+      - aggregation: total
+        kind: counter
+  - id: cancelled_runs
+    azure_name: Cancelled Runs
+    time_grain: PT1M
+    series:
+      - aggregation: total
+        kind: counter
+  - id: cancel_requested_runs
+    azure_name: Cancel Requested Runs
+    time_grain: PT1M
+    series:
+      - aggregation: total
+        kind: counter
+  - id: finalizing_runs
+    azure_name: Finalizing Runs
+    time_grain: PT1M
+    series:
+      - aggregation: total
+        kind: counter
+  - id: not_responding_runs
+    azure_name: Not Responding Runs
+    time_grain: PT1M
+    series:
+      - aggregation: total
+        kind: counter
+  - id: errors
+    azure_name: Errors
+    time_grain: PT1M
+    series:
+      - aggregation: total
+        kind: counter
+  - id: warnings
+    azure_name: Warnings
+    time_grain: PT1M
+    series:
+      - aggregation: total
+        kind: counter
 template:
   family: Azure Machine Learning Workspace
   context_namespace: machine_learning
   chart_defaults:
     label_promotion:
-    - resource_name
-    - resource_group
-    - region
-    - resource_type
-    - profile
+      - resource_name
+      - resource_group
+      - region
+      - resource_type
+      - profile
     instances:
       by_labels:
-      - resource_uid
+        - resource_uid
   charts:
-  - id: am_azure_machine_learning__agent_events
-    title: Azure Machine Learning Agent Events
-    context: agent_events
-    family: Agents
-    type: line
-    units: events/s
-    algorithm: incremental
-    dimensions:
-    - selector: machine_learning.agents_total
-      name: agent_events
-    - selector: machine_learning.threads_total
-      name: thread_events
-  - id: am_azure_machine_learning__agent_messages
-    title: Azure Machine Learning Agent Messages
-    context: agent_messages
-    family: Agents
-    type: line
-    units: messages/s
-    algorithm: incremental
-    dimensions:
-    - selector: machine_learning.messages_total
-      name: messages
-  - id: am_azure_machine_learning__agent_runs
-    title: Azure Machine Learning Agent Runs
-    context: agent_runs
-    family: Agents
-    type: line
-    units: runs/s
-    algorithm: incremental
-    dimensions:
-    - selector: machine_learning.runs_total
-      name: runs
-  - id: am_azure_machine_learning__agent_tokens
-    title: Azure Machine Learning Agent Tokens
-    context: agent_tokens
-    family: Agents
-    type: line
-    units: tokens/s
-    algorithm: incremental
-    dimensions:
-    - selector: machine_learning.tokens_total
-      name: tokens
-  - id: am_azure_machine_learning__agent_tool_calls
-    title: Azure Machine Learning Agent Tool Calls
-    context: agent_tool_calls
-    family: Agents
-    type: line
-    units: calls/s
-    algorithm: incremental
-    dimensions:
-    - selector: machine_learning.tool_calls_total
-      name: tool_calls
-  - id: am_azure_machine_learning__agent_indexed_files
-    title: Azure Machine Learning Agent Indexed Files
-    context: agent_indexed_files
-    family: Agents
-    type: line
-    units: files/s
-    algorithm: incremental
-    dimensions:
-    - selector: machine_learning.indexed_files_total
-      name: indexed_files
-  - id: am_azure_machine_learning__model_deployments
-    title: Azure Machine Learning Model Deployments
-    context: model_deployments
-    family: Model
-    type: line
-    units: deployments/s
-    algorithm: incremental
-    dimensions:
-    - selector: machine_learning.model_deploy_started_total
-      name: started
-    - selector: machine_learning.model_deploy_succeeded_total
-      name: succeeded
-    - selector: machine_learning.model_deploy_failed_total
-      name: failed
-  - id: am_azure_machine_learning__model_registrations
-    title: Azure Machine Learning Model Registrations
-    context: model_registrations
-    family: Model
-    type: line
-    units: registrations/s
-    algorithm: incremental
-    dimensions:
-    - selector: machine_learning.model_register_succeeded_total
-      name: succeeded
-    - selector: machine_learning.model_register_failed_total
-      name: failed
-  - id: am_azure_machine_learning__cluster_cores
-    title: Azure Machine Learning Cluster Cores
-    context: cluster_cores
-    family: Quota
-    type: stacked
-    units: cores
-    algorithm: absolute
-    dimensions:
-    - selector: machine_learning.active_cores_average
-      name: active
-    - selector: machine_learning.idle_cores_average
-      name: idle
-    - selector: machine_learning.leaving_cores_average
-      name: leaving
-    - selector: machine_learning.preempted_cores_average
-      name: preempted
-    - selector: machine_learning.unusable_cores_average
-      name: unusable
-  - id: am_azure_machine_learning__total_cores
-    title: Azure Machine Learning Total Cores
-    context: total_cores
-    family: Quota
-    type: line
-    units: cores
-    algorithm: absolute
-    dimensions:
-    - selector: machine_learning.total_cores_average
-      name: total
-  - id: am_azure_machine_learning__cluster_nodes
-    title: Azure Machine Learning Cluster Nodes
-    context: cluster_nodes
-    family: Quota
-    type: stacked
-    units: nodes
-    algorithm: absolute
-    dimensions:
-    - selector: machine_learning.active_nodes_average
-      name: active
-    - selector: machine_learning.idle_nodes_average
-      name: idle
-    - selector: machine_learning.leaving_nodes_average
-      name: leaving
-    - selector: machine_learning.preempted_nodes_average
-      name: preempted
-    - selector: machine_learning.unusable_nodes_average
-      name: unusable
-  - id: am_azure_machine_learning__total_nodes
-    title: Azure Machine Learning Total Nodes
-    context: total_nodes
-    family: Quota
-    type: line
-    units: nodes
-    algorithm: absolute
-    dimensions:
-    - selector: machine_learning.total_nodes_average
-      name: total
-  - id: am_azure_machine_learning__quota_utilization
-    title: Azure Machine Learning Quota Utilization
-    context: quota_utilization
-    family: Quota
-    type: line
-    units: percentage
-    algorithm: absolute
-    dimensions:
-    - selector: machine_learning.quota_utilization_percentage_average
-      name: utilization
-  - id: am_azure_machine_learning__cpu_utilization
-    title: Azure Machine Learning CPU Utilization
-    context: cpu_utilization
-    family: Compute
-    type: line
-    units: percentage
-    algorithm: absolute
-    dimensions:
-    - selector: machine_learning.cpu_utilization_average
-      name: cluster_cpu
-    - selector: machine_learning.cpu_utilization_percentage_average
-      name: node_cpu
-  - id: am_azure_machine_learning__cpu_millicores
-    title: Azure Machine Learning CPU Millicores
-    context: cpu_millicores
-    family: Compute
-    type: line
-    units: millicores
-    algorithm: absolute
-    dimensions:
-    - selector: machine_learning.cpu_utilization_millicores_average
-      name: used
-    - selector: machine_learning.cpu_capacity_millicores_average
-      name: capacity
-  - id: am_azure_machine_learning__cpu_memory_utilization
-    title: Azure Machine Learning CPU Memory Utilization
-    context: cpu_memory_utilization
-    family: Compute
-    type: line
-    units: percentage
-    algorithm: absolute
-    dimensions:
-    - selector: machine_learning.cpu_memory_utilization_percentage_average
-      name: utilization
-  - id: am_azure_machine_learning__cpu_memory_megabytes
-    title: Azure Machine Learning CPU Memory
-    context: cpu_memory_megabytes
-    family: Compute
-    type: line
-    units: megabytes
-    algorithm: absolute
-    dimensions:
-    - selector: machine_learning.cpu_memory_utilization_megabytes_average
-      name: used
-    - selector: machine_learning.cpu_memory_capacity_megabytes_average
-      name: capacity
-  - id: am_azure_machine_learning__gpu_utilization
-    title: Azure Machine Learning GPU Utilization
-    context: gpu_utilization
-    family: Compute
-    type: line
-    units: percentage
-    algorithm: absolute
-    dimensions:
-    - selector: machine_learning.gpu_utilization_average
-      name: cluster_gpu
-    - selector: machine_learning.gpu_utilization_percentage_average
-      name: node_gpu
-  - id: am_azure_machine_learning__gpu_milligpus
-    title: Azure Machine Learning GPU MilliGPUs
-    context: gpu_milligpus
-    family: Compute
-    type: line
-    units: milliGPUs
-    algorithm: absolute
-    dimensions:
-    - selector: machine_learning.gpu_utilization_milli_gpus_average
-      name: used
-    - selector: machine_learning.gpu_capacity_milli_gpus_average
-      name: capacity
-  - id: am_azure_machine_learning__gpu_memory_utilization
-    title: Azure Machine Learning GPU Memory Utilization
-    context: gpu_memory_utilization
-    family: Compute
-    type: line
-    units: percentage
-    algorithm: absolute
-    dimensions:
-    - selector: machine_learning.gpu_memory_utilization_average
-      name: cluster_gpu_memory
-    - selector: machine_learning.gpu_memory_utilization_percentage_average
-      name: node_gpu_memory
-  - id: am_azure_machine_learning__gpu_memory_megabytes
-    title: Azure Machine Learning GPU Memory
-    context: gpu_memory_megabytes
-    family: Compute
-    type: line
-    units: megabytes
-    algorithm: absolute
-    dimensions:
-    - selector: machine_learning.gpu_memory_utilization_megabytes_average
-      name: used
-    - selector: machine_learning.gpu_memory_capacity_megabytes_average
-      name: capacity
-  - id: am_azure_machine_learning__gpu_energy
-    title: Azure Machine Learning GPU Energy
-    context: gpu_energy
-    family: Compute
-    type: line
-    units: joules/s
-    algorithm: incremental
-    dimensions:
-    - selector: machine_learning.gpu_energy_joules_total
-      name: energy
-  - id: am_azure_machine_learning__disk_usage
-    title: Azure Machine Learning Disk Usage
-    context: disk_usage
-    family: Compute
-    type: line
-    units: megabytes
-    algorithm: absolute
-    dimensions:
-    - selector: machine_learning.disk_used_megabytes_average
-      name: used
-    - selector: machine_learning.disk_avail_megabytes_average
-      name: available
-  - id: am_azure_machine_learning__disk_io
-    title: Azure Machine Learning Disk I/O
-    context: disk_io
-    family: Compute
-    type: line
-    units: megabytes/s
-    algorithm: incremental
-    dimensions:
-    - selector: machine_learning.disk_read_megabytes_total
-      name: read
-    - selector: machine_learning.disk_write_megabytes_total
-      name: write
-  - id: am_azure_machine_learning__network_traffic
-    title: Azure Machine Learning Network Traffic
-    context: network_traffic
-    family: Network
-    type: line
-    units: megabytes/s
-    algorithm: incremental
-    dimensions:
-    - selector: machine_learning.network_input_megabytes_total
-      name: in
-    - selector: machine_learning.network_output_megabytes_total
-      name: out
-  - id: am_azure_machine_learning__infiniband_traffic
-    title: Azure Machine Learning InfiniBand Traffic
-    context: infiniband_traffic
-    family: Network
-    type: line
-    units: megabytes/s
-    algorithm: incremental
-    dimensions:
-    - selector: machine_learning.ib_receive_megabytes_total
-      name: receive
-    - selector: machine_learning.ib_transmit_megabytes_total
-      name: transmit
-  - id: am_azure_machine_learning__storage_api_calls
-    title: Azure Machine Learning Storage API Calls
-    context: storage_api_calls
-    family: Compute
-    type: line
-    units: calls/s
-    algorithm: incremental
-    dimensions:
-    - selector: machine_learning.storage_api_success_count_total
-      name: success
-    - selector: machine_learning.storage_api_failure_count_total
-      name: failure
-  - id: am_azure_machine_learning__run_lifecycle
-    title: Azure Machine Learning Run Lifecycle
-    context: run_lifecycle
-    family: Runs
-    type: line
-    units: runs/s
-    algorithm: incremental
-    dimensions:
-    - selector: machine_learning.not_started_runs_total
-      name: not_started
-    - selector: machine_learning.starting_runs_total
-      name: starting
-    - selector: machine_learning.preparing_runs_total
-      name: preparing
-    - selector: machine_learning.provisioning_runs_total
-      name: provisioning
-    - selector: machine_learning.queued_runs_total
-      name: queued
-    - selector: machine_learning.started_runs_total
-      name: started
-  - id: am_azure_machine_learning__run_completion
-    title: Azure Machine Learning Run Completion
-    context: run_completion
-    family: Runs
-    type: line
-    units: runs/s
-    algorithm: incremental
-    dimensions:
-    - selector: machine_learning.completed_runs_total
-      name: completed
-    - selector: machine_learning.failed_runs_total
-      name: failed
-    - selector: machine_learning.finalizing_runs_total
-      name: finalizing
-    - selector: machine_learning.cancelled_runs_total
-      name: cancelled
-    - selector: machine_learning.cancel_requested_runs_total
-      name: cancel_requested
-    - selector: machine_learning.not_responding_runs_total
-      name: not_responding
-  - id: am_azure_machine_learning__run_issues
-    title: Azure Machine Learning Run Issues
-    context: run_issues
-    family: Runs
-    type: line
-    units: events/s
-    algorithm: incremental
-    dimensions:
-    - selector: machine_learning.errors_total
-      name: errors
-    - selector: machine_learning.warnings_total
-      name: warnings
+    - id: am_azure_machine_learning__agent_events
+      title: Azure Machine Learning Agent Events
+      context: agent_events
+      family: Agents
+      type: line
+      units: events/s
+      algorithm: incremental
+      dimensions:
+        - selector: agents_total
+          name: agent_events
+        - selector: threads_total
+          name: thread_events
+    - id: am_azure_machine_learning__agent_messages
+      title: Azure Machine Learning Agent Messages
+      context: agent_messages
+      family: Agents
+      type: line
+      units: messages/s
+      algorithm: incremental
+      dimensions:
+        - selector: messages_total
+          name: messages
+    - id: am_azure_machine_learning__agent_runs
+      title: Azure Machine Learning Agent Runs
+      context: agent_runs
+      family: Agents
+      type: line
+      units: runs/s
+      algorithm: incremental
+      dimensions:
+        - selector: runs_total
+          name: runs
+    - id: am_azure_machine_learning__agent_tokens
+      title: Azure Machine Learning Agent Tokens
+      context: agent_tokens
+      family: Agents
+      type: line
+      units: tokens/s
+      algorithm: incremental
+      dimensions:
+        - selector: tokens_total
+          name: tokens
+    - id: am_azure_machine_learning__agent_tool_calls
+      title: Azure Machine Learning Agent Tool Calls
+      context: agent_tool_calls
+      family: Agents
+      type: line
+      units: calls/s
+      algorithm: incremental
+      dimensions:
+        - selector: tool_calls_total
+          name: tool_calls
+    - id: am_azure_machine_learning__agent_indexed_files
+      title: Azure Machine Learning Agent Indexed Files
+      context: agent_indexed_files
+      family: Agents
+      type: line
+      units: files/s
+      algorithm: incremental
+      dimensions:
+        - selector: indexed_files_total
+          name: indexed_files
+    - id: am_azure_machine_learning__model_deployments
+      title: Azure Machine Learning Model Deployments
+      context: model_deployments
+      family: Model
+      type: line
+      units: deployments/s
+      algorithm: incremental
+      dimensions:
+        - selector: model_deploy_started_total
+          name: started
+        - selector: model_deploy_succeeded_total
+          name: succeeded
+        - selector: model_deploy_failed_total
+          name: failed
+    - id: am_azure_machine_learning__model_registrations
+      title: Azure Machine Learning Model Registrations
+      context: model_registrations
+      family: Model
+      type: line
+      units: registrations/s
+      algorithm: incremental
+      dimensions:
+        - selector: model_register_succeeded_total
+          name: succeeded
+        - selector: model_register_failed_total
+          name: failed
+    - id: am_azure_machine_learning__cluster_cores
+      title: Azure Machine Learning Cluster Cores
+      context: cluster_cores
+      family: Quota
+      type: stacked
+      units: cores
+      algorithm: absolute
+      dimensions:
+        - selector: active_cores_average
+          name: active
+        - selector: idle_cores_average
+          name: idle
+        - selector: leaving_cores_average
+          name: leaving
+        - selector: preempted_cores_average
+          name: preempted
+        - selector: unusable_cores_average
+          name: unusable
+    - id: am_azure_machine_learning__total_cores
+      title: Azure Machine Learning Total Cores
+      context: total_cores
+      family: Quota
+      type: line
+      units: cores
+      algorithm: absolute
+      dimensions:
+        - selector: total_cores_average
+          name: total
+    - id: am_azure_machine_learning__cluster_nodes
+      title: Azure Machine Learning Cluster Nodes
+      context: cluster_nodes
+      family: Quota
+      type: stacked
+      units: nodes
+      algorithm: absolute
+      dimensions:
+        - selector: active_nodes_average
+          name: active
+        - selector: idle_nodes_average
+          name: idle
+        - selector: leaving_nodes_average
+          name: leaving
+        - selector: preempted_nodes_average
+          name: preempted
+        - selector: unusable_nodes_average
+          name: unusable
+    - id: am_azure_machine_learning__total_nodes
+      title: Azure Machine Learning Total Nodes
+      context: total_nodes
+      family: Quota
+      type: line
+      units: nodes
+      algorithm: absolute
+      dimensions:
+        - selector: total_nodes_average
+          name: total
+    - id: am_azure_machine_learning__quota_utilization
+      title: Azure Machine Learning Quota Utilization
+      context: quota_utilization
+      family: Quota
+      type: line
+      units: percentage
+      algorithm: absolute
+      dimensions:
+        - selector: quota_utilization_percentage_average
+          name: utilization
+    - id: am_azure_machine_learning__cpu_utilization
+      title: Azure Machine Learning CPU Utilization
+      context: cpu_utilization
+      family: Compute
+      type: line
+      units: percentage
+      algorithm: absolute
+      dimensions:
+        - selector: cpu_utilization_average
+          name: cluster_cpu
+        - selector: cpu_utilization_percentage_average
+          name: node_cpu
+    - id: am_azure_machine_learning__cpu_millicores
+      title: Azure Machine Learning CPU Millicores
+      context: cpu_millicores
+      family: Compute
+      type: line
+      units: millicores
+      algorithm: absolute
+      dimensions:
+        - selector: cpu_utilization_millicores_average
+          name: used
+        - selector: cpu_capacity_millicores_average
+          name: capacity
+    - id: am_azure_machine_learning__cpu_memory_utilization
+      title: Azure Machine Learning CPU Memory Utilization
+      context: cpu_memory_utilization
+      family: Compute
+      type: line
+      units: percentage
+      algorithm: absolute
+      dimensions:
+        - selector: cpu_memory_utilization_percentage_average
+          name: utilization
+    - id: am_azure_machine_learning__cpu_memory_megabytes
+      title: Azure Machine Learning CPU Memory
+      context: cpu_memory_megabytes
+      family: Compute
+      type: line
+      units: megabytes
+      algorithm: absolute
+      dimensions:
+        - selector: cpu_memory_utilization_megabytes_average
+          name: used
+        - selector: cpu_memory_capacity_megabytes_average
+          name: capacity
+    - id: am_azure_machine_learning__gpu_utilization
+      title: Azure Machine Learning GPU Utilization
+      context: gpu_utilization
+      family: Compute
+      type: line
+      units: percentage
+      algorithm: absolute
+      dimensions:
+        - selector: gpu_utilization_average
+          name: cluster_gpu
+        - selector: gpu_utilization_percentage_average
+          name: node_gpu
+    - id: am_azure_machine_learning__gpu_milligpus
+      title: Azure Machine Learning GPU MilliGPUs
+      context: gpu_milligpus
+      family: Compute
+      type: line
+      units: milliGPUs
+      algorithm: absolute
+      dimensions:
+        - selector: gpu_utilization_milli_gpus_average
+          name: used
+        - selector: gpu_capacity_milli_gpus_average
+          name: capacity
+    - id: am_azure_machine_learning__gpu_memory_utilization
+      title: Azure Machine Learning GPU Memory Utilization
+      context: gpu_memory_utilization
+      family: Compute
+      type: line
+      units: percentage
+      algorithm: absolute
+      dimensions:
+        - selector: gpu_memory_utilization_average
+          name: cluster_gpu_memory
+        - selector: gpu_memory_utilization_percentage_average
+          name: node_gpu_memory
+    - id: am_azure_machine_learning__gpu_memory_megabytes
+      title: Azure Machine Learning GPU Memory
+      context: gpu_memory_megabytes
+      family: Compute
+      type: line
+      units: megabytes
+      algorithm: absolute
+      dimensions:
+        - selector: gpu_memory_utilization_megabytes_average
+          name: used
+        - selector: gpu_memory_capacity_megabytes_average
+          name: capacity
+    - id: am_azure_machine_learning__gpu_energy
+      title: Azure Machine Learning GPU Energy
+      context: gpu_energy
+      family: Compute
+      type: line
+      units: joules/s
+      algorithm: incremental
+      dimensions:
+        - selector: gpu_energy_joules_total
+          name: energy
+    - id: am_azure_machine_learning__disk_usage
+      title: Azure Machine Learning Disk Usage
+      context: disk_usage
+      family: Compute
+      type: line
+      units: megabytes
+      algorithm: absolute
+      dimensions:
+        - selector: disk_used_megabytes_average
+          name: used
+        - selector: disk_avail_megabytes_average
+          name: available
+    - id: am_azure_machine_learning__disk_io
+      title: Azure Machine Learning Disk I/O
+      context: disk_io
+      family: Compute
+      type: line
+      units: megabytes/s
+      algorithm: incremental
+      dimensions:
+        - selector: disk_read_megabytes_total
+          name: read
+        - selector: disk_write_megabytes_total
+          name: write
+    - id: am_azure_machine_learning__network_traffic
+      title: Azure Machine Learning Network Traffic
+      context: network_traffic
+      family: Network
+      type: line
+      units: megabytes/s
+      algorithm: incremental
+      dimensions:
+        - selector: network_input_megabytes_total
+          name: in
+        - selector: network_output_megabytes_total
+          name: out
+    - id: am_azure_machine_learning__infiniband_traffic
+      title: Azure Machine Learning InfiniBand Traffic
+      context: infiniband_traffic
+      family: Network
+      type: line
+      units: megabytes/s
+      algorithm: incremental
+      dimensions:
+        - selector: ib_receive_megabytes_total
+          name: receive
+        - selector: ib_transmit_megabytes_total
+          name: transmit
+    - id: am_azure_machine_learning__storage_api_calls
+      title: Azure Machine Learning Storage API Calls
+      context: storage_api_calls
+      family: Compute
+      type: line
+      units: calls/s
+      algorithm: incremental
+      dimensions:
+        - selector: storage_api_success_count_total
+          name: success
+        - selector: storage_api_failure_count_total
+          name: failure
+    - id: am_azure_machine_learning__run_lifecycle
+      title: Azure Machine Learning Run Lifecycle
+      context: run_lifecycle
+      family: Runs
+      type: line
+      units: runs/s
+      algorithm: incremental
+      dimensions:
+        - selector: not_started_runs_total
+          name: not_started
+        - selector: starting_runs_total
+          name: starting
+        - selector: preparing_runs_total
+          name: preparing
+        - selector: provisioning_runs_total
+          name: provisioning
+        - selector: queued_runs_total
+          name: queued
+        - selector: started_runs_total
+          name: started
+    - id: am_azure_machine_learning__run_completion
+      title: Azure Machine Learning Run Completion
+      context: run_completion
+      family: Runs
+      type: line
+      units: runs/s
+      algorithm: incremental
+      dimensions:
+        - selector: completed_runs_total
+          name: completed
+        - selector: failed_runs_total
+          name: failed
+        - selector: finalizing_runs_total
+          name: finalizing
+        - selector: cancelled_runs_total
+          name: cancelled
+        - selector: cancel_requested_runs_total
+          name: cancel_requested
+        - selector: not_responding_runs_total
+          name: not_responding
+    - id: am_azure_machine_learning__run_issues
+      title: Azure Machine Learning Run Issues
+      context: run_issues
+      family: Runs
+      type: line
+      units: events/s
+      algorithm: incremental
+      dimensions:
+        - selector: errors_total
+          name: errors
+        - selector: warnings_total
+          name: warnings

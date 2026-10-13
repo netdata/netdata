@@ -34,7 +34,7 @@ func newChart(num, ctx, labels int, typ collectorapi.ChartType) *collectorapi.Ch
 	if ctx > 0 {
 		chart.Ctx += fmt.Sprintf("_%d", ctx)
 	}
-	for i := 0; i < labels; i++ {
+	for i := range labels {
 		chart.Labels = append(chart.Labels, collectorapi.Label{
 			Key:   fmt.Sprintf("random_name_%d", i),
 			Value: fmt.Sprintf("random_value_%d_%d", num, i),
@@ -50,7 +50,7 @@ func newHiddenChart(num, ctx, labels int, typ collectorapi.ChartType) *collector
 	if ctx > 0 {
 		chart.Ctx += fmt.Sprintf("_%d", ctx)
 	}
-	for i := 0; i < labels; i++ {
+	for i := range labels {
 		chart.Labels = append(chart.Labels, collectorapi.Label{
 			Key:   fmt.Sprintf("random_name_%d", i),
 			Value: fmt.Sprintf("random_value_%d_%d", num, i),

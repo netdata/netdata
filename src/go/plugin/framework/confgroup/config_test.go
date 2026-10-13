@@ -119,6 +119,14 @@ func TestConfig_Priority(t *testing.T) {
 	}
 }
 
+func TestSourceTypePriority(t *testing.T) {
+	assert.Equal(t, 16, SourceTypePriority(TypeDyncfg))
+	assert.Equal(t, 8, SourceTypePriority(TypeUser))
+	assert.Equal(t, 4, SourceTypePriority(TypeDiscovered))
+	assert.Equal(t, 2, SourceTypePriority(TypeStock))
+	assert.Equal(t, 0, SourceTypePriority("other"))
+}
+
 func TestConfig_Hash(t *testing.T) {
 	tests := map[string]struct {
 		one, two Config
@@ -188,6 +196,15 @@ func TestConfig_SetProvider(t *testing.T) {
 	cfg.SetProvider("name")
 
 	assert.Equal(t, cfg.Provider(), "name")
+}
+
+func TestConfigCloneReturnsUnsupportedValueFailure(t *testing.T) {
+	config := Config{"unsupported": make(chan struct{})}
+
+	cloned, err := config.Clone()
+
+	assert.Nil(t, cloned)
+	assert.ErrorContains(t, err, "YAML marshal panic")
 }
 
 func TestConfig_Apply(t *testing.T) {
@@ -338,6 +355,42 @@ func TestConfig_FunctionOnly(t *testing.T) {
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
 			assert.Equal(t, test.expected, test.cfg.FunctionOnly())
+		})
+	}
+}
+
+func TestConfigTrustIdentity(t *testing.T) {
+	for _, source := range []string{TypeDiscovered, TypeUser, TypeStock, TypeDyncfg, "", "unknown"} {
+		t.Run(source, func(t *testing.T) {
+			config := Config{"module": "module", "name": "job"}.SetSourceType(source)
+			originalHash, originalUID := config.Hash(), config.UID()
+			config.SetDiscoveryPipelineID("pipeline-a")
+			config.SetTrustDiscoveredTargets(false)
+			assert.Equal(t, originalHash, config.Hash())
+			assert.Equal(t, originalUID, config.UID())
+			config.SetTrustDiscoveredTargets(true)
+			if source == TypeDiscovered {
+				assert.NotEqual(t, originalHash, config.Hash())
+				assert.NotEqual(t, originalUID, config.UID())
+			} else {
+				assert.Equal(t, originalHash, config.Hash())
+				assert.Equal(t, originalUID, config.UID())
+			}
+			trustedHash, trustedUID := config.Hash(), config.UID()
+			config.SetDiscoveryPipelineID("pipeline-b")
+			if source == TypeDiscovered {
+				assert.NotEqual(t, trustedHash, config.Hash())
+				assert.NotEqual(t, trustedUID, config.UID())
+			} else {
+				assert.Equal(t, trustedHash, config.Hash())
+				assert.Equal(t, trustedUID, config.UID())
+			}
+			cloned, err := config.Clone()
+			assert.NoError(t, err)
+			assert.Equal(t, config.Hash(), cloned.Hash())
+			assert.Equal(t, "pipeline-b", cloned.DiscoveryPipelineID())
+			config.SetTrustDiscoveredTargets(false)
+			assert.Equal(t, originalHash, config.Hash())
 		})
 	}
 }

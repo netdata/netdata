@@ -6,6 +6,7 @@ modules:
       module_name: ntpd
       monitored_instance:
         name: NTPd
+        description: Monitor a configured NTP daemon's clock offset, jitter, frequency, dispersion, stratum, precision, and optional peer timing metrics.
         link: https://www.ntp.org/documentation/4.2.8-series/ntpd
         icon_filename: ntp.png
         categories:

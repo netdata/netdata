@@ -5,6 +5,7 @@
 
 struct variable_lookup_score {
     RRDSET *st;
+    RRDSET_ACQUIRED *rsa;
     const char *source;
     NETDATA_DOUBLE value;
     size_t score;
@@ -36,9 +37,19 @@ struct variable_lookup_job {
 };
 
 static void variable_lookup_add_result_with_score(struct variable_lookup_job *vbd, NETDATA_DOUBLE n, RRDSET *st, const char *source __maybe_unused) {
-    if(vbd->score.last_rrdset != st && vbd->rc->rrdset) {
-        vbd->score.last_rrdset = st;
-        vbd->score.last_score = rrdlabels_common_count(vbd->rc->rrdset->rrdlabels, st->rrdlabels);
+    RRDSET_ACQUIRED *rsa = rrdset_find_and_acquire(st->rrdhost, rrdset_id(st), true);
+    if(!rsa)
+        return;
+
+    st = rrdset_acquired_to_rrdset(rsa);
+
+    if(vbd->score.last_rrdset != st) {
+        RRDSET *alert_st = rrdcalc_rrdset_read_lock(vbd->rc);
+        if(alert_st) {
+            vbd->score.last_rrdset = st;
+            vbd->score.last_score = rrdlabels_common_count(alert_st->rrdlabels, st->rrdlabels);
+            rrdcalc_rrdset_read_unlock(alert_st);
+        }
     }
 
     if(vbd->result.used >= vbd->result.size) {
@@ -53,8 +64,19 @@ static void variable_lookup_add_result_with_score(struct variable_lookup_job *vb
         .value = n,
         .score = vbd->score.last_score,
         .st = st,
+        .rsa = rsa,
         .source = source,
     };
+}
+
+static void variable_lookup_results_free(struct variable_lookup_job *vbd) {
+    for(size_t i = 0; i < vbd->result.used; i++)
+        rrdset_acquired_release(vbd->result.array[i].rsa);
+
+    freez(vbd->result.array);
+    vbd->result.array = NULL;
+    vbd->result.used = 0;
+    vbd->result.size = 0;
 }
 
 static bool variable_lookup_in_chart(struct variable_lookup_job *vbd, RRDSET *st, bool stop_on_match) {
@@ -140,16 +162,85 @@ static bool variable_lookup_context(struct variable_lookup_job *vbd, const char 
     return found;
 }
 
-bool alert_variable_from_running_alerts(struct variable_lookup_job *vbd) {
+// Alerts sharing one name on a single host - one per matching chart. Sized to
+// cover the usual case (an alert templated over every disk, interface, mount)
+// without allocating.
+#define ALERT_NAME_MATCHES_ONSTACK 64
+
+// Resolves an alert-name variable through the host's name index instead of
+// scanning every alert of the host.
+//
+// Lifetime: rrdcalc_by_name_snapshot() returns ACQUIRED dictionary items, and
+// that reference - not any dictionary lock - is what keeps each RRDCALC alive
+// while we score it. A dictionary lock would not be enough: the free in
+// dict_item_free_or_mark_deleted() runs after item_linked_list_remove() has
+// already released the items write lock.
+//
+// The name-index lock is taken and released inside the snapshot and is
+// deliberately NOT held while scoring, because scoring acquires chart locks
+// while rrdcalc_name_index_del() runs with st->alerts.spinlock already held -
+// holding both in the opposite order would be a lock-order inversion.
+//
+// No dictionary lock is taken in this path at all.
+static bool alert_variable_from_running_alerts(struct variable_lookup_job *vbd, bool snapshot_values) {
     bool found = false;
-    RRDCALC *rc;
-    foreach_rrdcalc_in_rrdhost_read(vbd->host, rc) {
-        if(rc->config.name == vbd->variable && rc->rrdset) {
-            variable_lookup_add_result_with_score(vbd, (NETDATA_DOUBLE)rc->value, rc->rrdset, "alarm value");
+
+    const DICTIONARY_ITEM *onstack[ALERT_NAME_MATCHES_ONSTACK];
+    const DICTIONARY_ITEM **matches = onstack, **allocated = NULL;
+    size_t matches_size = ALERT_NAME_MATCHES_ONSTACK;
+
+    // Grow until the whole set fits. When it does not fit the snapshot acquires
+    // nothing, so there is never a partial set to release. This can only repeat
+    // if alerts of this name were added in between, so it terminates.
+    size_t count = rrdcalc_by_name_snapshot(vbd->host, vbd->variable, matches, matches_size);
+    while(unlikely(count > matches_size)) {
+        matches_size = count;
+        freez(allocated);
+        allocated = mallocz(sizeof(const DICTIONARY_ITEM *) * matches_size);
+        matches = allocated;
+
+        count = rrdcalc_by_name_snapshot(vbd->host, vbd->variable, matches, matches_size);
+    }
+
+#ifdef NETDATA_INTERNAL_CHECKS
+    // Verify every alert of this name that the dictionary knows about against the
+    // index. Each alert is checked on its own, at one instant, under the index
+    // lock - see rrdcalc_name_index_verify() for why this must not be a
+    // set-versus-set comparison against the snapshot taken above.
+    {
+        RRDCALC *check;
+        foreach_rrdcalc_in_rrdhost_read(vbd->host, check) {
+            if(check->config.name == vbd->variable)
+                rrdcalc_name_index_verify(vbd->host, check);
+        }
+        foreach_rrdcalc_in_rrdhost_done(check);
+    }
+#endif
+
+    for(size_t i = 0; i < count ; i++) {
+        RRDCALC *rc = dictionary_acquired_item_value(matches[i]);
+
+        RRDSET *st = NULL;
+        RRDSET_ACQUIRED *rsa = rrdcalc_rrdset_acquire_linked(vbd->host, rc, &st);
+        if(rsa) {
+            NETDATA_DOUBLE value;
+            if(snapshot_values) {
+                RRDCALC_RUNTIME_SNAPSHOT snapshot;
+                rrdcalc_runtime_snapshot_get(rc, &snapshot);
+                value = snapshot.value;
+            }
+            else
+                value = rc->value;
+
+            variable_lookup_add_result_with_score(vbd, value, st, "alarm value");
+            rrdset_acquired_release(rsa);
             found = true;
         }
+
+        dictionary_acquired_item_release(vbd->host->rrdcalc_root_index, matches[i]);
     }
-    foreach_rrdcalc_in_rrdhost_done(rc);
+
+    freez(allocated);
     return found;
 }
 
@@ -210,9 +301,16 @@ bool alert_variable_lookup_internal(STRING *variable, void *data, NETDATA_DOUBLE
     RRDSET *source_st = NULL;
 
     RRDCALC *rc = data;
-    RRDSET *st = rc->rrdset;
+    RRDSET *linked_st = rrdcalc_rrdset_read_lock(rc);
+    if(!linked_st)
+        return false;
 
-    if(!st)
+    RRDHOST *host = linked_st->rrdhost;
+    rrdcalc_rrdset_read_unlock(linked_st);
+
+    RRDSET *st = NULL;
+    RRDSET_ACQUIRED *rsa = rrdcalc_rrdset_acquire_linked(host, rc, &st);
+    if(!rsa)
         return false;
 
     if(unlikely(!last_collected_t_string)) {
@@ -350,10 +448,12 @@ bool alert_variable_lookup_internal(STRING *variable, void *data, NETDATA_DOUBLE
     if (strendswith_lengths(vbd.dimension, vbd.dimension_length, "_raw", 4)) {
         vbd.dimension_length -= 4;
         vbd.dimension_selection = DIM_SELECT_RAW;
+        string_freez(vbd.dim);
         vbd.dim = string_strndupz(vbd.dimension, vbd.dimension_length);
     } else if (strendswith_lengths(vbd.dimension, vbd.dimension_length, "_last_collected_t", 17)) {
         vbd.dimension_length -= 17;
         vbd.dimension_selection = DIM_SELECT_LAST_COLLECTED;
+        string_freez(vbd.dim);
         vbd.dim = string_strndupz(vbd.dimension, vbd.dimension_length);
     }
 
@@ -373,16 +473,14 @@ bool alert_variable_lookup_internal(STRING *variable, void *data, NETDATA_DOUBLE
     }
 
     // alert names
-    if(alert_variable_from_running_alerts(&vbd)) {
+    if(alert_variable_from_running_alerts(&vbd, wb != NULL)) {
         found = true;
         goto find_best_scored;
     }
 
     // find the components of the variable
     {
-        char id[string_strlen(vbd.dim) + 1];
-        memcpy(id, string2str(vbd.dim), string_strlen(vbd.dim));
-        id[string_strlen(vbd.dim)] = '\0';
+        char *id = strdupz(string2str(vbd.dim));
 
         char *dot = strrchr(id, '.');
         while(dot) {
@@ -397,6 +495,8 @@ bool alert_variable_lookup_internal(STRING *variable, void *data, NETDATA_DOUBLE
             *dot = '.';
             dot = dot2;
         }
+
+        freez(id);
     }
 
 find_best_scored:
@@ -409,7 +509,6 @@ find_best_scored:
         source = best->source;
         source_st = best->st;
         *result = best->value;
-        freez(vbd.result.array);
     }
     else {
         found = false;
@@ -424,9 +523,9 @@ log:
                "resolved with %s of chart '%s' and context '%s'",
                string2str(variable),
                string2str(rc->config.name),
-               string2str(rc->rrdset->id),
-               string2str(rc->rrdset->context),
-               string2str(rc->rrdset->rrdhost->hostname),
+               string2str(st->id),
+               string2str(st->context),
+               string2str(st->rrdhost->hostname),
                source,
                string2str(source_st->id),
                string2str(source_st->context)
@@ -438,9 +537,9 @@ log:
                "could not be resolved",
                string2str(variable),
                string2str(rc->config.name),
-               string2str(rc->rrdset->id),
-               string2str(rc->rrdset->context),
-               string2str(rc->rrdset->rrdhost->hostname)
+               string2str(st->id),
+               string2str(st->context),
+               string2str(st->rrdhost->hostname)
         );
     }
 #endif
@@ -464,7 +563,9 @@ log:
         }
     }
 
+    variable_lookup_results_free(&vbd);
     string_freez(vbd.dim);
+    rrdset_acquired_release(rsa);
 
     return found;
 }
@@ -481,6 +582,7 @@ int alert_variable_lookup_trace(RRDHOST *host __maybe_unused, RRDSET *st, const 
 
     STRING *v = string_strdupz(variable);
     RRDCALC rc = {
+        .chart = st->id,
         .rrdset = st,
     };
 

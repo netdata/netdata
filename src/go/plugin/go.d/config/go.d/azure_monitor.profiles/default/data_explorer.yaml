@@ -1,783 +1,782 @@
 ---
-id: data_explorer
-name: Azure Data Explorer Cluster
+display_name: Azure Data Explorer Cluster
 resource_type: Microsoft.Kusto/clusters
 metrics:
-- id: cpu
-  azure_name: CPU
-  time_grain: PT1M
-  series:
-  - aggregation: average
-    kind: gauge
-- id: ingestion_utilization
-  azure_name: IngestionUtilization
-  time_grain: PT1M
-  series:
-  - aggregation: average
-    kind: gauge
-- id: cache_utilization_factor
-  azure_name: CacheUtilizationFactor
-  time_grain: PT1M
-  series:
-  - aggregation: average
-    kind: gauge
-- id: keep_alive
-  azure_name: KeepAlive
-  time_grain: PT1M
-  series:
-  - aggregation: average
-    kind: gauge
-- id: instance_count
-  azure_name: InstanceCount
-  time_grain: PT1M
-  series:
-  - aggregation: average
-    kind: gauge
-  - aggregation: maximum
-    kind: gauge
-  - aggregation: minimum
-    kind: gauge
-- id: total_number_of_extents
-  azure_name: TotalNumberOfExtents
-  time_grain: PT1M
-  series:
-  - aggregation: average
-    kind: gauge
-- id: total_number_of_throttled_commands
-  azure_name: TotalNumberOfThrottledCommands
-  time_grain: PT1M
-  series:
-  - aggregation: total
-    kind: counter
-- id: follower_latency
-  azure_name: FollowerLatency
-  time_grain: PT1M
-  series:
-  - aggregation: average
-    kind: gauge
-- id: query_duration
-  azure_name: QueryDuration
-  time_grain: PT1M
-  series:
-  - aggregation: average
-    kind: gauge
-- id: query_result
-  azure_name: QueryResult
-  time_grain: PT1M
-  series:
-  - aggregation: count
-    kind: counter
-- id: total_number_of_concurrent_queries
-  azure_name: TotalNumberOfConcurrentQueries
-  time_grain: PT1M
-  series:
-  - aggregation: average
-    kind: gauge
-  - aggregation: maximum
-    kind: gauge
-- id: total_number_of_throttled_queries
-  azure_name: TotalNumberOfThrottledQueries
-  time_grain: PT1M
-  series:
-  - aggregation: total
-    kind: counter
-- id: weak_consistency_latency
-  azure_name: WeakConsistencyLatency
-  time_grain: PT1M
-  series:
-  - aggregation: average
-    kind: gauge
-- id: ingestion_result
-  azure_name: IngestionResult
-  time_grain: PT1M
-  series:
-  - aggregation: total
-    kind: counter
-- id: ingestion_volume_in_mb
-  azure_name: IngestionVolumeInMB
-  time_grain: PT1M
-  series:
-  - aggregation: total
-    kind: counter
-- id: ingestion_latency_in_seconds
-  azure_name: IngestionLatencyInSeconds
-  time_grain: PT1M
-  series:
-  - aggregation: average
-    kind: gauge
-- id: events_processed
-  azure_name: EventsProcessed
-  time_grain: PT1M
-  series:
-  - aggregation: total
-    kind: counter
-- id: events_received
-  azure_name: EventsReceived
-  time_grain: PT1M
-  series:
-  - aggregation: total
-    kind: counter
-- id: events_dropped
-  azure_name: EventsDropped
-  time_grain: PT1M
-  series:
-  - aggregation: total
-    kind: counter
-- id: blobs_processed
-  azure_name: BlobsProcessed
-  time_grain: PT1M
-  series:
-  - aggregation: total
-    kind: counter
-- id: blobs_received
-  azure_name: BlobsReceived
-  time_grain: PT1M
-  series:
-  - aggregation: total
-    kind: counter
-- id: blobs_dropped
-  azure_name: BlobsDropped
-  time_grain: PT1M
-  series:
-  - aggregation: total
-    kind: counter
-- id: discovery_latency
-  azure_name: DiscoveryLatency
-  time_grain: PT1M
-  series:
-  - aggregation: average
-    kind: gauge
-- id: stage_latency
-  azure_name: StageLatency
-  time_grain: PT1M
-  series:
-  - aggregation: average
-    kind: gauge
-- id: queue_length
-  azure_name: QueueLength
-  time_grain: PT1M
-  series:
-  - aggregation: average
-    kind: gauge
-- id: queue_oldest_message
-  azure_name: QueueOldestMessage
-  time_grain: PT1M
-  series:
-  - aggregation: average
-    kind: gauge
-- id: received_data_size_bytes
-  azure_name: ReceivedDataSizeBytes
-  time_grain: PT1M
-  series:
-  - aggregation: total
-    kind: counter
-- id: batches_processed
-  azure_name: BatchesProcessed
-  time_grain: PT1M
-  series:
-  - aggregation: total
-    kind: counter
-- id: batch_blob_count
-  azure_name: BatchBlobCount
-  time_grain: PT1M
-  series:
-  - aggregation: average
-    kind: gauge
-- id: batch_size
-  azure_name: BatchSize
-  time_grain: PT1M
-  series:
-  - aggregation: average
-    kind: gauge
-- id: batch_duration
-  azure_name: BatchDuration
-  time_grain: PT1M
-  series:
-  - aggregation: average
-    kind: gauge
-- id: export_utilization
-  azure_name: ExportUtilization
-  time_grain: PT1M
-  series:
-  - aggregation: maximum
-    kind: gauge
-- id: continuous_export_num_of_records_exported
-  azure_name: ContinuousExportNumOfRecordsExported
-  time_grain: PT1M
-  series:
-  - aggregation: total
-    kind: counter
-- id: continuous_export_result
-  azure_name: ContinuousExportResult
-  time_grain: PT1M
-  series:
-  - aggregation: count
-    kind: counter
-- id: continuous_export_pending_count
-  azure_name: ContinuousExportPendingCount
-  time_grain: PT1M
-  series:
-  - aggregation: maximum
-    kind: gauge
-- id: continuous_export_max_lateness_minutes
-  azure_name: ContinuousExportMaxLatenessMinutes
-  time_grain: PT1M
-  series:
-  - aggregation: maximum
-    kind: gauge
-- id: streaming_ingest_data_rate
-  azure_name: StreamingIngestDataRate
-  time_grain: PT1M
-  series:
-  - aggregation: average
-    kind: gauge
-- id: streaming_ingest_duration
-  azure_name: StreamingIngestDuration
-  time_grain: PT1M
-  series:
-  - aggregation: average
-    kind: gauge
-- id: streaming_ingest_results
-  azure_name: StreamingIngestResults
-  time_grain: PT1M
-  series:
-  - aggregation: count
-    kind: counter
-- id: streaming_ingest_utilization
-  azure_name: StreamingIngestUtilization
-  time_grain: PT1M
-  series:
-  - aggregation: average
-    kind: gauge
-- id: materialized_view_health
-  azure_name: MaterializedViewHealth
-  time_grain: PT1M
-  series:
-  - aggregation: average
-    kind: gauge
-- id: materialized_view_age_minutes
-  azure_name: MaterializedViewAgeMinutes
-  time_grain: PT1M
-  series:
-  - aggregation: average
-    kind: gauge
-- id: materialized_view_age_seconds
-  azure_name: MaterializedViewAgeSeconds
-  time_grain: PT1M
-  series:
-  - aggregation: average
-    kind: gauge
-- id: materialized_view_records_in_delta
-  azure_name: MaterializedViewRecordsInDelta
-  time_grain: PT1M
-  series:
-  - aggregation: average
-    kind: gauge
-- id: materialized_view_extents_rebuild
-  azure_name: MaterializedViewExtentsRebuild
-  time_grain: PT1M
-  series:
-  - aggregation: average
-    kind: gauge
-- id: materialized_view_data_loss
-  azure_name: MaterializedViewDataLoss
-  time_grain: PT1M
-  series:
-  - aggregation: maximum
-    kind: gauge
-- id: materialized_view_result
-  azure_name: MaterializedViewResult
-  time_grain: PT1M
-  series:
-  - aggregation: average
-    kind: gauge
-- id: partitioning_percentage
-  azure_name: PartitioningPercentage
-  time_grain: PT1M
-  series:
-  - aggregation: average
-    kind: gauge
-- id: partitioning_percentage_hot
-  azure_name: PartitioningPercentageHot
-  time_grain: PT1M
-  series:
-  - aggregation: average
-    kind: gauge
-- id: processed_partitioned_records
-  azure_name: ProcessedPartitionedRecords
-  time_grain: PT1M
-  series:
-  - aggregation: average
-    kind: gauge
+  - id: cpu
+    azure_name: CPU
+    time_grain: PT1M
+    series:
+      - aggregation: average
+        kind: gauge
+  - id: ingestion_utilization
+    azure_name: IngestionUtilization
+    time_grain: PT1M
+    series:
+      - aggregation: average
+        kind: gauge
+  - id: cache_utilization_factor
+    azure_name: CacheUtilizationFactor
+    time_grain: PT1M
+    series:
+      - aggregation: average
+        kind: gauge
+  - id: keep_alive
+    azure_name: KeepAlive
+    time_grain: PT1M
+    series:
+      - aggregation: average
+        kind: gauge
+  - id: instance_count
+    azure_name: InstanceCount
+    time_grain: PT1M
+    series:
+      - aggregation: average
+        kind: gauge
+      - aggregation: maximum
+        kind: gauge
+      - aggregation: minimum
+        kind: gauge
+  - id: total_number_of_extents
+    azure_name: TotalNumberOfExtents
+    time_grain: PT1M
+    series:
+      - aggregation: average
+        kind: gauge
+  - id: total_number_of_throttled_commands
+    azure_name: TotalNumberOfThrottledCommands
+    time_grain: PT1M
+    series:
+      - aggregation: total
+        kind: counter
+  - id: follower_latency
+    azure_name: FollowerLatency
+    time_grain: PT1M
+    series:
+      - aggregation: average
+        kind: gauge
+  - id: query_duration
+    azure_name: QueryDuration
+    time_grain: PT1M
+    series:
+      - aggregation: average
+        kind: gauge
+  - id: query_result
+    azure_name: QueryResult
+    time_grain: PT1M
+    series:
+      - aggregation: count
+        kind: counter
+  - id: total_number_of_concurrent_queries
+    azure_name: TotalNumberOfConcurrentQueries
+    time_grain: PT1M
+    series:
+      - aggregation: average
+        kind: gauge
+      - aggregation: maximum
+        kind: gauge
+  - id: total_number_of_throttled_queries
+    azure_name: TotalNumberOfThrottledQueries
+    time_grain: PT1M
+    series:
+      - aggregation: total
+        kind: counter
+  - id: weak_consistency_latency
+    azure_name: WeakConsistencyLatency
+    time_grain: PT1M
+    series:
+      - aggregation: average
+        kind: gauge
+  - id: ingestion_result
+    azure_name: IngestionResult
+    time_grain: PT1M
+    series:
+      - aggregation: total
+        kind: counter
+  - id: ingestion_volume_in_mb
+    azure_name: IngestionVolumeInMB
+    time_grain: PT1M
+    series:
+      - aggregation: total
+        kind: counter
+  - id: ingestion_latency_in_seconds
+    azure_name: IngestionLatencyInSeconds
+    time_grain: PT1M
+    series:
+      - aggregation: average
+        kind: gauge
+  - id: events_processed
+    azure_name: EventsProcessed
+    time_grain: PT1M
+    series:
+      - aggregation: total
+        kind: counter
+  - id: events_received
+    azure_name: EventsReceived
+    time_grain: PT1M
+    series:
+      - aggregation: total
+        kind: counter
+  - id: events_dropped
+    azure_name: EventsDropped
+    time_grain: PT1M
+    series:
+      - aggregation: total
+        kind: counter
+  - id: blobs_processed
+    azure_name: BlobsProcessed
+    time_grain: PT1M
+    series:
+      - aggregation: total
+        kind: counter
+  - id: blobs_received
+    azure_name: BlobsReceived
+    time_grain: PT1M
+    series:
+      - aggregation: total
+        kind: counter
+  - id: blobs_dropped
+    azure_name: BlobsDropped
+    time_grain: PT1M
+    series:
+      - aggregation: total
+        kind: counter
+  - id: discovery_latency
+    azure_name: DiscoveryLatency
+    time_grain: PT1M
+    series:
+      - aggregation: average
+        kind: gauge
+  - id: stage_latency
+    azure_name: StageLatency
+    time_grain: PT1M
+    series:
+      - aggregation: average
+        kind: gauge
+  - id: queue_length
+    azure_name: QueueLength
+    time_grain: PT1M
+    series:
+      - aggregation: average
+        kind: gauge
+  - id: queue_oldest_message
+    azure_name: QueueOldestMessage
+    time_grain: PT1M
+    series:
+      - aggregation: average
+        kind: gauge
+  - id: received_data_size_bytes
+    azure_name: ReceivedDataSizeBytes
+    time_grain: PT1M
+    series:
+      - aggregation: total
+        kind: counter
+  - id: batches_processed
+    azure_name: BatchesProcessed
+    time_grain: PT1M
+    series:
+      - aggregation: total
+        kind: counter
+  - id: batch_blob_count
+    azure_name: BatchBlobCount
+    time_grain: PT1M
+    series:
+      - aggregation: average
+        kind: gauge
+  - id: batch_size
+    azure_name: BatchSize
+    time_grain: PT1M
+    series:
+      - aggregation: average
+        kind: gauge
+  - id: batch_duration
+    azure_name: BatchDuration
+    time_grain: PT1M
+    series:
+      - aggregation: average
+        kind: gauge
+  - id: export_utilization
+    azure_name: ExportUtilization
+    time_grain: PT1M
+    series:
+      - aggregation: maximum
+        kind: gauge
+  - id: continuous_export_num_of_records_exported
+    azure_name: ContinuousExportNumOfRecordsExported
+    time_grain: PT1M
+    series:
+      - aggregation: total
+        kind: counter
+  - id: continuous_export_result
+    azure_name: ContinuousExportResult
+    time_grain: PT1M
+    series:
+      - aggregation: count
+        kind: counter
+  - id: continuous_export_pending_count
+    azure_name: ContinuousExportPendingCount
+    time_grain: PT1M
+    series:
+      - aggregation: maximum
+        kind: gauge
+  - id: continuous_export_max_lateness_minutes
+    azure_name: ContinuousExportMaxLatenessMinutes
+    time_grain: PT1M
+    series:
+      - aggregation: maximum
+        kind: gauge
+  - id: streaming_ingest_data_rate
+    azure_name: StreamingIngestDataRate
+    time_grain: PT1M
+    series:
+      - aggregation: average
+        kind: gauge
+  - id: streaming_ingest_duration
+    azure_name: StreamingIngestDuration
+    time_grain: PT1M
+    series:
+      - aggregation: average
+        kind: gauge
+  - id: streaming_ingest_results
+    azure_name: StreamingIngestResults
+    time_grain: PT1M
+    series:
+      - aggregation: count
+        kind: counter
+  - id: streaming_ingest_utilization
+    azure_name: StreamingIngestUtilization
+    time_grain: PT1M
+    series:
+      - aggregation: average
+        kind: gauge
+  - id: materialized_view_health
+    azure_name: MaterializedViewHealth
+    time_grain: PT1M
+    series:
+      - aggregation: average
+        kind: gauge
+  - id: materialized_view_age_minutes
+    azure_name: MaterializedViewAgeMinutes
+    time_grain: PT1M
+    series:
+      - aggregation: average
+        kind: gauge
+  - id: materialized_view_age_seconds
+    azure_name: MaterializedViewAgeSeconds
+    time_grain: PT1M
+    series:
+      - aggregation: average
+        kind: gauge
+  - id: materialized_view_records_in_delta
+    azure_name: MaterializedViewRecordsInDelta
+    time_grain: PT1M
+    series:
+      - aggregation: average
+        kind: gauge
+  - id: materialized_view_extents_rebuild
+    azure_name: MaterializedViewExtentsRebuild
+    time_grain: PT1M
+    series:
+      - aggregation: average
+        kind: gauge
+  - id: materialized_view_data_loss
+    azure_name: MaterializedViewDataLoss
+    time_grain: PT1M
+    series:
+      - aggregation: maximum
+        kind: gauge
+  - id: materialized_view_result
+    azure_name: MaterializedViewResult
+    time_grain: PT1M
+    series:
+      - aggregation: average
+        kind: gauge
+  - id: partitioning_percentage
+    azure_name: PartitioningPercentage
+    time_grain: PT1M
+    series:
+      - aggregation: average
+        kind: gauge
+  - id: partitioning_percentage_hot
+    azure_name: PartitioningPercentageHot
+    time_grain: PT1M
+    series:
+      - aggregation: average
+        kind: gauge
+  - id: processed_partitioned_records
+    azure_name: ProcessedPartitionedRecords
+    time_grain: PT1M
+    series:
+      - aggregation: average
+        kind: gauge
 template:
   family: Azure Data Explorer Cluster
   context_namespace: data_explorer
   chart_defaults:
     label_promotion:
-    - resource_name
-    - resource_group
-    - region
-    - resource_type
-    - profile
+      - resource_name
+      - resource_group
+      - region
+      - resource_type
+      - profile
     instances:
       by_labels:
-      - resource_uid
+        - resource_uid
   charts:
-  - id: am_azure_data_explorer__cpu_utilization
-    title: Azure Data Explorer CPU Utilization
-    context: cpu_utilization
-    family: Compute
-    type: line
-    units: percentage
-    algorithm: absolute
-    dimensions:
-    - selector: data_explorer.cpu_average
-      name: average
-  - id: am_azure_data_explorer__utilization
-    title: Azure Data Explorer Utilization
-    context: utilization
-    family: Compute
-    type: line
-    units: percentage
-    algorithm: absolute
-    dimensions:
-    - selector: data_explorer.ingestion_utilization_average
-      name: ingestion
-    - selector: data_explorer.cache_utilization_factor_average
-      name: cache
-  - id: am_azure_data_explorer__keep_alive
-    title: Azure Data Explorer Keep Alive
-    context: keep_alive
-    family: Compute
-    type: line
-    units: count
-    algorithm: absolute
-    dimensions:
-    - selector: data_explorer.keep_alive_average
-      name: average
-  - id: am_azure_data_explorer__instance_count
-    title: Azure Data Explorer Instance Count
-    context: instance_count
-    family: Compute
-    type: line
-    units: instances
-    algorithm: absolute
-    dimensions:
-    - selector: data_explorer.instance_count_average
-      name: average
-    - selector: data_explorer.instance_count_maximum
-      name: maximum
-    - selector: data_explorer.instance_count_minimum
-      name: minimum
-  - id: am_azure_data_explorer__extents
-    title: Azure Data Explorer Total Extents
-    context: extents
-    family: Compute
-    type: line
-    units: extents
-    algorithm: absolute
-    dimensions:
-    - selector: data_explorer.total_number_of_extents_average
-      name: average
-  - id: am_azure_data_explorer__throttled_commands
-    title: Azure Data Explorer Throttled Commands
-    context: throttled_commands
-    family: Compute
-    type: line
-    units: commands/s
-    algorithm: incremental
-    dimensions:
-    - selector: data_explorer.total_number_of_throttled_commands_total
-      name: total
-  - id: am_azure_data_explorer__follower_latency
-    title: Azure Data Explorer Follower Latency
-    context: follower_latency
-    family: Compute
-    type: line
-    units: milliseconds
-    algorithm: absolute
-    dimensions:
-    - selector: data_explorer.follower_latency_average
-      name: average
-  - id: am_azure_data_explorer__query_duration
-    title: Azure Data Explorer Query Duration
-    context: query_duration
-    family: Query
-    type: line
-    units: milliseconds
-    algorithm: absolute
-    dimensions:
-    - selector: data_explorer.query_duration_average
-      name: average
-  - id: am_azure_data_explorer__query_count
-    title: Azure Data Explorer Query Count
-    context: query_count
-    family: Query
-    type: line
-    units: queries/s
-    algorithm: incremental
-    dimensions:
-    - selector: data_explorer.query_result_count
-      name: count
-  - id: am_azure_data_explorer__concurrent_queries
-    title: Azure Data Explorer Concurrent Queries
-    context: concurrent_queries
-    family: Query
-    type: line
-    units: queries
-    algorithm: absolute
-    dimensions:
-    - selector: data_explorer.total_number_of_concurrent_queries_average
-      name: average
-    - selector: data_explorer.total_number_of_concurrent_queries_maximum
-      name: maximum
-  - id: am_azure_data_explorer__throttled_queries
-    title: Azure Data Explorer Throttled Queries
-    context: throttled_queries
-    family: Query
-    type: line
-    units: queries/s
-    algorithm: incremental
-    dimensions:
-    - selector: data_explorer.total_number_of_throttled_queries_total
-      name: total
-  - id: am_azure_data_explorer__weak_consistency_latency
-    title: Azure Data Explorer Weak Consistency Latency
-    context: weak_consistency_latency
-    family: Query
-    type: line
-    units: seconds
-    algorithm: absolute
-    dimensions:
-    - selector: data_explorer.weak_consistency_latency_average
-      name: average
-  - id: am_azure_data_explorer__ingestion_result
-    title: Azure Data Explorer Ingestion Result
-    context: ingestion_result
-    family: Ingestion
-    type: line
-    units: sources/s
-    algorithm: incremental
-    dimensions:
-    - selector: data_explorer.ingestion_result_total
-      name: total
-  - id: am_azure_data_explorer__ingestion_volume
-    title: Azure Data Explorer Ingestion Volume
-    context: ingestion_volume
-    family: Ingestion
-    type: line
-    units: bytes/s
-    algorithm: incremental
-    dimensions:
-    - selector: data_explorer.ingestion_volume_in_mb_total
-      name: total
-  - id: am_azure_data_explorer__ingestion_latency
-    title: Azure Data Explorer Ingestion Latency
-    context: ingestion_latency
-    family: Ingestion
-    type: line
-    units: seconds
-    algorithm: absolute
-    dimensions:
-    - selector: data_explorer.ingestion_latency_in_seconds_average
-      name: average
-  - id: am_azure_data_explorer__events
-    title: Azure Data Explorer Events
-    context: events
-    family: Ingestion
-    type: line
-    units: events/s
-    algorithm: incremental
-    dimensions:
-    - selector: data_explorer.events_received_total
-      name: received
-    - selector: data_explorer.events_processed_total
-      name: processed
-    - selector: data_explorer.events_dropped_total
-      name: dropped
-  - id: am_azure_data_explorer__blobs
-    title: Azure Data Explorer Blobs
-    context: blobs
-    family: Ingestion
-    type: line
-    units: blobs/s
-    algorithm: incremental
-    dimensions:
-    - selector: data_explorer.blobs_received_total
-      name: received
-    - selector: data_explorer.blobs_processed_total
-      name: processed
-    - selector: data_explorer.blobs_dropped_total
-      name: dropped
-  - id: am_azure_data_explorer__discovery_latency
-    title: Azure Data Explorer Discovery Latency
-    context: discovery_latency
-    family: Ingestion
-    type: line
-    units: seconds
-    algorithm: absolute
-    dimensions:
-    - selector: data_explorer.discovery_latency_average
-      name: average
-  - id: am_azure_data_explorer__stage_latency
-    title: Azure Data Explorer Stage Latency
-    context: stage_latency
-    family: Ingestion
-    type: line
-    units: seconds
-    algorithm: absolute
-    dimensions:
-    - selector: data_explorer.stage_latency_average
-      name: average
-  - id: am_azure_data_explorer__ingestion_queue
-    title: Azure Data Explorer Ingestion Queue
-    context: ingestion_queue
-    family: Ingestion
-    type: line
-    units: messages
-    algorithm: absolute
-    dimensions:
-    - selector: data_explorer.queue_length_average
-      name: length
-  - id: am_azure_data_explorer__queue_oldest_message
-    title: Azure Data Explorer Queue Oldest Message Age
-    context: queue_oldest_message
-    family: Ingestion
-    type: line
-    units: seconds
-    algorithm: absolute
-    dimensions:
-    - selector: data_explorer.queue_oldest_message_average
-      name: age
-  - id: am_azure_data_explorer__received_data_size
-    title: Azure Data Explorer Received Data Size
-    context: received_data_size
-    family: Ingestion
-    type: line
-    units: bytes/s
-    algorithm: incremental
-    dimensions:
-    - selector: data_explorer.received_data_size_bytes_total
-      name: total
-  - id: am_azure_data_explorer__batches_processed
-    title: Azure Data Explorer Batches Processed
-    context: batches_processed
-    family: Ingestion
-    type: line
-    units: batches/s
-    algorithm: incremental
-    dimensions:
-    - selector: data_explorer.batches_processed_total
-      name: total
-  - id: am_azure_data_explorer__batch_blob_count
-    title: Azure Data Explorer Batch Blob Count
-    context: batch_blob_count
-    family: Ingestion
-    type: line
-    units: blobs
-    algorithm: absolute
-    dimensions:
-    - selector: data_explorer.batch_blob_count_average
-      name: average
-  - id: am_azure_data_explorer__batch_size
-    title: Azure Data Explorer Batch Size
-    context: batch_size
-    family: Ingestion
-    type: line
-    units: bytes
-    algorithm: absolute
-    dimensions:
-    - selector: data_explorer.batch_size_average
-      name: average
-  - id: am_azure_data_explorer__batch_duration
-    title: Azure Data Explorer Batch Duration
-    context: batch_duration
-    family: Ingestion
-    type: line
-    units: seconds
-    algorithm: absolute
-    dimensions:
-    - selector: data_explorer.batch_duration_average
-      name: average
-  - id: am_azure_data_explorer__export_utilization
-    title: Azure Data Explorer Export Utilization
-    context: export_utilization
-    family: Export
-    type: line
-    units: percentage
-    algorithm: absolute
-    dimensions:
-    - selector: data_explorer.export_utilization_maximum
-      name: maximum
-  - id: am_azure_data_explorer__continuous_export_records
-    title: Azure Data Explorer Continuous Export Records
-    context: continuous_export_records
-    family: Export
-    type: line
-    units: records/s
-    algorithm: incremental
-    dimensions:
-    - selector: data_explorer.continuous_export_num_of_records_exported_total
-      name: total
-  - id: am_azure_data_explorer__continuous_export_result
-    title: Azure Data Explorer Continuous Export Result
-    context: continuous_export_result
-    family: Export
-    type: line
-    units: results/s
-    algorithm: incremental
-    dimensions:
-    - selector: data_explorer.continuous_export_result_count
-      name: count
-  - id: am_azure_data_explorer__continuous_export_pending
-    title: Azure Data Explorer Continuous Export Pending Jobs
-    context: continuous_export_pending
-    family: Export
-    type: line
-    units: jobs
-    algorithm: absolute
-    dimensions:
-    - selector: data_explorer.continuous_export_pending_count_maximum
-      name: maximum
-  - id: am_azure_data_explorer__continuous_export_lateness
-    title: Azure Data Explorer Continuous Export Lateness
-    context: continuous_export_lateness
-    family: Export
-    type: line
-    units: minutes
-    algorithm: absolute
-    dimensions:
-    - selector: data_explorer.continuous_export_max_lateness_minutes_maximum
-      name: maximum
-  - id: am_azure_data_explorer__streaming_ingest_data_rate
-    title: Azure Data Explorer Streaming Ingest Data Rate
-    context: streaming_ingest_data_rate
-    family: Streaming
-    type: line
-    units: bytes/s
-    algorithm: absolute
-    dimensions:
-    - selector: data_explorer.streaming_ingest_data_rate_average
-      name: average
-  - id: am_azure_data_explorer__streaming_ingest_duration
-    title: Azure Data Explorer Streaming Ingest Duration
-    context: streaming_ingest_duration
-    family: Streaming
-    type: line
-    units: milliseconds
-    algorithm: absolute
-    dimensions:
-    - selector: data_explorer.streaming_ingest_duration_average
-      name: average
-  - id: am_azure_data_explorer__streaming_ingest_result
-    title: Azure Data Explorer Streaming Ingest Result
-    context: streaming_ingest_result
-    family: Streaming
-    type: line
-    units: results/s
-    algorithm: incremental
-    dimensions:
-    - selector: data_explorer.streaming_ingest_results_count
-      name: count
-  - id: am_azure_data_explorer__streaming_ingest_utilization
-    title: Azure Data Explorer Streaming Ingest Utilization
-    context: streaming_ingest_utilization
-    family: Streaming
-    type: line
-    units: percentage
-    algorithm: absolute
-    dimensions:
-    - selector: data_explorer.streaming_ingest_utilization_average
-      name: average
-  - id: am_azure_data_explorer__materialized_view_health
-    title: Azure Data Explorer Materialized View Health
-    context: materialized_view_health
-    family: Materialized Views
-    type: line
-    units: status
-    algorithm: absolute
-    dimensions:
-    - selector: data_explorer.materialized_view_health_average
-      name: health
-  - id: am_azure_data_explorer__materialized_view_age
-    title: Azure Data Explorer Materialized View Age
-    context: materialized_view_age
-    family: Materialized Views
-    type: line
-    units: minutes
-    algorithm: absolute
-    dimensions:
-    - selector: data_explorer.materialized_view_age_minutes_average
-      name: minutes
-  - id: am_azure_data_explorer__materialized_view_age_seconds
-    title: Azure Data Explorer Materialized View Age (Seconds)
-    context: materialized_view_age_seconds
-    family: Materialized Views
-    type: line
-    units: seconds
-    algorithm: absolute
-    dimensions:
-    - selector: data_explorer.materialized_view_age_seconds_average
-      name: average
-  - id: am_azure_data_explorer__materialized_view_records_in_delta
-    title: Azure Data Explorer Materialized View Records in Delta
-    context: materialized_view_records_in_delta
-    family: Materialized Views
-    type: line
-    units: records
-    algorithm: absolute
-    dimensions:
-    - selector: data_explorer.materialized_view_records_in_delta_average
-      name: average
-  - id: am_azure_data_explorer__materialized_view_extents_rebuild
-    title: Azure Data Explorer Materialized View Extents Rebuild
-    context: materialized_view_extents_rebuild
-    family: Materialized Views
-    type: line
-    units: extents
-    algorithm: absolute
-    dimensions:
-    - selector: data_explorer.materialized_view_extents_rebuild_average
-      name: average
-  - id: am_azure_data_explorer__materialized_view_data_loss
-    title: Azure Data Explorer Materialized View Data Loss
-    context: materialized_view_data_loss
-    family: Materialized Views
-    type: line
-    units: status
-    algorithm: absolute
-    dimensions:
-    - selector: data_explorer.materialized_view_data_loss_maximum
-      name: maximum
-  - id: am_azure_data_explorer__materialized_view_result
-    title: Azure Data Explorer Materialized View Result
-    context: materialized_view_result
-    family: Materialized Views
-    type: line
-    units: status
-    algorithm: absolute
-    dimensions:
-    - selector: data_explorer.materialized_view_result_average
-      name: average
-  - id: am_azure_data_explorer__partitioning_percentage
-    title: Azure Data Explorer Partitioning Percentage
-    context: partitioning_percentage
-    family: Partitioning
-    type: line
-    units: percentage
-    algorithm: absolute
-    dimensions:
-    - selector: data_explorer.partitioning_percentage_average
-      name: total
-    - selector: data_explorer.partitioning_percentage_hot_average
-      name: hot
-  - id: am_azure_data_explorer__partitioned_records
-    title: Azure Data Explorer Processed Partitioned Records
-    context: partitioned_records
-    family: Partitioning
-    type: line
-    units: records
-    algorithm: absolute
-    dimensions:
-    - selector: data_explorer.processed_partitioned_records_average
-      name: average
+    - id: am_azure_data_explorer__cpu_utilization
+      title: Azure Data Explorer CPU Utilization
+      context: cpu_utilization
+      family: Compute
+      type: line
+      units: percentage
+      algorithm: absolute
+      dimensions:
+        - selector: cpu_average
+          name: average
+    - id: am_azure_data_explorer__utilization
+      title: Azure Data Explorer Utilization
+      context: utilization
+      family: Compute
+      type: line
+      units: percentage
+      algorithm: absolute
+      dimensions:
+        - selector: ingestion_utilization_average
+          name: ingestion
+        - selector: cache_utilization_factor_average
+          name: cache
+    - id: am_azure_data_explorer__keep_alive
+      title: Azure Data Explorer Keep Alive
+      context: keep_alive
+      family: Compute
+      type: line
+      units: count
+      algorithm: absolute
+      dimensions:
+        - selector: keep_alive_average
+          name: average
+    - id: am_azure_data_explorer__instance_count
+      title: Azure Data Explorer Instance Count
+      context: instance_count
+      family: Compute
+      type: line
+      units: instances
+      algorithm: absolute
+      dimensions:
+        - selector: instance_count_average
+          name: average
+        - selector: instance_count_maximum
+          name: maximum
+        - selector: instance_count_minimum
+          name: minimum
+    - id: am_azure_data_explorer__extents
+      title: Azure Data Explorer Total Extents
+      context: extents
+      family: Compute
+      type: line
+      units: extents
+      algorithm: absolute
+      dimensions:
+        - selector: total_number_of_extents_average
+          name: average
+    - id: am_azure_data_explorer__throttled_commands
+      title: Azure Data Explorer Throttled Commands
+      context: throttled_commands
+      family: Compute
+      type: line
+      units: commands/s
+      algorithm: incremental
+      dimensions:
+        - selector: total_number_of_throttled_commands_total
+          name: total
+    - id: am_azure_data_explorer__follower_latency
+      title: Azure Data Explorer Follower Latency
+      context: follower_latency
+      family: Compute
+      type: line
+      units: milliseconds
+      algorithm: absolute
+      dimensions:
+        - selector: follower_latency_average
+          name: average
+    - id: am_azure_data_explorer__query_duration
+      title: Azure Data Explorer Query Duration
+      context: query_duration
+      family: Query
+      type: line
+      units: milliseconds
+      algorithm: absolute
+      dimensions:
+        - selector: query_duration_average
+          name: average
+    - id: am_azure_data_explorer__query_count
+      title: Azure Data Explorer Query Count
+      context: query_count
+      family: Query
+      type: line
+      units: queries/s
+      algorithm: incremental
+      dimensions:
+        - selector: query_result_count
+          name: count
+    - id: am_azure_data_explorer__concurrent_queries
+      title: Azure Data Explorer Concurrent Queries
+      context: concurrent_queries
+      family: Query
+      type: line
+      units: queries
+      algorithm: absolute
+      dimensions:
+        - selector: total_number_of_concurrent_queries_average
+          name: average
+        - selector: total_number_of_concurrent_queries_maximum
+          name: maximum
+    - id: am_azure_data_explorer__throttled_queries
+      title: Azure Data Explorer Throttled Queries
+      context: throttled_queries
+      family: Query
+      type: line
+      units: queries/s
+      algorithm: incremental
+      dimensions:
+        - selector: total_number_of_throttled_queries_total
+          name: total
+    - id: am_azure_data_explorer__weak_consistency_latency
+      title: Azure Data Explorer Weak Consistency Latency
+      context: weak_consistency_latency
+      family: Query
+      type: line
+      units: seconds
+      algorithm: absolute
+      dimensions:
+        - selector: weak_consistency_latency_average
+          name: average
+    - id: am_azure_data_explorer__ingestion_result
+      title: Azure Data Explorer Ingestion Result
+      context: ingestion_result
+      family: Ingestion
+      type: line
+      units: sources/s
+      algorithm: incremental
+      dimensions:
+        - selector: ingestion_result_total
+          name: total
+    - id: am_azure_data_explorer__ingestion_volume
+      title: Azure Data Explorer Ingestion Volume
+      context: ingestion_volume
+      family: Ingestion
+      type: line
+      units: bytes/s
+      algorithm: incremental
+      dimensions:
+        - selector: ingestion_volume_in_mb_total
+          name: total
+    - id: am_azure_data_explorer__ingestion_latency
+      title: Azure Data Explorer Ingestion Latency
+      context: ingestion_latency
+      family: Ingestion
+      type: line
+      units: seconds
+      algorithm: absolute
+      dimensions:
+        - selector: ingestion_latency_in_seconds_average
+          name: average
+    - id: am_azure_data_explorer__events
+      title: Azure Data Explorer Events
+      context: events
+      family: Ingestion
+      type: line
+      units: events/s
+      algorithm: incremental
+      dimensions:
+        - selector: events_received_total
+          name: received
+        - selector: events_processed_total
+          name: processed
+        - selector: events_dropped_total
+          name: dropped
+    - id: am_azure_data_explorer__blobs
+      title: Azure Data Explorer Blobs
+      context: blobs
+      family: Ingestion
+      type: line
+      units: blobs/s
+      algorithm: incremental
+      dimensions:
+        - selector: blobs_received_total
+          name: received
+        - selector: blobs_processed_total
+          name: processed
+        - selector: blobs_dropped_total
+          name: dropped
+    - id: am_azure_data_explorer__discovery_latency
+      title: Azure Data Explorer Discovery Latency
+      context: discovery_latency
+      family: Ingestion
+      type: line
+      units: seconds
+      algorithm: absolute
+      dimensions:
+        - selector: discovery_latency_average
+          name: average
+    - id: am_azure_data_explorer__stage_latency
+      title: Azure Data Explorer Stage Latency
+      context: stage_latency
+      family: Ingestion
+      type: line
+      units: seconds
+      algorithm: absolute
+      dimensions:
+        - selector: stage_latency_average
+          name: average
+    - id: am_azure_data_explorer__ingestion_queue
+      title: Azure Data Explorer Ingestion Queue
+      context: ingestion_queue
+      family: Ingestion
+      type: line
+      units: messages
+      algorithm: absolute
+      dimensions:
+        - selector: queue_length_average
+          name: length
+    - id: am_azure_data_explorer__queue_oldest_message
+      title: Azure Data Explorer Queue Oldest Message Age
+      context: queue_oldest_message
+      family: Ingestion
+      type: line
+      units: seconds
+      algorithm: absolute
+      dimensions:
+        - selector: queue_oldest_message_average
+          name: age
+    - id: am_azure_data_explorer__received_data_size
+      title: Azure Data Explorer Received Data Size
+      context: received_data_size
+      family: Ingestion
+      type: line
+      units: bytes/s
+      algorithm: incremental
+      dimensions:
+        - selector: received_data_size_bytes_total
+          name: total
+    - id: am_azure_data_explorer__batches_processed
+      title: Azure Data Explorer Batches Processed
+      context: batches_processed
+      family: Ingestion
+      type: line
+      units: batches/s
+      algorithm: incremental
+      dimensions:
+        - selector: batches_processed_total
+          name: total
+    - id: am_azure_data_explorer__batch_blob_count
+      title: Azure Data Explorer Batch Blob Count
+      context: batch_blob_count
+      family: Ingestion
+      type: line
+      units: blobs
+      algorithm: absolute
+      dimensions:
+        - selector: batch_blob_count_average
+          name: average
+    - id: am_azure_data_explorer__batch_size
+      title: Azure Data Explorer Batch Size
+      context: batch_size
+      family: Ingestion
+      type: line
+      units: bytes
+      algorithm: absolute
+      dimensions:
+        - selector: batch_size_average
+          name: average
+    - id: am_azure_data_explorer__batch_duration
+      title: Azure Data Explorer Batch Duration
+      context: batch_duration
+      family: Ingestion
+      type: line
+      units: seconds
+      algorithm: absolute
+      dimensions:
+        - selector: batch_duration_average
+          name: average
+    - id: am_azure_data_explorer__export_utilization
+      title: Azure Data Explorer Export Utilization
+      context: export_utilization
+      family: Export
+      type: line
+      units: percentage
+      algorithm: absolute
+      dimensions:
+        - selector: export_utilization_maximum
+          name: maximum
+    - id: am_azure_data_explorer__continuous_export_records
+      title: Azure Data Explorer Continuous Export Records
+      context: continuous_export_records
+      family: Export
+      type: line
+      units: records/s
+      algorithm: incremental
+      dimensions:
+        - selector: continuous_export_num_of_records_exported_total
+          name: total
+    - id: am_azure_data_explorer__continuous_export_result
+      title: Azure Data Explorer Continuous Export Result
+      context: continuous_export_result
+      family: Export
+      type: line
+      units: results/s
+      algorithm: incremental
+      dimensions:
+        - selector: continuous_export_result_count
+          name: count
+    - id: am_azure_data_explorer__continuous_export_pending
+      title: Azure Data Explorer Continuous Export Pending Jobs
+      context: continuous_export_pending
+      family: Export
+      type: line
+      units: jobs
+      algorithm: absolute
+      dimensions:
+        - selector: continuous_export_pending_count_maximum
+          name: maximum
+    - id: am_azure_data_explorer__continuous_export_lateness
+      title: Azure Data Explorer Continuous Export Lateness
+      context: continuous_export_lateness
+      family: Export
+      type: line
+      units: minutes
+      algorithm: absolute
+      dimensions:
+        - selector: continuous_export_max_lateness_minutes_maximum
+          name: maximum
+    - id: am_azure_data_explorer__streaming_ingest_data_rate
+      title: Azure Data Explorer Streaming Ingest Data Rate
+      context: streaming_ingest_data_rate
+      family: Streaming
+      type: line
+      units: bytes/s
+      algorithm: absolute
+      dimensions:
+        - selector: streaming_ingest_data_rate_average
+          name: average
+    - id: am_azure_data_explorer__streaming_ingest_duration
+      title: Azure Data Explorer Streaming Ingest Duration
+      context: streaming_ingest_duration
+      family: Streaming
+      type: line
+      units: milliseconds
+      algorithm: absolute
+      dimensions:
+        - selector: streaming_ingest_duration_average
+          name: average
+    - id: am_azure_data_explorer__streaming_ingest_result
+      title: Azure Data Explorer Streaming Ingest Result
+      context: streaming_ingest_result
+      family: Streaming
+      type: line
+      units: results/s
+      algorithm: incremental
+      dimensions:
+        - selector: streaming_ingest_results_count
+          name: count
+    - id: am_azure_data_explorer__streaming_ingest_utilization
+      title: Azure Data Explorer Streaming Ingest Utilization
+      context: streaming_ingest_utilization
+      family: Streaming
+      type: line
+      units: percentage
+      algorithm: absolute
+      dimensions:
+        - selector: streaming_ingest_utilization_average
+          name: average
+    - id: am_azure_data_explorer__materialized_view_health
+      title: Azure Data Explorer Materialized View Health
+      context: materialized_view_health
+      family: Materialized Views
+      type: line
+      units: status
+      algorithm: absolute
+      dimensions:
+        - selector: materialized_view_health_average
+          name: health
+    - id: am_azure_data_explorer__materialized_view_age
+      title: Azure Data Explorer Materialized View Age
+      context: materialized_view_age
+      family: Materialized Views
+      type: line
+      units: minutes
+      algorithm: absolute
+      dimensions:
+        - selector: materialized_view_age_minutes_average
+          name: minutes
+    - id: am_azure_data_explorer__materialized_view_age_seconds
+      title: Azure Data Explorer Materialized View Age (Seconds)
+      context: materialized_view_age_seconds
+      family: Materialized Views
+      type: line
+      units: seconds
+      algorithm: absolute
+      dimensions:
+        - selector: materialized_view_age_seconds_average
+          name: average
+    - id: am_azure_data_explorer__materialized_view_records_in_delta
+      title: Azure Data Explorer Materialized View Records in Delta
+      context: materialized_view_records_in_delta
+      family: Materialized Views
+      type: line
+      units: records
+      algorithm: absolute
+      dimensions:
+        - selector: materialized_view_records_in_delta_average
+          name: average
+    - id: am_azure_data_explorer__materialized_view_extents_rebuild
+      title: Azure Data Explorer Materialized View Extents Rebuild
+      context: materialized_view_extents_rebuild
+      family: Materialized Views
+      type: line
+      units: extents
+      algorithm: absolute
+      dimensions:
+        - selector: materialized_view_extents_rebuild_average
+          name: average
+    - id: am_azure_data_explorer__materialized_view_data_loss
+      title: Azure Data Explorer Materialized View Data Loss
+      context: materialized_view_data_loss
+      family: Materialized Views
+      type: line
+      units: status
+      algorithm: absolute
+      dimensions:
+        - selector: materialized_view_data_loss_maximum
+          name: maximum
+    - id: am_azure_data_explorer__materialized_view_result
+      title: Azure Data Explorer Materialized View Result
+      context: materialized_view_result
+      family: Materialized Views
+      type: line
+      units: status
+      algorithm: absolute
+      dimensions:
+        - selector: materialized_view_result_average
+          name: average
+    - id: am_azure_data_explorer__partitioning_percentage
+      title: Azure Data Explorer Partitioning Percentage
+      context: partitioning_percentage
+      family: Partitioning
+      type: line
+      units: percentage
+      algorithm: absolute
+      dimensions:
+        - selector: partitioning_percentage_average
+          name: total
+        - selector: partitioning_percentage_hot_average
+          name: hot
+    - id: am_azure_data_explorer__partitioned_records
+      title: Azure Data Explorer Processed Partitioned Records
+      context: partitioned_records
+      family: Partitioning
+      type: line
+      units: records
+      algorithm: absolute
+      dimensions:
+        - selector: processed_partitioned_records_average
+          name: average

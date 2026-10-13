@@ -8,6 +8,7 @@ import (
 	"net"
 	"strconv"
 	"strings"
+	"sync"
 
 	"github.com/netdata/netdata/go/plugins/logger"
 	"github.com/netdata/netdata/go/plugins/plugin/agent/discovery/sd/model"
@@ -59,7 +60,9 @@ func newPodDiscoverer(pod, cmap, secret cache.SharedInformer) *podDiscoverer {
 		panic("nil pod or cmap or secret informer")
 	}
 
-	queue := workqueue.NewTypedWithConfig(workqueue.TypedQueueConfig[any]{Name: "pod"})
+	queue := workqueue.NewTypedWithConfig(workqueue.TypedQueueConfig[any]{
+		Name: "pod",
+	})
 
 	_, _ = pod.AddEventHandler(cache.ResourceEventHandlerFuncs{
 		AddFunc:    func(obj any) { enqueue(queue, obj) },
@@ -93,11 +96,17 @@ func (p *podDiscoverer) String() string {
 func (p *podDiscoverer) Discover(ctx context.Context, in chan<- []model.TargetGroup) {
 	p.Info("instance is started")
 	defer p.Info("instance is stopped")
+	var children sync.WaitGroup
+	defer children.Wait()
+	// ShutDown wakes workers blocked in Get; it must happen before joining them.
 	defer p.queue.ShutDown()
 
-	go p.podInformer.Run(ctx.Done())
-	go p.cmapInformer.Run(ctx.Done())
-	go p.secretInformer.Run(ctx.Done())
+	children.Add(1)
+	go func() { defer children.Done(); p.podInformer.Run(ctx.Done()) }()
+	children.Add(1)
+	go func() { defer children.Done(); p.cmapInformer.Run(ctx.Done()) }()
+	children.Add(1)
+	go func() { defer children.Done(); p.secretInformer.Run(ctx.Done()) }()
 
 	if !cache.WaitForCacheSync(ctx.Done(),
 		p.podInformer.HasSynced, p.cmapInformer.HasSynced, p.secretInformer.HasSynced) {
@@ -105,7 +114,8 @@ func (p *podDiscoverer) Discover(ctx context.Context, in chan<- []model.TargetGr
 		return
 	}
 
-	go p.run(ctx, in)
+	children.Add(1)
+	go func() { defer children.Done(); p.run(ctx, in) }()
 
 	<-ctx.Done()
 }
@@ -135,7 +145,9 @@ func (p *podDiscoverer) handleQueueItem(ctx context.Context, in chan<- []model.T
 	}
 
 	if !ok {
-		tgg := &podTargetGroup{source: podSourceFromNsName(namespace, name)}
+		tgg := &podTargetGroup{
+			source: podSourceFromNsName(namespace, name),
+		}
 		model.SendTargetGroup(ctx, in, tgg)
 		return
 	}

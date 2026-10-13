@@ -27,19 +27,17 @@ func TestCollectorStoreConcurrencyScenarios(t *testing.T) {
 				var writerWG sync.WaitGroup
 				var readerWG sync.WaitGroup
 
-				writerWG.Add(1)
-				go func() {
-					defer writerWG.Done()
+				writerWG.Go(func() {
 					for i := 1; i <= cycles; i++ {
 						cc.BeginCycle()
 						g.Observe(SampleValue(i))
 						cc.CommitCycleSuccess()
 					}
 					writeDone.Store(true)
-				}()
+				})
 
 				readerWG.Add(readers)
-				for i := 0; i < readers; i++ {
+				for range readers {
 					go func() {
 						defer readerWG.Done()
 						for !writeDone.Load() {

@@ -258,7 +258,6 @@ static inline void tc_device_commit(struct tc_device *d) {
 
     // we only need to add leaf classes
     struct tc_class *c, *x /*, *root = NULL */;
-    unsigned long long bytes_sum = 0, packets_sum = 0, dropped_sum = 0, tokens_sum = 0, ctokens_sum = 0;
     int active_nodes = 0, updated_classes = 0, updated_qdiscs = 0;
 
     // prepare all classes
@@ -358,11 +357,6 @@ static inline void tc_device_commit(struct tc_device *d) {
         if(unlikely((c->isleaf && c->hasparent) || d->enabled_all_classes_qdiscs)) {
             c->render = true;
             active_nodes++;
-            bytes_sum += c->bytes;
-            packets_sum += c->packets;
-            dropped_sum += c->dropped;
-            tokens_sum += c->tokens;
-            ctokens_sum += c->ctokens;
         }
 
         //if(unlikely(!c->hasparent)) {
@@ -800,6 +794,9 @@ static inline int tc_space(char c) {
 }
 
 static inline void tc_split_words(char *str, char **words, int max_words) {
+    if(unlikely(max_words <= 0))
+        return;
+
     char *s = str;
     int i = 0;
 
@@ -926,7 +923,11 @@ void tc_main(void *ptr) {
         }
 
         char buffer[TC_LINE_MAX+1] = "";
-        while(fgets(buffer, TC_LINE_MAX, spawn_popen_stdout(tc_child_instance)) != NULL) {
+        FILE *child_stdout = spawn_popen_stdout(tc_child_instance);
+        if(unlikely(!child_stdout))
+            goto child_done;
+
+        while(fgets(buffer, TC_LINE_MAX, child_stdout) != NULL) {
             if(unlikely(!service_running(SERVICE_COLLECTORS))) break;
 
             buffer[TC_LINE_MAX] = '\0';
@@ -1132,6 +1133,7 @@ void tc_main(void *ptr) {
             worker_is_idle();
         }
 
+child_done:;
         // fgets() failed or loop broke
         int code = spawn_popen_kill(tc_child_instance, 0);
         tc_child_instance = NULL;

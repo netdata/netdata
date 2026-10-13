@@ -13,9 +13,5 @@
       }
     }
   },
-  "uiSchema": {
-    "uiOptions": {
-      "fullPage": true
-    }
-  }
+  "uiSchema": {}
 }

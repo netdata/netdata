@@ -2,9 +2,9 @@
 
 package program
 
-import "testing"
-
 import (
+	"testing"
+
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -25,7 +25,11 @@ func TestNewProgramScenarios(t *testing.T) {
 			version: "v1",
 			metrics: []string{"windows_tx_total", "windows_rx_total", "windows_tx_total"},
 			charts: []Chart{
-				sampleChart("win.nic.traffic"),
+				func() Chart {
+					chart := sampleChart("win.nic.traffic")
+					chart.Identity.OptionalByLabels = []string{"pid"}
+					return chart
+				}(),
 			},
 			assert: func(t *testing.T, p *Program) {
 				t.Helper()
@@ -39,9 +43,11 @@ func TestNewProgramScenarios(t *testing.T) {
 
 				// Mutate returned chart copy and ensure Program internals are unaffected.
 				gotCharts[0].Meta.Title = "mutated-title"
+				gotCharts[0].Identity.OptionalByLabels[0] = "mutated-label"
 				again, ok := p.Chart("win.nic.traffic")
 				require.True(t, ok, "Chart() did not return existing template id")
 				assert.Equal(t, "Network traffic", again.Meta.Title)
+				assert.Equal(t, []string{"pid"}, again.Identity.OptionalByLabels)
 			},
 		},
 		"rejects duplicate chart template IDs": {
@@ -83,8 +89,7 @@ func TestNewProgramScenarios(t *testing.T) {
 						Mode:       PromotionModeAutoIntersection,
 						Precedence: DefaultLabelPrecedence(),
 					},
-					Lifecycle:       LifecyclePolicy{},
-					CollisionReduce: ReduceSum,
+					Lifecycle: LifecyclePolicy{},
 					Dimensions: []Dimension{
 						{
 							Selector: SelectorBinding{
@@ -94,6 +99,71 @@ func TestNewProgramScenarios(t *testing.T) {
 						},
 					},
 				},
+			},
+			wantErr: true,
+		},
+		"rejects invalid chart type": {
+			version: "v1",
+			metrics: []string{"windows_rx_total"},
+			charts: []Chart{
+				func() Chart {
+					chart := sampleChart("invalid-type")
+					chart.Meta.Type = ChartType("bars")
+					return chart
+				}(),
+			},
+			wantErr: true,
+		},
+		"rejects invalid dimension aggregation": {
+			version: "v1",
+			metrics: []string{"windows_rx_total"},
+			charts: []Chart{
+				func() Chart {
+					chart := sampleChart("invalid-aggregation")
+					chart.Dimensions[0].Aggregation = Aggregation(255)
+					return chart
+				}(),
+			},
+			wantErr: true,
+		},
+		"rejects missing label promotion mode": {
+			version: "v1",
+			metrics: []string{"windows_rx_total"},
+			charts: []Chart{
+				func() Chart {
+					chart := sampleChart("missing-label-mode")
+					chart.Labels.Mode = ""
+					return chart
+				}(),
+			},
+			wantErr: true,
+		},
+		"rejects negation-only instance selectors": {
+			version: "v1",
+			metrics: []string{"windows_rx_total"},
+			charts: []Chart{
+				func() Chart {
+					chart := sampleChart("negation-only-instance-selectors")
+					chart.Identity.InstanceByLabels = []InstanceLabelSelector{
+						{Exclude: true, Key: "nic"},
+					}
+					return chart
+				}(),
+			},
+			wantErr: true,
+		},
+		"rejects malformed instance selector keys": {
+			version: "v1",
+			metrics: []string{"windows_rx_total"},
+			charts: []Chart{
+				func() Chart {
+					chart := sampleChart("malformed-instance-selector")
+					chart.Identity.InstanceByLabels = []InstanceLabelSelector{
+						{Key: "nic"},
+						{Exclude: true, Key: " host"},
+					}
+					return chart
+				}(),
 			},
 			wantErr: true,
 		},
@@ -112,6 +182,81 @@ func TestNewProgramScenarios(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestValidateInstanceLabelSelectorsReportsJoinedErrors(t *testing.T) {
+	err := validateInstanceLabelSelectors([]InstanceLabelSelector{
+		{Exclude: true, Key: " host"},
+		{},
+	})
+
+	require.Error(t, err)
+	assert.ErrorContains(t, err, "instance selector[0]: exclude selector key must be trimmed")
+	assert.ErrorContains(t, err, "instance selector[1]: selector is empty")
+	assert.ErrorContains(t, err, "instance selectors must include at least one positive selector")
+}
+
+func TestValidateInstanceLabelPolicyRejectsOptionalConflicts(t *testing.T) {
+	tests := map[string]struct {
+		required []InstanceLabelSelector
+		optional []string
+		wantErr  string
+	}{
+		"wildcard": {
+			required: []InstanceLabelSelector{{IncludeAll: true}},
+			optional: []string{"pid"},
+			wantErr:  "cannot be combined with include-all",
+		},
+		"required overlap": {
+			required: []InstanceLabelSelector{{Key: "pid"}},
+			optional: []string{"pid"},
+			wantErr:  "conflicts with required selectors",
+		},
+		"duplicate": {
+			optional: []string{"pid", "pid"},
+			wantErr:  "duplicate key",
+		},
+		"magic token": {
+			optional: []string{"!pid"},
+			wantErr:  "key must be explicit",
+		},
+	}
+
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) {
+			err := validateInstanceLabelPolicy(tc.required, tc.optional)
+			require.Error(t, err)
+			assert.ErrorContains(t, err, tc.wantErr)
+		})
+	}
+}
+
+func TestValidateDimensionReportsJoinedErrors(t *testing.T) {
+	err := validateDimension(Dimension{})
+
+	require.Error(t, err)
+	assert.ErrorContains(t, err, "selector expression is required")
+	assert.ErrorContains(t, err, "selector matcher is required")
+	assert.ErrorContains(t, err, "dimension name is required")
+}
+
+func TestNewProgramReportsJoinedChartErrors(t *testing.T) {
+	chart := sampleChart("invalid-multi")
+	chart.Meta.Context = ""
+	chart.Meta.Units = ""
+	chart.Identity.InstanceByLabels = []InstanceLabelSelector{
+		{Exclude: true, Key: "nic"},
+	}
+	chart.Dimensions = []Dimension{{}}
+
+	_, err := New("v1", 42, []string{"windows_rx_total"}, []Chart{chart})
+	require.Error(t, err)
+	assert.ErrorContains(t, err, "context is required")
+	assert.ErrorContains(t, err, "units is required")
+	assert.ErrorContains(t, err, "identity: instance selectors must include at least one positive selector")
+	assert.ErrorContains(t, err, "dimension[0]: selector expression is required")
+	assert.ErrorContains(t, err, "selector matcher is required")
+	assert.ErrorContains(t, err, "dimension name is required")
 }
 
 func sampleChart(templateID string) Chart {
@@ -148,7 +293,6 @@ func sampleChart(templateID string) Chart {
 				ExpireAfterCycles: 10,
 			},
 		},
-		CollisionReduce: ReduceSum,
 		Dimensions: []Dimension{
 			{
 				Selector: SelectorBinding{

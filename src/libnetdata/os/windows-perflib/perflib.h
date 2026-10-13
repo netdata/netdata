@@ -29,6 +29,7 @@ DWORD RegistryFindIDByName(const char *name);
 
 PERF_DATA_BLOCK *perflibGetPerformanceData(DWORD id);
 void perflibFreePerformanceData(void);
+bool perflibRefreshPerformanceDataCache(void);
 PERF_OBJECT_TYPE *perflibFindObjectTypeByName(PERF_DATA_BLOCK *pDataBlock, const char *name);
 PERF_INSTANCE_DEFINITION *perflibForEachInstance(PERF_DATA_BLOCK *pDataBlock, PERF_OBJECT_TYPE *pObjectType, PERF_INSTANCE_DEFINITION *lastInstance);
 
@@ -43,14 +44,22 @@ typedef struct _rawdata {
 typedef struct _counterdata {
     DWORD id;
     bool updated;
-    uint8_t failures;           // counts the number of failures to find this key
+    uint8_t failures;           // consecutive failures to find this key (0..PERFLIB_MAX_FAILURES_TO_FIND_METRIC)
+    uint16_t backoff;           // when parked, cycles remaining until the next re-probe (fits in struct padding)
     const char *key;
     DWORD OverwriteCounterType; // if set, the counter type will be overwritten once read
+    bool elapsed_time_uses_wall_clock;
     RAW_DATA current;
     RAW_DATA previous;
 } COUNTER_DATA;
 
+// After this many consecutive misses we stop scanning for the metric every cycle.
 #define PERFLIB_MAX_FAILURES_TO_FIND_METRIC 10
+
+// Once parked, re-probe for the metric every this many collections so that a
+// transiently-missing counter (e.g. a Perflib provider that was temporarily
+// unavailable) resumes on its own without a service restart.
+#define PERFLIB_REPROBE_INTERVAL 300
 
 #define RAW_DATA_EMPTY (RAW_DATA){ 0 }
 

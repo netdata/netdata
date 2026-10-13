@@ -5,8 +5,10 @@
 
 #if defined(OS_WINDOWS)
 
-char *netdata_win_local_interface();
-char *netdata_win_local_ip();
+#include <stdbool.h>
+
+// Caller frees returned strings. 1 = value, 0 = absent, -1 = failed.
+int netdata_win_default_network(char **iface, char **ipaddr);
 
 #endif
 

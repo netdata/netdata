@@ -93,6 +93,12 @@ type CollectMeta struct {
 	LastAttemptSeq    uint64
 	LastAttemptStatus CollectStatus
 	LastSuccessSeq    uint64
+	// EvictedDescriptors is the cumulative count of descriptors removed by the
+	// descriptor-universe sweep (a name whose series are gone and whose grace elapsed).
+	EvictedDescriptors uint64
+	// DroppedNames is the cumulative count of names dropped for a cycle because their
+	// writes were an ambiguous multi-kind conflict with no established authority.
+	DroppedNames uint64
 }
 
 type QuantilePoint struct {
@@ -126,6 +132,8 @@ type MeasureFieldSpec struct {
 	Float bool
 }
 
+// MeasureSetPoint holds values in declared field order. Snapshot gauge fields may
+// be NaN to represent unavailable observations; other MeasureSet writes require finite values.
 type MeasureSetPoint struct {
 	Values []SampleValue
 }

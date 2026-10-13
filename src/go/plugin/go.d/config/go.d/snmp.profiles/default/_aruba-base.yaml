@@ -1,3 +1,6 @@
+extends:
+  - _std-lldp-mib.yaml
+
 metadata:
   device:
     fields:

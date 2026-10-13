@@ -1,0 +1,51 @@
+# RouterOS RB750Gr3 fixture evidence shows a device deviation: the standard
+# readable lldpRemManAddrIfSubtype row anchor (.3) is absent, while the
+# nominally not-accessible INDEX objects (.1/.2) are readable. Its row suffix
+# stops before the address subtype, length, and octets, so index-only decoding
+# cannot reconstruct the management address.
+
+selector:
+  - sysobjectid:
+      include:
+        - '^1\.3\.6\.1\.4\.1\.14988\.1$'
+    sysdescr:
+      include:
+        - RouterOS RB750Gr3
+
+topology:
+  - kind: lldp_rem_man_addr
+    MIB: LLDP-MIB
+    table:
+      OID: 1.0.8802.1.1.2.1.4.2
+      name: lldpRemManAddrTable
+    symbols:
+      - OID: 1.0.8802.1.1.2.1.4.2.1.1
+        name: lldp_rem_man_addr
+    metric_tags:
+      - tag: lldp_loc_port_num
+        index: 2
+      - tag: lldp_rem_index
+        index: 3
+      - tag: lldp_rem_mgmt_addr_subtype
+        symbol:
+          OID: 1.0.8802.1.1.2.1.4.2.1.1
+          name: lldpRemManAddrSubtype
+      - tag: lldp_rem_mgmt_addr_len
+        index: 5
+      - tag: lldp_rem_mgmt_addr
+        symbol:
+          OID: 1.0.8802.1.1.2.1.4.2.1.2
+          name: lldpRemManAddr
+          format: hex
+      - tag: lldp_rem_mgmt_addr_if_subtype
+        symbol:
+          OID: 1.0.8802.1.1.2.1.4.2.1.3
+          name: lldpRemManAddrIfSubtype
+      - tag: lldp_rem_mgmt_addr_if_id
+        symbol:
+          OID: 1.0.8802.1.1.2.1.4.2.1.4
+          name: lldpRemManAddrIfId
+      - tag: lldp_rem_mgmt_addr_oid
+        symbol:
+          OID: 1.0.8802.1.1.2.1.4.2.1.5
+          name: lldpRemManAddrOID

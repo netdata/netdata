@@ -1,419 +1,418 @@
 ---
-id: logic_apps
-name: Azure Logic Apps Workflow
+display_name: Azure Logic Apps Workflow
 resource_type: Microsoft.Logic/workflows
 metrics:
-- id: runs_started
-  azure_name: RunsStarted
-  time_grain: PT1M
-  series:
-  - aggregation: total
-    kind: counter
-- id: runs_completed
-  azure_name: RunsCompleted
-  time_grain: PT1M
-  series:
-  - aggregation: total
-    kind: counter
-- id: runs_succeeded
-  azure_name: RunsSucceeded
-  time_grain: PT1M
-  series:
-  - aggregation: total
-    kind: counter
-- id: runs_failed
-  azure_name: RunsFailed
-  time_grain: PT1M
-  series:
-  - aggregation: total
-    kind: counter
-- id: runs_cancelled
-  azure_name: RunsCancelled
-  time_grain: PT1M
-  series:
-  - aggregation: total
-    kind: counter
-- id: run_latency
-  azure_name: RunLatency
-  time_grain: PT1M
-  series:
-  - aggregation: average
-    kind: gauge
-- id: run_success_latency
-  azure_name: RunSuccessLatency
-  time_grain: PT1M
-  series:
-  - aggregation: average
-    kind: gauge
-- id: run_failure_percentage
-  azure_name: RunFailurePercentage
-  time_grain: PT1M
-  series:
-  - aggregation: total
-    kind: gauge
-- id: run_throttled_events
-  azure_name: RunThrottledEvents
-  time_grain: PT1M
-  series:
-  - aggregation: total
-    kind: counter
-- id: run_start_throttled_events
-  azure_name: RunStartThrottledEvents
-  time_grain: PT1M
-  series:
-  - aggregation: total
-    kind: counter
-- id: actions_started
-  azure_name: ActionsStarted
-  time_grain: PT1M
-  series:
-  - aggregation: total
-    kind: counter
-- id: actions_completed
-  azure_name: ActionsCompleted
-  time_grain: PT1M
-  series:
-  - aggregation: total
-    kind: counter
-- id: actions_succeeded
-  azure_name: ActionsSucceeded
-  time_grain: PT1M
-  series:
-  - aggregation: total
-    kind: counter
-- id: actions_failed
-  azure_name: ActionsFailed
-  time_grain: PT1M
-  series:
-  - aggregation: total
-    kind: counter
-- id: actions_skipped
-  azure_name: ActionsSkipped
-  time_grain: PT1M
-  series:
-  - aggregation: total
-    kind: counter
-- id: action_latency
-  azure_name: ActionLatency
-  time_grain: PT1M
-  series:
-  - aggregation: average
-    kind: gauge
-- id: action_success_latency
-  azure_name: ActionSuccessLatency
-  time_grain: PT1M
-  series:
-  - aggregation: average
-    kind: gauge
-- id: action_throttled_events
-  azure_name: ActionThrottledEvents
-  time_grain: PT1M
-  series:
-  - aggregation: total
-    kind: counter
-- id: triggers_started
-  azure_name: TriggersStarted
-  time_grain: PT1M
-  series:
-  - aggregation: total
-    kind: counter
-- id: triggers_completed
-  azure_name: TriggersCompleted
-  time_grain: PT1M
-  series:
-  - aggregation: total
-    kind: counter
-- id: triggers_succeeded
-  azure_name: TriggersSucceeded
-  time_grain: PT1M
-  series:
-  - aggregation: total
-    kind: counter
-- id: triggers_fired
-  azure_name: TriggersFired
-  time_grain: PT1M
-  series:
-  - aggregation: total
-    kind: counter
-- id: triggers_failed
-  azure_name: TriggersFailed
-  time_grain: PT1M
-  series:
-  - aggregation: total
-    kind: counter
-- id: triggers_skipped
-  azure_name: TriggersSkipped
-  time_grain: PT1M
-  series:
-  - aggregation: total
-    kind: counter
-- id: trigger_latency
-  azure_name: TriggerLatency
-  time_grain: PT1M
-  series:
-  - aggregation: average
-    kind: gauge
-- id: trigger_fire_latency
-  azure_name: TriggerFireLatency
-  time_grain: PT1M
-  series:
-  - aggregation: average
-    kind: gauge
-- id: trigger_success_latency
-  azure_name: TriggerSuccessLatency
-  time_grain: PT1M
-  series:
-  - aggregation: average
-    kind: gauge
-- id: trigger_throttled_events
-  azure_name: TriggerThrottledEvents
-  time_grain: PT1M
-  series:
-  - aggregation: total
-    kind: counter
-- id: total_billable_executions
-  azure_name: TotalBillableExecutions
-  time_grain: PT1M
-  series:
-  - aggregation: total
-    kind: counter
-- id: billable_action_executions
-  azure_name: BillableActionExecutions
-  time_grain: PT1M
-  series:
-  - aggregation: total
-    kind: counter
-- id: billable_trigger_executions
-  azure_name: BillableTriggerExecutions
-  time_grain: PT1M
-  series:
-  - aggregation: total
-    kind: counter
-- id: billing_usage_native_operation
-  azure_name: BillingUsageNativeOperation
-  time_grain: PT1M
-  series:
-  - aggregation: total
-    kind: counter
-- id: billing_usage_standard_connector
-  azure_name: BillingUsageStandardConnector
-  time_grain: PT1M
-  series:
-  - aggregation: total
-    kind: counter
-- id: billing_usage_storage_consumption
-  azure_name: BillingUsageStorageConsumption
-  time_grain: PT1M
-  series:
-  - aggregation: total
-    kind: counter
-- id: agent_loop_execution
-  azure_name: AgentLoopExecution
-  time_grain: PT1M
-  series:
-  - aggregation: total
-    kind: counter
-- id: completion_token_overflow_usage
-  azure_name: CompletionTokenOverflowUsage
-  time_grain: PT1M
-  series:
-  - aggregation: total
-    kind: counter
-- id: prompt_token_overflow_usage
-  azure_name: PromptTokenOverflowUsage
-  time_grain: PT1M
-  series:
-  - aggregation: total
-    kind: counter
+  - id: runs_started
+    azure_name: RunsStarted
+    time_grain: PT1M
+    series:
+      - aggregation: total
+        kind: counter
+  - id: runs_completed
+    azure_name: RunsCompleted
+    time_grain: PT1M
+    series:
+      - aggregation: total
+        kind: counter
+  - id: runs_succeeded
+    azure_name: RunsSucceeded
+    time_grain: PT1M
+    series:
+      - aggregation: total
+        kind: counter
+  - id: runs_failed
+    azure_name: RunsFailed
+    time_grain: PT1M
+    series:
+      - aggregation: total
+        kind: counter
+  - id: runs_cancelled
+    azure_name: RunsCancelled
+    time_grain: PT1M
+    series:
+      - aggregation: total
+        kind: counter
+  - id: run_latency
+    azure_name: RunLatency
+    time_grain: PT1M
+    series:
+      - aggregation: average
+        kind: gauge
+  - id: run_success_latency
+    azure_name: RunSuccessLatency
+    time_grain: PT1M
+    series:
+      - aggregation: average
+        kind: gauge
+  - id: run_failure_percentage
+    azure_name: RunFailurePercentage
+    time_grain: PT1M
+    series:
+      - aggregation: total
+        kind: gauge
+  - id: run_throttled_events
+    azure_name: RunThrottledEvents
+    time_grain: PT1M
+    series:
+      - aggregation: total
+        kind: counter
+  - id: run_start_throttled_events
+    azure_name: RunStartThrottledEvents
+    time_grain: PT1M
+    series:
+      - aggregation: total
+        kind: counter
+  - id: actions_started
+    azure_name: ActionsStarted
+    time_grain: PT1M
+    series:
+      - aggregation: total
+        kind: counter
+  - id: actions_completed
+    azure_name: ActionsCompleted
+    time_grain: PT1M
+    series:
+      - aggregation: total
+        kind: counter
+  - id: actions_succeeded
+    azure_name: ActionsSucceeded
+    time_grain: PT1M
+    series:
+      - aggregation: total
+        kind: counter
+  - id: actions_failed
+    azure_name: ActionsFailed
+    time_grain: PT1M
+    series:
+      - aggregation: total
+        kind: counter
+  - id: actions_skipped
+    azure_name: ActionsSkipped
+    time_grain: PT1M
+    series:
+      - aggregation: total
+        kind: counter
+  - id: action_latency
+    azure_name: ActionLatency
+    time_grain: PT1M
+    series:
+      - aggregation: average
+        kind: gauge
+  - id: action_success_latency
+    azure_name: ActionSuccessLatency
+    time_grain: PT1M
+    series:
+      - aggregation: average
+        kind: gauge
+  - id: action_throttled_events
+    azure_name: ActionThrottledEvents
+    time_grain: PT1M
+    series:
+      - aggregation: total
+        kind: counter
+  - id: triggers_started
+    azure_name: TriggersStarted
+    time_grain: PT1M
+    series:
+      - aggregation: total
+        kind: counter
+  - id: triggers_completed
+    azure_name: TriggersCompleted
+    time_grain: PT1M
+    series:
+      - aggregation: total
+        kind: counter
+  - id: triggers_succeeded
+    azure_name: TriggersSucceeded
+    time_grain: PT1M
+    series:
+      - aggregation: total
+        kind: counter
+  - id: triggers_fired
+    azure_name: TriggersFired
+    time_grain: PT1M
+    series:
+      - aggregation: total
+        kind: counter
+  - id: triggers_failed
+    azure_name: TriggersFailed
+    time_grain: PT1M
+    series:
+      - aggregation: total
+        kind: counter
+  - id: triggers_skipped
+    azure_name: TriggersSkipped
+    time_grain: PT1M
+    series:
+      - aggregation: total
+        kind: counter
+  - id: trigger_latency
+    azure_name: TriggerLatency
+    time_grain: PT1M
+    series:
+      - aggregation: average
+        kind: gauge
+  - id: trigger_fire_latency
+    azure_name: TriggerFireLatency
+    time_grain: PT1M
+    series:
+      - aggregation: average
+        kind: gauge
+  - id: trigger_success_latency
+    azure_name: TriggerSuccessLatency
+    time_grain: PT1M
+    series:
+      - aggregation: average
+        kind: gauge
+  - id: trigger_throttled_events
+    azure_name: TriggerThrottledEvents
+    time_grain: PT1M
+    series:
+      - aggregation: total
+        kind: counter
+  - id: total_billable_executions
+    azure_name: TotalBillableExecutions
+    time_grain: PT1M
+    series:
+      - aggregation: total
+        kind: counter
+  - id: billable_action_executions
+    azure_name: BillableActionExecutions
+    time_grain: PT1M
+    series:
+      - aggregation: total
+        kind: counter
+  - id: billable_trigger_executions
+    azure_name: BillableTriggerExecutions
+    time_grain: PT1M
+    series:
+      - aggregation: total
+        kind: counter
+  - id: billing_usage_native_operation
+    azure_name: BillingUsageNativeOperation
+    time_grain: PT1M
+    series:
+      - aggregation: total
+        kind: counter
+  - id: billing_usage_standard_connector
+    azure_name: BillingUsageStandardConnector
+    time_grain: PT1M
+    series:
+      - aggregation: total
+        kind: counter
+  - id: billing_usage_storage_consumption
+    azure_name: BillingUsageStorageConsumption
+    time_grain: PT1M
+    series:
+      - aggregation: total
+        kind: counter
+  - id: agent_loop_execution
+    azure_name: AgentLoopExecution
+    time_grain: PT1M
+    series:
+      - aggregation: total
+        kind: counter
+  - id: completion_token_overflow_usage
+    azure_name: CompletionTokenOverflowUsage
+    time_grain: PT1M
+    series:
+      - aggregation: total
+        kind: counter
+  - id: prompt_token_overflow_usage
+    azure_name: PromptTokenOverflowUsage
+    time_grain: PT1M
+    series:
+      - aggregation: total
+        kind: counter
 template:
   family: Azure Logic Apps Workflow
   context_namespace: logic_apps
   chart_defaults:
     label_promotion:
-    - resource_name
-    - resource_group
-    - region
-    - resource_type
-    - profile
+      - resource_name
+      - resource_group
+      - region
+      - resource_type
+      - profile
     instances:
       by_labels:
-      - resource_uid
+        - resource_uid
   charts:
-  - id: am_azure_logic_apps__run_lifecycle
-    title: Azure Logic Apps Run Lifecycle
-    context: run_lifecycle
-    family: Runs
-    type: line
-    units: runs/s
-    algorithm: incremental
-    dimensions:
-    - selector: logic_apps.runs_started_total
-      name: started
-    - selector: logic_apps.runs_completed_total
-      name: completed
-    - selector: logic_apps.runs_succeeded_total
-      name: succeeded
-    - selector: logic_apps.runs_failed_total
-      name: failed
-    - selector: logic_apps.runs_cancelled_total
-      name: cancelled
-  - id: am_azure_logic_apps__run_latency
-    title: Azure Logic Apps Run Latency
-    context: run_latency
-    family: Runs
-    type: line
-    units: seconds
-    algorithm: absolute
-    dimensions:
-    - selector: logic_apps.run_latency_average
-      name: all
-    - selector: logic_apps.run_success_latency_average
-      name: success
-  - id: am_azure_logic_apps__run_failure_rate
-    title: Azure Logic Apps Run Failure Rate
-    context: run_failure_rate
-    family: Runs
-    type: line
-    units: percentage
-    algorithm: absolute
-    dimensions:
-    - selector: logic_apps.run_failure_percentage_total
-      name: failure_rate
-  - id: am_azure_logic_apps__run_throttling
-    title: Azure Logic Apps Run Throttling
-    context: run_throttling
-    family: Runs
-    type: line
-    units: events/s
-    algorithm: incremental
-    dimensions:
-    - selector: logic_apps.run_throttled_events_total
-      name: during_run
-    - selector: logic_apps.run_start_throttled_events_total
-      name: at_start
-  - id: am_azure_logic_apps__action_lifecycle
-    title: Azure Logic Apps Action Lifecycle
-    context: action_lifecycle
-    family: Actions
-    type: line
-    units: actions/s
-    algorithm: incremental
-    dimensions:
-    - selector: logic_apps.actions_started_total
-      name: started
-    - selector: logic_apps.actions_completed_total
-      name: completed
-    - selector: logic_apps.actions_succeeded_total
-      name: succeeded
-    - selector: logic_apps.actions_failed_total
-      name: failed
-    - selector: logic_apps.actions_skipped_total
-      name: skipped
-  - id: am_azure_logic_apps__action_latency
-    title: Azure Logic Apps Action Latency
-    context: action_latency
-    family: Actions
-    type: line
-    units: seconds
-    algorithm: absolute
-    dimensions:
-    - selector: logic_apps.action_latency_average
-      name: all
-    - selector: logic_apps.action_success_latency_average
-      name: success
-  - id: am_azure_logic_apps__action_throttling
-    title: Azure Logic Apps Action Throttling
-    context: action_throttling
-    family: Actions
-    type: line
-    units: events/s
-    algorithm: incremental
-    dimensions:
-    - selector: logic_apps.action_throttled_events_total
-      name: total
-  - id: am_azure_logic_apps__trigger_lifecycle
-    title: Azure Logic Apps Trigger Lifecycle
-    context: trigger_lifecycle
-    family: Triggers
-    type: line
-    units: triggers/s
-    algorithm: incremental
-    dimensions:
-    - selector: logic_apps.triggers_started_total
-      name: started
-    - selector: logic_apps.triggers_completed_total
-      name: completed
-    - selector: logic_apps.triggers_succeeded_total
-      name: succeeded
-    - selector: logic_apps.triggers_fired_total
-      name: fired
-    - selector: logic_apps.triggers_failed_total
-      name: failed
-    - selector: logic_apps.triggers_skipped_total
-      name: skipped
-  - id: am_azure_logic_apps__trigger_latency
-    title: Azure Logic Apps Trigger Latency
-    context: trigger_latency
-    family: Triggers
-    type: line
-    units: seconds
-    algorithm: absolute
-    dimensions:
-    - selector: logic_apps.trigger_latency_average
-      name: all
-    - selector: logic_apps.trigger_fire_latency_average
-      name: fire
-    - selector: logic_apps.trigger_success_latency_average
-      name: success
-  - id: am_azure_logic_apps__trigger_throttling
-    title: Azure Logic Apps Trigger Throttling
-    context: trigger_throttling
-    family: Triggers
-    type: line
-    units: events/s
-    algorithm: incremental
-    dimensions:
-    - selector: logic_apps.trigger_throttled_events_total
-      name: total
-  - id: am_azure_logic_apps__billable_executions
-    title: Azure Logic Apps Billable Executions
-    context: billable_executions
-    family: Billing
-    type: line
-    units: executions/s
-    algorithm: incremental
-    dimensions:
-    - selector: logic_apps.total_billable_executions_total
-      name: total
-    - selector: logic_apps.billable_action_executions_total
-      name: actions
-    - selector: logic_apps.billable_trigger_executions_total
-      name: triggers
-  - id: am_azure_logic_apps__billing_by_type
-    title: Azure Logic Apps Billing by Type
-    context: billing_by_type
-    family: Billing
-    type: line
-    units: operations/s
-    algorithm: incremental
-    dimensions:
-    - selector: logic_apps.billing_usage_native_operation_total
-      name: native
-    - selector: logic_apps.billing_usage_standard_connector_total
-      name: standard_connector
-    - selector: logic_apps.billing_usage_storage_consumption_total
-      name: storage
-  - id: am_azure_logic_apps__agent
-    title: Azure Logic Apps AI Agent Activity
-    context: agent
-    family: Agent
-    type: line
-    units: events/s
-    algorithm: incremental
-    dimensions:
-    - selector: logic_apps.agent_loop_execution_total
-      name: loop_executions
-    - selector: logic_apps.completion_token_overflow_usage_total
-      name: completion_overflow
-    - selector: logic_apps.prompt_token_overflow_usage_total
-      name: prompt_overflow
+    - id: am_azure_logic_apps__run_lifecycle
+      title: Azure Logic Apps Run Lifecycle
+      context: run_lifecycle
+      family: Runs
+      type: line
+      units: runs/s
+      algorithm: incremental
+      dimensions:
+        - selector: runs_started_total
+          name: started
+        - selector: runs_completed_total
+          name: completed
+        - selector: runs_succeeded_total
+          name: succeeded
+        - selector: runs_failed_total
+          name: failed
+        - selector: runs_cancelled_total
+          name: cancelled
+    - id: am_azure_logic_apps__run_latency
+      title: Azure Logic Apps Run Latency
+      context: run_latency
+      family: Runs
+      type: line
+      units: seconds
+      algorithm: absolute
+      dimensions:
+        - selector: run_latency_average
+          name: all
+        - selector: run_success_latency_average
+          name: success
+    - id: am_azure_logic_apps__run_failure_rate
+      title: Azure Logic Apps Run Failure Rate
+      context: run_failure_rate
+      family: Runs
+      type: line
+      units: percentage
+      algorithm: absolute
+      dimensions:
+        - selector: run_failure_percentage_total
+          name: failure_rate
+    - id: am_azure_logic_apps__run_throttling
+      title: Azure Logic Apps Run Throttling
+      context: run_throttling
+      family: Runs
+      type: line
+      units: events/s
+      algorithm: incremental
+      dimensions:
+        - selector: run_throttled_events_total
+          name: during_run
+        - selector: run_start_throttled_events_total
+          name: at_start
+    - id: am_azure_logic_apps__action_lifecycle
+      title: Azure Logic Apps Action Lifecycle
+      context: action_lifecycle
+      family: Actions
+      type: line
+      units: actions/s
+      algorithm: incremental
+      dimensions:
+        - selector: actions_started_total
+          name: started
+        - selector: actions_completed_total
+          name: completed
+        - selector: actions_succeeded_total
+          name: succeeded
+        - selector: actions_failed_total
+          name: failed
+        - selector: actions_skipped_total
+          name: skipped
+    - id: am_azure_logic_apps__action_latency
+      title: Azure Logic Apps Action Latency
+      context: action_latency
+      family: Actions
+      type: line
+      units: seconds
+      algorithm: absolute
+      dimensions:
+        - selector: action_latency_average
+          name: all
+        - selector: action_success_latency_average
+          name: success
+    - id: am_azure_logic_apps__action_throttling
+      title: Azure Logic Apps Action Throttling
+      context: action_throttling
+      family: Actions
+      type: line
+      units: events/s
+      algorithm: incremental
+      dimensions:
+        - selector: action_throttled_events_total
+          name: total
+    - id: am_azure_logic_apps__trigger_lifecycle
+      title: Azure Logic Apps Trigger Lifecycle
+      context: trigger_lifecycle
+      family: Triggers
+      type: line
+      units: triggers/s
+      algorithm: incremental
+      dimensions:
+        - selector: triggers_started_total
+          name: started
+        - selector: triggers_completed_total
+          name: completed
+        - selector: triggers_succeeded_total
+          name: succeeded
+        - selector: triggers_fired_total
+          name: fired
+        - selector: triggers_failed_total
+          name: failed
+        - selector: triggers_skipped_total
+          name: skipped
+    - id: am_azure_logic_apps__trigger_latency
+      title: Azure Logic Apps Trigger Latency
+      context: trigger_latency
+      family: Triggers
+      type: line
+      units: seconds
+      algorithm: absolute
+      dimensions:
+        - selector: trigger_latency_average
+          name: all
+        - selector: trigger_fire_latency_average
+          name: fire
+        - selector: trigger_success_latency_average
+          name: success
+    - id: am_azure_logic_apps__trigger_throttling
+      title: Azure Logic Apps Trigger Throttling
+      context: trigger_throttling
+      family: Triggers
+      type: line
+      units: events/s
+      algorithm: incremental
+      dimensions:
+        - selector: trigger_throttled_events_total
+          name: total
+    - id: am_azure_logic_apps__billable_executions
+      title: Azure Logic Apps Billable Executions
+      context: billable_executions
+      family: Billing
+      type: line
+      units: executions/s
+      algorithm: incremental
+      dimensions:
+        - selector: total_billable_executions_total
+          name: total
+        - selector: billable_action_executions_total
+          name: actions
+        - selector: billable_trigger_executions_total
+          name: triggers
+    - id: am_azure_logic_apps__billing_by_type
+      title: Azure Logic Apps Billing by Type
+      context: billing_by_type
+      family: Billing
+      type: line
+      units: operations/s
+      algorithm: incremental
+      dimensions:
+        - selector: billing_usage_native_operation_total
+          name: native
+        - selector: billing_usage_standard_connector_total
+          name: standard_connector
+        - selector: billing_usage_storage_consumption_total
+          name: storage
+    - id: am_azure_logic_apps__agent
+      title: Azure Logic Apps AI Agent Activity
+      context: agent
+      family: Agent
+      type: line
+      units: events/s
+      algorithm: incremental
+      dimensions:
+        - selector: agent_loop_execution_total
+          name: loop_executions
+        - selector: completion_token_overflow_usage_total
+          name: completion_overflow
+        - selector: prompt_token_overflow_usage_total
+          name: prompt_overflow

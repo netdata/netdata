@@ -13,6 +13,8 @@
 // Writes error message to error buffer on failure
 // required: if true, validates parameter exists, is array type, and is non-empty
 // list_tool: tool name to recommend for discovering exact values (e.g., MCP_TOOL_LIST_NODES)
+// Every error message it writes is a complete, period-terminated sentence, so callers may append
+// their own guidance separated by a single space.
 BUFFER *mcp_params_parse_array_to_pattern(
     struct json_object *params,
     const char *param_name,
@@ -33,11 +35,13 @@ BUFFER *mcp_params_parse_labels_object(
 );
 
 // Add array parameter schema (for nodes, instances, dimensions)
+// required: the runtime rejects an empty array, so the schema advertises minItems: 1
 void mcp_schema_add_array_param(
     BUFFER *buffer,
     const char *param_name,
     const char *title,
-    const char *description
+    const char *description,
+    bool required
 );
 
 // Add labels object parameter schema

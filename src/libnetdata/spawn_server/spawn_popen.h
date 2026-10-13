@@ -13,8 +13,25 @@ typedef struct popen_instance POPEN_INSTANCE;
 
 POPEN_INSTANCE *spawn_popen_run(const char *cmd);
 POPEN_INSTANCE *spawn_popen_run_argv(const char **argv);
+// Unix nofork backend only; other backends return NULL/ENOTSUP. Signals are failures, including
+// SIGTERM/SIGPIPE. Group cleanup is owned by the spawn server; final signals precede leader reaping.
+// This covers trusted tools that retain their process group, not deliberately daemonizing tools.
+// Cleanup requires an operational spawn server. Leader exit ends any remaining descendant grace.
+POPEN_INSTANCE *spawn_popen_run_argv_group(const char **argv);
 POPEN_INSTANCE *spawn_popen_run_variadic(const char *cmd, ...);
 int spawn_popen_wait(POPEN_INSTANCE *pi);
+
+// Wait for the child for up to timeout_ms. A non-positive timeout_ms performs a single, minimal
+// bounded poll; the wait is always bounded, never infinite.
+// SPAWN_TIMEDWAIT_EXITED: the child exited; *code holds its spawn_popen_wait()-style return code
+//   and pi has been freed.
+// SPAWN_TIMEDWAIT_RUNNING: no exit was observed within timeout_ms; pi remains valid - call again, or
+//   spawn_popen_wait()/spawn_popen_kill(). Not proof the child is alive: see the note on
+//   SPAWN_TIMEDWAIT_RUNNING in spawn_server.h before using pi's pid for anything.
+// SPAWN_TIMEDWAIT_ERROR: the wait could not be completed (the child's state is unknown); pi remains
+//   valid and the caller must reclaim it with spawn_popen_kill(). Do NOT loop on ERROR.
+SPAWN_TIMEDWAIT_RESULT spawn_popen_timedwait(POPEN_INSTANCE *pi, int timeout_ms, int *code);
+
 int spawn_popen_kill(POPEN_INSTANCE *pi, int timeout_ms);
 
 pid_t spawn_popen_pid(POPEN_INSTANCE *pi);

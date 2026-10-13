@@ -17,7 +17,7 @@ func TestLimitUsesFixedWindow(t *testing.T) {
 	now := time.Unix(100, 0)
 	l.rl.now = func() time.Time { return now }
 
-	for i := 0; i < 3; i++ {
+	for range 3 {
 		l.Limit("k", 2, 5*time.Second).Info("msg")
 	}
 	assert.Equal(t, 2, h.count())
@@ -159,12 +159,10 @@ func TestOnceConcurrentLogsOnlyOnce(t *testing.T) {
 
 	l, h := newTestLogger(slog.LevelDebug)
 	var wg sync.WaitGroup
-	for i := 0; i < 100; i++ {
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
+	for range 100 {
+		wg.Go(func() {
 			l.Once("concurrent").Info("x")
-		}()
+		})
 	}
 	wg.Wait()
 

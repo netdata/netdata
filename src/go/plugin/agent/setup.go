@@ -11,7 +11,7 @@ import (
 	"github.com/netdata/netdata/go/plugins/plugin/agent/secrets/secretstore"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/collectorapi"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/confgroup"
-	"github.com/netdata/netdata/go/plugins/plugin/framework/functions"
+	"github.com/netdata/netdata/go/plugins/plugin/framework/dyncfg"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/vnodes"
 	"gopkg.in/yaml.v2"
 )
@@ -71,7 +71,13 @@ func (a *Agent) loadEnabledModules(cfg config) collectorapi.Registry {
 	return enabled
 }
 
-func (a *Agent) buildDiscoveryConf(enabled collectorapi.Registry, fnReg functions.Registry) discovery.Config {
+type discoverySetup struct {
+	Defaults     confgroup.Registry
+	BuildContext discovery.BuildContext
+	Providers    []discovery.ProviderFactory
+}
+
+func (a *Agent) buildDiscoveryConf(enabled collectorapi.Registry) discoverySetup {
 	a.Info("building discovery config")
 
 	reg := confgroup.Registry{}
@@ -88,33 +94,29 @@ func (a *Agent) buildDiscoveryConf(enabled collectorapi.Registry, fnReg function
 
 	watchPaths := a.CollectorsConfigWatchPath
 	sdConfDir := a.ServiceDiscoveryConfigDir
-	if a.DisableServiceDiscovery {
-		dummyPaths = nil
+	if !a.serviceDiscoveryEnabled() {
 		sdConfDir = nil
 	}
+	var dyncfgOutput dyncfg.Output
+	if a.Out != nil {
+		dyncfgOutput = dyncfg.NewProtocolOutput(a.Out)
+	}
 
-	cfg := discovery.Config{
-		Registry: reg,
+	cfg := discoverySetup{
+		Defaults: reg,
 		BuildContext: discovery.BuildContext{
-			Policy: discovery.PlatformPolicy{
-				IsInsideK8s: a.IsInsideK8s,
-			},
 			RunMode: a.runModePolicy,
 			Identity: discovery.PluginIdentity{
 				Name: a.Name,
 			},
-			Out: a.Out,
+			DyncfgOutput: dyncfgOutput,
 			Paths: discovery.PathsConfig{
-				PluginConfigDir:           a.ConfigDir,
-				CollectorsConfigDir:       a.CollectorsConfDir,
 				CollectorsConfigWatchPath: watchPaths,
 				ServiceDiscoveryConfigDir: sdConfDir,
-				VarLibDir:                 a.VarLibDir,
 			},
 			Registry:   reg,
 			ReadPaths:  readPaths,
 			DummyNames: dummyPaths,
-			FnReg:      fnReg,
 		},
 		Providers: append([]discovery.ProviderFactory(nil), a.DiscoveryProviders...),
 	}
@@ -166,7 +168,7 @@ func (a *Agent) buildDiscoveryConf(enabled collectorapi.Registry, fnReg function
 	return cfg
 }
 
-func (a *Agent) setupVnodeRegistry() map[string]*vnodes.VirtualNode {
+func (a *Agent) setupVnodeRegistry() map[string]*vnodes.Config {
 	a.Debugf("looking for 'vnodes/' in %v", a.ConfigDir)
 	if len(a.ConfigDir) == 0 {
 		return nil
@@ -177,7 +179,7 @@ func (a *Agent) setupVnodeRegistry() map[string]*vnodes.VirtualNode {
 		return nil
 	}
 
-	reg := vnodes.Load(dirPath)
+	reg := vnodes.Load(dirPath, a.SNMPVnodeAcquirer != nil)
 	a.Infof("found '%s' (%d vhosts)", dirPath, len(reg))
 
 	return reg
@@ -189,7 +191,7 @@ func (a *Agent) setupSecretStoreConfigs() []secretstore.Config {
 		return nil
 	}
 
-	cfgs, errs := secretstore.LoadFileConfigs(a.CollectorsConfDir)
+	cfgs, errs := a.loadSecretStores(a.CollectorsConfDir)
 	for _, err := range errs {
 		a.Warningf("%v", err)
 	}

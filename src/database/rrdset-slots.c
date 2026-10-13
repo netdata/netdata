@@ -212,12 +212,17 @@ void rrdset_pluginsd_receive_unslot_and_cleanup(RRDSET *st) {
     pid_t collector_tid = __atomic_load_n(&st->pluginsd.collector_tid, __ATOMIC_ACQUIRE);
     pid_t current_tid = gettid_cached();
     if(collector_tid != 0) {
-        if(collector_tid != current_tid &&
-           !rrdset_flag_check(st, RRDSET_FLAG_COLLECTION_FINISHED)) {
-            internal_fatal(true,
-                           "PRD_ARRAY: cleanup called while collector (tid %d) is still active - lifecycle violation",
-                           collector_tid);
-
+        if(collector_tid != current_tid) {
+            // A different thread owns this chart as collector.
+            // We must not release PRD dimension references while that thread may
+            // still be using cached rd pointers from the array.
+            // RRDSET_FLAG_COLLECTION_FINISHED is not a reliable signal here:
+            // it can be set by the cleanup caller (service thread) rather than
+            // by the collector itself, creating a race where we free dimensions
+            // that the collector is actively dereferencing.
+            // Legitimate teardown clears collector_tid via
+            // rrdhost_pluginsd_receive_chart_slots_free() after the receiver
+            // is fully stopped, before invoking cleanup.
             nd_log_limit_static_global_var(erl, 1, 0);
             nd_log_limit(&erl, NDLS_DAEMON, NDLP_WARNING,
                          "PLUGINSD: attempted cleanup while collector (tid %d) is still active on chart, skipping",
@@ -226,28 +231,19 @@ void rrdset_pluginsd_receive_unslot_and_cleanup(RRDSET *st) {
             return;
         }
 
-        if(collector_tid == current_tid) {
-            // Cleanup in the collector thread should not normally happen.
-            // Keep this explicit so we don't mask it as a stale tid case.
+        // We ARE the collector thread - safe to proceed with cleanup.
+        // This should not normally happen; keep it explicit so we don't
+        // mask it as a stale tid case.
 #ifdef NETDATA_INTERNAL_CHECKS
-            internal_fatal(true,
-                           "PRD_ARRAY: cleanup called from collector thread (tid %d) - lifecycle violation",
-                           collector_tid);
+        internal_fatal(true,
+                       "PRD_ARRAY: cleanup called from collector thread (tid %d) - lifecycle violation",
+                       collector_tid);
 #endif
 
-            nd_log_limit_static_global_var(erl_collector, 1, 0);
-            nd_log_limit(&erl_collector, NDLS_DAEMON, NDLP_WARNING,
-                         "PLUGINSD: cleanup called from collector thread (tid %d), forcing collector_tid=0",
-                         collector_tid);
-        }
-        else {
-            // Finalization can hit stale collector_tid on charts that were not switched away.
-            // Treat this as cleanup ownership handoff and continue.
-            nd_log_limit_static_global_var(erl_finalize, 1, 0);
-            nd_log_limit(&erl_finalize, NDLS_DAEMON, NDLP_WARNING,
-                         "PLUGINSD: cleanup forcing stale collector_tid=%d to 0 for finalized chart",
-                         collector_tid);
-        }
+        nd_log_limit_static_global_var(erl_collector, 1, 0);
+        nd_log_limit(&erl_collector, NDLS_DAEMON, NDLP_WARNING,
+                     "PLUGINSD: cleanup called from collector thread (tid %d), forcing collector_tid=0",
+                     collector_tid);
 
         __atomic_store_n(&st->pluginsd.collector_tid, 0, __ATOMIC_RELEASE);
     }

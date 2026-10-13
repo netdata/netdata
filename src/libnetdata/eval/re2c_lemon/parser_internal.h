@@ -5,7 +5,7 @@
 #include "parser.h" // This has the token definitions (TOK_*)
 
 // Token values for re2c lexer
-typedef union {
+typedef struct {
     NETDATA_DOUBLE dval;
     char *strval;
 } YYSTYPE;

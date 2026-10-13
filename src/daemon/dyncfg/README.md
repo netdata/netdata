@@ -97,7 +97,8 @@ DynCfg uses HTTP-like response codes to indicate the status of operations. These
 #### Success Codes (2xx)
 
 - **DYNCFG_RESP_RUNNING (200)**: Configuration was accepted and is currently running
-- **DYNCFG_RESP_ACCEPTED (202)**: Configuration was accepted but not yet running
+- **DYNCFG_RESP_ACCEPTED (202)**: Configuration was accepted but is not running: it is still starting, or it was
+  adopted and failed; the configuration status says which
 - **DYNCFG_RESP_ACCEPTED_DISABLED (298)**: Configuration was accepted but is currently disabled
 - **DYNCFG_RESP_ACCEPTED_RESTART_REQUIRED (299)**: Configuration was accepted but requires a restart to apply
 
@@ -111,6 +112,17 @@ Standard HTTP error codes are used, including:
 - **HTTP_RESP_NOT_IMPLEMENTED (501)**: The requested operation is not implemented
 
 When implementing a callback function, always return the appropriate response code to indicate the status of the operation. The DynCfg system uses these codes to determine how to handle the configuration and what to display to the user.
+
+For `add`, `update`, `enable`, `disable` and `remove`, the response code is the adoption decision: DynCfg saves the
+change only on a 2xx response and replays saved configurations when the plugin starts. A 2xx MUST mean the plugin now
+holds the requested configuration. A completed plugin rejection MUST preserve the previous configuration and enabled
+intent. Report the health of an adopted configuration, such as a job that failed to start, through its status, not the
+response code.
+
+Timeouts, lost replies, crashes, and structural failures after a transition can leave the outcome indeterminate.
+An error on those paths does not prove rejection. The daemon persists the successful reply it observes; a plugin
+`get` result is not evidence of daemon persistence. See [the plugin protocol](../../plugins.d/DYNCFG.md#3-process-commands-and-respond)
+for the mutation response contract.
 
 ### Source Types
 
@@ -142,39 +154,40 @@ For internal plugins, the Netdata daemon already handles initialization and shut
 Register your configurations when your plugin initializes:
 
 ```c
-bool dyncfg_add(
-    RRDHOST *host,               // The host this configuration belongs to (localhost for global configs)
-    const char *id,              // Unique ID for this configuration
-    const char *path,            // Path for UI organization
-    DYNCFG_STATUS status,        // Initial status (ACCEPTED, DISABLED, etc.)
-    DYNCFG_TYPE type,            // SINGLE, TEMPLATE, or JOB
-    DYNCFG_SOURCE_TYPE source_type, // INTERNAL, DYNCFG, USER
-    const char *source,          // Source identifier (e.g., "internal")
-    DYNCFG_CMDS cmds,            // Supported commands (bitwise OR of DYNCFG_CMD_* values)
-    HTTP_ACCESS view_access,     // Access permissions for viewing
-    HTTP_ACCESS edit_access,     // Access permissions for editing
-    dyncfg_cb_t cb,              // Callback function for handling commands
-    void *data                   // User data passed to the callback
-);
+bool dyncfg_add(const struct dyncfg_add_inline_spec *spec);
+
+struct dyncfg_add_inline_spec {
+    RRDHOST *host;                    // The host this configuration belongs to (localhost for global configs)
+    const char *id;                   // Unique ID for this configuration
+    const char *path;                 // Path for UI organization
+    DYNCFG_STATUS status;             // Initial status (ACCEPTED, DISABLED, etc.)
+    DYNCFG_TYPE type;                 // SINGLE, TEMPLATE, or JOB
+    DYNCFG_SOURCE_TYPE source_type;   // INTERNAL, DYNCFG, USER
+    const char *source;               // Source identifier (e.g., "internal")
+    DYNCFG_CMDS cmds;                 // Supported commands (bitwise OR of DYNCFG_CMD_* values)
+    HTTP_ACCESS view_access;          // Access permissions for viewing
+    HTTP_ACCESS edit_access;          // Access permissions for editing
+    dyncfg_cb_t cb;                   // Callback function for handling commands
+    void *data;                       // User data passed to the callback
+};
 ```
 
 Example (from health_dyncfg.c):
 
 ```c
-dyncfg_add(
-    localhost,
-    DYNCFG_HEALTH_ALERT_PROTOTYPE_PREFIX, 
-    "/health/alerts/prototypes",
-    DYNCFG_STATUS_ACCEPTED, 
-    DYNCFG_TYPE_TEMPLATE,
-    DYNCFG_SOURCE_TYPE_INTERNAL, 
-    "internal",
-    DYNCFG_CMD_SCHEMA | DYNCFG_CMD_ADD | DYNCFG_CMD_ENABLE | DYNCFG_CMD_DISABLE | DYNCFG_CMD_USERCONFIG,
-    HTTP_ACCESS_NONE,
-    HTTP_ACCESS_NONE,
-    dyncfg_health_cb, 
-    NULL
-);
+dyncfg_add(&(struct dyncfg_add_inline_spec) {
+    .host = localhost,
+    .id = DYNCFG_HEALTH_ALERT_PROTOTYPE_PREFIX,
+    .path = "/health/alerts/prototypes",
+    .status = DYNCFG_STATUS_ACCEPTED,
+    .type = DYNCFG_TYPE_TEMPLATE,
+    .source_type = DYNCFG_SOURCE_TYPE_INTERNAL,
+    .source = "internal",
+    .cmds = DYNCFG_CMD_SCHEMA | DYNCFG_CMD_ADD | DYNCFG_CMD_ENABLE | DYNCFG_CMD_DISABLE | DYNCFG_CMD_USERCONFIG,
+    .view_access = HTTP_ACCESS_NONE,
+    .edit_access = HTTP_ACCESS_NONE,
+    .cb = dyncfg_health_cb,
+});
 ```
 
 ### 3. Implement a Callback Function
@@ -281,54 +294,60 @@ Schema files should be named after the configuration ID with `.json` extension, 
 
 If no static schema file is found, Netdata will call the plugin or module with the `DYNCFG_CMD_SCHEMA` command:
 
-1. For internal plugins, the callback function should return a JSON Schema document
-2. For external plugins, the plugin should respond to the schema command with a JSON Schema document
+1. For internal plugins, the callback function returns the schema document described below
+2. For external plugins, the plugin responds to the schema command with the same document
 
 This gives you flexibility to either:
 
 - Use static schema files for simple, fixed configurations
 - Generate schemas dynamically for more complex configurations that may change based on runtime conditions
 
-Example JSON Schema:
+The schema document is an object with two members, `jsonSchema` (a draft-07 JSON Schema) and `uiSchema` (presentation
+hints for the form). A bare JSON Schema renders an empty form. Example:
 
 ```json
 {
-  "type": "object",
-  "properties": {
-    "url": {
-      "type": "string",
-      "format": "uri",
-      "title": "Server URL",
-      "description": "The URL of the server to connect to"
-    },
-    "timeout": {
-      "type": "integer",
-      "minimum": 1,
-      "maximum": 60,
-      "title": "Timeout",
-      "description": "Connection timeout in seconds"
-    },
-    "auth": {
-      "type": "object",
-      "title": "Authentication",
-      "properties": {
-        "username": {
-          "type": "string",
-          "title": "Username"
-        },
-        "password": {
-          "type": "string",
-          "format": "password",
-          "title": "Password"
-        }
+  "jsonSchema": {
+    "$schema": "http://json-schema.org/draft-07/schema#",
+    "title": "Example configuration",
+    "type": "object",
+    "properties": {
+      "url": {
+        "title": "URL",
+        "description": "URL of the server to connect to.",
+        "type": "string",
+        "format": "uri"
+      },
+      "timeout": {
+        "title": "Timeout",
+        "description": "Connection timeout, in seconds.",
+        "type": "integer",
+        "minimum": 1,
+        "maximum": 60,
+        "default": 5
+      },
+      "username": {
+        "title": "Username",
+        "description": "Username for HTTP basic authentication.",
+        "type": "string"
+      },
+      "password": {
+        "title": "Password",
+        "description": "Password for HTTP basic authentication.",
+        "type": "string"
       }
-    }
+    },
+    "required": ["url"]
   },
-  "required": [
-    "url"
-  ]
+  "uiSchema": {
+    "password": { "ui:widget": "password" }
+  }
 }
 ```
+
+The `ui:*` keys the UI honors, how `title`, `description`, and `ui:help` render, and the form behaviors a schema
+author must design around (tabs, defaults, validation, `dependencies`, secrets) are documented in
+[External Plugins DynCfg documentation](/src/plugins.d/DYNCFG.md), section "JSON Schema for Configuration UI".
 
 ## Action Behavior by Configuration Type
 
@@ -434,7 +453,7 @@ This is a good example of an external plugin using the DynCfg system for a singl
 go.d.plugin uses DynCfg to manage job configurations. It:
 
 1. Registers configurations through the plugins.d protocol
-2. Generates dynamic JSON Schema based on Go struct tags
+2. Ships a hand-written `config_schema.json` per collector (the `jsonSchema`/`uiSchema` document) and returns it verbatim
 3. Handles configuration updates for collecting jobs
 
 It uses IDs like:

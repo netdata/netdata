@@ -8,10 +8,10 @@ import (
 	"testing"
 
 	"github.com/netdata/netdata/go/plugins/plugin/agent/discovery"
+	"github.com/netdata/netdata/go/plugins/plugin/agent/policy"
 	"github.com/netdata/netdata/go/plugins/plugin/agent/secrets/secretstore"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/collectorapi"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/confgroup"
-
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"gopkg.in/yaml.v2"
@@ -244,6 +244,7 @@ jobs:
 `)
 
 		agent := &Agent{
+			loadSecretStores:  secretstore.LoadFileConfigs,
 			ConfigDir:         []string{configRoot},
 			CollectorsConfDir: []string{userCollectors, stockCollectors},
 		}
@@ -284,8 +285,7 @@ func TestAgent_buildDiscoveryConf(t *testing.T) {
 			DiscoveryProviders: providers,
 		}
 
-		cfg := a.buildDiscoveryConf(enabled, nil)
-		assert.True(t, cfg.BuildContext.Policy.IsInsideK8s)
+		cfg := a.buildDiscoveryConf(enabled)
 		assert.Empty(t, cfg.Providers)
 	})
 
@@ -295,8 +295,63 @@ func TestAgent_buildDiscoveryConf(t *testing.T) {
 			DiscoveryProviders: providers,
 		}
 
-		cfg := a.buildDiscoveryConf(enabled, nil)
-		assert.False(t, cfg.BuildContext.Policy.IsInsideK8s)
+		cfg := a.buildDiscoveryConf(enabled)
 		assert.Len(t, cfg.Providers, 1)
 	})
+}
+
+func TestAgent_buildDiscoveryConf_serviceDiscoveryGating(t *testing.T) {
+	providers := []discovery.ProviderFactory{
+		discovery.NewProviderFactory("noop", nil),
+	}
+	enabled := collectorapi.Registry{
+		"module1": collectorapi.Creator{},
+	}
+
+	tests := map[string]struct {
+		agent         *Agent
+		wantSDDir     []string
+		wantWatchPath []string
+	}{
+		"terminal mode disables service discovery without changing collector watch paths": {
+			agent: &Agent{
+				runModePolicy:             policy.Agent(true),
+				ServiceDiscoveryConfigDir: []string{"sd"},
+				CollectorsConfDir:         []string{"collectors"},
+				CollectorsConfigWatchPath: []string{"watch/*.conf"},
+				DiscoveryProviders:        providers,
+			},
+			wantWatchPath: []string{"watch/*.conf"},
+		},
+		"plugin-level disable overrides non-terminal service discovery policy": {
+			agent: &Agent{
+				runModePolicy:             policy.Agent(false),
+				DisableServiceDiscovery:   true,
+				ServiceDiscoveryConfigDir: []string{"sd"},
+				CollectorsConfDir:         []string{"collectors"},
+				DiscoveryProviders:        providers,
+			},
+		},
+		"non-terminal mode keeps service discovery enabled": {
+			agent: &Agent{
+				runModePolicy:             policy.Agent(false),
+				ServiceDiscoveryConfigDir: []string{"sd"},
+				CollectorsConfDir:         []string{"collectors"},
+				CollectorsConfigWatchPath: []string{"watch/*.conf"},
+				DiscoveryProviders:        providers,
+			},
+			wantSDDir:     []string{"sd"},
+			wantWatchPath: []string{"watch/*.conf"},
+		},
+	}
+
+	for name, test := range tests {
+		t.Run(name, func(t *testing.T) {
+			require.NotNil(t, test.agent)
+
+			cfg := test.agent.buildDiscoveryConf(enabled)
+			assert.Equal(t, test.wantSDDir, []string(cfg.BuildContext.Paths.ServiceDiscoveryConfigDir))
+			assert.Equal(t, test.wantWatchPath, cfg.BuildContext.Paths.CollectorsConfigWatchPath)
+		})
+	}
 }

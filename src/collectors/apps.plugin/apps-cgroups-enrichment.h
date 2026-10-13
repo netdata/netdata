@@ -1,0 +1,47 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+// cppcheck-suppress-file unusedStructMember
+
+#ifndef NETDATA_APPS_CGROUPS_ENRICHMENT_H
+#define NETDATA_APPS_CGROUPS_ENRICHMENT_H 1
+
+#include "apps_plugin.h"
+
+#if defined(OS_LINUX)
+
+#include "collectors/common-cgroups/cgroup-topology-rules.h"
+
+#define APPS_ENRICHMENT_CGROUP_PATH_MAX CGROUP_TOPOLOGY_CGROUP_PATH_MAX
+#define APPS_ENRICHMENT_CGROUP_NAME_MAX CGROUP_TOPOLOGY_CGROUP_NAME_MAX
+#define APPS_ENRICHMENT_CONTAINER_NAME_MAX CGROUP_TOPOLOGY_SYSTEMD_UNIT_MAX
+#define APPS_ENRICHMENT_ORCHESTRATOR_MAX CGROUP_TOPOLOGY_ORCHESTRATOR_MAX
+#define APPS_ENRICHMENT_K8S_NAME_MAX CGROUP_TOPOLOGY_K8S_NAME_MAX
+#define APPS_ENRICHMENT_DOCKER_IMAGE_MAX CGROUP_TOPOLOGY_DOCKER_IMAGE_MAX
+#define APPS_ENRICHMENT_SYSTEMD_UNIT_MAX CGROUP_TOPOLOGY_SYSTEMD_UNIT_MAX
+#define APPS_ENRICHMENT_SYSTEMD_KIND_MAX CGROUP_TOPOLOGY_SYSTEMD_KIND_MAX
+#define APPS_ENRICHMENT_ACTOR_KIND_MAX CGROUP_TOPOLOGY_ACTOR_KIND_MAX
+#define APPS_ENRICHMENT_ACTOR_TYPE_MAX CGROUP_TOPOLOGY_ACTOR_TYPE_MAX
+
+typedef struct {
+    char cgroup_status[32];
+    char cgroup_path[APPS_ENRICHMENT_CGROUP_PATH_MAX];
+    char cgroup_name[APPS_ENRICHMENT_CGROUP_NAME_MAX];
+    char container_name[APPS_ENRICHMENT_CONTAINER_NAME_MAX];
+    char orchestrator[APPS_ENRICHMENT_ORCHESTRATOR_MAX];
+    char k8s_pod_name[APPS_ENRICHMENT_K8S_NAME_MAX];
+    char k8s_namespace[APPS_ENRICHMENT_K8S_NAME_MAX];
+    char k8s_workload[APPS_ENRICHMENT_K8S_NAME_MAX];
+    char docker_container_name[APPS_ENRICHMENT_CGROUP_NAME_MAX];
+    char docker_image[APPS_ENRICHMENT_DOCKER_IMAGE_MAX];
+    char systemd_unit_name[APPS_ENRICHMENT_SYSTEMD_UNIT_MAX];
+    char systemd_unit_kind[APPS_ENRICHMENT_SYSTEMD_KIND_MAX];
+    char actor_kind[APPS_ENRICHMENT_ACTOR_KIND_MAX];
+    char actor_type[APPS_ENRICHMENT_ACTOR_TYPE_MAX];
+} APPS_PROCESS_ENRICHMENT;
+
+// Caller must hold apps_pids_mutex while cgroup lookup cache fields are copied.
+void apps_process_enrichment_fill(struct pid_stat *p, APPS_PROCESS_ENRICHMENT *out);
+void apps_emit_process_enrichment_values(BUFFER *wb, const APPS_PROCESS_ENRICHMENT *enrichment);
+
+#endif
+
+#endif /* NETDATA_APPS_CGROUPS_ENRICHMENT_H */

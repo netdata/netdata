@@ -2,6 +2,238 @@ plugin_name: windows.plugin
 modules:
   - meta:
       plugin_name: windows.plugin
+      module_name: PerflibDNS
+      monitored_instance:
+        name: DNS Server
+        link: "https://learn.microsoft.com/en-us/windows-server/networking/dns/dns-overview"
+        categories:
+          - data-collection.operating-systems
+        icon_filename: "windows.svg"
+      related_resources:
+        integrations:
+          list: []
+      info_provided_to_referring_integrations:
+        description: ""
+      keywords:
+        - windows
+        - dns server
+        - dns
+        - perflib
+        - microsoft
+    overview:
+      data_collection:
+        metrics_description: |
+          Monitor DNS Server query traffic, recursion, zone transfers, dynamic updates, memory, response handling, and WINS lookups on Windows.
+        method_description: |
+          It reads DNS Server performance counters from Windows Perflib.
+      supported_platforms:
+        include: ["windows"]
+        exclude: []
+      multi_instance: false
+      additional_permissions:
+        description: ""
+      default_behavior:
+        auto_detection:
+          description: |
+            This collector is enabled by default and checks for DNS Server counters on every collection. Once Windows registers the counters, DNS Server charts appear on the next collection if the DNS Server service is running.
+        limits:
+          description: ""
+        performance_impact:
+          description: ""
+    setup:
+      prerequisites:
+        list:
+          - title: DNS Server role
+            description: Install the Windows DNS Server role and run its service so Windows exposes the DNS performance object.
+      configuration:
+        file:
+          name: "netdata.conf"
+          section_name: "[plugin:windows:PerflibDNS]"
+          description: "The Netdata main configuration file"
+        options:
+          description: ""
+          folding:
+            title: "Config option"
+            enabled: false
+          list:
+            - name: update every
+              description: Data collection frequency.
+              default_value: 1
+              required: false
+        examples:
+          folding:
+            enabled: true
+            title: ""
+          list: []
+    troubleshooting:
+      problems:
+        list: []
+    alerts: []
+    metrics:
+      folding:
+        title: Metrics
+        enabled: false
+      description: "DNS Server event counters are running totals, displayed as per-second rates. Missing counters leave gaps. Query-drop totals and individual reasons are separate, non-stacked dimensions. Suppressed responses and recursive send timeouts have separate charts and units."
+      availability: []
+      scopes:
+        - name: DNS Server
+          description: Aggregate counters from the DNS Server performance object on the host.
+          labels: []
+          metrics:
+            - name: windows.dns.queries
+              description: DNS queries received
+              unit: "queries/s"
+              chart_type: stacked
+              dimensions:
+                - name: tcp
+                - name: udp
+            - name: windows.dns.responses
+              description: DNS responses sent
+              unit: "responses/s"
+              chart_type: stacked
+              dimensions:
+                - name: tcp
+                - name: udp
+            - name: windows.dns.query_handling
+              description: DNS queries dropped
+              unit: "queries/s"
+              chart_type: line
+              dimensions:
+                - name: dropped_total
+                - name: dropped_policy
+                - name: dropped_rate_limiting
+                - name: dropped_send
+                - name: dropped_bad_socket
+            - name: windows.dns.suppressed_responses
+              description: DNS responses suppressed
+              unit: "responses/s"
+              chart_type: line
+              dimensions:
+                - name: suppressed
+            - name: windows.dns.remote_queries
+              description: DNS remote queries in flight
+              unit: "queries"
+              chart_type: line
+              dimensions:
+                - name: in_flight
+            - name: windows.dns.recursive_queries
+              description: DNS recursive queries
+              unit: "queries/s"
+              chart_type: line
+              dimensions:
+                - name: queries
+                - name: failures
+            - name: windows.dns.recursive_send_timeouts
+              description: DNS recursive send timeouts
+              unit: "timeouts/s"
+              chart_type: line
+              dimensions:
+                - name: timeouts
+            - name: windows.dns.zone_transfer_requests_received
+              description: DNS zone transfer requests received
+              unit: "requests/s"
+              chart_type: line
+              dimensions:
+                - name: axfr
+                - name: ixfr
+            - name: windows.dns.zone_transfer_requests_sent
+              description: DNS zone transfer requests sent
+              unit: "requests/s"
+              chart_type: line
+              dimensions:
+                - name: axfr
+                - name: ixfr
+                - name: soa
+            - name: windows.dns.zone_transfer_responses_received
+              description: DNS zone transfer responses received
+              unit: "responses/s"
+              chart_type: line
+              dimensions:
+                - name: axfr
+                - name: ixfr
+            - name: windows.dns.zone_transfer_success_received
+              description: DNS zone transfers completed on secondary
+              unit: "transfers/s"
+              chart_type: line
+              dimensions:
+                - name: axfr
+                - name: ixfr_tcp
+                - name: ixfr_udp
+            - name: windows.dns.zone_transfer_success_sent
+              description: DNS zone transfers completed on primary
+              unit: "transfers/s"
+              chart_type: line
+              dimensions:
+                - name: axfr
+                - name: ixfr
+            - name: windows.dns.zone_transfer_failures
+              description: DNS zone transfer failures
+              unit: "failures/s"
+              chart_type: line
+              dimensions:
+                - name: failures
+            - name: windows.dns.notify_received
+              description: DNS notifications received
+              unit: "notifications/s"
+              chart_type: line
+              dimensions:
+                - name: received
+            - name: windows.dns.notify_sent
+              description: DNS notifications sent
+              unit: "notifications/s"
+              chart_type: line
+              dimensions:
+                - name: sent
+            - name: windows.dns.dynamic_updates
+              description: DNS dynamic update events
+              unit: "updates/s"
+              chart_type: line
+              dimensions:
+                - name: no_operation
+                - name: written
+                - name: rejected
+                - name: timed_out
+                - name: secure_received
+                - name: secure_failure
+            - name: windows.dns.dynamic_updates_queued
+              description: DNS dynamic updates queued
+              unit: "updates"
+              chart_type: line
+              dimensions:
+                - name: queued
+            - name: windows.dns.memory_used
+              description: DNS server memory used
+              unit: "bytes"
+              chart_type: line
+              dimensions:
+                - name: caching
+                - name: database_node
+                - name: nbstat
+                - name: record_flow
+                - name: tcp_message
+                - name: udp_message
+            - name: windows.dns.unmatched_responses
+              description: DNS unmatched responses
+              unit: "responses/s"
+              chart_type: line
+              dimensions:
+                - name: unmatched
+            - name: windows.dns.wins_lookups
+              description: DNS WINS lookups received
+              unit: "lookups/s"
+              chart_type: line
+              dimensions:
+                - name: forward
+                - name: reverse
+            - name: windows.dns.wins_responses
+              description: DNS WINS responses sent
+              unit: "responses/s"
+              chart_type: line
+              dimensions:
+                - name: forward
+                - name: reverse
+  - meta:
+      plugin_name: windows.plugin
       module_name: PerflibProcessor
       monitored_instance:
         name: Processor
@@ -22,9 +254,10 @@ modules:
     overview:
       data_collection:
         metrics_description: |
-          This collector monitors processors statistics on host.
+          Monitor processor performance statistics on Windows hosts through Perflib.
         method_description: |
-          It queries Processor object from Perflib in order to gather the metrics.
+          It queries the Processor Information object from Perflib in order to gather the metrics, falling back to the
+          legacy Processor object only when Processor Information is unavailable.
       supported_platforms:
         include: ["windows"]
         exclude: []
@@ -187,17 +420,30 @@ modules:
               dimensions:
                 - name: read
                 - name: write
-            - name: mem.swap_pages_io
-              description: Swap Pages
-              unit: "pages/s"
-              chart_type: stacked
+            - name: mem.swapio
+              description: Swap I/O
+              unit: "KiB/s"
+              chart_type: area
               dimensions:
-                - name: read
-                - name: write
+                - name: in
+                - name: out
             - name: mem.system_pool_size
               description: System Memory Pool
               unit: "bytes"
               chart_type: stacked
+              dimensions:
+                - name: paged
+                - name: non-paged
+            - name: mem.system_pool_paged
+              description: Paged System Memory Pool
+              unit: "bytes"
+              chart_type: line
+              dimensions:
+                - name: resident
+            - name: mem.system_pool_allocs
+              description: System Pool Allocations
+              unit: "allocations/s"
+              chart_type: line
               dimensions:
                 - name: paged
                 - name: non-paged
@@ -207,6 +453,60 @@ modules:
               chart_type: line
               dimensions:
                 - name: free
+            - name: mem.committed
+              description: Committed Memory
+              unit: "bytes"
+              chart_type: line
+              dimensions:
+                - name: committed
+                - name: limit
+            - name: mem.system_cache
+              description: System Cache Memory
+              unit: "bytes"
+              chart_type: line
+              dimensions:
+                - name: cache
+                - name: peak
+                - name: resident
+            - name: mem.page_lists
+              description: Memory Page Lists
+              unit: "bytes"
+              chart_type: stacked
+              dimensions:
+                - name: free
+                - name: modified
+                - name: standby_core
+                - name: standby_normal
+                - name: standby_reserve
+            - name: mem.system_code
+              description: System Code Memory
+              unit: "bytes"
+              chart_type: line
+              dimensions:
+                - name: resident
+                - name: total
+            - name: mem.system_drivers
+              description: System Driver Memory
+              unit: "bytes"
+              chart_type: line
+              dimensions:
+                - name: resident
+                - name: total
+            - name: mem.page_faults_breakdown
+              description: Memory Page Fault Breakdown
+              unit: "faults/s"
+              chart_type: line
+              dimensions:
+                - name: cache
+                - name: demand_zero
+                - name: transition
+                - name: write_copies
+            - name: mem.transition_repurposed
+              description: Transition Pages Repurposed
+              unit: "pages/s"
+              chart_type: line
+              dimensions:
+                - name: repurposed
   - meta:
       plugin_name: windows.plugin
       module_name: PerflibProcesses
@@ -333,7 +633,8 @@ modules:
         metrics_description: |
           Detailed statistics for all disk devices and volumes.
         method_description: |
-          It queries 'LogicalDisk' and 'PhysicalDisk' objects from Perflib in order to gather the metrics.
+          It uses Windows volume-space APIs for disk-space metrics, including folder-mounted and Cluster Shared
+          Volumes, and queries the 'LogicalDisk' and 'PhysicalDisk' objects from Perflib for the remaining metrics.
       supported_platforms:
         include: ["windows"]
         exclude: []
@@ -366,11 +667,23 @@ modules:
               description: Data collection frequency.
               default_value: 1
               required: false
+            - name: exclude space metrics on paths
+              description: >-
+                Space-separated, case-insensitive Netdata simple patterns for logical-volume mount points to exclude
+                from disk space collection. Patterns support `*` wildcards and `!` negative terms. For example,
+                `*AssuredRecoveryTemp*` excludes temporary backup volumes with that path component.
+              default_value: ""
+              required: false
         examples:
           folding:
             enabled: true
-            title: ""
-          list: []
+            title: "Configuration"
+          list:
+            - name: Exclude temporary backup volumes
+              description: Exclude logical-volume disk space metrics for mount points that contain `AssuredRecoveryTemp`.
+              config: |
+                [plugin:windows:PerflibStorage]
+                  exclude space metrics on paths = *AssuredRecoveryTemp*
     troubleshooting:
       problems:
         list: []
@@ -394,16 +707,18 @@ modules:
                 - name: reads
                 - name: writes
         - name: Logical Disk
-          description: "These metrics refer to Logical Disks."
+          description: "These metrics refer to Logical Disks. Volumes without a drive letter are included, addressed by the folder they are mounted on - this covers Cluster Shared Volumes on failover-cluster nodes, which Windows exposes only below the system drive, as '%SystemDrive%\\ClusterStorage\\VolumeN' (for example 'C:\\ClusterStorage\\Volume1')."
           labels:
             - name: mount_point
-              description: "Drive letter or mount point path assigned by Windows (e.g., 'C:', 'D:')."
-            - name: driver_type
-              description: "Classification of the disk device (e.g., norootdir, removable, cdrom, ramdisk)."
+              description: "Drive letter or mount point path assigned by Windows (e.g., 'C:', 'D:', 'C:\\ClusterStorage\\Volume1')."
+            - name: drive_type
+              description: "Classification of the disk device (e.g., norootdir, removable, fixed, remote, cdrom, ramdisk)."
             - name: filesystem
-              description: "File system format used on the volume (e.g., NTFS, FAT32)."
+              description: "File system format used on the volume (e.g., ntfs, refs, csvfs)."
             - name: rw_mode
               description: "Current read/write permissions status of the volume (read-only access, read and write access)."
+            - name: serial_number
+              description: "Volume serial number reported by Windows, in hexadecimal."
           metrics:
             - name: disk.space
               description: Disk Space Usage
@@ -494,6 +809,7 @@ modules:
       module_name: PerflibNetwork
       monitored_instance:
         name: Network Subsystem
+        description: "Monitor Windows network interface traffic, errors, drops, queue length, and offload activity through Perflib."
         link: "https://learn.microsoft.com/en-us/windows/win32/networking"
         categories:
           - data-collection.networking
@@ -814,6 +1130,202 @@ modules:
                 - name: connections
   - meta:
       plugin_name: windows.plugin
+      module_name: PerflibSMB
+      monitored_instance:
+        name: SMB Server Shares
+        link: "https://learn.microsoft.com/en-us/openspecs/windows_protocols/ms-smb/"
+        categories:
+          - data-collection.storage
+        icon_filename: "windows.svg"
+      related_resources:
+        integrations:
+          list: []
+      info_provided_to_referring_integrations:
+        description: ""
+      keywords:
+        - windows
+        - microsoft
+        - smb
+        - share
+        - file sharing
+    overview:
+      data_collection:
+        metrics_description: |
+          Monitor SMB server share activity and throughput counters on Windows systems.
+        method_description: |
+          It queries the 'SMB Server Shares' object from Perflib in order to gather the metrics.
+      supported_platforms:
+        include: ["windows"]
+        exclude: []
+      multi_instance: false
+      additional_permissions:
+        description: ""
+      default_behavior:
+        auto_detection:
+          description: |
+            This collector is enabled by default and automatically detects all available SMB share instances and metrics. On systems where the 'SMB Server Shares' object is not available, no SMB metrics are collected.
+        limits:
+          description: ""
+        performance_impact:
+          description: ""
+    setup:
+      prerequisites:
+        list: []
+      configuration:
+        file:
+          name: "netdata.conf"
+          section_name: "[plugin:windows:PerflibSMB]"
+          description: "The Netdata main configuration file"
+        options:
+          description: ""
+          folding:
+            title: "Config option"
+            enabled: false
+          list:
+            - name: update every
+              description: Data collection frequency.
+              default_value: 1
+              required: false
+        examples:
+          folding:
+            enabled: true
+            title: ""
+          list: []
+    troubleshooting:
+      problems:
+        list: []
+    alerts: []
+    metrics:
+      folding:
+        title: Metrics
+        enabled: false
+      description: ""
+      availability: []
+      scopes:
+        - name: SMB Share
+          description: "These metrics refer to SMB shares."
+          labels:
+            - name: share
+              description: SMB share name as exposed by the Windows SMB Server Shares performance object.
+          metrics:
+            - name: smb.server_shares_current_open_file_count
+              description: Current total count of open files on the SMB share.
+              unit: "files"
+              chart_type: line
+              dimensions:
+                - name: open
+            - name: smb.server_shares_write_requests
+              description: Write requests on the SMB share.
+              unit: "requests/s"
+              chart_type: line
+              dimensions:
+                - name: writes
+            - name: smb.server_shares_read_requests
+              description: Read requests on the SMB share.
+              unit: "requests/s"
+              chart_type: line
+              dimensions:
+                - name: reads
+            - name: smb.server_shares_metadata_requests
+              description: Metadata requests on the SMB share.
+              unit: "requests/s"
+              chart_type: line
+              dimensions:
+                - name: metadata
+            - name: smb.server_shares_files_opened
+              description: Files opened on the SMB share.
+              unit: "files/s"
+              chart_type: line
+              dimensions:
+                - name: opened
+  - meta:
+      plugin_name: windows.plugin
+      module_name: PerflibTerminalServices
+      monitored_instance:
+        name: Terminal Services sessions
+        link: "https://learn.microsoft.com/en-us/azure/virtual-desktop/insights-glossary"
+        categories:
+          - data-collection.operating-systems
+        icon_filename: "windows.svg"
+      related_resources:
+        integrations:
+          list: []
+      info_provided_to_referring_integrations:
+        description: ""
+      keywords:
+        - terminal services
+        - remote desktop services
+        - rds
+    overview:
+      data_collection:
+        metrics_description: |
+          Monitor aggregate active and inactive Terminal Services sessions on Windows hosts.
+        method_description: |
+          It queries the `Terminal Services` object from Perflib. These are aggregate Remote Desktop Services session
+          states, not a per-user inventory or a count of TCP connections.
+      supported_platforms:
+        include: ["windows"]
+        exclude: []
+      multi_instance: false
+      additional_permissions:
+        description: ""
+      default_behavior:
+        auto_detection:
+          description: |
+            The collector automatically detects the `Terminal Services` performance object. It does not collect metrics
+            when the object is unavailable on the host.
+        limits:
+          description: ""
+        performance_impact:
+          description: ""
+    setup:
+      prerequisites:
+        list: []
+      configuration:
+        file:
+          name: "netdata.conf"
+          section_name: "[plugin:windows:PerflibTerminalServices]"
+          description: "The Netdata main configuration file"
+        options:
+          description: ""
+          folding:
+            title: "Config option"
+            enabled: false
+          list:
+            - name: update every
+              description: Data collection frequency.
+              default_value: 1
+              required: false
+        examples:
+          folding:
+            enabled: true
+            title: ""
+          list: []
+    troubleshooting:
+      problems:
+        list: []
+    alerts: []
+    metrics:
+      folding:
+        title: Metrics
+        enabled: false
+      description: ""
+      availability: []
+      scopes:
+        - name: System
+          description: These metrics refer to aggregate Terminal Services session states on the host.
+          labels: []
+          metrics:
+            - name: terminal_services.sessions
+              description: Aggregate Terminal Services sessions. Active sessions have a connected user; inactive
+                sessions are not actively connected.
+              unit: sessions
+              chart_type: stacked
+              dimensions:
+                - name: active
+                - name: inactive
+  - meta:
+      plugin_name: windows.plugin
       module_name: PerflibObjects
       monitored_instance:
         name: Semaphore statistics
@@ -942,7 +1454,14 @@ modules:
           description: ""
     setup:
       prerequisites:
-        list: []
+        list:
+          - title: Install the Netdata Driver (netdata_driver.sys)
+            description: |
+              CPU temperature monitoring on Windows requires the Netdata kernel driver (`netdata_driver.sys`) to be installed on the host. The driver is an optional component and is not installed by default.
+
+              When you install Netdata with the Windows MSI installer, select the **Netdata Driver: Hardware Metrics Collection** option on the feature selection screen. If Netdata is already installed without the driver, the installer's Change/Modify option does not expose this checkbox again; uninstall Netdata first, then reinstall it and select the option during setup.
+
+              Editing `netdata.conf` alone is not enough. Without the driver, the `GetHardwareInfo` module cannot read the CPU `msr` register, so the `cpu.temperature` chart is never created and CPU temperature will not appear on the dashboard. The collector records an error in the Netdata log, but no temperature chart is produced.
       configuration:
         file:
           name: "netdata.conf"
@@ -1240,7 +1759,7 @@ modules:
         - name: Sensor
           description: "These metrics refer to Sensors."
           labels:
-            - name: name
+            - name: label
               description: Sensor friendly name.
             - name: manufacturer
               description: The sensor manufacturer.
@@ -1253,6 +1772,21 @@ modules:
               chart_type: line
               dimensions:
                 - name: input
+            - name: system.hw.sensor.temperature.histogram
+              description: Distribution of all temperature sensors in fixed bands
+              unit: "sensors"
+              chart_type: heatmap
+              dimensions:
+                - name: "40"
+                - name: "50"
+                - name: "60"
+                - name: "70"
+                - name: "80"
+                - name: "85"
+                - name: "90"
+                - name: "95"
+                - name: "100"
+                - name: "+Inf"
             - name: system.hw.sensor.power.input
               description: Sensor Power
               unit: "W"
@@ -1551,10 +2085,47 @@ modules:
               chart_type: line
               dimensions:
                 - name: uptime
+            - name: iis.website_blocked_async_io_requests
+              description: Website blocked async I/O requests
+              unit: "requests"
+              chart_type: line
+              dimensions:
+                - name: blocked
+            - name: iis.website_cgi_requests
+              description: Website active CGI requests
+              unit: "requests"
+              chart_type: line
+              dimensions:
+                - name: active
+            - name: iis.website_users_total_rate
+              description: Website total user counts
+              unit: "users/s"
+              chart_type: line
+              dimensions:
+                - name: anonymous
+                - name: non_anonymous
+            - name: iis.website_blocked_async_io_requests_rate
+              description: Website total blocked async I/O requests
+              unit: "requests/s"
+              chart_type: line
+              dimensions:
+                - name: requests
+            - name: iis.website_cgi_requests_rate
+              description: Website CGI requests
+              unit: "requests/s"
+              chart_type: line
+              dimensions:
+                - name: requests
+            - name: iis.website_rejected_async_io_requests_rate
+              description: Website rejected async I/O requests
+              unit: "requests/s"
+              chart_type: line
+              dimensions:
+                - name: requests
         - name: IIS Application Pool
           description: "These metrics refer to the IIS application pool WAS (Windows Process Activation Service)."
           labels:
-            - name: app
+            - name: app_pool
               description: The name of the Application Pool.
           metrics:
             - name: iis.application_pool_current_status
@@ -1614,6 +2185,18 @@ modules:
               chart_type: line
               dimensions:
                 - name: uptime
+            - name: iis.application_pool_current_uptime
+              description: IIS App Pool current uptime
+              unit: "seconds"
+              chart_type: line
+              dimensions:
+                - name: uptime
+            - name: iis.application_pool_time_since_last_worker_process_failure
+              description: Time since the last IIS worker process failure
+              unit: "seconds"
+              chart_type: line
+              dimensions:
+                - name: seconds
         - name: IIS W3SCV W3MP
           description: "These metrics refer to the World Wide Web Publishing Service, the service responsible for hosting and serving web content."
           labels:
@@ -1625,7 +2208,7 @@ modules:
               unit: "threads"
               chart_type: line
               dimensions:
-                - name: threads
+                - name: active
             - name: iis.w3svc_w3wp_requests_total
               description: HTTP requests served by the worker process
               unit: "requests/s"
@@ -1694,15 +2277,384 @@ modules:
                 - name: used
             - name: iis.w3svc_w3wp_output_cache_flushed_total
               description: Flushes of output cache
-              unit: "flushes"
+              unit: "flushes/s"
               chart_type: line
               dimensions:
                 - name: output_cache_entries
+        - name: IIS W3SVC W3WP Worker Process
+          description: "These metrics describe app-pool totals across IIS worker processes, including activity, caches, and WebSocket requests."
+          labels:
+            - name: app
+              description: Application pool name.
+          metrics:
+            - name: iis.w3svc_w3wp_maximum_threads
+              description: Maximum worker threads
+              unit: "threads"
+              chart_type: line
+              dimensions:
+                - name: threads
+            - name: iis.w3svc_w3wp_active_flushed_entries
+              description: Worker cache entries pending flush
+              unit: "entries"
+              chart_type: line
+              dimensions:
+                - name: entries
+            - name: iis.w3svc_w3wp_file_cache_max_memory
+              description: Maximum worker file cache memory
+              unit: "bytes"
+              chart_type: line
+              dimensions:
+                - name: used
+            - name: iis.w3svc_w3wp_file_cache_flushes
+              description: Worker file cache flushes
+              unit: "flushes/s"
+              chart_type: line
+              dimensions:
+                - name: flushes
+            - name: iis.w3svc_w3wp_file_cache_queries
+              description: Worker file cache hits and misses
+              unit: "queries/s"
+              chart_type: line
+              dimensions:
+                - name: hits
+                - name: misses
+            - name: iis.w3svc_w3wp_files_cached
+              description: Files currently in the worker file cache
+              unit: "files"
+              chart_type: line
+              dimensions:
+                - name: files
+            - name: iis.w3svc_w3wp_uri_cache_queries
+              description: Worker URI cache hits and misses
+              unit: "queries/s"
+              chart_type: line
+              dimensions:
+                - name: hits
+                - name: misses
+            - name: iis.w3svc_w3wp_uris_cached
+              description: URIs currently in the worker cache
+              unit: "uris"
+              chart_type: line
+              dimensions:
+                - name: uris
+            - name: iis.w3svc_w3wp_metadata_cache_queries
+              description: Worker metadata cache hits and misses
+              unit: "queries/s"
+              chart_type: line
+              dimensions:
+                - name: hits
+                - name: misses
+            - name: iis.w3svc_w3wp_metadata_cached
+              description: Metadata currently in the worker cache
+              unit: "blocks"
+              chart_type: line
+              dimensions:
+                - name: blocks
+            - name: iis.w3svc_w3wp_metadata_cache_flushes
+              description: Worker metadata cache flushes
+              unit: "flushes/s"
+              chart_type: line
+              dimensions:
+                - name: flushes
+            - name: iis.w3svc_w3wp_output_cache_items
+              description: Items currently in the worker output cache
+              unit: "items"
+              chart_type: line
+              dimensions:
+                - name: items
+            - name: iis.w3svc_w3wp_output_cache_queries
+              description: Worker output cache hits and misses
+              unit: "queries/s"
+              chart_type: line
+              dimensions:
+                - name: hits
+                - name: misses
+            - name: iis.w3svc_w3wp_output_cache_flushed_items
+              description: Worker output cache items flushed
+              unit: "items/s"
+              chart_type: line
+              dimensions:
+                - name: items
+            - name: iis.w3svc_w3wp_http_responses
+              description: Worker HTTP responses by status
+              unit: "percentage"
+              chart_type: line
+              dimensions:
+                - name: "401"
+                - name: "403"
+                - name: "404"
+                - name: "500"
+            - name: iis.w3svc_w3wp_websocket_active_requests
+              description: Active worker WebSocket requests
+              unit: "requests"
+              chart_type: line
+              dimensions:
+                - name: active
+            - name: iis.w3svc_w3wp_websocket_connection_attempts
+              description: Worker WebSocket connection attempts
+              unit: "connections/s"
+              chart_type: line
+              dimensions:
+                - name: attempts
+            - name: iis.w3svc_w3wp_websocket_connections_accepted
+              description: Worker WebSocket connections accepted
+              unit: "connections/s"
+              chart_type: line
+              dimensions:
+                - name: accepted
+            - name: iis.w3svc_w3wp_websocket_connections_rejected
+              description: Worker WebSocket connections rejected
+              unit: "connections/s"
+              chart_type: line
+              dimensions:
+                - name: rejected
+        - name: IIS Web Service Cache
+          description: IIS server cache metrics.
+          labels: []
+          metrics:
+            - name: iis.server_cache_active_flushed_entries
+              description: IIS server cache entries pending flush
+              unit: "entries"
+              chart_type: line
+              dimensions:
+                - name: entries
+            - name: iis.server_file_cache_memory
+              description: IIS server file cache memory
+              unit: "bytes"
+              chart_type: line
+              dimensions:
+                - name: used
+                - name: maximum
+            - name: iis.server_file_cache_flushes
+              description: IIS server file cache flushes
+              unit: "flushes/s"
+              chart_type: line
+              dimensions:
+                - name: flushes
+            - name: iis.server_file_cache_queries
+              description: IIS server file cache hits and misses
+              unit: "queries/s"
+              chart_type: line
+              dimensions:
+                - name: hits
+                - name: misses
+            - name: iis.server_files_cached
+              description: Files in the IIS server cache
+              unit: "files"
+              chart_type: line
+              dimensions:
+                - name: files
+            - name: iis.server_files_cache_rate
+              description: IIS server files added to and removed from cache
+              unit: "files/s"
+              chart_type: line
+              dimensions:
+                - name: cached
+                - name: flushed
+            - name: iis.server_metadata_cached
+              description: Metadata blocks in the IIS cache
+              unit: "blocks"
+              chart_type: line
+              dimensions:
+                - name: blocks
+            - name: iis.server_metadata_flushes
+              description: IIS metadata cache flushes
+              unit: "flushes/s"
+              chart_type: line
+              dimensions:
+                - name: flushes
+            - name: iis.server_metadata_queries
+              description: IIS metadata cache hits and misses
+              unit: "queries/s"
+              chart_type: line
+              dimensions:
+                - name: hits
+                - name: misses
+            - name: iis.server_metadata_cache_rate
+              description: IIS metadata blocks added to and removed from cache
+              unit: "blocks/s"
+              chart_type: line
+              dimensions:
+                - name: cached
+                - name: flushed
+            - name: iis.server_output_cache_items
+              description: IIS output cache items
+              unit: "items"
+              chart_type: line
+              dimensions:
+                - name: flushed
+                - name: current
+            - name: iis.server_output_cache_memory
+              description: IIS output cache memory
+              unit: "bytes"
+              chart_type: area
+              dimensions:
+                - name: used
+            - name: iis.server_output_cache_queries
+              description: IIS output cache hits and misses
+              unit: "queries/s"
+              chart_type: line
+              dimensions:
+                - name: hits
+                - name: misses
+            - name: iis.server_output_cache_flushed
+              description: IIS output cache items flushed
+              unit: "items/s"
+              chart_type: line
+              dimensions:
+                - name: items
+            - name: iis.server_output_cache_flushes
+              description: IIS output cache flushes
+              unit: "flushes/s"
+              chart_type: line
+              dimensions:
+                - name: flushes
+        - name: IIS URI Cache
+          description: IIS URI cache metrics split between user and kernel modes.
+          labels: []
+          metrics:
+            - name: iis.server_uri_cache_flushes
+              description: IIS URI cache flushes
+              unit: "flushes/s"
+              chart_type: line
+              dimensions:
+                - name: user
+                - name: kernel
+            - name: iis.server_uri_cache_queries
+              description: IIS URI cache hits and misses
+              unit: "queries/s"
+              chart_type: line
+              dimensions:
+                - name: user_hits
+                - name: kernel_hits
+                - name: user_misses
+                - name: kernel_misses
+            - name: iis.server_uris_cached
+              description: URIs in the IIS cache
+              unit: "uris"
+              chart_type: line
+              dimensions:
+                - name: user
+                - name: kernel
+            - name: iis.server_uris_cached_rate
+              description: IIS URI cache additions
+              unit: "uris/s"
+              chart_type: line
+              dimensions:
+                - name: user
+                - name: kernel
+            - name: iis.server_uris_flushed_rate
+              description: IIS URI cache removals
+              unit: "uris/s"
+              chart_type: line
+              dimensions:
+                - name: user
+                - name: kernel
+  - meta:
+      plugin_name: windows.plugin
+      module_name: PerflibHttpService
+      monitored_instance:
+        name: HTTP Service
+        description: Monitor HTTP.sys request queues, including queued requests, arrival rates, rejections, and request age, on Windows.
+        link: "https://learn.microsoft.com/en-us/windows/win32/http/http-api-start-page"
+        categories:
+          - data-collection.web-servers-and-proxies
+        icon_filename: "windows.svg"
+      related_resources:
+        integrations:
+          list: []
+      info_provided_to_referring_integrations:
+        description: ""
+      keywords:
+        - windows
+        - http.sys
+        - http service
+        - request queues
+    overview:
+      data_collection:
+        metrics_description: |
+          This collector monitors HTTP.sys request queues.
+        method_description: |
+          It queries the 'HTTP Service Request Queues' object from Perflib.
+      supported_platforms:
+        include: ["windows"]
+        exclude: []
+      multi_instance: false
+      additional_permissions:
+        description: ""
+      default_behavior:
+        auto_detection:
+          description: |
+            The collector automatically detects the HTTP service counters.
+        limits:
+          description: ""
+        performance_impact:
+          description: ""
+    setup:
+      prerequisites:
+        list: []
+      configuration:
+        file:
+          name: "netdata.conf"
+          section_name: "[plugin:windows:PerflibHttpService]"
+          description: "The Netdata main configuration file"
+        options:
+          description: ""
+          folding:
+            title: "Config option"
+            enabled: false
+          list:
+            - name: update every
+              description: Data collection frequency.
+              default_value: 1
+              required: false
+        examples:
+          folding:
+            enabled: true
+            title: ""
+          list: []
+    troubleshooting:
+      problems:
+        list: []
+    alerts: []
+    metrics:
+      folding:
+        title: Metrics
+        enabled: false
+      description: ""
+      availability: []
+      scopes:
+        - name: HTTP service request queue
+          description: HTTP.sys request queue metrics.
+          labels:
+            - name: queue
+              description: The HTTP.sys request queue name.
+          metrics:
+            - name: windows.http_service_queue_current_queue_size
+              description: Current HTTP request queue size
+              unit: "requests"
+              chart_type: line
+              dimensions:
+                - name: queued
+            - name: windows.http_service_queue_request_rate
+              description: HTTP request queue rates
+              unit: "requests/s"
+              chart_type: line
+              dimensions:
+                - name: rejected
+                - name: requests
+            - name: windows.http_service_queue_max_queue_item_age
+              description: Maximum age of an HTTP request in the queue
+              unit: "seconds"
+              chart_type: line
+              dimensions:
+                - name: age
   - meta:
       plugin_name: windows.plugin
       module_name: PerflibHyperV
       monitored_instance:
         name: Hyper-V
+        description: Monitor Hyper-V virtual machine health, compute, memory, storage, network, and virtual switch performance on Windows hosts.
         link: "https://learn.microsoft.com/en-us/virtualization/hyper-v-on-windows/about/"
         categories:
           - data-collection.containers-and-vms
@@ -1718,10 +2670,12 @@ modules:
         - hyperv
         - virtualization
         - vm
+        - azure-local
+        - azure-stack-hci
     overview:
       data_collection:
         metrics_description: |
-          This collector monitors website requests and logins.
+          This collector monitors Hyper-V virtualization metrics including virtual machine health status, root partition virtualization layer statistics (TLB flushes, address spaces, attached devices, GPA space), per-VM CPU usage, memory allocation and pressure, storage device I/O and errors, network interface traffic and packets, and virtual switch traffic, packets, and dropped packets.
         method_description: |
           It queries the 'HyperV' object from Perflib in order to gather the metrics.
       supported_platforms:
@@ -1789,6 +2743,12 @@ modules:
               chart_type: line
               dimensions:
                 - name: gpa
+            - name: hyperv.root_partition_io_tlb_flush_cost
+              description: Root partition I/O TLB flush cost
+              unit: "ns"
+              chart_type: line
+              dimensions:
+                - name: cost
             - name: hyperv.root_partition_virtual_tlb_flush_entries
               description: Root partition flushes of the entire virtual TLB
               unit: "flushes/s"
@@ -1825,6 +2785,12 @@ modules:
               chart_type: line
               dimensions:
                 - name: illegal_interrupt
+            - name: hyperv.root_partition_device_interrupt_mappings
+              description: Root partition device interrupt mappings
+              unit: "mappings"
+              chart_type: line
+              dimensions:
+                - name: mappings
             - name: hyperv.root_partition_device_interrupt_throttle_events
               description: Root partition throttled interrupts
               unit: "events"
@@ -1853,12 +2819,30 @@ modules:
                 - name: 4K
                 - name: 2M
                 - name: 1G
+            - name: hyperv.root_partition_gpa_pages
+              description: Root partition GPA pages
+              unit: "pages"
+              chart_type: line
+              dimensions:
+                - name: gpa
             - name: hyperv.root_partition_gpa_space_modifications
               description: Root partition GPA space modifications
               unit: "modifications/s"
               chart_type: line
               dimensions:
                 - name: gpa
+            - name: hyperv.root_partition_recommended_virtual_tlb_size
+              description: Root partition recommended virtual TLB size
+              unit: "pages"
+              chart_type: line
+              dimensions:
+                - name: recommended
+            - name: hyperv.root_partition_skipped_timer_ticks
+              description: Root partition skipped timer ticks
+              unit: "ticks"
+              chart_type: line
+              dimensions:
+                - name: skipped
 
         - name: Virtual Machine
           description: "These metrics refer to the Virtual Machine."
@@ -1899,12 +2883,39 @@ modules:
               chart_type: line
               dimensions:
                 - name: pressure
+            - name: hyperv.vm_memory_pressure_limits
+              description: VM memory pressure limits
+              unit: "percentage"
+              chart_type: line
+              dimensions:
+                - name: max
+                - name: min
+            - name: hyperv.vm_memory_operations
+              description: VM dynamic memory operations
+              unit: "operations/s"
+              chart_type: line
+              dimensions:
+                - name: add
+                - name: remove
+            - name: hyperv.vm_memory_added_removed
+              description: VM dynamic memory adjustments
+              unit: "bytes/s"
+              chart_type: area
+              dimensions:
+                - name: added
+                - name: removed
             - name: hyperv.vm_vid_physical_pages_allocated
               description: VM physical pages allocated
               unit: "pages"
               chart_type: line
               dimensions:
                 - name: allocated
+            - name: hyperv.vm_vid_preferred_numa_node
+              description: VM preferred NUMA node index
+              unit: "node"
+              chart_type: line
+              dimensions:
+                - name: index
             - name: hyperv.vm_vid_remote_physical_pages
               description: VM physical pages not allocated from the preferred NUMA node
               unit: "pages"
@@ -1925,7 +2936,7 @@ modules:
                 - name: read
                 - name: write
             - name: hyperv.vm_storage_device_operations
-              description: VM storage device IOPS"
+              description: VM storage device IOPS
               unit: "operations/s"
               chart_type: line
               dimensions:
@@ -1937,6 +2948,38 @@ modules:
               chart_type: line
               dimensions:
                 - name: errors
+            - name: hyperv.vm_storage_device_queue_length
+              description: VM storage device queue length
+              unit: "requests"
+              chart_type: line
+              dimensions:
+                - name: device
+                - name: lower
+            - name: hyperv.vm_storage_device_latency
+              description: VM storage device latency
+              unit: "seconds"
+              chart_type: line
+              dimensions:
+                - name: device
+                - name: lower
+            - name: hyperv.vm_storage_device_throughput
+              description: VM storage device throughput
+              unit: "transfers/s"
+              chart_type: line
+              dimensions:
+                - name: throughput
+            - name: hyperv.vm_storage_device_normalized_throughput
+              description: VM storage device normalized throughput
+              unit: "transfers"
+              chart_type: line
+              dimensions:
+                - name: normalized
+            - name: hyperv.vm_storage_device_io_quota_replenishment_rate
+              description: VM storage device IO quota replenishment rate
+              unit: "quota"
+              chart_type: line
+              dimensions:
+                - name: replenishment
         - name: Virtual Machine Network Interface
           description: "These metrics refer to the Virtual Machine Network Interface."
           labels:
@@ -1998,6 +3041,12 @@ modules:
             - name: vswitch
               description: The name of the Virtual Switch.
           metrics:
+            - name: hyperv.vswitch_total_traffic
+              description: Virtual switch total traffic
+              unit: "kilobits/s"
+              chart_type: line
+              dimensions:
+                - name: total
             - name: hyperv.vswitch_traffic
               description: Virtual switch traffic
               unit: "kilobits/s"
@@ -2005,6 +3054,12 @@ modules:
               dimensions:
                 - name: received
                 - name: sent
+            - name: hyperv.vswitch_total_packets
+              description: Virtual switch total packets
+              unit: "packets/s"
+              chart_type: line
+              dimensions:
+                - name: total
             - name: hyperv.vswitch_packets
               description: Virtual switch packets
               unit: "packets/s"
@@ -2065,6 +3120,18 @@ modules:
               chart_type: line
               dimensions:
                 - name: purged
+            - name: hyperv.vswitch_send_channel_moves
+              description: Virtual switch send channel moves
+              unit: "moves/s"
+              chart_type: line
+              dimensions:
+                - name: moves
+            - name: hyperv.vswitch_vmq_moves
+              description: Virtual switch VMQ moves
+              unit: "moves/s"
+              chart_type: line
+              dimensions:
+                - name: moves
   - meta:
       plugin_name: windows.plugin
       module_name: PerflibNetFramework
@@ -2087,7 +3154,7 @@ modules:
     overview:
       data_collection:
         metrics_description: |
-          This collector monitors application built with .NET
+          Monitor runtime and performance statistics for applications built with .NET Framework through Perflib.
         method_description: |
           It queries different NET Framework objects per process from Perflib in order to gather the metrics.
       supported_platforms:
@@ -2101,9 +3168,21 @@ modules:
           description: |
             The collector automatically detects all of the metrics, no further configuration is required.
         limits:
-          description: ""
+          description: |
+            Charts are keyed by raw Perflib instance names. Instances with the same name are combined into one chart
+            series, so their gauges and rates represent the process group. Fraction counters use the ratio of summed
+            numerators and bases. CLR Memory charts include a `process_id` label only while exactly one process has
+            that name; the label is removed while the name is ambiguous. Different raw names remain separate series.
+            Rate charts establish a new baseline for one collection after the number or process-ID set of same-name
+            instances changes. They assume the group does not advance by 2^31 or more between samples; an implausibly
+            large delta is discarded as one lost sample. A temporarily unreadable process ID removes its label
+            without resetting unrelated rate charts.
+            The security stack walk depth chart reports the largest depth reported by any process in the group.
         performance_impact:
-          description: ""
+          description: |
+            Creates up to 49 charts per .NET Framework process name, up from 32 in the previous implementation. A
+            chart is only created when its Perflib counter is available, so the actual number depends on the .NET
+            runtime in use.
     setup:
       prerequisites:
         list: []
@@ -2170,7 +3249,7 @@ modules:
                 - name: traversed
             - name: netframework.clrinterop_com_callable_wrappers
               description: COM callable wrappers (CCW)
-              unit: ccw/s
+              unit: ccw
               chart_type: line
               dimensions:
                 - name: com_callable_wrappers
@@ -2182,7 +3261,7 @@ modules:
                 - name: marshallings
             - name: netframework.clrinterop_interop_stubs_created
               description: Created stubs
-              unit: stubs/s
+              unit: stubs
               chart_type: line
               dimensions:
                 - name: created
@@ -2200,7 +3279,7 @@ modules:
                 - name: time
             - name: netframework.clrjit_standard_failures
               description: JIT compiler failures
-              unit: failures/s
+              unit: failures
               chart_type: line
               dimensions:
                 - name: failures
@@ -2216,6 +3295,24 @@ modules:
               chart_type: line
               dimensions:
                 - name: committed
+            - name: netframework.clrloading_current_appdomains
+              description: Current application domains
+              unit: domains
+              chart_type: line
+              dimensions:
+                - name: current
+            - name: netframework.clrloading_current_assemblies
+              description: Current loaded assemblies
+              unit: assemblies
+              chart_type: line
+              dimensions:
+                - name: current
+            - name: netframework.clrloading_current_classes_loaded
+              description: Current loaded classes
+              unit: classes
+              chart_type: line
+              dimensions:
+                - name: current
             - name: netframework.clrloading_appdomains_loaded
               description: Loaded application domains
               unit: domain/s
@@ -2242,7 +3339,7 @@ modules:
                 - name: loaded
             - name: netframework.clrloading_class_load_failures
               description: Class load failures
-              unit: failures/s
+              unit: failures
               chart_type: line
               dimensions:
                 - name: class_load
@@ -2270,6 +3367,12 @@ modules:
               chart_type: line
               dimensions:
                 - name: objects
+            - name: netframework.clrremoting_contexts
+              description: Total of remoting contexts
+              unit: contexts
+              chart_type: line
+              dimensions:
+                - name: contexts
             - name: netframework.clrremoting_remote_calls
               description: Remote Procedure Calls (RPC) invoked
               unit: calls/s
@@ -2306,6 +3409,12 @@ modules:
               chart_type: line
               dimensions:
                 - name: threads
+            - name: netframework.clrlocksandthreads_current_queue_length
+              description: Current managed lock waiters
+              unit: threads
+              chart_type: line
+              dimensions:
+                - name: threads
             - name: netframework.clrlocksandthreads_current_logical_threads
               description: Logical threads
               unit: threads
@@ -2318,6 +3427,12 @@ modules:
               chart_type: line
               dimensions:
                 - name: physical
+            - name: netframework.clrlocksandthreads_current_recognized_threads
+              description: Current recognized threads
+              unit: threads
+              chart_type: line
+              dimensions:
+                - name: threads
             - name: netframework.clrlocksandthreads_recognized_threads
               description: Threads recognized by the runtime
               unit: threads/s
@@ -2330,6 +3445,93 @@ modules:
               chart_type: line
               dimensions:
                 - name: contentions
+        - name: .NET Framework CLR Memory processes
+          description: "These metrics refer to .NET Framework CLR Memory instances."
+          labels:
+            - name: process
+              description: The process name.
+            - name: process_id
+              description: |
+                The process ID when the process name identifies exactly one process; omitted for same-name groups.
+          metrics:
+            - name: netframework.clrmemory_allocated_bytes
+              description: Allocated bytes on the GC heap
+              unit: bytes/s
+              chart_type: line
+              dimensions:
+                - name: allocated
+            - name: netframework.clrmemory_finalization_survivors
+              description: Finalization survivors
+              unit: objects
+              chart_type: line
+              dimensions:
+                - name: survivors
+            - name: netframework.clrmemory_heap_size
+              description: Heap sizes by generation and Gen 0 allocation budget
+              unit: bytes
+              chart_type: line
+              dimensions:
+                - name: gen0
+                - name: gen1
+                - name: gen2
+                - name: loh
+            - name: netframework.clrmemory_promoted_bytes
+              description: Promoted bytes by generation
+              unit: bytes/s
+              chart_type: line
+              dimensions:
+                - name: gen0
+                - name: gen1
+            - name: netframework.clrmemory_gc_handles
+              description: GC handles in use
+              unit: handles
+              chart_type: line
+              dimensions:
+                - name: handles
+            - name: netframework.clrmemory_collections
+              description: Garbage collections by generation
+              unit: collections/s
+              chart_type: line
+              dimensions:
+                - name: gen0
+                - name: gen1
+                - name: gen2
+            - name: netframework.clrmemory_induced_gc
+              description: Induced garbage collections
+              unit: collections/s
+              chart_type: line
+              dimensions:
+                - name: induced
+            - name: netframework.clrmemory_pinned_objects
+              description: Pinned objects
+              unit: objects
+              chart_type: line
+              dimensions:
+                - name: pinned
+            - name: netframework.clrmemory_sink_blocks_in_use
+              description: Sink blocks in use
+              unit: blocks
+              chart_type: line
+              dimensions:
+                - name: in_use
+            - name: netframework.clrmemory_committed_bytes
+              description: Committed GC virtual memory
+              unit: bytes
+              chart_type: line
+              dimensions:
+                - name: committed
+            - name: netframework.clrmemory_reserved_bytes
+              description: Reserved GC virtual memory
+              unit: bytes
+              chart_type: line
+              dimensions:
+                - name: reserved
+            - name: netframework.clrmemory_gc_time
+              description: Time spent in garbage collection
+              unit: percentage
+              chart_type: line
+              dimensions:
+                - name: time
   - meta:
       plugin_name: windows.plugin
       module_name: PerflibAD
@@ -2339,6 +3541,7 @@ modules:
         categories:
           - data-collection.applications
         icon_filename: "windows.svg"
+        description: 'Monitor Active Directory operations, replication, LDAP activity, binds, queues, database work, cleanup, security descriptors, and SAM metrics.'
       related_resources:
         integrations:
           list: []
@@ -2352,7 +3555,7 @@ modules:
     overview:
       data_collection:
         metrics_description: |
-          This collector monitors Active Directory IO and queries.
+          This collector monitors Active Directory directory operations, replication, LDAP activity, binds, queueing, database, cleanup, security descriptor propagation, and SAM metrics.
         method_description: |
           It queries DirectoryServices object from Perflib in order to gather the metrics.
       supported_platforms:
@@ -2407,6 +3610,54 @@ modules:
           description: "These metrics refer to Active Directory."
           labels: []
           metrics:
+            - name: ad.address_book_ambiguous_name_resolution
+              description: Address book ambiguous name resolution
+              unit: operations/s
+              chart_type: line
+              dimensions:
+                - name: ambiguous_name_resolution
+            - name: ad.address_book_browse
+              description: Address book browse operations
+              unit: operations/s
+              chart_type: line
+              dimensions:
+                - name: browse
+            - name: ad.address_book_find
+              description: Address book matches
+              unit: operations/s
+              chart_type: line
+              dimensions:
+                - name: find
+            - name: ad.address_book_property_read
+              description: Address book property reads
+              unit: operations/s
+              chart_type: line
+              dimensions:
+                - name: property_read
+            - name: ad.address_book_search
+              description: Address book searches
+              unit: operations/s
+              chart_type: line
+              dimensions:
+                - name: search
+            - name: ad.address_book_proxy_search
+              description: Address book proxy searches
+              unit: operations/s
+              chart_type: line
+              dimensions:
+                - name: proxy_search
+            - name: ad.address_book_client_sessions
+              description: Address book client sessions
+              unit: sessions
+              chart_type: line
+              dimensions:
+                - name: sessions
+            - name: ad.approximate_highest_dnt
+              description: Approximate highest distinguished name tag
+              unit: dnt
+              chart_type: line
+              dimensions:
+                - name: dnt
             - name: ad.directory_operations
               description: AD directory operations
               unit: operations/s
@@ -2415,12 +3666,42 @@ modules:
                 - name: read
                 - name: write
                 - name: search
+            - name: ad.searches_base
+              description: Directory base searches
+              unit: searches/s
+              chart_type: line
+              dimensions:
+                - name: base
+            - name: ad.searches_subtree
+              description: Directory subtree searches
+              unit: searches/s
+              chart_type: line
+              dimensions:
+                - name: subtree
+            - name: ad.searches_one_level
+              description: Directory one-level searches
+              unit: searches/s
+              chart_type: line
+              dimensions:
+                - name: one_level
             - name: ad.name_cache_lookups
               description: Name cache lookups
               unit: lookups/s
               chart_type: line
               dimensions:
                 - name: lookups
+            - name: ad.name_cache_hits
+              description: Name cache hits
+              unit: hits/s
+              chart_type: line
+              dimensions:
+                - name: hits
+            - name: ad.ldap_searches
+              description: LDAP client search operations
+              unit: searches/s
+              chart_type: line
+              dimensions:
+                - name: searches
             - name: ad.dra_replication_properties_updated
               description: DRA replication properties updated
               unit: properties/s
@@ -2434,25 +3715,55 @@ modules:
               dimensions:
                 - name: inbound
             - name: ad.dra_replication_intersite_compressed_traffic
-              description: DRA replication compressed traffic withing site
-              unit: bytes/s
-              chart_type: area
-              dimensions:
-                - name: inbound
-                - name: outbound
-            - name: ad.dra_replication_intrasite_compressed_traffic
               description: DRA replication compressed traffic between sites
               unit: bytes/s
               chart_type: area
               dimensions:
                 - name: inbound
                 - name: outbound
-            - name: ad.dra_replication_pending_syncs
-              description: DRA replication pending syncs
-              unit: syncs
+            - name: ad.dra_replication_intrasite_uncompressed_traffic
+              description: DRA replication uncompressed traffic within site
+              unit: bytes/s
+              chart_type: area
+              dimensions:
+                - name: inbound
+                - name: outbound
+            - name: ad.replication_highest_usn_committed
+              description: Highest replication committed update sequence number
+              unit: usn/s
               chart_type: line
               dimensions:
-                - name: pending
+                - name: committed
+            - name: ad.replication_highest_usn_issued
+              description: Highest replication issued update sequence number
+              unit: usn/s
+              chart_type: line
+              dimensions:
+                - name: issued
+            - name: ad.replication_inbound_sync_objects_remaining
+              description: Replication inbound sync objects remaining
+              unit: objects
+              chart_type: line
+              dimensions:
+                - name: remaining
+            - name: ad.replication_inbound_link_value_updates_remaining
+              description: Replication inbound link value updates remaining
+              unit: updates
+              chart_type: line
+              dimensions:
+                - name: remaining
+            - name: ad.replication_inbound_objects_updated
+              description: Replication inbound objects updated
+              unit: objects/s
+              chart_type: line
+              dimensions:
+                - name: updated
+            - name: ad.replication_inbound_objects_filtered
+              description: Replication inbound objects filtered
+              unit: objects/s
+              chart_type: line
+              dimensions:
+                - name: filtered
             - name: ad.dra_replication_pending_syncs
               description: DRA replication pending syncs
               unit: syncs
@@ -2465,12 +3776,78 @@ modules:
               chart_type: line
               dimensions:
                 - name: request
-            - name: ad.name_cache_hits
-              description: Name cache hits
-              unit: hits/s
+            - name: ad.replication_pending_operations
+              description: Replication pending operations
+              unit: operations
               chart_type: line
               dimensions:
-                - name: hits
+                - name: pending
+            - name: ad.replication_sync_requests_success
+              description: Replication sync requests successful
+              unit: requests/s
+              chart_type: line
+              dimensions:
+                - name: success
+            - name: ad.replication_sync_requests_schema_mismatch_failure
+              description: Replication sync requests failed due to schema mismatch
+              unit: requests/s
+              chart_type: line
+              dimensions:
+                - name: failure
+            - name: ad.name_translations_client
+              description: Client name translations
+              unit: translations/s
+              chart_type: line
+              dimensions:
+                - name: client
+            - name: ad.name_translations_server
+              description: Server name translations
+              unit: translations/s
+              chart_type: line
+              dimensions:
+                - name: server
+            - name: ad.change_monitors_registered
+              description: Registered change monitors
+              unit: monitors
+              chart_type: line
+              dimensions:
+                - name: registered
+            - name: ad.change_monitor_updates_pending
+              description: Pending change monitor updates
+              unit: updates
+              chart_type: line
+              dimensions:
+                - name: pending
+            - name: ad.directory_search_suboperations
+              description: Directory search suboperations
+              unit: operations/s
+              chart_type: line
+              dimensions:
+                - name: suboperations
+            - name: ad.security_descriptor_propagation_events
+              description: Security descriptor propagation events
+              unit: events/s
+              chart_type: line
+              dimensions:
+                - name: events
+            - name: ad.security_descriptor_propagation_events_queued
+              description: Security descriptor propagation events queued
+              unit: events
+              chart_type: line
+              dimensions:
+                - name: queued
+            - name: ad.security_descriptor_propagation_access_wait
+              description: Security descriptor propagation access wait
+              unit: seconds
+              chart_type: line
+              dimensions:
+                - name: wait
+            - name: ad.security_descriptor_propagation_items_queued
+              description: Security descriptor propagation items queued
+              unit: items
+              chart_type: line
+              dimensions:
+                - name: queued
             - name: ad.ds_threads
               description: Directory Service threads
               unit: threads
@@ -2483,18 +3860,360 @@ modules:
               chart_type: line
               dimensions:
                 - name: last_bind
-            - name: ad.ldap_searches
-              description: LDAP client search operations
-              unit: searches/s
+            - name: ad.binds_digest
+              description: Digest binds
+              unit: binds/s
               chart_type: line
               dimensions:
-                - name: searches
+                - name: digest
+            - name: ad.binds_ds_client
+              description: DS client binds
+              unit: binds/s
+              chart_type: line
+              dimensions:
+                - name: ds_client
+            - name: ad.binds_ds_server
+              description: DS server binds
+              unit: binds/s
+              chart_type: line
+              dimensions:
+                - name: ds_server
+            - name: ad.binds_external
+              description: External binds
+              unit: binds/s
+              chart_type: line
+              dimensions:
+                - name: external
+            - name: ad.binds_fast
+              description: Fast binds
+              unit: binds/s
+              chart_type: line
+              dimensions:
+                - name: fast
+            - name: ad.binds_negotiate
+              description: Negotiated binds
+              unit: binds/s
+              chart_type: line
+              dimensions:
+                - name: negotiate
+            - name: ad.binds_ntlm
+              description: NTLM binds
+              unit: binds/s
+              chart_type: line
+              dimensions:
+                - name: ntlm
+            - name: ad.binds_simple
+              description: Simple binds
+              unit: binds/s
+              chart_type: line
+              dimensions:
+                - name: simple
+            - name: ad.binds_ldap
+              description: LDAP successful binds
+              unit: binds/s
+              chart_type: line
+              dimensions:
+                - name: ldap
+            - name: ad.ldap_closed_connections
+              description: LDAP closed connections
+              unit: connections/s
+              chart_type: line
+              dimensions:
+                - name: closed
+            - name: ad.ldap_opened_connections_ldap
+              description: LDAP opened connections
+              unit: connections/s
+              chart_type: line
+              dimensions:
+                - name: ldap
+            - name: ad.ldap_opened_connections_ldaps
+              description: LDAPS opened connections
+              unit: connections/s
+              chart_type: line
+              dimensions:
+                - name: ldaps
+            - name: ad.ldap_active_threads
+              description: LDAP active threads
+              unit: threads
+              chart_type: line
+              dimensions:
+                - name: active
+            - name: ad.ldap_udp_operations
+              description: LDAP UDP operations
+              unit: operations/s
+              chart_type: line
+              dimensions:
+                - name: udp
+            - name: ad.ldap_writes
+              description: LDAP writes
+              unit: writes/s
+              chart_type: line
+              dimensions:
+                - name: writes
+            - name: ad.ldap_client_sessions
+              description: LDAP client sessions
+              unit: sessions
+              chart_type: line
+              dimensions:
+                - name: sessions
+            - name: ad.atq_outstanding_requests
+              description: Outstanding requests
+              unit: requests
+              chart_type: line
+              dimensions:
+                - name: outstanding
+            - name: ad.atq_estimated_delay
+              description: Estimated queue delay
+              unit: seconds
+              chart_type: line
+              dimensions:
+                - name: delay
             - name: ad.atq_average_request_latency
               description: Average request processing time
               unit: seconds
               chart_type: line
               dimensions:
                 - name: time
+            - name: ad.atq_current_threads_ldap
+              description: Current ATQ LDAP threads
+              unit: threads
+              chart_type: line
+              dimensions:
+                - name: ldap
+            - name: ad.atq_current_threads_other
+              description: Current ATQ other threads
+              unit: threads
+              chart_type: line
+              dimensions:
+                - name: other
+            - name: ad.atq_current_threads_total
+              description: Current ATQ total threads
+              unit: threads
+              chart_type: line
+              dimensions:
+                - name: total
+            - name: ad.database_operations
+              description: AD database operations
+              unit: operations/s
+              chart_type: line
+              dimensions:
+                - name: add
+                - name: delete
+                - name: modify
+                - name: recycle
+            - name: ad.directory_reads
+              description: Directory reads
+              unit: reads/s
+              chart_type: line
+              dimensions:
+                - name: read
+            - name: ad.directory_searches
+              description: Directory searches
+              unit: searches/s
+              chart_type: line
+              dimensions:
+                - name: search
+            - name: ad.directory_writes
+              description: Directory writes
+              unit: writes/s
+              chart_type: line
+              dimensions:
+                - name: write
+            - name: ad.replication_inbound_object_updates_remaining
+              description: Replication inbound object updates remaining
+              unit: updates
+              chart_type: line
+              dimensions:
+                - name: remaining
+            - name: ad.replication_inbound_values_dns_only
+              description: DRA replication inbound values DNs only
+              unit: values/s
+              chart_type: line
+              dimensions:
+                - name: dns_only
+            - name: ad.replication_inbound_values_total
+              description: DRA replication inbound values total
+              unit: values/s
+              chart_type: line
+              dimensions:
+                - name: total
+            - name: ad.replication_outbound_objects_filtered
+              description: Replication outbound objects filtered
+              unit: objects/s
+              chart_type: line
+              dimensions:
+                - name: filtered
+            - name: ad.replication_outbound_objects
+              description: Replication outbound objects
+              unit: objects/s
+              chart_type: line
+              dimensions:
+                - name: objects
+            - name: ad.replication_outbound_properties
+              description: Replication outbound properties
+              unit: properties/s
+              chart_type: line
+              dimensions:
+                - name: properties
+            - name: ad.replication_outbound_values_dns_only
+              description: DRA replication outbound values DNs only
+              unit: values/s
+              chart_type: line
+              dimensions:
+                - name: dns_only
+            - name: ad.replication_outbound_values_total
+              description: DRA replication outbound values total
+              unit: values/s
+              chart_type: line
+              dimensions:
+                - name: total
+            - name: ad.replication_threads_getting_nc_changes
+              description: DRA threads getting NC changes
+              unit: threads
+              chart_type: line
+              dimensions:
+                - name: threads
+            - name: ad.replication_threads_getting_nc_changes_holding_semaphore
+              description: DRA threads getting NC changes holding semaphore
+              unit: threads
+              chart_type: line
+              dimensions:
+                - name: threads
+            - name: ad.transitive_operations
+              description: Transitive operations
+              unit: operations/s
+              chart_type: line
+              dimensions:
+                - name: operations
+            - name: ad.transitive_suboperations
+              description: Transitive suboperations
+              unit: suboperations/s
+              chart_type: line
+              dimensions:
+                - name: suboperations
+            - name: ad.replication_inbound_bytes_total
+              description: DRA replication inbound bytes total
+              unit: bytes/s
+              chart_type: line
+              dimensions:
+                - name: inbound
+            - name: ad.replication_outbound_bytes_total
+              description: DRA replication outbound bytes total
+              unit: bytes/s
+              chart_type: line
+              dimensions:
+                - name: outbound
+            - name: ad.link_values_cleaned
+              description: Link values cleaned
+              unit: values/s
+              chart_type: line
+              dimensions:
+                - name: cleaned
+            - name: ad.phantom_objects_cleaned
+              description: Phantom objects cleaned
+              unit: objects/s
+              chart_type: line
+              dimensions:
+                - name: cleaned
+            - name: ad.phantom_objects_visited
+              description: Phantom objects visited
+              unit: objects/s
+              chart_type: line
+              dimensions:
+                - name: visited
+            - name: ad.tombstoned_objects_collected
+              description: Tombstoned objects collected
+              unit: objects/s
+              chart_type: line
+              dimensions:
+                - name: collected
+            - name: ad.tombstoned_objects_visited
+              description: Tombstoned objects visited
+              unit: objects/s
+              chart_type: line
+              dimensions:
+                - name: visited
+            - name: ad.sam_group_membership_evaluations
+              description: SAM group membership evaluations
+              unit: evaluations/s
+              chart_type: line
+              dimensions:
+                - name: global
+                - name: domain_local
+                - name: universal
+            - name: ad.sam_group_membership_global_catalog_evaluations
+              description: SAM group membership global catalog evaluations
+              unit: evaluations/s
+              chart_type: line
+              dimensions:
+                - name: global_catalog
+            - name: ad.sam_group_membership_evaluations_nontransitive
+              description: SAM non-transitive membership evaluations
+              unit: evaluations/s
+              chart_type: line
+              dimensions:
+                - name: nontransitive
+            - name: ad.sam_group_membership_evaluations_transitive
+              description: SAM transitive membership evaluations
+              unit: evaluations/s
+              chart_type: line
+              dimensions:
+                - name: transitive
+            - name: ad.sam_group_evaluation_latency
+              description: SAM group evaluation latency
+              unit: latency
+              chart_type: line
+              dimensions:
+                - name: account_group
+                - name: resource_group
+            - name: ad.sam_computer_creation_requests
+              description: SAM computer creation requests
+              unit: requests/s
+              chart_type: line
+              dimensions:
+                - name: request
+            - name: ad.sam_computer_creation_successful_requests
+              description: SAM successful computer creation requests
+              unit: requests/s
+              chart_type: line
+              dimensions:
+                - name: success
+            - name: ad.sam_user_creation_requests
+              description: SAM user creation requests
+              unit: requests/s
+              chart_type: line
+              dimensions:
+                - name: request
+            - name: ad.sam_user_creation_successful_requests
+              description: SAM successful user creation requests
+              unit: requests/s
+              chart_type: line
+              dimensions:
+                - name: success
+            - name: ad.sam_query_display_requests
+              description: SAM query display requests
+              unit: requests/s
+              chart_type: line
+              dimensions:
+                - name: query
+            - name: ad.sam_enumerations
+              description: SAM enumerations
+              unit: enumerations/s
+              chart_type: line
+              dimensions:
+                - name: enumeration
+            - name: ad.sam_membership_changes
+              description: SAM membership changes
+              unit: changes/s
+              chart_type: line
+              dimensions:
+                - name: change
+            - name: ad.sam_password_changes
+              description: SAM password changes
+              unit: changes/s
+              chart_type: line
+              dimensions:
+                - name: change
   - meta:
       plugin_name: windows.plugin
       module_name: PerflibADCS
@@ -2791,6 +4510,12 @@ modules:
               chart_type: line
               dimensions:
                 - name: authentications
+            - name: adfs.extranet_account_lockouts
+              description: Extranet account lockouts
+              unit: lockouts/s
+              chart_type: line
+              dimensions:
+                - name: lockouts
             - name: adfs.external_authentications
               description: Authentications from external MFA providers
               unit: authentications/s
@@ -3044,6 +4769,7 @@ modules:
       module_name: PerflibExchange
       monitored_instance:
         name: MS Exchange
+        description: "Monitor Microsoft Exchange performance counters for mail flow, databases, clients, and server health through Perflib."
         link: "https://www.microsoft.com/en-us/microsoft-365/exchange/email"
         categories:
           - data-collection.applications
@@ -3501,6 +5227,7 @@ modules:
       module_name: PerflibASP
       monitored_instance:
         name: ASP.NET
+        description: "Monitor ASP.NET application requests, errors, sessions, queues, and runtime performance through Perflib."
         link: "https://dotnet.microsoft.com/en-us/apps/aspnet"
         categories:
           - data-collection.web-servers-and-proxies

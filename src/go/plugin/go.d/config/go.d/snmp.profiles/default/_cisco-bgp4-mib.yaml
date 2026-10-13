@@ -1,0 +1,218 @@
+# Vendor-native Cisco BGP peer visibility from CISCO-BGP4-MIB.
+# The peer row uses the VRF-aware cbgpPeer3Table. The peer-family row uses
+# cbgpPeer2AddrFamilyPrefixTable and resolves peer descriptors from
+# cbgpPeer2Table because the prefix table's remote address, AFI, and SAFI are
+# not-accessible INDEX objects.
+
+bgp:
+  - id: cisco-bgp-peer
+    MIB: CISCO-BGP4-MIB
+    kind: peer
+    table:
+      OID: 1.3.6.1.4.1.9.9.187.1.2.9
+      name: cbgpPeer3Table
+    identity:
+      routing_instance:
+        symbol: { OID: 1.3.6.1.4.1.9.9.187.1.2.9.1.4, name: cbgpPeer3VrfName }
+      neighbor:
+        symbol: { OID: 1.3.6.1.4.1.9.9.187.1.2.9.1.3, name: cbgpPeer3RemoteAddr, format: ip_address }
+      remote_as:
+        symbol: { OID: 1.3.6.1.4.1.9.9.187.1.2.9.1.13, name: cbgpPeer3RemoteAs, format: uint32 }
+    descriptors:
+      local_address:
+        symbol: { OID: 1.3.6.1.4.1.9.9.187.1.2.9.1.8, name: cbgpPeer3LocalAddr, format: ip_address }
+      local_as:
+        symbol: { OID: 1.3.6.1.4.1.9.9.187.1.2.9.1.10, name: cbgpPeer3LocalAs, format: uint32 }
+      local_identifier:
+        symbol: { OID: 1.3.6.1.4.1.9.9.187.1.2.9.1.11, name: cbgpPeer3LocalIdentifier, format: ip_address }
+      peer_identifier:
+        symbol: { OID: 1.3.6.1.4.1.9.9.187.1.2.9.1.14, name: cbgpPeer3RemoteIdentifier, format: ip_address }
+      peer_type:
+        index: 2
+        mapping:
+          0: unknown
+          1: ipv4
+          2: ipv6
+          3: ipv4z
+          4: ipv6z
+          16: dns
+      bgp_version:
+        symbol: { OID: 1.3.6.1.4.1.9.9.187.1.2.9.1.7, name: cbgpPeer3NegotiatedVersion }
+    admin:
+      enabled:
+        symbol:
+          OID: 1.3.6.1.4.1.9.9.187.1.2.9.1.6
+          name: cbgpPeer3AdminStatus
+          mapping:
+            1: stop
+            2: start
+    state:
+      symbol:
+        OID: 1.3.6.1.4.1.9.9.187.1.2.9.1.5
+        name: cbgpPeer3State
+        mapping:
+          1: idle
+          2: connect
+          3: active
+          4: opensent
+          5: openconfirm
+          6: established
+    previous_state:
+      partial: true
+      partial_states: [idle, connect, active, opensent, openconfirm, established]
+      symbol:
+        OID: 1.3.6.1.4.1.9.9.187.1.2.9.1.31
+        name: cbgpPeer3PrevState
+        mapping:
+          0: none
+          1: idle
+          2: connect
+          3: active
+          4: opensent
+          5: openconfirm
+          6: established
+    connection:
+      established_uptime:
+        symbol: { OID: 1.3.6.1.4.1.9.9.187.1.2.9.1.21, name: cbgpPeer3FsmEstablishedTime }
+      last_received_update_age:
+        symbol: { OID: 1.3.6.1.4.1.9.9.187.1.2.9.1.29, name: cbgpPeer3InUpdateElapsedTime }
+    traffic:
+      messages:
+        received:
+          symbol: { OID: 1.3.6.1.4.1.9.9.187.1.2.9.1.17, name: cbgpPeer3InTotalMessages }
+        sent:
+          symbol: { OID: 1.3.6.1.4.1.9.9.187.1.2.9.1.18, name: cbgpPeer3OutTotalMessages }
+      updates:
+        received:
+          symbol: { OID: 1.3.6.1.4.1.9.9.187.1.2.9.1.15, name: cbgpPeer3InUpdates }
+        sent:
+          symbol: { OID: 1.3.6.1.4.1.9.9.187.1.2.9.1.16, name: cbgpPeer3OutUpdates }
+    transitions:
+      established:
+        symbol: { OID: 1.3.6.1.4.1.9.9.187.1.2.9.1.20, name: cbgpPeer3FsmEstablishedTransitions }
+    timers:
+      negotiated:
+        hold_time:
+          symbol: { OID: 1.3.6.1.4.1.9.9.187.1.2.9.1.23, name: cbgpPeer3HoldTime }
+        keepalive_time:
+          symbol: { OID: 1.3.6.1.4.1.9.9.187.1.2.9.1.24, name: cbgpPeer3KeepAlive }
+      configured:
+        connect_retry:
+          symbol: { OID: 1.3.6.1.4.1.9.9.187.1.2.9.1.22, name: cbgpPeer3ConnectRetryInterval }
+        hold_time:
+          symbol: { OID: 1.3.6.1.4.1.9.9.187.1.2.9.1.25, name: cbgpPeer3HoldTimeConfigured }
+        keepalive_time:
+          symbol: { OID: 1.3.6.1.4.1.9.9.187.1.2.9.1.26, name: cbgpPeer3KeepAliveConfigured }
+        min_as_origination_interval:
+          symbol: { OID: 1.3.6.1.4.1.9.9.187.1.2.9.1.27, name: cbgpPeer3MinASOriginationInterval }
+        min_route_advertisement_interval:
+          symbol: { OID: 1.3.6.1.4.1.9.9.187.1.2.9.1.28, name: cbgpPeer3MinRouteAdvertisementInterval }
+    last_error:
+      code:
+        symbol:
+          OID: 1.3.6.1.4.1.9.9.187.1.2.9.1.19
+          name: cbgpPeer3LastErrorCode
+          format: hex
+          extract_value: '^([0-9a-f]{2})'
+      subcode:
+        symbol:
+          OID: 1.3.6.1.4.1.9.9.187.1.2.9.1.19
+          name: cbgpPeer3LastErrorSubcode
+          format: hex
+          extract_value: '^[0-9a-f]{2}([0-9a-f]{2})'
+
+  - id: cisco-bgp-peer-family
+    MIB: CISCO-BGP4-MIB
+    kind: peer_family
+    table:
+      OID: 1.3.6.1.4.1.9.9.187.1.2.8
+      name: cbgpPeer2AddrFamilyPrefixTable
+    identity:
+      neighbor:
+        index_transform:
+          - start: 2
+            drop_right: 2
+        format: ip_address
+      remote_as:
+        table: cbgpPeer2Table
+        index_transform:
+          - start: 0
+            drop_right: 2
+        symbol: { OID: 1.3.6.1.4.1.9.9.187.1.2.5.1.11, name: cbgpPeer2RemoteAs, format: uint32 }
+      address_family:
+        index_from_end: 2
+        mapping:
+          1: ipv4
+          2: ipv6
+          25: l2vpn
+      subsequent_address_family:
+        index_from_end: 1
+        mapping:
+          1: unicast
+          2: multicast
+          4: labeled_unicast
+          5: mvpn
+          65: vpls
+          70: evpn
+          128: vpn
+          132: rtfilter
+          133: flow
+    descriptors:
+      local_address:
+        table: cbgpPeer2Table
+        index_transform:
+          - start: 0
+            drop_right: 2
+        symbol: { OID: 1.3.6.1.4.1.9.9.187.1.2.5.1.6, name: cbgpPeer2LocalAddr, format: ip_address }
+      local_as:
+        table: cbgpPeer2Table
+        index_transform:
+          - start: 0
+            drop_right: 2
+        symbol: { OID: 1.3.6.1.4.1.9.9.187.1.2.5.1.8, name: cbgpPeer2LocalAs, format: uint32 }
+      local_identifier:
+        table: cbgpPeer2Table
+        index_transform:
+          - start: 0
+            drop_right: 2
+        symbol: { OID: 1.3.6.1.4.1.9.9.187.1.2.5.1.9, name: cbgpPeer2LocalIdentifier, format: ip_address }
+      peer_identifier:
+        table: cbgpPeer2Table
+        index_transform:
+          - start: 0
+            drop_right: 2
+        symbol: { OID: 1.3.6.1.4.1.9.9.187.1.2.5.1.12, name: cbgpPeer2RemoteIdentifier, format: ip_address }
+      peer_type:
+        index: 1
+        mapping:
+          0: unknown
+          1: ipv4
+          2: ipv6
+          3: ipv4z
+          4: ipv6z
+          16: dns
+      bgp_version:
+        table: cbgpPeer2Table
+        index_transform:
+          - start: 0
+            drop_right: 2
+        symbol: { OID: 1.3.6.1.4.1.9.9.187.1.2.5.1.5, name: cbgpPeer2NegotiatedVersion }
+    routes:
+      current:
+        accepted:
+          symbol: { OID: 1.3.6.1.4.1.9.9.187.1.2.8.1.1, name: cbgpPeer2AcceptedPrefixes }
+        rejected:
+          symbol: { OID: 1.3.6.1.4.1.9.9.187.1.2.8.1.2, name: cbgpPeer2DeniedPrefixes }
+        advertised:
+          symbol: { OID: 1.3.6.1.4.1.9.9.187.1.2.8.1.6, name: cbgpPeer2AdvertisedPrefixes }
+        suppressed:
+          symbol: { OID: 1.3.6.1.4.1.9.9.187.1.2.8.1.7, name: cbgpPeer2SuppressedPrefixes }
+        withdrawn:
+          symbol: { OID: 1.3.6.1.4.1.9.9.187.1.2.8.1.8, name: cbgpPeer2WithdrawnPrefixes }
+    route_limits:
+      limit:
+        symbol: { OID: 1.3.6.1.4.1.9.9.187.1.2.8.1.3, name: cbgpPeer2PrefixAdminLimit }
+      threshold:
+        symbol: { OID: 1.3.6.1.4.1.9.9.187.1.2.8.1.4, name: cbgpPeer2PrefixThreshold }
+      clear_threshold:
+        symbol: { OID: 1.3.6.1.4.1.9.9.187.1.2.8.1.5, name: cbgpPeer2PrefixClearThreshold }

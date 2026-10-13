@@ -2,6 +2,12 @@
 
 package program
 
+import (
+	"errors"
+	"fmt"
+	"strings"
+)
+
 // PromotionMode defines how non-identity chart labels are selected.
 type PromotionMode string
 
@@ -45,6 +51,99 @@ func DefaultLabelPrecedence() LabelPrecedence {
 		InstanceOverJob:      true,
 		ReservedImmutable:    true,
 	}
+}
+
+func validateLabelPolicy(policy LabelPolicy) error {
+	switch policy.Mode {
+	case PromotionModeAutoIntersection, PromotionModeExplicitIntersection:
+		return nil
+	default:
+		return fmt.Errorf("invalid promotion mode %q", policy.Mode)
+	}
+}
+
+func validateInstanceLabelSelectors(selectors []InstanceLabelSelector) error {
+	if len(selectors) == 0 {
+		return nil
+	}
+
+	hasPositive := false
+	var errs []error
+	for i, selector := range selectors {
+		switch {
+		case selector.IncludeAll:
+			if selector.Exclude || selector.Key != "" {
+				errs = append(errs, fmt.Errorf("instance selector[%d]: include-all selector must not set exclude or key", i))
+				continue
+			}
+			hasPositive = true
+		case selector.Exclude:
+			if selector.Key == "" {
+				errs = append(errs, fmt.Errorf("instance selector[%d]: exclude selector key is required", i))
+				continue
+			}
+			if strings.TrimSpace(selector.Key) != selector.Key {
+				errs = append(errs, fmt.Errorf("instance selector[%d]: exclude selector key must be trimmed", i))
+			}
+		case selector.Key != "":
+			if strings.TrimSpace(selector.Key) != selector.Key {
+				errs = append(errs, fmt.Errorf("instance selector[%d]: selector key must be trimmed", i))
+			}
+			hasPositive = true
+		default:
+			errs = append(errs, fmt.Errorf("instance selector[%d]: selector is empty", i))
+		}
+	}
+
+	if !hasPositive {
+		errs = append(errs, fmt.Errorf("instance selectors must include at least one positive selector"))
+	}
+	return errors.Join(errs...)
+}
+
+func validateInstanceLabelPolicy(selectors []InstanceLabelSelector, optionalKeys []string) error {
+	if len(optionalKeys) == 0 {
+		return validateInstanceLabelSelectors(selectors)
+	}
+
+	var errs []error
+	if err := validateInstanceLabelSelectors(selectors); err != nil {
+		errs = append(errs, err)
+	}
+
+	requiredKeys := make(map[string]struct{}, len(selectors))
+	includeAll := false
+	for _, selector := range selectors {
+		includeAll = includeAll || selector.IncludeAll
+		if selector.Key != "" {
+			requiredKeys[selector.Key] = struct{}{}
+		}
+	}
+
+	seen := make(map[string]struct{}, len(optionalKeys))
+	for i, key := range optionalKeys {
+		if key == "" {
+			errs = append(errs, fmt.Errorf("optional instance label[%d]: key is required", i))
+			continue
+		}
+		if strings.TrimSpace(key) != key {
+			errs = append(errs, fmt.Errorf("optional instance label[%d]: key must be trimmed", i))
+		}
+		if key == "*" || strings.HasPrefix(key, "!") {
+			errs = append(errs, fmt.Errorf("optional instance label[%d]: key must be explicit", i))
+		}
+		if _, ok := seen[key]; ok {
+			errs = append(errs, fmt.Errorf("optional instance label[%d]: duplicate key %q", i, key))
+		}
+		seen[key] = struct{}{}
+		if includeAll {
+			errs = append(errs, fmt.Errorf("optional instance label[%d]: cannot be combined with include-all", i))
+		}
+		if _, ok := requiredKeys[key]; ok {
+			errs = append(errs, fmt.Errorf("optional instance label[%d]: key %q conflicts with required selectors", i, key))
+		}
+	}
+	return errors.Join(errs...)
 }
 
 // InstanceLabelSelector is a normalized token from instances.by_labels.

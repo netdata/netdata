@@ -4,6 +4,7 @@ package mongo
 
 import (
 	"fmt"
+	"maps"
 	"reflect"
 
 	"github.com/netdata/netdata/go/plugins/pkg/stm"
@@ -22,9 +23,7 @@ func (c *Collector) collectServerStatus(mx map[string]int64) error {
 
 	c.addOptionalCharts(s)
 
-	for k, v := range stm.ToMap(s) {
-		mx[k] = v
-	}
+	maps.Copy(mx, stm.ToMap(s))
 
 	if s.Transactions != nil && s.Transactions.CommitTypes != nil {
 		px := "txn_commit_types_"

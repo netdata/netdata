@@ -24,7 +24,7 @@ inline size_t pluginsd_initialize_plugin_directories()
     // Get the configuration entry
     if (likely(!plugins_dir_list)) {
         snprintfz(plugins_dirs, FILENAME_MAX * 2, "\"%s\" \"%s/custom-plugins.d\"", PLUGINS_DIR, CONFIG_DIR);
-        plugins_dir_list = strdupz(inicfg_get(&netdata_config, CONFIG_SECTION_DIRECTORIES, "plugins", plugins_dirs));
+        plugins_dir_list = strdupz(inicfg_get_quoted_path_list(&netdata_config, CONFIG_SECTION_DIRECTORIES, "plugins", plugins_dirs));
     }
 
     // Parse it and store it to plugin directories
@@ -83,6 +83,34 @@ static void pluginsd_worker_thread_handle_success(struct plugind *cd) {
     }
 }
 
+// The policy for a failed run, whether the plugin exited with an error or we
+// disconnected it because we could not parse its output: disable it if it never
+// produced useful output, otherwise restart it with backoff until too many
+// consecutive runs fail without useful output.
+static void pluginsd_worker_thread_handle_failure(struct plugind *cd, const char *failure) {
+    if (!cd->successful_collections) {
+        netdata_log_error("PLUGINSD: 'host:%s', '%s' (pid %d) %s and haven't collected any data. Disabling it.",
+              rrdhost_hostname(cd->host), string2str(cd->fullfilename), cd->unsafe.pid, failure);
+        plugin_set_disabled(cd);
+        return;
+    }
+
+    if (cd->serial_failures <= SERIAL_FAILURES_THRESHOLD) {
+        netdata_log_error("PLUGINSD: 'host:%s', '%s' (pid %d) %s, but has given useful output in the past (%zu times). %s",
+              rrdhost_hostname(cd->host), string2str(cd->fullfilename), cd->unsafe.pid, failure, cd->successful_collections,
+              plugin_is_enabled(cd) ? "Waiting a bit before starting it again." : "Will not start it again - it is disabled.");
+
+        pluginsd_sleep(cd->update_every * 10);
+        return;
+    }
+
+    netdata_log_error("PLUGINSD: 'host:%s', '%s' (pid %d) %s, but has given useful output in the past (%zu times)."
+          "We tried to restart it %zu times, but it failed to generate data. Disabling it.",
+          rrdhost_hostname(cd->host), string2str(cd->fullfilename), cd->unsafe.pid, failure,
+          cd->successful_collections, cd->serial_failures);
+    plugin_set_disabled(cd);
+}
+
 static void pluginsd_worker_thread_handle_error(struct plugind *cd, int worker_ret_code) {
     if (worker_ret_code == -1) {
         netdata_log_info("PLUGINSD: 'host:%s', '%s' (pid %d) exited abnormally. Disabling it.",
@@ -91,30 +119,9 @@ static void pluginsd_worker_thread_handle_error(struct plugind *cd, int worker_r
         return;
     }
 
-    if (!cd->successful_collections) {
-        netdata_log_error("PLUGINSD: 'host:%s', '%s' (pid %d) exited with error code %d and haven't collected any data. Disabling it.",
-              rrdhost_hostname(cd->host), string2str(cd->fullfilename), cd->unsafe.pid, worker_ret_code);
-        plugin_set_disabled(cd);
-        return;
-    }
-
-    if (cd->serial_failures <= SERIAL_FAILURES_THRESHOLD) {
-        netdata_log_error("PLUGINSD: 'host:%s', '%s' (pid %d) exited with error code %d, but has given useful output in the past (%zu times). %s",
-              rrdhost_hostname(cd->host), string2str(cd->fullfilename), cd->unsafe.pid, worker_ret_code, cd->successful_collections,
-              plugin_is_enabled(cd) ? "Waiting a bit before starting it again." : "Will not start it again - it is disabled.");
-
-        pluginsd_sleep(cd->update_every * 10);
-        return;
-    }
-
-    if (cd->serial_failures > SERIAL_FAILURES_THRESHOLD) {
-        netdata_log_error("PLUGINSD: 'host:%s', '%s' (pid %d) exited with error code %d, but has given useful output in the past (%zu times)."
-              "We tried to restart it %zu times, but it failed to generate data. Disabling it.",
-              rrdhost_hostname(cd->host), string2str(cd->fullfilename), cd->unsafe.pid, worker_ret_code,
-              cd->successful_collections, cd->serial_failures);
-        plugin_set_disabled(cd);
-        return;
-    }
+    char failure[50];
+    snprintfz(failure, sizeof(failure), "exited with error code %d", worker_ret_code);
+    pluginsd_worker_thread_handle_failure(cd, failure);
 }
 
 #undef SERIAL_FAILURES_THRESHOLD
@@ -159,10 +166,11 @@ static void pluginsd_worker_thread(void *arg) {
         };
         ND_LOG_STACK_PUSH(lgs);
 
+        bool retry = false, protocol_error = false;
         count = pluginsd_process(cd->host, cd,
                                  spawn_popen_read_fd(cd->unsafe.pi),
                                  spawn_popen_write_fd(cd->unsafe.pi),
-                                 0);
+                                 0, &retry, &protocol_error);
 
         nd_log(NDLS_COLLECTORS, NDLP_WARNING,
                "PLUGINSD: 'host:%s', '%s' (pid %d) disconnected after %zu successful data collections.",
@@ -171,7 +179,13 @@ static void pluginsd_worker_thread(void *arg) {
         int worker_ret_code = spawn_popen_kill(cd->unsafe.pi, 3 * MSEC_PER_SEC);
         cd->unsafe.pi = NULL;
 
-        if(likely(worker_ret_code == 0))
+        if (retry && worker_ret_code != -1)
+            pluginsd_sleep(cd->update_every);
+        else if (protocol_error && worker_ret_code != -1)
+            // after the disconnect the plugin usually exits cleanly or on SIGTERM/SIGPIPE,
+            // so its exit code cannot tell that the run failed
+            pluginsd_worker_thread_handle_failure(cd, "sent output that could not be parsed");
+        else if(likely(worker_ret_code == 0))
             pluginsd_worker_thread_handle_success(cd);
         else
             pluginsd_worker_thread_handle_error(cd, worker_ret_code);
@@ -274,6 +288,22 @@ static bool is_plugin(char *dst, size_t dst_size, const char *filename) {
     return false;
 }
 
+// Plugins that were removed from the agent but may linger on disk after an
+// upgrade.
+static bool is_obsolete_plugin(const char *pluginname) {
+    static const char *obsolete[] = {
+        "otel-signal-viewer",
+        NULL,
+    };
+
+    for (size_t i = 0; obsolete[i]; i++) {
+        if (strcmp(pluginname, obsolete[i]) == 0)
+            return true;
+    }
+
+    return false;
+}
+
 void *pluginsd_main(void *ptr) {
     CLEANUP_FUNCTION_REGISTER(pluginsd_main_cleanup) cleanup_ptr = ptr;
 
@@ -325,6 +355,20 @@ void *pluginsd_main(void *ptr) {
                 char pluginname[CONFIG_MAX_NAME + 1];
                 if(!is_plugin(pluginname, sizeof(pluginname), file->d_name)) {
                     netdata_log_debug(D_PLUGINSD, "file '%s' does not look like a plugin", file->d_name);
+                    continue;
+                }
+
+                // Skip any obsolete plugins.
+                if(is_obsolete_plugin(pluginname)) {
+                    // log info level first time, debug level afterwards.
+                    static bool logged_obsolete = false;
+                    if(!logged_obsolete) {
+                        logged_obsolete = true;
+                        netdata_log_info("skipping obsolete plugin '%s'; the current agent already provides its function", file->d_name);
+                    }
+                    else {
+                        netdata_log_debug(D_PLUGINSD, "skipping obsolete plugin '%s'", file->d_name);
+                    }
                     continue;
                 }
 

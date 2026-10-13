@@ -3,6 +3,7 @@
 #include "rrd.h"
 #include "storage-engine.h"
 #include "rrddim-collection.h"
+#include "ram/rrddim_mem.h"
 
 void rrddim_metadata_updated(RRDDIM *rd) {
     rrdcontext_updated_rrddim(rd);
@@ -28,6 +29,10 @@ struct rrddim_constructor {
     } react_action;
 
 };
+
+static inline int32_t rrddim_normalize_divisor(int32_t divisor) {
+    return divisor ? divisor : 1;
+}
 
 // isolated call to appear
 // separate in statistics
@@ -60,8 +65,7 @@ static void rrddim_insert_callback(const DICTIONARY_ITEM *item __maybe_unused, v
 
     rd->algorithm = ctr->algorithm;
     rd->multiplier = ctr->multiplier;
-    rd->divisor = ctr->divisor;
-    if(!rd->divisor) rd->divisor = 1;
+    rd->divisor = rrddim_normalize_divisor(ctr->divisor);
 
     rd->rrdset = st;
 
@@ -143,31 +147,11 @@ static void rrddim_insert_callback(const DICTIONARY_ITEM *item __maybe_unused, v
             netdata_log_error("Failed to initialize data collection for all db tiers for chart '%s', dimension '%s", rrdset_name(st), rrddim_name(rd));
     }
 
-    if(rrdset_number_of_dimensions(st) != 0) {
-        RRDDIM *td;
-        dfe_start_write(st->rrddim_root_index, td) {
-            if(td) break;
-        }
-        dfe_done(td);
-
-        if(td && (td->algorithm != rd->algorithm || ABS(td->multiplier) != ABS(rd->multiplier) || ABS(td->divisor) != ABS(rd->divisor))) {
-            if(!rrdset_flag_check(st, RRDSET_FLAG_HETEROGENEOUS)) {
-#ifdef NETDATA_INTERNAL_CHECKS
-                netdata_log_info("Dimension '%s' added on chart '%s' of host '%s' is not homogeneous to other dimensions already "
-                     "present (algorithm is '%s' vs '%s', multiplier is %d vs %d, "
-                     "divisor is %d vs %d).",
-                     rrddim_name(rd),
-                     rrdset_name(st),
-                     rrdhost_hostname(host),
-                     rrd_algorithm_name(rd->algorithm), rrd_algorithm_name(td->algorithm),
-                     rd->multiplier, td->multiplier,
-                     rd->divisor, td->divisor
-                );
-#endif
-                rrdset_flag_set(st, RRDSET_FLAG_HETEROGENEOUS);
-            }
-        }
-    }
+    // NOTE: the heterogeneity check has moved to rrddim_react_callback().
+    // Running it here calls dfe_start_*() on st->rrddim_root_index while the
+    // index write-lock of that dict is still held by the inserter — AB-BA
+    // against svc_rrdset_archive_obsolete_dimensions() which holds items-write
+    // and then calls dictionary_del() that wants index-write.
 
     // let the chart resync
     rrdset_flag_set(st, RRDSET_FLAG_SYNC_CLOCK);
@@ -229,22 +213,39 @@ static void rrddim_delete_callback(const DICTIONARY_ITEM *item __maybe_unused, v
 
     netdata_log_debug(D_RRD_CALLS, "rrddim_free() %s.%s", rrdset_name(st), rrddim_name(rd));
 
-    if (!rrddim_finalize_collection_and_check_retention(rd) && rd->rrd_memory_mode == RRD_DB_MODE_DBENGINE) {
-        /* This metric has no data and no references */
+    // finalize collection first (tears down tier collect handles); its return
+    // means "the db still has retention for this dimension".
+    bool has_db_retention = rrddim_finalize_collection_and_check_retention(rd);
+
+    // Delete the dimension's SQLite metadata when freeing it leaves no queryable
+    // data behind:
+    //   - dbengine: only when no on-disk retention remains;
+    //   - ram/alloc/none: all use the in-memory rrddim storage backend, so data
+    //     lives only in RAM and a freed dimension is always orphaned (the
+    //     retention check above misreports these modes as retained).
+    if ((rd->rrd_memory_mode == RRD_DB_MODE_DBENGINE && !has_db_retention) ||
+        rd->rrd_memory_mode == RRD_DB_MODE_RAM ||
+        rd->rrd_memory_mode == RRD_DB_MODE_ALLOC ||
+        rd->rrd_memory_mode == RRD_DB_MODE_NONE) {
         metaqueue_delete_dimension_uuid(uuidmap_uuid_ptr(rd->uuid));
     }
+
+    bool db_data_lifetime_transferred = false;
 
     for(size_t tier = 0; tier < nd_profile.storage_tiers;tier++) {
         spinlock_lock(&rd->tiers[tier].spinlock);
         if(rd->tiers[tier].smh) {
             STORAGE_ENGINE *eng = host->db[tier].eng;
-            eng->api.metric_release(rd->tiers[tier].smh);
+            if(rd->tiers[tier].seb == STORAGE_ENGINE_BACKEND_RRDDIM)
+                db_data_lifetime_transferred |= rrddim_metric_release_from_rrddim(rd->tiers[tier].smh, rd);
+            else
+                eng->api.metric_release(rd->tiers[tier].smh);
             rd->tiers[tier].smh = NULL;
         }
         spinlock_unlock(&rd->tiers[tier].spinlock);
     }
 
-    if(rd->db.data) {
+    if(rd->db.data && !db_data_lifetime_transferred) {
         pulse_db_rrd_memory_sub(rd->db.memsize);
 
         if(rd->rrd_memory_mode == RRD_DB_MODE_RAM)
@@ -300,6 +301,40 @@ static void rrddim_react_callback(const DICTIONARY_ITEM *item __maybe_unused, vo
         rrdset_flag_set(st, RRDSET_FLAG_SYNC_CLOCK);
     }
 
+    if(ctr->react_action & RRDDIM_REACT_NEW) {
+        // heterogeneity check (in react not insert: insert still holds index-write).
+        // compare and flag-set inside the loop body so td stays referenced via the
+        // dfe iterator (no UAF after dfe_done). rd is in the items list by react
+        // time, so skip td == rd.
+        RRDDIM *td;
+        dfe_start_read(st->rrddim_root_index, td) {
+            if(td == rd)
+                continue;
+
+            if(td->algorithm != rd->algorithm
+               || rrddim_scale_magnitude(td->multiplier) != rrddim_scale_magnitude(rd->multiplier)
+               || rrddim_scale_magnitude(td->divisor)    != rrddim_scale_magnitude(rd->divisor)) {
+                if(!rrdset_flag_check(st, RRDSET_FLAG_HETEROGENEOUS)) {
+#ifdef NETDATA_INTERNAL_CHECKS
+                    netdata_log_info("Dimension '%s' added on chart '%s' of host '%s' is not homogeneous to other dimensions already "
+                         "present (algorithm is '%s' vs '%s', multiplier is %d vs %d, "
+                         "divisor is %d vs %d).",
+                         rrddim_name(rd),
+                         rrdset_name(st),
+                         rrdhost_hostname(st->rrdhost),
+                         rrd_algorithm_name(rd->algorithm), rrd_algorithm_name(td->algorithm),
+                         rd->multiplier, td->multiplier,
+                         rd->divisor, td->divisor
+                    );
+#endif
+                    rrdset_flag_set(st, RRDSET_FLAG_HETEROGENEOUS);
+                }
+            }
+            break;
+        }
+        dfe_done(td);
+    }
+
     rrddim_metadata_updated(rd);
 }
 
@@ -324,8 +359,8 @@ void rrddim_index_destroy(RRDSET *st) {
     st->rrddim_root_index = NULL;
 }
 
-static inline RRDDIM *rrddim_index_find(RRDSET *st, const char *id) {
-    return dictionary_get(st->rrddim_root_index, id);
+static inline const DICTIONARY_ITEM *rrddim_index_find_and_acquire(RRDSET *st, const char *id) {
+    return dictionary_get_and_acquire_item(st->rrddim_root_index, id);
 }
 
 // ----------------------------------------------------------------------------
@@ -334,13 +369,16 @@ static inline RRDDIM *rrddim_index_find(RRDSET *st, const char *id) {
 inline RRDDIM *rrddim_find(RRDSET *st, const char *id, bool include_obsolete) {
     netdata_log_debug(D_RRD_CALLS, "rrddim_find() for chart %s, dimension %s", rrdset_name(st), id);
 
-    RRDDIM *rd = rrddim_index_find(st, id);
+    const DICTIONARY_ITEM *rd_item = rrddim_index_find_and_acquire(st, id);
+    RRDDIM *rd = dictionary_acquired_item_value(rd_item);
     if(rd) {
         if(!include_obsolete && rrddim_flag_check(rd, RRDDIM_FLAG_OBSOLETE) && !rrdset_is_discoverable(st))
-            return NULL;
-
-        rd->rrdset->last_accessed_time_s = now_realtime_sec();
+            rd = NULL;
+        else
+            rrdset_touch_last_accessed_time_s(rd->rrdset);
     }
+
+    dictionary_acquired_item_release(st->rrddim_root_index, rd_item);
 
     return rd;
 }
@@ -356,7 +394,7 @@ inline RRDDIM_ACQUIRED *rrddim_find_and_acquire(RRDSET *st, const char *id, bool
             return NULL;
         }
 
-        rd->rrdset->last_accessed_time_s = now_realtime_sec();
+        rrdset_touch_last_accessed_time_s(rd->rrdset);
     }
 
     return rda;
@@ -421,6 +459,8 @@ inline int rrddim_set_multiplier(RRDSET *st, RRDDIM *rd, int32_t multiplier) {
 }
 
 inline int rrddim_set_divisor(RRDSET *st, RRDDIM *rd, int32_t divisor) {
+    divisor = rrddim_normalize_divisor(divisor);
+
     if(unlikely(rd->divisor == divisor))
         return 0;
 
@@ -500,17 +540,20 @@ RRDDIM *rrddim_add_custom(RRDSET *st
 
     RRDDIM *rd = NULL;
     while(!rd) {
-        rd = rrddim_index_find(st, id);
-        if(rd) {
-            if(spinlock_trylock(&rd->destroy_lock)) {
-                rrddim_isnot_obsolete___safe_from_collector_thread(st, rd);
-                spinlock_unlock(&rd->destroy_lock);
+        const DICTIONARY_ITEM *item = dictionary_get_and_acquire_item(st->rrddim_root_index, id);
+        if(item) {
+            RRDDIM *existing_rd = dictionary_acquired_item_value(item);
+            if(spinlock_trylock(&existing_rd->destroy_lock)) {
+                rrddim_isnot_obsolete___safe_from_collector_thread(st, existing_rd);
+                spinlock_unlock(&existing_rd->destroy_lock);
             }
             else {
-                rd = NULL;
+                dictionary_acquired_item_release(st->rrddim_root_index, item);
                 microsleep(1 * USEC_PER_MS);
                 continue;
             }
+
+            dictionary_acquired_item_release(st->rrddim_root_index, item);
         }
 
         struct rrddim_constructor tmp = {
@@ -524,6 +567,20 @@ RRDDIM *rrddim_add_custom(RRDSET *st
         };
 
         rd = dictionary_set_advanced(st->rrddim_root_index, tmp.id, -1, NULL, rrddim_size(), &tmp);
+
+        if(unlikely(!rd))
+            // The index refused the insert, which only happens once
+            // rrddim_index_destroy() has destroyed it - and that runs from
+            // rrdset_free(), i.e. this chart is already being freed. Retrying
+            // can never succeed: the loop above would spin at 100% CPU forever
+            // on a dictionary that refuses every insert. Returning NULL is not
+            // an option either - rrddim_add() callers dereference the result
+            // unconditionally (the usual idiom is rrddim_set_by_pointer() on
+            // the very next line), so this mirrors rrdset_create_custom().
+            fatal("RRDDIM: dimension '%s' of chart '%s' on host '%s' cannot be created: "
+                  "the chart's dimension index is being destroyed. "
+                  "A collector is still adding dimensions to a chart that is being freed.",
+                  id, rrdset_id(st), rrdhost_hostname(st->rrdhost));
     }
 
     return(rd);
@@ -583,6 +640,17 @@ int rrddim_unhide(RRDSET *st, const char *id) {
 }
 
 inline void rrddim_is_obsolete___safe_from_collector_thread(RRDSET *st, RRDDIM *rd) {
+    // Already obsolete - there is no transition to make, and bumping RRDSET.version again would
+    // re-send the whole chart definition upstream. pluginsd_dimension() calls this on every
+    // DIMENSION line carrying the "obsolete" option, so a child that keeps declaring a dimension
+    // obsolete would otherwise re-announce its chart forever.
+    // Skipping the housekeeping flag re-raise is safe: svc_rrdset_archive_obsolete_dimensions()
+    // (daemon/service.c) re-sets RRDSET_FLAG_OBSOLETE_DIMENSIONS itself whenever a candidate could
+    // not be archived in a pass, so cleanup does not depend on the collector re-raising it.
+    // Mirrors rrdset_is_obsolete___safe_from_collector_thread(), which has always been guarded.
+    if(unlikely(rrddim_flag_check(rd, RRDDIM_FLAG_OBSOLETE)))
+        return;
+
     netdata_log_debug(D_RRD_CALLS, "rrddim_is_obsolete___safe_from_collector_thread() for chart %s, dimension %s", rrdset_name(st), rrddim_name(rd));
 
     rrddim_flag_set(rd, RRDDIM_FLAG_OBSOLETE);
@@ -593,6 +661,21 @@ inline void rrddim_is_obsolete___safe_from_collector_thread(RRDSET *st, RRDDIM *
 }
 
 inline void rrddim_isnot_obsolete___safe_from_collector_thread(RRDSET *st __maybe_unused, RRDDIM *rd) {
+    // Nothing to clear when the dimension is not obsolete - and doing the work anyway is not free:
+    // rrdset_metadata_updated() bumps RRDSET.version, which makes rrdset_check_upstream_exposed()
+    // false and re-sends the entire chart definition (incl. every chart label) to the parent. The
+    // hot callers (rrddim_add_custom(), pluginsd_dimension()) reach this on every collection step,
+    // so without this guard every collected dimension re-announces its chart, forever.
+    // This mirrors rrdset_isnot_obsolete___safe_from_collector_thread(), which has always been guarded.
+    // Skipping rrddim_reinitialize_collection() here is safe: the hot callers that pass a
+    // non-obsolete dimension (rrddim_add_custom(), pluginsd_dimension()) have just run it via
+    // rrddim_conflict_callback() in the rrddim_add() that precedes them, and it is idempotent
+    // anyway (it only fills rd->tiers[].sch when NULL). The callers that revive a genuinely
+    // obsolete dimension (pluginsd_set_v2(), rrdset_done()) already test RRDDIM_FLAG_OBSOLETE
+    // themselves, so this guard never fires for them and the full body below runs.
+    if(likely(!rrddim_flag_check(rd, RRDDIM_FLAG_OBSOLETE)))
+        return;
+
     netdata_log_debug(D_RRD_CALLS, "rrddim_isnot_obsolete___safe_from_collector_thread() for chart %s, dimension %s", rrdset_name(st), rrddim_name(rd));
 
     rrddim_flag_clear(rd, RRDDIM_FLAG_OBSOLETE);
@@ -651,13 +734,7 @@ collected_number rrddim_timed_set_by_pointer(RRDSET *st __maybe_unused, RRDDIM *
 //        *((int64_t *)Pvalue) = *((int64_t *)Pvalue) + 1;
 //    spinlock_unlock(&st->rrdhost->accounting.spinlock);
 
-    NETDATA_DOUBLE v = value >= 0 ? (NETDATA_DOUBLE)value : (NETDATA_DOUBLE)(-value);
-    if (unlikely(v > rrddim_collected_max_as_double(rd))) {
-        if(rrddim_is_float(rd))
-            rrddim_set_collected_max_float(rd, v);
-        else
-            rrddim_set_collected_max_int(rd, (int64_t)v);
-    }
+    rrddim_update_collected_max_from_int(rd, value);
     // For int dims return the last collected int; for float dims the integer return is meaningless, so return 0 to avoid truncation misuse.
     if(rrddim_is_float(rd))
         return 0;

@@ -196,7 +196,7 @@ func (c *Client) GetResourcePublications() (*ResourcePublicationsResult, error) 
 	return nil, errors.New("PCF protocol requires CGO support")
 }
 
-func (c *Client) GetResourceMonitorData() (map[string]interface{}, error) {
+func (c *Client) GetResourceMonitorData() (map[string]any, error) {
 	return nil, errors.New("PCF protocol requires CGO support")
 }
 

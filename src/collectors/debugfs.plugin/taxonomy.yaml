@@ -1,0 +1,5 @@
+taxonomy_version: 1
+plugin_name: debugfs.plugin
+module_name: libsensors
+taxonomy_optout:
+  reason: debugfs.plugin covers heterogeneous Linux kernel subsystems (memory fragmentation, zswap, powercap, audit, libsensors hardware sensors) across independent collection modules. Dashboard taxonomy placement for these contexts has not yet been defined.

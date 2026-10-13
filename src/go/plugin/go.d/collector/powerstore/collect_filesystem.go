@@ -2,9 +2,12 @@
 
 package powerstore
 
-import "sync"
+import (
+	"context"
+	"sync"
+)
 
-func (c *Collector) collectFileSystems() {
+func (c *Collector) collectFileSystems(ctx context.Context) {
 	var wg sync.WaitGroup
 
 	for id, fs := range c.discovered.fileSystems {
@@ -14,7 +17,7 @@ func (c *Collector) collectFileSystems() {
 			c.sem <- struct{}{}
 			defer func() { <-c.sem }()
 
-			pm, err := c.client.PerformanceMetricsByFileSystem(id)
+			pm, err := c.client.PerformanceMetricsByFileSystem(ctx, id)
 			if err != nil {
 				c.Warningf("error collecting filesystem %s perf metrics: %v", id, err)
 			} else if len(pm) > 0 {

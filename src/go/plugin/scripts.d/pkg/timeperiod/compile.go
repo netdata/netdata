@@ -299,7 +299,7 @@ func (p *Period) NextAllowed(t time.Time) time.Time {
 	if p == nil {
 		return t
 	}
-	for i := 0; i < 60*24*90; i++ { // search up to ~90 days
+	for range 60 * 24 * 90 { // search up to ~90 days
 		if p.Allows(t) {
 			return t
 		}

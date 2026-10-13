@@ -15,11 +15,7 @@ import (
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/docker/dockerfunc"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/dockerhost"
 
-	"github.com/docker/docker/api/types"
-	typesContainer "github.com/docker/docker/api/types/container"
-	typesImage "github.com/docker/docker/api/types/image"
-	typesSystem "github.com/docker/docker/api/types/system"
-	docker "github.com/docker/docker/client"
+	docker "github.com/moby/moby/client"
 )
 
 //go:embed "config_schema.json"
@@ -28,9 +24,13 @@ var configSchema string
 func init() {
 	collectorapi.Register("docker", collectorapi.Creator{
 		JobConfigSchema: configSchema,
+		Defaults: collectorapi.Defaults{
+			// Docker Engine 29+ with the containerd image store makes the container list expensive for the daemon.
+			UpdateEvery: 10,
+		},
 		Create:          func() collectorapi.CollectorV1 { return New() },
 		Config:          func() any { return &Config{} },
-		Methods:         dockerfunc.Methods,
+		SharedFunctions: dockerfunc.Methods,
 		MethodHandler: func(job collectorapi.RuntimeJob) funcapi.MethodHandler {
 			c, ok := job.Collector().(*Collector)
 			if !ok {
@@ -52,10 +52,11 @@ func New() *Collector {
 
 		charts: summaryCharts.Copy(),
 		newClient: func(cfg Config) (dockerClient, error) {
-			return docker.NewClientWithOpts(docker.WithHost(cfg.Address))
+			return docker.New(docker.WithHost(cfg.Address))
 		},
 		cntrSr:     matcher.TRUE(),
 		containers: make(map[string]bool),
+		now:        time.Now,
 	}
 	c.funcRouter = dockerfunc.NewRouter(funcDepsAdapter{collector: c})
 	return c
@@ -83,15 +84,17 @@ type (
 
 		funcRouter funcapi.MethodHandler
 
-		verNegotiated bool
-		containers    map[string]bool
-		cntrSr        matcher.Matcher
+		containers map[string]bool
+		cntrSr     matcher.Matcher
+
+		now               func() time.Time
+		images            imagesSnapshot
+		imagesNextRefresh time.Time
 	}
 	dockerClient interface {
-		NegotiateAPIVersion(context.Context)
-		Info(context.Context) (typesSystem.Info, error)
-		ImageList(context.Context, typesImage.ListOptions) ([]typesImage.Summary, error)
-		ContainerList(context.Context, typesContainer.ListOptions) ([]types.Container, error)
+		Info(context.Context, docker.InfoOptions) (docker.SystemInfoResult, error)
+		ImageList(context.Context, docker.ImageListOptions) (docker.ImageListResult, error)
+		ContainerList(context.Context, docker.ContainerListOptions) (docker.ContainerListResult, error)
 		Close() error
 	}
 )

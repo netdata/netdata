@@ -6,6 +6,7 @@ modules:
       module_name: tengine
       monitored_instance:
         name: Tengine
+        description: "Monitor Tengine bandwidth, connections, requests, response codes, and upstream activity."
         link: https://tengine.taobao.org/
         icon_filename: tengine.jpeg
         categories:
@@ -189,13 +190,13 @@ modules:
             - name: Multi-instance
               description: |
                 > **Note**: When you define multiple jobs, their names must be unique.
-                
+
                 Local and remote instances.
               config: |
                 jobs:
                  - name: local
                    url: http://127.0.0.1/us
-                
+
                  - name: remote
                    url: http://203.0.113.10/us
     troubleshooting:

@@ -63,7 +63,7 @@ modules:
             | server_address | %<A               | Server FQDN or peer name.                                     |
             | mime_type      | %mt               | MIME content type.                                            |
 
-            In addition, to make `Squid` [native log format](https://wiki.squid-cache.org/Features/LogFormat#Squid_native_access.log_format_in_detail) csv parsable, squidlog understands these groups of codes:
+            In addition, to make `Squid` [native log format](https://wiki.squid-cache.org/Features/LogFormat#squid-native-accesslog-format-in-detail) csv parsable, squidlog understands these groups of codes:
 
             | field       | squid format code | description                        |
             |-------------|-------------------|------------------------------------|

@@ -2,9 +2,12 @@
 
 package powerstore
 
-import "sync"
+import (
+	"context"
+	"sync"
+)
 
-func (c *Collector) collectVolumes() {
+func (c *Collector) collectVolumes(ctx context.Context) {
 	var wg sync.WaitGroup
 
 	for id, vol := range c.discovered.volumes {
@@ -14,7 +17,7 @@ func (c *Collector) collectVolumes() {
 			c.sem <- struct{}{}
 			defer func() { <-c.sem }()
 
-			pm, err := c.client.PerformanceMetricsByVolume(id)
+			pm, err := c.client.PerformanceMetricsByVolume(ctx, id)
 			if err != nil {
 				c.Warningf("error collecting volume %s perf metrics: %v", id, err)
 			} else if len(pm) > 0 {
@@ -28,7 +31,7 @@ func (c *Collector) collectVolumes() {
 				c.mx.volume.perf.avgLatency.WithLabelValues(name).Observe(last.AvgLatency)
 			}
 
-			sm, err := c.client.SpaceMetricsByVolume(id)
+			sm, err := c.client.SpaceMetricsByVolume(ctx, id)
 			if err != nil {
 				c.Warningf("error collecting volume %s space metrics: %v", id, err)
 			} else if len(sm) > 0 {

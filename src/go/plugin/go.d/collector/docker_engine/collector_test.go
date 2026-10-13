@@ -251,7 +251,7 @@ func TestCollector_Collect(t *testing.T) {
 			pulsar, srv := test.prepare(t)
 			defer srv.Close()
 
-			for i := 0; i < 10; i++ {
+			for range 10 {
 				_ = pulsar.Collect(context.Background())
 			}
 			mx := pulsar.Collect(context.Background())

@@ -1,139 +1,138 @@
 ---
-id: firewall
-name: Azure Firewall
+display_name: Azure Firewall
 resource_type: Microsoft.Network/azureFirewalls
 metrics:
-- id: firewall_health
-  azure_name: FirewallHealth
-  time_grain: PT1M
-  series:
-  - aggregation: average
-    kind: gauge
-- id: firewall_latency_png
-  azure_name: FirewallLatencyPng
-  time_grain: PT1M
-  series:
-  - aggregation: average
-    kind: gauge
-- id: throughput
-  azure_name: Throughput
-  time_grain: PT1M
-  series:
-  - aggregation: average
-    kind: gauge
-- id: data_processed
-  azure_name: DataProcessed
-  time_grain: PT1M
-  series:
-  - aggregation: total
-    kind: counter
-- id: application_rule_hit
-  azure_name: ApplicationRuleHit
-  time_grain: PT1M
-  series:
-  - aggregation: total
-    kind: counter
-- id: network_rule_hit
-  azure_name: NetworkRuleHit
-  time_grain: PT1M
-  series:
-  - aggregation: total
-    kind: counter
-- id: snat_port_utilization
-  azure_name: SNATPortUtilization
-  time_grain: PT1M
-  series:
-  - aggregation: average
-    kind: gauge
-- id: observed_capacity
-  azure_name: ObservedCapacity
-  time_grain: PT1M
-  series:
-  - aggregation: average
-    kind: gauge
+  - id: firewall_health
+    azure_name: FirewallHealth
+    time_grain: PT1M
+    series:
+      - aggregation: average
+        kind: gauge
+  - id: firewall_latency_png
+    azure_name: FirewallLatencyPng
+    time_grain: PT1M
+    series:
+      - aggregation: average
+        kind: gauge
+  - id: throughput
+    azure_name: Throughput
+    time_grain: PT1M
+    series:
+      - aggregation: average
+        kind: gauge
+  - id: data_processed
+    azure_name: DataProcessed
+    time_grain: PT1M
+    series:
+      - aggregation: total
+        kind: counter
+  - id: application_rule_hit
+    azure_name: ApplicationRuleHit
+    time_grain: PT1M
+    series:
+      - aggregation: total
+        kind: counter
+  - id: network_rule_hit
+    azure_name: NetworkRuleHit
+    time_grain: PT1M
+    series:
+      - aggregation: total
+        kind: counter
+  - id: snat_port_utilization
+    azure_name: SNATPortUtilization
+    time_grain: PT1M
+    series:
+      - aggregation: average
+        kind: gauge
+  - id: observed_capacity
+    azure_name: ObservedCapacity
+    time_grain: PT1M
+    series:
+      - aggregation: average
+        kind: gauge
 template:
   family: Azure Firewall
   context_namespace: firewall
   chart_defaults:
     label_promotion:
-    - resource_name
-    - resource_group
-    - region
-    - resource_type
-    - profile
+      - resource_name
+      - resource_group
+      - region
+      - resource_type
+      - profile
     instances:
       by_labels:
-      - resource_uid
+        - resource_uid
   charts:
-  - id: am_azure_firewall__health
-    title: Azure Firewall Health State
-    context: health
-    family: Health
-    type: line
-    units: percentage
-    algorithm: absolute
-    dimensions:
-    - selector: firewall.firewall_health_average
-      name: average
-  - id: am_azure_firewall__latency
-    title: Azure Firewall Latency Probe
-    context: latency
-    family: Performance
-    type: line
-    units: milliseconds
-    algorithm: absolute
-    dimensions:
-    - selector: firewall.firewall_latency_png_average
-      name: average
-  - id: am_azure_firewall__throughput
-    title: Azure Firewall Throughput
-    context: throughput
-    family: Traffic
-    type: line
-    units: bits/s
-    algorithm: absolute
-    dimensions:
-    - selector: firewall.throughput_average
-      name: average
-  - id: am_azure_firewall__data_processed
-    title: Azure Firewall Data Processed
-    context: data_processed
-    family: Traffic
-    type: line
-    units: bytes/s
-    algorithm: incremental
-    dimensions:
-    - selector: firewall.data_processed_total
-      name: total
-  - id: am_azure_firewall__rule_hits
-    title: Azure Firewall Rule Hits
-    context: rule_hits
-    family: Rules
-    type: line
-    units: hits/s
-    algorithm: incremental
-    dimensions:
-    - selector: firewall.application_rule_hit_total
-      name: application
-    - selector: firewall.network_rule_hit_total
-      name: network
-  - id: am_azure_firewall__snat_port_utilization
-    title: Azure Firewall SNAT Port Utilization
-    context: snat_port_utilization
-    family: SNAT
-    type: line
-    units: percentage
-    algorithm: absolute
-    dimensions:
-    - selector: firewall.snat_port_utilization_average
-      name: average
-  - id: am_azure_firewall__capacity
-    title: Azure Firewall Observed Capacity Units
-    context: capacity
-    family: Capacity
-    type: line
-    units: units
-    algorithm: absolute
-    dimensions:
-    - selector: firewall.observed_capacity_average
-      name: average
+    - id: am_azure_firewall__health
+      title: Azure Firewall Health State
+      context: health
+      family: Health
+      type: line
+      units: percentage
+      algorithm: absolute
+      dimensions:
+        - selector: firewall_health_average
+          name: average
+    - id: am_azure_firewall__latency
+      title: Azure Firewall Latency Probe
+      context: latency
+      family: Performance
+      type: line
+      units: milliseconds
+      algorithm: absolute
+      dimensions:
+        - selector: firewall_latency_png_average
+          name: average
+    - id: am_azure_firewall__throughput
+      title: Azure Firewall Throughput
+      context: throughput
+      family: Traffic
+      type: line
+      units: bits/s
+      algorithm: absolute
+      dimensions:
+        - selector: throughput_average
+          name: average
+    - id: am_azure_firewall__data_processed
+      title: Azure Firewall Data Processed
+      context: data_processed
+      family: Traffic
+      type: line
+      units: bytes/s
+      algorithm: incremental
+      dimensions:
+        - selector: data_processed_total
+          name: total
+    - id: am_azure_firewall__rule_hits
+      title: Azure Firewall Rule Hits
+      context: rule_hits
+      family: Rules
+      type: line
+      units: hits/s
+      algorithm: incremental
+      dimensions:
+        - selector: application_rule_hit_total
+          name: application
+        - selector: network_rule_hit_total
+          name: network
+    - id: am_azure_firewall__snat_port_utilization
+      title: Azure Firewall SNAT Port Utilization
+      context: snat_port_utilization
+      family: SNAT
+      type: line
+      units: percentage
+      algorithm: absolute
+      dimensions:
+        - selector: snat_port_utilization_average
+          name: average
+    - id: am_azure_firewall__capacity
+      title: Azure Firewall Observed Capacity Units
+      context: capacity
+      family: Capacity
+      type: line
+      units: units
+      algorithm: absolute
+      dimensions:
+        - selector: observed_capacity_average
+          name: average

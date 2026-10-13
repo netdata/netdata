@@ -1,0 +1,7 @@
+{
+  "@context": "http://schema.org/extensions",
+  "@type": "MessageCard",
+  "themeColor": "FFA500",
+  "title": "⚠️ Alert WARNING from Netdata on node",
+  "text": "summary  \nNode: node  \nAlert: alert  \nStatus: WARNING  \nTime: 2026\\-09\\-14T12:00:00Z"
+}

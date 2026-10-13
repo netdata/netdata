@@ -24,7 +24,7 @@ modules:
         metrics_description: |
           This collector monitors the activity and health of Docker Engine and Docker Swarm.
         method_description: |
-          The [built-in](https://docs.docker.com/config/daemon/prometheus/) Prometheus exporter is used to get the metrics.
+          The [built-in](https://docs.docker.com/engine/daemon/prometheus/) Prometheus exporter is used to get the metrics.
       supported_platforms:
         include: []
         exclude: []
@@ -44,7 +44,7 @@ modules:
         list:
           - title: Enable built-in Prometheus exporter
             description: |
-              To enable built-in Prometheus exporter, follow the [official documentation](https://docs.docker.com/config/daemon/prometheus/#configure-docker).
+              To enable built-in Prometheus exporter, follow the [official documentation](https://docs.docker.com/engine/daemon/prometheus/#configure-the-daemon).
       configuration:
         file:
           name: go.d/docker_engine.conf

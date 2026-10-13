@@ -6,6 +6,7 @@ import (
 	"bytes"
 	"testing"
 
+	metrixselector "github.com/netdata/netdata/go/plugins/pkg/metrix/selector"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/chartemit"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/runtimecomp"
 	"github.com/stretchr/testify/assert"
@@ -61,6 +62,42 @@ func TestRuntimeComponentRegistrationScenarios(t *testing.T) {
 				specs := svc.registry.snapshot()
 				require.Len(t, specs, 1)
 				assert.NotEmpty(t, specs[0].TemplateYAML)
+			},
+		},
+		"registration and snapshots own nested autogen rules": {
+			run: func(t *testing.T) {
+				svc := New(nil)
+				svc.pluginName = "go.d"
+				deny := []string{"private_*"}
+				counterRaw := []string{"internal_*_total"}
+
+				err := svc.RegisterComponent(ComponentConfig{
+					Name:  "component",
+					Store: metrix.NewRuntimeStore(),
+					Autogen: runtimecomp.AutogenPolicy{
+						Enabled: true,
+						Rules: []runtimecomp.AutogenRule{{
+							Scope:    "internal_*",
+							Selector: metrixselector.Expr{Deny: deny},
+						}},
+						CounterRawCharts: counterRaw,
+					},
+				})
+				require.NoError(t, err)
+
+				deny[0] = "caller_mutation"
+				counterRaw[0] = "caller_mutation"
+				first := svc.registry.snapshot()
+				require.Len(t, first, 1)
+				assert.Equal(t, []string{"private_*"}, first[0].Autogen.Rules[0].Selector.Deny)
+				assert.Equal(t, []string{"internal_*_total"}, first[0].Autogen.CounterRawCharts)
+
+				first[0].Autogen.Rules[0].Selector.Deny[0] = "snapshot_mutation"
+				first[0].Autogen.CounterRawCharts[0] = "snapshot_mutation"
+				second := svc.registry.snapshot()
+				require.Len(t, second, 1)
+				assert.Equal(t, []string{"private_*"}, second[0].Autogen.Rules[0].Selector.Deny)
+				assert.Equal(t, []string{"internal_*_total"}, second[0].Autogen.CounterRawCharts)
 			},
 		},
 		"registration rejects empty template when autogen is disabled": {

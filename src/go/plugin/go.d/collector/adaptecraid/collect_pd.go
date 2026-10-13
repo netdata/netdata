@@ -92,8 +92,8 @@ func parsePhysDevInfo(bs []byte) (map[string]*physicalDevice, error) {
 	for sc.Scan() {
 		line := strings.TrimSpace(sc.Text())
 
-		if strings.HasPrefix(line, "Device #") {
-			num := strings.TrimPrefix(line, "Device #")
+		if after, ok := strings.CutPrefix(line, "Device #"); ok {
+			num := after
 			pd = &physicalDevice{number: num}
 			devices[num] = pd
 			continue
@@ -104,6 +104,12 @@ func parsePhysDevInfo(bs []byte) (map[string]*physicalDevice, error) {
 		}
 
 		switch {
+		case strings.HasPrefix(line, "Device is"):
+			// Skip non-disk entries such as "Device is an Enclosure Services Device".
+			if line != "Device is a Hard drive" {
+				delete(devices, pd.number)
+				pd = nil
+			}
 		case strings.HasPrefix(line, "State"):
 			pd.state = getColonSepValue(line)
 		case strings.HasPrefix(line, "Reported Location"):

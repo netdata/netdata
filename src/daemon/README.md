@@ -26,6 +26,32 @@ netdata -h
 | `-v`, `-V`    | Display version and exit          | -                           |
 | `-W options`  | Advanced options (see below)      | -                           |
 
+## System Information Refresh
+
+The Agent detects full system information at startup. A background thread refreshes CPU count, total RAM, disk capacity,
+and the OS default interface name, IP address, and detection method. The first refresh runs five minutes after startup;
+subsequent refreshes run thirty minutes after the previous check finishes.
+Checks do not overlap. Changed values update the cached host information and automatic host labels and propagate through
+streaming to Parents. CPU model and frequency, OS/kernel details, and cloud/container/virtualization identity remain
+startup-only on every platform.
+
+Startup and refresh use the same CPU-count sources. On Linux, the count prefers present logical CPUs, excluding empty
+hot-plug slots and independent of the Agent's CPU affinity. In lxcfs containers it uses the virtualized `/proc/cpuinfo`
+count. If the kernel's present-CPU list is unavailable, detection falls back to CPU directories in sysfs, `/proc/cpuinfo`,
+then the CPUs available to the process from `nproc`.
+
+On Unix, `system-info.sh` has a 30-second execution deadline after spawning. Failed executions and invalid or incomplete
+runtime responses are discarded and logged with a reason. Startup keeps recognized non-empty values and warns when records
+are malformed or unknown, or no usable values were returned. Failed individual runtime probes retain their previous values; successful absence clears the
+corresponding optional values. Cancellation asks the spawn server to terminate the probe's process group; abrupt spawn-server
+failure can prevent process cleanup. Remaining descendants are terminated when the script leader exits. Runtime refresh does not rewrite the
+process environment exported during startup.
+
+On Windows, runtime refresh uses native probes for the same fields. Native Windows calls do not use the Unix subprocess deadline.
+
+See [automatic host labels](/docs/netdata-agent/configuration/organize-systems-metrics-and-alerts.md#use-automatic-labels)
+for label semantics and compatibility during gradual upgrades.
+
 ## Logging
 
 For details about Netdata's logging system and configuration, see [Netdata Logging](/src/libnetdata/log/README.md).
@@ -123,6 +149,32 @@ The nice level ranges from -20 (the highest priority) to 19 (the lowest priority
 
 </details>
 
+## Windows WMI Startup Timeout (Windows only)
+
+When running on Windows, the Netdata Agent classifies whether the host is bare metal or a virtual machine (Hyper-V, VMware, VirtualBox, KVM, QEMU, Parallels, Xen, etc.) by probing the host's WMI, SMBIOS, and registry. To bound how long agent startup can wait on a slow or unhealthy WMI provider, each WMI query uses a timeout before falling back to the next detection path. This bounds — but does not eliminate — the startup delay; see the connection cap note below.
+
+<details>
+<summary>Tune the WMI startup timeout</summary>
+
+To change the timeout, [edit](/docs/netdata-agent/configuration/README.md#edit-configuration-files) `netdata.conf`:
+
+```text
+[global]
+    wmi startup timeout = 5000
+```
+
+**Valid Range**: `100` to `60000` milliseconds. Values outside this range are silently clamped to the nearest boundary.
+
+**Default**: `5000` (5 seconds).
+
+**Behavior when a WMI query times out**: The probe chain falls back to the next detection path (SMBIOS strings, registry key existence) and ultimately reports `NETDATA_SYSTEM_VIRTUALIZATION = none` for bare metal or the matching hypervisor name (e.g. `microsoft` for Hyper-V, `vmware`, `oracle` for VirtualBox). A timeout is logged at debug level.
+
+**Startup delay is bounded, not eliminated**: This option only bounds each WMI *query*. The initial WMI *connection* is bounded separately at roughly 2 minutes (a Windows `WBEM_FLAG_CONNECT_USE_MAX_WAIT` limit, independent of this option and outside the 100–60000 ms range). Startup runs two WMI probes (virtualization and container), so on an unhealthy WMI service the worst-case added startup delay is approximately a 2-minute connection plus this query timeout for each probe. Operators debugging slow Windows startup should account for the connection cap, not just this setting.
+
+This option has no effect on Linux, macOS, or FreeBSD; those operating systems use `src/daemon/system-info.sh` for virt/container detection and do not call WMI.
+
+</details>
+
 ## Debugging
 
 When Netdata is compiled with debugging enabled:
@@ -131,7 +183,7 @@ When Netdata is compiled with debugging enabled:
 - **Debug Logging**: Disabled by default. To enable logging for specific components:
     - Open `netdata.conf`.
     - Set the `debug flags` option to a hex value that corresponds to the components you want to trace.
-    - Debug flag options are defined in [log.h](https://raw.githubusercontent.com/netdata/netdata/master/src/libnetdata/log/log.h) as `D_*` values. Use `0xffffffffffffffff` to enable all debug flags.
+    - Debug flag options are defined in [nd_log.h](https://raw.githubusercontent.com/netdata/netdata/master/src/libnetdata/log/nd_log.h) as `D_*` values. Use `0xffffffffffffffff` to enable all debug flags.
 
 > **Important**
 >
