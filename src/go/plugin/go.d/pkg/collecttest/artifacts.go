@@ -307,15 +307,19 @@ type HealthAlert struct {
 	On     string
 	Units  string
 	Lookup string
+	// Expressions holds the calc, warn and crit expressions that are set, in
+	// configuration order.
+	Expressions []string
 }
 
-var healthAlertLine = regexp.MustCompile(`^\s*(template|alarm|on|units|lookup)\s*:\s*(.*?)\s*$`)
+var healthAlertLine = regexp.MustCompile(`^\s*(template|alarm|on|units|lookup|calc|warn|crit)\s*:\s*(.*?)\s*$`)
 
 // ParseHealthAlerts extracts the alarm/template blocks of a health.d
-// configuration with the fields the artifact checks compare.
+// configuration with the fields the artifact checks compare. A line ending in
+// a backslash continues on the next line, as in health_config.c.
 func ParseHealthAlerts(healthConfig []byte) []HealthAlert {
 	var out []HealthAlert
-	for line := range strings.SplitSeq(string(healthConfig), "\n") {
+	for line := range strings.SplitSeq(strings.ReplaceAll(string(healthConfig), "\\\n", " "), "\n") {
 		match := healthAlertLine.FindStringSubmatch(line)
 		if match == nil {
 			continue
@@ -334,6 +338,10 @@ func ParseHealthAlerts(healthConfig []byte) []HealthAlert {
 		case "lookup":
 			if len(out) > 0 {
 				out[len(out)-1].Lookup = match[2]
+			}
+		case "calc", "warn", "crit":
+			if len(out) > 0 {
+				out[len(out)-1].Expressions = append(out[len(out)-1].Expressions, match[2])
 			}
 		}
 	}
@@ -359,6 +367,41 @@ func lookupDimensions(lookup string) []string {
 	for _, entry := range strings.FieldsFunc(strings.Join(fields, ","), func(r rune) bool { return r == ',' || r == '|' }) {
 		if !strings.EqualFold(entry, "all") && !strings.ContainsAny(entry, "*!") {
 			names = append(names, entry)
+		}
+	}
+	return names
+}
+
+var (
+	// healthVariable is a $name or ${name} reference, as the expression lexer
+	// (libnetdata/eval) reads it.
+	healthVariable = regexp.MustCompile(`\$\{([^}]*)\}|\$([^\s&|!><=%+\-*/?(){}]+)`)
+	// healthBuiltins are the variables health_variable.c resolves before
+	// dimensions, plus green and red, which health_config.c substitutes.
+	healthBuiltins = map[string]bool{
+		"this": true, "now": true, "after": true, "before": true, "status": true, "REMOVED": true,
+		"UNINITIALIZED": true, "UNDEFINED": true, "CLEAR": true, "WARNING": true, "CRITICAL": true,
+		"last_collected_t": true, "update_every": true, "green": true, "red": true,
+	}
+)
+
+// expressionDimensions returns the variables of an alert's expressions that
+// can only resolve to a dimension of its own chart: not a health built-in, not
+// the value of a named alert, and not a qualified chart.dimension reference.
+// The _raw and _last_collected_t suffixes select a dimension's raw value and
+// collection time, so they are removed.
+func expressionDimensions(expressions []string, alertNames map[string]bool) []string {
+	var names []string
+	for _, expression := range expressions {
+		for _, match := range healthVariable.FindAllStringSubmatch(expression, -1) {
+			name := match[1] + match[2]
+			if healthBuiltins[name] || alertNames[name] || strings.Contains(name, ".") {
+				continue
+			}
+			for _, suffix := range []string{"_raw", "_last_collected_t"} {
+				name = strings.TrimSuffix(name, suffix)
+			}
+			names = append(names, name)
 		}
 	}
 	return names
@@ -423,11 +466,20 @@ func AssertHealthAlertsTargetChartTemplateWith(t testing.TB, healthConfig []byte
 }
 
 // CheckHealthAlertsMatchMetadataMetrics requires every alert (within opts) to
-// target a documented metric, to state that metric's documented unit and to
-// look up only its documented dimensions. An alert whose lookup derives another
-// unit (a percentage of the window, an anomaly rate) does not fit this check.
+// target a documented metric, to state that metric's documented unit, to look
+// up only its documented dimensions, and to read in calc, warn and crit only
+// its documented dimensions besides built-ins, alert values and qualified
+// references. Health matches a variable against a dimension's ID or name, and
+// go.d sends the dimension name as the ID, so a variable spelled as the
+// collector's internal dimension ID never resolves. An alert whose lookup
+// derives another unit (a percentage of the window, an anomaly rate) does not
+// fit this check.
 func CheckHealthAlertsMatchMetadataMetrics(alerts []HealthAlert, metrics []MetadataMetric, opts HealthAlertsCheck) error {
 	var problems []error
+	alertNames := make(map[string]bool, len(alerts))
+	for _, alert := range alerts {
+		alertNames[alert.Name] = true
+	}
 	byName := make(map[string]MetadataMetric, len(metrics))
 	for _, metric := range metrics {
 		if _, dup := byName[metric.Name]; dup {
@@ -453,6 +505,11 @@ func CheckHealthAlertsMatchMetadataMetrics(alerts []HealthAlert, metrics []Metad
 				problems = append(problems, fmt.Errorf("%s: lookup dimension %q is not documented for %s", alert.Name, dimension, alert.On))
 			}
 		}
+		for _, dimension := range expressionDimensions(alert.Expressions, alertNames) {
+			if !slices.Contains(metric.Dimensions, dimension) {
+				problems = append(problems, fmt.Errorf("%s: variable %q is not a documented dimension of %s", alert.Name, dimension, alert.On))
+			}
+		}
 	}
 	return errors.Join(sortedErrors(problems)...)
 }
@@ -475,7 +532,8 @@ func CheckHealthAlertsMatchMetadataWith(healthConfig, metadataYAML []byte, opts 
 }
 
 // AssertHealthAlertsMatchMetadata fails the test when an alert targets an
-// undocumented metric, states another unit or looks up an undocumented dimension.
+// undocumented metric, states another unit, or looks up or reads an
+// undocumented dimension.
 func AssertHealthAlertsMatchMetadata(t testing.TB, healthConfig, metadataYAML []byte) {
 	t.Helper()
 	AssertHealthAlertsMatchMetadataWith(t, healthConfig, metadataYAML, HealthAlertsCheck{})

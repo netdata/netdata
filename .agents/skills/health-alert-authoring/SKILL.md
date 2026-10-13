@@ -94,7 +94,9 @@ template: example_ratio
 
 Runtime facts:
 
-- Matching is by dimension ID or name in the alert's own chart.
+- Matching is by dimension ID or name in the alert's own chart. go.d sends each dimension's name as its ID
+  (`jobruntime/job_v1_render.go`, `chartemit/apply.go`), so a go.d collector's internal metric key never resolves;
+  use the dimension name the chart and `metadata.yaml` show (`${failed volumes}` when it contains a space).
 - The default dimension value is `collector.last_stored_value`: the latest database-stored value after interpolation, not
   a database-window aggregate and not necessarily the raw last collector sample.
 - A missing dimension makes the expression fail with an unknown variable and the alert value become `NaN`.

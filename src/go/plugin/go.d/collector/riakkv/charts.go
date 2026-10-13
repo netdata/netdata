@@ -292,7 +292,7 @@ Memory collected as Megabytes, returned as bytes from Riak.
 */
 var (
 	vmProcessesCountChart = collectorapi.Chart{
-		ID:       "vm_processes",
+		ID:       "vm_processes_count",
 		Title:    "Total processes running in the Erlang VM",
 		Units:    "processes",
 		Fam:      "vm",
@@ -303,7 +303,7 @@ var (
 		},
 	}
 	vmProcessesMemoryChart = collectorapi.Chart{
-		ID:       "vm_processes_memory",
+		ID:       "vm_processes",
 		Title:    "Memory allocated & used by Erlang processes",
 		Units:    "bytes",
 		Fam:      "vm",

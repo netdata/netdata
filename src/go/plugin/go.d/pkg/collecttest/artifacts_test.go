@@ -160,11 +160,13 @@ func TestParseHealthAlerts(t *testing.T) {
        on: app.latency
      calc: $p99
     units: seconds
+     crit: $this > \
+           $p50 * 10
      info: slow requests
 `
 	assert.Equal(t, []HealthAlert{
-		{Name: "app_requests_failed", On: "app.requests", Units: "requests/s", Lookup: "max -1m unaligned of failed"},
-		{Name: "app_latency_high", On: "app.latency", Units: "seconds"},
+		{Name: "app_requests_failed", On: "app.requests", Units: "requests/s", Lookup: "max -1m unaligned of failed", Expressions: []string{"$this > 0"}},
+		{Name: "app_latency_high", On: "app.latency", Units: "seconds", Expressions: []string{"$p99", "$this >             $p50 * 10"}},
 	}, ParseHealthAlerts([]byte(health)))
 }
 
@@ -333,6 +335,21 @@ func TestCheckHealthAlertsMatchMetadataMetrics(t *testing.T) {
 		"foreach without of":         {alerts: alert(func(a *HealthAlert) { a.Lookup = "average -5m anomaly-bit foreach *" })},
 		"lookup without dimensions":  {alerts: alert(func(a *HealthAlert) { a.Lookup = "min -5m unaligned" })},
 		"calc without lookup":        {alerts: alert(func(a *HealthAlert) { a.Lookup = "" })},
+		"expressions read documented dimensions": {
+			alerts: alert(func(a *HealthAlert) { a.Expressions = []string{"$failed * 100 / ($ok + ${failed})", "$this > 0"} }),
+		},
+		"expression reads an undocumented dimension": {
+			alerts:  alert(func(a *HealthAlert) { a.Expressions = []string{"$failed_requests_total"} }),
+			wantErr: `app_requests_failed: variable "failed_requests_total" is not a documented dimension of app.requests`,
+		},
+		"built-ins, alert values and qualified references": {
+			alerts: alert(func(a *HealthAlert) {
+				a.Expressions = []string{"$this > ($app_requests_failed + $status + $WARNING + $green + ${app.latency.p99} + $update_every)"}
+			}),
+		},
+		"raw and collection-time suffixes name the dimension": {
+			alerts: alert(func(a *HealthAlert) { a.Expressions = []string{"$failed_raw + $ok_last_collected_t - $now"} }),
+		},
 		"shared file with prefix": {
 			alerts: append(testHealthAlerts(), HealthAlert{Name: "other_alert", On: "other.chart", Units: "x"}),
 			opts:   HealthAlertsCheck{ContextPrefix: "app."},
