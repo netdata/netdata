@@ -496,13 +496,15 @@ class: Latency
 
 **Available Classes:**
 
-| Class        | Use Case                                                                                                                       |
-|--------------|--------------------------------------------------------------------------------------------------------------------------------|
-| Availability | Whether something is up, reachable, healthy or in its expected state (up/down, health and state checks, sessions, replication) |
-| Errors       | Counts or rates of errors, failures, drops, rejections and corruption                                                          |
-| Latency      | Time-based measures: response and processing time, lag, delay, time since the last success                                     |
-| Utilization  | Use of a finite capacity: CPU, memory, space, pools, connections or quotas against their limit, saturation, hit ratios         |
-| Workload     | Volume of work: request, traffic, throughput and event rates, queue and backlog sizes, rate anomalies                          |
+| Class        | Use Case                                                                                                                                                     |
+|--------------|--------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| Availability | Whether something is up, reachable, healthy or in its expected state (up/down, health and state checks, sessions, replication)                               |
+| Errors       | Counts or rates of errors, failures, drops, rejections and corruption, and failed job or task outcomes                                                       |
+| Latency      | Time-based measures: response and processing time, lag, delay, time since the last success                                                                   |
+| Utilization  | Use of a finite capacity: CPU, memory, space, pools, connections or quotas against their limit, saturation, hit ratios, time left until expiry or exhaustion |
+| Workload     | Volume of work: request, traffic, throughput and event rates, queue and backlog sizes, rate anomalies                                                        |
+
+When the same condition can be measured in different ways, the shape of the value decides. For example, throttling reported as a flag or as the share of time spent throttled is `Utilization`, while a count or rate of throttled items (requests, events) is `Errors`.
 
 :::note
 
