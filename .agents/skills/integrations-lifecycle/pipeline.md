@@ -101,15 +101,16 @@ Before writing, `attach_descriptions` resolves the page meta description of ever
 none. An invalid or duplicate description prints `Error: ...` and exits 1 before either file is written.
 
 - `integrations/integrations.js`: the `integrations/templates/integrations.js` shell with a two-line `// DO NOT EDIT
-  THIS FILE DIRECTLY` banner and `export const categories = [...]; export const integrations = [...]`, holding the rich
-  variant. `convert_local_links` rewrites every `](/` to `](https://github.com/netdata/netdata/blob/master/` first, so a
-  metadata link written as `](/src/foo/bar.md)` reaches the dashboard as a GitHub link.
+  THIS FILE DIRECTLY` banner and `export const categories = [...]; export const integrations = [...]; export const
+  alerts = {...}`, holding the rich variant. `convert_local_links` rewrites every `](/` to
+  `](https://github.com/netdata/netdata/blob/master/` first, so a metadata link written as `](/src/foo/bar.md)` reaches
+  the dashboard as a GitHub link.
 - `integrations/integrations.json`: `{categories, integrations, alerts}` with the clean variant, no banner. The
   dashboard's drift check reads it from `raw.githubusercontent.com` (`in-app-contract.md`).
-- Both files also carry `alerts` (`export const alerts` in the JS): one entry per stock alert name, built by
-  `build_alert_index` in `health_alerts.py` from `health.d` and, for `integrations`, the names each integration's
-  `metadata.yaml` lists (`alert_owners`, computed before rendering turns `alerts` into Markdown). Text values keep their
-  authored quotes; the Agent itself turns every quote into a space.
+- `alerts` is the same in both files: one entry per stock alert name, built by `build_alert_index` in
+  `health_alerts.py` from `health.d` and, for `integrations`, the names each integration's `metadata.yaml` lists
+  (`alert_owners`, computed before rendering turns `alerts` into Markdown). Text values follow the Agent's
+  `health_strip_quotes` (wrapping quotes removed, inner double quotes become spaces).
 
 Three content variants therefore exist: rich markers in `.js`, markers stripped in `.json`, and, in the tracked pages,
 markers converted to HTML `<details>` by `clean_and_write` in `gen_docs_integrations.py`, which reads the rich keys.

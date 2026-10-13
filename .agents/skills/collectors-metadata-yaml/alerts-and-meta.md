@@ -17,15 +17,17 @@ integration.", which MUST be true.
 - Every alert or template in `src/health/health.d/*.conf` whose `on:` context belongs to this collector has a row.
   Every row corresponds to one entry in a conf. Adding, renaming, or removing an alert changes both files in the same
   change.
-- `name` is the alert or template name as written in the conf. `metric` is the `on:` context. `info` is the conf's
-  `info` line verbatim: same words, same case, same punctuation. `link` is the conf file on the master branch
+- `name` is the alert or template name as written in the conf. `metric` is a template's `on:` context, or for an
+  alarm the context of the chart its `on:` names. `info` is the conf's `info` line verbatim: same words, same case,
+  same punctuation. `link` is the conf file on the master branch
   (`https://github.com/netdata/netdata/blob/master/src/health/health.d/<file>.conf`). `os` is present only when the
-  conf restricts the alert with `os:`, with the same value.
+  conf restricts the alert by operating system (`host labels: _os=...`), with the same values.
 - No alert prose is written here. If the `info` reads badly for the page, fix the conf; the page copies it.
 - Rows are ordered as they appear in the conf, so a reader can follow the link and find them in order.
 - CI (`integrations/tests/test_health_alerts.py`) fails on a row whose `name` is not a stock alert, whose `link` is not
-  the conf that defines it, or, for a template, whose `metric` is not its `on:` context. An `alarm:` `on:` is a chart
-  id, not a context, so an alarm row's `metric` is a review check, like `info`, `os`, order and completeness.
+  the conf that defines it, or whose `metric` is not the alert's `on:`. An alarm documented under a context that
+  differs from its chart id (the Go IPMI SEL chart) is listed in the test's `METRIC_ELSEWHERE`. `info`, `os`, order and
+  completeness remain review checks.
 
 ## 2. `meta.monitored_instance`: The Product Identity
 

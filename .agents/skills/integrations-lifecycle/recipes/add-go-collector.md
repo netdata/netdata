@@ -59,7 +59,8 @@ Interpreter and dependencies: `integrations/README.md` (look for `<repo>/.venv/`
 ```bash
 python3 integrations/gen_integrations.py
 python3 integrations/gen_docs_integrations.py --check
-python3 -m unittest integrations.tests.test_descriptions integrations.tests.test_collector_metadata
+python3 -m unittest integrations.tests.test_descriptions integrations.tests.test_collector_metadata \
+    integrations.tests.test_health_alerts
 ```
 
 Preview rendered prose with `../how-tos/preview-collector-page.md`. It keeps checkout pages and README files

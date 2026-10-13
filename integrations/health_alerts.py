@@ -3,13 +3,13 @@
 
 Reads ``src/health/health.d/*.conf`` with the line rules of the Agent's ``health_readfile`` and builds the ``alerts``
 export of ``integrations.js``/``integrations.json``, and checks the ``alerts`` rows of integration metadata against it.
-Text values keep their authored quotes (the Agent turns every quote into a space); only wrapping quotes are removed.
+Text values follow the Agent's ``health_strip_quotes``: wrapping quotes are removed, inner double quotes become spaces.
 """
 
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Dict, Iterable, List, Mapping, Optional
+from typing import AbstractSet, Dict, Iterable, List, Mapping, Optional, Tuple
 
 from _common import AGENT_REPO, REPO_PATH
 
@@ -24,15 +24,15 @@ def _trim_all(text: str) -> str:
     return ' '.join(text.split())
 
 
-def _unquote(text: str) -> str:
+def _strip_quotes(text: str) -> str:
     if len(text) >= 2 and text[0] == text[-1] and text[0] in '"\'':
-        return text[1:-1].strip()
-    return text
+        text = text[1:-1]
+    return text.replace('"', ' ')
 
 
 def _logical_lines(text: str) -> Iterable[str]:
     pending = ''
-    for raw in text.splitlines():
+    for raw in text.split('\n'):
         line = (pending + raw).strip()
         pending = ''
         if not line or line.startswith('#'):
@@ -68,7 +68,7 @@ def parse_health_config(text: str, source: str = '') -> List[dict]:
         elif key == 'on':
             rule['on'] = value
         elif key in EXPORTED_FIELDS:
-            rule[key] = _unquote(value)
+            rule[key] = _strip_quotes(value)
 
     return rules
 
@@ -76,7 +76,8 @@ def parse_health_config(text: str, source: str = '') -> List[dict]:
 def load_stock_rules(directory: Path = HEALTH_CONFIG_DIR) -> List[dict]:
     rules = []
     for path in sorted(directory.glob('*.conf')):
-        rules.extend(parse_health_config(path.read_text(errors='replace'), path.relative_to(REPO_PATH).as_posix()))
+        text = path.read_text(encoding='utf-8', errors='replace')
+        rules.extend(parse_health_config(text, path.relative_to(REPO_PATH).as_posix()))
     return rules
 
 
@@ -111,11 +112,14 @@ def conf_link(source: str) -> str:
     return CONF_LINK_PREFIX + source
 
 
-def check_alert_rows(rows: Iterable[tuple], rules: Iterable[dict]) -> List[str]:
+def check_alert_rows(
+    rows: Iterable[tuple], rules: Iterable[dict], metric_elsewhere: AbstractSet[Tuple[str, str]] = frozenset()
+) -> List[str]:
     """Problems with metadata ``alerts`` rows, given as ``(where, row)`` pairs.
 
-    A row must name a stock alert and link a file that defines it; a template row's ``metric`` must be one of the
-    template's ``on`` contexts (an alarm's ``on`` is a chart id, which the row's context cannot be compared with).
+    A row must name a stock alert, link a file that defines it, and have ``metric`` equal to one of the alert's ``on``
+    targets. An alarm's ``on`` is a chart id; ``metric_elsewhere`` lists the ``(name, metric)`` pairs whose chart id
+    differs from the context the row documents.
     """
     grouped = rules_by_name(rules)
     problems = []
@@ -131,8 +135,8 @@ def check_alert_rows(rows: Iterable[tuple], rules: Iterable[dict]) -> List[str]:
         if row.get('link') not in links:
             problems.append(f'{where}: alert {name!r} link {row.get("link")!r} is not {" or ".join(links)}')
 
-        contexts = sorted({rule['on'] for rule in group if rule['template'] and rule.get('on')})
-        if contexts and row.get('metric') not in contexts:
-            problems.append(f'{where}: alert {name!r} metric {row.get("metric")!r} is not {" or ".join(contexts)}')
+        targets = sorted({rule['on'] for rule in group if rule.get('on')})
+        if row.get('metric') not in targets and (name, row.get('metric')) not in metric_elsewhere:
+            problems.append(f'{where}: alert {name!r} metric {row.get("metric")!r} is not {" or ".join(targets)}')
 
     return problems

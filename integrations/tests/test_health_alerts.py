@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 """Stock health alert metadata: the ``alerts`` catalogue export and the metadata ``alerts`` rows that mirror it.
 
-The mirror rules live in `.agents/skills/collectors-metadata-yaml/alerts-and-meta.md`; only name, link and template
-metric are checked here.
+The mirror rules live in `.agents/skills/collectors-metadata-yaml/alerts-and-meta.md`; only name, link and metric are
+checked here. The loaders skip a metadata file that fails schema validation; `gen_integrations.py` fails on it first.
 """
 
 import json
@@ -28,6 +28,21 @@ from health_alerts import (  # noqa: E402
 )
 
 RULE_LINE = re.compile(r'^\s*(alarm|template)\s*:\s*(\S+)', re.IGNORECASE)
+
+# Alarm rows whose `metric` is the context of the chart the alarm's `on:` names, not that chart id. The Go IPMI
+# collector keeps the C plugin's chart id `ipmi.events` under its own context. Remove a pair when it is no longer
+# needed; the test fails if a listed pair stops being an exception.
+METRIC_ELSEWHERE = frozenset({('ipmi_events', 'ipmi_go.sel')})
+
+
+def stock_rule_lines():
+    lines = []
+    for path in sorted(HEALTH_CONFIG_DIR.glob('*.conf')):
+        for line in path.read_text(encoding='utf-8', errors='replace').split('\n'):
+            match = RULE_LINE.match(line)
+            if match:
+                lines.append((path.relative_to(REPO_ROOT).as_posix(), match.group(2)))
+    return lines
 
 
 def rows_of(items):
@@ -70,7 +85,7 @@ component: 'nginx'
                 'type': 'Web Server',
                 'component': 'nginx',
                 'summary': 'requests are failing',
-                'info': 'the "upstream" is down',
+                'info': 'the  upstream  is down',
             },
             {
                 'name': 'second',
@@ -125,19 +140,23 @@ class CheckAlertRowsTest(unittest.TestCase):
         {'name': 'chart_alarm', 'template': False, 'source': 'src/health/health.d/a.conf', 'on': 'ipmi.events'},
     ]
 
-    def test_reports_unknown_names_wrong_links_and_wrong_template_metrics(self):
+    def test_reports_unknown_names_wrong_links_and_wrong_metrics(self):
+        alarm_link = conf_link('src/health/health.d/a.conf')
+        template_link = conf_link('src/health/health.d/t.conf')
         rows = [
-            ('ok template', {'name': 'tmpl', 'metric': 'app.ctx', 'link': conf_link('src/health/health.d/t.conf')}),
-            ('ok alarm on another context', {'name': 'chart_alarm', 'metric': 'ipmi_go.sel',
-                                             'link': conf_link('src/health/health.d/a.conf')}),
-            ('unknown', {'name': 'gone', 'metric': 'app.ctx', 'link': conf_link('src/health/health.d/t.conf')}),
-            ('wrong link', {'name': 'tmpl', 'metric': 'app.ctx', 'link': conf_link('src/health/health.d/a.conf')}),
-            ('wrong metric', {'name': 'tmpl', 'metric': 'app.other', 'link': conf_link('src/health/health.d/t.conf')}),
+            ('ok template', {'name': 'tmpl', 'metric': 'app.ctx', 'link': template_link}),
+            ('ok alarm', {'name': 'chart_alarm', 'metric': 'ipmi.events', 'link': alarm_link}),
+            ('ok alarm documented elsewhere', {'name': 'chart_alarm', 'metric': 'ipmi_go.sel', 'link': alarm_link}),
+            ('unknown', {'name': 'gone', 'metric': 'app.ctx', 'link': template_link}),
+            ('wrong link', {'name': 'tmpl', 'metric': 'app.ctx', 'link': alarm_link}),
+            ('wrong template metric', {'name': 'tmpl', 'metric': 'app.other', 'link': template_link}),
+            ('wrong alarm metric', {'name': 'chart_alarm', 'metric': 'ipv4.events', 'link': alarm_link}),
         ]
 
-        problems = check_alert_rows(rows, self.RULES)
+        problems = check_alert_rows(rows, self.RULES, {('chart_alarm', 'ipmi_go.sel')})
 
-        self.assertEqual([problem.split(':')[0] for problem in problems], ['unknown', 'wrong link', 'wrong metric'])
+        self.assertEqual([problem.split(':')[0] for problem in problems],
+                         ['unknown', 'wrong link', 'wrong template metric', 'wrong alarm metric'])
 
 
 class CatalogueExportTest(unittest.TestCase):
@@ -161,27 +180,31 @@ class StockHealthConfigTest(unittest.TestCase):
         cls.rules = load_stock_rules()
 
     def test_every_rule_line_becomes_one_rule_with_a_target(self):
-        expected = []
-        for path in sorted(HEALTH_CONFIG_DIR.glob('*.conf')):
-            for line in path.read_text(errors='replace').splitlines():
-                match = RULE_LINE.match(line)
-                if match:
-                    expected.append((path.relative_to(REPO_ROOT).as_posix(), match.group(2)))
-
-        self.assertEqual([(rule['source'], rule['name']) for rule in self.rules], expected)
+        self.assertEqual([(rule['source'], rule['name']) for rule in self.rules], stock_rule_lines())
         self.assertEqual([rule['name'] for rule in self.rules if not rule.get('on')], [])
 
-    def test_the_index_covers_every_stock_alert_name(self):
+    def test_the_index_has_one_entry_per_stock_alert_name(self):
         index = build_alert_index(self.rules)
 
-        self.assertEqual(sorted(index), sorted({rule['name'] for rule in self.rules}))
+        self.assertEqual(sorted(index), sorted({name for _, name in stock_rule_lines()}))
 
 
 class MetadataAlertRowsTest(unittest.TestCase):
-    def test_every_metadata_alert_row_matches_a_stock_alert(self):
-        rows = rows_of(load_collectors()) + rows_of(load_flows()) + rows_of(load_device())
+    @classmethod
+    def setUpClass(cls):
+        cls.rows = rows_of(load_collectors()) + rows_of(load_flows()) + rows_of(load_device())
+        cls.rules = load_stock_rules()
 
-        self.assertEqual(check_alert_rows(rows, load_stock_rules()), [])
+    def test_every_metadata_alert_row_matches_a_stock_alert(self):
+        problems = check_alert_rows(self.rows, self.rules, METRIC_ELSEWHERE)
+
+        self.assertEqual(problems, [], '\n'.join(problems))
+
+    def test_every_metric_exception_is_still_needed(self):
+        needed = {pair for pair in METRIC_ELSEWHERE if check_alert_rows(
+            [(where, row) for where, row in self.rows if (row.get('name'), row.get('metric')) == pair], self.rules)}
+
+        self.assertEqual(needed, METRIC_ELSEWHERE)
 
 
 if __name__ == '__main__':

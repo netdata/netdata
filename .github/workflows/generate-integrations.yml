@@ -33,6 +33,7 @@ on:
       - 'integrations/descriptions.py'
       - 'integrations/gen_npm_catalog.py'
       - 'integrations/gen_integrations.py'
+      - 'integrations/health_alerts.py'
       - 'integrations/prometheus_profile_docs.py'
       - 'integrations/tests/**'
       - 'integrations/gen_docs_integrations.py'
