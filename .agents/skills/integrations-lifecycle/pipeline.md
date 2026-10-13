@@ -10,7 +10,7 @@ Citations name files and symbols, never line numbers. Dependencies and the comma
 |---|---|---|---|---|
 | 0 | `integrations/gen_npm_catalog.py` | SNMP device profiles, the trap-profile catalogue, generator-owned copy | `src/go/plugin/go.d/collector/snmp/npm-catalog/metadata.yaml`; side report `metrics-metadata-gaps.txt` | metadata yes; report untracked and not gitignored |
 | 0 | ibm.d `go generate` (`docgen`, `metricgen`) | `contexts.yaml`, `config.go`, `module.yaml` | `metadata.yaml`, `config_schema.json`, `zz_generated_contexts.go`; also writes through the `README.md` symlink into the generated page (`ibm-d.md`) | yes |
-| 1 | `integrations/gen_integrations.py` | every source below, `integrations/categories.yaml`, `.github/data/distros.yml`, schemas, templates | `integrations/integrations.js`, `integrations/integrations.json` | gitignored |
+| 1 | `integrations/gen_integrations.py` | every source below, `integrations/categories.yaml`, `.github/data/distros.yml`, `src/health/health.d/*.conf`, schemas, templates | `integrations/integrations.js`, `integrations/integrations.json` | gitignored |
 | 2 | `integrations/gen_docs_integrations.py` | `integrations.js` only (never the JSON) | one page per integration, README symlinks | yes |
 | 3 | `integrations/gen_doc_collector_page.py` | `integrations.js` | `src/collectors/COLLECTORS.md` | yes |
 | 4 | `integrations/gen_doc_secrets_page.py` | `integrations.js` | `src/collectors/SECRETS.md` | yes |
@@ -47,7 +47,8 @@ substitute for running the scripts.
 Non-YAML inputs: `integrations/categories.yaml` (validated against `categories.json`); `.github/data/distros.yml`
 (loaded with `load_yaml` and NOT validated, although `distros.json` exists; garbage yields silently broken
 `platform_info` tables); the 17 schemas under `integrations/schemas/` (`schema-reference.md`); the Jinja templates under
-`integrations/templates/` (delimiters below).
+`integrations/templates/` (delimiters below); the stock health configuration `src/health/health.d/*.conf`, read by
+`health_alerts.py` with the line rules of the Agent's `health_readfile` for the `alerts` export (Stage 1: outputs).
 
 ## Stage 1: validation
 
@@ -100,24 +101,30 @@ Before writing, `attach_descriptions` resolves the page meta description of ever
 none. An invalid or duplicate description prints `Error: ...` and exits 1 before either file is written.
 
 - `integrations/integrations.js`: the `integrations/templates/integrations.js` shell with a two-line `// DO NOT EDIT
-  THIS FILE DIRECTLY` banner and `export const categories = [...]; export const integrations = [...]`, holding the rich
-  variant. `convert_local_links` rewrites every `](/` to `](https://github.com/netdata/netdata/blob/master/` first, so a
-  metadata link written as `](/src/foo/bar.md)` reaches the dashboard as a GitHub link.
-- `integrations/integrations.json`: `{categories, integrations}` with the clean variant, no banner. The dashboard's
-  drift check reads it from `raw.githubusercontent.com` (`in-app-contract.md`).
+  THIS FILE DIRECTLY` banner and `export const categories = [...]; export const integrations = [...]; export const
+  alerts = {...}`, holding the rich variant. `convert_local_links` rewrites every `](/` to
+  `](https://github.com/netdata/netdata/blob/master/` first, so a metadata link written as `](/src/foo/bar.md)` reaches
+  the dashboard as a GitHub link.
+- `integrations/integrations.json`: `{categories, integrations, alerts}` with the clean variant, no banner. The
+  dashboard's drift check reads it from `raw.githubusercontent.com` (`in-app-contract.md`).
+- `alerts` is the same in both files: one entry per stock alert name, built by `build_alert_index` in
+  `health_alerts.py` from `health.d` and, for `integrations`, the names each integration's `metadata.yaml` lists
+  (`alert_owners`, computed before rendering turns `alerts` into Markdown). Text values drop quotes that wrap the
+  whole value and turn inner double quotes into spaces; single quotes stay.
 
 Three content variants therefore exist: rich markers in `.js`, markers stripped in `.json`, and, in the tracked pages,
 markers converted to HTML `<details>` by `clean_and_write` in `gen_docs_integrations.py`, which reads the rich keys.
 
 ## Stage 2: pages
 
-`gen_docs_integrations.py` (`main`) in order: parse `integrations.js` by splitting on the two `export const` markers
-(`read_integrations_js`; missing or malformed input is a hard error before anything is touched); resolve and validate
-the meta description of every page across all ten documentation modes (`_validate_complete_description_corpus`, the
-contract in `description-authoring.md`); with `--check`, print per-mode counts and stop; otherwise `cleanup()` and
-write. Keep that order: the preflight and the input read MUST stay before cleanup so a description defect or a missing
-catalog cannot delete the committed tree. `-c plugin/module` scopes cleanup and writes to one collector but still
-validates the whole corpus; an unknown collector is an error, never an empty run. CI never uses `-c`.
+`gen_docs_integrations.py` (`main`) in order: parse `integrations.js` by splitting on the `categories` and
+`integrations` markers and stopping at the next `export const` (`read_integrations_js`; the umbrella-page loaders stop
+the same way; missing or malformed input is a hard error before anything is touched); resolve and validate the meta
+description of every page across all ten documentation modes (`_validate_complete_description_corpus`, the contract in
+`description-authoring.md`); with `--check`, print per-mode counts and stop; otherwise `cleanup()` and write. Keep that
+order: the preflight and the input read MUST stay before cleanup so a description defect or a missing catalog cannot
+delete the committed tree. `-c plugin/module` scopes cleanup and writes to one collector but still validates the whole
+corpus; an unknown collector is an error, never an empty run. CI never uses `-c`.
 
 `cleanup()` removes every `**/integrations` directory it owns. Pages are then generated only from the current catalog;
 CI validates that same output. Before removing a migrated producer, update Learn's legacy catalogue to retain every
@@ -206,15 +213,15 @@ schemas, templates, generators, and tests above, except that `integrations/logs/
 list): stage 0 (`gen_npm_catalog.py`, `go generate` for ibm.d), the "Verify generated runtime outputs" gate (`git diff
 --exit-code` on ibm.d `config_schema.json` and `zz_generated_contexts.go`, plus a check that both are tracked for every
 module), stage 1, the unit test modules `test_descriptions`, `test_prometheus_profile_docs`, `test_collector_metadata`,
-stages 2 to 5, `rm` of the gitignored catalogs and the NPM side report, then `peter-evans/create-pull-request` on branch
-`integrations-regen` (label `integrations-update`, title "Regenerate integrations docs", token
-`NETDATABOT_GITHUB_TOKEN`), and a Slack notification on failure.
+`test_health_alerts`, stages 2 to 5, `rm` of the gitignored catalogs and the NPM side report, then
+`peter-evans/create-pull-request` on branch `integrations-regen` (label `integrations-update`, title "Regenerate
+integrations docs", token `NETDATABOT_GITHUB_TOKEN`), and a Slack notification on failure.
 
-`.github/workflows/check-markdown.yml` (pull requests, path-filtered on Markdown, docs, metadata, `integrations/**`, the
-profile and ibm.d producer inputs): checks out the PR (with full history) and `netdata/learn`, installs Learn's
-hash-pinned ingest requirements plus `pip.sh`, then runs stage 0, the same runtime-output gate, stage 1, the same three
-test modules (`test_descriptions` with `LEARN_INGEST_PATH` set to Learn's ingest script), stages 2 to 5, and finally
-`learn/ingest/ingest.py --local-repo netdata:... --ignore-on-prem-repo
+`.github/workflows/check-markdown.yml` (pull requests, path-filtered on Markdown, docs, metadata, `integrations/**`,
+`src/health/health.d/**`, the profile and ibm.d producer inputs): checks out the PR (with full history) and
+`netdata/learn`, installs Learn's hash-pinned ingest requirements plus `pip.sh`, then runs stage 0, the same
+runtime-output gate, stage 1, the same four test modules (`test_descriptions` with `LEARN_INGEST_PATH` set to Learn's
+ingest script), stages 2 to 5, and finally `learn/ingest/ingest.py --local-repo netdata:... --ignore-on-prem-repo
 --fail-links-netdata`. It fails a PR on generation errors, test failures, or unresolved links; it does NOT compare the
 regenerated pages with the committed ones. `integrations/tests/test_collector_page_navigation.py` and `test_taxonomy.py`
 exist but no workflow runs them. What the two workflows mean for a source PR is in `consistency.md`, "Delivery

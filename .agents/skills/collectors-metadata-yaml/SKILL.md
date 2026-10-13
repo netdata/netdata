@@ -152,7 +152,8 @@ complete the validation and preview before committing:
 6. Statements verified against the code, not against the previous prose: permissions, defaults, what is created or
    deleted, limits, addresses probed.
 7. Markdown safety items above; for authorized changes run
-   `python3 -m unittest integrations.tests.test_collector_metadata` (selected mechanical checks) and the pipeline
+   `python3 -m unittest integrations.tests.test_collector_metadata integrations.tests.test_health_alerts` (selected
+   mechanical checks; the second covers `alerts` rows) and the pipeline
    validation in `integrations-lifecycle/description-authoring.md`
    (`gen_docs_integrations.py --check`, `test_descriptions`).
 8. Generated hunks under `integrations/` are not part of the commit; the post-merge regeneration owns them.
