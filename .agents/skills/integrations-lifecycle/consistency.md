@@ -91,11 +91,14 @@ are read only by this tooling.
   the `src/health/REFERENCE.md` tables.
 - `collecttest.AssertConfigSchemaMatchesMetadata` (opt-in, per collector test): option descriptions and tabs agree
   between `config_schema.json` and `metadata.yaml`.
+- `collecttest` artifact checks (opt-in, per collector test;
+  `.agents/skills/collectors-go-framework-v2/chart-template.md#tests`): metric rows against the chart template, and
+  stock alert targets, units and lookup dimensions against the documented metrics.
 - The ibm.d runtime-output drift gate ("Delivery boundary" above).
-- Not enforced anywhere: metric rows against the code, option names against the schema for collectors that have not
-  opted in, stock conf defaults against the schema. `check-markdown.yml` checks that generated links resolve on Learn,
-  not that sources are in sync. `integrations/check_collector_metadata.py` is broken and unused (`gotchas.md`). Until
-  such checks exist, these are review-time checks.
+- Not enforced anywhere: metric rows against the code and option names against the schema for collectors that have
+  not opted in, stock conf defaults against the schema. `check-markdown.yml` checks that generated links resolve on
+  Learn, not that sources are in sync. `integrations/check_collector_metadata.py` is broken and unused
+  (`gotchas.md`). Until such checks exist, these are review-time checks.
 - ibm.d modules are the exception: docgen generates `metadata.yaml` and `config_schema.json` from `contexts.yaml`,
   `config.go`, and `module.yaml`, so those agree by construction; the stock `.conf` and `health.d/<...>.conf` still need
   manual sync (`ibm-d.md`).
@@ -118,7 +121,8 @@ Review follows `AGENTS.md#skill-selection` and does not itself regenerate or pub
    `.agents/skills/collectors-metadata-yaml/setup.md`.
 3. **Alerts keep an owner.** An alert added, removed, or retargeted in `health.d` reaches the pages by derivation: its
    `on:` context is declared in the owning collector's `metadata.yaml` metrics, or the alert is listed by name where
-   the context cannot be declared. Rule: `.agents/skills/collectors-metadata-yaml/alerts-and-meta.md` section 1.
+   the context cannot be declared, or excluded by name where the monitored instance lacks the data it reads. Rule:
+   `.agents/skills/collectors-metadata-yaml/alerts-and-meta.md` section 1.
 4. **README handling.** A plugin directory with one integration has a README symlinked to the generated
    `integrations/<slug>.md`, which follows `metadata.yaml`. A directory with several integrations has a hand-written
    README the author updates. `agent_notification` is special: the README itself is the generated artifact (no

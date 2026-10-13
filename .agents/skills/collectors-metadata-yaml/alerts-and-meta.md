@@ -19,12 +19,16 @@ integration.", which MUST be true.
   admits a platform the plugin runs on, and its `_collect_plugin`/`_collect_module` chart-label filter, when present,
   admits the plugin and module. Owner: `integrations/health_alerts.py` (`rule_admits`, `alert_rows`, and the
   `PLUGIN_PLATFORMS` table for plugins built for some platforms only).
-- Declared contexts MUST be exact: a wrong or missing context drops the collector's alerts from its page, and CI fails
-  when a stock alert has no owner.
+- Declared contexts MUST be the contexts the collector creates at runtime: a wrong or missing one drops alerts from the
+  page or lists one that never attaches, and CI fails when a stock alert has no owner.
 - `alerts` in `metadata.yaml` is an optional list of alert names for alerts the page owns although no declared context
   derives them: charts created at runtime from profiles (CloudWatch, SNMP BGP) or an alarm on a chart id that the
-  collector keeps under another context (Go IPMI `ipmi_events`). A comment above the list says why. CI rejects a name
-  that is unknown, an Agent alert, derivable, or excluded by the alert's filters.
+  collector keeps under another context (`ipmi_events` on FreeIPMI and Go IPMI). A comment above the list says why.
+  CI rejects a name that is unknown, an Agent alert, derivable, or excluded by the alert's filters.
+- `excluded_alerts` is an optional list of derived alert names the monitored instance cannot evaluate, because it does
+  not report the data they read (a Redis-compatible server without the Redis field an alert uses). The page leaves
+  them out, and the page's `limits` text says which data is missing. CI rejects a name that is not derived or is also
+  listed in `alerts`.
 - No alert prose is written here. If the `info` reads badly for the page, fix the conf; the page copies it, `${...}`
   variables included.
 - Rows follow the configuration order (files sorted by name, then file order), one row per alert name and target.
@@ -102,8 +106,8 @@ Prerequisites (one h5 per entry, or "No additional configuration is required."),
 
 ## 6. Review Questions For This Family
 
-- Does every alert in the health conf for this collector's contexts have a row, and does every row's `info` match the
-  conf character for character?
+- Are the declared metric contexts the ones the collector creates at runtime, so the derived alert table lists the
+  alerts that attach? Does every `alerts` or `excluded_alerts` name have its reason on record?
 - Is `name` the vendor's spelling, and is `link` the product page (or justifiably empty)?
 - Is there one primary category, an existing icon, and five to ten real search terms (plus service or vendor names
   only for a multi-service collector)?

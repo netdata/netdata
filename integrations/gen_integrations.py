@@ -1369,7 +1369,7 @@ def declared_contexts(item):
 def alert_subjects(items):
     return [
         alert_subject(make_id(item['meta']), item['meta']['plugin_name'], item['meta']['module_name'],
-                      declared_contexts(item), item.get('alerts') or [])
+                      declared_contexts(item), item.get('alerts') or [], item.get('excluded_alerts') or [])
         for item in items
     ]
 
@@ -1382,6 +1382,7 @@ def attach_alerts(rules, *groups):
 
     for item, subject in zip(items, subjects):
         item['alerts'] = ownership[subject['id']]
+        item.pop('excluded_alerts', None)
 
     return alert_owners(ownership)
 

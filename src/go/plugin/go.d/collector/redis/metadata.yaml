@@ -530,6 +530,10 @@ modules:
             Dragonfly does not provide the Redis fields used for rejected connections, dataset and script memory, memory fragmentation, tracking and timeout-table clients, or RDB save duration, age, and changes-since-save charts.
 
             Replica link status is available, but the duration of a down link is not. Of the stock Redis alerts, only background-save failure has the required measurements.
+    excluded_alerts:
+      - redis_connections_rejected
+      - redis_bgsave_slow
+      - redis_master_link_down
 
   - <<: *module
     meta:
@@ -603,6 +607,11 @@ modules:
             Kvrocks does not provide the Redis fields used for rejected connections, key expiration and eviction events, allocator memory usage, memory fragmentation, tracking and timeout-table clients, or RDB save charts. RSS and Lua memory remain available.
 
             Replica link status is available, but the duration of a down link is not. None of the stock Redis alerts has the required measurements for Kvrocks.
+    excluded_alerts:
+      - redis_connections_rejected
+      - redis_bgsave_broken
+      - redis_bgsave_slow
+      - redis_master_link_down
 
   - <<: *module
     meta:
@@ -656,6 +665,9 @@ modules:
         performance_impact:
           description: |
             Collection is lightweight for the Netdata Agent. The periodic `INFO KEYSPACE` request runs a full store scan on the Garnet server; on very large stores it may exceed the job timeout, in which case the keys and expires-keys charts stay empty until the `timeout` option is raised.
+    excluded_alerts:
+      - redis_bgsave_slow
+      - redis_master_link_down
     setup:
       <<: *setup
       prerequisites:

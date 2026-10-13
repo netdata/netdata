@@ -239,14 +239,16 @@ def agent_internal_alerts(rules: Iterable[dict]) -> List[str]:
 
 
 def alert_subject(subject_id: str, plugin_name: str, module_name: str, contexts: Iterable[str] = (),
-                  names: Iterable[str] = ()) -> dict:
-    """An integration as alert ownership sees it: the contexts it declares and the alert names it lists."""
+                  names: Iterable[str] = (), excluded: Iterable[str] = ()) -> dict:
+    """An integration as alert ownership sees it: the contexts it declares, the alert names it lists and the derived
+    alert names it excludes because its monitored instance lacks the data they evaluate."""
     return {
         'id': subject_id,
         'plugin_name': plugin_name,
         'module_name': module_name,
         'contexts': frozenset(contexts),
         'names': tuple(names),
+        'excluded': frozenset(excluded),
     }
 
 
@@ -261,7 +263,7 @@ def derived_rules(rules: Iterable[dict], subject: dict) -> List[dict]:
 
 def alert_rows(rules: Sequence[dict], subject: dict, internal: Iterable[str] = ()) -> List[dict]:
     """The page rows of one subject, in configuration order: the rules on its declared contexts and the rules of the
-    alert names it lists, each admitted by the rule's platform and plugin filters.
+    alert names it lists, each admitted by the rule's platform and plugin filters, without the names it excludes.
 
     One row per alert name and target; Agent-internal alerts are never owned.
     """
@@ -270,7 +272,7 @@ def alert_rows(rules: Sequence[dict], subject: dict, internal: Iterable[str] = (
     rows, seen = [], set()
 
     for rule in rules:
-        if rule['name'] in internal or not _admits_subject(rule, subject):
+        if rule['name'] in internal or rule['name'] in subject['excluded'] or not _admits_subject(rule, subject):
             continue
         if rule.get('on') not in subject['contexts'] and rule['name'] not in names:
             continue
@@ -303,8 +305,9 @@ def alert_owners(ownership: Mapping[str, Iterable[dict]]) -> Dict[str, set]:
 
 
 def check_listed_names(rules: Sequence[dict], subjects: Iterable[dict]) -> List[str]:
-    """Problems with alert names an integration lists: each names a stock, non-Agent alert that its contexts cannot
-    derive and whose platform and plugin filters admit the integration."""
+    """Problems with alert names an integration lists or excludes: a listed name is a stock, non-Agent alert that its
+    contexts cannot derive and whose platform and plugin filters admit the integration; an excluded name is one its
+    contexts derive and it does not list."""
     grouped = rules_by_name(rules)
     internal = set(agent_internal_alerts(rules))
     problems = []
@@ -321,6 +324,12 @@ def check_listed_names(rules: Sequence[dict], subjects: Iterable[dict]) -> List[
                 problems.append(f'{where} is derived from a declared context; remove it from the alerts list')
             elif not any(_admits_subject(rule, subject) for rule in grouped[name]):
                 problems.append(f'{where} excludes this plugin or its platforms')
+        for name in sorted(subject['excluded']):
+            where = f'{subject["id"]}: excluded alert {name!r}'
+            if name in subject['names']:
+                problems.append(f'{where} is also listed')
+            elif name not in derivable:
+                problems.append(f'{where} is not derived from a declared context; remove it from excluded_alerts')
 
     return problems
 

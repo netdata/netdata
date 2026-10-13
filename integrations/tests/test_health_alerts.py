@@ -25,6 +25,7 @@ from health_alerts import (  # noqa: E402
     ALERT_CLASSES,
     ALERT_TYPES,
     HEALTH_CONFIG_DIR,
+    PLUGIN_PLATFORMS,
     agent_internal_alerts,
     alert_owners,
     alert_ownership,
@@ -193,6 +194,10 @@ class RuleAdmitsTest(unittest.TestCase):
                 'fields': {'host_labels': '_os=linux'}, 'plugin': 'proc.plugin', 'want': True},
             'Linux alert on the FreeBSD plugin': {
                 'fields': {'host_labels': '_os=linux'}, 'plugin': 'freebsd.plugin', 'want': False},
+            'Linux alert on the Windows plugin': {
+                'fields': {'host_labels': '_os=linux'}, 'plugin': 'windows.plugin', 'want': False},
+            'FreeBSD alert on a Linux plugin': {
+                'fields': {'host_labels': '_os=freebsd'}, 'plugin': 'proc.plugin', 'want': False},
             'Linux alert on a plugin that runs anywhere': {
                 'fields': {'host_labels': '_os=linux'}, 'plugin': 'go.d.plugin', 'want': True},
             'platform excluded by a negation': {
@@ -264,6 +269,24 @@ class AlertOwnershipTest(unittest.TestCase):
             'cloud_errors': ['cloud'],
         })
 
+    def test_excluded_names_leave_the_rows(self):
+        subject = alert_subject('lite', 'freebsd.plugin', 'm', ['system.cpu', 'system.load'], excluded=['load_bsd'])
+
+        self.assertEqual(alert_ownership(self.RULES, [subject]), {
+            'lite': [self.row('cpu_usage', 'cpu.conf', 'system.cpu', 'CPU usage')],
+        })
+
+    def test_listed_names_keep_only_the_admitted_variants(self):
+        rules = [
+            rule('events', 'linux.events', 'src/health/health.d/linux.conf', info='Linux', host_labels='_os=linux'),
+            rule('events', 'any.events', 'src/health/health.d/any.conf', info='any'),
+        ]
+        subject = alert_subject('bsd', 'freebsd.plugin', 'm', [], ['events'])
+
+        self.assertEqual(alert_ownership(rules, [subject]), {
+            'bsd': [self.row('events', 'any.conf', 'any.events', 'any')],
+        })
+
     def test_agent_alerts_are_those_on_agent_charts_only(self):
         rules = self.RULES + [rule('mixed', 'netdata.x'), rule('mixed', 'app.x'), rule('ml', 'anomaly_detection.y')]
 
@@ -275,17 +298,32 @@ class AlertOwnershipTest(unittest.TestCase):
             alert_subject('unknown', 'go.d.plugin', 'm', [], ['gone']),
             alert_subject('agent', 'go.d.plugin', 'm', [], ['dbengine_full']),
             alert_subject('derivable', 'proc.plugin', 'm', ['system.cpu'], ['cpu_usage']),
-            alert_subject('excluded', 'proc.plugin', 'm', [], ['load_bsd']),
+            alert_subject('not admitted', 'proc.plugin', 'm', [], ['load_bsd']),
         ]
 
-        problems = [problem.split(': alert ')[0] for problem in check_listed_names(self.RULES, subjects)]
+        problems = [problem.split(': ')[0] for problem in check_listed_names(self.RULES, subjects)]
 
-        self.assertEqual(problems, ['unknown', 'agent', 'derivable', 'excluded'])
+        self.assertEqual(problems, ['unknown', 'agent', 'derivable', 'not admitted'])
+
+    def test_excluded_names_must_be_derived_and_not_listed(self):
+        subjects = [
+            alert_subject('ok', 'proc.plugin', 'm', ['system.cpu'], excluded=['cpu_usage']),
+            alert_subject('not derived', 'proc.plugin', 'm', ['system.cpu'], excluded=['load_bsd']),
+            alert_subject('unknown', 'proc.plugin', 'm', ['system.cpu'], excluded=['gone']),
+            alert_subject('listed', 'ipmi.plugin', 'm', [], ['sel_events'], excluded=['sel_events']),
+        ]
+        not_derived = 'is not derived from a declared context; remove it from excluded_alerts'
+
+        self.assertEqual(check_listed_names(self.RULES, subjects), [
+            f"not derived: excluded alert 'load_bsd' {not_derived}",
+            f"unknown: excluded alert 'gone' {not_derived}",
+            "listed: excluded alert 'sel_events' is also listed",
+        ])
 
 
 class AttachAlertsTest(unittest.TestCase):
     def test_page_rows_and_export_owners_come_from_one_derivation(self):
-        def item(module, contexts=(), names=(), profile_contexts=()):
+        def item(module, contexts=(), names=(), profile_contexts=(), excluded=()):
             return {
                 'meta': {'plugin_name': 'go.d.plugin', 'module_name': module, 'monitored_instance': {'name': module}},
                 'metrics': {
@@ -293,17 +331,23 @@ class AttachAlertsTest(unittest.TestCase):
                     'profile_coverage': {'contexts': list(profile_contexts)},
                 },
                 'alerts': list(names),
+                'excluded_alerts': list(excluded),
             }
 
         rules = [rule('requests', 'app.requests'), rule('listed', 'cloud.x'), rule('profiled', 'prometheus.app.y')]
-        collectors = [item('app', contexts=['app.requests']), item('cloud', names=['listed'])]
+        collectors = [
+            item('app', contexts=['app.requests']),
+            item('lite', contexts=['app.requests'], excluded=['requests']),
+            item('cloud', names=['listed']),
+        ]
         devices = [item('exporter', profile_contexts=['prometheus.app.y'])]
 
         owners = attach_alerts(rules, collectors, devices)
 
         self.assertEqual(
             {item['meta']['module_name']: [row['name'] for row in item['alerts']] for item in collectors + devices},
-            {'app': ['requests'], 'cloud': ['listed'], 'exporter': ['profiled']})
+            {'app': ['requests'], 'lite': [], 'cloud': ['listed'], 'exporter': ['profiled']})
+        self.assertEqual([item for item in collectors + devices if 'excluded_alerts' in item], [])
         self.assertEqual(owners, {
             'requests': {'go.d.plugin-app-app'},
             'listed': {'go.d.plugin-cloud-cloud'},
@@ -421,6 +465,11 @@ class StockAlertOwnershipTest(unittest.TestCase):
         unowned = sorted(names - owned - set(agent_internal_alerts(self.rules)))
 
         self.assertEqual(unowned, sorted(UNOWNED))
+
+    def test_the_platform_table_names_real_plugins(self):
+        plugins = {subject['plugin_name'] for subject in self.subjects}
+
+        self.assertEqual(sorted(set(PLUGIN_PLATFORMS) - plugins), [])
 
     def test_listed_alert_names_are_stock_and_not_derivable(self):
         problems = check_listed_names(self.rules, self.subjects)
