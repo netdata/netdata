@@ -42,7 +42,7 @@ var (
 		Priority: prioDHCPPoolUtilization,
 		Type:     collectorapi.Area,
 		Dims: collectorapi.Dims{
-			{ID: "dhcp_pool_%s_utilization", Name: "utilization"},
+			{ID: "dhcp_pool_%s_utilization", Name: "utilization", Div: precision},
 		},
 	}
 	dhcpPoolActiveLeasesChartTmpl = collectorapi.Chart{

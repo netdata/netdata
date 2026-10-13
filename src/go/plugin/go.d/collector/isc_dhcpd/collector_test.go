@@ -5,6 +5,7 @@
 package isc_dhcpd
 
 import (
+	"cmp"
 	"context"
 	"os"
 	"testing"
@@ -129,6 +130,28 @@ func TestCollector_Charts(t *testing.T) {
 	require.NoError(t, collr.Init(context.Background()))
 
 	assert.NotNil(t, collr.Charts())
+}
+
+// The utilization charts are in percent: the stored value, scaled by each dimension's multiplier and divisor, never
+// exceeds 100 (a pool in the IPv4 fixture holds 2 leases of 126 addresses).
+func TestCollector_PoolUtilizationChartsArePercent(t *testing.T) {
+	collr := prepareDHCPdLeasesIPv4()
+	require.NoError(t, collr.Init(context.Background()))
+	mx := collr.Collect(context.Background())
+	require.NotEmpty(t, mx)
+
+	var checked int
+	for _, chart := range *collr.Charts() {
+		if chart.Units != "percent" {
+			continue
+		}
+		for _, dim := range chart.Dims {
+			value := float64(mx[dim.ID]) * float64(cmp.Or(dim.Mul, 1)) / float64(cmp.Or(dim.Div, 1))
+			assert.LessOrEqualf(t, value, 100.0, "%s: %s", chart.ID, dim.ID)
+			checked++
+		}
+	}
+	assert.Equal(t, len(collr.Pools), checked)
 }
 
 func TestCollector_Collect(t *testing.T) {
