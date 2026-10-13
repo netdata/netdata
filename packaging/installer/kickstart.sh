@@ -608,7 +608,7 @@ always_run() {
   _log_run_cmd "${@}"
   "${@}"
   ret="$?"
-  _log_run_result "${ret}"
+  _log_run_result "${ret}" "${@}"
   return "${ret}"
 }
 
