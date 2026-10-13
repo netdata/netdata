@@ -129,6 +129,16 @@
 - Build(deps): bump go.mongodb.org/mongo-driver/v2 from 2.9.1 to 2.9.2 in /src/go ([#24265](https://github.com/netdata/netdata/issues/24265))
 - Build(deps): bump golang.org/x/sync from 0.23.0 to 0.24.0 in /src/go ([#24267](https://github.com/netdata/netdata/issues/24267))
 - Build(deps): bump github.com/cloudflare/cfssl from 1.7.0 to 1.7.1 in /src/go ([#24264](https://github.com/netdata/netdata/issues/24264))
+- Feat(ndsudo): add restricted tegrastats supervision and acquisition ownership ([#24247](https://github.com/netdata/netdata/issues/24247))
+- Fix(go.d/redfish): collect manager network ports as Port resources ([#24270](https://github.com/netdata/netdata/issues/24270))
+- Feat(go.d/jetson): enable restricted privileged tegrastats collection ([#24268](https://github.com/netdata/netdata/issues/24268))
+- Regenerate integrations docs ([#24271](https://github.com/netdata/netdata/issues/24271))
+- Assorted improvements for R2 build artifact uploads. ([#24109](https://github.com/netdata/netdata/issues/24109))
+- Fix(chartengine): honor explicit zero chart expiry ([#24275](https://github.com/netdata/netdata/issues/24275))
+- Feat(go.d/jetson): collect SoC temperatures from tegrastats ([#24274](https://github.com/netdata/netdata/issues/24274))
+- Test(go): stabilize IPMI and Jetson lifecycle tests ([#24283](https://github.com/netdata/netdata/issues/24283))
+- Fix(go.d/jetson): qualify sensor temperature metric ([#24281](https://github.com/netdata/netdata/issues/24281))
+- Regenerate integrations docs ([#24282](https://github.com/netdata/netdata/issues/24282))
 
 ## [2.12.0] - 2026-09-30
 
