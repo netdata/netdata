@@ -28,7 +28,6 @@ func TestArtifacts(t *testing.T) {
 	})
 	collecttest.AssertHealthAlertsTargetChartTemplate(t, health, chartTemplateYAML)
 	collecttest.AssertHealthAlertsMatchMetadata(t, health, metadata)
-	collecttest.AssertMetadataAlertsMatchHealthConfig(t, metadata, health)
 	collecttest.AssertConfigSchemaMatchesMetadataWith(t, "config_schema.json", "metadata.yaml", collecttest.ConfigSchemaCheck{Defaults: true})
 }
 

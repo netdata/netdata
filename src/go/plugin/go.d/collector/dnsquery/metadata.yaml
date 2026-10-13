@@ -131,11 +131,6 @@ modules:
     troubleshooting:
       problems:
         list: []
-    alerts:
-      - name: dns_query_query_status
-        metric: dns_query.query_status
-        info: "DNS request type ${label:record_type} to server ${label:server} is unsuccessful"
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/dns_query.conf
     metrics:
       folding:
         title: Metrics

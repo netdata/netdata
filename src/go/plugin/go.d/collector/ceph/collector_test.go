@@ -791,7 +791,6 @@ func TestCollector_ArtifactsAgree(t *testing.T) {
 	collecttest.AssertMetadataDocumentsChartTemplate(t, metadata, template, nil)
 	// ceph.conf also carries the Prometheus ceph module's alerts.
 	collecttest.AssertHealthAlertsTargetChartTemplateWith(t, health, template, collecttest.HealthAlertsCheck{ContextPrefix: "ceph."})
-	collecttest.AssertMetadataAlertsMatchHealthConfigWith(t, metadata, health, collecttest.MetadataAlertsCheck{SharedHealthConfig: true})
 	collecttest.AssertHealthAlertsMatchMetadataWith(t, health, metadata, collecttest.HealthAlertsCheck{ContextPrefix: "ceph."})
 }
 

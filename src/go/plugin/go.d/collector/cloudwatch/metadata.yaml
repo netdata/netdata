@@ -1364,151 +1364,45 @@ modules:
               Read the *GetMetricData Profile Metric Request Estimates* chart to see which profiles drive the requests,
               then narrow `rules[].profiles`, `rules[].metrics`, and `rules[].regions`, add resource tag filters, or
               raise `rule_defaults.query.period` together with `update_every`.
+    # CloudWatch profiles create these alerts' charts at runtime, so `metrics` cannot declare their contexts. The
+    # integrations generator derives every other alert row from the contexts `metrics` declares.
     alerts:
-      - name: aws_cloudwatch_ec2_status_check_failed
-        metric: cloudwatch.ec2.status_check_failed
-        info: "EC2 instance ${label:instance_id} in ${label:region} has failed AWS status checks."
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/cloudwatch.conf
-      - name: aws_cloudwatch_ec2_attached_ebs_status_check_failed
-        metric: cloudwatch.ec2.status_check_failed
-        info: "EC2 instance ${label:instance_id} in ${label:region} has an attached EBS volume failing AWS status checks."
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/cloudwatch.conf
-      - name: aws_cloudwatch_alb_target_group_unhealthy_hosts
-        metric: cloudwatch.alb_target_health.unhealthy_hosts
-        info: "ALB target group ${label:target_group} on load balancer ${label:load_balancer} in ${label:region} has sustained unhealthy registered targets."
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/cloudwatch.conf
-      - name: aws_cloudwatch_nlb_target_group_unhealthy_hosts
-        metric: cloudwatch.nlb_target_health.unhealthy_hosts
-        info: "NLB target group ${label:target_group} on load balancer ${label:load_balancer} in ${label:region} has sustained unhealthy registered targets."
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/cloudwatch.conf
-      - name: aws_cloudwatch_ebs_stalled_io_check_failed
-        metric: cloudwatch.ebs_stalled_io.stalled_io_check
-        info: "EBS volume ${label:volume_id} in ${label:region} has failed AWS stalled I/O checks."
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/cloudwatch.conf
-      - name: aws_cloudwatch_nat_gateway_port_allocation_errors
-        metric: cloudwatch.nat_gateway.errors
-        info: "NAT Gateway ${label:nat_gateway_id} in ${label:region} is reporting source-port allocation failures."
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/cloudwatch.conf
-      - name: aws_cloudwatch_efs_io_limit_reached
-        metric: cloudwatch.efs.io_limit
-        info: "EFS file system ${label:file_system_id} in ${label:region} is at its AWS PercentIOLimit threshold."
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/cloudwatch.conf
-      - name: aws_cloudwatch_efs_burst_credits_exhausted
-        metric: cloudwatch.efs.burst_credit
-        info: "EFS file system ${label:file_system_id} in ${label:region} has exhausted burst credits."
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/cloudwatch.conf
-      - name: aws_cloudwatch_ecs_cpu_utilization
-        metric: cloudwatch.ecs.utilization
-        info: "ECS service ${label:service_name} in cluster ${label:cluster_name} (${label:region}) has sustained CPU utilization above the AWS recommended alarm threshold."
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/cloudwatch.conf
-      - name: aws_cloudwatch_ecs_memory_utilization
-        metric: cloudwatch.ecs.utilization
-        info: "ECS service ${label:service_name} in cluster ${label:cluster_name} (${label:region}) has sustained memory utilization above the AWS recommended alarm threshold."
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/cloudwatch.conf
-      - name: aws_cloudwatch_ecs_ebs_filesystem_utilization
-        metric: cloudwatch.ecs.ebs_filesystem_utilization
-        info: "ECS service ${label:service_name} in cluster ${label:cluster_name} (${label:region}) has sustained EBS filesystem utilization above the AWS recommended alarm threshold."
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/cloudwatch.conf
-      - name: aws_cloudwatch_opensearch_cluster_status_red
-        metric: cloudwatch.opensearch.cluster_status
-        info: "OpenSearch domain ${label:domain_name} in ${label:region} is reporting red cluster status."
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/cloudwatch.conf
-      - name: aws_cloudwatch_opensearch_cluster_status_yellow
-        metric: cloudwatch.opensearch.cluster_status
-        info: "OpenSearch domain ${label:domain_name} in ${label:region} is reporting yellow cluster status."
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/cloudwatch.conf
-      - name: aws_cloudwatch_opensearch_index_writes_blocked
-        metric: cloudwatch.opensearch.index_writes_blocked
-        info: "OpenSearch domain ${label:domain_name} in ${label:region} is blocking index write requests."
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/cloudwatch.conf
-      - name: aws_cloudwatch_opensearch_jvm_memory_pressure
-        metric: cloudwatch.opensearch.jvm_memory_pressure
-        info: "OpenSearch domain ${label:domain_name} in ${label:region} has sustained JVM memory pressure above the AWS recommended alarm threshold."
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/cloudwatch.conf
-      - name: aws_cloudwatch_opensearch_cpu_utilization
-        metric: cloudwatch.opensearch.cpu
-        info: "OpenSearch domain ${label:domain_name} in ${label:region} has sustained maximum CPU utilization above the AWS recommended alarm threshold."
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/cloudwatch.conf
-      - name: aws_cloudwatch_opensearch_automated_snapshot_failure
-        metric: cloudwatch.opensearch.automated_snapshot_failure
-        info: "OpenSearch domain ${label:domain_name} in ${label:region} has a failed automated snapshot."
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/cloudwatch.conf
-      - name: aws_cloudwatch_opensearch_old_gen_jvm_memory_pressure
-        metric: cloudwatch.opensearch.old_gen_jvm_memory_pressure
-        info: "OpenSearch domain ${label:domain_name} in ${label:region} has sustained old-generation JVM memory pressure above the AWS recommended alarm threshold."
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/cloudwatch.conf
-      - name: aws_cloudwatch_elasticache_engine_cpu_utilization
-        metric: cloudwatch.elasticache.cpu
-        info: "ElastiCache node ${label:cache_cluster_id}/${label:cache_node_id} in ${label:region} has sustained engine CPU utilization above the AWS recommended alarm threshold."
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/cloudwatch.conf
-      - name: aws_cloudwatch_msk_active_controller_missing
-        metric: cloudwatch.msk_cluster.active_controllers
-        info: "MSK cluster ${label:cluster_name} in ${label:region} has had no active controller for a sustained period."
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/cloudwatch.conf
-      - name: aws_cloudwatch_msk_multiple_active_controllers
-        metric: cloudwatch.msk_cluster.active_controllers
-        info: "MSK cluster ${label:cluster_name} in ${label:region} has had more than one active controller for a sustained period."
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/cloudwatch.conf
-      - name: aws_cloudwatch_msk_offline_partitions
-        metric: cloudwatch.msk_cluster.offline_partitions
-        info: "MSK cluster ${label:cluster_name} in ${label:region} has had offline partitions for a sustained period."
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/cloudwatch.conf
-      - name: aws_cloudwatch_msk_cpu_utilization
-        metric: cloudwatch.msk.cpu
-        info: "MSK broker ${label:broker_id} in cluster ${label:cluster_name} (${label:region}) has sustained CpuUser plus CpuSystem above the AWS best-practice threshold."
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/cloudwatch.conf
-      - name: aws_cloudwatch_msk_data_logs_disk_used
-        metric: cloudwatch.msk.disk_used
-        info: "MSK broker ${label:broker_id} in cluster ${label:cluster_name} (${label:region}) has sustained data-log disk utilization above the AWS best-practice threshold."
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/cloudwatch.conf
-      - name: aws_cloudwatch_msk_heap_memory_after_gc
-        metric: cloudwatch.msk.heap_memory_after_gc
-        info: "MSK broker ${label:broker_id} in cluster ${label:cluster_name} (${label:region}) has sustained heap memory after GC above the AWS best-practice threshold."
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/cloudwatch.conf
-      - name: aws_cloudwatch_msk_under_replicated_partitions
-        metric: cloudwatch.msk.partitions
-        info: "MSK broker ${label:broker_id} in cluster ${label:cluster_name} (${label:region}) has had under-replicated partitions for a sustained period. This can happen during planned MSK rolling maintenance, but outside expected maintenance it means replicas are not fully caught up."
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/cloudwatch.conf
-      - name: aws_cloudwatch_msk_under_min_isr_partitions
-        metric: cloudwatch.msk.under_min_isr
-        info: "MSK broker ${label:broker_id} in cluster ${label:cluster_name} (${label:region}) has had partitions below the configured minimum in-sync replica count for a sustained period."
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/cloudwatch.conf
-      - name: aws_cloudwatch_rds_replica_lag
-        metric: cloudwatch.rds.replica_lag
-        info: "RDS instance ${label:db_instance_identifier} in ${label:region} has sustained replica lag above the AWS recommended alarm threshold."
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/cloudwatch.conf
-      - name: aws_cloudwatch_rds_maximum_used_transaction_ids
-        metric: cloudwatch.rds.maximum_used_transaction_ids
-        info: "RDS instance ${label:db_instance_identifier} in ${label:region} is above the AWS recommended transaction ID alarm threshold."
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/cloudwatch.conf
-      - name: aws_cloudwatch_rds_ebs_byte_balance
-        metric: cloudwatch.rds.ebs_balance
-        info: "RDS instance ${label:db_instance_identifier} in ${label:region} has sustained EBS byte balance below the AWS recommended alarm threshold."
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/cloudwatch.conf
-      - name: aws_cloudwatch_rds_ebs_io_balance
-        metric: cloudwatch.rds.ebs_balance
-        info: "RDS instance ${label:db_instance_identifier} in ${label:region} has sustained EBS I/O balance below the AWS recommended alarm threshold."
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/cloudwatch.conf
-      - name: aws_cloudwatch_vpn_tunnel_down
-        metric: cloudwatch.vpn.tunnel_state
-        info: "Site-to-Site VPN ${label:vpn_id} in ${label:region} has one or more tunnels down."
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/cloudwatch.conf
-      - name: aws_cloudwatch_sns_invalid_notification_attributes
-        metric: cloudwatch.sns.invalid_notifications
-        info: "SNS topic ${label:topic_name} in ${label:region} has sustained notifications filtered out because of invalid attributes."
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/cloudwatch.conf
-      - name: aws_cloudwatch_sns_invalid_notification_body
-        metric: cloudwatch.sns.invalid_notifications
-        info: "SNS topic ${label:topic_name} in ${label:region} has sustained notifications filtered out because of invalid message bodies."
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/cloudwatch.conf
-      - name: aws_cloudwatch_sns_notifications_redriven_to_dlq
-        metric: cloudwatch.sns.dlq_redrive
-        info: "SNS topic ${label:topic_name} in ${label:region} has sustained notifications moved to a dead-letter queue."
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/cloudwatch.conf
-      - name: aws_cloudwatch_sns_notifications_failed_to_redrive_to_dlq
-        metric: cloudwatch.sns.dlq_redrive
-        info: "SNS topic ${label:topic_name} in ${label:region} has sustained notifications that could not be moved to a dead-letter queue."
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/cloudwatch.conf
+      - aws_cloudwatch_ec2_status_check_failed
+      - aws_cloudwatch_ec2_attached_ebs_status_check_failed
+      - aws_cloudwatch_alb_target_group_unhealthy_hosts
+      - aws_cloudwatch_nlb_target_group_unhealthy_hosts
+      - aws_cloudwatch_ebs_stalled_io_check_failed
+      - aws_cloudwatch_nat_gateway_port_allocation_errors
+      - aws_cloudwatch_efs_io_limit_reached
+      - aws_cloudwatch_efs_burst_credits_exhausted
+      - aws_cloudwatch_ecs_cpu_utilization
+      - aws_cloudwatch_ecs_memory_utilization
+      - aws_cloudwatch_ecs_ebs_filesystem_utilization
+      - aws_cloudwatch_opensearch_cluster_status_red
+      - aws_cloudwatch_opensearch_cluster_status_yellow
+      - aws_cloudwatch_opensearch_index_writes_blocked
+      - aws_cloudwatch_opensearch_jvm_memory_pressure
+      - aws_cloudwatch_opensearch_cpu_utilization
+      - aws_cloudwatch_opensearch_automated_snapshot_failure
+      - aws_cloudwatch_opensearch_old_gen_jvm_memory_pressure
+      - aws_cloudwatch_elasticache_engine_cpu_utilization
+      - aws_cloudwatch_msk_active_controller_missing
+      - aws_cloudwatch_msk_multiple_active_controllers
+      - aws_cloudwatch_msk_offline_partitions
+      - aws_cloudwatch_msk_cpu_utilization
+      - aws_cloudwatch_msk_data_logs_disk_used
+      - aws_cloudwatch_msk_heap_memory_after_gc
+      - aws_cloudwatch_msk_under_replicated_partitions
+      - aws_cloudwatch_msk_under_min_isr_partitions
+      - aws_cloudwatch_rds_replica_lag
+      - aws_cloudwatch_rds_maximum_used_transaction_ids
+      - aws_cloudwatch_rds_ebs_byte_balance
+      - aws_cloudwatch_rds_ebs_io_balance
+      - aws_cloudwatch_vpn_tunnel_down
+      - aws_cloudwatch_sns_invalid_notification_attributes
+      - aws_cloudwatch_sns_invalid_notification_body
+      - aws_cloudwatch_sns_notifications_redriven_to_dlq
+      - aws_cloudwatch_sns_notifications_failed_to_redrive_to_dlq
     metrics:
       folding:
         title: Metrics

@@ -250,39 +250,13 @@
           },
           "alerts": {
             "type": "array",
-            "description": "The list of configured alerts shipped with Netdata for this collector.",
+            "description": "Stock alerts this integration owns although no context in 'metrics' derives them, for charts created at runtime from profiles or alarms on a chart id. The integrations generator derives every other alert from the declared metric contexts and src/health/health.d; integrations/tests/test_health_alerts.py rejects a name that is unknown or derivable.",
             "items": {
-              "type": "object",
-              "description": "Information about the configured alert.",
-              "properties": {
-                "name": {
-                  "type": "string",
-                  "description": "Alert's 'alarm' or 'template' value (https://learn.netdata.cloud/docs/alerting/health-configuration-reference#alarm-line-alarm-or-template)."
-                },
-                "link": {
-                  "type": "string",
-                  "description": "Link to github .conf file that this alert originates from"
-                },
-                "metric": {
-                  "type": "string",
-                  "description": "Alert's 'on' value (https://learn.netdata.cloud/docs/alerting/health-configuration-reference#alarm-line-on)."
-                },
-                "info": {
-                  "type": "string",
-                  "description": "Alert's 'info' value (https://learn.netdata.cloud/docs/alerting/health-configuration-reference#alarm-line-info)."
-                },
-                "os": {
-                  "type": "string",
-                  "description": "Alert's 'os' value (https://learn.netdata.cloud/docs/alerting/health-configuration-reference#alarm-line-os)."
-                }
-              },
-              "required": [
-                "name",
-                "link",
-                "metric",
-                "info"
-              ]
-            }
+              "type": "string",
+              "description": "Alert's 'alarm' or 'template' value (https://learn.netdata.cloud/docs/alerting/health-configuration-reference#alarm-line-alarm-or-template).",
+              "minLength": 1
+            },
+            "uniqueItems": true
           },
           "metrics": {
             "type": "object",
@@ -688,7 +662,6 @@
           "overview",
           "setup",
           "troubleshooting",
-          "alerts",
           "metrics"
         ]
       }

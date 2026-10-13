@@ -31,6 +31,8 @@ from pathlib import Path
 
 from ruamel.yaml import YAML
 
+from health_alerts import agent_internal_alerts, alert_rows, alert_subject, load_stock_rules
+
 REPO_PATH = Path(__file__).resolve().parent.parent
 PROFILES_DIR = REPO_PATH / 'src' / 'go' / 'plugin' / 'go.d' / 'config' / 'go.d' / 'snmp.profiles' / 'default'
 TRAP_CATALOGUE = (REPO_PATH / 'src' / 'go' / 'plugin' / 'go.d' / 'config' / 'go.d'
@@ -579,12 +581,12 @@ METRICS = {'folding': {'title': 'Metrics', 'enabled': False}, 'description': '',
 
 
 def make_entry(name, link, categories, icon, keywords, ov, plugin_name=PLUGIN_GO_D, module_name='snmp', metrics=None,
-               setup=None):
+               setup=None, alerts=()):
     monitored_instance = {'name': name, 'link': link, 'categories': categories, 'icon_filename': icon}
     if name in PAGE_DESCRIPTIONS:
         monitored_instance['description'] = PAGE_DESCRIPTIONS[name]
 
-    return {
+    entry = {
         'meta': {
             'plugin_name': plugin_name,
             'module_name': module_name,
@@ -596,9 +598,11 @@ def make_entry(name, link, categories, icon, keywords, ov, plugin_name=PLUGIN_GO
         'overview': ov,
         'setup': setup if setup is not None else SETUP,
         'troubleshooting': TROUBLESHOOTING if module_name in ('snmp', 'snmp_topology') else EMPTY_TROUBLESHOOTING,
-        'alerts': [],
-        'metrics': metrics if metrics is not None else METRICS,
     }
+    if alerts:
+        entry['alerts'] = list(alerts)
+    entry['metrics'] = metrics if metrics is not None else METRICS
+    return entry
 
 
 def metrics_block(description_md):
@@ -737,9 +741,29 @@ def render_profile_metrics_md(metrics, display):
     return '\n'.join(lines)
 
 
-def build_device_modules(profiles):
+def profile_virtual_contexts(name, profiles):
+    """Chart contexts of the virtual metrics across the resolved extends chain (same naming as symbols)."""
+    chain = resolve_extends(name, profiles) | {name}
+    return sorted({
+        _ctx(vm['name'])
+        for m in chain
+        for vm in ((profiles.get(m, {}).get('data') or {}).get('virtual_metrics') or [])
+        if isinstance(vm, dict) and vm.get('name') and not vm['name'].startswith('_')
+    })
+
+
+def device_alert_names(contexts, rules, internal):
+    """Stock alerts on the profile's chart contexts. A device entry documents its contexts in Markdown, not in
+    `metrics.scopes`, so the integrations generator cannot derive them and the entry lists them by name."""
+    subject = alert_subject('', PLUGIN_GO_D, 'snmp', contexts)
+    return list(dict.fromkeys(row['name'] for row in alert_rows(rules, subject, internal)))
+
+
+def build_device_modules(profiles, rules=None):
     """One catalog page per concrete device profile (per profile, not per vendor),
-    each listing the metrics it adds, grouped by family."""
+    each listing the metrics it adds, grouped by family, and the stock alerts on them."""
+    rules = load_stock_rules() if rules is None else rules
+    internal = agent_internal_alerts(rules)
     modules = []
     for name in sorted(n for n in profiles if is_device_catalog_profile(n)):
         data = profiles[name]['data']
@@ -767,6 +791,8 @@ def build_device_modules(profiles):
                 f'Auto-detected as {display} via sysObjectID/sysDescr.',
             ),
             metrics=metrics_block(render_profile_metrics_md(mets, display)),
+            alerts=device_alert_names(
+                [met['context'] for met in mets] + profile_virtual_contexts(name, profiles), rules, internal),
         ))
     return modules
 

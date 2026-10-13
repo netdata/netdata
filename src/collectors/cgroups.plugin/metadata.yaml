@@ -70,15 +70,6 @@ modules:
     troubleshooting:
       problems:
         list: []
-    alerts:
-      - name: cgroup_10min_cpu_usage
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/cgroups.conf
-        metric: cgroup.cpu_limit
-        info: average cgroup CPU utilization over the last 10 minutes
-      - name: cgroup_ram_in_use
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/cgroups.conf
-        metric: cgroup.mem_usage
-        info: cgroup memory utilization
     metrics:
       folding:
         title: Metrics
@@ -580,15 +571,6 @@ modules:
       data_collection:
         <<: *data_collection
         metrics_description: Monitor Kubernetes pod and container resource utilization — CPU, memory, disk I/O, and network — via Linux cgroups.
-    alerts: &k8s_alerts
-      - name: k8s_cgroup_10min_cpu_usage
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/cgroups.conf
-        metric: k8s.cgroup.cpu_limit
-        info: average cgroup CPU utilization over the last 10 minutes
-      - name: k8s_cgroup_ram_in_use
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/cgroups.conf
-        metric: k8s.cgroup.mem_usage
-        info: cgroup memory utilization
     metrics: &k8s_metrics
       folding:
         title: Metrics
@@ -1003,7 +985,6 @@ modules:
       data_collection:
         <<: *data_collection
         metrics_description: "Monitor systemd service resource utilization — CPU, memory, and disk I/O — via Linux cgroups."
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -1501,7 +1482,6 @@ modules:
       data_collection:
         <<: *data_collection
         metrics_description: "Monitor Red Hat OpenShift container resource utilization — CPU, memory, disk I/O, and network — via Linux cgroups."
-    alerts: *k8s_alerts
     metrics: *k8s_metrics
   - <<: *module
     meta:

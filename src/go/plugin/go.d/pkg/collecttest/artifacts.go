@@ -105,13 +105,6 @@ func isRuntimeNamedSelector(meta metrixselector.Meta) bool {
 	return false
 }
 
-// MetadataAlert is one metadata.yaml alerts[] row.
-type MetadataAlert struct {
-	Name   string
-	Metric string
-	Info   string
-}
-
 // MetadataMetric is one metadata.yaml metrics.scopes[].metrics[] row with the
 // scope it belongs to and its dimension names.
 type MetadataMetric struct {
@@ -126,7 +119,6 @@ type MetadataMetric struct {
 // MetadataModule is the decoded part of one metadata.yaml module these checks use.
 type MetadataModule struct {
 	ID        string
-	Alerts    []MetadataAlert
 	Metrics   []MetadataMetric
 	Functions []MetadataFunction
 }
@@ -136,11 +128,6 @@ type metadataDocument struct {
 		Meta struct {
 			ID string `yaml:"id"`
 		} `yaml:"meta"`
-		Alerts []struct {
-			Name   string `yaml:"name"`
-			Metric string `yaml:"metric"`
-			Info   string `yaml:"info"`
-		} `yaml:"alerts"`
 		Metrics struct {
 			Scopes []struct {
 				Name    string `yaml:"name"`
@@ -211,9 +198,6 @@ func DecodeMetadataModule(metadataYAML []byte, moduleID string) (MetadataModule,
 	}
 	raw := doc.Modules[index]
 	out := MetadataModule{ID: raw.Meta.ID}
-	for _, alert := range raw.Alerts {
-		out.Alerts = append(out.Alerts, MetadataAlert{Name: alert.Name, Metric: alert.Metric, Info: alert.Info})
-	}
 	for _, scope := range raw.Metrics.Scopes {
 		for _, metric := range scope.Metrics {
 			row := MetadataMetric{
@@ -321,12 +305,11 @@ func AssertMetadataDocumentsChartTemplate(t testing.TB, metadataYAML []byte, tem
 type HealthAlert struct {
 	Name   string
 	On     string
-	Info   string
 	Units  string
 	Lookup string
 }
 
-var healthAlertLine = regexp.MustCompile(`^\s*(template|alarm|on|info|units|lookup)\s*:\s*(.*?)\s*$`)
+var healthAlertLine = regexp.MustCompile(`^\s*(template|alarm|on|units|lookup)\s*:\s*(.*?)\s*$`)
 
 // ParseHealthAlerts extracts the alarm/template blocks of a health.d
 // configuration with the fields the artifact checks compare.
@@ -343,10 +326,6 @@ func ParseHealthAlerts(healthConfig []byte) []HealthAlert {
 		case "on":
 			if len(out) > 0 {
 				out[len(out)-1].On = match[2]
-			}
-		case "info":
-			if len(out) > 0 {
-				out[len(out)-1].Info = match[2]
 			}
 		case "units":
 			if len(out) > 0 {
@@ -508,93 +487,6 @@ func AssertHealthAlertsMatchMetadataWith(t testing.TB, healthConfig, metadataYAM
 	t.Helper()
 	if err := CheckHealthAlertsMatchMetadataWith(healthConfig, metadataYAML, opts); err != nil {
 		t.Fatalf("health alerts do not match metadata.yaml:\n%v", err)
-	}
-}
-
-// MetadataAlertsCheck selects what the metadata-alerts-versus-health check
-// compares when metadata.yaml has several modules or the health.d file is
-// shared by several collectors.
-type MetadataAlertsCheck struct {
-	// ModuleID selects the metadata module by meta.id; empty requires a single module.
-	ModuleID string
-	// SharedHealthConfig accepts alerts in the health.d file that this module does
-	// not document; every documented alert must still match its shipped block.
-	SharedHealthConfig bool
-}
-
-// CheckMetadataAlertsMatchHealthAlerts requires the documented alerts to match
-// the shipped ones: every documented alert exists, its metric equals the
-// alert's on context and its info text is verbatim, across every shipped
-// variant of that name (a health.d file may repeat a name for OS- or
-// label-specific variants). Unless sharedHealthConfig is set, every shipped
-// alert must also be documented.
-func CheckMetadataAlertsMatchHealthAlerts(documented []MetadataAlert, shipped []HealthAlert, sharedHealthConfig bool) error {
-	byName := make(map[string][]HealthAlert)
-	for _, alert := range shipped {
-		byName[alert.Name] = append(byName[alert.Name], alert)
-	}
-	var problems []error
-	seen := make(map[string]bool)
-	for _, alert := range documented {
-		if seen[alert.Name] {
-			problems = append(problems, fmt.Errorf("%s: documented twice", alert.Name))
-			continue
-		}
-		seen[alert.Name] = true
-		variants, ok := byName[alert.Name]
-		if !ok {
-			problems = append(problems, fmt.Errorf("%s: documented but not in the health configuration", alert.Name))
-			continue
-		}
-		for _, actual := range variants {
-			if alert.Metric != actual.On {
-				problems = append(problems, fmt.Errorf("%s: metric %q, alert on %q", alert.Name, alert.Metric, actual.On))
-			}
-			if alert.Info != actual.Info {
-				problems = append(problems, fmt.Errorf("%s: info %q, alert info %q", alert.Name, alert.Info, actual.Info))
-			}
-		}
-	}
-	if !sharedHealthConfig {
-		for name := range byName {
-			if !seen[name] {
-				problems = append(problems, fmt.Errorf("%s: in the health configuration but not documented", name))
-			}
-		}
-	}
-	return errors.Join(sortedErrors(problems)...)
-}
-
-// CheckMetadataAlertsMatchHealthConfig decodes a single-module metadata.yaml and
-// a health.d configuration and runs CheckMetadataAlertsMatchHealthAlerts
-// requiring every shipped alert to be documented.
-func CheckMetadataAlertsMatchHealthConfig(metadataYAML, healthConfig []byte) error {
-	return CheckMetadataAlertsMatchHealthConfigWith(metadataYAML, healthConfig, MetadataAlertsCheck{})
-}
-
-// CheckMetadataAlertsMatchHealthConfigWith is CheckMetadataAlertsMatchHealthConfig
-// selected by opts.
-func CheckMetadataAlertsMatchHealthConfigWith(metadataYAML, healthConfig []byte, opts MetadataAlertsCheck) error {
-	module, err := DecodeMetadataModule(metadataYAML, opts.ModuleID)
-	if err != nil {
-		return err
-	}
-	return CheckMetadataAlertsMatchHealthAlerts(module.Alerts, ParseHealthAlerts(healthConfig), opts.SharedHealthConfig)
-}
-
-// AssertMetadataAlertsMatchHealthConfig fails the test when
-// CheckMetadataAlertsMatchHealthConfig reports drift.
-func AssertMetadataAlertsMatchHealthConfig(t testing.TB, metadataYAML, healthConfig []byte) {
-	t.Helper()
-	AssertMetadataAlertsMatchHealthConfigWith(t, metadataYAML, healthConfig, MetadataAlertsCheck{})
-}
-
-// AssertMetadataAlertsMatchHealthConfigWith is AssertMetadataAlertsMatchHealthConfig
-// selected by opts.
-func AssertMetadataAlertsMatchHealthConfigWith(t testing.TB, metadataYAML, healthConfig []byte, opts MetadataAlertsCheck) {
-	t.Helper()
-	if err := CheckMetadataAlertsMatchHealthConfigWith(metadataYAML, healthConfig, opts); err != nil {
-		t.Fatalf("metadata.yaml alerts do not match the health configuration:\n%v", err)
 	}
 }
 

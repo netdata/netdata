@@ -532,23 +532,6 @@ modules:
           - name: Windows script support
             description: |
               On Windows, point `plugin` directly to a `.ps1`, `.bat`, or `.cmd` script. Netdata automatically invokes `.ps1` scripts through `powershell.exe` and `.bat`/`.cmd` scripts through `cmd.exe`. Ensure scripts are stored in directories with appropriate ACLs.
-    alerts:
-      - name: nagios_job_execution_state_warn
-        metric: nagios.job.execution_state
-        info: "Nagios job ${label:nagios_job} is in WARNING state"
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/nagios.conf
-      - name: nagios_job_execution_state_crit
-        metric: nagios.job.execution_state
-        info: "Nagios job ${label:nagios_job} is in CRITICAL state"
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/nagios.conf
-      - name: nagios_job_perfdata_threshold_state_warn
-        metric: nagios.job.perfdata_threshold_state
-        info: "Nagios job ${label:nagios_job} perfdata ${label:perfdata_value} is in WARNING threshold state"
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/nagios.conf
-      - name: nagios_job_perfdata_threshold_state_crit
-        metric: nagios.job.perfdata_threshold_state
-        info: "Nagios job ${label:nagios_job} perfdata ${label:perfdata_value} is in CRITICAL threshold state"
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/nagios.conf
     metrics:
       folding:
         title: Metrics

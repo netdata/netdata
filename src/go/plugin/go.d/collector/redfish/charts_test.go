@@ -52,10 +52,6 @@ func TestHealthAlertsTargetChartTemplate(t *testing.T) {
 	collecttest.AssertHealthAlertsTargetChartTemplate(t, readArtifact(t, healthConfigPath), chartTemplateYAML)
 }
 
-func TestMetadataAlertsMatchHealthConfig(t *testing.T) {
-	collecttest.AssertMetadataAlertsMatchHealthConfig(t, readArtifact(t, "metadata.yaml"), readArtifact(t, healthConfigPath))
-}
-
 func TestHealthAlertsMatchMetadata(t *testing.T) {
 	collecttest.AssertHealthAlertsMatchMetadata(t, readArtifact(t, healthConfigPath), readArtifact(t, "metadata.yaml"))
 }

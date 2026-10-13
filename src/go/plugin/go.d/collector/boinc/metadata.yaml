@@ -101,23 +101,6 @@ modules:
     troubleshooting:
       problems:
         list: []
-    alerts:
-      - name: boinc_total_tasks
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/boinc.conf
-        metric: boinc.tasks
-        info: average number of total tasks over the last 10 minutes
-      - name: boinc_active_tasks
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/boinc.conf
-        metric: boinc.tasks
-        info: average number of active tasks over the last 10 minutes
-      - name: boinc_compute_errors
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/boinc.conf
-        metric: boinc.tasks_per_state
-        info: average number of compute errors over the last 10 minutes
-      - name: boinc_upload_errors
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/boinc.conf
-        metric: boinc.tasks_per_state
-        info: average number of failed uploads over the last 10 minutes
     metrics:
       folding:
         title: Metrics

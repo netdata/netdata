@@ -202,27 +202,6 @@ modules:
     troubleshooting:
       problems:
         list: []
-    alerts:
-      - name: hdfs_capacity_usage
-        metric: hdfs.capacity
-        info: summary datanodes space capacity utilization
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/hdfs.conf
-      - name: hdfs_missing_blocks
-        metric: hdfs.blocks
-        info: number of missing blocks
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/hdfs.conf
-      - name: hdfs_stale_nodes
-        metric: hdfs.data_nodes
-        info: number of datanodes marked stale due to delayed heartbeat
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/hdfs.conf
-      - name: hdfs_dead_nodes
-        metric: hdfs.data_nodes
-        info: number of datanodes which are currently dead
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/hdfs.conf
-      - name: hdfs_num_failed_volumes
-        metric: hdfs.datanode_failed_volumes
-        info: number of failed volumes
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/hdfs.conf
     metrics:
       folding:
         title: Metrics

@@ -189,31 +189,6 @@ modules:
             description: |
               The collector reports missing or invalid integer, decimal, duration, status, license expiration, and IPsec tunnel-count values with the metricset, field, entity name, and raw value when present.
               It does not silently convert missing or malformed values to zero, report fake valid status, or treat unrecognized license dates as never-expiring licenses.
-    alerts:
-      - name: panos_bgp_peer_not_established
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/panos.conf
-        metric: panos.bgp.peer.state
-        info: Critical when a BGP peer has not been established for 5 minutes.
-      - name: panos_device_certificate_invalid
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/panos.conf
-        metric: panos.system.device_certificate_status
-        info: Critical when PAN-OS reports the device certificate as invalid.
-      - name: panos_ha_peer_connection_down
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/panos.conf
-        metric: panos.ha.peer.connection_status
-        info: Critical when the HA peer connection has not been up for 5 minutes.
-      - name: panos_environment_sensor_alarm
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/panos.conf
-        metric: panos.environment.sensor_alarm_status
-        info: Critical when PAN-OS reports an environment sensor alarm.
-      - name: panos_license_expired
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/panos.conf
-        metric: panos.license.status
-        info: Critical when PAN-OS reports a license as expired.
-      - name: panos_license_expires_soon
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/panos.conf
-        metric: panos.license.time_until_expiration
-        info: Warning under 30 days before expiration, critical under 7 days. Expired licenses trigger panos_license_expired instead.
     metrics:
       folding:
         title: Metrics

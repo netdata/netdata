@@ -139,7 +139,6 @@ func TestStockAlertsMatchMetadata(t *testing.T) {
 	require.NoError(t, err)
 	health, err := os.ReadFile(filepath.Join("..", "..", "..", "..", "..", "health", "health.d", "dcgm.conf"))
 	require.NoError(t, err)
-	collecttest.AssertMetadataAlertsMatchHealthConfig(t, metadata, health)
 	collecttest.AssertHealthAlertsMatchMetadata(t, health, metadata)
 }
 

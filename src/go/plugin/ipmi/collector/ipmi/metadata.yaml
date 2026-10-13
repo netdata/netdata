@@ -169,15 +169,10 @@ modules:
             cause: The plugin account cannot open the local IPMI device for reading and writing.
             fix: Grant device access through the host security policy, or run a trusted local test explicitly with sudo.
               Rebuilding the plugin does not grant device access.
+    # ipmi_events is an alarm on chart id ipmi.events, which this collector creates under the ipmi_go.sel context,
+    # so no declared context derives it. The integrations generator derives every other alert row from `metrics`.
     alerts:
-      - name: ipmi_go_sensor_state
-        metric: ipmi_go.sensor_state
-        info: IPMI sensor ${label:sensor} (${label:component}) state
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/ipmi.conf
-      - name: ipmi_events
-        metric: ipmi_go.sel
-        info: number of events in the IPMI System Event Log (SEL)
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/ipmi.conf
+      - ipmi_events
     metrics:
       folding:
         title: Metrics

@@ -22,6 +22,7 @@ on:
       - 'src/go/plugin/ibm.d/modules/**/contexts/contexts.yaml'
       - 'src/go/plugin/ibm.d/modules/**/contexts/doc.go'
       - 'src/exporting/**/metadata.yaml'
+      - 'src/health/health.d/**'
       - 'src/health/notifications/**/metadata.yaml'
       - 'integrations/templates/**'
       - 'integrations/schemas/**'

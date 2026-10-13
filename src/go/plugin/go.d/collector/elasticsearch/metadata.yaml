@@ -272,27 +272,6 @@ modules:
     troubleshooting:
       problems:
         list: []
-    alerts:
-      - name: elasticsearch_node_indices_search_time_query
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/elasticsearch.conf
-        metric: elasticsearch.node_indices_search_time
-        info: search performance is degraded, queries run slowly.
-      - name: elasticsearch_node_indices_search_time_fetch
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/elasticsearch.conf
-        metric: elasticsearch.node_indices_search_time
-        info: search performance is degraded, fetches run slowly.
-      - name: elasticsearch_cluster_health_status_red
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/elasticsearch.conf
-        metric: elasticsearch.cluster_health_status
-        info: cluster health status is red.
-      - name: elasticsearch_cluster_health_status_yellow
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/elasticsearch.conf
-        metric: elasticsearch.cluster_health_status
-        info: cluster health status is yellow.
-      - name: elasticsearch_node_index_health_red
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/elasticsearch.conf
-        metric: elasticsearch.node_index_health
-        info: node index $label:index health status is red.
     functions:
       description: |
         This collector exposes real-time functions for interactive troubleshooting in the Live tab.
