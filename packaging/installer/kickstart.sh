@@ -2154,9 +2154,9 @@ set_static_archive_urls() {
           if [ -n "${INSTALL_VERSION}" ]; then
             version="v${INSTALL_VERSION}"
           else
-            version="$(get_redirect "${NETDATA_TARBALL_BASEURL}/releases/latest")"
+            version="$(get_redirect "${NETDATA_TARBALL_BASEURL}/latest")"
           fi
-          NETDATA_STATIC_ARCHIVE_URL_PREFIX="${NETDATA_TARBALL_BASEURL}/releases/${version}"
+          NETDATA_STATIC_ARCHIVE_URL_PREFIX="${NETDATA_TARBALL_BASEURL}/${version}"
         fi
 
         check_for_remote_file "${NETDATA_STATIC_ARCHIVE_URL_PREFIX}/Manifest"
@@ -2315,9 +2315,9 @@ set_source_archive_urls() {
           if [ -n "${INSTALL_VERSION}" ]; then
             version="v${INSTALL_VERSION}"
           else
-            version="$(get_redirect "${NETDATA_TARBALL_BASEURL}/releases/latest")"
+            version="$(get_redirect "${NETDATA_TARBALL_BASEURL}/latest")"
           fi
-          NETDATA_SOURCE_ARCHIVE_URL_PREFIX="${NETDATA_TARBALL_BASEURL}/releases/${version}"
+          NETDATA_SOURCE_ARCHIVE_URL_PREFIX="${NETDATA_TARBALL_BASEURL}/${version}"
         fi
 
         check_for_remote_file "${NETDATA_SOURCE_ARCHIVE_URL_PREFIX}/Manifest"
