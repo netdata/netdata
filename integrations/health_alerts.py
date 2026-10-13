@@ -4,7 +4,7 @@
 Reads ``src/health/health.d/*.conf`` with the line rules of the Agent's ``health_readfile``, decides which integrations
 own each stock alert, builds the integration pages' alert rows and the ``alerts`` export of
 ``integrations.js``/``integrations.json``, and checks the stock alerts' ``class``, ``type`` and ``component`` against
-the classification vocabulary.
+the classification vocabulary and the variables of their expressions against documented dimensions.
 Text values drop quotes that wrap the whole value and turn inner double quotes into spaces; single quotes stay.
 """
 
@@ -21,6 +21,7 @@ CONF_LINK_PREFIX = f'https://github.com/{AGENT_REPO}/blob/master/'
 
 RULE_KEYS = ('alarm', 'template')
 EXPORTED_FIELDS = ('class', 'type', 'component', 'units', 'summary', 'info')
+EXPRESSION_FIELDS = ('calc', 'warn', 'crit')
 
 # Match lines the Agent folds into label patterns (health_config.c, PARSE_HEALTH_CONFIG_LINE_PATTERN_APPEND): the key
 # names the label it implies, or None when the value carries its own `label=pattern` words.
@@ -70,6 +71,40 @@ PLUGIN_PLATFORMS = {
 
 # Alerts on the Agent's own charts belong to no integration.
 AGENT_INTERNAL_PREFIXES = ('netdata.', 'anomaly_detection.')
+
+# Variables the Agent resolves before chart dimensions (src/health/health_variable.c), plus green and red, which the
+# configuration loader substitutes (health_config.c).
+HEALTH_BUILTIN_VARIABLES = frozenset({
+    'this', 'now', 'after', 'before', 'status', 'REMOVED', 'UNINITIALIZED', 'UNDEFINED', 'CLEAR', 'WARNING', 'CRITICAL',
+    'last_collected_t', 'update_every', 'green', 'red',
+})
+
+# A $name or ${name} reference, as the expression lexer reads it (src/libnetdata/eval/re2c_lemon/lexer.re).
+_VARIABLE = re.compile(r'\$\{([^}]*)\}|\$([^\s&|!><=%+\-*/?(){}]+)')
+
+# Chart and host variables stock alerts read, by the context of the alert's target. Collectors define them with
+# VARIABLE lines (C) or chart Vars (go.d), which metadata.yaml does not document. Producers:
+# cgroups.plugin sys_fs_cgroup.c (memory_limit); proc.plugin proc_stat.c and windows.plugin perflib-processor.c
+# (active_processors), proc_net_dev.c and perflib-network.c (nic_speed_max), ipc.c (ipc_*), proc_net_stat_conntrack.c
+# (netfilter_conntrack_max), proc_loadavg.c (pidmax), proc_net_netstat.c (tcp_max_connections), proc_net_sockstat.c
+# (tcp_mem_*, tcp_max_orphans); go.d cockroachdb, postgres and whoisquery charts.go.
+CHART_VARIABLES = {
+    'cgroup.mem_usage': ('memory_limit',),
+    'k8s.cgroup.mem_usage': ('memory_limit',),
+    'system.load': ('active_processors',),
+    'net.net': ('nic_speed_max',),
+    'system.ipc_semaphores': ('ipc_semaphores_max',),
+    'system.ipc_semaphore_arrays': ('ipc_semaphores_arrays_max',),
+    'netfilter.conntrack_sockets': ('netfilter_conntrack_max',),
+    'system.active_processes': ('pidmax',),
+    'ip.tcpsock': ('tcp_max_connections',),
+    'ipv4.sockstat_tcp_mem': ('tcp_mem_high', 'tcp_mem_pressure'),
+    'ipv4.sockstat_tcp_sockets': ('tcp_max_orphans',),
+    'cockroachdb.process_file_descriptors': ('sys_fd_softlimit',),
+    'postgres.table_bloat_size_perc': ('table_size',),
+    'postgres.index_bloat_size_perc': ('index_size',),
+    'whoisquery.time_until_expiration': ('days_until_expiration_warning', 'days_until_expiration_critical'),
+}
 
 
 def _trim_all(text: str) -> str:
@@ -130,6 +165,8 @@ def parse_health_config(text: str, source: str = '') -> List[dict]:
             rule['on'] = value
         elif key in EXPORTED_FIELDS:
             rule[key] = _strip_quotes(value)
+        elif key in EXPRESSION_FIELDS:
+            rule[key] = value
         elif key in HOST_LABEL_KEYS:
             _add_pattern(rule, 'host_labels', HOST_LABEL_KEYS[key], value)
         elif key in CHART_LABEL_KEYS:
@@ -330,6 +367,46 @@ def check_listed_names(rules: Sequence[dict], subjects: Iterable[dict]) -> List[
                 problems.append(f'{where} is also listed')
             elif name not in derivable:
                 problems.append(f'{where} is not derived from a declared context; remove it from excluded_alerts')
+
+    return problems
+
+
+def expression_variables(rule: dict) -> List[str]:
+    """The variables of a rule's calc, warn and crit expressions that must resolve on its own chart: not health built-ins
+    and not qualified chart.dimension references. The _raw and _last_collected_t suffixes select a dimension's raw value
+    and collection time, so they are removed."""
+    variables = []
+    for field in EXPRESSION_FIELDS:
+        for braced, bare in _VARIABLE.findall(rule.get(field, '')):
+            name = braced or bare
+            if name in HEALTH_BUILTIN_VARIABLES or '.' in name:
+                continue
+            for suffix in ('_raw', '_last_collected_t'):
+                name = name.removesuffix(suffix)
+            variables.append(name)
+    return list(dict.fromkeys(variables))
+
+
+def check_expression_variables(rules: Sequence[dict], dimensions: Mapping[str, Iterable[str]],
+                               chart_variables: Mapping[str, Iterable[str]] = CHART_VARIABLES) -> List[str]:
+    """Problems with the variables stock alerts read. On a target whose dimensions an integration documents, each
+    variable must be one of those dimension names, an alert name, or a chart or host variable listed for the target.
+
+    The Agent matches a variable against a dimension's ID or name, and go.d sends the dimension name as the ID, so a
+    collector's internal metric key never resolves. Targets that no integration documents are not checked.
+    """
+    names = {rule['name'] for rule in rules}
+    problems = []
+
+    for rule in rules:
+        documented = dimensions.get(rule.get('on'))
+        if documented is None:
+            continue
+        known = set(documented) | set(chart_variables.get(rule['on'], ())) | names
+        for variable in expression_variables(rule):
+            if variable not in known:
+                problems.append(f'{rule["source"]}: {rule["name"]} reads ${{{variable}}}, which is not a documented '
+                                f'dimension or a listed variable of {rule["on"]}')
 
     return problems
 

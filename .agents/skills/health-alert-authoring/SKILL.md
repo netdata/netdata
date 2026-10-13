@@ -387,7 +387,9 @@ items below:
 6. Search for same-incident alerts, duplicate contexts, old names, fallback overlap, and generated artifacts. Record the
    result in the SOW. The integration pages list the alert automatically when its `on:` context is one the collector's
    `metadata.yaml` declares (`.agents/skills/collectors-metadata-yaml/alerts-and-meta.md`, section 1);
-   `integrations/tests/test_health_alerts.py` fails on an alert no integration owns.
+   `integrations/tests/test_health_alerts.py` fails on an alert no integration owns, and on a `calc`, `warn` or `crit`
+   variable that is not a documented dimension name, an alert name, or a chart or host variable listed in
+   `CHART_VARIABLES` (`integrations/health_alerts.py`; add a new `VARIABLE` an alert reads there, with its producer).
 7. For an externally sourced alert pack, commit a source-pinned mapping that records the original condition, scope,
    severity, persistence intent, supported releases, Netdata owner, adaptation, and known differences. Tests MUST consume
    that mapping rather than restating the intended result independently.

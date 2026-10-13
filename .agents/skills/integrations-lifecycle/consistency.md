@@ -87,8 +87,9 @@ are read only by this tooling.
   alert ownership rule and its invariants (the metadata skill's `alerts-and-meta.md`, section 1; the test's `UNOWNED`
   names are the only owner-less alerts besides Agent alerts, and an entry that gains an owner fails). It also pins the
   `alerts` export parser to `health.d`, requires every stock alert to set `class` and `type` from the vocabulary in
-  `health_alerts.py` and a `component` without case or plural spelling variants, and keeps that vocabulary equal to
-  the `src/health/REFERENCE.md` tables.
+  `health_alerts.py` and a `component` without case or plural spelling variants, keeps that vocabulary equal to the
+  `src/health/REFERENCE.md` tables, and requires every `calc`, `warn` and `crit` variable on a documented target to
+  be a documented dimension name, an alert name or a listed chart or host variable (`CHART_VARIABLES`).
 - `collecttest.AssertConfigSchemaMatchesMetadata` (opt-in, per collector test): option descriptions and tabs agree
   between `config_schema.json` and `metadata.yaml`.
 - `collecttest` artifact checks (opt-in, per collector test;

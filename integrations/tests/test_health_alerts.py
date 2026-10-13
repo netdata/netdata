@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """Stock health alert metadata: the integration pages' alert rows and the ``alerts`` catalogue export, both derived
-from ``src/health/health.d`` and the contexts integrations declare, and the stock alerts' classification vocabulary.
+from ``src/health/health.d`` and the contexts integrations declare, the stock alerts' classification vocabulary, and
+the variables their expressions read.
 
 The ownership rule is documented in `.agents/skills/collectors-metadata-yaml/alerts-and-meta.md`. The loaders skip a
 metadata file that fails schema validation; `gen_integrations.py` fails on it first.
@@ -24,6 +25,7 @@ from gen_npm_catalog import build_device_modules, load_profiles  # noqa: E402
 from health_alerts import (  # noqa: E402
     ALERT_CLASSES,
     ALERT_TYPES,
+    CHART_VARIABLES,
     HEALTH_CONFIG_DIR,
     PLUGIN_PLATFORMS,
     agent_internal_alerts,
@@ -32,8 +34,10 @@ from health_alerts import (  # noqa: E402
     alert_subject,
     build_alert_index,
     check_classification,
+    check_expression_variables,
     check_listed_names,
     conf_link,
+    expression_variables,
     label_admits,
     label_patterns,
     load_stock_rules,
@@ -79,7 +83,7 @@ def reference_table_values(heading):
     return values[2:]  # header row and separator
 
 
-def corpus_subjects():
+def corpus_items():
     """Every integration that can own an alert, as the generators see it.
 
     The NPM device entries come from the catalog generator rather than its committed output, which the post-merge
@@ -87,7 +91,18 @@ def corpus_subjects():
     """
     collectors = load_collectors()
     project_prometheus_profile_coverage(collectors)
-    return alert_subjects(collectors + load_flows() + build_device_modules(load_profiles()))
+    return collectors + load_flows() + build_device_modules(load_profiles())
+
+
+def documented_dimensions(items):
+    """Dimension names per metric context, over every integration that documents the context."""
+    dimensions = {}
+    for item in items:
+        for scope in (item.get('metrics') or {}).get('scopes') or []:
+            for metric in scope.get('metrics') or []:
+                names = (dimension['name'] for dimension in metric.get('dimensions') or [])
+                dimensions.setdefault(metric['name'], set()).update(names)
+    return dimensions
 
 
 def rule(name, on, source='src/health/health.d/x.conf', template=True, **fields):
@@ -103,6 +118,8 @@ class ParseHealthConfigTest(unittest.TestCase):
  template: first
        on: app.requests
     CLASS: Errors
+     calc: $failed  * 100 / \\
+           ($ok + $failed)
      type: "Web Server"
 component: 'nginx'
   summary: requests   are \\
@@ -129,6 +146,7 @@ chart labels: device = !wl* *
                 'source': 'src/health/health.d/x.conf',
                 'on': 'app.requests',
                 'class': 'Errors',
+                'calc': '$failed * 100 / ($ok + $failed)',
                 'type': 'Web Server',
                 'component': 'nginx',
                 'summary': 'requests are failing',
@@ -323,6 +341,28 @@ class AlertOwnershipTest(unittest.TestCase):
         ])
 
 
+class ExpressionVariablesTest(unittest.TestCase):
+    def test_reads_the_variables_a_chart_must_resolve(self):
+        expressions = rule('a', 'app.x', calc='$used * 100 / ($used + ${free space}) + $this',
+                           warn='$this > $other_alert + ${app.y.z} + $used_raw',
+                           crit='$now - $used_last_collected_t > $update_every')
+
+        self.assertEqual(expression_variables(expressions), ['used', 'free space', 'other_alert'])
+
+    def test_variables_are_documented_dimensions_alert_names_or_listed_variables(self):
+        rules = [
+            rule('ok', 'app.x', calc='$used / $limit', warn='$this > $helper'),
+            rule('helper', 'app.x', calc='$used'),
+            rule('metric_key', 'app.x', calc='$used_bytes_total'),
+            rule('undocumented_target', 'app.y', calc='$anything'),
+        ]
+
+        self.assertEqual(check_expression_variables(rules, {'app.x': {'used'}}, {'app.x': ('limit',)}), [
+            'src/health/health.d/x.conf: metric_key reads ${used_bytes_total}, which is not a documented dimension or '
+            'a listed variable of app.x',
+        ])
+
+
 class AttachAlertsTest(unittest.TestCase):
     def test_page_rows_and_export_owners_come_from_one_derivation(self):
         def item(module, contexts=(), names=(), profile_contexts=(), excluded=()):
@@ -458,7 +498,9 @@ class StockAlertOwnershipTest(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
         cls.rules = load_stock_rules()
-        cls.subjects = corpus_subjects()
+        items = corpus_items()
+        cls.subjects = alert_subjects(items)
+        cls.dimensions = documented_dimensions(items)
 
     def test_every_stock_alert_has_an_owner_except_agent_alerts(self):
         owned = set(alert_owners(alert_ownership(self.rules, self.subjects)))
@@ -472,6 +514,18 @@ class StockAlertOwnershipTest(unittest.TestCase):
         plugins = {subject['plugin_name'] for subject in self.subjects}
 
         self.assertEqual(sorted(set(PLUGIN_PLATFORMS) - plugins), [])
+
+    def test_expression_variables_resolve(self):
+        problems = check_expression_variables(self.rules, self.dimensions)
+
+        self.assertEqual(problems, [], '\n'.join(problems))
+
+    def test_every_listed_chart_variable_is_read_and_undocumented(self):
+        read = {(rule['on'], variable) for rule in self.rules for variable in expression_variables(rule)}
+        listed = {(context, variable) for context, variables in CHART_VARIABLES.items() for variable in variables}
+
+        self.assertEqual(sorted(listed - read), [])
+        self.assertEqual(sorted(pair for pair in listed if pair[1] in self.dimensions.get(pair[0], ())), [])
 
     def test_listed_alert_names_are_stock_and_not_derivable(self):
         problems = check_listed_names(self.rules, self.subjects)
