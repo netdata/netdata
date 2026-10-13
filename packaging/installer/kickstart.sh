@@ -2560,10 +2560,10 @@ prepare_offline_install_source() {
         manifest_url="${NETDATA_STATIC_ARCHIVE_URL_PREFIX}/Manifest"
         progress "Fetching ${manifest_url}"
         if ! download "${manifest_url}" "./Manifest" "force"; then
-          fatal "Unable to download release manifest file. ${BADNET_MSG}" F0526
+          fatal "Unable to download release Manifest file. ${BADNET_MSG}" F0526
         fi
 
-        if ! download "${NETDATA_STATIC_ARCHIVE_URL_PREFIX}/Version" ; then
+        if ! download "${NETDATA_STATIC_ARCHIVE_URL_PREFIX}/Version" "./Version"; then
           fatal "Unable to download release Version file. ${BADNET_MSG}" F0526
         fi
 
