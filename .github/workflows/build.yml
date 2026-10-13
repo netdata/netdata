@@ -873,7 +873,7 @@ jobs:
           SLACK_MESSAGE: |-
               ${{ github.repository }}: Artifact verification for static build failed.
               Checkout:  ${{ steps.checkout.outcome }}
-              Fetch artifacts: ${{ steps.fetch-artifacts.outcome }}
+              Fetch artifacts: ${{ steps.fetch.outcome }}
               Verify artifacts: ${{ steps.verify.outcome }}
           SLACK_WEBHOOK: ${{ secrets.SLACK_WEBHOOK_URL }}
         if: >-
