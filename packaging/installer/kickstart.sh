@@ -972,7 +972,7 @@ verify_manifest() {
 
           if ! echo "${file_hash} *${f}" | safe_sha256sum -c -; then
             failed="$((failed + 1))"
-            warning "Invalid checksum for ${dir}/${f}, expected: ${csum}, actual $(safe_sha256sum "${file}" | awk '{print $1}')"
+            warning "Invalid checksum for ${dir}/${f}, expected: ${file_hash}, actual $(safe_sha256sum "${file}" | awk '{print $1}')"
           fi
         fi
       done
