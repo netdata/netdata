@@ -977,7 +977,7 @@ verify_manifest() {
         fi
       done
     elif [ -r "./sha256sums.txt" ]; then
-      files="$(awk '{ print $2 }' | tr -d '*')"
+      files="$(awk '{ print $2 }' ./sha256sums.txt | tr -d '*')"
       for f in ${files} ; do
         if [ -r "${f}" ]; then
           csum="$(grep -E "${f}\$" ./sha256sums.txt | awk '{print $1}')"
