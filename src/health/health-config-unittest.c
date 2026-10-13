@@ -676,6 +676,43 @@ static int run_delay_parse_case(
     return 0;
 }
 
+static int test_strip_quotes(int *passed) {
+    static const struct {
+        const char *input;
+        const char *expected;
+        const char *description;
+    } tests[] = {
+        { "the instance's page cache", "the instance's page cache", "an apostrophe stays" },
+        { "vPC link is not in 'alive' state", "vPC link is not in 'alive' state", "inner single quotes stay" },
+        { "'quoted text'", "quoted text", "wrapping single quotes are removed" },
+        { "\"quoted text\"", "quoted text", "wrapping double quotes are removed" },
+        { "'it's here'", "it's here", "wrapping quotes go, an inner apostrophe stays" },
+        { "in ${this == 1 ? \"warning\" : \"critical\"} state", "in ${this == 1 ?  warning  :  critical } state",
+          "inner double quotes become spaces" },
+        { "'mismatched\"", "'mismatched ", "unmatched wrapping quotes are not a pair" },
+        { "'", "'", "a lone single quote stays" },
+        { "\"", " ", "a lone double quote becomes a space" },
+        { "''", "", "an empty quoted value becomes empty" },
+        { "plain", "plain", "an unquoted value is unchanged" },
+    };
+
+    int failed = 0;
+    for(size_t i = 0; i < sizeof(tests) / sizeof(tests[0]); i++) {
+        char value[256];
+        strncpyz(value, tests[i].input, sizeof(value) - 1);
+        health_strip_quotes(value);
+        if(strcmp(value, tests[i].expected) != 0) {
+            fprintf(stderr, "FAILED: strip quotes, %s: got '%s', expected '%s'\n",
+                    tests[i].description, value, tests[i].expected);
+            failed++;
+        }
+        else
+            (*passed)++;
+    }
+
+    return failed;
+}
+
 static int test_delay_parser_multiplier_boundaries(int *passed) {
     static const struct {
         const char *input;
@@ -1201,6 +1238,7 @@ int health_config_unittest(void) {
     failed += test_dyncfg_update_every_boundaries(&passed);
     failed += test_dyncfg_integer_destination_boundaries(&passed);
     failed += test_dyncfg_delay_multiplier_boundaries(&passed);
+    failed += test_strip_quotes(&passed);
     failed += test_delay_parser_multiplier_boundaries(&passed);
     failed += test_delay_multiplier_runtime_boundaries(&passed);
     failed += test_prototype_rejects_non_finite_delay_multiplier(&passed);

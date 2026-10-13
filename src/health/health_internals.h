@@ -140,6 +140,7 @@ extern struct health_plugin_globals health_globals;
 int health_readfile(const char *filename, void *data, bool stock_config);
 
 // for unit testing
+void health_strip_quotes(char *s);
 int health_parse_db_lookup(size_t line, const char *filename, char *string, struct rrd_alert_config *ac);
 int health_parse_delay(size_t line, const char *filename, char *string,
                        int *delay_up_duration, int *delay_down_duration,
