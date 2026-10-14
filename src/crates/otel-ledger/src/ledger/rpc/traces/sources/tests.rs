@@ -35,7 +35,7 @@ fn make_supplier_with_min_entries(min_entries: u64) -> TracesSourceSupplier {
     TracesSourceSupplier::new(
         make_registries(),
         Arc::new(ChunkCache::new(64 * 1024 * 1024)),
-        min_entries,
+        Arc::new(crate::ledger::wal_prefix::WalPrefixes::new(min_entries)),
         None,
     )
 }
@@ -507,7 +507,7 @@ fn remote_supplier(
     TracesSourceSupplier::new(
         registries,
         Arc::new(ChunkCache::new(64 * 1024 * 1024)),
-        4,
+        Arc::new(crate::ledger::wal_prefix::WalPrefixes::new(4)),
         Some(remote.read()),
     )
 }

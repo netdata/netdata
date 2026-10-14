@@ -31,6 +31,10 @@ mod grid;
 mod logs;
 mod traces;
 
+/// The traces fixtures, for the ledger-level tests that need real WALs.
+#[cfg(test)]
+pub(crate) use traces::fixtures as traces_fixtures;
+
 pub(crate) use logs::OtelLogsHandler;
 pub(crate) use traces::OtelTracesHandler;
 

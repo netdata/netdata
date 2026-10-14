@@ -24,10 +24,12 @@ mod cleaner;
 mod indexer;
 mod ingestor;
 mod pipeline;
+mod prebuild;
 mod retention;
 mod rpc;
 mod traces_pipeline;
 mod uploader;
+mod wal_prefix;
 
 use file_lifecycle::Pipeline;
 pub(crate) use rpc::OtelLogsHandler;
@@ -116,6 +118,12 @@ pub struct Ledger {
     /// global byte budget), keyed by `(seq, chunk index)`. A WAL's chunks are
     /// dropped when its authoritative SFST registers (or the WAL proves empty).
     chunk_cache: Arc<ChunkCache>,
+    /// Builds the traces WALs' chunks as the writer syncs, so traces
+    /// queries rarely build one; fed each traces `Synced` event, told to
+    /// forget a WAL when its chunks drop.
+    traces_prebuilder: prebuild::ChunkPrebuilder,
+    /// The traces WALs' chunk boundaries, shared with the traces handler.
+    traces_prefixes: Arc<wal_prefix::WalPrefixes>,
     /// Per-signal frame-sequence gap-check. The single writer process feeds every
     /// signal over one connection, but assigns a separate monotonic `frame_seq`
     /// per signal, so the next-expected seq is tracked per signal — a gap is then a
@@ -272,6 +280,20 @@ impl Ledger {
         // pressure — so re-evaluate it if either signal's query load grows.
         let chunk_cache = Arc::new(ChunkCache::new(CHUNK_CACHE_BYTES));
 
+        // Traces chunk boundaries, kept current across queries, and the
+        // prebuilder that builds new chunks as the writer syncs (traces
+        // only: logs have no per-keystroke query path, and prebuilding
+        // chunks nobody queries spends CPU and the shared cache).
+        let traces_prefixes = Arc::new(wal_prefix::WalPrefixes::new(
+            traces_pipeline::TRACES_CHUNK_MIN_ENTRIES,
+        ));
+        let traces_prebuilder = prebuild::ChunkPrebuilder::spawn(
+            Arc::clone(&traces_prefixes),
+            ng_index::build_sfst_traces_range,
+            Arc::clone(&chunk_cache),
+            cancel.child_token(),
+        );
+
         let (pipeline_tx, pipeline_rx) = mpsc::unbounded_channel();
         let (outbound_tx, outbound_rx) = mpsc::unbounded_channel();
 
@@ -312,6 +334,7 @@ impl Ledger {
             storage.as_ref(),
             read_cache.as_ref(),
             chunk_cache.clone(),
+            Arc::clone(&traces_prefixes),
             &pipeline_tx,
         )
         .await?;
@@ -360,6 +383,8 @@ impl Ledger {
             upload_retry: file_lifecycle::upload_retry::UploadRetry::default(),
             retry_timer,
             chunk_cache,
+            traces_prebuilder,
+            traces_prefixes,
             // Each signal's frame_seq stream starts at 1 (the ingestor's first
             // assigned frame_seq), so the gap-check's next-expected seeds to 1.
             expected_frame_seq: PerSignal { logs: 1, traces: 1 },

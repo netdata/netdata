@@ -30,7 +30,7 @@ fn make_handler_over(registries: Arc<RwLock<TenantRegistries>>) -> OtelTracesHan
     OtelTracesHandler::new(
         registries,
         Arc::new(ChunkCache::new(64 * 1024 * 1024)),
-        4,
+        Arc::new(crate::ledger::wal_prefix::WalPrefixes::new(4)),
         None,
     )
 }

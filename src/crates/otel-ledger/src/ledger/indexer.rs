@@ -136,6 +136,9 @@ impl Ledger {
                 // A query may have built a chunk for this seq against the
                 // active WAL; drop it.
                 self.chunk_cache.drop_seq(file_id.seq).await;
+                if signal == Signal::Traces {
+                    self.traces_prefixes.forget(file_id.seq);
+                }
 
                 if let Err(e) = self.cleaner.send(CleanerRequest::DeleteWalFile {
                     pipeline_id: file_id.pipeline_id,
@@ -171,6 +174,9 @@ impl Ledger {
                 // queued, so a racing query resolves the seq to the SFST, never
                 // a gap.
                 self.chunk_cache.drop_seq(file_id.seq).await;
+                if signal == Signal::Traces {
+                    self.traces_prefixes.forget(file_id.seq);
+                }
 
                 if let Err(e) = self.cleaner.send(CleanerRequest::DeleteWalFile {
                     pipeline_id: file_id.pipeline_id,

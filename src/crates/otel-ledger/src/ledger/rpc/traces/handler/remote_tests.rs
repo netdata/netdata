@@ -55,7 +55,7 @@ fn handler(registries: Arc<RwLock<TenantRegistries>>, remote: &TestRemote) -> Ot
     OtelTracesHandler::new(
         registries,
         Arc::new(ChunkCache::new(64 * 1024 * 1024)),
-        4,
+        Arc::new(crate::ledger::wal_prefix::WalPrefixes::new(4)),
         Some(remote.read()),
     )
 }

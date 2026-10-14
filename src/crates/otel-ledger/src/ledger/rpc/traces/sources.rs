@@ -43,7 +43,7 @@ use std::sync::Arc;
 
 use bridge::function::ProgressState;
 use file_cache::CacheError;
-use file_lifecycle::chunk::{BuiltChunk, ChunkCache};
+use file_lifecycle::chunk::ChunkCache;
 use file_lifecycle::query::{CatalogFile, RemotePlan};
 use file_lifecycle::registry::{TenantRegistries, WalDesc};
 use file_lifecycle::remote_read::RemoteRead;
@@ -53,7 +53,9 @@ use sfsq::traces::{
 };
 use tokio::sync::RwLock;
 use tokio_util::sync::CancellationToken;
-use wal::prefix::{chunk_boundaries, tail_start};
+use wal::prefix::tail_start;
+
+use crate::ledger::wal_prefix::{WalPrefixes, build_chunk};
 
 /// Filename extensions of the source-id derivation (the registries'
 /// own on-disk extensions, which those crates keep private).
@@ -124,8 +126,9 @@ pub(crate) enum CaptureError {
 pub(crate) struct TracesSourceSupplier {
     registries: Arc<RwLock<TenantRegistries>>,
     chunk_cache: Arc<ChunkCache>,
-    /// Minimum records per chunk boundary (`wal::prefix::chunk_boundaries`).
-    min_entries: u64,
+    /// The active WALs' chunk boundaries, kept current across queries and
+    /// shared with the chunk prebuilder.
+    prefixes: Arc<WalPrefixes>,
     /// Reading evicted files back; `None` when remote storage is disabled.
     remote: Option<RemoteRead>,
 }
@@ -134,13 +137,13 @@ impl TracesSourceSupplier {
     pub(crate) fn new(
         registries: Arc<RwLock<TenantRegistries>>,
         chunk_cache: Arc<ChunkCache>,
-        min_entries: u64,
+        prefixes: Arc<WalPrefixes>,
         remote: Option<RemoteRead>,
     ) -> Self {
         Self {
             registries,
             chunk_cache,
-            min_entries,
+            prefixes,
             remote,
         }
     }
@@ -418,69 +421,37 @@ impl TracesSourceSupplier {
             return None;
         }
         let header = wal::HEADER_SIZE as u64;
-        let scan_path = wal.path.clone();
-        let valid_up_to = wal.valid_up_to;
-        let frames = match tokio::task::spawn_blocking(move || {
-            wal::scan_frame_boundaries(&scan_path, wal::FrameRange::new(header, valid_up_to))
-        })
-        .await
+        // Boundaries up to this snapshot's bound; only frames no earlier
+        // call folded are scanned.
+        let boundaries = match self
+            .prefixes
+            .chunks(wal.id.seq, &wal.path, wal.valid_up_to)
+            .await
         {
-            Ok(Ok(frames)) => frames,
-            Ok(Err(e)) => {
-                tracing::warn!(seq = wal.id.seq, "traces WAL boundary scan failed: {e}");
-                return None;
-            }
+            Ok(boundaries) => boundaries,
             Err(e) => {
-                tracing::warn!(
-                    seq = wal.id.seq,
-                    "traces WAL boundary scan task failed: {e}"
-                );
+                tracing::warn!(seq = wal.id.seq, "traces WAL {e}");
                 return None;
             }
         };
         // The boundary scan is itself a blocking phase — poll on the way
-        // out of it, then again before each chunk build.
+        // out of it, then again before each chunk.
         if cancel.is_cancelled() {
             return None;
         }
 
-        let boundaries = chunk_boundaries(&frames, header, self.min_entries);
         let mut chunks = Vec::with_capacity(boundaries.len());
         for chunk in &boundaries {
             if cancel.is_cancelled() {
                 return None;
             }
             let seq = wal.id.seq;
-            let path = wal.path.clone();
-            let (range, expected) = (chunk.range, chunk.entry_count);
-            // The traces seal for this byte range, singleflighted
-            // through the shared cache — (seq, index) keys never
-            // collide with logs because seqs are process-global (one
-            // shared highwater). Record-count cross-check as in the
-            // logs path.
-            let init = async move {
-                match tokio::task::spawn_blocking(move || {
-                    ng_index::build_sfst_traces_range(&path, range)
-                })
-                .await
-                {
-                    Ok(Ok((summary, bytes))) => {
-                        if u64::from(summary.record_count) != expected {
-                            Err(format!(
-                                "chunk record count {} != expected {expected}",
-                                summary.record_count
-                            ))
-                        } else {
-                            Ok(Arc::new(BuiltChunk {
-                                summary,
-                                bytes: Arc::new(bytes),
-                            }))
-                        }
-                    }
-                    Ok(Err(e)) => Err(format!("build_sfst_traces_range: {e}")),
-                    Err(e) => Err(format!("build task: {e}")),
-                }
-            };
+            // The traces seal for this byte range, singleflighted through
+            // the shared cache — normally a hit, as the prebuilder built it
+            // when the writer synced; otherwise this joins its build or
+            // builds. (seq, index) keys never collide with logs because
+            // seqs are process-global (one shared highwater).
+            let init = build_chunk(ng_index::build_sfst_traces_range, wal.path.clone(), *chunk);
             match self.chunk_cache.get_or_build(seq, chunk.index, init).await {
                 Ok(built) => chunks.push(ResolvedChunk {
                     index: chunk.index,

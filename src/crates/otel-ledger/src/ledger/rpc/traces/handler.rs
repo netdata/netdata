@@ -47,6 +47,7 @@ use super::wire::{
     OVERVIEW_SCOPE_WINDOW, OtelTracesRequest, OtelTracesResponse, SearchParams, SearchResult,
     TraceParams, TracesMode,
 };
+use crate::ledger::wal_prefix::WalPrefixes;
 use file_lifecycle::remote_read::RemoteRead;
 
 /// Shorthand for the handler-level error every failure path maps to.
@@ -116,11 +117,11 @@ impl OtelTracesHandler {
     pub(crate) fn new(
         registries: Arc<RwLock<TenantRegistries>>,
         chunk_cache: Arc<ChunkCache>,
-        min_entries: u64,
+        prefixes: Arc<WalPrefixes>,
         remote: Option<RemoteRead>,
     ) -> Self {
         Self {
-            supplier: TracesSourceSupplier::new(registries, chunk_cache, min_entries, remote),
+            supplier: TracesSourceSupplier::new(registries, chunk_cache, prefixes, remote),
             value_lists: Arc::new(tokio::sync::Semaphore::new(VALUE_LIST_CONCURRENCY)),
         }
     }

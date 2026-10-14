@@ -47,6 +47,23 @@ impl Ledger {
                 return;
             }
 
+            // A traces WAL grew: let the prebuilder build its new chunks.
+            if signal == Signal::Traces
+                && let wal::FileEvent::Synced {
+                    file_id,
+                    valid_up_to,
+                    ..
+                } = msg.event
+                && valid_up_to.0 > 0
+                && let Some(registry) = registries.get(&msg.tenant_id)
+            {
+                self.traces_prebuilder.synced(
+                    file_id.seq,
+                    registry.wal.file_path(file_id),
+                    valid_up_to.0,
+                );
+            }
+
             // Closed WAL: queue a seal (WAL → SFST) with the indexer.
             if let wal::FileEvent::Closed { file_id, .. } = msg.event {
                 let registry = registries

@@ -46,7 +46,7 @@ use super::rpc::OtelTracesHandler;
 /// spans) from scratch, at roughly 12 µs per span, so the threshold bounds
 /// that per-request cost; the price is more, smaller chunks, each built
 /// once and cached.
-const TRACES_CHUNK_MIN_ENTRIES: u64 = 4_096;
+pub(crate) const TRACES_CHUNK_MIN_ENTRIES: u64 = 4_096;
 
 /// Build the traces pipeline: spawn the shared [`Indexer`] with the traces
 /// seal, then delegate to [`super::pipeline::build_pipeline`] with a closure
@@ -65,6 +65,7 @@ pub(crate) async fn build_traces_pipeline(
     storage: Option<&OpendalStorage>,
     read_cache: Option<&file_cache::FileCache>,
     chunk_cache: Arc<ChunkCache>,
+    prefixes: Arc<super::wal_prefix::WalPrefixes>,
     pipeline_tx: &mpsc::UnboundedSender<(Signal, PipelineResp)>,
 ) -> anyhow::Result<Pipeline> {
     // The traces seal: decode ng-flatten trace frames (payload format 3)
@@ -95,8 +96,7 @@ pub(crate) async fn build_traces_pipeline(
         indexer,
         pipeline_tx,
         move |registries| {
-            let traces_handler =
-                OtelTracesHandler::new(registries, chunk_cache, TRACES_CHUNK_MIN_ENTRIES, remote);
+            let traces_handler = OtelTracesHandler::new(registries, chunk_cache, prefixes, remote);
             let handler: Arc<dyn RawFunctionHandler> =
                 Arc::new(HandlerAdapter::new(traces_handler));
             // The traces-own GET shim: the literal `info` token →

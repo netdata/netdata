@@ -141,6 +141,42 @@ pub fn tail_start(chunks: &[ChunkBoundary], start: u64) -> u64 {
     chunks.last().map_or(start, |c| c.range.end())
 }
 
+/// A [`chunk_boundaries`] fold kept current as the durable prefix grows:
+/// it holds the complete chunks so far and the frames after the last of
+/// them (the tail's frames), and [`extend`](Self::extend) folds only the
+/// newly scanned frames. Because boundaries are append-only, the result
+/// always equals one fold over the whole scan.
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct ChunkFold {
+    chunks: Vec<ChunkBoundary>,
+    tail_frames: Vec<FrameBoundary>,
+}
+
+impl ChunkFold {
+    /// Fold `frames` — the scan of the bytes that follow everything folded
+    /// so far — into the chunks. `start` and `min_entries` must be the same
+    /// on every call (the fold's origin and threshold).
+    pub fn extend(&mut self, frames: &[FrameBoundary], start: u64, min_entries: u64) {
+        self.tail_frames.extend_from_slice(frames);
+        let base = tail_start(&self.chunks, start);
+        let first_index = self.chunks.len() as u32;
+        let added = chunk_boundaries(&self.tail_frames, base, min_entries);
+        if let Some(last) = added.last() {
+            let end = last.range.end();
+            self.tail_frames.retain(|f| f.end_offset > end);
+        }
+        self.chunks.extend(added.into_iter().map(|c| ChunkBoundary {
+            index: first_index + c.index,
+            ..c
+        }));
+    }
+
+    /// The complete chunks so far, in index order.
+    pub fn chunks(&self) -> &[ChunkBoundary] {
+        &self.chunks
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -213,6 +249,24 @@ mod tests {
         let chunks = chunk_boundaries(&[], 64, 10);
         assert!(chunks.is_empty());
         assert_eq!(tail_start(&chunks, 64), 64);
+    }
+
+    #[test]
+    fn an_extended_fold_equals_one_fold_over_the_whole_scan() {
+        // Frames of varied sizes, split into every pair of increments.
+        let frames: Vec<FrameBoundary> = (1..=12u64)
+            .map(|i| fb(100 * i, (i % 5 + 2) as u32))
+            .collect();
+        let whole = chunk_boundaries(&frames, 64, 10);
+        for a in 0..=frames.len() {
+            for b in a..=frames.len() {
+                let mut fold = ChunkFold::default();
+                fold.extend(&frames[..a], 64, 10);
+                fold.extend(&frames[a..b], 64, 10);
+                fold.extend(&frames[b..], 64, 10);
+                assert_eq!(fold.chunks(), &whole[..], "split at {a}, {b}");
+            }
+        }
     }
 
     #[test]
