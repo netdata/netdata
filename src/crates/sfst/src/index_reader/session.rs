@@ -318,6 +318,13 @@ impl<'r, 'a> TraceFileSession<'r, 'a> {
         self.view.full()
     }
 
+    /// Whether the file carries the rollup stats (`TRSS`): a TOC check.
+    pub fn has_rollup_stats(&self) -> bool {
+        self.view
+            .chunk()
+            .is_ok_and(|chunk| chunk.has_trace_rollup_stats())
+    }
+
     /// The file's bloom failed to decode: lookups fall back to the exact
     /// path, and the file is damaged.
     pub fn bloom_unreadable(&self) -> bool {

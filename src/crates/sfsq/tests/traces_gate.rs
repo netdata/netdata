@@ -216,7 +216,10 @@ fn rare_root_selection_completes_instead_of_burning_the_ceiling() {
     let q = || SearchQuery::new(pred(vec![root_service_eq("cold")])).limit(1);
 
     let sources = both_roles(|| vec![sealed_source(dir.path(), &wal, "one")]);
-    let off = run(sources, q().trace_gate_for_tests(false));
+    let off = run(
+        sources,
+        q().trace_gate_for_tests(false).rows_for_tests(false),
+    );
     assert!(off.traces.is_empty());
     assert!(
         off.status.has(PartialReason::WorkCeiling),
@@ -468,7 +471,10 @@ fn rootless_heavy_corpus_completes_root_selections() {
     let sources = || both_roles(|| vec![sealed_source(dir.path(), &wal, "one")]);
     let q = || SearchQuery::new(pred(vec![root_service_eq("flagd")])).limit(1);
 
-    let off = run(sources(), q().trace_gate_for_tests(false));
+    let off = run(
+        sources(),
+        q().trace_gate_for_tests(false).rows_for_tests(false),
+    );
     assert!(off.traces.is_empty());
     assert!(
         off.status.has(PartialReason::WorkCeiling),
@@ -789,12 +795,25 @@ fn corrupt_bloom_chunk_is_skipped_and_surfaced() {
     let build = || both_roles(|| vec![sealed_source_at(&path, "one")]);
 
     let q = || SearchQuery::new(pred(vec![root_service_eq("hot")]));
-    let on = run(build(), q().single_source_proof_ids_for_tests(0));
+    let on = run(
+        build(),
+        q().single_source_proof_ids_for_tests(0)
+            .rows_for_tests(false),
+    );
     assert!(on.traces.is_empty());
     assert!(
         on.status.has(PartialReason::SourceFailure),
         "{:?}",
         on.status
+    );
+    // The rows path reads past the hint (exact lookups answer) and
+    // still reports it.
+    let rows = run(build(), q().single_source_proof_ids_for_tests(0));
+    assert_eq!(ids(&rows), vec![hex(1)]);
+    assert!(
+        rows.status.has(PartialReason::SourceFailure),
+        "{:?}",
+        rows.status
     );
 
     let proof = run(build(), q());
@@ -1056,7 +1075,10 @@ fn high_tier_resolution_matches_gate_off() {
         )]))
     };
     let on = run(sources(), q());
-    let off = run(sources(), q().trace_gate_for_tests(false));
+    let off = run(
+        sources(),
+        q().trace_gate_for_tests(false).rows_for_tests(false),
+    );
     assert_eq!(ids(&on), ids(&off), "same trace found either way");
     assert_eq!(on.traces.len(), 1);
     // 1099 non-matching candidates: gate-off burns the assembled
@@ -1503,7 +1525,10 @@ fn token_gate_completes_instead_of_burning_the_ceiling() {
         .driver_for_tests(0)
         .limit(1)
     };
-    let off = run(sources(), q().trace_gate_for_tests(false));
+    let off = run(
+        sources(),
+        q().trace_gate_for_tests(false).rows_for_tests(false),
+    );
     assert!(off.traces.is_empty());
     assert!(
         off.status.has(PartialReason::WorkCeiling),

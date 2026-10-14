@@ -877,6 +877,66 @@ fn row_from_parts(
         negated_base,
         ..
     } = reads;
+    // ── The verdict: tokens over the in-window stored rows ──────────
+    let mut evidence = scope
+        .tail_evidence
+        .cloned()
+        .unwrap_or_else(|| TokenEvidence::new(positive_count));
+    // Before any part is read: a non-match costs only positions.
+    let window_holders: Vec<usize> = match (scope.single_file, scope.tail_only) {
+        (Some(slot), _) => scope
+            .window_slots
+            .iter()
+            .copied()
+            .filter(|&s| s == slot)
+            .collect(),
+        (None, true) => Vec::new(),
+        (None, false) => scope.window_slots.to_vec(),
+    };
+    let decidable = holder_evidence(
+        trace_id,
+        &window_holders,
+        &mut evidence,
+        HolderReads {
+            sessions: &mut *sessions,
+            loaded: &mut *loaded,
+            token_sets: &mut *token_sets,
+            pending: &mut *pending,
+            files: &mut *files,
+            file_plans,
+            positive_count,
+            negated_base,
+            stop_when_all_positive: false,
+        },
+        CompileEnv {
+            query: env.query,
+            slot_sources: env.slot_sources,
+            status: &mut *env.status,
+            degraded_assembly: &mut *env.degraded_assembly,
+            truncated_up_to: &mut *env.truncated_up_to,
+        },
+        work,
+    );
+    if !decidable {
+        return RowOutcome::Fallback;
+    }
+    if evidence.negated {
+        return RowOutcome::NoMatch;
+    }
+    let rank = if positive_count == 0 {
+        evidence.newest_any
+    } else {
+        evidence
+            .newest
+            .iter()
+            .copied()
+            .collect::<Option<Vec<_>>>()
+            .and_then(|n| n.into_iter().min())
+    };
+    let Some(rank) = rank else {
+        return RowOutcome::NoMatch;
+    };
+
     // ── The parts: holder files, then tails ──────────────────────────
     let candidates: Vec<usize> = match (scope.single_file, scope.tail_only) {
         (Some(slot), _) => vec![slot],
@@ -887,8 +947,15 @@ fn row_from_parts(
     let mut holders: Vec<usize> = Vec::new();
     for slot in candidates {
         work.rows_visited += 1;
-        if scope.single_file.is_none() && !sessions[slot].screen(trace_id) {
-            continue;
+        if scope.single_file.is_none() {
+            if !sessions[slot].screen(trace_id) {
+                continue;
+            }
+            // A corrupt bloom is only a hint this screen read past (exact
+            // lookups answer), but it is reported.
+            if sessions[slot].bloom_unreadable() {
+                env.status.add(PartialReason::SourceFailure);
+            }
         }
         if scope.rows_failed.contains(&slot) {
             return RowOutcome::Fallback;
@@ -946,54 +1013,6 @@ fn row_from_parts(
     if parts.is_empty() {
         return RowOutcome::Fallback;
     }
-
-    // ── The verdict: tokens over the in-window stored rows ──────────
-    let mut evidence = scope
-        .tail_evidence
-        .cloned()
-        .unwrap_or_else(|| TokenEvidence::new(positive_count));
-    let window_holders: Vec<usize> = holders
-        .iter()
-        .copied()
-        .filter(|slot| scope.window_slots.contains(slot))
-        .collect();
-    let decidable = holder_evidence(
-        trace_id,
-        &window_holders,
-        &mut evidence,
-        HolderReads {
-            sessions,
-            loaded,
-            token_sets,
-            pending,
-            files,
-            file_plans,
-            positive_count,
-            negated_base,
-            stop_when_all_positive: false,
-        },
-        env,
-        work,
-    );
-    if !decidable {
-        return RowOutcome::Fallback;
-    }
-    if evidence.negated {
-        return RowOutcome::NoMatch;
-    }
-    let rank = if positive_count == 0 {
-        evidence.newest_any
-    } else {
-        evidence
-            .newest
-            .iter()
-            .copied()
-            .collect::<Option<Vec<_>>>()
-            .and_then(|n| n.into_iter().min())
-    };
-    let Some(rank) = rank else {
-        return RowOutcome::NoMatch;
-    };
 
     // ── The row: the parts merged ────────────────────────────────────
     let start_ns = parts
@@ -1685,6 +1704,9 @@ pub fn search(
     // Files whose rollup or stats failed to read: their candidates
     // assemble without reading them again.
     let mut rows_failed: HashSet<usize> = HashSet::new();
+    // With files but none sealed with stats every row would fall back:
+    // skip the rows path (a TOC check per file). Tails need no stats.
+    let rows = query.rows && (sessions.is_empty() || sessions.iter().any(|s| s.has_rollup_stats()));
     let mut assembled_count = 0usize;
     let mut finals: Vec<Assembled> = Vec::new();
     // Final ranks, best-first, for the Nth-final threshold.
@@ -1791,6 +1813,71 @@ pub fn search(
                 (Origin::File(slot), Some(proof)) if !proof.may_repeat(trace_id) => Some(slot),
                 _ => None,
             };
+            // The rows path (decision 49) first: it decides exactly from
+            // the holders' rollup parts, so the gates below run only for
+            // the candidates it leaves to assembly (a holder sealed before
+            // the stats, a read that fails, a breached ceiling).
+            if rows && !breached(&work) {
+                let parts_of_tails = tail_parts.get_or_insert_with(|| {
+                    let mut parts: HashMap<TraceId, Vec<TracePart>> = HashMap::new();
+                    for (_, scan) in &tails {
+                        work.rows_visited += scan.num_spans() as u64;
+                        for part in tail_trace_parts(scan) {
+                            parts.entry(part.aggregate.trace_id).or_default().push(part);
+                        }
+                    }
+                    parts
+                });
+                let tails_seen = tail_evidence.get_or_insert_with(|| {
+                    window_tail_evidence(&tails, &window_ids, &lowered, query.window, &mut work)
+                });
+                let outcome = row_from_parts(
+                    trace_id,
+                    RowScope {
+                        single_file,
+                        tail_only: emitter == Origin::Tail
+                            && proof.as_ref().is_some_and(|p| !p.may_repeat(trace_id)),
+                        window_slots: &window_slots,
+                        tail_parts: parts_of_tails.get(&trace_id),
+                        tail_evidence: tails_seen.get(&trace_id),
+                        lowered: &lowered,
+                        exact: !degraded_assembly,
+                        rows_failed: &mut rows_failed,
+                    },
+                    HolderReads {
+                        sessions: &mut sessions,
+                        loaded: &mut loaded,
+                        token_sets: &mut token_sets,
+                        pending: &mut pending,
+                        files: &mut files,
+                        file_plans: &file_plans,
+                        positive_count,
+                        negated_base,
+                        stop_when_all_positive: false,
+                    },
+                    CompileEnv {
+                        query: &query,
+                        slot_sources: &slot_sources,
+                        status: &mut status,
+                        degraded_assembly: &mut degraded_assembly,
+                        truncated_up_to: &mut truncated_up_to,
+                    },
+                    &mut work,
+                );
+                match outcome {
+                    RowOutcome::Row(summary) => {
+                        assembled_count += 1;
+                        let rank = (summary.newest_matched_start_ns, trace_id);
+                        final_ranks.insert((std::cmp::Reverse(rank.0), rank.1));
+                        finals.push(Assembled { summary, rank });
+                        continue;
+                    }
+                    // A decided non-match is as cheap as a prune: its reads
+                    // are charged to the rows ceiling, not this one.
+                    RowOutcome::NoMatch => continue,
+                    RowOutcome::Fallback => {}
+                }
+            }
             if gated && let Some(g) = gate.as_mut() {
                 let decision =
                     g.check(trace_id, single_file, &mut sessions, &mut loaded, &mut work);
@@ -1864,72 +1951,6 @@ pub fn search(
                 if decidable && !evidence.all_positive() {
                     token_prunes += 1;
                     continue;
-                }
-            }
-            // The rows path (decision 49): decide and summarize from the
-            // holders' rollup parts, without assembly. A holder sealed
-            // before the stats, a read that fails, or a breached ceiling
-            // falls back to the assembly below.
-            if query.rows && !breached(&work) {
-                let parts_of_tails = tail_parts.get_or_insert_with(|| {
-                    let mut parts: HashMap<TraceId, Vec<TracePart>> = HashMap::new();
-                    for (_, scan) in &tails {
-                        work.rows_visited += scan.num_spans() as u64;
-                        for part in tail_trace_parts(scan) {
-                            parts.entry(part.aggregate.trace_id).or_default().push(part);
-                        }
-                    }
-                    parts
-                });
-                let tails_seen = tail_evidence.get_or_insert_with(|| {
-                    window_tail_evidence(&tails, &window_ids, &lowered, query.window, &mut work)
-                });
-                let outcome = row_from_parts(
-                    trace_id,
-                    RowScope {
-                        single_file,
-                        tail_only: emitter == Origin::Tail
-                            && proof.as_ref().is_some_and(|p| !p.may_repeat(trace_id)),
-                        window_slots: &window_slots,
-                        tail_parts: parts_of_tails.get(&trace_id),
-                        tail_evidence: tails_seen.get(&trace_id),
-                        lowered: &lowered,
-                        exact: !degraded_assembly,
-                        rows_failed: &mut rows_failed,
-                    },
-                    HolderReads {
-                        sessions: &mut sessions,
-                        loaded: &mut loaded,
-                        token_sets: &mut token_sets,
-                        pending: &mut pending,
-                        files: &mut files,
-                        file_plans: &file_plans,
-                        positive_count,
-                        negated_base,
-                        stop_when_all_positive: false,
-                    },
-                    CompileEnv {
-                        query: &query,
-                        slot_sources: &slot_sources,
-                        status: &mut status,
-                        degraded_assembly: &mut degraded_assembly,
-                        truncated_up_to: &mut truncated_up_to,
-                    },
-                    &mut work,
-                );
-                match outcome {
-                    RowOutcome::Row(summary) => {
-                        assembled_count += 1;
-                        let rank = (summary.newest_matched_start_ns, trace_id);
-                        final_ranks.insert((std::cmp::Reverse(rank.0), rank.1));
-                        finals.push(Assembled { summary, rank });
-                        continue;
-                    }
-                    RowOutcome::NoMatch => {
-                        assembled_count += 1;
-                        continue;
-                    }
-                    RowOutcome::Fallback => {}
                 }
             }
             let mut merged: Vec<&mut dyn SpanSource> = Vec::with_capacity(origin.len());
