@@ -570,7 +570,8 @@ pub(crate) fn single_source_proof(
 pub(crate) fn tokens_prune(
     trace_id: sfst::TraceId,
     session: &mut sfst::TraceFileSession<'_, '_>,
-    others: &[sfst::CompiledTracePlan],
+    sets: &[sfst::CompiledTracePlan],
+    driver: usize,
     work: &mut ScanWork,
 ) -> bool {
     work.rows_visited += 1;
@@ -578,7 +579,8 @@ pub(crate) fn tokens_prune(
         return false;
     };
     work.rows_visited += positions.len() as u64;
-    for plan in others {
+    // The driver's set emitted the candidate: it matches by construction.
+    for (_, plan) in sets.iter().enumerate().filter(|&(i, _)| i != driver) {
         work.rows_visited += positions.len() as u64;
         if !positions.iter().any(|&pos| plan.contains(pos)) {
             return true;

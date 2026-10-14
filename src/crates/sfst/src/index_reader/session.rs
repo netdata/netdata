@@ -170,22 +170,15 @@ pub enum RollupEvidence {
     Row(RollupRow),
 }
 
-/// What finds a trace's rows: decoded on the first id the filters let
-/// through.
-struct Lookup {
-    index: crate::TraceIdIndex,
-    trace_ids: crate::TraceIds,
-}
-
 /// The per-row columns a found trace's spans read — decoded together,
-/// once, on the first lookup that finds rows.
+/// once, on the first lookup that finds rows (the timestamps are their
+/// own field, shared with discovery).
 struct Rows {
     span_ids: crate::SpanIds,
     parents: crate::ParentSpanIds,
     durations: crate::Durations,
     flags: crate::Flags,
     dropped: crate::DroppedAttributeCounts,
-    timestamps: crate::Timestamps,
 }
 
 /// The optional event/link structures — decoded together, once, on the
@@ -202,7 +195,12 @@ pub struct TraceFileSession<'r, 'a> {
     bloom: BloomGate,
     screen: Screen,
     // The loaded layer, dropped by `release`.
-    lookup: Option<Lookup>,
+    /// The trace-id index (TIDX): with `trace_ids`, the lookup pair.
+    index: Option<crate::TraceIdIndex>,
+    /// The per-row trace ids (TRCE), shared by lookups and discovery.
+    trace_ids: Option<crate::TraceIds>,
+    /// The per-row start timestamps (TIMS), shared by rows and discovery.
+    timestamps: Option<crate::Timestamps>,
     rows: Option<Rows>,
     extras: Option<Extras>,
     /// Stream-batch cache, pre-sized to the file's batch count on the
@@ -258,7 +256,9 @@ impl<'r, 'a> TraceFileSession<'r, 'a> {
             view,
             bloom,
             screen: Screen::Off,
-            lookup: None,
+            index: None,
+            trace_ids: None,
+            timestamps: None,
             rows: None,
             extras: None,
             batches: Vec::new(),
@@ -335,15 +335,14 @@ impl<'r, 'a> TraceFileSession<'r, 'a> {
         if !matches!(self.screen, Screen::Pending) {
             return true;
         }
-        let decoded = self.lookup.is_none();
+        let held = (self.index.is_some(), self.trace_ids.is_some());
         self.screen = match self.lookup() {
-            Ok(lookup) => Screen::Built(TraceIdBloom::build(&lookup.index, &lookup.trace_ids)),
+            Ok((index, trace_ids)) => Screen::Built(TraceIdBloom::build(index, trace_ids)),
             Err(_) => Screen::Unavailable,
         };
         let pass = self.might_contain(trace_id);
-        if !pass && decoded {
-            self.lookup = None;
-            self.emptied();
+        if !pass {
+            self.free_lookup(held);
         }
         pass
     }
@@ -448,15 +447,47 @@ impl<'r, 'a> TraceFileSession<'r, 'a> {
     }
 
     /// The lookup structures, decoding them on first use.
-    fn lookup(&mut self) -> Result<&Lookup, crate::Error> {
-        if self.lookup.is_none() {
-            let chunk = self.view.chunk()?;
-            self.lookup = Some(Lookup {
-                index: chunk.trace_id_index()?,
-                trace_ids: chunk.trace_ids()?,
-            });
+    /// The lookup pair (TIDX + TRCE), decoding what is missing.
+    fn lookup(&mut self) -> Result<(&crate::TraceIdIndex, &crate::TraceIds), crate::Error> {
+        if self.index.is_none() {
+            self.index = Some(self.view.chunk()?.trace_id_index()?);
         }
-        Ok(self.lookup.as_ref().expect("just populated"))
+        self.trace_ids()?;
+        Ok((
+            self.index.as_ref().expect("just populated"),
+            self.trace_ids.as_ref().expect("just populated"),
+        ))
+    }
+
+    /// Free the parts of the lookup pair a lookup decoded that found
+    /// nothing; `held` = which parts were loaded before it.
+    fn free_lookup(&mut self, held: (bool, bool)) {
+        if !held.0 {
+            self.index = None;
+        }
+        if !held.1 {
+            self.trace_ids = None;
+        }
+        self.emptied();
+    }
+
+    /// The file's per-row trace ids, decoding them on first use. Part of
+    /// the loaded layer: a caller bounding its loaded sessions touches
+    /// its [`crate::LoadedSources`] after this.
+    pub fn trace_ids(&mut self) -> Result<&crate::TraceIds, crate::Error> {
+        if self.trace_ids.is_none() {
+            self.trace_ids = Some(self.view.chunk()?.trace_ids()?);
+        }
+        Ok(self.trace_ids.as_ref().expect("just populated"))
+    }
+
+    /// The file's per-row start timestamps, decoding them on first use.
+    /// Part of the loaded layer, like [`trace_ids`](Self::trace_ids).
+    pub fn timestamps(&mut self) -> Result<&crate::Timestamps, crate::Error> {
+        if self.timestamps.is_none() {
+            self.timestamps = Some(crate::Timestamps::new(self.view.chunk()?.timestamps()?));
+        }
+        Ok(self.timestamps.as_ref().expect("just populated"))
     }
 
     /// The rows holding `trace_id`, chronological (empty when the file
@@ -471,16 +502,15 @@ impl<'r, 'a> TraceFileSession<'r, 'a> {
         if trace_id.is_unset() {
             return Err(crate::Error::UnsetTraceId);
         }
-        let held = self.lookup.is_some();
+        let held = (self.index.is_some(), self.trace_ids.is_some());
         if !self.screen(trace_id) {
             return Ok(Vec::new());
         }
-        let lookup = self.lookup()?;
-        let positions = lookup.index.positions(trace_id, &lookup.trace_ids).to_vec();
-        if positions.is_empty() && !held {
+        let (index, trace_ids) = self.lookup()?;
+        let positions = index.positions(trace_id, trace_ids).to_vec();
+        if positions.is_empty() {
             // A false positive: free what found nothing.
-            self.lookup = None;
-            self.emptied();
+            self.free_lookup(held);
         }
         Ok(positions)
     }
@@ -496,9 +526,9 @@ impl<'r, 'a> TraceFileSession<'r, 'a> {
                 durations: chunk.durations()?,
                 flags: chunk.flags()?,
                 dropped: chunk.dropped_attribute_counts()?,
-                timestamps: crate::Timestamps::new(chunk.timestamps()?),
             });
         }
+        self.timestamps()?;
         Ok(self.rows.as_ref().expect("just populated"))
     }
 
@@ -585,10 +615,11 @@ impl SpanSource for TraceFileSession<'_, '_> {
         self.rows()?;
         let kinds = &self.kinds;
         let cols = self.rows.as_ref().expect("populated above");
+        let timestamps = self.timestamps.as_ref().expect("rows load them");
         positions
             .into_iter()
             .map(|pos| {
-                let start_ns = cols.timestamps.at(pos).ok_or_else(|| {
+                let start_ns = timestamps.at(pos).ok_or_else(|| {
                     crate::Error::CorruptIndex(format!(
                         "trace session: position {pos} has no timestamp"
                     ))
@@ -702,7 +733,9 @@ impl SpanSource for TraceFileSession<'_, '_> {
         self.load_kinds(&[pos])?;
         let kind = self.kinds.get(&pos).copied().unwrap_or(0);
 
-        let cols = self.rows()?;
+        self.rows()?;
+        let cols = self.rows.as_ref().expect("populated above");
+        let timestamps = self.timestamps.as_ref().expect("rows load them");
         let i = pos as usize;
         let bounds = |what: &str| {
             crate::Error::CorruptIndex(format!("trace session: {what} missing at position {pos}"))
@@ -710,7 +743,7 @@ impl SpanSource for TraceFileSession<'_, '_> {
         Ok(TraceSpan {
             span_id: cols.span_ids.get(i),
             parent_span_id: cols.parents.get(i),
-            start_ns: cols.timestamps.at(pos).ok_or_else(|| bounds("timestamp"))?,
+            start_ns: timestamps.at(pos).ok_or_else(|| bounds("timestamp"))?,
             duration_ns: *cols.durations.0.get(i).ok_or_else(|| bounds("duration"))?,
             kind,
             flags: *cols.flags.0.get(i).ok_or_else(|| bounds("flags"))?,
@@ -726,7 +759,9 @@ impl SpanSource for TraceFileSession<'_, '_> {
     /// Whether the loaded layer holds anything (see the module docs).
     fn is_loaded(&self) -> bool {
         matches!(self.view, View::Full(_))
-            || self.lookup.is_some()
+            || self.index.is_some()
+            || self.trace_ids.is_some()
+            || self.timestamps.is_some()
             || self.rows.is_some()
             || self.extras.is_some()
             || !self.batches.is_empty()
@@ -741,7 +776,9 @@ impl SpanSource for TraceFileSession<'_, '_> {
     /// again on next use, with the same answers.
     fn release(&mut self) {
         self.view.release();
-        self.lookup = None;
+        self.index = None;
+        self.trace_ids = None;
+        self.timestamps = None;
         self.rows = None;
         self.extras = None;
         self.batches = Vec::new();

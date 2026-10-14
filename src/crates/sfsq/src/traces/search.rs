@@ -463,17 +463,16 @@ struct FileDiscovery {
 
 /// Where a window file's candidates come from.
 enum Discovery {
-    /// Span discovery: the compiled plan plus the owned columns that map
-    /// positions to candidates, and the descending band cursor of
-    /// rank-bounded extraction. `band_bottom` is the lowest position
-    /// already emitted (every matched position in `[band_bottom, hi)`
-    /// has been emitted); `lo` means exhausted.
+    /// Span discovery: the descending band cursor of rank-bounded
+    /// extraction over the file's driver set (in the search's token
+    /// sets); positions map to candidates through the file's session.
+    /// `band_bottom` is the lowest position already emitted (every
+    /// matched position in `[band_bottom, hi)` has been emitted); `lo`
+    /// means exhausted. `bound` caches the start at `band_bottom - 1`.
     Positions {
-        compiled: sfst::CompiledTracePlan,
-        trace_ids: sfst::TraceIds,
-        timestamps: sfst::Timestamps,
         lo: u32,
         band_bottom: u32,
+        bound: Option<i64>,
     },
     /// Rollup discovery: the file's surviving rollup rows as
     /// `(rank bound, trace id)`, newest bound first (ties by id); `next`
@@ -503,31 +502,34 @@ impl FileDiscovery {
             return None;
         }
         match &self.source {
-            Discovery::Positions {
-                timestamps,
-                band_bottom,
-                ..
-            } => timestamps.at(band_bottom - 1),
+            Discovery::Positions { bound, .. } => *bound,
             Discovery::Rollup { ranked, next } => Some(ranked[*next].0),
         }
     }
 
     /// Emit the next `count` candidates into `pool` (UNSET trace ids
     /// filtered), moving the cursor down. Every emitted candidate counts
-    /// into `work`.
-    fn extend(&mut self, count: usize, work: &mut ScanWork, pool: &mut CandidatePool) {
+    /// into `work`. Span discovery reads the driver set from `token_sets`
+    /// and the columns through the file's session; a failed decode is
+    /// returned and the file is left exhausted.
+    fn extend(
+        &mut self,
+        count: usize,
+        work: &mut ScanWork,
+        pool: &mut CandidatePool,
+        discovery: &mut DiscoveryReads<'_, '_, '_, '_>,
+    ) -> Result<(), sfst::Error> {
         if self.exhausted() || count == 0 {
-            return;
+            return Ok(());
         }
         let slot = self.slot;
         match &mut self.source {
             Discovery::Positions {
-                compiled,
-                trace_ids,
-                timestamps,
                 lo,
                 band_bottom,
+                bound,
             } => {
+                let compiled = &discovery.token_sets[&slot][discovery.driver];
                 let emitted = compiled.newest_in_range(*lo, *band_bottom, count, work);
                 match emitted.first() {
                     None => *band_bottom = *lo,
@@ -548,15 +550,43 @@ impl FileDiscovery {
                         }
                     }
                 }
-                for &pos in &emitted {
-                    let trace_id = trace_ids.get(pos as usize);
-                    if trace_id.is_unset() {
-                        continue;
+                let session = &mut discovery.sessions[slot];
+                let read = (|| -> Result<Option<i64>, sfst::Error> {
+                    let ids: Vec<TraceId> = {
+                        let trace_ids = session.trace_ids()?;
+                        emitted
+                            .iter()
+                            .map(|&pos| trace_ids.get(pos as usize))
+                            .collect()
+                    };
+                    let timestamps = session.timestamps()?;
+                    let missing = |pos: u32| {
+                        sfst::Error::CorruptIndex(format!("trace search: no timestamp at {pos}"))
+                    };
+                    for (&pos, trace_id) in emitted.iter().zip(ids) {
+                        if trace_id.is_unset() {
+                            continue;
+                        }
+                        let start_ns = timestamps.at(pos).ok_or_else(|| missing(pos))?;
+                        pool.add(trace_id, start_ns, Origin::File(slot));
                     }
-                    let start_ns = timestamps
-                        .at(pos)
-                        .expect("column lengths validated at discovery setup");
-                    pool.add(trace_id, start_ns, Origin::File(slot));
+                    if *band_bottom <= *lo {
+                        return Ok(None);
+                    }
+                    Ok(Some(
+                        timestamps
+                            .at(*band_bottom - 1)
+                            .ok_or_else(|| missing(*band_bottom - 1))?,
+                    ))
+                })();
+                discovery.loaded.touch(slot, discovery.sessions);
+                match read {
+                    Ok(next) => *bound = next,
+                    Err(e) => {
+                        *band_bottom = *lo;
+                        *bound = None;
+                        return Err(e);
+                    }
                 }
             }
             Discovery::Rollup { ranked, next } => {
@@ -568,7 +598,41 @@ impl FileDiscovery {
                 *next = end;
             }
         }
+        Ok(())
     }
+}
+
+/// Extend `file`, surfacing a failed column read as a source failure
+/// that degrades every assembly (the file stops discovering).
+#[allow(clippy::too_many_arguments)]
+fn extend_file(
+    file: &mut FileDiscovery,
+    count: usize,
+    work: &mut ScanWork,
+    pool: &mut CandidatePool,
+    reads: &mut DiscoveryReads<'_, '_, '_, '_>,
+    source: &TraceSource,
+    status: &mut StatusBuilder,
+    degraded_assembly: &mut bool,
+) {
+    if let Err(e) = file.extend(count, work, pool, reads) {
+        tracing::warn!(
+            "sfsq traces: source {} failed to read its discovery columns: {e}",
+            source.source_id()
+        );
+        status.add(PartialReason::SourceFailure);
+        *degraded_assembly = true;
+    }
+}
+
+/// What span discovery reads besides a file's cursor: the sessions (the
+/// columns), the loaded-source limit they report to, every compiled
+/// window file's token sets and the driver's index among them.
+struct DiscoveryReads<'s, 'r, 'a, 'l> {
+    sessions: &'s mut [sfst::TraceFileSession<'r, 'a>],
+    loaded: &'l mut sfst::LoadedSources,
+    token_sets: &'s HashMap<usize, Vec<sfst::CompiledTracePlan>>,
+    driver: usize,
 }
 
 /// Which source emitted a candidate's best raw rank. A single-source
@@ -891,10 +955,10 @@ pub fn search(
     // different files): the token with the fewest in-window matches in
     // the window tails plus the newest window file, which compiles every
     // positive token for the count; ties go to the earlier token. ─────
-    // With two or more positive span-local tokens, every window file
-    // compiles them all: the driver's set discovers, the others feed the
-    // token gate (per file slot).
-    let keep_others = query.gate_enabled && lowered.positive.len() > 1 && !pinned;
+    // Every window file compiles every positive span-local token: the
+    // driver's set discovers, all of them stay in `token_sets` (per file
+    // slot) as the token gate's evidence.
+    let multi_token = query.gate_enabled && lowered.positive.len() > 1 && !pinned;
     let mut token_sets: HashMap<usize, Vec<sfst::CompiledTracePlan>> = HashMap::new();
     let mut driver = query.driver.unwrap_or(0);
     if query.driver.is_none() && lowered.positive.len() > 1 && !pinned {
@@ -947,11 +1011,25 @@ pub fn search(
             .min_by_key(|&i| (counts[i], i))
             .expect("two or more positive tokens");
         if let Some(found) = newest {
-            let (mut file, others) = found.into_file(driver);
-            if keep_others {
-                token_sets.insert(file.slot, others);
-            }
-            file.extend(clamp(k, &work, query.visited_ceiling), &mut work, &mut pool);
+            let mut file = found.into_file(&mut token_sets);
+            let count = clamp(k, &work, query.visited_ceiling);
+            let mut reads = DiscoveryReads {
+                sessions: &mut sessions,
+                loaded: &mut loaded,
+                token_sets: &token_sets,
+                driver,
+            };
+            let source = slot_sources[file.slot];
+            extend_file(
+                &mut file,
+                count,
+                &mut work,
+                &mut pool,
+                &mut reads,
+                source,
+                &mut status,
+                &mut degraded_assembly,
+            );
             if !file.exhausted() {
                 files.push(file);
             }
@@ -963,10 +1041,10 @@ pub fn search(
     };
     // What each later window-file compile compiles, and where the
     // driver's set sits among them.
-    let (file_plans, file_driver) = if keep_others {
-        (&positive_plans[..], driver)
-    } else {
+    let (file_plans, file_driver) = if lowered.positive.is_empty() {
         (std::slice::from_ref(driver_plan), 0)
+    } else {
+        (&positive_plans[..], driver)
     };
 
     'tails: for (source_id, scan) in &tails {
@@ -1018,7 +1096,7 @@ pub fn search(
             .trace_level
             .as_ref()
             .is_some_and(TraceLevelEval::has_prunable_condition);
-    let token_gate_wanted = keep_others && !degraded_assembly;
+    let token_gate_wanted = multi_token && !degraded_assembly;
     let mut proof: Option<sfst::RepeatFilter> = None;
     let mut gate: Option<TraceGate<'_>> = None;
     if trace_gate_wanted || token_gate_wanted {
@@ -1204,9 +1282,10 @@ pub fn search(
             if gated
                 && token_gate
                 && let Some(slot) = single_file
-                && let Some(others) = token_sets.get(&slot)
+                && let Some(sets) = token_sets.get(&slot)
             {
-                let prune = tokens_prune(trace_id, &mut sessions[slot], others, &mut work);
+                let prune =
+                    tokens_prune(trace_id, &mut sessions[slot], sets, file_driver, &mut work);
                 loaded.touch(slot, &mut sessions);
                 if prune {
                     token_prunes += 1;
@@ -1332,7 +1411,24 @@ pub fn search(
                 );
                 surface_gate_failures(g, &origin, &mut status, &mut degraded_assembly);
                 if let Some(mut file) = file {
-                    file.extend(clamp(k, &work, query.visited_ceiling), &mut work, &mut pool);
+                    let count = clamp(k, &work, query.visited_ceiling);
+                    let mut reads = DiscoveryReads {
+                        sessions: &mut sessions,
+                        loaded: &mut loaded,
+                        token_sets: &token_sets,
+                        driver: file_driver,
+                    };
+                    let source = slot_sources[file.slot];
+                    extend_file(
+                        &mut file,
+                        count,
+                        &mut work,
+                        &mut pool,
+                        &mut reads,
+                        source,
+                        &mut status,
+                        &mut degraded_assembly,
+                    );
                     if !file.exhausted() {
                         files.push(file);
                     }
@@ -1352,12 +1448,25 @@ pub fn search(
                 &mut truncated_up_to,
             );
             if let Some(found) = found {
-                let (mut file, others) = found.into_file(file_driver);
-                if keep_others {
-                    token_sets.insert(file.slot, others);
-                }
+                let mut file = found.into_file(&mut token_sets);
                 let count = clamp(k, &work, query.visited_ceiling);
-                file.extend(count, &mut work, &mut pool);
+                let mut reads = DiscoveryReads {
+                    sessions: &mut sessions,
+                    loaded: &mut loaded,
+                    token_sets: &token_sets,
+                    driver: file_driver,
+                };
+                let source = slot_sources[file.slot];
+                extend_file(
+                    &mut file,
+                    count,
+                    &mut work,
+                    &mut pool,
+                    &mut reads,
+                    source,
+                    &mut status,
+                    &mut degraded_assembly,
+                );
                 if !file.exhausted() {
                     files.push(file);
                 }
@@ -1373,7 +1482,23 @@ pub fn search(
                 break;
             }
             let count = clamp(grow, &work, query.visited_ceiling);
-            file.extend(count, &mut work, &mut pool);
+            let mut reads = DiscoveryReads {
+                sessions: &mut sessions,
+                loaded: &mut loaded,
+                token_sets: &token_sets,
+                driver: file_driver,
+            };
+            let source = slot_sources[file.slot];
+            extend_file(
+                file,
+                count,
+                &mut work,
+                &mut pool,
+                &mut reads,
+                source,
+                &mut status,
+                &mut degraded_assembly,
+            );
         }
         // Exhausted files hold nothing more to discover.
         files.retain(|f| !f.exhausted());
@@ -1400,33 +1525,33 @@ pub fn search(
     })
 }
 
-/// One window file's phase-1 columns with its compiled plans.
+/// One window file's compiled plans and the window's position range.
 struct Discovered {
     slot: usize,
     compiled: Vec<sfst::CompiledTracePlan>,
-    trace_ids: sfst::TraceIds,
-    timestamps: sfst::Timestamps,
     /// The window's position range in the file.
     lo: u32,
     hi: u32,
+    /// The start at `hi - 1`: the newest candidate the file could hold.
+    top: i64,
 }
 
 impl Discovered {
-    /// The file's discovery state, driven by compiled plan `driver`,
-    /// and the other compiled plans in order (the token gate's sets).
-    fn into_file(mut self, driver: usize) -> (FileDiscovery, Vec<sfst::CompiledTracePlan>) {
-        let compiled = self.compiled.remove(driver);
-        let file = FileDiscovery {
+    /// The file's discovery state; its compiled sets join `token_sets`
+    /// (kept while the search runs, the token gate's evidence).
+    fn into_file(
+        self,
+        token_sets: &mut HashMap<usize, Vec<sfst::CompiledTracePlan>>,
+    ) -> FileDiscovery {
+        token_sets.insert(self.slot, self.compiled);
+        FileDiscovery {
             slot: self.slot,
             source: Discovery::Positions {
-                compiled,
-                trace_ids: self.trace_ids,
-                timestamps: self.timestamps,
                 lo: self.lo,
                 band_bottom: self.hi,
+                bound: Some(self.top),
             },
-        };
-        (file, self.compiled)
+        }
     }
 }
 
@@ -1454,8 +1579,8 @@ fn compile_pending(
 ) -> Option<Discovered> {
     let PendingFile { slot, rank_bound } = file;
     let source = slot_sources[slot];
-    let reader = match sessions[slot].reader() {
-        Ok(reader) => reader,
+    match sessions[slot].reader() {
+        Ok(_) => {}
         Err(e) => {
             tracing::warn!(
                 "sfsq traces: source {} failed to open: {e}",
@@ -1473,7 +1598,7 @@ fn compile_pending(
     let mut budget_truncated = false;
     let discovered = discovery_state(
         slot,
-        reader,
+        &mut sessions[slot],
         plans,
         query.window,
         limits,
@@ -1592,15 +1717,15 @@ fn surface_gate_failures(
 /// sets `truncated`.
 fn discovery_state(
     slot: usize,
-    reader: &sfst::IndexReader<'_>,
+    session: &mut sfst::TraceFileSession<'_, '_>,
     plans: &[sfst::TracePlan],
     window: Option<TimeWindow>,
     limits: sfst::ScanLimits,
     work: &mut ScanWork,
     truncated: &mut bool,
 ) -> Result<Option<Discovered>, sfst::Error> {
-    let total = reader.summary().record_count;
-    let timestamps = reader.load_timestamps()?;
+    let total = session.reader()?.summary().record_count;
+    let timestamps = session.timestamps()?;
     let (lo, hi) = match window {
         Some(w) => timestamps.window(w.range_ns()),
         None => (0, total),
@@ -1608,14 +1733,17 @@ fn discovery_state(
     if lo >= hi {
         return Ok(None);
     }
-    let trace_ids = reader.trace_ids()?;
-    if trace_ids.len() != total as usize || timestamps.len() != total as usize {
+    let timestamps_len = timestamps.len();
+    let top = timestamps.at(hi - 1);
+    let trace_ids_len = session.trace_ids()?.len();
+    if trace_ids_len != total as usize || timestamps_len != total as usize {
         return Err(sfst::Error::CorruptIndex(format!(
-            "trace search: column lengths {}/{} disagree with record_count {total}",
-            trace_ids.len(),
-            timestamps.len(),
+            "trace search: column lengths {trace_ids_len}/{timestamps_len} disagree with \
+             record_count {total}",
         )));
     }
+    let top = top.expect("hi is within the validated column");
+    let reader = session.reader()?;
     let Some(compiled) = reader.compile_trace_plans(plans, (lo, hi), limits, work)? else {
         *truncated = true;
         return Ok(None);
@@ -1623,10 +1751,9 @@ fn discovery_state(
     Ok(Some(Discovered {
         slot,
         compiled,
-        trace_ids,
-        timestamps,
         lo,
         hi,
+        top,
     }))
 }
 

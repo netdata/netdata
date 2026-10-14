@@ -867,6 +867,65 @@ fn oracle_equivalence_under_relayouts() {
     }
 }
 
+/// Discovery reads its columns through the sessions: with one loaded
+/// session at a time, a file's later bands decode its columns again
+/// after other files' reads released them, and the answer equals the
+/// default limit's — for match-all discovery and for a two-token query
+/// (every token compiled per file).
+#[test]
+fn discovery_survives_session_release() {
+    let dir = tempfile::tempdir().unwrap();
+    // Four files interleaved in time: file f holds traces f+1, f+5, ….
+    let wals: Vec<_> = (0..4u8)
+        .map(|f| {
+            let spans: Vec<SpanSpec> = (0..6u8)
+                .map(|i| {
+                    let t = f + 1 + i * 4;
+                    let name = if t % 3 == 0 { "hot" } else { "op" };
+                    let mut s = sp(1, 0, u64::from(t) * 1_000_000_000, name);
+                    s.trace = [0; 16];
+                    s.trace[15] = t;
+                    s
+                })
+                .collect();
+            let svc = vec![kv_str("service.name", "svc")];
+            write_wal(
+                dir.path(),
+                vec![req_with(svc, None, &spans)],
+                &format!("f{f}"),
+            )
+        })
+        .collect();
+    let sources = || {
+        both_roles(|| {
+            wals.iter()
+                .enumerate()
+                .map(|(f, wal)| sealed_source(dir.path(), wal, &format!("f{f}")))
+                .collect()
+        })
+    };
+    let any_name = builtin(BuiltinField::Name, CompareOp::Regex, vec![text("op|hot")]);
+    for (query, want) in [
+        (
+            SearchQuery::new(pred(vec![])).limit(3),
+            vec![hex(24), hex(23), hex(22)],
+        ),
+        (
+            SearchQuery::new(tokens(vec![
+                Token::positive(pred(vec![any_name])),
+                Token::positive(pred(vec![name_eq("op")])),
+            ]))
+            .limit(3),
+            vec![hex(23), hex(22), hex(20)],
+        ),
+    ] {
+        let wide = run(sources(), query.clone());
+        assert_eq!(ids(&wide), want);
+        let narrow = run(sources(), query.loaded_sources_cap_for_tests(1));
+        assert_eq!(norm(&narrow), norm(&wide));
+    }
+}
+
 /// Summary numbers against ground truth (single layout; equivalence is
 /// proven above): roots, envelope, counts, ranks.
 #[test]
