@@ -344,6 +344,13 @@ fn ids(data: &SearchData) -> Vec<String> {
     data.traces.iter().map(|t| t.trace_id.to_string()).collect()
 }
 
+/// A query on the assembly path (rows off): for the tests that pin
+/// canonical-assembly properties — resend dedup, canonical ranks, the
+/// span cap — which the rows path deliberately does not have.
+fn canon_query(tokens: impl Into<TokenQuery>) -> SearchQuery {
+    SearchQuery::new(tokens).rows_for_tests(false)
+}
+
 /// Shared-world trace `n` hex-rendered, for expectation lists.
 fn hex(n: u8) -> String {
     sfst::TraceId::from(tid(n)).to_string()
@@ -360,12 +367,12 @@ fn oracle_equivalence_under_relayouts() {
     let queries: Vec<(&str, SearchQuery, Vec<String>)> = vec![
         (
             "all",
-            SearchQuery::new(Predicate::all()),
+            canon_query(Predicate::all()),
             vec![hex(3), hex(5), hex(6), hex(4), hex(2), hex(1)],
         ),
         (
             "service",
-            SearchQuery::new(pred(vec![attr_eq(
+            canon_query(pred(vec![attr_eq(
                 AttributeOwner::Resource,
                 "service.name",
                 "svc-a",
@@ -377,7 +384,7 @@ fn oracle_equivalence_under_relayouts() {
             // (900s): only the ROOT of T3 matches this pattern, so T3
             // ranks by 900s, not by its non-matching 1900s child.
             "name-regex",
-            SearchQuery::new(pred(vec![builtin(
+            canon_query(pred(vec![builtin(
                 BuiltinField::Name,
                 CompareOp::Regex,
                 vec![text("GET .*")],
@@ -386,7 +393,7 @@ fn oracle_equivalence_under_relayouts() {
         ),
         (
             "status-error",
-            SearchQuery::new(pred(vec![builtin(
+            canon_query(pred(vec![builtin(
                 BuiltinField::Status,
                 CompareOp::Eq,
                 vec![text("ERROR")],
@@ -395,7 +402,7 @@ fn oracle_equivalence_under_relayouts() {
         ),
         (
             "kind-keyword",
-            SearchQuery::new(pred(vec![builtin(
+            canon_query(pred(vec![builtin(
                 BuiltinField::Kind,
                 CompareOp::Eq,
                 vec![text("CONSUMER")],
@@ -406,7 +413,7 @@ fn oracle_equivalence_under_relayouts() {
             // Regex over the kind LABEL set is stage-A evaluable (26A):
             // matches T4's CONSUMER (1200s) and T1's SERVER (1000s).
             "kind-regex",
-            SearchQuery::new(pred(vec![builtin(
+            canon_query(pred(vec![builtin(
                 BuiltinField::Kind,
                 CompareOp::Regex,
                 vec![text("SERVER|CONSUMER")],
@@ -415,7 +422,7 @@ fn oracle_equivalence_under_relayouts() {
         ),
         (
             "duration-floor",
-            SearchQuery::new(pred(vec![builtin(
+            canon_query(pred(vec![builtin(
                 BuiltinField::Duration,
                 CompareOp::Gte,
                 vec![PredicateValue::Integer(1_000_000)],
@@ -425,7 +432,7 @@ fn oracle_equivalence_under_relayouts() {
         (
             // Span-group semantics: ONE span carries both conditions.
             "conjunction",
-            SearchQuery::new(pred(vec![
+            canon_query(pred(vec![
                 attr_eq(AttributeOwner::Resource, "service.name", "svc-a"),
                 attr_eq(AttributeOwner::Span, "http.method", "GET"),
             ])),
@@ -435,7 +442,7 @@ fn oracle_equivalence_under_relayouts() {
             // Window [1050s, 1600s): T6's canonical (1300s) is inside —
             // ranked by it; T1/T3 have no span starting inside.
             "window",
-            SearchQuery::new(Predicate::all())
+            canon_query(Predicate::all())
                 .window(TimeWindow::new(1_050 * NS as i64, 1_600 * NS as i64).unwrap()),
             vec![hex(5), hex(6), hex(4), hex(2)],
         ),
@@ -445,19 +452,19 @@ fn oracle_equivalence_under_relayouts() {
             // re-evaluation, and the trace is dropped — never a false
             // positive from raw phase-1.
             "ghost-only-on-loser",
-            SearchQuery::new(pred(vec![attr_eq(AttributeOwner::Span, "ghost", "yes")])),
+            canon_query(pred(vec![attr_eq(AttributeOwner::Span, "ghost", "yes")])),
             vec![],
         ),
         (
             // The canonical-matches direction: `flag` exists only on the
             // canonical copy; found regardless of the newer resend.
             "flag-on-canonical",
-            SearchQuery::new(pred(vec![attr_eq(AttributeOwner::Span, "flag", "on")])),
+            canon_query(pred(vec![attr_eq(AttributeOwner::Span, "flag", "on")])),
             vec![hex(6)],
         ),
         (
             "multi-value-or",
-            SearchQuery::new(pred(vec![cond(
+            canon_query(pred(vec![cond(
                 PredicateTarget::Attribute(AttributeOwner::Span, "http.method".into()),
                 CompareOp::Eq,
                 vec![text("GET"), text("POST")],
@@ -469,7 +476,7 @@ fn oracle_equivalence_under_relayouts() {
             // only T2's POST span; spans without http.method never
             // satisfy a negated comparison.
             "negated-attribute",
-            SearchQuery::new(pred(vec![cond(
+            canon_query(pred(vec![cond(
                 PredicateTarget::Attribute(AttributeOwner::Span, "http.method".into()),
                 CompareOp::NotEq,
                 vec![text("GET")],
@@ -482,7 +489,7 @@ fn oracle_equivalence_under_relayouts() {
             // nothing satisfies `ghost != x`, however the raw copies
             // look.
             "negated-absent-attribute",
-            SearchQuery::new(pred(vec![cond(
+            canon_query(pred(vec![cond(
                 PredicateTarget::Attribute(AttributeOwner::Span, "ghost".into()),
                 CompareOp::NotEq,
                 vec![text("x")],
@@ -495,7 +502,7 @@ fn oracle_equivalence_under_relayouts() {
             // every trace owning a non-SERVER span — all six (T1 through
             // its UNSPECIFIED child).
             "negated-kind",
-            SearchQuery::new(pred(vec![builtin(
+            canon_query(pred(vec![builtin(
                 BuiltinField::Kind,
                 CompareOp::NotEq,
                 vec![text("SERVER")],
@@ -505,7 +512,7 @@ fn oracle_equivalence_under_relayouts() {
         (
             // The UNSPECIFIED default is a stored, selectable kind.
             "kind-unspecified",
-            SearchQuery::new(pred(vec![builtin(
+            canon_query(pred(vec![builtin(
                 BuiltinField::Kind,
                 CompareOp::Eq,
                 vec![text("UNSPECIFIED")],
@@ -517,7 +524,7 @@ fn oracle_equivalence_under_relayouts() {
             // span sent without a status (T1's child, T3's late child,
             // T4, T6's canonical copy).
             "status-unset",
-            SearchQuery::new(pred(vec![builtin(
+            canon_query(pred(vec![builtin(
                 BuiltinField::Status,
                 CompareOp::Eq,
                 vec![text("UNSET")],
@@ -528,7 +535,7 @@ fn oracle_equivalence_under_relayouts() {
             // `status != ERROR` reaches UNSET spans too, not only OK ones
             // (which alone would give T1 and T3).
             "status-not-error",
-            SearchQuery::new(pred(vec![builtin(
+            canon_query(pred(vec![builtin(
                 BuiltinField::Status,
                 CompareOp::NotEq,
                 vec![text("ERROR")],
@@ -539,7 +546,7 @@ fn oracle_equivalence_under_relayouts() {
             // The any-owner disjunction: `env` is a RESOURCE attribute of
             // svc-a; the any-owner lookup reaches it.
             "any-owner-attribute",
-            SearchQuery::new(pred(vec![cond(
+            canon_query(pred(vec![cond(
                 PredicateTarget::Attribute(AttributeOwner::Any, "env".into()),
                 CompareOp::Eq,
                 vec![text("prod")],
@@ -549,7 +556,7 @@ fn oracle_equivalence_under_relayouts() {
         (
             // Dictionary numerics: `retries` renders as the token "3".
             "numeric-attribute",
-            SearchQuery::new(pred(vec![cond(
+            canon_query(pred(vec![cond(
                 PredicateTarget::Attribute(AttributeOwner::Span, "retries".into()),
                 CompareOp::Gte,
                 vec![PredicateValue::Integer(2)],
@@ -560,7 +567,7 @@ fn oracle_equivalence_under_relayouts() {
             // Numeric equality accepts the float spelling of an integer
             // token (the dictionary-numeric rule, not byte equality).
             "numeric-float-eq",
-            SearchQuery::new(pred(vec![cond(
+            canon_query(pred(vec![cond(
                 PredicateTarget::Attribute(AttributeOwner::Span, "retries".into()),
                 CompareOp::Eq,
                 vec![PredicateValue::Float(3.0)],
@@ -570,7 +577,7 @@ fn oracle_equivalence_under_relayouts() {
         (
             // span:id — the SPAN column scan; T5's middle child.
             "span-id",
-            SearchQuery::new(pred(vec![builtin(
+            canon_query(pred(vec![builtin(
                 BuiltinField::SpanId,
                 CompareOp::Eq,
                 vec![text("5252525252525252")],
@@ -580,7 +587,7 @@ fn oracle_equivalence_under_relayouts() {
         (
             // span:parentID — children of T5's root.
             "parent-id",
-            SearchQuery::new(pred(vec![builtin(
+            canon_query(pred(vec![builtin(
                 BuiltinField::ParentSpanId,
                 CompareOp::Eq,
                 vec![text("5151515151515151")],
@@ -591,7 +598,7 @@ fn oracle_equivalence_under_relayouts() {
             // Negated parent id: parent PRESENT and ≠ T5's root — roots
             // (unset parent = absent) never satisfy it.
             "negated-parent-id",
-            SearchQuery::new(pred(vec![builtin(
+            canon_query(pred(vec![builtin(
                 BuiltinField::ParentSpanId,
                 CompareOp::NotEq,
                 vec![text("5151515151515151")],
@@ -602,7 +609,7 @@ fn oracle_equivalence_under_relayouts() {
             // trace:id pins the candidate set; the span-local remainder
             // still applies in phase 2.
             "trace-id-pin",
-            SearchQuery::new(pred(vec![
+            canon_query(pred(vec![
                 builtin(
                     BuiltinField::TraceId,
                     CompareOp::Eq,
@@ -615,7 +622,7 @@ fn oracle_equivalence_under_relayouts() {
         (
             // A pin whose remainder fails phase-2 re-evaluation drops.
             "trace-id-pin-no-match",
-            SearchQuery::new(pred(vec![
+            canon_query(pred(vec![
                 builtin(BuiltinField::TraceId, CompareOp::Eq, vec![text(&hex(1))]),
                 builtin(BuiltinField::Status, CompareOp::Eq, vec![text("ERROR")]),
             ])),
@@ -624,7 +631,7 @@ fn oracle_equivalence_under_relayouts() {
         (
             // trace:id != excludes at pool admission.
             "trace-id-excluded",
-            SearchQuery::new(pred(vec![
+            canon_query(pred(vec![
                 builtin(BuiltinField::Status, CompareOp::Eq, vec![text("ERROR")]),
                 builtin(BuiltinField::TraceId, CompareOp::NotEq, vec![text(&hex(5))]),
             ])),
@@ -634,7 +641,7 @@ fn oracle_equivalence_under_relayouts() {
             // link:spanID / link:traceID — the LNKB row scan; T4 links
             // to T1's root span.
             "link-span-id",
-            SearchQuery::new(pred(vec![builtin(
+            canon_query(pred(vec![builtin(
                 BuiltinField::LinkSpanId,
                 CompareOp::Eq,
                 vec![text("1111111111111111")],
@@ -643,7 +650,7 @@ fn oracle_equivalence_under_relayouts() {
         ),
         (
             "link-trace-id",
-            SearchQuery::new(pred(vec![builtin(
+            canon_query(pred(vec![builtin(
                 BuiltinField::LinkTraceId,
                 CompareOp::Eq,
                 vec![text(&hex(1))],
@@ -654,7 +661,7 @@ fn oracle_equivalence_under_relayouts() {
             // event:name rides the flat events.name token; the span-side
             // evaluator gathers from the STRUCTURED event names.
             "event-name",
-            SearchQuery::new(pred(vec![builtin(
+            canon_query(pred(vec![builtin(
                 BuiltinField::EventName,
                 CompareOp::Eq,
                 vec![text("exception")],
@@ -663,7 +670,7 @@ fn oracle_equivalence_under_relayouts() {
         ),
         (
             "event-name-regex",
-            SearchQuery::new(pred(vec![builtin(
+            canon_query(pred(vec![builtin(
                 BuiltinField::EventName,
                 CompareOp::Regex,
                 vec![text("exc.*")],
@@ -673,7 +680,7 @@ fn oracle_equivalence_under_relayouts() {
         (
             // Event attribute through the structural refine.
             "event-attr",
-            SearchQuery::new(pred(vec![attr_eq(
+            canon_query(pred(vec![attr_eq(
                 AttributeOwner::Event,
                 "exception.type",
                 "IOError",
@@ -683,7 +690,7 @@ fn oracle_equivalence_under_relayouts() {
         (
             // Same-event conjunction: name + attribute on ONE event.
             "event-subgroup-same",
-            SearchQuery::new(pred(vec![
+            canon_query(pred(vec![
                 builtin(BuiltinField::EventName, CompareOp::Eq, vec![text("retry")]),
                 attr_eq(AttributeOwner::Event, "attempt", "2"),
             ])),
@@ -695,7 +702,7 @@ fn oracle_equivalence_under_relayouts() {
             // carries both — the mandatory refine rejects what a loose
             // span-level match would leak.
             "event-subgroup-counterexample",
-            SearchQuery::new(pred(vec![
+            canon_query(pred(vec![
                 attr_eq(AttributeOwner::Event, "exception.type", "IOError"),
                 attr_eq(AttributeOwner::Event, "attempt", "2"),
             ])),
@@ -704,7 +711,7 @@ fn oracle_equivalence_under_relayouts() {
         (
             // Cross-condition on names: no single event is named both.
             "event-two-names-unsatisfiable",
-            SearchQuery::new(pred(vec![
+            canon_query(pred(vec![
                 builtin(
                     BuiltinField::EventName,
                     CompareOp::Eq,
@@ -718,7 +725,7 @@ fn oracle_equivalence_under_relayouts() {
             // event:timeSinceStart computes in the refine (the corpus
             // writes events at start + 1ns).
             "event-time-since-start",
-            SearchQuery::new(pred(vec![builtin(
+            canon_query(pred(vec![builtin(
                 BuiltinField::EventTimeSinceStart,
                 CompareOp::Lte,
                 vec![PredicateValue::Integer(1)],
@@ -727,7 +734,7 @@ fn oracle_equivalence_under_relayouts() {
         ),
         (
             "event-time-since-start-none",
-            SearchQuery::new(pred(vec![builtin(
+            canon_query(pred(vec![builtin(
                 BuiltinField::EventTimeSinceStart,
                 CompareOp::Gt,
                 vec![PredicateValue::Integer(1)],
@@ -737,7 +744,7 @@ fn oracle_equivalence_under_relayouts() {
         (
             // Link attribute + link id on the SAME link.
             "link-subgroup-same",
-            SearchQuery::new(pred(vec![
+            canon_query(pred(vec![
                 attr_eq(AttributeOwner::Link, "rel", "follows"),
                 builtin(
                     BuiltinField::LinkSpanId,
@@ -751,7 +758,7 @@ fn oracle_equivalence_under_relayouts() {
             // The LINK counterexample: attribute from one link, id from
             // the other — no single link has both.
             "link-subgroup-counterexample",
-            SearchQuery::new(pred(vec![
+            canon_query(pred(vec![
                 attr_eq(AttributeOwner::Link, "rel", "other"),
                 builtin(
                     BuiltinField::LinkSpanId,
@@ -763,7 +770,7 @@ fn oracle_equivalence_under_relayouts() {
         ),
         (
             "link-subgroup-other",
-            SearchQuery::new(pred(vec![
+            canon_query(pred(vec![
                 attr_eq(AttributeOwner::Link, "rel", "other"),
                 builtin(
                     BuiltinField::LinkSpanId,
@@ -777,7 +784,7 @@ fn oracle_equivalence_under_relayouts() {
             // Trace-level only: phase-1 candidates come from All over
             // the window (C-4); the root evaluates post-assembly.
             "root-service",
-            SearchQuery::new(pred(vec![builtin(
+            canon_query(pred(vec![builtin(
                 BuiltinField::RootServiceName,
                 CompareOp::Eq,
                 vec![text("svc-a")],
@@ -786,7 +793,7 @@ fn oracle_equivalence_under_relayouts() {
         ),
         (
             "root-name-regex",
-            SearchQuery::new(pred(vec![builtin(
+            canon_query(pred(vec![builtin(
                 BuiltinField::RootName,
                 CompareOp::Regex,
                 vec![text("GET .*")],
@@ -795,7 +802,7 @@ fn oracle_equivalence_under_relayouts() {
         ),
         (
             "negated-root-name",
-            SearchQuery::new(pred(vec![builtin(
+            canon_query(pred(vec![builtin(
                 BuiltinField::RootName,
                 CompareOp::NotEq,
                 vec![text("GET /users")],
@@ -805,7 +812,7 @@ fn oracle_equivalence_under_relayouts() {
         (
             // Envelope duration: only T3 spans a second-scale envelope.
             "trace-duration",
-            SearchQuery::new(pred(vec![builtin(
+            canon_query(pred(vec![builtin(
                 BuiltinField::TraceDuration,
                 CompareOp::Gt,
                 vec![PredicateValue::Integer((100 * NS) as i64)],
@@ -816,7 +823,7 @@ fn oracle_equivalence_under_relayouts() {
             // MIXED: the span-local half lowers to the file plans, the
             // trace-level half applies post-assembly (C-4).
             "mixed-trace-level",
-            SearchQuery::new(pred(vec![
+            canon_query(pred(vec![
                 builtin(BuiltinField::Status, CompareOp::Eq, vec![text("ERROR")]),
                 builtin(
                     BuiltinField::RootServiceName,
@@ -936,7 +943,7 @@ fn summary_ground_truth() {
     let wal = write_wal(dir.path(), all, "world");
     let sources = both_roles(|| vec![sealed_source(dir.path(), &wal, "one")]);
 
-    let data = run(sources, SearchQuery::new(Predicate::all()));
+    let data = run(sources, canon_query(Predicate::all()));
     assert_breakdowns_partition(&data);
     let by_id = |n: u8| {
         data.traces
@@ -1054,7 +1061,7 @@ fn service_breakdown_partitions_the_retained_canonical_spans() {
     let wal = write_wal(dir.path(), reqs, "breakdown");
 
     let sources = both_roles(|| vec![sealed_source(dir.path(), &wal, "one")]);
-    let data = run(sources, SearchQuery::new(Predicate::all()));
+    let data = run(sources, canon_query(Predicate::all()));
     assert_eq!(ids(&data), vec![hex(22), hex(21)]);
     assert_breakdowns_partition(&data);
     let (t22, t21) = (&data.traces[0], &data.traces[1]);
@@ -1084,7 +1091,7 @@ fn service_breakdown_partitions_the_retained_canonical_spans() {
     let sources = both_roles(|| vec![sealed_source(dir.path(), &wal, "one")]);
     let filtered = run(
         sources,
-        SearchQuery::new(pred(vec![attr_eq(
+        canon_query(pred(vec![attr_eq(
             AttributeOwner::Resource,
             "service.name",
             "cart",
@@ -1104,10 +1111,7 @@ fn service_breakdown_partitions_the_retained_canonical_spans() {
     // Capped at 2 spans: each trace keeps its two earliest, inexact, and
     // the breakdown partitions exactly those.
     let sources = both_roles(|| vec![sealed_source(dir.path(), &wal, "one")]);
-    let capped = run(
-        sources,
-        SearchQuery::new(Predicate::all()).span_cap_for_tests(2),
-    );
+    let capped = run(sources, canon_query(Predicate::all()).span_cap_for_tests(2));
     assert!(capped.status.has(PartialReason::SizeCap));
     assert_breakdowns_partition(&capped);
     let (t22, t21) = (&capped.traces[0], &capped.traces[1]);
@@ -1165,13 +1169,13 @@ fn inflated_raw_ranks_do_not_hide_the_true_top_trace() {
     let matching = pred(vec![attr_eq(AttributeOwner::Span, "m", "yes")]);
     // limit 1 → initial K = 3: the raw top-3 are all inflated resends.
     let sources = both_roles(|| vec![sealed_source(dir.path(), &wal, "one")]);
-    let top = run(sources, SearchQuery::new(matching.clone()).limit(1));
+    let top = run(sources, canon_query(matching.clone()).limit(1));
     assert_eq!(ids(&top), vec![hex(6)], "the hidden winner surfaces");
     assert_eq!(top.status, QueryStatus::Complete);
 
     // Full ordering: canonical ranks throughout (500, then 105..101).
     let sources = both_roles(|| vec![sealed_source(dir.path(), &wal, "one")]);
-    let all = run(sources, SearchQuery::new(matching).limit(10));
+    let all = run(sources, canon_query(matching).limit(10));
     assert_eq!(
         ids(&all),
         vec![hex(6), hex(5), hex(4), hex(3), hex(2), hex(1)]
@@ -1193,7 +1197,7 @@ fn window_applies_to_the_canonical_copy() {
     let sources = both_roles(|| vec![sealed_source(dir.path(), &wal, "one")]);
     let data = run(
         sources,
-        SearchQuery::new(Predicate::all())
+        canon_query(Predicate::all())
             .window(TimeWindow::new(1_890 * NS as i64, 2_000 * NS as i64).unwrap()),
     );
     assert_eq!(ids(&data), vec![hex(3)]);
@@ -1405,7 +1409,7 @@ fn assembled_ceiling_terminates_with_the_gathered_result() {
     let sources = both_roles(|| vec![sealed_source(dir.path(), &wal, "one")]);
     let data = run(
         sources,
-        SearchQuery::new(pred(vec![attr_eq(AttributeOwner::Span, "m", "yes")])).limit(1),
+        canon_query(pred(vec![attr_eq(AttributeOwner::Span, "m", "yes")])).limit(1),
     );
     // Ceiling = max(1 × 16, 64) = 64 < 80 candidates: Partial.
     assert!(data.status.has(PartialReason::WorkCeiling));
@@ -1418,7 +1422,7 @@ fn assembled_ceiling_terminates_with_the_gathered_result() {
     let sources = both_roles(|| vec![sealed_source(dir.path(), &wal, "one")]);
     let again = run(
         sources,
-        SearchQuery::new(pred(vec![attr_eq(AttributeOwner::Span, "m", "yes")])).limit(1),
+        canon_query(pred(vec![attr_eq(AttributeOwner::Span, "m", "yes")])).limit(1),
     );
     assert_eq!(norm(&data), norm(&again));
 }
@@ -1456,7 +1460,7 @@ fn visited_rows_ceiling_gates_refill() {
     let wal = write_wal(dir.path(), reqs, "visited");
 
     let q = || {
-        SearchQuery::new(pred(vec![attr_eq(AttributeOwner::Span, "m", "yes")]))
+        canon_query(pred(vec![attr_eq(AttributeOwner::Span, "m", "yes")]))
             .limit(1)
             .visited_rows_ceiling_for_tests(30)
     };
@@ -1559,8 +1563,7 @@ fn capped_candidates_are_never_silently_dropped() {
     let sources = both_roles(|| vec![sealed_source(dir.path(), &wal, "one")]);
     let dropped = run(
         sources,
-        SearchQuery::new(pred(vec![attr_eq(AttributeOwner::Span, "m", "yes")]))
-            .span_cap_for_tests(2),
+        canon_query(pred(vec![attr_eq(AttributeOwner::Span, "m", "yes")])).span_cap_for_tests(2),
     );
     assert_eq!(ids(&dropped), vec![hex(8)]);
     assert!(dropped.status.has(PartialReason::SizeCap));
@@ -1570,8 +1573,7 @@ fn capped_candidates_are_never_silently_dropped() {
     let sources = both_roles(|| vec![sealed_source(dir.path(), &wal, "one")]);
     let kept = run(
         sources,
-        SearchQuery::new(pred(vec![attr_eq(AttributeOwner::Span, "a", "yes")]))
-            .span_cap_for_tests(2),
+        canon_query(pred(vec![attr_eq(AttributeOwner::Span, "a", "yes")])).span_cap_for_tests(2),
     );
     assert_eq!(ids(&kept), vec![hex(7), hex(9)]);
     assert!(kept.status.has(PartialReason::SizeCap));
@@ -1587,7 +1589,7 @@ fn capped_candidates_are_never_silently_dropped() {
     let sources = both_roles(|| vec![sealed_source(dir.path(), &wal, "one")]);
     let trimmed = run(
         sources,
-        SearchQuery::new(pred(vec![attr_eq(AttributeOwner::Span, "m2", "yes")]))
+        canon_query(pred(vec![attr_eq(AttributeOwner::Span, "m2", "yes")]))
             .span_cap_for_tests(2)
             .limit(1),
     );
@@ -1597,7 +1599,7 @@ fn capped_candidates_are_never_silently_dropped() {
     let sources = both_roles(|| vec![sealed_source(dir.path(), &wal, "one")]);
     let true_top = run(
         sources,
-        SearchQuery::new(pred(vec![attr_eq(AttributeOwner::Span, "m2", "yes")])).limit(1),
+        canon_query(pred(vec![attr_eq(AttributeOwner::Span, "m2", "yes")])).limit(1),
     );
     assert_eq!(ids(&true_top), vec![hex(9)]);
     assert_eq!(true_top.status, QueryStatus::Complete);
@@ -1606,7 +1608,7 @@ fn capped_candidates_are_never_silently_dropped() {
     let sources = both_roles(|| vec![sealed_source(dir.path(), &wal, "one")]);
     let uncapped = run(
         sources,
-        SearchQuery::new(pred(vec![attr_eq(AttributeOwner::Span, "m", "yes")])),
+        canon_query(pred(vec![attr_eq(AttributeOwner::Span, "m", "yes")])),
     );
     assert_eq!(ids(&uncapped), vec![hex(9), hex(8)]);
     assert_eq!(uncapped.status, QueryStatus::Complete);
@@ -1741,7 +1743,7 @@ fn trace_level_conditions_exclude_indeterminate_candidates() {
     let sources = both_roles(|| vec![sealed_source(dir.path(), &wal, "one")]);
     let full = run(
         sources,
-        SearchQuery::new(pred(vec![builtin(
+        canon_query(pred(vec![builtin(
             BuiltinField::RootName,
             CompareOp::Regex,
             vec![text("root-.*")],
@@ -1755,7 +1757,7 @@ fn trace_level_conditions_exclude_indeterminate_candidates() {
     let sources = both_roles(|| vec![sealed_source(dir.path(), &wal, "one")]);
     let capped = run(
         sources,
-        SearchQuery::new(pred(vec![builtin(
+        canon_query(pred(vec![builtin(
             BuiltinField::RootName,
             CompareOp::Regex,
             vec![text("root-.*")],
@@ -2455,6 +2457,40 @@ fn on_every_layout(
     query: &SearchQuery,
     want: &[String],
 ) -> (Vec<SummaryPrint>, QueryStatus) {
+    on_every_layout_with(dir, world, name, query, want, want)
+}
+
+/// [`on_every_layout`] on both paths: assembly (canonical spans) answers
+/// `want`, the rows path (stored rows, decision 49) `want_rows` — they
+/// differ where a losing resend moves a rank (T6's 1950 s copy). Returns
+/// the rows path's reference.
+fn on_every_layout_with(
+    dir: &Path,
+    world: &World,
+    name: &str,
+    query: &SearchQuery,
+    want: &[String],
+    want_rows: &[String],
+) -> (Vec<SummaryPrint>, QueryStatus) {
+    layouts_agree(
+        dir,
+        world,
+        &format!("{name} (assembly)"),
+        &query.clone().rows_for_tests(false),
+        want,
+    );
+    layouts_agree(dir, world, &format!("{name} (rows)"), query, want_rows)
+}
+
+/// Every layout answers `query` with `want`, exactly and completely, and
+/// with the same summaries.
+fn layouts_agree(
+    dir: &Path,
+    world: &World,
+    name: &str,
+    query: &SearchQuery,
+    want: &[String],
+) -> (Vec<SummaryPrint>, QueryStatus) {
     let mut reference = None;
     for layout_name in LAYOUTS {
         let data = run(layout(dir, world, layout_name), query.clone());
@@ -2521,12 +2557,13 @@ fn negated_token_is_not_exists() {
     let dir = tempfile::tempdir().unwrap();
     let world = world(dir.path());
     let chip = SearchQuery::new(tokens(vec![neg(vec![span_attr_eq("http.method", "GET")])]));
-    on_every_layout(
+    on_every_layout_with(
         dir.path(),
         &world,
         "not exists",
         &chip,
         &[hex(5), hex(6), hex(4), hex(2)],
+        &[hex(6), hex(5), hex(4), hex(2)],
     );
     let in_token = SearchQuery::new(tokens(vec![pos(vec![cond(
         PredicateTarget::Attribute(AttributeOwner::Span, "http.method".into()),
@@ -2542,12 +2579,13 @@ fn negated_absent_field_passes() {
     let dir = tempfile::tempdir().unwrap();
     let world = world(dir.path());
     let query = SearchQuery::new(tokens(vec![neg(vec![span_attr_eq("nowhere", "x")])]));
-    on_every_layout(
+    on_every_layout_with(
         dir.path(),
         &world,
         "absent",
         &query,
         &[hex(3), hex(5), hex(6), hex(4), hex(2), hex(1)],
+        &[hex(6), hex(3), hex(5), hex(4), hex(2), hex(1)],
     );
 }
 
@@ -2566,12 +2604,13 @@ fn negated_event_token() {
         )
     };
     let query = SearchQuery::new(tokens(vec![neg(vec![exception()])]));
-    on_every_layout(
+    on_every_layout_with(
         dir.path(),
         &world,
         "no exception",
         &query,
         &[hex(3), hex(5), hex(6), hex(4), hex(1)],
+        &[hex(6), hex(3), hex(5), hex(4), hex(1)],
     );
     let query = SearchQuery::new(tokens(vec![pos(vec![exception()])]));
     on_every_layout(dir.path(), &world, "exception", &query, &[hex(2)]);
@@ -2602,12 +2641,13 @@ fn negated_trace_level_and_id_tokens() {
         CompareOp::Eq,
         vec![text(&id(1)), text(&id(2))],
     )])]));
-    on_every_layout(
+    on_every_layout_with(
         dir.path(),
         &world,
         "not T1 or T2",
         &not_t1,
         &[hex(3), hex(5), hex(6), hex(4)],
+        &[hex(6), hex(3), hex(5), hex(4)],
     );
     // NOT (id ∉ {T4}) pins T4.
     let only_t4 = SearchQuery::new(tokens(vec![neg(vec![builtin(
@@ -2695,20 +2735,28 @@ fn forced_driver_invariance() {
         ),
     ];
     for (i, (query, want)) in queries.iter().enumerate() {
-        let auto = on_every_layout(
+        // T6's stored 1950 s resend ranks it first on the rows path.
+        let want_rows = if i == 3 {
+            vec![hex(6), hex(3), hex(4), hex(1)]
+        } else {
+            want.clone()
+        };
+        let auto = on_every_layout_with(
             dir.path(),
             &world,
             &format!("query {i}"),
             &SearchQuery::new(query.clone()),
             want,
+            &want_rows,
         );
         for driver in 0..2 {
-            let forced = on_every_layout(
+            let forced = on_every_layout_with(
                 dir.path(),
                 &world,
                 &format!("query {i}, driver {driver}"),
                 &SearchQuery::new(query.clone()).driver_for_tests(driver),
                 want,
+                &want_rows,
             );
             assert_eq!(forced, auto, "query {i}, driver {driver}");
         }
@@ -2785,9 +2833,10 @@ fn multi_token_cursor_partition() {
             layout(dir.path(), &world, layout_name),
             SearchQuery::new(query.clone()).limit(10),
         );
+        // Rows path: T6's stored 1950 s resend ranks it first.
         assert_eq!(
             ids(&full),
-            vec![hex(5), hex(6), hex(4), hex(2)],
+            vec![hex(6), hex(5), hex(4), hex(2)],
             "{layout_name}"
         );
         let full = norm(&full).0;
@@ -2885,7 +2934,7 @@ fn negated_token_excludes_capped_traces() {
     );
     let sources = || both_roles(|| vec![sealed_source(dir.path(), &wal, "one")]);
     let query = || {
-        SearchQuery::new(tokens(vec![
+        canon_query(tokens(vec![
             pos(vec![attr_eq(
                 AttributeOwner::Resource,
                 "service.name",

@@ -724,7 +724,10 @@ fn corrupt_rollup_chunk_is_skipped_and_surfaced() {
     // Gate-off never reads TRSU (only the gate does): the corruption
     // goes UNDISCOVERED and the trace returns — discovery laziness
     // cuts both ways.
-    let off = run(build(), q().trace_gate_for_tests(false));
+    let off = run(
+        build(),
+        q().trace_gate_for_tests(false).rows_for_tests(false),
+    );
     assert_eq!(ids(&off), vec![hex(1)]);
     assert_eq!(off.status, QueryStatus::Complete);
 }
@@ -826,7 +829,10 @@ fn pruned_candidates_sizecap_partial_is_never_observed() {
     let sources = || both_roles(|| vec![sealed_source(dir.path(), &wal, "one")]);
     let q = || SearchQuery::new(pred(vec![root_service_eq("hot")])).span_cap_for_tests(2);
 
-    let off = run(sources(), q().trace_gate_for_tests(false));
+    let off = run(
+        sources(),
+        q().trace_gate_for_tests(false).rows_for_tests(false),
+    );
     assert_eq!(ids(&off), vec![hex(2)]);
     assert!(
         off.status.has(PartialReason::SizeCap),
@@ -953,7 +959,10 @@ fn pruning_masks_assembly_only_corruption_by_design() {
         "the prune never reads SPAN: corruption stays undiscovered"
     );
 
-    let off = run(sources(), q().trace_gate_for_tests(false));
+    let off = run(
+        sources(),
+        q().trace_gate_for_tests(false).rows_for_tests(false),
+    );
     assert!(off.traces.is_empty());
     assert!(
         off.status.has(PartialReason::SourceFailure),

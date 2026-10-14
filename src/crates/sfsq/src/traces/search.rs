@@ -170,6 +170,7 @@ use sfst::{ScanWork, TraceId};
 use super::by_id::{DEFAULT_SPAN_CAP, LOADED_SOURCES_MAX};
 use super::gate::{GateDecision, PROOF_IDS_MAX, TraceGate, single_source_proof, tokens_prune};
 use super::predicate::{EvalPredicate, LoweredTokens, PredicateError, TokenQuery, TraceLevelEval};
+use super::rollup::{RootClaim, TracePart, sealed_trace_part, tail_trace_parts};
 use super::sources::{SourceId, SourceSetError, TraceSource, validate_sources};
 use super::status::{PartialReason, QueryStatus, StatusBuilder};
 use super::vocab::{BuiltinField, span_field};
@@ -241,6 +242,7 @@ pub struct SearchQuery {
     proof_ids_max: u64,
     rollup_discovery: bool,
     assembled_ceiling: Option<usize>,
+    rows: bool,
 }
 
 impl SearchQuery {
@@ -261,6 +263,7 @@ impl SearchQuery {
             proof_ids_max: PROOF_IDS_MAX,
             rollup_discovery: true,
             assembled_ceiling: None,
+            rows: true,
         }
     }
 
@@ -287,6 +290,15 @@ impl SearchQuery {
     #[doc(hidden)]
     pub fn visited_rows_ceiling_for_tests(mut self, ceiling: u64) -> Self {
         self.visited_ceiling = ceiling;
+        self
+    }
+
+    /// Test-only switch off the rows path (decision 49): every candidate
+    /// is assembled, as before it, so tests can pin canonical-assembly
+    /// properties. NOT a tuning surface.
+    #[doc(hidden)]
+    pub fn rows_for_tests(mut self, enabled: bool) -> Self {
+        self.rows = enabled;
         self
     }
 
@@ -731,6 +743,9 @@ fn holder_evidence(
         stop_when_all_positive,
     } = reads;
     let window = env.query.window;
+    // Without a span-local token no set is read: positions and starts
+    // alone give the newest in-window start.
+    let needs_sets = positive_count > 0 || file_plans.len() > negated_base;
     for &slot in slots {
         if evidence.negated || (stop_when_all_positive && evidence.all_positive()) {
             return true;
@@ -739,7 +754,8 @@ fn holder_evidence(
         if !sessions[slot].screen(trace_id) {
             continue;
         }
-        if !token_sets.contains_key(&slot)
+        if needs_sets
+            && !token_sets.contains_key(&slot)
             && let Some(at) = pending.iter().position(|p| p.slot == slot)
         {
             let file = pending.remove(at).expect("position found it");
@@ -759,22 +775,26 @@ fn holder_evidence(
                 files.push(found.into_file(token_sets));
             }
         }
-        let Some(sets) = token_sets.get(&slot) else {
-            // Not compiled: either the window misses the file's rows
-            // (nothing in-window to probe) or it failed or was cut short
-            // (undecidable).
-            let in_window = sessions[slot].timestamps().map(|ts| {
-                let (lo, hi) = match window {
-                    Some(w) => ts.window(w.range_ns()),
-                    None => (0, ts.len() as u32),
-                };
-                lo < hi
-            });
-            loaded.touch(slot, sessions);
-            if matches!(in_window, Ok(false)) {
-                continue;
+        let sets: &[sfst::CompiledTracePlan] = match token_sets.get(&slot) {
+            Some(sets) => sets,
+            None if !needs_sets => &[],
+            None => {
+                // Not compiled: either the window misses the file's rows
+                // (nothing in-window to probe) or it failed or was cut short
+                // (undecidable).
+                let in_window = sessions[slot].timestamps().map(|ts| {
+                    let (lo, hi) = match window {
+                        Some(w) => ts.window(w.range_ns()),
+                        None => (0, ts.len() as u32),
+                    };
+                    lo < hi
+                });
+                loaded.touch(slot, sessions);
+                if matches!(in_window, Ok(false)) {
+                    continue;
+                }
+                return false;
             }
-            return false;
         };
         let positions = sessions[slot].positions(trace_id);
         let read = positions.and_then(|positions| {
@@ -802,12 +822,277 @@ fn holder_evidence(
                     TokenEvidence::see(newest, start_ns);
                 }
             }
-            if sets[negated_base..].iter().any(|set| set.contains(pos)) {
+            if sets.len() > negated_base && sets[negated_base..].iter().any(|set| set.contains(pos))
+            {
                 evidence.negated = true;
             }
         }
     }
     true
+}
+
+/// What a candidate's row is read from besides the sessions.
+struct RowScope<'c> {
+    /// The proof's single holder file, when it has one.
+    single_file: Option<usize>,
+    /// The candidate lives in the tails alone.
+    tail_only: bool,
+    window_slots: &'c [usize],
+    tail_parts: Option<&'c Vec<TracePart>>,
+    tail_evidence: Option<&'c TokenEvidence>,
+    lowered: &'c LoweredTokens,
+    /// No completion source failed so far.
+    exact: bool,
+    /// Files whose rollup or stats failed to read.
+    rows_failed: &'c mut HashSet<usize>,
+}
+
+/// The rows path's answer for one candidate.
+enum RowOutcome {
+    /// It matches: its row, `newest_matched_start_ns` = its rank.
+    Row(TraceSummary),
+    /// It does not match.
+    NoMatch,
+    /// It needs assembly (a holder without stats, a failed read).
+    Fallback,
+}
+
+/// Decide `trace_id` and build its row from its holders' rollup parts
+/// (decision 49: stored-row units).
+fn row_from_parts(
+    trace_id: TraceId,
+    scope: RowScope<'_>,
+    reads: HolderReads<'_, '_, '_>,
+    env: CompileEnv<'_, '_>,
+    work: &mut ScanWork,
+) -> RowOutcome {
+    let HolderReads {
+        sessions,
+        loaded,
+        token_sets,
+        pending,
+        files,
+        file_plans,
+        positive_count,
+        negated_base,
+        ..
+    } = reads;
+    // ── The parts: holder files, then tails ──────────────────────────
+    let candidates: Vec<usize> = match (scope.single_file, scope.tail_only) {
+        (Some(slot), _) => vec![slot],
+        (None, true) => Vec::new(),
+        (None, false) => (0..sessions.len()).collect(),
+    };
+    let mut parts: Vec<TracePart> = Vec::new();
+    let mut holders: Vec<usize> = Vec::new();
+    for slot in candidates {
+        work.rows_visited += 1;
+        if scope.single_file.is_none() && !sessions[slot].screen(trace_id) {
+            continue;
+        }
+        if scope.rows_failed.contains(&slot) {
+            return RowOutcome::Fallback;
+        }
+        let part = sessions[slot].rollup_part(trace_id);
+        let built = match part {
+            Ok(sfst::PartEvidence::Part(row, stats)) => {
+                work.rows_visited += stats.services.len() as u64 + 1;
+                let session = &mut sessions[slot];
+                let mut resolve =
+                    |field: &str, kv_ref: u32| -> Result<Option<String>, sfst::Error> {
+                        if kv_ref == sfst::ROLLUP_NO_REF {
+                            return Ok(None);
+                        }
+                        match session.resolve_rollup_ref(field, kv_ref)? {
+                            sfst::RollupRefOutcome::Value(v) => Ok(Some(v.to_string())),
+                            sfst::RollupRefOutcome::Corrupt => Err(sfst::Error::CorruptIndex(
+                                "trace rollup ref resolves to no value".into(),
+                            )),
+                        }
+                    };
+                Some(sealed_trace_part(trace_id, &row, &stats, &mut resolve))
+            }
+            Ok(sfst::PartEvidence::Absent) => None,
+            Ok(sfst::PartEvidence::NoStats | sfst::PartEvidence::NoRollup) => {
+                loaded.touch(slot, sessions);
+                return RowOutcome::Fallback;
+            }
+            Err(e) => Some(Err(e)),
+        };
+        loaded.touch(slot, sessions);
+        match built {
+            None => {}
+            Some(Ok(part)) => {
+                parts.push(part);
+                holders.push(slot);
+            }
+            Some(Err(e)) => {
+                // A corrupt rollup or stats chunk: surfaced here, since the
+                // assembly the candidate falls back to never reads it (and
+                // loses no span by it, so results stay exact).
+                tracing::warn!(
+                    "sfsq traces: source {} rollup stats failed to read: {e}",
+                    env.slot_sources[slot].source_id()
+                );
+                env.status.add(PartialReason::SourceFailure);
+                scope.rows_failed.insert(slot);
+                return RowOutcome::Fallback;
+            }
+        }
+    }
+    if let Some(tail_parts) = scope.tail_parts {
+        parts.extend(tail_parts.iter().cloned());
+    }
+    if parts.is_empty() {
+        return RowOutcome::Fallback;
+    }
+
+    // ── The verdict: tokens over the in-window stored rows ──────────
+    let mut evidence = scope
+        .tail_evidence
+        .cloned()
+        .unwrap_or_else(|| TokenEvidence::new(positive_count));
+    let window_holders: Vec<usize> = holders
+        .iter()
+        .copied()
+        .filter(|slot| scope.window_slots.contains(slot))
+        .collect();
+    let decidable = holder_evidence(
+        trace_id,
+        &window_holders,
+        &mut evidence,
+        HolderReads {
+            sessions,
+            loaded,
+            token_sets,
+            pending,
+            files,
+            file_plans,
+            positive_count,
+            negated_base,
+            stop_when_all_positive: false,
+        },
+        env,
+        work,
+    );
+    if !decidable {
+        return RowOutcome::Fallback;
+    }
+    if evidence.negated {
+        return RowOutcome::NoMatch;
+    }
+    let rank = if positive_count == 0 {
+        evidence.newest_any
+    } else {
+        evidence
+            .newest
+            .iter()
+            .copied()
+            .collect::<Option<Vec<_>>>()
+            .and_then(|n| n.into_iter().min())
+    };
+    let Some(rank) = rank else {
+        return RowOutcome::NoMatch;
+    };
+
+    // ── The row: the parts merged ────────────────────────────────────
+    let start_ns = parts
+        .iter()
+        .map(|p| p.aggregate.min_start_ns)
+        .min()
+        .expect("parts");
+    let end_ns = parts
+        .iter()
+        .map(|p| p.aggregate.max_end_ns)
+        .max()
+        .expect("parts");
+    let duration_ns = end_ns.saturating_sub(start_ns);
+    let mut spans_by_service: HashMap<&str, u64> = HashMap::new();
+    let (mut span_count, mut error_count, mut unattributed) = (0u64, 0u64, 0u64);
+    for part in &parts {
+        span_count += part.aggregate.span_count;
+        error_count += part.aggregate.error_count;
+        for (service, spans, _) in &part.services {
+            match service {
+                Some(name) => *spans_by_service.entry(name).or_default() += spans,
+                None => unattributed += spans,
+            }
+        }
+    }
+    let root = pick_root(&parts);
+    if scope.lowered.needs_whole_trace() && !scope.exact {
+        return RowOutcome::NoMatch; // indeterminate → excluded
+    }
+    if scope.lowered.has_trace_level() {
+        let (service, name) = root.clone().unwrap_or((None, None));
+        if !scope
+            .lowered
+            .trace_level_matches(name.as_deref(), service.as_deref(), duration_ns)
+        {
+            return RowOutcome::NoMatch;
+        }
+    }
+    let (top, other) = super::overview::top_k(
+        spans_by_service.into_iter().collect(),
+        SERVICE_BREAKDOWN_TOP_K,
+    );
+    let (root_service, root_name) = root.unwrap_or((None, None));
+    RowOutcome::Row(TraceSummary {
+        trace_id,
+        root_service,
+        root_name,
+        start_ns,
+        newest_matched_start_ns: rank,
+        duration_ns,
+        span_count: span_count as usize,
+        error_count: error_count as usize,
+        service_breakdown: ServiceBreakdown {
+            top: top
+                .into_iter()
+                .map(|(service, spans)| (service.to_owned(), spans))
+                .collect(),
+            other,
+            unattributed,
+        },
+        exact: scope.exact,
+    })
+}
+
+/// The trace's root across its parts: the TRUE claim with the smallest
+/// `(start, span id)` — the combiner's order. Unknown (`None`) when a
+/// withheld claim starts at or before it, when claims sharing it name
+/// different facets (a root resent with different values), or with no
+/// claim at all. `Some((service, name))` otherwise.
+fn pick_root(parts: &[TracePart]) -> Option<(Option<String>, Option<String>)> {
+    let best = parts
+        .iter()
+        .filter_map(|p| match &p.root {
+            RootClaim::True {
+                start_ns, span_id, ..
+            } => Some((*start_ns, *span_id)),
+            _ => None,
+        })
+        .min()?;
+    if parts
+        .iter()
+        .any(|p| matches!(p.root, RootClaim::Withheld { start_ns } if start_ns <= best.0))
+    {
+        return None;
+    }
+    let mut facets = parts.iter().filter_map(|p| match &p.root {
+        RootClaim::True {
+            start_ns,
+            span_id,
+            service,
+            name,
+        } if (*start_ns, *span_id) == best => Some((service.clone(), name.clone())),
+        _ => None,
+    });
+    let first = facets.next()?;
+    if facets.any(|f| f != first) {
+        return None;
+    }
+    Some(first)
 }
 
 /// Extend `file`, surfacing a failed column read as a source failure
@@ -1117,9 +1402,6 @@ pub fn search(
     // list before any compile): where a candidate's tokens are probed.
     let mut window_slots: Vec<usize> = Vec::new();
     for (slot, source) in slot_sources.iter().enumerate() {
-        if pinned {
-            break;
-        }
         if !window_ids.contains(source.source_id()) {
             continue;
         }
@@ -1143,8 +1425,11 @@ pub fn search(
             Some(w) => file_end.min(w.range_ns().end),
             None => file_end,
         };
-        pending.push_back(PendingFile { slot, rank_bound });
         window_slots.push(slot);
+        // A pinned query discovers from its pins, never from files.
+        if !pinned {
+            pending.push_back(PendingFile { slot, rank_bound });
+        }
     }
     pending.make_contiguous().sort_by(|a, b| {
         b.rank_bound.cmp(&a.rank_bound).then_with(|| {
@@ -1395,6 +1680,11 @@ pub fn search(
     });
     // The window tails' token bits, built on first need.
     let mut tail_evidence: Option<HashMap<TraceId, TokenEvidence>> = None;
+    // Every completion tail's trace parts, built on first need.
+    let mut tail_parts: Option<HashMap<TraceId, Vec<TracePart>>> = None;
+    // Files whose rollup or stats failed to read: their candidates
+    // assemble without reading them again.
+    let mut rows_failed: HashSet<usize> = HashSet::new();
     let mut assembled_count = 0usize;
     let mut finals: Vec<Assembled> = Vec::new();
     // Final ranks, best-first, for the Nth-final threshold.
@@ -1574,6 +1864,72 @@ pub fn search(
                 if decidable && !evidence.all_positive() {
                     token_prunes += 1;
                     continue;
+                }
+            }
+            // The rows path (decision 49): decide and summarize from the
+            // holders' rollup parts, without assembly. A holder sealed
+            // before the stats, a read that fails, or a breached ceiling
+            // falls back to the assembly below.
+            if query.rows && !breached(&work) {
+                let parts_of_tails = tail_parts.get_or_insert_with(|| {
+                    let mut parts: HashMap<TraceId, Vec<TracePart>> = HashMap::new();
+                    for (_, scan) in &tails {
+                        work.rows_visited += scan.num_spans() as u64;
+                        for part in tail_trace_parts(scan) {
+                            parts.entry(part.aggregate.trace_id).or_default().push(part);
+                        }
+                    }
+                    parts
+                });
+                let tails_seen = tail_evidence.get_or_insert_with(|| {
+                    window_tail_evidence(&tails, &window_ids, &lowered, query.window, &mut work)
+                });
+                let outcome = row_from_parts(
+                    trace_id,
+                    RowScope {
+                        single_file,
+                        tail_only: emitter == Origin::Tail
+                            && proof.as_ref().is_some_and(|p| !p.may_repeat(trace_id)),
+                        window_slots: &window_slots,
+                        tail_parts: parts_of_tails.get(&trace_id),
+                        tail_evidence: tails_seen.get(&trace_id),
+                        lowered: &lowered,
+                        exact: !degraded_assembly,
+                        rows_failed: &mut rows_failed,
+                    },
+                    HolderReads {
+                        sessions: &mut sessions,
+                        loaded: &mut loaded,
+                        token_sets: &mut token_sets,
+                        pending: &mut pending,
+                        files: &mut files,
+                        file_plans: &file_plans,
+                        positive_count,
+                        negated_base,
+                        stop_when_all_positive: false,
+                    },
+                    CompileEnv {
+                        query: &query,
+                        slot_sources: &slot_sources,
+                        status: &mut status,
+                        degraded_assembly: &mut degraded_assembly,
+                        truncated_up_to: &mut truncated_up_to,
+                    },
+                    &mut work,
+                );
+                match outcome {
+                    RowOutcome::Row(summary) => {
+                        assembled_count += 1;
+                        let rank = (summary.newest_matched_start_ns, trace_id);
+                        final_ranks.insert((std::cmp::Reverse(rank.0), rank.1));
+                        finals.push(Assembled { summary, rank });
+                        continue;
+                    }
+                    RowOutcome::NoMatch => {
+                        assembled_count += 1;
+                        continue;
+                    }
+                    RowOutcome::Fallback => {}
                 }
             }
             let mut merged: Vec<&mut dyn SpanSource> = Vec::with_capacity(origin.len());
