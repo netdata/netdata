@@ -2110,3 +2110,69 @@ fn a_window_file_that_cannot_beat_the_page_is_never_compiled() {
     );
     assert!(data.status.has(PartialReason::SourceFailure));
 }
+
+/// A value longer than any defensive cut is evaluated whole, sealed or
+/// tail alike: a condition that depends on its last bytes matches, and
+/// the attached span carries the full value.
+#[test]
+fn long_values_are_evaluated_whole_in_every_layout() {
+    let dir = tempfile::tempdir().unwrap();
+    let big = format!("{}-tail", "x".repeat(70_000));
+    let span = SpanSpec {
+        attrs: vec![kv_str("big", &big)],
+        ..span_in(1, 1, 0, 100 * NS, "op")
+    };
+    let wal = write_wal(
+        dir.path(),
+        vec![req_with(vec![kv_str("service.name", "svc")], None, &[span])],
+        "long",
+    );
+    let big_target = || PredicateTarget::Attribute(AttributeOwner::Span, "big".into());
+    let queries = [
+        (
+            "equal",
+            cond(big_target(), CompareOp::Eq, vec![text(&big)]),
+            vec![hex(1)],
+        ),
+        (
+            "regex past the cut",
+            cond(big_target(), CompareOp::Regex, vec![text("x+-tail")]),
+            vec![hex(1)],
+        ),
+        (
+            "negated",
+            cond(big_target(), CompareOp::NotEq, vec![text(&big)]),
+            vec![],
+        ),
+    ];
+    for (layout, sources) in [
+        (
+            "sealed",
+            both_roles(|| vec![sealed_source(dir.path(), &wal, "sealed")]),
+        ),
+        ("tail", both_roles(|| vec![tail_source(&wal, "tail")])),
+    ] {
+        let mut sources = Some(sources);
+        for (name, condition, want) in &queries {
+            let s = sources.take().unwrap_or_else(|| match layout {
+                "sealed" => both_roles(|| vec![sealed_source(dir.path(), &wal, "sealed")]),
+                _ => both_roles(|| vec![tail_source(&wal, "tail")]),
+            });
+            let data = run(s, SearchQuery::new(pred(vec![condition.clone()])));
+            assert_eq!(&ids(&data), want, "{name} on {layout}");
+            assert_eq!(data.status, QueryStatus::Complete, "{name} on {layout}");
+            for t in &data.traces {
+                let value = t.matched_spans[0]
+                    .fields
+                    .iter()
+                    .find(|(k, _)| k == "attributes.big")
+                    .map(|(_, v)| v.len());
+                assert_eq!(
+                    value,
+                    Some(big.len()),
+                    "{name} on {layout}: attached value cut"
+                );
+            }
+        }
+    }
+}

@@ -22,8 +22,10 @@
 //!   and string resolution) only once a lookup finds rows;
 //! - stream batches, EVNB/LNKB and the trace rollup (TRSU) decode lazily,
 //!   once;
-//! - KvId→string resolutions accumulate in a per-session cache, each
-//!   value cut to [`RESOLVED_VALUE_MAX_BYTES`].
+//! - KvId→string resolutions accumulate in a per-session cache; a value
+//!   longer than [`CACHED_VALUE_MAX_BYTES`] is resolved whole for the span
+//!   that needs it and not kept. Values are never cut: predicates and
+//!   canonical selection see what was stored, in every layout.
 //!
 //! Two layers: the bloom and the screen stay for the session's life (a
 //! few KB per file); everything else is the LOADED layer, which
@@ -130,25 +132,12 @@ impl<'a> View<'_, 'a> {
     }
 }
 
-/// The longest value a session resolves, in bytes: ten times the largest
-/// value seen in practice (a ~6 KB stack trace). It bounds what one
-/// materialized span, and the session's string cache, can hold under
-/// hostile input, before any caller's own cap; a longer value is cut at
-/// a character boundary.
-const RESOLVED_VALUE_MAX_BYTES: usize = 64 * 1024;
-
-/// Cut the value of a `key=value` string to [`RESOLVED_VALUE_MAX_BYTES`].
-fn cap_resolved(kv: &mut String) {
-    let value_start = kv.find('=').map_or(0, |i| i + 1);
-    let mut end = value_start.saturating_add(RESOLVED_VALUE_MAX_BYTES);
-    if kv.len() <= end {
-        return;
-    }
-    while !kv.is_char_boundary(end) {
-        end -= 1;
-    }
-    kv.truncate(end);
-}
+/// The longest `key=value` string the session's string cache keeps. The
+/// cache saves re-resolving values that repeat across spans (service
+/// names, methods, routes); a long value rarely repeats, so it is resolved
+/// for the span that needs it and dropped, which keeps the cache's size a
+/// function of the file's short values, not of its longest ones.
+const CACHED_VALUE_MAX_BYTES: usize = 4 * 1024;
 
 fn upgrade_failed() -> crate::Error {
     crate::Error::CorruptIndex("trace session: the file failed to open fully".into())
@@ -514,18 +503,24 @@ impl<'r, 'a> TraceFileSession<'r, 'a> {
         Ok(self.batches[b].as_ref().expect("just populated"))
     }
 
-    /// Resolve `ids` through the per-session cache, fetching only the
-    /// missing ones from the file.
-    fn resolve(&mut self, ids: &mut Vec<u32>) -> Result<(), crate::Error> {
+    /// Resolve `ids` into the per-session cache, fetching only the missing
+    /// ones from the file. Returns the ids of the long values it added,
+    /// which the caller removes once its span is built.
+    fn resolve(&mut self, ids: &mut Vec<u32>) -> Result<Vec<u32>, crate::Error> {
         ids.sort_unstable();
         ids.dedup();
         ids.retain(|id| !self.strings.contains_key(id));
+        let mut long = Vec::new();
         if !ids.is_empty() {
-            let mut resolved = self.view.full()?.resolve_kv_strings(ids)?;
-            resolved.values_mut().for_each(cap_resolved);
-            self.strings.extend(resolved);
+            let resolved = self.view.full()?.resolve_kv_strings(ids)?;
+            for (id, kv) in resolved {
+                if kv.len() > CACHED_VALUE_MAX_BYTES {
+                    long.push(id);
+                }
+                self.strings.insert(id, kv);
+            }
         }
-        Ok(())
+        Ok(long)
     }
 }
 
@@ -600,7 +595,7 @@ impl SpanSource for TraceFileSession<'_, '_> {
         if let Some(lk) = &extras.links {
             needed.extend(lk.all_refs_for_row(pos).map(|id| id.0));
         }
-        self.resolve(&mut needed)?;
+        let long = self.resolve(&mut needed)?;
 
         // Row facets: the `events.`/`links.` tokens exist for search; in
         // the reconstructed span they appear structured instead, so drop
@@ -663,6 +658,10 @@ impl SpanSource for TraceFileSession<'_, '_> {
             .links
             .as_ref()
             .map_or(0, |lk| lk.row_dropped_count(pos));
+        // Every string of this span is built: long values leave the cache.
+        for id in long {
+            self.strings.remove(&id);
+        }
 
         // `kind` from the facet, as `span_refs` reads it (a released
         // session lost the cached values).
@@ -717,22 +716,5 @@ impl SpanSource for TraceFileSession<'_, '_> {
         self.rollup = None;
         self.resolver = None;
         self.emptied();
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn resolved_values_are_cut_at_a_character_boundary() {
-        let mut kv = format!("k={}", "é".repeat(RESOLVED_VALUE_MAX_BYTES));
-        cap_resolved(&mut kv);
-        // "é" is two bytes: the cut lands on a boundary at the cap.
-        assert_eq!(kv.len(), 2 + RESOLVED_VALUE_MAX_BYTES);
-        let mut kv = format!("k={}x", "a".repeat(RESOLVED_VALUE_MAX_BYTES - 1));
-        let before = kv.clone();
-        cap_resolved(&mut kv);
-        assert_eq!(kv, before, "at the cap: untouched");
     }
 }
