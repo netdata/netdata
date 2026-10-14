@@ -5,11 +5,12 @@
 //!
 //! Folds per-trace aggregates from BOTH source shapes — sealed files'
 //! `TRSU` rollup rows and WAL tails' decoded-span folds (parity
-//! test-pinned) — into one map keyed by trace id (sealed-file rotation
-//! is content-agnostic: a trace's spans straddle files and tails),
-//! then bins each merged trace into the (time bucket × log-scale
-//! duration bin) grid by its ENVELOPE (min start; saturating max end
-//! − min start).
+//! test-pinned) — per trace id (sealed-file rotation is
+//! content-agnostic: a trace's spans straddle files and tails): a trace
+//! held by one source bins from that source alone, the others merge in
+//! a capped remainder map (`fold` module docs), and each trace bins
+//! into the (time bucket × log-scale duration bin) grid by its ENVELOPE
+//! (min start; saturating max end − min start).
 //!
 //! Pinned semantics:
 //!

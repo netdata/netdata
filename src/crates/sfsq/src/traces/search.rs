@@ -23,15 +23,19 @@
 //!   file discovery did not compile compiles for evidence alone) — and,
 //!   when it matches, its row is built from its holders' rollup parts
 //!   (`TRSU` + `TRSS`) and the tails' decoded spans: no span assembles.
-//! - **Fallback (assembly):** a candidate the evidence keeps but whose
-//!   row cannot be built that way — a holder sealed before `TRSS`, a
-//!   rollup that fails to read, a breached ceiling — assembles through
-//!   the shared combiner over ALL completion sources (sessions opened
-//!   once, reused for every candidate — the by-id pattern), every token
-//!   re-evaluates against the retained CANONICAL spans, and a non-match
-//!   drops. Such a trace lists only when both agree (decision 52): a
-//!   negated token any stored copy matches has already excluded it, and
-//!   its row numbers are canonical. The gates pre-filter only this path.
+//! - **Fallback (assembly):** a candidate whose row cannot be built that
+//!   way — a holder sealed before `TRSS`, a rollup or evidence read that
+//!   fails — and every candidate once the rows ceiling is breached, or
+//!   of a query whose window holds no `TRSS` file (the rows path is then
+//!   skipped), assembles through the shared combiner over ALL completion
+//!   sources (sessions opened once, reused for every candidate — the
+//!   by-id pattern), every token re-evaluates against the retained
+//!   CANONICAL spans, a non-match drops, and the row numbers are
+//!   canonical. When the rows path decided first, its stored-row
+//!   evidence has already excluded a trace any stored copy of which
+//!   matches a negated token, so the trace lists only when both agree;
+//!   otherwise the canonical verdict alone decides (decision 52). The
+//!   gates pre-filter only this path.
 //!
 //! # Tokens
 //!
@@ -40,14 +44,16 @@
 //! within a token; different tokens may match different spans, in any
 //! files); a negated one when none does (NOT EXISTS — an in-token `!=`
 //! instead keeps presence ∩ complement on one span). Trace-level tokens
-//! test the assembled trace (below), negated ones its negation; `trace_id`
-//! tokens pin or exclude candidates.
+//! test the trace's merged row (on the fallback, the assembled trace;
+//! below), negated ones its negation; `trace_id` tokens pin or exclude
+//! candidates.
 //!
 //! The driver is the positive span-local token with the fewest in-window
 //! matches in the window tails plus the newest window file (ties: the
 //! earlier token), fixed for the query; without one, the empty plan (C-4:
-//! every in-window span). Every answer has an in-window canonical span
-//! matching the driver, so any driver finds every answer.
+//! every in-window span). Every answer has an in-window stored span
+//! matching the driver (on the fallback, a canonical one, which is
+//! stored too), so any driver finds every answer.
 //!
 //! A trace's rank is the OLDEST of its positive span-local tokens' newest
 //! matching span starts (its newest in-window span without such a token):
@@ -56,9 +62,10 @@
 //! stays sound.
 //!
 //! Every window file compiles all positive span-local tokens together
-//! when there are two or more; the other tokens' sets feed the token gate
-//! ([`gate`](super::gate)), which prunes a candidate held by one file
-//! alone when some token matches none of its rows there.
+//! (the empty plan without one) plus the negated tokens' positive forms.
+//! The sets are the rows path's token evidence, and they feed the token
+//! gate ([`gate`](super::gate)), which prunes a candidate whose in-window
+//! rows in every window holder miss some positive token.
 //!
 //! # Rollup discovery
 //!
@@ -70,7 +77,7 @@
 //! whole trace is decided on the spot by the gate's rules; the rest rank
 //! by `min(max_end, the file's bound)`, which is at or above every
 //! in-window span start the trace has in that file, so the raw rank still
-//! bounds the canonical one (C-1) and the loop examines them newest
+//! bounds the final one (C-1) and the loop examines them newest
 //! bound first. Without the proof (its budget passed, a file without a
 //! rollup) the query discovers from spans.
 //!
@@ -82,8 +89,9 @@
 //! # Ranking and refill (pins C-1, R2-1)
 //!
 //! The phase-1 raw rank — `(newest matched raw-span start, trace_id)` —
-//! is an UPPER BOUND on the canonical rank and orders only the candidate
-//! frontier; the FINAL ordering is by canonical matched-span start. The
+//! is an UPPER BOUND on the final rank (the row's, or the canonical one
+//! on the fallback) and orders only the candidate frontier; the FINAL
+//! ordering is by that rank. The
 //! loop keeps examining (and, when the discovered pool runs dry,
 //! grow-K-refilling each unexhausted file's next position band) while an
 //! unexamined or undiscovered candidate could still outrank the
@@ -163,10 +171,12 @@
 //! so it is not reported; corruption found mid-query (a window file's
 //! dictionary at its compile, a file's rows at a merge) degrades every
 //! assembly from that point on, while traces assembled before it stay
-//! exact. Window files also compile lazily, newest first
+//! exact. Window files also compile lazily for discovery, newest first
 //! (by the rank bound their summaries give), and only while that bound
-//! can still beat the N-th result: an older file is never compiled, and
-//! a work ceiling stops after the newest files, not in source-id order.
+//! can still beat the N-th result, so a work ceiling stops after the
+//! newest files, not in source-id order. An older file compiles only
+//! when a candidate's evidence needs it (under rollup discovery it then
+//! stays pending for discovery).
 //!
 //! Memory stays bounded however many files the completion set holds: each
 //! session keeps only its bloom and a tight screen for the whole query,
@@ -209,7 +219,7 @@ pub const SERVICE_BREAKDOWN_TOP_K: usize = 5;
 /// the demand-driven refill doubles it per round.
 const OVER_COLLECTION_FACTOR: usize = 3;
 /// Assembled-traces ceiling, multiplier side: at most `limit ×` this
-/// combiner runs per query.
+/// matching rows and combiner runs per query.
 const ASSEMBLED_CEILING_FACTOR: usize = 16;
 /// Assembled-traces ceiling, floor side: the cap never drops below
 /// this, so small limits still bound loop churn.
@@ -485,8 +495,8 @@ pub struct ServiceBreakdown {
 /// honestly.
 #[derive(Debug)]
 pub struct SearchData {
-    /// Most-recent-first by canonical matched-span start (`trace_id`
-    /// tiebreak), at most `limit`.
+    /// Most-recent-first by rank (`TraceSummary::newest_matched_start_ns`,
+    /// `trace_id` tiebreak), at most `limit`.
     pub traces: Vec<TraceSummary>,
     pub status: QueryStatus,
 }
@@ -715,8 +725,8 @@ fn window_tail_evidence(
 }
 
 /// What the holder probe reads and may grow: the sessions, their limit,
-/// the compiled window files' sets (a pending holder compiles on demand
-/// and joins discovery), and the per-file plan layout.
+/// the compiled window files' sets (a holder without sets compiles on
+/// demand; see `span_discovery`), and the per-file plan layout.
 struct HolderReads<'c, 'r, 'a> {
     sessions: &'c mut [sfst::TraceFileSession<'r, 'a>],
     loaded: &'c mut sfst::LoadedSources,
@@ -1347,7 +1357,7 @@ fn outranks(a: (i64, TraceId), b: (i64, TraceId)) -> bool {
 /// already made the whole query Partial{SizeCap} at assembly.)
 struct Assembled {
     summary: TraceSummary,
-    /// Canonical rank: (newest matched canonical span start, trace_id).
+    /// Final rank: (the summary's `newest_matched_start_ns`, trace_id).
     rank: (i64, TraceId),
 }
 

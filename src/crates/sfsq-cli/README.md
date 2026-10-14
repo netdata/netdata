@@ -245,7 +245,8 @@ newest matching span; with none, the start of the newest span in the
 window. When a value is not set, the line shows
 `<no service>` or `<unnamed>`. The counts include each stored copy of a
 resent span. The suffix `[inexact]` shows that a source of that trace
-failed, so its numbers can be too low. A final `N trace(s), status …` line gives the count and `complete`, or
+failed, so its numbers can be too low. A final `N trace(s), status …`
+line gives the count and `complete`, or
 `PARTIAL` with the reasons.
 
 ## Examples

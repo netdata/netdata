@@ -1475,6 +1475,10 @@ impl LoweredTokens {
     /// holds only if NO span matches. An inexact assembly is then
     /// indeterminate and excluded (decision 15). Positive span-local
     /// tokens need no such care: a match found is a match.
+    pub(crate) fn needs_whole_trace(&self) -> bool {
+        self.has_trace_level() || !self.negated.is_empty()
+    }
+
     /// Whether a trace-level token reads the root: an unknown root
     /// (a withheld claim) is then indeterminate, either polarity.
     pub(crate) fn reads_root(&self) -> bool {
@@ -1485,10 +1489,6 @@ impl LoweredTokens {
                 .trace_level_negated
                 .iter()
                 .any(TraceLevelEval::reads_root)
-    }
-
-    pub(crate) fn needs_whole_trace(&self) -> bool {
-        self.has_trace_level() || !self.negated.is_empty()
     }
 
     /// The trace-level verdict on an exact assembled trace's TRUE-root
@@ -1580,7 +1580,6 @@ enum TraceLevelCondition {
 }
 
 impl TraceLevelEval {
-    /// Compile the trace-level predicate half (validated, evaluable).
     /// Whether a condition reads the root (name or service).
     pub(crate) fn reads_root(&self) -> bool {
         self.conditions
@@ -1588,6 +1587,7 @@ impl TraceLevelEval {
             .any(|c| !matches!(c, TraceLevelCondition::Duration { .. }))
     }
 
+    /// Compile the trace-level predicate half (validated, evaluable).
     pub(crate) fn new(trace_level: &Predicate) -> Self {
         let conditions = trace_level
             .conditions

@@ -1,5 +1,6 @@
-//! The per-file rollup root-ref resolver — the string seam behind the
-//! sfsq trace-level gate. The gate tests a rollup row's root refs
+//! The per-file rollup ref resolver — the string seam behind the sfsq
+//! trace-level gate and the search rows path (which also resolves the
+//! `TRSS` per-service refs). The gate tests a rollup row's root refs
 //! ([`TraceRollup::root_service_refs`](crate::TraceRollup::root_service_refs)
 //! and [`root_name_refs`](crate::TraceRollup::root_name_refs),
 //! file-interner [`KvId`](crate::KvId)s into the root fields'

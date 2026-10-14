@@ -926,8 +926,8 @@ pub fn run_search(args: &SearchArgs, out: &mut dyn std::io::Write) -> Result<()>
         Arc::new(AtomicUsize::new(0)),
     )?;
 
-    // `[inexact]` marks a trace whose assembly was capped or degraded —
-    // its summary numbers may undercount (the engine's `exact` flag).
+    // `[inexact]` marks a trace with a failed source (or a capped
+    // fallback assembly) — its numbers may undercount (`exact`).
     for t in &data.traces {
         writeln!(
             out,

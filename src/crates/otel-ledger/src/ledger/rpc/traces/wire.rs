@@ -782,10 +782,11 @@ impl From<sfst::FieldTier> for TierWire {
 /// One search page: bounded most-recent-first trace summaries. Summary
 /// numbers count STORED rows (a resent span counts each time it was
 /// stored), read from the files' trace rollups over the match window
-/// widened by the completion slack (at least 1 h per side); a trace
+/// widened by the completion slack (at least 1 h per side). A trace
 /// touching a file sealed before the rollup stats is assembled instead
-/// (canonical figures). A row's `exact` is false when a source failed
-/// (numbers may undercount). Spans in files beyond that range are
+/// (canonical figures), as is one whose rollup read failed and every
+/// trace past the rows work ceiling. A row's `exact` is false when a
+/// source failed (numbers may undercount). Spans in files beyond that range are
 /// unknown, not counted.
 #[derive(Debug, Serialize)]
 pub struct SearchResult {
@@ -872,10 +873,11 @@ pub struct AnchorWire {
 /// edges: it shows a trace whose envelope starts before the
 /// grid while the grid's bin-by-envelope-start rule drops it, the
 /// grid's window is the page's aligned to whole buckets, so a match in
-/// the widened band bins a trace the page excludes, a positive root
-/// chip passes in the grid on ANY source's recorded root while the page
-/// reads the earliest one, and a `trace_fragments` grid counts some
-/// traces per file.
+/// the widened band bins a trace the page excludes, root chips read ANY
+/// source's recorded root in the grid (a positive chip passes on any
+/// match, a negated one fails on any match or any withheld claim) while
+/// the page reads the earliest claim, and a `trace_fragments` grid
+/// counts some traces per file.
 #[derive(Debug, Serialize)]
 pub struct OverviewSection {
     /// The section's own version, independent of the enclosing result's.
@@ -884,8 +886,8 @@ pub struct OverviewSection {
     /// never hardcode.
     pub unit: &'static str,
     /// The AGGREGATE's completeness. Separate from the page's because
-    /// the reasons do not overlap: `overview_ceiling` and
-    /// `rollup_absent` can only come from this pass and only ever
+    /// the reasons do not overlap: `overview_ceiling`, `rollup_absent`
+    /// and `trace_fragments` can only come from this pass and only ever
     /// affect these numbers, while the page's `size_cap` can only come
     /// from its own assembly — one merged array would name a reason
     /// without naming the number it hit.
@@ -905,7 +907,9 @@ pub struct TraceSummaryWire {
     pub trace_id: String,
     /// The root span's `service.name` resource attribute: the earliest
     /// stored span without a parent. Absent when the root carries none,
-    /// when no root span was stored, or when stored copies disagree.
+    /// when no root span was stored, or when stored copies disagree. An
+    /// assembled row (see [`SearchResult`]) shows the orphan-promoted
+    /// display root instead when no span lacks a parent.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub root_service: Option<String>,
     /// The root span's name (absent as `root_service` is).
