@@ -26,11 +26,11 @@
 //! ([`logs::LogsShard`]), so a query can fan out and aggregate.
 //! [`logs::run`] is the all-in-one local entry point.
 //!
-//! [`traces`] — trace queries over the same source kinds, with five
+//! [`traces`] — trace queries over the same source kinds, with four
 //! operation surfaces: [`traces::trace_by_id`] (cross-source assembly
 //! through one shared combiner, `sfst::trace_combine`),
-//! [`traces::search()`], [`traces::overview()`], [`traces::slowest()`],
-//! and attribute enumeration. Unlike logs there is no silent
+//! [`traces::search()`], [`traces::overview()`], and attribute
+//! enumeration. Unlike logs there is no silent
 //! degradation: a source that fails is an explicit partial
 //! ([`traces::QueryStatus`]), and source identity is validated up
 //! front — duplicate ids and overlapping WAL ranges are rejected.
@@ -49,8 +49,7 @@
 //! - `traces/` — `sources` (validated source identity), `predicate`
 //!   (the shared predicate AST), `status` (the partial-result
 //!   contract), and one module per operation (`by_id`, `search` with
-//!   its `gate` pre-assembly filter, `overview`, `slowest`,
-//!   `attributes`); `fold` merges cross-source aggregates over
+//!   its `gate` pre-assembly filter, `overview`, `attributes`); `fold` merges cross-source aggregates over
 //!   `rollup`'s per-trace shapes; `vocab`/`window`/`wal_scan` are
 //!   shared support.
 //!

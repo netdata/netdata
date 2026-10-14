@@ -1,6 +1,6 @@
 //! Multi-source trace-query subsystem: cross-source trace-by-id,
 //! attribute / attribute-value enumeration, search, and the
-//! trace-level aggregates (overview, slowest).
+//! trace-level overview aggregate.
 //!
 //! Same philosophy as [`logs`](crate::logs): neutral, transport-free —
 //! plain Rust data in and out, no wire concerns; each consumer (the CLI,
@@ -26,7 +26,7 @@
 //! of three ways — span assembly through the shared combiner
 //! `sfst::trace_combine` ([`trace_by_id`]; [`search()`], whose phase-2
 //! assembly the gate pre-filters), assembly-free trace-level
-//! aggregates ([`overview()`], [`slowest()`]) folded by `fold` over
+//! aggregates ([`overview()`]) folded by `fold` over
 //! `rollup`'s per-trace shapes, or dictionary enumeration
 //! ([`attribute_names`] / [`attribute_values`]).
 //!
@@ -45,9 +45,8 @@
 //!   assembly only when the rollup evidence proves a non-match.
 //! - overview — [`overview()`]: the trace-density grid (time bucket ×
 //!   duration bin) over stored-row statistics.
-//! - slowest — [`slowest()`]: top-K traces ranked by envelope duration.
-//! - fold / rollup — the aggregate machinery behind overview, slowest,
-//!   and the root facets: per-trace shapes from both source kinds
+//! - fold / rollup — the aggregate machinery behind overview and its
+//!   root facets: per-trace shapes from both source kinds
 //!   (sealed `TRSU` rows; tails' decoded-span folds, parity
 //!   test-pinned), merged by one cross-source fold.
 //! - attributes — [`attribute_names`] / [`attribute_values`]:
@@ -69,7 +68,6 @@ mod overview;
 mod predicate;
 mod rollup;
 mod search;
-mod slowest;
 mod sources;
 mod status;
 mod vocab;
@@ -98,10 +96,6 @@ pub use search::{
     DEFAULT_SEARCH_LIMIT, DEFAULT_SPANS_PER_TRACE, SERVICE_BREAKDOWN_TOP_K, SPANS_PER_TRACE_MAX,
     SearchData, SearchQuery, SearchRequestError, SearchSources, ServiceBreakdown, TraceSummary,
     search,
-};
-pub use slowest::{
-    DEFAULT_SLOWEST_LIMIT, SLOWEST_LIMIT_MAX, SlowTrace, SlowestData, SlowestQuery,
-    SlowestRequestError, slowest,
 };
 pub use sources::{
     SourceId, SourceSetError, TraceSfstCandidate, TraceSource, TraceUnavailable, TraceWalTail,

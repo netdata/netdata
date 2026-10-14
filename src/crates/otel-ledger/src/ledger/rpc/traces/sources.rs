@@ -135,7 +135,7 @@ impl TracesSourceSupplier {
 
     /// One snapshot, `copies` identical source vectors: a thin wrapper
     /// over [`capture_ranges`](Self::capture_ranges) repeating the same
-    /// window. The one-shot modes (trace, overview/slowest, the
+    /// window. The one-shot modes (trace, overview, the
     /// enumeration pair) capture one copy each; search instead hands its
     /// completion range to both roles through
     /// [`capture_ranges`](Self::capture_ranges) — see there.

@@ -24,8 +24,7 @@
 //!   `FunctionsParams::search_params`: defaults, relative-window
 //!   resolution, and the duration-filter forwarding;
 //! - per-mode param objects: self-contained windows, the overview
-//!   grid's selections-but-no-duration-bounds rule, the slowest limit,
-//!   and the `overview_facets` knob's `Option<bool>` semantics;
+//!   grid's selections-but-no-duration-bounds rule, and the `overview_facets` knob's `Option<bool>` semantics;
 //! - `InfoResponse`'s exact descriptor JSON and the untagged response
 //!   envelope;
 //! - `StatusWire` serialization: the two status shapes, deterministic
@@ -185,10 +184,6 @@ fn each_selector_selects_its_mode() {
         TracesMode::Overview(_)
     ));
     assert!(matches!(
-        req(json!({"slowest": {}})).mode,
-        TracesMode::Slowest(_)
-    ));
-    assert!(matches!(
         req(json!({"search": {}})).mode,
         TracesMode::Search(_)
     ));
@@ -203,7 +198,6 @@ fn a_present_but_null_selector_selects_then_rejects() {
     for (body, needle) in [
         (json!({"trace": null}), "invalid trace selector"),
         (json!({"overview": null}), "invalid overview selector"),
-        (json!({"slowest": null}), "invalid slowest selector"),
         (json!({"search": null}), "invalid search selector"),
     ] {
         let err = req_err(body.clone());
@@ -306,9 +300,9 @@ fn conflicting_selectors_are_a_client_error() {
         err.contains("conflicting mode selectors: trace, overview"),
         "{err}"
     );
-    let err = req_err(json!({"overview": {}, "slowest": {}}));
+    let err = req_err(json!({"overview": {}, "search": {}}));
     assert!(
-        err.contains("conflicting mode selectors: overview, slowest"),
+        err.contains("conflicting mode selectors: overview, search"),
         "{err}"
     );
     // info is a PEER selector — no precedence.
@@ -397,10 +391,6 @@ fn windowed_mode_objects_carry_their_own_window() {
         panic!("attribute_values mode expected");
     };
     assert_eq!((p.after, p.before), (5, 6));
-    let TracesMode::Slowest(p) = req(json!({"slowest": {"after": 7, "before": 8}})).mode else {
-        panic!("slowest mode expected");
-    };
-    assert_eq!((p.after, p.before), (7, 8));
 
     // Omitted windows keep the 0 = "unspecified" sentinel — the
     // adapter's resolve_window defaults are untouched.
@@ -463,7 +453,7 @@ fn info_response_shape_is_pinned() {
             "v": 3,
             "accepted_params": [
                 "info", "trace", "attributes", "attribute_values", "overview",
-                "slowest", "search", "tenant", "after", "before", "last", "anchor", "selections",
+                "search", "tenant", "after", "before", "last", "anchor", "selections",
                 "min_trace_duration_ns", "max_trace_duration_ns", "overview_facets"
             ],
             "required_params": [],
@@ -517,7 +507,6 @@ fn every_partial_reason() -> Vec<PartialReason> {
         PartialReason::Cancelled,
         PartialReason::OverviewCeiling,
         PartialReason::RollupAbsent,
-        PartialReason::SlowestCeiling,
         PartialReason::RemoteUnavailable,
     ];
     for reason in &all {
@@ -528,7 +517,6 @@ fn every_partial_reason() -> Vec<PartialReason> {
             | PartialReason::Cancelled
             | PartialReason::OverviewCeiling
             | PartialReason::RollupAbsent
-            | PartialReason::SlowestCeiling
             | PartialReason::RemoteUnavailable => {}
         }
     }
@@ -546,8 +534,7 @@ fn every_partial_reason_wire_name_is_pinned() {
         serde_json::to_value(&wire).unwrap(),
         json!({"partial": [
             "size_cap", "source_failure", "work_ceiling", "cancelled",
-            "overview_ceiling", "rollup_absent", "slowest_ceiling",
-            "remote_unavailable"
+            "overview_ceiling", "rollup_absent", "remote_unavailable"
         ]})
     );
 }
@@ -578,25 +565,6 @@ fn every_partial_reason_is_in_the_published_schema() {
             "{name} is not in {path}: {published:?}"
         );
     }
-}
-
-#[test]
-fn slowest_params_reject_junk_and_unknown_fields() {
-    for (body, needle) in [
-        (json!({"slowest": 7}), "invalid slowest selector"),
-        (json!({"slowest": {"bogus": 1}}), "unknown field"),
-    ] {
-        let err = req_err(body.clone());
-        assert!(err.contains(needle), "for {body}: {err}");
-    }
-    let TracesMode::Slowest(p) = req(json!({"slowest": {}})).mode else {
-        panic!("slowest mode expected");
-    };
-    assert_eq!(p.limit, None);
-    let TracesMode::Slowest(p) = req(json!({"slowest": {"limit": 5}})).mode else {
-        panic!("slowest mode expected");
-    };
-    assert_eq!(p.limit, Some(5));
 }
 
 #[test]

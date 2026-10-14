@@ -374,7 +374,7 @@ async fn progress_counts_the_downloads_beside_the_sources() {
 }
 
 /// The windowed aggregate modes over the corpus window.
-fn aggregate_bodies() -> [serde_json::Value; 4] {
+fn aggregate_bodies() -> [serde_json::Value; 3] {
     let window = |mode: &str, extra: serde_json::Value| {
         let mut params = json!({"after": T_S, "before": T_S + 100});
         params
@@ -385,7 +385,6 @@ fn aggregate_bodies() -> [serde_json::Value; 4] {
     };
     [
         window("overview", json!({"facets": true})),
-        window("slowest", json!({})),
         window("attributes", json!({})),
         window("attribute_values", json!({"key": "resource.service.name"})),
     ]
@@ -417,9 +416,6 @@ async fn every_aggregate_mode_reports_a_failed_download() {
             "{body}"
         );
     }
-    // What the downloaded file holds is still served.
-    let v = call(&h, aggregate_bodies()[1].clone()).await.unwrap();
-    assert_eq!(traces_of(&v), ["0b", "0a"]);
 }
 
 #[tokio::test]
@@ -429,7 +425,7 @@ async fn a_lost_file_outside_the_window_does_not_make_an_answer_partial() {
     let (h, remote, [_, two]) = evicted_setup(64 * MIB).await;
     remote.lose(&two);
 
-    for mode in ["overview", "slowest", "attributes"] {
+    for mode in ["overview", "attributes"] {
         let body = json!({ mode: {"after": T_S + 5, "before": T_S + 25} });
         let v = call(&h, body.clone()).await.unwrap();
         assert_eq!(v["status"], json!({"complete": true}), "{body}");

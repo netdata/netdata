@@ -1,5 +1,5 @@
 //! Trace-level aggregates WITHOUT assembly: the neutral per-trace
-//! shape the cross-source folds (overview, slowest) consume from BOTH
+//! shape the cross-source fold (overview) consumes from BOTH
 //! source kinds:
 //!
 //! - **Sealed files / chunks** carry the `TRSU` rollup chunk
@@ -23,7 +23,7 @@
 //! folding a tail equals reading the `TRSU` of sealing the same data.
 //! The shared fold (`fold.rs`) picks the sealed view per caller —
 //! envelopes for the overview grid, the root-resolving view for
-//! slowest and the overview's root facets.
+//! the overview's root facets.
 
 use std::collections::HashMap;
 
@@ -157,7 +157,7 @@ pub fn tail_trace_aggregates(scan: &TraceWalScan) -> Vec<TraceAggregate> {
 /// grid path. `root` is always `None` here (UNRESOLVED, not honest-absent):
 /// resolving roots needs the root-field dictionaries decoded, and the
 /// overview grid discards roots anyway. Root-consuming callers
-/// (slowest, the overview's root-facet lists) use
+/// (the overview's root-facet lists) use
 /// [`sealed_trace_aggregates`].
 ///
 /// Precondition: `rollup` comes from `IndexReader::trace_rollup()` (the

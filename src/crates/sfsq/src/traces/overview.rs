@@ -463,7 +463,7 @@ pub(crate) struct FoldedTail {
 /// and the search rows' service breakdown so both rank identically.
 pub(crate) fn top_k<V: Ord>(mut entries: Vec<(V, u64)>, k: usize) -> (Vec<(V, u64)>, FoldedTail) {
     let rank = |a: &(V, u64), b: &(V, u64)| b.1.cmp(&a.1).then_with(|| a.0.cmp(&b.0));
-    // Select-then-sort, like the slowest top-K: O(n + K log K).
+    // Select-then-sort: O(n + K log K).
     let mut tail = FoldedTail::default();
     if entries.len() > k {
         entries.select_nth_unstable_by(k - 1, rank);

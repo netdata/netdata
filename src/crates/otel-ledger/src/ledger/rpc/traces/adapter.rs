@@ -17,15 +17,15 @@ use std::collections::HashMap;
 use sfsq::traces::{
     AttributeKey, AttributeNamesData, AttributeOwner, AttributeValuesData, BuiltinField, CompareOp,
     Condition, DURATION_BIN_LABELS, DurationPercentiles, FieldKinds, OverviewData, Predicate,
-    PredicateTarget, PredicateValue, SearchData, SlowestData, TraceData,
+    PredicateTarget, PredicateValue, SearchData, TraceData,
 };
 
 use super::wire::{
     AnchorWire, AttributeValueWire, AttributeValuesResult, AttributesResult, CoverageWire,
     EventWire, FacetListWire, FacetValueWire, FieldKindsWire, LinkWire, OverviewGridWire,
     OverviewPercentilesWire, OverviewResult, OverviewSection, OverviewTotals, SearchItems,
-    SearchResult, ServiceBreakdownWire, ServiceSpansWire, SlowestResult, SlowestTraceWire,
-    SpanWire, StatusWire, TraceItems, TraceResult, TraceSummaryWire,
+    SearchResult, ServiceBreakdownWire, ServiceSpansWire, SpanWire, StatusWire, TraceItems,
+    TraceResult, TraceSummaryWire,
 };
 
 /// Parse a W3C text-form trace id: exactly 32 hex chars (16 bytes),
@@ -538,42 +538,6 @@ pub(crate) fn to_overview_section(
         totals: parts.totals,
         top_root_services: parts.top_root_services,
         top_root_operations: parts.top_root_operations,
-    }
-}
-
-// ── Slowest: engine data → wire ─────────────────────────────────────
-
-/// Shape the duration-ranked top-K into the wire result. `limit` is the
-/// resolved request limit (`items.max_to_return`); the engine already
-/// truncated to it.
-pub(crate) fn to_slowest_result(data: SlowestData, limit: usize) -> SlowestResult {
-    SlowestResult {
-        mode: "slowest",
-        version: 1,
-        status: StatusWire::from(&data.status),
-        items: SearchItems {
-            returned: data.traces.len(),
-            max_to_return: limit,
-        },
-        traces: data
-            .traces
-            .into_iter()
-            .map(|t| {
-                let (root_service, root_name) = match t.root {
-                    Some(r) => (r.service, r.name),
-                    None => (None, None),
-                };
-                SlowestTraceWire {
-                    trace_id: t.trace_id.to_string(),
-                    root_service,
-                    root_name,
-                    start_ns: t.min_start_ns,
-                    duration_ns: t.duration_ns,
-                    span_count: t.span_count,
-                    error_count: t.error_count,
-                }
-            })
-            .collect(),
     }
 }
 

@@ -28,7 +28,7 @@ pub struct TimeWindow {
 /// attributes) wrap this via `#[from]` — the per-op wrap pattern.
 /// Search and attributes never construct a window (only the overview
 /// does, from its grid), so their variant keeps the error surface
-/// uniform; `slowest` takes an already-built window and has none.
+/// uniform.
 #[derive(Debug, thiserror::Error)]
 pub enum WindowError {
     #[error("invalid time window [{start_ns}, {end_ns}): start must be before end")]
@@ -45,8 +45,7 @@ impl TimeWindow {
 
     /// Whether `t_ns` lies in the window — the span-start test (search
     /// decision 5: a span is in the window iff its START is). Consumed
-    /// per-span by the predicate evaluator and once per merged trace by
-    /// slowest's rank filter (on the envelope start).
+    /// per-span by the predicate evaluator.
     pub(crate) fn contains(&self, t_ns: i64) -> bool {
         self.start_ns <= t_ns && t_ns < self.end_ns
     }

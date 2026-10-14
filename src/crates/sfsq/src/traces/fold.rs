@@ -1,7 +1,6 @@
 //! The shared cross-source trace-aggregate merge — ONE implementation
 //! of the source loop and merge rule behind every trace-level
-//! aggregate mode: [`overview`](super::overview) and
-//! [`slowest`](super::slowest) (the overview's opt-in root-facet
+//! aggregate: [`overview`](super::overview) (its opt-in root-facet
 //! lists read the same map), so the engine-op contract cannot drift
 //! between them. The logs engine composes its own aggregate → merge →
 //! page pipeline; this is the traces twin.
@@ -73,7 +72,7 @@ use sfst::{ScanWork, TracePlan};
 
 /// How a caller parameterizes the shared fold.
 pub(crate) struct SourceFoldSpec {
-    /// The op name for log lines (`"overview"`, `"slowest"`, …).
+    /// The op name for log lines (`"overview"`, …).
     pub op: &'static str,
     /// The caller's visited budget (rollup rows + tail spans), shared
     /// with the filter's scans (see the module docs).

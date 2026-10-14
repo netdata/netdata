@@ -1,6 +1,6 @@
 //! Shared fixtures for the sfsq traces integration suites: every
 //! `tests/traces_*.rs` binary declares `mod common;` (attributes,
-//! by_id, gate, overview, rollup_tail, search, slowest); the
+//! by_id, gate, overview, rollup_tail, search); the
 //! ng_wal_equivalence.rs logs harness builds its own fixtures instead.
 //! Contents: OTLP span specs and request builders, a WAL writer running
 //! the production normalize→flatten→encode pipeline, and `TraceSource`
@@ -374,8 +374,8 @@ pub fn missing_source(dir: &Path, id: &str, min_s: u32, max_s: u32) -> TraceSour
 }
 
 /// A minimal valid SFST WITHOUT the optional `TRSU` trace-rollup chunk —
-/// a hand-built pre-rollup ("legacy") file. The overview and slowest
-/// suites use it to pin the never-mixed rule: a rollup-less file
+/// a hand-built pre-rollup ("legacy") file. The overview suite
+/// uses it to pin the never-mixed rule: a rollup-less file
 /// contributes no traces to rollup-backed results and the status reports
 /// `RollupAbsent`. Returns the sealed-file source wrapping it.
 pub fn legacy_sfst_source(dir: &Path, name: &str) -> TraceSource {

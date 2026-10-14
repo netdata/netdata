@@ -33,7 +33,7 @@
 //!   completion-coverage vs frozen-window split.
 //!
 //! Not pinned here: `validate_trace_bounds` and the overview /
-//! slowest / attributes converters (covered end-to-end by the
+//! attributes converters (covered end-to-end by the
 //! handler tests) and request deserialization (the wire tests).
 use super::*;
 use serde_json::json;

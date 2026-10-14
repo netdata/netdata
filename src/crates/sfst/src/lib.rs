@@ -211,7 +211,7 @@ const CHUNK_EVENTS: chunk_file::ChunkId = *b"EVNB";
 const CHUNK_LINKS: chunk_file::ChunkId = *b"LNKB";
 // Optional per-file trace rollup (cold region, after the span structures —
 // matching the writer stage order): one row per distinct set trace id — the
-// trace-level aggregate for overview/slowest/facet folds without assembly.
+// trace-level aggregate for overview/facet folds without assembly.
 // Same additive TOC-indexed contract as TIDX (see `trace_rollup`).
 const CHUNK_TRACE_ROLLUP: chunk_file::ChunkId = *b"TRSU";
 // Optional per-file trace-id bloom (cold region, after TIDX): a serialized

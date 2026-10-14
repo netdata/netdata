@@ -1,6 +1,6 @@
 //! Query-level result status — the no-silent-degrade contract.
 //!
-//! Every traces operation — trace-by-id, search, overview, slowest,
+//! Every traces operation — trace-by-id, search, overview,
 //! attribute names/values — returns a [`QueryStatus`] beside its data:
 //! [`Complete`](QueryStatus::Complete) means every relevant source was
 //! successfully and fully examined; [`Partial`](QueryStatus::Partial)
@@ -60,12 +60,6 @@ pub enum PartialReason {
     /// writes no chunk by the seal's `is_meaningful` rule, and
     /// exclusion loses nothing.
     RollupAbsent,
-    /// The slowest mode's visited-rows ceiling was hit before every
-    /// in-window source was folded: the ranking covers the
-    /// deterministic prefix of sources ([`SourceId`](super::SourceId)
-    /// order) processed so far — the true slowest trace may live in an
-    /// unvisited source.
-    SlowestCeiling,
     /// A source's bytes could not be obtained from remote storage (the
     /// download failed, or the catalog listing the file could not be
     /// read): spans that may live there are absent. Distinct from

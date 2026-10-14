@@ -1,10 +1,10 @@
 //! Netdata function wire types for `otel-traces`.
 //!
 //! The transport layer between the netdata function protocol and the
-//! wire-neutral `sfsq::traces` engine. One Function view plus seven
+//! wire-neutral `sfsq::traces` engine. One Function view plus six
 //! explicit peer modes, each selected by exactly one top-level
 //! sub-object — `info`, `trace`, `attributes`, `attribute_values`,
-//! `overview`, `slowest`, `search` — the mode's params self-contained
+//! `overview`, `search` — the mode's params self-contained
 //! in its object. A request without a selector is the Functions view:
 //! standard Functions parameters around the native search payload,
 //! wrapped as `type: "traces"`. Explicit modes keep their native
@@ -28,7 +28,7 @@ use sfsq::traces::{PartialReason, QueryStatus};
 
 /// Request param names accepted by this function, advertised to the UI
 /// in `InfoResponse::accepted_params`. The rule: the list carries
-/// exactly the TOP-LEVEL keys — the seven mode selectors, `tenant`, and
+/// exactly the TOP-LEVEL keys — the six mode selectors, `tenant`, and
 /// every field the implicit Functions view reads, its own duration band
 /// and `overview_facets` opt-in included. `selections` is listed for
 /// the same reason: it is how the filter rail's picks travel, and a
@@ -46,7 +46,6 @@ pub const ACCEPTED_PARAMS: &[&str] = &[
     "attributes",
     "attribute_values",
     "overview",
-    "slowest",
     "search",
     "tenant",
     "after",
@@ -59,7 +58,7 @@ pub const ACCEPTED_PARAMS: &[&str] = &[
     "overview_facets",
 ];
 
-/// The raw top-level shape: the seven mode selectors and supported
+/// The raw top-level shape: the six mode selectors and supported
 /// Functions fields captured presence-preserving (see [`present`]),
 /// plus `tenant`. Private on purpose: deserialized only through
 /// [`OtelTracesRequest`]'s manual `Deserialize` (which enforces a
@@ -86,9 +85,6 @@ struct RawOtelTracesRequest {
     /// The overview grid (time × log-duration density).
     #[serde(default, deserialize_with = "present")]
     overview: Option<serde_json::Value>,
-    /// The slowest mode (duration-ranked top-K traces).
-    #[serde(default, deserialize_with = "present")]
-    slowest: Option<serde_json::Value>,
     /// The search mode (bounded most-recent-first trace summaries).
     #[serde(default, deserialize_with = "present")]
     search: Option<serde_json::Value>,
@@ -149,7 +145,6 @@ pub enum TracesMode {
     Attributes(AttributesParams),
     AttributeValues(AttributeValuesParams),
     Overview(OverviewParams),
-    Slowest(SlowestParams),
     Search(SearchParams),
 }
 
@@ -196,7 +191,6 @@ impl TryFrom<RawOtelTracesRequest> for OtelTracesRequest {
             ("attributes", raw.attributes.is_some()),
             ("attribute_values", raw.attribute_values.is_some()),
             ("overview", raw.overview.is_some()),
-            ("slowest", raw.slowest.is_some()),
             ("search", raw.search.is_some()),
         ]
         .into_iter()
@@ -266,8 +260,6 @@ impl TryFrom<RawOtelTracesRequest> for OtelTracesRequest {
             TracesMode::AttributeValues(typed("attribute_values", v)?)
         } else if let Some(v) = &raw.overview {
             TracesMode::Overview(typed("overview", v)?)
-        } else if let Some(v) = &raw.slowest {
-            TracesMode::Slowest(typed("slowest", v)?)
         } else if let Some(v) = &raw.search {
             TracesMode::Search(typed("search", v)?)
         } else {
@@ -411,7 +403,7 @@ pub struct SearchParams {
     pub before: u32,
     /// Result limit (top-K most-recent-first). Zero and beyond
     /// [`SEARCH_LIMIT_MAX`] are client errors — search has no unbounded
-    /// option (the slowest-mode precedent).
+    /// option.
     #[serde(default = "default_limit")]
     pub limit: usize,
     /// Matched spans attached per returned trace (engine default 3,
@@ -450,11 +442,10 @@ fn default_limit() -> usize {
     sfsq::traces::DEFAULT_SEARCH_LIMIT
 }
 
-/// Wire maximum for [`SearchParams::limit`], mirroring the engine's
-/// `sfsq::traces::SLOWEST_LIMIT_MAX` bound on the sibling mode. The
-/// cap lives at the wire, not the engine: a cursor walk legitimately
-/// re-runs the engine with `limit = served + limit` (the served prefix
-/// itself capped at 10,000), so the engine-side limit is bounded by
+/// Wire maximum for [`SearchParams::limit`]. The cap lives at the wire,
+/// not the engine: a cursor walk legitimately re-runs the engine with
+/// `limit = served + limit` (the served prefix itself capped at
+/// 10,000), so the engine-side limit is bounded by
 /// construction once the client half is capped here. Uncapped, a
 /// caller-chosen limit would scale the assembly ceiling (`limit × 16`)
 /// without bound.
@@ -471,22 +462,6 @@ where
     D: serde::Deserializer<'de>,
 {
     serde_json::Value::deserialize(d).map(Some)
-}
-
-/// The `slowest` mode's typed parameters.
-#[derive(Debug, Clone, Default, Deserialize)]
-#[serde(deny_unknown_fields)]
-pub struct SlowestParams {
-    /// Rank window, unix seconds; `0` means "unspecified" (the
-    /// adapter's `resolve_window` defaults).
-    #[serde(default)]
-    pub after: u32,
-    #[serde(default)]
-    pub before: u32,
-    /// Result limit (top-K). Engine default 20; zero and beyond the
-    /// library maximum (1000) are client errors — no unbounded option.
-    #[serde(default)]
-    pub limit: Option<usize>,
 }
 
 /// The `overview` mode's typed parameters. The time-bucket geometry
@@ -595,7 +570,6 @@ pub enum OtelTracesResponse {
     Attributes(AttributesResult),
     AttributeValues(AttributeValuesResult),
     Overview(Box<OverviewResult>),
-    Slowest(Box<SlowestResult>),
 }
 
 /// Functions protocol envelope for the trace-specific contract. The
@@ -726,49 +700,6 @@ pub struct OverviewTotals {
     pub spans: u64,
     /// Of those spans, ERROR-status ones.
     pub errors: u64,
-}
-
-// ── Slowest response ────────────────────────────────────────────────
-
-/// The slowest mode's bounded list: the window's duration-ranked top-K
-/// traces (duration DESC, trace id ASC). Row numbers are STORED-ROW
-/// statistics (resends count); exact canonical figures live in the
-/// `trace` mode (the row click). The overview's envelope-start clipping
-/// applies, and capture is file-granular — a trace whose earlier/later
-/// spans live only in files outside the window merges a TRUNCATED
-/// envelope, so a boundary-straddling long trace can rank by less than
-/// its true duration. NO pagination: a rank cursor over an unstable
-/// dataset re-ranks between pages, so top-K is one bounded page by
-/// design.
-#[derive(Debug, Serialize)]
-pub struct SlowestResult {
-    /// The response's self-description: always `"slowest"`.
-    pub mode: &'static str,
-    pub version: u32,
-    pub status: StatusWire,
-    pub items: SearchItems,
-    pub traces: Vec<SlowestTraceWire>,
-}
-
-/// One ranked trace; ids in W3C lowercase hex.
-#[derive(Debug, Serialize)]
-pub struct SlowestTraceWire {
-    pub trace_id: String,
-    /// The merged root's `service.name`; absent when the trace has no
-    /// true root or the root carries none.
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub root_service: Option<String>,
-    /// The merged root's span name.
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub root_name: Option<String>,
-    /// Merged envelope start.
-    pub start_ns: i64,
-    /// The RANK key: merged envelope duration, saturating.
-    pub duration_ns: i64,
-    /// Stored spans across all sources (resends included).
-    pub span_count: u64,
-    /// Of those spans, ERROR-status ones.
-    pub error_count: u64,
 }
 
 // ── Enumeration responses ───────────────────────────────────────────
@@ -1234,7 +1165,6 @@ pub enum PartialReasonWire {
     Cancelled,
     OverviewCeiling,
     RollupAbsent,
-    SlowestCeiling,
     RemoteUnavailable,
 }
 
@@ -1247,7 +1177,6 @@ impl From<PartialReason> for PartialReasonWire {
             PartialReason::Cancelled => PartialReasonWire::Cancelled,
             PartialReason::OverviewCeiling => PartialReasonWire::OverviewCeiling,
             PartialReason::RollupAbsent => PartialReasonWire::RollupAbsent,
-            PartialReason::SlowestCeiling => PartialReasonWire::SlowestCeiling,
             PartialReason::RemoteUnavailable => PartialReasonWire::RemoteUnavailable,
         }
     }

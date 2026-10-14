@@ -4,9 +4,8 @@
 //! The full mode catalog lives here: `info` (capability discovery),
 //! `trace` (exact single-trace fetch), `search` (bounded
 //! most-recent-first search), the enumeration pair `attributes`
-//! / `attribute_values` (the facet lists' vocabulary), `overview` (the
-//! trace-density grid), and `slowest` (the window's duration-ranked
-//! top-K). Mode selection and every request-SHAPE check happen at
+//! / `attribute_values` (the facet lists' vocabulary), and `overview`
+//! (the trace-density grid). Mode selection and every request-SHAPE check happen at
 //! deserialization (the wire's typed request — shape errors are
 //! transport 400s); this handler owns only the semantic validation
 //! (trace-id shape, zero limits, bounds).
@@ -32,25 +31,24 @@ use file_lifecycle::chunk::ChunkCache;
 use file_lifecycle::registry::TenantRegistries;
 
 use sfsq::traces::{
-    AttributeNamesQuery, AttributeRequestError, AttributeValuesQuery, DEFAULT_SLOWEST_LIMIT,
-    OverviewQuery, OverviewRequestError, Predicate, PredicateTarget, SLOWEST_LIMIT_MAX,
-    SPANS_PER_TRACE_MAX, SearchQuery, SearchRequestError, SearchSources, SlowestQuery,
-    SlowestRequestError, TimeWindow, TraceQuery, TraceRequestError, attribute_names,
-    attribute_values, overview, search, slowest, trace_by_id,
+    AttributeNamesQuery, AttributeRequestError, AttributeValuesQuery, OverviewQuery,
+    OverviewRequestError, Predicate, PredicateTarget, SPANS_PER_TRACE_MAX, SearchQuery,
+    SearchRequestError, SearchSources, TimeWindow, TraceQuery, TraceRequestError, attribute_names,
+    attribute_values, overview, search, trace_by_id,
 };
 
 use super::adapter::{
     ResolvedWindow, build_predicate, builtin_word, completion_capture_range, heatmap_predicate,
     parse_cursor, parse_enumeration_key, parse_owner_word, parse_trace_id, resolve_window,
     to_attribute_values_result, to_attributes_result, to_overview_result, to_overview_section,
-    to_search_result, to_slowest_result, to_trace_result, validate_trace_bounds,
+    to_search_result, to_trace_result, validate_trace_bounds,
 };
 use super::sources::{Capture, CaptureError, TracesSourceSupplier};
 use super::wire::{
     AttributeValuesParams, AttributesParams, CoverageWire, FunctionsParams,
     FunctionsTracesResponse, InfoResponse, OVERVIEW_SCOPE_SELECTION, OVERVIEW_SCOPE_WINDOW,
-    OtelTracesRequest, OtelTracesResponse, OverviewParams, SearchParams, SearchResult,
-    SlowestParams, TraceParams, TracesMode,
+    OtelTracesRequest, OtelTracesResponse, OverviewParams, SearchParams, SearchResult, TraceParams,
+    TracesMode,
 };
 use file_lifecycle::remote_read::RemoteRead;
 
@@ -504,7 +502,7 @@ impl OtelTracesHandler {
         )))
     }
 
-    /// Common setup for the windowed fold modes (enumeration, slowest):
+    /// Common setup for the enumeration modes:
     /// canonicalized window + one captured source set (with its pins, for
     /// the caller's blocking closure) + the engine window; the capture
     /// sets the progress total. Callers pass their own params' window
@@ -712,56 +710,6 @@ impl OtelTracesHandler {
             ))),
         }
     }
-
-    /// The `slowest` mode: the window's duration-ranked top-K traces —
-    /// the UI's explicit "Slowest" sort. Row numbers are stored-row
-    /// sums; pre-rollup files are excluded under `rollup_absent`;
-    /// no pagination by design.
-    async fn slowest(
-        &self,
-        ctx: &FunctionCallContext,
-        params: &SlowestParams,
-        tenant: Option<&str>,
-    ) -> netdata_plugin_error::Result<OtelTracesResponse> {
-        let client_err = |e: String| handler_err(format!("invalid otel-traces request: {e}"));
-        let limit = params.limit.unwrap_or(DEFAULT_SLOWEST_LIMIT);
-        // Pre-capture twins of the engine's own checks: reject before
-        // the registry read and chunk builds capture() performs (the
-        // engine re-checks as defense in depth).
-        if limit == 0 {
-            return Err(client_err(
-                "a zero limit would return nothing; slowest has no unbounded option".into(),
-            ));
-        }
-        if limit > SLOWEST_LIMIT_MAX {
-            return Err(client_err(format!(
-                "limit {limit} exceeds the library maximum {SLOWEST_LIMIT_MAX}"
-            )));
-        }
-
-        let (sources, pins, window) = self
-            .enumeration_setup(ctx, params.after, params.before, tenant)
-            .await?;
-        let query = SlowestQuery::new(window).limit(limit);
-
-        let done = ctx.progress.done_counter();
-        let cancel = ctx.cancellation.clone();
-        match tokio::task::spawn_blocking(move || {
-            let _pins = pins;
-            slowest(sources, query, cancel, done)
-        })
-        .await
-        {
-            Ok(Ok(data)) => Ok(OtelTracesResponse::Slowest(Box::new(to_slowest_result(
-                data, limit,
-            )))),
-            Ok(Err(SlowestRequestError::SourceSet(e))) => Err(handler_err(format!(
-                "otel-traces internal error: captured source set is inconsistent: {e}"
-            ))),
-            Ok(Err(e)) => Err(client_err(e.to_string())),
-            Err(e) => Err(handler_err(format!("otel-traces slowest task failed: {e}"))),
-        }
-    }
 }
 
 /// Enumeration request errors: a rejected source set is the supplier's
@@ -796,7 +744,6 @@ impl FunctionHandler for OtelTracesHandler {
                 self.attribute_values(&ctx, params, tenant).await
             }
             TracesMode::Overview(params) => self.overview(&ctx, params, tenant).await,
-            TracesMode::Slowest(params) => self.slowest(&ctx, params, tenant).await,
         }
     }
 

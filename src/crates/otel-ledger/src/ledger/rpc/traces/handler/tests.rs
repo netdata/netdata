@@ -1,6 +1,6 @@
 //! The `otel-traces` Function handler pinned end to end through
 //! `on_call`: every mode's wire contract (info, trace, search, the
-//! enumeration pair, overview, slowest, and the Functions view's
+//! enumeration pair, overview, and the Functions view's
 //! embedded window aggregate), window canonicalization, tie-safe
 //! pagination, the scope gates, tenant scoping, and the transport
 //! status boundary (shape errors 400, semantic errors 500).
@@ -80,7 +80,6 @@ async fn info_returns_the_descriptor() {
             "attributes",
             "attribute_values",
             "overview",
-            "slowest",
             "search",
             "tenant",
             "after",
@@ -145,7 +144,6 @@ async fn every_mode_is_implemented_an_empty_agent_answers_them_all() {
     // an empty agent — none is a not-implemented error.
     for body in [
         json!({"overview": {}}),
-        json!({"slowest": {}}),
         json!({"attributes": {}}),
         json!({"attribute_values": {"key": "name"}}),
     ] {
@@ -1105,52 +1103,6 @@ async fn overview_facets_are_opt_in_and_partition_the_population() {
 }
 
 #[tokio::test]
-async fn slowest_ranks_the_corpus_by_merged_envelope() {
-    // Envelope durations: E 2500ns > B 1500ns > A/C/D 500ns (the tie
-    // breaks by ascending trace id). Roots are each trace's span-1.
-    let h = handler_with_search_corpus().await;
-    let mut body = window_body();
-    merge(&mut body, json!({}));
-    let body = as_mode("slowest", body);
-    let v = serde_json::to_value(call_on(&h, body).await.unwrap()).unwrap();
-    assert_eq!(v["status"], json!({"complete": true}));
-    assert_eq!(ids(&v), ["0e", "0b", "0a", "0c", "0d"]);
-    assert_eq!(v["items"], json!({"returned": 5, "max_to_return": 20}));
-    let top = &v["traces"][0];
-    assert_eq!(top["duration_ns"], 2500);
-    assert_eq!(top["root_service"], "svc-a");
-    assert_eq!(top["root_name"], "span-1");
-    assert_eq!(top["span_count"], 3);
-    assert_eq!(top["error_count"], 0);
-}
-
-#[tokio::test]
-async fn slowest_limit_truncates_and_zero_is_a_client_error() {
-    let h = handler_with_search_corpus().await;
-    let mut body = window_body();
-    merge(&mut body, json!({"limit": 2}));
-    let body = as_mode("slowest", body);
-    let v = serde_json::to_value(call_on(&h, body).await.unwrap()).unwrap();
-    assert_eq!(ids(&v), ["0e", "0b"]);
-    assert_eq!(v["items"], json!({"returned": 2, "max_to_return": 2}));
-
-    let mut body = window_body();
-    merge(&mut body, json!({"limit": 0}));
-    let body = as_mode("slowest", body);
-    let err = call_on(&h, body).await.expect_err("zero limit");
-    assert!(err.to_string().contains("zero limit"), "{err}");
-
-    let mut body = window_body();
-    merge(&mut body, json!({"limit": 1001}));
-    let body = as_mode("slowest", body);
-    let err = call_on(&h, body).await.expect_err("limit beyond max");
-    assert!(
-        err.to_string().contains("exceeds the library maximum"),
-        "{err}"
-    );
-}
-
-#[tokio::test]
 async fn overview_grid_matches_the_corpus_distribution() {
     // 100s window → 1s buckets aligned to [T_S, T_S+100). The corpus's
     // 5 TRACES (A=1 span, B=2, C=1, D=1, E=3 — 8 stored spans), every
@@ -1345,7 +1297,6 @@ async fn every_mode_sets_its_progress_total_and_completes_it() {
         (windowed("search", json!({})), (2, 2)),
         (functions_body(2), (4, 4)),
         (windowed("overview", json!({})), (2, 2)),
-        (windowed("slowest", json!({})), (2, 2)),
         (windowed("attributes", json!({})), (2, 2)),
         (windowed("attribute_values", json!({"key": "name"})), (2, 2)),
     ] {
@@ -1956,7 +1907,7 @@ async fn absent_and_empty_object_payloads_use_the_functions_view() {
 }
 
 /// Every response variant serializes its `mode` discriminator — all
-/// seven of them, one assertion each.
+/// six of them, one assertion each.
 #[tokio::test]
 async fn every_response_shape_declares_its_mode() {
     let h = handler_with_search_corpus().await;
@@ -1964,7 +1915,6 @@ async fn every_response_shape_declares_its_mode() {
         (json!({"info": {}}), "info"),
         (as_mode("search", window_body()), "search"),
         (as_mode("overview", window_body()), "overview"),
-        (as_mode("slowest", window_body()), "slowest"),
         (as_mode("attributes", window_body()), "attributes"),
         (
             {
