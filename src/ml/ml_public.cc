@@ -231,7 +231,7 @@ void ml_host_stop(RRDHOST *rh) {
 
             dim->suppression_anomaly_counter = 0;
             dim->suppression_window_counter = 0;
-            dim->cns.clear();
+            dim->cns_count = 0;
             dim->cns_head = 0;
             dim->km_contexts.clear();
             dim->has_received_downstream_model = false;
@@ -421,8 +421,7 @@ void ml_dimension_new(RRDDIM *rd)
     dim->create_new_model_queued = false;
     dim->reset_generation = 0;
     dim->cns_head = 0;
-
-    ml_kmeans_init(&dim->kmeans);
+    dim->cns_count = 0;
 
     if (simple_pattern_matches(Cfg.sp_charts_to_skip, rrdset_name(rd->rrdset)))
         dim->mls = MACHINE_LEARNING_STATUS_DISABLED_DUE_TO_EXCLUDED_CHART;
@@ -440,7 +439,32 @@ void ml_dimension_new(RRDDIM *rd)
 
     rd->ml_dimension = (rrd_ml_dimension_t *) dim;
 
-    metaqueue_ml_load_models(rd);
+    // Load persisted models only for dimensions ML can actually use.
+    // An excluded dimension never predicts -- ml_dimension_predict() returns
+    // immediately when mls != MACHINE_LEARNING_STATUS_ENABLED -- so loading its
+    // models costs an ml.db query plus up to
+    // num_models_to_use * sizeof(ml_kmeans_inlined_t) bytes per dimension.
+    //
+    // Those models have one other consumer: the duplicate/older-model check in
+    // ml_worker_add_existing_model() (ml.cc), which is NOT gated on mls, so an
+    // excluded dimension can still receive, install, persist and forward a
+    // streamed model. Without the persisted set, a streamed model that set
+    // would have rejected (a child re-sending an old model, or a child clock
+    // that stepped back) is accepted after a parent restart. That is already
+    // what happens after every child reconnect: ml_host_stop() clears
+    // km_contexts and nothing reloads them. For an excluded dimension the
+    // accepted model costs one ml.db write and one forward upstream; it is
+    // never used to predict.
+    //
+    // Skipping the flag here (rather than returning early inside
+    // ml_dimension_load_models()) also keeps the metadata walker from touching
+    // these dimensions at all.
+    //
+    // mls is decided once, above, from the chart name at creation. A later
+    // chart rename does not recompute it, but prediction is gated on the same
+    // mls, so loading and predicting always agree.
+    if (dim->mls == MACHINE_LEARNING_STATUS_ENABLED)
+        metaqueue_ml_load_models(rd);
 
     // Only enqueue once ml is running for this host. Otherwise, ml_host_start()
     // will sweep all untrained dimensions and enqueue them when it runs.
@@ -548,6 +572,7 @@ void ml_init()
         worker->scratch_training_cns = new calculated_number_t[max_elements_needed_for_training]();
 
         worker->id = idx;
+        ml_kmeans_init(&worker->kmeans_scratch);
         worker->queue = ml_queue_init();
         worker->pending_model_info.reserve(Cfg.flush_models_batch_size);
         netdata_mutex_init(&worker->nd_mutex);
