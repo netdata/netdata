@@ -23,7 +23,7 @@ fi
 # -----------------------------------------------------------------------------
 # create the makeself archive
 
-run bash "${NETDATA_MAKESELF_PATH}/create-directory-manifest.sh" "${NETDATA_INSTALL_PATH}" || exit 1
+run bash "${NETDATA_MAKESELF_PATH}/create-package-manifest.sh" "${NETDATA_INSTALL_PATH}" || exit 1
 
 run sed "s|NETDATA_VERSION|${VERSION}|g" < "${NETDATA_MAKESELF_PATH}/makeself.lsm" > "${NETDATA_MAKESELF_PATH}/makeself.lsm.tmp"
 

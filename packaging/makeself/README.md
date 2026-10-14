@@ -10,10 +10,10 @@ Netdata provides pre-built static binaries for Linux systems where native packag
 ## State permissions during updates
 
 Installation makes package directories traversable and initializes the service's library, cache and log roots.
-A build-generated inventory identifies the exact shipped directories; updates never discover directories by walking
+A build-generated inventory identifies the exact shipped paths; updates never discover directories by walking
 the installed tree. Application-created directories retain their modes, including custom state paths outside the
 standard roots and execution-completion records. Shared root initialization does not recursively change file owners.
-Fleet preparation filters the inventory to match retained package content. The source installer's fallback directory
+The eBPF ownership adjustment also targets exact shipped entries. Fleet preparation filters the inventory to match retained package content. The source installer's fallback directory
 setup uses the same ownership boundary.
 Explicit systemd-tmpfiles policies for database/claiming files and the historical static OTEL ownership repair still
 apply; an update is not a general recursive permission repair.

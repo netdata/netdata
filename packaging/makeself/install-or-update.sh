@@ -180,17 +180,23 @@ dir_should_be_link etc/netdata ../../usr/lib/netdata/conf.d orig
 progress "fix permissions"
 
 run chmod g+rx,o+rx /opt
-# Makeself creates implicit package parents with a private umask. Only restore
-# accessibility for directories shipped by this package, never discovered state.
-if [ ! -s "${NETDATA_PREFIX}/system/package-directories" ]; then
-  run_failed "Missing package directory inventory"
+# Makeself creates implicit package parents with a private umask. Apply package
+# permissions only to shipped paths, never to discovered application state.
+if [ ! -s "${NETDATA_PREFIX}/system/package-manifest" ]; then
+  run_failed "Missing package path inventory"
   exit 1
 fi
-while IFS= read -r directory; do
-  if [ -d "${NETDATA_PREFIX}/${directory}" ]; then
-    run chmod go+rx "${NETDATA_PREFIX}/${directory}" || exit 1
+while IFS= read -r package_path; do
+  path="${NETDATA_PREFIX}/${package_path}"
+  [ -e "${path}" ] || [ -L "${path}" ] || continue
+  if [ -d "${path}" ] && [ ! -L "${path}" ]; then
+    run chmod go+rx "${path}" || exit 1
   fi
-done < "${NETDATA_PREFIX}/system/package-directories"
+  case "${package_path}" in
+    ./usr/libexec/netdata/plugins.d/ebpf.d | ./usr/libexec/netdata/plugins.d/ebpf.d/*)
+      run chown -h "root:${NETDATA_GROUP}" "${path}" || exit 1 ;;
+  esac
+done < "${NETDATA_PREFIX}/system/package-manifest"
 
 install_netdata_dirs
 
@@ -202,10 +208,6 @@ install_netdata_dirs
 # the log dir non-recursively, so nothing else fixes the subtree.
 if [ -d "${NETDATA_LOG_DIR}/otel" ]; then
   run chown -R ${NETDATA_USER}:${NETDATA_GROUP} "${NETDATA_LOG_DIR}/otel"
-fi
-
-if [ -d /opt/netdata/usr/libexec/netdata/plugins.d/ebpf.d ]; then
-  run chown -R root:${NETDATA_GROUP} /opt/netdata/usr/libexec/netdata/plugins.d/ebpf.d
 fi
 
 # The Go helper replaces the old Bash artifact. Remove leftovers from an

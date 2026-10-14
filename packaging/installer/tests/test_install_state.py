@@ -12,7 +12,7 @@ import unittest
 ROOT = Path(__file__).resolve().parents[3]
 INSTALLER = ROOT / 'packaging/makeself/install-or-update.sh'
 FUNCTIONS = ROOT / 'packaging/installer/functions.sh'
-INVENTORY = ROOT / 'packaging/makeself/create-directory-manifest.sh'
+INVENTORY = ROOT / 'packaging/makeself/create-package-manifest.sh'
 
 
 @unittest.skipUnless(sys.platform == 'linux', 'Linux installer permission semantics')
@@ -62,7 +62,7 @@ run() {
             (package / root).mkdir(parents=True)
         self.generate_inventory(package)
         (self.prefix / 'system').mkdir()
-        shutil.copyfile(package / 'system/package-directories', self.prefix / 'system/package-directories')
+        shutil.copyfile(package / 'system/package-manifest', self.prefix / 'system/package-manifest')
 
     def generate_inventory(self, tree):
         result = subprocess.run(['bash', str(INVENTORY), str(tree)], capture_output=True, text=True)
@@ -77,7 +77,8 @@ run() {
     def state_fixture(self):
         paths = []
         for root in ('var/lib/netdata', 'var/cache/netdata', 'var/log/netdata',
-                     'custom-runtime', 'usr/libexec/custom-runtime'):
+                     'custom-runtime', 'usr/libexec/custom-runtime',
+                     'usr/libexec/netdata/plugins.d/ebpf.d/custom-runtime'):
             private = self.prefix / root / 'application/private/completion'
             private.mkdir(parents=True)
             for directory in (private.parent.parent, private.parent, private):
@@ -91,6 +92,9 @@ run() {
             executable.write_text('immutable executable fixture\n')
             executable.chmod(0o500)
             paths.append(executable)
+            if os.geteuid() == 0 and '/ebpf.d/' in root:
+                for entry in (private.parent.parent, private.parent, private, receipt, executable):
+                    os.chown(entry, self.service_uid, self.service_gid)
         return paths
 
     @staticmethod
@@ -102,15 +106,40 @@ run() {
         paths = self.state_fixture()
         before = self.snapshot(paths)
         package_dir = self.prefix / 'usr/libexec/netdata/plugins.d'
-        package_dir.mkdir(parents=True, mode=0o700)
+        package_dir.mkdir(parents=True, exist_ok=True)
+        package_dir.chmod(0o700)
         self.run_setup()
         self.assertEqual(self.snapshot(paths), before)
         self.assertEqual(stat.S_IMODE(package_dir.stat().st_mode) & 0o055, 0o055)
 
+    @unittest.skipUnless(os.geteuid() == 0, 'root is required for package ownership')
+    def test_ebpf_ownership_applies_only_to_shipped_entries(self):
+        relative = Path('usr/libexec/netdata/plugins.d/ebpf.d')
+        package = self.base / 'package'
+        (package / relative).mkdir()
+        (package / relative / 'program.o').write_text('shipped object')
+        link_target = self.prefix / 'custom-runtime/application/private/completion'
+        os.symlink(link_target, package / relative / 'private-link')
+        self.generate_inventory(package)
+        shutil.copyfile(package / 'system/package-manifest', self.prefix / 'system/package-manifest')
+        paths = self.state_fixture()
+        before = self.snapshot(paths)
+        shipped = self.prefix / relative / 'program.o'
+        shutil.copyfile(package / relative / 'program.o', shipped)
+        os.chown(shipped, self.service_uid, self.service_gid)
+        link = self.prefix / relative / 'private-link'
+        os.symlink(link_target, link)
+        os.lchown(link, self.service_uid, self.service_gid)
+        self.run_setup()
+        self.assertEqual(self.snapshot(paths), before)
+        self.assertEqual((shipped.stat().st_uid, shipped.stat().st_gid), (0, self.service_gid))
+        self.assertEqual((shipped.parent.stat().st_uid, shipped.parent.stat().st_gid), (0, self.service_gid))
+        self.assertEqual((link.lstat().st_uid, link.lstat().st_gid), (0, self.service_gid))
+
     def test_missing_inventory_does_not_walk_existing_state(self):
         paths = self.state_fixture()
         before = self.snapshot(paths)
-        (self.prefix / 'system/package-directories').rename(self.base / 'saved-inventory')
+        (self.prefix / 'system/package-manifest').rename(self.base / 'saved-inventory')
         result = subprocess.run(['bash', str(self.script), str(self.prefix), str(FUNCTIONS)],
                                 env=self.environment, capture_output=True, text=True)
         self.assertNotEqual(result.returncode, 0)
