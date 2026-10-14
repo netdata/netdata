@@ -92,6 +92,18 @@ pub(crate) struct Capture {
     pub(crate) pins: Vec<file_cache::CachedFile>,
 }
 
+/// What a capture does with the offloaded files a range selects.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum RemotePolicy {
+    /// Download them, within the download cache; a footprint over its
+    /// capacity fails the capture ([`CaptureError::TooLarge`]).
+    Download,
+    /// Fetch nothing: each becomes an unavailable source, which the
+    /// engine reports as `remote_unavailable`. For the modes whose
+    /// answer must stay cheap whatever the retention holds.
+    Skip,
+}
+
 /// Why a capture failed as a whole. Everything narrower degrades into the
 /// captured sources instead (an unavailable remote file, a refused WAL).
 #[derive(Debug)]
@@ -148,11 +160,18 @@ impl TracesSourceSupplier {
         tenant: &TenantId,
         time_range: std::ops::Range<u32>,
         copies: usize,
+        remote_policy: RemotePolicy,
         cancel: &CancellationToken,
         progress: &ProgressState,
     ) -> Result<Capture, CaptureError> {
-        self.capture_ranges(tenant, &vec![time_range; copies], cancel, progress)
-            .await
+        self.capture_ranges(
+            tenant,
+            &vec![time_range; copies],
+            remote_policy,
+            cancel,
+            progress,
+        )
+        .await
     }
 
     /// One snapshot, one source vector per entry in `ranges` —
@@ -182,15 +201,19 @@ impl TracesSourceSupplier {
     /// second capture call would break — and each WAL resolves ONCE,
     /// its chunk bytes `Arc`-shared by every copy that selected it.
     ///
-    /// Remote files are planned first, so a query whose remote footprint
-    /// exceeds the download cache fails ([`CaptureError::TooLarge`]) before
-    /// any WAL work or download; the union of every range's remote files is
-    /// then downloaded once. A cancelled call returns no copies.
+    /// Remote files are planned first. Under [`RemotePolicy::Download`], a
+    /// query whose remote footprint exceeds the download cache fails
+    /// ([`CaptureError::TooLarge`]) before any WAL work or download, and the
+    /// union of every range's remote files is then downloaded once. Under
+    /// [`RemotePolicy::Skip`], nothing downloads and every planned remote
+    /// file becomes an unavailable source. A cancelled call returns no
+    /// copies.
     ///
     /// Sets `progress`'s total before the downloads: the sources of the
     /// DISTINCT ranges (each is walked by one engine pass that ticks
     /// once per source; search's window role shares the completion range
-    /// and does not tick) plus one unit per planned download — an upper
+    /// and does not tick) plus one unit per planned download (none under
+    /// [`RemotePolicy::Skip`]) — an upper
     /// bound, as a cached file downloads nothing. One case undercounts:
     /// when the Functions view's aggregate range happens to equal its
     /// completion range, two passes tick over the one counted range, so
@@ -199,6 +222,7 @@ impl TracesSourceSupplier {
         &self,
         tenant: &TenantId,
         ranges: &[std::ops::Range<u32>],
+        remote_policy: RemotePolicy,
         cancel: &CancellationToken,
         progress: &ProgressState,
     ) -> Result<Capture, CaptureError> {
@@ -248,16 +272,22 @@ impl TracesSourceSupplier {
             union,
             unreadable,
         } = match (&self.remote, remote_input) {
-            (Some(remote), Some(input)) => {
-                let capacity = remote.cache().capacity();
-                tokio::task::spawn_blocking(move || input.plan_within(capacity))
+            (Some(remote), Some(input)) => match remote_policy {
+                RemotePolicy::Download => {
+                    let capacity = remote.cache().capacity();
+                    tokio::task::spawn_blocking(move || input.plan_within(capacity))
+                        .await
+                        .map_err(CaptureError::Planning)?
+                        .map_err(|too_large| CaptureError::TooLarge {
+                            at_least: too_large.at_least,
+                            capacity: too_large.capacity,
+                        })?
+                }
+                // Nothing downloads, so the cache's capacity is moot.
+                RemotePolicy::Skip => tokio::task::spawn_blocking(move || input.plan())
                     .await
-                    .map_err(CaptureError::Planning)?
-                    .map_err(|too_large| CaptureError::TooLarge {
-                        at_least: too_large.at_least,
-                        capacity: too_large.capacity,
-                    })?
-            }
+                    .map_err(CaptureError::Planning)?,
+            },
             _ => RemotePlan::default(),
         };
         // Ranges with no plan (remote storage disabled) contribute no
@@ -304,10 +334,14 @@ impl TracesSourceSupplier {
             .zip(&unreadable_per_range)
             .map(|((local, remote), catalogs)| local.len() + remote.len() + catalogs.len())
             .sum();
-        progress.set_total(sources_total + union.len());
+        let downloads = match remote_policy {
+            RemotePolicy::Download => union.len(),
+            RemotePolicy::Skip => 0,
+        };
+        progress.set_total(sources_total + downloads);
 
         let (downloaded, pins) = match &self.remote {
-            Some(remote) if !union.is_empty() => {
+            Some(remote) if remote_policy == RemotePolicy::Download && !union.is_empty() => {
                 match remote.fetch(union, cancel, progress.done_counter()).await {
                     Ok(fetched) => (fetched.files, fetched.pins),
                     Err(CacheError::Cancelled) => return Ok(cancelled()),

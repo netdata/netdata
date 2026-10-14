@@ -70,6 +70,7 @@ async fn empty_registries_yield_empty_copies() {
             &TenantId::from("default"),
             0..u32::MAX,
             2,
+            RemotePolicy::Download,
             &CancellationToken::new(),
             &ProgressState::new(),
         )
@@ -90,6 +91,7 @@ async fn sealed_file_maps_to_an_identity_named_file_source() {
             &TenantId::from("default"),
             0..u32::MAX,
             1,
+            RemotePolicy::Download,
             &CancellationToken::new(),
             &ProgressState::new(),
         )
@@ -128,6 +130,7 @@ async fn copies_are_structurally_identical() {
             &TenantId::from("default"),
             0..u32::MAX,
             2,
+            RemotePolicy::Download,
             &CancellationToken::new(),
             &ProgressState::new(),
         )
@@ -150,6 +153,7 @@ async fn window_pruning_is_file_granular() {
             &TenantId::from("default"),
             900..2000,
             1,
+            RemotePolicy::Download,
             &CancellationToken::new(),
             &ProgressState::new(),
         )
@@ -188,6 +192,7 @@ async fn wal_resolves_to_chunks_and_a_tail() {
             &TenantId::from("default"),
             0..u32::MAX,
             1,
+            RemotePolicy::Download,
             &CancellationToken::new(),
             &ProgressState::new(),
         )
@@ -240,6 +245,7 @@ async fn wal_below_min_entries_is_all_tail() {
             &TenantId::from("default"),
             0..u32::MAX,
             1,
+            RemotePolicy::Download,
             &CancellationToken::new(),
             &ProgressState::new(),
         )
@@ -289,6 +295,7 @@ async fn corrupt_wal_is_refused_whole_but_sealed_files_still_serve() {
             &TenantId::from("default"),
             0..u32::MAX,
             1,
+            RemotePolicy::Download,
             &CancellationToken::new(),
             &ProgressState::new(),
         )
@@ -321,6 +328,7 @@ async fn cancelled_capture_with_a_wal_returns_empty_and_caches_nothing() {
             &TenantId::from("default"),
             0..u32::MAX,
             1,
+            RemotePolicy::Download,
             &cancel,
             &ProgressState::new(),
         )
@@ -343,6 +351,7 @@ async fn cancelled_capture_returns_empty() {
             &TenantId::from("default"),
             0..u32::MAX,
             2,
+            RemotePolicy::Download,
             &cancel,
             &ProgressState::new(),
         )
@@ -362,6 +371,7 @@ async fn capture_is_tenant_scoped() {
             &TenantId::from("tenant-b"),
             0..u32::MAX,
             1,
+            RemotePolicy::Download,
             &CancellationToken::new(),
             &ProgressState::new(),
         )
@@ -401,6 +411,7 @@ async fn source_ids_do_not_depend_on_the_directory() {
                 &TenantId::from("default"),
                 0..u32::MAX,
                 1,
+                RemotePolicy::Download,
                 &CancellationToken::new(),
                 &ProgressState::new(),
             )
@@ -445,6 +456,7 @@ async fn chunk_ids_order_numerically() {
             &TenantId::from("default"),
             0..u32::MAX,
             1,
+            RemotePolicy::Download,
             &CancellationToken::new(),
             &ProgressState::new(),
         )
@@ -473,6 +485,7 @@ async fn capture_sets_the_progress_total_to_the_distinct_ranges_sources() {
         .capture_ranges(
             &TenantId::from("default"),
             &[0..u32::MAX, 0..u32::MAX, 900..2000],
+            RemotePolicy::Download,
             &CancellationToken::new(),
             &progress,
         )
@@ -497,6 +510,51 @@ fn remote_supplier(
         4,
         Some(remote.read()),
     )
+}
+
+#[tokio::test]
+async fn skip_plans_without_downloading_and_never_fails_too_large() {
+    // A cache too small for either file: Download would fail TooLarge,
+    // Skip answers with one unavailable source per offloaded file.
+    let registries = make_registries();
+    let remote = TestRemote::new(100);
+    for seq in 1..=2 {
+        remote
+            .evicted(
+                &registries,
+                "default",
+                file_registry::test_identity(),
+                seq,
+                vec![otlp_req(0x10 + seq as u8, 3, seq * 1_000_000_000)],
+            )
+            .await;
+    }
+    let supplier = remote_supplier(registries, &remote);
+    let progress = ProgressState::new();
+
+    let capture = supplier
+        .capture(
+            &TenantId::from("default"),
+            0..u32::MAX,
+            1,
+            RemotePolicy::Skip,
+            &CancellationToken::new(),
+            &progress,
+        )
+        .await
+        .unwrap();
+
+    let sources = &capture.sets[0];
+    assert_eq!(sources.len(), 2);
+    assert!(
+        sources
+            .iter()
+            .all(|s| matches!(s, TraceSource::Unavailable(_))),
+        "every offloaded file is reported, none fetched"
+    );
+    assert!(capture.pins.is_empty());
+    assert_eq!(remote.cache.file_count(), 0, "nothing downloaded");
+    assert_eq!(progress.load(), (0, 2), "no download units in the total");
 }
 
 #[tokio::test]
@@ -534,6 +592,7 @@ async fn too_large_fails_before_any_download_or_chunk_build() {
             &TenantId::from("default"),
             0..u32::MAX,
             1,
+            RemotePolicy::Download,
             &CancellationToken::new(),
             &progress,
         )
@@ -587,6 +646,7 @@ async fn a_cancelled_capture_downloads_nothing() {
             &TenantId::from("default"),
             0..u32::MAX,
             1,
+            RemotePolicy::Download,
             &cancel,
             &ProgressState::new(),
         )
@@ -623,6 +683,7 @@ async fn remote_sources_are_named_like_local_sealed_files() {
             &TenantId::from("default"),
             0..u32::MAX,
             1,
+            RemotePolicy::Download,
             &CancellationToken::new(),
             &ProgressState::new(),
         )

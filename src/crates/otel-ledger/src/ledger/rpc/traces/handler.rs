@@ -40,7 +40,7 @@ use super::adapter::{
     parse_enumeration_key, parse_trace_id, resolve_window, to_attribute_values_result,
     to_overview_section, to_search_result, to_trace_result, validate_trace_bounds,
 };
-use super::sources::{Capture, CaptureError, TracesSourceSupplier};
+use super::sources::{Capture, CaptureError, RemotePolicy, TracesSourceSupplier};
 use super::wire::{
     AttributeValuesParams, CoverageWire, FunctionsParams, FunctionsTracesResponse, InfoResponse,
     OVERVIEW_SCOPE_SELECTION, OVERVIEW_SCOPE_WINDOW, OtelTracesRequest, OtelTracesResponse,
@@ -114,11 +114,14 @@ impl OtelTracesHandler {
     /// cross-source `trace_by_id`.
     ///
     /// Ignores the envelope window; assembly bounds live in the `trace`
-    /// sub-object. Absent bounds capture the FULL range, remote history
-    /// included (too-large history fails via the download cache rather
-    /// than truncate) — a trace is one object whose spans straddle
-    /// files. Present bounds prune file-granularly (a file overlapping
-    /// the bounds is probed whole). Either way the response DECLARES
+    /// sub-object. Absent bounds capture the FULL local range; offloaded
+    /// files are skipped, never downloaded (each reports
+    /// `remote_unavailable`), so a lookup without bounds stays cheap
+    /// however much retention is offloaded. Present bounds also download
+    /// the offloaded files they select (too-large history fails via the
+    /// download cache rather than truncate) — a trace is one object whose
+    /// spans straddle files. Present bounds prune file-granularly (a file
+    /// overlapping the bounds is probed whole). Either way the response DECLARES
     /// the range used (`coverage`) — spans beyond it are unknown, never
     /// silently dropped. An id absent from the sources is a Complete
     /// empty trace, not an error.
@@ -142,6 +145,11 @@ impl OtelTracesHandler {
 
         let bounds = validate_trace_bounds(params.after, params.before)
             .map_err(|e| handler_err(format!("invalid otel-traces request: {e}")))?;
+        let remote_policy = if bounds.is_some() {
+            RemotePolicy::Download
+        } else {
+            RemotePolicy::Skip
+        };
         let capture_range = bounds.unwrap_or(0..u32::MAX);
         let coverage = CoverageWire {
             after: capture_range.start,
@@ -156,7 +164,14 @@ impl OtelTracesHandler {
         // counter once per source and the bridge's ticker renders it.
         let Capture { mut sets, pins } = self
             .supplier
-            .capture(&tenant, capture_range, 1, &ctx.cancellation, &ctx.progress)
+            .capture(
+                &tenant,
+                capture_range,
+                1,
+                remote_policy,
+                &ctx.cancellation,
+                &ctx.progress,
+            )
             .await
             .map_err(capture_error)?;
         let sources = sets.pop().unwrap_or_default();
@@ -291,7 +306,13 @@ impl OtelTracesHandler {
         // completion range and does not tick).
         let Capture { mut sets, pins } = self
             .supplier
-            .capture_ranges(&tenant, &ranges, &ctx.cancellation, &ctx.progress)
+            .capture_ranges(
+                &tenant,
+                &ranges,
+                RemotePolicy::Download,
+                &ctx.cancellation,
+                &ctx.progress,
+            )
             .await
             .map_err(capture_error)?;
         // The pops unwind `ranges` (aggregate was pushed last).
@@ -454,7 +475,16 @@ impl OtelTracesHandler {
         let tenant = TenantId::resolve_query(tenant);
         let Capture { mut sets, pins } = self
             .supplier
-            .capture(&tenant, window.capture, 1, &ctx.cancellation, &ctx.progress)
+            .capture(
+                &tenant,
+                window.capture,
+                1,
+                // The value lists answer per keystroke: offloaded files are
+                // reported, never downloaded.
+                RemotePolicy::Skip,
+                &ctx.cancellation,
+                &ctx.progress,
+            )
             .await
             .map_err(capture_error)?;
         Ok((sets.pop().unwrap_or_default(), pins, engine_window))

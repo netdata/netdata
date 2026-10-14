@@ -94,8 +94,10 @@ async fn list(h: &OtelTracesHandler, last: usize) -> serde_json::Value {
     call(h, functions_body(last)).await.unwrap()["data"].clone()
 }
 
+/// A trace lookup bounded to the corpus window: bounds make the
+/// lookup download the offloaded files it selects.
 fn trace_body(byte: u8) -> serde_json::Value {
-    json!({"trace": {"id": trace_id(byte)}})
+    json!({"trace": {"id": trace_id(byte), "after": T_S, "before": T_S + 100}})
 }
 
 /// Both files local; remote storage on but nothing cataloged.
@@ -370,60 +372,45 @@ async fn progress_counts_the_downloads_beside_the_sources() {
     assert_eq!(progress.load(), (2, 3));
 }
 
-/// The windowed enumeration mode over the corpus window.
-fn aggregate_bodies() -> [serde_json::Value; 1] {
-    let window = |mode: &str, extra: serde_json::Value| {
-        let mut params = json!({"after": T_S, "before": T_S + 100});
-        params
-            .as_object_mut()
-            .unwrap()
-            .extend(extra.as_object().unwrap().clone());
-        json!({ mode: params })
-    };
-    [window(
-        "attribute_values",
-        json!({"key": "resource.service.name"}),
-    )]
-}
-
 #[tokio::test]
-async fn evicted_files_answer_the_aggregate_modes_as_local_files() {
-    let (local, _) = local_setup().await;
-    let (evicted, _remote, _) = evicted_setup(64 * MIB).await;
+async fn value_lists_and_unbounded_lookups_skip_offloaded_files() {
+    // The per-keystroke value list and a trace lookup without bounds
+    // never download: each offloaded file the request selects reports
+    // `remote_unavailable` instead, however large the retention.
+    let (h, remote, _) = evicted_setup(64 * MIB).await;
+    let partial = json!({"partial": ["remote_unavailable"]});
 
-    for body in aggregate_bodies() {
-        let from_local = call(&local, body.clone()).await.unwrap();
-        let from_remote = call(&evicted, body.clone()).await.unwrap();
-        assert_eq!(from_local["status"], json!({"complete": true}), "{body}");
-        assert_eq!(from_remote, from_local, "{body}");
-    }
-}
+    let body = json!({"attribute_values": {"after": T_S, "before": T_S + 100, "key": "resource.service.name"}});
+    let v = call(&h, body).await.unwrap();
+    assert_eq!(v["status"], partial);
+    assert_eq!(v["values"], json!([]));
 
-#[tokio::test]
-async fn every_aggregate_mode_reports_a_failed_download() {
-    let (h, remote, [_, two]) = evicted_setup(64 * MIB).await;
-    remote.lose(&two);
+    let v = call(&h, json!({"trace": {"id": trace_id(0x0B)}}))
+        .await
+        .unwrap();
+    assert_eq!(v["status"], partial);
+    assert_eq!(v["items"]["returned"], 0);
+    assert_eq!(
+        v["coverage"],
+        json!({"after": 0, "before": u32::MAX}),
+        "the declared range is still the whole retention"
+    );
 
-    for body in aggregate_bodies() {
-        let v = call(&h, body.clone()).await.unwrap();
-        assert_eq!(
-            v["status"],
-            json!({"partial": ["remote_unavailable"]}),
-            "{body}"
-        );
-    }
+    assert_eq!(remote.cache.file_count(), 0, "nothing downloaded");
 }
 
 #[tokio::test]
 async fn a_lost_file_outside_the_window_does_not_make_an_answer_partial() {
-    // File 2 (seconds 30-40) is lost; a window over file 1 alone does not
-    // need it.
+    // File 2 (seconds 30-40) is lost; a lookup bounded to file 1 alone
+    // does not need it. (The list's page would: its completion range
+    // widens the window by at least an hour per side.)
     let (h, remote, [_, two]) = evicted_setup(64 * MIB).await;
     remote.lose(&two);
 
-    let body = json!({"attribute_values": {"after": T_S + 5, "before": T_S + 25, "key": "resource.service.name"}});
+    let body = json!({"trace": {"id": trace_id(0x0A), "after": T_S + 5, "before": T_S + 25}});
     let v = call(&h, body).await.unwrap();
     assert_eq!(v["status"], json!({"complete": true}));
+    assert_eq!(v["items"]["returned"], 1);
 }
 
 #[tokio::test]
