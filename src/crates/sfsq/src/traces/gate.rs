@@ -2,6 +2,11 @@
 //! filter that spares [`search`](super::search::search) an assembly
 //! per provably non-matching candidate.
 //!
+//! Since the rows path (decision 49) the gates run only for the
+//! candidates it leaves to assembly — mostly traces held by files
+//! sealed before `TRSS` — and as rollup discovery's single-source
+//! pre-filter.
+//!
 //! Trace-level predicates (`trace:root_service_name` / `trace:root_name`
 //! selections, `trace:duration` lower bounds) are decided
 //! post-assembly; without a gate every candidate in the window is

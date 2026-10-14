@@ -2,9 +2,10 @@
 //!
 //! [`search`] evaluates a [`TokenQuery`] (a flat
 //! [`Predicate`](super::Predicate) converts with its meaning kept) over
-//! a validated pair of source sets and returns exact, most-recent-first
-//! trace summaries — exact up to the ruled root-divergence carve-out
-//! below — in a pinned two-phase design:
+//! a validated pair of source sets and returns most-recent-first trace
+//! summaries in STORED-ROW units (decision 49): a resent span counts
+//! each time it was stored, and a losing resend can match. Pinned
+//! two-phase design:
 //!
 //! - **Phase 1 (over-approximation, window set):** candidates come from
 //!   ONE span-local token, the driver (below). Each window file's plan
@@ -16,16 +17,26 @@
 //!   (a losing resend may match while its canonical copy does not) but
 //!   NEVER under-approximate: a matching canonical span raw-matches in
 //!   its own file (pinned per-trace span-group consequence).
-//! - **Phase 2 (exact assembly, completion set):** candidates assemble
-//!   through the shared combiner over ALL completion sources (sessions
-//!   opened once, reused for every candidate — the by-id pattern), every
-//!   token re-evaluates against the retained CANONICAL spans, and
-//!   non-matching candidates drop.
+//! - **Phase 2 (rows, completion set):** each candidate is decided from
+//!   token evidence over its holders' in-window stored rows — matched
+//!   positions and compiled token sets, which every file has (a window
+//!   file discovery did not compile compiles for evidence alone) — and,
+//!   when it matches, its row is built from its holders' rollup parts
+//!   (`TRSU` + `TRSS`) and the tails' decoded spans: no span assembles.
+//! - **Fallback (assembly):** a candidate the evidence keeps but whose
+//!   row cannot be built that way — a holder sealed before `TRSS`, a
+//!   rollup that fails to read, a breached ceiling — assembles through
+//!   the shared combiner over ALL completion sources (sessions opened
+//!   once, reused for every candidate — the by-id pattern), every token
+//!   re-evaluates against the retained CANONICAL spans, and a non-match
+//!   drops. Such a trace lists only when both agree (decision 52): a
+//!   negated token any stored copy matches has already excluded it, and
+//!   its row numbers are canonical. The gates pre-filter only this path.
 //!
 //! # Tokens
 //!
 //! Tokens AND at trace level. A span-local token holds when some
-//! canonical span starting in the window satisfies its whole group (C-3
+//! stored span starting in the window satisfies its whole group (C-3
 //! within a token; different tokens may match different spans, in any
 //! files); a negated one when none does (NOT EXISTS — an in-token `!=`
 //! instead keeps presence ∩ complement on one span). Trace-level tokens
@@ -107,6 +118,14 @@
 //! findable by span-level conditions, by id, and in the panels.
 //!
 //! # Recorded-vs-canonical root divergence (the accepted ruling)
+//!
+//! On the rows path a root condition reads the recorded claims
+//! directly: the earliest TRUE claim across the holders is the root,
+//! and a WITHHELD claim at or before it (or copies naming different
+//! facets) leaves the root unknown, which excludes the trace from any
+//! root condition, either polarity (decision 15). The divergence below
+//! concerns the fallback, where the gate and assembly read different
+//! things.
 //!
 //! The trace-level gate ([`gate`](super::gate)) prunes root-selection
 //! candidates on the sealed rollup's RECORDED per-file root claims,
@@ -407,20 +426,23 @@ pub enum SearchRequestError {
     SourceSet(#[from] SourceSetError),
 }
 
-/// One returned trace: EXACT summary numbers derived from the phase-2
-/// canonical assembly (never from raw phase-1 matches).
+/// One returned trace: summary numbers in stored-row units from its
+/// holders' rollup parts, or canonical ones from a fallback assembly
+/// (module docs; never from raw phase-1 matches).
 #[derive(Debug)]
 pub struct TraceSummary {
     pub trace_id: TraceId,
-    /// The summary root span's `service.name` resource attribute;
-    /// `None` when the root carries none.
+    /// The root span's `service.name` resource attribute; `None` when
+    /// the root carries none, or there is no known root (none stored,
+    /// or unknown). A fallback assembly shows the orphan-promoted
+    /// display root instead.
     pub root_service: Option<String>,
-    /// The summary root span's name.
+    /// The root span's name (`None` as `root_service` is).
     pub root_name: Option<String>,
-    /// Envelope start: the earliest retained canonical span start.
+    /// Envelope start: the earliest stored span start.
     pub start_ns: i64,
     /// The trace's RANK key: the oldest of the positive span-local
-    /// tokens' newest canonical matched-span starts (with one such token,
+    /// tokens' newest matched-span starts (with one such token,
     /// its newest match; without one, the newest in-window span) — what
     /// the most-recent-first ordering sorts by, and what a consumer
     /// paging by rank MUST anchor on (the ledger's search cursor carries
@@ -430,21 +452,21 @@ pub struct TraceSummary {
     /// Envelope duration: `max(start ⊕ duration) − min(start)`,
     /// SATURATING (ingest saturates pathological durations).
     pub duration_ns: i64,
-    /// Retained canonical spans (the capped set).
+    /// Stored spans (resends included; a fallback: the retained
+    /// canonical spans, capped).
     pub span_count: usize,
-    /// Retained canonical spans with ERROR status.
+    /// Of those, the ERROR ones.
     pub error_count: usize,
-    /// The retained canonical spans by resource `service.name`.
+    /// The same spans by resource `service.name`.
     pub service_breakdown: ServiceBreakdown,
-    /// `false` when this trace's assembly was capped or degraded (span
-    /// cap hit, a source failed during its merge, or a completion source
-    /// failed to open or was unavailable) — its summary numbers may
-    /// undercount.
+    /// `false` when a completion source failed to open, failed or was
+    /// unavailable (or a fallback assembly hit its span cap) — its
+    /// summary numbers may undercount.
     pub exact: bool,
 }
 
 /// One returned trace's spans by resource `service.name`, over the same
-/// retained canonical spans as [`TraceSummary::span_count`] — so it
+/// spans as [`TraceSummary::span_count`] — so it
 /// shares the `exact` caveat, and the parts partition them exactly:
 /// `sum(top) + other + unattributed == span_count`.
 #[derive(Debug, PartialEq, Eq)]

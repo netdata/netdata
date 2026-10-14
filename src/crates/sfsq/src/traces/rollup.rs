@@ -1,6 +1,6 @@
 //! Trace-level aggregates WITHOUT assembly: the neutral per-trace
-//! shape the cross-source fold (overview) consumes from BOTH
-//! source kinds:
+//! shapes the cross-source fold (overview) and search's rows path
+//! consume from BOTH source kinds:
 //!
 //! - **Sealed files / chunks** carry the `TRSU` rollup chunk
 //!   (`sfst::TraceRollup`, folded per file by the indexer's span

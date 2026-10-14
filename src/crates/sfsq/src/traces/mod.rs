@@ -24,10 +24,10 @@
 //!
 //! Flow: every operation validates its source set, then evaluates one
 //! of three ways — span assembly through the shared combiner
-//! `sfst::trace_combine` ([`trace_by_id`]; [`search()`], whose phase-2
-//! assembly the gate pre-filters), assembly-free trace-level
-//! aggregates ([`overview()`]) folded by `fold` over
-//! `rollup`'s per-trace shapes, or dictionary enumeration
+//! `sfst::trace_combine` ([`trace_by_id`]; [`search()`]'s fallback,
+//! which the gate pre-filters), assembly-free trace-level shapes
+//! (`rollup`'s per-trace parts: [`search()`]'s rows, and
+//! [`overview()`] folded by `fold`), or dictionary enumeration
 //! ([`attribute_names`] / [`attribute_values`]).
 //!
 //! # Module map
@@ -39,13 +39,14 @@
 //!   canonical-span evaluator ([`span_matches`]) are built from.
 //! - by_id — [`trace_by_id`]: one trace assembled across all sources.
 //! - search — [`search()`]: two-phase ranked search (raw
-//!   over-approximation, then exact assembly) under deterministic work
-//!   ceilings.
-//! - gate — search's rollup-backed pre-assembly filter: skips an
+//!   over-approximation, then rows from the rollups in stored-row units,
+//!   with assembly as the fallback) under deterministic work ceilings.
+//! - gate — the fallback's rollup-backed pre-assembly filter: skips an
 //!   assembly only when the rollup evidence proves a non-match.
 //! - overview — [`overview()`]: the trace-density grid (time bucket ×
 //!   duration bin) over stored-row statistics.
-//! - fold / rollup — the aggregate machinery behind overview:
+//! - fold / rollup — the aggregate machinery behind overview (rollup's
+//!   parts also build search's rows):
 //!   per-trace shapes from both source kinds
 //!   (sealed `TRSU` rows; tails' decoded-span folds, parity
 //!   test-pinned), merged by one cross-source fold.

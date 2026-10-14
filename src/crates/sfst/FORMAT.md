@@ -279,7 +279,8 @@ within a row, so the sentinel sorts last), `service_spans` and
 Counts are stored-row statistics, like the rollup's.
 
 It follows `TRSU` directly, requires it, and is written with it by the
-traces seal. Readers validate it against the decoded rollup
+traces seal. A reader reaches it only through the decoded rollup, so a
+`TRSS` without a `TRSU` is never read (and not rejected). Readers validate it against the decoded rollup
 (`IndexReader::trace_rollup_stats`): one row per rollup row, offsets from 0
 to the entry count with at least one entry per row, parallel entries, refs
 within the id space or the sentinel and strictly increasing per row,

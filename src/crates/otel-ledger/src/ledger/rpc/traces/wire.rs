@@ -780,10 +780,12 @@ impl From<sfst::FieldTier> for TierWire {
 // ── Search page ─────────────────────────────────────────────────────
 
 /// One search page: bounded most-recent-first trace summaries. Summary
-/// numbers are EXACT canonical-assembly figures over the match window
-/// widened by the completion slack (at least 1 h per side) unless a
-/// row's `exact` is false (its assembly was capped or degraded —
-/// numbers may undercount). Spans in files beyond that range are
+/// numbers count STORED rows (a resent span counts each time it was
+/// stored), read from the files' trace rollups over the match window
+/// widened by the completion slack (at least 1 h per side); a trace
+/// touching a file sealed before the rollup stats is assembled instead
+/// (canonical figures). A row's `exact` is false when a source failed
+/// (numbers may undercount). Spans in files beyond that range are
 /// unknown, not counted.
 #[derive(Debug, Serialize)]
 pub struct SearchResult {
@@ -857,8 +859,9 @@ pub struct AnchorWire {
 /// the whole window (a trace whose envelope starts before the window is
 /// clipped from here even though `search` returns its in-window spans,
 /// so a returned row can have no cell), and `totals.spans` sums STORED
-/// rows where the page's per-row numbers are canonical-assembly
-/// figures. Two measurements, never a subset relation.
+/// rows over the grid's population while a page row counts its trace's
+/// stored rows over the completion range. Two measurements, never a
+/// subset relation.
 ///
 /// How the section's population relates to the page's: it applies the
 /// page's chips, text and `selections` except duration ones, with
@@ -866,11 +869,13 @@ pub struct AnchorWire {
 /// span-local chip holds when ANY stored copy of a span starting inside
 /// the grid matches (a `!` chip when none does), a root chip reads the
 /// roots the sources recorded. The list beside it can differ at the
-/// edges: it dedups contradicting copies (the resend case the search
-/// engine documents), it shows a trace whose envelope starts before the
-/// grid while the grid's bin-by-envelope-start rule drops it, and the
+/// edges: it shows a trace whose envelope starts before the
+/// grid while the grid's bin-by-envelope-start rule drops it, the
 /// grid's window is the page's aligned to whole buckets, so a match in
-/// the widened band bins a trace the page excludes.
+/// the widened band bins a trace the page excludes, a positive root
+/// chip passes in the grid on ANY source's recorded root while the page
+/// reads the earliest one, and a `trace_fragments` grid counts some
+/// traces per file.
 #[derive(Debug, Serialize)]
 pub struct OverviewSection {
     /// The section's own version, independent of the enclosing result's.
@@ -898,14 +903,15 @@ pub struct OverviewSection {
 #[derive(Debug, Serialize)]
 pub struct TraceSummaryWire {
     pub trace_id: String,
-    /// The summary root span's `service.name` resource attribute;
-    /// absent when the root carries none.
+    /// The root span's `service.name` resource attribute: the earliest
+    /// stored span without a parent. Absent when the root carries none,
+    /// when no root span was stored, or when stored copies disagree.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub root_service: Option<String>,
-    /// The summary root span's name.
+    /// The root span's name (absent as `root_service` is).
     #[serde(skip_serializing_if = "Option::is_none")]
     pub root_name: Option<String>,
-    /// Envelope start (earliest retained canonical span start).
+    /// Envelope start (earliest stored span start).
     pub start_ns: i64,
     /// The rank key — what the most-recent-first ordering sorts by: the
     /// newest matching span's start, and with several chips the OLDEST
@@ -915,11 +921,12 @@ pub struct TraceSummaryWire {
     pub newest_matched_start_ns: i64,
     /// Envelope duration, saturating.
     pub duration_ns: i64,
+    /// Stored spans (resends included) and, of those, ERROR ones.
     pub span_count: usize,
     pub error_count: usize,
     pub service_breakdown: ServiceBreakdownWire,
-    /// False when this trace's assembly was capped or degraded — its
-    /// summary numbers may undercount. "Exact" means exact within the
+    /// False when a source failed (or a fallback assembly was capped) —
+    /// the summary numbers may undercount. "Exact" means exact within the
     /// completion range (see [`SearchResult`]): spans in files beyond it
     /// are unknown loss the flag cannot see.
     pub exact: bool,

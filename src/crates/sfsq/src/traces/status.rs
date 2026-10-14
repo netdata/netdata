@@ -92,7 +92,9 @@ pub enum PartialReason {
     /// The overview met more traces stored in several files than its
     /// merge holds: the rest were counted once per file, each with its
     /// file-local envelope and filter matches (the per-block rule some
-    /// tracing stores apply to every trace). Overview-only.
+    /// tracing stores apply to every trace). With a filter, a fragment
+    /// can also miss a match its other files hold, so a trace may count
+    /// less, not only more. Overview-only.
     TraceFragments,
 }
 

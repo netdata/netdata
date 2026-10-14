@@ -45,8 +45,10 @@
 //!   positive one holds when some source's recorded true root satisfies
 //!   it (a sealed file's rollup claim, a tail's earliest unset-parent
 //!   span), so a trace whose sources record different roots can pass
-//!   tokens no single root satisfies, and a withheld claim (an
-//!   ambiguous tie) counts as no root. `trace_id` tokens pin or
+//!   tokens no single root satisfies. A withheld claim (an ambiguous
+//!   tie) makes the root unknown: the trace passes no negated root
+//!   token, and a positive one only through another source's claim.
+//!   `trace_id` tokens pin or
 //!   exclude. The filter SELECTS traces, it does not trim them: a binned
 //!   trace still contributes its WHOLE merged envelope and ALL its
 //!   stored spans, matching or not. Trace-duration tokens are REJECTED
@@ -62,9 +64,10 @@
 //! [`OverviewCeiling`](PartialReason::OverviewCeiling). The budget
 //! charges each source its fold cost — rollup rows (sealed) or decoded
 //! spans (tails) — and is checked BETWEEN sources, so one source may
-//! overshoot it by that source's whole cost. It bounds WORK, not
-//! memory — the merge map peaks at the processed prefix's distinct
-//! traces.
+//! overshoot it by that source's whole cost. It bounds WORK; memory is
+//! bounded by the fold's remainder cap (`fold` module docs: traces
+//! held by several files past it count per file, flagged
+//! [`TraceFragments`](PartialReason::TraceFragments)).
 
 use std::sync::Arc;
 use std::sync::atomic::AtomicUsize;

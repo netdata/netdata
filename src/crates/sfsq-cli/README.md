@@ -243,9 +243,9 @@ token on spans, take the start of the newest span that matches it: `rank`
 is the oldest of these starts. With one such token, it is the start of the
 newest matching span; with none, the start of the newest span in the
 window. When a value is not set, the line shows
-`<no service>` or `<unnamed>`. The suffix `[inexact]` shows that the
-assembly of that trace was capped or degraded, so its numbers can be too
-low. A final `N trace(s), status …` line gives the count and `complete`, or
+`<no service>` or `<unnamed>`. The counts include each stored copy of a
+resent span. The suffix `[inexact]` shows that a source of that trace
+failed, so its numbers can be too low. A final `N trace(s), status …` line gives the count and `complete`, or
 `PARTIAL` with the reasons.
 
 ## Examples
