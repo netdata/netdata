@@ -169,10 +169,10 @@ Metrics:
 | cgroup.shmat | Calls to syscall shmat(2). | at | calls/s |
 | cgroup.shmdt | Calls to syscall shmdt(2). | dt | calls/s |
 | cgroup.shmctl | Calls to syscall shmctl(2). | ctl | calls/s |
-| services.shmget | Calls to syscall shmget(2). | a dimension per systemd service | calls/s |
-| services.shmat | Calls to syscall shmat(2). | a dimension per systemd service | calls/s |
-| services.shmdt | Calls to syscall shmdt(2). | a dimension per systemd service | calls/s |
-| services.shmctl | Calls to syscall shmctl(2). | a dimension per systemd service | calls/s |
+| systemd.service.shmget | Calls to syscall shmget(2). | a dimension per systemd service | calls/s |
+| systemd.service.shmat | Calls to syscall shmat(2). | a dimension per systemd service | calls/s |
+| systemd.service.shmdt | Calls to syscall shmdt(2). | a dimension per systemd service | calls/s |
+| systemd.service.shmctl | Calls to syscall shmctl(2). | a dimension per systemd service | calls/s |
 
 
 ### Per apps
