@@ -1973,6 +1973,59 @@ static int test_rrddim_divisor_normalization(void) {
     return rc;
 }
 
+// Health acquires the chart of every alert on every pass. That acquire must not touch last_accessed,
+// or an obsolete chart with an alert never ages past "cleanup obsolete charts after" and is never freed
+// (regressed by #23081). Real readers (rrdset_find_and_acquire()) must still touch it.
+static int test_health_acquire_keeps_obsolete_chart_unaccessed(void) {
+    fprintf(stderr, "%s() running...\n", __FUNCTION__);
+
+    RRD_DB_MODE old_default_rrd_memory_mode = default_rrd_memory_mode;
+    default_rrd_memory_mode = RRD_DB_MODE_ALLOC;
+
+    int rc = 0;
+    RRDSET *st = rrdset_create_localhost(
+        "netdata", "unittest-health-acquire", "unittest-health-acquire", "netdata", NULL,
+        "Unit Testing", "x", "unittest", NULL, 1, nd_profile.update_every, RRDSET_TYPE_LINE);
+
+    rrdset_is_obsolete___safe_from_collector_thread(st);
+
+    const time_t long_ago = 1;
+    rrdset_set_last_accessed_time_s(st, long_ago);
+
+    RRDCALC alert = { 0 };
+    alert.chart = string_strdupz(rrdset_id(st));
+    alert.rrdset = st;
+
+    RRDSET *linked = NULL;
+    RRDSET_ACQUIRED *rsa = rrdcalc_rrdset_acquire_linked(localhost, &alert, &linked);
+    if(!rsa || linked != st) {
+        fprintf(stderr, "%s: health could not acquire the obsolete chart of its alert\n", __FUNCTION__);
+        rc = 1;
+    }
+    if(rsa)
+        rrdset_acquired_release(rsa);
+
+    if(rrdset_last_accessed_time_s(st) != long_ago) {
+        fprintf(stderr, "%s: health acquiring the chart touched last_accessed, the chart can never be freed\n",
+                __FUNCTION__);
+        rc = 1;
+    }
+
+    rsa = rrdset_find_and_acquire(localhost, rrdset_id(st), true);
+    if(!rsa || rrdset_last_accessed_time_s(st) == long_ago) {
+        fprintf(stderr, "%s: a reader acquiring the chart did not touch last_accessed\n", __FUNCTION__);
+        rc = 1;
+    }
+    if(rsa)
+        rrdset_acquired_release(rsa);
+
+    string_freez(alert.chart);
+    rrdset_free(st);
+
+    default_rrd_memory_mode = old_default_rrd_memory_mode;
+    return rc;
+}
+
 static int test_rrdset_rejects_invalid_update_every(void) {
     fprintf(stderr, "%s() running...\n", __FUNCTION__);
 
@@ -2454,6 +2507,9 @@ int run_all_mockup_tests(void)
         return 1;
 
     if(test_rrdset_rejects_invalid_update_every())
+        return 1;
+
+    if(test_health_acquire_keeps_obsolete_chart_unaccessed())
         return 1;
 
     if(test_rrdr_relative_window_extreme_values())
