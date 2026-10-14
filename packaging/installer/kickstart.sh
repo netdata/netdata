@@ -2481,9 +2481,9 @@ try_build_install() {
       if download "${NETDATA_SOURCE_ARCHIVE_URL_PREFIX}/${gzip_name}" "${gzip_name}"; then
         archive_name="${gzip_name}"
         decompress="$(command -v gzip 2>/dev/null) -dc"
+      else
+        fatal "Unable to find a usable ${SELECTED_RELEASE_CHANNEL} source archive in Manifest file.\n${BADNET_MESSAGE}" F0527
       fi
-    else
-      fatal "Unable to find a usable ${SELECTED_RELEASE_CHANNEL} source archive in Manifest file.\n${BADNET_MESSAGE}" F0527
     fi
 
     if [ -z "${archive_name}" ]; then
