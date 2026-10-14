@@ -203,8 +203,8 @@ Metrics:
 | cgroup.task_exit | Tasks starts exit process | exit | calls/s |
 | cgroup.task_close | Tasks closed | process | calls/s |
 | cgroup.task_error | Errors to create process or threads | process | calls/s |
-| services.process_create | Process started | a dimension per systemd service | calls/s |
-| services.thread_create | Threads started | a dimension per systemd service | calls/s |
-| services.task_close | Tasks starts exit process | a dimension per systemd service | calls/s |
-| services.task_exit | Tasks closed | a dimension per systemd service | calls/s |
-| services.task_error | Errors to create process or threads | a dimension per systemd service | calls/s |
+| systemd.service.process_create | Process started | a dimension per systemd service | calls/s |
+| systemd.service.thread_create | Threads started | a dimension per systemd service | calls/s |
+| systemd.service.task_close | Tasks starts exit process | a dimension per systemd service | calls/s |
+| systemd.service.task_exit | Tasks closed | a dimension per systemd service | calls/s |
+| systemd.service.task_error | Errors to create process or threads | a dimension per systemd service | calls/s |
