@@ -260,3 +260,45 @@ fn parent_cycle_stays_a_forest_and_terminates() {
     }
     assert!(seen.iter().all(|&s| s), "every span reachable from a root");
 }
+
+// ── MetaReader ──────────────────────────────────────────────────────
+
+/// Flip the first byte of chunk `id`, so its CRC no longer matches.
+fn corrupt_chunk(buf: &mut [u8], id: chunk_file::ChunkId) {
+    let offset = {
+        let container =
+            chunk_file::container::Container::open(buf, crate::MAGIC, crate::VERSION).unwrap();
+        let meta = container.chunk_meta(id).expect("chunk present");
+        usize::try_from(meta.offset).unwrap()
+    };
+    buf[offset] ^= 0xFF;
+}
+
+#[test]
+fn meta_reader_matches_the_full_readers_summary_metadata_and_fields() {
+    let buf = trace_file(&[(sid(1), SpanId::UNSET), (sid(2), sid(1))]);
+    let full = IndexReader::open(&buf).unwrap();
+    let meta = crate::MetaReader::open(&buf).unwrap();
+    assert_eq!(meta.summary(), full.summary());
+    assert_eq!(meta.metadata().unwrap(), full.metadata());
+    assert_eq!(
+        meta.field_table().unwrap().names().collect::<Vec<_>>(),
+        full.field_table().names().collect::<Vec<_>>()
+    );
+}
+
+#[test]
+fn meta_reader_never_decodes_the_primary_fst() {
+    // A corrupt PRIM fails the full open but not the metadata view: key
+    // listing must not pay for (or fail on) the low-card dictionary.
+    let mut buf = trace_file(&[(sid(1), SpanId::UNSET)]);
+    corrupt_chunk(&mut buf, crate::CHUNK_PRIMARY);
+    assert!(IndexReader::open(&buf).is_err());
+
+    let meta = crate::MetaReader::open(&buf).unwrap();
+    assert!(meta.field_table().is_ok());
+    assert!(
+        meta.into_index_reader().is_err(),
+        "the upgrade decodes PRIM and surfaces the corruption"
+    );
+}

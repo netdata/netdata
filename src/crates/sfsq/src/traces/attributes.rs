@@ -288,18 +288,22 @@ pub fn attribute_names(
             TraceSource::Sfst(c) => {
                 if !pruned(query.window, &c.summary) {
                     match map_source(&c.source) {
-                        Ok(mapped) => match sfst::IndexReader::open(mapped.bytes()) {
-                            Ok(reader) => {
-                                add_storage_names(&mut reader.field_table().names());
-                            }
-                            Err(e) => {
+                        // Keys need only the field table: the metadata
+                        // reader never decodes PRIM.
+                        Ok(mapped) => {
+                            let listed =
+                                sfst::MetaReader::open(mapped.bytes()).and_then(|reader| {
+                                    add_storage_names(&mut reader.field_table()?.names());
+                                    Ok(())
+                                });
+                            if let Err(e) = listed {
                                 tracing::warn!(
                                     "sfsq traces: source {} failed to parse: {e}",
                                     c.source_id
                                 );
                                 status.add(PartialReason::SourceFailure);
                             }
-                        },
+                        }
                         Err(e) => {
                             tracing::warn!(
                                 "sfsq traces: source {} failed to map: {e}",

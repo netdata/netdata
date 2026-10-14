@@ -5,6 +5,8 @@
 //! that follow the access pattern described in `sfst/FORMAT.md`:
 //!
 //! 1. Decode `SUMR` + `META` + `PRIM` eagerly on open (always needed).
+//!    [`MetaReader`] stops after `SUMR` and decodes `META` lazily, for
+//!    callers that need only the summary, metadata or field table.
 //! 2. Look up low-card `key=value` pairs in the primary FST → position bitmap.
 //! 3. Load secondary chunks on demand (mid-card `MF{hi}{lo}` FST or
 //!    high-card `HF{hi}{lo}` columnar chunk).
@@ -36,6 +38,56 @@ use crate::{
     BitmapValue, Bucket, FacetResult, FieldEntry, FieldTier, Filter, Grid, Histogram, IdRanges,
     KvId, Matcher, Metadata, SpanId, Summary, Timeline, Timestamps, TraceId,
 };
+
+/// The metadata-only view of an `.sfst` file: `SUMR` on open, `META`
+/// and the field table on first use, never `PRIM`. Listing a file's
+/// keys needs only the field table, and `PRIM` (the low-card dictionary
+/// plus its position bitmaps) dominates the cost of a full open.
+/// [`into_index_reader`](Self::into_index_reader) upgrades to the full
+/// reader without decoding `META` again.
+pub struct MetaReader<'a> {
+    sfst: ChunkReader<'a>,
+    summary: Summary,
+}
+
+impl<'a> MetaReader<'a> {
+    /// Open a split-FST index from a byte slice, decoding the summary only.
+    pub fn open(data: &'a [u8]) -> Result<Self, crate::Error> {
+        let sfst = ChunkReader::open(data)?;
+        let summary = sfst.summary()?;
+        Ok(Self { sfst, summary })
+    }
+
+    /// The cheap summary fields (see [`IndexReader::summary`]).
+    pub fn summary(&self) -> &Summary {
+        &self.summary
+    }
+
+    /// The heavy index metadata, decoded on first use.
+    pub fn metadata(&self) -> Result<&Metadata, crate::Error> {
+        self.sfst.metadata()
+    }
+
+    /// The field table derived from the schema tree, on first use.
+    pub fn field_table(&self) -> Result<&crate::FieldTable, crate::Error> {
+        self.sfst.fields()
+    }
+
+    /// The full reader: decodes `PRIM`, reusing the cached `META` and
+    /// field table.
+    pub fn into_index_reader(self) -> Result<IndexReader<'a>, crate::Error> {
+        // Force the metadata + derived-field-table caches so the full
+        // reader's accessors are infallible.
+        self.sfst.metadata()?;
+        self.sfst.fields()?;
+        let primary = self.sfst.primary()?;
+        Ok(IndexReader {
+            sfst: self.sfst,
+            summary: self.summary,
+            primary,
+        })
+    }
+}
 
 /// A successfully opened split-FST index.
 ///
@@ -201,18 +253,7 @@ impl<'a> IndexReader<'a> {
     /// Everything else (timestamps, per-row columns, trace structures,
     /// stream batches) decodes lazily, on the accessor that needs it.
     pub fn open(data: &'a [u8]) -> Result<Self, crate::Error> {
-        let sfst = ChunkReader::open(data)?;
-        let summary = sfst.summary()?;
-        // Force the metadata + derived-field-table caches so subsequent
-        // accessors are infallible.
-        sfst.metadata()?;
-        sfst.fields()?;
-        let primary = sfst.primary()?;
-        Ok(Self {
-            sfst,
-            summary,
-            primary,
-        })
+        MetaReader::open(data)?.into_index_reader()
     }
 
     /// The cheap summary fields (timestamps, record count, opaque
