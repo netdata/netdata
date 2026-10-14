@@ -38,24 +38,43 @@ const FUZZY2_MIN_CHARS: usize = 8;
 /// a typo, and the per-candidate cost grows with it.
 const FUZZY_MAX_CHARS: usize = 32;
 
+/// Unanchored, Unicode-simple-case-insensitive substring match of one
+/// literal term: the contains class of [`ValueMatcher`], and the matcher
+/// behind free-text search (the index plan and the span evaluator), so
+/// "suggest says contains" and "text matches" are one rule.
+#[derive(Debug, Clone)]
+pub struct ContainsMatcher(regex::bytes::Regex);
+
+impl ContainsMatcher {
+    /// `None` for an empty term (it would match everything) or one the
+    /// regex engine refuses to compile (beyond its size limits).
+    pub fn new(term: &str) -> Option<Self> {
+        if term.is_empty() {
+            return None;
+        }
+        regex::bytes::RegexBuilder::new(&regex::escape(term))
+            .case_insensitive(true)
+            .build()
+            .ok()
+            .map(Self)
+    }
+
+    pub fn is_match(&self, value: &[u8]) -> bool {
+        self.0.is_match(value)
+    }
+}
+
 /// Classifies candidates against one term; built once per request.
 pub struct ValueMatcher {
     folded: Vec<u8>,
-    contains: Option<regex::bytes::Regex>,
+    contains: Option<ContainsMatcher>,
     fuzzy: Option<Fuzzy>,
 }
 
 impl ValueMatcher {
     pub fn new(term: &str) -> Self {
         let folded = term.to_ascii_lowercase();
-        let contains = (!term.is_empty())
-            .then(|| {
-                regex::bytes::RegexBuilder::new(&regex::escape(term))
-                    .case_insensitive(true)
-                    .build()
-                    .ok()
-            })
-            .flatten();
+        let contains = ContainsMatcher::new(term);
         let chars: Vec<char> = folded.chars().collect();
         let fuzzy = (FUZZY1_MIN_CHARS..=FUZZY_MAX_CHARS)
             .contains(&chars.len())
@@ -87,7 +106,7 @@ impl ValueMatcher {
         if self
             .contains
             .as_ref()
-            .is_some_and(|re| re.is_match(candidate))
+            .is_some_and(|c| c.is_match(candidate))
         {
             return Some(MatchClass::Contains);
         }

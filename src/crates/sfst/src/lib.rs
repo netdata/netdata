@@ -130,7 +130,7 @@ pub use trace_rollup::{
     ROLLUP_NO_REF, ROOT_CLAIM_NONE, ROOT_CLAIM_TRUE, ROOT_CLAIM_WITHHELD, RollupRow, TraceRollup,
     TraceRollupRows,
 };
-pub use vocab_match::{MatchClass, ValueMatcher};
+pub use vocab_match::{ContainsMatcher, MatchClass, ValueMatcher};
 
 /// Deterministic opaque partition key for tests. SFST treats `part_key` as an
 /// opaque `u64` and never decodes it, so tests fabricate distinct keys per
