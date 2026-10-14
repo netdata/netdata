@@ -423,6 +423,38 @@ static size_t test_dbengine_burst_retention_case(
     return errors;
 }
 
+// rotation's retention check of a metric whose only page is still hot: the collector may flush that page right
+// after the check, so the check must leave the page's end as the clean time - a clean time of 0 would leave the
+// metric without retention once the flush clears the hot time, with its page still dirty
+static size_t test_dbengine_zero_retention_check_keeps_hot_page(RRDHOST *host, const char *id) {
+    fprintf(stderr, "DBENGINE Burst Retention Test: '%s', retention check while the page is hot...\n", id);
+
+    RRDSET *st = rrdset_create(host, "netdata", id, id, "netdata", NULL, "Unit Testing", "a value", "unittest",
+                               NULL, 1, 1, RRDSET_TYPE_LINE);
+    RRDDIM *rd = rrddim_add(st, "dim", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+    struct rrdeng_collect_handle *handle = (struct rrdeng_collect_handle *)rd->tiers[0].sch;
+
+    time_t t0 = START_TIMESTAMP;
+    for(size_t p = 0; p < 10; p++)
+        rrddim_store_metric(rd, (usec_t)(t0 + 1 + (time_t)p) * USEC_PER_SEC, (NETDATA_DOUBLE)p, SN_DEFAULT_FLAGS);
+
+    if(!handle->pgc_page) {
+        fprintf(stderr, " >>> DBENGINE: BURST RETENTION: '%s' has no hot page\n", id);
+        return 1;
+    }
+
+    mrg_metric_has_zero_disk_retention(main_mrg, handle->metric);
+
+    time_t clean = mrg_metric_get_latest_clean_time_s(main_mrg, handle->metric);
+    if(clean != t0 + 10) {
+        fprintf(stderr, " >>> DBENGINE: BURST RETENTION: '%s' clean time is %" PRId64 ", expected %" PRId64 "\n",
+                id, (int64_t)clean, (int64_t)(t0 + 10));
+        return 1;
+    }
+
+    return 0;
+}
+
 static size_t test_dbengine_burst_retention(RRDHOST *host) {
     size_t errors = 0;
     time_t t0 = START_TIMESTAMP;
@@ -452,6 +484,8 @@ static size_t test_dbengine_burst_retention(RRDHOST *host) {
     // gap-only pages discarded at page-full rotation: same, at capacity
     errors += test_dbengine_burst_retention_case(host, "dbengine-burst-all-gaps-capacity",
                                                  1100, 1100, true, t0 + 1100, t0 + 1100);
+
+    errors += test_dbengine_zero_retention_check_keeps_hot_page(host, "dbengine-zero-retention-hot-page");
 
     return errors;
 }
