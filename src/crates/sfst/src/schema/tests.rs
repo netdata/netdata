@@ -461,3 +461,13 @@ fn inconsistent_arenas_fail_the_offset_rebuild() {
     decoded.row_lens[0] = u32::MAX;
     assert!(!decoded.rebuild_offsets(), "overflow is corruption");
 }
+
+#[test]
+fn tiers_from_cardinality_follow_the_threshold_and_its_tenfold() {
+    let t = crate::DEFAULT_CARDINALITY_THRESHOLD;
+    assert_eq!(FieldTier::from_cardinality(99, t), FieldTier::Low);
+    assert_eq!(FieldTier::from_cardinality(100, t), FieldTier::Mid);
+    assert_eq!(FieldTier::from_cardinality(999, t), FieldTier::Mid);
+    assert_eq!(FieldTier::from_cardinality(1000, t), FieldTier::High);
+    assert!(FieldTier::Low < FieldTier::Mid && FieldTier::Mid < FieldTier::High);
+}

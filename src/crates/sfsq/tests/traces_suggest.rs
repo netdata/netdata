@@ -20,8 +20,9 @@ use common::{
 };
 use sfsq::traces::{
     AttributeKey, AttributeOwner, AttributeRequestError, PartialReason, QueryStatus, SuggestData,
-    SuggestQuery, TraceSource, suggest,
+    SuggestQuery, Suggestion, TraceSource, suggest,
 };
+use sfst::FieldTier;
 use sfst::MatchClass::{self, *};
 use tokio_util::sync::CancellationToken;
 
@@ -267,4 +268,75 @@ fn cancellation_is_all_or_empty_and_zero_limits_are_rejected() {
         .unwrap_err();
         assert!(matches!(err, AttributeRequestError::ZeroLimit), "{err}");
     }
+}
+
+/// A test renderer: lowercase owner word + `.` + name; builtins by
+/// their lowercased variant name.
+fn render(owner: AttributeOwner, key: &AttributeKey) -> String {
+    match key {
+        AttributeKey::Builtin(b) => format!("{b:?}").to_lowercase(),
+        AttributeKey::Attribute(a) => format!("{}.{a}", format!("{owner:?}").to_lowercase()),
+    }
+}
+
+#[test]
+fn keys_match_by_rendered_or_bare_name_with_their_highest_tier() {
+    let dir = tempfile::tempdir().unwrap();
+    // `hi` has 150 values in one file (mid tier) and 5 in another (low).
+    let hi = |n: usize, at_s: u64| -> Vec<common::SpanSpec> {
+        (0..n)
+            .map(|i| {
+                let mut s = sp(
+                    (i % 250) as u8 + 1,
+                    0,
+                    (BASE_S + at_s) * 1_000_000_000,
+                    "op",
+                );
+                s.attrs = vec![kv_str("hi", &format!("h{i:03}"))];
+                s
+            })
+            .collect()
+    };
+    let mid = write_wal(dir.path(), vec![req(&hi(150, 20))], "mid");
+    let low = write_wal(dir.path(), vec![req(&hi(5, 10))], "low");
+    let t = write_wal(dir.path(), vec![req(&spans(&["x"], 30))], "t");
+    let sources = vec![
+        sealed_source(dir.path(), &mid, "mid"),
+        sealed_source(dir.path(), &low, "low"),
+        tail_source(&t, "t"),
+    ];
+    let keys = |term: &str| {
+        run(
+            sources.clone(),
+            SuggestQuery::keys(render).term(term).max_items(50),
+        )
+    };
+
+    let data = keys("hi");
+    assert_eq!(
+        data.items[0],
+        Suggestion {
+            text: "span.hi".into(),
+            truncated: false,
+            class: Exact,
+            tier: Some(FieldTier::Mid),
+        },
+        "the bare name is exact; the higher tier wins"
+    );
+
+    // Users type attribute names, not owners.
+    let data = keys("serv");
+    assert_eq!(items(&data)[0], ("resource.service.name", Prefix));
+
+    // Every builtin is a key; one no source carries has no tier.
+    let data = keys("");
+    let tier_of = |text: &str| data.items.iter().find(|s| s.text == text).map(|s| s.tier);
+    assert_eq!(tier_of("duration"), Some(None));
+    assert_eq!(tier_of("name"), Some(Some(FieldTier::Low)));
+    assert_eq!(
+        tier_of("span.k"),
+        Some(Some(FieldTier::Low)),
+        "from the tail"
+    );
+    assert_eq!(data.status, QueryStatus::Complete);
 }

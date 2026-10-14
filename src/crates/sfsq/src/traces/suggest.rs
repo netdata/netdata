@@ -1,9 +1,19 @@
-//! Suggestions for the search bar: one key's values matched against a
-//! typed term.
+//! Suggestions for the search bar: the keys, or one key's values,
+//! matched against a typed term.
 //!
 //! Ranking: match class (exact, prefix, contains, then typo-tolerant;
 //! [`sfst::ValueMatcher`]), then bytes. One matcher classifies every
-//! tier and the WAL tail, so a value ranks the same wherever it lives.
+//! tier and the WAL tail, so a candidate ranks the same wherever it
+//! lives.
+//!
+//! Keys come back as the caller renders them ([`KeyRenderer`]: the
+//! engine owns no wire words), and a key matches by the better of its
+//! rendered form (`resource.service.name`) and its bare name
+//! (`service.name`; a builtin's bare name is its rendered word): users
+//! type attribute names, not owners. Every builtin field is a key
+//! whatever the data holds (builtins are engine capabilities); a key's
+//! tier is the highest any visited source gives it, and a key no source
+//! carries (a virtual builtin such as the duration) has none.
 //!
 //! Bounds, independent of how many files the window holds:
 //! - items: at most `max_items` suggestions, and only that many are kept
@@ -20,9 +30,10 @@
 //!   is always visited. An early stop reports `complete_after`: every
 //!   span from that second on lives in a visited source.
 //!
-//! A sealed file contributes from its dictionaries alone
-//! ([`sfst::MetaReader::for_each_field_value`]: no position bitmaps, no
-//! rows), a tail from its frame-decoded pair table. Values are matched
+//! A sealed file contributes from its metadata (keys) or its
+//! dictionaries ([`sfst::MetaReader::for_each_field_value`]: no position
+//! bitmaps, no rows), a tail from its frame-decoded pair table, whose
+//! value counts give its keys' tiers. Values are matched
 //! on their full bytes and shown cut to [`DISPLAY_MAX_BYTES`] at a
 //! character boundary, flagged: values sharing that prefix are one
 //! suggestion. Values that are not UTF-8 are skipped, since a selection
@@ -48,7 +59,7 @@ use super::attributes::{AttributeRequestError, pruned, storage_field_of};
 use super::order::{complete_after, newest_first};
 use super::sources::{TraceSource, validate_sources};
 use super::status::{PartialReason, QueryStatus, StatusBuilder};
-use super::vocab::{AttributeKey, AttributeOwner};
+use super::vocab::{AttributeKey, AttributeOwner, BuiltinField, storage_to_attribute};
 use super::wal_scan::TraceWalScan;
 use super::window::TimeWindow;
 use crate::source::map_source;
@@ -66,11 +77,20 @@ pub const DEFAULT_STALE_FILES: usize = 8;
 /// Values scanned between two deadline checks inside one source.
 pub const DEADLINE_CHECK_EVERY: usize = 1024;
 
-/// One suggestions request: a key's values matching `term`.
+/// Renders a key as the caller names it (the ledger's selection grammar,
+/// the CLI's words).
+pub type KeyRenderer = fn(AttributeOwner, &AttributeKey) -> String;
+
+#[derive(Debug, Clone)]
+enum Target {
+    Keys(KeyRenderer),
+    Values(AttributeOwner, AttributeKey),
+}
+
+/// One suggestions request: the keys, or a key's values, matching `term`.
 #[derive(Debug, Clone)]
 pub struct SuggestQuery {
-    owner: AttributeOwner,
-    key: AttributeKey,
+    target: Target,
     term: String,
     window: Option<TimeWindow>,
     max_items: usize,
@@ -84,9 +104,17 @@ impl SuggestQuery {
     /// or a builtin field with a dictionary under
     /// [`AttributeOwner::Builtin`]).
     pub fn values(owner: AttributeOwner, key: AttributeKey) -> Self {
+        Self::new(Target::Values(owner, key))
+    }
+
+    /// Suggest keys, each rendered by `render`.
+    pub fn keys(render: KeyRenderer) -> Self {
+        Self::new(Target::Keys(render))
+    }
+
+    fn new(target: Target) -> Self {
         Self {
-            owner,
-            key,
+            target,
             term: String::new(),
             window: None,
             max_items: DEFAULT_SUGGEST_ITEMS,
@@ -96,7 +124,7 @@ impl SuggestQuery {
         }
     }
 
-    /// The typed text; empty matches every value (as a prefix).
+    /// The typed text; empty matches every candidate (as a prefix).
     pub fn term(mut self, term: impl Into<String>) -> Self {
         self.term = term.into();
         self
@@ -134,11 +162,14 @@ impl SuggestQuery {
 /// One suggestion.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Suggestion {
-    /// The value, cut to [`DISPLAY_MAX_BYTES`] when `truncated`.
+    /// The key or value, cut to [`DISPLAY_MAX_BYTES`] when `truncated`.
     pub text: String,
     /// The text is a prefix of at least one longer value.
     pub truncated: bool,
     pub class: MatchClass,
+    /// Keys only: the highest tier a visited source gives the key;
+    /// `None` when no source carries it.
+    pub tier: Option<sfst::FieldTier>,
 }
 
 /// The suggestions, best first.
@@ -153,7 +184,7 @@ pub struct SuggestData {
     pub complete_after: Option<u32>,
 }
 
-/// Suggest values per `query` over `sources`. See the module docs for
+/// Suggest keys or values per `query` over `sources`. See the module docs for
 /// ranking, bounds, cancellation and failure contracts. `progress` ticks
 /// once per source; an early stop ticks the rest.
 ///
@@ -168,12 +199,28 @@ pub fn suggest(
     if query.max_items == 0 || query.max_files == 0 {
         return Err(AttributeRequestError::ZeroLimit);
     }
-    let storage = storage_field_of(query.owner, &query.key)?;
+    let target = match &query.target {
+        Target::Keys(render) => Resolved::Keys(*render),
+        Target::Values(owner, key) => Resolved::Values(storage_field_of(*owner, key)?),
+    };
     validate_sources(&sources)?;
     newest_first(&mut sources);
 
     let matcher = ValueMatcher::new(&query.term);
     let mut set = BoundedSuggestions::new(query.max_items);
+    if let Resolved::Keys(render) = target {
+        for field in BuiltinField::ALL {
+            let key = AttributeKey::Builtin(field);
+            offer_key(
+                &mut set,
+                &matcher,
+                render,
+                AttributeOwner::Builtin,
+                &key,
+                None,
+            );
+        }
+    }
     let mut status = StatusBuilder::new();
     let mut clock = Clock::new(query.deadline);
     let (mut visited_files, mut stale) = (0usize, 0usize);
@@ -202,8 +249,8 @@ pub fn suggest(
         }
         let visit = match source {
             TraceSource::Sfst(c) if pruned(query.window, &c.summary) => Visit::Absent,
-            TraceSource::Sfst(c) => visit_sfst(c, &storage, &matcher, &mut set, &mut clock),
-            TraceSource::Tail(t) => visit_tail(t, &storage, &matcher, &mut set, &mut clock),
+            TraceSource::Sfst(c) => visit_sfst(c, &target, &matcher, &mut set, &mut clock),
+            TraceSource::Tail(t) => visit_tail(t, &target, &matcher, &mut set, &mut clock),
             TraceSource::Unavailable(u) => {
                 if !pruned(query.window, &u.summary) {
                     status.add(PartialReason::RemoteUnavailable);
@@ -246,9 +293,17 @@ pub fn suggest(
     })
 }
 
+/// The query's target, validated.
+enum Resolved {
+    Keys(KeyRenderer),
+    /// The storage field holding the key's values.
+    Values(String),
+}
+
 /// What one source contributed.
 enum Visit {
-    /// Pruned by the window, unavailable, or without the key: no work.
+    /// Pruned by the window, unavailable, or (values) without the key:
+    /// no work.
     Absent,
     Failed(String),
     /// Scanned to the end; `changed` when the set took a new suggestion.
@@ -261,7 +316,7 @@ enum Visit {
 
 fn visit_sfst(
     c: &super::sources::TraceSfstCandidate,
-    storage: &str,
+    target: &Resolved,
     matcher: &ValueMatcher,
     set: &mut BoundedSuggestions,
     clock: &mut Clock,
@@ -273,6 +328,22 @@ fn visit_sfst(
     let meta = match sfst::MetaReader::open(mapped.bytes()) {
         Ok(m) => m,
         Err(e) => return Visit::Failed(format!("open: {e}")),
+    };
+    let storage = match target {
+        Resolved::Values(storage) => storage,
+        Resolved::Keys(render) => {
+            let fields = match meta.field_table() {
+                Ok(fields) => fields,
+                Err(e) => return Visit::Failed(format!("field table: {e}")),
+            };
+            let mut changed = false;
+            for field in fields.iter() {
+                if let Some((owner, key)) = storage_to_attribute(&field.name) {
+                    changed |= offer_key(set, matcher, *render, owner, &key, Some(field.tier));
+                }
+            }
+            return Visit::Scanned { changed };
+        }
     };
     let (mut changed, mut interrupted) = (false, false);
     let present = meta.for_each_field_value(storage, |value| {
@@ -293,7 +364,7 @@ fn visit_sfst(
 
 fn visit_tail(
     t: &super::sources::TraceWalTail,
-    storage: &str,
+    target: &Resolved,
     matcher: &ValueMatcher,
     set: &mut BoundedSuggestions,
     clock: &mut Clock,
@@ -302,7 +373,23 @@ fn visit_tail(
         Ok(scan) => scan,
         Err(e) => return Visit::Failed(format!("scan: {e}")),
     };
-    let Some(values) = scan.pair_table().get(storage) else {
+    let storage = match target {
+        Resolved::Values(storage) => storage,
+        Resolved::Keys(render) => {
+            let mut changed = false;
+            for (name, values) in scan.pair_table() {
+                if let Some((owner, key)) = storage_to_attribute(name) {
+                    let tier = sfst::FieldTier::from_cardinality(
+                        values.len(),
+                        sfst::DEFAULT_CARDINALITY_THRESHOLD,
+                    );
+                    changed |= offer_key(set, matcher, *render, owner, &key, Some(tier));
+                }
+            }
+            return Visit::Scanned { changed };
+        }
+    };
+    let Some(values) = scan.pair_table().get(storage.as_str()) else {
         return Visit::Absent;
     };
     let mut changed = false;
@@ -323,7 +410,33 @@ fn offer(set: &mut BoundedSuggestions, matcher: &ValueMatcher, value: &[u8]) -> 
     let Ok(text) = std::str::from_utf8(value) else {
         return false;
     };
-    set.offer(text, class)
+    set.offer(text, class, None)
+}
+
+/// Classify a key by the better of its rendered form and its bare name,
+/// and offer it; `true` when the set changed.
+fn offer_key(
+    set: &mut BoundedSuggestions,
+    matcher: &ValueMatcher,
+    render: KeyRenderer,
+    owner: AttributeOwner,
+    key: &AttributeKey,
+    tier: Option<sfst::FieldTier>,
+) -> bool {
+    let text = render(owner, key);
+    let bare = match key {
+        AttributeKey::Attribute(name) => matcher.classify(name.as_bytes()),
+        AttributeKey::Builtin(_) => None,
+    };
+    match matcher
+        .classify(text.as_bytes())
+        .into_iter()
+        .chain(bare)
+        .min()
+    {
+        Some(class) => set.offer(&text, class, tier),
+        None => false,
+    }
 }
 
 /// The deadline, checked cheaply inside scans.
@@ -348,12 +461,18 @@ impl Clock {
     }
 }
 
+/// What the set knows about one display text.
+struct Entry {
+    class: MatchClass,
+    truncated: bool,
+    tier: Option<sfst::FieldTier>,
+}
+
 /// The best `k` suggestions seen so far, by (class, text). Memory is
 /// O(k): a candidate that cannot enter is dropped at once.
 struct BoundedSuggestions {
     k: usize,
-    /// Display text → (class, truncated).
-    best: HashMap<Box<str>, (MatchClass, bool)>,
+    best: HashMap<Box<str>, Entry>,
     order: BTreeSet<(MatchClass, Box<str>)>,
     /// A match was rejected or evicted.
     truncated: bool,
@@ -369,22 +488,25 @@ impl BoundedSuggestions {
         }
     }
 
-    /// Offer a matching value; `true` when the set changed.
-    fn offer(&mut self, value: &str, class: MatchClass) -> bool {
+    /// Offer a matching candidate; `true` when the set changed. A key
+    /// seen again keeps the highest tier; that alone is no change.
+    fn offer(&mut self, value: &str, class: MatchClass, tier: Option<sfst::FieldTier>) -> bool {
         let (display, cut) = display_text(value);
-        if let Some((old_class, old_cut)) = self.best.get_mut(display) {
-            // Another value with the same display text: keep the better
-            // class, and flag the text if either was cut.
+        if let Some(entry) = self.best.get_mut(display) {
+            // Another candidate with the same display text: keep the
+            // better class and the higher tier, and flag the text if
+            // either was cut.
+            entry.tier = entry.tier.max(tier);
             let mut changed = false;
-            if cut && !*old_cut {
-                *old_cut = true;
+            if cut && !entry.truncated {
+                entry.truncated = true;
                 changed = true;
             }
-            if class < *old_class {
+            if class < entry.class {
                 let key: Box<str> = display.into();
-                self.order.remove(&(*old_class, key.clone()));
+                self.order.remove(&(entry.class, key.clone()));
                 self.order.insert((class, key));
-                *old_class = class;
+                entry.class = class;
                 changed = true;
             }
             return changed;
@@ -400,7 +522,14 @@ impl BoundedSuggestions {
             self.truncated = true;
         }
         let key: Box<str> = display.into();
-        self.best.insert(key.clone(), (class, cut));
+        self.best.insert(
+            key.clone(),
+            Entry {
+                class,
+                truncated: cut,
+                tier,
+            },
+        );
         self.order.insert((class, key));
         true
     }
@@ -409,11 +538,15 @@ impl BoundedSuggestions {
         self.order
             .into_iter()
             .map(|(class, text)| {
-                let truncated = self.best.remove(&text).is_some_and(|(_, cut)| cut);
+                let entry = self
+                    .best
+                    .remove(&text)
+                    .expect("every ordered text has an entry");
                 Suggestion {
                     text: text.into(),
-                    truncated,
+                    truncated: entry.truncated,
                     class,
+                    tier: entry.tier,
                 }
             })
             .collect()
@@ -448,11 +581,11 @@ mod tests {
     #[test]
     fn the_set_keeps_the_best_k_by_class_then_text() {
         let mut set = BoundedSuggestions::new(2);
-        assert!(set.offer("b", Prefix));
-        assert!(set.offer("a", Contains));
+        assert!(set.offer("b", Prefix, None));
+        assert!(set.offer("a", Contains, None));
         // Full: a worse candidate is dropped, a better one evicts the worst.
-        assert!(!set.offer("c", Contains));
-        assert!(set.offer("z", Exact));
+        assert!(!set.offer("c", Contains, None));
+        assert!(set.offer("z", Exact, None));
         assert!(set.truncated);
         assert_eq!(
             texts(set),
@@ -463,9 +596,9 @@ mod tests {
     #[test]
     fn a_repeated_text_keeps_its_better_class() {
         let mut set = BoundedSuggestions::new(3);
-        assert!(set.offer("a", Fuzzy1));
-        assert!(!set.offer("a", Fuzzy2));
-        assert!(set.offer("a", Prefix));
+        assert!(set.offer("a", Fuzzy1, None));
+        assert!(!set.offer("a", Fuzzy2, None));
+        assert!(set.offer("a", Prefix, None));
         assert!(!set.truncated);
         assert_eq!(texts(set), [("a".into(), Prefix, false)]);
     }
@@ -475,9 +608,9 @@ mod tests {
         // The worst only improves, so an evicted value cannot re-enter
         // with the class it was evicted at.
         let mut set = BoundedSuggestions::new(1);
-        assert!(set.offer("b", Contains));
-        assert!(set.offer("a", Prefix));
-        assert!(!set.offer("b", Contains));
+        assert!(set.offer("b", Contains, None));
+        assert!(set.offer("a", Prefix, None));
+        assert!(!set.offer("b", Contains, None));
         assert_eq!(texts(set), [("a".into(), Prefix, false)]);
     }
 
@@ -488,8 +621,8 @@ mod tests {
         let long_a = format!("{head}éa");
         let long_b = format!("{head}éb");
         let mut set = BoundedSuggestions::new(4);
-        assert!(set.offer(&long_a, Prefix));
-        assert!(!set.offer(&long_b, Prefix));
+        assert!(set.offer(&long_a, Prefix, None));
+        assert!(!set.offer(&long_b, Prefix, None));
         assert_eq!(texts(set), [(head, Prefix, true)]);
     }
 }

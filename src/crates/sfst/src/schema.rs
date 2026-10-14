@@ -131,6 +131,21 @@ pub enum FieldTier {
     High,
 }
 
+impl FieldTier {
+    /// The tier of a field with `cardinality` distinct values under the
+    /// threshold `threshold` (see the type docs).
+    pub fn from_cardinality(cardinality: usize, threshold: u32) -> Self {
+        let t = threshold as usize;
+        if cardinality < t {
+            FieldTier::Low
+        } else if cardinality < t.saturating_mul(10) {
+            FieldTier::Mid
+        } else {
+            FieldTier::High
+        }
+    }
+}
+
 /// Default cardinality threshold for [`FieldTier`] classification.
 /// Public so every producer of field tables — the index build here and
 /// the WAL row scan in `sfsq` — classifies with the same boundaries
