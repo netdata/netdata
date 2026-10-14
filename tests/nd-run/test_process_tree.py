@@ -301,13 +301,17 @@ class TreeTests(unittest.TestCase):
 
     def test_path_only_pipes_are_rejected_before_launch(self):
         for endpoint in ("control", "status"):
-            with self.subTest(endpoint=endpoint):
-                process, _, status = self.start([PROBE, "fds"], path_only=endpoint)
-                process.wait(timeout=10)
-                self.assertEqual(process.returncode, 126)
-                self.assertEqual(process.stdout.read(), b"")
-                self.assertEqual(os.read(status, 256), b"")
-                self.assertIn(b"private protocol descriptors", process.stderr.read())
+            for persistent in (False, True):
+                with self.subTest(endpoint=endpoint, persistent=persistent):
+                    record = self.new_completion() if persistent else None
+                    process, _, status = self.start([PROBE, "fds"], path_only=endpoint, completion=record)
+                    process.wait(timeout=10)
+                    self.assertEqual(process.returncode, 126)
+                    self.assertEqual(process.stdout.read(), b"")
+                    self.assertEqual(os.read(status, 256), b"")
+                    self.assertIn(b"private protocol descriptors", process.stderr.read())
+                    if record:
+                        self.assert_receipt(record)
 
     def test_exec_failure_has_verified_empty_tree(self):
         process, _, status = self.start([BUILD / "missing-executable"])
