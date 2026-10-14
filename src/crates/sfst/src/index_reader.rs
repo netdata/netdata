@@ -881,7 +881,8 @@ impl<'a> IndexReader<'a> {
             return Ok(Trace::empty());
         }
         let mut sources: [&mut dyn crate::trace_combine::SpanSource; 1] = [&mut session];
-        let mut outcome = crate::trace_combine::combine(&mut sources, trace_id, None, &|| false);
+        let mut outcome =
+            crate::trace_combine::combine(&mut sources, trace_id, None, None, &|| false);
         // Single source: any failure IS the result — propagate (the
         // cross-source engine instead reports failures as a partial
         // status; with one file there is nothing left to serve).

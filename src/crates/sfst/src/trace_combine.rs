@@ -40,6 +40,12 @@
 //! - Capping stops at the first unique span BEYOND the cap — an
 //!   exactly-cap trace is `Complete`, and resends of already-kept keys
 //!   (checked before the cap) cannot truncate.
+//! - An optional [`SpanShaper`] shapes each span the merge keeps (after
+//!   canonical selection, so content identity is unaffected) and weighs
+//!   it; the merge stops at the first unique span whose weight would
+//!   pass the shaper's budget, by the cap's rule. The kept spans then
+//!   hold what the caller will send, not full values: a caller's
+//!   response budget bounds the merge's memory.
 //!
 //! [`IndexReader::trace_by_id`]: crate::IndexReader::trace_by_id
 
@@ -92,11 +98,36 @@ pub trait SpanSource {
     fn materialize(&mut self, position: u32) -> Result<TraceSpan, crate::Error>;
 }
 
+/// What a [`SpanShaper`] made of one span the merge keeps.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct Shaped {
+    /// The span's weight against the shaper's budget (e.g. its bytes in
+    /// a response).
+    pub weight: usize,
+    /// The shaper cut part of the span (e.g. capped a value).
+    pub cut: bool,
+}
+
+/// Shapes the spans a merge keeps, in the order it keeps them (the total
+/// order), and bounds their summed weight. See the module docs.
+pub trait SpanShaper {
+    /// Shape `span` in place and weigh it.
+    fn shape(&mut self, span: &mut TraceSpan) -> Shaped;
+    /// The most the kept spans may weigh together.
+    fn budget(&self) -> usize;
+}
+
 /// What [`combine`] produced.
 pub struct CombineOutcome {
     pub trace: Trace,
+    /// Parallel to `trace.spans`: the shaper cut part of the span (all
+    /// `false` without a shaper).
+    pub cut: Vec<bool>,
     /// The span cap was reached AND at least one more unique span exists.
     pub truncated: bool,
+    /// The shaper's budget refused a unique span: the trace is the prefix
+    /// that fits.
+    pub budget_hit: bool,
     /// The merge was cancelled mid-way: the trace is the deterministic
     /// merged prefix assembled so far.
     pub cancelled: bool,
@@ -173,6 +204,8 @@ impl PartialOrd for HeapEntry {
 ///
 /// `cap = None` means unbounded; `cap = Some(0)` is a caller error the
 /// engine rejects at its request boundary (asserted here in debug builds).
+/// `shaper`, when given, shapes and weighs every kept span (see
+/// [`SpanShaper`]).
 ///
 /// `cancel` is polled during head resolution and once per merge group.
 /// Once the merge is running, a firing cancel keeps the deterministic
@@ -183,6 +216,7 @@ pub fn combine(
     sources: &mut [&mut dyn SpanSource],
     trace_id: TraceId,
     cap: Option<usize>,
+    mut shaper: Option<&mut dyn SpanShaper>,
     cancel: &dyn Fn() -> bool,
 ) -> CombineOutcome {
     debug_assert!(
@@ -202,7 +236,9 @@ pub fn combine(
             roots: Vec::new(),
             children: Vec::new(),
         },
+        cut: Vec::new(),
         truncated: false,
+        budget_hit: false,
         cancelled: true,
         failures,
         contributing_sources: Vec::new(),
@@ -252,9 +288,10 @@ pub fn combine(
 
     let mut failed: Vec<bool> = vec![false; sources.len()];
     let mut seen: HashSet<(SpanId, i32)> = HashSet::new();
-    let mut spans: Vec<TraceSpan> = Vec::new();
+    let mut kept = Kept::default();
     let mut contributors: Vec<usize> = Vec::new();
     let mut truncated = false;
+    let mut budget_hit = false;
     let mut cancelled = false;
 
     'merge: while let Some(head) = heap.pop() {
@@ -312,7 +349,7 @@ pub fn combine(
         // beyond it — the result is truncated, and the beyond-cap payload
         // is never built.
         if let Some(n) = cap
-            && spans.len() >= n
+            && kept.spans.len() >= n
         {
             truncated = true;
             break 'merge;
@@ -325,8 +362,11 @@ pub fn combine(
             let r = refs[source][index];
             match sources[source].materialize(r.position) {
                 Ok(span) => {
+                    if !kept.push(span, &mut shaper) {
+                        budget_hit = true;
+                        break 'merge;
+                    }
                     seen.insert((span_id, kind));
-                    spans.push(span);
                     contributors.push(source);
                 }
                 Err(e) => {
@@ -384,8 +424,11 @@ pub fn combine(
                 }
             }
             if let Some((_, _, span)) = best {
+                if !kept.push(span, &mut shaper) {
+                    budget_hit = true;
+                    break 'merge;
+                }
                 seen.insert((span_id, kind));
-                spans.push(span);
                 contributors.append(&mut tied_sources);
             }
             continue;
@@ -417,29 +460,62 @@ pub fn combine(
         // nothing beyond it is touched.
         for (_, _, span, source) in members {
             if let Some(n) = cap
-                && spans.len() >= n
+                && kept.spans.len() >= n
             {
                 truncated = true;
                 break 'merge;
             }
-            spans.push(span);
+            if !kept.push(span, &mut shaper) {
+                budget_hit = true;
+                break 'merge;
+            }
             contributors.push(source);
         }
     }
 
     contributors.sort_unstable();
     contributors.dedup();
-    let (roots, children) = build_forest(&spans);
+    let (roots, children) = build_forest(&kept.spans);
     CombineOutcome {
         trace: Trace {
-            spans,
+            spans: kept.spans,
             roots,
             children,
         },
+        cut: kept.cut,
         truncated,
+        budget_hit,
         cancelled,
         failures,
         contributing_sources: contributors,
+    }
+}
+
+/// The spans a merge keeps, shaped and weighed when a shaper is given.
+#[derive(Default)]
+struct Kept {
+    spans: Vec<TraceSpan>,
+    cut: Vec<bool>,
+    weight: usize,
+}
+
+impl Kept {
+    /// Keep `span` unless the shaper's budget refuses it (`false`: the
+    /// caller stops the merge).
+    fn push(&mut self, mut span: TraceSpan, shaper: &mut Option<&mut dyn SpanShaper>) -> bool {
+        let mut cut = false;
+        if let Some(shaper) = shaper.as_deref_mut() {
+            let shaped = shaper.shape(&mut span);
+            let weight = self.weight.saturating_add(shaped.weight);
+            if weight > shaper.budget() {
+                return false;
+            }
+            self.weight = weight;
+            cut = shaped.cut;
+        }
+        self.spans.push(span);
+        self.cut.push(cut);
+        true
     }
 }
 
@@ -589,7 +665,7 @@ mod tests {
     }
 
     fn run(sources: &mut [&mut dyn SpanSource], cap: Option<usize>) -> CombineOutcome {
-        combine(sources, tid(), cap, &|| false)
+        combine(sources, tid(), cap, None, &|| false)
     }
 
     #[test]
@@ -868,7 +944,7 @@ mod tests {
             polls.set(polls.get() + 1);
             polls.get() >= 2
         };
-        let out = combine(&mut set, tid(), None, &cancel);
+        let out = combine(&mut set, tid(), None, None, &cancel);
         assert!(out.cancelled);
         assert!(out.trace.spans.is_empty());
 
@@ -881,15 +957,101 @@ mod tests {
             polls.set(polls.get() + 1);
             polls.get() >= 4
         };
-        let out = combine(&mut set, tid(), None, &cancel);
+        let out = combine(&mut set, tid(), None, None, &cancel);
         assert!(out.cancelled);
         assert_eq!(out.trace.spans.len(), 1);
         assert_eq!(out.trace.spans[0].fields[0].1, "first");
 
         // Cancelled with ZERO sources: still cancelled, never Complete.
         let mut empty: Vec<&mut dyn SpanSource> = vec![];
-        let out = combine(&mut empty, tid(), None, &|| true);
+        let out = combine(&mut empty, tid(), None, None, &|| true);
         assert!(out.cancelled);
+    }
+
+    /// Weighs every span 10 and cuts its name to `cut_to` characters.
+    struct TenEach {
+        budget: usize,
+        cut_to: usize,
+        seen: Vec<String>,
+    }
+
+    impl SpanShaper for TenEach {
+        fn shape(&mut self, span: &mut TraceSpan) -> Shaped {
+            let name = &mut span.fields[0].1;
+            self.seen.push(name.clone());
+            let cut = name.len() > self.cut_to;
+            name.truncate(self.cut_to);
+            Shaped { weight: 10, cut }
+        }
+        fn budget(&self) -> usize {
+            self.budget
+        }
+    }
+
+    fn shaped(spans: Vec<TraceSpan>, budget: usize) -> (CombineOutcome, TenEach) {
+        let mut src = VecSource::new(spans);
+        let mut shaper = TenEach {
+            budget,
+            cut_to: 3,
+            seen: Vec::new(),
+        };
+        let out = combine(
+            &mut [&mut src as &mut dyn SpanSource],
+            tid(),
+            None,
+            Some(&mut shaper),
+            &|| false,
+        );
+        (out, shaper)
+    }
+
+    #[test]
+    fn a_shaper_bounds_the_kept_weight_by_the_caps_rule() {
+        let three = || {
+            vec![
+                span([1; 8], [0; 8], 1, 1, "a"),
+                span([2; 8], [1; 8], 2, 1, "b"),
+                span([3; 8], [1; 8], 3, 1, "c"),
+            ]
+        };
+        // 25 holds two spans of 10: the third is the first beyond it.
+        let (out, _) = shaped(three(), 25);
+        assert_eq!(out.trace.spans.len(), 2);
+        assert!(out.budget_hit && !out.truncated);
+        // An exact fit is complete.
+        let (out, _) = shaped(three(), 30);
+        assert_eq!(out.trace.spans.len(), 3);
+        assert!(!out.budget_hit);
+        assert_eq!(out.trace.children.len(), 3);
+    }
+
+    #[test]
+    fn resends_never_spend_the_budget() {
+        // A resend of a kept key is skipped before shaping.
+        let spans = vec![
+            span([1; 8], [0; 8], 1, 1, "a"),
+            span([1; 8], [0; 8], 5, 1, "a"),
+            span([2; 8], [1; 8], 6, 1, "b"),
+        ];
+        let (out, shaper) = shaped(spans, 20);
+        assert_eq!(out.trace.spans.len(), 2);
+        assert!(!out.budget_hit);
+        assert_eq!(shaper.seen, ["a", "b"]);
+    }
+
+    #[test]
+    fn the_shaper_sees_the_canonical_copy_and_flags_its_cuts() {
+        // Two copies of one key: the earlier one is canonical, and only it
+        // is shaped; the kept span carries the shaped content.
+        let spans = vec![
+            span([1; 8], [0; 8], 1, 1, "first"),
+            span([1; 8], [0; 8], 1, 1, "first-other"),
+            span([2; 8], [1; 8], 2, 1, "ok"),
+        ];
+        let (out, shaper) = shaped(spans, 100);
+        assert_eq!(shaper.seen.len(), 2);
+        assert_eq!(out.trace.spans[0].fields[0].1.len(), 3);
+        assert_eq!(out.cut, [true, false]);
     }
 
     #[test]

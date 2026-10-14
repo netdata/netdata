@@ -906,7 +906,7 @@ pub fn search(
                     continue;
                 }
             }
-            let outcome = combine(&mut merged, trace_id, Some(query.span_cap), &|| {
+            let outcome = combine(&mut merged, trace_id, Some(query.span_cap), None, &|| {
                 cancel.is_cancelled()
             });
             assembled_count += 1;

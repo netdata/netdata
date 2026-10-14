@@ -391,6 +391,44 @@ fn failed_sources_are_reported_and_the_rest_served() {
     assert!(!data.status.has(PartialReason::SizeCap));
 }
 
+/// A shaper bounds what the merge keeps: past its budget the trace is the
+/// earliest spans that fit, reported as `byte_budget`, with the shaper's
+/// cut flags beside them.
+#[test]
+fn a_shaper_budget_cuts_the_trace_and_says_so() {
+    struct OneEach;
+    impl sfst::trace_combine::SpanShaper for OneEach {
+        fn shape(&mut self, span: &mut sfst::TraceSpan) -> sfst::trace_combine::Shaped {
+            sfst::trace_combine::Shaped {
+                weight: 1,
+                cut: span.start_ns == 1,
+            }
+        }
+        fn budget(&self) -> usize {
+            2
+        }
+    }
+    let dir = tempfile::tempdir().unwrap();
+    let wal = write_wal(
+        dir.path(),
+        vec![req(&[sp(1, 0, 1, "a"), sp(2, 1, 2, "b"), sp(3, 1, 3, "c")])],
+        "w",
+    );
+    let data = trace_by_id(
+        vec![sealed_source(dir.path(), &wal, "w")],
+        TraceQuery::new(sfst::TraceId::from(TRACE)).shaper(Box::new(OneEach)),
+        CancellationToken::new(),
+        Arc::new(AtomicUsize::new(0)),
+    )
+    .unwrap();
+    assert_eq!(span_names(&data), ["a", "b"]);
+    assert_eq!(data.span_cut, [true, false]);
+    assert_eq!(
+        data.status,
+        QueryStatus::Partial([PartialReason::ByteBudget].into())
+    );
+}
+
 /// Bloom first: a file that does not hold the trace is never opened
 /// fully, so a corrupt primary dictionary there stays unread — the
 /// lookup is complete. The same corruption in the file holding the trace

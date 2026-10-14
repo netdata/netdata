@@ -16,8 +16,8 @@ use std::collections::{HashMap, HashSet};
 
 use sfsq::traces::{
     AttributeKey, AttributeOwner, AttributeValuesData, BuiltinField, CompareOp, Condition,
-    DURATION_BIN_LABELS, DurationPercentiles, FieldKinds, OverviewData, PartialReason, Predicate,
-    PredicateTarget, PredicateValue, QueryStatus, SearchData, TraceData,
+    DURATION_BIN_LABELS, DurationPercentiles, FieldKinds, OverviewData, Predicate, PredicateTarget,
+    PredicateValue, SearchData, TraceData,
 };
 
 use super::wire::{
@@ -102,8 +102,8 @@ pub(crate) fn completion_capture_range(window: &std::ops::Range<u32>) -> std::op
 pub(crate) const TRACE_VALUE_MAX_BYTES: usize = 8 * 1024;
 
 /// Budget for a trace's spans and their field kinds, in compact JSON
-/// bytes. Past it the response keeps the earliest spans and reports
-/// `byte_budget`.
+/// bytes ([`WireShaper`]). Past it the engine keeps the earliest spans
+/// and reports `byte_budget`.
 pub(crate) const TRACE_SPANS_MAX_BYTES: usize = 2 * 1024 * 1024;
 
 /// Per-value cap, in JSON bytes (see [`truncate_value`]), on the
@@ -181,66 +181,38 @@ fn json_len(value: &impl serde::Serialize) -> usize {
     count.0
 }
 
-/// `status` with `extra` added (a partial is a set, so a repeat is a no-op).
-fn with_reason(status: QueryStatus, extra: PartialReason) -> QueryStatus {
-    match status {
-        QueryStatus::Complete => QueryStatus::Partial([extra].into()),
-        QueryStatus::Partial(mut reasons) => {
-            reasons.insert(extra);
-            QueryStatus::Partial(reasons)
-        }
-    }
-}
-
 /// Shape one assembled trace into the wire result. `trace_id` is echoed
 /// back in canonical (lowercase) hex regardless of the request's casing.
 /// `coverage` is the capture range assembly actually used.
 ///
-/// Bounded: values are capped ([`TRACE_VALUE_MAX_BYTES`], flagged per
-/// span) and the spans stop at [`TRACE_SPANS_MAX_BYTES`]. A cut trace
-/// keeps its earliest spans — the combiner's total order, as the
-/// engine's own span cap does — with its graph rebuilt over them and
-/// its field kinds narrowed to the names they carry, and reports
-/// `byte_budget`.
+/// The engine already shaped the trace with [`WireShaper`]: values are
+/// capped (flagged per span in `span_cut`), a trace past the budget is
+/// its earliest spans with their own graph and field kinds and reports
+/// `byte_budget`. This only maps it.
 pub(crate) fn to_trace_result(
     trace_id: &sfst::TraceId,
     data: TraceData,
     coverage: CoverageWire,
 ) -> TraceResult {
-    let mut t = data.trace;
-    let mut status = data.status;
-    let mut field_kinds = data.field_kinds;
-    let truncated: Vec<bool> = t.spans.iter_mut().map(cap_span_values).collect();
-    let mut spans = Vec::with_capacity(t.spans.len());
-    {
-        // A name's kind entry is sent once: it counts with the first kept
-        // span that carries the name.
-        let mut kinds = KindCosts::new(&field_kinds);
-        let mut bytes = 0usize;
-        for (s, &cut) in t.spans.iter().zip(&truncated) {
-            let wire = span_wire(s, cut);
-            bytes += json_len(&wire) + kinds.first_seen_in(s);
-            if bytes > TRACE_SPANS_MAX_BYTES {
-                break;
-            }
-            spans.push(wire);
-        }
-    }
-    if spans.len() < t.spans.len() {
-        t.spans.truncate(spans.len());
-        let (roots, children) = sfst::trace_combine::build_forest(&t.spans);
-        t.roots = roots;
-        t.children = children;
-        retain_kinds_of(&mut field_kinds, &t.spans);
-        status = with_reason(status, PartialReason::ByteBudget);
-    }
+    let t = data.trace;
+    let cut = data
+        .span_cut
+        .iter()
+        .copied()
+        .chain(std::iter::repeat(false));
+    let spans: Vec<SpanWire> = t
+        .spans
+        .iter()
+        .zip(cut)
+        .map(|(s, c)| span_wire(s, c))
+        .collect();
     let summary_root = t.summary_root();
     TraceResult {
         mode: "trace",
         version: 1,
         trace_id: trace_id.to_string(),
         coverage,
-        status: StatusWire::from(&status),
+        status: StatusWire::from(&data.status),
         items: TraceItems {
             returned: spans.len(),
         },
@@ -248,37 +220,43 @@ pub(crate) fn to_trace_result(
         roots: t.roots,
         children: t.children,
         spans,
-        field_kinds: field_kinds_wire(field_kinds),
+        field_kinds: field_kinds_wire(data.field_kinds),
     }
 }
 
-/// The wire cost of each name's field-kind entry, charged once, the
-/// first time a span carries the name.
-struct KindCosts<'a> {
-    sections: [HashMap<&'a str, sfst::ValueKind>; 3],
+/// The longest [`kind_word`]: a name's kind entry is charged at this
+/// upper bound, since kinds are known only once the merge is done.
+const KIND_WORD_MAX: &str = "empty_kvlist";
+
+/// Shapes a trace's spans for the wire while the engine merges them (the
+/// trace handler passes it to `TraceQuery::shaper`): caps each span's
+/// values at [`TRACE_VALUE_MAX_BYTES`], flags the span when it cut one,
+/// and weighs it as its compact JSON plus, for each name it is the first
+/// to carry, an upper bound of that name's field-kind entry. The engine
+/// keeps spans while they fit [`TRACE_SPANS_MAX_BYTES`], so the merge
+/// itself holds no more than the response will.
+pub(crate) struct WireShaper {
+    /// Names already charged: span fields, event and link attributes.
+    names: [HashSet<String>; 3],
 }
 
-impl<'a> KindCosts<'a> {
-    fn new(kinds: &'a FieldKinds) -> Self {
-        let index = |v: &'a [(String, sfst::ValueKind)]| -> HashMap<&'a str, sfst::ValueKind> {
-            v.iter().map(|(n, k)| (n.as_str(), *k)).collect()
-        };
+impl WireShaper {
+    pub(crate) fn new() -> Self {
         Self {
-            sections: [
-                index(&kinds.fields),
-                index(&kinds.event_attributes),
-                index(&kinds.link_attributes),
-            ],
+            names: Default::default(),
         }
     }
+}
 
-    /// Bytes of the kind entries `span` brings in first.
-    fn first_seen_in(&mut self, span: &sfst::TraceSpan) -> usize {
-        let [fields, events, links] = &mut self.sections;
-        let mut cost = 0;
-        let mut charge = |section: &mut HashMap<&'a str, sfst::ValueKind>, name: &str| {
-            if let Some(kind) = section.remove(name) {
-                cost += json_len(&(name, kind_word(kind))) + 1;
+impl sfst::trace_combine::SpanShaper for WireShaper {
+    fn shape(&mut self, span: &mut sfst::TraceSpan) -> sfst::trace_combine::Shaped {
+        let cut = cap_span_values(span);
+        let mut weight = json_len(&span_wire(span, cut));
+        let [fields, events, links] = &mut self.names;
+        let mut charge = |seen: &mut HashSet<String>, name: &str| {
+            if !seen.contains(name) {
+                seen.insert(name.to_string());
+                weight += json_len(&(name, KIND_WORD_MAX)) + 1;
             }
         };
         for (name, _) in &span.fields {
@@ -294,32 +272,12 @@ impl<'a> KindCosts<'a> {
                 charge(links, name);
             }
         }
-        cost
+        sfst::trace_combine::Shaped { weight, cut }
     }
-}
 
-/// Keep the kinds of the names `spans` carry: the engine projects them
-/// onto every assembled span, and a cut trace sends only some of them.
-fn retain_kinds_of(kinds: &mut FieldKinds, spans: &[sfst::TraceSpan]) {
-    let mut fields: HashSet<&str> = HashSet::new();
-    let mut event_attributes: HashSet<&str> = HashSet::new();
-    let mut link_attributes: HashSet<&str> = HashSet::new();
-    for s in spans {
-        fields.extend(s.fields.iter().map(|(k, _)| k.as_str()));
-        for e in &s.events {
-            event_attributes.extend(e.attributes.iter().map(|(k, _)| k.as_str()));
-        }
-        for l in &s.links {
-            link_attributes.extend(l.attributes.iter().map(|(k, _)| k.as_str()));
-        }
+    fn budget(&self) -> usize {
+        TRACE_SPANS_MAX_BYTES
     }
-    kinds.fields.retain(|(n, _)| fields.contains(n.as_str()));
-    kinds
-        .event_attributes
-        .retain(|(n, _)| event_attributes.contains(n.as_str()));
-    kinds
-        .link_attributes
-        .retain(|(n, _)| link_attributes.contains(n.as_str()));
 }
 
 /// One assembled span → the wire shape (events and links ride along).

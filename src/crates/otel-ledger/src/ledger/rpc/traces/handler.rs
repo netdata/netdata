@@ -37,7 +37,7 @@ use sfsq::traces::{
 };
 
 use super::adapter::{
-    ResolvedWindow, build_predicate, check_request_text, completion_capture_range,
+    ResolvedWindow, WireShaper, build_predicate, check_request_text, completion_capture_range,
     heatmap_predicate, parse_cursor, parse_trace_id, parse_values_key, render_attribute_key,
     resolve_window, to_attribute_values_result, to_overview_section, to_search_result,
     to_suggest_result, to_trace_result, validate_trace_bounds,
@@ -116,10 +116,10 @@ const TRACE_CONCURRENCY: usize = 2;
 /// complete one later. The newest source is always visited.
 const SUGGEST_DEADLINE: std::time::Duration = std::time::Duration::from_millis(250);
 
-/// The engine's span cap for one trace lookup. The response's byte
-/// budget (`TRACE_SPANS_MAX_BYTES`) holds about a thousand spans, so
-/// assembling far more only spends memory; the engine's own default
-/// (65,536) is a runaway-merge guard, not a response size.
+/// The engine's span cap for one trace lookup: the item bound beside the
+/// byte budget the wire shaper enforces (`TRACE_SPANS_MAX_BYTES`, about
+/// a thousand typical spans), for traces of tiny spans. The engine's own
+/// default (65,536) is a runaway-merge guard, not a response size.
 const TRACE_SPAN_CAP: usize = 10_000;
 
 pub(crate) struct OtelTracesHandler {
@@ -198,7 +198,9 @@ impl OtelTracesHandler {
                     .to_string(),
             ));
         }
-        let query = TraceQuery::new(trace_id).span_cap(TRACE_SPAN_CAP);
+        let query = TraceQuery::new(trace_id)
+            .span_cap(TRACE_SPAN_CAP)
+            .shaper(Box::new(WireShaper::new()));
 
         let bounds = validate_trace_bounds(params.after, params.before)
             .map_err(|e| handler_err(format!("invalid otel-traces request: {e}")))?;
@@ -223,6 +225,7 @@ impl OtelTracesHandler {
                 },
                 status: QueryStatus::Partial([PartialReason::Busy].into()),
                 field_kinds: FieldKinds::default(),
+                span_cut: Vec::new(),
             };
             return Ok(OtelTracesResponse::Trace(Box::new(to_trace_result(
                 &trace_id, busy, coverage,

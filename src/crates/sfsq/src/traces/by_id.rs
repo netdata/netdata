@@ -37,7 +37,7 @@ use std::sync::atomic::{AtomicUsize, Ordering};
 
 use tokio_util::sync::CancellationToken;
 
-use sfst::trace_combine::{SpanSource, combine};
+use sfst::trace_combine::{SpanShaper, SpanSource, combine};
 
 use super::sources::{SourceSetError, TraceSource, validate_sources};
 use super::status::{PartialReason, QueryStatus, StatusBuilder};
@@ -51,10 +51,20 @@ pub const DEFAULT_SPAN_CAP: usize = 65_536;
 /// A trace-by-id request in engine terms. [`new`](Self::new) applies the
 /// default span cap; [`span_cap`](Self::span_cap) overrides it and
 /// [`unbounded`](Self::unbounded) removes it.
-#[derive(Debug, Clone)]
 pub struct TraceQuery {
     trace_id: sfst::TraceId,
     span_cap: Option<usize>,
+    shaper: Option<Box<dyn SpanShaper + Send>>,
+}
+
+impl std::fmt::Debug for TraceQuery {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("TraceQuery")
+            .field("trace_id", &self.trace_id)
+            .field("span_cap", &self.span_cap)
+            .field("shaper", &self.shaper.is_some())
+            .finish()
+    }
 }
 
 impl TraceQuery {
@@ -62,7 +72,18 @@ impl TraceQuery {
         Self {
             trace_id,
             span_cap: Some(DEFAULT_SPAN_CAP),
+            shaper: None,
         }
+    }
+
+    /// Shape and weigh every span the merge keeps (a caller caps values
+    /// to its response's limits), and stop at the shaper's budget: the
+    /// merge then holds only what fits, and the result reports
+    /// [`ByteBudget`](PartialReason::ByteBudget) when the budget cut the
+    /// trace (see `sfst::trace_combine::SpanShaper`).
+    pub fn shaper(mut self, shaper: Box<dyn SpanShaper + Send>) -> Self {
+        self.shaper = Some(shaper);
+        self
     }
 
     /// Override the span cap. Zero is rejected at [`trace_by_id`]'s
@@ -127,6 +148,9 @@ pub struct TraceData {
     /// Field → coalesced scalar kind for the returned trace; see
     /// [`FieldKinds`] for the sectioning and coalescing contract.
     pub field_kinds: FieldKinds,
+    /// Parallel to `trace.spans`: the query's shaper cut part of the
+    /// span (all `false` without a shaper).
+    pub span_cut: Vec<bool>,
 }
 
 /// Run a cross-source trace-by-id. See the module docs for the status
@@ -166,6 +190,7 @@ pub fn trace_by_id(
             },
             status: status.finish(),
             field_kinds: FieldKinds::default(),
+            span_cut: Vec::new(),
         }
     };
     // Pre-heads cancellation returns EMPTY + Cancelled — polled up front
@@ -249,15 +274,23 @@ pub fn trace_by_id(
         origin.push(source_id.to_string());
     }
 
-    let outcome = combine(&mut merged, query.trace_id, query.span_cap, &|| {
-        cancel.is_cancelled()
-    });
+    let mut shaper = query.shaper;
+    let outcome = combine(
+        &mut merged,
+        query.trace_id,
+        query.span_cap,
+        shaper.as_deref_mut().map(|s| s as &mut dyn SpanShaper),
+        &|| cancel.is_cancelled(),
+    );
     // Release the merge's &mut borrows (each session, each tail) so the
     // field-kind pass below can read tails by index again.
     drop(merged);
 
     if outcome.truncated {
         status.add(PartialReason::SizeCap);
+    }
+    if outcome.budget_hit {
+        status.add(PartialReason::ByteBudget);
     }
     if outcome.cancelled {
         status.add(PartialReason::Cancelled);
@@ -331,5 +364,6 @@ pub fn trace_by_id(
         trace: outcome.trace,
         status: status.finish(),
         field_kinds,
+        span_cut: outcome.cut,
     })
 }

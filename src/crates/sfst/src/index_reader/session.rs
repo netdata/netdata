@@ -17,7 +17,8 @@
 //!   file's metadata view and opens the full reader (`PRIM`, for `_kind`
 //!   and string resolution) only once a lookup finds rows;
 //! - stream batches and EVNB/LNKB decode lazily, once;
-//! - KvId→string resolutions accumulate in a per-session cache.
+//! - KvId→string resolutions accumulate in a per-session cache, each
+//!   value cut to [`RESOLVED_VALUE_MAX_BYTES`].
 //!
 //! The session implements [`SpanSource`], so the shared combiner
 //! ([`crate::trace_combine::combine`]) drives it: cheap [`SpanRef`]s up
@@ -101,6 +102,26 @@ impl<'a> View<'_, 'a> {
             View::Failed => Err(upgrade_failed()),
         }
     }
+}
+
+/// The longest value a session resolves, in bytes: ten times the largest
+/// value seen in practice (a ~6 KB stack trace). It bounds what one
+/// materialized span, and the session's string cache, can hold under
+/// hostile input, before any caller's own cap; a longer value is cut at
+/// a character boundary.
+const RESOLVED_VALUE_MAX_BYTES: usize = 64 * 1024;
+
+/// Cut the value of a `key=value` string to [`RESOLVED_VALUE_MAX_BYTES`].
+fn cap_resolved(kv: &mut String) {
+    let value_start = kv.find('=').map_or(0, |i| i + 1);
+    let mut end = value_start.saturating_add(RESOLVED_VALUE_MAX_BYTES);
+    if kv.len() <= end {
+        return;
+    }
+    while !kv.is_char_boundary(end) {
+        end -= 1;
+    }
+    kv.truncate(end);
 }
 
 fn upgrade_failed() -> crate::Error {
@@ -300,7 +321,8 @@ impl<'r, 'a> TraceFileSession<'r, 'a> {
         ids.dedup();
         ids.retain(|id| !self.strings.contains_key(id));
         if !ids.is_empty() {
-            let resolved = self.view.full()?.resolve_kv_strings(ids)?;
+            let mut resolved = self.view.full()?.resolve_kv_strings(ids)?;
+            resolved.values_mut().for_each(cap_resolved);
             self.strings.extend(resolved);
         }
         Ok(())
@@ -492,5 +514,22 @@ impl SpanSource for TraceFileSession<'_, '_> {
             events,
             links,
         })
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn resolved_values_are_cut_at_a_character_boundary() {
+        let mut kv = format!("k={}", "é".repeat(RESOLVED_VALUE_MAX_BYTES));
+        cap_resolved(&mut kv);
+        // "é" is two bytes: the cut lands on a boundary at the cap.
+        assert_eq!(kv.len(), 2 + RESOLVED_VALUE_MAX_BYTES);
+        let mut kv = format!("k={}x", "a".repeat(RESOLVED_VALUE_MAX_BYTES - 1));
+        let before = kv.clone();
+        cap_resolved(&mut kv);
+        assert_eq!(kv, before, "at the cap: untouched");
     }
 }

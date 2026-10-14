@@ -69,8 +69,9 @@ pub enum PartialReason {
     RemoteUnavailable,
     /// The response reached its byte budget: what it carries is a
     /// complete, valid prefix (for a trace, its earliest spans), and the
-    /// rest is left out. Raised by the ledger when it shapes a response,
-    /// never by an engine operation.
+    /// rest is left out. Raised by trace-by-id when the caller's shaper
+    /// budget refuses a span, and by a caller that shapes a response
+    /// itself.
     ByteBudget,
     /// The request was refused before any work: too many requests of its
     /// kind were already running. The result is empty, not wrong; the
