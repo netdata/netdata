@@ -2176,3 +2176,46 @@ fn long_values_are_evaluated_whole_in_every_layout() {
         }
     }
 }
+
+/// A pending window file that may hold a newer candidate than the pool's
+/// best compiles before the pool is examined, as eager compile would have
+/// ranked it: the tail's older trace (over the span cap) is never
+/// assembled, so the page is complete instead of `size_cap`.
+#[test]
+fn a_newer_pending_file_compiles_before_older_pool_candidates() {
+    let dir = tempfile::tempdir().unwrap();
+    let svc = || vec![kv_str("service.name", "svc")];
+    let older = write_wal(
+        dir.path(),
+        vec![req_with(
+            svc(),
+            None,
+            &[
+                span_in(1, 1, 0, 100 * NS, "a"),
+                span_in(1, 2, 1, 101 * NS, "a"),
+            ],
+        )],
+        "older-tail",
+    );
+    let newer = write_wal(
+        dir.path(),
+        vec![req_with(svc(), None, &[span_in(2, 1, 0, 150 * NS, "b")])],
+        "newer",
+    );
+    let sources = || {
+        both_roles(|| {
+            vec![
+                tail_source(&older, "older-tail"),
+                sealed_source(dir.path(), &newer, "newer"),
+            ]
+        })
+    };
+    let data = run(
+        sources(),
+        SearchQuery::new(Predicate::all())
+            .limit(1)
+            .span_cap_for_tests(1),
+    );
+    assert_eq!(ids(&data), vec![hex(2)]);
+    assert_eq!(data.status, QueryStatus::Complete);
+}
