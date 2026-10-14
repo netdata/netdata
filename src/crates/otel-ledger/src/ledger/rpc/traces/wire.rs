@@ -1,13 +1,12 @@
 //! Netdata function wire types for `otel-traces`.
 //!
 //! The transport layer between the netdata function protocol and the
-//! wire-neutral `sfsq::traces` engine. One Function view plus five
+//! wire-neutral `sfsq::traces` engine. One Function view plus three
 //! explicit peer modes, each selected by exactly one top-level
-//! sub-object — `info`, `trace`, `attributes`, `attribute_values`,
-//! `search` — the mode's params self-contained
-//! in its object. A request without a selector is the Functions view:
-//! standard Functions parameters around the native search payload,
-//! wrapped as `type: "traces"`. Explicit modes keep their native
+//! sub-object — `info`, `trace`, `attribute_values` — the mode's params
+//! self-contained in its object. A request without a selector is the
+//! Functions view (the trace list): standard Functions parameters
+//! around the search page, wrapped as `type: "traces"`. Explicit modes keep their native
 //! response shapes. Mixing the two request forms, naming more than one
 //! selector, or an unknown key anywhere is a client error.
 //!
@@ -28,7 +27,7 @@ use sfsq::traces::{PartialReason, QueryStatus};
 
 /// Request param names accepted by this function, advertised to the UI
 /// in `InfoResponse::accepted_params`. The rule: the list carries
-/// exactly the TOP-LEVEL keys — the five mode selectors, `tenant`, and
+/// exactly the TOP-LEVEL keys — the three mode selectors, `tenant`, and
 /// every field the implicit Functions view reads, its own duration band
 /// included. `selections` is listed for
 /// the same reason: it is how the filter rail's picks travel, and a
@@ -43,9 +42,7 @@ use sfsq::traces::{PartialReason, QueryStatus};
 pub const ACCEPTED_PARAMS: &[&str] = &[
     "info",
     "trace",
-    "attributes",
     "attribute_values",
-    "search",
     "tenant",
     "after",
     "before",
@@ -56,7 +53,7 @@ pub const ACCEPTED_PARAMS: &[&str] = &[
     "max_trace_duration_ns",
 ];
 
-/// The raw top-level shape: the five mode selectors and supported
+/// The raw top-level shape: the three mode selectors and supported
 /// Functions fields captured presence-preserving (see [`present`]),
 /// plus `tenant`. Private on purpose: deserialized only through
 /// [`OtelTracesRequest`]'s manual `Deserialize` (which enforces a
@@ -74,15 +71,9 @@ struct RawOtelTracesRequest {
     /// The single-trace mode (dumb span list by trace id).
     #[serde(default, deserialize_with = "present")]
     trace: Option<serde_json::Value>,
-    /// Attribute-name enumeration (facet keys).
-    #[serde(default, deserialize_with = "present")]
-    attributes: Option<serde_json::Value>,
     /// Attribute-value enumeration (facet values).
     #[serde(default, deserialize_with = "present")]
     attribute_values: Option<serde_json::Value>,
-    /// The search mode (bounded most-recent-first trace summaries).
-    #[serde(default, deserialize_with = "present")]
-    search: Option<serde_json::Value>,
     #[serde(default, deserialize_with = "present")]
     after: Option<serde_json::Value>,
     #[serde(default, deserialize_with = "present")]
@@ -131,9 +122,7 @@ pub enum TracesMode {
     Functions(FunctionsParams),
     Info,
     Trace(TraceParams),
-    Attributes(AttributesParams),
     AttributeValues(AttributeValuesParams),
-    Search(SearchParams),
 }
 
 impl<'de> Deserialize<'de> for OtelTracesRequest {
@@ -169,16 +158,14 @@ impl TryFrom<RawOtelTracesRequest> for OtelTracesRequest {
     /// Mode resolution then the typed parse, in that order: ALL present
     /// selectors are counted BEFORE any selector value is decoded, so a
     /// conflicting body reports the conflict even when one selector is
-    /// also malformed (`{"trace": null, "search": {}}` is a conflict,
+    /// also malformed (`{"trace": null, "info": {}}` is a conflict,
     /// not an invalid trace selector).
     fn try_from(raw: RawOtelTracesRequest) -> Result<Self, String> {
         // Declaration order pins the conflict message's name order.
         let present: Vec<&'static str> = [
             ("info", raw.info.is_some()),
             ("trace", raw.trace.is_some()),
-            ("attributes", raw.attributes.is_some()),
             ("attribute_values", raw.attribute_values.is_some()),
-            ("search", raw.search.is_some()),
         ]
         .into_iter()
         .filter_map(|(name, set)| set.then_some(name))
@@ -239,12 +226,8 @@ impl TryFrom<RawOtelTracesRequest> for OtelTracesRequest {
             TracesMode::Info
         } else if let Some(v) = &raw.trace {
             TracesMode::Trace(typed("trace", v)?)
-        } else if let Some(v) = &raw.attributes {
-            TracesMode::Attributes(typed("attributes", v)?)
         } else if let Some(v) = &raw.attribute_values {
             TracesMode::AttributeValues(typed("attribute_values", v)?)
-        } else if let Some(v) = &raw.search {
-            TracesMode::Search(typed("search", v)?)
         } else {
             unreachable!("an explicit selector was verified present");
         };
@@ -256,23 +239,25 @@ impl TryFrom<RawOtelTracesRequest> for OtelTracesRequest {
     }
 }
 
-/// Standard Functions parameters for the default trace-search view.
-/// They translate into the native search mode (see
-/// [`Self::search_params`]); the response is that mode's page wrapped
-/// in the Functions envelope, plus the full-window aggregate on a
-/// first page only — an anchored page carries none ([`Self::anchor`]).
+/// Standard Functions parameters for the trace list. They translate
+/// into the search page's params (see [`Self::search_params`]); the
+/// response is that page wrapped in the Functions envelope, plus the
+/// full-window aggregate on a first page only — an anchored page
+/// carries none ([`Self::anchor`]).
 #[derive(Debug, Clone, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct FunctionsParams {
     /// Match window, unix seconds, with the standard Functions
-    /// conventions: `0` means "unspecified" (the search mode's
+    /// conventions: `0` means "unspecified" (the search page's
     /// defaults apply) and a NEGATIVE value is relative — `before`
     /// counted back from now, `after` from the resolved `before`.
     #[serde(default)]
     pub after: i64,
     #[serde(default)]
     pub before: i64,
-    /// Maximum traces on the page.
+    /// Maximum traces on the page. Zero and beyond
+    /// [`SEARCH_LIMIT_MAX`] are client errors — the list has no
+    /// unbounded option.
     #[serde(default = "default_limit")]
     pub last: usize,
     /// Opaque cursor from the previous page's `anchor.next`. It also
@@ -281,6 +266,9 @@ pub struct FunctionsParams {
     /// [`SearchResult::overview`]).
     #[serde(default)]
     pub anchor: Option<String>,
+    /// Facet selections. Keys are `<owner>.<key>` attributes
+    /// (resource/span/instrumentation/event/link) or bare builtin words
+    /// (see the adapter's grammar); values OR within a key, keys AND.
     #[serde(default)]
     pub selections: std::collections::HashMap<String, Vec<String>>,
     /// Inclusive lower bound on the TRACE envelope duration,
@@ -306,12 +294,9 @@ pub struct FunctionsParams {
 }
 
 impl FunctionsParams {
-    /// Translate into the native search params: relative windows
+    /// Translate into the search page's params: relative windows
     /// resolved (`before` against `now`, `after` against the resolved
-    /// `before`), the rest passed through, and `spans_per_trace` pinned
-    /// to 0 — the Functions view attaches no matched spans (its
-    /// `min`/`max` span-duration bounds stay `None` too; the view only
-    /// speaks trace-envelope duration).
+    /// `before`), the rest passed through.
     pub fn search_params(&self, now: u32) -> Result<SearchParams, String> {
         fn resolve(label: &str, value: i64, base: u32) -> Result<u32, String> {
             let absolute = if value < 0 {
@@ -340,10 +325,7 @@ impl FunctionsParams {
             after,
             before,
             limit: self.last,
-            spans_per_trace: Some(0),
             selections: self.selections.clone(),
-            min_duration_ns: None,
-            max_duration_ns: None,
             min_trace_duration_ns: self.min_trace_duration_ns,
             max_trace_duration_ns: self.max_trace_duration_ns,
             anchor: self.anchor.clone(),
@@ -360,38 +342,20 @@ impl FunctionsParams {
 #[serde(deny_unknown_fields)]
 struct InfoParams {}
 
-/// The `search` mode's typed parameters.
-#[derive(Debug, Clone, Deserialize)]
-#[serde(deny_unknown_fields)]
+/// The search page's resolved params — [`FunctionsParams`] after
+/// window resolution; never deserialized.
+#[derive(Debug, Clone)]
 pub struct SearchParams {
     /// Match window, unix seconds; `0` means "unspecified" (`before` 0
     /// → now, `after` 0 → before − 900 — the adapter's
     /// `resolve_window`). IGNORED on an anchor page: the cursor carries
     /// the original page's frozen window (the rank is window-dependent,
     /// so a narrowed window would re-rank).
-    #[serde(default)]
     pub after: u32,
-    #[serde(default)]
     pub before: u32,
-    /// Result limit (top-K most-recent-first). Zero and beyond
-    /// [`SEARCH_LIMIT_MAX`] are client errors — search has no unbounded
-    /// option.
-    #[serde(default = "default_limit")]
+    /// Result limit (top-K most-recent-first).
     pub limit: usize,
-    /// Matched spans attached per returned trace (engine default 3,
-    /// hard max 128, 0 = none).
-    #[serde(default)]
-    pub spans_per_trace: Option<usize>,
-    /// Facet selections. Keys are `<owner>.<key>` attributes
-    /// (resource/span/instrumentation/event/link) or bare builtin words
-    /// (see the adapter's grammar); values OR within a key, keys AND.
-    #[serde(default)]
     pub selections: std::collections::HashMap<String, Vec<String>>,
-    /// Inclusive span-duration bounds, nanoseconds.
-    #[serde(default)]
-    pub min_duration_ns: Option<i64>,
-    #[serde(default)]
-    pub max_duration_ns: Option<i64>,
     /// Inclusive TRACE-envelope-duration bounds, nanoseconds — the
     /// overview grid's cell-click narrowing (the grid bins by trace
     /// envelope, so span-duration bounds would mismatch it). Round-trip
@@ -399,22 +363,19 @@ pub struct SearchParams {
     /// `[edge, next_edge)`, these bounds INCLUSIVE — a cell click sends
     /// `min = edge, max = next_edge − 1`, or an exactly-on-edge trace
     /// leaks in from the next bin.
-    #[serde(default)]
     pub min_trace_duration_ns: Option<i64>,
-    #[serde(default)]
     pub max_trace_duration_ns: Option<i64>,
     /// Opaque pagination cursor echoed from a previous response's
     /// `anchor.next`.
-    #[serde(default)]
     pub anchor: Option<String>,
 }
 
-/// Page size when the request omits `limit` (the engine's default).
+/// Page size when the request omits `last` (the engine's default).
 fn default_limit() -> usize {
     sfsq::traces::DEFAULT_SEARCH_LIMIT
 }
 
-/// Wire maximum for [`SearchParams::limit`]. The cap lives at the wire,
+/// Wire maximum for [`FunctionsParams::last`]. The cap lives at the wire,
 /// not the engine: a cursor walk legitimately re-runs the engine with
 /// `limit = served + limit` (the served prefix itself capped at
 /// 10,000), so the engine-side limit is bounded by
@@ -436,25 +397,6 @@ where
     serde_json::Value::deserialize(d).map(Some)
 }
 
-/// The `attributes` mode's typed parameters.
-#[derive(Debug, Clone, Default, Deserialize)]
-#[serde(deny_unknown_fields)]
-pub struct AttributesParams {
-    /// Vocabulary window, unix seconds; `0` means "unspecified" (the
-    /// adapter's `resolve_window` defaults).
-    #[serde(default)]
-    pub after: u32,
-    #[serde(default)]
-    pub before: u32,
-    /// Restrict to one owner: `resource` / `span` / `instrumentation` /
-    /// `event` / `link` / `builtin`. Absent = every owner.
-    #[serde(default)]
-    pub owner: Option<String>,
-    /// Cap the key list (the response's `truncated` flag is exact).
-    #[serde(default)]
-    pub max_keys: Option<usize>,
-}
-
 /// The `attribute_values` mode's typed parameters.
 #[derive(Debug, Clone, Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -466,7 +408,7 @@ pub struct AttributeValuesParams {
     #[serde(default)]
     pub before: u32,
     /// The key, in the selection grammar (`<owner>.<key>` or a bare
-    /// builtin word) — exactly what `attributes` returned.
+    /// builtin word).
     pub key: String,
     /// Cap the value list (the response's `truncated` flag is exact).
     #[serde(default)]
@@ -482,10 +424,6 @@ pub struct TraceParams {
     /// The trace id: 32 hex chars (16 bytes), case-insensitive — the
     /// W3C trace-context text form.
     pub id: String,
-    /// Span cap override — may only TIGHTEN the engine default
-    /// (65,536): zero and values beyond the default are client errors.
-    #[serde(default)]
-    pub span_cap: Option<usize>,
     /// Optional assembly bounds, unix seconds: only files whose
     /// summary range overlaps `[after, before)` are probed for the
     /// trace's spans. Both-or-neither; `after < before` — violations
@@ -509,13 +447,11 @@ pub enum OtelTracesResponse {
     Functions(Box<FunctionsTracesResponse>),
     Info(InfoResponse),
     Trace(Box<TraceResult>),
-    Search(Box<SearchResult>),
-    Attributes(AttributesResult),
     AttributeValues(AttributeValuesResult),
 }
 
 /// Functions protocol envelope for the trace-specific contract. The
-/// nested payload is the native developer-owned search response, plus
+/// nested payload is the search page, plus
 /// the full-window aggregate this view composes for it
 /// ([`SearchResult::overview`]); the envelope's numeric `status` cannot collide with the
 /// payload's query-completeness `status` object.
@@ -590,27 +526,12 @@ pub struct OverviewTotals {
     pub errors: u64,
 }
 
-// ── Enumeration responses ───────────────────────────────────────────
+// ── Enumeration response ────────────────────────────────────────────
 //
-// Window semantics for both: pruning is FILE-GRANULAR — a key or value
-// counted here comes from a file overlapping the window and may itself
-// lie just outside it. Exact per-row filtering belongs to `search`; the
-// facet rail needs the vocabulary, not row counts (counts arrive with
-// the trace-level overview).
-
-/// The facet keys, each in the selection grammar (`<owner>.<key>` or a
-/// bare builtin word) — feed them back as `selections` keys or an
-/// `attribute_values` request verbatim.
-#[derive(Debug, Serialize)]
-pub struct AttributesResult {
-    /// The response's self-description: always `"attributes"`.
-    pub mode: &'static str,
-    pub version: u32,
-    pub status: StatusWire,
-    /// Exact: true iff `max_keys` cut the list short.
-    pub truncated: bool,
-    pub keys: Vec<String>,
-}
+// Window semantics: pruning is FILE-GRANULAR — a value counted here
+// comes from a file overlapping the window and may itself lie just
+// outside it. Exact per-row filtering belongs to the list; the facet
+// rail needs the vocabulary, not row counts.
 
 /// One key's values. Values are the engine's STORAGE labels (`status` ∈
 /// `UNSET`/`OK`/`ERROR`, `kind` ∈ `UNSPECIFIED`/`INTERNAL`/`SERVER`/…) —
@@ -637,14 +558,14 @@ pub struct AttributeValueWire {
     pub kind: Option<&'static str>,
 }
 
-// ── Search mode response ────────────────────────────────────────────
+// ── Search page ─────────────────────────────────────────────────────
 
 /// One search page: bounded most-recent-first trace summaries. Summary
-/// numbers are EXACT canonical-assembly figures WITHIN the declared
-/// `completion_coverage` range unless a row's `exact` is false (its
-/// assembly was capped or degraded — numbers may undercount). Spans in
-/// files beyond the declared range are unknown, not counted — the
-/// coverage declaration is the bound on "canonical".
+/// numbers are EXACT canonical-assembly figures over the match window
+/// widened by the completion slack (at least 1 h per side) unless a
+/// row's `exact` is false (its assembly was capped or degraded —
+/// numbers may undercount). Spans in files beyond that range are
+/// unknown, not counted.
 #[derive(Debug, Serialize)]
 pub struct SearchResult {
     /// The response's self-description: always `"search"`.
@@ -653,16 +574,8 @@ pub struct SearchResult {
     /// Query-level completeness — a work-ceiling breach or a lost
     /// source shows up here, never silently.
     pub status: StatusWire,
-    /// The completion-assembly bounds, unix seconds: matched traces
-    /// assembled their spans from files overlapping this range (the
-    /// match window widened by a per-side slack). Spans beyond it are
-    /// UNKNOWN, not absent — per-row numbers are canonical WITHIN this
-    /// declared range.
-    pub completion_coverage: CoverageWire,
     pub items: SearchItems,
     pub traces: Vec<TraceSummaryWire>,
-    /// Schema kinds for the fields the attached `matched_spans` expose.
-    pub field_kinds: FieldKindsWire,
     /// Present only when the page is FULL (`returned == max_to_return`)
     /// — a short page means the window is exhausted. Echo `next` back as
     /// the `anchor` param for the following page; treat it as opaque.
@@ -670,10 +583,8 @@ pub struct SearchResult {
     pub anchor: Option<AnchorWire>,
     /// The window aggregate, composed from a second engine pass in this
     /// same request under the page's `selections` (its `scope` says
-    /// whether they applied). The Functions view's contract only — the
-    /// legacy `search` mode never carries it — and absent (never
-    /// `null`) when not composed, so a consumer detects it by PRESENCE
-    /// and degrades to page-derived numbers without a version gate.
+    /// whether they applied). Absent (never `null`) when not composed,
+    /// so a consumer detects it by PRESENCE.
     ///
     /// Present on a FIRST page only: a request carrying an anchor
     /// ([`FunctionsParams::anchor`]) gets NO `overview` key at all.
@@ -745,9 +656,8 @@ pub struct OverviewSection {
     pub status: StatusWire,
     /// The GRID's window, unix seconds: the request's window snapped
     /// outward to wall-clock bucket multiples. Deliberately not the
-    /// page's `completion_coverage` (the same window widened by
-    /// assembly slack, ≥ 1h per side) — two derivations, two numbers,
-    /// both reported.
+    /// page's completion range (the same window widened by assembly
+    /// slack, ≥ 1h per side).
     pub coverage: CoverageWire,
     /// Which population these numbers cover, relative to the page:
     /// [`OVERVIEW_SCOPE_SELECTION`] means the page's `selections` were
@@ -807,15 +717,11 @@ pub struct TraceSummaryWire {
     pub span_count: usize,
     pub error_count: usize,
     pub service_breakdown: ServiceBreakdownWire,
-    pub matched_count: usize,
     /// False when this trace's assembly was capped or degraded — its
-    /// summary numbers may undercount. "Exact" means exact WITHIN the
-    /// query's declared `completion_coverage`: spans in files beyond
-    /// that range are unknown loss the flag cannot see.
+    /// summary numbers may undercount. "Exact" means exact within the
+    /// completion range (see [`SearchResult`]): spans in files beyond it
+    /// are unknown loss the flag cannot see.
     pub exact: bool,
-    /// The matched subset, `min(spans_per_trace, matched_count)` spans
-    /// in the combiner's total order.
-    pub matched_spans: Vec<SpanWire>,
 }
 
 /// One returned trace's spans by resource `service.name`, over the same
@@ -829,8 +735,6 @@ pub struct ServiceBreakdownWire {
     pub top: Vec<ServiceSpansWire>,
     /// Spans in the services beyond `top`.
     pub other: u64,
-    /// How many services `other` covers.
-    pub other_services: usize,
     /// Spans without a `service.name` — counted, never attributed to a
     /// service.
     pub unattributed: u64,

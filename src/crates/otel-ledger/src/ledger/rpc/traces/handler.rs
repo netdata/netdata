@@ -3,9 +3,8 @@
 //!
 //! The full mode catalog lives here: the Functions view (the trace
 //! list plus its trace-density grid), `info` (capability discovery),
-//! `trace` (exact single-trace fetch), `search` (bounded
-//! most-recent-first search), and the enumeration pair `attributes`
-//! / `attribute_values` (the facet lists' vocabulary). Mode selection and every request-SHAPE check happen at
+//! `trace` (exact single-trace fetch), and `attribute_values` (the
+//! facet lists' value vocabulary). Mode selection and every request-SHAPE check happen at
 //! deserialization (the wire's typed request — shape errors are
 //! transport 400s); this handler owns only the semantic validation
 //! (trace-id shape, zero limits, bounds).
@@ -31,23 +30,21 @@ use file_lifecycle::chunk::ChunkCache;
 use file_lifecycle::registry::TenantRegistries;
 
 use sfsq::traces::{
-    AttributeNamesQuery, AttributeRequestError, AttributeValuesQuery, OverviewQuery,
-    OverviewRequestError, Predicate, SPANS_PER_TRACE_MAX, SearchQuery, SearchRequestError,
-    SearchSources, TimeWindow, TraceQuery, TraceRequestError, attribute_names, attribute_values,
-    overview, search, trace_by_id,
+    AttributeRequestError, AttributeValuesQuery, OverviewQuery, OverviewRequestError, Predicate,
+    SearchQuery, SearchRequestError, SearchSources, TimeWindow, TraceQuery, TraceRequestError,
+    attribute_values, overview, search, trace_by_id,
 };
 
 use super::adapter::{
     ResolvedWindow, build_predicate, completion_capture_range, heatmap_predicate, parse_cursor,
-    parse_enumeration_key, parse_owner_word, parse_trace_id, resolve_window,
-    to_attribute_values_result, to_attributes_result, to_overview_section, to_search_result,
-    to_trace_result, validate_trace_bounds,
+    parse_enumeration_key, parse_trace_id, resolve_window, to_attribute_values_result,
+    to_overview_section, to_search_result, to_trace_result, validate_trace_bounds,
 };
 use super::sources::{Capture, CaptureError, TracesSourceSupplier};
 use super::wire::{
-    AttributeValuesParams, AttributesParams, CoverageWire, FunctionsParams,
-    FunctionsTracesResponse, InfoResponse, OVERVIEW_SCOPE_SELECTION, OVERVIEW_SCOPE_WINDOW,
-    OtelTracesRequest, OtelTracesResponse, SearchParams, SearchResult, TraceParams, TracesMode,
+    AttributeValuesParams, CoverageWire, FunctionsParams, FunctionsTracesResponse, InfoResponse,
+    OVERVIEW_SCOPE_SELECTION, OVERVIEW_SCOPE_WINDOW, OtelTracesRequest, OtelTracesResponse,
+    SearchParams, SearchResult, TraceParams, TracesMode,
 };
 use file_lifecycle::remote_read::RemoteRead;
 
@@ -86,7 +83,7 @@ fn capture_error(e: CaptureError) -> netdata_plugin_error::NetdataPluginError {
 ///
 /// `None` means no second pass and no `overview` section: the Functions
 /// view passes `None` on an ANCHOR page (the anchor gate in
-/// `functions`); the legacy `search` mode always does.
+/// `functions`).
 struct AggregateRequest {
     /// The heatmap's filter: the page's selections when they are all
     /// span-level, `None` for the plain window grid (no selections, or
@@ -141,27 +138,7 @@ impl OtelTracesHandler {
                     .to_string(),
             ));
         }
-        let mut query = TraceQuery::new(trace_id);
-        if let Some(cap) = params.span_cap {
-            // Pre-capture twin of the engine's ZeroSpanCap check.
-            if cap == 0 {
-                return Err(handler_err(
-                    "invalid otel-traces request: a zero span cap would return nothing; \
-                     omit the cap or raise it"
-                        .to_string(),
-                ));
-            }
-            // The wire may TIGHTEN the engine's runaway-merge bound,
-            // never loosen it — an oversized cap would defeat the
-            // default's documented purpose (see DEFAULT_SPAN_CAP).
-            if cap > sfsq::traces::DEFAULT_SPAN_CAP {
-                return Err(handler_err(format!(
-                    "invalid otel-traces request: 'span_cap' {cap} exceeds the maximum {}",
-                    sfsq::traces::DEFAULT_SPAN_CAP
-                )));
-            }
-            query = query.span_cap(cap);
-        }
+        let query = TraceQuery::new(trace_id);
 
         let bounds = validate_trace_bounds(params.after, params.before)
             .map_err(|e| handler_err(format!("invalid otel-traces request: {e}")))?;
@@ -219,9 +196,8 @@ impl OtelTracesHandler {
 
     /// The engine's bounded most-recent-first search over the request's
     /// (canonicalized) window, with wire-level tie-safe pagination —
-    /// see the adapter's cursor docs. The shared page core of both the
-    /// `search` mode and the Functions view (which layers the aggregate
-    /// on through `aggregate`).
+    /// see the adapter's cursor docs. The Functions view's page core
+    /// (it layers the aggregate on through `aggregate`).
     ///
     /// `aggregate` adds the Functions view's full-window section: a
     /// SECOND engine pass in this same call, off the same capture. It
@@ -243,7 +219,7 @@ impl OtelTracesHandler {
         // limit past the engine's own ZeroLimit check.
         if params.limit == 0 {
             return Err(client_err(
-                "a zero 'limit' would return nothing; search has no unbounded option".into(),
+                "a zero 'last' would return nothing; the list has no unbounded option".into(),
             ));
         }
         // The wire cap on the CLIENT half of the limit; the engine's
@@ -251,20 +227,10 @@ impl OtelTracesHandler {
         // construction once this side is capped (see SEARCH_LIMIT_MAX).
         if params.limit > super::wire::SEARCH_LIMIT_MAX {
             return Err(client_err(format!(
-                "'limit' {} exceeds the maximum {}",
+                "'last' {} exceeds the maximum {}",
                 params.limit,
                 super::wire::SEARCH_LIMIT_MAX
             )));
-        }
-        // Pre-capture twin of the engine's own check: reject before the
-        // registry read and chunk builds capture() performs (the engine
-        // re-checks as defense in depth).
-        if let Some(spt) = params.spans_per_trace {
-            if spt > SPANS_PER_TRACE_MAX {
-                return Err(client_err(format!(
-                    "spans_per_trace {spt} exceeds the library maximum {SPANS_PER_TRACE_MAX}"
-                )));
-            }
         }
         let cursor = params
             .anchor
@@ -274,8 +240,6 @@ impl OtelTracesHandler {
             .map_err(client_err)?;
         let predicate = build_predicate(
             &params.selections,
-            params.min_duration_ns,
-            params.max_duration_ns,
             params.min_trace_duration_ns,
             params.max_trace_duration_ns,
         )
@@ -288,15 +252,14 @@ impl OtelTracesHandler {
         let window = resolve_window(params.after, params.before, now_s, cursor.as_ref())
             .map_err(client_err)?;
 
-        let mut query = SearchQuery::new(predicate)
+        // The list attaches no matched spans to its rows.
+        let query = SearchQuery::new(predicate)
             .window(
                 TimeWindow::new(window.start_ns, window.end_ns)
                     .map_err(|e| client_err(e.to_string()))?,
             )
-            .limit(params.limit.saturating_add(cursor.map_or(0, |c| c.served)));
-        if let Some(spt) = params.spans_per_trace {
-            query = query.spans_per_trace(spt);
-        }
+            .limit(params.limit.saturating_add(cursor.map_or(0, |c| c.served)))
+            .spans_per_trace(0);
 
         // ONE capture over the COMPLETION range (the match window
         // widened by the clamped slack), feeding two roles: the engine
@@ -306,10 +269,6 @@ impl OtelTracesHandler {
         // ORIGINAL window (window.capture) — the completion range
         // re-derives from it deterministically on every page.
         let completion_range = completion_capture_range(&window.capture);
-        let completion_coverage = CoverageWire {
-            after: completion_range.start,
-            before: completion_range.end,
-        };
         // The aggregate's geometry and window: the grid's, snapped
         // outward to wall-clock bucket multiples — NOT the page's
         // slack-widened range. Its sources are captured by that window
@@ -402,7 +361,6 @@ impl OtelTracesHandler {
             params.limit,
             cursor.as_ref(),
             (window.capture.start, window.capture.end),
-            completion_coverage,
         );
         if let (Some(section), Some((grid, aligned_after, aligned_before))) =
             (section, aggregate_grid)
@@ -427,18 +385,6 @@ impl OtelTracesHandler {
             ));
         }
         Ok(result)
-    }
-
-    async fn search(
-        &self,
-        ctx: &FunctionCallContext,
-        params: &SearchParams,
-        tenant: Option<&str>,
-    ) -> netdata_plugin_error::Result<OtelTracesResponse> {
-        // The native mode keeps its own contract: no embedded section.
-        Ok(OtelTracesResponse::Search(Box::new(
-            self.search_result(ctx, params, tenant, None).await?,
-        )))
     }
 
     /// The Functions view: the search page plus the full-window
@@ -512,50 +458,6 @@ impl OtelTracesHandler {
             .await
             .map_err(capture_error)?;
         Ok((sets.pop().unwrap_or_default(), pins, engine_window))
-    }
-
-    /// The `attributes` mode: exact dictionary-backed key enumeration —
-    /// the facet lists' vocabulary, in the selection grammar.
-    async fn attributes(
-        &self,
-        ctx: &FunctionCallContext,
-        params: &AttributesParams,
-        tenant: Option<&str>,
-    ) -> netdata_plugin_error::Result<OtelTracesResponse> {
-        let client_err = |e: String| handler_err(format!("invalid otel-traces request: {e}"));
-        let mut query = AttributeNamesQuery::new();
-        if let Some(word) = params.owner.as_deref() {
-            query = query.owner(parse_owner_word(word).map_err(client_err)?);
-        }
-        if let Some(max) = params.max_keys {
-            // Pre-capture twin of the engine's own check.
-            if max == 0 {
-                return Err(client_err(
-                    "a zero key/value limit would return nothing; omit the limit or raise it"
-                        .into(),
-                ));
-            }
-            query = query.max_keys(max);
-        }
-        let (sources, pins, window) = self
-            .enumeration_setup(ctx, params.after, params.before, tenant)
-            .await?;
-        query = query.window(window);
-
-        let done = ctx.progress.done_counter();
-        let cancel = ctx.cancellation.clone();
-        match tokio::task::spawn_blocking(move || {
-            let _pins = pins;
-            attribute_names(sources, query, cancel, done)
-        })
-        .await
-        {
-            Ok(Ok(data)) => Ok(OtelTracesResponse::Attributes(to_attributes_result(data))),
-            Ok(Err(e)) => Err(map_attribute_error(e)),
-            Err(e) => Err(handler_err(format!(
-                "otel-traces attributes task failed: {e}"
-            ))),
-        }
     }
 
     /// The `attribute_values` mode: one key's exact value vocabulary
@@ -640,8 +542,6 @@ impl FunctionHandler for OtelTracesHandler {
             TracesMode::Functions(params) => self.functions(&ctx, params, tenant).await,
             TracesMode::Info => Ok(OtelTracesResponse::Info(InfoResponse::default())),
             TracesMode::Trace(params) => self.trace(&ctx, params, tenant).await,
-            TracesMode::Search(params) => self.search(&ctx, params, tenant).await,
-            TracesMode::Attributes(params) => self.attributes(&ctx, params, tenant).await,
             TracesMode::AttributeValues(params) => {
                 self.attribute_values(&ctx, params, tenant).await
             }

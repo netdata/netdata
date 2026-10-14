@@ -17,11 +17,11 @@
 //!   `field_kinds` words — plus the empty-trace degenerate;
 //! - the selection-key grammar: `BUILTIN_WORDS`/`OWNER_WORDS` in
 //!   lockstep with the engine enums (a new owner fails compilation,
-//!   a new builtin fails this suite), render ∘ parse identity, owner
-//!   words, and selection-key parsing with its rejections;
+//!   a new builtin fails this suite) and selection-key parsing with
+//!   its rejections;
 //! - [`build_predicate`]: sorted-key Eq conditions, empty selections
-//!   validate but constrain nothing, span + trace duration bounds,
-//!   inverted trace-duration bounds as client errors;
+//!   validate but constrain nothing, trace duration bounds, inverted
+//!   trace-duration bounds as client errors;
 //! - the cursor codec: encode/parse round-trip, malformed
 //!   rejections, over-cap walks advised to narrow;
 //! - window canonicalization: the now-derived default window, the
@@ -30,10 +30,10 @@
 //!   after-key filtering with tie runs and no straddling duplicates,
 //!   served accumulation + cap, partial statuses ending the walk
 //!   with the reason on the wire, the service breakdown, and the
-//!   completion-coverage vs frozen-window split.
+//!   cursor's frozen window.
 //!
-//! Not pinned here: `validate_trace_bounds` and the overview /
-//! attributes converters (covered end-to-end by the
+//! Not pinned here: `validate_trace_bounds` and the overview
+//! converter (covered end-to-end by the
 //! handler tests) and request deserialization (the wire tests).
 use super::*;
 use serde_json::json;
@@ -221,66 +221,6 @@ fn every_engine_owner_is_deliberately_placed_in_the_wire_grammar() {
 }
 
 #[test]
-fn rendered_keys_round_trip_through_the_selection_grammar() {
-    // render ∘ parse = identity, so a facet rail can feed enumerated
-    // keys straight back as selection keys or values requests: every
-    // owner-qualified attribute form round-trips below, then every
-    // builtin word.
-    let cases: Vec<(AttributeOwner, AttributeKey)> = vec![
-        (
-            AttributeOwner::Resource,
-            AttributeKey::Attribute("service.name".into()),
-        ),
-        (
-            AttributeOwner::Span,
-            AttributeKey::Attribute("http.method".into()),
-        ),
-        (AttributeOwner::Event, AttributeKey::Attribute("x".into())),
-        (AttributeOwner::Link, AttributeKey::Attribute("peer".into())),
-        (
-            AttributeOwner::Instrumentation,
-            AttributeKey::Attribute("telemetry.sdk".into()),
-        ),
-    ];
-    for (owner, key) in cases {
-        let rendered = render_attribute_key(owner, &key);
-        assert_eq!(
-            parse_enumeration_key(&rendered).unwrap(),
-            (owner, key),
-            "{rendered}"
-        );
-    }
-    // Every builtin word round-trips too.
-    for builtin in BuiltinField::ALL {
-        let rendered =
-            render_attribute_key(AttributeOwner::Builtin, &AttributeKey::Builtin(builtin));
-        assert_eq!(
-            parse_enumeration_key(&rendered).unwrap(),
-            (AttributeOwner::Builtin, AttributeKey::Builtin(builtin)),
-            "{rendered}"
-        );
-    }
-}
-
-#[test]
-fn owner_words_parse_including_builtin() {
-    assert_eq!(
-        parse_owner_word("resource").unwrap(),
-        AttributeOwner::Resource
-    );
-    assert_eq!(
-        parse_owner_word("builtin").unwrap(),
-        AttributeOwner::Builtin
-    );
-    assert!(parse_owner_word("any").is_err(), "Any stays un-nameable");
-    assert!(parse_owner_word("bogus").is_err());
-    assert!(
-        parse_owner_word("Resource").is_err(),
-        "case-sensitive by design"
-    );
-}
-
-#[test]
 fn selection_keys_parse_owners_builtins_and_dotted_attributes() {
     assert_eq!(
         parse_selection_key("resource.service.name").unwrap(),
@@ -300,7 +240,7 @@ fn selection_keys_parse_owners_builtins_and_dotted_attributes() {
 }
 
 #[test]
-fn predicate_builds_sorted_eq_conditions_plus_duration_bounds() {
+fn predicate_builds_sorted_eq_conditions_plus_trace_duration_bounds() {
     let mut selections = HashMap::new();
     selections.insert(
         "resource.service.name".to_string(),
@@ -308,10 +248,9 @@ fn predicate_builds_sorted_eq_conditions_plus_duration_bounds() {
     );
     selections.insert("status".to_string(), vec!["ERROR".to_string()]);
     selections.insert("span.empty".to_string(), vec![]); // no constraint
-    let p = build_predicate(&selections, Some(5), Some(10), Some(100), Some(200)).unwrap();
-    assert_eq!(p.conditions.len(), 6);
-    // Sorted selection keys first, then the span-duration bounds
-    // (BuiltinField::Duration), then the trace-duration bounds.
+    let p = build_predicate(&selections, Some(100), Some(200)).unwrap();
+    assert_eq!(p.conditions.len(), 4);
+    // Sorted selection keys first, then the trace-duration bounds.
     assert_eq!(
         p.conditions[0].target,
         PredicateTarget::Attribute(AttributeOwner::Resource, "service.name".into())
@@ -322,23 +261,21 @@ fn predicate_builds_sorted_eq_conditions_plus_duration_bounds() {
         p.conditions[1].target,
         PredicateTarget::Builtin(BuiltinField::Status)
     );
+    assert_eq!(
+        p.conditions[2].target,
+        PredicateTarget::Builtin(BuiltinField::TraceDuration)
+    );
     assert_eq!(p.conditions[2].op, CompareOp::Gte);
+    assert_eq!(
+        p.conditions[3].target,
+        PredicateTarget::Builtin(BuiltinField::TraceDuration)
+    );
     assert_eq!(p.conditions[3].op, CompareOp::Lte);
-    assert_eq!(
-        p.conditions[4].target,
-        PredicateTarget::Builtin(BuiltinField::TraceDuration)
-    );
-    assert_eq!(p.conditions[4].op, CompareOp::Gte);
-    assert_eq!(
-        p.conditions[5].target,
-        PredicateTarget::Builtin(BuiltinField::TraceDuration)
-    );
-    assert_eq!(p.conditions[5].op, CompareOp::Lte);
 }
 
 #[test]
 fn inverted_trace_duration_bounds_are_a_client_error() {
-    let err = build_predicate(&HashMap::new(), None, None, Some(10), Some(5))
+    let err = build_predicate(&HashMap::new(), Some(10), Some(5))
         .expect_err("inverted bounds must reject");
     assert!(err.contains("min_trace_duration_ns"), "{err}");
 }
@@ -439,14 +376,8 @@ fn search_data(traces: Vec<sfsq::traces::TraceSummary>) -> SearchData {
     }
 }
 
-// The shared fixture window and its completion capture — the window
-// widened by the 1h minimum slack, exactly `completion_capture_range`
-// of WIN.
+// The shared fixture window.
 const WIN: (u32, u32) = (9_000, 10_000);
-const WIN_COVERAGE: CoverageWire = CoverageWire {
-    after: 5_400,
-    before: 13_600,
-};
 
 // The window widened by clamp(width, 1h, 24h) per side, saturating
 // at the u32 bounds: a middle-width window widens by its own width,
@@ -463,22 +394,17 @@ fn completion_capture_range_clamps_and_saturates() {
     );
 }
 
-// The page-1 cursor carries the MATCH window; the widened capture
-// range travels separately as `completion_coverage`.
+// The page-1 cursor carries the MATCH window, never the widened
+// completion range.
 #[test]
-fn cursor_freezes_the_original_window_while_coverage_declares_the_widened_range() {
+fn cursor_freezes_the_original_window() {
     let r = to_search_result(
         search_data(vec![summary(1, 300), summary(2, 200)]),
         2,
         None,
         WIN,
-        WIN_COVERAGE,
     );
     let v = serde_json::to_value(&r).unwrap();
-    assert_eq!(
-        v["completion_coverage"],
-        serde_json::json!({"after": 5_400, "before": 13_600})
-    );
     let cursor = parse_cursor(v["anchor"]["next"].as_str().unwrap()).unwrap();
     assert_eq!((cursor.after_s, cursor.before_s), WIN);
 }
@@ -495,14 +421,13 @@ fn search_rows_carry_the_service_breakdown() {
         other_services: 2,
         unattributed: 1,
     };
-    let r = to_search_result(search_data(vec![t]), 2, None, WIN, WIN_COVERAGE);
+    let r = to_search_result(search_data(vec![t]), 2, None, WIN);
     let v = serde_json::to_value(&r).unwrap();
     assert_eq!(
         v["traces"][0]["service_breakdown"],
         json!({
             "top": [{"value": "frontend", "spans": 6}, {"value": "cart", "spans": 3}],
             "other": 2,
-            "other_services": 2,
             "unattributed": 1,
         })
     );
@@ -515,7 +440,6 @@ fn full_page_emits_a_cursor_and_short_page_does_not() {
         2,
         None,
         WIN,
-        WIN_COVERAGE,
     );
     assert_eq!(r.items.returned, 2);
     assert_eq!(
@@ -523,13 +447,7 @@ fn full_page_emits_a_cursor_and_short_page_does_not() {
         format!("t2:9000:10000:200:{}:2", "02".repeat(16))
     );
 
-    let r = to_search_result(
-        search_data(vec![summary(1, 300)]),
-        2,
-        None,
-        WIN,
-        WIN_COVERAGE,
-    );
+    let r = to_search_result(search_data(vec![summary(1, 300)]), 2, None, WIN);
     assert!(r.anchor.is_none(), "a short page ends the walk");
 }
 
@@ -544,7 +462,7 @@ fn anchor_page_drops_everything_at_or_above_the_after_key() {
         summary(3, 200), // rank tie, id above the key → fresh
         summary(4, 100),
     ]);
-    let r = to_search_result(data, 2, Some(&c), WIN, WIN_COVERAGE);
+    let r = to_search_result(data, 2, Some(&c), WIN);
     let ids: Vec<&str> = r.traces.iter().map(|t| t.trace_id.as_str()).collect();
     assert_eq!(
         ids,
@@ -570,7 +488,7 @@ fn straddling_trace_does_not_duplicate_below_the_boundary() {
         summary(0x1A, 50),            // U: the key
         summary(0x1B, 30),            // W: genuinely fresh
     ]);
-    let r = to_search_result(data, 2, Some(&c), WIN, WIN_COVERAGE);
+    let r = to_search_result(data, 2, Some(&c), WIN);
     let ids: Vec<&str> = r.traces.iter().map(|t| t.trace_id.as_str()).collect();
     assert_eq!(ids, vec!["1b".repeat(16).as_str()], "only W is fresh");
 }
@@ -586,7 +504,7 @@ fn a_walk_at_the_served_cap_emits_no_further_cursor() {
         summary(0x03, 300),
         summary(0x04, 200),
     ]);
-    let r = to_search_result(data, 2, Some(&c), WIN, WIN_COVERAGE);
+    let r = to_search_result(data, 2, Some(&c), WIN);
     assert_eq!(r.items.returned, 2, "the page itself still fills");
     assert!(
         r.anchor.is_none(),
@@ -606,7 +524,7 @@ fn partial_full_page_ends_the_walk_with_the_status_saying_why() {
         status: b.finish(),
         field_kinds: FieldKinds::default(),
     };
-    let r = to_search_result(data, 2, None, WIN, WIN_COVERAGE);
+    let r = to_search_result(data, 2, None, WIN);
     assert_eq!(r.items.returned, 2, "the page itself is full");
     assert!(r.anchor.is_none());
     assert_eq!(
@@ -627,7 +545,7 @@ fn remote_unavailable_full_page_ends_the_walk() {
         status: b.finish(),
         field_kinds: FieldKinds::default(),
     };
-    let r = to_search_result(data, 2, None, WIN, WIN_COVERAGE);
+    let r = to_search_result(data, 2, None, WIN);
     assert_eq!(r.items.returned, 2, "the page itself is full");
     assert!(r.anchor.is_none());
     assert_eq!(
@@ -647,7 +565,7 @@ fn work_ceiling_partial_reaches_the_wire() {
         status: b.finish(),
         field_kinds: FieldKinds::default(),
     };
-    let r = to_search_result(data, 20, None, WIN, WIN_COVERAGE);
+    let r = to_search_result(data, 20, None, WIN);
     assert_eq!(
         serde_json::to_value(&r.status).unwrap(),
         json!({"partial": ["work_ceiling"]})

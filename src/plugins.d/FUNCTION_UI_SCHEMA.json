@@ -823,108 +823,6 @@
       },
       "additionalProperties": false
     },
-    "traces_string_pair": {
-      "type": "array",
-      "minItems": 2,
-      "maxItems": 2,
-      "items": { "type": "string" }
-    },
-    "traces_field_kinds": {
-      "type": "object",
-      "required": ["fields", "event_attributes", "link_attributes"],
-      "properties": {
-        "fields": {
-          "type": "array",
-          "items": { "$ref": "#/definitions/traces_string_pair" }
-        },
-        "event_attributes": {
-          "type": "array",
-          "items": { "$ref": "#/definitions/traces_string_pair" }
-        },
-        "link_attributes": {
-          "type": "array",
-          "items": { "$ref": "#/definitions/traces_string_pair" }
-        }
-      },
-      "additionalProperties": true
-    },
-    "traces_event": {
-      "type": "object",
-      "required": ["time_unix_nano", "name", "dropped_attributes_count", "attributes"],
-      "properties": {
-        "time_unix_nano": { "type": "integer", "minimum": 0 },
-        "name": { "type": "string" },
-        "dropped_attributes_count": { "type": "integer", "minimum": 0 },
-        "attributes": {
-          "type": "array",
-          "items": { "$ref": "#/definitions/traces_string_pair" }
-        }
-      },
-      "additionalProperties": true
-    },
-    "traces_link": {
-      "type": "object",
-      "required": [
-        "trace_id",
-        "span_id",
-        "trace_state",
-        "flags",
-        "dropped_attributes_count",
-        "attributes"
-      ],
-      "properties": {
-        "trace_id": { "type": "string" },
-        "span_id": { "type": "string" },
-        "trace_state": { "type": "string" },
-        "flags": { "type": "integer", "minimum": 0 },
-        "dropped_attributes_count": { "type": "integer", "minimum": 0 },
-        "attributes": {
-          "type": "array",
-          "items": { "$ref": "#/definitions/traces_string_pair" }
-        }
-      },
-      "additionalProperties": true
-    },
-    "traces_span": {
-      "type": "object",
-      "required": [
-        "span_id",
-        "start_ns",
-        "duration_ns",
-        "kind",
-        "flags",
-        "dropped_attributes_count",
-        "dropped_events_count",
-        "dropped_links_count",
-        "fields",
-        "events",
-        "links"
-      ],
-      "properties": {
-        "span_id": { "type": "string" },
-        "parent_span_id": { "type": "string" },
-        "start_ns": { "type": "integer" },
-        "duration_ns": { "type": "integer" },
-        "kind": { "type": "integer" },
-        "flags": { "type": "integer", "minimum": 0 },
-        "dropped_attributes_count": { "type": "integer", "minimum": 0 },
-        "dropped_events_count": { "type": "integer", "minimum": 0 },
-        "dropped_links_count": { "type": "integer", "minimum": 0 },
-        "fields": {
-          "type": "array",
-          "items": { "$ref": "#/definitions/traces_string_pair" }
-        },
-        "events": {
-          "type": "array",
-          "items": { "$ref": "#/definitions/traces_event" }
-        },
-        "links": {
-          "type": "array",
-          "items": { "$ref": "#/definitions/traces_link" }
-        }
-      },
-      "additionalProperties": true
-    },
     "traces_search_item": {
       "type": "object",
       "required": [
@@ -935,9 +833,7 @@
         "span_count",
         "error_count",
         "service_breakdown",
-        "matched_count",
-        "exact",
-        "matched_spans"
+        "exact"
       ],
       "properties": {
         "trace_id": { "type": "string" },
@@ -949,12 +845,7 @@
         "span_count": { "type": "integer", "minimum": 0 },
         "error_count": { "type": "integer", "minimum": 0 },
         "service_breakdown": { "$ref": "#/definitions/traces_service_breakdown" },
-        "matched_count": { "type": "integer", "minimum": 0 },
-        "exact": { "type": "boolean" },
-        "matched_spans": {
-          "type": "array",
-          "items": { "$ref": "#/definitions/traces_span" }
-        }
+        "exact": { "type": "boolean" }
       },
       "additionalProperties": true
     },
@@ -969,14 +860,13 @@
     },
     "traces_service_breakdown": {
       "type": "object",
-      "required": ["top", "other", "other_services", "unattributed"],
+      "required": ["top", "other", "unattributed"],
       "properties": {
         "top": {
           "type": "array",
           "items": { "$ref": "#/definitions/traces_service_spans" }
         },
         "other": { "type": "integer", "minimum": 0 },
-        "other_services": { "type": "integer", "minimum": 0 },
         "unattributed": { "type": "integer", "minimum": 0 }
       },
       "additionalProperties": true
@@ -987,16 +877,13 @@
         "mode",
         "version",
         "status",
-        "completion_coverage",
         "items",
-        "traces",
-        "field_kinds"
+        "traces"
       ],
       "properties": {
         "mode": { "const": "search" },
         "version": { "type": "integer", "minimum": 1 },
         "status": { "$ref": "#/definitions/traces_status" },
-        "completion_coverage": { "$ref": "#/definitions/traces_coverage" },
         "items": {
           "type": "object",
           "required": ["returned", "max_to_return"],
@@ -1010,7 +897,6 @@
           "type": "array",
           "items": { "$ref": "#/definitions/traces_search_item" }
         },
-        "field_kinds": { "$ref": "#/definitions/traces_field_kinds" },
         "anchor": {
           "type": "object",
           "required": ["next"],

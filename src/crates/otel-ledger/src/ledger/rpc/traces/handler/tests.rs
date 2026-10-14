@@ -77,9 +77,7 @@ async fn info_returns_the_descriptor() {
         json!([
             "info",
             "trace",
-            "attributes",
             "attribute_values",
-            "search",
             "tenant",
             "after",
             "before",
@@ -93,28 +91,11 @@ async fn info_returns_the_descriptor() {
     assert_eq!(v["required_params"], json!([]));
 }
 
-#[tokio::test]
-async fn an_empty_search_object_is_an_empty_complete_page() {
-    // `{"search": {}}` takes every default (recent window, limit 20);
-    // on an empty agent that's an empty COMPLETE page, never a panic
-    // or an error. (A selector-less `{}` body is not an error either —
-    // it selects the Functions view, pinned by the wire tests and the
-    // raw-transport tests at the end of this file.)
-    let resp = call(json!({"search": {}})).await.unwrap();
-    let v = serde_json::to_value(&resp).unwrap();
-    assert_eq!(v["mode"], "search");
-    assert_eq!(v["status"], json!({"complete": true}));
-    assert_eq!(v["items"], json!({"returned": 0, "max_to_return": 20}));
-    assert_eq!(v["traces"], json!([]));
-    assert!(v.get("anchor").is_none(), "a short page has no next cursor");
-}
-
 /// A request with no mode selector (top-level Functions params only)
-/// IS the Functions view: the unchanged native search page wrapped as
-/// `{type, data}` — while the native mode keeps answering bare, with
-/// neither wrapper key.
+/// IS the Functions view: the search page wrapped as `{type, data}`. On
+/// an empty agent that's an empty COMPLETE page, never an error.
 #[tokio::test]
-async fn a_mode_less_request_wraps_the_existing_search_contract_as_traces() {
+async fn a_mode_less_request_wraps_the_search_page_as_traces() {
     let resp = call(json!({"after": -3600, "before": 0, "last": 7}))
         .await
         .unwrap();
@@ -129,21 +110,17 @@ async fn a_mode_less_request_wraps_the_existing_search_contract_as_traces() {
         json!({"returned": 0, "max_to_return": 7})
     );
     assert_eq!(v["data"]["traces"], json!([]));
-
-    let native = serde_json::to_value(call(json!({"search": {}})).await.unwrap()).unwrap();
-    assert_eq!(native["mode"], "search");
-    assert!(native.get("type").is_none());
-    assert!(native.get("data").is_none());
+    assert!(
+        v["data"].get("anchor").is_none(),
+        "a short page has no next cursor"
+    );
 }
 
 #[tokio::test]
 async fn every_mode_is_implemented_an_empty_agent_answers_them_all() {
     // The mode catalog is complete: every selector answers cleanly on
     // an empty agent — none is a not-implemented error.
-    for body in [
-        json!({"attributes": {}}),
-        json!({"attribute_values": {"key": "name"}}),
-    ] {
+    for body in [json!({"attribute_values": {"key": "name"}})] {
         call(body.clone())
             .await
             .unwrap_or_else(|e| panic!("{body}: {e}"));
@@ -394,25 +371,6 @@ async fn trace_by_id_assembles_the_fixture_trace_end_to_end() {
 }
 
 #[tokio::test]
-async fn span_cap_returns_the_earliest_spans_and_a_size_cap_partial() {
-    let h = handler_with_fixture_wal().await;
-    let resp = call_on(
-        &h,
-        json!({"trace": {"id": FIXTURE_TRACE_ID, "span_cap": 2}}),
-    )
-    .await
-    .unwrap();
-    let v = serde_json::to_value(&resp).unwrap();
-    assert_eq!(v["status"], json!({"partial": ["size_cap"]}));
-    assert_eq!(v["items"]["returned"], 2);
-    // Pin WHICH spans: the globally earliest two (fixture starts ascend
-    // with the span id) — the contract the engine suite also pins, now
-    // end to end through the Function.
-    assert_eq!(v["spans"][0]["span_id"], "01".repeat(8));
-    assert_eq!(v["spans"][1]["span_id"], "02".repeat(8));
-}
-
-#[tokio::test]
 async fn absent_trace_id_is_a_complete_empty_trace() {
     // "Nothing stored under this id" is an answer, not an error.
     let h = handler_with_fixture_wal().await;
@@ -442,15 +400,6 @@ async fn semantically_invalid_trace_requests_are_clean_client_errors() {
             json!({"trace": {"id": "00000000000000000000000000000000"}}),
             "all-zero",
         ),
-        (
-            json!({"trace": {"id": FIXTURE_TRACE_ID, "span_cap": 0}}),
-            "zero span cap",
-        ),
-        // The wire may only tighten the runaway-merge bound.
-        (
-            json!({"trace": {"id": FIXTURE_TRACE_ID, "span_cap": 65_537}}),
-            "exceeds the maximum",
-        ),
         // Assembly bounds: both-or-neither, ordered.
         (
             json!({"trace": {"id": FIXTURE_TRACE_ID, "after": 100}}),
@@ -477,7 +426,7 @@ async fn semantically_invalid_trace_requests_are_clean_client_errors() {
     }
 }
 
-// ── The search mode ─────────────────────────────────────────────────
+// ── The trace list ─────────────────────────────────────────────────
 
 /// Corpus base, unix seconds; the corpus queries below pin explicit
 /// windows around it, so nothing depends on the wall clock.
@@ -518,6 +467,21 @@ fn as_mode(mode: &str, params: serde_json::Value) -> serde_json::Value {
     json!({ mode: params })
 }
 
+/// The list request (the selector-less Functions view) from flat
+/// search-style params — `limit` is spelled `last` there — returning
+/// the page (`data`).
+async fn list(
+    h: &OtelTracesHandler,
+    mut params: serde_json::Value,
+) -> netdata_plugin_error::Result<serde_json::Value> {
+    let obj = params.as_object_mut().unwrap();
+    if let Some(limit) = obj.remove("limit") {
+        obj.insert("last".to_string(), limit);
+    }
+    let v = serde_json::to_value(call_on(h, params).await?).unwrap();
+    Ok(v["data"].clone())
+}
+
 fn merge(base: &mut serde_json::Value, extra: serde_json::Value) {
     base.as_object_mut()
         .unwrap()
@@ -536,18 +500,6 @@ fn ids(v: &serde_json::Value) -> Vec<String> {
 }
 
 #[tokio::test]
-async fn search_declares_the_widened_completion_coverage() {
-    let h = handler_with_search_corpus().await;
-    let v =
-        serde_json::to_value(call_on(&h, as_mode("search", window_body())).await.unwrap()).unwrap();
-    // Window width 100s clamps to the 1h minimum slack per side.
-    assert_eq!(
-        v["completion_coverage"],
-        json!({"after": T_S - 3_600, "before": T_S + 100 + 3_600})
-    );
-}
-
-#[tokio::test]
 async fn search_completion_captures_slack_files_and_skips_beyond_slack() {
     let registries = make_registries();
     install_wal(
@@ -561,8 +513,7 @@ async fn search_completion_captures_slack_files_and_skips_beyond_slack() {
     // Inside the slack band (30min past the window edge).
     install_sfst(&registries, "default", 2, T_S + 1_800, T_S + 1_900).await;
     let h = make_handler_over(registries);
-    let v =
-        serde_json::to_value(call_on(&h, as_mode("search", window_body())).await.unwrap()).unwrap();
+    let v = list(&h, window_body()).await.unwrap();
     assert_eq!(v["status"], json!({"partial": ["source_failure"]}));
 
     let registries = make_registries();
@@ -576,17 +527,14 @@ async fn search_completion_captures_slack_files_and_skips_beyond_slack() {
     // Beyond the slack band (2h past a 100s window's 1h slack).
     install_sfst(&registries, "default", 2, T_S + 7_300, T_S + 7_400).await;
     let h = make_handler_over(registries);
-    let v =
-        serde_json::to_value(call_on(&h, as_mode("search", window_body())).await.unwrap()).unwrap();
+    let v = list(&h, window_body()).await.unwrap();
     assert_eq!(v["status"], json!({"complete": true}));
 }
 
 #[tokio::test]
 async fn search_returns_most_recent_first_with_deterministic_ties() {
     let h = handler_with_search_corpus().await;
-    let mut body = window_body();
-    body["spans_per_trace"] = json!(1);
-    let v = serde_json::to_value(call_on(&h, as_mode("search", body)).await.unwrap()).unwrap();
+    let v = list(&h, window_body()).await.unwrap();
     assert_eq!(v["status"], json!({"complete": true}));
     // Newest first; the C/D tie breaks by trace_id ascending.
     assert_eq!(ids(&v), vec!["0e", "0c", "0d", "0b", "0a"]);
@@ -599,12 +547,10 @@ async fn search_returns_most_recent_first_with_deterministic_ties() {
         json!({
             "top": [{"value": "svc-a", "spans": 3}],
             "other": 0,
-            "other_services": 0,
             "unattributed": 0,
         })
     );
     assert_eq!(e["exact"], true);
-    assert_eq!(e["matched_spans"].as_array().unwrap().len(), 1);
 }
 
 #[tokio::test]
@@ -613,25 +559,25 @@ async fn selections_narrow_by_service_operation_and_attributes() {
 
     let mut body = window_body();
     body["selections"] = json!({"resource.service.name": ["svc-a"]});
-    let v = serde_json::to_value(call_on(&h, as_mode("search", body)).await.unwrap()).unwrap();
+    let v = list(&h, body).await.unwrap();
     assert_eq!(ids(&v), vec!["0e", "0c", "0a"]);
 
     // Multi-value OR within a key.
     let mut body = window_body();
     body["selections"] = json!({"resource.service.name": ["svc-a", "svc-b"]});
-    let v = serde_json::to_value(call_on(&h, as_mode("search", body)).await.unwrap()).unwrap();
+    let v = list(&h, body).await.unwrap();
     assert_eq!(ids(&v).len(), 5);
 
     // Builtin word: only B and E have a second span.
     let mut body = window_body();
     body["selections"] = json!({"name": ["span-2"]});
-    let v = serde_json::to_value(call_on(&h, as_mode("search", body)).await.unwrap()).unwrap();
+    let v = list(&h, body).await.unwrap();
     assert_eq!(ids(&v), vec!["0e", "0b"]);
 
     // Keys AND across selections.
     let mut body = window_body();
     body["selections"] = json!({"name": ["span-2"], "resource.service.name": ["svc-b"]});
-    let v = serde_json::to_value(call_on(&h, as_mode("search", body)).await.unwrap()).unwrap();
+    let v = list(&h, body).await.unwrap();
     assert_eq!(ids(&v), vec!["0b"]);
 }
 
@@ -669,75 +615,35 @@ async fn the_otel_defaults_are_selectable_in_the_functions_view() {
 }
 
 #[tokio::test]
-async fn duration_bounds_filter_spans() {
-    let h = handler_with_search_corpus().await;
-    // Fixture spans last 500 ns each.
-    let mut body = window_body();
-    body["min_duration_ns"] = json!(501);
-    let v = serde_json::to_value(call_on(&h, as_mode("search", body)).await.unwrap()).unwrap();
-    assert_eq!(ids(&v).len(), 0);
-
-    let mut body = window_body();
-    body["min_duration_ns"] = json!(100);
-    body["max_duration_ns"] = json!(500);
-    let v = serde_json::to_value(call_on(&h, as_mode("search", body)).await.unwrap()).unwrap();
-    assert_eq!(ids(&v).len(), 5);
-}
-
-#[tokio::test]
 async fn pagination_walks_the_corpus_without_dups_or_gaps_across_the_tie() {
     let h = handler_with_search_corpus().await;
 
     // Page 1 (limit=2): E, C — the tail C ties with D.
     let mut body = window_body();
     body["limit"] = json!(2);
-    let v1 =
-        serde_json::to_value(call_on(&h, as_mode("search", body.clone())).await.unwrap()).unwrap();
+    let v1 = list(&h, body.clone()).await.unwrap();
     assert_eq!(ids(&v1), vec!["0e", "0c"]);
     let next1 = v1["anchor"]["next"].as_str().unwrap().to_string();
 
     // Page 2: the tie partner D, then B.
     body["anchor"] = json!(next1);
-    let v2 =
-        serde_json::to_value(call_on(&h, as_mode("search", body.clone())).await.unwrap()).unwrap();
+    let v2 = list(&h, body.clone()).await.unwrap();
     assert_eq!(ids(&v2), vec!["0d", "0b"]);
     let next2 = v2["anchor"]["next"].as_str().unwrap().to_string();
 
     // Page 3: A alone; short page, walk over.
     body["anchor"] = json!(next2);
-    let v3 =
-        serde_json::to_value(call_on(&h, as_mode("search", body.clone())).await.unwrap()).unwrap();
+    let v3 = list(&h, body.clone()).await.unwrap();
     assert_eq!(ids(&v3), vec!["0a"]);
     assert!(v3.get("anchor").is_none());
 }
 
 #[tokio::test]
-async fn spans_per_trace_zero_attaches_no_spans() {
-    let h = handler_with_search_corpus().await;
-    let mut body = window_body();
-    body["spans_per_trace"] = json!(0);
-    let v = serde_json::to_value(call_on(&h, as_mode("search", body)).await.unwrap()).unwrap();
-    assert!(
-        v["traces"]
-            .as_array()
-            .unwrap()
-            .iter()
-            .all(|t| t["matched_spans"].as_array().unwrap().is_empty())
-    );
-    // The counts still tell the story.
-    assert_eq!(v["traces"][0]["matched_count"], 3);
-}
-
-#[tokio::test]
-async fn invalid_search_requests_are_clean_client_errors() {
+async fn invalid_list_requests_are_clean_client_errors() {
     let h = handler_with_search_corpus().await;
     for (body, needle) in [
-        (json!({"limit": 0}), "zero 'limit'"),
+        (json!({"limit": 0}), "zero 'last'"),
         (json!({"limit": 1001}), "exceeds the maximum"),
-        (
-            json!({"spans_per_trace": 200}),
-            "exceeds the library maximum",
-        ),
         (
             json!({"selections": {"bogus": ["x"]}}),
             "unknown selection key",
@@ -745,7 +651,7 @@ async fn invalid_search_requests_are_clean_client_errors() {
         (json!({"anchor": "junk"}), "malformed anchor"),
         (json!({"after": 500, "before": 400}), "invalid window"),
     ] {
-        let err = call_on(&h, as_mode("search", body.clone()))
+        let err = list(&h, body.clone())
             .await
             .expect_err("must be a client error");
         let msg = err.to_string();
@@ -753,9 +659,9 @@ async fn invalid_search_requests_are_clean_client_errors() {
     }
     // The boundary itself is legal (locks the cap against an accidental
     // off-by-one `<`).
-    call_on(&h, as_mode("search", json!({"limit": 1000})))
+    list(&h, json!({"limit": 1000}))
         .await
-        .expect("limit == max succeeds");
+        .expect("last == max succeeds");
 }
 
 #[tokio::test]
@@ -781,12 +687,10 @@ async fn pagination_survives_a_trace_whose_envelope_predates_its_rank() {
 
     let mut body = window_body();
     body["limit"] = json!(2);
-    body["spans_per_trace"] = json!(0);
-    let v1 =
-        serde_json::to_value(call_on(&h, as_mode("search", body.clone())).await.unwrap()).unwrap();
+    let v1 = list(&h, body.clone()).await.unwrap();
     assert_eq!(ids(&v1), vec!["1b", "0f"], "V (50s) then F (rank 45s)");
     body["anchor"] = v1["anchor"]["next"].clone();
-    let v2 = serde_json::to_value(call_on(&h, as_mode("search", body)).await.unwrap()).unwrap();
+    let v2 = list(&h, body).await.unwrap();
     assert_eq!(ids(&v2), vec!["1a"], "U (30s) must not be gapped out");
     assert!(v2.get("anchor").is_none());
 }
@@ -815,13 +719,10 @@ async fn straddling_trace_above_the_tail_never_reappears() {
 
     let mut body = window_body();
     body["limit"] = json!(2);
-    body["spans_per_trace"] = json!(0);
-    let v1 =
-        serde_json::to_value(call_on(&h, as_mode("search", body.clone())).await.unwrap()).unwrap();
+    let v1 = list(&h, body.clone()).await.unwrap();
     assert_eq!(ids(&v1), vec!["0f", "1a"], "F (rank 70s) then U (50s)");
     body["anchor"] = v1["anchor"]["next"].clone();
-    let v2 =
-        serde_json::to_value(call_on(&h, as_mode("search", body.clone())).await.unwrap()).unwrap();
+    let v2 = list(&h, body.clone()).await.unwrap();
     assert_eq!(
         ids(&v2),
         vec!["1b"],
@@ -837,16 +738,16 @@ async fn anchor_pages_ignore_the_requests_own_window() {
     let h = handler_with_search_corpus().await;
     let mut body = window_body();
     body["limit"] = json!(2);
-    body["spans_per_trace"] = json!(0);
-    let v1 = serde_json::to_value(call_on(&h, as_mode("search", body)).await.unwrap()).unwrap();
+    let v1 = list(&h, body).await.unwrap();
     let next = v1["anchor"]["next"].clone();
 
     // Page 2 with a WRONG window — the frozen one must win.
-    let body2 = as_mode(
-        "search",
-        json!({"after": 1, "before": 2, "limit": 2, "spans_per_trace": 0, "anchor": next}),
-    );
-    let v2 = serde_json::to_value(call_on(&h, body2).await.unwrap()).unwrap();
+    let v2 = list(
+        &h,
+        json!({"after": 1, "before": 2, "limit": 2, "anchor": next}),
+    )
+    .await
+    .unwrap();
     assert_eq!(ids(&v2), vec!["0d", "0b"]);
 }
 
@@ -873,9 +774,7 @@ async fn late_arrivals_above_the_key_shorten_pages_but_never_duplicate() {
 
     let mut body = window_body();
     body["limit"] = json!(2);
-    body["spans_per_trace"] = json!(0);
-    let v1 =
-        serde_json::to_value(call_on(&h, as_mode("search", body.clone())).await.unwrap()).unwrap();
+    let v1 = list(&h, body.clone()).await.unwrap();
     assert_eq!(ids(&v1), vec!["0d", "0c"]);
 
     // A burst of three late arrivals, all ranked above the key (0c@30).
@@ -895,7 +794,7 @@ async fn late_arrivals_above_the_key_shorten_pages_but_never_duplicate() {
     // engine top-4 = [23, 22, 21, 0d]; everything at-or-above the key
     // drops → a short (here empty) page, no duplicates, walk ends.
     body["anchor"] = v1["anchor"]["next"].clone();
-    let v2 = serde_json::to_value(call_on(&h, as_mode("search", body)).await.unwrap()).unwrap();
+    let v2 = list(&h, body).await.unwrap();
     let page2 = ids(&v2);
     assert!(
         !page2.contains(&"0d".to_string()) && !page2.contains(&"0c".to_string()),
@@ -907,57 +806,7 @@ async fn late_arrivals_above_the_key_shorten_pages_but_never_duplicate() {
     );
 }
 
-// ── The enumeration modes ───────────────────────────────────────────
-
-#[tokio::test]
-async fn attributes_lists_keys_in_the_selection_grammar() {
-    let h = handler_with_search_corpus().await;
-    let mut body = window_body();
-    merge(&mut body, json!({}));
-    let body = as_mode("attributes", body);
-    let v = serde_json::to_value(call_on(&h, body).await.unwrap()).unwrap();
-    assert_eq!(v["status"], json!({"complete": true}));
-    assert_eq!(v["truncated"], false);
-    let keys: Vec<&str> = v["keys"]
-        .as_array()
-        .unwrap()
-        .iter()
-        .map(|k| k.as_str().unwrap())
-        .collect();
-    assert!(keys.contains(&"resource.service.name"), "{keys:?}");
-    assert!(keys.contains(&"name"), "builtin word: {keys:?}");
-    // The round-trip contract (every returned key feeds straight back
-    // as a selection or a values request) is pinned in the adapter
-    // tests; here we spot-check it end to end through the Function.
-    let mut body = window_body();
-    merge(&mut body, json!({"key": keys[0]}));
-    let body = as_mode("attribute_values", body);
-    let v = serde_json::to_value(call_on(&h, body).await.unwrap()).unwrap();
-    assert_eq!(v["key"], keys[0]);
-}
-
-#[tokio::test]
-async fn attributes_owner_filter_and_truncation_are_exact() {
-    let h = handler_with_search_corpus().await;
-    let mut body = window_body();
-    merge(&mut body, json!({"owner": "resource"}));
-    let body = as_mode("attributes", body);
-    let v = serde_json::to_value(call_on(&h, body).await.unwrap()).unwrap();
-    let keys = v["keys"].as_array().unwrap();
-    assert!(!keys.is_empty());
-    assert!(
-        keys.iter()
-            .all(|k| k.as_str().unwrap().starts_with("resource.")),
-        "{keys:?}"
-    );
-
-    let mut body = window_body();
-    merge(&mut body, json!({"max_keys": 1}));
-    let body = as_mode("attributes", body);
-    let v = serde_json::to_value(call_on(&h, body).await.unwrap()).unwrap();
-    assert_eq!(v["keys"].as_array().unwrap().len(), 1);
-    assert_eq!(v["truncated"], true);
-}
+// ── The enumeration mode ───────────────────────────────────────────
 
 #[tokio::test]
 async fn attribute_values_returns_storage_labels_with_kinds() {
@@ -1019,11 +868,6 @@ async fn enumeration_invalid_requests_are_clean_client_errors() {
     // Shape errors (null selectors, missing `key`) are wire-test
     // territory now; these are the handler's semantic rejections.
     for (body, needle) in [
-        (json!({"attributes": {"owner": "bogus"}}), "unknown owner"),
-        (
-            json!({"attributes": {"max_keys": 0}}),
-            "zero key/value limit",
-        ),
         (
             json!({"attribute_values": {"key": "bogus"}}),
             "unknown selection key",
@@ -1201,9 +1045,7 @@ async fn every_mode_sets_its_progress_total_and_completes_it() {
             json!({"trace": {"id": "0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a"}}),
             (2, 2),
         ),
-        (windowed("search", json!({})), (2, 2)),
         (functions_body(2), (4, 4)),
-        (windowed("attributes", json!({})), (2, 2)),
         (windowed("attribute_values", json!({"key": "name"})), (2, 2)),
     ] {
         assert_eq!(progress_of(&h, body.clone()).await, expected, "{body}");
@@ -1250,18 +1092,12 @@ async fn the_functions_view_aggregates_the_whole_window_beside_the_page() {
 }
 
 #[tokio::test]
-async fn the_aggregates_coverage_is_the_grids_aligned_window_not_the_pages() {
+async fn the_aggregates_coverage_is_the_grids_aligned_window() {
     let h = handler_with_search_corpus().await;
     // An 886s window: the grid picks 10s buckets and snaps outward to
-    // wall-clock multiples, while the page declares the same window
-    // widened by the completion slack. Three different windows, two of
-    // them reported.
+    // wall-clock multiples, and reports that aligned window.
     let body = json!({"after": T_S + 7, "before": T_S + 893, "last": 20});
     let v = serde_json::to_value(call_on(&h, body).await.unwrap()).unwrap();
-    assert_eq!(
-        v["data"]["completion_coverage"],
-        json!({"after": T_S + 7 - 3_600, "before": T_S + 893 + 3_600})
-    );
     let o = &v["data"]["overview"];
     assert_eq!(o["coverage"], json!({"after": T_S, "before": T_S + 900}));
     assert_eq!(o["grid"]["bucket_start_s"], T_S);
@@ -1462,9 +1298,8 @@ async fn an_anchor_page_carries_no_aggregate_and_walks_the_corpus_unchanged() {
     // perturbs nothing the client reads off it.
     let mut legacy = window_body();
     legacy["limit"] = json!(2);
-    legacy["spans_per_trace"] = json!(0);
     legacy["anchor"] = next1;
-    let l2 = serde_json::to_value(call_on(&h, as_mode("search", legacy)).await.unwrap()).unwrap();
+    let l2 = list(&h, legacy).await.unwrap();
     assert_eq!(l2["traces"], v2["data"]["traces"]);
     assert_eq!(l2["items"], v2["data"]["items"]);
     assert_eq!(l2["anchor"], v2["data"]["anchor"]);
@@ -1487,18 +1322,6 @@ async fn an_anchor_page_carries_no_aggregate_and_walks_the_corpus_unchanged() {
 }
 
 #[tokio::test]
-async fn the_legacy_search_mode_carries_no_aggregate_section() {
-    let h = handler_with_search_corpus().await;
-    let v =
-        serde_json::to_value(call_on(&h, as_mode("search", window_body())).await.unwrap()).unwrap();
-    assert_eq!(v["mode"], "search");
-    assert!(
-        v.get("overview").is_none(),
-        "the aggregate section is the Functions view's contract"
-    );
-}
-
-#[tokio::test]
 async fn tenant_scoping_isolates_and_defaults() {
     // The tenant selector scopes every data mode: another tenant's data
     // is invisible, an unknown tenant is empty (never an all-tenant
@@ -1513,21 +1336,19 @@ async fn tenant_scoping_isolates_and_defaults() {
     .await;
     let h = make_handler_over(registries);
 
-    let mut body = window_body();
-    body["spans_per_trace"] = json!(0);
+    let body = window_body();
     // Default tenant: tenant-a's data is invisible.
-    let v =
-        serde_json::to_value(call_on(&h, as_mode("search", body.clone())).await.unwrap()).unwrap();
+    let v = list(&h, body.clone()).await.unwrap();
     assert_eq!(v["items"]["returned"], 0);
     // The owning tenant sees it — `tenant` rides at the TOP level.
-    let mut wrapped = as_mode("search", body.clone());
+    let mut wrapped = body.clone();
     wrapped["tenant"] = json!("tenant-a");
-    let v = serde_json::to_value(call_on(&h, wrapped).await.unwrap()).unwrap();
+    let v = list(&h, wrapped).await.unwrap();
     assert_eq!(v["items"]["returned"], 1);
     // An unknown tenant is empty, not an error and not a union.
-    let mut wrapped = as_mode("search", body);
+    let mut wrapped = body;
     wrapped["tenant"] = json!("nope");
-    let v = serde_json::to_value(call_on(&h, wrapped).await.unwrap()).unwrap();
+    let v = list(&h, wrapped).await.unwrap();
     assert_eq!(v["items"]["returned"], 0);
 
     // Tenant routes identically through every data mode (the
@@ -1595,7 +1416,7 @@ async fn shape_errors_are_transport_400s() {
     for (payload, needle) in [
         (&br#"{"bogus": 1}"#[..], "unknown field"),
         (
-            br#"{"search": {}, "after": 1}"#,
+            br#"{"info": {}, "after": 1}"#,
             "cannot mix a mode selector with Functions parameters",
         ),
         (
@@ -1607,7 +1428,7 @@ async fn shape_errors_are_transport_400s() {
         (br#"{"attribute_values": []}"#, "expected an object"),
         (br#"[]"#, "otel-traces request object"),
         (
-            br#"{"search": {}, "tenant": "a", "tenant": "b"}"#,
+            br#"{"info": {}, "tenant": "a", "tenant": "b"}"#,
             "duplicate field",
         ),
     ] {
@@ -1632,7 +1453,7 @@ async fn semantic_errors_keep_the_handler_status() {
     // bounds, bad trace id) rides the pre-existing handler-error
     // mapping — frozen behavior, deliberately not reclassified here.
     for payload in [
-        &br#"{"search": {"limit": 0}}"#[..],
+        &br#"{"last": 0}"#[..],
         br#"{"trace": {"id": "11111111111111111111111111111111", "after": 100}}"#,
         br#"{"trace": {"id": "xyz"}}"#,
     ] {
@@ -1679,8 +1500,6 @@ async fn every_response_shape_declares_its_mode() {
     let h = handler_with_search_corpus().await;
     for (body, mode) in [
         (json!({"info": {}}), "info"),
-        (as_mode("search", window_body()), "search"),
-        (as_mode("attributes", window_body()), "attributes"),
         (
             {
                 let mut inner = window_body();

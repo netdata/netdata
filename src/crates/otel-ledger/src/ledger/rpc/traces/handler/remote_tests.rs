@@ -83,14 +83,15 @@ async fn call_with(
         .map(|resp| serde_json::to_value(resp).unwrap())
 }
 
-fn search_body(limit: usize) -> serde_json::Value {
-    json!({"search": {"after": T_S, "before": T_S + 100, "limit": limit}})
-}
-
 /// The Functions view over the corpus window: the mode a request
 /// without an explicit selector deserializes as.
 fn functions_body(last: usize) -> serde_json::Value {
     json!({"after": T_S, "before": T_S + 100, "last": last})
+}
+
+/// The list page (`data`) of [`functions_body`].
+async fn list(h: &OtelTracesHandler, last: usize) -> serde_json::Value {
+    call(h, functions_body(last)).await.unwrap()["data"].clone()
 }
 
 fn trace_body(byte: u8) -> serde_json::Value {
@@ -138,7 +139,7 @@ async fn evicted_files_answer_exactly_as_local_files() {
     for body in [
         trace_body(0x0B),
         trace_body(0x0C),
-        search_body(20),
+        functions_body(20),
         functions_body(2),
     ] {
         let from_local = call(&local, body.clone()).await.unwrap();
@@ -147,7 +148,7 @@ async fn evicted_files_answer_exactly_as_local_files() {
     }
     // The local side is Complete with remote storage on: nothing remote
     // was needed, nothing reported missing.
-    let local_search = call(&local, search_body(20)).await.unwrap();
+    let local_search = list(&local, 20).await;
     assert_eq!(local_search["status"], json!({"complete": true}));
     assert_eq!(traces_of(&local_search), ["0e", "0c", "0b", "0a"]);
     // The answers came from downloaded files.
@@ -167,7 +168,7 @@ async fn a_failed_download_is_reported_and_leaves_search_inexact() {
     assert_eq!(v["items"]["returned"], 2);
 
     // A full page over a partial result: every summary inexact, no cursor.
-    let v = call(&h, search_body(2)).await.unwrap();
+    let v = list(&h, 2).await;
     assert_eq!(v["status"], partial);
     assert_eq!(traces_of(&v), ["0b", "0a"]);
     assert!(
@@ -203,7 +204,7 @@ async fn a_storage_error_costs_only_its_own_file() {
         .await;
     let h = handler(registries, &remote);
 
-    let v = call(&h, search_body(20)).await.unwrap();
+    let v = list(&h, 20).await;
     assert_eq!(v["status"], json!({"partial": ["remote_unavailable"]}));
     assert_eq!(traces_of(&v), ["0e", "0c"]);
     assert_eq!(remote.cache.file_count(), 1, "file 2 was downloaded");
@@ -221,7 +222,7 @@ async fn an_unreadable_catalog_is_reported() {
     assert_eq!(v["status"], partial);
     assert_eq!(v["items"]["returned"], 0);
 
-    let v = call(&h, search_body(20)).await.unwrap();
+    let v = list(&h, 20).await;
     assert_eq!(v["status"], partial);
     assert_eq!(traces_of(&v), ["0e", "0c"]);
 }
@@ -232,7 +233,7 @@ async fn a_query_too_large_for_the_download_cache_is_a_hard_error() {
     // Any fixture file alone exceeds the 100 B cache, so every query
     // shape fails at remote planning, before anything downloads.
 
-    for body in [trace_body(0x0B), search_body(20), functions_body(2)] {
+    for body in [trace_body(0x0B), functions_body(2)] {
         let err = call(&h, body.clone()).await.unwrap_err().to_string();
         assert!(
             err.contains("more than 100 B of remote trace data")
@@ -329,7 +330,7 @@ async fn another_identitys_file_at_the_same_seq_is_downloaded() {
         .await;
     let h = handler(registries, &remote);
 
-    let v = call(&h, search_body(20)).await.unwrap();
+    let v = list(&h, 20).await;
     assert_eq!(v["status"], json!({"complete": true}));
     assert_eq!(traces_of(&v), ["0e", "0c", "0b", "0a"]);
     assert_eq!(remote.cache.file_count(), 1);
@@ -349,15 +350,11 @@ async fn half_evicted_setup() -> (OtelTracesHandler, TestRemote) {
 #[tokio::test]
 async fn progress_counts_the_downloads_beside_the_sources() {
     // Every walked source ticks, as does each planned download. Trace
-    // and search plan one range: two sources plus one download. The
+    // plans one range: two sources plus one download. The
     // Functions view plans two distinct ranges — the page's completion
     // range and the aggregate's grid range — each selecting both files:
     // four source ticks plus the same one download.
-    for (body, expected) in [
-        (trace_body(0x0C), (3, 3)),
-        (search_body(20), (3, 3)),
-        (functions_body(2), (5, 5)),
-    ] {
+    for (body, expected) in [(trace_body(0x0C), (3, 3)), (functions_body(2), (5, 5))] {
         let (h, _remote) = half_evicted_setup().await;
         let progress = ProgressState::new();
         call_with(&h, body.clone(), &progress).await.unwrap();
@@ -373,8 +370,8 @@ async fn progress_counts_the_downloads_beside_the_sources() {
     assert_eq!(progress.load(), (2, 3));
 }
 
-/// The windowed enumeration modes over the corpus window.
-fn aggregate_bodies() -> [serde_json::Value; 2] {
+/// The windowed enumeration mode over the corpus window.
+fn aggregate_bodies() -> [serde_json::Value; 1] {
     let window = |mode: &str, extra: serde_json::Value| {
         let mut params = json!({"after": T_S, "before": T_S + 100});
         params
@@ -383,10 +380,10 @@ fn aggregate_bodies() -> [serde_json::Value; 2] {
             .extend(extra.as_object().unwrap().clone());
         json!({ mode: params })
     };
-    [
-        window("attributes", json!({})),
-        window("attribute_values", json!({"key": "resource.service.name"})),
-    ]
+    [window(
+        "attribute_values",
+        json!({"key": "resource.service.name"}),
+    )]
 }
 
 #[tokio::test]
@@ -424,11 +421,6 @@ async fn a_lost_file_outside_the_window_does_not_make_an_answer_partial() {
     let (h, remote, [_, two]) = evicted_setup(64 * MIB).await;
     remote.lose(&two);
 
-    for mode in ["attributes"] {
-        let body = json!({ mode: {"after": T_S + 5, "before": T_S + 25} });
-        let v = call(&h, body.clone()).await.unwrap();
-        assert_eq!(v["status"], json!({"complete": true}), "{body}");
-    }
     let body = json!({"attribute_values": {"after": T_S + 5, "before": T_S + 25, "key": "resource.service.name"}});
     let v = call(&h, body).await.unwrap();
     assert_eq!(v["status"], json!({"complete": true}));

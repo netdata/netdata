@@ -154,16 +154,8 @@ fn each_selector_selects_its_mode() {
         TracesMode::Trace(_)
     ));
     assert!(matches!(
-        req(json!({"attributes": {}})).mode,
-        TracesMode::Attributes(_)
-    ));
-    assert!(matches!(
         req(json!({"attribute_values": {"key": "kind"}})).mode,
         TracesMode::AttributeValues(_)
-    ));
-    assert!(matches!(
-        req(json!({"search": {}})).mode,
-        TracesMode::Search(_)
     ));
     assert!(matches!(req(json!({"info": {}})).mode, TracesMode::Info));
 }
@@ -179,7 +171,6 @@ fn a_present_but_null_selector_selects_then_rejects() {
             json!({"attribute_values": null}),
             "invalid attribute_values selector",
         ),
-        (json!({"search": null}), "invalid search selector"),
     ] {
         let err = req_err(body.clone());
         assert!(err.contains(needle), "for {body}: {err}");
@@ -197,7 +188,6 @@ fn selectors_are_object_only_arrays_reject() {
             "invalid attribute_values selector",
         ),
         (json!({"trace": ["00ff", 7]}), "invalid trace selector"),
-        (json!({"search": []}), "invalid search selector"),
     ] {
         let err = req_err(body.clone());
         assert!(
@@ -224,17 +214,17 @@ fn the_top_level_must_be_a_json_object() {
 /// mixing error rather than an unknown-field error.
 #[test]
 fn unknown_and_retired_top_level_keys_are_client_errors() {
-    for body in [json!({"search": {}, "bogus": 1}), json!({"bogus": 1})] {
+    for body in [json!({"info": {}, "bogus": 1}), json!({"bogus": 1})] {
         let err = req_err(body.clone());
         assert!(err.contains("unknown field"), "for {body}: {err}");
     }
 
     for body in [
-        json!({"search": {}, "after": 1, "before": 2}),
-        json!({"search": {}, "last": 5}),
-        json!({"search": {}, "timeout": 30}),
-        json!({"search": {}, "min_trace_duration_ns": 1}),
-        json!({"search": {}, "max_trace_duration_ns": 1}),
+        json!({"info": {}, "after": 1, "before": 2}),
+        json!({"info": {}, "last": 5}),
+        json!({"info": {}, "timeout": 30}),
+        json!({"info": {}, "min_trace_duration_ns": 1}),
+        json!({"info": {}, "max_trace_duration_ns": 1}),
         json!({"trace": {"id": "00"}, "anchor": "x"}),
     ] {
         let err = req_err(body.clone());
@@ -246,8 +236,8 @@ fn unknown_and_retired_top_level_keys_are_client_errors() {
 }
 
 /// The `trace` selector's strictness and parse-through: junk shapes and
-/// unknown fields are client errors; a well-formed body carries `id`,
-/// `span_cap`, and the optional window through untouched — semantic
+/// unknown fields are client errors; a well-formed body carries `id`
+/// and the optional window through untouched — semantic
 /// validation is not the wire's job.
 #[test]
 fn trace_params_reject_malformed_and_parse_bounds() {
@@ -255,16 +245,19 @@ fn trace_params_reject_malformed_and_parse_bounds() {
         (json!({"trace": 7}), "invalid trace selector"),
         (json!({"trace": {}}), "missing field `id`"),
         (json!({"trace": {"id": "00", "bogus": 1}}), "unknown field"),
+        (
+            json!({"trace": {"id": "00", "span_cap": 9}}),
+            "unknown field",
+        ),
     ];
     for (body, needle) in cases {
         let err = req_err(body.clone());
         assert!(err.contains(needle), "for {body}: {err}");
     }
-    let TracesMode::Trace(ok) = req(json!({"trace": {"id": "00ff", "span_cap": 9}})).mode else {
+    let TracesMode::Trace(ok) = req(json!({"trace": {"id": "00ff"}})).mode else {
         panic!("trace mode expected");
     };
     assert_eq!(ok.id, "00ff");
-    assert_eq!(ok.span_cap, Some(9));
     assert_eq!(ok.after, None);
     assert_eq!(ok.before, None);
 
@@ -316,50 +309,14 @@ fn duplicate_keys_are_rejected_not_last_value_wins() {
     assert!(err.to_string().contains("duplicate field"), "{err}");
 
     let err = serde_json::from_slice::<OtelTracesRequest>(
-        br#"{"search": {}, "tenant": "a", "tenant": "b"}"#,
+        br#"{"info": {}, "tenant": "a", "tenant": "b"}"#,
     )
     .expect_err("duplicate tenant must be rejected");
     assert!(err.to_string().contains("duplicate field"), "{err}");
 }
 
 #[test]
-fn search_params_defaults_and_strictness() {
-    let TracesMode::Search(p) = req(json!({"search": {}})).mode else {
-        panic!("search mode expected");
-    };
-    assert_eq!(p.after, 0);
-    assert_eq!(p.before, 0);
-    assert_eq!(p.limit, sfsq::traces::DEFAULT_SEARCH_LIMIT);
-    assert_eq!(p.spans_per_trace, None);
-    assert!(p.selections.is_empty());
-    assert_eq!(p.anchor, None);
-
-    let TracesMode::Search(p) = req(json!({"search": {
-        "after": 10, "before": 20, "limit": 1,
-        "selections": {"kind": ["SERVER"]}
-    }}))
-    .mode
-    else {
-        panic!("search mode expected");
-    };
-    assert_eq!((p.after, p.before), (10, 20));
-    assert_eq!(p.limit, 1);
-    assert_eq!(p.selections["kind"], vec!["SERVER"]);
-
-    let err = req_err(json!({"search": {"last": 5}}));
-    assert!(
-        err.contains("invalid search selector") && err.contains("unknown field"),
-        "the old `last` name is retired: {err}"
-    );
-}
-
-#[test]
 fn windowed_mode_objects_carry_their_own_window() {
-    let TracesMode::Attributes(p) = req(json!({"attributes": {"after": 3, "before": 4}})).mode
-    else {
-        panic!("attributes mode expected");
-    };
-    assert_eq!((p.after, p.before), (3, 4));
     let TracesMode::AttributeValues(p) =
         req(json!({"attribute_values": {"key": "kind", "after": 5, "before": 6}})).mode
     else {
@@ -378,7 +335,7 @@ fn windowed_mode_objects_carry_their_own_window() {
 
 #[test]
 fn tenant_rides_beside_any_mode() {
-    let r = req(json!({"search": {}, "tenant": "t1"}));
+    let r = req(json!({"trace": {"id": "00"}, "tenant": "t1"}));
     assert_eq!(r.tenant.as_deref(), Some("t1"));
     let r = req(json!({"info": {}}));
     assert_eq!(r.tenant, None);
@@ -403,8 +360,7 @@ fn info_response_shape_is_pinned() {
             "has_history": true,
             "v": 3,
             "accepted_params": [
-                "info", "trace", "attributes", "attribute_values", "search",
-                "tenant", "after", "before", "last", "anchor", "selections",
+                "info", "trace", "attribute_values", "tenant", "after", "before", "last", "anchor", "selections",
                 "min_trace_duration_ns", "max_trace_duration_ns"
             ],
             "required_params": [],

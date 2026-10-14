@@ -15,16 +15,16 @@
 use std::collections::HashMap;
 
 use sfsq::traces::{
-    AttributeKey, AttributeNamesData, AttributeOwner, AttributeValuesData, BuiltinField, CompareOp,
-    Condition, DURATION_BIN_LABELS, DurationPercentiles, FieldKinds, OverviewData, Predicate,
-    PredicateTarget, PredicateValue, SearchData, TraceData,
+    AttributeKey, AttributeOwner, AttributeValuesData, BuiltinField, CompareOp, Condition,
+    DURATION_BIN_LABELS, DurationPercentiles, FieldKinds, OverviewData, Predicate, PredicateTarget,
+    PredicateValue, SearchData, TraceData,
 };
 
 use super::wire::{
-    AnchorWire, AttributeValueWire, AttributeValuesResult, AttributesResult, CoverageWire,
-    EventWire, FieldKindsWire, LinkWire, OverviewGridWire, OverviewPercentilesWire,
-    OverviewSection, OverviewTotals, SearchItems, SearchResult, ServiceBreakdownWire,
-    ServiceSpansWire, SpanWire, StatusWire, TraceItems, TraceResult, TraceSummaryWire,
+    AnchorWire, AttributeValueWire, AttributeValuesResult, CoverageWire, EventWire, FieldKindsWire,
+    LinkWire, OverviewGridWire, OverviewPercentilesWire, OverviewSection, OverviewTotals,
+    SearchItems, SearchResult, ServiceBreakdownWire, ServiceSpansWire, SpanWire, StatusWire,
+    TraceItems, TraceResult, TraceSummaryWire,
 };
 
 /// Parse a W3C text-form trace id: exactly 32 hex chars (16 bytes),
@@ -247,23 +247,14 @@ pub(crate) fn parse_selection_key(key: &str) -> Result<PredicateTarget, String> 
 
 /// Build the engine predicate from the wire's filters: each selection
 /// key is one Eq condition (values OR within the key, keys AND — the
-/// engine's multi-value semantics); the duration bounds become builtin
-/// Duration comparisons. Keys iterate sorted so requests are
+/// engine's multi-value semantics); the trace-duration bounds become
+/// builtin TraceDuration comparisons. Keys iterate sorted so requests are
 /// deterministic. An empty value list is no constraint.
 pub(crate) fn build_predicate(
     selections: &HashMap<String, Vec<String>>,
-    min_duration_ns: Option<i64>,
-    max_duration_ns: Option<i64>,
     min_trace_duration_ns: Option<i64>,
     max_trace_duration_ns: Option<i64>,
 ) -> Result<Predicate, String> {
-    if let (Some(min), Some(max)) = (min_duration_ns, max_duration_ns)
-        && min > max
-    {
-        return Err(format!(
-            "min_duration_ns {min} exceeds max_duration_ns {max}: nothing can match"
-        ));
-    }
     if let (Some(min), Some(max)) = (min_trace_duration_ns, max_trace_duration_ns)
         && min > max
     {
@@ -291,20 +282,6 @@ pub(crate) fn build_predicate(
                 .collect(),
         });
     }
-    if let Some(min) = min_duration_ns {
-        conditions.push(Condition {
-            target: PredicateTarget::Builtin(BuiltinField::Duration),
-            op: CompareOp::Gte,
-            values: vec![PredicateValue::Integer(min)],
-        });
-    }
-    if let Some(max) = max_duration_ns {
-        conditions.push(Condition {
-            target: PredicateTarget::Builtin(BuiltinField::Duration),
-            op: CompareOp::Lte,
-            values: vec![PredicateValue::Integer(max)],
-        });
-    }
     if let Some(min) = min_trace_duration_ns {
         conditions.push(Condition {
             target: PredicateTarget::Builtin(BuiltinField::TraceDuration),
@@ -322,51 +299,7 @@ pub(crate) fn build_predicate(
     Ok(Predicate { conditions })
 }
 
-// ── Enumeration: owner words + key rendering ────────────────────────
-
-/// Parse the `attributes.owner` word: an attribute owner or `builtin`.
-/// (`Any` stays un-nameable — the engine rejects enumerating it.)
-pub(crate) fn parse_owner_word(word: &str) -> Result<AttributeOwner, String> {
-    if word == "builtin" {
-        return Ok(AttributeOwner::Builtin);
-    }
-    OWNER_WORDS
-        .iter()
-        .find(|(w, _)| *w == word)
-        .map(|(_, o)| *o)
-        .ok_or_else(|| {
-            format!(
-                "unknown owner {word:?}: one of resource, span, instrumentation, \
-                 event, link, builtin"
-            )
-        })
-}
-
-/// The selection-grammar word of a builtin field.
-fn builtin_word(field: BuiltinField) -> &'static str {
-    BUILTIN_WORDS
-        .iter()
-        .find(|(_, f)| *f == field)
-        .map(|(w, _)| *w)
-        .expect("the lockstep test pins a wire word for every builtin")
-}
-
-/// Render one enumerated key into the selection grammar — the exact
-/// inverse of [`parse_selection_key`] (round-trip pinned by tests), so
-/// the facet rail can feed keys straight back as selections.
-pub(crate) fn render_attribute_key(owner: AttributeOwner, key: &AttributeKey) -> String {
-    match key {
-        AttributeKey::Builtin(b) => builtin_word(*b).to_string(),
-        AttributeKey::Attribute(a) => {
-            let word = OWNER_WORDS
-                .iter()
-                .find(|(_, o)| *o == owner)
-                .map(|(w, _)| *w)
-                .expect("attribute keys only ever carry attribute owners");
-            format!("{word}.{a}")
-        }
-    }
-}
+// ── Enumeration: key parsing ────────────────────────────────────────
 
 /// A selection-grammar key as the enumeration API's (owner, key) pair.
 pub(crate) fn parse_enumeration_key(key: &str) -> Result<(AttributeOwner, AttributeKey), String> {
@@ -374,21 +307,6 @@ pub(crate) fn parse_enumeration_key(key: &str) -> Result<(AttributeOwner, Attrib
         PredicateTarget::Attribute(owner, a) => (owner, AttributeKey::Attribute(a)),
         PredicateTarget::Builtin(f) => (AttributeOwner::Builtin, AttributeKey::Builtin(f)),
     })
-}
-
-/// Shape the key enumeration into the wire result.
-pub(crate) fn to_attributes_result(data: AttributeNamesData) -> AttributesResult {
-    AttributesResult {
-        mode: "attributes",
-        version: 1,
-        status: StatusWire::from(&data.status),
-        truncated: data.truncated,
-        keys: data
-            .keys
-            .iter()
-            .map(|(owner, key)| render_attribute_key(*owner, key))
-            .collect(),
-    }
 }
 
 /// Shape one key's value enumeration into the wire result. `key` is the
@@ -471,7 +389,7 @@ fn to_percentiles(buckets: &[Option<DurationPercentiles>]) -> OverviewPercentile
 pub(crate) fn heatmap_predicate(
     selections: &HashMap<String, Vec<String>>,
 ) -> Result<Option<Predicate>, String> {
-    let predicate = build_predicate(selections, None, None, None, None)?;
+    let predicate = build_predicate(selections, None, None)?;
     Ok((!predicate.is_all()).then_some(predicate))
 }
 
@@ -652,7 +570,6 @@ pub(crate) fn to_search_result(
     limit: usize,
     incoming: Option<&SearchCursor>,
     frozen: (u32, u32),
-    completion_coverage: CoverageWire,
 ) -> SearchResult {
     let mut traces = data.traces;
     if let Some(c) = incoming {
@@ -684,13 +601,11 @@ pub(crate) fn to_search_result(
         mode: "search",
         version: 1,
         status: StatusWire::from(&data.status),
-        completion_coverage,
         items: SearchItems {
             returned: traces.len(),
             max_to_return: limit,
         },
         traces: traces.into_iter().map(summary_wire).collect(),
-        field_kinds: field_kinds_wire(data.field_kinds),
         anchor,
         // Composed by the caller when it ran the aggregate pass: only
         // the Functions view does, and only it holds the second engine
@@ -699,8 +614,7 @@ pub(crate) fn to_search_result(
     }
 }
 
-/// One search-page summary → the wire shape (matched spans as full
-/// wire spans).
+/// One search-page summary → the wire shape.
 fn summary_wire(t: sfsq::traces::TraceSummary) -> TraceSummaryWire {
     TraceSummaryWire {
         trace_id: t.trace_id.to_string(),
@@ -712,9 +626,7 @@ fn summary_wire(t: sfsq::traces::TraceSummary) -> TraceSummaryWire {
         span_count: t.span_count,
         error_count: t.error_count,
         service_breakdown: service_breakdown_wire(t.service_breakdown),
-        matched_count: t.matched_count,
         exact: t.exact,
-        matched_spans: t.matched_spans.into_iter().map(span_wire).collect(),
     }
 }
 
@@ -727,7 +639,6 @@ fn service_breakdown_wire(b: sfsq::traces::ServiceBreakdown) -> ServiceBreakdown
             .map(|(value, spans)| ServiceSpansWire { value, spans })
             .collect(),
         other: b.other,
-        other_services: b.other_services,
         unattributed: b.unattributed,
     }
 }
