@@ -47,6 +47,7 @@ static const struct system_info_field {
     { "NETDATA_HOST_OS_LABEL_CODENAME", "_os_codename", offsetof(struct rrdhost_system_info, host_os_label_codename), false, false },
     { "NETDATA_HOST_OS_LABEL_EDITION", "_os_edition", offsetof(struct rrdhost_system_info, host_os_label_edition), false, false },
     { "NETDATA_HOST_OS_LABEL_BUILD", "_os_build", offsetof(struct rrdhost_system_info, host_os_label_build), false, false },
+    { "NETDATA_SYSTEM_L4T_VERSION", "_system_l4t_version", offsetof(struct rrdhost_system_info, host_l4t_version), false, false },
     { "NETDATA_SYSTEM_CPU_LOGICAL_CPU_COUNT", "_system_cores", offsetof(struct rrdhost_system_info, host_cores), true, true },
     { "NETDATA_SYSTEM_CPU_FREQ", "_system_cpu_freq", offsetof(struct rrdhost_system_info, host_cpu_freq), true, false },
     { "NETDATA_SYSTEM_CPU_MODEL", "_system_cpu_model", offsetof(struct rrdhost_system_info, host_cpu_model), false, false },
@@ -308,6 +309,32 @@ int rrdhost_system_info_unittest(void) {
 #define SI_CHECK(condition) do { if (!(condition)) { fprintf(stderr, "system-info test failed at %s:%d: %s\n", __FILE__, __LINE__, #condition); errors++; } } while (0)
     struct rrdhost_system_info *dst = rrdhost_system_info_create();
     struct rrdhost_system_info *candidate = rrdhost_system_info_create();
+    // Optional startup identity survives copying, label reloads and runtime updates.
+    RRDLABELS *l4t_labels = rrdlabels_create();
+    rrdhost_system_info_to_rrdlabels(dst, l4t_labels);
+    SI_CHECK(!rrdlabels_exist(l4t_labels, "_system_l4t_version"));
+    SI_CHECK(!rrdhost_system_info_set_by_name(dst, "NETDATA_SYSTEM_L4T_VERSION", "36.5.0"));
+    SI_CHECK(rrdhost_system_info_label_is_owned("_system_l4t_version"));
+    SI_CHECK(!rrdhost_system_info_label_is_runtime("_system_l4t_version"));
+    struct rrdhost_system_info *l4t_copy = rrdhost_system_info_dup(dst);
+    SI_CHECK(l4t_copy->host_l4t_version && l4t_copy->host_l4t_version != dst->host_l4t_version);
+    rrdhost_system_info_to_rrdlabels(l4t_copy, l4t_labels);
+    rrdhost_system_info_free(l4t_copy);
+    char l4t_value[32];
+    rrdlabels_get_value_strcpyz(l4t_labels, l4t_value, sizeof(l4t_value), "_system_l4t_version");
+    SI_CHECK(!strcmp(l4t_value, "36.5.0"));
+    l4t_copy = rrdhost_system_info_from_host_labels(l4t_labels);
+    rrdlabels_destroy(l4t_labels);
+    SI_CHECK(l4t_copy->host_l4t_version && !strcmp(l4t_copy->host_l4t_version, "36.5.0"));
+    BUFFER *l4t_json = buffer_create(0, NULL);
+    buffer_json_initialize(l4t_json, "\"", "\"", 0, true, BUFFER_JSON_OPTIONS_DEFAULT);
+    rrdhost_system_info_to_json_v1(l4t_json, l4t_copy);
+    SI_CHECK(!strstr(buffer_tostring(l4t_json), "36.5.0"));
+    buffer_free(l4t_json);
+    rrdhost_system_info_free(l4t_copy);
+    SI_CHECK(dst->host_l4t_version && !strcmp(dst->host_l4t_version, "36.5.0"));
+    SI_CHECK(!rrdhost_system_info_detected_set(candidate, "NETDATA_SYSTEM_L4T_VERSION", NULL));
+    SI_CHECK(!rrdhost_system_info_detected_set(candidate, "NETDATA_SYSTEM_L4T_VERSION", "39.2.1"));
     rrdhost_system_info_set_by_name(dst, "NETDATA_SYSTEM_TOTAL_RAM", "1024");
     dst->hops = 7;
     dst->ml_enabled = true;
@@ -319,6 +346,7 @@ int rrdhost_system_info_unittest(void) {
     SI_CHECK(system_info_parse_runtime(candidate, (char *)buffer_tostring(b)));
     SI_CHECK(rrdhost_system_info_update(dst, candidate));
     SI_CHECK(!strcmp(dst->host_ram_total, "2048"));
+    SI_CHECK(dst->host_l4t_version && !strcmp(dst->host_l4t_version, "36.5.0"));
     SI_CHECK(!rrdhost_system_info_update(dst, candidate));
     SI_CHECK(dst->hops == 7 && dst->ml_enabled && dst->ml_capable && dst->mc_version == 3);
     SI_CHECK(!strcmp(dst->install_type, "fixture") && !strcmp(dst->kernel_name, "Linux"));
@@ -369,6 +397,7 @@ int rrdhost_system_info_unittest(void) {
     fresh = rrdlabels_create();
     SI_CHECK(rrdhost_system_info_update_from_labels(dst, old, fresh));
     SI_CHECK(!dst->host_ram_total); // previously advertised then deleted
+    SI_CHECK(dst->host_l4t_version && !strcmp(dst->host_l4t_version, "36.5.0"));
     SI_CHECK(!strcmp(dst->host_cpu_freq, "2000000000"));
     SI_CHECK(rrdhost_system_info_label_is_owned("_net_default_iface"));
     SI_CHECK(!rrdhost_system_info_label_is_owned("_stream_egress_iface"));
@@ -389,6 +418,13 @@ int rrdhost_system_info_unittest(void) {
     SI_CHECK(!startup->host_ram_total);
     char empty_startup[] = "\n";
     SI_CHECK(!system_info_parse_startup(startup, empty_startup));
+    char *saved_l4t_env = system_info_strdupz(getenv("NETDATA_SYSTEM_L4T_VERSION"));
+    char l4t_startup[] = "NETDATA_SYSTEM_L4T_VERSION=36.5.0\n";
+    SI_CHECK(system_info_parse_startup(startup, l4t_startup));
+    SI_CHECK(startup->host_l4t_version && !strcmp(startup->host_l4t_version, "36.5.0"));
+    if (saved_l4t_env) nd_setenv("NETDATA_SYSTEM_L4T_VERSION", saved_l4t_env, 1);
+    else unsetenv("NETDATA_SYSTEM_L4T_VERSION");
+    freez(saved_l4t_env);
     const char *network_keys[] = {
         "NETDATA_SYSTEM_DEFAULT_INTERFACE_NAME", "NETDATA_SYSTEM_DEFAULT_INTERFACE_IP",
         "NETDATA_SYSTEM_DEFAULT_INTERFACE_DETECTION",
@@ -714,6 +750,7 @@ void rrdhost_system_info_free(struct rrdhost_system_info *system_info) {
         freez(system_info->host_os_label_codename);
         freez(system_info->host_os_label_edition);
         freez(system_info->host_os_label_build);
+        freez(system_info->host_l4t_version);
         freez(system_info->host_cores);
         freez(system_info->host_cpu_freq);
         freez(system_info->host_cpu_model);
@@ -774,6 +811,7 @@ struct rrdhost_system_info *rrdhost_system_info_dup(struct rrdhost_system_info *
     copy->host_os_label_codename = system_info_strdupz(system_info->host_os_label_codename);
     copy->host_os_label_edition = system_info_strdupz(system_info->host_os_label_edition);
     copy->host_os_label_build = system_info_strdupz(system_info->host_os_label_build);
+    copy->host_l4t_version = system_info_strdupz(system_info->host_l4t_version);
     copy->host_cores = system_info_strdupz(system_info->host_cores);
     copy->host_cpu_freq = system_info_strdupz(system_info->host_cpu_freq);
     copy->host_cpu_model = system_info_strdupz(system_info->host_cpu_model);

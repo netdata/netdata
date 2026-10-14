@@ -617,6 +617,7 @@ static int reloaded_labels_unittest(void) {
     host.abbrev_timezone = string_strdupz("UTC");
     rrdhost_system_info_set_by_name(host.system_info, "NETDATA_SYSTEM_TOTAL_RAM", "1024");
     rrdhost_system_info_set_by_name(host.system_info, "NETDATA_HOST_OS_NAME", "startup-os");
+    rrdhost_system_info_set_by_name(host.system_info, "NETDATA_SYSTEM_L4T_VERSION", "36.5.0");
     rrdlabels_add(host.rrdlabels, "old-config", "remove", RRDLABEL_SRC_CONFIG);
     rrdlabels_add(host.rrdlabels, "k8s", "keep", RRDLABEL_SRC_AUTO | RRDLABEL_SRC_K8S);
 
@@ -634,6 +635,7 @@ static int reloaded_labels_unittest(void) {
     rrdlabels_add(host.rrdlabels, "_aclk_test", "live", RRDLABEL_SRC_AUTO);
     rrdhost_commit_reloaded_labels(&host, config, k8s, false);
     RELOAD_CHECK(refresh_test_label(host.rrdlabels, "_system_ram_total", "2048"));
+    RELOAD_CHECK(refresh_test_label(host.rrdlabels, "_system_l4t_version", "36.5.0"));
     RELOAD_CHECK(refresh_test_label(host.rrdlabels, "_os_name", "startup-os"));
     RELOAD_CHECK(refresh_test_label(host.rrdlabels, "old-config", NULL));
     RELOAD_CHECK(refresh_test_label(host.rrdlabels, "new-config", "new"));
@@ -654,6 +656,7 @@ static int reloaded_labels_unittest(void) {
     RELOAD_CHECK(refresh_test_label(host.rrdlabels, "k8s", NULL));
     RELOAD_CHECK(refresh_test_label(host.rrdlabels, "new-config", NULL));
     RELOAD_CHECK(refresh_test_label(host.rrdlabels, "_system_ram_total", "2048"));
+    RELOAD_CHECK(refresh_test_label(host.rrdlabels, "_system_l4t_version", "36.5.0"));
     rrdlabels_destroy(config);
     rrdlabels_destroy(k8s);
     rrdhost_system_info_free(candidate);
