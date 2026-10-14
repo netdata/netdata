@@ -158,6 +158,9 @@ a *leaf* is the innermost family that holds charts.
   pins an alert's thresholds, lookup, cadence or recipients, restates what the artifact said when it was written and
   MUST NOT exist; health.d owns alert policy. An independent oracle, such as a V1 parity manifest during a migration or
   upstream alert rules with a recorded mapping, is not a restatement.
+- **V1 collectors.** `collecttest.V1ChartsByContext` presents V1 charts (a static list or the templates the collector
+  instantiates) as the V1 renderer sends them, so the same metadata checks apply through
+  `collecttest.CheckMetadataMetricsMatchCharts` (the `elasticsearch` and `mssql` artifacts tests).
 - **Coverage.** `collecttest.AssertChartCoverage` (`src/go/plugin/go.d/pkg/collecttest/chart_coverage.go`) derives the
   expected charts and dimensions from the live static or native provider and store, per host scope; do not add
   `RequiredContexts` that repeat it.
