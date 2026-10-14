@@ -699,6 +699,27 @@ fn a_trace_over_the_byte_budget_keeps_its_earliest_spans() {
 }
 
 #[test]
+fn long_values_in_a_value_list_are_cut_flagged_and_listed_once() {
+    let long = |c: char| format!("{}{c}", "a".repeat(LIST_VALUE_MAX_BYTES));
+    let data = sfsq::traces::AttributeValuesData {
+        values: [long('x'), long('y'), "b".to_string()]
+            .into_iter()
+            .map(|value| sfsq::traces::AttributeValue { value, kind: None })
+            .collect(),
+        truncated: false,
+        status: QueryStatus::Complete,
+    };
+    let v = serde_json::to_value(to_attribute_values_result(data, "name".into())).unwrap();
+    assert_eq!(
+        v["values"],
+        json!([
+            {"value": "a".repeat(LIST_VALUE_MAX_BYTES), "truncated": true},
+            {"value": "b"}
+        ])
+    );
+}
+
+#[test]
 fn a_list_rows_long_strings_are_cut_and_flagged() {
     let mut t = summary(1, 300);
     t.root_name = Some("n".repeat(LIST_VALUE_MAX_BYTES + 1));

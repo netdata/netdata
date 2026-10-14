@@ -566,6 +566,11 @@ pub struct AttributeValueWire {
     /// dictionaries carry no kind for it.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub kind: Option<&'static str>,
+    /// Present (`true`) only when `value` was cut to the per-value cap
+    /// (the adapter's `LIST_VALUE_MAX_BYTES`, at a character boundary):
+    /// a display prefix, which an equality selection does not match.
+    #[serde(skip_serializing_if = "std::ops::Not::not")]
+    pub truncated: bool,
 }
 
 // ── Search page ─────────────────────────────────────────────────────

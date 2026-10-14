@@ -105,11 +105,13 @@ pub(crate) const TRACE_VALUE_MAX_BYTES: usize = 8 * 1024;
 /// response keeps the earliest spans and reports `byte_budget`.
 pub(crate) const TRACE_SPANS_MAX_BYTES: usize = 2 * 1024 * 1024;
 
-/// Per-value cap on a list row's free-length strings (root service and
-/// name, breakdown service names). Rows are for display; the trace view
-/// carries values up to [`TRACE_VALUE_MAX_BYTES`]. With at most
-/// [`super::wire::SEARCH_LIMIT_MAX`] rows, a page stays well under 1 MB
-/// by construction, so no page byte budget has to cut rows off a page.
+/// Per-value cap on the free-length strings of list rows (root service
+/// and name, breakdown service names) and of value lists. Both are for
+/// display; the trace view carries values up to
+/// [`TRACE_VALUE_MAX_BYTES`]. With at most
+/// [`super::wire::SEARCH_LIMIT_MAX`] rows or
+/// [`super::wire::MAX_VALUES_MAX`] values, a response stays well under
+/// 1 MB by construction, so no byte budget has to cut items off a page.
 pub(crate) const LIST_VALUE_MAX_BYTES: usize = 256;
 
 /// Cut `s` to at most `max` bytes at a character boundary; `true` when
@@ -421,25 +423,34 @@ pub(crate) fn parse_enumeration_key(key: &str) -> Result<(AttributeOwner, Attrib
 }
 
 /// Shape one key's value enumeration into the wire result. `key` is the
-/// request's key, echoed in the selection grammar.
+/// request's key, echoed in the selection grammar. Values are capped at
+/// [`LIST_VALUE_MAX_BYTES`] and flagged when cut.
 pub(crate) fn to_attribute_values_result(
     data: AttributeValuesData,
     key: String,
 ) -> AttributeValuesResult {
+    let mut values: Vec<AttributeValueWire> = Vec::with_capacity(data.values.len());
+    for v in data.values {
+        let mut value = v.value;
+        let truncated = truncate_value(&mut value, LIST_VALUE_MAX_BYTES);
+        // Values sharing a cut prefix are adjacent in byte order: list
+        // the prefix once.
+        if values.last().is_some_and(|prev| prev.value == value) {
+            continue;
+        }
+        values.push(AttributeValueWire {
+            value,
+            kind: v.kind.map(kind_word),
+            truncated,
+        });
+    }
     AttributeValuesResult {
         mode: "attribute_values",
         version: 1,
         status: StatusWire::from(&data.status),
         truncated: data.truncated,
         key,
-        values: data
-            .values
-            .into_iter()
-            .map(|v| AttributeValueWire {
-                value: v.value,
-                kind: v.kind.map(kind_word),
-            })
-            .collect(),
+        values,
     }
 }
 

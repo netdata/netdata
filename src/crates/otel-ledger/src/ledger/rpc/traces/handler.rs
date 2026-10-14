@@ -474,34 +474,22 @@ impl OtelTracesHandler {
         )))
     }
 
-    /// Common setup for the enumeration modes:
-    /// canonicalized window + one captured source set (with its pins, for
-    /// the caller's blocking closure) + the engine window; the capture
-    /// sets the progress total. Callers pass their own params' window
-    /// fields — every mode's window is self-contained on the wire.
+    /// One captured source set for an enumeration over `window` (with
+    /// its pins, for the caller's blocking closure); the capture sets
+    /// the progress total.
     async fn enumeration_setup(
         &self,
         ctx: &FunctionCallContext,
-        after: u32,
-        before: u32,
+        window: &ResolvedWindow,
         tenant: Option<&str>,
-    ) -> netdata_plugin_error::Result<(
-        Vec<sfsq::traces::TraceSource>,
-        Vec<file_cache::CachedFile>,
-        TimeWindow,
-    )> {
-        let now_s = unix_now_s();
-        let window: ResolvedWindow = resolve_window(after, before, now_s, None)
-            .map_err(|e| handler_err(format!("invalid otel-traces request: {e}")))?;
-        let engine_window = TimeWindow::new(window.start_ns, window.end_ns)
-            .map_err(|e| handler_err(format!("invalid otel-traces request: {e}")))?;
-
+    ) -> netdata_plugin_error::Result<(Vec<sfsq::traces::TraceSource>, Vec<file_cache::CachedFile>)>
+    {
         let tenant = TenantId::resolve_query(tenant);
         let Capture { mut sets, pins } = self
             .supplier
             .capture(
                 &tenant,
-                window.capture,
+                window.capture.clone(),
                 1,
                 // The value lists answer per keystroke: offloaded files are
                 // reported, never downloaded.
@@ -511,7 +499,7 @@ impl OtelTracesHandler {
             )
             .await
             .map_err(capture_error)?;
-        Ok((sets.pop().unwrap_or_default(), pins, engine_window))
+        Ok((sets.pop().unwrap_or_default(), pins))
     }
 
     /// The `attribute_values` mode: one key's exact value vocabulary
@@ -537,6 +525,12 @@ impl OtelTracesHandler {
                 "'max_values' {max} exceeds the maximum {MAX_VALUES_MAX}"
             )));
         }
+        // The window is self-contained on the wire; it is validated
+        // before admission, so a bad request is a client error, not `busy`.
+        let window =
+            resolve_window(params.after, params.before, unix_now_s(), None).map_err(&client_err)?;
+        let engine_window = TimeWindow::new(window.start_ns, window.end_ns)
+            .map_err(|e| client_err(e.to_string()))?;
         // Admission before capture: capture already does WAL and catalog
         // work. The permit moves into the blocking task, so it is held
         // until the engine stops, even when a cancel drops this future.
@@ -552,11 +546,10 @@ impl OtelTracesHandler {
                 ),
             ));
         };
-        let mut query = AttributeValuesQuery::new(owner, key).max_values(max);
-        let (sources, pins, window) = self
-            .enumeration_setup(ctx, params.after, params.before, tenant)
-            .await?;
-        query = query.window(window);
+        let query = AttributeValuesQuery::new(owner, key)
+            .max_values(max)
+            .window(engine_window);
+        let (sources, pins) = self.enumeration_setup(ctx, &window, tenant).await?;
 
         let done = ctx.progress.done_counter();
         let cancel = ctx.cancellation.clone();

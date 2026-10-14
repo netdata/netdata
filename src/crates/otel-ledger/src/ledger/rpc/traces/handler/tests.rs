@@ -880,6 +880,14 @@ async fn value_lists_beyond_the_admission_limit_answer_busy() {
     assert_eq!(v["status"], json!({"partial": ["busy"]}));
     assert_eq!(v["values"], json!([]));
     assert_eq!(v["key"], "name");
+    // A bad request stays the client's error, not `busy`.
+    let err = call_on(
+        &h,
+        json!({"attribute_values": {"key": "name", "after": 500, "before": 400}}),
+    )
+    .await
+    .expect_err("an invalid window");
+    assert!(err.to_string().contains("invalid window"), "{err}");
 }
 
 #[tokio::test]
@@ -919,6 +927,31 @@ async fn value_lists_default_to_and_cap_at_bounded_sizes() {
     )
     .await
     .expect("the maximum itself is legal");
+
+    // Without `max_values`, a key with more distinct values lists the
+    // default count.
+    let registries = make_registries();
+    install_wal(
+        &registries,
+        "default",
+        1,
+        vec![otlp_req_svc(0x0A, 150, base_ns(10), "svc-a")],
+    )
+    .await;
+    let h = make_handler_over(registries);
+    let mut body = window_body();
+    merge(&mut body, json!({"key": "name"}));
+    let v = serde_json::to_value(
+        call_on(&h, as_mode("attribute_values", body))
+            .await
+            .unwrap(),
+    )
+    .unwrap();
+    assert_eq!(
+        v["values"].as_array().unwrap().len(),
+        super::super::wire::DEFAULT_MAX_VALUES
+    );
+    assert_eq!(v["truncated"], true);
 }
 
 #[tokio::test]

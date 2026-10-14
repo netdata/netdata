@@ -12,7 +12,10 @@
 //!
 //! Determinism (design-record decision 13): enumerate ALL candidate
 //! sources, merge into ordered sets, then limit — `truncated` is exact
-//! for keys and values, and source order never changes a result.
+//! for keys and values, and source order never changes a result. The
+//! value merge keeps only the `max + 1` smallest values as it goes:
+//! the answer is a byte-ordered prefix, so memory stays bounded by the
+//! limit, not by the key's distinct values across the window.
 //! Consequently cancellation is ALL-OR-EMPTY (phase-4b pin C2): a merge
 //! prefix would depend on caller order, so a cancel observed before every
 //! source has contributed returns an EMPTY result with
@@ -213,6 +216,30 @@ fn storage_field_of(
     }
 }
 
+/// Open `bytes` fully only when its field table carries `storage`. The
+/// table needs `META` alone, so a file without the field never decodes
+/// `PRIM`.
+fn open_with_field<'a>(
+    bytes: &'a [u8],
+    storage: &str,
+) -> Result<Option<sfst::IndexReader<'a>>, sfst::Error> {
+    let meta = sfst::MetaReader::open(bytes)?;
+    if !meta.field_table()?.contains(storage) {
+        return Ok(None);
+    }
+    meta.into_index_reader().map(Some)
+}
+
+/// Keep the `max + 1` smallest of the merged values: the answer is the
+/// smallest `max`, and the one past them keeps `truncated` exact.
+fn keep_smallest(values: &mut BTreeSet<String>, max: Option<usize>) {
+    if let Some(max) = max {
+        while values.len() > max.saturating_add(1) {
+            values.pop_last();
+        }
+    }
+}
+
 /// Whether a window (if any) prunes an SFST candidate. A pruned file is
 /// SKIPPED, not failed — out-of-window is a data condition.
 fn pruned(window: Option<TimeWindow>, summary: &sfst::Summary) -> bool {
@@ -407,27 +434,26 @@ pub fn attribute_values(
             TraceSource::Sfst(c) => {
                 if !pruned(query.window, &c.summary) {
                     match map_source(&c.source) {
-                        Ok(mapped) => match sfst::IndexReader::open(mapped.bytes()) {
+                        Ok(mapped) => match open_with_field(mapped.bytes(), &storage) {
                             // A file without the field contributes
                             // nothing — absent-matches-nothing, a data
                             // condition (21A).
-                            Ok(reader) if reader.field_table().contains(&storage) => {
-                                match reader.field_values(&storage) {
-                                    Ok(vs) => {
-                                        values.extend(vs);
-                                        let kinds = reader.metadata().tree.derive_scalar_kinds();
-                                        fold_kind(&mut kind, kind_of(&kinds));
-                                    }
-                                    Err(e) => {
-                                        tracing::warn!(
-                                            "sfsq traces: source {} failed to enumerate {storage}: {e}",
-                                            c.source_id
-                                        );
-                                        status.add(PartialReason::SourceFailure);
-                                    }
+                            Ok(None) => {}
+                            Ok(Some(reader)) => match reader.field_values(&storage) {
+                                Ok(vs) => {
+                                    values.extend(vs);
+                                    keep_smallest(&mut values, query.max_values);
+                                    let kinds = reader.metadata().tree.derive_scalar_kinds();
+                                    fold_kind(&mut kind, kind_of(&kinds));
                                 }
-                            }
-                            Ok(_) => {}
+                                Err(e) => {
+                                    tracing::warn!(
+                                        "sfsq traces: source {} failed to enumerate {storage}: {e}",
+                                        c.source_id
+                                    );
+                                    status.add(PartialReason::SourceFailure);
+                                }
+                            },
                             Err(e) => {
                                 tracing::warn!(
                                     "sfsq traces: source {} failed to parse: {e}",
@@ -450,6 +476,7 @@ pub fn attribute_values(
                 Ok(scan) => {
                     if let Some(vs) = scan.pair_table().get(&storage) {
                         values.extend(vs.iter().cloned());
+                        keep_smallest(&mut values, query.max_values);
                         fold_kind(&mut kind, kind_of(scan.field_kinds()));
                     }
                 }

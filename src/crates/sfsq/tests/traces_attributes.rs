@@ -295,6 +295,20 @@ fn values_merge_all_tiers_across_sources_with_exact_truncation() {
     assert_eq!(cut.values.len(), 139);
     assert_eq!(cut.values.last().unwrap().value, "v1018");
 
+    // The merge keeps only `max + 1` values as it goes: smaller values
+    // from a source merged after the set filled still win, in any order.
+    let want: Vec<String> = (0..10).map(|i| format!("v{i:04}")).collect();
+    let mut reversed = sources();
+    reversed.reverse();
+    for srcs in [sources(), reversed] {
+        let small = values(srcs, q().max_values(10));
+        assert!(small.truncated);
+        assert_eq!(
+            value_strings(&small),
+            want.iter().map(String::as_str).collect::<Vec<_>>()
+        );
+    }
+
     // The service-list lookup: resource service.name across the whole
     // corpus — four sources all carrying `svc` collapse to one value.
     let svc = values(
