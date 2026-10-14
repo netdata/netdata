@@ -2691,7 +2691,7 @@ paths:
           description: |
             **Facet Filter:** Filter transitions by alert component.
 
-            Components narrow the alert type: the host subsystem for `System` alerts (e.g., "Network", "Disk", "Memory"), otherwise the product, service or protocol (e.g., "PostgreSQL", "Redis", "BGP").
+            Components narrow the alert type: the subsystem for `System` and `Netdata` alerts (e.g., "Network", "Disk", "Memory"), the component kind, management interface, device class or check kind for `Kubernetes`, `Hardware` and `Synthetic` alerts (e.g., "Kubelet", "Redfish", "HTTP endpoint"), otherwise the product, service or protocol (e.g., "PostgreSQL", "Redis", "BGP"). The health configuration reference (`src/health/REFERENCE.md`) lists the rules.
 
             **Format:** Comma-separated list of component names
 
@@ -2704,7 +2704,7 @@ paths:
 
             **Examples:**
             - `f_component=Disk` - Only disk-related transitions
-            - `f_component=Network,Disk` - Network and disk alerts
+            - `f_component=Network,Disk` - Host networking and disk alerts
 
             **Use Cases:**
             - Component-specific incident investigation

@@ -123,9 +123,17 @@ def conf_link(source: str) -> str:
     return CONF_LINK_PREFIX + source
 
 
+def _plurals(word: str) -> Tuple[str, ...]:
+    """English plural endings: -s, -es, and -ies for a consonant followed by y."""
+    plurals = (word + 's', word + 'es')
+    if len(word) > 1 and word.endswith('y') and word[-2] not in 'aeiou':
+        plurals += (word[:-1] + 'ies',)
+    return plurals
+
+
 def _components_collide(first: str, second: str) -> bool:
     first, second = first.casefold(), second.casefold()
-    return first == second or any(first == second + suffix or second == first + suffix for suffix in ('s', 'es'))
+    return first == second or first in _plurals(second) or second in _plurals(first)
 
 
 def check_classification(rules: Iterable[dict]) -> List[str]:

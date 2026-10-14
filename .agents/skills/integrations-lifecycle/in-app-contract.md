@@ -80,5 +80,5 @@ is why `integrations.js` carries them (`pipeline.md`, "Stage 1: outputs", for th
    stock alerts and alerts of other Agent versions are absent or differ; a dashboard surface MUST treat a missing name
    as "no catalogue data", not as an error. The Dyncfg Health workspace is its consumer. Stock `class` and `type` values
    come from the closed vocabulary in `integrations/health_alerts.py` (`ALERT_CLASSES`, `ALERT_TYPES`; defined in
-   `src/health/REFERENCE.md`), so a surface may group by them; other values come only from custom alerts or other Agent
-   versions.
+   `src/health/REFERENCE.md`), so a surface may group by them; other values come only from custom alerts, user edits of
+   stock alerts or other Agent versions.

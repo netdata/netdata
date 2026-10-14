@@ -168,6 +168,10 @@ class CheckClassificationTest(unittest.TestCase):
             rule('unknown_type', **{'class': 'Errors', 'type': 'Other', 'component': 'CPU'}),
             rule('plural', **{'class': 'Errors', 'type': 'System', 'component': 'Processes'}),
             rule('case', **{'class': 'Errors', 'type': 'System', 'component': 'cpu'}),
+            rule('policy', **{'class': 'Errors', 'type': 'Network', 'component': 'Policy'}),
+            rule('policies', **{'class': 'Errors', 'type': 'Network', 'component': 'Policies'}),
+            rule('key', **{'class': 'Errors', 'type': 'Network', 'component': 'Key'}),
+            rule('keies', **{'class': 'Errors', 'type': 'Network', 'component': 'Keies'}),
         ]
 
         problems = [problem.split(': ', 1)[1].split(' is not one of ')[0] for problem in check_classification(rules)]
@@ -179,6 +183,7 @@ class CheckClassificationTest(unittest.TestCase):
             "unknown_type: type 'Other'",
             "plural: component 'Processes' collides with 'Process' (x.conf: ok)",
             "case: component 'cpu' collides with 'CPU' (x.conf: blank_type)",
+            "policies: component 'Policies' collides with 'Policy' (x.conf: policy)",
         ])
 
 
