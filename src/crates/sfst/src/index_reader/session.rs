@@ -2,23 +2,35 @@
 //! cross-source engine and the substrate of the single-file
 //! [`IndexReader::trace_by_id`].
 //!
-//! One session per open file serves MANY trace-id lookups while decoding
-//! each shared structure exactly once (the phase-4 guardrails):
+//! One session per open file serves many trace-id lookups, decoding each
+//! structure at most once while it stays loaded:
 //!
-//! - the TBLM bloom is decoded once and tested per id (a corrupt bloom
+//! - the TBLM bloom is decoded on open and tested per id (a corrupt bloom
 //!   degrades to the exact lookup with ONE demoted warning per session,
 //!   not one per lookup);
-//! - the lookup structures (TIDX + TRCE) decode on the first lookup the
-//!   bloom lets through, and the per-row columns (SPAN/PSPN/DURN/FLAG/
-//!   DRAC + timestamps) only on the first lookup that finds rows — a
-//!   definite bloom miss touches neither, a false positive only the
-//!   lookup pair (which a one-id owned session drops again);
+//! - a screened session ([`TraceFileSession::screened`], for a caller
+//!   that looks up many ids in one file) builds a tight filter
+//!   ([`TraceIdBloom::screen`]) from the lookup structures the first time
+//!   it decodes them, so the sealed bloom's later false positives cost no
+//!   decode;
+//! - the lookup structures (TIDX + TRCE) decode on the first id the
+//!   filters let through, the per-row columns (SPAN/PSPN/DURN/FLAG/DRAC +
+//!   timestamps) only on the first lookup that finds rows, and a probe
+//!   that finds nothing drops what it decoded;
 //! - an owned session ([`TraceFileSession::open_owned`]) starts from the
 //!   file's metadata view and opens the full reader (`PRIM`, for `_kind`
 //!   and string resolution) only once a lookup finds rows;
-//! - stream batches and EVNB/LNKB decode lazily, once;
+//! - stream batches, EVNB/LNKB and the trace rollup (TRSU) decode lazily,
+//!   once;
 //! - KvId→string resolutions accumulate in a per-session cache, each
 //!   value cut to [`RESOLVED_VALUE_MAX_BYTES`].
+//!
+//! Two layers: the bloom and the screen stay for the session's life (a
+//! few KB per file); everything else is the LOADED layer, which
+//! [`release`](SpanSource::release) drops. A caller holding many
+//! sessions keeps only a few loaded
+//! ([`LoadedSources`](crate::LoadedSources)); a released session decodes
+//! again on its next use and answers the same.
 //!
 //! The session implements [`SpanSource`], so the shared combiner
 //! ([`crate::trace_combine::combine`]) drives it: cheap [`SpanRef`]s up
@@ -40,12 +52,13 @@
 
 use std::collections::HashMap;
 
-use crate::TraceId;
 use crate::index_reader::{
-    IndexReader, MetaReader, TraceEvent, TraceLink, TraceSpan, kv_attr, kv_value,
+    IndexReader, MetaReader, RollupRefOutcome, RollupRootResolver, TraceEvent, TraceLink,
+    TraceSpan, kv_attr, kv_value,
 };
 use crate::reader::ChunkReader;
 use crate::trace_combine::{SpanRef, SpanSource};
+use crate::{RollupRow, TraceId, TraceIdBloom, TraceRollup};
 
 /// The bloom gate, resolved once per session.
 enum BloomGate {
@@ -86,6 +99,17 @@ impl<'a> View<'_, 'a> {
             View::Meta(m) => Ok(m.summary().record_count),
             View::Full(r) => Ok(r.summary().record_count),
             View::Failed => Err(upgrade_failed()),
+        }
+    }
+
+    /// Downgrade an owned full reader to its metadata view (a borrowed
+    /// reader is the caller's; a failed upgrade stays failed).
+    fn release(&mut self) {
+        if matches!(self, View::Full(_)) {
+            let View::Full(full) = std::mem::replace(self, View::Failed) else {
+                unreachable!("matched above");
+            };
+            *self = View::Meta(Box::new((*full).into_meta_reader()));
         }
     }
 
@@ -130,8 +154,33 @@ fn upgrade_failed() -> crate::Error {
     crate::Error::CorruptIndex("trace session: the file failed to open fully".into())
 }
 
-/// What finds a trace's rows: decoded on the first lookup the bloom
-/// lets through.
+/// A screened session's tight filter (see [`TraceIdBloom::screen`]).
+enum Screen {
+    /// Not a screened session: the bloom alone decides.
+    Off,
+    /// To be built on the first lookup decode.
+    Pending,
+    /// Built; `None` when the file holds no set trace id.
+    Built(Option<TraceIdBloom>),
+    /// The lookup structures failed to decode; the exact lookup decodes
+    /// them again and surfaces the error.
+    Unavailable,
+}
+
+/// One file's trace-rollup evidence for one trace id
+/// ([`TraceFileSession::rollup_row`]).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum RollupEvidence {
+    /// The file has no rollup chunk (written before rollups existed).
+    NoRollup,
+    /// The rollup holds no row for the trace: the file holds none of its
+    /// spans.
+    Absent,
+    Row(RollupRow),
+}
+
+/// What finds a trace's rows: decoded on the first id the filters let
+/// through.
 struct Lookup {
     index: crate::TraceIdIndex,
     trace_ids: crate::TraceIds,
@@ -160,10 +209,9 @@ struct Extras {
 pub struct TraceFileSession<'r, 'a> {
     view: View<'r, 'a>,
     bloom: BloomGate,
+    screen: Screen,
+    // The loaded layer, dropped by `release`.
     lookup: Option<Lookup>,
-    /// Drop the lookup structures after a lookup that finds nothing:
-    /// a one-id session (an owned one) never needs them again.
-    transient_lookup: bool,
     rows: Option<Rows>,
     extras: Option<Extras>,
     /// Stream-batch cache, pre-sized to the file's batch count on the
@@ -174,15 +222,18 @@ pub struct TraceFileSession<'r, 'a> {
     /// Row position → raw `_kind` int, filled per looked-up trace from
     /// the low-card facet bitmaps (no row access).
     kinds: HashMap<u32, i32>,
+    rollup: Option<TraceRollup>,
+    resolver: Option<RollupRootResolver>,
+    /// The caller's hook for when the session holds nothing decoded.
+    on_release: Option<Box<dyn FnMut() + 'a>>,
 }
 
 impl<'r, 'a> TraceFileSession<'r, 'a> {
-    /// Open a session over a full reader the caller keeps (several
-    /// lookups share its decodes). Resolves the bloom gate (once;
-    /// corrupt → one demoted warning + exact lookups); everything else
-    /// decodes lazily.
+    /// Open a session over a full reader the caller keeps. Resolves the
+    /// bloom gate (once; corrupt → one demoted warning + exact lookups);
+    /// everything else decodes lazily.
     pub fn open(reader: &'r IndexReader<'a>) -> Self {
-        Self::new(View::Borrowed(reader), false)
+        Self::new(View::Borrowed(reader))
     }
 
     /// Open a session that owns its file's metadata view: the bloom
@@ -192,10 +243,10 @@ impl<'r, 'a> TraceFileSession<'r, 'a> {
     /// full reader. A file the bloom rules out costs its summary,
     /// metadata and bloom.
     pub fn open_owned(meta: MetaReader<'a>) -> Self {
-        Self::new(View::Meta(Box::new(meta)), true)
+        Self::new(View::Meta(Box::new(meta)))
     }
 
-    fn new(view: View<'r, 'a>, transient_lookup: bool) -> Self {
+    fn new(view: View<'r, 'a>) -> Self {
         let bloom = match view.chunk() {
             Ok(chunk) if chunk.has_trace_id_bloom() => match chunk.trace_id_bloom() {
                 Ok(filter) => BloomGate::Filter(filter),
@@ -215,21 +266,35 @@ impl<'r, 'a> TraceFileSession<'r, 'a> {
         Self {
             view,
             bloom,
+            screen: Screen::Off,
             lookup: None,
-            transient_lookup,
             rows: None,
             extras: None,
             batches: Vec::new(),
             strings: HashMap::new(),
             kinds: HashMap::new(),
+            rollup: None,
+            resolver: None,
+            on_release: None,
         }
     }
 
-    /// Keep the lookup structures after a lookup that finds nothing: a
-    /// caller looking up many ids in this file (search) decodes them
-    /// once.
-    pub fn keep_lookup(mut self) -> Self {
-        self.transient_lookup = false;
+    /// Build a tight filter over the file's trace ids on the first lookup
+    /// decode, and screen every later id with it: for a caller looking up
+    /// many ids in this file (search), whose false positives would
+    /// otherwise each decode the lookup structures. A one-id lookup gains
+    /// nothing from it.
+    pub fn screened(mut self) -> Self {
+        self.screen = Screen::Pending;
+        self
+    }
+
+    /// Call `hook` whenever the session ends up holding nothing decoded
+    /// (a release, or a probe that dropped what it decoded): a caller
+    /// that maps the file drops its pages there, since everything the
+    /// session keeps is a copy.
+    pub fn on_release(mut self, hook: impl FnMut() + 'a) -> Self {
+        self.on_release = Some(Box::new(hook));
         self
     }
 
@@ -244,36 +309,128 @@ impl<'r, 'a> TraceFileSession<'r, 'a> {
         self.view.full()
     }
 
-    /// Whether the file carries the per-file trace rollup (`TRSU`).
-    pub fn has_trace_rollup(&self) -> bool {
-        self.view
-            .chunk()
-            .is_ok_and(|chunk| chunk.has_trace_rollup())
-    }
-
-    /// Decode and validate the per-file trace rollup (`TRSU`).
-    pub fn trace_rollup(&self) -> Result<crate::TraceRollup, crate::Error> {
-        self.view.chunk()?.trace_rollup()
-    }
-
     /// The file's bloom failed to decode: lookups fall back to the exact
     /// path, and the file is damaged.
     pub fn bloom_unreadable(&self) -> bool {
         matches!(self.bloom, BloomGate::Unreadable)
     }
 
-    /// Bloom test: `false` is a definite miss (skip this file without
-    /// touching TIDX/TRCE); `true` means "maybe" (or no usable bloom).
+    /// Bloom (and built screen) test, decoding nothing: `false` is a
+    /// definite miss; `true` means "maybe" (or no usable filter).
     pub fn might_contain(&self, trace_id: TraceId) -> bool {
-        match &self.bloom {
+        let bloom = match &self.bloom {
             BloomGate::Pass | BloomGate::Unreadable => true,
             BloomGate::Filter(bloom) => bloom.might_contain(trace_id),
+        };
+        bloom
+            && match &self.screen {
+                Screen::Built(Some(screen)) => screen.might_contain(trace_id),
+                Screen::Built(None) => false,
+                Screen::Off | Screen::Pending | Screen::Unavailable => true,
+            }
+    }
+
+    /// [`might_contain`](Self::might_contain), building a screened
+    /// session's screen first when this is the first id the bloom lets
+    /// through. `false` is a definite miss. The build keeps the lookup
+    /// structures only when the id passes, for the lookup that follows.
+    pub fn screen(&mut self, trace_id: TraceId) -> bool {
+        if !self.might_contain(trace_id) {
+            return false;
+        }
+        if !matches!(self.screen, Screen::Pending) {
+            return true;
+        }
+        let decoded = self.lookup.is_none();
+        self.screen = match self.lookup() {
+            Ok(lookup) => Screen::Built(TraceIdBloom::screen(&lookup.index, &lookup.trace_ids)),
+            Err(_) => Screen::Unavailable,
+        };
+        let pass = self.might_contain(trace_id);
+        if !pass && decoded {
+            self.lookup = None;
+            self.emptied();
+        }
+        pass
+    }
+
+    /// `trace_id`'s row in the file's trace rollup (`TRSU`), decoding the
+    /// rollup on first use: it stays loaded while it answers rows, and a
+    /// probe that finds nothing drops the rollup it decoded. Screen first:
+    /// an id the filters rule out never needs it.
+    pub fn rollup_row(&mut self, trace_id: TraceId) -> Result<RollupEvidence, crate::Error> {
+        let decoded = self.rollup.is_none();
+        if decoded {
+            let chunk = self.view.chunk()?;
+            if !chunk.has_trace_rollup() {
+                return Ok(RollupEvidence::NoRollup);
+            }
+            self.rollup = Some(chunk.trace_rollup()?);
+        }
+        let rollup = self.rollup.as_ref().expect("decoded above");
+        match rollup.row(trace_id) {
+            Some(row) => Ok(RollupEvidence::Row(row)),
+            None => {
+                if decoded {
+                    self.rollup = None;
+                    self.emptied();
+                }
+                Ok(RollupEvidence::Absent)
+            }
         }
     }
 
-    /// The rows holding `trace_id`, decoding the lookup structures on
-    /// first use.
-    fn positions(&mut self, trace_id: TraceId) -> Result<Vec<u32>, crate::Error> {
+    /// Resolve a rollup root ref as a value of `field_name`, through the
+    /// file's dictionaries (the full reader) and the session's
+    /// [`RollupRootResolver`]. `Err` when the file cannot open fully.
+    pub fn resolve_rollup_ref(
+        &mut self,
+        field_name: &str,
+        kv_ref: u32,
+    ) -> Result<RollupRefOutcome<'_>, crate::Error> {
+        let reader = self.view.full()?;
+        let resolver = self.resolver.get_or_insert_with(RollupRootResolver::new);
+        Ok(resolver.resolve(reader, field_name, kv_ref))
+    }
+
+    /// Tell the caller when nothing decoded is left.
+    fn emptied(&mut self) {
+        if !self.is_loaded()
+            && let Some(hook) = self.on_release.as_mut()
+        {
+            hook();
+        }
+    }
+
+    /// `kind` per position from the low-card `_kind` facet bitmaps, for
+    /// the positions not cached yet (materialize_field on a low field
+    /// never touches stream batches). Absent field / value → 0 (files
+    /// written before UNSPECIFIED was stored skip it). A corrupt
+    /// multi-valued row takes the first value — deterministic, and
+    /// impossible from the production flattener.
+    fn load_kinds(&mut self, positions: &[u32]) -> Result<(), crate::Error> {
+        let missing: Vec<u32> = positions
+            .iter()
+            .copied()
+            .filter(|p| !self.kinds.contains_key(p))
+            .collect();
+        if missing.is_empty() {
+            return Ok(());
+        }
+        let values = self.view.full()?.materialize_field("_kind", &missing)?;
+        for (p, vals) in missing.iter().zip(values) {
+            debug_assert!(
+                vals.len() <= 1,
+                "a row carries multiple _kind values (impossible from the flattener)"
+            );
+            let kind = vals.first().and_then(|v| v.parse().ok()).unwrap_or(0);
+            self.kinds.insert(*p, kind);
+        }
+        Ok(())
+    }
+
+    /// The lookup structures, decoding them on first use.
+    fn lookup(&mut self) -> Result<&Lookup, crate::Error> {
         if self.lookup.is_none() {
             let chunk = self.view.chunk()?;
             self.lookup = Some(Lookup {
@@ -281,7 +438,12 @@ impl<'r, 'a> TraceFileSession<'r, 'a> {
                 trace_ids: chunk.trace_ids()?,
             });
         }
-        let lookup = self.lookup.as_ref().expect("just populated");
+        Ok(self.lookup.as_ref().expect("just populated"))
+    }
+
+    /// The rows holding `trace_id`.
+    fn positions(&mut self, trace_id: TraceId) -> Result<Vec<u32>, crate::Error> {
+        let lookup = self.lookup()?;
         Ok(lookup.index.positions(trace_id, &lookup.trace_ids).to_vec())
     }
 
@@ -371,41 +533,21 @@ impl SpanSource for TraceFileSession<'_, '_> {
         if trace_id.is_unset() {
             return Err(crate::Error::UnsetTraceId);
         }
-        if !self.might_contain(trace_id) {
+        let held = self.lookup.is_some();
+        if !self.screen(trace_id) {
             return Ok(Vec::new());
         }
         let positions = self.positions(trace_id)?;
         if positions.is_empty() {
-            // A bloom false positive: an owned session frees what found
-            // nothing.
-            if self.transient_lookup {
+            // A false positive: free what found nothing.
+            if !held {
                 self.lookup = None;
+                self.emptied();
             }
             return Ok(Vec::new());
         }
 
-        // `kind` per position from the low-card `_kind` facet bitmaps
-        // (materialize_field on a low field never touches stream
-        // batches). Absent field / value → 0 (files written before
-        // UNSPECIFIED was stored skip it). A corrupt multi-valued row
-        // takes the first value — deterministic, and impossible from the
-        // production flattener.
-        let missing: Vec<u32> = positions
-            .iter()
-            .copied()
-            .filter(|p| !self.kinds.contains_key(p))
-            .collect();
-        if !missing.is_empty() {
-            let values = self.view.full()?.materialize_field("_kind", &missing)?;
-            for (p, vals) in missing.iter().zip(values) {
-                debug_assert!(
-                    vals.len() <= 1,
-                    "a row carries multiple _kind values (impossible from the flattener)"
-                );
-                let kind = vals.first().and_then(|v| v.parse().ok()).unwrap_or(0);
-                self.kinds.insert(*p, kind);
-            }
-        }
+        self.load_kinds(&positions)?;
 
         self.rows()?;
         let kinds = &self.kinds;
@@ -518,16 +660,10 @@ impl SpanSource for TraceFileSession<'_, '_> {
             .as_ref()
             .map_or(0, |lk| lk.row_dropped_count(pos));
 
-        // `kind`: from the facet map when `span_refs` populated it (the
-        // combiner always calls span_refs first); the field parse is the
-        // defensive fallback for direct callers.
-        let kind = self.kinds.get(&pos).copied().unwrap_or_else(|| {
-            fields
-                .iter()
-                .find(|(k, _)| k == "_kind")
-                .and_then(|(_, v)| v.parse().ok())
-                .unwrap_or(0)
-        });
+        // `kind` from the facet, as `span_refs` reads it (a released
+        // session lost the cached values).
+        self.load_kinds(&[pos])?;
+        let kind = self.kinds.get(&pos).copied().unwrap_or(0);
 
         let cols = self.rows()?;
         let i = pos as usize;
@@ -548,6 +684,35 @@ impl SpanSource for TraceFileSession<'_, '_> {
             events,
             links,
         })
+    }
+
+    /// Whether the loaded layer holds anything (see the module docs).
+    fn is_loaded(&self) -> bool {
+        matches!(self.view, View::Full(_))
+            || self.lookup.is_some()
+            || self.rows.is_some()
+            || self.extras.is_some()
+            || !self.batches.is_empty()
+            || !self.strings.is_empty()
+            || !self.kinds.is_empty()
+            || self.rollup.is_some()
+            || self.resolver.is_some()
+    }
+
+    /// Drop the loaded layer, keeping the bloom and the screen: an owned
+    /// full reader goes back to its metadata view, and everything decodes
+    /// again on next use, with the same answers.
+    fn release(&mut self) {
+        self.view.release();
+        self.lookup = None;
+        self.rows = None;
+        self.extras = None;
+        self.batches = Vec::new();
+        self.strings = HashMap::new();
+        self.kinds = HashMap::new();
+        self.rollup = None;
+        self.resolver = None;
+        self.emptied();
     }
 }
 

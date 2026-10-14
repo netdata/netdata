@@ -318,6 +318,16 @@ fn straddling_trace_survives_merged_envelope_and_split_root() {
     let off = run(sources(), q().trace_gate_for_tests(false));
     assert_eq!(ids(&on), vec![hex(1)]);
     assert_eq!(norm(&on), norm(&off));
+
+    // One loaded session at a time: the gate's evidence (rollups, root
+    // values) and the assembly reload what a release dropped.
+    for q in [
+        SearchQuery::new(pred(vec![min_duration(5 * NS as i64)])),
+        SearchQuery::new(pred(vec![root_service_eq("svc-a")])),
+    ] {
+        let capped = run(sources(), q.clone().loaded_sources_cap_for_tests(1));
+        assert_eq!(norm(&capped), norm(&run(sources(), q)));
+    }
 }
 
 /// Tail spans are invisible to the gate's evidence: a candidate with

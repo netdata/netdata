@@ -48,6 +48,13 @@ use crate::source::map_source;
 /// above any honest trace, low enough that a runaway merge stays bounded.
 pub const DEFAULT_SPAN_CAP: usize = 65_536;
 
+/// Most files holding decoded state at once while a trace is assembled
+/// or a search runs (decision 43): each file's decoded state is bounded
+/// by its size, so the limit bounds memory however many files a trace or
+/// a window spans. A count, not bytes: files are size-rotated, and a file
+/// holds at most 8 stream batches.
+pub(crate) const LOADED_SOURCES_MAX: usize = 8;
+
 /// A trace-by-id request in engine terms. [`new`](Self::new) applies the
 /// default span cap; [`span_cap`](Self::span_cap) overrides it and
 /// [`unbounded`](Self::unbounded) removes it.
@@ -239,7 +246,8 @@ pub fn trace_by_id(
     // here on): the bloom decides first, and only a file that holds the
     // trace opens fully. An SFST whose summary does not parse is a
     // SourceFailure; one the bloom rules out never decodes more than its
-    // summary, metadata and bloom. The merge borrows the sessions.
+    // summary, metadata and bloom. The merge borrows the sessions and
+    // keeps few of them loaded; a released one drops its file's pages.
     let mut sessions: Vec<sfst::TraceFileSession<'_, '_>> = Vec::new();
     let mut origin: Vec<String> = Vec::new();
     for (mapped, source) in &mapped_sfsts {
@@ -248,7 +256,10 @@ pub fn trace_by_id(
         }
         match sfst::MetaReader::open(mapped.bytes()) {
             Ok(meta) => {
-                sessions.push(sfst::TraceFileSession::open_owned(meta));
+                sessions.push(
+                    sfst::TraceFileSession::open_owned(meta)
+                        .on_release(move || mapped.release_pages()),
+                );
                 origin.push(source.source_id().to_string());
             }
             Err(e) => {
@@ -279,6 +290,7 @@ pub fn trace_by_id(
         &mut merged,
         query.trace_id,
         query.span_cap,
+        Some(&mut sfst::LoadedSources::new(LOADED_SOURCES_MAX)),
         shaper.as_deref_mut().map(|s| s as &mut dyn SpanShaper),
         &|| cancel.is_cancelled(),
     );

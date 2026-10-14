@@ -68,6 +68,16 @@ impl Mapped {
             Mapped::Memory(v) => v,
         }
     }
+
+    /// Drop a mapped file's pages from this process's resident set (the
+    /// page cache keeps them; a later read faults them back). For a
+    /// reader whose decoded state lives on the heap and that is done with
+    /// the file for now. An in-memory source has nothing to drop.
+    pub(crate) fn release_pages(&self) {
+        if let Mapped::File(m) = self {
+            release_cold_region(m, (0, m.len()));
+        }
+    }
 }
 
 /// A failure obtaining a source's bytes.

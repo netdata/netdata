@@ -30,7 +30,7 @@ mod session;
 mod trace_plan;
 
 pub use rollup_resolver::{RollupRefOutcome, RollupRootResolver};
-pub use session::TraceFileSession;
+pub use session::{RollupEvidence, TraceFileSession};
 pub use trace_plan::{
     CompiledTracePlan, GroupCondition, IdColumnKind, NumberCmp, PlanMatcher, PlanTerm, ScanWork,
     TracePlan, numeric_token_matches,
@@ -324,6 +324,17 @@ impl<'a> IndexReader<'a> {
     /// stream batches) decodes lazily, on the accessor that needs it.
     pub fn open(data: &'a [u8]) -> Result<Self, crate::Error> {
         MetaReader::open(data)?.into_index_reader()
+    }
+
+    /// Drop the primary dictionary and keep the metadata view (summary
+    /// and the cached metadata): the downgrade of
+    /// [`MetaReader::into_index_reader`], for a caller that holds many
+    /// files and keeps few of them fully open.
+    pub fn into_meta_reader(self) -> MetaReader<'a> {
+        MetaReader {
+            sfst: self.sfst,
+            summary: self.summary,
+        }
     }
 
     /// The cheap summary fields (timestamps, record count, opaque
@@ -882,7 +893,7 @@ impl<'a> IndexReader<'a> {
         }
         let mut sources: [&mut dyn crate::trace_combine::SpanSource; 1] = [&mut session];
         let mut outcome =
-            crate::trace_combine::combine(&mut sources, trace_id, None, None, &|| false);
+            crate::trace_combine::combine(&mut sources, trace_id, None, None, None, &|| false);
         // Single source: any failure IS the result — propagate (the
         // cross-source engine instead reports failures as a partial
         // status; with one file there is nothing left to serve).

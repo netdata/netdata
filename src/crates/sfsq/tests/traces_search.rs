@@ -867,6 +867,17 @@ fn oracle_equivalence_under_relayouts() {
             );
             let got = norm(&data);
             assert_eq!(got.1, QueryStatus::Complete, "query {qname} on {lname}");
+            // One loaded session at a time: every step releases the
+            // previous file, and the answer is the same.
+            let capped = run(
+                layout(dir.path(), &world, lname),
+                query.clone().loaded_sources_cap_for_tests(1),
+            );
+            assert_eq!(
+                norm(&capped),
+                got,
+                "query {qname} on {lname}: releasing sessions changed the answer"
+            );
             match &reference {
                 None => reference = Some(got),
                 Some(want) => {

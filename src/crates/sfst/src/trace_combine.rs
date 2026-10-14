@@ -46,10 +46,18 @@
 //!   pass the shaper's budget, by the cap's rule. The kept spans then
 //!   hold what the caller will send, not full values: a caller's
 //!   response budget bounds the merge's memory.
+//! - With a [`LoadedSources`], at most its limit of sources hold decoded
+//!   state at once: after each read, the least recently read source
+//!   beyond the limit is released ([`SpanSource::release`]) and decodes
+//!   again if read later. A trace whose spans spread over hundreds of
+//!   files (a long-lived stream) then costs a bounded amount of decoded
+//!   state, not one file's worth per file. A caller that reads the same
+//!   sources between merges (search's plan compiles and trace-level
+//!   gate) shares one tracker, so the limit holds across the query.
 //!
 //! [`IndexReader::trace_by_id`]: crate::IndexReader::trace_by_id
 
-use std::collections::{BinaryHeap, HashMap, HashSet};
+use std::collections::{BinaryHeap, HashMap, HashSet, VecDeque};
 use std::hash::Hasher;
 
 use crate::index_reader::{Trace, TraceSpan};
@@ -96,6 +104,87 @@ pub trait SpanSource {
     /// Materialize the full span at a `position` previously returned by
     /// [`span_refs`](Self::span_refs).
     fn materialize(&mut self, position: u32) -> Result<TraceSpan, crate::Error>;
+
+    /// Whether the source holds decoded state that
+    /// [`release`](Self::release) would free.
+    fn is_loaded(&self) -> bool {
+        false
+    }
+
+    /// Drop the decoded state the source can rebuild; later calls decode
+    /// again and answer the same (positions from an earlier
+    /// [`span_refs`](Self::span_refs) stay valid).
+    fn release(&mut self) {}
+}
+
+impl<S: SpanSource + ?Sized> SpanSource for &mut S {
+    fn span_refs(&mut self, trace_id: TraceId) -> Result<Vec<SpanRef>, crate::Error> {
+        (**self).span_refs(trace_id)
+    }
+
+    fn materialize(&mut self, position: u32) -> Result<TraceSpan, crate::Error> {
+        (**self).materialize(position)
+    }
+
+    fn is_loaded(&self) -> bool {
+        (**self).is_loaded()
+    }
+
+    fn release(&mut self) {
+        (**self).release()
+    }
+}
+
+/// Keeps at most a limit of sources holding decoded state across the
+/// reads of one query (see the module docs): each read marks its source
+/// the most recent, and the least recently read sources beyond the limit
+/// are released. Indices are the caller's source indices, the same in
+/// every slice passed to [`touch`](Self::touch) and [`combine`]; a
+/// shorter slice (sessions without the merge's tails) treats the sources
+/// it lacks as not loaded.
+pub struct LoadedSources {
+    limit: usize,
+    /// Sources that held decoded state when last read, least recently
+    /// read first.
+    order: VecDeque<usize>,
+}
+
+impl LoadedSources {
+    /// A tracker keeping at most `limit` (non-zero) sources loaded.
+    pub fn new(limit: usize) -> Self {
+        assert_ne!(limit, 0, "a source must stay loaded while it is read");
+        Self {
+            limit,
+            order: VecDeque::new(),
+        }
+    }
+
+    /// Record a read of source `i`, then release the least recently read
+    /// sources while more than the limit hold decoded state.
+    pub fn touch<S: SpanSource>(&mut self, i: usize, sources: &mut [S]) {
+        if let Some(at) = self.order.iter().position(|&j| j == i) {
+            self.order.remove(at);
+        }
+        let loaded_at = |sources: &[S], j: usize| sources.get(j).is_some_and(S::is_loaded);
+        if !loaded_at(sources, i) {
+            return;
+        }
+        self.order.push_back(i);
+        let mut loaded = self
+            .order
+            .iter()
+            .filter(|&&j| loaded_at(sources, j))
+            .count();
+        while loaded > self.limit {
+            // `i` is last and the limit is non-zero, so it is never
+            // reached here.
+            let j = self.order.pop_front().expect("more loaded than listed");
+            if loaded_at(sources, j) {
+                sources[j].release();
+                loaded -= 1;
+            }
+        }
+    }
 }
 
 /// What a [`SpanShaper`] made of one span the merge keeps.
@@ -204,8 +293,9 @@ impl PartialOrd for HeapEntry {
 ///
 /// `cap = None` means unbounded; `cap = Some(0)` is a caller error the
 /// engine rejects at its request boundary (asserted here in debug builds).
-/// `shaper`, when given, shapes and weighs every kept span (see
-/// [`SpanShaper`]).
+/// `loaded`, when given, keeps at most its limit of sources holding
+/// decoded state (see [`LoadedSources`]). `shaper`, when given, shapes and
+/// weighs every kept span (see [`SpanShaper`]).
 ///
 /// `cancel` is polled during head resolution and once per merge group.
 /// Once the merge is running, a firing cancel keeps the deterministic
@@ -216,6 +306,7 @@ pub fn combine(
     sources: &mut [&mut dyn SpanSource],
     trace_id: TraceId,
     cap: Option<usize>,
+    mut loaded: Option<&mut LoadedSources>,
     mut shaper: Option<&mut dyn SpanShaper>,
     cancel: &dyn Fn() -> bool,
 ) -> CombineOutcome {
@@ -225,6 +316,11 @@ pub fn combine(
     );
 
     let mut failures: Vec<(usize, crate::Error)> = Vec::new();
+    let mut touch = |i: usize, sources: &mut [&mut dyn SpanSource]| {
+        if let Some(loaded) = loaded.as_deref_mut() {
+            loaded.touch(i, sources);
+        }
+    };
 
     // Cancellation during head resolution (this loop) is the "before all
     // source heads are known" phase: no deterministic prefix exists yet,
@@ -250,11 +346,13 @@ pub fn combine(
     // Per-source candidate lists, sorted by the cheap key (+ position for
     // an in-source total order; same-position duplicates cannot exist).
     let mut refs: Vec<Vec<SpanRef>> = Vec::with_capacity(sources.len());
-    for (i, source) in sources.iter_mut().enumerate() {
+    for i in 0..sources.len() {
         if cancel() {
             return cancelled_empty(failures);
         }
-        match source.span_refs(trace_id) {
+        let found = sources[i].span_refs(trace_id);
+        touch(i, sources);
+        match found {
             Ok(mut r) => {
                 r.sort_unstable_by_key(|s| (s.cheap_key(), s.position));
                 refs.push(r);
@@ -360,7 +458,9 @@ pub fn combine(
         if group.len() == 1 && !is_unset {
             let (source, index) = group[0];
             let r = refs[source][index];
-            match sources[source].materialize(r.position) {
+            let materialized = sources[source].materialize(r.position);
+            touch(source, sources);
+            match materialized {
                 Ok(span) => {
                     if !kept.push(span, &mut shaper) {
                         budget_hit = true;
@@ -396,7 +496,9 @@ pub fn combine(
                     continue;
                 }
                 let r = refs[source][index];
-                match sources[source].materialize(r.position) {
+                let materialized = sources[source].materialize(r.position);
+                touch(source, sources);
+                match materialized {
                     Ok(span) => {
                         let bytes = canonical_bytes(&span);
                         let hash = content_hash(&bytes);
@@ -443,7 +545,9 @@ pub fn combine(
                 continue;
             }
             let r = refs[source][index];
-            match sources[source].materialize(r.position) {
+            let materialized = sources[source].materialize(r.position);
+            touch(source, sources);
+            match materialized {
                 Ok(span) => {
                     let bytes = canonical_bytes(&span);
                     members.push((content_hash(&bytes), bytes, span, source));
@@ -665,7 +769,7 @@ mod tests {
     }
 
     fn run(sources: &mut [&mut dyn SpanSource], cap: Option<usize>) -> CombineOutcome {
-        combine(sources, tid(), cap, None, &|| false)
+        combine(sources, tid(), cap, None, None, &|| false)
     }
 
     #[test]
@@ -891,6 +995,86 @@ mod tests {
     }
 
     #[test]
+    fn a_loaded_limit_bounds_the_sources_holding_state() {
+        // Six sources whose spans interleave in time, so the merge keeps
+        // returning to sources it released: at most `limit` hold state
+        // when any read starts, and the trace is the unlimited one.
+        struct Loading {
+            inner: VecSource,
+            loaded: bool,
+            others: std::rc::Rc<std::cell::Cell<usize>>,
+            peak: std::rc::Rc<std::cell::Cell<usize>>,
+        }
+        impl Loading {
+            fn enter(&mut self) {
+                let held = self.others.get();
+                self.peak.set(self.peak.get().max(held));
+                if !self.loaded {
+                    self.loaded = true;
+                    self.others.set(held + 1);
+                }
+            }
+        }
+        impl SpanSource for Loading {
+            fn span_refs(&mut self, id: TraceId) -> Result<Vec<SpanRef>, crate::Error> {
+                self.enter();
+                self.inner.span_refs(id)
+            }
+            fn materialize(&mut self, position: u32) -> Result<TraceSpan, crate::Error> {
+                self.enter();
+                self.inner.materialize(position)
+            }
+            fn is_loaded(&self) -> bool {
+                self.loaded
+            }
+            fn release(&mut self) {
+                assert!(self.loaded, "released only when loaded");
+                self.loaded = false;
+                self.others.set(self.others.get() - 1);
+            }
+        }
+        let spans = |i: u8| {
+            (0..3u8)
+                .map(|k| {
+                    span(
+                        [i + 1, k + 1, 0, 0, 0, 0, 0, 0],
+                        [0; 8],
+                        i64::from(k * 6 + i),
+                        1,
+                        "s",
+                    )
+                })
+                .collect::<Vec<_>>()
+        };
+        let merge = |limit: Option<usize>| {
+            let mut tracker = limit.map(LoadedSources::new);
+            let held = std::rc::Rc::new(std::cell::Cell::new(0));
+            let peak = std::rc::Rc::new(std::cell::Cell::new(0));
+            let mut sources: Vec<Loading> = (0..6u8)
+                .map(|i| Loading {
+                    inner: VecSource::new(spans(i)),
+                    loaded: false,
+                    others: std::rc::Rc::clone(&held),
+                    peak: std::rc::Rc::clone(&peak),
+                })
+                .collect();
+            let mut set: Vec<&mut dyn SpanSource> = sources
+                .iter_mut()
+                .map(|s| s as &mut dyn SpanSource)
+                .collect();
+            let out = combine(&mut set, tid(), None, tracker.as_mut(), None, &|| false);
+            (out, peak.get())
+        };
+        let (free, free_peak) = merge(None);
+        let (limited, limited_peak) = merge(Some(2));
+        assert_eq!(free_peak, 6, "without a limit every source stays loaded");
+        assert!(limited_peak <= 2, "peak {limited_peak} above the limit");
+        assert_eq!(limited.trace.spans, free.trace.spans);
+        assert_eq!(limited.trace.spans.len(), 18);
+        assert_eq!(limited.contributing_sources, free.contributing_sources);
+    }
+
+    #[test]
     fn beyond_cap_payloads_are_never_materialized() {
         // The cap bounds WORK, not just output: with cap 1 and three
         // unique candidates, exactly ONE payload materializes (the
@@ -944,7 +1128,7 @@ mod tests {
             polls.set(polls.get() + 1);
             polls.get() >= 2
         };
-        let out = combine(&mut set, tid(), None, None, &cancel);
+        let out = combine(&mut set, tid(), None, None, None, &cancel);
         assert!(out.cancelled);
         assert!(out.trace.spans.is_empty());
 
@@ -957,14 +1141,14 @@ mod tests {
             polls.set(polls.get() + 1);
             polls.get() >= 4
         };
-        let out = combine(&mut set, tid(), None, None, &cancel);
+        let out = combine(&mut set, tid(), None, None, None, &cancel);
         assert!(out.cancelled);
         assert_eq!(out.trace.spans.len(), 1);
         assert_eq!(out.trace.spans[0].fields[0].1, "first");
 
         // Cancelled with ZERO sources: still cancelled, never Complete.
         let mut empty: Vec<&mut dyn SpanSource> = vec![];
-        let out = combine(&mut empty, tid(), None, None, &|| true);
+        let out = combine(&mut empty, tid(), None, None, None, &|| true);
         assert!(out.cancelled);
     }
 
@@ -998,6 +1182,7 @@ mod tests {
         let out = combine(
             &mut [&mut src as &mut dyn SpanSource],
             tid(),
+            None,
             None,
             Some(&mut shaper),
             &|| false,

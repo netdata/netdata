@@ -104,6 +104,15 @@
 //! (by the rank bound their summaries give), and only while that bound
 //! can still beat the N-th result: an older file is never compiled, and
 //! a work ceiling stops after the newest files, not in source-id order.
+//!
+//! Memory stays bounded however many files the completion set holds: each
+//! session keeps only its bloom and a tight screen for the whole query,
+//! and at most `LOADED_SOURCES_MAX` (8) sessions keep their decoded layer
+//! (dictionary, lookup structures, rows, batches, rollup) at once — the
+//! least recently used is released, which only costs a decode again —
+//! between candidates and, through the combiner's limit, within one
+//! candidate's assembly. Candidates are examined newest first, so the
+//! files they read stay recent while they are needed.
 
 use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet, VecDeque};
 use std::sync::Arc;
@@ -114,7 +123,7 @@ use tokio_util::sync::CancellationToken;
 use sfst::trace_combine::{SpanSource, combine};
 use sfst::{ScanWork, TraceId};
 
-use super::by_id::{DEFAULT_SPAN_CAP, FieldKinds};
+use super::by_id::{DEFAULT_SPAN_CAP, FieldKinds, LOADED_SOURCES_MAX};
 use super::gate::{GateDecision, TraceGate};
 use super::predicate::{EvalPredicate, Predicate, PredicateError, TraceLevelEval};
 use super::sources::{SourceId, SourceSetError, TraceSource, validate_sources};
@@ -183,6 +192,7 @@ pub struct SearchQuery {
     visited_ceiling: u64,
     span_cap: usize,
     gate_enabled: bool,
+    loaded_sources_cap: usize,
 }
 
 impl SearchQuery {
@@ -195,6 +205,7 @@ impl SearchQuery {
             visited_ceiling: VISITED_ROWS_CEILING,
             span_cap: DEFAULT_SPAN_CAP,
             gate_enabled: true,
+            loaded_sources_cap: LOADED_SOURCES_MAX,
         }
     }
 
@@ -252,6 +263,16 @@ impl SearchQuery {
     #[doc(hidden)]
     pub fn trace_gate_for_tests(mut self, enabled: bool) -> Self {
         self.gate_enabled = enabled;
+        self
+    }
+
+    /// Test-only override of the loaded-sources limit (must be non-zero),
+    /// so a test proves that releasing sessions never changes a result.
+    /// NOT a tuning surface.
+    #[doc(hidden)]
+    pub fn loaded_sources_cap_for_tests(mut self, cap: usize) -> Self {
+        assert_ne!(cap, 0, "loaded_sources_cap must be non-zero");
+        self.loaded_sources_cap = cap;
         self
     }
 }
@@ -626,7 +647,7 @@ pub fn search(
     // Each completion SFST is a session that owns its file's metadata
     // view (the slot): it opens fully only when a step needs it — a
     // window file's plan compile, a found trace's rows, the gate's root
-    // values. Lookup structures stay for the query's many candidates.
+    // values. Screened: the query looks up many candidates per file.
     let mut sessions: Vec<sfst::TraceFileSession<'_, '_>> = Vec::new();
     let mut slot_sources: Vec<&TraceSource> = Vec::new();
     for (mapped, source) in &mapped_sfsts {
@@ -635,7 +656,11 @@ pub fn search(
         }
         match sfst::MetaReader::open(mapped.bytes()) {
             Ok(meta) => {
-                sessions.push(sfst::TraceFileSession::open_owned(meta).keep_lookup());
+                sessions.push(
+                    sfst::TraceFileSession::open_owned(meta)
+                        .screened()
+                        .on_release(move || mapped.release_pages()),
+                );
                 slot_sources.push(source);
             }
             Err(e) => {
@@ -814,6 +839,9 @@ pub fn search(
     let mut final_ranks: BTreeSet<(std::cmp::Reverse<i64>, TraceId)> = BTreeSet::new();
 
     // ── The examine / grow-K loop (C-1 + R2-1) ───────────────────────
+    // Every read of a session — plan compile, gate evidence, merge —
+    // reports to one tracker, which keeps the limit across the query.
+    let mut loaded = sfst::LoadedSources::new(query.loaded_sources_cap);
     loop {
         if cancel.is_cancelled() {
             return Ok(cancelled_empty(status));
@@ -888,7 +916,7 @@ pub fn search(
             // (point-of-discovery semantics, the same contract as a
             // mid-merge read failure).
             if let Some(g) = gate.as_mut() {
-                let decision = g.check(trace_id, &mut sessions);
+                let decision = g.check(trace_id, &mut sessions, &mut loaded);
                 for idx in g.take_new_failures() {
                     let who = origin.get(idx).map(String::as_str).unwrap_or("?");
                     tracing::warn!(
@@ -908,9 +936,14 @@ pub fn search(
             for (_, tail) in tails.iter_mut() {
                 merged.push(tail);
             }
-            let outcome = combine(&mut merged, trace_id, Some(query.span_cap), None, &|| {
-                cancel.is_cancelled()
-            });
+            let outcome = combine(
+                &mut merged,
+                trace_id,
+                Some(query.span_cap),
+                Some(&mut loaded),
+                None,
+                &|| cancel.is_cancelled(),
+            );
             drop(merged);
             assembled_count += 1;
             // Failures fold into the status BEFORE the cancellation
@@ -1030,14 +1063,16 @@ pub fn search(
                 }
             };
             let mut budget_truncated = false;
-            match discovery_state(
+            let discovered = discovery_state(
                 reader,
                 &plan,
                 query.window,
                 query.visited_ceiling,
                 &mut work,
                 &mut budget_truncated,
-            ) {
+            );
+            loaded.touch(slot, &mut sessions);
+            match discovered {
                 Ok(Some(mut file)) => {
                     let count = clamp(k, &work, query.visited_ceiling);
                     file.extend(count, &mut work, &mut pool);

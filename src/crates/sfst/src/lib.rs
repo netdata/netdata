@@ -107,8 +107,9 @@ pub mod registry;
 pub use error::Error;
 pub use index_reader::{
     BitmapFilter, CompiledTracePlan, GroupCondition, IdColumnKind, IndexReader, MetaReader,
-    NumberCmp, PlanMatcher, PlanTerm, RollupRefOutcome, RollupRootResolver, ScanWork, Trace,
-    TraceEvent, TraceFileSession, TraceLink, TracePlan, TraceSpan, numeric_token_matches,
+    NumberCmp, PlanMatcher, PlanTerm, RollupEvidence, RollupRefOutcome, RollupRootResolver,
+    ScanWork, Trace, TraceEvent, TraceFileSession, TraceLink, TracePlan, TraceSpan,
+    numeric_token_matches,
 };
 pub use index_writer::IndexWriter;
 pub use kv_interner::KvSlot;
@@ -123,10 +124,10 @@ pub use row_index::RowIndex;
 pub use schema::join_value_kinds;
 pub use span_extras::{EventIndex, EventRef, EventRows, LinkIndex, LinkRef, LinkRows};
 pub use trace_bloom::TraceIdBloom;
-pub use trace_combine::{CombineOutcome, SpanRef, SpanSource};
+pub use trace_combine::{CombineOutcome, LoadedSources, SpanRef, SpanSource};
 pub use trace_index::TraceIdIndex;
 pub use trace_rollup::{
-    ROLLUP_NO_REF, ROOT_CLAIM_NONE, ROOT_CLAIM_TRUE, ROOT_CLAIM_WITHHELD, TraceRollup,
+    ROLLUP_NO_REF, ROOT_CLAIM_NONE, ROOT_CLAIM_TRUE, ROOT_CLAIM_WITHHELD, RollupRow, TraceRollup,
     TraceRollupRows,
 };
 pub use vocab_match::{MatchClass, ValueMatcher};

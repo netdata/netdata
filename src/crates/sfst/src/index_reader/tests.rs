@@ -377,3 +377,64 @@ fn an_owned_session_finds_what_a_borrowed_one_finds() {
         );
     }
 }
+
+#[test]
+fn a_screened_session_answers_false_positives_without_a_lookup() {
+    use crate::trace_combine::SpanSource;
+    use std::cell::Cell;
+    // The sealed bloom admits OTHER; the file does not hold it.
+    let bloom = bloom_over(&[TRACE, OTHER]);
+    let buf = trace_file_with_bloom(&[(sid(1), SpanId::UNSET)], Some(&bloom));
+    let other = TraceId::from(OTHER);
+    // A lookup that finds nothing drops what it decoded and reports it.
+    let drops = Cell::new(0);
+
+    // Unscreened: the false positive decodes the lookup structures.
+    let mut plain = owned(&buf).on_release(|| drops.set(drops.get() + 1));
+    assert!(plain.span_refs(other).unwrap().is_empty());
+    assert_eq!(drops.get(), 1, "the lookup ran and was dropped");
+    assert!(!plain.is_loaded());
+
+    // Screened: the first lookup builds the screen, which then rules
+    // OTHER out without a lookup.
+    drops.set(0);
+    let mut screened = owned(&buf)
+        .screened()
+        .on_release(|| drops.set(drops.get() + 1));
+    assert!(
+        screened.might_contain(other),
+        "the sealed bloom alone admits it"
+    );
+    assert_eq!(screened.span_refs(TraceId::from(TRACE)).unwrap().len(), 1);
+    assert!(!screened.might_contain(other));
+    assert!(screened.span_refs(other).unwrap().is_empty());
+    assert_eq!(drops.get(), 0, "no lookup ran");
+    assert!(screened.is_loaded(), "the hit keeps its layer");
+}
+
+#[test]
+fn a_released_session_reloads_with_the_same_answers() {
+    use crate::trace_combine::SpanSource;
+    let bloom = bloom_over(&[TRACE]);
+    let buf = trace_file_with_bloom(&[(sid(1), SpanId::UNSET), (sid(2), sid(1))], Some(&bloom));
+    let id = TraceId::from(TRACE);
+    let mut session = owned(&buf).screened();
+    assert!(!session.is_loaded());
+    let refs = session.span_refs(id).unwrap();
+    let spans: Vec<_> = refs
+        .iter()
+        .map(|r| session.materialize(r.position).unwrap())
+        .collect();
+    assert!(session.is_loaded());
+
+    session.release();
+    assert!(
+        !session.is_loaded(),
+        "the full reader went back to metadata"
+    );
+    assert!(session.might_contain(id), "the screen stays");
+    assert_eq!(session.span_refs(id).unwrap(), refs);
+    for (r, span) in refs.iter().zip(&spans) {
+        assert_eq!(&session.materialize(r.position).unwrap(), span);
+    }
+}

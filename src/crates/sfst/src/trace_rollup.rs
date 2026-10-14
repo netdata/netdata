@@ -209,6 +209,33 @@ impl TraceRollup {
         }
         (lo < n && self.trace_ids.get(lo) == trace_id).then_some(lo)
     }
+
+    /// The root claim and envelope of `trace_id`'s row, copied out, or
+    /// `None` when this file holds no spans of that trace.
+    pub fn row(&self, trace_id: TraceId) -> Option<RollupRow> {
+        let row = self.find(trace_id)?;
+        Some(RollupRow {
+            root_claim: self.root_is_true_root[row],
+            root_service_ref: self.root_service_refs[row],
+            root_name_ref: self.root_name_refs[row],
+            min_start_ns: self.min_start_ns[row],
+            max_end_ns: self.max_end_ns[row],
+        })
+    }
+}
+
+/// The columns of one rollup row a trace-level filter reads, copied out
+/// so the decoded rollup can be dropped.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct RollupRow {
+    /// [`ROOT_CLAIM_NONE`], [`ROOT_CLAIM_TRUE`] or [`ROOT_CLAIM_WITHHELD`].
+    pub root_claim: u8,
+    /// See [`TraceRollup::root_service_refs`].
+    pub root_service_ref: u32,
+    /// See [`TraceRollup::root_name_refs`].
+    pub root_name_ref: u32,
+    pub min_start_ns: i64,
+    pub max_end_ns: i64,
 }
 
 /// One trace's in-progress aggregate (insertion phase).

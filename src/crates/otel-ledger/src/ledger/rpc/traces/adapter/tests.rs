@@ -757,6 +757,7 @@ fn shaped_trace(spans: Vec<sfst::TraceSpan>) -> TraceResult {
         &mut [&mut source as &mut dyn sfst::trace_combine::SpanSource],
         trace_id,
         Some(10_000),
+        None,
         Some(&mut shaper),
         &|| false,
     );

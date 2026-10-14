@@ -24,6 +24,12 @@
 //! ids. Consumers: `reader.rs` decodes and validates it at the trust
 //! boundary; `index_reader/session.rs` tests it per id and, when corrupt,
 //! warns once and degrades to exact `TIDX` lookups.
+//!
+//! The same type serves as a session's query-time screen
+//! ([`TraceIdBloom::screen`]): a tighter filter over the same ids, built
+//! from the lookup pair when a session looks up many ids in one file, so a
+//! 5% sealed filter costs one lookup decode per file instead of one per
+//! false positive. Never written to a file.
 
 use fastbloom::BloomFilter;
 use serde::{Deserialize, Serialize};
@@ -32,6 +38,13 @@ use crate::{Error, TraceId, TraceIdIndex, TraceIds};
 
 /// Build-time false-positive target over the distinct ids (≈6.25 bits/id).
 const FALSE_POSITIVE_RATE: f64 = 0.05;
+
+/// Query-time false-positive target of a session screen (≈24 bits/id,
+/// ~30 KB for 10k distinct ids). A screen false positive costs a decode
+/// (the lookup structures, or a rollup for the trace-level gate, ~0.5 ms)
+/// where a probe costs ~50 ns, so the rate keeps those decodes near 0.5%
+/// of the probe work; at 0.1% they doubled a gated search's time.
+const SCREEN_FALSE_POSITIVE_RATE: f64 = 0.000_01;
 
 /// Constant hashing seed: identical inputs seal to byte-identical chunks
 /// (reproducible files), and the seed state serializes with the filter so
@@ -59,17 +72,28 @@ impl TraceIdBloom {
     /// `trace_ids` MUST be the chronological `TRCE` column `index` was built
     /// from (the same coupling `TraceIdIndex::positions` documents).
     pub(crate) fn build(index: &TraceIdIndex, trace_ids: &TraceIds) -> Option<Self> {
+        Self::with_rate(index, trace_ids, FALSE_POSITIVE_RATE)
+    }
+
+    /// A session's query-time screen over the same ids as
+    /// [`build`](Self::build), at [`SCREEN_FALSE_POSITIVE_RATE`]. Built from
+    /// the lookup pair the exact lookup reads, so it never rules out an id
+    /// that lookup would find. `None` when the file has no set trace ids.
+    pub(crate) fn screen(index: &TraceIdIndex, trace_ids: &TraceIds) -> Option<Self> {
+        Self::with_rate(index, trace_ids, SCREEN_FALSE_POSITIVE_RATE)
+    }
+
+    fn with_rate(index: &TraceIdIndex, trace_ids: &TraceIds, rate: f64) -> Option<Self> {
         // fastbloom sizes the filter from the item count BEFORE insertion, so
         // collect the distinct ids — adjacent-dedup over the sorted
         // permutation, each exactly once — into a transient `Vec` first. That
         // buffer costs 16 B per distinct id, bounded by the `TRCE` column the
-        // seal already holds in memory twice (insertion-order +
-        // chronological) — never the peak.
+        // caller already holds.
         let distinct: Vec<TraceId> = index.distinct_ids(trace_ids).collect();
         if distinct.is_empty() {
             return None;
         }
-        let mut filter = BloomFilter::with_false_pos(FALSE_POSITIVE_RATE)
+        let mut filter = BloomFilter::with_false_pos(rate)
             .seed(&SEED)
             .expected_items(distinct.len());
         for id in &distinct {
@@ -234,6 +258,33 @@ mod tests {
             "measured FP rate {rate} exceeds 2x the 5% target"
         );
         assert!(rate > 0.005, "suspiciously low FP rate {rate} — wrong n?");
+    }
+
+    #[test]
+    fn a_screen_keeps_every_member_and_almost_no_other() {
+        let members: Vec<TraceId> = (0..10_000u32)
+            .map(|i| {
+                let mut a = [0u8; 16];
+                a[..4].copy_from_slice(&i.to_be_bytes());
+                a[15] = 1;
+                TraceId::from(a)
+            })
+            .collect();
+        let (col, idx) = indexed(&members);
+        let screen = TraceIdBloom::screen(&idx, &col).unwrap();
+        assert_eq!(screen.distinct_ids(), 10_000);
+        assert!(members.iter().all(|&m| screen.might_contain(m)));
+        let probes = 100_000u32;
+        let hits = (0..probes)
+            .filter(|i| {
+                let mut a = [0u8; 16];
+                a[..4].copy_from_slice(&i.to_be_bytes());
+                a[8] = 0xAB;
+                screen.might_contain(TraceId::from(a))
+            })
+            .count();
+        // 100k probes at 0.001%: one expected; ten would be 100x the target.
+        assert!(hits < 10, "{hits} false positives in {probes} probes");
     }
 
     #[test]
