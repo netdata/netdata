@@ -297,7 +297,8 @@
                     "prefix": {
                       "type": "string",
                       "minLength": 1,
-                      "description": "Static prefix shared by the runtime chart contexts, normally ending with a dot (for example `prometheus.`)."
+                      "description": "Static prefix shared by the runtime chart contexts, ending with a dot (for example `prometheus.`).",
+                      "pattern": "\\.$"
                     },
                     "reason": {
                       "type": "string",

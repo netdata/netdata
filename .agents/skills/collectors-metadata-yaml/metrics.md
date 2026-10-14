@@ -78,8 +78,8 @@ pointer done as a table; the size rule above does not count it. Exemplar: `cloud
   `azure_monitor.`, `nagios.`. Each entry is a `prefix` and a one-line `reason`. It renders nowhere on the page; the
   catalogue exports it so a custom alert on such a context finds this collector
   (`integrations-lifecycle/in-app-contract.md`, the `contexts` export), and CI fails when another collector documents
-  a context under the prefix that no longer prefix of its own covers. Describe the runtime contexts for operators in
-  `metrics.description` as well.
+  a context under the prefix, unless a longer prefix of that collector covers it. Describe what the collector creates
+  at runtime in `metrics.description` in operator terms, without listing contexts (section 3).
   `dynamic_collect_plugins` is read only by the dormant taxonomy tooling (`integrations-lifecycle/consistency.md`).
 - `availability` adds one column per value to every metrics table, marking which rows exist in which variant
   (product editions, a basic versus extended mode). Use it only when rows really differ by variant; the values are
