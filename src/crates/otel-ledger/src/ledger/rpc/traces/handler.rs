@@ -226,6 +226,7 @@ impl OtelTracesHandler {
                 status: QueryStatus::Partial([PartialReason::Busy].into()),
                 field_kinds: FieldKinds::default(),
                 span_cut: Vec::new(),
+                matched: Vec::new(),
             };
             return Ok(OtelTracesResponse::Trace(Box::new(to_trace_result(
                 &trace_id, busy, coverage,

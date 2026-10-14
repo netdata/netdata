@@ -37,8 +37,9 @@ use std::sync::atomic::{AtomicUsize, Ordering};
 
 use tokio_util::sync::CancellationToken;
 
-use sfst::trace_combine::{SpanShaper, SpanSource, combine};
+use sfst::trace_combine::{Shaped, SpanShaper, SpanSource, combine};
 
+use super::predicate::{LoweredTokens, PredicateError, SpanToken, TokenQuery};
 use super::sources::{SourceSetError, TraceSource, validate_sources};
 use super::status::{PartialReason, QueryStatus, StatusBuilder};
 use super::wal_scan::TraceWalScan;
@@ -62,6 +63,7 @@ pub struct TraceQuery {
     trace_id: sfst::TraceId,
     span_cap: Option<usize>,
     shaper: Option<Box<dyn SpanShaper + Send>>,
+    highlight: TokenQuery,
 }
 
 impl std::fmt::Debug for TraceQuery {
@@ -70,6 +72,7 @@ impl std::fmt::Debug for TraceQuery {
             .field("trace_id", &self.trace_id)
             .field("span_cap", &self.span_cap)
             .field("shaper", &self.shaper.is_some())
+            .field("highlight", &self.highlight)
             .finish()
     }
 }
@@ -80,7 +83,19 @@ impl TraceQuery {
             trace_id,
             span_cap: Some(DEFAULT_SPAN_CAP),
             shaper: None,
+            highlight: TokenQuery::default(),
         }
+    }
+
+    /// Report the spans matching `tokens` ([`TraceData::matched`]): a
+    /// span matches when it satisfies some positive span-local token's
+    /// whole group (free text included), tested on its FULL values
+    /// before any [`shaper`](Self::shaper) cuts them. Negated,
+    /// trace-level and `trace_id` tokens select no span. No window: the
+    /// whole trace is shown.
+    pub fn highlight(mut self, tokens: impl Into<TokenQuery>) -> Self {
+        self.highlight = tokens.into();
+        self
     }
 
     /// Shape and weigh every span the merge keeps (a caller caps values
@@ -123,6 +138,8 @@ pub enum TraceRequestError {
     #[error("a zero span cap would return nothing; omit the cap or raise it")]
     ZeroSpanCap,
     #[error(transparent)]
+    Highlight(#[from] PredicateError),
+    #[error(transparent)]
     SourceSet(#[from] SourceSetError),
 }
 
@@ -158,6 +175,39 @@ pub struct TraceData {
     /// Parallel to `trace.spans`: the query's shaper cut part of the
     /// span (all `false` without a shaper).
     pub span_cut: Vec<bool>,
+    /// Ascending indices into `trace.spans` of the spans matching the
+    /// query's highlight tokens (empty without any).
+    pub matched: Vec<u32>,
+}
+
+/// Wraps the caller's shaper: each span the merge keeps is tested
+/// against the highlight tokens on its full values, then shaped.
+/// `matched` gets one entry per shaped span, the last of which the
+/// budget may refuse; the kept prefix is the trace.
+struct Highlighter<'t> {
+    tokens: &'t [SpanToken],
+    inner: Option<Box<dyn SpanShaper + Send>>,
+    matched: Vec<bool>,
+}
+
+impl SpanShaper for Highlighter<'_> {
+    fn shape(&mut self, span: &mut sfst::TraceSpan) -> Shaped {
+        self.matched
+            .push(self.tokens.iter().any(|t| t.eval.matches(span, None)));
+        match self.inner.as_deref_mut() {
+            Some(inner) => inner.shape(span),
+            None => Shaped {
+                weight: 0,
+                cut: false,
+            },
+        }
+    }
+
+    fn budget(&self) -> usize {
+        self.inner
+            .as_deref()
+            .map_or(usize::MAX, |inner| inner.budget())
+    }
 }
 
 /// Run a cross-source trace-by-id. See the module docs for the status
@@ -184,6 +234,7 @@ pub fn trace_by_id(
     if query.span_cap == Some(0) {
         return Err(TraceRequestError::ZeroSpanCap);
     }
+    query.highlight.validate()?;
     validate_sources(&sources)?;
 
     let mut status = StatusBuilder::new();
@@ -198,6 +249,7 @@ pub fn trace_by_id(
             status: status.finish(),
             field_kinds: FieldKinds::default(),
             span_cut: Vec::new(),
+            matched: Vec::new(),
         }
     };
     // Pre-heads cancellation returns EMPTY + Cancelled — polled up front
@@ -293,13 +345,20 @@ pub fn trace_by_id(
         origin.push(source_id.to_string());
     }
 
-    let mut shaper = query.shaper;
+    let lowered = LoweredTokens::new(&query.highlight);
+    let mut highlighter = Highlighter {
+        tokens: &lowered.positive,
+        inner: query.shaper,
+        matched: Vec::new(),
+    };
+    // Without a shaper or a token to test, the merge shapes nothing.
+    let shaping = highlighter.inner.is_some() || !highlighter.tokens.is_empty();
     let outcome = combine(
         &mut merged,
         query.trace_id,
         query.span_cap,
         Some(&mut sfst::LoadedSources::new(LOADED_SOURCES_MAX)),
-        shaper.as_deref_mut().map(|s| s as &mut dyn SpanShaper),
+        shaping.then_some(&mut highlighter as &mut dyn SpanShaper),
         &|| cancel.is_cancelled(),
     );
     // Release the merge's &mut borrows (each session, each tail) so the
@@ -380,10 +439,20 @@ pub fn trace_by_id(
         link_attributes: project(&link_attr_names, "links.attributes."),
     };
 
+    let kept = outcome.trace.spans.len();
+    let matched = highlighter
+        .matched
+        .iter()
+        .take(kept)
+        .enumerate()
+        .filter(|(_, hit)| **hit)
+        .map(|(i, _)| i as u32)
+        .collect();
     Ok(TraceData {
         trace: outcome.trace,
         status: status.finish(),
         field_kinds,
         span_cut: outcome.cut,
+        matched,
     })
 }

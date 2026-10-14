@@ -689,3 +689,173 @@ fn unavailable_sources_are_reported_with_their_own_reason() {
         QueryStatus::Partial(BTreeSet::from([PartialReason::RemoteUnavailable]))
     );
 }
+
+// ── Highlight ─────────────────────────────────────────────────────────
+
+fn token(
+    target: sfsq::traces::PredicateTarget,
+    op: sfsq::traces::CompareOp,
+    value: &str,
+) -> sfsq::traces::Token {
+    sfsq::traces::Token::positive(sfsq::traces::Predicate {
+        conditions: vec![sfsq::traces::Condition {
+            target,
+            op,
+            values: vec![sfsq::traces::PredicateValue::Text(value.to_string())],
+        }],
+    })
+}
+
+fn name_token(name: &str) -> sfsq::traces::Token {
+    token(
+        sfsq::traces::PredicateTarget::Builtin(sfsq::traces::BuiltinField::Name),
+        sfsq::traces::CompareOp::Eq,
+        name,
+    )
+}
+
+fn highlight(
+    sources: Vec<TraceSource>,
+    tokens: Vec<sfsq::traces::Token>,
+    shaper: Option<Box<dyn sfst::trace_combine::SpanShaper + Send>>,
+) -> sfsq::traces::TraceData {
+    let mut query =
+        TraceQuery::new(sfst::TraceId::from(TRACE)).highlight(sfsq::traces::TokenQuery { tokens });
+    if let Some(shaper) = shaper {
+        query = query.shaper(shaper);
+    }
+    trace_by_id(
+        sources,
+        query,
+        CancellationToken::new(),
+        Arc::new(AtomicUsize::new(0)),
+    )
+    .unwrap()
+}
+
+/// Cuts every field value to 4 bytes, one unit per span.
+struct Cut4 {
+    budget: usize,
+}
+
+impl sfst::trace_combine::SpanShaper for Cut4 {
+    fn shape(&mut self, span: &mut sfst::TraceSpan) -> sfst::trace_combine::Shaped {
+        let mut cut = false;
+        for (_, value) in &mut span.fields {
+            if value.len() > 4 {
+                value.truncate(4);
+                cut = true;
+            }
+        }
+        sfst::trace_combine::Shaped { weight: 1, cut }
+    }
+    fn budget(&self) -> usize {
+        self.budget
+    }
+}
+
+/// Highlighting tests the full values: a free-text match that lies past
+/// the shaper's cut still marks the span, whose returned value is cut.
+#[test]
+fn highlight_sees_values_past_the_cut() {
+    let dir = tempfile::tempdir().unwrap();
+    let mut a = sp(1, 0, 1, "a");
+    a.attrs = vec![kv_str("note", "xxxxxxxx-needle")];
+    let mut b = sp(2, 1, 2, "b");
+    b.attrs = vec![kv_str("note", "plain")];
+    let wal = write_wal(dir.path(), vec![req(&[a, b])], "w");
+    let text = token(
+        sfsq::traces::PredicateTarget::FreeText,
+        sfsq::traces::CompareOp::Contains,
+        "NEEDLE",
+    );
+    let data = highlight(
+        vec![sealed_source(dir.path(), &wal, "w")],
+        vec![text],
+        Some(Box::new(Cut4 { budget: 100 })),
+    );
+    assert_eq!(span_names(&data), ["a", "b"]);
+    assert_eq!(data.matched, [0]);
+    let note = data.trace.spans[0]
+        .fields
+        .iter()
+        .find(|(k, _)| k == "attributes.note")
+        .map(|(_, v)| v.as_str());
+    assert_eq!(note, Some("xxxx"), "the returned value is cut");
+}
+
+/// Indices name spans, not ids: of a client/server pair sharing a span
+/// id only the matching one is marked, and a span with the UNSET id can
+/// match too.
+#[test]
+fn highlight_shared_and_unset_ids() {
+    let dir = tempfile::tempdir().unwrap();
+    let mut client = sp(1, 0, 1, "client");
+    client.kind = 3;
+    let mut server = sp(1, 1, 2, "server");
+    server.kind = 2;
+    let unset = sp(0, 1, 3, "unset");
+    let wal = write_wal(dir.path(), vec![req(&[client, server, unset])], "w");
+    let src = || vec![sealed_source(dir.path(), &wal, "w")];
+    let data = highlight(src(), vec![name_token("server")], None);
+    assert_eq!(span_names(&data), ["client", "server", "unset"]);
+    assert_eq!(data.matched, [1]);
+    let data = highlight(src(), vec![name_token("unset"), name_token("client")], None);
+    assert_eq!(data.matched, [0, 2], "any positive token marks a span");
+}
+
+/// Past the byte budget the trace is a prefix, and so are its marks: a
+/// matching span the budget refused is not reported.
+#[test]
+fn highlight_respects_the_byte_budget_prefix() {
+    let dir = tempfile::tempdir().unwrap();
+    let wal = write_wal(
+        dir.path(),
+        vec![req(&[sp(1, 0, 1, "a"), sp(2, 1, 2, "b"), sp(3, 1, 3, "c")])],
+        "w",
+    );
+    let data = highlight(
+        vec![sealed_source(dir.path(), &wal, "w")],
+        vec![name_token("b"), name_token("c")],
+        Some(Box::new(Cut4 { budget: 2 })),
+    );
+    assert_eq!(span_names(&data), ["a", "b"]);
+    assert_eq!(data.matched, [1]);
+    assert!(data.status.has(PartialReason::ByteBudget));
+}
+
+/// Without tokens nothing is marked; negated, trace-level and `trace_id`
+/// tokens select no span; an invalid token is a request error.
+#[test]
+fn highlight_without_tokens_is_empty() {
+    let dir = tempfile::tempdir().unwrap();
+    let wal = write_wal(dir.path(), vec![req(&[sp(1, 0, 1, "a")])], "w");
+    let src = || vec![sealed_source(dir.path(), &wal, "w")];
+    assert!(run(src()).matched.is_empty());
+    let root = token(
+        sfsq::traces::PredicateTarget::Builtin(sfsq::traces::BuiltinField::RootName),
+        sfsq::traces::CompareOp::Eq,
+        "a",
+    );
+    let negated = sfsq::traces::Token::negated(name_token("a").group);
+    let data = highlight(src(), vec![root, negated], None);
+    assert!(data.matched.is_empty());
+    let short = token(
+        sfsq::traces::PredicateTarget::FreeText,
+        sfsq::traces::CompareOp::Contains,
+        "a",
+    );
+    let err = trace_by_id(
+        src(),
+        TraceQuery::new(sfst::TraceId::from(TRACE)).highlight(sfsq::traces::TokenQuery {
+            tokens: vec![short],
+        }),
+        CancellationToken::new(),
+        Arc::new(AtomicUsize::new(0)),
+    )
+    .unwrap_err();
+    assert!(
+        matches!(err, sfsq::traces::TraceRequestError::Highlight(_)),
+        "{err}"
+    );
+}

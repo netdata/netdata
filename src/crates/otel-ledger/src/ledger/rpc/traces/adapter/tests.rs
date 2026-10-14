@@ -127,6 +127,7 @@ fn trace_result_shape_is_pinned() {
             link_attributes: vec![],
         },
         span_cut: Vec::new(),
+        matched: Vec::new(),
     };
     let v = serde_json::to_value(to_trace_result(
         &trace_id,
@@ -579,6 +580,7 @@ fn empty_trace_maps_to_complete_zero_span_result() {
         status: QueryStatus::Complete,
         field_kinds: FieldKinds::default(),
         span_cut: Vec::new(),
+        matched: Vec::new(),
     };
     let v = serde_json::to_value(to_trace_result(
         &trace_id,
@@ -776,6 +778,7 @@ fn shaped_trace(spans: Vec<sfst::TraceSpan>) -> TraceResult {
             ..FieldKinds::default()
         },
         span_cut: out.cut,
+        matched: Vec::new(),
     };
     to_trace_result(&trace_id, data, coverage_all())
 }
