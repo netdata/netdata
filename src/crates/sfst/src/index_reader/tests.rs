@@ -317,6 +317,18 @@ fn bloom_over(ids: &[[u8; 16]]) -> crate::TraceIdBloom {
     crate::TraceIdBloom::build(&index, &trace).expect("non-empty")
 }
 
+/// A loose bloom over `ids` (64 bits, one hash: ~3% false positives for
+/// two ids), as files sealed before the tight target carry.
+fn loose_bloom_over(ids: &[[u8; 16]]) -> crate::TraceIdBloom {
+    let mut filter = fastbloom::BloomFilter::with_num_bits(64)
+        .seed(&0u128)
+        .hashes(1);
+    for id in ids {
+        filter.insert(id);
+    }
+    crate::TraceIdBloom::raw_for_tests(ids.len() as u32, filter)
+}
+
 fn owned(buf: &[u8]) -> crate::TraceFileSession<'_, '_> {
     crate::TraceFileSession::open_owned(crate::MetaReader::open(buf).unwrap())
 }
@@ -344,13 +356,15 @@ fn an_owned_session_answers_a_bloom_miss_from_the_bloom_alone() {
 #[test]
 fn a_false_positive_reads_only_the_lookup_pair() {
     use crate::trace_combine::SpanSource;
-    // The bloom admits OTHER; the file does not hold it.
+    // The bloom admits OTHER; the file does not hold it. Two rows, so a
+    // bloom over two ids is valid (not the unreadable-bloom fallback).
     let bloom = bloom_over(&[TRACE, OTHER]);
-    let mut buf = trace_file_with_bloom(&[(sid(1), SpanId::UNSET)], Some(&bloom));
+    let mut buf = trace_file_with_bloom(&[(sid(1), SpanId::UNSET), (sid(2), sid(1))], Some(&bloom));
     for id in [crate::CHUNK_SPAN_IDS, crate::CHUNK_PRIMARY] {
         corrupt_chunk(&mut buf, id);
     }
     let mut session = owned(&buf);
+    assert!(!session.bloom_unreadable());
     assert!(session.might_contain(TraceId::from(OTHER)));
     assert!(session.span_refs(TraceId::from(OTHER)).unwrap().is_empty());
     // Finding the held trace needs the row columns and the full reader:
@@ -382,15 +396,18 @@ fn an_owned_session_finds_what_a_borrowed_one_finds() {
 fn a_screened_session_answers_false_positives_without_a_lookup() {
     use crate::trace_combine::SpanSource;
     use std::cell::Cell;
-    // The sealed bloom admits OTHER; the file does not hold it.
-    let bloom = bloom_over(&[TRACE, OTHER]);
-    let buf = trace_file_with_bloom(&[(sid(1), SpanId::UNSET)], Some(&bloom));
+    // A loose sealed bloom admits OTHER; the file does not hold it.
+    let bloom = loose_bloom_over(&[TRACE, OTHER]);
+    assert!(!bloom.is_tight());
+    let buf = trace_file_with_bloom(&[(sid(1), SpanId::UNSET), (sid(2), sid(1))], Some(&bloom));
     let other = TraceId::from(OTHER);
     // A lookup that finds nothing drops what it decoded and reports it.
     let drops = Cell::new(0);
 
     // Unscreened: the false positive decodes the lookup structures.
     let mut plain = owned(&buf).on_release(|| drops.set(drops.get() + 1));
+    assert!(!plain.bloom_unreadable());
+    assert!(plain.might_contain(other), "the loose bloom admits it");
     assert!(plain.span_refs(other).unwrap().is_empty());
     assert_eq!(drops.get(), 1, "the lookup ran and was dropped");
     assert!(!plain.is_loaded());
@@ -405,11 +422,35 @@ fn a_screened_session_answers_false_positives_without_a_lookup() {
         screened.might_contain(other),
         "the sealed bloom alone admits it"
     );
-    assert_eq!(screened.span_refs(TraceId::from(TRACE)).unwrap().len(), 1);
+    assert_eq!(screened.span_refs(TraceId::from(TRACE)).unwrap().len(), 2);
     assert!(!screened.might_contain(other));
     assert!(screened.span_refs(other).unwrap().is_empty());
     assert_eq!(drops.get(), 0, "no lookup ran");
     assert!(screened.is_loaded(), "the hit keeps its layer");
+}
+
+#[test]
+fn a_tight_sealed_bloom_needs_no_screen() {
+    use crate::trace_combine::SpanSource;
+    use std::cell::Cell;
+    // A tight bloom that (by construction) admits OTHER: a screened
+    // session builds nothing more, so OTHER takes the lookup like an
+    // unscreened one — at the tight rate that is the rare case.
+    let bloom = bloom_over(&[TRACE, OTHER]);
+    assert!(bloom.is_tight());
+    let buf = trace_file_with_bloom(&[(sid(1), SpanId::UNSET), (sid(2), sid(1))], Some(&bloom));
+    let drops = Cell::new(0);
+    let mut screened = owned(&buf)
+        .screened()
+        .on_release(|| drops.set(drops.get() + 1));
+    assert!(!screened.bloom_unreadable());
+    assert_eq!(screened.span_refs(TraceId::from(TRACE)).unwrap().len(), 2);
+    assert!(
+        screened.might_contain(TraceId::from(OTHER)),
+        "no screen was built"
+    );
+    assert!(screened.span_refs(TraceId::from(OTHER)).unwrap().is_empty());
+    assert_eq!(drops.get(), 0, "the hit keeps the layer loaded");
 }
 
 #[test]

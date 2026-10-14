@@ -9,10 +9,10 @@
 //!   degrades to the exact lookup with ONE demoted warning per session,
 //!   not one per lookup);
 //! - a screened session ([`TraceFileSession::screened`], for a caller
-//!   that looks up many ids in one file) builds a tight filter
-//!   ([`TraceIdBloom::screen`]) from the lookup structures the first time
-//!   it decodes them, so the sealed bloom's later false positives cost no
-//!   decode;
+//!   that looks up many ids in one file) whose file has no tight bloom (a
+//!   file sealed at the former 5% target, or a missing or corrupt bloom)
+//!   builds one from the lookup structures the first time it decodes them,
+//!   so later false positives cost no decode;
 //! - the lookup structures (TIDX + TRCE) decode on the first id the
 //!   filters let through, the per-row columns (SPAN/PSPN/DURN/FLAG/DRAC +
 //!   timestamps) only on the first lookup that finds rows, and a probe
@@ -154,7 +154,8 @@ fn upgrade_failed() -> crate::Error {
     crate::Error::CorruptIndex("trace session: the file failed to open fully".into())
 }
 
-/// A screened session's tight filter (see [`TraceIdBloom::screen`]).
+/// A screened session's query-time filter (see
+/// [`TraceFileSession::screened`]).
 enum Screen {
     /// Not a screened session: the bloom alone decides.
     Off,
@@ -279,13 +280,16 @@ impl<'r, 'a> TraceFileSession<'r, 'a> {
         }
     }
 
-    /// Build a tight filter over the file's trace ids on the first lookup
-    /// decode, and screen every later id with it: for a caller looking up
-    /// many ids in this file (search), whose false positives would
-    /// otherwise each decode the lookup structures. A one-id lookup gains
-    /// nothing from it.
+    /// Unless the file's sealed bloom is already tight, build a tight
+    /// filter over the file's trace ids on the first lookup decode and
+    /// screen every later id with it: for a caller looking up many ids in
+    /// this file (search), whose false positives would otherwise each
+    /// decode the lookup structures. A one-id lookup gains nothing from it.
     pub fn screened(mut self) -> Self {
-        self.screen = Screen::Pending;
+        self.screen = match &self.bloom {
+            BloomGate::Filter(bloom) if bloom.is_tight() => Screen::Off,
+            BloomGate::Filter(_) | BloomGate::Pass | BloomGate::Unreadable => Screen::Pending,
+        };
         self
     }
 
@@ -343,7 +347,7 @@ impl<'r, 'a> TraceFileSession<'r, 'a> {
         }
         let decoded = self.lookup.is_none();
         self.screen = match self.lookup() {
-            Ok(lookup) => Screen::Built(TraceIdBloom::screen(&lookup.index, &lookup.trace_ids)),
+            Ok(lookup) => Screen::Built(TraceIdBloom::build(&lookup.index, &lookup.trace_ids)),
             Err(_) => Screen::Unavailable,
         };
         let pass = self.might_contain(trace_id);

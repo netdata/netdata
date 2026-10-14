@@ -159,25 +159,26 @@ trusted-producer invariant, so a crafted file could yield wrong lookups but
 never a panic.
 
 The optional `TBLM` chunk is the **per-file trace-id bloom**: a serialized
-[`fastbloom`] filter over the file's DISTINCT set trace ids, plus that distinct
-count for validation. It answers "is trace X definitely NOT in this file?" so a
-cross-file trace-by-id skips a file with one small chunk read, never touching
-`TIDX`/`TRCE` (the single-file `trace_by_id` uses it as the same pre-check).
-False negatives are impossible; false positives (~5% build-time target,
-≈6.25 bits per distinct id) merely fall through to the exact `TIDX` lookup.
-The payload is self-describing — the filter's bit length, hash count, and
-seeded hasher state all serialize with it — so readers never depend on the
-build-time constants; the build uses a fixed seed, making identical inputs
-seal to identical bytes. It lives in the cold region after `TIDX` and before
-`EVNB`, so a reader that ignores it skips it like any other optional chunk.
-Written only when the file has at least one set (non-zero) trace id, and only
-together with `TIDX` (the bloom is derived from the index's sorted
-permutation; the writer rejects TBLM-without-TIDX at declaration, and the
-reader symmetrically rejects a bloom in a file without the index). Detected
-via the TOC (`IndexReader::has_trace_id_bloom`). The bloom is a skip hint,
-not authoritative: a corrupt one degrades to exact `TIDX` lookups (one
-warning per trace session), so it can never make a findable trace
-unfindable.
+[`fastbloom`] filter over the file's DISTINCT set trace ids, plus that
+distinct count for validation. It answers "is trace X definitely NOT in this
+file?" so a cross-file trace-by-id skips a file with one small chunk read,
+never touching `TIDX`/`TRCE` (the single-file `trace_by_id` uses it as the
+same pre-check). False negatives are impossible; false positives (0.001%
+build-time target, ≈24 bits per distinct id; files sealed earlier carry a 5%
+target, ≈6.25 bits) merely fall through to the exact `TIDX` lookup. The
+payload is self-describing — the filter's bit length, hash count, and seeded
+hasher state all serialize with it — so readers never depend on the build-time
+constants (a reader that looks up many ids in a file with a loose filter
+builds a tighter one at query time); the build uses a fixed seed, making
+identical inputs seal to identical bytes. It lives in the cold region after
+`TIDX` and before `EVNB`, so a reader that ignores it skips it like any other
+optional chunk. Written only when the file has at least one set (non-zero)
+trace id, and only together with `TIDX` (the bloom is derived from the index's
+sorted permutation; the writer rejects TBLM-without-TIDX at declaration, and
+the reader symmetrically rejects a bloom in a file without the index).
+Detected via the TOC (`IndexReader::has_trace_id_bloom`). The bloom is a skip
+hint, not authoritative: a corrupt one degrades to exact `TIDX` lookups (one
+warning per trace session), so it can never make a findable trace unfindable.
 
 [`fastbloom`]: https://crates.io/crates/fastbloom
 

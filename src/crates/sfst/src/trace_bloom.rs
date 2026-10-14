@@ -5,19 +5,24 @@
 //! `TIDX` locates a trace's spans *within* one file; it cannot make "not in
 //! this file" cheap across MANY files — the cross-file fan-out would
 //! otherwise open every candidate file's index. A bloom `false` is definitive
-//! and skips the file; the ~5% false positives each cost one wasted `TIDX`
-//! lookup; false negatives cannot happen.
+//! and skips the file; a false positive costs one wasted `TIDX` lookup;
+//! false negatives cannot happen.
 //!
 //! The filter is a `fastbloom::BloomFilter` serialized verbatim inside the
 //! chunk via serde, so the payload is self-describing: bit length, hash
 //! count, and seeded hasher state all travel with it. The crate is pinned
 //! and audited `unsafe`-free per version (see the workspace `Cargo.toml`).
 //!
-//! Build-time policy lives here: 5% false-positive target over the file's
-//! DISTINCT non-unset trace ids, one filter per file, a constant seed so
-//! identical inputs seal to identical bytes, ~6.25 bits per distinct id
-//! (≈0.8 MB per million). Bounding that cardinality is the producer's
-//! responsibility (file-rotation limits), not this module's.
+//! Build-time policy lives here: a 0.001% false-positive target over the
+//! file's DISTINCT non-unset trace ids, one filter per file, a constant seed
+//! so identical inputs seal to identical bytes, ~24 bits per distinct id
+//! (≈3 MB per million). The target is tight because one query probes every
+//! file's filter per candidate and a false positive costs a decode (~0.5 ms
+//! against a ~50 ns probe): at 5% a trace lookup decoded ~12 files' lookup
+//! structures for nothing at 243 files. Files sealed before this target
+//! carry 5% filters (≈6.25 bits per id); the payload says which
+//! ([`is_tight`](TraceIdBloom::is_tight)). Bounding the cardinality is the
+//! producer's responsibility (file-rotation limits), not this module's.
 //!
 //! Chunk contract: additive and TOC-detected like `TIDX`/`EVNB`/`LNKB` (no
 //! format version bump); the chunk is absent when the file has no set trace
@@ -25,26 +30,27 @@
 //! boundary; `index_reader/session.rs` tests it per id and, when corrupt,
 //! warns once and degrades to exact `TIDX` lookups.
 //!
-//! The same type serves as a session's query-time screen
-//! ([`TraceIdBloom::screen`]): a tighter filter over the same ids, built
-//! from the lookup pair when a session looks up many ids in one file, so a
-//! 5% sealed filter costs one lookup decode per file instead of one per
-//! false positive. Never written to a file.
+//! The same type serves as a session's query-time screen: for a file whose
+//! sealed filter is not tight (or is absent or corrupt), a session that
+//! looks up many ids builds one from the lookup structures, so such a file
+//! costs one lookup decode per query instead of one per false positive.
 
 use fastbloom::BloomFilter;
 use serde::{Deserialize, Serialize};
 
 use crate::{Error, TraceId, TraceIdIndex, TraceIds};
 
-/// Build-time false-positive target over the distinct ids (≈6.25 bits/id).
-const FALSE_POSITIVE_RATE: f64 = 0.05;
+/// False-positive target over the distinct ids (≈24 bits/id, ~30 KB for
+/// 10k distinct ids), sealed and query-time alike. A false positive costs
+/// a decode (lookup structures, or a rollup for the trace-level gate,
+/// ~0.5 ms) where a probe costs ~50 ns: this rate keeps those decodes near
+/// 0.5% of the probe work; at 0.1% they doubled a gated search's time.
+const FALSE_POSITIVE_RATE: f64 = 0.000_01;
 
-/// Query-time false-positive target of a session screen (≈24 bits/id,
-/// ~30 KB for 10k distinct ids). A screen false positive costs a decode
-/// (the lookup structures, or a rollup for the trace-level gate, ~0.5 ms)
-/// where a probe costs ~50 ns, so the rate keeps those decodes near 0.5%
-/// of the probe work; at 0.1% they doubled a gated search's time.
-const SCREEN_FALSE_POSITIVE_RATE: f64 = 0.000_01;
+/// A filter whose estimated false-positive rate is at most this needs no
+/// query-time screen (an order of magnitude above the target, so filter
+/// sizing details never matter; a 5% filter is far above it).
+const TIGHT_FALSE_POSITIVE_RATE: f64 = 0.000_1;
 
 /// Constant hashing seed: identical inputs seal to byte-identical chunks
 /// (reproducible files), and the seed state serializes with the filter so
@@ -71,19 +77,11 @@ impl TraceIdBloom {
     ///
     /// `trace_ids` MUST be the chronological `TRCE` column `index` was built
     /// from (the same coupling `TraceIdIndex::positions` documents).
+    ///
+    /// A session builds its query-time screen the same way, from the lookup
+    /// pair the exact lookup reads, so a screen never rules out an id that
+    /// lookup would find.
     pub(crate) fn build(index: &TraceIdIndex, trace_ids: &TraceIds) -> Option<Self> {
-        Self::with_rate(index, trace_ids, FALSE_POSITIVE_RATE)
-    }
-
-    /// A session's query-time screen over the same ids as
-    /// [`build`](Self::build), at [`SCREEN_FALSE_POSITIVE_RATE`]. Built from
-    /// the lookup pair the exact lookup reads, so it never rules out an id
-    /// that lookup would find. `None` when the file has no set trace ids.
-    pub(crate) fn screen(index: &TraceIdIndex, trace_ids: &TraceIds) -> Option<Self> {
-        Self::with_rate(index, trace_ids, SCREEN_FALSE_POSITIVE_RATE)
-    }
-
-    fn with_rate(index: &TraceIdIndex, trace_ids: &TraceIds, rate: f64) -> Option<Self> {
         // fastbloom sizes the filter from the item count BEFORE insertion, so
         // collect the distinct ids — adjacent-dedup over the sorted
         // permutation, each exactly once — into a transient `Vec` first. That
@@ -93,7 +91,7 @@ impl TraceIdBloom {
         if distinct.is_empty() {
             return None;
         }
-        let mut filter = BloomFilter::with_false_pos(rate)
+        let mut filter = BloomFilter::with_false_pos(FALSE_POSITIVE_RATE)
             .seed(&SEED)
             .expected_items(distinct.len());
         for id in &distinct {
@@ -106,8 +104,9 @@ impl TraceIdBloom {
     }
 
     /// Whether the file MIGHT contain `id`. `false` is definitive (no false
-    /// negatives); `true` is probabilistic (~5% of absent ids). The unset
-    /// (all-zero) id forms no trace and is never contained.
+    /// negatives); `true` is probabilistic (the filter's false-positive
+    /// rate over absent ids). The unset (all-zero) id forms no trace and is
+    /// never contained.
     pub fn might_contain(&self, id: TraceId) -> bool {
         !id.is_unset() && self.filter.contains(id.as_bytes())
     }
@@ -115,6 +114,18 @@ impl TraceIdBloom {
     /// Distinct set trace ids at build time.
     pub fn distinct_ids(&self) -> u32 {
         self.distinct_ids
+    }
+
+    /// Whether the filter is tight enough that a query-time screen would add
+    /// nothing: its estimated false-positive rate, `(1 - e^(-k·n/m))^k`
+    /// over its bits `m`, hashes `k` and distinct ids `n`, is at most
+    /// 0.01%. False for 5% filters sealed before the tight target. Call on a
+    /// validated filter (the reader validates).
+    pub fn is_tight(&self) -> bool {
+        let m = self.filter.num_bits() as f64;
+        let k = f64::from(self.filter.num_hashes());
+        let n = f64::from(self.distinct_ids);
+        (1.0 - (-k * n / m).exp()).powf(k) <= TIGHT_FALSE_POSITIVE_RATE
     }
 
     /// Test-only constructor for deliberately malformed filters (validate /
@@ -157,10 +168,10 @@ impl TraceIdBloom {
                 "trace_id bloom filter has an empty bit vector".into(),
             ));
         }
-        // The optimal hash count at our 5% target is 4 for normal filters —
-        // but fastbloom floors the filter at 64 bits, which inflates the
-        // optimal k for tiny files (a legitimate 1-distinct-id filter at 5%
-        // computes k = 44). The cap must therefore stay >= 44; do NOT tighten
+        // The optimal hash count is 4 for normal filters at the old 5% target
+        // and ~17 at 0.001% — but fastbloom floors the filter at 64 bits,
+        // which inflates the optimal k for tiny files (a legitimate
+        // 1-distinct-id filter computes k = 44 at either target). The cap must therefore stay >= 44; do NOT tighten
         // it toward the "normal" optimum or freshly-rolled low-volume files
         // become unreadable.
         //
@@ -228,9 +239,9 @@ mod tests {
     }
 
     #[test]
-    fn false_positive_rate_near_target() {
-        // 10k distinct member ids; probe 100k absent ids. Expect ~5%,
-        // asserted loosely (< 2x target) to stay robust across crate versions.
+    fn false_positives_stay_near_the_target() {
+        // 10k distinct member ids, 100k absent probes: at 0.001%, one
+        // false positive expected; ten would be 100x the target.
         let members: Vec<TraceId> = (0..10_000u32)
             .map(|i| {
                 let mut a = [0u8; 16];
@@ -241,50 +252,38 @@ mod tests {
             .collect();
         let (col, idx) = indexed(&members);
         let bloom = TraceIdBloom::build(&idx, &col).unwrap();
-
-        let mut hits = 0u32;
-        const PROBES: u32 = 100_000;
-        for i in 0..PROBES {
-            let mut a = [0u8; 16];
-            a[..4].copy_from_slice(&i.to_be_bytes());
-            a[8] = 0xAB; // disjoint from the member universe
-            if bloom.might_contain(TraceId::from(a)) {
-                hits += 1;
-            }
-        }
-        let rate = hits as f64 / PROBES as f64;
-        assert!(
-            rate < 0.10,
-            "measured FP rate {rate} exceeds 2x the 5% target"
-        );
-        assert!(rate > 0.005, "suspiciously low FP rate {rate} — wrong n?");
-    }
-
-    #[test]
-    fn a_screen_keeps_every_member_and_almost_no_other() {
-        let members: Vec<TraceId> = (0..10_000u32)
-            .map(|i| {
-                let mut a = [0u8; 16];
-                a[..4].copy_from_slice(&i.to_be_bytes());
-                a[15] = 1;
-                TraceId::from(a)
-            })
-            .collect();
-        let (col, idx) = indexed(&members);
-        let screen = TraceIdBloom::screen(&idx, &col).unwrap();
-        assert_eq!(screen.distinct_ids(), 10_000);
-        assert!(members.iter().all(|&m| screen.might_contain(m)));
+        assert!(members.iter().all(|&m| bloom.might_contain(m)));
         let probes = 100_000u32;
         let hits = (0..probes)
             .filter(|i| {
                 let mut a = [0u8; 16];
                 a[..4].copy_from_slice(&i.to_be_bytes());
-                a[8] = 0xAB;
-                screen.might_contain(TraceId::from(a))
+                a[8] = 0xAB; // disjoint from the member universe
+                bloom.might_contain(TraceId::from(a))
             })
             .count();
-        // 100k probes at 0.001%: one expected; ten would be 100x the target.
         assert!(hits < 10, "{hits} false positives in {probes} probes");
+    }
+
+    #[test]
+    fn built_filters_are_tight_and_old_five_percent_ones_are_not() {
+        for n in [1u8, 2, 200] {
+            let ids: Vec<TraceId> = (0..n).map(|i| id(i, 1)).collect();
+            let (col, idx) = indexed(&ids);
+            let bloom = TraceIdBloom::build(&idx, &col).unwrap();
+            bloom.validate(ids.len()).unwrap();
+            assert!(bloom.is_tight(), "{n} ids");
+        }
+        // A filter sealed at the former 5% target.
+        let mut loose = BloomFilter::with_false_pos(0.05)
+            .seed(&SEED)
+            .expected_items(10_000);
+        for i in 0..10_000u32 {
+            let mut a = [0u8; 16];
+            a[..4].copy_from_slice(&i.to_be_bytes());
+            loose.insert(&a);
+        }
+        assert!(!TraceIdBloom::raw_for_tests(10_000, loose).is_tight());
     }
 
     #[test]
