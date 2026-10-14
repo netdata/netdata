@@ -56,10 +56,10 @@ use std::sync::atomic::{AtomicUsize, Ordering};
 use tokio_util::sync::CancellationToken;
 
 use super::predicate::{SpanToken, TokenKind, TokenQuery, TraceIdConstraints, TraceLevelEval};
-use super::rollup::{TraceAggregate, sealed_trace_envelopes, tail_trace_aggregates};
+use super::rollup::{RootPick, TraceAggregate, sealed_trace_envelopes, tail_trace_aggregates};
 use super::sources::{TraceSfstCandidate, TraceSource};
 use super::status::{PartialReason, StatusBuilder};
-use super::vocab::{BuiltinField, resource_service_field, span_field};
+use super::vocab::{BuiltinField, resource_service_field};
 use super::wal_scan::TraceWalScan;
 use super::window::TimeWindow;
 use crate::source::map_source;
@@ -300,7 +300,7 @@ impl TokenFilter {
         work: &mut ScanWork,
         ceiling: u64,
     ) -> bool {
-        let mut roots: HashMap<sfst::TraceId, &sfst::TraceSpan> = HashMap::new();
+        let mut roots: HashMap<sfst::TraceId, Option<RootPick<'_>>> = HashMap::new();
         for (trace_id, span) in scan.spans_with_ids() {
             work.rows_visited += 1;
             if work.rows_visited > ceiling {
@@ -310,10 +310,7 @@ impl TokenFilter {
                 continue;
             }
             if !self.roots.is_empty() && span.parent_span_id.is_unset() {
-                let earliest = roots.entry(trace_id).or_insert(span);
-                if (span.start_ns, span.span_id) < (earliest.start_ns, earliest.span_id) {
-                    *earliest = span;
-                }
+                RootPick::offer(roots.entry(trace_id).or_default(), span);
             }
             let mut bits = 0;
             for (bit, token) in &self.span {
@@ -327,15 +324,13 @@ impl TokenFilter {
                 m.mask |= bits;
             }
         }
-        let name_field = BuiltinField::Name
-            .dictionary_field()
-            .expect("Name is dictionary-backed");
-        let service_field = resource_service_field();
-        for (trace_id, root) in roots {
-            let bits = self.root_bits(
-                span_field(root, name_field),
-                span_field(root, &service_field),
-            );
+        // Only an unambiguous claim sets root bits — the seal's rule,
+        // as a sealed file's rollup claims are read.
+        for (trace_id, pick) in roots {
+            let Some((service, name)) = pick.as_ref().and_then(RootPick::true_root) else {
+                continue;
+            };
+            let bits = self.root_bits(name, service);
             if bits != 0
                 && let Some(m) = merged.get_mut(&trace_id)
             {

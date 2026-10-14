@@ -16,8 +16,12 @@
 
 mod common;
 
-use common::{req, sp, write_wal};
-use sfsq::traces::{TraceWalScan, sealed_trace_envelopes, tail_trace_aggregates};
+use common::{req, sealed_source, sp, tail_source, write_wal};
+use sfsq::traces::{
+    BuiltinField, CompareOp, Condition, OverviewQuery, Predicate, PredicateTarget, PredicateValue,
+    RootClaim, Token, TokenQuery, TraceWalScan, overview, sealed_trace_envelopes,
+    sealed_trace_part, tail_trace_aggregates, tail_trace_parts,
+};
 
 /// A corpus covering the rollup semantics the fixture can reach
 /// (one trace id per bullet):
@@ -27,6 +31,7 @@ use sfsq::traces::{TraceWalScan, sealed_trace_envelopes, tail_trace_aggregates};
 /// - trace B: NO unset-parent span;
 /// - trace C: two equal-start roots;
 /// - trace D: two copies of one `(start, span_id)` with differing kinds;
+/// - trace E: a root that starts after one of its children;
 /// - one UNSET-trace-id span (excluded everywhere).
 fn corpus() -> Vec<common::SpanSpec> {
     let a = [0xA1u8; 16];
@@ -60,6 +65,11 @@ fn corpus() -> Vec<common::SpanSpec> {
     d_tie_b.trace = d;
     d_tie_b.kind = 2; // SERVER
 
+    let e = [0xE5u8; 16];
+    let mut e_child = sp(10, 9, 600, "e-child");
+    e_child.trace = e;
+    let mut e_root = sp(9, 0, 700, "e-root");
+    e_root.trace = e;
     let mut unset = sp(6, 0, 100, "no-trace");
     unset.trace = [0; 16];
 
@@ -73,6 +83,8 @@ fn corpus() -> Vec<common::SpanSpec> {
         c_root_lo,
         d_tie_a,
         d_tie_b,
+        e_child,
+        e_root,
         unset,
     ]
 }
@@ -97,6 +109,87 @@ fn tail_fold_matches_the_sealed_rollup_value_for_value() {
     assert_eq!(tail, sealed, "the parity contract");
 }
 
+/// A tail's parts equal the `TRSU` + `TRSS` rows of sealing the same
+/// data: max starts, per-service counts and every kind of root claim.
+#[test]
+fn tail_parts_match_the_sealed_rollup_and_stats() {
+    let dir = tempfile::tempdir().unwrap();
+    let wal = write_wal(dir.path(), vec![req(&corpus())], "parts");
+    let tail = tail_trace_parts(&TraceWalScan::scan(&wal).unwrap());
+    let out = dir.path().join("parts.sfst");
+    ng_index::build_sfst_traces_file(&wal, &out, &ng_index::Metrics::new()).unwrap();
+    let bytes = std::fs::read(&out).unwrap();
+    let reader = sfst::IndexReader::open(&bytes).unwrap();
+    let rollup = reader.trace_rollup().unwrap();
+    let stats = reader.trace_rollup_stats(&rollup).unwrap();
+    let mut resolver = sfst::RollupRootResolver::new();
+    let mut resolve = |field: &str, kv_ref: u32| -> Result<Option<String>, sfst::Error> {
+        if kv_ref == sfst::ROLLUP_NO_REF {
+            return Ok(None);
+        }
+        match resolver.resolve(&reader, field, kv_ref) {
+            sfst::RollupRefOutcome::Value(v) => Ok(Some(v.to_string())),
+            sfst::RollupRefOutcome::Corrupt => panic!("a sealed ref resolves"),
+        }
+    };
+    let sealed: Vec<_> = (0..rollup.len())
+        .map(|i| sealed_trace_part(&rollup, &stats, i, &mut resolve).unwrap())
+        .collect();
+    assert_eq!(tail, sealed, "the parity contract");
+    // A: a true root; B: none; C: the lower span id of an equal start;
+    // D: a full tie with different kinds is withheld.
+    assert!(
+        matches!(&tail[0].root, RootClaim::True { start_ns: 1_000, name: Some(n), .. } if n == "a-root")
+    );
+    assert_eq!(tail[0].max_start_ns, 1_800);
+    assert_eq!(tail[1].root, RootClaim::None);
+    assert!(matches!(&tail[2].root, RootClaim::True { name: Some(n), .. } if n == "c-root-lo"));
+    assert_eq!(tail[3].root, RootClaim::Withheld { start_ns: 4_000 });
+    assert!(
+        matches!(tail[4].root, RootClaim::True { start_ns: 700, .. }),
+        "after a child"
+    );
+    assert_eq!(tail[0].services.len(), 1);
+    assert_eq!((tail[0].services[0].1, tail[0].services[0].2), (4, 1));
+}
+
+/// The heatmap's root tokens read a tail's claims by the seal's rules: a
+/// full tie with different facets sets no root bit, as in the sealed
+/// file.
+#[test]
+fn tail_root_claim_withholds_like_the_seal() {
+    let dir = tempfile::tempdir().unwrap();
+    let wal = write_wal(dir.path(), vec![req(&corpus())], "claims");
+    let grid = sfst::Grid::new(0, 1_000, 10);
+    let root_named = |name: &str| TokenQuery {
+        tokens: vec![Token::positive(Predicate {
+            conditions: vec![Condition {
+                target: PredicateTarget::Builtin(BuiltinField::RootName),
+                op: CompareOp::Eq,
+                values: vec![PredicateValue::Text(name.to_string())],
+            }],
+        })],
+    };
+    let count = |source: sfsq::traces::TraceSource, name: &str| {
+        overview(
+            vec![source],
+            OverviewQuery::new(grid).tokens(root_named(name)),
+            tokio_util::sync::CancellationToken::new(),
+            std::sync::Arc::new(std::sync::atomic::AtomicUsize::new(0)),
+        )
+        .unwrap()
+        .total_traces
+    };
+    for (name, want) in [("d-tie", 0), ("a-root", 1), ("c-root-lo", 1)] {
+        assert_eq!(count(tail_source(&wal, "t"), name), want, "tail {name}");
+        assert_eq!(
+            count(sealed_source(dir.path(), &wal, "s"), name),
+            want,
+            "sealed {name}"
+        );
+    }
+}
+
 /// The tail fold's semantics, field by field, on the corpus above —
 /// the parity test already equates both sides wholesale, so this runs
 /// the tail side alone, asserting WHERE each number comes from.
@@ -108,7 +201,7 @@ fn the_fold_pins_every_rollup_semantic() {
     let aggs = tail_trace_aggregates(&scan);
 
     // The UNSET-trace-id span vanished; rows sort by trace id.
-    assert_eq!(aggs.len(), 4);
+    assert_eq!(aggs.len(), 5);
     let (a, b, c, d) = (&aggs[0], &aggs[1], &aggs[2], &aggs[3]);
     assert_eq!(a.trace_id, sfst::TraceId::from([0xA1; 16]));
 

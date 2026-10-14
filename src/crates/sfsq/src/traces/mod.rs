@@ -96,7 +96,10 @@ pub use predicate::{
     TEXT_MAX_BYTES, TEXT_MIN_CHARS, TOKENS_MAX, Token, TokenQuery, span_matches,
     starts_with_pattern,
 };
-pub use rollup::{TraceAggregate, sealed_trace_envelopes, tail_trace_aggregates};
+pub use rollup::{
+    RootClaim, TraceAggregate, TracePart, sealed_trace_envelopes, sealed_trace_part,
+    tail_trace_aggregates, tail_trace_parts,
+};
 pub use search::{
     DEFAULT_SEARCH_LIMIT, SERVICE_BREAKDOWN_TOP_K, SearchData, SearchQuery, SearchRequestError,
     SearchSources, ServiceBreakdown, TraceSummary, search,
