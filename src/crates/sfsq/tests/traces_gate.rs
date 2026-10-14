@@ -1186,28 +1186,39 @@ fn differential_gate_on_off_sweep() {
         ];
         for (qi, query) in queries.into_iter().enumerate() {
             let q = || SearchQuery::new(query.clone()).limit(30);
-            // No gate at all: the trace-level gate off and no proof
-            // (the token gate needs it).
-            let reference = norm(&run(
-                sources(),
-                q().trace_gate_for_tests(false)
-                    .single_source_proof_ids_for_tests(0),
-            ));
-            for (mode, (proof, rollup)) in
-                [(true, true), (false, true), (true, false), (false, false)]
-                    .into_iter()
-                    .enumerate()
-            {
-                let mut query = q().rollup_discovery_for_tests(rollup);
-                if !proof {
-                    query = query.single_source_proof_ids_for_tests(0);
+            // Both paths: rows (decided first) and assembly with the gates
+            // in every mode; on this resend-free, rooted corpus they agree.
+            let mut by_path = Vec::new();
+            for rows in [true, false] {
+                // No gate at all: the trace-level gate off and no proof
+                // (the token gate needs it).
+                let reference = norm(&run(
+                    sources(),
+                    q().rows_for_tests(rows)
+                        .trace_gate_for_tests(false)
+                        .single_source_proof_ids_for_tests(0),
+                ));
+                for (mode, (proof, rollup)) in
+                    [(true, true), (false, true), (true, false), (false, false)]
+                        .into_iter()
+                        .enumerate()
+                {
+                    let mut query = q().rows_for_tests(rows).rollup_discovery_for_tests(rollup);
+                    if !proof {
+                        query = query.single_source_proof_ids_for_tests(0);
+                    }
+                    assert_eq!(
+                        norm(&run(sources(), query)),
+                        reference,
+                        "seed {seed} query {qi} rows {rows} mode {mode} (proof {proof}, rollup {rollup})"
+                    );
                 }
-                assert_eq!(
-                    norm(&run(sources(), query)),
-                    reference,
-                    "seed {seed} query {qi} mode {mode} (proof {proof}, rollup {rollup})"
-                );
+                by_path.push(reference);
             }
+            assert_eq!(
+                by_path[0], by_path[1],
+                "seed {seed} query {qi}: rows vs assembly"
+            );
         }
     }
 }

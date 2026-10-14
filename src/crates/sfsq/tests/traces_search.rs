@@ -3228,3 +3228,23 @@ fn rollup_and_pinned_windows_take_the_rows_path() {
         assert_eq!(data.traces[0].span_count, 2, "{name}: stored rows");
     }
 }
+
+/// A losing resend matches a positive chip on the rows path (stored
+/// rows, decision 49) and not on assembly (canonical copy): the shared
+/// world's T6 1950 s copy carries `ghost=yes`.
+#[test]
+fn a_losing_resend_matches_on_the_rows_path() {
+    let dir = tempfile::tempdir().unwrap();
+    let world = world(dir.path());
+    let ghost = || tokens(vec![pos(vec![span_attr_eq("ghost", "yes")])]);
+    let rows = run(
+        layout(dir.path(), &world, "single-sealed"),
+        SearchQuery::new(ghost()),
+    );
+    let canon = run(
+        layout(dir.path(), &world, "single-sealed"),
+        canon_query(ghost()),
+    );
+    assert_eq!(ids(&rows), vec![hex(6)]);
+    assert!(canon.traces.is_empty());
+}
