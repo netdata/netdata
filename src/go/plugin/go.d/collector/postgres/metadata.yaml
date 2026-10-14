@@ -234,7 +234,31 @@ modules:
                     dsn: 'postgresql://netdata@203.0.113.0:5432/postgres'
     troubleshooting:
       problems:
-        list: []
+        list:
+          - name: "PostgreSQL collector fails with password authentication failed (SQLSTATE 28P01)"
+            description: |
+              When the Netdata PostgreSQL collector attempts to connect to a PostgreSQL instance using credentials that do not match a valid database user — either because the username or password is incorrect, or because the user does not exist — PostgreSQL rejects the connection. This commonly occurs with auto-discovered instances where default or placeholder credentials are used, after PostgreSQL user credentials are rotated, or when the collector is first configured with incorrect credentials.
+
+              The collector logs will include an authentication error similar to:
+              ```
+              failed SASL auth: FATAL: password authentication failed for user "<username>" (SQLSTATE 28P01)
+              ```
+
+              You may also see `tls error: server refused TLS connection` before the authentication error. This message is harmless — it indicates the collector attempted TLS first and fell back to a plain-text connection, which is normal behavior. The actual failure is the authentication error.
+
+              The collector retries the connection periodically but will continue to fail until the credentials are corrected.
+
+              **Fix the credentials using Dynamic Configuration (dyncfg)**
+
+              1. Go to the Netdata dashboard.
+              2. Navigate to the collector configuration for the failed PostgreSQL job.
+              3. Update the **DSN** with the correct credentials for your PostgreSQL instance.
+              4. Save the configuration — the collector reconnects automatically without a restart.
+
+              You do not need to manually edit configuration files or restart the Netdata Agent when updating credentials via Dynamic Configuration.
+
+              Use a PostgreSQL user that exists and has the required monitoring roles (recommended: the `netdata` user described in Prerequisites), then update the DSN accordingly.
+
     alerts:
       - name: postgres_total_connection_utilization
         metric: postgres.connections_utilization
