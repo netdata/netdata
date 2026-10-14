@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
-"""Stock health alert metadata: the ``alerts`` catalogue export and the metadata ``alerts`` rows that mirror it.
+"""Stock health alert metadata: the ``alerts`` catalogue export, the stock alerts' classification vocabulary, and the
+metadata ``alerts`` rows that mirror the stock alerts.
 
 The mirror rules live in `.agents/skills/collectors-metadata-yaml/alerts-and-meta.md`; only name, link and metric are
 checked here. The loaders skip a metadata file that fails schema validation; `gen_integrations.py` fails on it first.
@@ -19,15 +20,19 @@ sys.path.insert(0, str(INTEGRATIONS_DIR))
 from gen_docs_integrations import read_integrations_js  # noqa: E402
 from gen_integrations import alert_owners, load_collectors, load_device, load_flows, render_integrations  # noqa: E402
 from health_alerts import (  # noqa: E402
+    ALERT_CLASSES,
+    ALERT_TYPES,
     HEALTH_CONFIG_DIR,
     build_alert_index,
     check_alert_rows,
+    check_classification,
     conf_link,
     load_stock_rules,
     parse_health_config,
 )
 
 RULE_LINE = re.compile(r'^\s*(alarm|template)\s*:\s*(\S+)', re.IGNORECASE)
+HEALTH_REFERENCE = REPO_ROOT / 'src' / 'health' / 'REFERENCE.md'
 
 # Alarm rows whose `metric` is the context of the chart the alarm's `on:` names, not that chart id. The Go IPMI
 # collector keeps the C plugin's chart id `ipmi.events` under its own context. Remove a pair when it is no longer
@@ -43,6 +48,21 @@ def stock_rule_lines():
             if match:
                 lines.append((path.relative_to(REPO_ROOT).as_posix(), match.group(2)))
     return lines
+
+
+def reference_table_values(heading):
+    """First-column values of the first table after a REFERENCE.md heading, without Markdown code quotes."""
+    lines = HEALTH_REFERENCE.read_text(encoding='utf-8').split('\n')
+    start = lines.index(heading)
+    values = []
+    for line in lines[start + 1:]:
+        if line.startswith('#'):
+            break
+        if line.startswith('|'):
+            values.append(line.split('|')[1].strip().strip('`'))
+        elif values:
+            break
+    return values[2:]  # header row and separator
 
 
 def rows_of(items):
@@ -134,6 +154,39 @@ class BuildAlertIndexTest(unittest.TestCase):
         })
 
 
+class CheckClassificationTest(unittest.TestCase):
+    def test_reports_missing_fields_values_outside_the_vocabulary_and_colliding_components(self):
+        def rule(name, **fields):
+            return {'name': name, 'source': 'x.conf', **fields}
+
+        rules = [
+            rule('ok', **{'class': 'Errors', 'type': 'System', 'component': 'Process'}),
+            rule('ok_same_component', **{'class': 'Latency', 'type': 'System', 'component': 'Process'}),
+            rule('no_component', **{'class': 'Errors', 'type': 'System'}),
+            rule('blank_type', **{'class': 'Errors', 'type': '  ', 'component': 'CPU'}),
+            rule('unknown_class', **{'class': 'Error', 'type': 'System', 'component': 'CPU'}),
+            rule('unknown_type', **{'class': 'Errors', 'type': 'Other', 'component': 'CPU'}),
+            rule('plural', **{'class': 'Errors', 'type': 'System', 'component': 'Processes'}),
+            rule('case', **{'class': 'Errors', 'type': 'System', 'component': 'cpu'}),
+            rule('policy', **{'class': 'Errors', 'type': 'Network', 'component': 'Policy'}),
+            rule('policies', **{'class': 'Errors', 'type': 'Network', 'component': 'Policies'}),
+            rule('key', **{'class': 'Errors', 'type': 'Network', 'component': 'Key'}),
+            rule('keies', **{'class': 'Errors', 'type': 'Network', 'component': 'Keies'}),
+        ]
+
+        problems = [problem.split(': ', 1)[1].split(' is not one of ')[0] for problem in check_classification(rules)]
+
+        self.assertEqual(problems, [
+            'no_component: no component',
+            'blank_type: no type',
+            "unknown_class: class 'Error'",
+            "unknown_type: type 'Other'",
+            "plural: component 'Processes' collides with 'Process' (x.conf: ok)",
+            "case: component 'cpu' collides with 'CPU' (x.conf: blank_type)",
+            "policies: component 'Policies' collides with 'Policy' (x.conf: policy)",
+        ])
+
+
 class CheckAlertRowsTest(unittest.TestCase):
     RULES = [
         {'name': 'tmpl', 'template': True, 'source': 'src/health/health.d/t.conf', 'on': 'app.ctx'},
@@ -187,6 +240,17 @@ class StockHealthConfigTest(unittest.TestCase):
         index = build_alert_index(self.rules)
 
         self.assertEqual(sorted(index), sorted({name for _, name in stock_rule_lines()}))
+
+    def test_every_stock_alert_is_classified_with_the_vocabulary(self):
+        problems = check_classification(self.rules)
+
+        self.assertEqual(problems, [], '\n'.join(problems))
+
+    def test_the_reference_documents_the_vocabulary(self):
+        classes = reference_table_values('#### Alert Line `class`')
+        types = reference_table_values('#### Alert Line `type`')
+
+        self.assertEqual((classes, types), (list(ALERT_CLASSES), list(ALERT_TYPES)))
 
 
 class MetadataAlertRowsTest(unittest.TestCase):

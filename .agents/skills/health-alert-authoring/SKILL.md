@@ -409,6 +409,10 @@ Before requesting review, confirm all of the following:
 - Its timing is the closest safe Netdata adaptation, with startup/gap/stale differences disclosed; `delay:` is not
   standing in for another engine's persistence state machine.
 - Notification defaults follow the approved product policy.
+- It sets `class`, `type` and `component` by the definitions and component rules in `src/health/REFERENCE.md`
+  ("Alert Line `class`", "`type`", "`component`"); `integrations/tests/test_health_alerts.py` enforces the vocabulary.
+  A new class or type value is a user-visible contract change: it needs user approval and changes the REFERENCE.md table
+  and `integrations/health_alerts.py` together.
 - No shared health/query behavior was added or assumed without the required separate scope approval.
 
 ## Authoritative References
