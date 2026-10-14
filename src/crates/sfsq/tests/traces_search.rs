@@ -2047,3 +2047,55 @@ fn an_unread_corrupt_slack_file_does_not_degrade_the_page() {
     assert_eq!(data.status, QueryStatus::Complete);
     assert_eq!(data.traces.len(), 1);
 }
+
+/// Window files compile newest first, only while they can still beat
+/// the N-th result: an older file is never compiled (here its corrupt
+/// dictionary stays unread and the page is complete).
+#[test]
+fn a_window_file_that_cannot_beat_the_page_is_never_compiled() {
+    let dir = tempfile::tempdir().unwrap();
+    let svc = || vec![kv_str("service.name", "svc")];
+    let traced = |t: u8, at: u64| {
+        let mut s = sp(t, 0, at * NS, "op");
+        s.trace = tid(t);
+        s
+    };
+    let w_new = write_wal(
+        dir.path(),
+        vec![req_with(svc(), None, &[traced(1, 30), traced(2, 31)])],
+        "new",
+    );
+    let w_old = write_wal(
+        dir.path(),
+        vec![req_with(svc(), None, &[traced(3, 10)])],
+        "old",
+    );
+    drop(sealed_source(dir.path(), &w_old, "old"));
+    corrupt_chunk(&dir.path().join("old.sfst"), *b"PRIM");
+    let sources = || {
+        vec![
+            sealed_source(dir.path(), &w_new, "new"),
+            sealed_source_at(&dir.path().join("old.sfst"), "old"),
+        ]
+    };
+    let data = run(
+        SearchSources {
+            window: sources(),
+            completion: sources(),
+        },
+        SearchQuery::new(Predicate::default()).limit(2),
+    );
+    assert_eq!(data.status, QueryStatus::Complete);
+    assert_eq!(data.traces.len(), 2);
+
+    // A page the old file could still change compiles it, and its
+    // corruption surfaces.
+    let data = run(
+        SearchSources {
+            window: sources(),
+            completion: sources(),
+        },
+        SearchQuery::new(Predicate::default()).limit(3),
+    );
+    assert!(data.status.has(PartialReason::SourceFailure));
+}

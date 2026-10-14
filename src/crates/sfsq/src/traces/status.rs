@@ -32,7 +32,8 @@ pub enum PartialReason {
     SourceFailure,
     /// Search's work ceiling was hit before the candidate space was
     /// exhausted (the assembled-candidate ceiling, or the visited-rows
-    /// ceiling that gates a grow-K refill). Search-only: trace-by-id
+    /// ceiling that gates a grow-K refill). Window files are discovered
+    /// newest first, so what the ceiling left out is the older files'. Search-only: trace-by-id
     /// never adds it — the span cap is that mode's runaway-work guard.
     WorkCeiling,
     /// The caller cancelled. Trace-by-id returns EMPTY before all

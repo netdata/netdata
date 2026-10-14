@@ -100,9 +100,12 @@
 //! found trace's rows, or the gate's root values. Corruption in what a
 //! query never reads (a slack-only file that holds none of its
 //! candidates, a dictionary no step needs) is therefore not discovered,
-//! so it is not reported.
+//! so it is not reported. Window files also compile lazily, newest first
+//! (by the rank bound their summaries give), and only while that bound
+//! can still beat the N-th result: an older file is never compiled, and
+//! a work ceiling stops after the newest files, not in source-id order.
 
-use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet};
+use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet, VecDeque};
 use std::sync::Arc;
 use std::sync::atomic::{AtomicUsize, Ordering};
 
@@ -352,6 +355,13 @@ pub struct SearchData {
     /// onto the names the attached `matched_spans` expose (the same
     /// projection rule as trace-by-id).
     pub field_kinds: FieldKinds,
+}
+
+/// A window file not compiled yet: its session slot and the exclusive
+/// upper bound on any candidate start it could hold.
+struct PendingFile {
+    slot: usize,
+    rank_bound: i64,
 }
 
 /// Phase-1 state of one window SFST file: the compiled plan plus the
@@ -669,18 +679,20 @@ pub fn search(
             }
         }
     }
+    // Window files wait, newest first, until the main loop needs their
+    // candidates (lazy compile): an uncompiled file is an undiscovered
+    // threat at its rank bound, and one that bound can no longer beat
+    // the N-th final is never compiled.
+    let mut pending: VecDeque<PendingFile> = VecDeque::new();
     for (slot, source) in slot_sources.iter().enumerate() {
         if pinned {
             break;
-        }
-        if cancel.is_cancelled() {
-            return Ok(cancelled_empty(status));
         }
         if !window_ids.contains(source.source_id()) {
             continue;
         }
         let TraceSource::Sfst(c) = source else {
-            unreachable!("readers hold SFST sources only")
+            unreachable!("sessions hold SFST sources only")
         };
         // File-granular window pruning on the summary range — the same
         // overlap comparison key enumeration shares
@@ -699,48 +711,14 @@ pub fn search(
             Some(w) => file_end.min(w.range_ns().end),
             None => file_end,
         };
-        if work.rows_visited > query.visited_ceiling {
-            merge_bound(&mut truncated_up_to, rank_bound);
-            continue;
-        }
-        let mut budget_truncated = false;
-        let reader = match sessions[slot].reader() {
-            Ok(reader) => reader,
-            Err(e) => {
-                // The file cannot open fully: neither discovery nor any
-                // assembly can read it, so every summary is inexact.
-                tracing::warn!(
-                    "sfsq traces: source {} failed to open: {e}",
-                    source.source_id()
-                );
-                status.add(PartialReason::SourceFailure);
-                degraded_assembly = true;
-                continue;
-            }
-        };
-        match discovery_state(
-            reader,
-            &plan,
-            query.window,
-            query.visited_ceiling,
-            &mut work,
-            &mut budget_truncated,
-        ) {
-            Ok(Some(file)) => files.push(file),
-            Ok(None) => {
-                if budget_truncated {
-                    merge_bound(&mut truncated_up_to, rank_bound);
-                }
-            }
-            Err(e) => {
-                tracing::warn!(
-                    "sfsq traces: source {} failed phase-1 compilation: {e}",
-                    source.source_id()
-                );
-                status.add(PartialReason::SourceFailure);
-            }
-        }
+        pending.push_back(PendingFile { slot, rank_bound });
     }
+    pending.make_contiguous().sort_by(|a, b| {
+        b.rank_bound.cmp(&a.rank_bound).then_with(|| {
+            let id = |p: &PendingFile| slot_sources[p.slot].source_id().as_str();
+            id(a).cmp(id(b))
+        })
+    });
     'tails: for (source_id, scan) in &tails {
         if pinned {
             break;
@@ -772,23 +750,17 @@ pub fn search(
         }
     }
 
-    // Initial per-file over-collection. A ceiling breach mid-way leaves
-    // the remaining files unexhausted, which the main loop's
-    // undiscovered-threat check sees on its own. Extensions are clamped
-    // to the remaining budget (+1 so the breach registers) — emission
-    // itself must not overshoot.
+    // Extensions are clamped to the remaining budget (+1 so the breach
+    // registers) — emission itself must not overshoot. A ceiling breach
+    // leaves files unexhausted or uncompiled, which the main loop's
+    // undiscovered-threat check sees on its own.
     let clamp = |count: usize, work: &ScanWork, ceiling: u64| -> usize {
         let remaining = ceiling.saturating_sub(work.rows_visited).saturating_add(1);
         count.min(usize::try_from(remaining).unwrap_or(usize::MAX))
     };
+    // Per-file over-collection: a file compiled late extends at the
+    // current K.
     let mut k = query.limit.saturating_mul(OVER_COLLECTION_FACTOR).max(1);
-    for file in &mut files {
-        if work.rows_visited > query.visited_ceiling {
-            break;
-        }
-        let count = clamp(k, &work, query.visited_ceiling);
-        file.extend(count, &mut work, &mut pool);
-    }
 
     // ── The trace-level pre-assembly gate (see the gate module) ──────
     // Engaged only when a prunable trace-level condition exists, the
@@ -875,7 +847,15 @@ pub fn search(
                 (Some(_), None) => true,
                 (Some(bound), Some((nth_start, _))) => bound > nth_start,
             };
+        // An uncompiled file threatens while its exclusive rank bound
+        // exceeds the N-th final's start.
+        let pending_threat = match (pending.front(), nth_final) {
+            (None, _) => false,
+            (Some(_), None) => true,
+            (Some(p), Some((nth_start, _))) => p.rank_bound > nth_start,
+        };
         let undiscovered_threat = truncation_threat
+            || pending_threat
             || match nth_final {
                 None => files.iter().any(|f| !f.exhausted()),
                 Some((nth_start, _)) => files
@@ -1010,15 +990,78 @@ pub fn search(
             continue;
         }
 
-        // Pool drained of threats but undiscovered candidates remain:
-        // demand-driven grow-K (R2-1) — double K, emit each unexhausted
-        // file's next band. The visited-rows ceiling gates refill: once
-        // breached, no further discovery runs and the standing threat
-        // makes the result Partial{WorkCeiling}, deterministically.
+        // Pool drained of threats but undiscovered candidates remain.
+        // The visited-rows ceiling gates refill: once breached, no
+        // further discovery runs and the standing threat makes the
+        // result Partial{WorkCeiling}, deterministically.
         if work.rows_visited > query.visited_ceiling {
             status.add(PartialReason::WorkCeiling);
             break;
         }
+        // Compile the newest pending file when it may hold a newer
+        // candidate than any compiled file still can (its bound is
+        // exclusive, a compiled file's inclusive).
+        let compiled_bound = files
+            .iter()
+            .filter_map(FileDiscovery::undiscovered_bound)
+            .max();
+        if pending_threat
+            && let Some(next) = pending.front()
+            && compiled_bound.is_none_or(|b| next.rank_bound > b)
+        {
+            let PendingFile { slot, rank_bound } = pending.pop_front().expect("peeked");
+            if cancel.is_cancelled() {
+                return Ok(cancelled_empty(status));
+            }
+            let source = slot_sources[slot];
+            let reader = match sessions[slot].reader() {
+                Ok(reader) => reader,
+                Err(e) => {
+                    // The file cannot open fully: its candidates stay
+                    // undiscovered, and an assembly that needs its rows
+                    // fails there too.
+                    tracing::warn!(
+                        "sfsq traces: source {} failed to open: {e}",
+                        source.source_id()
+                    );
+                    status.add(PartialReason::SourceFailure);
+                    degraded_assembly = true;
+                    continue;
+                }
+            };
+            let mut budget_truncated = false;
+            match discovery_state(
+                reader,
+                &plan,
+                query.window,
+                query.visited_ceiling,
+                &mut work,
+                &mut budget_truncated,
+            ) {
+                Ok(Some(mut file)) => {
+                    let count = clamp(k, &work, query.visited_ceiling);
+                    file.extend(count, &mut work, &mut pool);
+                    if !file.exhausted() {
+                        files.push(file);
+                    }
+                }
+                Ok(None) => {
+                    if budget_truncated {
+                        merge_bound(&mut truncated_up_to, rank_bound);
+                    }
+                }
+                Err(e) => {
+                    tracing::warn!(
+                        "sfsq traces: source {} failed phase-1 compilation: {e}",
+                        source.source_id()
+                    );
+                    status.add(PartialReason::SourceFailure);
+                }
+            }
+            continue;
+        }
+        // Otherwise demand-driven grow-K (R2-1): double K, emit each
+        // unexhausted file's next band.
         let grow = k;
         k = k.saturating_mul(2);
         for file in &mut files {
@@ -1028,6 +1071,8 @@ pub fn search(
             let count = clamp(grow, &work, query.visited_ceiling);
             file.extend(count, &mut work, &mut pool);
         }
+        // Exhausted files hold nothing more to discover.
+        files.retain(|f| !f.exhausted());
         // Progress is guaranteed: an unexhausted file either emits or
         // exhausts, so the threat re-check terminates the loop.
     }
