@@ -331,8 +331,11 @@ STORAGE_COLLECT_HANDLE *rrdeng_store_metric_init(STORAGE_METRIC_HANDLE *smh, uin
 void rrdeng_store_metric_flush_current_page(STORAGE_COLLECT_HANDLE *sch) {
     struct rrdeng_collect_handle *handle = (struct rrdeng_collect_handle *)sch;
 
-    if (unlikely(!handle->pgc_page))
+    if (unlikely(!handle->pgc_page)) {
+        // a page-full flush already released the page, but storing its last point set the hot time again
+        mrg_metric_clear_hot_latest_time_s(main_mrg, handle->metric);
         return;
+    }
 
     if(pgd_is_empty(handle->page_data))
         pgc_page_to_clean_evict_or_release(main_cache, handle->pgc_page);
@@ -345,7 +348,7 @@ void rrdeng_store_metric_flush_current_page(STORAGE_COLLECT_HANDLE *sch) {
         pgc_page_hot_to_dirty_and_release(main_cache, handle->pgc_page, false);
     }
 
-    mrg_metric_set_hot_latest_time_s(main_mrg, handle->metric, 0);
+    mrg_metric_clear_hot_latest_time_s(main_mrg, handle->metric);
 
     __atomic_store_n(&handle->pgc_page, NULL, __ATOMIC_RELAXED);
     handle->page_flags = 0;

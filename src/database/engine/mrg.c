@@ -443,6 +443,12 @@ bool mrg_metric_set_hot_latest_time_s(MRG *mrg __maybe_unused, METRIC *metric, t
     return false;
 }
 
+// the metric has no hot page any more: nothing collected is waiting to be stored
+ALWAYS_INLINE
+void mrg_metric_clear_hot_latest_time_s(MRG *mrg __maybe_unused, METRIC *metric) {
+    __atomic_store_n(&metric->latest_time_s_hot, 0, __ATOMIC_RELAXED);
+}
+
 ALWAYS_INLINE
 time_t mrg_metric_get_latest_clean_time_s(MRG *mrg __maybe_unused, METRIC *metric) {
     time_t clean = __atomic_load_n(&metric->latest_time_s_clean, __ATOMIC_RELAXED);
