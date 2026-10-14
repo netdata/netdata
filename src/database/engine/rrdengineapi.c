@@ -1118,9 +1118,9 @@ void rrdeng_get_37_statistics(struct rrdengine_instance *ctx, unsigned long long
     array[31] = (uint64_t)__atomic_load_n(&global_stats.global_fs_errors, __ATOMIC_RELAXED); // used
     array[32] = (uint64_t)__atomic_load_n(&global_stats.rrdeng_reserved_file_descriptors, __ATOMIC_RELAXED); // used
     array[33] = 0; // (uint64_t)__atomic_load_n(&ctx->stats.pg_cache_over_half_dirty_events, __ATOMIC_RELAXED);
-    array[34] = (uint64_t)__atomic_load_n(&global_stats.global_pg_cache_over_half_dirty_events, __ATOMIC_RELAXED); // used
+    array[34] = 0;
     array[35] = 0; // (uint64_t)__atomic_load_n(&ctx->stats.flushing_pressure_page_deletions, __ATOMIC_RELAXED);
-    array[36] = (uint64_t)__atomic_load_n(&global_stats.global_flushing_pressure_page_deletions, __ATOMIC_RELAXED); // used
+    array[36] = 0;
     array[37] = 0; //(uint64_t)pg_cache->active_descriptors;
 
     fatal_assert(RRDENG_NR_STATS == 38);
