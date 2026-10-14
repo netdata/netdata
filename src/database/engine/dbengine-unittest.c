@@ -495,6 +495,43 @@ static size_t test_dbengine_zero_retention_check_keeps_hot_page(RRDHOST *host, c
     return 0;
 }
 
+// rotation's retention check of a metric whose only page is hot and holds gaps only: the flush will discard that
+// page, so the check must not record it as retention, or the stopped metric is never deleted
+static size_t test_dbengine_zero_retention_check_ignores_gap_only_page(RRDHOST *host, const char *id) {
+    fprintf(stderr, "DBENGINE Burst Retention Test: '%s', retention check while a gap-only page is hot...\n", id);
+
+    RRDSET *st = rrdset_create(host, "netdata", id, id, "netdata", NULL, "Unit Testing", "a value", "unittest",
+                               NULL, 1, 1, RRDSET_TYPE_LINE);
+    RRDDIM *rd = rrddim_add(st, "dim", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+    struct rrdeng_collect_handle *handle = (struct rrdeng_collect_handle *)rd->tiers[0].sch;
+
+    time_t t0 = START_TIMESTAMP;
+    for(size_t p = 0; p < 10; p++)
+        rrddim_store_metric(rd, (usec_t)(t0 + 1 + (time_t)p) * USEC_PER_SEC, NAN, SN_EMPTY_SLOT);
+
+    if(!handle->pgc_page) {
+        fprintf(stderr, " >>> DBENGINE: BURST RETENTION: '%s' has no hot page\n", id);
+        return 1;
+    }
+
+    mrg_metric_has_zero_disk_retention(main_mrg, handle->metric);
+
+    for(size_t tier = 0; tier < nd_profile.storage_tiers; tier++)
+        storage_engine_store_flush(rd->tiers[tier].sch);
+
+    // the end of retention decides deletion (the first time may keep the hot time the retention reader stamped
+    // while the page was hot)
+    time_t first = 0, last = 0;
+    rrdeng_metric_retention_by_id(host->db[0].si, rd->uuid, &first, &last);
+    if(last) {
+        fprintf(stderr, " >>> DBENGINE: BURST RETENTION: '%s' retention is %" PRId64 " - %" PRId64 ", expected no end\n",
+                id, (int64_t)first, (int64_t)last);
+        return 1;
+    }
+
+    return 0;
+}
+
 static size_t test_dbengine_burst_retention(RRDHOST *host) {
     size_t errors = 0;
     time_t t0 = START_TIMESTAMP;
@@ -526,6 +563,7 @@ static size_t test_dbengine_burst_retention(RRDHOST *host) {
     errors += test_dbengine_burst_retention_page_full_case(host, "dbengine-burst-all-gaps-page-full");
 
     errors += test_dbengine_zero_retention_check_keeps_hot_page(host, "dbengine-zero-retention-hot-page");
+    errors += test_dbengine_zero_retention_check_ignores_gap_only_page(host, "dbengine-zero-retention-gap-only-page");
 
     return errors;
 }
