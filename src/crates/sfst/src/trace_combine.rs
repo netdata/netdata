@@ -47,13 +47,18 @@
 //!   hold what the caller will send, not full values: a caller's
 //!   response budget bounds the merge's memory.
 //! - With a [`LoadedSources`], at most its limit of sources hold decoded
-//!   state at once: after each read, the least recently read source
-//!   beyond the limit is released ([`SpanSource::release`]) and decodes
-//!   again if read later. A trace whose spans spread over hundreds of
-//!   files (a long-lived stream) then costs a bounded amount of decoded
-//!   state, not one file's worth per file. A caller that reads the same
-//!   sources between merges (search's plan compiles and trace-level
-//!   gate) shares one tracker, so the limit holds across the query.
+//!   state at once: after each read, the least recently read source beyond
+//!   the limit is released ([`SpanSource::release`]) and decodes again if
+//!   read later. A trace whose spans spread over hundreds of files (a
+//!   long-lived stream) then costs a bounded amount of decoded state, not
+//!   one file's worth per file. A caller that reads the same sources
+//!   between merges (search's plan compiles and trace-level gate) shares
+//!   one tracker, so the limit holds across the query. A source that must
+//!   decode again to build a span also builds its next pending spans (up to
+//!   64 per load, 512 held at once): a trace whose spans alternate across
+//!   more files than the limit then decodes each file once per that many
+//!   spans, not per span. Building a span is a pure function of its
+//!   position, so this changes no result.
 //!
 //! [`IndexReader::trace_by_id`]: crate::IndexReader::trace_by_id
 
@@ -132,6 +137,81 @@ impl<S: SpanSource + ?Sized> SpanSource for &mut S {
 
     fn release(&mut self) {
         (**self).release()
+    }
+}
+
+/// Spans a source builds ahead of their turn when it must decode again to
+/// build one (see the module docs).
+const READ_AHEAD: usize = 64;
+/// Most spans held ahead of their turn across one merge.
+const READ_AHEAD_MAX: usize = 512;
+
+/// The spans a merge built ahead of their turn, by `(source, position)`.
+#[derive(Default)]
+struct ReadAhead {
+    enabled: bool,
+    spans: HashMap<(usize, u32), TraceSpan>,
+}
+
+impl ReadAhead {
+    /// Move the spans built ahead for `group`'s members into a map the
+    /// group's materializations draw from; whatever the group does not
+    /// use (a skipped resend, a failed source, a stopped merge) is dropped
+    /// with that map.
+    fn take_group(
+        &mut self,
+        group: &[(usize, usize)],
+        refs: &[Vec<SpanRef>],
+    ) -> HashMap<(usize, u32), TraceSpan> {
+        let mut taken = HashMap::new();
+        if self.spans.is_empty() {
+            return taken;
+        }
+        for &(source, index) in group {
+            let key = (source, refs[source][index].position);
+            if let Some(span) = self.spans.remove(&key) {
+                taken.insert(key, span);
+            }
+        }
+        taken
+    }
+
+    /// The span at `position` of `source`: built ahead, or built now. A
+    /// source that had to decode again also builds up to `READ_AHEAD`
+    /// of its `pending` refs (its refs after the current group). A failure
+    /// while reading ahead stops the read-ahead and surfaces at that span's
+    /// own turn.
+    fn materialize(
+        &mut self,
+        taken: &mut HashMap<(usize, u32), TraceSpan>,
+        sources: &mut [&mut dyn SpanSource],
+        source: usize,
+        position: u32,
+        pending: &[SpanRef],
+    ) -> Result<TraceSpan, crate::Error> {
+        if let Some(span) = taken.remove(&(source, position)) {
+            return Ok(span);
+        }
+        let reload = self.enabled && !sources[source].is_loaded();
+        let span = sources[source].materialize(position)?;
+        if reload {
+            for r in pending.iter().take(READ_AHEAD) {
+                if self.spans.len() >= READ_AHEAD_MAX {
+                    break;
+                }
+                let key = (source, r.position);
+                if self.spans.contains_key(&key) {
+                    continue;
+                }
+                match sources[source].materialize(r.position) {
+                    Ok(ahead) => {
+                        self.spans.insert(key, ahead);
+                    }
+                    Err(_) => break,
+                }
+            }
+        }
+        Ok(span)
     }
 }
 
@@ -316,6 +396,7 @@ pub fn combine(
     );
 
     let mut failures: Vec<(usize, crate::Error)> = Vec::new();
+    let limited = loaded.is_some();
     let mut touch = |i: usize, sources: &mut [&mut dyn SpanSource]| {
         if let Some(loaded) = loaded.as_deref_mut() {
             loaded.touch(i, sources);
@@ -385,6 +466,12 @@ pub fn combine(
     };
 
     let mut failed: Vec<bool> = vec![false; sources.len()];
+    // Per source: the index of its first ref the merge has not reached.
+    let mut cursor: Vec<usize> = vec![0; sources.len()];
+    let mut ahead = ReadAhead {
+        enabled: limited,
+        ..ReadAhead::default()
+    };
     let mut seen: HashSet<(SpanId, i32)> = HashSet::new();
     let mut kept = Kept::default();
     let mut contributors: Vec<usize> = Vec::new();
@@ -427,7 +514,9 @@ pub fn combine(
                 }
             }
             advance(&mut heap, source, index);
+            cursor[source] = index + 1;
         }
+        let mut taken = ahead.take_group(&group, &refs);
         group.retain(|&(source, _)| !failed[source]);
         if group.is_empty() {
             continue;
@@ -458,7 +547,13 @@ pub fn combine(
         if group.len() == 1 && !is_unset {
             let (source, index) = group[0];
             let r = refs[source][index];
-            let materialized = sources[source].materialize(r.position);
+            let materialized = ahead.materialize(
+                &mut taken,
+                sources,
+                source,
+                r.position,
+                &refs[source][cursor[source]..],
+            );
             touch(source, sources);
             match materialized {
                 Ok(span) => {
@@ -496,7 +591,13 @@ pub fn combine(
                     continue;
                 }
                 let r = refs[source][index];
-                let materialized = sources[source].materialize(r.position);
+                let materialized = ahead.materialize(
+                    &mut taken,
+                    sources,
+                    source,
+                    r.position,
+                    &refs[source][cursor[source]..],
+                );
                 touch(source, sources);
                 match materialized {
                     Ok(span) => {
@@ -545,7 +646,13 @@ pub fn combine(
                 continue;
             }
             let r = refs[source][index];
-            let materialized = sources[source].materialize(r.position);
+            let materialized = ahead.materialize(
+                &mut taken,
+                sources,
+                source,
+                r.position,
+                &refs[source][cursor[source]..],
+            );
             touch(source, sources);
             match materialized {
                 Ok(span) => {
@@ -997,22 +1104,25 @@ mod tests {
     #[test]
     fn a_loaded_limit_bounds_the_sources_holding_state() {
         // Six sources whose spans interleave in time, so the merge keeps
-        // returning to sources it released: at most `limit` hold state
-        // when any read starts, and the trace is the unlimited one.
+        // returning to sources it released: at most `limit` plus the one
+        // being read hold state at any moment, a released source reads
+        // ahead instead of reloading per span, and the trace is the
+        // unlimited one.
         struct Loading {
             inner: VecSource,
             loaded: bool,
             others: std::rc::Rc<std::cell::Cell<usize>>,
             peak: std::rc::Rc<std::cell::Cell<usize>>,
+            loads: std::rc::Rc<std::cell::Cell<usize>>,
         }
         impl Loading {
             fn enter(&mut self) {
-                let held = self.others.get();
-                self.peak.set(self.peak.get().max(held));
                 if !self.loaded {
                     self.loaded = true;
-                    self.others.set(held + 1);
+                    self.others.set(self.others.get() + 1);
+                    self.loads.set(self.loads.get() + 1);
                 }
+                self.peak.set(self.peak.get().max(self.others.get()));
             }
         }
         impl SpanSource for Loading {
@@ -1050,12 +1160,14 @@ mod tests {
             let mut tracker = limit.map(LoadedSources::new);
             let held = std::rc::Rc::new(std::cell::Cell::new(0));
             let peak = std::rc::Rc::new(std::cell::Cell::new(0));
+            let loads = std::rc::Rc::new(std::cell::Cell::new(0));
             let mut sources: Vec<Loading> = (0..6u8)
                 .map(|i| Loading {
                     inner: VecSource::new(spans(i)),
                     loaded: false,
                     others: std::rc::Rc::clone(&held),
                     peak: std::rc::Rc::clone(&peak),
+                    loads: std::rc::Rc::clone(&loads),
                 })
                 .collect();
             let mut set: Vec<&mut dyn SpanSource> = sources
@@ -1063,14 +1175,17 @@ mod tests {
                 .map(|s| s as &mut dyn SpanSource)
                 .collect();
             let out = combine(&mut set, tid(), None, tracker.as_mut(), None, &|| false);
-            (out, peak.get())
+            (out, peak.get(), loads.get())
         };
-        let (free, free_peak) = merge(None);
-        let (limited, limited_peak) = merge(Some(2));
+        let (free, free_peak, _) = merge(None);
+        let (limited, limited_peak, loads) = merge(Some(2));
         assert_eq!(free_peak, 6, "without a limit every source stays loaded");
-        assert!(limited_peak <= 2, "peak {limited_peak} above the limit");
+        assert!(limited_peak <= 3, "peak {limited_peak} above the limit + 1");
         assert_eq!(limited.trace.spans, free.trace.spans);
         assert_eq!(limited.trace.spans.len(), 18);
+        // Six loads for the refs, then each released source loads once
+        // more and reads its two later spans ahead: 12, not 6 + 18.
+        assert_eq!(loads, 12, "loads with read-ahead");
         assert_eq!(limited.contributing_sources, free.contributing_sources);
     }
 
@@ -1250,6 +1365,53 @@ mod tests {
         assert_eq!(out.trace.spans[0].fields[0].1, "good");
         assert_eq!(out.failures.len(), 1);
         assert_eq!(out.failures[0].0, 1);
+    }
+
+    #[test]
+    fn reading_ahead_surfaces_a_failure_at_its_own_turn() {
+        // Two interleaved sources under a limit of one, so each reads
+        // ahead; the bad source fails at its third span. The outcome
+        // matches the unlimited merge: the same spans, the same failure.
+        let merge = |limit: Option<usize>| {
+            let mut a = VecSource::new(
+                (0..4u8)
+                    .map(|k| {
+                        span(
+                            [1, k + 1, 0, 0, 0, 0, 0, 0],
+                            [0; 8],
+                            i64::from(k * 2),
+                            1,
+                            "a",
+                        )
+                    })
+                    .collect(),
+            );
+            let mut b = VecSource::new(
+                (0..4u8)
+                    .map(|k| {
+                        span(
+                            [2, k + 1, 0, 0, 0, 0, 0, 0],
+                            [0; 8],
+                            i64::from(k * 2 + 1),
+                            1,
+                            "b",
+                        )
+                    })
+                    .collect(),
+            );
+            b.fail_at = Some(2);
+            let mut tracker = limit.map(LoadedSources::new);
+            let mut set: Vec<&mut dyn SpanSource> = vec![&mut a, &mut b];
+            combine(&mut set, tid(), None, tracker.as_mut(), None, &|| false)
+        };
+        let free = merge(None);
+        let limited = merge(Some(1));
+        assert_eq!(limited.trace.spans, free.trace.spans);
+        assert_eq!(free.trace.spans.len(), 6, "four of a, b's first two");
+        let failed =
+            |out: &CombineOutcome| out.failures.iter().map(|(i, _)| *i).collect::<Vec<_>>();
+        assert_eq!(failed(&limited), vec![1]);
+        assert_eq!(failed(&free), vec![1]);
     }
 
     #[test]
