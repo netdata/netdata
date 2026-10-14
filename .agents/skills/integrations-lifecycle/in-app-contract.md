@@ -68,6 +68,13 @@ each first-segment namespace (never `netdata.`) plus its `metrics.dynamic_contex
 every context another module documents under it lies under a longer exported prefix of that module. NPM device
 records are not in the export; the SNMP collector owns their `snmp.` contexts.
 
+- Match chart contexts only (an alert instance's `context`, a template's `on`). Never look up a chart id or an
+  alarm's `on` chart: chart ids do not follow context namespaces (proc.plugin's `mdstat.*` charts have `md.*`
+  contexts).
+- A prefix never takes a context another collector documents, but a context nobody documents can match the wrong
+  collector's prefix, so prefix owners are as accurate as the metadata; chart labels such as `_collect_plugin`, when a
+  consumer has them, are more exact.
+
 The dashboard's renderer interprets the `{% details %}` / `{% /details %}` markers embedded in the rich strings, which
 is why `integrations.js` carries them (`pipeline.md`, "Stage 1: outputs", for the three content variants).
 

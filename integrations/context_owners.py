@@ -8,7 +8,8 @@ Prefixes cover contexts created at runtime. A record's candidates are the longes
 contexts in each first-segment namespace (never the Agent's ``netdata`` namespace, which every plugin's
 self-monitoring charts share) and the prefixes its ``metrics.dynamic_context_prefixes`` declares. A candidate is kept
 only when every context another module documents under it also lies under a longer kept prefix of that module, so a
-match never takes another collector's contexts; the check repeats until no candidate drops.
+prefix match never takes a context another collector documents; the check repeats until no candidate drops. A context
+nobody documents can still match another collector's prefix, so prefix owners are as accurate as the metadata.
 """
 
 from typing import Dict, Iterable, List, Mapping, Sequence, Set

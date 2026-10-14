@@ -302,7 +302,7 @@
                     "reason": {
                       "type": "string",
                       "minLength": 1,
-                      "description": "Why this collector needs a dynamic context-prefix selector."
+                      "description": "Where the runtime contexts under this prefix come from (profiles, user configuration, received metric names)."
                     }
                   },
                   "required": [

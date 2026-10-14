@@ -2,11 +2,10 @@
 
 The scripts in this directory turn every `metadata.yaml` in the repository into the integrations catalog
 (`integrations.js`, `integrations.json`, which also carry the stock alerts of `src/health/health.d/` and the owners
-of each chart context), one
-documentation page per integration (its alert table derived from those alerts and the metric contexts the integration
-declares), and the umbrella pages under `src/collectors/`. How the pipeline works, what is generated, and how changes
-are delivered is documented for maintainers in `.agents/skills/integrations-lifecycle/`; this file is the local-run
-reference.
+of documented chart contexts and context prefixes), one documentation page per integration (its alert table derived
+from those alerts and the metric contexts the integration declares), and the umbrella pages under `src/collectors/`.
+How the pipeline works, what is generated, and how changes are delivered is documented for maintainers in
+`.agents/skills/integrations-lifecycle/`; this file is the local-run reference.
 
 ## Requirements
 

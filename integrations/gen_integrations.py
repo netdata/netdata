@@ -1387,6 +1387,12 @@ def context_subjects(items):
     ]
 
 
+def build_context_index(collectors, flows):
+    """The `contexts` export over the collector and flow records (NPM device records document no contexts; the SNMP
+    collector owns theirs through its prefix)."""
+    return context_owners(context_subjects(collectors + flows))
+
+
 def attach_alerts(rules, *groups):
     """Replace each item's listed alert names with its page rows and drop its excluded names; return the owners of each
     alert name."""
@@ -1413,8 +1419,8 @@ def render_integrations(categories, integrations, alerts, contexts, output_path=
     output_path.write_text(data)
 
 
-def render_json(categories, integrations, alerts, contexts):
-    JSON_PATH.write_text(json.dumps({
+def render_json(categories, integrations, alerts, contexts, output_path=JSON_PATH):
+    output_path.write_text(json.dumps({
         'categories': categories,
         'integrations': integrations,
         'alerts': alerts,
@@ -1440,7 +1446,7 @@ def main():
     project_prometheus_profile_coverage(collectors)
     rules = load_stock_rules()
     alerts = build_alert_index(rules, attach_alerts(rules, collectors, flows, devices))
-    contexts = context_owners(context_subjects(collectors + flows))
+    contexts = build_context_index(collectors, flows)
 
     collectors, clean_collectors, ids = render_collectors(categories, collectors, dict())
     deploy, clean_deploy, ids = render_deploy(distros, categories, deploy, ids)
