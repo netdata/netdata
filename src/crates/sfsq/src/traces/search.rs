@@ -729,6 +729,9 @@ struct HolderReads<'c, 'r, 'a> {
     /// Stop as soon as every positive token has a match (a prune check
     /// needs no more).
     stop_when_all_positive: bool,
+    /// The query discovers from spans, so a pending holder compiled for
+    /// evidence joins discovery (false: rollup discovery keeps it).
+    span_discovery: bool,
 }
 
 /// What an on-demand compile reports to.
@@ -774,6 +777,7 @@ fn holder_evidence(
         positive_count,
         negated_base,
         stop_when_all_positive,
+        span_discovery,
     } = reads;
     let window = env.query.window;
     // Without a span-local token no set is read: positions and starts
@@ -790,7 +794,13 @@ fn holder_evidence(
         if !sessions[slot].screen(trace_id) {
             continue;
         }
+        // Under span discovery a pending holder compiles here and joins
+        // discovery early, as the loop would compile it. Under rollup
+        // discovery it stays pending: as a span-discovery file, its every
+        // in-window trace would become a candidate the rollup prune never
+        // saw. It compiles for evidence alone below.
         if needs_sets
+            && span_discovery
             && !token_sets.contains_key(&slot)
             && let Some(at) = pending.iter().position(|p| p.slot == slot)
         {
@@ -942,6 +952,7 @@ fn row_from_parts(
         file_plans,
         positive_count,
         negated_base,
+        span_discovery,
         ..
     } = reads;
     // ── The verdict: tokens over the in-window stored rows ──────────
@@ -974,6 +985,7 @@ fn row_from_parts(
             positive_count,
             negated_base,
             stop_when_all_positive: false,
+            span_discovery,
         },
         CompileEnv {
             query: env.query,
@@ -1951,6 +1963,7 @@ pub fn search(
                         positive_count,
                         negated_base,
                         stop_when_all_positive: false,
+                        span_discovery: !rollup_discovery,
                     },
                     CompileEnv {
                         query: &query,
@@ -2036,6 +2049,7 @@ pub fn search(
                             positive_count,
                             negated_base,
                             stop_when_all_positive: true,
+                            span_discovery: !rollup_discovery,
                         },
                         CompileEnv {
                             query: &query,

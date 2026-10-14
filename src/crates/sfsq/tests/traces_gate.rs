@@ -1753,3 +1753,62 @@ fn rollup_discovery_ceiling() {
         tiny.status
     );
 }
+
+/// Rollup discovery prunes single-file short traces from their rollup
+/// rows; a negated span chip must not undo that. A multi-file
+/// candidate's token evidence compiles the window files it needs for
+/// evidence alone — never as span-discovery files, whose every
+/// in-window trace would become a candidate that the duration then
+/// rejects one by one.
+#[test]
+fn negated_chip_keeps_rollup_discovery() {
+    let dir = tempfile::tempdir().unwrap();
+    let svc = || vec![kv_str("service.name", "svc")];
+    let files: Vec<_> = (0..6u8)
+        .map(|f| {
+            let base = u64::from(f) * 100;
+            let mut spans: Vec<SpanSpec> = (0..30u8)
+                .map(|j| {
+                    let at = (base + u64::from(j)) * NS;
+                    root_span(2 + f * 30 + j, 0x10, at, at + 50, "op")
+                })
+                .collect();
+            // Trace 1 has a span in every file: 500 s long.
+            spans.push(if f == 0 {
+                root_span(1, 0x11, 50 * NS, 50 * NS + 50, "op")
+            } else {
+                span_in(1, 0x11 + f, 0x11, (base + 50) * NS, "op")
+            });
+            let wal = write_wal(
+                dir.path(),
+                vec![req_with(svc(), None, &spans)],
+                &format!("f{f}"),
+            );
+            (wal, format!("f{f}"))
+        })
+        .collect();
+    let sources = || {
+        both_roles(|| {
+            files
+                .iter()
+                .map(|(wal, id)| sealed_source(dir.path(), wal, id))
+                .collect()
+        })
+    };
+    let dur = || Token::positive(pred(vec![min_duration(10 * NS as i64)]));
+    let not_zzz = || Token::negated(pred(vec![name_eq("zzz")]));
+    // Measured: about 250 rows of work without the flood, 1075 with it
+    // (each short trace popped and decided); at most 2 assemblies keep
+    // the rows path's breach from finishing the flood by assembly.
+    for (name, toks) in [
+        ("duration", vec![dur()]),
+        ("duration + not", vec![dur(), not_zzz()]),
+    ] {
+        let q = SearchQuery::new(tokens(toks))
+            .visited_rows_ceiling_for_tests(500)
+            .assembled_ceiling_for_tests(2);
+        let data = run(sources(), q);
+        assert_eq!(data.status, QueryStatus::Complete, "{name}");
+        assert_eq!(ids(&data), vec![hex(1)], "{name}");
+    }
+}
