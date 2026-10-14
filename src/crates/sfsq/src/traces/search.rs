@@ -1187,7 +1187,8 @@ pub fn search(
             // corrupt file's spans cannot reach the results even though
             // `merged` still holds the session (point-of-discovery
             // semantics, the same contract as a mid-merge read failure).
-            let gated = !breached(&work);
+            // The gates charge rows alone: only that ceiling turns them off.
+            let gated = work.rows_visited <= query.visited_ceiling;
             let single_file = match (emitter, &proof) {
                 (Origin::File(slot), Some(proof)) if !proof.may_repeat(trace_id) => Some(slot),
                 _ => None,
