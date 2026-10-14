@@ -258,7 +258,7 @@ fn cancellation_is_all_or_empty_and_zero_limits_are_rejected() {
     assert!(data.items.is_empty());
     assert_eq!(data.status, partial(&[PartialReason::Cancelled]));
 
-    for query in [q().max_items(0), q().max_files(0)] {
+    for query in [q().max_items(0), q().max_files(0), q().stale_files(0)] {
         let err = suggest(
             Vec::new(),
             query,
@@ -320,6 +320,7 @@ fn keys_match_by_rendered_or_bare_name_with_their_highest_tier() {
             truncated: false,
             class: Exact,
             tier: Some(FieldTier::Mid),
+            enumerable: true,
         },
         "the bare name is exact; the higher tier wins"
     );
@@ -332,6 +333,11 @@ fn keys_match_by_rendered_or_bare_name_with_their_highest_tier() {
     let data = keys("");
     let tier_of = |text: &str| data.items.iter().find(|s| s.text == text).map(|s| s.tier);
     assert_eq!(tier_of("duration"), Some(None));
+    let duration = data.items.iter().find(|s| s.text == "duration").unwrap();
+    assert!(
+        !duration.enumerable,
+        "a virtual key has no values to suggest"
+    );
     assert_eq!(tier_of("name"), Some(Some(FieldTier::Low)));
     assert_eq!(
         tier_of("span.k"),
@@ -339,4 +345,88 @@ fn keys_match_by_rendered_or_bare_name_with_their_highest_tier() {
         "from the tail"
     );
     assert_eq!(data.status, QueryStatus::Complete);
+}
+
+/// `n` spans carrying distinct values `v0000..` of span attribute `key`,
+/// at `at_s` seconds past [`BASE_S`].
+fn many(key: &str, n: usize, at_s: u64) -> Vec<common::SpanSpec> {
+    (0..n)
+        .map(|i| {
+            let mut s = sp(
+                (i % 250) as u8 + 1,
+                0,
+                (BASE_S + at_s) * 1_000_000_000,
+                "op",
+            );
+            s.attrs = vec![kv_str(key, &format!("v{i:04}"))];
+            s
+        })
+        .collect()
+}
+
+#[test]
+fn the_deadline_can_stop_a_later_source_mid_scan() {
+    // The newest source is scanned whole; the older one is cut at the
+    // first check past the deadline, and counts as not visited.
+    let dir = tempfile::tempdir().unwrap();
+    let new = write_wal(dir.path(), vec![req(&spans(&["c"], 30))], "new");
+    let reqs = many("k", 2000, 20).chunks(250).map(req).collect();
+    let old = write_wal(dir.path(), reqs, "old");
+    let progress = Arc::new(AtomicUsize::new(0));
+    let data = suggest(
+        vec![
+            sealed_source(dir.path(), &old, "old"),
+            sealed_source(dir.path(), &new, "new"),
+        ],
+        q().deadline_after_values(1000),
+        CancellationToken::new(),
+        Arc::clone(&progress),
+    )
+    .unwrap();
+    assert_eq!(data.status, partial(&[PartialReason::Deadline]));
+    assert_eq!(data.complete_after, Some((BASE_S + 20 + 1) as u32));
+    assert_eq!(
+        progress.load(Ordering::Relaxed),
+        2,
+        "each source counted once"
+    );
+    assert!(!data.items.is_empty());
+}
+
+#[test]
+fn the_window_prunes_sealed_and_unavailable_sources() {
+    let dir = tempfile::tempdir().unwrap();
+    let sources = three_files(dir.path(), &["c"], &["b"], &["a"]);
+    let mut sources = sources;
+    sources.push(unavailable_source(
+        "remote",
+        (BASE_S + 50) as u32,
+        (BASE_S + 55) as u32,
+    ));
+    let ns = |s: u64| ((BASE_S + s) * 1_000_000_000) as i64;
+    let window = sfsq::traces::TimeWindow::new(ns(15), ns(25)).unwrap();
+    let data = run(sources, q().window(window));
+    assert_eq!(items(&data), [("b", Prefix)]);
+    assert_eq!(data.status, QueryStatus::Complete);
+}
+
+#[test]
+fn a_tails_key_tier_follows_its_value_count() {
+    let dir = tempfile::tempdir().unwrap();
+    let t = write_wal(
+        dir.path(),
+        many("t", 150, 30).chunks(250).map(req).collect(),
+        "t",
+    );
+    let data = run(
+        vec![tail_source(&t, "t")],
+        SuggestQuery::keys(render).term("span.t"),
+    );
+    assert_eq!(
+        data.items
+            .iter()
+            .find(|s| s.text == "span.t")
+            .map(|s| s.tier),
+        Some(Some(FieldTier::Mid))
+    );
 }

@@ -51,8 +51,9 @@
 //!   test-pinned), merged by one cross-source fold.
 //! - attributes — [`attribute_names`] / [`attribute_values`]:
 //!   key/value enumeration straight off the dictionaries.
-//! - suggest — [`suggest()`]: a key's values matched against a typed
-//!   term, newest data first, bounded in items, sources and time.
+//! - suggest — [`suggest()`]: the keys, or a key's values, matched
+//!   against a typed term, newest data first, bounded in items, sources
+//!   and time.
 //! - order — the newest-first source order behind suggest's early stops.
 //! - status — [`QueryStatus`] and [`PartialReason`]: the reason set
 //!   returned beside every operation's data.

@@ -6,7 +6,8 @@
 //!
 //! 1. Decode `SUMR` + `META` + `PRIM` eagerly on open (always needed).
 //!    [`MetaReader`] stops after `SUMR` and decodes `META` lazily, for
-//!    callers that need only the summary, metadata or field table.
+//!    callers that need only the summary, metadata, field table or one
+//!    field's values (dictionary keys only, no position bitmaps).
 //! 2. Look up low-card `key=value` pairs in the primary FST → position bitmap.
 //! 3. Load secondary chunks on demand (mid-card `MF{hi}{lo}` FST or
 //!    high-card `HF{hi}{lo}` columnar chunk).
@@ -40,10 +41,13 @@ use crate::{
     KvId, Matcher, Metadata, SpanId, Summary, Timeline, Timestamps, TraceId,
 };
 
-/// The metadata-only view of an `.sfst` file: `SUMR` on open, `META`
-/// and the field table on first use, never `PRIM`. Listing a file's
-/// keys needs only the field table, and `PRIM` (the low-card dictionary
-/// plus its position bitmaps) dominates the cost of a full open.
+/// The metadata view of an `.sfst` file: `SUMR` on open, `META` and the
+/// field table on first use, and never `PRIM`'s position bitmaps.
+/// Listing a file's keys needs only the field table; listing one field's
+/// values decodes only that field's dictionary keys
+/// ([`for_each_field_value`](Self::for_each_field_value)). `PRIM` (the
+/// low-card dictionary plus its position bitmaps) dominates the cost of a
+/// full open.
 /// [`into_index_reader`](Self::into_index_reader) upgrades to the full
 /// reader without decoding `META` again.
 pub struct MetaReader<'a> {

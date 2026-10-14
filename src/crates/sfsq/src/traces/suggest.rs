@@ -27,8 +27,10 @@
 //!   ([`NoNewMatches`](PartialReason::NoNewMatches)), or at the deadline
 //!   ([`Deadline`](PartialReason::Deadline)), checked between sources and
 //!   every [`DEADLINE_CHECK_EVERY`] values inside one; the newest source
-//!   is always visited. An early stop reports `complete_after`: every
-//!   span from that second on lives in a visited source.
+//!   is always visited, and the first source that carries the key is
+//!   scanned whole. An early stop reports `complete_after`: every span
+//!   from that second on lives in a visited source; it is absent when an
+//!   unvisited source is a WAL tail, which may hold any recent span.
 //!
 //! A sealed file contributes from its metadata (keys) or its
 //! dictionaries ([`sfst::MetaReader::for_each_field_value`]: no position
@@ -97,6 +99,7 @@ pub struct SuggestQuery {
     max_files: usize,
     stale_files: usize,
     deadline: Option<Instant>,
+    deadline_after_values: Option<usize>,
 }
 
 impl SuggestQuery {
@@ -121,6 +124,7 @@ impl SuggestQuery {
             max_files: DEFAULT_SUGGEST_FILES,
             stale_files: DEFAULT_STALE_FILES,
             deadline: None,
+            deadline_after_values: None,
         }
     }
 
@@ -147,14 +151,24 @@ impl SuggestQuery {
         self
     }
 
+    /// Zero is rejected ([`AttributeRequestError::ZeroLimit`]).
     pub fn stale_files(mut self, n: usize) -> Self {
         self.stale_files = n;
         self
     }
 
-    /// Stop visiting sources at `at` (the newest one is always visited).
+    /// Stop visiting sources at `at`. The newest source is always
+    /// visited, and the first that carries the key is scanned whole.
     pub fn deadline(mut self, at: Instant) -> Self {
         self.deadline = Some(at);
+        self
+    }
+
+    /// Tests: a deadline that passes once `n` values were scanned, so
+    /// a stop inside a source is reproducible.
+    #[doc(hidden)]
+    pub fn deadline_after_values(mut self, n: usize) -> Self {
+        self.deadline_after_values = Some(n);
         self
     }
 }
@@ -170,6 +184,10 @@ pub struct Suggestion {
     /// Keys only: the highest tier a visited source gives the key;
     /// `None` when no source carries it.
     pub tier: Option<sfst::FieldTier>,
+    /// Keys: `false` for a key without stored values (a virtual builtin
+    /// such as the duration), whose values cannot be suggested. Values:
+    /// always `true`.
+    pub enumerable: bool,
 }
 
 /// The suggestions, best first.
@@ -180,7 +198,8 @@ pub struct SuggestData {
     pub truncated: bool,
     pub status: QueryStatus,
     /// Set after an early stop: every span from this second (unix) on
-    /// lives in a visited source (see [`complete_after`]).
+    /// lives in a visited source. Absent when nothing was left unvisited,
+    /// or when an unvisited source is a tail (see [`complete_after`]).
     pub complete_after: Option<u32>,
 }
 
@@ -196,7 +215,7 @@ pub fn suggest(
     cancel: CancellationToken,
     progress: Arc<AtomicUsize>,
 ) -> Result<SuggestData, AttributeRequestError> {
-    if query.max_items == 0 || query.max_files == 0 {
+    if query.max_items == 0 || query.max_files == 0 || query.stale_files == 0 {
         return Err(AttributeRequestError::ZeroLimit);
     }
     let target = match &query.target {
@@ -222,7 +241,7 @@ pub fn suggest(
         }
     }
     let mut status = StatusBuilder::new();
-    let mut clock = Clock::new(query.deadline);
+    let mut clock = Clock::new(query.deadline, query.deadline_after_values);
     let (mut visited_files, mut stale) = (0usize, 0usize);
     let mut stop = None;
     for (i, source) in sources.iter().enumerate() {
@@ -236,17 +255,20 @@ pub fn suggest(
             });
         }
         if i > 0 && clock.expired() {
-            stop = Some((i, PartialReason::Deadline));
+            stop = Some((i, PartialReason::Deadline, i));
             break;
         }
         if visited_files == query.max_files {
-            stop = Some((i, PartialReason::FileBudget));
+            stop = Some((i, PartialReason::FileBudget, i));
             break;
         }
         if stale == query.stale_files {
-            stop = Some((i, PartialReason::NoNewMatches));
+            stop = Some((i, PartialReason::NoNewMatches, i));
             break;
         }
+        // The first source that carries the key is scanned whole, so the
+        // answer is not empty for lack of time once one is reached.
+        clock.armed = visited_files > 0;
         let visit = match source {
             TraceSource::Sfst(c) if pruned(query.window, &c.summary) => Visit::Absent,
             TraceSource::Sfst(c) => visit_sfst(c, &target, &matcher, &mut set, &mut clock),
@@ -270,19 +292,19 @@ pub fn suggest(
                 stale = if changed { 0 } else { stale + 1 };
             }
             Visit::Interrupted => {
-                // The source was cut short: count it as not visited.
-                stop = Some((i, PartialReason::Deadline));
+                // The source was cut short: it counts as not visited, but
+                // its progress tick is already in.
+                stop = Some((i, PartialReason::Deadline, i + 1));
                 break;
             }
         }
     }
 
     let mut complete = None;
-    if let Some((first_unvisited, reason)) = stop {
+    if let Some((first_unvisited, reason, first_unticked)) = stop {
         status.add(reason);
-        let rest = &sources[first_unvisited..];
-        progress.fetch_add(rest.len(), Ordering::Relaxed);
-        complete = complete_after(rest);
+        progress.fetch_add(sources.len() - first_unticked, Ordering::Relaxed);
+        complete = complete_after(&sources[first_unvisited..]);
     }
     let truncated = set.truncated;
     Ok(SuggestData {
@@ -413,6 +435,13 @@ fn offer(set: &mut BoundedSuggestions, matcher: &ValueMatcher, value: &[u8]) -> 
     set.offer(text, class, None)
 }
 
+/// What a key suggestion carries besides its text.
+#[derive(Debug, Clone, Copy)]
+struct KeyInfo {
+    tier: Option<sfst::FieldTier>,
+    enumerable: bool,
+}
+
 /// Classify a key by the better of its rendered form and its bare name,
 /// and offer it; `true` when the set changed.
 fn offer_key(
@@ -424,9 +453,9 @@ fn offer_key(
     tier: Option<sfst::FieldTier>,
 ) -> bool {
     let text = render(owner, key);
-    let bare = match key {
-        AttributeKey::Attribute(name) => matcher.classify(name.as_bytes()),
-        AttributeKey::Builtin(_) => None,
+    let (bare, enumerable) = match key {
+        AttributeKey::Attribute(name) => (matcher.classify(name.as_bytes()), true),
+        AttributeKey::Builtin(b) => (None, b.dictionary_field().is_some()),
     };
     match matcher
         .classify(text.as_bytes())
@@ -434,7 +463,7 @@ fn offer_key(
         .chain(bare)
         .min()
     {
-        Some(class) => set.offer(&text, class, tier),
+        Some(class) => set.offer(&text, class, Some(KeyInfo { tier, enumerable })),
         None => false,
     }
 }
@@ -442,22 +471,33 @@ fn offer_key(
 /// The deadline, checked cheaply inside scans.
 struct Clock {
     deadline: Option<Instant>,
+    /// Tests: expire once this many values were scanned.
+    after_values: Option<usize>,
     ticks: usize,
+    /// Whether a scan may stop mid-source.
+    armed: bool,
 }
 
 impl Clock {
-    fn new(deadline: Option<Instant>) -> Self {
-        Self { deadline, ticks: 0 }
+    fn new(deadline: Option<Instant>, after_values: Option<usize>) -> Self {
+        Self {
+            deadline,
+            after_values,
+            ticks: 0,
+            armed: false,
+        }
     }
 
     fn expired(&self) -> bool {
         self.deadline.is_some_and(|d| Instant::now() >= d)
+            || self.after_values.is_some_and(|n| self.ticks >= n)
     }
 
-    /// Checks the clock every [`DEADLINE_CHECK_EVERY`] calls.
+    /// Counts one scanned value; checks the clock every
+    /// [`DEADLINE_CHECK_EVERY`] values when armed.
     fn tick_expired(&mut self) -> bool {
         self.ticks += 1;
-        self.ticks.is_multiple_of(DEADLINE_CHECK_EVERY) && self.expired()
+        self.armed && self.ticks.is_multiple_of(DEADLINE_CHECK_EVERY) && self.expired()
     }
 }
 
@@ -465,7 +505,7 @@ impl Clock {
 struct Entry {
     class: MatchClass,
     truncated: bool,
-    tier: Option<sfst::FieldTier>,
+    key: Option<KeyInfo>,
 }
 
 /// The best `k` suggestions seen so far, by (class, text). Memory is
@@ -488,24 +528,27 @@ impl BoundedSuggestions {
         }
     }
 
-    /// Offer a matching candidate; `true` when the set changed. A key
-    /// seen again keeps the highest tier; that alone is no change.
-    fn offer(&mut self, value: &str, class: MatchClass, tier: Option<sfst::FieldTier>) -> bool {
+    /// Offer a matching candidate (`key`: a key's details; `None` for a
+    /// value); `true` when the set changed. A key seen again keeps the
+    /// highest tier; that alone is no change.
+    fn offer(&mut self, value: &str, class: MatchClass, key: Option<KeyInfo>) -> bool {
         let (display, cut) = display_text(value);
         if let Some(entry) = self.best.get_mut(display) {
             // Another candidate with the same display text: keep the
             // better class and the higher tier, and flag the text if
             // either was cut.
-            entry.tier = entry.tier.max(tier);
+            if let (Some(seen), Some(key)) = (entry.key.as_mut(), key) {
+                seen.tier = seen.tier.max(key.tier);
+            }
             let mut changed = false;
             if cut && !entry.truncated {
                 entry.truncated = true;
                 changed = true;
             }
             if class < entry.class {
-                let key: Box<str> = display.into();
-                self.order.remove(&(entry.class, key.clone()));
-                self.order.insert((class, key));
+                let text: Box<str> = display.into();
+                self.order.remove(&(entry.class, text.clone()));
+                self.order.insert((class, text));
                 entry.class = class;
                 changed = true;
             }
@@ -521,16 +564,16 @@ impl BoundedSuggestions {
             self.best.remove(&evicted);
             self.truncated = true;
         }
-        let key: Box<str> = display.into();
+        let text: Box<str> = display.into();
         self.best.insert(
-            key.clone(),
+            text.clone(),
             Entry {
                 class,
                 truncated: cut,
-                tier,
+                key,
             },
         );
-        self.order.insert((class, key));
+        self.order.insert((class, text));
         true
     }
 
@@ -546,7 +589,8 @@ impl BoundedSuggestions {
                     text: text.into(),
                     truncated: entry.truncated,
                     class,
-                    tier: entry.tier,
+                    tier: entry.key.and_then(|k| k.tier),
+                    enumerable: entry.key.is_none_or(|k| k.enumerable),
                 }
             })
             .collect()

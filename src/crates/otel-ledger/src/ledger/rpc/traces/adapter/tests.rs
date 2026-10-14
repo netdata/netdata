@@ -658,6 +658,7 @@ fn suggestions_are_capped_flagged_and_listed_once() {
         truncated,
         class,
         tier: None,
+        enumerable: true,
     };
     // Control characters: 256 raw bytes the engine kept are 1,536 on
     // the wire; the adapter cuts them to the cap, and two texts that

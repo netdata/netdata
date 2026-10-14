@@ -33,14 +33,16 @@ pub(crate) fn newest_first(sources: &mut [TraceSource]) {
 
 /// After a newest-first walk stopped before `unvisited`: the first second
 /// from which every span lives in a visited source — one past the newest
-/// unvisited summary (summaries are inclusive seconds). An unvisited
-/// tail could hold any recent span, so it claims nothing (`u32::MAX`).
-/// `None` when nothing was left unvisited.
+/// unvisited summary (summaries are inclusive seconds). `None` when
+/// nothing was left unvisited, or when an unvisited source is a tail,
+/// which could hold any recent span: then nothing can be claimed.
 pub(crate) fn complete_after(unvisited: &[TraceSource]) -> Option<u32> {
-    unvisited
-        .iter()
-        .map(|s| newest_s(s).map_or(u32::MAX, |t| t.saturating_add(1)))
-        .max()
+    let mut newest = None;
+    for source in unvisited {
+        let t = newest_s(source)?;
+        newest = newest.max(Some(t.saturating_add(1)));
+    }
+    newest
 }
 
 #[cfg(test)]
@@ -115,6 +117,7 @@ mod tests {
             complete_after(&[sealed("a", 100), sealed("b", 50)]),
             Some(101)
         );
-        assert_eq!(complete_after(&[tail("t")]), Some(u32::MAX));
+        assert_eq!(complete_after(&[tail("t")]), None);
+        assert_eq!(complete_after(&[sealed("a", 100), tail("t")]), None);
     }
 }
