@@ -838,7 +838,13 @@ fn highlight_without_tokens_is_empty() {
         "a",
     );
     let negated = sfsq::traces::Token::negated(name_token("a").group);
-    let data = highlight(src(), vec![root, negated], None);
+    let id_hex: String = TRACE.iter().map(|b| format!("{b:02x}")).collect();
+    let by_id = token(
+        sfsq::traces::PredicateTarget::Builtin(sfsq::traces::BuiltinField::TraceId),
+        sfsq::traces::CompareOp::Eq,
+        &id_hex,
+    );
+    let data = highlight(src(), vec![root, negated, by_id], None);
     assert!(data.matched.is_empty());
     let short = token(
         sfsq::traces::PredicateTarget::FreeText,

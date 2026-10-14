@@ -1801,6 +1801,79 @@ async fn chips_and_text_filter_the_list_and_the_grid() {
     assert_eq!(v["data"]["overview"]["totals"]["traces"], 2);
 }
 
+/// Every chip op reaches the engine with its wire meaning: negated
+/// regex and prefix ops are NOT EXISTS, ordering ops compare numbers,
+/// root and `trace_id` chips select whole traces, and all of them
+/// filter the grid too.
+#[tokio::test]
+async fn every_chip_op_reaches_the_engine() {
+    let h = handler_with_search_corpus().await;
+    let run = |conditions: serde_json::Value| {
+        let mut body = functions_body(20);
+        body["conditions"] = conditions;
+        let h = &h;
+        async move { serde_json::to_value(call_on(h, body).await.unwrap()).unwrap() }
+    };
+    let chip = |key: &str, op: &str, values: serde_json::Value| json!([{"key": key, "op": op, "values": values}]);
+    let sorted = |v: &serde_json::Value| {
+        let mut ids = ids(&v["data"]);
+        ids.sort();
+        ids
+    };
+    let id_0b = "0b".repeat(16);
+    for (conditions, want, grid) in [
+        // No span named span-2 or span-3: the one-span traces.
+        (
+            chip("name", "!~", json!(["span-[23]"])),
+            vec!["0a", "0c", "0d"],
+            3,
+        ),
+        (
+            chip("resource.service.name", "!^=", json!(["svc-a"])),
+            vec!["0b", "0d"],
+            2,
+        ),
+        // Envelopes: 500 ns, 0B 1500 ns, 0E 2500 ns. Duration chips
+        // leave the grid alone.
+        (
+            chip("trace_duration", "<", json!([1000])),
+            vec!["0a", "0c", "0d"],
+            5,
+        ),
+        (chip("trace_duration", ">", json!([1500])), vec!["0e"], 5),
+        (
+            chip("trace_duration", "<=", json!([1500])),
+            vec!["0a", "0b", "0c", "0d"],
+            5,
+        ),
+        (
+            chip("duration", ">", json!([400])),
+            vec!["0a", "0b", "0c", "0d", "0e"],
+            5,
+        ),
+        (chip("duration", "<", json!([400])), vec![], 0),
+        (
+            chip("root_service_name", "=", json!(["svc-b"])),
+            vec!["0b", "0d"],
+            2,
+        ),
+        (chip("root_name", "!=", json!(["span-1"])), vec![], 0),
+        (chip("trace_id", "=", json!([id_0b.clone()])), vec!["0b"], 1),
+        (
+            chip("trace_id", "!=", json!([id_0b.clone()])),
+            vec!["0a", "0c", "0d", "0e"],
+            4,
+        ),
+    ] {
+        let v = run(conditions.clone()).await;
+        assert_eq!(sorted(&v), want, "{conditions}");
+        assert_eq!(
+            v["data"]["overview"]["totals"]["traces"], grid,
+            "{conditions}"
+        );
+    }
+}
+
 /// A malformed chip or text is a client error before admission.
 #[tokio::test]
 async fn bad_chips_and_text_are_client_errors() {
@@ -1828,6 +1901,36 @@ async fn bad_chips_and_text_are_client_errors() {
         assert!(
             err.contains("invalid otel-traces request"),
             "{conditions} {text}: {err}"
+        );
+    }
+}
+
+/// A malformed chip or text in the trace mode is a client error too.
+#[tokio::test]
+async fn bad_chips_in_the_trace_mode_are_client_errors() {
+    let registries = make_registries();
+    install_sealed(
+        &registries,
+        "default",
+        1,
+        vec![otlp_req(0x11, 3, 1_000_000_000)],
+    )
+    .await;
+    let h = make_handler_over(registries);
+    for params in [
+        json!({"conditions": [{"key": "nope", "op": "=", "values": ["x"]}]}),
+        json!({"conditions": [{"key": "name", "op": "~~", "values": ["x"]}]}),
+        json!({"text": ["ab"]}),
+    ] {
+        let mut trace = params.clone();
+        trace["id"] = json!(FIXTURE_TRACE_ID);
+        let err = call_on(&h, json!({ "trace": trace }))
+            .await
+            .unwrap_err()
+            .to_string();
+        assert!(
+            err.contains("invalid otel-traces request"),
+            "{params}: {err}"
         );
     }
 }
