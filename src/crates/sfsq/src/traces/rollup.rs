@@ -256,59 +256,55 @@ pub fn tail_trace_parts(scan: &TraceWalScan) -> Vec<TracePart> {
 /// no-ref sentinel; an error for a corrupt ref).
 pub type RefResolve<'r> = dyn FnMut(&str, u32) -> Result<Option<String>, sfst::Error> + 'r;
 
-/// Row `index` of a sealed file's `TRSU` + `TRSS` as a [`TracePart`],
-/// resolving the root and service refs through `resolve(field, ref)`
-/// (`None` for the no-ref sentinel; an error for a corrupt ref).
-///
-/// Precondition: both come from the validating accessors
-/// (`trace_rollup`, `trace_rollup_stats`).
+/// A sealed file's rollup row and stats for `trace_id` as a
+/// [`TracePart`], resolving the root and service refs through
+/// `resolve(field, ref)`.
 pub fn sealed_trace_part(
-    rollup: &sfst::TraceRollup,
-    stats: &sfst::TraceRollupStats,
-    index: usize,
+    trace_id: sfst::TraceId,
+    row: &sfst::RollupRow,
+    stats: &sfst::StatsRow,
     resolve: &mut RefResolve<'_>,
 ) -> Result<TracePart, sfst::Error> {
     let name_field = BuiltinField::Name
         .dictionary_field()
         .expect("Name is dictionary-backed");
     let service_field = resource_service_field();
-    let min_start = rollup.min_start_ns[index];
-    let at = |offset: u64| min_start.saturating_add_unsigned(offset);
-    let root_start = at(stats.root_start_offsets_ns[index]);
-    let root = match rollup.root_is_true_root[index] {
+    let root = match row.root_claim {
         sfst::ROOT_CLAIM_TRUE => RootClaim::True {
-            start_ns: root_start,
-            span_id: rollup.root_span_ids.get(index),
-            service: resolve(&service_field, rollup.root_service_refs[index])?,
-            name: resolve(name_field, rollup.root_name_refs[index])?,
+            start_ns: stats.root_start_ns,
+            span_id: row.root_span_id,
+            service: resolve(&service_field, row.root_service_ref)?,
+            name: resolve(name_field, row.root_name_ref)?,
         },
         sfst::ROOT_CLAIM_WITHHELD => RootClaim::Withheld {
-            start_ns: root_start,
+            start_ns: stats.root_start_ns,
         },
         _ => RootClaim::None,
     };
-    let (from, to) = (
-        stats.service_offsets[index] as usize,
-        stats.service_offsets[index + 1] as usize,
-    );
-    let mut services = Vec::with_capacity(to - from);
-    for e in from..to {
+    let mut services = Vec::with_capacity(stats.services.len());
+    for &(service_ref, spans, errors) in &stats.services {
         services.push((
-            resolve(&service_field, stats.service_refs[e])?,
-            u64::from(stats.service_spans[e]),
-            u64::from(stats.service_errors[e]),
+            resolve(&service_field, service_ref)?,
+            u64::from(spans),
+            u64::from(errors),
         ));
     }
     sort_services(&mut services);
+    let (span_count, error_count) = stats
+        .services
+        .iter()
+        .fold((0u64, 0u64), |(s, e), &(_, spans, errors)| {
+            (s + u64::from(spans), e + u64::from(errors))
+        });
     Ok(TracePart {
         aggregate: TraceAggregate {
-            trace_id: rollup.trace_ids.get(index),
-            min_start_ns: min_start,
-            max_end_ns: rollup.max_end_ns[index],
-            span_count: u64::from(rollup.span_counts[index]),
-            error_count: u64::from(rollup.error_counts[index]),
+            trace_id,
+            min_start_ns: row.min_start_ns,
+            max_end_ns: row.max_end_ns,
+            span_count,
+            error_count,
         },
-        max_start_ns: at(stats.max_start_offsets_ns[index]),
+        max_start_ns: stats.max_start_ns,
         root,
         services,
     })

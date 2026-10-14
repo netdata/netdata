@@ -898,7 +898,7 @@ fn mid_tier_resolution_and_the_resolver_closed_rule() {
     let service_ref = rollup.root_service_refs[0];
     assert_ne!(name_ref, sfst::ROLLUP_NO_REF);
     assert_ne!(service_ref, sfst::ROLLUP_NO_REF);
-    let mut resolver = sfst::RollupRootResolver::new();
+    let mut resolver = sfst::RollupRefResolver::new();
     assert!(
         matches!(
             resolver.resolve(&reader, "name", name_ref),

@@ -122,7 +122,7 @@ fn tail_parts_match_the_sealed_rollup_and_stats() {
     let reader = sfst::IndexReader::open(&bytes).unwrap();
     let rollup = reader.trace_rollup().unwrap();
     let stats = reader.trace_rollup_stats(&rollup).unwrap();
-    let mut resolver = sfst::RollupRootResolver::new();
+    let mut resolver = sfst::RollupRefResolver::new();
     let mut resolve = |field: &str, kv_ref: u32| -> Result<Option<String>, sfst::Error> {
         if kv_ref == sfst::ROLLUP_NO_REF {
             return Ok(None);
@@ -133,7 +133,10 @@ fn tail_parts_match_the_sealed_rollup_and_stats() {
         }
     };
     let sealed: Vec<_> = (0..rollup.len())
-        .map(|i| sealed_trace_part(&rollup, &stats, i, &mut resolve).unwrap())
+        .map(|i| {
+            let (row, stats) = (rollup.row_at(i), stats.row_at(&rollup, i));
+            sealed_trace_part(rollup.trace_ids.get(i), &row, &stats, &mut resolve).unwrap()
+        })
         .collect();
     assert_eq!(tail, sealed, "the parity contract");
     // A: a true root; B: none; C: the lower span id of an equal start;
@@ -227,7 +230,7 @@ fn the_fold_pins_every_rollup_semantic() {
 #[test]
 fn a_root_ref_in_another_fields_range_is_corruption() {
     // The search gate resolves rollup root refs through
-    // `sfst::RollupRootResolver`. A ref pointing into ANOTHER field's
+    // `sfst::RollupRefResolver`. A ref pointing into ANOTHER field's
     // KvId range stays inside the kv table (chunk validation cannot
     // catch it), so the resolver's closed rule is the only guard: it
     // must answer Corrupt, never the other field's value.
@@ -242,7 +245,7 @@ fn a_root_ref_in_another_fields_range_is_corruption() {
 
     // Row 0 (trace A) claims a true root: its own refs resolve...
     assert_eq!(rollup.root_is_true_root[0], sfst::ROOT_CLAIM_TRUE);
-    let mut resolver = sfst::RollupRootResolver::new();
+    let mut resolver = sfst::RollupRefResolver::new();
     assert!(matches!(
         resolver.resolve(&reader, "name", rollup.root_name_refs[0]),
         sfst::RollupRefOutcome::Value("a-root")

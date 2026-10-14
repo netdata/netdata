@@ -65,7 +65,7 @@
 //! A file that proves itself corrupt in ANY way — an undecodable TBLM
 //! or TRSU chunk, or a rollup ref the resolver cannot map to a proven
 //! value in its field (the closed rule; see
-//! [`sfst::RollupRootResolver`]) — becomes a FAILED SOURCE from the
+//! [`sfst::RollupRefResolver`]) — becomes a FAILED SOURCE from the
 //! point of discovery:
 //!
 //! - the gate stops consulting it and queues the discovery for the

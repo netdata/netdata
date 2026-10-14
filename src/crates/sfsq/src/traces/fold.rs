@@ -203,7 +203,7 @@ impl TokenFilter {
             .dictionary_field()
             .expect("Name is dictionary-backed");
         let service_field = resource_service_field();
-        let mut resolver = sfst::RollupRootResolver::new();
+        let mut resolver = sfst::RollupRefResolver::new();
         for i in 0..rollup.len() {
             let row = rollup.row_at(i);
             if row.root_claim != sfst::ROOT_CLAIM_TRUE {

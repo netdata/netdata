@@ -83,11 +83,11 @@ enum FieldState {
 /// reader elsewhere). Owns at most the two root-field dictionaries
 /// (`name`, the resource `service.name` spelling).
 #[derive(Default)]
-pub struct RollupRootResolver {
+pub struct RollupRefResolver {
     fields: HashMap<String, FieldState>,
 }
 
-impl RollupRootResolver {
+impl RollupRefResolver {
     /// An empty resolver; a field's dictionary decodes on first use.
     pub fn new() -> Self {
         Self::default()

@@ -56,8 +56,8 @@
 use std::collections::HashMap;
 
 use crate::index_reader::{
-    IndexReader, MetaReader, RollupRefOutcome, RollupRootResolver, TraceEvent, TraceLink,
-    TraceSpan, kv_attr, kv_value,
+    IndexReader, MetaReader, RollupRefOutcome, RollupRefResolver, TraceEvent, TraceLink, TraceSpan,
+    kv_attr, kv_value,
 };
 use crate::reader::ChunkReader;
 use crate::trace_combine::{SpanRef, SpanSource};
@@ -158,6 +158,19 @@ enum Screen {
     Unavailable,
 }
 
+/// One file's rollup row and stats for one trace id
+/// ([`TraceFileSession::rollup_part`]).
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum PartEvidence {
+    /// The file has no rollup chunk.
+    NoRollup,
+    /// The file has the rollup but no stats (sealed before `TRSS`).
+    NoStats,
+    /// The file holds none of the trace's spans.
+    Absent,
+    Part(RollupRow, crate::StatsRow),
+}
+
 /// One file's trace-rollup evidence for one trace id
 /// ([`TraceFileSession::rollup_row`]).
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -212,7 +225,8 @@ pub struct TraceFileSession<'r, 'a> {
     /// the low-card facet bitmaps (no row access).
     kinds: HashMap<u32, i32>,
     rollup: Option<TraceRollup>,
-    resolver: Option<RollupRootResolver>,
+    stats: Option<crate::TraceRollupStats>,
+    resolver: Option<RollupRefResolver>,
     /// The caller's hook for when the session holds nothing decoded.
     on_release: Option<Box<dyn FnMut() + 'a>>,
 }
@@ -265,6 +279,7 @@ impl<'r, 'a> TraceFileSession<'r, 'a> {
             strings: HashMap::new(),
             kinds: HashMap::new(),
             rollup: None,
+            stats: None,
             resolver: None,
             on_release: None,
         }
@@ -373,6 +388,43 @@ impl<'r, 'a> TraceFileSession<'r, 'a> {
         }
     }
 
+    /// `trace_id`'s rollup row and its stats (`TRSU` + `TRSS`), decoding
+    /// both into the loaded layer (a caller bounding its loaded sessions
+    /// touches its [`crate::LoadedSources`] after this). A probe that
+    /// finds no row drops what it decoded.
+    pub fn rollup_part(&mut self, trace_id: TraceId) -> Result<PartEvidence, crate::Error> {
+        let decoded = (self.rollup.is_none(), self.stats.is_none());
+        if decoded.0 {
+            let chunk = self.view.chunk()?;
+            if !chunk.has_trace_rollup() {
+                return Ok(PartEvidence::NoRollup);
+            }
+            self.rollup = Some(chunk.trace_rollup()?);
+        }
+        let rollup = self.rollup.as_ref().expect("decoded above");
+        let Some(index) = rollup.find(trace_id) else {
+            if decoded.0 {
+                self.rollup = None;
+                self.emptied();
+            }
+            return Ok(PartEvidence::Absent);
+        };
+        if decoded.1 {
+            let chunk = self.view.chunk()?;
+            if !chunk.has_trace_rollup_stats() {
+                return Ok(PartEvidence::NoStats);
+            }
+            let stats = chunk.trace_rollup_stats(rollup)?;
+            self.stats = Some(stats);
+        }
+        let rollup = self.rollup.as_ref().expect("decoded above");
+        let stats = self.stats.as_ref().expect("decoded above");
+        Ok(PartEvidence::Part(
+            rollup.row_at(index),
+            stats.row_at(rollup, index),
+        ))
+    }
+
     /// Visit every row of the file's trace rollup (`TRSU`) — its trace
     /// id and copied-out row — in id order, decoding the rollup into the
     /// loaded layer (later [`rollup_row`](Self::rollup_row) calls reuse
@@ -399,14 +451,14 @@ impl<'r, 'a> TraceFileSession<'r, 'a> {
 
     /// Resolve a rollup root ref as a value of `field_name`, through the
     /// file's dictionaries (the full reader) and the session's
-    /// [`RollupRootResolver`]. `Err` when the file cannot open fully.
+    /// [`RollupRefResolver`]. `Err` when the file cannot open fully.
     pub fn resolve_rollup_ref(
         &mut self,
         field_name: &str,
         kv_ref: u32,
     ) -> Result<RollupRefOutcome<'_>, crate::Error> {
         let reader = self.view.full()?;
-        let resolver = self.resolver.get_or_insert_with(RollupRootResolver::new);
+        let resolver = self.resolver.get_or_insert_with(RollupRefResolver::new);
         Ok(resolver.resolve(reader, field_name, kv_ref))
     }
 
@@ -768,6 +820,7 @@ impl SpanSource for TraceFileSession<'_, '_> {
             || !self.strings.is_empty()
             || !self.kinds.is_empty()
             || self.rollup.is_some()
+            || self.stats.is_some()
             || self.resolver.is_some()
     }
 
@@ -785,6 +838,7 @@ impl SpanSource for TraceFileSession<'_, '_> {
         self.strings = HashMap::new();
         self.kinds = HashMap::new();
         self.rollup = None;
+        self.stats = None;
         self.resolver = None;
         self.emptied();
     }

@@ -29,8 +29,8 @@ mod rollup_resolver;
 mod session;
 mod trace_plan;
 
-pub use rollup_resolver::{RollupRefOutcome, RollupRootResolver};
-pub use session::{RollupEvidence, TraceFileSession};
+pub use rollup_resolver::{RollupRefOutcome, RollupRefResolver};
+pub use session::{PartEvidence, RollupEvidence, TraceFileSession};
 pub use trace_plan::{
     CompiledTracePlan, GroupCondition, IdColumnKind, NumberCmp, PlanMatcher, PlanTerm, ScanLimits,
     ScanWork, TracePlan, numeric_token_matches,

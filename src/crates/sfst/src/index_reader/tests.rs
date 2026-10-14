@@ -521,6 +521,77 @@ fn positions_report_to_loaded_sources() {
     ));
 }
 
+/// A trace's rollup row and stats come from the session, again after a
+/// release; a file sealed before the stats says so, a pre-rollup file
+/// too.
+#[test]
+fn session_reads_rollup_parts() {
+    use crate::trace_combine::SpanSource;
+    use std::io::Cursor;
+    let arena = bumpalo::Bump::new();
+    let mut ri = crate::RowIndex::new(&arena, 10);
+    let mut ids = TraceIds::with_capacity(3);
+    let mut rollup = crate::TraceRollupRows::new();
+    for (i, b) in [1u8, 2, 2].into_iter().enumerate() {
+        let slot = ri.intern(None, "l=a");
+        ri.row(1_000 + i as i64, &[slot]);
+        let id = TraceId::from([b; 16]);
+        ids.push(id);
+        rollup.record_span(
+            id,
+            sid(i as u8 + 1),
+            i == 1,
+            1_000 + i as i64,
+            10,
+            0,
+            i == 2,
+            None,
+            None,
+        );
+    }
+    ri.trace_ids = Some(ids);
+    ri.build_trace_id_index = true;
+    ri.trace_rollup = Some(rollup);
+    let (buf, _s, _m) =
+        crate::IndexWriter::write_into(&ri, Cursor::new(Vec::new()), Vec::new()).unwrap();
+    let buf = buf.into_inner();
+
+    let mut session = owned(&buf);
+    let part = session.rollup_part(TraceId::from([2; 16])).unwrap();
+    let crate::PartEvidence::Part(row, stats) = &part else {
+        panic!("trace 2 has a part: {part:?}");
+    };
+    assert_eq!(
+        (row.root_claim, row.root_span_id),
+        (crate::ROOT_CLAIM_TRUE, sid(2))
+    );
+    assert_eq!((stats.max_start_ns, stats.root_start_ns), (1_002, 1_001));
+    assert_eq!(stats.services, vec![(crate::ROLLUP_NO_REF, 2, 1)]);
+    assert_eq!(
+        session.rollup_part(TraceId::from([9; 16])).unwrap(),
+        crate::PartEvidence::Absent
+    );
+    session.release();
+    assert_eq!(session.rollup_part(TraceId::from([2; 16])).unwrap(), part);
+
+    // Hide TRSS: rename its TOC entry, as a file sealed before it reads.
+    let mut legacy = buf.clone();
+    let at = legacy
+        .windows(4)
+        .position(|w| w == b"TRSS")
+        .expect("a TOC entry");
+    legacy[at..at + 4].copy_from_slice(b"XXSS");
+    assert_eq!(
+        owned(&legacy).rollup_part(TraceId::from([2; 16])).unwrap(),
+        crate::PartEvidence::NoStats
+    );
+    let plain = trace_file(&[(sid(1), SpanId::UNSET)]);
+    assert_eq!(
+        owned(&plain).rollup_part(TraceId::from([2; 16])).unwrap(),
+        crate::PartEvidence::NoRollup
+    );
+}
+
 #[test]
 fn rollup_rows_stream_from_the_session() {
     use crate::trace_combine::SpanSource;

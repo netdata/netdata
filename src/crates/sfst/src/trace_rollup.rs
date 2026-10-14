@@ -223,6 +223,7 @@ impl TraceRollup {
             root_claim: self.root_is_true_root[index],
             root_service_ref: self.root_service_refs[index],
             root_name_ref: self.root_name_refs[index],
+            root_span_id: self.root_span_ids.get(index),
             min_start_ns: self.min_start_ns[index],
             max_end_ns: self.max_end_ns[index],
         }
@@ -319,6 +320,42 @@ impl TraceRollupStats {
         }
         Ok(())
     }
+
+    /// Row `index`'s stats with absolute starts (`stats` validated
+    /// against `rollup`, `index < rollup.len()`).
+    pub fn row_at(&self, rollup: &TraceRollup, index: usize) -> StatsRow {
+        let min_start = rollup.min_start_ns[index];
+        let (from, to) = (
+            self.service_offsets[index] as usize,
+            self.service_offsets[index + 1] as usize,
+        );
+        StatsRow {
+            max_start_ns: min_start.saturating_add_unsigned(self.max_start_offsets_ns[index]),
+            root_start_ns: min_start.saturating_add_unsigned(self.root_start_offsets_ns[index]),
+            services: (from..to)
+                .map(|e| {
+                    (
+                        self.service_refs[e],
+                        self.service_spans[e],
+                        self.service_errors[e],
+                    )
+                })
+                .collect(),
+        }
+    }
+}
+
+/// One rollup row's stats ([`TraceRollupStats`]), copied out with
+/// absolute starts.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct StatsRow {
+    pub max_start_ns: i64,
+    /// The root candidate's start on TRUE and WITHHELD claims; the row's
+    /// min start otherwise.
+    pub root_start_ns: i64,
+    /// `(service ref, stored spans, ERROR spans)`, refs ascending, the
+    /// no-ref sentinel last.
+    pub services: Vec<(u32, u32, u32)>,
 }
 
 /// The columns of one rollup row a trace-level filter reads, copied out
@@ -331,6 +368,8 @@ pub struct RollupRow {
     pub root_service_ref: u32,
     /// See [`TraceRollup::root_name_refs`].
     pub root_name_ref: u32,
+    /// See [`TraceRollup::root_span_ids`].
+    pub root_span_id: SpanId,
     pub min_start_ns: i64,
     pub max_end_ns: i64,
 }
