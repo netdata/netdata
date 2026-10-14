@@ -3,8 +3,8 @@
 Inspect OpenTelemetry logs and traces stored in Netdata's on-disk **WAL/SFST**
 files from the terminal, without a running agent. Useful for forensic and
 offline inspection. Run with no subcommand, it queries **logs** and prints
-NDJSON; the `trace`, `attributes`, `attribute-values`, and `search`
-subcommands query **traces** and print plain text.
+NDJSON. The trace subcommands (`trace`, `attributes`, `attribute-values`,
+`suggest`, `overview` and `search`) query **traces** and print plain text.
 
 > The logs mode also ships inside the Netdata Agent as `otel-plugin logs`
 > (the shipped binary; this standalone `sfsq-cli` is a dev/forensic tool, not
@@ -79,31 +79,68 @@ convention), so `--name api` with no `--namespace` matches logs that carry no
 
 ## Trace subcommands
 
-`sfsq-cli trace`, `attributes`, `attribute-values`, and `search` drive the
-traces query engine over the **traces** signal's files — on a stock install
+The trace subcommands drive the traces query engine over the **traces**
+signal's files — on a stock install
 the sealed SFSTs under `{base_dir}/traces/index/` and the WALs under
 `{base_dir}/traces/wal/`. Unlike the logs mode there is no directory or
 config resolution: you name the files. Output is line-based text, not NDJSON.
 
-Common to all four:
+Common to all of them:
 
 - `--sfst FILE` — a sealed traces SFST file, repeatable; `--wal FILE` — a
   traces WAL file, repeatable. At least one of the two is required.
-- `--start-ns N` / `--end-ns N` — an optional half-open window in epoch
-  nanoseconds; the two flags must be given together (and start before end).
-  `search` admits a span when its *start* falls in the window; key
-  enumeration prunes at file granularity.
+- `--start-ns N` / `--end-ns N` — a half-open window in epoch nanoseconds.
+  Give the two flags together, with start before end. `trace` has no
+  window, `overview` needs one (for its grid), and the others make it
+  optional. `search` admits a span when its *start* is in the window. Key
+  and value enumeration (`attributes`, `attribute-values`, `suggest`) skips
+  whole files outside the window.
 - WAL files are scanned whole as tails — right for shut-down or recovered
   WALs; query an actively written WAL through a live agent instead. A torn
   or truncated tail is clamped to the last complete frame (with a warning);
   a corrupt WAL is skipped with a warning so one bad file cannot abort a
   multi-file query, while a nonexistent or header-less path is a hard error.
 
+### Search tokens (`search`, `overview`, `trace`)
+
+These flags give the search bar's tokens. A trace matches when it matches
+all tokens. Different tokens can match different spans of the trace. All
+four flags are repeatable.
+
+- `--where COND` — one span must match all `--where` conditions together.
+  A condition on the whole trace (`root-name`, `root-service-name`,
+  `trace-duration`) or on `trace-id` is a token of its own.
+- `--and COND` — a token of its own: a span of the trace matches the
+  condition.
+- `--not COND` — a token of its own: no span of the trace matches the
+  condition (NOT EXISTS). For a condition on the whole trace, the trace
+  does not match it.
+- `--text TERM` — free text, one token per term. A span matches when the
+  term is a part of one of its values, case-insensitive: the span name, the
+  status message, the event names, or an attribute value. Keys do not
+  match. A term has 3 or more characters.
+
+`COND` is `TARGET<op>VALUE`. `TARGET` is `OWNER.KEY` (the attribute owners
+`resource`, `span`, `instrumentation`, `event`, `link`), `.KEY` (any owner:
+resource ∪ span), or a builtin-field word (the list is under `attributes`
+below). The ops:
+
+| Op | Meaning |
+|---|---|
+| `=` / `!=` | Is equal / is not equal to the text |
+| `=~` / `!~` | Matches / does not match the regex. The regex must match the whole value. |
+| `^=` / `!^=` | Starts / does not start with the text |
+| `>` `<` `>=` `<=` | Compares numbers (integer or decimal values) |
+
+An empty value is an error. `!=`, `!~` and `!^=` apply to one span: the
+span has the field, and its value does not match. To find the traces in
+which no span has a value, use `--not` with `=`, `=~` or `^=`.
+
 ### `trace` — reconstruct one trace
 
 ```
 sfsq-cli trace --trace-id <32 hex chars> (--sfst FILE | --wal FILE)…
-               [--span-cap N]
+               [--span-cap N] [token flags]
 ```
 
 Prints a summary line — `trace <id>: N span(s), M root(s), status …, K typed
@@ -111,6 +148,11 @@ field(s)` — followed by the span tree, one line per span, indented two
 spaces per depth level (a span reached again through a cycle prints once).
 `--trace-id` is the 16-byte trace id as hex, case-insensitive. `--span-cap`
 overrides the assembly cap (default 65,536; 0 rejected).
+
+The token flags mark spans. The summary line then ends with `, N matched`,
+and the line of each span that matches a token ends with `[match]`. Only
+positive tokens on spans mark spans: `--not` tokens, and tokens on the
+whole trace or on `trace-id`, mark no span.
 
 ### `attributes` / `attribute-values` — enumerate keys and values
 
@@ -134,31 +176,73 @@ when the value carries no type). Both end with a
 `--max-keys` / `--max-values` cap the list (0 rejected) and set the
 `truncated` flag when they cut it.
 
+### `suggest` — suggest keys or values
+
+```
+sfsq-cli suggest (--sfst FILE | --wal FILE)… [--owner OWNER --key KEY]
+                 [--term TEXT] [--max-items N] [--max-files N]
+                 [--stale-files N] [--deadline-ms N]
+                 [--start-ns N --end-ns N]
+```
+
+Without `--owner` and `--key`, `suggest` gives keys. With them, it gives
+the values of that key (`OWNER` and `KEY` as for `attribute-values`). It
+reads the newest files first. A key or a value matches `--term` when it is
+equal to the term, starts with it, contains it, or starts within one edit
+(terms of 4 or more characters) or two edits (8 or more) of it. An empty
+term matches all.
+
+- `--max-items` — the maximum number of suggestions (default 50; 0 is an
+  error).
+- `--max-files` — stop after this number of files that have the key
+  (default 256; 0 is an error).
+- `--stale-files` — stop after this number of files in sequence that add
+  no suggestion (default 8; 0 is an error).
+- `--deadline-ms` — stop after this number of milliseconds.
+
+Each suggestion is one line: `<text> match=<class>`, then `tier=…` for a
+key, and `truncated` when the text is cut for display. The last line gives
+the count, the `truncated` flag, the status, `complete after <unix second>`
+when a limit stopped the walk (the files that it read hold all spans from
+that second), and the time.
+
+### `overview` — count the traces of the heatmap grid
+
+```
+sfsq-cli overview (--sfst FILE | --wal FILE)… --start-ns N --end-ns N
+                  [--buckets N] [token flags]
+```
+
+`overview` builds the grid of the list's heatmap: time buckets by trace
+duration bins. `--buckets` sets the number of time buckets (default 60).
+The token flags filter the traces that it counts. A token on
+`trace-duration` is an error, because the duration is the grid's own axis.
+The command is for measurements and does not print the grid. It prints one
+line: `N trace(s), N span(s), N error(s), status …, <time> ms`.
+
 ### `search` — filter whole traces
 
 ```
 sfsq-cli search (--sfst FILE | --wal FILE)…
-                [--where 'TARGET<op>VALUE']…
+                [token flags]
                 [--min-duration-ns N] [--max-duration-ns N]
                 [--limit N]
                 [--start-ns N --end-ns N]
 ```
 
-- `--where` — repeatable; conditions AND and are evaluated per span: a trace
-  matches when one of its spans satisfies all of them. `TARGET` is
-  `OWNER.KEY` (the attribute owners above), `.KEY` (any owner: resource ∪
-  span), or a builtin-field word. Ops: `=` / `!=` (text), `=~` / `!~`
-  (regex anchored to the whole value), `>` `<` `>=` `<=` (integer or decimal
-  values). An empty value is rejected.
+- Token flags — see *Search tokens* above.
 - `--min-duration-ns` / `--max-duration-ns` — shorthand for `duration`
-  `>=`/`<=` conditions (inclusive).
+  `>=`/`<=` conditions (inclusive), in the `--where` group.
 - `--limit` — keep the top-K most recent matching traces (default 20;
   0 rejected).
 
 Per matching trace, one line
 `<trace-id> <root-service> / <root-name> start=<ns> dur=<ns>ns spans=N
-errors=N rank=<ns>`. `rank` is the start of the newest matching span, which
-sets the order of the list. When a value is not set, the line shows
+errors=N rank=<ns>`. `rank` sets the order of the list. For each positive
+token on spans, take the start of the newest span that matches it: `rank`
+is the oldest of these starts. With one such token, it is the start of the
+newest matching span; with none, the start of the newest span in the
+window. When a value is not set, the line shows
 `<no service>` or `<unnamed>`. The suffix `[inexact]` shows that the
 assembly of that trace was capped or degraded, so its numbers can be too
 low. A final `N trace(s), status …` line gives the count and `complete`, or
@@ -180,16 +264,23 @@ sfsq-cli --wal-dir /var/lib/netdata/otel/logs/wal --sfst-dir /var/lib/netdata/ot
 # Show which files were consulted (to stderr)
 sfsq-cli --config /etc/netdata/otel.yaml --name api --show-files
 
-# Reconstruct one trace from a sealed SFST plus a recovered WAL
+# Reconstruct one trace from a sealed SFST plus a recovered WAL,
+# and mark the spans that contain the text "checkout"
 sfsq-cli trace --trace-id 4bf92f3577b34da6a3ce929d0e0e4736 \
   --sfst /var/lib/netdata/otel/traces/index/<SEQ>.sfst \
-  --wal  /var/lib/netdata/otel/traces/wal/<SEQ>.wal
+  --wal  /var/lib/netdata/otel/traces/wal/<SEQ>.wal \
+  --text checkout
 
 # Checkout traces with a span of ≥ 1ms in the last 10 minutes, newest first
 # (root-service-name matches the trace's true root; window in epoch ns)
 sfsq-cli search --sfst /var/lib/netdata/otel/traces/index/<SEQ>.sfst \
   --where 'root-service-name=checkout' --min-duration-ns 1000000 \
   --start-ns 1769000000000000000 --end-ns 1769000600000000000
+
+# Traces with a frontend span and a PostgreSQL span, and no error span
+sfsq-cli search --sfst /var/lib/netdata/otel/traces/index/<SEQ>.sfst \
+  --and 'resource.service.name=frontend' --and 'span.db.system=postgresql' \
+  --not 'status=ERROR'
 
 # Which values does the span attribute http.method take?
 sfsq-cli attribute-values --owner span --key http.method \

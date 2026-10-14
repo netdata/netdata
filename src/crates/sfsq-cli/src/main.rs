@@ -36,7 +36,8 @@ struct Cli {
 #[derive(Debug, clap::Subcommand)]
 enum Cmd {
     /// Reconstruct one trace across sealed SFSTs and traces WALs
-    /// (cross-source trace-by-id over `sfsq::traces`).
+    /// (cross-source trace-by-id over `sfsq::traces`); the token flags
+    /// mark the spans they match.
     Trace(TraceArgs),
     /// Enumerate attribute and builtin-field keys across sealed SFSTs
     /// and traces WALs (`sfsq::traces` key enumeration).
@@ -117,5 +118,53 @@ mod tests {
             cli.is_ok(),
             "expected `--since -1h --until +30m` to parse: {cli:?}"
         );
+    }
+
+    /// `search`, `overview` and `trace` all take the token flags, and a
+    /// free-text term may start with a dash.
+    #[test]
+    fn token_flags_parse_on_search_overview_and_trace() {
+        let flags = [
+            "--sfst",
+            "/x",
+            "--where",
+            "name=a",
+            "--and",
+            "status=ERROR",
+            "--not",
+            "kind=CLIENT",
+            "--text",
+            "-abc",
+        ];
+        for (cmd, extra) in [
+            ("search", &[][..]),
+            ("overview", &["--start-ns", "0", "--end-ns", "10"][..]),
+            (
+                "trace",
+                &["--trace-id", "00000000000000000000000000000001"][..],
+            ),
+        ] {
+            let argv = ["sfsq-cli", cmd]
+                .into_iter()
+                .chain(flags)
+                .chain(extra.iter().copied());
+            let cli = Cli::try_parse_from(argv).unwrap_or_else(|e| panic!("{cmd}: {e}"));
+            let tokens = match cli.cmd {
+                Some(Cmd::Search(a)) => a.tokens,
+                Some(Cmd::Overview(a)) => a.tokens,
+                Some(Cmd::Trace(a)) => a.tokens,
+                other => panic!("{cmd}: parsed as {other:?}"),
+            };
+            assert_eq!(
+                (tokens.conditions, tokens.and, tokens.not, tokens.text),
+                (
+                    vec!["name=a".to_string()],
+                    vec!["status=ERROR".to_string()],
+                    vec!["kind=CLIENT".to_string()],
+                    vec!["-abc".to_string()],
+                ),
+                "{cmd}"
+            );
+        }
     }
 }

@@ -7,7 +7,8 @@
 //! vocabulary off the dictionaries, `suggest` matches keys or values
 //! against a term (and prints its time, for measurements), `overview`
 //! builds the list's heatmap grid (for measurements), `search` filters
-//! whole traces.
+//! whole traces. `search`, `overview` and `trace` take the search bar's
+//! tokens ([`TokenArgs`]); `trace` marks the spans they match.
 //!
 //! WAL inputs are served as tail scans over the file's full frame range —
 //! right for shut-down or recovered WALs (the dev case); an actively
@@ -27,9 +28,9 @@ use tokio_util::sync::CancellationToken;
 use sfsq::traces::{
     AttributeKey, AttributeNamesQuery, AttributeOwner, AttributeValuesQuery, BuiltinField,
     CompareOp, Condition, OverviewQuery, Predicate, PredicateTarget, PredicateValue, QueryStatus,
-    SearchQuery, SearchSources, SourceId, SuggestQuery, TimeWindow, TraceQuery, TraceSfstCandidate,
-    TraceSource, TraceWalTail, WalCoverage, attribute_names, attribute_values, overview, search,
-    suggest, trace_by_id,
+    SearchQuery, SearchSources, SourceId, SuggestQuery, TimeWindow, Token, TokenQuery, TraceQuery,
+    TraceSfstCandidate, TraceSource, TraceWalTail, WalCoverage, attribute_names, attribute_values,
+    overview, search, starts_with_pattern, suggest, trace_by_id,
 };
 
 /// Reconstruct one trace across sealed SFSTs and traces WALs.
@@ -50,6 +51,9 @@ pub struct TraceArgs {
     /// Span cap override (default 65,536); 0 is rejected.
     #[arg(long)]
     pub span_cap: Option<usize>,
+
+    #[command(flatten)]
+    pub tokens: TokenArgs,
 }
 
 /// Parse a 32-hex-char trace id.
@@ -155,7 +159,9 @@ pub fn run_trace(args: &TraceArgs, out: &mut dyn std::io::Write) -> Result<()> {
     let trace_id = parse_trace_id(&args.trace_id)?;
     let sources = build_sources(&args.sfsts, &args.wals)?;
 
-    let mut query = TraceQuery::new(trace_id);
+    let highlight = args.tokens.tokens(Vec::new())?;
+    let highlighting = !highlight.tokens.is_empty();
+    let mut query = TraceQuery::new(trace_id).highlight(highlight);
     if let Some(cap) = args.span_cap {
         query = query.span_cap(cap);
     }
@@ -178,13 +184,22 @@ pub fn run_trace(args: &TraceArgs, out: &mut dyn std::io::Write) -> Result<()> {
     let typed = data.field_kinds.fields.len()
         + data.field_kinds.event_attributes.len()
         + data.field_kinds.link_attributes.len();
+    let matched_count = if highlighting {
+        format!(", {} matched", data.matched.len())
+    } else {
+        String::new()
+    };
     writeln!(
         out,
-        "trace {}: {} span(s), {} root(s), status {status}, {typed} typed field(s)",
+        "trace {}: {} span(s), {} root(s), status {status}, {typed} typed field(s){matched_count}",
         args.trace_id,
         t.spans.len(),
         t.roots.len(),
     )?;
+    let mut matched = vec![false; t.spans.len()];
+    for &i in &data.matched {
+        matched[i as usize] = true;
+    }
 
     // Iterative revisit-guarded DFS (cycle edges survive in `children`).
     // The summary root is computed ONCE (it scans the span list).
@@ -205,7 +220,7 @@ pub fn run_trace(args: &TraceArgs, out: &mut dyn std::io::Write) -> Result<()> {
         let summary_root = (summary_root_idx == Some(i)).then_some(" [summary root]");
         writeln!(
             out,
-            "{:indent$}{} kind={} start={} dur={}ns ev={} lk={}{}",
+            "{:indent$}{} kind={} start={} dur={}ns ev={} lk={}{}{}",
             "",
             name,
             s.kind,
@@ -214,6 +229,7 @@ pub fn run_trace(args: &TraceArgs, out: &mut dyn std::io::Write) -> Result<()> {
             s.events.len(),
             s.links.len(),
             summary_root.unwrap_or(""),
+            if matched[i] { " [match]" } else { "" },
             indent = depth * 2,
         )?;
         for &c in t.children[i].iter().rev() {
@@ -594,6 +610,182 @@ pub fn run_suggest(args: &SuggestArgs, out: &mut dyn std::io::Write) -> Result<(
     Ok(())
 }
 
+// ── Search-bar tokens (search / overview / trace) ─────────────────────
+
+/// The search bar's tokens as flags. Tokens AND at trace level: each may
+/// match a different span of the trace. This is the dev tool's rendering
+/// of the engine's [`TokenQuery`], not a wire grammar; values are engine
+/// storage labels.
+#[derive(Debug, Default, clap::Args)]
+pub struct TokenArgs {
+    /// A condition, repeatable: one span must satisfy every `--where`
+    /// together (trace-level targets are tokens of their own). COND is
+    /// `TARGET<op>VALUE`. TARGET is `OWNER.KEY`
+    /// (resource/span/instrumentation/event/link), `.KEY` (any owner:
+    /// resource ∪ span), or a builtin-field word (`name`, `status`,
+    /// `kind`, …). OPS: `=`, `!=` (text), `=~`, `!~` (regex anchored to
+    /// the whole value), `^=`, `!^=` (starts with), `>`, `<`, `>=`, `<=`
+    /// (numeric).
+    #[arg(long = "where", value_name = "COND")]
+    pub conditions: Vec<String>,
+
+    /// A condition as a token of its own, repeatable: some span
+    /// satisfies it. Same grammar as `--where`.
+    #[arg(long = "and", value_name = "COND")]
+    pub and: Vec<String>,
+
+    /// A condition no span of the trace satisfies (NOT EXISTS),
+    /// repeatable. Same grammar as `--where`.
+    #[arg(long = "not", value_name = "COND")]
+    pub not: Vec<String>,
+
+    /// Free text, repeatable, one token per term: a case-insensitive
+    /// substring of a span's name, status message, event names or any
+    /// attribute value (never of a key); at least 3 characters.
+    #[arg(long = "text", value_name = "TERM", allow_hyphen_values = true)]
+    pub text: Vec<String>,
+}
+
+impl TokenArgs {
+    /// The query: the `--where` conditions plus `group` (the command's
+    /// own same-span conditions) as one flat predicate, then one token
+    /// per `--and`, `--not` and `--text`.
+    fn tokens(&self, mut group: Vec<Condition>) -> Result<TokenQuery> {
+        let mut conditions = self
+            .conditions
+            .iter()
+            .map(|spec| parse_condition("--where", spec))
+            .collect::<Result<Vec<_>>>()?;
+        conditions.append(&mut group);
+        let mut query = TokenQuery::from(Predicate { conditions });
+        let alone = |condition| Predicate {
+            conditions: vec![condition],
+        };
+        for spec in &self.and {
+            let condition = parse_condition("--and", spec)?;
+            query.tokens.push(Token::positive(alone(condition)));
+        }
+        for spec in &self.not {
+            let condition = parse_condition("--not", spec)?;
+            query.tokens.push(Token::negated(alone(condition)));
+        }
+        for term in &self.text {
+            query.tokens.push(Token::positive(alone(Condition {
+                target: PredicateTarget::FreeText,
+                op: CompareOp::Contains,
+                values: vec![PredicateValue::Text(term.clone())],
+            })));
+        }
+        Ok(query)
+    }
+}
+
+/// Parse one condition given to `flag`: `TARGET <op> VALUE`. The op
+/// match is leftmost, longest-symbol first, so `>=` never parses as `>`
+/// with a `=value`, `=~` never as `=` with a `~value`, and `!^=` never as
+/// `^=` after a target ending in `!`. Ordering ops take numeric values;
+/// the others take text, and `^=`/`!^=` ("starts with") become the
+/// anchored regex of the escaped value.
+fn parse_condition(flag: &str, spec: &str) -> Result<Condition> {
+    // (symbol, op, starts with)
+    const OPS: [(&str, CompareOp, bool); 10] = [
+        ("!^=", CompareOp::NotRegex, true),
+        ("^=", CompareOp::Regex, true),
+        ("=~", CompareOp::Regex, false),
+        ("!~", CompareOp::NotRegex, false),
+        ("!=", CompareOp::NotEq, false),
+        (">=", CompareOp::Gte, false),
+        ("<=", CompareOp::Lte, false),
+        (">", CompareOp::Gt, false),
+        ("<", CompareOp::Lt, false),
+        ("=", CompareOp::Eq, false),
+    ];
+    let (target_word, (op, starts_with), value) = OPS
+        .iter()
+        .filter_map(|&(sym, op, starts_with)| {
+            spec.find(sym).map(|at| (at, sym.len(), (op, starts_with)))
+        })
+        .min_by_key(|&(at, len, _)| (at, std::cmp::Reverse(len)))
+        .map(|(at, len, op)| (&spec[..at], op, &spec[at + len..]))
+        .ok_or_else(|| anyhow::anyhow!("{flag} must be TARGET<op>VALUE, got {spec:?}"))?;
+    // An empty value is a structurally valid predicate that matches no
+    // well-formed dictionary entry — in this dev tool it is always a
+    // typo, so fail loudly instead of returning a silent empty result.
+    if value.is_empty() {
+        bail!("{flag} {spec:?} has an empty value");
+    }
+    let target = parse_target(flag, target_word.trim())?;
+    let value = if matches!(
+        op,
+        CompareOp::Gt | CompareOp::Lt | CompareOp::Gte | CompareOp::Lte
+    ) {
+        if let Ok(n) = value.parse::<i64>() {
+            PredicateValue::Integer(n)
+        } else if let Ok(f) = value.parse::<f64>() {
+            PredicateValue::Float(f)
+        } else {
+            bail!("{flag} {spec:?}: ordering comparisons take a numeric value");
+        }
+    } else if starts_with {
+        PredicateValue::Text(starts_with_pattern(value))
+    } else {
+        PredicateValue::Text(value.to_string())
+    };
+    Ok(Condition {
+        target,
+        op,
+        values: vec![value],
+    })
+}
+
+/// A condition's target, given to `flag`: `OWNER.KEY` for the attribute
+/// owners, a bare builtin-field word otherwise.
+fn parse_target(flag: &str, word: &str) -> Result<PredicateTarget> {
+    // An empty key after the owner strip (a bare `.` or a trailing
+    // `owner.`) is a structurally valid predicate that matches no
+    // dictionary entry — positive or negated (the pinned rule is
+    // presence ∩ complement, so absence never satisfies `!=` either).
+    // The same always-a-typo class as an empty value: fail loudly
+    // instead of returning a silent empty result.
+    let non_empty = |key: &str| -> Result<String> {
+        if key.is_empty() {
+            bail!("{flag} target {word:?} has an empty attribute key");
+        }
+        Ok(key.to_string())
+    };
+    // `.KEY` = the any-owner attribute (resource ∪ span disjunction).
+    if let Some(key) = word.strip_prefix('.') {
+        return Ok(PredicateTarget::Attribute(
+            AttributeOwner::Any,
+            non_empty(key)?,
+        ));
+    }
+    for (owner_name, owner) in [
+        ("resource", AttributeOwner::Resource),
+        ("span", AttributeOwner::Span),
+        ("instrumentation", AttributeOwner::Instrumentation),
+        ("event", AttributeOwner::Event),
+        ("link", AttributeOwner::Link),
+    ] {
+        if let Some(key) = word
+            .strip_prefix(owner_name)
+            .and_then(|r| r.strip_prefix('.'))
+        {
+            return Ok(PredicateTarget::Attribute(owner, non_empty(key)?));
+        }
+    }
+    BUILTIN_WORDS
+        .iter()
+        .find(|(w, _)| *w == word)
+        .map(|(_, i)| PredicateTarget::Builtin(*i))
+        .ok_or_else(|| {
+            anyhow::anyhow!(
+                "unknown {flag} target {word:?}: use OWNER.KEY \
+                 (resource/span/instrumentation/event/link) or a builtin-field word"
+            )
+        })
+}
+
 // ── Overview ───────────────────────────────────────────────────────────
 
 /// Build the trace-density grid (time bucket × duration bin) — the
@@ -620,10 +812,10 @@ pub struct OverviewArgs {
     #[arg(long, default_value_t = 60)]
     pub buckets: usize,
 
-    /// Count only traces with a span matching every condition, as
-    /// `search --where`. Repeatable.
-    #[arg(long = "where")]
-    pub conditions: Vec<String>,
+    /// Count only the traces the tokens match (trace-duration tokens are
+    /// rejected: duration is the grid's own axis).
+    #[command(flatten)]
+    pub tokens: TokenArgs,
 }
 
 pub fn run_overview(args: &OverviewArgs, out: &mut dyn std::io::Write) -> Result<()> {
@@ -633,15 +825,8 @@ pub fn run_overview(args: &OverviewArgs, out: &mut dyn std::io::Write) -> Result
     }
     let buckets = args.buckets as i64;
     let width = (args.end_ns - args.start_ns + buckets - 1) / buckets;
-    let mut query = OverviewQuery::new(sfst::Grid::new(args.start_ns, width, args.buckets));
-    if !args.conditions.is_empty() {
-        let conditions = args
-            .conditions
-            .iter()
-            .map(|spec| parse_condition(spec))
-            .collect::<Result<_>>()?;
-        query = query.tokens(Predicate { conditions });
-    }
+    let query = OverviewQuery::new(sfst::Grid::new(args.start_ns, width, args.buckets))
+        .tokens(args.tokens.tokens(Vec::new())?);
     let sources = build_sources(&args.sfsts, &args.wals)?;
     let data = overview(
         sources,
@@ -674,17 +859,11 @@ pub struct SearchArgs {
     #[arg(long = "wal")]
     pub wals: Vec<PathBuf>,
 
-    /// A filter condition, repeatable (conditions AND). TARGET is
-    /// `OWNER.KEY` (resource/span/instrumentation/event/link), `.KEY`
-    /// (any owner: resource ∪ span), or a builtin-field word (`name`,
-    /// `status`, `kind`, …). OPS: `=`, `!=` (text), `=~`, `!~`
-    /// (anchored regex), `>`, `<`, `>=`, `<=` (numeric). This is the
-    /// dev tool's rendering of the engine's typed predicate, not a wire
-    /// grammar; values are engine storage labels.
-    #[arg(long = "where")]
-    pub conditions: Vec<String>,
+    #[command(flatten)]
+    pub tokens: TokenArgs,
 
-    /// Minimum span duration, inclusive nanoseconds.
+    /// Minimum span duration, inclusive nanoseconds (a `--where`
+    /// condition: the same span as the others).
     #[arg(long)]
     pub min_duration_ns: Option<i64>,
 
@@ -707,109 +886,8 @@ pub struct SearchArgs {
     pub end_ns: Option<i64>,
 }
 
-/// Parse one `--where` condition: `TARGET <op> VALUE`. The op match is
-/// leftmost, longest-symbol first, so `>=` never parses as `>` with a
-/// `=value` and `=~` never as `=` with a `~value`. Ordering ops take
-/// numeric values; `=`/`!=`/`=~`/`!~` take text.
-fn parse_condition(spec: &str) -> Result<Condition> {
-    const OPS: [(&str, CompareOp); 8] = [
-        ("=~", CompareOp::Regex),
-        ("!~", CompareOp::NotRegex),
-        ("!=", CompareOp::NotEq),
-        (">=", CompareOp::Gte),
-        ("<=", CompareOp::Lte),
-        (">", CompareOp::Gt),
-        ("<", CompareOp::Lt),
-        ("=", CompareOp::Eq),
-    ];
-    let (target_word, op, value) = OPS
-        .iter()
-        .filter_map(|(sym, op)| spec.find(sym).map(|at| (at, sym.len(), *op)))
-        .min_by_key(|&(at, len, _)| (at, std::cmp::Reverse(len)))
-        .map(|(at, len, op)| (&spec[..at], op, &spec[at + len..]))
-        .ok_or_else(|| anyhow::anyhow!("--where must be TARGET<op>VALUE, got {spec:?}"))?;
-    // An empty value is a structurally valid predicate that matches no
-    // well-formed dictionary entry — in this dev tool it is always a
-    // typo, so fail loudly instead of returning a silent empty result.
-    if value.is_empty() {
-        bail!("--where {spec:?} has an empty value");
-    }
-    let target = parse_target(target_word.trim())?;
-    let value = if matches!(
-        op,
-        CompareOp::Gt | CompareOp::Lt | CompareOp::Gte | CompareOp::Lte
-    ) {
-        if let Ok(n) = value.parse::<i64>() {
-            PredicateValue::Integer(n)
-        } else if let Ok(f) = value.parse::<f64>() {
-            PredicateValue::Float(f)
-        } else {
-            bail!("--where {spec:?}: ordering comparisons take a numeric value");
-        }
-    } else {
-        PredicateValue::Text(value.to_string())
-    };
-    Ok(Condition {
-        target,
-        op,
-        values: vec![value],
-    })
-}
-
-/// A `--where` target: `OWNER.KEY` for the attribute owners, a bare
-/// builtin-field word otherwise.
-fn parse_target(word: &str) -> Result<PredicateTarget> {
-    // An empty key after the owner strip (a bare `.` or a trailing
-    // `owner.`) is a structurally valid predicate that matches no
-    // dictionary entry — positive or negated (the pinned rule is
-    // presence ∩ complement, so absence never satisfies `!=` either).
-    // The same always-a-typo class as an empty value: fail loudly
-    // instead of returning a silent empty result.
-    let non_empty = |key: &str| -> Result<String> {
-        if key.is_empty() {
-            bail!("--where target {word:?} has an empty attribute key");
-        }
-        Ok(key.to_string())
-    };
-    // `.KEY` = the any-owner attribute (resource ∪ span disjunction).
-    if let Some(key) = word.strip_prefix('.') {
-        return Ok(PredicateTarget::Attribute(
-            AttributeOwner::Any,
-            non_empty(key)?,
-        ));
-    }
-    for (owner_name, owner) in [
-        ("resource", AttributeOwner::Resource),
-        ("span", AttributeOwner::Span),
-        ("instrumentation", AttributeOwner::Instrumentation),
-        ("event", AttributeOwner::Event),
-        ("link", AttributeOwner::Link),
-    ] {
-        if let Some(key) = word
-            .strip_prefix(owner_name)
-            .and_then(|r| r.strip_prefix('.'))
-        {
-            return Ok(PredicateTarget::Attribute(owner, non_empty(key)?));
-        }
-    }
-    BUILTIN_WORDS
-        .iter()
-        .find(|(w, _)| *w == word)
-        .map(|(_, i)| PredicateTarget::Builtin(*i))
-        .ok_or_else(|| {
-            anyhow::anyhow!(
-                "unknown --where target {word:?}: use OWNER.KEY \
-                 (resource/span/instrumentation/event/link) or a builtin-field word"
-            )
-        })
-}
-
 pub fn run_search(args: &SearchArgs, out: &mut dyn std::io::Write) -> Result<()> {
-    let mut conditions: Vec<Condition> = args
-        .conditions
-        .iter()
-        .map(|spec| parse_condition(spec))
-        .collect::<Result<_>>()?;
+    let mut conditions = Vec::new();
     if let Some(min) = args.min_duration_ns {
         conditions.push(Condition {
             target: PredicateTarget::Builtin(BuiltinField::Duration),
@@ -825,7 +903,7 @@ pub fn run_search(args: &SearchArgs, out: &mut dyn std::io::Write) -> Result<()>
         });
     }
 
-    let mut query = SearchQuery::new(Predicate { conditions });
+    let mut query = SearchQuery::new(args.tokens.tokens(conditions)?);
     if let Some(window) = parse_window(args.start_ns, args.end_ns)? {
         query = query.window(window);
     }
@@ -883,20 +961,144 @@ mod tests {
     #[test]
     fn where_targets_reject_empty_keys_but_keep_dotted_ones() {
         for bad in [".", "span.", "resource.", "event."] {
-            let err = parse_target(bad).expect_err(bad);
+            let err = parse_target("--where", bad).expect_err(bad);
             assert!(
                 err.to_string().contains("empty attribute key"),
                 "{bad}: {err}"
             );
         }
         assert!(matches!(
-            parse_target("..foo"),
+            parse_target("--where", "..foo"),
             Ok(PredicateTarget::Attribute(AttributeOwner::Any, k)) if k == ".foo"
         ));
         assert!(matches!(
-            parse_target("span.http.method"),
+            parse_target("--where", "span.http.method"),
             Ok(PredicateTarget::Attribute(AttributeOwner::Span, k)) if k == "http.method"
         ));
+    }
+
+    fn text(v: &str) -> PredicateValue {
+        PredicateValue::Text(v.to_string())
+    }
+
+    fn cond(target: PredicateTarget, op: CompareOp, values: Vec<PredicateValue>) -> Condition {
+        Condition { target, op, values }
+    }
+
+    fn span_attr(key: &str) -> PredicateTarget {
+        PredicateTarget::Attribute(AttributeOwner::Span, key.to_string())
+    }
+
+    /// Every op spelling, matched leftmost and longest first: `^=` /
+    /// `!^=` become the starts-with regex, the others keep their value.
+    #[test]
+    fn condition_ops_parse_leftmost_longest() {
+        let name = || PredicateTarget::Builtin(BuiltinField::Name);
+        for (spec, want) in [
+            ("name=a=b", cond(name(), CompareOp::Eq, vec![text("a=b")])),
+            ("name!=a", cond(name(), CompareOp::NotEq, vec![text("a")])),
+            (
+                "name=~a.*",
+                cond(name(), CompareOp::Regex, vec![text("a.*")]),
+            ),
+            (
+                "name!~a",
+                cond(name(), CompareOp::NotRegex, vec![text("a")]),
+            ),
+            (
+                "name^=a.b",
+                cond(name(), CompareOp::Regex, vec![text(r"a\.b(?s:.*)")]),
+            ),
+            (
+                "span.k!^=x",
+                cond(span_attr("k"), CompareOp::NotRegex, vec![text("x(?s:.*)")]),
+            ),
+            (
+                "span.k>=5",
+                cond(
+                    span_attr("k"),
+                    CompareOp::Gte,
+                    vec![PredicateValue::Integer(5)],
+                ),
+            ),
+            (
+                "span.k<1.5",
+                cond(
+                    span_attr("k"),
+                    CompareOp::Lt,
+                    vec![PredicateValue::Float(1.5)],
+                ),
+            ),
+        ] {
+            assert_eq!(parse_condition("--and", spec).unwrap(), want, "{spec}");
+        }
+        for (spec, why) in [
+            ("name", "must be TARGET<op>VALUE"),
+            ("name^=", "empty value"),
+            ("span.k>x", "numeric value"),
+            ("span.=x", "empty attribute key"),
+        ] {
+            let err = parse_condition("--not", spec).unwrap_err().to_string();
+            assert!(err.contains("--not") && err.contains(why), "{spec}: {err}");
+        }
+    }
+
+    /// `--where` (plus the command's own conditions) stays one same-span
+    /// group with its trace-level conditions split out; each `--and`,
+    /// `--not` and `--text` is a token of its own.
+    #[test]
+    fn token_flags_build_the_query() {
+        let flags = TokenArgs {
+            conditions: vec!["name=a".into(), "root-name=r".into()],
+            and: vec!["span.k^=p".into()],
+            not: vec!["status=ERROR".into()],
+            text: vec!["checkout".into()],
+        };
+        let duration = cond(
+            PredicateTarget::Builtin(BuiltinField::Duration),
+            CompareOp::Gte,
+            vec![PredicateValue::Integer(5)],
+        );
+        let group = |conditions| Predicate { conditions };
+        assert_eq!(
+            flags.tokens(vec![duration.clone()]).unwrap(),
+            TokenQuery {
+                tokens: vec![
+                    Token::positive(group(vec![
+                        cond(
+                            PredicateTarget::Builtin(BuiltinField::Name),
+                            CompareOp::Eq,
+                            vec![text("a")]
+                        ),
+                        duration,
+                    ])),
+                    Token::positive(group(vec![cond(
+                        PredicateTarget::Builtin(BuiltinField::RootName),
+                        CompareOp::Eq,
+                        vec![text("r")]
+                    )])),
+                    Token::positive(group(vec![cond(
+                        span_attr("k"),
+                        CompareOp::Regex,
+                        vec![text("p(?s:.*)")]
+                    )])),
+                    Token::negated(group(vec![cond(
+                        PredicateTarget::Builtin(BuiltinField::Status),
+                        CompareOp::Eq,
+                        vec![text("ERROR")]
+                    )])),
+                    Token::positive(group(vec![cond(
+                        PredicateTarget::FreeText,
+                        CompareOp::Contains,
+                        vec![text("checkout")]
+                    )])),
+                ]
+            }
+        );
+        assert_eq!(
+            TokenArgs::default().tokens(Vec::new()).unwrap(),
+            TokenQuery::default()
+        );
     }
 
     /// Content corruption is per-source: a WAL with a garbage header is
