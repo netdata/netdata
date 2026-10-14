@@ -220,7 +220,7 @@ static struct proc_module {
      .func = do_PerflibMSMQ,
      .rd = NULL,
      .thread = NULL,
-     .cleanup = NULL},
+     .cleanup = do_PerflibMSMQ_cleanup},
     {.name = "PerflibNUMA",
      .dim = "PerflibNUMA",
      .enabled = CONFIG_BOOLEAN_YES,

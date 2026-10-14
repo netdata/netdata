@@ -38,6 +38,7 @@ To change a setting, remove the comment symbol (`#`) from the beginning of the l
         # PerflibADCS = yes
         # PerflibADFS = yes
         # PerflibExchange = yes
+        # PerflibMSMQ = yes
         # PerflibNUMA = yes
         # PerflibASP = yes
 ```
@@ -64,3 +65,18 @@ and `HyperV` threads:
 [plugin:windows:PerflibHyperV]
         #update every = 15s
 ```
+
+## PerflibMSMQ
+
+`PerflibMSMQ` collects queue and journal message/byte counts. By default, it charts up to 100 queues individually and
+sums the remaining queues into an `Other (aggregated)` series. Configure it in `[plugin:windows:PerflibMSMQ]`:
+
+```ini
+[plugin:windows:PerflibMSMQ]
+    queues to chart individually = *
+    max individually charted queues = 100
+```
+
+The selector accepts comma or pipe separated case-insensitive simple patterns; prefix a comma or pipe with `\` to
+match it literally. Matching queue names are selected in case-insensitive alphabetical order; the cap may be set to
+`0` to aggregate all queues.

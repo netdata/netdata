@@ -58,6 +58,7 @@ int do_PerflibADFS(int update_every, usec_t dt);
 int do_PerflibHyperV(int update_every, usec_t dt);
 int do_PerflibExchange(int update_every, usec_t dt __maybe_unused);
 int do_PerflibMSMQ(int update_every, usec_t dt __maybe_unused);
+void do_PerflibMSMQ_cleanup(void);
 int do_PerflibNUMA(int update_every, usec_t dt __maybe_unused);
 int do_PerflibASP(int update_every, usec_t dt __maybe_unused);
 int do_PerflibSMB(int update_every, usec_t dt __maybe_unused);

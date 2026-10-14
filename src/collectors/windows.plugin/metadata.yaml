@@ -5064,9 +5064,13 @@ modules:
       default_behavior:
         auto_detection:
           description: |
-            The collector automatically detects all MSMQ queues. No further configuration is required.
+            The collector detects MSMQ queues automatically, charts up to 100 matching queues individually by default,
+            and aggregates unmatched or over-limit queues into an `Other (aggregated)` series. Configure the selector
+            and cap in `[plugin:windows:PerflibMSMQ]`.
         limits:
-          description: ""
+          description: |
+            By default, at most 100 queues are charted individually. Remaining queues are aggregated; setting the
+            individual queue limit to 0 aggregates all queues.
         performance_impact:
           description: ""
     setup:
@@ -5091,6 +5095,19 @@ modules:
               description: Data collection frequency.
               default_value: 1
               required: false
+            - name: queues to chart individually
+              description: |
+                Case-insensitive simple patterns separated by commas or pipes. Escape a comma or pipe with a backslash
+                to match that character literally. Matching queues are chosen in case-insensitive alphabetical order
+                before applying the individual chart limit.
+              default_value: "*"
+              required: false
+            - name: max individually charted queues
+              description: |
+                Maximum number of matching queues to chart individually. Other queues are summed into the `Other
+                (aggregated)` series; 0 aggregates all queues.
+              default_value: 100
+              required: false
         examples:
           folding:
             enabled: true
@@ -5108,10 +5125,10 @@ modules:
       availability: []
       scopes:
         - name: queue
-          description: "These metrics refer to a single MSMQ queue."
+          description: "These metrics refer to one MSMQ queue or the aggregate of queues selected for the Other series."
           labels:
             - name: queue
-              description: The name of the MSMQ queue.
+              description: The queue name, or `Other (aggregated)` for the sum of queues not charted individually.
           metrics:
             - name: msmq.queue_messages
               description: MSMQ messages in queue
