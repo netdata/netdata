@@ -13,8 +13,8 @@ use std::process::ExitCode;
 use clap::Parser;
 
 use sfsq_cli::traces::{
-    AttributeValuesArgs, AttributesArgs, SearchArgs, TraceArgs, run_attribute_values,
-    run_attributes, run_search, run_trace,
+    AttributeValuesArgs, AttributesArgs, SearchArgs, SuggestArgs, TraceArgs, run_attribute_values,
+    run_attributes, run_search, run_suggest, run_trace,
 };
 use sfsq_cli::{Args, init_tracing, is_broken_pipe, run};
 
@@ -46,6 +46,9 @@ enum Cmd {
     /// Search for traces across sealed SFSTs and traces WALs
     /// (`sfsq::traces` search: exact summaries, most-recent-first).
     Search(SearchArgs),
+    /// Suggest keys, or one key's values, matching a term (the search
+    /// bar's suggestions: newest data first, bounded).
+    Suggest(SuggestArgs),
 }
 
 /// Run one query and map its result to a process exit code. Bad argv exits
@@ -62,6 +65,7 @@ fn main() -> ExitCode {
         Some(Cmd::Attributes(args)) => Some(run_attributes(args, &mut out)),
         Some(Cmd::AttributeValues(args)) => Some(run_attribute_values(args, &mut out)),
         Some(Cmd::Search(args)) => Some(run_search(args, &mut out)),
+        Some(Cmd::Suggest(args)) => Some(run_suggest(args, &mut out)),
         None => None,
     };
     if let Some(result) = subcommand {

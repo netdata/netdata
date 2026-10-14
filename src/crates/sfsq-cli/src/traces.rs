@@ -1,10 +1,12 @@
-//! `sfsq-cli trace` / `attributes` / `attribute-values` / `search` — the
-//! `sfsq::traces` engine from the terminal, without a running agent. Each
-//! subcommand takes an explicit file list (`--sfst` sealed files, `--wal`
-//! traces WALs) instead of the logs front door's directory discovery;
-//! `trace` reconstructs one trace through the shared combiner,
-//! `attributes` / `attribute-values` enumerate the key vocabulary off the
-//! dictionaries, `search` filters whole traces.
+//! `sfsq-cli trace` / `attributes` / `attribute-values` / `suggest` /
+//! `search` — the `sfsq::traces` engine from the terminal, without a
+//! running agent. Each subcommand takes an explicit file list (`--sfst`
+//! sealed files, `--wal` traces WALs) instead of the logs front door's
+//! directory discovery; `trace` reconstructs one trace through the shared
+//! combiner, `attributes` / `attribute-values` enumerate the key
+//! vocabulary off the dictionaries, `suggest` matches keys or values
+//! against a term (and prints its time, for measurements), `search`
+//! filters whole traces.
 //!
 //! WAL inputs are served as tail scans over the file's full frame range —
 //! right for shut-down or recovered WALs (the dev case); an actively
@@ -24,8 +26,8 @@ use tokio_util::sync::CancellationToken;
 use sfsq::traces::{
     AttributeKey, AttributeNamesQuery, AttributeOwner, AttributeValuesQuery, BuiltinField,
     CompareOp, Condition, Predicate, PredicateTarget, PredicateValue, QueryStatus, SearchQuery,
-    SearchSources, SourceId, TimeWindow, TraceQuery, TraceSfstCandidate, TraceSource, TraceWalTail,
-    WalCoverage, attribute_names, attribute_values, search, trace_by_id,
+    SearchSources, SourceId, SuggestQuery, TimeWindow, TraceQuery, TraceSfstCandidate, TraceSource,
+    TraceWalTail, WalCoverage, attribute_names, attribute_values, search, suggest, trace_by_id,
 };
 
 /// Reconstruct one trace across sealed SFSTs and traces WALs.
@@ -470,6 +472,122 @@ pub fn run_attribute_values(
         data.values.len(),
         data.truncated,
         status_word(&data.status),
+    )?;
+    Ok(())
+}
+
+// ── Suggest ────────────────────────────────────────────────────────────
+
+/// Suggest keys, or one key's values, matching a term — the search
+/// bar's suggestions, newest data first, bounded in items, sources and
+/// time.
+#[derive(Debug, clap::Args)]
+pub struct SuggestArgs {
+    /// A sealed traces SFST file. Repeatable.
+    #[arg(long = "sfst")]
+    pub sfsts: Vec<PathBuf>,
+
+    /// A flattened traces WAL file, scanned whole as a tail. Repeatable.
+    #[arg(long = "wal")]
+    pub wals: Vec<PathBuf>,
+
+    /// Suggest this key's values (with --key); without it, suggest keys.
+    #[arg(long, value_enum, requires = "key")]
+    pub owner: Option<OwnerArg>,
+
+    /// The key: the bare attribute name, or (under --owner builtin) a
+    /// builtin-field word.
+    #[arg(long, requires = "owner")]
+    pub key: Option<String>,
+
+    /// The typed text; empty matches everything.
+    #[arg(long, default_value = "")]
+    pub term: String,
+
+    /// Cap the suggestions (exact truncation flag); 0 is rejected.
+    #[arg(long)]
+    pub max_items: Option<usize>,
+
+    /// Stop after this many sources that carry the key; 0 is rejected.
+    #[arg(long)]
+    pub max_files: Option<usize>,
+
+    /// Stop after this many consecutive sources that add nothing.
+    #[arg(long)]
+    pub stale_files: Option<usize>,
+
+    /// Stop walking sources after this many milliseconds.
+    #[arg(long)]
+    pub deadline_ms: Option<u64>,
+
+    /// Window start, nanoseconds since the epoch (half-open; file-granular
+    /// pruning). Requires --end-ns.
+    #[arg(long, allow_hyphen_values = true)]
+    pub start_ns: Option<i64>,
+
+    /// Window end, nanoseconds since the epoch (exclusive). Requires
+    /// --start-ns.
+    #[arg(long, allow_hyphen_values = true)]
+    pub end_ns: Option<i64>,
+}
+
+/// This tool's key rendering: `<owner>.<key>`, a builtin by its word.
+fn cli_key(owner: AttributeOwner, key: &AttributeKey) -> String {
+    match key {
+        AttributeKey::Builtin(_) => key_word(key),
+        AttributeKey::Attribute(_) => format!("{}.{}", owner_word(owner), key_word(key)),
+    }
+}
+
+pub fn run_suggest(args: &SuggestArgs, out: &mut dyn std::io::Write) -> Result<()> {
+    let started = std::time::Instant::now();
+    let mut query = match (args.owner, &args.key) {
+        (Some(owner), Some(key)) => {
+            let owner: AttributeOwner = owner.into();
+            SuggestQuery::values(owner, parse_key(owner, key)?)
+        }
+        _ => SuggestQuery::keys(cli_key),
+    };
+    query = query.term(args.term.clone());
+    if let Some(max) = args.max_items {
+        query = query.max_items(max);
+    }
+    if let Some(max) = args.max_files {
+        query = query.max_files(max);
+    }
+    if let Some(n) = args.stale_files {
+        query = query.stale_files(n);
+    }
+    if let Some(ms) = args.deadline_ms {
+        query = query.deadline(started + std::time::Duration::from_millis(ms));
+    }
+    if let Some(window) = parse_window(args.start_ns, args.end_ns)? {
+        query = query.window(window);
+    }
+    let sources = build_sources(&args.sfsts, &args.wals)?;
+    let data = suggest(
+        sources,
+        query,
+        CancellationToken::new(),
+        Arc::new(AtomicUsize::new(0)),
+    )?;
+    let elapsed = started.elapsed();
+    for s in &data.items {
+        let tier = s.tier.map(|t| format!(" tier={t:?}")).unwrap_or_default();
+        let cut = if s.truncated { " truncated" } else { "" };
+        writeln!(out, "{} match={:?}{tier}{cut}", s.text, s.class)?;
+    }
+    let complete = data
+        .complete_after
+        .map(|t| format!(", complete after {t}"))
+        .unwrap_or_default();
+    writeln!(
+        out,
+        "{} suggestion(s), truncated {}, status {}{complete}, {:.1} ms",
+        data.items.len(),
+        data.truncated,
+        status_word(&data.status),
+        elapsed.as_secs_f64() * 1000.0,
     )?;
     Ok(())
 }
