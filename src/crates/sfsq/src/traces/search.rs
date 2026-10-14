@@ -100,7 +100,10 @@
 //! found trace's rows, or the gate's root values. Corruption in what a
 //! query never reads (a slack-only file that holds none of its
 //! candidates, a dictionary no step needs) is therefore not discovered,
-//! so it is not reported. Window files also compile lazily, newest first
+//! so it is not reported; corruption found mid-query (a window file's
+//! dictionary at its compile, a file's rows at a merge) degrades every
+//! assembly from that point on, while traces assembled before it stay
+//! exact. Window files also compile lazily, newest first
 //! (by the rank bound their summaries give), and only while that bound
 //! can still beat the N-th result: an older file is never compiled, and
 //! a work ceiling stops after the newest files, not in source-id order.
@@ -896,7 +899,27 @@ pub fn search(
             break; // complete: nothing left could change the top `limit`
         }
 
-        if pool_threat {
+        // The newest pending file compiles when it may hold a newer
+        // candidate than any compiled file still can (its bound is
+        // exclusive, a compiled file's inclusive) — and before the pool is
+        // examined when it may also beat the pool's best: compiled eagerly,
+        // its candidates would rank there, and examining the pool first
+        // only costs assemblies that can fall out of the page.
+        let compiled_bound = files
+            .iter()
+            .filter_map(FileDiscovery::undiscovered_bound)
+            .max();
+        let compile_next = pending_threat
+            && work.rows_visited <= query.visited_ceiling
+            && pending
+                .front()
+                .is_some_and(|next| compiled_bound.is_none_or(|b| next.rank_bound > b));
+        let compile_first = compile_next
+            && pool.peek().is_some_and(|(start, _)| {
+                pending.front().is_some_and(|next| next.rank_bound > start)
+            });
+
+        if pool_threat && !compile_first {
             // Assembly has its own deterministic ceiling; a breach
             // terminates with the gathered, ranked, trimmed result
             // (R2-4) — Partial, because a threat still stood.
@@ -1031,17 +1054,7 @@ pub fn search(
             status.add(PartialReason::WorkCeiling);
             break;
         }
-        // Compile the newest pending file when it may hold a newer
-        // candidate than any compiled file still can (its bound is
-        // exclusive, a compiled file's inclusive).
-        let compiled_bound = files
-            .iter()
-            .filter_map(FileDiscovery::undiscovered_bound)
-            .max();
-        if pending_threat
-            && let Some(next) = pending.front()
-            && compiled_bound.is_none_or(|b| next.rank_bound > b)
-        {
+        if compile_next {
             let PendingFile { slot, rank_bound } = pending.pop_front().expect("peeked");
             if cancel.is_cancelled() {
                 return Ok(cancelled_empty(status));

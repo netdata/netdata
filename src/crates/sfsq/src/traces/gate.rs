@@ -21,9 +21,12 @@
 //! by explicit ruling as recall-miss only.
 //!
 //! The caller engages the gate only when every completion source
-//! opened at setup: a source that failed or was unavailable holds
-//! spans the gate cannot see, so every assembly is already degraded
-//! and nothing may be pruned toward.
+//! opened at setup (its metadata view): a source that failed or was
+//! unavailable holds spans the gate cannot see, so every assembly is
+//! already degraded and nothing may be pruned toward. A file that opens
+//! but later fails to open fully (a corrupt dictionary found at a plan
+//! compile or a merge) degrades every assembly from that point on, the
+//! same point-of-discovery rule as a corrupt rollup below.
 //!
 //! # Prune rules
 //!
