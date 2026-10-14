@@ -1150,13 +1150,13 @@ fn multi_plan_compile_equals_per_plan() {
 
 /// A live subgroup plan compiled beside a high-card plan refines the
 /// same rows as when compiled alone.
-#[test]
-fn multi_plan_compile_refines_subgroups() {
-    const ROWS: usize = 128;
+/// 128 rows, each with a high-card `h=wNNN` and one event named
+/// `eNN` (16 names, the mid tier).
+fn event_file() -> Vec<u8> {
     let arena = Bump::new();
     let mut ri = RowIndex::new(&arena, 10);
     let mut events = crate::EventRows::new();
-    for i in 0..ROWS {
+    for i in 0..128 {
         let h = ri.intern(None, &format!("h=w{i:03}"));
         let name = ri.intern(None, &format!("events.name=e{:02}", i % 16));
         ri.row(1_000 + i as i64, &[h, name]);
@@ -1165,7 +1165,13 @@ fn multi_plan_compile_refines_subgroups() {
     }
     ri.events = Some(events);
     let (buf, _s, _m) = IndexWriter::write_into(&ri, Cursor::new(Vec::new()), Vec::new()).unwrap();
-    let bytes = buf.into_inner();
+    buf.into_inner()
+}
+
+#[test]
+fn multi_plan_compile_refines_subgroups() {
+    const ROWS: usize = 128;
+    let bytes = event_file();
     let idx = IndexReader::open(&bytes).unwrap();
     let plans = vec![
         plan(vec![PlanTerm::EventGroup {
@@ -1202,8 +1208,9 @@ fn multi_plan_compile_refines_subgroups() {
     );
 }
 
-/// Membership agrees with the range count at every position, inside
-/// and outside the compile range and past the universe.
+/// Membership agrees with the range count inside the compile range and
+/// is false outside it — for whole-file dictionary sets too — and past
+/// the universe.
 #[test]
 fn contains_equals_count_in_range() {
     let (bytes, _) = fixture();
@@ -1223,12 +1230,43 @@ fn contains_equals_count_in_range() {
                 .unwrap()
                 .expect("unbounded");
             for pos in 0..N as u32 + 5 {
+                let in_range = (range.0..range.1).contains(&pos);
                 assert_eq!(
                     compiled.contains(pos),
-                    compiled.count_in_range(pos, pos + 1) == 1,
+                    in_range && compiled.count_in_range(pos, pos + 1) == 1,
                     "plan {i}, range {range:?}, pos {pos}"
                 );
             }
         }
     }
+}
+
+/// A subgroup field condition walks its dictionary twice (the flat
+/// pre-filter, then the KvIds the refine needs); a ceiling crossed by
+/// the first walk stops before the second.
+#[test]
+fn subgroup_field_stops_after_one_walk() {
+    let bytes = event_file();
+    let idx = IndexReader::open(&bytes).unwrap();
+    let p = plan(vec![PlanTerm::EventGroup {
+        conditions: vec![crate::GroupCondition::Field {
+            field: "events.name".to_string(),
+            matcher: crate::PlanMatcher::Contains("e0".to_string()),
+        }],
+    }]);
+    let one_walk = 16 * "events.name=e00".len() as u64;
+    let mut work = ScanWork::default();
+    compile(&idx, &p, &mut work);
+    assert_eq!(work.dict_bytes, 2 * one_walk, "both walks charged");
+    let mut work = ScanWork::default();
+    let limits = ScanLimits {
+        rows: u64::MAX,
+        dict_bytes: one_walk - 1,
+    };
+    assert!(
+        idx.compile_trace_plan(&p, (0, 128), limits, &mut work)
+            .unwrap()
+            .is_none()
+    );
+    assert_eq!(work.dict_bytes, one_walk);
 }

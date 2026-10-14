@@ -303,6 +303,10 @@ pub struct CompiledTracePlan {
     set: PosSet,
     /// The file's record count — the hard clamp on extraction ranges.
     universe: u32,
+    /// The compile range `[lo, hi)`: the set is exact within it only
+    /// (dictionary terms hold the whole file, column and refine terms
+    /// the range).
+    range: (u32, u32),
 }
 
 /// One per-field resolution: a set already known (low/mid tiers, absent
@@ -616,6 +620,7 @@ impl IndexReader<'_> {
             out.push(CompiledTracePlan {
                 set,
                 universe: total,
+                range,
             });
         }
         Ok(Some(out))
@@ -778,6 +783,11 @@ impl IndexReader<'_> {
                                     probes,
                                     work,
                                 )?;
+                                // Two walks of the same dictionary, each
+                                // checked: the overshoot stays one walk.
+                                if dict_over(work) {
+                                    return Ok(None);
+                                }
                                 parts.push((m, None));
                                 resolved_conditions.push(ResolvedGroupCondition::Kv(
                                     self.field_matching_kvids(field, &test, work)?,
@@ -1223,9 +1233,10 @@ impl CompiledTracePlan {
     /// visit. Its cost grows with the tree bytes before `pos` (the
     /// serialized tree has no skip index), so many probes against one
     /// plan are better batched. Positions outside the compile range
-    /// never match.
+    /// never match, whatever the term kinds.
     pub fn contains(&self, pos: u32) -> bool {
-        pos < self.universe && self.set.contains(pos)
+        let (lo, hi) = self.range;
+        (lo..hi).contains(&pos) && self.set.contains(pos)
     }
 
     /// Matched-position count within `[lo, hi)` — a bitmap-tree walk, no
