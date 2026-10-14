@@ -1296,3 +1296,24 @@ fn grid_trace_id_tokens() {
         2
     );
 }
+
+/// A filter of `trace_id` tokens alone is tested on the ids: no source
+/// is scanned, so even a file whose dictionary is corrupt answers.
+#[test]
+fn trace_id_only_filter_scans_no_source() {
+    let dir = tempfile::tempdir().unwrap();
+    let wal = write_wal(dir.path(), vec![req(&corpus())], "ids");
+    drop(sealed_source(dir.path(), &wal, "s"));
+    let path = dir.path().join("s.sfst");
+    corrupt_chunk(&path, *b"PRIM");
+    let a = Predicate {
+        conditions: vec![Condition {
+            target: PredicateTarget::Builtin(BuiltinField::TraceId),
+            op: CompareOp::Eq,
+            values: vec![text(&sfst::TraceId::from([0xA; 16]).to_string())],
+        }],
+    };
+    let data = tokens_grid(vec![sealed_source_at(&path, "s")], vec![Token::positive(a)]);
+    assert_eq!(data.status, QueryStatus::Complete);
+    assert_eq!(data.total_traces, 1, "trace A");
+}

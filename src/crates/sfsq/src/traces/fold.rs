@@ -176,6 +176,12 @@ impl TokenFilter {
         Some(filter)
     }
 
+    /// Whether a source must be scanned for bits: only span-local and
+    /// root tokens set any (`trace_id` tokens are tested on the id).
+    fn scans(&self) -> bool {
+        !self.span.is_empty() || !self.roots.is_empty()
+    }
+
     /// Whether a merged trace passes (the type docs).
     pub(crate) fn passes(&self, trace_id: sfst::TraceId, m: &MergedTrace) -> bool {
         m.mask & self.required == self.required
@@ -599,7 +605,9 @@ pub(crate) fn merge_trace_sources(
                 };
                 let aggs = sealed_trace_envelopes(&rollup);
                 fold_into(&mut local, &aggs);
-                if let Some(filter) = &spec.filter {
+                if let Some(filter) = &spec.filter
+                    && filter.scans()
+                {
                     // Only a filter needs the full reader (PRIM).
                     let marked = meta.into_index_reader().and_then(|reader| {
                         filter.mark_sealed(&reader, &rollup, &mut local, &mut filter_work, limits)
@@ -632,6 +640,7 @@ pub(crate) fn merge_trace_sources(
             Prepared::Tail(scan, aggs) => {
                 fold_into(&mut local, &aggs);
                 if let Some(filter) = &spec.filter
+                    && filter.scans()
                     && !filter.mark_tail(&scan, &mut local, &mut filter_work, spec.filter_ceiling)
                 {
                     mark_unknown(&mut local, &aggs);
