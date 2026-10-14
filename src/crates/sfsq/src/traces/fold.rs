@@ -105,6 +105,9 @@ pub(crate) struct MergedTrace {
     /// A source holding this trace failed its filter scan, so its bits
     /// are not all known: the trace cannot pass a negated token.
     pub unknown: bool,
+    /// A source withheld its root claim (an ambiguous tie): the root is
+    /// unknown, so the trace cannot pass a negated root token either.
+    pub root_unknown: bool,
 }
 
 /// The overview's token filter (its module docs), lowered once for the
@@ -122,6 +125,8 @@ pub(crate) struct TokenFilter {
     span: Vec<(u32, SpanToken)>,
     plans: Vec<TracePlan>,
     roots: Vec<(u32, TraceLevelEval)>,
+    /// The bits of the root tokens.
+    root_mask: u32,
     required: u32,
     forbidden: u32,
     trace_ids: TraceIdConstraints,
@@ -139,6 +144,7 @@ impl TokenFilter {
             span: Vec::new(),
             plans: Vec::new(),
             roots: Vec::new(),
+            root_mask: 0,
             required: 0,
             forbidden: 0,
             trace_ids: TraceIdConstraints::default(),
@@ -154,6 +160,7 @@ impl TokenFilter {
                 }
                 TokenKind::TraceLevel => {
                     filter.roots.push((bit, TraceLevelEval::new(&token.group)));
+                    filter.root_mask |= bit;
                 }
                 TokenKind::TraceId => {
                     filter.trace_ids.add_token(token);
@@ -174,6 +181,7 @@ impl TokenFilter {
         m.mask & self.required == self.required
             && m.mask & self.forbidden == 0
             && !(m.unknown && self.forbidden != 0)
+            && !(m.root_unknown && self.forbidden & self.root_mask != 0)
             && self.trace_ids.admits(trace_id)
     }
 
@@ -206,6 +214,11 @@ impl TokenFilter {
         let mut resolver = sfst::RollupRefResolver::new();
         for i in 0..rollup.len() {
             let row = rollup.row_at(i);
+            if row.root_claim == sfst::ROOT_CLAIM_WITHHELD
+                && let Some(m) = merged.get_mut(&rollup.trace_ids.get(i))
+            {
+                m.root_unknown = true;
+            }
             if row.root_claim != sfst::ROOT_CLAIM_TRUE {
                 continue; // no root, or one of unknown value: no root bit
             }
@@ -328,6 +341,11 @@ impl TokenFilter {
         // as a sealed file's rollup claims are read.
         for (trace_id, pick) in roots {
             let Some((service, name)) = pick.as_ref().and_then(RootPick::true_root) else {
+                if pick.is_some()
+                    && let Some(m) = merged.get_mut(&trace_id)
+                {
+                    m.root_unknown = true; // withheld
+                }
                 continue;
             };
             let bits = self.root_bits(name, service);
@@ -375,6 +393,7 @@ fn fold_into(merged: &mut HashMap<sfst::TraceId, MergedTrace>, aggs: &[TraceAggr
             error_count: 0,
             mask: 0,
             unknown: false,
+            root_unknown: false,
         });
         m.min_start_ns = m.min_start_ns.min(a.min_start_ns);
         m.max_end_ns = m.max_end_ns.max(a.max_end_ns);
@@ -391,6 +410,7 @@ fn merge_into(into: &mut MergedTrace, from: &MergedTrace) {
     into.error_count = into.error_count.saturating_add(from.error_count);
     into.mask |= from.mask;
     into.unknown |= from.unknown;
+    into.root_unknown |= from.root_unknown;
 }
 
 /// A prefix source pass 1 opened, kept for pass 2: a sealed file is

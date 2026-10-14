@@ -3133,3 +3133,58 @@ fn rows_never_hit_the_span_cap() {
     let canon = run(sources(), canon_query(pred(vec![])).span_cap_for_tests(2));
     assert!(canon.status.has(PartialReason::SizeCap));
 }
+
+/// A withheld root claim (copies of one root span disagreeing on their
+/// facets) leaves the root unknown: a root chip of either polarity
+/// excludes the trace, on the list and the heatmap; without a root chip
+/// the trace lists, with no root shown.
+#[test]
+fn withheld_root_is_unknown_to_root_chips() {
+    let dir = tempfile::tempdir().unwrap();
+    let svc = || vec![kv_str("service.name", "x")];
+    let mut a = span_in(1, 0x11, 0, 100 * NS, "root");
+    a.kind = 1;
+    let mut b = a.clone();
+    b.kind = 2;
+    let wal = write_wal(dir.path(), vec![req_with(svc(), None, &[a, b])], "withheld");
+    let sources = || both_roles(|| vec![sealed_source(dir.path(), &wal, "one")]);
+    let root_x = || {
+        pred(vec![builtin(
+            BuiltinField::RootServiceName,
+            CompareOp::Eq,
+            vec![text("x")],
+        )])
+    };
+    let negated = TokenQuery {
+        tokens: vec![Token::negated(root_x())],
+    };
+    let positive = TokenQuery {
+        tokens: vec![Token::positive(root_x())],
+    };
+    assert!(
+        run(sources(), SearchQuery::new(negated.clone()))
+            .traces
+            .is_empty()
+    );
+    assert!(
+        run(sources(), SearchQuery::new(positive.clone()))
+            .traces
+            .is_empty()
+    );
+    let all = run(sources(), SearchQuery::new(pred(vec![])));
+    assert_eq!(ids(&all), vec![hex(1)]);
+    assert_eq!(all.traces[0].root_service, None);
+    let grid = |tokens: TokenQuery| {
+        sfsq::traces::overview(
+            vec![sealed_source(dir.path(), &wal, "g")],
+            sfsq::traces::OverviewQuery::new(sfst::Grid::new(0, 1_000 * NS as i64, 1))
+                .tokens(tokens),
+            CancellationToken::new(),
+            Arc::new(AtomicUsize::new(0)),
+        )
+        .unwrap()
+        .total_traces
+    };
+    assert_eq!(grid(negated), 0, "heatmap: negated");
+    assert_eq!(grid(positive), 0, "heatmap: positive");
+}

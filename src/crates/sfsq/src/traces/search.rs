@@ -1042,6 +1042,15 @@ fn row_from_parts(
     if scope.lowered.needs_whole_trace() && !scope.exact {
         return RowOutcome::NoMatch; // indeterminate → excluded
     }
+    // An unknown root (a withheld claim) is indeterminate for a root
+    // condition of either polarity (decision 15): excluded.
+    if matches!(root, PickedRoot::Unknown) && scope.lowered.reads_root() {
+        return RowOutcome::NoMatch;
+    }
+    let root = match root {
+        PickedRoot::Known(service, name) => Some((service, name)),
+        PickedRoot::Absent | PickedRoot::Unknown => None,
+    };
     if scope.lowered.has_trace_level() {
         let (service, name) = root.clone().unwrap_or((None, None));
         if !scope
@@ -1077,13 +1086,29 @@ fn row_from_parts(
     })
 }
 
-/// The trace's root across its parts: the TRUE claim with the smallest
-/// `(start, span id)` — the combiner's order. Unknown (`None`) when a
-/// withheld claim starts at or before it, when claims sharing it name
-/// different facets (a root resent with different values), or with no
-/// claim at all. `Some((service, name))` otherwise.
-fn pick_root(parts: &[TracePart]) -> Option<(Option<String>, Option<String>)> {
-    let best = parts
+/// A trace's root across its parts.
+enum PickedRoot {
+    /// The root's `(service, name)`.
+    Known(Option<String>, Option<String>),
+    /// No source holds an unset-parent span of the trace.
+    Absent,
+    /// Unset-parent spans exist, but which one is the root is not known.
+    Unknown,
+}
+
+/// The TRUE claim with the smallest `(start, span id)` — the combiner's
+/// order. Unknown when a withheld claim starts at or before it (or there
+/// is only withheld ones), or when claims sharing it name different
+/// facets (a root resent with different values).
+fn pick_root(parts: &[TracePart]) -> PickedRoot {
+    let withheld = parts
+        .iter()
+        .filter_map(|p| match p.root {
+            RootClaim::Withheld { start_ns } => Some(start_ns),
+            _ => None,
+        })
+        .min();
+    let Some(best) = parts
         .iter()
         .filter_map(|p| match &p.root {
             RootClaim::True {
@@ -1091,12 +1116,16 @@ fn pick_root(parts: &[TracePart]) -> Option<(Option<String>, Option<String>)> {
             } => Some((*start_ns, *span_id)),
             _ => None,
         })
-        .min()?;
-    if parts
-        .iter()
-        .any(|p| matches!(p.root, RootClaim::Withheld { start_ns } if start_ns <= best.0))
-    {
-        return None;
+        .min()
+    else {
+        return if withheld.is_some() {
+            PickedRoot::Unknown
+        } else {
+            PickedRoot::Absent
+        };
+    };
+    if withheld.is_some_and(|start_ns| start_ns <= best.0) {
+        return PickedRoot::Unknown;
     }
     let mut facets = parts.iter().filter_map(|p| match &p.root {
         RootClaim::True {
@@ -1107,11 +1136,11 @@ fn pick_root(parts: &[TracePart]) -> Option<(Option<String>, Option<String>)> {
         } if (*start_ns, *span_id) == best => Some((service.clone(), name.clone())),
         _ => None,
     });
-    let first = facets.next()?;
+    let first = facets.next().expect("the best claim is a TRUE one");
     if facets.any(|f| f != first) {
-        return None;
+        return PickedRoot::Unknown;
     }
-    Some(first)
+    PickedRoot::Known(first.0, first.1)
 }
 
 /// Extend `file`, surfacing a failed column read as a source failure
