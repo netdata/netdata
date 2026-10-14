@@ -22,7 +22,7 @@
 #  - TMPDIR (set to a usable temporary directory)
 #  - NETDATA_BASE_URL (set the base url for downloading the dist tarball)
 
-# Next unused error code: U0033
+# Next unused error code: U0035
 
 set -e
 
@@ -1283,16 +1283,26 @@ verify_macos_pkg() {
 
   # Publisher pinning: a valid Developer ID signature from anyone else is
   # still a refusal - signature validity alone establishes nothing about
-  # who published the package.
+  # who published the package. The checks read pkgutil's verdict lines and
+  # the signing (leaf) certificate, not just any line of its output.
   if [ -n "${NETDATA_MACOS_PKG_TEAM_ID}" ]; then
     if ! sig="$(pkgutil --check-signature "${pkgfile}" 2>/dev/null)"; then
       fatal "Downloaded macOS package is not signed; refusing to install it." U002A
     fi
-    if ! echo "${sig}" | grep -q "Developer ID Installer"; then
-      fatal "Downloaded macOS package is not signed with a Developer ID Installer certificate; refusing to install it." U002B
+    if ! echo "${sig}" | grep -q '^ *Status: signed by a developer certificate issued by Apple for distribution$'; then
+      fatal "Downloaded macOS package is not signed by a certificate Apple trusts for distribution; refusing to install it." U0033
     fi
-    if ! echo "${sig}" | grep -q "(${NETDATA_MACOS_PKG_TEAM_ID})"; then
-      fatal "Downloaded macOS package is signed by a publisher other than Netdata; refusing to install it." U002C
+    leaf="$(echo "${sig}" | sed -n 's/^ *1\. //p' | head -n 1)"
+    case "${leaf}" in
+      "Developer ID Installer: "*) ;;
+      *) fatal "Downloaded macOS package is not signed with a Developer ID Installer certificate; refusing to install it." U002B ;;
+    esac
+    case "${leaf}" in
+      *"(${NETDATA_MACOS_PKG_TEAM_ID})") ;;
+      *) fatal "Downloaded macOS package is signed by a publisher other than Netdata; refusing to install it." U002C ;;
+    esac
+    if ! echo "${sig}" | grep -q '^ *Notarization: trusted by the Apple notary service$'; then
+      fatal "Downloaded macOS package is not notarized by Apple; refusing to install it." U0034
     fi
   elif [ "${NETDATA_UPDATER_ALLOW_UNSIGNED_PKG:-0}" != "1" ]; then
     fatal "This updater has no pinned publisher for macOS packages and NETDATA_UPDATER_ALLOW_UNSIGNED_PKG is not set; refusing to install unverifiable packages." U002D
