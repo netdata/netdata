@@ -302,3 +302,78 @@ fn meta_reader_never_decodes_the_primary_fst() {
         "the upgrade decodes PRIM and surfaces the corruption"
     );
 }
+
+// ── Owned sessions: bloom first ─────────────────────────────────────
+
+const OTHER: [u8; 16] = [8u8; 16];
+
+/// A bloom over `ids` (the file it is written into may hold fewer).
+fn bloom_over(ids: &[[u8; 16]]) -> crate::TraceIdBloom {
+    let mut trace = TraceIds::with_capacity(ids.len());
+    for id in ids {
+        trace.push(TraceId::from(*id));
+    }
+    let index = TraceIdIndex::build(&trace);
+    crate::TraceIdBloom::build(&index, &trace).expect("non-empty")
+}
+
+fn owned(buf: &[u8]) -> crate::TraceFileSession<'_, '_> {
+    crate::TraceFileSession::open_owned(crate::MetaReader::open(buf).unwrap())
+}
+
+#[test]
+fn an_owned_session_answers_a_bloom_miss_from_the_bloom_alone() {
+    use crate::trace_combine::SpanSource;
+    let bloom = bloom_over(&[TRACE]);
+    let miss = (9u8..=255)
+        .map(|b| TraceId::from([b; 16]))
+        .find(|id| !bloom.might_contain(*id))
+        .expect("an id the bloom rules out");
+    let mut buf = trace_file_with_bloom(&[(sid(1), SpanId::UNSET)], Some(&bloom));
+    for id in [
+        crate::CHUNK_TRACE_INDEX,
+        crate::CHUNK_TRACE_IDS,
+        crate::CHUNK_PRIMARY,
+    ] {
+        corrupt_chunk(&mut buf, id);
+    }
+    let mut session = owned(&buf);
+    assert!(session.span_refs(miss).unwrap().is_empty());
+}
+
+#[test]
+fn a_false_positive_reads_only_the_lookup_pair() {
+    use crate::trace_combine::SpanSource;
+    // The bloom admits OTHER; the file does not hold it.
+    let bloom = bloom_over(&[TRACE, OTHER]);
+    let mut buf = trace_file_with_bloom(&[(sid(1), SpanId::UNSET)], Some(&bloom));
+    for id in [crate::CHUNK_SPAN_IDS, crate::CHUNK_PRIMARY] {
+        corrupt_chunk(&mut buf, id);
+    }
+    let mut session = owned(&buf);
+    assert!(session.might_contain(TraceId::from(OTHER)));
+    assert!(session.span_refs(TraceId::from(OTHER)).unwrap().is_empty());
+    // Finding the held trace needs the row columns and the full reader:
+    // their corruption surfaces there.
+    assert!(session.span_refs(TraceId::from(TRACE)).is_err());
+}
+
+#[test]
+fn an_owned_session_finds_what_a_borrowed_one_finds() {
+    use crate::trace_combine::SpanSource;
+    let bloom = bloom_over(&[TRACE]);
+    let buf = trace_file_with_bloom(&[(sid(1), SpanId::UNSET), (sid(2), sid(1))], Some(&bloom));
+    let reader = IndexReader::open(&buf).unwrap();
+    let mut borrowed = crate::TraceFileSession::open(&reader);
+    let mut owned = owned(&buf);
+    let id = TraceId::from(TRACE);
+    let refs = borrowed.span_refs(id).unwrap();
+    assert_eq!(refs.len(), 2);
+    assert_eq!(owned.span_refs(id).unwrap(), refs);
+    for r in &refs {
+        assert_eq!(
+            owned.materialize(r.position).unwrap(),
+            borrowed.materialize(r.position).unwrap()
+        );
+    }
+}

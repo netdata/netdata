@@ -8,7 +8,7 @@
 //! materialize only as the merge accepts them.
 //!
 //! Status honesty (the design-record contract): a source that fails to
-//! map, open, or decode surfaces as a
+//! map, open, or decode what the lookup reads surfaces as a
 //! [`SourceFailure`](PartialReason::SourceFailure) reason on the
 //! query-level [`QueryStatus`], and an unavailable source as
 //! [`RemoteUnavailable`](PartialReason::RemoteUnavailable) — never a
@@ -18,6 +18,12 @@
 //! merge returns the deterministic merged prefix. The span cap yields
 //! [`SizeCap`](PartialReason::SizeCap) keeping the globally earliest
 //! spans (cap+1 detection — an exactly-cap trace is `Complete`).
+//!
+//! Bloom first: each SFST opens as its metadata view, and only a file
+//! that holds the trace decodes its row columns and primary dictionary
+//! (`sfst::TraceFileSession::open_owned`). Corruption in what a lookup
+//! never reads — a file the bloom rules out, or one that does not hold
+//! the trace — is not discovered, so it is not reported.
 //!
 //! The result also carries a field→schema-kind map, so consumers type
 //! values from the declared schema kinds instead of inferring them from
@@ -204,17 +210,22 @@ pub fn trace_by_id(
         progress.fetch_add(1, Ordering::Relaxed);
     }
 
-    // Readers borrow the mappings (which stay put from here on); an
-    // unparseable SFST is a SourceFailure. Sessions then borrow the
-    // readers; the merge borrows the sessions — strictly sequential
-    // borrows, no self-reference.
-    let mut readers: Vec<(sfst::IndexReader<'_>, &TraceSource)> = Vec::new();
+    // Sessions own a metadata view of their mapping (which stays put from
+    // here on): the bloom decides first, and only a file that holds the
+    // trace opens fully. An SFST whose summary does not parse is a
+    // SourceFailure; one the bloom rules out never decodes more than its
+    // summary, metadata and bloom. The merge borrows the sessions.
+    let mut sessions: Vec<sfst::TraceFileSession<'_, '_>> = Vec::new();
+    let mut origin: Vec<String> = Vec::new();
     for (mapped, source) in &mapped_sfsts {
         if cancel.is_cancelled() {
             return Ok(cancelled_empty(status));
         }
-        match sfst::IndexReader::open(mapped.bytes()) {
-            Ok(reader) => readers.push((reader, source)),
+        match sfst::MetaReader::open(mapped.bytes()) {
+            Ok(meta) => {
+                sessions.push(sfst::TraceFileSession::open_owned(meta));
+                origin.push(source.source_id().to_string());
+            }
             Err(e) => {
                 tracing::warn!(
                     "sfsq traces: source {} failed to parse: {e}",
@@ -224,19 +235,11 @@ pub fn trace_by_id(
             }
         }
     }
-    let mut sessions: Vec<sfst::TraceFileSession<'_, '_>> = readers
-        .iter()
-        .map(|(reader, _)| sfst::TraceFileSession::open(reader))
-        .collect();
 
     // The combiner's input slice: sessions first, tails after — the
     // index split the field-kind pass below relies on. `origin` maps a
     // merge index back to a diagnostic label.
     let session_count = sessions.len();
-    let mut origin: Vec<String> = readers
-        .iter()
-        .map(|(_, source)| source.source_id().to_string())
-        .collect();
     let mut merged: Vec<&mut dyn SpanSource> = Vec::new();
     for session in sessions.iter_mut() {
         merged.push(session);
@@ -278,7 +281,16 @@ pub fn trace_by_id(
     };
     for &idx in &outcome.contributing_sources {
         if idx < session_count {
-            fold(readers[idx].0.metadata().tree.derive_scalar_kinds());
+            match sessions[idx].metadata() {
+                Ok(metadata) => fold(metadata.tree.derive_scalar_kinds()),
+                Err(e) => {
+                    tracing::warn!(
+                        "sfsq traces: source {} metadata failed to read: {e}",
+                        origin[idx]
+                    );
+                    status.add(PartialReason::SourceFailure);
+                }
+            }
         } else {
             fold(tails[idx - session_count].1.field_kinds().to_vec());
         }

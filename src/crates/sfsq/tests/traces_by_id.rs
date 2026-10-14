@@ -21,8 +21,8 @@ use std::sync::atomic::{AtomicUsize, Ordering};
 use tokio_util::sync::CancellationToken;
 
 use common::{
-    SpanSpec, TRACE, kv_double, kv_int, kv_str, memory_source, missing_source, req, sealed_source,
-    sp, tail_source, unavailable_source, write_wal,
+    SpanSpec, TRACE, corrupt_chunk, kv_double, kv_int, kv_str, memory_source, missing_source, req,
+    sealed_source, sealed_source_at, sp, tail_source, unavailable_source, write_wal,
 };
 use sfsq::Source;
 use sfsq::traces::{
@@ -389,6 +389,32 @@ fn failed_sources_are_reported_and_the_rest_served() {
     assert!(data.status.has(PartialReason::SourceFailure));
     // A source failure must not masquerade as a size-cap partial.
     assert!(!data.status.has(PartialReason::SizeCap));
+}
+
+/// Bloom first: a file that does not hold the trace is never opened
+/// fully, so a corrupt primary dictionary there stays unread — the
+/// lookup is complete. The same corruption in the file holding the trace
+/// is reported.
+#[test]
+fn a_corrupt_file_the_trace_does_not_need_stays_unread() {
+    let dir = tempfile::tempdir().unwrap();
+    let mut other = sp(1, 0, 1, "other");
+    other.trace = [0x42; 16];
+    let w_other = write_wal(dir.path(), vec![req(&[other])], "other");
+    let w_held = write_wal(dir.path(), vec![req(&[sp(2, 0, 2, "held")])], "held");
+    for (wal, id) in [(&w_other, "other"), (&w_held, "held")] {
+        drop(sealed_source(dir.path(), wal, id));
+        corrupt_chunk(&dir.path().join(format!("{id}.sfst")), *b"PRIM");
+    }
+    let other = || sealed_source_at(&dir.path().join("other.sfst"), "other");
+    let held = || sealed_source_at(&dir.path().join("held.sfst"), "held");
+
+    let data = run(vec![other(), sealed_source(dir.path(), &w_held, "fresh")]);
+    assert_eq!(span_names(&data), ["held"]);
+    assert_eq!(data.status, QueryStatus::Complete);
+
+    let data = run(vec![other(), held()]);
+    assert!(data.status.has(PartialReason::SourceFailure));
 }
 
 #[test]
