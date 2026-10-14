@@ -39,8 +39,8 @@ use std::sync::atomic::{AtomicUsize, Ordering};
 use tokio_util::sync::CancellationToken;
 
 use common::{
-    SpanSpec, corrupt_chunk, kv_str, memory_source, missing_source, req_with, sealed_source,
-    sealed_source_at, sp, tail_source, unavailable_source, write_wal,
+    SpanSpec, corrupt_chunk, hide_chunk, kv_str, memory_source, missing_source, req_with,
+    sealed_source, sealed_source_at, sp, tail_source, unavailable_source, write_wal,
 };
 use opentelemetry_proto::tonic::collector::trace::v1::ExportTraceServiceRequest;
 use sfsq::traces::{
@@ -2254,10 +2254,11 @@ fn text_corpus() -> (
 }
 
 /// Free text finds the same traces whether a span is read through the
-/// index (sealed files: low, mid and high tiers) or decoded (WAL
-/// tails): span names, status messages, span/resource/scope attribute
-/// values, event names and attribute values, and link attribute values,
-/// case-insensitively; never field names or `status_code`.
+/// index (sealed files: low, mid and high tiers, with or without event
+/// and link structures) or decoded (WAL tails): span names, status
+/// messages, span/resource/scope attribute values, event names and
+/// attribute values, and link attribute values, case-insensitively;
+/// never field names or `status_code`.
 #[test]
 fn text_index_span_parity() {
     let dir = tempfile::tempdir().unwrap();
@@ -2285,8 +2286,19 @@ fn text_index_span_parity() {
         assert_eq!(tier("attributes.route"), Some(sfst::FieldTier::Mid));
         assert_eq!(tier("attributes.flag"), Some(sfst::FieldTier::Low));
     }
+    // A file sealed without its event and link structures (EVNB, LNKB):
+    // event names and event/link attributes then reach the spans as row
+    // facets under their storage names.
+    drop(sealed_source(dir.path(), &wal_all, "flat"));
+    let flat = dir.path().join("flat.sfst");
+    hide_chunk(&flat, *b"EVNB");
+    hide_chunk(&flat, *b"LNKB");
     type Layout<'a> = (&'static str, Box<dyn Fn() -> Vec<TraceSource> + 'a>);
-    let layouts: [Layout; 4] = [
+    let layouts: [Layout; 5] = [
+        (
+            "sealed-without-structures",
+            Box::new(|| vec![sealed_source_at(&flat, "flat")]),
+        ),
         (
             "sealed",
             Box::new(|| vec![sealed_source(dir.path(), &wal_all, "all")]),
@@ -2779,4 +2791,61 @@ fn token_ceilings_terminate() {
     );
     assert_eq!(ids(&data), vec![hex(1)]);
     assert_eq!(data.status, QueryStatus::Complete);
+}
+
+/// A negated token needs the whole trace: when the assembly is capped,
+/// the unseen spans may hold what it forbids, so the trace is excluded
+/// as indeterminate (and the query is Partial). A trace assembled whole
+/// still returns.
+#[test]
+fn negated_token_excludes_capped_traces() {
+    let dir = tempfile::tempdir().unwrap();
+    let wal = write_wal(
+        dir.path(),
+        vec![req_with(
+            vec![kv_str("service.name", "svc-x")],
+            None,
+            &[
+                // T1: an OK root, then an ERROR child the cap hides.
+                SpanSpec {
+                    status: Some((1, "")),
+                    ..span_in(1, 0x11, 0, 1_000 * NS, "root")
+                },
+                SpanSpec {
+                    status: Some((2, "boom")),
+                    ..span_in(1, 0x12, 0x11, 1_001 * NS, "child")
+                },
+                // T2: one OK span, whole under the cap.
+                SpanSpec {
+                    status: Some((1, "")),
+                    ..span_in(2, 0x21, 0, 1_002 * NS, "solo")
+                },
+            ],
+        )],
+        "capped-negation",
+    );
+    let sources = || both_roles(|| vec![sealed_source(dir.path(), &wal, "one")]);
+    let query = || {
+        SearchQuery::new(tokens(vec![
+            pos(vec![attr_eq(
+                AttributeOwner::Resource,
+                "service.name",
+                "svc-x",
+            )]),
+            neg(vec![builtin(
+                BuiltinField::Status,
+                CompareOp::Eq,
+                vec![text("ERROR")],
+            )]),
+        ]))
+    };
+    let whole = run(sources(), query());
+    assert_eq!(ids(&whole), vec![hex(2)]);
+    assert_eq!(whole.status, QueryStatus::Complete);
+    let capped = run(sources(), query().span_cap_for_tests(1));
+    assert_eq!(ids(&capped), vec![hex(2)]);
+    assert_eq!(
+        capped.status,
+        QueryStatus::Partial([PartialReason::SizeCap].into())
+    );
 }

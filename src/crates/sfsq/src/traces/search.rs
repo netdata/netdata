@@ -836,6 +836,9 @@ pub fn search(
     if query.driver.is_none() && lowered.positive.len() > 1 && !pinned {
         let mut counts = vec![0u64; lowered.positive.len()];
         'count: for (source_id, scan) in &tails {
+            if cancel.is_cancelled() {
+                return Ok(cancelled_empty(status));
+            }
             if !window_ids.contains(source_id) {
                 continue;
             }
@@ -1184,21 +1187,22 @@ pub fn search(
                     rank.0,
                     !outcome.truncated && !merge_failed && !degraded_assembly,
                 );
-                // Trace-level conditions evaluate post-assembly as
-                // TRI-STATE: an inexact trace's root and envelope
-                // values are unreliable, so the candidate is EXCLUDED
-                // as indeterminate — never guessed either way (the
-                // underlying cause already marked the query Partial:
-                // SizeCap at the examined-truncated rule, SourceFailure
-                // at the failure sites). Root conditions test the TRUE
-                // root only (decision 1D, see the module docs): a trace
-                // whose root span was never exported has NO root as far
-                // as filters are concerned; the summary's promoted root
-                // is display.
+                // Trace-level and negated tokens evaluate post-assembly
+                // as TRI-STATE: an inexact trace's root and envelope
+                // values are unreliable, and its missing spans may hold
+                // what a negated token forbids, so the candidate is
+                // EXCLUDED as indeterminate — never guessed either way
+                // (the underlying cause already marked the query
+                // Partial: SizeCap at the examined-truncated rule,
+                // SourceFailure at the failure sites). Root conditions
+                // test the TRUE root only (decision 1D, see the module
+                // docs): a trace whose root span was never exported has
+                // NO root as far as filters are concerned; the summary's
+                // promoted root is display.
+                if lowered.needs_whole_trace() && !summary.exact {
+                    continue; // indeterminate → excluded
+                }
                 if lowered.has_trace_level() {
-                    if !summary.exact {
-                        continue; // indeterminate → excluded
-                    }
                     let (true_root_name, true_root_service) = true_root_fields(&trace);
                     if !lowered.trace_level_matches(
                         true_root_name.as_deref(),

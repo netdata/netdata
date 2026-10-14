@@ -413,6 +413,13 @@ impl Condition {
                         got: term.len(),
                     });
                 }
+                // Built once here so the evaluators' builds cannot fail.
+                if sfst::ContainsMatcher::new(term).is_none() {
+                    return Err(PredicateError::InvalidPattern {
+                        pattern: term.clone(),
+                        msg: "the free-text matcher does not compile".to_string(),
+                    });
+                }
             }
             PredicateTarget::Attribute(AttributeOwner::Builtin, key) => {
                 return Err(PredicateError::AttributeUnderBuiltinOwner { key: key.clone() });
@@ -1438,10 +1445,18 @@ impl LoweredTokens {
         }
     }
 
-    /// Whether any trace-level token (either polarity) applies: an
-    /// inexact trace is then indeterminate and excluded (decision 15).
+    /// Whether any trace-level token (either polarity) applies.
     pub(crate) fn has_trace_level(&self) -> bool {
         self.trace_level.is_some() || !self.trace_level_negated.is_empty()
+    }
+
+    /// Whether a verdict needs every span of the trace: a trace-level
+    /// token reads its root and envelope, a negated span-local token
+    /// holds only if NO span matches. An inexact assembly is then
+    /// indeterminate and excluded (decision 15). Positive span-local
+    /// tokens need no such care: a match found is a match.
+    pub(crate) fn needs_whole_trace(&self) -> bool {
+        self.has_trace_level() || !self.negated.is_empty()
     }
 
     /// The trace-level verdict on an exact assembled trace's TRUE-root

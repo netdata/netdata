@@ -282,6 +282,28 @@ pub fn sealed_source(dir: &Path, wal_path: &Path, id: &str) -> TraceSource {
     sealed_source_at(&out, id)
 }
 
+/// Make chunk `id` ABSENT from a sealed SFST by renaming its TOC entry
+/// to an id no reader asks for — the "older file without this chunk"
+/// shape, built from a real modern seal (payload bytes untouched).
+pub fn hide_chunk(path: &Path, id: [u8; 4]) {
+    let mut bytes = std::fs::read(path).unwrap();
+    let num_chunks = u32::from_le_bytes(bytes[8..12].try_into().unwrap()) as usize;
+    let toc_start = chunk_file::container::HEADER_SIZE;
+    let entry_size = 12; // ChunkId(4) + offset u64 LE
+    let mut hidden = false;
+    for i in 0..num_chunks {
+        let at = toc_start + i * entry_size;
+        if bytes[at..at + 4] == id {
+            // Unique per hidden chunk (the TOC rejects duplicate ids).
+            bytes[at] = b'Z';
+            hidden = true;
+            break;
+        }
+    }
+    assert!(hidden, "chunk {:?} not found in TOC", id);
+    std::fs::write(path, &bytes).unwrap();
+}
+
 /// Flip the first payload byte of chunk `id` inside a sealed SFST — a
 /// CRC mismatch, the cheapest "corrupt in any way" (the gate and
 /// overview suites corrupt `TRSU`/`TBLM`/`SPAN`/`TRCE` this way).

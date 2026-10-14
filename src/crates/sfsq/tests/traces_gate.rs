@@ -45,8 +45,8 @@ use std::sync::atomic::AtomicUsize;
 use tokio_util::sync::CancellationToken;
 
 use common::{
-    SpanSpec, corrupt_chunk, kv_str, req_with, sealed_source, sealed_source_at, sp, tail_source,
-    write_wal,
+    SpanSpec, corrupt_chunk, hide_chunk, kv_str, req_with, sealed_source, sealed_source_at, sp,
+    tail_source, write_wal,
 };
 use opentelemetry_proto::tonic::collector::trace::v1::ExportTraceServiceRequest;
 use sfsq::traces::{
@@ -178,28 +178,6 @@ fn min_duration(ns: i64) -> Condition {
         CompareOp::Gte,
         vec![PredicateValue::Integer(ns)],
     )
-}
-
-/// Make chunk `id` ABSENT from a sealed SFST by renaming its TOC entry
-/// to an id no reader asks for — the "older file without this chunk"
-/// shape, built from a real modern seal (payload bytes untouched).
-fn hide_chunk(path: &Path, id: [u8; 4]) {
-    let mut bytes = std::fs::read(path).unwrap();
-    let num_chunks = u32::from_le_bytes(bytes[8..12].try_into().unwrap()) as usize;
-    let toc_start = chunk_file::container::HEADER_SIZE;
-    let entry_size = 12; // ChunkId(4) + offset u64 LE
-    let mut hidden = false;
-    for i in 0..num_chunks {
-        let at = toc_start + i * entry_size;
-        if bytes[at..at + 4] == id {
-            // Unique per hidden chunk (the TOC rejects duplicate ids).
-            bytes[at] = b'Z';
-            hidden = true;
-            break;
-        }
-    }
-    assert!(hidden, "chunk {:?} not found in TOC", id);
-    std::fs::write(path, &bytes).unwrap();
 }
 
 /// The path a [`sealed_source`] wrote (its naming contract).
