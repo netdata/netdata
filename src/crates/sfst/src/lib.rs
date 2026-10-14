@@ -92,6 +92,7 @@ mod kv_interner;
 mod prefix_map;
 pub mod query;
 mod reader;
+mod rollup_upgrade;
 mod row_index;
 mod schema;
 mod span_extras;
@@ -120,6 +121,7 @@ pub use query::{
 };
 pub use reader::{read_summary, read_summary_path};
 pub use registry::{File, Registry, RetentionPolicy};
+pub use rollup_upgrade::{StatsUpgrade, add_trace_rollup_stats, derive_trace_rollup};
 pub use row_index::RowIndex;
 pub use schema::join_value_kinds;
 pub use span_extras::{EventIndex, EventRef, EventRows, LinkIndex, LinkRef, LinkRows};

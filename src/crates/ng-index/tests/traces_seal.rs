@@ -935,6 +935,135 @@ fn seal_writes_rollup_stats_per_service() {
     assert_eq!(stats.root_start_offsets_ns, vec![500]);
 }
 
+/// A corpus that exercises every rollup rule: resends, an ambiguous
+/// root tie, two services plus a service-less resource, errors.
+fn rollup_corpus() -> Vec<u8> {
+    rollup_corpus_with(true)
+}
+
+/// [`rollup_corpus`], with or without its resent child span.
+fn rollup_corpus_with(resend: bool) -> Vec<u8> {
+    use opentelemetry_proto::tonic::trace::v1 as otlp;
+    let mut root = span([0x1; 16], [1; 8], [0; 8], 1_000, 2_000, "root");
+    root.status = Some(otlp::Status {
+        code: 2,
+        message: "boom".into(),
+    });
+    root.kind = 2;
+    let child = span([0x1; 16], [2; 8], [1; 8], 1_100, 1_200, "child");
+    let mut tie_a = span([0x2; 16], [3; 8], [0; 8], 3_000, 3_100, "tie");
+    tie_a.kind = 1;
+    let mut tie_b = tie_a.clone();
+    tie_b.kind = 3;
+    let mut other = req(vec![span([0x1; 16], [4; 8], [1; 8], 1_300, 1_400, "other")]);
+    other.resource_spans[0].resource = Some(Resource {
+        attributes: vec![kv("service.name", "other")],
+        ..Default::default()
+    });
+    let mut anon = req(vec![span([0x3; 16], [5; 8], [9; 8], 5_000, 5_100, "anon")]);
+    anon.resource_spans[0].resource = Some(Resource::default());
+    let mut a = vec![root, child.clone(), tie_a, tie_b];
+    if resend {
+        a.push(child);
+    }
+    seal(vec![req(a), other, anon])
+}
+
+/// A sealed file's container, opened with its own header's magic and
+/// version.
+fn container(file: &[u8]) -> chunk_file::container::Container<'_> {
+    let magic: [u8; 4] = file[0..4].try_into().unwrap();
+    let version = u32::from_le_bytes(file[4..8].try_into().unwrap());
+    chunk_file::container::Container::open(file, &magic, version).unwrap()
+}
+
+/// The bytes of `file` with chunk `drop` left out (a file sealed before
+/// that chunk existed), or with chunk `id`'s payload replaced.
+fn rewrite(file: &[u8], drop: Option<[u8; 4]>, replace: Option<([u8; 4], &[u8])>) -> Vec<u8> {
+    let c = container(file);
+    let ids: Vec<[u8; 4]> = c.chunk_ids().filter(|id| Some(*id) != drop).collect();
+    let mut w = chunk_file::container::StreamingWriter::new(
+        std::io::Cursor::new(Vec::new()),
+        file[0..4].try_into().unwrap(),
+        u32::from_le_bytes(file[4..8].try_into().unwrap()),
+        ids.len() as u32,
+    )
+    .unwrap();
+    for id in ids {
+        match &replace {
+            Some((r, payload)) if *r == id => w.write_chunk(id, payload).unwrap(),
+            _ => w.write_chunk(id, c.chunk(id).unwrap()).unwrap(),
+        }
+    }
+    w.finish().unwrap().into_inner()
+}
+
+/// Reading a sealed file's rows back reproduces its rollup and stats.
+#[test]
+fn derived_rollup_equals_the_sealed_one() {
+    let bytes = rollup_corpus();
+    let reader = IndexReader::open(&bytes).unwrap();
+    let rollup = reader.trace_rollup().unwrap();
+    let stats = reader.trace_rollup_stats(&rollup).unwrap();
+    assert_eq!(
+        rollup.root_is_true_root,
+        vec![1, 2, 0],
+        "TRUE, WITHHELD, NONE"
+    );
+    assert_eq!(stats.service_offsets, vec![0, 2, 3, 4], "two services in A");
+    assert_eq!(sfst::derive_trace_rollup(&reader).unwrap(), (rollup, stats));
+}
+
+/// The upgrade writes the stats the seal would have written and copies
+/// every other chunk byte for byte; a file with stats is left alone.
+#[test]
+fn upgrade_adds_stats_and_copies_every_other_chunk() {
+    let sealed = rollup_corpus();
+    assert!(matches!(
+        sfst::add_trace_rollup_stats(&sealed).unwrap(),
+        sfst::StatsUpgrade::HasStats
+    ));
+    let legacy = rewrite(&sealed, Some(*b"TRSS"), None);
+    assert!(!IndexReader::open(&legacy).unwrap().has_trace_rollup_stats());
+    let sfst::StatsUpgrade::Upgraded(upgraded) = sfst::add_trace_rollup_stats(&legacy).unwrap()
+    else {
+        panic!("a legacy file upgrades");
+    };
+    let open = |b: &[u8]| {
+        let reader = IndexReader::open(b).unwrap();
+        let rollup = reader.trace_rollup().unwrap();
+        reader.trace_rollup_stats(&rollup).unwrap()
+    };
+    assert_eq!(open(&upgraded), open(&sealed));
+    let (old, new) = (container(&sealed), container(&upgraded));
+    let ids: Vec<[u8; 4]> = new.chunk_ids().collect();
+    assert_eq!(
+        ids,
+        old.chunk_ids().collect::<Vec<_>>(),
+        "TRSS right after TRSU"
+    );
+    for id in ids.into_iter().filter(|id| id != b"TRSS") {
+        assert_eq!(new.chunk(id).unwrap(), old.chunk(id).unwrap(), "{id:?}");
+    }
+}
+
+/// A stored rollup the rows do not reproduce is refused: no stats are
+/// derived from inputs the derivation could not read back.
+#[test]
+fn upgrade_refuses_a_rollup_that_does_not_rederive() {
+    let sealed = rollup_corpus();
+    // The same corpus without the resend seals the same tokens, so its
+    // rollup decodes here, with one span fewer than these rows hold.
+    let other = rollup_corpus_with(false);
+    let grafted = container(&other).chunk(*b"TRSU").unwrap().to_vec();
+    let legacy = rewrite(&sealed, Some(*b"TRSS"), Some((*b"TRSU", &grafted)));
+    assert!(IndexReader::open(&legacy).unwrap().trace_rollup().is_ok());
+    assert!(matches!(
+        sfst::add_trace_rollup_stats(&legacy).unwrap(),
+        sfst::StatsUpgrade::RollupMismatch
+    ));
+}
+
 #[test]
 fn rollup_captures_error_status_kind_and_service_absence() {
     // Coverage for the rollup's capture fields: an ERROR-status root with a

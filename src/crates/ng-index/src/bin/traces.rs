@@ -15,6 +15,7 @@
 //! ng-index-traces seal  --in ~/repos/tmp/ng/<wal> --out /tmp/traces.sfst
 //! ng-index-traces trace --sfst /tmp/traces.sfst --trace-id <32-hex-chars>
 //! ng-index-traces trace --sfst /tmp/traces.sfst --sample 10
+//! ng-index-traces add-stats --in <sfst or dir> --out <sfst or dir>
 //! ```
 
 use std::collections::HashSet;
@@ -62,11 +63,23 @@ enum Cmd {
         #[arg(long)]
         sample: Option<usize>,
     },
+    /// Add the `TRSS` rollup stats to sealed SFSTs that predate them (benchmark
+    /// corpora). A file whose rollup does not derive again from its rows is
+    /// copied unchanged and reported.
+    AddStats {
+        /// A sealed SFST file, or a directory of `.sfst` files.
+        #[arg(long = "in")]
+        input: PathBuf,
+        /// The output file, or the output directory (created).
+        #[arg(long)]
+        out: PathBuf,
+    },
 }
 
 fn main() -> ExitCode {
     match Args::parse().cmd {
         Cmd::Seal { input, out } => seal(&input, &out),
+        Cmd::AddStats { input, out } => add_stats(&input, &out),
         Cmd::Trace {
             sfst,
             trace_id: Some(id),
@@ -84,6 +97,72 @@ fn main() -> ExitCode {
             ExitCode::FAILURE
         }
     }
+}
+
+/// Upgrade one file, or every `.sfst` file of a directory, into `out`.
+fn add_stats(input: &Path, out: &Path) -> ExitCode {
+    let pairs: Vec<(PathBuf, PathBuf)> = if input.is_dir() {
+        if let Err(e) = std::fs::create_dir_all(out) {
+            eprintln!("cannot create {}: {e}", out.display());
+            return ExitCode::FAILURE;
+        }
+        let entries = match std::fs::read_dir(input) {
+            Ok(entries) => entries,
+            Err(e) => {
+                eprintln!("cannot read {}: {e}", input.display());
+                return ExitCode::FAILURE;
+            }
+        };
+        let mut files: Vec<PathBuf> = entries
+            .filter_map(|e| e.ok().map(|e| e.path()))
+            .filter(|p| p.extension().is_some_and(|x| x == "sfst"))
+            .collect();
+        files.sort();
+        files
+            .into_iter()
+            .map(|p| {
+                let dst = out.join(p.file_name().expect("a listed file has a name"));
+                (p, dst)
+            })
+            .collect()
+    } else {
+        vec![(input.to_path_buf(), out.to_path_buf())]
+    };
+    let mut counts = [0usize; 4];
+    for (src, dst) in pairs {
+        let bytes = match std::fs::read(&src) {
+            Ok(b) => b,
+            Err(e) => {
+                eprintln!("cannot read {}: {e}", src.display());
+                return ExitCode::FAILURE;
+            }
+        };
+        let (written, outcome, slot) = match sfst::add_trace_rollup_stats(&bytes) {
+            Ok(sfst::StatsUpgrade::Upgraded(b)) => (b, "upgraded", 0),
+            Ok(sfst::StatsUpgrade::HasStats) => (bytes, "already has stats", 1),
+            Ok(sfst::StatsUpgrade::NoRollup) => (bytes, "no rollup, copied", 2),
+            Ok(sfst::StatsUpgrade::RollupMismatch) => (
+                bytes,
+                "REFUSED: the rollup does not derive again, copied",
+                3,
+            ),
+            Err(e) => {
+                eprintln!("cannot upgrade {}: {e}", src.display());
+                return ExitCode::FAILURE;
+            }
+        };
+        if let Err(e) = std::fs::write(&dst, written) {
+            eprintln!("cannot write {}: {e}", dst.display());
+            return ExitCode::FAILURE;
+        }
+        counts[slot] += 1;
+        println!("{}: {outcome}", src.display());
+    }
+    println!(
+        "{} upgraded, {} already had stats, {} without a rollup, {} refused",
+        counts[0], counts[1], counts[2], counts[3]
+    );
+    ExitCode::SUCCESS
 }
 
 /// Print up to `limit` distinct (non-unset) trace ids present in the sealed file, in

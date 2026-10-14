@@ -3290,6 +3290,7 @@ version = "0.1.3"
 dependencies = [
  "bincode 2.0.1",
  "bumpalo",
+ "chunk-file",
  "clap",
  "file-registry",
  "ng-flatten",
