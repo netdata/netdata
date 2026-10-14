@@ -229,7 +229,8 @@ pub trait FunctionHandler: Send + Sync + 'static {
     /// payload is deserialized from `{}`).
     type Request: DeserializeOwned + Send;
 
-    /// Response payload, pretty-printed as `application/json` into the result.
+    /// Response payload, serialized as compact `application/json` into the
+    /// result (the handlers' byte budgets count compact JSON).
     type Response: Serialize + Send;
 
     /// Execute the call.
@@ -401,7 +402,7 @@ impl<H: FunctionHandler> RawFunctionHandler for HandlerAdapter<H> {
         let expires: u64 = current_timestamp + 2;
 
         match result {
-            Ok(response) => match serde_json::to_vec_pretty(&response) {
+            Ok(response) => match serde_json::to_vec(&response) {
                 Ok(payload) => FunctionResult {
                     transaction,
                     status: 200,
@@ -440,7 +441,7 @@ impl<H: FunctionHandler> RawFunctionHandler for HandlerAdapter<H> {
                     status: 500,
                     expires: 0,
                     format: "application/json".to_string(),
-                    payload: serde_json::to_vec_pretty(&error_json).unwrap_or_else(|_| {
+                    payload: serde_json::to_vec(&error_json).unwrap_or_else(|_| {
                         r#"{"error": "Failed to serialize error response"}"#
                             .as_bytes()
                             .to_vec()
@@ -558,5 +559,65 @@ mod tests {
 
         let result = task.await.expect("handler task panicked");
         assert_eq!(result.status, 200);
+    }
+
+    // Echoes its request, or fails when the request carries `fail`.
+    struct EchoHandler;
+
+    #[async_trait]
+    impl FunctionHandler for EchoHandler {
+        type Request = serde_json::Value;
+        type Response = serde_json::Value;
+
+        async fn on_call(
+            &self,
+            _ctx: FunctionCallContext,
+            request: Self::Request,
+        ) -> Result<Self::Response> {
+            if request.get("fail").is_some() {
+                return Err(netdata_plugin_error::NetdataPluginError::Other {
+                    message: "failed".to_string(),
+                });
+            }
+            Ok(request)
+        }
+
+        fn declaration(&self) -> FunctionDeclaration {
+            FunctionDeclaration::new("test-echo", "test echo handler")
+        }
+    }
+
+    async fn echo(payload: serde_json::Value) -> FunctionResult {
+        let (outbound_tx, _outbound_rx) = mpsc::unbounded_channel();
+        let ctx = Arc::new(FunctionContext {
+            function_call: Box::new(FunctionCall {
+                transaction: "tx-echo".to_string(),
+                timeout: 60,
+                name: "test-echo".to_string(),
+                args: Vec::new(),
+                access: None,
+                source: None,
+                payload: Some(serde_json::to_vec(&payload).unwrap()),
+            }),
+            cancellation_token: CancellationToken::new(),
+            outbound_tx,
+        });
+        HandlerAdapter::new(EchoHandler).handle_raw(ctx).await
+    }
+
+    // Responses and error bodies are compact JSON: the bytes a handler's
+    // budget counts are the bytes sent.
+    #[tokio::test]
+    async fn results_are_compact_json() {
+        let request = serde_json::json!({"a": [1, 2], "b": {"c": "d"}});
+        let ok = echo(request.clone()).await;
+        assert_eq!(ok.status, 200);
+        assert_eq!(ok.payload, serde_json::to_vec(&request).unwrap());
+
+        let failed = echo(serde_json::json!({"fail": true})).await;
+        assert_eq!(failed.status, 500);
+        assert!(!failed.payload.contains(&b'\n'));
+        let body: serde_json::Value = serde_json::from_slice(&failed.payload).unwrap();
+        assert_eq!(body["status"], 500);
     }
 }
