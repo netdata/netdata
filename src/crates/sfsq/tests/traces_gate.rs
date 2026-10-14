@@ -1812,3 +1812,77 @@ fn negated_chip_keeps_rollup_discovery() {
         assert_eq!(ids(&data), vec![hex(1)], "{name}");
     }
 }
+
+/// A window file whose evidence read fails is reported once and not
+/// read again: later candidates it may hold fall back without a retry
+/// (each retry re-decoded its dictionary and warned again).
+#[test]
+fn failed_evidence_read_is_reported_once() {
+    use std::io::Write;
+    use std::sync::Mutex;
+
+    #[derive(Clone, Default)]
+    struct Lines(Arc<Mutex<Vec<u8>>>);
+    impl Write for Lines {
+        fn write(&mut self, buf: &[u8]) -> std::io::Result<usize> {
+            self.0.lock().unwrap().extend_from_slice(buf);
+            Ok(buf.len())
+        }
+        fn flush(&mut self) -> std::io::Result<()> {
+            Ok(())
+        }
+    }
+
+    let dir = tempfile::tempdir().unwrap();
+    let svc = || vec![kv_str("service.name", "svc")];
+    // Five long traces, each with a span in both files; the older
+    // file's dictionary is corrupt.
+    let file = |f: u8| {
+        let spans: Vec<SpanSpec> = (1..=5u8)
+            .map(|t| {
+                let at = (u64::from(f) * 100 + u64::from(t)) * NS;
+                if f == 0 {
+                    root_span(t, 0x10, at, at + 50, "op")
+                } else {
+                    span_in(t, 0x20, 0x10, at, "op")
+                }
+            })
+            .collect();
+        write_wal(
+            dir.path(),
+            vec![req_with(svc(), None, &spans)],
+            &format!("e{f}"),
+        )
+    };
+    let (old, new) = (file(0), file(1));
+    drop(sealed_source(dir.path(), &old, "e0"));
+    corrupt_chunk(&sealed_path(dir.path(), "e0"), *b"PRIM");
+    let sources = both_roles(|| {
+        vec![
+            sealed_source_at(&sealed_path(dir.path(), "e0"), "e0"),
+            sealed_source(dir.path(), &new, "e1"),
+        ]
+    });
+    let query = SearchQuery::new(tokens(vec![
+        Token::positive(pred(vec![min_duration(10 * NS as i64)])),
+        Token::negated(pred(vec![name_eq("zzz")])),
+    ]));
+    let lines = Lines::default();
+    let writer = lines.clone();
+    let subscriber = tracing_subscriber::fmt()
+        .with_writer(move || writer.clone())
+        .with_ansi(false)
+        .finish();
+    let data = tracing::subscriber::with_default(subscriber, || run(sources, query));
+    assert!(
+        data.status.has(PartialReason::SourceFailure),
+        "{:?}",
+        data.status
+    );
+    let log = String::from_utf8(lines.0.lock().unwrap().clone()).unwrap();
+    assert_eq!(
+        log.matches("failed a token evidence read").count(),
+        1,
+        "{log}"
+    );
+}

@@ -732,6 +732,9 @@ struct HolderReads<'c, 'r, 'a> {
     /// The query discovers from spans, so a pending holder compiled for
     /// evidence joins discovery (false: rollup discovery keeps it).
     span_discovery: bool,
+    /// Files whose evidence read failed (reported once): a candidate
+    /// they may hold is undecidable without reading them again.
+    evidence_failed: &'c mut HashSet<usize>,
 }
 
 /// What an on-demand compile reports to.
@@ -778,6 +781,7 @@ fn holder_evidence(
         negated_base,
         stop_when_all_positive,
         span_discovery,
+        evidence_failed,
     } = reads;
     let window = env.query.window;
     // Without a span-local token no set is read: positions and starts
@@ -793,6 +797,9 @@ fn holder_evidence(
         work.rows_visited += 1;
         if !sessions[slot].screen(trace_id) {
             continue;
+        }
+        if evidence_failed.contains(&slot) {
+            return false;
         }
         // Under span discovery a pending holder compiles here and joins
         // discovery early, as the loop would compile it. Under rollup
@@ -838,6 +845,7 @@ fn holder_evidence(
                 Ok(false) => continue,
                 Ok(true) => {}
                 Err(e) => {
+                    evidence_failed.insert(slot);
                     report_evidence_failure(&mut env, slot, &e);
                     return false;
                 }
@@ -863,6 +871,7 @@ fn holder_evidence(
                 }
                 Ok(None) => return false, // cut short by a ceiling
                 Err(e) => {
+                    evidence_failed.insert(slot);
                     report_evidence_failure(&mut env, slot, &e);
                     return false;
                 }
@@ -885,6 +894,7 @@ fn holder_evidence(
         let starts = match read {
             Ok(starts) => starts,
             Err(e) => {
+                evidence_failed.insert(slot);
                 report_evidence_failure(&mut env, slot, &e);
                 return false;
             }
@@ -953,6 +963,7 @@ fn row_from_parts(
         positive_count,
         negated_base,
         span_discovery,
+        evidence_failed,
         ..
     } = reads;
     // ── The verdict: tokens over the in-window stored rows ──────────
@@ -986,6 +997,7 @@ fn row_from_parts(
             negated_base,
             stop_when_all_positive: false,
             span_discovery,
+            evidence_failed: &mut *evidence_failed,
         },
         CompileEnv {
             query: env.query,
@@ -1813,6 +1825,7 @@ pub fn search(
     // Files whose rollup or stats failed to read: their candidates
     // assemble without reading them again.
     let mut rows_failed: HashSet<usize> = HashSet::new();
+    let mut evidence_failed: HashSet<usize> = HashSet::new();
     // With files but none sealed with stats every row would fall back:
     // skip the rows path (a TOC check per file). Tails need no stats.
     let rows = query.rows && (sessions.is_empty() || sessions.iter().any(|s| s.has_rollup_stats()));
@@ -1964,6 +1977,7 @@ pub fn search(
                         negated_base,
                         stop_when_all_positive: false,
                         span_discovery: !rollup_discovery,
+                        evidence_failed: &mut evidence_failed,
                     },
                     CompileEnv {
                         query: &query,
@@ -2050,6 +2064,7 @@ pub fn search(
                             negated_base,
                             stop_when_all_positive: true,
                             span_discovery: !rollup_discovery,
+                            evidence_failed: &mut evidence_failed,
                         },
                         CompileEnv {
                             query: &query,
