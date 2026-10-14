@@ -6,15 +6,16 @@ Use this when a collector's metrics, chart contexts, configuration, alerts, or d
 ## 1. Identify what changed
 
 From the collector directory, list the changed surfaces: runtime code; `metadata.yaml` metric contexts, units,
-dimensions, setup, alerts; `config_schema.json`; the stock `.conf`; `health.d/*.conf`. The generated
-`integrations/<slug>.md` and `README.md` symlink are outputs and follow automatically.
+dimensions, setup, and its `alerts` and `excluded_alerts` name lists where present; `config_schema.json`; the stock
+`.conf`; `health.d/*.conf`. The generated `integrations/<slug>.md` and `README.md` symlink are outputs and follow
+automatically, including the alert table.
 
 ## 2. Update `metadata.yaml`
 
-Metric rows mirror the code (context, chart title, unit, chart type, dimensions); option rows mirror the schema; alert
-rows mirror the health conf. The content rules for every field are in `.agents/skills/collectors-metadata-yaml/`
-(`metrics.md`, `setup.md`, `alerts-and-meta.md`); the catalog sentence and page description in
-`../description-authoring.md`.
+Metric rows mirror the code (context, chart title, unit, chart type, dimensions); option rows mirror the schema; the
+alert table is derived from the health conf and the declared contexts. The content rules for every field are in
+`.agents/skills/collectors-metadata-yaml/` (`metrics.md`, `setup.md`, `alerts-and-meta.md`); the catalog sentence and
+page description in `../description-authoring.md`.
 
 ## 3. Update the remaining artifacts
 

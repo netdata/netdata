@@ -420,35 +420,6 @@ modules:
 
               **Resolution:**
               Customize the alert threshold in `health.d/web_log.conf` by copying the web_log_1m_unmatched template and adjusting the warn condition, or silence notifications via Netdata Cloud alert configuration.
-    alerts:
-      - name: web_log_1m_unmatched
-        metric: web_log.excluded_requests
-        info: percentage of unparsed log lines over the last minute
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/web_log.conf
-      - name: web_log_1m_requests
-        metric: web_log.type_requests
-        info: "ratio of successful HTTP requests over the last minute (1xx, 2xx, 304, 401)"
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/web_log.conf
-      - name: web_log_1m_redirects
-        metric: web_log.type_requests
-        info: "ratio of redirection HTTP requests over the last minute (3xx except 304)"
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/web_log.conf
-      - name: web_log_1m_bad_requests
-        metric: web_log.type_requests
-        info: "ratio of client error HTTP requests over the last minute (4xx except 401)"
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/web_log.conf
-      - name: web_log_1m_internal_errors
-        metric: web_log.type_requests
-        info: "ratio of server error HTTP requests over the last minute (5xx)"
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/web_log.conf
-      - name: web_log_web_slow
-        metric: web_log.request_processing_time
-        info: average HTTP response time over the last 1 minute
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/web_log.conf
-      - name: web_log_5m_requests_ratio
-        metric: web_log.type_requests
-        info: ratio of successful HTTP requests over over the last 5 minutes, compared with the previous 5 minutes
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/web_log.conf
     metrics:
       folding:
         title: Metrics

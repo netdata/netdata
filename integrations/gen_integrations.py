@@ -23,7 +23,7 @@ from _common import (
     warn,
 )
 from descriptions import build_description_index
-from health_alerts import build_alert_index, load_stock_rules
+from health_alerts import alert_owners, alert_ownership, alert_subject, build_alert_index, load_stock_rules
 from prometheus_profile_docs import project_prometheus_profile_coverage
 
 TEMPLATE_PATH = INTEGRATIONS_PATH / 'templates'
@@ -752,8 +752,6 @@ def dedupe_integrations(integrations, ids):
 
 
 def render_collectors(categories, collectors, ids):
-    project_prometheus_profile_coverage(collectors)
-
     debug('Computing default categories.')
 
     default_cats, valid_cats = get_category_sets(categories)
@@ -1361,15 +1359,33 @@ def attach_descriptions(integrations, clean_integrations):
             item['description'] = descriptions[item['id']]
 
 
-def alert_owners(*groups):
-    owners = {}
+def declared_contexts(item):
+    """Metric contexts the item declares, including those of its Prometheus profiles (after the coverage projection)."""
+    metrics = item.get('metrics') or {}
+    contexts = [metric['name'] for scope in metrics.get('scopes') or [] for metric in scope.get('metrics') or []]
+    return contexts + (metrics.get('profile_coverage') or {}).get('contexts', [])
 
-    for items in groups:
-        for item in items:
-            for alert in item.get('alerts') or []:
-                owners.setdefault(alert['name'], set()).add(make_id(item['meta']))
 
-    return owners
+def alert_subjects(items):
+    return [
+        alert_subject(make_id(item['meta']), item['meta']['plugin_name'], item['meta']['module_name'],
+                      declared_contexts(item), item.get('alerts') or [], item.get('excluded_alerts') or [])
+        for item in items
+    ]
+
+
+def attach_alerts(rules, *groups):
+    """Replace each item's listed alert names with its page rows and drop its excluded names; return the owners of each
+    alert name."""
+    items = [item for group in groups for item in group]
+    subjects = alert_subjects(items)
+    ownership = alert_ownership(rules, subjects)
+
+    for item, subject in zip(items, subjects):
+        item['alerts'] = ownership[subject['id']]
+        item.pop('excluded_alerts', None)
+
+    return alert_owners(ownership)
 
 
 def render_integrations(categories, integrations, alerts, output_path=OUTPUT_PATH):
@@ -1406,7 +1422,9 @@ def main():
     secretstores = load_secretstores()
     service_discoveries = load_service_discoveries()
 
-    alerts = build_alert_index(load_stock_rules(), alert_owners(collectors, flows, devices))
+    project_prometheus_profile_coverage(collectors)
+    rules = load_stock_rules()
+    alerts = build_alert_index(rules, attach_alerts(rules, collectors, flows, devices))
 
     collectors, clean_collectors, ids = render_collectors(categories, collectors, dict())
     deploy, clean_deploy, ids = render_deploy(distros, categories, deploy, ids)

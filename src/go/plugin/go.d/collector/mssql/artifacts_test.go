@@ -12,17 +12,14 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// The integration page mirrors the shipped artifacts: option rows equal the DynCfg form, metric rows
-// equal the chart definitions, and alert rows equal the health configuration.
-// (The health configuration's own consistency with the charts is not asserted here: its alert units
-// use `%` where the charts say `percentage`.)
+// The integration page mirrors the shipped artifacts: option rows equal the DynCfg form and metric rows
+// equal the chart definitions. (The health configuration's consistency with the charts is not asserted
+// here: its alert units use `%` where the charts say `percentage`.)
 func TestArtifacts(t *testing.T) {
 	read := func(path string) []byte { data, err := os.ReadFile(path); require.NoError(t, err); return data }
 	metadata := read("metadata.yaml")
-	health := read("../../../../../health/health.d/mssql.conf")
 
 	collecttest.AssertConfigSchemaMatchesMetadataWith(t, "config_schema.json", "metadata.yaml", collecttest.ConfigSchemaCheck{Defaults: true})
-	collecttest.AssertMetadataAlertsMatchHealthConfig(t, metadata, health)
 
 	module, err := collecttest.DecodeMetadataModule(metadata, "")
 	require.NoError(t, err)

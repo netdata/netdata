@@ -619,63 +619,16 @@ modules:
                       labels:
                         site: dc1
                         rack: a12
+    # SNMP profiles create the BGP charts at runtime, so `metrics` cannot declare these alerts' contexts. The
+    # integrations generator derives every other alert row from the contexts `metrics` declares.
     alerts:
-      - name: snmp_license_expiring
-        metric: snmp.license.remaining_time
-        info: "The earliest monitored SNMP license or subscription on this device is close to expiration."
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/snmp.conf
-      - name: snmp_license_authorization_expiring
-        metric: snmp.license.authorization_remaining_time
-        info: "The license authorization timer on this device is close to expiration."
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/snmp.conf
-      - name: snmp_license_certificate_expiring
-        metric: snmp.license.certificate_remaining_time
-        info: "The license certificate timer on this device is close to expiration."
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/snmp.conf
-      - name: snmp_license_grace_period_ending
-        metric: snmp.license.grace_remaining_time
-        info: "The licensing grace or evaluation period on this device is ending or already expired."
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/snmp.conf
-      - name: snmp_license_state_warning
-        metric: snmp.license.state
-        info: "One or more monitored licenses on this device are degraded, in grace, or otherwise in warning state."
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/snmp.conf
-      - name: snmp_license_state_critical
-        metric: snmp.license.state
-        info: "One or more monitored licenses on this device are expired, invalid, unauthorized, or otherwise in critical state."
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/snmp.conf
-      - name: snmp_license_usage_high
-        metric: snmp.license.usage_percent
-        info: "The most constrained monitored license pool on this device is nearing exhaustion."
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/snmp.conf
-      - name: snmp_bgp_peer_down
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/snmp_bgp.conf
-        metric: snmp.bgp.peers.availability
-        info: BGP peer is administratively enabled but remains out of Established
-      - name: snmp_bgp_peer_family_down
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/snmp_bgp.conf
-        metric: snmp.bgp.peer_families.availability
-        info: BGP peer-family is administratively enabled but remains out of Established
-      - name: snmp_bgp_peer_transitions_anomaly
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/snmp_bgp.conf
-        metric: snmp.bgp.peers.established_transitions
-        info: ML anomaly detection on per-peer established transition activity
-      - name: snmp_bgp_peer_family_transitions_anomaly
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/snmp_bgp.conf
-        metric: snmp.bgp.peer_families.established_transitions
-        info: ML anomaly detection on per-peer-family established transition activity
-      - name: snmp_bgp_peer_updates_anomaly
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/snmp_bgp.conf
-        metric: snmp.bgp.peers.update_traffic
-        info: ML anomaly detection on per-peer BGP UPDATE traffic
-      - name: snmp_bgp_peer_family_updates_anomaly
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/snmp_bgp.conf
-        metric: snmp.bgp.peer_families.update_traffic
-        info: ML anomaly detection on per-peer-family BGP UPDATE traffic
-      - name: snmp_bgp_peer_family_prefixes_accepted_anomaly
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/snmp_bgp.conf
-        metric: snmp.bgp.peer_families.route_counts.current
-        info: ML anomaly detection on accepted-prefix gauges where the vendor MIB exposes them
+      - snmp_bgp_peer_down
+      - snmp_bgp_peer_family_down
+      - snmp_bgp_peer_transitions_anomaly
+      - snmp_bgp_peer_family_transitions_anomaly
+      - snmp_bgp_peer_updates_anomaly
+      - snmp_bgp_peer_family_updates_anomaly
+      - snmp_bgp_peer_family_prefixes_accepted_anomaly
     functions:
       description: |
         This collector exposes real-time functions for interactive troubleshooting in the Live tab.

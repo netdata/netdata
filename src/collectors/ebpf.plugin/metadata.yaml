@@ -118,7 +118,6 @@ modules:
     troubleshooting:
       problems:
         list: []
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -345,7 +344,6 @@ modules:
     troubleshooting:
       problems:
         list: []
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -451,7 +449,6 @@ modules:
     troubleshooting:
       problems:
         list: []
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -606,13 +603,6 @@ modules:
     troubleshooting:
       problems:
         list: []
-    alerts:
-      - name: sync_freq
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/synchronization.conf
-        metric: mem.sync
-        info:
-          number of sync() system calls. Every call causes all pending modifications to filesystem metadata and cached file data to be written to the
-          underlying filesystems.
     metrics:
       folding:
         title: Metrics
@@ -736,7 +726,6 @@ modules:
     troubleshooting:
       problems:
         list: []
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -869,7 +858,6 @@ modules:
     troubleshooting:
       problems:
         list: []
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -1027,7 +1015,6 @@ modules:
             description: Set default lifetime for thread when enabled by cloud.
             default_value: 300
             required: false
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -1174,7 +1161,6 @@ modules:
     troubleshooting:
       problems:
         list: []
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -1357,7 +1343,6 @@ modules:
     troubleshooting:
       problems:
         list: []
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -1548,7 +1533,6 @@ modules:
     troubleshooting:
       problems:
         list: []
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -1664,7 +1648,6 @@ modules:
     troubleshooting:
       problems:
         list: []
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -1807,7 +1790,6 @@ modules:
     troubleshooting:
       problems:
         list: []
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -2186,7 +2168,6 @@ modules:
     troubleshooting:
       problems:
         list: []
-    alerts: []
     metrics:
       folding:
         title: Metrics

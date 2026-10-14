@@ -117,4 +117,6 @@ The relative path is `../../docgen` for top-level modules and `../../../docgen` 
 ## What generation does and does not cover
 
 Generation keeps runtime metric registration, integration metadata, and the DynCfg schema consistent by construction. It
-does NOT cover the stock `.conf` or `health.d/<...>.conf`; those still need manual sync under the consistency rule.
+does NOT cover the stock `.conf` or `health.d/<...>.conf`; those still need manual sync under the consistency rule. The
+page's alert table is derived from `health.d` and the generated contexts, so an alert whose `on:` matches no
+`contexts.yaml` context has no owner and fails `integrations/tests/test_health_alerts.py`.

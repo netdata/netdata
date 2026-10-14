@@ -803,7 +803,6 @@ modules:
     troubleshooting:
       problems:
         list: []
-    alerts: []
     functions:
       description: |
         This collector supports user-defined SQL functions that expose query results as

@@ -250,39 +250,23 @@
           },
           "alerts": {
             "type": "array",
-            "description": "The list of configured alerts shipped with Netdata for this collector.",
+            "description": "Stock alerts this integration owns although no context in 'metrics' derives them, for charts created at runtime from profiles or alarms on a chart id. The integrations generator derives every other alert from the declared metric contexts and src/health/health.d; integrations/tests/test_health_alerts.py rejects a name that is unknown, targets only Agent charts, is derivable, or names an alert whose filters exclude this integration.",
             "items": {
-              "type": "object",
-              "description": "Information about the configured alert.",
-              "properties": {
-                "name": {
-                  "type": "string",
-                  "description": "Alert's 'alarm' or 'template' value (https://learn.netdata.cloud/docs/alerting/health-configuration-reference#alarm-line-alarm-or-template)."
-                },
-                "link": {
-                  "type": "string",
-                  "description": "Link to github .conf file that this alert originates from"
-                },
-                "metric": {
-                  "type": "string",
-                  "description": "Alert's 'on' value (https://learn.netdata.cloud/docs/alerting/health-configuration-reference#alarm-line-on)."
-                },
-                "info": {
-                  "type": "string",
-                  "description": "Alert's 'info' value (https://learn.netdata.cloud/docs/alerting/health-configuration-reference#alarm-line-info)."
-                },
-                "os": {
-                  "type": "string",
-                  "description": "Alert's 'os' value (https://learn.netdata.cloud/docs/alerting/health-configuration-reference#alarm-line-os)."
-                }
-              },
-              "required": [
-                "name",
-                "link",
-                "metric",
-                "info"
-              ]
-            }
+              "type": "string",
+              "description": "Alert's 'alarm' or 'template' value (https://learn.netdata.cloud/docs/alerting/health-configuration-reference#alarm-line-alarm-or-template).",
+              "minLength": 1
+            },
+            "uniqueItems": true
+          },
+          "excluded_alerts": {
+            "type": "array",
+            "description": "Stock alerts a declared context in 'metrics' derives but this integration's monitored instance cannot evaluate, because it does not report the data they read (for example a Redis-compatible server without a Redis field). The integrations generator leaves them off the alert table; integrations/tests/test_health_alerts.py rejects a name that is not derived or is also listed in 'alerts'.",
+            "items": {
+              "type": "string",
+              "description": "Alert's 'alarm' or 'template' value (https://learn.netdata.cloud/docs/alerting/health-configuration-reference#alarm-line-alarm-or-template).",
+              "minLength": 1
+            },
+            "uniqueItems": true
           },
           "metrics": {
             "type": "object",
@@ -688,7 +672,6 @@
           "overview",
           "setup",
           "troubleshooting",
-          "alerts",
           "metrics"
         ]
       }

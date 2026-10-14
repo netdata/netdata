@@ -115,7 +115,6 @@ modules:
               waiting attempts or execution inability. Open the latest retained run for errors and actual failure
               phases. Missing measurements are gaps; stale, inconclusive and cancelled observations are not
               recovery.
-    alerts: []
     metrics:
       description: Each native job has its own chart identity. Attempt duration excludes waiting for admission.
         Missing observations are omitted.

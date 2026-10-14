@@ -1,6 +1,5 @@
 modules:
-    - alerts: []
-      meta:
+    - meta:
         id: collector-dem.plugin-receiver
         info_provided_to_referring_integrations:
             description: ""

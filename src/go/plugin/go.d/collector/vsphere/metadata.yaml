@@ -413,31 +413,6 @@ modules:
           - name: vCenter reboot recovery
             description: |
               The collector cannot always recover an existing session after a vCenter reboot. Restart `go.d.plugin` if collection does not resume after vCenter becomes available again.
-    alerts:
-      - name: vsphere_vm_cpu_utilization
-        metric: vsphere.vm_cpu_utilization
-        info: Virtual Machine CPU utilization
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/vsphere.conf
-      - name: vsphere_vm_mem_utilization
-        metric: vsphere.vm_mem_utilization
-        info: Virtual Machine memory utilization
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/vsphere.conf
-      - name: vsphere_vm_snapshot_chain_depth
-        metric: vsphere.vm_snapshot_max_chain_depth
-        info: Virtual Machine snapshot maximum chain depth
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/vsphere.conf
-      - name: vsphere_vm_snapshot_age
-        metric: vsphere.vm_snapshot_max_age
-        info: Virtual Machine oldest snapshot age
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/vsphere.conf
-      - name: vsphere_host_cpu_utilization
-        metric: vsphere.host_cpu_utilization
-        info: ESXi Host CPU utilization
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/vsphere.conf
-      - name: vsphere_host_mem_utilization
-        metric: vsphere.host_mem_utilization
-        info: ESXi Host memory utilization
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/vsphere.conf
     functions:
       description: |
         This collector exposes read-only readiness and topology functions for interactive troubleshooting in the Live tab. Both functions require selecting a configured vSphere collector job.

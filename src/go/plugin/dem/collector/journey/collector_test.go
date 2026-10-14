@@ -152,12 +152,4 @@ func TestPreparedCheckAndArtifacts(t *testing.T) {
 			ContextPrefix: "dem_synthetic.",
 		},
 	)
-	collecttest.AssertMetadataAlertsMatchHealthConfigWith(
-		t,
-		metadata,
-		health,
-		collecttest.MetadataAlertsCheck{
-			SharedHealthConfig: true,
-		},
-	)
 }

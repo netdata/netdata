@@ -156,15 +156,6 @@ modules:
     troubleshooting:
       problems:
         list: []
-    alerts:
-      - name: x509check_days_until_expiration
-        metric: x509check.time_until_expiration
-        info: "SSL cert expiring soon (${label:source} cn:${label:common_name})"
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/x509check.conf
-      - name: x509check_revocation_status
-        metric: x509check.revocation_status
-        info: "SSL cert revoked (${label:source})"
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/x509check.conf
     metrics:
       folding:
         title: Metrics

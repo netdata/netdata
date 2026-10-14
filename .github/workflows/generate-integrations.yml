@@ -22,6 +22,7 @@ on:
       - 'src/go/plugin/ibm.d/modules/**/contexts/contexts.yaml'
       - 'src/go/plugin/ibm.d/modules/**/contexts/doc.go'
       - 'src/exporting/**/metadata.yaml'
+      - 'src/health/health.d/**'
       - 'src/health/notifications/**/metadata.yaml'
       - 'integrations/templates/**'
       - 'integrations/schemas/**'
@@ -112,7 +113,7 @@ jobs:
         run: |
           source ./virtualenv/bin/activate
           python3 -m unittest integrations.tests.test_collector_metadata
-      - name: Test Health Alerts Catalogue And Metadata Alert Rows
+      - name: Test Stock Health Alert Metadata
         id: test-health-alerts
         run: |
           source ./virtualenv/bin/activate
@@ -173,7 +174,7 @@ jobs:
               Test Integration Descriptions: ${{ steps.test-descriptions.outcome }}
               Test Prometheus Profile Documentation: ${{ steps.test-prometheus-profile-documentation.outcome }}
               Test Collector Metadata Content Rules: ${{ steps.test-collector-metadata.outcome }}
-              Test Health Alerts Catalogue And Metadata Alert Rows: ${{ steps.test-health-alerts.outcome }}
+              Test Stock Health Alert Metadata: ${{ steps.test-health-alerts.outcome }}
               Generate Integrations Documentation: ${{ steps.generate-integrations-documentation.outcome }}
               Generate src/collectors/COLLECTORS.md: ${{ steps.generate-collectors-md.outcome }}
               Generate src/collectors/SECRETS.md: ${{ steps.generate-secrets-md.outcome }}

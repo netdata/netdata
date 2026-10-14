@@ -157,51 +157,6 @@ modules:
     troubleshooting:
       problems:
         list: []
-    alerts:
-      - name: systemd_service_unit_failed_state
-        metric: systemd.service_unit_state
-        info: systemd service unit in the failed state
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/systemdunits.conf
-      - name: systemd_socket_unit_failed_state
-        metric: systemd.socket_unit_state
-        info: systemd socket unit in the failed state
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/systemdunits.conf
-      - name: systemd_target_unit_failed_state
-        metric: systemd.target_unit_state
-        info: systemd target unit in the failed state
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/systemdunits.conf
-      - name: systemd_path_unit_failed_state
-        metric: systemd.path_unit_state
-        info: systemd path unit in the failed state
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/systemdunits.conf
-      - name: systemd_device_unit_failed_state
-        metric: systemd.device_unit_state
-        info: systemd device unit in the failed state
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/systemdunits.conf
-      - name: systemd_mount_unit_failed_state
-        metric: systemd.mount_unit_state
-        info: systemd mount unit in the failed state
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/systemdunits.conf
-      - name: systemd_automount_unit_failed_state
-        metric: systemd.automount_unit_state
-        info: systemd automount unit in the failed state
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/systemdunits.conf
-      - name: systemd_swap_unit_failed_state
-        metric: systemd.swap_unit_state
-        info: systemd swap unit in the failed state
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/systemdunits.conf
-      - name: systemd_scope_unit_failed_state
-        metric: systemd.scope_unit_state
-        info: systemd scope unit in the failed state
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/systemdunits.conf
-      - name: systemd_slice_unit_failed_state
-        metric: systemd.slice_unit_state
-        info: systemd slice unit in the failed state
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/systemdunits.conf
-      - name: systemd_timer_unit_failed_state
-        metric: systemd.timer_unit_state
-        info: systemd timer unit in the failed state
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/systemdunits.conf
     metrics:
       folding:
         title: Metrics

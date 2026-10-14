@@ -137,11 +137,6 @@ modules:
               waiting attempts or execution inability. Open the latest retained run for errors and actual failure
               phases. Missing measurements are gaps; stale, inconclusive and cancelled observations are not
               recovery.
-    alerts:
-      - name: dem_journey_failed
-        metric: dem_synthetic.execution_state
-        info: Latest fresh journey attempt failed or timed out for ${label:_collect_job}
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/dem.conf
     metrics:
       description: Each native job has its own chart identity. Attempt duration excludes waiting for admission.
         Missing observations are omitted.

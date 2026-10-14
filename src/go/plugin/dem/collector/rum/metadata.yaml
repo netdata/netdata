@@ -1,32 +1,5 @@
 modules:
-  - alerts:
-      - name: rum_lcp_experience_quality
-        metric: rum.lcp_population
-        info: Largest Contentful Paint exceeds its good threshold for more than 25% of recent observed document
-            experiences; critical when more than 25% exceed its poor threshold. Requires at least 30 observations and a
-            complete local population.
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/dem.conf
-      - name: rum_inp_experience_quality
-        metric: rum.inp_population
-        info: Interaction to Next Paint exceeds its good threshold for more than 25% of recent observed document
-            experiences; critical when more than 25% exceed its poor threshold. Requires at least 30 observations and a
-            complete local population.
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/dem.conf
-      - name: rum_cls_experience_quality
-        metric: rum.cls_population
-        info: Cumulative Layout Shift exceeds its good threshold for more than 25% of recent observed document
-            experiences; critical when more than 25% exceed its poor threshold. Requires at least 30 observations and a
-            complete local population.
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/dem.conf
-      - name: rum_events_dropped
-        metric: rum.otlp
-        info: RUM event log delivery failed or records were locally dropped in the last 5 minutes
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/dem.conf
-      - name: rum_spans_dropped
-        metric: rum.spans
-        info: RUM browser span delivery failed or spans were locally dropped in the last 5 minutes
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/dem.conf
-    functions:
+  - functions:
         description: Use these process-wide Functions through the Netdata Agent or Cloud to inspect RUM setup, live
             activity and retained investigation history. Invoke their public rum-* names; filter by site where
             supported.
