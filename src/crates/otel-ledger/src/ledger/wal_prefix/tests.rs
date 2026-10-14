@@ -215,3 +215,34 @@ async fn forgetting_a_wal_drops_its_boundaries_and_chunks() {
     assert!(prefixes.entries.lock().unwrap().is_empty());
     cancel.cancel();
 }
+
+#[tokio::test]
+async fn a_forget_right_behind_a_sync_leaves_nothing() {
+    // Whether the two land in one batch or the sync is built first, the
+    // forget wins: WAL 8 ends with no boundaries and no chunks.
+    let (path, frames) = five_frame_wal(8).await;
+    let (other, other_frames) = five_frame_wal(9).await;
+    let (end, other_end) = (
+        frames.last().unwrap().end_offset,
+        other_frames.last().unwrap().end_offset,
+    );
+    let chunks = folded_up_to(&frames, end);
+    let prefixes = Arc::new(WalPrefixes::new(3));
+    let cache = Arc::new(ChunkCache::new(64 * 1024 * 1024));
+    let cancel = CancellationToken::new();
+    let prebuilder = spawn_prebuilder(
+        &prefixes,
+        ng_index::build_sfst_traces_range,
+        &cache,
+        &cancel,
+    );
+    prebuilder.synced(8, path, end);
+    prebuilder.forget(8);
+    // Served in arrival order: once WAL 9 is built, WAL 8 was handled.
+    prebuilder.synced(9, other, other_end);
+    await_cached(&cache, 9, &folded_up_to(&other_frames, other_end), true).await;
+    assert!(!cached(&cache, 8, chunks[0].index).await);
+    let seqs: Vec<u64> = prefixes.entries.lock().unwrap().keys().copied().collect();
+    assert_eq!(seqs, [9]);
+    cancel.cancel();
+}
