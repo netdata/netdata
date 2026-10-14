@@ -108,7 +108,7 @@ pub use error::Error;
 pub use index_reader::{
     BitmapFilter, CompiledTracePlan, GroupCondition, IdColumnKind, IndexReader, MetaReader,
     NumberCmp, PlanMatcher, PlanTerm, RollupEvidence, RollupRefOutcome, RollupRootResolver,
-    ScanWork, Trace, TraceEvent, TraceFileSession, TraceLink, TracePlan, TraceSpan,
+    ScanLimits, ScanWork, Trace, TraceEvent, TraceFileSession, TraceLink, TracePlan, TraceSpan,
     numeric_token_matches,
 };
 pub use index_writer::IndexWriter;

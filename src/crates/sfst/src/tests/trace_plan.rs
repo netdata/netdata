@@ -2,10 +2,11 @@
 //! (`index_reader/trace_plan.rs`): one compilation resolving every
 //! term against a file, then rank-bounded extractions of the newest-K
 //! matched positions. Pins: per-tier term resolution (exact, regex,
-//! dictionary numerics), cross-term conjunction, negation (the pinned
-//! `presence ∩ complement` rule), duration bounds, work accounting
-//! (free dictionary terms, ONE shared stream-batch pass, in-scan
-//! budget stops), and the rank-bounded proof — emission is
+//! dictionary numerics, contains), free-text field sets, cross-term
+//! conjunction, negation (the pinned `presence ∩ complement` rule),
+//! duration bounds, work accounting (dictionary terms visit no rows,
+//! ONE shared stream-batch pass, in-scan budget stops, dictionary
+//! bytes and their ceiling), and the rank-bounded proof — emission is
 //! `min(K, matched)`, never the full set.
 //!
 //! One shared 256-row fixture (one field per tier at threshold 10,
@@ -13,15 +14,30 @@
 //! brute-force full-scan oracle; dedicated fixtures cover what it
 //! structurally cannot — multi-batch masking, the short-circuit arms
 //! (no event/link index; empty matching set with the chunk present),
-//! and a file without DURN.
+//! a file without DURN, and non-ASCII case variants.
 
 use std::io::Cursor;
 
 use bumpalo::Bump;
 
 use crate::{
-    CompiledTracePlan, Durations, IndexReader, IndexWriter, PlanTerm, RowIndex, ScanWork, TracePlan,
+    CompiledTracePlan, Durations, IndexReader, IndexWriter, PlanTerm, RowIndex, ScanLimits,
+    ScanWork, TracePlan,
 };
+
+/// No ceiling on either unit.
+const UNLIMITED: ScanLimits = ScanLimits {
+    rows: u64::MAX,
+    dict_bytes: u64::MAX,
+};
+
+/// A rows ceiling alone.
+fn rows_ceiling(rows: u64) -> ScanLimits {
+    ScanLimits {
+        rows,
+        dict_bytes: u64::MAX,
+    }
+}
 
 /// One fixture row's field values, mirrored for the oracle.
 struct FixtureRow {
@@ -129,7 +145,7 @@ fn number(field: &str, cmp: crate::NumberCmp, values: &[f64], negated: bool) -> 
 
 /// Whole-file, unbounded compile — the shape most tests need.
 fn compile(idx: &IndexReader<'_>, p: &TracePlan, work: &mut ScanWork) -> CompiledTracePlan {
-    idx.compile_trace_plan(p, (0, idx.summary().record_count), u64::MAX, work)
+    idx.compile_trace_plan(p, (0, idx.summary().record_count), UNLIMITED, work)
         .unwrap()
         .expect("an unbounded compile cannot run out of budget")
 }
@@ -401,8 +417,9 @@ fn absent_field_collapses_the_conjunction() {
     assert_eq!(work.rows_visited, 0, "collapsed plan skips the SB scan");
 }
 
-/// Compilation work: dictionary terms are free; high-card terms cost one
-/// shared stream-batch pass however many there are.
+/// Compilation rows: dictionary terms visit none (their dictionary
+/// bytes are pinned by `dict_ceiling_truncates_compile`); high-card
+/// terms cost one shared stream-batch pass however many there are.
 #[test]
 fn work_counts_one_shared_stream_batch_pass() {
     let (bytes, _) = fixture();
@@ -565,7 +582,7 @@ fn malformed_pattern_fails_compilation() {
                 idx.compile_trace_plan(
                     &plan(vec![tokens(field, &[], &["("])]),
                     (0, N as u32),
-                    u64::MAX,
+                    UNLIMITED,
                     &mut work,
                 ),
                 Err(crate::Error::InvalidPattern(_))
@@ -591,7 +608,7 @@ fn duration_term_requires_the_durn_column() {
         idx.compile_trace_plan(
             &plan(vec![PlanTerm::duration(Some(0), None)]),
             (0, 1),
-            u64::MAX,
+            UNLIMITED,
             &mut work,
         )
         .is_err()
@@ -609,7 +626,7 @@ fn compile_budget_stops_the_stream_batch_scan() {
     let p = plan(vec![tokens("h", &[], &["w.*"])]);
     let mut work = ScanWork::default();
     let out = idx
-        .compile_trace_plan(&p, (0, N as u32), 10, &mut work)
+        .compile_trace_plan(&p, (0, N as u32), rows_ceiling(10), &mut work)
         .unwrap();
     assert!(out.is_none(), "budget-truncated compile yields no plan");
     assert_eq!(work.rows_visited, 11, "stopped one past the ceiling");
@@ -620,7 +637,7 @@ fn compile_budget_stops_the_stream_batch_scan() {
         .compile_trace_plan(
             &plan(vec![tokens("l", &["a"], &[])]),
             (0, N as u32),
-            0,
+            rows_ceiling(0),
             &mut w2,
         )
         .unwrap();
@@ -637,7 +654,7 @@ fn duration_scan_is_clipped_to_the_range() {
     let p = plan(vec![PlanTerm::duration(Some(0), None)]);
     let mut work = ScanWork::default();
     let compiled = idx
-        .compile_trace_plan(&p, (10, 20), u64::MAX, &mut work)
+        .compile_trace_plan(&p, (10, 20), UNLIMITED, &mut work)
         .unwrap()
         .expect("in budget");
     assert_eq!(compiled.count_in_range(10, 20), 10);
@@ -688,7 +705,7 @@ fn impossible_subgroup_skips_the_budgeted_scan() {
     let mut work = ScanWork::default();
     // Even a ZERO budget compiles: nothing needs scanning.
     let compiled = idx
-        .compile_trace_plan(&p, (0, N as u32), 0, &mut work)
+        .compile_trace_plan(&p, (0, N as u32), rows_ceiling(0), &mut work)
         .unwrap()
         .expect("no scan needed");
     assert_eq!(compiled.count_in_range(0, N as u32), 0);
@@ -741,7 +758,7 @@ fn empty_event_kvid_set_short_circuits_with_the_chunk_present() {
     ]);
     let mut work = ScanWork::default();
     let compiled = idx
-        .compile_trace_plan(&p, (0, ROWS as u32), 0, &mut work)
+        .compile_trace_plan(&p, (0, ROWS as u32), rows_ceiling(0), &mut work)
         .unwrap()
         .expect("no scan needed");
     assert_eq!(compiled.count_in_range(0, ROWS as u32), 0);
@@ -760,7 +777,7 @@ fn empty_event_kvid_set_short_circuits_with_the_chunk_present() {
     }]);
     let mut work = ScanWork::default();
     let compiled = idx
-        .compile_trace_plan(&p, (0, ROWS as u32), u64::MAX, &mut work)
+        .compile_trace_plan(&p, (0, ROWS as u32), UNLIMITED, &mut work)
         .unwrap()
         .expect("within budget");
     assert_eq!(
@@ -768,4 +785,279 @@ fn empty_event_kvid_set_short_circuits_with_the_chunk_present() {
         1,
         "only row 5 carries e005"
     );
+}
+
+/// A free-text term over a field set (exact names and name prefixes).
+fn fields_in(exact: &[&str], prefixes: &[&str], term: &str) -> PlanTerm {
+    PlanTerm::FieldsIn {
+        exact: exact.iter().map(|s| s.to_string()).collect(),
+        prefixes: prefixes.iter().map(|s| s.to_string()).collect(),
+        matcher: crate::PlanMatcher::Contains(term.to_string()),
+    }
+}
+
+/// Every matched position, checked against the full-scan oracle.
+fn assert_matches_oracle(
+    idx: &IndexReader<'_>,
+    rows: &[FixtureRow],
+    p: &TracePlan,
+    pred: impl Fn(&FixtureRow) -> bool,
+    case: &str,
+) {
+    let mut work = ScanWork::default();
+    let compiled = compile(idx, p, &mut work);
+    let want = oracle(rows, pred, 0, N as u32, N);
+    let mut w = ScanWork::default();
+    assert_eq!(
+        compiled.matched_in_range(0, N as u32, &mut w),
+        want,
+        "{case}"
+    );
+    assert_eq!(
+        compiled.count_in_range(0, N as u32),
+        want.len() as u64,
+        "{case}"
+    );
+}
+
+/// A free-text term resolves over the low, mid and high tiers of the
+/// fields its scope selects, case-insensitively, and ANDs with other
+/// terms; a scope selecting no field, or an empty term, matches nothing.
+#[test]
+fn fields_in_matches_every_tier() {
+    let (bytes, rows) = fixture();
+    let idx = IndexReader::open(&bytes).unwrap();
+    type Pred = Box<dyn Fn(&FixtureRow) -> bool>;
+    let cases: Vec<(&str, TracePlan, Pred)> = vec![
+        (
+            "mid and both high fields (prefix h selects h and h2)",
+            plan(vec![fields_in(&["l", "m"], &["h"], "1")]),
+            Box::new(|r: &FixtureRow| r.m.contains('1') || r.h.contains('1') || r.h2.contains('1')),
+        ),
+        (
+            "high tier, upper-case term",
+            plan(vec![fields_in(&["l", "m"], &["h"], "W01")]),
+            Box::new(|r: &FixtureRow| r.h.contains("w01")),
+        ),
+        (
+            "mid tier, upper-case term",
+            plan(vec![fields_in(&["l", "m"], &["h"], "V0")]),
+            Box::new(|r: &FixtureRow| r.m.starts_with("v0")),
+        ),
+        (
+            "low tier, upper-case term",
+            plan(vec![fields_in(&["l", "m"], &["h"], "A")]),
+            Box::new(|r: &FixtureRow| r.l == "a"),
+        ),
+        (
+            "sparse field selected by exact name",
+            plan(vec![fields_in(&["s"], &[], "ye")]),
+            Box::new(|r: &FixtureRow| r.s.as_deref() == Some("yes")),
+        ),
+        (
+            "AND with a token term",
+            plan(vec![
+                fields_in(&["m"], &["h"], "1"),
+                tokens("l", &["a"], &[]),
+            ]),
+            Box::new(|r: &FixtureRow| {
+                r.l == "a" && (r.m.contains('1') || r.h.contains('1') || r.h2.contains('1'))
+            }),
+        ),
+        (
+            "no field in scope",
+            plan(vec![fields_in(&["zz"], &["q"], "1")]),
+            Box::new(|_| false),
+        ),
+        (
+            "empty term",
+            plan(vec![fields_in(&["l", "m"], &["h"], "")]),
+            Box::new(|_| false),
+        ),
+    ];
+    for (case, p, pred) in &cases {
+        assert_matches_oracle(&idx, &rows, p, pred, case);
+    }
+}
+
+/// Free text tests VALUES only: a term that occurs only in field names
+/// (or in the `field=` key syntax) matches nothing, whether the scope
+/// is a field set or a single field.
+#[test]
+fn fields_in_never_matches_key_names() {
+    let (bytes, rows) = fixture();
+    let idx = IndexReader::open(&bytes).unwrap();
+    for term in ["h2", "um", "=", "l=a", "h=w"] {
+        let p = plan(vec![fields_in(&["l", "m", "num", "s"], &["h", "f"], term)]);
+        assert_matches_oracle(&idx, &rows, &p, |_| false, term);
+        let single = plan(vec![PlanTerm::Fields {
+            fields: vec!["num".to_string()],
+            matcher: crate::PlanMatcher::Contains(term.to_string()),
+            negated: false,
+        }]);
+        assert_matches_oracle(&idx, &rows, &single, |_| false, term);
+    }
+}
+
+/// The plan's contains matcher is suggest's contains class: a stored
+/// value matches a (non-empty) term exactly when the suggest matcher
+/// ranks it exact, prefix or contains — on every tier, with Unicode
+/// case variants (`É`/`é`, `ẞ`/`ß`, the Kelvin sign) included.
+#[test]
+fn contains_equals_suggest_contains() {
+    const ROWS: usize = 128;
+    let base = [
+        "Élan",
+        "élan",
+        "ELAN",
+        "Straße",
+        "STRAẞE",
+        "\u{212A}elvin",
+        "kelvin",
+        "plain",
+    ];
+    let arena = Bump::new();
+    let mut ri = RowIndex::new(&arena, 10);
+    // Field -> per-row value: `t` low (8 values), `tm` mid (16), `th`
+    // high (128).
+    let mut values: Vec<(&str, Vec<String>)> =
+        vec![("t", Vec::new()), ("tm", Vec::new()), ("th", Vec::new())];
+    for i in 0..ROWS {
+        let b = base[i % base.len()];
+        let row = [
+            b.to_string(),
+            format!("{b}-{}", i % 2),
+            format!("{b}-{i:03}"),
+        ];
+        let mut slots = Vec::new();
+        for ((field, column), value) in values.iter_mut().zip(row) {
+            slots.push(ri.intern(None, &format!("{field}={value}")));
+            column.push(value);
+        }
+        ri.row(1_000 + i as i64, &slots);
+    }
+    let (buf, _s, _m) = IndexWriter::write_into(&ri, Cursor::new(Vec::new()), Vec::new()).unwrap();
+    let bytes = buf.into_inner();
+    let idx = IndexReader::open(&bytes).unwrap();
+
+    let terms = [
+        "élan", "ÉLAN", "elan", "straße", "STRASSE", "ẞ", "ß", "kelvin", "\u{212A}", "-1", "PLAIN",
+        "x",
+    ];
+    for term in terms {
+        let suggest = crate::ValueMatcher::new(term);
+        for (field, column) in &values {
+            let want: Vec<u32> = (0..ROWS as u32)
+                .filter(|&p| {
+                    suggest
+                        .classify(column[p as usize].as_bytes())
+                        .is_some_and(|c| c <= crate::MatchClass::Contains)
+                })
+                .collect();
+            let p = plan(vec![PlanTerm::Fields {
+                fields: vec![field.to_string()],
+                matcher: crate::PlanMatcher::Contains(term.to_string()),
+                negated: false,
+            }]);
+            let mut work = ScanWork::default();
+            let compiled = compile(&idx, &p, &mut work);
+            let mut w = ScanWork::default();
+            assert_eq!(
+                compiled.matched_in_range(0, ROWS as u32, &mut w),
+                want,
+                "term {term:?}, field {field}"
+            );
+        }
+    }
+}
+
+/// Dictionary walks are charged by key bytes and bounded by their own
+/// ceiling: low, mid and high walks charge every walked `field=value`
+/// key; the high-tier exact lookup is free; a breach stops after the
+/// field that crossed it (no truncated plan); and a compilation entered
+/// over the ceiling returns before any walk.
+#[test]
+fn dict_ceiling_truncates_compile() {
+    let (bytes, _) = fixture();
+    let idx = IndexReader::open(&bytes).unwrap();
+    let dict = |limit: u64| ScanLimits {
+        rows: u64::MAX,
+        dict_bytes: limit,
+    };
+    let walked = |p: &TracePlan| {
+        let mut work = ScanWork::default();
+        compile(&idx, p, &mut work);
+        work.dict_bytes
+    };
+    // Exact key sizes: `l=a`/`l=b`, sixteen `m=vNN`, 128 `h=wNNN`, 128
+    // `h2=xNNN`.
+    assert_eq!(walked(&plan(vec![tokens("l", &["a"], &[])])), 2 * 3);
+    assert_eq!(walked(&plan(vec![tokens("m", &["v03"], &[])])), 16 * 5);
+    let high = plan(vec![PlanTerm::Fields {
+        fields: vec!["h".to_string()],
+        matcher: crate::PlanMatcher::Contains("w00".to_string()),
+        negated: false,
+    }]);
+    assert_eq!(walked(&high), 128 * 6);
+    assert_eq!(
+        walked(&plan(vec![tokens("h", &["w005"], &[])])),
+        0,
+        "exact lookup is free"
+    );
+
+    // At the ceiling: compiles. One byte under: no plan, stopped after
+    // the walk.
+    let mut work = ScanWork::default();
+    assert!(
+        idx.compile_trace_plan(&high, (0, N as u32), dict(128 * 6), &mut work)
+            .unwrap()
+            .is_some()
+    );
+    let mut work = ScanWork::default();
+    assert!(
+        idx.compile_trace_plan(&high, (0, N as u32), dict(128 * 6 - 1), &mut work)
+            .unwrap()
+            .is_none()
+    );
+    assert_eq!(work.dict_bytes, 128 * 6);
+
+    // A field set stops at the first field over the ceiling: it never
+    // walks every field in scope.
+    let text = plan(vec![fields_in(&["l", "m"], &["h"], "1")]);
+    let all = walked(&text);
+    assert_eq!(
+        all,
+        2 * 3 + 16 * 5 + 128 * 6 + 128 * 7,
+        "l, m, h and h2 walked"
+    );
+    let mut work = ScanWork::default();
+    assert!(
+        idx.compile_trace_plan(&text, (0, N as u32), dict(1), &mut work)
+            .unwrap()
+            .is_none()
+    );
+    assert!(
+        work.dict_bytes > 1 && work.dict_bytes < all,
+        "{}",
+        work.dict_bytes
+    );
+
+    // Entered over the ceiling: no plan and no walk, so later files of
+    // a query never overshoot by a field each — even a plan with no
+    // dictionary term gets no plan.
+    for p in [
+        plan(vec![tokens("l", &["a"], &[])]),
+        plan(vec![PlanTerm::duration(Some(0), None)]),
+    ] {
+        let mut work = ScanWork {
+            rows_visited: 0,
+            dict_bytes: 11,
+        };
+        assert!(
+            idx.compile_trace_plan(&p, (0, N as u32), dict(10), &mut work)
+                .unwrap()
+                .is_none()
+        );
+        assert_eq!(work.dict_bytes, 11, "nothing walked");
+    }
 }

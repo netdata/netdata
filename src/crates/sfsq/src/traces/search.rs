@@ -157,6 +157,11 @@ const ASSEMBLED_CEILING_FLOOR: usize = 64;
 /// rows, emitted phase-1 positions, and tail spans evaluated (sfst
 /// trace_plan.rs counts the same units).
 const VISITED_ROWS_CEILING: u64 = 4_000_000;
+/// Dictionary-bytes ceiling: key bytes of every dictionary walk of the
+/// query's compilations (sfst trace_plan.rs, `ScanWork::dict_bytes`). A
+/// free-text term walks ~1.5 MB of dictionaries per file, so a day of
+/// files (~240) fits.
+const DICT_BYTES_CEILING: u64 = 512 << 20;
 
 /// The two validated source sets of one search. `window` drives phase-1
 /// candidate discovery; `completion` — its superset, ENFORCED by
@@ -1032,11 +1037,15 @@ pub fn search(
                 }
             };
             let mut budget_truncated = false;
+            let limits = sfst::ScanLimits {
+                rows: query.visited_ceiling,
+                dict_bytes: DICT_BYTES_CEILING,
+            };
             let discovered = discovery_state(
                 reader,
                 &plan,
                 query.window,
-                query.visited_ceiling,
+                limits,
                 &mut work,
                 &mut budget_truncated,
             );
@@ -1101,7 +1110,7 @@ pub fn search(
 /// range, decode the candidate-mapping columns once (owned, so grow-K
 /// rounds touch no reader), and compile the plan against that range
 /// (work counted, budget-bounded). `Ok(None)` = the window range is
-/// empty in this file, OR the visited budget ran out mid-compilation —
+/// empty in this file, OR a work ceiling ran out mid-compilation —
 /// the latter sets `truncated` so the engine records the file's rank
 /// bound as a standing threat instead of claiming completeness over
 /// data it could not afford to scan.
@@ -1109,7 +1118,7 @@ fn discovery_state(
     reader: &sfst::IndexReader<'_>,
     plan: &sfst::TracePlan,
     window: Option<TimeWindow>,
-    ceiling: u64,
+    limits: sfst::ScanLimits,
     work: &mut ScanWork,
     truncated: &mut bool,
 ) -> Result<Option<FileDiscovery>, sfst::Error> {
@@ -1130,7 +1139,7 @@ fn discovery_state(
             timestamps.len(),
         )));
     }
-    let Some(compiled) = reader.compile_trace_plan(plan, (lo, hi), ceiling, work)? else {
+    let Some(compiled) = reader.compile_trace_plan(plan, (lo, hi), limits, work)? else {
         *truncated = true;
         return Ok(None);
     };

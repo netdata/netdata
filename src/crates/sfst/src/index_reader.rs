@@ -32,8 +32,8 @@ mod trace_plan;
 pub use rollup_resolver::{RollupRefOutcome, RollupRootResolver};
 pub use session::{RollupEvidence, TraceFileSession};
 pub use trace_plan::{
-    CompiledTracePlan, GroupCondition, IdColumnKind, NumberCmp, PlanMatcher, PlanTerm, ScanWork,
-    TracePlan, numeric_token_matches,
+    CompiledTracePlan, GroupCondition, IdColumnKind, NumberCmp, PlanMatcher, PlanTerm, ScanLimits,
+    ScanWork, TracePlan, numeric_token_matches,
 };
 
 use crate::{
@@ -1330,11 +1330,7 @@ impl<'a> IndexReader<'a> {
     fn locate_field(&self, field_name: &str) -> Option<FieldLocation> {
         field_table_tiered(self.field_table())
             .find(|(field, _)| field.name == field_name)
-            .map(|(field, ti)| match field.tier {
-                FieldTier::Low => FieldLocation::Low,
-                FieldTier::Mid => FieldLocation::Mid(ti),
-                FieldTier::High => FieldLocation::High(ti),
-            })
+            .map(|(field, ti)| FieldLocation::of(field, ti))
     }
 
     /// Compute the on-disk `KvId` for the `local`-th value of high-card
@@ -1753,6 +1749,18 @@ enum FieldLocation {
     Low,
     Mid(u16),
     High(u16),
+}
+
+impl FieldLocation {
+    /// The location of `field` given its tier-relative index (from
+    /// [`field_table_tiered`]).
+    fn of(field: &FieldEntry, tier_index: u16) -> Self {
+        match field.tier {
+            FieldTier::Low => FieldLocation::Low,
+            FieldTier::Mid => FieldLocation::Mid(tier_index),
+            FieldTier::High => FieldLocation::High(tier_index),
+        }
+    }
 }
 
 /// A [`Filter`] compiled against one file: each filter

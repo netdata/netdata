@@ -864,6 +864,8 @@ pub(crate) enum EvalMatcher {
         cmp: sfst::NumberCmp,
         values: Vec<f64>,
     },
+    /// `None`: the empty term, which matches nothing (the plan's rule).
+    Contains(Option<sfst::ContainsMatcher>),
 }
 
 impl EvalMatcher {
@@ -880,6 +882,9 @@ impl EvalMatcher {
             EvalMatcher::Number { cmp, values } => values
                 .iter()
                 .any(|&rhs| sfst::numeric_token_matches(value, *cmp, rhs)),
+            EvalMatcher::Contains(matcher) => matcher
+                .as_ref()
+                .is_some_and(|m| m.is_match(value.as_bytes())),
         }
     }
 }
@@ -969,6 +974,9 @@ impl EvalPredicate {
                 PlanTerm::LinkGroup { conditions } => EvalTerm::LinkGroup {
                     conditions: conditions.iter().map(eval_group_condition).collect(),
                 },
+                PlanTerm::FieldsIn { .. } => {
+                    unreachable!("no predicate lowers a FieldsIn term yet")
+                }
             })
             .collect();
         Self { terms }
@@ -1086,6 +1094,9 @@ fn eval_matcher(matcher: &sfst::PlanMatcher) -> EvalMatcher {
             cmp: *cmp,
             values: values.clone(),
         },
+        sfst::PlanMatcher::Contains(term) => EvalMatcher::Contains((!term.is_empty()).then(|| {
+            sfst::ContainsMatcher::new(term).expect("text terms validated at the request boundary")
+        })),
     }
 }
 

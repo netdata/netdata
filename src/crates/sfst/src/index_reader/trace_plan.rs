@@ -16,12 +16,19 @@
 //!
 //! - `fields` holds ONE storage field, or several OR-combined (the
 //!   grammar's unscoped attribute = resource ∪ span disjunction);
-//! - the matcher selects tokens — exact values and anchored regexes, or
-//!   a NUMERIC comparison evaluated at the dictionary (each distinct
-//!   stored value parsed once; unparseable values never match);
+//! - the matcher selects tokens — exact values and anchored regexes, a
+//!   NUMERIC comparison evaluated at the dictionary (each distinct
+//!   stored value parsed once; unparseable values never match), or a
+//!   case-insensitive substring ([`crate::ContainsMatcher`], the
+//!   free-text rule);
 //! - `negated` applies the pinned negation rule
 //!   `presence(fields) ∩ complement(match)`: an absent attribute never
 //!   satisfies a negated comparison.
+//!
+//! [`PlanTerm::FieldsIn`] is the free-text form: its fields are chosen
+//! per file from the field table (exact names and name prefixes), then
+//! it resolves as a positive multi-field term. Only values are tested,
+//! never field names.
 //!
 //! Terms resolve per tier: low/mid dictionary lookups and walks; ALL
 //! high-card probes (matches AND presence sets alike — a presence probe
@@ -42,17 +49,30 @@
 //! - each EMITTED matched position (rank-bounded extraction makes
 //!   emission itself the bounded unit).
 //!
-//! The caller's `ceiling` is enforced INSIDE each budgeted pass — the
-//! stream-batch scan and the subgroup refines (a counter alone could
-//! overshoot by a whole file): a compilation that would exceed it stops
-//! and returns `Ok(None)` — a truncated plan must never be used, it
-//! would under-approximate.
+//! [`ScanWork::dict_bytes`] counts the `field=value` key bytes of every
+//! dictionary WALK: the low-tier prefix walk, the mid-tier chunk walk,
+//! the high-tier key walk, and the subgroup KvId collection. A free-text
+//! term walks every attribute dictionary of every file, so dictionary
+//! work is no longer small next to row work. The high-tier exact-value
+//! binary search reads a handful of keys and stays free.
 //!
-//! Deliberately EXCLUDED (bounded by construction): dictionary walks
-//! (FST/arena — dictionary-sized), the DURN column pass (clipped to the
-//! caller's position range, so it is window-bounded) and other
-//! fixed-width column reads, and the `range_cardinality` probes of the
-//! extraction (tree walks, not row visits).
+//! The caller's [`ScanLimits`] are enforced INSIDE the compilation:
+//! `rows` within each budgeted pass — the stream-batch scan and the
+//! subgroup refines (a counter alone could overshoot by a whole file) —
+//! and `dict_bytes` after each field's walk (overshoot ≤ one field's
+//! dictionary). A compilation that would exceed either stops and returns
+//! `Ok(None)` — a truncated plan must never be used, it would
+//! under-approximate. Both counters are cumulative over the caller's
+//! query, so the limits are the query's totals; a compilation entered
+//! with `dict_bytes` already over its limit returns `Ok(None)` before
+//! any walk, so the overshoot stays one field per query, not per file.
+//!
+//! Deliberately EXCLUDED (bounded by construction): the field-table
+//! scan, the high-tier presence set (masks, no key bytes), the DURN
+//! column pass (clipped to the caller's position range, so it is
+//! window-bounded) and other fixed-width column reads, and the
+//! `range_cardinality` probes of the extraction (tree walks, not row
+//! visits).
 //!
 //! # Rank-bounded extraction (pin R3-1)
 //!
@@ -98,6 +118,10 @@ pub enum PlanMatcher {
     /// the grammar's multi-value numeric equality). See
     /// [`numeric_token_matches`].
     Number { cmp: NumberCmp, values: Vec<f64> },
+    /// Values containing the term, Unicode-simple case-insensitive
+    /// ([`crate::ContainsMatcher`]: the same rule as suggest's contains
+    /// class). An empty term matches nothing.
+    Contains(String),
 }
 
 /// The numeric comparison of [`PlanMatcher::Number`]. Negated
@@ -143,6 +167,16 @@ pub enum PlanTerm {
         fields: Vec<String>,
         matcher: PlanMatcher,
         negated: bool,
+    },
+    /// Rows selected by `matcher` over the union of this file's fields
+    /// named exactly as an `exact` entry or starting with one of
+    /// `prefixes` — the free-text scope, chosen per file from the field
+    /// table (the caller owns the names; this crate does not interpret
+    /// them). Positive only; a file with no such field matches nothing.
+    FieldsIn {
+        exact: Vec<String>,
+        prefixes: Vec<String>,
+        matcher: PlanMatcher,
     },
     /// Rows whose DURN duration lies in ANY of the INCLUSIVE
     /// `[min_ns, max_ns]` intervals (bounds optional; the caller maps
@@ -244,6 +278,18 @@ pub struct ScanWork {
     /// rows scanned, refine rows AND event/link records walked, and
     /// emitted extraction positions. One counter, one ceiling.
     pub rows_visited: u64,
+    /// Key bytes of every dictionary walk (module docs).
+    pub dict_bytes: u64,
+}
+
+/// The ceilings of one compilation, compared against the caller's
+/// cumulative [`ScanWork`] counters.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct ScanLimits {
+    /// Ceiling of [`ScanWork::rows_visited`].
+    pub rows: u64,
+    /// Ceiling of [`ScanWork::dict_bytes`].
+    pub dict_bytes: u64,
 }
 
 /// A [`TracePlan`] resolved against one file: the matched-position set,
@@ -327,25 +373,69 @@ fn refine_rows(
     Some(PosSet::from_sorted(matched, total))
 }
 
-/// Whether a `field=value` key's VALUE bytes satisfy `matcher` (shared
-/// by the per-tier set walks and the subgroup KvId collection).
-fn matcher_hits(
-    kv_bytes: &[u8],
-    prefix_len: usize,
-    matcher: &PlanMatcher,
-    compiled_patterns: &[regex::bytes::Regex],
-) -> bool {
-    let value = &kv_bytes[prefix_len..];
-    match matcher {
-        PlanMatcher::Tokens { exact, .. } => {
-            exact.iter().any(|e| e.as_bytes() == value)
-                || compiled_patterns.iter().any(|r| r.is_match(value))
+/// A [`PlanMatcher`] compiled once per term for the dictionary walks
+/// (shared by the per-tier set walks and the subgroup KvId collection).
+enum ValueTest<'m> {
+    Tokens {
+        exact: &'m [String],
+        patterns: Vec<regex::bytes::Regex>,
+    },
+    Number {
+        cmp: NumberCmp,
+        values: &'m [f64],
+    },
+    /// `None`: the empty term, which matches nothing.
+    Contains(Option<crate::ContainsMatcher>),
+}
+
+impl<'m> ValueTest<'m> {
+    fn new(matcher: &'m PlanMatcher) -> Result<Self, crate::Error> {
+        Ok(match matcher {
+            PlanMatcher::Tokens { exact, patterns } => ValueTest::Tokens {
+                exact,
+                patterns: patterns
+                    .iter()
+                    .map(|p| crate::query::compile_pattern(p))
+                    .collect::<Result<Vec<_>, _>>()?,
+            },
+            PlanMatcher::Number { cmp, values } => ValueTest::Number { cmp: *cmp, values },
+            PlanMatcher::Contains(term) if term.is_empty() => ValueTest::Contains(None),
+            PlanMatcher::Contains(term) => {
+                let matcher = crate::ContainsMatcher::new(term).ok_or_else(|| {
+                    crate::Error::InvalidPattern(format!(
+                        "contains term of {} bytes does not compile",
+                        term.len()
+                    ))
+                })?;
+                ValueTest::Contains(Some(matcher))
+            }
+        })
+    }
+
+    /// The exact values when they are the whole test: the high tier's
+    /// binary-search fast path.
+    fn exact_only(&self) -> Option<&'m [String]> {
+        match self {
+            ValueTest::Tokens { exact, patterns } if patterns.is_empty() => Some(exact),
+            _ => None,
         }
-        PlanMatcher::Number { cmp, values } => std::str::from_utf8(value).is_ok_and(|v| {
-            values
-                .iter()
-                .any(|&rhs| numeric_token_matches(v, *cmp, rhs))
-        }),
+    }
+
+    /// Whether a stored VALUE (the bytes after `field=`) satisfies the
+    /// test.
+    fn hits(&self, value: &[u8]) -> bool {
+        match self {
+            ValueTest::Tokens { exact, patterns } => {
+                exact.iter().any(|e| e.as_bytes() == value)
+                    || patterns.iter().any(|r| r.is_match(value))
+            }
+            ValueTest::Number { cmp, values } => std::str::from_utf8(value).is_ok_and(|v| {
+                values
+                    .iter()
+                    .any(|&rhs| numeric_token_matches(v, *cmp, rhs))
+            }),
+            ValueTest::Contains(matcher) => matcher.as_ref().is_some_and(|m| m.is_match(value)),
+        }
     }
 }
 
@@ -353,10 +443,10 @@ impl IndexReader<'_> {
     /// Resolve `plan` against this file for queries within the position
     /// range `[lo, hi)` (the caller's window; pass `(0, record_count)`
     /// for the whole file). See the module docs for the term algebra,
-    /// tier resolution, and work accounting. `Ok(None)` = the visited
-    /// budget ran out inside a budgeted pass — the shared stream-batch
-    /// scan or a subgroup refine; a truncated plan is never returned
-    /// (it would under-approximate).
+    /// tier resolution, and work accounting. `Ok(None)` = a ceiling of
+    /// `limits` ran out — rows inside the shared stream-batch scan or a
+    /// subgroup refine, dictionary bytes after a field's walk; a
+    /// truncated plan is never returned (it would under-approximate).
     ///
     /// The compiled plan answers `count_in_range`/`newest_in_range`/
     /// `matched_in_range` correctly only for sub-ranges of `[lo, hi)`
@@ -366,13 +456,18 @@ impl IndexReader<'_> {
         &self,
         plan: &TracePlan,
         range: (u32, u32),
-        ceiling: u64,
+        limits: ScanLimits,
         work: &mut ScanWork,
     ) -> Result<Option<CompiledTracePlan>, crate::Error> {
         let total = self.summary().record_count;
         let (range_lo, range_hi) = (range.0.min(total), range.1.min(total));
+        let ceiling = limits.rows;
+        let dict_over = |work: &ScanWork| work.dict_bytes > limits.dict_bytes;
+        if dict_over(work) {
+            return Ok(None);
+        }
 
-        // ── Resolve every term: dictionary work only (uncounted) ─────
+        // ── Resolve every term: dictionary work (charged to dict_bytes) ──
         let mut probes: Vec<(KvIdSet, u8)> = Vec::new();
         let mut resolved: Vec<Option<ResolvedTerm>> = Vec::new(); // None = non-Fields slot
         let mut durations: Vec<Option<PosSet>> = Vec::new(); // parallel to `resolved`, zipped below
@@ -384,30 +479,63 @@ impl IndexReader<'_> {
                     matcher,
                     negated,
                 } => {
-                    let compiled_patterns = match matcher {
-                        PlanMatcher::Tokens { patterns, .. } => patterns
-                            .iter()
-                            .map(|p| crate::query::compile_pattern(p))
-                            .collect::<Result<Vec<_>, _>>()?,
-                        PlanMatcher::Number { .. } => Vec::new(),
-                    };
+                    let test = ValueTest::new(matcher)?;
                     let mut matches = Vec::with_capacity(fields.len());
                     let mut presence = negated.then(|| Vec::with_capacity(fields.len()));
                     for field in fields {
                         let (m, p) = self.resolve_field(
                             field,
-                            matcher,
-                            &compiled_patterns,
+                            self.locate_field(field),
+                            &test,
                             *negated,
                             total,
                             &mut probes,
+                            work,
                         )?;
+                        if dict_over(work) {
+                            return Ok(None);
+                        }
                         matches.push(m);
                         if let (Some(acc), Some(part)) = (presence.as_mut(), p) {
                             acc.push(part);
                         }
                     }
                     resolved.push(Some(ResolvedTerm { matches, presence }));
+                    durations.push(None);
+                }
+                PlanTerm::FieldsIn {
+                    exact,
+                    prefixes,
+                    matcher,
+                } => {
+                    let test = ValueTest::new(matcher)?;
+                    let mut matches = Vec::new();
+                    for (entry, tier_index) in super::field_table_tiered(self.field_table()) {
+                        let name = entry.name.as_str();
+                        if !exact.iter().any(|e| e == name)
+                            && !prefixes.iter().any(|p| name.starts_with(p.as_str()))
+                        {
+                            continue;
+                        }
+                        let location = FieldLocation::of(entry, tier_index);
+                        let (m, _) = self.resolve_field(
+                            name,
+                            Some(location),
+                            &test,
+                            false,
+                            total,
+                            &mut probes,
+                            work,
+                        )?;
+                        if dict_over(work) {
+                            return Ok(None);
+                        }
+                        matches.push(m);
+                    }
+                    resolved.push(Some(ResolvedTerm {
+                        matches,
+                        presence: None,
+                    }));
                     durations.push(None);
                 }
                 PlanTerm::IdColumn {
@@ -463,25 +591,23 @@ impl IndexReader<'_> {
                     for condition in conditions {
                         match condition {
                             GroupCondition::Field { field, matcher } => {
-                                let compiled_patterns = match matcher {
-                                    PlanMatcher::Tokens { patterns, .. } => patterns
-                                        .iter()
-                                        .map(|pat| crate::query::compile_pattern(pat))
-                                        .collect::<Result<Vec<_>, _>>()?,
-                                    PlanMatcher::Number { .. } => Vec::new(),
-                                };
+                                let test = ValueTest::new(matcher)?;
                                 let (m, _) = self.resolve_field(
                                     field,
-                                    matcher,
-                                    &compiled_patterns,
+                                    self.locate_field(field),
+                                    &test,
                                     false,
                                     total,
                                     &mut probes,
+                                    work,
                                 )?;
                                 parts.push((m, None));
                                 resolved_conditions.push(ResolvedGroupCondition::Kv(
-                                    self.field_matching_kvids(field, matcher, &compiled_patterns)?,
+                                    self.field_matching_kvids(field, &test, work)?,
                                 ));
+                                if dict_over(work) {
+                                    return Ok(None);
+                                }
                             }
                             GroupCondition::TimeSinceStart { intervals } => {
                                 resolved_conditions
@@ -507,15 +633,18 @@ impl IndexReader<'_> {
                             exact: Vec::new(),
                             patterns: vec![".*".to_string()],
                         };
-                        let compiled = vec![crate::query::compile_pattern(".*")?];
                         let (m, _) = self.resolve_field(
                             "events.name",
-                            &names,
-                            &compiled,
+                            self.locate_field("events.name"),
+                            &ValueTest::new(&names)?,
                             false,
                             total,
                             &mut probes,
+                            work,
                         )?;
+                        if dict_over(work) {
+                            return Ok(None);
+                        }
                         parts.push((m, None));
                     }
                     let chunk_absent = if is_event {
@@ -779,29 +908,27 @@ impl IndexReader<'_> {
         }))
     }
 
-    /// Resolve one field of a term: the MATCH part and (for negated
-    /// terms) the PRESENCE part, each a ready set (low/mid, absent) or
-    /// a registered high-card probe. Dictionary work only.
+    /// Resolve one field of a term at its `location` (`None`: absent
+    /// from this file): the MATCH part and (for negated terms) the
+    /// PRESENCE part, each a ready set (low/mid, absent) or a registered
+    /// high-card probe. Dictionary work only, its key bytes charged to
+    /// `work.dict_bytes`.
+    #[allow(clippy::too_many_arguments)]
     fn resolve_field(
         &self,
         field: &str,
-        matcher: &PlanMatcher,
-        compiled_patterns: &[regex::bytes::Regex],
+        location: Option<FieldLocation>,
+        test: &ValueTest<'_>,
         want_presence: bool,
         total: u32,
         probes: &mut Vec<(KvIdSet, u8)>,
+        work: &mut ScanWork,
     ) -> Result<(Part, Option<Part>), crate::Error> {
         let prefix_len = field.len() + 1;
-        let value_matches =
-            |kv_bytes: &[u8]| matcher_hits(kv_bytes, prefix_len, matcher, compiled_patterns);
-
-        let location = match self.locate_field(field) {
-            Some(loc) => loc,
-            None => {
-                // Absent field: no matches, no presence.
-                let presence = want_presence.then(|| Part::Ready(PosSet::empty(total)));
-                return Ok((Part::Ready(PosSet::empty(total)), presence));
-            }
+        let Some(location) = location else {
+            // Absent field: no matches, no presence.
+            let presence = want_presence.then(|| Part::Ready(PosSet::empty(total)));
+            return Ok((Part::Ready(PosSet::empty(total)), presence));
         };
 
         match location {
@@ -809,29 +936,35 @@ impl IndexReader<'_> {
                 let prefix = format!("{field}=");
                 let mut matched = PosSet::empty(total);
                 let mut presence = want_presence.then(|| PosSet::empty(total));
+                let mut walked = 0u64;
                 self.primary
                     .prefix_for_each(prefix.as_bytes(), |kv_bytes, bv| {
-                        if value_matches(kv_bytes) {
+                        walked += kv_bytes.len() as u64;
+                        if test.hits(&kv_bytes[prefix_len..]) {
                             matched.or_assign(&PosSet::from_value(bv));
                         }
                         if let Some(p) = presence.as_mut() {
                             p.or_assign(&PosSet::from_value(bv));
                         }
                     });
+                work.dict_bytes += walked;
                 Ok((Part::Ready(matched), presence.map(Part::Ready)))
             }
             FieldLocation::Mid(idx) => {
                 let chunk = self.sfst.mid_field(idx)?;
                 let mut matched = PosSet::empty(total);
                 let mut presence = want_presence.then(|| PosSet::empty(total));
+                let mut walked = 0u64;
                 chunk.for_each(|kv_bytes, bv| {
-                    if value_matches(kv_bytes) {
+                    walked += kv_bytes.len() as u64;
+                    if test.hits(&kv_bytes[prefix_len..]) {
                         matched.or_assign(&PosSet::from_value(bv));
                     }
                     if let Some(p) = presence.as_mut() {
                         p.or_assign(&PosSet::from_value(bv));
                     }
                 });
+                work.dict_bytes += walked;
                 Ok((Part::Ready(matched), presence.map(Part::Ready)))
             }
             FieldLocation::High(idx) => {
@@ -839,25 +972,23 @@ impl IndexReader<'_> {
                 let base = self.high_kv_id(idx, 0).0;
                 let mut targets = KvIdSet::new(base, hf.len() as u32);
                 let mut mask: u8 = 0;
-                match matcher {
+                if let Some(exact) = test.exact_only() {
                     // Exact-only terms keep the pinned KvId fast path
-                    // (binary search per value); everything else walks
-                    // the dictionary once.
-                    PlanMatcher::Tokens { exact, patterns } if patterns.is_empty() => {
-                        for value in exact {
-                            let kv = format!("{field}={value}");
-                            if let Ok(local) = hf.binary_search(kv.as_bytes()) {
-                                targets.insert(KvId(base + local as u32));
-                                mask |= hf.masks[local];
-                            }
+                    // (binary search per value, uncharged); everything
+                    // else walks the dictionary once.
+                    for value in exact {
+                        let kv = format!("{field}={value}");
+                        if let Ok(local) = hf.binary_search(kv.as_bytes()) {
+                            targets.insert(KvId(base + local as u32));
+                            mask |= hf.masks[local];
                         }
                     }
-                    _ => {
-                        for (local, key) in hf.keys().enumerate() {
-                            if value_matches(key) {
-                                targets.insert(KvId(base + local as u32));
-                                mask |= hf.masks[local];
-                            }
+                } else {
+                    for (local, key) in hf.keys().enumerate() {
+                        work.dict_bytes += key.len() as u64;
+                        if test.hits(&key[prefix_len..]) {
+                            targets.insert(KvId(base + local as u32));
+                            mask |= hf.masks[local];
                         }
                     }
                 }
@@ -892,12 +1023,13 @@ impl IndexReader<'_> {
     /// field in field-table order with values in dictionary order (the
     /// tested `resolve_kv_strings` labeling), so the id of the `i`-th
     /// walked value is `field_start + i`. An absent field yields the
-    /// empty set (unsatisfiable subgroup condition in this file).
+    /// empty set (unsatisfiable subgroup condition in this file). The
+    /// walk's key bytes are charged to `work.dict_bytes`.
     fn field_matching_kvids(
         &self,
         field: &str,
-        matcher: &PlanMatcher,
-        compiled_patterns: &[regex::bytes::Regex],
+        test: &ValueTest<'_>,
+        work: &mut ScanWork,
     ) -> Result<std::collections::HashSet<u32>, crate::Error> {
         let mut start = 0u32;
         let mut present = false;
@@ -913,7 +1045,11 @@ impl IndexReader<'_> {
             return Ok(out);
         }
         let prefix_len = field.len() + 1;
-        let hits = |kv: &[u8]| matcher_hits(kv, prefix_len, matcher, compiled_patterns);
+        let mut walked = 0u64;
+        let mut hits = |kv: &[u8]| {
+            walked += kv.len() as u64;
+            test.hits(&kv[prefix_len..])
+        };
         match self.locate_field(field) {
             None => {}
             Some(FieldLocation::Low) => {
@@ -946,6 +1082,7 @@ impl IndexReader<'_> {
                 }
             }
         }
+        work.dict_bytes += walked;
         Ok(out)
     }
 }

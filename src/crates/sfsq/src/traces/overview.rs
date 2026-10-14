@@ -89,6 +89,9 @@ const DURATION_BIN_EDGES_NS: [i64; DURATION_BIN_COUNT - 1] = [
 
 /// The default visited budget (rollup rows + tail spans examined).
 const VISITED_ROWS_CEILING: u64 = 4_000_000;
+/// The filter's dictionary-bytes budget (the search's value and
+/// reasoning: a free-text term over a day of files).
+const DICT_BYTES_CEILING: u64 = 512 << 20;
 
 /// Which duration bin an envelope duration falls in.
 fn duration_bin(duration_ns: i64) -> usize {
@@ -283,6 +286,7 @@ pub fn overview(
     let spec = SourceFoldSpec {
         op: "overview",
         visited_ceiling: query.visited_ceiling,
+        dict_ceiling: DICT_BYTES_CEILING,
         ceiling_reason: PartialReason::OverviewCeiling,
         filter,
     };

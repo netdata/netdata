@@ -24,7 +24,8 @@
 //!   reason. The budget bounds WORK, not memory (the map peaks at the
 //!   processed prefix's distinct traces).
 //! - The optional span filter ([`SpanFilter`]): its scans and
-//!   emissions are charged to the SAME ceiling as the fold, and a
+//!   emissions are charged to the SAME ceiling as the fold, its
+//!   dictionary walks to the caller's dictionary-bytes ceiling, and a
 //!   refused or truncated filter scan stops the merge with the
 //!   caller's ceiling reason, so a half-flagged file never poses as
 //!   complete.
@@ -58,6 +59,9 @@ pub(crate) struct SourceFoldSpec {
     /// The caller's visited budget (rollup rows + tail spans), shared
     /// with the filter's scans (see the module docs).
     pub visited_ceiling: u64,
+    /// The caller's dictionary-bytes budget for the filter's
+    /// compilations (sfst `ScanWork::dict_bytes`).
+    pub dict_ceiling: u64,
     /// The caller's own ceiling reason (each op names its own).
     pub ceiling_reason: PartialReason,
     /// Optional span-level filter (the overview's filtered grid): when
@@ -109,16 +113,17 @@ impl SpanFilter {
 
     /// Flag the traces of `reader` that own a matched in-window row.
     /// Returns `Ok(false)` when the budget refused the work (the
-    /// compile's stream-batch scan or the extraction would cross
-    /// `ceiling`): the caller reports its ceiling reason and stops, so a
-    /// half-flagged file never poses as a complete answer. Emission and
-    /// scanned rows are charged to `work`.
+    /// compile's stream-batch scan or dictionary walks, or the
+    /// extraction, would cross `limits`): the caller reports its ceiling
+    /// reason and stops, so a half-flagged file never poses as a
+    /// complete answer. Emission, scanned rows and walked dictionary
+    /// bytes are charged to `work`.
     fn mark_sealed(
         &self,
         reader: &sfst::IndexReader<'_>,
         merged: &mut HashMap<sfst::TraceId, MergedTrace>,
         work: &mut ScanWork,
-        ceiling: u64,
+        limits: sfst::ScanLimits,
     ) -> Result<bool, sfst::Error> {
         let total = reader.summary().record_count;
         let timestamps = reader.load_timestamps()?;
@@ -139,7 +144,7 @@ impl SpanFilter {
                 timestamps.len(),
             )));
         }
-        let Some(compiled) = reader.compile_trace_plan(&self.plan, (lo, hi), ceiling, work)? else {
+        let Some(compiled) = reader.compile_trace_plan(&self.plan, (lo, hi), limits, work)? else {
             return Ok(false);
         };
         // Refuse an extraction that would breach: emission is the
@@ -147,7 +152,7 @@ impl SpanFilter {
         if work
             .rows_visited
             .saturating_add(compiled.count_in_range(lo, hi))
-            > ceiling
+            > limits.rows
         {
             return Ok(false);
         }
@@ -323,9 +328,12 @@ pub(crate) fn merge_trace_sources(
                     // The filter sees the ceiling net of the fold's share
                     // INCLUDING this source's rows, so its in-file checks
                     // cannot overshoot on the fold's behalf.
-                    let filter_ceiling = spec.visited_ceiling.saturating_sub(visited);
+                    let limits = sfst::ScanLimits {
+                        rows: spec.visited_ceiling.saturating_sub(visited),
+                        dict_bytes: spec.dict_ceiling,
+                    };
                     let marked = meta.into_index_reader().and_then(|reader| {
-                        filter.mark_sealed(&reader, &mut merged, &mut filter_work, filter_ceiling)
+                        filter.mark_sealed(&reader, &mut merged, &mut filter_work, limits)
                     });
                     match marked {
                         Ok(true) => {}
