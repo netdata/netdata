@@ -805,7 +805,8 @@
                   "cancelled",
                   "overview_ceiling",
                   "rollup_absent",
-                  "remote_unavailable"
+                  "remote_unavailable",
+                  "busy"
                 ]
               }
             }

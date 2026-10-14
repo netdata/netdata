@@ -863,6 +863,62 @@ async fn attribute_values_returns_storage_labels_with_kinds() {
 }
 
 #[tokio::test]
+async fn value_lists_beyond_the_admission_limit_answer_busy() {
+    // No free permit: the request is refused before any work, with an
+    // empty list and the reason — not an error.
+    let registries = make_registries();
+    let h = make_handler_over(registries).with_value_list_concurrency(0);
+    let v = serde_json::to_value(
+        call_on(&h, json!({"attribute_values": {"key": "name"}}))
+            .await
+            .unwrap(),
+    )
+    .unwrap();
+    assert_eq!(v["status"], json!({"partial": ["busy"]}));
+    assert_eq!(v["values"], json!([]));
+    assert_eq!(v["key"], "name");
+}
+
+#[tokio::test]
+async fn a_finished_value_list_releases_its_permit() {
+    let h = handler_with_search_corpus()
+        .await
+        .with_value_list_concurrency(1);
+    let mut body = window_body();
+    merge(&mut body, json!({"key": "resource.service.name"}));
+    for _ in 0..2 {
+        let v = serde_json::to_value(
+            call_on(&h, as_mode("attribute_values", body.clone()))
+                .await
+                .unwrap(),
+        )
+        .unwrap();
+        assert_eq!(v["status"], json!({"complete": true}));
+    }
+}
+
+#[tokio::test]
+async fn value_lists_default_to_and_cap_at_bounded_sizes() {
+    let h = handler_with_search_corpus().await;
+    let err = call_on(
+        &h,
+        json!({"attribute_values": {"key": "name", "max_values": 1001}}),
+    )
+    .await
+    .expect_err("beyond the maximum");
+    assert!(
+        err.to_string().contains("exceeds the maximum 1000"),
+        "{err}"
+    );
+    call_on(
+        &h,
+        json!({"attribute_values": {"key": "name", "max_values": 1000}}),
+    )
+    .await
+    .expect("the maximum itself is legal");
+}
+
+#[tokio::test]
 async fn enumeration_invalid_requests_are_clean_client_errors() {
     let h = handler_with_search_corpus().await;
     // Shape errors (null selectors, missing `key`) are wire-test

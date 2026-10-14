@@ -397,6 +397,12 @@ where
     serde_json::Value::deserialize(d).map(Some)
 }
 
+/// [`AttributeValuesParams::max_values`] when the request omits it.
+pub const DEFAULT_MAX_VALUES: usize = 100;
+
+/// Wire maximum for [`AttributeValuesParams::max_values`].
+pub const MAX_VALUES_MAX: usize = 1000;
+
 /// The `attribute_values` mode's typed parameters.
 #[derive(Debug, Clone, Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -411,6 +417,9 @@ pub struct AttributeValuesParams {
     /// builtin word).
     pub key: String,
     /// Cap the value list (the response's `truncated` flag is exact).
+    /// Absent means [`DEFAULT_MAX_VALUES`]; zero and beyond
+    /// [`MAX_VALUES_MAX`] are client errors, so the response stays
+    /// bounded.
     #[serde(default)]
     pub max_values: Option<usize>,
 }
@@ -954,6 +963,7 @@ pub enum PartialReasonWire {
     OverviewCeiling,
     RollupAbsent,
     RemoteUnavailable,
+    Busy,
 }
 
 impl From<PartialReason> for PartialReasonWire {
@@ -966,6 +976,7 @@ impl From<PartialReason> for PartialReasonWire {
             PartialReason::OverviewCeiling => PartialReasonWire::OverviewCeiling,
             PartialReason::RollupAbsent => PartialReasonWire::RollupAbsent,
             PartialReason::RemoteUnavailable => PartialReasonWire::RemoteUnavailable,
+            PartialReason::Busy => PartialReasonWire::Busy,
         }
     }
 }

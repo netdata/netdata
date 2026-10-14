@@ -30,9 +30,9 @@ use file_lifecycle::chunk::ChunkCache;
 use file_lifecycle::registry::TenantRegistries;
 
 use sfsq::traces::{
-    AttributeRequestError, AttributeValuesQuery, OverviewQuery, OverviewRequestError, Predicate,
-    SearchQuery, SearchRequestError, SearchSources, TimeWindow, TraceQuery, TraceRequestError,
-    attribute_values, overview, search, trace_by_id,
+    AttributeRequestError, AttributeValuesQuery, OverviewQuery, OverviewRequestError,
+    PartialReason, Predicate, QueryStatus, SearchQuery, SearchRequestError, SearchSources,
+    TimeWindow, TraceQuery, TraceRequestError, attribute_values, overview, search, trace_by_id,
 };
 
 use super::adapter::{
@@ -42,9 +42,10 @@ use super::adapter::{
 };
 use super::sources::{Capture, CaptureError, RemotePolicy, TracesSourceSupplier};
 use super::wire::{
-    AttributeValuesParams, CoverageWire, FunctionsParams, FunctionsTracesResponse, InfoResponse,
-    OVERVIEW_SCOPE_SELECTION, OVERVIEW_SCOPE_WINDOW, OtelTracesRequest, OtelTracesResponse,
-    SearchParams, SearchResult, TraceParams, TracesMode,
+    AttributeValuesParams, CoverageWire, DEFAULT_MAX_VALUES, FunctionsParams,
+    FunctionsTracesResponse, InfoResponse, MAX_VALUES_MAX, OVERVIEW_SCOPE_SELECTION,
+    OVERVIEW_SCOPE_WINDOW, OtelTracesRequest, OtelTracesResponse, SearchParams, SearchResult,
+    TraceParams, TracesMode,
 };
 use file_lifecycle::remote_read::RemoteRead;
 
@@ -91,9 +92,16 @@ struct AggregateRequest {
     predicate: Option<Predicate>,
 }
 
+/// How many value-list requests may run at once. They arrive per
+/// keystroke; beyond this a request answers `busy` at once instead of
+/// queueing CPU and memory behind the others.
+const VALUE_LIST_CONCURRENCY: usize = 2;
+
 pub(crate) struct OtelTracesHandler {
     /// Live source resolution (registries snapshot + WAL chunk builds).
     supplier: TracesSourceSupplier,
+    /// Admission for the value lists (see [`VALUE_LIST_CONCURRENCY`]).
+    value_lists: Arc<tokio::sync::Semaphore>,
 }
 
 impl OtelTracesHandler {
@@ -107,7 +115,16 @@ impl OtelTracesHandler {
     ) -> Self {
         Self {
             supplier: TracesSourceSupplier::new(registries, chunk_cache, min_entries, remote),
+            value_lists: Arc::new(tokio::sync::Semaphore::new(VALUE_LIST_CONCURRENCY)),
         }
+    }
+
+    /// Test-only admission override: `0` makes every value-list request
+    /// answer `busy`.
+    #[cfg(test)]
+    pub(crate) fn with_value_list_concurrency(mut self, permits: usize) -> Self {
+        self.value_lists = Arc::new(tokio::sync::Semaphore::new(permits));
+        self
     }
 
     /// The `trace` mode: exact single-trace fetch via the engine's
@@ -500,17 +517,35 @@ impl OtelTracesHandler {
     ) -> netdata_plugin_error::Result<OtelTracesResponse> {
         let client_err = |e: String| handler_err(format!("invalid otel-traces request: {e}"));
         let (owner, key) = parse_enumeration_key(&params.key).map_err(client_err)?;
-        let mut query = AttributeValuesQuery::new(owner, key);
-        if let Some(max) = params.max_values {
-            // Pre-capture twin of the engine's own check.
-            if max == 0 {
-                return Err(client_err(
-                    "a zero key/value limit would return nothing; omit the limit or raise it"
-                        .into(),
-                ));
-            }
-            query = query.max_values(max);
+        let max = params.max_values.unwrap_or(DEFAULT_MAX_VALUES);
+        // Pre-capture twin of the engine's own zero check, plus the wire's
+        // bound on the response.
+        if max == 0 {
+            return Err(client_err(
+                "a zero key/value limit would return nothing; omit the limit or raise it".into(),
+            ));
         }
+        if max > MAX_VALUES_MAX {
+            return Err(client_err(format!(
+                "'max_values' {max} exceeds the maximum {MAX_VALUES_MAX}"
+            )));
+        }
+        // Admission before capture: capture already does WAL and catalog
+        // work. The permit moves into the blocking task, so it is held
+        // until the engine stops, even when a cancel drops this future.
+        let Ok(permit) = Arc::clone(&self.value_lists).try_acquire_owned() else {
+            return Ok(OtelTracesResponse::AttributeValues(
+                to_attribute_values_result(
+                    sfsq::traces::AttributeValuesData {
+                        values: Vec::new(),
+                        truncated: false,
+                        status: QueryStatus::Partial([PartialReason::Busy].into()),
+                    },
+                    params.key.clone(),
+                ),
+            ));
+        };
+        let mut query = AttributeValuesQuery::new(owner, key).max_values(max);
         let (sources, pins, window) = self
             .enumeration_setup(ctx, params.after, params.before, tenant)
             .await?;
@@ -520,6 +555,7 @@ impl OtelTracesHandler {
         let cancel = ctx.cancellation.clone();
         let wire_key = params.key.clone();
         match tokio::task::spawn_blocking(move || {
+            let _permit = permit;
             let _pins = pins;
             attribute_values(sources, query, cancel, done)
         })

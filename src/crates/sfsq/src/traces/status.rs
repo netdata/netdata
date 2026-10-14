@@ -64,9 +64,14 @@ pub enum PartialReason {
     /// download failed, or the catalog listing the file could not be
     /// read): spans that may live there are absent. Distinct from
     /// [`SourceFailure`](Self::SourceFailure), which reports bytes that
-    /// were available but could not be read. Declared last: wire order
-    /// is declaration order.
+    /// were available but could not be read.
     RemoteUnavailable,
+    /// The request was refused before any work: too many requests of its
+    /// kind were already running. The result is empty, not wrong; the
+    /// caller retries. Raised by the ledger's admission control, never
+    /// by an engine operation. Declared last: wire order is declaration
+    /// order.
+    Busy,
 }
 
 /// The status of one query's result.
