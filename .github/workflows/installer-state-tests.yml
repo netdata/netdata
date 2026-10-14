@@ -6,6 +6,8 @@ on:
       - '.github/workflows/installer-state-tests.yml'
       - 'packaging/installer/functions.sh'
       - 'packaging/installer/tests/test_install_state.py'
+      - 'packaging/installer/tests/test_prepare_fleet.py'
+      - 'packaging/makeself/prepare-fleet.py'
       - 'packaging/makeself/install-or-update.sh'
       - 'packaging/makeself/create-package-manifest.sh'
       - 'packaging/makeself/jobs/98-create-archive.sh'
@@ -18,6 +20,8 @@ on:
       - '.github/workflows/installer-state-tests.yml'
       - 'packaging/installer/functions.sh'
       - 'packaging/installer/tests/test_install_state.py'
+      - 'packaging/installer/tests/test_prepare_fleet.py'
+      - 'packaging/makeself/prepare-fleet.py'
       - 'packaging/makeself/install-or-update.sh'
       - 'packaging/makeself/create-package-manifest.sh'
       - 'packaging/makeself/jobs/98-create-archive.sh'
@@ -44,3 +48,5 @@ jobs:
         run: python3 packaging/installer/tests/test_install_state.py -v
       - name: Root ownership and tmpfiles fixtures
         run: sudo python3 packaging/installer/tests/test_install_state.py -v
+      - name: Fleet package inventory fixtures
+        run: python3 packaging/installer/tests/test_prepare_fleet.py -v
