@@ -106,8 +106,11 @@ pub(crate) const TRACE_VALUE_MAX_BYTES: usize = 8 * 1024;
 pub(crate) const TRACE_SPANS_MAX_BYTES: usize = 2 * 1024 * 1024;
 
 /// Per-value cap on a list row's free-length strings (root service and
-/// name, breakdown service names).
-pub(crate) const LIST_VALUE_MAX_BYTES: usize = 1024;
+/// name, breakdown service names). Rows are for display; the trace view
+/// carries values up to [`TRACE_VALUE_MAX_BYTES`]. With at most
+/// [`super::wire::SEARCH_LIMIT_MAX`] rows, a page stays well under 1 MB
+/// by construction, so no page byte budget has to cut rows off a page.
+pub(crate) const LIST_VALUE_MAX_BYTES: usize = 256;
 
 /// Cut `s` to at most `max` bytes at a character boundary; `true` when
 /// it was cut.

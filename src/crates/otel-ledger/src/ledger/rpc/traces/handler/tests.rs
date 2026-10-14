@@ -643,7 +643,10 @@ async fn invalid_list_requests_are_clean_client_errors() {
     let h = handler_with_search_corpus().await;
     for (body, needle) in [
         (json!({"limit": 0}), "zero 'last'"),
-        (json!({"limit": 1001}), "exceeds the maximum"),
+        (
+            json!({"limit": super::super::wire::SEARCH_LIMIT_MAX + 1}),
+            "exceeds the maximum",
+        ),
         (
             json!({"selections": {"bogus": ["x"]}}),
             "unknown selection key",
@@ -659,7 +662,7 @@ async fn invalid_list_requests_are_clean_client_errors() {
     }
     // The boundary itself is legal (locks the cap against an accidental
     // off-by-one `<`).
-    list(&h, json!({"limit": 1000}))
+    list(&h, json!({"limit": super::super::wire::SEARCH_LIMIT_MAX}))
         .await
         .expect("last == max succeeds");
 }

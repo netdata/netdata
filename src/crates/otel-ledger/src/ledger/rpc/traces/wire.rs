@@ -381,8 +381,9 @@ fn default_limit() -> usize {
 /// 10,000), so the engine-side limit is bounded by
 /// construction once the client half is capped here. Uncapped, a
 /// caller-chosen limit would scale the assembly ceiling (`limit × 16`)
-/// without bound.
-pub const SEARCH_LIMIT_MAX: usize = 1000;
+/// without bound. It is the page the UI requests; together with the
+/// adapter's per-value cap it bounds the page's bytes.
+pub const SEARCH_LIMIT_MAX: usize = 200;
 
 /// Presence-preserving selector deserializer: serde's stock
 /// `Option<Value>` maps a present-but-`null` key to `None`, which would
