@@ -73,7 +73,7 @@ else
 fi
 
 echo "create-pkg: staging install tree"
-rm -rf "${STAGING}" "${INNER_DIR}"
+rm -rf "${STAGING}" "${INNER_DIR}" "${OUTPUT}"
 mkdir -p "${STAGING}" "${INNER_DIR}" "$(dirname "${OUTPUT}")"
 DESTDIR="${STAGING}" cmake --install "${BUILD_DIR}" > "${WORK_DIR}/install.log" 2>&1
 
@@ -85,10 +85,15 @@ if [ "${SIGN}" -eq 1 ]; then
     : > "${MACHO_LIST}"
     while IFS= read -r f; do
         case "$(file -b "${f}")" in
+            Mach-O*object*) ;; # codesign does not sign object files
             Mach-O*) printf '%s\n' "${f}" >> "${MACHO_LIST}" ;;
             *) ;;
         esac
     done < "${WORK_DIR}/files.list"
+    if [ ! -s "${MACHO_LIST}" ]; then
+        echo "create-pkg: found no Mach-O files to sign under ${STAGING}" >&2
+        exit 1
+    fi
 
     # Signing identifiers are derived from file names, and codesign warns that
     # two programs must never share one.
@@ -181,7 +186,16 @@ if [ "${SIGN}" -eq 1 ]; then
     fi
     echo "create-pkg: notarized (submission ${submission})"
 
-    xcrun stapler staple "${OUTPUT}"
+    # The ticket can take a little while to become available after acceptance.
+    tries=0
+    until xcrun stapler staple "${OUTPUT}"; do
+        tries=$((tries + 1))
+        if [ "${tries}" -ge 5 ]; then
+            echo "create-pkg: could not staple the notarization ticket" >&2
+            exit 1
+        fi
+        sleep 30
+    done
     xcrun stapler validate "${OUTPUT}"
 
     sig="$(pkgutil --check-signature "${OUTPUT}")"

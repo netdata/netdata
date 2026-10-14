@@ -46,10 +46,11 @@ KEYCHAIN="${WORK_DIR}/netdata-signing.keychain-db"
 FILES="${WORK_DIR}/netdata-signing"
 
 if [ "${REMOVE}" -eq 1 ]; then
+    # The API key goes first, so a failing keychain deletion cannot leave it behind.
+    rm -rf "${FILES}"
     if [ -e "${KEYCHAIN}" ]; then
         security delete-keychain "${KEYCHAIN}"
     fi
-    rm -rf "${FILES}"
     echo "import-signing-identities: removed" >&2
     exit 0
 fi
@@ -62,6 +63,15 @@ for var in MACOS_APP_P12 MACOS_APP_P12_PASSWORD MACOS_INSTALLER_P12 MACOS_INSTAL
         exit 1
     fi
 done
+# Both values end up in NAME=value lines and in a file name.
+if ! printf '%s\n' "${MACOS_NOTARY_KEY_ID}" | grep -Eqx '[A-Z0-9]{10}'; then
+    echo "import-signing-identities: MACOS_NOTARY_KEY_ID is not a 10-character App Store Connect Key ID" >&2
+    exit 1
+fi
+if ! printf '%s\n' "${MACOS_NOTARY_ISSUER}" | grep -Eqx '[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}'; then
+    echo "import-signing-identities: MACOS_NOTARY_ISSUER is not an Issuer ID (lowercase UUID)" >&2
+    exit 1
+fi
 if [ -e "${KEYCHAIN}" ] || [ -e "${FILES}" ]; then
     echo "import-signing-identities: ${WORK_DIR} already holds signing material; run --remove first" >&2
     exit 1
@@ -70,12 +80,6 @@ fi
 mkdir -p "${FILES}"
 printf '%s' "${MACOS_APP_P12}" | base64 --decode > "${FILES}/application.p12"
 printf '%s' "${MACOS_INSTALLER_P12}" | base64 --decode > "${FILES}/installer.p12"
-
-curl -fsSL --retry 3 -o "${FILES}/DeveloperIDG2CA.cer" "${G2_URL}"
-if [ "$(shasum -a 256 "${FILES}/DeveloperIDG2CA.cer" | cut -d' ' -f1)" != "${G2_SHA256}" ]; then
-    echo "import-signing-identities: ${G2_URL} does not match the pinned SHA-256" >&2
-    exit 1
-fi
 
 # The keychain password only has to outlive this script: the keychain stays
 # unlocked (no timeout) until --remove deletes it.
@@ -99,6 +103,11 @@ if security find-certificate -a -Z "${KEYCHAIN}" | grep -q "^SHA-1 hash: ${G2_SH
     echo "import-signing-identities: the Developer ID G2 intermediate came with the identities" >&2
 else
     echo "import-signing-identities: importing the Developer ID G2 intermediate" >&2
+    curl -fsSL --retry 3 -o "${FILES}/DeveloperIDG2CA.cer" "${G2_URL}"
+    if [ "$(shasum -a 256 "${FILES}/DeveloperIDG2CA.cer" | cut -d' ' -f1)" != "${G2_SHA256}" ]; then
+        echo "import-signing-identities: ${G2_URL} does not match the pinned SHA-256" >&2
+        exit 1
+    fi
     security import "${FILES}/DeveloperIDG2CA.cer" -k "${KEYCHAIN}" >/dev/null
 fi
 # Without this, codesign and productbuild stop at an access prompt nobody can
@@ -106,9 +115,14 @@ fi
 security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k "${keychain_password}" "${KEYCHAIN}" >/dev/null
 rm -f "${FILES}/application.p12" "${FILES}/installer.p12"
 
-# codesign and productbuild look identities up in the search list.
-# shellcheck disable=SC2046
-security list-keychains -d user -s "${KEYCHAIN}" $(security list-keychains -d user | tr -d '"')
+# codesign and productbuild look identities up in the search list. The current
+# entries are kept one per line, so paths with spaces survive.
+security list-keychains -d user | sed -e 's/^ *"//' -e 's/" *$//' > "${FILES}/search-list"
+set -- "${KEYCHAIN}"
+while IFS= read -r entry; do
+    [ -n "${entry}" ] && set -- "$@" "${entry}"
+done < "${FILES}/search-list"
+security list-keychains -d user -s "$@"
 
 # Exactly one valid identity of each kind, from the same team.
 app="$(security find-identity -v -p codesigning "${KEYCHAIN}" | grep '"Developer ID Application: ' || true)"
