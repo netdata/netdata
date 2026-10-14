@@ -969,9 +969,12 @@ async fn enumeration_invalid_requests_are_clean_client_errors() {
             json!({"attribute_values": {"key": "bogus"}}),
             "unknown selection key",
         ),
-        // A virtual builtin has no value dictionary — the engine's own
-        // message surfaces.
-        (json!({"attribute_values": {"key": "duration"}}), "virtual"),
+        // A virtual builtin has no value dictionary: rejected before
+        // admission.
+        (
+            json!({"attribute_values": {"key": "duration"}}),
+            "has no stored values",
+        ),
     ] {
         let err = call_on(&h, body.clone())
             .await
@@ -1609,6 +1612,7 @@ async fn every_response_shape_declares_its_mode() {
             json!({"trace": {"id": "0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a"}}),
             "trace",
         ),
+        (json!({"suggest": {}}), "suggest"),
     ] {
         let v = serde_json::to_value(call_on(&h, body.clone()).await.unwrap()).unwrap();
         assert_eq!(v["mode"], mode, "for {body}");
@@ -1645,6 +1649,15 @@ async fn suggest_lists_matching_values_and_keys() {
         v["items"][0],
         json!({"text": "resource.service.name", "match": "prefix", "tier": "low"})
     );
+
+    // A virtual key is flagged: it has no values to ask for.
+    let mut body = window_body();
+    merge(&mut body, json!({"term": "duration"}));
+    let v = serde_json::to_value(call_on(&h, as_mode("suggest", body)).await.unwrap()).unwrap();
+    assert_eq!(
+        v["items"][0],
+        json!({"text": "duration", "match": "exact", "virtual": true})
+    );
 }
 
 #[tokio::test]
@@ -1668,6 +1681,22 @@ async fn suggest_is_validated_before_admission_and_bounded() {
         (
             json!({"suggest": {"key": "nope.x"}}),
             "invalid otel-traces request",
+        ),
+        (
+            json!({"suggest": {"key": "duration"}}),
+            "has no stored values",
+        ),
+        (
+            json!({"attribute_values": {"key": "trace_id"}}),
+            "has no stored values",
+        ),
+        (
+            json!({"suggest": {"term": "x".repeat(1025)}}),
+            "'term' is longer than 1024 bytes",
+        ),
+        (
+            json!({"attribute_values": {"key": format!("span.{}", "k".repeat(1020))}}),
+            "'key' is longer than 1024 bytes",
         ),
     ] {
         let err = call_on(&h, body.clone()).await.expect_err("a client error");

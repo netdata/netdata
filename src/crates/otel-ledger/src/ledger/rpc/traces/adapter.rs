@@ -531,6 +531,33 @@ pub(crate) fn render_attribute_key(owner: AttributeOwner, key: &AttributeKey) ->
     }
 }
 
+/// A key whose values a request lists or suggests: bounded in length,
+/// and with stored values (a virtual builtin such as the duration has
+/// none). Checked before admission, so a bad key is the client's error.
+pub(crate) fn parse_values_key(key: &str) -> Result<(AttributeOwner, AttributeKey), String> {
+    check_request_text("key", key)?;
+    let (owner, key) = parse_enumeration_key(key)?;
+    if let AttributeKey::Builtin(b) = key
+        && b.dictionary_field().is_none()
+    {
+        return Err(format!(
+            "'{}' has no stored values to list",
+            builtin_word(b)
+        ));
+    }
+    Ok((owner, key))
+}
+
+/// Reject a request string past [`super::wire::REQUEST_TEXT_MAX_BYTES`]:
+/// the matcher built from it runs before any deadline.
+pub(crate) fn check_request_text(name: &str, text: &str) -> Result<(), String> {
+    let max = super::wire::REQUEST_TEXT_MAX_BYTES;
+    if text.len() > max {
+        return Err(format!("'{name}' is longer than {max} bytes"));
+    }
+    Ok(())
+}
+
 /// A selection-grammar key as the enumeration API's (owner, key) pair.
 pub(crate) fn parse_enumeration_key(key: &str) -> Result<(AttributeOwner, AttributeKey), String> {
     Ok(match parse_selection_key(key)? {
@@ -562,6 +589,7 @@ pub(crate) fn to_suggest_result(
             match_class: s.class.into(),
             truncated: cut || s.truncated,
             tier: s.tier.map(Into::into),
+            is_virtual: !s.enumerable,
         });
     }
     SuggestResult {

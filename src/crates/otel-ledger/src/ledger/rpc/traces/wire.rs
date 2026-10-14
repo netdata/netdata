@@ -423,7 +423,8 @@ pub struct AttributeValuesParams {
     #[serde(default)]
     pub before: u32,
     /// The key, in the selection grammar (`<owner>.<key>` or a bare
-    /// builtin word).
+    /// builtin word); at most [`REQUEST_TEXT_MAX_BYTES`], and with stored
+    /// values (not a virtual builtin such as `duration`).
     pub key: String,
     /// Cap the value list (the response's `truncated` flag is exact).
     /// Absent means [`DEFAULT_MAX_VALUES`]; zero and beyond
@@ -432,6 +433,10 @@ pub struct AttributeValuesParams {
     #[serde(default)]
     pub max_values: Option<usize>,
 }
+
+/// Longest `key` (both value modes) or `term` (suggest), in bytes; a
+/// longer one is a client error.
+pub const REQUEST_TEXT_MAX_BYTES: usize = 1024;
 
 /// Wire maximum for [`SuggestParams::max_items`]; absent means the
 /// engine's `DEFAULT_SUGGEST_ITEMS`.
@@ -449,10 +454,13 @@ pub struct SuggestParams {
     #[serde(default)]
     pub before: u32,
     /// The key whose values to suggest, in the selection grammar
-    /// (`<owner>.<key>` or a bare builtin word).
+    /// (`<owner>.<key>` or a bare builtin word); at most
+    /// [`REQUEST_TEXT_MAX_BYTES`], and with stored values (a key
+    /// suggestion flagged `virtual` has none).
     #[serde(default)]
     pub key: Option<String>,
     /// The typed text; absent or empty matches everything (as a prefix).
+    /// At most [`REQUEST_TEXT_MAX_BYTES`].
     #[serde(default)]
     pub term: String,
     /// Cap the suggestions (the response's `truncated` flag is exact).
@@ -630,7 +638,9 @@ pub struct SuggestResult {
     /// Exact: a further match existed among the visited sources.
     pub truncated: bool,
     /// After an early stop: every span from this second (unix) on lives
-    /// in a visited source.
+    /// in a visited source. Absent when nothing was left unvisited, or
+    /// when an unvisited source is an active WAL's tail, which may hold
+    /// any recent span (the partial reason still says the walk stopped).
     #[serde(skip_serializing_if = "Option::is_none")]
     pub complete_after: Option<u32>,
 }
@@ -651,6 +661,11 @@ pub struct SuggestionWire {
     /// absent when no source carries it.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub tier: Option<TierWire>,
+    /// Keys only: present (`true`) for a key without stored values (a
+    /// virtual builtin such as `duration`); a values request for it is a
+    /// client error.
+    #[serde(rename = "virtual", skip_serializing_if = "std::ops::Not::not")]
+    pub is_virtual: bool,
 }
 
 /// Match classes on the wire; the two typo-tolerant engine classes are

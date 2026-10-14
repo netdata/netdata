@@ -37,10 +37,10 @@ use sfsq::traces::{
 };
 
 use super::adapter::{
-    ResolvedWindow, build_predicate, completion_capture_range, heatmap_predicate, parse_cursor,
-    parse_enumeration_key, parse_trace_id, render_attribute_key, resolve_window,
-    to_attribute_values_result, to_overview_section, to_search_result, to_suggest_result,
-    to_trace_result, validate_trace_bounds,
+    ResolvedWindow, build_predicate, check_request_text, completion_capture_range,
+    heatmap_predicate, parse_cursor, parse_trace_id, parse_values_key, render_attribute_key,
+    resolve_window, to_attribute_values_result, to_overview_section, to_search_result,
+    to_suggest_result, to_trace_result, validate_trace_bounds,
 };
 use super::sources::{Capture, CaptureError, RemotePolicy, TracesSourceSupplier};
 use super::wire::{
@@ -519,7 +519,7 @@ impl OtelTracesHandler {
         tenant: Option<&str>,
     ) -> netdata_plugin_error::Result<OtelTracesResponse> {
         let client_err = |e: String| handler_err(format!("invalid otel-traces request: {e}"));
-        let (owner, key) = parse_enumeration_key(&params.key).map_err(client_err)?;
+        let (owner, key) = parse_values_key(&params.key).map_err(client_err)?;
         let max = params.max_values.unwrap_or(DEFAULT_MAX_VALUES);
         // Pre-capture twin of the engine's own zero check, plus the wire's
         // bound on the response.
@@ -602,9 +602,10 @@ impl OtelTracesHandler {
                 "'max_items' {max} exceeds the maximum {SUGGEST_ITEMS_MAX}"
             )));
         }
+        check_request_text("term", &params.term).map_err(client_err)?;
         let query = match &params.key {
             Some(key) => {
-                let (owner, key) = parse_enumeration_key(key).map_err(client_err)?;
+                let (owner, key) = parse_values_key(key).map_err(client_err)?;
                 SuggestQuery::values(owner, key)
             }
             None => SuggestQuery::keys(render_attribute_key),
