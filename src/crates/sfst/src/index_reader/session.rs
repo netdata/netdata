@@ -27,8 +27,9 @@
 //!   that needs it and not kept. Values are never cut: predicates and
 //!   canonical selection see what was stored, in every layout.
 //!
-//! Two layers: the bloom and the screen stay for the session's life (a
-//! few KB per file); everything else is the LOADED layer, which
+//! Two layers: the bloom and the screen stay for the session's life
+//! (about 3 bytes per distinct trace id in the file: ~30 KB for 10k);
+//! everything else is the LOADED layer, which
 //! [`release`](SpanSource::release) drops. A caller holding many
 //! sessions keeps only a few loaded
 //! ([`LoadedSources`](crate::LoadedSources)); a released session decodes

@@ -246,8 +246,9 @@ pub fn trace_by_id(
     // here on): the bloom decides first, and only a file that holds the
     // trace opens fully. An SFST whose summary does not parse is a
     // SourceFailure; one the bloom rules out never decodes more than its
-    // summary, metadata and bloom. The merge borrows the sessions and
-    // keeps few of them loaded; a released one drops its file's pages.
+    // summary, metadata and bloom, and is dropped at once. The merge
+    // borrows the rest and keeps few of them loaded; a released one drops
+    // its file's pages.
     let mut sessions: Vec<sfst::TraceFileSession<'_, '_>> = Vec::new();
     let mut origin: Vec<String> = Vec::new();
     for (mapped, source) in &mapped_sfsts {
@@ -256,10 +257,17 @@ pub fn trace_by_id(
         }
         match sfst::MetaReader::open(mapped.bytes()) {
             Ok(meta) => {
-                sessions.push(
-                    sfst::TraceFileSession::open_owned(meta)
-                        .on_release(move || mapped.release_pages()),
-                );
+                let session = sfst::TraceFileSession::open_owned(meta)
+                    .on_release(move || mapped.release_pages());
+                // A file the bloom rules out holds nothing for this
+                // lookup: drop it now, so resident state is that of the
+                // files that may hold the trace, not of every file.
+                if !session.might_contain(query.trace_id) {
+                    drop(session);
+                    mapped.release_pages();
+                    continue;
+                }
+                sessions.push(session);
                 origin.push(source.source_id().to_string());
             }
             Err(e) => {
