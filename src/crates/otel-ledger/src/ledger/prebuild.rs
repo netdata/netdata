@@ -8,10 +8,18 @@
 //! that needs a chunk the task is building joins that build (the cache's
 //! singleflight) instead of starting another.
 //!
+//! Each chunk is built once: the task remembers the next index per WAL,
+//! so later syncs neither rebuild a chunk the cache evicted (a query
+//! builds it on demand) nor refresh the recency of chunks nobody reads.
+//! When a WAL's chunks drop (its seal registered),
+//! [`ChunkPrebuilder::forget`] queues behind any `Synced` already sent,
+//! then drops the WAL's boundaries and cached chunks again, so a build
+//! that raced the seal leaves nothing behind.
+//!
 //! Fire-and-forget: the channel is unbounded and messages are idempotent
 //! (a later `Synced` subsumes an earlier one of the same WAL), so the
 //! ledger's event loop never waits on a build. Queued messages of one WAL
-//! coalesce to its latest bound.
+//! coalesce to its latest bound; WALs are served in arrival order.
 
 use std::collections::HashMap;
 use std::path::PathBuf;
@@ -30,9 +38,14 @@ struct Synced {
     valid_up_to: u64,
 }
 
+enum Msg {
+    Synced(Synced),
+    Forget(u64),
+}
+
 /// The handle the ledger notifies; see the module docs.
 pub(crate) struct ChunkPrebuilder {
-    tx: mpsc::UnboundedSender<Synced>,
+    tx: mpsc::UnboundedSender<Msg>,
 }
 
 impl ChunkPrebuilder {
@@ -52,21 +65,29 @@ impl ChunkPrebuilder {
     /// WAL `seq` at `path` is durable up to `valid_up_to`.
     pub(crate) fn synced(&self, seq: u64, path: PathBuf, valid_up_to: u64) {
         // A closed channel means the task stopped at shutdown.
-        let _ = self.tx.send(Synced {
+        let _ = self.tx.send(Msg::Synced(Synced {
             seq,
             path,
             valid_up_to,
-        });
+        }));
+    }
+
+    /// WAL `seq`'s chunks dropped: forget its boundaries and drop any
+    /// chunk built since.
+    pub(crate) fn forget(&self, seq: u64) {
+        let _ = self.tx.send(Msg::Forget(seq));
     }
 }
 
 async fn run(
-    mut rx: mpsc::UnboundedReceiver<Synced>,
+    mut rx: mpsc::UnboundedReceiver<Msg>,
     prefixes: Arc<WalPrefixes>,
     seal: ChunkSealFn,
     chunk_cache: Arc<ChunkCache>,
     cancel: CancellationToken,
 ) {
+    // Per WAL, the first chunk index not built yet.
+    let mut next_index: HashMap<u64, u32> = HashMap::new();
     loop {
         let first = tokio::select! {
             () = cancel.cancelled() => return,
@@ -75,16 +96,33 @@ async fn run(
                 None => return,
             },
         };
-        let mut latest: HashMap<u64, Synced> = HashMap::new();
-        latest.insert(first.seq, first);
+        // One entry per WAL, at its first arrival in this batch.
+        let mut latest: Vec<Synced> = Vec::new();
+        let mut forgotten: Vec<u64> = Vec::new();
+        let mut apply = |msg: Msg| match msg {
+            Msg::Synced(s) => match latest.iter_mut().find(|l| l.seq == s.seq) {
+                Some(slot) => *slot = s,
+                None => latest.push(s),
+            },
+            Msg::Forget(seq) => {
+                latest.retain(|l| l.seq != seq);
+                forgotten.push(seq);
+            }
+        };
+        apply(first);
         while let Ok(msg) = rx.try_recv() {
-            latest.insert(msg.seq, msg);
+            apply(msg);
+        }
+        for seq in forgotten {
+            next_index.remove(&seq);
+            prefixes.forget(seq);
+            chunk_cache.drop_seq(seq).await;
         }
         for Synced {
             seq,
             path,
             valid_up_to,
-        } in latest.into_values()
+        } in latest
         {
             let chunks = match prefixes.chunks(seq, &path, valid_up_to).await {
                 Ok(chunks) => chunks,
@@ -95,16 +133,17 @@ async fn run(
                     continue;
                 }
             };
-            for chunk in chunks {
+            let start = next_index.get(&seq).copied().unwrap_or(0);
+            for chunk in chunks.into_iter().filter(|c| c.index >= start) {
                 if cancel.is_cancelled() {
                     return;
                 }
-                // A hit (already built) is a cache lookup.
                 let build = build_chunk(seal, path.clone(), chunk);
                 if let Err(e) = chunk_cache.get_or_build(seq, chunk.index, build).await {
                     tracing::debug!(seq, index = chunk.index, "chunk prebuild failed: {e}");
                     break;
                 }
+                next_index.insert(seq, chunk.index + 1);
             }
         }
     }

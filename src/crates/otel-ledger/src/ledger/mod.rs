@@ -122,8 +122,6 @@ pub struct Ledger {
     /// queries rarely build one; fed each traces `Synced` event, told to
     /// forget a WAL when its chunks drop.
     traces_prebuilder: prebuild::ChunkPrebuilder,
-    /// The traces WALs' chunk boundaries, shared with the traces handler.
-    traces_prefixes: Arc<wal_prefix::WalPrefixes>,
     /// Per-signal frame-sequence gap-check. The single writer process feeds every
     /// signal over one connection, but assigns a separate monotonic `frame_seq`
     /// per signal, so the next-expected seq is tracked per signal — a gap is then a
@@ -384,7 +382,6 @@ impl Ledger {
             retry_timer,
             chunk_cache,
             traces_prebuilder,
-            traces_prefixes,
             // Each signal's frame_seq stream starts at 1 (the ingestor's first
             // assigned frame_seq), so the gap-check's next-expected seeds to 1.
             expected_frame_seq: PerSignal { logs: 1, traces: 1 },

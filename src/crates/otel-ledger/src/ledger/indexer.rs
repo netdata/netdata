@@ -137,7 +137,7 @@ impl Ledger {
                 // active WAL; drop it.
                 self.chunk_cache.drop_seq(file_id.seq).await;
                 if signal == Signal::Traces {
-                    self.traces_prefixes.forget(file_id.seq);
+                    self.traces_prebuilder.forget(file_id.seq);
                 }
 
                 if let Err(e) = self.cleaner.send(CleanerRequest::DeleteWalFile {
@@ -175,7 +175,7 @@ impl Ledger {
                 // a gap.
                 self.chunk_cache.drop_seq(file_id.seq).await;
                 if signal == Signal::Traces {
-                    self.traces_prefixes.forget(file_id.seq);
+                    self.traces_prebuilder.forget(file_id.seq);
                 }
 
                 if let Err(e) = self.cleaner.send(CleanerRequest::DeleteWalFile {

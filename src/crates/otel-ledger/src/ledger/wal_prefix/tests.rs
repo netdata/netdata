@@ -2,6 +2,7 @@
 //! WALs written by the shared fixtures.
 
 use std::sync::Arc;
+use std::sync::atomic::{AtomicUsize, Ordering};
 use std::time::Duration;
 
 use file_lifecycle::chunk::ChunkCache;
@@ -83,6 +84,48 @@ async fn built_chunks_carry_their_records_and_summary() {
     );
 }
 
+/// Whether chunk `index` of WAL `seq` is cached: an erring build
+/// succeeds only on a hit.
+async fn cached(cache: &ChunkCache, seq: u64, index: u32) -> bool {
+    cache
+        .get_or_build(seq, index, async {
+            Err::<Arc<BuiltChunk>, &str>("not built")
+        })
+        .await
+        .is_ok()
+}
+
+/// Wait until `chunks` of WAL `seq` are all cached (`true`) or all gone
+/// (`false`).
+async fn await_cached(cache: &ChunkCache, seq: u64, chunks: &[ChunkBoundary], want: bool) {
+    assert!(!chunks.is_empty());
+    let deadline = tokio::time::Instant::now() + Duration::from_secs(10);
+    for chunk in chunks {
+        while cached(cache, seq, chunk.index).await != want {
+            assert!(
+                tokio::time::Instant::now() < deadline,
+                "chunk {} of WAL {seq} never became cached={want}",
+                chunk.index
+            );
+            tokio::time::sleep(Duration::from_millis(10)).await;
+        }
+    }
+}
+
+fn spawn_prebuilder(
+    prefixes: &Arc<WalPrefixes>,
+    seal: ChunkSealFn,
+    cache: &Arc<ChunkCache>,
+    cancel: &CancellationToken,
+) -> ChunkPrebuilder {
+    ChunkPrebuilder::spawn(
+        Arc::clone(prefixes),
+        seal,
+        Arc::clone(cache),
+        cancel.clone(),
+    )
+}
+
 #[tokio::test]
 async fn the_prebuilder_builds_new_chunks_on_its_own() {
     let (path, frames) = five_frame_wal(4).await;
@@ -90,36 +133,85 @@ async fn the_prebuilder_builds_new_chunks_on_its_own() {
     let prefixes = Arc::new(WalPrefixes::new(3));
     let cache = Arc::new(ChunkCache::new(64 * 1024 * 1024));
     let cancel = CancellationToken::new();
-    let prebuilder = ChunkPrebuilder::spawn(
-        Arc::clone(&prefixes),
+    let prebuilder = spawn_prebuilder(
+        &prefixes,
         ng_index::build_sfst_traces_range,
-        Arc::clone(&cache),
-        cancel.clone(),
+        &cache,
+        &cancel,
     );
     prebuilder.synced(4, path, end);
+    await_cached(&cache, 4, &folded_up_to(&frames, end), true).await;
+    cancel.cancel();
+}
 
-    // An erring build succeeds only on a cache hit: every chunk the
-    // prebuilder built answers without it.
-    let expected = folded_up_to(&frames, end);
-    assert!(!expected.is_empty());
-    let deadline = tokio::time::Instant::now() + Duration::from_secs(10);
-    for chunk in &expected {
-        loop {
-            let probe = cache
-                .get_or_build(4, chunk.index, async {
-                    Err::<Arc<BuiltChunk>, &str>("not built")
-                })
-                .await;
-            if probe.is_ok() {
-                break;
-            }
-            assert!(
-                tokio::time::Instant::now() < deadline,
-                "chunk {} was never prebuilt",
-                chunk.index
-            );
-            tokio::time::sleep(Duration::from_millis(10)).await;
-        }
-    }
+static SEALS: AtomicUsize = AtomicUsize::new(0);
+
+/// The traces range seal, counted (only one test uses it).
+fn counting_seal(
+    path: &Path,
+    range: wal::FrameRange,
+) -> Result<(sfst::Summary, Vec<u8>), ng_index::Error> {
+    SEALS.fetch_add(1, Ordering::SeqCst);
+    ng_index::build_sfst_traces_range(path, range)
+}
+
+#[tokio::test]
+async fn the_prebuilder_builds_each_chunk_once() {
+    let (path, frames) = five_frame_wal(5).await;
+    let (other, other_frames) = five_frame_wal(6).await;
+    let (end, other_end) = (
+        frames.last().unwrap().end_offset,
+        other_frames.last().unwrap().end_offset,
+    );
+    let (chunks, other_chunks) = (
+        folded_up_to(&frames, end),
+        folded_up_to(&other_frames, other_end),
+    );
+    let prefixes = Arc::new(WalPrefixes::new(3));
+    let cache = Arc::new(ChunkCache::new(64 * 1024 * 1024));
+    let cancel = CancellationToken::new();
+    let prebuilder = spawn_prebuilder(&prefixes, counting_seal, &cache, &cancel);
+
+    prebuilder.synced(5, path.clone(), end);
+    await_cached(&cache, 5, &chunks, true).await;
+    assert_eq!(SEALS.load(Ordering::SeqCst), chunks.len());
+
+    // A later sync does not rebuild a chunk the cache dropped; a query
+    // builds it on demand. WALs are served in arrival order, so once
+    // WAL 6's chunks are cached, WAL 5's second sync was handled.
+    cache.drop_seq(5).await;
+    prebuilder.synced(5, path, end);
+    prebuilder.synced(6, other, other_end);
+    await_cached(&cache, 6, &other_chunks, true).await;
+    assert_eq!(
+        SEALS.load(Ordering::SeqCst),
+        chunks.len() + other_chunks.len()
+    );
+    assert!(!cached(&cache, 5, chunks[0].index).await);
+    cancel.cancel();
+}
+
+#[tokio::test]
+async fn forgetting_a_wal_drops_its_boundaries_and_chunks() {
+    let (path, frames) = five_frame_wal(7).await;
+    let end = frames.last().unwrap().end_offset;
+    let chunks = folded_up_to(&frames, end);
+    let prefixes = Arc::new(WalPrefixes::new(3));
+    let cache = Arc::new(ChunkCache::new(64 * 1024 * 1024));
+    let cancel = CancellationToken::new();
+    let prebuilder = spawn_prebuilder(
+        &prefixes,
+        ng_index::build_sfst_traces_range,
+        &cache,
+        &cancel,
+    );
+    prebuilder.synced(7, path, end);
+    await_cached(&cache, 7, &chunks, true).await;
+
+    // The boundaries go first, then the chunks: once the chunks are
+    // gone, so is the WAL's entry.
+    prebuilder.forget(7);
+    await_cached(&cache, 7, &chunks, false).await;
+    assert!(prefixes.entries.lock().unwrap().is_empty());
     cancel.cancel();
 }
