@@ -78,28 +78,33 @@ enum FieldState {
 }
 
 /// The stateful per-file resolver. Open one per file per query; ask it
-/// about many refs. Owns at most the two root-field dictionaries
+/// about many refs, always with the same file's reader (it takes the
+/// reader per call, so a caller can hold the resolver while it lends the
+/// reader elsewhere). Owns at most the two root-field dictionaries
 /// (`name`, the resource `service.name` spelling).
-pub struct RollupRootResolver<'r, 'a> {
-    reader: &'r IndexReader<'a>,
+#[derive(Default)]
+pub struct RollupRootResolver {
     fields: HashMap<String, FieldState>,
 }
 
-impl<'r, 'a> RollupRootResolver<'r, 'a> {
+impl RollupRootResolver {
     /// An empty resolver; a field's dictionary decodes on first use.
-    pub fn new(reader: &'r IndexReader<'a>) -> Self {
-        Self {
-            reader,
-            fields: HashMap::new(),
-        }
+    pub fn new() -> Self {
+        Self::default()
     }
 
-    /// Resolve `kv_ref` as a value of `field_name`. `ROLLUP_NO_REF` is
-    /// the caller's absence arm and must not be passed here.
-    pub fn resolve(&mut self, field_name: &str, kv_ref: u32) -> RollupRefOutcome<'_> {
+    /// Resolve `kv_ref` as a value of `field_name` in `reader`'s file.
+    /// `ROLLUP_NO_REF` is the caller's absence arm and must not be passed
+    /// here.
+    pub fn resolve(
+        &mut self,
+        reader: &IndexReader<'_>,
+        field_name: &str,
+        kv_ref: u32,
+    ) -> RollupRefOutcome<'_> {
         debug_assert_ne!(kv_ref, ROLLUP_NO_REF, "NO_REF is absence, not a ref");
         if !self.fields.contains_key(field_name) {
-            let state = decode_field(self.reader, field_name);
+            let state = decode_field(reader, field_name);
             self.fields.insert(field_name.to_string(), state);
         }
         let state = self

@@ -39,8 +39,8 @@ use std::sync::atomic::{AtomicUsize, Ordering};
 use tokio_util::sync::CancellationToken;
 
 use common::{
-    SpanSpec, kv_str, memory_source, missing_source, req_with, sealed_source, sp, tail_source,
-    unavailable_source, write_wal,
+    SpanSpec, corrupt_chunk, kv_str, memory_source, missing_source, req_with, sealed_source,
+    sealed_source_at, sp, tail_source, unavailable_source, write_wal,
 };
 use opentelemetry_proto::tonic::collector::trace::v1::ExportTraceServiceRequest;
 use sfsq::traces::{
@@ -2017,4 +2017,33 @@ fn an_unavailable_source_makes_trace_level_candidates_indeterminate() {
         degraded.status,
         QueryStatus::Partial(BTreeSet::from([PartialReason::RemoteUnavailable]))
     );
+}
+
+/// Files open lazily: a corrupt dictionary in a slack-only file that
+/// holds none of the candidates is never read, so the page is complete.
+#[test]
+fn an_unread_corrupt_slack_file_does_not_degrade_the_page() {
+    let dir = tempfile::tempdir().unwrap();
+    let svc = || vec![kv_str("service.name", "svc")];
+    let mut a = sp(1, 0, 10 * NS, "a");
+    a.trace = tid(1);
+    let mut b = sp(2, 0, 20 * NS, "b");
+    b.trace = tid(2);
+    let w_window = write_wal(dir.path(), vec![req_with(svc(), None, &[a])], "window");
+    let w_slack = write_wal(dir.path(), vec![req_with(svc(), None, &[b])], "slack");
+    drop(sealed_source(dir.path(), &w_slack, "slack"));
+    corrupt_chunk(&dir.path().join("slack.sfst"), *b"PRIM");
+    let window = || sealed_source(dir.path(), &w_window, "window");
+    let data = run(
+        SearchSources {
+            window: vec![window()],
+            completion: vec![
+                window(),
+                sealed_source_at(&dir.path().join("slack.sfst"), "slack"),
+            ],
+        },
+        SearchQuery::new(Predicate::default()),
+    );
+    assert_eq!(data.status, QueryStatus::Complete);
+    assert_eq!(data.traces.len(), 1);
 }

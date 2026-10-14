@@ -149,18 +149,18 @@ fn a_root_ref_in_another_fields_range_is_corruption() {
 
     // Row 0 (trace A) claims a true root: its own refs resolve...
     assert_eq!(rollup.root_is_true_root[0], sfst::ROOT_CLAIM_TRUE);
-    let mut resolver = sfst::RollupRootResolver::new(&reader);
+    let mut resolver = sfst::RollupRootResolver::new();
     assert!(matches!(
-        resolver.resolve("name", rollup.root_name_refs[0]),
+        resolver.resolve(&reader, "name", rollup.root_name_refs[0]),
         sfst::RollupRefOutcome::Value("a-root")
     ));
     assert!(matches!(
-        resolver.resolve(service_field, rollup.root_service_refs[0]),
+        resolver.resolve(&reader, service_field, rollup.root_service_refs[0]),
         sfst::RollupRefOutcome::Value("svc")
     ));
     // ...while its NAME ref read as a SERVICE ref is corruption.
     assert!(matches!(
-        resolver.resolve(service_field, rollup.root_name_refs[0]),
+        resolver.resolve(&reader, service_field, rollup.root_name_refs[0]),
         sfst::RollupRefOutcome::Corrupt
     ));
 }

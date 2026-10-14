@@ -94,6 +94,13 @@
 //! runs on tie-free, single-valued, corruption-free corpora — inside
 //! the accepted mechanisms the divergence is fine; everywhere else
 //! gate-on and gate-off must be byte-identical.
+//!
+//! Files open lazily: each completion SFST is a session over its
+//! metadata view, opened fully only for a window file's plan compile, a
+//! found trace's rows, or the gate's root values. Corruption in what a
+//! query never reads (a slack-only file that holds none of its
+//! candidates, a dictionary no step needs) is therefore not discovered,
+//! so it is not reported.
 
 use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet};
 use std::sync::Arc;
@@ -606,13 +613,21 @@ pub fn search(
         }
         progress.fetch_add(1, Ordering::Relaxed);
     }
-    let mut readers: Vec<(sfst::IndexReader<'_>, &TraceSource)> = Vec::new();
+    // Each completion SFST is a session that owns its file's metadata
+    // view (the slot): it opens fully only when a step needs it — a
+    // window file's plan compile, a found trace's rows, the gate's root
+    // values. Lookup structures stay for the query's many candidates.
+    let mut sessions: Vec<sfst::TraceFileSession<'_, '_>> = Vec::new();
+    let mut slot_sources: Vec<&TraceSource> = Vec::new();
     for (mapped, source) in &mapped_sfsts {
         if cancel.is_cancelled() {
             return Ok(cancelled_empty(status));
         }
-        match sfst::IndexReader::open(mapped.bytes()) {
-            Ok(reader) => readers.push((reader, source)),
+        match sfst::MetaReader::open(mapped.bytes()) {
+            Ok(meta) => {
+                sessions.push(sfst::TraceFileSession::open_owned(meta).keep_lookup());
+                slot_sources.push(source);
+            }
             Err(e) => {
                 tracing::warn!(
                     "sfsq traces: source {} failed to parse: {e}",
@@ -654,7 +669,7 @@ pub fn search(
             }
         }
     }
-    for (reader, source) in &readers {
+    for (slot, source) in slot_sources.iter().enumerate() {
         if pinned {
             break;
         }
@@ -689,6 +704,20 @@ pub fn search(
             continue;
         }
         let mut budget_truncated = false;
+        let reader = match sessions[slot].reader() {
+            Ok(reader) => reader,
+            Err(e) => {
+                // The file cannot open fully: neither discovery nor any
+                // assembly can read it, so every summary is inexact.
+                tracing::warn!(
+                    "sfsq traces: source {} failed to open: {e}",
+                    source.source_id()
+                );
+                status.add(PartialReason::SourceFailure);
+                degraded_assembly = true;
+                continue;
+            }
+        };
         match discovery_state(
             reader,
             &plan,
@@ -785,37 +814,23 @@ pub fn search(
                     }
                 }
             }
-            Some(TraceGate::new(
-                readers.iter().map(|(reader, _)| reader).collect(),
-                tail_ids,
-                tl,
-            ))
+            Some(TraceGate::new(sessions.len(), tail_ids, tl))
         }
         _ => None,
     };
 
-    // ── Phase 2: sessions over the whole completion snapshot ─────────
-    let mut sessions: Vec<sfst::TraceFileSession<'_, '_>> = readers
-        .iter()
-        .map(|(reader, _)| sfst::TraceFileSession::open(reader))
-        .collect();
+    // ── Phase 2: the sessions over the whole completion snapshot ─────
     let session_count = sessions.len();
-    // Merge-index → source id, parallel to `merged`: names the source
-    // in the failure warnings below. The FieldKinds pass splits the
-    // same index space at `session_count` (below = SFST readers, from
+    // Merge-index → source id: names the source in the failure warnings
+    // below. The merge input (built per candidate, so the gate can lend
+    // the sessions between merges) and the FieldKinds pass split the
+    // same index space at `session_count` (below = SFST sessions, from
     // it = tails).
-    let mut origin: Vec<String> = readers
+    let mut origin: Vec<String> = slot_sources
         .iter()
-        .map(|(_, source)| source.source_id().to_string())
+        .map(|source| source.source_id().to_string())
         .collect();
-    let mut merged: Vec<&mut dyn SpanSource> = Vec::new();
-    for session in sessions.iter_mut() {
-        merged.push(session);
-    }
-    for (source_id, tail) in tails.iter_mut() {
-        merged.push(tail);
-        origin.push(source_id.to_string());
-    }
+    origin.extend(tails.iter().map(|(source_id, _)| source_id.to_string()));
 
     let assembled_ceiling = query
         .limit
@@ -893,7 +908,7 @@ pub fn search(
             // (point-of-discovery semantics, the same contract as a
             // mid-merge read failure).
             if let Some(g) = gate.as_mut() {
-                let decision = g.check(trace_id);
+                let decision = g.check(trace_id, &mut sessions);
                 for idx in g.take_new_failures() {
                     let who = origin.get(idx).map(String::as_str).unwrap_or("?");
                     tracing::warn!(
@@ -906,9 +921,17 @@ pub fn search(
                     continue;
                 }
             }
+            let mut merged: Vec<&mut dyn SpanSource> = Vec::with_capacity(origin.len());
+            for session in sessions.iter_mut() {
+                merged.push(session);
+            }
+            for (_, tail) in tails.iter_mut() {
+                merged.push(tail);
+            }
             let outcome = combine(&mut merged, trace_id, Some(query.span_cap), None, &|| {
                 cancel.is_cancelled()
             });
+            drop(merged);
             assembled_count += 1;
             // Failures fold into the status BEFORE the cancellation
             // return: observed reasons coexist with Cancelled (the
@@ -1027,7 +1050,17 @@ pub fn search(
     }
     for idx in contributing {
         let pairs = if idx < session_count {
-            readers[idx].0.metadata().tree.derive_scalar_kinds()
+            match sessions[idx].metadata() {
+                Ok(metadata) => metadata.tree.derive_scalar_kinds(),
+                Err(e) => {
+                    tracing::warn!(
+                        "sfsq traces: source {} metadata failed to read: {e}",
+                        origin[idx]
+                    );
+                    status.add(PartialReason::SourceFailure);
+                    continue;
+                }
+            }
         } else {
             tails[idx - session_count].1.field_kinds().to_vec()
         };

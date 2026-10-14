@@ -49,9 +49,11 @@ use crate::trace_combine::{SpanRef, SpanSource};
 
 /// The bloom gate, resolved once per session.
 enum BloomGate {
-    /// No bloom chunk, or it failed to decode (warned once): every id
-    /// falls through to the exact lookup.
+    /// No bloom chunk: every id falls through to the exact lookup.
     Pass,
+    /// The bloom failed to decode (warned once): every id falls through
+    /// to the exact lookup, and a caller can see the file is damaged.
+    Unreadable,
     Filter(crate::TraceIdBloom),
 }
 
@@ -205,7 +207,7 @@ impl<'r, 'a> TraceFileSession<'r, 'a> {
                     tracing::warn!(
                         "trace_id bloom unreadable; session falls back to exact lookups: {e}"
                     );
-                    BloomGate::Pass
+                    BloomGate::Unreadable
                 }
             },
             _ => BloomGate::Pass,
@@ -223,16 +225,48 @@ impl<'r, 'a> TraceFileSession<'r, 'a> {
         }
     }
 
+    /// Keep the lookup structures after a lookup that finds nothing: a
+    /// caller looking up many ids in this file (search) decodes them
+    /// once.
+    pub fn keep_lookup(mut self) -> Self {
+        self.transient_lookup = false;
+        self
+    }
+
     /// The file's metadata (decoded once, cached by the reader).
     pub fn metadata(&self) -> Result<&crate::Metadata, crate::Error> {
         self.view.chunk()?.metadata()
+    }
+
+    /// The full reader, opened on first use for an owned session (its
+    /// `PRIM` decode), for callers that compile plans or resolve values.
+    pub fn reader(&mut self) -> Result<&IndexReader<'a>, crate::Error> {
+        self.view.full()
+    }
+
+    /// Whether the file carries the per-file trace rollup (`TRSU`).
+    pub fn has_trace_rollup(&self) -> bool {
+        self.view
+            .chunk()
+            .is_ok_and(|chunk| chunk.has_trace_rollup())
+    }
+
+    /// Decode and validate the per-file trace rollup (`TRSU`).
+    pub fn trace_rollup(&self) -> Result<crate::TraceRollup, crate::Error> {
+        self.view.chunk()?.trace_rollup()
+    }
+
+    /// The file's bloom failed to decode: lookups fall back to the exact
+    /// path, and the file is damaged.
+    pub fn bloom_unreadable(&self) -> bool {
+        matches!(self.bloom, BloomGate::Unreadable)
     }
 
     /// Bloom test: `false` is a definite miss (skip this file without
     /// touching TIDX/TRCE); `true` means "maybe" (or no usable bloom).
     pub fn might_contain(&self, trace_id: TraceId) -> bool {
         match &self.bloom {
-            BloomGate::Pass => true,
+            BloomGate::Pass | BloomGate::Unreadable => true,
             BloomGate::Filter(bloom) => bloom.might_contain(trace_id),
         }
     }

@@ -128,18 +128,8 @@ pub(crate) struct GateStats {
     pub tail_unprunable: u64,
     pub uncovered_unprunable: u64,
     pub bloom_probes: u64,
-    pub bloom_decodes: u64,
     pub rollup_decodes: u64,
     pub corrupt_files: u64,
-}
-
-/// Per-file bloom state, resolved once per file.
-enum BloomState {
-    Unprobed,
-    /// No TBLM chunk: might-contain for every candidate (absence is a
-    /// version fact — mirrors the session's `BloomGate::Pass`).
-    PassAll,
-    Ready(sfst::TraceIdBloom),
 }
 
 /// Per-file rollup state, resolved once per file.
@@ -151,12 +141,12 @@ enum RollupState {
     Ready(Box<sfst::TraceRollup>),
 }
 
-/// One completion file's gate state, indexed in reader order.
-struct GateFile<'r, 'a> {
-    reader: &'r sfst::IndexReader<'a>,
-    bloom: BloomState,
+/// One completion file's gate state, indexed in session order. The file
+/// itself is the caller's session, lent to each check: its bloom, its
+/// rollup and, for resolving root values, its full reader.
+struct GateFile {
     rollup: RollupState,
-    resolver: Option<sfst::RollupRootResolver<'r, 'a>>,
+    resolver: Option<sfst::RollupRootResolver>,
     /// Proven corrupt: out of the evidence set (the caller also removes
     /// it from the truth by marking the source failed).
     failed: bool,
@@ -182,8 +172,8 @@ enum RowVerdict {
 /// The trace-level pre-assembly gate over one query's completion
 /// readers: per-file evidence caches plus the compiled prune rules,
 /// consulted per popped candidate.
-pub(crate) struct TraceGate<'r, 'a, 'e> {
-    files: Vec<GateFile<'r, 'a>>,
+pub(crate) struct TraceGate<'e> {
+    files: Vec<GateFile>,
     /// Trace ids with ANY tail presence — unprunable wholesale.
     tail_ids: HashSet<sfst::TraceId>,
     /// Positive root conditions; matchers borrow the compiled eval.
@@ -199,21 +189,18 @@ pub(crate) struct TraceGate<'r, 'a, 'e> {
     pub(crate) stats: GateStats,
 }
 
-impl<'r, 'a, 'e> TraceGate<'r, 'a, 'e> {
-    /// Build the gate over the completion readers (indices align with
-    /// the caller's reader/session/origin order) and the eagerly
-    /// collected tail provenance ids.
+impl<'e> TraceGate<'e> {
+    /// Build the gate over `files` completion sessions (indices align
+    /// with the caller's session/origin order; each check lends them)
+    /// and the eagerly collected tail provenance ids.
     pub(crate) fn new(
-        readers: Vec<&'r sfst::IndexReader<'a>>,
+        files: usize,
         tail_ids: HashSet<sfst::TraceId>,
         eval: &'e TraceLevelEval,
     ) -> Self {
         Self {
-            files: readers
-                .into_iter()
-                .map(|reader| GateFile {
-                    reader,
-                    bloom: BloomState::Unprobed,
+            files: (0..files)
+                .map(|_| GateFile {
                     rollup: RollupState::Undecoded,
                     resolver: None,
                     failed: false,
@@ -238,7 +225,11 @@ impl<'r, 'a, 'e> TraceGate<'r, 'a, 'e> {
 
     /// Decide one popped candidate. Always sound to ignore (assembling
     /// a prunable candidate is never wrong — only slower).
-    pub(crate) fn check(&mut self, trace_id: sfst::TraceId) -> GateDecision {
+    pub(crate) fn check(
+        &mut self,
+        trace_id: sfst::TraceId,
+        sessions: &mut [sfst::TraceFileSession<'_, '_>],
+    ) -> GateDecision {
         self.stats.checks += 1;
         if self.tail_ids.contains(&trace_id) {
             self.stats.tail_unprunable += 1;
@@ -251,10 +242,10 @@ impl<'r, 'a, 'e> TraceGate<'r, 'a, 'e> {
             if self.files[idx].failed {
                 continue;
             }
-            if !self.probe_bloom(idx, trace_id) {
+            if !self.probe_bloom(idx, trace_id, sessions) {
                 continue; // proven absent from this file, or file failed
             }
-            match self.decode_rollup(idx) {
+            match self.decode_rollup(idx, sessions) {
                 RollupProbe::Uncovered => {
                     // Short-circuit: one uncovered bloom-present file
                     // already forces UNPRUNABLE.
@@ -334,7 +325,7 @@ impl<'r, 'a, 'e> TraceGate<'r, 'a, 'e> {
                 if kv_ref == sfst::ROLLUP_NO_REF {
                     continue; // absent never satisfies: this row fails
                 }
-                match self.resolve_row(file, field, kv_ref, matcher) {
+                match self.resolve_row(file, field, kv_ref, matcher, sessions) {
                     RowVerdict::Matches => continue 'condition,
                     RowVerdict::Fails => {}
                     RowVerdict::Corrupt => {
@@ -391,17 +382,21 @@ impl<'r, 'a, 'e> TraceGate<'r, 'a, 'e> {
         field: GateRootField,
         kv_ref: u32,
         matcher: &EvalMatcher,
+        sessions: &mut [sfst::TraceFileSession<'_, '_>],
     ) -> RowVerdict {
         let field_name: &str = match field {
             GateRootField::Service => &self.service_field,
             GateRootField::Name => name_field(),
         };
-        let entry = &mut self.files[file];
-        let reader = entry.reader;
-        let resolver = entry
+        // Resolving a value needs the full reader (the dictionaries);
+        // a file that cannot open fully cannot prove its claim.
+        let Ok(reader) = sessions[file].reader() else {
+            return RowVerdict::Corrupt;
+        };
+        let resolver = self.files[file]
             .resolver
-            .get_or_insert_with(|| sfst::RollupRootResolver::new(reader));
-        match resolver.resolve(field_name, kv_ref) {
+            .get_or_insert_with(sfst::RollupRootResolver::new);
+        match resolver.resolve(reader, field_name, kv_ref) {
             sfst::RollupRefOutcome::Value(value) => {
                 if matcher.value_matches(value) {
                     RowVerdict::Matches
@@ -413,45 +408,38 @@ impl<'r, 'a, 'e> TraceGate<'r, 'a, 'e> {
         }
     }
 
-    /// Whether the candidate MIGHT be in file `idx` (bloom semantics).
-    /// A bloom decode failure fails the file (corrupt) and returns
+    /// Whether the candidate MIGHT be in file `idx` (the session's
+    /// bloom). An unreadable bloom fails the file (corrupt) and returns
     /// `false` — the file is no longer evidence OR truth.
-    fn probe_bloom(&mut self, idx: usize, trace_id: sfst::TraceId) -> bool {
-        if matches!(self.files[idx].bloom, BloomState::Unprobed) {
-            let reader = self.files[idx].reader;
-            self.files[idx].bloom = if !reader.has_trace_id_bloom() {
-                BloomState::PassAll
-            } else {
-                self.stats.bloom_decodes += 1;
-                match reader.trace_id_bloom() {
-                    Ok(bloom) => BloomState::Ready(bloom),
-                    Err(e) => {
-                        tracing::warn!("sfsq traces gate: trace-id bloom failed to decode: {e}");
-                        self.mark_failed(idx);
-                        return false;
-                    }
-                }
-            };
+    fn probe_bloom(
+        &mut self,
+        idx: usize,
+        trace_id: sfst::TraceId,
+        sessions: &[sfst::TraceFileSession<'_, '_>],
+    ) -> bool {
+        if sessions[idx].bloom_unreadable() {
+            self.mark_failed(idx);
+            return false;
         }
         self.stats.bloom_probes += 1;
-        match &self.files[idx].bloom {
-            BloomState::PassAll => true,
-            BloomState::Ready(bloom) => bloom.might_contain(trace_id),
-            BloomState::Unprobed => unreachable!("resolved above"),
-        }
+        sessions[idx].might_contain(trace_id)
     }
 
     /// Decode (once) and report the file's rollup state. A decode
     /// failure marks the file corrupt and reports
     /// [`RollupProbe::Failed`].
-    fn decode_rollup(&mut self, idx: usize) -> RollupProbe {
+    fn decode_rollup(
+        &mut self,
+        idx: usize,
+        sessions: &[sfst::TraceFileSession<'_, '_>],
+    ) -> RollupProbe {
         if matches!(self.files[idx].rollup, RollupState::Undecoded) {
-            let reader = self.files[idx].reader;
-            self.files[idx].rollup = if !reader.has_trace_rollup() {
+            let session = &sessions[idx];
+            self.files[idx].rollup = if !session.has_trace_rollup() {
                 RollupState::Uncovered
             } else {
                 self.stats.rollup_decodes += 1;
-                match reader.trace_rollup() {
+                match session.trace_rollup() {
                     Ok(rollup) => RollupState::Ready(Box::new(rollup)),
                     Err(e) => {
                         tracing::warn!("sfsq traces gate: trace rollup failed to decode: {e}");

@@ -866,24 +866,24 @@ fn mid_tier_resolution_and_the_resolver_closed_rule() {
     let service_ref = rollup.root_service_refs[0];
     assert_ne!(name_ref, sfst::ROLLUP_NO_REF);
     assert_ne!(service_ref, sfst::ROLLUP_NO_REF);
-    let mut resolver = sfst::RollupRootResolver::new(&reader);
+    let mut resolver = sfst::RollupRootResolver::new();
     assert!(
         matches!(
-            resolver.resolve("name", name_ref),
+            resolver.resolve(&reader, "name", name_ref),
             sfst::RollupRefOutcome::Value(v) if v.starts_with("op-")
         ),
         "a ref in its own field is a proven value"
     );
     assert!(
         matches!(
-            resolver.resolve("name", service_ref),
+            resolver.resolve(&reader, "name", service_ref),
             sfst::RollupRefOutcome::Corrupt
         ),
         "a wrong-field ref is corruption evidence, never absence"
     );
     assert!(
         matches!(
-            resolver.resolve("no.such.field", name_ref),
+            resolver.resolve(&reader, "no.such.field", name_ref),
             sfst::RollupRefOutcome::Corrupt
         ),
         "a ref into an absent field can never be proven"
