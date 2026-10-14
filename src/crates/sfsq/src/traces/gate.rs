@@ -520,23 +520,32 @@ impl<'e> TraceGate<'e> {
 /// The single-source proof (module docs): record every completion
 /// source's trace ids once per source — each file's rollup ids, then
 /// each tail's distinct ids — stopping once more than `max_ids` are
-/// recorded. `None` when a file has no rollup or cannot decode it (its
-/// ids are unknown, so no id is provably single-source) or the budget
-/// ran out.
+/// recorded. `Ok(None)` when a file has no rollup (its ids are unknown,
+/// so no id is provably single-source), the budget ran out, or
+/// `cancelled` fired. `Err((file, error))` when a file's rollup fails
+/// to decode: a corrupt source the caller surfaces (module docs).
 pub(crate) fn single_source_proof(
     sessions: &mut [sfst::TraceFileSession<'_, '_>],
     tail_ids: &[HashSet<sfst::TraceId>],
     loaded: &mut sfst::LoadedSources,
     max_ids: u64,
-) -> Option<sfst::RepeatFilter> {
+    cancelled: &dyn Fn() -> bool,
+) -> Result<Option<sfst::RepeatFilter>, (usize, sfst::Error)> {
     let mut filter = sfst::RepeatFilter::new();
     let mut recorded = 0u64;
     for idx in 0..sessions.len() {
+        if cancelled() {
+            return Ok(None);
+        }
         let visited = sessions[idx].for_each_rollup_row(|id, _| filter.record(id));
         loaded.touch(idx, sessions);
-        recorded += visited.ok()?? as u64;
+        match visited {
+            Ok(Some(n)) => recorded += n as u64,
+            Ok(None) => return Ok(None),
+            Err(e) => return Err((idx, e)),
+        }
         if recorded > max_ids {
-            return None;
+            return Ok(None);
         }
     }
     for ids in tail_ids {
@@ -545,10 +554,10 @@ pub(crate) fn single_source_proof(
         }
         recorded += ids.len() as u64;
         if recorded > max_ids {
-            return None;
+            return Ok(None);
         }
     }
-    Some(filter)
+    Ok(Some(filter))
 }
 
 /// The token gate (module docs) for a candidate held by `session`'s

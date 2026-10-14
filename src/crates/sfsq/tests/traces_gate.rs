@@ -729,6 +729,41 @@ fn corrupt_rollup_chunk_is_skipped_and_surfaced() {
     assert_eq!(off.status, QueryStatus::Complete);
 }
 
+/// A corrupt TRSU chunk under a token-only query: the single-source
+/// proof cannot be built and says so — `SourceFailure` — instead of
+/// turning itself off silently. Assembly never reads the rollup, so
+/// the result stays exact.
+#[test]
+fn corrupt_rollup_under_the_proof_is_surfaced() {
+    let dir = tempfile::tempdir().unwrap();
+    let svc = vec![kv_str("service.name", "hot")];
+    let reqs = vec![req_with(
+        svc,
+        None,
+        &[root_span(1, 0x11, 100 * NS, 101 * NS, "op")],
+    )];
+    let wal = write_wal(dir.path(), reqs, "corrupt-proof");
+    drop(sealed_source(dir.path(), &wal, "one"));
+    let path = sealed_path(dir.path(), "one");
+    corrupt_chunk(&path, *b"TRSU");
+    let build = || both_roles(|| vec![sealed_source_at(&path, "one")]);
+
+    let data = run(
+        build(),
+        SearchQuery::new(tokens(vec![
+            Token::positive(pred(vec![service_eq("hot")])),
+            Token::positive(pred(vec![name_eq("op")])),
+        ])),
+    );
+    assert_eq!(ids(&data), vec![hex(1)]);
+    assert!(data.traces[0].exact, "assembly never read the rollup");
+    assert!(
+        data.status.has(PartialReason::SourceFailure),
+        "the corrupt rollup is surfaced: {:?}",
+        data.status
+    );
+}
+
 /// A corrupt TBLM chunk: same principle through the all-file path's
 /// other read (its screens). The single-source proof decides from the
 /// rollup alone and never reads the bloom, a lookup hint whose

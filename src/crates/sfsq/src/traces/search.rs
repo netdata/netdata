@@ -1034,7 +1034,26 @@ pub fn search(
             tail_ids.push(ids);
         }
         if query.proof_ids_max > 0 {
-            proof = single_source_proof(&mut sessions, &tail_ids, &mut loaded, query.proof_ids_max);
+            match single_source_proof(
+                &mut sessions,
+                &tail_ids,
+                &mut loaded,
+                query.proof_ids_max,
+                &|| cancel.is_cancelled(),
+            ) {
+                Ok(built) => proof = built,
+                // The proof is an accelerator: a corrupt rollup turns it
+                // off and is surfaced. Assembly never reads the rollup,
+                // so results stay exact; the trace-level gate, when
+                // built, applies its own failed-source rule on reading it.
+                Err((idx, e)) => {
+                    tracing::warn!(
+                        "sfsq traces: source {} trace rollup failed to decode: {e}",
+                        slot_sources[idx].source_id()
+                    );
+                    status.add(PartialReason::SourceFailure);
+                }
+            }
         }
         if trace_gate_wanted {
             let tl = lowered.trace_level.as_ref().expect("wanted above");
