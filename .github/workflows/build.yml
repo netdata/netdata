@@ -1386,6 +1386,10 @@ jobs:
     if: github.event_name != 'workflow_dispatch'
     needs:
       - file-check
+    env:
+      # Like the Windows signing step, pull requests never sign; other events
+      # sign once the signing secrets exist.
+      MACOS_SIGNING: ${{ github.event_name != 'pull_request' && secrets.MACOS_DEVELOPER_ID_APPLICATION_P12 != '' }}
     steps:
       - name: Skip Check
         id: skip
@@ -1418,11 +1422,29 @@ jobs:
         if: needs.file-check.outputs.run == 'true'
         run: |
           bash ./packaging/installer/install-required-packages.sh --dont-wait --non-interactive netdata-all
+      - name: Import signing identities
+        id: import-signing
+        if: needs.file-check.outputs.run == 'true' && env.MACOS_SIGNING == 'true'
+        env:
+          MACOS_APP_P12: ${{ secrets.MACOS_DEVELOPER_ID_APPLICATION_P12 }}
+          MACOS_APP_P12_PASSWORD: ${{ secrets.MACOS_DEVELOPER_ID_APPLICATION_P12_PASSWORD }}
+          MACOS_INSTALLER_P12: ${{ secrets.MACOS_DEVELOPER_ID_INSTALLER_P12 }}
+          MACOS_INSTALLER_P12_PASSWORD: ${{ secrets.MACOS_DEVELOPER_ID_INSTALLER_P12_PASSWORD }}
+          MACOS_NOTARY_KEY_P8: ${{ secrets.MACOS_NOTARY_KEY_P8 }}
+          MACOS_NOTARY_KEY_ID: ${{ secrets.MACOS_NOTARY_KEY_ID }}
+          MACOS_NOTARY_ISSUER: ${{ secrets.MACOS_NOTARY_ISSUER_ID }}
+        run: |
+          ./packaging/macos/import-signing-identities.sh "${RUNNER_TEMP}" >> "${GITHUB_ENV}"
       - name: Build package
         id: build-pkg
         if: needs.file-check.outputs.run == 'true'
         run: |
           ./packaging/build-package.sh PKG "${PWD}/build-pkg"
+      - name: Remove signing identities
+        id: remove-signing
+        if: always() && steps.import-signing.outcome != 'skipped'
+        run: |
+          ./packaging/macos/import-signing-identities.sh --remove "${RUNNER_TEMP}"
       - name: Store package
         id: store
         if: needs.file-check.outputs.run == 'true'
