@@ -32,23 +32,21 @@ struct BuildErr;
 /// same in-flight build, then yields `bytes`. Runs only on a cache
 /// miss — a hit never invokes it — so the counters count builds, not
 /// requests.
-fn counting_build(
+async fn counting_build(
     counter: Arc<AtomicUsize>,
     bytes: Vec<u8>,
-) -> impl std::future::Future<Output = Result<Arc<BuiltChunk>, BuildErr>> {
-    async move {
-        counter.fetch_add(1, Ordering::SeqCst);
-        tokio::time::sleep(Duration::from_millis(20)).await;
-        Ok::<Arc<BuiltChunk>, BuildErr>(Arc::new(BuiltChunk {
-            summary: sfst::Summary {
-                min_timestamp_s: 0,
-                max_timestamp_s: 0,
-                record_count: bytes.len() as u32,
-                content_meta: Vec::new(),
-            },
-            bytes: Arc::new(bytes),
-        }))
-    }
+) -> Result<Arc<BuiltChunk>, BuildErr> {
+    counter.fetch_add(1, Ordering::SeqCst);
+    tokio::time::sleep(Duration::from_millis(20)).await;
+    Ok(Arc::new(BuiltChunk {
+        summary: sfst::Summary {
+            min_timestamp_s: 0,
+            max_timestamp_s: 0,
+            record_count: bytes.len() as u32,
+            content_meta: Vec::new(),
+        },
+        bytes: Arc::new(bytes),
+    }))
 }
 
 /// A cache with a 64 MiB budget — far above the few-byte test chunks,
