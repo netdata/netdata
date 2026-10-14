@@ -186,11 +186,14 @@ The following alerts are available:
 
 | Alert name  | On metric | Description |
 |:------------|:----------|:------------|
-| [ kubelet_node_config_error ](https://github.com/netdata/netdata/blob/master/src/health/health.d/kubelet.conf) | k8s_kubelet.kubelet_node_config_error | the node is experiencing a configuration-related error (0: false, 1: true) |
-| [ kubelet_token_requests ](https://github.com/netdata/netdata/blob/master/src/health/health.d/kubelet.conf) | k8s_kubelet.kubelet_token_requests | number of failed Token() requests to the alternate token source |
-| [ kubelet_token_requests ](https://github.com/netdata/netdata/blob/master/src/health/health.d/kubelet.conf) | k8s_kubelet.kubelet_token_requests | number of failed Token() requests to the alternate token source |
-| [ kubelet_operations_error ](https://github.com/netdata/netdata/blob/master/src/health/health.d/kubelet.conf) | k8s_kubelet.kubelet_operations_errors | number of Docker or runtime operation errors |
-| [ kubelet_operations_error ](https://github.com/netdata/netdata/blob/master/src/health/health.d/kubelet.conf) | k8s_kubelet.kubelet_operations_errors | number of Docker or runtime operation errors |
+| [ kubelet_node_config_error ](https://github.com/netdata/netdata/blob/master/src/health/health.d/kubelet.conf) | k8s_kubelet.kubelet_node_config_error | The node is experiencing a configuration-related error (0: false, 1: true) |
+| [ kubelet_token_requests ](https://github.com/netdata/netdata/blob/master/src/health/health.d/kubelet.conf) | k8s_kubelet.kubelet_token_requests | Number of failed Token() requests to the alternate token source |
+| [ kubelet_1m_pleg_relist_latency_quantile_05 ](https://github.com/netdata/netdata/blob/master/src/health/health.d/kubelet.conf) | k8s_kubelet.kubelet_pleg_relist_latency_microseconds | average Pod Lifecycle Event Generator relisting latency over the last minute (quantile 0.5) |
+| [ kubelet_10s_pleg_relist_latency_quantile_05 ](https://github.com/netdata/netdata/blob/master/src/health/health.d/kubelet.conf) | k8s_kubelet.kubelet_pleg_relist_latency_microseconds | Ratio of average Pod Lifecycle Event Generator relisting latency over the last 10 seconds, compared to the last minute (quantile 0.5) |
+| [ kubelet_1m_pleg_relist_latency_quantile_09 ](https://github.com/netdata/netdata/blob/master/src/health/health.d/kubelet.conf) | k8s_kubelet.kubelet_pleg_relist_latency_microseconds | average Pod Lifecycle Event Generator relisting latency over the last minute (quantile 0.9) |
+| [ kubelet_10s_pleg_relist_latency_quantile_09 ](https://github.com/netdata/netdata/blob/master/src/health/health.d/kubelet.conf) | k8s_kubelet.kubelet_pleg_relist_latency_microseconds | Ratio of average Pod Lifecycle Event Generator relisting latency over the last 10 seconds, compared to the last minute (quantile 0.9) |
+| [ kubelet_1m_pleg_relist_latency_quantile_099 ](https://github.com/netdata/netdata/blob/master/src/health/health.d/kubelet.conf) | k8s_kubelet.kubelet_pleg_relist_latency_microseconds | average Pod Lifecycle Event Generator relisting latency over the last minute (quantile 0.99) |
+| [ kubelet_10s_pleg_relist_latency_quantile_099 ](https://github.com/netdata/netdata/blob/master/src/health/health.d/kubelet.conf) | k8s_kubelet.kubelet_pleg_relist_latency_microseconds | Ratio of average Pod Lifecycle Event Generator relisting latency over the last 10 seconds, compared to the last minute (quantile 0.99) |
 
 
 

@@ -210,7 +210,13 @@ jobs:
 
 ## Alerts
 
-There are no alerts configured by default for this integration.
+
+The following alerts are available:
+
+| Alert name  | On metric | Description |
+|:------------|:----------|:------------|
+| [ unbound_request_list_overwritten ](https://github.com/netdata/netdata/blob/master/src/health/health.d/unbound.conf) | unbound.request_list_jostle_list | Number of overwritten queries in the request-list |
+| [ unbound_request_list_dropped ](https://github.com/netdata/netdata/blob/master/src/health/health.d/unbound.conf) | unbound.request_list_jostle_list | Number of dropped queries in the request-list |
 
 
 

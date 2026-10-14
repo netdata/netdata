@@ -160,7 +160,7 @@ The following alerts are available:
 | Alert name  | On metric | Description |
 |:------------|:----------|:------------|
 | [ ipmi_go_sensor_state ](https://github.com/netdata/netdata/blob/master/src/health/health.d/ipmi.conf) | ipmi_go.sensor_state | IPMI sensor ${label:sensor} (${label:component}) state |
-| [ ipmi_events ](https://github.com/netdata/netdata/blob/master/src/health/health.d/ipmi.conf) | ipmi_go.sel | number of events in the IPMI System Event Log (SEL) |
+| [ ipmi_events ](https://github.com/netdata/netdata/blob/master/src/health/health.d/ipmi.conf) | ipmi.events | number of events in the IPMI System Event Log (SEL) |
 
 
 

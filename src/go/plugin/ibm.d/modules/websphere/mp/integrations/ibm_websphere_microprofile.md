@@ -113,7 +113,15 @@ jobs:
 
 ## Alerts
 
-There are no alerts configured by default for this integration.
+
+The following alerts are available:
+
+| Alert name  | On metric | Description |
+|:------------|:----------|:------------|
+| [ websphere_mp_heap_utilization ](https://github.com/netdata/netdata/blob/master/src/health/health.d/websphere_mp.conf) | websphere_mp.jvm_heap_utilization | MicroProfile heap utilization is ${value}% |
+| [ websphere_mp_cpu_usage ](https://github.com/netdata/netdata/blob/master/src/health/health.d/websphere_mp.conf) | websphere_mp.cpu_usage | MicroProfile-reported CPU utilization is ${value}% |
+| [ websphere_mp_threadpool_utilization ](https://github.com/netdata/netdata/blob/master/src/health/health.d/websphere_mp.conf) | websphere_mp.threadpool_usage | MicroProfile thread pool active threads are ${value}% of capacity |
+| [ websphere_mp_rest_response_time ](https://github.com/netdata/netdata/blob/master/src/health/health.d/websphere_mp.conf) | websphere_mp.rest_response_time | Average response time for ${label:method} ${label:endpoint} is ${value}ms |
 
 
 

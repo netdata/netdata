@@ -161,7 +161,7 @@ The following alerts are available:
 | [ megacli_phys_drive_media_errors ](https://github.com/netdata/netdata/blob/master/src/health/health.d/megacli.conf) | megacli.phys_drive_media_errors | MegaCLI physical drive adapter ${label:adapter_number} slot ${label:slot_number} media errors |
 | [ megacli_phys_drive_predictive_failures ](https://github.com/netdata/netdata/blob/master/src/health/health.d/megacli.conf) | megacli.phys_drive_predictive_failures | MegaCLI physical drive (adapter ${label:adapter_number} slot ${label:slot_number}) predictive failures |
 | [ megacli_bbu_charge ](https://github.com/netdata/netdata/blob/master/src/health/health.d/megacli.conf) | megacli.bbu_charge | MegaCLI Backup Battery Unit (adapter ${label:adapter_number}) average charge over the last minute |
-| [ megacli_bbu_recharge_cycles ](https://github.com/netdata/netdata/blob/master/src/health/health.d/megacli.conf) | megacli.bbu_recharge_cycles | MegaCLI Backup Battery Unit (adapter ${label:adapter_number}) average charge over the last minute |
+| [ megacli_bbu_recharge_cycles ](https://github.com/netdata/netdata/blob/master/src/health/health.d/megacli.conf) | megacli.bbu_recharge_cycles | MegaCLI Backup Battery Unit (adapter ${label:adapter_number}) recharge cycles |
 
 
 
@@ -209,8 +209,8 @@ Metrics:
 
 | Metric | Description | Dimensions | Unit |
 |:------|:------------|:----------|:----|
-| megacli.phys_drive_media_errors_rate | Physical Drive media errors rate | media_errors | errors/s |
-| megacli.phys_drive_predictive_failures_rate | Physical Drive predictive failures rate | predictive_failures | failures/s |
+| megacli.phys_drive_media_errors | Physical Drive media errors rate | media_errors | errors/s |
+| megacli.phys_drive_predictive_failures | Physical Drive predictive failures rate | predictive_failures | failures/s |
 
 
 ### Per backup battery unit

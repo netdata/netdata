@@ -436,12 +436,12 @@ The following alerts are available:
 
 | Alert name  | On metric | Description |
 |:------------|:----------|:------------|
-| [ vsphere_vm_cpu_utilization ](https://github.com/netdata/netdata/blob/master/src/health/health.d/vsphere.conf) | vsphere.vm_cpu_utilization | Virtual Machine CPU utilization |
-| [ vsphere_vm_mem_utilization ](https://github.com/netdata/netdata/blob/master/src/health/health.d/vsphere.conf) | vsphere.vm_mem_utilization | Virtual Machine memory utilization |
-| [ vsphere_vm_snapshot_chain_depth ](https://github.com/netdata/netdata/blob/master/src/health/health.d/vsphere.conf) | vsphere.vm_snapshot_max_chain_depth | Virtual Machine snapshot maximum chain depth |
-| [ vsphere_vm_snapshot_age ](https://github.com/netdata/netdata/blob/master/src/health/health.d/vsphere.conf) | vsphere.vm_snapshot_max_age | Virtual Machine oldest snapshot age |
-| [ vsphere_host_cpu_utilization ](https://github.com/netdata/netdata/blob/master/src/health/health.d/vsphere.conf) | vsphere.host_cpu_utilization | ESXi Host CPU utilization |
-| [ vsphere_host_mem_utilization ](https://github.com/netdata/netdata/blob/master/src/health/health.d/vsphere.conf) | vsphere.host_mem_utilization | ESXi Host memory utilization |
+| [ vsphere_vm_cpu_utilization ](https://github.com/netdata/netdata/blob/master/src/health/health.d/vsphere.conf) | vsphere.vm_cpu_utilization | CPU utilization VM ${label:vm} host ${label:host} cluster ${label:cluster} datacenter ${label:datacenter} |
+| [ vsphere_vm_mem_utilization ](https://github.com/netdata/netdata/blob/master/src/health/health.d/vsphere.conf) | vsphere.vm_mem_utilization | Memory utilization VM ${label:vm} host ${label:host} cluster ${label:cluster} datacenter ${label:datacenter} |
+| [ vsphere_vm_snapshot_chain_depth ](https://github.com/netdata/netdata/blob/master/src/health/health.d/vsphere.conf) | vsphere.vm_snapshot_max_chain_depth | Snapshot max chain depth for VM ${label:vm} host ${label:host} cluster ${label:cluster} datacenter ${label:datacenter}; zero means no snapshots |
+| [ vsphere_vm_snapshot_age ](https://github.com/netdata/netdata/blob/master/src/health/health.d/vsphere.conf) | vsphere.vm_snapshot_max_age | Oldest snapshot age for VM ${label:vm} host ${label:host} cluster ${label:cluster} datacenter ${label:datacenter}; zero means no snapshots |
+| [ vsphere_host_cpu_utilization ](https://github.com/netdata/netdata/blob/master/src/health/health.d/vsphere.conf) | vsphere.host_cpu_utilization | CPU utilization ESXi host ${label:host} cluster ${label:cluster} datacenter ${label:datacenter} |
+| [ vsphere_host_mem_utilization ](https://github.com/netdata/netdata/blob/master/src/health/health.d/vsphere.conf) | vsphere.host_mem_utilization | Memory utilization ESXi host ${label:host} cluster ${label:cluster} datacenter ${label:datacenter} |
 
 
 

@@ -632,9 +632,9 @@ The following alerts are available:
 
 | Alert name  | On metric | Description |
 |:------------|:----------|:------------|
-| [ am_firewall_health ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_firewall.conf) | azure_monitor.firewall.health | Firewall health on ${label:resource_name} |
-| [ am_firewall_latency ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_firewall.conf) | azure_monitor.firewall.latency | Firewall latency on ${label:resource_name} |
-| [ am_firewall_snat_port_utilization ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_firewall.conf) | azure_monitor.firewall.snat_port_utilization | Firewall SNAT port utilization on ${label:resource_name} |
+| [ am_firewall_health ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_firewall.conf) | azure_monitor.firewall.health | Health state of Azure Firewall ${label:resource_name} in ${label:resource_group} (${label:region}). AMBA threshold is 90%. Values below 100% indicate partial degradation |
+| [ am_firewall_latency ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_firewall.conf) | azure_monitor.firewall.latency | Average latency probe of Azure Firewall ${label:resource_name} in ${label:resource_group} (${label:region}). High latency indicates firewall processing delays |
+| [ am_firewall_snat_port_utilization ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_firewall.conf) | azure_monitor.firewall.snat_port_utilization | SNAT port utilization of Azure Firewall ${label:resource_name} in ${label:resource_group} (${label:region}). AMBA threshold is 80%. Exhaustion causes outbound connection failures |
 
 
 

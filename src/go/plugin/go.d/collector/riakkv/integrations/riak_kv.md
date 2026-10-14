@@ -216,7 +216,17 @@ jobs:
 
 ## Alerts
 
-There are no alerts configured by default for this integration.
+
+The following alerts are available:
+
+| Alert name  | On metric | Description |
+|:------------|:----------|:------------|
+| [ riakkv_list_keys_active ](https://github.com/netdata/netdata/blob/master/src/health/health.d/riakkv.conf) | riak.core.fsm_active | Number of currently running list keys finite state machines |
+| [ riakkv_1h_kv_get_mean_latency ](https://github.com/netdata/netdata/blob/master/src/health/health.d/riakkv.conf) | riak.kv.latency.get | average time between reception of client GET request and subsequent response to client over the last hour |
+| [ riakkv_kv_get_slow ](https://github.com/netdata/netdata/blob/master/src/health/health.d/riakkv.conf) | riak.kv.latency.get | Average time between reception of client GET request and subsequent response to the client over the last 3 minutes, compared to the average over the last hour |
+| [ riakkv_1h_kv_put_mean_latency ](https://github.com/netdata/netdata/blob/master/src/health/health.d/riakkv.conf) | riak.kv.latency.put | Average time between reception of client PUT request and subsequent response to the client over the last hour |
+| [ riakkv_kv_put_slow ](https://github.com/netdata/netdata/blob/master/src/health/health.d/riakkv.conf) | riak.kv.latency.put | Average time between reception of client PUT request and subsequent response to the client over the last 3 minutes, compared to the average over the last hour |
+| [ riakkv_vm_high_process_count ](https://github.com/netdata/netdata/blob/master/src/health/health.d/riakkv.conf) | riak.vm.processes.count | Number of processes running in the Erlang VM |
 
 
 
@@ -253,15 +263,15 @@ Metrics:
 | riak.search.latency.index | Time it takes Search to index a new document | median, min, 95, 99, 999, max | ms |
 | riak.consistent.latency.get | Strongly consistent read latency | mean, median, 95, 99, 100 | ms |
 | riak.consistent.latency.put | Strongly consistent write latency | mean, median, 95, 99, 100 | ms |
-| riak.vm | Total processes running in the Erlang VM | processes | total |
-| riak.vm.memory.processes | Memory allocated &amp; used by Erlang processes | allocated, used | MB |
-| riak.kv.siblings_encountered.get | Number of siblings encountered during GET operations by this node during the past minute | mean, median, 95, 99, 100 | siblings |
-| riak.kv.objsize.get | Object size encountered by this node during the past minute | mean, median, 95, 99, 100 | KB |
-| riak.search.vnodeq_size | Number of unprocessed messages in the vnode message queues of Search on this node in the past minute | mean, median, 95, 99, 100 | messages |
-| riak.search.index | Errors encountered by Search | index_fail, bad_entry, extract_fail | errors |
+| riak.vm.processes.count | Total processes running in the Erlang VM | processes | processes |
+| riak.vm.processes.memory | Memory allocated &amp; used by Erlang processes | allocated, used | bytes |
+| riak.kv.siblings_encountered.get | Siblings encountered during GET operations by this node during the past minute | mean, median, 95, 99, 100 | siblings |
+| riak.kv.objsize.get | Object size encountered by this node during the past minute | mean, median, 95, 99, 100 | bytes |
+| riak.search.vnodeq_size | Unprocessed messages in the vnode message queues of Search in the past minute | mean, median, 95, 99, 100 | messages |
+| riak.search.index.errors | Errors encountered by Search | index_fail, bad_entry, extract_fail | errors |
 | riak.core.protobuf_connections | Protocol buffer connections by status | active | connections |
 | riak.core.repairs | Number of repair operations this node has coordinated | read | repairs |
-| riak.core.fsm_active | Active finite state machines by kind | get, put, secondary index, list keys | fsms |
+| riak.core.fsm_active | Active finite state machines by kind | get, put, secondary_index, list_keys | fsms |
 | riak.core.fsm_rejected | Finite state machines being rejected by Sidejobs overload protection | get, put | fsms |
 
 

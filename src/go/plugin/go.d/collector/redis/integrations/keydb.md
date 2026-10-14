@@ -241,10 +241,10 @@ The following alerts are available:
 
 | Alert name  | On metric | Description |
 |:------------|:----------|:------------|
-| [ redis_connections_rejected ](https://github.com/netdata/netdata/blob/master/src/health/health.d/redis.conf) | redis.connections | connections rejected because of maxclients limit in the last minute |
-| [ redis_bgsave_slow ](https://github.com/netdata/netdata/blob/master/src/health/health.d/redis.conf) | redis.bgsave_now | duration of the on-going RDB save operation |
-| [ redis_bgsave_broken ](https://github.com/netdata/netdata/blob/master/src/health/health.d/redis.conf) | redis.bgsave_health | status of the last RDB save operation (0: ok, 1: error) |
-| [ redis_master_link_down ](https://github.com/netdata/netdata/blob/master/src/health/health.d/redis.conf) | redis.master_link_down_since_time | time elapsed since the link between master and slave is down |
+| [ redis_connections_rejected ](https://github.com/netdata/netdata/blob/master/src/health/health.d/redis.conf) | redis.connections | Connections rejected because of maxclients limit in the last minute |
+| [ redis_bgsave_broken ](https://github.com/netdata/netdata/blob/master/src/health/health.d/redis.conf) | redis.bgsave_health | Status of the last RDB save operation (0: ok, 1: error) |
+| [ redis_bgsave_slow ](https://github.com/netdata/netdata/blob/master/src/health/health.d/redis.conf) | redis.bgsave_now | Duration of the on-going RDB save operation |
+| [ redis_master_link_down ](https://github.com/netdata/netdata/blob/master/src/health/health.d/redis.conf) | redis.master_link_down_since_time | Time elapsed since the link between master and slave is down |
 
 
 

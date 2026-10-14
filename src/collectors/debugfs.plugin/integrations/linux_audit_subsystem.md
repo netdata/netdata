@@ -117,8 +117,8 @@ The following alerts are available:
 
 | Alert name  | On metric | Description |
 |:------------|:----------|:------------|
-| [ audit_backlog_utilization ](https://github.com/netdata/netdata/blob/master/src/health/health.d/audit.conf) | audit.backlog_utilization | Linux audit backlog utilization has exceeded the warning threshold while failure mode is set to panic. Kernel panic is imminent if backlog overflows. |
-| [ audit_lost_events ](https://github.com/netdata/netdata/blob/master/src/health/health.d/audit.conf) | audit.lost | Linux audit subsystem is losing events (backlog overflow, rate limiting, or memory pressure). |
+| [ audit_backlog_utilization ](https://github.com/netdata/netdata/blob/master/src/health/health.d/audit.conf) | audit.backlog_utilization | Linux audit backlog is filling up while failure mode is set to panic — kernel panic is imminent if backlog overflows |
+| [ audit_lost_events ](https://github.com/netdata/netdata/blob/master/src/health/health.d/audit.conf) | audit.lost | Linux audit subsystem is losing events (backlog overflow, rate limiting, or memory pressure) |
 
 
 

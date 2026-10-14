@@ -120,7 +120,21 @@ There are no configuration examples.
 
 ## Alerts
 
-There are no alerts configured by default for this integration.
+
+The following alerts are available:
+
+| Alert name  | On metric | Description |
+|:------------|:----------|:------------|
+| [ fortigate_hw_sensor_alarm ](https://github.com/netdata/netdata/blob/master/src/health/health.d/snmp_fortigate.conf) | snmp.device_prof_fgHwSensorEntAlarmStatus | Hardware sensor ${label:sensor_name} on FortiGate device has triggered an alarm |
+| [ fortigate_ha_node_out_of_sync ](https://github.com/netdata/netdata/blob/master/src/health/health.d/snmp_fortigate.conf) | snmp.device_prof_fgHaStatsSyncStatus | FortiGate HA cluster member ${label:ha_node_hostname} (${label:ha_node_serial}) is out of sync |
+| [ fortigate_ha_node_cpu_high ](https://github.com/netdata/netdata/blob/master/src/health/health.d/snmp_fortigate.conf) | snmp.device_prof_fgHaStatsCpuUsage | CPU utilization on FortiGate HA cluster member ${label:ha_node_hostname} is high |
+| [ fortigate_ha_node_memory_high ](https://github.com/netdata/netdata/blob/master/src/health/health.d/snmp_fortigate.conf) | snmp.device_prof_fgHaStatsMemUsage | Memory utilization on FortiGate HA cluster member ${label:ha_node_hostname} is high |
+| [ fortigate_sdwan_link_dead ](https://github.com/netdata/netdata/blob/master/src/health/health.d/snmp_fortigate.conf) | snmp.device_prof_fgVWLHealthCheckLinkState | SD-WAN health-check ${label:sdwan_healthcheck} on interface ${label:sdwan_interface} reports link is dead |
+| [ fortigate_sdwan_link_latency_high ](https://github.com/netdata/netdata/blob/master/src/health/health.d/snmp_fortigate.conf) | snmp.device_prof_fgVWLHealthCheckLinkLatency | SD-WAN health-check ${label:sdwan_healthcheck} on interface ${label:sdwan_interface} has high latency |
+| [ fortigate_sdwan_link_packet_loss ](https://github.com/netdata/netdata/blob/master/src/health/health.d/snmp_fortigate.conf) | snmp.device_prof_fgVWLHealthCheckLinkPacketLoss | SD-WAN health-check ${label:sdwan_healthcheck} on interface ${label:sdwan_interface} has high packet loss |
+| [ fortigate_ips_critical_events ](https://github.com/netdata/netdata/blob/master/src/health/health.d/snmp_fortigate.conf) | snmp.device_prof_fgIpsSeverity | Critical severity intrusions detected on FortiGate VDOM ${label:vdom_name} |
+| [ fortigate_link_monitor_dead ](https://github.com/netdata/netdata/blob/master/src/health/health.d/snmp_fortigate.conf) | snmp.device_prof_fgLinkMonitorState | Link monitor ${label:link_monitor} reports gateway probe is dead |
+| [ fortigate_wireless_ap_offline ](https://github.com/netdata/netdata/blob/master/src/health/health.d/snmp_fortigate.conf) | snmp.device_prof_fgWcWtpSessionConnectionState | Wireless access point ${label:wtp_id} (model ${label:wtp_model}) is not online |
 
 
 

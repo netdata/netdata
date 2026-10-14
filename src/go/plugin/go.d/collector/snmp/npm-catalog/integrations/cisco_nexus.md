@@ -120,7 +120,18 @@ There are no configuration examples.
 
 ## Alerts
 
-There are no alerts configured by default for this integration.
+
+The following alerts are available:
+
+| Alert name  | On metric | Description |
+|:------------|:----------|:------------|
+| [ snmp_cisco_nexus_vpc_peer_keepalive ](https://github.com/netdata/netdata/blob/master/src/health/health.d/snmp_cisco_nexus.conf) | snmp.device_prof_cVpcPeerKeepAliveStatus | vPC peer-keepalive link is not in 'alive' state on domain ${label:vpc_domain_id} |
+| [ snmp_cisco_nexus_vpc_dual_active ](https://github.com/netdata/netdata/blob/master/src/health/health.d/snmp_cisco_nexus.conf) | snmp.device_prof_cVpcDualActiveDetectionStatus | vPC dual-active condition detected on domain ${label:vpc_domain_id} — both switches may be forwarding independently, risking loops |
+| [ snmp_cisco_nexus_vpc_member_consistency ](https://github.com/netdata/netdata/blob/master/src/health/health.d/snmp_cisco_nexus.conf) | snmp.device_prof_cVpcStatusHostLinkConsistencyStatus | vPC member ${label:vpc_id} on domain ${label:vpc_domain_id} has a configuration consistency check failure |
+| [ snmp_cisco_nexus_hsrp_not_active_standby ](https://github.com/netdata/netdata/blob/master/src/health/health.d/snmp_cisco_nexus.conf) | snmp.device_prof_cHsrpGrpStandbyState | HSRP group ${label:hsrp_group} on ${label:interface} is not in active or standby state |
+| [ snmp_cisco_nexus_bfd_session_down ](https://github.com/netdata/netdata/blob/master/src/health/health.d/snmp_cisco_nexus.conf) | snmp.device_prof_ciscoBfdSessState | BFD session ${label:bfd_session_index} is in 'down' state — sub-second failure detection triggered |
+| [ snmp_cisco_nexus_ntp_not_synchronized ](https://github.com/netdata/netdata/blob/master/src/health/health.d/snmp_cisco_nexus.conf) | snmp.device_prof_cntpSysSrvStatus | Cisco NTP service is not synchronized to any reference clock or remote server |
+| [ snmp_cisco_nexus_feature_enabled_not_running ](https://github.com/netdata/netdata/blob/master/src/health/health.d/snmp_cisco_nexus.conf) | snmp.device_prof_cfcFeatureCtrlOpStatus2 | NX-OS feature '${label:feature_name}' is enabled but not running — the feature process may have crashed |
 
 
 

@@ -256,11 +256,11 @@ The following alerts are available:
 
 | Alert name  | On metric | Description |
 |:------------|:----------|:------------|
-| [ elasticsearch_node_indices_search_time_query ](https://github.com/netdata/netdata/blob/master/src/health/health.d/elasticsearch.conf) | elasticsearch.node_indices_search_time | search performance is degraded, queries run slowly. |
-| [ elasticsearch_node_indices_search_time_fetch ](https://github.com/netdata/netdata/blob/master/src/health/health.d/elasticsearch.conf) | elasticsearch.node_indices_search_time | search performance is degraded, fetches run slowly. |
-| [ elasticsearch_cluster_health_status_red ](https://github.com/netdata/netdata/blob/master/src/health/health.d/elasticsearch.conf) | elasticsearch.cluster_health_status | cluster health status is red. |
-| [ elasticsearch_cluster_health_status_yellow ](https://github.com/netdata/netdata/blob/master/src/health/health.d/elasticsearch.conf) | elasticsearch.cluster_health_status | cluster health status is yellow. |
-| [ elasticsearch_node_index_health_red ](https://github.com/netdata/netdata/blob/master/src/health/health.d/elasticsearch.conf) | elasticsearch.node_index_health | node index $label:index health status is red. |
+| [ elasticsearch_cluster_health_status_red ](https://github.com/netdata/netdata/blob/master/src/health/health.d/elasticsearch.conf) | elasticsearch.cluster_health_status | Elasticsearch cluster ${label:cluster_name} health status is red. |
+| [ elasticsearch_cluster_health_status_yellow ](https://github.com/netdata/netdata/blob/master/src/health/health.d/elasticsearch.conf) | elasticsearch.cluster_health_status | Elasticsearch cluster ${label:cluster_name} health status is yellow. |
+| [ elasticsearch_node_index_health_red ](https://github.com/netdata/netdata/blob/master/src/health/health.d/elasticsearch.conf) | elasticsearch.node_index_health | Elasticsearch cluster ${label:cluster_name} index ${label:index} health status is red. |
+| [ elasticsearch_node_indices_search_time_query ](https://github.com/netdata/netdata/blob/master/src/health/health.d/elasticsearch.conf) | elasticsearch.node_indices_search_time | Elasticsearch cluster ${label:cluster_name} node ${label:node_name} search performance is degraded, queries run slowly. |
+| [ elasticsearch_node_indices_search_time_fetch ](https://github.com/netdata/netdata/blob/master/src/health/health.d/elasticsearch.conf) | elasticsearch.node_indices_search_time | Elasticsearch cluster ${label:cluster_name} node ${label:node_name} search performance is degraded, fetches run slowly. |
 
 
 

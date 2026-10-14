@@ -177,7 +177,7 @@ The following alerts are available:
 
 | Alert name  | On metric | Description |
 |:------------|:----------|:------------|
-| [ dnsmasq_dhcp_dhcp_range_utilization ](https://github.com/netdata/netdata/blob/master/src/health/health.d/dnsmasq_dhcp.conf) | dnsmasq_dhcp.dhcp_range_utilization | DHCP range utilization |
+| [ dnsmasq_dhcp_dhcp_range_utilization ](https://github.com/netdata/netdata/blob/master/src/health/health.d/dnsmasq_dhcp.conf) | dnsmasq_dhcp.dhcp_range_utilization | DHCP range ${label:dhcp_range} utilization |
 
 
 

@@ -189,12 +189,12 @@ The following alerts are available:
 
 | Alert name  | On metric | Description |
 |:------------|:----------|:------------|
-| [ panos_bgp_peer_not_established ](https://github.com/netdata/netdata/blob/master/src/health/health.d/panos.conf) | panos.bgp.peer.state | Critical when a BGP peer has not been established for 5 minutes. |
-| [ panos_device_certificate_invalid ](https://github.com/netdata/netdata/blob/master/src/health/health.d/panos.conf) | panos.system.device_certificate_status | Critical when PAN-OS reports the device certificate as invalid. |
-| [ panos_ha_peer_connection_down ](https://github.com/netdata/netdata/blob/master/src/health/health.d/panos.conf) | panos.ha.peer.connection_status | Critical when the HA peer connection has not been up for 5 minutes. |
-| [ panos_environment_sensor_alarm ](https://github.com/netdata/netdata/blob/master/src/health/health.d/panos.conf) | panos.environment.sensor_alarm_status | Critical when PAN-OS reports an environment sensor alarm. |
-| [ panos_license_expired ](https://github.com/netdata/netdata/blob/master/src/health/health.d/panos.conf) | panos.license.status | Critical when PAN-OS reports a license as expired. |
-| [ panos_license_expires_soon ](https://github.com/netdata/netdata/blob/master/src/health/health.d/panos.conf) | panos.license.time_until_expiration | Warning under 30 days before expiration, critical under 7 days. Expired licenses trigger panos_license_expired instead. |
+| [ panos_bgp_peer_not_established ](https://github.com/netdata/netdata/blob/master/src/health/health.d/panos.conf) | panos.bgp.peer.state | BGP peer ${label:peer_address} in virtual router or logical router ${label:vr} has not been established for the last 5 minutes |
+| [ panos_device_certificate_invalid ](https://github.com/netdata/netdata/blob/master/src/health/health.d/panos.conf) | panos.system.device_certificate_status | PAN-OS reports the device certificate status as invalid |
+| [ panos_ha_peer_connection_down ](https://github.com/netdata/netdata/blob/master/src/health/health.d/panos.conf) | panos.ha.peer.connection_status | PAN-OS HA peer connection has not been up for the last 5 minutes |
+| [ panos_environment_sensor_alarm ](https://github.com/netdata/netdata/blob/master/src/health/health.d/panos.conf) | panos.environment.sensor_alarm_status | PAN-OS reports an environment alarm for ${label:sensor_type} sensor ${label:sensor} in slot ${label:slot} |
+| [ panos_license_expired ](https://github.com/netdata/netdata/blob/master/src/health/health.d/panos.conf) | panos.license.status | PAN-OS reports license ${label:feature} as expired |
+| [ panos_license_expires_soon ](https://github.com/netdata/netdata/blob/master/src/health/health.d/panos.conf) | panos.license.time_until_expiration | PAN-OS license ${label:feature} has less than 30 days before expiration; expired licenses trigger panos_license_expired |
 
 
 
