@@ -39,8 +39,14 @@ use file_lifecycle::ipc::{CleanerRequest, CleanerResponse, UploaderRequest, Uplo
 use file_lifecycle::remote_read::RemoteRead;
 use file_lifecycle::storage::OpendalStorage;
 
-use super::pipeline::CHUNK_MIN_ENTRIES;
 use super::rpc::OtelTracesHandler;
+
+/// Minimum spans per chunk when indexing an active traces WAL's prefix at
+/// query time. Every query decodes the un-chunked tail (up to this many
+/// spans) from scratch, at roughly 12 µs per span, so the threshold bounds
+/// that per-request cost; the price is more, smaller chunks, each built
+/// once and cached.
+const TRACES_CHUNK_MIN_ENTRIES: u64 = 4_096;
 
 /// Build the traces pipeline: spawn the shared [`Indexer`] with the traces
 /// seal, then delegate to [`super::pipeline::build_pipeline`] with a closure
@@ -90,7 +96,7 @@ pub(crate) async fn build_traces_pipeline(
         pipeline_tx,
         move |registries| {
             let traces_handler =
-                OtelTracesHandler::new(registries, chunk_cache, CHUNK_MIN_ENTRIES, remote);
+                OtelTracesHandler::new(registries, chunk_cache, TRACES_CHUNK_MIN_ENTRIES, remote);
             let handler: Arc<dyn RawFunctionHandler> =
                 Arc::new(HandlerAdapter::new(traces_handler));
             // The traces-own GET shim: the literal `info` token →

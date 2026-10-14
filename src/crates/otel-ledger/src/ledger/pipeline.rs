@@ -48,10 +48,9 @@ use file_lifecycle::storage::OpendalStorage;
 use super::OtelLogsHandler;
 use file_lifecycle::remote_read::RemoteRead;
 
-/// Minimum records per chunk when indexing an active WAL's prefix at
-/// query time. Shared by the logs and traces handlers (the traces pipeline
-/// imports it). A fixed default for now; tuning is deferred with the rest
-/// of cache governance.
+/// Minimum records per chunk when indexing an active logs WAL's prefix at
+/// query time (traces use their own, `TRACES_CHUNK_MIN_ENTRIES`). A fixed
+/// default for now; tuning is deferred with the rest of cache governance.
 pub(crate) const CHUNK_MIN_ENTRIES: u64 = 16_384;
 /// Maximum time startup waits on remote object storage (LIST/stat
 /// reconciliation) per tenant before proceeding to Ready. A slow/unreachable

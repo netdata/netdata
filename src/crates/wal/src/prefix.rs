@@ -38,7 +38,8 @@
 //!
 //! `otel-ledger` (`rpc/logs/handler.rs`, `rpc/traces/sources.rs`):
 //! per-query chunk + tail planning, `min_entries` wired from its
-//! `CHUNK_MIN_ENTRIES` (16_384, a fixed default today). `sfsq`
+//! `CHUNK_MIN_ENTRIES` (16_384, logs) and `TRACES_CHUNK_MIN_ENTRIES`
+//! (4_096, traces) — fixed defaults today. `sfsq`
 //! (`tests/ng_wal_equivalence.rs`): partitions fixtures with this rule
 //! — `u64::MAX` for the all-tail shape, small thresholds for the
 //! chunk + tail merge path — and asserts chunk + tail serving equals
@@ -104,8 +105,8 @@ pub fn chunk_boundaries(
     min_entries: u64,
 ) -> Vec<ChunkBoundary> {
     // `min_entries == 0` would make every frame its own chunk —
-    // degenerate, and contrary to the >=16K design intent (the ledger
-    // wires `CHUNK_MIN_ENTRIES` = 16_384). The threshold is
+    // degenerate, and contrary to the design intent (the ledger wires
+    // thousands: 16_384 for logs, 4_096 for traces). The threshold is
     // caller-supplied, so guard it in debug rather than at runtime
     // cost.
     debug_assert!(min_entries > 0, "min_entries must be positive");
