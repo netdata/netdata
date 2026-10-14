@@ -139,6 +139,19 @@
 - Test(go): stabilize IPMI and Jetson lifecycle tests ([#24283](https://github.com/netdata/netdata/issues/24283))
 - Fix(go.d/jetson): qualify sensor temperature metric ([#24281](https://github.com/netdata/netdata/issues/24281))
 - Regenerate integrations docs ([#24282](https://github.com/netdata/netdata/issues/24282))
+- Feat(daemon): refresh system information periodically ([#24222](https://github.com/netdata/netdata/issues/24222))
+- Add metrics to IIS (windows.plugin) ([#24157](https://github.com/netdata/netdata/issues/24157))
+- Regenerate integrations docs ([#24291](https://github.com/netdata/netdata/issues/24291))
+- Feat(integrations): export stock health alerts and validate metadata alert rows ([#24292](https://github.com/netdata/netdata/issues/24292))
+- Test(scripts.d): fix dynamic check lifecycle flakes ([#24288](https://github.com/netdata/netdata/issues/24288))
+- Regenerate integrations docs ([#24295](https://github.com/netdata/netdata/issues/24295))
+- Bump version of vendored IBM MQ libraries to 9.4.5.1. ([#24294](https://github.com/netdata/netdata/issues/24294))
+- Fix(system-info): size FreeBSD disks from GEOM instead of df ([#24287](https://github.com/netdata/netdata/issues/24287))
+- Contexts: stop walking all contexts when an exact scope context misses ([#24239](https://github.com/netdata/netdata/issues/24239))
+- Health: check the chart selector before the host in prototype matching ([#24241](https://github.com/netdata/netdata/issues/24241))
+- Sqlite: fix metadata cleanup stalls and lost context checks ([#24227](https://github.com/netdata/netdata/issues/24227))
+- Sqlite: fix four health persistence bugs ([#24223](https://github.com/netdata/netdata/issues/24223))
+- Aclk: deliver alert transitions to the cloud exactly as recorded ([#24224](https://github.com/netdata/netdata/issues/24224))
 
 ## [2.12.0] - 2026-09-30
 
