@@ -724,7 +724,8 @@ fn a_trace_over_the_byte_budget_keeps_its_earliest_spans() {
     assert_eq!((&r.roots, &r.children), (&roots, &children));
     assert_eq!(r.field_kinds.fields.len(), kept);
     let spans_bytes: usize = r.spans.iter().map(json_len).sum();
-    assert!(spans_bytes <= TRACE_SPANS_MAX_BYTES);
+    let kinds_bytes: usize = r.field_kinds.fields.iter().map(|e| json_len(e) + 1).sum();
+    assert!(spans_bytes + kinds_bytes <= TRACE_SPANS_MAX_BYTES);
     let v = serde_json::to_value(&r).unwrap();
     assert_eq!(v["status"], json!({"partial": ["byte_budget"]}));
 }

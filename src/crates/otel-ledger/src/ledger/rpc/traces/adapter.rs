@@ -101,8 +101,9 @@ pub(crate) fn completion_capture_range(window: &std::ops::Range<u32>) -> std::op
 /// stops a pathological value from dominating the response.
 pub(crate) const TRACE_VALUE_MAX_BYTES: usize = 8 * 1024;
 
-/// Budget for a trace's spans, in compact JSON bytes. Past it the
-/// response keeps the earliest spans and reports `byte_budget`.
+/// Budget for a trace's spans and their field kinds, in compact JSON
+/// bytes. Past it the response keeps the earliest spans and reports
+/// `byte_budget`.
 pub(crate) const TRACE_SPANS_MAX_BYTES: usize = 2 * 1024 * 1024;
 
 /// Per-value cap, in JSON bytes (see [`truncate_value`]), on the
@@ -211,14 +212,19 @@ pub(crate) fn to_trace_result(
     let mut field_kinds = data.field_kinds;
     let truncated: Vec<bool> = t.spans.iter_mut().map(cap_span_values).collect();
     let mut spans = Vec::with_capacity(t.spans.len());
-    let mut bytes = 0usize;
-    for (s, &cut) in t.spans.iter().zip(&truncated) {
-        let wire = span_wire(s, cut);
-        bytes += json_len(&wire);
-        if bytes > TRACE_SPANS_MAX_BYTES {
-            break;
+    {
+        // A name's kind entry is sent once: it counts with the first kept
+        // span that carries the name.
+        let mut kinds = KindCosts::new(&field_kinds);
+        let mut bytes = 0usize;
+        for (s, &cut) in t.spans.iter().zip(&truncated) {
+            let wire = span_wire(s, cut);
+            bytes += json_len(&wire) + kinds.first_seen_in(s);
+            if bytes > TRACE_SPANS_MAX_BYTES {
+                break;
+            }
+            spans.push(wire);
         }
-        spans.push(wire);
     }
     if spans.len() < t.spans.len() {
         t.spans.truncate(spans.len());
@@ -243,6 +249,52 @@ pub(crate) fn to_trace_result(
         children: t.children,
         spans,
         field_kinds: field_kinds_wire(field_kinds),
+    }
+}
+
+/// The wire cost of each name's field-kind entry, charged once, the
+/// first time a span carries the name.
+struct KindCosts<'a> {
+    sections: [HashMap<&'a str, sfst::ValueKind>; 3],
+}
+
+impl<'a> KindCosts<'a> {
+    fn new(kinds: &'a FieldKinds) -> Self {
+        let index = |v: &'a [(String, sfst::ValueKind)]| -> HashMap<&'a str, sfst::ValueKind> {
+            v.iter().map(|(n, k)| (n.as_str(), *k)).collect()
+        };
+        Self {
+            sections: [
+                index(&kinds.fields),
+                index(&kinds.event_attributes),
+                index(&kinds.link_attributes),
+            ],
+        }
+    }
+
+    /// Bytes of the kind entries `span` brings in first.
+    fn first_seen_in(&mut self, span: &sfst::TraceSpan) -> usize {
+        let [fields, events, links] = &mut self.sections;
+        let mut cost = 0;
+        let mut charge = |section: &mut HashMap<&'a str, sfst::ValueKind>, name: &str| {
+            if let Some(kind) = section.remove(name) {
+                cost += json_len(&(name, kind_word(kind))) + 1;
+            }
+        };
+        for (name, _) in &span.fields {
+            charge(fields, name);
+        }
+        for e in &span.events {
+            for (name, _) in &e.attributes {
+                charge(events, name);
+            }
+        }
+        for l in &span.links {
+            for (name, _) in &l.attributes {
+                charge(links, name);
+            }
+        }
+        cost
     }
 }
 
