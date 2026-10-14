@@ -425,7 +425,7 @@ impl OtelTracesHandler {
         let aggregate_query = aggregate_grid.map(|(grid, ..)| {
             let query = OverviewQuery::new(grid);
             match aggregate_predicate {
-                Some(predicate) => query.predicate(predicate),
+                Some(predicate) => query.tokens(predicate),
                 None => query,
             }
         });

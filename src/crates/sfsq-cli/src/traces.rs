@@ -640,7 +640,7 @@ pub fn run_overview(args: &OverviewArgs, out: &mut dyn std::io::Write) -> Result
             .iter()
             .map(|spec| parse_condition(spec))
             .collect::<Result<_>>()?;
-        query = query.predicate(Predicate { conditions });
+        query = query.tokens(Predicate { conditions });
     }
     let sources = build_sources(&args.sfsts, &args.wals)?;
     let data = overview(

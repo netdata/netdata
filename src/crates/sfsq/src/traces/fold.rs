@@ -23,7 +23,7 @@
 //!   source may overshoot by its whole cost; the caller names the
 //!   reason. The budget bounds WORK, not memory (the map peaks at the
 //!   processed prefix's distinct traces).
-//! - The optional span filter ([`SpanFilter`]): its scans and
+//! - The optional token filter ([`TokenFilter`]): its scans and
 //!   emissions are charged to the SAME ceiling as the fold, its
 //!   dictionary walks to the caller's dictionary-bytes ceiling, and a
 //!   refused or truncated filter scan stops the merge with the
@@ -43,10 +43,11 @@ use std::sync::atomic::{AtomicUsize, Ordering};
 
 use tokio_util::sync::CancellationToken;
 
-use super::predicate::{EvalPredicate, Predicate};
+use super::predicate::{SpanToken, TokenKind, TokenQuery, TraceIdConstraints, TraceLevelEval};
 use super::rollup::{TraceAggregate, sealed_trace_envelopes, tail_trace_aggregates};
 use super::sources::TraceSource;
 use super::status::{PartialReason, StatusBuilder};
+use super::vocab::{BuiltinField, resource_service_field, span_field};
 use super::wal_scan::TraceWalScan;
 use super::window::TimeWindow;
 use crate::source::map_source;
@@ -64,13 +65,11 @@ pub(crate) struct SourceFoldSpec {
     pub dict_ceiling: u64,
     /// The caller's own ceiling reason (each op names its own).
     pub ceiling_reason: PartialReason,
-    /// Optional span-level filter (the overview's filtered grid): when
-    /// set, every source is ALSO scanned for spans matching it and the
-    /// traces owning a match are flagged [`MergedTrace::matched`] —
-    /// the caller bins the flagged traces only. Without a filter every
-    /// merged trace is flagged, so a filter-agnostic caller reads the
-    /// flag unconditionally.
-    pub filter: Option<SpanFilter>,
+    /// Optional token filter (the overview's filtered grid): when set,
+    /// every source is ALSO scanned for its tokens and each merged trace
+    /// carries their bits ([`MergedTrace::mask`]) — the caller bins the
+    /// traces the filter passes.
+    pub filter: Option<TokenFilter>,
 }
 
 /// One trace's cross-source merge: envelopes widen, stored-row
@@ -80,45 +79,147 @@ pub(crate) struct MergedTrace {
     pub max_end_ns: i64,
     pub span_count: u64,
     pub error_count: u64,
-    /// Whether some STORED row of this trace matched the spec's
-    /// [`SpanFilter`] (always `true` without one). Stored-row
-    /// semantics, like every number here: a resend that matches flags
-    /// the trace even when its canonical copy would not.
-    pub matched: bool,
+    /// The spec's [`TokenFilter`] bits this trace's stored rows and
+    /// recorded roots set (stored-row semantics, like every number
+    /// here: a resend that matches sets a bit even when its canonical
+    /// copy would not).
+    pub mask: u32,
+    /// A source holding this trace failed its filter scan, so its bits
+    /// are not all known: the trace cannot pass a negated token.
+    pub unknown: bool,
 }
 
-/// The span-level half of a predicate, compiled once for the whole
-/// merge: the neutral per-file plan for sealed sources (the search
-/// engine's phase-1 substrate) and the span-side evaluator for tails,
-/// both lowered from the SAME plan so the two source shapes cannot
-/// disagree. Matches are confined to spans STARTING in `window` — the
-/// search engine's rule — so the selected population is the search
-/// list's, up to the overview's bin-by-envelope-start clipping (its
-/// module docs; it passes its grid span as the filter window).
-pub(crate) struct SpanFilter {
-    plan: TracePlan,
-    eval: EvalPredicate,
+/// The overview's token filter (its module docs), lowered once for the
+/// whole merge: one bit per span-local or root token (its index in the
+/// query). Span-local tokens set their bit from the stored rows STARTING
+/// in `window` — the search engine's rule — through the per-file plans
+/// for sealed sources and the span-side evaluator for tails, one
+/// lowering each so the two source shapes cannot disagree. Root tokens
+/// set theirs from each source's recorded true root: a sealed file's
+/// rollup claim, a tail's earliest unset-parent span. A merged trace
+/// passes when every positive bit is set, no negated bit is (nor any bit
+/// left unknown by a failed source) and its id passes the `trace_id`
+/// tokens.
+pub(crate) struct TokenFilter {
+    span: Vec<(u32, SpanToken)>,
+    plans: Vec<TracePlan>,
+    roots: Vec<(u32, TraceLevelEval)>,
+    required: u32,
+    forbidden: u32,
+    trace_ids: TraceIdConstraints,
     window: TimeWindow,
 }
 
-impl SpanFilter {
-    /// `span_local` must be validated, evaluable and span-local
-    /// (partitioned by the caller) — the search engine's precondition
-    /// for the same lowering.
-    pub(crate) fn new(span_local: &Predicate, window: TimeWindow) -> Self {
-        let plan = span_local.to_trace_plan();
-        let eval = EvalPredicate::new(&plan);
-        Self { plan, eval, window }
+impl TokenFilter {
+    /// `tokens` must be validated and hold no trace-duration token (the
+    /// caller's axis); `None` when no token filters anything.
+    pub(crate) fn new(tokens: &TokenQuery, window: TimeWindow) -> Option<Self> {
+        if tokens.tokens.is_empty() {
+            return None;
+        }
+        let mut filter = Self {
+            span: Vec::new(),
+            plans: Vec::new(),
+            roots: Vec::new(),
+            required: 0,
+            forbidden: 0,
+            trace_ids: TraceIdConstraints::default(),
+            window,
+        };
+        for (i, token) in tokens.tokens.iter().enumerate() {
+            let bit = 1u32 << i;
+            match token.kind() {
+                TokenKind::SpanLocal => {
+                    let lowered = SpanToken::new(&token.group);
+                    filter.plans.push(lowered.plan.clone());
+                    filter.span.push((bit, lowered));
+                }
+                TokenKind::TraceLevel => {
+                    filter.roots.push((bit, TraceLevelEval::new(&token.group)));
+                }
+                TokenKind::TraceId => {
+                    filter.trace_ids.add_token(token);
+                    continue;
+                }
+            }
+            if token.negated {
+                filter.forbidden |= bit;
+            } else {
+                filter.required |= bit;
+            }
+        }
+        Some(filter)
     }
 
-    /// Flag the traces of `reader` that own a matched in-window row.
-    /// Returns `Ok(false)` when the budget refused the work (the
-    /// compile's stream-batch scan or dictionary walks, or the
-    /// extraction, would cross `limits`): the caller reports its ceiling
-    /// reason and stops, so a half-flagged file never poses as a
-    /// complete answer. Emission, scanned rows and walked dictionary
-    /// bytes are charged to `work`.
+    /// Whether a merged trace passes (the type docs).
+    pub(crate) fn passes(&self, trace_id: sfst::TraceId, m: &MergedTrace) -> bool {
+        m.mask & self.required == self.required
+            && m.mask & self.forbidden == 0
+            && !(m.unknown && self.forbidden != 0)
+            && self.trace_ids.admits(trace_id)
+    }
+
+    /// Set the bits of `reader`'s traces: span-local tokens from its
+    /// matched in-window rows, root tokens from its rollup's true-root
+    /// claims. Returns `Ok(false)` when the budget refused the work (a
+    /// compile's stream-batch scan or dictionary walks, an extraction,
+    /// or the claims would cross `limits`): the caller reports its
+    /// ceiling reason and stops, so a half-marked file never poses as a
+    /// complete answer. Emission, scanned rows, claims and walked
+    /// dictionary bytes are charged to `work`.
     fn mark_sealed(
+        &self,
+        reader: &sfst::IndexReader<'_>,
+        rollup: &sfst::TraceRollup,
+        merged: &mut HashMap<sfst::TraceId, MergedTrace>,
+        work: &mut ScanWork,
+        limits: sfst::ScanLimits,
+    ) -> Result<bool, sfst::Error> {
+        if !self.span.is_empty() && !self.mark_sealed_rows(reader, merged, work, limits)? {
+            return Ok(false);
+        }
+        if self.roots.is_empty() {
+            return Ok(true);
+        }
+        let name_field = BuiltinField::Name
+            .dictionary_field()
+            .expect("Name is dictionary-backed");
+        let service_field = resource_service_field();
+        let mut resolver = sfst::RollupRootResolver::new();
+        for i in 0..rollup.len() {
+            let row = rollup.row_at(i);
+            if row.root_claim != sfst::ROOT_CLAIM_TRUE {
+                continue; // no root, or one of unknown value: no root bit
+            }
+            work.rows_visited += 1;
+            if work.rows_visited > limits.rows {
+                return Ok(false);
+            }
+            let mut resolve = |field: &str, kv_ref: u32| -> Result<Option<String>, sfst::Error> {
+                if kv_ref == sfst::ROLLUP_NO_REF {
+                    return Ok(None);
+                }
+                match resolver.resolve(reader, field, kv_ref) {
+                    sfst::RollupRefOutcome::Value(v) => Ok(Some(v.to_string())),
+                    sfst::RollupRefOutcome::Corrupt => Err(sfst::Error::CorruptIndex(
+                        "trace rollup root ref resolves to no value".into(),
+                    )),
+                }
+            };
+            let name = resolve(name_field, row.root_name_ref)?;
+            let service = resolve(&service_field, row.root_service_ref)?;
+            let bits = self.root_bits(name.as_deref(), service.as_deref());
+            if bits != 0
+                && let Some(m) = merged.get_mut(&rollup.trace_ids.get(i))
+            {
+                m.mask |= bits;
+            }
+        }
+        Ok(true)
+    }
+
+    /// The span-local half of [`mark_sealed`](Self::mark_sealed).
+    fn mark_sealed_rows(
         &self,
         reader: &sfst::IndexReader<'_>,
         merged: &mut HashMap<sfst::TraceId, MergedTrace>,
@@ -128,7 +229,7 @@ impl SpanFilter {
         let total = reader.summary().record_count;
         let timestamps = reader.load_timestamps()?;
         let (lo, hi) = timestamps.window(self.window.range_ns());
-        // No rows of this file start in the window: nothing to flag,
+        // No rows of this file start in the window: nothing to mark,
         // no budget spent.
         if lo >= hi {
             return Ok(true);
@@ -136,7 +237,7 @@ impl SpanFilter {
         let trace_ids = reader.trace_ids()?;
         // The position algebra below indexes both columns against
         // record_count — disagreeing lengths are corruption; refuse
-        // rather than flag by position.
+        // rather than mark by position.
         if trace_ids.len() != total as usize || timestamps.len() != total as usize {
             return Err(sfst::Error::CorruptIndex(format!(
                 "trace overview filter: column lengths {}/{} disagree with record_count {total}",
@@ -144,34 +245,36 @@ impl SpanFilter {
                 timestamps.len(),
             )));
         }
-        let Some(compiled) = reader.compile_trace_plan(&self.plan, (lo, hi), limits, work)? else {
+        let Some(compiled) = reader.compile_trace_plans(&self.plans, (lo, hi), limits, work)?
+        else {
             return Ok(false);
         };
         // Refuse an extraction that would breach: emission is the
         // budget unit and a counter alone would overshoot by the file.
-        if work
-            .rows_visited
-            .saturating_add(compiled.count_in_range(lo, hi))
-            > limits.rows
-        {
+        let emitted: u64 = compiled.iter().map(|c| c.count_in_range(lo, hi)).sum();
+        if work.rows_visited.saturating_add(emitted) > limits.rows {
             return Ok(false);
         }
-        for pos in compiled.matched_in_range(lo, hi, work) {
-            let trace_id = trace_ids.get(pos as usize);
-            if trace_id.is_unset() {
-                continue;
-            }
-            if let Some(m) = merged.get_mut(&trace_id) {
-                m.matched = true;
+        for ((bit, _), compiled) in self.span.iter().zip(&compiled) {
+            for pos in compiled.matched_in_range(lo, hi, work) {
+                let trace_id = trace_ids.get(pos as usize);
+                if trace_id.is_unset() {
+                    continue;
+                }
+                if let Some(m) = merged.get_mut(&trace_id) {
+                    m.mask |= bit;
+                }
             }
         }
         Ok(true)
     }
 
-    /// Flag the traces of a decoded tail that own a matched in-window
-    /// span. Every visited span is charged; a breach returns `false`
-    /// mid-tail (the tail's cost is per span, so the check is per span
-    /// too — a between-sources check alone could overshoot by a tail).
+    /// Set the bits of a decoded tail's traces: span-local tokens from
+    /// its in-window spans, root tokens from each trace's earliest
+    /// unset-parent span in the tail. Every visited span is charged; a
+    /// breach returns `false` mid-tail (the tail's cost is per span, so
+    /// the check is per span too — a between-sources check alone could
+    /// overshoot by a tail).
     fn mark_tail(
         &self,
         scan: &TraceWalScan,
@@ -179,36 +282,75 @@ impl SpanFilter {
         work: &mut ScanWork,
         ceiling: u64,
     ) -> bool {
+        let mut roots: HashMap<sfst::TraceId, &sfst::TraceSpan> = HashMap::new();
         for (trace_id, span) in scan.spans_with_ids() {
             work.rows_visited += 1;
             if work.rows_visited > ceiling {
                 return false;
             }
-            if trace_id.is_unset() || !self.eval.matches(span, Some(self.window)) {
+            if trace_id.is_unset() {
                 continue;
             }
-            if let Some(m) = merged.get_mut(&trace_id) {
-                m.matched = true;
+            if !self.roots.is_empty() && span.parent_span_id.is_unset() {
+                let earliest = roots.entry(trace_id).or_insert(span);
+                if (span.start_ns, span.span_id) < (earliest.start_ns, earliest.span_id) {
+                    *earliest = span;
+                }
+            }
+            let mut bits = 0;
+            for (bit, token) in &self.span {
+                if token.eval.matches(span, Some(self.window)) {
+                    bits |= bit;
+                }
+            }
+            if bits != 0
+                && let Some(m) = merged.get_mut(&trace_id)
+            {
+                m.mask |= bits;
+            }
+        }
+        let name_field = BuiltinField::Name
+            .dictionary_field()
+            .expect("Name is dictionary-backed");
+        let service_field = resource_service_field();
+        for (trace_id, root) in roots {
+            let bits = self.root_bits(
+                span_field(root, name_field),
+                span_field(root, &service_field),
+            );
+            if bits != 0
+                && let Some(m) = merged.get_mut(&trace_id)
+            {
+                m.mask |= bits;
             }
         }
         true
+    }
+
+    /// The bits of the root tokens a recorded root's values satisfy.
+    fn root_bits(&self, name: Option<&str>, service: Option<&str>) -> u32 {
+        let mut bits = 0;
+        for (bit, eval) in &self.roots {
+            // Root tokens only: the duration is never read.
+            if eval.matches(name, service, 0) {
+                bits |= bit;
+            }
+        }
+        bits
     }
 }
 
 /// Fold one source's aggregates into the merge map (the merge rule in
 /// the module docs).
-fn fold_into(
-    merged: &mut HashMap<sfst::TraceId, MergedTrace>,
-    aggs: Vec<TraceAggregate>,
-    matched: bool,
-) {
+fn fold_into(merged: &mut HashMap<sfst::TraceId, MergedTrace>, aggs: &[TraceAggregate]) {
     for a in aggs {
         let m = merged.entry(a.trace_id).or_insert(MergedTrace {
             min_start_ns: i64::MAX,
             max_end_ns: i64::MIN,
             span_count: 0,
             error_count: 0,
-            matched,
+            mask: 0,
+            unknown: false,
         });
         m.min_start_ns = m.min_start_ns.min(a.min_start_ns);
         m.max_end_ns = m.max_end_ns.max(a.max_end_ns);
@@ -247,8 +389,6 @@ pub(crate) fn merge_trace_sources(
     }
 
     let mut merged: HashMap<sfst::TraceId, MergedTrace> = HashMap::new();
-    // Without a filter every trace is flagged at insertion.
-    let matched_default = spec.filter.is_none();
 
     // Two budget meters, one ceiling: `visited` charges the fold (rollup
     // rows / tail spans) and `filter_work` charges the filter's scans and
@@ -307,8 +447,8 @@ pub(crate) fn merge_trace_sources(
                     progress.fetch_add(1, Ordering::Relaxed);
                     continue;
                 }
-                let aggs = match meta.trace_rollup().map(|r| sealed_trace_envelopes(&r)) {
-                    Ok(a) => a,
+                let rollup = match meta.trace_rollup() {
+                    Ok(r) => r,
                     Err(e) => {
                         tracing::warn!(
                             "sfsq {}: source {} rollup failed to read: {e}",
@@ -320,10 +460,11 @@ pub(crate) fn merge_trace_sources(
                         continue;
                     }
                 };
+                let aggs = sealed_trace_envelopes(&rollup);
                 // The sealed side's cost is its TRSU rows (one per
                 // distinct trace).
                 visited = visited.saturating_add(aggs.len() as u64);
-                fold_into(&mut merged, aggs, matched_default);
+                fold_into(&mut merged, &aggs);
                 if let Some(filter) = &spec.filter {
                     // The filter sees the ceiling net of the fold's share
                     // INCLUDING this source's rows, so its in-file checks
@@ -333,7 +474,7 @@ pub(crate) fn merge_trace_sources(
                         dict_bytes: spec.dict_ceiling,
                     };
                     let marked = meta.into_index_reader().and_then(|reader| {
-                        filter.mark_sealed(&reader, &mut merged, &mut filter_work, limits)
+                        filter.mark_sealed(&reader, &rollup, &mut merged, &mut filter_work, limits)
                     });
                     match marked {
                         Ok(true) => {}
@@ -346,15 +487,20 @@ pub(crate) fn merge_trace_sources(
                             // Unlike a refused scan (`Ok(false)`), an
                             // error does NOT stop the merge: the
                             // file's rows are already merged, only its
-                            // matches are unknown — its traces stay
-                            // unflagged and the failure is on the
-                            // result.
+                            // bits are unknown — its traces cannot
+                            // pass a negated token and the failure is
+                            // on the result.
                             tracing::warn!(
                                 "sfsq {}: source {} filter scan failed: {e}",
                                 spec.op,
                                 c.source_id
                             );
                             status.add(PartialReason::SourceFailure);
+                            for a in &aggs {
+                                if let Some(m) = merged.get_mut(&a.trace_id) {
+                                    m.unknown = true;
+                                }
+                            }
                         }
                     }
                 }
@@ -374,7 +520,7 @@ pub(crate) fn merge_trace_sources(
                 // traces. (The fold skips unset-trace-id spans; charging
                 // them anyway just trips the ceiling marginally earlier.)
                 visited = visited.saturating_add(scan.num_spans() as u64);
-                fold_into(&mut merged, aggs, matched_default);
+                fold_into(&mut merged, &aggs);
                 let filter_ceiling = spec.visited_ceiling.saturating_sub(visited);
                 if let Some(filter) = &spec.filter
                     && !filter.mark_tail(&scan, &mut merged, &mut filter_work, filter_ceiling)

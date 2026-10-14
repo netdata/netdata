@@ -34,17 +34,22 @@
 //!   spans, here applied to the merged envelope, so a long trace
 //!   straddling the window's left edge is invisible here even though
 //!   search returns its in-window spans.
-//! - **Filtered population is a stored-row match**: with an
-//!   [`OverviewQuery::predicate`], a trace is binned when ANY of its
-//!   stored rows that starts inside the grid matches the span-local
-//!   predicate — evaluated by the search engine's per-file plan
-//!   (sealed) and span-side evaluator (tails), never by canonical
-//!   assembly. The filter SELECTS traces, it does not trim them: a
-//!   binned trace still contributes its WHOLE merged envelope and ALL
-//!   its stored spans, matching or not. Trace-level conditions
-//!   (`root_name`, `root_service_name`, `trace_duration`) and
-//!   `trace_id` pins need assembly or the candidate machinery and are
-//!   REJECTED at the request boundary — never silently ignored.
+//! - **Filtered population is a stored-row match**: with
+//!   [`OverviewQuery::tokens`], a span-local token holds for a trace
+//!   when ANY of its stored rows that starts inside the grid matches
+//!   its group (a negated one: when none does) — evaluated by the search
+//!   engine's per-file plans (sealed) and span-side evaluator (tails),
+//!   never by canonical assembly. Root tokens read RECORDED roots: a
+//!   positive one holds when some source's recorded true root satisfies
+//!   it (a sealed file's rollup claim, a tail's earliest unset-parent
+//!   span), so a trace whose sources record different roots can pass
+//!   tokens no single root satisfies, and a withheld claim (an
+//!   ambiguous tie) counts as no root. `trace_id` tokens pin or
+//!   exclude. The filter SELECTS traces, it does not trim them: a binned
+//!   trace still contributes its WHOLE merged envelope and ALL its
+//!   stored spans, matching or not. Trace-duration tokens are REJECTED
+//!   at the request boundary — the duration is the grid's own axis —
+//!   never silently ignored.
 //!
 //! Engine contracts come from the shared fold (`super::fold`): sources
 //! process in `SourceId` order; a failed source is a
@@ -64,10 +69,11 @@ use std::sync::atomic::AtomicUsize;
 
 use tokio_util::sync::CancellationToken;
 
-use super::fold::{SourceFoldSpec, SpanFilter, merge_trace_sources};
-use super::predicate::{Predicate, PredicateError};
+use super::fold::{SourceFoldSpec, TokenFilter, merge_trace_sources};
+use super::predicate::{PredicateError, PredicateTarget, TokenQuery};
 use super::sources::{SourceSetError, TraceSource, validate_sources};
 use super::status::{PartialReason, QueryStatus, StatusBuilder};
+use super::vocab::BuiltinField;
 use super::window::{TimeWindow, WindowError};
 
 /// Number of log-scale duration bins (fixed).
@@ -134,7 +140,7 @@ fn percentiles(durations: &mut [i64]) -> Option<DurationPercentiles> {
 pub struct OverviewQuery {
     grid: sfst::Grid,
     visited_ceiling: u64,
-    predicate: Option<Predicate>,
+    tokens: TokenQuery,
 }
 
 impl OverviewQuery {
@@ -142,18 +148,18 @@ impl OverviewQuery {
         Self {
             grid,
             visited_ceiling: VISITED_ROWS_CEILING,
-            predicate: None,
+            tokens: TokenQuery::default(),
         }
     }
 
-    /// Bin only the traces owning a stored row that matches `predicate`
-    /// (module docs, "Filtered population"). Span-local conditions
-    /// only — `overview` rejects a trace-level one at request time
-    /// ([`OverviewRequestError::TraceLevelCondition`]); the match-all
-    /// predicate is the unfiltered grid. The filter's scans share the
-    /// visited budget.
-    pub fn predicate(mut self, predicate: Predicate) -> Self {
-        self.predicate = (!predicate.is_all()).then_some(predicate);
+    /// Bin only the traces that pass `tokens` (module docs, "Filtered
+    /// population"); a flat [`Predicate`](super::Predicate) converts with
+    /// its meaning kept. No tokens is the unfiltered grid; a
+    /// trace-duration token is rejected at request time
+    /// ([`OverviewRequestError::DurationToken`]). The filter's scans
+    /// share the visited budget.
+    pub fn tokens(mut self, tokens: impl Into<TokenQuery>) -> Self {
+        self.tokens = tokens.into();
         self
     }
 
@@ -182,11 +188,10 @@ pub enum OverviewRequestError {
     /// contract).
     #[error(transparent)]
     Window(#[from] WindowError),
-    /// A trace-level or trace-id condition: the filtered grid evaluates
-    /// stored rows, never an assembled trace, so it cannot honour one —
-    /// the caller decides (fall back to the unfiltered grid, or refuse).
-    #[error("the overview filter evaluates span-level conditions only; {target} is trace-level")]
-    TraceLevelCondition { target: String },
+    /// A trace-duration token: the duration is the grid's own axis, so
+    /// the caller drops the token (or refuses the request).
+    #[error("the overview cannot filter on trace duration, its own axis")]
+    DurationToken,
 }
 
 /// One overview's paint plus everything needed to interpret it honestly.
@@ -263,24 +268,19 @@ pub fn overview(
     let grid = query.grid;
     let grid_start = grid.bucket_start_ns;
 
-    // The filter: validated like a search predicate, then confined to
-    // the span-local subset — the only one stored rows can answer.
-    let filter = match &query.predicate {
-        None => None,
-        Some(predicate) => {
-            predicate.validate()?;
-            predicate.ensure_evaluable()?;
-            if let Some(target) = predicate.trace_level_target() {
-                return Err(OverviewRequestError::TraceLevelCondition {
-                    target: target.to_string(),
-                });
-            }
-            Some(SpanFilter::new(
-                predicate,
-                TimeWindow::new(grid_start, grid_end)?,
-            ))
-        }
-    };
+    // The filter: validated like search tokens, minus the duration
+    // axis.
+    query.tokens.validate()?;
+    let duration = PredicateTarget::Builtin(BuiltinField::TraceDuration);
+    if query
+        .tokens
+        .tokens
+        .iter()
+        .any(|t| t.group.conditions.iter().any(|c| c.target == duration))
+    {
+        return Err(OverviewRequestError::DurationToken);
+    }
+    let filter = TokenFilter::new(&query.tokens, TimeWindow::new(grid_start, grid_end)?);
 
     let mut status = StatusBuilder::new();
     let spec = SourceFoldSpec {
@@ -307,10 +307,15 @@ pub fn overview(
     // until the fold ends, atop a merge map already costing several
     // times that per trace.
     let mut bucket_durations: Vec<Vec<i64>> = vec![Vec::new(); grid.num_buckets];
-    for m in merged.values() {
-        // Unflagged under a filter (no stored row matched), or clipped
-        // by the bin-by-envelope-start rule.
-        if !m.matched || m.min_start_ns < grid_start || m.min_start_ns >= grid_end {
+    for (trace_id, m) in &merged {
+        // Filtered out, or clipped by the bin-by-envelope-start rule.
+        if spec
+            .filter
+            .as_ref()
+            .is_some_and(|f| !f.passes(*trace_id, m))
+            || m.min_start_ns < grid_start
+            || m.min_start_ns >= grid_end
+        {
             continue;
         }
         let bucket = ((m.min_start_ns - grid_start) / grid.bucket_width_ns) as usize;

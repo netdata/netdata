@@ -656,12 +656,12 @@ impl Predicate {
         Ok(())
     }
 
-    /// The first condition stored rows cannot answer — a trace-level
+    /// The first condition that is not span-local — a trace-level
     /// builtin (`root_name`, `root_service_name`, `trace_duration`) or a
     /// `trace_id` constraint — or `None` when every condition is
-    /// span-local. The overview's filter and its callers decide policy
-    /// on this (refuse, or fall back to the unfiltered grid); the list
-    /// of fields is owned HERE so a wire cannot drift from the engine.
+    /// span-local. Such a condition must be its token's only one; the
+    /// list of fields is owned HERE so a wire cannot drift from the
+    /// engine.
     pub fn trace_level_target(&self) -> Option<&PredicateTarget> {
         use BuiltinField::*;
         self.conditions.iter().map(|c| &c.target).find(|t| {
@@ -978,6 +978,36 @@ pub(crate) struct TraceIdConstraints {
     pub(crate) pins: Option<std::collections::BTreeSet<sfst::TraceId>>,
     /// Ids excluded by `trace:id !=` conditions.
     pub(crate) excluded: std::collections::BTreeSet<sfst::TraceId>,
+}
+
+impl TraceIdConstraints {
+    /// Fold one validated `trace_id` token in: pins intersect,
+    /// exclusions union. The id is single-valued per trace, so a negated
+    /// token swaps the two: NOT (id ∈ S) is id ∉ S and NOT (id ∉ S) is
+    /// id ∈ S.
+    pub(crate) fn add_token(&mut self, token: &Token) {
+        let (_, mut c) = token.group.split_trace_id_conditions();
+        if token.negated {
+            let pins = (!c.excluded.is_empty()).then(|| std::mem::take(&mut c.excluded));
+            c.excluded = c.pins.take().unwrap_or_default();
+            c.pins = pins;
+        }
+        if let Some(pins) = c.pins {
+            self.pins = Some(match self.pins.take() {
+                None => pins,
+                Some(prev) => prev.intersection(&pins).copied().collect(),
+            });
+        }
+        self.excluded.extend(c.excluded);
+    }
+
+    /// Whether a trace id passes the constraints.
+    pub(crate) fn admits(&self, trace_id: sfst::TraceId) -> bool {
+        self.pins
+            .as_ref()
+            .is_none_or(|pins| pins.contains(&trace_id))
+            && !self.excluded.contains(&trace_id)
+    }
 }
 
 /// Parse a validated fixed-width hex id (validation guarantees length
@@ -1375,7 +1405,7 @@ pub(crate) struct SpanToken {
 }
 
 impl SpanToken {
-    fn new(group: &Predicate) -> Self {
+    pub(crate) fn new(group: &Predicate) -> Self {
         let plan = group.to_trace_plan();
         let eval = EvalPredicate::new(&plan);
         Self { plan, eval }
@@ -1412,24 +1442,7 @@ impl LoweredTokens {
                     trace_level_negated.push(TraceLevelEval::new(&token.group));
                 }
                 TokenKind::TraceLevel => trace_level.extend(token.group.conditions.iter().cloned()),
-                TokenKind::TraceId => {
-                    let (_, mut c) = token.group.split_trace_id_conditions();
-                    // The id is single-valued per trace: NOT (id ∈ S) is
-                    // id ∉ S and NOT (id ∉ S) is id ∈ S.
-                    if token.negated {
-                        let pins =
-                            (!c.excluded.is_empty()).then(|| std::mem::take(&mut c.excluded));
-                        c.excluded = c.pins.take().unwrap_or_default();
-                        c.pins = pins;
-                    }
-                    if let Some(pins) = c.pins {
-                        trace_ids.pins = Some(match trace_ids.pins.take() {
-                            None => pins,
-                            Some(prev) => prev.intersection(&pins).copied().collect(),
-                        });
-                    }
-                    trace_ids.excluded.extend(c.excluded);
-                }
+                TokenKind::TraceId => trace_ids.add_token(token),
             }
         }
         Self {

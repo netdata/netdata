@@ -44,8 +44,8 @@ use common::{
 use sfsq::traces::{
     AttributeOwner, BuiltinField, CompareOp, Condition, DURATION_BIN_COUNT, DurationPercentiles,
     OverviewData, OverviewQuery, OverviewRequestError, PartialReason, Predicate, PredicateTarget,
-    PredicateValue, QueryStatus, SearchQuery, SearchSources, TimeWindow, TraceQuery, TraceSource,
-    overview, search, trace_by_id,
+    PredicateValue, QueryStatus, SearchQuery, SearchSources, TimeWindow, Token, TokenQuery,
+    TraceQuery, TraceSource, overview, search, trace_by_id,
 };
 
 /// The suite's standard grid: 10 one-second buckets covering [0s, 10s).
@@ -491,7 +491,7 @@ fn service_eq(value: &str) -> Predicate {
 
 /// `run` with the predicate attached — the filtered-grid driver below.
 fn filtered(sources: Vec<TraceSource>, predicate: Predicate) -> OverviewData {
-    run(sources, OverviewQuery::new(grid()).predicate(predicate))
+    run(sources, OverviewQuery::new(grid()).tokens(predicate))
 }
 
 /// The filter selects TRACES by a matching stored row and keeps each
@@ -659,7 +659,7 @@ fn filtered_grid_charges_the_visited_ceiling() {
         let data = run(
             src,
             OverviewQuery::new(grid())
-                .predicate(name_in(&["c-1"]))
+                .tokens(name_in(&["c-1"]))
                 .visited_rows_ceiling_for_tests(1),
         );
         assert!(data.status.has(PartialReason::OverviewCeiling));
@@ -684,7 +684,7 @@ fn filter_work_accumulates_across_sources() {
         run(
             sources,
             OverviewQuery::new(grid())
-                .predicate(predicate())
+                .tokens(predicate())
                 .visited_rows_ceiling_for_tests(ceiling),
         )
     };
@@ -748,6 +748,17 @@ fn a_failed_filter_scan_leaves_the_files_traces_unflagged() {
     assert_eq!(data.total_traces, 1);
     assert_eq!(data.cells[1][3], 1, "A, from the healthy file");
     assert_eq!(data.cells[5][5], 0, "C stays unflagged");
+
+    // A negated token cannot pass the failed file's traces: their rows
+    // might match it.
+    let data = run(
+        src(),
+        OverviewQuery::new(grid()).tokens(TokenQuery {
+            tokens: vec![Token::negated(name_in(&["nope"]))],
+        }),
+    );
+    assert!(data.status.has(PartialReason::SourceFailure));
+    assert_eq!(data.total_traces, 1, "A alone");
 }
 
 /// The unfiltered grid reads a file's metadata and rollup alone: a
@@ -779,40 +790,31 @@ fn the_unfiltered_grid_never_reads_the_primary_dictionary() {
     assert_eq!(data.cells[5][5], 0, "C stays unflagged");
 }
 
-/// Trace-level and trace-id conditions cannot be answered from stored
-/// rows: a clean request error names the offending target, never a
-/// silently unfiltered grid.
+/// The duration is the grid's own axis: a trace-duration token is a
+/// clean request error, either polarity, never a silently unfiltered
+/// grid. Root and `trace_id` tokens are accepted (tests below).
 #[test]
-fn filtered_grid_rejects_trace_level_conditions() {
+fn grid_rejects_duration_tokens() {
     let dir = tempfile::tempdir().unwrap();
     let wal = write_wal(dir.path(), vec![req(&corpus())], "c");
-    for (field, value) in [
-        (BuiltinField::RootName, text("a-1")),
-        (BuiltinField::RootServiceName, text("svc")),
-        (BuiltinField::TraceDuration, PredicateValue::Integer(1000)),
-        (
-            BuiltinField::TraceId,
-            text("0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a"),
-        ),
-    ] {
-        let predicate = Predicate {
-            conditions: vec![Condition {
-                target: PredicateTarget::Builtin(field),
-                op: CompareOp::Eq,
-                values: vec![value],
-            }],
-        };
+    let duration = || Predicate {
+        conditions: vec![Condition {
+            target: PredicateTarget::Builtin(BuiltinField::TraceDuration),
+            op: CompareOp::Gte,
+            values: vec![PredicateValue::Integer(1000)],
+        }],
+    };
+    for token in [Token::positive(duration()), Token::negated(duration())] {
         let err = overview(
             vec![sealed_source(dir.path(), &wal, "a")],
-            OverviewQuery::new(grid()).predicate(predicate),
+            OverviewQuery::new(grid()).tokens(TokenQuery {
+                tokens: vec![token],
+            }),
             CancellationToken::new(),
             Arc::new(AtomicUsize::new(0)),
         )
         .unwrap_err();
-        assert!(
-            matches!(err, OverviewRequestError::TraceLevelCondition { .. }),
-            "{field:?}: {err}"
-        );
+        assert!(matches!(err, OverviewRequestError::DurationToken), "{err}");
     }
 }
 
@@ -910,5 +912,245 @@ fn unavailable_sources_are_reported_while_the_rest_count() {
     assert_eq!(
         only.status,
         QueryStatus::Partial(BTreeSet::from([PartialReason::RemoteUnavailable]))
+    );
+}
+
+// ── Tokens ────────────────────────────────────────────────────────────
+
+fn tokens_grid(sources: Vec<TraceSource>, tokens: Vec<Token>) -> OverviewData {
+    run(
+        sources,
+        OverviewQuery::new(grid()).tokens(TokenQuery { tokens }),
+    )
+}
+
+/// Tokens AND per trace over stored rows from any source: A's two spans
+/// live in a sealed file and a tail, and two tokens matched by
+/// different rows (and sources) select it; tokens matched by different
+/// traces select nothing.
+#[test]
+fn grid_population_follows_tokens() {
+    let dir = tempfile::tempdir().unwrap();
+    let c = corpus();
+    let wal_sealed = write_wal(dir.path(), vec![req(&[c[0].clone(), c[2].clone()])], "s"); // a-1, B
+    let wal_tail = write_wal(
+        dir.path(),
+        vec![req(&[c[1].clone(), c[3].clone(), c[4].clone()])],
+        "t",
+    ); // a-2, C
+    let src = || {
+        vec![
+            sealed_source(dir.path(), &wal_sealed, "s"),
+            tail_source(&wal_tail, "t"),
+        ]
+    };
+    let both = tokens_grid(
+        src(),
+        vec![
+            Token::positive(name_in(&["a-1"])),
+            Token::positive(name_in(&["a-2"])),
+        ],
+    );
+    assert_eq!(both.status, QueryStatus::Complete);
+    assert_eq!(both.total_traces, 1);
+    assert_eq!(both.cells[1][3], 1, "A, whole");
+    assert_eq!(both.total_spans, 2);
+
+    let apart = tokens_grid(
+        src(),
+        vec![
+            Token::positive(name_in(&["a-1"])),
+            Token::positive(name_in(&["b-err"])),
+        ],
+    );
+    assert_eq!(apart.total_traces, 0);
+
+    // One token's values OR: the flat-predicate meaning.
+    let either = tokens_grid(src(), vec![Token::positive(name_in(&["a-1", "b-err"]))]);
+    assert_eq!(either.total_traces, 2);
+}
+
+/// A negated token excludes the traces with a matching stored row in
+/// the grid, from any source.
+#[test]
+fn grid_negated_token() {
+    let dir = tempfile::tempdir().unwrap();
+    let c = corpus();
+    let wal_sealed = write_wal(dir.path(), vec![req(&c[..3])], "s"); // A, B
+    let wal_tail = write_wal(dir.path(), vec![req(&c[3..])], "t"); // C
+    let src = || {
+        vec![
+            sealed_source(dir.path(), &wal_sealed, "s"),
+            tail_source(&wal_tail, "t"),
+        ]
+    };
+    let error = || Predicate {
+        conditions: vec![Condition {
+            target: PredicateTarget::Builtin(BuiltinField::Status),
+            op: CompareOp::Eq,
+            values: vec![text("ERROR")],
+        }],
+    };
+    let data = tokens_grid(src(), vec![Token::negated(error())]);
+    assert_eq!(data.total_traces, 2, "A and C");
+    assert_eq!(data.total_errors, 0);
+    let data = tokens_grid(src(), vec![Token::negated(name_in(&["c-1"]))]);
+    assert_eq!(data.total_traces, 2, "A and B");
+    let data = tokens_grid(
+        src(),
+        vec![
+            Token::positive(name_in(&["c-2"])),
+            Token::negated(name_in(&["c-1"])),
+        ],
+    );
+    assert_eq!(data.total_traces, 0);
+}
+
+/// Free text selects by stored values, case-insensitively, from sealed
+/// files and tails.
+#[test]
+fn grid_text_token() {
+    let dir = tempfile::tempdir().unwrap();
+    let c = corpus();
+    let wal_sealed = write_wal(dir.path(), vec![req(&c[..3])], "s"); // A, B
+    let wal_tail = write_wal(dir.path(), vec![req(&c[3..])], "t"); // C
+    let src = || {
+        vec![
+            sealed_source(dir.path(), &wal_sealed, "s"),
+            tail_source(&wal_tail, "t"),
+        ]
+    };
+    let text_token = |term: &str| {
+        Token::positive(Predicate {
+            conditions: vec![Condition {
+                target: PredicateTarget::FreeText,
+                op: CompareOp::Contains,
+                values: vec![text(term)],
+            }],
+        })
+    };
+    assert_eq!(
+        tokens_grid(src(), vec![text_token("B-ERR")]).total_traces,
+        1
+    );
+    assert_eq!(tokens_grid(src(), vec![text_token("c-2")]).total_traces, 1);
+    assert_eq!(
+        tokens_grid(src(), vec![text_token("svc")]).total_traces,
+        3,
+        "resource values"
+    );
+    assert_eq!(tokens_grid(src(), vec![text_token("nope")]).total_traces, 0);
+}
+
+/// Root tokens read the recorded roots: a sealed file's rollup claim, a
+/// tail's earliest unset-parent span. A trace whose root was never
+/// stored passes a negated root token and fails the positive one.
+#[test]
+fn grid_root_claims() {
+    let dir = tempfile::tempdir().unwrap();
+    let c = corpus();
+    let mut child = tspan(0xD, 6, 7_000_000_000, 7_100_000_000, "orphan");
+    child.parent = [9; 8];
+    let wal_sealed = write_wal(
+        dir.path(),
+        vec![
+            req_with(vec![kv_str("service.name", "svc-a")], None, &c[..2]),
+            req_with(vec![kv_str("service.name", "svc-b")], None, &c[2..3]),
+            req_with(vec![kv_str("service.name", "svc-d")], None, &[child]),
+        ],
+        "s",
+    );
+    let wal_tail = write_wal(
+        dir.path(),
+        vec![req_with(
+            vec![kv_str("service.name", "svc-c")],
+            None,
+            &c[3..],
+        )],
+        "t",
+    );
+    let src = || {
+        vec![
+            sealed_source(dir.path(), &wal_sealed, "s"),
+            tail_source(&wal_tail, "t"),
+        ]
+    };
+    let root = |field: BuiltinField, value: &str| Predicate {
+        conditions: vec![Condition {
+            target: PredicateTarget::Builtin(field),
+            op: CompareOp::Eq,
+            values: vec![text(value)],
+        }],
+    };
+    let count = |tokens| tokens_grid(src(), tokens).total_traces;
+    assert_eq!(
+        count(vec![Token::positive(root(
+            BuiltinField::RootServiceName,
+            "svc-a"
+        ))]),
+        1
+    );
+    assert_eq!(
+        count(vec![Token::positive(root(
+            BuiltinField::RootServiceName,
+            "svc-c"
+        ))]),
+        1,
+        "tail root"
+    );
+    assert_eq!(
+        count(vec![Token::positive(root(BuiltinField::RootName, "a-1"))]),
+        1,
+        "the earliest root"
+    );
+    assert_eq!(
+        count(vec![Token::positive(root(BuiltinField::RootName, "c-1"))]),
+        1,
+        "the tail's earliest root"
+    );
+    assert_eq!(
+        count(vec![Token::positive(root(BuiltinField::RootName, "c-2"))]),
+        0
+    );
+    assert_eq!(
+        count(vec![Token::positive(root(BuiltinField::RootName, "a-2"))]),
+        0
+    );
+    assert_eq!(
+        count(vec![Token::positive(root(
+            BuiltinField::RootServiceName,
+            "svc-d"
+        ))]),
+        0,
+        "no root"
+    );
+    assert_eq!(
+        count(vec![Token::negated(root(
+            BuiltinField::RootServiceName,
+            "svc-a"
+        ))]),
+        3,
+        "B, C and the rootless D"
+    );
+}
+
+/// `trace_id` tokens pin or exclude traces in the grid.
+#[test]
+fn grid_trace_id_tokens() {
+    let dir = tempfile::tempdir().unwrap();
+    let wal = write_wal(dir.path(), vec![req(&corpus())], "s");
+    let src = || vec![sealed_source(dir.path(), &wal, "s")];
+    let id = || Predicate {
+        conditions: vec![Condition {
+            target: PredicateTarget::Builtin(BuiltinField::TraceId),
+            op: CompareOp::Eq,
+            values: vec![text(&sfst::TraceId::from([0xA; 16]).to_string())],
+        }],
+    };
+    let pinned = tokens_grid(src(), vec![Token::positive(id())]);
+    assert_eq!((pinned.total_traces, pinned.cells[1][3]), (1, 1));
+    assert_eq!(
+        tokens_grid(src(), vec![Token::negated(id())]).total_traces,
+        2
     );
 }
