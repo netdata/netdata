@@ -123,6 +123,7 @@ within its tier in the trailing bytes.
     "EVNB"      EventIndex  (per-row span event structure)    No (optional)
     "LNKB"      LinkIndex  (per-row span link structure)      No (optional)
     "TRSU"      TraceRollup  (per-file trace rollup rows)      No (optional)
+    "TRSS"      TraceRollupStats  (per-row rollup stats)      No (optional)
     "MF{hi}{lo}" PrefixMap<BitmapValue>  (mid-card field)     No (one per mid field)
     "HF{hi}{lo}" HighField  (high-card field, columnar SoA)   No (one per high field)
     "SB0{N}"    StreamBatch  (stream-batch N, fixed-width arena)  Yes (at least 1)
@@ -263,9 +264,33 @@ rows, a non-inverted envelope, and `span_count ≥ errors`. Same additive
 TOC-indexed contract as `TIDX`: presence needs no format version bump, and
 pre-rollup readers ignore it.
 
+The optional `TRSS` chunk carries **per-row rollup stats**, index-parallel to
+the `TRSU` rows (same order; trace ids are not repeated), so a consumer can
+build a trace's list row from rollups alone. Struct-of-arrays:
+`max_start_offsets_ns` and `root_start_offsets_ns` (`Vec<u64>`, the latest
+stored span start and the root candidate's start, both minus the row's
+`min_start_ns`; the root start is `0` on rows with claim flag `0` and kept on
+WITHHELD rows), `service_offsets` (`Vec<u32>`, one more than the rows: row
+`i`'s entries are `service_offsets[i]..service_offsets[i + 1]`), and per entry
+`service_refs` (`Vec<u32>`, the file `KvId` of the resource `service.name`
+token, or the `u32::MAX` sentinel for spans without one; strictly increasing
+within a row, so the sentinel sorts last), `service_spans` and
+`service_errors` (`Vec<u32>`, stored spans and ERROR spans of that service).
+Counts are stored-row statistics, like the rollup's.
+
+It follows `TRSU` directly, requires it, and is written with it by the
+traces seal. Readers validate it against the decoded rollup
+(`IndexReader::trace_rollup_stats`): one row per rollup row, offsets from 0
+to the entry count with at least one entry per row, parallel entries, refs
+within the id space or the sentinel and strictly increasing per row,
+`spans ≥ 1` and `errors ≤ spans` per entry, per-row sums equal to the
+rollup's counts, `root start ≤ max start ≤ max_end − min_start`, and a zero
+root start on rows without a root candidate. Files sealed before it carry
+`TRSU` alone; consumers fall back for those.
+
 The signal split is producer policy, not format law: the format only fixes
 what each id carries and that everything but `TIMS`/`PRIM`/one `SB{i}` is
-optional. In-tree, `TIDX`/`TBLM`/`EVNB`/`LNKB`/`TRSU` are written only by
+optional. In-tree, `TIDX`/`TBLM`/`EVNB`/`LNKB`/`TRSU`/`TRSS` are written only by
 the traces seal (log trace ids are correlation ids, not a grouping key);
 the logs seal emits none of them.
 
@@ -668,9 +693,10 @@ A new **optional, TOC-indexed** chunk id is additive: it changes no
 existing chunk's bincode layout, a file without it simply omits it,
 and a reader that does not know it reads the rest unchanged. Adding
 one therefore needs **no version bump**. The optional per-row columns,
-the `TIDX` trace_id index, the `TBLM` trace-id bloom, and the
-`EVNB`/`LNKB` span event/link structures (see [§ Chunk Ids](#chunk-ids))
-follow exactly this rule.
+the `TIDX` trace_id index, the `TBLM` trace-id bloom, the
+`EVNB`/`LNKB` span event/link structures, and the `TRSU`/`TRSS` trace
+rollup and its stats (see [§ Chunk Ids](#chunk-ids)) follow exactly this
+rule.
 
 ### When to bump the version
 

@@ -899,6 +899,42 @@ fn seal_writes_the_trace_rollup_with_honest_roots_and_stored_counts() {
     assert_eq!(tr.spans.len(), 2, "assembly still dedups the resend");
 }
 
+/// The seal writes the rollup's per-row stats beside it: stored spans
+/// and errors per resource service (resends count; a resource without
+/// `service.name` is the sentinel entry), and the max and root starts
+/// as offsets from the row's first start.
+#[test]
+fn seal_writes_rollup_stats_per_service() {
+    use opentelemetry_proto::tonic::trace::v1 as otlp;
+    let mut root = span([0xE; 16], [1; 8], [0; 8], 1_500, 2_000, "root-op");
+    root.status = Some(otlp::Status {
+        code: 2,
+        message: "boom".into(),
+    });
+    let early = span([0xE; 16], [2; 8], [1; 8], 1_000, 1_100, "early");
+    let late = span([0xE; 16], [3; 8], [1; 8], 1_900, 1_950, "late");
+    let mut svcless = req(vec![span([0xE; 16], [4; 8], [1; 8], 1_200, 1_300, "anon")]);
+    svcless.resource_spans[0].resource = Some(Resource::default());
+    let bytes = seal(vec![req(vec![root, early, late.clone(), late]), svcless]);
+
+    let reader = IndexReader::open(&bytes).unwrap();
+    assert!(reader.has_trace_rollup_stats());
+    let rollup = reader.trace_rollup().unwrap();
+    let stats = reader.trace_rollup_stats(&rollup).unwrap();
+    assert_eq!(rollup.span_counts, vec![5]);
+    assert_eq!(stats.service_offsets, vec![0, 2]);
+    let strings = reader.build_string_table(reader.field_table()).unwrap();
+    assert_eq!(
+        strings[stats.service_refs[0] as usize],
+        "resource.attributes.service.name=svc"
+    );
+    assert_eq!(stats.service_refs[1], sfst::ROLLUP_NO_REF);
+    assert_eq!(stats.service_spans, vec![4, 1], "the resend counts twice");
+    assert_eq!(stats.service_errors, vec![1, 0]);
+    assert_eq!(stats.max_start_offsets_ns, vec![900]);
+    assert_eq!(stats.root_start_offsets_ns, vec![500]);
+}
+
 #[test]
 fn rollup_captures_error_status_kind_and_service_absence() {
     // Coverage for the rollup's capture fields: an ERROR-status root with a

@@ -568,6 +568,23 @@ impl<'a> ChunkReader<'a> {
         Ok(rollup)
     }
 
+    /// Whether the file carries the optional per-row rollup stats (`TRSS`).
+    pub fn has_trace_rollup_stats(&self) -> bool {
+        self.container.has_chunk(crate::CHUNK_TRACE_ROLLUP_STATS)
+    }
+
+    /// Decode the per-row rollup stats (`TRSS`) and validate them against
+    /// the file's decoded `rollup` (`trace_rollup`).
+    pub fn trace_rollup_stats(
+        &self,
+        rollup: &crate::TraceRollup,
+    ) -> Result<crate::TraceRollupStats, Error> {
+        let stats: crate::TraceRollupStats =
+            unpack(self.chunk_raw_by_id(crate::CHUNK_TRACE_ROLLUP_STATS)?)?;
+        stats.validate(rollup, self.metadata()?.id_ranges.high_end.0)?;
+        Ok(stats)
+    }
+
     /// Decode and validate the span link structure (`LNKB`). See
     /// [`event_index`](Self::event_index).
     pub fn link_index(&self) -> Result<crate::LinkIndex, Error> {

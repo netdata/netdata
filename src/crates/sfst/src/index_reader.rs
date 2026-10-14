@@ -136,6 +136,20 @@ impl<'a> MetaReader<'a> {
         self.sfst.has_trace_rollup()
     }
 
+    /// Whether the file carries the optional per-row rollup stats (`TRSS`).
+    pub fn has_trace_rollup_stats(&self) -> bool {
+        self.sfst.has_trace_rollup_stats()
+    }
+
+    /// Decode the per-row rollup stats (`TRSS`), validated against the
+    /// file's decoded `rollup`.
+    pub fn trace_rollup_stats(
+        &self,
+        rollup: &crate::TraceRollup,
+    ) -> Result<crate::TraceRollupStats, crate::Error> {
+        self.sfst.trace_rollup_stats(rollup)
+    }
+
     /// Decode and validate the per-file trace rollup (`TRSU`), as
     /// [`IndexReader::trace_rollup`] does: the unfiltered trace overview
     /// needs nothing else.
@@ -512,6 +526,20 @@ impl<'a> IndexReader<'a> {
     /// Whether the file carries the optional per-file trace rollup (`TRSU`).
     pub fn has_trace_rollup(&self) -> bool {
         self.sfst.has_trace_rollup()
+    }
+
+    /// Whether the file carries the optional per-row rollup stats (`TRSS`).
+    pub fn has_trace_rollup_stats(&self) -> bool {
+        self.sfst.has_trace_rollup_stats()
+    }
+
+    /// Decode the per-row rollup stats (`TRSS`), validated against the
+    /// file's decoded `rollup`.
+    pub fn trace_rollup_stats(
+        &self,
+        rollup: &crate::TraceRollup,
+    ) -> Result<crate::TraceRollupStats, crate::Error> {
+        self.sfst.trace_rollup_stats(rollup)
     }
 
     /// Decode and validate the per-file trace rollup (`TRSU`).

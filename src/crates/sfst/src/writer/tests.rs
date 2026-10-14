@@ -49,6 +49,7 @@ fn counts(mid: u16, high: u16, batches: u8) -> ChunkCounts {
         event_index: false,
         link_index: false,
         trace_rollup: false,
+        trace_rollup_stats: false,
         mid_fields: mid,
         high_fields: high,
         stream_batches: batches,
@@ -390,6 +391,7 @@ fn col_counts(columns: ColumnsPresent) -> ChunkCounts {
         event_index: false,
         link_index: false,
         trace_rollup: false,
+        trace_rollup_stats: false,
         mid_fields: 0,
         high_fields: 0,
         stream_batches: 1,
@@ -437,6 +439,56 @@ fn all_per_row_columns_round_trip() {
     assert_eq!(reader.dropped_attribute_counts().unwrap(), drac);
     assert_eq!(reader.parent_span_ids().unwrap(), parent);
     assert_eq!(reader.durations().unwrap(), durations);
+}
+
+/// The rollup stats need the rollup they extend, follow it directly,
+/// and round-trip through the reader validated against it.
+#[test]
+fn writer_orders_stats_after_rollup() {
+    let mut no_rollup = col_counts(present_all());
+    no_rollup.trace_rollup_stats = true;
+    assert!(matches!(
+        ChunkWriter::new(Cursor::new(Vec::new()), no_rollup),
+        Err(Error::WriterMisuse(_)),
+    ));
+
+    let mut rows = crate::TraceRollupRows::new();
+    let t = |b: u8| crate::TraceId::from([b; 16]);
+    let sp = |b: u8| crate::SpanId::from([b; 8]);
+    rows.record_span(t(1), sp(1), true, 1, 1, 0, false, None, None);
+    rows.record_span(t(2), sp(2), false, 2, 1, 0, true, None, None);
+    let (rollup, stats) = rows.sealed_with_stats(&[]);
+
+    let mut counts = col_counts(present_all());
+    counts.trace_rollup = true;
+    counts.trace_rollup_stats = true;
+    let (observed, trace, span, flags, drac, parent, durations) = sample_columns(3);
+    let mut w = writer(counts);
+    w.summary(&summary()).unwrap();
+    w.metadata(&metadata_with_columns(Vec::new(), columns_table()))
+        .unwrap();
+    w.timestamps(&[1, 2, 3]).unwrap();
+    w.primary(entries()).unwrap();
+    w.observed_timestamps(&observed).unwrap();
+    w.trace_ids(&trace).unwrap();
+    w.span_ids(&span).unwrap();
+    w.flags(&flags).unwrap();
+    w.dropped_attribute_counts(&drac).unwrap();
+    w.parent_span_ids(&parent).unwrap();
+    w.durations(&durations).unwrap();
+    assert!(matches!(
+        w.trace_rollup_stats(&stats),
+        Err(Error::WriterMisuse(_))
+    ));
+    w.trace_rollup(&rollup).unwrap();
+    w.trace_rollup_stats(&stats).unwrap();
+    w.add_stream_batch(&batch()).unwrap();
+    let buf = w.finish().unwrap().into_inner();
+
+    let reader = crate::reader::ChunkReader::open(&buf).unwrap();
+    assert!(reader.has_trace_rollup_stats());
+    let read = reader.trace_rollup().unwrap();
+    assert_eq!(reader.trace_rollup_stats(&read).unwrap(), stats);
 }
 
 #[test]
@@ -606,6 +658,7 @@ fn idx_counts() -> ChunkCounts {
         event_index: false,
         link_index: false,
         trace_rollup: false,
+        trace_rollup_stats: false,
         mid_fields: 0,
         high_fields: 0,
         stream_batches: 1,
@@ -695,6 +748,7 @@ fn trace_id_index_without_its_column_is_rejected() {
         event_index: false,
         link_index: false,
         trace_rollup: false,
+        trace_rollup_stats: false,
         mid_fields: 0,
         high_fields: 0,
         stream_batches: 1,
@@ -861,6 +915,7 @@ fn trace_id_bloom_without_index_is_rejected() {
         event_index: false,
         link_index: false,
         trace_rollup: false,
+        trace_rollup_stats: false,
         mid_fields: 0,
         high_fields: 0,
         stream_batches: 1,

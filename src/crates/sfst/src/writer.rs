@@ -23,10 +23,11 @@ use crate::{
     ALL_COLUMNS, BitmapValue, CHUNK_DROPPED_ATTRS, CHUNK_DURATION, CHUNK_EVENTS, CHUNK_FLAGS,
     CHUNK_LINKS, CHUNK_META, CHUNK_OBSERVED_TS, CHUNK_PARENT_SPAN_IDS, CHUNK_PRIMARY,
     CHUNK_SPAN_IDS, CHUNK_SUMMARY, CHUNK_TIMS, CHUNK_TRACE_BLOOM, CHUNK_TRACE_IDS,
-    CHUNK_TRACE_INDEX, CHUNK_TRACE_ROLLUP, ColumnSpec, ColumnsTable, DroppedAttributeCounts,
-    Durations, Error, Flags, HighField, MAGIC, MAX_STREAM_BATCHES, Metadata, ObservedTimestamps,
-    ParentSpanIds, SpanIds, StreamBatch, Summary, TraceIdIndex, TraceIds, VERSION,
-    ZSTD_LEVEL_DEFAULT, ZSTD_LEVEL_FST, high_field_id, mid_field_id, stream_batch_id,
+    CHUNK_TRACE_INDEX, CHUNK_TRACE_ROLLUP, CHUNK_TRACE_ROLLUP_STATS, ColumnSpec, ColumnsTable,
+    DroppedAttributeCounts, Durations, Error, Flags, HighField, MAGIC, MAX_STREAM_BATCHES,
+    Metadata, ObservedTimestamps, ParentSpanIds, SpanIds, StreamBatch, Summary, TraceIdIndex,
+    TraceIds, VERSION, ZSTD_LEVEL_DEFAULT, ZSTD_LEVEL_FST, high_field_id, mid_field_id,
+    stream_batch_id,
 };
 
 /// Serialize a value with bincode, then compress with zstd at
@@ -132,6 +133,10 @@ pub struct ChunkCounts {
     /// after the span structures. Row-derived from the `TRCE` column's
     /// data, so a file that sets this must also carry the trace_id column.
     pub trace_rollup: bool,
+    /// Whether the file carries the optional per-row rollup stats
+    /// (`TRSS`), right after the rollup it is index-parallel to; requires
+    /// `trace_rollup`.
+    pub trace_rollup_stats: bool,
     /// Mid-cardinality per-field FST chunks (`MF{i}`).
     pub mid_fields: u16,
     /// High-cardinality per-field sorted-list chunks (`HF{i}`).
@@ -159,6 +164,7 @@ enum Stage {
     EventIndex,
     LinkIndex,
     TraceRollup,
+    TraceRollupStats,
     Secondary,
 }
 
@@ -175,6 +181,7 @@ impl Stage {
             Stage::EventIndex => "the declared span event structure chunk",
             Stage::LinkIndex => "the declared span link structure chunk",
             Stage::TraceRollup => "the declared trace rollup chunk",
+            Stage::TraceRollupStats => "the declared trace rollup stats chunk",
             Stage::Secondary => "a mid-field, high-field, or stream-batch chunk",
         }
     }
@@ -249,8 +256,13 @@ impl<W: Write + Seek> ChunkWriter<W> {
                 "trace rollup declared without the trace_id column it derives from".into(),
             ));
         }
+        if counts.trace_rollup_stats && !counts.trace_rollup {
+            return Err(Error::WriterMisuse(
+                "trace rollup stats declared without the trace rollup they extend".into(),
+            ));
+        }
         // TOC size: the 4 prefix chunks, one chunk per declared optional
-        // (per-row columns, TIDX/TBLM, EVNB/LNKB, TRSU), and the
+        // (per-row columns, TIDX/TBLM, EVNB/LNKB, TRSU/TRSS), and the
         // mid/high-field and stream-batch chunks.
         let num_chunks = 4u32
             + counts.columns.count()
@@ -259,6 +271,7 @@ impl<W: Write + Seek> ChunkWriter<W> {
             + u32::from(counts.event_index)
             + u32::from(counts.link_index)
             + u32::from(counts.trace_rollup)
+            + u32::from(counts.trace_rollup_stats)
             + u32::from(counts.mid_fields)
             + u32::from(counts.high_fields)
             + u32::from(counts.stream_batches);
@@ -582,6 +595,25 @@ impl<W: Write + Seek> ChunkWriter<W> {
         }
         let packed = pack(rollup, ZSTD_LEVEL_DEFAULT)?;
         self.inner.write_chunk(CHUNK_TRACE_ROLLUP, &packed)?;
+        self.stage = if self.counts.trace_rollup_stats {
+            Stage::TraceRollupStats
+        } else {
+            Stage::Secondary
+        };
+        Ok(())
+    }
+
+    /// Write the optional per-row rollup stats chunk (`TRSS`, declared
+    /// via [`ChunkCounts::trace_rollup_stats`]), right after the rollup.
+    pub fn trace_rollup_stats(&mut self, stats: &crate::TraceRollupStats) -> Result<(), Error> {
+        if self.stage != Stage::TraceRollupStats {
+            return Err(Error::WriterMisuse(format!(
+                "trace rollup stats chunk out of order: the writer expects {} next",
+                self.stage.expects(),
+            )));
+        }
+        let packed = pack(stats, ZSTD_LEVEL_DEFAULT)?;
+        self.inner.write_chunk(CHUNK_TRACE_ROLLUP_STATS, &packed)?;
         self.stage = Stage::Secondary;
         Ok(())
     }

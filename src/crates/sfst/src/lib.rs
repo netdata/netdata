@@ -128,7 +128,7 @@ pub use trace_combine::{CombineOutcome, LoadedSources, SpanRef, SpanSource};
 pub use trace_index::TraceIdIndex;
 pub use trace_rollup::{
     ROLLUP_NO_REF, ROOT_CLAIM_NONE, ROOT_CLAIM_TRUE, ROOT_CLAIM_WITHHELD, RollupRow, TraceRollup,
-    TraceRollupRows,
+    TraceRollupRows, TraceRollupStats,
 };
 pub use vocab_match::{ContainsMatcher, MatchClass, ValueMatcher};
 
@@ -218,6 +218,7 @@ const CHUNK_LINKS: chunk_file::ChunkId = *b"LNKB";
 // assembly.
 // Same additive TOC-indexed contract as TIDX (see `trace_rollup`).
 const CHUNK_TRACE_ROLLUP: chunk_file::ChunkId = *b"TRSU";
+const CHUNK_TRACE_ROLLUP_STATS: chunk_file::ChunkId = *b"TRSS";
 // Optional per-file trace-id bloom (cold region, after TIDX): a serialized
 // fastbloom filter over the file's distinct set trace ids — "definitely not in
 // this file" for cross-file trace-by-id, at a 5% build-time FP target. Same

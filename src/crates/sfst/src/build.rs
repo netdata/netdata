@@ -449,6 +449,11 @@ pub(crate) fn build_into<W: Write + Seek>(
             .trace_rollup
             .as_ref()
             .is_some_and(|r| r.is_meaningful()),
+        // Its per-row stats ride with it, always.
+        trace_rollup_stats: row_index
+            .trace_rollup
+            .as_ref()
+            .is_some_and(|r| r.is_meaningful()),
         mid_fields: u16::try_from(row_index.mid_fields().len())
             .expect("mid-card field count exceeds u16::MAX"),
         high_fields: u16::try_from(row_index.high_fields().len())
@@ -562,7 +567,9 @@ pub(crate) fn build_into<W: Write + Seek>(
             .trace_rollup
             .as_ref()
             .expect("declared only when the accumulator exists");
-        w.trace_rollup(&rollup.sealed(&kv_to_file))?;
+        let (rollup, stats) = rollup.sealed_with_stats(&kv_to_file);
+        w.trace_rollup(&rollup)?;
+        w.trace_rollup_stats(&stats)?;
     }
 
     // Mid-cardinality FSTs, high-cardinality chunks, then the stream
