@@ -539,6 +539,11 @@ modules:
       description: |
         Each configured job produces execution state and resource usage charts. When a check emits Nagios performance data, additional charts are created automatically for each metric. Non-counter perfdata with warning/critical thresholds also get threshold state charts for alerting.
       availability: []
+      dynamic_context_prefixes:
+        - prefix: nagios.
+          reason: >-
+            Performance data charts are generated at runtime for each metric a check emits, under the nagios
+            namespace.
       scopes:
         - name: job
           description: These metrics refer to each configured check job.
