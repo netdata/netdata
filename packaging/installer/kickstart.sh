@@ -2482,7 +2482,7 @@ try_build_install() {
         archive_name="${gzip_name}"
         decompress="$(command -v gzip 2>/dev/null) -dc"
       else
-        fatal "Unable to find a usable ${SELECTED_RELEASE_CHANNEL} source archive in Manifest file.\n${BADNET_MESSAGE}" F0527
+        fatal "Unable to find a usable ${SELECTED_RELEASE_CHANNEL} source archive in Manifest file.\n${BADNET_MSG}" F0527
       fi
     fi
 
