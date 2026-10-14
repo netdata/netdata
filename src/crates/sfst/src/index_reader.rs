@@ -1946,6 +1946,11 @@ impl PosSet {
         self.bitmap.range_cardinality(&self.data, lo..hi)
     }
 
+    /// Whether `pos` is set (false past the universe).
+    fn contains(&self, pos: u32) -> bool {
+        self.bitmap.contains(&self.data, pos)
+    }
+
     /// Set positions in ascending order.
     fn iter(&self) -> impl Iterator<Item = u32> + '_ {
         self.bitmap.iter(&self.data)

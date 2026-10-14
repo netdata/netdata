@@ -8,7 +8,9 @@
 //! set, then any number of RANK-BOUNDED extractions of the newest-K
 //! matched positions. Position algebra ([`super::PosSet`]) stays
 //! private to the format crate; the seam is plan in, positions + work
-//! out.
+//! out. Several plans (one per search token) compile against a file
+//! together ([`IndexReader::compile_trace_plans`]), sharing one
+//! stream-batch pass.
 //!
 //! # The term algebra
 //!
@@ -333,6 +335,93 @@ struct GroupSlot {
     impossible: bool,
 }
 
+/// One plan's terms resolved against a file, awaiting the shared
+/// stream-batch scan.
+struct ResolvedPlan {
+    /// Per term slot: a field term's parts (`None` for other slots).
+    resolved: Vec<Option<ResolvedTerm>>,
+    /// Per term slot: a set known before the scan (duration, id
+    /// column), or filled by a subgroup refine after it.
+    durations: Vec<Option<PosSet>>,
+    groups: Vec<GroupSlot>,
+}
+
+impl ResolvedPlan {
+    /// Whether the terms resolvable without the scan already collapse
+    /// the conjunction — the scan would be wasted work for this plan.
+    fn ready_empty(&self, total: u32) -> bool {
+        // A term combines WITHOUT the scan only if all parts are ready.
+        let or_parts = |parts: &[Part]| -> Option<PosSet> {
+            let mut acc = PosSet::empty(total);
+            for part in parts {
+                match part {
+                    Part::Ready(set) => acc.or_assign(set),
+                    Part::Probe(_) => return None,
+                }
+            }
+            Some(acc)
+        };
+        let combine_ready = |term: &ResolvedTerm| -> Option<PosSet> {
+            let matched = or_parts(&term.matches)?;
+            match &term.presence {
+                None => Some(matched),
+                Some(parts) => {
+                    let mut presence = or_parts(parts)?;
+                    presence.and_not_assign(&matched);
+                    Some(presence)
+                }
+            }
+        };
+        let group_ready_empty = |group: &GroupSlot| -> bool {
+            if group.impossible {
+                return true;
+            }
+            // An all-ready pre-filter that ANDs to empty leaves the
+            // refine nothing to visit.
+            let mut acc: Option<PosSet> = None;
+            for part in &group.prefilter {
+                let Part::Ready(set) = part else { return false };
+                match &mut acc {
+                    None => acc = Some(set.clone()),
+                    Some(a) => a.and_assign(set),
+                }
+            }
+            acc.is_some_and(|set| set.is_empty())
+        };
+        self.resolved
+            .iter()
+            .flatten()
+            .any(|term| combine_ready(term).is_some_and(|set| set.is_empty()))
+            || self.durations.iter().flatten().any(PosSet::is_empty)
+            || self.groups.iter().any(group_ready_empty)
+    }
+
+    /// Flag every shared probe this plan reads.
+    fn mark_probes(&self, needed: &mut [bool]) {
+        let mut mark = |parts: &[Part]| {
+            for part in parts {
+                if let Part::Probe(i) = part {
+                    needed[*i] = true;
+                }
+            }
+        };
+        for term in self.resolved.iter().flatten() {
+            mark(&term.matches);
+            if let Some(presence) = &term.presence {
+                mark(presence);
+            }
+        }
+        for group in &self.groups {
+            mark(&group.prefilter);
+        }
+    }
+}
+
+/// Whether the dictionary-bytes counter is over its ceiling.
+fn dict_exceeded(work: &ScanWork, limits: ScanLimits) -> bool {
+    work.dict_bytes > limits.dict_bytes
+}
+
 /// A subgroup condition resolved for KvId-level refine.
 enum ResolvedGroupCondition {
     /// Matching KvIds of the condition's dictionary field (empty =
@@ -440,18 +529,99 @@ impl<'m> ValueTest<'m> {
 }
 
 impl IndexReader<'_> {
-    /// Resolve `plan` against this file for queries within the position
-    /// range `[lo, hi)` (the caller's window; pass `(0, record_count)`
-    /// for the whole file). See the module docs for the term algebra,
-    /// tier resolution, and work accounting. `Ok(None)` = a ceiling of
-    /// `limits` ran out — rows inside the shared stream-batch scan or a
-    /// subgroup refine, dictionary bytes after a field's walk; a
-    /// truncated plan is never returned (it would under-approximate).
+    /// Resolve `plans` against this file for queries within the
+    /// position range `[lo, hi)` (the caller's window; pass
+    /// `(0, record_count)` for the whole file), one compiled plan per
+    /// input plan, in order. See the module docs for the term algebra,
+    /// tier resolution, and work accounting. Every plan's high-card
+    /// probes share ONE stream-batch pass, so compiling several plans
+    /// (one per search token) costs one scan, not one per plan.
+    /// `Ok(None)` = a ceiling of `limits` ran out — rows inside the
+    /// shared stream-batch scan or a subgroup refine, dictionary bytes
+    /// after a field's walk; no plan is returned then, since a missing
+    /// or truncated one would under-approximate.
     ///
-    /// The compiled plan answers `count_in_range`/`newest_in_range`/
-    /// `matched_in_range` correctly only for sub-ranges of `[lo, hi)`
+    /// A compiled plan answers `count_in_range`/`newest_in_range`/
+    /// `matched_in_range`/`contains` correctly only within `[lo, hi)`
     /// (duration, id-column and subgroup-refine positions outside it
     /// were never collected).
+    pub fn compile_trace_plans(
+        &self,
+        plans: &[TracePlan],
+        range: (u32, u32),
+        limits: ScanLimits,
+        work: &mut ScanWork,
+    ) -> Result<Option<Vec<CompiledTracePlan>>, crate::Error> {
+        let total = self.summary().record_count;
+        let range = (range.0.min(total), range.1.min(total));
+        if dict_exceeded(work, limits) {
+            return Ok(None);
+        }
+
+        // ── Resolve every plan's terms (dictionary work) ─────────────
+        let mut probes: Vec<(KvIdSet, u8)> = Vec::new();
+        let mut resolved = Vec::with_capacity(plans.len());
+        for plan in plans {
+            let Some(r) = self.resolve_plan(plan, range, total, limits, &mut probes, work)? else {
+                return Ok(None);
+            };
+            resolved.push(r);
+        }
+
+        // ── Probe-free short-circuit: a plan whose ready terms already
+        // collapse its conjunction needs no scan — its probes are left
+        // out, and when no plan needs one the scan is skipped,
+        // deterministically. ─────────────────────────────────────────
+        let ready_empty: Vec<bool> = resolved.iter().map(|r| r.ready_empty(total)).collect();
+        let mut needed = vec![false; probes.len()];
+        for (plan, &empty) in resolved.iter().zip(&ready_empty) {
+            if !empty {
+                plan.mark_probes(&mut needed);
+            }
+        }
+        let refs: Vec<(&KvIdSet, u8)> = probes
+            .iter()
+            .zip(&needed)
+            .filter(|(_, needed)| **needed)
+            .map(|((targets, mask), _)| (targets, *mask))
+            .collect();
+        // Probes no live plan reads get throwaway empty sets.
+        let mut probe_sets: Vec<PosSet> = probes.iter().map(|_| PosSet::empty(total)).collect();
+        if !refs.is_empty() {
+            let Some(sets) =
+                self.scan_high_multi(&refs, total, limits.rows, &mut work.rows_visited)?
+            else {
+                return Ok(None); // budget ran out mid-scan
+            };
+            let slots = needed
+                .iter()
+                .enumerate()
+                .filter(|(_, n)| **n)
+                .map(|(i, _)| i);
+            for (slot, set) in slots.zip(sets) {
+                probe_sets[slot] = set;
+            }
+        }
+
+        let mut out = Vec::with_capacity(plans.len());
+        for (plan, empty) in resolved.into_iter().zip(ready_empty) {
+            let set = if empty {
+                PosSet::empty(total)
+            } else {
+                match self.finish_plan(plan, &probe_sets, range, total, limits.rows, work)? {
+                    Some(set) => set,
+                    None => return Ok(None),
+                }
+            };
+            out.push(CompiledTracePlan {
+                set,
+                universe: total,
+            });
+        }
+        Ok(Some(out))
+    }
+
+    /// [`Self::compile_trace_plans`] for one plan.
     pub fn compile_trace_plan(
         &self,
         plan: &TracePlan,
@@ -459,16 +629,23 @@ impl IndexReader<'_> {
         limits: ScanLimits,
         work: &mut ScanWork,
     ) -> Result<Option<CompiledTracePlan>, crate::Error> {
-        let total = self.summary().record_count;
-        let (range_lo, range_hi) = (range.0.min(total), range.1.min(total));
-        let ceiling = limits.rows;
-        let dict_over = |work: &ScanWork| work.dict_bytes > limits.dict_bytes;
-        if dict_over(work) {
-            return Ok(None);
-        }
+        let compiled = self.compile_trace_plans(std::slice::from_ref(plan), range, limits, work)?;
+        Ok(compiled.map(|mut plans| plans.pop().expect("one plan in, one out")))
+    }
 
-        // ── Resolve every term: dictionary work (charged to dict_bytes) ──
-        let mut probes: Vec<(KvIdSet, u8)> = Vec::new();
+    /// Resolve one plan's terms into its slots, registering its
+    /// high-card probes in the shared `probes`. Dictionary work only;
+    /// `Ok(None)` = the dictionary ceiling ran out.
+    fn resolve_plan(
+        &self,
+        plan: &TracePlan,
+        (range_lo, range_hi): (u32, u32),
+        total: u32,
+        limits: ScanLimits,
+        probes: &mut Vec<(KvIdSet, u8)>,
+        work: &mut ScanWork,
+    ) -> Result<Option<ResolvedPlan>, crate::Error> {
+        let dict_over = |work: &ScanWork| dict_exceeded(work, limits);
         let mut resolved: Vec<Option<ResolvedTerm>> = Vec::new(); // None = non-Fields slot
         let mut durations: Vec<Option<PosSet>> = Vec::new(); // parallel to `resolved`, zipped below
         let mut groups: Vec<GroupSlot> = Vec::new(); // event/link subgroups (refined post-pass)
@@ -489,7 +666,7 @@ impl IndexReader<'_> {
                             &test,
                             *negated,
                             total,
-                            &mut probes,
+                            probes,
                             work,
                         )?;
                         if dict_over(work) {
@@ -524,7 +701,7 @@ impl IndexReader<'_> {
                             &test,
                             false,
                             total,
-                            &mut probes,
+                            probes,
                             work,
                         )?;
                         if dict_over(work) {
@@ -598,7 +775,7 @@ impl IndexReader<'_> {
                                     &test,
                                     false,
                                     total,
-                                    &mut probes,
+                                    probes,
                                     work,
                                 )?;
                                 parts.push((m, None));
@@ -639,7 +816,7 @@ impl IndexReader<'_> {
                             &ValueTest::new(&names)?,
                             false,
                             total,
-                            &mut probes,
+                            probes,
                             work,
                         )?;
                         if dict_over(work) {
@@ -697,72 +874,30 @@ impl IndexReader<'_> {
                 }
             }
         }
+        Ok(Some(ResolvedPlan {
+            resolved,
+            durations,
+            groups,
+        }))
+    }
 
-        // ── Probe-free short-circuit: if the terms already resolvable
-        // collapse the conjunction, the stream-batch scan is wasted
-        // work — skip it, deterministically. ──────────────────────────
-        let combine_ready = |term: &ResolvedTerm| -> Option<PosSet> {
-            // A term combines WITHOUT the scan only if all parts are ready.
-            let or_parts = |parts: &[Part]| -> Option<PosSet> {
-                let mut acc = PosSet::empty(total);
-                for part in parts {
-                    match part {
-                        Part::Ready(set) => acc.or_assign(set),
-                        Part::Probe(_) => return None,
-                    }
-                }
-                Some(acc)
-            };
-            let matched = or_parts(&term.matches)?;
-            match &term.presence {
-                None => Some(matched),
-                Some(parts) => {
-                    let mut presence = or_parts(parts)?;
-                    presence.and_not_assign(&matched);
-                    Some(presence)
-                }
-            }
-        };
-        let group_ready_empty = |group: &GroupSlot| -> bool {
-            if group.impossible {
-                return true;
-            }
-            // An all-ready pre-filter that ANDs to empty leaves the
-            // refine nothing to visit.
-            let mut acc: Option<PosSet> = None;
-            for part in &group.prefilter {
-                let Part::Ready(set) = part else { return false };
-                match &mut acc {
-                    None => acc = Some(set.clone()),
-                    Some(a) => a.and_assign(set),
-                }
-            }
-            acc.is_some_and(|set| set.is_empty())
-        };
-        let ready_empty = resolved
-            .iter()
-            .flatten()
-            .any(|term| combine_ready(term).is_some_and(|set| set.is_empty()))
-            || durations.iter().flatten().any(PosSet::is_empty)
-            || groups.iter().any(group_ready_empty);
-        // When short-circuiting, the scan is skipped and the probe
-        // slots get throwaway empty sets — every consumer of
-        // `probe_sets` sits behind the early return below.
-        let probe_sets: Vec<PosSet> = if probes.is_empty() || ready_empty {
-            probes.iter().map(|_| PosSet::empty(total)).collect()
-        } else {
-            let refs: Vec<(&KvIdSet, u8)> = probes.iter().map(|(t, m)| (t, *m)).collect();
-            match self.scan_high_multi(&refs, total, ceiling, &mut work.rows_visited)? {
-                Some(sets) => sets,
-                None => return Ok(None), // budget ran out mid-scan
-            }
-        };
-        if ready_empty {
-            return Ok(Some(CompiledTracePlan {
-                set: PosSet::empty(total),
-                universe: total,
-            }));
-        }
+    /// One live plan's post-scan work: the subgroup refines, then the
+    /// conjunction in plan order. `Ok(None)` = the rows ceiling ran out
+    /// in a refine.
+    fn finish_plan(
+        &self,
+        plan: ResolvedPlan,
+        probe_sets: &[PosSet],
+        (range_lo, range_hi): (u32, u32),
+        total: u32,
+        ceiling: u64,
+        work: &mut ScanWork,
+    ) -> Result<Option<PosSet>, crate::Error> {
+        let ResolvedPlan {
+            resolved,
+            mut durations,
+            groups,
+        } = plan;
 
         // ── Structural refine per subgroup (MANDATORY, decision 10):
         // a single event/link must satisfy the whole subgroup — every
@@ -864,7 +999,6 @@ impl IndexReader<'_> {
             };
             durations[group.term_index] = Some(set);
         }
-
         // ── Combine in plan order ─────────────────────────────────────
         let materialize = |parts: &[Part]| -> PosSet {
             let mut acc = PosSet::empty(total);
@@ -902,10 +1036,7 @@ impl IndexReader<'_> {
             }
         }
 
-        Ok(Some(CompiledTracePlan {
-            set: acc.unwrap_or_else(|| PosSet::full(total)),
-            universe: total,
-        }))
+        Ok(Some(acc.unwrap_or_else(|| PosSet::full(total))))
     }
 
     /// Resolve one field of a term at its `location` (`None`: absent
@@ -1088,6 +1219,15 @@ impl IndexReader<'_> {
 }
 
 impl CompiledTracePlan {
+    /// Whether position `pos` matched — a bitmap-tree probe, no row
+    /// visit. Its cost grows with the tree bytes before `pos` (the
+    /// serialized tree has no skip index), so many probes against one
+    /// plan are better batched. Positions outside the compile range
+    /// never match.
+    pub fn contains(&self, pos: u32) -> bool {
+        pos < self.universe && self.set.contains(pos)
+    }
+
     /// Matched-position count within `[lo, hi)` — a bitmap-tree walk, no
     /// row visits.
     pub fn count_in_range(&self, lo: u32, hi: u32) -> u64 {

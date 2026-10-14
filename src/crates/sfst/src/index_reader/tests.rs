@@ -479,3 +479,43 @@ fn a_released_session_reloads_with_the_same_answers() {
         assert_eq!(&session.materialize(r.position).unwrap(), span);
     }
 }
+
+#[test]
+fn positions_report_to_loaded_sources() {
+    use crate::trace_combine::SpanSource;
+    use std::cell::Cell;
+    let bloom = bloom_over(&[TRACE, OTHER]);
+    let buf = trace_file_with_bloom(&[(sid(1), SpanId::UNSET), (sid(2), sid(1))], Some(&bloom));
+    let id = TraceId::from(TRACE);
+
+    // A hit keeps the lookup pair: the session reports loaded, and the
+    // tracker releases the least recent one past its limit.
+    let mut sessions = vec![owned(&buf), owned(&buf)];
+    let mut loaded = crate::LoadedSources::new(1);
+    assert_eq!(sessions[0].positions(id).unwrap(), vec![0, 1]);
+    assert!(sessions[0].is_loaded());
+    loaded.touch(0, &mut sessions);
+    assert_eq!(sessions[1].positions(id).unwrap(), vec![0, 1]);
+    loaded.touch(1, &mut sessions);
+    assert!(!sessions[0].is_loaded(), "released past the limit");
+    assert!(sessions[1].is_loaded());
+    assert_eq!(sessions[0].positions(id).unwrap(), vec![0, 1], "reloads");
+
+    // A false positive frees what it decoded; a bloom miss decodes
+    // nothing; UNSET is a request error.
+    let drops = Cell::new(0);
+    let mut session = owned(&buf).on_release(|| drops.set(drops.get() + 1));
+    assert!(session.positions(TraceId::from(OTHER)).unwrap().is_empty());
+    assert!(!session.is_loaded());
+    assert_eq!(drops.get(), 1, "the lookup ran and was dropped");
+    let miss = (9u8..=255)
+        .map(|b| TraceId::from([b; 16]))
+        .find(|id| !bloom.might_contain(*id))
+        .expect("an id the bloom rules out");
+    assert!(session.positions(miss).unwrap().is_empty());
+    assert_eq!(drops.get(), 1, "no lookup ran");
+    assert!(matches!(
+        session.positions(TraceId::UNSET),
+        Err(crate::Error::UnsetTraceId)
+    ));
+}

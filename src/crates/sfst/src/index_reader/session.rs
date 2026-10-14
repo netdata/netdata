@@ -435,10 +435,30 @@ impl<'r, 'a> TraceFileSession<'r, 'a> {
         Ok(self.lookup.as_ref().expect("just populated"))
     }
 
-    /// The rows holding `trace_id`.
-    fn positions(&mut self, trace_id: TraceId) -> Result<Vec<u32>, crate::Error> {
+    /// The rows holding `trace_id`, chronological (empty when the file
+    /// holds none). An id the bloom or screen rules out costs no decode;
+    /// otherwise the lookup pair (TIDX + TRCE) decodes on first use and
+    /// stays while the id is found, so the session then reports itself
+    /// loaded: a caller bounding its loaded sessions touches its
+    /// [`crate::LoadedSources`] after this. A false positive frees what
+    /// it decoded. The UNSET id is a request error, as in
+    /// [`SpanSource::span_refs`].
+    pub fn positions(&mut self, trace_id: TraceId) -> Result<Vec<u32>, crate::Error> {
+        if trace_id.is_unset() {
+            return Err(crate::Error::UnsetTraceId);
+        }
+        let held = self.lookup.is_some();
+        if !self.screen(trace_id) {
+            return Ok(Vec::new());
+        }
         let lookup = self.lookup()?;
-        Ok(lookup.index.positions(trace_id, &lookup.trace_ids).to_vec())
+        let positions = lookup.index.positions(trace_id, &lookup.trace_ids).to_vec();
+        if positions.is_empty() && !held {
+            // A false positive: free what found nothing.
+            self.lookup = None;
+            self.emptied();
+        }
+        Ok(positions)
     }
 
     /// The per-row columns, decoding them on the first lookup that finds
@@ -530,20 +550,9 @@ impl SpanSource for TraceFileSession<'_, '_> {
         // The batch-primitive contract: an UNSET id in a candidate set is
         // a request error (TIDX omits UNSET while a tail scan could serve
         // it — accepting it here would make lookups layout-dependent).
-        if trace_id.is_unset() {
-            return Err(crate::Error::UnsetTraceId);
-        }
-        let held = self.lookup.is_some();
-        if !self.screen(trace_id) {
-            return Ok(Vec::new());
-        }
+        // `positions` enforces it, screens, and frees a false positive.
         let positions = self.positions(trace_id)?;
         if positions.is_empty() {
-            // A false positive: free what found nothing.
-            if !held {
-                self.lookup = None;
-                self.emptied();
-            }
             return Ok(Vec::new());
         }
 

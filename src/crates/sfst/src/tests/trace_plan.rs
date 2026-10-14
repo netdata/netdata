@@ -1061,3 +1061,174 @@ fn dict_ceiling_truncates_compile() {
         assert_eq!(work.dict_bytes, 11, "nothing walked");
     }
 }
+
+/// Several plans compiled together equal each plan compiled alone —
+/// windowed or whole-file, with ready-empty, probe-free, negated,
+/// numeric and subgroup plans among them — while their high-card probes
+/// share ONE stream-batch pass. A ceiling breach anywhere yields no
+/// plans at all.
+#[test]
+fn multi_plan_compile_equals_per_plan() {
+    let (bytes, _) = fixture();
+    let idx = IndexReader::open(&bytes).unwrap();
+    let plans = vec![
+        plan(vec![tokens("h", &[], &["w0[0-5]."])]),
+        plan(vec![tokens("h2", &[], &["x0.."])]),
+        plan(vec![
+            tokens("l", &["a"], &[]),
+            PlanTerm::duration(Some(100), None),
+        ]),
+        plan(vec![
+            tokens("absent", &["x"], &[]),
+            tokens("h", &[], &["w.*"]),
+        ]),
+        plan(vec![not_tokens("m", &["v03"], &[])]),
+        plan(vec![number("fnum", crate::NumberCmp::Lt, &[20.0], false)]),
+        plan(vec![fields_in(&["m"], &["h"], "1")]),
+        plan(vec![PlanTerm::EventGroup {
+            conditions: vec![crate::GroupCondition::TimeSinceStart {
+                intervals: vec![(Some(0), None)],
+            }],
+        }]),
+        TracePlan::default(),
+    ];
+    for range in [(0, N as u32), (10, 200)] {
+        let mut multi_work = ScanWork::default();
+        let multi = idx
+            .compile_trace_plans(&plans, range, UNLIMITED, &mut multi_work)
+            .unwrap()
+            .expect("unbounded");
+        assert_eq!(multi.len(), plans.len());
+        let mut single_rows = 0;
+        for (i, (p, compiled)) in plans.iter().zip(&multi).enumerate() {
+            let mut work = ScanWork::default();
+            let alone = idx
+                .compile_trace_plan(p, range, UNLIMITED, &mut work)
+                .unwrap()
+                .expect("unbounded");
+            single_rows += work.rows_visited;
+            let mut w = ScanWork::default();
+            assert_eq!(
+                compiled.matched_in_range(range.0, range.1, &mut w),
+                alone.matched_in_range(range.0, range.1, &mut w),
+                "plan {i}, range {range:?}"
+            );
+        }
+        // The h, h2, fnum and free-text (h, h2) plans each scan alone;
+        // together one pass.
+        assert_eq!(single_rows, 4 * N as u64);
+        assert_eq!(multi_work.rows_visited, N as u64, "one shared pass");
+    }
+
+    // All-or-nothing under either ceiling.
+    let mut work = ScanWork::default();
+    assert!(
+        idx.compile_trace_plans(&plans, (0, N as u32), rows_ceiling(10), &mut work)
+            .unwrap()
+            .is_none()
+    );
+    let mut work = ScanWork::default();
+    let dict = ScanLimits {
+        rows: u64::MAX,
+        dict_bytes: 100,
+    };
+    assert!(
+        idx.compile_trace_plans(&plans, (0, N as u32), dict, &mut work)
+            .unwrap()
+            .is_none()
+    );
+
+    // Probes only a ready-empty plan registered are left out: beside a
+    // probe-free plan, nothing is scanned.
+    let mut work = ScanWork::default();
+    let pair = [plans[3].clone(), plans[2].clone()];
+    idx.compile_trace_plans(&pair, (0, N as u32), UNLIMITED, &mut work)
+        .unwrap()
+        .expect("unbounded");
+    assert_eq!(work.rows_visited, 0);
+}
+
+/// A live subgroup plan compiled beside a high-card plan refines the
+/// same rows as when compiled alone.
+#[test]
+fn multi_plan_compile_refines_subgroups() {
+    const ROWS: usize = 128;
+    let arena = Bump::new();
+    let mut ri = RowIndex::new(&arena, 10);
+    let mut events = crate::EventRows::new();
+    for i in 0..ROWS {
+        let h = ri.intern(None, &format!("h=w{i:03}"));
+        let name = ri.intern(None, &format!("events.name=e{:02}", i % 16));
+        ri.row(1_000 + i as i64, &[h, name]);
+        events.push_event(1_000 + i as u64, 0, name, &[]);
+        events.end_row(0);
+    }
+    ri.events = Some(events);
+    let (buf, _s, _m) = IndexWriter::write_into(&ri, Cursor::new(Vec::new()), Vec::new()).unwrap();
+    let bytes = buf.into_inner();
+    let idx = IndexReader::open(&bytes).unwrap();
+    let plans = vec![
+        plan(vec![PlanTerm::EventGroup {
+            conditions: vec![crate::GroupCondition::Field {
+                field: "events.name".to_string(),
+                matcher: crate::PlanMatcher::Tokens {
+                    exact: vec!["e05".to_string()],
+                    patterns: vec![],
+                },
+            }],
+        }]),
+        plan(vec![tokens("h", &[], &["w0.."])]),
+    ];
+    let mut work = ScanWork::default();
+    let multi = idx
+        .compile_trace_plans(&plans, (0, ROWS as u32), UNLIMITED, &mut work)
+        .unwrap()
+        .expect("unbounded");
+    for (p, compiled) in plans.iter().zip(&multi) {
+        let mut w = ScanWork::default();
+        let alone = idx
+            .compile_trace_plan(p, (0, ROWS as u32), UNLIMITED, &mut w)
+            .unwrap()
+            .expect("unbounded");
+        assert_eq!(
+            compiled.matched_in_range(0, ROWS as u32, &mut w),
+            alone.matched_in_range(0, ROWS as u32, &mut w)
+        );
+    }
+    let mut w = ScanWork::default();
+    assert_eq!(
+        multi[0].matched_in_range(0, ROWS as u32, &mut w),
+        (0..ROWS as u32).filter(|i| i % 16 == 5).collect::<Vec<_>>()
+    );
+}
+
+/// Membership agrees with the range count at every position, inside
+/// and outside the compile range and past the universe.
+#[test]
+fn contains_equals_count_in_range() {
+    let (bytes, _) = fixture();
+    let idx = IndexReader::open(&bytes).unwrap();
+    let plans = [
+        plan(vec![tokens("h", &[], &["w0[0-5]."])]),
+        plan(vec![not_tokens("s", &["yes"], &[])]),
+        plan(vec![PlanTerm::duration(Some(100), Some(900))]),
+        TracePlan::default(),
+        plan(vec![tokens("absent", &["x"], &[])]),
+    ];
+    for range in [(0, N as u32), (10, 20)] {
+        for (i, p) in plans.iter().enumerate() {
+            let mut work = ScanWork::default();
+            let compiled = idx
+                .compile_trace_plan(p, range, UNLIMITED, &mut work)
+                .unwrap()
+                .expect("unbounded");
+            for pos in 0..N as u32 + 5 {
+                assert_eq!(
+                    compiled.contains(pos),
+                    compiled.count_in_range(pos, pos + 1) == 1,
+                    "plan {i}, range {range:?}, pos {pos}"
+                );
+            }
+        }
+    }
+}
