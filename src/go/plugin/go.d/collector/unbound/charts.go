@@ -320,7 +320,7 @@ var (
 	// TODO: do not add subnet and ipsecmod stuff by default?
 	memModChart = Chart{
 		ID:       "mod_memory",
-		Title:    "CollectorV1 Memory",
+		Title:    "Module Memory",
 		Units:    "KB",
 		Fam:      "mem",
 		Ctx:      "unbound.mod_memory",

@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	"github.com/netdata/netdata/go/plugins/plugin/framework/charttpl"
+	"github.com/netdata/netdata/go/plugins/plugin/framework/collectorapi"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -87,6 +88,67 @@ groups:
 
 	_, err = ChartTemplateCharts(template + "      - title: Requests Again\n        context: requests\n        units: requests/s\n        dimensions:\n          - selector: requests_total\n            name: total\n")
 	require.ErrorContains(t, err, `duplicate chart context "app.requests"`)
+}
+
+func TestV1ChartsByContext(t *testing.T) {
+	requests := &collectorapi.Chart{
+		ID:    "requests_%s",
+		Title: "Requests",
+		Units: "requests/s",
+		Ctx:   "app.requests",
+		Dims:  collectorapi.Dims{{ID: "app_%s_ok", Name: "ok"}, {ID: "failed"}},
+	}
+	latency := &collectorapi.Chart{
+		ID:    "latency_%s",
+		Title: "Latency",
+		Units: "ms",
+		Ctx:   "app.latency",
+		Type:  collectorapi.Stacked,
+	}
+	tests := map[string]struct {
+		charts  collectorapi.Charts
+		want    map[string]charttpl.Chart
+		wantErr string
+	}{
+		"renders as the V1 renderer": {
+			charts: collectorapi.Charts{requests, latency},
+			want: map[string]charttpl.Chart{
+				"app.requests": {
+					Context:    "app.requests",
+					Title:      "Requests",
+					Units:      "requests/s",
+					Type:       "line",
+					Dimensions: []charttpl.Dimension{{Name: "ok"}, {Name: "failed"}},
+				},
+				"app.latency": {
+					Context:    "app.latency",
+					Title:      "Latency",
+					Units:      "ms",
+					Type:       "stacked",
+					Dimensions: []charttpl.Dimension{{NameFromLabel: "runtime"}},
+				},
+			},
+		},
+		"chart ID used twice": {
+			charts:  collectorapi.Charts{requests, &collectorapi.Chart{ID: requests.ID, Ctx: "app.other"}},
+			wantErr: `chart ID "requests_%s" is used twice`,
+		},
+		"context used twice": {
+			charts:  collectorapi.Charts{requests, &collectorapi.Chart{ID: "other", Ctx: requests.Ctx}},
+			wantErr: `context "app.requests" is used by two charts`,
+		},
+	}
+	for name, test := range tests {
+		t.Run(name, func(t *testing.T) {
+			got, err := V1ChartsByContext(test.charts)
+			if test.wantErr != "" {
+				require.EqualError(t, err, test.wantErr)
+				return
+			}
+			require.NoError(t, err)
+			assert.Equal(t, test.want, got)
+		})
+	}
 }
 
 func TestDecodeMetadataModule(t *testing.T) {
