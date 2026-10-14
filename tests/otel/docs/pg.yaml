@@ -1,0 +1,22 @@
+receivers:
+  postgresql:
+    endpoint: "localhost:5432"
+    username: "otel"
+    password: "otel"
+    databases:
+      - "testdb"
+    collection_interval: 10s
+    tls:
+      insecure: true
+
+exporters:
+  otlp:
+    endpoint: "localhost:4317"
+    tls:
+      insecure: true
+
+service:
+  pipelines:
+    metrics:
+      receivers: [postgresql]
+      exporters: [otlp]
