@@ -135,8 +135,10 @@ static void rrdset_insert_callback(const DICTIONARY_ITEM *item __maybe_unused, v
     ml_chart_new(st);
 }
 
-// the destructor - runs under the dictionary write lock when garbage collection frees the chart,
-// and with no dictionary lock held when dictionary_del() frees an unreferenced one
+// the destructor - runs when the last link to the chart goes, which is either its id index item or
+// its name index item (a view sharing it): under that dictionary's write lock when its garbage
+// collection frees the item (for the name index also under its index write lock), or with no
+// dictionary lock held when dictionary_del() frees an unreferenced one
 static void rrdset_delete_callback(const DICTIONARY_ITEM *item __maybe_unused, void *rrdset, void *rrdhost __maybe_unused) {
     RRDSET *st = rrdset;
 

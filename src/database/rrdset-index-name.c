@@ -138,8 +138,10 @@ void rrdset_index_del_name(RRDHOST *host, RRDSET *st) {
             if(dictionary_acquired_item_value(sta) == st)
                 dictionary_del(host->rrdset_root_index_name, rrdset_name(st));
 
+            // no garbage collection here: collecting a view walks all its items, so doing it per
+            // deleted chart makes freeing N charts cost N full walks. The obsolete charts cleanup
+            // collects once per sweep, and the next name insert collects anyway.
             dictionary_acquired_item_release(host->rrdset_root_index_name, sta);
-            dictionary_garbage_collect(host->rrdset_root_index_name);
         }
 
         rrdset_flag_clear(st, RRDSET_FLAG_INDEXED_NAME);

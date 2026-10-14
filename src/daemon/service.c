@@ -184,6 +184,10 @@ static inline size_t svc_rrdhost_cleanup_charts_marked_obsolete(RRDHOST *host) {
     }
     rrdset_foreach_done(st);
 
+    // the name index first: its deleted items share the charts with the id index items, so collecting
+    // it first lets the id index collection free the charts it still holds. Charts whose id items were
+    // already collected during the sweep (a chart created on this host meanwhile) are destroyed here.
+    dictionary_garbage_collect(host->rrdset_root_index_name);
     dictionary_garbage_collect(host->rrdset_root_index);
 
     if(partial_archives != partial_candidates)

@@ -149,6 +149,18 @@ size_t dictionary_referenced_items(DICTIONARY *dict) {
     return referenced_items;
 }
 
+// items marked deleted and unreferenced, waiting for a garbage collection to free them; on a view,
+// items orphaned by a master deletion are counted only once a collection walks past them
+size_t dictionary_pending_deletes(DICTIONARY *dict) {
+    if(unlikely(!dict)) return 0;
+
+    long int pending = DICTIONARY_PENDING_DELETES_GET(dict);
+    if(pending < 0)
+        fatal("DICTIONARY: pending deletes is negative: %ld", pending);
+
+    return pending;
+}
+
 void dictionary_version_increment(DICTIONARY *dict) {
     __atomic_fetch_add(&dict->version, 1, __ATOMIC_RELAXED);
 }
