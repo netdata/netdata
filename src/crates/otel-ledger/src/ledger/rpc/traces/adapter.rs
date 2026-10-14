@@ -12,7 +12,7 @@
 //! mode dispatch and the sealed-SFST + live-WAL source capture
 //! ([`super::sources`]) — the adapter never touches registry state.
 
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 
 use sfsq::traces::{
     AttributeKey, AttributeOwner, AttributeValuesData, BuiltinField, CompareOp, Condition,
@@ -186,8 +186,9 @@ fn with_reason(status: QueryStatus, extra: PartialReason) -> QueryStatus {
 /// Bounded: values are capped ([`TRACE_VALUE_MAX_BYTES`], flagged per
 /// span) and the spans stop at [`TRACE_SPANS_MAX_BYTES`]. A cut trace
 /// keeps its earliest spans — the combiner's total order, as the
-/// engine's own span cap does — with its graph rebuilt over them, and
-/// reports `byte_budget`.
+/// engine's own span cap does — with its graph rebuilt over them and
+/// its field kinds narrowed to the names they carry, and reports
+/// `byte_budget`.
 pub(crate) fn to_trace_result(
     trace_id: &sfst::TraceId,
     data: TraceData,
@@ -195,6 +196,7 @@ pub(crate) fn to_trace_result(
 ) -> TraceResult {
     let mut t = data.trace;
     let mut status = data.status;
+    let mut field_kinds = data.field_kinds;
     let truncated: Vec<bool> = t.spans.iter_mut().map(cap_span_values).collect();
     let mut spans = Vec::with_capacity(t.spans.len());
     let mut bytes = 0usize;
@@ -211,6 +213,7 @@ pub(crate) fn to_trace_result(
         let (roots, children) = sfst::trace_combine::build_forest(&t.spans);
         t.roots = roots;
         t.children = children;
+        retain_kinds_of(&mut field_kinds, &t.spans);
         status = with_reason(status, PartialReason::ByteBudget);
     }
     let summary_root = t.summary_root();
@@ -227,8 +230,32 @@ pub(crate) fn to_trace_result(
         roots: t.roots,
         children: t.children,
         spans,
-        field_kinds: field_kinds_wire(data.field_kinds),
+        field_kinds: field_kinds_wire(field_kinds),
     }
+}
+
+/// Keep the kinds of the names `spans` carry: the engine projects them
+/// onto every assembled span, and a cut trace sends only some of them.
+fn retain_kinds_of(kinds: &mut FieldKinds, spans: &[sfst::TraceSpan]) {
+    let mut fields: HashSet<&str> = HashSet::new();
+    let mut event_attributes: HashSet<&str> = HashSet::new();
+    let mut link_attributes: HashSet<&str> = HashSet::new();
+    for s in spans {
+        fields.extend(s.fields.iter().map(|(k, _)| k.as_str()));
+        for e in &s.events {
+            event_attributes.extend(e.attributes.iter().map(|(k, _)| k.as_str()));
+        }
+        for l in &s.links {
+            link_attributes.extend(l.attributes.iter().map(|(k, _)| k.as_str()));
+        }
+    }
+    kinds.fields.retain(|(n, _)| fields.contains(n.as_str()));
+    kinds
+        .event_attributes
+        .retain(|(n, _)| event_attributes.contains(n.as_str()));
+    kinds
+        .link_attributes
+        .retain(|(n, _)| link_attributes.contains(n.as_str()));
 }
 
 /// One assembled span → the wire shape (events and links ride along).

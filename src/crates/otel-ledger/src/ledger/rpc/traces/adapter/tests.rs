@@ -657,9 +657,10 @@ fn an_oversized_span_value_is_cut_and_flagged() {
 
 #[test]
 fn a_trace_over_the_byte_budget_keeps_its_earliest_spans() {
-    // A chain of spans each carrying one capped-size value: the budget
-    // holds only a prefix. The graph is rebuilt over the kept spans, and
-    // the status says the trace was cut.
+    // A chain of spans each carrying one capped-size value under its own
+    // key: the budget holds only a prefix. The kept spans are the input
+    // prefix in order, the graph is rebuilt over them, the field kinds
+    // cover only their keys, and the status says the trace was cut.
     let trace_id = parse_trace_id("11111111111111111111111111111111").unwrap();
     let n = TRACE_SPANS_MAX_BYTES / TRACE_VALUE_MAX_BYTES + 50;
     let spans: Vec<sfst::TraceSpan> = (0..n)
@@ -667,10 +668,14 @@ fn a_trace_over_the_byte_budget_keeps_its_earliest_spans() {
             let id = (i % 250) as u8 + 1;
             let parent = (i > 0).then(|| ((i - 1) % 250) as u8 + 1);
             let mut s = span(id, parent, 1_000 + i as i64);
-            s.fields = vec![("attributes.v".into(), "x".repeat(TRACE_VALUE_MAX_BYTES))];
+            s.fields = vec![(
+                format!("attributes.v{i}"),
+                "x".repeat(TRACE_VALUE_MAX_BYTES),
+            )];
             s
         })
         .collect();
+    let input = spans.clone();
     let (roots, children) = sfst::trace_combine::build_forest(&spans);
     let data = TraceData {
         trace: sfst::Trace {
@@ -679,7 +684,12 @@ fn a_trace_over_the_byte_budget_keeps_its_earliest_spans() {
             children,
         },
         status: QueryStatus::Complete,
-        field_kinds: FieldKinds::default(),
+        field_kinds: FieldKinds {
+            fields: (0..n)
+                .map(|i| (format!("attributes.v{i}"), sfst::ValueKind::Str))
+                .collect(),
+            ..FieldKinds::default()
+        },
     };
     let r = to_trace_result(&trace_id, data, coverage_all());
     let kept = r.spans.len();
@@ -692,6 +702,13 @@ fn a_trace_over_the_byte_budget_keeps_its_earliest_spans() {
     );
     assert!(r.roots.iter().all(|&i| i < kept));
     assert!(r.children.iter().flatten().all(|&i| i < kept));
+    for (got, want) in r.spans.iter().zip(&input) {
+        assert_eq!(got.span_id, want.span_id.to_string());
+        assert_eq!(got.start_ns, want.start_ns);
+    }
+    let (roots, children) = sfst::trace_combine::build_forest(&input[..kept]);
+    assert_eq!((&r.roots, &r.children), (&roots, &children));
+    assert_eq!(r.field_kinds.fields.len(), kept);
     let spans_bytes: usize = r.spans.iter().map(json_len).sum();
     assert!(spans_bytes <= TRACE_SPANS_MAX_BYTES);
     let v = serde_json::to_value(&r).unwrap();
