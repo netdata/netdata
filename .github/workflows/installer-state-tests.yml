@@ -1,0 +1,41 @@
+---
+name: Installer state permissions
+on:
+  pull_request:
+    paths:
+      - '.github/workflows/installer-state-tests.yml'
+      - 'packaging/installer/functions.sh'
+      - 'packaging/installer/tests/test_install_state.py'
+      - 'packaging/makeself/install-or-update.sh'
+      - 'packaging/makeself/makeself*.sh'
+      - 'system/systemd/tmpfiles.conf.in'
+  push:
+    branches:
+      - master
+    paths:
+      - '.github/workflows/installer-state-tests.yml'
+      - 'packaging/installer/functions.sh'
+      - 'packaging/installer/tests/test_install_state.py'
+      - 'packaging/makeself/install-or-update.sh'
+      - 'packaging/makeself/makeself*.sh'
+      - 'system/systemd/tmpfiles.conf.in'
+permissions:
+  contents: read
+concurrency:
+  group: installer-state-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  linux:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Shell validation
+        run: |
+          bash -n packaging/makeself/install-or-update.sh
+          sh -n packaging/installer/functions.sh
+          shellcheck packaging/makeself/install-or-update.sh packaging/installer/functions.sh
+      - name: Unprivileged isolated fixtures
+        run: python3 packaging/installer/tests/test_install_state.py -v
+      - name: Root ownership and tmpfiles fixtures
+        run: sudo python3 packaging/installer/tests/test_install_state.py -v

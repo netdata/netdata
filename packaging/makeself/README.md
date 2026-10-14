@@ -7,6 +7,24 @@ Netdata provides pre-built static binaries for Linux systems where native packag
 - Self-contained installation (no system dependencies required, no interference with system libraries)
 - Installed under `/opt/netdata`
 
+## State permissions during updates
+
+Installation makes package directories traversable and initializes the service's library, cache and log roots.
+It preserves application-created descendants under those roots, including private directory modes, file owners
+and execution-completion records. The source installer's fallback directory setup uses the same ownership boundary.
+Explicit systemd-tmpfiles policies for database/claiming files and the historical static OTEL ownership repair still
+apply; an update is not a general recursive permission repair.
+
+The isolated regression suite exercises both directory-setup paths and actual makeself archive overlays:
+
+```sh
+python3 packaging/installer/tests/test_install_state.py -v
+sudo python3 packaging/installer/tests/test_install_state.py -v
+```
+
+The Linux root run additionally verifies distinct state owners, systemd-tmpfiles and the historical ownership repair.
+All fixtures live in temporary directories; the tests do not install services or change host Netdata directories.
+
 ## Supported Architectures
 
 | Architecture | Identifier | Notes                            |

@@ -16,6 +16,9 @@ NETDATA_USER_CONFIG_DIR="${NETDATA_PREFIX}/etc/netdata"
 NETDATA_LIB_DIR="${NETDATA_PREFIX}/var/lib/netdata"
 NETDATA_CACHE_DIR="${NETDATA_PREFIX}/var/cache/netdata"
 NETDATA_LOG_DIR="${NETDATA_PREFIX}/var/log/netdata"
+# Consumed by install_netdata_dirs in functions.sh.
+# shellcheck disable=SC2034
+NETDATA_CLAIMING_DIR="${NETDATA_LIB_DIR}/cloud.d"
 
 # -----------------------------------------------------------------------------
 if [ -d /opt/netdata/etc/netdata.old ]; then
@@ -175,7 +178,11 @@ dir_should_be_link etc/netdata ../../usr/lib/netdata/conf.d orig
 progress "fix permissions"
 
 run chmod g+rx,o+rx /opt
-run find /opt/netdata -type d -exec chmod go+rx '{}' \+
+# Makeself creates package parents with a private umask. Make those traversable,
+# but leave application-owned state to its owners and explicit migrations below.
+run find "${NETDATA_PREFIX}" \
+  \( -path "${NETDATA_LIB_DIR}" -o -path "${NETDATA_CACHE_DIR}" -o -path "${NETDATA_LOG_DIR}" \) -prune -o \
+  -type d -exec chmod go+rx '{}' \+
 
 install_netdata_dirs
 
