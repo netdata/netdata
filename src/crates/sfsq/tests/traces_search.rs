@@ -2957,3 +2957,179 @@ fn negated_token_excludes_capped_traces() {
         QueryStatus::Partial([PartialReason::SizeCap].into())
     );
 }
+
+// ── The rows path (decision 49) ──────────────────────────────────────
+
+/// The row of trace `n` in `data`.
+fn row_of(data: &SearchData, n: u8) -> &sfsq::traces::TraceSummary {
+    data.traces
+        .iter()
+        .find(|t| t.trace_id.to_string() == hex(n))
+        .unwrap_or_else(|| panic!("trace {n} in {:?}", ids(data)))
+}
+
+/// Rows count stored rows: a resent span counts twice and its later copy
+/// sets the rank; assembly keeps one canonical copy.
+#[test]
+fn stored_rows_count_resends_and_a_losing_copy_matches() {
+    let dir = tempfile::tempdir().unwrap();
+    let svc = || vec![kv_str("service.name", "svc")];
+    let wal = write_wal(
+        dir.path(),
+        vec![
+            req_with(svc(), None, &[span_in(1, 0x11, 0, 100 * NS, "op")]),
+            req_with(svc(), None, &[span_in(1, 0x11, 0, 300 * NS, "op")]),
+        ],
+        "resend",
+    );
+    let sources = || both_roles(|| vec![sealed_source(dir.path(), &wal, "one")]);
+    let rows = run(sources(), SearchQuery::new(pred(vec![])));
+    let canon = run(sources(), canon_query(pred(vec![])));
+    let (row, assembled) = (row_of(&rows, 1), row_of(&canon, 1));
+    assert_eq!(
+        (row.span_count, row.newest_matched_start_ns),
+        (2, 300 * NS as i64)
+    );
+    assert_eq!(assembled.span_count, 1, "assembly dedups the resend");
+}
+
+/// The row's root is the earliest TRUE claim across files; a withheld
+/// claim at or before it leaves the root unknown, and a trace without
+/// an unset-parent span has none (no display promotion).
+#[test]
+fn root_is_the_earliest_recorded_claim_across_files() {
+    let dir = tempfile::tempdir().unwrap();
+    let svc = || vec![kv_str("service.name", "svc")];
+    let mut tie_a = span_in(2, 0x22, 0, 15 * NS, "tie");
+    tie_a.kind = 1;
+    let mut tie_b = tie_a.clone();
+    tie_b.kind = 2;
+    let wal_a = write_wal(
+        dir.path(),
+        vec![req_with(
+            svc(),
+            None,
+            &[
+                span_in(1, 0x11, 0, 10 * NS, "late"),
+                span_in(2, 0x21, 0, 20 * NS, "kept"),
+                span_in(3, 0x31, 0x99, 30 * NS, "orphan"),
+            ],
+        )],
+        "a",
+    );
+    let wal_b = write_wal(
+        dir.path(),
+        vec![req_with(
+            svc(),
+            None,
+            &[span_in(1, 0x12, 0, 5 * NS, "early"), tie_a, tie_b],
+        )],
+        "b",
+    );
+    let sources = || {
+        both_roles(|| {
+            vec![
+                sealed_source(dir.path(), &wal_a, "a"),
+                sealed_source(dir.path(), &wal_b, "b"),
+            ]
+        })
+    };
+    let rows = run(sources(), SearchQuery::new(pred(vec![])));
+    assert_eq!(row_of(&rows, 1).root_name.as_deref(), Some("early"));
+    assert_eq!(row_of(&rows, 2).root_name, None, "a withheld claim first");
+    assert_eq!(row_of(&rows, 3).root_name, None, "rootless");
+}
+
+/// A holder sealed before TRSS sends its candidates to assembly
+/// (canonical counts); a trace held only by files with stats keeps
+/// stored-row counts. Trace 1 straddles both files, its resend pair in
+/// the legacy one.
+#[test]
+fn legacy_holder_falls_back_to_assembly() {
+    let dir = tempfile::tempdir().unwrap();
+    let svc = || vec![kv_str("service.name", "svc")];
+    let pair = |t: u8, id: u8, at: u64| {
+        vec![
+            req_with(svc(), None, &[span_in(t, id, 0, at * NS, "op")]),
+            req_with(svc(), None, &[span_in(t, id, 0, at * NS, "op")]),
+        ]
+    };
+    let wal_old = write_wal(dir.path(), pair(1, 0x11, 100), "legacy-old");
+    let mut new = pair(2, 0x21, 200);
+    new.push(req_with(
+        svc(),
+        None,
+        &[span_in(1, 0x12, 0x11, 150 * NS, "child")],
+    ));
+    let wal_new = write_wal(dir.path(), new, "legacy-new");
+    drop(sealed_source(dir.path(), &wal_old, "old"));
+    let old = dir.path().join("old.sfst");
+    hide_chunk(&old, *b"TRSS");
+    let sources = || {
+        both_roles(|| {
+            vec![
+                sealed_source_at(&old, "old"),
+                sealed_source(dir.path(), &wal_new, "new"),
+            ]
+        })
+    };
+    let data = run(sources(), SearchQuery::new(pred(vec![])));
+    assert_eq!(data.status, QueryStatus::Complete);
+    assert_eq!(row_of(&data, 1).span_count, 2, "assembled: the resend once");
+    assert_eq!(row_of(&data, 2).span_count, 2, "stored rows");
+}
+
+/// A corrupt TRSS chunk is reported, and the trace still returns exact
+/// through assembly (which never reads it).
+#[test]
+fn corrupt_stats_chunk_is_skipped_and_surfaced() {
+    let dir = tempfile::tempdir().unwrap();
+    let svc = vec![kv_str("service.name", "svc")];
+    let wal = write_wal(
+        dir.path(),
+        vec![req_with(svc, None, &[span_in(1, 0x11, 0, 100 * NS, "op")])],
+        "corrupt-trss",
+    );
+    drop(sealed_source(dir.path(), &wal, "one"));
+    let path = dir.path().join("one.sfst");
+    corrupt_chunk(&path, *b"TRSS");
+    let data = run(
+        both_roles(|| vec![sealed_source_at(&path, "one")]),
+        SearchQuery::new(pred(vec![])),
+    );
+    assert_eq!(ids(&data), vec![hex(1)]);
+    assert!(data.traces[0].exact);
+    assert!(
+        data.status.has(PartialReason::SourceFailure),
+        "{:?}",
+        data.status
+    );
+}
+
+/// A row reads rollups, never spans, so the span cap does not touch it.
+#[test]
+fn rows_never_hit_the_span_cap() {
+    let dir = tempfile::tempdir().unwrap();
+    let svc = vec![kv_str("service.name", "svc")];
+    let spans: Vec<SpanSpec> = (0..4u8)
+        .map(|i| {
+            span_in(
+                1,
+                0x11 + i,
+                if i == 0 { 0 } else { 0x11 },
+                (100 + u64::from(i)) * NS,
+                "op",
+            )
+        })
+        .collect();
+    let wal = write_wal(dir.path(), vec![req_with(svc, None, &spans)], "cap");
+    let sources = || both_roles(|| vec![sealed_source(dir.path(), &wal, "one")]);
+    let rows = run(
+        sources(),
+        SearchQuery::new(pred(vec![])).span_cap_for_tests(2),
+    );
+    assert_eq!(rows.status, QueryStatus::Complete);
+    assert_eq!((rows.traces[0].span_count, rows.traces[0].exact), (4, true));
+    let canon = run(sources(), canon_query(pred(vec![])).span_cap_for_tests(2));
+    assert!(canon.status.has(PartialReason::SizeCap));
+}
