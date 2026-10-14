@@ -521,7 +521,7 @@ fn positions_report_to_loaded_sources() {
 }
 
 #[test]
-fn rollup_ids_stream_from_the_session() {
+fn rollup_rows_stream_from_the_session() {
     use crate::trace_combine::SpanSource;
     use std::io::Cursor;
     let arena = bumpalo::Bump::new();
@@ -545,7 +545,7 @@ fn rollup_ids_stream_from_the_session() {
     let mut session = owned(&buf);
     let mut got = Vec::new();
     assert_eq!(
-        session.for_each_rollup_id(|id| got.push(id)).unwrap(),
+        session.for_each_rollup_row(|id, _| got.push(id)).unwrap(),
         Some(3)
     );
     assert_eq!(
@@ -560,5 +560,5 @@ fn rollup_ids_stream_from_the_session() {
     ));
 
     let plain = trace_file(&[(sid(1), SpanId::UNSET)]);
-    assert_eq!(owned(&plain).for_each_rollup_id(|_| {}).unwrap(), None);
+    assert_eq!(owned(&plain).for_each_rollup_row(|_, _| {}).unwrap(), None);
 }

@@ -49,6 +49,20 @@
 //! ([`gate`](super::gate)), which prunes a candidate held by one file
 //! alone when some token matches none of its rows there.
 //!
+//! # Rollup discovery
+//!
+//! A query with no positive span-local token but a trace-level token the
+//! gate can decide on (a duration lower bound, a root condition)
+//! discovers from window files' rollup rows instead of their spans: one
+//! row per trace and file, not one per span. Rows with no possible
+//! in-window start drop; a row the single-source proof says holds the
+//! whole trace is decided on the spot by the gate's rules; the rest rank
+//! by `min(max_end, the file's bound)`, which is at or above every
+//! in-window span start the trace has in that file, so the raw rank still
+//! bounds the canonical one (C-1) and the loop examines them newest
+//! bound first. Without the proof (its budget passed, a file without a
+//! rollup) the query discovers from spans.
+//!
 //! Consumers (grep-verified): the ledger's otel-traces Search mode —
 //! the Functions view pages it beside an optional aggregate section
 //! (`otel-ledger/src/ledger/rpc/traces/handler.rs` `search_result`) —
@@ -225,6 +239,7 @@ pub struct SearchQuery {
     loaded_sources_cap: usize,
     driver: Option<usize>,
     proof_ids_max: u64,
+    rollup_discovery: bool,
 }
 
 impl SearchQuery {
@@ -243,6 +258,7 @@ impl SearchQuery {
             loaded_sources_cap: LOADED_SOURCES_MAX,
             driver: None,
             proof_ids_max: PROOF_IDS_MAX,
+            rollup_discovery: true,
         }
     }
 
@@ -310,6 +326,14 @@ impl SearchQuery {
     #[doc(hidden)]
     pub fn trace_gate_for_tests(mut self, enabled: bool) -> Self {
         self.gate_enabled = enabled;
+        self
+    }
+
+    /// Test-only switch for rollup discovery: off, trace-level-only
+    /// queries discover from spans. NOT a tuning surface.
+    #[doc(hidden)]
+    pub fn rollup_discovery_for_tests(mut self, enabled: bool) -> Self {
+        self.rollup_discovery = enabled;
         self
     }
 
@@ -429,80 +453,120 @@ struct PendingFile {
     rank_bound: i64,
 }
 
-/// Phase-1 state of one window SFST file: the compiled plan plus the
-/// owned columns that map positions to candidates, and the descending
-/// band cursor of rank-bounded extraction. `band_bottom` is the lowest
-/// position already emitted (every matched position in
-/// `[band_bottom, hi)` has been emitted); `lo` means exhausted.
+/// Phase-1 state of one window SFST file: its candidates, emitted
+/// newest-first in bands.
 struct FileDiscovery {
     /// The file's session slot, recorded on every candidate it emits.
     slot: usize,
-    compiled: sfst::CompiledTracePlan,
-    trace_ids: sfst::TraceIds,
-    timestamps: sfst::Timestamps,
-    lo: u32,
-    band_bottom: u32,
+    source: Discovery,
+}
+
+/// Where a window file's candidates come from.
+enum Discovery {
+    /// Span discovery: the compiled plan plus the owned columns that map
+    /// positions to candidates, and the descending band cursor of
+    /// rank-bounded extraction. `band_bottom` is the lowest position
+    /// already emitted (every matched position in `[band_bottom, hi)`
+    /// has been emitted); `lo` means exhausted.
+    Positions {
+        compiled: sfst::CompiledTracePlan,
+        trace_ids: sfst::TraceIds,
+        timestamps: sfst::Timestamps,
+        lo: u32,
+        band_bottom: u32,
+    },
+    /// Rollup discovery: the file's surviving rollup rows as
+    /// `(rank bound, trace id)`, newest bound first (ties by id); `next`
+    /// is the first not yet emitted.
+    Rollup {
+        ranked: Vec<(i64, TraceId)>,
+        next: usize,
+    },
 }
 
 impl FileDiscovery {
     fn exhausted(&self) -> bool {
-        self.band_bottom <= self.lo
+        match &self.source {
+            Discovery::Positions {
+                lo, band_bottom, ..
+            } => band_bottom <= lo,
+            Discovery::Rollup { ranked, next } => *next >= ranked.len(),
+        }
     }
 
-    /// The highest raw-rank start an UNDISCOVERED candidate from this
-    /// file could still have (positions below the band are unexplored;
-    /// timestamps ascend). `None` when exhausted.
+    /// The highest raw rank an UNDISCOVERED candidate from this file
+    /// could still have (positions below the band are unexplored and
+    /// timestamps ascend; rollup rows below the cursor rank lower).
+    /// `None` when exhausted.
     fn undiscovered_bound(&self) -> Option<i64> {
         if self.exhausted() {
             return None;
         }
-        self.timestamps.at(self.band_bottom - 1)
+        match &self.source {
+            Discovery::Positions {
+                timestamps,
+                band_bottom,
+                ..
+            } => timestamps.at(band_bottom - 1),
+            Discovery::Rollup { ranked, next } => Some(ranked[*next].0),
+        }
     }
 
-    /// Emit the next `count` newest matched positions below the current
-    /// band into `pool` (UNSET trace ids filtered), moving the
-    /// band cursor down. Every emitted position counts into `work`.
+    /// Emit the next `count` candidates into `pool` (UNSET trace ids
+    /// filtered), moving the cursor down. Every emitted candidate counts
+    /// into `work`.
     fn extend(&mut self, count: usize, work: &mut ScanWork, pool: &mut CandidatePool) {
         if self.exhausted() || count == 0 {
             return;
         }
-        let emitted = self
-            .compiled
-            .newest_in_range(self.lo, self.band_bottom, count, work);
-        match emitted.first() {
-            None => self.band_bottom = self.lo,
-            Some(&lowest) => {
-                // The band [lowest, band_bottom) held exactly
-                // `emitted.len()` matches; fewer than requested means
-                // everything below is drained. An exactly-full band may
-                // have drained it too, so probe — `count_in_range`, a
-                // bitmap-tree walk, not a row visit — and never mistake
-                // an empty remainder for an undiscovered threat: that
-                // would turn a provably complete result
-                // Partial{WorkCeiling} when the last match crossed the
-                // ceiling.
-                self.band_bottom = if emitted.len() < count {
-                    self.lo
-                } else {
-                    lowest
-                };
-                if self.band_bottom > self.lo
-                    && self.compiled.count_in_range(self.lo, self.band_bottom) == 0
-                {
-                    self.band_bottom = self.lo;
+        let slot = self.slot;
+        match &mut self.source {
+            Discovery::Positions {
+                compiled,
+                trace_ids,
+                timestamps,
+                lo,
+                band_bottom,
+            } => {
+                let emitted = compiled.newest_in_range(*lo, *band_bottom, count, work);
+                match emitted.first() {
+                    None => *band_bottom = *lo,
+                    Some(&lowest) => {
+                        // The band [lowest, band_bottom) held exactly
+                        // `emitted.len()` matches; fewer than requested
+                        // means everything below is drained. An
+                        // exactly-full band may have drained it too, so
+                        // probe — `count_in_range`, a bitmap-tree walk,
+                        // not a row visit — and never mistake an empty
+                        // remainder for an undiscovered threat: that
+                        // would turn a provably complete result
+                        // Partial{WorkCeiling} when the last match
+                        // crossed the ceiling.
+                        *band_bottom = if emitted.len() < count { *lo } else { lowest };
+                        if *band_bottom > *lo && compiled.count_in_range(*lo, *band_bottom) == 0 {
+                            *band_bottom = *lo;
+                        }
+                    }
+                }
+                for &pos in &emitted {
+                    let trace_id = trace_ids.get(pos as usize);
+                    if trace_id.is_unset() {
+                        continue;
+                    }
+                    let start_ns = timestamps
+                        .at(pos)
+                        .expect("column lengths validated at discovery setup");
+                    pool.add(trace_id, start_ns, Origin::File(slot));
                 }
             }
-        }
-        for &pos in &emitted {
-            let trace_id = self.trace_ids.get(pos as usize);
-            if trace_id.is_unset() {
-                continue;
+            Discovery::Rollup { ranked, next } => {
+                let end = (*next).saturating_add(count).min(ranked.len());
+                work.rows_visited += (end - *next) as u64;
+                for &(bound, trace_id) in &ranked[*next..end] {
+                    pool.add(trace_id, bound, Origin::File(slot));
+                }
+                *next = end;
             }
-            let start_ns = self
-                .timestamps
-                .at(pos)
-                .expect("column lengths validated at discovery setup");
-            pool.add(trace_id, start_ns, Origin::File(self.slot));
         }
     }
 }
@@ -982,6 +1046,11 @@ pub fn search(
         }
     }
     let token_gate = token_gate_wanted && proof.is_some();
+    // Rollup discovery (module docs): candidates from window files'
+    // rollup rows instead of their spans, for queries the trace-level
+    // gate decides with no positive span-local token to discover from.
+    let rollup_discovery =
+        query.rollup_discovery && lowered.positive.is_empty() && gate.is_some() && proof.is_some();
     let mut token_prunes = 0u64;
 
     // ── Phase 2: the sessions over the whole completion snapshot ─────
@@ -1107,14 +1176,7 @@ pub fn search(
             if gated && let Some(g) = gate.as_mut() {
                 let decision =
                     g.check(trace_id, single_file, &mut sessions, &mut loaded, &mut work);
-                for idx in g.take_new_failures() {
-                    let who = origin.get(idx).map(String::as_str).unwrap_or("?");
-                    tracing::warn!(
-                        "sfsq traces: source {who} is corrupt (gate evidence); skipped and surfaced"
-                    );
-                    status.add(PartialReason::SourceFailure);
-                    degraded_assembly = true;
-                }
+                surface_gate_failures(g, &origin, &mut status, &mut degraded_assembly);
                 if decision == GateDecision::Prune {
                     continue;
                 }
@@ -1231,6 +1293,32 @@ pub fn search(
             if cancel.is_cancelled() {
                 return Ok(cancelled_empty(status));
             }
+            if rollup_discovery {
+                let g = gate.as_mut().expect("rollup discovery runs with the gate");
+                let file = compile_rollup(
+                    next,
+                    &query,
+                    &mut sessions,
+                    &slot_sources,
+                    &mut loaded,
+                    g,
+                    proof
+                        .as_ref()
+                        .expect("rollup discovery runs with the proof"),
+                    &mut work,
+                    &mut status,
+                    &mut degraded_assembly,
+                    &mut truncated_up_to,
+                );
+                surface_gate_failures(g, &origin, &mut status, &mut degraded_assembly);
+                if let Some(mut file) = file {
+                    file.extend(clamp(k, &work, query.visited_ceiling), &mut work, &mut pool);
+                    if !file.exhausted() {
+                        files.push(file);
+                    }
+                }
+                continue;
+            }
             let found = compile_pending(
                 next,
                 file_plans,
@@ -1310,11 +1398,13 @@ impl Discovered {
         let compiled = self.compiled.remove(driver);
         let file = FileDiscovery {
             slot: self.slot,
-            compiled,
-            trace_ids: self.trace_ids,
-            timestamps: self.timestamps,
-            lo: self.lo,
-            band_bottom: self.hi,
+            source: Discovery::Positions {
+                compiled,
+                trace_ids: self.trace_ids,
+                timestamps: self.timestamps,
+                lo: self.lo,
+                band_bottom: self.hi,
+            },
         };
         (file, self.compiled)
     }
@@ -1386,6 +1476,91 @@ fn compile_pending(
             status.add(PartialReason::SourceFailure);
             None
         }
+    }
+}
+
+/// Rollup discovery for one pending window file (module docs): the
+/// file's rollup rows that may hold an in-window span start, minus the
+/// rows of single-source traces (the proof) the trace-level gate rules
+/// out on that row alone, ranked by `min(max_end, file bound)` — at or
+/// above every in-window span start the trace has in this file. One
+/// unit per row (the gate charges its own reads). A file whose rollup
+/// fails to decode is a source failure that degrades every assembly; a
+/// ceiling crossed mid-file leaves its rank bound in `truncated_up_to`
+/// as a standing threat. `None` in those cases.
+#[allow(clippy::too_many_arguments)]
+fn compile_rollup(
+    file: PendingFile,
+    query: &SearchQuery,
+    sessions: &mut [sfst::TraceFileSession<'_, '_>],
+    slot_sources: &[&TraceSource],
+    loaded: &mut sfst::LoadedSources,
+    gate: &mut TraceGate<'_>,
+    proof: &sfst::RepeatFilter,
+    work: &mut ScanWork,
+    status: &mut StatusBuilder,
+    degraded_assembly: &mut bool,
+    truncated_up_to: &mut Option<i64>,
+) -> Option<FileDiscovery> {
+    let PendingFile { slot, rank_bound } = file;
+    let mut rows = Vec::new();
+    let read = sessions[slot].for_each_rollup_row(|id, row| rows.push((id, row)));
+    loaded.touch(slot, sessions);
+    match read {
+        Ok(Some(_)) => {}
+        // The proof covered this file, so its rollup decoded before; a
+        // failure now still fails the file.
+        Ok(None) | Err(_) => {
+            tracing::warn!(
+                "sfsq traces: source {} failed to read its trace rollup",
+                slot_sources[slot].source_id()
+            );
+            status.add(PartialReason::SourceFailure);
+            *degraded_assembly = true;
+            return None;
+        }
+    }
+    let window_start = query.window.map_or(i64::MIN, |w| w.range_ns().start);
+    let mut ranked = Vec::new();
+    for (trace_id, row) in rows {
+        work.rows_visited += 1;
+        if work.rows_visited > query.visited_ceiling {
+            *truncated_up_to = Some(truncated_up_to.map_or(rank_bound, |b| b.max(rank_bound)));
+            return None;
+        }
+        // No span of this row can start inside [window_start, rank_bound).
+        if row.min_start_ns >= rank_bound || row.max_end_ns < window_start {
+            continue;
+        }
+        if !proof.may_repeat(trace_id)
+            && gate.check_row(slot, row, sessions, loaded, work) == GateDecision::Prune
+        {
+            continue;
+        }
+        ranked.push((row.max_end_ns.min(rank_bound - 1), trace_id));
+    }
+    ranked.sort_unstable_by(|a, b| b.0.cmp(&a.0).then(a.1.cmp(&b.1)));
+    Some(FileDiscovery {
+        slot,
+        source: Discovery::Rollup { ranked, next: 0 },
+    })
+}
+
+/// Surface the files the trace-level gate proved corrupt since the last
+/// call: warn, `SourceFailure`, and every later assembly degraded.
+fn surface_gate_failures(
+    gate: &mut TraceGate<'_>,
+    origin: &[String],
+    status: &mut StatusBuilder,
+    degraded_assembly: &mut bool,
+) {
+    for idx in gate.take_new_failures() {
+        let who = origin.get(idx).map(String::as_str).unwrap_or("?");
+        tracing::warn!(
+            "sfsq traces: source {who} is corrupt (gate evidence); skipped and surfaced"
+        );
+        status.add(PartialReason::SourceFailure);
+        *degraded_assembly = true;
     }
 }
 

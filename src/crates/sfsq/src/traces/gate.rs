@@ -101,7 +101,9 @@
 //! proves single-source, emitted by a window file, lives in that file
 //! alone: the trace-level rules read that one rollup row (coverage is
 //! complete by the proof), and the token gate ([`tokens_prune`]) reads
-//! that one file's rows. Other candidates (straddling traces and the
+//! that one file's rows. Rollup discovery applies the same row rules
+//! while it reads a window file's rollup ([`TraceGate::check_row`]), so
+//! such a trace never enters the candidate pool. Other candidates (straddling traces and the
 //! filter's false positives) take the all-file path above. A file
 //! without a rollup, or one that fails to decode it, disables the proof
 //! for the query: its ids are unknown. So does passing
@@ -177,6 +179,7 @@ pub(crate) enum GateDecision {
 pub(crate) struct GateStats {
     pub checks: u64,
     pub single_source: u64,
+    pub rows_decided: u64,
     pub prunes: u64,
     pub no_root_prunes: u64,
     pub tail_unprunable: u64,
@@ -187,6 +190,7 @@ pub(crate) struct GateStats {
 }
 
 /// One rollup row of evidence for the candidate under test.
+#[derive(Clone, Copy)]
 struct RowEvidence {
     file: usize,
     row: sfst::RollupRow,
@@ -326,11 +330,40 @@ impl<'e> TraceGate<'e> {
             }
         }
         // Coverage-complete now holds over the surviving files.
+        self.decide(&rows, sessions, loaded, work)
+    }
 
+    /// Decide a candidate from ONE rollup row of a file the single-source
+    /// proof says holds it alone (rollup discovery's local verdict) —
+    /// the same rules as [`check`](Self::check), on that row.
+    pub(crate) fn check_row(
+        &mut self,
+        file: usize,
+        row: sfst::RollupRow,
+        sessions: &mut [sfst::TraceFileSession<'_, '_>],
+        loaded: &mut sfst::LoadedSources,
+        work: &mut ScanWork,
+    ) -> GateDecision {
+        if self.failed[file] {
+            return GateDecision::Assemble;
+        }
+        self.stats.rows_decided += 1;
+        self.decide(&[RowEvidence { file, row }], sessions, loaded, work)
+    }
+
+    /// The prune rules over the candidate's covering rows (every file
+    /// that may hold it, coverage complete).
+    fn decide(
+        &mut self,
+        rows: &[RowEvidence],
+        sessions: &mut [sfst::TraceFileSession<'_, '_>],
+        loaded: &mut sfst::LoadedSources,
+        work: &mut ScanWork,
+    ) -> GateDecision {
         // ── Root claim census (decision 1D) ──────────────────────────
         let mut any_claim = false;
         let mut any_withheld = false;
-        for r in &rows {
+        for r in rows {
             if self.failed[r.file] {
                 continue;
             }
@@ -363,7 +396,7 @@ impl<'e> TraceGate<'e> {
         'condition: for ci in 0..positive_conditions {
             let (field, matcher) = self.root_conditions[ci];
             let mut claiming = 0usize;
-            for &RowEvidence { file, row } in &rows {
+            for &RowEvidence { file, row } in rows {
                 if self.failed[file] {
                     continue; // defensive: never read evidence from a failed file
                 }
@@ -406,7 +439,7 @@ impl<'e> TraceGate<'e> {
         // ── Duration rule: merged envelope below the lower bound ─────
         if let Some(bound) = self.duration_lower_bound {
             let mut envelope: Option<(i64, i64)> = None;
-            for &RowEvidence { file, row } in &rows {
+            for &RowEvidence { file, row } in rows {
                 if self.failed[file] {
                     continue;
                 }
@@ -499,7 +532,7 @@ pub(crate) fn single_source_proof(
     let mut filter = sfst::RepeatFilter::new();
     let mut recorded = 0u64;
     for idx in 0..sessions.len() {
-        let visited = sessions[idx].for_each_rollup_id(|id| filter.record(id));
+        let visited = sessions[idx].for_each_rollup_row(|id, _| filter.record(id));
         loaded.touch(idx, sessions);
         recorded += visited.ok()?? as u64;
         if recorded > max_ids {

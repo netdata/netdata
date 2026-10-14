@@ -1377,3 +1377,150 @@ fn gate_probes_hit_the_ceiling() {
     );
     assert_eq!(on.status, QueryStatus::Complete);
 }
+
+// ── Rollup discovery ─────────────────────────────────────────────────
+
+/// Trace-level-only queries discover from rollup rows; span discovery
+/// (the toggle) and the gates off give the same answers at every limit,
+/// with straddling and tail-extended traces, a negated span-local token
+/// and a window.
+#[test]
+fn rollup_and_span_discovery_agree() {
+    let dir = tempfile::tempdir().unwrap();
+    let sources = mixed_corpus(dir.path());
+    let window = sfsq::traces::TimeWindow::new(104 * NS as i64, 110 * NS as i64).unwrap();
+    let queries: Vec<SearchQuery> = vec![
+        SearchQuery::new(pred(vec![min_duration(5 * NS as i64)])),
+        SearchQuery::new(pred(vec![root_service_eq("svc-a")])),
+        SearchQuery::new(pred(vec![
+            root_service_eq("svc-b"),
+            min_duration(5 * NS as i64),
+        ])),
+        SearchQuery::new(tokens(vec![
+            Token::positive(pred(vec![min_duration(5 * NS as i64)])),
+            Token::negated(pred(vec![name_eq("db")])),
+        ])),
+        SearchQuery::new(pred(vec![min_duration(5 * NS as i64)])).window(window),
+    ];
+    for (i, q) in queries.into_iter().enumerate() {
+        for limit in [1, 3, 20] {
+            let q = q.clone().limit(limit);
+            let rollup = run(sources(), q.clone());
+            let spans = run(sources(), q.clone().rollup_discovery_for_tests(false));
+            let off = run(sources(), q.trace_gate_for_tests(false));
+            assert!(!rollup.traces.is_empty(), "query {i}, limit {limit}");
+            assert_eq!(
+                rollup.status,
+                QueryStatus::Complete,
+                "query {i}, limit {limit}"
+            );
+            assert_eq!(
+                norm(&rollup),
+                norm(&spans),
+                "query {i}, limit {limit}: spans"
+            );
+            assert_eq!(
+                norm(&rollup),
+                norm(&off),
+                "query {i}, limit {limit}: gates off"
+            );
+        }
+    }
+}
+
+/// A rollup row ranks by its envelope end, which can lie far after the
+/// trace's newest span start: an early long span must not outrank a
+/// later short one in the answer (the bound only orders the frontier),
+/// and a trace whose newest span starts late must rank by it, not by
+/// its first start.
+#[test]
+fn long_span_rank_bound_is_sound() {
+    let dir = tempfile::tempdir().unwrap();
+    let svc = vec![kv_str("service.name", "svc-a")];
+    // Trace 1 starts at 100 s and runs 50 s; trace 2 starts at 140 s
+    // and runs 10 s. Both envelopes end at 150 s; trace 2 is newer.
+    // Trace 3 starts at 120 s, but its child starts at 145 s, the
+    // newest start of all.
+    let a = req_with(
+        svc.clone(),
+        None,
+        &[
+            root_span(1, 0x11, 100 * NS, 150 * NS, "long"),
+            root_span(3, 0x31, 120 * NS, 121 * NS, "early-root"),
+            SpanSpec {
+                end: 146 * NS,
+                ..span_in(3, 0x32, 0x31, 145 * NS, "late-child")
+            },
+        ],
+    );
+    let b = req_with(
+        svc,
+        None,
+        &[root_span(2, 0x21, 140 * NS, 150 * NS, "short")],
+    );
+    let wal_a = write_wal(dir.path(), vec![a], "long-a");
+    let wal_b = write_wal(dir.path(), vec![b], "short-b");
+    let sources = || {
+        both_roles(|| {
+            vec![
+                sealed_source(dir.path(), &wal_a, "a"),
+                sealed_source(dir.path(), &wal_b, "b"),
+            ]
+        })
+    };
+    let q = |limit| SearchQuery::new(pred(vec![min_duration(5 * NS as i64)])).limit(limit);
+    assert_eq!(ids(&run(sources(), q(1))), vec![hex(3)]);
+    assert_eq!(ids(&run(sources(), q(2))), vec![hex(3), hex(2)]);
+    assert_eq!(ids(&run(sources(), q(3))), vec![hex(3), hex(2), hex(1)]);
+    assert_eq!(
+        norm(&run(sources(), q(3))),
+        norm(&run(sources(), q(3).trace_gate_for_tests(false)))
+    );
+}
+
+/// Rollup discovery visits one row per trace and file, not one per span:
+/// a span-heavy corpus that span discovery cannot finish inside the
+/// visited ceiling completes; a tiny ceiling still ends `WorkCeiling`.
+#[test]
+fn rollup_discovery_ceiling() {
+    let dir = tempfile::tempdir().unwrap();
+    let svc = vec![kv_str("service.name", "svc-a")];
+    // 40 traces of 40 spans each; every tenth lasts 10 s.
+    let reqs: Vec<ExportTraceServiceRequest> = (1..=40u8)
+        .map(|t| {
+            let start = u64::from(t) * 100 * NS;
+            let end = if t % 10 == 0 {
+                start + 10 * NS
+            } else {
+                start + NS
+            };
+            let mut spans = vec![root_span(t, 1, start, end, "root")];
+            for c in 2..=40u8 {
+                spans.push(span_in(t, c, 1, start + u64::from(c), "child"));
+            }
+            req_with(svc.clone(), None, &spans)
+        })
+        .collect();
+    let wal = write_wal(dir.path(), reqs, "span-heavy");
+    let sources = || both_roles(|| vec![sealed_source(dir.path(), &wal, "one")]);
+    let q = || {
+        SearchQuery::new(pred(vec![min_duration(5 * NS as i64)]))
+            .limit(10)
+            .visited_rows_ceiling_for_tests(400)
+    };
+    let rollup = run(sources(), q());
+    assert_eq!(ids(&rollup), vec![hex(40), hex(30), hex(20), hex(10)]);
+    assert_eq!(rollup.status, QueryStatus::Complete);
+    let spans = run(sources(), q().rollup_discovery_for_tests(false));
+    assert!(
+        spans.status.has(PartialReason::WorkCeiling),
+        "{:?}",
+        spans.status
+    );
+    let tiny = run(sources(), q().visited_rows_ceiling_for_tests(5));
+    assert!(
+        tiny.status.has(PartialReason::WorkCeiling),
+        "{:?}",
+        tiny.status
+    );
+}

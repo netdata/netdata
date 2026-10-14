@@ -213,14 +213,19 @@ impl TraceRollup {
     /// The root claim and envelope of `trace_id`'s row, copied out, or
     /// `None` when this file holds no spans of that trace.
     pub fn row(&self, trace_id: TraceId) -> Option<RollupRow> {
-        let row = self.find(trace_id)?;
-        Some(RollupRow {
-            root_claim: self.root_is_true_root[row],
-            root_service_ref: self.root_service_refs[row],
-            root_name_ref: self.root_name_refs[row],
-            min_start_ns: self.min_start_ns[row],
-            max_end_ns: self.max_end_ns[row],
-        })
+        Some(self.row_at(self.find(trace_id)?))
+    }
+
+    /// Row `index`'s root claim and envelope, copied out (`index <
+    /// len()`).
+    pub fn row_at(&self, index: usize) -> RollupRow {
+        RollupRow {
+            root_claim: self.root_is_true_root[index],
+            root_service_ref: self.root_service_refs[index],
+            root_name_ref: self.root_name_refs[index],
+            min_start_ns: self.min_start_ns[index],
+            max_end_ns: self.max_end_ns[index],
+        }
     }
 }
 
