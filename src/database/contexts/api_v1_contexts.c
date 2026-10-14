@@ -69,8 +69,7 @@ static inline int rrdmetric_to_json_callback(const DICTIONARY_ITEM *item, void *
 
     if(t->chart_dimensions
        && !simple_pattern_matches_string(t->chart_dimensions, rm->id)
-       && rm->name != rm->id
-       && !simple_pattern_matches_string(t->chart_dimensions, rm->name))
+       && (rm->name == rm->id || !simple_pattern_matches_string(t->chart_dimensions, rm->name)))
         return 0;
 
     if(t->written) {
