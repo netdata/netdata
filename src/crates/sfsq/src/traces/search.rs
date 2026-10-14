@@ -44,6 +44,11 @@
 //! The driver's raw rank bounds it from above, so the C-1 refill below
 //! stays sound.
 //!
+//! Every window file compiles all positive span-local tokens together
+//! when there are two or more; the other tokens' sets feed the token gate
+//! ([`gate`](super::gate)), which prunes a candidate held by one file
+//! alone when some token matches none of its rows there.
+//!
 //! Consumers (grep-verified): the ledger's otel-traces Search mode —
 //! the Functions view pages it beside an optional aggregate section
 //! (`otel-ledger/src/ledger/rpc/traces/handler.rs` `search_result`) —
@@ -149,8 +154,8 @@ use sfst::trace_combine::{SpanSource, combine};
 use sfst::{ScanWork, TraceId};
 
 use super::by_id::{DEFAULT_SPAN_CAP, LOADED_SOURCES_MAX};
-use super::gate::{GateDecision, TraceGate};
-use super::predicate::{EvalPredicate, LoweredTokens, PredicateError, TokenQuery};
+use super::gate::{GateDecision, PROOF_IDS_MAX, TraceGate, single_source_proof, tokens_prune};
+use super::predicate::{EvalPredicate, LoweredTokens, PredicateError, TokenQuery, TraceLevelEval};
 use super::sources::{SourceId, SourceSetError, TraceSource, validate_sources};
 use super::status::{PartialReason, QueryStatus, StatusBuilder};
 use super::vocab::{BuiltinField, span_field};
@@ -219,6 +224,7 @@ pub struct SearchQuery {
     gate_enabled: bool,
     loaded_sources_cap: usize,
     driver: Option<usize>,
+    proof_ids_max: u64,
 }
 
 impl SearchQuery {
@@ -236,6 +242,7 @@ impl SearchQuery {
             gate_enabled: true,
             loaded_sources_cap: LOADED_SOURCES_MAX,
             driver: None,
+            proof_ids_max: PROOF_IDS_MAX,
         }
     }
 
@@ -297,12 +304,22 @@ impl SearchQuery {
         self
     }
 
-    /// Test-only kill switch for the trace-level pre-assembly gate —
-    /// the differential gate-on/gate-off superset test's toggle. NOT a
-    /// tuning surface; production always runs with the gate.
+    /// Test-only kill switch for the pre-assembly gates (trace-level
+    /// and token) — the differential gate-on/gate-off superset tests'
+    /// toggle. NOT a tuning surface; production always runs with them.
     #[doc(hidden)]
     pub fn trace_gate_for_tests(mut self, enabled: bool) -> Self {
         self.gate_enabled = enabled;
+        self
+    }
+
+    /// Test-only override of the gates' single-source proof budget in
+    /// recorded ids (0 = no proof: every candidate takes the all-file
+    /// path and the token gate stays off). NOT a tuning surface;
+    /// production uses the gate module's `PROOF_IDS_MAX`.
+    #[doc(hidden)]
+    pub fn single_source_proof_ids_for_tests(mut self, max_ids: u64) -> Self {
+        self.proof_ids_max = max_ids;
         self
     }
 
@@ -418,6 +435,8 @@ struct PendingFile {
 /// position already emitted (every matched position in
 /// `[band_bottom, hi)` has been emitted); `lo` means exhausted.
 struct FileDiscovery {
+    /// The file's session slot, recorded on every candidate it emits.
+    slot: usize,
     compiled: sfst::CompiledTracePlan,
     trace_ids: sfst::TraceIds,
     timestamps: sfst::Timestamps,
@@ -483,9 +502,20 @@ impl FileDiscovery {
                 .timestamps
                 .at(pos)
                 .expect("column lengths validated at discovery setup");
-            pool.add(trace_id, start_ns);
+            pool.add(trace_id, start_ns, Origin::File(self.slot));
         }
     }
+}
+
+/// Which source emitted a candidate's best raw rank. A single-source
+/// trace has exactly one possible origin, which the gates rely on.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum Origin {
+    /// A window file (its session slot).
+    File(usize),
+    Tail,
+    /// A `trace_id` pin.
+    Pin,
 }
 
 /// The discovered candidate frontier: best raw rank per trace, iterated
@@ -494,7 +524,7 @@ impl FileDiscovery {
 /// re-discover them at an equal-or-worse rank).
 struct CandidatePool {
     ranked: BTreeSet<(std::cmp::Reverse<i64>, TraceId)>,
-    best: HashMap<TraceId, i64>,
+    best: HashMap<TraceId, (i64, Origin)>,
     examined: HashSet<TraceId>,
     /// Ids excluded by `trace:id !=` conditions — never admitted.
     excluded: BTreeSet<TraceId>,
@@ -510,19 +540,19 @@ impl CandidatePool {
         }
     }
 
-    fn add(&mut self, trace_id: TraceId, start_ns: i64) {
+    fn add(&mut self, trace_id: TraceId, start_ns: i64, origin: Origin) {
         if self.examined.contains(&trace_id) || self.excluded.contains(&trace_id) {
             return;
         }
         match self.best.get_mut(&trace_id) {
-            Some(best) if *best >= start_ns => {}
+            Some((best, _)) if *best >= start_ns => {}
             Some(best) => {
-                self.ranked.remove(&(std::cmp::Reverse(*best), trace_id));
-                *best = start_ns;
+                self.ranked.remove(&(std::cmp::Reverse(best.0), trace_id));
+                *best = (start_ns, origin);
                 self.ranked.insert((std::cmp::Reverse(start_ns), trace_id));
             }
             None => {
-                self.best.insert(trace_id, start_ns);
+                self.best.insert(trace_id, (start_ns, origin));
                 self.ranked.insert((std::cmp::Reverse(start_ns), trace_id));
             }
         }
@@ -535,12 +565,13 @@ impl CandidatePool {
             .map(|&(std::cmp::Reverse(start), id)| (start, id))
     }
 
-    /// Take the best unexamined candidate for assembly.
-    fn pop(&mut self) -> Option<(i64, TraceId)> {
-        let (std::cmp::Reverse(start), id) = self.ranked.pop_first()?;
-        self.best.remove(&id);
+    /// Take the best unexamined candidate for assembly, with the
+    /// origin of its best rank.
+    fn pop(&mut self) -> Option<(TraceId, Origin)> {
+        let (_, id) = self.ranked.pop_first()?;
+        let (_, origin) = self.best.remove(&id).expect("ranked ids have a best");
         self.examined.insert(id);
-        Some((start, id))
+        Some((id, origin))
     }
 }
 
@@ -723,7 +754,7 @@ pub fn search(
     if let Some(pins) = trace_ids.pins {
         for trace_id in pins {
             if !trace_id.is_unset() {
-                pool.add(trace_id, i64::MAX);
+                pool.add(trace_id, i64::MAX, Origin::Pin);
             }
         }
     }
@@ -796,6 +827,11 @@ pub fn search(
     // different files): the token with the fewest in-window matches in
     // the window tails plus the newest window file, which compiles every
     // positive token for the count; ties go to the earlier token. ─────
+    // With two or more positive span-local tokens, every window file
+    // compiles them all: the driver's set discovers, the others feed the
+    // token gate (per file slot).
+    let keep_others = query.gate_enabled && lowered.positive.len() > 1 && !pinned;
+    let mut token_sets: HashMap<usize, Vec<sfst::CompiledTracePlan>> = HashMap::new();
     let mut driver = query.driver.unwrap_or(0);
     if query.driver.is_none() && lowered.positive.len() > 1 && !pinned {
         let mut counts = vec![0u64; lowered.positive.len()];
@@ -844,7 +880,10 @@ pub fn search(
             .min_by_key(|&i| (counts[i], i))
             .expect("two or more positive tokens");
         if let Some(found) = newest {
-            let mut file = found.into_file(driver);
+            let (mut file, others) = found.into_file(driver);
+            if keep_others {
+                token_sets.insert(file.slot, others);
+            }
             file.extend(clamp(k, &work, query.visited_ceiling), &mut work, &mut pool);
             if !file.exhausted() {
                 files.push(file);
@@ -854,6 +893,13 @@ pub fn search(
     let (driver_plan, driver_eval) = match lowered.positive.get(driver) {
         Some(token) => (&token.plan, &token.eval),
         None => (&match_all.0, &match_all.1),
+    };
+    // What each later window-file compile compiles, and where the
+    // driver's set sits among them.
+    let (file_plans, file_driver) = if keep_others {
+        (&positive_plans[..], driver)
+    } else {
+        (std::slice::from_ref(driver_plan), 0)
     };
 
     'tails: for (source_id, scan) in &tails {
@@ -882,39 +928,58 @@ pub fn search(
                 break 'tails;
             }
             if !trace_id.is_unset() && driver_eval.matches(span, query.window) {
-                pool.add(trace_id, span.start_ns);
+                pool.add(trace_id, span.start_ns, Origin::Tail);
             }
         }
     }
 
-    // ── The trace-level pre-assembly gate (see the gate module) ──────
-    // Engaged only when a prunable trace-level condition exists, the
-    // candidate set is not pinned (a `trace:id =` lookup must always
-    // assemble), and no completion source failed or was unavailable
-    // during setup (every assembly is already degraded then —
+    // ── The pre-assembly gates (see the gate module) ─────────────────
+    // Engaged only when the candidate set is not pinned (a `trace:id =`
+    // lookup must always assemble) and no completion source failed or
+    // was unavailable so far (every assembly is already degraded then —
     // trace-level evaluation excludes all candidates as indeterminate,
-    // so there is nothing left to prune toward). Tail provenance is
-    // collected EAGERLY here — ids only, before `merged` takes its
-    // `&mut` tail borrows.
-    let mut gate = match &lowered.trace_level {
-        Some(tl)
-            if query.gate_enabled
-                && tl.has_prunable_condition()
-                && !pinned
-                && !degraded_assembly =>
-        {
-            let mut tail_ids: HashSet<TraceId> = HashSet::new();
-            for (_, scan) in &tails {
-                for (trace_id, _) in scan.spans_with_ids() {
-                    if !trace_id.is_unset() {
-                        tail_ids.insert(trace_id);
-                    }
+    // and the single-source proof cannot cover a lost source): the
+    // trace-level gate for a prunable trace-level token, the token gate
+    // for two or more positive span-local tokens (it needs the proof).
+    // Either builds the proof first. Tail provenance is collected
+    // EAGERLY here — ids only, before `merged` takes its `&mut` tail
+    // borrows; every visited tail span is charged.
+    let trace_gate_wanted = query.gate_enabled
+        && !pinned
+        && !degraded_assembly
+        && lowered
+            .trace_level
+            .as_ref()
+            .is_some_and(TraceLevelEval::has_prunable_condition);
+    let token_gate_wanted = keep_others && !degraded_assembly;
+    let mut proof: Option<sfst::RepeatFilter> = None;
+    let mut gate: Option<TraceGate<'_>> = None;
+    if trace_gate_wanted || token_gate_wanted {
+        let mut tail_ids: Vec<HashSet<TraceId>> = Vec::with_capacity(tails.len());
+        for (_, scan) in &tails {
+            let mut ids = HashSet::new();
+            for (trace_id, _) in scan.spans_with_ids() {
+                work.rows_visited += 1;
+                if !trace_id.is_unset() {
+                    ids.insert(trace_id);
                 }
             }
-            Some(TraceGate::new(sessions.len(), tail_ids, tl))
+            tail_ids.push(ids);
         }
-        _ => None,
-    };
+        if query.proof_ids_max > 0 {
+            proof = single_source_proof(&mut sessions, &tail_ids, &mut loaded, query.proof_ids_max);
+        }
+        if trace_gate_wanted {
+            let tl = lowered.trace_level.as_ref().expect("wanted above");
+            gate = Some(TraceGate::new(
+                sessions.len(),
+                tail_ids.into_iter().flatten().collect(),
+                tl,
+            ));
+        }
+    }
+    let token_gate = token_gate_wanted && proof.is_some();
+    let mut token_prunes = 0u64;
 
     // ── Phase 2: the sessions over the whole completion snapshot ─────
     // Merge-index → source id: names the source in the failure warnings
@@ -1019,19 +1084,26 @@ pub fn search(
                 status.add(PartialReason::WorkCeiling);
                 break;
             }
-            let (_, trace_id) = pool.pop().expect("peeked above");
-            // The gate: skip the assembly when the rollup evidence
-            // proves a non-match; a pruned pop charges NOTHING toward
-            // the assembled ceiling — that is the incident fix.
-            // Corruption the gate discovers is skip-and-surface: the
-            // source is failed (SourceFailure + degraded assembly), so
-            // every LATER summary is inexact and trace-level evaluation
-            // excludes it — the corrupt file's spans cannot reach the
-            // results even though `merged` still holds the session
-            // (point-of-discovery semantics, the same contract as a
-            // mid-merge read failure).
-            if let Some(g) = gate.as_mut() {
-                let decision = g.check(trace_id, &mut sessions, &mut loaded);
+            let (trace_id, emitter) = pool.pop().expect("peeked above");
+            // The gates: skip the assembly when the evidence proves a
+            // non-match; a pruned pop charges NOTHING toward the
+            // assembled ceiling — that is the incident fix. Their reads
+            // are charged, so a breached ceiling turns them off
+            // (assembling is always sound). Corruption the trace-level
+            // gate discovers is skip-and-surface: the source is failed
+            // (SourceFailure + degraded assembly), so every LATER summary
+            // is inexact and trace-level evaluation excludes it — the
+            // corrupt file's spans cannot reach the results even though
+            // `merged` still holds the session (point-of-discovery
+            // semantics, the same contract as a mid-merge read failure).
+            let gated = !breached(&work);
+            let single_file = match (emitter, &proof) {
+                (Origin::File(slot), Some(proof)) if !proof.may_repeat(trace_id) => Some(slot),
+                _ => None,
+            };
+            if gated && let Some(g) = gate.as_mut() {
+                let decision =
+                    g.check(trace_id, single_file, &mut sessions, &mut loaded, &mut work);
                 for idx in g.take_new_failures() {
                     let who = origin.get(idx).map(String::as_str).unwrap_or("?");
                     tracing::warn!(
@@ -1041,6 +1113,18 @@ pub fn search(
                     degraded_assembly = true;
                 }
                 if decision == GateDecision::Prune {
+                    continue;
+                }
+            }
+            if gated
+                && token_gate
+                && let Some(slot) = single_file
+                && let Some(others) = token_sets.get(&slot)
+            {
+                let prune = tokens_prune(trace_id, &mut sessions[slot], others, &mut work);
+                loaded.touch(slot, &mut sessions);
+                if prune {
+                    token_prunes += 1;
                     continue;
                 }
             }
@@ -1145,7 +1229,7 @@ pub fn search(
             }
             let found = compile_pending(
                 next,
-                std::slice::from_ref(driver_plan),
+                file_plans,
                 &query,
                 &mut sessions,
                 &slot_sources,
@@ -1156,7 +1240,10 @@ pub fn search(
                 &mut truncated_up_to,
             );
             if let Some(found) = found {
-                let mut file = found.into_file(0);
+                let (mut file, others) = found.into_file(file_driver);
+                if keep_others {
+                    token_sets.insert(file.slot, others);
+                }
                 let count = clamp(k, &work, query.visited_ceiling);
                 file.extend(count, &mut work, &mut pool);
                 if !file.exhausted() {
@@ -1185,6 +1272,9 @@ pub fn search(
     if let Some(g) = &gate {
         tracing::debug!(stats = ?g.stats, "sfsq traces: trace-level gate");
     }
+    if token_gate {
+        tracing::debug!(token_prunes, "sfsq traces: token gate");
+    }
 
     // ── Final ordering: canonical rank, trimmed to the limit ─────────
     finals.sort_by(|a, b| {
@@ -1200,6 +1290,7 @@ pub fn search(
 
 /// One window file's phase-1 columns with its compiled plans.
 struct Discovered {
+    slot: usize,
     compiled: Vec<sfst::CompiledTracePlan>,
     trace_ids: sfst::TraceIds,
     timestamps: sfst::Timestamps,
@@ -1209,15 +1300,19 @@ struct Discovered {
 }
 
 impl Discovered {
-    /// The file's discovery state, driven by compiled plan `driver`.
-    fn into_file(mut self, driver: usize) -> FileDiscovery {
-        FileDiscovery {
-            compiled: self.compiled.swap_remove(driver),
+    /// The file's discovery state, driven by compiled plan `driver`,
+    /// and the other compiled plans in order (the token gate's sets).
+    fn into_file(mut self, driver: usize) -> (FileDiscovery, Vec<sfst::CompiledTracePlan>) {
+        let compiled = self.compiled.remove(driver);
+        let file = FileDiscovery {
+            slot: self.slot,
+            compiled,
             trace_ids: self.trace_ids,
             timestamps: self.timestamps,
             lo: self.lo,
             band_bottom: self.hi,
-        }
+        };
+        (file, self.compiled)
     }
 }
 
@@ -1263,6 +1358,7 @@ fn compile_pending(
     };
     let mut budget_truncated = false;
     let discovered = discovery_state(
+        slot,
         reader,
         plans,
         query.window,
@@ -1296,6 +1392,7 @@ fn compile_pending(
 /// this file, OR a work ceiling ran out mid-compilation — the latter
 /// sets `truncated`.
 fn discovery_state(
+    slot: usize,
     reader: &sfst::IndexReader<'_>,
     plans: &[sfst::TracePlan],
     window: Option<TimeWindow>,
@@ -1325,6 +1422,7 @@ fn discovery_state(
         return Ok(None);
     };
     Ok(Some(Discovered {
+        slot,
         compiled,
         trace_ids,
         timestamps,

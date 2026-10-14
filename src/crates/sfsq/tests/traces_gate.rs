@@ -24,6 +24,10 @@
 //! - **Skip-and-surface:** a file that proves itself corrupt through any
 //!   gate read (TBLM, TRSU) is skipped as a failed source AND surfaced
 //!   (`SourceFailure`), never silently downgraded.
+//! - **The single-source proof and the token gate** only remove work:
+//!   proof on, proof off and gates off agree; a file without a rollup
+//!   turns the proof off; the gates' reads are charged to the visited
+//!   ceiling.
 //!
 //! Not pinned here: the no-root prune itself — its verdicts are
 //! observable, the prune is not (`GateStats` is crate-internal; see
@@ -46,8 +50,9 @@ use common::{
 };
 use opentelemetry_proto::tonic::collector::trace::v1::ExportTraceServiceRequest;
 use sfsq::traces::{
-    BuiltinField, CompareOp, Condition, PartialReason, Predicate, PredicateTarget, PredicateValue,
-    QueryStatus, SearchData, SearchQuery, SearchSources, TraceSource, search,
+    AttributeOwner, BuiltinField, CompareOp, Condition, PartialReason, Predicate, PredicateTarget,
+    PredicateValue, QueryStatus, SearchData, SearchQuery, SearchSources, Token, TokenQuery,
+    TraceSource, search,
 };
 
 const NS: u64 = 1_000_000_000;
@@ -746,7 +751,12 @@ fn corrupt_rollup_chunk_is_skipped_and_surfaced() {
     assert_eq!(off.status, QueryStatus::Complete);
 }
 
-/// A corrupt TBLM chunk: same principle through the gate's other read.
+/// A corrupt TBLM chunk: same principle through the all-file path's
+/// other read (its screens). The single-source proof decides from the
+/// rollup alone and never reads the bloom, a lookup hint whose
+/// corruption the session's lookups already survive (they fall back to
+/// the exact index): the trace returns, as with the gate off —
+/// discovery laziness again.
 #[test]
 fn corrupt_bloom_chunk_is_skipped_and_surfaced() {
     let dir = tempfile::tempdir().unwrap();
@@ -763,13 +773,17 @@ fn corrupt_bloom_chunk_is_skipped_and_surfaced() {
     let build = || both_roles(|| vec![sealed_source_at(&path, "one")]);
 
     let q = || SearchQuery::new(pred(vec![root_service_eq("hot")]));
-    let on = run(build(), q());
+    let on = run(build(), q().single_source_proof_ids_for_tests(0));
     assert!(on.traces.is_empty());
     assert!(
         on.status.has(PartialReason::SourceFailure),
         "{:?}",
         on.status
     );
+
+    let proof = run(build(), q());
+    assert_eq!(ids(&proof), vec![hex(1)]);
+    assert_eq!(proof.status, QueryStatus::Complete);
 }
 
 /// The recorded status delta, pinned: a pruned candidate's would-have-
@@ -1122,4 +1136,266 @@ fn differential_gate_on_off_sweep() {
             assert_eq!(norm(&on), norm(&off), "seed {seed} query {qi}");
         }
     }
+}
+
+// ── The single-source proof and the token gate ──────────────────────
+
+fn name_eq(name: &str) -> Condition {
+    builtin(BuiltinField::Name, CompareOp::Eq, vec![text(name)])
+}
+
+fn service_eq(service: &str) -> Condition {
+    Condition {
+        target: PredicateTarget::Attribute(AttributeOwner::Resource, "service.name".into()),
+        op: CompareOp::Eq,
+        values: vec![text(service)],
+    }
+}
+
+fn tokens(tokens: Vec<Token>) -> TokenQuery {
+    TokenQuery { tokens }
+}
+
+/// Twelve traces over three sealed files and a tail: single-file traces,
+/// traces straddling two files (their merged envelope reaches the
+/// duration bound, a file's alone does not), and traces with tail spans.
+fn mixed_corpus(dir: &Path) -> impl Fn() -> SearchSources + '_ {
+    let svc = |s: &str| vec![kv_str("service.name", s)];
+    let mut files: [Vec<ExportTraceServiceRequest>; 4] = Default::default();
+    for t in 1..=12u8 {
+        let start = 100 * NS + u64::from(t) * NS;
+        let service = if t % 2 == 0 { "svc-a" } else { "svc-b" };
+        let home = usize::from(t % 3);
+        let root = root_span(t, 0x10, start, start + 1_000_000, "root-op");
+        files[home].push(req_with(svc(service), None, &[root]));
+        let child_name = if t % 4 == 0 { "db" } else { "cache" };
+        let child = SpanSpec {
+            end: start + 8 * NS,
+            ..span_in(t, 0x11, 0x10, start + 7 * NS, child_name)
+        };
+        // Traces 1-4 straddle into the next file, 5-6 into the tail,
+        // the rest stay home.
+        let away = match t {
+            1..=4 => (home + 1) % 3,
+            5 | 6 => 3,
+            _ => home,
+        };
+        files[away].push(req_with(svc(service), None, &[child]));
+    }
+    let [a, b, c, tail] = files;
+    let wals = [
+        write_wal(dir, a, "mixed-a"),
+        write_wal(dir, b, "mixed-b"),
+        write_wal(dir, c, "mixed-c"),
+        write_wal(dir, tail, "mixed-tail"),
+    ];
+    move || {
+        both_roles(|| {
+            vec![
+                sealed_source(dir, &wals[0], "a"),
+                sealed_source(dir, &wals[1], "b"),
+                sealed_source(dir, &wals[2], "c"),
+                tail_source(&wals[3], "tail"),
+            ]
+        })
+    }
+}
+
+/// The proof only removes work: with it, without it, and with every gate
+/// off, the answers are identical — trace-level selections, duration
+/// bounds that only straddling or tail-extended traces reach, and
+/// multi-token queries the token gate prunes.
+#[test]
+fn single_file_proof_on_off_identity() {
+    let dir = tempfile::tempdir().unwrap();
+    let sources = mixed_corpus(dir.path());
+    let queries: Vec<(SearchQuery, usize)> = vec![
+        (SearchQuery::new(pred(vec![root_service_eq("svc-a")])), 6),
+        (
+            SearchQuery::new(pred(vec![min_duration(5 * NS as i64)])),
+            12,
+        ),
+        (
+            SearchQuery::new(pred(vec![
+                root_service_eq("svc-b"),
+                min_duration(5 * NS as i64),
+            ])),
+            6,
+        ),
+        (
+            SearchQuery::new(tokens(vec![
+                Token::positive(pred(vec![name_eq("root-op")])),
+                Token::positive(pred(vec![name_eq("db")])),
+            ]))
+            .driver_for_tests(0),
+            3,
+        ),
+        (
+            SearchQuery::new(tokens(vec![
+                Token::positive(pred(vec![service_eq("svc-a")])),
+                Token::positive(pred(vec![name_eq("cache")])),
+                Token::negated(pred(vec![name_eq("db")])),
+            ])),
+            3,
+        ),
+    ];
+    for (i, (q, count)) in queries.into_iter().enumerate() {
+        let q = q.limit(20);
+        let on = run(sources(), q.clone());
+        let no_proof = run(sources(), q.clone().single_source_proof_ids_for_tests(0));
+        // A budget that ends after the first file's ids turns the proof
+        // off; it is never used cut short.
+        let cut = run(sources(), q.clone().single_source_proof_ids_for_tests(4));
+        assert_eq!(norm(&on), norm(&cut), "query {i}: proof budget passed");
+        let off = run(sources(), q.trace_gate_for_tests(false));
+        assert_eq!(on.traces.len(), count, "query {i}");
+        assert_eq!(on.status, QueryStatus::Complete, "query {i}");
+        assert_eq!(norm(&on), norm(&no_proof), "query {i}: proof off");
+        assert_eq!(norm(&on), norm(&off), "query {i}: gates off");
+    }
+}
+
+/// A trace whose newest span sits in a file with a rollup (so that file
+/// emits the candidate) and whose older span sits in a file without one:
+/// the proof cannot see the second file's ids, so it is off for the
+/// query — read alone, the first file's envelope would prune the trace.
+#[test]
+fn file_without_rollup_disables_the_proof() {
+    let dir = tempfile::tempdir().unwrap();
+    let svc = vec![kv_str("service.name", "svc-a")];
+    let a = req_with(
+        svc.clone(),
+        None,
+        &[root_span(
+            1,
+            0x11,
+            100 * NS,
+            100 * NS + 1_000_000,
+            "root-op",
+        )],
+    );
+    let b = req_with(
+        svc,
+        None,
+        &[SpanSpec {
+            end: 91 * NS,
+            ..span_in(1, 0x12, 0x11, 90 * NS, "early-op")
+        }],
+    );
+    let wal_a = write_wal(dir.path(), vec![a], "norollup-a");
+    let wal_b = write_wal(dir.path(), vec![b], "norollup-b");
+    drop(sealed_source(dir.path(), &wal_a, "a"));
+    drop(sealed_source(dir.path(), &wal_b, "b"));
+    hide_chunk(&sealed_path(dir.path(), "b"), *b"TRSU");
+    let sources = || {
+        both_roles(|| {
+            vec![
+                sealed_source_at(&sealed_path(dir.path(), "a"), "a"),
+                sealed_source_at(&sealed_path(dir.path(), "b"), "b"),
+            ]
+        })
+    };
+    let q = || SearchQuery::new(pred(vec![min_duration(5 * NS as i64)]));
+    let on = run(sources(), q());
+    assert_eq!(ids(&on), vec![hex(1)]);
+    assert_eq!(
+        norm(&on),
+        norm(&run(sources(), q().trace_gate_for_tests(false)))
+    );
+}
+
+/// The token gate's incident shape: many candidates match the driver
+/// token, none the other — gate-off burns the assembled ceiling, the
+/// gate prunes each from its single file's rows and proves the empty
+/// answer. A trace matching both still returns.
+#[test]
+fn token_gate_completes_instead_of_burning_the_ceiling() {
+    let dir = tempfile::tempdir().unwrap();
+    let hot = vec![kv_str("service.name", "hot")];
+    let mut reqs: Vec<ExportTraceServiceRequest> = (0..70u8)
+        .map(|i| {
+            let start = u64::from(i + 1) * NS;
+            req_with(
+                hot.clone(),
+                None,
+                &[root_span(i + 1, 0x10, start, start + 50, "op")],
+            )
+        })
+        .collect();
+    let wal = write_wal(dir.path(), reqs.clone(), "token-incident");
+    let sources = || both_roles(|| vec![sealed_source(dir.path(), &wal, "one")]);
+    let q = || {
+        SearchQuery::new(tokens(vec![
+            Token::positive(pred(vec![service_eq("hot")])),
+            Token::positive(pred(vec![name_eq("rare")])),
+        ]))
+        .driver_for_tests(0)
+        .limit(1)
+    };
+    let off = run(sources(), q().trace_gate_for_tests(false));
+    assert!(off.traces.is_empty());
+    assert!(
+        off.status.has(PartialReason::WorkCeiling),
+        "{:?}",
+        off.status
+    );
+    let on = run(sources(), q());
+    assert!(on.traces.is_empty());
+    assert_eq!(on.status, QueryStatus::Complete);
+
+    // Trace 30 gains a `rare` child: it returns, gate on and off.
+    reqs.push(req_with(
+        hot,
+        None,
+        &[span_in(30, 0x11, 0x10, 30 * NS + 10, "rare")],
+    ));
+    let wal = write_wal(dir.path(), reqs, "token-hit");
+    let sources = || both_roles(|| vec![sealed_source(dir.path(), &wal, "hit")]);
+    let on = run(sources(), q());
+    assert_eq!(ids(&on), vec![hex(30)]);
+    assert_eq!(on.status, QueryStatus::Complete);
+}
+
+/// The gates' reads count toward the visited ceiling: a budget the
+/// gate-off search fits in is too small once the proof and the checks
+/// are charged — the search ends `WorkCeiling` instead of doing
+/// uncounted work.
+#[test]
+fn gate_probes_hit_the_ceiling() {
+    let dir = tempfile::tempdir().unwrap();
+    let hot = vec![kv_str("service.name", "hot")];
+    let reqs: Vec<ExportTraceServiceRequest> = (0..70u8)
+        .map(|i| {
+            let start = u64::from(i + 1) * NS;
+            req_with(
+                hot.clone(),
+                None,
+                &[root_span(i + 1, 0x10, start, start + 50, "op")],
+            )
+        })
+        .collect();
+    let wal = write_wal(dir.path(), reqs, "charged");
+    let sources = || both_roles(|| vec![sealed_source(dir.path(), &wal, "one")]);
+    let q = || {
+        SearchQuery::new(pred(vec![root_service_eq("cold")]))
+            .limit(1)
+            .visited_rows_ceiling_for_tests(100)
+    };
+    // Without the gates: discovery alone fits, and the assembled
+    // ceiling ends the discards.
+    let off = run(sources(), q().trace_gate_for_tests(false));
+    assert!(off.traces.is_empty());
+    // A rollup row per check with the proof, a screen and a row per
+    // check without it: both exceed the budget.
+    for q in [q(), q().single_source_proof_ids_for_tests(0)] {
+        let on = run(sources(), q);
+        assert!(on.traces.is_empty());
+        assert!(on.status.has(PartialReason::WorkCeiling), "{:?}", on.status);
+    }
+    // With the default ceiling the gate proves the empty answer.
+    let on = run(
+        sources(),
+        SearchQuery::new(pred(vec![root_service_eq("cold")])).limit(1),
+    );
+    assert_eq!(on.status, QueryStatus::Complete);
 }
