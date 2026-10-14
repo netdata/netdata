@@ -169,7 +169,9 @@ use sfst::{ScanWork, TraceId};
 
 use super::by_id::{DEFAULT_SPAN_CAP, LOADED_SOURCES_MAX};
 use super::gate::{GateDecision, PROOF_IDS_MAX, TraceGate, single_source_proof, tokens_prune};
-use super::predicate::{EvalPredicate, LoweredTokens, PredicateError, TokenQuery, TraceLevelEval};
+use super::predicate::{
+    EvalPredicate, LoweredTokens, PredicateError, SpanToken, TokenQuery, TraceLevelEval,
+};
 use super::sources::{SourceId, SourceSetError, TraceSource, validate_sources};
 use super::status::{PartialReason, QueryStatus, StatusBuilder};
 use super::vocab::{BuiltinField, span_field};
@@ -240,6 +242,7 @@ pub struct SearchQuery {
     driver: Option<usize>,
     proof_ids_max: u64,
     rollup_discovery: bool,
+    assembled_ceiling: Option<usize>,
 }
 
 impl SearchQuery {
@@ -259,6 +262,7 @@ impl SearchQuery {
             driver: None,
             proof_ids_max: PROOF_IDS_MAX,
             rollup_discovery: true,
+            assembled_ceiling: None,
         }
     }
 
@@ -285,6 +289,15 @@ impl SearchQuery {
     #[doc(hidden)]
     pub fn visited_rows_ceiling_for_tests(mut self, ceiling: u64) -> Self {
         self.visited_ceiling = ceiling;
+        self
+    }
+
+    /// Test-only override of the assembled-candidate ceiling (0 = any
+    /// assembly ends the search with `WorkCeiling`), so a test proves a
+    /// verdict needed no assembly. NOT a tuning surface.
+    #[doc(hidden)]
+    pub fn assembled_ceiling_for_tests(mut self, ceiling: usize) -> Self {
+        self.assembled_ceiling = Some(ceiling);
         self
     }
 
@@ -602,6 +615,40 @@ impl FileDiscovery {
     }
 }
 
+/// Per trace held by a window tail, the bits of the positive span-local
+/// tokens (bit `i` = token `i`) one of its in-window spans matches.
+/// Every visited span is charged.
+fn window_tail_token_bits(
+    tails: &[(SourceId, TraceWalScan)],
+    window_ids: &HashSet<&SourceId>,
+    positive: &[SpanToken],
+    window: Option<TimeWindow>,
+    work: &mut ScanWork,
+) -> HashMap<TraceId, u64> {
+    let mut bits: HashMap<TraceId, u64> = HashMap::new();
+    for (source_id, scan) in tails {
+        if !window_ids.contains(source_id) {
+            continue;
+        }
+        for (trace_id, span) in scan.spans_with_ids() {
+            work.rows_visited += 1;
+            if trace_id.is_unset() {
+                continue;
+            }
+            let mut matched = 0u64;
+            for (i, token) in positive.iter().enumerate() {
+                if token.eval.matches(span, window) {
+                    matched |= 1 << i;
+                }
+            }
+            if matched != 0 {
+                *bits.entry(trace_id).or_insert(0) |= matched;
+            }
+        }
+    }
+    bits
+}
+
 /// Extend `file`, surfacing a failed column read as a source failure
 /// that degrades every assembly (the file stops discovering).
 #[allow(clippy::too_many_arguments)]
@@ -891,6 +938,9 @@ pub fn search(
     // threat at its rank bound, and one that bound can no longer beat
     // the N-th final is never compiled.
     let mut pending: VecDeque<PendingFile> = VecDeque::new();
+    // The window files that can hold an in-window span (the pending
+    // list before any compile): where a candidate's tokens are probed.
+    let mut window_slots: Vec<usize> = Vec::new();
     for (slot, source) in slot_sources.iter().enumerate() {
         if pinned {
             break;
@@ -919,6 +969,7 @@ pub fn search(
             None => file_end,
         };
         pending.push_back(PendingFile { slot, rank_bound });
+        window_slots.push(slot);
     }
     pending.make_contiguous().sort_by(|a, b| {
         b.rank_bound.cmp(&a.rank_bound).then_with(|| {
@@ -1161,10 +1212,14 @@ pub fn search(
         .collect();
     origin.extend(tails.iter().map(|(source_id, _)| source_id.to_string()));
 
-    let assembled_ceiling = query
-        .limit
-        .saturating_mul(ASSEMBLED_CEILING_FACTOR)
-        .max(ASSEMBLED_CEILING_FLOOR);
+    let assembled_ceiling = query.assembled_ceiling.unwrap_or_else(|| {
+        query
+            .limit
+            .saturating_mul(ASSEMBLED_CEILING_FACTOR)
+            .max(ASSEMBLED_CEILING_FLOOR)
+    });
+    // The window tails' token bits, built on first need.
+    let mut tail_token_bits: Option<HashMap<TraceId, u64>> = None;
     let mut assembled_count = 0usize;
     let mut finals: Vec<Assembled> = Vec::new();
     // Final ranks, best-first, for the Nth-final threshold.
@@ -1288,6 +1343,99 @@ pub fn search(
                     tokens_prune(trace_id, &mut sessions[slot], sets, file_driver, &mut work);
                 loaded.touch(slot, &mut sessions);
                 if prune {
+                    token_prunes += 1;
+                    continue;
+                }
+            }
+            // The token gate for a candidate not proven single-file: its
+            // in-window stored rows live only in window files and window
+            // tails, so a positive token none of them matches proves the
+            // non-match. A window holder not compiled yet compiles now and
+            // joins discovery; one that cannot answer (failed, cut short,
+            // no in-window rows) leaves the candidate to assembly.
+            if gated
+                && token_gate
+                && single_file.is_none()
+                && matches!(emitter, Origin::File(_) | Origin::Tail)
+            {
+                let all: u64 = (1u64 << lowered.positive.len()) - 1;
+                let tail_bits = tail_token_bits.get_or_insert_with(|| {
+                    window_tail_token_bits(
+                        &tails,
+                        &window_ids,
+                        &lowered.positive,
+                        query.window,
+                        &mut work,
+                    )
+                });
+                let mut bits = tail_bits.get(&trace_id).copied().unwrap_or(0);
+                let mut decidable = true;
+                if bits != all && proof.as_ref().is_some_and(|p| p.may_repeat(trace_id)) {
+                    for &slot in &window_slots {
+                        if bits == all {
+                            break;
+                        }
+                        work.rows_visited += 1;
+                        if !sessions[slot].screen(trace_id) {
+                            continue;
+                        }
+                        if !token_sets.contains_key(&slot)
+                            && let Some(at) = pending.iter().position(|p| p.slot == slot)
+                        {
+                            let file = pending.remove(at).expect("position found it");
+                            let found = compile_pending(
+                                file,
+                                file_plans,
+                                &query,
+                                &mut sessions,
+                                &slot_sources,
+                                &mut loaded,
+                                &mut work,
+                                &mut status,
+                                &mut degraded_assembly,
+                                &mut truncated_up_to,
+                            );
+                            if let Some(found) = found {
+                                files.push(found.into_file(&mut token_sets));
+                            }
+                        }
+                        let Some(sets) = token_sets.get(&slot) else {
+                            // Not compiled: either the window misses the
+                            // file's rows (nothing in-window to probe) or
+                            // it failed or was cut short (undecidable).
+                            let in_window = sessions[slot].timestamps().map(|ts| {
+                                let (lo, hi) = match query.window {
+                                    Some(w) => ts.window(w.range_ns()),
+                                    None => (0, ts.len() as u32),
+                                };
+                                lo < hi
+                            });
+                            loaded.touch(slot, &mut sessions);
+                            if matches!(in_window, Ok(false)) {
+                                continue;
+                            }
+                            decidable = false;
+                            break;
+                        };
+                        let positions = sessions[slot].positions(trace_id);
+                        loaded.touch(slot, &mut sessions);
+                        let Ok(positions) = positions else {
+                            decidable = false;
+                            break;
+                        };
+                        work.rows_visited += positions.len() as u64;
+                        for (i, set) in sets.iter().enumerate() {
+                            if bits & (1 << i) != 0 {
+                                continue;
+                            }
+                            work.rows_visited += positions.len() as u64;
+                            if positions.iter().any(|&pos| set.contains(pos)) {
+                                bits |= 1 << i;
+                            }
+                        }
+                    }
+                }
+                if decidable && bits != all {
                     token_prunes += 1;
                     continue;
                 }

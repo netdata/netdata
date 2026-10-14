@@ -1181,6 +1181,125 @@ fn differential_gate_on_off_sweep() {
     }
 }
 
+// ── The token gate for multi-file and tail candidates ───────────────
+
+/// Two-token query (`op` AND `db`) driven by `op`, so discovery emits
+/// what `op` matches.
+fn op_and_db() -> SearchQuery {
+    SearchQuery::new(tokens(vec![
+        Token::positive(pred(vec![name_eq("op")])),
+        Token::positive(pred(vec![name_eq("db")])),
+    ]))
+    .driver_for_tests(0)
+}
+
+/// Multi-file candidates that cannot match need no assembly: their
+/// in-window rows in every window holder miss a token. With room for
+/// one assembly, two such candidates complete (pruned) instead of
+/// ending the search at the ceiling.
+#[test]
+fn zero_hit_straddlers_need_no_assembly() {
+    let dir = tempfile::tempdir().unwrap();
+    let svc = || vec![kv_str("service.name", "svc")];
+    let half = |at: u64| {
+        req_with(
+            svc(),
+            None,
+            &[
+                root_span(1, 0x11, at * NS, at * NS + 50, "op"),
+                root_span(2, 0x21, (at + 1) * NS, (at + 1) * NS + 50, "op"),
+            ],
+        )
+    };
+    let wal_a = write_wal(dir.path(), vec![half(100)], "straddle-a");
+    let wal_b = write_wal(dir.path(), vec![half(200)], "straddle-b");
+    // A third holder whose rows all start after the query window: in
+    // the window source set, but it holds no in-window span to probe.
+    let wal_c = write_wal(dir.path(), vec![half(500)], "straddle-c");
+    let sources = || {
+        both_roles(|| {
+            vec![
+                sealed_source(dir.path(), &wal_a, "a"),
+                sealed_source(dir.path(), &wal_b, "b"),
+                sealed_source(dir.path(), &wal_c, "c"),
+            ]
+        })
+    };
+    let window = sfsq::traces::TimeWindow::new(100 * NS as i64, 300 * NS as i64).unwrap();
+    let data = run(
+        sources(),
+        op_and_db().window(window).assembled_ceiling_for_tests(1),
+    );
+    assert_eq!(data.status, QueryStatus::Complete, "{:?}", data.status);
+    assert!(data.traces.is_empty());
+}
+
+/// A window holder not compiled yet compiles when a multi-file
+/// candidate needs it and then discovers like any other file: the
+/// answer equals the no-gate one, including the holder's own trace.
+#[test]
+fn on_demand_compile_equals_gate_off() {
+    let dir = tempfile::tempdir().unwrap();
+    let svc = || vec![kv_str("service.name", "svc")];
+    // X: `op` in the newest file, `db` in the older one. V: both in the
+    // older file. W: `op` alone in the newest file.
+    let newest = req_with(
+        svc(),
+        None,
+        &[
+            root_span(1, 0x11, 200 * NS, 200 * NS + 50, "op"),
+            root_span(3, 0x31, 150 * NS, 150 * NS + 50, "op"),
+        ],
+    );
+    let older = req_with(
+        svc(),
+        None,
+        &[
+            span_in(1, 0x12, 0x11, 100 * NS, "db"),
+            root_span(2, 0x21, 90 * NS, 90 * NS + 50, "op"),
+            span_in(2, 0x22, 0x21, 91 * NS, "db"),
+        ],
+    );
+    let wal_new = write_wal(dir.path(), vec![newest], "ondemand-new");
+    let wal_old = write_wal(dir.path(), vec![older], "ondemand-old");
+    let sources = || {
+        both_roles(|| {
+            vec![
+                sealed_source(dir.path(), &wal_new, "new"),
+                sealed_source(dir.path(), &wal_old, "old"),
+            ]
+        })
+    };
+    let q = || op_and_db().limit(2);
+    let on = run(sources(), q());
+    assert_eq!(ids(&on), vec![hex(1), hex(2)]);
+    assert_eq!(
+        norm(&on),
+        norm(&run(sources(), q().trace_gate_for_tests(false)))
+    );
+}
+
+/// A tail-only candidate missing a token is pruned from the tail's own
+/// rows, without assembly.
+#[test]
+fn tail_held_non_match_is_pruned() {
+    let dir = tempfile::tempdir().unwrap();
+    let svc = vec![kv_str("service.name", "svc")];
+    let reqs = vec![req_with(
+        svc,
+        None,
+        &[
+            root_span(1, 0x11, 100 * NS, 100 * NS + 50, "op"),
+            root_span(2, 0x21, 101 * NS, 101 * NS + 50, "op"),
+        ],
+    )];
+    let wal = write_wal(dir.path(), reqs, "tail-prune");
+    let sources = || both_roles(|| vec![tail_source(&wal, "t")]);
+    let data = run(sources(), op_and_db().assembled_ceiling_for_tests(1));
+    assert_eq!(data.status, QueryStatus::Complete, "{:?}", data.status);
+    assert!(data.traces.is_empty());
+}
+
 // ── The single-source proof and the token gate ──────────────────────
 
 fn name_eq(name: &str) -> Condition {
