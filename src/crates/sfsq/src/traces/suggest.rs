@@ -199,7 +199,8 @@ pub struct SuggestData {
     pub status: QueryStatus,
     /// Set after an early stop: every span from this second (unix) on
     /// lives in a visited source. Absent when nothing was left unvisited,
-    /// or when an unvisited source is a tail (see [`complete_after`]).
+    /// or when an unvisited source is a tail, which could hold any recent
+    /// span.
     pub complete_after: Option<u32>,
 }
 
