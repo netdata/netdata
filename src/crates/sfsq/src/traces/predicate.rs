@@ -37,6 +37,12 @@ use super::window::TimeWindow;
 pub enum PredicateTarget {
     Attribute(AttributeOwner, String),
     Builtin(BuiltinField),
+    /// Free text: a case-insensitive substring of any VALUE of the span
+    /// name, the status message, event names, or any attribute
+    /// (resource, span, scope, event, link) — never of a field name.
+    /// Takes [`CompareOp::Contains`] and one text value of at least
+    /// [`TEXT_MIN_CHARS`] characters and at most [`TEXT_MAX_BYTES`].
+    FreeText,
 }
 
 impl std::fmt::Display for PredicateTarget {
@@ -48,6 +54,7 @@ impl std::fmt::Display for PredicateTarget {
             }
             PredicateTarget::Attribute(owner, key) => write!(f, "{owner:?} attribute {key:?}"),
             PredicateTarget::Builtin(i) => write!(f, "builtin field {i:?}"),
+            PredicateTarget::FreeText => write!(f, "free text"),
         }
     }
 }
@@ -66,6 +73,9 @@ pub enum CompareOp {
     Regex,
     /// Negated full-value-anchored regex (`!~`).
     NotRegex,
+    /// Case-insensitive substring, free text only (the rule of
+    /// suggest's contains class, [`sfst::ContainsMatcher`]).
+    Contains,
 }
 
 impl CompareOp {
@@ -125,6 +135,114 @@ impl Predicate {
     }
 }
 
+/// One search-bar token: conditions one span must satisfy together (a
+/// span-local group — free text included), exactly one trace-level
+/// condition, or exactly one `trace_id` condition. A query's tokens AND
+/// at trace level: different tokens may match different spans.
+///
+/// `negated` is NOT EXISTS over the group: no span of the trace
+/// satisfies it (for a trace-level or `trace_id` token, the trace does
+/// not). It differs from an in-group `!=`, which keeps the condition's
+/// presence ∩ complement meaning on one span.
+#[derive(Debug, Clone, PartialEq)]
+pub struct Token {
+    pub group: Predicate,
+    pub negated: bool,
+}
+
+impl Token {
+    /// A token matched by any trace one of whose spans satisfies `group`.
+    pub fn positive(group: Predicate) -> Self {
+        Self {
+            group,
+            negated: false,
+        }
+    }
+
+    /// A token matched by any trace none of whose spans satisfies
+    /// `group`.
+    pub fn negated(group: Predicate) -> Self {
+        Self {
+            group,
+            negated: true,
+        }
+    }
+}
+
+/// A search-bar query: the conjunction of its tokens (none = match
+/// everything). Holds at most [`TOKENS_MAX`] tokens.
+#[derive(Debug, Clone, Default, PartialEq)]
+pub struct TokenQuery {
+    pub tokens: Vec<Token>,
+}
+
+impl TokenQuery {
+    /// Request validation, runnable before any source opens (a wire can
+    /// reject a bad request before admission): the token count, every
+    /// token non-empty with a trace-level or `trace_id` condition alone
+    /// in its token, and every condition structurally valid and
+    /// evaluable.
+    pub fn validate(&self) -> Result<(), PredicateError> {
+        if self.tokens.len() > TOKENS_MAX {
+            return Err(PredicateError::TooManyTokens {
+                max: TOKENS_MAX,
+                got: self.tokens.len(),
+            });
+        }
+        for token in &self.tokens {
+            let conditions = &token.group.conditions;
+            if conditions.is_empty() {
+                return Err(PredicateError::EmptyToken);
+            }
+            token.group.validate()?;
+            token.group.ensure_evaluable()?;
+            if conditions.len() > 1
+                && let Some(target) = token.group.trace_level_target()
+            {
+                return Err(PredicateError::TokenNotAlone {
+                    target: target.to_string(),
+                });
+            }
+        }
+        Ok(())
+    }
+}
+
+impl From<Predicate> for TokenQuery {
+    /// A flat predicate as tokens with its meaning kept: its span-local
+    /// conditions as ONE positive group (same span), and each
+    /// trace-level and `trace_id` condition as its own positive token,
+    /// in-group polarity unchanged.
+    fn from(predicate: Predicate) -> Self {
+        let (rest, alone): (Vec<Condition>, Vec<Condition>) =
+            predicate.conditions.into_iter().partition(|c| {
+                let single = Predicate {
+                    conditions: vec![c.clone()],
+                };
+                single.trace_level_target().is_none()
+            });
+        let mut tokens = Vec::with_capacity(alone.len() + 1);
+        if !rest.is_empty() {
+            tokens.push(Token::positive(Predicate { conditions: rest }));
+        }
+        for condition in alone {
+            tokens.push(Token::positive(Predicate {
+                conditions: vec![condition],
+            }));
+        }
+        Self { tokens }
+    }
+}
+
+/// The most tokens one [`TokenQuery`] carries (the engine keeps one
+/// match bit per token in a `u32`).
+pub const TOKENS_MAX: usize = 32;
+/// The shortest free-text term, in characters (Unicode scalar values):
+/// shorter terms match too much to be useful.
+pub const TEXT_MIN_CHARS: usize = 3;
+/// The longest free-text term, in bytes.
+pub const TEXT_MAX_BYTES: usize = 1024;
+
 /// A predicate request error — the caller built an invalid predicate (or
 /// one this build cannot evaluate yet); nothing was queried.
 #[derive(Debug, thiserror::Error)]
@@ -132,7 +250,7 @@ pub enum PredicateError {
     #[error("a condition on {target} carries no values")]
     NoValues { target: String },
     #[error("{op:?} takes exactly one value, got {got}")]
-    OrderingArity { op: CompareOp, got: usize },
+    SingleValueArity { op: CompareOp, got: usize },
     #[error("attribute {key:?} cannot live under the Builtin owner")]
     AttributeUnderBuiltinOwner { key: String },
     #[error("{op:?} is not a valid comparison on {target}")]
@@ -161,6 +279,16 @@ pub enum PredicateError {
     /// wrong result.
     #[error("not yet evaluable: {construct}")]
     NotYetEvaluable { construct: String },
+    #[error("free text needs at least {min} characters, got {got}")]
+    TextTooShort { min: usize, got: usize },
+    #[error("free text is {got} bytes, over the limit of {max}")]
+    TextTooLong { max: usize, got: usize },
+    #[error("{got} tokens exceed the limit of {max}")]
+    TooManyTokens { max: usize, got: usize },
+    #[error("a token carries no conditions")]
+    EmptyToken,
+    #[error("{target} must be the only condition of its token")]
+    TokenNotAlone { target: String },
 }
 
 /// The builtin's comparison class — which operators and value types
@@ -202,8 +330,8 @@ impl Condition {
         if self.values.is_empty() {
             return Err(PredicateError::NoValues { target });
         }
-        if self.op.is_ordering() && self.values.len() != 1 {
-            return Err(PredicateError::OrderingArity {
+        if (self.op.is_ordering() || self.op == CompareOp::Contains) && self.values.len() != 1 {
+            return Err(PredicateError::SingleValueArity {
                 op: self.op,
                 got: self.values.len(),
             });
@@ -235,7 +363,36 @@ impl Condition {
             return Err(PredicateError::NanValue { target });
         }
 
+        // Contains is the free-text operator, and free text takes nothing
+        // else.
+        if (self.op == CompareOp::Contains) != (self.target == PredicateTarget::FreeText) {
+            return Err(PredicateError::InvalidOpForTarget {
+                op: self.op,
+                target,
+            });
+        }
         match &self.target {
+            PredicateTarget::FreeText => {
+                let [PredicateValue::Text(term)] = self.values.as_slice() else {
+                    return Err(PredicateError::TextValueRequired {
+                        op: self.op,
+                        target,
+                    });
+                };
+                let chars = term.chars().count();
+                if chars < TEXT_MIN_CHARS {
+                    return Err(PredicateError::TextTooShort {
+                        min: TEXT_MIN_CHARS,
+                        got: chars,
+                    });
+                }
+                if term.len() > TEXT_MAX_BYTES {
+                    return Err(PredicateError::TextTooLong {
+                        max: TEXT_MAX_BYTES,
+                        got: term.len(),
+                    });
+                }
+            }
             PredicateTarget::Attribute(AttributeOwner::Builtin, key) => {
                 return Err(PredicateError::AttributeUnderBuiltinOwner { key: key.clone() });
             }
@@ -442,6 +599,8 @@ impl Condition {
             {
                 None
             }
+            // Free text resolves per file over the text scope.
+            (PredicateTarget::FreeText, CompareOp::Contains) => None,
             (target, op) => Some(format!("{op:?} on {target}")),
         }
     }
@@ -692,6 +851,17 @@ impl Predicate {
                 (PredicateTarget::Builtin(BuiltinField::TraceId), _) => {
                     unreachable!("trace:id conditions are split out before lowering")
                 }
+                (PredicateTarget::FreeText, _) => {
+                    let PredicateValue::Text(term) = &condition.values[0] else {
+                        unreachable!("validated: free text takes one text value");
+                    };
+                    let scope = super::vocab::text_scope();
+                    terms.push(PlanTerm::FieldsIn {
+                        exact: scope.exact,
+                        prefixes: scope.prefixes,
+                        matcher: sfst::PlanMatcher::Contains(term.clone()),
+                    });
+                }
                 (target, op) => {
                     let fields: Vec<String> = match target {
                         // The any-owner attribute is the pinned
@@ -721,6 +891,7 @@ impl Predicate {
                                 .expect("evaluable builtins are dictionary-backed")
                                 .to_string(),
                         ],
+                        PredicateTarget::FreeText => unreachable!("lowered above"),
                     };
                     let negated = matches!(op, CompareOp::NotEq | CompareOp::NotRegex);
                     terms.push(PlanTerm::Fields {
@@ -773,6 +944,7 @@ fn condition_matcher(op: CompareOp, values: &[PredicateValue]) -> sfst::PlanMatc
             CompareOp::Regex | CompareOp::NotRegex => {
                 unreachable!("validated: regex takes text patterns")
             }
+            CompareOp::Contains => unreachable!("validated: contains is free text only"),
         };
         sfst::PlanMatcher::Number { cmp, values }
     } else {
@@ -845,7 +1017,7 @@ fn duration_bounds(op: CompareOp, v: i64) -> (Option<i64>, Option<i64>) {
             None => EMPTY,
         },
         CompareOp::Lte => (None, Some(v)),
-        CompareOp::NotEq | CompareOp::Regex | CompareOp::NotRegex => {
+        CompareOp::NotEq | CompareOp::Regex | CompareOp::NotRegex | CompareOp::Contains => {
             unreachable!("not a duration bound op (validated)")
         }
     }
@@ -906,6 +1078,11 @@ enum EvalTerm {
         column: sfst::IdColumnKind,
         ids: Vec<sfst::SpanId>,
         negated: bool,
+    },
+    FieldsIn {
+        exact: Vec<String>,
+        prefixes: Vec<String>,
+        matcher: EvalMatcher,
     },
     EventGroup {
         conditions: Vec<EvalGroupCondition>,
@@ -974,9 +1151,15 @@ impl EvalPredicate {
                 PlanTerm::LinkGroup { conditions } => EvalTerm::LinkGroup {
                     conditions: conditions.iter().map(eval_group_condition).collect(),
                 },
-                PlanTerm::FieldsIn { .. } => {
-                    unreachable!("no predicate lowers a FieldsIn term yet")
-                }
+                PlanTerm::FieldsIn {
+                    exact,
+                    prefixes,
+                    matcher,
+                } => EvalTerm::FieldsIn {
+                    exact: exact.clone(),
+                    prefixes: prefixes.clone(),
+                    matcher: eval_matcher(matcher),
+                },
             })
             .collect();
         Self { terms }
@@ -1018,6 +1201,40 @@ impl EvalPredicate {
                 } else {
                     any_match
                 }
+            }
+            EvalTerm::FieldsIn {
+                exact,
+                prefixes,
+                matcher,
+            } => {
+                // Storage names: row facets as stored; event names and
+                // event/link attributes under their storage spellings
+                // (spans carry them structured and prefix-stripped when
+                // the file has the structure, as row facets otherwise).
+                let in_scope = |head: &str, tail: &str| scope_has(exact, prefixes, head, tail);
+                let event_name = BuiltinField::EventName
+                    .dictionary_field()
+                    .expect("dictionary-backed");
+                let event_attr = AttributeOwner::Event
+                    .attribute_prefix()
+                    .expect("attribute owner");
+                let link_attr = AttributeOwner::Link
+                    .attribute_prefix()
+                    .expect("attribute owner");
+                span.fields
+                    .iter()
+                    .any(|(k, v)| in_scope(k, "") && matcher.value_matches(v))
+                    || span.events.iter().any(|e| {
+                        (in_scope(event_name, "") && matcher.value_matches(&e.name))
+                            || e.attributes
+                                .iter()
+                                .any(|(k, v)| in_scope(event_attr, k) && matcher.value_matches(v))
+                    })
+                    || span.links.iter().any(|l| {
+                        l.attributes
+                            .iter()
+                            .any(|(k, v)| in_scope(link_attr, k) && matcher.value_matches(v))
+                    })
             }
             EvalTerm::Duration { intervals, negated } => {
                 let in_any = intervals.iter().any(|&(lo, hi)| {
@@ -1075,6 +1292,23 @@ impl EvalPredicate {
             }),
         })
     }
+}
+
+/// Whether the storage name `head` + `tail` is in a free-text scope —
+/// equal to an `exact` name or under one of `prefixes` — without
+/// building the name.
+fn scope_has(exact: &[String], prefixes: &[String], head: &str, tail: &str) -> bool {
+    let len = head.len() + tail.len();
+    let equals =
+        |name: &str| name.len() == len && name.starts_with(head) && &name[head.len()..] == tail;
+    let under = |prefix: &str| {
+        if prefix.len() <= head.len() {
+            head.starts_with(prefix)
+        } else {
+            prefix.starts_with(head) && tail.starts_with(&prefix[head.len()..])
+        }
+    };
+    exact.iter().any(|e| equals(e)) || prefixes.iter().any(|p| under(p))
 }
 
 /// Compile one plan matcher for span-side use (patterns validated at
@@ -1416,7 +1650,7 @@ mod tests {
                 CompareOp::Gt,
                 vec![PredicateValue::Integer(1), PredicateValue::Integer(2)],
             )),
-            PredicateError::OrderingArity { got: 2, .. }
+            PredicateError::SingleValueArity { got: 2, .. }
         ));
         assert!(matches!(
             err(cond(
@@ -2181,5 +2415,220 @@ mod tests {
             CompareOp::NotEq,
             vec![PredicateValue::Integer(250)],
         )));
+    }
+
+    fn free_text(term: &str) -> Condition {
+        cond(
+            PredicateTarget::FreeText,
+            CompareOp::Contains,
+            vec![text(term)],
+        )
+    }
+
+    fn group(conditions: Vec<Condition>) -> Predicate {
+        Predicate { conditions }
+    }
+
+    /// Token validation: the token cap, empty tokens, trace-level and
+    /// `trace_id` conditions alone in their token, the free-text rules
+    /// (operator, one text value, length in characters and bytes), and
+    /// every condition checked as in a predicate.
+    #[test]
+    fn token_validation_matrix() {
+        let root = cond(
+            PredicateTarget::Builtin(BuiltinField::RootServiceName),
+            CompareOp::Eq,
+            vec![text("svc")],
+        );
+        let trace_id = cond(
+            PredicateTarget::Builtin(BuiltinField::TraceId),
+            CompareOp::Eq,
+            vec![text(&"ab".repeat(16))],
+        );
+        let duration = cond(
+            PredicateTarget::Builtin(BuiltinField::TraceDuration),
+            CompareOp::Gte,
+            vec![PredicateValue::Integer(5)],
+        );
+        let attr = cond(span_attr("x"), CompareOp::Eq, vec![text("v")]);
+        let check = |tokens: Vec<Token>| TokenQuery { tokens }.validate();
+        let alone = |c: &Condition| Token::positive(group(vec![c.clone()]));
+
+        // Valid: no tokens; free text in a same-span group; negated
+        // tokens of every kind; three characters of any width; the byte
+        // limit; the token limit.
+        check(vec![]).unwrap();
+        check(vec![Token::positive(group(vec![
+            attr.clone(),
+            free_text("abc"),
+        ]))])
+        .unwrap();
+        check(vec![
+            Token::negated(group(vec![attr.clone()])),
+            Token::negated(group(vec![root.clone()])),
+            Token::negated(group(vec![trace_id.clone()])),
+            alone(&duration),
+        ])
+        .unwrap();
+        check(vec![alone(&free_text("日本語"))]).unwrap();
+        check(vec![alone(&free_text(&"a".repeat(TEXT_MAX_BYTES)))]).unwrap();
+        check((0..TOKENS_MAX).map(|_| alone(&attr)).collect()).unwrap();
+
+        let err = |tokens: Vec<Token>| check(tokens).unwrap_err();
+        assert!(matches!(
+            err((0..=TOKENS_MAX).map(|_| alone(&attr)).collect()),
+            PredicateError::TooManyTokens { max: 32, got: 33 }
+        ));
+        assert!(matches!(
+            err(vec![Token::negated(Predicate::all())]),
+            PredicateError::EmptyToken
+        ));
+        for single in [&root, &trace_id, &duration] {
+            assert!(matches!(
+                err(vec![Token::positive(group(vec![
+                    attr.clone(),
+                    single.clone()
+                ]))]),
+                PredicateError::TokenNotAlone { .. }
+            ));
+        }
+        assert!(matches!(
+            err(vec![alone(&free_text("éé"))]),
+            PredicateError::TextTooShort { min: 3, got: 2 }
+        ));
+        assert!(matches!(
+            err(vec![alone(&free_text(&"a".repeat(TEXT_MAX_BYTES + 1)))]),
+            PredicateError::TextTooLong {
+                max: 1024,
+                got: 1025
+            }
+        ));
+        assert!(matches!(
+            err(vec![alone(&cond(
+                PredicateTarget::FreeText,
+                CompareOp::Eq,
+                vec![text("abc")]
+            ))]),
+            PredicateError::InvalidOpForTarget { .. }
+        ));
+        assert!(matches!(
+            err(vec![alone(&cond(
+                span_attr("x"),
+                CompareOp::Contains,
+                vec![text("abc")]
+            ))]),
+            PredicateError::InvalidOpForTarget { .. }
+        ));
+        assert!(matches!(
+            err(vec![alone(&cond(
+                PredicateTarget::FreeText,
+                CompareOp::Contains,
+                vec![text("abc"), text("def")]
+            ))]),
+            PredicateError::SingleValueArity { got: 2, .. }
+        ));
+        assert!(matches!(
+            err(vec![alone(&cond(
+                PredicateTarget::FreeText,
+                CompareOp::Contains,
+                vec![PredicateValue::Integer(123)]
+            ))]),
+            PredicateError::TextValueRequired { .. }
+        ));
+        assert!(matches!(
+            err(vec![alone(&cond(
+                span_attr("x"),
+                CompareOp::Regex,
+                vec![text("(")]
+            ))]),
+            PredicateError::InvalidPattern { .. }
+        ));
+        assert!(matches!(
+            err(vec![alone(&cond(
+                PredicateTarget::Builtin(BuiltinField::EventName),
+                CompareOp::NotEq,
+                vec![text("e")]
+            ))]),
+            PredicateError::NotYetEvaluable { .. }
+        ));
+    }
+
+    /// A flat predicate keeps its meaning as tokens: its span-local
+    /// conditions (free text included) as one positive group, each
+    /// trace-level and `trace_id` condition as its own positive token.
+    #[test]
+    fn a_predicate_becomes_tokens_with_its_meaning() {
+        let root = cond(
+            PredicateTarget::Builtin(BuiltinField::RootName),
+            CompareOp::NotEq,
+            vec![text("r")],
+        );
+        let trace_id = cond(
+            PredicateTarget::Builtin(BuiltinField::TraceId),
+            CompareOp::Eq,
+            vec![text(&"ab".repeat(16))],
+        );
+        let attr = cond(span_attr("x"), CompareOp::NotEq, vec![text("v")]);
+        let words = free_text("abc");
+        let tokens = TokenQuery::from(group(vec![
+            attr.clone(),
+            root.clone(),
+            words.clone(),
+            trace_id.clone(),
+        ]));
+        assert_eq!(
+            tokens.tokens,
+            vec![
+                Token::positive(group(vec![attr, words])),
+                Token::positive(group(vec![root])),
+                Token::positive(group(vec![trace_id])),
+            ]
+        );
+        assert!(TokenQuery::from(Predicate::all()).tokens.is_empty());
+    }
+
+    /// Free text lowers to one field-set term over the text scope: the
+    /// name, status message and event names, and every attribute
+    /// owner's fields — not `kind`, `status_code` or the scope name.
+    #[test]
+    fn free_text_lowers_to_the_text_scope() {
+        let plan = group(vec![free_text("Abc")]).to_trace_plan();
+        let strings = |v: &[&str]| v.iter().map(|s| s.to_string()).collect::<Vec<_>>();
+        assert_eq!(
+            plan.terms,
+            vec![PlanTerm::FieldsIn {
+                exact: strings(&["name", "status_message", "events.name"]),
+                prefixes: strings(&[
+                    "resource.attributes.",
+                    "attributes.",
+                    "scope.attributes.",
+                    "events.attributes.",
+                    "links.attributes.",
+                ]),
+                matcher: sfst::PlanMatcher::Contains("Abc".to_string()),
+            }]
+        );
+        // The span-side scope test, without building names.
+        let (exact, prefixes) = match &plan.terms[0] {
+            PlanTerm::FieldsIn {
+                exact, prefixes, ..
+            } => (exact, prefixes),
+            _ => unreachable!(),
+        };
+        for (head, tail, want) in [
+            ("name", "", true),
+            ("events.name", "", true),
+            ("events.attributes.", "k", true),
+            ("links.attributes.", "a.b", true),
+            ("attributes.http.url", "", true),
+            ("kind", "", false),
+            ("status_code", "", false),
+            ("scope.name", "", false),
+            ("events.", "name", true),
+            ("events.", "names", false),
+            ("links.", "attributes.x", true),
+        ] {
+            assert_eq!(scope_has(exact, prefixes, head, tail), want, "{head}{tail}");
+        }
     }
 }

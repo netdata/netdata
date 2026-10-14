@@ -185,6 +185,43 @@ pub fn storage_to_attribute(storage: &str) -> Option<(AttributeOwner, AttributeK
     None
 }
 
+/// The storage fields free text searches (decision 18: values only): the
+/// span name, the status message and event names, plus every attribute
+/// owner's values. Never field names, the `kind`/`status_code` labels, or
+/// ids.
+pub(crate) struct TextScope {
+    /// Fields searched by exact storage name.
+    pub(crate) exact: Vec<String>,
+    /// Field-name prefixes: every field under one is searched.
+    pub(crate) prefixes: Vec<String>,
+}
+
+/// The free-text scope, built from the vocabulary.
+pub(crate) fn text_scope() -> TextScope {
+    let builtins = [
+        BuiltinField::Name,
+        BuiltinField::StatusMessage,
+        BuiltinField::EventName,
+    ];
+    let owners = [
+        AttributeOwner::Resource,
+        AttributeOwner::Span,
+        AttributeOwner::Instrumentation,
+        AttributeOwner::Event,
+        AttributeOwner::Link,
+    ];
+    TextScope {
+        exact: builtins
+            .iter()
+            .map(|b| b.dictionary_field().expect("dictionary-backed").to_string())
+            .collect(),
+        prefixes: owners
+            .iter()
+            .map(|o| o.attribute_prefix().expect("attribute owner").to_string())
+            .collect(),
+    }
+}
+
 /// The resource `service.name` attribute's full storage field — the one
 /// composite spelling several folds need (`summarize`, the trace
 /// aggregates). Built from the vocabulary, never hand-written.

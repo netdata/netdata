@@ -521,6 +521,7 @@ pub(crate) fn parse_enumeration_key(key: &str) -> Result<(AttributeOwner, Attrib
     Ok(match parse_selection_key(key)? {
         PredicateTarget::Attribute(owner, a) => (owner, AttributeKey::Attribute(a)),
         PredicateTarget::Builtin(f) => (AttributeOwner::Builtin, AttributeKey::Builtin(f)),
+        PredicateTarget::FreeText => return Err(format!("'{key}' is not a key")),
     })
 }
 

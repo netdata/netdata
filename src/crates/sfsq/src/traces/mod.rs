@@ -92,7 +92,8 @@ pub use overview::{
     OverviewRequestError, overview,
 };
 pub use predicate::{
-    CompareOp, Condition, Predicate, PredicateError, PredicateTarget, PredicateValue, span_matches,
+    CompareOp, Condition, Predicate, PredicateError, PredicateTarget, PredicateValue,
+    TEXT_MAX_BYTES, TEXT_MIN_CHARS, TOKENS_MAX, Token, TokenQuery, span_matches,
 };
 pub use rollup::{TraceAggregate, sealed_trace_envelopes, tail_trace_aggregates};
 pub use search::{

@@ -2138,3 +2138,215 @@ fn a_newer_pending_file_compiles_before_older_pool_candidates() {
     assert_eq!(ids(&data), vec![hex(2)]);
     assert_eq!(data.status, QueryStatus::Complete);
 }
+
+// ── Free text: index and span paths agree ──────────────────────────
+
+/// One span (and trace) of the free-text corpus, with the values free
+/// text should search, for the oracle.
+struct TextSpan {
+    trace: [u8; 16],
+    spec: SpanSpec,
+    /// Every value in the free-text scope: name, status message, span,
+    /// resource and scope attribute values, event names and attribute
+    /// values, link attribute values.
+    scope_values: Vec<String>,
+}
+
+const TEXT_TRACES: usize = 2400;
+const TEXT_BATCH: usize = 100;
+
+/// 2400 one-span traces in requests of 100, sized so each half (1200
+/// spans) seals `name` and `rq` into the high tier, `route` into the
+/// mid tier and the rest into the low tier. Rare values: a low-card
+/// flag, status messages, an event (name + attribute), a link
+/// attribute, a resource attribute on batch 3 and a scope attribute on
+/// batch 5. Status ERROR without a message on others: free text never
+/// searches `status_code`.
+fn text_corpus() -> (
+    Vec<ExportTraceServiceRequest>,
+    Vec<ExportTraceServiceRequest>,
+    Vec<TextSpan>,
+) {
+    let mut spans = Vec::new();
+    let mut early = Vec::new();
+    let mut late = Vec::new();
+    for batch in 0..TEXT_TRACES / TEXT_BATCH {
+        let mut resource = vec![kv_str("service.name", &format!("svc-{}", batch % 4))];
+        if batch == 3 {
+            resource.push(kv_str("deployment", "blue-CANARY"));
+        }
+        let scope_attrs = vec![kv_str("feature", "telescope-mode")];
+        let scope = (batch == 5).then(|| ("lib", "1.0", scope_attrs.clone()));
+        let mut specs = Vec::new();
+        for i in batch * TEXT_BATCH..(batch + 1) * TEXT_BATCH {
+            let mut trace = [0u8; 16];
+            trace[0] = 1;
+            trace[14..].copy_from_slice(&(i as u16).to_be_bytes());
+            let name: &'static str = Box::leak(format!("op-{i:04}").into_boxed_str());
+            let mut spec = SpanSpec {
+                trace,
+                ..sp(1, 0, (1_000 + i as u64) * NS, name)
+            };
+            spec.attrs = vec![
+                kv_str("rq", &format!("rq{i:04}x")),
+                kv_str("route", &format!("route-{:03}", i % 150)),
+                common::kv_int("count", (i % 7) as i64),
+            ];
+            if i % 500 == 5 {
+                spec.attrs.push(kv_str("flag", "Golden-Ticket"));
+            }
+            if i % 400 == 11 {
+                spec.status = Some((2, "Upstream TIMEOUT at gateway"));
+            } else if i % 401 == 13 {
+                spec.status = Some((2, ""));
+            }
+            if i % 300 == 7 {
+                spec.events = vec![(
+                    "checkout.failed",
+                    vec![kv_str("error.detail", "Card DECLINED by issuer")],
+                )];
+            }
+            if i % 350 == 9 {
+                spec.links = vec![(tid(9), [0x99; 8], vec![kv_str("rel", "follows-from-batch")])];
+            }
+            let mut scope_values = vec![
+                name.to_string(),
+                format!("rq{i:04}x"),
+                format!("route-{:03}", i % 150),
+                (i % 7).to_string(),
+                format!("svc-{}", batch % 4),
+            ];
+            if i % 500 == 5 {
+                scope_values.push("Golden-Ticket".into());
+            }
+            if let Some((_, message)) = spec.status {
+                scope_values.push(message.to_string());
+            }
+            if batch == 3 {
+                scope_values.push("blue-CANARY".into());
+            }
+            if batch == 5 {
+                scope_values.push("telescope-mode".into());
+            }
+            if i % 300 == 7 {
+                scope_values.push("checkout.failed".into());
+                scope_values.push("Card DECLINED by issuer".into());
+            }
+            if i % 350 == 9 {
+                scope_values.push("follows-from-batch".into());
+            }
+            specs.push(spec.clone());
+            spans.push(TextSpan {
+                trace,
+                spec,
+                scope_values,
+            });
+        }
+        let request = req_with(resource, scope, &specs);
+        if batch < TEXT_TRACES / TEXT_BATCH / 2 {
+            early.push(request);
+        } else {
+            late.push(request);
+        }
+    }
+    (early, late, spans)
+}
+
+/// Free text finds the same traces whether a span is read through the
+/// index (sealed files: low, mid and high tiers) or decoded (WAL
+/// tails): span names, status messages, span/resource/scope attribute
+/// values, event names and attribute values, and link attribute values,
+/// case-insensitively; never field names or `status_code`.
+#[test]
+fn text_index_span_parity() {
+    let dir = tempfile::tempdir().unwrap();
+    let (early, late, spans) = text_corpus();
+    assert!(spans.iter().all(|s| s.spec.trace == s.trace));
+    let mut all = early.clone();
+    all.extend(late.clone());
+    let wal_all = write_wal(dir.path(), all, "all");
+    let wal_early = write_wal(dir.path(), early, "early");
+    let wal_late = write_wal(dir.path(), late, "late");
+    // The tiers the corpus is sized for, in each sealed half.
+    for half in [&wal_early, &wal_late] {
+        sealed_source(dir.path(), half, "probe");
+        let bytes = std::fs::read(dir.path().join("probe.sfst")).unwrap();
+        let meta = sfst::MetaReader::open(&bytes).unwrap();
+        let tier = |name: &str| {
+            meta.field_table()
+                .unwrap()
+                .iter()
+                .find(|f| f.name == name)
+                .map(|f| f.tier)
+        };
+        assert_eq!(tier("name"), Some(sfst::FieldTier::High));
+        assert_eq!(tier("attributes.rq"), Some(sfst::FieldTier::High));
+        assert_eq!(tier("attributes.route"), Some(sfst::FieldTier::Mid));
+        assert_eq!(tier("attributes.flag"), Some(sfst::FieldTier::Low));
+    }
+    type Layout<'a> = (&'static str, Box<dyn Fn() -> Vec<TraceSource> + 'a>);
+    let layouts: [Layout; 4] = [
+        (
+            "sealed",
+            Box::new(|| vec![sealed_source(dir.path(), &wal_all, "all")]),
+        ),
+        (
+            "sealed-halves",
+            Box::new(|| {
+                vec![
+                    sealed_source(dir.path(), &wal_early, "early"),
+                    sealed_source(dir.path(), &wal_late, "late"),
+                ]
+            }),
+        ),
+        ("tail", Box::new(|| vec![tail_source(&wal_all, "all-tail")])),
+        (
+            "sealed-plus-tail",
+            Box::new(|| {
+                vec![
+                    sealed_source(dir.path(), &wal_early, "early"),
+                    tail_source(&wal_late, "late-tail"),
+                ]
+            }),
+        ),
+    ];
+    let terms = [
+        ("RQ0777X", 1),       // high tier, upper case
+        ("op-1999", 1),       // span name, high tier
+        ("route-042", 16),    // mid tier
+        ("golden", 5),        // low tier
+        ("timeout", 6),       // status message
+        ("checkout.fail", 8), // event name
+        ("declined", 8),      // event attribute value
+        ("from-batch", 7),    // link attribute value
+        ("canary", 100),      // resource attribute value
+        ("telescope", 100),   // scope attribute value
+        ("error", 0),         // only a field name and `status_code`
+        ("rel", 0),           // only a field name
+    ];
+    for (term, count) in terms {
+        let needle = term.to_lowercase();
+        let want: BTreeSet<String> = spans
+            .iter()
+            .filter(|s| {
+                s.scope_values
+                    .iter()
+                    .any(|v| v.to_lowercase().contains(&needle))
+            })
+            .map(|s| sfst::TraceId::from(s.trace).to_string())
+            .collect();
+        assert_eq!(want.len(), count, "oracle for {term}");
+        for (name, build) in &layouts {
+            let query = SearchQuery::new(pred(vec![cond(
+                PredicateTarget::FreeText,
+                CompareOp::Contains,
+                vec![text(term)],
+            )]))
+            .limit(200);
+            let data = run(both_roles(build), query);
+            let got: BTreeSet<String> = ids(&data).into_iter().collect();
+            assert_eq!(got, want, "{term} on {name}");
+            assert_eq!(data.status, QueryStatus::Complete, "{term} on {name}");
+        }
+    }
+}
