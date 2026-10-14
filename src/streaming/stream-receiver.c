@@ -764,11 +764,6 @@ static void stream_receiver_remove_internal(struct stream_thread *sth, struct re
     // set a default exit reason, if not set
     receiver_set_exit_reason(rpt, reason, false);
 
-    // in case we are connected to netdata cloud,
-    // we inform cloud that a child got disconnected
-    uint64_t total_reboot = rrdhost_stream_path_total_reboot_time_ms(rpt->host);
-    schedule_node_state_update(rpt->host, MIN((total_reboot * MAX_CHILD_DISC_TOLERANCE), MAX_CHILD_DISC_DELAY));
-
     rrdhost_clear_receiver(rpt, reason);
     rrdhost_set_is_parent_label();
 
@@ -1468,6 +1463,13 @@ void rrdhost_clear_receiver(struct receiver_state *rpt, STREAM_HANDSHAKE reason)
 
             rrdhost_receiver_unlock(host);
             {
+                // in case we are connected to netdata cloud, we inform cloud that a child got disconnected.
+                // This must happen after the online flag is cleared: scheduled earlier, the update could be
+                // evaluated while the child still looks online, report it live, and never be repeated.
+                // The delay is read here, before stream_path_child_disconnected() clears the stream path.
+                uint64_t total_reboot = rrdhost_stream_path_total_reboot_time_ms(host);
+                schedule_node_state_update(host, MIN((total_reboot * MAX_CHILD_DISC_TOLERANCE), MAX_CHILD_DISC_DELAY));
+
                 // this will wait until all workers finish
                 object_state_deactivate(&host->state_id);
 
