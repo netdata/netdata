@@ -387,7 +387,7 @@ fn info_response_shape_is_pinned() {
             "has_history": true,
             "v": 3,
             "accepted_params": [
-                "info", "trace", "attribute_values", "suggest", "tenant", "after", "before", "last", "anchor", "selections",
+                "info", "trace", "attribute_values", "suggest", "tenant", "after", "before", "last", "anchor", "conditions", "text", "selections",
                 "min_trace_duration_ns", "max_trace_duration_ns"
             ],
             "required_params": [],

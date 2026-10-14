@@ -84,6 +84,8 @@ async fn info_returns_the_descriptor() {
             "before",
             "last",
             "anchor",
+            "conditions",
+            "text",
             "selections",
             "min_trace_duration_ns",
             "max_trace_duration_ns"
@@ -610,7 +612,6 @@ async fn the_otel_defaults_are_selectable_in_the_functions_view() {
     let v = serde_json::to_value(call_on(&h, body).await.unwrap()).unwrap();
     assert_eq!(ids(&v["data"]), ["0b"]);
     let o = &v["data"]["overview"];
-    assert_eq!(o["scope"], "selection");
     assert_eq!(o["totals"], json!({"traces": 1, "spans": 2, "errors": 0}));
 
     let mut body = functions_body(20);
@@ -1172,7 +1173,6 @@ async fn the_functions_view_aggregates_the_whole_window_beside_the_page() {
     let o = &v["data"]["overview"];
     assert_eq!(o["version"], 1);
     assert_eq!(o["unit"], "traces");
-    assert_eq!(o["scope"], "window");
     assert_eq!(o["status"], json!({"complete": true}));
     assert_eq!(o["totals"], json!({"traces": 5, "spans": 8, "errors": 0}));
     assert_eq!(o["grid"]["bucket_start_s"], T_S);
@@ -1211,13 +1211,12 @@ async fn the_aggregate_bins_only_the_selected_traces() {
     let h = handler_with_search_corpus().await;
 
     // Selections active: the aggregate follows them (the svc-a traces
-    // A, C, E — 5 stored spans) and says so through `scope`.
+    // A, C, E — 5 stored spans).
     let mut body = functions_body(20);
     body["selections"] = json!({"resource.service.name": ["svc-a"]});
     let v = serde_json::to_value(call_on(&h, body).await.unwrap()).unwrap();
     assert_eq!(ids(&v["data"]), ["0e", "0c", "0a"]);
     let o = &v["data"]["overview"];
-    assert_eq!(o["scope"], "selection");
     assert_eq!(o["totals"], json!({"traces": 3, "spans": 5, "errors": 0}));
     let cells = o["grid"]["cells"].as_array().unwrap();
     let sum: u64 = cells
@@ -1238,31 +1237,31 @@ async fn the_aggregate_follows_the_selections_but_never_the_duration_bounds() {
     let h = handler_with_search_corpus().await;
     // A selection AND a duration bound: the list honours both (E is the
     // only svc-a trace with a ≥1µs envelope), the grid honours the
-    // selection alone — duration is its own axis — and `scope` names
-    // exactly that.
+    // selection alone — duration is its own axis.
     let mut body = functions_body(20);
     body["selections"] = json!({"resource.service.name": ["svc-a"]});
     body["min_trace_duration_ns"] = json!(1_000);
     let v = serde_json::to_value(call_on(&h, body).await.unwrap()).unwrap();
     assert_eq!(ids(&v["data"]), ["0e"]);
     let o = &v["data"]["overview"];
-    assert_eq!(o["scope"], "selection");
     assert_eq!(o["totals"], json!({"traces": 3, "spans": 5, "errors": 0}));
 
     // Values OR within a key: both services select everything, and the
-    // grid equals the unfiltered one — but the scope still says what ran.
+    // grid equals the unfiltered one.
     let mut body = functions_body(20);
     body["selections"] = json!({"resource.service.name": ["svc-a", "svc-b"]});
     let v = serde_json::to_value(call_on(&h, body).await.unwrap()).unwrap();
     let o = &v["data"]["overview"];
-    assert_eq!(o["scope"], "selection");
     assert_eq!(o["totals"], json!({"traces": 5, "spans": 8, "errors": 0}));
 
     // An empty value list constrains nothing: the plain window grid.
     let mut body = functions_body(20);
     body["selections"] = json!({"resource.service.name": []});
     let v = serde_json::to_value(call_on(&h, body).await.unwrap()).unwrap();
-    assert_eq!(v["data"]["overview"]["scope"], "window");
+    assert!(
+        v["data"]["overview"].get("scope").is_none(),
+        "scope left the wire"
+    );
 }
 
 /// Every trace-level word the engine owns (`trace_level_target`), as
@@ -1277,36 +1276,26 @@ const TRACE_LEVEL_SELECTIONS: [(&str, &str, &[&str]); 3] = [
 ];
 
 #[tokio::test]
-async fn a_trace_level_selection_word_falls_back_to_the_window_grid() {
+async fn trace_level_selection_words_filter_the_grid_too() {
     let h = handler_with_search_corpus().await;
-    // A trace-level word is a legitimate LIST filter but stored rows
-    // cannot answer it for the grid: the grid runs unfiltered and says
-    // so, rather than guessing from the rollup's approximate root.
+    // Root words read the roots the sources recorded and `trace_id`
+    // pins: the grid bins the traces the list shows.
     for (word, value, listed) in TRACE_LEVEL_SELECTIONS {
         let mut body = functions_body(20);
         body["selections"] = json!({word: [value]});
         let v = serde_json::to_value(call_on(&h, body).await.unwrap()).unwrap();
         assert_eq!(ids(&v["data"]), listed, "{word}: the list applies the word");
         let o = &v["data"]["overview"];
-        assert_eq!(o["scope"], "window", "{word}");
-        assert_eq!(
-            o["totals"],
-            json!({"traces": 5, "spans": 8, "errors": 0}),
-            "{word}"
-        );
+        assert_eq!(o["totals"]["traces"], listed.len(), "{word}");
     }
 
-    // Mixed with a span-level word, the WHOLE predicate is dropped: the
-    // span-level half alone (svc-b: 2 traces) would misrepresent a list
-    // that applies both.
+    // Mixed with a span-level word, both apply to the grid as to the list.
     let mut body = functions_body(20);
     body["selections"] =
         json!({"root_service_name": ["svc-a"], "resource.service.name": ["svc-b"]});
     let v = serde_json::to_value(call_on(&h, body).await.unwrap()).unwrap();
     assert!(ids(&v["data"]).is_empty(), "no trace is on both services");
-    let o = &v["data"]["overview"];
-    assert_eq!(o["scope"], "window");
-    assert_eq!(o["totals"], json!({"traces": 5, "spans": 8, "errors": 0}));
+    assert_eq!(v["data"]["overview"]["totals"]["traces"], 0);
 }
 
 #[tokio::test]
@@ -1315,14 +1304,12 @@ async fn duration_bounds_narrow_the_list_but_never_the_aggregate() {
 
     // A lower bound narrows the page to the window's two long traces
     // (envelopes 2500ns and 1500ns) while the aggregate keeps counting
-    // all five — duration bounds never reach the grid, and `scope` stays
-    // `window` since no selection ran.
+    // all five — duration bounds never reach the grid.
     let mut body = functions_body(20);
     body["min_trace_duration_ns"] = json!(1_000);
     let v = serde_json::to_value(call_on(&h, body).await.unwrap()).unwrap();
     assert_eq!(ids(&v["data"]), ["0e", "0b"]);
     let o = &v["data"]["overview"];
-    assert_eq!(o["scope"], "window");
     assert_eq!(o["totals"], json!({"traces": 5, "spans": 8, "errors": 0}));
 
     // The upper bound behaves identically — the heatmap's cell click
@@ -1332,7 +1319,6 @@ async fn duration_bounds_narrow_the_list_but_never_the_aggregate() {
     let v = serde_json::to_value(call_on(&h, body).await.unwrap()).unwrap();
     assert_eq!(ids(&v["data"]), ["0c", "0d", "0a"]);
     let o = &v["data"]["overview"];
-    assert_eq!(o["scope"], "window");
     assert_eq!(o["totals"], json!({"traces": 5, "spans": 8, "errors": 0}));
 }
 
@@ -1760,4 +1746,132 @@ async fn finished_lists_and_lookups_release_their_permits() {
         .unwrap();
         assert_eq!(v["status"], json!({"complete": true}));
     }
+}
+
+// ── Search-bar chips and free text ─────────────────────────────────
+
+/// Chips and free text filter the list and the grid alike, each one a
+/// token: `!` ops are NOT EXISTS, `^=` is "starts with", and a duration
+/// chip narrows the list but never the grid (its own axis).
+#[tokio::test]
+async fn chips_and_text_filter_the_list_and_the_grid() {
+    let h = handler_with_search_corpus().await;
+    let run = |conditions: serde_json::Value, text: serde_json::Value| {
+        let mut body = functions_body(20);
+        body["conditions"] = conditions;
+        body["text"] = text;
+        let h = &h;
+        async move { serde_json::to_value(call_on(h, body).await.unwrap()).unwrap() }
+    };
+    let chip = |key: &str, op: &str, values: serde_json::Value| json!([{"key": key, "op": op, "values": values}]);
+
+    let v = run(
+        chip("resource.service.name", "=", json!(["svc-a"])),
+        json!([]),
+    )
+    .await;
+    assert_eq!(ids(&v["data"]), ["0e", "0c", "0a"]);
+    assert_eq!(v["data"]["overview"]["totals"]["traces"], 3);
+
+    let v = run(
+        chip("resource.service.name", "!=", json!(["svc-a"])),
+        json!([]),
+    )
+    .await;
+    assert_eq!(ids(&v["data"]), ["0d", "0b"]);
+    assert_eq!(v["data"]["overview"]["totals"]["traces"], 2);
+
+    let v = run(
+        chip("resource.service.name", "^=", json!(["svc-"])),
+        json!([]),
+    )
+    .await;
+    assert_eq!(ids(&v["data"]).len(), 5);
+
+    let v = run(chip("trace_duration", ">=", json!([1000])), json!([])).await;
+    assert_eq!(ids(&v["data"]), ["0e", "0b"]);
+    assert_eq!(v["data"]["overview"]["totals"]["traces"], 5, "not the grid");
+
+    let v = run(json!([]), json!(["SVC-B"])).await;
+    assert_eq!(
+        ids(&v["data"]),
+        ["0d", "0b"],
+        "free text over resource values"
+    );
+    assert_eq!(v["data"]["overview"]["totals"]["traces"], 2);
+}
+
+/// A malformed chip or text is a client error before admission.
+#[tokio::test]
+async fn bad_chips_and_text_are_client_errors() {
+    let h = handler_with_search_corpus().await;
+    let chip = |key: &str, op: &str, values: serde_json::Value| json!([{"key": key, "op": op, "values": values}]);
+    let too_many: Vec<serde_json::Value> = (0..65).map(|i| json!(format!("v{i}"))).collect();
+    let tokens_33: Vec<serde_json::Value> = (0..33).map(|i| json!(format!("term{i}"))).collect();
+    for (conditions, text) in [
+        (chip("resource.service.name", "~=", json!(["x"])), json!([])),
+        (chip("nope", "=", json!(["x"])), json!([])),
+        (
+            chip("resource.service.name", "=", json!(too_many)),
+            json!([]),
+        ),
+        (chip("resource.service.name", "=~", json!(["("])), json!([])),
+        (chip("resource.service.name", "^=", json!([5])), json!([])),
+        (chip("trace_duration", ">=", json!(["long"])), json!([])),
+        (json!([]), json!(["ab"])),
+        (json!([]), json!(tokens_33)),
+    ] {
+        let mut body = functions_body(20);
+        body["conditions"] = conditions.clone();
+        body["text"] = text.clone();
+        let err = call_on(&h, body).await.unwrap_err().to_string();
+        assert!(
+            err.contains("invalid otel-traces request"),
+            "{conditions} {text}: {err}"
+        );
+    }
+}
+
+/// The trace mode marks the spans matching the list's chips; without
+/// chips nothing is marked, and the field is always present.
+#[tokio::test]
+async fn the_trace_marks_spans_matching_the_chips() {
+    let registries = make_registries();
+    install_sealed(
+        &registries,
+        "default",
+        1,
+        vec![otlp_req(0x11, 3, 1_000_000_000)],
+    )
+    .await;
+    let h = make_handler_over(registries);
+    let v = serde_json::to_value(
+        call_on(&h, json!({"trace": {"id": FIXTURE_TRACE_ID}}))
+            .await
+            .unwrap(),
+    )
+    .unwrap();
+    assert_eq!(v["matched"], json!([]));
+    let v = serde_json::to_value(
+        call_on(
+            &h,
+            json!({"trace": {
+                "id": FIXTURE_TRACE_ID,
+                "conditions": [{"key": "name", "op": "=", "values": ["span-1"]}],
+            }}),
+        )
+        .await
+        .unwrap(),
+    )
+    .unwrap();
+    let matched = v["matched"].as_array().unwrap();
+    assert_eq!(matched.len(), 1);
+    let span = &v["spans"][matched[0].as_u64().unwrap() as usize];
+    assert!(
+        span["fields"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .any(|f| f == &json!(["name", "span-1"]))
+    );
 }

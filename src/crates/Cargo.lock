@@ -3730,6 +3730,7 @@ dependencies = [
  "opentelemetry-proto",
  "otel-catalog",
  "otel-logs-identity",
+ "regex",
  "serde",
  "serde_json",
  "sfsq",

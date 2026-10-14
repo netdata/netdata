@@ -921,13 +921,12 @@
     },
     "traces_overview": {
       "type": "object",
-      "required": ["version", "unit", "status", "coverage", "scope", "grid", "totals"],
+      "required": ["version", "unit", "status", "coverage", "grid", "totals"],
       "properties": {
         "version": { "type": "integer", "minimum": 1 },
         "unit": { "type": "string" },
         "status": { "$ref": "#/definitions/traces_status" },
         "coverage": { "$ref": "#/definitions/traces_coverage" },
-        "scope": { "type": "string", "enum": ["window", "selection"] },
         "grid": {
           "type": "object",
           "required": [

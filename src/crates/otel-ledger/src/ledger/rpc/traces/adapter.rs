@@ -4,7 +4,7 @@
 //!
 //! * wire → engine — request-side parsing: hex ids, the selection-key
 //!   grammar, the pagination cursor, window canonicalization
-//!   ([`resolve_window`]), the search predicate ([`build_predicate`]).
+//!   ([`resolve_window`]), the search tokens ([`build_tokens`]).
 //! * engine → wire — the response shapers (`to_*_result`), ids rendered
 //!   as W3C lowercase hex.
 //!
@@ -17,14 +17,15 @@ use std::collections::{HashMap, HashSet};
 use sfsq::traces::{
     AttributeKey, AttributeOwner, AttributeValuesData, BuiltinField, CompareOp, Condition,
     DURATION_BIN_LABELS, DurationPercentiles, FieldKinds, OverviewData, Predicate, PredicateTarget,
-    PredicateValue, SearchData, TraceData,
+    PredicateValue, SearchData, Token, TokenQuery, TraceData,
 };
 
 use super::wire::{
-    AnchorWire, AttributeValueWire, AttributeValuesResult, CoverageWire, EventWire, FieldKindsWire,
-    LinkWire, OverviewGridWire, OverviewPercentilesWire, OverviewSection, OverviewTotals,
-    SearchItems, SearchResult, ServiceBreakdownWire, ServiceSpansWire, SpanWire, StatusWire,
-    SuggestResult, SuggestionWire, TraceItems, TraceResult, TraceSummaryWire,
+    AnchorWire, AttributeValueWire, AttributeValuesResult, CONDITION_VALUES_MAX, ConditionParams,
+    ConditionValue, CoverageWire, EventWire, FieldKindsWire, LinkWire, OverviewGridWire,
+    OverviewPercentilesWire, OverviewSection, OverviewTotals, SearchItems, SearchResult,
+    ServiceBreakdownWire, ServiceSpansWire, SpanWire, StatusWire, SuggestResult, SuggestionWire,
+    TraceItems, TraceResult, TraceSummaryWire,
 };
 
 /// Parse a W3C text-form trace id: exactly 32 hex chars (16 bytes),
@@ -220,6 +221,7 @@ pub(crate) fn to_trace_result(
         roots: t.roots,
         children: t.children,
         spans,
+        matched: data.matched,
         field_kinds: field_kinds_wire(data.field_kinds),
     }
 }
@@ -461,6 +463,115 @@ pub(crate) fn build_predicate(
     Ok(Predicate { conditions })
 }
 
+/// The search tokens of a request: the filter rail's `selections` and
+/// duration band as their flat predicate means (one same-span token, one
+/// token per bound — `TokenQuery::from`), then one token per chip and
+/// per free-text term. Validated whole here, so a bad request is a
+/// client error before admission.
+pub(crate) fn build_tokens(
+    selections: &HashMap<String, Vec<String>>,
+    min_trace_duration_ns: Option<i64>,
+    max_trace_duration_ns: Option<i64>,
+    conditions: &[ConditionParams],
+    text: &[String],
+) -> Result<TokenQuery, String> {
+    let mut tokens = TokenQuery::from(build_predicate(
+        selections,
+        min_trace_duration_ns,
+        max_trace_duration_ns,
+    )?);
+    for condition in conditions {
+        tokens.tokens.push(chip_token(condition)?);
+    }
+    for term in text {
+        check_request_text("text", term)?;
+        tokens.tokens.push(Token::positive(Predicate {
+            conditions: vec![Condition {
+                target: PredicateTarget::FreeText,
+                op: CompareOp::Contains,
+                values: vec![PredicateValue::Text(term.clone())],
+            }],
+        }));
+    }
+    tokens.validate().map_err(|e| e.to_string())?;
+    Ok(tokens)
+}
+
+/// One chip as its token: a `!` op is NOT EXISTS over the positive form,
+/// and `^=` ("starts with") is the anchored regex of the escaped value
+/// followed by anything, line breaks included.
+fn chip_token(chip: &ConditionParams) -> Result<Token, String> {
+    let target = parse_selection_key(&chip.key)?;
+    let (op, negated, prefix) = match chip.op.as_str() {
+        "=" => (CompareOp::Eq, false, false),
+        "!=" => (CompareOp::Eq, true, false),
+        "=~" => (CompareOp::Regex, false, false),
+        "!~" => (CompareOp::Regex, true, false),
+        "^=" => (CompareOp::Regex, false, true),
+        "!^=" => (CompareOp::Regex, true, true),
+        ">" => (CompareOp::Gt, false, false),
+        ">=" => (CompareOp::Gte, false, false),
+        "<" => (CompareOp::Lt, false, false),
+        "<=" => (CompareOp::Lte, false, false),
+        other => return Err(format!("condition on '{}': unknown op '{other}'", chip.key)),
+    };
+    if chip.values.len() > CONDITION_VALUES_MAX {
+        return Err(format!(
+            "condition on '{}' carries {} values, over the limit of {CONDITION_VALUES_MAX}",
+            chip.key,
+            chip.values.len()
+        ));
+    }
+    let mut values = Vec::with_capacity(chip.values.len());
+    for value in &chip.values {
+        values.push(match value {
+            ConditionValue::Text(text) => {
+                check_request_text("condition value", text)?;
+                PredicateValue::Text(if prefix {
+                    format!("{}(?s:.*)", regex::escape(text))
+                } else {
+                    text.clone()
+                })
+            }
+            ConditionValue::Number(_) if prefix => {
+                return Err(format!(
+                    "condition on '{}': '{}' takes text values",
+                    chip.key, chip.op
+                ));
+            }
+            ConditionValue::Number(n) => match n.as_i64() {
+                Some(i) => PredicateValue::Integer(i),
+                None => PredicateValue::Float(n.as_f64().ok_or_else(|| {
+                    format!("condition on '{}': number {n} is out of range", chip.key)
+                })?),
+            },
+        });
+    }
+    let group = Predicate {
+        conditions: vec![Condition { target, op, values }],
+    };
+    Ok(if negated {
+        Token::negated(group)
+    } else {
+        Token::positive(group)
+    })
+}
+
+/// The heatmap's tokens: the page's, minus every trace-duration one —
+/// duration is the grid's own axis, so a cell click or a duration chip
+/// narrows the list beside the grid, not the grid.
+pub(crate) fn heatmap_tokens(tokens: &TokenQuery) -> TokenQuery {
+    let duration = PredicateTarget::Builtin(BuiltinField::TraceDuration);
+    TokenQuery {
+        tokens: tokens
+            .tokens
+            .iter()
+            .filter(|t| !t.group.conditions.iter().any(|c| c.target == duration))
+            .cloned()
+            .collect(),
+    }
+}
+
 // ── Enumeration: key parsing and rendering ──────────────────────────
 
 /// The selection-grammar word of a builtin field.
@@ -609,7 +720,6 @@ pub(crate) fn to_overview_section(
     data: OverviewData,
     grid: sfst::Grid,
     coverage: CoverageWire,
-    scope: &'static str,
 ) -> OverviewSection {
     const NS_PER_S: i64 = 1_000_000_000;
     debug_assert_eq!(grid.bucket_start_ns % NS_PER_S, 0);
@@ -619,7 +729,6 @@ pub(crate) fn to_overview_section(
         unit: "traces",
         status: StatusWire::from(&data.status),
         coverage,
-        scope,
         grid: OverviewGridWire {
             bucket_start_s: (grid.bucket_start_ns / NS_PER_S) as u32,
             bucket_width_s: (grid.bucket_width_ns / NS_PER_S) as u32,
@@ -644,17 +753,6 @@ fn to_percentiles(buckets: &[Option<DurationPercentiles>]) -> OverviewPercentile
         p95: buckets.iter().map(|b| b.map(|p| p.p95)).collect(),
         p99: buckets.iter().map(|b| b.map(|p| p.p99)).collect(),
     }
-}
-
-/// The heatmap's predicate from a request's `selections` alone — the
-/// page's grammar and builder, minus every duration bound (the grid
-/// never applies those; see the wire's `scope` doc). `None` when the
-/// selections constrain nothing, so the caller runs the plain grid.
-pub(crate) fn heatmap_predicate(
-    selections: &HashMap<String, Vec<String>>,
-) -> Result<Option<Predicate>, String> {
-    let predicate = build_predicate(selections, None, None)?;
-    Ok((!predicate.is_all()).then_some(predicate))
 }
 
 // ── Search: pagination cursor ───────────────────────────────────────

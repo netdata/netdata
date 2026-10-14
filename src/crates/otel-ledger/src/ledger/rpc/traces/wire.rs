@@ -27,11 +27,11 @@ use sfsq::traces::{PartialReason, QueryStatus};
 
 /// Request param names accepted by this function, advertised to the UI
 /// in `InfoResponse::accepted_params`. The rule: the list carries
-/// exactly the TOP-LEVEL keys — the three mode selectors, `tenant`, and
-/// every field the implicit Functions view reads, its own duration band
-/// included. `selections` is listed for
-/// the same reason: it is how the filter rail's picks travel, and a
-/// field the implicit view honours but this list omits is unreachable.
+/// exactly the TOP-LEVEL keys — the mode selectors, `tenant`, and every
+/// field the implicit Functions view reads: its window and cursor, the
+/// search bar's `conditions` and `text`, and (until the bar replaces
+/// them) the filter rail's `selections` and its duration band. A field
+/// the implicit view honours but this list omits is unreachable.
 ///
 /// `timeout` is deliberately NOT listed: the implicit view accepts it
 /// for protocol parity and ignores it (execution deadlines belong to
@@ -49,6 +49,8 @@ pub const ACCEPTED_PARAMS: &[&str] = &[
     "before",
     "last",
     "anchor",
+    "conditions",
+    "text",
     "selections",
     "min_trace_duration_ns",
     "max_trace_duration_ns",
@@ -86,6 +88,10 @@ struct RawOtelTracesRequest {
     last: Option<serde_json::Value>,
     #[serde(default, deserialize_with = "present")]
     anchor: Option<serde_json::Value>,
+    #[serde(default, deserialize_with = "present")]
+    conditions: Option<serde_json::Value>,
+    #[serde(default, deserialize_with = "present")]
+    text: Option<serde_json::Value>,
     #[serde(default, deserialize_with = "present")]
     min_trace_duration_ns: Option<serde_json::Value>,
     #[serde(default, deserialize_with = "present")]
@@ -181,6 +187,8 @@ impl TryFrom<RawOtelTracesRequest> for OtelTracesRequest {
             || raw.before.is_some()
             || raw.last.is_some()
             || raw.anchor.is_some()
+            || raw.conditions.is_some()
+            || raw.text.is_some()
             || raw.min_trace_duration_ns.is_some()
             || raw.max_trace_duration_ns.is_some()
             || raw.selections.is_some()
@@ -217,6 +225,8 @@ impl TryFrom<RawOtelTracesRequest> for OtelTracesRequest {
                 ("before", raw.before.as_ref()),
                 ("last", raw.last.as_ref()),
                 ("anchor", raw.anchor.as_ref()),
+                ("conditions", raw.conditions.as_ref()),
+                ("text", raw.text.as_ref()),
                 ("min_trace_duration_ns", raw.min_trace_duration_ns.as_ref()),
                 ("max_trace_duration_ns", raw.max_trace_duration_ns.as_ref()),
                 ("selections", raw.selections.as_ref()),
@@ -274,9 +284,22 @@ pub struct FunctionsParams {
     /// [`SearchResult::overview`]).
     #[serde(default)]
     pub anchor: Option<String>,
+    /// The search bar's chips, each one token: they AND at trace level
+    /// (different chips may match different spans). See
+    /// [`ConditionParams`].
+    #[serde(default)]
+    pub conditions: Vec<ConditionParams>,
+    /// The search bar's free-text tokens: each matches a trace with a
+    /// span whose name, status message, event name or any attribute
+    /// VALUE contains it, case-insensitively (never a field name, the
+    /// kind or the status). At least 3 characters, at most
+    /// [`REQUEST_TEXT_MAX_BYTES`].
+    #[serde(default)]
+    pub text: Vec<String>,
     /// Facet selections. Keys are `<owner>.<key>` attributes
     /// (resource/span/instrumentation/event/link) or bare builtin words
-    /// (see the adapter's grammar); values OR within a key, keys AND.
+    /// (see the adapter's grammar); values OR within a key, keys AND,
+    /// all on ONE span (one token beside the chips).
     #[serde(default)]
     pub selections: std::collections::HashMap<String, Vec<String>>,
     /// Inclusive lower bound on the TRACE envelope duration,
@@ -333,6 +356,8 @@ impl FunctionsParams {
             after,
             before,
             limit: self.last,
+            conditions: self.conditions.clone(),
+            text: self.text.clone(),
             selections: self.selections.clone(),
             min_trace_duration_ns: self.min_trace_duration_ns,
             max_trace_duration_ns: self.max_trace_duration_ns,
@@ -363,6 +388,8 @@ pub struct SearchParams {
     pub before: u32,
     /// Result limit (top-K most-recent-first).
     pub limit: usize,
+    pub conditions: Vec<ConditionParams>,
+    pub text: Vec<String>,
     pub selections: std::collections::HashMap<String, Vec<String>>,
     /// Inclusive TRACE-envelope-duration bounds, nanoseconds — the
     /// overview grid's cell-click narrowing (the grid bins by trace
@@ -377,6 +404,38 @@ pub struct SearchParams {
     /// `anchor.next`.
     pub anchor: Option<String>,
 }
+
+/// One search-bar chip: `key op values`, one token of the query.
+///
+/// - `key`: the selection grammar (`<owner>.<key>` or a bare builtin
+///   word, as `suggest` renders keys), including the trace-level words
+///   (`root_name`, `root_service_name`, `trace_duration`, `trace_id`).
+/// - `op`: `=` `!=` `=~` `!~` `>` `>=` `<` `<=` `^=` `!^=`. A `!` op means
+///   NOT EXISTS: no span of the trace matches the positive form (for a
+///   trace-level key: the trace does not). `=~` is a regex over the
+///   WHOLE value (Rust dialect); `^=` is "starts with", for picking a
+///   suggestion the response cut.
+/// - `values`: JSON strings or numbers (at most
+///   [`CONDITION_VALUES_MAX`]); several OR (any may match). Durations
+///   are integer nanoseconds; ordering ops take one value.
+#[derive(Debug, Clone, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct ConditionParams {
+    pub key: String,
+    pub op: String,
+    pub values: Vec<ConditionValue>,
+}
+
+/// A chip value: text, or a JSON number (an integer when integral).
+#[derive(Debug, Clone, Deserialize)]
+#[serde(untagged)]
+pub enum ConditionValue {
+    Text(String),
+    Number(serde_json::Number),
+}
+
+/// Most values one chip carries.
+pub const CONDITION_VALUES_MAX: usize = 64;
 
 /// Page size when the request omits `last` (the engine's default).
 fn default_limit() -> usize {
@@ -488,6 +547,14 @@ pub struct TraceParams {
     pub after: Option<u32>,
     #[serde(default)]
     pub before: Option<u32>,
+    /// The list's chips, to mark the spans matching them
+    /// ([`TraceResult::matched`]); the same shape as
+    /// [`FunctionsParams::conditions`].
+    #[serde(default)]
+    pub conditions: Vec<ConditionParams>,
+    /// The list's free-text tokens, likewise.
+    #[serde(default)]
+    pub text: Vec<String>,
 }
 
 // ── Response ────────────────────────────────────────────────────────
@@ -732,9 +799,10 @@ pub struct SearchResult {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub anchor: Option<AnchorWire>,
     /// The window aggregate, composed from a second engine pass in this
-    /// same request under the page's `selections` (its `scope` says
-    /// whether they applied). Absent (never `null`) when not composed,
-    /// so a consumer detects it by PRESENCE.
+    /// same request under the page's chips, text and `selections` — all
+    /// but trace-duration chips and the duration band (duration is the
+    /// grid's own axis). Absent (never `null`) when not composed, so a
+    /// consumer detects it by PRESENCE.
     ///
     /// Present on a FIRST page only: a request carrying an anchor
     /// ([`FunctionsParams::anchor`]) gets NO `overview` key at all.
@@ -774,8 +842,7 @@ pub struct AnchorWire {
 /// The search response's embedded full-window aggregate: the
 /// TRACE-density grid (time buckets × log-scale duration bins; a trace
 /// bins by its cross-source merged envelope, straddling traces count
-/// once), its totals, the grid's own `coverage`, the `scope` honesty
-/// flag, and its OWN `status`. Sources sealed before the rollup chunk
+/// once), its totals, the grid's own `coverage`, and its OWN `status`. Sources sealed before the rollup chunk
 /// existed are EXCLUDED under the `rollup_absent` partial — units are
 /// never mixed. Carried by a Functions
 /// FIRST page only — a request with an anchor
@@ -790,6 +857,18 @@ pub struct AnchorWire {
 /// so a returned row can have no cell), and `totals.spans` sums STORED
 /// rows where the page's per-row numbers are canonical-assembly
 /// figures. Two measurements, never a subset relation.
+///
+/// How the section's population relates to the page's: it applies the
+/// page's chips, text and `selections` except duration ones, with
+/// stored-row semantics, like every other number in the section — a
+/// span-local chip holds when ANY stored copy of a span starting inside
+/// the grid matches (a `!` chip when none does), a root chip reads the
+/// roots the sources recorded. The list beside it can differ at the
+/// edges: it dedups contradicting copies (the resend case the search
+/// engine documents), it shows a trace whose envelope starts before the
+/// grid while the grid's bin-by-envelope-start rule drops it, and the
+/// grid's window is the page's aligned to whole buckets, so a match in
+/// the widened band bins a trace the page excludes.
 #[derive(Debug, Serialize)]
 pub struct OverviewSection {
     /// The section's own version, independent of the enclosing result's.
@@ -809,41 +888,9 @@ pub struct OverviewSection {
     /// page's completion range (the same window widened by assembly
     /// slack, ≥ 1h per side).
     pub coverage: CoverageWire,
-    /// Which population these numbers cover, relative to the page:
-    /// [`OVERVIEW_SCOPE_SELECTION`] means the page's `selections` were
-    /// applied (the grid bins the traces owning a stored row that
-    /// matches them); [`OVERVIEW_SCOPE_WINDOW`] means they were NOT —
-    /// none sent, only empty value lists, or a trace-level word stored
-    /// rows cannot answer. The duration bounds are NEVER applied to
-    /// the grid, under either value: duration is the grid's own axis,
-    /// so a cell click or the rail's minimum narrows the list beside
-    /// the grid, not the grid. Captioning the totals without reading
-    /// this lies as soon as the filter rail is non-empty.
-    pub scope: &'static str,
     pub grid: OverviewGridWire,
     pub totals: OverviewTotals,
 }
-
-/// [`OverviewSection::scope`]: the aggregate
-/// covers the whole window and applied NONE of the page's selections —
-/// the page carried none, or carried a trace-level word (`root_name`,
-/// `root_service_name`, `trace_duration`, `trace_id`) that stored rows
-/// cannot answer, in which case the Functions view falls back to this
-/// rather than guess.
-pub const OVERVIEW_SCOPE_WINDOW: &str = "window";
-
-/// [`OverviewSection::scope`]: the same
-/// window under the same `selections` as the page. Stored-row
-/// semantics, like every other number in the section: a trace is
-/// binned when ANY stored copy of one of its spans matches and starts
-/// inside the grid. The list beside it can differ at the edges — it
-/// dedups contradicting copies (the resend case the search engine
-/// documents), it shows a trace whose envelope starts before the grid
-/// while the grid's bin-by-envelope-start rule drops it, and the
-/// grid's window is the page's aligned to whole buckets, so a match in
-/// the widened band bins a trace the page excludes. The duration
-/// bounds are not part of the scope (see [`OverviewSection::scope`]).
-pub const OVERVIEW_SCOPE_SELECTION: &str = "selection";
 
 /// One returned trace summary; ids in W3C lowercase hex.
 #[derive(Debug, Serialize)]
@@ -858,9 +905,11 @@ pub struct TraceSummaryWire {
     pub root_name: Option<String>,
     /// Envelope start (earliest retained canonical span start).
     pub start_ns: i64,
-    /// The rank key: the newest matched-span start — what the
-    /// most-recent-first ordering sorts by. Can be much newer than the
-    /// envelope `start_ns`.
+    /// The rank key — what the most-recent-first ordering sorts by: the
+    /// newest matching span's start, and with several chips the OLDEST
+    /// of each chip's newest match (a trace is as recent as its least
+    /// recent required match); without span chips, the newest span in
+    /// the window. Can be much newer than the envelope `start_ns`.
     pub newest_matched_start_ns: i64,
     /// Envelope duration, saturating.
     pub duration_ns: i64,
@@ -940,6 +989,12 @@ pub struct TraceResult {
     /// whose resolved parent is span `i`.
     pub children: Vec<Vec<usize>>,
     pub spans: Vec<SpanWire>,
+    /// Ascending indices into `spans` of the spans matching the
+    /// request's chips or free text: a span matches when it satisfies a
+    /// positive chip (or text token) on its full values, before any value
+    /// cut. Negated and trace-level chips mark nothing. Empty without
+    /// chips; covers the returned spans only.
+    pub matched: Vec<u32>,
     pub field_kinds: FieldKindsWire,
 }
 
