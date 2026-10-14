@@ -14,6 +14,8 @@ renice 19 $$ >/dev/null 2>/dev/null
 NETDATA_PREFIX="/opt/netdata"
 NETDATA_USER_CONFIG_DIR="${NETDATA_PREFIX}/etc/netdata"
 NETDATA_LIB_DIR="${NETDATA_PREFIX}/var/lib/netdata"
+# Consumed by install_netdata_dirs in functions.sh.
+# shellcheck disable=SC2034
 NETDATA_CACHE_DIR="${NETDATA_PREFIX}/var/cache/netdata"
 NETDATA_LOG_DIR="${NETDATA_PREFIX}/var/log/netdata"
 # Consumed by install_netdata_dirs in functions.sh.
@@ -178,11 +180,17 @@ dir_should_be_link etc/netdata ../../usr/lib/netdata/conf.d orig
 progress "fix permissions"
 
 run chmod g+rx,o+rx /opt
-# Makeself creates package parents with a private umask. Make those traversable,
-# but leave application-owned state to its owners and explicit migrations below.
-run find "${NETDATA_PREFIX}" \
-  \( -path "${NETDATA_LIB_DIR}" -o -path "${NETDATA_CACHE_DIR}" -o -path "${NETDATA_LOG_DIR}" \) -prune -o \
-  -type d -exec chmod go+rx '{}' \+
+# Makeself creates implicit package parents with a private umask. Only restore
+# accessibility for directories shipped by this package, never discovered state.
+if [ ! -s "${NETDATA_PREFIX}/system/package-directories" ]; then
+  run_failed "Missing package directory inventory"
+  exit 1
+fi
+while IFS= read -r directory; do
+  if [ -d "${NETDATA_PREFIX}/${directory}" ]; then
+    run chmod go+rx "${NETDATA_PREFIX}/${directory}" || exit 1
+  fi
+done < "${NETDATA_PREFIX}/system/package-directories"
 
 install_netdata_dirs
 

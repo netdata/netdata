@@ -12,6 +12,7 @@ import unittest
 ROOT = Path(__file__).resolve().parents[3]
 INSTALLER = ROOT / 'packaging/makeself/install-or-update.sh'
 FUNCTIONS = ROOT / 'packaging/installer/functions.sh'
+INVENTORY = ROOT / 'packaging/makeself/create-directory-manifest.sh'
 
 
 @unittest.skipUnless(sys.platform == 'linux', 'Linux installer permission semantics')
@@ -54,6 +55,18 @@ run() {
 }
 ''' + source[begin:end].replace('/opt/netdata', '${NETDATA_PREFIX}'))
         self.script.chmod(0o755)
+        # Inventory is produced before any application state exists.
+        package = self.base / 'package'
+        for root in ('system', 'usr/libexec/netdata/plugins.d', 'var/lib/netdata',
+                     'var/cache/netdata', 'var/log/netdata'):
+            (package / root).mkdir(parents=True)
+        self.generate_inventory(package)
+        (self.prefix / 'system').mkdir()
+        shutil.copyfile(package / 'system/package-directories', self.prefix / 'system/package-directories')
+
+    def generate_inventory(self, tree):
+        result = subprocess.run(['bash', str(INVENTORY), str(tree)], capture_output=True, text=True)
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
 
     def run_setup(self):
         result = subprocess.run(['bash', str(self.script), str(self.prefix), str(FUNCTIONS)],
@@ -63,7 +76,8 @@ run() {
 
     def state_fixture(self):
         paths = []
-        for root in ('var/lib/netdata', 'var/cache/netdata', 'var/log/netdata'):
+        for root in ('var/lib/netdata', 'var/cache/netdata', 'var/log/netdata',
+                     'custom-runtime', 'usr/libexec/custom-runtime'):
             private = self.prefix / root / 'application/private/completion'
             private.mkdir(parents=True)
             for directory in (private.parent.parent, private.parent, private):
@@ -92,6 +106,15 @@ run() {
         self.run_setup()
         self.assertEqual(self.snapshot(paths), before)
         self.assertEqual(stat.S_IMODE(package_dir.stat().st_mode) & 0o055, 0o055)
+
+    def test_missing_inventory_does_not_walk_existing_state(self):
+        paths = self.state_fixture()
+        before = self.snapshot(paths)
+        (self.prefix / 'system/package-directories').rename(self.base / 'saved-inventory')
+        result = subprocess.run(['bash', str(self.script), str(self.prefix), str(FUNCTIONS)],
+                                env=self.environment, capture_output=True, text=True)
+        self.assertNotEqual(result.returncode, 0)
+        self.assertEqual(self.snapshot(paths), before)
 
     def test_fallback_creates_usable_service_roots(self):
         self.run_setup()
@@ -185,6 +208,7 @@ install_netdata_dirs
             (payload / root / '.keep').touch()
         (payload / 'usr/libexec/netdata').mkdir(parents=True)
         (payload / 'usr/libexec/netdata/component').write_text('package component\n')
+        self.generate_inventory(payload)
         archive = self.base / 'installer.run'
         build = subprocess.run(['sh', str(ROOT / 'packaging/makeself/makeself.sh'),
                                 '--gzip', '--notemp', '--target', str(self.prefix),

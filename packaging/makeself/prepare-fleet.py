@@ -474,6 +474,25 @@ def copy_package_files(args, input_path, archive, work, stage, kept, report):
             os.utime(target, (m.mtime, m.mtime))
 
 
+def filter_package_directories(stage, kept):
+    # Older source packages have no directory inventory. For new packages, retain
+    # only shipped directories and implicit parents of retained archive members.
+    name = 'system/package-directories'
+    if name not in kept:
+        return
+    if not kept[name].isfile():
+        fail('package directory inventory must be a regular file')
+    directories = {'.'}
+    for path, member in kept.items():
+        if member.isdir():
+            directories.add('./' + path)
+        directories.update('./' + str(p) for p in PurePosixPath(path).parents if str(p) != '.')
+    inventory = stage / name
+    inventory.write_text(''.join(line + '\n' for line in inventory.read_text().splitlines()
+                                 if line in directories))
+    kept[name].size = inventory.stat().st_size
+
+
 def write_manifest(stage, kept, report):
     report['output_regular_bytes_without_manifest'] = sum(m.size for m in kept.values() if m.isfile())
     manifest = stage / MANIFEST
@@ -500,6 +519,7 @@ def stage_package(args, input_path, archive, work, records, report):
             target = stage / name
             target.parent.mkdir(parents=True, exist_ok=True)
             os.symlink(m.linkname, target)
+    filter_package_directories(stage, kept)
     write_manifest(stage, kept, report)
     return stage, kept
 
