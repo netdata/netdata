@@ -23,8 +23,7 @@
 //! - the implicit view's parameter mapping through
 //!   `FunctionsParams::search_params`: defaults, relative-window
 //!   resolution, and the duration-filter forwarding;
-//! - per-mode param objects: self-contained windows, the overview
-//!   grid's selections-but-no-duration-bounds rule, and the `overview_facets` knob's `Option<bool>` semantics;
+//! - per-mode param objects: self-contained windows;
 //! - `InfoResponse`'s exact descriptor JSON and the untagged response
 //!   envelope;
 //! - `StatusWire` serialization: the two status shapes, deterministic
@@ -130,23 +129,6 @@ fn the_functions_view_forwards_the_maximum_trace_duration() {
 }
 
 #[test]
-fn overview_facets_rides_with_the_functions_parameters() {
-    // The aggregate's facet opt-in is a Functions parameter — it
-    // selects the Functions view, and cannot ride with a mode selector
-    // (the response's `overview` key is no request field: that
-    // selector still means the legacy mode).
-    assert!(matches!(
-        req(json!({"after": -900, "overview_facets": true})).mode,
-        TracesMode::Functions(_)
-    ));
-    let err = req_err(json!({"overview": {}, "overview_facets": true}));
-    assert!(
-        err.contains("cannot mix a mode selector with Functions parameters"),
-        "{err}"
-    );
-}
-
-#[test]
 fn info_is_the_strict_empty_object() {
     assert!(matches!(req(json!({"info": {}})).mode, TracesMode::Info));
     // Bools (the old wire's two forms), junk scalars, null, arrays,
@@ -180,10 +162,6 @@ fn each_selector_selects_its_mode() {
         TracesMode::AttributeValues(_)
     ));
     assert!(matches!(
-        req(json!({"overview": {}})).mode,
-        TracesMode::Overview(_)
-    ));
-    assert!(matches!(
         req(json!({"search": {}})).mode,
         TracesMode::Search(_)
     ));
@@ -197,7 +175,10 @@ fn a_present_but_null_selector_selects_then_rejects() {
     // deserializer keeps the selection so the error names the selector.
     for (body, needle) in [
         (json!({"trace": null}), "invalid trace selector"),
-        (json!({"overview": null}), "invalid overview selector"),
+        (
+            json!({"attribute_values": null}),
+            "invalid attribute_values selector",
+        ),
         (json!({"search": null}), "invalid search selector"),
     ] {
         let err = req_err(body.clone());
@@ -211,7 +192,10 @@ fn selectors_are_object_only_arrays_reject() {
     // via the seq visitor; the is_object gate before the typed parse
     // closes that hole for every selector value.
     for (body, needle) in [
-        (json!({"overview": []}), "invalid overview selector"),
+        (
+            json!({"attribute_values": []}),
+            "invalid attribute_values selector",
+        ),
         (json!({"trace": ["00ff", 7]}), "invalid trace selector"),
         (json!({"search": []}), "invalid search selector"),
     ] {
@@ -295,14 +279,9 @@ fn trace_params_reject_malformed_and_parse_bounds() {
 
 #[test]
 fn conflicting_selectors_are_a_client_error() {
-    let err = req_err(json!({"trace": {}, "overview": {}}));
+    let err = req_err(json!({"trace": {}, "attribute_values": {}}));
     assert!(
-        err.contains("conflicting mode selectors: trace, overview"),
-        "{err}"
-    );
-    let err = req_err(json!({"overview": {}, "search": {}}));
-    assert!(
-        err.contains("conflicting mode selectors: overview, search"),
+        err.contains("conflicting mode selectors: trace, attribute_values"),
         "{err}"
     );
     // info is a PEER selector — no precedence.
@@ -317,9 +296,9 @@ fn conflicting_selectors_are_a_client_error() {
 fn a_conflict_is_reported_before_a_malformed_selector() {
     // All present selectors are counted before any is decoded, so the
     // conflict wins over a malformed selector in the same body.
-    let err = req_err(json!({"trace": null, "overview": {}}));
+    let err = req_err(json!({"trace": null, "attribute_values": {}}));
     assert!(
-        err.contains("conflicting mode selectors: trace, overview"),
+        err.contains("conflicting mode selectors: trace, attribute_values"),
         "{err}"
     );
 }
@@ -376,10 +355,6 @@ fn search_params_defaults_and_strictness() {
 
 #[test]
 fn windowed_mode_objects_carry_their_own_window() {
-    let TracesMode::Overview(p) = req(json!({"overview": {"after": 1, "before": 2}})).mode else {
-        panic!("overview mode expected");
-    };
-    assert_eq!((p.after, p.before), (1, 2));
     let TracesMode::Attributes(p) = req(json!({"attributes": {"after": 3, "before": 4}})).mode
     else {
         panic!("attributes mode expected");
@@ -394,35 +369,11 @@ fn windowed_mode_objects_carry_their_own_window() {
 
     // Omitted windows keep the 0 = "unspecified" sentinel — the
     // adapter's resolve_window defaults are untouched.
-    let TracesMode::Overview(p) = req(json!({"overview": {}})).mode else {
-        panic!("overview mode expected");
+    let TracesMode::AttributeValues(p) = req(json!({"attribute_values": {"key": "kind"}})).mode
+    else {
+        panic!("attribute_values mode expected");
     };
     assert_eq!((p.after, p.before), (0, 0));
-}
-
-/// The standalone grid takes the page's `selections` grammar and
-/// nothing else of the page's filters: the duration bounds are unknown
-/// fields here (the grid never applies them).
-#[test]
-fn overview_params_take_selections_but_no_duration_bounds() {
-    let TracesMode::Overview(p) =
-        req(json!({"overview": {"selections": {"name": ["GET", "POST"]}}})).mode
-    else {
-        panic!("overview mode expected");
-    };
-    assert_eq!(p.selections["name"], vec!["GET", "POST"]);
-    let TracesMode::Overview(p) = req(json!({"overview": {}})).mode else {
-        panic!("overview mode expected");
-    };
-    assert!(p.selections.is_empty());
-    for field in [
-        "min_trace_duration_ns",
-        "max_trace_duration_ns",
-        "min_duration_ns",
-    ] {
-        let msg = req_err(json!({"overview": {field: 1}}));
-        assert!(msg.contains("unknown field"), "{field}: {msg}");
-    }
 }
 
 #[test]
@@ -452,9 +403,9 @@ fn info_response_shape_is_pinned() {
             "has_history": true,
             "v": 3,
             "accepted_params": [
-                "info", "trace", "attributes", "attribute_values", "overview",
-                "search", "tenant", "after", "before", "last", "anchor", "selections",
-                "min_trace_duration_ns", "max_trace_duration_ns", "overview_facets"
+                "info", "trace", "attributes", "attribute_values", "search",
+                "tenant", "after", "before", "last", "anchor", "selections",
+                "min_trace_duration_ns", "max_trace_duration_ns"
             ],
             "required_params": [],
             "help": "Query and visualize OpenTelemetry traces.",
@@ -563,34 +514,6 @@ fn every_partial_reason_is_in_the_published_schema() {
         assert!(
             published.contains(&name),
             "{name} is not in {path}: {published:?}"
-        );
-    }
-}
-
-#[test]
-fn overview_facets_knob_parses_and_junk_is_rejected() {
-    let facets = |v: serde_json::Value| -> Option<bool> {
-        let TracesMode::Overview(p) = req(v).mode else {
-            panic!("overview mode expected");
-        };
-        p.facets
-    };
-    assert_eq!(facets(json!({"overview": {}})), None);
-    assert_eq!(facets(json!({"overview": {"facets": true}})), Some(true));
-    assert_eq!(facets(json!({"overview": {"facets": false}})), Some(false));
-    assert_eq!(
-        facets(json!({"overview": {"facets": null}})),
-        None,
-        "null means off, not an error (Option<bool> semantics)"
-    );
-    for body in [
-        json!({"overview": {"facets": "yes"}}),
-        json!({"overview": {"bogus": 1}}),
-    ] {
-        let err = req_err(body.clone());
-        assert!(
-            err.contains("invalid overview selector"),
-            "for {body}: {err}"
         );
     }
 }

@@ -1,7 +1,7 @@
 //! The optional per-file trace rollup (`TRSU` chunk): one summary row
 //! per distinct set (non-UNSET) trace id in the file, so trace-level
-//! queries (overview, root facets) fold aggregates without
-//! assembling traces.
+//! queries (the overview grid, the search gate's root checks) read
+//! per-trace aggregates without assembling traces.
 //!
 //! Pinned semantics:
 //!

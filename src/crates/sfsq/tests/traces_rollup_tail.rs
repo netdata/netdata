@@ -2,34 +2,31 @@
 //! "Parity contract (test-pinned)" note in `src/traces/rollup.rs`:
 //! folding a WAL tail's decoded spans (`tail_trace_aggregates`) equals
 //! reading the `TRSU` rollup of sealing the SAME data
-//! (`sealed_trace_aggregates`) — value-for-value across envelopes,
-//! stored-row counts, and honest roots.
+//! (`sealed_trace_envelopes`) — value-for-value across envelopes and
+//! stored-row counts.
 //!
-//! Coverage: the wholesale parity plus the roots-free envelope view,
-//! a semantic-by-semantic audit of the tail fold on one corpus, and
-//! the two sealed root-ref edges (corrupt-ref escalation, the
-//! `ROLLUP_NO_REF` sentinel). Not pinned here (the fixture cannot
-//! reach them): the u32::MAX count clamp and the saturating envelope
-//! end. Fixtures come from `tests/common/mod.rs`; the sibling
-//! `tests/traces_*.rs` suites pin the surrounding query ops — for the
-//! aggregate modes, these per-source aggregates merge in
-//! `src/traces/fold.rs`.
+//! Coverage: the wholesale parity, a semantic-by-semantic audit of the
+//! tail fold on one corpus, and the rollup root-ref resolver's closed
+//! rule (a ref in another field's range is corruption) that the search
+//! gate relies on. Not pinned here (the fixture cannot reach them): the
+//! u32::MAX count clamp and the saturating envelope end. Fixtures come
+//! from `tests/common/mod.rs`; the sibling `tests/traces_*.rs` suites
+//! pin the surrounding query ops — for the overview, these per-source
+//! aggregates merge in `src/traces/fold.rs`.
 
 mod common;
 
 use common::{req, sp, write_wal};
-use sfsq::traces::{
-    TraceWalScan, sealed_trace_aggregates, sealed_trace_envelopes, tail_trace_aggregates,
-};
+use sfsq::traces::{TraceWalScan, sealed_trace_envelopes, tail_trace_aggregates};
 
 /// A corpus covering the rollup semantics the fixture can reach
 /// (one trace id per bullet):
-/// - trace A: a true root (unset parent, SERVER kind) + a child + a
-///   RESENT copy of the child (stored-row counts) + an ERROR span;
-/// - trace B: NO unset-parent span (honest root absence);
-/// - trace C: two equal-start true roots (the span-id tie-break);
-/// - trace D: a FULL `(start, span_id)` tie with differing facets —
-///   the abstention (claim withheld on BOTH sides of the parity);
+/// - trace A: a root (unset parent, SERVER kind) + a child + a RESENT
+///   copy of the child (stored-row counts) + an ERROR span stretching
+///   the envelope end;
+/// - trace B: NO unset-parent span;
+/// - trace C: two equal-start roots;
+/// - trace D: two copies of one `(start, span_id)` with differing kinds;
 /// - one UNSET-trace-id span (excluded everywhere).
 fn corpus() -> Vec<common::SpanSpec> {
     let a = [0xA1u8; 16];
@@ -90,24 +87,14 @@ fn tail_fold_matches_the_sealed_rollup_value_for_value() {
     let tail = tail_trace_aggregates(&scan);
 
     // Sealed side: run the production sealer over the SAME WAL, then
-    // read its TRSU and resolve the root refs.
+    // read its TRSU.
     let out = dir.path().join("parity.sfst");
     ng_index::build_sfst_traces_file(&wal, &out, &ng_index::Metrics::new()).unwrap();
     let bytes = std::fs::read(&out).unwrap();
     let reader = sfst::IndexReader::open(&bytes).unwrap();
-    let sealed = sealed_trace_aggregates(&reader.trace_rollup().unwrap(), &reader).unwrap();
+    let sealed = sealed_trace_envelopes(&reader.trace_rollup().unwrap());
 
     assert_eq!(tail, sealed, "the parity contract");
-
-    // The roots-free envelope view (the overview grid's path) must be
-    // the SAME rows minus root resolution: no dictionary decode, every
-    // other field value-for-value.
-    let envelopes = sealed_trace_envelopes(&reader.trace_rollup().unwrap());
-    let rootless: Vec<_> = sealed
-        .into_iter()
-        .map(|a| sfsq::traces::TraceAggregate { root: None, ..a })
-        .collect();
-    assert_eq!(envelopes, rootless, "the envelope view drops only roots");
 }
 
 /// The tail fold's semantics, field by field, on the corpus above —
@@ -126,78 +113,54 @@ fn the_fold_pins_every_rollup_semantic() {
     assert_eq!(a.trace_id, sfst::TraceId::from([0xA1; 16]));
 
     // A: stored-row counts (4 = root + child + resend + err), one error,
-    // envelope stretched by the error span's end, a true SERVER root
-    // with service + name resolved.
+    // envelope stretched by the error span's end.
     assert_eq!(a.span_count, 4, "the resend counts");
     assert_eq!(a.error_count, 1);
     assert_eq!(a.min_start_ns, 1_000);
     assert_eq!(a.max_end_ns, 9_000);
-    let root = a.root.as_ref().expect("A has a true root");
-    assert_eq!(root.kind, 2);
-    assert_eq!(root.service.as_deref(), Some("svc"));
-    assert_eq!(root.name.as_deref(), Some("a-root"));
 
-    // B: honest absence — counts still fold, no synthesized root.
+    // B: a trace without a root still folds its counts.
     assert_eq!(b.span_count, 1);
-    assert!(b.root.is_none(), "no unset-parent span → None");
+    assert_eq!(b.error_count, 0);
 
-    // C: equal-start roots tie-break by ascending span id.
-    let c_root = c.root.as_ref().expect("C has true roots");
-    assert_eq!(c_root.span_id, sfst::SpanId::from([5; 8]));
-    assert_eq!(c_root.name.as_deref(), Some("c-root-lo"));
+    // C: both equal-start roots count.
+    assert_eq!(c.span_count, 2);
+    assert_eq!(c.min_start_ns, 3_000);
 
-    // D: the ambiguous full-key tie abstains — roots exist, none is
-    // claimed (the seal marks the row WITHHELD; the fold reads None).
+    // D: both stored copies count (stored-row semantics).
     assert_eq!(d.span_count, 2);
-    assert!(d.root.is_none(), "ambiguous tie → claim withheld");
 }
 
 #[test]
-fn corrupt_root_ref_escalates_instead_of_rendering_a_wrong_root() {
-    // A root ref pointing into ANOTHER field's KvId range is corruption
-    // evidence for the whole file (the resolver's closed rule) — the
-    // sealed fold must error so the caller fails the source, never
-    // render the other field's value as a root.
+fn a_root_ref_in_another_fields_range_is_corruption() {
+    // The search gate resolves rollup root refs through
+    // `sfst::RollupRootResolver`. A ref pointing into ANOTHER field's
+    // KvId range stays inside the kv table (chunk validation cannot
+    // catch it), so the resolver's closed rule is the only guard: it
+    // must answer Corrupt, never the other field's value.
     let dir = tempfile::tempdir().unwrap();
     let wal = write_wal(dir.path(), vec![req(&corpus())], "corrupt-ref");
     let out = dir.path().join("corrupt-ref.sfst");
     ng_index::build_sfst_traces_file(&wal, &out, &ng_index::Metrics::new()).unwrap();
     let bytes = std::fs::read(&out).unwrap();
     let reader = sfst::IndexReader::open(&bytes).unwrap();
+    let rollup = reader.trace_rollup().unwrap();
+    let service_field = "resource.attributes.service.name";
 
-    // Row 0 (trace A) claims a true root; its name ref lives in the
-    // span-name field's range — as a SERVICE ref it stays inside the
-    // kv table (chunk validation cannot catch it) but outside the
-    // service field: the class a bare string-table lookup mis-renders.
-    let mut rollup = reader.trace_rollup().unwrap();
-    rollup.root_service_refs[0] = rollup.root_name_refs[0];
-    let err = sealed_trace_aggregates(&rollup, &reader).unwrap_err();
-    assert!(matches!(err, sfst::Error::CorruptIndex(_)), "{err}");
-}
-
-#[test]
-fn sealed_root_without_service_resolves_the_sentinel_to_none() {
-    // The sealed fold's ROLLUP_NO_REF → None arm: a true root (unset
-    // parent) whose resource carries no service.name — `req_with`
-    // sends no resource attributes, so the seal stores the sentinel
-    // for the service ref.
-    use common::req_with;
-    let mut root = sp(1, 0, 1_000, "svcless-root");
-    root.trace = [0xD4; 16];
-    let dir = tempfile::tempdir().unwrap();
-    let wal = write_wal(dir.path(), vec![req_with(vec![], None, &[root])], "svcless");
-
-    let out = dir.path().join("svcless.sfst");
-    ng_index::build_sfst_traces_file(&wal, &out, &ng_index::Metrics::new()).unwrap();
-    let bytes = std::fs::read(&out).unwrap();
-    let reader = sfst::IndexReader::open(&bytes).unwrap();
-    let sealed = sealed_trace_aggregates(&reader.trace_rollup().unwrap(), &reader).unwrap();
-
-    let root = sealed[0].root.as_ref().expect("a true root");
-    assert_eq!(root.service, None, "the sentinel resolves to honest None");
-    assert_eq!(root.name.as_deref(), Some("svcless-root"));
-
-    // And the tail fold agrees — the parity holds here too.
-    let tail = tail_trace_aggregates(&TraceWalScan::scan(&wal).unwrap());
-    assert_eq!(tail, sealed);
+    // Row 0 (trace A) claims a true root: its own refs resolve...
+    assert_eq!(rollup.root_is_true_root[0], sfst::ROOT_CLAIM_TRUE);
+    let mut resolver = sfst::RollupRootResolver::new(&reader);
+    assert!(matches!(
+        resolver.resolve("name", rollup.root_name_refs[0]),
+        sfst::RollupRefOutcome::Value("a-root")
+    ));
+    assert!(matches!(
+        resolver.resolve(service_field, rollup.root_service_refs[0]),
+        sfst::RollupRefOutcome::Value("svc")
+    ));
+    // ...while its NAME ref read as a SERVICE ref is corruption.
+    assert!(matches!(
+        resolver.resolve(service_field, rollup.root_name_refs[0]),
+        sfst::RollupRefOutcome::Corrupt
+    ));
 }

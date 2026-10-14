@@ -1023,28 +1023,6 @@
       },
       "additionalProperties": true
     },
-    "traces_facet_value": {
-      "type": "object",
-      "required": ["value", "traces"],
-      "properties": {
-        "value": { "type": "string" },
-        "traces": { "type": "integer", "minimum": 0 }
-      },
-      "additionalProperties": true
-    },
-    "traces_facet_list": {
-      "type": "object",
-      "required": ["top", "other", "unattributed"],
-      "properties": {
-        "top": {
-          "type": "array",
-          "items": { "$ref": "#/definitions/traces_facet_value" }
-        },
-        "other": { "type": "integer", "minimum": 0 },
-        "unattributed": { "type": "integer", "minimum": 0 }
-      },
-      "additionalProperties": true
-    },
     "traces_percentile_series": {
       "type": "array",
       "items": { "type": ["integer", "null"], "minimum": 0 }
@@ -1111,9 +1089,7 @@
             "errors": { "type": "integer", "minimum": 0 }
           },
           "additionalProperties": true
-        },
-        "top_root_services": { "$ref": "#/definitions/traces_facet_list" },
-        "top_root_operations": { "$ref": "#/definitions/traces_facet_list" }
+        }
       },
       "additionalProperties": true
     },

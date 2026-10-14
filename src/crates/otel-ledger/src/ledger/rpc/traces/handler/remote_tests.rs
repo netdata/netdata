@@ -373,8 +373,8 @@ async fn progress_counts_the_downloads_beside_the_sources() {
     assert_eq!(progress.load(), (2, 3));
 }
 
-/// The windowed aggregate modes over the corpus window.
-fn aggregate_bodies() -> [serde_json::Value; 3] {
+/// The windowed enumeration modes over the corpus window.
+fn aggregate_bodies() -> [serde_json::Value; 2] {
     let window = |mode: &str, extra: serde_json::Value| {
         let mut params = json!({"after": T_S, "before": T_S + 100});
         params
@@ -384,7 +384,6 @@ fn aggregate_bodies() -> [serde_json::Value; 3] {
         json!({ mode: params })
     };
     [
-        window("overview", json!({"facets": true})),
         window("attributes", json!({})),
         window("attribute_values", json!({"key": "resource.service.name"})),
     ]
@@ -425,7 +424,7 @@ async fn a_lost_file_outside_the_window_does_not_make_an_answer_partial() {
     let (h, remote, [_, two]) = evicted_setup(64 * MIB).await;
     remote.lose(&two);
 
-    for mode in ["overview", "attributes"] {
+    for mode in ["attributes"] {
         let body = json!({ mode: {"after": T_S + 5, "before": T_S + 25} });
         let v = call(&h, body.clone()).await.unwrap();
         assert_eq!(v["status"], json!({"complete": true}), "{body}");

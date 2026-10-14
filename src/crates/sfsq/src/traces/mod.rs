@@ -45,8 +45,8 @@
 //!   assembly only when the rollup evidence proves a non-match.
 //! - overview — [`overview()`]: the trace-density grid (time bucket ×
 //!   duration bin) over stored-row statistics.
-//! - fold / rollup — the aggregate machinery behind overview and its
-//!   root facets: per-trace shapes from both source kinds
+//! - fold / rollup — the aggregate machinery behind overview:
+//!   per-trace shapes from both source kinds
 //!   (sealed `TRSU` rows; tails' decoded-span folds, parity
 //!   test-pinned), merged by one cross-source fold.
 //! - attributes — [`attribute_names`] / [`attribute_values`]:
@@ -82,16 +82,13 @@ pub use by_id::{
     DEFAULT_SPAN_CAP, FieldKinds, TraceData, TraceQuery, TraceRequestError, trace_by_id,
 };
 pub use overview::{
-    DURATION_BIN_COUNT, DURATION_BIN_LABELS, DurationPercentiles, FACET_TOP_K, FacetList,
-    OverviewData, OverviewQuery, OverviewRequestError, RootFacets, overview,
+    DURATION_BIN_COUNT, DURATION_BIN_LABELS, DurationPercentiles, OverviewData, OverviewQuery,
+    OverviewRequestError, overview,
 };
 pub use predicate::{
     CompareOp, Condition, Predicate, PredicateError, PredicateTarget, PredicateValue, span_matches,
 };
-pub use rollup::{
-    TraceAggregate, TraceRootInfo, sealed_trace_aggregates, sealed_trace_envelopes,
-    tail_trace_aggregates,
-};
+pub use rollup::{TraceAggregate, sealed_trace_envelopes, tail_trace_aggregates};
 pub use search::{
     DEFAULT_SEARCH_LIMIT, DEFAULT_SPANS_PER_TRACE, SERVICE_BREAKDOWN_TOP_K, SPANS_PER_TRACE_MAX,
     SearchData, SearchQuery, SearchRequestError, SearchSources, ServiceBreakdown, TraceSummary,

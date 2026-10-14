@@ -1,7 +1,7 @@
 //! The `otel-traces` Function handler pinned end to end through
 //! `on_call`: every mode's wire contract (info, trace, search, the
-//! enumeration pair, overview, and the Functions view's
-//! embedded window aggregate), window canonicalization, tie-safe
+//! enumeration pair, and the Functions view's embedded window
+//! aggregate), window canonicalization, tie-safe
 //! pagination, the scope gates, tenant scoping, and the transport
 //! status boundary (shape errors 400, semantic errors 500).
 //!
@@ -79,7 +79,6 @@ async fn info_returns_the_descriptor() {
             "trace",
             "attributes",
             "attribute_values",
-            "overview",
             "search",
             "tenant",
             "after",
@@ -88,8 +87,7 @@ async fn info_returns_the_descriptor() {
             "anchor",
             "selections",
             "min_trace_duration_ns",
-            "max_trace_duration_ns",
-            "overview_facets"
+            "max_trace_duration_ns"
         ])
     );
     assert_eq!(v["required_params"], json!([]));
@@ -143,7 +141,6 @@ async fn every_mode_is_implemented_an_empty_agent_answers_them_all() {
     // The mode catalog is complete: every selector answers cleanly on
     // an empty agent — none is a not-implemented error.
     for body in [
-        json!({"overview": {}}),
         json!({"attributes": {}}),
         json!({"attribute_values": {"key": "name"}}),
     ] {
@@ -1043,75 +1040,21 @@ async fn enumeration_invalid_requests_are_clean_client_errors() {
     }
 }
 
-// ── The overview mode ───────────────────────────────────────────────
+// ── The heatmap (the list's embedded window aggregate) ───────────────
 
-#[tokio::test]
-async fn overview_facets_are_opt_in_and_partition_the_population() {
-    // Corpus roots are each trace's span-1: services svc-a×3 (A,C,E)
-    // and svc-b×2 (B,D); every root is named "span-1".
-    let h = handler_with_search_corpus().await;
-
-    let mut body = window_body();
-    merge(&mut body, json!({}));
-    let body = as_mode("overview", body);
-    let v = serde_json::to_value(call_on(&h, body).await.unwrap()).unwrap();
-    assert!(
-        v.get("top_root_services").is_none(),
-        "absent unless requested"
-    );
-    assert!(v.get("top_root_operations").is_none());
-
-    let mut body = window_body();
-    merge(&mut body, json!({"facets": true}));
-    let body = as_mode("overview", body);
-    let v = serde_json::to_value(call_on(&h, body).await.unwrap()).unwrap();
-    assert_eq!(v["totals"]["traces"], 5);
-    assert_eq!(
-        v["top_root_services"],
-        json!({
-            "top": [
-                {"value": "svc-a", "traces": 3},
-                {"value": "svc-b", "traces": 2}
-            ],
-            "other": 0,
-            "unattributed": 0
-        })
-    );
-    assert_eq!(
-        v["top_root_operations"],
-        json!({
-            "top": [{"value": "span-1", "traces": 5}],
-            "other": 0,
-            "unattributed": 0
-        })
-    );
-    // The wire-side partition identity, asserted structurally too.
-    for name in ["top_root_services", "top_root_operations"] {
-        let f = &v[name];
-        let sum: u64 = f["top"]
-            .as_array()
-            .unwrap()
-            .iter()
-            .map(|e| e["traces"].as_u64().unwrap())
-            .sum();
-        assert_eq!(
-            sum + f["other"].as_u64().unwrap() + f["unattributed"].as_u64().unwrap(),
-            v["totals"]["traces"].as_u64().unwrap(),
-            "{name}"
-        );
-    }
+/// The list request's embedded aggregate for the corpus window.
+async fn heatmap_of(h: &OtelTracesHandler) -> serde_json::Value {
+    let v = serde_json::to_value(call_on(h, functions_body(20)).await.unwrap()).unwrap();
+    v["data"]["overview"].clone()
 }
 
 #[tokio::test]
-async fn overview_grid_matches_the_corpus_distribution() {
+async fn the_heatmap_matches_the_corpus_distribution() {
     // 100s window → 1s buckets aligned to [T_S, T_S+100). The corpus's
     // 5 TRACES (A=1 span, B=2, C=1, D=1, E=3 — 8 stored spans), every
     // envelope sub-1ms (bin 0), binned at each trace's start second.
     let h = handler_with_search_corpus().await;
-    let mut body = window_body();
-    merge(&mut body, json!({}));
-    let body = as_mode("overview", body);
-    let v = serde_json::to_value(call_on(&h, body).await.unwrap()).unwrap();
+    let v = heatmap_of(&h).await;
     assert_eq!(v["unit"], "traces");
     assert_eq!(v["status"], json!({"complete": true}));
     assert_eq!(v["totals"], json!({"traces": 5, "spans": 8, "errors": 0}));
@@ -1138,7 +1081,7 @@ async fn overview_grid_matches_the_corpus_distribution() {
 }
 
 #[tokio::test]
-async fn overview_counts_error_spans_in_totals() {
+async fn the_heatmap_counts_error_spans_in_totals() {
     use crate::ledger::rpc::traces::fixtures::otlp_req_err;
     let registries = make_registries();
     install_wal(
@@ -1152,10 +1095,7 @@ async fn overview_counts_error_spans_in_totals() {
     )
     .await;
     let h = make_handler_over(registries);
-    let mut body = window_body();
-    merge(&mut body, json!({}));
-    let body = as_mode("overview", body);
-    let v = serde_json::to_value(call_on(&h, body).await.unwrap()).unwrap();
+    let v = heatmap_of(&h).await;
     assert_eq!(v["totals"], json!({"traces": 2, "spans": 4, "errors": 1}));
 }
 
@@ -1175,9 +1115,7 @@ async fn the_grid_carries_error_counts_per_bucket_and_duration_bin() {
     )
     .await;
     let h = make_handler_over(registries);
-    let mut body = window_body();
-    merge(&mut body, json!({}));
-    let v = serde_json::to_value(call_on(&h, as_mode("overview", body)).await.unwrap()).unwrap();
+    let v = heatmap_of(&h).await;
     assert_eq!(v["totals"], json!({"traces": 3, "spans": 6, "errors": 2}));
     let cells = v["grid"]["cells"].as_array().unwrap();
     let errors = v["grid"]["error_cells"].as_array().unwrap();
@@ -1203,21 +1141,12 @@ async fn the_grid_carries_error_counts_per_bucket_and_duration_bin() {
         .map(|e| e.as_u64().unwrap())
         .sum();
     assert_eq!(sum, 2, "the error cells sum to totals.errors");
-
-    // The Functions view's embedded section reports the same grid.
-    let s = serde_json::to_value(call_on(&h, functions_body(20)).await.unwrap()).unwrap();
-    assert_eq!(
-        s["data"]["overview"]["grid"]["error_cells"],
-        v["grid"]["error_cells"]
-    );
 }
 
 #[tokio::test]
 async fn the_grid_carries_exact_per_bucket_duration_percentiles() {
     let h = handler_with_search_corpus().await;
-    let mut body = window_body();
-    merge(&mut body, json!({}));
-    let v = serde_json::to_value(call_on(&h, as_mode("overview", body)).await.unwrap()).unwrap();
+    let v = heatmap_of(&h).await;
     let p = &v["grid"]["duration_percentiles_ns"];
     for rank in ["p50", "p95", "p99"] {
         let a = p[rank].as_array().unwrap_or_else(|| panic!("{rank} array"));
@@ -1235,28 +1164,6 @@ async fn the_grid_carries_exact_per_bucket_duration_percentiles() {
     // an instantaneous trace.
     for rank in ["p50", "p95", "p99"] {
         assert!(p[rank][0].is_null(), "{rank} of an empty bucket");
-    }
-
-    // The Functions view's embedded section reports the same arrays.
-    let s = serde_json::to_value(call_on(&h, functions_body(20)).await.unwrap()).unwrap();
-    assert_eq!(s["data"]["overview"]["grid"]["duration_percentiles_ns"], *p);
-}
-
-#[tokio::test]
-async fn overview_invalid_selectors_are_clean_client_errors() {
-    let h = handler_with_search_corpus().await;
-    // Shape errors are wire-test territory; the inverted window is the
-    // semantic rejection the handler owns (the window now rides INSIDE
-    // the mode object).
-    for (body, needle) in [(
-        json!({"overview": {"after": 500, "before": 400}}),
-        "invalid window",
-    )] {
-        let err = call_on(&h, body.clone())
-            .await
-            .expect_err("must be a client error");
-        let msg = err.to_string();
-        assert!(msg.contains(needle), "for {body}: {msg}");
     }
 }
 
@@ -1296,7 +1203,6 @@ async fn every_mode_sets_its_progress_total_and_completes_it() {
         ),
         (windowed("search", json!({})), (2, 2)),
         (functions_body(2), (4, 4)),
-        (windowed("overview", json!({})), (2, 2)),
         (windowed("attributes", json!({})), (2, 2)),
         (windowed("attribute_values", json!({"key": "name"})), (2, 2)),
     ] {
@@ -1341,9 +1247,6 @@ async fn the_functions_view_aggregates_the_whole_window_beside_the_page() {
         .map(|c| c.as_u64().unwrap())
         .sum();
     assert_eq!(sum, 5, "cell sums equal totals.traces");
-    // The default paint stays cheap: root facets are opt-in here too.
-    assert!(o.get("top_root_services").is_none());
-    assert!(o.get("top_root_operations").is_none());
 }
 
 #[tokio::test]
@@ -1368,38 +1271,12 @@ async fn the_aggregates_coverage_is_the_grids_aligned_window_not_the_pages() {
 }
 
 #[tokio::test]
-async fn the_scope_gate_suppresses_the_root_facets_while_selections_are_active() {
+async fn the_aggregate_bins_only_the_selected_traces() {
     let h = handler_with_search_corpus().await;
 
-    // No selections: page and aggregate describe the same population,
-    // so the opted-in facet lists are exact.
-    let mut body = functions_body(20);
-    body["overview_facets"] = json!(true);
-    let v = serde_json::to_value(call_on(&h, body).await.unwrap()).unwrap();
-    let o = &v["data"]["overview"];
-    assert_eq!(o["scope"], "window");
-    assert_eq!(
-        o["top_root_services"],
-        json!({
-            "top": [
-                {"value": "svc-a", "traces": 3},
-                {"value": "svc-b", "traces": 2}
-            ],
-            "other": 0,
-            "unattributed": 0
-        })
-    );
-    assert_eq!(
-        o["top_root_operations"],
-        json!({"top": [{"value": "span-1", "traces": 5}], "other": 0, "unattributed": 0})
-    );
-
     // Selections active: the aggregate follows them (the svc-a traces
-    // A, C, E — 5 stored spans — and says so through `scope`), while the
-    // facet lists stay suppressed by the product rule "facets describe
-    // the whole window or not at all", even though the request opted in.
+    // A, C, E — 5 stored spans) and says so through `scope`.
     let mut body = functions_body(20);
-    body["overview_facets"] = json!(true);
     body["selections"] = json!({"resource.service.name": ["svc-a"]});
     let v = serde_json::to_value(call_on(&h, body).await.unwrap()).unwrap();
     assert_eq!(ids(&v["data"]), ["0e", "0c", "0a"]);
@@ -1418,11 +1295,6 @@ async fn the_scope_gate_suppresses_the_root_facets_while_selections_are_active()
     assert_eq!(cells[20][0], 0);
     assert_eq!(cells[30][0], 1);
     assert_eq!(cells[40][0], 1);
-    assert!(
-        o.get("top_root_services").is_none(),
-        "facets stay whole-window-or-nothing"
-    );
-    assert!(o.get("top_root_operations").is_none());
 }
 
 #[tokio::test]
@@ -1461,17 +1333,12 @@ async fn the_aggregate_follows_the_selections_but_never_the_duration_bounds() {
 /// the wire spells it, with a value the Functions list can apply and
 /// the ids that list then shows (newest first). `trace_duration` is
 /// absent: selection values are text and the field takes integers, so
-/// the engine rejects it outright; the standalone mode still names it
-/// (see [`TRACE_DURATION_SELECTION`]).
+/// the engine rejects it outright.
 const TRACE_LEVEL_SELECTIONS: [(&str, &str, &[&str]); 3] = [
     ("root_service_name", "svc-a", &["0e", "0c", "0a"]),
     ("root_name", "span-1", &["0e", "0c", "0d", "0b", "0a"]),
     ("trace_id", "0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a", &["0a"]),
 ];
-
-/// The fourth trace-level word, reachable only where no list validates
-/// the value first.
-const TRACE_DURATION_SELECTION: (&str, &str) = ("trace_duration", "1000");
 
 #[tokio::test]
 async fn a_trace_level_selection_word_falls_back_to_the_window_grid() {
@@ -1507,88 +1374,30 @@ async fn a_trace_level_selection_word_falls_back_to_the_window_grid() {
 }
 
 #[tokio::test]
-async fn the_overview_mode_applies_selections_and_reports_scope() {
-    let h = handler_with_search_corpus().await;
-    let mut body = window_body();
-    merge(
-        &mut body,
-        json!({"selections": {"resource.service.name": ["svc-b"]}}),
-    );
-    let v = serde_json::to_value(call_on(&h, as_mode("overview", body)).await.unwrap()).unwrap();
-    assert_eq!(v["mode"], "overview");
-    assert_eq!(v["scope"], "selection");
-    assert_eq!(v["totals"], json!({"traces": 2, "spans": 3, "errors": 0}));
-    let cells = v["grid"]["cells"].as_array().unwrap();
-    assert_eq!(cells[20][0], 1, "B at 20");
-    assert_eq!(cells[30][0], 1, "D at 30");
-
-    let v = serde_json::to_value(
-        call_on(&h, as_mode("overview", window_body()))
-            .await
-            .unwrap(),
-    )
-    .unwrap();
-    assert_eq!(v["scope"], "window");
-    assert_eq!(v["totals"], json!({"traces": 5, "spans": 8, "errors": 0}));
-
-    // No list to carry a trace-level word for: a clean client error
-    // naming the word, never a silently unfiltered grid — alone or
-    // mixed with a span-level word.
-    let mixed = json!({"root_service_name": ["svc-a"], "resource.service.name": ["svc-b"]});
-    let cases = TRACE_LEVEL_SELECTIONS
-        .iter()
-        .map(|(word, value, _)| (*word, *value))
-        .chain([TRACE_DURATION_SELECTION])
-        .map(|(word, value)| (word, json!({word: [value]})))
-        .chain([("root_service_name", mixed)]);
-    for (word, selections) in cases {
-        let mut body = window_body();
-        merge(&mut body, json!({"selections": selections}));
-        let err = call_on(&h, as_mode("overview", body))
-            .await
-            .expect_err("must be a client error");
-        let msg = err.to_string();
-        assert!(msg.contains(word), "{msg}");
-        assert!(msg.contains("trace-level"), "{msg}");
-    }
-}
-
-#[tokio::test]
-async fn the_scope_gate_suppresses_the_root_facets_while_a_duration_bound_is_active() {
+async fn duration_bounds_narrow_the_list_but_never_the_aggregate() {
     let h = handler_with_search_corpus().await;
 
     // A lower bound narrows the page to the window's two long traces
     // (envelopes 2500ns and 1500ns) while the aggregate keeps counting
     // all five — duration bounds never reach the grid, and `scope` stays
-    // `window` since no selection ran — so lists would enumerate
-    // durations the page excluded, counted over the population it does
-    // not show.
+    // `window` since no selection ran.
     let mut body = functions_body(20);
-    body["overview_facets"] = json!(true);
     body["min_trace_duration_ns"] = json!(1_000);
     let v = serde_json::to_value(call_on(&h, body).await.unwrap()).unwrap();
     assert_eq!(ids(&v["data"]), ["0e", "0b"]);
     let o = &v["data"]["overview"];
     assert_eq!(o["scope"], "window");
     assert_eq!(o["totals"], json!({"traces": 5, "spans": 8, "errors": 0}));
-    assert!(
-        o.get("top_root_services").is_none(),
-        "window-scoped facet lists would contradict the duration filter"
-    );
-    assert!(o.get("top_root_operations").is_none());
 
-    // The upper bound gates identically — the heatmap's cell click
+    // The upper bound behaves identically — the heatmap's cell click
     // sends it, on its own or paired with the lower one.
     let mut body = functions_body(20);
-    body["overview_facets"] = json!(true);
     body["max_trace_duration_ns"] = json!(1_000);
     let v = serde_json::to_value(call_on(&h, body).await.unwrap()).unwrap();
     assert_eq!(ids(&v["data"]), ["0c", "0d", "0a"]);
     let o = &v["data"]["overview"];
     assert_eq!(o["scope"], "window");
     assert_eq!(o["totals"], json!({"traces": 5, "spans": 8, "errors": 0}));
-    assert!(o.get("top_root_services").is_none());
-    assert!(o.get("top_root_operations").is_none());
 }
 
 #[tokio::test]
@@ -1610,25 +1419,12 @@ async fn the_aggregate_captures_the_aligned_window_and_carries_its_own_status() 
     // The page probed the slack file and says so...
     assert_eq!(v["data"]["status"], json!({"partial": ["source_failure"]}));
     // ...the aggregate never saw it: its capture is the grid's window,
-    // so its status is its own and its numbers are the standalone
-    // overview mode's for the same window.
+    // so its status is its own.
     assert_eq!(v["data"]["overview"]["status"], json!({"complete": true}));
     assert_eq!(
         v["data"]["overview"]["totals"],
         json!({"traces": 1, "spans": 3, "errors": 0})
     );
-
-    let native = serde_json::to_value(
-        call_on(&h, as_mode("overview", window_body()))
-            .await
-            .unwrap(),
-    )
-    .unwrap();
-    assert_eq!(native["status"], v["data"]["overview"]["status"]);
-    assert_eq!(native["totals"], v["data"]["overview"]["totals"]);
-    assert_eq!(native["grid"], v["data"]["overview"]["grid"]);
-    assert_eq!(native["unit"], v["data"]["overview"]["unit"]);
-    assert_eq!(native["scope"], v["data"]["overview"]["scope"]);
 }
 
 #[tokio::test]
@@ -1691,36 +1487,6 @@ async fn an_anchor_page_carries_no_aggregate_and_walks_the_corpus_unchanged() {
 }
 
 #[tokio::test]
-async fn the_root_facets_opt_in_cannot_resurrect_the_aggregate_on_an_anchor_page() {
-    let h = handler_with_search_corpus().await;
-
-    // First page, facets opted in over an unfiltered page: the scope
-    // gate honours the opt-in, exactly as before.
-    let mut body = functions_body(2);
-    body["overview_facets"] = json!(true);
-    let v1 = serde_json::to_value(call_on(&h, body.clone()).await.unwrap()).unwrap();
-    assert_eq!(
-        v1["data"]["overview"]["top_root_services"],
-        json!({
-            "top": [
-                {"value": "svc-a", "traces": 3},
-                {"value": "svc-b", "traces": 2}
-            ],
-            "other": 0,
-            "unattributed": 0
-        })
-    );
-
-    // The same request plus a cursor: the opt-in gates the facet LISTS
-    // inside the section, never the section's existence, so an anchor
-    // page has neither.
-    body["anchor"] = v1["data"]["anchor"]["next"].clone();
-    let v2 = serde_json::to_value(call_on(&h, body).await.unwrap()).unwrap();
-    assert_eq!(ids(&v2["data"]), ["0d", "0b"]);
-    assert!(v2["data"].get("overview").is_none());
-}
-
-#[tokio::test]
 async fn the_legacy_search_mode_carries_no_aggregate_section() {
     let h = handler_with_search_corpus().await;
     let v =
@@ -1764,14 +1530,14 @@ async fn tenant_scoping_isolates_and_defaults() {
     let v = serde_json::to_value(call_on(&h, wrapped).await.unwrap()).unwrap();
     assert_eq!(v["items"]["returned"], 0);
 
-    // Tenant routes identically through every data mode (the four
-    // TenantId::resolve_query sites): trace, overview, and one
+    // Tenant routes identically through every data mode (the
+    // TenantId::resolve_query sites): trace, the Functions view, and one
     // enumeration path each see tenant-a's data only when scoped.
     let mut values_body = window_body();
     merge(&mut values_body, json!({"key": "resource.service.name"}));
     for mut wrapped in [
         json!({"trace": {"id": "0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a"}}),
-        as_mode("overview", window_body()),
+        functions_body(20),
         as_mode("attribute_values", values_body),
     ] {
         let unscoped = serde_json::to_value(call_on(&h, wrapped.clone()).await.unwrap()).unwrap();
@@ -1783,7 +1549,7 @@ async fn tenant_scoping_isolates_and_defaults() {
             } else if let Some(values) = v.get("values") {
                 values.as_array().unwrap().len()
             } else {
-                v["totals"]["traces"].as_u64().unwrap() as usize
+                v["data"]["items"]["returned"].as_u64().unwrap() as usize
             }
         };
         assert_eq!(count(&unscoped), 0, "unscoped sees nothing: {wrapped}");
@@ -1833,12 +1599,12 @@ async fn shape_errors_are_transport_400s() {
             "cannot mix a mode selector with Functions parameters",
         ),
         (
-            br#"{"trace": {}, "overview": {}}"#,
+            br#"{"trace": {}, "attribute_values": {}}"#,
             "conflicting mode selectors",
         ),
         (br#"{"info": true}"#, "invalid info selector"),
         (br#"{"trace": null}"#, "invalid trace selector"),
-        (br#"{"overview": []}"#, "expected an object"),
+        (br#"{"attribute_values": []}"#, "expected an object"),
         (br#"[]"#, "otel-traces request object"),
         (
             br#"{"search": {}, "tenant": "a", "tenant": "b"}"#,
@@ -1906,15 +1672,14 @@ async fn absent_and_empty_object_payloads_use_the_functions_view() {
     assert!(body.contains("EOF"), "{body}");
 }
 
-/// Every response variant serializes its `mode` discriminator — all
-/// six of them, one assertion each.
+/// Every explicit mode's response serializes its `mode` discriminator,
+/// one assertion each.
 #[tokio::test]
 async fn every_response_shape_declares_its_mode() {
     let h = handler_with_search_corpus().await;
     for (body, mode) in [
         (json!({"info": {}}), "info"),
         (as_mode("search", window_body()), "search"),
-        (as_mode("overview", window_body()), "overview"),
         (as_mode("attributes", window_body()), "attributes"),
         (
             {

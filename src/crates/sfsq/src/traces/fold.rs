@@ -1,8 +1,6 @@
 //! The shared cross-source trace-aggregate merge — ONE implementation
 //! of the source loop and merge rule behind every trace-level
-//! aggregate: [`overview`](super::overview) (its opt-in root-facet
-//! lists read the same map), so the engine-op contract cannot drift
-//! between them. The logs engine composes its own aggregate → merge →
+//! aggregate: [`overview`](super::overview). The logs engine composes its own aggregate → merge →
 //! page pipeline; this is the traces twin.
 //!
 //! Owned here, once:
@@ -24,28 +22,14 @@
 //!   — each shape's actual fold cost — checked BETWEEN sources, so one
 //!   source may overshoot by its whole cost; the caller names the
 //!   reason. The budget bounds WORK, not memory (the map peaks at the
-//!   processed prefix's distinct traces), and does NOT charge the
-//!   root-resolving path's dictionary decodes — that cost is bounded by
-//!   the two root fields' cardinality per file, and by capture in file
-//!   count.
+//!   processed prefix's distinct traces).
 //! - The optional span filter ([`SpanFilter`]): its scans and
 //!   emissions are charged to the SAME ceiling as the fold, and a
 //!   refused or truncated filter scan stops the merge with the
 //!   caller's ceiling reason, so a half-flagged file never poses as
 //!   complete.
-//! - The merge rule: envelopes widen, stored-row counts saturate
-//!   (resends count), and the cross-source root pick is the SMALLEST
-//!   candidate root span id, ties to the first candidate (`SourceId`
-//!   order). `TRSU` carries no root start, so "earliest" is not
-//!   computable across sources — single-root straddles have exactly one
-//!   candidate and resends carry the same id, so only genuine
-//!   multi-root traces reach the tie. Accepted: for a CROSS-SOURCE
-//!   multi-root trace the pick can differ from trace-by-id's
-//!   `summary_root` (which sees start times) — a list row and the
-//!   opened trace may show different roots. The per-source pick
-//!   (earliest `(start_ns, span_id)`, see [`super::rollup`]) agrees
-//!   with assembly; the divergence is confined to that pathological
-//!   case.
+//! - The merge rule: envelopes widen and stored-row counts saturate
+//!   (resends count).
 //!
 //! File-granularity caveat (all windowed aggregate modes): capture
 //! prunes by file time-range overlap, so a trace whose earlier or
@@ -59,10 +43,7 @@ use std::sync::atomic::{AtomicUsize, Ordering};
 use tokio_util::sync::CancellationToken;
 
 use super::predicate::{EvalPredicate, Predicate};
-use super::rollup::{
-    TraceAggregate, TraceRootInfo, sealed_trace_aggregates, sealed_trace_envelopes,
-    tail_trace_aggregates,
-};
+use super::rollup::{TraceAggregate, sealed_trace_envelopes, tail_trace_aggregates};
 use super::sources::TraceSource;
 use super::status::{PartialReason, StatusBuilder};
 use super::wal_scan::TraceWalScan;
@@ -79,13 +60,6 @@ pub(crate) struct SourceFoldSpec {
     pub visited_ceiling: u64,
     /// The caller's own ceiling reason (each op names its own).
     pub ceiling_reason: PartialReason,
-    /// Whether the merge carries roots. `true`: sealed sources resolve
-    /// them (the dictionary-decoding [`sealed_trace_aggregates`] view)
-    /// and tail-resolved roots merge. `false`: sealed sources read the
-    /// roots-free [`sealed_trace_envelopes`] view and the merge DROPS
-    /// the tail-resolved roots too, so `MergedTrace.root` is uniformly
-    /// absent.
-    pub resolve_roots: bool,
     /// Optional span-level filter (the overview's filtered grid): when
     /// set, every source is ALSO scanned for spans matching it and the
     /// traces owning a match are flagged [`MergedTrace::matched`] —
@@ -96,13 +70,12 @@ pub(crate) struct SourceFoldSpec {
 }
 
 /// One trace's cross-source merge: envelopes widen, stored-row
-/// counts sum (resends included), the root merges per the pick rule above.
+/// counts sum (resends included).
 pub(crate) struct MergedTrace {
     pub min_start_ns: i64,
     pub max_end_ns: i64,
     pub span_count: u64,
     pub error_count: u64,
-    pub root: Option<TraceRootInfo>,
     /// Whether some STORED row of this trace matched the spec's
     /// [`SpanFilter`] (always `true` without one). Stored-row
     /// semantics, like every number here: a resend that matches flags
@@ -222,7 +195,6 @@ impl SpanFilter {
 fn fold_into(
     merged: &mut HashMap<sfst::TraceId, MergedTrace>,
     aggs: Vec<TraceAggregate>,
-    resolve_roots: bool,
     matched: bool,
 ) {
     for a in aggs {
@@ -231,36 +203,12 @@ fn fold_into(
             max_end_ns: i64::MIN,
             span_count: 0,
             error_count: 0,
-            root: None,
             matched,
         });
         m.min_start_ns = m.min_start_ns.min(a.min_start_ns);
         m.max_end_ns = m.max_end_ns.max(a.max_end_ns);
         m.span_count = m.span_count.saturating_add(a.span_count);
         m.error_count = m.error_count.saturating_add(a.error_count);
-        // Tails resolve roots unconditionally (cheap — in-memory, no
-        // dictionary decode); a roots-free caller drops them HERE so
-        // `MergedTrace.root` is uniformly absent, never
-        // sealed-absent-but-tail-present. WITHHELD rows (the seal-time
-        // tie abstention, `ROOT_CLAIM_WITHHELD`) arrive as `root: None`
-        // and do not compete — another source's claimed root may win
-        // even though the withheld candidates could be earlier.
-        // Accepted: this is the display/aggregate path (already
-        // approximate across sources, see the module docs); filters
-        // never read roots, and the trace gate treats WITHHELD as
-        // unprunable (see `gate`).
-        if !resolve_roots {
-            continue;
-        }
-        if let Some(candidate) = a.root {
-            // The cross-source pick: smallest root span id wins; the
-            // incumbent survives ties — the first candidate in
-            // SourceId order.
-            match &m.root {
-                Some(current) if current.span_id <= candidate.span_id => {}
-                _ => m.root = Some(candidate),
-            }
-        }
     }
 }
 
@@ -352,13 +300,7 @@ pub(crate) fn merge_trace_sources(
                     progress.fetch_add(1, Ordering::Relaxed);
                     continue;
                 }
-                let aggs = match reader.trace_rollup().and_then(|r| {
-                    if spec.resolve_roots {
-                        sealed_trace_aggregates(&r, &reader)
-                    } else {
-                        Ok(sealed_trace_envelopes(&r))
-                    }
-                }) {
+                let aggs = match reader.trace_rollup().map(|r| sealed_trace_envelopes(&r)) {
                     Ok(a) => a,
                     Err(e) => {
                         tracing::warn!(
@@ -374,7 +316,7 @@ pub(crate) fn merge_trace_sources(
                 // The sealed side's cost is its TRSU rows (one per
                 // distinct trace).
                 visited = visited.saturating_add(aggs.len() as u64);
-                fold_into(&mut merged, aggs, spec.resolve_roots, matched_default);
+                fold_into(&mut merged, aggs, matched_default);
                 if let Some(filter) = &spec.filter {
                     // The filter sees the ceiling net of the fold's share
                     // INCLUDING this source's rows, so its in-file checks
@@ -420,7 +362,7 @@ pub(crate) fn merge_trace_sources(
                 // traces. (The fold skips unset-trace-id spans; charging
                 // them anyway just trips the ceiling marginally earlier.)
                 visited = visited.saturating_add(scan.num_spans() as u64);
-                fold_into(&mut merged, aggs, spec.resolve_roots, matched_default);
+                fold_into(&mut merged, aggs, matched_default);
                 let filter_ceiling = spec.visited_ceiling.saturating_sub(visited);
                 if let Some(filter) = &spec.filter
                     && !filter.mark_tail(&scan, &mut merged, &mut filter_work, filter_ceiling)

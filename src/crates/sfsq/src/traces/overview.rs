@@ -1,8 +1,7 @@
 //! Cross-source TRACE-density overview — the traces UI's default paint
-//! (trace-level numbers, `unit:"traces"`). Consumers: the otel-traces
-//! Function's `overview` mode and the `overview` section embedded in
-//! its `search` view — the ledger's adapter shapes both from one
-//! [`OverviewData`].
+//! (trace-level numbers, `unit:"traces"`). Consumer: the `overview`
+//! section the otel-traces Function's list view embeds — the ledger's
+//! adapter shapes it from one [`OverviewData`].
 //!
 //! Folds per-trace aggregates from BOTH source shapes — sealed files'
 //! `TRSU` rollup rows and WAL tails' decoded-span folds (parity
@@ -46,13 +45,6 @@
 //!   (`root_name`, `root_service_name`, `trace_duration`) and
 //!   `trace_id` pins need assembly or the candidate machinery and are
 //!   REJECTED at the request boundary — never silently ignored.
-//! - **Roots are resolved only for the facet lists**: the grid needs
-//!   only envelopes and counts, so the shared fold (one merge, in
-//!   [`super::fold`]) runs roots-free by default — no root-field
-//!   dictionary decodes. Requesting [`OverviewQuery::root_facets`]
-//!   flips the flag and accumulates the top-root lists over the binned
-//!   population, whose size the visited budget already bounds through
-//!   the merge map.
 //!
 //! Engine contracts come from the shared fold (`super::fold`): sources
 //! process in `SourceId` order; a failed source is a
@@ -98,10 +90,6 @@ const DURATION_BIN_EDGES_NS: [i64; DURATION_BIN_COUNT - 1] = [
 /// The default visited budget (rollup rows + tail spans examined).
 const VISITED_ROWS_CEILING: u64 = 4_000_000;
 
-/// How many values each root-facet list carries (the rest fold into
-/// `other`). Fixed — a UI-default, not a tuning surface.
-pub const FACET_TOP_K: usize = 10;
-
 /// Which duration bin an envelope duration falls in.
 fn duration_bin(duration_ns: i64) -> usize {
     DURATION_BIN_EDGES_NS.partition_point(|&edge| duration_ns >= edge)
@@ -143,7 +131,6 @@ fn percentiles(durations: &mut [i64]) -> Option<DurationPercentiles> {
 pub struct OverviewQuery {
     grid: sfst::Grid,
     visited_ceiling: u64,
-    root_facets: bool,
     predicate: Option<Predicate>,
 }
 
@@ -152,7 +139,6 @@ impl OverviewQuery {
         Self {
             grid,
             visited_ceiling: VISITED_ROWS_CEILING,
-            root_facets: false,
             predicate: None,
         }
     }
@@ -165,15 +151,6 @@ impl OverviewQuery {
     /// visited budget.
     pub fn predicate(mut self, predicate: Predicate) -> Self {
         self.predicate = (!predicate.is_all()).then_some(predicate);
-        self
-    }
-
-    /// Also compute the top-root-service/operation facet lists. OFF by
-    /// default: resolving roots makes the sealed path decode the
-    /// root-field dictionaries, so the default paint stays cheap and
-    /// the facet rail opts in.
-    pub fn root_facets(mut self, on: bool) -> Self {
-        self.root_facets = on;
         self
     }
 
@@ -209,29 +186,6 @@ pub enum OverviewRequestError {
     TraceLevelCondition { target: String },
 }
 
-/// One root-facet dimension's bounded list. The three parts partition
-/// the binned trace population exactly:
-/// `sum(top) + other + unattributed == total_traces`.
-#[derive(Debug, PartialEq, Eq)]
-pub struct FacetList {
-    /// The top [`FACET_TOP_K`] values — count DESC, value ASC.
-    pub top: Vec<(String, u64)>,
-    /// Traces attributed to values beyond the top K.
-    pub other: u64,
-    /// Traces with NO usable value for this dimension: no source
-    /// claims a root (absent, or a multi-root tie abstaining) or the
-    /// claimed root lacks the field. Never attributed to a value.
-    pub unattributed: u64,
-}
-
-/// The trace-level facet lists — present only when
-/// [`OverviewQuery::root_facets`] requested them.
-#[derive(Debug, PartialEq, Eq)]
-pub struct RootFacets {
-    pub services: FacetList,
-    pub operations: FacetList,
-}
-
 /// One overview's paint plus everything needed to interpret it honestly.
 /// All numbers count TRACES (or their STORED spans — resends count); the wire
 /// labels the unit.
@@ -261,14 +215,11 @@ pub struct OverviewData {
     /// `cells`'s outer index, `None` where nothing binned. Not derived
     /// from `cells`: the duration bins are decade-wide.
     pub bucket_percentiles: Vec<Option<DurationPercentiles>>,
-    /// The top-root facet lists over the SAME binned population —
-    /// `None` unless the query requested them.
-    pub root_facets: Option<RootFacets>,
     pub status: QueryStatus,
 }
 
 impl OverviewData {
-    fn empty(num_buckets: usize, facets_requested: bool, status: QueryStatus) -> Self {
+    fn empty(num_buckets: usize, status: QueryStatus) -> Self {
         Self {
             cells: vec![[0; DURATION_BIN_COUNT]; num_buckets],
             error_cells: vec![[0; DURATION_BIN_COUNT]; num_buckets],
@@ -276,10 +227,6 @@ impl OverviewData {
             total_spans: 0,
             total_errors: 0,
             bucket_percentiles: vec![None; num_buckets],
-            // A requested facet section stays PRESENT (empty lists) even
-            // on the all-or-empty paths — the response shape follows the
-            // request, not the outcome.
-            root_facets: facets_requested.then(|| FacetCounts::default().finish()),
             status,
         }
     }
@@ -337,17 +284,10 @@ pub fn overview(
         op: "overview",
         visited_ceiling: query.visited_ceiling,
         ceiling_reason: PartialReason::OverviewCeiling,
-        // Roots only for the facets: resolve_roots=false skips the
-        // sealed root-field dictionary decodes and drops tail roots.
-        resolve_roots: query.root_facets,
         filter,
     };
     let Some(merged) = merge_trace_sources(sources, &spec, &cancel, &progress, &mut status) else {
-        return Ok(OverviewData::empty(
-            grid.num_buckets,
-            query.root_facets,
-            status.finish(),
-        ));
+        return Ok(OverviewData::empty(grid.num_buckets, status.finish()));
     };
 
     // Bin the merged traces by envelope; totals fold alongside. A
@@ -363,7 +303,6 @@ pub fn overview(
     // until the fold ends, atop a merge map already costing several
     // times that per trace.
     let mut bucket_durations: Vec<Vec<i64>> = vec![Vec::new(); grid.num_buckets];
-    let mut facets = query.root_facets.then(FacetCounts::default);
     for m in merged.values() {
         // Unflagged under a filter (no stored row matched), or clipped
         // by the bin-by-envelope-start rule.
@@ -379,9 +318,6 @@ pub fn overview(
         total_spans = total_spans.saturating_add(m.span_count);
         total_errors = total_errors.saturating_add(m.error_count);
         bucket_durations[bucket].push(duration);
-        if let Some(f) = facets.as_mut() {
-            f.count(m.root.as_ref());
-        }
     }
 
     Ok(OverviewData {
@@ -394,59 +330,8 @@ pub fn overview(
             .iter_mut()
             .map(|d| percentiles(d))
             .collect(),
-        root_facets: facets.map(FacetCounts::finish),
         status: status.finish(),
     })
-}
-
-/// The facet accumulation over the binned population: full per-value
-/// count maps (the root service/operation vocabularies are small by
-/// nature), reduced to the bounded lists at the end.
-#[derive(Default)]
-struct FacetCounts {
-    services: std::collections::HashMap<String, u64>,
-    operations: std::collections::HashMap<String, u64>,
-    service_unattributed: u64,
-    operation_unattributed: u64,
-}
-
-impl FacetCounts {
-    fn count(&mut self, root: Option<&super::rollup::TraceRootInfo>) {
-        // Allocate the key only on first sight of a value, not per trace.
-        fn bump(map: &mut std::collections::HashMap<String, u64>, value: &str) {
-            if let Some(c) = map.get_mut(value) {
-                *c += 1;
-            } else {
-                map.insert(value.to_string(), 1);
-            }
-        }
-        match root.and_then(|r| r.service.as_deref()) {
-            Some(svc) => bump(&mut self.services, svc),
-            None => self.service_unattributed = self.service_unattributed.saturating_add(1),
-        }
-        match root.and_then(|r| r.name.as_deref()) {
-            Some(op) => bump(&mut self.operations, op),
-            None => self.operation_unattributed = self.operation_unattributed.saturating_add(1),
-        }
-    }
-
-    fn finish(self) -> RootFacets {
-        RootFacets {
-            services: reduce(self.services, self.service_unattributed),
-            operations: reduce(self.operations, self.operation_unattributed),
-        }
-    }
-}
-
-/// Reduce a full count map to the bounded list: count DESC, value ASC,
-/// the tail folded into `other`.
-fn reduce(counts: std::collections::HashMap<String, u64>, unattributed: u64) -> FacetList {
-    let (top, other) = top_k(counts.into_iter().collect(), FACET_TOP_K);
-    FacetList {
-        top,
-        other: other.count,
-        unattributed,
-    }
 }
 
 /// The entries [`top_k`] folded away.
@@ -459,8 +344,8 @@ pub(crate) struct FoldedTail {
 }
 
 /// Keep the `k` (≥ 1) highest-count entries — count DESC, value ASC —
-/// and fold the rest into a [`FoldedTail`]. Shared by the root facets
-/// and the search rows' service breakdown so both rank identically.
+/// and fold the rest into a [`FoldedTail`]. Used by the search rows'
+/// service breakdown.
 pub(crate) fn top_k<V: Ord>(mut entries: Vec<(V, u64)>, k: usize) -> (Vec<(V, u64)>, FoldedTail) {
     let rank = |a: &(V, u64), b: &(V, u64)| b.1.cmp(&a.1).then_with(|| a.0.cmp(&b.0));
     // Select-then-sort: O(n + K log K).

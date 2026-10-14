@@ -22,10 +22,9 @@ use sfsq::traces::{
 
 use super::wire::{
     AnchorWire, AttributeValueWire, AttributeValuesResult, AttributesResult, CoverageWire,
-    EventWire, FacetListWire, FacetValueWire, FieldKindsWire, LinkWire, OverviewGridWire,
-    OverviewPercentilesWire, OverviewResult, OverviewSection, OverviewTotals, SearchItems,
-    SearchResult, ServiceBreakdownWire, ServiceSpansWire, SpanWire, StatusWire, TraceItems,
-    TraceResult, TraceSummaryWire,
+    EventWire, FieldKindsWire, LinkWire, OverviewGridWire, OverviewPercentilesWire,
+    OverviewSection, OverviewTotals, SearchItems, SearchResult, ServiceBreakdownWire,
+    ServiceSpansWire, SpanWire, StatusWire, TraceItems, TraceResult, TraceSummaryWire,
 };
 
 /// Parse a W3C text-form trace id: exactly 32 hex chars (16 bytes),
@@ -343,9 +342,8 @@ pub(crate) fn parse_owner_word(word: &str) -> Result<AttributeOwner, String> {
         })
 }
 
-/// The selection-grammar word of a builtin field — for error messages
-/// that must speak the wire's language, not the engine's.
-pub(crate) fn builtin_word(field: BuiltinField) -> &'static str {
+/// The selection-grammar word of a builtin field.
+fn builtin_word(field: BuiltinField) -> &'static str {
     BUILTIN_WORDS
         .iter()
         .find(|(_, f)| *f == field)
@@ -358,11 +356,7 @@ pub(crate) fn builtin_word(field: BuiltinField) -> &'static str {
 /// the facet rail can feed keys straight back as selections.
 pub(crate) fn render_attribute_key(owner: AttributeOwner, key: &AttributeKey) -> String {
     match key {
-        AttributeKey::Builtin(b) => BUILTIN_WORDS
-            .iter()
-            .find(|(_, f)| f == b)
-            .map(|(w, _)| (*w).to_string())
-            .expect("the lockstep test pins a wire word for every builtin"),
+        AttributeKey::Builtin(b) => builtin_word(*b).to_string(),
         AttributeKey::Attribute(a) => {
             let word = OWNER_WORDS
                 .iter()
@@ -422,40 +416,28 @@ pub(crate) fn to_attribute_values_result(
 
 // ── Overview: engine data → wire ────────────────────────────────────
 
-/// Everything the standalone overview mode and the search response's
-/// embedded section share. Shaped once so the two surfaces cannot
-/// report the same window differently.
-struct OverviewParts {
-    status: StatusWire,
-    grid: OverviewGridWire,
-    totals: OverviewTotals,
-    top_root_services: Option<FacetListWire>,
-    top_root_operations: Option<FacetListWire>,
-}
-
-/// Shape the trace-density grid's shared body. The wire's
+/// Shape the list response's embedded window aggregate. The wire's
 /// second-granular geometry derives from the SAME `grid` the engine
 /// binned on — one source of truth; the shared derivation guarantees
-/// whole seconds (debug-asserted).
-fn overview_parts(data: OverviewData, grid: sfst::Grid) -> OverviewParts {
+/// whole seconds (debug-asserted). `coverage` is the grid's aligned
+/// window (derived together with `grid`) and `scope` is what the
+/// engine pass actually carried, which only the caller knows. The wire
+/// contract is `OverviewSection`.
+pub(crate) fn to_overview_section(
+    data: OverviewData,
+    grid: sfst::Grid,
+    coverage: CoverageWire,
+    scope: &'static str,
+) -> OverviewSection {
     const NS_PER_S: i64 = 1_000_000_000;
     debug_assert_eq!(grid.bucket_start_ns % NS_PER_S, 0);
     debug_assert_eq!(grid.bucket_width_ns % NS_PER_S, 0);
-    let to_list = |l: sfsq::traces::FacetList| FacetListWire {
-        top: l
-            .top
-            .into_iter()
-            .map(|(value, traces)| FacetValueWire { value, traces })
-            .collect(),
-        other: l.other,
-        unattributed: l.unattributed,
-    };
-    let (top_root_services, top_root_operations) = match data.root_facets {
-        Some(f) => (Some(to_list(f.services)), Some(to_list(f.operations))),
-        None => (None, None),
-    };
-    OverviewParts {
+    OverviewSection {
+        version: 1,
+        unit: "traces",
         status: StatusWire::from(&data.status),
+        coverage,
+        scope,
         grid: OverviewGridWire {
             bucket_start_s: (grid.bucket_start_ns / NS_PER_S) as u32,
             bucket_width_s: (grid.bucket_width_ns / NS_PER_S) as u32,
@@ -469,8 +451,6 @@ fn overview_parts(data: OverviewData, grid: sfst::Grid) -> OverviewParts {
             spans: data.total_spans,
             errors: data.total_errors,
         },
-        top_root_services,
-        top_root_operations,
     }
 }
 
@@ -493,52 +473,6 @@ pub(crate) fn heatmap_predicate(
 ) -> Result<Option<Predicate>, String> {
     let predicate = build_predicate(selections, None, None, None, None)?;
     Ok((!predicate.is_all()).then_some(predicate))
-}
-
-/// Shape the standalone `overview` mode's response; `scope` is what
-/// actually ran (the handler's decision, from the predicate it passed).
-pub(crate) fn to_overview_result(
-    data: OverviewData,
-    grid: sfst::Grid,
-    scope: &'static str,
-) -> OverviewResult {
-    let parts = overview_parts(data, grid);
-    OverviewResult {
-        mode: "overview",
-        version: 1,
-        unit: "traces",
-        status: parts.status,
-        scope,
-        grid: parts.grid,
-        totals: parts.totals,
-        top_root_services: parts.top_root_services,
-        top_root_operations: parts.top_root_operations,
-    }
-}
-
-/// Shape the same aggregate as the SEARCH response's embedded section:
-/// the body of [`to_overview_result`] minus `mode`, plus the caller's
-/// `coverage` (the grid's aligned window, derived together with
-/// `grid`) and `scope` — what the engine pass actually carried, which
-/// only the caller knows. The wire contract is `OverviewSection`.
-pub(crate) fn to_overview_section(
-    data: OverviewData,
-    grid: sfst::Grid,
-    coverage: CoverageWire,
-    scope: &'static str,
-) -> OverviewSection {
-    let parts = overview_parts(data, grid);
-    OverviewSection {
-        version: 1,
-        unit: "traces",
-        status: parts.status,
-        coverage,
-        scope,
-        grid: parts.grid,
-        totals: parts.totals,
-        top_root_services: parts.top_root_services,
-        top_root_operations: parts.top_root_operations,
-    }
 }
 
 // ── Search: pagination cursor ───────────────────────────────────────
