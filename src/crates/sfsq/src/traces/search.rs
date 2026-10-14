@@ -712,10 +712,21 @@ struct HolderReads<'c, 'r, 'a> {
 /// What an on-demand compile reports to.
 struct CompileEnv<'c, 'q> {
     query: &'c SearchQuery,
+    cancel: &'c CancellationToken,
     slot_sources: &'c [&'q TraceSource],
     status: &'c mut StatusBuilder,
     degraded_assembly: &'c mut bool,
     truncated_up_to: &'c mut Option<i64>,
+}
+
+/// A holder that could not answer the evidence: reported, the candidate
+/// left to assembly.
+fn report_evidence_failure(env: &mut CompileEnv<'_, '_>, slot: usize, e: &sfst::Error) {
+    tracing::warn!(
+        "sfsq traces: source {} failed a token evidence read: {e}",
+        env.slot_sources[slot].source_id()
+    );
+    env.status.add(PartialReason::SourceFailure);
 }
 
 /// Add the evidence of `slots` (window files that may hold the trace) to
@@ -728,7 +739,7 @@ fn holder_evidence(
     slots: &[usize],
     evidence: &mut TokenEvidence,
     reads: HolderReads<'_, '_, '_>,
-    env: CompileEnv<'_, '_>,
+    mut env: CompileEnv<'_, '_>,
     work: &mut ScanWork,
 ) -> bool {
     let HolderReads {
@@ -749,6 +760,9 @@ fn holder_evidence(
     for &slot in slots {
         if evidence.negated || (stop_when_all_positive && evidence.all_positive()) {
             return true;
+        }
+        if env.cancel.is_cancelled() {
+            return false; // the fallback's assembly reports the cancel
         }
         work.rows_visited += 1;
         if !sessions[slot].screen(trace_id) {
@@ -775,27 +789,54 @@ fn holder_evidence(
                 files.push(found.into_file(token_sets));
             }
         }
-        let sets: &[sfst::CompiledTracePlan] = match token_sets.get(&slot) {
-            Some(sets) => sets,
-            None if !needs_sets => &[],
-            None => {
-                // Not compiled: either the window misses the file's rows
-                // (nothing in-window to probe) or it failed or was cut short
-                // (undecidable).
-                let in_window = sessions[slot].timestamps().map(|ts| {
-                    let (lo, hi) = match window {
-                        Some(w) => ts.window(w.range_ns()),
-                        None => (0, ts.len() as u32),
-                    };
-                    lo < hi
-                });
-                loaded.touch(slot, sessions);
-                if matches!(in_window, Ok(false)) {
-                    continue;
+        if needs_sets && !token_sets.contains_key(&slot) {
+            // Not compiled for discovery (a rollup-discovered window, a
+            // pinned query, or a compile that failed): nothing in-window
+            // to probe when the window misses the file's rows, else
+            // compile its sets for evidence alone.
+            let in_window = sessions[slot].timestamps().map(|ts| {
+                let (lo, hi) = match window {
+                    Some(w) => ts.window(w.range_ns()),
+                    None => (0, ts.len() as u32),
+                };
+                lo < hi
+            });
+            loaded.touch(slot, sessions);
+            match in_window {
+                Ok(false) => continue,
+                Ok(true) => {}
+                Err(e) => {
+                    report_evidence_failure(&mut env, slot, &e);
+                    return false;
                 }
-                return false;
             }
-        };
+            let limits = sfst::ScanLimits {
+                rows: env.query.visited_ceiling,
+                dict_bytes: env.query.dict_ceiling,
+            };
+            let mut truncated = false;
+            let compiled = discovery_state(
+                slot,
+                &mut sessions[slot],
+                file_plans,
+                window,
+                limits,
+                work,
+                &mut truncated,
+            );
+            loaded.touch(slot, sessions);
+            match compiled {
+                Ok(Some(found)) => {
+                    token_sets.insert(slot, found.compiled);
+                }
+                Ok(None) => return false, // cut short by a ceiling
+                Err(e) => {
+                    report_evidence_failure(&mut env, slot, &e);
+                    return false;
+                }
+            }
+        }
+        let sets: &[sfst::CompiledTracePlan] = token_sets.get(&slot).map_or(&[], Vec::as_slice);
         let positions = sessions[slot].positions(trace_id);
         let read = positions.and_then(|positions| {
             let timestamps = sessions[slot].timestamps()?;
@@ -809,8 +850,12 @@ fn holder_evidence(
             Ok(starts)
         });
         loaded.touch(slot, sessions);
-        let Ok(starts) = read else {
-            return false;
+        let starts = match read {
+            Ok(starts) => starts,
+            Err(e) => {
+                report_evidence_failure(&mut env, slot, &e);
+                return false;
+            }
         };
         work.rows_visited += starts.len() as u64 * (sets.len() as u64 + 1);
         for &(pos, start_ns) in &starts {
@@ -910,6 +955,7 @@ fn row_from_parts(
         },
         CompileEnv {
             query: env.query,
+            cancel: env.cancel,
             slot_sources: env.slot_sources,
             status: &mut *env.status,
             degraded_assembly: &mut *env.degraded_assembly,
@@ -1886,6 +1932,7 @@ pub fn search(
                     },
                     CompileEnv {
                         query: &query,
+                        cancel: &cancel,
                         slot_sources: &slot_sources,
                         status: &mut status,
                         degraded_assembly: &mut degraded_assembly,
@@ -1970,6 +2017,7 @@ pub fn search(
                         },
                         CompileEnv {
                             query: &query,
+                            cancel: &cancel,
                             slot_sources: &slot_sources,
                             status: &mut status,
                             degraded_assembly: &mut degraded_assembly,

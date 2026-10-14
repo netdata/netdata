@@ -3188,3 +3188,43 @@ fn withheld_root_is_unknown_to_root_chips() {
     assert_eq!(grid(negated), 0, "heatmap: negated");
     assert_eq!(grid(positive), 0, "heatmap: positive");
 }
+
+/// Windows whose files discovery never compiles get their token sets
+/// for evidence alone, so the rows path decides them too: a trace-level
+/// chip (rollup discovery) with a negated span chip, and a `trace_id`
+/// pin with a span chip. Stored-row counts (the resend twice) show the
+/// rows path answered, not assembly.
+#[test]
+fn rollup_and_pinned_windows_take_the_rows_path() {
+    let dir = tempfile::tempdir().unwrap();
+    let svc = || vec![kv_str("service.name", "svc")];
+    let wal = write_wal(
+        dir.path(),
+        vec![
+            req_with(svc(), None, &[span_in(1, 0x11, 0, 100 * NS, "op")]),
+            req_with(svc(), None, &[span_in(1, 0x11, 0, 100 * NS, "op")]),
+        ],
+        "evidence",
+    );
+    let sources = || both_roles(|| vec![sealed_source(dir.path(), &wal, "one")]);
+    let duration = builtin(
+        BuiltinField::TraceDuration,
+        CompareOp::Gte,
+        vec![PredicateValue::Integer(0)],
+    );
+    let pin = builtin(BuiltinField::TraceId, CompareOp::Eq, vec![text(&hex(1))]);
+    for (name, query) in [
+        (
+            "duration + not",
+            tokens(vec![pos(vec![duration]), neg(vec![name_eq("zzz")])]),
+        ),
+        (
+            "pin + span",
+            tokens(vec![pos(vec![pin]), pos(vec![name_eq("op")])]),
+        ),
+    ] {
+        let data = run(sources(), SearchQuery::new(query));
+        assert_eq!(ids(&data), vec![hex(1)], "{name}");
+        assert_eq!(data.traces[0].span_count, 2, "{name}: stored rows");
+    }
+}
