@@ -59,7 +59,7 @@ impl ValueMatcher {
         let chars: Vec<char> = folded.chars().collect();
         let fuzzy = (FUZZY1_MIN_CHARS..=FUZZY_MAX_CHARS)
             .contains(&chars.len())
-            .then(|| Fuzzy {
+            .then_some(Fuzzy {
                 max_distance: if chars.len() >= FUZZY2_MIN_CHARS {
                     2
                 } else {
