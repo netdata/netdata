@@ -375,15 +375,19 @@ bool mrg_metric_has_zero_disk_retention(MRG *mrg __maybe_unused, METRIC *metric)
             // the page's metric, so a page being saved still needs it (a page also has no status briefly while it
             // is added to the cache or changes queue; counting those too only keeps the metric for another rotation)
             bool is_unsaved = !is_hot && !pgc_is_page_clean(page);
+            // a hot page with gaps only is discarded by the flush, so it is no retention; if it gets a real value
+            // after this scan, its flush sets the clean time and the conditional updates below keep it
+            bool has_data = !pgd_is_empty(pgc_page_data(page));
+            bool counts = (is_hot || is_unsaved) && has_data;
             page_first_time_s = pgc_page_start_time_s(page);
             time_t page_end_time_s = pgc_page_end_time_s(page);
 
-            if ((is_hot || is_unsaved) && page_first_time_s > 0 && page_first_time_s < min_first_time_s)
+            if (counts && page_first_time_s > 0 && page_first_time_s < min_first_time_s)
                 min_first_time_s = page_first_time_s;
 
             // a hot page counts too: if the collector flushes it after this scan, a clean time of 0 would leave the
             // metric without retention while its page is dirty, and its last release would free it under the page
-            if ((is_hot || is_unsaved) && page_end_time_s > max_end_time_s)
+            if (counts && page_end_time_s > max_end_time_s)
                 max_end_time_s = page_end_time_s;
 
             pgc_page_release(main_cache, page);
