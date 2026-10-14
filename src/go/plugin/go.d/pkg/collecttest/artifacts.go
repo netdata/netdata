@@ -61,9 +61,12 @@ func ChartTemplateCharts(templateYAML string) (map[string]charttpl.Chart, error)
 // V1ChartsByContext converts framework V1 charts (static lists or the
 // templates a collector instantiates) to template charts keyed by context, as
 // the V1 renderer presents them: the chart type through ChartType.String and
-// each dimension under its name, or its ID when the name is empty. Two charts
-// with one ID are an error (the Agent keeps one chart per ID, so the second
-// replaces the first one's context), and so are two charts with one context.
+// each dimension under its name, or its ID when the name is empty. A chart
+// without dimensions gets them at runtime, so it is presented with one
+// label-named dimension and the metadata check skips its dimension names. Two
+// charts with one ID are an error (the Agent keeps one chart per ID, so the
+// second replaces the first one's context), and so are two charts with one
+// context.
 func V1ChartsByContext(charts collectorapi.Charts) (map[string]charttpl.Chart, error) {
 	var problems []error
 	ids := make(map[string]bool, len(charts))
@@ -80,6 +83,9 @@ func V1ChartsByContext(charts collectorapi.Charts) (map[string]charttpl.Chart, e
 		tpl := charttpl.Chart{Context: chart.Ctx, Title: chart.Title, Units: chart.Units, Type: chart.Type.String()}
 		for _, dim := range chart.Dims {
 			tpl.Dimensions = append(tpl.Dimensions, charttpl.Dimension{Name: cmp.Or(dim.Name, dim.ID)})
+		}
+		if len(chart.Dims) == 0 {
+			tpl.Dimensions = []charttpl.Dimension{{NameFromLabel: "runtime"}}
 		}
 		out[chart.Ctx] = tpl
 	}

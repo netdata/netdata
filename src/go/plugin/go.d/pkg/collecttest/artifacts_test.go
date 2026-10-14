@@ -120,7 +120,13 @@ func TestV1ChartsByContext(t *testing.T) {
 					Type:       "line",
 					Dimensions: []charttpl.Dimension{{Name: "ok"}, {Name: "failed"}},
 				},
-				"app.latency": {Context: "app.latency", Title: "Latency", Units: "ms", Type: "stacked"},
+				"app.latency": {
+					Context:    "app.latency",
+					Title:      "Latency",
+					Units:      "ms",
+					Type:       "stacked",
+					Dimensions: []charttpl.Dimension{{NameFromLabel: "runtime"}},
+				},
 			},
 		},
 		"chart ID used twice": {
