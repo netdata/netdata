@@ -74,9 +74,19 @@ pub enum PartialReason {
     /// The request was refused before any work: too many requests of its
     /// kind were already running. The result is empty, not wrong; the
     /// caller retries. Raised by the ledger's admission control, never
-    /// by an engine operation. Declared last: wire order is declaration
-    /// order.
+    /// by an engine operation.
     Busy,
+    /// A newest-first walk visited its budget of sources and stopped:
+    /// older sources were not visited (the result says from when on it
+    /// is complete). Suggest-only.
+    FileBudget,
+    /// A newest-first walk reached its deadline and stopped: older
+    /// sources were not visited. Suggest-only (the one operation with a
+    /// deadline).
+    Deadline,
+    /// A newest-first walk stopped after several consecutive sources
+    /// added no new match: older sources were not visited. Suggest-only.
+    NoNewMatches,
 }
 
 /// The status of one query's result.

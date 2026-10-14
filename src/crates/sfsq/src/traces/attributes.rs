@@ -191,7 +191,7 @@ pub struct AttributeValuesData {
 /// only under the Builtin owner, attribute keys only under a concrete
 /// attribute owner, `Any` never. A virtual builtin — no value dictionary
 /// anywhere (decision 18B) — has no field to resolve and is rejected.
-fn storage_field_of(
+pub(super) fn storage_field_of(
     owner: AttributeOwner,
     key: &AttributeKey,
 ) -> Result<String, AttributeRequestError> {
@@ -242,7 +242,7 @@ fn keep_smallest(values: &mut BTreeSet<String>, max: Option<usize>) {
 
 /// Whether a window (if any) prunes an SFST candidate. A pruned file is
 /// SKIPPED, not failed — out-of-window is a data condition.
-fn pruned(window: Option<TimeWindow>, summary: &sfst::Summary) -> bool {
+pub(super) fn pruned(window: Option<TimeWindow>, summary: &sfst::Summary) -> bool {
     window.is_some_and(|w| !w.overlaps_summary(summary.min_timestamp_s, summary.max_timestamp_s))
 }
 

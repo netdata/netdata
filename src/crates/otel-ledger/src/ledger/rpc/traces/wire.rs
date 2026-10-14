@@ -982,6 +982,9 @@ pub enum PartialReasonWire {
     RemoteUnavailable,
     ByteBudget,
     Busy,
+    FileBudget,
+    Deadline,
+    NoNewMatches,
 }
 
 impl From<PartialReason> for PartialReasonWire {
@@ -996,6 +999,9 @@ impl From<PartialReason> for PartialReasonWire {
             PartialReason::RemoteUnavailable => PartialReasonWire::RemoteUnavailable,
             PartialReason::ByteBudget => PartialReasonWire::ByteBudget,
             PartialReason::Busy => PartialReasonWire::Busy,
+            PartialReason::FileBudget => PartialReasonWire::FileBudget,
+            PartialReason::Deadline => PartialReasonWire::Deadline,
+            PartialReason::NoNewMatches => PartialReasonWire::NoNewMatches,
         }
     }
 }

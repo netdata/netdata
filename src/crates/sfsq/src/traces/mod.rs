@@ -51,6 +51,9 @@
 //!   test-pinned), merged by one cross-source fold.
 //! - attributes — [`attribute_names`] / [`attribute_values`]:
 //!   key/value enumeration straight off the dictionaries.
+//! - suggest — [`suggest()`]: a key's values matched against a typed
+//!   term, newest data first, bounded in items, sources and time.
+//! - order — the newest-first source order behind suggest's early stops.
 //! - status — [`QueryStatus`] and [`PartialReason`]: the reason set
 //!   returned beside every operation's data.
 //! - vocab — the typed key vocabulary ([`AttributeOwner`],
@@ -64,12 +67,14 @@ mod attributes;
 mod by_id;
 mod fold;
 mod gate;
+mod order;
 mod overview;
 mod predicate;
 mod rollup;
 mod search;
 mod sources;
 mod status;
+mod suggest;
 mod vocab;
 mod wal_scan;
 mod window;
@@ -99,6 +104,10 @@ pub use sources::{
     WalCoverage, validate_sources,
 };
 pub use status::{PartialReason, QueryStatus, StatusBuilder};
+pub use suggest::{
+    DEADLINE_CHECK_EVERY, DEFAULT_STALE_FILES, DEFAULT_SUGGEST_FILES, DEFAULT_SUGGEST_ITEMS,
+    DISPLAY_MAX_BYTES, SuggestData, SuggestQuery, Suggestion, suggest,
+};
 pub use vocab::{AttributeKey, AttributeOwner, BuiltinField, storage_to_attribute};
 pub use wal_scan::{TraceScanError, TraceWalScan};
 pub use window::{TimeWindow, WindowError};
