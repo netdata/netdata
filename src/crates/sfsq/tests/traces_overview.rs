@@ -400,8 +400,12 @@ fn percentile_corpus() -> Vec<common::SpanSpec> {
     spans
 }
 
+/// Per-bucket percentiles come from the bucket's histogram: within 1/32
+/// of the exact nearest-rank duration and inside the bucket's observed
+/// range, so the top ranks land on the largest duration and a one-trace
+/// bucket reports its duration at every rank.
 #[test]
-fn per_bucket_percentiles_are_exact_nearest_rank_durations() {
+fn per_bucket_percentiles_from_the_histogram() {
     let dir = tempfile::tempdir().unwrap();
     let wal = write_wal(dir.path(), vec![req(&percentile_corpus())], "pct");
     let data = run(
@@ -410,18 +414,12 @@ fn per_bucket_percentiles_are_exact_nearest_rank_durations() {
     );
     assert_eq!(data.total_traces, 11);
     assert_eq!(data.bucket_percentiles.len(), 10, "one per time bucket");
-    // n=10, nearest rank ceil(p/100 x n) - 1 (0-based): p50 is the 5th
-    // smallest, p95 and p99 the largest. Every answer is an OBSERVED
-    // duration — the ranks select from the bucket's real durations,
-    // they are not interpolated from the decade-wide "1-10ms" bin.
-    assert_eq!(
-        data.bucket_percentiles[2],
-        Some(DurationPercentiles {
-            p50: 5_000_000,
-            p95: 10_000_000,
-            p99: 10_000_000,
-        })
-    );
+    // n=10, durations 1..10 ms: the exact p50 is 5 ms (the 5th
+    // smallest), p95 and p99 the largest. The histogram answers p50
+    // within 1/32 and clamps the top ranks to the observed maximum.
+    let p = data.bucket_percentiles[2].expect("bucket 2 binned traces");
+    assert!((p.p50 - 5_000_000).abs() <= 5_000_000 / 32, "p50 {}", p.p50);
+    assert_eq!((p.p95, p.p99), (10_000_000, 10_000_000));
     // A one-trace bucket answers that trace's duration at every rank.
     assert_eq!(
         data.bucket_percentiles[5],

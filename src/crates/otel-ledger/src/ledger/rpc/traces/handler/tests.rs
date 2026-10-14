@@ -1088,8 +1088,10 @@ async fn the_grid_carries_error_counts_per_bucket_and_duration_bin() {
     assert_eq!(sum, 2, "the error cells sum to totals.errors");
 }
 
+/// Every bucket of this corpus holds one distinct duration, so the
+/// histogram answers it exactly.
 #[tokio::test]
-async fn the_grid_carries_exact_per_bucket_duration_percentiles() {
+async fn the_grid_carries_per_bucket_duration_percentiles() {
     let h = handler_with_search_corpus().await;
     let v = heatmap_of(&h).await;
     let p = &v["grid"]["duration_percentiles_ns"];

@@ -615,8 +615,8 @@ pub struct OverviewGridWire {
     /// failed spans reads 3, not 1. Read beside `cells[bucket][bin]` to
     /// paint one heatmap cell's count and error rate together.
     pub error_cells: Vec<Vec<u64>>,
-    /// Per time bucket, the binned traces' EXACT envelope-duration
-    /// percentiles, nanoseconds.
+    /// Per time bucket, the binned traces' envelope-duration
+    /// percentiles, nanoseconds (within 1/32 of exact).
     pub duration_percentiles_ns: OverviewPercentilesWire,
 }
 
@@ -624,9 +624,11 @@ pub struct OverviewGridWire {
 /// index-parallel to `cells`, `null` where the bucket binned no trace
 /// (zero would render as an instantaneous trace).
 ///
-/// Exact nearest-rank values over each bucket's population — NEVER
-/// interpolate these from `duration_bins`, whose decade-wide edges
-/// cannot resolve better than an order of magnitude.
+/// Nearest-rank values over each bucket's population from a fixed-size
+/// log-linear histogram: within 1/32 of the exact duration and inside
+/// the bucket's observed range. NEVER interpolate these from
+/// `duration_bins`, whose decade-wide edges cannot resolve better than
+/// an order of magnitude.
 #[derive(Debug, Serialize)]
 pub struct OverviewPercentilesWire {
     pub p50: Vec<Option<i64>>,
