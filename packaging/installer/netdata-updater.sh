@@ -34,13 +34,12 @@ NETDATA_STABLE_REPO_URL="${NETDATA_BASE_URL:-https://repository.netdata.cloud/re
 NETDATA_NIGHTLY_REPO_URL="${NETDATA_BASE_URL:-https://repository.netdata.cloud/repos/edge}"
 NETDATA_DEFAULT_ACCEPT_MAJOR_VERSIONS="1 2"
 
-# Publisher pinning for macOS package updates: the Apple Developer Team ID
-# expected on a downloaded .pkg. Empty means this build has no pinned
-# publisher (Netdata's macOS packages are not signed yet); the updater then
-# fails closed unless NETDATA_UPDATER_ALLOW_UNSIGNED_PKG=1 is set in the
-# updater config - a development/CI escape. Release gating must assert this
-# is non-empty once package signing ships.
-NETDATA_MACOS_PKG_TEAM_ID=""
+# Publisher pinning for macOS package updates: the Apple Developer Team ID of
+# Netdata, Inc., whose Developer ID Installer certificate must have signed a
+# downloaded .pkg. An updater config that empties it pins no publisher; the
+# updater then fails closed unless NETDATA_UPDATER_ALLOW_UNSIGNED_PKG=1 is also
+# set there - a development/CI escape for unsigned test packages.
+NETDATA_MACOS_PKG_TEAM_ID="2T8GZ986CU"
 
 # Following variables are intended to be overridden by the updater config file.
 NETDATA_UPDATER_JITTER=3600
