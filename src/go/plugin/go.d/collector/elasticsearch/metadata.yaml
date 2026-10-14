@@ -429,12 +429,12 @@ modules:
                 - name: queries
                 - name: fetches
             - name: elasticsearch.node_indices_search_time
-              description: node_indices_search_time
+              description: Time Spent On Search Operations
               unit: milliseconds
               chart_type: stacked
               dimensions:
-                - name: queries
-                - name: fetches
+                - name: query
+                - name: fetch
             - name: elasticsearch.node_indices_refresh
               description: Refresh Operations
               unit: operations/s
@@ -606,7 +606,7 @@ modules:
                 - name: force_merge
                 - name: management
             - name: elasticsearch.node_cluster_communication_packets
-              description: Cluster Communication
+              description: Node Cluster Communication
               unit: pps
               chart_type: line
               dimensions:
@@ -649,8 +649,8 @@ modules:
               chart_type: line
               dimensions:
                 - name: green
-                - name: yellow
                 - name: red
+                - name: yellow
             - name: elasticsearch.cluster_number_of_nodes
               description: Cluster Nodes Count
               unit: nodes
@@ -668,7 +668,7 @@ modules:
                 - name: relocating
                 - name: initializing
                 - name: unassigned
-                - name: delayed_unaasigned
+                - name: delayed_unassigned
             - name: elasticsearch.cluster_pending_tasks
               description: Cluster Pending Tasks
               unit: tasks
@@ -710,7 +710,7 @@ modules:
             - name: elasticsearch.cluster_indices_query_cache
               description: Cluster Indices Query Cache
               unit: events/s
-              chart_type: line
+              chart_type: stacked
               dimensions:
                 - name: hit
                 - name: miss
@@ -746,8 +746,8 @@ modules:
               chart_type: line
               dimensions:
                 - name: green
-                - name: yellow
                 - name: red
+                - name: yellow
             - name: elasticsearch.node_index_shards_count
               description: Index Shards Count
               unit: shards
