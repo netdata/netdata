@@ -629,8 +629,10 @@ The following alerts are available:
 
 | Alert name  | On metric | Description |
 |:------------|:----------|:------------|
-| [ am_container_registry_pull_failures ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_container_registry.conf) | azure_monitor.container_registry.pull_count | ACR pull failures on ${label:resource_name} |
-| [ am_container_registry_push_failures ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_container_registry.conf) | azure_monitor.container_registry.push_count | ACR push failures on ${label:resource_name} |
+| [ am_container_registry_pull_total ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_container_registry.conf) | azure_monitor.container_registry.pull_count | Total image pull rate on ACR ${label:resource_name} |
+| [ am_container_registry_pull_failures ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_container_registry.conf) | azure_monitor.container_registry.pull_count | Percentage of failed image pulls on ACR ${label:resource_name} in ${label:resource_group} (${label:region}) |
+| [ am_container_registry_push_total ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_container_registry.conf) | azure_monitor.container_registry.push_count | Total image push rate on ACR ${label:resource_name} |
+| [ am_container_registry_push_failures ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_container_registry.conf) | azure_monitor.container_registry.push_count | Percentage of failed image pushes on ACR ${label:resource_name} in ${label:resource_group} (${label:region}) |
 
 
 

@@ -275,8 +275,8 @@ The following alerts are available:
 
 | Alert name  | On metric | Description |
 |:------------|:----------|:------------|
-| [ redis_connections_rejected ](https://github.com/netdata/netdata/blob/master/src/health/health.d/redis.conf) | redis.connections | connections rejected because of maxclients limit in the last minute |
-| [ redis_bgsave_broken ](https://github.com/netdata/netdata/blob/master/src/health/health.d/redis.conf) | redis.bgsave_health | status of the last RDB save operation (0: ok, 1: error) |
+| [ redis_connections_rejected ](https://github.com/netdata/netdata/blob/master/src/health/health.d/redis.conf) | redis.connections | Connections rejected because of maxclients limit in the last minute |
+| [ redis_bgsave_broken ](https://github.com/netdata/netdata/blob/master/src/health/health.d/redis.conf) | redis.bgsave_health | Status of the last RDB save operation (0: ok, 1: error) |
 
 
 

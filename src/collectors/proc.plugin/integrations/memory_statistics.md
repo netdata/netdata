@@ -101,8 +101,8 @@ The following alerts are available:
 
 | Alert name  | On metric | Description |
 |:------------|:----------|:------------|
-| [ 30min_ram_swapped_out ](https://github.com/netdata/netdata/blob/master/src/health/health.d/swap.conf) | mem.swapio | percentage of the system RAM swapped in the last 30 minutes |
-| [ oom_kill ](https://github.com/netdata/netdata/blob/master/src/health/health.d/ram.conf) | mem.oom_kill | number of out of memory kills in the last 30 minutes |
+| [ oom_kill ](https://github.com/netdata/netdata/blob/master/src/health/health.d/ram.conf) | mem.oom_kill | Number of out of memory kills in the last 30 minutes |
+| [ 30min_ram_swapped_out ](https://github.com/netdata/netdata/blob/master/src/health/health.d/swap.conf) | mem.swapio | Percentage of the system RAM swapped in the last 30 minutes |
 
 
 

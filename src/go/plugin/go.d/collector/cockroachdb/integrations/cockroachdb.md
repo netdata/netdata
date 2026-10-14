@@ -247,11 +247,11 @@ The following alerts are available:
 
 | Alert name  | On metric | Description |
 |:------------|:----------|:------------|
-| [ cockroachdb_used_storage_capacity ](https://github.com/netdata/netdata/blob/master/src/health/health.d/cockroachdb.conf) | cockroachdb.storage_used_capacity_percentage | storage capacity utilization |
-| [ cockroachdb_used_usable_storage_capacity ](https://github.com/netdata/netdata/blob/master/src/health/health.d/cockroachdb.conf) | cockroachdb.storage_used_capacity_percentage | storage usable space utilization |
-| [ cockroachdb_unavailable_ranges ](https://github.com/netdata/netdata/blob/master/src/health/health.d/cockroachdb.conf) | cockroachdb.ranges_replication_problem | number of ranges with fewer live replicas than needed for quorum |
-| [ cockroachdb_underreplicated_ranges ](https://github.com/netdata/netdata/blob/master/src/health/health.d/cockroachdb.conf) | cockroachdb.ranges_replication_problem | number of ranges with fewer live replicas than the replication target |
-| [ cockroachdb_open_file_descriptors_limit ](https://github.com/netdata/netdata/blob/master/src/health/health.d/cockroachdb.conf) | cockroachdb.process_file_descriptors | open file descriptors utilization (against softlimit) |
+| [ cockroachdb_used_storage_capacity ](https://github.com/netdata/netdata/blob/master/src/health/health.d/cockroachdb.conf) | cockroachdb.storage_used_capacity_percentage | Storage capacity utilization |
+| [ cockroachdb_used_usable_storage_capacity ](https://github.com/netdata/netdata/blob/master/src/health/health.d/cockroachdb.conf) | cockroachdb.storage_used_capacity_percentage | Storage usable space utilization |
+| [ cockroachdb_unavailable_ranges ](https://github.com/netdata/netdata/blob/master/src/health/health.d/cockroachdb.conf) | cockroachdb.ranges_replication_problem | Number of ranges with fewer live replicas than needed for quorum |
+| [ cockroachdb_underreplicated_ranges ](https://github.com/netdata/netdata/blob/master/src/health/health.d/cockroachdb.conf) | cockroachdb.ranges_replication_problem | Number of ranges with fewer live replicas than the replication target |
+| [ cockroachdb_open_file_descriptors_limit ](https://github.com/netdata/netdata/blob/master/src/health/health.d/cockroachdb.conf) | cockroachdb.process_file_descriptors | Open file descriptors utilization (against softlimit) |
 
 
 

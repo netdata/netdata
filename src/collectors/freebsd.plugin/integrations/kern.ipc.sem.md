@@ -100,13 +100,7 @@ There are no configuration examples.
 
 ## Alerts
 
-
-The following alerts are available:
-
-| Alert name  | On metric | Description |
-|:------------|:----------|:------------|
-| [ semaphores_used ](https://github.com/netdata/netdata/blob/master/src/health/health.d/ipc.conf) | system.ipc_semaphores | IPC semaphore utilization |
-| [ semaphore_arrays_used ](https://github.com/netdata/netdata/blob/master/src/health/health.d/ipc.conf) | system.ipc_semaphore_arrays | IPC semaphore arrays utilization |
+There are no alerts configured by default for this integration.
 
 
 

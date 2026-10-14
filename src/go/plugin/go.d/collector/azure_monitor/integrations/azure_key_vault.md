@@ -629,9 +629,9 @@ The following alerts are available:
 
 | Alert name  | On metric | Description |
 |:------------|:----------|:------------|
-| [ am_key_vault_availability ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_key_vault.conf) | azure_monitor.key_vault.availability | Key Vault availability on ${label:resource_name} |
-| [ am_key_vault_api_latency ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_key_vault.conf) | azure_monitor.key_vault.api_latency | Key Vault API latency on ${label:resource_name} |
-| [ am_key_vault_saturation ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_key_vault.conf) | azure_monitor.key_vault.saturation | Key Vault saturation on ${label:resource_name} |
+| [ am_key_vault_availability ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_key_vault.conf) | azure_monitor.key_vault.availability | Overall vault availability of Azure Key Vault ${label:resource_name} in ${label:resource_group} (${label:region}). Azure SLA guarantees 99.99% availability |
+| [ am_key_vault_api_latency ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_key_vault.conf) | azure_monitor.key_vault.api_latency | Average API latency of Azure Key Vault ${label:resource_name} in ${label:resource_group} (${label:region}). High latency may indicate throttling or service degradation |
+| [ am_key_vault_saturation ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_key_vault.conf) | azure_monitor.key_vault.saturation | Vault saturation of Azure Key Vault ${label:resource_name} in ${label:resource_group} (${label:region}). High saturation means the vault is approaching its transaction limits |
 
 
 

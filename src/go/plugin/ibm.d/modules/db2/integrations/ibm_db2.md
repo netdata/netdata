@@ -126,7 +126,28 @@ jobs:
 
 ## Alerts
 
-There are no alerts configured by default for this integration.
+
+The following alerts are available:
+
+| Alert name  | On metric | Description |
+|:------------|:----------|:------------|
+| [ db2_connection_failed ](https://github.com/netdata/netdata/blob/master/src/health/health.d/db2.conf) | db2.service_health | Cannot connect to DB2 database |
+| [ db2_database_critical_state ](https://github.com/netdata/netdata/blob/master/src/health/health.d/db2.conf) | db2.service_health | DB2 database is in ${this == 1 ?  warning  :  critical } state (quiesced or unknown) |
+| [ db2_connection_usage ](https://github.com/netdata/netdata/blob/master/src/health/health.d/db2.conf) | db2.connections | Active connections are at ${value}% of maximum on DB2 database |
+| [ db2_lock_timeout_rate ](https://github.com/netdata/netdata/blob/master/src/health/health.d/db2.conf) | db2.locking | Lock timeouts in the last minute on DB2 database |
+| [ db2_deadlock_rate ](https://github.com/netdata/netdata/blob/master/src/health/health.d/db2.conf) | db2.deadlocks | Deadlocks detected in the last minute on DB2 database |
+| [ db2_bufferpool_hit_ratio_low ](https://github.com/netdata/netdata/blob/master/src/health/health.d/db2.conf) | db2.bufferpool_hit_ratio | Buffer pool hit ratio is ${value}% on DB2 database (poor performance) |
+| [ db2_sort_overflow_ratio ](https://github.com/netdata/netdata/blob/master/src/health/health.d/db2.conf) | db2.sorting | Sort overflow ratio is ${value}% on DB2 database |
+| [ db2_log_space_usage ](https://github.com/netdata/netdata/blob/master/src/health/health.d/db2.conf) | db2.log_space | Log space usage is ${value}% on DB2 database |
+| [ db2_log_utilization_high ](https://github.com/netdata/netdata/blob/master/src/health/health.d/db2.conf) | db2.log_utilization | Transaction log utilization is ${value}% |
+| [ db2_lock_wait_time_high ](https://github.com/netdata/netdata/blob/master/src/health/health.d/db2.conf) | db2.lock_wait_time | Average lock wait time is ${value} milliseconds |
+| [ db2_high_lock_contention ](https://github.com/netdata/netdata/blob/master/src/health/health.d/db2.conf) | db2.lock_details | ${value} agents are waiting for locks |
+| [ db2_tablespace_usage ](https://github.com/netdata/netdata/blob/master/src/health/health.d/db2.conf) | db2.tablespace_usage | Tablespace ${label:tablespace} usage is ${value}% on DB2 database |
+| [ db2_bufferpool_instance_hit_ratio ](https://github.com/netdata/netdata/blob/master/src/health/health.d/db2.conf) | db2.bufferpool_instance_hit_ratio | Buffer pool ${label:bufferpool} hit ratio is ${value}% on DB2 database |
+| [ db2_long_running_queries ](https://github.com/netdata/netdata/blob/master/src/health/health.d/db2.conf) | db2.long_running_queries | ${value} critical long running queries on DB2 database |
+| [ db2_backup_age ](https://github.com/netdata/netdata/blob/master/src/health/health.d/db2.conf) | db2.backup_age | Last full backup was ${value} hours ago on DB2 database |
+| [ db2_backup_status ](https://github.com/netdata/netdata/blob/master/src/health/health.d/db2.conf) | db2.backup_status | Last backup failed on DB2 database |
+| [ db2_table_scan_ratio ](https://github.com/netdata/netdata/blob/master/src/health/health.d/db2.conf) | db2.index_usage | Index ${label:index} has a full scan ratio of ${value}%, which may indicate poor query performance. |
 
 
 

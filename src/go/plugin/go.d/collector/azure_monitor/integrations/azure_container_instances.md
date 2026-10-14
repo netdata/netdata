@@ -629,10 +629,10 @@ The following alerts are available:
 
 | Alert name  | On metric | Description |
 |:------------|:----------|:------------|
-| [ am_container_instances_cpu_usage ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_container_instances.conf) | azure_monitor.container_instances.cpu_usage | Container CPU on ${label:resource_name} |
-| [ am_container_instances_memory_usage ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_container_instances.conf) | azure_monitor.container_instances.memory_usage | Container memory on ${label:resource_name} |
-| [ am_container_instances_network_rx ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_container_instances.conf) | azure_monitor.container_instances.network | Container inbound traffic on ${label:resource_name} |
-| [ am_container_instances_network_tx ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_container_instances.conf) | azure_monitor.container_instances.network | Container outbound traffic on ${label:resource_name} |
+| [ am_container_instances_cpu_usage ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_container_instances.conf) | azure_monitor.container_instances.cpu_usage | Average CPU usage of container group ${label:resource_name} in ${label:resource_group} (${label:region}) |
+| [ am_container_instances_memory_usage ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_container_instances.conf) | azure_monitor.container_instances.memory_usage | Average memory usage of container group ${label:resource_name} in ${label:resource_group} (${label:region}) |
+| [ am_container_instances_network_rx ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_container_instances.conf) | azure_monitor.container_instances.network | High inbound network traffic on container group ${label:resource_name} in ${label:resource_group} (${label:region}) |
+| [ am_container_instances_network_tx ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_container_instances.conf) | azure_monitor.container_instances.network | High outbound network traffic on container group ${label:resource_name} in ${label:resource_group} (${label:region}) |
 
 
 

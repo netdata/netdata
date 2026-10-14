@@ -73,7 +73,12 @@ There are no configuration examples.
 
 ## Alerts
 
-There are no alerts configured by default for this integration.
+
+The following alerts are available:
+
+| Alert name  | On metric | Description |
+|:------------|:----------|:------------|
+| [ apps_group_file_descriptors_utilization ](https://github.com/netdata/netdata/blob/master/src/health/health.d/file_descriptors.conf) | app.fds_open_limit | Open files percentage against the processes limits, among all PIDs in application group |
 
 
 
