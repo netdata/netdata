@@ -970,6 +970,55 @@ fn grid_population_follows_tokens() {
     assert_eq!(either.total_traces, 2);
 }
 
+/// A filter scan the ceiling refuses leaves its source's rows folded
+/// but unflagged: those traces are unknown, so they cannot pass a
+/// negated token. A token every trace matches keeps the grid empty at
+/// every budget, whether the refused source is a sealed file or a tail.
+#[test]
+fn a_refused_filter_scan_cannot_pass_negated_tokens() {
+    let dir = tempfile::tempdir().unwrap();
+    let c = corpus();
+    let wal_a = write_wal(dir.path(), vec![req(&c[..2])], "a"); // A
+    let wal_b = write_wal(dir.path(), vec![req(&c[2..])], "b"); // B, C
+    let any_name = || Predicate {
+        conditions: vec![Condition {
+            target: PredicateTarget::Builtin(BuiltinField::Name),
+            op: CompareOp::Regex,
+            values: vec![text(".*")],
+        }],
+    };
+    let sources: [&dyn Fn() -> Vec<TraceSource>; 2] = [
+        &|| {
+            vec![
+                sealed_source(dir.path(), &wal_a, "a"),
+                sealed_source(dir.path(), &wal_b, "b"),
+            ]
+        },
+        &|| {
+            vec![
+                sealed_source(dir.path(), &wal_a, "a"),
+                tail_source(&wal_b, "b"),
+            ]
+        },
+    ];
+    for src in sources {
+        let mut partials = 0;
+        for ceiling in 0..64 {
+            let data = run(
+                src(),
+                OverviewQuery::new(grid())
+                    .tokens(TokenQuery {
+                        tokens: vec![Token::negated(any_name())],
+                    })
+                    .visited_rows_ceiling_for_tests(ceiling),
+            );
+            partials += data.status.has(PartialReason::OverviewCeiling) as usize;
+            assert_eq!(data.total_traces, 0, "ceiling {ceiling}: {:?}", data.status);
+        }
+        assert!(partials > 0, "some ceilings refuse the work");
+    }
+}
+
 /// A negated token excludes the traces with a matching stored row in
 /// the grid, from any source.
 #[test]

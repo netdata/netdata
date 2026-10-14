@@ -163,9 +163,9 @@ impl TokenFilter {
     /// matched in-window rows, root tokens from its rollup's true-root
     /// claims. Returns `Ok(false)` when the budget refused the work (a
     /// compile's stream-batch scan or dictionary walks, an extraction,
-    /// or the claims would cross `limits`): the caller reports its
-    /// ceiling reason and stops, so a half-marked file never poses as a
-    /// complete answer. Emission, scanned rows, claims and walked
+    /// or the claims would cross `limits`): the caller marks the file's
+    /// traces unknown, reports its ceiling reason and stops, so a
+    /// half-marked file never poses as a complete answer. Emission, scanned rows, claims and walked
     /// dictionary bytes are charged to `work`.
     fn mark_sealed(
         &self,
@@ -340,6 +340,17 @@ impl TokenFilter {
     }
 }
 
+/// Mark one source's merged traces as unknown to the filter: their rows
+/// count, but their bits are missing, so they cannot pass a negated
+/// token ([`TokenFilter::passes`]).
+fn mark_unknown(merged: &mut HashMap<sfst::TraceId, MergedTrace>, aggs: &[TraceAggregate]) {
+    for a in aggs {
+        if let Some(m) = merged.get_mut(&a.trace_id) {
+            m.unknown = true;
+        }
+    }
+}
+
 /// Fold one source's aggregates into the merge map (the merge rule in
 /// the module docs).
 fn fold_into(merged: &mut HashMap<sfst::TraceId, MergedTrace>, aggs: &[TraceAggregate]) {
@@ -479,6 +490,9 @@ pub(crate) fn merge_trace_sources(
                     match marked {
                         Ok(true) => {}
                         Ok(false) => {
+                            // The file's rows are merged but its bits
+                            // are partial: unknown, like a failed scan.
+                            mark_unknown(&mut merged, &aggs);
                             status.add(spec.ceiling_reason);
                             progress.fetch_add(1, Ordering::Relaxed);
                             break;
@@ -496,11 +510,7 @@ pub(crate) fn merge_trace_sources(
                                 c.source_id
                             );
                             status.add(PartialReason::SourceFailure);
-                            for a in &aggs {
-                                if let Some(m) = merged.get_mut(&a.trace_id) {
-                                    m.unknown = true;
-                                }
-                            }
+                            mark_unknown(&mut merged, &aggs);
                         }
                     }
                 }
@@ -525,6 +535,7 @@ pub(crate) fn merge_trace_sources(
                 if let Some(filter) = &spec.filter
                     && !filter.mark_tail(&scan, &mut merged, &mut filter_work, filter_ceiling)
                 {
+                    mark_unknown(&mut merged, &aggs);
                     status.add(spec.ceiling_reason);
                     progress.fetch_add(1, Ordering::Relaxed);
                     break;
