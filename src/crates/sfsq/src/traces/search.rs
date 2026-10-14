@@ -169,9 +169,7 @@ use sfst::{ScanWork, TraceId};
 
 use super::by_id::{DEFAULT_SPAN_CAP, LOADED_SOURCES_MAX};
 use super::gate::{GateDecision, PROOF_IDS_MAX, TraceGate, single_source_proof, tokens_prune};
-use super::predicate::{
-    EvalPredicate, LoweredTokens, PredicateError, SpanToken, TokenQuery, TraceLevelEval,
-};
+use super::predicate::{EvalPredicate, LoweredTokens, PredicateError, TokenQuery, TraceLevelEval};
 use super::sources::{SourceId, SourceSetError, TraceSource, validate_sources};
 use super::status::{PartialReason, QueryStatus, StatusBuilder};
 use super::vocab::{BuiltinField, span_field};
@@ -615,38 +613,201 @@ impl FileDiscovery {
     }
 }
 
-/// Per trace held by a window tail, the bits of the positive span-local
-/// tokens (bit `i` = token `i`) one of its in-window spans matches.
-/// Every visited span is charged.
-fn window_tail_token_bits(
+/// One candidate's token evidence over the stored rows that can start in
+/// the window (window tails and window files).
+#[derive(Debug, Clone)]
+struct TokenEvidence {
+    /// Per positive span-local token, its newest in-window stored match
+    /// start.
+    newest: Vec<Option<i64>>,
+    /// A negated token's positive form matched an in-window stored row.
+    negated: bool,
+    /// The newest in-window stored span start.
+    newest_any: Option<i64>,
+}
+
+impl TokenEvidence {
+    fn new(positive: usize) -> Self {
+        Self {
+            newest: vec![None; positive],
+            negated: false,
+            newest_any: None,
+        }
+    }
+
+    fn all_positive(&self) -> bool {
+        self.newest.iter().all(Option::is_some)
+    }
+
+    fn see(slot: &mut Option<i64>, start_ns: i64) {
+        *slot = Some(slot.map_or(start_ns, |s| s.max(start_ns)));
+    }
+}
+
+/// Per trace held by a window tail, its token evidence over the tail's
+/// in-window spans. Every visited span is charged.
+fn window_tail_evidence(
     tails: &[(SourceId, TraceWalScan)],
     window_ids: &HashSet<&SourceId>,
-    positive: &[SpanToken],
+    lowered: &LoweredTokens,
     window: Option<TimeWindow>,
     work: &mut ScanWork,
-) -> HashMap<TraceId, u64> {
-    let mut bits: HashMap<TraceId, u64> = HashMap::new();
+) -> HashMap<TraceId, TokenEvidence> {
+    let mut seen: HashMap<TraceId, TokenEvidence> = HashMap::new();
     for (source_id, scan) in tails {
         if !window_ids.contains(source_id) {
             continue;
         }
         for (trace_id, span) in scan.spans_with_ids() {
             work.rows_visited += 1;
-            if trace_id.is_unset() {
+            if trace_id.is_unset() || !window.is_none_or(|w| w.contains(span.start_ns)) {
                 continue;
             }
-            let mut matched = 0u64;
-            for (i, token) in positive.iter().enumerate() {
+            let evidence = seen
+                .entry(trace_id)
+                .or_insert_with(|| TokenEvidence::new(lowered.positive.len()));
+            TokenEvidence::see(&mut evidence.newest_any, span.start_ns);
+            for (slot, token) in evidence.newest.iter_mut().zip(&lowered.positive) {
                 if token.eval.matches(span, window) {
-                    matched |= 1 << i;
+                    TokenEvidence::see(slot, span.start_ns);
                 }
             }
-            if matched != 0 {
-                *bits.entry(trace_id).or_insert(0) |= matched;
+            if lowered.negated.iter().any(|t| t.eval.matches(span, window)) {
+                evidence.negated = true;
             }
         }
     }
-    bits
+    seen
+}
+
+/// What the holder probe reads and may grow: the sessions, their limit,
+/// the compiled window files' sets (a pending holder compiles on demand
+/// and joins discovery), and the per-file plan layout.
+struct HolderReads<'c, 'r, 'a> {
+    sessions: &'c mut [sfst::TraceFileSession<'r, 'a>],
+    loaded: &'c mut sfst::LoadedSources,
+    token_sets: &'c mut HashMap<usize, Vec<sfst::CompiledTracePlan>>,
+    pending: &'c mut VecDeque<PendingFile>,
+    files: &'c mut Vec<FileDiscovery>,
+    file_plans: &'c [sfst::TracePlan],
+    positive_count: usize,
+    negated_base: usize,
+    /// Stop as soon as every positive token has a match (a prune check
+    /// needs no more).
+    stop_when_all_positive: bool,
+}
+
+/// What an on-demand compile reports to.
+struct CompileEnv<'c, 'q> {
+    query: &'c SearchQuery,
+    slot_sources: &'c [&'q TraceSource],
+    status: &'c mut StatusBuilder,
+    degraded_assembly: &'c mut bool,
+    truncated_up_to: &'c mut Option<i64>,
+}
+
+/// Add the evidence of `slots` (window files that may hold the trace) to
+/// `evidence`: each slot the screen admits is probed through its
+/// positions against its compiled sets, with starts from its timestamps.
+/// `false` when a holder cannot answer (it failed, or its compile was cut
+/// short): the candidate needs assembly.
+fn holder_evidence(
+    trace_id: TraceId,
+    slots: &[usize],
+    evidence: &mut TokenEvidence,
+    reads: HolderReads<'_, '_, '_>,
+    env: CompileEnv<'_, '_>,
+    work: &mut ScanWork,
+) -> bool {
+    let HolderReads {
+        sessions,
+        loaded,
+        token_sets,
+        pending,
+        files,
+        file_plans,
+        positive_count,
+        negated_base,
+        stop_when_all_positive,
+    } = reads;
+    let window = env.query.window;
+    for &slot in slots {
+        if evidence.negated || (stop_when_all_positive && evidence.all_positive()) {
+            return true;
+        }
+        work.rows_visited += 1;
+        if !sessions[slot].screen(trace_id) {
+            continue;
+        }
+        if !token_sets.contains_key(&slot)
+            && let Some(at) = pending.iter().position(|p| p.slot == slot)
+        {
+            let file = pending.remove(at).expect("position found it");
+            let found = compile_pending(
+                file,
+                file_plans,
+                env.query,
+                sessions,
+                env.slot_sources,
+                loaded,
+                work,
+                env.status,
+                env.degraded_assembly,
+                env.truncated_up_to,
+            );
+            if let Some(found) = found {
+                files.push(found.into_file(token_sets));
+            }
+        }
+        let Some(sets) = token_sets.get(&slot) else {
+            // Not compiled: either the window misses the file's rows
+            // (nothing in-window to probe) or it failed or was cut short
+            // (undecidable).
+            let in_window = sessions[slot].timestamps().map(|ts| {
+                let (lo, hi) = match window {
+                    Some(w) => ts.window(w.range_ns()),
+                    None => (0, ts.len() as u32),
+                };
+                lo < hi
+            });
+            loaded.touch(slot, sessions);
+            if matches!(in_window, Ok(false)) {
+                continue;
+            }
+            return false;
+        };
+        let positions = sessions[slot].positions(trace_id);
+        let read = positions.and_then(|positions| {
+            let timestamps = sessions[slot].timestamps()?;
+            let mut starts = Vec::with_capacity(positions.len());
+            for pos in positions {
+                let start_ns = timestamps.at(pos).ok_or_else(|| {
+                    sfst::Error::CorruptIndex(format!("trace search: no timestamp at {pos}"))
+                })?;
+                starts.push((pos, start_ns));
+            }
+            Ok(starts)
+        });
+        loaded.touch(slot, sessions);
+        let Ok(starts) = read else {
+            return false;
+        };
+        work.rows_visited += starts.len() as u64 * (sets.len() as u64 + 1);
+        for &(pos, start_ns) in &starts {
+            if window.is_none_or(|w| w.contains(start_ns)) {
+                TokenEvidence::see(&mut evidence.newest_any, start_ns);
+            }
+            for (i, newest) in evidence.newest.iter_mut().enumerate().take(positive_count) {
+                if sets[i].contains(pos) {
+                    TokenEvidence::see(newest, start_ns);
+                }
+            }
+            if sets[negated_base..].iter().any(|set| set.contains(pos)) {
+                evidence.negated = true;
+            }
+        }
+    }
+    true
 }
 
 /// Extend `file`, surfacing a failed column read as a source failure
@@ -817,6 +978,20 @@ pub fn search(
         sfst::TracePlan::default(),
         EvalPredicate::new(&sfst::TracePlan::default()),
     );
+    // What every window-file compile compiles: the positive span-local
+    // tokens (match-all without one: the discovery driver), then the
+    // negated tokens' positive forms (NOT EXISTS evidence), from index
+    // `negated_base` on.
+    let positive_count = lowered.positive.len();
+    let negated_base = positive_count.max(1);
+    let file_plans: Vec<sfst::TracePlan> = if positive_count == 0 {
+        vec![match_all.0.clone()]
+    } else {
+        positive_plans.clone()
+    }
+    .into_iter()
+    .chain(lowered.negated.iter().map(|t| t.plan.clone()))
+    .collect();
 
     let mut status = StatusBuilder::new();
     let mut work = ScanWork::default();
@@ -1042,7 +1217,7 @@ pub fn search(
         {
             newest = compile_pending(
                 next,
-                &positive_plans,
+                &file_plans,
                 &query,
                 &mut sessions,
                 &slot_sources,
@@ -1086,16 +1261,16 @@ pub fn search(
             }
         }
     }
-    let (driver_plan, driver_eval) = match lowered.positive.get(driver) {
-        Some(token) => (&token.plan, &token.eval),
-        None => (&match_all.0, &match_all.1),
+    let driver_eval = match lowered.positive.get(driver) {
+        Some(token) => &token.eval,
+        None => &match_all.1,
     };
     // What each later window-file compile compiles, and where the
     // driver's set sits among them.
-    let (file_plans, file_driver) = if lowered.positive.is_empty() {
-        (std::slice::from_ref(driver_plan), 0)
+    let file_driver = if lowered.positive.is_empty() {
+        0
     } else {
-        (&positive_plans[..], driver)
+        driver
     };
 
     'tails: for (source_id, scan) in &tails {
@@ -1219,7 +1394,7 @@ pub fn search(
             .max(ASSEMBLED_CEILING_FLOOR)
     });
     // The window tails' token bits, built on first need.
-    let mut tail_token_bits: Option<HashMap<TraceId, u64>> = None;
+    let mut tail_evidence: Option<HashMap<TraceId, TokenEvidence>> = None;
     let mut assembled_count = 0usize;
     let mut finals: Vec<Assembled> = Vec::new();
     // Final ranks, best-first, for the Nth-final threshold.
@@ -1339,8 +1514,13 @@ pub fn search(
                 && let Some(slot) = single_file
                 && let Some(sets) = token_sets.get(&slot)
             {
-                let prune =
-                    tokens_prune(trace_id, &mut sessions[slot], sets, file_driver, &mut work);
+                let prune = tokens_prune(
+                    trace_id,
+                    &mut sessions[slot],
+                    &sets[..positive_count],
+                    file_driver,
+                    &mut work,
+                );
                 loaded.touch(slot, &mut sessions);
                 if prune {
                     token_prunes += 1;
@@ -1358,84 +1538,40 @@ pub fn search(
                 && single_file.is_none()
                 && matches!(emitter, Origin::File(_) | Origin::Tail)
             {
-                let all: u64 = (1u64 << lowered.positive.len()) - 1;
-                let tail_bits = tail_token_bits.get_or_insert_with(|| {
-                    window_tail_token_bits(
-                        &tails,
-                        &window_ids,
-                        &lowered.positive,
-                        query.window,
-                        &mut work,
-                    )
+                let tails_seen = tail_evidence.get_or_insert_with(|| {
+                    window_tail_evidence(&tails, &window_ids, &lowered, query.window, &mut work)
                 });
-                let mut bits = tail_bits.get(&trace_id).copied().unwrap_or(0);
-                let mut decidable = true;
-                if bits != all && proof.as_ref().is_some_and(|p| p.may_repeat(trace_id)) {
-                    for &slot in &window_slots {
-                        if bits == all {
-                            break;
-                        }
-                        work.rows_visited += 1;
-                        if !sessions[slot].screen(trace_id) {
-                            continue;
-                        }
-                        if !token_sets.contains_key(&slot)
-                            && let Some(at) = pending.iter().position(|p| p.slot == slot)
-                        {
-                            let file = pending.remove(at).expect("position found it");
-                            let found = compile_pending(
-                                file,
-                                file_plans,
-                                &query,
-                                &mut sessions,
-                                &slot_sources,
-                                &mut loaded,
-                                &mut work,
-                                &mut status,
-                                &mut degraded_assembly,
-                                &mut truncated_up_to,
-                            );
-                            if let Some(found) = found {
-                                files.push(found.into_file(&mut token_sets));
-                            }
-                        }
-                        let Some(sets) = token_sets.get(&slot) else {
-                            // Not compiled: either the window misses the
-                            // file's rows (nothing in-window to probe) or
-                            // it failed or was cut short (undecidable).
-                            let in_window = sessions[slot].timestamps().map(|ts| {
-                                let (lo, hi) = match query.window {
-                                    Some(w) => ts.window(w.range_ns()),
-                                    None => (0, ts.len() as u32),
-                                };
-                                lo < hi
-                            });
-                            loaded.touch(slot, &mut sessions);
-                            if matches!(in_window, Ok(false)) {
-                                continue;
-                            }
-                            decidable = false;
-                            break;
-                        };
-                        let positions = sessions[slot].positions(trace_id);
-                        loaded.touch(slot, &mut sessions);
-                        let Ok(positions) = positions else {
-                            decidable = false;
-                            break;
-                        };
-                        work.rows_visited += positions.len() as u64;
-                        for (i, set) in sets.iter().enumerate() {
-                            if bits & (1 << i) != 0 {
-                                continue;
-                            }
-                            work.rows_visited += positions.len() as u64;
-                            if positions.iter().any(|&pos| set.contains(pos)) {
-                                bits |= 1 << i;
-                            }
-                        }
-                    }
-                }
-                if decidable && bits != all {
+                let mut evidence = tails_seen
+                    .get(&trace_id)
+                    .cloned()
+                    .unwrap_or_else(|| TokenEvidence::new(positive_count));
+                let decidable = evidence.all_positive()
+                    || !proof.as_ref().is_some_and(|p| p.may_repeat(trace_id))
+                    || holder_evidence(
+                        trace_id,
+                        &window_slots,
+                        &mut evidence,
+                        HolderReads {
+                            sessions: &mut sessions,
+                            loaded: &mut loaded,
+                            token_sets: &mut token_sets,
+                            pending: &mut pending,
+                            files: &mut files,
+                            file_plans: &file_plans,
+                            positive_count,
+                            negated_base,
+                            stop_when_all_positive: true,
+                        },
+                        CompileEnv {
+                            query: &query,
+                            slot_sources: &slot_sources,
+                            status: &mut status,
+                            degraded_assembly: &mut degraded_assembly,
+                            truncated_up_to: &mut truncated_up_to,
+                        },
+                        &mut work,
+                    );
+                if decidable && !evidence.all_positive() {
                     token_prunes += 1;
                     continue;
                 }
@@ -1585,7 +1721,7 @@ pub fn search(
             }
             let found = compile_pending(
                 next,
-                file_plans,
+                &file_plans,
                 &query,
                 &mut sessions,
                 &slot_sources,
