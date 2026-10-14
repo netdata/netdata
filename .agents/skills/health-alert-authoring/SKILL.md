@@ -386,13 +386,16 @@ items below:
    collision-bearing labels where relevant.
 6. Search for same-incident alerts, duplicate contexts, old names, fallback overlap, and generated artifacts. Record the
    result in the SOW. The integration pages list the alert automatically when its `on:` context is one the collector's
-   `metadata.yaml` declares (`.agents/skills/collectors-metadata-yaml/alerts-and-meta.md`, section 1);
+   `metadata.yaml` declares and its `_os` and plugin/module filters admit the collector, unless the integration lists
+   it in `excluded_alerts` (`.agents/skills/collectors-metadata-yaml/alerts-and-meta.md`, section 1);
    `integrations/tests/test_health_alerts.py` fails on an alert no integration owns. For an alert whose target an
    integration documents in `metrics.scopes` (contexts created from profiles are not checked), it also fails on a
-   `calc`, `warn` or `crit` variable that is not a documented dimension name, an alert name, a chart or host variable
-   listed in `CHART_VARIABLES` or `HOST_VARIABLES` (`integrations/health_alerts.py`; add a new one there with the file
-   that defines it), or a resolvable `context.dimension` reference. Read dimensions by name: a C dimension ID that
-   differs from its name resolves at runtime but fails the check.
+   `calc`, `warn` or `crit` variable that is not a documented dimension name (a `_raw` or `_last_collected_t` suffix is
+   allowed), an alert name, a chart or host variable listed in `CHART_VARIABLES` or `HOST_VARIABLES`
+   (`integrations/health_alerts.py`; add a new one there with the file that defines it), or a `context.dimension`
+   reference; such a reference is checked only when its context is documented, and health built-ins and the rule's own
+   `green`/`red` are exempt. Read dimensions by name: a C dimension ID that differs from its name resolves at runtime
+   but fails the check.
 7. For an externally sourced alert pack, commit a source-pinned mapping that records the original condition, scope,
    severity, persistence intent, supported releases, Netdata owner, adaptation, and known differences. Tests MUST consume
    that mapping rather than restating the intended result independently.

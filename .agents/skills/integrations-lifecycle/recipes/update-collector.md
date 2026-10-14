@@ -6,8 +6,9 @@ Use this when a collector's metrics, chart contexts, configuration, alerts, or d
 ## 1. Identify what changed
 
 From the collector directory, list the changed surfaces: runtime code; `metadata.yaml` metric contexts, units,
-dimensions, setup; `config_schema.json`; the stock `.conf`; `health.d/*.conf`. The generated
-`integrations/<slug>.md` and `README.md` symlink are outputs and follow automatically, including the alert table.
+dimensions, setup, and its `alerts` and `excluded_alerts` name lists where present; `config_schema.json`; the stock
+`.conf`; `health.d/*.conf`. The generated `integrations/<slug>.md` and `README.md` symlink are outputs and follow
+automatically, including the alert table.
 
 ## 2. Update `metadata.yaml`
 

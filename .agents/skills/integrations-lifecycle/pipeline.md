@@ -69,8 +69,8 @@ export (Stage 1: outputs).
 Before rendering, `main()` attaches the Prometheus profile projection to the collectors
 (`project_prometheus_profile_coverage`, `how-tos/prometheus-profile-metadata.md`; it also lists the profiles' chart
 contexts), then `attach_alerts` replaces the alert names of every collector, flow and device record with its derived
-page rows and drops `excluded_alerts` from the record (`health_alerts.py`; the ownership rule is in the metadata skill's
-`alerts-and-meta.md`, section 1).
+page rows and drops `excluded_alerts` from the record (`attach_alerts` in `gen_integrations.py`, rows from
+`alert_ownership` in `health_alerts.py`; the ownership rule is in the metadata skill's `alerts-and-meta.md`, section 1).
 
 For collectors (`render_collectors`; the other types follow the same shape):
 

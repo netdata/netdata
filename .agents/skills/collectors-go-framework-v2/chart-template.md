@@ -151,9 +151,10 @@ a *leaf* is the innermost family that holds charts.
   `collecttest.AssertHealthAlertsTargetChartTemplate` and `collecttest.AssertHealthAlertsMatchMetadata`
   (`src/go/plugin/go.d/pkg/collecttest/artifacts.go`) compare metadata.yaml, health.d and the template with each other.
   The `...With` variants take `HealthAlertsCheck`, which narrows a shared health.d file by context prefix (and, for the
-  metadata comparison, selects the module by `meta.id`). The metadata check compares stateset dimensions in declared
-  order, not rendered order, and requires the variables of `calc`, `warn` and `crit` to be documented dimensions,
-  built-ins, alert names or qualified references. Page alert tables are derived, not checked
+  metadata comparison, selects the module by `meta.id`). `AssertMetadataDocumentsChartTemplate` compares stateset
+  dimensions in declared order, not rendered order. `AssertHealthAlertsMatchMetadata` requires each alert's target,
+  unit and lookup dimensions to be documented, and the variables of `calc`, `warn` and `crit` to be documented
+  dimensions, built-ins, alert names or qualified references. Page alert tables are derived, not checked
   (`.agents/skills/collectors-metadata-yaml/alerts-and-meta.md`, section 1).
 - **Never restate an artifact.** A test that names one of the template's own contexts, dimension lists or families, or
   pins an alert's thresholds, lookup, cadence or recipients, restates what the artifact said when it was written and
