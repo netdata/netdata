@@ -3,8 +3,9 @@
 //! [`attribute_names`] and [`attribute_values`] answer "what can be filtered on, and
 //! with which values" straight off the dictionaries: a sealed or
 //! in-memory SFST contributes its field table and per-field dictionary
-//! chunks ([`sfst::IndexReader::field_values`] — never stream batches or
-//! row columns), a WAL tail contributes its frame-decoded pair table.
+//! keys ([`sfst::MetaReader::for_each_field_value`] — never position
+//! bitmaps, stream batches or row columns), a WAL tail contributes its
+//! frame-decoded pair table.
 //! Keys and values come back as the TYPED, wire-neutral vocabulary of
 //! [`super::vocab`]; the Builtin owner is the full static
 //! [`BuiltinField`] set regardless of data (builtin fields are engine
@@ -13,9 +14,9 @@
 //! Determinism (design-record decision 13): enumerate ALL candidate
 //! sources, merge into ordered sets, then limit — `truncated` is exact
 //! for keys and values, and source order never changes a result. The
-//! value merge keeps only the `max + 1` smallest values as it goes:
-//! the answer is a byte-ordered prefix, so memory stays bounded by the
-//! limit, not by the key's distinct values across the window.
+//! value merge keeps only the `max + 1` smallest values as it goes, and
+//! reads at most that many from each file: the answer is a byte-ordered
+//! prefix, so memory follows the limit, not the key's distinct values.
 //! Consequently cancellation is ALL-OR-EMPTY (phase-4b pin C2): a merge
 //! prefix would depend on caller order, so a cancel observed before every
 //! source has contributed returns an EMPTY result with
@@ -40,6 +41,7 @@
 //! guarantee is relative to the successfully observed sources.
 
 use std::collections::BTreeSet;
+use std::ops::ControlFlow;
 use std::sync::Arc;
 use std::sync::atomic::{AtomicUsize, Ordering};
 
@@ -216,18 +218,34 @@ pub(super) fn storage_field_of(
     }
 }
 
-/// Open `bytes` fully only when its field table carries `storage`. The
-/// table needs `META` alone, so a file without the field never decodes
-/// `PRIM`.
-fn open_with_field<'a>(
-    bytes: &'a [u8],
+/// One file's values of a field, and the file's field kinds.
+type FileValues = (Vec<String>, Vec<(String, sfst::ValueKind)>);
+
+/// One file's values of `storage`; `None` when the file lacks the
+/// field. Reads the field's dictionary alone (no position bitmaps), in
+/// byte order, and stops after `max + 1` values: a value past them has
+/// `max + 1` smaller ones in this file, so it cannot be in the answer.
+fn file_values(
+    bytes: &[u8],
     storage: &str,
-) -> Result<Option<sfst::IndexReader<'a>>, sfst::Error> {
+    max: Option<usize>,
+) -> Result<Option<FileValues>, sfst::Error> {
     let meta = sfst::MetaReader::open(bytes)?;
-    if !meta.field_table()?.contains(storage) {
+    let take = max.map_or(usize::MAX, |m| m.saturating_add(1));
+    let mut values = Vec::new();
+    let present = meta.for_each_field_value(storage, |v| {
+        values.push(String::from_utf8_lossy(v).into_owned());
+        if values.len() == take {
+            ControlFlow::Break(())
+        } else {
+            ControlFlow::Continue(())
+        }
+    })?;
+    if !present {
         return Ok(None);
     }
-    meta.into_index_reader().map(Some)
+    let kinds = meta.metadata()?.tree.derive_scalar_kinds();
+    Ok(Some((values, kinds)))
 }
 
 /// Keep the `max + 1` smallest of the merged values: the answer is the
@@ -434,29 +452,20 @@ pub fn attribute_values(
             TraceSource::Sfst(c) => {
                 if !pruned(query.window, &c.summary) {
                     match map_source(&c.source) {
-                        Ok(mapped) => match open_with_field(mapped.bytes(), &storage) {
+                        Ok(mapped) => match file_values(mapped.bytes(), &storage, query.max_values)
+                        {
                             // A file without the field contributes
                             // nothing — absent-matches-nothing, a data
                             // condition (21A).
                             Ok(None) => {}
-                            Ok(Some(reader)) => match reader.field_values(&storage) {
-                                Ok(vs) => {
-                                    values.extend(vs);
-                                    keep_smallest(&mut values, query.max_values);
-                                    let kinds = reader.metadata().tree.derive_scalar_kinds();
-                                    fold_kind(&mut kind, kind_of(&kinds));
-                                }
-                                Err(e) => {
-                                    tracing::warn!(
-                                        "sfsq traces: source {} failed to enumerate {storage}: {e}",
-                                        c.source_id
-                                    );
-                                    status.add(PartialReason::SourceFailure);
-                                }
-                            },
+                            Ok(Some((vs, kinds))) => {
+                                values.extend(vs);
+                                keep_smallest(&mut values, query.max_values);
+                                fold_kind(&mut kind, kind_of(&kinds));
+                            }
                             Err(e) => {
                                 tracing::warn!(
-                                    "sfsq traces: source {} failed to parse: {e}",
+                                    "sfsq traces: source {} failed to enumerate {storage}: {e}",
                                     c.source_id
                                 );
                                 status.add(PartialReason::SourceFailure);
