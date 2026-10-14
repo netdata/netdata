@@ -30,10 +30,10 @@ use file_lifecycle::chunk::ChunkCache;
 use file_lifecycle::registry::TenantRegistries;
 
 use sfsq::traces::{
-    AttributeRequestError, AttributeValuesQuery, OverviewQuery, OverviewRequestError,
-    PartialReason, Predicate, QueryStatus, SearchQuery, SearchRequestError, SearchSources,
-    SuggestQuery, TimeWindow, TraceQuery, TraceRequestError, attribute_values, overview, search,
-    trace_by_id,
+    AttributeRequestError, AttributeValuesQuery, FieldKinds, OverviewQuery, OverviewRequestError,
+    PartialReason, Predicate, QueryStatus, SearchData, SearchQuery, SearchRequestError,
+    SearchSources, SuggestQuery, TimeWindow, TraceData, TraceQuery, TraceRequestError,
+    attribute_values, overview, search, trace_by_id,
 };
 
 use super::adapter::{
@@ -100,6 +100,17 @@ struct AggregateRequest {
 /// `busy` at once instead of queueing CPU and memory behind the others.
 const VALUE_LIST_CONCURRENCY: usize = 2;
 
+/// How many list requests (the Functions view: search page plus its
+/// heatmap, under one permit) may run at once. A list over a long window
+/// is the costliest request; beyond this one answers `busy` at once, so a
+/// burst of them cannot stack CPU and memory. A pool of its own, so a
+/// slow list never makes a keystroke or a trace click `busy`.
+const LIST_CONCURRENCY: usize = 2;
+
+/// How many trace lookups may run at once (a pool of its own, as for
+/// lists).
+const TRACE_CONCURRENCY: usize = 2;
+
 /// How long a suggestion request may walk sources, from its arrival:
 /// suggestions answer per keystroke, so a partial answer now beats a
 /// complete one later. The newest source is always visited.
@@ -117,6 +128,10 @@ pub(crate) struct OtelTracesHandler {
     /// Admission for the value lists and suggestions (see
     /// [`VALUE_LIST_CONCURRENCY`]).
     value_lists: Arc<tokio::sync::Semaphore>,
+    /// Admission for the Functions view (see [`LIST_CONCURRENCY`]).
+    lists: Arc<tokio::sync::Semaphore>,
+    /// Admission for trace lookups (see [`TRACE_CONCURRENCY`]).
+    traces: Arc<tokio::sync::Semaphore>,
 }
 
 impl OtelTracesHandler {
@@ -131,6 +146,8 @@ impl OtelTracesHandler {
         Self {
             supplier: TracesSourceSupplier::new(registries, chunk_cache, prefixes, remote),
             value_lists: Arc::new(tokio::sync::Semaphore::new(VALUE_LIST_CONCURRENCY)),
+            lists: Arc::new(tokio::sync::Semaphore::new(LIST_CONCURRENCY)),
+            traces: Arc::new(tokio::sync::Semaphore::new(TRACE_CONCURRENCY)),
         }
     }
 
@@ -139,6 +156,14 @@ impl OtelTracesHandler {
     #[cfg(test)]
     pub(crate) fn with_value_list_concurrency(mut self, permits: usize) -> Self {
         self.value_lists = Arc::new(tokio::sync::Semaphore::new(permits));
+        self
+    }
+
+    /// Test-only admission override for lists and trace lookups.
+    #[cfg(test)]
+    pub(crate) fn with_list_and_trace_concurrency(mut self, lists: usize, traces: usize) -> Self {
+        self.lists = Arc::new(tokio::sync::Semaphore::new(lists));
+        self.traces = Arc::new(tokio::sync::Semaphore::new(traces));
         self
     }
 
@@ -187,6 +212,22 @@ impl OtelTracesHandler {
             after: capture_range.start,
             before: capture_range.end,
         };
+        // Admission before capture (which may download); the permit
+        // moves into the blocking task, held until the engine stops.
+        let Ok(permit) = Arc::clone(&self.traces).try_acquire_owned() else {
+            let busy = TraceData {
+                trace: sfst::Trace {
+                    spans: Vec::new(),
+                    roots: Vec::new(),
+                    children: Vec::new(),
+                },
+                status: QueryStatus::Partial([PartialReason::Busy].into()),
+                field_kinds: FieldKinds::default(),
+            };
+            return Ok(OtelTracesResponse::Trace(Box::new(to_trace_result(
+                &trace_id, busy, coverage,
+            ))));
+        };
 
         let tenant = TenantId::resolve_query(tenant);
         // A cancelled capture returns NO copies; the empty default flows
@@ -217,6 +258,7 @@ impl OtelTracesHandler {
         // the client's — framed as internal so a debugger looks at the
         // right side. A panicked task is a handler failure.
         let data = match tokio::task::spawn_blocking(move || {
+            let _permit = permit;
             let _pins = pins;
             trace_by_id(sources, query, cancel, done)
         })
@@ -324,6 +366,22 @@ impl OtelTracesHandler {
             super::super::grid::grid_for_window_s(window.capture.start, window.capture.end)
         });
 
+        // Admission before capture (which may download); one permit for
+        // the page and its heatmap, moved into their blocking task.
+        let Ok(permit) = Arc::clone(&self.lists).try_acquire_owned() else {
+            let busy = SearchData {
+                traces: Vec::new(),
+                status: QueryStatus::Partial([PartialReason::Busy].into()),
+                field_kinds: FieldKinds::default(),
+            };
+            return Ok(to_search_result(
+                busy,
+                params.limit,
+                cursor.as_ref(),
+                (window.capture.start, window.capture.end),
+            ));
+        };
+
         let tenant = TenantId::resolve_query(tenant);
         // ONE capture for every pass: the two search roles over the
         // completion range, the aggregate over the grid's. One snapshot
@@ -375,6 +433,7 @@ impl OtelTracesHandler {
         // runtime thread, so one blocking task covers the pair — and a
         // cancellation between them cannot pair mismatched snapshots.
         let joined = tokio::task::spawn_blocking(move || {
+            let _permit = permit;
             let _pins = pins;
             let page = search(
                 SearchSources {

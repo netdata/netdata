@@ -1703,3 +1703,61 @@ async fn suggest_is_validated_before_admission_and_bounded() {
         assert!(err.to_string().contains(needle), "{body}: {err}");
     }
 }
+
+#[tokio::test]
+async fn lists_and_trace_lookups_have_their_own_admission() {
+    // No list or trace permit: both answer `busy` at once, empty and
+    // without a heatmap or a cursor; the keystroke pool is untouched.
+    let h = handler_with_search_corpus()
+        .await
+        .with_list_and_trace_concurrency(0, 0);
+    let v = serde_json::to_value(call_on(&h, window_body()).await.unwrap()).unwrap();
+    assert_eq!(v["type"], "traces");
+    assert_eq!(v["data"]["status"], json!({"partial": ["busy"]}));
+    assert_eq!(v["data"]["traces"], json!([]));
+    assert!(v["data"].get("overview").is_none());
+    assert!(v["data"].get("anchor").is_none());
+
+    let v = serde_json::to_value(
+        call_on(
+            &h,
+            json!({"trace": {"id": "0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a"}}),
+        )
+        .await
+        .unwrap(),
+    )
+    .unwrap();
+    assert_eq!(v["status"], json!({"partial": ["busy"]}));
+    assert_eq!(v["items"]["returned"], 0);
+
+    let mut body = window_body();
+    merge(&mut body, json!({"key": "resource.service.name"}));
+    let v = serde_json::to_value(
+        call_on(&h, as_mode("attribute_values", body))
+            .await
+            .unwrap(),
+    )
+    .unwrap();
+    assert_eq!(v["status"], json!({"complete": true}));
+}
+
+#[tokio::test]
+async fn finished_lists_and_lookups_release_their_permits() {
+    let h = handler_with_search_corpus()
+        .await
+        .with_list_and_trace_concurrency(1, 1);
+    for _ in 0..2 {
+        let v = serde_json::to_value(call_on(&h, window_body()).await.unwrap()).unwrap();
+        assert_eq!(v["data"]["status"], json!({"complete": true}));
+        let v = serde_json::to_value(
+            call_on(
+                &h,
+                json!({"trace": {"id": "0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a"}}),
+            )
+            .await
+            .unwrap(),
+        )
+        .unwrap();
+        assert_eq!(v["status"], json!({"complete": true}));
+    }
+}
