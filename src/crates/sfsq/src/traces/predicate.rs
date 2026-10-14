@@ -91,6 +91,13 @@ impl CompareOp {
     }
 }
 
+/// The [`CompareOp::Regex`] pattern of "starts with `text`": the escaped
+/// text, then anything, line breaks included (regex conditions match the
+/// whole value).
+pub fn starts_with_pattern(text: &str) -> String {
+    format!("{}(?s:.*)", regex::escape(text))
+}
+
 /// One comparison value. Duration comparisons take
 /// [`Integer`](Self::Integer) nanoseconds only — the wire carries its
 /// duration bounds as integer nanoseconds, and a text value there is a
@@ -2708,6 +2715,58 @@ mod tests {
             TokenQuery::from(group(vec![duration.clone()])).tokens,
             vec![Token::positive(group(vec![duration]))]
         );
+    }
+
+    /// "Starts with" is a literal prefix of the whole value: regex
+    /// metacharacters stay literal and the rest may span lines.
+    #[test]
+    fn starts_with_pattern_is_a_literal_prefix() {
+        let span = TraceSpan {
+            span_id: sfst::SpanId::from([1u8; 8]),
+            parent_span_id: sfst::SpanId::from([0u8; 8]),
+            start_ns: 1_000,
+            duration_ns: 250,
+            kind: 2,
+            flags: 0,
+            dropped_attributes_count: 0,
+            dropped_events_count: 0,
+            dropped_links_count: 0,
+            fields: vec![
+                ("name".into(), "a.b(c)\nrest".into()),
+                ("attributes.k".into(), "axb(c)".into()),
+            ],
+            events: vec![],
+            links: vec![],
+        };
+        for (target, prefix, want) in [
+            (PredicateTarget::Builtin(BuiltinField::Name), "a.b(", true),
+            (
+                PredicateTarget::Builtin(BuiltinField::Name),
+                "a.b(c)\nrest",
+                true,
+            ),
+            (
+                PredicateTarget::Builtin(BuiltinField::Name),
+                "a.b(c)\nrest!",
+                false,
+            ),
+            (PredicateTarget::Builtin(BuiltinField::Name), "b(c)", false),
+            (span_attr("k"), "a.b", false),
+            (span_attr("k"), "axb(", true),
+        ] {
+            let predicate = Predicate {
+                conditions: vec![cond(
+                    target.clone(),
+                    CompareOp::Regex,
+                    vec![text(&starts_with_pattern(prefix))],
+                )],
+            };
+            assert_eq!(
+                span_matches(&span, &predicate, None),
+                want,
+                "{target} ^= {prefix:?}"
+            );
+        }
     }
 
     /// Free text lowers to one field-set term over the text scope: the

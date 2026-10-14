@@ -94,6 +94,7 @@ pub use overview::{
 pub use predicate::{
     CompareOp, Condition, Predicate, PredicateError, PredicateTarget, PredicateValue,
     TEXT_MAX_BYTES, TEXT_MIN_CHARS, TOKENS_MAX, Token, TokenQuery, span_matches,
+    starts_with_pattern,
 };
 pub use rollup::{TraceAggregate, sealed_trace_envelopes, tail_trace_aggregates};
 pub use search::{

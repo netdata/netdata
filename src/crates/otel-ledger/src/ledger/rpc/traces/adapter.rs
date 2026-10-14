@@ -528,7 +528,7 @@ fn chip_token(chip: &ConditionParams) -> Result<Token, String> {
             ConditionValue::Text(text) => {
                 check_request_text("condition value", text)?;
                 PredicateValue::Text(if prefix {
-                    format!("{}(?s:.*)", regex::escape(text))
+                    sfsq::traces::starts_with_pattern(text)
                 } else {
                     text.clone()
                 })
