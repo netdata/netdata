@@ -150,7 +150,28 @@ pub struct Token {
     pub negated: bool,
 }
 
+/// What a validated [`Token`] constrains.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum TokenKind {
+    SpanLocal,
+    TraceLevel,
+    TraceId,
+}
+
 impl Token {
+    /// The token's kind. Meaningful after [`TokenQuery::validate`]: a
+    /// trace-level or `trace_id` condition is then its token's only one.
+    pub(crate) fn kind(&self) -> TokenKind {
+        use BuiltinField::*;
+        match self.group.conditions.first().map(|c| &c.target) {
+            Some(PredicateTarget::Builtin(RootName | RootServiceName | TraceDuration)) => {
+                TokenKind::TraceLevel
+            }
+            Some(PredicateTarget::Builtin(TraceId)) => TokenKind::TraceId,
+            _ => TokenKind::SpanLocal,
+        }
+    }
+
     /// A token matched by any trace one of whose spans satisfies `group`.
     pub fn positive(group: Predicate) -> Self {
         Self {
@@ -644,37 +665,14 @@ impl Predicate {
         })
     }
 
-    /// Split into `(span_local, trace_level)` (pin R3-2): trace-level
-    /// builtins (`RootName`, `RootServiceName`, `TraceDuration`)
-    /// evaluate post-assembly as tri-state (decision 15); EVERYTHING the
-    /// span-side evaluator and the file plans see — and a trace's rank
-    /// (its newest matching span) — is the span-local part.
-    pub(crate) fn partition(&self) -> (Predicate, Predicate) {
-        use BuiltinField::*;
-        let (trace_level, span_local): (Vec<Condition>, Vec<Condition>) =
-            self.conditions.iter().cloned().partition(|c| {
-                matches!(
-                    c.target,
-                    PredicateTarget::Builtin(RootName | RootServiceName | TraceDuration)
-                )
-            });
-        (
-            Predicate {
-                conditions: span_local,
-            },
-            Predicate {
-                conditions: trace_level,
-            },
-        )
-    }
-
     /// Strip `trace:id` conditions out of the predicate — they are
     /// neither span-local (a `TraceSpan` carries no trace id) nor
     /// trace-level builtins; they constrain the ENGINE's candidate
     /// set: `=` values intersect into a PIN set (phase-1 discovery is
     /// skipped — pins go straight to assembly), `!=` values union into
-    /// an exclusion filter at pool admission. Run BEFORE the R3-2
-    /// partition. Hex parsing is infallible post-validation.
+    /// an exclusion filter at pool admission ([`LoweredTokens`] folds
+    /// each `trace_id` token's constraints across the query). Hex
+    /// parsing is infallible post-validation.
     pub(crate) fn split_trace_id_conditions(&self) -> (Predicate, TraceIdConstraints) {
         let mut rest = Vec::with_capacity(self.conditions.len());
         let mut pins: Option<std::collections::BTreeSet<sfst::TraceId>> = None;
@@ -966,6 +964,7 @@ fn condition_matcher(op: CompareOp, values: &[PredicateValue]) -> sfst::PlanMatc
 
 /// The engine-level candidate constraints of `trace:id` conditions
 /// (see [`Predicate::split_trace_id_conditions`]).
+#[derive(Default)]
 pub(crate) struct TraceIdConstraints {
     /// `Some` = the candidate set is EXACTLY these ids (already the
     /// intersection of every `trace:id =` condition; may be empty).
@@ -1361,8 +1360,141 @@ fn eval_group_condition(c: &sfst::GroupCondition) -> EvalGroupCondition {
     }
 }
 
-/// The post-assembly evaluator of the TRACE-LEVEL partition half
-/// (decision 15 / pin R3-2): boolean over the assembled trace's root
+/// One span-local token lowered once: the per-file plan and its
+/// span-side twin (one lowering, module docs).
+pub(crate) struct SpanToken {
+    pub(crate) plan: TracePlan,
+    pub(crate) eval: EvalPredicate,
+}
+
+impl SpanToken {
+    fn new(group: &Predicate) -> Self {
+        let plan = group.to_trace_plan();
+        let eval = EvalPredicate::new(&plan);
+        Self { plan, eval }
+    }
+}
+
+/// A validated [`TokenQuery`] lowered for the engines: span-local tokens
+/// as [`SpanToken`]s by polarity, trace-level tokens as evaluators, and
+/// `trace_id` tokens folded into candidate constraints.
+pub(crate) struct LoweredTokens {
+    /// Positive span-local tokens, in token order.
+    pub(crate) positive: Vec<SpanToken>,
+    /// Negated span-local tokens' positive forms.
+    pub(crate) negated: Vec<SpanToken>,
+    /// The positive trace-level tokens' conditions, AND-combined.
+    pub(crate) trace_level: Option<TraceLevelEval>,
+    /// One evaluator per negated trace-level token.
+    trace_level_negated: Vec<TraceLevelEval>,
+    pub(crate) trace_ids: TraceIdConstraints,
+}
+
+impl LoweredTokens {
+    pub(crate) fn new(query: &TokenQuery) -> Self {
+        let mut positive = Vec::new();
+        let mut negated = Vec::new();
+        let mut trace_level = Vec::new();
+        let mut trace_level_negated = Vec::new();
+        let mut trace_ids = TraceIdConstraints::default();
+        for token in &query.tokens {
+            match token.kind() {
+                TokenKind::SpanLocal if token.negated => negated.push(SpanToken::new(&token.group)),
+                TokenKind::SpanLocal => positive.push(SpanToken::new(&token.group)),
+                TokenKind::TraceLevel if token.negated => {
+                    trace_level_negated.push(TraceLevelEval::new(&token.group));
+                }
+                TokenKind::TraceLevel => trace_level.extend(token.group.conditions.iter().cloned()),
+                TokenKind::TraceId => {
+                    let (_, mut c) = token.group.split_trace_id_conditions();
+                    // The id is single-valued per trace: NOT (id ∈ S) is
+                    // id ∉ S and NOT (id ∉ S) is id ∈ S.
+                    if token.negated {
+                        let pins =
+                            (!c.excluded.is_empty()).then(|| std::mem::take(&mut c.excluded));
+                        c.excluded = c.pins.take().unwrap_or_default();
+                        c.pins = pins;
+                    }
+                    if let Some(pins) = c.pins {
+                        trace_ids.pins = Some(match trace_ids.pins.take() {
+                            None => pins,
+                            Some(prev) => prev.intersection(&pins).copied().collect(),
+                        });
+                    }
+                    trace_ids.excluded.extend(c.excluded);
+                }
+            }
+        }
+        Self {
+            positive,
+            negated,
+            trace_level: (!trace_level.is_empty()).then(|| {
+                TraceLevelEval::new(&Predicate {
+                    conditions: trace_level,
+                })
+            }),
+            trace_level_negated,
+            trace_ids,
+        }
+    }
+
+    /// Whether any trace-level token (either polarity) applies: an
+    /// inexact trace is then indeterminate and excluded (decision 15).
+    pub(crate) fn has_trace_level(&self) -> bool {
+        self.trace_level.is_some() || !self.trace_level_negated.is_empty()
+    }
+
+    /// The trace-level verdict on an exact assembled trace's TRUE-root
+    /// values and envelope duration: every positive trace-level token
+    /// holds and no negated one does (a rootless trace satisfies no
+    /// root condition, so it passes a negated one).
+    pub(crate) fn trace_level_matches(
+        &self,
+        root_name: Option<&str>,
+        root_service: Option<&str>,
+        trace_duration_ns: i64,
+    ) -> bool {
+        self.trace_level
+            .as_ref()
+            .is_none_or(|tl| tl.matches(root_name, root_service, trace_duration_ns))
+            && !self
+                .trace_level_negated
+                .iter()
+                .any(|tl| tl.matches(root_name, root_service, trace_duration_ns))
+    }
+
+    /// The rank of an assembled trace (spans in ascending start order)
+    /// under the span-local tokens, over spans starting in `window`:
+    /// the OLDEST of each positive token's newest matching span start
+    /// (the trace is as recent as its least recent required match), or
+    /// the newest in-window span start without positive tokens. `None`
+    /// when a positive token matches no span, a negated token matches
+    /// one, or no span starts in the window.
+    pub(crate) fn span_rank(&self, spans: &[TraceSpan], window: Option<TimeWindow>) -> Option<i64> {
+        if self
+            .negated
+            .iter()
+            .any(|t| spans.iter().any(|s| t.eval.matches(s, window)))
+        {
+            return None;
+        }
+        if self.positive.is_empty() {
+            let newest = spans
+                .iter()
+                .rposition(|s| window.is_none_or(|w| w.contains(s.start_ns)))?;
+            return Some(spans[newest].start_ns);
+        }
+        let mut rank = i64::MAX;
+        for token in &self.positive {
+            let newest = spans.iter().rposition(|s| token.eval.matches(s, window))?;
+            rank = rank.min(spans[newest].start_ns);
+        }
+        Some(rank)
+    }
+}
+
+/// The post-assembly evaluator of trace-level conditions (decision 15
+/// / pin R3-2): boolean over the assembled trace's root
 /// name, root service, and envelope duration. The ENGINE owns the
 /// tri-state — an assembled trace with unreliable (capped or degraded)
 /// values is excluded as indeterminate before this evaluator runs. The
@@ -1956,54 +2088,6 @@ mod tests {
         ));
     }
 
-    /// Partition (R3-2): trace-level builtins split out; everything
-    /// else stays span-local, order preserved within each part.
-    #[test]
-    fn partition_splits_trace_level_conditions() {
-        let p = Predicate {
-            conditions: vec![
-                cond(span_attr("x"), CompareOp::Eq, vec![text("v")]),
-                cond(
-                    PredicateTarget::Builtin(BuiltinField::TraceDuration),
-                    CompareOp::Gt,
-                    vec![PredicateValue::Integer(5)],
-                ),
-                cond(
-                    PredicateTarget::Builtin(BuiltinField::Duration),
-                    CompareOp::Gt,
-                    vec![PredicateValue::Integer(5)],
-                ),
-                cond(
-                    PredicateTarget::Builtin(BuiltinField::RootName),
-                    CompareOp::Eq,
-                    vec![text("r")],
-                ),
-            ],
-        };
-        let (span_local, trace_level) = p.partition();
-        assert_eq!(span_local.conditions.len(), 2);
-        assert_eq!(trace_level.conditions.len(), 2);
-        assert!(span_local.conditions.iter().all(|c| !matches!(
-            c.target,
-            PredicateTarget::Builtin(
-                BuiltinField::RootName
-                    | BuiltinField::RootServiceName
-                    | BuiltinField::TraceDuration
-            )
-        )));
-        // All-trace-level → span-local is the empty form (C-4: phase-1
-        // candidates come from `All` over the window).
-        let only_trace = Predicate {
-            conditions: vec![cond(
-                PredicateTarget::Builtin(BuiltinField::TraceDuration),
-                CompareOp::Gt,
-                vec![PredicateValue::Integer(5)],
-            )],
-        };
-        let (span_local, _) = only_trace.partition();
-        assert!(span_local.is_all());
-    }
-
     /// The lowering constructs storage names only through the vocabulary
     /// and converts duration exclusivity to inclusive integer bounds.
     #[test]
@@ -2585,6 +2669,17 @@ mod tests {
             ]
         );
         assert!(TokenQuery::from(Predicate::all()).tokens.is_empty());
+        // Trace-level only: no span-local token, so discovery runs on the
+        // empty plan (C-4).
+        let duration = cond(
+            PredicateTarget::Builtin(BuiltinField::TraceDuration),
+            CompareOp::Gt,
+            vec![PredicateValue::Integer(5)],
+        );
+        assert_eq!(
+            TokenQuery::from(group(vec![duration.clone()])).tokens,
+            vec![Token::positive(group(vec![duration]))]
+        );
     }
 
     /// Free text lowers to one field-set term over the text scope: the

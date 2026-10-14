@@ -46,7 +46,8 @@ use opentelemetry_proto::tonic::collector::trace::v1::ExportTraceServiceRequest;
 use sfsq::traces::{
     AttributeOwner, BuiltinField, CompareOp, Condition, PartialReason, Predicate, PredicateError,
     PredicateTarget, PredicateValue, QueryStatus, SERVICE_BREAKDOWN_TOP_K, SearchData, SearchQuery,
-    SearchRequestError, SearchSources, ServiceBreakdown, TimeWindow, TraceSource, search,
+    SearchRequestError, SearchSources, ServiceBreakdown, TimeWindow, Token, TokenQuery,
+    TraceSource, search,
 };
 
 /// One second in nanoseconds — the corpus' timestamp unit (`500 * NS`
@@ -2349,4 +2350,433 @@ fn text_index_span_parity() {
             assert_eq!(data.status, QueryStatus::Complete, "{term} on {name}");
         }
     }
+}
+
+// ── Tokens: trace-level AND across spans and files, NOT EXISTS ──────
+
+fn pos(conditions: Vec<Condition>) -> Token {
+    Token::positive(pred(conditions))
+}
+
+fn neg(conditions: Vec<Condition>) -> Token {
+    Token::negated(pred(conditions))
+}
+
+fn tokens(tokens: Vec<Token>) -> TokenQuery {
+    TokenQuery { tokens }
+}
+
+fn name_eq(name: &str) -> Condition {
+    builtin(BuiltinField::Name, CompareOp::Eq, vec![text(name)])
+}
+
+fn span_attr_eq(key: &str, value: &str) -> Condition {
+    attr_eq(AttributeOwner::Span, key, value)
+}
+
+/// `query` on every layout of the shared world: the expected ids in
+/// order, every row exact, Complete, and the same summaries (ranks
+/// included) as on the single sealed file. Returns that reference.
+fn on_every_layout(
+    dir: &Path,
+    world: &World,
+    name: &str,
+    query: &SearchQuery,
+    want: &[String],
+) -> (Vec<SummaryPrint>, QueryStatus) {
+    let mut reference = None;
+    for layout_name in LAYOUTS {
+        let data = run(layout(dir, world, layout_name), query.clone());
+        assert_eq!(ids(&data), want, "{name} on {layout_name}");
+        assert!(
+            data.traces.iter().all(|t| t.exact),
+            "{name} on {layout_name}"
+        );
+        let got = norm(&data);
+        assert_eq!(got.1, QueryStatus::Complete, "{name} on {layout_name}");
+        match &reference {
+            None => reference = Some(got),
+            Some(r) => assert_eq!(&got, r, "{name} on {layout_name}: summaries"),
+        }
+    }
+    reference.expect("layouts")
+}
+
+/// Two positive tokens may match different spans of one trace (T1's
+/// root and its db child); the same conditions in ONE token need one
+/// span holding both. The rank is the older of the two tokens' newest
+/// matches.
+#[test]
+fn cross_span_and() {
+    let dir = tempfile::tempdir().unwrap();
+    let world = world(dir.path());
+    let split = SearchQuery::new(tokens(vec![
+        pos(vec![name_eq("GET /users")]),
+        pos(vec![span_attr_eq("db.system", "pg")]),
+    ]));
+    let (rows, _) = on_every_layout(dir.path(), &world, "split", &split, &[hex(1)]);
+    assert_eq!(
+        rows[0].7,
+        1_000 * NS as i64,
+        "min of the two newest matches"
+    );
+    let joined = SearchQuery::new(tokens(vec![pos(vec![
+        name_eq("GET /users"),
+        span_attr_eq("db.system", "pg"),
+    ])]));
+    on_every_layout(dir.path(), &world, "joined", &joined, &[]);
+}
+
+/// Tokens matched in different files (T3's early root, its late child)
+/// still AND: the trace assembles across sources. Its rank is the older
+/// match, so a trace whose newest match is recent can rank old.
+#[test]
+fn cross_file_and() {
+    let dir = tempfile::tempdir().unwrap();
+    let world = world(dir.path());
+    let query = SearchQuery::new(tokens(vec![
+        pos(vec![name_eq("GET /health")]),
+        pos(vec![name_eq("late-check")]),
+    ]));
+    let (rows, _) = on_every_layout(dir.path(), &world, "cross-file", &query, &[hex(3)]);
+    assert_eq!(rows[0].7, 900 * NS as i64);
+}
+
+/// A negated token is NOT EXISTS: no span of the trace matches its
+/// positive form — traces without the field pass. An in-token `!=`
+/// keeps its one-span meaning: the field present with another value.
+#[test]
+fn negated_token_is_not_exists() {
+    let dir = tempfile::tempdir().unwrap();
+    let world = world(dir.path());
+    let chip = SearchQuery::new(tokens(vec![neg(vec![span_attr_eq("http.method", "GET")])]));
+    on_every_layout(
+        dir.path(),
+        &world,
+        "not exists",
+        &chip,
+        &[hex(5), hex(6), hex(4), hex(2)],
+    );
+    let in_token = SearchQuery::new(tokens(vec![pos(vec![cond(
+        PredicateTarget::Attribute(AttributeOwner::Span, "http.method".into()),
+        CompareOp::NotEq,
+        vec![text("GET")],
+    )])]));
+    on_every_layout(dir.path(), &world, "in-token !=", &in_token, &[hex(2)]);
+}
+
+/// A negated token on a field no span carries excludes nothing.
+#[test]
+fn negated_absent_field_passes() {
+    let dir = tempfile::tempdir().unwrap();
+    let world = world(dir.path());
+    let query = SearchQuery::new(tokens(vec![neg(vec![span_attr_eq("nowhere", "x")])]));
+    on_every_layout(
+        dir.path(),
+        &world,
+        "absent",
+        &query,
+        &[hex(3), hex(5), hex(6), hex(4), hex(2), hex(1)],
+    );
+}
+
+/// A negated event token excludes the traces holding a matching event
+/// (an in-token negated event condition is not evaluable; the token
+/// form is).
+#[test]
+fn negated_event_token() {
+    let dir = tempfile::tempdir().unwrap();
+    let world = world(dir.path());
+    let exception = || {
+        builtin(
+            BuiltinField::EventName,
+            CompareOp::Eq,
+            vec![text("exception")],
+        )
+    };
+    let query = SearchQuery::new(tokens(vec![neg(vec![exception()])]));
+    on_every_layout(
+        dir.path(),
+        &world,
+        "no exception",
+        &query,
+        &[hex(3), hex(5), hex(6), hex(4), hex(1)],
+    );
+    let query = SearchQuery::new(tokens(vec![pos(vec![exception()])]));
+    on_every_layout(dir.path(), &world, "exception", &query, &[hex(2)]);
+}
+
+/// Negated trace-level and `trace_id` tokens: NOT on the trace's value.
+/// A positive root condition never holds without a true root, so a
+/// trace whose root was never exported passes the negated token.
+#[test]
+fn negated_trace_level_and_id_tokens() {
+    let dir = tempfile::tempdir().unwrap();
+    let world = world(dir.path());
+    let not_b = SearchQuery::new(tokens(vec![neg(vec![builtin(
+        BuiltinField::RootServiceName,
+        CompareOp::Eq,
+        vec![text("svc-b")],
+    )])]));
+    on_every_layout(
+        dir.path(),
+        &world,
+        "root not svc-b",
+        &not_b,
+        &[hex(3), hex(2), hex(1)],
+    );
+    let id = |n: u8| sfst::TraceId::from(tid(n)).to_string();
+    let not_t1 = SearchQuery::new(tokens(vec![neg(vec![builtin(
+        BuiltinField::TraceId,
+        CompareOp::Eq,
+        vec![text(&id(1)), text(&id(2))],
+    )])]));
+    on_every_layout(
+        dir.path(),
+        &world,
+        "not T1 or T2",
+        &not_t1,
+        &[hex(3), hex(5), hex(6), hex(4)],
+    );
+    // NOT (id ∉ {T4}) pins T4.
+    let only_t4 = SearchQuery::new(tokens(vec![neg(vec![builtin(
+        BuiltinField::TraceId,
+        CompareOp::NotEq,
+        vec![text(&id(4))],
+    )])]));
+    on_every_layout(dir.path(), &world, "pin T4", &only_t4, &[hex(4)]);
+
+    // A rootless trace (child spans only) passes a negated root token
+    // and fails the positive one.
+    let rootless = write_wal(
+        dir.path(),
+        vec![req_with(
+            vec![kv_str("service.name", "svc-r")],
+            None,
+            &[span_in(7, 0x72, 0x71, 1_000 * NS, "orphan")],
+        )],
+        "rootless",
+    );
+    let sources = || both_roles(|| vec![sealed_source(dir.path(), &rootless, "rootless")]);
+    let root = || {
+        vec![builtin(
+            BuiltinField::RootServiceName,
+            CompareOp::Eq,
+            vec![text("svc-r")],
+        )]
+    };
+    let data = run(sources(), SearchQuery::new(tokens(vec![neg(root())])));
+    assert_eq!(ids(&data), vec![hex(7)]);
+    let data = run(sources(), SearchQuery::new(tokens(vec![pos(root())])));
+    assert!(ids(&data).is_empty());
+}
+
+/// Whichever positive token drives discovery, the answer is the same.
+#[test]
+fn forced_driver_invariance() {
+    let dir = tempfile::tempdir().unwrap();
+    let world = world(dir.path());
+    let queries = [
+        (
+            tokens(vec![
+                pos(vec![name_eq("GET /users")]),
+                pos(vec![span_attr_eq("db.system", "pg")]),
+            ]),
+            vec![hex(1)],
+        ),
+        (
+            tokens(vec![
+                pos(vec![name_eq("GET /health")]),
+                pos(vec![name_eq("late-check")]),
+            ]),
+            vec![hex(3)],
+        ),
+        (
+            tokens(vec![
+                pos(vec![attr_eq(
+                    AttributeOwner::Resource,
+                    "service.name",
+                    "svc-b",
+                )]),
+                pos(vec![builtin(
+                    BuiltinField::Status,
+                    CompareOp::Eq,
+                    vec![text("ERROR")],
+                )]),
+                neg(vec![name_eq("fast-step")]),
+            ]),
+            vec![],
+        ),
+        (
+            tokens(vec![
+                pos(vec![cond(
+                    PredicateTarget::Attribute(AttributeOwner::Resource, "service.name".into()),
+                    CompareOp::Regex,
+                    vec![text("svc-.*")],
+                )]),
+                pos(vec![builtin(
+                    BuiltinField::Status,
+                    CompareOp::Regex,
+                    vec![text("OK|UNSET")],
+                )]),
+            ]),
+            vec![hex(3), hex(6), hex(4), hex(1)],
+        ),
+    ];
+    for (i, (query, want)) in queries.iter().enumerate() {
+        let auto = on_every_layout(
+            dir.path(),
+            &world,
+            &format!("query {i}"),
+            &SearchQuery::new(query.clone()),
+            want,
+        );
+        for driver in 0..2 {
+            let forced = on_every_layout(
+                dir.path(),
+                &world,
+                &format!("query {i}, driver {driver}"),
+                &SearchQuery::new(query.clone()).driver_for_tests(driver),
+                want,
+            );
+            assert_eq!(forced, auto, "query {i}, driver {driver}");
+        }
+    }
+}
+
+/// A flat predicate and the tokens it means give the same answer:
+/// span-local conditions as one token, trace-level and `trace_id`
+/// conditions as their own.
+#[test]
+fn single_token_equals_predicate() {
+    let dir = tempfile::tempdir().unwrap();
+    let world = world(dir.path());
+    let service_a = || attr_eq(AttributeOwner::Resource, "service.name", "svc-a");
+    let get = || span_attr_eq("http.method", "GET");
+    let root_a = || {
+        builtin(
+            BuiltinField::RootServiceName,
+            CompareOp::Eq,
+            vec![text("svc-a")],
+        )
+    };
+    let not_t1 = || {
+        builtin(
+            BuiltinField::TraceId,
+            CompareOp::NotEq,
+            vec![text(&sfst::TraceId::from(tid(1)).to_string())],
+        )
+    };
+    let cases = [
+        (
+            pred(vec![service_a(), get()]),
+            vec![pos(vec![service_a(), get()])],
+        ),
+        (
+            pred(vec![get(), root_a(), not_t1()]),
+            vec![pos(vec![get()]), pos(vec![root_a()]), pos(vec![not_t1()])],
+        ),
+        (pred(vec![root_a()]), vec![pos(vec![root_a()])]),
+    ];
+    for (i, (flat, explicit)) in cases.into_iter().enumerate() {
+        for layout_name in LAYOUTS {
+            let a = run(
+                layout(dir.path(), &world, layout_name),
+                SearchQuery::new(flat.clone()),
+            );
+            let b = run(
+                layout(dir.path(), &world, layout_name),
+                SearchQuery::new(tokens(explicit.clone())),
+            );
+            assert_eq!(norm(&a), norm(&b), "case {i} on {layout_name}");
+            assert!(!a.traces.is_empty(), "case {i} on {layout_name}");
+        }
+    }
+}
+
+/// A multi-token result pages as prefixes: every limit returns the
+/// first rows of the full answer (the ledger's cursor reruns the query
+/// with a larger limit and drops the served prefix).
+#[test]
+fn multi_token_cursor_partition() {
+    let dir = tempfile::tempdir().unwrap();
+    let world = world(dir.path());
+    let query = tokens(vec![
+        pos(vec![cond(
+            PredicateTarget::Attribute(AttributeOwner::Resource, "service.name".into()),
+            CompareOp::Regex,
+            vec![text("svc-.*")],
+        )]),
+        neg(vec![span_attr_eq("http.method", "GET")]),
+    ]);
+    for layout_name in LAYOUTS {
+        let full = run(
+            layout(dir.path(), &world, layout_name),
+            SearchQuery::new(query.clone()).limit(10),
+        );
+        assert_eq!(
+            ids(&full),
+            vec![hex(5), hex(6), hex(4), hex(2)],
+            "{layout_name}"
+        );
+        let full = norm(&full).0;
+        for limit in 1..=full.len() {
+            let page = run(
+                layout(dir.path(), &world, layout_name),
+                SearchQuery::new(query.clone()).limit(limit),
+            );
+            assert_eq!(norm(&page).0, full[..limit], "{layout_name}, limit {limit}");
+        }
+    }
+}
+
+/// Token queries stop at the work ceilings: the visited-rows ceiling
+/// (tails, compiles and emissions, the driver count included) and the
+/// dictionary-bytes ceiling of a free-text token's walks.
+#[test]
+fn token_ceilings_terminate() {
+    let dir = tempfile::tempdir().unwrap();
+    let world = world(dir.path());
+    let query = tokens(vec![
+        pos(vec![cond(
+            PredicateTarget::Attribute(AttributeOwner::Resource, "service.name".into()),
+            CompareOp::Regex,
+            vec![text("svc-.*")],
+        )]),
+        pos(vec![builtin(
+            BuiltinField::Status,
+            CompareOp::Regex,
+            vec![text("OK|UNSET")],
+        )]),
+    ]);
+    for layout_name in LAYOUTS {
+        let data = run(
+            layout(dir.path(), &world, layout_name),
+            SearchQuery::new(query.clone()).visited_rows_ceiling_for_tests(1),
+        );
+        assert_eq!(
+            data.status,
+            QueryStatus::Partial([PartialReason::WorkCeiling].into()),
+            "{layout_name}"
+        );
+    }
+    let text_query = tokens(vec![pos(vec![cond(
+        PredicateTarget::FreeText,
+        CompareOp::Contains,
+        vec![text("users")],
+    )])]);
+    let data = run(
+        layout(dir.path(), &world, "single-sealed"),
+        SearchQuery::new(text_query.clone()).dict_bytes_ceiling_for_tests(1),
+    );
+    assert_eq!(
+        data.status,
+        QueryStatus::Partial([PartialReason::WorkCeiling].into())
+    );
+    let data = run(
+        layout(dir.path(), &world, "single-sealed"),
+        SearchQuery::new(text_query),
+    );
+    assert_eq!(ids(&data), vec![hex(1)]);
+    assert_eq!(data.status, QueryStatus::Complete);
 }

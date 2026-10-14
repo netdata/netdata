@@ -1,26 +1,48 @@
 //! Cross-source trace search.
 //!
-//! [`search`] evaluates a span-local predicate (the positive stage-A
-//! subset of the [`Predicate`] grammar) over a validated pair of source
-//! sets and returns exact, most-recent-first trace summaries — exact up
-//! to the ruled root-divergence carve-out below — in a pinned two-phase
-//! design:
+//! [`search`] evaluates a [`TokenQuery`] (a flat
+//! [`Predicate`](super::Predicate) converts with its meaning kept) over
+//! a validated pair of source sets and returns exact, most-recent-first
+//! trace summaries — exact up to the ruled root-divergence carve-out
+//! below — in a pinned two-phase design:
 //!
-//! - **Phase 1 (over-approximation, window set):** each window file's
-//!   plan compiles once ([`sfst::TracePlan`]; the sfst trace_plan
-//!   module owns the execution, its one shared stream-batch pass for
-//!   high-card terms, and the work accounting) and yields RANK-BOUNDED
-//!   newest-K matched positions; tail spans evaluate decoded through
-//!   the same span-side evaluator phase 2 uses. Raw matches can
-//!   OVER-approximate (a losing resend may match while its canonical
-//!   copy does not) but NEVER under-approximate: a matching canonical
-//!   span raw-matches in its own file (pinned per-trace span-group
-//!   consequence).
+//! - **Phase 1 (over-approximation, window set):** candidates come from
+//!   ONE span-local token, the driver (below). Each window file's plan
+//!   compiles once ([`sfst::TracePlan`]; the sfst trace_plan module owns
+//!   the execution, its one shared stream-batch pass for high-card
+//!   terms, and the work accounting) and yields RANK-BOUNDED newest-K
+//!   matched positions; tail spans evaluate decoded through the same
+//!   span-side evaluator phase 2 uses. Raw matches can OVER-approximate
+//!   (a losing resend may match while its canonical copy does not) but
+//!   NEVER under-approximate: a matching canonical span raw-matches in
+//!   its own file (pinned per-trace span-group consequence).
 //! - **Phase 2 (exact assembly, completion set):** candidates assemble
 //!   through the shared combiner over ALL completion sources (sessions
-//!   opened once, reused for every candidate — the by-id pattern), the
-//!   span-local predicate re-evaluates against the retained CANONICAL
-//!   spans, and non-matching candidates drop.
+//!   opened once, reused for every candidate — the by-id pattern), every
+//!   token re-evaluates against the retained CANONICAL spans, and
+//!   non-matching candidates drop.
+//!
+//! # Tokens
+//!
+//! Tokens AND at trace level. A span-local token holds when some
+//! canonical span starting in the window satisfies its whole group (C-3
+//! within a token; different tokens may match different spans, in any
+//! files); a negated one when none does (NOT EXISTS — an in-token `!=`
+//! instead keeps presence ∩ complement on one span). Trace-level tokens
+//! test the assembled trace (below), negated ones its negation; `trace_id`
+//! tokens pin or exclude candidates.
+//!
+//! The driver is the positive span-local token with the fewest in-window
+//! matches in the window tails plus the newest window file (ties: the
+//! earlier token), fixed for the query; without one, the empty plan (C-4:
+//! every in-window span). Every answer has an in-window canonical span
+//! matching the driver, so any driver finds every answer.
+//!
+//! A trace's rank is the OLDEST of its positive span-local tokens' newest
+//! matching span starts (its newest in-window span without such a token):
+//! a trace is as recent as its least recent required match (decision 30).
+//! The driver's raw rank bounds it from above, so the C-1 refill below
+//! stays sound.
 //!
 //! Consumers (grep-verified): the ledger's otel-traces Search mode —
 //! the Functions view pages it beside an optional aggregate section
@@ -128,7 +150,7 @@ use sfst::{ScanWork, TraceId};
 
 use super::by_id::{DEFAULT_SPAN_CAP, LOADED_SOURCES_MAX};
 use super::gate::{GateDecision, TraceGate};
-use super::predicate::{EvalPredicate, Predicate, PredicateError, TraceLevelEval};
+use super::predicate::{EvalPredicate, LoweredTokens, PredicateError, TokenQuery};
 use super::sources::{SourceId, SourceSetError, TraceSource, validate_sources};
 use super::status::{PartialReason, QueryStatus, StatusBuilder};
 use super::vocab::{BuiltinField, span_field};
@@ -188,25 +210,32 @@ pub struct SearchSources {
 /// builder methods narrow or widen.
 #[derive(Debug, Clone)]
 pub struct SearchQuery {
-    predicate: Predicate,
+    tokens: TokenQuery,
     window: Option<TimeWindow>,
     limit: usize,
     visited_ceiling: u64,
+    dict_ceiling: u64,
     span_cap: usize,
     gate_enabled: bool,
     loaded_sources_cap: usize,
+    driver: Option<usize>,
 }
 
 impl SearchQuery {
-    pub fn new(predicate: Predicate) -> Self {
+    /// A search for `tokens` — a [`TokenQuery`], or a flat
+    /// [`Predicate`](super::Predicate) with its meaning kept
+    /// (`TokenQuery::from`).
+    pub fn new(tokens: impl Into<TokenQuery>) -> Self {
         Self {
-            predicate,
+            tokens: tokens.into(),
             window: None,
             limit: DEFAULT_SEARCH_LIMIT,
             visited_ceiling: VISITED_ROWS_CEILING,
+            dict_ceiling: DICT_BYTES_CEILING,
             span_cap: DEFAULT_SPAN_CAP,
             gate_enabled: true,
             loaded_sources_cap: LOADED_SOURCES_MAX,
+            driver: None,
         }
     }
 
@@ -233,6 +262,23 @@ impl SearchQuery {
     #[doc(hidden)]
     pub fn visited_rows_ceiling_for_tests(mut self, ceiling: u64) -> Self {
         self.visited_ceiling = ceiling;
+        self
+    }
+
+    /// Test-only override of the dictionary-bytes work ceiling. NOT a
+    /// tuning surface; production uses [`DICT_BYTES_CEILING`].
+    #[doc(hidden)]
+    pub fn dict_bytes_ceiling_for_tests(mut self, ceiling: u64) -> Self {
+        self.dict_ceiling = ceiling;
+        self
+    }
+
+    /// Test-only choice of the discovery driver: the index among the
+    /// positive span-local tokens (in token order; must exist), so a test
+    /// proves the driver never changes a result. NOT a tuning surface.
+    #[doc(hidden)]
+    pub fn driver_for_tests(mut self, positive_span_token: usize) -> Self {
+        self.driver = Some(positive_span_token);
         self
     }
 
@@ -309,11 +355,13 @@ pub struct TraceSummary {
     pub root_name: Option<String>,
     /// Envelope start: the earliest retained canonical span start.
     pub start_ns: i64,
-    /// The trace's RANK key: the newest canonical matched-span start —
-    /// what the most-recent-first ordering sorts by, and what a
-    /// consumer paging by rank MUST anchor on (the ledger's search
-    /// cursor carries exactly this pair). Never the envelope
-    /// `start_ns`, which can be much older.
+    /// The trace's RANK key: the oldest of the positive span-local
+    /// tokens' newest canonical matched-span starts (with one such token,
+    /// its newest match; without one, the newest in-window span) — what
+    /// the most-recent-first ordering sorts by, and what a consumer
+    /// paging by rank MUST anchor on (the ledger's search cursor carries
+    /// exactly this pair). Never the envelope `start_ns`, which can be
+    /// much older.
     pub newest_matched_start_ns: i64,
     /// Envelope duration: `max(start ⊕ duration) − min(start)`,
     /// SATURATING (ingest saturates pathological durations).
@@ -528,8 +576,7 @@ pub fn search(
     if query.limit == 0 {
         return Err(SearchRequestError::ZeroLimit);
     }
-    query.predicate.validate()?;
-    query.predicate.ensure_evaluable()?;
+    query.tokens.validate()?;
     validate_sources(&sources.window)?;
     validate_sources(&sources.completion)?;
     let completion_ids: HashSet<&SourceId> = sources
@@ -545,16 +592,25 @@ pub fn search(
         }
     }
 
-    // `trace:id` conditions split out FIRST (they constrain the
-    // candidate set, not the spans); the R3-2 partition applies to the
-    // remainder. A trace-level-only predicate leaves the span-local
-    // half empty — phase-1 candidates come from `All` over the window
-    // (pin C-4) via the empty plan.
-    let (remainder, trace_ids) = query.predicate.split_trace_id_conditions();
-    let (span_local, trace_level) = remainder.partition();
-    let plan = span_local.to_trace_plan();
-    let eval = EvalPredicate::new(&plan);
-    let trace_level_eval = (!trace_level.is_all()).then(|| TraceLevelEval::new(&trace_level));
+    // One lowering per token: span-local tokens to plan + evaluator,
+    // trace-level tokens to evaluators, `trace_id` tokens to candidate
+    // constraints (they constrain the candidate set, not the spans).
+    // Without a positive span-local token, phase-1 candidates come from
+    // `All` over the window (pin C-4) via the empty plan.
+    let mut lowered = LoweredTokens::new(&query.tokens);
+    if let Some(d) = query.driver {
+        assert!(
+            d < lowered.positive.len(),
+            "driver_for_tests names a positive span-local token"
+        );
+    }
+    let trace_ids = std::mem::take(&mut lowered.trace_ids);
+    let positive_plans: Vec<sfst::TracePlan> =
+        lowered.positive.iter().map(|t| t.plan.clone()).collect();
+    let match_all = (
+        sfst::TracePlan::default(),
+        EvalPredicate::new(&sfst::TracePlan::default()),
+    );
 
     let mut status = StatusBuilder::new();
     let mut work = ScanWork::default();
@@ -655,9 +711,6 @@ pub fn search(
     // unbounded.
     let mut truncated_up_to: Option<i64> = None; // exclusive ns bound
     let mut truncated_unbounded = false;
-    let merge_bound = |acc: &mut Option<i64>, bound: i64| {
-        *acc = Some(acc.map_or(bound, |b| b.max(bound)));
-    };
     let mut files: Vec<FileDiscovery> = Vec::new();
     let mut pool = CandidatePool::new(trace_ids.excluded);
     // `trace:id =` PINS the candidate set: discovery is skipped whole —
@@ -714,6 +767,95 @@ pub fn search(
             id(a).cmp(id(b))
         })
     });
+
+    // Extensions are clamped to the remaining budget (+1 so the breach
+    // registers) — emission itself must not overshoot. A ceiling breach
+    // leaves files unexhausted or uncompiled, which the main loop's
+    // undiscovered-threat check sees on its own.
+    let clamp = |count: usize, work: &ScanWork, ceiling: u64| -> usize {
+        let remaining = ceiling.saturating_sub(work.rows_visited).saturating_add(1);
+        count.min(usize::try_from(remaining).unwrap_or(usize::MAX))
+    };
+    // Per-file over-collection: a file compiled late extends at the
+    // current K.
+    let mut k = query.limit.saturating_mul(OVER_COLLECTION_FACTOR).max(1);
+    // Every read of a session — plan compile, gate evidence, merge —
+    // reports to one tracker, which keeps the limit across the query.
+    let mut loaded = sfst::LoadedSources::new(query.loaded_sources_cap);
+    // Either work ceiling breached: discovery stops (a compile cut short
+    // by dictionary bytes leaves a threat only this check resolves).
+    let breached = |work: &ScanWork| {
+        work.rows_visited > query.visited_ceiling || work.dict_bytes > query.dict_ceiling
+    };
+
+    // ── The driver: the positive span-local token whose matches seed
+    // discovery; phase 2 checks the others. Any positive token's
+    // in-window matches cover every answer, so the driver never changes
+    // a result, only how many candidates assemble. Fixed once per query
+    // (a per-file choice would miss a trace whose tokens match in
+    // different files): the token with the fewest in-window matches in
+    // the window tails plus the newest window file, which compiles every
+    // positive token for the count; ties go to the earlier token. ─────
+    let mut driver = query.driver.unwrap_or(0);
+    if query.driver.is_none() && lowered.positive.len() > 1 && !pinned {
+        let mut counts = vec![0u64; lowered.positive.len()];
+        'count: for (source_id, scan) in &tails {
+            if !window_ids.contains(source_id) {
+                continue;
+            }
+            for (trace_id, span) in scan.spans_with_ids() {
+                work.rows_visited += 1;
+                if work.rows_visited > query.visited_ceiling {
+                    break 'count;
+                }
+                if trace_id.is_unset() {
+                    continue;
+                }
+                for (count, token) in counts.iter_mut().zip(&lowered.positive) {
+                    if token.eval.matches(span, query.window) {
+                        *count += 1;
+                    }
+                }
+            }
+        }
+        let mut newest = None;
+        if !breached(&work)
+            && let Some(next) = pending.pop_front()
+        {
+            newest = compile_pending(
+                next,
+                &positive_plans,
+                &query,
+                &mut sessions,
+                &slot_sources,
+                &mut loaded,
+                &mut work,
+                &mut status,
+                &mut degraded_assembly,
+                &mut truncated_up_to,
+            );
+            if let Some(found) = &newest {
+                for (count, compiled) in counts.iter_mut().zip(&found.compiled) {
+                    *count += compiled.count_in_range(found.lo, found.hi);
+                }
+            }
+        }
+        driver = (0..counts.len())
+            .min_by_key(|&i| (counts[i], i))
+            .expect("two or more positive tokens");
+        if let Some(found) = newest {
+            let mut file = found.into_file(driver);
+            file.extend(clamp(k, &work, query.visited_ceiling), &mut work, &mut pool);
+            if !file.exhausted() {
+                files.push(file);
+            }
+        }
+    }
+    let (driver_plan, driver_eval) = match lowered.positive.get(driver) {
+        Some(token) => (&token.plan, &token.eval),
+        None => (&match_all.0, &match_all.1),
+    };
+
     'tails: for (source_id, scan) in &tails {
         if pinned {
             break;
@@ -739,23 +881,11 @@ pub fn search(
                 truncated_unbounded = true;
                 break 'tails;
             }
-            if !trace_id.is_unset() && eval.matches(span, query.window) {
+            if !trace_id.is_unset() && driver_eval.matches(span, query.window) {
                 pool.add(trace_id, span.start_ns);
             }
         }
     }
-
-    // Extensions are clamped to the remaining budget (+1 so the breach
-    // registers) — emission itself must not overshoot. A ceiling breach
-    // leaves files unexhausted or uncompiled, which the main loop's
-    // undiscovered-threat check sees on its own.
-    let clamp = |count: usize, work: &ScanWork, ceiling: u64| -> usize {
-        let remaining = ceiling.saturating_sub(work.rows_visited).saturating_add(1);
-        count.min(usize::try_from(remaining).unwrap_or(usize::MAX))
-    };
-    // Per-file over-collection: a file compiled late extends at the
-    // current K.
-    let mut k = query.limit.saturating_mul(OVER_COLLECTION_FACTOR).max(1);
 
     // ── The trace-level pre-assembly gate (see the gate module) ──────
     // Engaged only when a prunable trace-level condition exists, the
@@ -766,7 +896,7 @@ pub fn search(
     // so there is nothing left to prune toward). Tail provenance is
     // collected EAGERLY here — ids only, before `merged` takes its
     // `&mut` tail borrows.
-    let mut gate = match &trace_level_eval {
+    let mut gate = match &lowered.trace_level {
         Some(tl)
             if query.gate_enabled
                 && tl.has_prunable_condition()
@@ -807,9 +937,6 @@ pub fn search(
     let mut final_ranks: BTreeSet<(std::cmp::Reverse<i64>, TraceId)> = BTreeSet::new();
 
     // ── The examine / grow-K loop (C-1 + R2-1) ───────────────────────
-    // Every read of a session — plan compile, gate evidence, merge —
-    // reports to one tracker, which keeps the limit across the query.
-    let mut loaded = sfst::LoadedSources::new(query.loaded_sources_cap);
     loop {
         if cancel.is_cancelled() {
             return Ok(cancelled_empty(status));
@@ -875,7 +1002,7 @@ pub fn search(
             .filter_map(FileDiscovery::undiscovered_bound)
             .max();
         let compile_next = pending_threat
-            && work.rows_visited <= query.visited_ceiling
+            && !breached(&work)
             && pending
                 .front()
                 .is_some_and(|next| compiled_bound.is_none_or(|b| next.rank_bound > b));
@@ -962,15 +1089,11 @@ pub fn search(
             }
             let trace = outcome.trace;
             // Phase-2 re-evaluation against the CANONICAL spans: the
-            // over-approximation drop point. Spans are in combiner total
-            // order (ascending start), so the last matching span is the
-            // newest matched one — the rank.
-            let newest = trace
-                .spans
-                .iter()
-                .rposition(|span| eval.matches(span, query.window));
-            if let Some(newest) = newest {
-                let rank = (trace.spans[newest].start_ns, trace_id);
+            // over-approximation drop point, every span-local token
+            // checked (spans are in combiner total order, ascending
+            // start, which the rank reads).
+            if let Some(rank_ns) = lowered.span_rank(&trace.spans, query.window) {
+                let rank = (rank_ns, trace_id);
                 let summary = summarize(
                     trace_id,
                     &trace,
@@ -988,12 +1111,12 @@ pub fn search(
                 // whose root span was never exported has NO root as far
                 // as filters are concerned; the summary's promoted root
                 // is display.
-                if let Some(tl) = &trace_level_eval {
+                if lowered.has_trace_level() {
                     if !summary.exact {
                         continue; // indeterminate → excluded
                     }
                     let (true_root_name, true_root_service) = true_root_fields(&trace);
-                    if !tl.matches(
+                    if !lowered.trace_level_matches(
                         true_root_name.as_deref(),
                         true_root_service.as_deref(),
                         summary.duration_ns,
@@ -1008,67 +1131,36 @@ pub fn search(
         }
 
         // Pool drained of threats but undiscovered candidates remain.
-        // The visited-rows ceiling gates refill: once breached, no
+        // The work ceilings gate refill: once either is breached, no
         // further discovery runs and the standing threat makes the
         // result Partial{WorkCeiling}, deterministically.
-        if work.rows_visited > query.visited_ceiling {
+        if breached(&work) {
             status.add(PartialReason::WorkCeiling);
             break;
         }
         if compile_next {
-            let PendingFile { slot, rank_bound } = pending.pop_front().expect("peeked");
+            let next = pending.pop_front().expect("peeked");
             if cancel.is_cancelled() {
                 return Ok(cancelled_empty(status));
             }
-            let source = slot_sources[slot];
-            let reader = match sessions[slot].reader() {
-                Ok(reader) => reader,
-                Err(e) => {
-                    // The file cannot open fully: its candidates stay
-                    // undiscovered, and an assembly that needs its rows
-                    // fails there too.
-                    tracing::warn!(
-                        "sfsq traces: source {} failed to open: {e}",
-                        source.source_id()
-                    );
-                    status.add(PartialReason::SourceFailure);
-                    degraded_assembly = true;
-                    continue;
-                }
-            };
-            let mut budget_truncated = false;
-            let limits = sfst::ScanLimits {
-                rows: query.visited_ceiling,
-                dict_bytes: DICT_BYTES_CEILING,
-            };
-            let discovered = discovery_state(
-                reader,
-                &plan,
-                query.window,
-                limits,
+            let found = compile_pending(
+                next,
+                std::slice::from_ref(driver_plan),
+                &query,
+                &mut sessions,
+                &slot_sources,
+                &mut loaded,
                 &mut work,
-                &mut budget_truncated,
+                &mut status,
+                &mut degraded_assembly,
+                &mut truncated_up_to,
             );
-            loaded.touch(slot, &mut sessions);
-            match discovered {
-                Ok(Some(mut file)) => {
-                    let count = clamp(k, &work, query.visited_ceiling);
-                    file.extend(count, &mut work, &mut pool);
-                    if !file.exhausted() {
-                        files.push(file);
-                    }
-                }
-                Ok(None) => {
-                    if budget_truncated {
-                        merge_bound(&mut truncated_up_to, rank_bound);
-                    }
-                }
-                Err(e) => {
-                    tracing::warn!(
-                        "sfsq traces: source {} failed phase-1 compilation: {e}",
-                        source.source_id()
-                    );
-                    status.add(PartialReason::SourceFailure);
+            if let Some(found) = found {
+                let mut file = found.into_file(0);
+                let count = clamp(k, &work, query.visited_ceiling);
+                file.extend(count, &mut work, &mut pool);
+                if !file.exhausted() {
+                    files.push(file);
                 }
             }
             continue;
@@ -1106,22 +1198,111 @@ pub fn search(
     })
 }
 
-/// Build one window file's phase-1 state: resolve the window's position
-/// range, decode the candidate-mapping columns once (owned, so grow-K
-/// rounds touch no reader), and compile the plan against that range
-/// (work counted, budget-bounded). `Ok(None)` = the window range is
-/// empty in this file, OR a work ceiling ran out mid-compilation —
-/// the latter sets `truncated` so the engine records the file's rank
-/// bound as a standing threat instead of claiming completeness over
-/// data it could not afford to scan.
+/// One window file's phase-1 columns with its compiled plans.
+struct Discovered {
+    compiled: Vec<sfst::CompiledTracePlan>,
+    trace_ids: sfst::TraceIds,
+    timestamps: sfst::Timestamps,
+    /// The window's position range in the file.
+    lo: u32,
+    hi: u32,
+}
+
+impl Discovered {
+    /// The file's discovery state, driven by compiled plan `driver`.
+    fn into_file(mut self, driver: usize) -> FileDiscovery {
+        FileDiscovery {
+            compiled: self.compiled.swap_remove(driver),
+            trace_ids: self.trace_ids,
+            timestamps: self.timestamps,
+            lo: self.lo,
+            band_bottom: self.hi,
+        }
+    }
+}
+
+/// Compile `plans` against one pending window file over the query
+/// window, its session opening fully first (the read reports to
+/// `loaded`). A file that cannot open is a source failure that degrades
+/// every assembly (an assembly needing its rows fails there too); one
+/// that fails to compile is a source failure; one a work ceiling cut
+/// short leaves its rank bound in `truncated_up_to` as a standing threat
+/// instead of claiming completeness over data it could not afford to
+/// scan. `None` in those cases and when the window misses the file's
+/// rows.
+#[allow(clippy::too_many_arguments)]
+fn compile_pending(
+    file: PendingFile,
+    plans: &[sfst::TracePlan],
+    query: &SearchQuery,
+    sessions: &mut [sfst::TraceFileSession<'_, '_>],
+    slot_sources: &[&TraceSource],
+    loaded: &mut sfst::LoadedSources,
+    work: &mut ScanWork,
+    status: &mut StatusBuilder,
+    degraded_assembly: &mut bool,
+    truncated_up_to: &mut Option<i64>,
+) -> Option<Discovered> {
+    let PendingFile { slot, rank_bound } = file;
+    let source = slot_sources[slot];
+    let reader = match sessions[slot].reader() {
+        Ok(reader) => reader,
+        Err(e) => {
+            tracing::warn!(
+                "sfsq traces: source {} failed to open: {e}",
+                source.source_id()
+            );
+            status.add(PartialReason::SourceFailure);
+            *degraded_assembly = true;
+            return None;
+        }
+    };
+    let limits = sfst::ScanLimits {
+        rows: query.visited_ceiling,
+        dict_bytes: query.dict_ceiling,
+    };
+    let mut budget_truncated = false;
+    let discovered = discovery_state(
+        reader,
+        plans,
+        query.window,
+        limits,
+        work,
+        &mut budget_truncated,
+    );
+    loaded.touch(slot, sessions);
+    match discovered {
+        Ok(found) => {
+            if budget_truncated {
+                *truncated_up_to = Some(truncated_up_to.map_or(rank_bound, |b| b.max(rank_bound)));
+            }
+            found
+        }
+        Err(e) => {
+            tracing::warn!(
+                "sfsq traces: source {} failed phase-1 compilation: {e}",
+                source.source_id()
+            );
+            status.add(PartialReason::SourceFailure);
+            None
+        }
+    }
+}
+
+/// Resolve the window's position range in one file, decode the
+/// candidate-mapping columns once (owned, so grow-K rounds touch no
+/// reader), and compile `plans` against that range together (work
+/// counted, budget-bounded). `Ok(None)` = the window range is empty in
+/// this file, OR a work ceiling ran out mid-compilation — the latter
+/// sets `truncated`.
 fn discovery_state(
     reader: &sfst::IndexReader<'_>,
-    plan: &sfst::TracePlan,
+    plans: &[sfst::TracePlan],
     window: Option<TimeWindow>,
     limits: sfst::ScanLimits,
     work: &mut ScanWork,
     truncated: &mut bool,
-) -> Result<Option<FileDiscovery>, sfst::Error> {
+) -> Result<Option<Discovered>, sfst::Error> {
     let total = reader.summary().record_count;
     let timestamps = reader.load_timestamps()?;
     let (lo, hi) = match window {
@@ -1139,16 +1320,16 @@ fn discovery_state(
             timestamps.len(),
         )));
     }
-    let Some(compiled) = reader.compile_trace_plan(plan, (lo, hi), limits, work)? else {
+    let Some(compiled) = reader.compile_trace_plans(plans, (lo, hi), limits, work)? else {
         *truncated = true;
         return Ok(None);
     };
-    Ok(Some(FileDiscovery {
+    Ok(Some(Discovered {
         compiled,
         trace_ids,
         timestamps,
         lo,
-        band_bottom: hi,
+        hi,
     }))
 }
 
