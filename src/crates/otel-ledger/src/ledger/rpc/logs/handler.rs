@@ -33,7 +33,7 @@ use super::wire::{
     CatalogFileEntry, FilesResponse, InfoResponse, OtelLogsRequest, OtelLogsResponse,
     SfstFileEntry, StreamId, TenantFiles, WalFileEntry,
 };
-use file_lifecycle::chunk::ChunkCache;
+use file_lifecycle::chunk::{BuiltChunk, ChunkCache};
 use file_lifecycle::registry::{TenantRegistries, WalDesc};
 use wal::prefix::{chunk_boundaries, tail_start};
 use wal::registry::FileStatus;
@@ -232,7 +232,10 @@ impl OtelLogsHandler {
                                 summary.record_count
                             ))
                         } else {
-                            Ok(Arc::new(bytes))
+                            Ok(Arc::new(BuiltChunk {
+                                summary,
+                                bytes: Arc::new(bytes),
+                            }))
                         }
                     }
                     Ok(Err(e)) => Err(format!("build_sfst_range: {e}")),
@@ -241,27 +244,14 @@ impl OtelLogsHandler {
             };
 
             match self.chunk_cache.get_or_build(seq, chunk.index, init).await {
-                Ok(bytes) => match sfst::IndexReader::open(&bytes[..]) {
-                    Ok(reader) => candidates.push(SfstCandidate {
-                        summary: reader.summary().clone(),
-                        file_seq: seq,
-                        // Chunks and the tail of one WAL share `seq`;
-                        // the chunk index disambiguates them in the
-                        // cursor order.
-                        part: sfsq::logs::Part::Indexed(chunk.index),
-                        source: Source::Memory(bytes),
-                    }),
-                    // Unexpected — the bytes were just built. Same
-                    // policy: refuse the whole WAL (see above).
-                    Err(e) => {
-                        tracing::warn!(
-                            seq,
-                            index = chunk.index,
-                            "chunk parse failed; refusing to query this WAL: {e}"
-                        );
-                        return (Vec::new(), Vec::new());
-                    }
-                },
+                Ok(built) => candidates.push(SfstCandidate {
+                    summary: built.summary.clone(),
+                    file_seq: seq,
+                    // Chunks and the tail of one WAL share `seq`; the
+                    // chunk index disambiguates them in the cursor order.
+                    part: sfsq::logs::Part::Indexed(chunk.index),
+                    source: Source::Memory(Arc::clone(&built.bytes)),
+                }),
                 // Build failure (decode error, count mismatch, panic):
                 // refuse the whole WAL — see the failure policy above.
                 Err(e) => {

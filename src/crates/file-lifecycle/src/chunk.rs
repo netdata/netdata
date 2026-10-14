@@ -13,8 +13,9 @@
 //! record count cross-checked against the scan's `entry_count`. This
 //! module owns the memoization:
 //!
-//! - [`ChunkCache`] — a process-wide memo of built chunk SFST byte
-//!   images, keyed `(wal_seq, chunk_index)`, with build singleflight and
+//! - [`ChunkCache`] — a process-wide memo of built chunks
+//!   ([`BuiltChunk`]: the SFST byte image and its summary), keyed
+//!   `(wal_seq, chunk_index)`, with build singleflight and
 //!   a byte-budget LRU (both from `moka`). Concurrent queries that need
 //!   the same chunk build it once; a chunk, once built, is reused until
 //!   the WAL rotates ([`ChunkCache::drop_seq`]) or the budget evicts it.
@@ -49,10 +50,18 @@ use std::sync::Mutex;
 
 use moka::future::Cache;
 
-/// A process-wide memo of built chunk SFST byte images, keyed
-/// `(wal_seq, chunk_index)` — see `ChunkKey`.
+/// One built chunk: the self-contained SFST byte image and the summary
+/// its builder produced. Keeping the summary beside the bytes spares a
+/// query re-opening the image just to read it back.
+pub struct BuiltChunk {
+    pub summary: sfst::Summary,
+    pub bytes: Arc<Vec<u8>>,
+}
+
+/// A process-wide memo of built chunks, keyed `(wal_seq, chunk_index)` —
+/// see `ChunkKey`.
 ///
-/// Values are `Arc<Vec<u8>>` — a self-contained SFST parseable by
+/// Values are [`BuiltChunk`]s; their bytes are an SFST parseable by
 /// [`sfst::IndexReader::open`]. The cache validates nothing itself; the
 /// guarantee a hit makes is the builder's. Production builders
 /// (otel-ledger's query handlers, on a blocking thread) build the chunk
@@ -66,7 +75,7 @@ use moka::future::Cache;
 /// pipeline's query handlers and the indexer-response path (see the
 /// module consumers).
 pub struct ChunkCache {
-    cache: Cache<ChunkKey, Arc<Vec<u8>>>,
+    cache: Cache<ChunkKey, Arc<BuiltChunk>>,
     /// `wal_seq -> number of chunk indices ever built for it`, so
     /// [`drop_seq`](Self::drop_seq) can invalidate each key by hand
     /// (per-key `invalidate` is immediately consistent; moka's
@@ -105,7 +114,9 @@ impl ChunkCache {
         debug_assert!(max_bytes > 0, "ChunkCache budget must be positive");
         let cache = Cache::builder()
             .max_capacity(max_bytes)
-            .weigher(|_k: &ChunkKey, v: &Arc<Vec<u8>>| v.len().min(u32::MAX as usize) as u32)
+            .weigher(|_k: &ChunkKey, v: &Arc<BuiltChunk>| {
+                v.bytes.len().min(u32::MAX as usize) as u32
+            })
             .build();
         Self {
             cache,
@@ -113,7 +124,7 @@ impl ChunkCache {
         }
     }
 
-    /// Return chunk `(wal_seq, chunk_index)`'s bytes, building them with
+    /// Return chunk `(wal_seq, chunk_index)`, building it with
     /// `init` only if absent; on a hit `init` never runs. Under
     /// contention for the same key exactly one `init` runs and the rest
     /// await its result (moka's `try_get_with` singleflight). A build
@@ -125,8 +136,8 @@ impl ChunkCache {
         &self,
         wal_seq: u64,
         chunk_index: u32,
-        init: impl Future<Output = Result<Arc<Vec<u8>>, E>>,
-    ) -> Result<Arc<Vec<u8>>, Arc<E>>
+        init: impl Future<Output = Result<Arc<BuiltChunk>, E>>,
+    ) -> Result<Arc<BuiltChunk>, Arc<E>>
     where
         E: Send + Sync + 'static,
     {
@@ -134,7 +145,7 @@ impl ChunkCache {
             wal_seq,
             chunk_index,
         };
-        let bytes = self.cache.try_get_with(key, init).await?;
+        let chunk = self.cache.try_get_with(key, init).await?;
         // Record the index so drop_seq can find the seq's keys later.
         // Idempotent: a cache hit re-records the same max.
         //
@@ -155,7 +166,7 @@ impl ChunkCache {
             let n = built.entry(wal_seq).or_insert(0);
             *n = (*n).max(chunk_index + 1);
         }
-        Ok(bytes)
+        Ok(chunk)
     }
 
     /// Drop every chunk of `wal_seq` — called by the indexer-response

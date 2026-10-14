@@ -18,7 +18,7 @@
 //! (`rpc/logs/handler.rs::resolve_wal`): descriptors captured under ONE
 //! brief registry read lock (one `valid_up_to` per WAL — the whole
 //! query sees one consistent durable prefix), and the logs failure
-//! policy: a WAL whose chunks won't build/parse is refused WHOLE for
+//! policy: a WAL whose chunks won't build is refused WHOLE for
 //! this snapshot (logged; its data returns via the sealed SFST after
 //! rotation, or on a later query — build errors aren't cached).
 //!
@@ -43,7 +43,7 @@ use std::sync::Arc;
 
 use bridge::function::ProgressState;
 use file_cache::CacheError;
-use file_lifecycle::chunk::ChunkCache;
+use file_lifecycle::chunk::{BuiltChunk, ChunkCache};
 use file_lifecycle::query::{CatalogFile, RemotePlan};
 use file_lifecycle::registry::{TenantRegistries, WalDesc};
 use file_lifecycle::remote_read::RemoteRead;
@@ -471,7 +471,10 @@ impl TracesSourceSupplier {
                                 summary.record_count
                             ))
                         } else {
-                            Ok(Arc::new(bytes))
+                            Ok(Arc::new(BuiltChunk {
+                                summary,
+                                bytes: Arc::new(bytes),
+                            }))
                         }
                     }
                     Ok(Err(e)) => Err(format!("build_sfst_traces_range: {e}")),
@@ -479,22 +482,12 @@ impl TracesSourceSupplier {
                 }
             };
             match self.chunk_cache.get_or_build(seq, chunk.index, init).await {
-                Ok(bytes) => match sfst::IndexReader::open(&bytes[..]) {
-                    Ok(reader) => chunks.push(ResolvedChunk {
-                        index: chunk.index,
-                        range: chunk.range,
-                        summary: reader.summary().clone(),
-                        bytes,
-                    }),
-                    Err(e) => {
-                        tracing::warn!(
-                            seq,
-                            index = chunk.index,
-                            "traces chunk parse failed; refusing this WAL: {e}"
-                        );
-                        return None;
-                    }
-                },
+                Ok(built) => chunks.push(ResolvedChunk {
+                    index: chunk.index,
+                    range: chunk.range,
+                    summary: built.summary.clone(),
+                    bytes: Arc::clone(&built.bytes),
+                }),
                 Err(e) => {
                     tracing::warn!(
                         seq,

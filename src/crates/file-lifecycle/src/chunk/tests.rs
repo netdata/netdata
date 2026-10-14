@@ -20,7 +20,7 @@ use std::sync::Arc;
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::time::Duration;
 
-use super::ChunkCache;
+use super::{BuiltChunk, ChunkCache};
 
 // ── ChunkCache (async, fake builder) ──────────────────────────────
 
@@ -35,11 +35,19 @@ struct BuildErr;
 fn counting_build(
     counter: Arc<AtomicUsize>,
     bytes: Vec<u8>,
-) -> impl std::future::Future<Output = Result<Arc<Vec<u8>>, BuildErr>> {
+) -> impl std::future::Future<Output = Result<Arc<BuiltChunk>, BuildErr>> {
     async move {
         counter.fetch_add(1, Ordering::SeqCst);
         tokio::time::sleep(Duration::from_millis(20)).await;
-        Ok::<Arc<Vec<u8>>, BuildErr>(Arc::new(bytes))
+        Ok::<Arc<BuiltChunk>, BuildErr>(Arc::new(BuiltChunk {
+            summary: sfst::Summary {
+                min_timestamp_s: 0,
+                max_timestamp_s: 0,
+                record_count: bytes.len() as u32,
+                content_meta: Vec::new(),
+            },
+            bytes: Arc::new(bytes),
+        }))
     }
 }
 
@@ -67,8 +75,8 @@ async fn concurrent_requests_build_a_chunk_once() {
         }));
     }
     for h in handles {
-        let bytes = h.await.unwrap().unwrap();
-        assert_eq!(*bytes, vec![1, 2, 3]);
+        let chunk = h.await.unwrap().unwrap();
+        assert_eq!(*chunk.bytes, vec![1, 2, 3]);
     }
     assert_eq!(builds.load(Ordering::SeqCst), 1, "singleflight: one build");
 }
@@ -96,12 +104,12 @@ async fn distinct_keys_build_independently() {
     // A repeat of an existing key is served from cache — the fresh
     // builder (different bytes) never runs and the original image is
     // returned.
-    let bytes = cache
+    let chunk = cache
         .get_or_build(7, 0, counting_build(builds.clone(), vec![9]))
         .await
         .unwrap();
     assert_eq!(builds.load(Ordering::SeqCst), 3, "cache hit, no rebuild");
-    assert_eq!(*bytes, vec![0], "served the originally built bytes");
+    assert_eq!(*chunk.bytes, vec![0], "served the originally built bytes");
 }
 
 #[tokio::test]
@@ -111,7 +119,7 @@ async fn build_errors_are_not_cached() {
 
     let failing = |attempts: Arc<AtomicUsize>| async move {
         attempts.fetch_add(1, Ordering::SeqCst);
-        Err::<Arc<Vec<u8>>, BuildErr>(BuildErr)
+        Err::<Arc<BuiltChunk>, BuildErr>(BuildErr)
     };
 
     let r1 = cache.get_or_build(7, 0, failing(attempts.clone())).await;
@@ -128,7 +136,7 @@ async fn build_errors_are_not_cached() {
         .get_or_build(7, 0, counting_build(builds.clone(), vec![5]))
         .await
         .unwrap();
-    assert_eq!(*ok, vec![5]);
+    assert_eq!(*ok.bytes, vec![5]);
 }
 
 #[tokio::test]

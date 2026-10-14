@@ -616,7 +616,7 @@ async fn too_large_fails_before_any_download_or_chunk_build() {
     let probe = supplier
         .chunk_cache
         .get_or_build(test_file_id(9).seq, 0, async {
-            Err::<Arc<Vec<u8>>, &str>("not built")
+            Err::<Arc<file_lifecycle::chunk::BuiltChunk>, &str>("not built")
         })
         .await;
     assert!(probe.is_err(), "no chunk was built");
