@@ -66,6 +66,11 @@ pub enum PartialReason {
     /// [`SourceFailure`](Self::SourceFailure), which reports bytes that
     /// were available but could not be read.
     RemoteUnavailable,
+    /// The response reached its byte budget: what it carries is a
+    /// complete, valid prefix (for a trace, its earliest spans), and the
+    /// rest is left out. Raised by the ledger when it shapes a response,
+    /// never by an engine operation.
+    ByteBudget,
     /// The request was refused before any work: too many requests of its
     /// kind were already running. The result is empty, not wrong; the
     /// caller retries. Raised by the ledger's admission control, never

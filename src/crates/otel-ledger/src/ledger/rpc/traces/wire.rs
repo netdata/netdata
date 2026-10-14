@@ -731,6 +731,11 @@ pub struct TraceSummaryWire {
     /// completion range (see [`SearchResult`]): spans in files beyond it
     /// are unknown loss the flag cannot see.
     pub exact: bool,
+    /// Present (`true`) only when `root_service`, `root_name` or a
+    /// breakdown value was cut to the per-value cap (the adapter's
+    /// `LIST_VALUE_MAX_BYTES`, at a character boundary).
+    #[serde(skip_serializing_if = "std::ops::Not::not")]
+    pub truncated: bool,
 }
 
 /// One returned trace's spans by resource `service.name`, over the same
@@ -826,6 +831,12 @@ pub struct SpanWire {
     pub fields: Vec<(String, String)>,
     pub events: Vec<EventWire>,
     pub links: Vec<LinkWire>,
+    /// Present (`true`) only when one or more of this span's values —
+    /// a field value, an event name or attribute value, a link's
+    /// `trace_state` or attribute value — was cut to the per-value cap
+    /// (the adapter's `TRACE_VALUE_MAX_BYTES`, at a character boundary).
+    #[serde(skip_serializing_if = "std::ops::Not::not")]
+    pub truncated: bool,
 }
 
 /// One span event; attribute keys are prefix-stripped (`foo`, not
@@ -963,6 +974,7 @@ pub enum PartialReasonWire {
     OverviewCeiling,
     RollupAbsent,
     RemoteUnavailable,
+    ByteBudget,
     Busy,
 }
 
@@ -976,6 +988,7 @@ impl From<PartialReason> for PartialReasonWire {
             PartialReason::OverviewCeiling => PartialReasonWire::OverviewCeiling,
             PartialReason::RollupAbsent => PartialReasonWire::RollupAbsent,
             PartialReason::RemoteUnavailable => PartialReasonWire::RemoteUnavailable,
+            PartialReason::ByteBudget => PartialReasonWire::ByteBudget,
             PartialReason::Busy => PartialReasonWire::Busy,
         }
     }

@@ -806,6 +806,7 @@
                   "overview_ceiling",
                   "rollup_absent",
                   "remote_unavailable",
+                  "byte_budget",
                   "busy"
                 ]
               }
@@ -846,7 +847,8 @@
         "span_count": { "type": "integer", "minimum": 0 },
         "error_count": { "type": "integer", "minimum": 0 },
         "service_breakdown": { "$ref": "#/definitions/traces_service_breakdown" },
-        "exact": { "type": "boolean" }
+        "exact": { "type": "boolean" },
+        "truncated": { "type": "boolean" }
       },
       "additionalProperties": true
     },

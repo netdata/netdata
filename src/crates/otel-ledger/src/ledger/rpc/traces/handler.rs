@@ -97,6 +97,12 @@ struct AggregateRequest {
 /// queueing CPU and memory behind the others.
 const VALUE_LIST_CONCURRENCY: usize = 2;
 
+/// The engine's span cap for one trace lookup. The response's byte
+/// budget (`TRACE_SPANS_MAX_BYTES`) holds about a thousand spans, so
+/// assembling far more only spends memory; the engine's own default
+/// (65,536) is a runaway-merge guard, not a response size.
+const TRACE_SPAN_CAP: usize = 10_000;
+
 pub(crate) struct OtelTracesHandler {
     /// Live source resolution (registries snapshot + WAL chunk builds).
     supplier: TracesSourceSupplier,
@@ -158,7 +164,7 @@ impl OtelTracesHandler {
                     .to_string(),
             ));
         }
-        let query = TraceQuery::new(trace_id);
+        let query = TraceQuery::new(trace_id).span_cap(TRACE_SPAN_CAP);
 
         let bounds = validate_trace_bounds(params.after, params.before)
             .map_err(|e| handler_err(format!("invalid otel-traces request: {e}")))?;

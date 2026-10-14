@@ -600,3 +600,114 @@ fn empty_trace_maps_to_complete_zero_span_result() {
     assert_eq!(v["summary_root"], serde_json::Value::Null);
     assert_eq!(v["spans"], json!([]));
 }
+
+// ── Response bounds ─────────────────────────────────────────────────
+
+fn coverage_all() -> CoverageWire {
+    CoverageWire {
+        after: 0,
+        before: u32::MAX,
+    }
+}
+
+#[test]
+fn values_are_cut_at_a_character_boundary() {
+    // "é" is two bytes: a cut landing inside it backs off to before it.
+    let mut s = "aé".to_string();
+    assert!(truncate_value(&mut s, 2));
+    assert_eq!(s, "a");
+    let mut s = "abc".to_string();
+    assert!(!truncate_value(&mut s, 3), "at the cap: untouched");
+    assert_eq!(s, "abc");
+}
+
+#[test]
+fn an_oversized_span_value_is_cut_and_flagged() {
+    let trace_id = parse_trace_id("11111111111111111111111111111111").unwrap();
+    let mut root = span(1, None, 1_000);
+    root.fields = vec![(
+        "attributes.stack".into(),
+        "x".repeat(TRACE_VALUE_MAX_BYTES + 10),
+    )];
+    let data = TraceData {
+        trace: sfst::Trace {
+            spans: vec![root, span(2, Some(1), 2_000)],
+            roots: vec![0],
+            children: vec![vec![1], vec![]],
+        },
+        status: QueryStatus::Complete,
+        field_kinds: FieldKinds::default(),
+    };
+    let v = serde_json::to_value(to_trace_result(&trace_id, data, coverage_all())).unwrap();
+    assert_eq!(
+        v["spans"][0]["fields"][0][1].as_str().unwrap().len(),
+        TRACE_VALUE_MAX_BYTES
+    );
+    assert_eq!(v["spans"][0]["truncated"], true);
+    assert!(
+        v["spans"][1].get("truncated").is_none(),
+        "absent when nothing was cut"
+    );
+    assert_eq!(
+        v["status"],
+        json!({"complete": true}),
+        "a cut value is not a cut trace"
+    );
+}
+
+#[test]
+fn a_trace_over_the_byte_budget_keeps_its_earliest_spans() {
+    // A chain of spans each carrying one capped-size value: the budget
+    // holds only a prefix. The graph is rebuilt over the kept spans, and
+    // the status says the trace was cut.
+    let trace_id = parse_trace_id("11111111111111111111111111111111").unwrap();
+    let n = TRACE_SPANS_MAX_BYTES / TRACE_VALUE_MAX_BYTES + 50;
+    let spans: Vec<sfst::TraceSpan> = (0..n)
+        .map(|i| {
+            let id = (i % 250) as u8 + 1;
+            let parent = (i > 0).then(|| ((i - 1) % 250) as u8 + 1);
+            let mut s = span(id, parent, 1_000 + i as i64);
+            s.fields = vec![("attributes.v".into(), "x".repeat(TRACE_VALUE_MAX_BYTES))];
+            s
+        })
+        .collect();
+    let (roots, children) = sfst::trace_combine::build_forest(&spans);
+    let data = TraceData {
+        trace: sfst::Trace {
+            spans,
+            roots,
+            children,
+        },
+        status: QueryStatus::Complete,
+        field_kinds: FieldKinds::default(),
+    };
+    let r = to_trace_result(&trace_id, data, coverage_all());
+    let kept = r.spans.len();
+    assert!(kept > 0 && kept < n, "kept {kept} of {n}");
+    assert_eq!(r.items.returned, kept);
+    assert_eq!(
+        r.children.len(),
+        kept,
+        "the graph covers the kept spans only"
+    );
+    assert!(r.roots.iter().all(|&i| i < kept));
+    assert!(r.children.iter().flatten().all(|&i| i < kept));
+    let spans_bytes: usize = r.spans.iter().map(json_len).sum();
+    assert!(spans_bytes <= TRACE_SPANS_MAX_BYTES);
+    let v = serde_json::to_value(&r).unwrap();
+    assert_eq!(v["status"], json!({"partial": ["byte_budget"]}));
+}
+
+#[test]
+fn a_list_rows_long_strings_are_cut_and_flagged() {
+    let mut t = summary(1, 300);
+    t.root_name = Some("n".repeat(LIST_VALUE_MAX_BYTES + 1));
+    let r = to_search_result(search_data(vec![t, summary(2, 200)]), 2, None, WIN);
+    let v = serde_json::to_value(&r).unwrap();
+    assert_eq!(
+        v["traces"][0]["root_name"].as_str().unwrap().len(),
+        LIST_VALUE_MAX_BYTES
+    );
+    assert_eq!(v["traces"][0]["truncated"], true);
+    assert!(v["traces"][1].get("truncated").is_none());
+}

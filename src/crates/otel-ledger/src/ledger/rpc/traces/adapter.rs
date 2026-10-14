@@ -16,8 +16,8 @@ use std::collections::HashMap;
 
 use sfsq::traces::{
     AttributeKey, AttributeOwner, AttributeValuesData, BuiltinField, CompareOp, Condition,
-    DURATION_BIN_LABELS, DurationPercentiles, FieldKinds, OverviewData, Predicate, PredicateTarget,
-    PredicateValue, SearchData, TraceData,
+    DURATION_BIN_LABELS, DurationPercentiles, FieldKinds, OverviewData, PartialReason, Predicate,
+    PredicateTarget, PredicateValue, QueryStatus, SearchData, TraceData,
 };
 
 use super::wire::{
@@ -93,35 +93,142 @@ pub(crate) fn completion_capture_range(window: &std::ops::Range<u32>) -> std::op
     window.start.saturating_sub(slack)..window.end.saturating_add(slack)
 }
 
+// ── Response bounds ─────────────────────────────────────────────────
+
+/// Per-value cap on the strings a trace's spans carry. The largest value
+/// seen in practice is a ~6 KB exception stack trace, so real values
+/// stay whole; the cap only stops a pathological value from dominating
+/// the response.
+pub(crate) const TRACE_VALUE_MAX_BYTES: usize = 8 * 1024;
+
+/// Budget for a trace's spans, in compact JSON bytes. Past it the
+/// response keeps the earliest spans and reports `byte_budget`.
+pub(crate) const TRACE_SPANS_MAX_BYTES: usize = 2 * 1024 * 1024;
+
+/// Per-value cap on a list row's free-length strings (root service and
+/// name, breakdown service names).
+pub(crate) const LIST_VALUE_MAX_BYTES: usize = 1024;
+
+/// Cut `s` to at most `max` bytes at a character boundary; `true` when
+/// it was cut.
+fn truncate_value(s: &mut String, max: usize) -> bool {
+    if s.len() <= max {
+        return false;
+    }
+    let mut cut = max;
+    while !s.is_char_boundary(cut) {
+        cut -= 1;
+    }
+    s.truncate(cut);
+    true
+}
+
+/// Apply [`TRACE_VALUE_MAX_BYTES`] to every value one span carries;
+/// `true` when any was cut.
+fn cap_span_values(s: &mut sfst::TraceSpan) -> bool {
+    let max = TRACE_VALUE_MAX_BYTES;
+    let mut cut = false;
+    for (_, v) in &mut s.fields {
+        cut |= truncate_value(v, max);
+    }
+    for e in &mut s.events {
+        cut |= truncate_value(&mut e.name, max);
+        for (_, v) in &mut e.attributes {
+            cut |= truncate_value(v, max);
+        }
+    }
+    for l in &mut s.links {
+        cut |= truncate_value(&mut l.trace_state, max);
+        for (_, v) in &mut l.attributes {
+            cut |= truncate_value(v, max);
+        }
+    }
+    cut
+}
+
+/// Bytes `value` takes as compact JSON.
+fn json_len(value: &impl serde::Serialize) -> usize {
+    struct Count(usize);
+    impl std::io::Write for Count {
+        fn write(&mut self, buf: &[u8]) -> std::io::Result<usize> {
+            self.0 += buf.len();
+            Ok(buf.len())
+        }
+        fn flush(&mut self) -> std::io::Result<()> {
+            Ok(())
+        }
+    }
+    let mut count = Count(0);
+    serde_json::to_writer(&mut count, value).expect("wire types serialize");
+    count.0
+}
+
+/// `status` with `extra` added (a partial is a set, so a repeat is a no-op).
+fn with_reason(status: QueryStatus, extra: PartialReason) -> QueryStatus {
+    match status {
+        QueryStatus::Complete => QueryStatus::Partial([extra].into()),
+        QueryStatus::Partial(mut reasons) => {
+            reasons.insert(extra);
+            QueryStatus::Partial(reasons)
+        }
+    }
+}
+
 /// Shape one assembled trace into the wire result. `trace_id` is echoed
 /// back in canonical (lowercase) hex regardless of the request's casing.
 /// `coverage` is the capture range assembly actually used.
+///
+/// Bounded: values are capped ([`TRACE_VALUE_MAX_BYTES`], flagged per
+/// span) and the spans stop at [`TRACE_SPANS_MAX_BYTES`]. A cut trace
+/// keeps its earliest spans — the combiner's total order, as the
+/// engine's own span cap does — with its graph rebuilt over them, and
+/// reports `byte_budget`.
 pub(crate) fn to_trace_result(
     trace_id: &sfst::TraceId,
     data: TraceData,
     coverage: CoverageWire,
 ) -> TraceResult {
-    let t = data.trace;
+    let mut t = data.trace;
+    let mut status = data.status;
+    let truncated: Vec<bool> = t.spans.iter_mut().map(cap_span_values).collect();
+    let mut spans = Vec::with_capacity(t.spans.len());
+    let mut bytes = 0usize;
+    for (s, &cut) in t.spans.iter().zip(&truncated) {
+        let wire = span_wire(s, cut);
+        bytes += json_len(&wire);
+        if bytes > TRACE_SPANS_MAX_BYTES {
+            break;
+        }
+        spans.push(wire);
+    }
+    if spans.len() < t.spans.len() {
+        t.spans.truncate(spans.len());
+        let (roots, children) = sfst::trace_combine::build_forest(&t.spans);
+        t.roots = roots;
+        t.children = children;
+        status = with_reason(status, PartialReason::ByteBudget);
+    }
     let summary_root = t.summary_root();
     TraceResult {
         mode: "trace",
         version: 1,
         trace_id: trace_id.to_string(),
         coverage,
-        status: StatusWire::from(&data.status),
+        status: StatusWire::from(&status),
         items: TraceItems {
-            returned: t.spans.len(),
+            returned: spans.len(),
         },
         summary_root,
         roots: t.roots,
         children: t.children,
-        spans: t.spans.into_iter().map(span_wire).collect(),
+        spans,
         field_kinds: field_kinds_wire(data.field_kinds),
     }
 }
 
 /// One assembled span → the wire shape (events and links ride along).
-fn span_wire(s: sfst::TraceSpan) -> SpanWire {
+/// `truncated` says whether [`cap_span_values`] cut any of its values.
+fn span_wire(s: &sfst::TraceSpan, truncated: bool) -> SpanWire {
     SpanWire {
         span_id: s.span_id.to_string(),
         // OTel semantics: an unset parent means "root", rendered as an
@@ -134,31 +241,32 @@ fn span_wire(s: sfst::TraceSpan) -> SpanWire {
         dropped_attributes_count: s.dropped_attributes_count,
         dropped_events_count: s.dropped_events_count,
         dropped_links_count: s.dropped_links_count,
-        fields: s.fields,
-        events: s.events.into_iter().map(event_wire).collect(),
-        links: s.links.into_iter().map(link_wire).collect(),
+        fields: s.fields.clone(),
+        events: s.events.iter().map(event_wire).collect(),
+        links: s.links.iter().map(link_wire).collect(),
+        truncated,
     }
 }
 
 /// One span event → the wire shape.
-fn event_wire(e: sfst::TraceEvent) -> EventWire {
+fn event_wire(e: &sfst::TraceEvent) -> EventWire {
     EventWire {
         time_unix_nano: e.time_unix_nano,
-        name: e.name,
+        name: e.name.clone(),
         dropped_attributes_count: e.dropped_attributes_count,
-        attributes: e.attributes,
+        attributes: e.attributes.clone(),
     }
 }
 
 /// One span link → the wire shape (the linked trace id, W3C hex).
-fn link_wire(l: sfst::TraceLink) -> LinkWire {
+fn link_wire(l: &sfst::TraceLink) -> LinkWire {
     LinkWire {
         trace_id: l.trace_id.to_string(),
         span_id: l.span_id.to_string(),
-        trace_state: l.trace_state,
+        trace_state: l.trace_state.clone(),
         flags: l.flags,
         dropped_attributes_count: l.dropped_attributes_count,
-        attributes: l.attributes,
+        attributes: l.attributes.clone(),
     }
 }
 
@@ -614,8 +722,20 @@ pub(crate) fn to_search_result(
     }
 }
 
-/// One search-page summary → the wire shape.
-fn summary_wire(t: sfsq::traces::TraceSummary) -> TraceSummaryWire {
+/// One search-page summary → the wire shape, its free-length strings
+/// capped at [`LIST_VALUE_MAX_BYTES`].
+fn summary_wire(mut t: sfsq::traces::TraceSummary) -> TraceSummaryWire {
+    let max = LIST_VALUE_MAX_BYTES;
+    let mut truncated = false;
+    for s in [&mut t.root_service, &mut t.root_name]
+        .into_iter()
+        .flatten()
+    {
+        truncated |= truncate_value(s, max);
+    }
+    for (name, _) in &mut t.service_breakdown.top {
+        truncated |= truncate_value(name, max);
+    }
     TraceSummaryWire {
         trace_id: t.trace_id.to_string(),
         root_service: t.root_service,
@@ -627,6 +747,7 @@ fn summary_wire(t: sfsq::traces::TraceSummary) -> TraceSummaryWire {
         error_count: t.error_count,
         service_breakdown: service_breakdown_wire(t.service_breakdown),
         exact: t.exact,
+        truncated,
     }
 }
 
