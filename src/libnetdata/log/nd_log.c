@@ -484,6 +484,10 @@ void netdata_logger_with_limit(ERROR_LIMIT *erl, ND_LOG_SOURCES source, ND_LOG_F
         return;
     }
 
+    // reserve the window before unlocking, so that concurrent callers see it taken
+    erl->last_logged = now;
+    erl->count = 0;
+
     if(!nd_log.single_threaded_child)
         spinlock_unlock(&erl->spinlock);
 
@@ -493,8 +497,6 @@ void netdata_logger_with_limit(ERROR_LIMIT *erl, ND_LOG_SOURCES source, ND_LOG_F
             source == NDLS_DAEMON || source == NDLS_COLLECTORS,
             saved_errno, saved_winerror, fmt, args);
     va_end(args);
-    erl->last_logged = now;
-    erl->count = 0;
 }
 
 NEVER_INLINE NORETURN
