@@ -653,10 +653,7 @@ async fn invalid_list_requests_are_clean_client_errors() {
             json!({"limit": super::super::wire::SEARCH_LIMIT_MAX + 1}),
             "exceeds the maximum",
         ),
-        (
-            json!({"selections": {"bogus": ["x"]}}),
-            "unknown selection key",
-        ),
+        (json!({"selections": {"bogus": ["x"]}}), "unknown key"),
         (json!({"anchor": "junk"}), "malformed anchor"),
         (json!({"after": 500, "before": 400}), "invalid window"),
     ] {
@@ -966,10 +963,7 @@ async fn enumeration_invalid_requests_are_clean_client_errors() {
     // Shape errors (null selectors, missing `key`) are wire-test
     // territory now; these are the handler's semantic rejections.
     for (body, needle) in [
-        (
-            json!({"attribute_values": {"key": "bogus"}}),
-            "unknown selection key",
-        ),
+        (json!({"attribute_values": {"key": "bogus"}}), "unknown key"),
         // A virtual builtin has no value dictionary: rejected before
         // admission.
         (
@@ -1883,25 +1877,90 @@ async fn bad_chips_and_text_are_client_errors() {
     let chip = |key: &str, op: &str, values: serde_json::Value| json!([{"key": key, "op": op, "values": values}]);
     let too_many: Vec<serde_json::Value> = (0..65).map(|i| json!(format!("v{i}"))).collect();
     let tokens_33: Vec<serde_json::Value> = (0..33).map(|i| json!(format!("term{i}"))).collect();
-    for (conditions, text) in [
-        (chip("resource.service.name", "~=", json!(["x"])), json!([])),
-        (chip("nope", "=", json!(["x"])), json!([])),
+    let none = json!([]);
+    for (conditions, text, message) in [
+        (
+            chip("resource.service.name", "~=", json!(["x"])),
+            none.clone(),
+            "condition on 'resource.service.name': unknown op '~='",
+        ),
+        (
+            chip("nope", "=", json!(["x"])),
+            none.clone(),
+            "unknown key \"nope\": use",
+        ),
         (
             chip("resource.service.name", "=", json!(too_many)),
-            json!([]),
+            none.clone(),
+            "condition on 'resource.service.name' carries 65 values, over the limit of 64",
         ),
-        (chip("resource.service.name", "=~", json!(["("])), json!([])),
-        (chip("resource.service.name", "^=", json!([5])), json!([])),
-        (chip("trace_duration", ">=", json!(["long"])), json!([])),
-        (json!([]), json!(["ab"])),
-        (json!([]), json!(tokens_33)),
+        (
+            chip("resource.service.name", "=~", json!(["("])),
+            none.clone(),
+            "'resource.service.name =~': invalid pattern \"(\": ",
+        ),
+        (
+            chip("resource.service.name", "^=", json!([5])),
+            none.clone(),
+            "condition on 'resource.service.name': '^=' takes text values",
+        ),
+        (
+            chip("trace_duration", ">=", json!(["long"])),
+            none.clone(),
+            "'trace_duration >=' takes whole nanoseconds",
+        ),
+        (
+            chip("trace_duration", "=~", json!(["x"])),
+            none.clone(),
+            "'=~' is not valid on 'trace_duration'",
+        ),
+        (
+            chip("trace_duration", "^=", json!(["1"])),
+            none.clone(),
+            "'^=' is not valid on 'trace_duration'",
+        ),
+        (
+            chip("name", ">=", json!([5])),
+            none.clone(),
+            "'>=' is not valid on 'name'",
+        ),
+        (
+            chip("trace_duration", ">=", json!([1, 2])),
+            none.clone(),
+            "'trace_duration >=' takes exactly one value, got 2",
+        ),
+        (
+            chip("resource.service.name", "=", json!([])),
+            none.clone(),
+            "'resource.service.name =' has no values",
+        ),
+        (
+            chip("trace_id", "=", json!(["xyz"])),
+            none.clone(),
+            "'trace_id' takes 32-character hex ids, got \"xyz\"",
+        ),
+        (
+            chip("status", "=", json!([5])),
+            none.clone(),
+            "'status =' takes text values",
+        ),
+        (
+            none.clone(),
+            json!(["ab"]),
+            "text \"ab\" is shorter than 3 characters",
+        ),
+        (
+            none.clone(),
+            json!(tokens_33),
+            "at most 32 conditions and text terms, got 33",
+        ),
     ] {
         let mut body = functions_body(20);
         body["conditions"] = conditions.clone();
         body["text"] = text.clone();
         let err = call_on(&h, body).await.unwrap_err().to_string();
         assert!(
-            err.contains("invalid otel-traces request"),
+            err.contains(&format!("invalid otel-traces request: {message}")),
             "{conditions} {text}: {err}"
         );
     }
@@ -1919,10 +1978,23 @@ async fn bad_chips_in_the_trace_mode_are_client_errors() {
     )
     .await;
     let h = make_handler_over(registries);
-    for params in [
-        json!({"conditions": [{"key": "nope", "op": "=", "values": ["x"]}]}),
-        json!({"conditions": [{"key": "name", "op": "~~", "values": ["x"]}]}),
-        json!({"text": ["ab"]}),
+    for (params, message) in [
+        (
+            json!({"conditions": [{"key": "nope", "op": "=", "values": ["x"]}]}),
+            "unknown key \"nope\": use",
+        ),
+        (
+            json!({"conditions": [{"key": "name", "op": "~~", "values": ["x"]}]}),
+            "condition on 'name': unknown op '~~'",
+        ),
+        (
+            json!({"conditions": [{"key": "name", "op": ">", "values": [1]}]}),
+            "'>' is not valid on 'name'",
+        ),
+        (
+            json!({"text": ["ab"]}),
+            "text \"ab\" is shorter than 3 characters",
+        ),
     ] {
         let mut trace = params.clone();
         trace["id"] = json!(FIXTURE_TRACE_ID);
@@ -1931,7 +2003,7 @@ async fn bad_chips_in_the_trace_mode_are_client_errors() {
             .unwrap_err()
             .to_string();
         assert!(
-            err.contains("invalid otel-traces request"),
+            err.contains(&format!("invalid otel-traces request: {message}")),
             "{params}: {err}"
         );
     }

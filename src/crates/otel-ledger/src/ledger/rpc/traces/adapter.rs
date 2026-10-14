@@ -16,8 +16,8 @@ use std::collections::{HashMap, HashSet};
 
 use sfsq::traces::{
     AttributeKey, AttributeOwner, AttributeValuesData, BuiltinField, CompareOp, Condition,
-    DURATION_BIN_LABELS, DurationPercentiles, FieldKinds, OverviewData, Predicate, PredicateTarget,
-    PredicateValue, SearchData, Token, TokenQuery, TraceData,
+    DURATION_BIN_LABELS, DurationPercentiles, FieldKinds, OverviewData, Predicate, PredicateError,
+    PredicateTarget, PredicateValue, SearchData, TOKENS_MAX, Token, TokenQuery, TraceData,
 };
 
 use super::wire::{
@@ -391,7 +391,7 @@ pub(crate) fn parse_selection_key(key: &str) -> Result<PredicateTarget, String> 
     for (word, owner) in OWNER_WORDS {
         if let Some(rest) = key.strip_prefix(word).and_then(|r| r.strip_prefix('.')) {
             if rest.is_empty() {
-                return Err(format!("selection key {key:?} names no attribute"));
+                return Err(format!("key {key:?} names no attribute"));
             }
             return Ok(PredicateTarget::Attribute(owner, rest.to_string()));
         }
@@ -402,7 +402,7 @@ pub(crate) fn parse_selection_key(key: &str) -> Result<PredicateTarget, String> 
         .map(|(_, f)| PredicateTarget::Builtin(*f))
         .ok_or_else(|| {
             format!(
-                "unknown selection key {key:?}: use resource.<key> / span.<key> / \
+                "unknown key {key:?}: use resource.<key> / span.<key> / \
                  instrumentation.<key> / event.<key> / link.<key>, or a builtin \
                  field word"
             )
@@ -466,8 +466,10 @@ pub(crate) fn build_predicate(
 /// The search tokens of a request: the filter rail's `selections` and
 /// duration band as their flat predicate means (one same-span token, one
 /// token per bound — `TokenQuery::from`), then one token per chip and
-/// per free-text term. Validated whole here, so a bad request is a
-/// client error before admission.
+/// per free-text term. Every chip and term is validated alone, so a bad
+/// request is a client error before admission whose message names the
+/// chip as sent ([`chip_error`], [`text_error`]); the token count is the
+/// only rule over the whole query.
 pub(crate) fn build_tokens(
     selections: &HashMap<String, Vec<String>>,
     min_trace_duration_ns: Option<i64>,
@@ -480,21 +482,99 @@ pub(crate) fn build_tokens(
         min_trace_duration_ns,
         max_trace_duration_ns,
     )?);
+    let count = tokens.tokens.len() + conditions.len() + text.len();
+    if count > TOKENS_MAX {
+        return Err(format!(
+            "at most {TOKENS_MAX} conditions and text terms, got {count}"
+        ));
+    }
     for condition in conditions {
         tokens.tokens.push(chip_token(condition)?);
     }
     for term in text {
         check_request_text("text", term)?;
-        tokens.tokens.push(Token::positive(Predicate {
+        let token = Token::positive(Predicate {
             conditions: vec![Condition {
                 target: PredicateTarget::FreeText,
                 op: CompareOp::Contains,
                 values: vec![PredicateValue::Text(term.clone())],
             }],
-        }));
+        });
+        tokens
+            .tokens
+            .push(validated(token).map_err(|e| text_error(term, e))?);
     }
-    tokens.validate().map_err(|e| e.to_string())?;
+    debug_assert!(tokens.validate().is_ok(), "every token validated alone");
     Ok(tokens)
+}
+
+/// One token validated as a query of its own: every rule but the count.
+fn validated(token: Token) -> Result<Token, PredicateError> {
+    let mut query = TokenQuery {
+        tokens: vec![token],
+    };
+    query.validate()?;
+    Ok(query.tokens.pop().expect("the query holds the token"))
+}
+
+/// A chip's validation error in the wire's own words — the key and op
+/// as sent, never the engine's diagnostic names (the engine stays
+/// wire-neutral: the CLI spells keys differently). The last arm holds
+/// the variants a single-condition chip on a parsed key cannot raise.
+fn chip_error(key: &str, op: &str, err: PredicateError) -> String {
+    let chip = format!("'{key} {op}'");
+    match err {
+        PredicateError::NoValues { .. } => format!("{chip} has no values"),
+        PredicateError::SingleValueArity { got, .. } => {
+            format!("{chip} takes exactly one value, got {got}")
+        }
+        PredicateError::InvalidOpForTarget { .. } => format!("'{op}' is not valid on '{key}'"),
+        PredicateError::TextValueRequired { .. } => format!("{chip} takes text values"),
+        PredicateError::NumericValueRequired { .. } => format!("{chip} takes numbers"),
+        PredicateError::NonIntegerDuration => format!("{chip} takes whole nanoseconds"),
+        PredicateError::InvalidPattern { pattern, msg } => format!(
+            "{chip}: invalid pattern {pattern:?}: {}",
+            msg.split_whitespace().collect::<Vec<_>>().join(" ")
+        ),
+        PredicateError::MixedValueTypes { .. } => format!("{chip} mixes text and numbers"),
+        PredicateError::NanValue { .. } => format!("{chip} compares against NaN"),
+        PredicateError::InvalidIdValue { value, width, .. } => {
+            format!("'{key}' takes {width}-character hex ids, got {value:?}")
+        }
+        PredicateError::NotYetEvaluable { .. } => format!("{chip} is not supported"),
+        PredicateError::AttributeUnderBuiltinOwner { .. }
+        | PredicateError::TextTooShort { .. }
+        | PredicateError::TextTooLong { .. }
+        | PredicateError::TooManyTokens { .. }
+        | PredicateError::EmptyToken
+        | PredicateError::TokenNotAlone { .. } => format!("{chip} is not valid"),
+    }
+}
+
+/// A free-text term's validation error in the wire's own words. The
+/// last arm holds the variants a free-text token cannot raise.
+fn text_error(term: &str, err: PredicateError) -> String {
+    match err {
+        PredicateError::TextTooShort { min, .. } => {
+            format!("text {term:?} is shorter than {min} characters")
+        }
+        PredicateError::TextTooLong { max, .. } => format!("text is longer than {max} bytes"),
+        PredicateError::InvalidPattern { .. } => format!("text {term:?} cannot be matched"),
+        PredicateError::NoValues { .. }
+        | PredicateError::SingleValueArity { .. }
+        | PredicateError::AttributeUnderBuiltinOwner { .. }
+        | PredicateError::InvalidOpForTarget { .. }
+        | PredicateError::TextValueRequired { .. }
+        | PredicateError::NumericValueRequired { .. }
+        | PredicateError::NonIntegerDuration
+        | PredicateError::MixedValueTypes { .. }
+        | PredicateError::NanValue { .. }
+        | PredicateError::InvalidIdValue { .. }
+        | PredicateError::NotYetEvaluable { .. }
+        | PredicateError::TooManyTokens { .. }
+        | PredicateError::EmptyToken
+        | PredicateError::TokenNotAlone { .. } => format!("text {term:?} is not valid"),
+    }
 }
 
 /// One chip as its token: a `!` op is NOT EXISTS over the positive form,
@@ -550,11 +630,12 @@ fn chip_token(chip: &ConditionParams) -> Result<Token, String> {
     let group = Predicate {
         conditions: vec![Condition { target, op, values }],
     };
-    Ok(if negated {
+    let token = if negated {
         Token::negated(group)
     } else {
         Token::positive(group)
-    })
+    };
+    validated(token).map_err(|e| chip_error(&chip.key, &chip.op, e))
 }
 
 /// The heatmap's tokens: the page's, minus every trace-duration one —
