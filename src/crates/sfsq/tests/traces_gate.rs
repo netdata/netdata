@@ -1060,10 +1060,12 @@ fn high_tier_resolution_matches_gate_off() {
 
 // ── The differential sweep ───────────────────────────────────────────
 
-/// Seeded pseudo-random corpora × trace-level predicates: gate-on and
-/// gate-off answers are identical (results AND status) on tie-free,
-/// corruption-free inputs. Span-level-only predicates ride along to pin
-/// the not-engaged path.
+/// Seeded pseudo-random corpora × trace-level predicates and token
+/// queries: every gate mode — the single-source proof on or off (the
+/// all-file path), rollup or span discovery — answers exactly as no
+/// gate at all (results AND status) on tie-free, corruption-free
+/// inputs. Span-level-only predicates ride along to pin the
+/// not-engaged path.
 #[test]
 fn differential_gate_on_off_sweep() {
     // A tiny deterministic LCG — no external randomness, stable seeds.
@@ -1116,37 +1118,65 @@ fn differential_gate_on_off_sweep() {
                 ]
             })
         };
-        let queries: Vec<Predicate> = vec![
-            pred(vec![root_service_eq("ad")]),
-            pred(vec![root_service_eq("nosuch")]),
+        let queries: Vec<TokenQuery> = vec![
+            pred(vec![root_service_eq("ad")]).into(),
+            pred(vec![root_service_eq("nosuch")]).into(),
             pred(vec![builtin(
                 BuiltinField::RootName,
                 CompareOp::Regex,
                 vec![text("(get|post)")],
-            )]),
-            pred(vec![min_duration(5 * NS as i64)]),
-            pred(vec![min_duration(NS as i64), root_service_eq("cart")]),
+            )])
+            .into(),
+            pred(vec![min_duration(5 * NS as i64)]).into(),
+            pred(vec![min_duration(NS as i64), root_service_eq("cart")]).into(),
             pred(vec![builtin(
                 BuiltinField::TraceDuration,
                 CompareOp::Lt,
                 vec![PredicateValue::Integer(3 * NS as i64)],
-            )]),
+            )])
+            .into(),
             // Span-level-only: the gate is never engaged.
             pred(vec![builtin(
                 BuiltinField::Name,
                 CompareOp::Eq,
                 vec![text("child")],
-            )]),
+            )])
+            .into(),
+            // Two positive span-local tokens: the token gate.
+            tokens(vec![
+                Token::positive(pred(vec![name_eq("child")])),
+                Token::positive(pred(vec![service_eq("cart")])),
+            ]),
+            tokens(vec![
+                Token::positive(pred(vec![name_eq("child")])),
+                Token::positive(pred(vec![name_eq("get")])),
+                Token::negated(pred(vec![service_eq("ad")])),
+            ]),
         ];
-        for (qi, predicate) in queries.into_iter().enumerate() {
-            let on = run(sources(), SearchQuery::new(predicate.clone()).limit(30));
-            let off = run(
+        for (qi, query) in queries.into_iter().enumerate() {
+            let q = || SearchQuery::new(query.clone()).limit(30);
+            // No gate at all: the trace-level gate off and no proof
+            // (the token gate needs it).
+            let reference = norm(&run(
                 sources(),
-                SearchQuery::new(predicate)
-                    .limit(30)
-                    .trace_gate_for_tests(false),
-            );
-            assert_eq!(norm(&on), norm(&off), "seed {seed} query {qi}");
+                q().trace_gate_for_tests(false)
+                    .single_source_proof_ids_for_tests(0),
+            ));
+            for (mode, (proof, rollup)) in
+                [(true, true), (false, true), (true, false), (false, false)]
+                    .into_iter()
+                    .enumerate()
+            {
+                let mut query = q().rollup_discovery_for_tests(rollup);
+                if !proof {
+                    query = query.single_source_proof_ids_for_tests(0);
+                }
+                assert_eq!(
+                    norm(&run(sources(), query)),
+                    reference,
+                    "seed {seed} query {qi} mode {mode} (proof {proof}, rollup {rollup})"
+                );
+            }
         }
     }
 }
