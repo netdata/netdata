@@ -284,6 +284,11 @@ it adds no scheduler, worker, per-task heap object, or population scan.
   Functions" cap**. `lifecycle/task.go`.
 - **An ordinary timed-out run task keeps run ownership.** The kernel only cooperatively cancels it; its claims, lane,
   and resource authority stay held until it returns, and repeated overruns can escalate to fail-stop.
+- **Queued cooperative deadline work retains its required start.** While the run is active, a Function with
+  `CooperativeDeadline` whose deadline the kernel has processed keeps its lane position and starts with
+  `context.DeadlineExceeded` when its lane and claims become available. A later cancellation preserves that required
+  start. Cancellation processed before timeout removes queued work without starting it and answers `499`.
+  `kernel_disposal.go`, `kernel_dispatch.go`.
 - **A contained attempt keeps process ownership instead.** Its caller, claims, and run may settle after the
   containment cut because late output and mutation cannot escape the process-owned attempt boundary. The physical
   worker may still finish state private to that attempt; the boundary prevents publication, re-entry, or reuse until
