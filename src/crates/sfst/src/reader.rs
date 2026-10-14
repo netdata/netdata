@@ -72,6 +72,31 @@ pub(crate) fn unpack<T: DeserializeOwned>(data: &[u8]) -> Result<T, Error> {
     Ok(val)
 }
 
+/// The FST of a packed [`PrefixMap`](crate::PrefixMap) payload. The
+/// payload serializes the FST bytes first (a bincode length, then the
+/// bytes) and the values after them, so decompression streams only up
+/// to the FST's end: listing a dictionary's keys never decompresses its
+/// position bitmaps.
+fn unpack_fst(data: &[u8]) -> Result<fst::Map<Vec<u8>>, Error> {
+    use std::io::Read;
+    let zstd_err = |e: std::io::Error| Error::Zstd(e.to_string());
+    let mut decoder = zstd::stream::read::Decoder::with_buffer(data).map_err(zstd_err)?;
+    let len: u64 = bincode::decode_from_std_read(&mut decoder, bincode::config::standard())?;
+    // `take` bounds the read by the stream, not by a length a corrupt
+    // payload could inflate.
+    let mut fst_bytes = Vec::new();
+    decoder
+        .take(len)
+        .read_to_end(&mut fst_bytes)
+        .map_err(zstd_err)?;
+    if fst_bytes.len() as u64 != len {
+        return Err(Error::CorruptIndex(
+            "dictionary FST shorter than its declared length".into(),
+        ));
+    }
+    fst::Map::new(fst_bytes).map_err(|e| Error::CorruptIndex(format!("dictionary FST: {e}")))
+}
+
 /// Zero-copy reader over a memory-mapped (or in-memory) SFST file.
 ///
 /// `open` parses only the header and TOC. Typed accessors decode their
@@ -236,6 +261,12 @@ impl<'a> ChunkReader<'a> {
         unpack(self.primary_raw()?)
     }
 
+    /// The primary chunk's FST alone, without the position bitmaps
+    /// that follow it in the payload (see [`unpack_fst`]).
+    pub(crate) fn primary_fst(&self) -> Result<fst::Map<Vec<u8>>, Error> {
+        unpack_fst(self.primary_raw()?)
+    }
+
     /// Raw compressed bytes of the primary chunk.
     pub fn primary_raw(&self) -> Result<&'a [u8], Error> {
         self.chunk_raw_by_id(CHUNK_PRIMARY)
@@ -246,6 +277,12 @@ impl<'a> ChunkReader<'a> {
     /// Decompress and deserialize a mid-card field FST by index.
     pub(crate) fn mid_field(&self, index: u16) -> Result<PrefixMap<BitmapValue>, Error> {
         unpack(self.mid_field_raw(index)?)
+    }
+
+    /// A mid-card field chunk's FST alone, without its position bitmaps
+    /// (see [`unpack_fst`]).
+    pub(crate) fn mid_field_fst(&self, index: u16) -> Result<fst::Map<Vec<u8>>, Error> {
+        unpack_fst(self.mid_field_raw(index)?)
     }
 
     /// Raw compressed bytes of a mid-card field chunk (crc32-verified).

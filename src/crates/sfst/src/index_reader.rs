@@ -19,6 +19,7 @@
 //! (src/crates/sfsq/src/traces/search.rs).
 
 use std::collections::HashMap;
+use std::ops::ControlFlow;
 
 use crate::PrefixMap;
 use crate::reader::ChunkReader;
@@ -71,6 +72,59 @@ impl<'a> MetaReader<'a> {
     /// The field table derived from the schema tree, on first use.
     pub fn field_table(&self) -> Result<&crate::FieldTable, crate::Error> {
         self.sfst.fields()
+    }
+
+    /// Visit the values of `field` in this file's dictionary byte order
+    /// (the bytes after `field=`), decoding only what lists them: the
+    /// low tier from the primary FST and the mid tier from its field FST,
+    /// neither with its position bitmaps, and the high tier from its
+    /// sorted arena. `visit` breaks to stop early. `Ok(false)` when the
+    /// file has no such field.
+    pub fn for_each_field_value(
+        &self,
+        field: &str,
+        mut visit: impl FnMut(&[u8]) -> ControlFlow<()>,
+    ) -> Result<bool, crate::Error> {
+        use fst::{IntoStreamer, Streamer};
+        let Some((entry, idx)) =
+            field_table_tiered(self.field_table()?).find(|(f, _)| f.name == field)
+        else {
+            return Ok(false);
+        };
+        let prefix = format!("{field}=");
+        match entry.tier {
+            FieldTier::Low => {
+                // Field names hold no '=' (flattener invariant), so the
+                // field's keys are exactly the range [`field=`, `field>`).
+                let map = self.sfst.primary_fst()?;
+                let mut end = prefix.clone().into_bytes();
+                *end.last_mut().expect("non-empty") += 1;
+                let mut keys = map.range().ge(prefix.as_bytes()).lt(&end).into_stream();
+                while let Some((key, _)) = keys.next() {
+                    if visit(dictionary_value(key, &prefix)?).is_break() {
+                        break;
+                    }
+                }
+            }
+            FieldTier::Mid => {
+                let map = self.sfst.mid_field_fst(idx)?;
+                let mut keys = map.stream();
+                while let Some((key, _)) = keys.next() {
+                    if visit(dictionary_value(key, &prefix)?).is_break() {
+                        break;
+                    }
+                }
+            }
+            FieldTier::High => {
+                let hf = self.sfst.high_field(idx)?;
+                for key in hf.keys() {
+                    if visit(dictionary_value(key, &prefix)?).is_break() {
+                        break;
+                    }
+                }
+            }
+        }
+        Ok(true)
     }
 
     /// The full reader: decodes `PRIM`, reusing the cached `META` and
@@ -1911,6 +1965,13 @@ impl KvIdSet {
     fn is_empty(&self) -> bool {
         self.bits.iter().all(|&word| word == 0)
     }
+}
+
+/// The value bytes of a `field=value` dictionary key, given `field=`.
+fn dictionary_value<'k>(key: &'k [u8], prefix: &str) -> Result<&'k [u8], crate::Error> {
+    key.strip_prefix(prefix.as_bytes()).ok_or_else(|| {
+        crate::Error::CorruptIndex(format!("dictionary key outside the field `{prefix}`"))
+    })
 }
 
 /// Pair each field with its **tier-relative** index (0-based within its own

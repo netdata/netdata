@@ -20,7 +20,7 @@ test-util = []
 
 [dependencies]
 # Format
-fst = { workspace = true }
+fst = { workspace = true, features = ["levenshtein"] }
 bumpalo = { workspace = true }
 serde = { workspace = true, features = ["derive"] }
 serde_bytes = { workspace = true }

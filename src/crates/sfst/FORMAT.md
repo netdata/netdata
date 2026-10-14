@@ -491,6 +491,12 @@ panicking the unchecked path walk or hanging on a cyclic edge.
 The bitmap records the time-sorted log positions where the
 `key=value` pair appears. Always present.
 
+The serialized `PrefixMap` holds two fields in this order: `fst_bytes`
+(the FST, a bincode length then the raw bytes; its outputs index into
+`values`) and `values` (one `BitmapValue` per key). Readers that only
+list keys stream the decompression and stop after `fst_bytes`, so the
+order is part of the format. `MF{i}` uses the same layout.
+
 ### `MF{i}` — Mid-card field FSTs
 
 One chunk per mid-cardinality field, in the order those fields appear

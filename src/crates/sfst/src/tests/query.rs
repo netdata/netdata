@@ -1481,3 +1481,65 @@ fn second_chunk_per_tier_resolves() {
     assert_eq!(fields.get("req").map(String::as_str), Some("q2"));
     assert_eq!(fields.get("trace").map(String::as_str), Some("t2"));
 }
+
+#[test]
+fn field_values_stream_from_the_dictionaries_alone() {
+    let data = build_two_per_tier_fixture();
+    let full = IndexReader::open(&data).unwrap();
+    let meta = MetaReader::open(&data).unwrap();
+    for field in ["level", "host", "region", "req", "trace"] {
+        let mut got = Vec::new();
+        let present = meta
+            .for_each_field_value(field, |v| {
+                got.push(String::from_utf8(v.to_vec()).unwrap());
+                std::ops::ControlFlow::Continue(())
+            })
+            .unwrap();
+        assert!(present, "{field}");
+        assert_eq!(got, full.field_values(field).unwrap(), "{field}");
+    }
+    assert!(
+        !meta
+            .for_each_field_value("absent", |_| std::ops::ControlFlow::Continue(()))
+            .unwrap()
+    );
+    let mut seen = 0;
+    meta.for_each_field_value("host", |_| {
+        seen += 1;
+        std::ops::ControlFlow::Break(())
+    })
+    .unwrap();
+    assert_eq!(seen, 1, "a break stops the walk");
+}
+
+#[test]
+fn dictionary_fsts_decode_alone_with_the_full_decodes_keys() {
+    // The FST-only decode relies on the payload's field order (FST bytes
+    // first); a reorder would break it, and this pins it.
+    use fst::{IntoStreamer, Streamer};
+    let data = build_two_per_tier_fixture();
+    let reader = crate::reader::ChunkReader::open(&data).unwrap();
+    let fst_keys = |map: fst::Map<Vec<u8>>| {
+        let mut keys = Vec::new();
+        let mut stream = map.into_stream();
+        while let Some((k, _)) = stream.next() {
+            keys.push(k.to_vec());
+        }
+        keys
+    };
+    let map_keys = |map: crate::PrefixMap<BitmapValue>| {
+        let mut keys = Vec::new();
+        map.for_each(|k, _| keys.push(k.to_vec()));
+        keys
+    };
+    assert_eq!(
+        fst_keys(reader.primary_fst().unwrap()),
+        map_keys(reader.primary().unwrap())
+    );
+    for idx in 0..2 {
+        assert_eq!(
+            fst_keys(reader.mid_field_fst(idx).unwrap()),
+            map_keys(reader.mid_field(idx).unwrap())
+        );
+    }
+}

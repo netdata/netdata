@@ -123,8 +123,8 @@ pub struct FieldEntry {
 /// Cardinality tier for a field. The cardinality threshold `T` and
 /// its 10× cutoff (set by the producer; default
 /// [`DEFAULT_CARDINALITY_THRESHOLD`]) define the boundaries: `< T` is
-/// low, `[T, 10·T)` is mid, `≥ 10·T` is high.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+/// low, `[T, 10·T)` is mid, `≥ 10·T` is high. Ordered low < mid < high.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
 pub enum FieldTier {
     Low,
     Mid,
@@ -503,16 +503,15 @@ impl SchemaTree {
     /// stats on every leaf).
     pub fn derive_field_table(&self) -> FieldTable {
         use std::collections::BTreeMap;
-        // BTreeMap keyed by (tier_rank, name) yields the canonical
+        // BTreeMap keyed by (tier, name) yields the canonical
         // low→mid→high-then-by-name order directly.
-        let mut by_path: BTreeMap<(u8, String), LeafStats> = BTreeMap::new();
+        let mut by_path: BTreeMap<(FieldTier, String), LeafStats> = BTreeMap::new();
         for (id, node) in self.iter() {
             if !node.kind.is_leaf() {
                 continue;
             }
             let Some(stats) = node.leaf else { continue };
-            let rank = tier_rank(stats.tier);
-            by_path.entry((rank, self.path(id))).or_insert(stats);
+            by_path.entry((stats.tier, self.path(id))).or_insert(stats);
         }
         by_path
             .into_iter()
@@ -544,15 +543,6 @@ impl SchemaTree {
             .into_iter()
             .filter_map(|(path, set)| set.coalesce().map(|k| (path, k)))
             .collect()
-    }
-}
-
-/// Sort rank for tier ordering (low → mid → high).
-fn tier_rank(tier: FieldTier) -> u8 {
-    match tier {
-        FieldTier::Low => 0,
-        FieldTier::Mid => 1,
-        FieldTier::High => 2,
     }
 }
 
