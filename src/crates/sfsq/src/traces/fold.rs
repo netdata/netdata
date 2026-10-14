@@ -275,7 +275,9 @@ pub(crate) fn merge_trace_sources(
                         continue;
                     }
                 };
-                let reader = match sfst::IndexReader::open(mapped.bytes()) {
+                // The fold reads META and TRSU alone; only a filter needs
+                // the full reader (PRIM), upgraded below.
+                let meta = match sfst::MetaReader::open(mapped.bytes()) {
                     Ok(r) => r,
                     Err(e) => {
                         tracing::warn!(
@@ -290,7 +292,7 @@ pub(crate) fn merge_trace_sources(
                 };
                 // No mixed units: a pre-rollup file cannot contribute trace-level
                 // numbers — excluded, flagged, never mixed in.
-                if !reader.has_trace_rollup() {
+                if !meta.has_trace_rollup() {
                     tracing::debug!(
                         "sfsq {}: source {} has no trace rollup; excluded",
                         spec.op,
@@ -300,7 +302,7 @@ pub(crate) fn merge_trace_sources(
                     progress.fetch_add(1, Ordering::Relaxed);
                     continue;
                 }
-                let aggs = match reader.trace_rollup().map(|r| sealed_trace_envelopes(&r)) {
+                let aggs = match meta.trace_rollup().map(|r| sealed_trace_envelopes(&r)) {
                     Ok(a) => a,
                     Err(e) => {
                         tracing::warn!(
@@ -322,8 +324,10 @@ pub(crate) fn merge_trace_sources(
                     // INCLUDING this source's rows, so its in-file checks
                     // cannot overshoot on the fold's behalf.
                     let filter_ceiling = spec.visited_ceiling.saturating_sub(visited);
-                    match filter.mark_sealed(&reader, &mut merged, &mut filter_work, filter_ceiling)
-                    {
+                    let marked = meta.into_index_reader().and_then(|reader| {
+                        filter.mark_sealed(&reader, &mut merged, &mut filter_work, filter_ceiling)
+                    });
+                    match marked {
                         Ok(true) => {}
                         Ok(false) => {
                             status.add(spec.ceiling_reason);

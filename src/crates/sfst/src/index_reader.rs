@@ -131,6 +131,18 @@ impl<'a> MetaReader<'a> {
         Ok(true)
     }
 
+    /// Whether the file carries the optional per-file trace rollup (`TRSU`).
+    pub fn has_trace_rollup(&self) -> bool {
+        self.sfst.has_trace_rollup()
+    }
+
+    /// Decode and validate the per-file trace rollup (`TRSU`), as
+    /// [`IndexReader::trace_rollup`] does: the unfiltered trace overview
+    /// needs nothing else.
+    pub fn trace_rollup(&self) -> Result<crate::TraceRollup, crate::Error> {
+        self.sfst.trace_rollup()
+    }
+
     /// The full reader: decodes `PRIM`, reusing the cached `META` and
     /// field table.
     pub fn into_index_reader(self) -> Result<IndexReader<'a>, crate::Error> {

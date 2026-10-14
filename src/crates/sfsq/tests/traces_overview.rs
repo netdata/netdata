@@ -750,6 +750,35 @@ fn a_failed_filter_scan_leaves_the_files_traces_unflagged() {
     assert_eq!(data.cells[5][5], 0, "C stays unflagged");
 }
 
+/// The unfiltered grid reads a file's metadata and rollup alone: a
+/// corrupt primary dictionary does not touch it. A filter needs that
+/// dictionary, so there the file's matches are unknown and reported.
+#[test]
+fn the_unfiltered_grid_never_reads_the_primary_dictionary() {
+    let dir = tempfile::tempdir().unwrap();
+    let c = corpus();
+    let wal_bad = write_wal(dir.path(), vec![req(&c[2..])], "bad"); // B, C
+    let wal_ok = write_wal(dir.path(), vec![req(&c[..2])], "ok"); // A
+    drop(sealed_source(dir.path(), &wal_bad, "bad"));
+    let bad_path = dir.path().join("bad.sfst");
+    corrupt_chunk(&bad_path, *b"PRIM");
+    let src = || {
+        vec![
+            sealed_source_at(&bad_path, "bad"),
+            sealed_source(dir.path(), &wal_ok, "ok"),
+        ]
+    };
+
+    let plain = run(src(), OverviewQuery::new(grid()));
+    assert_eq!(plain.status, QueryStatus::Complete);
+    assert_eq!(plain.total_traces, 3);
+
+    let data = filtered(src(), name_in(&["a-1", "c-1"]));
+    assert!(data.status.has(PartialReason::SourceFailure));
+    assert_eq!(data.total_traces, 1);
+    assert_eq!(data.cells[5][5], 0, "C stays unflagged");
+}
+
 /// Trace-level and trace-id conditions cannot be answered from stored
 /// rows: a clean request error names the offending target, never a
 /// silently unfiltered grid.

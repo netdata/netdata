@@ -1,12 +1,13 @@
 //! `sfsq-cli trace` / `attributes` / `attribute-values` / `suggest` /
-//! `search` — the `sfsq::traces` engine from the terminal, without a
+//! `overview` / `search` — the `sfsq::traces` engine from the terminal, without a
 //! running agent. Each subcommand takes an explicit file list (`--sfst`
 //! sealed files, `--wal` traces WALs) instead of the logs front door's
 //! directory discovery; `trace` reconstructs one trace through the shared
 //! combiner, `attributes` / `attribute-values` enumerate the key
 //! vocabulary off the dictionaries, `suggest` matches keys or values
-//! against a term (and prints its time, for measurements), `search`
-//! filters whole traces.
+//! against a term (and prints its time, for measurements), `overview`
+//! builds the list's heatmap grid (for measurements), `search` filters
+//! whole traces.
 //!
 //! WAL inputs are served as tail scans over the file's full frame range —
 //! right for shut-down or recovered WALs (the dev case); an actively
@@ -25,9 +26,10 @@ use tokio_util::sync::CancellationToken;
 
 use sfsq::traces::{
     AttributeKey, AttributeNamesQuery, AttributeOwner, AttributeValuesQuery, BuiltinField,
-    CompareOp, Condition, Predicate, PredicateTarget, PredicateValue, QueryStatus, SearchQuery,
-    SearchSources, SourceId, SuggestQuery, TimeWindow, TraceQuery, TraceSfstCandidate, TraceSource,
-    TraceWalTail, WalCoverage, attribute_names, attribute_values, search, suggest, trace_by_id,
+    CompareOp, Condition, OverviewQuery, Predicate, PredicateTarget, PredicateValue, QueryStatus,
+    SearchQuery, SearchSources, SourceId, SuggestQuery, TimeWindow, TraceQuery, TraceSfstCandidate,
+    TraceSource, TraceWalTail, WalCoverage, attribute_names, attribute_values, overview, search,
+    suggest, trace_by_id,
 };
 
 /// Reconstruct one trace across sealed SFSTs and traces WALs.
@@ -588,6 +590,73 @@ pub fn run_suggest(args: &SuggestArgs, out: &mut dyn std::io::Write) -> Result<(
         data.truncated,
         status_word(&data.status),
         elapsed.as_secs_f64() * 1000.0,
+    )?;
+    Ok(())
+}
+
+// ── Overview ───────────────────────────────────────────────────────────
+
+/// Build the trace-density grid (time bucket × duration bin) — the
+/// list's heatmap — over sealed SFSTs and traces WALs.
+#[derive(Debug, clap::Args)]
+pub struct OverviewArgs {
+    /// A sealed traces SFST file. Repeatable.
+    #[arg(long = "sfst")]
+    pub sfsts: Vec<PathBuf>,
+
+    /// A flattened traces WAL file, scanned whole as a tail. Repeatable.
+    #[arg(long = "wal")]
+    pub wals: Vec<PathBuf>,
+
+    /// Grid start, nanoseconds since the epoch.
+    #[arg(long, allow_hyphen_values = true)]
+    pub start_ns: i64,
+
+    /// Grid end, nanoseconds since the epoch (exclusive).
+    #[arg(long, allow_hyphen_values = true)]
+    pub end_ns: i64,
+
+    /// Time buckets across the grid.
+    #[arg(long, default_value_t = 60)]
+    pub buckets: usize,
+
+    /// Count only traces with a span matching every condition, as
+    /// `search --where`. Repeatable.
+    #[arg(long = "where")]
+    pub conditions: Vec<String>,
+}
+
+pub fn run_overview(args: &OverviewArgs, out: &mut dyn std::io::Write) -> Result<()> {
+    let started = std::time::Instant::now();
+    if args.buckets == 0 || args.end_ns <= args.start_ns {
+        bail!("--buckets must be positive and --end-ns after --start-ns");
+    }
+    let buckets = args.buckets as i64;
+    let width = (args.end_ns - args.start_ns + buckets - 1) / buckets;
+    let mut query = OverviewQuery::new(sfst::Grid::new(args.start_ns, width, args.buckets));
+    if !args.conditions.is_empty() {
+        let conditions = args
+            .conditions
+            .iter()
+            .map(|spec| parse_condition(spec))
+            .collect::<Result<_>>()?;
+        query = query.predicate(Predicate { conditions });
+    }
+    let sources = build_sources(&args.sfsts, &args.wals)?;
+    let data = overview(
+        sources,
+        query,
+        CancellationToken::new(),
+        Arc::new(AtomicUsize::new(0)),
+    )?;
+    writeln!(
+        out,
+        "{} trace(s), {} span(s), {} error(s), status {}, {:.1} ms",
+        data.total_traces,
+        data.total_spans,
+        data.total_errors,
+        status_word(&data.status),
+        started.elapsed().as_secs_f64() * 1000.0,
     )?;
     Ok(())
 }
