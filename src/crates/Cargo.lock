@@ -1643,7 +1643,6 @@ version = "0.4.7"
 source = "git+https://github.com/vkalintiris/fst.git?branch=bumpalo#980a6384d3247a85120f0e3fc03dae846ef59529"
 dependencies = [
  "bumpalo",
- "utf8-ranges",
 ]
 
 [[package]]
@@ -6156,12 +6155,6 @@ name = "utf-8"
 version = "0.7.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "09cc8ee72d2a9becf2f2febe0205bbed8fc6615b7cb429ad062dc7b7ddd036a9"
-
-[[package]]
-name = "utf8-ranges"
-version = "1.0.5"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "7fcfc827f90e53a02eaef5e535ee14266c1d569214c6aa70133a624d8a3164ba"
 
 [[package]]
 name = "utf8_iter"
