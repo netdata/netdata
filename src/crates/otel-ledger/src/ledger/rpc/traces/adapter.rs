@@ -95,18 +95,19 @@ pub(crate) fn completion_capture_range(window: &std::ops::Range<u32>) -> std::op
 
 // ── Response bounds ─────────────────────────────────────────────────
 
-/// Per-value cap on the strings a trace's spans carry. The largest value
-/// seen in practice is a ~6 KB exception stack trace, so real values
-/// stay whole; the cap only stops a pathological value from dominating
-/// the response.
+/// Per-value cap on the strings a trace's spans carry, in JSON bytes
+/// (see [`truncate_value`]). The largest value seen in practice is a
+/// ~6 KB exception stack trace, so real values stay whole; the cap only
+/// stops a pathological value from dominating the response.
 pub(crate) const TRACE_VALUE_MAX_BYTES: usize = 8 * 1024;
 
 /// Budget for a trace's spans, in compact JSON bytes. Past it the
 /// response keeps the earliest spans and reports `byte_budget`.
 pub(crate) const TRACE_SPANS_MAX_BYTES: usize = 2 * 1024 * 1024;
 
-/// Per-value cap on the free-length strings of list rows (root service
-/// and name, breakdown service names) and of value lists. Both are for
+/// Per-value cap, in JSON bytes (see [`truncate_value`]), on the
+/// free-length strings of list rows (root service and name, breakdown
+/// service names) and of value lists. Both are for
 /// display; the trace view carries values up to
 /// [`TRACE_VALUE_MAX_BYTES`]. With at most
 /// [`super::wire::SEARCH_LIMIT_MAX`] rows or
@@ -114,18 +115,29 @@ pub(crate) const TRACE_SPANS_MAX_BYTES: usize = 2 * 1024 * 1024;
 /// 1 MB by construction, so no byte budget has to cut items off a page.
 pub(crate) const LIST_VALUE_MAX_BYTES: usize = 256;
 
-/// Cut `s` to at most `max` bytes at a character boundary; `true` when
-/// it was cut.
+/// Cut `s` at a character boundary so that it takes at most `max` bytes
+/// as a JSON string body (escapes counted, quotes not); `true` when it
+/// was cut. Counting the escaped form bounds what is sent: a control
+/// character takes six bytes on the wire.
 fn truncate_value(s: &mut String, max: usize) -> bool {
-    if s.len() <= max {
-        return false;
+    let mut used = 0;
+    for (i, c) in s.char_indices() {
+        used += json_escaped_len(c);
+        if used > max {
+            s.truncate(i);
+            return true;
+        }
     }
-    let mut cut = max;
-    while !s.is_char_boundary(cut) {
-        cut -= 1;
+    false
+}
+
+/// Bytes `c` takes inside a JSON string, as serde_json writes it.
+fn json_escaped_len(c: char) -> usize {
+    match c {
+        '"' | '\\' | '\n' | '\r' | '\t' | '\u{08}' | '\u{0C}' => 2,
+        c if u32::from(c) < 0x20 => 6,
+        c => c.len_utf8(),
     }
-    s.truncate(cut);
-    true
 }
 
 /// Apply [`TRACE_VALUE_MAX_BYTES`] to every value one span carries;
@@ -457,14 +469,16 @@ pub(crate) fn to_attribute_values_result(
     key: String,
 ) -> AttributeValuesResult {
     let mut values: Vec<AttributeValueWire> = Vec::with_capacity(data.values.len());
+    let mut listed: HashMap<String, usize> = HashMap::new();
     for v in data.values {
         let mut value = v.value;
         let truncated = truncate_value(&mut value, LIST_VALUE_MAX_BYTES);
-        // Values sharing a cut prefix are adjacent in byte order: list
-        // the prefix once.
-        if values.last().is_some_and(|prev| prev.value == value) {
+        // Values sharing a cut prefix list it once, flagged if any was cut.
+        if let Some(&i) = listed.get(&value) {
+            values[i].truncated |= truncated;
             continue;
         }
+        listed.insert(value.clone(), values.len());
         values.push(AttributeValueWire {
             value,
             kind: v.kind.map(kind_word),

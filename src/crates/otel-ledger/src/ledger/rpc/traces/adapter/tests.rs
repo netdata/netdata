@@ -622,6 +622,20 @@ fn values_are_cut_at_a_character_boundary() {
 }
 
 #[test]
+fn caps_count_the_escaped_json_length() {
+    // Every ASCII character, and a few wider ones, as serde_json writes them.
+    for c in (0u8..0x80).map(char::from).chain(['é', '€', '😀']) {
+        let wire = serde_json::to_string(&c.to_string()).unwrap();
+        assert_eq!(json_escaped_len(c), wire.len() - 2, "{c:?}");
+    }
+    // A control character takes six bytes on the wire: ten fit in 60.
+    let mut s = "\u{1}".repeat(100);
+    assert!(truncate_value(&mut s, 60));
+    assert_eq!(s.chars().count(), 10);
+    assert!(serde_json::to_string(&s).unwrap().len() - 2 <= 60);
+}
+
+#[test]
 fn an_oversized_span_value_is_cut_and_flagged() {
     let trace_id = parse_trace_id("11111111111111111111111111111111").unwrap();
     let mut root = span(1, None, 1_000);
@@ -733,6 +747,23 @@ fn long_values_in_a_value_list_are_cut_flagged_and_listed_once() {
             {"value": "a".repeat(LIST_VALUE_MAX_BYTES), "truncated": true},
             {"value": "b"}
         ])
+    );
+
+    // A value equal to another's cut prefix need not be its neighbour:
+    // `p` < `p + "bb"` (uncut) < `p + "€x"` (cut back to `p`).
+    let p = "a".repeat(LIST_VALUE_MAX_BYTES - 2);
+    let data = sfsq::traces::AttributeValuesData {
+        values: [p.clone(), format!("{p}bb"), format!("{p}€x")]
+            .into_iter()
+            .map(|value| sfsq::traces::AttributeValue { value, kind: None })
+            .collect(),
+        truncated: false,
+        status: QueryStatus::Complete,
+    };
+    let v = serde_json::to_value(to_attribute_values_result(data, "name".into())).unwrap();
+    assert_eq!(
+        v["values"],
+        json!([{"value": p, "truncated": true}, {"value": format!("{p}bb")}])
     );
 }
 
