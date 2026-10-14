@@ -171,9 +171,9 @@ impl TraceIdBloom {
         // The optimal hash count is 4 for normal filters at the old 5% target
         // and ~17 at 0.001% — but fastbloom floors the filter at 64 bits,
         // which inflates the optimal k for tiny files (a legitimate
-        // 1-distinct-id filter computes k = 44 at either target). The cap must therefore stay >= 44; do NOT tighten
-        // it toward the "normal" optimum or freshly-rolled low-volume files
-        // become unreadable.
+        // 1-distinct-id filter computes k = 44 at either target). The cap
+        // must therefore stay >= 44; do NOT tighten it toward the "normal"
+        // optimum or freshly-rolled low-volume files become unreadable.
         //
         // fastbloom's `num_hashes()` computes `num_hashes_minus_one + 1`
         // UNCHECKED on a serde-visible private field: a crafted chunk carrying
