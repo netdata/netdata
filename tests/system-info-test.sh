@@ -90,7 +90,8 @@ label_output=$(/bin/sh -c '
 
 # Native AGX Orin capture from #24165: retain only the public release header.
 l4t_header='# R36 (release), REVISION: 5.0, GCID: 43688277, BOARD: generic, EABI: aarch64, DATE: Fri Jan 16 03:50:45 UTC 2026'
-l4t_file="${test_dir}/nv_tegra_release"
+# Exercise redirection with spaces and sed/shell metacharacters in the fixture path.
+l4t_file="${test_dir}/nv_tegra_release &| fixture"
 assert_l4t_version() {
     expected_l4t=$1
     l4t_path=$2
@@ -562,6 +563,9 @@ done
 # Redirect only the release-file path in a copy; execute production startup/output
 # and runtime flow with the existing command shims, without modifying /etc.
 printf '%s\n' "$l4t_header" > "$l4t_file"
+# Keep the reference literal: the copied script reads the path as quoted environment data.
+# shellcheck disable=SC2016
+sed 's|/etc/nv_tegra_release|"$L4T_TEST_SOURCE"|g' "$system_info_script" > "${test_dir}/l4t-system-info.sh"
 for l4t_scenario in native container non-linux invalid missing runtime; do
     l4t_mode=--bounded
     l4t_kernel=Linux
@@ -574,10 +578,9 @@ for l4t_scenario in native container non-linux invalid missing runtime; do
         missing) l4t_source="${test_dir}/missing-release" ;;
         runtime) l4t_mode=--runtime; printf '%s\n' "$l4t_header" > "$l4t_file" ;;
     esac
-    sed "s|/etc/nv_tegra_release|${l4t_source}|g" "$system_info_script" > "${test_dir}/l4t-system-info.sh"
     : > "${test_dir}/runtime-probes.log"
     l4t_output=$(PATH="${test_dir}/runtime-bin:${PATH}" RUNTIME_PROBE_LOG="${test_dir}/runtime-probes.log" \
-        TEST_KERNEL="$l4t_kernel" TEST_CONTAINER="$l4t_container" \
+        TEST_KERNEL="$l4t_kernel" TEST_CONTAINER="$l4t_container" L4T_TEST_SOURCE="$l4t_source" \
         /bin/sh "${test_dir}/l4t-system-info.sh" "$l4t_mode")
     if [ "$l4t_scenario" = native ]; then
         printf '%s\n' "$l4t_output" | grep -Fx 'NETDATA_SYSTEM_L4T_VERSION=36.5.0' >/dev/null
