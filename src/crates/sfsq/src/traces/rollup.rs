@@ -252,6 +252,10 @@ pub fn tail_trace_parts(scan: &TraceWalScan) -> Vec<TracePart> {
     parts
 }
 
+/// Resolves a rollup ref of a storage field to its value (`None` for the
+/// no-ref sentinel; an error for a corrupt ref).
+pub type RefResolve<'r> = dyn FnMut(&str, u32) -> Result<Option<String>, sfst::Error> + 'r;
+
 /// Row `index` of a sealed file's `TRSU` + `TRSS` as a [`TracePart`],
 /// resolving the root and service refs through `resolve(field, ref)`
 /// (`None` for the no-ref sentinel; an error for a corrupt ref).
@@ -262,7 +266,7 @@ pub fn sealed_trace_part(
     rollup: &sfst::TraceRollup,
     stats: &sfst::TraceRollupStats,
     index: usize,
-    resolve: &mut dyn FnMut(&str, u32) -> Result<Option<String>, sfst::Error>,
+    resolve: &mut RefResolve<'_>,
 ) -> Result<TracePart, sfst::Error> {
     let name_field = BuiltinField::Name
         .dictionary_field()
