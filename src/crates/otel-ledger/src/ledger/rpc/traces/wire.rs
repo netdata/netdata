@@ -1177,6 +1177,7 @@ pub enum PartialReasonWire {
     FileBudget,
     Deadline,
     NoNewMatches,
+    TraceFragments,
 }
 
 impl From<PartialReason> for PartialReasonWire {
@@ -1194,6 +1195,7 @@ impl From<PartialReason> for PartialReasonWire {
             PartialReason::FileBudget => PartialReasonWire::FileBudget,
             PartialReason::Deadline => PartialReasonWire::Deadline,
             PartialReason::NoNewMatches => PartialReasonWire::NoNewMatches,
+            PartialReason::TraceFragments => PartialReasonWire::TraceFragments,
         }
     }
 }

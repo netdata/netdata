@@ -810,7 +810,8 @@
                   "busy",
                   "file_budget",
                   "deadline",
-                  "no_new_matches"
+                  "no_new_matches",
+                  "trace_fragments"
                 ]
               }
             }

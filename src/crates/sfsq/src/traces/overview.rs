@@ -71,7 +71,7 @@ use std::sync::atomic::AtomicUsize;
 
 use tokio_util::sync::CancellationToken;
 
-use super::fold::{SourceFoldSpec, TokenFilter, merge_trace_sources};
+use super::fold::{MergedTrace, SourceFoldSpec, TokenFilter, merge_trace_sources};
 use super::predicate::{PredicateError, PredicateTarget, TokenQuery};
 use super::sources::{SourceSetError, TraceSource, validate_sources};
 use super::status::{PartialReason, QueryStatus, StatusBuilder};
@@ -95,8 +95,17 @@ const DURATION_BIN_EDGES_NS: [i64; DURATION_BIN_COUNT - 1] = [
     10_000_000_000, // 10s
 ];
 
-/// The default visited budget (rollup rows + tail spans examined).
-const VISITED_ROWS_CEILING: u64 = 4_000_000;
+/// The fold budget (rollup rows + tail spans of the prefix): ~1.5 s at
+/// the measured ~0.38 µs per row. The single-source proof's filter
+/// stays accurate at this many ids.
+const FOLD_ROWS_CEILING: u64 = 4_000_000;
+const _: () = assert!(FOLD_ROWS_CEILING <= super::gate::PROOF_IDS_MAX);
+/// The filter's budget (scanned rows, emitted positions, claims, tail
+/// spans): the same ~1.5 s at the measured ~0.11 µs per unit.
+const FILTER_UNITS_CEILING: u64 = 14_000_000;
+/// The most multi-source traces the merge holds (~27 MB at ~105 B per
+/// entry); more are counted per file, flagged.
+const REMAINDER_TRACES_MAX: usize = 262_144;
 /// The filter's dictionary-bytes budget (the search's value and
 /// reasoning: a free-text term over a day of files).
 const DICT_BYTES_CEILING: u64 = 512 << 20;
@@ -203,7 +212,9 @@ impl DurationHistogram {
 #[derive(Debug, Clone)]
 pub struct OverviewQuery {
     grid: sfst::Grid,
-    visited_ceiling: u64,
+    fold_ceiling: u64,
+    filter_ceiling: u64,
+    remainder_cap: usize,
     tokens: TokenQuery,
 }
 
@@ -211,7 +222,9 @@ impl OverviewQuery {
     pub fn new(grid: sfst::Grid) -> Self {
         Self {
             grid,
-            visited_ceiling: VISITED_ROWS_CEILING,
+            fold_ceiling: FOLD_ROWS_CEILING,
+            filter_ceiling: FILTER_UNITS_CEILING,
+            remainder_cap: REMAINDER_TRACES_MAX,
             tokens: TokenQuery::default(),
         }
     }
@@ -221,17 +234,32 @@ impl OverviewQuery {
     /// its meaning kept. No tokens is the unfiltered grid; a
     /// trace-duration token is rejected at request time
     /// ([`OverviewRequestError::DurationToken`]). The filter's scans
-    /// share the visited budget.
+    /// have their own budget.
     pub fn tokens(mut self, tokens: impl Into<TokenQuery>) -> Self {
         self.tokens = tokens.into();
         self
     }
 
-    /// Test-only ceiling override — proves ceiling termination without a
-    /// four-million-row corpus. NOT a tuning surface.
+    /// Test-only fold-budget override — proves ceiling termination
+    /// without a four-million-row corpus. NOT a tuning surface.
     #[doc(hidden)]
-    pub fn visited_rows_ceiling_for_tests(mut self, ceiling: u64) -> Self {
-        self.visited_ceiling = ceiling;
+    pub fn fold_rows_ceiling_for_tests(mut self, ceiling: u64) -> Self {
+        self.fold_ceiling = ceiling;
+        self
+    }
+
+    /// Test-only filter-budget override. NOT a tuning surface.
+    #[doc(hidden)]
+    pub fn filter_units_ceiling_for_tests(mut self, ceiling: u64) -> Self {
+        self.filter_ceiling = ceiling;
+        self
+    }
+
+    /// Test-only remainder cap override — proves the fragment overflow
+    /// without a quarter-million multi-file traces. NOT a tuning surface.
+    #[doc(hidden)]
+    pub fn remainder_traces_for_tests(mut self, cap: usize) -> Self {
+        self.remainder_cap = cap;
         self
     }
 }
@@ -265,7 +293,8 @@ pub enum OverviewRequestError {
 pub struct OverviewData {
     /// Per time bucket (grid order), the per-duration-bin TRACE counts.
     /// A trace bins by its merged envelope: bucket of `min_start_ns`,
-    /// duration bin of `max_end − min_start` (saturating). Length =
+    /// duration bin of `max_end − min_start` (saturating) — per file
+    /// under [`TraceFragments`](PartialReason::TraceFragments). Length =
     /// `grid.num_buckets`; each row = [`DURATION_BIN_COUNT`].
     pub cells: Vec<[u64; DURATION_BIN_COUNT]>,
     /// Per cell, the binned traces' STORED ERROR-status spans —
@@ -282,10 +311,11 @@ pub struct OverviewData {
     pub total_spans: u64,
     /// Of those spans, ERROR-status ones.
     pub total_errors: u64,
-    /// Per time bucket, the EXACT nearest-rank envelope-duration
-    /// percentiles over the traces binned there — index-parallel to
-    /// `cells`'s outer index, `None` where nothing binned. Not derived
-    /// from `cells`: the duration bins are decade-wide.
+    /// Per time bucket, the nearest-rank envelope-duration percentiles
+    /// over the traces binned there, from a fixed-size histogram (within
+    /// 1/32 of exact; module docs) — index-parallel to `cells`'s outer
+    /// index, `None` where nothing binned. Not derived from `cells`: the
+    /// duration bins are decade-wide.
     pub bucket_percentiles: Vec<Option<DurationPercentiles>>,
     pub status: QueryStatus,
 }
@@ -349,16 +379,15 @@ pub fn overview(
     let mut status = StatusBuilder::new();
     let spec = SourceFoldSpec {
         op: "overview",
-        visited_ceiling: query.visited_ceiling,
+        fold_ceiling: query.fold_ceiling,
+        filter_ceiling: query.filter_ceiling,
+        remainder_cap: query.remainder_cap,
         dict_ceiling: DICT_BYTES_CEILING,
         ceiling_reason: PartialReason::OverviewCeiling,
         filter,
     };
-    let Some(merged) = merge_trace_sources(sources, &spec, &cancel, &progress, &mut status) else {
-        return Ok(OverviewData::empty(grid.num_buckets, status.finish()));
-    };
 
-    // Bin the merged traces by envelope; totals fold alongside. A
+    // Bin each finished trace by envelope; totals fold alongside. A
     // trace whose envelope START lies outside the grid is clipped —
     // the search engine's start-in-window rule, applied to the
     // envelope.
@@ -369,16 +398,13 @@ pub fn overview(
     let mut total_errors = 0u64;
     // A fixed-size histogram per bucket that binned a trace.
     let mut bucket_histograms: Vec<Option<DurationHistogram>> = vec![None; grid.num_buckets];
-    for (trace_id, m) in &merged {
+    let mut bin = |trace_id: sfst::TraceId, m: &MergedTrace| {
         // Filtered out, or clipped by the bin-by-envelope-start rule.
-        if spec
-            .filter
-            .as_ref()
-            .is_some_and(|f| !f.passes(*trace_id, m))
+        if spec.filter.as_ref().is_some_and(|f| !f.passes(trace_id, m))
             || m.min_start_ns < grid_start
             || m.min_start_ns >= grid_end
         {
-            continue;
+            return;
         }
         let bucket = ((m.min_start_ns - grid_start) / grid.bucket_width_ns) as usize;
         let duration = m.max_end_ns.saturating_sub(m.min_start_ns);
@@ -391,6 +417,9 @@ pub fn overview(
         bucket_histograms[bucket]
             .get_or_insert_with(DurationHistogram::new)
             .record(duration);
+    };
+    if !merge_trace_sources(sources, &spec, &cancel, &progress, &mut status, &mut bin) {
+        return Ok(OverviewData::empty(grid.num_buckets, status.finish()));
     }
 
     Ok(OverviewData {

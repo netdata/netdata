@@ -23,9 +23,10 @@
 //! Fixtures: tests/common/mod.rs — real WALs through the production
 //! write/seal pipeline, mixed sealed/tail source shapes, and the
 //! hand-built legacy no-rollup file. Grids are tiny (one-second
-//! buckets, [`grid`]); ceilings are forced with
-//! `visited_rows_ceiling_for_tests`, so the 4M default budget is never
-//! what's under test. Not pinned: the bins' wire labels, error cells
+//! buckets, [`grid`]); budgets are forced with
+//! `fold_rows_ceiling_for_tests`, `filter_units_ceiling_for_tests` and
+//! `remainder_traces_for_tests`, so the defaults are never what's under
+//! test. Not pinned: the bins' wire labels, error cells
 //! and percentiles under every partial path, and progress ticking
 //! beyond the one-per-source count.
 
@@ -298,7 +299,7 @@ fn ceiling_terminates_with_the_deterministic_prefix_and_the_partial() {
             sealed_source(dir.path(), &wal_a, "1-first"),
             sealed_source(dir.path(), &wal_b, "2-second"),
         ],
-        OverviewQuery::new(grid()).visited_rows_ceiling_for_tests(0),
+        OverviewQuery::new(grid()).fold_rows_ceiling_for_tests(0),
     );
     assert!(data.status.has(PartialReason::OverviewCeiling));
     assert_eq!(data.total_traces, 1, "only the first source's trace");
@@ -643,11 +644,11 @@ fn filtered_grid_selects_by_any_stored_copy() {
     }
 }
 
-/// The filter's scans share the fold's ONE ceiling: an exhausted budget
+/// The filter's scans are charged to their own budget: an exhausted one
 /// stops the merge with the overview's own `OverviewCeiling` partial,
 /// and nothing half-flagged is binned.
 #[test]
-fn filtered_grid_charges_the_visited_ceiling() {
+fn filtered_grid_charges_the_filter_ceiling() {
     let dir = tempfile::tempdir().unwrap();
     let wal = write_wal(dir.path(), vec![req(&corpus())], "c");
     for src in [
@@ -658,17 +659,17 @@ fn filtered_grid_charges_the_visited_ceiling() {
             src,
             OverviewQuery::new(grid())
                 .tokens(name_in(&["c-1"]))
-                .visited_rows_ceiling_for_tests(1),
+                .filter_units_ceiling_for_tests(0),
         );
         assert!(data.status.has(PartialReason::OverviewCeiling));
         assert_eq!(data.total_traces, 0);
     }
 }
 
-/// The filter's scans are charged to the fold's ONE ceiling and
-/// accumulate across sources: two files each affordable alone are not
-/// affordable together, and the merge stops with the partial reason
-/// while the traces the earlier file already selected stay binned.
+/// The filter's units accumulate across sources: two files each
+/// affordable alone are not affordable together, and the merge stops
+/// with the partial reason while the traces the earlier file already
+/// selected stay binned.
 #[test]
 fn filter_work_accumulates_across_sources() {
     let dir = tempfile::tempdir().unwrap();
@@ -683,11 +684,11 @@ fn filter_work_accumulates_across_sources() {
             sources,
             OverviewQuery::new(grid())
                 .tokens(predicate())
-                .visited_rows_ceiling_for_tests(ceiling),
+                .filter_units_ceiling_for_tests(ceiling),
         )
     };
-    // The smallest ceiling under which one file alone completes: its
-    // fold rows plus its filter's scan and emission.
+    // The smallest filter budget under which one file alone completes:
+    // its filter's scan and emission.
     let minimal = |source: &dyn Fn() -> TraceSource| {
         (0..64)
             .find(|&ceiling| at(vec![source()], ceiling).status == QueryStatus::Complete)
@@ -1008,13 +1009,107 @@ fn a_refused_filter_scan_cannot_pass_negated_tokens() {
                     .tokens(TokenQuery {
                         tokens: vec![Token::negated(any_name())],
                     })
-                    .visited_rows_ceiling_for_tests(ceiling),
+                    .filter_units_ceiling_for_tests(ceiling),
             );
             partials += data.status.has(PartialReason::OverviewCeiling) as usize;
             assert_eq!(data.total_traces, 0, "ceiling {ceiling}: {:?}", data.status);
         }
         assert!(partials > 0, "some ceilings refuse the work");
     }
+}
+
+/// A two-file corpus where trace C straddles the files: A and C's first
+/// span in `a`, B and C's second span in `b`.
+fn straddling_sources(dir: &std::path::Path) -> impl Fn() -> Vec<TraceSource> + '_ {
+    let c = corpus();
+    let wal_a = write_wal(
+        dir,
+        vec![req(&[c[0].clone(), c[1].clone(), c[3].clone()])],
+        "a",
+    );
+    let wal_b = write_wal(dir, vec![req(&[c[2].clone(), c[4].clone()])], "b");
+    move || {
+        vec![
+            sealed_source(dir, &wal_a, "a"),
+            sealed_source(dir, &wal_b, "b"),
+        ]
+    }
+}
+
+/// Past the remainder cap, a trace stored in several files counts once
+/// per file with its file-local envelope, flagged `TraceFragments`;
+/// single-file traces bin as they always do.
+#[test]
+fn remainder_overflow_counts_fragments_and_flags_them() {
+    let dir = tempfile::tempdir().unwrap();
+    let src = straddling_sources(dir.path());
+    let merged = run(src(), OverviewQuery::new(grid()));
+    assert_eq!(merged.status, QueryStatus::Complete);
+    assert_eq!(merged.total_traces, 3);
+    assert_eq!((merged.cells[5][3], merged.cells[5][5]), (0, 1), "C: 12 s");
+
+    let split = run(
+        src(),
+        OverviewQuery::new(grid()).remainder_traces_for_tests(0),
+    );
+    assert!(split.status.has(PartialReason::TraceFragments));
+    assert_eq!(split.total_traces, 4, "C counts once per file");
+    assert_eq!(split.cells[5][3], 1, "C in a: 100 ms");
+    assert_eq!(split.cells[5][5], 1, "C in b: ~12 s");
+    assert_eq!(split.total_spans, merged.total_spans);
+    assert_eq!(
+        (split.cells[1][3], split.cells[3][0]),
+        (1, 1),
+        "A and B unchanged"
+    );
+}
+
+/// A trace held by one file never enters the remainder map: with no
+/// room at all, a single-file corpus still bins exactly and completes.
+#[test]
+fn single_source_traces_never_enter_the_remainder() {
+    let dir = tempfile::tempdir().unwrap();
+    let c = corpus();
+    let wal_a = write_wal(dir.path(), vec![req(&c[..3])], "a"); // A, B
+    let wal_b = write_wal(dir.path(), vec![req(&c[3..])], "b"); // C
+    let src = || {
+        vec![
+            sealed_source(dir.path(), &wal_a, "a"),
+            tail_source(&wal_b, "b"),
+        ]
+    };
+    let data = run(
+        src(),
+        OverviewQuery::new(grid()).remainder_traces_for_tests(0),
+    );
+    assert_eq!(data.status, QueryStatus::Complete);
+    assert_eq!(data.total_traces, 3);
+    assert_eq!(data.cells, run(src(), OverviewQuery::new(grid())).cells);
+}
+
+/// The fold and the filter have separate budgets: a fold budget that
+/// just covers the files completes a filtered grid too, and a filter
+/// budget alone trips the partial however large the fold budget is.
+#[test]
+fn fold_and_filter_meters_trip_separately() {
+    let dir = tempfile::tempdir().unwrap();
+    let src = straddling_sources(dir.path());
+    let fold = |ceiling: u64| OverviewQuery::new(grid()).fold_rows_ceiling_for_tests(ceiling);
+    // The smallest fold budget that completes the unfiltered grid.
+    let fold_cost = (0..64)
+        .find(|&c| run(src(), fold(c)).status == QueryStatus::Complete)
+        .expect("a small corpus completes");
+    let filtered = run(src(), fold(fold_cost).tokens(name_in(&["a-1", "c-2"])));
+    assert_eq!(filtered.status, QueryStatus::Complete);
+    assert_eq!(filtered.total_traces, 2, "A and C");
+
+    let starved = run(
+        src(),
+        fold(u64::MAX)
+            .tokens(name_in(&["a-1", "c-2"]))
+            .filter_units_ceiling_for_tests(0),
+    );
+    assert!(starved.status.has(PartialReason::OverviewCeiling));
 }
 
 /// A negated token excludes the traces with a matching stored row in

@@ -44,13 +44,12 @@ pub enum PartialReason {
     /// re-ranking and grow-K, and a mid-loop aggregate cancel discards
     /// the partial fold.
     Cancelled,
-    /// The overview's visited-rows ceiling was hit before every
-    /// in-window source was binned: the grid holds the deterministic
-    /// prefix of sources ([`SourceId`](super::SourceId) order)
-    /// processed so far. Distinct from
-    /// [`WorkCeiling`](Self::WorkCeiling) — this budget counts rows
-    /// visited per source (TRSU rows / tail spans), not search's
-    /// candidate loop.
+    /// One of the overview's budgets was hit before every in-window
+    /// source was binned: the fold budget (TRSU rows / tail spans per
+    /// source) or the filter's (its scans and matches). The grid holds
+    /// the deterministic prefix of sources ([`SourceId`](super::SourceId)
+    /// order) processed so far. Distinct from
+    /// [`WorkCeiling`](Self::WorkCeiling), search's candidate loop.
     OverviewCeiling,
     /// A sealed source has no trace rollup chunk (`TRSU`) and was
     /// EXCLUDED from trace-level aggregation: including it would
@@ -90,6 +89,11 @@ pub enum PartialReason {
     /// A newest-first walk stopped after several consecutive sources
     /// added no new match: older sources were not visited. Suggest-only.
     NoNewMatches,
+    /// The overview met more traces stored in several files than its
+    /// merge holds: the rest were counted once per file, each with its
+    /// file-local envelope and filter matches (the per-block rule some
+    /// tracing stores apply to every trace). Overview-only.
+    TraceFragments,
 }
 
 /// The status of one query's result.

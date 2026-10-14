@@ -18,17 +18,29 @@
 //!   file without the trace rollup is EXCLUDED as
 //!   [`RollupAbsent`](PartialReason::RollupAbsent) (no mixed units —
 //!   pre-rollup files cannot contribute trace-level numbers).
-//! - The visited budget: rollup rows (sealed) / decoded spans (tails)
-//!   — each shape's actual fold cost — checked BETWEEN sources, so one
-//!   source may overshoot by its whole cost; the caller names the
-//!   reason. The budget bounds WORK, not memory (the map peaks at the
-//!   processed prefix's distinct traces).
+//! - Two passes. Pass 1 records every source's trace ids in a
+//!   fixed-size [`sfst::RepeatFilter`] and fixes the PREFIX of sources
+//!   by the fold budget: rollup rows (sealed) / decoded spans (tails),
+//!   each shape's actual fold cost, checked BETWEEN sources, so one
+//!   source may overshoot by its whole cost; the sources after it are
+//!   dropped with the caller's reason. Pass 2 folds the prefix one
+//!   source at a time: a trace the filter proves single-source is
+//!   finished inside its source and handed to the caller's sink at
+//!   once; the rest fold in a remainder map capped at
+//!   [`SourceFoldSpec::remainder_cap`] traces and reach the sink at the
+//!   end. Memory: the filter, the capped map and one source, never a
+//!   map of every trace.
+//! - Remainder overflow: a trace absent from a full remainder map is
+//!   handed over per source, as its own trace (a long trace stored in
+//!   several files then counts once per file, with its file-local
+//!   envelope) and the result carries
+//!   [`TraceFragments`](PartialReason::TraceFragments).
 //! - The optional token filter ([`TokenFilter`]): its scans and
-//!   emissions are charged to the SAME ceiling as the fold, its
-//!   dictionary walks to the caller's dictionary-bytes ceiling, and a
-//!   refused or truncated filter scan stops the merge with the
-//!   caller's ceiling reason, so a half-flagged file never poses as
-//!   complete.
+//!   emissions are charged to their OWN ceiling, its dictionary walks
+//!   to the caller's dictionary-bytes ceiling, and a refused or
+//!   truncated filter scan leaves the source's traces unknown and stops
+//!   the merge with the caller's ceiling reason, so a half-flagged file
+//!   never poses as complete.
 //! - The merge rule: envelopes widen and stored-row counts saturate
 //!   (resends count).
 //!
@@ -45,7 +57,7 @@ use tokio_util::sync::CancellationToken;
 
 use super::predicate::{SpanToken, TokenKind, TokenQuery, TraceIdConstraints, TraceLevelEval};
 use super::rollup::{TraceAggregate, sealed_trace_envelopes, tail_trace_aggregates};
-use super::sources::TraceSource;
+use super::sources::{TraceSfstCandidate, TraceSource};
 use super::status::{PartialReason, StatusBuilder};
 use super::vocab::{BuiltinField, resource_service_field, span_field};
 use super::wal_scan::TraceWalScan;
@@ -57,9 +69,15 @@ use sfst::{ScanWork, TracePlan};
 pub(crate) struct SourceFoldSpec {
     /// The op name for log lines (`"overview"`, …).
     pub op: &'static str,
-    /// The caller's visited budget (rollup rows + tail spans), shared
-    /// with the filter's scans (see the module docs).
-    pub visited_ceiling: u64,
+    /// The fold budget: rollup rows + tail spans of the prefix (module
+    /// docs).
+    pub fold_ceiling: u64,
+    /// The filter's budget: its scanned rows, emitted positions, claims
+    /// and visited tail spans.
+    pub filter_ceiling: u64,
+    /// The most multi-source traces the remainder map holds (module
+    /// docs).
+    pub remainder_cap: usize,
     /// The caller's dictionary-bytes budget for the filter's
     /// compilations (sfst `ScanWork::dict_bytes`).
     pub dict_ceiling: u64,
@@ -370,49 +388,107 @@ fn fold_into(merged: &mut HashMap<sfst::TraceId, MergedTrace>, aggs: &[TraceAggr
     }
 }
 
-/// Run the shared source loop and merge (the contracts in the module
-/// docs). `sources` may arrive in any order — sorted by `SourceId`
-/// here. `progress` ticks once per processed source (failed and
-/// unavailable ones included).
+/// Merge one source's trace into a remainder entry (the merge rule).
+fn merge_into(into: &mut MergedTrace, from: &MergedTrace) {
+    into.min_start_ns = into.min_start_ns.min(from.min_start_ns);
+    into.max_end_ns = into.max_end_ns.max(from.max_end_ns);
+    into.span_count = into.span_count.saturating_add(from.span_count);
+    into.error_count = into.error_count.saturating_add(from.error_count);
+    into.mask |= from.mask;
+    into.unknown |= from.unknown;
+}
+
+/// A prefix source pass 1 opened, kept for pass 2: a sealed file is
+/// mapped again there (its rollup decoded again), a tail keeps its scan.
+enum Prepared<'a> {
+    Sealed(&'a TraceSfstCandidate),
+    Tail(TraceWalScan, Vec<TraceAggregate>),
+}
+
+/// Open a sealed source's rollup; a failure is surfaced and `None`.
+fn open_rollup<'m>(
+    spec: &SourceFoldSpec,
+    c: &TraceSfstCandidate,
+    mapped: &'m crate::source::Mapped,
+    status: &mut StatusBuilder,
+) -> Option<(sfst::MetaReader<'m>, sfst::TraceRollup)> {
+    let meta = match sfst::MetaReader::open(mapped.bytes()) {
+        Ok(r) => r,
+        Err(e) => {
+            tracing::warn!(
+                "sfsq {}: source {} failed to parse: {e}",
+                spec.op,
+                c.source_id
+            );
+            status.add(PartialReason::SourceFailure);
+            return None;
+        }
+    };
+    // No mixed units: a pre-rollup file cannot contribute trace-level
+    // numbers — excluded, flagged, never mixed in.
+    if !meta.has_trace_rollup() {
+        tracing::debug!(
+            "sfsq {}: source {} has no trace rollup; excluded",
+            spec.op,
+            c.source_id
+        );
+        status.add(PartialReason::RollupAbsent);
+        return None;
+    }
+    match meta.trace_rollup() {
+        Ok(rollup) => Some((meta, rollup)),
+        Err(e) => {
+            tracing::warn!(
+                "sfsq {}: source {} rollup failed to read: {e}",
+                spec.op,
+                c.source_id
+            );
+            status.add(PartialReason::SourceFailure);
+            None
+        }
+    }
+}
+
+/// Run the shared two-pass merge (the contracts in the module docs).
+/// `sources` may arrive in any order — sorted by `SourceId` here.
+/// `progress` ticks once per source (failed and unavailable ones
+/// included). Every finished trace reaches `sink` exactly once:
+/// single-source ones during pass 2, remainder ones at its end, and
+/// overflow fragments once per source.
 ///
-/// Returns `None` only when cancelled — all-or-empty, with the
-/// `Cancelled` reason already added to `status`. A ceiling breach is
-/// different: the loop stops, later sources contribute nothing and add
-/// no reason, and the prefix merged so far returns as `Some` with the
-/// caller's ceiling reason on `status` — a partial answer, labelled
-/// partial.
+/// Returns `false` only when cancelled — all-or-empty: the caller drops
+/// what the sink gathered; the `Cancelled` reason is already on
+/// `status`. A ceiling breach is different: the merge stops, later
+/// sources contribute nothing and add no reason, and what reached the
+/// sink stands, with the caller's ceiling reason on `status` — a partial
+/// answer, labelled partial.
 pub(crate) fn merge_trace_sources(
     mut sources: Vec<TraceSource>,
     spec: &SourceFoldSpec,
     cancel: &CancellationToken,
     progress: &AtomicUsize,
     status: &mut StatusBuilder,
-) -> Option<HashMap<sfst::TraceId, MergedTrace>> {
+    sink: &mut dyn FnMut(sfst::TraceId, &MergedTrace),
+) -> bool {
     sources.sort_by(|a, b| a.source_id().as_str().cmp(b.source_id().as_str()));
-
     // The up-front poll exists for the empty-source-list case: the
-    // per-iteration poll below never runs, so without it a cancelled
-    // call with no sources would return `Some` (an empty map) and
-    // report Complete.
+    // per-iteration polls never run, so without it a cancelled call with
+    // no sources would report Complete.
     if cancel.is_cancelled() {
         status.add(PartialReason::Cancelled);
-        return None;
+        return false;
     }
 
-    let mut merged: HashMap<sfst::TraceId, MergedTrace> = HashMap::new();
-
-    // Two budget meters, one ceiling: `visited` charges the fold (rollup
-    // rows / tail spans) and `filter_work` charges the filter's scans and
-    // emissions; the between-sources check sums them, and the filter's
-    // own in-file checks see the ceiling net of the fold's share.
-    let mut visited = 0u64;
-    let mut filter_work = ScanWork::default();
+    // ── Pass 1: the proof's ids and the prefix ──────────────────────
+    let mut proof = sfst::RepeatFilter::new();
+    let mut fold_rows = 0u64;
+    let mut prefix: Vec<Prepared<'_>> = Vec::new();
     for source in &sources {
         if cancel.is_cancelled() {
             status.add(PartialReason::Cancelled);
-            return None;
+            return false;
         }
-        if visited.saturating_add(filter_work.rows_visited) > spec.visited_ceiling {
+        if fold_rows > spec.fold_ceiling {
             status.add(spec.ceiling_reason);
             break;
         }
@@ -431,89 +507,17 @@ pub(crate) fn merge_trace_sources(
                         continue;
                     }
                 };
-                // The fold reads META and TRSU alone; only a filter needs
-                // the full reader (PRIM), upgraded below.
-                let meta = match sfst::MetaReader::open(mapped.bytes()) {
-                    Ok(r) => r,
-                    Err(e) => {
-                        tracing::warn!(
-                            "sfsq {}: source {} failed to parse: {e}",
-                            spec.op,
-                            c.source_id
-                        );
-                        status.add(PartialReason::SourceFailure);
-                        progress.fetch_add(1, Ordering::Relaxed);
-                        continue;
-                    }
-                };
-                // No mixed units: a pre-rollup file cannot contribute trace-level
-                // numbers — excluded, flagged, never mixed in.
-                if !meta.has_trace_rollup() {
-                    tracing::debug!(
-                        "sfsq {}: source {} has no trace rollup; excluded",
-                        spec.op,
-                        c.source_id
-                    );
-                    status.add(PartialReason::RollupAbsent);
+                let Some((_, rollup)) = open_rollup(spec, c, &mapped, status) else {
                     progress.fetch_add(1, Ordering::Relaxed);
                     continue;
-                }
-                let rollup = match meta.trace_rollup() {
-                    Ok(r) => r,
-                    Err(e) => {
-                        tracing::warn!(
-                            "sfsq {}: source {} rollup failed to read: {e}",
-                            spec.op,
-                            c.source_id
-                        );
-                        status.add(PartialReason::SourceFailure);
-                        progress.fetch_add(1, Ordering::Relaxed);
-                        continue;
-                    }
                 };
-                let aggs = sealed_trace_envelopes(&rollup);
+                for i in 0..rollup.len() {
+                    proof.record(rollup.trace_ids.get(i));
+                }
                 // The sealed side's cost is its TRSU rows (one per
                 // distinct trace).
-                visited = visited.saturating_add(aggs.len() as u64);
-                fold_into(&mut merged, &aggs);
-                if let Some(filter) = &spec.filter {
-                    // The filter sees the ceiling net of the fold's share
-                    // INCLUDING this source's rows, so its in-file checks
-                    // cannot overshoot on the fold's behalf.
-                    let limits = sfst::ScanLimits {
-                        rows: spec.visited_ceiling.saturating_sub(visited),
-                        dict_bytes: spec.dict_ceiling,
-                    };
-                    let marked = meta.into_index_reader().and_then(|reader| {
-                        filter.mark_sealed(&reader, &rollup, &mut merged, &mut filter_work, limits)
-                    });
-                    match marked {
-                        Ok(true) => {}
-                        Ok(false) => {
-                            // The file's rows are merged but its bits
-                            // are partial: unknown, like a failed scan.
-                            mark_unknown(&mut merged, &aggs);
-                            status.add(spec.ceiling_reason);
-                            progress.fetch_add(1, Ordering::Relaxed);
-                            break;
-                        }
-                        Err(e) => {
-                            // Unlike a refused scan (`Ok(false)`), an
-                            // error does NOT stop the merge: the
-                            // file's rows are already merged, only its
-                            // bits are unknown — its traces cannot
-                            // pass a negated token and the failure is
-                            // on the result.
-                            tracing::warn!(
-                                "sfsq {}: source {} filter scan failed: {e}",
-                                spec.op,
-                                c.source_id
-                            );
-                            status.add(PartialReason::SourceFailure);
-                            mark_unknown(&mut merged, &aggs);
-                        }
-                    }
-                }
+                fold_rows = fold_rows.saturating_add(rollup.len() as u64);
+                prefix.push(Prepared::Sealed(c));
             }
             TraceSource::Tail(t) => {
                 let scan = match TraceWalScan::scan_range(&t.path, t.coverage.range) {
@@ -526,27 +530,129 @@ pub(crate) fn merge_trace_sources(
                     }
                 };
                 let aggs = tail_trace_aggregates(&scan);
+                for a in &aggs {
+                    proof.record(a.trace_id);
+                }
                 // The tail's cost is its decoded spans, not its distinct
                 // traces. (The fold skips unset-trace-id spans; charging
                 // them anyway just trips the ceiling marginally earlier.)
-                visited = visited.saturating_add(scan.num_spans() as u64);
-                fold_into(&mut merged, &aggs);
-                let filter_ceiling = spec.visited_ceiling.saturating_sub(visited);
-                if let Some(filter) = &spec.filter
-                    && !filter.mark_tail(&scan, &mut merged, &mut filter_work, filter_ceiling)
-                {
-                    mark_unknown(&mut merged, &aggs);
-                    status.add(spec.ceiling_reason);
-                    progress.fetch_add(1, Ordering::Relaxed);
-                    break;
-                }
+                fold_rows = fold_rows.saturating_add(scan.num_spans() as u64);
+                prefix.push(Prepared::Tail(scan, aggs));
             }
             // The callers' captures are already window-pruned, so an
             // unavailable source here is in range: its traces are missing.
-            TraceSource::Unavailable(_) => status.add(PartialReason::RemoteUnavailable),
+            TraceSource::Unavailable(_) => {
+                status.add(PartialReason::RemoteUnavailable);
+                progress.fetch_add(1, Ordering::Relaxed);
+            }
         }
-        progress.fetch_add(1, Ordering::Relaxed);
     }
 
-    Some(merged)
+    // ── Pass 2: fold the prefix, one source at a time ───────────────
+    let mut remainder: HashMap<sfst::TraceId, MergedTrace> = HashMap::new();
+    let mut fragments = false;
+    let mut filter_work = ScanWork::default();
+    let limits = sfst::ScanLimits {
+        rows: spec.filter_ceiling,
+        dict_bytes: spec.dict_ceiling,
+    };
+    for prepared in prefix {
+        if cancel.is_cancelled() {
+            status.add(PartialReason::Cancelled);
+            return false;
+        }
+        let mut local: HashMap<sfst::TraceId, MergedTrace> = HashMap::new();
+        let mut refused = false;
+        match prepared {
+            Prepared::Sealed(c) => {
+                let mapped = match map_source(&c.source) {
+                    Ok(m) => m,
+                    Err(e) => {
+                        tracing::warn!(
+                            "sfsq {}: source {} failed to map: {e}",
+                            spec.op,
+                            c.source_id
+                        );
+                        status.add(PartialReason::SourceFailure);
+                        progress.fetch_add(1, Ordering::Relaxed);
+                        continue;
+                    }
+                };
+                let Some((meta, rollup)) = open_rollup(spec, c, &mapped, status) else {
+                    progress.fetch_add(1, Ordering::Relaxed);
+                    continue;
+                };
+                let aggs = sealed_trace_envelopes(&rollup);
+                fold_into(&mut local, &aggs);
+                if let Some(filter) = &spec.filter {
+                    // Only a filter needs the full reader (PRIM).
+                    let marked = meta.into_index_reader().and_then(|reader| {
+                        filter.mark_sealed(&reader, &rollup, &mut local, &mut filter_work, limits)
+                    });
+                    match marked {
+                        Ok(true) => {}
+                        Ok(false) => {
+                            // The file's rows are merged but its bits
+                            // are partial: unknown, like a failed scan.
+                            mark_unknown(&mut local, &aggs);
+                            refused = true;
+                        }
+                        Err(e) => {
+                            // Unlike a refused scan, an error does NOT
+                            // stop the merge: the file's rows count, only
+                            // its bits are unknown — its traces cannot
+                            // pass a negated token and the failure is on
+                            // the result.
+                            tracing::warn!(
+                                "sfsq {}: source {} filter scan failed: {e}",
+                                spec.op,
+                                c.source_id
+                            );
+                            status.add(PartialReason::SourceFailure);
+                            mark_unknown(&mut local, &aggs);
+                        }
+                    }
+                }
+            }
+            Prepared::Tail(scan, aggs) => {
+                fold_into(&mut local, &aggs);
+                if let Some(filter) = &spec.filter
+                    && !filter.mark_tail(&scan, &mut local, &mut filter_work, spec.filter_ceiling)
+                {
+                    mark_unknown(&mut local, &aggs);
+                    refused = true;
+                }
+            }
+        }
+        for (trace_id, m) in local {
+            if !proof.may_repeat(trace_id) {
+                // The whole trace is in this source: finished.
+                sink(trace_id, &m);
+                continue;
+            }
+            let room = remainder.len() < spec.remainder_cap;
+            match remainder.get_mut(&trace_id) {
+                Some(into) => merge_into(into, &m),
+                None if room => {
+                    remainder.insert(trace_id, m);
+                }
+                None => {
+                    fragments = true;
+                    sink(trace_id, &m);
+                }
+            }
+        }
+        progress.fetch_add(1, Ordering::Relaxed);
+        if refused {
+            status.add(spec.ceiling_reason);
+            break;
+        }
+    }
+    for (trace_id, m) in &remainder {
+        sink(*trace_id, m);
+    }
+    if fragments {
+        status.add(PartialReason::TraceFragments);
+    }
+    true
 }
