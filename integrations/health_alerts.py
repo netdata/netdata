@@ -85,15 +85,19 @@ _VARIABLE = re.compile(r'\$\{([^}]*)\}|\$([^\s&|!><=%+\-*/?(){}]+)')
 
 # Host variables stock alerts read (rrdvar host variables); they resolve from any chart. Each maps to the files that
 # define it. metadata.yaml documents dimensions only, so variables are listed here.
+_PROC_NET_SOCKSTAT = ('src/collectors/proc.plugin/proc_net_sockstat.c',)
 HOST_VARIABLES = {
-    'active_processors': ('src/collectors/proc.plugin/proc_stat.c', 'src/collectors/windows.plugin/perflib-processor.c'),
+    'active_processors': (
+        'src/collectors/proc.plugin/proc_stat.c',
+        'src/collectors/windows.plugin/perflib-processor.c',
+    ),
     'ipc_semaphores_arrays_max': ('src/collectors/proc.plugin/ipc.c',),
     'ipc_semaphores_max': ('src/collectors/proc.plugin/ipc.c',),
     'netfilter_conntrack_max': ('src/collectors/proc.plugin/proc_net_stat_conntrack.c',),
     'tcp_max_connections': ('src/collectors/proc.plugin/proc_net_netstat.c',),
-    'tcp_max_orphans': ('src/collectors/proc.plugin/proc_net_sockstat.c',),
-    'tcp_mem_high': ('src/collectors/proc.plugin/proc_net_sockstat.c',),
-    'tcp_mem_pressure': ('src/collectors/proc.plugin/proc_net_sockstat.c',),
+    'tcp_max_orphans': _PROC_NET_SOCKSTAT,
+    'tcp_mem_high': _PROC_NET_SOCKSTAT,
+    'tcp_mem_pressure': _PROC_NET_SOCKSTAT,
 }
 
 # Chart variables stock alerts read (C VARIABLE lines, go.d chart Vars), by the context of the chart that defines
@@ -103,7 +107,10 @@ CHART_VARIABLES = {
     'cgroup.mem_usage': _CGROUP_MEMORY,
     'k8s.cgroup.mem_usage': _CGROUP_MEMORY,
     'net.net': {
-        'nic_speed_max': ('src/collectors/proc.plugin/proc_net_dev.c', 'src/collectors/windows.plugin/perflib-network.c'),
+        'nic_speed_max': (
+            'src/collectors/proc.plugin/proc_net_dev.c',
+            'src/collectors/windows.plugin/perflib-network.c',
+        ),
     },
     'system.active_processes': {'pidmax': ('src/collectors/proc.plugin/proc_loadavg.c',)},
     'cockroachdb.process_file_descriptors': {
@@ -441,8 +448,8 @@ def check_expression_variables(rules: Sequence[dict], dimensions: Mapping[str, I
             if any(context not in dimensions or name in dimensions[context]
                    for context, name in _qualified_references(dimension)):
                 continue
-            problems.append(f'{rule["source"]}: {rule["name"]} reads ${{{variable}}}, which is no documented dimension, '
-                            f'listed variable or alert of {target}')
+            problems.append(f'{rule["source"]}: {rule["name"]} reads ${{{variable}}}, '
+                            f'which is no documented dimension, listed variable or alert of {target}')
 
     return problems
 
