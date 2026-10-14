@@ -43,6 +43,7 @@ pub const ACCEPTED_PARAMS: &[&str] = &[
     "info",
     "trace",
     "attribute_values",
+    "suggest",
     "tenant",
     "after",
     "before",
@@ -74,6 +75,9 @@ struct RawOtelTracesRequest {
     /// Attribute-value enumeration (facet values).
     #[serde(default, deserialize_with = "present")]
     attribute_values: Option<serde_json::Value>,
+    /// Search-bar suggestions: keys, or one key's values.
+    #[serde(default, deserialize_with = "present")]
+    suggest: Option<serde_json::Value>,
     #[serde(default, deserialize_with = "present")]
     after: Option<serde_json::Value>,
     #[serde(default, deserialize_with = "present")]
@@ -123,6 +127,7 @@ pub enum TracesMode {
     Info,
     Trace(TraceParams),
     AttributeValues(AttributeValuesParams),
+    Suggest(SuggestParams),
 }
 
 impl<'de> Deserialize<'de> for OtelTracesRequest {
@@ -166,6 +171,7 @@ impl TryFrom<RawOtelTracesRequest> for OtelTracesRequest {
             ("info", raw.info.is_some()),
             ("trace", raw.trace.is_some()),
             ("attribute_values", raw.attribute_values.is_some()),
+            ("suggest", raw.suggest.is_some()),
         ]
         .into_iter()
         .filter_map(|(name, set)| set.then_some(name))
@@ -228,6 +234,8 @@ impl TryFrom<RawOtelTracesRequest> for OtelTracesRequest {
             TracesMode::Trace(typed("trace", v)?)
         } else if let Some(v) = &raw.attribute_values {
             TracesMode::AttributeValues(typed("attribute_values", v)?)
+        } else if let Some(v) = &raw.suggest {
+            TracesMode::Suggest(typed("suggest", v)?)
         } else {
             unreachable!("an explicit selector was verified present");
         };
@@ -425,6 +433,34 @@ pub struct AttributeValuesParams {
     pub max_values: Option<usize>,
 }
 
+/// Wire maximum for [`SuggestParams::max_items`]; absent means the
+/// engine's `DEFAULT_SUGGEST_ITEMS`.
+pub const SUGGEST_ITEMS_MAX: usize = 200;
+
+/// The `suggest` mode's typed parameters: without `key`, suggest keys;
+/// with it, that key's values. Both match `term`.
+#[derive(Debug, Clone, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct SuggestParams {
+    /// Window, unix seconds; `0` means "unspecified" (the adapter's
+    /// `resolve_window` defaults).
+    #[serde(default)]
+    pub after: u32,
+    #[serde(default)]
+    pub before: u32,
+    /// The key whose values to suggest, in the selection grammar
+    /// (`<owner>.<key>` or a bare builtin word).
+    #[serde(default)]
+    pub key: Option<String>,
+    /// The typed text; absent or empty matches everything (as a prefix).
+    #[serde(default)]
+    pub term: String,
+    /// Cap the suggestions (the response's `truncated` flag is exact).
+    /// Zero and beyond [`SUGGEST_ITEMS_MAX`] are client errors.
+    #[serde(default)]
+    pub max_items: Option<usize>,
+}
+
 /// The `trace` mode's typed parameters. Unknown fields are rejected —
 /// a misspelled parameter on a small object is a client error, not a
 /// silent ignore.
@@ -458,6 +494,7 @@ pub enum OtelTracesResponse {
     Info(InfoResponse),
     Trace(Box<TraceResult>),
     AttributeValues(AttributeValuesResult),
+    Suggest(SuggestResult),
 }
 
 /// Functions protocol envelope for the trace-specific contract. The
@@ -571,6 +608,89 @@ pub struct AttributeValueWire {
     /// a display prefix, which an equality selection does not match.
     #[serde(skip_serializing_if = "std::ops::Not::not")]
     pub truncated: bool,
+}
+
+/// Suggestions, best first: match class, then bytes. Bounded by
+/// construction: at most [`SUGGEST_ITEMS_MAX`] items of at most the
+/// adapter's `LIST_VALUE_MAX_BYTES` each.
+#[derive(Debug, Serialize)]
+pub struct SuggestResult {
+    /// The response's self-description: always `"suggest"`.
+    pub mode: &'static str,
+    pub version: u32,
+    /// Partial reasons include the early stops of the newest-first walk
+    /// (`file_budget`, `deadline`, `no_new_matches`), each with
+    /// `complete_after`.
+    pub status: StatusWire,
+    /// The requested key, echoed, for value suggestions; absent for
+    /// key suggestions.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub key: Option<String>,
+    pub items: Vec<SuggestionWire>,
+    /// Exact: a further match existed among the visited sources.
+    pub truncated: bool,
+    /// After an early stop: every span from this second (unix) on lives
+    /// in a visited source.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub complete_after: Option<u32>,
+}
+
+#[derive(Debug, Serialize)]
+pub struct SuggestionWire {
+    /// A key in the selection grammar, or a value as stored.
+    pub text: String,
+    /// How it matched the term.
+    #[serde(rename = "match")]
+    pub match_class: MatchWire,
+    /// Present (`true`) only when `text` is a cut prefix of a longer
+    /// value: an equality selection does not match it.
+    #[serde(skip_serializing_if = "std::ops::Not::not")]
+    pub truncated: bool,
+    /// Keys only: the highest cardinality tier any visited source gives
+    /// the key (a high-tier key's values need a term to be useful);
+    /// absent when no source carries it.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub tier: Option<TierWire>,
+}
+
+/// Match classes on the wire; the two typo-tolerant engine classes are
+/// one `fuzzy`.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "snake_case")]
+pub enum MatchWire {
+    Exact,
+    Prefix,
+    Contains,
+    Fuzzy,
+}
+
+impl From<sfst::MatchClass> for MatchWire {
+    fn from(class: sfst::MatchClass) -> Self {
+        match class {
+            sfst::MatchClass::Exact => MatchWire::Exact,
+            sfst::MatchClass::Prefix => MatchWire::Prefix,
+            sfst::MatchClass::Contains => MatchWire::Contains,
+            sfst::MatchClass::Fuzzy1 | sfst::MatchClass::Fuzzy2 => MatchWire::Fuzzy,
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "snake_case")]
+pub enum TierWire {
+    Low,
+    Mid,
+    High,
+}
+
+impl From<sfst::FieldTier> for TierWire {
+    fn from(tier: sfst::FieldTier) -> Self {
+        match tier {
+            sfst::FieldTier::Low => TierWire::Low,
+            sfst::FieldTier::Mid => TierWire::Mid,
+            sfst::FieldTier::High => TierWire::High,
+        }
+    }
 }
 
 // ── Search page ─────────────────────────────────────────────────────

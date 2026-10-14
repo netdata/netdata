@@ -334,6 +334,33 @@ fn windowed_mode_objects_carry_their_own_window() {
 }
 
 #[test]
+fn suggest_params_parse_with_defaults_and_reject_strays() {
+    let TracesMode::Suggest(p) = req(json!({"suggest": {}})).mode else {
+        panic!("suggest mode expected");
+    };
+    assert_eq!(
+        (p.after, p.before, p.key, p.term.as_str(), p.max_items),
+        (0, 0, None, "", None)
+    );
+    let TracesMode::Suggest(p) =
+        req(json!({"suggest": {"key": "name", "term": "ab", "max_items": 7}})).mode
+    else {
+        panic!("suggest mode expected");
+    };
+    assert_eq!(
+        (p.key.as_deref(), p.term.as_str(), p.max_items),
+        (Some("name"), "ab", Some(7))
+    );
+    let err = req_err(json!({"suggest": {"terms": "ab"}}));
+    assert!(err.contains("invalid suggest selector"), "{err}");
+    let err = req_err(json!({"attribute_values": {"key": "name"}, "suggest": {}}));
+    assert!(
+        err.contains("conflicting mode selectors: attribute_values, suggest"),
+        "{err}"
+    );
+}
+
+#[test]
 fn tenant_rides_beside_any_mode() {
     let r = req(json!({"trace": {"id": "00"}, "tenant": "t1"}));
     assert_eq!(r.tenant.as_deref(), Some("t1"));
@@ -360,7 +387,7 @@ fn info_response_shape_is_pinned() {
             "has_history": true,
             "v": 3,
             "accepted_params": [
-                "info", "trace", "attribute_values", "tenant", "after", "before", "last", "anchor", "selections",
+                "info", "trace", "attribute_values", "suggest", "tenant", "after", "before", "last", "anchor", "selections",
                 "min_trace_duration_ns", "max_trace_duration_ns"
             ],
             "required_params": [],

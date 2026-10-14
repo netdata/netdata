@@ -78,6 +78,7 @@ async fn info_returns_the_descriptor() {
             "info",
             "trace",
             "attribute_values",
+            "suggest",
             "tenant",
             "after",
             "before",
@@ -120,7 +121,11 @@ async fn a_mode_less_request_wraps_the_search_page_as_traces() {
 async fn every_mode_is_implemented_an_empty_agent_answers_them_all() {
     // The mode catalog is complete: every selector answers cleanly on
     // an empty agent — none is a not-implemented error.
-    for body in [json!({"attribute_values": {"key": "name"}})] {
+    for body in [
+        json!({"attribute_values": {"key": "name"}}),
+        json!({"suggest": {}}),
+        json!({"suggest": {"key": "name", "term": "x"}}),
+    ] {
         call(body.clone())
             .await
             .unwrap_or_else(|e| panic!("{body}: {e}"));
@@ -1607,5 +1612,65 @@ async fn every_response_shape_declares_its_mode() {
     ] {
         let v = serde_json::to_value(call_on(&h, body.clone()).await.unwrap()).unwrap();
         assert_eq!(v["mode"], mode, "for {body}");
+    }
+}
+
+#[tokio::test]
+async fn suggest_lists_matching_values_and_keys() {
+    let h = handler_with_search_corpus().await;
+    let mut body = window_body();
+    merge(
+        &mut body,
+        json!({"key": "resource.service.name", "term": "svc-"}),
+    );
+    let v = serde_json::to_value(call_on(&h, as_mode("suggest", body)).await.unwrap()).unwrap();
+    assert_eq!(v["mode"], "suggest");
+    assert_eq!(v["key"], "resource.service.name");
+    assert_eq!(
+        v["items"],
+        json!([
+            {"text": "svc-a", "match": "prefix"},
+            {"text": "svc-b", "match": "prefix"}
+        ])
+    );
+    assert_eq!(v["status"], json!({"complete": true}));
+    assert_eq!(v["truncated"], false);
+
+    // Keys: rendered in the selection grammar, matched by bare name too.
+    let mut body = window_body();
+    merge(&mut body, json!({"term": "service"}));
+    let v = serde_json::to_value(call_on(&h, as_mode("suggest", body)).await.unwrap()).unwrap();
+    assert!(v.get("key").is_none());
+    assert_eq!(
+        v["items"][0],
+        json!({"text": "resource.service.name", "match": "prefix", "tier": "low"})
+    );
+}
+
+#[tokio::test]
+async fn suggest_is_validated_before_admission_and_bounded() {
+    let h = handler_with_search_corpus()
+        .await
+        .with_value_list_concurrency(0);
+    let v = serde_json::to_value(call_on(&h, json!({"suggest": {}})).await.unwrap()).unwrap();
+    assert_eq!(v["status"], json!({"partial": ["busy"]}));
+    assert_eq!(v["items"], json!([]));
+    for (body, needle) in [
+        (
+            json!({"suggest": {"after": 500, "before": 400}}),
+            "invalid window",
+        ),
+        (json!({"suggest": {"max_items": 0}}), "zero 'max_items'"),
+        (
+            json!({"suggest": {"max_items": 201}}),
+            "exceeds the maximum 200",
+        ),
+        (
+            json!({"suggest": {"key": "nope.x"}}),
+            "invalid otel-traces request",
+        ),
+    ] {
+        let err = call_on(&h, body.clone()).await.expect_err("a client error");
+        assert!(err.to_string().contains(needle), "{body}: {err}");
     }
 }

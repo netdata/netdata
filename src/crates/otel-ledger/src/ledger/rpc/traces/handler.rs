@@ -32,20 +32,22 @@ use file_lifecycle::registry::TenantRegistries;
 use sfsq::traces::{
     AttributeRequestError, AttributeValuesQuery, OverviewQuery, OverviewRequestError,
     PartialReason, Predicate, QueryStatus, SearchQuery, SearchRequestError, SearchSources,
-    TimeWindow, TraceQuery, TraceRequestError, attribute_values, overview, search, trace_by_id,
+    SuggestQuery, TimeWindow, TraceQuery, TraceRequestError, attribute_values, overview, search,
+    trace_by_id,
 };
 
 use super::adapter::{
     ResolvedWindow, build_predicate, completion_capture_range, heatmap_predicate, parse_cursor,
-    parse_enumeration_key, parse_trace_id, resolve_window, to_attribute_values_result,
-    to_overview_section, to_search_result, to_trace_result, validate_trace_bounds,
+    parse_enumeration_key, parse_trace_id, render_attribute_key, resolve_window,
+    to_attribute_values_result, to_overview_section, to_search_result, to_suggest_result,
+    to_trace_result, validate_trace_bounds,
 };
 use super::sources::{Capture, CaptureError, RemotePolicy, TracesSourceSupplier};
 use super::wire::{
     AttributeValuesParams, CoverageWire, DEFAULT_MAX_VALUES, FunctionsParams,
     FunctionsTracesResponse, InfoResponse, MAX_VALUES_MAX, OVERVIEW_SCOPE_SELECTION,
-    OVERVIEW_SCOPE_WINDOW, OtelTracesRequest, OtelTracesResponse, SearchParams, SearchResult,
-    TraceParams, TracesMode,
+    OVERVIEW_SCOPE_WINDOW, OtelTracesRequest, OtelTracesResponse, SUGGEST_ITEMS_MAX, SearchParams,
+    SearchResult, SuggestParams, TraceParams, TracesMode,
 };
 use crate::ledger::wal_prefix::WalPrefixes;
 use file_lifecycle::remote_read::RemoteRead;
@@ -93,10 +95,15 @@ struct AggregateRequest {
     predicate: Option<Predicate>,
 }
 
-/// How many value-list requests may run at once. They arrive per
-/// keystroke; beyond this a request answers `busy` at once instead of
-/// queueing CPU and memory behind the others.
+/// How many value-list and suggestion requests may run at once, shared
+/// by both. They arrive per keystroke; beyond this a request answers
+/// `busy` at once instead of queueing CPU and memory behind the others.
 const VALUE_LIST_CONCURRENCY: usize = 2;
+
+/// How long a suggestion request may walk sources, from its arrival:
+/// suggestions answer per keystroke, so a partial answer now beats a
+/// complete one later. The newest source is always visited.
+const SUGGEST_DEADLINE: std::time::Duration = std::time::Duration::from_millis(250);
 
 /// The engine's span cap for one trace lookup. The response's byte
 /// budget (`TRACE_SPANS_MAX_BYTES`) holds about a thousand spans, so
@@ -107,7 +114,8 @@ const TRACE_SPAN_CAP: usize = 10_000;
 pub(crate) struct OtelTracesHandler {
     /// Live source resolution (registries snapshot + WAL chunk builds).
     supplier: TracesSourceSupplier,
-    /// Admission for the value lists (see [`VALUE_LIST_CONCURRENCY`]).
+    /// Admission for the value lists and suggestions (see
+    /// [`VALUE_LIST_CONCURRENCY`]).
     value_lists: Arc<tokio::sync::Semaphore>,
 }
 
@@ -491,8 +499,8 @@ impl OtelTracesHandler {
                 &tenant,
                 window.capture.clone(),
                 1,
-                // The value lists answer per keystroke: offloaded files are
-                // reported, never downloaded.
+                // Value lists and suggestions answer per keystroke:
+                // offloaded files are reported, never downloaded.
                 RemotePolicy::Skip,
                 &ctx.cancellation,
                 &ctx.progress,
@@ -570,6 +578,76 @@ impl OtelTracesHandler {
             ))),
         }
     }
+    /// The `suggest` mode: keys, or one key's values, matching a typed
+    /// term (see `sfsq::traces::suggest`), bounded in items, sources and
+    /// time.
+    async fn suggest(
+        &self,
+        ctx: &FunctionCallContext,
+        params: &SuggestParams,
+        tenant: Option<&str>,
+    ) -> netdata_plugin_error::Result<OtelTracesResponse> {
+        let deadline = std::time::Instant::now() + SUGGEST_DEADLINE;
+        let client_err = |e: String| handler_err(format!("invalid otel-traces request: {e}"));
+        let max = params
+            .max_items
+            .unwrap_or(sfsq::traces::DEFAULT_SUGGEST_ITEMS);
+        if max == 0 {
+            return Err(client_err(
+                "a zero 'max_items' would return nothing; omit it or raise it".into(),
+            ));
+        }
+        if max > SUGGEST_ITEMS_MAX {
+            return Err(client_err(format!(
+                "'max_items' {max} exceeds the maximum {SUGGEST_ITEMS_MAX}"
+            )));
+        }
+        let query = match &params.key {
+            Some(key) => {
+                let (owner, key) = parse_enumeration_key(key).map_err(client_err)?;
+                SuggestQuery::values(owner, key)
+            }
+            None => SuggestQuery::keys(render_attribute_key),
+        };
+        // Validated before admission: a bad request is a client error,
+        // not `busy`.
+        let window =
+            resolve_window(params.after, params.before, unix_now_s(), None).map_err(&client_err)?;
+        let engine_window = TimeWindow::new(window.start_ns, window.end_ns)
+            .map_err(|e| client_err(e.to_string()))?;
+        let Ok(permit) = Arc::clone(&self.value_lists).try_acquire_owned() else {
+            return Ok(OtelTracesResponse::Suggest(to_suggest_result(
+                sfsq::traces::SuggestData {
+                    items: Vec::new(),
+                    truncated: false,
+                    status: QueryStatus::Partial([PartialReason::Busy].into()),
+                    complete_after: None,
+                },
+                params.key.clone(),
+            )));
+        };
+        let query = query
+            .term(params.term.clone())
+            .max_items(max)
+            .window(engine_window)
+            .deadline(deadline);
+        let (sources, pins) = self.enumeration_setup(ctx, &window, tenant).await?;
+
+        let done = ctx.progress.done_counter();
+        let cancel = ctx.cancellation.clone();
+        let key = params.key.clone();
+        match tokio::task::spawn_blocking(move || {
+            let _permit = permit;
+            let _pins = pins;
+            sfsq::traces::suggest(sources, query, cancel, done)
+        })
+        .await
+        {
+            Ok(Ok(data)) => Ok(OtelTracesResponse::Suggest(to_suggest_result(data, key))),
+            Ok(Err(e)) => Err(map_attribute_error(e)),
+            Err(e) => Err(handler_err(format!("otel-traces suggest task failed: {e}"))),
+        }
+    }
 }
 
 /// The wall clock as unix seconds, saturating at the u32 horizon (the
@@ -611,6 +689,7 @@ impl FunctionHandler for OtelTracesHandler {
             TracesMode::AttributeValues(params) => {
                 self.attribute_values(&ctx, params, tenant).await
             }
+            TracesMode::Suggest(params) => self.suggest(&ctx, params, tenant).await,
         }
     }
 

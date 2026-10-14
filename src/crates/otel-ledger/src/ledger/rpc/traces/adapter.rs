@@ -24,7 +24,7 @@ use super::wire::{
     AnchorWire, AttributeValueWire, AttributeValuesResult, CoverageWire, EventWire, FieldKindsWire,
     LinkWire, OverviewGridWire, OverviewPercentilesWire, OverviewSection, OverviewTotals,
     SearchItems, SearchResult, ServiceBreakdownWire, ServiceSpansWire, SpanWire, StatusWire,
-    TraceItems, TraceResult, TraceSummaryWire,
+    SuggestResult, SuggestionWire, TraceItems, TraceResult, TraceSummaryWire,
 };
 
 /// Parse a W3C text-form trace id: exactly 32 hex chars (16 bytes),
@@ -503,7 +503,33 @@ pub(crate) fn build_predicate(
     Ok(Predicate { conditions })
 }
 
-// ── Enumeration: key parsing ────────────────────────────────────────
+// ── Enumeration: key parsing and rendering ──────────────────────────
+
+/// The selection-grammar word of a builtin field.
+fn builtin_word(field: BuiltinField) -> &'static str {
+    BUILTIN_WORDS
+        .iter()
+        .find(|(_, f)| *f == field)
+        .map(|(w, _)| *w)
+        .expect("the lockstep test pins a wire word for every builtin")
+}
+
+/// Render one key into the selection grammar — the exact inverse of
+/// [`parse_selection_key`] (round-trip pinned by tests), so a suggested
+/// key feeds straight back as a selection or a values request.
+pub(crate) fn render_attribute_key(owner: AttributeOwner, key: &AttributeKey) -> String {
+    match key {
+        AttributeKey::Builtin(b) => builtin_word(*b).to_string(),
+        AttributeKey::Attribute(a) => {
+            let word = OWNER_WORDS
+                .iter()
+                .find(|(_, o)| *o == owner)
+                .map(|(w, _)| *w)
+                .expect("attribute keys only ever carry attribute owners");
+            format!("{word}.{a}")
+        }
+    }
+}
 
 /// A selection-grammar key as the enumeration API's (owner, key) pair.
 pub(crate) fn parse_enumeration_key(key: &str) -> Result<(AttributeOwner, AttributeKey), String> {
@@ -511,6 +537,42 @@ pub(crate) fn parse_enumeration_key(key: &str) -> Result<(AttributeOwner, Attrib
         PredicateTarget::Attribute(owner, a) => (owner, AttributeKey::Attribute(a)),
         PredicateTarget::Builtin(f) => (AttributeOwner::Builtin, AttributeKey::Builtin(f)),
     })
+}
+
+/// Shape suggestions into the wire result. `key` echoes the request's
+/// key for value suggestions. Texts are capped at
+/// [`LIST_VALUE_MAX_BYTES`] of JSON (the engine cut raw bytes) and
+/// flagged when cut; a text cut to an earlier item's is listed once.
+pub(crate) fn to_suggest_result(
+    data: sfsq::traces::SuggestData,
+    key: Option<String>,
+) -> SuggestResult {
+    let mut items: Vec<SuggestionWire> = Vec::with_capacity(data.items.len());
+    let mut listed: HashMap<String, usize> = HashMap::new();
+    for s in data.items {
+        let mut text = s.text;
+        let cut = truncate_value(&mut text, LIST_VALUE_MAX_BYTES);
+        if let Some(&i) = listed.get(&text) {
+            items[i].truncated |= cut || s.truncated;
+            continue;
+        }
+        listed.insert(text.clone(), items.len());
+        items.push(SuggestionWire {
+            text,
+            match_class: s.class.into(),
+            truncated: cut || s.truncated,
+            tier: s.tier.map(Into::into),
+        });
+    }
+    SuggestResult {
+        mode: "suggest",
+        version: 1,
+        status: StatusWire::from(&data.status),
+        key,
+        items,
+        truncated: data.truncated,
+        complete_after: data.complete_after,
+    }
 }
 
 /// Shape one key's value enumeration into the wire result. `key` is the

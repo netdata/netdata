@@ -611,6 +611,88 @@ fn coverage_all() -> CoverageWire {
 }
 
 #[test]
+fn rendered_keys_round_trip_through_the_selection_grammar() {
+    // render ∘ parse = identity, so a suggested key feeds straight back
+    // as a selection key or a values request: every owner-qualified
+    // attribute form, then every builtin word.
+    let cases: Vec<(AttributeOwner, AttributeKey)> = vec![
+        (
+            AttributeOwner::Resource,
+            AttributeKey::Attribute("service.name".into()),
+        ),
+        (
+            AttributeOwner::Span,
+            AttributeKey::Attribute("http.method".into()),
+        ),
+        (AttributeOwner::Event, AttributeKey::Attribute("x".into())),
+        (AttributeOwner::Link, AttributeKey::Attribute("peer".into())),
+        (
+            AttributeOwner::Instrumentation,
+            AttributeKey::Attribute("telemetry.sdk".into()),
+        ),
+    ];
+    for (owner, key) in cases {
+        let rendered = render_attribute_key(owner, &key);
+        assert_eq!(
+            parse_enumeration_key(&rendered).unwrap(),
+            (owner, key),
+            "{rendered}"
+        );
+    }
+    for builtin in BuiltinField::ALL {
+        let rendered =
+            render_attribute_key(AttributeOwner::Builtin, &AttributeKey::Builtin(builtin));
+        assert_eq!(
+            parse_enumeration_key(&rendered).unwrap(),
+            (AttributeOwner::Builtin, AttributeKey::Builtin(builtin)),
+            "{rendered}"
+        );
+    }
+}
+
+#[test]
+fn suggestions_are_capped_flagged_and_listed_once() {
+    use sfsq::traces::{SuggestData, Suggestion};
+    let item = |text: String, class, truncated| Suggestion {
+        text,
+        truncated,
+        class,
+        tier: None,
+    };
+    // Control characters: 256 raw bytes the engine kept are 1,536 on
+    // the wire; the adapter cuts them to the cap, and two texts that
+    // differ past it become one flagged item.
+    let ctl = "\u{1}".repeat(LIST_VALUE_MAX_BYTES);
+    let data = SuggestData {
+        items: vec![
+            item(ctl.clone(), sfst::MatchClass::Prefix, false),
+            item(
+                format!("{}x", &ctl[..LIST_VALUE_MAX_BYTES - 1]),
+                sfst::MatchClass::Prefix,
+                false,
+            ),
+            item("b".into(), sfst::MatchClass::Fuzzy2, false),
+        ],
+        truncated: true,
+        status: QueryStatus::Complete,
+        complete_after: Some(7),
+    };
+    let v = serde_json::to_value(to_suggest_result(data, Some("name".into()))).unwrap();
+    let kept = "\u{1}".repeat(LIST_VALUE_MAX_BYTES / 6);
+    assert_eq!(
+        v,
+        json!({
+            "mode": "suggest", "version": 1, "status": {"complete": true}, "key": "name",
+            "items": [
+                {"text": kept, "match": "prefix", "truncated": true},
+                {"text": "b", "match": "fuzzy"},
+            ],
+            "truncated": true, "complete_after": 7,
+        })
+    );
+}
+
+#[test]
 fn values_are_cut_at_a_character_boundary() {
     // "é" is two bytes: a cut landing inside it backs off to before it.
     let mut s = "aé".to_string();
