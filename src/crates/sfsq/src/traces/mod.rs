@@ -96,9 +96,8 @@ pub use predicate::{
 };
 pub use rollup::{TraceAggregate, sealed_trace_envelopes, tail_trace_aggregates};
 pub use search::{
-    DEFAULT_SEARCH_LIMIT, DEFAULT_SPANS_PER_TRACE, SERVICE_BREAKDOWN_TOP_K, SPANS_PER_TRACE_MAX,
-    SearchData, SearchQuery, SearchRequestError, SearchSources, ServiceBreakdown, TraceSummary,
-    search,
+    DEFAULT_SEARCH_LIMIT, SERVICE_BREAKDOWN_TOP_K, SearchData, SearchQuery, SearchRequestError,
+    SearchSources, ServiceBreakdown, TraceSummary, search,
 };
 pub use sources::{
     SourceId, SourceSetError, TraceSfstCandidate, TraceSource, TraceUnavailable, TraceWalTail,

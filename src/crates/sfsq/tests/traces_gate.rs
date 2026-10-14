@@ -107,8 +107,8 @@ fn hex(n: u8) -> String {
 }
 
 /// One summary rendered comparable across gate settings — trace-level
-/// values AND span-level attachments, so the differential sweep also
-/// catches a gate-induced change in which spans ride along.
+/// values AND the rank (the newest matching span), so the differential
+/// sweep also catches a gate-induced change in which spans match.
 type NormRow = (
     String,
     Option<String>,
@@ -117,8 +117,7 @@ type NormRow = (
     i64,
     usize,
     usize,
-    usize,
-    Vec<(i64, i64)>,
+    i64,
     bool,
 );
 type Norm = (Vec<NormRow>, QueryStatus);
@@ -136,11 +135,7 @@ fn norm(data: &SearchData) -> Norm {
                     t.duration_ns,
                     t.span_count,
                     t.error_count,
-                    t.matched_count,
-                    t.matched_spans
-                        .iter()
-                        .map(|s| (s.start_ns, s.duration_ns))
-                        .collect(),
+                    t.newest_matched_start_ns,
                     t.exact,
                 )
             })

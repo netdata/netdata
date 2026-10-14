@@ -140,7 +140,7 @@ when the value carries no type). Both end with a
 sfsq-cli search (--sfst FILE | --wal FILE)…
                 [--where 'TARGET<op>VALUE']…
                 [--min-duration-ns N] [--max-duration-ns N]
-                [--limit N] [--spans-per-trace N]
+                [--limit N]
                 [--start-ns N --end-ns N]
 ```
 
@@ -153,17 +153,16 @@ sfsq-cli search (--sfst FILE | --wal FILE)…
 - `--min-duration-ns` / `--max-duration-ns` — shorthand for `duration`
   `>=`/`<=` conditions (inclusive).
 - `--limit` — keep the top-K most recent matching traces (default 20;
-  0 rejected). `--spans-per-trace` — matched spans attached per trace
-  (default 3, max 128, 0 = none).
+  0 rejected).
 
 Per matching trace, one line
 `<trace-id> <root-service> / <root-name> start=<ns> dur=<ns>ns spans=N
-errors=N matched=N` — `<no service>` / `<unnamed>` when unset, and an
-`[inexact]` suffix when that trace's assembly was capped or degraded (its
-summary numbers may undercount) — followed by the attached spans, two-space
-indented (`  <name> start=<ns> dur=<ns>ns`). A final
-`N trace(s), status …` line reports the count and `complete` or `PARTIAL`
-with reasons.
+errors=N rank=<ns>`. `rank` is the start of the newest matching span, which
+sets the order of the list. When a value is not set, the line shows
+`<no service>` or `<unnamed>`. The suffix `[inexact]` shows that the
+assembly of that trace was capped or degraded, so its numbers can be too
+low. A final `N trace(s), status …` line gives the count and `complete`, or
+`PARTIAL` with the reasons.
 
 ## Examples
 

@@ -117,7 +117,7 @@
 //! candidate's assembly. Candidates are examined newest first, so the
 //! files they read stay recent while they are needed.
 
-use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet, VecDeque};
+use std::collections::{BTreeSet, HashMap, HashSet, VecDeque};
 use std::sync::Arc;
 use std::sync::atomic::{AtomicUsize, Ordering};
 
@@ -126,7 +126,7 @@ use tokio_util::sync::CancellationToken;
 use sfst::trace_combine::{SpanSource, combine};
 use sfst::{ScanWork, TraceId};
 
-use super::by_id::{DEFAULT_SPAN_CAP, FieldKinds, LOADED_SOURCES_MAX};
+use super::by_id::{DEFAULT_SPAN_CAP, LOADED_SOURCES_MAX};
 use super::gate::{GateDecision, TraceGate};
 use super::predicate::{EvalPredicate, Predicate, PredicateError, TraceLevelEval};
 use super::sources::{SourceId, SourceSetError, TraceSource, validate_sources};
@@ -141,11 +141,6 @@ use crate::source::map_source;
 /// Default result limit; zero is rejected and there is no unbounded
 /// option — search is top-K by construction.
 pub const DEFAULT_SEARCH_LIMIT: usize = 20;
-/// Default attached matched spans per returned trace.
-pub const DEFAULT_SPANS_PER_TRACE: usize = 3;
-/// Library maximum for [`SearchQuery::spans_per_trace`]; beyond it is a request
-/// error (an unbounded attachment would defeat the summary shape).
-pub const SPANS_PER_TRACE_MAX: usize = 128;
 /// How many services a returned trace's [`ServiceBreakdown`] names (the
 /// rest fold into `other`). Fixed — a UI-default, not a tuning surface.
 pub const SERVICE_BREAKDOWN_TOP_K: usize = 5;
@@ -184,14 +179,13 @@ pub struct SearchSources {
     pub completion: Vec<TraceSource>,
 }
 
-/// A search request. [`new`](Self::new) applies the default limit and
-/// spans_per_trace; builder methods narrow or widen.
+/// A search request. [`new`](Self::new) applies the default limit;
+/// builder methods narrow or widen.
 #[derive(Debug, Clone)]
 pub struct SearchQuery {
     predicate: Predicate,
     window: Option<TimeWindow>,
     limit: usize,
-    spans_per_trace: usize,
     visited_ceiling: u64,
     span_cap: usize,
     gate_enabled: bool,
@@ -204,7 +198,6 @@ impl SearchQuery {
             predicate,
             window: None,
             limit: DEFAULT_SEARCH_LIMIT,
-            spans_per_trace: DEFAULT_SPANS_PER_TRACE,
             visited_ceiling: VISITED_ROWS_CEILING,
             span_cap: DEFAULT_SPAN_CAP,
             gate_enabled: true,
@@ -225,13 +218,6 @@ impl SearchQuery {
     /// request validation; there is no unbounded option.
     pub fn limit(mut self, limit: usize) -> Self {
         self.limit = limit;
-        self
-    }
-
-    /// Matched spans attached per returned trace (`0` = none, max
-    /// [`SPANS_PER_TRACE_MAX`]).
-    pub fn spans_per_trace(mut self, spans_per_trace: usize) -> Self {
-        self.spans_per_trace = spans_per_trace;
         self
     }
 
@@ -286,8 +272,6 @@ impl SearchQuery {
 pub enum SearchRequestError {
     #[error("a zero limit would return nothing; search has no unbounded option")]
     ZeroLimit,
-    #[error("spans_per_trace {got} exceeds the library maximum {SPANS_PER_TRACE_MAX}")]
-    SpansPerTraceBeyondMax { got: usize },
     /// The window set must be a subset of the completion set (one
     /// snapshot, two roles) — checked by `SourceId` membership BEFORE
     /// any I/O (pin C-2/R2-7). A source that vanishes AFTER this
@@ -335,12 +319,6 @@ pub struct TraceSummary {
     pub error_count: usize,
     /// The retained canonical spans by resource `service.name`.
     pub service_breakdown: ServiceBreakdown,
-    /// Canonical spans in the retained capped set satisfying the
-    /// span-local predicate + window after phase-2 re-evaluation.
-    pub matched_count: usize,
-    /// The matched subset, `min(spans_per_trace, matched_count)` spans in combiner
-    /// total order — deterministic under any physical layout.
-    pub matched_spans: Vec<sfst::TraceSpan>,
     /// `false` when this trace's assembly was capped or degraded (span
     /// cap hit, a source failed during its merge, or a completion source
     /// failed to open or was unavailable) — its summary numbers may
@@ -359,8 +337,6 @@ pub struct ServiceBreakdown {
     pub top: Vec<(String, u64)>,
     /// Spans in the services beyond `top`.
     pub other: u64,
-    /// How many services `other` covers.
-    pub other_services: usize,
     /// Spans without a `service.name` — counted, never attributed to a
     /// service.
     pub unattributed: u64,
@@ -374,11 +350,6 @@ pub struct SearchData {
     /// tiebreak), at most `limit`.
     pub traces: Vec<TraceSummary>,
     pub status: QueryStatus,
-    /// Field → coalesced schema kind, merged from exactly the sources
-    /// that contributed retained spans of the RETURNED traces, projected
-    /// onto the names the attached `matched_spans` expose (the same
-    /// projection rule as trace-by-id).
-    pub field_kinds: FieldKinds,
 }
 
 /// A window file not compiled yet: its session slot and the exclusive
@@ -533,9 +504,6 @@ struct Assembled {
     summary: TraceSummary,
     /// Canonical rank: (newest matched canonical span start, trace_id).
     rank: (i64, TraceId),
-    /// Merge-source indices that contributed retained spans (the
-    /// FieldKinds domain when this trace is returned).
-    contributing: Vec<usize>,
 }
 
 /// Run a cross-source search. See the module docs for the two-phase,
@@ -554,11 +522,6 @@ pub fn search(
     // ── Request validation, before any I/O ──────────────────────────
     if query.limit == 0 {
         return Err(SearchRequestError::ZeroLimit);
-    }
-    if query.spans_per_trace > SPANS_PER_TRACE_MAX {
-        return Err(SearchRequestError::SpansPerTraceBeyondMax {
-            got: query.spans_per_trace,
-        });
     }
     query.predicate.validate()?;
     query.predicate.ensure_evaluable()?;
@@ -596,7 +559,6 @@ pub fn search(
             status.add(PartialReason::Cancelled);
             status.finish()
         },
-        field_kinds: FieldKinds::default(),
     };
     if cancel.is_cancelled() {
         return Ok(cancelled_empty(status));
@@ -820,12 +782,10 @@ pub fn search(
     };
 
     // ── Phase 2: the sessions over the whole completion snapshot ─────
-    let session_count = sessions.len();
     // Merge-index → source id: names the source in the failure warnings
-    // below. The merge input (built per candidate, so the gate can lend
-    // the sessions between merges) and the FieldKinds pass split the
-    // same index space at `session_count` (below = SFST sessions, from
-    // it = tails).
+    // below. The merge input is built per candidate (so the gate can
+    // lend the sessions between merges): SFST sessions first, then
+    // tails.
     let mut origin: Vec<String> = slot_sources
         .iter()
         .map(|source| source.source_id().to_string())
@@ -997,19 +957,19 @@ pub fn search(
             }
             let trace = outcome.trace;
             // Phase-2 re-evaluation against the CANONICAL spans: the
-            // over-approximation drop point.
-            let matched: Vec<usize> = (0..trace.spans.len())
-                .filter(|&i| eval.matches(&trace.spans[i], query.window))
-                .collect();
-            if let Some(&newest) = matched.last() {
-                // Spans are in combiner total order (ascending start), so
-                // the last matched index is the newest matched span.
+            // over-approximation drop point. Spans are in combiner total
+            // order (ascending start), so the last matching span is the
+            // newest matched one — the rank.
+            let newest = trace
+                .spans
+                .iter()
+                .rposition(|span| eval.matches(span, query.window));
+            if let Some(newest) = newest {
                 let rank = (trace.spans[newest].start_ns, trace_id);
                 let summary = summarize(
                     trace_id,
                     &trace,
-                    &matched,
-                    query.spans_per_trace,
+                    rank.0,
                     !outcome.truncated && !merge_failed && !degraded_assembly,
                 );
                 // Trace-level conditions evaluate post-assembly as
@@ -1037,11 +997,7 @@ pub fn search(
                     }
                 }
                 final_ranks.insert((std::cmp::Reverse(rank.0), rank.1));
-                finals.push(Assembled {
-                    summary,
-                    rank,
-                    contributing: outcome.contributing_sources,
-                });
+                finals.push(Assembled { summary, rank });
             }
             continue;
         }
@@ -1135,69 +1091,9 @@ pub fn search(
     });
     finals.truncate(query.limit);
 
-    // ── FieldKinds over the RETURNED traces ───────────────────────────
-    let mut kinds: BTreeMap<String, sfst::ValueKind> = BTreeMap::new();
-    let mut contributing: BTreeSet<usize> = BTreeSet::new();
-    for f in &finals {
-        contributing.extend(f.contributing.iter().copied());
-    }
-    for idx in contributing {
-        let pairs = if idx < session_count {
-            match sessions[idx].metadata() {
-                Ok(metadata) => metadata.tree.derive_scalar_kinds(),
-                Err(e) => {
-                    tracing::warn!(
-                        "sfsq traces: source {} metadata failed to read: {e}",
-                        origin[idx]
-                    );
-                    status.add(PartialReason::SourceFailure);
-                    continue;
-                }
-            }
-        } else {
-            tails[idx - session_count].1.field_kinds().to_vec()
-        };
-        for (field, kind) in pairs {
-            kinds
-                .entry(field)
-                .and_modify(|k| *k = sfst::join_value_kinds(*k, kind))
-                .or_insert(kind);
-        }
-    }
-    let mut field_names: BTreeSet<&str> = BTreeSet::new();
-    let mut event_attr_names: BTreeSet<&str> = BTreeSet::new();
-    let mut link_attr_names: BTreeSet<&str> = BTreeSet::new();
-    for f in &finals {
-        for span in &f.summary.matched_spans {
-            field_names.extend(span.fields.iter().map(|(k, _)| k.as_str()));
-            for ev in &span.events {
-                event_attr_names.extend(ev.attributes.iter().map(|(k, _)| k.as_str()));
-            }
-            for lk in &span.links {
-                link_attr_names.extend(lk.attributes.iter().map(|(k, _)| k.as_str()));
-            }
-        }
-    }
-    let project = |names: &BTreeSet<&str>, prefix: &str| -> Vec<(String, sfst::ValueKind)> {
-        names
-            .iter()
-            .filter_map(|name| {
-                kinds
-                    .get(&format!("{prefix}{name}"))
-                    .map(|k| (name.to_string(), *k))
-            })
-            .collect()
-    };
-    let field_kinds = FieldKinds {
-        fields: project(&field_names, ""),
-        event_attributes: project(&event_attr_names, "events.attributes."),
-        link_attributes: project(&link_attr_names, "links.attributes."),
-    };
-
     Ok(SearchData {
         traces: finals.into_iter().map(|f| f.summary).collect(),
         status: status.finish(),
-        field_kinds,
     })
 }
 
@@ -1271,13 +1167,11 @@ fn true_root_fields(trace: &sfst::Trace) -> (Option<String>, Option<String>) {
 
 /// Derive one exact summary from the assembled trace (pins R2-5):
 /// root fields from the combiner's summary root, envelope with
-/// saturating arithmetic, counts over the retained capped set, and the
-/// spans_per_trace attachment in combiner order.
+/// saturating arithmetic, counts over the retained capped set.
 fn summarize(
     trace_id: TraceId,
     trace: &sfst::Trace,
-    matched: &[usize],
-    spans_per_trace: usize,
+    newest_matched_start_ns: i64,
     exact: bool,
 ) -> TraceSummary {
     // Storage names via the vocabulary only — never hand-built.
@@ -1311,8 +1205,7 @@ fn summarize(
             .into_iter()
             .map(|(service, spans)| (service.to_owned(), spans))
             .collect(),
-        other: other.count,
-        other_services: other.entries,
+        other,
         unattributed,
     };
 
@@ -1333,25 +1226,11 @@ fn summarize(
             .and_then(|r| span_field(r, name_field))
             .map(str::to_owned),
         start_ns,
-        // Spans are in combiner total order (ascending start), so the
-        // last matched index is the newest matched span — the same
-        // derivation the caller's rank uses. `matched` is non-empty at
-        // every call site (a no-match candidate never summarizes); the
-        // envelope fallback just keeps the function total.
-        newest_matched_start_ns: matched
-            .last()
-            .map(|&i| trace.spans[i].start_ns)
-            .unwrap_or(start_ns),
+        newest_matched_start_ns,
         duration_ns: end_ns.saturating_sub(start_ns),
         span_count: trace.spans.len(),
         error_count,
         service_breakdown,
-        matched_count: matched.len(),
-        matched_spans: matched
-            .iter()
-            .take(spans_per_trace)
-            .map(|&i| trace.spans[i].clone())
-            .collect(),
         exact,
     }
 }

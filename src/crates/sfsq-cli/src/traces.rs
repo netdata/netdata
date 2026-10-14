@@ -696,10 +696,6 @@ pub struct SearchArgs {
     #[arg(long)]
     pub limit: Option<usize>,
 
-    /// Matched spans attached per trace (default 3, max 128, 0 = none).
-    #[arg(long)]
-    pub spans_per_trace: Option<usize>,
-
     /// Window start, nanoseconds since the epoch (half-open; span-START
     /// semantics). Requires --end-ns.
     #[arg(long, allow_hyphen_values = true)]
@@ -836,9 +832,6 @@ pub fn run_search(args: &SearchArgs, out: &mut dyn std::io::Write) -> Result<()>
     if let Some(limit) = args.limit {
         query = query.limit(limit);
     }
-    if let Some(spans_per_trace) = args.spans_per_trace {
-        query = query.spans_per_trace(spans_per_trace);
-    }
 
     // The dev shape: the same source list fills both roles — the engine
     // requires window ⊆ completion, and identical lists satisfy that
@@ -860,7 +853,7 @@ pub fn run_search(args: &SearchArgs, out: &mut dyn std::io::Write) -> Result<()>
     for t in &data.traces {
         writeln!(
             out,
-            "{} {} / {} start={} dur={}ns spans={} errors={} matched={}{}",
+            "{} {} / {} start={} dur={}ns spans={} errors={} rank={}{}",
             t.trace_id,
             t.root_service.as_deref().unwrap_or("<no service>"),
             t.root_name.as_deref().unwrap_or("<unnamed>"),
@@ -868,22 +861,9 @@ pub fn run_search(args: &SearchArgs, out: &mut dyn std::io::Write) -> Result<()>
             t.duration_ns,
             t.span_count,
             t.error_count,
-            t.matched_count,
+            t.newest_matched_start_ns,
             if t.exact { "" } else { " [inexact]" },
         )?;
-        for span in &t.matched_spans {
-            let name = span
-                .fields
-                .iter()
-                .find(|(k, _)| k == "name")
-                .map(|(_, v)| v.as_str())
-                .unwrap_or("<unnamed>");
-            writeln!(
-                out,
-                "  {} start={} dur={}ns",
-                name, span.start_ns, span.duration_ns
-            )?;
-        }
     }
     writeln!(
         out,

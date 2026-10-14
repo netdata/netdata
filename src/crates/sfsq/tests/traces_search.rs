@@ -16,7 +16,7 @@
 //!   are identical under source-order permutation.
 //!
 //! Also pinned: the summary numbers against ground truth (roots,
-//! envelope, counts, spans_per_trace trimming), the service breakdown's
+//! envelope, counts, ranks), the service breakdown's
 //! partition of the retained canonical spans, the request-validation
 //! matrix, post-validation source vanish, unavailable-source honesty
 //! (including the completion slack), the span-cap honesty pair,
@@ -97,17 +97,16 @@ fn run(sources: SearchSources, query: SearchQuery) -> SearchData {
 
 /// One summary rendered comparable across layouts.
 type SummaryPrint = (
-    String,                                // trace id (hex)
-    Option<String>,                        // root_service
-    Option<String>,                        // root_name
-    i64,                                   // start_ns
-    i64,                                   // duration_ns
-    usize,                                 // span_count
-    usize,                                 // error_count
-    usize,                                 // matched_count
-    Vec<(String, i64, i64)>,               // attached spans: (name, start, duration)
-    bool,                                  // exact
-    (Vec<(String, u64)>, u64, usize, u64), // service breakdown
+    String,                         // trace id (hex)
+    Option<String>,                 // root_service
+    Option<String>,                 // root_name
+    i64,                            // start_ns
+    i64,                            // duration_ns
+    usize,                          // span_count
+    usize,                          // error_count
+    i64,                            // newest_matched_start_ns (the rank)
+    bool,                           // exact
+    (Vec<(String, u64)>, u64, u64), // service breakdown
 );
 
 /// The whole result — rows plus status — in comparable form: the
@@ -125,24 +124,11 @@ fn norm(data: &SearchData) -> (Vec<SummaryPrint>, QueryStatus) {
                 t.duration_ns,
                 t.span_count,
                 t.error_count,
-                t.matched_count,
-                t.matched_spans
-                    .iter()
-                    .map(|s| {
-                        let name = s
-                            .fields
-                            .iter()
-                            .find(|(k, _)| k == "name")
-                            .map(|(_, v)| v.clone())
-                            .unwrap_or_default();
-                        (name, s.start_ns, s.duration_ns)
-                    })
-                    .collect(),
+                t.newest_matched_start_ns,
                 t.exact,
                 (
                     t.service_breakdown.top.clone(),
                     t.service_breakdown.other,
-                    t.service_breakdown.other_services,
                     t.service_breakdown.unattributed,
                 ),
             )
@@ -152,23 +138,16 @@ fn norm(data: &SearchData) -> (Vec<SummaryPrint>, QueryStatus) {
 }
 
 /// Positional expected-value constructor for `ServiceBreakdown` asserts.
-fn breakdown(
-    top: &[(&str, u64)],
-    other: u64,
-    other_services: usize,
-    unattributed: u64,
-) -> ServiceBreakdown {
+fn breakdown(top: &[(&str, u64)], other: u64, unattributed: u64) -> ServiceBreakdown {
     ServiceBreakdown {
         top: top.iter().map(|&(s, n)| (s.to_string(), n)).collect(),
         other,
-        other_services,
         unattributed,
     }
 }
 
 /// Every returned row's breakdown partitions exactly the spans its
-/// `span_count` counts, within the cap, with `other` and
-/// `other_services` empty together.
+/// `span_count` counts, within the cap.
 fn assert_breakdowns_partition(data: &SearchData) {
     for t in &data.traces {
         let b = &t.service_breakdown;
@@ -182,7 +161,6 @@ fn assert_breakdowns_partition(data: &SearchData) {
             "trace {}",
             t.trace_id
         );
-        assert_eq!(b.other == 0, b.other_services == 0, "trace {}", t.trace_id);
     }
 }
 
@@ -889,7 +867,7 @@ fn oracle_equivalence_under_relayouts() {
 }
 
 /// Summary numbers against ground truth (single layout; equivalence is
-/// proven above): roots, envelope, counts, spans_per_trace trim, combiner order.
+/// proven above): roots, envelope, counts, ranks.
 #[test]
 fn summary_ground_truth() {
     let dir = tempfile::tempdir().unwrap();
@@ -898,10 +876,7 @@ fn summary_ground_truth() {
     let wal = write_wal(dir.path(), all, "world");
     let sources = both_roles(|| vec![sealed_source(dir.path(), &wal, "one")]);
 
-    let data = run(
-        sources,
-        SearchQuery::new(Predicate::all()).spans_per_trace(2),
-    );
+    let data = run(sources, SearchQuery::new(Predicate::all()));
     assert_breakdowns_partition(&data);
     let by_id = |n: u8| {
         data.traces
@@ -916,11 +891,10 @@ fn summary_ground_truth() {
     assert_eq!(t1.root_name.as_deref(), Some("GET /users"));
     assert_eq!(t1.start_ns, (1_000 * NS) as i64);
     assert_eq!(t1.duration_ns, 500_000);
-    assert_eq!((t1.span_count, t1.error_count, t1.matched_count), (2, 0, 2));
-    assert_eq!(t1.service_breakdown, breakdown(&[("svc-a", 2)], 0, 0, 0));
-    // spans_per_trace(2) attaches both, in combiner (chronological) order.
-    assert_eq!(t1.matched_spans.len(), 2);
-    assert!(t1.matched_spans[0].start_ns < t1.matched_spans[1].start_ns);
+    assert_eq!((t1.span_count, t1.error_count), (2, 0));
+    assert_eq!(t1.service_breakdown, breakdown(&[("svc-a", 2)], 0, 0));
+    // Ranked by the newest matching span: the child.
+    assert_eq!(t1.newest_matched_start_ns, (1_000 * NS + 10) as i64);
 
     // T3: spans scattered across the halves; envelope spans both.
     let t3 = by_id(3);
@@ -928,43 +902,23 @@ fn summary_ground_truth() {
     assert_eq!(t3.start_ns, (900 * NS) as i64);
     assert_eq!(t3.duration_ns, (1_000 * NS + 50) as i64);
     assert_eq!(t3.span_count, 2);
-    assert_eq!(t3.service_breakdown, breakdown(&[("svc-a", 2)], 0, 0, 0));
+    assert_eq!(t3.service_breakdown, breakdown(&[("svc-a", 2)], 0, 0));
 
     // T5: all three spans carry ERROR.
     let t5 = by_id(5);
     assert_eq!((t5.span_count, t5.error_count), (3, 3));
-    assert_eq!(t5.service_breakdown, breakdown(&[("svc-b", 3)], 0, 0, 0));
-    assert_eq!(
-        t5.matched_spans.len(),
-        2,
-        "spans_per_trace trims the attachment"
-    );
-    assert_eq!(
-        t5.matched_count, 3,
-        "matched_count is not trimmed by spans_per_trace"
-    );
+    assert_eq!(t5.service_breakdown, breakdown(&[("svc-b", 3)], 0, 0));
+    assert_eq!(t5.newest_matched_start_ns, (1_520 * NS) as i64);
 
     // T6: the resend collapsed to the canonical copy.
     let t6 = by_id(6);
     assert_eq!((t6.span_count, t6.start_ns), (1, (1_300 * NS) as i64));
-    assert_eq!(t6.service_breakdown, breakdown(&[("svc-b", 1)], 0, 0, 0));
-
-    // spans_per_trace = 0 attaches nothing, counts unaffected.
-    let sources = both_roles(|| vec![sealed_source(dir.path(), &wal, "one")]);
-    let none = run(
-        sources,
-        SearchQuery::new(Predicate::all()).spans_per_trace(0),
-    );
-    assert!(none.traces.iter().all(|t| t.matched_spans.is_empty()));
-    assert_eq!(
-        none.traces.iter().map(|t| t.matched_count).sum::<usize>(),
-        10
-    );
+    assert_eq!(t6.service_breakdown, breakdown(&[("svc-b", 1)], 0, 0));
 }
 
 /// The per-service breakdown over the retained canonical spans: ranked
 /// by span count then name (ties at the cut included), capped with the
-/// tail folded into `other`/`other_services`, service-less spans
+/// tail folded into `other`, service-less spans
 /// counted as `unattributed`, a resend from another service counted
 /// once under its canonical copy's service, and a capped trace
 /// partitioning only its retained spans.
@@ -1047,7 +1001,7 @@ fn service_breakdown_partitions_the_retained_canonical_spans() {
     assert_eq!(t21.span_count, 9);
     assert_eq!(
         t21.service_breakdown,
-        breakdown(&[("frontend", 3), ("auth", 2), ("cart", 2)], 0, 0, 2)
+        breakdown(&[("frontend", 3), ("auth", 2), ("cart", 2)], 0, 2)
     );
     assert_eq!(t22.span_count, 17);
     assert_eq!(
@@ -1061,7 +1015,6 @@ fn service_breakdown_partitions_the_retained_canonical_spans() {
                 ("echo", 2)
             ],
             3,
-            2,
             0
         )
     );
@@ -1080,10 +1033,12 @@ fn service_breakdown_partitions_the_retained_canonical_spans() {
     assert_eq!(ids(&filtered), vec![hex(21)]);
     assert_breakdowns_partition(&filtered);
     let t21 = &filtered.traces[0];
-    assert_eq!((t21.span_count, t21.matched_count), (9, 2));
+    assert_eq!(t21.span_count, 9);
+    // Ranked by its newest cart span, not by the trace's newest span.
+    assert_eq!(t21.newest_matched_start_ns, (5_004 * NS) as i64);
     assert_eq!(
         t21.service_breakdown,
-        breakdown(&[("frontend", 3), ("auth", 2), ("cart", 2)], 0, 0, 2)
+        breakdown(&[("frontend", 3), ("auth", 2), ("cart", 2)], 0, 2)
     );
 
     // Capped at 2 spans: each trace keeps its two earliest, inexact, and
@@ -1097,11 +1052,8 @@ fn service_breakdown_partitions_the_retained_canonical_spans() {
     assert_breakdowns_partition(&capped);
     let (t22, t21) = (&capped.traces[0], &capped.traces[1]);
     assert!(!t21.exact && !t22.exact);
-    assert_eq!(
-        t21.service_breakdown,
-        breakdown(&[("frontend", 2)], 0, 0, 0)
-    );
-    assert_eq!(t22.service_breakdown, breakdown(&[("alpha", 2)], 0, 0, 0));
+    assert_eq!(t21.service_breakdown, breakdown(&[("frontend", 2)], 0, 0));
+    assert_eq!(t22.service_breakdown, breakdown(&[("alpha", 2)], 0, 0));
 }
 
 /// The glm 7-trace construction (pin R2-1): losing resends inflate raw
@@ -1191,10 +1143,8 @@ fn window_applies_to_the_canonical_copy() {
     assert_eq!(t3.root_name.as_deref(), Some("GET /health"));
     assert_eq!(t3.start_ns, (900 * NS) as i64);
     assert_eq!(t3.span_count, 2);
-    // …but matched_count/attachment follow predicate + window.
-    assert_eq!(t3.matched_count, 1);
-    assert_eq!(t3.matched_spans.len(), 1);
-    assert_eq!(t3.matched_spans[0].start_ns, (1_900 * NS) as i64);
+    // …but the rank follows predicate + window.
+    assert_eq!(t3.newest_matched_start_ns, (1_900 * NS) as i64);
 }
 
 /// Request validation: everything rejected BEFORE any I/O.
@@ -1215,13 +1165,6 @@ fn request_validation_matrix() {
     assert!(matches!(
         try_search(sources(), SearchQuery::new(Predicate::all()).limit(0)),
         Err(SearchRequestError::ZeroLimit)
-    ));
-    assert!(matches!(
-        try_search(
-            sources(),
-            SearchQuery::new(Predicate::all()).spans_per_trace(129)
-        ),
-        Err(SearchRequestError::SpansPerTraceBeyondMax { got: 129 })
     ));
     // Structural predicate error.
     assert!(matches!(
@@ -1574,7 +1517,7 @@ fn capped_candidates_are_never_silently_dropped() {
     assert!(kept.status.has(PartialReason::SizeCap));
     let t9 = &kept.traces[1];
     assert!(!t9.exact);
-    assert_eq!((t9.span_count, t9.matched_count), (2, 1));
+    assert_eq!(t9.span_count, 2);
 
     // Direction 3 (the trimmed-out shape): for `m2`, trace 9's computed
     // rank comes from its RETAINED spans (200s) though its true newest
@@ -1849,36 +1792,6 @@ fn empty_window_set_is_a_complete_empty() {
     let data = run(sources, SearchQuery::new(Predicate::all()));
     assert!(data.traces.is_empty());
     assert_eq!(data.status, QueryStatus::Complete);
-}
-
-/// FieldKinds cover exactly the returned traces' attached spans: names
-/// the attachment exposes, kinds from the contributing sources.
-#[test]
-fn field_kinds_describe_the_returned_data() {
-    let dir = tempfile::tempdir().unwrap();
-    let mut all = early_requests();
-    all.extend(late_requests());
-    let wal = write_wal(dir.path(), all, "world");
-    let sources = both_roles(|| vec![sealed_source(dir.path(), &wal, "one")]);
-    let data = run(
-        sources,
-        SearchQuery::new(pred(vec![attr_eq(AttributeOwner::Span, "queue", "q1")])),
-    );
-    assert_eq!(ids(&data), vec![hex(4)]);
-    let names: Vec<&str> = data
-        .field_kinds
-        .fields
-        .iter()
-        .map(|(k, _)| k.as_str())
-        .collect();
-    assert!(names.contains(&"attributes.queue"), "{names:?}");
-    assert!(
-        names.contains(&"resource.attributes.service.name"),
-        "{names:?}"
-    );
-    // svc-a's attributes exist in the (single, contributing) file but on
-    // no attached span — the projection excludes them.
-    assert!(!names.contains(&"attributes.http.method"), "{names:?}");
 }
 
 /// Search across ONLY tails (no sealed file at all): the tail path
@@ -2161,19 +2074,25 @@ fn long_values_are_evaluated_whole_in_every_layout() {
             let data = run(s, SearchQuery::new(pred(vec![condition.clone()])));
             assert_eq!(&ids(&data), want, "{name} on {layout}");
             assert_eq!(data.status, QueryStatus::Complete, "{name} on {layout}");
-            for t in &data.traces {
-                let value = t.matched_spans[0]
-                    .fields
-                    .iter()
-                    .find(|(k, _)| k == "attributes.big")
-                    .map(|(_, v)| v.len());
-                assert_eq!(
-                    value,
-                    Some(big.len()),
-                    "{name} on {layout}: attached value cut"
-                );
-            }
         }
+        // The trace view returns the value whole too.
+        let sources = match layout {
+            "sealed" => vec![sealed_source(dir.path(), &wal, "sealed")],
+            _ => vec![tail_source(&wal, "tail")],
+        };
+        let trace = sfsq::traces::trace_by_id(
+            sources,
+            sfsq::traces::TraceQuery::new(sfst::TraceId::from(tid(1))),
+            CancellationToken::new(),
+            Arc::new(AtomicUsize::new(0)),
+        )
+        .expect("valid request");
+        let value = trace.trace.spans[0]
+            .fields
+            .iter()
+            .find(|(k, _)| k == "attributes.big")
+            .map(|(_, v)| v.len());
+        assert_eq!(value, Some(big.len()), "{layout}: value cut");
     }
 }
 

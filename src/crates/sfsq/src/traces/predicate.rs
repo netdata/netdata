@@ -488,8 +488,8 @@ impl Predicate {
     /// Split into `(span_local, trace_level)` (pin R3-2): trace-level
     /// builtins (`RootName`, `RootServiceName`, `TraceDuration`)
     /// evaluate post-assembly as tri-state (decision 15); EVERYTHING the
-    /// span-side evaluator and the file plans see — and everything
-    /// `matched_count`/`spans_per_trace` are defined over — is the span-local part.
+    /// span-side evaluator and the file plans see — and a trace's rank
+    /// (its newest matching span) — is the span-local part.
     pub(crate) fn partition(&self) -> (Predicate, Predicate) {
         use BuiltinField::*;
         let (trace_level, span_local): (Vec<Condition>, Vec<Condition>) =
@@ -927,7 +927,8 @@ enum EvalGroupCondition {
 /// The span-side predicate evaluator — the single source of truth for
 /// what a span-local predicate MEANS (pin R2-9): the tail's phase 1
 /// evaluates it per decoded span, phase 2 re-evaluates it per retained
-/// canonical span, and `matched_count`/`spans_per_trace` are defined by it.
+/// canonical span, and a trace's rank (its newest matching span) is
+/// defined by it.
 pub(crate) struct EvalPredicate {
     terms: Vec<EvalTerm>,
 }

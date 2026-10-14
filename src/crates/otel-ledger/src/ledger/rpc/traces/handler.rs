@@ -350,8 +350,7 @@ impl OtelTracesHandler {
                 TimeWindow::new(window.start_ns, window.end_ns)
                     .map_err(|e| client_err(e.to_string()))?,
             )
-            .limit(params.limit.saturating_add(cursor.map_or(0, |c| c.served)))
-            .spans_per_trace(0);
+            .limit(params.limit.saturating_add(cursor.map_or(0, |c| c.served)));
 
         // ONE capture over the COMPLETION range (the match window
         // widened by the clamped slack), feeding two roles: the engine
@@ -375,7 +374,6 @@ impl OtelTracesHandler {
             let busy = SearchData {
                 traces: Vec::new(),
                 status: QueryStatus::Partial([PartialReason::Busy].into()),
-                field_kinds: FieldKinds::default(),
             };
             return Ok(to_search_result(
                 busy,

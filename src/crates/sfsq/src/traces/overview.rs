@@ -334,29 +334,17 @@ pub fn overview(
     })
 }
 
-/// The entries [`top_k`] folded away.
-#[derive(Debug, Default)]
-pub(crate) struct FoldedTail {
-    /// Their summed counts.
-    pub count: u64,
-    /// How many entries they were.
-    pub entries: usize,
-}
-
 /// Keep the `k` (≥ 1) highest-count entries — count DESC, value ASC —
-/// and fold the rest into a [`FoldedTail`]. Used by the search rows'
-/// service breakdown.
-pub(crate) fn top_k<V: Ord>(mut entries: Vec<(V, u64)>, k: usize) -> (Vec<(V, u64)>, FoldedTail) {
+/// and sum the counts of the rest. Used by the search rows' service
+/// breakdown.
+pub(crate) fn top_k<V: Ord>(mut entries: Vec<(V, u64)>, k: usize) -> (Vec<(V, u64)>, u64) {
     let rank = |a: &(V, u64), b: &(V, u64)| b.1.cmp(&a.1).then_with(|| a.0.cmp(&b.0));
     // Select-then-sort: O(n + K log K).
-    let mut tail = FoldedTail::default();
+    let mut folded = 0;
     if entries.len() > k {
         entries.select_nth_unstable_by(k - 1, rank);
-        for (_, n) in entries.drain(k..) {
-            tail.count += n;
-            tail.entries += 1;
-        }
+        folded = entries.drain(k..).map(|(_, n)| n).sum();
     }
     entries.sort_unstable_by(rank);
-    (entries, tail)
+    (entries, folded)
 }

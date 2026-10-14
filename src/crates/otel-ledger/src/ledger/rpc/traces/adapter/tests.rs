@@ -360,11 +360,8 @@ fn summary_ranked(id_byte: u8, envelope_ns: i64, rank_ns: i64) -> sfsq::traces::
         service_breakdown: sfsq::traces::ServiceBreakdown {
             top: vec![("svc".into(), 2)],
             other: 0,
-            other_services: 0,
             unattributed: 0,
         },
-        matched_count: 2,
-        matched_spans: vec![],
         exact: true,
     }
 }
@@ -373,7 +370,6 @@ fn search_data(traces: Vec<sfsq::traces::TraceSummary>) -> SearchData {
     SearchData {
         traces,
         status: QueryStatus::Complete,
-        field_kinds: FieldKinds::default(),
     }
 }
 
@@ -419,7 +415,6 @@ fn search_rows_carry_the_service_breakdown() {
     t.service_breakdown = sfsq::traces::ServiceBreakdown {
         top: vec![("frontend".into(), 6), ("cart".into(), 3)],
         other: 2,
-        other_services: 2,
         unattributed: 1,
     };
     let r = to_search_result(search_data(vec![t]), 2, None, WIN);
@@ -523,7 +518,6 @@ fn partial_full_page_ends_the_walk_with_the_status_saying_why() {
     let data = SearchData {
         traces: vec![summary(1, 300), summary(2, 200)],
         status: b.finish(),
-        field_kinds: FieldKinds::default(),
     };
     let r = to_search_result(data, 2, None, WIN);
     assert_eq!(r.items.returned, 2, "the page itself is full");
@@ -544,7 +538,6 @@ fn remote_unavailable_full_page_ends_the_walk() {
     let data = SearchData {
         traces: vec![summary(1, 300), summary(2, 200)],
         status: b.finish(),
-        field_kinds: FieldKinds::default(),
     };
     let r = to_search_result(data, 2, None, WIN);
     assert_eq!(r.items.returned, 2, "the page itself is full");
@@ -564,7 +557,6 @@ fn work_ceiling_partial_reaches_the_wire() {
     let data = SearchData {
         traces: vec![summary(1, 300)],
         status: b.finish(),
-        field_kinds: FieldKinds::default(),
     };
     let r = to_search_result(data, 20, None, WIN);
     assert_eq!(
