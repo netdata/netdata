@@ -35,6 +35,7 @@ on:
       - 'integrations/gen_npm_catalog.py'
       - 'integrations/gen_integrations.py'
       - 'integrations/health_alerts.py'
+      - 'integrations/context_owners.py'
       - 'integrations/prometheus_profile_docs.py'
       - 'integrations/tests/**'
       - 'integrations/gen_docs_integrations.py'
@@ -118,6 +119,11 @@ jobs:
         run: |
           source ./virtualenv/bin/activate
           python3 -m unittest integrations.tests.test_health_alerts
+      - name: Test Catalogue Context Owners
+        id: test-context-owners
+        run: |
+          source ./virtualenv/bin/activate
+          python3 -m unittest integrations.tests.test_context_owners
       - name: Generate Integrations Documentation
         id: generate-integrations-documentation
         run: |
@@ -175,6 +181,7 @@ jobs:
               Test Prometheus Profile Documentation: ${{ steps.test-prometheus-profile-documentation.outcome }}
               Test Collector Metadata Content Rules: ${{ steps.test-collector-metadata.outcome }}
               Test Stock Health Alert Metadata: ${{ steps.test-health-alerts.outcome }}
+              Test Catalogue Context Owners: ${{ steps.test-context-owners.outcome }}
               Generate Integrations Documentation: ${{ steps.generate-integrations-documentation.outcome }}
               Generate src/collectors/COLLECTORS.md: ${{ steps.generate-collectors-md.outcome }}
               Generate src/collectors/SECRETS.md: ${{ steps.generate-secrets-md.outcome }}

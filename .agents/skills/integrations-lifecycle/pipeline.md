@@ -107,15 +107,17 @@ none. An invalid or duplicate description prints `Error: ...` and exits 1 before
 
 - `integrations/integrations.js`: the `integrations/templates/integrations.js` shell with a two-line `// DO NOT EDIT
   THIS FILE DIRECTLY` banner and `export const categories = [...]; export const integrations = [...]; export const
-  alerts = {...}`, holding the rich variant. `convert_local_links` rewrites every `](/` to
-  `](https://github.com/netdata/netdata/blob/master/` first, so a metadata link written as `](/src/foo/bar.md)` reaches
-  the dashboard as a GitHub link.
-- `integrations/integrations.json`: `{categories, integrations, alerts}` with the clean variant, no banner. The
-  dashboard's drift check reads it from `raw.githubusercontent.com` (`in-app-contract.md`).
+  alerts = {...}; export const contexts = {...}`, holding the rich variant. `convert_local_links` rewrites every
+  `](/` to `](https://github.com/netdata/netdata/blob/master/` first, so a metadata link written as
+  `](/src/foo/bar.md)` reaches the dashboard as a GitHub link.
+- `integrations/integrations.json`: `{categories, integrations, alerts, contexts}` with the clean variant, no banner.
+  The dashboard's drift check reads it from `raw.githubusercontent.com` (`in-app-contract.md`).
 - `alerts` is the same in both files: one entry per stock alert name, built by `build_alert_index` in
   `health_alerts.py` from `health.d`; `integrations` comes from the derivation that builds the page rows
   (`attach_alerts`, before rendering turns `alerts` into Markdown). Text values drop quotes that wrap the whole value
   and turn inner double quotes into spaces; single quotes stay.
+- `contexts` is the same in both files: context owners from `context_owners` in `context_owners.py`, computed in
+  `main()` from the collector and flow records before rendering (`in-app-contract.md`).
 
 Three content variants therefore exist: rich markers in `.js`, markers stripped in `.json`, and, in the tracked pages,
 markers converted to HTML `<details>` by `clean_and_write` in `gen_docs_integrations.py`, which reads the rich keys.

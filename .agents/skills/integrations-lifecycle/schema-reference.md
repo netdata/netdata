@@ -49,8 +49,9 @@ Behavior not visible in the schema:
   declared context derives, and each `excluded_alerts` name one that a declared context derives, is checked by
   `integrations/tests/test_health_alerts.py`, not by the schema; the alert table itself is derived
   (`.agents/skills/collectors-metadata-yaml/alerts-and-meta.md#1-alerts-derived-from-the-health-configuration`).
-- `metrics.dynamic_context_prefixes[]` and `metrics.dynamic_collect_plugins[]` are read only by the dormant taxonomy
-  tooling (`consistency.md`, "The dormant collector taxonomy"); nothing renders them.
+- `metrics.dynamic_context_prefixes[]` feeds the catalogue's `contexts` export (`in-app-contract.md`) and the dormant
+  taxonomy tooling; `metrics.dynamic_collect_plugins[]` only the taxonomy tooling (`consistency.md`, "The dormant
+  collector taxonomy"). Nothing renders either.
 - `profile_coverage.modules.<meta.id>[]` is allowed only in the Prometheus collector's metadata file, and
   `metrics.profile_coverage` is a generated in-memory projection that must never be authored
   (`how-tos/prometheus-profile-metadata.md`).

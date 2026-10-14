@@ -388,4 +388,9 @@ modules:
       description: |
         Metrics are created dynamically from supported OpenTelemetry data. The exact charts depend on the received metric names, attributes, instrumentation scopes, and mapping rules.
       availability: []
+      dynamic_context_prefixes:
+        - prefix: otel.
+          reason: >-
+            Chart contexts are generated at runtime from the received OpenTelemetry metric names as
+            otel.<metric name>.
       scopes: []

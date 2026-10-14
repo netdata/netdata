@@ -289,7 +289,7 @@
               },
               "dynamic_context_prefixes": {
                 "type": "array",
-                "description": "Dynamic chart context prefixes this collector is allowed to reference from taxonomy.yaml. Use only when the collector emits contexts that are not fully listed in metadata.yaml but share a stable namespace prefix.",
+                "description": "Chart context prefixes of contexts the collector creates at runtime, which metadata.yaml cannot list in full but which share a stable namespace. The integrations catalogue exports each as a context owner prefix (integrations.js `contexts.prefixes`), and the collector taxonomy tooling may reference them from taxonomy.yaml.",
                 "items": {
                   "type": "object",
                   "additionalProperties": false,
@@ -297,12 +297,13 @@
                     "prefix": {
                       "type": "string",
                       "minLength": 1,
-                      "description": "Static prefix shared by dynamic chart contexts."
+                      "description": "Static prefix shared by the runtime chart contexts, ending with a dot (for example `prometheus.`).",
+                      "pattern": "\\.$"
                     },
                     "reason": {
                       "type": "string",
                       "minLength": 1,
-                      "description": "Why this collector needs a dynamic context-prefix selector."
+                      "description": "Where the runtime contexts under this prefix come from (profiles, user configuration, received metric names)."
                     }
                   },
                   "required": [

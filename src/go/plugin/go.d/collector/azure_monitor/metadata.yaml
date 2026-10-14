@@ -621,6 +621,11 @@ modules:
 
         **See the service-specific integrations below for detailed metric lists per Azure service.**
       availability: []
+      dynamic_context_prefixes:
+        - prefix: azure_monitor.
+          reason: >-
+            Profile charts, including those of user-supplied profiles, are generated at runtime under the
+            azure_monitor namespace.
       scopes: []
   - <<: *module
     meta:

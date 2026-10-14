@@ -113,6 +113,11 @@ jobs:
           source ./venv/bin/activate
           cd netdata && python3 -m unittest integrations.tests.test_health_alerts
 
+      - name: Test Catalogue Context Owners
+        run: |
+          source ./venv/bin/activate
+          cd netdata && python3 -m unittest integrations.tests.test_context_owners
+
       - name: Generate Integrations Documentation
         run: |
           source ./venv/bin/activate

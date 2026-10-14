@@ -71,8 +71,8 @@ short contributor-facing version.
 `integrations/tests/test_taxonomy.py` are an early implementation of a collector dashboard taxonomy that is unused
 today, will change substantially, and is kept in the tree for that later work. No workflow runs any of it (removed
 2026-09-06). Do not author, extend, or seed `taxonomy.yaml` for a new collector; leave the existing files alone unless
-the redesign touches them; `metrics.dynamic_context_prefixes` and `metrics.dynamic_collect_plugins` in `metadata.yaml`
-are read only by this tooling.
+the redesign touches them; `metrics.dynamic_collect_plugins` in `metadata.yaml` is read only by this tooling, and
+`metrics.dynamic_context_prefixes` also feeds the catalogue's `contexts` export.
 
 ## What is enforced today
 
@@ -92,6 +92,9 @@ are read only by this tooling.
   be a documented dimension name (also with a `_raw` or `_last_collected_t` suffix), an alert name, a listed chart or
   host variable (`CHART_VARIABLES`, `HOST_VARIABLES`) or a `context.dimension` reference, checked only when that
   context is documented; health built-ins and the `green`/`red` a rule sets are exempt.
+- `integrations/tests/test_context_owners.py` (both workflows): the `contexts` export rules (`in-app-contract.md`);
+  every declared `dynamic_context_prefixes` entry is exported, and no exported prefix covers a context another module
+  documents outside that module's longer prefixes.
 - `collecttest.AssertConfigSchemaMatchesMetadata` (opt-in, per collector test): option descriptions and tabs agree
   between `config_schema.json` and `metadata.yaml`.
 - `collecttest` artifact checks (opt-in, per collector test;
