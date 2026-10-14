@@ -477,14 +477,19 @@ class CatalogueExportTest(unittest.TestCase):
         categories = [{'id': 'data-collection', 'name': 'Data Collection', 'children': []}]
         integrations = [{'id': 'p-m-M', 'meta': {}}]
         alerts = {'disk': {'template': True, 'on': ['disk.space'], 'source': 'b.conf', 'integrations': []}}
+        contexts = {'exact': {'disk.space': ['p-m-M']}, 'prefixes': {'disk.': ['p-m-M']}}
 
         with tempfile.TemporaryDirectory() as directory:
             output = Path(directory) / 'integrations.js'
-            render_integrations(categories, integrations, alerts, output)
+            render_integrations(categories, integrations, alerts, contexts, output)
             text = output.read_text()
-            exported = json.loads(text.split('export const alerts = ', 1)[1])
+            after_alerts = text.split('export const alerts = ', 1)[1]
+            exported_alerts, exported_contexts = after_alerts.split('\nexport const contexts = ', 1)
 
-            self.assertEqual((read_integrations_js(str(output)), exported), ((categories, integrations), alerts))
+            self.assertEqual(
+                (read_integrations_js(str(output)), json.loads(exported_alerts), json.loads(exported_contexts)),
+                ((categories, integrations), alerts, contexts),
+            )
 
 
 class StockHealthConfigTest(unittest.TestCase):

@@ -22,6 +22,7 @@ from _common import (
     make_validator,
     warn,
 )
+from context_owners import context_owners, context_subject
 from descriptions import build_description_index
 from health_alerts import alert_owners, alert_ownership, alert_subject, build_alert_index, load_stock_rules
 from prometheus_profile_docs import project_prometheus_profile_coverage
@@ -1374,6 +1375,18 @@ def alert_subjects(items):
     ]
 
 
+def declared_context_prefixes(item):
+    return [entry['prefix'] for entry in (item.get('metrics') or {}).get('dynamic_context_prefixes') or []]
+
+
+def context_subjects(items):
+    return [
+        context_subject(make_id(item['meta']), item['meta']['plugin_name'], item['meta']['module_name'],
+                        declared_contexts(item), declared_context_prefixes(item))
+        for item in items
+    ]
+
+
 def attach_alerts(rules, *groups):
     """Replace each item's listed alert names with its page rows and drop its excluded names; return the owners of each
     alert name."""
@@ -1388,22 +1401,24 @@ def attach_alerts(rules, *groups):
     return alert_owners(ownership)
 
 
-def render_integrations(categories, integrations, alerts, output_path=OUTPUT_PATH):
+def render_integrations(categories, integrations, alerts, contexts, output_path=OUTPUT_PATH):
     template = get_jinja_env().get_template('integrations.js')
     data = template.render(
         categories=json.dumps(categories, indent=4),
         integrations=json.dumps(integrations, indent=4),
         alerts=json.dumps(alerts, indent=4),
+        contexts=json.dumps(contexts, indent=4),
     )
     data = convert_local_links(data, "https://github.com/netdata/netdata/blob/master")
     output_path.write_text(data)
 
 
-def render_json(categories, integrations, alerts):
+def render_json(categories, integrations, alerts, contexts):
     JSON_PATH.write_text(json.dumps({
         'categories': categories,
         'integrations': integrations,
         'alerts': alerts,
+        'contexts': contexts,
     }, indent=4))
 
 
@@ -1425,6 +1440,7 @@ def main():
     project_prometheus_profile_coverage(collectors)
     rules = load_stock_rules()
     alerts = build_alert_index(rules, attach_alerts(rules, collectors, flows, devices))
+    contexts = context_owners(context_subjects(collectors + flows))
 
     collectors, clean_collectors, ids = render_collectors(categories, collectors, dict())
     deploy, clean_deploy, ids = render_deploy(distros, categories, deploy, ids)
@@ -1453,8 +1469,8 @@ def main():
         print(f'Error: {error}', file=sys.stderr)
         return 1
 
-    render_integrations(categories, integrations, alerts)
-    render_json(categories, clean_integrations, alerts)
+    render_integrations(categories, integrations, alerts, contexts)
+    render_json(categories, clean_integrations, alerts, contexts)
 
     return fail_on_warnings()
 

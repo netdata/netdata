@@ -73,10 +73,13 @@ pointer done as a table; the size rule above does not count it. Exemplar: `cloud
 
 ## 4. `dynamic_context_prefixes` And `availability`
 
-- `dynamic_context_prefixes` (and `dynamic_collect_plugins`) are read only by the dormant collector taxonomy tooling
-  and render nowhere on the page (`integrations-lifecycle/consistency.md`, "The dormant collector taxonomy"). Do not add
-  them to document runtime-only contexts; describe those in `metrics.description` in operator terms instead. The
-  existing declarations stay until the taxonomy is redesigned.
+- `dynamic_context_prefixes` declares the namespace of contexts the collector creates at runtime (from profiles,
+  user configuration or received metric names) when the documented contexts do not reveal it: `prometheus.`,
+  `azure_monitor.`, `nagios.`. Each entry is a `prefix` and a one-line `reason`. It renders nowhere on the page; the
+  catalogue exports it so a custom alert on such a context finds this collector
+  (`integrations-lifecycle/in-app-contract.md`, the `contexts` export), and CI fails when another collector documents
+  a context under the prefix. Describe the runtime contexts for operators in `metrics.description` as well.
+  `dynamic_collect_plugins` is read only by the dormant taxonomy tooling (`integrations-lifecycle/consistency.md`).
 - `availability` adds one column per value to every metrics table, marking which rows exist in which variant
   (product editions, a basic versus extended mode). Use it only when rows really differ by variant; the values are
   the variant names an operator recognizes.
