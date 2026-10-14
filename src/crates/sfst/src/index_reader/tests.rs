@@ -519,3 +519,46 @@ fn positions_report_to_loaded_sources() {
         Err(crate::Error::UnsetTraceId)
     ));
 }
+
+#[test]
+fn rollup_ids_stream_from_the_session() {
+    use crate::trace_combine::SpanSource;
+    use std::io::Cursor;
+    let arena = bumpalo::Bump::new();
+    let mut ri = crate::RowIndex::new(&arena, 10);
+    let mut ids = TraceIds::with_capacity(4);
+    let mut rollup = crate::TraceRollupRows::new();
+    for (i, b) in [3u8, 1, 3, 2].into_iter().enumerate() {
+        let slot = ri.intern(None, "l=a");
+        ri.row(1_000 + i as i64, &[slot]);
+        let id = TraceId::from([b; 16]);
+        ids.push(id);
+        rollup.record_span(id, sid(i as u8 + 1), true, 1_000, 10, 0, false, None, None);
+    }
+    ri.trace_ids = Some(ids);
+    ri.build_trace_id_index = true;
+    ri.trace_rollup = Some(rollup);
+    let (buf, _s, _m) =
+        crate::IndexWriter::write_into(&ri, Cursor::new(Vec::new()), Vec::new()).unwrap();
+    let buf = buf.into_inner();
+
+    let mut session = owned(&buf);
+    let mut got = Vec::new();
+    assert_eq!(
+        session.for_each_rollup_id(|id| got.push(id)).unwrap(),
+        Some(3)
+    );
+    assert_eq!(
+        got,
+        [1u8, 2, 3].map(|b| TraceId::from([b; 16])),
+        "each trace once, in id order"
+    );
+    assert!(session.is_loaded(), "the rollup stays for later rows");
+    assert!(matches!(
+        session.rollup_row(TraceId::from([2; 16])).unwrap(),
+        crate::RollupEvidence::Row(_)
+    ));
+
+    let plain = trace_file(&[(sid(1), SpanId::UNSET)]);
+    assert_eq!(owned(&plain).for_each_rollup_id(|_| {}).unwrap(), None);
+}

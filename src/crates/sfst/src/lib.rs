@@ -123,7 +123,7 @@ pub use registry::{File, Registry, RetentionPolicy};
 pub use row_index::RowIndex;
 pub use schema::join_value_kinds;
 pub use span_extras::{EventIndex, EventRef, EventRows, LinkIndex, LinkRef, LinkRows};
-pub use trace_bloom::TraceIdBloom;
+pub use trace_bloom::{RepeatFilter, TraceIdBloom};
 pub use trace_combine::{CombineOutcome, LoadedSources, SpanRef, SpanSource};
 pub use trace_index::TraceIdIndex;
 pub use trace_rollup::{

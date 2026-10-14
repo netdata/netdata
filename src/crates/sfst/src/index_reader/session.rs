@@ -374,6 +374,30 @@ impl<'r, 'a> TraceFileSession<'r, 'a> {
         }
     }
 
+    /// Visit every trace id of the file's trace rollup (`TRSU`), in id
+    /// order, decoding the rollup into the loaded layer (later
+    /// [`rollup_row`](Self::rollup_row) calls reuse it; a caller bounding
+    /// its loaded sessions touches its [`crate::LoadedSources`] after
+    /// this). `Ok(None)` when the file has no rollup, else the number of
+    /// ids visited.
+    pub fn for_each_rollup_id(
+        &mut self,
+        mut visit: impl FnMut(TraceId),
+    ) -> Result<Option<usize>, crate::Error> {
+        if self.rollup.is_none() {
+            let chunk = self.view.chunk()?;
+            if !chunk.has_trace_rollup() {
+                return Ok(None);
+            }
+            self.rollup = Some(chunk.trace_rollup()?);
+        }
+        let ids = &self.rollup.as_ref().expect("decoded above").trace_ids;
+        for i in 0..ids.len() {
+            visit(ids.get(i));
+        }
+        Ok(Some(ids.len()))
+    }
+
     /// Resolve a rollup root ref as a value of `field_name`, through the
     /// file's dictionaries (the full reader) and the session's
     /// [`RollupRootResolver`]. `Err` when the file cannot open fully.

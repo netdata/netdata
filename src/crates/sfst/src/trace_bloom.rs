@@ -34,6 +34,10 @@
 //! sealed filter is not tight (or is absent or corrupt), a session that
 //! looks up many ids builds one from the lookup structures, so such a file
 //! costs one lookup decode per query instead of one per false positive.
+//!
+//! [`RepeatFilter`] is a query-time sibling: fixed memory, it tells which
+//! ids were recorded more than once (by a query, once per source), so a
+//! trace held by exactly one source can be decided from that source alone.
 
 use fastbloom::BloomFilter;
 use serde::{Deserialize, Serialize};
@@ -201,6 +205,28 @@ impl TraceIdBloom {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// Ids recorded once never repeat; ids recorded twice always do (no
+    /// false negatives); a never-recorded id does not.
+    #[test]
+    fn repeat_filter_tells_once_from_more() {
+        let id = |i: u32| {
+            let mut b = [0u8; 16];
+            b[..4].copy_from_slice(&i.to_be_bytes());
+            b[15] = 1;
+            TraceId::from(b)
+        };
+        let mut filter = RepeatFilter::new();
+        for i in 0..20_000 {
+            filter.record(id(i));
+        }
+        for i in 10_000..20_000 {
+            filter.record(id(i));
+        }
+        assert!((0..10_000).all(|i| !filter.may_repeat(id(i))));
+        assert!((10_000..20_000).all(|i| filter.may_repeat(id(i))));
+        assert!(!filter.may_repeat(id(99_999)));
+    }
 
     fn id(seed: u8, tail: u8) -> TraceId {
         let mut a = [0u8; 16];
@@ -536,5 +562,62 @@ mod tests {
             reader.trace_id_bloom().is_err(),
             "missing TRCE column rejected"
         );
+    }
+}
+
+/// Fixed-memory "recorded more than once?" filter over trace ids: two
+/// blooms, one of every recorded id and one of the ids recorded while
+/// already present. A query records each id once per source; then
+/// [`may_repeat`](Self::may_repeat) `false` proves the id came from at
+/// most one source. Memory never grows: more ids only raise the false
+/// positives, which answer `true` (the safe side).
+#[derive(Debug, Clone)]
+pub struct RepeatFilter {
+    seen: BloomFilter,
+    repeated: BloomFilter,
+}
+
+impl RepeatFilter {
+    /// Bits per bloom: 4 MiB each. At a day of a busy agent (~2.5 M
+    /// distinct ids) a once-recorded id answers `true` about 0.1% of the
+    /// time (0.4% for the last ids recorded).
+    const BITS: usize = 1 << 25;
+    /// Hashes per id: fewer than the optimum for the ids above (`m/n·ln 2`
+    /// is ~9), for half the probes per id.
+    const HASHES: u32 = 4;
+
+    pub fn new() -> Self {
+        let bloom = || {
+            BloomFilter::with_num_bits(Self::BITS)
+                .seed(&SEED)
+                .hashes(Self::HASHES)
+        };
+        Self {
+            seen: bloom(),
+            repeated: bloom(),
+        }
+    }
+
+    /// Record one occurrence of `id` (callers record an id once per
+    /// source).
+    pub fn record(&mut self, id: TraceId) {
+        let bytes = id.as_bytes();
+        if self.seen.contains(bytes) {
+            self.repeated.insert(bytes);
+        } else {
+            self.seen.insert(bytes);
+        }
+    }
+
+    /// Whether `id` may have been recorded more than once. `false` is
+    /// definitive (no false negatives).
+    pub fn may_repeat(&self, id: TraceId) -> bool {
+        self.repeated.contains(id.as_bytes())
+    }
+}
+
+impl Default for RepeatFilter {
+    fn default() -> Self {
+        Self::new()
     }
 }
