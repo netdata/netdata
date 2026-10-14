@@ -124,6 +124,7 @@ type NormRow = (
     usize,
     i64,
     bool,
+    (Vec<(String, u64)>, u64, u64),
 );
 type Norm = (Vec<NormRow>, QueryStatus);
 
@@ -142,6 +143,11 @@ fn norm(data: &SearchData) -> Norm {
                     t.error_count,
                     t.newest_matched_start_ns,
                     t.exact,
+                    (
+                        t.service_breakdown.top.clone(),
+                        t.service_breakdown.other,
+                        t.service_breakdown.unattributed,
+                    ),
                 )
             })
             .collect(),
@@ -1115,37 +1121,61 @@ fn differential_gate_on_off_sweep() {
     for seed in 0..4u64 {
         let mut rng = Lcg(seed.wrapping_mul(0x9E3779B97F4A7C15).wrapping_add(1));
         let dir = tempfile::tempdir().unwrap();
-        // 24 traces, 1-3 spans each, distinct starts (tie-free), spread
-        // across two sealed files by trace parity.
+        // 24 traces, 1-3 spans each, distinct starts (tie-free), rooted.
+        // Each lives in one sealed file by parity, except: every fifth
+        // lives in a WAL tail; every seventh keeps its root sealed and its
+        // children (service `db`) in the tail; every third (of the rest)
+        // puts its children (service `db`) in the other sealed file.
         let mut reqs_a: Vec<ExportTraceServiceRequest> = Vec::new();
         let mut reqs_b: Vec<ExportTraceServiceRequest> = Vec::new();
+        let mut reqs_tail: Vec<ExportTraceServiceRequest> = Vec::new();
         for t in 1..=24u8 {
             let svc = services[rng.next(4) as usize];
             let name: &'static str = names[rng.next(4) as usize];
             let start = u64::from(t) * 10 * NS + rng.next(1000);
             let dur = (rng.next(20) + 1) * NS / 2;
-            let mut spans = vec![root_span(t, 0x10, start, start + dur, name)];
-            for extra in 0..rng.next(3) {
-                let id = 0x20 + extra as u8;
-                spans.push(SpanSpec {
+            let split = t % 5 != 0 && (t % 7 == 0 || t % 3 == 0);
+            let children = if split { rng.next(2) + 1 } else { rng.next(3) };
+            let root = root_span(t, 0x10, start, start + dur, name);
+            let children: Vec<SpanSpec> = (0..children)
+                .map(|extra| SpanSpec {
                     end: start + dur / 2,
-                    ..span_in(t, id, 0x10, start + 1 + extra * 7, "child")
-                });
-            }
-            let req = req_with(vec![kv_str("service.name", svc)], None, &spans);
-            if t % 2 == 0 {
-                reqs_a.push(req)
+                    ..span_in(t, 0x20 + extra as u8, 0x10, start + 1 + extra * 7, "child")
+                })
+                .collect();
+            let req = |svc: &str, spans: &[SpanSpec]| {
+                req_with(vec![kv_str("service.name", svc)], None, spans)
+            };
+            let (home, away) = if t % 2 == 0 {
+                (&mut reqs_a, &mut reqs_b)
             } else {
-                reqs_b.push(req)
+                (&mut reqs_b, &mut reqs_a)
+            };
+            if t % 5 == 0 {
+                let mut spans = vec![root];
+                spans.extend(children);
+                reqs_tail.push(req(svc, &spans));
+            } else if t % 7 == 0 {
+                home.push(req(svc, &[root]));
+                reqs_tail.push(req("db", &children));
+            } else if t % 3 == 0 {
+                home.push(req(svc, &[root]));
+                away.push(req("db", &children));
+            } else {
+                let mut spans = vec![root];
+                spans.extend(children);
+                home.push(req(svc, &spans));
             }
         }
         let wal_a = write_wal(dir.path(), reqs_a, "diff-a");
         let wal_b = write_wal(dir.path(), reqs_b, "diff-b");
+        let wal_tail = write_wal(dir.path(), reqs_tail, "diff-tail");
         let sources = || {
             both_roles(|| {
                 vec![
                     sealed_source(dir.path(), &wal_a, "a"),
                     sealed_source(dir.path(), &wal_b, "b"),
+                    tail_source(&wal_tail, "t"),
                 ]
             })
         };
@@ -1182,6 +1212,20 @@ fn differential_gate_on_off_sweep() {
                 Token::positive(pred(vec![name_eq("child")])),
                 Token::positive(pred(vec![name_eq("get")])),
                 Token::negated(pred(vec![service_eq("ad")])),
+            ]),
+            // Tokens met in different holders (files, the tail).
+            tokens(vec![
+                Token::positive(pred(vec![service_eq("db")])),
+                Token::positive(pred(vec![service_eq("cart")])),
+            ]),
+            tokens(vec![
+                Token::positive(pred(vec![service_eq("front")])),
+                Token::negated(pred(vec![service_eq("db")])),
+            ]),
+            // Rollup discovery with a negated span chip.
+            tokens(vec![
+                Token::positive(pred(vec![min_duration(NS as i64)])),
+                Token::negated(pred(vec![name_eq("child")])),
             ]),
         ];
         for (qi, query) in queries.into_iter().enumerate() {
@@ -1268,12 +1312,24 @@ fn zero_hit_straddlers_need_no_assembly() {
         })
     };
     let window = sfsq::traces::TimeWindow::new(100 * NS as i64, 300 * NS as i64).unwrap();
-    let data = run(
-        sources(),
-        op_and_db().window(window).assembled_ceiling_for_tests(1),
-    );
-    assert_eq!(data.status, QueryStatus::Complete, "{:?}", data.status);
-    assert!(data.traces.is_empty());
+    // Both paths: the rows path decides them; without it the token gate
+    // prunes them (the path of files sealed before TRSS).
+    for rows in [true, false] {
+        let data = run(
+            sources(),
+            op_and_db()
+                .window(window)
+                .assembled_ceiling_for_tests(1)
+                .rows_for_tests(rows),
+        );
+        assert_eq!(
+            data.status,
+            QueryStatus::Complete,
+            "rows {rows}: {:?}",
+            data.status
+        );
+        assert!(data.traces.is_empty(), "rows {rows}");
+    }
 }
 
 /// A window holder not compiled yet compiles when a multi-file
@@ -1312,13 +1368,16 @@ fn on_demand_compile_equals_gate_off() {
             ]
         })
     };
-    let q = || op_and_db().limit(2);
-    let on = run(sources(), q());
-    assert_eq!(ids(&on), vec![hex(1), hex(2)]);
-    assert_eq!(
-        norm(&on),
-        norm(&run(sources(), q().trace_gate_for_tests(false)))
-    );
+    for rows in [true, false] {
+        let q = || op_and_db().limit(2).rows_for_tests(rows);
+        let on = run(sources(), q());
+        assert_eq!(ids(&on), vec![hex(1), hex(2)], "rows {rows}");
+        assert_eq!(
+            norm(&on),
+            norm(&run(sources(), q().trace_gate_for_tests(false))),
+            "rows {rows}"
+        );
+    }
 }
 
 /// A tail-only candidate missing a token is pruned from the tail's own
@@ -1337,9 +1396,21 @@ fn tail_held_non_match_is_pruned() {
     )];
     let wal = write_wal(dir.path(), reqs, "tail-prune");
     let sources = || both_roles(|| vec![tail_source(&wal, "t")]);
-    let data = run(sources(), op_and_db().assembled_ceiling_for_tests(1));
-    assert_eq!(data.status, QueryStatus::Complete, "{:?}", data.status);
-    assert!(data.traces.is_empty());
+    for rows in [true, false] {
+        let data = run(
+            sources(),
+            op_and_db()
+                .assembled_ceiling_for_tests(1)
+                .rows_for_tests(rows),
+        );
+        assert_eq!(
+            data.status,
+            QueryStatus::Complete,
+            "rows {rows}: {:?}",
+            data.status
+        );
+        assert!(data.traces.is_empty(), "rows {rows}");
+    }
 }
 
 // ── The single-source proof and the token gate ──────────────────────

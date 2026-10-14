@@ -3248,3 +3248,64 @@ fn a_losing_resend_matches_on_the_rows_path() {
     assert_eq!(ids(&rows), vec![hex(6)]);
     assert!(canon.traces.is_empty());
 }
+
+/// Root claims across files: a withheld claim at or before the earliest
+/// TRUE claim leaves the root unknown (root chips of either polarity
+/// exclude the trace); a TRUE claim earlier than every withheld one is
+/// the root. Trace 1: withheld at 100 s in one file, an unset-parent
+/// span at 200 s in the other. Trace 2: withheld at 300 s, an
+/// unset-parent span at 250 s.
+#[test]
+fn withheld_claims_across_files() {
+    let dir = tempfile::tempdir().unwrap();
+    let withheld = |trace: u8, start: u64| {
+        let mut a = span_in(trace, 0x11, 0, start * NS, "root");
+        a.kind = 1;
+        let mut b = a.clone();
+        b.kind = 2;
+        req_with(vec![kv_str("service.name", "x")], None, &[a, b])
+    };
+    let other = |trace: u8, start: u64| {
+        req_with(
+            vec![kv_str("service.name", "y")],
+            None,
+            &[span_in(trace, 0x30, 0, start * NS, "late")],
+        )
+    };
+    let wal_0 = write_wal(dir.path(), vec![withheld(1, 100), withheld(2, 300)], "w0");
+    let wal_1 = write_wal(dir.path(), vec![other(1, 200), other(2, 250)], "w1");
+    let sources = || {
+        both_roles(|| {
+            vec![
+                sealed_source(dir.path(), &wal_0, "w0"),
+                sealed_source(dir.path(), &wal_1, "w1"),
+            ]
+        })
+    };
+    let root = |value: &str| {
+        vec![builtin(
+            BuiltinField::RootServiceName,
+            CompareOp::Eq,
+            vec![text(value)],
+        )]
+    };
+    let all = run(sources(), SearchQuery::new(pred(vec![])));
+    let roots: Vec<_> = all
+        .traces
+        .iter()
+        .map(|t| (t.trace_id.to_string(), t.root_service.clone()))
+        .collect();
+    assert_eq!(roots, vec![(hex(2), Some("y".into())), (hex(1), None)]);
+    for (name, query, want) in [
+        ("y", tokens(vec![pos(root("y"))]), vec![hex(2)]),
+        ("x", tokens(vec![pos(root("x"))]), vec![]),
+        ("not x", tokens(vec![neg(root("x"))]), vec![hex(2)]),
+        ("not y", tokens(vec![neg(root("y"))]), vec![]),
+    ] {
+        assert_eq!(
+            ids(&run(sources(), SearchQuery::new(query))),
+            want,
+            "{name}"
+        );
+    }
+}
