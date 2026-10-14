@@ -807,6 +807,29 @@ HOST_OS_LABEL_CODENAME="${HOST_VERSION_CODENAME}"
 HOST_OS_LABEL_EDITION="${HOST_VARIANT}"
 HOST_OS_LABEL_BUILD="${HOST_BUILD_ID}"
 
+# Jetson Linux identity belongs to the native host, not a container image.
+detect_host_l4t_version() {
+  HOST_L4T_VERSION=""
+  case "${KERNEL_NAME}:${CONTAINER}" in
+    Linux:unknown|Linux:none) ;;
+    *) return ;;
+  esac
+  [ -f "$1" ] && [ -r "$1" ] || return 0
+  HOST_L4T_VERSION=$(LC_ALL=C awk '
+    NR == 1 {
+      if ($0 ~ /^# R[0-9]+ \(release\), REVISION: [0-9]+(\.[0-9]+)*,/) {
+        release = $2; sub(/^R/, "", release)
+        split($0, header, ",")
+        revision = header[2]; sub(/^ REVISION: /, "", revision)
+        print release "." revision
+      }
+      exit
+    }
+  ' "$1" 2>/dev/null) || HOST_L4T_VERSION=""
+}
+
+detect_host_l4t_version /etc/nv_tegra_release
+
 # -------------------------------------------------------------------------------------------------
 # Detect information about the CPU
 
@@ -1019,6 +1042,9 @@ for label_field in NAME VERSION RELEASE CODENAME EDITION BUILD; do
     printf 'NETDATA_HOST_OS_LABEL_%s=%s\n' "${label_field}" "${label_value}"
   fi
 done
+if [ -n "${HOST_L4T_VERSION}" ]; then
+  printf 'NETDATA_SYSTEM_L4T_VERSION=%s\n' "${HOST_L4T_VERSION}"
+fi
 echo "NETDATA_HOST_IS_K8S_NODE=${HOST_IS_K8S_NODE}"
 echo "NETDATA_SYSTEM_KERNEL_NAME=${KERNEL_NAME}"
 echo "NETDATA_SYSTEM_KERNEL_VERSION=${KERNEL_VERSION}"
