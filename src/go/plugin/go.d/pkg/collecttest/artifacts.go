@@ -3,6 +3,7 @@
 package collecttest
 
 import (
+	"cmp"
 	"errors"
 	"fmt"
 	"regexp"
@@ -12,6 +13,7 @@ import (
 
 	metrixselector "github.com/netdata/netdata/go/plugins/pkg/metrix/selector"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/charttpl"
+	"github.com/netdata/netdata/go/plugins/plugin/framework/collectorapi"
 	"gopkg.in/yaml.v3"
 )
 
@@ -54,6 +56,40 @@ func ChartTemplateCharts(templateYAML string) (map[string]charttpl.Chart, error)
 		return nil, err
 	}
 	return out, nil
+}
+
+// V1ChartsByContext converts framework V1 charts (static lists or the
+// templates a collector instantiates) to template charts keyed by context, as
+// the V1 renderer presents them: the chart type through ChartType.String and
+// each dimension under its name, or its ID when the name is empty. A chart
+// without dimensions gets them at runtime, so it is presented with one
+// label-named dimension and the metadata check skips its dimension names. Two
+// charts with one ID are an error (the Agent keeps one chart per ID, so the
+// second replaces the first one's context), and so are two charts with one
+// context.
+func V1ChartsByContext(charts collectorapi.Charts) (map[string]charttpl.Chart, error) {
+	var problems []error
+	ids := make(map[string]bool, len(charts))
+	out := make(map[string]charttpl.Chart, len(charts))
+	for _, chart := range charts {
+		if ids[chart.ID] {
+			problems = append(problems, fmt.Errorf("chart ID %q is used twice", chart.ID))
+		}
+		ids[chart.ID] = true
+		if _, ok := out[chart.Ctx]; ok {
+			problems = append(problems, fmt.Errorf("context %q is used by two charts", chart.Ctx))
+			continue
+		}
+		tpl := charttpl.Chart{Context: chart.Ctx, Title: chart.Title, Units: chart.Units, Type: chart.Type.String()}
+		for _, dim := range chart.Dims {
+			tpl.Dimensions = append(tpl.Dimensions, charttpl.Dimension{Name: cmp.Or(dim.Name, dim.ID)})
+		}
+		if len(chart.Dims) == 0 {
+			tpl.Dimensions = []charttpl.Dimension{{NameFromLabel: "runtime"}}
+		}
+		out[chart.Ctx] = tpl
+	}
+	return out, errors.Join(problems...)
 }
 
 // ChartDimensionNames resolves the dimension names a template chart renders:
