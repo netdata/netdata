@@ -447,10 +447,11 @@ bool mrg_metric_set_hot_latest_time_s(MRG *mrg __maybe_unused, METRIC *metric, t
     return false;
 }
 
-// the metric has no hot page any more: nothing collected is waiting to be stored
+// the collector that stored latest_time_s has no hot page any more: nothing it collected is waiting to be stored.
+// Cleared only if it is still that collector's time - a duplicate writer of the metric may have stored another one
 ALWAYS_INLINE
-void mrg_metric_clear_hot_latest_time_s(MRG *mrg __maybe_unused, METRIC *metric) {
-    __atomic_store_n(&metric->latest_time_s_hot, 0, __ATOMIC_RELAXED);
+void mrg_metric_clear_hot_latest_time_s(MRG *mrg __maybe_unused, METRIC *metric, time_t latest_time_s) {
+    __atomic_compare_exchange_n(&metric->latest_time_s_hot, &latest_time_s, 0, false, __ATOMIC_RELAXED, __ATOMIC_RELAXED);
 }
 
 ALWAYS_INLINE

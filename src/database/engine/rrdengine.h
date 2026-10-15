@@ -253,6 +253,7 @@ struct rrdeng_collect_handle {
     usec_t page_start_time_ut;
     usec_t page_end_time_ut;
     usec_t update_every_ut;
+    time_t hot_time_s;                        // the hot time this handle stored in the MRG and has not cleared yet
 };
 
 struct rrdeng_query_handle {
