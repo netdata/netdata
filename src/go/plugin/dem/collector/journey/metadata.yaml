@@ -61,6 +61,8 @@ modules:
         list:
           - title: Set up the browser runtime
             description: |
+              Browser runtime delivery is experimental; released bundles and automatic manifest installation are not
+              provided. Supply a trusted runtime manifest and its matching bundle before enabling browser monitors.
               Run Chromium with its sandbox enabled as the unprivileged Netdata service account on Linux amd64 or arm64.
               Managed mode prepares the exact runtime when a browser monitor is enabled, using an administrator-installed
               runtime manifest. For offline setup, install the trusted manifest and import its matching archive, or select

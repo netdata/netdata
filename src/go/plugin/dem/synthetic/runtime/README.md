@@ -6,7 +6,7 @@ and asynchronous preparation. It does not install host packages or run npm.
 
 ## Trust and preparation
 
-An Agent-installed format-1 `Manifest` pins architecture, compressed SHA256 and
+An administrator-supplied format-1 `Manifest` pins architecture, compressed SHA256 and
 size, tar size, entry count, expanded regular-file bytes, layout and interpreter
 bindings. An archive cannot provide its own trust anchor. Downloads use the
 installed HTTPS URL; offline import verifies the identical digest and bounds.
@@ -17,8 +17,9 @@ and preparation. Inactivity is an acquisition failure and uses the existing retr
 backoff; voluntary demand cancellation remains distinct and permits immediate
 preparation when demand returns. Closing the response cancels outstanding network
 I/O and stops its timer.
-The independent release pipeline must supply real pinned artifacts before an
-installed download manifest is enabled.
+Bundle construction, release selection and manifest installation are outside this
+experimental foundation. Development deployments must supply a trusted manifest and
+matching archive; no production download source is configured by this tree.
 
 Extraction rejects escaping paths, duplicate entries, privileged modes, devices,
 hard links and symlink parents. Internal symlinks are allowed. Before publication,

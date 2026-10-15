@@ -4,7 +4,6 @@ on:
   pull_request:
     paths:
       - '.github/workflows/dem-runtime-tests.yml'
-      - 'packaging/dem-runtime/**'
       - 'src/collectors/utils/nd-run.c'
       - 'src/collectors/utils/nd-process-tree.*'
       - 'src/collectors/utils/supervisor-pipes.h'
@@ -21,7 +20,6 @@ on:
     branches: [master]
     paths:
       - '.github/workflows/dem-runtime-tests.yml'
-      - 'packaging/dem-runtime/**'
       - 'src/collectors/utils/nd-run.c'
       - 'src/collectors/utils/nd-process-tree.*'
       - 'src/collectors/utils/supervisor-pipes.h'
@@ -49,8 +47,6 @@ jobs:
         with:
           go-version-file: src/go/go.mod
           cache-dependency-path: src/go/go.sum
-      - name: Bundle format and build-tool tests
-        run: python3 -m unittest discover -s packaging/dem-runtime -v
       - name: Build the real supervisor
         shell: bash
         run: |

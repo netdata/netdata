@@ -451,6 +451,11 @@ containers need compatible namespace/seccomp support. RUM does not require a bro
 
 ### Runtime setup and retirement
 
+Browser runtime delivery is experimental. DEM is disabled by default at build time. This tree provides preparation,
+execution and retirement, but no bundle builder, release artifacts or manifest installation. Development deployments
+must supply a trusted manifest and its matching bundle. Packaging and independent runtime releases are separate work;
+the current Agent-owned adapters and exact component pins are temporary. Browser jobs cannot run without those inputs.
+
 Managed mode is the default. Accepting an enabled journey or Lighthouse configuration requests its exact runtime;
 validation and disabled configurations do not download it. Preparation runs separately from website monitoring.
 An unavailable runtime leaves the monitor waiting for its dependency; it does not produce website failure measurements.
@@ -466,9 +471,9 @@ runtime:
 ```
 
 Managed setup reads a trusted `plugins.d/dem/runtime-<architecture>.json` manifest identifying the archive, digest,
-size limits and executable layout. Monitor configuration cannot choose a download URL. Publication of these manifests,
-archives and corresponding sources is still pending release qualification and a confirmed public URL. A checkout or
-package without that manifest reports setup unavailability; it does not guess a source or fetch a different browser.
+size limits and executable layout. The administrator must supply this file, or select an absolute `manifest_path`
+in `dem.conf`. Monitor configuration cannot choose a download URL. A checkout or package without that manifest reports
+setup unavailability; it does not guess a source or fetch a different browser.
 
 The cache defaults to `NETDATA_LIB_DIR/dem/runtime`. Its 4 GiB allowance includes preparation reservations. Known
 enabled monitors protect their runtime; every probe and browser invocation also has an independent execution pin.
@@ -501,10 +506,11 @@ configuration-root environment variables; use `--config-dir` for an explicit adm
 Explicit `--manifest`, `--cache` and `--allow-download` values override the loaded configuration. Cache inventory and
 maintenance errors remain separate from monitor outcomes. CLI inventory is a storage observation, not the running plugin's live preparation status.
 
-Native packages, Docker, static installations and source builds use the same managed owner. The portable runtime
-brings private Node, Chromium libraries, fonts and JavaScript dependencies; it does not install host packages or
-modify installed adapters. Persist the cache in Docker if it should survive container replacement. An image can
-instead include a preload at its final path:
+With an explicitly supplied manifest and matching bundle, the same managed store can be used in native, Docker,
+static and source-build layouts. This does not establish production delivery or qualification for those methods.
+The bundle supplies private Node, Chromium libraries, fonts and JavaScript dependencies; preparation does not install
+host packages or modify installed adapters. Persist the cache in Docker if it should survive container replacement.
+A development image can instead include a preload at its final path:
 
 ```sh
 dem.plugin runtime preload --root /opt/netdata-dem-runtime --archive /absolute/path/runtime.tar.gz
