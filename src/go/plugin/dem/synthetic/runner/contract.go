@@ -7,7 +7,7 @@ import (
 	"encoding/json"
 )
 
-// The same manifest supplies the bundle builder and the compiled runner checks.
+// This manifest supplies the compiled checks for the experimental runtime contract.
 // Runtime paths cannot change the versions accepted by this Agent build.
 //
 //go:embed assets/manifest.json
