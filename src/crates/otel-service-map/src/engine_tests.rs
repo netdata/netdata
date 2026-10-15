@@ -466,3 +466,40 @@ fn a_new_tenant_does_not_accept_spans_older_than_the_horizon() {
     assert!(edges.is_empty());
     assert_eq!(losses.late, 1);
 }
+
+#[test]
+fn a_client_nested_through_an_internal_span_is_one_call() {
+    let outer = span(Kind::Client, "cart", 1, None);
+    let internal = span(Kind::Internal, "cart", 2, Some(1));
+    let inner = span(Kind::Client, "cart", 3, Some(2));
+    let orders: HashMap<&str, Vec<SpanFacts>> = HashMap::from([
+        (
+            "outer first",
+            vec![outer.clone(), internal.clone(), inner.clone()],
+        ),
+        (
+            "inner first",
+            vec![inner.clone(), internal.clone(), outer.clone()],
+        ),
+        (
+            "internal first",
+            vec![internal.clone(), inner.clone(), outer.clone()],
+        ),
+        (
+            "inner, outer, internal",
+            vec![inner.clone(), outer.clone(), internal.clone()],
+        ),
+    ]);
+    for (name, spans) in orders {
+        let (edges, _, engine) = run(spans);
+        let expected = HashMap::from([(
+            Edge {
+                caller: Node::Service(service("cart")),
+                callee: Node::Peer(peer("redis")),
+            },
+            (1, 0),
+        )]);
+        assert_eq!(calls(&edges), expected, "{name}");
+        assert_eq!(engine.in_flight(), 0, "{name}");
+    }
+}

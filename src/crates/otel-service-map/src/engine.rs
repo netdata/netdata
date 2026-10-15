@@ -16,7 +16,7 @@
 use std::collections::{BTreeMap, HashMap, VecDeque};
 use std::sync::Arc;
 
-use crate::facts::{SpanFacts, SpanId, TraceId};
+use crate::facts::{Kind, SpanFacts, SpanId, TraceId};
 use crate::peer::{PeerKey, PeerKind, UNKNOWN_PEER};
 use crate::stats::{Edge, LossCounters, MinuteStats, NS_PER_MINUTE, Node};
 
@@ -325,17 +325,7 @@ fn ingest_span(
     if let Some(parent) = facts.parent_span_id {
         let parent_key = (facts.trace_id, parent);
         if facts.kind.is_caller() {
-            if let Some(entry) = pairing.recent.get_mut(&parent_key) {
-                entry.has_caller_child = true;
-            } else if let std::collections::hash_map::Entry::Vacant(slot) =
-                pairing.caller_children.entry(parent_key)
-            {
-                slot.insert(now_ns);
-                pairing
-                    .queue
-                    .push_back((now_ns, Expiry::CallerChild(parent_key)));
-                *in_flight += 1;
-            }
+            mark_outer_caller(pairing, in_flight, facts.trace_id, parent, now_ns);
         }
         if facts.kind.is_callee() {
             if let Some(entry) = pairing.recent.get_mut(&parent_key) {
@@ -360,6 +350,12 @@ fn ingest_span(
     let has_caller_child = pairing.caller_children.remove(&key).is_some();
     if has_caller_child {
         *in_flight -= 1;
+        // A caller below an INTERNAL span marks the caller above it.
+        if facts.kind == Kind::Internal {
+            if let Some(parent) = facts.parent_span_id {
+                mark_outer_caller(pairing, in_flight, facts.trace_id, parent, now_ns);
+            }
+        }
     }
     let children = pairing.waiting.remove(&key);
     let mut entry = Entry {
@@ -377,6 +373,48 @@ fn ingest_span(
     pairing.recent.insert(key, entry);
     pairing.queue.push_back((now_ns, Expiry::Recent(key)));
     *in_flight += 1;
+}
+
+/// How many INTERNAL spans a nested client call may sit under.
+const MAX_INTERNAL_DEPTH: usize = 16;
+
+/// Marks the nearest CLIENT/PRODUCER ancestor of a caller span, reached
+/// through INTERNAL spans from `parent`, as an outer caller span: a nested
+/// client call is one call, made by the innermost client span. An ancestor
+/// that has not arrived yet gets a marker it picks up when it does.
+fn mark_outer_caller(
+    pairing: &mut Pairing,
+    in_flight: &mut usize,
+    trace: TraceId,
+    mut parent: SpanId,
+    now_ns: u64,
+) {
+    for _ in 0..MAX_INTERNAL_DEPTH {
+        let key = (trace, parent);
+        match pairing.recent.get_mut(&key) {
+            Some(entry) if entry.facts.kind.is_caller() => {
+                entry.has_caller_child = true;
+                return;
+            }
+            Some(entry) if entry.facts.kind == Kind::Internal => match entry.facts.parent_span_id {
+                Some(p) => parent = p,
+                None => return,
+            },
+            // Under a SERVER/CONSUMER span: the client span is the
+            // service's own outgoing call.
+            Some(_) => return,
+            None => {
+                if let std::collections::hash_map::Entry::Vacant(slot) =
+                    pairing.caller_children.entry(key)
+                {
+                    slot.insert(now_ns);
+                    pairing.queue.push_back((now_ns, Expiry::CallerChild(key)));
+                    *in_flight += 1;
+                }
+                return;
+            }
+        }
+    }
 }
 
 /// `child` is a callee span whose parent is `parent`.
