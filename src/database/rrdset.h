@@ -67,6 +67,9 @@ typedef enum __attribute__ ((__packed__)) rrdset_flags {
     RRDSET_FLAG_PENDING_LABEL_RECHECK            = (1 << 27), // chart labels changed since the last health
                                                               // prototype evaluation; the health thread must
                                                               // detach + reattach alerts for this chart.
+
+    RRDSET_FLAG_DELETE_COMMITTED                 = (1 << 28), // the obsolete-chart reaper is freeing this chart: its
+                                                              // destroy_lock stays held until the chart is freed
 } RRDSET_FLAGS;
 
 // --------------------------------------------------------------------------------------------------------------------

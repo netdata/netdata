@@ -139,14 +139,31 @@ static inline void pluginsd_clear_scope_chart(PARSER *parser, const char *keywor
     parser->user.clabel_changed = false;
 }
 
-// Revive an obsolete scope chart that is collected again. The scope holds a reference to it, so the reaper cannot
-// free it; the reaper may only hold destroy_lock for a moment, while it checks the chart - wait for it.
-static ALWAYS_INLINE void pluginsd_revive_scope_chart(PARSER *parser, RRDSET *st) {
+// Revive an obsolete scope chart that is collected again. The scope holds a reference to it, so the reaper holds
+// destroy_lock only while it checks the chart - wait for it. Unless the reaper committed to freeing the chart before
+// that reference was taken: then destroy_lock is released only when the chart is freed, which our reference prevents.
+// The scope ends and false is returned; the caller fails the keyword, so the connection restarts and the chart is
+// defined again.
+static ALWAYS_INLINE bool pluginsd_revive_scope_chart(PARSER *parser, RRDSET *st, const char *keyword) {
     if(likely(!rrdset_flag_check(st, RRDSET_FLAG_OBSOLETE)))
-        return;
+        return true;
 
-    if(likely(parser->user.st_ref.scope))
-        spinlock_lock(&st->destroy_lock);
+    if(likely(parser->user.st_ref.scope)) {
+        while(!spinlock_trylock(&st->destroy_lock)) {
+            if(unlikely(rrdset_flag_check(st, RRDSET_FLAG_DELETE_COMMITTED))) {
+                nd_log(NDLS_DAEMON, NDLP_ERR,
+                       "PLUGINSD: 'host:%s/chart:%s' is being deleted while %s collects it.",
+                       rrdhost_hostname(st->rrdhost), rrdset_id(st), keyword);
+
+                // end the scope while our reference still keeps the chart
+                pluginsd_clear_scope_chart(parser, keyword, NULL);
+                pluginsd_keyword_chart_refs_release(parser);
+                return false;
+            }
+
+            tinysleep();
+        }
+    }
     else if(!spinlock_trylock(&st->destroy_lock))
         fatal("PLUGINSD: chart '%s' of host '%s' is being collected while is being destroyed.",
               rrdset_id(st), rrdhost_hostname(st->rrdhost));
@@ -157,6 +174,7 @@ static ALWAYS_INLINE void pluginsd_revive_scope_chart(PARSER *parser, RRDSET *st
     // the reaper frees only obsolete charts
     rrdset_acquired_release(parser->user.st_ref.scope);
     parser->user.st_ref.scope = NULL;
+    return true;
 }
 
 static ALWAYS_INLINE bool pluginsd_set_scope_chart(PARSER *parser, RRDSET *st, const char *keyword) {
