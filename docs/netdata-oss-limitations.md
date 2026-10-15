@@ -72,9 +72,9 @@ Functions provide on-demand, detailed information beyond standard metrics.
 
 | Feature                         | Anonymous | Community | Paid |
 |---------------------------------|:---------:|:---------:|:----:|
-| Alert explanations              |     ✗     |     ✓     |  ✓   |
-| Alert configuration suggestions |     ✗     |     ✓     |  ✓   |
-| AI-powered insights             |     ✗     |     ✓     |  ✓   |
+| Alert explanations              |     ✗     |     ✗     |  ✓   |
+| Alert configuration suggestions |     ✗     |     ✗     |  ✓   |
+| AI-powered insights             |     ✗     |     ✗     |  ✓   |
 
 ### Organization Features
 
@@ -162,7 +162,7 @@ Netdata Cloud and each Agent keep separate preferred-node lists. Netdata Cloud s
 | **Alert Notifications**   | Full access | Full access   | Full access |
 | **Public Functions**      | Full access | Full access   | Full access |
 | **Sensitive Functions**   | Blocked     | Full access   | Full access |
-| **AI Features**           | Blocked     | Full access   | Full access |
+| **AI Features**           | Blocked     | Not available | Full access |
 | **Dynamic Configuration** | Blocked     | Blocked       | Full access |
 | **Node Dashboard Access** | 5 nodes     | 5 nodes       | Unlimited   |
 | **Custom Dashboards**     | 1 per agent | 1 per room    | Unlimited   |
