@@ -1,0 +1,18 @@
+[package]
+name = "otel-service-map"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+
+[lints]
+workspace = true
+
+[lib]
+name = "otel_service_map"
+path = "src/lib.rs"
+
+[dependencies]
+opentelemetry-proto = { workspace = true }
+serde = { workspace = true, features = ["derive", "rc"] }
+
+[dev-dependencies]

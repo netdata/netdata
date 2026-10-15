@@ -3804,6 +3804,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "otel-service-map"
+version = "0.1.3"
+dependencies = [
+ "opentelemetry-proto",
+ "serde",
+]
+
+[[package]]
 name = "otel-streams"
 version = "0.1.3"
 dependencies = [

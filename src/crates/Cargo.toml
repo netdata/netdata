@@ -40,6 +40,7 @@ members = [
 
     "otel-ingestor",
     "otel-legacy-logs",
+    "otel-service-map",
 
     # WAL
     "file-registry",
@@ -254,6 +255,7 @@ otel-ledger = { path = "otel-ledger" }
 file-lifecycle = { path = "file-lifecycle" }
 otel-ingestor = { path = "otel-ingestor" }
 otel-legacy-logs = { path = "otel-legacy-logs" }
+otel-service-map = { path = "otel-service-map" }
 otel-catalog = { path = "otel-catalog" }
 file-cache = { path = "file-cache" }
 
