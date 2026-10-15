@@ -553,6 +553,10 @@ static size_t test_dbengine_flush_keeps_other_writer_hot_time(RRDHOST *host, con
 
     size_t errors = 0;
     STORAGE_COLLECT_HANDLE *other = rrdeng_store_metric_init(rd->tiers[0].smh, 1, st->smg[0]);
+    if(!other) {
+        fprintf(stderr, " >>> DBENGINE: BURST RETENTION: '%s' failed to create the duplicate writer\n", id);
+        return 1;
+    }
     METRIC *metric = ((struct rrdeng_collect_handle *)other)->metric;
 
     // the new writer has stored nothing: its flush must leave the first writer's hot time
