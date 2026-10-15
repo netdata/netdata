@@ -218,6 +218,11 @@ int stacktrace_unittest(void) {
     // Initialize stacktrace subsystem
     stacktrace_init();
 
+    if(!stacktrace_available()) {
+        fprintf(stderr, "\nSTACKTRACE TEST: SKIPPED (backend '%s' cannot capture stack traces)\n", stacktrace_backend());
+        return 0;
+    }
+
     bool cache_collision_test = stacktrace_cache_unittest() == 0;
     fprintf(stderr, "\nSTACKTRACE CACHE COLLISION TEST: %s\n", cache_collision_test ? "SUCCESS" : "FAILURE");
     
