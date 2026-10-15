@@ -3506,6 +3506,9 @@ int run_all_mockup_tests(void)
     if(test_health_acquire_keeps_obsolete_chart_unaccessed())
         return 1;
 
+    if(metadata_expired_dimensions_unittest())
+        return 1;
+
     // These cover one invariant between them, so run them all and report every failure rather than
     // short-circuiting on the first - a partial result here is hard to read. Deliberately no count
     // in this comment: it went stale the first time a test was added.
