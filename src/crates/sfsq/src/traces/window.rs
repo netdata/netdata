@@ -1,6 +1,6 @@
 //! The shared query time window: one validated, half-open nanosecond
-//! range serving every windowed trace operation — attribute
-//! enumeration's file-granular pruning, search's candidate pruning and
+//! range serving every windowed trace operation — suggestions'
+//! file-granular pruning, search's candidate pruning and
 //! span-start filtering, the aggregates' scan bounds and envelope-start
 //! rank filter — so the half-open-nanosecond comparisons are written
 //! once and can never fork between operations.
@@ -63,10 +63,10 @@ impl TimeWindow {
     /// time bounding is file-granular): the range expands to the
     /// half-open nanoseconds `[min_s·10⁹, (max_s+1)·10⁹)` (saturating)
     /// and half-open ranges intersect iff each starts before the other
-    /// ends. THE file-pruning comparison — attribute enumeration and
-    /// search call this one method, so their file granularity cannot
-    /// drift. Tails are out of its reach (no summary, never pruned):
-    /// attributes takes a tail wholesale; search filters its spans
+    /// ends. THE file-pruning comparison — suggestions and search call
+    /// this one method, so their file granularity cannot drift. Tails are
+    /// out of its reach (no summary, never pruned): suggest takes a tail
+    /// wholesale; search filters its spans
     /// per-span.
     pub(crate) fn overlaps_summary(&self, min_s: u32, max_s: u32) -> bool {
         const NS: i64 = 1_000_000_000;

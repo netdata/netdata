@@ -30,9 +30,9 @@ use file_lifecycle::chunk::ChunkCache;
 use file_lifecycle::registry::TenantRegistries;
 
 use sfsq::traces::{
-    AttributeRequestError, FieldKinds, OverviewQuery, OverviewRequestError, PartialReason,
-    QueryStatus, SearchData, SearchQuery, SearchRequestError, SearchSources, SuggestQuery,
-    TimeWindow, TraceData, TraceQuery, TraceRequestError, overview, search, trace_by_id,
+    FieldKinds, OverviewQuery, OverviewRequestError, PartialReason, QueryStatus, SearchData,
+    SearchQuery, SearchRequestError, SearchSources, SuggestQuery, SuggestRequestError, TimeWindow,
+    TraceData, TraceQuery, TraceRequestError, overview, search, trace_by_id,
 };
 
 use super::adapter::{
@@ -597,7 +597,7 @@ impl OtelTracesHandler {
         .await
         {
             Ok(Ok(data)) => Ok(OtelTracesResponse::Suggest(to_suggest_result(data, key))),
-            Ok(Err(e)) => Err(map_attribute_error(e)),
+            Ok(Err(e)) => Err(map_suggest_error(e)),
             Err(e) => Err(handler_err(format!("otel-traces suggest task failed: {e}"))),
         }
     }
@@ -615,9 +615,9 @@ fn unix_now_s() -> u32 {
 
 /// Suggestion request errors: a rejected source set is the supplier's
 /// inconsistency (internal); everything else is the client's request.
-fn map_attribute_error(e: AttributeRequestError) -> netdata_plugin_error::NetdataPluginError {
+fn map_suggest_error(e: SuggestRequestError) -> netdata_plugin_error::NetdataPluginError {
     match e {
-        AttributeRequestError::SourceSet(e) => handler_err(format!(
+        SuggestRequestError::SourceSet(e) => handler_err(format!(
             "otel-traces internal error: captured source set is inconsistent: {e}"
         )),
         other => handler_err(format!("invalid otel-traces request: {other}")),

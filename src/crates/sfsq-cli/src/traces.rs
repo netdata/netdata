@@ -1,11 +1,10 @@
-//! `sfsq-cli trace` / `attributes` / `attribute-values` / `suggest` /
-//! `overview` / `search` — the `sfsq::traces` engine from the terminal, without a
-//! running agent. Each subcommand takes an explicit file list (`--sfst`
-//! sealed files, `--wal` traces WALs) instead of the logs front door's
-//! directory discovery; `trace` reconstructs one trace through the shared
-//! combiner, `attributes` / `attribute-values` enumerate the key
-//! vocabulary off the dictionaries, `suggest` matches keys or values
-//! against a term (and prints its time, for measurements), `overview`
+//! `sfsq-cli trace` / `suggest` / `overview` / `search` — the
+//! `sfsq::traces` engine from the terminal, without a running agent. Each
+//! subcommand takes an explicit file list (`--sfst` sealed files, `--wal`
+//! traces WALs) instead of the logs front door's directory discovery;
+//! `trace` reconstructs one trace through the shared combiner, `suggest`
+//! lists keys, or one key's values, matching a term (and prints its time,
+//! for measurements), `overview`
 //! builds the list's heatmap grid (for measurements), `search` filters
 //! whole traces. `search`, `overview` and `trace` take the search bar's
 //! tokens ([`TokenArgs`]); `trace` marks the spans they match.
@@ -26,11 +25,10 @@ use anyhow::{Context, Result, bail};
 use tokio_util::sync::CancellationToken;
 
 use sfsq::traces::{
-    AttributeKey, AttributeNamesQuery, AttributeOwner, AttributeValuesQuery, BuiltinField,
-    CompareOp, Condition, OverviewQuery, Predicate, PredicateTarget, PredicateValue, QueryStatus,
-    SearchQuery, SearchSources, SourceId, SuggestQuery, TimeWindow, Token, TokenQuery, TraceQuery,
-    TraceSfstCandidate, TraceSource, TraceWalTail, WalCoverage, attribute_names, attribute_values,
-    overview, search, starts_with_pattern, suggest, trace_by_id,
+    AttributeKey, AttributeOwner, BuiltinField, CompareOp, Condition, OverviewQuery, Predicate,
+    PredicateTarget, PredicateValue, QueryStatus, SearchQuery, SearchSources, SourceId,
+    SuggestQuery, TimeWindow, Token, TokenQuery, TraceQuery, TraceSfstCandidate, TraceSource,
+    TraceWalTail, WalCoverage, overview, search, starts_with_pattern, suggest, trace_by_id,
 };
 
 /// Reconstruct one trace across sealed SFSTs and traces WALs.
@@ -239,7 +237,7 @@ pub fn run_trace(args: &TraceArgs, out: &mut dyn std::io::Write) -> Result<()> {
     Ok(())
 }
 
-// ── Key enumeration (attributes / attribute-values) ───────────────────
+// ── Key words (the suggest command's owners and keys) ─────────────────
 
 /// An `AttributeOwner` as a CLI word (this tool's rendering, not a
 /// wire contract). `Any` is deliberately absent: it exists for
@@ -359,139 +357,6 @@ fn status_word(status: &QueryStatus) -> String {
         QueryStatus::Complete => "complete".to_string(),
         QueryStatus::Partial(reasons) => format!("PARTIAL {reasons:?}"),
     }
-}
-
-/// Enumerate attribute and builtin-field keys across sealed SFSTs and traces WALs.
-#[derive(Debug, clap::Args)]
-pub struct AttributesArgs {
-    /// A sealed traces SFST file. Repeatable.
-    #[arg(long = "sfst")]
-    pub sfsts: Vec<PathBuf>,
-
-    /// A flattened traces WAL file, scanned whole as a tail. Repeatable.
-    #[arg(long = "wal")]
-    pub wals: Vec<PathBuf>,
-
-    /// Enumerate only one owner.
-    #[arg(long, value_enum)]
-    pub owner: Option<OwnerArg>,
-
-    /// Cap the key list (exact truncation flag); 0 is rejected.
-    #[arg(long)]
-    pub max_keys: Option<usize>,
-
-    /// Window start, nanoseconds since the epoch (half-open; file-granular
-    /// pruning). Requires --end-ns.
-    #[arg(long, allow_hyphen_values = true)]
-    pub start_ns: Option<i64>,
-
-    /// Window end, nanoseconds since the epoch (exclusive). Requires
-    /// --start-ns.
-    #[arg(long, allow_hyphen_values = true)]
-    pub end_ns: Option<i64>,
-}
-
-pub fn run_attributes(args: &AttributesArgs, out: &mut dyn std::io::Write) -> Result<()> {
-    let sources = build_sources(&args.sfsts, &args.wals)?;
-    let mut query = AttributeNamesQuery::new();
-    if let Some(owner) = args.owner {
-        query = query.owner(owner.into());
-    }
-    if let Some(max) = args.max_keys {
-        query = query.max_keys(max);
-    }
-    if let Some(window) = parse_window(args.start_ns, args.end_ns)? {
-        query = query.window(window);
-    }
-    let data = attribute_names(
-        sources,
-        query,
-        CancellationToken::new(),
-        Arc::new(AtomicUsize::new(0)),
-    )?;
-    for (owner, key) in &data.keys {
-        writeln!(out, "{} {}", owner_word(*owner), key_word(key))?;
-    }
-    writeln!(
-        out,
-        "{} key(s), truncated {}, status {}",
-        data.keys.len(),
-        data.truncated,
-        status_word(&data.status),
-    )?;
-    Ok(())
-}
-
-/// Enumerate one key's values across sealed SFSTs and traces WALs.
-#[derive(Debug, clap::Args)]
-pub struct AttributeValuesArgs {
-    /// A sealed traces SFST file. Repeatable.
-    #[arg(long = "sfst")]
-    pub sfsts: Vec<PathBuf>,
-
-    /// A flattened traces WAL file, scanned whole as a tail. Repeatable.
-    #[arg(long = "wal")]
-    pub wals: Vec<PathBuf>,
-
-    /// The key's owner.
-    #[arg(long, value_enum)]
-    pub owner: OwnerArg,
-
-    /// The key: the bare attribute name, or (under --owner builtin)
-    /// a builtin-field word such as `status` or `event-name`.
-    #[arg(long)]
-    pub key: String,
-
-    /// Cap the value list (exact truncation flag); 0 is rejected.
-    #[arg(long)]
-    pub max_values: Option<usize>,
-
-    /// Window start, nanoseconds since the epoch (half-open; file-granular
-    /// pruning). Requires --end-ns.
-    #[arg(long, allow_hyphen_values = true)]
-    pub start_ns: Option<i64>,
-
-    /// Window end, nanoseconds since the epoch (exclusive). Requires
-    /// --start-ns.
-    #[arg(long, allow_hyphen_values = true)]
-    pub end_ns: Option<i64>,
-}
-
-pub fn run_attribute_values(
-    args: &AttributeValuesArgs,
-    out: &mut dyn std::io::Write,
-) -> Result<()> {
-    let owner: AttributeOwner = args.owner.into();
-    let key = parse_key(owner, &args.key)?;
-    let sources = build_sources(&args.sfsts, &args.wals)?;
-    let mut query = AttributeValuesQuery::new(owner, key);
-    if let Some(max) = args.max_values {
-        query = query.max_values(max);
-    }
-    if let Some(window) = parse_window(args.start_ns, args.end_ns)? {
-        query = query.window(window);
-    }
-    let data = attribute_values(
-        sources,
-        query,
-        CancellationToken::new(),
-        Arc::new(AtomicUsize::new(0)),
-    )?;
-    for v in &data.values {
-        let kind = v
-            .kind
-            .map(|k| format!("{k:?}"))
-            .unwrap_or_else(|| "none".to_string());
-        writeln!(out, "{} kind={kind}", v.value)?;
-    }
-    writeln!(
-        out,
-        "{} value(s), truncated {}, status {}",
-        data.values.len(),
-        data.truncated,
-        status_word(&data.status),
-    )?;
-    Ok(())
 }
 
 // ── Suggest ────────────────────────────────────────────────────────────

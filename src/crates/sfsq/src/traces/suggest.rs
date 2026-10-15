@@ -41,8 +41,8 @@
 //! suggestion. Values that are not UTF-8 are skipped, since a selection
 //! could not name them.
 //!
-//! Time bounding is file-granular, as for the other enumerations: a
-//! window prunes sources whose summary does not overlap it.
+//! Time bounding is file-granular: a window prunes sources whose
+//! summary does not overlap it.
 //! Cancellation is all-or-empty. Failure honesty: a source that fails to
 //! map, open or read is a [`SourceFailure`](PartialReason::SourceFailure),
 //! an in-window unavailable one a
@@ -57,14 +57,84 @@ use std::time::Instant;
 use sfst::{MatchClass, ValueMatcher};
 use tokio_util::sync::CancellationToken;
 
-use super::attributes::{AttributeRequestError, pruned, storage_field_of};
 use super::order::{complete_after, newest_first};
-use super::sources::{TraceSource, validate_sources};
+use super::sources::{SourceSetError, TraceSource, validate_sources};
 use super::status::{PartialReason, QueryStatus, StatusBuilder};
 use super::vocab::{AttributeKey, AttributeOwner, BuiltinField, storage_to_attribute};
 use super::wal_scan::TraceWalScan;
-use super::window::TimeWindow;
+use super::window::{TimeWindow, WindowError};
 use crate::source::map_source;
+
+/// A suggestion request error: the caller built an invalid request or
+/// source set; nothing was queried. Data conditions are not errors: a
+/// key absent from every source yields no suggestions.
+#[derive(Debug, thiserror::Error)]
+pub enum SuggestRequestError {
+    /// Zero would return nothing by construction, so it is refused
+    /// rather than honored.
+    #[error("a zero key/value limit would return nothing; omit the limit or raise it")]
+    ZeroLimit,
+    /// No path here builds a [`WindowError`]: the query carries an
+    /// already-validated [`TimeWindow`] (the caller constructs it, so an
+    /// invalid window never reaches the engine). The variant completes
+    /// the per-operation error wrap (see `window.rs`).
+    #[error(transparent)]
+    Window(#[from] WindowError),
+    /// The static virtual/dictionary split is known at the boundary
+    /// (decision 18B), so asking for a virtual builtin's values is a
+    /// caller bug, not a data condition.
+    #[error(
+        "builtin field {0:?} is virtual (no value dictionary); its values cannot be enumerated"
+    )]
+    NotEnumerable(BuiltinField),
+    #[error("a builtin key requires the Builtin owner, got {0:?} (pin C4)")]
+    BuiltinKeyOutsideBuiltinOwner(AttributeOwner),
+    #[error("the Builtin owner holds no attribute keys, got attribute {0:?} (pin C4)")]
+    AttributeKeyUnderBuiltinOwner(String),
+    /// `Any` exists for predicates (the owner-agnostic filter); values
+    /// are per concrete owner.
+    #[error("the Any owner is a predicate construct; enumeration takes a concrete owner")]
+    AnyOwnerNotEnumerable,
+    #[error(transparent)]
+    SourceSet(#[from] SourceSetError),
+}
+
+/// Resolve a values request's `(owner, key)` pair to the storage
+/// dictionary field it reads. The owner/key pairing is strict (pin C4):
+/// builtin keys only under the Builtin owner, attribute keys only under
+/// a concrete attribute owner, `Any` never. A virtual builtin — no value
+/// dictionary anywhere (decision 18B) — has no field to resolve and is
+/// rejected.
+fn storage_field_of(
+    owner: AttributeOwner,
+    key: &AttributeKey,
+) -> Result<String, SuggestRequestError> {
+    match (owner, key) {
+        (AttributeOwner::Any, _) => Err(SuggestRequestError::AnyOwnerNotEnumerable),
+        (AttributeOwner::Builtin, AttributeKey::Builtin(i)) => i
+            .dictionary_field()
+            .map(str::to_string)
+            .ok_or(SuggestRequestError::NotEnumerable(*i)),
+        (AttributeOwner::Builtin, AttributeKey::Attribute(a)) => Err(
+            SuggestRequestError::AttributeKeyUnderBuiltinOwner(a.clone()),
+        ),
+        (owner, AttributeKey::Builtin(_)) => {
+            Err(SuggestRequestError::BuiltinKeyOutsideBuiltinOwner(owner))
+        }
+        (owner, AttributeKey::Attribute(bare)) => {
+            let prefix = owner
+                .attribute_prefix()
+                .expect("validated: a concrete attribute owner");
+            Ok(format!("{prefix}{bare}"))
+        }
+    }
+}
+
+/// Whether a window (if any) prunes a sealed candidate. A pruned file is
+/// skipped, not failed: out-of-window is a data condition.
+fn pruned(window: Option<TimeWindow>, summary: &sfst::Summary) -> bool {
+    window.is_some_and(|w| !w.overlaps_summary(summary.min_timestamp_s, summary.max_timestamp_s))
+}
 
 /// Longest suggestion text, in bytes; longer values are cut at a
 /// character boundary and flagged.
@@ -139,19 +209,19 @@ impl SuggestQuery {
         self
     }
 
-    /// Zero is rejected ([`AttributeRequestError::ZeroLimit`]).
+    /// Zero is rejected ([`SuggestRequestError::ZeroLimit`]).
     pub fn max_items(mut self, max: usize) -> Self {
         self.max_items = max;
         self
     }
 
-    /// Zero is rejected ([`AttributeRequestError::ZeroLimit`]).
+    /// Zero is rejected ([`SuggestRequestError::ZeroLimit`]).
     pub fn max_files(mut self, max: usize) -> Self {
         self.max_files = max;
         self
     }
 
-    /// Zero is rejected ([`AttributeRequestError::ZeroLimit`]).
+    /// Zero is rejected ([`SuggestRequestError::ZeroLimit`]).
     pub fn stale_files(mut self, n: usize) -> Self {
         self.stale_files = n;
         self
@@ -215,9 +285,9 @@ pub fn suggest(
     query: SuggestQuery,
     cancel: CancellationToken,
     progress: Arc<AtomicUsize>,
-) -> Result<SuggestData, AttributeRequestError> {
+) -> Result<SuggestData, SuggestRequestError> {
     if query.max_items == 0 || query.max_files == 0 || query.stale_files == 0 {
-        return Err(AttributeRequestError::ZeroLimit);
+        return Err(SuggestRequestError::ZeroLimit);
     }
     let target = match &query.target {
         Target::Keys(render) => Resolved::Keys(*render),

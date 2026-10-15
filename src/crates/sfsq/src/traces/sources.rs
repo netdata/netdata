@@ -89,10 +89,8 @@ pub struct TraceSfstCandidate {
     pub source_id: SourceId,
     /// Cheap time/stream/size facts ([`sfst::Summary`]). Consumed only by
     /// the operations that summary-prune: search's phase-1 file-granular
-    /// window prune ([`search`](super::search::search)) and attribute
-    /// enumeration's window prune
-    /// ([`attribute_names`](super::attribute_names) /
-    /// [`attribute_values`](super::attribute_values)). Trace-by-id never
+    /// window prune ([`search`](super::search::search)) and suggestions'
+    /// window prune ([`suggest`](super::suggest())). Trace-by-id never
     /// reads it — the TBLM bloom prunes a by-id probe better than time
     /// ranges — and no completion-role source is pruned by it at all.
     pub summary: sfst::Summary,
@@ -135,9 +133,8 @@ pub struct TraceUnavailable {
     pub source_id: SourceId,
     /// The known time range and counts of the missing data (for a
     /// remote file, its catalog entry). One summary-pruning consumer:
-    /// attribute enumeration applies its sealed-candidate window prune
-    /// to an unavailable source too
-    /// ([`attribute_names`](super::attribute_names)), so one
+    /// suggestions apply their sealed-candidate window prune to an
+    /// unavailable source too ([`suggest`](super::suggest())), so one
     /// outside the window is irrelevant rather than reported;
     /// operations without a summary prune always report it.
     pub summary: sfst::Summary,
@@ -211,7 +208,7 @@ pub enum SourceSetError {
 /// adjacent ranges are fine), and no in-memory chunk without its
 /// coverage. The one gate every operation runs before any I/O —
 /// `trace_by_id`, `search` (for both of its sets), `overview`,
-/// `attribute_names`/`attribute_values` — so a bad set is a
+/// `suggest` — so a bad set is a
 /// request error, never a mid-query surprise.
 pub fn validate_sources(sources: &[TraceSource]) -> Result<(), SourceSetError> {
     let mut seen: HashSet<&SourceId> = HashSet::with_capacity(sources.len());

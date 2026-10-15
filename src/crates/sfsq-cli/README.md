@@ -3,8 +3,8 @@
 Inspect OpenTelemetry logs and traces stored in Netdata's on-disk **WAL/SFST**
 files from the terminal, without a running agent. Useful for forensic and
 offline inspection. Run with no subcommand, it queries **logs** and prints
-NDJSON. The trace subcommands (`trace`, `attributes`, `attribute-values`,
-`suggest`, `overview` and `search`) query **traces** and print plain text.
+NDJSON. The trace subcommands (`trace`, `suggest`, `overview` and `search`)
+query **traces** and print plain text.
 
 > The logs mode also ships inside the Netdata Agent as `otel-plugin logs`
 > (the shipped binary; this standalone `sfsq-cli` is a dev/forensic tool, not
@@ -92,9 +92,8 @@ Common to all of them:
 - `--start-ns N` / `--end-ns N` — a half-open window in epoch nanoseconds.
   Give the two flags together, with start before end. `trace` has no
   window, `overview` needs one (for its grid), and the others make it
-  optional. `search` admits a span when its *start* is in the window. Key
-  and value enumeration (`attributes`, `attribute-values`, `suggest`) skips
-  whole files outside the window.
+  optional. `search` admits a span when its *start* is in the window.
+  `suggest` skips whole files outside the window.
 - WAL files are scanned whole as tails — right for shut-down or recovered
   WALs; query an actively written WAL through a live agent instead. A torn
   or truncated tail is clamped to the last complete frame (with a warning);
@@ -122,7 +121,7 @@ four flags are repeatable.
 
 `COND` is `TARGET<op>VALUE`. `TARGET` is `OWNER.KEY` (the attribute owners
 `resource`, `span`, `instrumentation`, `event`, `link`), `.KEY` (any owner:
-resource ∪ span), or a builtin-field word (the list is under `attributes`
+resource ∪ span), or a builtin-field word (the list is under `suggest`
 below). The ops:
 
 | Op | Meaning |
@@ -154,28 +153,6 @@ and the line of each span that matches a token ends with `[match]`. Only
 positive tokens on spans mark spans: `--not` tokens, and tokens on the
 whole trace or on `trace-id`, mark no span.
 
-### `attributes` / `attribute-values` — enumerate keys and values
-
-```
-sfsq-cli attributes       (--sfst FILE | --wal FILE)… [--owner OWNER]
-                          [--max-keys N] [--start-ns N --end-ns N]
-sfsq-cli attribute-values (--sfst FILE | --wal FILE)… --owner OWNER
-                          --key KEY [--max-values N] [--start-ns N --end-ns N]
-```
-
-`OWNER` is one of `resource`, `span`, `instrumentation`, `event`, `link`,
-`builtin`. `KEY` is the bare attribute name, or — under `--owner builtin` —
-one of the builtin-field words: `name`, `kind`, `status`, `status-message`,
-`instrumentation-name`, `instrumentation-version`, `event-name`, `duration`,
-`span-id`, `parent-span-id`, `trace-id`, `link-span-id`, `link-trace-id`,
-`event-time-since-start`, `root-name`, `root-service-name`,
-`trace-duration`. `attributes` prints one `<owner> <key>` line per key;
-`attribute-values` prints one `<value> kind=<type>` line per value (`none`
-when the value carries no type). Both end with a
-`N key(s)/value(s), truncated true|false, status …` summary line;
-`--max-keys` / `--max-values` cap the list (0 rejected) and set the
-`truncated` flag when they cut it.
-
 ### `suggest` — suggest keys or values
 
 ```
@@ -186,8 +163,16 @@ sfsq-cli suggest (--sfst FILE | --wal FILE)… [--owner OWNER --key KEY]
 ```
 
 Without `--owner` and `--key`, `suggest` gives keys. With them, it gives
-the values of that key (`OWNER` and `KEY` as for `attribute-values`). It
-reads the newest files first. A key or a value matches `--term` when it is
+the values of that key. `OWNER` is one of `resource`, `span`,
+`instrumentation`, `event`, `link`, `builtin`. `KEY` is the bare attribute
+name, or — under `--owner builtin` — one of the builtin-field words: `name`,
+`kind`, `status`, `status-message`, `instrumentation-name`,
+`instrumentation-version`, `event-name`, `duration`, `span-id`,
+`parent-span-id`, `trace-id`, `link-span-id`, `link-trace-id`,
+`event-time-since-start`, `root-name`, `root-service-name`,
+`trace-duration`. Only `name`, `kind`, `status`, `status-message`, the two
+`instrumentation-…` words and `event-name` have stored values; the others
+are rejected with `--key`. It reads the newest files first. A key or a value matches `--term` when it is
 equal to the term, starts with it, contains it, or starts within one edit
 (terms of 4 or more characters) or two edits (8 or more) of it. An empty
 term matches all.
@@ -284,7 +269,7 @@ sfsq-cli search --sfst /var/lib/netdata/otel/traces/index/<SEQ>.sfst \
   --not 'status=ERROR'
 
 # Which values does the span attribute http.method take?
-sfsq-cli attribute-values --owner span --key http.method \
+sfsq-cli suggest --owner span --key http.method \
   --sfst /var/lib/netdata/otel/traces/index/<SEQ>.sfst
 ```
 

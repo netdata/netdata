@@ -5,8 +5,8 @@
 //! (`ng_flatten::FlattenedTraceRequest`, payload format 3) into spans
 //! once and serves them from memory — to the shared combiner as a
 //! `sfst::SpanSource` (trace-by-id) and directly to the
-//! other operations: the cross-source aggregates fold, search, and the
-//! attribute enumerations. It exists for data the indexer hasn't
+//! other operations: the cross-source aggregates fold, search, and
+//! suggestions. It exists for data the indexer hasn't
 //! reached yet — the bounded, un-indexed *tail* of an active WAL — so a
 //! whole-range decode per query is affordable (the same rationale as
 //! the logs [`WalScan`](crate::logs::WalScan)). The WAL itself carries
@@ -101,7 +101,7 @@ pub struct TraceWalScan {
     field_kinds: Vec<(String, sfst::ValueKind)>,
     /// Storage field → distinct rendered values over the scanned frames —
     /// the tail's counterpart of a sealed file's value dictionaries, for
-    /// key/value enumeration. Built from EXACTLY the entry set the seal
+    /// key/value suggestions. Built from EXACTLY the entry set the seal
     /// interns: resource ∪ scope ∪ span entries (including
     /// `_kind`/`_status_code`/`trace_state`; the mapping layer filters,
     /// same as for sealed field tables) PLUS the structured

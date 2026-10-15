@@ -6,7 +6,10 @@
 //! (source budget, no new matches, deadline) with their reason and
 //! `complete_after`; sources without the key cost no budget; unavailable
 //! and broken sources are reported; cancellation is all-or-empty; zero
-//! limits are rejected.
+//! limits, the owner/key pairings of pin C4 and duplicate source ids are
+//! rejected; keys partition by owner with every builtin and no internal
+//! field; builtin values are the storage labels and virtual builtins
+//! have none.
 
 mod common;
 
@@ -15,12 +18,12 @@ use std::sync::atomic::{AtomicUsize, Ordering};
 use std::time::{Duration, Instant};
 
 use common::{
-    kv_str, memory_source, missing_source, req, sealed_source, sp, tail_source, unavailable_source,
-    write_wal,
+    kv_double, kv_int, kv_str, memory_source, missing_source, req, req_with, sealed_source, sp,
+    tail_source, unavailable_source, write_wal,
 };
 use sfsq::traces::{
-    AttributeKey, AttributeOwner, AttributeRequestError, PartialReason, QueryStatus, SuggestData,
-    SuggestQuery, Suggestion, TraceSource, suggest,
+    AttributeKey, AttributeOwner, BuiltinField, PartialReason, QueryStatus, SourceId, SuggestData,
+    SuggestQuery, SuggestRequestError, Suggestion, TraceSfstCandidate, TraceSource, suggest,
 };
 use sfst::FieldTier;
 use sfst::MatchClass::{self, *};
@@ -266,7 +269,7 @@ fn cancellation_is_all_or_empty_and_zero_limits_are_rejected() {
             Arc::new(AtomicUsize::new(0)),
         )
         .unwrap_err();
-        assert!(matches!(err, AttributeRequestError::ZeroLimit), "{err}");
+        assert!(matches!(err, SuggestRequestError::ZeroLimit), "{err}");
     }
 }
 
@@ -429,4 +432,207 @@ fn a_tails_key_tier_follows_its_value_count() {
             .map(|s| s.tier),
         Some(Some(FieldTier::Mid))
     );
+}
+
+/// Keys spread over every owner and all three source shapes: each lands
+/// under its owner, every builtin is a key, the internal facets and the
+/// bare `trace_state` field never surface (a span attribute named
+/// `trace_state` does), and the answer does not depend on source order.
+#[test]
+fn keys_partition_by_owner_whatever_the_source_order() {
+    let dir = tempfile::tempdir().unwrap();
+    let mut a1 = sp(1, 0, BASE_S * 1_000_000_000, "op-a");
+    a1.kind = 2;
+    a1.status = Some((2, "boom"));
+    a1.trace_state = "ot=th:8";
+    a1.attrs = vec![kv_str("trace_state", "user-attr"), kv_int("retries", 3)];
+    let wal_a = write_wal(
+        dir.path(),
+        vec![req_with(
+            vec![kv_str("service.name", "svc-a"), kv_str("host", "h1")],
+            Some(("mylib", "1.2", vec![kv_str("lang", "rust")])),
+            &[a1],
+        )],
+        "part-a",
+    );
+    let mut b1 = sp(2, 1, (BASE_S + 1) * 1_000_000_000, "op-b");
+    b1.events = vec![("retry", vec![kv_int("attempt", 1)])];
+    b1.links = vec![([0xCD; 16], [9; 8], vec![kv_str("rel", "follows")])];
+    let wal_b = write_wal(dir.path(), vec![req(&[b1])], "part-b");
+    let mut c1 = sp(3, 1, (BASE_S + 2) * 1_000_000_000, "op-c");
+    c1.attrs = vec![kv_double("ratio", 0.5)];
+    let wal_c = write_wal(dir.path(), vec![req(&[c1])], "part-c");
+    let sources = vec![
+        sealed_source(dir.path(), &wal_a, "sealed-a"),
+        memory_source(&wal_b, "chunk-b"),
+        tail_source(&wal_c, "tail-c"),
+    ];
+
+    let keys_of = |sources: Vec<TraceSource>| -> Vec<String> {
+        let data = run(sources, SuggestQuery::keys(render).max_items(200));
+        assert_eq!(data.status, QueryStatus::Complete);
+        assert!(!data.truncated);
+        let mut keys: Vec<String> = data.items.into_iter().map(|s| s.text).collect();
+        keys.sort();
+        keys
+    };
+    let keys = keys_of(sources.clone());
+    for want in [
+        "resource.host",
+        "resource.service.name",
+        "span.ratio",
+        "span.retries",
+        "span.trace_state",
+        "instrumentation.lang",
+        "event.attempt",
+        "link.rel",
+    ] {
+        assert!(keys.iter().any(|k| k == want), "{want} in {keys:?}");
+    }
+    for builtin in BuiltinField::ALL {
+        let word = format!("{builtin:?}").to_lowercase();
+        assert!(keys.contains(&word), "builtin {word} in {keys:?}");
+    }
+    for internal in ["_kind", "_status_code", "trace_state"] {
+        assert!(
+            !keys
+                .iter()
+                .any(|k| k.ends_with(internal) && !k.starts_with("span.")),
+            "{internal} must not surface: {keys:?}"
+        );
+    }
+
+    let mut reversed = sources;
+    reversed.reverse();
+    assert_eq!(keys_of(reversed), keys);
+}
+
+/// Dictionary-backed builtins suggest their STORAGE labels (mapping them
+/// to wire words is the adapter's job); a virtual builtin has no values
+/// and asking for them is a request error.
+#[test]
+fn builtin_values_are_storage_labels_and_virtual_builtins_have_none() {
+    let dir = tempfile::tempdir().unwrap();
+    let mut a = sp(1, 0, BASE_S * 1_000_000_000, "op-a");
+    a.kind = 2;
+    a.status = Some((2, "boom"));
+    a.events = vec![("retry", Vec::new())];
+    let wal = write_wal(
+        dir.path(),
+        vec![req_with(
+            vec![kv_str("service.name", "svc")],
+            Some(("mylib", "1.2", Vec::new())),
+            &[a],
+        )],
+        "i",
+    );
+    let builtin = |field: BuiltinField| {
+        SuggestQuery::values(AttributeOwner::Builtin, AttributeKey::Builtin(field))
+    };
+    let texts = |field: BuiltinField| -> Vec<String> {
+        run(vec![sealed_source(dir.path(), &wal, "f")], builtin(field))
+            .items
+            .into_iter()
+            .map(|s| s.text)
+            .collect()
+    };
+    assert_eq!(texts(BuiltinField::Name), ["op-a"]);
+    assert_eq!(texts(BuiltinField::Kind), ["SERVER"]);
+    assert_eq!(texts(BuiltinField::Status), ["ERROR"]);
+    assert_eq!(texts(BuiltinField::StatusMessage), ["boom"]);
+    assert_eq!(texts(BuiltinField::InstrumentationName), ["mylib"]);
+    assert_eq!(texts(BuiltinField::InstrumentationVersion), ["1.2"]);
+    assert_eq!(texts(BuiltinField::EventName), ["retry"]);
+
+    for virt in [
+        BuiltinField::Duration,
+        BuiltinField::SpanId,
+        BuiltinField::ParentSpanId,
+        BuiltinField::TraceId,
+        BuiltinField::LinkSpanId,
+        BuiltinField::LinkTraceId,
+        BuiltinField::EventTimeSinceStart,
+        BuiltinField::RootName,
+        BuiltinField::RootServiceName,
+        BuiltinField::TraceDuration,
+    ] {
+        let err = suggest(
+            vec![sealed_source(dir.path(), &wal, "f")],
+            builtin(virt),
+            CancellationToken::new(),
+            Arc::new(AtomicUsize::new(0)),
+        )
+        .unwrap_err();
+        assert!(
+            matches!(err, SuggestRequestError::NotEnumerable(i) if i == virt),
+            "virtual {virt:?} must be NotEnumerable"
+        );
+    }
+}
+
+/// The owner/key pairings of pin C4, the `Any` owner and duplicate
+/// source ids are request errors before anything is read; a key no
+/// source carries is a complete, empty answer.
+#[test]
+fn bad_requests_are_rejected_and_an_absent_key_is_empty() {
+    let fails = |sources: Vec<TraceSource>, query: SuggestQuery| {
+        suggest(
+            sources,
+            query,
+            CancellationToken::new(),
+            Arc::new(AtomicUsize::new(0)),
+        )
+        .unwrap_err()
+    };
+    assert!(matches!(
+        fails(
+            Vec::new(),
+            SuggestQuery::values(AttributeOwner::Any, AttributeKey::Attribute("k".into()))
+        ),
+        SuggestRequestError::AnyOwnerNotEnumerable
+    ));
+    assert!(matches!(
+        fails(
+            Vec::new(),
+            SuggestQuery::values(
+                AttributeOwner::Span,
+                AttributeKey::Builtin(BuiltinField::Name)
+            )
+        ),
+        SuggestRequestError::BuiltinKeyOutsideBuiltinOwner(AttributeOwner::Span)
+    ));
+    assert!(matches!(
+        fails(
+            Vec::new(),
+            SuggestQuery::values(AttributeOwner::Builtin, AttributeKey::Attribute("k".into()))
+        ),
+        SuggestRequestError::AttributeKeyUnderBuiltinOwner(a) if a == "k"
+    ));
+    let dup = |id: &str| {
+        TraceSource::Sfst(TraceSfstCandidate {
+            source_id: SourceId::new(id.to_string()),
+            summary: sfst::Summary {
+                min_timestamp_s: 0,
+                max_timestamp_s: 0,
+                record_count: 0,
+                content_meta: Vec::new(),
+            },
+            source: sfsq::Source::File("/dev/null".into()),
+            coverage: None,
+        })
+    };
+    assert!(matches!(
+        fails(vec![dup("same"), dup("same")], q()),
+        SuggestRequestError::SourceSet(_)
+    ));
+
+    let dir = tempfile::tempdir().unwrap();
+    let wal = write_wal(dir.path(), vec![req(&spans(&["x"], 0))], "a");
+    let data = run(
+        vec![sealed_source(dir.path(), &wal, "f"), tail_source(&wal, "t")],
+        SuggestQuery::values(AttributeOwner::Link, AttributeKey::Attribute("nope".into())),
+    );
+    assert!(data.items.is_empty());
+    assert!(!data.truncated);
+    assert_eq!(data.status, QueryStatus::Complete);
 }

@@ -1,6 +1,5 @@
-//! Multi-source trace-query subsystem: cross-source trace-by-id,
-//! attribute / attribute-value enumeration, search, and the
-//! trace-level overview aggregate.
+//! Multi-source trace-query subsystem: cross-source trace-by-id, search,
+//! the trace-level overview aggregate, and the search bar's suggestions.
 //!
 //! Same philosophy as [`logs`](crate::logs): neutral, transport-free —
 //! plain Rust data in and out, no wire concerns; each consumer (the CLI,
@@ -27,8 +26,8 @@
 //! `sfst::trace_combine` ([`trace_by_id`]; [`search()`]'s fallback,
 //! which the gate pre-filters), assembly-free trace-level shapes
 //! (`rollup`'s per-trace parts: [`search()`]'s rows, and
-//! [`overview()`] folded by `fold`), or dictionary enumeration
-//! ([`attribute_names`] / [`attribute_values`]).
+//! [`overview()`] folded by `fold`), or dictionary reads
+//! ([`suggest()`]).
 //!
 //! # Module map
 //!
@@ -50,8 +49,6 @@
 //!   per-trace shapes from both source kinds
 //!   (sealed `TRSU` rows; tails' decoded-span folds, parity
 //!   test-pinned), merged by one cross-source fold.
-//! - attributes — [`attribute_names`] / [`attribute_values`]:
-//!   key/value enumeration straight off the dictionaries.
 //! - suggest — [`suggest()`]: the keys, or a key's values, matched
 //!   against a typed term, newest data first, bounded in items, sources
 //!   and time.
@@ -65,7 +62,6 @@
 //! - window — [`TimeWindow`]: the half-open query window shared by
 //!   every operation that takes one.
 
-mod attributes;
 mod by_id;
 mod fold;
 mod gate;
@@ -81,10 +77,6 @@ mod vocab;
 mod wal_scan;
 mod window;
 
-pub use attributes::{
-    AttributeNamesData, AttributeNamesQuery, AttributeRequestError, AttributeValue,
-    AttributeValuesData, AttributeValuesQuery, attribute_names, attribute_values,
-};
 pub use by_id::{
     DEFAULT_SPAN_CAP, FieldKinds, TraceData, TraceQuery, TraceRequestError, trace_by_id,
 };
@@ -112,7 +104,8 @@ pub use sources::{
 pub use status::{PartialReason, QueryStatus, StatusBuilder};
 pub use suggest::{
     DEADLINE_CHECK_EVERY, DEFAULT_STALE_FILES, DEFAULT_SUGGEST_FILES, DEFAULT_SUGGEST_ITEMS,
-    DISPLAY_MAX_BYTES, KeyRenderer, SuggestData, SuggestQuery, Suggestion, suggest,
+    DISPLAY_MAX_BYTES, KeyRenderer, SuggestData, SuggestQuery, SuggestRequestError, Suggestion,
+    suggest,
 };
 pub use vocab::{AttributeKey, AttributeOwner, BuiltinField, storage_to_attribute};
 pub use wal_scan::{TraceScanError, TraceWalScan};

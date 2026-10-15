@@ -61,16 +61,6 @@ pub fn kv_double(k: &str, v: f64) -> KeyValue {
     }
 }
 
-/// An attribute with NO value — flattens to a `Null` entry, the key
-/// stays present. Only traces_attributes.rs exercises this.
-pub fn kv_null(k: &str) -> KeyValue {
-    KeyValue {
-        key: k.into(),
-        value: None,
-        key_strindex: 0,
-    }
-}
-
 #[derive(Clone)]
 pub struct SpanSpec {
     /// The owning trace (defaults to the shared [`TRACE`]; the search

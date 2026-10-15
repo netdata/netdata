@@ -16,7 +16,7 @@
 //! engine.
 //!
 //! The storage↔vocabulary mapping lives here in BOTH directions —
-//! [`storage_to_attribute`] for key enumeration (attributes.rs);
+//! [`storage_to_attribute`] for key suggestions (suggest.rs);
 //! [`AttributeOwner::attribute_prefix`]
 //! and [`BuiltinField::dictionary_field`] for value lookups and 4c
 //! lowering — so there is exactly one table to keep right.
@@ -160,7 +160,7 @@ const INTERNAL_FIELDS: [&str; 2] = ["_kind", "_status_code"];
 /// `trace_state` (17A), and anything unrecognized (a foreign field in a
 /// file this engine was pointed at is not vocabulary). That `None` is
 /// the vocabulary's one deliberate silent filter — a dropped name never
-/// surfaces as a filterable key (see attributes.rs).
+/// surfaces as a filterable key (see suggest.rs).
 pub fn storage_to_attribute(storage: &str) -> Option<(AttributeOwner, AttributeKey)> {
     if INTERNAL_FIELDS.contains(&storage) || storage == "trace_state" {
         return None;

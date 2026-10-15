@@ -429,7 +429,7 @@ pub enum SearchRequestError {
     /// through the `From` conversion — kept so a caller assembling a
     /// request can `?` window construction into the one request-error
     /// type (the R2-8 wrapper contract, mirroring
-    /// `AttributeRequestError`).
+    /// `SuggestRequestError`).
     #[error(transparent)]
     Window(#[from] WindowError),
     #[error(transparent)]
@@ -1559,7 +1559,7 @@ pub fn search(
             unreachable!("sessions hold SFST sources only")
         };
         // File-granular window pruning on the summary range — the same
-        // overlap comparison key enumeration shares
+        // overlap comparison suggestions share
         // (`TimeWindow::overlaps_summary`); exact for span-start
         // windows because file ranges are span-start-based.
         if query.window.is_some_and(|w| {
