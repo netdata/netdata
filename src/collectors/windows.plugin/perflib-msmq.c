@@ -153,21 +153,28 @@ static void initialize(void)
 }
 
 static void msmq_queue_chart_id(
-    char *dst, size_t size, const char *chart_type, const char *instance, const char *suffix)
+    char *dst,
+    size_t size,
+    const char *chart_type,
+    size_t chart_type_length,
+    const char *instance,
+    const char *suffix,
+    size_t suffix_length)
 {
-    XXH64_hash_t hash = XXH3_64bits(instance, strlen(instance));
-    const size_t fixed_length = strlen("msmq_queue_") + 1 + 16 + 1 + strlen(suffix);
+    const size_t instance_length = strnlen(instance, sizeof(windows_shared_buffer));
+    XXH64_hash_t hash = XXH3_64bits(instance, instance_length);
+    const size_t fixed_length = sizeof("msmq_queue_") - 1 + 1 + 16 + 1 + suffix_length;
     const size_t full_id_limit = RRD_ID_LENGTH_MAX - 1;
-    const size_t type_prefix_length = strlen(chart_type) + 1;
+    const size_t type_prefix_length = chart_type_length + 1;
     size_t chart_id_limit = full_id_limit > type_prefix_length ? full_id_limit - type_prefix_length : 0;
     if (size && chart_id_limit >= size)
         chart_id_limit = size - 1;
-    size_t instance_length = chart_id_limit > fixed_length ? chart_id_limit - fixed_length : 0;
+    size_t visible_instance_length = chart_id_limit > fixed_length ? chart_id_limit - fixed_length : 0;
     snprintfz(
         dst,
         size,
         "msmq_queue_%.*s_%016llx_%s",
-        (int)instance_length,
+        (int)visible_instance_length,
         instance,
         (unsigned long long)hash,
         suffix);
@@ -178,7 +185,14 @@ static void msmq_queue_chart_messages(struct msmq_queue *mq, const char *queue, 
 {
     if (unlikely(!mq->st_messages)) {
         char id[RRD_ID_LENGTH_MAX + 1];
-        msmq_queue_chart_id(id, sizeof(id), "msmq_queue_messages", queue, "messages");
+        msmq_queue_chart_id(
+            id,
+            sizeof(id),
+            "msmq_queue_messages",
+            sizeof("msmq_queue_messages") - 1,
+            queue,
+            "messages",
+            sizeof("messages") - 1);
 
         mq->st_messages = rrdset_create_localhost(
             "msmq_queue_messages",
@@ -207,7 +221,14 @@ static void msmq_queue_chart_bytes(struct msmq_queue *mq, const char *queue, int
 {
     if (unlikely(!mq->st_bytes)) {
         char id[RRD_ID_LENGTH_MAX + 1];
-        msmq_queue_chart_id(id, sizeof(id), "msmq_queue_bytes", queue, "bytes");
+        msmq_queue_chart_id(
+            id,
+            sizeof(id),
+            "msmq_queue_bytes",
+            sizeof("msmq_queue_bytes") - 1,
+            queue,
+            "bytes",
+            sizeof("bytes") - 1);
 
         mq->st_bytes = rrdset_create_localhost(
             "msmq_queue_bytes",
@@ -236,7 +257,14 @@ static void msmq_queue_chart_journal_messages(struct msmq_queue *mq, const char 
 {
     if (unlikely(!mq->st_journal_messages)) {
         char id[RRD_ID_LENGTH_MAX + 1];
-        msmq_queue_chart_id(id, sizeof(id), "msmq_queue_journal_messages", queue, "journal_messages");
+        msmq_queue_chart_id(
+            id,
+            sizeof(id),
+            "msmq_queue_journal_messages",
+            sizeof("msmq_queue_journal_messages") - 1,
+            queue,
+            "journal_messages",
+            sizeof("journal_messages") - 1);
 
         mq->st_journal_messages = rrdset_create_localhost(
             "msmq_queue_journal_messages",
@@ -267,7 +295,14 @@ static void msmq_queue_chart_journal_bytes(struct msmq_queue *mq, const char *qu
 {
     if (unlikely(!mq->st_journal_bytes)) {
         char id[RRD_ID_LENGTH_MAX + 1];
-        msmq_queue_chart_id(id, sizeof(id), "msmq_queue_journal_bytes", queue, "journal_bytes");
+        msmq_queue_chart_id(
+            id,
+            sizeof(id),
+            "msmq_queue_journal_bytes",
+            sizeof("msmq_queue_journal_bytes") - 1,
+            queue,
+            "journal_bytes",
+            sizeof("journal_bytes") - 1);
 
         mq->st_journal_bytes = rrdset_create_localhost(
             "msmq_queue_journal_bytes",
