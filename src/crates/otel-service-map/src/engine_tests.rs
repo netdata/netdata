@@ -504,3 +504,60 @@ fn a_client_nested_through_an_internal_span_is_one_call() {
         assert_eq!(engine.in_flight(), 0, "{name}");
     }
 }
+
+/// Random arrival orders, duplicates, self-calls, resends after expiry,
+/// capacity limits and backward clock steps: the pairing store's size never
+/// drifts, stays near its cap, and drains to zero.
+#[test]
+fn in_flight_accounting_never_drifts() {
+    let mut seed = 0x9E37_79B9_7F4A_7C15u64;
+    let mut next = move |n: u64| {
+        seed ^= seed << 13;
+        seed ^= seed >> 7;
+        seed ^= seed << 17;
+        seed % n
+    };
+    for run in 0..300 {
+        let cap = 1 + next(30) as usize;
+        let mut engine = Engine::new(Limits {
+            max_in_flight: cap,
+            ..Limits::default()
+        });
+        let mut now = T0 + 10 * SEC;
+        let mut latest = now;
+        for _ in 0..300 {
+            match next(10) {
+                0 => engine.expire(now),
+                1 => {
+                    engine.take_closed(now);
+                }
+                2 => now = now.saturating_sub(next(40) * SEC),
+                _ => {
+                    let kind = [
+                        Kind::Server,
+                        Kind::Client,
+                        Kind::Internal,
+                        Kind::Producer,
+                        Kind::Consumer,
+                    ][next(5) as usize];
+                    let id = 1 + next(12) as u8;
+                    let parent = (next(4) != 0).then(|| 1 + next(12) as u8);
+                    let svc = ["a", "b", "c"][next(3) as usize];
+                    let mut s = span(kind, svc, id, parent);
+                    s.trace_id = [next(3) as u8; 16];
+                    s.end_ns = now;
+                    engine.ingest(TENANT, vec![s], 0, now);
+                }
+            }
+            assert!(
+                engine.in_flight() <= cap + 3,
+                "run {run}: {} over cap {cap}",
+                engine.in_flight()
+            );
+            now += next(5) * SEC;
+            latest = latest.max(now);
+        }
+        engine.expire(latest + 60 * SEC);
+        assert_eq!(engine.in_flight(), 0, "run {run}");
+    }
+}
