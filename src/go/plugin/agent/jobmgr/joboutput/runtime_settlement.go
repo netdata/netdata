@@ -153,7 +153,7 @@ func (t *runtimeSettlementTransaction) Apply(ctx context.Context) (applied lifec
 		ctx,
 		t.scope, t.current, nil, lifecycle.LongLivedPermit{}, disposition, &postimage, internalReply(),
 		dcjc.configStatusCleanup(t.scope.ID, status), autoDetectionRetryToken{}, afterApply,
-		jobConfig, jobConfigIntentPreserve, nil, nil,
+		jobConfig, jobConfigIntentPreserve, nil, nil, nil,
 	)
 	if err != nil {
 		return lifecycle.AppliedResourceTransaction{}, err

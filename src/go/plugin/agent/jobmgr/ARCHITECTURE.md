@@ -608,7 +608,11 @@ flowchart TD
      already matches. A runtime is passed only when readiness commits Running; failed candidates leave no runtime reference behind. Replacement/removal reconciles
      the prior incarnation from the graph preimage. Hook panic is fail-open and cannot change candidate, graph, or
      cleanup behavior. This is a latest-state projection, not an event bus or retry history.
-4. **Accept and retire** — a successful preflight candidate remains process-owned while a short transaction commits
+4. **Accept and retire** — after every admission step that yields graph claims (including configuration-intent
+   reservation), revalidate the candidate's process ownership, Store snapshot and vnode lifetime before preparing
+   graph adoption. A stale candidate aborts its unused reservation and follows the same source-specific failure
+   policy as preflight: interactive rejection preserves the incumbent; discovery retains its dependency wait or
+   pending rebuild policy. A successful preflight candidate remains process-owned while a short transaction commits
    Accepted and transfers it to accepted activation. Replacement fences the incumbent's ordinary output and detaches
    its run projections immediately; its physical managed loop, `Stop`, Function drain, and collector cleanup remain
    process-owned until they return. An aborted acceptance releases its candidate without replacing the incumbent.
@@ -746,8 +750,10 @@ Collectors with `JobConfigIntentOwner` reserve resources only after structural v
 identity. This admission gate covers discovery, Enable and failure adoption, independently of missing dependencies
 or a quarantined candidate. Pure configuration validation and owner reservation run in the same separate contained
 operation outside the graph claim, so neither supersedes a candidate awaiting handoff. The stage owns its reservation
-until graph claims are reacquired and the result is taken. Cancellation, rejection and failed claim reacquisition
-abort a late or untaken reservation inside the physical attempt; process shutdown joins that cleanup. Same-job
+until graph claims are reacquired and the result is taken. Taking a reservation does not authorize a stale
+preflight candidate: candidate validity is checked again before any graph or incumbent change. Cancellation,
+rejection and failed claim reacquisition abort a late or untaken reservation inside the physical attempt; process
+shutdown joins that cleanup. Same-job
 mutations remain serialized while unrelated graph work can proceed. Unchanged identity and retirement do not
 repeat validation callbacks. Retirement calls the intent owner's Prepare with a zero next identity, then Commit to
 release intent. Retirement preparation, Commit and Abort perform bounded in-memory ownership changes. The owner may

@@ -339,6 +339,23 @@ func (dcjc *DynCfgJobController) prepareDiscovered(
 		)
 	}
 	stage, probeFailure, activation := dcjc.prepareContainedCandidate(ctx, change.Config)
+	if activation.err == nil && probeFailure == nil {
+		acceptedPostimage := postimage
+		acceptedPostimage.Status = dyncfg.StatusAccepted.String()
+		acceptedCleanup := dcjc.configCreateCleanup(
+			acceptedPostimage, change.Config.SourceType(), change.Config.Source(),
+			dcjc.configType(dcjc.modules[change.Config.Module()]),
+		)
+		prepared, err := dcjc.prepareCandidateAdoption(
+			ctx, scope, current, permit, stage, change.Config, &acceptedPostimage, reply, acceptedCleanup,
+			dcjc.pendingDesiredSettlement(change.Config, change.pending),
+		)
+		var preflight *candidatePreflightError
+		if !errors.As(err, &preflight) {
+			return prepared, err
+		}
+		activation = classifyActivationError(err)
+	}
 	if err := activation.err; err != nil {
 		if ctx.Err() != nil || lifecycle.OwnershipRetained(err) {
 			return nil, err
@@ -454,41 +471,27 @@ func (dcjc *DynCfgJobController) prepareDiscovered(
 		},
 		removePlainStock: change.Config.SourceType() == confgroup.TypeStock,
 	}
-	if probeFailure != nil {
-		if dcjc.configModules.activationWaitsForDependency(change.Config, probeFailure) {
-			return dcjc.prepareDiscoveredActivationWait(
-				ctx,
-				change,
-				current,
-				scope,
-				permit,
-				postimage,
-				pendingSettlement,
-				probeFailure,
-				0,
-			)
-		}
-		return dcjc.prepareProbeFailure(
+	if dcjc.configModules.activationWaitsForDependency(change.Config, probeFailure) {
+		return dcjc.prepareDiscoveredActivationWait(
 			ctx,
-			scope,
+			change,
 			current,
+			scope,
 			permit,
-			autoDetectionRetryToken{},
+			postimage,
+			pendingSettlement,
 			probeFailure,
-			failurePlan,
+			0,
 		)
 	}
-	postimage.Status = dyncfg.StatusAccepted.String()
-	cleanup = dcjc.configCreateCleanup(
-		postimage,
-		change.Config.SourceType(),
-		change.Config.Source(),
-		dcjc.configType(dcjc.modules[change.Config.Module()]),
-	)
-	return dcjc.prepareCandidateAdoption(
+	return dcjc.prepareProbeFailure(
 		ctx,
-		scope, current, permit, stage, change.Config, &postimage, reply, cleanup,
-		dcjc.pendingDesiredSettlement(change.Config, change.pending),
+		scope,
+		current,
+		permit,
+		autoDetectionRetryToken{},
+		probeFailure,
+		failurePlan,
 	)
 }
 

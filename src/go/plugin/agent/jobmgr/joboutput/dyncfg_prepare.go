@@ -4,6 +4,7 @@ package joboutput
 
 import (
 	"context"
+	"errors"
 	"fmt"
 
 	"github.com/netdata/netdata/go/plugins/plugin/agent/jobmgr/lifecycle"
@@ -337,6 +338,21 @@ func (dcjc *DynCfgJobController) prepareCandidate(
 	failedCleanup := cmd.cleanup(failedPostimage, dyncfg.StatusFailed)
 
 	stage, probeFailure, activation := dcjc.prepareContainedCandidate(ctx, cmd.config)
+	if activation.err == nil && probeFailure == nil {
+		acceptedPostimage := cmd.postimage
+		acceptedPostimage.Status = dyncfg.StatusAccepted.String()
+		prepared, err := dcjc.prepareCandidateAdoption(
+			ctx,
+			scope, current, permit, stage, cmd.config, &acceptedPostimage,
+			adoptedReply(cmd.command, dyncfg.StatusAccepted, jobFailure{}),
+			cmd.cleanup(acceptedPostimage, dyncfg.StatusAccepted), nil,
+		)
+		var preflight *candidatePreflightError
+		if !errors.As(err, &preflight) {
+			return prepared, err
+		}
+		activation = classifyActivationError(err)
+	}
 	if err := activation.err; err != nil {
 		if ctx.Err() != nil || lifecycle.OwnershipRetained(err) {
 			return nil, err
@@ -385,26 +401,16 @@ func (dcjc *DynCfgJobController) prepareCandidate(
 		afterApply:       dcjc.scheduleRetryAfterApply(cmd.config),
 		removePlainStock: cmd.config.SourceType() == confgroup.TypeStock,
 	}
-	if probeFailure != nil {
-		if !cmd.adoptsFailures || !adoptsFailure(probeFailure) {
-			return dcjc.rejectKeeping(
-				scope,
-				current,
-				permit,
-				collectorFailure(probeFailure, cmd.messages.failed),
-				kept,
-			)
-		}
-		return dcjc.prepareProbeFailure(ctx, scope, current, permit, autoDetectionRetryToken{}, probeFailure, failurePlan)
+	if !cmd.adoptsFailures || !adoptsFailure(probeFailure) {
+		return dcjc.rejectKeeping(
+			scope,
+			current,
+			permit,
+			collectorFailure(probeFailure, cmd.messages.failed),
+			kept,
+		)
 	}
-	acceptedPostimage := cmd.postimage
-	acceptedPostimage.Status = dyncfg.StatusAccepted.String()
-	return dcjc.prepareCandidateAdoption(
-		ctx,
-		scope, current, permit, stage, cmd.config, &acceptedPostimage,
-		adoptedReply(cmd.command, dyncfg.StatusAccepted, jobFailure{}),
-		cmd.cleanup(acceptedPostimage, dyncfg.StatusAccepted), nil,
-	)
+	return dcjc.prepareProbeFailure(ctx, scope, current, permit, autoDetectionRetryToken{}, probeFailure, failurePlan)
 }
 
 func (dcjc *DynCfgJobController) prepareDisable(

@@ -13,6 +13,13 @@ import (
 	"github.com/netdata/netdata/go/plugins/plugin/framework/dyncfg"
 )
 
+// A late preflight failure follows the same source-specific rejection/retry
+// policy as an invalid candidate returned from Check.
+type candidatePreflightError struct{ cause error }
+
+func (e *candidatePreflightError) Error() string { return e.cause.Error() }
+func (e *candidatePreflightError) Unwrap() error { return e.cause }
+
 // candidateAdoption retains the checked candidate until the graph transaction
 // transfers it to accepted activation. Dispose and a rolled-back Apply release
 // it; successful acceptance does not wait for the previous runtime's cleanup.
@@ -72,7 +79,7 @@ func (dcjc *DynCfgJobController) prepareCandidateAdoption(
 	result, err := stage.inspect()
 	if err != nil {
 		adoption.release()
-		return nil, err
+		return nil, &candidatePreflightError{cause: err}
 	}
 	spec, err := dcjc.configModules.newAcceptedActivationSpec(config)
 	if err != nil {
@@ -93,7 +100,7 @@ func (dcjc *DynCfgJobController) prepareCandidateAdoption(
 			identity: result.candidate.jobConfigIdentity,
 			snapshot: result.candidate.jobConfigSnapshot,
 		}, jobConfigIntentEnable,
-		nil, nil,
+		nil, nil, stage,
 	)
 	if err != nil {
 		adoption.release()

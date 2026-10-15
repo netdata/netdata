@@ -102,6 +102,7 @@ func (dcjc *DynCfgJobController) prepareMutationWithRetryAfterApply(
 		jobConfig, intent,
 		nil,
 		nil,
+		nil,
 	)
 }
 
@@ -121,6 +122,7 @@ func (dcjc *DynCfgJobController) prepareMutationWithRetryAfterApplyAndFallback(
 	intent jobConfigIntentTransition,
 	busyFallback *ResourceActivationFallback,
 	quarantinedFallback *ResourceActivationFallback,
+	candidate *preparedJobCandidate,
 ) (prepared lifecycle.PreparedResourceTransaction, resultErr error) {
 	if successor != nil && postimage != nil && postimage.Status == dyncfg.StatusAccepted.String() {
 		var config confgroup.Config
@@ -183,6 +185,13 @@ func (dcjc *DynCfgJobController) prepareMutationWithRetryAfterApplyAndFallback(
 				err = rollbackSuccessorMutation(successor, err)
 			}
 			return nil, err
+		}
+	}
+	// Admission can yield the graph claim after Check. Validate every captured
+	// dependency and candidate ownership only after all yielding work has finished.
+	if candidate != nil {
+		if _, err := candidate.inspect(); err != nil {
+			return nil, &candidatePreflightError{cause: err}
 		}
 	}
 	mutation, err := dcjc.graph.PrepareMutation([]dyncfg.GraphChange{{ID: scope.ID, Config: postimage}})
@@ -344,6 +353,7 @@ func (dcjc *DynCfgJobController) prepareMutationWithActivationFallbacks(
 		jobConfig, jobConfigIntentPreserve,
 		busyFallback,
 		quarantinedFallback,
+		nil,
 	)
 }
 
@@ -474,6 +484,7 @@ func (dcjc *DynCfgJobController) prepareProbeFailure(
 			snapshot: failure.jobConfigLifecycle,
 			failure:  failure.diagnosticFailure,
 		}, jobConfigIntentEnable,
+		nil,
 		nil,
 		nil,
 	)
