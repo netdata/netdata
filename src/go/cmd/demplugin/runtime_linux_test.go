@@ -14,6 +14,7 @@ import (
 	goruntime "runtime"
 	"testing"
 
+	"github.com/netdata/netdata/go/plugins/pkg/pluginconfig"
 	"github.com/netdata/netdata/go/plugins/plugin/dem"
 	runtime "github.com/netdata/netdata/go/plugins/plugin/dem/synthetic/runtime"
 	"github.com/stretchr/testify/assert"
@@ -148,4 +149,32 @@ func TestRuntimeImportDigestFailureNeverReportsPrepared(t *testing.T) {
 	report, err = runtimeCommand(t, "runtime", "status", "--config-dir", root, "--manifest", manifest, "--cache", filepath.Join(root, "cache"))
 	require.ErrorIs(t, err, runtime.ErrUnavailable)
 	assert.Equal(t, "unavailable", report.State)
+}
+
+func TestRuntimeImportUsesServiceConfiguration(t *testing.T) {
+	if !runtimeConfigProcess(t, "offline-import") {
+		return
+	}
+	manifest, archive := adminBundleFixture(t)
+	_, stock, buildUser, _, _ := runtimeConfigRoots(t)
+	serviceCache, wrongCache := filepath.Join(t.TempDir(), "service-cache"), filepath.Join(t.TempDir(), "wrong-cache")
+	writeRuntimeConfig(t, stock, manifest, serviceCache)
+	writeRuntimeConfig(t, buildUser, manifest, wrongCache)
+	pluginconfig.MustInit(pluginconfig.InitInput{})
+	service, err := dem.LoadConfig(pluginconfig.ConfigDir())
+	require.NoError(t, err)
+	require.Equal(t, serviceCache, service.Runtime.CachePath)
+	report, err := runtimeCommand(t, "runtime", "import", "--archive", archive)
+	require.NoError(t, err)
+	require.Equal(t, "prepared", report.State)
+	require.Equal(t, service.Runtime.CachePath, report.CachePath)
+	require.DirExists(t, filepath.Join(serviceCache, "generations", report.Generation))
+	require.NoDirExists(t, wrongCache)
+	// A later explicit cache override must not be lost to cached process state.
+	overrideCache := filepath.Join(t.TempDir(), "override-cache")
+	report, err = runtimeCommand(t, "runtime", "import", "--archive", archive, "--cache", overrideCache)
+	require.NoError(t, err)
+	require.Equal(t, overrideCache, report.CachePath)
+	require.DirExists(t, filepath.Join(overrideCache, "generations", report.Generation))
+	require.NoDirExists(t, wrongCache)
 }

@@ -14,7 +14,7 @@ import (
 
 	"github.com/netdata/netdata/go/plugins/pkg/buildinfo"
 	"github.com/netdata/netdata/go/plugins/pkg/executable"
-	"github.com/netdata/netdata/go/plugins/pkg/multipath"
+	"github.com/netdata/netdata/go/plugins/pkg/pluginconfig"
 	"github.com/netdata/netdata/go/plugins/plugin/dem"
 	"github.com/netdata/netdata/go/plugins/plugin/dem/synthetic/runner"
 	runtime "github.com/netdata/netdata/go/plugins/plugin/dem/synthetic/runtime"
@@ -77,10 +77,11 @@ func runRuntimeCommand(ctx context.Context, args []string, stdout, stderr io.Wri
 	if *archive != "" && !filepath.IsAbs(*archive) {
 		return true, errors.New("--archive must be absolute")
 	}
-	paths := multipath.New(os.Getenv("NETDATA_USER_CONFIG_DIR"), buildinfo.UserConfigDir, os.Getenv("NETDATA_STOCK_CONFIG_DIR"), buildinfo.StockConfigDir)
+	var confDirs []string
 	if *configDir != "" {
-		paths = multipath.New(*configDir)
+		confDirs = []string{*configDir}
 	}
+	paths := pluginconfig.ResolveConfigDirs(confDirs)
 	config, err := dem.LoadConfig(paths)
 	if err != nil {
 		return true, err

@@ -494,8 +494,12 @@ dem.plugin runtime qualify
 browser. `prepare` uses only the installed manifest's URL; `import` verifies an offline archive against that same trust.
 `qualify` runs a local sandboxed Playwright journey through the actual supervisor and reports qualification separately
 from preparation. It does not download missing files. `--config-dir`, `--manifest`, `--cache` and `--assets` support
-explicit installation paths; paths must be absolute. Cache inventory and maintenance errors remain separate from
-monitor outcomes. CLI inventory is a storage observation, not the running plugin's live preparation status.
+explicit installation paths; paths must be absolute. Configuration lookup follows normal plugin startup:
+`--config-dir` takes priority while retaining the selected user and stock roots; environment roots replace build
+roots, with the same installation fallbacks when neither is set. As at normal startup, terminal sessions ignore
+configuration-root environment variables; use `--config-dir` for an explicit administrator directory in that case.
+Explicit `--manifest`, `--cache` and `--allow-download` values override the loaded configuration. Cache inventory and
+maintenance errors remain separate from monitor outcomes. CLI inventory is a storage observation, not the running plugin's live preparation status.
 
 Native packages, Docker, static installations and source builds use the same managed owner. The portable runtime
 brings private Node, Chromium libraries, fonts and JavaScript dependencies; it does not install host packages or
