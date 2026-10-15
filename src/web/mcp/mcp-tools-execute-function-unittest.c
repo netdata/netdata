@@ -314,9 +314,15 @@ int mcp_execute_function_payload_unittest(void) {
         (void) mcp_tool_execute_function_execute(mcpc, params, 0);
 
         const char *found = strstr(mcp_ut_payload_seen, "\"selections\"");
+        struct json_object *parsed = json_tokener_parse(mcp_ut_payload_seen);
         if (mcp_ut_payload_calls != 1) {
             fprintf(stderr, "  FAILED: %s: the data call ran %d time(s), expected 1\n",
                     cases[i].function, mcp_ut_payload_calls);
+            errors++;
+        }
+        else if (!parsed) {
+            fprintf(stderr, "  FAILED: %s: the body is not valid JSON: %s\n",
+                    cases[i].function, mcp_ut_payload_seen);
             errors++;
         }
         else if (cases[i].expected ? !strstr(mcp_ut_payload_seen, cases[i].expected) : found != NULL) {
@@ -326,6 +332,8 @@ int mcp_execute_function_payload_unittest(void) {
         else
             fprintf(stderr, "  OK: %s: %s\n", cases[i].function, mcp_ut_payload_seen);
 
+        if (parsed)
+            json_object_put(parsed);
         json_object_put(params);
         mcp_free_client(mcpc);
     }

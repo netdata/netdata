@@ -408,8 +408,7 @@ where
 }
 
 /// Longest request string, in bytes: a suggestion's `key` or `term`, a
-/// chip's key or text value, a free-text term. A longer one is a client
-/// error.
+/// chip's text value, a free-text term. A longer one is a client error.
 pub const REQUEST_TEXT_MAX_BYTES: usize = 1024;
 
 /// Wire maximum for [`SuggestParams::max_items`]; absent means the

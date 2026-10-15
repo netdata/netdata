@@ -26,8 +26,9 @@
 //! otel-legacy-logs and netflow-plugin handlers. At the boundary, `bridge`
 //! renders `BadRequest` as an HTTP 400 result whose JSON body carries the
 //! bare message, and any other handler error as an HTTP 500 result whose JSON
-//! body carries the variant's Display text. `rt` has no 400 path: it renders
-//! every handler error, `BadRequest` included, as 500 (499 when cancelled).
+//! body carries the variant's Display text. `rt` renders every handler error,
+//! `BadRequest` included, as 500 (499 when cancelled); only a request it cannot
+//! deserialize is a 400 there.
 //! The otel-plugin supervisor converts transport errors into anyhow with `?`
 //! (adding its own context).
 //!
@@ -81,7 +82,8 @@ pub enum NetdataPluginError {
 
     /// The caller's request is invalid: retrying it unchanged fails again.
     /// Built by the otel-ledger otel-traces handler when it rejects a request
-    /// after deserialization (a bad chip, window or trace id). The message is
+    /// after deserialization (a bad chip, window or trace id, or a query that
+    /// needs more remote data than the download cache holds). The message is
     /// user-facing: `bridge` turns the error into an HTTP 400 result whose
     /// JSON body carries the bare message as `errorMessage`.
     #[error("bad request: {message}")]
@@ -89,8 +91,9 @@ pub enum NetdataPluginError {
 
     /// A function handler failed; the caller-visible bucket for `on_call`
     /// failures. Built by the otel-ledger otel-logs handler (request
-    /// validation included) and the otel-traces handler (remote-read capture
-    /// failures, internal source-set inconsistencies). Messages are
+    /// validation included) and the otel-traces handler (download-cache
+    /// eviction and planning failures, internal source-set inconsistencies,
+    /// engine rejections its own checks should have caught). Messages are
     /// user-facing: `bridge` turns the error into an HTTP 500 result whose
     /// JSON body carries this Display text.
     #[error("function handler error: {message}")]

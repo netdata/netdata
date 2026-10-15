@@ -78,6 +78,14 @@ fn capture_error(e: CaptureError) -> netdata_plugin_error::NetdataPluginError {
     let size = |bytes: u64| bytesize::ByteSize::b(bytes).display().si().to_string();
     match e {
         CaptureError::TooLarge { at_least, capacity } => {
+            // A 400 is logged at `info` by the bridge; the cache size is
+            // the operator's to raise, so say it where they look.
+            tracing::warn!(
+                "otel-traces: a query needs at least {} of remote trace data, more than the {} \
+                 download cache (`remote_storage.read_cache_max_size`)",
+                size(at_least),
+                size(capacity)
+            );
             netdata_plugin_error::NetdataPluginError::BadRequest {
                 message: format!(
                     "this query needs more than {} of remote trace data (at least {}), more \
@@ -260,11 +268,11 @@ impl OtelTracesHandler {
         let cancel = ctx.cancellation.clone();
 
         // Sync engine (maps + decompresses files) — off the runtime
-        // thread. Engine request errors (unset id, zero cap) are clean
-        // client errors; a rejected SOURCE SET is the supplier's
-        // inconsistency (duplicate ids / overlapping WAL coverage), not
-        // the client's — framed as internal so a debugger looks at the
-        // right side. A panicked task is a handler failure.
+        // thread. Engine request errors are internal: the handler checked
+        // each one first ([`engine_rejected`]). A rejected SOURCE SET is
+        // the supplier's inconsistency (duplicate ids / overlapping WAL
+        // coverage), framed as internal so a debugger looks at the right
+        // side. A panicked task is a handler failure.
         let data = match tokio::task::spawn_blocking(move || {
             let _permit = permit;
             let _pins = pins;
