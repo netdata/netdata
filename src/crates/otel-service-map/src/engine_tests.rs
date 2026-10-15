@@ -438,3 +438,31 @@ fn shutdown_hands_out_everything_and_counts_waiting_spans() {
     assert_eq!(edges, 1, "the root call was already counted");
     assert_eq!(engine.in_flight(), 0);
 }
+
+#[test]
+fn a_clock_corrected_backwards_reopens_minutes() {
+    let mut engine = Engine::new(Limits::default());
+    let now = T0 + 10 * SEC;
+    engine.ingest(TENANT, vec![span(Kind::Server, "a", 1, None)], 0, now);
+    // The clock jumps ten hours ahead, then is corrected.
+    engine.take_closed(now + 36_000 * SEC);
+    engine.take_closed(now + 30 * SEC);
+    let mut late_span = span(Kind::Server, "a", 2, None);
+    late_span.end_ns = now + 20 * SEC;
+    engine.ingest(TENANT, vec![late_span], 0, now + 30 * SEC);
+    let (edges, losses) = collect(&mut engine, now + 3_600 * SEC);
+    assert_eq!(losses.late, 0);
+    assert_eq!(edges.values().map(|e| e.server.calls).sum::<u64>(), 1);
+}
+
+#[test]
+fn a_new_tenant_does_not_accept_spans_older_than_the_horizon() {
+    let mut engine = Engine::new(Limits::default());
+    let now = T0 + 10 * SEC;
+    let mut old = span(Kind::Server, "a", 1, None);
+    old.end_ns = now - 3_600 * SEC;
+    engine.ingest("fresh", vec![old], 0, now);
+    let (edges, losses) = collect(&mut engine, now + 3_600 * SEC);
+    assert!(edges.is_empty());
+    assert_eq!(losses.late, 1);
+}

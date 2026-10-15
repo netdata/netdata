@@ -166,17 +166,25 @@ impl Engine {
         self.in_flight
     }
 
-    fn tenant(&mut self, tenant: &str) -> &mut Tenant {
-        if !self.tenants.contains_key(tenant) {
-            self.tenants.insert(Arc::from(tenant), Tenant::default());
-        }
-        self.tenants.get_mut(tenant).expect("inserted above")
+    /// A new tenant starts with the minutes before the horizon closed, like
+    /// every tenant after its first flush, so old spans count as late.
+    fn tenant(&mut self, tenant: &str, now_ns: u64) -> &mut Tenant {
+        let open_from = now_ns.saturating_sub(self.limits.horizon_ns) / NS_PER_MINUTE;
+        self.tenants
+            .entry(Arc::from(tenant))
+            .or_insert_with(|| Tenant {
+                pairing: Pairing::default(),
+                tally: Tally {
+                    minutes: BTreeMap::new(),
+                    closed_before: Some(open_from),
+                },
+            })
     }
 
     pub fn ingest(&mut self, tenant: &str, spans: Vec<SpanFacts>, invalid: u64, now_ns: u64) {
         let limits = self.limits.clone();
         let mut in_flight = self.in_flight;
-        let t = self.tenant(tenant);
+        let t = self.tenant(tenant, now_ns);
         if invalid > 0 {
             t.tally.losses(now_ns).invalid += invalid;
         }
@@ -188,13 +196,19 @@ impl Engine {
 
     pub fn note_handoff_drops(&mut self, tenant: &str, drops: u64, now_ns: u64) {
         if drops > 0 {
-            self.tenant(tenant).tally.losses(now_ns).handoff_drops += drops;
+            self.tenant(tenant, now_ns)
+                .tally
+                .losses(now_ns)
+                .handoff_drops += drops;
         }
     }
 
     pub fn note_unwritten_minutes(&mut self, tenant: &str, minutes: u64, now_ns: u64) {
         if minutes > 0 {
-            self.tenant(tenant).tally.losses(now_ns).unwritten_minutes += minutes;
+            self.tenant(tenant, now_ns)
+                .tally
+                .losses(now_ns)
+                .unwritten_minutes += minutes;
         }
     }
 
@@ -225,8 +239,10 @@ impl Engine {
                     stats,
                 });
             }
-            let closed_before = t.tally.closed_before.unwrap_or(0).max(open_from);
-            t.tally.closed_before = Some(closed_before);
+            // Follows the clock both ways: after a backward correction the
+            // reopened minutes count again, and their new counts merge with
+            // the stored ones when written.
+            t.tally.closed_before = Some(open_from);
         }
         out
     }
