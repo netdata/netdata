@@ -2526,10 +2526,14 @@ static METADATA_EXPIRED_DIMENSIONS *expired_dimensions_process(
             result->checked++;
 
             // a host that is gone has no live dimension to protect
-            if (host && ops->is_live(host, e))
+            if (host && ops->is_live(host, e)) {
                 result->live++;
-            else if (!ops->can_be_deleted(&e->uuid))
+                batch->delete_failures = 0;
+            }
+            else if (!ops->can_be_deleted(&e->uuid)) {
                 result->retained++;
+                batch->delete_failures = 0;
+            }
             else {
                 if (!in_transaction) {
                     // if it cannot start, the deletes still run, one commit each
@@ -4110,6 +4114,28 @@ int metadata_expired_dimensions_unittest(void)
         if (expired_dimensions_list_remaining(list) != before - 11) {
             fprintf(stderr, "%s: a record failing %d times was not given up: %zu left (expected %zu)\n",
                     __FUNCTION__, EXPIRED_DIMENSION_DELETE_ATTEMPTS, expired_dimensions_list_remaining(list), before - 11);
+            rc = 1;
+        }
+
+        // a record that failed once and is then kept (still with data) must not pass its failure count to the next
+        // record: that one still gets all its attempts
+        if (list) {
+            struct expired_dimensions_result once = { 0 };
+            list = expired_dimensions_process(list, &ops, &once);       // the next record fails once
+            if (list) {
+                uuid_copy(ut_expired_retained_uuid, list->items[list->done].uuid);
+                struct expired_dimensions_result kept = { 0 };
+                list = expired_dimensions_process(list, &ops, &kept);   // it is kept; the one after fails once
+                for (int i = 2; i < EXPIRED_DIMENSION_DELETE_ATTEMPTS; i++) {
+                    struct expired_dimensions_result again = { 0 };
+                    list = expired_dimensions_process(list, &ops, &again);
+                }
+            }
+            uuid_clear(ut_expired_retained_uuid);
+        }
+        if (expired_dimensions_list_remaining(list) != before - 12) {
+            fprintf(stderr, "%s: a record after a kept one was given up early: %zu left (expected %zu)\n",
+                    __FUNCTION__, expired_dimensions_list_remaining(list), before - 12);
             rc = 1;
         }
 
