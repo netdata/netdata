@@ -476,6 +476,12 @@ static inline bool json_parse_value(LOG_JSON_STATE *js) {
 }
 
 static inline bool json_key_index_and_push(LOG_JSON_STATE *js, size_t index) {
+    if(js->depth >= JSON_DEPTH_MAX - 1) {
+        snprintf(js->msg, sizeof(js->msg),
+                 "JSON PARSER: array too deep, at position %u", js->pos);
+        return false;
+    }
+
     char *d = js->stack[js->depth];
     if(js->depth > 0) {
         *d++ = '_';
