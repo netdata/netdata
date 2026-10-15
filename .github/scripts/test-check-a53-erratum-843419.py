@@ -4,6 +4,7 @@
 # Tests for check-a53-erratum-843419.py, on synthetic AArch64 ELF images.
 
 import contextlib
+import errno
 import importlib.util
 import io
 import os
@@ -157,7 +158,7 @@ class ElfTests(unittest.TestCase):
             finally:
                 top.chmod(0o700)
         self.assertEqual(rc, 1)
-        self.assertIn('ERROR: .: Permission denied', out.getvalue())
+        self.assertIn(f'ERROR: .: {os.strerror(errno.EACCES)}', out.getvalue())
         self.assertNotIn('no AArch64 executables found', out.getvalue())
 
     def test_go_build_id_note_alone_is_not_go(self):
