@@ -532,6 +532,47 @@ static size_t test_dbengine_zero_retention_check_ignores_gap_only_page(RRDHOST *
     return 0;
 }
 
+// two collectors writing the same metric (a duplicate writer): one of them flushing must not clear the hot time the
+// other one stored, whether it stored nothing itself or stored before the other, or the metric reports no current
+// data until the next store
+static size_t test_dbengine_flush_keeps_other_writer_hot_time(RRDHOST *host, const char *id) {
+    fprintf(stderr, "DBENGINE Burst Retention Test: '%s', a flush with a duplicate writer...\n", id);
+
+    RRDSET *st = rrdset_create(host, "netdata", id, id, "netdata", NULL, "Unit Testing", "a value", "unittest",
+                               NULL, 1, 1, RRDSET_TYPE_LINE);
+    RRDDIM *rd = rrddim_add(st, "dim", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+
+    time_t t0 = START_TIMESTAMP;
+    for(size_t p = 0; p < 5; p++)
+        rrddim_store_metric(rd, (usec_t)(t0 + 1 + (time_t)p) * USEC_PER_SEC, (NETDATA_DOUBLE)p, SN_DEFAULT_FLAGS);
+
+    size_t errors = 0;
+    STORAGE_COLLECT_HANDLE *other = rrdeng_store_metric_init(rd->tiers[0].smh, 1, st->smg[0]);
+    METRIC *metric = ((struct rrdeng_collect_handle *)other)->metric;
+
+    // the new writer has stored nothing: its flush must leave the first writer's hot time
+    rrdeng_store_metric_flush_current_page(other);
+    time_t latest = mrg_metric_get_latest_time_s(main_mrg, metric);
+    if(latest != t0 + 5) {
+        fprintf(stderr, " >>> DBENGINE: BURST RETENTION: '%s' after an idle writer's flush the latest time is %" PRId64
+                        ", expected %" PRId64 "\n", id, (int64_t)latest, (int64_t)(t0 + 5));
+        errors++;
+    }
+
+    // the new writer stores a newer point: the first writer's flush must leave it
+    rrdeng_store_metric_next(other, (usec_t)(t0 + 6) * USEC_PER_SEC, 6, 6, 6, 1, 0, SN_DEFAULT_FLAGS);
+    rrdeng_store_metric_flush_current_page(rd->tiers[0].sch);
+    latest = mrg_metric_get_latest_time_s(main_mrg, metric);
+    if(latest != t0 + 6) {
+        fprintf(stderr, " >>> DBENGINE: BURST RETENTION: '%s' after the older writer's flush the latest time is %" PRId64
+                        ", expected %" PRId64 "\n", id, (int64_t)latest, (int64_t)(t0 + 6));
+        errors++;
+    }
+
+    rrdeng_store_metric_finalize(other);
+    return errors;
+}
+
 static size_t test_dbengine_burst_retention(RRDHOST *host) {
     size_t errors = 0;
     time_t t0 = START_TIMESTAMP;
@@ -564,6 +605,7 @@ static size_t test_dbengine_burst_retention(RRDHOST *host) {
 
     errors += test_dbengine_zero_retention_check_keeps_hot_page(host, "dbengine-zero-retention-hot-page");
     errors += test_dbengine_zero_retention_check_ignores_gap_only_page(host, "dbengine-zero-retention-gap-only-page");
+    errors += test_dbengine_flush_keeps_other_writer_hot_time(host, "dbengine-duplicate-writer-hot-time");
 
     return errors;
 }
