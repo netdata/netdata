@@ -22,7 +22,7 @@
 #  - TMPDIR (set to a usable temporary directory)
 #  - NETDATA_BASE_URL (set the base url for downloading the dist tarball)
 
-# Next unused error code: U0035
+# Next unused error code: U0036
 
 set -e
 
@@ -1394,11 +1394,10 @@ update_macos_pkg() {
 
     installed_pkg_version="$(get_macos_pkg_receipt_version)"
     if [ -n "${new_pkg_version}" ] && [ "${installed_pkg_version}" != "${new_pkg_version}" ]; then
-      error "Installation reported success but the package receipt says version ${installed_pkg_version:-absent} instead of ${new_pkg_version}."
-    else
-      info "Updated to ${installed_pkg_version:-unknown}."
-      rm -r "${ndtmpdir}"
+      fatal "The Installer reported success, but the package receipt says version ${installed_pkg_version:-absent} instead of ${new_pkg_version}: Netdata was not updated. See /var/log/install.log for the Installer's reasoning." U0035
     fi
+    info "Updated to ${installed_pkg_version:-unknown}."
+    rm -r "${ndtmpdir}"
   fi
 
   if [ -e "${PREVDIR}" ]; then
