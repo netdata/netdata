@@ -1308,10 +1308,20 @@ async fn tenant_scoping_isolates_and_defaults() {
 
 // ── The transport status boundary ───────────────────────────────────
 //
-// Shape errors fail request DESERIALIZATION and must surface as
-// transport 400s through the bridge; the handler's semantic
-// validation keeps its (pre-existing) 500 mapping. These cross
-// `HandlerAdapter::handle_raw` — the same path the live bridge runs.
+// Shape errors fail request DESERIALIZATION in the bridge; the
+// handler's own validation rejects the rest. Both answer 400 with the
+// published `error_response` body, so the message reaches the UI as
+// `errorMessage`. These cross `HandlerAdapter::handle_raw` — the same
+// path the live bridge runs.
+
+/// The `errorMessage` of a 400 body, which must be exactly
+/// `{"status": 400, "errorMessage": …}`.
+fn bad_request_message(body: &str) -> String {
+    let v: serde_json::Value = serde_json::from_str(body).expect("a JSON body");
+    assert_eq!(v["status"], 400, "{body}");
+    assert_eq!(v.as_object().unwrap().len(), 2, "{body}");
+    v["errorMessage"].as_str().expect("a message").to_string()
+}
 
 /// `payload` verbatim through `HandlerAdapter::handle_raw` (None = no
 /// payload): the (status, body) the live bridge would transport.
@@ -1367,34 +1377,47 @@ async fn shape_errors_are_transport_400s() {
             "for {}: {body}",
             String::from_utf8_lossy(payload)
         );
+        let message = bad_request_message(&body);
         assert!(
-            body.contains(needle),
-            "for {}: {body}",
+            message.starts_with("Invalid request: ") && message.contains(needle),
+            "for {}: {message}",
             String::from_utf8_lossy(payload)
         );
     }
 }
 
 #[tokio::test]
-async fn semantic_errors_keep_the_handler_status() {
+async fn requests_the_handler_rejects_are_400s_too() {
     // The handler's own validation (zero limit, one-sided trace
-    // bounds, bad trace id) rides the pre-existing handler-error
-    // mapping — frozen behavior, deliberately not reclassified here.
-    for payload in [
-        &br#"{"last": 0}"#[..],
-        br#"{"trace": {"id": "11111111111111111111111111111111", "after": 100}}"#,
-        br#"{"trace": {"id": "xyz"}}"#,
+    // bounds, bad trace id, a bad chip, a short suggest term) answers
+    // the same body as a shape error.
+    for (payload, needle) in [
+        (&br#"{"last": 0}"#[..], "zero 'last'"),
+        (
+            br#"{"trace": {"id": "11111111111111111111111111111111", "after": 100}}"#,
+            "after",
+        ),
+        (br#"{"trace": {"id": "xyz"}}"#, "trace id"),
+        (
+            br#"{"conditions": [{"key": "bogus", "op": "=", "values": ["x"]}]}"#,
+            "unknown key",
+        ),
+        (
+            br#"{"suggest": {"key": "trace_id", "after": 1, "before": 2}}"#,
+            "trace_id",
+        ),
     ] {
         let (status, body) = raw_call(Some(payload)).await;
         assert_eq!(
             status,
-            500,
+            400,
             "for {}: {body}",
             String::from_utf8_lossy(payload)
         );
+        let message = bad_request_message(&body);
         assert!(
-            body.contains("invalid otel-traces request"),
-            "for {}: {body}",
+            message.starts_with("invalid otel-traces request: ") && message.contains(needle),
+            "for {}: {message}",
             String::from_utf8_lossy(payload)
         );
     }
@@ -1418,7 +1441,7 @@ async fn absent_and_empty_object_payloads_use_the_functions_view() {
 
     let (status, body) = raw_call(Some(b"")).await;
     assert_eq!(status, 400);
-    assert!(body.contains("EOF"), "{body}");
+    assert!(bad_request_message(&body).contains("EOF"), "{body}");
 }
 
 /// Every explicit mode's response serializes its `mode` discriminator,

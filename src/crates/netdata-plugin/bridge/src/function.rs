@@ -275,8 +275,12 @@ pub trait RawFunctionHandler: Send + Sync {
 /// [`RawFunctionHandler`] adapter around a typed [`FunctionHandler`]:
 /// deserializes `H::Request` from the call payload, runs `H::on_call` under
 /// the 250ms progress ticker and the cancellation select, and maps the outcome
-/// to a `FunctionResult` (200 `application/json`, or 400/500 error results —
-/// mapping on `handle_raw` below).
+/// to a `FunctionResult`: 200 `application/json`; 400 `application/json`
+/// `{"status": 400, "errorMessage": …}` for a payload that fails to
+/// deserialize and for [`NetdataPluginError::BadRequest`]; 500 for any other
+/// handler error.
+///
+/// [`NetdataPluginError::BadRequest`]: netdata_plugin_error::NetdataPluginError::BadRequest
 pub struct HandlerAdapter<H: FunctionHandler> {
     /// The wrapped handler, shared by every concurrent call.
     pub handler: Arc<H>,
@@ -303,32 +307,14 @@ impl<H: FunctionHandler> RawFunctionHandler for HandlerAdapter<H> {
                 Ok(p) => p,
                 Err(e) => {
                     error!("failed to deserialize request payload: {}", e);
-                    return FunctionResult {
-                        transaction,
-                        status: 400,
-                        expires: 0,
-                        format: "text/plain".to_string(),
-                        payload: format!("Invalid request: {e}").into_bytes(),
-                    };
+                    return bad_request(transaction, &format!("Invalid request: {e}"));
                 }
             },
             None => match serde_json::from_slice(b"{}") {
                 Ok(p) => p,
                 Err(e) => {
-                    // The body below is JSON although the result says
-                    // text/plain (unlike the malformed-payload arm above).
-                    let payload =
-                        serde_json::to_vec(&json!({ "error": "Request payload is empty" }))
-                            .expect("serializing a json value to work");
-
                     error!("failed to deserialize empty payload: {}", e);
-                    return FunctionResult {
-                        transaction,
-                        status: 400,
-                        expires: 0,
-                        format: "text/plain".to_string(),
-                        payload,
-                    };
+                    return bad_request(transaction, "Request payload is empty");
                 }
             },
         };
@@ -421,6 +407,11 @@ impl<H: FunctionHandler> RawFunctionHandler for HandlerAdapter<H> {
                     }
                 }
             },
+            Err(netdata_plugin_error::NetdataPluginError::BadRequest { message }) => {
+                // The caller's mistake, not a handler failure.
+                info!("function handler rejected the request: {}", message);
+                bad_request(transaction, &message)
+            }
             Err(e) => {
                 // A cancellation is the driver's normal teardown (e.g. the
                 // user closed the query), so log it as info; anything else is
@@ -453,6 +444,19 @@ impl<H: FunctionHandler> RawFunctionHandler for HandlerAdapter<H> {
 
     fn declaration(&self) -> FunctionDeclaration {
         self.handler.declaration()
+    }
+}
+
+/// A 400 result in the published `error_response` shape, so callers read
+/// the message as `errorMessage`.
+fn bad_request(transaction: String, message: &str) -> FunctionResult {
+    let body = json!({ "status": 400, "errorMessage": message });
+    FunctionResult {
+        transaction,
+        status: 400,
+        expires: 0,
+        format: "application/json".to_string(),
+        payload: serde_json::to_vec(&body).expect("serializing a json value to work"),
     }
 }
 
@@ -579,6 +583,11 @@ mod tests {
                     message: "failed".to_string(),
                 });
             }
+            if request.get("reject").is_some() {
+                return Err(netdata_plugin_error::NetdataPluginError::BadRequest {
+                    message: "rejected".to_string(),
+                });
+            }
             Ok(request)
         }
 
@@ -588,6 +597,10 @@ mod tests {
     }
 
     async fn echo(payload: serde_json::Value) -> FunctionResult {
+        echo_raw(Some(serde_json::to_vec(&payload).unwrap())).await
+    }
+
+    async fn echo_raw(payload: Option<Vec<u8>>) -> FunctionResult {
         let (outbound_tx, _outbound_rx) = mpsc::unbounded_channel();
         let ctx = Arc::new(FunctionContext {
             function_call: Box::new(FunctionCall {
@@ -597,7 +610,7 @@ mod tests {
                 args: Vec::new(),
                 access: None,
                 source: None,
-                payload: Some(serde_json::to_vec(&payload).unwrap()),
+                payload,
             }),
             cancellation_token: CancellationToken::new(),
             outbound_tx,
@@ -619,5 +632,32 @@ mod tests {
         assert!(!failed.payload.contains(&b'\n'));
         let body: serde_json::Value = serde_json::from_slice(&failed.payload).unwrap();
         assert_eq!(body["status"], 500);
+    }
+
+    // Every 400 carries the published `error_response` shape: a rejected
+    // request and a payload that fails to deserialize alike.
+    #[tokio::test]
+    async fn bad_requests_answer_400_with_an_error_message() {
+        let body = |result: &FunctionResult| -> serde_json::Value {
+            serde_json::from_slice(&result.payload).unwrap()
+        };
+
+        let rejected = echo(serde_json::json!({"reject": true})).await;
+        assert_eq!(rejected.status, 400);
+        assert_eq!(rejected.format, "application/json");
+        assert_eq!(
+            body(&rejected),
+            serde_json::json!({"status": 400, "errorMessage": "rejected"})
+        );
+
+        let malformed = echo_raw(Some(b"{".to_vec())).await;
+        assert_eq!(malformed.status, 400);
+        assert_eq!(malformed.format, "application/json");
+        assert_eq!(body(&malformed)["status"], 400);
+        let message = body(&malformed)["errorMessage"]
+            .as_str()
+            .unwrap()
+            .to_string();
+        assert!(message.starts_with("Invalid request: "), "{message}");
     }
 }

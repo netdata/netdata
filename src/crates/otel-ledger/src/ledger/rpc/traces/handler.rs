@@ -50,9 +50,17 @@ use super::wire::{
 use crate::ledger::wal_prefix::WalPrefixes;
 use file_lifecycle::remote_read::RemoteRead;
 
-/// Shorthand for the handler-level error every failure path maps to.
+/// Shorthand for a failure on the agent's side (HTTP 500).
 fn handler_err(message: String) -> netdata_plugin_error::NetdataPluginError {
     netdata_plugin_error::NetdataPluginError::FunctionHandler { message }
+}
+
+/// A request the handler rejects (HTTP 400): resending it unchanged fails
+/// again.
+fn client_err(e: impl std::fmt::Display) -> netdata_plugin_error::NetdataPluginError {
+    netdata_plugin_error::NetdataPluginError::BadRequest {
+        message: format!("invalid otel-traces request: {e}"),
+    }
 }
 
 /// A capture that failed as a whole: a hard error the caller can act on.
@@ -169,27 +177,23 @@ impl OtelTracesHandler {
         params: &TraceParams,
         tenant: Option<&str>,
     ) -> netdata_plugin_error::Result<OtelTracesResponse> {
-        let trace_id = parse_trace_id(&params.id)
-            .map_err(|e| handler_err(format!("invalid otel-traces request: {e}")))?;
+        let trace_id = parse_trace_id(&params.id).map_err(client_err)?;
         // Pre-capture twin of the engine's UnsetTraceId check (the
         // parser deliberately lets the sentinel through).
         if trace_id.is_unset() {
-            return Err(handler_err(
-                "invalid otel-traces request: the all-zero (unset) trace id cannot be looked up"
-                    .to_string(),
+            return Err(client_err(
+                "the all-zero (unset) trace id cannot be looked up",
             ));
         }
         // The list's chips mark the matching spans; validated before
         // admission like the list's.
-        let highlight = build_tokens(&params.conditions, &params.text)
-            .map_err(|e| handler_err(format!("invalid otel-traces request: {e}")))?;
+        let highlight = build_tokens(&params.conditions, &params.text).map_err(client_err)?;
         let query = TraceQuery::new(trace_id)
             .span_cap(TRACE_SPAN_CAP)
             .shaper(Box::new(WireShaper::new()))
             .highlight(highlight);
 
-        let bounds = validate_trace_bounds(params.after, params.before)
-            .map_err(|e| handler_err(format!("invalid otel-traces request: {e}")))?;
+        let bounds = validate_trace_bounds(params.after, params.before).map_err(client_err)?;
         let remote_policy = if bounds.is_some() {
             RemotePolicy::Download
         } else {
@@ -260,9 +264,7 @@ impl OtelTracesHandler {
                     "otel-traces internal error: captured source set is inconsistent: {e}"
                 )));
             }
-            Ok(Err(e)) => {
-                return Err(handler_err(format!("invalid otel-traces request: {e}")));
-            }
+            Ok(Err(e)) => return Err(client_err(e)),
             Err(e) => {
                 return Err(handler_err(format!("otel-traces trace task failed: {e}")));
             }
@@ -294,14 +296,12 @@ impl OtelTracesHandler {
         tenant: Option<&str>,
         aggregate: bool,
     ) -> netdata_plugin_error::Result<SearchResult> {
-        let client_err = |e: String| handler_err(format!("invalid otel-traces request: {e}"));
-
         // Zero must be rejected BEFORE the anchor allowance is added —
         // `limit=0` with a cursor would otherwise sneak a positive engine
         // limit past the engine's own ZeroLimit check.
         if params.limit == 0 {
             return Err(client_err(
-                "a zero 'last' would return nothing; the list has no unbounded option".into(),
+                "a zero 'last' would return nothing; the list has no unbounded option",
             ));
         }
         // The wire cap on the CLIENT half of the limit; the engine's
@@ -332,10 +332,7 @@ impl OtelTracesHandler {
 
         // The list attaches no matched spans to its rows.
         let query = SearchQuery::new(tokens)
-            .window(
-                TimeWindow::new(window.start_ns, window.end_ns)
-                    .map_err(|e| client_err(e.to_string()))?,
-            )
+            .window(TimeWindow::new(window.start_ns, window.end_ns).map_err(client_err)?)
             .limit(params.limit.saturating_add(cursor.map_or(0, |c| c.served)));
 
         // ONE capture over the COMPLETION range (the match window
@@ -441,7 +438,7 @@ impl OtelTracesHandler {
                     "otel-traces internal error: captured source set is inconsistent: {e}"
                 )));
             }
-            Err(e) => return Err(client_err(e.to_string())),
+            Err(e) => return Err(client_err(e)),
         };
 
         let mut result: SearchResult = to_search_result(
@@ -460,7 +457,13 @@ impl OtelTracesHandler {
                         "otel-traces internal error: captured source set is inconsistent: {e}"
                     )));
                 }
-                Err(e) => return Err(client_err(e.to_string())),
+                // The handler builds the grid and drops the duration chips,
+                // and the list pass already accepted the same chips.
+                Err(e) => {
+                    return Err(handler_err(format!(
+                        "otel-traces internal error: the window aggregate request is invalid: {e}"
+                    )));
+                }
             };
             result.overview = Some(to_overview_section(
                 section,
@@ -484,9 +487,7 @@ impl OtelTracesHandler {
         params: &FunctionsParams,
         tenant: Option<&str>,
     ) -> netdata_plugin_error::Result<OtelTracesResponse> {
-        let search_params = params
-            .search_params(unix_now_s())
-            .map_err(|e| handler_err(format!("invalid otel-traces request: {e}")))?;
+        let search_params = params.search_params(unix_now_s()).map_err(client_err)?;
         // The anchor gate. An anchor page reruns the same query over the
         // cursor's FROZEN window, so the section it would compose is the
         // first page's, byte for byte — only the rows advance. It is
@@ -513,13 +514,12 @@ impl OtelTracesHandler {
         tenant: Option<&str>,
     ) -> netdata_plugin_error::Result<OtelTracesResponse> {
         let deadline = std::time::Instant::now() + SUGGEST_DEADLINE;
-        let client_err = |e: String| handler_err(format!("invalid otel-traces request: {e}"));
         let max = params
             .max_items
             .unwrap_or(sfsq::traces::DEFAULT_SUGGEST_ITEMS);
         if max == 0 {
             return Err(client_err(
-                "a zero 'max_items' would return nothing; omit it or raise it".into(),
+                "a zero 'max_items' would return nothing; omit it or raise it",
             ));
         }
         if max > SUGGEST_ITEMS_MAX {
@@ -539,8 +539,7 @@ impl OtelTracesHandler {
         // not `busy`.
         let window =
             resolve_window(params.after, params.before, unix_now_s(), None).map_err(&client_err)?;
-        let engine_window = TimeWindow::new(window.start_ns, window.end_ns)
-            .map_err(|e| client_err(e.to_string()))?;
+        let engine_window = TimeWindow::new(window.start_ns, window.end_ns).map_err(client_err)?;
         let Ok(permit) = Arc::clone(&self.suggestions).try_acquire_owned() else {
             return Ok(OtelTracesResponse::Suggest(to_suggest_result(
                 sfsq::traces::SuggestData {
@@ -607,7 +606,7 @@ fn map_suggest_error(e: SuggestRequestError) -> netdata_plugin_error::NetdataPlu
         SuggestRequestError::SourceSet(e) => handler_err(format!(
             "otel-traces internal error: captured source set is inconsistent: {e}"
         )),
-        other => handler_err(format!("invalid otel-traces request: {other}")),
+        other => client_err(other),
     }
 }
 

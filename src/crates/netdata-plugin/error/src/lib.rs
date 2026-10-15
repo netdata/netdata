@@ -14,17 +14,20 @@
 //!   decode path.
 //! - `Schema` comes only from `ConfigDeclaration::try_from(&serde_json::Value)`
 //!   in netdata-plugin-types.
-//! - `FunctionHandler` is built by the otel-ledger otel-logs and otel-traces
-//!   handlers; `Other` by the function engines in `rt`/`bridge` (cancellation)
-//!   and the otel-legacy-logs and netflow-plugin handlers. `Runtime`, `Config`
-//!   and `Closed` have no constructor in the tree.
+//! - `BadRequest` is built by the otel-ledger otel-traces handler for the
+//!   requests it rejects; `FunctionHandler` by the otel-ledger otel-logs and
+//!   otel-traces handlers for everything else; `Other` by the function engines
+//!   in `rt`/`bridge` (cancellation) and the otel-legacy-logs and
+//!   netflow-plugin handlers. `Runtime`, `Config` and `Closed` have no
+//!   constructor in the tree.
 //!
 //! Consumers type function handlers with [`Result`]: the `FunctionHandler`
 //! traits in `rt` and `bridge`, `PluginRuntime::run`, and the otel-ledger,
 //! otel-legacy-logs and netflow-plugin handlers. At the boundary, `bridge`
-//! renders any handler error as an HTTP 500 result whose JSON body carries
-//! the variant's Display text; the otel-plugin supervisor converts transport
-//! errors into anyhow with `?` (adding its own context).
+//! renders `BadRequest` as an HTTP 400 result whose JSON body carries the
+//! bare message, and any other handler error as an HTTP 500 result whose JSON
+//! body carries the variant's Display text; the otel-plugin supervisor
+//! converts transport errors into anyhow with `?` (adding its own context).
 //!
 //! netdata-plugin-protocol re-exports [`NetdataPluginError`] and [`Result`]
 //! and defines the `TransportError` alias (in `transport.rs`); there is no
@@ -39,7 +42,7 @@ pub type Result<T> = std::result::Result<T, NetdataPluginError>;
 ///
 /// Only `Transport` carries a `source()` — the wrapped `std::io::Error`;
 /// every other variant is message-only, so a cause dropped when the error
-/// was built cannot be recovered. Display conventions: the five categorized
+/// was built cannot be recovered. Display conventions: the six categorized
 /// variants prefix their message with a lowercase `<category>: ` label,
 /// `Other` prints the bare message, and `Transport` is transparent. Callers
 /// render with `Display` (`{}`) into agent-visible bodies and logs, and with
@@ -74,10 +77,18 @@ pub enum NetdataPluginError {
     #[error("configuration error: {message}")]
     Config { message: String },
 
+    /// The caller's request is invalid: retrying it unchanged fails again.
+    /// Built by the otel-ledger otel-traces handler when it rejects a request
+    /// after deserialization (a bad chip, window or trace id). The message is
+    /// user-facing: `bridge` turns the error into an HTTP 400 result whose
+    /// JSON body carries the bare message as `errorMessage`.
+    #[error("bad request: {message}")]
+    BadRequest { message: String },
+
     /// A function handler failed; the caller-visible bucket for `on_call`
-    /// failures, invalid requests included. Built by the otel-ledger
-    /// otel-logs and otel-traces handlers (request validation, remote-read
-    /// capture failures, internal source-set inconsistencies). Messages are
+    /// failures. Built by the otel-ledger otel-logs handler (request
+    /// validation included) and the otel-traces handler (remote-read capture
+    /// failures, internal source-set inconsistencies). Messages are
     /// user-facing: `bridge` turns the error into an HTTP 500 result whose
     /// JSON body carries this Display text.
     #[error("function handler error: {message}")]
