@@ -1434,10 +1434,22 @@ release_journal:
             continue;
         }
 
-        PGC_PAGE *page = pgc_page_get_and_acquire(
+        // the first open-cache page that really belongs to this metric (see open_cache_page_is_of_metric())
+        UUIDMAP_ID uuid_id = mrg_metric_uuidmap_id(main_mrg, uuid_first_t_entry->metric);
+        PGC_SEARCH method = PGC_SEARCH_FIRST;
+        time_t page_start_time_s = 0;
+        PGC_PAGE *page;
+        while ((page = pgc_page_get_and_acquire(
                 open_cache, (Word_t)ctx,
-                (Word_t)uuid_first_t_entry->metric, 0,
-                PGC_SEARCH_FIRST);
+                (Word_t)uuid_first_t_entry->metric, page_start_time_s,
+                method))) {
+            if (open_cache_page_is_of_metric(page, uuid_id))
+                break;
+
+            method = PGC_SEARCH_NEXT;
+            page_start_time_s = pgc_page_start_time_s(page);
+            pgc_page_release(open_cache, page);
+        }
 
         if (page) {
             time_t old_first_time_s = uuid_first_t_entry->first_time_s;

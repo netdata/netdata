@@ -8,6 +8,13 @@ PGC *open_cache = NULL;
 PGC *extent_cache = NULL;
 struct rrdeng_cache_efficiency_stats rrdeng_cache_efficiency_stats = {};
 
+// an open-cache page is found by a bare METRIC pointer that can outlive its metric, and the address can be reused by
+// a new metric: the uuidmap id stored with the page says which metric the page really belongs to
+bool open_cache_page_is_of_metric(PGC_PAGE *page, UUIDMAP_ID uuid_id) {
+    struct extent_io_data *xio = (struct extent_io_data *)pgc_page_custom_data(open_cache, page);
+    return xio->uuid_id == uuid_id;
+}
+
 static void main_cache_free_clean_page_callback(PGC *cache __maybe_unused, PGC_ENTRY entry __maybe_unused)
 {
     // Release storage associated with the page
