@@ -111,8 +111,9 @@ static inline PARSER_RC pluginsd_end(char **words, size_t num_words, PARSER *par
         netdata_log_debug(D_PLUGINSD, "requested an END on chart '%s'", rrdset_id(st));
 
     // revive it while its scope still holds it, as rrdset_timed_done() would
-    if(likely(!rrdset_flag_check(st, RRDSET_FLAG_COLLECTION_FINISHED)))
-        pluginsd_revive_scope_chart(parser, st);
+    if(likely(!rrdset_flag_check(st, RRDSET_FLAG_COLLECTION_FINISHED)) &&
+       unlikely(!pluginsd_revive_scope_chart(parser, st, PLUGINSD_KEYWORD_END)))
+        return PLUGINSD_PROTOCOL_ERROR(NULL, NULL);
 
     pluginsd_clear_scope_chart(parser, PLUGINSD_KEYWORD_END, NULL);
     parser->user.data_collections_count++;
@@ -1108,7 +1109,8 @@ static ALWAYS_INLINE PARSER_RC pluginsd_begin_v2(char **words, size_t num_words,
     if(!pluginsd_set_scope_chart(parser, st, PLUGINSD_KEYWORD_BEGIN_V2))
         return PLUGINSD_PROTOCOL_ERROR(NULL, NULL);
 
-    pluginsd_revive_scope_chart(parser, st);
+    if(unlikely(!pluginsd_revive_scope_chart(parser, st, PLUGINSD_KEYWORD_BEGIN_V2)))
+        return PLUGINSD_PROTOCOL_ERROR(NULL, NULL);
 
     timing_step(TIMING_STEP_BEGIN2_FIND_CHART);
 
