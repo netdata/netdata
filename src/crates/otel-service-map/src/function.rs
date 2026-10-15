@@ -21,6 +21,7 @@ const HELP: &str = "Service map from OpenTelemetry traces: instrumented services
                     peers they call, and request, error and latency statistics per call direction.";
 const DEFAULT_WINDOW_S: u64 = 15 * 60;
 const MAX_WINDOW_S: u64 = 31 * 24 * 3600;
+const MAX_FUTURE_S: i64 = 24 * 3600;
 /// Far below the 16 MiB IPC message limit and the agent's 100 MiB plugin
 /// result limit, which stops the whole plugin.
 const MAX_ANSWER_BYTES: usize = 8 * 1024 * 1024;
@@ -87,16 +88,27 @@ fn parse(args: &[String], payload: Option<&[u8]>, now_s: u64) -> Result<Parsed, 
     // "15 minutes before `before`" for `after`; a negative value is relative
     // (to now for `before`, to `before` for `after`).
     let now = now_s as i64;
+    let out_of_range = || {
+        "after/before are out of range: use unix seconds or negative relative seconds".to_string()
+    };
     let before = match request.before {
-        None | Some(0) => now,
-        Some(b) if b < 0 => now + b,
-        Some(b) => b,
-    };
+        None | Some(0) => Some(now),
+        Some(b) if b < 0 => now.checked_add(b),
+        Some(b) => Some(b),
+    }
+    .ok_or_else(out_of_range)?;
     let after = match request.after {
-        None | Some(0) => before - DEFAULT_WINDOW_S as i64,
-        Some(a) if a < 0 => before + a,
-        Some(a) => a,
-    };
+        None | Some(0) => before.checked_sub(DEFAULT_WINDOW_S as i64),
+        Some(a) if a < 0 => before.checked_add(a),
+        Some(a) => Some(a),
+    }
+    .ok_or_else(out_of_range)?;
+    // A millisecond timestamp passed as seconds lands thousands of years ahead.
+    if before > now.saturating_add(MAX_FUTURE_S) {
+        return Err(format!(
+            "before ({before}) is more than a day in the future; times are unix seconds"
+        ));
+    }
     if after < 0 || before <= after {
         return Err(format!("after ({after}) must be before before ({before})"));
     }
@@ -275,6 +287,24 @@ mod tests {
                 Err(()),
             ),
             ("bad body", vec![], Some("{"), Err(())),
+            (
+                "before far in the future",
+                vec![],
+                Some(r#"{"before":300000000000}"#),
+                Err(()),
+            ),
+            (
+                "before in milliseconds",
+                args(&["before:1700000000000"]),
+                None,
+                Err(()),
+            ),
+            (
+                "relative values that overflow",
+                vec![],
+                Some(r#"{"before":-9223372036854775807,"after":-9223372036854775807}"#),
+                Err(()),
+            ),
         ];
         for (name, a, body, expected) in cases {
             let got = parse(&a, body.map(str::as_bytes), NOW).map_err(|_| ());

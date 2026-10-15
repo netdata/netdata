@@ -37,7 +37,11 @@ pub fn info() -> Value {
 /// The answer for `view` over `[after_s, before_s)` of `tenant`.
 pub fn build(view: &MapView, tenant: &str, after_s: u64, before_s: u64, now: SystemTime) -> Value {
     let mut out = template().clone();
-    let window_minutes = ((before_s.saturating_sub(after_s)) as f64 / 60.0).max(1.0 / 60.0);
+    // The map holds whole minutes, so the answer covers the minutes the
+    // window touches, and rates divide by that many minutes.
+    let (first_minute, last_minute) =
+        crate::view::window_minutes(after_s, before_s).unwrap_or((after_s / 60, after_s / 60));
+    let window_minutes = (last_minute - first_minute + 1) as f64;
     let mut dict = Dictionary::from_template(&out["data"]["dictionaries"]["strings"]);
 
     // Actors: every node of a counted edge, in a stable order so the UI keeps
@@ -189,8 +193,12 @@ pub fn build(view: &MapView, tenant: &str, after_s: u64, before_s: u64, now: Sys
 
     let data = &mut out["data"];
     data["collected_at"] = json!(rfc3339(now));
-    data["valid_after"] = json!(rfc3339(UNIX_EPOCH + Duration::from_secs(after_s)));
-    data["valid_until"] = json!(rfc3339(UNIX_EPOCH + Duration::from_secs(before_s)));
+    data["valid_after"] = json!(rfc3339(
+        UNIX_EPOCH + Duration::from_secs(first_minute.saturating_mul(60))
+    ));
+    data["valid_until"] = json!(rfc3339(
+        UNIX_EPOCH + Duration::from_secs((last_minute + 1).saturating_mul(60))
+    ));
     data["producer"]["instance"] = json!(tenant);
     actors.fill(&mut data["actors"], nodes.len());
     links.fill(&mut data["links"], view.edges.len() - overflow_edges(view));
@@ -374,7 +382,10 @@ fn round(value: f64, decimals: i32) -> f64 {
     (value * factor).round() / factor
 }
 
+/// Infallible: humantime cannot format years past 9999, so later times clamp.
 fn rfc3339(t: SystemTime) -> String {
+    const LAST_FORMATTABLE_S: u64 = 253_402_300_799;
+    let t = t.min(UNIX_EPOCH + Duration::from_secs(LAST_FORMATTABLE_S));
     humantime::format_rfc3339_seconds(t).to_string()
 }
 
@@ -462,7 +473,11 @@ mod tests {
         let data = &out["data"];
         assert_eq!(out["type"], "topology");
         assert_eq!(data["producer"]["instance"], "default");
-        assert_eq!(data["valid_after"], "1970-01-12T13:36:40Z");
+        assert_eq!(
+            data["valid_after"], "1970-01-12T13:36:00Z",
+            "minute aligned"
+        );
+        assert_eq!(data["valid_until"], "1970-01-12T13:47:00Z");
 
         let actors = &data["actors"];
         assert_eq!(actors["rows"], 5);
@@ -510,8 +525,8 @@ mod tests {
         assert_eq!(column(links, "calls")[first], 10);
         assert_eq!(
             column(links, "weight")[first],
-            1.0,
-            "10 calls over 10 minutes"
+            0.909,
+            "10 calls over the 11 minutes the window touches"
         );
         assert_eq!(column(links, "client_errors")[first], 1);
         assert_eq!(column(links, "server_error_pct")[first], 0.0);
@@ -675,6 +690,13 @@ mod tests {
             "{} is stale: rerun with UPDATE_GOLDEN=1",
             path.display()
         );
+    }
+
+    #[test]
+    fn timestamps_never_fail() {
+        assert_eq!(rfc3339(UNIX_EPOCH), "1970-01-01T00:00:00Z");
+        let far = UNIX_EPOCH + Duration::from_secs(300_000_000_000);
+        assert_eq!(rfc3339(far), "9999-12-31T23:59:59Z");
     }
 
     #[test]
