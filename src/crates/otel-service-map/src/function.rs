@@ -182,13 +182,23 @@ impl RawFunctionHandler for TopologyFunction {
                 tenant,
                 after_s,
                 before_s,
-            }) => {
-                let view = self.map.view(&tenant, after_s, before_s).await;
-                ok(
-                    transaction,
-                    &payload::build(&view, &tenant, after_s, before_s, now),
-                )
-            }
+            }) => match self.map.view(&tenant, after_s, before_s).await {
+                Err(message) => error(transaction, 503, &message),
+                // Building and serializing a large map takes a while: keep it
+                // off the runtime's workers, which also serve OTLP exports.
+                Ok(view) => tokio::task::spawn_blocking(move || {
+                    let body = payload::build(&view, &tenant, after_s, before_s, now);
+                    ok(transaction.clone(), &body)
+                })
+                .await
+                .unwrap_or_else(|e| {
+                    error(
+                        call.transaction.clone(),
+                        500,
+                        &format!("building the map failed: {e}"),
+                    )
+                }),
+            },
         }
     }
 

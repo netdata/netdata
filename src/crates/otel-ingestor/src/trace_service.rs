@@ -724,7 +724,10 @@ mod tests {
         let now_s = now / 1_000_000_000;
         let mut calls = Vec::new();
         for _ in 0..200 {
-            let view = map.view(tenant.as_str(), now_s - 600, now_s + 60).await;
+            let view = map
+                .view(tenant.as_str(), now_s - 600, now_s + 60)
+                .await
+                .unwrap();
             calls = view
                 .edges
                 .iter()

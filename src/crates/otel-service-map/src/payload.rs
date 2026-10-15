@@ -46,15 +46,15 @@ pub fn build(view: &MapView, tenant: &str, after_s: u64, before_s: u64, now: Sys
 
     // Actors: every node of a counted edge, in a stable order so the UI keeps
     // positions across refreshes. The overflow bucket is not an actor.
-    let mut nodes: Vec<&Node> = Vec::new();
+    let mut unique: std::collections::BTreeSet<&Node> = std::collections::BTreeSet::new();
     for edge in view.edges.keys() {
         for node in [&edge.caller, &edge.callee] {
-            if !matches!(node, Node::Overflow) && !nodes.contains(&node) {
-                nodes.push(node);
+            if !matches!(node, Node::Overflow) {
+                unique.insert(node);
             }
         }
     }
-    nodes.sort();
+    let nodes: Vec<&Node> = unique.into_iter().collect();
     let row_of: HashMap<&Node, usize> = nodes.iter().enumerate().map(|(i, n)| (*n, i)).collect();
     let shared_names = shared_service_names(&nodes);
 

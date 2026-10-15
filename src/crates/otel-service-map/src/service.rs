@@ -109,25 +109,30 @@ impl ServiceMap {
         }
     }
 
-    /// The map of `tenant` for `[after_s, before_s)` (unix seconds).
-    pub async fn view(&self, tenant: &str, after_s: u64, before_s: u64) -> MapView {
+    /// The map of `tenant` for `[after_s, before_s)` (unix seconds). An error
+    /// means the engine is broken (a panic poisoned its state), not that the
+    /// window is empty.
+    pub async fn view(&self, tenant: &str, after_s: u64, before_s: u64) -> Result<MapView, String> {
         let Some((from, to)) = view::window_minutes(after_s, before_s) else {
-            return MapView::default();
+            return Ok(MapView::default());
         };
         let shared = self.shared.clone();
         let tenant = tenant.to_string();
-        let result = tokio::task::spawn_blocking(move || {
-            let _gate = shared.flush_gate.read().expect("flush gate");
+        tokio::task::spawn_blocking(move || {
+            let _gate = shared
+                .flush_gate
+                .read()
+                .map_err(|_| "the service map's flush failed".to_string())?;
             let open = shared
                 .engine
                 .lock()
-                .expect("engine lock")
+                .map_err(|_| "the service map's engine failed".to_string())?
                 .open_minutes(&tenant, from, to);
             let stored = shared.store.load(&tenant, from, to);
-            view::build(stored, open)
+            Ok(view::build(stored, open))
         })
-        .await;
-        result.unwrap_or_default()
+        .await
+        .map_err(|e| format!("the service map query failed: {e}"))?
     }
 
     /// Stops the engine task after it wrote every open minute.
@@ -157,6 +162,7 @@ async fn run(
     tick.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Delay);
     let mut last_flush_minute = now_ns() / NS_PER_MINUTE;
     let mut last_retention_minute = None;
+    let mut flushing: Option<JoinHandle<()>> = None;
     loop {
         tokio::select! {
             prepared = rx.recv() => {
@@ -175,8 +181,13 @@ async fn run(
                     }
                     engine.expire(now);
                 }
+                // The flush runs beside the loop, one at a time, so a slow
+                // write or a long query holding the flush gate does not stop
+                // pairing and expiry; a minute whose flush is still busy
+                // waits for the next tick.
                 let minute = now / NS_PER_MINUTE;
-                if minute != last_flush_minute {
+                let idle = flushing.as_ref().is_none_or(|h: &JoinHandle<()>| h.is_finished());
+                if minute != last_flush_minute && idle {
                     last_flush_minute = minute;
                     let retention_due = last_retention_minute
                         .is_none_or(|last| minute >= last + RETENTION_EVERY_MINUTES);
@@ -184,7 +195,7 @@ async fn run(
                         last_retention_minute = Some(minute);
                     }
                     let shared = shared.clone();
-                    let _ = tokio::task::spawn_blocking(move || flush(&shared, now, retention_due, false)).await;
+                    flushing = Some(tokio::task::spawn_blocking(move || flush(&shared, now, retention_due, false)));
                 }
             }
             _ = &mut stop => break,
@@ -194,6 +205,9 @@ async fn run(
     while let Ok(p) = rx.try_recv() {
         let mut engine = shared.engine.lock().expect("engine lock");
         engine.ingest(&p.tenant, p.extracted.spans, p.extracted.invalid, now_ns());
+    }
+    if let Some(running) = flushing {
+        let _ = running.await;
     }
     let shared = shared.clone();
     let _ = tokio::task::spawn_blocking(move || flush(&shared, now_ns(), false, true)).await;
@@ -257,7 +271,7 @@ mod tests {
         // Let the engine task take the batch.
         let mut seen = 0;
         for _ in 0..100 {
-            let view = map.view("default", now_s - 600, now_s + 60).await;
+            let view = map.view("default", now_s - 600, now_s + 60).await.unwrap();
             seen = view.edges.values().map(|e| e.server.calls).sum::<u64>();
             if seen > 0 {
                 break;
@@ -268,17 +282,31 @@ mod tests {
         map.shutdown().await;
 
         let map = ServiceMap::start(Config::new(dir.path())).unwrap();
-        let view = map.view("default", now_s - 600, now_s + 60).await;
+        let view = map.view("default", now_s - 600, now_s + 60).await.unwrap();
         let edge = view.edges.keys().next().unwrap();
         assert_eq!(edge.caller, Node::UnknownCaller);
         assert_eq!(view.edges.values().map(|e| e.server.calls).sum::<u64>(), 1);
         assert!(
             map.view("other", now_s - 600, now_s + 60)
                 .await
+                .unwrap()
                 .edges
                 .is_empty()
         );
         map.shutdown().await;
+    }
+
+    #[tokio::test]
+    async fn a_broken_engine_is_an_error_not_an_empty_map() {
+        let dir = tempfile::tempdir().unwrap();
+        let map = ServiceMap::start(Config::new(dir.path())).unwrap();
+        let shared = map.shared.clone();
+        let _ = std::thread::spawn(move || {
+            let _engine = shared.engine.lock().unwrap();
+            panic!("poison the engine lock");
+        })
+        .join();
+        assert!(map.view("default", 0, 600).await.is_err());
     }
 
     #[tokio::test]
