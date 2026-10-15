@@ -81,7 +81,8 @@ want locally; set `max_total_size` to that size, since the 1GB default is usuall
 long before the 7-day `max_age`. For longer retention, keep `max_age` short, enable offloading, and size the object
 storage for one day's index size × the time you keep objects there; the Agent does not delete offloaded files, so
 expire them with the object storage's own lifecycle rules. Add headroom for the active write-ahead log
-(`max_file_size`) and, when offloading is enabled, for the download cache, which logs and traces share.
+(`max_file_size`) and, when offloading is enabled, for the download cache, which logs and traces share. The service
+map adds at most 256 MiB under `<base_dir>/service-map/`.
 
 ## Exploring traces
 
@@ -93,6 +94,35 @@ traces on all plans. Trace data is not stored in Netdata Cloud.
 When a sender sends a span again, the Agent stores each copy. The span counts in the trace list include each stored
 copy. The trace view shows each span one time. Traces in files that an earlier version stored show each span one time
 in the list too, until those files leave retention.
+
+## Service map
+
+The Agent also builds a service map from the spans that it receives. Open it from the **Topology** section of the
+**Live** view (Function `topology:tracing`). The map shows:
+
+- each instrumented service (one per `service.name`);
+- the calls between these services;
+- the databases, message queues and external endpoints that the services call but that send no spans. The map names
+  them from the attributes of the client spans, for example `db.system` or `server.address`.
+- one **unknown caller** for calls from callers that send no spans, for example health checks.
+
+For each call direction, the map shows the number of calls, the errors and the latency (p50, p95, p99 and maximum).
+It shows the client side and the server side separately. Select a service to see the services that it calls and the
+services that call it.
+
+How the map counts calls:
+
+- A call counts when a server span and its parent client span arrive within 30 seconds of each other.
+- A client span that gets no server span in 30 seconds counts as a call to a database, queue or external endpoint.
+- A server span that gets no parent client span in 30 seconds counts as a call from the unknown caller.
+- The map shows the last 15 minutes by default. The Agent keeps per-minute counts for 7 days, in at most 256 MiB.
+- The map starts to count when the Agent starts. It does not use spans that the Agent stored before.
+
+Limits:
+
+- The map shows only the spans that this Agent receives. If the two services of a call send their spans to different
+  Agents, each Agent shows only its half of the call.
+- If the senders sample traces, the map shows fewer calls than the services made.
 
 ## Where to next
 

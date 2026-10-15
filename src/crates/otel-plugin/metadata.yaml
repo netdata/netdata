@@ -36,7 +36,7 @@ modules:
     overview:
       data_collection:
         metrics_description: |
-          Receive OpenTelemetry metrics, logs, and traces from an OpenTelemetry Collector over OTLP/gRPC or OTLP/HTTP. The plugin converts supported metrics into Netdata charts, indexes logs for exploration in the Logs tab, and indexes traces for exploration in the Traces tab.
+          Receive OpenTelemetry metrics, logs, and traces from an OpenTelemetry Collector over OTLP/gRPC or OTLP/HTTP. The plugin converts supported metrics into Netdata charts, indexes logs for exploration in the Logs tab, and indexes traces for exploration in the Traces tab. It also builds a service map from the received spans (the `topology:tracing` Function).
 
           The plugin accepts gauges, sums, explicit-bucket histograms, and summaries. It does not currently ingest exponential histograms. Monotonic cumulative and delta sums are rate-normalized; non-monotonic cumulative sums behave as gauges.
 
