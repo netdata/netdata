@@ -1176,7 +1176,6 @@ ml_dimension_predict(ml_dimension_t *dim, calculated_number_t value, bool exists
     memcpy(src_cns, dim->cns + dim->cns_head, first_chunk * sizeof(calculated_number_t));
     if (dim->cns_head)
         memcpy(src_cns + first_chunk, dim->cns, dim->cns_head * sizeof(calculated_number_t));
-    memcpy(dst_cns, src_cns, n * sizeof(calculated_number_t));
 
     ml_features_t features = {
         Cfg.diff_n, smoothing_window, Cfg.lag_n,
