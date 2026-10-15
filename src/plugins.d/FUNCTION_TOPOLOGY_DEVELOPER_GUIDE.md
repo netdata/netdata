@@ -1916,6 +1916,52 @@ Older CTS implementations that fall back to local identity do not satisfy this
 contract. Per-node views do not depend on this CTS change. Metrics, overlays,
 modal fields and VM actor `power_state` remain unchanged.
 
+## Tracing Shape
+
+`topology:tracing` is the service map of the OpenTelemetry spans one
+otel-plugin receives (single node: no correlation, no overlays, no
+notifications).
+
+- Actors, all on layer `service`:
+  - `service`: one per (`service.namespace`, `service.name`); identity
+    `svc:<namespace>:<name>` with `:` and `%` escaped; `merge_identity`
+    `service_namespace`, `service_name`;
+  - `peer_database`, `peer_messaging`, `peer_external` (RPC and HTTP) and
+    `peer_other`: uninstrumented callees, named from the client span's peer
+    attributes; identity `peer:<kind>:<name>`; `role: endpoint`;
+  - `unknown_caller`: one actor for calls whose caller is not instrumented or
+    whose client span never arrived; `role: endpoint`.
+- Links are directed `dependency` links from caller to callee, one per
+  caller → callee pair in the window:
+  - `call` (service → service), `call_to_peer` (dashed) and
+    `call_from_unknown` (dotted);
+  - the client side (the caller's span) and the server side (the callee's
+    span) are separate column groups: calls, errors, error %, p50/p95/p99 and
+    max ms. A side that was never seen is null, not zero;
+  - `calls`/`errors` are the client side when it exists, else the server side;
+    `weight` is calls per minute and drives link width;
+  - percentiles and percentages are not aggregatable (`aggregation: none`).
+- "Calls to" and "Called by" are modal sections over the links table, not
+  copies of link rows in actor tables.
+- Totals (calls in, calls out, error % in) are also `actor_labels` rows, so
+  hover and the modal header show them.
+- `stats` carries the map size and the loss counters (`loss_*`: hand-off
+  drops, capacity drops, late, future, duplicates, invalid ids, unpaired
+  server halves, spans lost at shutdown, unreadable stored files) and the
+  overflow bucket's calls. Counters cover the requested window.
+- The Function accepts `after`/`before` (default: the last 15 minutes) and
+  `tenant`; `has_history` stays `false`. Errors answer
+  `{"status","errorMessage"}`: 400 for a bad window or body, 413 for an answer
+  over the producer's 8 MiB budget.
+
+The producer is the `otel-service-map` crate
+(`src/crates/otel-service-map/`): the payload's static part is
+`src/topology_template.json`, rows are filled by `src/payload.rs`, the handler
+is `src/function.rs`. The ingestor worker declares and serves it. The builder's
+output for a sample with every actor and link type is the cross-producer
+fixture `src/go/tools/functions-validation/fixtures/topology-v1/tracing.json`,
+kept in sync by a Rust golden test (`UPDATE_GOLDEN=1` regenerates it).
+
 ## Test Reconstruction
 
 Compatibility tests may project the new canonical payload into rollout adapter

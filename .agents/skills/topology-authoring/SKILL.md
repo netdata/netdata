@@ -42,8 +42,9 @@ producer) belong to `collectors-snmp-profiles`; this skill starts where those ro
 | `topology:snmp` | `src/go/plugin/go.d/collector/snmp_topology/` (render in `internal/topologyv1`) | `topology_scenario_golden_test.go`, `internal/topologyv1/golden_test.go`, see `src/go/plugin/go.d/collector/snmp_topology/ARCHITECTURE.md#validation-checklist` |
 | `topology:vsphere` | `src/go/plugin/go.d/collector/vsphere/func_topology*.go` | `func_topology_test.go` |
 | `topology:cato_networks` | `src/go/plugin/go.d/collector/cato_networks/topology.go`, `catofunc/topology.go` | `topology_test.go` |
+| `topology:tracing` | `src/crates/otel-service-map/` (`payload.rs`, `topology_template.json`, `function.rs`), served by the otel-plugin ingestor | the crate's tests (`cargo test -p otel-service-map`), including the golden test that keeps `src/go/tools/functions-validation/fixtures/topology-v1/tracing.json` current |
 
-All five emit `netdata.topology.v1`; no producer still emits a pre-v1 payload. Remaining per-producer refinements
+All six emit `netdata.topology.v1`; no producer still emits a pre-v1 payload. Remaining per-producer refinements
 are tracked in `src/plugins.d/FUNCTION_TOPOLOGY_IMPLEMENTATION_SCOPE.md#current-migration-inventory`. Cross-producer
 fixtures live in `src/go/tools/functions-validation/fixtures/topology-v1/` (none for `topology:cato_networks`); the
 Cloud aggregator itself is not in this repository.
