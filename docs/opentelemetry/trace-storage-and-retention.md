@@ -100,7 +100,7 @@ in the list too, until those files leave retention.
 The Agent also builds a service map from the spans that it receives. Open it from the **Topology** section of the
 **Live** view (Function `topology:tracing`). The map shows:
 
-- each instrumented service (one per `service.name`);
+- each instrumented service (one per `service.name`, and per `service.namespace` when it is set);
 - the calls between these services;
 - the databases, message queues and external endpoints that the services call but that send no spans. The map names
   them from the attributes of the client spans, for example `db.system` or `server.address`.
@@ -115,7 +115,8 @@ How the map counts calls:
 - A call counts when a server span and its parent client span arrive within 30 seconds of each other.
 - A client span that gets no server span in 30 seconds counts as a call to a database, queue or external endpoint.
 - A server span that gets no parent client span in 30 seconds counts as a call from the unknown caller.
-- The map shows the last 15 minutes by default. The Agent keeps per-minute counts for 7 days, in at most 256 MiB.
+- The map shows the last 15 minutes by default, rounded out to whole minutes. The Agent keeps per-minute counts for
+  7 days, in about 256 MiB at most (the Agent checks the size every 10 minutes).
 - The map starts to count when the Agent starts. It does not use spans that the Agent stored before.
 
 Limits:
@@ -123,6 +124,8 @@ Limits:
 - The map shows only the spans that this Agent receives. If the two services of a call send their spans to different
   Agents, each Agent shows only its half of the call.
 - If the senders sample traces, the map shows fewer calls than the services made.
+- Names longer than 256 bytes are cut. A database name or a protocol name (for example `redis`) never merges with an
+  instrumented service of the same name; a peer service name or a host name does.
 
 ## Where to next
 

@@ -1947,12 +1947,14 @@ notifications).
   hover and the modal header show them.
 - `stats` carries the map size and the loss counters (`loss_*`: hand-off
   drops, capacity drops, late, future, duplicates, invalid ids, unpaired
-  server halves, spans lost at shutdown, unreadable stored files) and the
-  overflow bucket's calls. Counters cover the requested window.
+  server halves, spans lost at shutdown, minutes that could not be written,
+  unreadable stored files) and the overflow bucket's calls. Counters cover
+  the requested window, rounded out to whole minutes.
 - The Function accepts `after`/`before` (default: the last 15 minutes) and
   `tenant`; `has_history` stays `false`. Errors answer
-  `{"status","errorMessage"}`: 400 for a bad window or body, 413 for an answer
-  over the producer's 8 MiB budget.
+  `{"status","errorMessage"}`: 400 for a bad window or body (including a
+  `before` more than a day ahead), 413 for an answer over the producer's
+  8 MiB budget, 503 when the service map's engine failed.
 
 The producer is the `otel-service-map` crate
 (`src/crates/otel-service-map/`): the payload's static part is
