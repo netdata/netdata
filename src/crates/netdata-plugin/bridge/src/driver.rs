@@ -26,7 +26,8 @@ pub trait CallResponse: Send + 'static {
 }
 
 pub struct CallDriver<R: CallResponse> {
-    handlers: Vec<Arc<dyn RawFunctionHandler>>,
+    /// Handlers with their declared names, the routing keys.
+    handlers: Vec<(String, Arc<dyn RawFunctionHandler>)>,
     transactions: HashMap<String, CancellationToken>,
     out_tx: mpsc::UnboundedSender<R>,
 }
@@ -37,14 +38,17 @@ impl<R: CallResponse> CallDriver<R> {
         out_tx: mpsc::UnboundedSender<R>,
     ) -> Self {
         Self {
-            handlers,
+            handlers: handlers
+                .into_iter()
+                .map(|h| (h.declaration().name, h))
+                .collect(),
             transactions: HashMap::new(),
             out_tx,
         }
     }
 
     pub fn declarations(&self) -> Vec<FunctionDeclaration> {
-        self.handlers.iter().map(|h| h.declaration()).collect()
+        self.handlers.iter().map(|(_, h)| h.declaration()).collect()
     }
 
     /// Spawns the handler declared as `name`, or answers 404.
@@ -59,8 +63,8 @@ impl<R: CallResponse> CallDriver<R> {
         let Some(handler) = self
             .handlers
             .iter()
-            .find(|h| h.declaration().name == name)
-            .cloned()
+            .find(|(n, _)| *n == name)
+            .map(|(_, h)| h.clone())
         else {
             let result = FunctionResult {
                 transaction,
@@ -95,7 +99,19 @@ impl<R: CallResponse> CallDriver<R> {
         });
         let out_tx = self.out_tx.clone();
         tokio::spawn(async move {
-            let result = handler.handle_raw(ctx).await;
+            // The handler runs in its own task so a panic in it still ends
+            // the call with an answer instead of leaving it unanswered.
+            let transaction = ctx.function_call.transaction.clone();
+            let result = match tokio::spawn(async move { handler.handle_raw(ctx).await }).await {
+                Ok(result) => result,
+                Err(e) => FunctionResult {
+                    transaction,
+                    status: 500,
+                    format: "text/plain".to_string(),
+                    expires: 0,
+                    payload: format!("function failed: {e}").into_bytes(),
+                },
+            };
             let _ = out_tx.send(R::from_result(result));
         });
     }
@@ -233,6 +249,31 @@ mod tests {
         driver.finish(&resp);
         let r = result(resp);
         assert_eq!((r.transaction.as_str(), r.status), ("t3", 499));
+        assert!(driver.transactions.is_empty());
+    }
+
+    struct Panics;
+
+    #[async_trait]
+    impl RawFunctionHandler for Panics {
+        async fn handle_raw(&self, _ctx: Arc<FunctionContext>) -> FunctionResult {
+            panic!("handler bug");
+        }
+
+        fn declaration(&self) -> FunctionDeclaration {
+            FunctionDeclaration::new("panics", "test")
+        }
+    }
+
+    #[tokio::test]
+    async fn a_panicking_handler_still_answers() {
+        let (tx, mut rx) = mpsc::unbounded_channel::<IngestorResponse>();
+        let mut driver = CallDriver::new(vec![Arc::new(Panics)], tx);
+        driver.call("t".into(), 10, "panics".into(), vec![], None);
+        let resp = rx.recv().await.unwrap();
+        driver.finish(&resp);
+        let r = result(resp);
+        assert_eq!((r.transaction.as_str(), r.status), ("t", 500));
         assert!(driver.transactions.is_empty());
     }
 
