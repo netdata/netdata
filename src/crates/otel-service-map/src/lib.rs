@@ -12,6 +12,8 @@ pub mod facts;
 pub mod histogram;
 pub mod peer;
 pub mod stats;
+pub mod store;
+pub mod view;
 
 #[cfg(test)]
 mod engine_tests;

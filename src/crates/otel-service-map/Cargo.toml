@@ -12,7 +12,11 @@ name = "otel_service_map"
 path = "src/lib.rs"
 
 [dependencies]
+bincode = { workspace = true }
+crc32fast = { workspace = true }
 opentelemetry-proto = { workspace = true }
 serde = { workspace = true, features = ["derive", "rc"] }
+tracing = { workspace = true }
 
 [dev-dependencies]
+tempfile = { workspace = true }

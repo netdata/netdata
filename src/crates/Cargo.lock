@@ -3807,8 +3807,12 @@ dependencies = [
 name = "otel-service-map"
 version = "0.1.3"
 dependencies = [
+ "bincode 2.0.1",
+ "crc32fast",
  "opentelemetry-proto",
  "serde",
+ "tempfile",
+ "tracing",
 ]
 
 [[package]]
