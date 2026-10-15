@@ -6,12 +6,11 @@ use std::sync::Arc;
 
 use opentelemetry_proto::tonic::collector::trace::v1::ExportTraceServiceRequest;
 use opentelemetry_proto::tonic::common::v1::KeyValue;
-use opentelemetry_proto::tonic::common::v1::any_value::Value;
 use opentelemetry_proto::tonic::trace::v1::span::SpanKind;
 use opentelemetry_proto::tonic::trace::v1::status::StatusCode;
 use serde::{Deserialize, Serialize};
 
-use crate::peer::{PeerKey, name_peer};
+use crate::peer::{PeerKey, cap_name, first_string, name_peer};
 
 pub type TraceId = [u8; 16];
 pub type SpanId = [u8; 8];
@@ -57,7 +56,9 @@ pub struct SpanFacts {
     /// child shows up.
     pub peer: Option<PeerKey>,
     pub end_ns: u64,
-    pub duration_us: u64,
+    /// `None` when the span has no start time: its call counts, its latency
+    /// is unknown.
+    pub duration_us: Option<u64>,
     pub error: bool,
 }
 
@@ -76,9 +77,9 @@ pub fn extract(request: &ExportTraceServiceRequest) -> Extracted {
             .as_ref()
             .map_or(&[], |r| r.attributes.as_slice());
         let service = ServiceKey {
-            namespace: string_attribute(resource_attributes, "service.namespace").map(Arc::from),
-            name: Arc::from(
-                string_attribute(resource_attributes, "service.name").unwrap_or(UNKNOWN_SERVICE),
+            namespace: first_string(resource_attributes, &["service.namespace"]).map(cap_name),
+            name: cap_name(
+                first_string(resource_attributes, &["service.name"]).unwrap_or(UNKNOWN_SERVICE),
             ),
         };
         for scope_spans in &resource_spans.scope_spans {
@@ -99,6 +100,12 @@ pub fn extract(request: &ExportTraceServiceRequest) -> Extracted {
                 let parent_span_id = SpanId::try_from(span.parent_span_id.as_slice())
                     .ok()
                     .filter(|p| *p != [0; 8]);
+                // A span cannot be its own parent; such a span would wait for
+                // itself and be neither a call nor a counted loss.
+                if parent_span_id == Some(span_id) {
+                    out.invalid += 1;
+                    continue;
+                }
                 let kind = match SpanKind::try_from(span.kind) {
                     Ok(SpanKind::Server) => Kind::Server,
                     Ok(SpanKind::Consumer) => Kind::Consumer,
@@ -111,9 +118,13 @@ pub fn extract(request: &ExportTraceServiceRequest) -> Extracted {
                     .as_ref()
                     .is_some_and(|s| s.code == StatusCode::Error as i32);
                 let peer = kind.is_caller().then(|| name_peer(&span.attributes));
-                let duration_ns = span
-                    .end_time_unix_nano
-                    .saturating_sub(span.start_time_unix_nano);
+                // Without a start time the duration would be the end time
+                // itself (decades), which would own every maximum and p99.
+                let duration_us = (span.start_time_unix_nano != 0).then(|| {
+                    span.end_time_unix_nano
+                        .saturating_sub(span.start_time_unix_nano)
+                        / 1_000
+                });
                 out.spans.push(SpanFacts {
                     trace_id,
                     span_id,
@@ -122,7 +133,7 @@ pub fn extract(request: &ExportTraceServiceRequest) -> Extracted {
                     service: service.clone(),
                     peer,
                     end_ns: span.end_time_unix_nano,
-                    duration_us: duration_ns / 1_000,
+                    duration_us,
                     error,
                 });
             }
@@ -131,24 +142,11 @@ pub fn extract(request: &ExportTraceServiceRequest) -> Extracted {
     out
 }
 
-fn string_attribute<'a>(attributes: &'a [KeyValue], key: &str) -> Option<&'a str> {
-    for kv in attributes {
-        if kv.key == key {
-            if let Some(Value::StringValue(s)) = kv.value.as_ref().and_then(|v| v.value.as_ref()) {
-                let s = s.trim();
-                if !s.is_empty() {
-                    return Some(s);
-                }
-            }
-        }
-    }
-    None
-}
-
 #[cfg(test)]
 pub(crate) mod tests {
     use super::*;
     use opentelemetry_proto::tonic::common::v1::AnyValue;
+    use opentelemetry_proto::tonic::common::v1::any_value::Value;
     use opentelemetry_proto::tonic::resource::v1::Resource;
     use opentelemetry_proto::tonic::trace::v1::{ResourceSpans, ScopeSpans, Span, Status};
 
@@ -214,7 +212,7 @@ pub(crate) mod tests {
         assert_eq!(client.kind, Kind::Client);
         assert_eq!(client.parent_span_id, Some([1; 8]));
         assert!(client.error);
-        assert_eq!(client.duration_us, 3_000);
+        assert_eq!(client.duration_us, Some(3_000));
         assert_eq!(client.service.name.as_ref(), "cart");
         assert_eq!(client.peer.as_ref().map(|p| p.name.as_ref()), Some("redis"));
 
@@ -228,6 +226,32 @@ pub(crate) mod tests {
             got.spans[2].parent_span_id, None,
             "an all-zero parent id means no parent"
         );
+    }
+
+    #[test]
+    fn self_parented_spans_are_invalid_and_missing_starts_have_no_latency() {
+        let req = request(
+            "a",
+            vec![
+                Span {
+                    trace_id: vec![1; 16],
+                    span_id: vec![5; 8],
+                    parent_span_id: vec![5; 8],
+                    ..Default::default()
+                },
+                Span {
+                    trace_id: vec![1; 16],
+                    span_id: vec![6; 8],
+                    start_time_unix_nano: 0,
+                    end_time_unix_nano: 1_700_000_000_000_000_000,
+                    ..Default::default()
+                },
+            ],
+        );
+        let got = extract(&req);
+        assert_eq!(got.invalid, 1);
+        assert_eq!(got.spans.len(), 1);
+        assert_eq!(got.spans[0].duration_us, None);
     }
 
     #[test]

@@ -407,7 +407,7 @@ mod tests {
     fn side(calls: u64, errors: u64, us: u64) -> SideStats {
         let mut s = SideStats::default();
         for i in 0..calls {
-            s.record(us, i < errors);
+            s.record(Some(us), i < errors);
         }
         s
     }
@@ -429,6 +429,7 @@ mod tests {
             Node::Peer(PeerKey {
                 kind: PeerKind::Database,
                 name: Arc::from("valkey-cart"),
+                foldable: false,
             }),
             side(4, 0, 300),
             SideStats::default(),
@@ -636,6 +637,7 @@ mod tests {
             Node::Peer(PeerKey {
                 kind,
                 name: Arc::from(name),
+                foldable: false,
             })
         };
         let mut add = |caller: Node, callee: Node, client: SideStats| {

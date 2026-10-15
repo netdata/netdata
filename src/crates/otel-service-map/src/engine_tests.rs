@@ -22,6 +22,7 @@ fn peer(name: &str) -> PeerKey {
     PeerKey {
         kind: PeerKind::Database,
         name: Arc::from(name),
+        foldable: false,
     }
 }
 
@@ -34,7 +35,7 @@ fn span(kind: Kind, svc: &str, id: u8, parent: Option<u8>) -> SpanFacts {
         service: service(svc),
         peer: kind.is_caller().then(|| peer("redis")),
         end_ns: T0 + 10 * SEC,
-        duration_us: 1_000 * u64::from(id),
+        duration_us: Some(1_000 * u64::from(id)),
         error: false,
     }
 }
@@ -100,10 +101,10 @@ fn pairs_in_either_arrival_order() {
 #[test]
 fn sides_keep_their_own_latency_and_errors() {
     let mut client = span(Kind::Client, "frontend", 1, None);
-    client.duration_us = 9_000;
+    client.duration_us = Some(9_000);
     client.error = true;
     let mut server = span(Kind::Server, "checkout", 2, Some(1));
-    server.duration_us = 4_000;
+    server.duration_us = Some(4_000);
     let (edges, _, _) = run(vec![client, server]);
     let stats = &edges[&svc_edge("frontend", "checkout")];
     assert_eq!((stats.client.errors, stats.client.max_us), (1, 9_000));

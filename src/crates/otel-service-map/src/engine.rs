@@ -463,6 +463,7 @@ fn expire_tenant(t: &mut Tenant, limits: &Limits, in_flight: &mut usize, now_ns:
                     let peer = entry.facts.peer.clone().unwrap_or_else(|| PeerKey {
                         kind: PeerKind::Other,
                         name: Arc::from(UNKNOWN_PEER),
+                        foldable: false,
                     });
                     let edge = Edge {
                         caller: Node::Service(entry.facts.service.clone()),

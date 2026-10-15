@@ -39,11 +39,14 @@ pub struct SideStats {
 }
 
 impl SideStats {
-    pub fn record(&mut self, duration_us: u64, error: bool) {
+    /// A call without a known duration counts, but adds no latency.
+    pub fn record(&mut self, duration_us: Option<u64>, error: bool) {
         self.calls += 1;
         self.errors += u64::from(error);
-        self.max_us = self.max_us.max(duration_us);
-        self.latency_us.record(duration_us);
+        if let Some(d) = duration_us {
+            self.max_us = self.max_us.max(d);
+            self.latency_us.record(d);
+        }
     }
 
     pub fn merge(&mut self, other: &SideStats) {

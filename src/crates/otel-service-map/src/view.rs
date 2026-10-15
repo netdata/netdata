@@ -57,6 +57,9 @@ pub fn build(stored: Loaded, open: Vec<(u64, MinuteStats)>) -> MapView {
         let Node::Peer(peer) = &edge.callee else {
             continue;
         };
+        if !peer.foldable {
+            continue;
+        }
         if let Some([service]) = services_by_name.get(peer.name.as_ref()).map(Vec::as_slice) {
             let renamed = Edge {
                 caller: edge.caller.clone(),
@@ -100,6 +103,7 @@ mod tests {
         Node::Peer(PeerKey {
             kind: PeerKind::Rpc,
             name: Arc::from(name),
+            foldable: true,
         })
     }
 
@@ -108,10 +112,10 @@ mod tests {
         for (caller, callee, client, server) in edges {
             let mut e = EdgeStats::default();
             for _ in 0..*client {
-                e.client.record(10, false);
+                e.client.record(Some(10), false);
             }
             for _ in 0..*server {
-                e.server.record(10, false);
+                e.server.record(Some(10), false);
             }
             stats.edges.insert(
                 Edge {
@@ -182,6 +186,25 @@ mod tests {
                 (service(None, "frontend"), peer("redis"), 1, 0),
             ]
         );
+    }
+
+    #[test]
+    fn database_and_system_names_do_not_fold() {
+        let mut stored = Loaded::default();
+        let redis = Node::Peer(PeerKey {
+            kind: PeerKind::Database,
+            name: Arc::from("redis"),
+            foldable: false,
+        });
+        stored.minutes.insert(
+            1,
+            minute(&[
+                (service(None, "frontend"), service(None, "redis"), 1, 1),
+                (service(None, "cart"), redis.clone(), 3, 0),
+            ]),
+        );
+        let view = build(stored, Vec::new());
+        assert!(view.edges.keys().any(|e| e.callee == redis));
     }
 
     #[test]

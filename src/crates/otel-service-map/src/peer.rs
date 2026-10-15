@@ -23,10 +23,57 @@ pub enum PeerKind {
     Other,
 }
 
-#[derive(Clone, Debug, PartialEq, Eq, Hash, PartialOrd, Ord, Serialize, Deserialize)]
+/// Identity is (`kind`, `name`); `foldable` only travels with it.
+#[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct PeerKey {
     pub kind: PeerKind,
     pub name: Arc<str>,
+    /// The name is an explicit peer service or a host name, so it may be the
+    /// `service.name` of an instrumented service; a database name or a
+    /// protocol system (`redis`) is not folded into a service of that name.
+    pub foldable: bool,
+}
+
+impl PartialEq for PeerKey {
+    fn eq(&self, other: &Self) -> bool {
+        (self.kind, &self.name) == (other.kind, &other.name)
+    }
+}
+
+impl Eq for PeerKey {}
+
+impl std::hash::Hash for PeerKey {
+    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
+        self.kind.hash(state);
+        self.name.hash(state);
+    }
+}
+
+impl PartialOrd for PeerKey {
+    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
+        Some(self.cmp(other))
+    }
+}
+
+impl Ord for PeerKey {
+    fn cmp(&self, other: &Self) -> std::cmp::Ordering {
+        (self.kind, &self.name).cmp(&(other.kind, &other.name))
+    }
+}
+
+/// Longer names are cut: a sender could otherwise put megabytes into every
+/// edge key, in memory and on disk.
+pub(crate) const MAX_NAME_BYTES: usize = 256;
+
+pub(crate) fn cap_name(name: &str) -> Arc<str> {
+    if name.len() <= MAX_NAME_BYTES {
+        return Arc::from(name);
+    }
+    let mut end = MAX_NAME_BYTES - '…'.len_utf8();
+    while !name.is_char_boundary(end) {
+        end -= 1;
+    }
+    Arc::from(format!("{}…", &name[..end]))
 }
 
 pub const UNKNOWN_PEER: &str = "unknown";
@@ -69,26 +116,31 @@ pub(crate) fn name_peer(attributes: &[KeyValue]) -> PeerKey {
                 .filter(|h| !is_ip(h))
         });
 
-    let name = first_string(attributes, PEER_SERVICE)
-        .or_else(|| match kind {
-            PeerKind::Database => first_string(attributes, DB_NAMESPACE),
-            PeerKind::Messaging => first_string(attributes, MESSAGING_DESTINATION),
-            PeerKind::Rpc => first_string(attributes, RPC_SERVICE),
-            PeerKind::Http | PeerKind::Other => None,
-        })
-        .or(host)
-        .or(db_system)
-        .or(messaging_system)
-        .or(rpc_system)
-        .unwrap_or(UNKNOWN_PEER);
+    let identity = match kind {
+        PeerKind::Database => first_string(attributes, DB_NAMESPACE),
+        PeerKind::Messaging => first_string(attributes, MESSAGING_DESTINATION),
+        PeerKind::Rpc => first_string(attributes, RPC_SERVICE),
+        PeerKind::Http | PeerKind::Other => None,
+    };
+    let (name, foldable) = if let Some(peer_service) = first_string(attributes, PEER_SERVICE) {
+        (peer_service, true)
+    } else if let Some(identity) = identity {
+        (identity, false)
+    } else if let Some(host) = host {
+        (host, true)
+    } else {
+        let system = db_system.or(messaging_system).or(rpc_system);
+        (system.unwrap_or(UNKNOWN_PEER), false)
+    };
 
     PeerKey {
         kind,
-        name: Arc::from(name),
+        name: cap_name(name),
+        foldable,
     }
 }
 
-fn first_string<'a>(attributes: &'a [KeyValue], keys: &[&str]) -> Option<&'a str> {
+pub(crate) fn first_string<'a>(attributes: &'a [KeyValue], keys: &[&str]) -> Option<&'a str> {
     for key in keys {
         for kv in attributes {
             if kv.key != *key {
@@ -106,10 +158,10 @@ fn first_string<'a>(attributes: &'a [KeyValue], keys: &[&str]) -> Option<&'a str
 }
 
 fn is_ip(host: &str) -> bool {
-    host.trim_start_matches('[')
-        .trim_end_matches(']')
-        .parse::<IpAddr>()
-        .is_ok()
+    let host = host.trim_start_matches('[').trim_end_matches(']');
+    // A zoned IPv6 address (`fe80::1%eth0`) does not parse with its zone.
+    let host = host.split('%').next().unwrap_or(host);
+    host.parse::<IpAddr>().is_ok()
 }
 
 /// The host of an absolute URL, without user info or port.
@@ -148,6 +200,7 @@ mod tests {
         PeerKey {
             kind,
             name: Arc::from(name),
+            foldable: false,
         }
     }
 
@@ -228,6 +281,43 @@ mod tests {
         for (name, pairs, expected) in cases {
             assert_eq!(name_peer(&attrs(&pairs)), expected, "{name}");
         }
+    }
+
+    #[test]
+    fn only_peer_services_and_host_names_fold() {
+        let foldable = |pairs: &[(&str, &str)]| name_peer(&attrs(pairs)).foldable;
+        assert!(foldable(&[("peer.service", "billing")]));
+        assert!(foldable(&[
+            ("db.system", "redis"),
+            ("server.address", "valkey-cart")
+        ]));
+        assert!(!foldable(&[
+            ("db.system", "postgresql"),
+            ("db.namespace", "orders")
+        ]));
+        assert!(
+            !foldable(&[("db.system", "redis")]),
+            "a system name is not a service name"
+        );
+        assert!(!foldable(&[]));
+    }
+
+    #[test]
+    fn zoned_ipv6_is_an_ip() {
+        let key = name_peer(&attrs(&[
+            ("server.address", "fe80::1%eth0"),
+            ("db.system", "redis"),
+        ]));
+        assert_eq!(key.name.as_ref(), "redis");
+    }
+
+    #[test]
+    fn long_names_are_capped_on_a_char_boundary() {
+        let long = "é".repeat(300);
+        let capped = cap_name(&long);
+        assert!(capped.len() <= MAX_NAME_BYTES);
+        assert!(capped.ends_with('…'));
+        assert_eq!(cap_name("short").as_ref(), "short");
     }
 
     #[test]

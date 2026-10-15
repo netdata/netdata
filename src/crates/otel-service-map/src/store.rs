@@ -21,7 +21,7 @@ use crate::stats::MinuteStats;
 const MAGIC: &[u8; 4] = b"NDSM";
 // Bumped on every change of `HourFile`'s encoding: an older file then reads
 // as corrupt instead of decoding into the wrong fields.
-const VERSION: u8 = 2;
+const VERSION: u8 = 3;
 const HEADER_LEN: usize = 4 + 1 + 4 + 4;
 const EXTENSION: &str = "smh";
 const MINUTES_PER_HOUR: u64 = 60;
@@ -282,7 +282,7 @@ mod tests {
         };
         let mut edge_stats = EdgeStats::default();
         for _ in 0..calls {
-            edge_stats.server.record(1_000, false);
+            edge_stats.server.record(Some(1_000), false);
         }
         stats.edges.insert(edge, edge_stats);
         stats.losses.late = late;
