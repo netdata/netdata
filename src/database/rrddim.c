@@ -44,9 +44,13 @@ static void rrddim_reinitialize_collection(RRDDIM *rd) {
     RRDSET *st = rd->rrdset;
 
     for(size_t tier = 0; tier < nd_profile.storage_tiers; tier++) {
+        // published under the same lock that finalizes it (rrddim_free), so a reader holding the tier
+        // spinlock (storage_engine_store_page_time_to_close_s() callers) sees either NULL or a live handle
+        spinlock_lock(&rd->tiers[tier].spinlock);
         if (!rd->tiers[tier].sch)
             rd->tiers[tier].sch =
                 storage_metric_store_init(rd->tiers[tier].seb, rd->tiers[tier].smh, st->rrdhost->db[tier].tier_grouping * st->update_every, rd->rrdset->smg[tier]);
+        spinlock_unlock(&rd->tiers[tier].spinlock);
     }
 }
 
