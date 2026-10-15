@@ -181,14 +181,8 @@ impl OtelTracesHandler {
         }
         // The list's chips mark the matching spans; validated before
         // admission like the list's.
-        let highlight = build_tokens(
-            &std::collections::HashMap::new(),
-            None,
-            None,
-            &params.conditions,
-            &params.text,
-        )
-        .map_err(|e| handler_err(format!("invalid otel-traces request: {e}")))?;
+        let highlight = build_tokens(&params.conditions, &params.text)
+            .map_err(|e| handler_err(format!("invalid otel-traces request: {e}")))?;
         let query = TraceQuery::new(trace_id)
             .span_cap(TRACE_SPAN_CAP)
             .shaper(Box::new(WireShaper::new()))
@@ -326,14 +320,7 @@ impl OtelTracesHandler {
             .map(parse_cursor)
             .transpose()
             .map_err(client_err)?;
-        let tokens = build_tokens(
-            &params.selections,
-            params.min_trace_duration_ns,
-            params.max_trace_duration_ns,
-            &params.conditions,
-            &params.text,
-        )
-        .map_err(client_err)?;
+        let tokens = build_tokens(&params.conditions, &params.text).map_err(client_err)?;
         let aggregate_tokens = aggregate.then(|| heatmap_tokens(&tokens));
 
         let now_s = unix_now_s();

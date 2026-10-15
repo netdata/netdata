@@ -19,9 +19,6 @@
 //!   lockstep with the engine enums (a new owner fails compilation,
 //!   a new builtin fails this suite) and selection-key parsing with
 //!   its rejections;
-//! - [`build_predicate`]: sorted-key Eq conditions, empty selections
-//!   validate but constrain nothing, trace duration bounds, inverted
-//!   trace-duration bounds as client errors;
 //! - the cursor codec: encode/parse round-trip, malformed
 //!   rejections, over-cap walks advised to narrow;
 //! - window canonicalization: the now-derived default window, the
@@ -211,7 +208,7 @@ fn every_engine_owner_is_deliberately_placed_in_the_wire_grammar() {
             AttributeOwner::Link => Some("link"),
             // Bare builtin words, not an owner prefix.
             AttributeOwner::Builtin => None,
-            // Not enumerable; selections are always owner-qualified.
+            // Not enumerable; keys are always owner-qualified.
             AttributeOwner::Any => None,
         }
     }
@@ -239,47 +236,6 @@ fn selection_keys_parse_owners_builtins_and_dotted_attributes() {
     for bad in ["resource.", "bogus", "resource", "svc.name"] {
         assert!(parse_selection_key(bad).is_err(), "{bad} must not parse");
     }
-}
-
-#[test]
-fn predicate_builds_sorted_eq_conditions_plus_trace_duration_bounds() {
-    let mut selections = HashMap::new();
-    selections.insert(
-        "resource.service.name".to_string(),
-        vec!["a".to_string(), "b".to_string()],
-    );
-    selections.insert("status".to_string(), vec!["ERROR".to_string()]);
-    selections.insert("span.empty".to_string(), vec![]); // no constraint
-    let p = build_predicate(&selections, Some(100), Some(200)).unwrap();
-    assert_eq!(p.conditions.len(), 4);
-    // Sorted selection keys first, then the trace-duration bounds.
-    assert_eq!(
-        p.conditions[0].target,
-        PredicateTarget::Attribute(AttributeOwner::Resource, "service.name".into())
-    );
-    assert_eq!(p.conditions[0].op, CompareOp::Eq);
-    assert_eq!(p.conditions[0].values.len(), 2);
-    assert_eq!(
-        p.conditions[1].target,
-        PredicateTarget::Builtin(BuiltinField::Status)
-    );
-    assert_eq!(
-        p.conditions[2].target,
-        PredicateTarget::Builtin(BuiltinField::TraceDuration)
-    );
-    assert_eq!(p.conditions[2].op, CompareOp::Gte);
-    assert_eq!(
-        p.conditions[3].target,
-        PredicateTarget::Builtin(BuiltinField::TraceDuration)
-    );
-    assert_eq!(p.conditions[3].op, CompareOp::Lte);
-}
-
-#[test]
-fn inverted_trace_duration_bounds_are_a_client_error() {
-    let err = build_predicate(&HashMap::new(), Some(10), Some(5))
-        .expect_err("inverted bounds must reject");
-    assert!(err.contains("min_trace_duration_ns"), "{err}");
 }
 
 // ── Search: cursor ──────────────────────────────────────────────────

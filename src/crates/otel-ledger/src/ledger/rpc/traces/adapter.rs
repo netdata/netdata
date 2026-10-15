@@ -372,7 +372,7 @@ const BUILTIN_WORDS: [(&str, BuiltinField); 17] = [
 /// `Builtin` is spelled as the bare builtin words above, and the
 /// predicates-only `Any` is not wire-nameable at all. Enumeration emits
 /// attribute keys owner-qualified ([`render_attribute_key`]), so
-/// attribute selections are always qualified; its `.expect` keeps this
+/// attribute chip keys are always qualified; its `.expect` keeps this
 /// table in lockstep with the engine enum.
 const OWNER_WORDS: [(&str, AttributeOwner); 5] = [
     ("resource", AttributeOwner::Resource),
@@ -407,85 +407,22 @@ pub(crate) fn parse_selection_key(key: &str) -> Result<PredicateTarget, String> 
         })
 }
 
-/// Build the engine predicate from the wire's filters: each selection
-/// key is one Eq condition (values OR within the key, keys AND — the
-/// engine's multi-value semantics); the trace-duration bounds become
-/// builtin TraceDuration comparisons. Keys iterate sorted so requests are
-/// deterministic. An empty value list is no constraint.
-pub(crate) fn build_predicate(
-    selections: &HashMap<String, Vec<String>>,
-    min_trace_duration_ns: Option<i64>,
-    max_trace_duration_ns: Option<i64>,
-) -> Result<Predicate, String> {
-    if let (Some(min), Some(max)) = (min_trace_duration_ns, max_trace_duration_ns)
-        && min > max
-    {
-        return Err(format!(
-            "min_trace_duration_ns {min} exceeds max_trace_duration_ns {max}: nothing can match"
-        ));
-    }
-    let mut conditions = Vec::new();
-    let mut keys: Vec<&String> = selections.keys().collect();
-    keys.sort();
-    for key in keys {
-        // Validate the key even when its value list is empty — a typo'd
-        // key must not hide behind an empty selection.
-        let target = parse_selection_key(key)?;
-        let values = &selections[key];
-        if values.is_empty() {
-            continue;
-        }
-        conditions.push(Condition {
-            target,
-            op: CompareOp::Eq,
-            values: values
-                .iter()
-                .map(|v| PredicateValue::Text(v.clone()))
-                .collect(),
-        });
-    }
-    if let Some(min) = min_trace_duration_ns {
-        conditions.push(Condition {
-            target: PredicateTarget::Builtin(BuiltinField::TraceDuration),
-            op: CompareOp::Gte,
-            values: vec![PredicateValue::Integer(min)],
-        });
-    }
-    if let Some(max) = max_trace_duration_ns {
-        conditions.push(Condition {
-            target: PredicateTarget::Builtin(BuiltinField::TraceDuration),
-            op: CompareOp::Lte,
-            values: vec![PredicateValue::Integer(max)],
-        });
-    }
-    Ok(Predicate { conditions })
-}
-
-/// The search tokens of a request: the filter rail's `selections` and
-/// duration band as their flat predicate means (one same-span token, one
-/// token per bound — `TokenQuery::from`), then one token per chip and
-/// per free-text term. Every chip and term is validated alone, so a bad
-/// request is a client error before admission whose message names the
-/// chip as sent ([`chip_error`], [`text_error`]); the token count is the
-/// only rule over the whole query.
+/// The search tokens of a request: one token per chip and per free-text
+/// term. Every chip and term is validated alone, so a bad request is a
+/// client error before admission whose message names the chip as sent
+/// ([`chip_error`], [`text_error`]); the token count is the only rule
+/// over the whole query.
 pub(crate) fn build_tokens(
-    selections: &HashMap<String, Vec<String>>,
-    min_trace_duration_ns: Option<i64>,
-    max_trace_duration_ns: Option<i64>,
     conditions: &[ConditionParams],
     text: &[String],
 ) -> Result<TokenQuery, String> {
-    let mut tokens = TokenQuery::from(build_predicate(
-        selections,
-        min_trace_duration_ns,
-        max_trace_duration_ns,
-    )?);
-    let count = tokens.tokens.len() + conditions.len() + text.len();
+    let count = conditions.len() + text.len();
     if count > TOKENS_MAX {
         return Err(format!(
             "at most {TOKENS_MAX} conditions and text terms, got {count}"
         ));
     }
+    let mut tokens = TokenQuery::default();
     for condition in conditions {
         tokens.tokens.push(chip_token(condition)?);
     }
@@ -828,7 +765,7 @@ fn to_percentiles(buckets: &[Option<DurationPercentiles>]) -> OverviewPercentile
 ///   indistinguishable from exhaustion). Late arrivals ranking BELOW
 ///   the key appear on later pages normally.
 /// - The cursor freezes the window but NOT the filters: echoing it with
-///   different selections re-partitions a different result set. The
+///   different chips or text re-partitions a different result set. The
 ///   client must keep the filters fixed for the walk's lifetime.
 ///
 /// Cost note: each page reruns the query with `limit = served + limit`,

@@ -28,10 +28,9 @@ use sfsq::traces::{PartialReason, QueryStatus};
 /// Request param names accepted by this function, advertised to the UI
 /// in `InfoResponse::accepted_params`. The rule: the list carries
 /// exactly the TOP-LEVEL keys — the mode selectors, `tenant`, and every
-/// field the implicit Functions view reads: its window and cursor, the
-/// search bar's `conditions` and `text`, and (until the bar replaces
-/// them) the filter rail's `selections` and its duration band. A field
-/// the implicit view honours but this list omits is unreachable.
+/// field the implicit Functions view reads: its window and cursor, and
+/// the search bar's `conditions` and `text`. A field the implicit view
+/// honours but this list omits is unreachable.
 ///
 /// `timeout` is deliberately NOT listed: the implicit view accepts it
 /// for protocol parity and ignores it (execution deadlines belong to
@@ -50,9 +49,6 @@ pub const ACCEPTED_PARAMS: &[&str] = &[
     "anchor",
     "conditions",
     "text",
-    "selections",
-    "min_trace_duration_ns",
-    "max_trace_duration_ns",
 ];
 
 /// The raw top-level shape: the three mode selectors and supported
@@ -88,12 +84,6 @@ struct RawOtelTracesRequest {
     conditions: Option<serde_json::Value>,
     #[serde(default, deserialize_with = "present")]
     text: Option<serde_json::Value>,
-    #[serde(default, deserialize_with = "present")]
-    min_trace_duration_ns: Option<serde_json::Value>,
-    #[serde(default, deserialize_with = "present")]
-    max_trace_duration_ns: Option<serde_json::Value>,
-    #[serde(default, deserialize_with = "present")]
-    selections: Option<serde_json::Value>,
     #[serde(default, deserialize_with = "present")]
     timeout: Option<serde_json::Value>,
     /// Tenant whose data the query reads — a scoping selector supplied
@@ -183,9 +173,6 @@ impl TryFrom<RawOtelTracesRequest> for OtelTracesRequest {
             || raw.anchor.is_some()
             || raw.conditions.is_some()
             || raw.text.is_some()
-            || raw.min_trace_duration_ns.is_some()
-            || raw.max_trace_duration_ns.is_some()
-            || raw.selections.is_some()
             || raw.timeout.is_some();
 
         match present.as_slice() {
@@ -221,9 +208,6 @@ impl TryFrom<RawOtelTracesRequest> for OtelTracesRequest {
                 ("anchor", raw.anchor.as_ref()),
                 ("conditions", raw.conditions.as_ref()),
                 ("text", raw.text.as_ref()),
-                ("min_trace_duration_ns", raw.min_trace_duration_ns.as_ref()),
-                ("max_trace_duration_ns", raw.max_trace_duration_ns.as_ref()),
-                ("selections", raw.selections.as_ref()),
                 ("timeout", raw.timeout.as_ref()),
             ] {
                 if let Some(value) = value {
@@ -288,27 +272,6 @@ pub struct FunctionsParams {
     /// [`REQUEST_TEXT_MAX_BYTES`].
     #[serde(default)]
     pub text: Vec<String>,
-    /// Facet selections. Keys are `<owner>.<key>` attributes
-    /// (resource/span/instrumentation/event/link) or bare builtin words
-    /// (see the adapter's grammar); values OR within a key, keys AND,
-    /// all on ONE span (one token beside the chips).
-    #[serde(default)]
-    pub selections: std::collections::HashMap<String, Vec<String>>,
-    /// Inclusive lower bound on the TRACE envelope duration,
-    /// nanoseconds — the "min duration" filter of the Functions view.
-    /// Trace-envelope, not span, so it narrows the same quantity the
-    /// overview grid bins by. Forwarded verbatim to
-    /// [`SearchParams::min_trace_duration_ns`], paired with
-    /// [`Self::max_trace_duration_ns`] (also forwarded): the pair
-    /// expresses a duration BAND, not only a floor.
-    #[serde(default)]
-    pub min_trace_duration_ns: Option<i64>,
-    /// Inclusive upper bound on the TRACE envelope duration,
-    /// nanoseconds — the "max duration" filter of the Functions view,
-    /// paired with [`Self::min_trace_duration_ns`]; forwarded verbatim
-    /// to [`SearchParams::max_trace_duration_ns`].
-    #[serde(default)]
-    pub max_trace_duration_ns: Option<i64>,
     /// Accepted for parity with the Functions protocol. Execution
     /// deadlines remain owned by the bridge call context.
     #[serde(default)]
@@ -350,9 +313,6 @@ impl FunctionsParams {
             limit: self.last,
             conditions: self.conditions.clone(),
             text: self.text.clone(),
-            selections: self.selections.clone(),
-            min_trace_duration_ns: self.min_trace_duration_ns,
-            max_trace_duration_ns: self.max_trace_duration_ns,
             anchor: self.anchor.clone(),
         })
     }
@@ -382,16 +342,6 @@ pub struct SearchParams {
     pub limit: usize,
     pub conditions: Vec<ConditionParams>,
     pub text: Vec<String>,
-    pub selections: std::collections::HashMap<String, Vec<String>>,
-    /// Inclusive TRACE-envelope-duration bounds, nanoseconds — the
-    /// overview grid's cell-click narrowing (the grid bins by trace
-    /// envelope, so span-duration bounds would mismatch it). Round-trip
-    /// convention: the grid's duration bins are HALF-OPEN
-    /// `[edge, next_edge)`, these bounds INCLUSIVE — a cell click sends
-    /// `min = edge, max = next_edge − 1`, or an exactly-on-edge trace
-    /// leaks in from the next bin.
-    pub min_trace_duration_ns: Option<i64>,
-    pub max_trace_duration_ns: Option<i64>,
     /// Opaque pagination cursor echoed from a previous response's
     /// `anchor.next`.
     pub anchor: Option<String>,
@@ -730,14 +680,14 @@ pub struct SearchResult {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub anchor: Option<AnchorWire>,
     /// The window aggregate, composed from a second engine pass in this
-    /// same request under the page's chips, text and `selections` — all
-    /// but trace-duration chips and the duration band (duration is the
-    /// grid's own axis). Absent (never `null`) when not composed, so a
+    /// same request under the page's chips and text — all but the
+    /// trace-duration chips (duration is the grid's own axis). Absent
+    /// (never `null`) when not composed, so a
     /// consumer detects it by PRESENCE.
     ///
     /// Present on a FIRST page only: a request carrying an anchor
     /// ([`FunctionsParams::anchor`]) gets NO `overview` key at all.
-    /// Such a page reruns the same query (same selections) over the
+    /// Such a page reruns the same query (same chips and text) over the
     /// cursor's frozen window, so recomposing the aggregate would
     /// repeat the section the first page already delivered — one extra
     /// full-window pass per page of a walk, for identical numbers. A
@@ -791,7 +741,7 @@ pub struct AnchorWire {
 /// subset relation.
 ///
 /// How the section's population relates to the page's: it applies the
-/// page's chips, text and `selections` except duration ones, with
+/// page's chips and text except the trace-duration ones, with
 /// stored-row semantics, like every other number in the section — a
 /// span-local chip holds when ANY stored copy of a span starting inside
 /// the grid matches (a `!` chip when none does), a root chip reads the

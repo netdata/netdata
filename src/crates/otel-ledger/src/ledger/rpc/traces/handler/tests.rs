@@ -84,10 +84,7 @@ async fn info_returns_the_descriptor() {
             "last",
             "anchor",
             "conditions",
-            "text",
-            "selections",
-            "min_trace_duration_ns",
-            "max_trace_duration_ns"
+            "text"
         ])
     );
     assert_eq!(v["required_params"], json!([]));
@@ -560,29 +557,30 @@ async fn search_returns_most_recent_first_with_deterministic_ties() {
 }
 
 #[tokio::test]
-async fn selections_narrow_by_service_operation_and_attributes() {
+async fn chips_narrow_by_service_operation_and_attributes() {
     let h = handler_with_search_corpus().await;
 
     let mut body = window_body();
-    body["selections"] = json!({"resource.service.name": ["svc-a"]});
+    body["conditions"] = json!([{"key": "resource.service.name", "op": "=", "values": ["svc-a"]}]);
     let v = list(&h, body).await.unwrap();
     assert_eq!(ids(&v), vec!["0e", "0c", "0a"]);
 
-    // Multi-value OR within a key.
+    // Multi-value OR within a chip.
     let mut body = window_body();
-    body["selections"] = json!({"resource.service.name": ["svc-a", "svc-b"]});
+    body["conditions"] =
+        json!([{"key": "resource.service.name", "op": "=", "values": ["svc-a", "svc-b"]}]);
     let v = list(&h, body).await.unwrap();
     assert_eq!(ids(&v).len(), 5);
 
     // Builtin word: only B and E have a second span.
     let mut body = window_body();
-    body["selections"] = json!({"name": ["span-2"]});
+    body["conditions"] = json!([{"key": "name", "op": "=", "values": ["span-2"]}]);
     let v = list(&h, body).await.unwrap();
     assert_eq!(ids(&v), vec!["0e", "0b"]);
 
-    // Keys AND across selections.
+    // Chips AND at trace level.
     let mut body = window_body();
-    body["selections"] = json!({"name": ["span-2"], "resource.service.name": ["svc-b"]});
+    body["conditions"] = json!([{"key": "name", "op": "=", "values": ["span-2"]}, {"key": "resource.service.name", "op": "=", "values": ["svc-b"]}]);
     let v = list(&h, body).await.unwrap();
     assert_eq!(ids(&v), vec!["0b"]);
 }
@@ -607,14 +605,14 @@ async fn the_otel_defaults_are_selectable_in_the_functions_view() {
     let h = make_handler_over(registries);
 
     let mut body = functions_body(20);
-    body["selections"] = json!({"status": ["UNSET"]});
+    body["conditions"] = json!([{"key": "status", "op": "=", "values": ["UNSET"]}]);
     let v = serde_json::to_value(call_on(&h, body).await.unwrap()).unwrap();
     assert_eq!(ids(&v["data"]), ["0b"]);
     let o = &v["data"]["overview"];
     assert_eq!(o["totals"], json!({"traces": 1, "spans": 2, "errors": 0}));
 
     let mut body = functions_body(20);
-    body["selections"] = json!({"kind": ["UNSPECIFIED"]});
+    body["conditions"] = json!([{"key": "kind", "op": "=", "values": ["UNSPECIFIED"]}]);
     let v = serde_json::to_value(call_on(&h, body).await.unwrap()).unwrap();
     assert_eq!(ids(&v["data"]), ["0b", "0a"]);
 }
@@ -652,7 +650,6 @@ async fn invalid_list_requests_are_clean_client_errors() {
             json!({"limit": super::super::wire::SEARCH_LIMIT_MAX + 1}),
             "exceeds the maximum",
         ),
-        (json!({"selections": {"bogus": ["x"]}}), "unknown key"),
         (json!({"anchor": "junk"}), "malformed anchor"),
         (json!({"after": 500, "before": 400}), "invalid window"),
     ] {
@@ -1054,10 +1051,10 @@ async fn the_aggregates_coverage_is_the_grids_aligned_window() {
 async fn the_aggregate_bins_only_the_selected_traces() {
     let h = handler_with_search_corpus().await;
 
-    // Selections active: the aggregate follows them (the svc-a traces
-    // A, C, E — 5 stored spans).
+    // A chip active: the aggregate follows it (the svc-a traces A, C,
+    // E — 5 stored spans).
     let mut body = functions_body(20);
-    body["selections"] = json!({"resource.service.name": ["svc-a"]});
+    body["conditions"] = json!([{"key": "resource.service.name", "op": "=", "values": ["svc-a"]}]);
     let v = serde_json::to_value(call_on(&h, body).await.unwrap()).unwrap();
     assert_eq!(ids(&v["data"]), ["0e", "0c", "0a"]);
     let o = &v["data"]["overview"];
@@ -1077,91 +1074,92 @@ async fn the_aggregate_bins_only_the_selected_traces() {
 }
 
 #[tokio::test]
-async fn the_aggregate_follows_the_selections_but_never_the_duration_bounds() {
+async fn the_aggregate_follows_the_chips_but_never_the_duration_ones() {
     let h = handler_with_search_corpus().await;
-    // A selection AND a duration bound: the list honours both (E is the
-    // only svc-a trace with a ≥1µs envelope), the grid honours the
-    // selection alone — duration is its own axis.
+    // A service chip AND a duration chip: the list honours both (E is
+    // the only svc-a trace with a ≥1µs envelope), the grid honours the
+    // service chip alone — duration is its own axis.
     let mut body = functions_body(20);
-    body["selections"] = json!({"resource.service.name": ["svc-a"]});
-    body["min_trace_duration_ns"] = json!(1_000);
+    body["conditions"] = json!([
+        {"key": "resource.service.name", "op": "=", "values": ["svc-a"]},
+        {"key": "trace_duration", "op": ">=", "values": [1_000]}
+    ]);
     let v = serde_json::to_value(call_on(&h, body).await.unwrap()).unwrap();
     assert_eq!(ids(&v["data"]), ["0e"]);
     let o = &v["data"]["overview"];
     assert_eq!(o["totals"], json!({"traces": 3, "spans": 5, "errors": 0}));
 
-    // Values OR within a key: both services select everything, and the
+    // Values OR within a chip: both services select everything, and the
     // grid equals the unfiltered one.
     let mut body = functions_body(20);
-    body["selections"] = json!({"resource.service.name": ["svc-a", "svc-b"]});
+    body["conditions"] =
+        json!([{"key": "resource.service.name", "op": "=", "values": ["svc-a", "svc-b"]}]);
     let v = serde_json::to_value(call_on(&h, body).await.unwrap()).unwrap();
     let o = &v["data"]["overview"];
     assert_eq!(o["totals"], json!({"traces": 5, "spans": 8, "errors": 0}));
-
-    // An empty value list constrains nothing: the plain window grid.
-    let mut body = functions_body(20);
-    body["selections"] = json!({"resource.service.name": []});
-    let v = serde_json::to_value(call_on(&h, body).await.unwrap()).unwrap();
-    assert!(
-        v["data"]["overview"].get("scope").is_none(),
-        "scope left the wire"
-    );
 }
 
-/// Every trace-level word the engine owns (`trace_level_target`), as
-/// the wire spells it, with a value the Functions list can apply and
-/// the ids that list then shows (newest first). `trace_duration` is
-/// absent: selection values are text and the field takes integers, so
-/// the engine rejects it outright.
-const TRACE_LEVEL_SELECTIONS: [(&str, &str, &[&str]); 3] = [
+/// Every trace-level word the engine owns (`trace_level_target`) but
+/// `trace_duration` (the grid's own axis), as the wire spells it, with
+/// a value an `=` chip can apply and the ids the list then shows
+/// (newest first).
+const TRACE_LEVEL_CHIPS: [(&str, &str, &[&str]); 3] = [
     ("root_service_name", "svc-a", &["0e", "0c", "0a"]),
     ("root_name", "span-1", &["0e", "0c", "0d", "0b", "0a"]),
     ("trace_id", "0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a", &["0a"]),
 ];
 
 #[tokio::test]
-async fn trace_level_selection_words_filter_the_grid_too() {
+async fn trace_level_chips_filter_the_grid_too() {
     let h = handler_with_search_corpus().await;
     // Root words read the roots the sources recorded and `trace_id`
     // pins: the grid bins the traces the list shows.
-    for (word, value, listed) in TRACE_LEVEL_SELECTIONS {
+    for (word, value, listed) in TRACE_LEVEL_CHIPS {
         let mut body = functions_body(20);
-        body["selections"] = json!({word: [value]});
+        body["conditions"] = json!([{"key": word, "op": "=", "values": [value]}]);
         let v = serde_json::to_value(call_on(&h, body).await.unwrap()).unwrap();
         assert_eq!(ids(&v["data"]), listed, "{word}: the list applies the word");
         let o = &v["data"]["overview"];
         assert_eq!(o["totals"]["traces"], listed.len(), "{word}");
     }
 
-    // Mixed with a span-level word, both apply to the grid as to the list.
+    // Mixed with a span-level chip, both apply to the grid as to the list.
     let mut body = functions_body(20);
-    body["selections"] =
-        json!({"root_service_name": ["svc-a"], "resource.service.name": ["svc-b"]});
+    body["conditions"] = json!([{"key": "root_service_name", "op": "=", "values": ["svc-a"]}, {"key": "resource.service.name", "op": "=", "values": ["svc-b"]}]);
     let v = serde_json::to_value(call_on(&h, body).await.unwrap()).unwrap();
     assert!(ids(&v["data"]).is_empty(), "no trace is on both services");
     assert_eq!(v["data"]["overview"]["totals"]["traces"], 0);
 }
 
 #[tokio::test]
-async fn duration_bounds_narrow_the_list_but_never_the_aggregate() {
+async fn duration_chips_narrow_the_list_but_never_the_aggregate() {
     let h = handler_with_search_corpus().await;
+    let bound = |op: &str, ns: u64| json!({"key": "trace_duration", "op": op, "values": [ns]});
 
     // A lower bound narrows the page to the window's two long traces
     // (envelopes 2500ns and 1500ns) while the aggregate keeps counting
-    // all five — duration bounds never reach the grid.
+    // all five — duration chips never reach the grid.
     let mut body = functions_body(20);
-    body["min_trace_duration_ns"] = json!(1_000);
+    body["conditions"] = json!([bound(">=", 1_000)]);
     let v = serde_json::to_value(call_on(&h, body).await.unwrap()).unwrap();
     assert_eq!(ids(&v["data"]), ["0e", "0b"]);
     let o = &v["data"]["overview"];
     assert_eq!(o["totals"], json!({"traces": 5, "spans": 8, "errors": 0}));
 
-    // The upper bound behaves identically — the heatmap's cell click
-    // sends it, on its own or paired with the lower one.
+    // The upper bound behaves identically.
     let mut body = functions_body(20);
-    body["max_trace_duration_ns"] = json!(1_000);
+    body["conditions"] = json!([bound("<=", 1_000)]);
     let v = serde_json::to_value(call_on(&h, body).await.unwrap()).unwrap();
     assert_eq!(ids(&v["data"]), ["0c", "0d", "0a"]);
+    let o = &v["data"]["overview"];
+    assert_eq!(o["totals"], json!({"traces": 5, "spans": 8, "errors": 0}));
+
+    // A band, the shape of a heatmap cell click (`>=` floor, `<`
+    // ceiling): only B's 1500ns envelope is inside.
+    let mut body = functions_body(20);
+    body["conditions"] = json!([bound(">=", 1_000), bound("<", 2_000)]);
+    let v = serde_json::to_value(call_on(&h, body).await.unwrap()).unwrap();
+    assert_eq!(ids(&v["data"]), ["0b"]);
     let o = &v["data"]["overview"];
     assert_eq!(o["totals"], json!({"traces": 5, "spans": 8, "errors": 0}));
 }

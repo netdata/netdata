@@ -22,7 +22,7 @@
 //!   all client errors, with the message fragments clients match on;
 //! - the implicit view's parameter mapping through
 //!   `FunctionsParams::search_params`: defaults, relative-window
-//!   resolution, and the duration-filter forwarding;
+//!   resolution, and the chips and text forwarding;
 //! - per-mode param objects: self-contained windows;
 //! - `InfoResponse`'s exact descriptor JSON and the untagged response
 //!   envelope;
@@ -33,7 +33,7 @@
 //!
 //! Not pinned here: the anchor's format (an opaque string on the wire —
 //! cursor parsing and the "malformed anchor" rejections are the
-//! adapter's pin, `rpc/traces/adapter.rs`), the selections grammar
+//! adapter's pin, `rpc/traces/adapter.rs`), the chip key grammar
 //! (also the adapter's), semantic validation beyond deserialization
 //! (trace-id shape, limit caps, window bounds — the handler's and
 //! engine's job), and data-mode response semantics (the handler tests,
@@ -66,7 +66,7 @@ fn a_request_without_a_mode_selector_selects_the_functions_search_view() {
     };
     assert_eq!((p.after, p.before, p.last), (0, 0, 20));
     assert_eq!(p.anchor, None);
-    assert!(p.selections.is_empty());
+    assert!(p.conditions.is_empty() && p.text.is_empty());
 
     let r = req(json!({"tenant": "t1"}));
     assert!(matches!(r.mode, TracesMode::Functions(_)));
@@ -77,7 +77,8 @@ fn a_request_without_a_mode_selector_selects_the_functions_search_view() {
         "before": -60,
         "last": 7,
         "anchor": "cursor",
-        "selections": {"root_name": ["GET /api"]},
+        "conditions": [{"key": "root_name", "op": "=", "values": ["GET /api"]}],
+        "text": ["timeout"],
         "timeout": 120000
     }))
     .mode
@@ -86,46 +87,11 @@ fn a_request_without_a_mode_selector_selects_the_functions_search_view() {
     };
     assert_eq!((p.after, p.before, p.last), (-3600, -60, 7));
     assert_eq!(p.anchor.as_deref(), Some("cursor"));
-    assert_eq!(p.selections["root_name"], ["GET /api"]);
+    assert_eq!(p.conditions[0].key, "root_name");
+    assert_eq!(p.text, ["timeout"]);
 
     let search = p.search_params(10_000).unwrap();
     assert_eq!((search.after, search.before), (6_340, 9_940));
-}
-
-#[test]
-fn the_functions_view_forwards_the_minimum_trace_duration() {
-    let TracesMode::Functions(p) = req(json!({"min_trace_duration_ns": 250_000_000})).mode else {
-        panic!("Functions mode expected");
-    };
-    assert_eq!(
-        p.search_params(10_000).unwrap().min_trace_duration_ns,
-        Some(250_000_000)
-    );
-
-    // Omitted stays unset — the bound is opt-in; a client that never
-    // sends it keeps the same engine query as before.
-    let TracesMode::Functions(p) = req(json!({})).mode else {
-        panic!("Functions mode expected");
-    };
-    assert_eq!(p.search_params(10_000).unwrap().min_trace_duration_ns, None);
-}
-
-#[test]
-fn the_functions_view_forwards_the_maximum_trace_duration() {
-    let TracesMode::Functions(p) = req(json!({"max_trace_duration_ns": 250_000_000})).mode else {
-        panic!("Functions mode expected");
-    };
-    assert_eq!(
-        p.search_params(10_000).unwrap().max_trace_duration_ns,
-        Some(250_000_000)
-    );
-
-    // Omitted stays unset — the bound is opt-in; a client that never
-    // sends it keeps the same engine query as before.
-    let TracesMode::Functions(p) = req(json!({})).mode else {
-        panic!("Functions mode expected");
-    };
-    assert_eq!(p.search_params(10_000).unwrap().max_trace_duration_ns, None);
 }
 
 #[test]
@@ -212,6 +178,9 @@ fn unknown_and_retired_top_level_keys_are_client_errors() {
         json!({"info": {}, "bogus": 1}),
         json!({"bogus": 1}),
         json!({"attribute_values": {"key": "kind"}}),
+        json!({"selections": {"name": ["GET"]}}),
+        json!({"min_trace_duration_ns": 1}),
+        json!({"max_trace_duration_ns": 1}),
     ] {
         let err = req_err(body.clone());
         assert!(err.contains("unknown field"), "for {body}: {err}");
@@ -221,8 +190,6 @@ fn unknown_and_retired_top_level_keys_are_client_errors() {
         json!({"info": {}, "after": 1, "before": 2}),
         json!({"info": {}, "last": 5}),
         json!({"info": {}, "timeout": 30}),
-        json!({"info": {}, "min_trace_duration_ns": 1}),
-        json!({"info": {}, "max_trace_duration_ns": 1}),
         json!({"trace": {"id": "00"}, "anchor": "x"}),
     ] {
         let err = req_err(body.clone());
@@ -384,8 +351,7 @@ fn info_response_shape_is_pinned() {
             "has_history": true,
             "v": 3,
             "accepted_params": [
-                "info", "trace", "suggest", "tenant", "after", "before", "last", "anchor", "conditions", "text", "selections",
-                "min_trace_duration_ns", "max_trace_duration_ns"
+                "info", "trace", "suggest", "tenant", "after", "before", "last", "anchor", "conditions", "text"
             ],
             "required_params": [],
             "help": "Query and visualize OpenTelemetry traces.",
