@@ -361,16 +361,7 @@ async fn trace_by_id_assembles_the_fixture_trace_end_to_end() {
         "fields carry the span name: {}",
         s0["fields"]
     );
-    // And the typed map describes what came back.
-    assert!(
-        v["field_kinds"]["fields"]
-            .as_array()
-            .unwrap()
-            .iter()
-            .any(|kv| kv[0] == "name"),
-        "{}",
-        v["field_kinds"]
-    );
+    assert!(v.get("field_kinds").is_none(), "no field kinds on the wire");
 }
 
 #[tokio::test]
@@ -609,7 +600,7 @@ async fn the_otel_defaults_are_selectable_in_the_functions_view() {
     let v = serde_json::to_value(call_on(&h, body).await.unwrap()).unwrap();
     assert_eq!(ids(&v["data"]), ["0b"]);
     let o = &v["data"]["overview"];
-    assert_eq!(o["totals"], json!({"traces": 1, "spans": 2, "errors": 0}));
+    assert_eq!(o["totals"], json!({"traces": 1}));
 
     let mut body = functions_body(20);
     body["conditions"] = json!([{"key": "kind", "op": "=", "values": ["UNSPECIFIED"]}]);
@@ -841,7 +832,7 @@ async fn the_heatmap_matches_the_corpus_distribution() {
     let v = heatmap_of(&h).await;
     assert_eq!(v["unit"], "traces");
     assert_eq!(v["status"], json!({"complete": true}));
-    assert_eq!(v["totals"], json!({"traces": 5, "spans": 8, "errors": 0}));
+    assert_eq!(v["totals"], json!({"traces": 5}));
     assert_eq!(v["grid"]["bucket_start_s"], T_S);
     assert_eq!(v["grid"]["bucket_width_s"], 1);
     assert_eq!(
@@ -865,25 +856,6 @@ async fn the_heatmap_matches_the_corpus_distribution() {
 }
 
 #[tokio::test]
-async fn the_heatmap_counts_error_spans_in_totals() {
-    use crate::ledger::rpc::traces::fixtures::otlp_req_err;
-    let registries = make_registries();
-    install_wal(
-        &registries,
-        "default",
-        1,
-        vec![
-            otlp_req_svc(0x0A, 2, base_ns(10), "svc"),
-            otlp_req_err(0x0B, 2, base_ns(20), "svc"), // span 1 = ERROR
-        ],
-    )
-    .await;
-    let h = make_handler_over(registries);
-    let v = heatmap_of(&h).await;
-    assert_eq!(v["totals"], json!({"traces": 2, "spans": 4, "errors": 1}));
-}
-
-#[tokio::test]
 async fn the_grid_carries_error_counts_per_bucket_and_duration_bin() {
     use crate::ledger::rpc::traces::fixtures::otlp_req_err;
     let registries = make_registries();
@@ -900,7 +872,7 @@ async fn the_grid_carries_error_counts_per_bucket_and_duration_bin() {
     .await;
     let h = make_handler_over(registries);
     let v = heatmap_of(&h).await;
-    assert_eq!(v["totals"], json!({"traces": 3, "spans": 6, "errors": 2}));
+    assert_eq!(v["totals"], json!({"traces": 3}));
     let cells = v["grid"]["cells"].as_array().unwrap();
     let errors = v["grid"]["error_cells"].as_array().unwrap();
     assert_eq!(errors.len(), cells.len(), "index-parallel to the cells");
@@ -924,7 +896,7 @@ async fn the_grid_carries_error_counts_per_bucket_and_duration_bin() {
         .flat_map(|r| r.as_array().unwrap())
         .map(|e| e.as_u64().unwrap())
         .sum();
-    assert_eq!(sum, 2, "the error cells sum to totals.errors");
+    assert_eq!(sum, 2, "one failing span in each failing trace");
 }
 
 /// Every bucket of this corpus holds one distinct duration, so the
@@ -1015,7 +987,7 @@ async fn the_functions_view_aggregates_the_whole_window_beside_the_page() {
     assert_eq!(o["version"], 1);
     assert_eq!(o["unit"], "traces");
     assert_eq!(o["status"], json!({"complete": true}));
-    assert_eq!(o["totals"], json!({"traces": 5, "spans": 8, "errors": 0}));
+    assert_eq!(o["totals"], json!({"traces": 5}));
     assert_eq!(o["grid"]["bucket_start_s"], T_S);
     assert_eq!(o["grid"]["bucket_width_s"], 1);
     assert_eq!(
@@ -1052,13 +1024,13 @@ async fn the_aggregate_bins_only_the_selected_traces() {
     let h = handler_with_search_corpus().await;
 
     // A chip active: the aggregate follows it (the svc-a traces A, C,
-    // E — 5 stored spans).
+    // E).
     let mut body = functions_body(20);
     body["conditions"] = json!([{"key": "resource.service.name", "op": "=", "values": ["svc-a"]}]);
     let v = serde_json::to_value(call_on(&h, body).await.unwrap()).unwrap();
     assert_eq!(ids(&v["data"]), ["0e", "0c", "0a"]);
     let o = &v["data"]["overview"];
-    assert_eq!(o["totals"], json!({"traces": 3, "spans": 5, "errors": 0}));
+    assert_eq!(o["totals"], json!({"traces": 3}));
     let cells = o["grid"]["cells"].as_array().unwrap();
     let sum: u64 = cells
         .iter()
@@ -1087,7 +1059,7 @@ async fn the_aggregate_follows_the_chips_but_never_the_duration_ones() {
     let v = serde_json::to_value(call_on(&h, body).await.unwrap()).unwrap();
     assert_eq!(ids(&v["data"]), ["0e"]);
     let o = &v["data"]["overview"];
-    assert_eq!(o["totals"], json!({"traces": 3, "spans": 5, "errors": 0}));
+    assert_eq!(o["totals"], json!({"traces": 3}));
 
     // Values OR within a chip: both services select everything, and the
     // grid equals the unfiltered one.
@@ -1096,7 +1068,7 @@ async fn the_aggregate_follows_the_chips_but_never_the_duration_ones() {
         json!([{"key": "resource.service.name", "op": "=", "values": ["svc-a", "svc-b"]}]);
     let v = serde_json::to_value(call_on(&h, body).await.unwrap()).unwrap();
     let o = &v["data"]["overview"];
-    assert_eq!(o["totals"], json!({"traces": 5, "spans": 8, "errors": 0}));
+    assert_eq!(o["totals"], json!({"traces": 5}));
 }
 
 /// Every trace-level word the engine owns (`trace_level_target`) but
@@ -1144,7 +1116,7 @@ async fn duration_chips_narrow_the_list_but_never_the_aggregate() {
     let v = serde_json::to_value(call_on(&h, body).await.unwrap()).unwrap();
     assert_eq!(ids(&v["data"]), ["0e", "0b"]);
     let o = &v["data"]["overview"];
-    assert_eq!(o["totals"], json!({"traces": 5, "spans": 8, "errors": 0}));
+    assert_eq!(o["totals"], json!({"traces": 5}));
 
     // The upper bound behaves identically.
     let mut body = functions_body(20);
@@ -1152,7 +1124,7 @@ async fn duration_chips_narrow_the_list_but_never_the_aggregate() {
     let v = serde_json::to_value(call_on(&h, body).await.unwrap()).unwrap();
     assert_eq!(ids(&v["data"]), ["0c", "0d", "0a"]);
     let o = &v["data"]["overview"];
-    assert_eq!(o["totals"], json!({"traces": 5, "spans": 8, "errors": 0}));
+    assert_eq!(o["totals"], json!({"traces": 5}));
 
     // A band, the shape of a heatmap cell click (`>=` floor, `<`
     // ceiling): only B's 1500ns envelope is inside.
@@ -1161,7 +1133,7 @@ async fn duration_chips_narrow_the_list_but_never_the_aggregate() {
     let v = serde_json::to_value(call_on(&h, body).await.unwrap()).unwrap();
     assert_eq!(ids(&v["data"]), ["0b"]);
     let o = &v["data"]["overview"];
-    assert_eq!(o["totals"], json!({"traces": 5, "spans": 8, "errors": 0}));
+    assert_eq!(o["totals"], json!({"traces": 5}));
 }
 
 #[tokio::test]
@@ -1185,10 +1157,7 @@ async fn the_aggregate_captures_the_aligned_window_and_carries_its_own_status() 
     // ...the aggregate never saw it: its capture is the grid's window,
     // so its status is its own.
     assert_eq!(v["data"]["overview"]["status"], json!({"complete": true}));
-    assert_eq!(
-        v["data"]["overview"]["totals"],
-        json!({"traces": 1, "spans": 3, "errors": 0})
-    );
+    assert_eq!(v["data"]["overview"]["totals"], json!({"traces": 1}));
 }
 
 #[tokio::test]
@@ -1198,10 +1167,7 @@ async fn an_anchor_page_carries_no_aggregate_and_walks_the_corpus_unchanged() {
     // Page 1 carries no cursor, so the aggregate is composed as ever.
     let v1 = serde_json::to_value(call_on(&h, functions_body(2)).await.unwrap()).unwrap();
     assert_eq!(ids(&v1["data"]), ["0e", "0c"]);
-    assert_eq!(
-        v1["data"]["overview"]["totals"],
-        json!({"traces": 5, "spans": 8, "errors": 0})
-    );
+    assert_eq!(v1["data"]["overview"]["totals"], json!({"traces": 5}));
     let next1 = v1["data"]["anchor"]["next"].clone();
 
     // Page 2: the tie partner D, then B, and its own cursor. Asserted

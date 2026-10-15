@@ -13,8 +13,9 @@
 //!   pin);
 //! - [`to_trace_result`]: the whole wire envelope — echoed lowercase
 //!   id, coverage echo, status, items, summary_root, roots/children,
-//!   an ABSENT `parent_span_id` for roots, event/link sub-shapes and
-//!   `field_kinds` words — plus the empty-trace degenerate;
+//!   an ABSENT `parent_span_id` for roots, event/link sub-shapes, no
+//!   `field_kinds` even when the engine reports kinds — plus the
+//!   empty-trace degenerate;
 //! - the selection-key grammar: `BUILTIN_WORDS`/`OWNER_WORDS` in
 //!   lockstep with the engine enums (a new owner fails compilation,
 //!   a new builtin fails this suite) and selection-key parsing with
@@ -34,7 +35,7 @@
 //! handler tests) and request deserialization (the wire tests).
 use super::*;
 use serde_json::json;
-use sfsq::traces::QueryStatus;
+use sfsq::traces::{FieldKinds, QueryStatus};
 
 // ── parse_trace_id ──────────────────────────────────────────────────
 
@@ -163,13 +164,9 @@ fn trace_result_shape_is_pinned() {
     let s1 = &v["spans"][1];
     assert_eq!(s1["parent_span_id"], "0101010101010101");
 
-    assert_eq!(
-        v["field_kinds"],
-        json!({
-            "fields": [["name", "str"]],
-            "event_attributes": [["k", "str"]],
-            "link_attributes": [],
-        })
+    assert!(
+        v.get("field_kinds").is_none(),
+        "the engine's field kinds stay off the wire"
     );
 }
 
@@ -718,12 +715,11 @@ impl sfst::trace_combine::SpanSource for VecSource {
 }
 
 /// Merge `spans` as the trace handler does (the wire shaper and its
-/// budget), then shape the engine's result into the wire. Field kinds
-/// cover the kept spans' names, as the engine projects them.
+/// budget), then shape the engine's result into the wire.
 fn shaped_trace(spans: Vec<sfst::TraceSpan>) -> TraceResult {
     let trace_id = parse_trace_id("11111111111111111111111111111111").unwrap();
     let mut source = VecSource(spans);
-    let mut shaper = WireShaper::new();
+    let mut shaper = WireShaper;
     let out = sfst::trace_combine::combine(
         &mut [&mut source as &mut dyn sfst::trace_combine::SpanSource],
         trace_id,
@@ -732,14 +728,6 @@ fn shaped_trace(spans: Vec<sfst::TraceSpan>) -> TraceResult {
         Some(&mut shaper),
         &|| false,
     );
-    let mut names: Vec<String> = out
-        .trace
-        .spans
-        .iter()
-        .flat_map(|s| s.fields.iter().map(|(k, _)| k.clone()))
-        .collect();
-    names.sort();
-    names.dedup();
     let data = TraceData {
         status: if out.budget_hit {
             QueryStatus::Partial([sfsq::traces::PartialReason::ByteBudget].into())
@@ -747,13 +735,7 @@ fn shaped_trace(spans: Vec<sfst::TraceSpan>) -> TraceResult {
             QueryStatus::Complete
         },
         trace: out.trace,
-        field_kinds: FieldKinds {
-            fields: names
-                .into_iter()
-                .map(|n| (n, sfst::ValueKind::Str))
-                .collect(),
-            ..FieldKinds::default()
-        },
+        field_kinds: FieldKinds::default(),
         span_cut: out.cut,
         matched: Vec::new(),
     };
@@ -788,8 +770,8 @@ fn an_oversized_span_value_is_cut_and_flagged() {
 fn a_trace_over_the_byte_budget_keeps_its_earliest_spans() {
     // A chain of spans each carrying one capped-size value under its own
     // key: the budget holds only a prefix. The kept spans are the input
-    // prefix in order with their own graph, and spans plus field kinds
-    // stay within the budget.
+    // prefix in order with their own graph, and the spans stay within
+    // the budget.
     let n = TRACE_SPANS_MAX_BYTES / TRACE_VALUE_MAX_BYTES + 50;
     let id = |i: usize| sfst::SpanId::from((i as u64 + 1).to_be_bytes());
     let spans: Vec<sfst::TraceSpan> = (0..n)
@@ -818,8 +800,7 @@ fn a_trace_over_the_byte_budget_keeps_its_earliest_spans() {
     let (roots, children) = sfst::trace_combine::build_forest(&input[..kept]);
     assert_eq!((&r.roots, &r.children), (&roots, &children));
     let spans_bytes: usize = r.spans.iter().map(json_len).sum();
-    let kinds_bytes: usize = r.field_kinds.fields.iter().map(|e| json_len(e) + 1).sum();
-    assert!(spans_bytes + kinds_bytes <= TRACE_SPANS_MAX_BYTES);
+    assert!(spans_bytes <= TRACE_SPANS_MAX_BYTES);
     let v = serde_json::to_value(&r).unwrap();
     assert_eq!(v["status"], json!({"partial": ["byte_budget"]}));
 }

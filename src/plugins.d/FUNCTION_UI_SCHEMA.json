@@ -974,11 +974,9 @@
         },
         "totals": {
           "type": "object",
-          "required": ["traces", "spans", "errors"],
+          "required": ["traces"],
           "properties": {
-            "traces": { "type": "integer", "minimum": 0 },
-            "spans": { "type": "integer", "minimum": 0 },
-            "errors": { "type": "integer", "minimum": 0 }
+            "traces": { "type": "integer", "minimum": 0 }
           },
           "additionalProperties": true
         }

@@ -522,11 +522,10 @@ pub struct OverviewGridWire {
     /// bins by its merged envelope).
     pub cells: Vec<Vec<u64>>,
     /// Per cell, the binned traces' STORED ERROR-status spans —
-    /// index-parallel to `cells` in BOTH dimensions, summing to
-    /// `totals.errors`. The same ERROR-SPAN statistic as that total,
-    /// sliced by the trace's cell: a cell holding one trace with three
-    /// failed spans reads 3, not 1. Read beside `cells[bucket][bin]` to
-    /// paint one heatmap cell's count and error rate together.
+    /// index-parallel to `cells` in BOTH dimensions. It counts spans,
+    /// not traces: a cell holding one trace with three failed spans
+    /// reads 3, not 1. Read beside `cells[bucket][bin]` to paint one
+    /// heatmap cell's count and error rate together.
     pub error_cells: Vec<Vec<u64>>,
     /// Per time bucket, the binned traces' envelope-duration
     /// percentiles, nanoseconds (within 1/32 of exact).
@@ -552,15 +551,11 @@ pub struct OverviewPercentilesWire {
 /// Totals are trace-envelope-aligned, not span-window-aligned: a trace
 /// whose merged envelope starts before the window is clipped from the
 /// grid AND these totals (even though `search` returns its in-window
-/// spans), and a binned trace contributes ALL its stored spans.
+/// spans).
 #[derive(Debug, Serialize)]
 pub struct OverviewTotals {
     /// Distinct traces binned into the grid (= the sum of all cells).
     pub traces: u64,
-    /// Their stored spans, summed (resends included).
-    pub spans: u64,
-    /// Of those spans, ERROR-status ones.
-    pub errors: u64,
 }
 
 /// Suggestions, best first: match class, then bytes. Bounded by
@@ -731,14 +726,11 @@ pub struct AnchorWire {
 /// recompute an identical one, so a paginating consumer must hold on
 /// to the section it was given. See [`SearchResult::overview`].
 ///
-/// Its population is NOT the page's, in two directions that a caption
-/// must respect: the grid and totals are TRACE-ENVELOPE-aligned over
-/// the whole window (a trace whose envelope starts before the window is
-/// clipped from here even though `search` returns its in-window spans,
-/// so a returned row can have no cell), and `totals.spans` sums STORED
-/// rows over the grid's population while a page row counts its trace's
-/// stored rows over the completion range. Two measurements, never a
-/// subset relation.
+/// Its population is NOT the page's, which a caption must respect: the
+/// grid and totals are TRACE-ENVELOPE-aligned over the whole window (a
+/// trace whose envelope starts before the window is clipped from here
+/// even though `search` returns its in-window spans, so a returned row
+/// can have no cell).
 ///
 /// How the section's population relates to the page's: it applies the
 /// page's chips and text except the trace-duration ones, with
@@ -884,7 +876,6 @@ pub struct TraceResult {
     /// cut. Negated and trace-level chips mark nothing. Empty without
     /// chips; covers the returned spans only.
     pub matched: Vec<u32>,
-    pub field_kinds: FieldKindsWire,
 }
 
 /// Result accounting. `returned` counts the spans in this response —
@@ -896,8 +887,8 @@ pub struct TraceItems {
 
 /// One span, ids in W3C lowercase hex. `fields` are the engine's
 /// resolved row facets as `[name, value]` string pairs (order
-/// preserved; names are storage names — `field_kinds.fields` carries
-/// their schema kinds). `kind` is the raw OTLP span-kind int; the
+/// preserved; names are storage names). `kind` is the raw OTLP
+/// span-kind int; the
 /// readable label is in `fields` under `kind`.
 #[derive(Debug, Serialize)]
 pub struct SpanWire {
@@ -944,17 +935,6 @@ pub struct LinkWire {
     pub flags: u32,
     pub dropped_attributes_count: u32,
     pub attributes: Vec<(String, String)>,
-}
-
-/// The sectioned name→kind map (span fields / event attributes / link
-/// attributes — sectioned because an event attr and a link attr may
-/// share a name with different kinds). Kind words are pinned by the
-/// adapter's exhaustive mapping.
-#[derive(Debug, Serialize)]
-pub struct FieldKindsWire {
-    pub fields: Vec<(String, &'static str)>,
-    pub event_attributes: Vec<(String, &'static str)>,
-    pub link_attributes: Vec<(String, &'static str)>,
 }
 
 #[derive(Debug, Serialize)]

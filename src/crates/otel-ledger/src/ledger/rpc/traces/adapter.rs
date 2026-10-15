@@ -12,19 +12,19 @@
 //! mode dispatch and the sealed-SFST + live-WAL source capture
 //! ([`super::sources`]) — the adapter never touches registry state.
 
-use std::collections::{HashMap, HashSet};
+use std::collections::HashMap;
 
 use sfsq::traces::{
     AttributeKey, AttributeOwner, BuiltinField, CompareOp, Condition, DURATION_BIN_LABELS,
-    DurationPercentiles, FieldKinds, OverviewData, Predicate, PredicateError, PredicateTarget,
-    PredicateValue, SearchData, TOKENS_MAX, Token, TokenQuery, TraceData,
+    DurationPercentiles, OverviewData, Predicate, PredicateError, PredicateTarget, PredicateValue,
+    SearchData, TOKENS_MAX, Token, TokenQuery, TraceData,
 };
 
 use super::wire::{
     AnchorWire, CONDITION_VALUES_MAX, ConditionParams, ConditionValue, CoverageWire, EventWire,
-    FieldKindsWire, LinkWire, OverviewGridWire, OverviewPercentilesWire, OverviewSection,
-    OverviewTotals, SearchItems, SearchResult, ServiceBreakdownWire, ServiceSpansWire, SpanWire,
-    StatusWire, SuggestResult, SuggestionWire, TraceItems, TraceResult, TraceSummaryWire,
+    LinkWire, OverviewGridWire, OverviewPercentilesWire, OverviewSection, OverviewTotals,
+    SearchItems, SearchResult, ServiceBreakdownWire, ServiceSpansWire, SpanWire, StatusWire,
+    SuggestResult, SuggestionWire, TraceItems, TraceResult, TraceSummaryWire,
 };
 
 /// Parse a W3C text-form trace id: exactly 32 hex chars (16 bytes),
@@ -101,8 +101,7 @@ pub(crate) fn completion_capture_range(window: &std::ops::Range<u32>) -> std::op
 /// stops a pathological value from dominating the response.
 pub(crate) const TRACE_VALUE_MAX_BYTES: usize = 8 * 1024;
 
-/// Budget for a trace's spans and their field kinds, in compact JSON
-/// bytes ([`WireShaper`]). Past it the engine keeps the earliest spans
+/// Budget for a trace's spans, in compact JSON bytes ([`WireShaper`]). Past it the engine keeps the earliest spans
 /// and reports `byte_budget`.
 pub(crate) const TRACE_SPANS_MAX_BYTES: usize = 2 * 1024 * 1024;
 
@@ -186,8 +185,8 @@ fn json_len(value: &impl serde::Serialize) -> usize {
 ///
 /// The engine already shaped the trace with [`WireShaper`]: values are
 /// capped (flagged per span in `span_cut`), a trace past the budget is
-/// its earliest spans with their own graph and field kinds and reports
-/// `byte_budget`. This only maps it.
+/// its earliest spans with their own graph and reports `byte_budget`.
+/// This only maps it.
 pub(crate) fn to_trace_result(
     trace_id: &sfst::TraceId,
     data: TraceData,
@@ -220,58 +219,21 @@ pub(crate) fn to_trace_result(
         children: t.children,
         spans,
         matched: data.matched,
-        field_kinds: field_kinds_wire(data.field_kinds),
     }
 }
-
-/// The longest [`kind_word`]: a name's kind entry is charged at this
-/// upper bound, since kinds are known only once the merge is done.
-const KIND_WORD_MAX: &str = "empty_kvlist";
 
 /// Shapes a trace's spans for the wire while the engine merges them (the
 /// trace handler passes it to `TraceQuery::shaper`): caps each span's
 /// values at [`TRACE_VALUE_MAX_BYTES`], flags the span when it cut one,
-/// and weighs it as its compact JSON plus, for each name it is the first
-/// to carry, an upper bound of that name's field-kind entry. The engine
-/// keeps spans while they fit [`TRACE_SPANS_MAX_BYTES`], so the merge
-/// itself holds no more than the response will.
-pub(crate) struct WireShaper {
-    /// Names already charged: span fields, event and link attributes.
-    names: [HashSet<String>; 3],
-}
-
-impl WireShaper {
-    pub(crate) fn new() -> Self {
-        Self {
-            names: Default::default(),
-        }
-    }
-}
+/// and weighs it as its compact JSON. The engine keeps spans while they
+/// fit [`TRACE_SPANS_MAX_BYTES`], so the merge itself holds no more than
+/// the response will.
+pub(crate) struct WireShaper;
 
 impl sfst::trace_combine::SpanShaper for WireShaper {
     fn shape(&mut self, span: &mut sfst::TraceSpan) -> sfst::trace_combine::Shaped {
         let cut = cap_span_values(span);
-        let mut weight = json_len(&span_wire(span, cut));
-        let [fields, events, links] = &mut self.names;
-        let mut charge = |seen: &mut HashSet<String>, name: &str| {
-            if !seen.contains(name) {
-                seen.insert(name.to_string());
-                weight += json_len(&(name, KIND_WORD_MAX)) + 1;
-            }
-        };
-        for (name, _) in &span.fields {
-            charge(fields, name);
-        }
-        for e in &span.events {
-            for (name, _) in &e.attributes {
-                charge(events, name);
-            }
-        }
-        for l in &span.links {
-            for (name, _) in &l.attributes {
-                charge(links, name);
-            }
-        }
+        let weight = json_len(&span_wire(span, cut));
         sfst::trace_combine::Shaped { weight, cut }
     }
 
@@ -321,19 +283,6 @@ fn link_wire(l: &sfst::TraceLink) -> LinkWire {
         flags: l.flags,
         dropped_attributes_count: l.dropped_attributes_count,
         attributes: l.attributes.clone(),
-    }
-}
-
-/// Field-kind tables → the wire shape, each kind spelled as its wire
-/// word ([`kind_word`]).
-fn field_kinds_wire(k: FieldKinds) -> FieldKindsWire {
-    let section = |v: Vec<(String, sfst::ValueKind)>| -> Vec<(String, &'static str)> {
-        v.into_iter().map(|(n, k)| (n, kind_word(k))).collect()
-    };
-    FieldKindsWire {
-        fields: section(k.fields),
-        event_attributes: section(k.event_attributes),
-        link_attributes: section(k.link_attributes),
     }
 }
 
@@ -721,8 +670,6 @@ pub(crate) fn to_overview_section(
         },
         totals: OverviewTotals {
             traces: data.total_traces,
-            spans: data.total_spans,
-            errors: data.total_errors,
         },
     }
 }
@@ -997,23 +944,6 @@ fn service_breakdown_wire(b: sfsq::traces::ServiceBreakdown) -> ServiceBreakdown
             .collect(),
         other: b.other,
         unattributed: b.unattributed,
-    }
-}
-
-/// The wire word for each schema value kind. Exhaustive on purpose: a
-/// new engine kind fails compilation here until its wire name is decided.
-fn kind_word(k: sfst::ValueKind) -> &'static str {
-    match k {
-        sfst::ValueKind::Null => "null",
-        sfst::ValueKind::Bool => "bool",
-        sfst::ValueKind::Int => "int",
-        sfst::ValueKind::Double => "double",
-        sfst::ValueKind::Str => "str",
-        sfst::ValueKind::Bytes => "bytes",
-        sfst::ValueKind::EmptyKvlist => "empty_kvlist",
-        sfst::ValueKind::EmptyArray => "empty_array",
-        sfst::ValueKind::Kvlist => "kvlist",
-        sfst::ValueKind::Array => "array",
     }
 }
 
