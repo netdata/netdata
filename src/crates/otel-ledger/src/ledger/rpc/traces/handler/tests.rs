@@ -1330,6 +1330,10 @@ async fn shape_errors_are_transport_400s() {
         (br#"{"info": true}"#, "invalid info selector"),
         (br#"{"trace": null}"#, "invalid trace selector"),
         (br#"{"suggest": []}"#, "expected an object"),
+        (
+            br#"{"conditions": [{"key": "name", "op": "=", "values": [true]}]}"#,
+            "invalid list request: a chip value is a string or a number",
+        ),
         (br#"[]"#, "otel-traces request object"),
         (
             br#"{"info": {}, "tenant": "a", "tenant": "b"}"#,
@@ -1350,6 +1354,25 @@ async fn shape_errors_are_transport_400s() {
             String::from_utf8_lossy(payload)
         );
     }
+}
+
+/// A capture failure is the caller's only when a narrower request
+/// fits; a broken download cache is the agent's.
+#[test]
+fn capture_failures_split_between_the_caller_and_the_agent() {
+    use crate::ledger::rpc::traces::sources::CaptureError;
+    use netdata_plugin_error::NetdataPluginError;
+    assert!(matches!(
+        capture_error(CaptureError::TooLarge {
+            at_least: 200,
+            capacity: 100
+        }),
+        NetdataPluginError::BadRequest { .. }
+    ));
+    assert!(matches!(
+        capture_error(CaptureError::EvictionFailed),
+        NetdataPluginError::FunctionHandler { .. }
+    ));
 }
 
 #[tokio::test]

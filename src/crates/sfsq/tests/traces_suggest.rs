@@ -7,9 +7,10 @@
 //! `complete_after`; sources without the key cost no budget; unavailable
 //! and broken sources are reported; cancellation is all-or-empty; zero
 //! limits, the owner/key pairings of pin C4 and duplicate source ids are
-//! rejected; keys partition by owner with every builtin and no internal
-//! field; builtin values are the storage labels and virtual builtins
-//! have none.
+//! rejected; keys partition by owner with every builtin (with or without
+//! sources) and no internal field; builtin values are the storage labels,
+//! the OTel defaults included, and virtual builtins have none; a window
+//! prunes files but never a tail.
 
 mod common;
 
@@ -397,7 +398,7 @@ fn the_deadline_can_stop_a_later_source_mid_scan() {
 }
 
 #[test]
-fn the_window_prunes_sealed_and_unavailable_sources() {
+fn the_window_prunes_sealed_and_unavailable_sources_but_never_the_tail() {
     let dir = tempfile::tempdir().unwrap();
     let sources = three_files(dir.path(), &["c"], &["b"], &["a"]);
     let mut sources = sources;
@@ -406,10 +407,30 @@ fn the_window_prunes_sealed_and_unavailable_sources() {
         (BASE_S + 50) as u32,
         (BASE_S + 55) as u32,
     ));
+    let tail = write_wal(dir.path(), vec![req(&spans(&["t"], 40))], "tail");
+    sources.push(tail_source(&tail, "tail"));
     let ns = |s: u64| ((BASE_S + s) * 1_000_000_000) as i64;
     let window = sfsq::traces::TimeWindow::new(ns(15), ns(25)).unwrap();
     let data = run(sources, q().window(window));
-    assert_eq!(items(&data), [("b", Prefix)]);
+    assert_eq!(
+        items(&data),
+        [("b", Prefix), ("t", Prefix)],
+        "a tail has no summary to prune by: it is read whole"
+    );
+    assert_eq!(data.status, QueryStatus::Complete);
+}
+
+#[test]
+fn every_builtin_is_a_key_without_any_source() {
+    let data = run(Vec::new(), SuggestQuery::keys(render).max_items(200));
+    let mut keys: Vec<String> = data.items.into_iter().map(|s| s.text).collect();
+    keys.sort();
+    let mut want: Vec<String> = BuiltinField::ALL
+        .iter()
+        .map(|b| format!("{b:?}").to_lowercase())
+        .collect();
+    want.sort();
+    assert_eq!(keys, want, "the builtin keys are static");
     assert_eq!(data.status, QueryStatus::Complete);
 }
 
@@ -517,12 +538,14 @@ fn builtin_values_are_storage_labels_and_virtual_builtins_have_none() {
     a.kind = 2;
     a.status = Some((2, "boom"));
     a.events = vec![("retry", Vec::new())];
+    // No kind and no status: the OTel defaults are stored values too.
+    let b = sp(2, 1, BASE_S * 1_000_000_000, "op-b");
     let wal = write_wal(
         dir.path(),
         vec![req_with(
             vec![kv_str("service.name", "svc")],
             Some(("mylib", "1.2", Vec::new())),
-            &[a],
+            &[a, b],
         )],
         "i",
     );
@@ -536,9 +559,9 @@ fn builtin_values_are_storage_labels_and_virtual_builtins_have_none() {
             .map(|s| s.text)
             .collect()
     };
-    assert_eq!(texts(BuiltinField::Name), ["op-a"]);
-    assert_eq!(texts(BuiltinField::Kind), ["SERVER"]);
-    assert_eq!(texts(BuiltinField::Status), ["ERROR"]);
+    assert_eq!(texts(BuiltinField::Name), ["op-a", "op-b"]);
+    assert_eq!(texts(BuiltinField::Kind), ["SERVER", "UNSPECIFIED"]);
+    assert_eq!(texts(BuiltinField::Status), ["ERROR", "UNSET"]);
     assert_eq!(texts(BuiltinField::StatusMessage), ["boom"]);
     assert_eq!(texts(BuiltinField::InstrumentationName), ["mylib"]);
     assert_eq!(texts(BuiltinField::InstrumentationVersion), ["1.2"]);

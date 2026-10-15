@@ -230,19 +230,25 @@ async fn an_unreadable_catalog_is_reported() {
 }
 
 #[tokio::test]
-async fn a_query_too_large_for_the_download_cache_is_a_hard_error() {
+async fn a_query_too_large_for_the_download_cache_is_a_bad_request() {
     let (h, remote, _) = evicted_setup(100).await;
     // Any fixture file alone exceeds the 100 B cache, so every query
-    // shape fails at remote planning, before anything downloads.
+    // shape fails at remote planning, before anything downloads. The
+    // caller fixes it with a narrower window: a 400, whose body carries
+    // the advice.
 
     for body in [trace_body(0x0B), functions_body(2)] {
-        let err = call(&h, body.clone()).await.unwrap_err().to_string();
+        let err = call(&h, body.clone()).await.unwrap_err();
         assert!(
-            err.contains("more than 100 B of remote trace data")
-                && err.contains(
-                    "narrow the time range or raise `remote_storage.read_cache_max_size`"
-                ),
-            "{body}: {err}"
+            matches!(
+                &err,
+                netdata_plugin_error::NetdataPluginError::BadRequest { message }
+                    if message.contains("more than 100 B of remote trace data")
+                        && message.contains(
+                            "narrow the time range or raise `remote_storage.read_cache_max_size`"
+                        )
+            ),
+            "{body}: {err:?}"
         );
     }
     assert_eq!(remote.cache.file_count(), 0, "nothing was downloaded");

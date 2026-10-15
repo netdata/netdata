@@ -26,8 +26,10 @@
 //! otel-legacy-logs and netflow-plugin handlers. At the boundary, `bridge`
 //! renders `BadRequest` as an HTTP 400 result whose JSON body carries the
 //! bare message, and any other handler error as an HTTP 500 result whose JSON
-//! body carries the variant's Display text; the otel-plugin supervisor
-//! converts transport errors into anyhow with `?` (adding its own context).
+//! body carries the variant's Display text. `rt` has no 400 path: it renders
+//! every handler error, `BadRequest` included, as 500 (499 when cancelled).
+//! The otel-plugin supervisor converts transport errors into anyhow with `?`
+//! (adding its own context).
 //!
 //! netdata-plugin-protocol re-exports [`NetdataPluginError`] and [`Result`]
 //! and defines the `TransportError` alias (in `transport.rs`); there is no

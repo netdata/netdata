@@ -306,14 +306,14 @@ impl<H: FunctionHandler> RawFunctionHandler for HandlerAdapter<H> {
             Some(bytes) => match serde_json::from_slice(bytes) {
                 Ok(p) => p,
                 Err(e) => {
-                    error!("failed to deserialize request payload: {}", e);
+                    info!("rejected a request that does not deserialize: {}", e);
                     return bad_request(transaction, &format!("Invalid request: {e}"));
                 }
             },
             None => match serde_json::from_slice(b"{}") {
                 Ok(p) => p,
                 Err(e) => {
-                    error!("failed to deserialize empty payload: {}", e);
+                    info!("rejected a request without a payload: {}", e);
                     return bad_request(transaction, "Request payload is empty");
                 }
             },
@@ -408,7 +408,8 @@ impl<H: FunctionHandler> RawFunctionHandler for HandlerAdapter<H> {
                 }
             },
             Err(netdata_plugin_error::NetdataPluginError::BadRequest { message }) => {
-                // The caller's mistake, not a handler failure.
+                // The caller's mistake, not a handler failure, like the
+                // deserialization rejections above.
                 info!("function handler rejected the request: {}", message);
                 bad_request(transaction, &message)
             }

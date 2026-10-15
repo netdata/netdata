@@ -150,8 +150,8 @@ impl TracesSourceSupplier {
 
     /// One snapshot, `copies` identical source vectors: a thin wrapper
     /// over [`capture_ranges`](Self::capture_ranges) repeating the same
-    /// window. The one-shot modes (trace, overview, the
-    /// enumeration pair) capture one copy each; search instead hands its
+    /// window. The one-shot modes (trace, overview, suggest) capture one
+    /// copy each; search instead hands its
     /// completion range to both roles through
     /// [`capture_ranges`](Self::capture_ranges) — see there.
     ///
@@ -191,7 +191,7 @@ impl TracesSourceSupplier {
     /// beside its page — must be handed its OWN file set, or it returns
     /// different numbers than the standalone mode does for the same
     /// window: a widened envelope can change a trace's duration bin,
-    /// drop it from the grid, or grow the span/error totals. The same
+    /// drop it from the grid, or grow its error counts. The same
     /// logic keeps search's two roles on ONE capture: both get the
     /// completion range (the match window widened by the slack) as
     /// identical copies — the engine narrows the window role itself,

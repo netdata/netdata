@@ -171,11 +171,12 @@ name, or — under `--owner builtin` — one of the builtin-field words: `name`,
 `parent-span-id`, `trace-id`, `link-span-id`, `link-trace-id`,
 `event-time-since-start`, `root-name`, `root-service-name`,
 `trace-duration`. Only `name`, `kind`, `status`, `status-message`, the two
-`instrumentation-…` words and `event-name` have stored values; the others
-are rejected with `--key`. It reads the newest files first. A key or a value matches `--term` when it is
-equal to the term, starts with it, contains it, or starts within one edit
-(terms of 4 or more characters) or two edits (8 or more) of it. An empty
-term matches all.
+`instrumentation-…` words and `event-name` have stored values. If you give
+one of the others as `--key`, the command fails. `suggest` reads the newest
+files first. A key or a value matches `--term` when it is equal to the
+term, starts with it, contains it, or starts within one edit (terms of 4 or
+more characters) or two edits (8 or more) of it. An empty term matches
+all.
 
 - `--max-items` — the maximum number of suggestions (default 50; 0 is an
   error).

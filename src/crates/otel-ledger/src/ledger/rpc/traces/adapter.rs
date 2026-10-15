@@ -101,8 +101,8 @@ pub(crate) fn completion_capture_range(window: &std::ops::Range<u32>) -> std::op
 /// stops a pathological value from dominating the response.
 pub(crate) const TRACE_VALUE_MAX_BYTES: usize = 8 * 1024;
 
-/// Budget for a trace's spans, in compact JSON bytes ([`WireShaper`]). Past it the engine keeps the earliest spans
-/// and reports `byte_budget`.
+/// Budget for a trace's spans, in compact JSON bytes ([`WireShaper`]).
+/// Past it the engine keeps the earliest spans and reports `byte_budget`.
 pub(crate) const TRACE_SPANS_MAX_BYTES: usize = 2 * 1024 * 1024;
 
 /// Per-value cap, in JSON bytes (see [`truncate_value`]), on the
@@ -319,7 +319,7 @@ const BUILTIN_WORDS: [(&str, BuiltinField); 17] = [
 /// The attribute owners a selection key may name, as `<owner>.<key>`.
 /// The engine enum has two further owners that stay un-named here:
 /// `Builtin` is spelled as the bare builtin words above, and the
-/// predicates-only `Any` is not wire-nameable at all. Enumeration emits
+/// predicates-only `Any` is not wire-nameable at all. `suggest` emits
 /// attribute keys owner-qualified ([`render_attribute_key`]), so
 /// attribute chip keys are always qualified; its `.expect` keeps this
 /// table in lockstep with the engine enum.
@@ -537,7 +537,7 @@ pub(crate) fn heatmap_tokens(tokens: &TokenQuery) -> TokenQuery {
     }
 }
 
-// ── Enumeration: key parsing and rendering ──────────────────────────
+// ── Suggest: key parsing and rendering ──────────────────────────────
 
 /// The selection-grammar word of a builtin field.
 fn builtin_word(field: BuiltinField) -> &'static str {
@@ -565,7 +565,7 @@ pub(crate) fn render_attribute_key(owner: AttributeOwner, key: &AttributeKey) ->
     }
 }
 
-/// A key whose values a request lists or suggests: bounded in length,
+/// A key whose values a request suggests: bounded in length,
 /// and with stored values (a virtual builtin such as the duration has
 /// none). Checked before admission, so a bad key is the client's error.
 pub(crate) fn parse_values_key(key: &str) -> Result<(AttributeOwner, AttributeKey), String> {
@@ -592,7 +592,7 @@ pub(crate) fn check_request_text(name: &str, text: &str) -> Result<(), String> {
     Ok(())
 }
 
-/// A selection-grammar key as the enumeration API's (owner, key) pair.
+/// A selection-grammar key as the engine's (owner, key) pair.
 pub(crate) fn parse_enumeration_key(key: &str) -> Result<(AttributeOwner, AttributeKey), String> {
     Ok(match parse_selection_key(key)? {
         PredicateTarget::Attribute(owner, a) => (owner, AttributeKey::Attribute(a)),

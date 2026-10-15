@@ -190,13 +190,13 @@ impl TryFrom<RawOtelTracesRequest> for OtelTracesRequest {
         /// (positional arrays), so `is_object` must be checked before
         /// delegating or `{"trace": ["id", 7]}` would silently parse.
         fn typed<T: serde::de::DeserializeOwned>(
-            name: &str,
+            what: &str,
             v: &serde_json::Value,
         ) -> Result<T, String> {
             if !v.is_object() {
-                return Err(format!("invalid {name} selector: expected an object"));
+                return Err(format!("invalid {what}: expected an object"));
             }
-            T::deserialize(v).map_err(|e| format!("invalid {name} selector: {e}"))
+            T::deserialize(v).map_err(|e| format!("invalid {what}: {e}"))
         }
 
         let mode = if present.is_empty() {
@@ -214,14 +214,14 @@ impl TryFrom<RawOtelTracesRequest> for OtelTracesRequest {
                     params.insert(name.to_string(), value.clone());
                 }
             }
-            TracesMode::Functions(typed("Functions", &serde_json::Value::Object(params))?)
+            TracesMode::Functions(typed("list request", &serde_json::Value::Object(params))?)
         } else if let Some(v) = &raw.info {
-            typed::<InfoParams>("info", v)?;
+            typed::<InfoParams>("info selector", v)?;
             TracesMode::Info
         } else if let Some(v) = &raw.trace {
-            TracesMode::Trace(typed("trace", v)?)
+            TracesMode::Trace(typed("trace selector", v)?)
         } else if let Some(v) = &raw.suggest {
-            TracesMode::Suggest(typed("suggest", v)?)
+            TracesMode::Suggest(typed("suggest selector", v)?)
         } else {
             unreachable!("an explicit selector was verified present");
         };
@@ -370,7 +370,7 @@ pub struct ConditionParams {
 
 /// A chip value: text, or a JSON number (an integer when integral).
 #[derive(Debug, Clone, Deserialize)]
-#[serde(untagged)]
+#[serde(untagged, expecting = "a chip value is a string or a number")]
 pub enum ConditionValue {
     Text(String),
     Number(serde_json::Number),
@@ -407,8 +407,9 @@ where
     serde_json::Value::deserialize(d).map(Some)
 }
 
-/// Longest `key` or `term` of a suggestion request, in bytes; a longer
-/// one is a client error.
+/// Longest request string, in bytes: a suggestion's `key` or `term`, a
+/// chip's key or text value, a free-text term. A longer one is a client
+/// error.
 pub const REQUEST_TEXT_MAX_BYTES: usize = 1024;
 
 /// Wire maximum for [`SuggestParams::max_items`]; absent means the
@@ -834,8 +835,8 @@ pub struct ServiceSpansWire {
 // ── Trace mode response ─────────────────────────────────────────────
 
 /// One assembled trace: the dumb span list plus the parent/child graph
-/// and the typed-field map — everything the UI needs to render a plain
-/// span table (a proper waterfall is deliberately future work).
+/// — everything the UI needs to render a plain span table (a proper
+/// waterfall is deliberately future work).
 ///
 /// The graph is node-index adjacency over `spans`: walk from `roots`
 /// via `children`; `children` can carry cycle edges (pathological
@@ -888,8 +889,7 @@ pub struct TraceItems {
 /// One span, ids in W3C lowercase hex. `fields` are the engine's
 /// resolved row facets as `[name, value]` string pairs (order
 /// preserved; names are storage names). `kind` is the raw OTLP
-/// span-kind int; the
-/// readable label is in `fields` under `kind`.
+/// span-kind int; the readable label is in `fields` under `kind`.
 #[derive(Debug, Serialize)]
 pub struct SpanWire {
     pub span_id: String,

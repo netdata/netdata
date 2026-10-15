@@ -63,17 +63,31 @@ fn client_err(e: impl std::fmt::Display) -> netdata_plugin_error::NetdataPluginE
     }
 }
 
+/// An engine request error after the handler's own checks passed: the
+/// two disagree, so it is the agent's failure (HTTP 500), not the
+/// caller's.
+fn engine_rejected(e: impl std::fmt::Display) -> netdata_plugin_error::NetdataPluginError {
+    handler_err(format!(
+        "otel-traces internal error: the engine rejected a request the handler accepted: {e}"
+    ))
+}
+
 /// A capture that failed as a whole: a hard error the caller can act on.
+/// Too much remote data is the request's (a narrower window fits).
 fn capture_error(e: CaptureError) -> netdata_plugin_error::NetdataPluginError {
     let size = |bytes: u64| bytesize::ByteSize::b(bytes).display().si().to_string();
     match e {
-        CaptureError::TooLarge { at_least, capacity } => handler_err(format!(
-            "this query needs more than {} of remote trace data (at least {}), more than the \
-             download cache holds; narrow the time range or raise \
-             `remote_storage.read_cache_max_size`",
-            size(capacity),
-            size(at_least)
-        )),
+        CaptureError::TooLarge { at_least, capacity } => {
+            netdata_plugin_error::NetdataPluginError::BadRequest {
+                message: format!(
+                    "this query needs more than {} of remote trace data (at least {}), more \
+                     than the download cache holds; narrow the time range or raise \
+                     `remote_storage.read_cache_max_size`",
+                    size(capacity),
+                    size(at_least)
+                ),
+            }
+        }
         CaptureError::EvictionFailed => handler_err(
             "the remote-read download cache directory is unwritable (eviction failed); check \
              its permissions and free space"
@@ -264,7 +278,11 @@ impl OtelTracesHandler {
                     "otel-traces internal error: captured source set is inconsistent: {e}"
                 )));
             }
-            Ok(Err(e)) => return Err(client_err(e)),
+            Ok(Err(
+                e @ (TraceRequestError::UnsetTraceId
+                | TraceRequestError::ZeroSpanCap
+                | TraceRequestError::Highlight(_)),
+            )) => return Err(engine_rejected(e)),
             Err(e) => {
                 return Err(handler_err(format!("otel-traces trace task failed: {e}")));
             }
@@ -438,7 +456,11 @@ impl OtelTracesHandler {
                     "otel-traces internal error: captured source set is inconsistent: {e}"
                 )));
             }
-            Err(e) => return Err(client_err(e)),
+            Err(
+                e @ (SearchRequestError::ZeroLimit
+                | SearchRequestError::Predicate(_)
+                | SearchRequestError::Window(_)),
+            ) => return Err(engine_rejected(e)),
         };
 
         let mut result: SearchResult = to_search_result(
@@ -599,14 +621,20 @@ fn unix_now_s() -> u32 {
         .min(u64::from(u32::MAX)) as u32
 }
 
-/// Suggestion request errors: a rejected source set is the supplier's
-/// inconsistency (internal); everything else is the client's request.
+/// Suggestion request errors are all the agent's: a rejected source set
+/// is the supplier's inconsistency, and the rest are checked by the
+/// handler first (`parse_values_key`, the limit and window checks).
 fn map_suggest_error(e: SuggestRequestError) -> netdata_plugin_error::NetdataPluginError {
     match e {
         SuggestRequestError::SourceSet(e) => handler_err(format!(
             "otel-traces internal error: captured source set is inconsistent: {e}"
         )),
-        other => client_err(other),
+        e @ (SuggestRequestError::ZeroLimit
+        | SuggestRequestError::Window(_)
+        | SuggestRequestError::NotEnumerable(_)
+        | SuggestRequestError::BuiltinKeyOutsideBuiltinOwner(_)
+        | SuggestRequestError::AttributeKeyUnderBuiltinOwner(_)
+        | SuggestRequestError::AnyOwnerNotEnumerable) => engine_rejected(e),
     }
 }
 
