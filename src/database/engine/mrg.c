@@ -403,11 +403,12 @@ bool mrg_metric_has_zero_disk_retention(MRG *mrg __maybe_unused, METRIC *metric)
 
             page_first_time_s = pgc_page_start_time_s(page);
             time_t page_end_time_s = pgc_page_end_time_s(page);
+            bool is_ours = open_cache_page_is_of_metric(page, metric->uuid);
 
-            if (page_first_time_s > 0 && page_first_time_s < min_first_time_s)
+            if (is_ours && page_first_time_s > 0 && page_first_time_s < min_first_time_s)
                 min_first_time_s = page_first_time_s;
 
-            if (page_end_time_s > max_end_time_s)
+            if (is_ours && page_end_time_s > max_end_time_s)
                 max_end_time_s = page_end_time_s;
 
             pgc_page_release(open_cache, page);
