@@ -28,6 +28,29 @@ void metadata_sync_init(void);
 void metadata_sync_shutdown(void);
 
 void metaqueue_delete_dimension_uuid(nd_uuid_t *uuid);
+
+// Dimensions of one host whose data expired from every tier, found by the contexts garbage collection.
+// The metadata thread deletes their rows, unless a live dimension uses the uuid again.
+struct metadata_expired_dimension {
+    nd_uuid_t uuid;
+    STRING *chart_id;
+    STRING *dim_id;
+};
+
+typedef struct metadata_expired_dimensions {
+    char machine_guid[GUID_LEN + 1];
+    size_t used;    // records added
+    size_t done;    // records the metadata thread has processed
+    size_t size;    // records allocated
+    uint8_t delete_failures;    // consecutive failed deletes of the next record
+    struct metadata_expired_dimension *items;
+    struct metadata_expired_dimensions *prev, *next;
+} METADATA_EXPIRED_DIMENSIONS;
+
+METADATA_EXPIRED_DIMENSIONS *metadata_expired_dimensions_create(const char *machine_guid);
+void metadata_expired_dimensions_add(METADATA_EXPIRED_DIMENSIONS *batch, UUIDMAP_ID uuid, STRING *chart_id, STRING *dim_id);
+void metadata_expired_dimensions_free(METADATA_EXPIRED_DIMENSIONS *batch);
+void metaqueue_delete_expired_dimensions(METADATA_EXPIRED_DIMENSIONS *batch);
 void metaqueue_store_claim_id(nd_uuid_t *host_uuid, nd_uuid_t *claim_uuid);
 void metaqueue_ml_load_models(RRDDIM *rd);
 void detect_machine_guid_change(nd_uuid_t *host_uuid);
@@ -65,4 +88,5 @@ size_t populate_metrics_from_database(void *mrg, void (*populate_cb)(void *mrg, 
 
 // UNIT TEST
 int metadata_unittest(void);
+int metadata_expired_dimensions_unittest(void);
 #endif //NETDATA_SQLITE_METADATA_H
