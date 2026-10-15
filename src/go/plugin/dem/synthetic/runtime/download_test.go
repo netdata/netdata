@@ -207,10 +207,14 @@ func TestDownloadExactByteEndingPreservesTimeoutAndCancellation(t *testing.T) {
 	for _, voluntary := range []bool{false, true} {
 		t.Run(map[bool]string{false: "timeout", true: "cancel"}[voluntary], func(t *testing.T) {
 			payload := []byte("exact archive bytes")
+			release := make(chan struct{})
+			defer close(release)
 			server := inactivityServer(t, func(w http.ResponseWriter, r *http.Request) {
 				_, _ = w.Write(payload)
 				w.(http.Flusher).Flush()
 				<-r.Context().Done()
+				// Do not let handler completion race cancellation with a normal EOF.
+				<-release
 			})
 			ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
 			defer cancel()
