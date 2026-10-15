@@ -7,6 +7,32 @@ Netdata provides pre-built static binaries for Linux systems where native packag
 - Self-contained installation (no system dependencies required, no interference with system libraries)
 - Installed under `/opt/netdata`
 
+## State permissions during updates
+
+Installation makes package directories traversable and initializes the service's library, cache and log roots.
+A build-generated inventory identifies the exact shipped paths; updates never discover directories by walking
+the installed tree. Application state directories outside shipped package paths retain their modes, including custom
+state paths outside the standard roots and execution-completion records. Paths occupied by shipped content remain
+installer-owned, including when a package directory is relocated through a symlink. Shared root initialization does
+not recursively change file owners. The eBPF ownership adjustment also targets exact shipped entries. Fleet preparation
+filters the inventory to match retained package content. The source installer's fallback directory setup uses the same
+ownership boundary.
+Explicit systemd-tmpfiles policies for database/claiming files and the historical static OTEL ownership repair still
+apply; an update is not a general recursive permission repair. Modes or owners changed by earlier updates are not
+automatically restored: recovery requires the affected application's intended permissions, which the installer cannot
+infer from the current state.
+
+The isolated regression suite exercises both directory-setup paths and actual makeself archive overlays:
+
+```sh
+python3 packaging/installer/tests/test_install_state.py -v
+sudo python3 packaging/installer/tests/test_install_state.py -v
+```
+
+The Linux root run additionally verifies distinct state owners and the historical ownership repair. It tests
+systemd-tmpfiles only when that command is available; otherwise that case is reported as skipped.
+All fixtures live in temporary directories; the tests do not install services or change host Netdata directories.
+
 ## Supported Architectures
 
 | Architecture | Identifier | Notes                            |
