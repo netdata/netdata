@@ -77,6 +77,7 @@ sums the remaining queues into an `Other (aggregated)` series. Configure it in `
     max individually charted queues = 100
 ```
 
-The selector accepts comma or pipe separated case-insensitive simple patterns; prefix a comma or pipe with `\` to
-match it literally. Matching queue names are selected in case-insensitive alphabetical order; the cap may be set to
-`0` to aggregate all queues.
+The selector accepts comma or pipe separated case-insensitive simple patterns. Windows queue paths can be pasted
+verbatim; prefix a comma or pipe with `\` to match that character literally. A leading `\!` or `\*` escapes the
+pattern marker; elsewhere, backslashes are treated as Windows path separators (so `*` remains a wildcard). Matching
+queue names are selected in case-insensitive alphabetical order; the cap may be set to `0` to aggregate all queues.

@@ -2,6 +2,8 @@
 
 #include "windows_plugin.h"
 #include "windows-internals.h"
+#include "libnetdata/sanitizers/chart_id_and_name.h"
+#include "libnetdata/xxHash/xxhash.h"
 
 #include <ctype.h>
 
@@ -11,7 +13,7 @@
 struct msmq_queue;
 
 typedef struct {
-    char *name;
+    DICT_ITEM_CONST DICTIONARY_ITEM *item;
     struct msmq_queue *mq;
 } MSMQ_SAMPLE;
 
@@ -38,14 +40,17 @@ struct msmq_queue {
 static int msmq_sample_compare(const void *a, const void *b)
 {
     const MSMQ_SAMPLE *sa = a, *sb = b;
-    int cmp = strcasecmp(sa->name, sb->name);
-    return cmp ? cmp : strcmp(sa->name, sb->name);
+    const char *name_a = dictionary_acquired_item_name(sa->item);
+    const char *name_b = dictionary_acquired_item_name(sb->item);
+    int cmp = strcasecmp(name_a, name_b);
+    return cmp ? cmp : strcmp(name_a, name_b);
 }
 
 static char *msmq_normalize_patterns(const char *input)
 {
-    char *patterns = strdupz(input);
-    char *read = patterns, *write = patterns;
+    char *source = strdupz(input);
+    char *patterns = mallocz((strlen(source) * 2) + 1);
+    char *read = source, *write = patterns;
     bool first = true;
 
     while (*read) {
@@ -66,9 +71,31 @@ static char *msmq_normalize_patterns(const char *input)
         if (start < end) {
             if (!first)
                 *write++ = ',';
-            size_t length = (size_t)(end - start);
-            memmove(write, start, length);
-            write += length;
+            bool token_start = true;
+            while (start < end) {
+                if (*start == '\\' && start + 1 < end) {
+                    char next = start[1];
+                    if (next == ',' || next == '|' ||
+                        ((next == '*' || next == '!') && token_start)) {
+                        *write++ = *start++;
+                        *write++ = *start++;
+                        token_start = false;
+                    } else {
+                        *write++ = '\\';
+                        *write++ = '\\';
+                        start++;
+                        token_start = false;
+                    }
+                } else if (*start == '\\') {
+                    *write++ = '\\';
+                    *write++ = '\\';
+                    start++;
+                    token_start = false;
+                } else {
+                    *write++ = *start++;
+                    token_start = false;
+                }
+            }
             first = false;
         }
         if (*read)
@@ -76,6 +103,7 @@ static char *msmq_normalize_patterns(const char *input)
     }
 
     *write = '\0';
+    freez(source);
     return patterns;
 }
 
@@ -130,7 +158,17 @@ static void initialize(void)
 
 static void msmq_queue_chart_id(char *dst, size_t size, const char *instance, const char *suffix)
 {
-    snprintfz(dst, size, "msmq_queue_%s_%s", instance, suffix);
+    XXH64_hash_t hash = XXH3_64bits(instance, strlen(instance));
+    const size_t fixed_length = strlen("msmq_queue__") + 16 + strlen(suffix) + 2;
+    size_t instance_length = size > fixed_length ? size - fixed_length : 0;
+    snprintfz(
+        dst,
+        size,
+        "msmq_queue_%.*s_%016llx_%s",
+        (int)instance_length,
+        instance,
+        (unsigned long long)hash,
+        suffix);
     netdata_fix_chart_name(dst);
 }
 
@@ -353,7 +391,14 @@ static void do_msmq(PERF_DATA_BLOCK *pDataBlock, int update_every)
         if (strcasecmp(windows_shared_buffer, "_Total") == 0)
             continue;
 
-        struct msmq_queue *mq = dictionary_set(msmq_queues, windows_shared_buffer, NULL, sizeof(*mq));
+        DICT_ITEM_CONST DICTIONARY_ITEM *item =
+            dictionary_set_and_acquire_item(msmq_queues, windows_shared_buffer, NULL, sizeof(struct msmq_queue));
+        if (!item) {
+            complete = false;
+            continue;
+        }
+
+        struct msmq_queue *mq = dictionary_acquired_item_value(item);
         mq->last_collected = now_ut;
         mq->messages_in_queue.updated = false;
         mq->bytes_in_queue.updated = false;
@@ -365,7 +410,7 @@ static void do_msmq(PERF_DATA_BLOCK *pDataBlock, int update_every)
         perflibGetInstanceCounter(pDataBlock, pObjectType, pi, &mq->messages_in_journal_queue);
         perflibGetInstanceCounter(pDataBlock, pObjectType, pi, &mq->bytes_in_journal_queue);
 
-        samples[samples_count++] = (MSMQ_SAMPLE){ .name = strdupz(windows_shared_buffer), .mq = mq };
+        samples[samples_count++] = (MSMQ_SAMPLE){ .item = item, .mq = mq };
     }
 
     // Sort before applying the cap so dictionary enumeration order cannot change chart selection.
@@ -378,12 +423,13 @@ static void do_msmq(PERF_DATA_BLOCK *pDataBlock, int update_every)
     for (size_t i = 0; i < samples_count; i++) {
         MSMQ_SAMPLE *s = &samples[i];
         struct msmq_queue *mq = s->mq;
-        if (simple_pattern_matches(queues_to_chart, s->name) && individual < (size_t)max_individual_queues) {
+        const char *queue = dictionary_acquired_item_name(s->item);
+        if (simple_pattern_matches(queues_to_chart, queue) && individual < (size_t)max_individual_queues) {
             individual++;
-            if (mq->messages_in_queue.updated) msmq_queue_chart_messages(mq, s->name, update_every);
-            if (mq->bytes_in_queue.updated) msmq_queue_chart_bytes(mq, s->name, update_every);
-            if (mq->messages_in_journal_queue.updated) msmq_queue_chart_journal_messages(mq, s->name, update_every);
-            if (mq->bytes_in_journal_queue.updated) msmq_queue_chart_journal_bytes(mq, s->name, update_every);
+            if (mq->messages_in_queue.updated) msmq_queue_chart_messages(mq, queue, update_every);
+            if (mq->bytes_in_queue.updated) msmq_queue_chart_bytes(mq, queue, update_every);
+            if (mq->messages_in_journal_queue.updated) msmq_queue_chart_journal_messages(mq, queue, update_every);
+            if (mq->bytes_in_journal_queue.updated) msmq_queue_chart_journal_bytes(mq, queue, update_every);
         } else {
             msmq_queue_obsolete_charts(mq);
             aggregated_queues++;
@@ -392,7 +438,7 @@ static void do_msmq(PERF_DATA_BLOCK *pDataBlock, int update_every)
             if (mq->messages_in_journal_queue.updated) other_journal_messages += mq->messages_in_journal_queue.current.Data; else other_journal_messages_ok = false;
             if (mq->bytes_in_journal_queue.updated) other_journal_bytes += mq->bytes_in_journal_queue.current.Data; else other_journal_bytes_ok = false;
         }
-        freez(s->name);
+        dictionary_acquired_item_release(msmq_queues, s->item);
     }
     freez(samples);
 
@@ -403,7 +449,7 @@ static void do_msmq(PERF_DATA_BLOCK *pDataBlock, int update_every)
                 &other_st_messages,
                 &other_rd_messages,
                 "msmq_queue_messages",
-                "msmq_queue_other_messages",
+                "msmq_queue_aggregate_messages_total",
                 "queues",
                 "msmq.queue_messages",
                 "MSMQ messages in other queues",
@@ -416,7 +462,7 @@ static void do_msmq(PERF_DATA_BLOCK *pDataBlock, int update_every)
                 &other_st_bytes,
                 &other_rd_bytes,
                 "msmq_queue_bytes",
-                "msmq_queue_other_bytes",
+                "msmq_queue_aggregate_bytes_total",
                 "queues",
                 "msmq.queue_bytes",
                 "MSMQ bytes in other queues",
@@ -429,7 +475,7 @@ static void do_msmq(PERF_DATA_BLOCK *pDataBlock, int update_every)
                 &other_st_journal_messages,
                 &other_rd_journal_messages,
                 "msmq_queue_journal_messages",
-                "msmq_queue_other_journal_messages",
+                "msmq_queue_aggregate_journal_messages_total",
                 "journal",
                 "msmq.queue_journal_messages",
                 "MSMQ messages in other journal queues",
@@ -442,7 +488,7 @@ static void do_msmq(PERF_DATA_BLOCK *pDataBlock, int update_every)
                 &other_st_journal_bytes,
                 &other_rd_journal_bytes,
                 "msmq_queue_journal_bytes",
-                "msmq_queue_other_journal_bytes",
+                "msmq_queue_aggregate_journal_bytes_total",
                 "journal",
                 "msmq.queue_journal_bytes",
                 "MSMQ bytes in other journal queues",
