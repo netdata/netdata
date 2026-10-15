@@ -606,6 +606,12 @@ pub struct SuggestionWire {
     /// client error.
     #[serde(rename = "virtual", skip_serializing_if = "std::ops::Not::not")]
     pub is_virtual: bool,
+    /// Keys only: present (`true`) when a visited source stored a number
+    /// under this attribute key, so the ordering ops (`>`, `>=`, `<`,
+    /// `<=`) can match its values; absent otherwise, and never on a
+    /// builtin key (those are typed by the grammar).
+    #[serde(skip_serializing_if = "std::ops::Not::not")]
+    pub numeric: bool,
 }
 
 /// Match classes on the wire; the two typo-tolerant engine classes are

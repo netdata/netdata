@@ -1492,6 +1492,37 @@ async fn suggest_lists_matching_values_and_keys() {
     );
 }
 
+/// A key that holds numbers carries `numeric: true` end to end; a text
+/// key carries no mark.
+#[tokio::test]
+async fn suggest_marks_keys_that_hold_numbers() {
+    use opentelemetry_proto::tonic::common::v1::{AnyValue, KeyValue, any_value::Value as Av};
+    let attr = |key: &str, value| KeyValue {
+        key: key.into(),
+        value: Some(AnyValue { value: Some(value) }),
+        key_strindex: 0,
+    };
+    let mut req = otlp_req_svc(0x0A, 1, base_ns(10), "svc-a");
+    req.resource_spans[0].scope_spans[0].spans[0].attributes = vec![
+        attr("http.status_code", Av::IntValue(200)),
+        attr("http.route", Av::StringValue("/cart".into())),
+    ];
+    let registries = make_registries();
+    install_wal(&registries, "default", 1, vec![req]).await;
+    let h = make_handler_over(registries);
+
+    let mut body = window_body();
+    merge(&mut body, json!({"term": "span.http."}));
+    let v = serde_json::to_value(call_on(&h, as_mode("suggest", body)).await.unwrap()).unwrap();
+    assert_eq!(
+        v["items"],
+        json!([
+            {"text": "span.http.route", "match": "prefix", "tier": "low"},
+            {"text": "span.http.status_code", "match": "prefix", "tier": "low", "numeric": true},
+        ])
+    );
+}
+
 #[tokio::test]
 async fn suggest_is_validated_before_admission_and_bounded() {
     let h = handler_with_search_corpus()

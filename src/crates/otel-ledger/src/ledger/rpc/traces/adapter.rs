@@ -604,7 +604,8 @@ pub(crate) fn parse_enumeration_key(key: &str) -> Result<(AttributeOwner, Attrib
 /// Shape suggestions into the wire result. `key` echoes the request's
 /// key for value suggestions. Texts are capped at
 /// [`LIST_VALUE_MAX_BYTES`] of JSON (the engine cut raw bytes) and
-/// flagged when cut; a text cut to an earlier item's is listed once.
+/// flagged when cut; a text cut to an earlier item's is listed once,
+/// keeping either's `numeric` mark.
 pub(crate) fn to_suggest_result(
     data: sfsq::traces::SuggestData,
     key: Option<String>,
@@ -616,6 +617,7 @@ pub(crate) fn to_suggest_result(
         let cut = truncate_value(&mut text, LIST_VALUE_MAX_BYTES);
         if let Some(&i) = listed.get(&text) {
             items[i].truncated |= cut || s.truncated;
+            items[i].numeric |= s.numeric;
             continue;
         }
         listed.insert(text.clone(), items.len());
@@ -625,6 +627,7 @@ pub(crate) fn to_suggest_result(
             truncated: cut || s.truncated,
             tier: s.tier.map(Into::into),
             is_virtual: !s.enumerable,
+            numeric: s.numeric,
         });
     }
     SuggestResult {

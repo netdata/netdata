@@ -599,6 +599,42 @@ fn rendered_keys_round_trip_through_the_selection_grammar() {
     }
 }
 
+/// A key is marked `numeric` only when the engine marked it; a key cut
+/// onto an earlier item's text keeps the mark on the merged item.
+#[test]
+fn key_suggestions_carry_the_numeric_mark_only_when_set() {
+    use sfsq::traces::{SuggestData, Suggestion};
+    let key = |text: String, numeric| Suggestion {
+        text,
+        truncated: false,
+        class: sfst::MatchClass::Prefix,
+        tier: Some(sfst::FieldTier::Low),
+        enumerable: true,
+        numeric,
+    };
+    let p = "a".repeat(LIST_VALUE_MAX_BYTES - 2);
+    let data = SuggestData {
+        items: vec![
+            key("span.code".into(), true),
+            key("span.label".into(), false),
+            key(p.clone(), false),
+            key(format!("{p}€x"), true),
+        ],
+        truncated: false,
+        status: QueryStatus::Complete,
+        complete_after: None,
+    };
+    let v = serde_json::to_value(to_suggest_result(data, None)).unwrap();
+    assert_eq!(
+        v["items"],
+        json!([
+            {"text": "span.code", "match": "prefix", "tier": "low", "numeric": true},
+            {"text": "span.label", "match": "prefix", "tier": "low"},
+            {"text": p, "match": "prefix", "truncated": true, "tier": "low", "numeric": true},
+        ])
+    );
+}
+
 #[test]
 fn suggestions_are_capped_flagged_and_listed_once() {
     use sfsq::traces::{SuggestData, Suggestion};
