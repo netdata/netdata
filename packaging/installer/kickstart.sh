@@ -1156,15 +1156,19 @@ detect_existing_install() {
   progress "Checking for existing installations of Netdata..."
   EXISTING_INSTALL_IS_NATIVE="0"
 
-  # /opt/netdata/bin is the static install's layout; /opt/netdata/usr/bin and
-  # /opt/netdata/usr/sbin are the native macOS package's. Both belong in each
-  # branch: on macOS the install prefix has a default, so the first branch is
-  # the one that runs there.
+  # The native macOS package installs its daemon in /opt/netdata/usr/sbin,
+  # which is not on PATH. The package exists only on macOS, so other systems
+  # keep their search list unchanged.
+  macos_pkg_path=""
+  if [ "${SYSTYPE}" = "Darwin" ]; then
+    macos_pkg_path=":/opt/netdata/usr/sbin"
+  fi
+
   if [ -n "${INSTALL_PREFIX}" ]; then
-    searchpath="/opt/netdata/bin:/opt/netdata/usr/bin:/opt/netdata/usr/sbin:${INSTALL_PREFIX}/bin:${INSTALL_PREFIX}/sbin:${INSTALL_PREFIX}/usr/bin:${INSTALL_PREFIX}/usr/sbin:${PATH}"
+    searchpath="/opt/netdata/bin${macos_pkg_path}:${INSTALL_PREFIX}/bin:${INSTALL_PREFIX}/sbin:${INSTALL_PREFIX}/usr/bin:${INSTALL_PREFIX}/usr/sbin:${PATH}"
     searchpath="${INSTALL_PREFIX}/netdata/bin:${INSTALL_PREFIX}/netdata/sbin:${INSTALL_PREFIX}/netdata/usr/bin:${INSTALL_PREFIX}/netdata/usr/sbin:${searchpath}"
   else
-    searchpath="/opt/netdata/bin:/opt/netdata/usr/bin:/opt/netdata/usr/sbin:${PATH}"
+    searchpath="/opt/netdata/bin${macos_pkg_path}:${PATH}"
   fi
 
   while [ -n "${searchpath}" ]; do
