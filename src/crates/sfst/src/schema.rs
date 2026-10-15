@@ -559,6 +559,17 @@ impl SchemaTree {
             .filter_map(|(path, set)| set.coalesce().map(|k| (path, k)))
             .collect()
     }
+
+    /// The leaf paths with at least one `Int` or `Double` leaf, whatever
+    /// other kinds they also hold. Not the coalesced view: `Int` with `Str`
+    /// coalesces to `Str`, yet its stored numbers still compare as numbers
+    /// (values are stored as text and parsed at comparison time).
+    pub fn derive_numeric_paths(&self) -> std::collections::BTreeSet<String> {
+        self.iter()
+            .filter(|(_, node)| matches!(node.kind, ValueKind::Int | ValueKind::Double))
+            .map(|(id, _)| self.path(id))
+            .collect()
+    }
 }
 
 /// Join two ALREADY-COALESCED scalar kinds across files/sources with the

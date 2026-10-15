@@ -16,7 +16,8 @@
 //!   under bincode — a decode-speed change only, no `VERSION` bump;
 //! - `derive_field_table` orders low → mid → high then by name and collapses
 //!   polymorphic paths to one entry; `derive_scalar_kinds` applies the
-//!   coalescing lattice;
+//!   coalescing lattice; `derive_numeric_paths` keeps every path with an
+//!   `Int`/`Double` leaf, mixed or not;
 //! - `validate` rejects every malformed tree shape as `Error::CorruptIndex`
 //!   at the META decode trust boundary;
 //! - `fill_field_stats` then `derive_field_table` reproduces the input table
@@ -240,6 +241,54 @@ fn scalar_coalescing_lattice() {
             ("nullstr".to_string(), ValueKind::Str),
             ("scalarobj".to_string(), ValueKind::Str),
         ]
+    );
+}
+
+/// The numeric paths are the paths with at least one `Int` or `Double`
+/// leaf, whatever else they hold: unlike the coalescing lattice, a mix with
+/// `Str` or `Bool` keeps the path numeric (stored values compare as
+/// numbers when they parse, whatever kind they arrived as).
+#[test]
+fn numeric_paths_have_an_int_or_double_leaf() {
+    let stats = LeafStats {
+        cardinality: 1,
+        tier: FieldTier::Low,
+    };
+    let node = |parent: u32, step: Step, kind: ValueKind| SchemaNode {
+        kind,
+        edge: Some(SchemaEdge { parent, step }),
+        leaf: if kind.is_leaf() { Some(stats) } else { None },
+    };
+    let field = |name: &str| Step::Field(name.into());
+    let tree = SchemaTree::from_nodes(vec![
+        SchemaNode {
+            kind: ValueKind::Kvlist,
+            edge: None,
+            leaf: None,
+        }, // 0 root
+        // Numeric: one kind, or mixed with other kinds.
+        node(0, field("int"), ValueKind::Int),
+        node(0, field("double"), ValueKind::Double),
+        node(0, field("intstr"), ValueKind::Int),
+        node(0, field("intstr"), ValueKind::Str),
+        node(0, field("booldouble"), ValueKind::Bool),
+        node(0, field("booldouble"), ValueKind::Double),
+        // Not numeric.
+        node(0, field("str"), ValueKind::Str),
+        node(0, field("bool"), ValueKind::Bool),
+        node(0, field("null"), ValueKind::Null),
+        // Nested numeric leaves: `obj.n` (node 10's child) and `arr[]`
+        // (node 12's element).
+        node(0, field("obj"), ValueKind::Kvlist),
+        node(10, field("n"), ValueKind::Int),
+        node(0, field("arr"), ValueKind::Array),
+        node(12, Step::ArrayElem, ValueKind::Double),
+    ]);
+
+    let numeric: Vec<String> = tree.derive_numeric_paths().into_iter().collect();
+    assert_eq!(
+        numeric,
+        vec!["arr[]", "booldouble", "double", "int", "intstr", "obj.n"]
     );
 }
 
