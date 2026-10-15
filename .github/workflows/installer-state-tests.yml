@@ -10,6 +10,8 @@ on:
       - 'packaging/makeself/prepare-fleet.py'
       - 'packaging/makeself/install-or-update.sh'
       - 'packaging/makeself/create-package-manifest.sh'
+      - 'packaging/makeself/functions.sh'
+      - 'packaging/makeself/jobs/97-create-package-manifest.sh'
       - 'packaging/makeself/jobs/98-create-archive.sh'
       - 'packaging/makeself/makeself*.sh'
       - 'system/systemd/tmpfiles.conf.in'
@@ -24,6 +26,8 @@ on:
       - 'packaging/makeself/prepare-fleet.py'
       - 'packaging/makeself/install-or-update.sh'
       - 'packaging/makeself/create-package-manifest.sh'
+      - 'packaging/makeself/functions.sh'
+      - 'packaging/makeself/jobs/97-create-package-manifest.sh'
       - 'packaging/makeself/jobs/98-create-archive.sh'
       - 'packaging/makeself/makeself*.sh'
       - 'system/systemd/tmpfiles.conf.in'
@@ -42,8 +46,10 @@ jobs:
         run: |
           bash -n packaging/makeself/install-or-update.sh
           bash -n packaging/makeself/create-package-manifest.sh
+          bash -n packaging/makeself/jobs/97-create-package-manifest.sh
           sh -n packaging/installer/functions.sh
           shellcheck packaging/makeself/create-package-manifest.sh packaging/makeself/install-or-update.sh packaging/installer/functions.sh
+          shellcheck -x packaging/makeself/jobs/97-create-package-manifest.sh
       - name: Unprivileged isolated fixtures
         run: python3 packaging/installer/tests/test_install_state.py -v
       - name: Root ownership and tmpfiles fixtures

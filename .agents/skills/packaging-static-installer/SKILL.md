@@ -81,6 +81,7 @@ The container then runs `packaging/makeself/run-all-jobs.sh`, which executes `pa
 | 89 | `buildinfo.install` | Writes `/opt/netdata/share/netdata/buildinfo.txt` |
 | 90 | `prepare-archive-source` | Copies post-installer scripts into the install tree |
 | 91 | `copy-ca-certificates` | Bundles a CA bundle |
+| 97 | `create-package-manifest` | Inventories shipped paths before archive creation |
 | 98 | `create-archive` | Runs `makeself.sh --gzip --complevel 9 --notemp --needroot` to build the `.gz.run` |
 | 99 | `copy-archives` | Renames the archive to `netdata-<arch>-<version>.gz.run` and copies aliases |
 

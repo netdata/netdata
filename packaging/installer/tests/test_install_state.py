@@ -12,7 +12,7 @@ import unittest
 ROOT = Path(__file__).resolve().parents[3]
 INSTALLER = ROOT / 'packaging/makeself/install-or-update.sh'
 FUNCTIONS = ROOT / 'packaging/installer/functions.sh'
-INVENTORY = ROOT / 'packaging/makeself/create-package-manifest.sh'
+INVENTORY_JOB = ROOT / 'packaging/makeself/jobs/97-create-package-manifest.sh'
 
 
 @unittest.skipUnless(sys.platform == 'linux', 'Linux installer permission semantics')
@@ -65,7 +65,9 @@ run() {
         shutil.copyfile(package / 'system/package-manifest', self.prefix / 'system/package-manifest')
 
     def generate_inventory(self, tree):
-        result = subprocess.run(['bash', str(INVENTORY), str(tree)], capture_output=True, text=True)
+        environment = dict(os.environ, NETDATA_INSTALL_PATH=str(tree), NETDATA_SOURCE_PATH=str(ROOT),
+                           NETDATA_MAKESELF_PATH=str(ROOT / 'packaging/makeself'))
+        result = subprocess.run([str(INVENTORY_JOB), str(tree)], env=environment, capture_output=True, text=True)
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
 
     def run_setup(self):
