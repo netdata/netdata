@@ -43,6 +43,7 @@
 //!    progress and chart data between the agent and the workers.
 
 pub mod config;
+pub mod driver;
 pub mod function;
 pub mod signals;
 
