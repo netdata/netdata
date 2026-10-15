@@ -13,7 +13,7 @@
 //! no index or dictionaries — frame decoding IS the access path — and
 //! this scan rebuilds the tail's in-memory counterparts of the sealed
 //! file's schema tree and value dictionaries (`field_kinds`,
-//! `pair_table`) alongside the spans.
+//! `numeric_fields`, `pair_table`) alongside the spans.
 //!
 //! Two plumbing facts: reads go through the buffered `wal::Reader`
 //! (never an mmap — that is the sealed-SFST candidate path,
@@ -99,6 +99,10 @@ pub struct TraceWalScan {
     /// (`ng_index::to_sfst_tree` + `derive_scalar_kinds`), so tail and
     /// sealed kinds agree by construction.
     field_kinds: Vec<(String, sfst::ValueKind)>,
+    /// The fields with at least one number (`Int`/`Double`) over the
+    /// scanned frames, through the same converter as the sealed path
+    /// (`derive_numeric_paths`).
+    numeric_fields: BTreeSet<String>,
     /// Storage field → distinct rendered values over the scanned frames —
     /// the tail's counterpart of a sealed file's value dictionaries, for
     /// key/value suggestions. Built from EXACTLY the entry set the seal
@@ -292,10 +296,11 @@ impl TraceWalScan {
         if spans.len() > u32::MAX as usize {
             return Err(TraceScanError::TooManySpans(spans.len()));
         }
-        let field_kinds = ng_index::to_sfst_tree(&flattener.into_tree()).derive_scalar_kinds();
+        let tree = ng_index::to_sfst_tree(&flattener.into_tree());
         Ok(TraceWalScan {
             spans,
-            field_kinds,
+            field_kinds: tree.derive_scalar_kinds(),
+            numeric_fields: tree.derive_numeric_paths(),
             pair_table,
         })
     }
@@ -318,6 +323,12 @@ impl TraceWalScan {
     /// struct field's doc).
     pub fn field_kinds(&self) -> &[(String, sfst::ValueKind)] {
         &self.field_kinds
+    }
+
+    /// The fields holding at least one number (see the struct field's
+    /// doc).
+    pub fn numeric_fields(&self) -> &BTreeSet<String> {
+        &self.numeric_fields
     }
 
     /// Storage field → distinct rendered values over the scanned frames

@@ -325,6 +325,7 @@ fn keys_match_by_rendered_or_bare_name_with_their_highest_tier() {
             class: Exact,
             tier: Some(FieldTier::Mid),
             enumerable: true,
+            numeric: false,
         },
         "the bare name is exact; the higher tier wins"
     );
@@ -453,6 +454,54 @@ fn a_tails_key_tier_follows_its_value_count() {
             .map(|s| s.tier),
         Some(Some(FieldTier::Mid))
     );
+}
+
+/// A key is numeric when any visited source stored a number (an `Int` or
+/// `Double`) under it, mixed with text or not, sealed or tail; builtins
+/// never are, whatever their storage holds.
+#[test]
+fn a_key_is_numeric_when_any_source_stored_a_number() {
+    let dir = tempfile::tempdir().unwrap();
+    let mut old = sp(1, 0, (BASE_S + 10) * 1_000_000_000, "op");
+    old.attrs = vec![
+        kv_int("code", 200),
+        kv_int("mixed", 3),
+        kv_str("label", "a"),
+    ];
+    // Sources are visited newest first: `mixed` arrives as text, and
+    // the older file's number must still mark it.
+    let mut new = sp(2, 0, (BASE_S + 20) * 1_000_000_000, "op");
+    new.attrs = vec![kv_str("mixed", "x")];
+    new.events = vec![("retry", vec![kv_int("attempt", 2)])];
+    let mut tail = sp(3, 0, (BASE_S + 30) * 1_000_000_000, "op");
+    tail.attrs = vec![kv_double("ratio", 0.5), kv_str("tail_label", "b")];
+    let old = write_wal(dir.path(), vec![req(&[old])], "old");
+    let new = write_wal(dir.path(), vec![req(&[new])], "new");
+    let tail = write_wal(dir.path(), vec![req(&[tail])], "tail");
+    let data = run(
+        vec![
+            sealed_source(dir.path(), &old, "old"),
+            memory_source(&new, "new"),
+            tail_source(&tail, "tail"),
+        ],
+        SuggestQuery::keys(render).max_items(200),
+    );
+
+    let mut numeric: Vec<&str> = data
+        .items
+        .iter()
+        .filter(|s| s.numeric)
+        .map(|s| s.text.as_str())
+        .collect();
+    numeric.sort();
+    assert_eq!(
+        numeric,
+        ["event.attempt", "span.code", "span.mixed", "span.ratio"]
+    );
+    for text in ["span.label", "span.tail_label", "name", "kind", "status"] {
+        assert!(data.items.iter().any(|s| s.text == text), "{text} is a key");
+    }
+    assert_eq!(data.status, QueryStatus::Complete);
 }
 
 /// Keys spread over every owner and all three source shapes: each lands

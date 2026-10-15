@@ -13,7 +13,10 @@
 //! type attribute names, not owners. Every builtin field is a key
 //! whatever the data holds (builtins are engine capabilities); a key's
 //! tier is the highest any visited source gives it, and a key no source
-//! carries (a virtual builtin such as the duration) has none.
+//! carries (a virtual builtin such as the duration) has none. An
+//! attribute key is `numeric` when any visited source's schema holds a
+//! number under it (`sfst::SchemaTree::derive_numeric_paths`; a tail's
+//! scan builds the same tree); builtins never are.
 //!
 //! Bounds, independent of how many files the window holds:
 //! - items: at most `max_items` suggestions, and only that many are kept
@@ -258,6 +261,10 @@ pub struct Suggestion {
     /// such as the duration), whose values cannot be suggested. Values:
     /// always `true`.
     pub enumerable: bool,
+    /// Keys: some visited source stored a number (an `Int` or `Double`)
+    /// under this attribute key, so ordering comparisons can match.
+    /// Always `false` for builtins and values.
+    pub numeric: bool,
 }
 
 /// The suggestions, best first.
@@ -301,13 +308,18 @@ pub fn suggest(
     if let Resolved::Keys(render) = target {
         for field in BuiltinField::ALL {
             let key = AttributeKey::Builtin(field);
+            let info = KeyInfo {
+                tier: None,
+                enumerable: true,
+                numeric: false,
+            };
             offer_key(
                 &mut set,
                 &matcher,
                 render,
                 AttributeOwner::Builtin,
                 &key,
-                None,
+                info,
             );
         }
     }
@@ -429,10 +441,19 @@ fn visit_sfst(
                 Ok(fields) => fields,
                 Err(e) => return Visit::Failed(format!("field table: {e}")),
             };
+            let numeric = match meta.metadata() {
+                Ok(metadata) => metadata.tree.derive_numeric_paths(),
+                Err(e) => return Visit::Failed(format!("metadata: {e}")),
+            };
             let mut changed = false;
             for field in fields.iter() {
                 if let Some((owner, key)) = storage_to_attribute(&field.name) {
-                    changed |= offer_key(set, matcher, *render, owner, &key, Some(field.tier));
+                    let info = KeyInfo {
+                        tier: Some(field.tier),
+                        enumerable: true,
+                        numeric: numeric.contains(&field.name),
+                    };
+                    changed |= offer_key(set, matcher, *render, owner, &key, info);
                 }
             }
             return Visit::Scanned { changed };
@@ -472,11 +493,15 @@ fn visit_tail(
             let mut changed = false;
             for (name, values) in scan.pair_table() {
                 if let Some((owner, key)) = storage_to_attribute(name) {
-                    let tier = sfst::FieldTier::from_cardinality(
-                        values.len(),
-                        sfst::DEFAULT_CARDINALITY_THRESHOLD,
-                    );
-                    changed |= offer_key(set, matcher, *render, owner, &key, Some(tier));
+                    let info = KeyInfo {
+                        tier: Some(sfst::FieldTier::from_cardinality(
+                            values.len(),
+                            sfst::DEFAULT_CARDINALITY_THRESHOLD,
+                        )),
+                        enumerable: true,
+                        numeric: scan.numeric_fields().contains(name),
+                    };
+                    changed |= offer_key(set, matcher, *render, owner, &key, info);
                 }
             }
             return Visit::Scanned { changed };
@@ -511,22 +536,32 @@ fn offer(set: &mut BoundedSuggestions, matcher: &ValueMatcher, value: &[u8]) -> 
 struct KeyInfo {
     tier: Option<sfst::FieldTier>,
     enumerable: bool,
+    numeric: bool,
 }
 
 /// Classify a key by the better of its rendered form and its bare name,
-/// and offer it; `true` when the set changed.
+/// and offer it; `true` when the set changed. A builtin's details come
+/// from the builtin itself: whether it has stored values, and never
+/// numeric (builtins are typed statically, whatever their storage holds).
 fn offer_key(
     set: &mut BoundedSuggestions,
     matcher: &ValueMatcher,
     render: KeyRenderer,
     owner: AttributeOwner,
     key: &AttributeKey,
-    tier: Option<sfst::FieldTier>,
+    info: KeyInfo,
 ) -> bool {
     let text = render(owner, key);
-    let (bare, enumerable) = match key {
-        AttributeKey::Attribute(name) => (matcher.classify(name.as_bytes()), true),
-        AttributeKey::Builtin(b) => (None, b.dictionary_field().is_some()),
+    let (bare, info) = match key {
+        AttributeKey::Attribute(name) => (matcher.classify(name.as_bytes()), info),
+        AttributeKey::Builtin(b) => (
+            None,
+            KeyInfo {
+                enumerable: b.dictionary_field().is_some(),
+                numeric: false,
+                ..info
+            },
+        ),
     };
     match matcher
         .classify(text.as_bytes())
@@ -534,7 +569,7 @@ fn offer_key(
         .chain(bare)
         .min()
     {
-        Some(class) => set.offer(&text, class, Some(KeyInfo { tier, enumerable })),
+        Some(class) => set.offer(&text, class, Some(info)),
         None => false,
     }
 }
@@ -601,15 +636,17 @@ impl BoundedSuggestions {
 
     /// Offer a matching candidate (`key`: a key's details; `None` for a
     /// value); `true` when the set changed. A key seen again keeps the
-    /// highest tier; that alone is no change.
+    /// highest tier and is numeric if any source said so; that alone is
+    /// no change.
     fn offer(&mut self, value: &str, class: MatchClass, key: Option<KeyInfo>) -> bool {
         let (display, cut) = display_text(value);
         if let Some(entry) = self.best.get_mut(display) {
             // Another candidate with the same display text: keep the
-            // better class and the higher tier, and flag the text if
-            // either was cut.
+            // better class, the higher tier and any numeric mark, and
+            // flag the text if either was cut.
             if let (Some(seen), Some(key)) = (entry.key.as_mut(), key) {
                 seen.tier = seen.tier.max(key.tier);
+                seen.numeric |= key.numeric;
             }
             let mut changed = false;
             if cut && !entry.truncated {
@@ -662,6 +699,7 @@ impl BoundedSuggestions {
                     class,
                     tier: entry.key.and_then(|k| k.tier),
                     enumerable: entry.key.is_none_or(|k| k.enumerable),
+                    numeric: entry.key.is_some_and(|k| k.numeric),
                 }
             })
             .collect()
@@ -706,6 +744,58 @@ mod tests {
             texts(set),
             [("z".into(), Exact, false), ("b".into(), Prefix, false)]
         );
+    }
+
+    #[test]
+    fn a_numeric_mark_merges_without_a_change_and_never_reaches_a_builtin() {
+        fn render(_: AttributeOwner, key: &AttributeKey) -> String {
+            match key {
+                AttributeKey::Attribute(a) => a.clone(),
+                AttributeKey::Builtin(b) => format!("{b:?}"),
+            }
+        }
+        let info = |numeric| KeyInfo {
+            tier: Some(sfst::FieldTier::Low),
+            enumerable: true,
+            numeric,
+        };
+        let matcher = ValueMatcher::new("");
+        let mut set = BoundedSuggestions::new(4);
+        let code = AttributeKey::Attribute("code".into());
+        assert!(offer_key(
+            &mut set,
+            &matcher,
+            render,
+            AttributeOwner::Span,
+            &code,
+            info(false)
+        ));
+        assert!(
+            !offer_key(
+                &mut set,
+                &matcher,
+                render,
+                AttributeOwner::Span,
+                &code,
+                info(true)
+            ),
+            "the mark alone does not lengthen the walk"
+        );
+        let name = AttributeKey::Builtin(BuiltinField::Name);
+        offer_key(
+            &mut set,
+            &matcher,
+            render,
+            AttributeOwner::Builtin,
+            &name,
+            info(true),
+        );
+        let numeric: Vec<(String, bool)> = set
+            .into_items()
+            .into_iter()
+            .map(|s| (s.text, s.numeric))
+            .collect();
+        assert_eq!(numeric, [("Name".into(), false), ("code".into(), true)]);
     }
 
     #[test]

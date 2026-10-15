@@ -458,7 +458,8 @@ pub fn run_suggest(args: &SuggestArgs, out: &mut dyn std::io::Write) -> Result<(
     for s in &data.items {
         let tier = s.tier.map(|t| format!(" tier={t:?}")).unwrap_or_default();
         let cut = if s.truncated { " truncated" } else { "" };
-        writeln!(out, "{} match={:?}{tier}{cut}", s.text, s.class)?;
+        let numeric = if s.numeric { " numeric" } else { "" };
+        writeln!(out, "{} match={:?}{tier}{cut}{numeric}", s.text, s.class)?;
     }
     let complete = data
         .complete_after
