@@ -28,6 +28,8 @@ func TestMetadataDocumentsProcessFunctions(t *testing.T) {
 	handler := rumfunctions.New(metadataFunctionSource{})
 	for _, declaration := range declarations {
 		t.Run(declaration.ID, func(t *testing.T) {
+			// RUM rows carry visitor sessions, locations and errors: sensitive data.
+			require.True(t, declaration.RequireCloud)
 			doc, ok := documented[declaration.ID]
 			require.True(t, ok, "missing Function documentation")
 			require.Equal(t, funcapi.FunctionName("rum", declaration), doc.FunctionName)

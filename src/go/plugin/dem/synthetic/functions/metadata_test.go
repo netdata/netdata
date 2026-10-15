@@ -31,6 +31,8 @@ func TestBothIntegrationsDocumentSharedProcessFunctions(t *testing.T) {
 			h := syntheticfunctions.New(nil)
 			for _, decl := range declarations {
 				t.Run(decl.ID, func(t *testing.T) {
+					// Registration must match the handler's own 0x1b permission check.
+					require.True(t, decl.RequireCloud)
 					doc, exists := docs[decl.ID]
 					require.True(t, exists)
 					assert.Equal(t, decl.FunctionName, doc.FunctionName)

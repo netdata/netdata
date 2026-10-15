@@ -61,6 +61,7 @@ func Declarations() []funcapi.FunctionConfig {
 				UpdateEvery:    10,
 				Help:           m.help,
 				Tags:           "synthetics",
+				RequireCloud:   true,
 				RawRequest:     true,
 				ManagedInfo:    true,
 				HasHistory:     m.history,
