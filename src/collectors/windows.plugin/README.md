@@ -78,6 +78,7 @@ sums the remaining queues into an `Other (aggregated)` series. Configure it in `
 ```
 
 The selector accepts comma or pipe separated case-insensitive simple patterns. Windows queue paths can be pasted
-verbatim; prefix a comma or pipe with `\` to match that character literally. A leading `\!` or `\*` escapes the
-pattern marker; elsewhere, backslashes are treated as Windows path separators (so `*` remains a wildcard). Matching
-queue names are selected in case-insensitive alphabetical order; the cap may be set to `0` to aggregate all queues.
+verbatim; prefix a comma or pipe with `\` to match that character literally. A leading `\!` matches a literal `!`
+instead of negating the pattern. The selector treats `*` as a wildcard; backslashes elsewhere are treated as Windows
+path separators. Matching queue names are selected in case-insensitive alphabetical order; the cap may be set to `0`
+to aggregate all queues.
