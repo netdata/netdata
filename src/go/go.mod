@@ -40,7 +40,7 @@ require (
 	github.com/fsnotify/fsnotify v1.10.1
 	github.com/go-ldap/ldap/v3 v3.4.15
 	github.com/go-sql-driver/mysql v1.10.1
-	github.com/godbus/dbus/v5 v5.2.2
+	github.com/godbus/dbus/v5 v5.2.3
 	github.com/gofrs/flock v0.13.1
 	github.com/gohugoio/hashstructure v1.1.0
 	github.com/golang/mock v1.6.0
