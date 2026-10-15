@@ -58,9 +58,23 @@ Each attempt starts a fresh browser and consumes CPU, memory and target website 
 
 ### Prerequisites
 
-#### Prepare the browser runtime
+#### Set up the browser runtime
 
-Configure the Node executable, pinned Playwright and Lighthouse dependencies, and full Chromium binary in the runtime section of dem.conf. Chromium must run with its sandbox enabled as the Netdata service account. Restart dem.plugin after changing runtime paths; the plugin does not download dependencies. Follow the [DEM runtime preparation guide](https://github.com/netdata/netdata/blob/master/src/go/plugin/dem/README.md) for the pinned versions and setup commands.
+Browser runtime delivery is experimental; released bundles and automatic manifest installation are not
+provided. Supply a trusted runtime manifest and its matching bundle before enabling browser monitors.
+Run Chromium with its sandbox enabled as the unprivileged Netdata service account on Linux amd64 or arm64.
+Managed mode prepares the exact runtime when a browser monitor is enabled, using an administrator-installed
+runtime manifest. For offline setup, install the trusted manifest and import its matching archive, or select
+`runtime.mode: preloaded` in `dem.conf` with the final `preload_path` produced by `dem.plugin runtime preload`.
+Both modes require the trusted manifest and its matching bundle. Preloads stay outside automatic cleanup;
+stop every consumer before replacing or removing them. Separately installed runtime components are unsupported.
+
+Run `dem.plugin runtime status` to inspect preparation and `dem.plugin runtime qualify` as the service
+account to check a local sandboxed browser run. Follow the
+[DEM runtime setup guide](https://github.com/netdata/netdata/blob/master/src/go/plugin/dem/README.md#runtime-setup-and-retirement)
+for manifests, downloads, offline imports, retention and protected preloads. Restart the plugin after changing
+runtime configuration.
+
 
 
 ### Configuration
@@ -377,4 +391,4 @@ Retained capture metadata remains available after run history expires. Fetch ver
 
 #### No conclusive observations
 
-Inspect native job status and synthetic inventory for runtime preparation errors, waiting attempts or execution inability. Open the latest retained run for errors and actual failure phases. Missing measurements are gaps; stale, inconclusive and cancelled observations are not recovery.
+Inspect native job status for unavailable dependencies and plugin logs for runtime preparation errors, waiting attempts or execution inability. Open the latest retained run for errors and actual failure phases. Missing measurements are gaps; stale, inconclusive and cancelled observations are not recovery.
