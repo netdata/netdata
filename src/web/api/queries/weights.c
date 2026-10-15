@@ -1932,7 +1932,10 @@ static void rrdset_weights_value(
 
 static void rrdset_weights_multi_dimensional_value(struct query_weights_data *qwd) {
     QUERY_TARGET_REQUEST qtr = {
+            // one RRDR dimension per metric needs the v1 response shape, but the instances filters use the names
+            // of the request's API version (id@machine_guid, name@hostname)
             .version = 1,
+            .instances_version = qwd->qwr->version,
             .scope_nodes = qwd->qwr->scope_nodes,
             .scope_contexts = qwd->qwr->scope_contexts,
             .scope_instances = qwd->qwr->scope_instances,
