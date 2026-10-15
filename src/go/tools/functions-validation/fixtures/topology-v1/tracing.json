@@ -769,6 +769,7 @@
       "loss_shutdown_lost": 0,
       "loss_unpaired_servers": 0,
       "loss_unreadable_files": 1,
+      "loss_unwritten_minutes": 0,
       "overflow_client_calls": 2,
       "overflow_server_calls": 1,
       "services": 3,

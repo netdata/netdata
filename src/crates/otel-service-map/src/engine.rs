@@ -192,6 +192,12 @@ impl Engine {
         }
     }
 
+    pub fn note_unwritten_minutes(&mut self, tenant: &str, minutes: u64, now_ns: u64) {
+        if minutes > 0 {
+            self.tenant(tenant).tally.losses(now_ns).unwritten_minutes += minutes;
+        }
+    }
+
     /// Ends the wait of every span that arrived `wait_ns` or more ago.
     pub fn expire(&mut self, now_ns: u64) {
         let limits = self.limits.clone();

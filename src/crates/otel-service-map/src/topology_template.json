@@ -2146,6 +2146,7 @@
       "loss_invalid": 0,
       "loss_unpaired_servers": 0,
       "loss_shutdown_lost": 0,
+      "loss_unwritten_minutes": 0,
       "loss_unreadable_files": 0,
       "overflow_client_calls": 0,
       "overflow_server_calls": 0

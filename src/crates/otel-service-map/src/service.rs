@@ -210,8 +210,12 @@ fn flush(shared: &Shared, now: u64, retention: bool, shutdown: bool) {
         }
     };
     if !closed.is_empty() {
-        if let Err(e) = shared.store.write(closed) {
-            tracing::error!(%e, "service map: cannot write closed minutes; they are lost");
+        let failed = shared.store.write(closed);
+        if !failed.is_empty() {
+            let mut engine = shared.engine.lock().expect("engine lock");
+            for (tenant, minutes) in failed {
+                engine.note_unwritten_minutes(&tenant, minutes, now);
+            }
         }
     }
     if retention {

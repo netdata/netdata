@@ -19,7 +19,9 @@ use crate::engine::ClosedMinute;
 use crate::stats::MinuteStats;
 
 const MAGIC: &[u8; 4] = b"NDSM";
-const VERSION: u8 = 1;
+// Bumped on every change of `HourFile`'s encoding: an older file then reads
+// as corrupt instead of decoding into the wrong fields.
+const VERSION: u8 = 2;
 const HEADER_LEN: usize = 4 + 1 + 4 + 4;
 const EXTENSION: &str = "smh";
 const MINUTES_PER_HOUR: u64 = 60;
@@ -67,8 +69,10 @@ impl Store {
     }
 
     /// Adds closed minutes to their hour files. A minute already on disk (from
-    /// before a restart) is merged, not replaced.
-    pub fn write(&self, closed: Vec<ClosedMinute>) -> io::Result<()> {
+    /// before a restart) is merged, not replaced. A file that cannot be
+    /// written does not stop the others; the minutes that could not be
+    /// written are returned per tenant, so they can be reported as lost.
+    pub fn write(&self, closed: Vec<ClosedMinute>) -> Vec<(Arc<str>, u64)> {
         type FileKey = (Arc<str>, u64);
         let mut by_file: HashMap<FileKey, Vec<(u64, MinuteStats)>> = HashMap::new();
         for c in closed {
@@ -77,18 +81,36 @@ impl Store {
                 .or_default()
                 .push((c.minute, c.stats));
         }
+        let mut failed: BTreeMap<Arc<str>, u64> = BTreeMap::new();
         for ((tenant, hour), minutes) in by_file {
-            let dir = self.root.join(tenant_dir(&tenant));
-            fs::create_dir_all(&dir)?;
-            let path = dir.join(format!("{hour}.{EXTENSION}"));
-            // An unreadable file is replaced: its minutes are already lost.
-            let mut file = read_file(&path).unwrap_or_default();
-            for (minute, stats) in minutes {
-                file.minutes.entry(minute).or_default().merge(&stats);
+            if let Err(e) = self.write_hour(&tenant, hour, &minutes) {
+                tracing::error!(%tenant, hour, %e, "service map: cannot write closed minutes; they are lost");
+                *failed.entry(tenant).or_insert(0) += minutes.len() as u64;
             }
-            write_file(&path, &file)?;
         }
-        Ok(())
+        failed.into_iter().collect()
+    }
+
+    fn write_hour(
+        &self,
+        tenant: &str,
+        hour: u64,
+        minutes: &[(u64, MinuteStats)],
+    ) -> io::Result<()> {
+        let dir = self.root.join(tenant_dir(tenant));
+        fs::create_dir_all(&dir)?;
+        let path = dir.join(format!("{hour}.{EXTENSION}"));
+        let mut file = match read_file(&path)? {
+            Read::Missing => HourFile::default(),
+            // Its minutes are already lost (and counted on every load); the
+            // new ones still get a readable file.
+            Read::Corrupt => HourFile::default(),
+            Read::Ok(file) => file,
+        };
+        for (minute, stats) in minutes {
+            file.minutes.entry(*minute).or_default().merge(stats);
+        }
+        write_file(&path, &file)
     }
 
     /// The stored minutes of `tenant` in `[from_minute, to_minute]`.
@@ -100,12 +122,13 @@ impl Store {
         let dir = self.root.join(tenant_dir(tenant));
         for hour in from_minute / MINUTES_PER_HOUR..=to_minute / MINUTES_PER_HOUR {
             let path = dir.join(format!("{hour}.{EXTENSION}"));
-            if !path.exists() {
-                continue;
-            }
-            let Some(file) = read_file(&path) else {
-                loaded.unreadable_files += 1;
-                continue;
+            let file = match read_file(&path) {
+                Ok(Read::Missing) => continue,
+                Ok(Read::Ok(file)) => file,
+                Ok(Read::Corrupt) | Err(_) => {
+                    loaded.unreadable_files += 1;
+                    continue;
+                }
             };
             for (minute, stats) in file.minutes.range(from_minute..=to_minute) {
                 loaded.minutes.entry(*minute).or_default().merge(stats);
@@ -189,8 +212,24 @@ fn remove_quietly(path: &Path) {
     }
 }
 
-fn read_file(path: &Path) -> Option<HourFile> {
-    let bytes = fs::read(path).ok()?;
+enum Read {
+    Missing,
+    /// Wrong magic, version, length or checksum, or a payload that does not
+    /// decode: a file from another format version or a damaged one.
+    Corrupt,
+    Ok(HourFile),
+}
+
+fn read_file(path: &Path) -> io::Result<Read> {
+    let bytes = match fs::read(path) {
+        Ok(bytes) => bytes,
+        Err(e) if e.kind() == io::ErrorKind::NotFound => return Ok(Read::Missing),
+        Err(e) => return Err(e),
+    };
+    Ok(decode(&bytes).map_or(Read::Corrupt, Read::Ok))
+}
+
+fn decode(bytes: &[u8]) -> Option<HourFile> {
     if bytes.len() < HEADER_LEN || &bytes[..4] != MAGIC || bytes[4] != VERSION {
         return None;
     }
@@ -218,7 +257,12 @@ fn write_file(path: &Path, file: &HourFile) -> io::Result<()> {
         out.write_all(&payload)?;
         out.sync_all()?;
     }
-    fs::rename(&tmp, path)
+    fs::rename(&tmp, path)?;
+    // Make the rename itself durable.
+    if let Some(dir) = path.parent() {
+        fs::File::open(dir)?.sync_all()?;
+    }
+    Ok(())
 }
 
 #[cfg(test)]
@@ -265,14 +309,13 @@ mod tests {
     fn round_trip_and_window() {
         let dir = tempfile::tempdir().unwrap();
         let store = Store::open(dir.path(), Retention::default()).unwrap();
-        store
-            .write(vec![
-                closed("default", 119, minute_with(1, 0)),
-                closed("default", 120, minute_with(2, 0)),
-                closed("default", 185, minute_with(3, 0)),
-                closed("other", 120, minute_with(9, 0)),
-            ])
-            .unwrap();
+        let failed = store.write(vec![
+            closed("default", 119, minute_with(1, 0)),
+            closed("default", 120, minute_with(2, 0)),
+            closed("default", 185, minute_with(3, 0)),
+            closed("other", 120, minute_with(9, 0)),
+        ]);
+        assert!(failed.is_empty());
         let loaded = store.load("default", 120, 200);
         assert_eq!(calls(&loaded), vec![(120, 2), (185, 3)]);
         assert_eq!(loaded.unreadable_files, 0);
@@ -288,12 +331,16 @@ mod tests {
     fn a_minute_written_twice_is_merged() {
         let dir = tempfile::tempdir().unwrap();
         let store = Store::open(dir.path(), Retention::default()).unwrap();
-        store
-            .write(vec![closed("default", 60, minute_with(2, 1))])
-            .unwrap();
-        store
-            .write(vec![closed("default", 60, minute_with(3, 4))])
-            .unwrap();
+        assert!(
+            store
+                .write(vec![closed("default", 60, minute_with(2, 1))])
+                .is_empty()
+        );
+        assert!(
+            store
+                .write(vec![closed("default", 60, minute_with(3, 4))])
+                .is_empty()
+        );
         let loaded = store.load("default", 60, 60);
         assert_eq!(calls(&loaded), vec![(60, 5)]);
         assert_eq!(loaded.minutes[&60].losses.late, 5);
@@ -303,12 +350,14 @@ mod tests {
     fn corrupt_files_are_skipped_and_counted_and_temp_files_ignored() {
         let dir = tempfile::tempdir().unwrap();
         let store = Store::open(dir.path(), Retention::default()).unwrap();
-        store
-            .write(vec![
-                closed("default", 60, minute_with(1, 0)),
-                closed("default", 120, minute_with(1, 0)),
-            ])
-            .unwrap();
+        assert!(
+            store
+                .write(vec![
+                    closed("default", 60, minute_with(1, 0)),
+                    closed("default", 120, minute_with(1, 0)),
+                ])
+                .is_empty()
+        );
         let tenant = dir.path().join(tenant_dir("default"));
         let mut bytes = fs::read(tenant.join("1.smh")).unwrap();
         let last = bytes.len() - 1;
@@ -321,6 +370,42 @@ mod tests {
     }
 
     #[test]
+    fn a_failing_file_does_not_drop_the_others() {
+        let dir = tempfile::tempdir().unwrap();
+        let store = Store::open(dir.path(), Retention::default()).unwrap();
+        // The tenant's directory cannot be created: a file has its name.
+        fs::write(dir.path().join(tenant_dir("blocked")), b"").unwrap();
+        let failed = store.write(vec![
+            closed("blocked", 60, minute_with(1, 0)),
+            closed("blocked", 61, minute_with(1, 0)),
+            closed("a", 60, minute_with(2, 0)),
+            closed("b", 120, minute_with(3, 0)),
+        ]);
+        assert_eq!(failed, vec![(Arc::from("blocked"), 2)]);
+        assert_eq!(calls(&store.load("a", 0, 1_000)), vec![(60, 2)]);
+        assert_eq!(calls(&store.load("b", 0, 1_000)), vec![(120, 3)]);
+    }
+
+    #[test]
+    fn an_unreadable_hour_file_is_not_overwritten_by_an_io_error() {
+        let dir = tempfile::tempdir().unwrap();
+        let store = Store::open(dir.path(), Retention::default()).unwrap();
+        assert!(
+            store
+                .write(vec![closed("default", 60, minute_with(1, 0))])
+                .is_empty()
+        );
+        let path = dir.path().join(tenant_dir("default")).join("1.smh");
+        // A directory where the hour file should be: reading fails with an
+        // I/O error, not "missing" or "corrupt".
+        fs::remove_file(&path).unwrap();
+        fs::create_dir(&path).unwrap();
+        let failed = store.write(vec![closed("default", 61, minute_with(1, 0))]);
+        assert_eq!(failed, vec![(Arc::from("default"), 1)]);
+        assert!(path.is_dir(), "left as it was");
+    }
+
+    #[test]
     fn retention_drops_old_hours_then_the_oldest_until_it_fits() {
         let dir = tempfile::tempdir().unwrap();
         let mut closed_minutes = Vec::new();
@@ -328,7 +413,7 @@ mod tests {
             closed_minutes.push(closed("default", hour * 60, minute_with(1, 0)));
         }
         let store = Store::open(dir.path(), Retention::default()).unwrap();
-        store.write(closed_minutes).unwrap();
+        assert!(store.write(closed_minutes).is_empty());
         let tenant = dir.path().join(tenant_dir("default"));
         let file_size = fs::metadata(tenant.join("4.smh")).unwrap().len();
         fs::write(tenant.join("9.tmp"), b"partial").unwrap();

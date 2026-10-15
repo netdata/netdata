@@ -88,6 +88,8 @@ pub struct LossCounters {
     pub unpaired_servers: u64,
     /// Spans still waiting for their other half at shutdown.
     pub shutdown_lost: u64,
+    /// Closed minutes that could not be written to disk.
+    pub unwritten_minutes: u64,
 }
 
 impl LossCounters {
@@ -100,6 +102,7 @@ impl LossCounters {
         self.invalid += other.invalid;
         self.unpaired_servers += other.unpaired_servers;
         self.shutdown_lost += other.shutdown_lost;
+        self.unwritten_minutes += other.unwritten_minutes;
     }
 }
 

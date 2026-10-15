@@ -224,6 +224,7 @@ pub fn build(view: &MapView, tenant: &str, after_s: u64, before_s: u64, now: Sys
     stats["loss_invalid"] = json!(losses.invalid);
     stats["loss_unpaired_servers"] = json!(losses.unpaired_servers);
     stats["loss_shutdown_lost"] = json!(losses.shutdown_lost);
+    stats["loss_unwritten_minutes"] = json!(losses.unwritten_minutes);
     stats["loss_unreadable_files"] = json!(view.unreadable_files);
     stats["overflow_client_calls"] = json!(overflow.0);
     stats["overflow_server_calls"] = json!(overflow.1);
