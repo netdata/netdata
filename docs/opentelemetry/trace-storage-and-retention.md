@@ -62,7 +62,6 @@ Reading traces back from object storage has these limits:
   complete the traces it finds.
 - Some requests do not download offloaded files. They report each offloaded file they select as
   `remote_unavailable`. These requests are:
-  - the value lists of the Traces tab filters;
   - the suggestions of the Traces search bar. They read the newest data first and can stop early, so they report
     only the offloaded files they reach before they stop;
   - a lookup of one trace by its ID without a time range. This lookup reads all local data. To include offloaded

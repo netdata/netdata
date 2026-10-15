@@ -373,18 +373,12 @@ async fn progress_counts_the_downloads_beside_the_sources() {
 }
 
 #[tokio::test]
-async fn value_lists_and_unbounded_lookups_skip_offloaded_files() {
-    // The per-keystroke value list and suggestions, and a trace lookup
-    // without bounds
-    // never download: each offloaded file the request selects reports
+async fn suggestions_and_unbounded_lookups_skip_offloaded_files() {
+    // Per-keystroke suggestions and a trace lookup without bounds never
+    // download: each offloaded file the request selects reports
     // `remote_unavailable` instead, however large the retention.
     let (h, remote, _) = evicted_setup(64 * MIB).await;
     let partial = json!({"partial": ["remote_unavailable"]});
-
-    let body = json!({"attribute_values": {"after": T_S, "before": T_S + 100, "key": "resource.service.name"}});
-    let v = call(&h, body).await.unwrap();
-    assert_eq!(v["status"], partial);
-    assert_eq!(v["values"], json!([]));
 
     let window = json!({"after": T_S, "before": T_S + 100});
     for body in [

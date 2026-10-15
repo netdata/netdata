@@ -77,7 +77,6 @@ async fn info_returns_the_descriptor() {
         json!([
             "info",
             "trace",
-            "attribute_values",
             "suggest",
             "tenant",
             "after",
@@ -124,7 +123,7 @@ async fn every_mode_is_implemented_an_empty_agent_answers_them_all() {
     // The mode catalog is complete: every selector answers cleanly on
     // an empty agent — none is a not-implemented error.
     for body in [
-        json!({"attribute_values": {"key": "name"}}),
+        json!({"trace": {"id": "481451a49451a81bd8807bca88d35e81"}}),
         json!({"suggest": {}}),
         json!({"suggest": {"key": "name", "term": "x"}}),
     ] {
@@ -812,170 +811,19 @@ async fn late_arrivals_above_the_key_shorten_pages_but_never_duplicate() {
     );
 }
 
-// ── The enumeration mode ───────────────────────────────────────────
+// ── Suggestion admission ───────────────────────────────────────────
 
 #[tokio::test]
-async fn attribute_values_returns_storage_labels_with_kinds() {
-    let h = handler_with_search_corpus().await;
-    let mut body = window_body();
-    merge(&mut body, json!({"key": "resource.service.name"}));
-    let body = as_mode("attribute_values", body);
-    let v = serde_json::to_value(call_on(&h, body).await.unwrap()).unwrap();
-    assert_eq!(v["key"], "resource.service.name");
-    assert_eq!(v["truncated"], false);
-    let values: Vec<&str> = v["values"]
-        .as_array()
-        .unwrap()
-        .iter()
-        .map(|x| x["value"].as_str().unwrap())
-        .collect();
-    assert!(
-        values.contains(&"svc-a") && values.contains(&"svc-b"),
-        "{values:?}"
-    );
-    assert!(
-        v["values"]
-            .as_array()
-            .unwrap()
-            .iter()
-            .all(|x| x["kind"] == "str"),
-        "service names carry their schema kind: {}",
-        v["values"]
-    );
-
-    // Builtin `name`: the corpus's span names.
-    let mut body = window_body();
-    merge(&mut body, json!({"key": "name"}));
-    let body = as_mode("attribute_values", body);
-    let v = serde_json::to_value(call_on(&h, body).await.unwrap()).unwrap();
-    let values: Vec<&str> = v["values"]
-        .as_array()
-        .unwrap()
-        .iter()
-        .map(|x| x["value"].as_str().unwrap())
-        .collect();
-    assert!(values.contains(&"span-1"), "{values:?}");
-
-    // Truncation flag exact.
-    let mut body = window_body();
-    merge(
-        &mut body,
-        json!({"key": "resource.service.name", "max_values": 1}),
-    );
-    let body = as_mode("attribute_values", body);
-    let v = serde_json::to_value(call_on(&h, body).await.unwrap()).unwrap();
-    assert_eq!(v["values"].as_array().unwrap().len(), 1);
-    assert_eq!(v["truncated"], true);
-}
-
-#[tokio::test]
-async fn value_lists_beyond_the_admission_limit_answer_busy() {
-    // No free permit: the request is refused before any work, with an
-    // empty list and the reason — not an error.
-    let registries = make_registries();
-    let h = make_handler_over(registries).with_value_list_concurrency(0);
-    let v = serde_json::to_value(
-        call_on(&h, json!({"attribute_values": {"key": "name"}}))
-            .await
-            .unwrap(),
-    )
-    .unwrap();
-    assert_eq!(v["status"], json!({"partial": ["busy"]}));
-    assert_eq!(v["values"], json!([]));
-    assert_eq!(v["key"], "name");
-    // A bad request stays the client's error, not `busy`.
-    let err = call_on(
-        &h,
-        json!({"attribute_values": {"key": "name", "after": 500, "before": 400}}),
-    )
-    .await
-    .expect_err("an invalid window");
-    assert!(err.to_string().contains("invalid window"), "{err}");
-}
-
-#[tokio::test]
-async fn a_finished_value_list_releases_its_permit() {
+async fn a_finished_suggestion_releases_its_permit() {
     let h = handler_with_search_corpus()
         .await
-        .with_value_list_concurrency(1);
+        .with_suggest_concurrency(1);
     let mut body = window_body();
     merge(&mut body, json!({"key": "resource.service.name"}));
     for _ in 0..2 {
-        let v = serde_json::to_value(
-            call_on(&h, as_mode("attribute_values", body.clone()))
-                .await
-                .unwrap(),
-        )
-        .unwrap();
-        assert_eq!(v["status"], json!({"complete": true}));
-    }
-}
-
-#[tokio::test]
-async fn value_lists_default_to_and_cap_at_bounded_sizes() {
-    let h = handler_with_search_corpus().await;
-    let err = call_on(
-        &h,
-        json!({"attribute_values": {"key": "name", "max_values": 1001}}),
-    )
-    .await
-    .expect_err("beyond the maximum");
-    assert!(
-        err.to_string().contains("exceeds the maximum 1000"),
-        "{err}"
-    );
-    call_on(
-        &h,
-        json!({"attribute_values": {"key": "name", "max_values": 1000}}),
-    )
-    .await
-    .expect("the maximum itself is legal");
-
-    // Without `max_values`, a key with more distinct values lists the
-    // default count.
-    let registries = make_registries();
-    install_wal(
-        &registries,
-        "default",
-        1,
-        vec![otlp_req_svc(0x0A, 150, base_ns(10), "svc-a")],
-    )
-    .await;
-    let h = make_handler_over(registries);
-    let mut body = window_body();
-    merge(&mut body, json!({"key": "name"}));
-    let v = serde_json::to_value(
-        call_on(&h, as_mode("attribute_values", body))
-            .await
-            .unwrap(),
-    )
-    .unwrap();
-    assert_eq!(
-        v["values"].as_array().unwrap().len(),
-        super::super::wire::DEFAULT_MAX_VALUES
-    );
-    assert_eq!(v["truncated"], true);
-}
-
-#[tokio::test]
-async fn enumeration_invalid_requests_are_clean_client_errors() {
-    let h = handler_with_search_corpus().await;
-    // Shape errors (null selectors, missing `key`) are wire-test
-    // territory now; these are the handler's semantic rejections.
-    for (body, needle) in [
-        (json!({"attribute_values": {"key": "bogus"}}), "unknown key"),
-        // A virtual builtin has no value dictionary: rejected before
-        // admission.
-        (
-            json!({"attribute_values": {"key": "duration"}}),
-            "has no stored values",
-        ),
-    ] {
-        let err = call_on(&h, body.clone())
-            .await
-            .expect_err("must be a client error");
-        let msg = err.to_string();
-        assert!(msg.contains(needle), "for {body}: {msg}");
+        let v = serde_json::to_value(call_on(&h, as_mode("suggest", body.clone())).await.unwrap())
+            .unwrap();
+        assert_ne!(v["status"], json!({"partial": ["busy"]}), "{v}");
     }
 }
 
@@ -1143,7 +991,7 @@ async fn every_mode_sets_its_progress_total_and_completes_it() {
             (2, 2),
         ),
         (functions_body(2), (4, 4)),
-        (windowed("attribute_values", json!({"key": "name"})), (2, 2)),
+        (windowed("suggest", json!({"key": "name"})), (2, 2)),
     ] {
         assert_eq!(progress_of(&h, body.clone()).await, expected, "{body}");
     }
@@ -1441,7 +1289,7 @@ async fn tenant_scoping_isolates_and_defaults() {
     for mut wrapped in [
         json!({"trace": {"id": "0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a"}}),
         functions_body(20),
-        as_mode("attribute_values", values_body),
+        as_mode("suggest", values_body),
     ] {
         let unscoped = serde_json::to_value(call_on(&h, wrapped.clone()).await.unwrap()).unwrap();
         wrapped["tenant"] = json!("tenant-a");
@@ -1449,8 +1297,8 @@ async fn tenant_scoping_isolates_and_defaults() {
         let count = |v: &serde_json::Value| -> usize {
             if let Some(items) = v.get("items").and_then(|i| i.get("returned")) {
                 items.as_u64().unwrap() as usize
-            } else if let Some(values) = v.get("values") {
-                values.as_array().unwrap().len()
+            } else if let Some(items) = v.get("items").and_then(|i| i.as_array()) {
+                items.len()
             } else {
                 v["data"]["items"]["returned"].as_u64().unwrap() as usize
             }
@@ -1502,12 +1350,12 @@ async fn shape_errors_are_transport_400s() {
             "cannot mix a mode selector with Functions parameters",
         ),
         (
-            br#"{"trace": {}, "attribute_values": {}}"#,
+            br#"{"trace": {}, "suggest": {}}"#,
             "conflicting mode selectors",
         ),
         (br#"{"info": true}"#, "invalid info selector"),
         (br#"{"trace": null}"#, "invalid trace selector"),
-        (br#"{"attribute_values": []}"#, "expected an object"),
+        (br#"{"suggest": []}"#, "expected an object"),
         (br#"[]"#, "otel-traces request object"),
         (
             br#"{"info": {}, "tenant": "a", "tenant": "b"}"#,
@@ -1583,14 +1431,6 @@ async fn every_response_shape_declares_its_mode() {
     for (body, mode) in [
         (json!({"info": {}}), "info"),
         (
-            {
-                let mut inner = window_body();
-                merge(&mut inner, json!({"key": "kind"}));
-                as_mode("attribute_values", inner)
-            },
-            "attribute_values",
-        ),
-        (
             json!({"trace": {"id": "0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a"}}),
             "trace",
         ),
@@ -1646,7 +1486,7 @@ async fn suggest_lists_matching_values_and_keys() {
 async fn suggest_is_validated_before_admission_and_bounded() {
     let h = handler_with_search_corpus()
         .await
-        .with_value_list_concurrency(0);
+        .with_suggest_concurrency(0);
     let v = serde_json::to_value(call_on(&h, json!({"suggest": {}})).await.unwrap()).unwrap();
     assert_eq!(v["status"], json!({"partial": ["busy"]}));
     assert_eq!(v["items"], json!([]));
@@ -1669,7 +1509,7 @@ async fn suggest_is_validated_before_admission_and_bounded() {
             "has no stored values",
         ),
         (
-            json!({"attribute_values": {"key": "trace_id"}}),
+            json!({"suggest": {"key": "trace_id"}}),
             "has no stored values",
         ),
         (
@@ -1677,7 +1517,7 @@ async fn suggest_is_validated_before_admission_and_bounded() {
             "'term' is longer than 1024 bytes",
         ),
         (
-            json!({"attribute_values": {"key": format!("span.{}", "k".repeat(1020))}}),
+            json!({"suggest": {"key": format!("span.{}", "k".repeat(1020))}}),
             "'key' is longer than 1024 bytes",
         ),
     ] {
@@ -1714,13 +1554,8 @@ async fn lists_and_trace_lookups_have_their_own_admission() {
 
     let mut body = window_body();
     merge(&mut body, json!({"key": "resource.service.name"}));
-    let v = serde_json::to_value(
-        call_on(&h, as_mode("attribute_values", body))
-            .await
-            .unwrap(),
-    )
-    .unwrap();
-    assert_eq!(v["status"], json!({"complete": true}));
+    let v = serde_json::to_value(call_on(&h, as_mode("suggest", body)).await.unwrap()).unwrap();
+    assert_ne!(v["status"], json!({"partial": ["busy"]}), "{v}");
 }
 
 #[tokio::test]

@@ -3,7 +3,7 @@
 //! The transport layer between the netdata function protocol and the
 //! wire-neutral `sfsq::traces` engine. One Function view plus three
 //! explicit peer modes, each selected by exactly one top-level
-//! sub-object — `info`, `trace`, `attribute_values` — the mode's params
+//! sub-object — `info`, `trace`, `suggest` — the mode's params
 //! self-contained in its object. A request without a selector is the
 //! Functions view (the trace list): standard Functions parameters
 //! around the search page, wrapped as `type: "traces"`. Explicit modes keep their native
@@ -42,7 +42,6 @@ use sfsq::traces::{PartialReason, QueryStatus};
 pub const ACCEPTED_PARAMS: &[&str] = &[
     "info",
     "trace",
-    "attribute_values",
     "suggest",
     "tenant",
     "after",
@@ -74,9 +73,6 @@ struct RawOtelTracesRequest {
     /// The single-trace mode (dumb span list by trace id).
     #[serde(default, deserialize_with = "present")]
     trace: Option<serde_json::Value>,
-    /// Attribute-value enumeration (facet values).
-    #[serde(default, deserialize_with = "present")]
-    attribute_values: Option<serde_json::Value>,
     /// Search-bar suggestions: keys, or one key's values.
     #[serde(default, deserialize_with = "present")]
     suggest: Option<serde_json::Value>,
@@ -132,7 +128,6 @@ pub enum TracesMode {
     Functions(FunctionsParams),
     Info,
     Trace(TraceParams),
-    AttributeValues(AttributeValuesParams),
     Suggest(SuggestParams),
 }
 
@@ -176,7 +171,6 @@ impl TryFrom<RawOtelTracesRequest> for OtelTracesRequest {
         let present: Vec<&'static str> = [
             ("info", raw.info.is_some()),
             ("trace", raw.trace.is_some()),
-            ("attribute_values", raw.attribute_values.is_some()),
             ("suggest", raw.suggest.is_some()),
         ]
         .into_iter()
@@ -242,8 +236,6 @@ impl TryFrom<RawOtelTracesRequest> for OtelTracesRequest {
             TracesMode::Info
         } else if let Some(v) = &raw.trace {
             TracesMode::Trace(typed("trace", v)?)
-        } else if let Some(v) = &raw.attribute_values {
-            TracesMode::AttributeValues(typed("attribute_values", v)?)
         } else if let Some(v) = &raw.suggest {
             TracesMode::Suggest(typed("suggest", v)?)
         } else {
@@ -465,36 +457,8 @@ where
     serde_json::Value::deserialize(d).map(Some)
 }
 
-/// [`AttributeValuesParams::max_values`] when the request omits it.
-pub const DEFAULT_MAX_VALUES: usize = 100;
-
-/// Wire maximum for [`AttributeValuesParams::max_values`].
-pub const MAX_VALUES_MAX: usize = 1000;
-
-/// The `attribute_values` mode's typed parameters.
-#[derive(Debug, Clone, Deserialize)]
-#[serde(deny_unknown_fields)]
-pub struct AttributeValuesParams {
-    /// Vocabulary window, unix seconds; `0` means "unspecified" (the
-    /// adapter's `resolve_window` defaults).
-    #[serde(default)]
-    pub after: u32,
-    #[serde(default)]
-    pub before: u32,
-    /// The key, in the selection grammar (`<owner>.<key>` or a bare
-    /// builtin word); at most [`REQUEST_TEXT_MAX_BYTES`], and with stored
-    /// values (not a virtual builtin such as `duration`).
-    pub key: String,
-    /// Cap the value list (the response's `truncated` flag is exact).
-    /// Absent means [`DEFAULT_MAX_VALUES`]; zero and beyond
-    /// [`MAX_VALUES_MAX`] are client errors, so the response stays
-    /// bounded.
-    #[serde(default)]
-    pub max_values: Option<usize>,
-}
-
-/// Longest `key` (both value modes) or `term` (suggest), in bytes; a
-/// longer one is a client error.
+/// Longest `key` or `term` of a suggestion request, in bytes; a longer
+/// one is a client error.
 pub const REQUEST_TEXT_MAX_BYTES: usize = 1024;
 
 /// Wire maximum for [`SuggestParams::max_items`]; absent means the
@@ -568,7 +532,6 @@ pub enum OtelTracesResponse {
     Functions(Box<FunctionsTracesResponse>),
     Info(InfoResponse),
     Trace(Box<TraceResult>),
-    AttributeValues(AttributeValuesResult),
     Suggest(SuggestResult),
 }
 
@@ -648,43 +611,6 @@ pub struct OverviewTotals {
     pub spans: u64,
     /// Of those spans, ERROR-status ones.
     pub errors: u64,
-}
-
-// ── Enumeration response ────────────────────────────────────────────
-//
-// Window semantics: pruning is FILE-GRANULAR — a value counted here
-// comes from a file overlapping the window and may itself lie just
-// outside it. Exact per-row filtering belongs to the list; the facet
-// rail needs the vocabulary, not row counts.
-
-/// One key's values. Values are the engine's STORAGE labels (`status` ∈
-/// `UNSET`/`OK`/`ERROR`, `kind` ∈ `UNSPECIFIED`/`INTERNAL`/`SERVER`/…) —
-/// exactly what search `selections` match on.
-#[derive(Debug, Serialize)]
-pub struct AttributeValuesResult {
-    /// The response's self-description: always `"attribute_values"`.
-    pub mode: &'static str,
-    pub version: u32,
-    pub status: StatusWire,
-    /// Exact: true iff `max_values` cut the list short.
-    pub truncated: bool,
-    /// The requested key, echoed in the selection grammar.
-    pub key: String,
-    pub values: Vec<AttributeValueWire>,
-}
-
-#[derive(Debug, Serialize)]
-pub struct AttributeValueWire {
-    pub value: String,
-    /// The value's schema kind (the shared kind words); absent when the
-    /// dictionaries carry no kind for it.
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub kind: Option<&'static str>,
-    /// Present (`true`) only when `value` was cut to the per-value cap
-    /// (the adapter's `LIST_VALUE_MAX_BYTES`, at a character boundary):
-    /// a display prefix, which an equality selection does not match.
-    #[serde(skip_serializing_if = "std::ops::Not::not")]
-    pub truncated: bool,
 }
 
 /// Suggestions, best first: match class, then bytes. Bounded by

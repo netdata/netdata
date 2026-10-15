@@ -3,8 +3,8 @@
 //!
 //! The full mode catalog lives here: the Functions view (the trace
 //! list plus its trace-density grid), `info` (capability discovery),
-//! `trace` (exact single-trace fetch), and `attribute_values` (the
-//! facet lists' value vocabulary). Mode selection and every request-SHAPE check happen at
+//! `trace` (exact single-trace fetch), and `suggest` (the search bar's
+//! keys and values). Mode selection and every request-SHAPE check happen at
 //! deserialization (the wire's typed request — shape errors are
 //! transport 400s); this handler owns only the semantic validation
 //! (trace-id shape, zero limits, bounds).
@@ -30,23 +30,22 @@ use file_lifecycle::chunk::ChunkCache;
 use file_lifecycle::registry::TenantRegistries;
 
 use sfsq::traces::{
-    AttributeRequestError, AttributeValuesQuery, FieldKinds, OverviewQuery, OverviewRequestError,
-    PartialReason, QueryStatus, SearchData, SearchQuery, SearchRequestError, SearchSources,
-    SuggestQuery, TimeWindow, TraceData, TraceQuery, TraceRequestError, attribute_values, overview,
-    search, trace_by_id,
+    AttributeRequestError, FieldKinds, OverviewQuery, OverviewRequestError, PartialReason,
+    QueryStatus, SearchData, SearchQuery, SearchRequestError, SearchSources, SuggestQuery,
+    TimeWindow, TraceData, TraceQuery, TraceRequestError, overview, search, trace_by_id,
 };
 
 use super::adapter::{
-    ResolvedWindow, WireShaper, build_tokens, check_request_text, completion_capture_range,
-    heatmap_tokens, parse_cursor, parse_trace_id, parse_values_key, render_attribute_key,
-    resolve_window, to_attribute_values_result, to_overview_section, to_search_result,
-    to_suggest_result, to_trace_result, validate_trace_bounds,
+    WireShaper, build_tokens, check_request_text, completion_capture_range, heatmap_tokens,
+    parse_cursor, parse_trace_id, parse_values_key, render_attribute_key, resolve_window,
+    to_overview_section, to_search_result, to_suggest_result, to_trace_result,
+    validate_trace_bounds,
 };
 use super::sources::{Capture, CaptureError, RemotePolicy, TracesSourceSupplier};
 use super::wire::{
-    AttributeValuesParams, CoverageWire, DEFAULT_MAX_VALUES, FunctionsParams,
-    FunctionsTracesResponse, InfoResponse, MAX_VALUES_MAX, OtelTracesRequest, OtelTracesResponse,
-    SUGGEST_ITEMS_MAX, SearchParams, SearchResult, SuggestParams, TraceParams, TracesMode,
+    CoverageWire, FunctionsParams, FunctionsTracesResponse, InfoResponse, OtelTracesRequest,
+    OtelTracesResponse, SUGGEST_ITEMS_MAX, SearchParams, SearchResult, SuggestParams, TraceParams,
+    TracesMode,
 };
 use crate::ledger::wal_prefix::WalPrefixes;
 use file_lifecycle::remote_read::RemoteRead;
@@ -78,10 +77,10 @@ fn capture_error(e: CaptureError) -> netdata_plugin_error::NetdataPluginError {
     }
 }
 
-/// How many value-list and suggestion requests may run at once, shared
-/// by both. They arrive per keystroke; beyond this a request answers
-/// `busy` at once instead of queueing CPU and memory behind the others.
-const VALUE_LIST_CONCURRENCY: usize = 2;
+/// How many suggestion requests may run at once (the keystroke class).
+/// They arrive per keystroke; beyond this a request answers `busy` at
+/// once instead of queueing CPU and memory behind the others.
+const SUGGEST_CONCURRENCY: usize = 2;
 
 /// How many list requests (the Functions view: search page plus its
 /// heatmap, under one permit) may run at once. A list over a long window
@@ -108,9 +107,8 @@ const TRACE_SPAN_CAP: usize = 10_000;
 pub(crate) struct OtelTracesHandler {
     /// Live source resolution (registries snapshot + WAL chunk builds).
     supplier: TracesSourceSupplier,
-    /// Admission for the value lists and suggestions (see
-    /// [`VALUE_LIST_CONCURRENCY`]).
-    value_lists: Arc<tokio::sync::Semaphore>,
+    /// Admission for suggestions (see [`SUGGEST_CONCURRENCY`]).
+    suggestions: Arc<tokio::sync::Semaphore>,
     /// Admission for the Functions view (see [`LIST_CONCURRENCY`]).
     lists: Arc<tokio::sync::Semaphore>,
     /// Admission for trace lookups (see [`TRACE_CONCURRENCY`]).
@@ -128,17 +126,17 @@ impl OtelTracesHandler {
     ) -> Self {
         Self {
             supplier: TracesSourceSupplier::new(registries, chunk_cache, prefixes, remote),
-            value_lists: Arc::new(tokio::sync::Semaphore::new(VALUE_LIST_CONCURRENCY)),
+            suggestions: Arc::new(tokio::sync::Semaphore::new(SUGGEST_CONCURRENCY)),
             lists: Arc::new(tokio::sync::Semaphore::new(LIST_CONCURRENCY)),
             traces: Arc::new(tokio::sync::Semaphore::new(TRACE_CONCURRENCY)),
         }
     }
 
-    /// Test-only admission override: `0` makes every value-list request
+    /// Test-only admission override: `0` makes every suggestion request
     /// answer `busy`.
     #[cfg(test)]
-    pub(crate) fn with_value_list_concurrency(mut self, permits: usize) -> Self {
-        self.value_lists = Arc::new(tokio::sync::Semaphore::new(permits));
+    pub(crate) fn with_suggest_concurrency(mut self, permits: usize) -> Self {
+        self.suggestions = Arc::new(tokio::sync::Semaphore::new(permits));
         self
     }
 
@@ -518,102 +516,6 @@ impl OtelTracesHandler {
         )))
     }
 
-    /// One captured source set for an enumeration over `window` (with
-    /// its pins, for the caller's blocking closure); the capture sets
-    /// the progress total.
-    async fn enumeration_setup(
-        &self,
-        ctx: &FunctionCallContext,
-        window: &ResolvedWindow,
-        tenant: Option<&str>,
-    ) -> netdata_plugin_error::Result<(Vec<sfsq::traces::TraceSource>, Vec<file_cache::CachedFile>)>
-    {
-        let tenant = TenantId::resolve_query(tenant);
-        let Capture { mut sets, pins } = self
-            .supplier
-            .capture(
-                &tenant,
-                window.capture.clone(),
-                1,
-                // Value lists and suggestions answer per keystroke:
-                // offloaded files are reported, never downloaded.
-                RemotePolicy::Skip,
-                &ctx.cancellation,
-                &ctx.progress,
-            )
-            .await
-            .map_err(capture_error)?;
-        Ok((sets.pop().unwrap_or_default(), pins))
-    }
-
-    /// The `attribute_values` mode: one key's exact value vocabulary
-    /// (storage labels — what search selections match on).
-    async fn attribute_values(
-        &self,
-        ctx: &FunctionCallContext,
-        params: &AttributeValuesParams,
-        tenant: Option<&str>,
-    ) -> netdata_plugin_error::Result<OtelTracesResponse> {
-        let client_err = |e: String| handler_err(format!("invalid otel-traces request: {e}"));
-        let (owner, key) = parse_values_key(&params.key).map_err(client_err)?;
-        let max = params.max_values.unwrap_or(DEFAULT_MAX_VALUES);
-        // Pre-capture twin of the engine's own zero check, plus the wire's
-        // bound on the response.
-        if max == 0 {
-            return Err(client_err(
-                "a zero key/value limit would return nothing; omit the limit or raise it".into(),
-            ));
-        }
-        if max > MAX_VALUES_MAX {
-            return Err(client_err(format!(
-                "'max_values' {max} exceeds the maximum {MAX_VALUES_MAX}"
-            )));
-        }
-        // The window is self-contained on the wire; it is validated
-        // before admission, so a bad request is a client error, not `busy`.
-        let window =
-            resolve_window(params.after, params.before, unix_now_s(), None).map_err(&client_err)?;
-        let engine_window = TimeWindow::new(window.start_ns, window.end_ns)
-            .map_err(|e| client_err(e.to_string()))?;
-        // Admission before capture: capture already does WAL and catalog
-        // work. The permit moves into the blocking task, so it is held
-        // until the engine stops, even when a cancel drops this future.
-        let Ok(permit) = Arc::clone(&self.value_lists).try_acquire_owned() else {
-            return Ok(OtelTracesResponse::AttributeValues(
-                to_attribute_values_result(
-                    sfsq::traces::AttributeValuesData {
-                        values: Vec::new(),
-                        truncated: false,
-                        status: QueryStatus::Partial([PartialReason::Busy].into()),
-                    },
-                    params.key.clone(),
-                ),
-            ));
-        };
-        let query = AttributeValuesQuery::new(owner, key)
-            .max_values(max)
-            .window(engine_window);
-        let (sources, pins) = self.enumeration_setup(ctx, &window, tenant).await?;
-
-        let done = ctx.progress.done_counter();
-        let cancel = ctx.cancellation.clone();
-        let wire_key = params.key.clone();
-        match tokio::task::spawn_blocking(move || {
-            let _permit = permit;
-            let _pins = pins;
-            attribute_values(sources, query, cancel, done)
-        })
-        .await
-        {
-            Ok(Ok(data)) => Ok(OtelTracesResponse::AttributeValues(
-                to_attribute_values_result(data, wire_key),
-            )),
-            Ok(Err(e)) => Err(map_attribute_error(e)),
-            Err(e) => Err(handler_err(format!(
-                "otel-traces attribute_values task failed: {e}"
-            ))),
-        }
-    }
     /// The `suggest` mode: keys, or one key's values, matching a typed
     /// term (see `sfsq::traces::suggest`), bounded in items, sources and
     /// time.
@@ -652,7 +554,7 @@ impl OtelTracesHandler {
             resolve_window(params.after, params.before, unix_now_s(), None).map_err(&client_err)?;
         let engine_window = TimeWindow::new(window.start_ns, window.end_ns)
             .map_err(|e| client_err(e.to_string()))?;
-        let Ok(permit) = Arc::clone(&self.value_lists).try_acquire_owned() else {
+        let Ok(permit) = Arc::clone(&self.suggestions).try_acquire_owned() else {
             return Ok(OtelTracesResponse::Suggest(to_suggest_result(
                 sfsq::traces::SuggestData {
                     items: Vec::new(),
@@ -668,7 +570,21 @@ impl OtelTracesHandler {
             .max_items(max)
             .window(engine_window)
             .deadline(deadline);
-        let (sources, pins) = self.enumeration_setup(ctx, &window, tenant).await?;
+        let Capture { mut sets, pins } = self
+            .supplier
+            .capture(
+                &TenantId::resolve_query(tenant),
+                window.capture.clone(),
+                1,
+                // Suggestions answer per keystroke: offloaded files are
+                // reported, never downloaded.
+                RemotePolicy::Skip,
+                &ctx.cancellation,
+                &ctx.progress,
+            )
+            .await
+            .map_err(capture_error)?;
+        let sources = sets.pop().unwrap_or_default();
 
         let done = ctx.progress.done_counter();
         let cancel = ctx.cancellation.clone();
@@ -697,7 +613,7 @@ fn unix_now_s() -> u32 {
         .min(u64::from(u32::MAX)) as u32
 }
 
-/// Enumeration request errors: a rejected source set is the supplier's
+/// Suggestion request errors: a rejected source set is the supplier's
 /// inconsistency (internal); everything else is the client's request.
 fn map_attribute_error(e: AttributeRequestError) -> netdata_plugin_error::NetdataPluginError {
     match e {
@@ -723,9 +639,6 @@ impl FunctionHandler for OtelTracesHandler {
             TracesMode::Functions(params) => self.functions(&ctx, params, tenant).await,
             TracesMode::Info => Ok(OtelTracesResponse::Info(InfoResponse::default())),
             TracesMode::Trace(params) => self.trace(&ctx, params, tenant).await,
-            TracesMode::AttributeValues(params) => {
-                self.attribute_values(&ctx, params, tenant).await
-            }
             TracesMode::Suggest(params) => self.suggest(&ctx, params, tenant).await,
         }
     }

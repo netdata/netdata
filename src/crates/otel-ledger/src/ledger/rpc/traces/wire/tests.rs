@@ -13,7 +13,7 @@
 //! Pins:
 //!
 //! - mode selection: no selector means the implicit Functions view,
-//!   each of the seven selectors its own mode, `tenant` riding beside
+//!   each of the three selectors its own mode, `tenant` riding beside
 //!   a selector;
 //! - strictness: unknown keys, a selector mixed with Functions
 //!   parameters, conflicting selectors (reported even when one is also
@@ -154,8 +154,8 @@ fn each_selector_selects_its_mode() {
         TracesMode::Trace(_)
     ));
     assert!(matches!(
-        req(json!({"attribute_values": {"key": "kind"}})).mode,
-        TracesMode::AttributeValues(_)
+        req(json!({"suggest": {"key": "kind"}})).mode,
+        TracesMode::Suggest(_)
     ));
     assert!(matches!(req(json!({"info": {}})).mode, TracesMode::Info));
 }
@@ -167,10 +167,7 @@ fn a_present_but_null_selector_selects_then_rejects() {
     // deserializer keeps the selection so the error names the selector.
     for (body, needle) in [
         (json!({"trace": null}), "invalid trace selector"),
-        (
-            json!({"attribute_values": null}),
-            "invalid attribute_values selector",
-        ),
+        (json!({"suggest": null}), "invalid suggest selector"),
     ] {
         let err = req_err(body.clone());
         assert!(err.contains(needle), "for {body}: {err}");
@@ -183,10 +180,7 @@ fn selectors_are_object_only_arrays_reject() {
     // via the seq visitor; the is_object gate before the typed parse
     // closes that hole for every selector value.
     for (body, needle) in [
-        (
-            json!({"attribute_values": []}),
-            "invalid attribute_values selector",
-        ),
+        (json!({"suggest": []}), "invalid suggest selector"),
         (json!({"trace": ["00ff", 7]}), "invalid trace selector"),
     ] {
         let err = req_err(body.clone());
@@ -214,7 +208,11 @@ fn the_top_level_must_be_a_json_object() {
 /// mixing error rather than an unknown-field error.
 #[test]
 fn unknown_and_retired_top_level_keys_are_client_errors() {
-    for body in [json!({"info": {}, "bogus": 1}), json!({"bogus": 1})] {
+    for body in [
+        json!({"info": {}, "bogus": 1}),
+        json!({"bogus": 1}),
+        json!({"attribute_values": {"key": "kind"}}),
+    ] {
         let err = req_err(body.clone());
         assert!(err.contains("unknown field"), "for {body}: {err}");
     }
@@ -272,9 +270,9 @@ fn trace_params_reject_malformed_and_parse_bounds() {
 
 #[test]
 fn conflicting_selectors_are_a_client_error() {
-    let err = req_err(json!({"trace": {}, "attribute_values": {}}));
+    let err = req_err(json!({"trace": {}, "suggest": {}}));
     assert!(
-        err.contains("conflicting mode selectors: trace, attribute_values"),
+        err.contains("conflicting mode selectors: trace, suggest"),
         "{err}"
     );
     // info is a PEER selector — no precedence.
@@ -289,9 +287,9 @@ fn conflicting_selectors_are_a_client_error() {
 fn a_conflict_is_reported_before_a_malformed_selector() {
     // All present selectors are counted before any is decoded, so the
     // conflict wins over a malformed selector in the same body.
-    let err = req_err(json!({"trace": null, "attribute_values": {}}));
+    let err = req_err(json!({"trace": null, "suggest": {}}));
     assert!(
-        err.contains("conflicting mode selectors: trace, attribute_values"),
+        err.contains("conflicting mode selectors: trace, suggest"),
         "{err}"
     );
 }
@@ -317,18 +315,17 @@ fn duplicate_keys_are_rejected_not_last_value_wins() {
 
 #[test]
 fn windowed_mode_objects_carry_their_own_window() {
-    let TracesMode::AttributeValues(p) =
-        req(json!({"attribute_values": {"key": "kind", "after": 5, "before": 6}})).mode
+    let TracesMode::Suggest(p) =
+        req(json!({"suggest": {"key": "kind", "after": 5, "before": 6}})).mode
     else {
-        panic!("attribute_values mode expected");
+        panic!("suggest mode expected");
     };
     assert_eq!((p.after, p.before), (5, 6));
 
     // Omitted windows keep the 0 = "unspecified" sentinel — the
     // adapter's resolve_window defaults are untouched.
-    let TracesMode::AttributeValues(p) = req(json!({"attribute_values": {"key": "kind"}})).mode
-    else {
-        panic!("attribute_values mode expected");
+    let TracesMode::Suggest(p) = req(json!({"suggest": {"key": "kind"}})).mode else {
+        panic!("suggest mode expected");
     };
     assert_eq!((p.after, p.before), (0, 0));
 }
@@ -353,9 +350,9 @@ fn suggest_params_parse_with_defaults_and_reject_strays() {
     );
     let err = req_err(json!({"suggest": {"terms": "ab"}}));
     assert!(err.contains("invalid suggest selector"), "{err}");
-    let err = req_err(json!({"attribute_values": {"key": "name"}, "suggest": {}}));
+    let err = req_err(json!({"info": {}, "suggest": {}}));
     assert!(
-        err.contains("conflicting mode selectors: attribute_values, suggest"),
+        err.contains("conflicting mode selectors: info, suggest"),
         "{err}"
     );
 }
@@ -387,7 +384,7 @@ fn info_response_shape_is_pinned() {
             "has_history": true,
             "v": 3,
             "accepted_params": [
-                "info", "trace", "attribute_values", "suggest", "tenant", "after", "before", "last", "anchor", "conditions", "text", "selections",
+                "info", "trace", "suggest", "tenant", "after", "before", "last", "anchor", "conditions", "text", "selections",
                 "min_trace_duration_ns", "max_trace_duration_ns"
             ],
             "required_params": [],

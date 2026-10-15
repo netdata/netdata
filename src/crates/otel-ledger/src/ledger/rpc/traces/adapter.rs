@@ -15,17 +15,16 @@
 use std::collections::{HashMap, HashSet};
 
 use sfsq::traces::{
-    AttributeKey, AttributeOwner, AttributeValuesData, BuiltinField, CompareOp, Condition,
-    DURATION_BIN_LABELS, DurationPercentiles, FieldKinds, OverviewData, Predicate, PredicateError,
-    PredicateTarget, PredicateValue, SearchData, TOKENS_MAX, Token, TokenQuery, TraceData,
+    AttributeKey, AttributeOwner, BuiltinField, CompareOp, Condition, DURATION_BIN_LABELS,
+    DurationPercentiles, FieldKinds, OverviewData, Predicate, PredicateError, PredicateTarget,
+    PredicateValue, SearchData, TOKENS_MAX, Token, TokenQuery, TraceData,
 };
 
 use super::wire::{
-    AnchorWire, AttributeValueWire, AttributeValuesResult, CONDITION_VALUES_MAX, ConditionParams,
-    ConditionValue, CoverageWire, EventWire, FieldKindsWire, LinkWire, OverviewGridWire,
-    OverviewPercentilesWire, OverviewSection, OverviewTotals, SearchItems, SearchResult,
-    ServiceBreakdownWire, ServiceSpansWire, SpanWire, StatusWire, SuggestResult, SuggestionWire,
-    TraceItems, TraceResult, TraceSummaryWire,
+    AnchorWire, CONDITION_VALUES_MAX, ConditionParams, ConditionValue, CoverageWire, EventWire,
+    FieldKindsWire, LinkWire, OverviewGridWire, OverviewPercentilesWire, OverviewSection,
+    OverviewTotals, SearchItems, SearchResult, ServiceBreakdownWire, ServiceSpansWire, SpanWire,
+    StatusWire, SuggestResult, SuggestionWire, TraceItems, TraceResult, TraceSummaryWire,
 };
 
 /// Parse a W3C text-form trace id: exactly 32 hex chars (16 bytes),
@@ -109,12 +108,11 @@ pub(crate) const TRACE_SPANS_MAX_BYTES: usize = 2 * 1024 * 1024;
 
 /// Per-value cap, in JSON bytes (see [`truncate_value`]), on the
 /// free-length strings of list rows (root service and name, breakdown
-/// service names) and of value lists. Both are for
-/// display; the trace view carries values up to
-/// [`TRACE_VALUE_MAX_BYTES`]. With at most
+/// service names) and of suggestions. Both are for display; the trace
+/// view carries values up to [`TRACE_VALUE_MAX_BYTES`]. With at most
 /// [`super::wire::SEARCH_LIMIT_MAX`] rows or
-/// [`super::wire::MAX_VALUES_MAX`] values, a response stays well under
-/// 1 MB by construction, so no byte budget has to cut items off a page.
+/// [`super::wire::SUGGEST_ITEMS_MAX`] suggestions, a response stays well
+/// under 1 MB by construction, so no byte budget has to cut items off.
 pub(crate) const LIST_VALUE_MAX_BYTES: usize = 256;
 
 /// Cut `s` at a character boundary so that it takes at most `max` bytes
@@ -751,40 +749,6 @@ pub(crate) fn to_suggest_result(
         items,
         truncated: data.truncated,
         complete_after: data.complete_after,
-    }
-}
-
-/// Shape one key's value enumeration into the wire result. `key` is the
-/// request's key, echoed in the selection grammar. Values are capped at
-/// [`LIST_VALUE_MAX_BYTES`] and flagged when cut.
-pub(crate) fn to_attribute_values_result(
-    data: AttributeValuesData,
-    key: String,
-) -> AttributeValuesResult {
-    let mut values: Vec<AttributeValueWire> = Vec::with_capacity(data.values.len());
-    let mut listed: HashMap<String, usize> = HashMap::new();
-    for v in data.values {
-        let mut value = v.value;
-        let truncated = truncate_value(&mut value, LIST_VALUE_MAX_BYTES);
-        // Values sharing a cut prefix list it once, flagged if any was cut.
-        if let Some(&i) = listed.get(&value) {
-            values[i].truncated |= truncated;
-            continue;
-        }
-        listed.insert(value.clone(), values.len());
-        values.push(AttributeValueWire {
-            value,
-            kind: v.kind.map(kind_word),
-            truncated,
-        });
-    }
-    AttributeValuesResult {
-        mode: "attribute_values",
-        version: 1,
-        status: StatusWire::from(&data.status),
-        truncated: data.truncated,
-        key,
-        values,
     }
 }
 

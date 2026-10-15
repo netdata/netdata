@@ -687,6 +687,27 @@ fn suggestions_are_capped_flagged_and_listed_once() {
             "truncated": true, "complete_after": 7,
         })
     );
+
+    // A text equal to another's cut prefix need not be its neighbour:
+    // `p` < `p + "bb"` (uncut) < `p + "€x"` (cut back to `p`).
+    let p = "a".repeat(LIST_VALUE_MAX_BYTES - 2);
+    let data = SuggestData {
+        items: [p.clone(), format!("{p}bb"), format!("{p}€x")]
+            .into_iter()
+            .map(|text| item(text, sfst::MatchClass::Prefix, false))
+            .collect(),
+        truncated: false,
+        status: QueryStatus::Complete,
+        complete_after: None,
+    };
+    let v = serde_json::to_value(to_suggest_result(data, Some("name".into()))).unwrap();
+    assert_eq!(
+        v["items"],
+        json!([
+            {"text": p, "match": "prefix", "truncated": true},
+            {"text": format!("{p}bb"), "match": "prefix"}
+        ])
+    );
 }
 
 #[test]
@@ -845,44 +866,6 @@ fn a_trace_over_the_byte_budget_keeps_its_earliest_spans() {
     assert!(spans_bytes + kinds_bytes <= TRACE_SPANS_MAX_BYTES);
     let v = serde_json::to_value(&r).unwrap();
     assert_eq!(v["status"], json!({"partial": ["byte_budget"]}));
-}
-
-#[test]
-fn long_values_in_a_value_list_are_cut_flagged_and_listed_once() {
-    let long = |c: char| format!("{}{c}", "a".repeat(LIST_VALUE_MAX_BYTES));
-    let data = sfsq::traces::AttributeValuesData {
-        values: [long('x'), long('y'), "b".to_string()]
-            .into_iter()
-            .map(|value| sfsq::traces::AttributeValue { value, kind: None })
-            .collect(),
-        truncated: false,
-        status: QueryStatus::Complete,
-    };
-    let v = serde_json::to_value(to_attribute_values_result(data, "name".into())).unwrap();
-    assert_eq!(
-        v["values"],
-        json!([
-            {"value": "a".repeat(LIST_VALUE_MAX_BYTES), "truncated": true},
-            {"value": "b"}
-        ])
-    );
-
-    // A value equal to another's cut prefix need not be its neighbour:
-    // `p` < `p + "bb"` (uncut) < `p + "€x"` (cut back to `p`).
-    let p = "a".repeat(LIST_VALUE_MAX_BYTES - 2);
-    let data = sfsq::traces::AttributeValuesData {
-        values: [p.clone(), format!("{p}bb"), format!("{p}€x")]
-            .into_iter()
-            .map(|value| sfsq::traces::AttributeValue { value, kind: None })
-            .collect(),
-        truncated: false,
-        status: QueryStatus::Complete,
-    };
-    let v = serde_json::to_value(to_attribute_values_result(data, "name".into())).unwrap();
-    assert_eq!(
-        v["values"],
-        json!([{"value": p, "truncated": true}, {"value": format!("{p}bb")}])
-    );
 }
 
 #[test]
