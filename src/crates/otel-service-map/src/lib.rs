@@ -9,7 +9,9 @@
 
 pub mod engine;
 pub mod facts;
+pub mod function;
 pub mod histogram;
+pub mod payload;
 pub mod peer;
 pub mod service;
 pub mod stats;

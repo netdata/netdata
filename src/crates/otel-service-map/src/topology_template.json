@@ -1,0 +1,2154 @@
+{
+  "v": 3,
+  "status": 200,
+  "type": "topology",
+  "has_history": false,
+  "update_every": 10,
+  "help": "Service map from OpenTelemetry traces: instrumented services, the services and uninstrumented peers they call, and request, error and latency statistics per call direction, client side and server side apart.",
+  "accepted_params": [
+    "info",
+    "after",
+    "before",
+    "tenant"
+  ],
+  "required_params": [],
+  "data": {
+    "schema_version": "netdata.topology.v1",
+    "producer": {
+      "source": "tracing",
+      "instance": "default",
+      "plugin": "otel-plugin",
+      "capabilities": [
+        "service-map",
+        "client-server-stats"
+      ]
+    },
+    "collected_at": "1970-01-01T00:00:00Z",
+    "valid_after": "1970-01-01T00:00:00Z",
+    "valid_until": "1970-01-01T00:00:00Z",
+    "view": {
+      "id": "service_map",
+      "scope": "node",
+      "mode": "detailed"
+    },
+    "dictionaries": {
+      "strings": [
+        "service",
+        "peer_database",
+        "peer_messaging",
+        "peer_external",
+        "peer_other",
+        "unknown_caller",
+        "call",
+        "call_to_peer",
+        "call_from_unknown"
+      ]
+    },
+    "types": {
+      "actor_types": {
+        "service": {
+          "layer": "service",
+          "identity": [
+            "id"
+          ],
+          "merge_identity": [
+            "service_namespace",
+            "service_name"
+          ],
+          "search": {
+            "enabled": true,
+            "columns": [
+              "display_name",
+              "service_name",
+              "service_namespace"
+            ]
+          },
+          "presentation": {
+            "label": "Service",
+            "role": "actor",
+            "icon": "service",
+            "color_slot": "primary",
+            "border": {
+              "enabled": true
+            },
+            "size": {
+              "mode": "link_count",
+              "scale": "normal"
+            },
+            "label_policy": {
+              "columns": [
+                "display_name"
+              ],
+              "fallback": "type_label",
+              "max_length": 80,
+              "array": "reject"
+            },
+            "hover": {
+              "fields": [
+                {
+                  "key": "calls_in",
+                  "label": "Calls in"
+                },
+                {
+                  "key": "calls_out",
+                  "label": "Calls out"
+                },
+                {
+                  "key": "error_pct_in",
+                  "label": "Errors in %"
+                }
+              ]
+            },
+            "modal": {
+              "enabled": true,
+              "labels": {
+                "enabled": true,
+                "table": "actor_labels",
+                "identification": {
+                  "fields": [
+                    {
+                      "key": "service.namespace",
+                      "label": "Namespace",
+                      "max_values": 1
+                    },
+                    {
+                      "key": "calls_in",
+                      "label": "Calls in",
+                      "max_values": 1
+                    },
+                    {
+                      "key": "calls_out",
+                      "label": "Calls out",
+                      "max_values": 1
+                    },
+                    {
+                      "key": "error_pct_in",
+                      "label": "Errors in",
+                      "max_values": 1
+                    }
+                  ]
+                }
+              },
+              "mini_topology": {
+                "enabled": true,
+                "depth": 1
+              },
+              "sections": [
+                {
+                  "id": "calls_to",
+                  "label": "Calls to",
+                  "order": 1,
+                  "source": {
+                    "kind": "links"
+                  },
+                  "owner_filter": {
+                    "mode": "actor_column",
+                    "actor_column": "src_actor"
+                  },
+                  "columns": [
+                    {
+                      "id": "peer",
+                      "label": "Callee",
+                      "projection": {
+                        "kind": "opposite_actor",
+                        "src_actor_column": "src_actor",
+                        "dst_actor_column": "dst_actor"
+                      },
+                      "cell": "actor_link"
+                    },
+                    {
+                      "id": "calls",
+                      "label": "Calls",
+                      "projection": {
+                        "kind": "direct",
+                        "column": "calls"
+                      },
+                      "cell": "number",
+                      "align": "right"
+                    },
+                    {
+                      "id": "rate",
+                      "label": "Calls/min",
+                      "projection": {
+                        "kind": "direct",
+                        "column": "weight"
+                      },
+                      "cell": "number",
+                      "align": "right"
+                    },
+                    {
+                      "id": "errors",
+                      "label": "Errors",
+                      "projection": {
+                        "kind": "direct",
+                        "column": "client_errors"
+                      },
+                      "cell": "number",
+                      "align": "right"
+                    },
+                    {
+                      "id": "error_pct",
+                      "label": "Errors %",
+                      "projection": {
+                        "kind": "direct",
+                        "column": "client_error_pct"
+                      },
+                      "cell": "number",
+                      "align": "right"
+                    },
+                    {
+                      "id": "p50",
+                      "label": "p50 ms",
+                      "projection": {
+                        "kind": "direct",
+                        "column": "client_p50_ms"
+                      },
+                      "cell": "number",
+                      "align": "right"
+                    },
+                    {
+                      "id": "p95",
+                      "label": "p95 ms",
+                      "projection": {
+                        "kind": "direct",
+                        "column": "client_p95_ms"
+                      },
+                      "cell": "number",
+                      "align": "right"
+                    },
+                    {
+                      "id": "p99",
+                      "label": "p99 ms",
+                      "projection": {
+                        "kind": "direct",
+                        "column": "client_p99_ms"
+                      },
+                      "cell": "number",
+                      "align": "right"
+                    },
+                    {
+                      "id": "max",
+                      "label": "Max ms",
+                      "projection": {
+                        "kind": "direct",
+                        "column": "client_max_ms"
+                      },
+                      "cell": "number",
+                      "visibility": "expanded"
+                    },
+                    {
+                      "id": "server_calls",
+                      "label": "Server calls",
+                      "projection": {
+                        "kind": "direct",
+                        "column": "server_calls"
+                      },
+                      "cell": "number",
+                      "visibility": "expanded"
+                    },
+                    {
+                      "id": "server_errors",
+                      "label": "Server errors",
+                      "projection": {
+                        "kind": "direct",
+                        "column": "server_errors"
+                      },
+                      "cell": "number",
+                      "visibility": "expanded"
+                    },
+                    {
+                      "id": "server_error_pct",
+                      "label": "Server errors %",
+                      "projection": {
+                        "kind": "direct",
+                        "column": "server_error_pct"
+                      },
+                      "cell": "number",
+                      "visibility": "expanded"
+                    },
+                    {
+                      "id": "server_p50",
+                      "label": "Server p50 ms",
+                      "projection": {
+                        "kind": "direct",
+                        "column": "server_p50_ms"
+                      },
+                      "cell": "number",
+                      "visibility": "expanded"
+                    },
+                    {
+                      "id": "server_p95",
+                      "label": "Server p95 ms",
+                      "projection": {
+                        "kind": "direct",
+                        "column": "server_p95_ms"
+                      },
+                      "cell": "number",
+                      "visibility": "expanded"
+                    },
+                    {
+                      "id": "server_p99",
+                      "label": "Server p99 ms",
+                      "projection": {
+                        "kind": "direct",
+                        "column": "server_p99_ms"
+                      },
+                      "cell": "number",
+                      "visibility": "expanded"
+                    },
+                    {
+                      "id": "server_max",
+                      "label": "Server max ms",
+                      "projection": {
+                        "kind": "direct",
+                        "column": "server_max_ms"
+                      },
+                      "cell": "number",
+                      "visibility": "expanded"
+                    }
+                  ],
+                  "sort": {
+                    "column": "calls",
+                    "direction": "desc"
+                  },
+                  "empty_label": "No outgoing calls in this time range."
+                },
+                {
+                  "id": "called_by",
+                  "label": "Called by",
+                  "order": 2,
+                  "source": {
+                    "kind": "links"
+                  },
+                  "owner_filter": {
+                    "mode": "actor_column",
+                    "actor_column": "dst_actor"
+                  },
+                  "columns": [
+                    {
+                      "id": "peer",
+                      "label": "Caller",
+                      "projection": {
+                        "kind": "opposite_actor",
+                        "src_actor_column": "src_actor",
+                        "dst_actor_column": "dst_actor"
+                      },
+                      "cell": "actor_link"
+                    },
+                    {
+                      "id": "calls",
+                      "label": "Calls",
+                      "projection": {
+                        "kind": "direct",
+                        "column": "calls"
+                      },
+                      "cell": "number",
+                      "align": "right"
+                    },
+                    {
+                      "id": "rate",
+                      "label": "Calls/min",
+                      "projection": {
+                        "kind": "direct",
+                        "column": "weight"
+                      },
+                      "cell": "number",
+                      "align": "right"
+                    },
+                    {
+                      "id": "errors",
+                      "label": "Errors",
+                      "projection": {
+                        "kind": "direct",
+                        "column": "server_errors"
+                      },
+                      "cell": "number",
+                      "align": "right"
+                    },
+                    {
+                      "id": "error_pct",
+                      "label": "Errors %",
+                      "projection": {
+                        "kind": "direct",
+                        "column": "server_error_pct"
+                      },
+                      "cell": "number",
+                      "align": "right"
+                    },
+                    {
+                      "id": "p50",
+                      "label": "p50 ms",
+                      "projection": {
+                        "kind": "direct",
+                        "column": "server_p50_ms"
+                      },
+                      "cell": "number",
+                      "align": "right"
+                    },
+                    {
+                      "id": "p95",
+                      "label": "p95 ms",
+                      "projection": {
+                        "kind": "direct",
+                        "column": "server_p95_ms"
+                      },
+                      "cell": "number",
+                      "align": "right"
+                    },
+                    {
+                      "id": "p99",
+                      "label": "p99 ms",
+                      "projection": {
+                        "kind": "direct",
+                        "column": "server_p99_ms"
+                      },
+                      "cell": "number",
+                      "align": "right"
+                    },
+                    {
+                      "id": "max",
+                      "label": "Max ms",
+                      "projection": {
+                        "kind": "direct",
+                        "column": "server_max_ms"
+                      },
+                      "cell": "number",
+                      "visibility": "expanded"
+                    },
+                    {
+                      "id": "client_calls",
+                      "label": "Client calls",
+                      "projection": {
+                        "kind": "direct",
+                        "column": "client_calls"
+                      },
+                      "cell": "number",
+                      "visibility": "expanded"
+                    },
+                    {
+                      "id": "client_errors",
+                      "label": "Client errors",
+                      "projection": {
+                        "kind": "direct",
+                        "column": "client_errors"
+                      },
+                      "cell": "number",
+                      "visibility": "expanded"
+                    },
+                    {
+                      "id": "client_error_pct",
+                      "label": "Client errors %",
+                      "projection": {
+                        "kind": "direct",
+                        "column": "client_error_pct"
+                      },
+                      "cell": "number",
+                      "visibility": "expanded"
+                    },
+                    {
+                      "id": "client_p50",
+                      "label": "Client p50 ms",
+                      "projection": {
+                        "kind": "direct",
+                        "column": "client_p50_ms"
+                      },
+                      "cell": "number",
+                      "visibility": "expanded"
+                    },
+                    {
+                      "id": "client_p95",
+                      "label": "Client p95 ms",
+                      "projection": {
+                        "kind": "direct",
+                        "column": "client_p95_ms"
+                      },
+                      "cell": "number",
+                      "visibility": "expanded"
+                    },
+                    {
+                      "id": "client_p99",
+                      "label": "Client p99 ms",
+                      "projection": {
+                        "kind": "direct",
+                        "column": "client_p99_ms"
+                      },
+                      "cell": "number",
+                      "visibility": "expanded"
+                    },
+                    {
+                      "id": "client_max",
+                      "label": "Client max ms",
+                      "projection": {
+                        "kind": "direct",
+                        "column": "client_max_ms"
+                      },
+                      "cell": "number",
+                      "visibility": "expanded"
+                    }
+                  ],
+                  "sort": {
+                    "column": "calls",
+                    "direction": "desc"
+                  },
+                  "empty_label": "No incoming calls in this time range."
+                }
+              ]
+            }
+          }
+        },
+        "peer_database": {
+          "layer": "service",
+          "identity": [
+            "id"
+          ],
+          "merge_identity": [
+            "peer_kind",
+            "peer_name"
+          ],
+          "search": {
+            "enabled": true,
+            "columns": [
+              "display_name",
+              "peer_kind",
+              "peer_name"
+            ]
+          },
+          "presentation": {
+            "label": "Database",
+            "role": "endpoint",
+            "icon": "database",
+            "color_slot": "blue",
+            "border": {
+              "enabled": true,
+              "style": "dashed"
+            },
+            "size": {
+              "mode": "fixed",
+              "scale": "compact"
+            },
+            "label_policy": {
+              "columns": [
+                "display_name"
+              ],
+              "fallback": "type_label",
+              "max_length": 80,
+              "array": "reject"
+            },
+            "hover": {
+              "fields": [
+                {
+                  "key": "calls_in",
+                  "label": "Calls in"
+                },
+                {
+                  "key": "error_pct_in",
+                  "label": "Errors in %"
+                }
+              ]
+            },
+            "modal": {
+              "enabled": true,
+              "labels": {
+                "enabled": true,
+                "table": "actor_labels",
+                "identification": {
+                  "fields": [
+                    {
+                      "key": "peer.kind",
+                      "label": "Kind",
+                      "max_values": 1
+                    },
+                    {
+                      "key": "calls_in",
+                      "label": "Calls in",
+                      "max_values": 1
+                    },
+                    {
+                      "key": "error_pct_in",
+                      "label": "Errors in",
+                      "max_values": 1
+                    }
+                  ]
+                }
+              },
+              "mini_topology": {
+                "enabled": true,
+                "depth": 1
+              },
+              "sections": [
+                {
+                  "id": "called_by",
+                  "label": "Called by",
+                  "order": 1,
+                  "source": {
+                    "kind": "links"
+                  },
+                  "owner_filter": {
+                    "mode": "actor_column",
+                    "actor_column": "dst_actor"
+                  },
+                  "columns": [
+                    {
+                      "id": "peer",
+                      "label": "Caller",
+                      "projection": {
+                        "kind": "opposite_actor",
+                        "src_actor_column": "src_actor",
+                        "dst_actor_column": "dst_actor"
+                      },
+                      "cell": "actor_link"
+                    },
+                    {
+                      "id": "calls",
+                      "label": "Calls",
+                      "projection": {
+                        "kind": "direct",
+                        "column": "calls"
+                      },
+                      "cell": "number",
+                      "align": "right"
+                    },
+                    {
+                      "id": "rate",
+                      "label": "Calls/min",
+                      "projection": {
+                        "kind": "direct",
+                        "column": "weight"
+                      },
+                      "cell": "number",
+                      "align": "right"
+                    },
+                    {
+                      "id": "errors",
+                      "label": "Errors",
+                      "projection": {
+                        "kind": "direct",
+                        "column": "client_errors"
+                      },
+                      "cell": "number",
+                      "align": "right"
+                    },
+                    {
+                      "id": "error_pct",
+                      "label": "Errors %",
+                      "projection": {
+                        "kind": "direct",
+                        "column": "client_error_pct"
+                      },
+                      "cell": "number",
+                      "align": "right"
+                    },
+                    {
+                      "id": "p50",
+                      "label": "p50 ms",
+                      "projection": {
+                        "kind": "direct",
+                        "column": "client_p50_ms"
+                      },
+                      "cell": "number",
+                      "align": "right"
+                    },
+                    {
+                      "id": "p95",
+                      "label": "p95 ms",
+                      "projection": {
+                        "kind": "direct",
+                        "column": "client_p95_ms"
+                      },
+                      "cell": "number",
+                      "align": "right"
+                    },
+                    {
+                      "id": "p99",
+                      "label": "p99 ms",
+                      "projection": {
+                        "kind": "direct",
+                        "column": "client_p99_ms"
+                      },
+                      "cell": "number",
+                      "align": "right"
+                    },
+                    {
+                      "id": "max",
+                      "label": "Max ms",
+                      "projection": {
+                        "kind": "direct",
+                        "column": "client_max_ms"
+                      },
+                      "cell": "number",
+                      "visibility": "expanded"
+                    }
+                  ],
+                  "sort": {
+                    "column": "calls",
+                    "direction": "desc"
+                  },
+                  "empty_label": "No calls in this time range."
+                }
+              ]
+            }
+          }
+        },
+        "peer_messaging": {
+          "layer": "service",
+          "identity": [
+            "id"
+          ],
+          "merge_identity": [
+            "peer_kind",
+            "peer_name"
+          ],
+          "search": {
+            "enabled": true,
+            "columns": [
+              "display_name",
+              "peer_kind",
+              "peer_name"
+            ]
+          },
+          "presentation": {
+            "label": "Messaging system",
+            "role": "endpoint",
+            "icon": "network",
+            "color_slot": "purple",
+            "border": {
+              "enabled": true,
+              "style": "dashed"
+            },
+            "size": {
+              "mode": "fixed",
+              "scale": "compact"
+            },
+            "label_policy": {
+              "columns": [
+                "display_name"
+              ],
+              "fallback": "type_label",
+              "max_length": 80,
+              "array": "reject"
+            },
+            "hover": {
+              "fields": [
+                {
+                  "key": "calls_in",
+                  "label": "Calls in"
+                },
+                {
+                  "key": "error_pct_in",
+                  "label": "Errors in %"
+                }
+              ]
+            },
+            "modal": {
+              "enabled": true,
+              "labels": {
+                "enabled": true,
+                "table": "actor_labels",
+                "identification": {
+                  "fields": [
+                    {
+                      "key": "peer.kind",
+                      "label": "Kind",
+                      "max_values": 1
+                    },
+                    {
+                      "key": "calls_in",
+                      "label": "Calls in",
+                      "max_values": 1
+                    },
+                    {
+                      "key": "error_pct_in",
+                      "label": "Errors in",
+                      "max_values": 1
+                    }
+                  ]
+                }
+              },
+              "mini_topology": {
+                "enabled": true,
+                "depth": 1
+              },
+              "sections": [
+                {
+                  "id": "called_by",
+                  "label": "Called by",
+                  "order": 1,
+                  "source": {
+                    "kind": "links"
+                  },
+                  "owner_filter": {
+                    "mode": "actor_column",
+                    "actor_column": "dst_actor"
+                  },
+                  "columns": [
+                    {
+                      "id": "peer",
+                      "label": "Caller",
+                      "projection": {
+                        "kind": "opposite_actor",
+                        "src_actor_column": "src_actor",
+                        "dst_actor_column": "dst_actor"
+                      },
+                      "cell": "actor_link"
+                    },
+                    {
+                      "id": "calls",
+                      "label": "Calls",
+                      "projection": {
+                        "kind": "direct",
+                        "column": "calls"
+                      },
+                      "cell": "number",
+                      "align": "right"
+                    },
+                    {
+                      "id": "rate",
+                      "label": "Calls/min",
+                      "projection": {
+                        "kind": "direct",
+                        "column": "weight"
+                      },
+                      "cell": "number",
+                      "align": "right"
+                    },
+                    {
+                      "id": "errors",
+                      "label": "Errors",
+                      "projection": {
+                        "kind": "direct",
+                        "column": "client_errors"
+                      },
+                      "cell": "number",
+                      "align": "right"
+                    },
+                    {
+                      "id": "error_pct",
+                      "label": "Errors %",
+                      "projection": {
+                        "kind": "direct",
+                        "column": "client_error_pct"
+                      },
+                      "cell": "number",
+                      "align": "right"
+                    },
+                    {
+                      "id": "p50",
+                      "label": "p50 ms",
+                      "projection": {
+                        "kind": "direct",
+                        "column": "client_p50_ms"
+                      },
+                      "cell": "number",
+                      "align": "right"
+                    },
+                    {
+                      "id": "p95",
+                      "label": "p95 ms",
+                      "projection": {
+                        "kind": "direct",
+                        "column": "client_p95_ms"
+                      },
+                      "cell": "number",
+                      "align": "right"
+                    },
+                    {
+                      "id": "p99",
+                      "label": "p99 ms",
+                      "projection": {
+                        "kind": "direct",
+                        "column": "client_p99_ms"
+                      },
+                      "cell": "number",
+                      "align": "right"
+                    },
+                    {
+                      "id": "max",
+                      "label": "Max ms",
+                      "projection": {
+                        "kind": "direct",
+                        "column": "client_max_ms"
+                      },
+                      "cell": "number",
+                      "visibility": "expanded"
+                    }
+                  ],
+                  "sort": {
+                    "column": "calls",
+                    "direction": "desc"
+                  },
+                  "empty_label": "No calls in this time range."
+                }
+              ]
+            }
+          }
+        },
+        "peer_external": {
+          "layer": "service",
+          "identity": [
+            "id"
+          ],
+          "merge_identity": [
+            "peer_kind",
+            "peer_name"
+          ],
+          "search": {
+            "enabled": true,
+            "columns": [
+              "display_name",
+              "peer_kind",
+              "peer_name"
+            ]
+          },
+          "presentation": {
+            "label": "External service",
+            "role": "endpoint",
+            "icon": "remote-endpoint",
+            "color_slot": "orange",
+            "border": {
+              "enabled": true,
+              "style": "dashed"
+            },
+            "size": {
+              "mode": "fixed",
+              "scale": "compact"
+            },
+            "label_policy": {
+              "columns": [
+                "display_name"
+              ],
+              "fallback": "type_label",
+              "max_length": 80,
+              "array": "reject"
+            },
+            "hover": {
+              "fields": [
+                {
+                  "key": "calls_in",
+                  "label": "Calls in"
+                },
+                {
+                  "key": "error_pct_in",
+                  "label": "Errors in %"
+                }
+              ]
+            },
+            "modal": {
+              "enabled": true,
+              "labels": {
+                "enabled": true,
+                "table": "actor_labels",
+                "identification": {
+                  "fields": [
+                    {
+                      "key": "peer.kind",
+                      "label": "Kind",
+                      "max_values": 1
+                    },
+                    {
+                      "key": "calls_in",
+                      "label": "Calls in",
+                      "max_values": 1
+                    },
+                    {
+                      "key": "error_pct_in",
+                      "label": "Errors in",
+                      "max_values": 1
+                    }
+                  ]
+                }
+              },
+              "mini_topology": {
+                "enabled": true,
+                "depth": 1
+              },
+              "sections": [
+                {
+                  "id": "called_by",
+                  "label": "Called by",
+                  "order": 1,
+                  "source": {
+                    "kind": "links"
+                  },
+                  "owner_filter": {
+                    "mode": "actor_column",
+                    "actor_column": "dst_actor"
+                  },
+                  "columns": [
+                    {
+                      "id": "peer",
+                      "label": "Caller",
+                      "projection": {
+                        "kind": "opposite_actor",
+                        "src_actor_column": "src_actor",
+                        "dst_actor_column": "dst_actor"
+                      },
+                      "cell": "actor_link"
+                    },
+                    {
+                      "id": "calls",
+                      "label": "Calls",
+                      "projection": {
+                        "kind": "direct",
+                        "column": "calls"
+                      },
+                      "cell": "number",
+                      "align": "right"
+                    },
+                    {
+                      "id": "rate",
+                      "label": "Calls/min",
+                      "projection": {
+                        "kind": "direct",
+                        "column": "weight"
+                      },
+                      "cell": "number",
+                      "align": "right"
+                    },
+                    {
+                      "id": "errors",
+                      "label": "Errors",
+                      "projection": {
+                        "kind": "direct",
+                        "column": "client_errors"
+                      },
+                      "cell": "number",
+                      "align": "right"
+                    },
+                    {
+                      "id": "error_pct",
+                      "label": "Errors %",
+                      "projection": {
+                        "kind": "direct",
+                        "column": "client_error_pct"
+                      },
+                      "cell": "number",
+                      "align": "right"
+                    },
+                    {
+                      "id": "p50",
+                      "label": "p50 ms",
+                      "projection": {
+                        "kind": "direct",
+                        "column": "client_p50_ms"
+                      },
+                      "cell": "number",
+                      "align": "right"
+                    },
+                    {
+                      "id": "p95",
+                      "label": "p95 ms",
+                      "projection": {
+                        "kind": "direct",
+                        "column": "client_p95_ms"
+                      },
+                      "cell": "number",
+                      "align": "right"
+                    },
+                    {
+                      "id": "p99",
+                      "label": "p99 ms",
+                      "projection": {
+                        "kind": "direct",
+                        "column": "client_p99_ms"
+                      },
+                      "cell": "number",
+                      "align": "right"
+                    },
+                    {
+                      "id": "max",
+                      "label": "Max ms",
+                      "projection": {
+                        "kind": "direct",
+                        "column": "client_max_ms"
+                      },
+                      "cell": "number",
+                      "visibility": "expanded"
+                    }
+                  ],
+                  "sort": {
+                    "column": "calls",
+                    "direction": "desc"
+                  },
+                  "empty_label": "No calls in this time range."
+                }
+              ]
+            }
+          }
+        },
+        "peer_other": {
+          "layer": "service",
+          "identity": [
+            "id"
+          ],
+          "merge_identity": [
+            "peer_kind",
+            "peer_name"
+          ],
+          "search": {
+            "enabled": true,
+            "columns": [
+              "display_name",
+              "peer_kind",
+              "peer_name"
+            ]
+          },
+          "presentation": {
+            "label": "Other peer",
+            "role": "endpoint",
+            "icon": "unknown",
+            "color_slot": "gray",
+            "border": {
+              "enabled": true,
+              "style": "dashed"
+            },
+            "size": {
+              "mode": "fixed",
+              "scale": "compact"
+            },
+            "label_policy": {
+              "columns": [
+                "display_name"
+              ],
+              "fallback": "type_label",
+              "max_length": 80,
+              "array": "reject"
+            },
+            "hover": {
+              "fields": [
+                {
+                  "key": "calls_in",
+                  "label": "Calls in"
+                },
+                {
+                  "key": "error_pct_in",
+                  "label": "Errors in %"
+                }
+              ]
+            },
+            "modal": {
+              "enabled": true,
+              "labels": {
+                "enabled": true,
+                "table": "actor_labels",
+                "identification": {
+                  "fields": [
+                    {
+                      "key": "peer.kind",
+                      "label": "Kind",
+                      "max_values": 1
+                    },
+                    {
+                      "key": "calls_in",
+                      "label": "Calls in",
+                      "max_values": 1
+                    },
+                    {
+                      "key": "error_pct_in",
+                      "label": "Errors in",
+                      "max_values": 1
+                    }
+                  ]
+                }
+              },
+              "mini_topology": {
+                "enabled": true,
+                "depth": 1
+              },
+              "sections": [
+                {
+                  "id": "called_by",
+                  "label": "Called by",
+                  "order": 1,
+                  "source": {
+                    "kind": "links"
+                  },
+                  "owner_filter": {
+                    "mode": "actor_column",
+                    "actor_column": "dst_actor"
+                  },
+                  "columns": [
+                    {
+                      "id": "peer",
+                      "label": "Caller",
+                      "projection": {
+                        "kind": "opposite_actor",
+                        "src_actor_column": "src_actor",
+                        "dst_actor_column": "dst_actor"
+                      },
+                      "cell": "actor_link"
+                    },
+                    {
+                      "id": "calls",
+                      "label": "Calls",
+                      "projection": {
+                        "kind": "direct",
+                        "column": "calls"
+                      },
+                      "cell": "number",
+                      "align": "right"
+                    },
+                    {
+                      "id": "rate",
+                      "label": "Calls/min",
+                      "projection": {
+                        "kind": "direct",
+                        "column": "weight"
+                      },
+                      "cell": "number",
+                      "align": "right"
+                    },
+                    {
+                      "id": "errors",
+                      "label": "Errors",
+                      "projection": {
+                        "kind": "direct",
+                        "column": "client_errors"
+                      },
+                      "cell": "number",
+                      "align": "right"
+                    },
+                    {
+                      "id": "error_pct",
+                      "label": "Errors %",
+                      "projection": {
+                        "kind": "direct",
+                        "column": "client_error_pct"
+                      },
+                      "cell": "number",
+                      "align": "right"
+                    },
+                    {
+                      "id": "p50",
+                      "label": "p50 ms",
+                      "projection": {
+                        "kind": "direct",
+                        "column": "client_p50_ms"
+                      },
+                      "cell": "number",
+                      "align": "right"
+                    },
+                    {
+                      "id": "p95",
+                      "label": "p95 ms",
+                      "projection": {
+                        "kind": "direct",
+                        "column": "client_p95_ms"
+                      },
+                      "cell": "number",
+                      "align": "right"
+                    },
+                    {
+                      "id": "p99",
+                      "label": "p99 ms",
+                      "projection": {
+                        "kind": "direct",
+                        "column": "client_p99_ms"
+                      },
+                      "cell": "number",
+                      "align": "right"
+                    },
+                    {
+                      "id": "max",
+                      "label": "Max ms",
+                      "projection": {
+                        "kind": "direct",
+                        "column": "client_max_ms"
+                      },
+                      "cell": "number",
+                      "visibility": "expanded"
+                    }
+                  ],
+                  "sort": {
+                    "column": "calls",
+                    "direction": "desc"
+                  },
+                  "empty_label": "No calls in this time range."
+                }
+              ]
+            }
+          }
+        },
+        "unknown_caller": {
+          "layer": "service",
+          "identity": [
+            "id"
+          ],
+          "search": {
+            "enabled": true,
+            "columns": [
+              "display_name"
+            ]
+          },
+          "presentation": {
+            "label": "Unknown caller",
+            "role": "endpoint",
+            "icon": "user",
+            "color_slot": "neutral",
+            "border": {
+              "enabled": true,
+              "style": "dotted"
+            },
+            "size": {
+              "mode": "fixed",
+              "scale": "compact"
+            },
+            "label_policy": {
+              "columns": [
+                "display_name"
+              ],
+              "fallback": "type_label",
+              "max_length": 80,
+              "array": "reject"
+            },
+            "hover": {
+              "fields": [
+                {
+                  "key": "calls_out",
+                  "label": "Calls out"
+                }
+              ]
+            },
+            "modal": {
+              "enabled": true,
+              "labels": {
+                "enabled": true,
+                "table": "actor_labels",
+                "identification": {
+                  "fields": [
+                    {
+                      "key": "calls_out",
+                      "label": "Calls out",
+                      "max_values": 1
+                    }
+                  ]
+                }
+              },
+              "mini_topology": {
+                "enabled": true,
+                "depth": 1
+              },
+              "sections": [
+                {
+                  "id": "calls_to",
+                  "label": "Calls to",
+                  "order": 1,
+                  "source": {
+                    "kind": "links"
+                  },
+                  "owner_filter": {
+                    "mode": "actor_column",
+                    "actor_column": "src_actor"
+                  },
+                  "columns": [
+                    {
+                      "id": "peer",
+                      "label": "Callee",
+                      "projection": {
+                        "kind": "opposite_actor",
+                        "src_actor_column": "src_actor",
+                        "dst_actor_column": "dst_actor"
+                      },
+                      "cell": "actor_link"
+                    },
+                    {
+                      "id": "calls",
+                      "label": "Calls",
+                      "projection": {
+                        "kind": "direct",
+                        "column": "calls"
+                      },
+                      "cell": "number",
+                      "align": "right"
+                    },
+                    {
+                      "id": "rate",
+                      "label": "Calls/min",
+                      "projection": {
+                        "kind": "direct",
+                        "column": "weight"
+                      },
+                      "cell": "number",
+                      "align": "right"
+                    },
+                    {
+                      "id": "errors",
+                      "label": "Errors",
+                      "projection": {
+                        "kind": "direct",
+                        "column": "server_errors"
+                      },
+                      "cell": "number",
+                      "align": "right"
+                    },
+                    {
+                      "id": "error_pct",
+                      "label": "Errors %",
+                      "projection": {
+                        "kind": "direct",
+                        "column": "server_error_pct"
+                      },
+                      "cell": "number",
+                      "align": "right"
+                    },
+                    {
+                      "id": "p50",
+                      "label": "p50 ms",
+                      "projection": {
+                        "kind": "direct",
+                        "column": "server_p50_ms"
+                      },
+                      "cell": "number",
+                      "align": "right"
+                    },
+                    {
+                      "id": "p95",
+                      "label": "p95 ms",
+                      "projection": {
+                        "kind": "direct",
+                        "column": "server_p95_ms"
+                      },
+                      "cell": "number",
+                      "align": "right"
+                    },
+                    {
+                      "id": "p99",
+                      "label": "p99 ms",
+                      "projection": {
+                        "kind": "direct",
+                        "column": "server_p99_ms"
+                      },
+                      "cell": "number",
+                      "align": "right"
+                    },
+                    {
+                      "id": "max",
+                      "label": "Max ms",
+                      "projection": {
+                        "kind": "direct",
+                        "column": "server_max_ms"
+                      },
+                      "cell": "number",
+                      "visibility": "expanded"
+                    }
+                  ],
+                  "sort": {
+                    "column": "calls",
+                    "direction": "desc"
+                  },
+                  "empty_label": "No calls in this time range."
+                }
+              ]
+            }
+          }
+        }
+      },
+      "link_types": {
+        "call": {
+          "orientation": "directed",
+          "direction_role": "dependency",
+          "semantic_role": "traffic",
+          "aggregation": {
+            "direction": "preserve",
+            "evidence": "drop",
+            "metrics": {
+              "calls": "sum",
+              "errors": "sum",
+              "weight": "sum",
+              "client_calls": "sum",
+              "client_errors": "sum",
+              "client_max_ms": "max",
+              "server_calls": "sum",
+              "server_errors": "sum",
+              "server_max_ms": "max"
+            }
+          },
+          "presentation": {
+            "label": "Call",
+            "color_slot": "primary",
+            "opacity": "normal",
+            "line_style": "solid",
+            "width": "normal",
+            "curve": "auto",
+            "arrow": "auto",
+            "layout": {
+              "strength": "normal",
+              "distance": "normal"
+            },
+            "variable": {
+              "channel": "width",
+              "scale_key": "call_rate",
+              "value_column": "weight",
+              "min": "thin",
+              "max": "emphasis"
+            },
+            "hover": {
+              "fields": [
+                {
+                  "key": "calls",
+                  "label": "Calls"
+                },
+                {
+                  "key": "weight",
+                  "label": "Calls/min"
+                },
+                {
+                  "key": "client_error_pct",
+                  "label": "Errors %"
+                },
+                {
+                  "key": "client_p95_ms",
+                  "label": "p95 ms"
+                }
+              ]
+            }
+          }
+        },
+        "call_to_peer": {
+          "orientation": "directed",
+          "direction_role": "dependency",
+          "semantic_role": "traffic",
+          "aggregation": {
+            "direction": "preserve",
+            "evidence": "drop",
+            "metrics": {
+              "calls": "sum",
+              "errors": "sum",
+              "weight": "sum",
+              "client_calls": "sum",
+              "client_errors": "sum",
+              "client_max_ms": "max",
+              "server_calls": "sum",
+              "server_errors": "sum",
+              "server_max_ms": "max"
+            }
+          },
+          "presentation": {
+            "label": "Call to uninstrumented peer",
+            "color_slot": "derived",
+            "opacity": "normal",
+            "line_style": "dashed",
+            "width": "normal",
+            "curve": "auto",
+            "arrow": "auto",
+            "layout": {
+              "strength": "normal",
+              "distance": "normal"
+            },
+            "variable": {
+              "channel": "width",
+              "scale_key": "call_rate",
+              "value_column": "weight",
+              "min": "thin",
+              "max": "emphasis"
+            },
+            "hover": {
+              "fields": [
+                {
+                  "key": "calls",
+                  "label": "Calls"
+                },
+                {
+                  "key": "weight",
+                  "label": "Calls/min"
+                },
+                {
+                  "key": "client_error_pct",
+                  "label": "Errors %"
+                },
+                {
+                  "key": "client_p95_ms",
+                  "label": "p95 ms"
+                }
+              ]
+            }
+          }
+        },
+        "call_from_unknown": {
+          "orientation": "directed",
+          "direction_role": "dependency",
+          "semantic_role": "traffic",
+          "aggregation": {
+            "direction": "preserve",
+            "evidence": "drop",
+            "metrics": {
+              "calls": "sum",
+              "errors": "sum",
+              "weight": "sum",
+              "client_calls": "sum",
+              "client_errors": "sum",
+              "client_max_ms": "max",
+              "server_calls": "sum",
+              "server_errors": "sum",
+              "server_max_ms": "max"
+            }
+          },
+          "presentation": {
+            "label": "Call from unknown caller",
+            "color_slot": "muted",
+            "opacity": "muted",
+            "line_style": "dotted",
+            "width": "normal",
+            "curve": "auto",
+            "arrow": "auto",
+            "layout": {
+              "strength": "normal",
+              "distance": "normal"
+            },
+            "variable": {
+              "channel": "width",
+              "scale_key": "call_rate",
+              "value_column": "weight",
+              "min": "thin",
+              "max": "emphasis"
+            },
+            "hover": {
+              "fields": [
+                {
+                  "key": "calls",
+                  "label": "Calls"
+                },
+                {
+                  "key": "weight",
+                  "label": "Calls/min"
+                },
+                {
+                  "key": "server_error_pct",
+                  "label": "Errors %"
+                },
+                {
+                  "key": "server_p95_ms",
+                  "label": "p95 ms"
+                }
+              ]
+            }
+          }
+        }
+      },
+      "table_types": {
+        "actor_labels": {
+          "role": "actor_inventory",
+          "owner": "actor",
+          "aggregation": "set",
+          "columns": [
+            {
+              "id": "actor",
+              "type": "actor_ref",
+              "role": "reference"
+            },
+            {
+              "id": "key",
+              "type": "string_ref",
+              "dictionary": "strings"
+            },
+            {
+              "id": "value",
+              "type": "string_ref",
+              "dictionary": "strings"
+            },
+            {
+              "id": "source",
+              "type": "string_ref",
+              "dictionary": "strings",
+              "nullable": true
+            },
+            {
+              "id": "value_index",
+              "type": "uint",
+              "nullable": true
+            }
+          ]
+        }
+      }
+    },
+    "presentation": {
+      "profile_version": "tracing.v1",
+      "selection": {
+        "actor_click": {
+          "mode": "highlight_connections"
+        }
+      },
+      "legend": {
+        "actors": [
+          {
+            "type": "service",
+            "label": "Service"
+          },
+          {
+            "type": "peer_database",
+            "label": "Database"
+          },
+          {
+            "type": "peer_messaging",
+            "label": "Messaging system"
+          },
+          {
+            "type": "peer_external",
+            "label": "External service"
+          },
+          {
+            "type": "peer_other",
+            "label": "Other peer"
+          },
+          {
+            "type": "unknown_caller",
+            "label": "Unknown caller"
+          }
+        ],
+        "links": [
+          {
+            "type": "call",
+            "label": "Call"
+          },
+          {
+            "type": "call_to_peer",
+            "label": "Call to uninstrumented peer"
+          },
+          {
+            "type": "call_from_unknown",
+            "label": "Call from unknown caller"
+          }
+        ]
+      },
+      "scale_keys": {
+        "call_rate": {
+          "label": "Calls per minute",
+          "unit": "calls/min"
+        }
+      }
+    },
+    "actors": {
+      "rows": 0,
+      "columns": [
+        {
+          "id": "type",
+          "type": "string_ref",
+          "dictionary": "strings"
+        },
+        {
+          "id": "layer",
+          "type": "string_ref",
+          "dictionary": "strings"
+        },
+        {
+          "id": "id",
+          "type": "string",
+          "role": "identity"
+        },
+        {
+          "id": "display_name",
+          "type": "string"
+        },
+        {
+          "id": "service_namespace",
+          "type": "string",
+          "nullable": true,
+          "role": "merge_identity"
+        },
+        {
+          "id": "service_name",
+          "type": "string",
+          "nullable": true,
+          "role": "merge_identity"
+        },
+        {
+          "id": "peer_kind",
+          "type": "string_ref",
+          "dictionary": "strings",
+          "nullable": true,
+          "role": "merge_identity"
+        },
+        {
+          "id": "peer_name",
+          "type": "string",
+          "nullable": true,
+          "role": "merge_identity"
+        },
+        {
+          "id": "calls_in",
+          "type": "uint",
+          "role": "metric",
+          "aggregation": "sum"
+        },
+        {
+          "id": "calls_out",
+          "type": "uint",
+          "role": "metric",
+          "aggregation": "sum"
+        },
+        {
+          "id": "errors_in",
+          "type": "uint",
+          "role": "metric",
+          "aggregation": "sum"
+        },
+        {
+          "id": "error_pct_in",
+          "type": "float",
+          "nullable": true,
+          "unit": "%",
+          "role": "metric",
+          "aggregation": "none"
+        }
+      ],
+      "values": [
+        {
+          "codec": "dict",
+          "values": [],
+          "indexes": []
+        },
+        {
+          "codec": "const",
+          "value": 0
+        },
+        {
+          "codec": "values",
+          "values": []
+        },
+        {
+          "codec": "values",
+          "values": []
+        },
+        {
+          "codec": "values",
+          "values": []
+        },
+        {
+          "codec": "values",
+          "values": []
+        },
+        {
+          "codec": "values",
+          "values": []
+        },
+        {
+          "codec": "values",
+          "values": []
+        },
+        {
+          "codec": "values",
+          "values": []
+        },
+        {
+          "codec": "values",
+          "values": []
+        },
+        {
+          "codec": "values",
+          "values": []
+        },
+        {
+          "codec": "values",
+          "values": []
+        }
+      ]
+    },
+    "links": {
+      "rows": 0,
+      "columns": [
+        {
+          "id": "type",
+          "type": "string_ref",
+          "dictionary": "strings"
+        },
+        {
+          "id": "src_actor",
+          "type": "actor_ref",
+          "role": "reference"
+        },
+        {
+          "id": "dst_actor",
+          "type": "actor_ref",
+          "role": "reference"
+        },
+        {
+          "id": "calls",
+          "type": "uint",
+          "role": "metric",
+          "aggregation": "sum"
+        },
+        {
+          "id": "errors",
+          "type": "uint",
+          "role": "metric",
+          "aggregation": "sum"
+        },
+        {
+          "id": "weight",
+          "type": "float",
+          "unit": "calls/min",
+          "role": "metric",
+          "aggregation": "sum"
+        },
+        {
+          "id": "client_calls",
+          "type": "uint",
+          "nullable": true,
+          "role": "metric",
+          "aggregation": "sum"
+        },
+        {
+          "id": "client_errors",
+          "type": "uint",
+          "nullable": true,
+          "role": "metric",
+          "aggregation": "sum"
+        },
+        {
+          "id": "client_error_pct",
+          "type": "float",
+          "nullable": true,
+          "unit": "%",
+          "role": "metric",
+          "aggregation": "none"
+        },
+        {
+          "id": "client_p50_ms",
+          "type": "float",
+          "nullable": true,
+          "unit": "ms",
+          "role": "metric",
+          "aggregation": "none"
+        },
+        {
+          "id": "client_p95_ms",
+          "type": "float",
+          "nullable": true,
+          "unit": "ms",
+          "role": "metric",
+          "aggregation": "none"
+        },
+        {
+          "id": "client_p99_ms",
+          "type": "float",
+          "nullable": true,
+          "unit": "ms",
+          "role": "metric",
+          "aggregation": "none"
+        },
+        {
+          "id": "client_max_ms",
+          "type": "float",
+          "nullable": true,
+          "unit": "ms",
+          "role": "metric",
+          "aggregation": "max"
+        },
+        {
+          "id": "server_calls",
+          "type": "uint",
+          "nullable": true,
+          "role": "metric",
+          "aggregation": "sum"
+        },
+        {
+          "id": "server_errors",
+          "type": "uint",
+          "nullable": true,
+          "role": "metric",
+          "aggregation": "sum"
+        },
+        {
+          "id": "server_error_pct",
+          "type": "float",
+          "nullable": true,
+          "unit": "%",
+          "role": "metric",
+          "aggregation": "none"
+        },
+        {
+          "id": "server_p50_ms",
+          "type": "float",
+          "nullable": true,
+          "unit": "ms",
+          "role": "metric",
+          "aggregation": "none"
+        },
+        {
+          "id": "server_p95_ms",
+          "type": "float",
+          "nullable": true,
+          "unit": "ms",
+          "role": "metric",
+          "aggregation": "none"
+        },
+        {
+          "id": "server_p99_ms",
+          "type": "float",
+          "nullable": true,
+          "unit": "ms",
+          "role": "metric",
+          "aggregation": "none"
+        },
+        {
+          "id": "server_max_ms",
+          "type": "float",
+          "nullable": true,
+          "unit": "ms",
+          "role": "metric",
+          "aggregation": "max"
+        }
+      ],
+      "values": [
+        {
+          "codec": "dict",
+          "values": [],
+          "indexes": []
+        },
+        {
+          "codec": "values",
+          "values": []
+        },
+        {
+          "codec": "values",
+          "values": []
+        },
+        {
+          "codec": "values",
+          "values": []
+        },
+        {
+          "codec": "values",
+          "values": []
+        },
+        {
+          "codec": "values",
+          "values": []
+        },
+        {
+          "codec": "values",
+          "values": []
+        },
+        {
+          "codec": "values",
+          "values": []
+        },
+        {
+          "codec": "values",
+          "values": []
+        },
+        {
+          "codec": "values",
+          "values": []
+        },
+        {
+          "codec": "values",
+          "values": []
+        },
+        {
+          "codec": "values",
+          "values": []
+        },
+        {
+          "codec": "values",
+          "values": []
+        },
+        {
+          "codec": "values",
+          "values": []
+        },
+        {
+          "codec": "values",
+          "values": []
+        },
+        {
+          "codec": "values",
+          "values": []
+        },
+        {
+          "codec": "values",
+          "values": []
+        },
+        {
+          "codec": "values",
+          "values": []
+        },
+        {
+          "codec": "values",
+          "values": []
+        },
+        {
+          "codec": "values",
+          "values": []
+        }
+      ]
+    },
+    "tables": {
+      "actor": {
+        "actor_labels": {
+          "type": "actor_labels",
+          "table": {
+            "rows": 0,
+            "columns": [
+              {
+                "id": "actor",
+                "type": "actor_ref",
+                "role": "reference"
+              },
+              {
+                "id": "key",
+                "type": "string_ref",
+                "dictionary": "strings"
+              },
+              {
+                "id": "value",
+                "type": "string_ref",
+                "dictionary": "strings"
+              },
+              {
+                "id": "source",
+                "type": "string_ref",
+                "dictionary": "strings",
+                "nullable": true
+              },
+              {
+                "id": "value_index",
+                "type": "uint",
+                "nullable": true
+              }
+            ],
+            "values": [
+              {
+                "codec": "values",
+                "values": []
+              },
+              {
+                "codec": "values",
+                "values": []
+              },
+              {
+                "codec": "values",
+                "values": []
+              },
+              {
+                "codec": "values",
+                "values": []
+              },
+              {
+                "codec": "values",
+                "values": []
+              }
+            ]
+          }
+        }
+      }
+    },
+    "stats": {
+      "services": 0,
+      "virtual_peers": 0,
+      "unknown_callers": 0,
+      "links": 0,
+      "calls": 0,
+      "loss_handoff_drops": 0,
+      "loss_capacity_drops": 0,
+      "loss_late": 0,
+      "loss_future": 0,
+      "loss_duplicates": 0,
+      "loss_invalid": 0,
+      "loss_unpaired_servers": 0,
+      "loss_shutdown_lost": 0,
+      "loss_unreadable_files": 0,
+      "overflow_client_calls": 0,
+      "overflow_server_calls": 0
+    }
+  }
+}

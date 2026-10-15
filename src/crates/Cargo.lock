@@ -3807,12 +3807,19 @@ dependencies = [
 name = "otel-service-map"
 version = "0.1.3"
 dependencies = [
+ "async-trait",
  "bincode 2.0.1",
+ "bridge",
  "crc32fast",
+ "humantime",
+ "netdata-plugin-protocol",
+ "netdata-plugin-types",
  "opentelemetry-proto",
  "serde",
+ "serde_json",
  "tempfile",
  "tokio",
+ "tokio-util",
  "tracing",
 ]
 
