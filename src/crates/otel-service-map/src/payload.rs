@@ -664,9 +664,14 @@ mod tests {
         if std::env::var_os("UPDATE_GOLDEN").is_some() {
             std::fs::write(&path, &pretty).unwrap();
         }
-        let stored = std::fs::read_to_string(&path).unwrap_or_default();
+        // Compared as JSON values: key order depends on whether another crate
+        // in the build turns on serde_json's `preserve_order`.
+        let stored: Value = std::fs::read_to_string(&path)
+            .ok()
+            .and_then(|s| serde_json::from_str(&s).ok())
+            .unwrap_or(Value::Null);
         assert!(
-            stored == pretty,
+            stored == out,
             "{} is stale: rerun with UPDATE_GOLDEN=1",
             path.display()
         );
