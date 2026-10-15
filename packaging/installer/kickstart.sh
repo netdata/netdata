@@ -961,7 +961,7 @@ verify_manifest() {
       if [ -n "${required_file}" ]; then
         progress "Verifying that ${required_file} exists in Manifest"
 
-        if echo "${files}" | grep -qv "${required_file}" ; then
+        if ! echo "${files}" | grep -qxF "${required_file}" ; then
           fatal "${required_file} is not present in Manifest" F052C
         fi
 
@@ -993,7 +993,7 @@ verify_manifest() {
       if [ -n "${required_file}" ]; then
         progress "Verifying that ${required_file} exists in sha256sums.txt"
 
-        if echo "${files}" | grep -qv "${required_file}" ; then
+        if ! echo "${files}" | grep -qxF "${required_file}" ; then
           fatal "${required_file} is not present in sha256sums.txt" F052C
         fi
 
@@ -2199,7 +2199,7 @@ set_static_archive_urls() {
         if [ -n "${INSTALL_VERSION}" ]; then
           version="v${INSTALL_VERSION}"
         else
-          version="$(get_redirect "${NETDATA_NETDATA_STATIC_ARCHIVE_URL_PREFIX}/latest")"
+          version="$(get_redirect "${NETDATA_STATIC_ARCHIVE_URL_PREFIX}/latest")"
         fi
         NETDATA_MANIFEST_INSTALL=0
         NETDATA_STATIC_ARCHIVE_NAME="netdata-${arch}-${version}.gz.run"
@@ -2623,16 +2623,16 @@ prepare_offline_install_source() {
         esac
 
         for arch in $(echo "${NETDATA_OFFLINE_ARCHES:-${STATIC_INSTALL_ARCHES}}" | awk '{for (i=1;i<=NF;i++) if (!a[$i]++) printf("%s%s",$i,FS)}{printf("\n")}'); do
-        set_static_archive_urls "${SELECTED_RELEASE_CHANNEL}" "${arch}"
+          set_static_archive_urls "${SELECTED_RELEASE_CHANNEL}" "${arch}"
 
-        if check_for_remote_file "${NETDATA_STATIC_ARCHIVE_URL}"; then
-            progress "Fetching ${NETDATA_STATIC_ARCHIVE_URL}"
-            if ! download "${NETDATA_STATIC_ARCHIVE_URL}" "netdata-${arch}-latest.gz.run"; then
-                warning "Failed to download static installer archive for ${arch}. ${BADNET_MSG}."
-            fi
-        else
-            progress "Skipping ${NETDATA_STATIC_ARCHIVE_URL} as it does not exist on the server."
-        fi
+          if check_for_remote_file "${NETDATA_STATIC_ARCHIVE_URL}"; then
+              progress "Fetching ${NETDATA_STATIC_ARCHIVE_URL}"
+              if ! download "${NETDATA_STATIC_ARCHIVE_URL}" "${NETDATA_STATIC_ARCHIVE_NAME}"; then
+                  warning "Failed to download static installer archive for ${arch}. ${BADNET_MSG}."
+              fi
+          else
+              progress "Skipping ${NETDATA_STATIC_ARCHIVE_URL} as it does not exist on the server."
+          fi
         done
 
         if [ -z "$(find . -name '*.gz.run')" ]; then
