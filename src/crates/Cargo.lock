@@ -3689,6 +3689,7 @@ dependencies = [
  "opentelemetry-proto",
  "otel-catalog",
  "otel-logs-identity",
+ "otel-service-map",
  "prost",
  "rcgen",
  "regex",

@@ -213,8 +213,8 @@ impl Supervisor {
     }
 
     /// Send Configure to the ingestor and return the functions it reports
-    /// (none today — the ingestor's Ready exists to gate the ledger's
-    /// declarations, see `register_declarations`). The ingestor sends Ready
+    /// (`topology:tracing` when its service map started; its Ready also gates
+    /// the ledger's declarations, see `register_declarations`). The ingestor sends Ready
     /// only once its gRPC endpoint is bound and every startup step succeeded,
     /// so a failure here (typically the port already in use) surfaces before
     /// anything has been declared to the agent.

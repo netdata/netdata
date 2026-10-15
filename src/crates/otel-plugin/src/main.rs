@@ -26,7 +26,8 @@ use clap::{Parser, Subcommand};
 #[derive(Subcommand)]
 enum WorkerKind {
     /// Run the ingestor worker: the OTLP gRPC receiver that streams records to
-    /// the ledger over the writer socket and chart data to the supervisor.
+    /// the ledger over the writer socket and chart data to the supervisor, and
+    /// serves the trace-derived service map (`topology:tracing`).
     Ingestor {
         /// Ferryboat IPC socket the supervisor bound for this worker.
         #[arg(long)]

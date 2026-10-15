@@ -22,6 +22,7 @@ netdata-plugin-types = { workspace = true }
 file-registry = { workspace = true }
 otel-logs-identity = { workspace = true }
 otel-catalog = { workspace = true }
+otel-service-map = { workspace = true }
 prost = { workspace = true }
 serde = { workspace = true, features = ["rc"] }
 sfst = { workspace = true }

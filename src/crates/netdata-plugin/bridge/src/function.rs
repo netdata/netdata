@@ -11,8 +11,10 @@
 //!
 //! The engine is protocol-agnostic. Its drivers are the run loops that receive
 //! function calls: the `otel-ledger` worker (`LedgerRequest::Call`, dispatched
-//! in its `rpc::dispatch`) and the `otel-legacy-logs` worker
-//! (`LegacyLogsRequest::Call`, dispatched in its own run loop). Both build a
+//! in its `rpc::dispatch`), the `otel-legacy-logs` worker
+//! (`LegacyLogsRequest::Call`, dispatched in its own run loop) and the
+//! `otel-ingestor` worker (through the shared [`crate::driver::CallDriver`]).
+//! Each builds a
 //! [`FunctionContext`] per call with the transaction id, a fresh
 //! [`CancellationToken`], and a per-call `mpsc::UnboundedSender<Message>` the
 //! ticker writes `FunctionProgressResponse` into; each translates those

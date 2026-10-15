@@ -51,6 +51,7 @@ use opentelemetry_proto::tonic::collector::trace::v1::{
 use tonic::{Request, Response, Status};
 
 use crate::ledger_sender::LedgerSender;
+use crate::observer::TraceObserver;
 use crate::tenant::extract_tenant_id;
 use bridge::config::AuthConfig;
 use bridge::signals::Signal;
@@ -160,6 +161,9 @@ pub struct NetdataTracesService {
     /// supervisor plus its self-generated per-process instance id; see
     /// `bridge::config::PluginConfig::identity`).
     identity: Identity,
+    /// Features that see accepted exports without taking part in storing
+    /// them (`observer.rs`).
+    observers: Vec<Arc<dyn TraceObserver>>,
 }
 
 impl NetdataTracesService {
@@ -184,7 +188,13 @@ impl NetdataTracesService {
             seq,
             auth,
             identity,
+            observers: Vec::new(),
         }
+    }
+
+    /// Adds an observer; only before the service is shared.
+    pub(crate) fn add_observer(&mut self, observer: Arc<dyn TraceObserver>) {
+        self.observers.push(observer);
     }
 
     /// The tenant's effective WAL rotation config: its per-tenant override,
@@ -301,6 +311,13 @@ impl NetdataTracesService {
             return Ok(ExportTraceServiceResponse {
                 partial_success: None,
             });
+        }
+
+        // Observers read the request before it is consumed below; their
+        // observations are committed only once the spans are durable.
+        let mut observations = Vec::with_capacity(self.observers.len());
+        for observer in &self.observers {
+            observations.push(observer.prepare(tenant_id.as_str(), &request));
         }
 
         let groups = partition_spans(request);
@@ -440,6 +457,10 @@ impl NetdataTracesService {
             self.sender.send_events(tenant_id.clone(), events);
         }
 
+        for observation in observations {
+            observation.commit();
+        }
+
         Ok(ExportTraceServiceResponse {
             partial_success: build_partial_success(out_of_window),
         })
@@ -546,6 +567,187 @@ mod tests {
                 InstanceId::new(uuid::Uuid::from_u128(2)).unwrap(),
             ),
         )
+    }
+
+    /// Counts what the export path hands to an observer.
+    #[derive(Default)]
+    struct Recorder {
+        prepared: Mutex<Vec<String>>,
+        committed: Arc<Mutex<Vec<String>>>,
+    }
+
+    struct Recorded {
+        tenant: String,
+        committed: Arc<Mutex<Vec<String>>>,
+    }
+
+    impl crate::observer::TraceObserver for Recorder {
+        fn prepare(
+            &self,
+            tenant: &str,
+            _request: &ExportTraceServiceRequest,
+        ) -> Box<dyn crate::observer::PreparedObservation> {
+            self.prepared.lock().unwrap().push(tenant.to_string());
+            Box::new(Recorded {
+                tenant: tenant.to_string(),
+                committed: Arc::clone(&self.committed),
+            })
+        }
+    }
+
+    impl crate::observer::PreparedObservation for Recorded {
+        fn commit(self: Box<Self>) {
+            self.committed.lock().unwrap().push(self.tenant);
+        }
+    }
+
+    #[tokio::test]
+    async fn observers_see_stored_exports_only() {
+        let now = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap()
+            .as_nanos() as u64;
+        let tenant = TenantId::default_tenant();
+
+        // Stored: prepared and committed once.
+        let tmp = tempfile::tempdir().unwrap();
+        let mut service = test_service(tmp.path().to_path_buf());
+        let recorder = Arc::new(Recorder::default());
+        service.add_observer(recorder.clone());
+        service
+            .export_traces(&tenant, spans_req(2, now))
+            .await
+            .unwrap();
+        assert_eq!(
+            *recorder.prepared.lock().unwrap(),
+            vec![tenant.as_str().to_string()]
+        );
+        assert_eq!(
+            *recorder.committed.lock().unwrap(),
+            vec![tenant.as_str().to_string()]
+        );
+
+        // Every span outside the ingestion window: nothing stored, nothing
+        // committed.
+        let mut service = test_service_with_ingest(
+            tmp.path().to_path_buf(),
+            bridge::config::IngestConfig {
+                max_age: std::time::Duration::from_secs(60),
+                future_skew: std::time::Duration::from_secs(60),
+            },
+        );
+        let recorder = Arc::new(Recorder::default());
+        service.add_observer(recorder.clone());
+        service
+            .export_traces(&tenant, spans_req(1, now - 7_200_000_000_000))
+            .await
+            .unwrap();
+        assert_eq!(recorder.prepared.lock().unwrap().len(), 1);
+        assert!(recorder.committed.lock().unwrap().is_empty());
+
+        // The WAL cannot be created: the export fails, nothing committed, so a
+        // client's retry is not seen twice.
+        let blocked = tmp.path().join("not-a-dir");
+        std::fs::write(&blocked, b"").unwrap();
+        let mut service = test_service(blocked);
+        let recorder = Arc::new(Recorder::default());
+        service.add_observer(recorder.clone());
+        assert!(
+            service
+                .export_traces(&tenant, spans_req(1, now))
+                .await
+                .is_err()
+        );
+        assert_eq!(recorder.prepared.lock().unwrap().len(), 1);
+        assert!(recorder.committed.lock().unwrap().is_empty());
+    }
+
+    #[tokio::test]
+    async fn the_service_map_sees_calls_between_services() {
+        use opentelemetry_proto::tonic::common::v1::{AnyValue, KeyValue, any_value};
+        use opentelemetry_proto::tonic::resource::v1::Resource;
+        use opentelemetry_proto::tonic::trace::v1::span::SpanKind;
+
+        let now = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap()
+            .as_nanos() as u64;
+        let resource = |service: &str, span: Span| ResourceSpans {
+            resource: Some(Resource {
+                attributes: vec![KeyValue {
+                    key: "service.name".to_string(),
+                    value: Some(AnyValue {
+                        value: Some(any_value::Value::StringValue(service.to_string())),
+                    }),
+                    ..Default::default()
+                }],
+                ..Default::default()
+            }),
+            scope_spans: vec![ScopeSpans {
+                spans: vec![span],
+                ..Default::default()
+            }],
+            ..Default::default()
+        };
+        let span = |id: u8, parent: Vec<u8>, kind: SpanKind| Span {
+            trace_id: vec![0x22; 16],
+            span_id: vec![id; 8],
+            parent_span_id: parent,
+            kind: kind as i32,
+            start_time_unix_nano: now - 2_000_000,
+            end_time_unix_nano: now - 1_000_000,
+            ..Default::default()
+        };
+
+        let tmp = tempfile::tempdir().unwrap();
+        let map = Arc::new(
+            otel_service_map::service::ServiceMap::start(otel_service_map::service::Config::new(
+                tmp.path().join("service-map"),
+            ))
+            .unwrap(),
+        );
+        let mut service = test_service(tmp.path().join("wal"));
+        service.add_observer(Arc::new(crate::observer::ServiceMapObserver(Arc::clone(
+            &map,
+        ))));
+        let tenant = TenantId::default_tenant();
+        // The callee exports first, as it often does.
+        let server = resource("checkout", span(2, vec![1; 8], SpanKind::Server));
+        let client = resource("frontend", span(1, vec![], SpanKind::Client));
+        for rs in [server, client] {
+            let req = ExportTraceServiceRequest {
+                resource_spans: vec![rs],
+            };
+            service.export_traces(&tenant, req).await.unwrap();
+        }
+
+        let now_s = now / 1_000_000_000;
+        let mut calls = Vec::new();
+        for _ in 0..200 {
+            let view = map.view(tenant.as_str(), now_s - 600, now_s + 60).await;
+            calls = view
+                .edges
+                .iter()
+                .map(|(e, s)| {
+                    (
+                        format!("{:?} -> {:?}", e.caller, e.callee),
+                        s.client.calls,
+                        s.server.calls,
+                    )
+                })
+                .collect();
+            if !calls.is_empty() {
+                break;
+            }
+            tokio::time::sleep(std::time::Duration::from_millis(10)).await;
+        }
+        assert_eq!(calls.len(), 1, "{calls:?}");
+        assert!(
+            calls[0].0.contains("frontend") && calls[0].0.contains("checkout"),
+            "{calls:?}"
+        );
+        assert_eq!((calls[0].1, calls[0].2), (1, 1));
+        map.shutdown().await;
     }
 
     #[test]

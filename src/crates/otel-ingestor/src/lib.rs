@@ -32,12 +32,18 @@
 //!   normalize/compare/hash extensions), `output` (plugin-protocol
 //!   formatting).
 //! - Ledger wiring: `ledger_sender` (writer→ledger IPC events).
+//! - Observers: `observer` (features that see accepted trace exports without
+//!   taking part in storing them). The service map (`otel-service-map`) is
+//!   one; it also serves the ingestor's one Function, `topology:tracing`,
+//!   through `bridge::driver::CallDriver`.
 
 use std::sync::Arc;
 use std::time::{SystemTime, UNIX_EPOCH};
 
 use anyhow::{Context, Result};
 use bridge::config::{AuthConfig, LifecycleConfig, PluginConfig, ProtocolConfig};
+use bridge::driver::{CallDriver, CallResponse, oversized_result};
+use bridge::function::RawFunctionHandler;
 use bridge::signals::Signal;
 use bridge::{IngestorRequest, IngestorResponse};
 use ferryboat::{Connection, Endpoint};
@@ -56,6 +62,7 @@ mod iter;
 mod ledger_sender;
 mod logs_service;
 mod metrics_service;
+mod observer;
 mod otel;
 mod otlp_json;
 mod output;
@@ -230,14 +237,30 @@ async fn run_ingestor(
         identity,
     ));
 
-    let traces_service = Arc::new(create_traces_service(
+    let mut traces_service = create_traces_service(
         &traces_lifecycle,
         &config.auth,
         sender,
         seq,
         clock,
         identity,
-    ));
+    );
+    // The service map sees accepted trace exports through the observer seam
+    // and serves `topology:tracing`. It is optional: when it cannot start,
+    // ingestion goes on without it.
+    let service_map = start_service_map(&config.base_dir);
+    if let Some(map) = &service_map {
+        traces_service.add_observer(Arc::new(observer::ServiceMapObserver(Arc::clone(map))));
+    }
+    let traces_service = Arc::new(traces_service);
+    let mut handlers: Vec<Arc<dyn RawFunctionHandler>> = Vec::new();
+    if let Some(map) = &service_map {
+        handlers.push(Arc::new(otel_service_map::function::TopologyFunction::new(
+            Arc::clone(map),
+        )));
+    }
+    let (call_tx, mut call_rx) = tokio::sync::mpsc::unbounded_channel::<IngestorResponse>();
+    let mut calls = CallDriver::new(handlers, call_tx);
 
     // Startup config warnings, per signal (each signal resolves its own
     // rotation + ingestion window).
@@ -293,9 +316,9 @@ async fn run_ingestor(
 
     // Every fallible startup step is behind us and the listener is bound, so
     // this is the point at which the supervisor may advertise the plugin. The
-    // ingestor declares no Functions of its own; its Ready gates the ledger's.
+    // ingestor's Ready also gates the ledger's declarations.
     conn.send(IngestorResponse::Ready {
-        declarations: vec![],
+        declarations: calls.declarations(),
     })
     .await?;
     tracing::info!("signaled ready to supervisor");
@@ -336,23 +359,36 @@ async fn run_ingestor(
                             break;
                         }
                     }
-                    req = conn.recv() => {
-                        match req {
-                            Ok(IngestorRequest::Call { transaction, .. }) => {
-                                // No Functions are registered here — reply 404
-                                let resp = IngestorResponse::Result(netdata_plugin_types::FunctionResult {
-                                    transaction,
-                                    status: 404,
-                                    format: "text/plain".to_string(),
-                                    expires: 0,
-                                    payload: b"no functions registered".to_vec(),
-                                });
-                                if let Err(e) = conn.send(resp).await {
-                                    tracing::error!(%e, "failed to send result to supervisor");
-                                    break;
+                    Some(resp) = call_rx.recv() => {
+                        calls.finish(&resp);
+                        let transaction = resp.result().map(|r| r.transaction.clone());
+                        match conn.send(resp).await {
+                            // ferryboat checks the size before writing, so the
+                            // link is intact: answer with a small error instead
+                            // of tearing down the ingestor.
+                            Err(ferryboat::Error::MessageTooLarge { size, max }) => {
+                                tracing::error!("function response too large: {size} bytes exceeds {max} byte limit");
+                                if let Some(transaction) = transaction {
+                                    let resp = IngestorResponse::Result(oversized_result(transaction, size, max));
+                                    if let Err(e) = conn.send(resp).await {
+                                        tracing::error!(%e, "failed to send result to supervisor");
+                                        break;
+                                    }
                                 }
                             }
-                            Ok(IngestorRequest::Cancel { .. }) => {}
+                            Err(e) => {
+                                tracing::error!(%e, "failed to send result to supervisor");
+                                break;
+                            }
+                            Ok(()) => {}
+                        }
+                    }
+                    req = conn.recv() => {
+                        match req {
+                            Ok(IngestorRequest::Call { transaction, timeout, name, args, payload }) => {
+                                calls.call(transaction, timeout, name, args, payload);
+                            }
+                            Ok(IngestorRequest::Cancel { transaction }) => calls.cancel(&transaction),
                             Ok(IngestorRequest::Shutdown) => {
                                 tracing::info!("received Shutdown from supervisor");
                                 break;
@@ -374,7 +410,33 @@ async fn run_ingestor(
     tick_handle.abort();
     logs_sweep_handle.abort();
     traces_sweep_handle.abort();
+    if let Some(map) = service_map {
+        // Within the supervisor's 2 s shutdown window, which the ledger shares.
+        if tokio::time::timeout(SERVICE_MAP_SHUTDOWN_BUDGET, map.shutdown())
+            .await
+            .is_err()
+        {
+            tracing::warn!("service map: shutdown took too long; its open minutes are lost");
+        }
+    }
     Ok(())
+}
+
+const SERVICE_MAP_SHUTDOWN_BUDGET: std::time::Duration = std::time::Duration::from_secs(1);
+
+/// Starts the service map under `{base_dir}/service-map`, or logs why it
+/// cannot and returns `None`.
+fn start_service_map(
+    base_dir: &std::path::Path,
+) -> Option<Arc<otel_service_map::service::ServiceMap>> {
+    let config = otel_service_map::service::Config::new(base_dir.join("service-map"));
+    match otel_service_map::service::ServiceMap::start(config) {
+        Ok(map) => Some(Arc::new(map)),
+        Err(e) => {
+            tracing::error!(%e, "service map: cannot start; topology:tracing is not available");
+            None
+        }
+    }
 }
 
 /// Build the writer→ledger state shared by every ingestion signal: one

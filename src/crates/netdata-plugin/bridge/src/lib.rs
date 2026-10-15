@@ -83,8 +83,8 @@ pub enum IngestorRequest {
     /// a name declared in `Ready`; `args` and `payload` are forwarded
     /// unchanged.
     ///
-    /// The ingestor currently serves no functions and answers every call
-    /// with a 404 `Result`.
+    /// The ingestor serves `topology:tracing` (when its service map started)
+    /// and answers any other name with a 404 `Result`.
     Call {
         transaction: String,
         timeout: u32,
@@ -105,9 +105,8 @@ pub enum IngestorRequest {
 pub enum IngestorResponse {
     /// Startup fully succeeded; the declarations are what the supervisor may
     /// advertise to the agent. Sent once, as the reply to `Configure` — the
-    /// supervisor accepts no other message in between. The ingestor declares
-    /// no functions today; its `Ready` still gates when the ledger's
-    /// declarations are advertised.
+    /// supervisor accepts no other message in between. The ingestor's `Ready`
+    /// also gates when the ledger's declarations are advertised.
     Ready {
         declarations: Vec<FunctionDeclaration>,
     },
@@ -116,8 +115,7 @@ pub enum IngestorResponse {
     /// dropped.
     Result(FunctionResult),
     /// Progress update for a running function; `done`/`total` are forwarded
-    /// to the agent verbatim as the progress response's `done`/`all`. Not
-    /// produced today — the ingestor serves no functions.
+    /// to the agent verbatim as the progress response's `done`/`all`.
     Progress {
         transaction: String,
         done: usize,
