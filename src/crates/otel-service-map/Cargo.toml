@@ -16,6 +16,7 @@ bincode = { workspace = true }
 crc32fast = { workspace = true }
 opentelemetry-proto = { workspace = true }
 serde = { workspace = true, features = ["derive", "rc"] }
+tokio = { workspace = true }
 tracing = { workspace = true }
 
 [dev-dependencies]

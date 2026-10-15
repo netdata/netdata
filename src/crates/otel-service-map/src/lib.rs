@@ -11,6 +11,7 @@ pub mod engine;
 pub mod facts;
 pub mod histogram;
 pub mod peer;
+pub mod service;
 pub mod stats;
 pub mod store;
 pub mod view;
