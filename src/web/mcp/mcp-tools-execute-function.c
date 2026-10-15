@@ -1757,14 +1757,12 @@ static BUFFER *build_post_payload_with_selections(struct json_object *selections
         buffer_json_member_add_boolean(payload, "slice", true);
     }
     
-    // Build selections object - start with provided selections and add condition-based selections for has_history functions
+    // Build selections object - start with provided selections and add condition-based selections for has_history functions.
+    // The object is opened with its first entry: strict Functions (otel-traces) reject an empty "selections".
     bool selections_added = false;
     
     // For has_history functions, add selections based on conditions with == or match operators
     if (entry->has_history && data->request.conditions.count > 0) {
-        buffer_json_member_add_object(payload, "selections");
-        selections_added = true;
-        
         for (size_t i = 0; i < data->request.conditions.count; i++) {
             CONDITION *cond = &data->request.conditions.items[i];
             
@@ -1774,6 +1772,11 @@ static BUFFER *build_post_payload_with_selections(struct json_object *selections
             }
             
             const char *column_name = cond->column_name;
+            
+            if (cond->v_type == COND_VALUE_STRING && !selections_added) {
+                buffer_json_member_add_object(payload, "selections");
+                selections_added = true;
+            }
             
             if (cond->op == OP_EQUALS && cond->v_type == COND_VALUE_STRING) {
                 // Single value equality: key == value -> "key": ["value"]
@@ -1817,11 +1820,6 @@ static BUFFER *build_post_payload_with_selections(struct json_object *selections
     
     // Add user-provided selections if provided
     if (selections && json_object_is_type(selections, json_type_object)) {
-        if (!selections_added) {
-            buffer_json_member_add_object(payload, "selections");
-            selections_added = true;
-        }
-        
         struct json_object_iterator it = json_object_iter_begin(selections);
         struct json_object_iterator itEnd = json_object_iter_end(selections);
         
@@ -1829,9 +1827,14 @@ static BUFFER *build_post_payload_with_selections(struct json_object *selections
             const char *key = json_object_iter_peek_name(&it);
             struct json_object *val = json_object_iter_peek_value(&it);
             
-            if (!val) {
+            if (!val || !(json_object_is_type(val, json_type_string) || json_object_is_type(val, json_type_array))) {
                 json_object_iter_next(&it);
                 continue;
+            }
+            
+            if (!selections_added) {
+                buffer_json_member_add_object(payload, "selections");
+                selections_added = true;
             }
             
             if (json_object_is_type(val, json_type_string)) {

@@ -199,3 +199,142 @@ int mcp_execute_function_access_unittest(void) {
             __FUNCTION__, errors ? "FAILED" : "passed", errors, errors == 1 ? "" : "s");
     return errors;
 }
+
+// ----------------------------------------------------------------------------
+// The POST body sent to a v3 has_history Function carries "selections" only
+// when it holds an entry. A free-text "q" becomes a wildcard condition that
+// never turns into a selection, and Functions with a strict wire (otel-traces)
+// reject an empty "selections" object as an unknown field. The control
+// Function has a required parameter, so a caller's selection must still reach
+// its body.
+
+#define MCP_UT_PAYLOAD_FN "unittest-mcp-payload"
+#define MCP_UT_PAYLOAD_REQUIRED_FN "unittest-mcp-payload-required"
+
+static char mcp_ut_payload_seen[4096];
+static int mcp_ut_payload_calls = 0;
+
+static int mcp_ut_payload_cb(BUFFER *wb, const char *function,
+                             BUFFER *payload, const char *source __maybe_unused) {
+    buffer_flush(wb);
+    wb->content_type = CT_APPLICATION_JSON;
+    buffer_json_initialize(wb, "\"", "\"", 0, true, BUFFER_JSON_OPTIONS_MINIFY);
+
+    if (strstr(function, " info")) {
+        buffer_json_member_add_uint64(wb, "v", 3);
+        buffer_json_member_add_uint64(wb, "status", HTTP_RESP_OK);
+        buffer_json_member_add_string(wb, "type", "traces");
+        buffer_json_member_add_boolean(wb, "has_history", true);
+        buffer_json_member_add_string(wb, "help", "unittest payload function");
+        buffer_json_member_add_array(wb, "accepted_params");
+        buffer_json_add_array_item_string(wb, "after");
+        buffer_json_add_array_item_string(wb, "before");
+        buffer_json_add_array_item_string(wb, "last");
+        buffer_json_array_close(wb);
+        buffer_json_member_add_array(wb, "required_params");
+        if (strstr(function, MCP_UT_PAYLOAD_REQUIRED_FN)) {
+            buffer_json_add_array_item_object(wb);
+            buffer_json_member_add_string(wb, "id", "__source");
+            buffer_json_member_add_string(wb, "name", "source");
+            buffer_json_member_add_string(wb, "type", "select");
+            buffer_json_member_add_array(wb, "options");
+            buffer_json_add_array_item_object(wb);
+            buffer_json_member_add_string(wb, "id", "all");
+            buffer_json_member_add_string(wb, "name", "all");
+            buffer_json_object_close(wb);
+            buffer_json_array_close(wb);
+            buffer_json_object_close(wb);
+        }
+        buffer_json_array_close(wb);
+    }
+    else {
+        mcp_ut_payload_calls++;
+        strncpyz(mcp_ut_payload_seen, payload ? buffer_tostring(payload) : "",
+                 sizeof(mcp_ut_payload_seen) - 1);
+        buffer_json_member_add_uint64(wb, "status", HTTP_RESP_OK);
+        buffer_json_member_add_string(wb, "type", "traces");
+    }
+
+    buffer_json_finalize(wb);
+    return HTTP_RESP_OK;
+}
+
+int mcp_execute_function_payload_unittest(void) {
+    fprintf(stderr, "\n%s() running...\n", __FUNCTION__);
+
+    RRDHOST *host = localhost;
+    if (!host) {
+        fprintf(stderr, "  FAILED: localhost is NULL (rrd_init not prepared)\n");
+        return 1;
+    }
+
+    mcp_functions_registry_init();
+    nrpc_inflight_calls_create();
+
+    const char *names[] = { MCP_UT_PAYLOAD_FN, MCP_UT_PAYLOAD_REQUIRED_FN };
+    for (size_t i = 0; i < _countof(names); i++)
+        nrpc_method_register_builtin(&(struct nrpc_builtin_desc) {
+            .owner = rrdhost_nrpc_owner(host),
+            .name = names[i],
+            .help = "unittest payload function",
+            .tags = "traces",
+            .timeout_s = 10,
+            .priority = 0,
+            .version = 3,
+            .access = HTTP_ACCESS_NONE,
+            .handler = mcp_ut_payload_cb,
+        });
+
+    struct {
+        const char *function;
+        const char *selections;
+        const char *expected;
+    } cases[] = {
+        { MCP_UT_PAYLOAD_FN, NULL, NULL },
+        { MCP_UT_PAYLOAD_REQUIRED_FN, "{\"__source\":\"all\"}", "\"selections\":{\"__source\":[\"all\"]}" },
+    };
+
+    int errors = 0;
+    for (size_t i = 0; i < _countof(cases); i++) {
+        MCP_CLIENT *mcpc = mcp_create_client(MCP_TRANSPORT_HTTP, NULL);
+        USER_AUTH full;
+        memset(&full, 0, sizeof(full));
+        full.access = HTTP_ACCESS_ALL;
+        mcpc->user_auth = &full;
+
+        struct json_object *params = mcp_ut_params(rrdhost_hostname(host), cases[i].function);
+        json_object_object_add(params, "after", json_object_new_int(-3600));
+        json_object_object_add(params, "before", json_object_new_int(0));
+        json_object_object_add(params, "q", json_object_new_string("checkout"));
+        if (cases[i].selections)
+            json_object_object_add(params, "selections", json_tokener_parse(cases[i].selections));
+
+        mcp_ut_payload_calls = 0;
+        mcp_ut_payload_seen[0] = '\0';
+        (void) mcp_tool_execute_function_execute(mcpc, params, 0);
+
+        const char *found = strstr(mcp_ut_payload_seen, "\"selections\"");
+        if (mcp_ut_payload_calls != 1) {
+            fprintf(stderr, "  FAILED: %s: the data call ran %d time(s), expected 1\n",
+                    cases[i].function, mcp_ut_payload_calls);
+            errors++;
+        }
+        else if (cases[i].expected ? !strstr(mcp_ut_payload_seen, cases[i].expected) : found != NULL) {
+            fprintf(stderr, "  FAILED: %s: unexpected body %s\n", cases[i].function, mcp_ut_payload_seen);
+            errors++;
+        }
+        else
+            fprintf(stderr, "  OK: %s: %s\n", cases[i].function, mcp_ut_payload_seen);
+
+        json_object_put(params);
+        mcp_free_client(mcpc);
+    }
+
+    for (size_t i = 0; i < _countof(names); i++)
+        nrpc_method_unregister(rrdhost_nrpc_owner(host), names[i], NRPC_SOURCE_DAEMON);
+    mcp_functions_registry_cleanup();
+
+    fprintf(stderr, "%s() %s (%d error%s)\n\n",
+            __FUNCTION__, errors ? "FAILED" : "passed", errors, errors == 1 ? "" : "s");
+    return errors;
+}
