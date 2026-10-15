@@ -816,6 +816,11 @@ static inline bool query_instance_matches_labels(
     SIMPLE_PATTERN *chart_label_key_sp,
     struct pattern_array *labels_pa)
 {
+    // Without a label filter every instance matches. Do not read the labels then:
+    // an archived instance loads them from SQLite on first access.
+    if (!chart_label_key_sp && !labels_pa)
+        return true;
+
     RRDLABELS *labels = rrdinstance_labels(ri);
     if (chart_label_key_sp && rrdlabels_match_simple_pattern_parsed(labels, chart_label_key_sp, '\0', NULL) != SP_MATCHED_POSITIVE)
         return false;
