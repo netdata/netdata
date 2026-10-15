@@ -5,6 +5,6 @@
 // Called after nd-run applies its existing identity and environment policy.
 // The final NDTREE1 frame proves child exhaustion; helper exit alone does not.
 // NDTREE1 unavailable means setup failed before launch, with ECHILD verified.
-int nd_process_tree_run(int control_fd, int status_fd, char **command);
+int nd_process_tree_run(int control_fd, int status_fd, int completion_fd, const char *completion_id, char **command);
 
 #endif

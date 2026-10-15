@@ -15,6 +15,7 @@ import (
 )
 
 func (dcjc *DynCfgJobController) prepareMutation(
+	ctx context.Context,
 	scope lifecycle.ResourceTransactionScope,
 	current lifecycle.ReadyResource,
 	successor lifecycle.PreparedResource,
@@ -25,6 +26,7 @@ func (dcjc *DynCfgJobController) prepareMutation(
 	cleanup lifecycle.TaskCleanup,
 ) (lifecycle.PreparedResourceTransaction, error) {
 	return dcjc.prepareMutationWithRetry(
+		ctx,
 		scope,
 		current,
 		successor,
@@ -38,6 +40,7 @@ func (dcjc *DynCfgJobController) prepareMutation(
 }
 
 func (dcjc *DynCfgJobController) prepareMutationWithRetry(
+	ctx context.Context,
 	scope lifecycle.ResourceTransactionScope,
 	current lifecycle.ReadyResource,
 	successor lifecycle.PreparedResource,
@@ -49,6 +52,7 @@ func (dcjc *DynCfgJobController) prepareMutationWithRetry(
 	retry autoDetectionRetryToken,
 ) (lifecycle.PreparedResourceTransaction, error) {
 	return dcjc.prepareMutationWithRetryAfterApply(
+		ctx,
 		scope,
 		current,
 		successor,
@@ -58,11 +62,12 @@ func (dcjc *DynCfgJobController) prepareMutationWithRetry(
 		reply,
 		cleanup,
 		retry,
-		nil,
+		nil, jobConfigIntentDisable,
 	)
 }
 
 func (dcjc *DynCfgJobController) prepareMutationWithRetryAfterApply(
+	ctx context.Context,
 	scope lifecycle.ResourceTransactionScope,
 	current lifecycle.ReadyResource,
 	successor lifecycle.PreparedResource,
@@ -73,6 +78,7 @@ func (dcjc *DynCfgJobController) prepareMutationWithRetryAfterApply(
 	cleanup lifecycle.TaskCleanup,
 	retry autoDetectionRetryToken,
 	afterApply func(),
+	intent jobConfigIntentTransition,
 	failures ...collectorapi.JobConfigFailure,
 ) (lifecycle.PreparedResourceTransaction, error) {
 	jobConfig := preparedJobConfigLifecycleState(successor)
@@ -82,6 +88,7 @@ func (dcjc *DynCfgJobController) prepareMutationWithRetryAfterApply(
 		jobConfig.failure = failures[0]
 	}
 	return dcjc.prepareMutationWithRetryAfterApplyAndFallback(
+		ctx,
 		scope,
 		current,
 		successor,
@@ -92,13 +99,15 @@ func (dcjc *DynCfgJobController) prepareMutationWithRetryAfterApply(
 		cleanup,
 		retry,
 		afterApply,
-		jobConfig,
+		jobConfig, intent,
+		nil,
 		nil,
 		nil,
 	)
 }
 
 func (dcjc *DynCfgJobController) prepareMutationWithRetryAfterApplyAndFallback(
+	ctx context.Context,
 	scope lifecycle.ResourceTransactionScope,
 	current lifecycle.ReadyResource,
 	successor lifecycle.PreparedResource,
@@ -110,9 +119,11 @@ func (dcjc *DynCfgJobController) prepareMutationWithRetryAfterApplyAndFallback(
 	retry autoDetectionRetryToken,
 	afterApply func(),
 	jobConfig preparedJobConfigLifecycle,
+	intent jobConfigIntentTransition,
 	busyFallback *ResourceActivationFallback,
 	quarantinedFallback *ResourceActivationFallback,
-) (lifecycle.PreparedResourceTransaction, error) {
+	candidate *preparedJobCandidate,
+) (prepared lifecycle.PreparedResourceTransaction, resultErr error) {
 	if successor != nil && postimage != nil && postimage.Status == dyncfg.StatusAccepted.String() {
 		var config confgroup.Config
 		if err := yaml.Unmarshal(postimage.Payload, &config); err != nil {
@@ -146,36 +157,62 @@ func (dcjc *DynCfgJobController) prepareMutationWithRetryAfterApplyAndFallback(
 		}
 	}
 	dependencyCommit = composeAfterApply(dependencyCommit, jobConfigReconcile)
+	configIntent, err := dcjc.prepareJobConfigIntent(ctx, scope.ID, postimage, intent)
+	if err != nil {
+		if successor != nil {
+			err = rollbackSuccessorMutation(successor, err)
+		}
+		return nil, err
+	}
+	transferred := false
+	defer func() {
+		if !transferred {
+			resultErr = errors.Join(resultErr, configIntent.abort())
+			for _, fallback := range []*ResourceActivationFallback{busyFallback, quarantinedFallback} {
+				if fallback != nil {
+					resultErr = errors.Join(resultErr, fallback.configIntent.abort())
+				}
+			}
+		}
+	}()
+	for _, fallback := range []*ResourceActivationFallback{busyFallback, quarantinedFallback} {
+		if fallback == nil {
+			continue
+		}
+		fallback.configIntent, err = dcjc.prepareJobConfigIntent(ctx, scope.ID, fallback.Change.Config, intent)
+		if err != nil {
+			if successor != nil {
+				err = rollbackSuccessorMutation(successor, err)
+			}
+			return nil, err
+		}
+	}
+	// Admission can yield the graph claim after Check. Validate every captured
+	// dependency and candidate ownership only after all yielding work has finished.
+	if candidate != nil {
+		if _, err := candidate.inspect(); err != nil {
+			return nil, &candidatePreflightError{cause: err}
+		}
+	}
 	mutation, err := dcjc.graph.PrepareMutation([]dyncfg.GraphChange{{ID: scope.ID, Config: postimage}})
 	if errors.Is(err, dyncfg.ErrGraphNoChange) {
 		afterApply = composeAfterApply(afterApply, jobConfigReconcile)
-		if successor != nil || disposition == lifecycle.ResourceTransactionRemoved {
-			return dcjc.prepareResourceTransaction(
-				ResourceTransactionSpec{
-					Scope:                         scope,
-					Disposition:                   disposition,
-					Current:                       current,
-					Successor:                     successor,
-					UnusedPermit:                  unusedPermit,
-					Graph:                         dcjc.graph,
-					AfterGraphCommit:              dependencyCommit,
-					AfterApply:                    afterApply,
-					ActivationBusyFallback:        busyFallback,
-					ActivationQuarantinedFallback: quarantinedFallback,
-					Cleanup:                       cleanup,
-					reply:                         &reply,
-				},
-			)
-		}
-		// The graph already holds the adopted postimage.
-		return dcjc.noopWithAfterApply(
-			scope,
-			current,
-			unusedPermit,
-			reply.seal(transactionOutcome{}),
-			afterApply,
-			cleanup,
-		)
+		transaction, err := dcjc.prepareResourceTransaction(ResourceTransactionSpec{
+			Scope:                         scope,
+			Disposition:                   disposition,
+			Current:                       current,
+			Successor:                     successor,
+			UnusedPermit:                  unusedPermit,
+			Graph:                         dcjc.graph,
+			configIntent:                  configIntent,
+			AfterApply:                    afterApply,
+			ActivationBusyFallback:        busyFallback,
+			ActivationQuarantinedFallback: quarantinedFallback,
+			Cleanup:                       cleanup,
+			reply:                         &reply,
+		})
+		transferred = err == nil
+		return transaction, err
 	}
 	if err != nil {
 		if successor != nil {
@@ -183,7 +220,7 @@ func (dcjc *DynCfgJobController) prepareMutationWithRetryAfterApplyAndFallback(
 		}
 		return nil, err
 	}
-	return dcjc.prepareResourceTransaction(
+	transaction, prepareErr := dcjc.prepareResourceTransaction(
 		ResourceTransactionSpec{
 			Scope:                         scope,
 			Disposition:                   disposition,
@@ -194,6 +231,7 @@ func (dcjc *DynCfgJobController) prepareMutationWithRetryAfterApplyAndFallback(
 			Mutation:                      mutation,
 			MutationPrepared:              true,
 			AfterGraphCommit:              dependencyCommit,
+			configIntent:                  configIntent,
 			AfterApply:                    afterApply,
 			ActivationBusyFallback:        busyFallback,
 			ActivationQuarantinedFallback: quarantinedFallback,
@@ -201,6 +239,8 @@ func (dcjc *DynCfgJobController) prepareMutationWithRetryAfterApplyAndFallback(
 			reply:                         &reply,
 		},
 	)
+	transferred = prepareErr == nil
+	return transaction, prepareErr
 }
 
 func (dcjc *DynCfgJobController) newActivationFallback(
@@ -260,6 +300,7 @@ type activationFallbackPlan struct {
 }
 
 func (dcjc *DynCfgJobController) prepareMutationWithActivationFallbacks(
+	ctx context.Context,
 	scope lifecycle.ResourceTransactionScope,
 	current lifecycle.ReadyResource,
 	successor lifecycle.PreparedResource,
@@ -298,6 +339,7 @@ func (dcjc *DynCfgJobController) prepareMutationWithActivationFallbacks(
 		return nil, rollbackSuccessorMutation(successor, err)
 	}
 	return dcjc.prepareMutationWithRetryAfterApplyAndFallback(
+		ctx,
 		scope,
 		current,
 		successor,
@@ -308,9 +350,10 @@ func (dcjc *DynCfgJobController) prepareMutationWithActivationFallbacks(
 		cleanup,
 		retry,
 		afterApply,
-		jobConfig,
+		jobConfig, jobConfigIntentPreserve,
 		busyFallback,
 		quarantinedFallback,
+		nil,
 	)
 }
 
@@ -366,6 +409,7 @@ func (dcjc *DynCfgJobController) scheduleAutoDetectionRetry(config confgroup.Con
 }
 
 func (dcjc *DynCfgJobController) prepareTransientConstructionFailure(
+	ctx context.Context,
 	scope lifecycle.ResourceTransactionScope,
 	current lifecycle.ReadyResource,
 	permit lifecycle.LongLivedPermit,
@@ -378,6 +422,7 @@ func (dcjc *DynCfgJobController) prepareTransientConstructionFailure(
 ) (lifecycle.PreparedResourceTransaction, error) {
 	failure := transientActivationFailure(config, err)
 	return dcjc.prepareMutationWithRetryAfterApply(
+		ctx,
 		scope,
 		current,
 		nil,
@@ -389,12 +434,13 @@ func (dcjc *DynCfgJobController) prepareTransientConstructionFailure(
 		retry,
 		func() {
 			dcjc.scheduleAutoDetectionRetry(config, failure)
-		},
+		}, jobConfigIntentEnable,
 		jobConfigFailure(err, "construction"),
 	)
 }
 
 func (dcjc *DynCfgJobController) prepareProbeFailure(
+	ctx context.Context,
 	scope lifecycle.ResourceTransactionScope,
 	current lifecycle.ReadyResource,
 	permit lifecycle.LongLivedPermit,
@@ -422,6 +468,7 @@ func (dcjc *DynCfgJobController) prepareProbeFailure(
 		}
 	}
 	return dcjc.prepareMutationWithRetryAfterApplyAndFallback(
+		ctx,
 		scope,
 		current,
 		nil,
@@ -436,7 +483,8 @@ func (dcjc *DynCfgJobController) prepareProbeFailure(
 			identity: dcjc.postimageJobConfigLifecycleGraphState(postimage).identity,
 			snapshot: failure.jobConfigLifecycle,
 			failure:  failure.diagnosticFailure,
-		},
+		}, jobConfigIntentEnable,
+		nil,
 		nil,
 		nil,
 	)

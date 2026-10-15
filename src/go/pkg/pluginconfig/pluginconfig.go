@@ -97,6 +97,15 @@ func UserConfigDirs() multipath.MultiPath { return dirs.userConfigDirsClone() }
 func StockConfigDir() string              { return dirs.stockConfigDir }
 func ConfigDir() multipath.MultiPath      { return dirs.configDir() }
 
+// ResolveConfigDirs resolves installation configuration roots without initializing
+// process-wide plugin state. It uses the same environment, CLI precedence and
+// installation discovery as MustInit, including terminal and Windows handling.
+func ResolveConfigDirs(confDirs []string) multipath.MultiPath {
+	var d directories
+	d.initConfigRoots(InitInput{ConfDir: confDirs}, readEnvFromOS(executable.Directory), executable.Directory)
+	return d.configDir()
+}
+
 func CollectorsUserDirs() multipath.MultiPath { return dirs.collectorsUserDirsClone() }
 func CollectorsStockDir() string              { return dirs.collectorsStockDir }
 func CollectorsDir() multipath.MultiPath      { return dirs.collectorsDir() }
@@ -132,14 +141,18 @@ func (d *directories) serviceDiscoveryDir() multipath.MultiPath {
 }
 
 func (d *directories) build(input InitInput, env envData, execName, execDir string) error {
-	d.initUserRoots(input, env, execDir)
-	d.initStockRoot(env, execDir)
+	d.initConfigRoots(input, env, execDir)
 	d.deriveCollectors(execName)
 	d.deriveServiceDiscovery(execName)
 	d.initWatchPaths(input, env)
 	d.initVarLib(env)
 	d.initDataRoots(env, execDir)
 	return d.validate()
+}
+
+func (d *directories) initConfigRoots(input InitInput, env envData, execDir string) {
+	d.initUserRoots(input, env, execDir)
+	d.initStockRoot(env, execDir)
 }
 
 // Build step 1: initialize "user" roots as a multipath: CLI (highest), env, fallback.

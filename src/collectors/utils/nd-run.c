@@ -42,7 +42,7 @@ void show_help() {
     fprintf(stdout, "\n");
     fprintf(stdout, "Usage: nd-run command [args...]\n");
     fprintf(stdout, "       nd-run --preserve-env -- command [args...]\n");
-    fprintf(stdout, "       nd-run --supervise-tree <control-fd> <status-fd> -- command [args...] (Linux)\n");
+    fprintf(stdout, "       nd-run --supervise-tree <control-fd> <status-fd> [--completion <directory-fd> <id>] -- command [args...] (Linux)\n");
     fprintf(stdout, "\n");
     fprintf(stdout, "The default is a minimal environment. --preserve-env retains inherited application variables\n");
     fprintf(stdout, "for trusted commands, but USER, LOGNAME, HOME, SHELL and LC_ALL remain helper-controlled.\n");
@@ -248,20 +248,32 @@ int main(int argc, char *argv[]) {
     }
 
     bool supervise_tree = strcmp(argv[1], "--supervise-tree") == 0;
-    int control_fd = -1, status_fd = -1;
+    int control_fd = -1, status_fd = -1, completion_fd = -1;
+    const char *completion_id = NULL;
     if (supervise_tree) {
-        if (argc < 6 || strcmp(argv[4], "--") != 0)
-            fatal_msg("usage: nd-run --supervise-tree <control-fd> <status-fd> -- command [args...]");
-        int *fds[] = { &control_fd, &status_fd };
-        for (int i = 0; i < 2; i++) {
+        if (argc < 6)
+            fatal_msg("tree supervision requires protocol descriptors and a command");
+        int *fds[] = { &control_fd, &status_fd, &completion_fd };
+        int count = 2;
+        command = 5;
+        if (strcmp(argv[4], "--completion") == 0) {
+            if (argc < 9)
+                fatal_msg("tree completion requires a directory descriptor, id and command");
+            count = 3;
+            completion_id = argv[6];
+            command = 8;
+        }
+        if (strcmp(argv[command - 1], "--") != 0)
+            fatal_msg("tree supervision requires -- before command");
+        for (int i = 0; i < count; i++) {
+            const char *text = argv[i == 2 ? 5 : 2 + i];
             char *end;
             errno = 0;
-            long fd = strtol(argv[2 + i], &end, 10);
-            if (errno || end == argv[2 + i] || *end || fd < 3 || fd > INT_MAX)
+            long fd = strtol(text, &end, 10);
+            if (errno || end == text || *end || fd < 3 || fd > INT_MAX)
                 fatal_msg("tree protocol descriptors must be integers greater than 2");
             *fds[i] = (int)fd;
         }
-        command = 5;
     }
 
     struct passwd *pw = getpwnam(NETDATA_USER);
@@ -291,7 +303,7 @@ int main(int argc, char *argv[]) {
     environ = new_environ;
 
     if (supervise_tree)
-        return nd_process_tree_run(control_fd, status_fd, &argv[command]);
+        return nd_process_tree_run(control_fd, status_fd, completion_fd, completion_id, &argv[command]);
 
     // Exec the requested command (replaces the current process on success)
     execvp(argv[command], &argv[command]);

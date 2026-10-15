@@ -2089,6 +2089,7 @@ func TestPrepareMutationLeavesUnusedPermitForTaskSupervisor(t *testing.T) {
 	}
 
 	transaction, err := controller.prepareMutation(
+		t.Context(),
 		scope,
 		nil,
 		nil,
@@ -2124,6 +2125,7 @@ func TestPrepareMutationRollsBackAfterTransactionValidationFailure(t *testing.T)
 	}
 
 	transaction, err := controller.prepareMutation(
+		t.Context(),
 		scope,
 		nil,
 		successor,
@@ -2345,6 +2347,7 @@ func TestFailedAutoDetectionPublishesConfigLifecycleOnlyAfterGraphCommit(t *test
 		ID: config.FullName(),
 	}
 	removeTransaction, err := controller.prepareMutation(
+		t.Context(),
 		removeScope,
 		nil,
 		nil,

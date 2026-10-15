@@ -10,7 +10,7 @@ import "context"
 // platforms without the supported Linux supervisor.
 func StartUnprivilegedProcessTree(
 	ctx context.Context,
-	opts ProcessOptions,
+	opts TreeOptions,
 	binPath string,
 	args ...string,
 ) (*TreeProcess, error) {

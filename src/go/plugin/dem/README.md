@@ -446,30 +446,97 @@ Journey defaults to 900 seconds between attempts and a 120-second admitted timeo
 One plugin-wide admission slot serializes expensive runs. Waiting time is separate from execution time; cancellation
 while waiting starts no browser. A fresh browser is created for each run.
 
-Browser jobs currently require Linux amd64 or arm64 and an unprivileged plugin identity. Prepare Node 24 or newer,
-full Chromium, its system libraries and compatible sandbox support. Chromium sandboxing stays enabled; setup refusal
-appears as execution inability. Containers need namespace/seccomp support for the sandbox. The plugin does not install
-packages or download browsers. Restart the plugin after changing `runtime` paths in `dem.conf`.
+Browser jobs require Linux amd64 or arm64 and an unprivileged plugin identity. Chromium sandboxing stays enabled;
+containers need compatible namespace/seccomp support. RUM does not require a browser runtime.
 
-The installed `plugins.d/dem/package.json` and `package-lock.json` pin `@playwright/test`/Playwright 1.63.0,
-Lighthouse 13.4.1 and Chrome Launcher 1.2.1. Copy both files into a prepared dependency directory, then run `npm ci
---omit=dev --ignore-scripts` there with the compatible Node version. Prepare the full Chromium revision 1243
-(version 153.0.8010.12) from that Playwright release; Lighthouse needs the full browser rather than only its headless
-shell. The pinned CLI supports `node node_modules/playwright/cli.js install --no-shell chromium` for operator-managed
-installation. Install system libraries using the release's documented platform prerequisites. Make the dependency and
-browser files readable/executable by the service account, then set absolute paths:
+### Runtime setup and retirement
+
+Browser runtime delivery is experimental. DEM is disabled by default at build time. This tree provides preparation,
+execution and retirement, but no bundle builder, release artifacts or manifest installation. Development deployments
+must supply a trusted manifest and its matching bundle. Packaging and independent runtime releases are separate work;
+the current Agent-owned adapters and exact component pins are temporary. Browser jobs cannot run without those inputs.
+
+Managed mode is the default. Accepting an enabled journey or Lighthouse configuration requests its exact runtime;
+validation and disabled configurations do not download it. Preparation runs separately from website monitoring.
+An unavailable runtime leaves the monitor waiting for its dependency; it does not produce website failure measurements.
+Downloads can be disabled by the administrator:
 
 ```yaml
 runtime:
-  node_path: /usr/bin/node
-  dependencies_path: /opt/netdata-dem
-  browser_path: /opt/netdata-dem/browsers/chromium-1243/chrome-linux64/chrome
+  mode: managed
+  allow_download: false
+  max_bytes: 4294967296
+  previous_retention_days: 7
+  idle_retention_days: 30
 ```
 
-The browser executable's directory varies by architecture and installation location; use the actual full Chromium
-path. Do not configure the headless-shell executable. Check validates preparation without executing a workflow.
-Prepared packages and installed runner assets are read-only during execution; generated config, caches, profiles and
-output are confined to a private run directory.
+Managed setup reads a trusted `plugins.d/dem/runtime-<architecture>.json` manifest identifying the archive, digest,
+size limits and executable layout. The administrator must supply this file, or select an absolute `manifest_path`
+in `dem.conf`. Monitor configuration cannot choose a download URL. A checkout or package without that manifest reports
+setup unavailability; it does not guess a source or fetch a different browser.
+
+The cache defaults to `NETDATA_LIB_DIR/dem/runtime`. Its 4 GiB allowance includes preparation reservations. Known
+enabled monitors protect their runtime; every probe and browser invocation also has an independent execution pin.
+Unneeded previous generations get a 7-day grace and idle runtimes 30 days, with hourly cleanup. Storage pressure can
+shorten either grace. Protected demand and executions can exceed the allowance. If child completion cannot be proved,
+the plugin stops and retains the execution's protection; an arbitrary timeout is not permission to remove its files.
+
+This is an ordinary cache: startup cleanup or another consumer can remove an expired generation before saved monitor
+enables arrive. Online setup can download it again; offline setup reports unavailability. For guaranteed offline
+availability across that gap, use an administrator-owned preload as described below. Restart the plugin after changing
+runtime configuration; an Agent upgrade requiring a new runtime needs that exact archive available online or imported.
+
+Run administration commands as the consuming service account, with the same configuration and library directory:
+
+```sh
+dem.plugin runtime status
+dem.plugin runtime prepare
+dem.plugin runtime import --archive /absolute/path/runtime.tar.gz
+dem.plugin runtime qualify
+```
+
+`status` reports cache inventory and whether the selected archive is prepared, without downloading or launching a
+browser. `prepare` uses only the installed manifest's URL; `import` verifies an offline archive against that same trust.
+`qualify` runs a local sandboxed Playwright journey through the actual supervisor and reports qualification separately
+from preparation. It does not download missing files. `--config-dir`, `--manifest`, `--cache` and `--assets` support
+explicit installation paths; paths must be absolute. Configuration lookup follows normal plugin startup:
+`--config-dir` takes priority while retaining the selected user and stock roots; environment roots replace build
+roots, with the same installation fallbacks when neither is set. As at normal startup, terminal sessions ignore
+configuration-root environment variables; use `--config-dir` for an explicit administrator directory in that case.
+Explicit `--manifest`, `--cache` and `--allow-download` values override the loaded configuration. Cache inventory and
+maintenance errors remain separate from monitor outcomes. CLI inventory is a storage observation, not the running plugin's live preparation status.
+
+With an explicitly supplied manifest and matching bundle, the same managed store can be used in native, Docker,
+static and source-build layouts. This does not establish production delivery or qualification for those methods.
+The bundle supplies private Node, Chromium libraries, fonts and JavaScript dependencies; preparation does not install
+host packages or modify installed adapters. Persist the cache in Docker if it should survive container replacement.
+A development image can instead include a preload at its final path:
+
+```sh
+dem.plugin runtime preload --root /opt/netdata-dem-runtime --archive /absolute/path/runtime.tar.gz
+```
+
+The root must be new or empty. Use the returned `runtime.mode: preloaded` configuration:
+
+```yaml
+runtime:
+  mode: preloaded
+  preload_path: /opt/netdata-dem-runtime
+```
+
+Both modes require the installed trusted runtime manifest. If the preload command uses an explicit `--manifest`,
+its returned configuration includes that `manifest_path`. A preload must match the required bundle and remain at its
+final path; moving it or upgrading to an Agent requiring a different bundle makes it unavailable. Prepare the new
+bundle at a new final path and switch configuration after stopping all consumers of the old preload.
+
+Preloads are outside automatic retirement, and managed-cache operations refuse their roots. Keep the directory
+privately owned by the consuming service account. It may be mounted read-only for execution. Stop every consumer
+before replacing or removing its files. This supports controlled offline images and read-only deployments while
+using the same qualified bundle as managed mode. Separately installed Node, npm packages or browsers cannot be selected.
+
+`runtime status` checks prepared identity without starting a browser; `runtime qualify` tests a local sandboxed
+browser under its calling account. Qualification still needs to run under the target service's sandbox and security
+policy; a successful image build does not establish host compatibility.
 
 Configure exactly one of inline `script` or absolute `script_path` in `dem/journey.conf`. Standard named imports from
 `@playwright/test` and destructured CommonJS `require` use the real pinned package. JS/TS, mjs/mts and cjs/cts entries,
@@ -503,7 +570,7 @@ start are distinct from a failed target. A workflow failure means a declared che
 The static `dem_journey_failed` template warns on the latest fresh failed/timed-out observation. A new successful
 observation clears it. Unknown, inconclusive, execution error, cancellation and observations older than two native
 intervals are UNDEFINED, not recovery. Replacement/restart begins unknown until a new observation. Critical escalation
-and configurable sensitivity are left for a separate alert-policy decision. Native job status shows preparation errors;
+and configurable sensitivity are left for a separate alert-policy decision. Native job status identifies unavailable dependencies; plugin logs explain runtime preparation errors.
 Functions show current execution and retained diagnosis.
 
 Lighthouse performance is a desktop lab score in points from 0 to 100; FCP, LCP, TBT and Speed Index are milliseconds,

@@ -25,7 +25,7 @@ import (
 	"golang.org/x/sys/unix"
 )
 
-func compileTreeHelper(t *testing.T) string {
+func compileTreeHelper(t testing.TB) string {
 	t.Helper()
 	cc, err := exec.LookPath("cc")
 	if err != nil {
@@ -158,7 +158,7 @@ func TestProcessTreeActualDescendants(t *testing.T) {
 			ctx, cancel := context.WithCancel(context.Background())
 			defer cancel()
 			args := treePayloadArgs(test.mode, dir)
-			process, err := startProcessTree(ctx, helper, ProcessOptions{
+			process, err := startProcessTree(ctx, helper, TreeOptions{
 				Stdin: stdin,
 			}, os.Args[0], args...)
 			require.NoError(t, err)
@@ -206,7 +206,7 @@ func TestProcessTreeCommandOutcomeAndPrivateProtocol(t *testing.T) {
 	defer output.Close()
 	process, err := StartUnprivilegedProcessTree(
 		context.Background(),
-		ProcessOptions{
+		TreeOptions{
 			Stdout: output,
 		},
 		"/bin/sh",
@@ -228,7 +228,7 @@ func TestProcessTreeCommandOutcomeAndPrivateProtocol(t *testing.T) {
 	missing, err := startProcessTree(
 		context.Background(),
 		helper,
-		ProcessOptions{},
+		TreeOptions{},
 		"/netdata-tree-fixture-does-not-exist",
 	)
 	require.NoError(t, err)
@@ -245,7 +245,7 @@ func TestProcessTreeMissingCompletionIsNotDrain(t *testing.T) {
 		t.Run(strconv.Itoa(len(script)), func(t *testing.T) {
 			helper := filepath.Join(t.TempDir(), "broken-helper")
 			require.NoError(t, os.WriteFile(helper, []byte("#!/bin/sh\n"+script+"\n"), 0700))
-			process, err := startProcessTree(context.Background(), helper, ProcessOptions{}, "unused")
+			process, err := startProcessTree(context.Background(), helper, TreeOptions{}, "unused")
 			require.NoError(t, err)
 			result := process.Wait()
 			assert.False(t, result.Drained)
@@ -257,13 +257,13 @@ func TestProcessTreeMissingCompletionIsNotDrain(t *testing.T) {
 func TestProcessTreePreCanceledAndMissingHelper(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	cancel()
-	process, err := startProcessTree(ctx, "missing", ProcessOptions{}, "unused")
+	process, err := startProcessTree(ctx, "missing", TreeOptions{}, "unused")
 	assert.Nil(t, process)
 	assert.ErrorIs(t, err, context.Canceled)
 	process, err = startProcessTree(
 		context.Background(),
 		filepath.Join(t.TempDir(), "missing"),
-		ProcessOptions{},
+		TreeOptions{},
 		"unused",
 	)
 	assert.Nil(t, process)
@@ -281,7 +281,7 @@ func TestProcessTreeConcurrentWaitClose(t *testing.T) {
 	process, err := startProcessTree(
 		context.Background(),
 		helper,
-		ProcessOptions{
+		TreeOptions{
 			Stdin: stdin,
 		},
 		os.Args[0],
@@ -325,7 +325,7 @@ func TestTreeCompletionRejectsNonterminalAndExtraFrames(t *testing.T) {
 func TestProcessTreeUnavailableIsDrainedSetupFailure(t *testing.T) {
 	helper := filepath.Join(t.TempDir(), "unavailable-helper")
 	require.NoError(t, os.WriteFile(helper, []byte("#!/bin/sh\nprintf 'NDTREE1 unavailable\\n' >&4\nexit 126\n"), 0700))
-	process, err := startProcessTree(context.Background(), helper, ProcessOptions{}, "unused")
+	process, err := startProcessTree(context.Background(), helper, TreeOptions{}, "unused")
 	require.NoError(t, err)
 	result := process.Wait()
 	assert.True(t, result.Drained)

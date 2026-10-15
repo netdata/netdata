@@ -7,7 +7,6 @@ import (
 
 	"github.com/netdata/netdata/go/plugins/pkg/multipath"
 	"github.com/netdata/netdata/go/plugins/plugin/dem/journal"
-	"github.com/netdata/netdata/go/plugins/plugin/dem/synthetic/runner"
 	"gopkg.in/yaml.v2"
 )
 
@@ -18,7 +17,7 @@ type RetentionConfig struct {
 type Config struct {
 	History   RetentionConfig `yaml:"history"`
 	Artifacts RetentionConfig `yaml:"artifacts"`
-	Runtime   runner.Config   `yaml:"runtime"`
+	Runtime   RuntimeConfig   `yaml:"runtime"`
 }
 
 func DefaultConfig() Config {
@@ -27,15 +26,18 @@ func DefaultConfig() Config {
 			Days:     7,
 			MaxBytes: 2 << 30,
 		},
-		Runtime: runner.Config{
-			NodePath: "/usr/bin/node",
-		},
+		Runtime: DefaultRuntimeConfig(),
 		History: RetentionConfig{
 			Days:     30,
 			MaxBytes: 1 << 30,
 		},
 	}
 }
+
+// Runtime validation must not decode settings owned by other configuration readers.
+type opaqueConfigValue struct{}
+
+func (*opaqueConfigValue) UnmarshalYAML(func(any) error) error { return nil }
 
 // LoadConfig reads the same highest-priority dem.conf as the Agent. Framework
 // fields are decoded by the Agent; this owner decodes process runtime and retention policy.
@@ -52,14 +54,27 @@ func LoadConfig(paths multipath.MultiPath) (Config, error) {
 	if err != nil {
 		return cfg, err
 	}
+	// Decode the original document strictly for runtime settings, including merges
+	// and aliases, while leaving other sections opaque to this schema.
+	runtimeInput := struct {
+		Runtime RuntimeConfig                `yaml:"runtime"`
+		Other   map[string]opaqueConfigValue `yaml:",inline"`
+	}{Runtime: cfg.Runtime}
+	if err = yaml.UnmarshalStrict(data, &runtimeInput); err != nil {
+		return cfg, fmt.Errorf("read dem.conf runtime settings: %w", err)
+	}
 	if err = yaml.Unmarshal(data, &cfg); err != nil {
 		return cfg, fmt.Errorf("read dem.conf: %w", err)
 	}
+	cfg.Runtime = runtimeInput.Runtime
 	if err = cfg.History.validate(journal.MinHistoryBytes); err != nil {
 		return cfg, fmt.Errorf("history.%w", err)
 	}
 	if err = cfg.Artifacts.validate(1); err != nil {
 		return cfg, fmt.Errorf("artifacts.%w", err)
+	}
+	if err = cfg.Runtime.validate(); err != nil {
+		return cfg, fmt.Errorf("runtime.%w", err)
 	}
 	return cfg, nil
 }

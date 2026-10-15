@@ -64,6 +64,7 @@ type DynCfgJobController struct {
 	diagnostics      jobmgr.DiagnosticObserver // operational log sink
 	commands         jobmgr.PreparedCommandPort
 	restartObservers restartObservers
+	configIntents    jobConfigIntentIndex
 	scheduler        *Scheduler // tick + retry scheduler
 }
 
@@ -238,11 +239,18 @@ func (dcjc *DynCfgJobController) Prepare(
 	case dyncfg.CommandRestart:
 		transaction, err = dcjc.prepareRestart(ctx, target, record, exists, current, scope, permit)
 	case dyncfg.CommandDisable:
-		transaction, err = dcjc.prepareDisable(target, record, exists, current, scope)
+		transaction, err = dcjc.prepareDisable(ctx, target, record, exists, current, scope)
 	case dyncfg.CommandRemove:
-		transaction, err = dcjc.prepareRemove(target, record, exists, current, scope)
+		transaction, err = dcjc.prepareRemove(ctx, target, record, exists, current, scope)
 	default:
 		transaction, err = dcjc.reject(scope, current, permit, notImplementedFailure(target.command))
+	}
+	var admission *configIntentAdmissionError
+	if errors.As(err, &admission) && ctx.Err() == nil && !lifecycle.OwnershipRetained(err) {
+		if rejection, ok := preparationFailure(classifyActivationError(err),
+			validationBusyMessage, validationBusyMessage, validationBusyMessage); ok {
+			transaction, err = dcjc.rejectKeeping(scope, current, permit, rejection, dyncfg.Status(record.Status))
+		}
 	}
 	return dcjc.observeTransaction(target.command, target.resourceID, transaction, err)
 }

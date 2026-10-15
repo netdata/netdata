@@ -20,8 +20,9 @@ import (
 func TestDiscoveredTrustRevocationRequiresPipelineIdentity(t *testing.T) {
 	for name, test := range map[string]struct {
 		incumbentID, replacementID, replacementSource string
-		revoked                                       bool
+		revoked, missingRuntime                       bool
 	}{
+		"same pipeline missing runtime":       {incumbentID: "pipeline-a", replacementID: "pipeline-a", revoked: true, missingRuntime: true},
 		"same pipeline":                       {incumbentID: "pipeline-a", replacementID: "pipeline-a", revoked: true},
 		"same pipeline changed target source": {incumbentID: "pipeline-a", replacementID: "pipeline-a", replacementSource: "changed-source", revoked: true},
 		"competing pipeline same source":      {incumbentID: "pipeline-a", replacementID: "pipeline-b"},
@@ -32,7 +33,9 @@ func TestDiscoveredTrustRevocationRequiresPipelineIdentity(t *testing.T) {
 	} {
 		t.Run(name, func(t *testing.T) {
 			controller, graph, _, _, state := newDynCfgJobTestHarness(t)
+			owner := &intentTestOwner{}
 			creator := controller.modules["module"]
+			creator.JobConfigIntent = owner
 			creator.Create = func() collectorapi.CollectorV1 {
 				charts := collectorapi.Charts{}
 				module := state.module(nil, false)
@@ -92,6 +95,10 @@ func TestDiscoveredTrustRevocationRequiresPipelineIdentity(t *testing.T) {
 
 			// The same duration is valid when resolved, but cannot decode as literal syntax.
 			config.SetTrustDiscoveredTargets(false)
+			if test.missingRuntime {
+				creator.ActivationDependencies = intentAdmissionDependencies(true)
+				controller.modules["module"] = creator
+			}
 			config.SetDiscoveryPipelineID(test.replacementID)
 			if test.replacementSource != "" {
 				config.SetSource(test.replacementSource)
@@ -128,6 +135,8 @@ func TestDiscoveredTrustRevocationRequiresPipelineIdentity(t *testing.T) {
 			stored, err := graphRecordConfig(record)
 			require.NoError(t, err)
 			require.False(t, stored.TrustDiscoveredTargets())
+			_, _, _, enabled := owner.snapshot()
+			require.Zero(t, enabled, "revoked invalid configuration must release acquisition authority")
 			require.False(t, dependencies.Affects("vault:main", config.FullName(), true))
 			require.Equal(t, 1, acquisitions)
 			require.EqualValues(t, lifecycle.LongLivedCensus{}, tasks.LongLivedCensus())
