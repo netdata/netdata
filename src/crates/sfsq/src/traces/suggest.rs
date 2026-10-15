@@ -781,6 +781,14 @@ mod tests {
             ),
             "the mark alone does not lengthen the walk"
         );
+        offer_key(
+            &mut set,
+            &matcher,
+            render,
+            AttributeOwner::Span,
+            &code,
+            info(false),
+        );
         let name = AttributeKey::Builtin(BuiltinField::Name);
         offer_key(
             &mut set,

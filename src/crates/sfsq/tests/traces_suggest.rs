@@ -457,8 +457,9 @@ fn a_tails_key_tier_follows_its_value_count() {
 }
 
 /// A key is numeric when any visited source stored a number (an `Int` or
-/// `Double`) under it, mixed with text or not, sealed or tail; builtins
-/// never are, whatever their storage holds.
+/// `Double`) under it, mixed with text in the same source or not, sealed
+/// or tail, whichever source in the walk holds the number; builtins never
+/// are, whatever their storage holds.
 #[test]
 fn a_key_is_numeric_when_any_source_stored_a_number() {
     let dir = tempfile::tempdir().unwrap();
@@ -466,18 +467,31 @@ fn a_key_is_numeric_when_any_source_stored_a_number() {
     old.attrs = vec![
         kv_int("code", 200),
         kv_int("mixed", 3),
+        kv_str("late", "z"),
         kv_str("label", "a"),
+        kv_int("both", 1),
     ];
-    // Sources are visited newest first: `mixed` arrives as text, and
-    // the older file's number must still mark it.
+    // One source holding a key as a number and as text: the coalesced
+    // kind is text, the mark stays.
+    let mut old_text = sp(4, 0, (BASE_S + 10) * 1_000_000_000, "op");
+    old_text.attrs = vec![kv_str("both", "x")];
+    // Sources are visited newest first: `mixed` arrives as text and the
+    // older file's number must still mark it; `late` arrives as a number
+    // and the older file's text must not unmark it.
     let mut new = sp(2, 0, (BASE_S + 20) * 1_000_000_000, "op");
-    new.attrs = vec![kv_str("mixed", "x")];
+    new.attrs = vec![kv_str("mixed", "x"), kv_int("late", 7)];
     new.events = vec![("retry", vec![kv_int("attempt", 2)])];
     let mut tail = sp(3, 0, (BASE_S + 30) * 1_000_000_000, "op");
-    tail.attrs = vec![kv_double("ratio", 0.5), kv_str("tail_label", "b")];
-    let old = write_wal(dir.path(), vec![req(&[old])], "old");
+    tail.attrs = vec![
+        kv_double("ratio", 0.5),
+        kv_str("tail_label", "b"),
+        kv_int("tail_both", 1),
+    ];
+    let mut tail_text = sp(5, 0, (BASE_S + 30) * 1_000_000_000, "op");
+    tail_text.attrs = vec![kv_str("tail_both", "y")];
+    let old = write_wal(dir.path(), vec![req(&[old, old_text])], "old");
     let new = write_wal(dir.path(), vec![req(&[new])], "new");
-    let tail = write_wal(dir.path(), vec![req(&[tail])], "tail");
+    let tail = write_wal(dir.path(), vec![req(&[tail, tail_text])], "tail");
     let data = run(
         vec![
             sealed_source(dir.path(), &old, "old"),
@@ -496,7 +510,15 @@ fn a_key_is_numeric_when_any_source_stored_a_number() {
     numeric.sort();
     assert_eq!(
         numeric,
-        ["event.attempt", "span.code", "span.mixed", "span.ratio"]
+        [
+            "event.attempt",
+            "span.both",
+            "span.code",
+            "span.late",
+            "span.mixed",
+            "span.ratio",
+            "span.tail_both",
+        ]
     );
     for text in ["span.label", "span.tail_label", "name", "kind", "status"] {
         assert!(data.items.iter().any(|s| s.text == text), "{text} is a key");

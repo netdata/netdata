@@ -187,7 +187,8 @@ all.
 - `--deadline-ms` — stop after this number of milliseconds.
 
 Each suggestion is one line: `<text> match=<class>`, then `tier=…` for a
-key, and `truncated` when the text is cut for display. The last line gives
+key, `truncated` when the text is cut for display, and `numeric` for a key
+that holds numbers. The last line gives
 the count, the `truncated` flag, the status, `complete after <unix second>`
 when a limit stopped the walk (the files that it read hold all spans from
 that second), and the time.
