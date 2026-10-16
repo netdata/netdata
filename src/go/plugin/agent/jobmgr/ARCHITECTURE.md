@@ -553,6 +553,12 @@ Source policy lives in `joboutput/candidate_controller.go`; `joboutput/candidate
 releases execution effects after commit. `joboutput/accepted_activation.go` retains contained execution, dependency
 waits and physical-release waits. It does not own another desired-config queue.
 
+Source reconciliation separates arbitration from recovery. Arbitration consumes source history and selects or
+proposes ownership; every exit then reconciles the surviving continuation's execution and deadline. A protected
+interactive DynCfg binding or masked source choice cannot bypass this recovery step. Grant withdrawal changes only
+the affected candidate's authority and retry facts; it does not reset the job's finite pass or another owner's wake.
+Revoked pass members are skipped while surviving members keep their position ahead of later arrivals.
+
 ### Exposed collector binding
 
 The single DynCfg collector/name describes one authoritative admitted candidate. Raw GET, CONFIG source metadata,
@@ -895,6 +901,14 @@ retry of that candidate, while eligible siblings may still receive their initial
   a collector's Check never blocks deadline delivery for an unrelated job.
 - Identical inventory, sibling changes and rejected proposals do not reset another candidate's cooldown. Explicit
   fresh ENABLE resets attempt facts; disable/removal/supersession/run retirement revokes old deadline capabilities.
+- Exact DynCfg recovery uses its admitted binding; source alternatives use the admitted continuation's tier. While
+  a higher-source proposal is pending, its predecessor keeps its own recovery scope until admission. Removing a
+  historical earliest grant recomputes the surviving deadline even when the proposal prevents immediate execution.
+  An unchanged deadline retains its wake capability. A consumed due wake is not rearmed while a proposal blocks
+  execution; candidate due facts remain available when the proposal resolves.
+- Passive, disabled, readiness-closed and manual-stop continuations have no ordinary wake. Framework retry keeps
+  its authorized Active candidate's exact deadline; dependency waits and quarantine cannot start sibling recovery.
+  The pending-proposal deadline scan runs during source reconciliation, outside readiness and wake settlement.
 - Readiness closes automatic recovery, including after-ready failure observed before Running publication. Exact
   RESTART and dependency resume stay pinned to their stored config rather than opening sibling search.
 
@@ -930,6 +944,8 @@ that binding, runtime, dependencies and acquisition intent. Metadata quarantine 
 Invalid metadata remains unpublishable; a metadata-valid replacement whose literal preparation fails can subsequently
 be exposed as Failed/manual source revocation. Unrelated or unidentified pipelines cannot withdraw the incumbent's
 permission. Historical-only withdrawal preserves an unrelated exposed binding and its remaining recovery deadlines.
+Those deadlines belong to the surviving continuation, including an interactive exact DynCfg override; source masking
+cannot skip recovery projection before executor effects commit.
 
 The controller consumes permission facts by membership incarnation against the preceding complete inventory, including
 each ordered observation in a batch. Repeated full snapshots cannot reapply an old opt-out against a later legitimate

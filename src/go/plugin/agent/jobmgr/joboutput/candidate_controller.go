@@ -530,8 +530,6 @@ func (c *candidateController) foldInventory(d *candidateDelta, inv DiscoveredJob
 	}
 	if r.Active != nil && (!candidateAuthorized(r, r.Active.Token.Candidate) || r.entry(r.Active.Token.Candidate).Rejected) {
 		r.Active = nil
-		r.Pass = nil
-		r.PassCursor = 0
 		r.Wake = nil
 		d.Decision.Wake = nil
 		r.FrameworkBlocked = false
@@ -711,6 +709,17 @@ func candidateSourceChoice(r *candidateRecord) *sourceSelection {
 }
 
 func (c *candidateController) reconcileSource(d *candidateDelta, now int64) error {
+	if err := c.arbitrateSource(d); err != nil {
+		return err
+	}
+	if err := c.progress(d, now); err != nil {
+		return err
+	}
+	return c.reconcileProposalWake(d, now)
+}
+
+// Source selection cannot bypass recovery of the surviving continuation.
+func (c *candidateController) arbitrateSource(d *candidateDelta) error {
 	r := d.after
 	choice := candidateSourceChoice(r)
 	var observation *sourceObservation
@@ -720,7 +729,6 @@ func (c *candidateController) reconcileSource(d *candidateDelta, now int64) erro
 	changed := !equalSourceObservation(r.Cursor, observation)
 	r.Cursor = observation
 	if r.Phase == candidateBlocked {
-		d.Decision.Wake = r.Wake
 		return nil
 	}
 	if r.Binding != nil && r.Binding.Config.SourceType() == confgroup.TypeDyncfg && !r.entry(r.Binding.Key).SourceOwned {
@@ -730,7 +738,7 @@ func (c *candidateController) reconcileSource(d *candidateDelta, now int64) erro
 	if r.Binding != nil && candidateSourceBlocked(r, r.Binding.Key) {
 		current := r.Binding.Config.SourceTypePriority()
 		if choice == nil || choice.Observation.Priority <= current {
-			return c.progress(d, now)
+			return nil
 		}
 	}
 	if choice == nil {
@@ -740,17 +748,17 @@ func (c *candidateController) reconcileSource(d *candidateDelta, now int64) erro
 			c.revoke(r)
 			d.Decision.Revoke = true
 		}
-		return c.progress(d, now)
+		return nil
 	}
 	e := choice.Member
 	if e == nil {
-		return c.progress(d, now)
+		return nil
 	}
 	if r.Binding != nil && r.Binding.Key == choice.Observation.Key {
-		return c.progress(d, now)
+		return nil
 	}
 	if !changed && r.Binding == nil {
-		return c.progress(d, now)
+		return nil
 	}
 	if r.Proposal != nil && r.Proposal.Token.Candidate == choice.Observation.Key {
 		return nil
@@ -758,7 +766,7 @@ func (c *candidateController) reconcileSource(d *candidateDelta, now int64) erro
 	// Same-tier additions belong to an existing open search. A still-observed
 	// admitted incumbent is sticky even if an alternative's UID sorts first.
 	if r.Binding != nil && candidateAuthorized(r, r.Binding.Key) && r.entry(r.Binding.Key).Observed && r.Binding.Config.SourceTypePriority() >= e.Candidate.Config.SourceTypePriority() {
-		return c.progress(d, now)
+		return nil
 	}
 	if !r.Inventory.AutoEnable {
 		c.revoke(r)
@@ -1297,7 +1305,10 @@ func (c *candidateController) resumeCandidate(d *candidateDelta, work *candidate
 
 func (c *candidateController) progress(d *candidateDelta, now int64) error {
 	r := d.after
-	if r.Enablement != candidateEnabled || r.SearchClosed || r.Manual != candidateManualNone || r.Active != nil || r.Proposal != nil || r.Phase == candidateBlocked {
+	if !r.recoveryOpen() {
+		return c.reconcileWake(d, 0, false)
+	}
+	if r.Active != nil || r.Proposal != nil || r.Phase == candidateBlocked {
 		d.Decision.Wake = r.Wake
 		return nil
 	}
@@ -1311,21 +1322,11 @@ func (c *candidateController) progress(d *candidateDelta, now int64) error {
 		r.tierDirty = false
 	}
 	tier := r.owningTier
-	eligible := func(key candidateKey) bool {
-		e := r.entry(key)
-		if e == nil || e.Rejected || !candidateAuthorized(r, key) {
-			return false
-		}
-		if r.Scope == candidateExactConfig {
-			return r.Binding != nil && key == r.Binding.Key
-		}
-		return e.SourceOwned && e.Candidate.Config.SourceTypePriority() == tier
-	}
 	for {
 		for r.PassCursor < len(r.Pass) {
 			key := r.Pass[r.PassCursor]
 			r.PassCursor++
-			if !eligible(key) {
+			if !r.recoveryEligible(key, tier) {
 				continue
 			}
 			e := r.editEntry(key)
@@ -1355,7 +1356,7 @@ func (c *candidateController) progress(d *candidateDelta, now int64) error {
 		var earliest int64
 		hasFuture := false
 		for key, e := range r.entries() {
-			if !eligible(key) {
+			if !r.recoveryEligible(key, tier) {
 				continue
 			}
 			if e.Initial {
@@ -1386,22 +1387,67 @@ func (c *candidateController) progress(d *candidateDelta, now int64) error {
 			continue
 		}
 		if hasFuture {
-			if r.Wake == nil || r.Wake.Due != earliest {
-				generation, err := c.next()
-				if err != nil {
-					return err
-				}
-				r.Wake = &candidateWake{Token: candidateWakeToken{Run: c.run, Intent: r.Intent, Schedule: generation}, Due: earliest}
-			}
 			r.Phase = candidateRetryWait
-			d.Decision.Wake = r.Wake
 		} else {
-			r.Wake = nil
 			r.Phase = candidateFailedManual
-			d.Decision.Wake = nil
 		}
+		return c.reconcileWake(d, earliest, hasFuture)
+	}
+}
+
+func (r *candidateRecord) recoveryOpen() bool {
+	return r.Enablement == candidateEnabled && !r.SearchClosed && r.Manual == candidateManualNone
+}
+
+func (r *candidateRecord) recoveryEligible(key candidateKey, tier int) bool {
+	e := r.entry(key)
+	if e == nil || e.Rejected || !candidateAuthorized(r, key) {
+		return false
+	}
+	if r.Scope == candidateExactConfig {
+		return r.Binding != nil && key == r.Binding.Key
+	}
+	return e.SourceOwned && e.Candidate.Config.SourceTypePriority() == tier
+}
+
+// A tentative higher source does not own its predecessor's retry scope. This
+// population scan runs during source reconciliation, never on a consumed wake
+// or readiness settlement, and cannot start a second executor.
+func (c *candidateController) reconcileProposalWake(d *candidateDelta, now int64) error {
+	r := d.after
+	if !r.recoveryOpen() || r.Proposal == nil || r.Active != nil || r.Binding == nil {
 		return nil
 	}
+	tier := r.Binding.Config.SourceTypePriority()
+	var earliest int64
+	hasDue := false
+	for key, entry := range r.entries() {
+		if entry.HasDue && r.recoveryEligible(key, tier) && (!hasDue || entry.Due < earliest) {
+			earliest = entry.Due
+			hasDue = true
+		}
+	}
+	// Once the heap consumes a due capability, retain the candidate's deadline
+	// facts without rearming it while the proposal still prevents execution.
+	if hasDue && earliest <= now && r.Wake == nil {
+		return nil
+	}
+	return c.reconcileWake(d, earliest, hasDue)
+}
+
+func (c *candidateController) reconcileWake(d *candidateDelta, due int64, scheduled bool) error {
+	r := d.after
+	if !scheduled {
+		r.Wake = nil
+	} else if r.Wake == nil || r.Wake.Due != due {
+		generation, err := c.next()
+		if err != nil {
+			return err
+		}
+		r.Wake = &candidateWake{Token: candidateWakeToken{Run: c.run, Intent: r.Intent, Schedule: generation}, Due: due}
+	}
+	d.Decision.Wake = r.Wake
+	return nil
 }
 
 func prepareCandidateRecord(source *candidateRecord) *candidateRecord {
@@ -1620,7 +1666,7 @@ func (r *candidateRecord) withdrawTrust(withdrawals map[string]*sourceObservatio
 	if len(withdrawals) == 0 {
 		return false
 	}
-	changed, withdrewBinding := false, false
+	withdrewBinding := false
 	for key, entry := range r.entries() {
 		config := entry.Candidate.Config
 		withdrawal := withdrawals[config.DiscoveryPipelineID()]
@@ -1631,16 +1677,10 @@ func (r *candidateRecord) withdrawTrust(withdrawals map[string]*sourceObservatio
 		entry.Admitted = false
 		entry.GrantIntent = 0
 		entry.HasDue = false
-		changed = true
 		if r.Binding != nil && r.Binding.Key == key {
 			r.TrustWithdrawal = withdrawal
 			withdrewBinding = true
 		}
-	}
-	if changed && !r.FrameworkBlocked {
-		r.Pass = nil
-		r.PassCursor = 0
-		r.Wake = nil
 	}
 	return withdrewBinding
 }
