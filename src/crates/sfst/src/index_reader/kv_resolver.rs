@@ -16,9 +16,12 @@
 //! - mid tier: the field's own FST, decoded without its position bitmaps;
 //! - high tier: the field's sorted columnar chunk, by index.
 //!
-//! One resolver per file, owned by its caller: each chunk decodes on first
-//! use and stays until the resolver is dropped, so a caller with a bounded
-//! loaded layer (the trace session) frees it with that layer. An id no
+//! One resolver per file, owned by its caller. Through
+//! [`key_into`](KvResolver::key_into) each chunk decodes on first use and
+//! stays until the resolver is dropped, so a caller with a bounded loaded
+//! layer (the trace session) frees it with that layer;
+//! [`strings`](KvResolver::strings) (a logs page's ids) frees each field's
+//! chunk before the next one decodes. An id no
 //! dictionary covers (past the file's ids, or a corrupt cardinality) is
 //! unresolved, never an error; a chunk that fails to decode is an error
 //! and is not cached.
@@ -59,6 +62,12 @@ pub(crate) struct KvResolver {
     /// Chunk decodes that failed, for the same tests.
     #[cfg(test)]
     pub(crate) failed_loads: usize,
+    /// Mid/high chunks held now, and the most held at once, for the same
+    /// tests.
+    #[cfg(test)]
+    resident: usize,
+    #[cfg(test)]
+    pub(crate) peak_resident: usize,
 }
 
 impl KvResolver {
@@ -94,16 +103,9 @@ impl KvResolver {
         id: u32,
         key: &mut Vec<u8>,
     ) -> Result<bool, crate::Error> {
-        if self.starts.is_empty() {
-            self.init(reader);
-        }
-        let total = *self.starts.last().expect("init pushes the total");
-        if id >= total {
+        let Some(i) = self.field_of(reader, id) else {
             return Ok(false);
-        }
-        // The last field starting at or before `id`: a field of zero
-        // cardinality shares its start with the next and is skipped.
-        let i = self.starts.partition_point(|&start| start <= id) - 1;
+        };
         let offset = id - self.starts[i];
         let field = &mut self.fields[i];
         match field.tier {
@@ -136,6 +138,8 @@ impl KvResolver {
                     {
                         if decoded.is_ok() {
                             self.loads += 1;
+                            self.resident += 1;
+                            self.peak_resident = self.peak_resident.max(self.resident);
                         } else {
                             self.failed_loads += 1;
                         }
@@ -154,6 +158,8 @@ impl KvResolver {
                     {
                         if decoded.is_ok() {
                             self.loads += 1;
+                            self.resident += 1;
+                            self.peak_resident = self.peak_resident.max(self.resident);
                         } else {
                             self.failed_loads += 1;
                         }
@@ -175,6 +181,13 @@ impl KvResolver {
     }
 
     /// `ids` resolved to strings (lossy UTF-8); unresolved ids are left out.
+    ///
+    /// A field's chunk is freed before the next field's decodes. Sorted ids
+    /// (a logs page) visit each field once, so the call holds one chunk at
+    /// a time instead of every chunk the page touches: on wide high-card
+    /// rows that is dozens of multi-MB chunks, which double a page's peak
+    /// memory and are returned to the OS and refaulted on every page.
+    /// Unsorted ids resolve the same, re-decoding a revisited field.
     pub(crate) fn strings(
         &mut self,
         reader: &IndexReader<'_>,
@@ -182,12 +195,40 @@ impl KvResolver {
     ) -> Result<HashMap<u32, String>, crate::Error> {
         let mut out = HashMap::with_capacity(ids.len());
         let mut key = Vec::new();
+        let mut current = None;
         for &id in ids {
+            if let Some(i) = self.field_of(reader, id)
+                && let Some(prev) = current.replace(i)
+                && prev != i
+            {
+                self.unload(prev);
+            }
             if self.key_into(reader, id, &mut key)? {
                 out.insert(id, String::from_utf8_lossy(&key).into_owned());
             }
         }
         Ok(out)
+    }
+
+    /// Free field `i`'s dictionary.
+    fn unload(&mut self, i: usize) {
+        #[cfg(test)]
+        if matches!(self.fields[i].dict, Dict::Mid(_) | Dict::High(_)) {
+            self.resident -= 1;
+        }
+        self.fields[i].dict = Dict::Unloaded;
+    }
+
+    /// The index of `id`'s field, or `None` for an id at or past the
+    /// file's total.
+    fn field_of(&mut self, reader: &IndexReader<'_>, id: u32) -> Option<usize> {
+        if self.starts.is_empty() {
+            self.init(reader);
+        }
+        let total = *self.starts.last().expect("init pushes the total");
+        // The last field starting at or before `id`: a field of zero
+        // cardinality shares its start with the next and is skipped.
+        (id < total).then(|| self.starts.partition_point(|&start| start <= id) - 1)
     }
 
     fn init(&mut self, reader: &IndexReader<'_>) {

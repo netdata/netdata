@@ -738,8 +738,8 @@ impl<'a> IndexReader<'a> {
     /// (mid-tier ones without their position bitmaps); each KvId is then a
     /// position lookup (`KvResolver`), so cost scales with the page's
     /// content, not the file's attribute space. Callers should still batch
-    /// a page's worth of positions into one call: the decoded chunks are
-    /// shared within it.
+    /// a page's worth of positions into one call: each touched chunk then
+    /// decodes once, and is freed before the next one decodes.
     pub fn materialize_rows(
         &self,
         positions: &[u32],

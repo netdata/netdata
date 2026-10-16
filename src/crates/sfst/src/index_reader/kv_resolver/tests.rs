@@ -9,7 +9,8 @@
 //!   for it;
 //! - ids at or past the file's total stay unresolved;
 //! - the answer does not depend on lookup order, and each mid/high chunk
-//!   decodes once per resolver.
+//!   decodes once per resolver;
+//! - `strings` over sorted ids (a logs page) holds one chunk at a time.
 //!
 //! The rollup ref resolver, which answers through this one, keeps its
 //! closed partition: a proven value in every tier, `Corrupt` across
@@ -125,6 +126,17 @@ fn assert_equivalent(bytes: &[u8], rows: &[Vec<String>]) {
     assert_eq!(
         kv.loads, chunks,
         "`strings`, as `materialize_rows` calls it"
+    );
+    assert!(
+        kv.peak_resident <= 1,
+        "`strings` holds one chunk at a time, held {}",
+        kv.peak_resident
+    );
+    let mut unsorted = KvResolver::new();
+    assert_eq!(
+        unsorted.strings(&idx, &shuffled(total)).unwrap(),
+        strings,
+        "`strings` does not depend on id order"
     );
     for (r, (ids, want)) in entries.iter().zip(rows).enumerate() {
         let mut got: Vec<&str> = ids.iter().map(|id| strings[&id.0].as_str()).collect();
