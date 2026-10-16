@@ -51,8 +51,8 @@ func TestDynamicChecksReplaceOnlyChangedFamily(t *testing.T) {
 	require.NotEmpty(t, alphaID)
 	require.NotEmpty(t, betaID)
 	changed := strings.ReplaceAll(strings.ReplaceAll(alphaCheck, "Check Alpha", "Renamed Alpha"), "queue", "host")
-	replaceResponse(t, path, checksFrame(changed, betaCheck))
 	out.Reset()
+	replaceResponse(t, path, checksFrame(changed, betaCheck))
 	tickUntil(t, job, func() bool { return strings.Contains(out.String(), "'Renamed Alpha'") })
 	wire := out.String()
 	assert.NotContains(t, wire, "CHART '"+betaID+"'", "unchanged sibling keeps its chart lifecycle")
@@ -61,9 +61,8 @@ func TestDynamicChecksReplaceOnlyChangedFamily(t *testing.T) {
 	assert.False(t, obsoleteChart(wire, betaID))
 	renamedID := chartWithTitle(wire, "Renamed Alpha")
 	require.NotEmpty(t, renamedID)
-	replaceResponse(t, path, checksFrame(betaCheck))
 	out.Reset()
-	// The reported CI run exceeded the shared three-second deadline here.
+	replaceResponse(t, path, checksFrame(betaCheck))
 	tickUntilWithin(t, job, 10*time.Second, func() bool { return obsoleteChart(out.String(), renamedID) })
 	assert.False(t, obsoleteChart(out.String(), betaID))
 	assert.Contains(t, out.String(), "BEGIN '"+betaID+"'")
@@ -80,8 +79,8 @@ func TestDynamicChecksEmptySnapshotRemovesChecks(t *testing.T) {
 			tickUntil(t, job, func() bool { return strings.Contains(out.String(), "SET 'critical' = 1") })
 			id := chartWithTitle(out.String(), "Check Alpha")
 			require.NotEmpty(t, id)
-			replaceResponse(t, path, response)
 			out.Reset()
+			replaceResponse(t, path, response)
 			tickUntil(t, job, func() bool { return obsoleteChart(out.String(), id) })
 			assert.NotContains(t, out.String(), "SET 'ok' = 1", "disappearance is not recovery")
 		})
@@ -110,8 +109,8 @@ func TestDynamicChecksFailedFramesDoNotPublishDefinitions(t *testing.T) {
 			tickUntil(t, job, func() bool { return strings.Contains(out.String(), "SET 'failed' = 1") })
 			assert.Equal(t, uint64(0), c.store.(metrix.DescriptorRetention).SuccessfulCommits())
 			assert.NotContains(t, out.String(), "Failed Alpha")
-			replaceResponse(t, path, checksFrame(betaCheck))
 			out.Reset()
+			replaceResponse(t, path, checksFrame(betaCheck))
 			tickUntil(t, job, func() bool { return strings.Contains(out.String(), "'Check Beta'") })
 			assert.NotContains(
 				t,
@@ -154,8 +153,8 @@ func TestContractsOutputRejectionStillCommitsContract(t *testing.T) {
 	tickUntil(t, job, func() bool { return out.rejected.Load() > 0 })
 	before := c.store.(metrix.DescriptorRetention).SuccessfulCommits()
 	require.Positive(t, before)
-	replaceResponse(t, path, contractFrame("changed", `[{"value":9}]`))
 	out.Reset()
+	replaceResponse(t, path, contractFrame("changed", `[{"value":9}]`))
 	tickUntil(t, job, func() bool {
 		select {
 		case err := <-observed.failures:
@@ -206,13 +205,13 @@ func TestDynamicChecksFailedReplacementPreservesCharts(t *testing.T) {
 	alphaID, betaID := chartWithTitle(first, "Check Alpha"), chartWithTitle(first, "Check Beta")
 	require.NotEmpty(t, alphaID)
 	require.NotEmpty(t, betaID)
-	replaceResponse(t, path, checksFrame(strings.Replace(alphaCheck, "Check Alpha", "Failed replacement", 1)))
 	out.Reset()
+	replaceResponse(t, path, checksFrame(strings.Replace(alphaCheck, "Check Alpha", "Failed replacement", 1)))
 	tickUntil(t, job, func() bool { return strings.Contains(out.String(), "SET 'failed' = 1") })
 	assert.NotContains(t, out.String(), "Failed replacement")
 	assert.False(t, obsoleteChart(out.String(), betaID), "failed omission must not obsolete a sibling")
-	replaceResponse(t, path, original)
 	out.Reset()
+	replaceResponse(t, path, original)
 	tickUntil(t, job, func() bool { return strings.Contains(out.String(), "SET 'critical' = 1") })
 	assert.NotContains(
 		t,

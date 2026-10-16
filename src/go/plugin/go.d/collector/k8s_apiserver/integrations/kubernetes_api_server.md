@@ -224,8 +224,17 @@ The following alerts are available:
 
 | Alert name  | On metric | Description |
 |:------------|:----------|:------------|
-| [ k8s_apiserver_request_errors ](https://github.com/netdata/netdata/blob/master/src/health/health.d/k8s_apiserver.conf) | k8s_apiserver.requests_by_code | high rate of API server request errors (5xx responses) |
-| [ k8s_apiserver_latency ](https://github.com/netdata/netdata/blob/master/src/health/health.d/k8s_apiserver.conf) | k8s_apiserver.request_latency | API server request latency is high |
+| [ k8s_apiserver_1m_requests ](https://github.com/netdata/netdata/blob/master/src/health/health.d/k8s_apiserver.conf) | k8s_apiserver.requests_total | number of API server requests in the last minute |
+| [ k8s_apiserver_dropped_requests ](https://github.com/netdata/netdata/blob/master/src/health/health.d/k8s_apiserver.conf) | k8s_apiserver.requests_dropped | API server dropped requests in the last minute due to overload |
+| [ k8s_apiserver_5xx_errors ](https://github.com/netdata/netdata/blob/master/src/health/health.d/k8s_apiserver.conf) | k8s_apiserver.requests_by_code | Percentage of 5xx server error responses over the last minute |
+| [ k8s_apiserver_4xx_errors ](https://github.com/netdata/netdata/blob/master/src/health/health.d/k8s_apiserver.conf) | k8s_apiserver.requests_by_code | Percentage of 4xx client error responses over the last minute (excluding 401/403) |
+| [ k8s_apiserver_latency_10m ](https://github.com/netdata/netdata/blob/master/src/health/health.d/k8s_apiserver.conf) | k8s_apiserver.request_latency | average API server request latency (p99) over the last 10 minutes |
+| [ k8s_apiserver_latency_high ](https://github.com/netdata/netdata/blob/master/src/health/health.d/k8s_apiserver.conf) | k8s_apiserver.request_latency | API server request latency (p99) over the last minute |
+| [ k8s_apiserver_inflight_mutating ](https://github.com/netdata/netdata/blob/master/src/health/health.d/k8s_apiserver.conf) | k8s_apiserver.inflight_requests | Average number of mutating requests currently in flight over the last minute (default limit is 600) |
+| [ k8s_apiserver_inflight_readonly ](https://github.com/netdata/netdata/blob/master/src/health/health.d/k8s_apiserver.conf) | k8s_apiserver.inflight_requests | Average number of read-only requests currently in flight over the last minute (default limit is 1000) |
+| [ k8s_apiserver_workqueue_depth ](https://github.com/netdata/netdata/blob/master/src/health/health.d/k8s_apiserver.conf) | k8s_apiserver.workqueue_depth | Average depth of controller work queue over the last minute |
+| [ k8s_apiserver_goroutines ](https://github.com/netdata/netdata/blob/master/src/health/health.d/k8s_apiserver.conf) | k8s_apiserver.goroutines | Average number of goroutines over the last 5 minutes |
+| [ k8s_apiserver_open_fds_utilization ](https://github.com/netdata/netdata/blob/master/src/health/health.d/k8s_apiserver.conf) | k8s_apiserver.open_fds | Percentage of file descriptors used by the API server |
 
 
 

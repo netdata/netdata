@@ -4,6 +4,8 @@
 
 static void system_info_cleanup(void *ptr) {
     struct netdata_static_thread *thread = CLEANUP_FUNCTION_GET_PTR(ptr);
+    if(!thread) return;
+
     thread->enabled = NETDATA_MAIN_THREAD_EXITED;
 }
 

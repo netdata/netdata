@@ -393,10 +393,6 @@ struct rrdeng_global_stats {
 
     /* number of File-Descriptors that have been reserved by dbengine */
     PAD64(rrdeng_stats_t) rrdeng_reserved_file_descriptors;
-
-    /* inability to flush global counters */
-    PAD64(rrdeng_stats_t) global_pg_cache_over_half_dirty_events;
-    PAD64(rrdeng_stats_t) global_flushing_pressure_page_deletions; /* number of deleted pages */
 };
 
 extern struct rrdeng_global_stats global_stats;

@@ -630,10 +630,10 @@ The following alerts are available:
 
 | Alert name  | On metric | Description |
 |:------------|:----------|:------------|
-| [ am_nat_gateway_datapath_availability ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_nat_gateway.conf) | azure_monitor.nat_gateway.datapath_availability | NAT Gateway availability on ${label:resource_name} |
-| [ am_nat_gateway_dropped_packets ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_nat_gateway.conf) | azure_monitor.nat_gateway.dropped_packets | NAT Gateway packet drops on ${label:resource_name} |
-| [ am_nat_gateway_snat_connections ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_nat_gateway.conf) | azure_monitor.nat_gateway.snat_connections | NAT Gateway SNAT connections on ${label:resource_name} |
-| [ am_nat_gateway_total_connections ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_nat_gateway.conf) | azure_monitor.nat_gateway.total_connections | NAT Gateway total connections on ${label:resource_name} |
+| [ am_nat_gateway_datapath_availability ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_nat_gateway.conf) | azure_monitor.nat_gateway.datapath_availability | Datapath availability of NAT Gateway ${label:resource_name} in ${label:resource_group} (${label:region}). Values below 100% indicate packet loss through the gateway. |
+| [ am_nat_gateway_dropped_packets ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_nat_gateway.conf) | azure_monitor.nat_gateway.dropped_packets | Packets being dropped by NAT Gateway ${label:resource_name} in ${label:resource_group} (${label:region}). Drops indicate SNAT port exhaustion or connection limit reached. |
+| [ am_nat_gateway_snat_connections ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_nat_gateway.conf) | azure_monitor.nat_gateway.snat_connections | SNAT connection count on NAT Gateway ${label:resource_name} in ${label:resource_group} (${label:region}). Azure limit is 2 million connections per gateway. |
+| [ am_nat_gateway_total_connections ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_nat_gateway.conf) | azure_monitor.nat_gateway.total_connections | Total SNAT connection count on NAT Gateway ${label:resource_name} in ${label:resource_group} (${label:region}). Azure limit is 2 million connections per gateway. |
 
 
 

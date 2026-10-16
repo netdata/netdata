@@ -284,6 +284,11 @@ it adds no scheduler, worker, per-task heap object, or population scan.
   Functions" cap**. `lifecycle/task.go`.
 - **An ordinary timed-out run task keeps run ownership.** The kernel only cooperatively cancels it; its claims, lane,
   and resource authority stay held until it returns, and repeated overruns can escalate to fail-stop.
+- **Queued cooperative deadline work retains its required start.** While the run is active, a Function with
+  `CooperativeDeadline` whose deadline the kernel has processed keeps its lane position and starts with
+  `context.DeadlineExceeded` when its lane and claims become available. A later cancellation preserves that required
+  start. Cancellation processed before timeout removes queued work without starting it and answers `499`.
+  `kernel_disposal.go`, `kernel_dispatch.go`.
 - **A contained attempt keeps process ownership instead.** Its caller, claims, and run may settle after the
   containment cut because late output and mutation cannot escape the process-owned attempt boundary. The physical
   worker may still finish state private to that attempt; the boundary prevents publication, re-entry, or reuse until
@@ -603,7 +608,11 @@ flowchart TD
      already matches. A runtime is passed only when readiness commits Running; failed candidates leave no runtime reference behind. Replacement/removal reconciles
      the prior incarnation from the graph preimage. Hook panic is fail-open and cannot change candidate, graph, or
      cleanup behavior. This is a latest-state projection, not an event bus or retry history.
-4. **Accept and retire** — a successful preflight candidate remains process-owned while a short transaction commits
+4. **Accept and retire** — after every admission step that yields graph claims (including configuration-intent
+   reservation), revalidate the candidate's process ownership, Store snapshot and vnode lifetime before preparing
+   graph adoption. A stale candidate aborts its unused reservation and follows the same source-specific failure
+   policy as preflight: interactive rejection preserves the incumbent; discovery retains its dependency wait or
+   pending rebuild policy. A successful preflight candidate remains process-owned while a short transaction commits
    Accepted and transfers it to accepted activation. Replacement fences the incumbent's ordinary output and detaches
    its run projections immediately; its physical managed loop, `Stop`, Function drain, and collector cleanup remain
    process-owned until they return. An aborted acceptance releases its candidate without replacing the incumbent.
@@ -717,7 +726,9 @@ the plugin restarts. Echo replies update status or record rejection without repl
   hold the reply. The accepted replacement has no incumbent fallback. An identical running DynCfg payload retains its
   current runtime and returns `200`.
 - **ENABLE.** Running is already satisfied (`200`). Other stored configurations accept enabled intent (`202`) through
-  a short transaction. Construction, readiness and resulting health settle afterward. Repeated ENABLE coalesces.
+  a short transaction. If the collector declares a configuration-intent resource owner, new acquisition authority
+  first requires pure raw validation (`400` for malformed input, `503` if validation is unavailable). Construction,
+  readiness and resulting health settle afterward. Repeated ENABLE coalesces.
 - **Other mutations.** Disabled UPDATE, DISABLE and REMOVE return `200` when applied. Runtime quarantine discovered
   after an accepted UPDATE is reported through later failed status and diagnostics; the mutation reply remains `202`.
 - **Informative commands.** TEST preserves its validation/error codes. RESTART runs a response-free resource transaction
@@ -734,6 +745,26 @@ cancellation, and deadlines through the actual kernel.
 
 `accepted` covers passive registration and enabled work that is staging, waiting, or starting. The activation index and
 current resource distinguish enabled intent; a passive registration never starts merely because a dependency appears.
+
+Collectors with `JobConfigIntentOwner` reserve resources only after structural validation of each changed enabled
+identity. This admission gate covers discovery, Enable and failure adoption, independently of missing dependencies
+or a quarantined candidate. Pure configuration validation and owner reservation run in the same separate contained
+operation outside the graph claim, so neither supersedes a candidate awaiting handoff. The stage owns its reservation
+until graph claims are reacquired and the result is taken. Taking a reservation does not authorize a stale
+preflight candidate: candidate validity is checked again before any graph or incumbent change. Cancellation,
+rejection and failed claim reacquisition abort a late or untaken reservation inside the physical attempt; process
+shutdown joins that cleanup. Same-job
+mutations remain serialized while unrelated graph work can proceed. Unchanged identity and retirement do not
+repeat validation callbacks. Retirement calls the intent owner's Prepare with a zero next identity, then Commit to
+release intent. Retirement preparation, Commit and Abort perform bounded in-memory ownership changes. The owner may
+queue physical cleanup on its maintenance worker; cleanup failures remain visible through owner health and final
+joined close. Operational failure/retry retains valid intent. The owning discovery pipeline can still
+revoke trust with an invalid postimage; that Failed adoption retires both the incumbent and acquisition intent.
+
+If admission validation or reservation is busy or times out, discovery retains unaccepted desired work until that
+exact admission attempt releases, preserving the incumbent. A quarantined admission identity rejects that revision.
+Interactive commands reject unavailable admission without changing state. Neither path grants acquisition before
+validation completes. No dependency lookup, reference resolution, Init or Check is part of this admission proof.
 
 - A short accepted mutation arms `{run epoch, config UID, activation generation}` only after commit. The worker builds
   and probes outside the Function request, graph claim, and resource lane. Fresh construction waits for predecessor

@@ -220,7 +220,7 @@ The following alerts are available:
 | [ rabbitmq_node_network_partition_status ](https://github.com/netdata/netdata/blob/master/src/health/health.d/rabbitmq.conf) | rabbitmq.node_network_partition_status | RabbitMQ network partition detected (node ${label:node} cluster ${label:cluster_id}) |
 | [ rabbitmq_node_mem_alarm_status_triggered ](https://github.com/netdata/netdata/blob/master/src/health/health.d/rabbitmq.conf) | rabbitmq.node_mem_alarm_status | RabbitMQ mem alarm triggered (node ${label:node} cluster ${label:cluster_id}) |
 | [ rabbitmq.node_disk_free_alarm_status_triggered ](https://github.com/netdata/netdata/blob/master/src/health/health.d/rabbitmq.conf) | rabbitmq.node_disk_free_alarm_status | RabbitMQ disk free alarm triggered (node ${label:node} cluster ${label:cluster_id}) |
-| [ rabbitmq_vhost_status_unhealthy ](https://github.com/netdata/netdata/blob/master/src/health/health.d/rabbitmq.conf) | rabbitmq.vhost_status | RabbitMQ vhost is not healthy (vhost ${label:vhost} cluster ${label:cluster_id}) |
+| [ rabbitmq_vhost_status_unhealthy ](https://github.com/netdata/netdata/blob/master/src/health/health.d/rabbitmq.conf) | rabbitmq.vhost_status | RabbitMQ vhost is unhealthy (vhost ${label:vhost} cluster ${label:cluster_id}) |
 | [ rabbitmq_queue_status_minority ](https://github.com/netdata/netdata/blob/master/src/health/health.d/rabbitmq.conf) | rabbitmq.queue_status | RabbitMQ queue insufficient online members (queue ${label:queue} node ${label:node} cluster ${label:cluster_id}) |
 | [ rabbitmq_queue_status_unhealthy ](https://github.com/netdata/netdata/blob/master/src/health/health.d/rabbitmq.conf) | rabbitmq.queue_status | RabbitMQ queue is unhealthy (queue ${label:queue} node ${label:node} cluster ${label:cluster_id}) |
 

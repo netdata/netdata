@@ -69,8 +69,7 @@ static inline int rrdmetric_to_json_callback(const DICTIONARY_ITEM *item, void *
 
     if(t->chart_dimensions
        && !simple_pattern_matches_string(t->chart_dimensions, rm->id)
-       && rm->name != rm->id
-       && !simple_pattern_matches_string(t->chart_dimensions, rm->name))
+       && (rm->name == rm->id || !simple_pattern_matches_string(t->chart_dimensions, rm->name)))
         return 0;
 
     if(t->written) {
@@ -131,7 +130,10 @@ static inline int rrdinstance_to_json_callback(const DICTIONARY_ITEM *item, void
     if(before && (!ri->first_time_s || before < ri->first_time_s))
         return 0;
 
-    RRDLABELS *labels = rrdinstance_labels(ri);
+    // An archived instance loads its labels from SQLite on first access; read them only when used.
+    RRDLABELS *labels = NULL;
+    if(t_parent->chart_label_key || t_parent->chart_labels_filter || (options & RRDCONTEXT_OPTION_SHOW_LABELS))
+        labels = rrdinstance_labels(ri);
 
     if(t_parent->chart_label_key && rrdlabels_match_simple_pattern_parsed(
                                          labels,

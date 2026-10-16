@@ -93,7 +93,7 @@ closing its pipes. These rules apply per invocation; there is no persistent sess
 ## Private process-tree supervision
 
 ```text
-nd-run --supervise-tree <control-fd> <status-fd> -- command [args...]
+nd-run --supervise-tree <control-fd> <status-fd> [--completion <directory-fd> <id>] -- command [args...]
 ```
 
 This Linux-only mode applies the existing identity and minimal-environment policy, then remains a per-run subreaper.
@@ -118,6 +118,34 @@ Run real ownership fixtures in a disposable Linux environment:
 ```sh
 python3 tests/nd-run/test_process_tree.py
 ```
+
+### Persistent tree completion
+
+Callers retaining resources across process restarts may supply `--completion`. It is opt-in; ordinary tree
+supervision is unchanged. The trusted resource owner first creates a fresh private directory (mode `0700`) containing
+mode `0600` regular files `publication.lock` (empty) and `pending` (`NDTREE1 pending <id>\n`). The ID is 64 lowercase
+hexadecimal characters, unique to this invocation. Persist the files, directory entry and resource-to-ID binding
+before launch. Pass an already-open directory descriptor, never a payload-selected path.
+
+The helper validates the expected pending record and exclusively creates and persists a `started` marker, then
+acquires the exclusive `publication.lock` before forking. The marker claims this invocation even while a recovery
+reader delays launch by holding the lock. A started/used invocation cannot run again, even after supervisor loss. Protocol
+aliases are rejected, and all record handles are closed in the payload. Only after `waitpid` establishes ECHILD does
+the helper write/fsync `complete.pending`, atomically publish `complete` (`NDTREE1 drained <id>\n`), sync the directory,
+and release the publication lock. This happens before status-pipe delivery and also after a verified prelaunch setup
+refusal. Command failure does not prevent verified cleanup. Completion certifies quiescence, not command success.
+
+Recovery requires the exact matching pending/completion records and an acquired publication lock; acquiring a lock
+alone never proves drainage. Missing, malformed or unreadable evidence remains uncertain. Completion publication
+failure does not change the live status-frame result: a living owner may still use that validated drainage proof.
+Killing the helper, or losing the caller between pin creation and launch, may leave an uncertain record indefinitely.
+Do not infer completion from a PID, timeout, reboot of a container, or missing helper. Any host-reboot recovery belongs
+to the resource owner's separately established host-local storage contract.
+
+After releasing its record lock, the helper never accesses the directory again. It must reside outside any resource
+being retired and must not access that resource after publishing completion. The owner may remove completed records;
+it must serialize its own acquisition/retirement policy. This protocol uses the existing trusted-command model,
+not isolation against malicious same-account code. It neither implements retention policy nor grants new privileges.
 
 ## Regression tests
 

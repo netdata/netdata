@@ -852,7 +852,7 @@ Netdata dashboards are generated automatically from the collected metrics and or
 - Mobile app for notifications
 
 **Agent dashboards**
-- The same dashboard served locally by every Agent and Parent, for single nodes or a Parent's Children, usable without Netdata Cloud (the local dashboard of a standalone Windows Agent depends on the plan; see Pricing and Licensing)
+- The same dashboard served locally by every Agent and Parent, for single nodes or a Parent's Children, usable without Netdata Cloud; the free tier's 5-node limit applies to it as it does to Netdata Cloud (see Pricing and Licensing)
 
 **Value**
 
@@ -1005,7 +1005,7 @@ Netdata is also available on [AWS Marketplace](https://aws.amazon.com/marketplac
 - **Not billed:** metrics volume, Logs Monitoring (querying logs in place), users, data retention, containers.
 - **Free Preview:** Logs Management (collecting, storing and indexing logs), Traces (OpenTelemetry trace storage and the Traces explorer), Network Flows (NetFlow, IPFIX, sFlow) and Digital Experience Monitoring (RUM, synthetic journeys, Lighthouse audits) are in Free Preview.
 - **Netdata AI:** usage measured in AI credits — one credit per investigation or report, fractional credits for smaller actions (conversations, alert creation and suggestion); alert explanations consume no credits. Business includes 10 AI credits per month; the 14-day trial includes 10 AI credits; additional credits are purchased in the app.
-- **Windows:** Windows Agents count as nodes like any other Agent and are monitored on every plan through Netdata Cloud (including Community); only the local dashboard of a standalone Windows Agent is unlocked on paid plans, and Windows Children streaming to a Linux Parent are shown on the Parent's dashboard on any plan.
+- **Windows:** Windows Agents count as nodes like any other Agent; their local dashboard follows the same plan rules as on Linux.
 - **Plan-gated features:** Netdata Cloud MCP, enterprise notification integrations (all Cloud integrations except Discord, personal email and the mobile app), additional roles, SSO and SCIM require a paid plan.
 
 ### Support

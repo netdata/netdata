@@ -25,6 +25,7 @@ import (
 	synthetichistory "github.com/netdata/netdata/go/plugins/plugin/dem/synthetic/history"
 	syntheticquery "github.com/netdata/netdata/go/plugins/plugin/dem/synthetic/query"
 	syntheticregistry "github.com/netdata/netdata/go/plugins/plugin/dem/synthetic/registry"
+	"github.com/netdata/netdata/go/plugins/plugin/dem/synthetic/runtimehost"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/collectorapi"
 )
 
@@ -38,6 +39,7 @@ type Dependencies struct {
 	GeoIPPaths     geoip.Paths
 	History        *journal.Store
 	Artifacts      *artifacts.Store
+	Runtime        *runtimehost.Host
 	Executor       Executor
 	ConfigProvider func() (Config, error)
 }
@@ -82,11 +84,16 @@ func New(deps Dependencies, cfg Config) Components {
 		Registry: syntheticRegistry,
 		Executor: deps.Executor,
 	})
-	collectors.Register("journey", workflow)
-	collectors.Register("lighthouse", lighthouse.Creator(lighthouse.Dependencies{
+	audit := lighthouse.Creator(lighthouse.Dependencies{
 		Registry: syntheticRegistry,
 		Executor: deps.Executor,
-	}))
+	})
+	if deps.Runtime != nil {
+		workflow.JobConfigIntent, audit.JobConfigIntent = deps.Runtime, deps.Runtime
+		workflow.ActivationDependencies, audit.ActivationDependencies = deps.Runtime.Dependencies, deps.Runtime.Dependencies
+	}
+	collectors.Register("journey", workflow)
+	collectors.Register("lighthouse", audit)
 	retention := &Retention{
 		policy:         cfg.History,
 		artifactPolicy: cfg.Artifacts,

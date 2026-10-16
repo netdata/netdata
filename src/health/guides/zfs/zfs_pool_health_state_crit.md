@@ -1,6 +1,6 @@
 ### Understand the alert
 
-The `zfs_pool_state_crit` alert indicates that your ZFS pool is faulted or unavailable, which can cause access and data loss problems. It is important to identify the current state of the pool and take corrective actions to remedy the situation.
+The `zfs_pool_health_state_crit` alert indicates that your ZFS pool is faulted or unavailable, which can cause access and data loss problems. It is important to identify the current state of the pool and take corrective actions to remedy the situation.
 
 ### Troubleshoot the alert
 

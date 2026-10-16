@@ -26,6 +26,7 @@ struct rrdhost_system_info {
     char *host_os_label_codename;
     char *host_os_label_edition;
     char *host_os_label_build;
+    char *host_l4t_version;
     char *host_cores;
     char *host_cpu_freq;
     char *host_cpu_model;

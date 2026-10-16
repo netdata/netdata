@@ -116,7 +116,7 @@ The following alerts are available:
 
 | Alert name  | On metric | Description |
 |:------------|:----------|:------------|
-| [ 10min_disk_utilization ](https://github.com/netdata/netdata/blob/master/src/health/health.d/disks.conf) | disk.util | average percentage of time ${label:device} disk was busy over the last 10 minutes |
+| [ 10min_disk_utilization ](https://github.com/netdata/netdata/blob/master/src/health/health.d/disks.conf) | disk.util | Average percentage of time ${label:device} disk was busy over the last 10 minutes |
 
 
 

@@ -148,4 +148,4 @@ Metrics:
 
 | Metric | Description | Dimensions | Unit |
 |:------|:------------|:----------|:----|
-| mem.edac_mc_errors | DIMM Error Detection And Correction (EDAC) Errors | correctable, uncorrectable | errors |
+| mem.edac_mc_dimm_errors | DIMM Error Detection And Correction (EDAC) Errors | correctable, uncorrectable | errors |

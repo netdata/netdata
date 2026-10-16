@@ -482,12 +482,6 @@ modules:
               Native NVMe health charts appear only when macOS exposes NVMe SMART-capable services through IOKit and allows the native SMART user client to open them. The collector does not use `nvme-cli` or any external NVMe tool on macOS.
 
               If generic disk I/O charts are present but NVMe health charts are absent, the device, controller, or macOS driver may not expose a readable native NVMe SMART user client. Some Apple internal Apple Fabric SSDs expose disk I/O and filesystem metrics but not detailed public NVMe health fields.
-    alerts:
-      - name: interface_speed
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/net.conf
-        metric: net.net
-        info: network interface ${label:device} current speed
-        os: "*"
     metrics:
       folding:
         title: Metrics

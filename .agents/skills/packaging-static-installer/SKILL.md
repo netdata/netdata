@@ -81,6 +81,7 @@ The container then runs `packaging/makeself/run-all-jobs.sh`, which executes `pa
 | 89 | `buildinfo.install` | Writes `/opt/netdata/share/netdata/buildinfo.txt` |
 | 90 | `prepare-archive-source` | Copies post-installer scripts into the install tree |
 | 91 | `copy-ca-certificates` | Bundles a CA bundle |
+| 97 | `create-package-manifest` | Inventories shipped paths before archive creation |
 | 98 | `create-archive` | Runs `makeself.sh --gzip --complevel 9 --notemp --needroot` to build the `.gz.run` |
 | 99 | `copy-archives` | Renames the archive to `netdata-<arch>-<version>.gz.run` and copies aliases |
 
@@ -265,10 +266,14 @@ scp artifacts/netdata-x86_64-latest.gz.run target-host:/tmp/
 
 # Install (on the target, as root)
 ssh target-host
-sudo sh /tmp/netdata-x86_64-latest.gz.run -- --auto-update
+sudo sh /tmp/netdata-x86_64-latest.gz.run
 # installer flags after the bare `--`; common: --dont-start-it, --disable-telemetry,
-# --claim-token <T> --claim-rooms <R>, --no-updates
+# --stable-channel, --nightly-channel, --certificates <mode>
 ```
+
+`packaging/makeself/install-or-update.sh` installs the updater without enabling it; `--auto-update` is ignored,
+and `--no-updates` is an unknown option. Check existing updater scheduling separately when testing updates.
+For state preservation and its regression suite, see `packaging/makeself/README.md#state-permissions-during-updates`.
 
 The installer always installs into `/opt/netdata` (hard-coded; `--target` would change it but the in-archive paths assume `/opt/netdata`, do not override).
 

@@ -257,7 +257,7 @@ jobs:
       - name: Upload Cache
         id: upload-cache
         if: github.repository == 'netdata/netdata' && needs.file-check.outputs.run == 'true' && github.event_name == 'workflow_dispatch'
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: cache-${{ steps.artifact-name.outputs.platform }}
           path: /tmp/build-cache/*
@@ -382,7 +382,7 @@ jobs:
       - name: Upload digest
         id: upload-digest
         if: github.repository == 'netdata/netdata'
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: docker-digests-${{ steps.artifact-name.outputs.platform }}
           path: /tmp/digests/*
@@ -543,7 +543,7 @@ jobs:
       - name: Upload digest
         id: upload-digest
         if: github.repository == 'netdata/netdata'
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: quay-digests-${{ steps.artifact-name.outputs.platform }}
           path: /tmp/digests/*
@@ -705,7 +705,7 @@ jobs:
       - name: Upload digest
         id: upload-digest
         if: github.repository == 'netdata/netdata'
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: ghcr-digests-${{ steps.artifact-name.outputs.platform }}
           path: /tmp/digests/*

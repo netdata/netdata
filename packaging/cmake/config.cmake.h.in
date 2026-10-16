@@ -87,6 +87,7 @@
 #cmakedefine HAVE_TM_GMTOFF
 
 #cmakedefine HAVE_LIBBACKTRACE
+#cmakedefine HAVE_STACKTRACE
 #cmakedefine HAVE_LIBUNWIND
 #cmakedefine HAVE_BACKTRACE
 #cmakedefine HAVE_CLOSE_RANGE

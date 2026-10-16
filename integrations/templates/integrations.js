@@ -3,4 +3,6 @@
 
 export const categories = [[ categories ]]
 export const integrations = [[ integrations ]]
+export const alerts = [[ alerts ]]
+export const contexts = [[ contexts ]]
 

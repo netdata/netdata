@@ -1317,7 +1317,7 @@ __attribute__((constructor)) void initialize_build_info(void) {
 #ifdef HAVE_LIBMNL
     build_info_set_status(BIB_LIB_LIBMNL, true);
 #endif
-#ifdef HAVE_LIBBACKTRACE
+#ifdef HAVE_STACKTRACE
     build_info_set_value(BIB_LIB_STACKTRACE, stacktrace_backend());
 #endif
 

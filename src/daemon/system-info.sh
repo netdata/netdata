@@ -130,17 +130,19 @@ detect_disk() {
       DISK_SIZE=$(printf '%s\n' "${disk_output}" | tail -n +2 | sed -E 's/\/dev\/disk([[:digit:]]*)s[[:digit:]]*/\/dev\/disk\1/g' | sort -k 1 | awk -F ' ' '{s=$NF;for(i=NF-1;i>=1;i--)s=s FS $i;print s}' | uniq -f 9 | awk '{print $8}' | sum_disk_sizes 1024) || DISK_STATUS=F
     fi
   elif [ "${KERNEL_NAME}" = FreeBSD ]; then
-    types='ufs'
-    vfs_output=$(lsvfs) || DISK_STATUS=F
-
-    if (printf '%s\n' "${vfs_output}" | grep -q zfs); then
-      types="${types},zfs"
+    # Like Linux /sys/block: sum the raw size of the GEOM DISK providers (the base disks;
+    # md, zvols, partitions and mirrors are other classes), skipping optical drives.
+    # GEOM has no removable flag, so USB disks count; a jail sees the host's disks;
+    # a multipath disk counts once per path.
+    # Not df: each ZFS dataset reports its used space plus the pool's free space, so the
+    # total counts free space once per dataset and changes on every write.
+    DISK_DETECTION="geom"
+    if geom_output=$(sysctl -n kern.geom.conftxt) &&
+      disk_size=$(printf '%s\n' "${geom_output}" | awk '$2 == "DISK" && $3 !~ /^cd[0-9]/ { print $4 }' | sum_disk_sizes 1); then
+      DISK_SIZE="${disk_size}"
+    else
+      DISK_STATUS=F
     fi
-
-    DISK_DETECTION="df"
-    disk_output=$(df -t ${types} -c -k) || DISK_STATUS=F
-    total="$(printf '%s\n' "${disk_output}" | tail -n 1 | awk '{print $2}')"
-    case "${total}" in ''|*[!0-9]*) DISK_STATUS=F ;; *) DISK_SIZE="$((total * 1024))" ;; esac
   else
     if [ -d /sys/block ] && [ -r /proc/devices ] && ! is_inside_lxc_container; then
       dev_major_whitelist=''
@@ -805,6 +807,29 @@ HOST_OS_LABEL_CODENAME="${HOST_VERSION_CODENAME}"
 HOST_OS_LABEL_EDITION="${HOST_VARIANT}"
 HOST_OS_LABEL_BUILD="${HOST_BUILD_ID}"
 
+# Jetson Linux identity belongs to the native host, not a container image.
+detect_host_l4t_version() {
+  HOST_L4T_VERSION=""
+  case "${KERNEL_NAME}:${CONTAINER}" in
+    Linux:unknown|Linux:none) ;;
+    *) return ;;
+  esac
+  [ -f "$1" ] && [ -r "$1" ] || return 0
+  HOST_L4T_VERSION=$(LC_ALL=C awk '
+    NR == 1 {
+      if ($0 ~ /^# R[0-9]+ \(release\), REVISION: [0-9]+(\.[0-9]+)*,/) {
+        release = $2; sub(/^R/, "", release)
+        split($0, header, ",")
+        revision = header[2]; sub(/^ REVISION: /, "", revision)
+        print release "." revision
+      }
+      exit
+    }
+  ' "$1" 2>/dev/null) || HOST_L4T_VERSION=""
+}
+
+detect_host_l4t_version /etc/nv_tegra_release
+
 # -------------------------------------------------------------------------------------------------
 # Detect information about the CPU
 
@@ -1017,6 +1042,9 @@ for label_field in NAME VERSION RELEASE CODENAME EDITION BUILD; do
     printf 'NETDATA_HOST_OS_LABEL_%s=%s\n' "${label_field}" "${label_value}"
   fi
 done
+if [ -n "${HOST_L4T_VERSION}" ]; then
+  printf 'NETDATA_SYSTEM_L4T_VERSION=%s\n' "${HOST_L4T_VERSION}"
+fi
 echo "NETDATA_HOST_IS_K8S_NODE=${HOST_IS_K8S_NODE}"
 echo "NETDATA_SYSTEM_KERNEL_NAME=${KERNEL_NAME}"
 echo "NETDATA_SYSTEM_KERNEL_VERSION=${KERNEL_VERSION}"

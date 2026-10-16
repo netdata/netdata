@@ -967,7 +967,7 @@ static void daemon_status_file_migrate_once(void) {
         session_status.reliability++;
     }
 
-#ifdef HAVE_LIBBACKTRACE
+#ifdef HAVE_STACKTRACE
     safecpy(session_status.stack_traces, stacktrace_backend());
 #endif
 
@@ -1666,7 +1666,7 @@ static void daemon_status_file_save_twice_if_we_can_get_stack_trace(BUFFER *wb, 
     if(live_session_status)
         daemon_status_file_session_status_writer_enter();
 
-#ifdef HAVE_LIBBACKTRACE
+#ifdef HAVE_STACKTRACE
     if(stacktrace_available())
         set_stack_trace_message_if_empty(ds, STACK_TRACE_INFO_PREFIX "will now attempt to get stack trace - if you see this message, we couldn't get it.");
     else
@@ -1685,7 +1685,7 @@ static void daemon_status_file_save_twice_if_we_can_get_stack_trace(BUFFER *wb, 
 
     buffer_flush(wb);
 
-#ifdef HAVE_LIBBACKTRACE
+#ifdef HAVE_STACKTRACE
     stacktrace_capture(wb);
 
     // Store the first netdata function from the stack trace if available
@@ -1876,7 +1876,7 @@ bool daemon_status_file_deadly_signal_received(EXIT_REASON reason, SIGNAL_CODE c
         }
     }
 
-#ifdef HAVE_LIBBACKTRACE
+#ifdef HAVE_STACKTRACE
 #if defined(OS_WINDOWS)
     // THE FOLLOWING CODE IS NOT ASYNC-SIGNAL-SAFE on MSYS2 due to internal locking in the runtime.
     // This can cause a deadlock when a signal is received while the lock is held.
@@ -1899,7 +1899,7 @@ bool daemon_status_file_deadly_signal_received(EXIT_REASON reason, SIGNAL_CODE c
         daemon_status_file_save(static_save_buffer, ds, false);
     }
 #endif // defined(OS_WINDOWS)
-#endif // HAVE_LIBBACKTRACE
+#endif // HAVE_STACKTRACE
 
     return duplicate;
 }

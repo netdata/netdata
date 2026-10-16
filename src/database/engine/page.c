@@ -524,6 +524,14 @@ ALWAYS_INLINE PGD *pgd_create_from_disk_data(uint8_t type, void *base, uint32_t 
     if (!size || size < page_type_size[type])
         return PGD_EMPTY;
 
+    // A gorilla page is stored on disk as a chain of fixed RRDENG_GORILLA_32BIT_BUFFER_SIZE buffers, so a
+    // valid length is always a positive multiple of it. A corrupted or crafted extent can carry any length;
+    // without this check size / RRDENG_GORILLA_32BIT_BUFFER_SIZE truncates to a smaller buffer count (zero for
+    // a sub-buffer size) while the allocation is sized to the shorter length, and gorilla_buffer_patch() then
+    // walks header.next past the end of the allocation.
+    if (type == RRDENG_PAGE_TYPE_GORILLA_32BIT && (size % RRDENG_GORILLA_32BIT_BUFFER_SIZE))
+        return PGD_EMPTY;
+
     PGD *pg = pgd_alloc(false); // this is malloc'd !
     pg->type = type;
     pg->states = PGD_STATE_CREATED_FROM_DISK;
@@ -532,11 +540,6 @@ ALWAYS_INLINE PGD *pgd_create_from_disk_data(uint8_t type, void *base, uint32_t 
     switch (type)
     {
         case RRDENG_PAGE_TYPE_GORILLA_32BIT:
-            internal_fatal(size == 0, "Asked to create page with 0 data!!!");
-            internal_fatal(size % sizeof(uint32_t), "Unaligned gorilla buffer size");
-            internal_fatal(size % RRDENG_GORILLA_32BIT_BUFFER_SIZE, "Expected size to be a multiple of %zu-bytes",
-                RRDENG_GORILLA_32BIT_BUFFER_SIZE);
-
             pg->raw.data = (void *)pgd_data_alloc(size, pg->partition, false);
             pg->raw.size = size;
 

@@ -606,19 +606,6 @@ modules:
               Raise `functions.<name>.timeout`, and for `top-queries` lower `functions.top_queries.time_window_days` or
               `functions.top_queries.limit`. For `error-info`, create the dedicated session from the prerequisites so
               the read stays within its small rollover files instead of the `system_health` history.
-    alerts:
-      - name: mssql_database_log_percent_used
-        metric: mssql.database_log_percent_used
-        info: SQL Server transaction log percent used has been above 90% for the last 15 minutes
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/mssql.conf
-      - name: mssql_sql_agent_job_last_execution_warning
-        metric: mssql.job_last_execution_status
-        info: Enabled SQL Server Agent job succeeded, but at least one step failed in the last completed execution
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/mssql.conf
-      - name: mssql_sql_agent_job_last_execution_failed
-        metric: mssql.job_last_execution_status
-        info: Enabled SQL Server Agent job failed in the last completed execution
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/mssql.conf
     functions:
       description: |
         Three Functions run diagnostic queries on demand from the dashboard's Live tab. They keep the metrics

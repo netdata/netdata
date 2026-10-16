@@ -606,12 +606,9 @@ static size_t rrdlabels_remove_all_unmarked_unsafe(RRDLABELS *labels)
 
             RRDLABELS_MEMORY_DELTA(&dictionary_stats_category_rrdlabels, judy_mem, 0);
 
+            // JudyLNext() continues from the next index after the deleted one; Index is only a number from here on
             delete_label((RRDLABEL *)Index);
             removed++;
-            if (labels->JudyL != (Pvoid_t) NULL) {
-                Index = 0;
-                first_then_next = true;
-            }
         }
     }
 
@@ -1694,6 +1691,79 @@ static int rrdlabels_unittest_mark_source_as_old(void) {
     return errors;
 }
 
+#define UT_REMOVE_LABELS 12
+
+struct rrdlabels_unittest_order {
+    size_t used;
+    char names[UT_REMOVE_LABELS + 1][16];
+};
+
+static int rrdlabels_unittest_order_callback(const char *name, const char *value __maybe_unused, RRDLABEL_SRC ls, void *data) {
+    struct rrdlabels_unittest_order *order = data;
+    if (!(ls & RRDLABEL_FLAG_DONT_DELETE) && order->used < UT_REMOVE_LABELS)
+        strncpyz(order->names[order->used++], name, sizeof(order->names[0]) - 1);
+    return 1;
+}
+
+// The sweep removes labels while walking them, so cover every position a removal can take in the walk:
+// none, the first, the last, a consecutive run, every other one, all but one, and all of them.
+static int rrdlabels_unittest_remove_unmarked_positions(void) {
+    fprintf(stderr, "\n%s() tests\n", __FUNCTION__);
+    int errors = 0;
+
+    const char *cases[] = {
+        "kkkkkkkkkkkk", // nothing to remove
+        "rkkkkkkkkkkk", // the first
+        "kkkkkkkkkkkr", // the last
+        "kkkrrrrkkkkk", // a consecutive run in the middle
+        "rkrkrkrkrkrk", // every other one
+        "rrrrrrrrrrrk", // all but the last
+        "krrrrrrrrrrr", // all but the first
+        "rrrrrrrrrrrr", // all of them
+    };
+
+    for (size_t c = 0; c < _countof(cases); c++) {
+        RRDLABELS *l = rrdlabels_create();
+        char name[16];
+        for (size_t i = 0; i < UT_REMOVE_LABELS; i++) {
+            snprintfz(name, sizeof(name) - 1, "key%zu", i);
+            rrdlabels_add(l, name, "value", RRDLABEL_SRC_CONFIG);
+        }
+        rrdlabels_add(l, "pinned", "value", RRDLABEL_SRC_AUTO | RRDLABEL_FLAG_DONT_DELETE);
+
+        // positions in the cases are positions in the walk, which follows the stored order, not the names
+        struct rrdlabels_unittest_order order = { 0 };
+        rrdlabels_walkthrough_read(l, rrdlabels_unittest_order_callback, &order);
+
+        rrdlabels_unmark_all(l);
+        size_t kept = 0;
+        for (size_t i = 0; i < order.used; i++) {
+            if (cases[c][i] == 'k') {
+                rrdlabels_add(l, order.names[i], "value", RRDLABEL_SRC_CONFIG);
+                kept++;
+            }
+        }
+        rrdlabels_remove_all_unmarked(l);
+
+        if (order.used != UT_REMOVE_LABELS || rrdlabels_entries(l) != kept + 1 || !rrdlabels_exist(l, "pinned")) {
+            fprintf(stderr, "  FAIL (%s): %zu entries left, expected %zu plus the pinned label\n",
+                    cases[c], rrdlabels_entries(l), kept);
+            errors++;
+        }
+        for (size_t i = 0; i < order.used; i++) {
+            if (rrdlabels_exist(l, order.names[i]) != (cases[c][i] == 'k')) {
+                fprintf(stderr, "  FAIL (%s): label '%s' at position %zu %s\n", cases[c], order.names[i], i,
+                        cases[c][i] == 'k' ? "was removed" : "survived");
+                errors++;
+            }
+        }
+        rrdlabels_destroy(l);
+    }
+
+    fprintf(stderr, "%s: %d errors\n", __FUNCTION__, errors);
+    return errors;
+}
+
 #define UT_EXPECT(_cond, _msg) do {                                            \
     if (!(_cond)) {                                                            \
         fprintf(stderr, "  FAIL: %s\n", (_msg));                               \
@@ -2250,6 +2320,7 @@ int rrdlabels_unittest(void) {
     errors += rrdlabels_unittest_double_check();
     errors += rrdlabels_unittest_migrate_check();
     errors += rrdlabels_unittest_mark_source_as_old();
+    errors += rrdlabels_unittest_remove_unmarked_positions();
     errors += rrdlabels_unittest_change_detection();
     errors += rrdlabels_unittest_subset();
     errors += rrdlabels_unittest_pattern_check();

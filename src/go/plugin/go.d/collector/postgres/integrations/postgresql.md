@@ -275,20 +275,20 @@ The following alerts are available:
 
 | Alert name  | On metric | Description |
 |:------------|:----------|:------------|
-| [ postgres_total_connection_utilization ](https://github.com/netdata/netdata/blob/master/src/health/health.d/postgres.conf) | postgres.connections_utilization | average total connection utilization over the last minute |
-| [ postgres_acquired_locks_utilization ](https://github.com/netdata/netdata/blob/master/src/health/health.d/postgres.conf) | postgres.locks_utilization | average acquired locks utilization over the last minute |
-| [ postgres_txid_exhaustion_perc ](https://github.com/netdata/netdata/blob/master/src/health/health.d/postgres.conf) | postgres.txid_exhaustion_perc | percent towards TXID wraparound |
-| [ postgres_db_cache_io_ratio ](https://github.com/netdata/netdata/blob/master/src/health/health.d/postgres.conf) | postgres.db_cache_io_ratio | average cache hit ratio in db ${label:database} over the last minute |
-| [ postgres_db_transactions_rollback_ratio ](https://github.com/netdata/netdata/blob/master/src/health/health.d/postgres.conf) | postgres.db_cache_io_ratio | average aborted transactions percentage in db ${label:database} over the last five minutes |
-| [ postgres_db_deadlocks_rate ](https://github.com/netdata/netdata/blob/master/src/health/health.d/postgres.conf) | postgres.db_deadlocks_rate | number of deadlocks detected in db ${label:database} in the last minute |
-| [ postgres_table_cache_io_ratio ](https://github.com/netdata/netdata/blob/master/src/health/health.d/postgres.conf) | postgres.table_cache_io_ratio | average cache hit ratio in db ${label:database} table ${label:table} over the last minute |
-| [ postgres_table_index_cache_io_ratio ](https://github.com/netdata/netdata/blob/master/src/health/health.d/postgres.conf) | postgres.table_index_cache_io_ratio | average index cache hit ratio in db ${label:database} table ${label:table} over the last minute |
-| [ postgres_table_toast_cache_io_ratio ](https://github.com/netdata/netdata/blob/master/src/health/health.d/postgres.conf) | postgres.table_toast_cache_io_ratio | average TOAST hit ratio in db ${label:database} table ${label:table} over the last minute |
+| [ postgres_total_connection_utilization ](https://github.com/netdata/netdata/blob/master/src/health/health.d/postgres.conf) | postgres.connections_utilization | Average total connection utilization over the last minute |
+| [ postgres_acquired_locks_utilization ](https://github.com/netdata/netdata/blob/master/src/health/health.d/postgres.conf) | postgres.locks_utilization | Average acquired locks utilization over the last minute |
+| [ postgres_txid_exhaustion_perc ](https://github.com/netdata/netdata/blob/master/src/health/health.d/postgres.conf) | postgres.txid_exhaustion_perc | Percent towards TXID wraparound |
+| [ postgres_db_cache_io_ratio ](https://github.com/netdata/netdata/blob/master/src/health/health.d/postgres.conf) | postgres.db_cache_io_ratio | Average cache hit ratio in db ${label:database} over the last minute |
+| [ postgres_db_transactions_rollback_ratio ](https://github.com/netdata/netdata/blob/master/src/health/health.d/postgres.conf) | postgres.db_transactions_ratio | Average aborted transactions percentage in db ${label:database} over the last five minutes |
+| [ postgres_db_deadlocks_rate ](https://github.com/netdata/netdata/blob/master/src/health/health.d/postgres.conf) | postgres.db_deadlocks_rate | Number of deadlocks detected in db ${label:database} in the last minute |
+| [ postgres_table_cache_io_ratio ](https://github.com/netdata/netdata/blob/master/src/health/health.d/postgres.conf) | postgres.table_cache_io_ratio | Average cache hit ratio in db ${label:database} table ${label:table} over the last minute |
+| [ postgres_table_index_cache_io_ratio ](https://github.com/netdata/netdata/blob/master/src/health/health.d/postgres.conf) | postgres.table_index_cache_io_ratio | Average index cache hit ratio in db ${label:database} table ${label:table} over the last minute |
+| [ postgres_table_toast_cache_io_ratio ](https://github.com/netdata/netdata/blob/master/src/health/health.d/postgres.conf) | postgres.table_toast_cache_io_ratio | Average TOAST hit ratio in db ${label:database} table ${label:table} over the last minute |
 | [ postgres_table_toast_index_cache_io_ratio ](https://github.com/netdata/netdata/blob/master/src/health/health.d/postgres.conf) | postgres.table_toast_index_cache_io_ratio | average index TOAST hit ratio in db ${label:database} table ${label:table} over the last minute |
-| [ postgres_table_bloat_size_perc ](https://github.com/netdata/netdata/blob/master/src/health/health.d/postgres.conf) | postgres.table_bloat_size_perc | bloat size percentage in db ${label:database} table ${label:table} |
-| [ postgres_table_last_autovacuum_time ](https://github.com/netdata/netdata/blob/master/src/health/health.d/postgres.conf) | postgres.table_autovacuum_since_time | time elapsed since db ${label:database} table ${label:table} was vacuumed by the autovacuum daemon |
-| [ postgres_table_last_autoanalyze_time ](https://github.com/netdata/netdata/blob/master/src/health/health.d/postgres.conf) | postgres.table_autoanalyze_since_time | time elapsed since db ${label:database} table ${label:table} was analyzed by the autovacuum daemon |
-| [ postgres_index_bloat_size_perc ](https://github.com/netdata/netdata/blob/master/src/health/health.d/postgres.conf) | postgres.index_bloat_size_perc | bloat size percentage in db ${label:database} table ${label:table} index ${label:index} |
+| [ postgres_table_bloat_size_perc ](https://github.com/netdata/netdata/blob/master/src/health/health.d/postgres.conf) | postgres.table_bloat_size_perc | Bloat size percentage in db ${label:database} table ${label:table} |
+| [ postgres_table_last_autovacuum_time ](https://github.com/netdata/netdata/blob/master/src/health/health.d/postgres.conf) | postgres.table_autovacuum_since_time | Time elapsed since db ${label:database} table ${label:table} was vacuumed by the autovacuum daemon |
+| [ postgres_table_last_autoanalyze_time ](https://github.com/netdata/netdata/blob/master/src/health/health.d/postgres.conf) | postgres.table_autoanalyze_since_time | Time elapsed since db ${label:database} table ${label:table} was analyzed by the autovacuum daemon |
+| [ postgres_index_bloat_size_perc ](https://github.com/netdata/netdata/blob/master/src/health/health.d/postgres.conf) | postgres.index_bloat_size_perc | Bloat size percentage in db ${label:database} table ${label:table} index ${label:index} |
 
 
 

@@ -34,23 +34,26 @@ type runJobServices struct {
 }
 
 type runGenerationConfig struct {
-	Generation       uint64                    // this run's generation number
-	ShutdownTimeout  time.Duration             // per-run shutdown budget
-	Diagnostics      jobmgr.DiagnosticObserver // process-wide operational log sink
-	UIDs             *lifecycle.UIDLedger      // process-lifetime UID ledger
-	Publication      *hostoutput.Publisher
-	Frames           *lifecycle.FrameOwner        // the one frame writer
-	CleanupOutput    *joboutput.CleanupOutputGate // process-lifetime accepted-cleanup output
-	ProcessFunctions []funcapi.ProcessFunctionProvider
-	Modules          collectorapi.Registry  // collector module registry
-	Jobs             runJobServices         // job services
-	Secrets          *SecretsConfig         // secret services
-	Discovery        runDiscoveryServices   // discovery services
-	SecretEpoch      *processSecretEpoch    // process-owned Store epoch for this run
-	Attempts         *containment.Authority // process-owned opaque-work authority
+	DependencySources []DependencySource
+	Generation        uint64                    // this run's generation number
+	ShutdownTimeout   time.Duration             // per-run shutdown budget
+	Diagnostics       jobmgr.DiagnosticObserver // process-wide operational log sink
+	UIDs              *lifecycle.UIDLedger      // process-lifetime UID ledger
+	Publication       *hostoutput.Publisher
+	Frames            *lifecycle.FrameOwner        // the one frame writer
+	CleanupOutput     *joboutput.CleanupOutputGate // process-lifetime accepted-cleanup output
+	ProcessFunctions  []funcapi.ProcessFunctionProvider
+	Modules           collectorapi.Registry  // collector module registry
+	Jobs              runJobServices         // job services
+	Secrets           *SecretsConfig         // secret services
+	Discovery         runDiscoveryServices   // discovery services
+	SecretEpoch       *processSecretEpoch    // process-owned Store epoch for this run
+	Attempts          *containment.Authority // process-owned opaque-work authority
 }
 
 type runGeneration struct {
+	dependencySources   []DependencySource
+	subscriptions       *dependencySubscriptions
 	publication         *hostoutput.Publisher
 	vnodeConfig         *agentdiscovery.VNodeConfiguration
 	diagnostics         jobmgr.DiagnosticObserver      // operational log sink
@@ -302,6 +305,7 @@ func newRunGeneration(
 	vnodeBinding.dependencyChanged = func(name string) {
 		dynCfgJobs.NotifyDependencyChanged("vnode", name)
 	}
+	subscriptions := &dependencySubscriptions{}
 	kernel, err := jobmgr.NewCommandKernel(
 		run,
 		config.UIDs,
@@ -310,6 +314,7 @@ func newRunGeneration(
 		lifecycle.RealClock{},
 		functions,
 		joinedRunFinalizer{
+			subscriptions:       subscriptions,
 			jobs:                dynCfgJobs,
 			functions:           functions,
 			secrets:             secretController,
@@ -344,6 +349,8 @@ func newRunGeneration(
 		}
 	}
 	return &runGeneration{
+		dependencySources:   config.DependencySources,
+		subscriptions:       subscriptions,
 		publication:         config.Publication,
 		vnodeConfig:         vnodeConfig,
 		diagnostics:         config.Diagnostics,
@@ -412,6 +419,9 @@ func (rg *runGeneration) startWithRunContext(
 		rg.run.Dirty(err)
 		rg.Stop()
 		return err
+	}
+	if err := rg.subscriptions.bind(rg.dependencySources, rg.dyncfg.NotifyDependencyChanged); err != nil {
+		return rg.stopAfterStartFailure(startupCtx, err)
 	}
 	if err := rg.functions.Activate(); err != nil {
 		rg.run.Dirty(err)
@@ -535,6 +545,7 @@ func (rmr *runMetricsRegistration) release() error {
 }
 
 type joinedRunFinalizer struct {
+	subscriptions       *dependencySubscriptions
 	jobs                *joboutput.DynCfgJobController
 	functions           *FunctionAssembly
 	secrets             *secretadapter.Controller
@@ -546,7 +557,7 @@ func (jrf joinedRunFinalizer) FinalizeRun(ctx context.Context, generation uint64
 		return errors.New("jobmgr composition: incomplete run finalizer")
 	}
 	jrf.jobs.FinalizeJobConfigLifecycles()
-	result := errors.Join(jrf.metricsRegistration.release(), jrf.functions.FinalizeRun(ctx, generation))
+	result := errors.Join(jrf.subscriptions.close(), jrf.jobs.FinalizeJobConfigIntents(), jrf.metricsRegistration.release(), jrf.functions.FinalizeRun(ctx, generation))
 	if jrf.secrets != nil {
 		result = errors.Join(result, jrf.secrets.CloseProjection())
 	}

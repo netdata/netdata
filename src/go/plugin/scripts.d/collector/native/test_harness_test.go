@@ -46,6 +46,8 @@ func (b *wireOutput) String() string {
 	return b.buffer.String()
 }
 
+// Reset before changing a running job's response fixture: collection can emit
+// one-time chart definitions or retirement as soon as the new response is visible.
 func (b *wireOutput) Reset() {
 	b.mu.Lock()
 	defer b.mu.Unlock()
@@ -97,7 +99,13 @@ func tickUntil(t *testing.T, job *jobruntime.JobV2, condition func() bool) {
 
 func tickUntilWithin(t *testing.T, job *jobruntime.JobV2, timeout time.Duration, condition func() bool) {
 	t.Helper()
-	require.Eventually(t, func() bool { job.Tick(1); return condition() }, timeout, 100*time.Millisecond)
+	require.Eventually(t, func() bool {
+		if condition() {
+			return true
+		}
+		job.Tick(1)
+		return false
+	}, timeout, 100*time.Millisecond)
 }
 
 // testRuntime runs Collector.Run directly, without the job runtime.

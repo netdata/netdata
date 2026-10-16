@@ -1,7 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-// Package safefile reads small configured files through a bounded,
-// regular-file-only path.
+// Package safefile opens configured regular files and provides bounded reads.
 package safefile
 
 import (
@@ -9,13 +8,14 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"os"
 )
 
 // MaxSize is the maximum number of bytes Read accepts.
 const MaxSize int64 = 1 << 20
 
 var (
-	// ErrFile identifies every failure returned by Read.
+	// ErrFile identifies every failure returned by Open and Read.
 	ErrFile = errors.New("safe file read failed")
 	// ErrNotRegular identifies a path whose opened object is not a regular file.
 	ErrNotRegular = errors.New("file is not regular")
@@ -41,13 +41,38 @@ func (e *fileError) Is(target error) bool {
 	return target == ErrFile || errors.Is(e.err, target)
 }
 
+// Open follows symlinks and opens a configured regular file for reading.
+// Unix opens are nonblocking, so FIFOs are rejected without waiting for a writer.
+// It imposes no size limit; the caller owns both read bounds and closing the file.
+func Open(path string) (*os.File, error) {
+	file, _, err := openRegular(path)
+	return file, err
+}
+
+func openRegular(path string) (*os.File, os.FileInfo, error) {
+	file, err := open(path)
+	if err != nil {
+		return nil, nil, newFileError("open", path, err)
+	}
+	info, err := file.Stat()
+	if err != nil {
+		file.Close()
+		return nil, nil, newFileError("stat", path, err)
+	}
+	if !info.Mode().IsRegular() {
+		file.Close()
+		return nil, nil, newFileError("read", path, ErrNotRegular)
+	}
+	return file, info, nil
+}
+
 // Read returns the contents of a configured regular file no larger than
 // MaxSize. The opened object is checked so a path replacement cannot bypass
 // the object-type validation.
 func Read(path string) (data []byte, err error) {
-	file, err := open(path)
+	file, info, err := openRegular(path)
 	if err != nil {
-		return nil, newFileError("open", path, err)
+		return nil, err
 	}
 	defer func() {
 		if closeErr := file.Close(); err == nil && closeErr != nil {
@@ -55,18 +80,9 @@ func Read(path string) (data []byte, err error) {
 			err = newFileError("close", path, closeErr)
 		}
 	}()
-
-	info, err := file.Stat()
-	if err != nil {
-		return nil, newFileError("stat", path, err)
-	}
-	if !info.Mode().IsRegular() {
-		return nil, newFileError("read", path, ErrNotRegular)
-	}
 	if info.Size() > MaxSize {
 		return nil, newFileError("read", path, ErrTooLarge)
 	}
-
 	data, err = readBounded(file, info.Size())
 	if err != nil {
 		return nil, newFileError("read", path, err)

@@ -55,7 +55,7 @@ func TestLoadConfigUsesHighestPriorityFile(t *testing.T) {
 
 func TestArtifactDefaultsAndIndependentPolicy(t *testing.T) {
 	dir := t.TempDir()
-	require.NoError(t, os.WriteFile(filepath.Join(dir, "dem.conf"), []byte("runtime: {node_path: /prepared/node, dependencies_path: /prepared}\nartifacts: {days: 2, max_bytes: 1024}"), 0600))
+	require.NoError(t, os.WriteFile(filepath.Join(dir, "dem.conf"), []byte("runtime: {mode: preloaded, preload_path: /prepared}\nartifacts: {days: 2, max_bytes: 1024}"), 0600))
 	cfg, err := LoadConfig(multipath.New(dir))
 	require.NoError(t, err)
 	assert.Equal(t, DefaultConfig().History, cfg.History)
@@ -63,8 +63,8 @@ func TestArtifactDefaultsAndIndependentPolicy(t *testing.T) {
 		Days:     2,
 		MaxBytes: 1024,
 	}, cfg.Artifacts)
-	assert.Equal(t, "/prepared/node", cfg.Runtime.NodePath)
-	// Preparation belongs to browser Check; RUM-only configuration needs no runtime.
+	assert.Equal(t, "/prepared", cfg.Runtime.PreloadPath)
+	// Runtime availability is checked by its owner; RUM configuration remains independent.
 	require.NoError(t, os.WriteFile(filepath.Join(dir, "dem.conf"), []byte("artifacts: {days: 0}"), 0600))
 	_, err = LoadConfig(multipath.New(dir))
 	require.ErrorContains(t, err, "artifacts")
@@ -81,4 +81,19 @@ func TestInvalidRetentionIdentifiesSetting(t *testing.T) {
 			})
 		}
 	}
+}
+
+func TestRuntimeValidationLeavesOtherSectionsOpaque(t *testing.T) {
+	dir := t.TempDir()
+	body := "enabled: yes\njobs: {future_option: [{duplicate: one, duplicate: two}]}\n" +
+		"history: {days: 7, unrelated: value}\nartifacts: {days: 2, unrelated: value}\n" +
+		"runtime: {allow_download: false}\n"
+	require.NoError(t, os.WriteFile(filepath.Join(dir, "dem.conf"), []byte(body), 0600))
+	cfg, err := LoadConfig(multipath.New(dir))
+	require.NoError(t, err)
+	require.Equal(t, 7, cfg.History.Days)
+	require.Equal(t, DefaultConfig().History.MaxBytes, cfg.History.MaxBytes)
+	require.Equal(t, 2, cfg.Artifacts.Days)
+	require.Equal(t, DefaultConfig().Artifacts.MaxBytes, cfg.Artifacts.MaxBytes)
+	require.False(t, cfg.Runtime.AllowDownload)
 }

@@ -105,7 +105,6 @@ modules:
           - error: no fresh intel_gpu_top sample
             cause: Netdata has not received a complete `intel_gpu_top` sample within the last two sampling intervals, usually because `intel_gpu_top` is starting, has stopped, or is being restarted.
             fix: If the error persists, look for `intel_gpu_top source unavailable` or `has not exited` messages in the collector log (see Diagnostics).
-    alerts: []
     metrics:
       folding:
         title: Metrics

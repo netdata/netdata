@@ -135,8 +135,10 @@ static void rrdset_insert_callback(const DICTIONARY_ITEM *item __maybe_unused, v
     ml_chart_new(st);
 }
 
-// the destructor - runs under the dictionary write lock when garbage collection frees the chart,
-// and with no dictionary lock held when dictionary_del() frees an unreferenced one
+// the destructor - runs when the last link to the chart goes, which is either its id index item or
+// its name index item (a view sharing it): under that dictionary's write lock when its garbage
+// collection frees the item (for the name index also under its index write lock), or with no
+// dictionary lock held when dictionary_del() frees an unreferenced one
 static void rrdset_delete_callback(const DICTIONARY_ITEM *item __maybe_unused, void *rrdset, void *rrdhost __maybe_unused) {
     RRDSET *st = rrdset;
 
@@ -404,6 +406,18 @@ RRDSET *rrdset_find_bytype(RRDHOST *host, const char *type, const char *id, bool
     return rrdset_find(host, buf, include_obsolete);
 }
 
+// acquire without side effects: obsolete charts are included and last_accessed is not touched,
+// for internal users (health) that must not keep an obsolete chart from being freed
+RRDSET_ACQUIRED *rrdset_acquire(RRDHOST *host, const char *id) {
+    // the index stays allocated for the whole life of the host (archiving only
+    // flushes it); this guard is defense-in-depth for callers racing with
+    // rrdhost_free_unlinked()
+    if (unlikely(!host->rrdset_root_index))
+        return NULL;
+
+    return (RRDSET_ACQUIRED *)dictionary_get_and_acquire_item(host->rrdset_root_index, id);
+}
+
 RRDSET_ACQUIRED *rrdset_find_and_acquire(RRDHOST *host, const char *id, bool include_obsolete) {
 #ifdef NETDATA_INTERNAL_CHECKS
     if(unlikely(debug_flags & D_RRD_CALLS)) {
@@ -413,13 +427,7 @@ RRDSET_ACQUIRED *rrdset_find_and_acquire(RRDHOST *host, const char *id, bool inc
     }
 #endif
 
-    // the index stays allocated for the whole life of the host (archiving only
-    // flushes it); this guard is defense-in-depth for callers racing with
-    // rrdhost_free_unlinked()
-    if (unlikely(!host->rrdset_root_index))
-        return NULL;
-
-    RRDSET_ACQUIRED *sta = (RRDSET_ACQUIRED *)dictionary_get_and_acquire_item(host->rrdset_root_index, id);
+    RRDSET_ACQUIRED *sta = rrdset_acquire(host, id);
     if(sta) {
         RRDSET *st = dictionary_acquired_item_value((const DICTIONARY_ITEM *)sta);
         if(st) {

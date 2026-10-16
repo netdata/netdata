@@ -31,7 +31,6 @@ typedef enum {
 
 struct aclk_query_http_api_v2 {
     char *payload;
-    char *query;
 };
 
 struct aclk_bin_payload {
@@ -101,12 +100,6 @@ typedef struct {
     aclk_query_type_t type;
     bool allocated;
 
-    // dedup_id is used to deduplicate queries in the list
-    // if type and dedup_id is the same message is deduplicated
-    // set dedup_id to NULL to never deduplicate the message
-    // set dedup_id to constant (e.g. empty string "") to make
-    // message of this type ever exist only once in the list
-    char *dedup_id;
     char *callback_topic;
     char *msg_id;
     union {

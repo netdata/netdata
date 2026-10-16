@@ -37,7 +37,7 @@ struct variable_lookup_job {
 };
 
 static void variable_lookup_add_result_with_score(struct variable_lookup_job *vbd, NETDATA_DOUBLE n, RRDSET *st, const char *source __maybe_unused) {
-    RRDSET_ACQUIRED *rsa = rrdset_find_and_acquire(st->rrdhost, rrdset_id(st), true);
+    RRDSET_ACQUIRED *rsa = rrdset_acquire(st->rrdhost, rrdset_id(st));
     if(!rsa)
         return;
 

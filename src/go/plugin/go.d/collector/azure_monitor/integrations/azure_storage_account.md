@@ -631,11 +631,11 @@ The following alerts are available:
 
 | Alert name  | On metric | Description |
 |:------------|:----------|:------------|
-| [ am_storage_accounts_availability ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_storage_accounts.conf) | azure_monitor.storage_accounts.availability | Storage availability on ${label:resource_name} |
-| [ am_storage_accounts_e2e_latency ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_storage_accounts.conf) | azure_monitor.storage_accounts.e2e_latency | Storage E2E latency on ${label:resource_name} |
-| [ am_storage_accounts_e2e_latency_peak ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_storage_accounts.conf) | azure_monitor.storage_accounts.e2e_latency | Storage E2E latency peak on ${label:resource_name} |
-| [ am_storage_accounts_server_latency ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_storage_accounts.conf) | azure_monitor.storage_accounts.server_latency | Storage server latency on ${label:resource_name} |
-| [ am_storage_accounts_server_latency_peak ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_storage_accounts.conf) | azure_monitor.storage_accounts.server_latency | Storage server latency peak on ${label:resource_name} |
+| [ am_storage_accounts_availability ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_storage_accounts.conf) | azure_monitor.storage_accounts.availability | Overall availability of Azure Storage Account ${label:resource_name} in ${label:resource_group} (${label:region}). Azure SLA guarantees 99.9% or higher depending on redundancy tier |
+| [ am_storage_accounts_e2e_latency ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_storage_accounts.conf) | azure_monitor.storage_accounts.e2e_latency | Average end-to-end latency of successful requests to Azure Storage Account ${label:resource_name} in ${label:resource_group} (${label:region}). Includes network round-trip time |
+| [ am_storage_accounts_e2e_latency_peak ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_storage_accounts.conf) | azure_monitor.storage_accounts.e2e_latency | Peak end-to-end latency of successful requests to Azure Storage Account ${label:resource_name} in ${label:resource_group} (${label:region}). Spikes may indicate throttling or network congestion |
+| [ am_storage_accounts_server_latency ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_storage_accounts.conf) | azure_monitor.storage_accounts.server_latency | Average server-side latency of successful requests to Azure Storage Account ${label:resource_name} in ${label:resource_group} (${label:region}). Excludes network time — high values indicate Azure-side processing delays |
+| [ am_storage_accounts_server_latency_peak ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_storage_accounts.conf) | azure_monitor.storage_accounts.server_latency | Peak server-side latency of successful requests to Azure Storage Account ${label:resource_name} in ${label:resource_group} (${label:region}). Spikes may indicate throttling at the storage partition level |
 
 
 

@@ -141,9 +141,9 @@ Before committing `metadata.yaml` changes:
    python3 -m unittest integrations.tests.test_collector_metadata
    ```
 
-   Both workflows run the same two test modules; `check-markdown.yml` runs `test_descriptions` with `LEARN_INGEST_PATH`
-   pointing at the checked-out `netdata/learn` ingest script, so a locally green run can still fail there on Learn-side
-   frontmatter parsing.
+   Both workflows also run `test_prometheus_profile_docs` and `test_health_alerts` (`pipeline.md`, "CI");
+   `check-markdown.yml` runs `test_descriptions` with `LEARN_INGEST_PATH` pointing at the checked-out `netdata/learn`
+   ingest script, so a locally green run can still fail there on Learn-side frontmatter parsing.
 2. For collectors, use `how-tos/preview-collector-page.md`; for flows and other integration types, use its
    [non-collector route](./how-tos/preview-collector-page.md#non-collector-pages). Inspect the catalog sentence separately
    under the contract above. Do not regenerate checkout pages or umbrella files just to read their wording. Full

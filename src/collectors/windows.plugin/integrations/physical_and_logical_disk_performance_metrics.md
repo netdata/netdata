@@ -116,7 +116,15 @@ Exclude logical-volume disk space metrics for mount points that contain `Assured
 
 ## Alerts
 
-There are no alerts configured by default for this integration.
+
+The following alerts are available:
+
+| Alert name  | On metric | Description |
+|:------------|:----------|:------------|
+| [ disk_space_usage ](https://github.com/netdata/netdata/blob/master/src/health/health.d/disks.conf) | disk.space | Total space utilization of disk ${label:mount_point} |
+| [ disk_fill_rate ](https://github.com/netdata/netdata/blob/master/src/health/health.d/disks.conf) | disk.space | average rate the disk fills up (positive), or frees up (negative) space, for the last hour |
+| [ out_of_disk_space_time ](https://github.com/netdata/netdata/blob/master/src/health/health.d/disks.conf) | disk.space | Estimated time the disk ${label:mount_point} will run out of space, if the system continues to add data with the rate of the last hour |
+| [ 10min_disk_utilization ](https://github.com/netdata/netdata/blob/master/src/health/health.d/disks.conf) | disk.util | Average percentage of time ${label:device} disk was busy over the last 10 minutes |
 
 
 

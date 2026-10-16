@@ -381,7 +381,6 @@ modules:
           - name: Logs from the former experimental plugin are not visible
             description: |
               A former-schema `otel.yaml` stops the current plugin and prints a migration guide. Replace it with a partial configuration based on the current stock file. The legacy `logs.journal_dir` key is accepted only to locate the former plugin's read-only journals; it is not part of the current storage layout.
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -389,4 +388,9 @@ modules:
       description: |
         Metrics are created dynamically from supported OpenTelemetry data. The exact charts depend on the received metric names, attributes, instrumentation scopes, and mapping rules.
       availability: []
+      dynamic_context_prefixes:
+        - prefix: otel.
+          reason: >-
+            Chart contexts are generated at runtime from the received OpenTelemetry metric names as
+            otel.<metric name>.
       scopes: []

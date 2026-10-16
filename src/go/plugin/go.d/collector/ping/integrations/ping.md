@@ -224,9 +224,9 @@ The following alerts are available:
 
 | Alert name  | On metric | Description |
 |:------------|:----------|:------------|
-| [ ping_host_reachable ](https://github.com/netdata/netdata/blob/master/src/health/health.d/ping.conf) | ping.host_packet_loss | network host ${label:host} reachability status |
-| [ ping_packet_loss ](https://github.com/netdata/netdata/blob/master/src/health/health.d/ping.conf) | ping.host_packet_loss | packet loss percentage to the network host ${label:host} over the last 10 minutes |
-| [ ping_host_latency ](https://github.com/netdata/netdata/blob/master/src/health/health.d/ping.conf) | ping.host_rtt | average latency to the network host ${label:host} over the last 10 seconds |
+| [ ping_host_reachable ](https://github.com/netdata/netdata/blob/master/src/health/health.d/ping.conf) | ping.host_packet_loss | Network host ${label:host} reachability status |
+| [ ping_packet_loss ](https://github.com/netdata/netdata/blob/master/src/health/health.d/ping.conf) | ping.host_packet_loss | Packet loss percentage to the network host ${label:host} over the last 10 minutes |
+| [ ping_host_latency ](https://github.com/netdata/netdata/blob/master/src/health/health.d/ping.conf) | ping.host_rtt | Average latency to the network host ${label:host} over the last 10 seconds |
 
 
 

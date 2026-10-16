@@ -243,11 +243,11 @@ The following alerts are available:
 | [ systemd_target_unit_failed_state ](https://github.com/netdata/netdata/blob/master/src/health/health.d/systemdunits.conf) | systemd.target_unit_state | systemd target unit in the failed state |
 | [ systemd_path_unit_failed_state ](https://github.com/netdata/netdata/blob/master/src/health/health.d/systemdunits.conf) | systemd.path_unit_state | systemd path unit in the failed state |
 | [ systemd_device_unit_failed_state ](https://github.com/netdata/netdata/blob/master/src/health/health.d/systemdunits.conf) | systemd.device_unit_state | systemd device unit in the failed state |
-| [ systemd_mount_unit_failed_state ](https://github.com/netdata/netdata/blob/master/src/health/health.d/systemdunits.conf) | systemd.mount_unit_state | systemd mount unit in the failed state |
+| [ systemd_mount_unit_failed_state ](https://github.com/netdata/netdata/blob/master/src/health/health.d/systemdunits.conf) | systemd.mount_unit_state | systemd mount units in the failed state |
 | [ systemd_automount_unit_failed_state ](https://github.com/netdata/netdata/blob/master/src/health/health.d/systemdunits.conf) | systemd.automount_unit_state | systemd automount unit in the failed state |
-| [ systemd_swap_unit_failed_state ](https://github.com/netdata/netdata/blob/master/src/health/health.d/systemdunits.conf) | systemd.swap_unit_state | systemd swap unit in the failed state |
-| [ systemd_scope_unit_failed_state ](https://github.com/netdata/netdata/blob/master/src/health/health.d/systemdunits.conf) | systemd.scope_unit_state | systemd scope unit in the failed state |
-| [ systemd_slice_unit_failed_state ](https://github.com/netdata/netdata/blob/master/src/health/health.d/systemdunits.conf) | systemd.slice_unit_state | systemd slice unit in the failed state |
+| [ systemd_swap_unit_failed_state ](https://github.com/netdata/netdata/blob/master/src/health/health.d/systemdunits.conf) | systemd.swap_unit_state | systemd swap units in the failed state |
+| [ systemd_scope_unit_failed_state ](https://github.com/netdata/netdata/blob/master/src/health/health.d/systemdunits.conf) | systemd.scope_unit_state | systemd scope units in the failed state |
+| [ systemd_slice_unit_failed_state ](https://github.com/netdata/netdata/blob/master/src/health/health.d/systemdunits.conf) | systemd.slice_unit_state | systemd slice units in the failed state |
 | [ systemd_timer_unit_failed_state ](https://github.com/netdata/netdata/blob/master/src/health/health.d/systemdunits.conf) | systemd.timer_unit_state | systemd timer unit in the failed state |
 
 
