@@ -180,6 +180,7 @@ type candidateEntry struct {
 	Admitted          bool
 	GrantIntent       uint64
 	Rejected          bool
+	TrustRevoked      bool
 	Initial           bool
 	Due               int64
 	HasDue            bool
@@ -196,9 +197,12 @@ type candidateSourceAdmission struct {
 // canonical lane serializes policy changes. Population preparation runs off-loop;
 // live runtime settlement prepares only bounded entry/header changes on the loop.
 type candidateRecord struct {
-	Revision         uint64
-	Inventory        DiscoveredJobInventory
-	Cursor           *sourceObservation
+	Revision  uint64
+	Inventory DiscoveredJobInventory
+	Cursor    *sourceObservation
+	// Withdrawal provenance classifies a later invalid literal replacement. It
+	// conveys no permission and never retains the withdrawn binding's payload.
+	TrustWithdrawal  *sourceObservation
 	InventoryReceipt [sha256.Size]byte
 	Binding          *candidateBinding
 	Intent           uint64
@@ -480,7 +484,11 @@ func (c *candidateController) prepareInventoryBatchValidated(input DiscoveredJob
 // choose a source, admit a binding, or release executable work.
 func (c *candidateController) foldInventory(d *candidateDelta, inv DiscoveredJobInventory, invalid map[candidateKey]bool) {
 	r := d.after
+	withdrawals := candidateTrustWithdrawals(r.Inventory, inv)
 	r.Inventory = inv
+	if previous := r.TrustWithdrawal; previous != nil && inv.Sources[previous.Key.Source] != previous.Lifetime {
+		r.TrustWithdrawal = nil
+	}
 	r.prepareSourceAdmissions()
 	r.ownEntries()
 	for _, e := range r.entries() {
@@ -502,6 +510,7 @@ func (c *candidateController) foldInventory(d *candidateDelta, inv DiscoveredJob
 			e.Rejected = true
 		}
 	}
+	withdrewBinding := r.withdrawTrust(withdrawals)
 	// Stamp absence only after the complete inventory has restored all current
 	// members. A surviving sibling keeps its original introduction provenance.
 	for _, entry := range r.entries() {
@@ -512,9 +521,12 @@ func (c *candidateController) foldInventory(d *candidateDelta, inv DiscoveredJob
 	r.pruneRecoveryGrants()
 	// Missing membership is not source removal: an admitted source grant survives
 	// until a replacement is admitted, including while replacement validation runs.
+	workRevoked := false
+	proposalRevoked := false
 	if r.Proposal != nil && (!candidateAuthorized(r, r.Proposal.Token.Candidate) || r.entry(r.Proposal.Token.Candidate).Rejected) {
 		r.Proposal = nil
-		d.Decision.Revoke = true
+		workRevoked = true
+		proposalRevoked = true
 	}
 	if r.Active != nil && (!candidateAuthorized(r, r.Active.Token.Candidate) || r.entry(r.Active.Token.Candidate).Rejected) {
 		r.Active = nil
@@ -522,16 +534,24 @@ func (c *candidateController) foldInventory(d *candidateDelta, inv DiscoveredJob
 		r.PassCursor = 0
 		r.Wake = nil
 		d.Decision.Wake = nil
-		if r.FrameworkBlocked && r.Block != candidateBlockQuarantined {
-			r.FrameworkBlocked = false
-			r.Phase = candidateDormant
-		}
-		d.Decision.Revoke = true
+		r.FrameworkBlocked = false
+		r.Phase = candidateDormant
+		workRevoked = true
 	}
 	if r.Binding != nil && (r.entry(r.Binding.Key) == nil || r.entry(r.Binding.Key).SourceOwned) && !candidateAuthorized(r, r.Binding.Key) {
 		r.Binding = nil
 		d.Decision.Remove = true
+		workRevoked = true
+	}
+	// The proposal, or otherwise Active, owns the executor. Retire a revoked
+	// executor without canceling unrelated work that has already displaced it.
+	if workRevoked && r.Proposal == nil && (r.Active == nil || proposalRevoked) {
 		d.Decision.Revoke = true
+	}
+	if withdrewBinding {
+		r.SearchClosed = false
+		r.Manual = candidateManualSourceRevoked
+		r.Phase = candidateFailedManual
 	}
 }
 
@@ -605,7 +625,7 @@ func compareCandidateKeys(a, b candidateKey) int {
 
 func candidateAuthorized(r *candidateRecord, key candidateKey) bool {
 	e := r.entry(key)
-	if e == nil {
+	if e == nil || e.TrustRevoked {
 		return false
 	}
 	if e.Observed {
@@ -638,7 +658,7 @@ func (r *candidateRecord) pruneRecoveryGrants() {
 			entry.Admitted = false
 			entry.GrantIntent = 0
 		}
-		if !candidateAuthorized(r, key) {
+		if !entry.Observed && !candidateAuthorized(r, key) {
 			r.removeEntry(key)
 		}
 	}
@@ -651,7 +671,7 @@ func candidateSourceBlocked(r *candidateRecord, key candidateKey) bool {
 			continue
 		}
 		found = true
-		if !e.Rejected {
+		if !e.Rejected && candidateAuthorized(r, e.Key) {
 			return false
 		}
 	}
@@ -661,7 +681,7 @@ func candidateSourceBlocked(r *candidateRecord, key candidateKey) bool {
 func candidateSourceChoice(r *candidateRecord) *sourceSelection {
 	var selected *candidateEntry
 	for _, e := range r.entries() {
-		if !e.Observed || !e.SourceOwned || e.Rejected {
+		if !e.Observed || !e.SourceOwned || e.Rejected || !candidateAuthorized(r, e.Key) {
 			continue
 		}
 		if selected == nil || e.Candidate.Config.SourceTypePriority() > selected.Candidate.Config.SourceTypePriority() || e.Candidate.Config.SourceTypePriority() == selected.Candidate.Config.SourceTypePriority() && compareCandidateKeys(e.Key, selected.Key) < 0 {
@@ -671,7 +691,7 @@ func candidateSourceChoice(r *candidateRecord) *sourceSelection {
 	if r.Cursor != nil {
 		previous := r.entry(r.Cursor.Key)
 		lifetime, present := r.Inventory.Sources[r.Cursor.Key.Source]
-		observed := previous != nil && previous.Observed && !previous.Rejected
+		observed := previous != nil && previous.Observed && !previous.Rejected && candidateAuthorized(r, previous.Key)
 		protected := present && lifetime == r.Cursor.Lifetime && (previous == nil || !previous.Rejected) && candidateSourceBlocked(r, r.Cursor.Key)
 		if (observed || protected) && (selected == nil || selected.Candidate.Config.SourceTypePriority() <= r.Cursor.Priority) {
 			if previous != nil && (previous.Rejected || !candidateAuthorized(r, previous.Key)) {
@@ -801,6 +821,13 @@ func (c *candidateController) revoke(r *candidateRecord) {
 func (c *candidateController) admit(d *candidateDelta, key candidateKey, health dyncfg.Status, listed bool) error {
 	r := d.after
 	e := r.editEntry(key)
+	if e == nil || e.TrustRevoked {
+		return errors.New("job output: candidate trust has been withdrawn")
+	}
+	r.TrustWithdrawal = nil
+	if r.Manual == candidateManualSourceRevoked {
+		r.Manual = candidateManualNone
+	}
 	e.Admitted = true
 	e.GrantIntent = r.Intent
 	r.admitSource(e)
@@ -1000,14 +1027,12 @@ func (c *candidateController) prepareOutcome(name string, token candidateWorkTok
 		d.Decision.Ignored = true
 		return d, nil
 	}
-	// Source trust authority belongs to this record, including retained grants;
-	// execution reports invalid preparation without choosing revocation policy.
-	if outcome.Kind == candidateRejected && candidateTrustOptOut(previousBinding, work.Config) {
+	// Inventory already consumed the permission withdrawal. Execution only
+	// classifies a metadata-valid replacement's failed literal preparation.
+	if outcome.Kind == candidateRejected && r.TrustWithdrawal != nil && work.Config.SourceType() == confgroup.TypeDiscovered &&
+		!work.Config.TrustDiscoveredTargets() && work.Config.DiscoveryPipelineID() == r.TrustWithdrawal.Key.Pipeline {
 		outcome.Kind = candidateSourceRevoked
 		outcome.Listed = true
-	}
-	if outcome.Kind == candidateRejected || outcome.Kind == candidateSourceRevoked {
-		r.revokeRejectedTrustGrants(work.Config)
 	}
 	if outcome.Kind == candidateRejected {
 		r.editEntry(token.Candidate).Rejected = true
@@ -1392,6 +1417,10 @@ func prepareCandidateRecord(source *candidateRecord) *candidateRecord {
 		observation := *source.Cursor
 		out.Cursor = &observation
 	}
+	if source.TrustWithdrawal != nil {
+		observation := *source.TrustWithdrawal
+		out.TrustWithdrawal = &observation
+	}
 	if source.Binding != nil {
 		binding := *source.Binding
 		out.Binding = &binding
@@ -1555,42 +1584,65 @@ func (r *candidateRecord) prepareSourceAdmissions() {
 	r.sourcesOwned = true
 }
 
-func candidateTrustOptOut(binding *candidateBinding, proposed confgroup.Config) bool {
-	return binding != nil && proposed.SourceType() == confgroup.TypeDiscovered && !proposed.TrustDiscoveredTargets() &&
-		proposed.DiscoveryPipelineID() != "" && binding.Config.SourceType() == confgroup.TypeDiscovered &&
-		binding.Config.TrustDiscoveredTargets() && binding.Config.DiscoveryPipelineID() == proposed.DiscoveryPipelineID()
+// Permission changes are source facts, including when metadata prevents any
+// executable proposal. Compare full inventories: ledger pruning is not a new
+// source observation, and an unchanged opt-out must not revoke a later grant.
+func candidateTrustWithdrawals(previous, next DiscoveredJobInventory) map[string]*sourceObservation {
+	var seen map[candidateKey]struct{}
+	var withdrawals map[string]*sourceObservation
+	for _, candidate := range next.Candidates {
+		config := candidate.Config
+		pipeline := config.DiscoveryPipelineID()
+		if config.SourceType() != confgroup.TypeDiscovered || config.TrustDiscoveredTargets() || pipeline == "" {
+			continue
+		}
+		if seen == nil {
+			seen = make(map[candidateKey]struct{}, len(previous.Candidates))
+			for _, old := range previous.Candidates {
+				seen[candidateIdentity(old)] = struct{}{}
+			}
+		}
+		key := candidateIdentity(candidate)
+		if _, present := seen[key]; present {
+			continue
+		}
+		if withdrawals == nil {
+			withdrawals = make(map[string]*sourceObservation)
+		}
+		withdrawals[pipeline] = &sourceObservation{Key: key, Priority: config.SourceTypePriority(), Lifetime: next.Sources[candidate.Source]}
+	}
+	return withdrawals
 }
 
-// A rejected opt-out can revoke a historical trusted grant even while an
-// unrelated pipeline owns the public binding. This rare source transition is
-// prepared off-loop; ordinary readiness and operational outcomes never scan here.
-func (r *candidateRecord) revokeRejectedTrustGrants(proposed confgroup.Config) {
-	pipeline := proposed.DiscoveryPipelineID()
-	if proposed.SourceType() != confgroup.TypeDiscovered || proposed.TrustDiscoveredTargets() || pipeline == "" {
-		return
+// Called after restoring complete observed membership and before pruning.
+// Observed revoked entries remain as fences until their membership disappears.
+func (r *candidateRecord) withdrawTrust(withdrawals map[string]*sourceObservation) bool {
+	if len(withdrawals) == 0 {
+		return false
 	}
-	matches := func(key candidateKey, entry *candidateEntry) bool {
+	changed, withdrewBinding := false, false
+	for key, entry := range r.entries() {
 		config := entry.Candidate.Config
-		return !entry.Observed && entry.Admitted && (r.Binding == nil || r.Binding.Key != key) &&
-			config.SourceType() == confgroup.TypeDiscovered && config.TrustDiscoveredTargets() &&
-			config.DiscoveryPipelineID() == pipeline && candidateAuthorized(r, key)
-	}
-	found := false
-	for key, entry := range r.entries() {
-		if matches(key, entry) {
-			found = true
-			break
+		withdrawal := withdrawals[config.DiscoveryPipelineID()]
+		if withdrawal == nil || entry.TrustRevoked || config.SourceType() != confgroup.TypeDiscovered || !config.TrustDiscoveredTargets() {
+			continue
+		}
+		entry.TrustRevoked = true
+		entry.Admitted = false
+		entry.GrantIntent = 0
+		entry.HasDue = false
+		changed = true
+		if r.Binding != nil && r.Binding.Key == key {
+			r.TrustWithdrawal = withdrawal
+			withdrewBinding = true
 		}
 	}
-	if !found {
-		return
+	if changed && !r.FrameworkBlocked {
+		r.Pass = nil
+		r.PassCursor = 0
+		r.Wake = nil
 	}
-	r.ownEntries()
-	for key, entry := range r.entries() {
-		if matches(key, entry) {
-			r.removeEntry(key)
-		}
-	}
+	return withdrewBinding
 }
 
 // prepareAdoptExact combines interactive acceptance and its health projection.

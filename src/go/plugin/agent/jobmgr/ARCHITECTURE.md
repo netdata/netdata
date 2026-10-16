@@ -531,6 +531,7 @@ Common event sequences:
 | --- | --- |
 | Higher source is Accepted, Running, Failed, or Disabled | Lower sources remain observed but cannot probe or take ownership. |
 | Admitted source proposes only rejected replacements | Its admitted incumbent and authorized recovery survive while that source slot remains; real removal or an accepted replacement revokes them. |
+| Owning discovered pipeline withdraws trust | Its trusted execution and recovery authority are revoked during inventory folding, independently of metadata admission. Invalid metadata cannot acquire an exposed binding. |
 | An admitted sibling fails and another sibling is adopted | Other still-authorized admission grants retain their immutable config and deadlines; sibling adoption alone is not source replacement. |
 | Enabled search has no active attempt and a new eligible sibling arrives | The controller can open a finite pass without resetting prior deadlines or repeating every failed member. Passive, disabled, blocked and readiness-closed searches do not start siblings. |
 | A delayed worker or deadline completes | The lane rechecks its exact run, intent and work/schedule capability; stale work cannot adopt, publish or re-enable. |
@@ -808,8 +809,8 @@ mutations remain serialized while unrelated graph work can proceed. Unchanged id
 repeat validation callbacks. Retirement calls the intent owner's Prepare with a zero next identity, then Commit to
 release intent. Retirement preparation, Commit and Abort perform bounded in-memory ownership changes. The owner may
 queue physical cleanup on its maintenance worker; cleanup failures remain visible through owner health and final
-joined close. Operational failure/retry retains valid intent. The owning discovery pipeline can still
-revoke trust with an invalid postimage; that Failed adoption retires both the incumbent and acquisition intent.
+joined close. Operational failure/retry retains valid intent. An owning discovery pipeline's trust withdrawal
+retires the trusted binding and acquisition intent during inventory commit, even when replacement metadata is invalid.
 
 If admission validation or reservation is busy or times out, the controller retains unaccepted work until that
 exact admission attempt releases, preserving the incumbent. A quarantined admission identity rejects that revision.
@@ -922,12 +923,22 @@ itself authority. It also stamps `__discovery_pipeline_id__` from the manager-ow
 target source text. Enabled discovered trust and its pipeline ID participate in `confgroup.Config.Hash` so changing
 the setting or trusted owner reconciles jobs even when their other values are unchanged. Absent/false trust stamps
 preserve the default hash. Cloning and graph payload serialization preserve both stamps.
-When opting out makes a literal field invalid, the job controller treats it as source revocation: it commits the
-replacement as Failed and removes the old trusted runtime and its dependencies only if both configs carry the same
-nonempty pipeline ID. Invalid proposals
-from a different or unidentified pipeline retain ordinary rejection behavior, preserving the trusted incumbent.
-An owning pipeline's trust opt-out also revokes its historical trusted recovery grants when another pipeline's
-candidate is exposed; it does not replace that unrelated exposed binding.
+Permission withdrawal belongs to the controller's inventory ingress, before executable metadata admission. A newly
+observed discovered membership with false trust and a nonempty pipeline ID revokes that pipeline's current and
+historical trusted memberships, work and retry grants. If it owns the exposed binding, the same transaction removes
+that binding, runtime, dependencies and acquisition intent. Metadata quarantine cannot bypass this withdrawal.
+Invalid metadata remains unpublishable; a metadata-valid replacement whose literal preparation fails can subsequently
+be exposed as Failed/manual source revocation. Unrelated or unidentified pipelines cannot withdraw the incumbent's
+permission. Historical-only withdrawal preserves an unrelated exposed binding and its remaining recovery deadlines.
+
+The controller consumes permission facts by membership incarnation against the preceding complete inventory, including
+each ordered observation in a batch. Repeated full snapshots cannot reapply an old opt-out against a later legitimate
+grant. A withdrawn trusted membership stays fenced while observed, so ENABLE, exact commands, resume and stale runtime
+outcomes cannot restore it; its fence is pruned on absence. A fresh incarnation follows ordinary source arbitration.
+Protected cursor history and the source-revoked manual hold preserve existing masking: withdrawal does not itself open
+automatic sibling search or a lower source tier. A valid replacement in the protected slot or real source removal can
+reconcile normally. Outcome processing classifies preparation failure from recorded withdrawal provenance; it does
+not independently withdraw permission. That provenance expires on admission or loss of its source lifetime.
 Rejected discovered candidates are scoped by pipeline ID too, so a competing candidate's rejection cannot suppress
 a later opt-out from the actual owner, even when their untrusted hashes match.
 

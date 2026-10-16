@@ -149,7 +149,9 @@ func TestDiscoveredTrustRevocationRequiresPipelineIdentity(t *testing.T) {
 			applied, err = transaction.Apply(t.Context())
 			require.NoError(t, err)
 			_, disposition, current = applied.Ownership()
-			require.Equal(t, lifecycle.ResourceTransactionRemoved, disposition)
+			// The inventory fixture already applied withdrawal and retired the
+			// runtime. This later completion publishes the valid Failed payload.
+			require.Equal(t, lifecycle.ResourceTransactionUnchanged, disposition)
 			require.Nil(t, current)
 			record, exists := graph.Lookup(config.FullName())
 			require.True(t, exists)
