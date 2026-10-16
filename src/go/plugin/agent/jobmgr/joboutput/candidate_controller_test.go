@@ -495,8 +495,10 @@ func TestCandidateControllerEnableTentativePreservesBinding(t *testing.T) {
 	enabled := candidateEnable(t, c, 2)
 	require.NotNil(t, enabled.Decision.Work)
 	assert.True(t, enabled.Decision.Work.Tentative)
-	assert.Nil(t, enabled.Decision.Binding)
-	assert.Equal(t, before, c.snapshot("test_job").Binding)
+	require.NotNil(t, enabled.Decision.Binding)
+	assert.Equal(t, before.Config, enabled.Decision.Binding.Config)
+	assert.Equal(t, before.Key, enabled.Decision.Binding.Key)
+	assert.Equal(t, dyncfg.StatusAccepted, enabled.Decision.Binding.Health)
 }
 
 func TestCandidateControllerFrameworkBlockPolicies(t *testing.T) {
@@ -530,6 +532,14 @@ func TestCandidateControllerFrameworkBlockPolicies(t *testing.T) {
 			// Late duplicate classification must not reset Failed or its original due.
 			duplicate := candidateResult(t, c, work, candidateOutcome{Kind: candidateFrameworkBlocked, Block: policy, Listed: true, RetryAfter: 99}, 3)
 			assert.True(t, duplicate.Decision.Ignored)
+			if policy != candidateBlockAcceptedWait {
+				enabled, err := c.prepareEnable("test_job", 3)
+				require.NoError(t, err)
+				require.NotNil(t, enabled.Decision.Work)
+				assert.Equal(t, work.Token.Candidate, enabled.Decision.Work.Token.Candidate)
+				assert.NotEqual(t, work.Token.Intent, enabled.Decision.Work.Token.Intent)
+				assert.Equal(t, dyncfg.StatusAccepted, enabled.Decision.Binding.Health)
+			}
 			resume, err := c.prepareResume("test_job", work.Token, 3)
 			applyCandidateDelta(t, resume, err)
 			switch policy {
@@ -552,7 +562,10 @@ func TestCandidateControllerFrameworkBlockPolicies(t *testing.T) {
 				assert.True(t, resume.Decision.Ignored)
 				assert.Nil(t, blocked.Decision.Wake)
 				enabled := candidateEnable(t, c, 50)
-				assert.True(t, enabled.Decision.Ignored)
+				require.NotNil(t, enabled.Decision.Work)
+				assert.Equal(t, work.Token.Candidate, enabled.Decision.Work.Token.Candidate)
+				assert.NotEqual(t, work.Token.Intent, enabled.Decision.Work.Token.Intent)
+				assert.Equal(t, dyncfg.StatusAccepted, enabled.Decision.Binding.Health)
 			}
 		})
 	}

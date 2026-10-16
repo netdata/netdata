@@ -211,12 +211,18 @@ func (dcjc *DynCfgJobController) prepareEnable(
 	if err != nil {
 		return nil, err
 	}
+	if delta.after.Binding == nil || !delta.after.Binding.Listed {
+		return nil, errors.New("job output: enabled config has no exposed binding")
+	}
+	postimage, err := candidateGraphBinding(scope.ID, delta.after.Binding)
+	if err != nil {
+		return nil, err
+	}
 	reply := adoptedReply(dyncfg.CommandEnable, dyncfg.StatusAccepted, jobFailure{})
 	reply.candidate = delta
-	postimage := graphConfig(record, dyncfg.StatusAccepted)
 	return dcjc.prepareMutationAfterApply(ctx, scope, current, nil, permit,
-		resourceRemovalDisposition(current), &postimage, reply,
-		dcjc.configStatusCleanup(scope.ID, dyncfg.StatusAccepted), nil, jobConfigIntentEnable)
+		resourceRemovalDisposition(current), postimage, reply,
+		dcjc.candidateProjectionCleanup(scope.ID, postimage, delta), nil, jobConfigIntentEnable)
 }
 
 func (dcjc *DynCfgJobController) prepareRestart(

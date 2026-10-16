@@ -2534,3 +2534,47 @@ func dynCfgTestActivationCommands(t *testing.T, controller *DynCfgJobController)
 	})
 	return commands
 }
+
+func TestEnableRearmsFailedFrameworkBlockedBinding(t *testing.T) {
+	controller, graph, _, _, _ := newDynCfgJobTestHarness(t)
+	commands := dynCfgTestActivationCommands(t, controller)
+	var constructions atomic.Int64
+	creator := controller.modules["module"]
+	creator.Create = func() collectorapi.CollectorV1 {
+		constructions.Add(1)
+		panic("construction failed")
+	}
+	controller.modules["module"] = creator
+	config := factoryTestConfig(false)
+	seedDynCfgJobGraphRecord(t, controller, graph, config, dyncfg.StatusDisabled)
+	applyAcceptedEnableForTest(t, controller, graph, config, 1)
+	require.Nil(t, applyActivationTestSubmission(t, commands.next(t, "internal/jobs/accepted-activation"), nil, 2))
+	before := controller.candidates.view(config.FullName())
+	require.True(t, before.FrameworkBlocked)
+	require.Equal(t, dyncfg.StatusFailed, before.Binding.Health)
+	record, _ := graph.Lookup(config.FullName())
+	require.Equal(t, before.Binding.Health.String(), record.Status)
+
+	prepared, err := controller.Prepare(t.Context(), DynCfgJobRequest{
+		Args: []string{controller.externalID(config.FullName()), "enable"},
+	}, nil, lifecycle.ResourceTransactionScope{ID: config.FullName()}, lifecycle.LongLivedPermit{})
+	require.NoError(t, err)
+	applied, err := prepared.Apply(t.Context())
+	require.NoError(t, err)
+	require.Equal(t, 202, applied.ResultStatus())
+	after := controller.candidates.view(config.FullName())
+	record, _ = graph.Lookup(config.FullName())
+	require.Equal(t, after.Binding.Health.String(), record.Status)
+	require.Equal(t, dyncfg.StatusAccepted.String(), record.Status)
+	require.NotEqual(t, before.Intent, after.Intent)
+
+	// Fresh intent still encounters the same quarantined process identity. It
+	// settles health without entering collector code or bypassing containment.
+	require.Nil(t, applyActivationTestSubmission(t, commands.next(t, "internal/jobs/accepted-activation"), nil, 3))
+	after = controller.candidates.view(config.FullName())
+	record, _ = graph.Lookup(config.FullName())
+	require.True(t, after.FrameworkBlocked)
+	require.Equal(t, dyncfg.StatusFailed, after.Binding.Health)
+	require.Equal(t, after.Binding.Health.String(), record.Status)
+	require.EqualValues(t, 1, constructions.Load())
+}

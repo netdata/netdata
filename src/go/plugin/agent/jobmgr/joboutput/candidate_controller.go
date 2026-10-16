@@ -767,7 +767,8 @@ func (c *candidateController) prepareEnable(name string, now int64) (delta *cand
 	if r.Binding == nil {
 		return nil, errors.New("job output: candidate enable has no admitted binding")
 	}
-	if r.Enablement == candidateEnabled && (r.Phase == candidateRunning || r.Active != nil || r.Proposal != nil || r.Phase == candidateBlocked) {
+	if r.Enablement == candidateEnabled && (r.Binding.Health == dyncfg.StatusRunning ||
+		r.Binding.Health == dyncfg.StatusAccepted && (r.Active != nil || r.Proposal != nil || r.Phase == candidateBlocked)) {
 		d.Decision.Ignored = true
 		return d, nil
 	}
@@ -790,14 +791,14 @@ func (c *candidateController) prepareEnable(name string, now int64) (delta *cand
 		e.Initial = true
 		e.HasDue = false
 	}
+	if err := c.admit(d, r.Binding.Key, dyncfg.StatusAccepted, r.Binding.Listed); err != nil {
+		return nil, err
+	}
 	// Re-resolve an unaccepted replacement interrupted by DISABLE.
 	choice := candidateSourceChoice(r)
 	if choice != nil && *choice != r.Binding.Key && !r.entry(r.Binding.Key).Observed && !candidateSourceBlocked(r, r.Binding.Key) {
 		r.Cursor = nil
 		return d, c.reconcileSource(d, now)
-	}
-	if err := c.admit(d, r.Binding.Key, dyncfg.StatusAccepted, r.Binding.Listed); err != nil {
-		return nil, err
 	}
 	return d, c.progress(d, now)
 }
