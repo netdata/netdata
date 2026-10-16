@@ -2058,6 +2058,17 @@ static inline bool logical_disk_space_chart_skipped(const struct logical_disk *d
     return d && (d->DriveType == 5 /* DRIVE_CDROM */ || (d->readonly_known && d->readonly));
 }
 
+// Handles volume recovery from a transient space query failure.
+// Invalidates cached metadata to trigger collection while preserving readonly_known.
+static inline void logical_disk_handle_space_recovery(struct logical_disk *d)
+{
+    if (d && d->space_failed_since) {
+        d->collected_metadata = false;
+        d->metadata_retry_after = 0;
+        d->space_failed_since = 0;
+    }
+}
+
 // percentDiskFree carries the free space in Data and the size of the volume in Time, both scaled by
 // divisor. Shared by the perflib pass and the mount point pass so every volume looks the same.
 static void logical_disk_chart(struct logical_disk *d, const char *name, int update_every)
@@ -2164,13 +2175,8 @@ static void logical_disk_collect_instance(
     struct logical_disk *d = dictionary_set(dict, resolved_name, NULL, sizeof(*d));
     const struct volume_space_result *result =
         volume_space_cycle_results ? dictionary_get(volume_space_cycle_results, resolved_name) : NULL;
-    if (result && result->success) {
-        if (d->space_failed_since) {
-            d->collected_metadata = false;
-            d->metadata_retry_after = 0;
-            d->space_failed_since = 0;
-        }
-    }
+    if (result && result->success)
+        logical_disk_handle_space_recovery(d);
     logical_disk_apply_metadata(d, result, now_ut);
     if (volume_space_extra_targets)
         dictionary_set(volume_space_extra_targets, resolved_name, NULL, 0);
@@ -2290,11 +2296,7 @@ static bool do_mount_points(DICTIONARY *results, int update_every, usec_t now_ut
 
         d = dictionary_set(logicalDisks, name, NULL, sizeof(*d));
         d->mount_point_source = true;
-        if (d->space_failed_since) {
-            d->collected_metadata = false;
-            d->metadata_retry_after = 0;
-            d->space_failed_since = 0;
-        }
+        logical_disk_handle_space_recovery(d);
 
         logical_disk_apply_metadata(d, result, now_ut);
 
@@ -3115,11 +3117,7 @@ static int logical_disk_metadata_unittest_run(void)
         .readonly_known = true,
         .space_failed_since = 500000,
     };
-    if (d_recov.space_failed_since) {
-        d_recov.collected_metadata = false;
-        d_recov.metadata_retry_after = 0;
-        d_recov.space_failed_since = 0;
-    }
+    logical_disk_handle_space_recovery(&d_recov);
     errors += mount_points_unittest_expect(
         "space query recovery retains readonly_known to prevent false alerts",
         !d_recov.collected_metadata && d_recov.readonly_known && d_recov.readonly);
