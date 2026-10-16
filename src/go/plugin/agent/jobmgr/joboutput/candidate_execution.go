@@ -293,15 +293,6 @@ func (dcjc *DynCfgJobController) prepareControllerActivationError(ctx context.Co
 	case activationFailureProposal:
 		state := dcjc.candidates.view(scope.ID)
 		if state != nil && state.Binding != nil {
-			incumbent, proposed := state.Binding.Config, attempt.spec.config
-			if incumbent.SourceType() == confgroup.TypeDiscovered && incumbent.TrustDiscoveredTargets() && incumbent.DiscoveryPipelineID() != "" &&
-				incumbent.DiscoveryPipelineID() == proposed.DiscoveryPipelineID() && proposed.SourceType() == confgroup.TypeDiscovered && !proposed.TrustDiscoveredTargets() {
-				delta, prepareErr := dcjc.candidates.prepareOutcome(scope.ID, attempt.spec.work.Token, candidateOutcome{Kind: candidateSourceRevoked, Listed: true}, dcjc.scheduler.retries.now())
-				if prepareErr != nil {
-					return nil, prepareErr
-				}
-				return dcjc.prepareCandidateDecision(ctx, scope, current, permit, delta)
-			}
 			if !attempt.spec.work.Tentative && state.Binding.Key == attempt.spec.work.Token.Candidate {
 				delta, prepareErr := dcjc.candidates.prepareOutcome(scope.ID, attempt.spec.work.Token, candidateOutcome{Kind: candidateAdmittedInvalid, Listed: state.Binding.Listed}, dcjc.scheduler.retries.now())
 				if prepareErr != nil {

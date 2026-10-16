@@ -672,7 +672,7 @@ func TestCandidateControllerTrustedSourceRevoked(t *testing.T) {
 	inv.Candidates[0].Incarnation = 2
 	proposal := candidateInventory(t, c, inv, 1).Decision.Work
 	require.NotNil(t, proposal)
-	revoked := candidateResult(t, c, proposal, candidateOutcome{Kind: candidateSourceRevoked, Listed: true}, 1)
+	revoked := candidateResult(t, c, proposal, candidateOutcome{Kind: candidateRejected}, 1)
 	require.NotNil(t, revoked.Decision.Binding)
 	assert.Equal(t, literal, revoked.Decision.Binding.Config)
 	assert.Equal(t, dyncfg.StatusFailed, revoked.Decision.Binding.Health)
@@ -1018,11 +1018,20 @@ func TestCandidateControllerConcurrentView(t *testing.T) {
 }
 
 func candidateCostController(t testing.TB, n int) (*candidateController, *candidateRecord) {
+	return candidateCostControllerSources(t, n, false)
+}
+
+func candidateCostControllerSources(t testing.TB, n int, separate bool) (*candidateController, *candidateRecord) {
 	t.Helper()
 	inv := DiscoveredJobInventory{FullName: "test_job", Version: 1, AutoEnable: true, Sources: map[string]uint64{"source": 1}}
 	for i := 0; i < n; i++ {
-		config := candidateTestConfig("source", fmt.Sprint(i))
-		inv.Candidates = append(inv.Candidates, DiscoveredJobCandidate{Config: config, Source: "source", Incarnation: uint64(i + 1)})
+		source := "source"
+		if separate {
+			source = fmt.Sprint("source-", i)
+		}
+		config := candidateTestConfig(source, fmt.Sprint(i))
+		inv.Sources[source] = 1
+		inv.Candidates = append(inv.Candidates, DiscoveredJobCandidate{Config: config, Source: source, Incarnation: uint64(i + 1)})
 	}
 	c := newCandidateController(1)
 	delta, err := c.prepareInventory(inv, 0)
@@ -1047,22 +1056,30 @@ func candidateCostFailurePass(t testing.TB, c *candidateController, initial *can
 
 func TestCandidateControllerFailurePassAllocationGrowth(t *testing.T) {
 	// An eightfold candidate increase permits sorting and linear setup, but must
-	// not restore the former quadratic cloning of the entire ledger per failure.
-	cSmall, small := candidateCostController(t, 32)
-	cLarge, large := candidateCostController(t, 256)
-	smallAllocs := testing.AllocsPerRun(3, func() { candidateCostFailurePass(t, cSmall, small) })
-	largeAllocs := testing.AllocsPerRun(3, func() { candidateCostFailurePass(t, cLarge, large) })
-	assert.Less(t, largeAllocs, smallAllocs*12, "all-failure pass allocations must scale near linearly")
+	// not restore quadratic copying or source-tier scans for each failure.
+	for name, separate := range map[string]bool{"shared source": false, "distinct sources": true} {
+		t.Run(name, func(t *testing.T) {
+			cSmall, small := candidateCostControllerSources(t, 32, separate)
+			cLarge, large := candidateCostControllerSources(t, 256, separate)
+			smallAllocs := testing.AllocsPerRun(3, func() { candidateCostFailurePass(t, cSmall, small) })
+			largeAllocs := testing.AllocsPerRun(3, func() { candidateCostFailurePass(t, cLarge, large) })
+			assert.Less(t, largeAllocs, smallAllocs*12, "all-failure pass allocations must scale near linearly")
+		})
+	}
 }
 
 func BenchmarkCandidateControllerFailurePass(b *testing.B) {
-	for _, n := range []int{10, 100, 1000} {
-		b.Run(fmt.Sprint(n), func(b *testing.B) {
-			c, initial := candidateCostController(b, n)
-			b.ReportAllocs()
-			b.ResetTimer()
-			for i := 0; i < b.N; i++ {
-				candidateCostFailurePass(b, c, initial)
+	for name, separate := range map[string]bool{"shared source": false, "distinct sources": true} {
+		b.Run(name, func(b *testing.B) {
+			for _, n := range []int{10, 100, 1000} {
+				b.Run(fmt.Sprint(n), func(b *testing.B) {
+					c, initial := candidateCostControllerSources(b, n, separate)
+					b.ReportAllocs()
+					b.ResetTimer()
+					for i := 0; i < b.N; i++ {
+						candidateCostFailurePass(b, c, initial)
+					}
+				})
 			}
 		})
 	}
@@ -1270,4 +1287,214 @@ func TestCandidateControllerReadinessRevokesHistoricalRetainedGrants(t *testing.
 	failed := candidateResult(t, c, enabled.Decision.Work, candidateOutcome{Kind: candidateFailed, Listed: true}, 4)
 	assert.Nil(t, failed.Decision.Work)
 	assert.Nil(t, failed.Decision.Wake)
+}
+
+func candidateHistoricalGrant(t *testing.T, discovered bool) (*candidateController, DiscoveredJobInventory, *candidateWork, *candidateWork) {
+	t.Helper()
+	c := newCandidateController(1)
+	a, b := candidateTestConfig("a", "old"), candidateTestConfig("b", "sibling")
+	if discovered {
+		a.SetSourceType(confgroup.TypeDiscovered).SetDiscoveryPipelineID("pipeline-a").SetTrustDiscoveredTargets(true)
+		b.SetSourceType(confgroup.TypeDiscovered).SetDiscoveryPipelineID("pipeline-b").SetTrustDiscoveredTargets(true)
+	}
+	inv := candidateTestInventory(1, true, a, b)
+	first := candidateInventory(t, c, inv, 0).Decision.Work
+	require.Equal(t, a, first.Config)
+	candidateResult(t, c, first, candidateOutcome{Kind: candidateAdmitted}, 0)
+	inv.Version = 2
+	invalid := candidateTestConfig("a", "invalid")
+	if discovered {
+		invalid.SetSourceType(confgroup.TypeDiscovered).SetDiscoveryPipelineID("pipeline-a").SetTrustDiscoveredTargets(true)
+	}
+	inv.Candidates[0].Config = invalid
+	inv.Candidates[0].Incarnation = 7
+	proposal := candidateInventory(t, c, inv, 1).Decision.Work
+	candidateResult(t, c, proposal, candidateOutcome{Kind: candidateRejected}, 1)
+	sibling := candidateResult(t, c, first, candidateOutcome{Kind: candidateFailed, Listed: true, RetryAfter: 10}, 2).Decision.Work
+	require.NotNil(t, sibling)
+	candidateResult(t, c, sibling, candidateOutcome{Kind: candidateAdmitted}, 2)
+	candidateResult(t, c, sibling, candidateOutcome{Kind: candidateFailed, Listed: true, RetryAfter: 100}, 3)
+	return c, inv, first, sibling
+}
+
+func TestCandidateControllerAcceptedSourceRevisionRevokesHistoricalGrant(t *testing.T) {
+	c, inv, old, sibling := candidateHistoricalGrant(t, false)
+	inv.Version = 3
+	inv.Candidates[0].Config = candidateTestConfig("a", "valid revision")
+	inv.Candidates[0].Incarnation = 8
+	fresh := candidateInventory(t, c, inv, 4).Decision.Work
+	require.NotNil(t, fresh)
+	assert.False(t, fresh.Tentative, "the fresh source candidate enters the existing finite pass")
+	failed := candidateResult(t, c, fresh, candidateOutcome{Kind: candidateFailed, Listed: true}, 4)
+	assert.False(t, candidateAuthorized(c.snapshot("test_job"), old.Token.Candidate), "accepted source replacement must revoke historical source recovery")
+	require.NotNil(t, failed.Decision.Wake)
+	assert.Equal(t, int64(103), failed.Decision.Wake.Due, "only the other source's deadline survives")
+	wake, err := c.prepareWake("test_job", failed.Decision.Wake.Token, 12)
+	applyCandidateDelta(t, wake, err)
+	assert.True(t, wake.Decision.Ignored)
+	assert.Nil(t, wake.Decision.Work)
+	wake, err = c.prepareWake("test_job", failed.Decision.Wake.Token, 103)
+	applyCandidateDelta(t, wake, err)
+	require.NotNil(t, wake.Decision.Work)
+	assert.Equal(t, sibling.Token.Candidate, wake.Decision.Work.Token.Candidate)
+}
+
+func TestCandidateControllerSurvivingSiblingDoesNotReplaceHistoricalGrant(t *testing.T) {
+	c := newCandidateController(1)
+	inv := candidateTestInventory(1, true, candidateTestConfig("source", "a"), candidateTestConfig("source", "b"))
+	first := candidateInventory(t, c, inv, 0).Decision.Work
+	candidateResult(t, c, first, candidateOutcome{Kind: candidateAdmitted}, 0)
+	inv.Version = 2
+	var invalidKey candidateKey
+	for i := range inv.Candidates {
+		if candidateIdentity(inv.Candidates[i]) == first.Token.Candidate {
+			inv.Candidates[i].Config = candidateTestConfig("source", "invalid")
+			inv.Candidates[i].Incarnation = 3
+			invalidKey = candidateIdentity(inv.Candidates[i])
+		}
+	}
+	delta, err := c.prepareInventoryValidated(inv, map[candidateKey]bool{invalidKey: true}, 1)
+	survivor := applyCandidateDelta(t, delta, err).Decision.Work
+	require.NotNil(t, survivor)
+	require.NotEqual(t, first.Token.Candidate, survivor.Token.Candidate)
+	candidateResult(t, c, survivor, candidateOutcome{Kind: candidateAdmitted}, 2)
+	assert.True(t, candidateAuthorized(c.snapshot("test_job"), first.Token.Candidate), "a source member predating the removal is an ordinary surviving alternative")
+}
+
+func TestCandidateControllerRejectedTrustOptOutRevokesOnlyOwnHistoricalGrants(t *testing.T) {
+	for name, pipeline := range map[string]string{"owning pipeline": "pipeline-a", "competitor pipeline": "competitor", "unidentified pipeline": ""} {
+		t.Run(name, func(t *testing.T) {
+			c, inv, old, sibling := candidateHistoricalGrant(t, true)
+			before := c.snapshot("test_job")
+			inv.Version = 3
+			rejected := candidateTestConfig("a", "${store:invalid}").SetSourceType(confgroup.TypeDiscovered).SetDiscoveryPipelineID(pipeline).SetTrustDiscoveredTargets(false)
+			inv.Candidates[0].Config = rejected
+			inv.Candidates[0].Incarnation = 8
+			work := candidateInventory(t, c, inv, 4).Decision.Work
+			require.NotNil(t, work)
+			delta := candidateResult(t, c, work, candidateOutcome{Kind: candidateRejected}, 4)
+			after := c.snapshot("test_job")
+			assert.Equal(t, before.Binding, after.Binding, "unrelated exposed source binding must survive the rejected proposal")
+			assert.Equal(t, before.Entries[sibling.Token.Candidate], after.Entries[sibling.Token.Candidate])
+			assert.Nil(t, delta.Decision.Binding)
+			assert.Equal(t, candidateManualNone, after.Manual)
+			require.NotNil(t, after.Wake)
+			if pipeline == "pipeline-a" {
+				assert.False(t, candidateAuthorized(after, old.Token.Candidate), "same-pipeline opt-out revokes historical trusted admission")
+				assert.Equal(t, int64(103), after.Wake.Due)
+			} else {
+				assert.True(t, candidateAuthorized(after, old.Token.Candidate))
+				assert.Equal(t, int64(12), after.Wake.Due)
+			}
+			enabled := candidateEnable(t, c, 5)
+			require.NotNil(t, enabled.Decision.Work)
+			assert.Equal(t, sibling.Token.Candidate, enabled.Decision.Work.Token.Candidate)
+			next := candidateResult(t, c, enabled.Decision.Work, candidateOutcome{Kind: candidateFailed, Listed: true}, 6)
+			if pipeline == "pipeline-a" {
+				assert.Nil(t, next.Decision.Work)
+			} else {
+				require.NotNil(t, next.Decision.Work)
+				assert.Equal(t, old.Token.Candidate, next.Decision.Work.Token.Candidate)
+			}
+
+		})
+	}
+}
+
+func TestCandidateControllerRetainedRetryDoesNotAdmitNewObservation(t *testing.T) {
+	c, inv, old, _ := candidateHistoricalGrant(t, false)
+	pending := c.view("test_job")
+	require.NotNil(t, pending)
+	wake := c.snapshot("test_job").Wake
+	delta, err := c.prepareWake("test_job", wake.Token, 12)
+	retry := applyCandidateDelta(t, delta, err).Decision.Work
+	require.NotNil(t, retry)
+	assert.Equal(t, old.Token.Candidate, retry.Token.Candidate)
+	inv.Version = 3
+	inv.Candidates[0].Config = candidateTestConfig("a", "new observed revision")
+	inv.Candidates[0].Incarnation = 8
+	update := candidateInventory(t, c, inv, 12)
+	assert.Nil(t, update.Decision.Work)
+	candidateResult(t, c, retry, candidateOutcome{Kind: candidateAdmitted}, 13)
+	assert.True(t, c.valid("test_job", retry.Token), "retained admission must use its original introduction, not the current observation")
+}
+
+func TestCandidateControllerSelectedTrustOptOutRevokesSamePipelineHistory(t *testing.T) {
+	c := newCandidateController(1)
+	config := func(source, value string, trust bool) confgroup.Config {
+		return candidateTestConfig(source, value).SetSourceType(confgroup.TypeDiscovered).SetDiscoveryPipelineID("owner").SetTrustDiscoveredTargets(trust)
+	}
+	inv := candidateTestInventory(1, true, config("a", "old", true), config("b", "selected", true))
+	first := candidateInventory(t, c, inv, 0).Decision.Work
+	candidateResult(t, c, first, candidateOutcome{Kind: candidateAdmitted}, 0)
+	inv.Version = 2
+	inv.Candidates[0].Config = config("a", "invalid", true)
+	inv.Candidates[0].Incarnation = 7
+	proposal := candidateInventory(t, c, inv, 1).Decision.Work
+	candidateResult(t, c, proposal, candidateOutcome{Kind: candidateRejected}, 1)
+	selected := candidateResult(t, c, first, candidateOutcome{Kind: candidateFailed, Listed: true, RetryAfter: 10}, 2).Decision.Work
+	candidateResult(t, c, selected, candidateOutcome{Kind: candidateAdmitted}, 2)
+	assert.True(t, candidateAuthorized(c.snapshot("test_job"), first.Token.Candidate))
+	inv.Version = 3
+	inv.Candidates[1].Config = config("b", "${store:invalid}", false)
+	inv.Candidates[1].Incarnation = 8
+	optOut := candidateInventory(t, c, inv, 3).Decision.Work
+	require.NotNil(t, optOut)
+	failed := candidateResult(t, c, optOut, candidateOutcome{Kind: candidateRejected}, 4)
+	require.NotNil(t, failed.Decision.Binding)
+	assert.Equal(t, optOut.Config, failed.Decision.Binding.Config)
+	assert.Equal(t, candidateManualSourceRevoked, c.view("test_job").Manual)
+	assert.False(t, candidateAuthorized(c.snapshot("test_job"), first.Token.Candidate))
+	enabled := candidateEnable(t, c, 5)
+	require.NotNil(t, enabled.Decision.Work)
+	assert.Equal(t, optOut.Token.Candidate, enabled.Decision.Work.Token.Candidate)
+	final := candidateResult(t, c, enabled.Decision.Work, candidateOutcome{Kind: candidateFailed, Listed: true}, 6)
+	assert.Nil(t, final.Decision.Work)
+	assert.Nil(t, final.Decision.Wake)
+}
+
+func TestCandidateControllerSourceAdmissionPreparationIsolation(t *testing.T) {
+	c, inv, old, _ := candidateHistoricalGrant(t, false)
+	inv.Version = 3
+	inv.Candidates[0].Config = candidateTestConfig("a", "fresh")
+	inv.Candidates[0].Incarnation = 8
+	work := candidateInventory(t, c, inv, 4).Decision.Work
+	before := c.snapshot("test_job")
+	abandoned, err := c.prepareOutcome("test_job", work.Token, candidateOutcome{Kind: candidateAdmitted}, 4)
+	require.NoError(t, err)
+	assert.Equal(t, before, c.snapshot("test_job"))
+	assert.True(t, candidateAuthorized(c.snapshot("test_job"), old.Token.Candidate))
+	require.Len(t, abandoned.after.sourceChanges, 1)
+	alternative, err := c.prepareOutcome("test_job", work.Token, candidateOutcome{Kind: candidateWaiting}, 4)
+	applyCandidateDelta(t, alternative, err)
+	committed := c.snapshot("test_job")
+	assert.False(t, abandoned.apply())
+	assert.Equal(t, committed, c.snapshot("test_job"))
+	assert.True(t, candidateAuthorized(c.snapshot("test_job"), old.Token.Candidate))
+}
+
+func TestCandidateControllerSameObservationReplacementChangesOwningTier(t *testing.T) {
+	c := newCandidateController(1)
+	user := candidateTestConfig("source", "old")
+	stock := candidateTestConfig("stock", "stock").SetSourceType(confgroup.TypeStock)
+	inv := candidateTestInventory(1, true, user, stock)
+	first := candidateInventory(t, c, inv, 0).Decision.Work
+	exhausted := candidateResult(t, c, first, candidateOutcome{Kind: candidateFailed, Listed: true, RetryAfter: 10}, 0)
+	require.NotNil(t, exhausted.Decision.Wake)
+	replacement := candidateTestConfig("source", "new").SetSourceType(confgroup.TypeDiscovered)
+	inv.Version = 2
+	inv.Candidates[0].Config = replacement
+	inv.Candidates[0].Incarnation = 3
+	proposal := candidateInventory(t, c, inv, 1).Decision.Work
+	require.NotNil(t, proposal)
+	assert.True(t, proposal.Tentative)
+	failed := candidateResult(t, c, proposal, candidateOutcome{Kind: candidateFailed, Listed: true, RetryAfter: 20}, 1)
+	assert.False(t, candidateAuthorized(c.snapshot("test_job"), first.Token.Candidate), "same-observation replacement revokes the prior higher-tier retained grant")
+	assert.Nil(t, failed.Decision.Work, "lower stock must remain masked by discovered ownership")
+	require.NotNil(t, failed.Decision.Wake)
+	assert.Equal(t, int64(21), failed.Decision.Wake.Due)
+	delta, err := c.prepareWake("test_job", failed.Decision.Wake.Token, 21)
+	applyCandidateDelta(t, delta, err)
+	require.NotNil(t, delta.Decision.Work)
+	assert.Equal(t, replacement, delta.Decision.Work.Config)
 }

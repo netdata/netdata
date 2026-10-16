@@ -60,8 +60,6 @@ type candidateWork struct {
 	Config      confgroup.Config
 	Tentative   bool
 	Predecessor uint64
-	// Replacement revokes the old source grant only after admission.
-	Replacement *candidateKey
 }
 
 type candidateWake struct {
@@ -146,17 +144,26 @@ type candidateOutcome struct {
 }
 
 type candidateEntry struct {
-	Candidate      DiscoveredJobCandidate
-	Key            candidateKey
-	SourceLifetime uint64
-	Observed       bool
-	SourceOwned    bool
-	Admitted       bool
-	GrantIntent    uint64
-	Rejected       bool
-	Initial        bool
-	Due            int64
-	HasDue         bool
+	Candidate         DiscoveredJobCandidate
+	Key               candidateKey
+	SourceLifetime    uint64
+	IntroducedVersion uint64
+	AbsentVersion     uint64
+	Observed          bool
+	SourceOwned       bool
+	Admitted          bool
+	GrantIntent       uint64
+	Rejected          bool
+	Initial           bool
+	Due               int64
+	HasDue            bool
+}
+
+// A source admission revokes memberships replaced by a candidate introduced at
+// this observation, while preserving alternatives that already survived together.
+type candidateSourceAdmission struct {
+	Lifetime          uint64
+	IntroducedVersion uint64
 }
 
 // candidateRecord is the sole policy state for one public job identity. Its
@@ -185,12 +192,15 @@ type candidateRecord struct {
 	Block            candidateBlockPolicy
 	// Only the owning lane reads the ledger while preparing. Entry values stay
 	// immutable until Apply merges these private changes under the controller lock.
-	entryChanges  map[candidateKey]*candidateEntry
-	entriesOwned  bool
-	owningTier    int
-	tierDirty     bool
-	grantCut      uint64
-	grantSelected candidateKey
+	entryChanges     map[candidateKey]*candidateEntry
+	entriesOwned     bool
+	owningTier       int
+	tierDirty        bool
+	grantCut         uint64
+	grantSelected    candidateKey
+	sourceAdmissions map[string]candidateSourceAdmission
+	sourceChanges    map[string]candidateSourceAdmission
+	sourcesOwned     bool
 }
 
 type candidateDecision struct {
@@ -285,6 +295,13 @@ func (d *candidateDelta) apply() bool {
 			}
 		}
 	}
+	if !d.after.sourcesOwned {
+		for source, admission := range d.after.sourceChanges {
+			d.after.sourceAdmissions[source] = admission
+		}
+	}
+	d.after.sourceChanges = nil
+	d.after.sourcesOwned = false
 	d.after.entryChanges = nil
 	d.after.entriesOwned = false
 	d.after.Revision++
@@ -400,6 +417,7 @@ func (c *candidateController) prepareInventoryValidated(input DiscoveredJobInven
 		return d, nil
 	}
 	r.Inventory = inv
+	r.prepareSourceAdmissions()
 	r.ownEntries()
 	for _, e := range r.entries() {
 		if e.SourceOwned || e.Candidate.Config.SourceType() != confgroup.TypeDyncfg {
@@ -410,7 +428,7 @@ func (c *candidateController) prepareInventoryValidated(input DiscoveredJobInven
 		key := candidateIdentity(observed)
 		e := r.entry(key)
 		if e == nil {
-			e = &candidateEntry{Candidate: observed, Key: key, Initial: true}
+			e = &candidateEntry{Candidate: observed, Key: key, Initial: true, IntroducedVersion: inv.Version}
 			r.setEntry(key, e)
 		}
 		e.Observed = true
@@ -418,6 +436,13 @@ func (c *candidateController) prepareInventoryValidated(input DiscoveredJobInven
 		e.SourceLifetime = inv.Sources[observed.Source]
 		if invalid[key] {
 			e.Rejected = true
+		}
+	}
+	// Stamp absence only after the complete inventory has restored all current
+	// members. A surviving sibling keeps its original introduction provenance.
+	for _, entry := range r.entries() {
+		if entry.SourceOwned && !entry.Observed && entry.AbsentVersion == 0 {
+			entry.AbsentVersion = inv.Version
 		}
 	}
 	r.pruneRecoveryGrants()
@@ -531,6 +556,9 @@ func candidateAuthorized(r *candidateRecord, key candidateKey) bool {
 // this retained-admission grant; a genuine pending successor keeps its exact grant.
 func candidateRetainedGrant(r *candidateRecord, key candidateKey, e *candidateEntry) bool {
 	if !e.Admitted {
+		return false
+	}
+	if e.SourceOwned && !e.Observed && e.AbsentVersion != 0 && r.sourceAdmission(e.Key.Source, e.SourceLifetime) >= e.AbsentVersion {
 		return false
 	}
 	if r.grantCut == 0 || e.GrantIntent > r.grantCut || key == r.grantSelected {
@@ -681,10 +709,7 @@ func (c *candidateController) reconcileSource(d *candidateDelta, now int64) erro
 		return err
 	}
 	work := &candidateWork{Token: candidateWorkToken{Run: c.run, Intent: generation, Attempt: attempt, Candidate: e.Key}, Config: e.Candidate.Config, Tentative: true, Predecessor: r.Intent}
-	if r.Binding != nil && r.Binding.Key.Source == e.Key.Source && !r.entry(r.Binding.Key).Observed {
-		key := r.Binding.Key
-		work.Replacement = &key
-	}
+
 	r.Proposal = work
 	// Initial auto-source work is enabled; existing disabled intent stays disabled
 	// until this meaningful replacement is admitted.
@@ -715,6 +740,7 @@ func (c *candidateController) admit(d *candidateDelta, key candidateKey, health 
 	e := r.editEntry(key)
 	e.Admitted = true
 	e.GrantIntent = r.Intent
+	r.admitSource(e)
 	stamp, err := c.next()
 	if err != nil {
 		return err
@@ -913,6 +939,15 @@ func (c *candidateController) prepareOutcome(name string, token candidateWorkTok
 		d.Decision.Ignored = true
 		return d, nil
 	}
+	// Source trust authority belongs to this record, including retained grants;
+	// execution reports invalid preparation without choosing revocation policy.
+	if outcome.Kind == candidateRejected && candidateTrustOptOut(previousBinding, work.Config) {
+		outcome.Kind = candidateSourceRevoked
+		outcome.Listed = true
+	}
+	if outcome.Kind == candidateRejected || outcome.Kind == candidateSourceRevoked {
+		r.revokeRejectedTrustGrants(work.Config)
+	}
 	if outcome.Kind == candidateRejected {
 		r.editEntry(token.Candidate).Rejected = true
 		r.tierDirty = true
@@ -967,9 +1002,6 @@ func (c *candidateController) prepareOutcome(name string, token candidateWorkTok
 		d.Decision.Wake = nil
 		work.Tentative = false
 		work.Predecessor = 0
-		if work.Replacement != nil {
-			r.removeEntry(*work.Replacement)
-		}
 		r.Pass = nil
 		r.PassCursor = 0
 		r.Cursor = &work.Token.Candidate
@@ -1295,11 +1327,13 @@ func (c *candidateController) progress(d *candidateDelta, now int64) error {
 
 func prepareCandidateRecord(source *candidateRecord) *candidateRecord {
 	if source == nil {
-		return &candidateRecord{Entries: make(map[candidateKey]*candidateEntry), tierDirty: true}
+		return &candidateRecord{Entries: make(map[candidateKey]*candidateEntry), sourceAdmissions: make(map[string]candidateSourceAdmission), tierDirty: true}
 	}
 	out := *source
 	out.entryChanges = nil
 	out.entriesOwned = false
+	out.sourceChanges = nil
+	out.sourcesOwned = false
 	if source.Cursor != nil {
 		key := *source.Cursor
 		out.Cursor = &key
@@ -1322,10 +1356,6 @@ func cloneCandidateWork(work *candidateWork) *candidateWork {
 		return nil
 	}
 	copy := *work
-	if work.Replacement != nil {
-		key := *work.Replacement
-		copy.Replacement = &key
-	}
 	return &copy
 }
 
@@ -1340,6 +1370,10 @@ func cloneCandidateRecord(source *candidateRecord) *candidateRecord {
 		out.Entries[key] = &copy
 	}
 	out.Pass = slices.Clone(source.Pass)
+	out.sourceAdmissions = maps.Clone(source.sourceAdmissions)
+	for key, admission := range source.sourceChanges {
+		out.sourceAdmissions[key] = admission
+	}
 	return out
 }
 
@@ -1415,6 +1449,94 @@ func (r *candidateRecord) ownEntries() {
 	r.entryChanges = nil
 	r.entriesOwned = true
 	r.tierDirty = true
+}
+
+func (r *candidateRecord) sourceAdmission(source string, lifetime uint64) uint64 {
+	admission, changed := r.sourceChanges[source]
+	if !changed {
+		admission = r.sourceAdmissions[source]
+	}
+	if admission.Lifetime != lifetime {
+		return 0
+	}
+	return admission.IntroducedVersion
+}
+
+func (r *candidateRecord) admitSource(entry *candidateEntry) {
+	// A retained retry does not accept a new source observation. Using today's
+	// inventory version here would let an old retry revoke its own grant.
+	if !entry.SourceOwned || !entry.Observed || entry.IntroducedVersion == 0 {
+		return
+	}
+	if r.sourceAdmission(entry.Key.Source, entry.SourceLifetime) >= entry.IntroducedVersion {
+		return
+	}
+	admission := candidateSourceAdmission{Lifetime: entry.SourceLifetime, IntroducedVersion: entry.IntroducedVersion}
+	if r.sourcesOwned {
+		r.sourceAdmissions[entry.Key.Source] = admission
+	} else {
+		if r.sourceChanges == nil {
+			r.sourceChanges = make(map[string]candidateSourceAdmission)
+		}
+		r.sourceChanges[entry.Key.Source] = admission
+	}
+	// An ordinary pass member is at the cached owning tier and keeps that tier
+	// authorized itself. A tentative tier-changing replacement needs re-arbitration.
+	if entry.Candidate.Config.SourceTypePriority() != r.owningTier {
+		r.tierDirty = true
+	}
+}
+
+// Inventory work prepares a complete source view off-loop. True lifetime changes
+// discard the old source cut independently of candidate and intent generations.
+func (r *candidateRecord) prepareSourceAdmissions() {
+	admissions := make(map[string]candidateSourceAdmission, len(r.Inventory.Sources))
+	for source, lifetime := range r.Inventory.Sources {
+		if version := r.sourceAdmission(source, lifetime); version != 0 {
+			admissions[source] = candidateSourceAdmission{Lifetime: lifetime, IntroducedVersion: version}
+		}
+	}
+	r.sourceAdmissions = admissions
+	r.sourceChanges = nil
+	r.sourcesOwned = true
+}
+
+func candidateTrustOptOut(binding *candidateBinding, proposed confgroup.Config) bool {
+	return binding != nil && proposed.SourceType() == confgroup.TypeDiscovered && !proposed.TrustDiscoveredTargets() &&
+		proposed.DiscoveryPipelineID() != "" && binding.Config.SourceType() == confgroup.TypeDiscovered &&
+		binding.Config.TrustDiscoveredTargets() && binding.Config.DiscoveryPipelineID() == proposed.DiscoveryPipelineID()
+}
+
+// A rejected opt-out can revoke a historical trusted grant even while an
+// unrelated pipeline owns the public binding. This rare source transition is
+// prepared off-loop; ordinary readiness and operational outcomes never scan here.
+func (r *candidateRecord) revokeRejectedTrustGrants(proposed confgroup.Config) {
+	pipeline := proposed.DiscoveryPipelineID()
+	if proposed.SourceType() != confgroup.TypeDiscovered || proposed.TrustDiscoveredTargets() || pipeline == "" {
+		return
+	}
+	matches := func(key candidateKey, entry *candidateEntry) bool {
+		config := entry.Candidate.Config
+		return !entry.Observed && entry.Admitted && (r.Binding == nil || r.Binding.Key != key) &&
+			config.SourceType() == confgroup.TypeDiscovered && config.TrustDiscoveredTargets() &&
+			config.DiscoveryPipelineID() == pipeline && candidateAuthorized(r, key)
+	}
+	found := false
+	for key, entry := range r.entries() {
+		if matches(key, entry) {
+			found = true
+			break
+		}
+	}
+	if !found {
+		return
+	}
+	r.ownEntries()
+	for key, entry := range r.entries() {
+		if matches(key, entry) {
+			r.removeEntry(key)
+		}
+	}
 }
 
 // prepareAdoptExact combines interactive acceptance and its health projection.

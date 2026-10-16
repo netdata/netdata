@@ -533,6 +533,10 @@ The last row preserves the existing override-removal boundary tracked by issue #
 change may reconcile, but this continuation model does not add automatic restoration. A masked cursor is observation
 history, not an admission grant. Removal of the actual admitted source is checked independently of that cursor.
 
+Admission of a newly introduced source membership supersedes retained grants that disappeared at or before that
+revision of the same source lifetime. Admitting a preexisting surviving sibling preserves those grants. Membership
+introduction and disappearance are source facts; later retries and fresh ENABLE do not rewrite that provenance.
+
 Source policy lives in `joboutput/candidate_controller.go`; `joboutput/candidate_execution.go` applies decisions and
 releases execution effects after commit. `joboutput/accepted_activation.go` retains contained execution, dependency
 waits and physical-release waits. It does not own another desired-config queue.
@@ -825,6 +829,8 @@ index retains identities and owners only and cannot select candidates or schedul
   Every terminal non-adoption path retains an acknowledged predecessor-scoped resume obligation, including rejection,
   cancellation, deadline, disposal and aborted acceptance. Delivery outlives the request context and waits for its
   acknowledgment outside the originating lane, avoiding a command waiting behind itself.
+- A rejected or withdrawn source proposal also restores an interrupted admitted predecessor when no runtime owns it.
+  The resume rechecks the surviving exact token in the job lane; a queued DISABLE or removal revokes that permission.
 - Disable, removal, supersession and run stop revoke work and publication authority. Late workers cannot publish stale
   status or restore old payloads. Function Detach revokes admission promptly; Finalize drains admitted callbacks before
   collector cleanup. The process-owned runtime identity remains occupied through physical cleanup.
@@ -909,6 +915,8 @@ When opting out makes a literal field invalid, the job controller treats it as s
 replacement as Failed and removes the old trusted runtime and its dependencies only if both configs carry the same
 nonempty pipeline ID. Invalid proposals
 from a different or unidentified pipeline retain ordinary rejection behavior, preserving the trusted incumbent.
+An owning pipeline's trust opt-out also revokes its historical trusted recovery grants when another pipeline's
+candidate is exposed; it does not replace that unrelated exposed binding.
 Rejected discovered candidates are scoped by pipeline ID too, so a competing candidate's rejection cannot suppress
 a later opt-out from the actual owner, even when their untrusted hashes match.
 

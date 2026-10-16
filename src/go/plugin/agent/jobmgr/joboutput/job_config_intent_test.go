@@ -255,6 +255,8 @@ func TestConfigIntentNamedWaitRunningFailureAndDisable(t *testing.T) {
 			controller.NotifyDependencyChanged("runtime", "browser")
 			current = applyActivationTestSubmission(t, waiting, nil, 2)
 			require.Nil(t, current)
+			current = applyActivationTestSubmission(t, commands.next(t, "internal/jobs/candidate-resume"), nil, 0)
+			require.Nil(t, current)
 			current = applyActivationTestSubmission(t, commands.next(t, "internal/jobs/accepted-activation"), nil, 3)
 			require.NotNil(t, current)
 			current = applyActivationTestSubmission(t, commands.next(t, "internal/jobs/runtime-ready"), current, 0)
@@ -345,8 +347,13 @@ func TestConfigIntentRejectedAndAbortedUpdatePreservesIncumbent(t *testing.T) {
 	}
 	controller.modules["module"] = creator
 	config := acceptedActivationTestConfig(confgroup.TypeDyncfg)
-	current := runtimeTestStartAndSettle(t, controller, config, nil, 1)
+	commands := bindHandoffTestWorkers(t, controller)
+	seedDynCfgJobGraphRecord(t, controller, graph, config, dyncfg.StatusDisabled)
+	applyAcceptedEnableForTest(t, controller, graph, config, 1)
+	current := applyActivationTestSubmission(t, commands.next(t, "internal/jobs/accepted-activation"), nil, 2)
 	t.Cleanup(func() { stopRuntimeTestResource(t, current) })
+	require.NotNil(t, current)
+	current = applyActivationTestSubmission(t, commands.next(t, "internal/jobs/runtime-ready"), current, 0)
 	before, _ := graph.Lookup(config.FullName())
 	request := DynCfgJobRequest{
 		Args: []string{controller.externalID(config.FullName()), "update"},

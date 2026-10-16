@@ -178,7 +178,7 @@ func TestConfigIntentAdmissionWaitsForExactValidationAttempt(t *testing.T) {
 			}
 			physicalRelease, ok := authority.ProcessAttemptReleased(identity)
 			require.True(t, ok)
-			commands := runtimeTestBindActivations(t, controller)
+			commands := bindHandoffTestWorkers(t, controller)
 			t.Cleanup(func() {
 				unblock()
 				if cut {
@@ -219,6 +219,7 @@ func TestConfigIntentAdmissionWaitsForExactValidationAttempt(t *testing.T) {
 			case <-time.After(time.Second):
 				t.Fatal("validation did not physically release")
 			}
+			applyActivationTestSubmission(t, commands.next(t, "internal/jobs/candidate-resume"), nil, 0)
 			applyActivationTestSubmission(t, commands.next(t, "internal/jobs/accepted-activation"), nil, 2)
 			record, exists := graph.Lookup(config.FullName())
 			require.True(t, exists)
