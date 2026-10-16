@@ -130,7 +130,8 @@ func (dcjc *DynCfgJobController) prepareControllerActivation(ctx context.Context
 		}
 	}()
 	work := attempt.spec.work
-	if work == nil || !dcjc.candidates.valid(scope.ID, work.Token) || !dcjc.scheduler.accepted.isCurrent(scope.ID, attempt.token) {
+	state := dcjc.candidates.view(scope.ID)
+	if work == nil || state == nil || !dcjc.candidates.valid(scope.ID, work.Token) || !dcjc.scheduler.accepted.isCurrent(scope.ID, attempt.token) {
 		return dcjc.noop(scope, current, permit, noResponseResult())
 	}
 	config := work.Config
@@ -140,7 +141,6 @@ func (dcjc *DynCfgJobController) prepareControllerActivation(ctx context.Context
 	if attempt.stage == nil {
 		return dcjc.prepareControllerActivationError(ctx, attempt, current, scope, permit, classifyActivationError(attempt.err))
 	}
-	state := dcjc.candidates.view(scope.ID)
 	if work.Tentative || state.Binding == nil || state.Binding.Key != work.Token.Candidate {
 		// Every changed binding retains its checked stage across admission.
 		// Resource reservation may yield and invalidate its dependency proof.
