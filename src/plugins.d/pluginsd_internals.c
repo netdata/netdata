@@ -98,6 +98,10 @@ void parser_destroy(PARSER *parser) {
     struct nrpc_transport *transport = parser->inflight.transport;
     parser->inflight.transport = NULL;
 
+    // the vnode index owns an interned STRING per machine guid; pluginsd_process() drains it on a
+    // plugin's normal teardown, this releases it on every other path
+    pluginsd_vnodes_index_destroy(parser);
+
     freez(parser);
 
     if(transport)

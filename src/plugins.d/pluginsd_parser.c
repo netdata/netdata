@@ -210,6 +210,151 @@ static inline bool pluginsd_update_host_ephemerality(RRDHOST *host) {
 
 #define VNODE_BASE_EPOCH (1704067200L)  // Jan 1, 2024 00:00:00 UTC
 
+// The vnode index maps the machine guid of every vnode this plugin defined to the last time the
+// plugin sent HOST for it.
+//
+// It is keyed by an owned interned STRING of the machine guid, never by RRDHOST *: nothing tells
+// this parser when one of its vnodes is freed. Two plugins can define the same machine guid, and
+// when one of them exits its teardown takes the vnode offline, which lets `netdatacli
+// remove-stale-node` free it while the other plugin is still running (the stale detection takes
+// it offline the same way). So every walk resolves the host from the key with
+// rrdhost_apply_by_machine_guid(), whose rrd read lock keeps the host allocated for the callback,
+// and a key that no longer resolves is a vnode that is gone; the stale scan drops such keys. Until
+// it does, a host recreated with the same guid (by another plugin or a streaming child) is still
+// this plugin's vnode: the next HOST for it re-claims it if it is not collected as a vnode.
+
+// Returns the entry's value slot, or NULL when the entry could not be created.
+static uint32_t *pluginsd_vnodes_index_add(PARSER *parser, const char *machine_guid) {
+    STRING *key = string_strdupz(machine_guid);
+
+    uint32_t *Pvalue = (uint32_t *) JudyLGet(parser->user.vnodes.JudyL, (Word_t) key, PJE0);
+    if(Pvalue) {
+        // the entry already owns a reference to this string - this one was only for the lookup
+        string_freez(key);
+        return Pvalue;
+    }
+
+    Pvalue = (uint32_t *) JudyLIns(&parser->user.vnodes.JudyL, (Word_t) key, PJE0);
+    if(unlikely(Pvalue == PJERR)) {
+        string_freez(key);
+        return NULL;
+    }
+
+    // the entry owns this reference from now on; pluginsd_vnodes_index_del() releases it
+    return Pvalue;
+}
+
+static uint32_t *pluginsd_vnodes_index_get(PARSER *parser, const char *machine_guid) {
+    STRING *key = string_strdupz(machine_guid);
+    uint32_t *Pvalue = (uint32_t *) JudyLGet(parser->user.vnodes.JudyL, (Word_t) key, PJE0);
+    string_freez(key);
+    return Pvalue;
+}
+
+static void pluginsd_vnodes_index_del(PARSER *parser, STRING *key) {
+    (void) JudyLDel(&parser->user.vnodes.JudyL, (Word_t) key, PJE0);
+    string_freez(key);
+}
+
+// Releases every key the index owns and the index itself. parser_destroy() calls it, so the keys
+// are released on every path that destroys a parser. Calling it twice is harmless.
+void pluginsd_vnodes_index_destroy(PARSER *parser) {
+    Word_t Index = 0;
+    bool first_then_next = true;
+    while(JudyLFirstThenNext(parser->user.vnodes.JudyL, &Index, &first_then_next))
+        string_freez((STRING *) Index);
+
+    (void) JudyLFreeArray(&parser->user.vnodes.JudyL, PJE0);
+}
+
+struct pluginsd_vnode_stale_check {
+    uint32_t seen_seconds_ago;      // in
+    uint32_t stale_after_seconds;   // out: the vnode's timeout, 0 when it has none
+    RRDHOST *expired;               // out: pinned; the caller takes it offline and releases the pin
+};
+
+// runs under the rrd read lock (rrdhost_apply_by_machine_guid)
+static void pluginsd_vnode_stale_check_cb(RRDHOST *host, void *data) {
+    struct pluginsd_vnode_stale_check *t = data;
+
+    t->stale_after_seconds = host->node_stale_after_seconds;
+    if(!t->stale_after_seconds || !rrdhost_flag_check(host, RRDHOST_FLAG_VIRTUAL_HOST))
+        return;
+
+    if(t->seen_seconds_ago < t->stale_after_seconds)
+        return;
+
+    // taking it offline is what makes it removable, and the caller still uses it after the rrd lock
+    // is released, so pin it (see metadata_lifetime_lock). A failed pin means a remover owns it.
+    if(rrdhost_pin_try(host))
+        t->expired = host;
+}
+
+// Expires the vnodes this plugin stopped feeding, and drops the ones that are gone.
+static void pluginsd_vnodes_stale_check(PARSER *parser) {
+    time_t now = now_realtime_sec();
+    if(parser->user.vnodes.last_host_stale_check >= now)
+        return;
+
+    uint32_t min_check_interval = UINT_MAX;
+
+    // keys whose host is gone: JudyLDel() is not safe inside JudyLFirstThenNext(), so they are
+    // collected here and deleted after the walk
+    STRING **gone = NULL;
+    size_t gone_used = 0, gone_size = 0;
+
+    Word_t Index = 0;
+    bool first_then_next = true;
+    uint32_t *Pvalue;
+    while ((Pvalue = (uint32_t *) JudyLFirstThenNext(parser->user.vnodes.JudyL, &Index, &first_then_next))) {
+        STRING *key = (STRING *) Index;
+        time_t last_seen = (*Pvalue + VNODE_BASE_EPOCH);
+
+        struct pluginsd_vnode_stale_check t = {
+            .seen_seconds_ago = (now > last_seen) ? (uint32_t)(now - last_seen) : 0,
+            .stale_after_seconds = 0,
+            .expired = NULL,
+        };
+
+        if(!rrdhost_apply_by_machine_guid(string2str(key), pluginsd_vnode_stale_check_cb, &t, true)) {
+            if(!gone) {
+                gone_size = (size_t) JudyLCount(parser->user.vnodes.JudyL, 0, -1, PJE0);
+                gone = mallocz(gone_size * sizeof(*gone));
+            }
+            if(gone_used < gone_size)
+                gone[gone_used++] = key;
+            continue;
+        }
+
+        if (!t.stale_after_seconds)
+            continue;
+
+        min_check_interval = MIN(min_check_interval, t.stale_after_seconds);
+
+        if(t.expired) {
+            // one atomic clear: both bits describe the same transition (we stopped collecting
+            // this vnode), so a reader that snapshots host->flags once cannot observe one
+            // without the other - rrdhost_status_ingest() derives ingest.type from such a
+            // snapshot. This is about consistent status reporting only; writer exclusivity is
+            // enforced by the receiver lock, not by these bits.
+            rrdhost_flag_clear(t.expired, RRDHOST_FLAG_VIRTUAL_HOST | RRDHOST_FLAG_COLLECTOR_ONLINE);
+            nd_log_daemon(NDLP_INFO, "VNODE: Marking node \"%s\" as STALE, last seen %u seconds ago", rrdhost_hostname(t.expired), t.seen_seconds_ago);
+            schedule_node_state_update(t.expired, 1000);
+            stream_sender_signal_to_stop_and_wait(t.expired, STREAM_HANDSHAKE_SND_VNODE_IS_STALE, false);
+            rrdhost_pin_release(t.expired);
+        }
+    }
+
+    for(size_t i = 0; i < gone_used; i++)
+        pluginsd_vnodes_index_del(parser, gone[i]);
+    freez(gone);
+
+    if (min_check_interval == UINT_MAX)
+        min_check_interval = 60;
+
+    parser->user.vnodes.last_host_stale_check = now_realtime_sec() + min_check_interval;
+}
+
 // A host has exactly one writer. For a vnode that writer is the local collector that defines it.
 //
 // RRDHOST_FLAG_VIRTUAL_HOST makes the streaming handshake reject incoming connections for this
@@ -299,10 +444,10 @@ static inline PARSER_RC pluginsd_host_define_end(char **words __maybe_unused, si
     rrdhost_flag_set(host, RRDHOST_FLAG_VIRTUAL_HOST);
 
     // the flag above closes the door to new receivers; this evicts one that is already inside.
-    // on failure we clear it again: this host is not in parser->user.vnodes.JudyL yet (JudyLIns is
-    // at the end of this function), so neither the stale detection nor the plugin teardown - both
-    // iterate that index - would ever clear it. We are not collecting into this host, so leaving
-    // the gate closed would reject the receiver we just failed to evict, plus every later
+    // on failure we clear it again: this host is not in parser->user.vnodes.JudyL yet
+    // (pluginsd_vnodes_index_add() is at the end of this function), so neither the stale detection
+    // nor the plugin teardown - both iterate that index - would ever clear it. We are not
+    // collecting into this host, so leaving the gate closed would reject the receiver we just failed to evict, plus every later
     // reconnect of a legitimate child with this machine guid, while nothing writes to it at all.
     if(!pluginsd_host_claim_as_local_vnode(host, PLUGINSD_KEYWORD_HOST_DEFINE_END)) {
         rrdhost_flag_clear(host, RRDHOST_FLAG_VIRTUAL_HOST);
@@ -350,8 +495,8 @@ static inline PARSER_RC pluginsd_host_define_end(char **words __maybe_unused, si
         schedule_node_state_update(host, 100);
 
     rrdhost_flag_set(host, RRDHOST_FLAG_METADATA_UPDATE);
-    uint32_t *Pvalue = (uint32_t *) JudyLIns(&parser->user.vnodes.JudyL, (Word_t) host, PJE0);
-    if (Pvalue != PJERR)
+    uint32_t *Pvalue = pluginsd_vnodes_index_add(parser, host->machine_guid);
+    if (Pvalue)
         *Pvalue = (uint32_t) (now_realtime_sec() - VNODE_BASE_EPOCH);
     else
         nd_log_daemon(NDLP_ERR, "VNODE: Cannot track virtual host \"%s\" for staleness - JudyLIns error", rrdhost_hostname(host));
@@ -369,42 +514,7 @@ static inline PARSER_RC pluginsd_host(char **words, size_t num_words, PARSER *pa
 
     if(!guid || !*guid || strcmp(guid, "localhost") == 0) {
         parser->user.host = localhost;
-        // Check if we need to switch any nodes to stale
-        uint32_t min_check_interval = UINT_MAX;
-        time_t now = now_realtime_sec();
-        if (parser->user.vnodes.last_host_stale_check < now) {
-            Word_t Index = 0;
-            bool first_then_next = true;
-            uint32_t *Pvalue;
-            while ((Pvalue = (uint32_t *) JudyLFirstThenNext(parser->user.vnodes.JudyL, &Index, &first_then_next))) {
-                RRDHOST *virtual_host = (RRDHOST *) Index;
-                uint32_t stale_after_seconds = virtual_host->node_stale_after_seconds;
-                if (!stale_after_seconds)
-                    continue;
-
-                min_check_interval = MIN(min_check_interval, stale_after_seconds);
-                if (rrdhost_flag_check(virtual_host, RRDHOST_FLAG_VIRTUAL_HOST)) {
-                    time_t last_seen = (*Pvalue + VNODE_BASE_EPOCH);
-                    uint32_t seen_seconds_ago = (now > last_seen) ? (uint32_t)(now - last_seen) : 0;
-
-                    if (seen_seconds_ago >= stale_after_seconds) {
-                        // one atomic clear: both bits describe the same transition (we stopped collecting
-                        // this vnode), so a reader that snapshots host->flags once cannot observe one
-                        // without the other - rrdhost_status_ingest() derives ingest.type from such a
-                        // snapshot. This is about consistent status reporting only; writer exclusivity is
-                        // enforced by the receiver lock, not by these bits.
-                        rrdhost_flag_clear(virtual_host, RRDHOST_FLAG_VIRTUAL_HOST | RRDHOST_FLAG_COLLECTOR_ONLINE);
-                        nd_log_daemon(NDLP_INFO, "VNODE: Marking node \"%s\" as STALE, last seen %u seconds ago", rrdhost_hostname(virtual_host), seen_seconds_ago);
-                        schedule_node_state_update(virtual_host, 1000);
-                        stream_sender_signal_to_stop_and_wait(virtual_host, STREAM_HANDSHAKE_SND_VNODE_IS_STALE, false);
-                    }
-                }
-            }
-            if (min_check_interval == UINT_MAX)
-                min_check_interval = 60;
-
-            parser->user.vnodes.last_host_stale_check = now_realtime_sec() + min_check_interval;
-        }
+        pluginsd_vnodes_stale_check(parser);
         return PARSER_RC_OK;
     }
 
@@ -417,12 +527,12 @@ static inline PARSER_RC pluginsd_host(char **words, size_t num_words, PARSER *pa
     // rrd_wrlock() before freeing it, so the host stays allocated while we check it. A re-enable makes
     // the host live again, so it pins the host (see metadata_lifetime_lock) before the lock is
     // released: a removal that found it offline cannot free it while we bring it back.
+    uint32_t *Pvalue = pluginsd_vnodes_index_get(parser, uuid_str);
     rrd_rdlock();
     RRDHOST *host = rrdhost_find_by_guid(uuid_str);
     bool reenable = false;
     bool pinned = false;
     if(likely(host)) {
-        uint32_t *Pvalue = (uint32_t *) JudyLGet(parser->user.vnodes.JudyL, (Word_t) host, PJE0);
         if (Pvalue) {
             *Pvalue = (uint32_t) (now_realtime_sec() - VNODE_BASE_EPOCH);
             // Check if we need to enable
@@ -1471,6 +1581,21 @@ static void pluginsd_vnode_arm_node_manifest(RRDHOST *host, void *data __maybe_u
     aclk_arm_node_manifest(host);
 }
 
+// runs under the rrd read lock (rrdhost_apply_by_machine_guid), which keeps the host allocated
+// while it is taken offline and its state update is queued - the clear stays before the update,
+// so the update publishes the offline state
+static void pluginsd_vnode_teardown_cb(RRDHOST *host, void *data __maybe_unused) {
+    nd_log_daemon(NDLP_INFO, "PLUGINSD: Checking virtual status for %s", rrdhost_hostname(host));
+    if (!rrdhost_flag_check(host, RRDHOST_FLAG_VIRTUAL_HOST))
+        return;
+
+    nd_log_daemon(NDLP_INFO, "PLUGINSD: Resetting virtual host status for %s", rrdhost_hostname(host));
+    // one atomic clear, for the same status-snapshot consistency reason as the stale
+    // detection in pluginsd_vnodes_stale_check()
+    rrdhost_flag_clear(host, RRDHOST_FLAG_VIRTUAL_HOST | RRDHOST_FLAG_COLLECTOR_ONLINE);
+    schedule_node_state_update(host, 1000);
+}
+
 inline size_t pluginsd_process(RRDHOST *host, struct plugind *cd, int fd_input, int fd_output, int trust_durations, bool *retry, bool *protocol_error)
 {
     *retry = false;
@@ -1561,17 +1686,15 @@ inline size_t pluginsd_process(RRDHOST *host, struct plugind *cd, int fd_input, 
 
     // The vnodes this plugin fed also carry its functions, and those only become unavailable
     // once nrpc_serving_finished() runs below. The manifest refresh therefore has to happen
-    // after that, so snapshot the hosts here - the JudyL lives in the parser, which is
-    // also destroyed below (before the manifest arms).
+    // after that, so snapshot the machine guids here - the vnode index lives in the parser, which
+    // is also destroyed below (before the manifest arms).
     //
-    // Snapshot machine guids rather than RRDHOST pointers: the loop below clears
-    // RRDHOST_FLAG_COLLECTOR_ONLINE, which is exactly what makes rrdhost_is_online() false and so
-    // lets `netdatacli remove-stale-node --unregister` free a vnode (see remove_ephemeral_host()).
-    // The loop holds the rrd read lock, so a vnode that goes offline in it cannot be unlinked and
-    // freed before the loop has finished with it (clear, state update, guid snapshot) - the clear
-    // stays before the state update, so the update publishes the offline state. After the loop
-    // each guid is re-resolved by rrdhost_apply_by_machine_guid(), which holds the host for the
-    // arm, so a vnode that did go away meanwhile is simply skipped.
+    // Every host is resolved from its guid under the rrd read lock (rrdhost_apply_by_machine_guid()),
+    // and a guid that no longer resolves is skipped: the index never holds an RRDHOST pointer, see
+    // pluginsd_vnodes_index_add(). Clearing RRDHOST_FLAG_COLLECTOR_ONLINE below makes
+    // rrdhost_is_online() false, which lets `netdatacli remove-stale-node` free the vnode as soon
+    // as the lock is released (see remove_ephemeral_host()), so the manifest arm resolves each guid
+    // again and skips a vnode that went away meanwhile.
     size_t vnodes_used = 0;
     char (*vnode_guids)[GUID_LEN + 1] = NULL;
 
@@ -1582,23 +1705,14 @@ inline size_t pluginsd_process(RRDHOST *host, struct plugind *cd, int fd_input, 
 
         Word_t Index = 0;
         bool first_then_next = true;
-        rrd_rdlock();
         while (JudyLFirstThenNext(parser->user.vnodes.JudyL, &Index, &first_then_next)) {
-            RRDHOST *virtual_host = (RRDHOST *) Index;
-            nd_log_daemon(NDLP_INFO, "PLUGINSD: Checking virtual status for %s", rrdhost_hostname(virtual_host));
-            if (rrdhost_flag_check(virtual_host, RRDHOST_FLAG_VIRTUAL_HOST)) {
-                nd_log_daemon(NDLP_INFO, "PLUGINSD: Reseting virtual host status for %s", rrdhost_hostname(virtual_host));
-                // one atomic clear, for the same status-snapshot consistency reason as the stale
-                // detection in pluginsd_host()
-                rrdhost_flag_clear(virtual_host, RRDHOST_FLAG_VIRTUAL_HOST | RRDHOST_FLAG_COLLECTOR_ONLINE);
-                schedule_node_state_update(virtual_host, 1000);
-            }
+            const char *machine_guid = string2str((STRING *) Index);
+            (void) rrdhost_apply_by_machine_guid(machine_guid, pluginsd_vnode_teardown_cb, NULL, true);
 
             if (vnodes_used < (size_t)vnodes_count)
-                strncpyz(vnode_guids[vnodes_used++], virtual_host->machine_guid, GUID_LEN);
+                strncpyz(vnode_guids[vnodes_used++], machine_guid, GUID_LEN);
         }
-        rrd_rdunlock();
-        (void) JudyLFreeArray(&parser->user.vnodes.JudyL, PJE0);
+        pluginsd_vnodes_index_destroy(parser);
     }
 
     // mark all charts of this plugin as obsolete
