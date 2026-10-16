@@ -161,13 +161,12 @@ static bool rrdmetric_conflict_callback(const DICTIONARY_ITEM *item __maybe_unus
     RRDDIM *rd = rrdmetric_rrddim_atomic_load(rm);
     RRDDIM *rd_new = rrdmetric_rrddim_atomic_load(rm_new);
 
-    if(rd && rd_new && rd != rd_new) {
+    if(rd != rd_new) {
         rrdmetric_rrddim_atomic_store(rm, rd_new);
-        rrd_flag_set_updated(rm, RRD_FLAG_UPDATE_REASON_CHANGED_LINKING);
-    }
 
-    if(rd != rd_new)
-        rrdmetric_rrddim_atomic_store(rm, rd_new);
+        if(rd && rd_new)
+            rrd_flag_set_updated(rm, RRD_FLAG_UPDATE_REASON_CHANGED_LINKING);
+    }
 
     spinlock_unlock(&rm->ri->spinlock);
 

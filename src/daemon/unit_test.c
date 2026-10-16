@@ -2037,7 +2037,7 @@ static int relinked_chart_check(const char *function, RRDSET *st, RRDDIM *rd) {
     int rc = 0;
 
     RRDINSTANCE *ri = st->rrdcontexts.rrdinstance ? rrdinstance_acquired_value(st->rrdcontexts.rrdinstance) : NULL;
-    if(!ri || ri->rrdset != st) {
+    if(!ri || rrdinstance_rrdset_atomic_load(ri) != st) {
         fprintf(stderr, "%s: the re-created chart lost its instance\n", function);
         rc = 1;
     }

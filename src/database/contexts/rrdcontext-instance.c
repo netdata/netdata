@@ -286,15 +286,15 @@ void rrdinstance_trigger_updates(RRDINSTANCE *ri, const char *function) {
             rrd_flag_set_updated(ri, RRD_FLAG_UPDATE_REASON_CHANGED_METADATA);
         }
     }
-
-    spinlock_unlock(&ri->spinlock);
-
-    if(st == NULL && unlikely(rrd_flag_is_collected(ri))) {
+    else if(unlikely(rrd_flag_is_collected(ri))) {
         // there is no rrdset, but we have it as collected!
+        // (under the lock, so that a chart taking the instance over cannot be archived by us)
 
         rrdinstance_set_archived(ri);
         rrd_flag_set_updated(ri, RRD_FLAG_UPDATE_REASON_CHANGED_LINKING);
     }
+
+    spinlock_unlock(&ri->spinlock);
 
     if(rrd_flag_is_updated(ri) || !rrd_flag_check(ri, RRD_FLAG_LIVE_RETENTION)) {
         rrd_flag_set_updated(ri->rc, RRD_FLAG_UPDATE_REASON_TRIGGERED);
@@ -408,7 +408,9 @@ inline void rrdinstance_from_rrdset(RRDSET *st) {
         spinlock_lock(&ri_old->spinlock);
         bool owned = rrdinstance_rrdset_atomic_load(ri_old) == st;
         if(owned) {
-            if(!rrd_flag_check(ri_old, RRD_FLAG_OWN_LABELS))
+            // the instance keeps its own (empty) labels from now on: it always has a set, created by the insert
+            // callback and flushed while a chart owned it, so there is nothing to create
+            if(unlikely(!ri_old->rrdlabels))
                 ri_old->rrdlabels = rrdlabels_create();
 
             rrdinstance_set_deleted_overwrite(ri_old, RRD_FLAG_UPDATED|RRD_FLAG_OWN_LABELS|RRD_FLAG_LIVE_RETENTION|RRD_FLAG_UPDATE_REASON_UNUSED|RRD_FLAG_UPDATE_REASON_ZERO_RETENTION);
