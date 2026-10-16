@@ -2466,7 +2466,7 @@ static ssize_t weights_count_node_callback(void *data, RRDHOST *host, bool query
     __atomic_fetch_add(&qwd->total_workload.nodes, 1, __ATOMIC_RELAXED);
     ssize_t ret = query_scope_foreach_context(host, qwd->qwr->scope_contexts,
                                 qwd->scope_contexts_sp, qwd->contexts_sp,
-                                weights_count_context_callback, queryable, qwd);
+                                weights_count_context_callback, queryable, qwd, NULL);
 
     return ret;
 }
@@ -2609,7 +2609,7 @@ static ssize_t weights_do_node_callback(void *data, RRDHOST *host, bool queryabl
 
     ssize_t ret = query_scope_foreach_context(host, qwd->qwr->scope_contexts,
                                 qwd->scope_contexts_sp, qwd->contexts_sp,
-                                weights_do_context_callback, queryable, qwd);
+                                weights_do_context_callback, queryable, qwd, NULL);
 
     return ret;
 }

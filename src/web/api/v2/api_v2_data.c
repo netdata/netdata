@@ -310,6 +310,8 @@ static int api_v23_data_internal(RRDHOST *host __maybe_unused, struct web_client
 
     owa = onewayalloc_create(0);
     ret = data_query_execute(owa, w->response.data, qt, &last_timestamp_in_data);
+    if(ret == HTTP_RESP_GATEWAY_TIMEOUT || ret == HTTP_RESP_CLIENT_CLOSED_REQUEST)
+        goto cleanup; // a cancelled query has a plain-text error body: do not wrap it or mark it cacheable
 
     if(format == DATASOURCE_DATATABLE_JSONP) {
         if(google_timestamp < last_timestamp_in_data)

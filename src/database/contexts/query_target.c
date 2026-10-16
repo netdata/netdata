@@ -1062,6 +1062,10 @@ static ssize_t query_scope_foreach_instance(QUERY_TARGET_LOCALS *qtl, QUERY_NODE
     return added;
 }
 
+static bool query_context_scan_should_stop(void *data) {
+    return query_target_build_cancelled(data, false);
+}
+
 static ssize_t query_context_add(void *data, RRDCONTEXT_ACQUIRED *rca, bool queryable_context) {
     QUERY_TARGET_LOCALS *qtl = data;
 
@@ -1167,7 +1171,7 @@ static ssize_t query_node_add(void *data, RRDHOST *host, bool queryable_host) {
         added = query_scope_foreach_context(
                 host, qtl->scope_contexts,
                 qt->contexts.scope_pattern, qt->contexts.pattern,
-                query_context_add, queryable_host, qtl);
+                query_context_add, queryable_host, qtl, query_context_scan_should_stop);
 
         if(added < 0)
             added = 0;
