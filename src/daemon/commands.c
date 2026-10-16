@@ -423,6 +423,10 @@ static int remove_ephemeral_host(BUFFER *wb, const char *machine_guid, bool repo
     }
     rrd_rdunlock();
 
+    // Authoritative while we hold the lock: every path that makes a host live (a child attaching,
+    // a plugin defining or re-enabling a vnode) holds the read side until the host is online (see
+    // metadata_lifetime_lock). So with the write side, an offline host stays offline - a reconnecting
+    // child is refused until we are done - and with the read side it stays allocated.
     if (rrdhost_is_online(host)) {
         if (report_error)
             buffer_sprintf(wb, "Node '%s' (machine guid: %s) is online - not changing it",
