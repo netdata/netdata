@@ -520,6 +520,11 @@ that tier. An eligible current selection is preferred; remaining candidates use 
 as a tie-breaker. A finite pass tries each member at most once. Initial sibling attempts do not wait for a failed
 candidate's retry cadence, including when its cadence is zero or its error forbids retrying that same config.
 
+Every retained Active or Proposal MUST pass the same capability and membership-authority check used by execution.
+One membership occupies at most one role. A distinct predecessor Active and successor Proposal may coexist, with the
+Proposal owning physical execution. Rejection or authority withdrawal reconciles both slots before occupancy can
+suppress progress or coalesce ENABLE. Binding/source admission grants remain separate from executable work validity.
+
 Passive daemon discovery admits `accepted` without Init/Check; ENABLE starts the search. Automatic source mode first
 checks a tentative proposal while preserving an incumbent. Invalid proposals quarantine their exact membership;
 operational failure crosses the persistent-source acceptance boundary, commits source-specific Failed/removal, and
@@ -788,9 +793,14 @@ the plugin restarts. Echo replies update status or record rejection without repl
   after an accepted UPDATE is reported through later failed status and diagnostics; the mutation reply remains `202`.
 - **Informative commands.** TEST preserves its validation/error codes and never adopts its payload. RESTART probes
   the exposed stored config only; it cannot sweep source siblings on failure. It runs a response-free resource transaction
-  from an independent Function invocation lane, then observes the exact activation token and installed generation. It
+  from an independent Function invocation lane, then observes the accepted continuation and exact installed generation. It
   returns `200` only after readiness/publication commits, or the classified failure. Stop/replacement invalidates the
   receipt; a later retry cannot satisfy it. Caller timeout/cancellation detaches observation without undoing adoption.
+- **Restart observation ownership.** Pending observation follows `{run, intent, candidate}` across fresh physical
+  attempts. Executor replacement, dependency waits and preflight interruption do not settle it. Committed controller
+  transitions complete classified terminal outcomes before retry effects, or retire observation when its semantic
+  authority disappears. Successful installation moves the receipt to the exact runtime identity. Run stop drains both
+  pending and installed observations, including interrupted continuations with no executor.
 - **Retirement.** A mutation rolled back before graph commit returns `503`; unapplied work cannot claim acceptance.
 
 Health is reported through CONFIG status and lifecycle diagnostics. `TestDynCfgJobMutationAdoptionAndRestartPreflight`
@@ -840,8 +850,10 @@ index retains identities and owners only and cannot select candidates or schedul
 - Successful staging installs an Activating generation under Accepted. Exact live readiness/failure transactions
   settle health and the continuation separately. Operational failure preserves source-specific stock removal and
   per-candidate retry/manual policy; readiness closes alternative search.
-- Store rotation pauses the exact committed config and intent, quiesces the old generation, commits/restores the
-  Store, then requests a token-scoped controller resume. Child commands do not probe or await startup. Deadline
+- Store rotation pauses the exact committed config under a fresh exact intent, quiesces the old generation,
+  commits/restores the Store, then requests a token-scoped controller resume. A pending RESTART observation of that
+  predecessor transfers to the paused intent before its executor or installed runtime retires. Child commands do not
+  probe or await startup. Deadline
   recovery retains only that scoped resume; disable/remove/replacement revokes it. Passive jobs are excluded.
 - Interactive preflight can interrupt physical execution without changing the predecessor's logical recovery facts.
   Every terminal non-adoption path retains an acknowledged predecessor-scoped resume obligation, including rejection,

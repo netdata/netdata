@@ -112,7 +112,6 @@ type acceptedActivationIndex struct {
 	terminalErr  error
 	stop         chan struct{}
 	done         chan struct{}
-	retire       func(acceptedActivationToken)
 	validWork    func(string, candidateWorkToken) bool
 	resumeWork   func(string, candidateWorkToken)
 }
@@ -469,9 +468,6 @@ func (aai *acceptedActivationIndex) detachLocked(id string) *preparedJobCandidat
 		return nil
 	}
 	delete(aai.entries, id)
-	if aai.retire != nil {
-		aai.retire(entry.token)
-	}
 	aai.dependencies.remove(id)
 	close(entry.cancel)
 	if entry.state == acceptedActivationTerminal {

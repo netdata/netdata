@@ -26,7 +26,16 @@ func candidateGraphBinding(id string, binding *candidateBinding) (*dyncfg.GraphC
 	return &dyncfg.GraphConfig{ID: id, Module: binding.Config.Module(), Name: binding.Config.Name(), Status: binding.Health.String(), Payload: payload}, nil
 }
 
-func (dcjc *DynCfgJobController) prepareCandidateDecision(ctx context.Context, scope lifecycle.ResourceTransactionScope, current lifecycle.ReadyResource, permit lifecycle.LongLivedPermit, delta *candidateDelta, facts ...preparedJobConfigLifecycle) (lifecycle.PreparedResourceTransaction, error) {
+type candidateDecisionOptions struct {
+	lifecycle preparedJobConfigLifecycle
+	restart   restartObservationTransition
+}
+
+func (dcjc *DynCfgJobController) prepareCandidateDecision(ctx context.Context, scope lifecycle.ResourceTransactionScope, current lifecycle.ReadyResource, permit lifecycle.LongLivedPermit, delta *candidateDelta, options ...candidateDecisionOptions) (lifecycle.PreparedResourceTransaction, error) {
+	var option candidateDecisionOptions
+	if len(options) > 0 {
+		option = options[0]
+	}
 	var resume func()
 	if before, after := delta.before, delta.after; current == nil && before != nil && before.Proposal != nil && before.Active != nil &&
 		after.Proposal == nil && after.Active != nil && after.Active.Token == before.Active.Token && delta.Decision.Work == nil {
@@ -36,7 +45,7 @@ func (dcjc *DynCfgJobController) prepareCandidateDecision(ctx context.Context, s
 		resume = func() { dcjc.retainCandidateResume(scope.ID, token) }
 	}
 	if delta.Decision.Binding == nil && !delta.Decision.Remove {
-		commit, err := dcjc.prepareCandidateCommit(delta, false)
+		commit, err := dcjc.prepareCandidateCommit(delta, false, option.restart)
 		if err != nil {
 			return nil, err
 		}
@@ -58,11 +67,8 @@ func (dcjc *DynCfgJobController) prepareCandidateDecision(ctx context.Context, s
 	}
 	reply := internalReply()
 	reply.candidate = delta
-	var jobConfig preparedJobConfigLifecycle
-	if len(facts) > 0 {
-		jobConfig = facts[0]
-	}
-	return dcjc.prepareMutationAfterApplyAndFallback(ctx, scope, current, nil, permit, resourceRemovalDisposition(current), postimage, reply, cleanup, resume, jobConfig, jobConfigIntentPreserve, nil, nil, nil)
+	reply.restart = option.restart
+	return dcjc.prepareMutationAfterApplyAndFallback(ctx, scope, current, nil, permit, resourceRemovalDisposition(current), postimage, reply, cleanup, resume, option.lifecycle, jobConfigIntentPreserve, nil, nil, nil)
 }
 
 func (dcjc *DynCfgJobController) candidateProjectionCleanup(id string, postimage *dyncfg.GraphConfig, delta *candidateDelta) lifecycle.TaskCleanup {
@@ -76,10 +82,15 @@ func (dcjc *DynCfgJobController) candidateProjectionCleanup(id string, postimage
 
 // prepareCandidateCommit resolves dependency keys off-loop. Its returned hook
 // only installs the prepared state and releases token-bearing executor effects.
-func (dcjc *DynCfgJobController) prepareCandidateCommit(delta *candidateDelta, handoff bool) (func(), error) {
+func (dcjc *DynCfgJobController) prepareCandidateCommit(delta *candidateDelta, handoff bool, transitions ...restartObservationTransition) (func(), error) {
 	if delta == nil {
 		return nil, nil
 	}
+	var transition restartObservationTransition
+	if len(transitions) > 0 {
+		transition = transitions[0]
+	}
+	observe := dcjc.prepareRestartObservationCommit(delta, transition)
 	var spec acceptedActivationSpec
 	if work := delta.Decision.Work; work != nil && !handoff {
 		var err error
@@ -105,6 +116,7 @@ func (dcjc *DynCfgJobController) prepareCandidateCommit(delta *candidateDelta, h
 		if delta.Decision.Ignored {
 			return
 		}
+		observe()
 		id := delta.name
 		if delta.Decision.Revoke {
 			dcjc.scheduler.accepted.cancelUnless(id, "")
@@ -265,10 +277,16 @@ func (dcjc *DynCfgJobController) prepareControllerProbeFailure(ctx context.Conte
 	if err != nil {
 		return nil, err
 	}
-	transaction, err := dcjc.prepareCandidateDecision(ctx, scope, current, permit, delta, preparedJobConfigLifecycle{
-		identity: dcjc.postimageJobConfigLifecycleGraphState(postimage).identity,
-		snapshot: failure.jobConfigLifecycle,
-		failure:  failure.diagnosticFailure,
+	transaction, err := dcjc.prepareCandidateDecision(ctx, scope, current, permit, delta, candidateDecisionOptions{
+		lifecycle: preparedJobConfigLifecycle{
+			identity: dcjc.postimageJobConfigLifecycleGraphState(postimage).identity,
+			snapshot: failure.jobConfigLifecycle,
+			failure:  failure.diagnosticFailure,
+		},
+		restart: restartObservationTransition{settlement: &activationRestartSettlement{
+			work:   attempt.spec.work.Token,
+			result: adoptedResult(dyncfg.CommandRestart, dyncfg.StatusFailed, collectorFailure(failure, "job restart failed: %v")),
+		}},
 	})
 	if err != nil {
 		return nil, err
@@ -294,6 +312,9 @@ func (dcjc *DynCfgJobController) prepareControllerActivationError(ctx context.Co
 	case activationFailureBusy, activationFailureStaleStore, activationFailureSuperseded:
 		return dcjc.prepareControllerWait(ctx, attempt, current, scope, permit, err, dcjc.activationRelease(scope.ID, jobmgr.ProcessAttemptJob))
 	case activationFailureProposal:
+		settlement := restartObservationTransition{settlement: &activationRestartSettlement{
+			work: attempt.spec.work.Token, result: rejectedResult(testFailure(err)),
+		}}
 		state := dcjc.candidates.view(scope.ID)
 		if state != nil && state.Binding != nil {
 			if !attempt.spec.work.Tentative && state.Binding.Key == attempt.spec.work.Token.Candidate {
@@ -305,14 +326,17 @@ func (dcjc *DynCfgJobController) prepareControllerActivationError(ctx context.Co
 				if prepareErr != nil {
 					return nil, prepareErr
 				}
-				return dcjc.prepareCandidateDecision(ctx, scope, current, permit, delta, preparedJobConfigLifecycle{identity: dcjc.postimageJobConfigLifecycleGraphState(postimage).identity, failure: jobConfigFailure(err, "activation")})
+				return dcjc.prepareCandidateDecision(ctx, scope, current, permit, delta, candidateDecisionOptions{
+					lifecycle: preparedJobConfigLifecycle{identity: dcjc.postimageJobConfigLifecycleGraphState(postimage).identity, failure: jobConfigFailure(err, "activation")},
+					restart:   settlement,
+				})
 			}
 		}
 		delta, prepareErr := dcjc.candidates.prepareOutcome(scope.ID, attempt.spec.work.Token, candidateOutcome{Kind: candidateRejected}, dcjc.scheduler.retries.now())
 		if prepareErr != nil {
 			return nil, prepareErr
 		}
-		prepared, prepareErr := dcjc.prepareCandidateDecision(ctx, scope, current, permit, delta)
+		prepared, prepareErr := dcjc.prepareCandidateDecision(ctx, scope, current, permit, delta, candidateDecisionOptions{restart: settlement})
 		if prepareErr != nil {
 			return nil, prepareErr
 		}
@@ -376,9 +400,15 @@ func (dcjc *DynCfgJobController) prepareControllerBlocked(ctx context.Context, a
 	if err != nil {
 		return nil, err
 	}
-	prepared, err := dcjc.prepareCandidateDecision(ctx, scope, current, permit, delta, preparedJobConfigLifecycle{
+	option := candidateDecisionOptions{lifecycle: preparedJobConfigLifecycle{
 		identity: dcjc.postimageJobConfigLifecycleGraphState(postimage).identity, failure: jobConfigFailure(cause, "activation"),
-	})
+	}}
+	if block != candidateBlockAcceptedWait {
+		option.restart.settlement = &activationRestartSettlement{
+			work: attempt.spec.work.Token, result: rejectedResult(testFailure(cause)),
+		}
+	}
+	prepared, err := dcjc.prepareCandidateDecision(ctx, scope, current, permit, delta, option)
 	if err != nil {
 		return nil, err
 	}

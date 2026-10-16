@@ -156,7 +156,8 @@ func adoptsFailure(failure *autoDetectionFailure) bool {
 // An empty command marks response-free internal work.
 type jobReply struct {
 	candidate         *candidateDelta // controller transition committed with this postimage
-	retainedCandidate bool            // checked stage is handed to the executor after commit
+	restart           restartObservationTransition
+	retainedCandidate bool // checked stage is handed to the executor after commit
 	command           dyncfg.Command
 	status            dyncfg.Status // status of the adopted postimage; empty when the change removes the job
 	failure           jobFailure    // why an adopted change ended Failed or removed

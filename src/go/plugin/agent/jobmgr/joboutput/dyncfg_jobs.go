@@ -105,10 +105,12 @@ func (dcjc *DynCfgJobController) BindBackgroundWorkers(
 	if dcjc == nil || dcjc.scheduler == nil {
 		return errors.New("job output: invalid background worker controller")
 	}
-	dcjc.scheduler.accepted.retire = dcjc.retireActivationRestart
 	dcjc.scheduler.accepted.validWork = dcjc.candidates.valid
 	dcjc.scheduler.accepted.resumeWork = dcjc.retainCandidateResume
-	dcjc.scheduler.retireCandidates = dcjc.candidates.retire
+	dcjc.scheduler.retireCandidates = func() {
+		dcjc.candidates.retire()
+		dcjc.restartObservers.retire()
+	}
 	if err := dcjc.scheduler.accepted.bind(
 		dcjc.factory,
 		commands,

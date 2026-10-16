@@ -375,8 +375,12 @@ func (c *candidateController) view(name string) *candidateView {
 		binding := *r.Binding
 		v.Binding = &binding
 	}
-	v.Active = cloneCandidateWork(r.Active)
-	v.Proposal = cloneCandidateWork(r.Proposal)
+	if r.Active != nil && c.validRecord(r, r.Active.Token) {
+		v.Active = cloneCandidateWork(r.Active)
+	}
+	if r.Proposal != nil && c.validRecord(r, r.Proposal.Token) {
+		v.Proposal = cloneCandidateWork(r.Proposal)
+	}
 	return v
 }
 
@@ -521,36 +525,43 @@ func (c *candidateController) foldInventory(d *candidateDelta, inv DiscoveredJob
 	r.pruneRecoveryGrants()
 	// Missing membership is not source removal: an admitted source grant survives
 	// until a replacement is admitted, including while replacement validation runs.
-	workRevoked := false
-	proposalRevoked := false
-	if r.Proposal != nil && (!candidateAuthorized(r, r.Proposal.Token.Candidate) || r.entry(r.Proposal.Token.Candidate).Rejected) {
-		r.Proposal = nil
-		workRevoked = true
-		proposalRevoked = true
-	}
-	if r.Active != nil && (!candidateAuthorized(r, r.Active.Token.Candidate) || r.entry(r.Active.Token.Candidate).Rejected) {
-		r.Active = nil
-		r.Wake = nil
-		d.Decision.Wake = nil
-		r.FrameworkBlocked = false
-		r.Phase = candidateDormant
-		workRevoked = true
-	}
+	c.reconcileWork(d)
 	if r.Binding != nil && (r.entry(r.Binding.Key) == nil || r.entry(r.Binding.Key).SourceOwned) && !candidateAuthorized(r, r.Binding.Key) {
 		r.Binding = nil
 		d.Decision.Remove = true
-		workRevoked = true
-	}
-	// The proposal, or otherwise Active, owns the executor. Retire a revoked
-	// executor without canceling unrelated work that has already displaced it.
-	if workRevoked && r.Proposal == nil && (r.Active == nil || proposalRevoked) {
-		d.Decision.Revoke = true
+		if r.Proposal == nil && r.Active == nil {
+			d.Decision.Revoke = true
+		}
 	}
 	if withdrewBinding {
 		r.SearchClosed = false
 		r.Manual = candidateManualSourceRevoked
 		r.Phase = candidateFailedManual
 	}
+}
+
+// Membership authority belongs to every role naming it. Reconcile both slots
+// before occupancy can suppress recovery; different-member roles remain valid.
+func (c *candidateController) reconcileWork(d *candidateDelta) bool {
+	r := d.after
+	proposalRevoked := r.Proposal != nil && !c.validRecord(r, r.Proposal.Token)
+	if proposalRevoked {
+		r.Proposal = nil
+	}
+	activeRevoked := r.Active != nil && !c.validRecord(r, r.Active.Token)
+	if activeRevoked {
+		r.Active = nil
+		r.Wake = nil
+		r.FrameworkBlocked = false
+		r.Block = candidateBlockQuarantined
+		r.Phase = candidateDormant
+	}
+	// Proposal owns physical execution ahead of a retained predecessor Active.
+	// Losing Active must not cancel an unrelated surviving Proposal.
+	if r.Proposal == nil && (proposalRevoked || activeRevoked) {
+		d.Decision.Revoke = true
+	}
+	return proposalRevoked || activeRevoked
 }
 
 func normalizeCandidateInventory(input DiscoveredJobInventory) (DiscoveredJobInventory, error) {
@@ -709,6 +720,7 @@ func candidateSourceChoice(r *candidateRecord) *sourceSelection {
 }
 
 func (c *candidateController) reconcileSource(d *candidateDelta, now int64) error {
+	c.reconcileWork(d)
 	if err := c.arbitrateSource(d); err != nil {
 		return err
 	}
@@ -760,7 +772,8 @@ func (c *candidateController) arbitrateSource(d *candidateDelta) error {
 	if !changed && r.Binding == nil {
 		return nil
 	}
-	if r.Proposal != nil && r.Proposal.Token.Candidate == choice.Observation.Key {
+	if r.Proposal != nil && c.validRecord(r, r.Proposal.Token) && r.Proposal.Token.Candidate == choice.Observation.Key ||
+		r.Active != nil && c.validRecord(r, r.Active.Token) && r.Active.Token.Candidate == choice.Observation.Key {
 		return nil
 	}
 	// Same-tier additions belong to an existing open search. A still-observed
@@ -859,12 +872,13 @@ func (c *candidateController) prepareEnable(name string, now int64) (delta *cand
 		return nil, err
 	}
 	r := d.after
+	reconciled := c.reconcileWork(d)
 	if r.Binding == nil {
 		return nil, errors.New("job output: candidate enable has no admitted binding")
 	}
 	if r.Enablement == candidateEnabled && (r.Binding.Health == dyncfg.StatusRunning ||
-		r.Binding.Health == dyncfg.StatusAccepted && (r.Active != nil || r.Proposal != nil || r.Phase == candidateBlocked)) {
-		d.Decision.Ignored = true
+		r.Binding.Health == dyncfg.StatusAccepted && (r.Active != nil || r.Proposal != nil)) {
+		d.Decision.Ignored = !reconciled
 		return d, nil
 	}
 	intent, err := c.next()
@@ -1045,16 +1059,14 @@ func (c *candidateController) prepareOutcome(name string, token candidateWorkTok
 	if outcome.Kind == candidateRejected {
 		r.editEntry(token.Candidate).Rejected = true
 		r.tierDirty = true
+		c.reconcileWork(d)
 		if tentative {
-			r.Proposal = nil
 			r.Cursor = nil
 			if r.Binding != nil {
 				if old := r.entry(r.Binding.Key); old != nil {
 					r.Cursor = observeCandidate(old)
 				}
 			}
-		} else {
-			r.Active = nil
 		}
 		// Invalid competitors do not reset the predecessor's pass or deadlines.
 		return d, c.reconcileSource(d, now)
@@ -1241,6 +1253,7 @@ func (c *candidateController) prepareWake(name string, token candidateWakeToken,
 		d.Decision.Ignored = true
 		return d, nil
 	}
+	c.reconcileWork(d)
 	r.Wake = nil
 	d.Decision.Wake = nil
 	if r.FrameworkBlocked {
@@ -1304,11 +1317,12 @@ func (c *candidateController) resumeCandidate(d *candidateDelta, work *candidate
 }
 
 func (c *candidateController) progress(d *candidateDelta, now int64) error {
+	c.reconcileWork(d)
 	r := d.after
 	if !r.recoveryOpen() {
 		return c.reconcileWake(d, 0, false)
 	}
-	if r.Active != nil || r.Proposal != nil || r.Phase == candidateBlocked {
+	if r.Active != nil || r.Proposal != nil {
 		d.Decision.Wake = r.Wake
 		return nil
 	}

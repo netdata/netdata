@@ -100,7 +100,7 @@ func (dcjc *DynCfgJobController) prepareMutationAfterApplyAndFallback(
 	}
 	if delta != nil {
 		reply.candidate = delta
-		commit, err := dcjc.prepareCandidateCommit(delta, reply.retainedCandidate)
+		commit, err := dcjc.prepareCandidateCommit(delta, reply.retainedCandidate, reply.restart)
 		if err != nil {
 			return nil, err
 		}
@@ -274,7 +274,7 @@ func (dcjc *DynCfgJobController) prepareMutationWithActivationFallbacks(
 ) (lifecycle.PreparedResourceTransaction, error) {
 	jobConfig := preparedJobConfigLifecycleState(successor)
 	if reply.candidate != nil {
-		commit, err := dcjc.prepareCandidateCommit(reply.candidate, false)
+		commit, err := dcjc.prepareCandidateCommit(reply.candidate, false, reply.restart)
 		if err != nil {
 			return nil, rollbackSuccessorMutation(successor, err)
 		}
@@ -288,7 +288,11 @@ func (dcjc *DynCfgJobController) prepareMutationWithActivationFallbacks(
 			if err != nil {
 				return nil, rollbackSuccessorMutation(successor, err)
 			}
-			commit, err := dcjc.prepareCandidateCommit(blocked, false)
+			commit, err := dcjc.prepareCandidateCommit(blocked, false, restartObservationTransition{
+				settlement: &activationRestartSettlement{
+					work: work.Token, result: rejectedResult(testFailure(jobmgr.ErrProcessAttemptQuarantined)),
+				},
+			})
 			if err != nil {
 				return nil, rollbackSuccessorMutation(successor, err)
 			}
