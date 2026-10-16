@@ -1346,8 +1346,8 @@ static void schedule_alert_snapshot_if_needed(struct aclk_sync_cfg_t *aclk_host_
 #define SNAPSHOT_ENTRIES_COUNT_COLUMN 32
 
 // True when the host has alerts in memory (a disconnected child has none: they are deleted at the disconnect).
-// The write lock is held while the alert index is destroyed (archiving or freeing the host); when it cannot be
-// read, assume there are alerts.
+// Archiving a host destroys the alert index under the write lock, so the try-read keeps this count away from it;
+// when the lock is busy, assume there are alerts.
 static bool host_has_alerts(RRDHOST *host)
 {
     if (!rw_spinlock_tryread_lock(&host->metadata_lifetime_lock))
