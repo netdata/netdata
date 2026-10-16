@@ -544,6 +544,7 @@ func (c *candidateController) foldInventory(d *candidateDelta, inv DiscoveredJob
 // before occupancy can suppress recovery; different-member roles remain valid.
 func (c *candidateController) reconcileWork(d *candidateDelta) bool {
 	r := d.after
+	owner := r.executionOwner()
 	proposalRevoked := r.Proposal != nil && !c.validRecord(r, r.Proposal.Token)
 	if proposalRevoked {
 		r.Proposal = nil
@@ -558,10 +559,17 @@ func (c *candidateController) reconcileWork(d *candidateDelta) bool {
 	}
 	// Proposal owns physical execution ahead of a retained predecessor Active.
 	// Losing Active must not cancel an unrelated surviving Proposal.
-	if r.Proposal == nil && (proposalRevoked || activeRevoked) {
+	if owner != nil && !c.validRecord(r, owner.Token) {
 		d.Decision.Revoke = true
 	}
 	return proposalRevoked || activeRevoked
+}
+
+func (r *candidateRecord) executionOwner() *candidateWork {
+	if r.Proposal != nil {
+		return r.Proposal
+	}
+	return r.Active
 }
 
 func normalizeCandidateInventory(input DiscoveredJobInventory) (DiscoveredJobInventory, error) {
@@ -1257,6 +1265,9 @@ func (c *candidateController) prepareWake(name string, token candidateWakeToken,
 	r.Wake = nil
 	d.Decision.Wake = nil
 	if r.FrameworkBlocked {
+		if r.executionOwner() != r.Active {
+			return d, nil
+		}
 		if r.Block != candidateBlockFailedRetry || r.Active == nil {
 			d.Decision.Ignored = true
 			return d, nil
@@ -1267,7 +1278,8 @@ func (c *candidateController) prepareWake(name string, token candidateWakeToken,
 }
 
 // prepareResume is an acknowledged recovery after execution was physically cut.
-// The old capability must still own this exact slot; duplicate resumes are stale.
+// Only the selected role may replace the executor; a predecessor waits for its
+// proposal to resolve. Duplicate resumes are stale.
 func (c *candidateController) prepareResume(name string, token candidateWorkToken, now int64) (delta *candidateDelta, err error) {
 	defer finalizeCandidateDelta(&delta)
 	d, err := c.prepare(name)
@@ -1275,15 +1287,12 @@ func (c *candidateController) prepareResume(name string, token candidateWorkToke
 		return nil, err
 	}
 	r := d.after
-	if !c.validRecord(r, token) {
+	work := r.executionOwner()
+	if work == nil || work.Token != token || !c.validRecord(r, token) {
 		d.Decision.Ignored = true
 		return d, nil
 	}
-	work := r.Active
-	if r.Proposal != nil && r.Proposal.Token == token {
-		work = r.Proposal
-	}
-	if r.FrameworkBlocked {
+	if r.FrameworkBlocked && work == r.Active {
 		entry := r.entry(token.Candidate)
 		if r.Block == candidateBlockQuarantined || r.Block == candidateBlockFailedRetry && (!entry.HasDue || entry.Due > now) {
 			d.Decision.Ignored = true
@@ -1300,7 +1309,7 @@ func (c *candidateController) resumeCandidate(d *candidateDelta, work *candidate
 		return err
 	}
 	work.Token.Attempt = attempt
-	if r.FrameworkBlocked {
+	if r.FrameworkBlocked && work == r.Active {
 		r.FrameworkBlocked = false
 		r.Block = candidateBlockQuarantined
 		r.Wake = nil

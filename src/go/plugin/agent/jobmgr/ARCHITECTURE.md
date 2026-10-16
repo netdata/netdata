@@ -524,6 +524,8 @@ Every retained Active or Proposal MUST pass the same capability and membership-a
 One membership occupies at most one role. A distinct predecessor Active and successor Proposal may coexist, with the
 Proposal owning physical execution. Rejection or authority withdrawal reconciles both slots before occupancy can
 suppress progress or coalesce ENABLE. Binding/source admission grants remain separate from executable work validity.
+Resume delivery follows the same Proposal-before-Active execution priority. Framework blocks belong to Active;
+resuming a tentative Proposal cannot consume that predecessor state or admit the Proposal before validation.
 
 Passive daemon discovery admits `accepted` without Init/Check; ENABLE starts the search. Automatic source mode first
 checks a tentative proposal while preserving an incumbent. Invalid proposals quarantine their exact membership;

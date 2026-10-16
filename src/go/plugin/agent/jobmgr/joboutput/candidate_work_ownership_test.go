@@ -223,3 +223,61 @@ func TestCandidateWorkOwnershipPreservesDistinctRoles(t *testing.T) {
 		})
 	}
 }
+
+func TestCandidateWorkOwnershipScopesResumeToItsRole(t *testing.T) {
+	for _, role := range []string{"proposal", "queued predecessor"} {
+		t.Run(role, func(t *testing.T) {
+			c := newCandidateController(1)
+			old := candidateTestConfig("source", "old")
+			inv := candidateTestInventory(1, true, old)
+			first := candidateInventory(t, c, inv, 0).Decision.Work
+			candidateResult(t, c, first, candidateOutcome{
+				Kind:   candidateFrameworkBlocked,
+				Block:  candidateBlockAcceptedWait,
+				Listed: true,
+			}, 0)
+			blocked := requireCandidateWorkOwnership(t, c)
+			require.True(t, blocked.FrameworkBlocked)
+			next := candidateTestConfig("source", "replacement")
+			inv.Version++
+			inv.Candidates[0] = DiscoveredJobCandidate{
+				Config:      next,
+				Source:      next.Source(),
+				Incarnation: 2,
+			}
+			proposal := candidateInventory(t, c, inv, 1).Decision.Work
+			require.NotNil(t, proposal)
+			candidateResult(t, c, proposal, candidateOutcome{
+				Kind: candidateWaiting,
+			}, 1)
+			before := requireCandidateWorkOwnership(t, c)
+			if role == "queued predecessor" {
+				delta, err := c.prepareResume("test_job", first.Token, 2)
+				applyCandidateDelta(t, delta, err)
+				require.True(t, delta.Decision.Ignored)
+				require.Nil(t, delta.Decision.Work, "queued predecessor cannot displace the proposal executor")
+				require.Equal(t, before, requireCandidateWorkOwnership(t, c))
+				return
+			}
+			delta, err := c.prepareResume("test_job", proposal.Token, 2)
+			applyCandidateDelta(t, delta, err)
+			after := requireCandidateWorkOwnership(t, c)
+			require.True(t, after.FrameworkBlocked, "predecessor retains its own framework wait")
+			require.Equal(t, before.Binding, after.Binding, "tentative resume is not admission")
+			require.Equal(t, before.Active, after.Active)
+			require.Nil(t, delta.Decision.Binding)
+			require.NotNil(t, delta.Decision.Work)
+			require.True(t, delta.Decision.Work.Tentative)
+			require.NotEqual(t, proposal.Token.Attempt, delta.Decision.Work.Token.Attempt)
+			candidateResult(t, c, delta.Decision.Work, candidateOutcome{
+				Kind: candidateRejected,
+			}, 3)
+			restored, err := c.prepareResume("test_job", first.Token, 4)
+			applyCandidateDelta(t, restored, err)
+			after = requireCandidateWorkOwnership(t, c)
+			require.False(t, after.FrameworkBlocked)
+			require.Nil(t, after.Proposal)
+			require.Equal(t, first.Token.Candidate, restored.Decision.Work.Token.Candidate)
+		})
+	}
+}
