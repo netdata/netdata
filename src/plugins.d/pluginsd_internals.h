@@ -155,6 +155,9 @@ static ALWAYS_INLINE bool pluginsd_revive_scope_chart(PARSER *parser, RRDSET *st
                        "PLUGINSD: 'host:%s/chart:%s' is being deleted while %s collects it.",
                        rrdhost_hostname(st->rrdhost), rrdset_id(st), keyword);
 
+                // BEGIN2 may have ended the previous scope already; it does not use that chart again
+                pluginsd_keyword_chart_refs_release(parser);
+
                 // end the scope while our reference still keeps the chart
                 pluginsd_clear_scope_chart(parser, keyword, NULL);
                 pluginsd_keyword_chart_refs_release(parser);
