@@ -151,10 +151,11 @@ then call `ready()` once all fallible startup prerequisites succeed and state is
 Readiness MUST NOT wait for a first packet or remote observation. `Init()` and `Check()` still run during configuration
 validation while an incumbent may own the endpoint; DynCfg `test` never calls `Run()`.
 
-The framework waits for readiness before collecting. Startup errors follow the existing configured autodetection retry
-policy; a `collectorapi.PermanentError`, unexpected nil return and recovered panic do not retry. Unexpected return after
-readiness makes the job Failed and requires an explicit restart. The implementation MUST return promptly after
-`ctx.Done()` and SHOULD make in-flight I/O cancellation-aware where the library permits. Cleanup waits for `Run()` to
+The framework waits for readiness before collecting. Startup errors follow the candidate recovery policy below; a
+`collectorapi.PermanentError`, unexpected nil return and recovered panic do not automatically retry the same config.
+Readiness closes automatic sibling search. Unexpected return after readiness makes the job Failed and requires an
+explicit command; sibling arrivals and retry timers do not start another config. The implementation MUST return promptly
+after `ctx.Done()` and SHOULD make in-flight I/O cancellation-aware where the library permits. Cleanup waits for `Run()` to
 return. See the
 [runtime readiness contract](/src/go/plugin/framework/jobruntime/README.md#runtime-readiness-and-termination) for
 startup timeout, cancellation, output fencing and physical ownership semantics.
@@ -170,21 +171,29 @@ live in helper methods, preferably in `init.go`, so the public method reads as t
 a cheap auth/connectivity probe, not a full collection. `Collect()` MUST run the real write path through `metrix`.
 `Cleanup()` closes idle connections and forwards Function cleanup.
 
-An `Init()` or `Check()` error fails the job. By default, a `Check()` error is retried every `autodetection_retry`
-seconds (never when it is 0, the framework default) and an `Init()` error is never retried. Classify the error when that
-default is wrong:
+An `Init()` or `Check()` error fails that candidate. By default, a `Check()` error can retry that config after its
+`autodetection_retry` seconds (never when it is 0, the framework default) and an `Init()` error is not retried. Classify
+the error when that default is wrong:
 
 - `collectorapi.PermanentError(err)`: a failure that retrying the same configuration cannot fix, such as an invalid
-  option or an unknown named profile. The job is never retried.
+  option or an unknown named profile. That config is not automatically retried.
 - `collectorapi.TemporaryError(err)`: a condition that may clear on its own, such as a dependency that is not ready
-  yet. The job keeps the `autodetection_retry` schedule, even from `Init()`.
+  yet. That config keeps its `autodetection_retry` schedule, even from `Init()`.
+
+Several source configs can share a module/job name. Before any candidate reaches readiness, an enabled source-owned
+job tries eligible alternatives at the highest owning source tier, including alternatives in other files. Each gets
+one attempt per finite pass; initial sibling attempts do not wait for a failed config's cadence. Each config retains
+its own retry policy. Failure never permits a lower source tier to bypass an owning higher tier. At most one runtime
+collects for the public job name, and its successful selection stays sticky on identical source snapshots.
 
 DynCfg `update` rejects every failed preflight regardless of `autodetection_retry`, preserving the incumbent:
 `422` for a permanent or unclassified collector failure, `503` for a temporary one. Successful replacement preflight
 returns `202` before runtime startup completes. Non-running `enable` accepts intent with `202` before probing;
 later failures are reported through job status and use the retry policy above. `add` is passive until enabled.
-A classified failure keeps a failed stock job listed in DynCfg instead of removing it. Leave the expected absence of a
-service at a stock endpoint unclassified. For all command outcomes, including `restart` and `test`, see
+RESTART probes only the currently exposed stored config; it does not try source siblings. A fresh ENABLE of a
+non-running source-owned job starts a new alternative search. A classified failure keeps a failed stock job listed in
+DynCfg instead of removing it. Leave the expected absence of a service at a stock endpoint unclassified. For all
+command outcomes, including `restart` and `test`, see
 [the Job Manager reply contract](/src/go/plugin/agent/jobmgr/ARCHITECTURE.md#dyncfg-reply-contract).
 
 ## Config

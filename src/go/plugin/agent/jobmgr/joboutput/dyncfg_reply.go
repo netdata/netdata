@@ -155,9 +155,11 @@ func adoptsFailure(failure *autoDetectionFailure) bool {
 // jobReply is the reply intent of a transaction that changes the job graph.
 // An empty command marks response-free internal work.
 type jobReply struct {
-	command dyncfg.Command
-	status  dyncfg.Status // status of the adopted postimage; empty when the change removes the job
-	failure jobFailure    // why an adopted change ended Failed or removed
+	candidate         *candidateDelta // controller transition committed with this postimage
+	retainedCandidate bool            // checked stage is handed to the executor after commit
+	command           dyncfg.Command
+	status            dyncfg.Status // status of the adopted postimage; empty when the change removes the job
+	failure           jobFailure    // why an adopted change ended Failed or removed
 }
 
 // internalReply is the reply intent of response-free internal work.

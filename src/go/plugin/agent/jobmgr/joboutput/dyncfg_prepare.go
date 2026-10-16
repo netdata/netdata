@@ -121,7 +121,7 @@ func (dcjc *DynCfgJobController) prepareUpdate(
 		return dcjc.reject(scope, current, permit, failure.failure)
 	}
 	status := dyncfg.Status(record.Status)
-	if status == dyncfg.StatusAccepted && current == nil && !dcjc.scheduler.accepted.enabled(scope.ID) {
+	if status == dyncfg.StatusAccepted && current == nil && !dcjc.ActivationEnabled(scope.ID) {
 		return dcjc.rejectKeeping(scope, current, permit, jobFailure{
 			class:   failureForbidden,
 			message: "updating is not allowed in 'accepted' state.",
@@ -197,47 +197,26 @@ func (dcjc *DynCfgJobController) prepareUpdate(
 }
 
 func (dcjc *DynCfgJobController) prepareEnable(
-	ctx context.Context,
-	target dynCfgTarget,
-	record dyncfg.GraphRecord,
-	exists bool,
-	current lifecycle.ReadyResource,
-	scope lifecycle.ResourceTransactionScope,
-	permit lifecycle.LongLivedPermit,
+	ctx context.Context, target dynCfgTarget, record dyncfg.GraphRecord, exists bool,
+	current lifecycle.ReadyResource, scope lifecycle.ResourceTransactionScope, permit lifecycle.LongLivedPermit,
 ) (lifecycle.PreparedResourceTransaction, error) {
 	if !exists {
-		return dcjc.reject(scope, current, permit, jobFailure{
-			class:   failureNotFound,
-			message: "config not found.",
-		})
+		return dcjc.reject(scope, current, permit, jobFailure{class: failureNotFound, message: "config not found."})
 	}
 	status := dyncfg.Status(record.Status)
-	if status == dyncfg.StatusRunning {
+	if status == dyncfg.StatusRunning || status == dyncfg.StatusAccepted && current != nil {
 		return dcjc.satisfyWithEnabledIntent(ctx, scope, current, permit, record, nil)
 	}
-	config, err := graphRecordConfig(record)
+	delta, err := dcjc.candidates.prepareEnable(scope.ID, dcjc.scheduler.retries.now())
 	if err != nil {
 		return nil, err
 	}
-	spec, err := dcjc.configModules.newAcceptedActivationSpec(config)
-	if err != nil {
-		return nil, err
-	}
-	activate := func() { dcjc.scheduler.accepted.arm(spec) }
-	if status == dyncfg.StatusAccepted {
-		if current != nil {
-			activate = nil // The installed generation already owns startup.
-		}
-		return dcjc.satisfyWithEnabledIntent(ctx, scope, current, permit, record, activate)
-	}
+	reply := adoptedReply(dyncfg.CommandEnable, dyncfg.StatusAccepted, jobFailure{})
+	reply.candidate = delta
 	postimage := graphConfig(record, dyncfg.StatusAccepted)
-	return dcjc.prepareMutationWithRetryAfterApply(
-		ctx,
-		scope, current, nil, permit, resourceRemovalDisposition(current), &postimage,
-		adoptedReply(dyncfg.CommandEnable, dyncfg.StatusAccepted, jobFailure{}),
-		dcjc.configStatusCleanup(scope.ID, dyncfg.StatusAccepted), autoDetectionRetryToken{}, activate,
-		jobConfigIntentEnable,
-	)
+	return dcjc.prepareMutationAfterApply(ctx, scope, current, nil, permit,
+		resourceRemovalDisposition(current), &postimage, reply,
+		dcjc.configStatusCleanup(scope.ID, dyncfg.StatusAccepted), nil, jobConfigIntentEnable)
 }
 
 func (dcjc *DynCfgJobController) prepareRestart(
@@ -331,7 +310,19 @@ func (dcjc *DynCfgJobController) prepareCandidate(
 	current lifecycle.ReadyResource,
 	scope lifecycle.ResourceTransactionScope,
 	permit lifecycle.LongLivedPermit,
-) (lifecycle.PreparedResourceTransaction, error) {
+) (transaction lifecycle.PreparedResourceTransaction, resultErr error) {
+	token, interrupted := dcjc.scheduler.accepted.interruptExecution(scope.ID)
+	defer func() {
+		if !interrupted {
+			return
+		}
+		resume := func() { dcjc.retainCandidateResume(scope.ID, token) }
+		if resultErr != nil || transaction == nil {
+			resume()
+		} else {
+			transaction = &candidatePreflightTransaction{PreparedResourceTransaction: transaction, resume: resume}
+		}
+	}()
 	kept := dyncfg.Status(cmd.record.Status)
 	failedPostimage := cmd.postimage
 	failedPostimage.Status = dyncfg.StatusFailed.String()
@@ -385,7 +376,6 @@ func (dcjc *DynCfgJobController) prepareCandidate(
 			failedPostimage,
 			adoptedReply(cmd.command, dyncfg.StatusFailed, failure),
 			failedCleanup,
-			autoDetectionRetryToken{},
 			cmd.config,
 			err,
 		)
@@ -398,7 +388,6 @@ func (dcjc *DynCfgJobController) prepareCandidate(
 		failedCleanup:    failedCleanup,
 		removedCleanup:   cmd.removedCleanup,
 		reply:            reply,
-		afterApply:       dcjc.scheduleRetryAfterApply(cmd.config),
 		removePlainStock: cmd.config.SourceType() == confgroup.TypeStock,
 	}
 	if !cmd.adoptsFailures || !adoptsFailure(probeFailure) {
@@ -410,7 +399,7 @@ func (dcjc *DynCfgJobController) prepareCandidate(
 			kept,
 		)
 	}
-	return dcjc.prepareProbeFailure(ctx, scope, current, permit, autoDetectionRetryToken{}, probeFailure, failurePlan)
+	return dcjc.prepareProbeFailure(ctx, scope, current, permit, probeFailure, failurePlan)
 }
 
 func (dcjc *DynCfgJobController) prepareDisable(

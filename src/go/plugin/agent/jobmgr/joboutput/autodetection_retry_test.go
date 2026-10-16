@@ -6,6 +6,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"strings"
 	"sync"
 	"testing"
 	"time"
@@ -13,6 +14,7 @@ import (
 	"github.com/netdata/netdata/go/plugins/plugin/agent/jobmgr"
 	"github.com/netdata/netdata/go/plugins/plugin/agent/jobmgr/lifecycle"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/confgroup"
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
@@ -21,8 +23,7 @@ func (adri *autoDetectionRetryIndex) joined() bool {
 		return true
 	}
 	adri.mu.Lock()
-	bound := adri.bound
-	done := adri.done
+	bound, done := adri.bound, adri.done
 	adri.mu.Unlock()
 	if !bound {
 		return true
@@ -35,255 +36,223 @@ func (adri *autoDetectionRetryIndex) joined() bool {
 	}
 }
 
-func TestAutoDetectionRetryIndexDispatchesOnlyCurrentDueEntries(t *testing.T) {
+func retryTestWake(schedule uint64, due int64) candidateWake {
+	return candidateWake{
+		Token: candidateWakeToken{
+			Run:      1,
+			Intent:   2,
+			Schedule: schedule,
+		},
+		Due: due,
+	}
+}
+
+func TestAutoDetectionRetryDispatchesOnlyCurrentDueCapabilities(t *testing.T) {
 	tests := map[string]struct {
-		arrange      func(*autoDetectionRetryIndex, confgroup.Config) confgroup.Config
-		clocks       []int
-		wantDispatch int
+		arrange func(*autoDetectionRetryIndex)
+		want    int
+		token   candidateWakeToken
 	}{
-		"due retry dispatches": {
-			arrange: func(index *autoDetectionRetryIndex, config confgroup.Config) confgroup.Config {
-				index.schedule(config, 2)
-				return config
-			},
-			clocks:       []int{0, 1, 2},
-			wantDispatch: 1,
+		"due": {
+			arrange: func(i *autoDetectionRetryIndex) { i.schedule("job", retryTestWake(1, 2)) },
+			want:    1,
+			token:   retryTestWake(1, 2).Token,
 		},
-		"replacement invalidates older token": {
-			arrange: func(index *autoDetectionRetryIndex, config confgroup.Config) confgroup.Config {
-				index.schedule(config, 1)
-				replacement, err := config.Clone()
-				if err != nil {
-					panic(err)
-				}
-				replacement.Set("option", "replacement")
-				index.schedule(replacement, 2)
-				return replacement
-			},
-			clocks:       []int{0, 1, 2},
-			wantDispatch: 1,
+		"replacement": {arrange: func(i *autoDetectionRetryIndex) {
+			i.schedule("job", retryTestWake(1, 1))
+			i.schedule("job", retryTestWake(2, 2))
+		}, want: 1, token: retryTestWake(2, 2).Token},
+		"cancel": {
+			arrange: func(i *autoDetectionRetryIndex) { i.schedule("job", retryTestWake(1, 1)); i.cancel("job") },
 		},
-		"cancel removes exact pending entry": {
-			arrange: func(index *autoDetectionRetryIndex, config confgroup.Config) confgroup.Config {
-				index.schedule(config, 1)
-				index.cancel(config.FullName())
-				return config
-			},
-			clocks: []int{0, 1, 2},
+		"wrong run": {
+			arrange: func(i *autoDetectionRetryIndex) { w := retryTestWake(1, 1); w.Token.Run = 2; i.schedule("job", w) },
 		},
 	}
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
 			index := newAutoDetectionRetryIndex()
 			commands := &autoDetectionRetryTestCommands{}
-			var planned []autoDetectionRetryToken
-			require.NoError(t, index.bind(
-				commands,
-				func(_ confgroup.Config, token autoDetectionRetryToken) (jobmgr.WorkPlan, error) {
-					planned = append(planned, token)
-					return jobmgr.WorkPlan{}, nil
-				},
-				7,
-				func(error) {},
-			))
-			config := autoDetectionRetryTestConfig("job")
-			expected := test.arrange(index, config)
-			for _, clock := range test.clocks {
+			var planned []candidateWakeToken
+			require.NoError(t, index.bind(commands, func(id string, token candidateWakeToken) (jobmgr.WorkPlan, error) {
+				assert.Equal(t, "job", id)
+				planned = append(planned, token)
+				return jobmgr.WorkPlan{}, nil
+			}, 1, func(error) {}))
+			test.arrange(index)
+			for _, clock := range []int{100, 101, 102} {
 				index.advance(clock)
 			}
-
-			commands.waitForSubmissions(t, test.wantDispatch)
+			commands.waitForSubmissions(t, test.want)
+			index.stopWorker()
+			require.NoError(t, index.wait(t.Context()))
 			submitted, plans, waited := commands.snapshot()
-			require.Len(t, submitted, test.wantDispatch)
-			require.Len(t, plans, test.wantDispatch)
-			require.False(t, waited)
-			if test.wantDispatch != 0 {
-				require.Equal(t, expected.UID(), planned[0].uid)
+			require.Len(t, submitted, test.want)
+			require.Len(t, plans, test.want)
+			assert.Equal(t, test.want > 0, waited)
+			if test.want > 0 {
+				assert.Equal(t, []candidateWakeToken{test.token}, planned)
 			}
-			index.stopWorker()
-			require.NoError(t, index.wait(context.Background()))
 		})
 	}
 }
 
-func TestAutoDetectionRetryIndexHasNoFixedPopulationLimit(t *testing.T) {
-	tests := map[string]struct {
-		population int
-	}{
-		"former active-job limit":          {population: 256},
-		"former active-job limit plus one": {population: 257},
-	}
-	for name, test := range tests {
-		t.Run(name, func(t *testing.T) {
-			index := newAutoDetectionRetryIndex()
-			commands := &autoDetectionRetryTestCommands{}
-			require.NoError(t, index.bind(
-				commands,
-				func(confgroup.Config, autoDetectionRetryToken) (jobmgr.WorkPlan, error) {
-					return jobmgr.WorkPlan{}, nil
-				},
-				1,
-				func(error) {},
-			))
-			for number := range test.population {
-				index.schedule(autoDetectionRetryTestConfig(fmt.Sprintf("job-%03d", number)), 1)
-			}
-			index.advance(0)
-			index.advance(1)
-			commands.waitForSubmissions(t, test.population)
-			submitted, _, _ := commands.snapshot()
-			require.Len(t, submitted, test.population)
-			index.stopWorker()
-			require.NoError(t, index.wait(context.Background()))
-		})
-	}
-}
-
-func TestAutoDetectionRetryUsesLogicalClockFromFirstRunTick(t *testing.T) {
+func TestAutoDetectionRetryLogicalClockAndRegression(t *testing.T) {
 	index := newAutoDetectionRetryIndex()
-	commands := &autoDetectionRetryTestCommands{}
-	require.NoError(t, index.bind(
-		commands,
-		func(confgroup.Config, autoDetectionRetryToken) (jobmgr.WorkPlan, error) {
-			return jobmgr.WorkPlan{}, nil
-		},
-		1,
-		func(error) {},
-	))
-	index.schedule(autoDetectionRetryTestConfig("job"), 2)
-
+	failures := make(chan error, 1)
+	require.NoError(
+		t,
+		index.bind(
+			&autoDetectionRetryTestCommands{},
+			func(string, candidateWakeToken) (jobmgr.WorkPlan, error) { return jobmgr.WorkPlan{}, nil },
+			1,
+			func(err error) { failures <- err },
+		),
+	)
 	index.advance(100)
-	index.advance(101)
-	commands.waitForSubmissions(t, 0)
+	assert.Equal(t, int64(0), index.now())
+	index.advance(103)
+	assert.Equal(t, int64(3), index.now())
 	index.advance(102)
-	commands.waitForSubmissions(t, 1)
-
+	select {
+	case err := <-failures:
+		require.ErrorContains(t, err, "process clock regressed")
+	case <-time.After(time.Second):
+		t.Fatal("clock regression not reported")
+	}
+	index.schedule("job", retryTestWake(1, 3))
+	index.advance(105)
+	assert.Equal(t, int64(3), index.now())
 	index.stopWorker()
-	require.NoError(t, index.wait(context.Background()))
+	require.ErrorContains(t, index.wait(t.Context()), "process clock regressed")
 }
 
-func TestAutoDetectionRetryRetainsExactAuthorityWhileDispatching(t *testing.T) {
+func TestAutoDetectionRetryRetainsExactCapabilityWhileDispatching(t *testing.T) {
 	release := make(chan struct{})
 	index := newAutoDetectionRetryIndex()
 	commands := &autoDetectionRetryTestCommands{
 		block: release,
 	}
-	require.NoError(t, index.bind(
-		commands,
-		func(confgroup.Config, autoDetectionRetryToken) (jobmgr.WorkPlan, error) {
-			return jobmgr.WorkPlan{}, nil
-		},
-		1,
-		func(error) {},
-	))
-	config := autoDetectionRetryTestConfig("job")
-	index.schedule(config, 1)
-	index.mu.Lock()
-	original := index.entries[config.FullName()].token
-	index.mu.Unlock()
+	require.NoError(
+		t,
+		index.bind(
+			commands,
+			func(string, candidateWakeToken) (jobmgr.WorkPlan, error) { return jobmgr.WorkPlan{}, nil },
+			1,
+			func(error) {},
+		),
+	)
+	original := retryTestWake(1, 1)
+	index.schedule("job", original)
 	index.advance(0)
 	index.advance(1)
 	commands.waitForSubmissions(t, 1)
-	require.True(t, index.isCurrent(config.FullName(), original))
-
-	replacement, err := config.Clone()
-	require.NoError(t, err)
-	replacement.Set("option", "replacement")
-	index.schedule(replacement, 1)
-	index.mu.Lock()
-	current := index.entries[config.FullName()].token
-	index.mu.Unlock()
-	require.False(t, index.isCurrent(config.FullName(), original))
-	require.True(t, index.isCurrent(config.FullName(), current))
-	index.cancelToken(config.FullName(), original)
-	require.True(t, index.isCurrent(config.FullName(), current))
-	index.cancelToken(config.FullName(), current)
-	require.False(t, index.isCurrent(config.FullName(), current))
-
+	require.True(t, index.isCurrent("job", original.Token))
+	replacement := retryTestWake(2, 2)
+	index.schedule("job", replacement)
+	require.False(t, index.isCurrent("job", original.Token))
+	require.True(t, index.isCurrent("job", replacement.Token))
+	index.cancelToken("job", original.Token)
+	require.True(t, index.isCurrent("job", replacement.Token))
+	index.cancelToken("job", replacement.Token)
+	require.False(t, index.isCurrent("job", replacement.Token))
 	close(release)
 	index.stopWorker()
-	require.NoError(t, index.wait(context.Background()))
+	require.NoError(t, index.wait(t.Context()))
 }
 
-func TestSchedulerTickDoesNotBlockOnRetryAdmission(t *testing.T) {
+func TestAutoDetectionRetryAlreadyDueAndPopulation(t *testing.T) {
+	index := newAutoDetectionRetryIndex()
+	commands := &autoDetectionRetryTestCommands{}
+	require.NoError(
+		t,
+		index.bind(
+			commands,
+			func(string, candidateWakeToken) (jobmgr.WorkPlan, error) { return jobmgr.WorkPlan{}, nil },
+			1,
+			func(error) {},
+		),
+	)
+	index.advance(10)
+	index.advance(13)
+	for n := range 257 {
+		index.schedule(fmt.Sprintf("job-%03d", n), retryTestWake(uint64(n+1), 3))
+	}
+	commands.waitForSubmissions(t, 257)
+	index.stopWorker()
+	require.NoError(t, index.wait(t.Context()))
+	submitted, _, _ := commands.snapshot()
+	require.Len(t, submitted, 257)
+}
+
+func TestSchedulerTickDoesNotBlockOnRetryAcknowledgement(t *testing.T) {
 	release := make(chan struct{})
 	commands := &autoDetectionRetryTestCommands{
 		block: release,
 	}
 	scheduler, err := NewScheduler(testModuleReconciler{})
 	require.NoError(t, err)
-	require.NoError(t, scheduler.bindBackgroundWorkers(
-		commands,
-		func(confgroup.Config, autoDetectionRetryToken) (jobmgr.WorkPlan, error) {
-			return jobmgr.WorkPlan{}, nil
-		},
-		func(confgroup.Config, pendingJobToken) (jobmgr.WorkPlan, error) {
-			return jobmgr.WorkPlan{}, nil
-		},
-		1,
-		func(error) {},
-	))
-	require.False(t, scheduler.retries.joined() && scheduler.pending.joined())
-	scheduler.retries.schedule(autoDetectionRetryTestConfig("job"), 1)
-	require.NoError(t, scheduler.Tick(context.Background(), 0))
-
+	require.NoError(
+		t,
+		scheduler.bindBackgroundWorkers(
+			commands,
+			func(string, candidateWakeToken) (jobmgr.WorkPlan, error) { return jobmgr.WorkPlan{}, nil },
+			1,
+			func(error) {},
+		),
+	)
+	require.False(t, scheduler.retries.joined())
+	scheduler.retries.schedule("job", retryTestWake(1, 1))
+	require.NoError(t, scheduler.Tick(t.Context(), 0))
 	tickDone := make(chan error, 1)
-	go func() {
-		tickDone <- scheduler.Tick(context.Background(), 1)
-	}()
+	go func() { tickDone <- scheduler.Tick(t.Context(), 1) }()
 	select {
 	case err := <-tickDone:
 		require.NoError(t, err)
 	case <-time.After(time.Second):
 		close(release)
-		require.FailNow(t, "test failed", "scheduler tick blocked on retry admission")
+		t.Fatal("tick blocked on retry acknowledgement")
 	}
 	commands.waitForSubmissions(t, 1)
 	close(release)
 	scheduler.StopBackgroundWorkers()
-	require.NoError(t, scheduler.WaitBackgroundWorkers(context.Background()))
-	require.True(t, scheduler.retries.joined() && scheduler.pending.joined())
+	require.NoError(t, scheduler.WaitBackgroundWorkers(t.Context()))
+	require.True(t, scheduler.retries.joined())
+	require.NoError(t, scheduler.accepted.wait(t.Context()))
 }
 
 func TestAutoDetectionRetryReportsStructuralDispatchFailure(t *testing.T) {
 	tests := map[string]struct {
-		planningErr error
-		submitErr   error
-	}{
-		"planning failure":   {planningErr: errors.New("retry planning failed")},
-		"submission failure": {submitErr: errors.New("retry submission failed")},
-	}
+		plan   error
+		submit error
+	}{"planning": {plan: errors.New("plan failed")}, "acknowledgement": {submit: errors.New("apply failed")}}
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
-			failed := make(chan error, 1)
 			index := newAutoDetectionRetryIndex()
-			require.NoError(t, index.bind(
-				&autoDetectionRetryTestCommands{
-					submitErr: test.submitErr,
-				},
-				func(confgroup.Config, autoDetectionRetryToken) (jobmgr.WorkPlan, error) {
-					return jobmgr.WorkPlan{}, test.planningErr
-				},
-				1,
-				func(err error) {
-					failed <- err
-				},
-			))
-			index.schedule(autoDetectionRetryTestConfig("job"), 1)
-			index.advance(0)
-			index.advance(1)
-
-			wantErr := test.planningErr
-			if wantErr == nil {
-				wantErr = test.submitErr
+			failed := make(chan error, 1)
+			require.NoError(
+				t,
+				index.bind(
+					&autoDetectionRetryTestCommands{
+						submitErr: test.submit,
+					},
+					func(string, candidateWakeToken) (jobmgr.WorkPlan, error) { return jobmgr.WorkPlan{}, test.plan },
+					1,
+					func(err error) { failed <- err },
+				),
+			)
+			index.schedule("job", retryTestWake(1, 0))
+			want := test.plan
+			if want == nil {
+				want = test.submit
 			}
 			select {
 			case err := <-failed:
-				require.ErrorIs(t, err, wantErr)
+				require.ErrorIs(t, err, want)
 			case <-time.After(time.Second):
-				require.FailNow(t, "test failed", "retry dispatch failure was not reported")
+				t.Fatal("dispatch failure not supervised")
 			}
-			require.ErrorIs(t, index.wait(context.Background()), wantErr)
+			require.ErrorIs(t, index.wait(t.Context()), want)
 			index.stopWorker()
 		})
 	}
@@ -295,109 +264,80 @@ func TestAutoDetectionRetryWaitRequiresWorkerJoin(t *testing.T) {
 		block: release,
 	}
 	index := newAutoDetectionRetryIndex()
-	require.NoError(t, index.bind(
-		commands,
-		func(confgroup.Config, autoDetectionRetryToken) (jobmgr.WorkPlan, error) {
-			return jobmgr.WorkPlan{}, nil
-		},
-		1,
-		func(error) {},
-	))
-	index.schedule(autoDetectionRetryTestConfig("job"), 1)
-	index.advance(0)
-	index.advance(1)
+	require.NoError(
+		t,
+		index.bind(
+			commands,
+			func(string, candidateWakeToken) (jobmgr.WorkPlan, error) { return jobmgr.WorkPlan{}, nil },
+			1,
+			func(error) {},
+		),
+	)
+	index.schedule("job", retryTestWake(1, 0))
 	commands.waitForSubmissions(t, 1)
 	index.stopWorker()
-
-	ctx, cancel := context.WithCancel(context.Background())
+	ctx, cancel := context.WithCancel(t.Context())
 	cancel()
 	require.ErrorIs(t, index.wait(ctx), context.Canceled)
-	select {
-	case <-index.done:
-		require.FailNow(t, "test failed", "retry worker joined while blocked")
-	default:
-	}
-
+	require.False(t, index.joined())
 	close(release)
-	require.NoError(t, index.wait(context.Background()))
-	select {
-	case <-index.done:
-	default:
-		require.FailNow(t, "test failed", "retry worker did not join")
-	}
+	require.NoError(t, index.wait(t.Context()))
+	require.True(t, index.joined())
 }
 
-func TestAutoDetectionRetryClassifiesStoppingSubmission(t *testing.T) {
-	sentinel := errors.New("structural failure")
+func TestAutoDetectionRetryClassifiesStoppingAcknowledgement(t *testing.T) {
 	tests := map[string]struct {
-		submitErr   error
-		wantFailure bool
+		err   error
+		fatal bool
 	}{
-		"exact current stopping token is clean": {submitErr: &lifecycle.StoppingRejection{
+		"current": {err: &lifecycle.StoppingRejection{
 			Generation: 1,
 		}},
-		"wrapped current stopping token is clean": {
-			submitErr: fmt.Errorf("wrapped: %w", &lifecycle.StoppingRejection{
+		"wrapped current": {err: fmt.Errorf("apply: %w", &lifecycle.StoppingRejection{
+			Generation: 1,
+		})},
+		"joined current": {
+			err: errors.Join(&lifecycle.StoppingRejection{
+				Generation: 1,
+			}, &lifecycle.StoppingRejection{
 				Generation: 1,
 			}),
 		},
-		"joined current stopping tokens are clean": {
-			submitErr: errors.Join(
-				&lifecycle.StoppingRejection{
-					Generation: 1,
-				},
-				&lifecycle.StoppingRejection{
-					Generation: 1,
-				},
-			),
-		},
-		"wrong generation is structural": {
-			submitErr: &lifecycle.StoppingRejection{
-				Generation: 2,
-			},
-			wantFailure: true,
-		},
-		"joined structural error is not hidden": {
-			submitErr: errors.Join(&lifecycle.StoppingRejection{
+		"wrong run": {err: &lifecycle.StoppingRejection{
+			Generation: 2,
+		}, fatal: true},
+		"mixed": {
+			err: errors.Join(&lifecycle.StoppingRejection{
 				Generation: 1,
-			}, sentinel),
-			wantFailure: true,
+			}, errors.New("structural")),
+			fatal: true,
 		},
 	}
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
-			failed := make(chan error, 1)
 			index := newAutoDetectionRetryIndex()
-			require.NoError(t, index.bind(
-				&autoDetectionRetryTestCommands{
-					submitErr: test.submitErr,
-				},
-				func(confgroup.Config, autoDetectionRetryToken) (jobmgr.WorkPlan, error) {
-					return jobmgr.WorkPlan{}, nil
-				},
-				1,
-				func(err error) {
-					failed <- err
-				},
-			))
-			index.schedule(autoDetectionRetryTestConfig("job"), 1)
-			index.advance(0)
-			index.advance(1)
-
-			waitErr := index.wait(context.Background())
-			if test.wantFailure {
-				require.ErrorIs(t, waitErr, test.submitErr)
-				select {
-				case err := <-failed:
-					require.ErrorIs(t, err, test.submitErr)
-				case <-time.After(time.Second):
-					require.FailNow(t, "test failed", "retry failure was not reported")
-				}
+			failed := make(chan error, 1)
+			require.NoError(
+				t,
+				index.bind(
+					&autoDetectionRetryTestCommands{
+						submitErr: test.err,
+					},
+					func(string, candidateWakeToken) (jobmgr.WorkPlan, error) { return jobmgr.WorkPlan{}, nil },
+					1,
+					func(err error) { failed <- err },
+				),
+			)
+			index.schedule("job", retryTestWake(1, 0))
+			err := index.wait(t.Context())
+			if test.fatal {
+				require.ErrorIs(t, err, test.err)
+				require.ErrorIs(t, <-failed, test.err)
 			} else {
-				require.NoError(t, waitErr)
+				require.NoError(t, err)
 				select {
 				case err := <-failed:
-					require.FailNowf(t, "test failed", "stopping submission was reported as a failure: %v", err)
+					t.Fatalf("current stopping failed: %v", err)
 				default:
 				}
 			}
@@ -461,7 +401,11 @@ func (adrtc *autoDetectionRetryTestCommands) submit(
 func (adrtc *autoDetectionRetryTestCommands) snapshot() ([]jobmgr.Request, []jobmgr.WorkPlan, bool) {
 	adrtc.mu.Lock()
 	defer adrtc.mu.Unlock()
-	return append([]jobmgr.Request(nil), adrtc.submitted...), append([]jobmgr.WorkPlan(nil), adrtc.plans...), adrtc.waited
+	return append(
+			[]jobmgr.Request(nil),
+			adrtc.submitted...), append(
+			[]jobmgr.WorkPlan(nil),
+			adrtc.plans...), adrtc.waited
 }
 
 func (adrtc *autoDetectionRetryTestCommands) waitForSubmissions(t *testing.T, want int) {
@@ -510,4 +454,164 @@ func autoDetectionRetryTestConfig(name string) confgroup.Config {
 		"__source__":          "user=test",
 		"__provider__":        "test",
 	}
+}
+
+func TestAutoDetectionRetryCoalescesSameWakeWhileAcknowledgementPending(t *testing.T) {
+	index := newAutoDetectionRetryIndex()
+	release := make(chan struct{})
+	commands := &concurrentRetryTestCommands{
+		release:   release,
+		submitted: make(chan jobmgr.Request, 2),
+	}
+	require.NoError(
+		t,
+		index.bind(
+			commands,
+			func(string, candidateWakeToken) (jobmgr.WorkPlan, error) { return jobmgr.WorkPlan{}, nil },
+			1,
+			func(err error) { t.Errorf("dispatch failure: %v", err) },
+		),
+	)
+	wake := retryTestWake(1, 0)
+	index.schedule("a", wake)
+	require.Equal(t, "a", (<-commands.submitted).LaneKey)
+	for range 3 {
+		index.schedule("a", wake)
+	}
+	close(release)
+	select {
+	case <-commands.submitted:
+		t.Error("identical in-flight wake was dispatched again")
+	case <-time.After(30 * time.Millisecond):
+	}
+	index.stopWorker()
+	require.NoError(t, index.wait(t.Context()))
+}
+
+func TestAutoDetectionRetryConflictingDeadlineFailsClosed(t *testing.T) {
+	index := newAutoDetectionRetryIndex()
+	failed := make(chan error, 1)
+	require.NoError(
+		t,
+		index.bind(
+			&autoDetectionRetryTestCommands{},
+			func(string, candidateWakeToken) (jobmgr.WorkPlan, error) { return jobmgr.WorkPlan{}, nil },
+			1,
+			func(err error) { failed <- err },
+		),
+	)
+	wake := retryTestWake(1, 2)
+	index.schedule("job", wake)
+	wake.Due = 3
+	index.schedule("job", wake)
+	select {
+	case err := <-failed:
+		require.ErrorContains(t, err, "conflicting wake deadline")
+	case <-time.After(time.Second):
+		t.Error("same capability accepted a different deadline")
+	}
+	index.stopWorker()
+	require.ErrorContains(t, index.wait(t.Context()), "conflicting wake deadline")
+}
+
+func TestAutoDetectionRetryDifferentNamesDoNotWaitForAnotherAcknowledgement(t *testing.T) {
+	index := newAutoDetectionRetryIndex()
+	release := make(chan struct{})
+	commands := &concurrentRetryTestCommands{
+		release:   release,
+		submitted: make(chan jobmgr.Request, 2),
+	}
+	require.NoError(
+		t,
+		index.bind(
+			commands,
+			func(string, candidateWakeToken) (jobmgr.WorkPlan, error) { return jobmgr.WorkPlan{}, nil },
+			1,
+			func(err error) { t.Errorf("retry dispatch: %v", err) },
+		),
+	)
+	index.schedule("a", retryTestWake(1, 0))
+	require.Equal(t, "a", (<-commands.submitted).LaneKey)
+	index.schedule("b", retryTestWake(2, 0))
+	select {
+	case request := <-commands.submitted:
+		require.Equal(t, "b", request.LaneKey)
+	case <-time.After(time.Second):
+		t.Error("one job's pending acknowledgement blocked another due wake")
+	}
+	index.stopWorker()
+	ctx, cancel := context.WithCancel(t.Context())
+	cancel()
+	require.ErrorIs(t, index.wait(ctx), context.Canceled, "stop must retain ownership of the pending dispatch")
+	close(release)
+	require.NoError(t, index.wait(t.Context()))
+}
+
+type concurrentRetryTestCommands struct {
+	release   <-chan struct{}
+	submitted chan jobmgr.Request
+}
+
+func (*concurrentRetryTestCommands) SubmitPrepared(context.Context, jobmgr.Request, jobmgr.WorkPlan) error {
+	return errors.New("test: retry delivery lost its acknowledgement")
+}
+
+func (c *concurrentRetryTestCommands) SubmitPreparedAndWait(
+	_ context.Context,
+	request jobmgr.Request,
+	_ jobmgr.WorkPlan,
+) error {
+	c.submitted <- request
+	if request.LaneKey == "a" {
+		<-c.release
+	}
+	return nil
+}
+
+func TestAutoDetectionRetryTransportIdentityAcceptsLongJobNames(t *testing.T) {
+	index := newAutoDetectionRetryIndex()
+	commands := &validatingRetryTestCommands{
+		submitted: make(chan jobmgr.Request, 1),
+	}
+	failed := make(chan error, 1)
+	require.NoError(
+		t,
+		index.bind(
+			commands,
+			func(string, candidateWakeToken) (jobmgr.WorkPlan, error) { return jobmgr.WorkPlan{}, nil },
+			1,
+			func(err error) { failed <- err },
+		),
+	)
+	id := "module_" + strings.Repeat("job", 100)
+	index.schedule(id, retryTestWake(1, 0))
+	select {
+	case request := <-commands.submitted:
+		require.Equal(t, id, request.LaneKey)
+		require.NotContains(t, request.UID, id)
+	case err := <-failed:
+		t.Errorf("valid long name failed transport validation: %v", err)
+	case <-time.After(time.Second):
+		t.Error("long job wake was not delivered")
+	}
+	index.stopWorker()
+	require.NoError(t, index.wait(t.Context()))
+}
+
+type validatingRetryTestCommands struct{ submitted chan jobmgr.Request }
+
+func (*validatingRetryTestCommands) SubmitPrepared(context.Context, jobmgr.Request, jobmgr.WorkPlan) error {
+	return errors.New("test: retry delivery lost acknowledgement")
+}
+
+func (c *validatingRetryTestCommands) SubmitPreparedAndWait(
+	_ context.Context,
+	request jobmgr.Request,
+	_ jobmgr.WorkPlan,
+) error {
+	if err := request.Validate(); err != nil {
+		return err
+	}
+	c.submitted <- request
+	return nil
 }

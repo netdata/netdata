@@ -11,18 +11,13 @@ import (
 
 	"github.com/netdata/netdata/go/plugins/plugin/agent/jobmgr"
 	"github.com/netdata/netdata/go/plugins/plugin/agent/jobmgr/lifecycle"
-	"github.com/netdata/netdata/go/plugins/plugin/framework/confgroup"
 )
 
-type autoDetectionRetryPlanner func(confgroup.Config, autoDetectionRetryToken) (jobmgr.WorkPlan, error)
-
-type autoDetectionRetryToken struct {
-	uid        string // config UID this retry targets
-	generation uint64 // retry generation; stale tokens are ignored
-}
+type autoDetectionRetryPlanner func(string, candidateWakeToken) (jobmgr.WorkPlan, error)
 
 type autoDetectionRetryIndex struct {
-	mu sync.Mutex // guards all fields below
+	mu         sync.Mutex     // guards all fields below
+	deliveries sync.WaitGroup // run-owned acknowledged dispatches
 
 	entries          map[string]*autoDetectionRetry // full-name -> pending retry
 	queue            autoDetectionRetryHeap         // due-ordered min-heap of retries
@@ -33,7 +28,6 @@ type autoDetectionRetryIndex struct {
 	logicalClock     int64                          // monotonic logical time derived from process ticks
 	lastProcessClock int                            // last observed process clock (regression guard)
 	clockInitialized bool                           // logical clock has a baseline
-	generation       uint64                         // monotonic issuer for retry-token sequence numbers
 	bound            bool                           // bind() succeeded; the worker is running
 	closed           bool                           // stopWorker() has been called
 	failed           bool                           // terminal failure latched
@@ -45,10 +39,10 @@ type autoDetectionRetryIndex struct {
 }
 
 type autoDetectionRetry struct {
-	config confgroup.Config        // config to re-attempt
-	token  autoDetectionRetryToken // retry token (uid + generation) identifying this attempt
-	due    int64                   // logical time this retry becomes due
-	index  int                     // position in the retry min-heap
+	id    string
+	token candidateWakeToken
+	due   int64
+	index int
 }
 
 type autoDetectionRetryHeap []*autoDetectionRetry
@@ -86,45 +80,51 @@ func (adri *autoDetectionRetryIndex) bind(
 	return nil
 }
 
-func (adri *autoDetectionRetryIndex) schedule(config confgroup.Config, after int) {
-	if adri == nil || config == nil || config.FullName() == "" || config.UID() == "" || after <= 0 {
-		return
-	}
-	cloned, err := config.Clone()
-	if err != nil {
+// schedule installs the controller's exact wake capability and logical deadline.
+func (adri *autoDetectionRetryIndex) schedule(id string, wake candidateWake) {
+	if adri == nil || id == "" || wake.Token.Run == 0 || wake.Token.Intent == 0 || wake.Token.Schedule == 0 {
 		return
 	}
 	adri.mu.Lock()
-	if adri.closed || adri.failed {
+	if adri.closed || adri.failed || (adri.bound && wake.Token.Run != adri.run) {
 		adri.mu.Unlock()
 		return
 	}
-	if current := adri.entries[config.FullName()]; current != nil {
-		adri.removeLocked(config.FullName(), current)
-	}
-	adri.generation++
-	if adri.generation == 0 {
-		adri.failed = true
-		adri.mu.Unlock()
-		adri.fail(errors.New("job output: autodetection retry generation wrapped"))
-		return
+	if current := adri.entries[id]; current != nil {
+		if current.token == wake.Token {
+			if current.due == wake.Due {
+				adri.mu.Unlock()
+				return
+			}
+			adri.failed = true
+			adri.mu.Unlock()
+			adri.fail(errors.New("job output: conflicting wake deadline for retry capability"))
+			return
+		}
+		adri.removeLocked(id, current)
 	}
 	retry := &autoDetectionRetry{
-		config: cloned,
-		token: autoDetectionRetryToken{
-			uid:        cloned.UID(),
-			generation: adri.generation,
-		},
-		due:   adri.logicalClock + int64(after),
+		id:    id,
+		token: wake.Token,
+		due:   wake.Due,
 		index: -1,
 	}
-	adri.entries[cloned.FullName()] = retry
+	adri.entries[id] = retry
 	heap.Push(&adri.queue, retry)
 	due := retry.due <= adri.logicalClock
 	adri.mu.Unlock()
 	if due {
 		adri.notify()
 	}
+}
+
+func (adri *autoDetectionRetryIndex) now() int64 {
+	if adri == nil {
+		return 0
+	}
+	adri.mu.Lock()
+	defer adri.mu.Unlock()
+	return adri.logicalClock
 }
 
 func (adri *autoDetectionRetryIndex) cancel(id string) {
@@ -140,18 +140,8 @@ func (adri *autoDetectionRetryIndex) cancel(id string) {
 	adri.removeLocked(id, retry)
 }
 
-// Source removal may arrive after failed stock discovery already removed the
-// graph entry. Cancel only that source's desired config, not a later winner.
-func (adri *autoDetectionRetryIndex) cancelConfig(id, uid string) {
-	adri.mu.Lock()
-	defer adri.mu.Unlock()
-	if retry := adri.entries[id]; retry != nil && retry.token.uid == uid {
-		adri.removeLocked(id, retry)
-	}
-}
-
-func (adri *autoDetectionRetryIndex) cancelToken(id string, token autoDetectionRetryToken) {
-	if adri == nil || id == "" || token.generation == 0 {
+func (adri *autoDetectionRetryIndex) cancelToken(id string, token candidateWakeToken) {
+	if adri == nil || id == "" || token.Schedule == 0 {
 		return
 	}
 	adri.mu.Lock()
@@ -170,8 +160,8 @@ func (adri *autoDetectionRetryIndex) removeLocked(id string, retry *autoDetectio
 	delete(adri.entries, id)
 }
 
-func (adri *autoDetectionRetryIndex) isCurrent(id string, token autoDetectionRetryToken) bool {
-	if adri == nil || id == "" || token.generation == 0 {
+func (adri *autoDetectionRetryIndex) isCurrent(id string, token candidateWakeToken) bool {
+	if adri == nil || id == "" || token.Schedule == 0 {
 		return false
 	}
 	adri.mu.Lock()
@@ -263,7 +253,7 @@ func (adri *autoDetectionRetryIndex) advance(processClock int) {
 }
 
 func (adri *autoDetectionRetryIndex) runWorker() {
-	defer close(adri.done)
+	defer func() { adri.deliveries.Wait(); close(adri.done) }()
 	for {
 		select {
 		case <-adri.stop:
@@ -275,20 +265,23 @@ func (adri *autoDetectionRetryIndex) runWorker() {
 			if retry == nil {
 				break
 			}
-			if err := adri.dispatch(retry); err != nil {
-				if lifecycle.ContainsOnlyCurrentStoppingRejections(err, adri.run) {
-					return
+			adri.deliveries.Add(1)
+			go func() {
+				defer adri.deliveries.Done()
+				if err := adri.dispatch(retry); err != nil {
+					if !lifecycle.ContainsOnlyCurrentStoppingRejections(err, adri.run) {
+						adri.fail(err)
+					}
+					adri.stopWorker()
 				}
-				adri.fail(err)
-				return
-			}
+			}()
 		}
 	}
 }
 
 // takeDue pops the earliest due retry from the heap. The popped retry stays in
 // entries (keyed by full name) so its token remains authoritative until the
-// dispatched command settles (cancelToken / retrySettlement) or a reschedule
+// dispatched command settles (cancelToken) or a reschedule
 // replaces it; leaving it in entries is intentional, not a leak.
 func (adri *autoDetectionRetryIndex) takeDue() *autoDetectionRetry {
 	adri.mu.Lock()
@@ -300,15 +293,23 @@ func (adri *autoDetectionRetryIndex) takeDue() *autoDetectionRetry {
 }
 
 func (adri *autoDetectionRetryIndex) dispatch(retry *autoDetectionRetry) error {
-	work, err := adri.plan(retry.config, retry.token)
+	if !adri.isCurrent(retry.id, retry.token) || retry.token.Run != adri.run {
+		return nil
+	}
+	work, err := adri.plan(retry.id, retry.token)
 	if err != nil {
 		return err
 	}
-	return adri.commands.SubmitPrepared(
+	return adri.commands.SubmitPreparedAndWait(
 		context.Background(),
 		jobmgr.Request{
-			UID:     fmt.Sprintf("jobmgr-autodetection-retry-%d-%d", adri.run, retry.token.generation),
-			LaneKey: retry.config.FullName(),
+			UID: fmt.Sprintf(
+				"jobmgr-autodetection-retry-%d-%d-%d",
+				retry.token.Run,
+				retry.token.Intent,
+				retry.token.Schedule,
+			),
+			LaneKey: retry.id,
 			Source:  lifecycle.SourceJobManager,
 			Route:   "internal/jobs/autodetection-retry",
 		},
@@ -345,7 +346,7 @@ func (h autoDetectionRetryHeap) Len() int {
 
 func (h autoDetectionRetryHeap) Less(left, right int) bool {
 	if h[left].due == h[right].due {
-		return h[left].token.generation < h[right].token.generation
+		return h[left].id < h[right].id
 	}
 	return h[left].due < h[right].due
 }

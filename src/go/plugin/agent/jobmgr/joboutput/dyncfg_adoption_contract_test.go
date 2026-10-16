@@ -58,67 +58,358 @@ func TestDynCfgJobMutationAdoptionAndRestartPreflight(t *testing.T) {
 		retry    int // autodetection_retry of the stored and the requested config
 		wantCode int
 	}{
-		"update running succeeds":                      {command: dyncfg.CommandUpdate, status: dyncfg.StatusRunning, wantCode: 202},
-		"update running with an invalid payload":       {command: dyncfg.CommandUpdate, status: dyncfg.StatusRunning, inject: injectInvalidPayload, wantCode: 400},
-		"update running with a permanent error":        {command: dyncfg.CommandUpdate, status: dyncfg.StatusRunning, inject: injectCheckPermanent, retry: 1, wantCode: 422},
-		"update running with a check failure":          {command: dyncfg.CommandUpdate, status: dyncfg.StatusRunning, inject: injectCheckUnclassified, wantCode: 422},
-		"update running with a retried check failure":  {command: dyncfg.CommandUpdate, status: dyncfg.StatusRunning, inject: injectCheckUnclassified, retry: 1, wantCode: 422},
-		"update running with a temporary error":        {command: dyncfg.CommandUpdate, status: dyncfg.StatusRunning, inject: injectCheckTemporary, wantCode: 503},
-		"update running with a retried temporary":      {command: dyncfg.CommandUpdate, status: dyncfg.StatusRunning, inject: injectCheckTemporary, retry: 1, wantCode: 503},
-		"update running with an init failure":          {command: dyncfg.CommandUpdate, status: dyncfg.StatusRunning, inject: injectInitUnclassified, retry: 1, wantCode: 422},
-		"update running with a permanent init error":   {command: dyncfg.CommandUpdate, status: dyncfg.StatusRunning, inject: injectInitPermanent, retry: 1, wantCode: 422},
-		"update running with a temporary init error":   {command: dyncfg.CommandUpdate, status: dyncfg.StatusRunning, inject: injectInitTemporary, wantCode: 503},
-		"update running with a retried temporary init": {command: dyncfg.CommandUpdate, status: dyncfg.StatusRunning, inject: injectInitTemporary, retry: 1, wantCode: 503},
-		"update running with a busy job":               {command: dyncfg.CommandUpdate, status: dyncfg.StatusRunning, inject: injectJobBusy, wantCode: 503},
-		"update running with a superseded job":         {command: dyncfg.CommandUpdate, status: dyncfg.StatusRunning, inject: injectJobSuperseded, wantCode: 503},
-		"update running past its deadline":             {command: dyncfg.CommandUpdate, status: dyncfg.StatusRunning, inject: injectJobDeadline, wantCode: 503},
-		"update running with a quarantined job":        {command: dyncfg.CommandUpdate, status: dyncfg.StatusRunning, inject: injectJobQuarantined, wantCode: 503},
-		"update running with a missing vnode":          {command: dyncfg.CommandUpdate, status: dyncfg.StatusRunning, inject: injectMissingVnode, wantCode: 503},
-		"update running with a retried missing vnode":  {command: dyncfg.CommandUpdate, status: dyncfg.StatusRunning, inject: injectMissingVnode, retry: 1, wantCode: 503},
-		"update running stock succeeds":                {command: dyncfg.CommandUpdate, status: dyncfg.StatusRunning, source: confgroup.TypeStock, wantCode: 202},
-		"update running stock with a permanent error":  {command: dyncfg.CommandUpdate, status: dyncfg.StatusRunning, source: confgroup.TypeStock, inject: injectCheckPermanent, wantCode: 422},
-		"update running user succeeds":                 {command: dyncfg.CommandUpdate, status: dyncfg.StatusRunning, source: confgroup.TypeUser, wantCode: 202},
-		"update running user with a retried check":     {command: dyncfg.CommandUpdate, status: dyncfg.StatusRunning, source: confgroup.TypeUser, inject: injectCheckUnclassified, retry: 1, wantCode: 422},
-		"update running user with a permanent error":   {command: dyncfg.CommandUpdate, status: dyncfg.StatusRunning, source: confgroup.TypeUser, inject: injectCheckPermanent, wantCode: 422},
-		"update failed with a permanent error":         {command: dyncfg.CommandUpdate, status: dyncfg.StatusFailed, inject: injectCheckPermanent, wantCode: 422},
-		"update failed succeeds":                       {command: dyncfg.CommandUpdate, status: dyncfg.StatusFailed, wantCode: 202},
-		"update failed with a check failure":           {command: dyncfg.CommandUpdate, status: dyncfg.StatusFailed, inject: injectCheckUnclassified, wantCode: 422},
-		"enable failed with a check failure":           {command: dyncfg.CommandEnable, status: dyncfg.StatusFailed, inject: injectCheckUnclassified, wantCode: 202},
-		"update disabled succeeds":                     {command: dyncfg.CommandUpdate, status: dyncfg.StatusDisabled, wantCode: 200},
-		"update disabled with an invalid payload":      {command: dyncfg.CommandUpdate, status: dyncfg.StatusDisabled, inject: injectInvalidPayload, wantCode: 400},
-		"update disabled with a missing vnode":         {command: dyncfg.CommandUpdate, status: dyncfg.StatusDisabled, inject: injectMissingVnode, wantCode: 200},
-		"update disabled with a busy job":              {command: dyncfg.CommandUpdate, status: dyncfg.StatusDisabled, inject: injectJobBusy, wantCode: 503},
-		"update accepted":                              {command: dyncfg.CommandUpdate, status: dyncfg.StatusAccepted, wantCode: 403},
-		"update unknown job":                           {command: dyncfg.CommandUpdate, wantCode: 404},
-		"enable disabled succeeds":                     {command: dyncfg.CommandEnable, status: dyncfg.StatusDisabled, wantCode: 202},
-		"enable disabled with a check failure":         {command: dyncfg.CommandEnable, status: dyncfg.StatusDisabled, inject: injectCheckUnclassified, wantCode: 202},
-		"enable disabled with a retried check":         {command: dyncfg.CommandEnable, status: dyncfg.StatusDisabled, inject: injectCheckUnclassified, retry: 1, wantCode: 202},
-		"enable disabled with a permanent error":       {command: dyncfg.CommandEnable, status: dyncfg.StatusDisabled, inject: injectCheckPermanent, retry: 1, wantCode: 202},
-		"enable disabled with a stored invalid config": {command: dyncfg.CommandEnable, status: dyncfg.StatusDisabled, inject: injectInvalidPayload, wantCode: 202},
-		"enable disabled v1 with a check failure":      {command: dyncfg.CommandEnable, status: dyncfg.StatusDisabled, inject: injectV1CheckUnclassified, wantCode: 202},
-		"enable disabled v1 with a retried check":      {command: dyncfg.CommandEnable, status: dyncfg.StatusDisabled, inject: injectV1CheckUnclassified, retry: 1, wantCode: 202},
-		"enable disabled stock with a retried check":   {command: dyncfg.CommandEnable, status: dyncfg.StatusDisabled, source: confgroup.TypeStock, inject: injectCheckUnclassified, retry: 1, wantCode: 202},
-		"enable failed with a quarantined job":         {command: dyncfg.CommandEnable, status: dyncfg.StatusFailed, inject: injectJobQuarantined, wantCode: 202},
-		"enable running":                               {command: dyncfg.CommandEnable, status: dyncfg.StatusRunning, wantCode: 200},
-		"enable accepted":                              {command: dyncfg.CommandEnable, status: dyncfg.StatusAccepted, wantCode: 202},
-		"restart running with a retried check":         {command: dyncfg.CommandRestart, status: dyncfg.StatusRunning, inject: injectCheckUnclassified, retry: 1, wantCode: 422},
-		"restart running with a retried temporary":     {command: dyncfg.CommandRestart, status: dyncfg.StatusRunning, inject: injectCheckTemporary, retry: 1, wantCode: 503},
-		"restart failed with a retried check":          {command: dyncfg.CommandRestart, status: dyncfg.StatusFailed, inject: injectCheckUnclassified, retry: 1, wantCode: 422},
-		"restart disabled":                             {command: dyncfg.CommandRestart, status: dyncfg.StatusDisabled, wantCode: 405},
-		"disable running":                              {command: dyncfg.CommandDisable, status: dyncfg.StatusRunning, wantCode: 200},
-		"disable disabled":                             {command: dyncfg.CommandDisable, status: dyncfg.StatusDisabled, wantCode: 200},
-		"disable accepted":                             {command: dyncfg.CommandDisable, status: dyncfg.StatusAccepted, wantCode: 200},
-		"remove accepted":                              {command: dyncfg.CommandRemove, status: dyncfg.StatusAccepted, wantCode: 200},
-		"add over an accepted job":                     {command: dyncfg.CommandAdd, status: dyncfg.StatusAccepted, wantCode: 202},
-		"remove running":                               {command: dyncfg.CommandRemove, status: dyncfg.StatusRunning, wantCode: 200},
-		"remove stock":                                 {command: dyncfg.CommandRemove, status: dyncfg.StatusRunning, source: confgroup.TypeStock, wantCode: 405},
-		"add succeeds":                                 {command: dyncfg.CommandAdd, wantCode: 202},
-		"add with an invalid payload":                  {command: dyncfg.CommandAdd, inject: injectInvalidPayload, wantCode: 400},
-		"add with a missing vnode":                     {command: dyncfg.CommandAdd, inject: injectMissingVnode, wantCode: 202},
-		"add with a retried missing vnode":             {command: dyncfg.CommandAdd, inject: injectMissingVnode, retry: 1, wantCode: 202},
-		"add with a busy job":                          {command: dyncfg.CommandAdd, inject: injectJobBusy, wantCode: 503},
-		"add over a running job":                       {command: dyncfg.CommandAdd, status: dyncfg.StatusRunning, wantCode: 202},
-		"add a name the daemon would save as sent":     {command: dyncfg.CommandAdd, name: "a:b", wantCode: 400},
+		"update running succeeds": {
+			command:  dyncfg.CommandUpdate,
+			status:   dyncfg.StatusRunning,
+			wantCode: 202,
+		},
+		"update running with an invalid payload": {
+			command:  dyncfg.CommandUpdate,
+			status:   dyncfg.StatusRunning,
+			inject:   injectInvalidPayload,
+			wantCode: 400,
+		},
+		"update running with a permanent error": {
+			command:  dyncfg.CommandUpdate,
+			status:   dyncfg.StatusRunning,
+			inject:   injectCheckPermanent,
+			retry:    1,
+			wantCode: 422,
+		},
+		"update running with a check failure": {
+			command:  dyncfg.CommandUpdate,
+			status:   dyncfg.StatusRunning,
+			inject:   injectCheckUnclassified,
+			wantCode: 422,
+		},
+		"update running with a retried check failure": {
+			command:  dyncfg.CommandUpdate,
+			status:   dyncfg.StatusRunning,
+			inject:   injectCheckUnclassified,
+			retry:    1,
+			wantCode: 422,
+		},
+		"update running with a temporary error": {
+			command:  dyncfg.CommandUpdate,
+			status:   dyncfg.StatusRunning,
+			inject:   injectCheckTemporary,
+			wantCode: 503,
+		},
+		"update running with a retried temporary": {
+			command:  dyncfg.CommandUpdate,
+			status:   dyncfg.StatusRunning,
+			inject:   injectCheckTemporary,
+			retry:    1,
+			wantCode: 503,
+		},
+		"update running with an init failure": {
+			command:  dyncfg.CommandUpdate,
+			status:   dyncfg.StatusRunning,
+			inject:   injectInitUnclassified,
+			retry:    1,
+			wantCode: 422,
+		},
+		"update running with a permanent init error": {
+			command:  dyncfg.CommandUpdate,
+			status:   dyncfg.StatusRunning,
+			inject:   injectInitPermanent,
+			retry:    1,
+			wantCode: 422,
+		},
+		"update running with a temporary init error": {
+			command:  dyncfg.CommandUpdate,
+			status:   dyncfg.StatusRunning,
+			inject:   injectInitTemporary,
+			wantCode: 503,
+		},
+		"update running with a retried temporary init": {
+			command:  dyncfg.CommandUpdate,
+			status:   dyncfg.StatusRunning,
+			inject:   injectInitTemporary,
+			retry:    1,
+			wantCode: 503,
+		},
+		"update running with a busy job": {
+			command:  dyncfg.CommandUpdate,
+			status:   dyncfg.StatusRunning,
+			inject:   injectJobBusy,
+			wantCode: 503,
+		},
+		"update running with a superseded job": {
+			command:  dyncfg.CommandUpdate,
+			status:   dyncfg.StatusRunning,
+			inject:   injectJobSuperseded,
+			wantCode: 503,
+		},
+		"update running past its deadline": {
+			command:  dyncfg.CommandUpdate,
+			status:   dyncfg.StatusRunning,
+			inject:   injectJobDeadline,
+			wantCode: 503,
+		},
+		"update running with a quarantined job": {
+			command:  dyncfg.CommandUpdate,
+			status:   dyncfg.StatusRunning,
+			inject:   injectJobQuarantined,
+			wantCode: 503,
+		},
+		"update running with a missing vnode": {
+			command:  dyncfg.CommandUpdate,
+			status:   dyncfg.StatusRunning,
+			inject:   injectMissingVnode,
+			wantCode: 503,
+		},
+		"update running with a retried missing vnode": {
+			command:  dyncfg.CommandUpdate,
+			status:   dyncfg.StatusRunning,
+			inject:   injectMissingVnode,
+			retry:    1,
+			wantCode: 503,
+		},
+		"update running stock succeeds": {
+			command:  dyncfg.CommandUpdate,
+			status:   dyncfg.StatusRunning,
+			source:   confgroup.TypeStock,
+			wantCode: 202,
+		},
+		"update running stock with a permanent error": {
+			command:  dyncfg.CommandUpdate,
+			status:   dyncfg.StatusRunning,
+			source:   confgroup.TypeStock,
+			inject:   injectCheckPermanent,
+			wantCode: 422,
+		},
+		"update running user succeeds": {
+			command:  dyncfg.CommandUpdate,
+			status:   dyncfg.StatusRunning,
+			source:   confgroup.TypeUser,
+			wantCode: 202,
+		},
+		"update running user with a retried check": {
+			command:  dyncfg.CommandUpdate,
+			status:   dyncfg.StatusRunning,
+			source:   confgroup.TypeUser,
+			inject:   injectCheckUnclassified,
+			retry:    1,
+			wantCode: 422,
+		},
+		"update running user with a permanent error": {
+			command:  dyncfg.CommandUpdate,
+			status:   dyncfg.StatusRunning,
+			source:   confgroup.TypeUser,
+			inject:   injectCheckPermanent,
+			wantCode: 422,
+		},
+		"update failed with a permanent error": {
+			command:  dyncfg.CommandUpdate,
+			status:   dyncfg.StatusFailed,
+			inject:   injectCheckPermanent,
+			wantCode: 422,
+		},
+		"update failed succeeds": {
+			command:  dyncfg.CommandUpdate,
+			status:   dyncfg.StatusFailed,
+			wantCode: 202,
+		},
+		"update failed with a check failure": {
+			command:  dyncfg.CommandUpdate,
+			status:   dyncfg.StatusFailed,
+			inject:   injectCheckUnclassified,
+			wantCode: 422,
+		},
+		"enable failed with a check failure": {
+			command:  dyncfg.CommandEnable,
+			status:   dyncfg.StatusFailed,
+			inject:   injectCheckUnclassified,
+			wantCode: 202,
+		},
+		"update disabled succeeds": {
+			command:  dyncfg.CommandUpdate,
+			status:   dyncfg.StatusDisabled,
+			wantCode: 200,
+		},
+		"update disabled with an invalid payload": {
+			command:  dyncfg.CommandUpdate,
+			status:   dyncfg.StatusDisabled,
+			inject:   injectInvalidPayload,
+			wantCode: 400,
+		},
+		"update disabled with a missing vnode": {
+			command:  dyncfg.CommandUpdate,
+			status:   dyncfg.StatusDisabled,
+			inject:   injectMissingVnode,
+			wantCode: 200,
+		},
+		"update disabled with a busy job": {
+			command:  dyncfg.CommandUpdate,
+			status:   dyncfg.StatusDisabled,
+			inject:   injectJobBusy,
+			wantCode: 503,
+		},
+		"update accepted": {
+			command:  dyncfg.CommandUpdate,
+			status:   dyncfg.StatusAccepted,
+			wantCode: 403,
+		},
+		"update unknown job": {command: dyncfg.CommandUpdate, wantCode: 404},
+		"enable disabled succeeds": {
+			command:  dyncfg.CommandEnable,
+			status:   dyncfg.StatusDisabled,
+			wantCode: 202,
+		},
+		"enable disabled with a check failure": {
+			command:  dyncfg.CommandEnable,
+			status:   dyncfg.StatusDisabled,
+			inject:   injectCheckUnclassified,
+			wantCode: 202,
+		},
+		"enable disabled with a retried check": {
+			command:  dyncfg.CommandEnable,
+			status:   dyncfg.StatusDisabled,
+			inject:   injectCheckUnclassified,
+			retry:    1,
+			wantCode: 202,
+		},
+		"enable disabled with a permanent error": {
+			command:  dyncfg.CommandEnable,
+			status:   dyncfg.StatusDisabled,
+			inject:   injectCheckPermanent,
+			retry:    1,
+			wantCode: 202,
+		},
+		"enable disabled with a stored invalid config": {
+			command:  dyncfg.CommandEnable,
+			status:   dyncfg.StatusDisabled,
+			inject:   injectInvalidPayload,
+			wantCode: 202,
+		},
+		"enable disabled v1 with a check failure": {
+			command:  dyncfg.CommandEnable,
+			status:   dyncfg.StatusDisabled,
+			inject:   injectV1CheckUnclassified,
+			wantCode: 202,
+		},
+		"enable disabled v1 with a retried check": {
+			command:  dyncfg.CommandEnable,
+			status:   dyncfg.StatusDisabled,
+			inject:   injectV1CheckUnclassified,
+			retry:    1,
+			wantCode: 202,
+		},
+		"enable disabled stock with a retried check": {
+			command:  dyncfg.CommandEnable,
+			status:   dyncfg.StatusDisabled,
+			source:   confgroup.TypeStock,
+			inject:   injectCheckUnclassified,
+			retry:    1,
+			wantCode: 202,
+		},
+		"enable failed with a quarantined job": {
+			command:  dyncfg.CommandEnable,
+			status:   dyncfg.StatusFailed,
+			inject:   injectJobQuarantined,
+			wantCode: 202,
+		},
+		"enable running": {
+			command:  dyncfg.CommandEnable,
+			status:   dyncfg.StatusRunning,
+			wantCode: 200,
+		},
+		"enable accepted": {
+			command:  dyncfg.CommandEnable,
+			status:   dyncfg.StatusAccepted,
+			wantCode: 202,
+		},
+		"restart running with a retried check": {
+			command:  dyncfg.CommandRestart,
+			status:   dyncfg.StatusRunning,
+			inject:   injectCheckUnclassified,
+			retry:    1,
+			wantCode: 422,
+		},
+		"restart running with a retried temporary": {
+			command:  dyncfg.CommandRestart,
+			status:   dyncfg.StatusRunning,
+			inject:   injectCheckTemporary,
+			retry:    1,
+			wantCode: 503,
+		},
+		"restart failed with a retried check": {
+			command:  dyncfg.CommandRestart,
+			status:   dyncfg.StatusFailed,
+			inject:   injectCheckUnclassified,
+			retry:    1,
+			wantCode: 422,
+		},
+		"restart disabled": {
+			command:  dyncfg.CommandRestart,
+			status:   dyncfg.StatusDisabled,
+			wantCode: 405,
+		},
+		"disable running": {
+			command:  dyncfg.CommandDisable,
+			status:   dyncfg.StatusRunning,
+			wantCode: 200,
+		},
+		"disable disabled": {
+			command:  dyncfg.CommandDisable,
+			status:   dyncfg.StatusDisabled,
+			wantCode: 200,
+		},
+		"disable accepted": {
+			command:  dyncfg.CommandDisable,
+			status:   dyncfg.StatusAccepted,
+			wantCode: 200,
+		},
+		"remove accepted": {
+			command:  dyncfg.CommandRemove,
+			status:   dyncfg.StatusAccepted,
+			wantCode: 200,
+		},
+		"add over an accepted job": {
+			command:  dyncfg.CommandAdd,
+			status:   dyncfg.StatusAccepted,
+			wantCode: 202,
+		},
+		"remove running": {
+			command:  dyncfg.CommandRemove,
+			status:   dyncfg.StatusRunning,
+			wantCode: 200,
+		},
+		"remove stock": {
+			command:  dyncfg.CommandRemove,
+			status:   dyncfg.StatusRunning,
+			source:   confgroup.TypeStock,
+			wantCode: 405,
+		},
+		"add succeeds": {command: dyncfg.CommandAdd, wantCode: 202},
+		"add with an invalid payload": {
+			command:  dyncfg.CommandAdd,
+			inject:   injectInvalidPayload,
+			wantCode: 400,
+		},
+		"add with a missing vnode": {
+			command:  dyncfg.CommandAdd,
+			inject:   injectMissingVnode,
+			wantCode: 202,
+		},
+		"add with a retried missing vnode": {
+			command:  dyncfg.CommandAdd,
+			inject:   injectMissingVnode,
+			retry:    1,
+			wantCode: 202,
+		},
+		"add with a busy job": {
+			command:  dyncfg.CommandAdd,
+			inject:   injectJobBusy,
+			wantCode: 503,
+		},
+		"add over a running job": {
+			command:  dyncfg.CommandAdd,
+			status:   dyncfg.StatusRunning,
+			wantCode: 202,
+		},
+		"add a name the daemon would save as sent": {command: dyncfg.CommandAdd, name: "a:b", wantCode: 400},
 	}
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
@@ -139,27 +430,37 @@ func TestDynCfgJobMutationAdoptionAndRestartPreflight(t *testing.T) {
 			if test.inject == injectInvalidPayload && test.command == dyncfg.CommandEnable {
 				stored.Set("option_str", map[string]any{"nested": 1})
 			}
-			if test.inject == injectMissingVnode && test.command != dyncfg.CommandUpdate && test.command != dyncfg.CommandAdd {
+			if test.inject == injectMissingVnode && test.command != dyncfg.CommandUpdate &&
+				test.command != dyncfg.CommandAdd {
 				stored.Set("vnode", "missing")
 			}
 			if test.status != "" {
-				seedDynCfgJobGraphRecord(t, graph, stored, test.status)
+				seedDynCfgJobGraphRecord(t, controller, graph, stored, test.status)
 			}
 			preimage, preimageExists := graph.Lookup(stored.FullName())
 			if test.status == dyncfg.StatusFailed {
 				// A failed job may already wait for its own retry; a rejected
 				// command must leave that retry in place.
-				controller.scheduler.retries.schedule(stored, 60)
+				seedTestCandidateRetry(t, controller, stored, 60)
 			}
 			retryBefore := runtimeTestHasRetry(controller, stored.FullName())
 
 			var events []string
 			var current lifecycle.ReadyResource
-			scope := lifecycle.ResourceTransactionScope{ID: stored.FullName()}
+			scope := lifecycle.ResourceTransactionScope{
+				ID: stored.FullName(),
+			}
 			next := uint64(1)
 			if test.status == dyncfg.StatusRunning {
-				scope.Current = lifecycle.ResourceIdentity{ID: stored.FullName(), Generation: 1}
-				current = &transactionTestReadyResource{identity: scope.Current, prefix: "current", events: &events}
+				scope.Current = lifecycle.ResourceIdentity{
+					ID:         stored.FullName(),
+					Generation: 1,
+				}
+				current = &transactionTestReadyResource{
+					identity: scope.Current,
+					prefix:   "current",
+					events:   &events,
+				}
 				next++
 			}
 			// Like the production route, only commands that may start a job
@@ -168,7 +469,10 @@ func TestDynCfgJobMutationAdoptionAndRestartPreflight(t *testing.T) {
 				test.command == dyncfg.CommandEnable ||
 				test.command == dyncfg.CommandRestart
 			if allocates {
-				scope.Successor = lifecycle.ResourceIdentity{ID: stored.FullName(), Generation: next}
+				scope.Successor = lifecycle.ResourceIdentity{
+					ID:         stored.FullName(),
+					Generation: next,
+				}
 			}
 			// Inject attempt failures only once the preimage is in place.
 			injectAdoptionAttemptFailure(controller, test.inject)
@@ -213,7 +517,16 @@ func TestDynCfgJobMutationAdoptionAndRestartPreflight(t *testing.T) {
 				preimage.Status == dyncfg.StatusRunning.String()
 			switch {
 			case persisted && adopted:
-				requireAdoptionHoldsRequest(t, controller, test.command, request, preimage, preimageExists, record, exists)
+				requireAdoptionHoldsRequest(
+					t,
+					controller,
+					test.command,
+					request,
+					preimage,
+					preimageExists,
+					record,
+					exists,
+				)
 				if test.command == dyncfg.CommandUpdate && source != confgroup.TypeDyncfg {
 					require.Regexp(t,
 						regexp.MustCompile(`CONFIG go.d:collector:module:job create `+record.Status+` job \S+ dyncfg `),
@@ -240,7 +553,12 @@ func TestDynCfgJobMutationAdoptionAndRestartPreflight(t *testing.T) {
 				}
 			case adopted:
 				require.True(t, exists)
-				require.Equal(t, dyncfg.StatusRunning.String(), record.Status, "restart answers 2xx only for a running job")
+				require.Equal(
+					t,
+					dyncfg.StatusRunning.String(),
+					record.Status,
+					"restart answers 2xx only for a running job",
+				)
 			}
 		})
 	}
@@ -297,7 +615,11 @@ func adoptionTestRequest(command dyncfg.Command, name string, inject adoptionInj
 		}
 		args = []string{"go.d:collector:module", string(command), name}
 	}
-	request := DynCfgJobRequest{Args: args, ContentType: "application/json", CallerSource: "user=test"}
+	request := DynCfgJobRequest{
+		Args:         args,
+		ContentType:  "application/json",
+		CallerSource: "user=test",
+	}
 	if command != dyncfg.CommandAdd && command != dyncfg.CommandUpdate {
 		return request
 	}
@@ -325,7 +647,11 @@ func adoptionTestReplyCode(t *testing.T, wire, uid string) int {
 	return code
 }
 
-func configureAdoptionTestCollector(controller *DynCfgJobController, state *factoryTestState, inject adoptionInjection) {
+func configureAdoptionTestCollector(
+	controller *DynCfgJobController,
+	state *factoryTestState,
+	inject adoptionInjection,
+) {
 	if inject == injectV1CheckUnclassified {
 		creator := controller.modules["module"]
 		creator.CreateV2 = nil

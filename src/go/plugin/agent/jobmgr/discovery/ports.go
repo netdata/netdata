@@ -7,17 +7,27 @@ import (
 
 	"github.com/netdata/netdata/go/plugins/plugin/agent/jobmgr"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/confgroup"
-	"github.com/netdata/netdata/go/plugins/plugin/framework/dyncfg"
 )
 
 type PreparedCommandPort interface {
 	SubmitPreparedAndWait(context.Context, jobmgr.Request, jobmgr.WorkPlan) error
 }
 
-type DiscoveredChange struct {
-	Config confgroup.Config // the winning discovered config
-	Status dyncfg.Status    // target status (Accepted / Running)
-	Remove bool             // remove the job rather than install it
+// SourceCandidate identifies one observed membership lifetime in a source slot.
+type SourceCandidate struct {
+	Config      confgroup.Config
+	Source      string
+	Incarnation uint64
 }
 
-type PlanDiscovered func(DiscoveredChange) (jobmgr.WorkPlan, error)
+// SourceInventory is the complete versioned source observation for one job.
+// Empty candidates and sources together are an explicit removal observation.
+type SourceInventory struct {
+	FullName   string
+	Version    uint64
+	Candidates []SourceCandidate
+	Sources    map[string]uint64 // observed per-source membership lifetimes, including malformed replacements
+	AutoEnable bool
+}
+
+type PlanInventory func(SourceInventory) (jobmgr.WorkPlan, error)
