@@ -114,6 +114,10 @@ static void logical_disk_cleanup(struct logical_disk *d)
     d->mount_point_source = false;
     d->metadata_retry_after = 0;
     d->space_failed_since = 0;
+    d->readonly = false;
+    d->readonly_known = false;
+    d->DriveType = 0;
+    d->SerialNumber = 0;
 
     rrdset_is_obsolete___safe_from_collector_thread(d->st_disk_space);
     d->st_disk_space = NULL;
@@ -1483,6 +1487,26 @@ static void mount_points_worker(void *ptr __maybe_unused)
     InterlockedExchange(&mount_points_worker_finished[worker_id], 1);
 }
 
+static void logical_disks_invalidate_changed_volumes(
+    DICTIONARY *previous_volume_ids, DICTIONARY *new_volume_ids)
+{
+    if (!logicalDisks || !previous_volume_ids || !new_volume_ids)
+        return;
+
+    void *old_id;
+    dfe_start_read(previous_volume_ids, old_id)
+    {
+        const char *path = old_id_dfe.name;
+        const char *new_id = dictionary_get(new_volume_ids, path);
+        if (old_id && new_id && strcmp((const char *)old_id, new_id) != 0) {
+            struct logical_disk *d = dictionary_get(logicalDisks, path);
+            if (d)
+                logical_disk_cleanup(d);
+        }
+    }
+    dfe_done(old_id);
+}
+
 // The registry is a snapshot - volumes and CSVs are added and removed while we run - but it is
 // rebuilt into fresh dictionaries and swapped in only once the scan actually produced one.
 // Discarding the old snapshot first would make a transient enumeration failure indistinguishable
@@ -1618,6 +1642,7 @@ static void mount_points_publish_snapshot(struct mount_points_snapshot *snapshot
         dictionary_destroy(mountPoints);
         dictionary_destroy(deviceMountPaths);
         dictionary_destroy(excludedDeviceNames);
+        logical_disks_invalidate_changed_volumes(previous_volume_ids, volume_ids);
         dictionary_destroy(previous_volume_ids);
         dictionary_destroy(uncertainMountPoints);
         dictionary_destroy(failed_volume_ids);
@@ -1647,6 +1672,7 @@ static void mount_points_publish_snapshot(struct mount_points_snapshot *snapshot
     dictionary_destroy(mountPoints);
     dictionary_destroy(deviceMountPaths);
     dictionary_destroy(excludedDeviceNames);
+    logical_disks_invalidate_changed_volumes(previous_volume_ids, volume_ids);
     dictionary_destroy(previous_volume_ids);
     dictionary_destroy(uncertainMountPoints);
     dictionary_destroy(failed_volume_ids);
@@ -1903,6 +1929,11 @@ static void logical_disk_apply_metadata(
         d->DriveType = result->drive_type;
 
     if (result->metadata_success) {
+        if (d->collected_metadata && d->SerialNumber && result->serial_number &&
+            d->SerialNumber != result->serial_number) {
+            d->readonly = false;
+            d->readonly_known = false;
+        }
         d->SerialNumber = result->serial_number;
         d->readonly = result->readonly;
         d->readonly_known = true;
@@ -2133,8 +2164,14 @@ static void logical_disk_collect_instance(
     struct logical_disk *d = dictionary_set(dict, resolved_name, NULL, sizeof(*d));
     const struct volume_space_result *result =
         volume_space_cycle_results ? dictionary_get(volume_space_cycle_results, resolved_name) : NULL;
-    if (result && result->success)
-        d->space_failed_since = 0;
+    if (result && result->success) {
+        if (d->space_failed_since) {
+            d->collected_metadata = false;
+            d->readonly_known = false;
+            d->metadata_retry_after = 0;
+            d->space_failed_since = 0;
+        }
+    }
     logical_disk_apply_metadata(d, result, now_ut);
     if (volume_space_extra_targets)
         dictionary_set(volume_space_extra_targets, resolved_name, NULL, 0);
@@ -2254,7 +2291,12 @@ static bool do_mount_points(DICTIONARY *results, int update_every, usec_t now_ut
 
         d = dictionary_set(logicalDisks, name, NULL, sizeof(*d));
         d->mount_point_source = true;
-        d->space_failed_since = 0;
+        if (d->space_failed_since) {
+            d->collected_metadata = false;
+            d->readonly_known = false;
+            d->metadata_retry_after = 0;
+            d->space_failed_since = 0;
+        }
 
         logical_disk_apply_metadata(d, result, now_ut);
 
@@ -3019,6 +3061,54 @@ static int logical_disk_metadata_unittest_run(void)
     errors += mount_points_unittest_expect(
         "NULL logical disk pointer does not skip space chart",
         !logical_disk_space_chart_skipped(NULL));
+
+    // Volume replacement and serial number change tests
+    struct logical_disk d_replace = {
+        .collected_metadata = true,
+        .SerialNumber = 0x1111,
+        .readonly = true,
+        .readonly_known = true,
+    };
+    struct volume_space_result new_vol_res = {
+        .metadata_attempted = true,
+        .metadata_success = true,
+        .serial_number = 0x2222,
+        .readonly = false,
+        .readonly_known = true,
+        .filesystem = "fat32",
+    };
+    logical_disk_apply_metadata(&d_replace, &new_vol_res, now_ut);
+    errors += mount_points_unittest_expect(
+        "volume serial number change updates serial number and read-only state",
+        d_replace.SerialNumber == 0x2222 && !d_replace.readonly && d_replace.readonly_known);
+    errors += mount_points_unittest_expect(
+        "replaced writable volume is no longer skipped",
+        !logical_disk_space_chart_skipped(&d_replace));
+    string_freez(d_replace.filesystem);
+
+    // Volume identity snapshot invalidation test
+    DICTIONARY *prev_vids = dictionary_create(DICT_OPTION_SINGLE_THREADED);
+    DICTIONARY *new_vids = dictionary_create(DICT_OPTION_SINGLE_THREADED);
+    dictionary_set(prev_vids, "E:", "Volume{old}", sizeof("Volume{old}"));
+    dictionary_set(new_vids, "E:", "Volume{new}", sizeof("Volume{new}"));
+
+    DICTIONARY *saved_disks = logicalDisks;
+    logicalDisks = dictionary_create_advanced(DICT_OPTION_FIXED_SIZE, NULL, sizeof(struct logical_disk));
+    struct logical_disk *tracked = dictionary_set(logicalDisks, "E:", NULL, sizeof(*tracked));
+    tracked->collected_metadata = true;
+    tracked->readonly = true;
+    tracked->readonly_known = true;
+    tracked->DriveType = 5;
+
+    logical_disks_invalidate_changed_volumes(prev_vids, new_vids);
+    errors += mount_points_unittest_expect(
+        "changed volume identity invalidates logical disk cached metadata",
+        !tracked->collected_metadata && !tracked->readonly && !tracked->readonly_known);
+
+    dictionary_destroy(logicalDisks);
+    logicalDisks = saved_disks;
+    dictionary_destroy(prev_vids);
+    dictionary_destroy(new_vids);
 
     return errors;
 }
