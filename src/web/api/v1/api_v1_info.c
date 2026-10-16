@@ -152,12 +152,7 @@ static int web_client_api_request_v1_info_fill_buffer(RRDHOST *host, BUFFER *wb)
 
     buffer_json_member_add_boolean(wb, "https-enabled", true);
 
-    buffer_json_member_add_quoted_string(wb, "buildinfo", analytics_data.netdata_buildinfo);
-    buffer_json_member_add_quoted_string(wb, "release-channel", analytics_data.netdata_config_release_channel);
-    buffer_json_member_add_quoted_string(wb, "notification-methods", analytics_data.netdata_notification_methods);
-
-    buffer_json_member_add_boolean(wb, "exporting-enabled", analytics_data.exporting_enabled);
-    buffer_json_member_add_quoted_string(wb, "exporting-connectors", analytics_data.netdata_exporting_connectors);
+    analytics_info_to_json(wb);
 
     buffer_json_member_add_uint64(wb, "allmetrics-prometheus-used", analytics_data.prometheus_hits);
     buffer_json_member_add_uint64(wb, "allmetrics-shell-used", analytics_data.shell_hits);
