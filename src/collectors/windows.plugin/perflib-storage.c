@@ -2167,7 +2167,6 @@ static void logical_disk_collect_instance(
     if (result && result->success) {
         if (d->space_failed_since) {
             d->collected_metadata = false;
-            d->readonly_known = false;
             d->metadata_retry_after = 0;
             d->space_failed_since = 0;
         }
@@ -2293,7 +2292,6 @@ static bool do_mount_points(DICTIONARY *results, int update_every, usec_t now_ut
         d->mount_point_source = true;
         if (d->space_failed_since) {
             d->collected_metadata = false;
-            d->readonly_known = false;
             d->metadata_retry_after = 0;
             d->space_failed_since = 0;
         }
@@ -3109,6 +3107,25 @@ static int logical_disk_metadata_unittest_run(void)
     logicalDisks = saved_disks;
     dictionary_destroy(prev_vids);
     dictionary_destroy(new_vids);
+
+    // Space-query recovery retains readonly_known while invalidating collected_metadata
+    struct logical_disk d_recov = {
+        .collected_metadata = true,
+        .readonly = true,
+        .readonly_known = true,
+        .space_failed_since = 500000,
+    };
+    if (d_recov.space_failed_since) {
+        d_recov.collected_metadata = false;
+        d_recov.metadata_retry_after = 0;
+        d_recov.space_failed_since = 0;
+    }
+    errors += mount_points_unittest_expect(
+        "space query recovery retains readonly_known to prevent false alerts",
+        !d_recov.collected_metadata && d_recov.readonly_known && d_recov.readonly);
+    errors += mount_points_unittest_expect(
+        "space query recovering read-only volume remains skipped",
+        logical_disk_space_chart_skipped(&d_recov));
 
     return errors;
 }
