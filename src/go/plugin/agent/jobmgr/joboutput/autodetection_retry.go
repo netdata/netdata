@@ -269,7 +269,8 @@ func (adri *autoDetectionRetryIndex) runWorker() {
 			go func() {
 				defer adri.deliveries.Done()
 				if err := adri.dispatch(retry); err != nil {
-					if !lifecycle.ContainsOnlyCurrentStoppingRejections(err, adri.run) {
+					if !lifecycle.ContainsOnlyCurrentStoppingRejections(err, adri.run) &&
+						!jobmgr.ContainsOnlyErrorLeaves(err, jobmgr.ErrProcessAttemptRetired, jobmgr.ErrProcessAttemptStopped) {
 						adri.fail(err)
 					}
 					adri.stopWorker()

@@ -31,17 +31,17 @@ func TestCandidateBatchSourcePriorityBeforeConstruction(t *testing.T) {
 							}
 							return nil
 						}}
-						lowerSource, higherSource := "a-source", "z-source"
-						if !lowerFirst {
-							lowerSource, higherSource = higherSource, lowerSource
-						}
 						config := func(source, tier, option string) confgroup.Config {
 							return confgroup.Config{"module": "module", "name": "local2", "update_every": 1, "option_str": option}.
 								SetSource(source).SetSourceType(tier).SetProvider("test")
 						}
-						lower := config(lowerSource, tiers[i-1], "lower")
-						higher := config(higherSource, tiers[i], "higher")
-						fixture := newContinuationFixture(t, version, auto, state, []confgroup.Config{lower, higher})
+						lower := config("a-source", tiers[i-1], "lower")
+						higher := config("z-source", tiers[i], "higher")
+						configs := []confgroup.Config{lower, higher}
+						if !lowerFirst {
+							configs[0], configs[1] = configs[1], configs[0]
+						}
+						fixture := newContinuationFixture(t, version, auto, state, configs)
 						fixture.enableIfPassive(auto)
 						select {
 						case option := <-probed:

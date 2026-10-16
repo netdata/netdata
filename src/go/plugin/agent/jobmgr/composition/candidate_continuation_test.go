@@ -458,6 +458,7 @@ func newContinuationFixture(t *testing.T, version string, auto bool, state *cont
 	t.Cleanup(func() {
 		fixture.generation.Stop()
 		require.NoError(t, fixture.generation.Wait(context.Background()))
+		require.NoError(t, fixture.generation.run.FinishShutdown())
 		closeRunTestUIDs(t, uids)
 	})
 	fixture.observe(configs)
@@ -467,13 +468,17 @@ func newContinuationFixture(t *testing.T, version string, auto bool, state *cont
 
 func (f *continuationFixture) observe(configs []confgroup.Config) {
 	f.t.Helper()
-	bySource := make(map[string][]confgroup.Config)
-	for _, config := range configs {
-		bySource[config.Source()] = append(bySource[config.Source()], config)
-	}
+	bySource := make(map[string]*confgroup.Group)
 	var batch []*confgroup.Group
-	for source, entries := range bySource {
-		batch = append(batch, &confgroup.Group{Source: source, Configs: entries})
+	for _, config := range configs {
+		source := config.Source()
+		group := bySource[source]
+		if group == nil {
+			group = &confgroup.Group{Source: source}
+			bySource[source] = group
+			batch = append(batch, group)
+		}
+		group.Configs = append(group.Configs, config)
 	}
 	select {
 	case f.batches <- batch:

@@ -285,6 +285,48 @@ func TestAutoDetectionRetryWaitRequiresWorkerJoin(t *testing.T) {
 	require.True(t, index.joined())
 }
 
+func TestSchedulerRetryPreparationAfterCandidateRetirement(t *testing.T) {
+	controller, _, _, _, _ := newDynCfgJobTestHarness(t)
+	candidates := controller.candidates
+	inventory := candidateInventory(t, candidates, candidateTestInventory(1, true, candidateTestConfig("file", "one")), 0)
+	failed := candidateResult(t, candidates, inventory.Decision.Work, candidateOutcome{
+		Kind:       candidateFailed,
+		Listed:     true,
+		RetryAfter: 1,
+	}, 0)
+	require.NotNil(t, failed.Decision.Wake)
+	commands := &activationTestCommands{
+		queue: make(chan activationTestSubmission, 1),
+		stop:  make(chan struct{}),
+	}
+	defer close(commands.stop)
+	failures := make(chan error, 1)
+	require.NoError(t, controller.BindBackgroundWorkers(commands, candidates.run, func(err error) { failures <- err }))
+	defer controller.scheduler.StopBackgroundWorkers()
+	retries := controller.scheduler.retries
+	retries.schedule("test_job", *failed.Decision.Wake)
+	retries.advance(0)
+	retries.advance(1)
+	call := commands.next(t, "internal/jobs/autodetection-retry")
+
+	// Shutdown retires candidates before stopping kernel ingress. An already
+	// admitted retry may still prepare during that interval.
+	controller.scheduler.StopBackgroundWorkers()
+	_, err := call.plan.Transaction.Prepare(t.Context(), nil, lifecycle.ResourceTransactionScope{
+		ID: "test_job",
+	}, lifecycle.LongLivedPermit{})
+	require.ErrorIs(t, err, jobmgr.ErrProcessAttemptRetired)
+	call.ack <- err
+	ctx, cancel := context.WithTimeout(t.Context(), time.Second)
+	defer cancel()
+	require.NoError(t, controller.scheduler.WaitBackgroundWorkers(ctx))
+	select {
+	case err := <-failures:
+		t.Fatalf("normal candidate retirement failed the run: %v", err)
+	default:
+	}
+}
+
 func TestAutoDetectionRetryClassifiesStoppingAcknowledgement(t *testing.T) {
 	tests := map[string]struct {
 		err   error
@@ -302,6 +344,18 @@ func TestAutoDetectionRetryClassifiesStoppingAcknowledgement(t *testing.T) {
 			}, &lifecycle.StoppingRejection{
 				Generation: 1,
 			}),
+		},
+		"retired":           {err: jobmgr.ErrProcessAttemptRetired},
+		"stopped":           {err: jobmgr.ErrProcessAttemptStopped},
+		"wrapped retired":   {err: fmt.Errorf("prepare: %w", jobmgr.ErrProcessAttemptRetired)},
+		"joined retirement": {err: errors.Join(jobmgr.ErrProcessAttemptRetired, jobmgr.ErrProcessAttemptStopped)},
+		"retired with structural failure": {
+			err:   errors.Join(jobmgr.ErrProcessAttemptRetired, errors.New("structural")),
+			fatal: true,
+		},
+		"retired with cancellation": {
+			err:   errors.Join(jobmgr.ErrProcessAttemptRetired, context.Canceled),
+			fatal: true,
 		},
 		"wrong run": {err: &lifecycle.StoppingRejection{
 			Generation: 2,

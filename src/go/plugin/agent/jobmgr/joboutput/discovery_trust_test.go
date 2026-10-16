@@ -31,16 +31,16 @@ func TestDiscoveredTrustRevocationRequiresPipelineIdentity(t *testing.T) {
 		"missing both identities":             {},
 	} {
 		t.Run(name, func(t *testing.T) {
-			controller, graph, _, _, state := newDynCfgJobTestHarness(t)
+			controller, graph, _, _, _ := newDynCfgJobTestHarness(t)
 			owner := &intentTestOwner{}
 			creator := controller.modules["module"]
 			creator.JobConfigIntent = owner
 			creator.Create = func() collectorapi.CollectorV1 {
 				charts := collectorapi.Charts{}
-				module := state.module(nil, false)
-				module.ChartsFunc = func() *collectorapi.Charts { return &charts }
 				return &trustDurationCollector{
-					MockCollectorV1: *module,
+					MockCollectorV1: collectorapi.MockCollectorV1{
+						ChartsFunc: func() *collectorapi.Charts { return &charts },
+					},
 				}
 			}
 			controller.modules["module"] = creator

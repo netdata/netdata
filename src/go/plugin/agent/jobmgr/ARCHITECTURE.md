@@ -574,8 +574,8 @@ if both candidates settle Failed; a status-only publication cannot communicate a
 removal can leave enabled controller recovery alive while the public job is unlisted. A later admitted candidate
 recreates its own binding and metadata.
 
-GET selects the exposed binding in its resource lane and preserves unresolved raw references without Init/Check.
-Inner RESTART selects and pins that exact stored config in the same lane; its outer response observer uses an
+GET reads the exposed graph binding and preserves unresolved raw references without Init/Check.
+Inner RESTART selects and pins the exposed stored config in its resource lane; its outer response observer uses an
 independent invocation lane. SCHEMA comes from the module registry. USERCONFIG and TEST use caller payloads. Tentative
 proposals, rejected edits and late old outcomes cannot acquire exposure.
 
