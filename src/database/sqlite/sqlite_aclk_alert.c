@@ -1396,7 +1396,9 @@ void send_alert_snapshot_to_cloud(RRDHOST *host __maybe_unused)
 
     // An empty health log view proves nothing while the host still has alerts in memory: a REMOVED saved after a
     // re-created alert's first transition leaves the live alert REMOVED in the health log. Clearing the cloud would
-    // hide it, so send nothing then.
+    // hide it, so send nothing then. The caller still completes the request, as it always did for an empty view:
+    // retrying would rebuild the version table on every pass for as long as the health log stays stale, and the next
+    // cloud checkpoint requests a new snapshot if the versions still differ.
     if (rc == SQLITE_DONE && host_has_alerts(host))
         goto done;
 
