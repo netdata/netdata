@@ -11,6 +11,10 @@
 //! - the answer does not depend on lookup order, and each mid/high chunk
 //!   decodes once per resolver.
 //!
+//! The rollup ref resolver, which answers through this one, keeps its
+//! closed partition: a proven value in every tier, `Corrupt` across
+//! fields, into a gap, or into an undecodable chunk.
+//!
 //! Fixtures cover dot-extended field families in every tier (the
 //! `a.b=` < `a=` sort hazard), the production tier boundaries (99/100 and
 //! 999/1000 values), hundreds of interleaved low-card fields, single-tier
@@ -25,7 +29,9 @@ use bumpalo::Bump;
 
 use super::KvResolver;
 use crate::schema::FieldTier;
-use crate::{IndexReader, IndexWriter, RowIndex, SpanId, TraceId};
+use crate::{
+    IndexReader, IndexWriter, RollupRefOutcome, RollupRefResolver, RowIndex, SpanId, TraceId,
+};
 
 /// A value of row `i`: empty, `=`-carrying, unicode, longer than 4 KiB, or
 /// plain. Distinct for distinct `i`.
@@ -220,13 +226,10 @@ fn every_id_of_single_tier_files() {
     assert_equivalent(&bytes, &rows);
 }
 
-/// Metadata claiming more values for a low-card field than the primary
-/// FST holds (corruption a CRC cannot catch): `base + offset` then lands
-/// on the next field's key, which must stay unresolved, as the walk left
-/// it; the next field still resolves at its own base, and a field with no
-/// key at all resolves nothing.
-#[test]
-fn a_low_field_short_of_its_cardinality_leaves_the_excess_unresolved() {
+/// A file whose metadata claims more values for a low-card field than the
+/// primary FST holds (corruption a CRC cannot catch). KvIds by the
+/// metadata: `a` 0..2, `b` 2..3, `c` 3..4; `PRIM` holds `a=x`, `b=y`.
+fn short_low_field_file() -> Vec<u8> {
     use crate::writer::{ChunkCounts, ChunkWriter, ColumnsPresent};
     use crate::{
         BitmapValue, ColumnsTable, FieldEntry, Histogram, IdRanges, KvId, Metadata, SchemaTree,
@@ -242,7 +245,6 @@ fn a_low_field_short_of_its_cardinality_leaves_the_excess_unresolved() {
         cardinality,
         tier: FieldTier::Low,
     };
-    // KvIds by the metadata: a 0..2, b 2..3, c 3..4. PRIM holds a=x, b=y.
     let metadata = Metadata {
         histogram: Histogram {
             timestamps: vec![1_700_000_000],
@@ -285,8 +287,16 @@ fn a_low_field_short_of_its_cardinality_leaves_the_excess_unresolved() {
     writer
         .add_stream_batch(&StreamBatch::for_write(&[vec![KvId(0)]]))
         .unwrap();
-    let bytes = writer.finish().unwrap().into_inner();
+    writer.finish().unwrap().into_inner()
+}
 
+/// [`short_low_field_file`]: `base + offset` lands on the next field's key
+/// for `a`'s second id, which must stay unresolved, as the walk left it;
+/// the next field still resolves at its own base, and a field with no key
+/// at all resolves nothing.
+#[test]
+fn a_low_field_short_of_its_cardinality_leaves_the_excess_unresolved() {
+    let bytes = short_low_field_file();
     let idx = IndexReader::open(&bytes).unwrap();
     let mut kv = KvResolver::new();
     let mut key = Vec::new();
@@ -299,6 +309,90 @@ fn a_low_field_short_of_its_cardinality_leaves_the_excess_unresolved() {
     assert_eq!(resolve(1), None, "a's second id would read b=y");
     assert_eq!(resolve(2), Some(b"b=y".to_vec()));
     assert_eq!(resolve(3), None, "c has no key");
+}
+
+/// The rollup ref resolver answers through the KvId resolver and keeps its
+/// closed partition: every in-range ref of a low, mid or high root field
+/// is that field's value; the same ref asked as another field, or a field
+/// the file lacks, is `Corrupt`.
+#[test]
+fn rollup_refs_resolve_in_every_tier_and_nowhere_else() {
+    let mut rows = Vec::new();
+    single_pairs("name", 20, &mut rows); // mid at threshold 10
+    single_pairs("service", 3, &mut rows); // low
+    single_pairs("id", 120, &mut rows); // high
+    let bytes = file_of(10, &rows);
+    let idx = IndexReader::open(&bytes).unwrap();
+    let table = idx.build_string_table(idx.field_table()).unwrap();
+    let mut resolver = RollupRefResolver::new();
+    for _ in 0..2 {
+        // The second pass answers from the memo.
+        for (id, kv) in table.iter().enumerate() {
+            let (field, value) = kv.split_once('=').unwrap();
+            for asked in ["name", "service", "id"] {
+                let want = if asked == field {
+                    RollupRefOutcome::Value(value)
+                } else {
+                    RollupRefOutcome::Corrupt
+                };
+                assert_eq!(
+                    resolver.resolve(&idx, asked, id as u32),
+                    want,
+                    "{asked} {id}"
+                );
+            }
+            assert_eq!(
+                resolver.resolve(&idx, "absent", id as u32),
+                RollupRefOutcome::Corrupt
+            );
+        }
+    }
+}
+
+/// A ref into a gap (a low field short of its cardinality) is `Corrupt`,
+/// as is every ref into a field whose chunk fails to decode, while the
+/// file's other fields keep resolving.
+#[test]
+fn rollup_refs_into_a_gap_or_an_undecodable_chunk_are_corrupt() {
+    let bytes = short_low_field_file();
+    let idx = IndexReader::open(&bytes).unwrap();
+    let mut resolver = RollupRefResolver::new();
+    assert_eq!(resolver.resolve(&idx, "a", 0), RollupRefOutcome::Value("x"));
+    assert_eq!(resolver.resolve(&idx, "a", 1), RollupRefOutcome::Corrupt);
+    assert_eq!(resolver.resolve(&idx, "b", 2), RollupRefOutcome::Value("y"));
+    assert_eq!(resolver.resolve(&idx, "c", 3), RollupRefOutcome::Corrupt);
+
+    let mut rows = Vec::new();
+    single_pairs("name", 20, &mut rows); // mid: chunk MF 0
+    single_pairs("service", 3, &mut rows);
+    let mut bytes = file_of(10, &rows);
+    let offset = {
+        let container = chunk_file::container::Container::open(&bytes, b"SFST", 1).unwrap();
+        container.chunk_meta(crate::mid_field_id(0)).unwrap().offset as usize
+    };
+    bytes[offset] ^= 0xFF; // the chunk's CRC no longer matches
+    let idx = IndexReader::open(&bytes).unwrap();
+    let mut resolver = RollupRefResolver::new();
+    let service = idx
+        .field_table()
+        .iter()
+        .position(|f| f.name == "service")
+        .unwrap() as u32;
+    for _ in 0..2 {
+        // The failure is remembered: no second decode, still `Corrupt`.
+        for id in 3..23 {
+            assert_eq!(
+                resolver.resolve(&idx, "name", id),
+                RollupRefOutcome::Corrupt,
+                "{id}"
+            );
+        }
+    }
+    assert_eq!(service, 0, "low fields come first");
+    assert_eq!(
+        resolver.resolve(&idx, "service", 0),
+        RollupRefOutcome::Value(value(0).as_str())
+    );
 }
 
 fn sid(i: usize) -> SpanId {

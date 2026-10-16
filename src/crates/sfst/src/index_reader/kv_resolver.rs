@@ -47,6 +47,7 @@ struct Field {
 }
 
 /// See the module docs. Always used with the same file's reader.
+#[derive(Default)]
 pub(crate) struct KvResolver {
     /// Parallel to the file's field table; empty until first use.
     fields: Vec<Field>,
@@ -59,12 +60,7 @@ pub(crate) struct KvResolver {
 
 impl KvResolver {
     pub(crate) fn new() -> Self {
-        Self {
-            fields: Vec::new(),
-            starts: Vec::new(),
-            #[cfg(test)]
-            loads: 0,
-        }
+        Self::default()
     }
 
     /// Whether anything is decoded (a trace session's loaded layer).
