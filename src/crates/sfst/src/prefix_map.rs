@@ -20,6 +20,11 @@
 //! (`reader.rs::primary` / `mid_field`); `IndexReader`
 //! (`index_reader.rs`) keeps the primary map resident for exact lookups
 //! and field-prefix scans.
+//!
+//! Each key's FST output is its position in sorted key order, so the
+//! outputs grow with the keys and the FST also answers the reverse
+//! question, the key at a position ([`key_at`]), in O(key length): the
+//! KvId resolver (`index_reader/kv_resolver.rs`) relies on it.
 
 // Not every accessor is used in-tree yet; the unit tests exercise the full API.
 #![allow(dead_code)]
@@ -174,6 +179,22 @@ impl<T> PrefixMap<T> {
         self.map.contains_key(key)
     }
 
+    /// Write the key at sorted position `index` into `key` (see
+    /// [`key_at`]).
+    pub fn key_at(&self, index: u64, key: &mut Vec<u8>) -> bool {
+        key_at(&self.map, index, key)
+    }
+
+    /// The sorted position of the first key that starts with `prefix`, or
+    /// `None` when no key does.
+    pub fn first_index_with_prefix(&self, prefix: &[u8]) -> Option<u64> {
+        let mut stream = self.map.range().ge(prefix).into_stream();
+        match stream.next() {
+            Some((key, index)) if key.starts_with(prefix) => Some(index),
+            _ => None,
+        }
+    }
+
     /// Collect all values whose keys start with `prefix`.
     ///
     /// Values are returned in key-sorted order.
@@ -226,6 +247,16 @@ impl<T> PrefixMap<T> {
     pub fn values(&self) -> &[T] {
         &self.values
     }
+}
+
+/// Write the key at sorted position `index` of a [`PrefixMap`]'s FST into
+/// `key` (cleared first); `false` when `index` is past the last key. For
+/// an FST read on its own, without the values (`reader.rs::mid_field_fst`):
+/// the reverse lookup is only defined because [`PrefixMap::build`] makes
+/// each output the key's sorted position.
+pub(crate) fn key_at(map: &fst::Map<Vec<u8>>, index: u64, key: &mut Vec<u8>) -> bool {
+    key.clear();
+    index < map.len() as u64 && map.as_fst().get_key_into(index, key)
 }
 
 /// Automaton that matches keys starting with a given byte prefix.
@@ -441,6 +472,87 @@ mod tests {
         assert_eq!(deserialized.get(b"beta"), Some(&2));
         assert_eq!(deserialized.get(b"gamma"), Some(&3));
         assert_eq!(deserialized.get(b"delta"), None);
+    }
+
+    /// `key_at` inverts the sorted position of every key, including keys
+    /// that prefix others and the `.`/`=` neighbours of the dot-extended
+    /// field families; `false` past the end and on an empty map.
+    #[test]
+    fn key_at_inverts_every_position() {
+        let keys = [
+            "",
+            "a",
+            "a.b=y",
+            "a=",
+            "a=x",
+            "a=xy",
+            "a=x=y",
+            "ab",
+            "b=\u{e9}t\u{e9}",
+            "b=\u{1f600}",
+        ];
+        let m = PrefixMap::build(keys.iter().map(|k| (*k, 0u32))).unwrap();
+        let mut sorted = keys.to_vec();
+        sorted.sort();
+        let mut buf = b"stale".to_vec();
+        for (i, want) in sorted.iter().enumerate() {
+            assert!(m.key_at(i as u64, &mut buf), "position {i}");
+            assert_eq!(buf, want.as_bytes(), "position {i}");
+        }
+        assert!(!m.key_at(sorted.len() as u64, &mut buf));
+        assert!(!m.key_at(u64::MAX, &mut buf));
+        let empty: PrefixMap<u32> = PrefixMap::build(Vec::<(&str, u32)>::new()).unwrap();
+        assert!(!empty.key_at(0, &mut buf));
+    }
+
+    /// The same over a few thousand generated keys with long shared
+    /// prefixes and mixed lengths, so the FST has deep chains and wide
+    /// fan-out nodes.
+    #[test]
+    fn key_at_inverts_generated_keys() {
+        let mut state = 0x9e37_79b9_7f4a_7c15u64;
+        let mut next = || {
+            state = state
+                .wrapping_mul(6_364_136_223_846_793_005)
+                .wrapping_add(1_442_695_040_888_963_407);
+            (state >> 33) as usize
+        };
+        let mut keys = std::collections::BTreeSet::new();
+        while keys.len() < 3_000 {
+            let field = ["f", "f.g", "f.g.h", "fg"][next() % 4];
+            let len = next() % 40;
+            let value: String = (0..len)
+                .map(|_| ['a', 'b', '=', '.', '\u{e9}', 'z'][next() % 6])
+                .collect();
+            keys.insert(format!("{field}={value}"));
+        }
+        let m = PrefixMap::build(keys.iter().map(|k| (k.as_str(), ()))).unwrap();
+        let mut buf = Vec::new();
+        for (i, want) in keys.iter().enumerate() {
+            assert!(m.key_at(i as u64, &mut buf), "position {i}");
+            assert_eq!(buf, want.as_bytes(), "position {i}");
+        }
+        assert!(!m.key_at(keys.len() as u64, &mut buf));
+    }
+
+    #[test]
+    fn first_index_with_prefix() {
+        // Sorted: "a.b=y" (0) < "a=x" (1) < "a=z" (2) < "ab=1" (3).
+        let m = PrefixMap::build([("a=z", 0u32), ("ab=1", 0), ("a.b=y", 0), ("a=x", 0)]).unwrap();
+        assert_eq!(m.first_index_with_prefix(b"a="), Some(1));
+        assert_eq!(m.first_index_with_prefix(b"a.b="), Some(0));
+        assert_eq!(m.first_index_with_prefix(b"ab="), Some(3));
+        assert_eq!(m.first_index_with_prefix(b"a"), Some(0));
+        assert_eq!(m.first_index_with_prefix(b""), Some(0));
+        assert_eq!(
+            m.first_index_with_prefix(b"a=x"),
+            Some(1),
+            "prefix is a key"
+        );
+        assert_eq!(m.first_index_with_prefix(b"a.c="), None, "between keys");
+        assert_eq!(m.first_index_with_prefix(b"b="), None, "past every key");
+        let empty: PrefixMap<u32> = PrefixMap::build(Vec::<(&str, u32)>::new()).unwrap();
+        assert_eq!(empty.first_index_with_prefix(b""), None);
     }
 
     #[test]

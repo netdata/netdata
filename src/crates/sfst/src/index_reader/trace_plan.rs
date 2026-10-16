@@ -1162,7 +1162,7 @@ impl IndexReader<'_> {
     /// The KvIds of `field`'s dictionary tokens selected by `matcher` —
     /// the subgroup refine's membership sets. KvIds are assigned per
     /// field in field-table order with values in dictionary order (the
-    /// tested `resolve_kv_strings` labeling), so the id of the `i`-th
+    /// labeling the KvId resolver's tests pin), so the id of the `i`-th
     /// walked value is `field_start + i`. An absent field yields the
     /// empty set (unsatisfiable subgroup condition in this file). The
     /// walk's key bytes are charged to `work.dict_bytes`.

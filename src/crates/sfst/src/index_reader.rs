@@ -25,9 +25,12 @@ use std::ops::ControlFlow;
 use crate::PrefixMap;
 use crate::reader::ChunkReader;
 
+mod kv_resolver;
 mod rollup_resolver;
 mod session;
 mod trace_plan;
+
+use kv_resolver::KvResolver;
 
 pub use rollup_resolver::{RollupRefOutcome, RollupRefResolver};
 pub use session::{PartEvidence, RollupEvidence, TraceFileSession};
@@ -718,83 +721,6 @@ impl<'a> IndexReader<'a> {
         Ok(out)
     }
 
-    /// Resolve sorted, deduplicated KvIds to their `key=value` strings,
-    /// decoding only the chunks whose fields the ids touch.
-    ///
-    /// A running cardinality sum over the field table locates each id's
-    /// field — KvIds are assigned per field in field-table order, so an id's
-    /// offset within its field indexes that field's value order directly.
-    /// Resolution deliberately walks PER FIELD: the primary FST's global sort
-    /// order diverges from the assignment order when one field name
-    /// dot-extends another ('.' sorts before '='), so a whole-FST walk cannot
-    /// label KvIds. An id no chunk covers (corrupt file) is left unresolved;
-    /// the caller renders it empty rather than failing the page.
-    fn resolve_kv_strings(&self, ids: &[u32]) -> Result<HashMap<u32, String>, crate::Error> {
-        debug_assert!(
-            ids.windows(2).all(|w| w[0] < w[1]),
-            "ids must be sorted+deduped"
-        );
-        let mut out = HashMap::with_capacity(ids.len());
-        let mut next = 0usize; // cursor into `ids`
-        let mut start = 0u32; // current field's first KvId
-        for (field, ti) in field_table_tiered(self.field_table()) {
-            if next >= ids.len() {
-                break;
-            }
-            let end = start + field.cardinality;
-            if ids[next] >= end {
-                start = end;
-                continue;
-            }
-            let lo = next;
-            while next < ids.len() && ids[next] < end {
-                next += 1;
-            }
-            let wanted = &ids[lo..next];
-            match field.tier {
-                FieldTier::Low => {
-                    let pairs = self
-                        .primary
-                        .prefix_pairs(format!("{}=", field.name).as_bytes());
-                    let mut w = 0usize;
-                    for (off, (key, _)) in pairs.iter().enumerate() {
-                        if w >= wanted.len() {
-                            break;
-                        }
-                        let id = start + off as u32;
-                        if wanted[w] == id {
-                            out.insert(id, String::from_utf8_lossy(key).into_owned());
-                            w += 1;
-                        }
-                    }
-                }
-                FieldTier::Mid => {
-                    let fst = self.sfst.mid_field(ti)?;
-                    let mut w = 0usize;
-                    let mut off = 0u32;
-                    fst.for_each(|key, _| {
-                        if w < wanted.len() && wanted[w] == start + off {
-                            out.insert(start + off, String::from_utf8_lossy(key).into_owned());
-                            w += 1;
-                        }
-                        off += 1;
-                    });
-                }
-                FieldTier::High => {
-                    let hf = self.sfst.high_field(ti)?;
-                    for &id in wanted {
-                        let off = (id - start) as usize;
-                        if off < hf.len() {
-                            out.insert(id, String::from_utf8_lossy(hf.key(off)).into_owned());
-                        }
-                    }
-                }
-            }
-            start = end;
-        }
-        Ok(out)
-    }
-
     /// Materialize full log rows for the given positions.
     ///
     /// For each position: its timestamp plus every attribute, resolved
@@ -808,9 +734,11 @@ impl<'a> IndexReader<'a> {
     ///
     /// Decodes the timestamps chunk, only the stream batches the positions
     /// fall in, and only the field chunks the rows' KvIds actually reference
-    /// (resolved per touched field, not via the whole table) — cost scales
-    /// with the page's content, not the file's attribute space. Callers
-    /// should still batch a page's worth of positions into one call.
+    /// (mid-tier ones without their position bitmaps); each KvId is then a
+    /// position lookup (`KvResolver`), so cost scales with the page's
+    /// content, not the file's attribute space. Callers should still batch
+    /// a page's worth of positions into one call: the decoded chunks are
+    /// shared within it.
     pub fn materialize_rows(
         &self,
         positions: &[u32],
@@ -845,7 +773,7 @@ impl<'a> IndexReader<'a> {
         }
         ids.sort_unstable();
         ids.dedup();
-        let strings = self.resolve_kv_strings(&ids)?;
+        let strings = KvResolver::new().strings(self, &ids)?;
 
         let mut rows = Vec::with_capacity(positions.len());
         for &pos in positions {

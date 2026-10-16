@@ -589,8 +589,8 @@ fn materialize_rows_resolves_timestamp_and_attributes() {
     let data = build_query_fixture();
     let reader = IndexReader::open(&data).unwrap();
     // Fixture positions: 0 = (info, api), 3 = (error, worker); 1s apart
-    // starting at FILE_MIN_NS. Stream KvIds resolve per-field via
-    // `resolve_kv_strings` to "level=…"/"service=…" pairs.
+    // starting at FILE_MIN_NS. Stream KvIds resolve per field (the KvId
+    // resolver) to "level=…"/"service=…" pairs.
     let rows = reader.materialize_rows(&[0, 3]).unwrap();
     assert_eq!(rows.len(), 2);
 
@@ -1475,9 +1475,9 @@ fn second_chunk_per_tier_resolves() {
         vec![0, 2]
     );
 
-    // materialize_rows → resolve_kv_strings walks the field table, decoding
-    // all four secondary chunks; row 3 carries the second value of every
-    // field (tier index 1 for region and trace).
+    // materialize_rows resolves through every tier, decoding all four
+    // secondary chunks; row 3 carries the second value of every field
+    // (tier index 1 for region and trace).
     let rows = reader.materialize_rows(&[3]).unwrap();
     let fields: std::collections::HashMap<String, String> =
         rows[0].fields.iter().cloned().collect();

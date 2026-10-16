@@ -523,10 +523,13 @@ The bitmap records the time-sorted log positions where the
 `key=value` pair appears. Always present.
 
 The serialized `PrefixMap` holds two fields in this order: `fst_bytes`
-(the FST, a bincode length then the raw bytes; its outputs index into
-`values`) and `values` (one `BitmapValue` per key). Readers that only
-list keys stream the decompression and stop after `fst_bytes`, so the
-order is part of the format. `MF{i}` uses the same layout.
+(the FST, a bincode length then the raw bytes) and `values` (one
+`BitmapValue` per key, in sorted key order). Each FST output is the
+key's position in sorted key order, which indexes into `values` and
+lets a reader find the key at a position without walking the FST
+(KvId resolution, above). Readers that only list or resolve keys stream
+the decompression and stop after `fst_bytes`, so the order is part of
+the format. `MF{i}` uses the same layout.
 
 ### `MF{i}` — Mid-card field FSTs
 
@@ -641,17 +644,28 @@ IDs are assigned during writing by walking the tiers in order:
 Within every tier, fields are sorted by name and each field's values
 follow the same order that field's dictionary is serialized in (sorted
 by the resolved string). Note the low tier is **not** the primary FST's
-global lexicographic iteration order: ids are assigned per field, and
-the reader resolves low-card ids with per-field prefix scans for the
-same reason (a global FST walk would mislabel families where one field
-name dot-extends another).
+global lexicographic iteration order: ids are assigned per field, and a
+global FST walk would mislabel families where one field name
+dot-extends another (`a.b=` sorts before `a=`, since '.' < '=').
 
 `low_end`, `mid_end`, `high_end` are carried in `Metadata::id_ranges`.
 
-The `SB{i}` chunks store `KvId`s, not strings; resolving a `KvId` back
-to its `key=value` requires checking which range it falls in and
-looking up the corresponding entry in `PRIM`, an `MF{i}` chunk, or an
-`HF{i}` chunk.
+The `SB{i}` chunks store `KvId`s, not strings. To resolve a `KvId` back
+to its `key=value`, the reader locates its field and its offset within
+the field by a running sum of the field table's cardinalities, then
+reads the entry at that position:
+
+- low tier: in `PRIM`, at the field's base position plus the offset. The
+  base is the position of the field's first `field=` key (a range
+  probe); a field's keys are contiguous in `PRIM` because they share
+  that prefix. A key that does not carry the field's prefix means the
+  file is corrupt, and the id stays unresolved;
+- mid tier: in the field's `MF{i}` FST, at the offset;
+- high tier: in the field's `HF{i}` chunk, at the offset.
+
+The FST lookups are reverse lookups (`fst::raw::Fst::get_key`), which
+are only defined because each FST output is the key's sorted position
+(see `PRIM` below).
 
 Tier assignment is stable for a given input: fields are sorted by
 name within each tier, and entries within each per-field structure

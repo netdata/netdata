@@ -166,7 +166,7 @@ fn value_half(key: &str, field_name: &str) -> Option<String> {
 }
 
 /// Locate `field_name`'s KvId range and decode its dictionary once.
-/// Mirrors `resolve_kv_strings`' per-field walk: KvIds are assigned in
+/// Follows the KvId assignment the KvId resolver uses: KvIds are assigned in
 /// field-table order, so a running cardinality sum yields each field's
 /// `[start, start + cardinality)` range.
 fn decode_field(reader: &IndexReader<'_>, field_name: &str) -> FieldState {

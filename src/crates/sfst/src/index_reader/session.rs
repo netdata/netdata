@@ -22,10 +22,13 @@
 //!   and string resolution) only once a lookup finds rows;
 //! - stream batches, EVNB/LNKB and the trace rollup (TRSU) decode lazily,
 //!   once;
-//! - KvId→string resolutions accumulate in a per-session cache; a value
-//!   longer than [`CACHED_VALUE_MAX_BYTES`] is resolved whole for the span
-//!   that needs it and not kept. Values are never cut: predicates and
-//!   canonical selection see what was stored, in every layout.
+//! - KvIds resolve through the session's [`KvResolver`]: a position lookup
+//!   per id, decoding each touched field's dictionary once (mid tier
+//!   without its position bitmaps). The resolved strings accumulate in a
+//!   per-session cache; a value longer than [`CACHED_VALUE_MAX_BYTES`] is
+//!   resolved whole for the span that needs it and not kept. Values are
+//!   never cut: predicates and canonical selection see what was stored, in
+//!   every layout.
 //!
 //! Two layers: the bloom and the screen stay for the session's life
 //! (about 3 bytes per distinct trace id in the file: ~30 KB for 10k);
@@ -56,8 +59,8 @@
 use std::collections::HashMap;
 
 use crate::index_reader::{
-    IndexReader, MetaReader, RollupRefOutcome, RollupRefResolver, TraceEvent, TraceLink, TraceSpan,
-    kv_attr, kv_value,
+    IndexReader, KvResolver, MetaReader, RollupRefOutcome, RollupRefResolver, TraceEvent,
+    TraceLink, TraceSpan, kv_attr, kv_value,
 };
 use crate::reader::ChunkReader;
 use crate::trace_combine::{SpanRef, SpanSource};
@@ -221,6 +224,8 @@ pub struct TraceFileSession<'r, 'a> {
     batches: Vec<Option<crate::StreamBatch>>,
     /// KvId → `key=value` string, accumulated across materializations.
     strings: HashMap<u32, String>,
+    /// The file's dictionaries, decoded as ids touch them.
+    kv: KvResolver,
     /// Row position → raw `_kind` int, filled per looked-up trace from
     /// the low-card facet bitmaps (no row access).
     kinds: HashMap<u32, i32>,
@@ -277,6 +282,7 @@ impl<'r, 'a> TraceFileSession<'r, 'a> {
             extras: None,
             batches: Vec::new(),
             strings: HashMap::new(),
+            kv: KvResolver::new(),
             kinds: HashMap::new(),
             rollup: None,
             stats: None,
@@ -637,17 +643,19 @@ impl<'r, 'a> TraceFileSession<'r, 'a> {
         Ok(self.batches[b].as_ref().expect("just populated"))
     }
 
-    /// Resolve `ids` into the per-session cache, fetching only the missing
-    /// ones from the file. Returns the ids of the long values it added,
-    /// which the caller removes once its span is built.
-    fn resolve(&mut self, ids: &mut Vec<u32>) -> Result<Vec<u32>, crate::Error> {
-        ids.sort_unstable();
-        ids.dedup();
-        ids.retain(|id| !self.strings.contains_key(id));
+    /// Resolve `ids` into the per-session cache, looking up only the
+    /// missing ones. Returns the ids of the long values it added, which
+    /// the caller removes once its span is built.
+    fn resolve(&mut self, ids: &[u32]) -> Result<Vec<u32>, crate::Error> {
         let mut long = Vec::new();
-        if !ids.is_empty() {
-            let resolved = self.view.full()?.resolve_kv_strings(ids)?;
-            for (id, kv) in resolved {
+        let mut key = Vec::new();
+        for &id in ids {
+            if self.strings.contains_key(&id) {
+                continue;
+            }
+            let reader = self.view.full()?;
+            if self.kv.key_into(reader, id, &mut key)? {
+                let kv = String::from_utf8_lossy(&key).into_owned();
                 if kv.len() > CACHED_VALUE_MAX_BYTES {
                     long.push(id);
                 }
@@ -655,6 +663,12 @@ impl<'r, 'a> TraceFileSession<'r, 'a> {
             }
         }
         Ok(long)
+    }
+
+    /// Dictionary chunks the session's resolver has decoded.
+    #[cfg(test)]
+    pub(crate) fn kv_loads(&self) -> usize {
+        self.kv.loads
     }
 }
 
@@ -719,7 +733,7 @@ impl SpanSource for TraceFileSession<'_, '_> {
         if let Some(lk) = &extras.links {
             needed.extend(lk.all_refs_for_row(pos).map(|id| id.0));
         }
-        let long = self.resolve(&mut needed)?;
+        let long = self.resolve(&needed)?;
 
         // Row facets: the `events.`/`links.` tokens exist for search; in
         // the reconstructed span they appear structured instead, so drop
@@ -825,6 +839,7 @@ impl SpanSource for TraceFileSession<'_, '_> {
             || self.extras.is_some()
             || !self.batches.is_empty()
             || !self.strings.is_empty()
+            || self.kv.is_loaded()
             || !self.kinds.is_empty()
             || self.rollup.is_some()
             || self.stats.is_some()
@@ -843,6 +858,7 @@ impl SpanSource for TraceFileSession<'_, '_> {
         self.extras = None;
         self.batches = Vec::new();
         self.strings = HashMap::new();
+        self.kv = KvResolver::new();
         self.kinds = HashMap::new();
         self.rollup = None;
         self.stats = None;
