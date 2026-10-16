@@ -25,6 +25,7 @@ struct logical_disk {
     ULONG divisor;
     ULONG chart_divisor; // the divisor the dimensions were created with
     bool readonly;
+    bool readonly_known;
 
     STRING *filesystem;
 
@@ -224,6 +225,7 @@ struct volume_space_result {
     UINT drive_type;
     DWORD serial_number;
     bool readonly;
+    bool readonly_known;
     char filesystem[128];
 };
 
@@ -695,10 +697,11 @@ static void volume_space_worker(void *ptr __maybe_unused)
             struct logical_disk metadata_disk = {0};
             STRING *filesystem = getFileSystemType(&metadata_disk, name);
             value.drive_type = metadata_disk.DriveType;
+            value.readonly = metadata_disk.readonly;
+            value.readonly_known = metadata_disk.readonly_known;
             if (filesystem) {
                 value.metadata_success = true;
                 value.serial_number = metadata_disk.SerialNumber;
-                value.readonly = metadata_disk.readonly;
                 snprintfz(value.filesystem, sizeof(value.filesystem), "%s", string2str(filesystem));
                 string_freez(filesystem);
             }
@@ -745,6 +748,7 @@ static void volume_space_worker(void *ptr __maybe_unused)
             value.drive_type = 0;
             value.serial_number = 0;
             value.readonly = false;
+            value.readonly_known = false;
             value.filesystem[0] = '\0';
         }
         if (!result_superseded) {
@@ -1869,6 +1873,7 @@ static STRING *getFileSystemType(struct logical_disk *d, const char *diskName)
         return NULL;
 
     d->readonly = fileSystemFlags & FILE_READ_ONLY_VOLUME;
+    d->readonly_known = true;
     d->SerialNumber = serialNumber;
 
     char fileSystem[128];
@@ -1900,11 +1905,16 @@ static void logical_disk_apply_metadata(
     if (result->metadata_success) {
         d->SerialNumber = result->serial_number;
         d->readonly = result->readonly;
+        d->readonly_known = true;
         string_freez(d->filesystem);
         d->filesystem = string_strdupz(result->filesystem);
         d->collected_metadata = true;
         d->metadata_retry_after = 0;
     } else {
+        if (result->readonly_known) {
+            d->readonly = result->readonly;
+            d->readonly_known = true;
+        }
         d->metadata_retry_after = now_ut + METADATA_RETRY_EVERY_UT;
     }
 }
@@ -2016,8 +2026,8 @@ static void logical_disk_labels(struct logical_disk *d, const char *name)
 static void logical_disk_chart(struct logical_disk *d, const char *name, int update_every)
 {
     // Skip optical drives (CD-ROM/DVD) and read-only volumes to prevent permanent critical alerts (#24150).
-    // d->readonly is consulted only when metadata has been successfully collected.
-    if (d->DriveType == 5 /* DRIVE_CDROM */ || (d->collected_metadata && d->readonly)) {
+    // d->readonly is consulted only when its state is known.
+    if (d->DriveType == 5 /* DRIVE_CDROM */ || (d->readonly_known && d->readonly)) {
         if (d->st_disk_space) {
             rrdset_is_obsolete___safe_from_collector_thread(d->st_disk_space);
             d->st_disk_space = NULL;
@@ -2934,6 +2944,55 @@ static int volume_space_result_unittest_run(void)
     return errors;
 }
 
+static int logical_disk_metadata_unittest_run(void)
+{
+    int errors = 0;
+    struct logical_disk d = {0};
+    usec_t now_ut = 1000000;
+
+    // Optical drive type is retained even when metadata collection is partial
+    struct volume_space_result optical_res = {
+        .metadata_attempted = true,
+        .metadata_success = false,
+        .drive_type = 5, /* DRIVE_CDROM */
+    };
+    logical_disk_apply_metadata(&d, &optical_res, now_ut);
+    errors += mount_points_unittest_expect(
+        "optical drive type is retained even when metadata_success is false",
+        d.DriveType == 5);
+
+    // Read-only state is retained when readonly_known is true despite metadata_success false
+    struct logical_disk d_ro = {0};
+    struct volume_space_result ro_res = {
+        .metadata_attempted = true,
+        .metadata_success = false,
+        .readonly = true,
+        .readonly_known = true,
+    };
+    logical_disk_apply_metadata(&d_ro, &ro_res, now_ut);
+    errors += mount_points_unittest_expect(
+        "read-only flag is retained when readonly_known is true despite metadata_success false",
+        d_ro.readonly && d_ro.readonly_known);
+
+    // Successful metadata marks collected_metadata and readonly_known
+    struct logical_disk d_success = {0};
+    struct volume_space_result full_res = {
+        .metadata_attempted = true,
+        .metadata_success = true,
+        .serial_number = 0x1234,
+        .readonly = true,
+        .readonly_known = true,
+        .filesystem = "ntfs",
+    };
+    logical_disk_apply_metadata(&d_success, &full_res, now_ut);
+    errors += mount_points_unittest_expect(
+        "successful metadata marks collected_metadata and readonly_known",
+        d_success.collected_metadata && d_success.readonly_known && d_success.readonly);
+    string_freez(d_success.filesystem);
+
+    return errors;
+}
+
 int perflib_storage_unittest(void)
 {
     int errors = 0;
@@ -2943,6 +3002,7 @@ int perflib_storage_unittest(void)
     errors += logical_disk_unittest_run("*AssuredRecoveryTemp*", 1, "C:", NULL);
     errors += logical_disk_unittest_run(NULL, 2, "C:", "Z:\\ASSUREDRECOVERYTEMP\\volume");
     errors += volume_space_result_unittest_run();
+    errors += logical_disk_metadata_unittest_run();
     errors += mount_points_query_failure_unittest_run();
     errors += mount_points_excluded_carry_unittest_run();
     errors += mount_points_unittest_run();
