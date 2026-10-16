@@ -309,7 +309,16 @@ func (dcjc *DynCfgJobController) prepareControllerActivationError(ctx context.Co
 		if prepareErr != nil {
 			return nil, prepareErr
 		}
-		return dcjc.prepareCandidateDecision(ctx, scope, current, permit, delta)
+		prepared, prepareErr := dcjc.prepareCandidateDecision(ctx, scope, current, permit, delta)
+		if prepareErr != nil {
+			return nil, prepareErr
+		}
+		return &candidateCompletionTransaction{PreparedResourceTransaction: prepared, applied: composeAfterApply(attempt.markApplied(), func() {
+			jobmgr.ObserveDiagnostic(dcjc.diagnostics, jobmgr.DiagnosticEvent{
+				Level: jobmgr.DiagnosticWarning, Name: "discovered collector proposal rejected", Resource: scope.ID,
+				State: "rejected", Generation: dcjc.generation, Err: jobmgr.RejectProposal(err),
+			})
+		})}, nil
 	case activationFailureDeadline:
 		if attempt.spec.work.Tentative {
 			return dcjc.prepareControllerBlocked(ctx, attempt, current, scope, permit, err, candidateBlockAcceptedWait)

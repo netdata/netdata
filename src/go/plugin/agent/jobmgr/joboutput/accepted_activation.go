@@ -250,8 +250,14 @@ func (aai *acceptedActivationIndex) runEntry(id string, entry *acceptedActivatio
 			aai.settle(id, entry.token)
 			return
 		}
+		// Dependency events cannot release physical containment. Keep their
+		// buffered notification until the exact occupied identity has joined.
+		var wake <-chan struct{}
+		if release == nil {
+			wake = entry.wake
+		}
 		select {
-		case <-entry.wake:
+		case <-wake:
 		case <-release:
 		case <-entry.cancel:
 			return

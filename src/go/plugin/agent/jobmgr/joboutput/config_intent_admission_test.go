@@ -207,8 +207,8 @@ func TestConfigIntentAdmissionWaitsForExactValidationAttempt(t *testing.T) {
 			require.Equal(t, physicalRelease, waitingRelease, "wait for raw validation, not candidate execution")
 			controller.NotifyDependencyChanged("runtime", "browser")
 			select {
-			case <-commands.queue:
-				t.Fatal("candidate advanced before physical validation release")
+			case call := <-commands.queue:
+				t.Fatalf("candidate advanced before physical validation release: %s", call.request.Route)
 			case <-time.After(20 * time.Millisecond):
 			}
 			prepared, committed, _, enabled = owner.snapshot()
