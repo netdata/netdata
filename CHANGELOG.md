@@ -183,6 +183,20 @@
 - Health: skip empty alert text fallbacks and dead link strings ([#24272](https://github.com/netdata/netdata/issues/24272))
 - Contexts: cheaper instance matching and one chart_label_key check ([#24277](https://github.com/netdata/netdata/issues/24277))
 - Health: stop alert evaluation from keeping obsolete charts alive ([#24273](https://github.com/netdata/netdata/issues/24273))
+- Build(deps): bump github.com/bmatcuk/doublestar/v4 from 4.10.2 to 4.10.3 in /src/go ([#24331](https://github.com/netdata/netdata/issues/24331))
+- Build(deps): bump github.com/godbus/dbus/v5 from 5.2.2 to 5.2.3 in /src/go ([#24329](https://github.com/netdata/netdata/issues/24329))
+- Build(deps): bump github.com/prometheus/common from 0.72.0 to 0.72.1 in /src/go ([#24330](https://github.com/netdata/netdata/issues/24330))
+- Build(deps): bump the github-actions group with 6 updates ([#24332](https://github.com/netdata/netdata/issues/24332))
+- Docs: state the free-tier dashboard limits the dashboard enforces ([#24327](https://github.com/netdata/netdata/issues/24327))
+- Docs: Netdata AI is not included in the Community plan ([#24337](https://github.com/netdata/netdata/issues/24337))
+- Contexts: do not load archived instance labels without a label filter ([#24325](https://github.com/netdata/netdata/issues/24325))
+- Fix(packaging): preserve application-owned state during static updates ([#24328](https://github.com/netdata/netdata/issues/24328))
+- Bound array nesting depth in json_key_index_and_push ([#24290](https://github.com/netdata/netdata/issues/24290))
+- Reject gorilla disk pages whose length is not a buffer multiple ([#24310](https://github.com/netdata/netdata/issues/24310))
+- Ml: drop a dead memcpy in dimension prediction ([#24221](https://github.com/netdata/netdata/issues/24221))
+- Ml: train dimensions in tier-0 page-close order ([#24073](https://github.com/netdata/netdata/issues/24073))
+- Weights: match instance@machine_guid and name@hostname in the value fast path ([#24284](https://github.com/netdata/netdata/issues/24284))
+- Feat(dem): add managed browser runtime foundation ([#24246](https://github.com/netdata/netdata/issues/24246))
 
 ## [2.12.0] - 2026-09-30
 
