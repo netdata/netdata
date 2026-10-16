@@ -463,15 +463,21 @@ static bool dictionary_free_all_resources(DICTIONARY *dict, size_t *mem, bool fo
     return true;
 }
 
+// guards the queue list only; never held while a dictionary is freed
 netdata_mutex_t dictionaries_waiting_to_be_destroyed_mutex;
 static DICTIONARY *dictionaries_waiting_to_be_destroyed = NULL;
 
+// held for a whole cleanup pass, so that passes do not overlap
+static netdata_mutex_t dictionaries_cleanup_mutex;
+
 static void __attribute__((constructor)) init_mutex(void) {
     netdata_mutex_init(&dictionaries_waiting_to_be_destroyed_mutex);
+    netdata_mutex_init(&dictionaries_cleanup_mutex);
 }
 
 static void __attribute__((destructor)) destroy_mutex(void) {
     netdata_mutex_destroy(&dictionaries_waiting_to_be_destroyed_mutex);
+    netdata_mutex_destroy(&dictionaries_cleanup_mutex);
 }
 
 #ifdef FSANITIZE_ADDRESS
@@ -508,15 +514,20 @@ size_t dictionary_destroy_delayed_count(void) {
     return count;
 }
 
-size_t cleanup_destroyed_dictionaries(bool shutdown __maybe_unused)
+static size_t cleanup_destroyed_dictionaries_pass(bool shutdown __maybe_unused, size_t *freed)
 {
-    if (netdata_mutex_trylock(&dictionaries_waiting_to_be_destroyed_mutex) != 0)
-        return 0;
+    *freed = 0;
 
-    if (!dictionaries_waiting_to_be_destroyed) {
-        netdata_mutex_unlock(&dictionaries_waiting_to_be_destroyed_mutex);
+    // Take the whole queue and free it without holding the queue mutex: freeing a dictionary runs its delete
+    // callbacks, and a callback that destroys a nested dictionary that still has referenced items queues it,
+    // which takes the queue mutex again.
+    netdata_mutex_lock(&dictionaries_waiting_to_be_destroyed_mutex);
+    DICTIONARY *queued = dictionaries_waiting_to_be_destroyed;
+    dictionaries_waiting_to_be_destroyed = NULL;
+    netdata_mutex_unlock(&dictionaries_waiting_to_be_destroyed_mutex);
+
+    if (!queued)
         return 0;
-    }
 
     size_t remaining = 0;
 
@@ -531,15 +542,13 @@ size_t cleanup_destroyed_dictionaries(bool shutdown __maybe_unused)
     STACKTRACE_INIT(&item_stacktrace_counts);
 #endif
 
-    DICTIONARY *dict, *last = NULL, *next = NULL;
-    for(dict = dictionaries_waiting_to_be_destroyed; dict ; dict = next) {
+    DICTIONARY *dict, *next = NULL, *survivors = NULL, *survivors_last = NULL;
+    for(dict = queued; dict ; dict = next) {
         next = dict->next;
 
         DICTIONARY_STATS_DICT_DESTROY_QUEUED_MINUS1(dict);
-        if(dictionary_free_all_resources(dict, NULL, false)) {
-            if(last) last->next = next;
-            else dictionaries_waiting_to_be_destroyed = next;
-        }
+        if(dictionary_free_all_resources(dict, NULL, false))
+            (*freed)++;
         else {
 #ifdef FSANITIZE_ADDRESS
             size_t ref_items = dictionary_referenced_items(dict);
@@ -565,13 +574,16 @@ size_t cleanup_destroyed_dictionaries(bool shutdown __maybe_unused)
 #endif
 
             DICTIONARY_STATS_DICT_DESTROY_QUEUED_PLUS1(dict);
-            last = dict;
+            dict->next = NULL;
+            if(survivors_last) survivors_last->next = dict;
+            else survivors = dict;
+            survivors_last = dict;
             remaining++;
         }
     }
 
 #ifdef FSANITIZE_ADDRESS
-    if (remaining > 0 && shutdown) {
+    if (remaining > 0 && shutdown && !*freed) {
         // Print deduplicated report
         fprintf(stderr, "WARNING: There are %zu dictionaries with references in them, that cannot be destroyed.\n", 
                 remaining);
@@ -606,7 +618,7 @@ size_t cleanup_destroyed_dictionaries(bool shutdown __maybe_unused)
             fprintf(stderr, "\n========= DICTIONARY ITEMS GROUPED BY CREATION STACKTRACE =========\n");
             
         // Loop through dictionaries to collect item stacktraces
-        for(dict = dictionaries_waiting_to_be_destroyed; dict; dict = dict->next) {
+        for(dict = survivors; dict; dict = dict->next) {
             // Iterate through all items and count by stacktrace
             DICTIONARY_ITEM *item;
             for(item = dict->items.list; item; item = item->next) {
@@ -653,8 +665,47 @@ size_t cleanup_destroyed_dictionaries(bool shutdown __maybe_unused)
     }
 #endif
 
-    netdata_mutex_unlock(&dictionaries_waiting_to_be_destroyed_mutex);
+    // put back what is still referenced, in front of anything queued meanwhile
+    if(survivors) {
+        netdata_mutex_lock(&dictionaries_waiting_to_be_destroyed_mutex);
+        survivors_last->next = dictionaries_waiting_to_be_destroyed;
+        dictionaries_waiting_to_be_destroyed = survivors;
+        netdata_mutex_unlock(&dictionaries_waiting_to_be_destroyed_mutex);
+    }
 
+    return remaining;
+}
+
+size_t cleanup_destroyed_dictionaries(bool shutdown)
+{
+    // a delete callback running inside a pass reaches here again on the same thread: let the running pass
+    // finish (the cleanup mutex cannot tell: it is recursive on Windows)
+    static __thread bool in_cleanup = false;
+    if (in_cleanup)
+        return 0;
+
+    // One pass at a time. Other callers only try: whoever holds it is already doing the work.
+    // Shutdown waits for a running pass, so that its count and report see everything.
+    if (shutdown)
+        netdata_mutex_lock(&dictionaries_cleanup_mutex);
+    else if (netdata_mutex_trylock(&dictionaries_cleanup_mutex) != 0)
+        return 0;
+
+    in_cleanup = true;
+
+    size_t freed, remaining;
+    if(!shutdown)
+        remaining = cleanup_destroyed_dictionaries_pass(false, &freed);
+    else {
+        // freeing a dictionary can queue nested ones from its delete callbacks: repeat until a pass frees
+        // nothing, so that the count (and the report of that last pass) covers them too
+        do {
+            remaining = cleanup_destroyed_dictionaries_pass(true, &freed);
+        } while(freed);
+    }
+
+    in_cleanup = false;
+    netdata_mutex_unlock(&dictionaries_cleanup_mutex);
     return remaining;
 }
 
