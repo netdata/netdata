@@ -115,23 +115,24 @@ type volumeManagerPlugin struct {
 }
 
 // pvcUtilizationPrecision keeps two decimal places of the utilization percentage.
+// It must equal the multiplier in pvcSpaceMetrics.Utilization's stm tag.
 const pvcUtilizationPrecision = 100
 
+// pvcMetrics holds the values of a PVC; a nil group means the kubelet has no data for it.
 type pvcMetrics struct {
-	Space struct {
-		Available mtx.Gauge `stm:"available"`
-		Used      mtx.Gauge `stm:"used"`
-		Reserved  mtx.Gauge `stm:"reserved"`
-		// nil when used + available is 0: utilization is undefined
-		Utilization *pvcUtilization `stm:"utilization"`
-	} `stm:"space"`
-	Inodes struct {
-		Available mtx.Gauge `stm:"available"`
-		Used      mtx.Gauge `stm:"used"`
-		Reserved  mtx.Gauge `stm:"reserved"`
-	} `stm:"inodes"`
+	Space  *pvcSpaceMetrics  `stm:"space"`
+	Inodes *pvcInodesMetrics `stm:"inodes"`
 }
 
-type pvcUtilization struct {
-	Percent mtx.Gauge `stm:",100"`
+type pvcSpaceMetrics struct {
+	Available   mtx.Gauge `stm:"available"`
+	Used        mtx.Gauge `stm:"used"`
+	Reserved    mtx.Gauge `stm:"reserved"`
+	Utilization mtx.Gauge `stm:"utilization,100"`
+}
+
+type pvcInodesMetrics struct {
+	Available mtx.Gauge `stm:"available"`
+	Used      mtx.Gauge `stm:"used"`
+	Reserved  mtx.Gauge `stm:"reserved"`
 }

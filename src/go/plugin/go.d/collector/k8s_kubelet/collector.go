@@ -47,7 +47,8 @@ func New() *Collector {
 
 		charts:             charts.Copy(),
 		collectedVMPlugins: make(map[string]bool),
-		collectedPVCs:      make(map[string]*Charts),
+		collectedPVCSpace:  make(map[string]*Charts),
+		collectedPVCInodes: make(map[string]*Charts),
 	}
 }
 
@@ -67,7 +68,8 @@ type Collector struct {
 	prom prometheus.Prometheus
 
 	collectedVMPlugins map[string]bool    // volume_manager_total_volumes
-	collectedPVCs      map[string]*Charts // kubelet_volume_stats_*: "<namespace>_<pvc>" => its charts
+	collectedPVCSpace  map[string]*Charts // kubelet_volume_stats_*_bytes: pvcID => space charts
+	collectedPVCInodes map[string]*Charts // kubelet_volume_stats_inodes*: pvcID => inode charts
 }
 
 func (c *Collector) Configuration() any {
