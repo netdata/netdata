@@ -1957,6 +1957,8 @@ static void rrdset_weights_multi_dimensional_value(struct query_weights_data *qw
             .timeout_ms = qwd->qwr->timeout_ms,
             .query_source = QUERY_SOURCE_API_WEIGHTS,
             .priority = STORAGE_PRIORITY_SYNCHRONOUS_FIRST,
+            .interrupt_callback = qwd->qwr->interrupt_callback,
+            .interrupt_callback_data = qwd->qwr->interrupt_callback_data,
     };
 
     ONEWAYALLOC *owa = onewayalloc_create(16 * 1024);
@@ -1964,6 +1966,15 @@ static void rrdset_weights_multi_dimensional_value(struct query_weights_data *qw
     stream_control_user_weights_query_started();
     RRDR *r = rrd2rrdr(owa, qt);
     stream_control_user_weights_query_finished();
+
+    if(r && (r->view.flags & RRDR_RESULT_FLAG_CANCEL)) {
+        // never register a cancelled (possibly partial) result; report why instead
+        if(r->view.flags & RRDR_RESULT_FLAG_TIMEOUT)
+            query_weights_set_timed_out(qwd);
+        else
+            query_weights_set_interrupted(qwd);
+        goto cleanup;
+    }
 
     if(!r || rrdr_rows(r) != 1 || !r->d || r->d != r->internal.qt->query.used)
         goto cleanup;

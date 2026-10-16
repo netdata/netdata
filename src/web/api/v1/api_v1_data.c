@@ -193,6 +193,13 @@ int api_v1_data(RRDHOST *host, struct web_client *w, char *url) {
     };
     qt = query_target_create(&qtr);
 
+    // checked before "no metrics": a cancelled build may have matched nothing yet
+    int cancelled_code = query_target_cancelled_response(qt, w->response.data);
+    if(cancelled_code) {
+        ret = cancelled_code;
+        goto cleanup;
+    }
+
     if(!qt || !qt->query.used) {
         buffer_sprintf(w->response.data, "No metrics where matched to query.");
         ret = HTTP_RESP_NOT_FOUND;

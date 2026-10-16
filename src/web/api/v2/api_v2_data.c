@@ -267,6 +267,12 @@ static int api_v23_data_internal(RRDHOST *host __maybe_unused, struct web_client
         goto cleanup;
     }
 
+    int cancelled_code = query_target_cancelled_response(qt, w->response.data);
+    if(cancelled_code) {
+        ret = cancelled_code;
+        goto cleanup;
+    }
+
     web_client_timeout_checkpoint_set(w, timeout);
     if(web_client_timeout_checkpoint_and_check(w, NULL)) {
         ret = w->response.code;
