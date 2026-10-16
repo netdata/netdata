@@ -403,10 +403,17 @@ static inline PARSER_RC pluginsd_host_define_end(char **words __maybe_unused, si
     if(!parser->user.host_define.parsing_host)
         return PLUGINSD_PROTOCOL_ERROR(PLUGINSD_KEYWORD_HOST_DEFINE_END, "missing initialization, send " PLUGINSD_KEYWORD_HOST_DEFINE " before this");
 
+    // our own pin on a selected host with this guid would keep rrdhost_find_or_create() from replacing
+    // an archived host of another memory mode, failing this definition on every retry
+    if(parser->user.host_pin &&
+        strcmp(parser->user.host_pin->machine_guid, parser->user.host_define.machine_guid_str) == 0)
+        pluginsd_select_host(parser, NULL, false, PLUGINSD_KEYWORD_HOST_DEFINE_END);
+
     struct rrdhost_system_info *system_info = rrdhost_system_info_from_host_labels(parser->user.host_define.rrdlabels);
 
-    // the host comes back pinned (see metadata_lifetime_lock): no remover can free it until we release
-    // it at the end of this function, after it is marked COLLECTOR_ONLINE (or we gave up on it)
+    // the host comes back pinned (see metadata_lifetime_lock): no remover can free it while we hold the
+    // pin. On success the pin becomes the pin of the selected host (pluginsd_select_host()), on failure
+    // we release it.
     SYSTEM_TZ tz = system_tz_get();
     RRDHOST *host = rrdhost_find_or_create(
         string2str(parser->user.host_define.hostname),
@@ -483,8 +490,7 @@ static inline PARSER_RC pluginsd_host_define_end(char **words __maybe_unused, si
     if(labels_changed)
         rrdhost_labels_changed(host);
 
-    parser->user.host = host;
-    pluginsd_clear_scope_chart(parser, PLUGINSD_KEYWORD_HOST_DEFINE_END, NULL);
+    pluginsd_select_host(parser, host, true, PLUGINSD_KEYWORD_HOST_DEFINE_END);
 
     rrdhost_flag_clear(host, RRDHOST_FLAG_ORPHAN);
     rrdcontext_host_child_connected(host);
@@ -503,8 +509,6 @@ static inline PARSER_RC pluginsd_host_define_end(char **words __maybe_unused, si
     host->node_stale_after_seconds = parser->user.host_define.node_stale_after_seconds;
     nd_log_daemon(NDLP_INFO, "VNODE: Configuring node stale after %u seconds for host \"%s\"", host->node_stale_after_seconds, rrdhost_hostname(host));
 
-    // it is COLLECTOR_ONLINE now, so every remover refuses it
-    rrdhost_pin_release(host);
     return PARSER_RC_OK;
 }
 
@@ -513,7 +517,7 @@ static inline PARSER_RC pluginsd_host(char **words, size_t num_words, PARSER *pa
     char *guid = get_word(words, num_words, 1);
 
     if(!guid || !*guid || strcmp(guid, "localhost") == 0) {
-        parser->user.host = localhost;
+        pluginsd_select_host(parser, localhost, false, PLUGINSD_KEYWORD_HOST);
         pluginsd_vnodes_stale_check(parser);
         return PARSER_RC_OK;
     }
@@ -523,22 +527,22 @@ static inline PARSER_RC pluginsd_host(char **words, size_t num_words, PARSER *pa
     if(!pluginsd_validate_machine_guid(guid, &uuid, uuid_str))
         return PLUGINSD_PROTOCOL_ERROR(PLUGINSD_KEYWORD_HOST, "cannot parse MACHINE_GUID - is it a valid UUID?");
 
-    // The lookup and the re-enable check run under the rrd lock: a remover unlinks the host under
-    // rrd_wrlock() before freeing it, so the host stays allocated while we check it. A re-enable makes
-    // the host live again, so it pins the host (see metadata_lifetime_lock) before the lock is
-    // released: a removal that found it offline cannot free it while we bring it back.
+    // The lookup, the pin and the re-enable check run under the rrd lock: a remover unlinks the host
+    // under rrd_wrlock() before freeing it, so the host stays allocated until we pin it. The pin is
+    // the pin of the selected host (pluginsd_select_host()) - any host, whether or not this plugin
+    // defined it, since an offline one is removable. A re-enable makes the host live again under the
+    // same pin.
     uint32_t *Pvalue = pluginsd_vnodes_index_get(parser, uuid_str);
     rrd_rdlock();
     RRDHOST *host = rrdhost_find_by_guid(uuid_str);
     bool reenable = false;
     bool pinned = false;
     if(likely(host)) {
-        if (Pvalue) {
+        pinned = rrdhost_pin_try(host);
+        if (pinned && Pvalue) {
             *Pvalue = (uint32_t) (now_realtime_sec() - VNODE_BASE_EPOCH);
             // Check if we need to enable
             reenable = !rrdhost_flag_check(host, RRDHOST_FLAG_VIRTUAL_HOST);
-            if (reenable)
-                pinned = rrdhost_pin_try(host);
         }
     }
     rrd_rdunlock();
@@ -546,14 +550,21 @@ static inline PARSER_RC pluginsd_host(char **words, size_t num_words, PARSER *pa
     if(unlikely(!host))
         return PLUGINSD_PROTOCOL_ERROR(PLUGINSD_KEYWORD_HOST, "cannot find a host with this machine guid - have you created it?");
 
-    parser->user.host = host;
-    if (reenable) {
-        if(!pinned) {
-            parser->user.host = NULL;
-            parser->user.retry = true;
-            return PARSER_RC_ERROR;
-        }
+    if(unlikely(!pinned)) {
+        // a removal holds this host. We stop the plugin and retry it later instead of keeping the
+        // previous selection: the commands that follow are meant for this host, so collecting them
+        // into another one would misattribute them.
+        nd_log_daemon(NDLP_INFO,
+                      "PLUGINSD: %s: host with machine guid %s is being removed - restarting the plugin later",
+                      PLUGINSD_KEYWORD_HOST, uuid_str);
+        pluginsd_select_host(parser, NULL, false, PLUGINSD_KEYWORD_HOST);
+        parser->user.retry = true;
+        return PARSER_RC_ERROR;
+    }
 
+    pluginsd_select_host(parser, host, true, PLUGINSD_KEYWORD_HOST);
+
+    if (reenable) {
         rrdhost_flag_set(host, RRDHOST_FLAG_VIRTUAL_HOST);
 
         // while this vnode was stale, a peer collecting the same device may have started
@@ -561,8 +572,7 @@ static inline PARSER_RC pluginsd_host(char **words, size_t num_words, PARSER *pa
         // on failure we retry the plugin: routing this data into a host we do not exclusively
         // own would corrupt it, and routing it to localhost would misattribute it.
         if(!pluginsd_host_claim_as_local_vnode(host, PLUGINSD_KEYWORD_HOST)) {
-            rrdhost_pin_release(host);
-            parser->user.host = NULL;
+            pluginsd_select_host(parser, NULL, false, PLUGINSD_KEYWORD_HOST);
             parser->user.retry = true;
             return PARSER_RC_ERROR;
         }
@@ -570,7 +580,6 @@ static inline PARSER_RC pluginsd_host(char **words, size_t num_words, PARSER *pa
         rrdhost_flag_set(host, RRDHOST_FLAG_COLLECTOR_ONLINE);
         nd_log_daemon(NDLP_INFO, "VNODE: Re-enabling virtual host \"%s\"", rrdhost_hostname(host));
         schedule_node_state_update(host, 1000);
-        rrdhost_pin_release(host);
     }
     return PARSER_RC_OK;
 }

@@ -415,11 +415,19 @@ static int remove_ephemeral_host(BUFFER *wb, const char *machine_guid, bool repo
     bool locked = unregister ? rw_spinlock_trywrite_lock(&host->metadata_lifetime_lock)
                              : rw_spinlock_tryread_lock(&host->metadata_lifetime_lock);
     if (!locked) {
-        if (report_error)
-            buffer_sprintf(wb, "Node '%s' (machine guid: %s) is busy - try again",
-                           rrdhost_hostname(host), host->machine_guid);
+        // a plugin holds the read side of a vnode for as long as it has it selected, so an online
+        // vnode fails here: report it as online, as it is reported when we get the lock
+        bool online = rrdhost_is_online(host);
+        if (report_error) {
+            if (online)
+                buffer_sprintf(wb, "Node '%s' (machine guid: %s) is online - not changing it",
+                               rrdhost_hostname(host), host->machine_guid);
+            else
+                buffer_sprintf(wb, "Node '%s' (machine guid: %s) is busy - try again",
+                               rrdhost_hostname(host), host->machine_guid);
+        }
         rrd_rdunlock();
-        return -1;
+        return online ? 0 : -1;
     }
     rrd_rdunlock();
 
