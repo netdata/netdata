@@ -140,7 +140,10 @@ func (dcjc *DynCfgJobController) prepareControllerActivation(ctx context.Context
 	if attempt.stage == nil {
 		return dcjc.prepareControllerActivationError(ctx, attempt, current, scope, permit, classifyActivationError(attempt.err))
 	}
-	if work.Tentative {
+	state := dcjc.candidates.view(scope.ID)
+	if work.Tentative || state.Binding == nil || state.Binding.Key != work.Token.Candidate {
+		// Every changed binding retains its checked stage across admission.
+		// Resource reservation may yield and invalidate its dependency proof.
 		result, err := attempt.stage.inspect()
 		if err != nil {
 			return dcjc.prepareControllerActivationError(ctx, attempt, current, scope, permit, classifyActivationError(err))
