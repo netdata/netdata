@@ -289,7 +289,7 @@ typedef struct rrdinstance {
     time_t first_time_s;
     time_t last_time_s;
 
-    RRDSET *rrdset;                     // pointer to RRDSET when collected, or NULL
+    RRDSET *rrdset;                     // pointer to RRDSET when collected, or NULL - use the atomic accessors
 
     RRDLABELS *rrdlabels;               // linked to RRDSET->chart_labels or own version
 
@@ -301,7 +301,22 @@ typedef struct rrdinstance {
         // don't use it for other purposes
         // it goes up and then resets to zero, on every iteration
     } internal;
+
+    // Serializes the changes of ownership: which chart this instance (and which dimension each of its metrics)
+    // belongs to, and whether the instance uses the chart's labels or its own. A chart re-created with the same
+    // id takes the instance over (the conflict callbacks) while the old chart may still exist and be destroyed
+    // later, on another thread, so its teardown must check under this lock that it still owns what it tears
+    // down. Nothing else is locked while holding it, except the labels lock in rrdlabels_flush().
+    SPINLOCK spinlock;
 } RRDINSTANCE;
+
+static ALWAYS_INLINE RRDSET *rrdinstance_rrdset_atomic_load(RRDINSTANCE *ri) {
+    return __atomic_load_n(&ri->rrdset, __ATOMIC_ACQUIRE);
+}
+
+static ALWAYS_INLINE void rrdinstance_rrdset_atomic_store(RRDINSTANCE *ri, RRDSET *st) {
+    __atomic_store_n(&ri->rrdset, st, __ATOMIC_RELEASE);
+}
 
 typedef struct rrdcontext {
     uint64_t version;

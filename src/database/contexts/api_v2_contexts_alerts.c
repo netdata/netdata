@@ -54,8 +54,8 @@ bool rrdcontext_matches_alert(struct rrdcontext_to_json_v2_data *ctl, RRDCONTEXT
     size_t matches = 0;
     RRDINSTANCE *ri;
     dfe_start_read(rc->rrdinstances, ri) {
-        if(ri->rrdset) {
-            RRDSET *st = ri->rrdset;
+        RRDSET *st = rrdinstance_rrdset_atomic_load(ri);
+        if(st) {
             rw_spinlock_read_lock(&st->alerts.spinlock);
             for (RRDCALC *rcl = st->alerts.base; rcl; rcl = rcl->next) {
                 if(ctl->alerts.alert_name_pattern && !simple_pattern_matches_string(ctl->alerts.alert_name_pattern, rcl->config.name))
