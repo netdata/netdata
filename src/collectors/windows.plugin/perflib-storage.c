@@ -2021,13 +2021,18 @@ static void logical_disk_labels(struct logical_disk *d, const char *name)
     rrdlabels_add(d->st_disk_space->rrdlabels, "serial_number", buf, RRDLABEL_SRC_AUTO);
 }
 
+// Predicate to decide if disk.space chart creation/update should be skipped (#24150)
+static inline bool logical_disk_space_chart_skipped(const struct logical_disk *d)
+{
+    return d && (d->DriveType == 5 /* DRIVE_CDROM */ || (d->readonly_known && d->readonly));
+}
+
 // percentDiskFree carries the free space in Data and the size of the volume in Time, both scaled by
 // divisor. Shared by the perflib pass and the mount point pass so every volume looks the same.
 static void logical_disk_chart(struct logical_disk *d, const char *name, int update_every)
 {
     // Skip optical drives (CD-ROM/DVD) and read-only volumes to prevent permanent critical alerts (#24150).
-    // d->readonly is consulted only when its state is known.
-    if (d->DriveType == 5 /* DRIVE_CDROM */ || (d->readonly_known && d->readonly)) {
+    if (logical_disk_space_chart_skipped(d)) {
         if (d->st_disk_space) {
             rrdset_is_obsolete___safe_from_collector_thread(d->st_disk_space);
             d->st_disk_space = NULL;
@@ -2989,6 +2994,31 @@ static int logical_disk_metadata_unittest_run(void)
         "successful metadata marks collected_metadata and readonly_known",
         d_success.collected_metadata && d_success.readonly_known && d_success.readonly);
     string_freez(d_success.filesystem);
+
+    // Chart suppression predicate tests
+    struct logical_disk optical_disk = { .DriveType = 5 /* DRIVE_CDROM */ };
+    errors += mount_points_unittest_expect(
+        "optical disk space chart is skipped",
+        logical_disk_space_chart_skipped(&optical_disk));
+
+    struct logical_disk known_ro_disk = { .DriveType = 3, .readonly = true, .readonly_known = true };
+    errors += mount_points_unittest_expect(
+        "known read-only disk space chart is skipped",
+        logical_disk_space_chart_skipped(&known_ro_disk));
+
+    struct logical_disk unknown_ro_disk = { .DriveType = 3, .readonly = true, .readonly_known = false };
+    errors += mount_points_unittest_expect(
+        "unknown read-only disk space chart is not skipped",
+        !logical_disk_space_chart_skipped(&unknown_ro_disk));
+
+    struct logical_disk rw_disk = { .DriveType = 3, .readonly = false, .readonly_known = true };
+    errors += mount_points_unittest_expect(
+        "writable disk space chart is not skipped",
+        !logical_disk_space_chart_skipped(&rw_disk));
+
+    errors += mount_points_unittest_expect(
+        "NULL logical disk pointer does not skip space chart",
+        !logical_disk_space_chart_skipped(NULL));
 
     return errors;
 }
