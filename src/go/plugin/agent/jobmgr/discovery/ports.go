@@ -30,4 +30,11 @@ type SourceInventory struct {
 	AutoEnable bool
 }
 
-type PlanInventory func(SourceInventory) (jobmgr.WorkPlan, error)
+// SourceInventoryBatch preserves ordered source facts from one complete Apply.
+// Only its final observation authorizes source selection and execution.
+type SourceInventoryBatch struct {
+	FullName     string
+	Observations []SourceInventory
+}
+
+type PlanInventory func(SourceInventoryBatch) (jobmgr.WorkPlan, error)

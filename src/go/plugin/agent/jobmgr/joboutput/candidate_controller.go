@@ -3,6 +3,7 @@
 package joboutput
 
 import (
+	"crypto/sha256"
 	"errors"
 	"fmt"
 	"iter"
@@ -14,6 +15,8 @@ import (
 	"github.com/netdata/netdata/go/plugins/plugin/agent/jobmgr"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/confgroup"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/dyncfg"
+
+	"gopkg.in/yaml.v2"
 )
 
 // DiscoveredJobCandidate identifies one observed membership lifetime, not merely
@@ -33,6 +36,29 @@ type DiscoveredJobInventory struct {
 	Candidates []DiscoveredJobCandidate
 	Sources    map[string]uint64
 	AutoEnable bool
+}
+
+// DiscoveredJobInventoryBatch preserves ordered source lifetime facts while releasing
+// executable work only after the complete observation batch has been applied.
+type DiscoveredJobInventoryBatch struct {
+	FullName     string
+	Observations []DiscoveredJobInventory
+}
+
+type sourceObservation struct {
+	Key      candidateKey
+	Priority int
+	Lifetime uint64
+}
+
+// History can remain authoritative after its executable membership is pruned.
+type sourceSelection struct {
+	Observation sourceObservation
+	Member      *candidateEntry
+}
+
+func observeCandidate(entry *candidateEntry) *sourceObservation {
+	return &sourceObservation{Key: entry.Key, Priority: entry.Candidate.Config.SourceTypePriority(), Lifetime: entry.SourceLifetime}
 }
 
 type candidateKey struct {
@@ -172,9 +198,8 @@ type candidateSourceAdmission struct {
 type candidateRecord struct {
 	Revision         uint64
 	Inventory        DiscoveredJobInventory
-	Cursor           *candidateKey
-	CursorConfig     confgroup.Config
-	CursorLifetime   uint64
+	Cursor           *sourceObservation
+	InventoryReceipt [sha256.Size]byte
 	Binding          *candidateBinding
 	Intent           uint64
 	Enablement       candidateEnablement
@@ -386,36 +411,75 @@ func (c *candidateController) prepareInventory(input DiscoveredJobInventory, now
 
 // prepareInventoryValidated quarantines metadata-invalid exact memberships before
 // source arbitration, while retaining their source-slot presence.
-func (c *candidateController) prepareInventoryValidated(input DiscoveredJobInventory, invalid map[candidateKey]bool, now int64) (delta *candidateDelta, err error) {
+func (c *candidateController) prepareInventoryValidated(input DiscoveredJobInventory, invalid map[candidateKey]bool, now int64) (*candidateDelta, error) {
+	return c.prepareInventoryBatchValidated(DiscoveredJobInventoryBatch{FullName: input.FullName, Observations: []DiscoveredJobInventory{input}}, invalid, now)
+}
+
+func (c *candidateController) prepareInventoryBatchValidated(input DiscoveredJobInventoryBatch, invalid map[candidateKey]bool, now int64) (delta *candidateDelta, err error) {
 	defer finalizeCandidateDelta(&delta)
-	inv, err := normalizeCandidateInventory(input)
-	if err != nil {
-		return nil, err
+	if input.FullName == "" || len(input.Observations) == 0 {
+		return nil, errors.New("job output: invalid candidate inventory batch")
 	}
-	d, err := c.prepare(inv.FullName)
+	batch := DiscoveredJobInventoryBatch{FullName: input.FullName, Observations: make([]DiscoveredJobInventory, len(input.Observations))}
+	for i, observation := range input.Observations {
+		inv, err := normalizeCandidateInventory(observation)
+		if err != nil {
+			return nil, err
+		}
+		if inv.FullName != input.FullName || i > 0 && inv.Version <= batch.Observations[i-1].Version {
+			return nil, errors.New("job output: invalid candidate inventory batch order")
+		}
+		batch.Observations[i] = inv
+	}
+	// YAML orders map keys; normalized candidates have a canonical key order.
+	// Keep only the digest so replay fencing does not retain historical configs.
+	encoded, err := yaml.Marshal(batch)
+	if err != nil {
+		return nil, fmt.Errorf("job output: encode candidate inventory receipt: %w", err)
+	}
+	receipt := sha256.Sum256(encoded)
+	d, err := c.prepare(input.FullName)
 	if err != nil {
 		return nil, err
 	}
 	r := d.after
-	if inv.Version < r.Inventory.Version {
+	last := batch.Observations[len(batch.Observations)-1]
+	if last.Version < r.Inventory.Version {
 		d.Decision.Ignored = true
 		return d, nil
 	}
-	if inv.Version == r.Inventory.Version {
-		if !reflect.DeepEqual(inv, r.Inventory) {
+	if last.Version == r.Inventory.Version {
+		if receipt != r.InventoryReceipt {
 			return nil, errors.New("job output: conflicting candidate inventory version")
 		}
 		d.Decision.Ignored = true
 		return d, nil
 	}
-	// A producer should suppress identical snapshots. Keep that guarantee here too:
-	// newer observation stamps alone cannot create an enabled lifetime.
-	oldContent := r.Inventory
-	oldContent.Version = inv.Version
-	if reflect.DeepEqual(oldContent, inv) {
-		r.Inventory = inv
+	if batch.Observations[0].Version <= r.Inventory.Version {
+		return nil, errors.New("job output: overlapping candidate inventory batch")
+	}
+	changed := false
+	for _, inv := range batch.Observations {
+		oldContent := r.Inventory
+		oldContent.Version = inv.Version
+		if reflect.DeepEqual(oldContent, inv) {
+			r.Inventory = inv
+			continue
+		}
+		changed = true
+		c.foldInventory(d, inv, invalid)
+	}
+	r.InventoryReceipt = receipt
+	if !changed {
 		return d, nil
 	}
+	return d, c.reconcileSource(d, now)
+}
+
+// Fold membership and revocation facts privately. Intermediate observations never
+// choose a source, admit a binding, or release executable work.
+func (c *candidateController) foldInventory(d *candidateDelta, inv DiscoveredJobInventory, invalid map[candidateKey]bool) {
+	r := d.after
 	r.Inventory = inv
 	r.prepareSourceAdmissions()
 	r.ownEntries()
@@ -469,7 +533,6 @@ func (c *candidateController) prepareInventoryValidated(input DiscoveredJobInven
 		d.Decision.Remove = true
 		d.Decision.Revoke = true
 	}
-	return d, c.reconcileSource(d, now)
 }
 
 func normalizeCandidateInventory(input DiscoveredJobInventory) (DiscoveredJobInventory, error) {
@@ -595,7 +658,7 @@ func candidateSourceBlocked(r *candidateRecord, key candidateKey) bool {
 	return found
 }
 
-func candidateSourceChoice(r *candidateRecord) *candidateKey {
+func candidateSourceChoice(r *candidateRecord) *sourceSelection {
 	var selected *candidateEntry
 	for _, e := range r.entries() {
 		if !e.Observed || !e.SourceOwned || e.Rejected {
@@ -605,37 +668,37 @@ func candidateSourceChoice(r *candidateRecord) *candidateKey {
 			selected = e
 		}
 	}
-	if r.Cursor != nil && r.CursorConfig != nil {
-		previous := r.entry(*r.Cursor)
-		lifetime, present := r.Inventory.Sources[r.Cursor.Source]
+	if r.Cursor != nil {
+		previous := r.entry(r.Cursor.Key)
+		lifetime, present := r.Inventory.Sources[r.Cursor.Key.Source]
 		observed := previous != nil && previous.Observed && !previous.Rejected
-		protected := present && lifetime == r.CursorLifetime && (previous == nil || !previous.Rejected) && candidateSourceBlocked(r, *r.Cursor)
-		if (observed || protected) && (selected == nil || selected.Candidate.Config.SourceTypePriority() <= r.CursorConfig.SourceTypePriority()) {
-			key := *r.Cursor
-			return &key
+		protected := present && lifetime == r.Cursor.Lifetime && (previous == nil || !previous.Rejected) && candidateSourceBlocked(r, r.Cursor.Key)
+		if (observed || protected) && (selected == nil || selected.Candidate.Config.SourceTypePriority() <= r.Cursor.Priority) {
+			if previous != nil && (previous.Rejected || !candidateAuthorized(r, previous.Key)) {
+				previous = nil
+			}
+			observation := *r.Cursor
+			if observed {
+				observation = *observeCandidate(previous)
+			}
+			return &sourceSelection{Observation: observation, Member: previous}
 		}
 	}
 	if selected == nil {
 		return nil
 	}
-	key := selected.Key
-	return &key
+	return &sourceSelection{Observation: *observeCandidate(selected), Member: selected}
 }
 
 func (c *candidateController) reconcileSource(d *candidateDelta, now int64) error {
 	r := d.after
 	choice := candidateSourceChoice(r)
-	changed := !equalCandidateKey(r.Cursor, choice)
-	r.Cursor = choice
+	var observation *sourceObservation
 	if choice != nil {
-		if entry := r.entry(*choice); entry != nil {
-			r.CursorConfig = entry.Candidate.Config
-			r.CursorLifetime = entry.SourceLifetime
-		}
-	} else {
-		r.CursorConfig = nil
-		r.CursorLifetime = 0
+		observation = &choice.Observation
 	}
+	changed := !equalSourceObservation(r.Cursor, observation)
+	r.Cursor = observation
 	if r.Phase == candidateBlocked {
 		d.Decision.Wake = r.Wake
 		return nil
@@ -646,7 +709,7 @@ func (c *candidateController) reconcileSource(d *candidateDelta, now int64) erro
 	// A selected admitted source remains authoritative against rejected revisions.
 	if r.Binding != nil && candidateSourceBlocked(r, r.Binding.Key) {
 		current := r.Binding.Config.SourceTypePriority()
-		if choice == nil || r.entry(*choice).Candidate.Config.SourceTypePriority() <= current {
+		if choice == nil || choice.Observation.Priority <= current {
 			return c.progress(d, now)
 		}
 	}
@@ -659,17 +722,17 @@ func (c *candidateController) reconcileSource(d *candidateDelta, now int64) erro
 		}
 		return c.progress(d, now)
 	}
-	e := r.entry(*choice)
+	e := choice.Member
 	if e == nil {
-		return nil
+		return c.progress(d, now)
 	}
-	if r.Binding != nil && r.Binding.Key == *choice {
+	if r.Binding != nil && r.Binding.Key == choice.Observation.Key {
 		return c.progress(d, now)
 	}
 	if !changed && r.Binding == nil {
 		return c.progress(d, now)
 	}
-	if r.Proposal != nil && r.Proposal.Token.Candidate == *choice {
+	if r.Proposal != nil && r.Proposal.Token.Candidate == choice.Observation.Key {
 		return nil
 	}
 	// Same-tier additions belong to an existing open search. A still-observed
@@ -720,7 +783,7 @@ func (c *candidateController) reconcileSource(d *candidateDelta, now int64) erro
 	return nil
 }
 
-func equalCandidateKey(a, b *candidateKey) bool {
+func equalSourceObservation(a, b *sourceObservation) bool {
 	return a == nil && b == nil || a != nil && b != nil && *a == *b
 }
 
@@ -747,10 +810,7 @@ func (c *candidateController) admit(d *candidateDelta, key candidateKey, health 
 	}
 	r.Binding = &candidateBinding{Config: e.Candidate.Config, Key: key, Health: health, Listed: listed, Stamp: stamp}
 	if r.Scope == candidateSourceAlternatives && e.Candidate.Config.SourceType() != confgroup.TypeDyncfg {
-		selected := key
-		r.Cursor = &selected
-		r.CursorConfig = e.Candidate.Config
-		r.CursorLifetime = e.SourceLifetime
+		r.Cursor = observeCandidate(e)
 	}
 	d.Decision.Binding = r.Binding
 	d.Decision.Remove = !listed
@@ -796,7 +856,7 @@ func (c *candidateController) prepareEnable(name string, now int64) (delta *cand
 	}
 	// Re-resolve an unaccepted replacement interrupted by DISABLE.
 	choice := candidateSourceChoice(r)
-	if choice != nil && *choice != r.Binding.Key && !r.entry(r.Binding.Key).Observed && !candidateSourceBlocked(r, r.Binding.Key) {
+	if choice != nil && choice.Member != nil && choice.Observation.Key != r.Binding.Key && !r.entry(r.Binding.Key).Observed && !candidateSourceBlocked(r, r.Binding.Key) {
 		r.Cursor = nil
 		return d, c.reconcileSource(d, now)
 	}
@@ -955,14 +1015,9 @@ func (c *candidateController) prepareOutcome(name string, token candidateWorkTok
 		if tentative {
 			r.Proposal = nil
 			r.Cursor = nil
-			r.CursorConfig = nil
-			r.CursorLifetime = 0
 			if r.Binding != nil {
-				key := r.Binding.Key
-				r.Cursor = &key
-				r.CursorConfig = r.Binding.Config
-				if old := r.entry(key); old != nil {
-					r.CursorLifetime = old.SourceLifetime
+				if old := r.entry(r.Binding.Key); old != nil {
+					r.Cursor = observeCandidate(old)
 				}
 			}
 		} else {
@@ -1005,9 +1060,7 @@ func (c *candidateController) prepareOutcome(name string, token candidateWorkTok
 		work.Predecessor = 0
 		r.Pass = nil
 		r.PassCursor = 0
-		r.Cursor = &work.Token.Candidate
-		r.CursorConfig = work.Config
-		r.CursorLifetime = r.entry(work.Token.Candidate).SourceLifetime
+		r.Cursor = observeCandidate(r.entry(work.Token.Candidate))
 	}
 	e := r.editEntry(token.Candidate)
 	e.Initial = false
@@ -1336,8 +1389,8 @@ func prepareCandidateRecord(source *candidateRecord) *candidateRecord {
 	out.sourceChanges = nil
 	out.sourcesOwned = false
 	if source.Cursor != nil {
-		key := *source.Cursor
-		out.Cursor = &key
+		observation := *source.Cursor
+		out.Cursor = &observation
 	}
 	if source.Binding != nil {
 		binding := *source.Binding

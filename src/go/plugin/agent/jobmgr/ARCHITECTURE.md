@@ -487,15 +487,23 @@ override and does not immediately reactivate a masked lower-priority source.
 
 ### Collector source-priority event flow
 
-One public collector/job name can have several distinct configurations. `discovery/inventory.go` reports complete
-immutable inventories per `FullName`: version, candidate/source membership lifetimes, source-slot presence, and passive
-or automatic source policy. It does not select a runtime. Identical observations do not create new intent. Observed
-removals remain ordered before re-addition, including when the re-added config has the same UID. Malformed replacements
-preserve the existing per-identity retention rules; source presence distinguishes rejection from genuine removal.
+One public collector/job name can have several distinct configurations. `discovery/inventory.go` reports one immutable
+observation batch per affected `FullName` for each Apply call. The batch retains ordered versions, candidate/source
+membership lifetimes, source-slot presence, and passive or automatic source policy. It does not select a runtime.
+Identical observations do not create new intent. Malformed replacements preserve per-identity retention; source
+presence distinguishes rejection from genuine removal.
 
-`composition/discovery.go` translates those inventories into short job-lane transactions. Delivery acknowledges that
-the controller applied the observation, not that a collector passed Check or started. A blocked probe cannot hold up
-inventory delivery for another job. Adapters do not import one another.
+`composition/discovery.go` translates a complete batch into one short job-lane transaction. The controller folds its
+observations privately and reconciles source authority once against the final inventory. Intermediate inventories
+cannot release Init/Check, even when a lower-priority source sorts before a higher-priority source in that same batch.
+True disappearance/re-addition still cuts the old lifetime, including equal-UID re-addition; candidate introduction
+and disappearance order still determines whether an admitted sibling supersedes a historical grant. These are
+ordered source facts, not permission to execute each intermediate state.
+
+Delivery acknowledges the whole batch, not a passed Check or started collector. Failed delivery replays that immutable
+batch before later batches for the same name. A compact receipt covers the ordered history as well as the final
+inventory, so conflicting replay cannot change admission provenance. Different names deliver independently; a blocked
+probe cannot hold up their inventory delivery. Adapters do not import one another.
 
 `joboutput/candidate_controller.go` owns one continuation record per job:
 
@@ -530,8 +538,11 @@ Common event sequences:
 | DynCfg override is removed | Its intent/runtime are revoked. The consumed lower-source cursor remains, so unchanged masked sources and irrelevant sibling events do not automatically restore it. |
 
 The last row preserves the existing override-removal boundary tracked by issue #23302. A meaningful later source
-change may reconcile, but this continuation model does not add automatic restoration. A masked cursor is observation
-history, not an admission grant. Removal of the actual admitted source is checked independently of that cursor.
+change may reconcile, but this continuation model does not add automatic restoration. A masked cursor retains only
+observation identity, priority and source lifetime. Source selection carries those history facts separately from its
+optional executable ledger member. A protected cursor can outlive that member: it preserves consumed source authority
+but cannot construct a collector or create an admission grant. Existing authorized recovery continues independently.
+Removal of the actual admitted source is checked independently of that cursor.
 
 Admission of a newly introduced source membership supersedes retained grants that disappeared at or before that
 revision of the same source lifetime. Admitting a preexisting surviving sibling preserves those grants. Membership

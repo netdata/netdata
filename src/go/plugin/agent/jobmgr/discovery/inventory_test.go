@@ -21,8 +21,8 @@ func TestInventoryIndexCompleteObservations(t *testing.T) {
 	index := newInventoryTestIndex(
 		t,
 		inventoryTestCommands(nil),
-		func(inventory SourceInventory) (jobmgr.WorkPlan, error) {
-			planned = append(planned, inventory)
+		func(batch SourceInventoryBatch) (jobmgr.WorkPlan, error) {
+			planned = append(planned, batch.Observations...)
 			return jobmgr.WorkPlan{}, nil
 		},
 	)
@@ -64,11 +64,13 @@ func TestInventoryIndexCompleteObservations(t *testing.T) {
 
 func TestInventoryIndexObservedRemovalAndReaddition(t *testing.T) {
 	var planned []SourceInventory
+	var plannedBatches []SourceInventoryBatch
 	index := newInventoryTestIndex(
 		t,
 		inventoryTestCommands(nil),
-		func(inventory SourceInventory) (jobmgr.WorkPlan, error) {
-			planned = append(planned, inventory)
+		func(batch SourceInventoryBatch) (jobmgr.WorkPlan, error) {
+			plannedBatches = append(plannedBatches, batch)
+			planned = append(planned, batch.Observations...)
 			return jobmgr.WorkPlan{}, nil
 		},
 	)
@@ -78,6 +80,8 @@ func TestInventoryIndexObservedRemovalAndReaddition(t *testing.T) {
 		Configs: []confgroup.Config{config},
 	}
 	require.NoError(t, index.Apply(t.Context(), []*confgroup.Group{group, {Source: "source"}, group}))
+	require.Len(t, plannedBatches, 1, "all lifetime facts commit as one batch")
+	require.Len(t, plannedBatches[0].Observations, 3)
 	require.Len(t, planned, 3)
 	assert.Equal(t, uint64(2), planned[1].Version)
 	assert.Empty(t, planned[1].Candidates)
@@ -100,8 +104,8 @@ func TestInventoryIndexCandidateRevisions(t *testing.T) {
 			index := newInventoryTestIndex(
 				t,
 				inventoryTestCommands(nil),
-				func(inventory SourceInventory) (jobmgr.WorkPlan, error) {
-					planned = append(planned, inventory)
+				func(batch SourceInventoryBatch) (jobmgr.WorkPlan, error) {
+					planned = append(planned, batch.Observations...)
 					return jobmgr.WorkPlan{}, nil
 				},
 			)
@@ -135,8 +139,8 @@ func TestInventoryIndexMalformedReplacementGranularity(t *testing.T) {
 	index := newInventoryTestIndex(
 		t,
 		inventoryTestCommands(nil),
-		func(inventory SourceInventory) (jobmgr.WorkPlan, error) {
-			planned = append(planned, inventory)
+		func(batch SourceInventoryBatch) (jobmgr.WorkPlan, error) {
+			planned = append(planned, batch.Observations...)
 			return jobmgr.WorkPlan{}, nil
 		},
 	)
@@ -169,11 +173,13 @@ func TestInventoryIndexMalformedReplacementGranularity(t *testing.T) {
 
 func TestInventoryIndexMalformedNewSourcePresence(t *testing.T) {
 	var planned []SourceInventory
+	var plannedBatches []SourceInventoryBatch
 	index := newInventoryTestIndex(
 		t,
 		inventoryTestCommands(nil),
-		func(inventory SourceInventory) (jobmgr.WorkPlan, error) {
-			planned = append(planned, inventory)
+		func(batch SourceInventoryBatch) (jobmgr.WorkPlan, error) {
+			plannedBatches = append(plannedBatches, batch)
+			planned = append(planned, batch.Observations...)
 			return jobmgr.WorkPlan{}, nil
 		},
 	)
@@ -183,6 +189,7 @@ func TestInventoryIndexMalformedNewSourcePresence(t *testing.T) {
 		Configs: []confgroup.Config{bad},
 	}
 	require.NoError(t, index.Apply(t.Context(), []*confgroup.Group{group, group, {Source: "source"}}))
+	require.Len(t, plannedBatches, 1)
 	require.Len(t, planned, 2)
 	assert.Empty(t, planned[0].Candidates)
 	assert.NotZero(t, planned[0].Sources["source"])
@@ -215,8 +222,8 @@ func TestInventoryIndexDeliveryFailureRetainsOrderedSnapshots(t *testing.T) {
 				}
 				return nil
 			})
-			index := newInventoryTestIndex(t, commands, func(inventory SourceInventory) (jobmgr.WorkPlan, error) {
-				planned = append(planned, inventory)
+			index := newInventoryTestIndex(t, commands, func(batch SourceInventoryBatch) (jobmgr.WorkPlan, error) {
+				planned = append(planned, batch.Observations...)
 				return jobmgr.WorkPlan{}, nil
 			})
 			config := inventoryTestConfig("job", confgroup.TypeUser, "source")
@@ -252,16 +259,16 @@ func TestInventoryIndexPlannerFailurePreservesPayload(t *testing.T) {
 	index := newInventoryTestIndex(
 		t,
 		inventoryTestCommands(nil),
-		func(inventory SourceInventory) (jobmgr.WorkPlan, error) {
+		func(batch SourceInventoryBatch) (jobmgr.WorkPlan, error) {
 			if fail {
 				var err error
-				original, err = cloneInventory(inventory)
+				original, err = cloneInventory(batch.Observations[0])
 				require.NoError(t, err)
-				inventory.Candidates[0].Config.Set("mutated", true)
-				inventory.Sources["source"] = 999
+				batch.Observations[0].Candidates[0].Config.Set("mutated", true)
+				batch.Observations[0].Sources["source"] = 999
 				return jobmgr.WorkPlan{}, failure
 			}
-			planned = append(planned, inventory)
+			planned = append(planned, batch.Observations...)
 			return jobmgr.WorkPlan{}, nil
 		},
 	)
@@ -290,14 +297,9 @@ func TestInventoryIndexDifferentNamesDeliverIndependently(t *testing.T) {
 	}()
 	var mu sync.Mutex
 	var requests []jobmgr.Request
-	healthyCount := 0
 	commands := inventoryTestCommands(func(ctx context.Context, request jobmgr.Request, _ jobmgr.WorkPlan) error {
 		mu.Lock()
 		requests = append(requests, request)
-		if request.LaneKey == "module_b" {
-			healthyCount++
-		}
-		count := healthyCount
 		mu.Unlock()
 		if request.LaneKey == "module_a" {
 			close(blocked)
@@ -306,7 +308,7 @@ func TestInventoryIndexDifferentNamesDeliverIndependently(t *testing.T) {
 			case <-ctx.Done():
 				return ctx.Err()
 			}
-		} else if request.LaneKey == "module_b" && count == 2 {
+		} else if request.LaneKey == "module_b" {
 			close(healthy)
 		}
 		return nil
@@ -314,7 +316,7 @@ func TestInventoryIndexDifferentNamesDeliverIndependently(t *testing.T) {
 	index := newInventoryTestIndex(
 		t,
 		commands,
-		func(SourceInventory) (jobmgr.WorkPlan, error) { return jobmgr.WorkPlan{}, nil },
+		func(SourceInventoryBatch) (jobmgr.WorkPlan, error) { return jobmgr.WorkPlan{}, nil },
 	)
 	done := make(chan error, 1)
 	go func() {
@@ -334,7 +336,7 @@ func TestInventoryIndexDifferentNamesDeliverIndependently(t *testing.T) {
 	require.NoError(t, <-done)
 	mu.Lock()
 	defer mu.Unlock()
-	require.Len(t, requests, 3)
+	require.Len(t, requests, 2)
 }
 
 func TestInventoryIndexConfiguration(t *testing.T) {
@@ -357,8 +359,8 @@ func TestInventoryIndexConfiguration(t *testing.T) {
 					RunJob:     test.runJob,
 					AutoEnable: test.autoEnable,
 					Commands:   inventoryTestCommands(nil),
-					Plan: func(inventory SourceInventory) (jobmgr.WorkPlan, error) {
-						planned = append(planned, inventory)
+					Plan: func(batch SourceInventoryBatch) (jobmgr.WorkPlan, error) {
+						planned = append(planned, batch.Observations...)
 						return jobmgr.WorkPlan{}, nil
 					},
 				},
@@ -429,8 +431,8 @@ func TestInventoryIndexTransportIdentityAcceptsUnpublishableConfigNames(t *testi
 		mu.Unlock()
 		return nil
 	})
-	index := newInventoryTestIndex(t, commands, func(inventory SourceInventory) (jobmgr.WorkPlan, error) {
-		observed = append(observed, inventory.FullName)
+	index := newInventoryTestIndex(t, commands, func(batch SourceInventoryBatch) (jobmgr.WorkPlan, error) {
+		observed = append(observed, batch.FullName)
 		return jobmgr.WorkPlan{}, nil
 	})
 	bad := inventoryTestConfig("bad=name", confgroup.TypeUser, "source")
@@ -457,7 +459,7 @@ func TestInventoryIndexDeliverySequenceOverflowFailsClosed(t *testing.T) {
 	index := newInventoryTestIndex(
 		t,
 		inventoryTestCommands(func(context.Context, jobmgr.Request, jobmgr.WorkPlan) error { calls++; return nil }),
-		func(SourceInventory) (jobmgr.WorkPlan, error) { return jobmgr.WorkPlan{}, nil },
+		func(SourceInventoryBatch) (jobmgr.WorkPlan, error) { return jobmgr.WorkPlan{}, nil },
 	)
 	index.deliverySequence = ^uint64(0)
 	config := inventoryTestConfig("job", confgroup.TypeUser, "source")
@@ -465,4 +467,147 @@ func TestInventoryIndexDeliverySequenceOverflowFailsClosed(t *testing.T) {
 	require.ErrorContains(t, err, "delivery sequence wrapped")
 	require.Zero(t, calls)
 	require.Len(t, index.pending[config.FullName()], 1, "overflow cannot acknowledge the observation")
+}
+
+func TestInventoryIndexWholeBatchAllSourceOrders(t *testing.T) {
+	orders := [][3]int{{0, 1, 2}, {0, 2, 1}, {1, 0, 2}, {1, 2, 0}, {2, 0, 1}, {2, 1, 0}}
+	for _, order := range orders {
+		t.Run(fmt.Sprint(order), func(t *testing.T) {
+			var planned []SourceInventoryBatch
+			var submitted int
+			index := newInventoryTestIndex(t, inventoryTestCommands(func(context.Context, jobmgr.Request, jobmgr.WorkPlan) error {
+				submitted++
+				return nil
+			}), func(batch SourceInventoryBatch) (jobmgr.WorkPlan, error) {
+				planned = append(planned, batch)
+				return jobmgr.WorkPlan{}, nil
+			})
+			configs := []confgroup.Config{
+				inventoryTestConfig("job", confgroup.TypeStock, "stock"),
+				inventoryTestConfig("job", confgroup.TypeDiscovered, "discovered"),
+				inventoryTestConfig("job", confgroup.TypeUser, "user"),
+			}
+			groups := make([]*confgroup.Group, 0, len(order))
+			for _, i := range order {
+				groups = append(groups, &confgroup.Group{Source: configs[i].Source(), Configs: []confgroup.Config{configs[i]}})
+			}
+			require.NoError(t, index.Apply(t.Context(), groups))
+			require.Len(t, planned, 1, "a source prefix must not be planned independently")
+			require.Equal(t, 1, submitted, "only the complete batch is acknowledged")
+			batch := planned[0]
+			assert.Equal(t, configs[0].FullName(), batch.FullName)
+			require.Len(t, batch.Observations, 3)
+			for i, observation := range batch.Observations {
+				assert.Equal(t, uint64(i+1), observation.Version)
+				assert.Equal(t, batch.FullName, observation.FullName)
+				require.Len(t, observation.Candidates, i+1)
+			}
+			final := batch.Observations[2]
+			var observed []confgroup.Config
+			for _, candidate := range final.Candidates {
+				observed = append(observed, candidate.Config)
+			}
+			assert.ElementsMatch(t, configs, observed, "final authority contains every source tier")
+		})
+	}
+}
+
+func TestInventoryIndexBatchCandidateLifetimeWithSurvivingSibling(t *testing.T) {
+	var planned []SourceInventoryBatch
+	index := newInventoryTestIndex(t, inventoryTestCommands(nil), func(batch SourceInventoryBatch) (jobmgr.WorkPlan, error) {
+		planned = append(planned, batch)
+		return jobmgr.WorkPlan{}, nil
+	})
+	first := inventoryTestConfig("job", confgroup.TypeUser, "source").Set("value", "first")
+	sibling := inventoryTestConfig("job", confgroup.TypeUser, "source").Set("value", "sibling")
+	group := &confgroup.Group{Source: "source", Configs: []confgroup.Config{first, sibling}}
+	require.NoError(t, index.Apply(t.Context(), []*confgroup.Group{
+		group, {Source: "source", Configs: []confgroup.Config{sibling}}, group,
+	}))
+	require.Len(t, planned, 1)
+	observations := planned[0].Observations
+	require.Len(t, observations, 3)
+	lifetimes := make([]map[string]uint64, len(observations))
+	for i, observation := range observations {
+		assert.Equal(t, uint64(i+1), observation.Version)
+		assert.Equal(t, observations[0].Sources, observation.Sources, "a sibling keeps the source slot alive")
+		lifetimes[i] = make(map[string]uint64)
+		for _, candidate := range observation.Candidates {
+			lifetimes[i][candidate.Config.Get("value").(string)] = candidate.Incarnation
+		}
+	}
+	assert.NotContains(t, lifetimes[1], "first")
+	assert.Greater(t, lifetimes[2]["first"], lifetimes[0]["first"], "equal payload re-add has a fresh membership")
+	assert.Equal(t, lifetimes[0]["sibling"], lifetimes[1]["sibling"])
+	assert.Equal(t, lifetimes[0]["sibling"], lifetimes[2]["sibling"])
+}
+
+func TestInventoryIndexFailedBatchReplayIsImmutableAndOrdered(t *testing.T) {
+	failure := errors.New("delivery failed")
+	var planned []SourceInventoryBatch
+	fail := true
+	index := newInventoryTestIndex(t, inventoryTestCommands(func(context.Context, jobmgr.Request, jobmgr.WorkPlan) error {
+		if fail {
+			return failure
+		}
+		return nil
+	}), func(batch SourceInventoryBatch) (jobmgr.WorkPlan, error) {
+		original, err := cloneInventoryBatch(batch)
+		require.NoError(t, err)
+		planned = append(planned, original)
+		// Neither a planner's private payload nor its retained work may mutate a
+		// later observation or the immutable queued batch.
+		for i := range batch.Observations {
+			observation := &batch.Observations[i]
+			if observation.Sources == nil {
+				observation.Sources = make(map[string]uint64)
+			}
+			observation.Sources["mutated"] = 999
+			for _, candidate := range observation.Candidates {
+				candidate.Config.Set("mutated", true)
+			}
+		}
+		batch.Observations[0].FullName = "mutated"
+		return jobmgr.WorkPlan{}, nil
+	})
+	config := inventoryTestConfig("job", confgroup.TypeStock, "stock")
+	group := &confgroup.Group{Source: "stock", Configs: []confgroup.Config{config}}
+	require.ErrorIs(t, index.Apply(t.Context(), []*confgroup.Group{group, {Source: "stock"}, group}), failure)
+	require.Len(t, planned, 1)
+	require.Len(t, planned[0].Observations, 3)
+	config.Set("caller mutation", true)
+	fail = false
+	user := inventoryTestConfig("job", confgroup.TypeUser, "user")
+	require.NoError(t, index.Apply(t.Context(), []*confgroup.Group{{Source: "user", Configs: []confgroup.Config{user}}}))
+	require.Len(t, planned, 3)
+	assert.Equal(t, planned[0], planned[1], "replay preserves every original fact and version")
+	require.Len(t, planned[2].Observations, 1, "the later Apply remains a distinct FIFO unit")
+	assert.Equal(t, uint64(4), planned[2].Observations[0].Version)
+	assert.Len(t, planned[2].Observations[0].Candidates, 2)
+	for _, candidate := range planned[2].Observations[0].Candidates {
+		assert.NotContains(t, candidate.Config, "mutated")
+		assert.NotContains(t, candidate.Config, "caller mutation")
+	}
+	assert.Empty(t, index.pending)
+}
+
+func TestInventoryIndexRejectsInvalidGroupBeforeObservingBatch(t *testing.T) {
+	for name, invalid := range map[string]*confgroup.Group{"nil": nil, "missing source": {}} {
+		t.Run(name, func(t *testing.T) {
+			var planned []SourceInventoryBatch
+			index := newInventoryTestIndex(t, inventoryTestCommands(nil), func(batch SourceInventoryBatch) (jobmgr.WorkPlan, error) {
+				planned = append(planned, batch)
+				return jobmgr.WorkPlan{}, nil
+			})
+			config := inventoryTestConfig("job", confgroup.TypeUser, "source")
+			group := &confgroup.Group{Source: "source", Configs: []confgroup.Config{config}}
+			require.ErrorContains(t, index.Apply(t.Context(), []*confgroup.Group{group, invalid}), "invalid group")
+			assert.Empty(t, index.sources)
+			assert.Empty(t, index.pending)
+			assert.Empty(t, planned)
+			require.NoError(t, index.Apply(t.Context(), []*confgroup.Group{group}))
+			require.Len(t, planned, 1, "a valid retry still publishes the previously unobserved source")
+			assert.Equal(t, uint64(1), planned[0].Observations[0].Version)
+		})
+	}
 }

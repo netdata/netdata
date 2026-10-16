@@ -54,21 +54,24 @@ func (rg *runGeneration) startDiscovery(ctx context.Context) error {
 			AutoEnable:  rg.discovery.AutoEnable,
 			Commands:    rg.kernel,
 			Diagnostics: rg.diagnostics,
-			Plan: func(inventory jobmgrdiscovery.SourceInventory) (jobmgr.WorkPlan, error) {
-				candidates := make([]joboutput.DiscoveredJobCandidate, len(inventory.Candidates))
-				for i, candidate := range inventory.Candidates {
-					candidates[i] = joboutput.DiscoveredJobCandidate{
-						Config:      candidate.Config,
-						Source:      candidate.Source,
-						Incarnation: candidate.Incarnation,
+			Plan: func(batch jobmgrdiscovery.SourceInventoryBatch) (jobmgr.WorkPlan, error) {
+				observations := make([]joboutput.DiscoveredJobInventory, len(batch.Observations))
+				for i, inventory := range batch.Observations {
+					candidates := make([]joboutput.DiscoveredJobCandidate, len(inventory.Candidates))
+					for j, candidate := range inventory.Candidates {
+						candidates[j] = joboutput.DiscoveredJobCandidate{
+							Config:      candidate.Config,
+							Source:      candidate.Source,
+							Incarnation: candidate.Incarnation,
+						}
+					}
+					observations[i] = joboutput.DiscoveredJobInventory{
+						FullName: inventory.FullName, Version: inventory.Version, Candidates: candidates,
+						Sources: inventory.Sources, AutoEnable: inventory.AutoEnable,
 					}
 				}
-				return rg.dyncfg.PlanInventory(joboutput.DiscoveredJobInventory{
-					FullName:   inventory.FullName,
-					Version:    inventory.Version,
-					Candidates: candidates,
-					Sources:    inventory.Sources,
-					AutoEnable: inventory.AutoEnable,
+				return rg.dyncfg.PlanInventory(joboutput.DiscoveredJobInventoryBatch{
+					FullName: batch.FullName, Observations: observations,
 				})
 			},
 		},

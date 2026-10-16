@@ -137,7 +137,7 @@ func TestDiscoverySupervisorReturnsContainedPanic(t *testing.T) {
 		jobmgrdiscovery.InventoryConfig{
 			Generation: 1,
 			Commands:   discoveryTestCommands{},
-			Plan: func(jobmgrdiscovery.SourceInventory) (jobmgr.WorkPlan, error) {
+			Plan: func(jobmgrdiscovery.SourceInventoryBatch) (jobmgr.WorkPlan, error) {
 				panic("inventory panic")
 			},
 		},
@@ -222,7 +222,7 @@ func newPublicationTestDiscovery(t *testing.T, discoverer agentdiscovery.Discove
 		jobmgrdiscovery.InventoryConfig{
 			Generation: 1,
 			Commands:   discoveryTestCommands{},
-			Plan: func(jobmgrdiscovery.SourceInventory) (jobmgr.WorkPlan, error) {
+			Plan: func(jobmgrdiscovery.SourceInventoryBatch) (jobmgr.WorkPlan, error) {
 				return jobmgr.WorkPlan{}, nil
 			},
 		},

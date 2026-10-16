@@ -254,7 +254,7 @@ func TestCandidateMetadataRejectsExternalProposalErrors(t *testing.T) {
 		},
 	})
 	require.Error(t, err, "clone failures are rejected by inventory normalization")
-	_, err = controller.PlanInventory(DiscoveredJobInventory{
+	_, err = planInventoryTest(controller, DiscoveredJobInventory{
 		FullName: "module_job",
 	})
 	require.Error(t, err, "missing observation versions are structural failures")

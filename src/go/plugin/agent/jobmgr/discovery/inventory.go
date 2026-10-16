@@ -42,7 +42,7 @@ type InventoryIndex struct {
 	presence         map[string]map[string]uint64
 	candidates       map[string]map[inventoryCandidateKey]SourceCandidate
 	versions         map[string]uint64
-	pending          map[string][]SourceInventory
+	pending          map[string][]SourceInventoryBatch
 	incarnation      uint64
 	deliverySequence uint64
 }
@@ -75,7 +75,7 @@ func NewInventoryIndex(config InventoryConfig) (*InventoryIndex, error) {
 		presence:    make(map[string]map[string]uint64),
 		candidates:  make(map[string]map[inventoryCandidateKey]SourceCandidate),
 		versions:    make(map[string]uint64),
-		pending:     make(map[string][]SourceInventory),
+		pending:     make(map[string][]SourceInventoryBatch),
 	}, nil
 }
 
@@ -84,17 +84,26 @@ func (ii *InventoryIndex) Apply(ctx context.Context, batch []*confgroup.Group) e
 		return errors.New("jobmgr discovery: invalid inventory batch")
 	}
 	for _, group := range batch {
-		if err := ii.applyGroup(group); err != nil {
+		if group == nil || group.Source == "" {
+			return errors.New("jobmgr discovery: invalid group")
+		}
+	}
+	observations := make(map[string][]SourceInventory)
+	for _, group := range batch {
+		if err := ii.applyGroup(group, observations); err != nil {
 			return err
 		}
+	}
+	for name, inventory := range observations {
+		ii.pending[name] = append(ii.pending[name], SourceInventoryBatch{
+			FullName:     name,
+			Observations: inventory,
+		})
 	}
 	return ii.deliver(ctx)
 }
 
-func (ii *InventoryIndex) applyGroup(group *confgroup.Group) error {
-	if group == nil || group.Source == "" {
-		return errors.New("jobmgr discovery: invalid group")
-	}
+func (ii *InventoryIndex) applyGroup(group *confgroup.Group, observations map[string][]SourceInventory) error {
 	previous := ii.sources[group.Source]
 	next := make(map[uint64]SourceCandidate, len(group.Configs))
 	rejected := make(map[string]error)
@@ -230,7 +239,7 @@ func (ii *InventoryIndex) applyGroup(group *confgroup.Group) error {
 			}
 			return strings.Compare(a.Config.UID(), b.Config.UID())
 		})
-		ii.pending[name] = append(ii.pending[name], inventory)
+		observations[name] = append(observations[name], inventory)
 	}
 	return nil
 }
@@ -255,8 +264,8 @@ func (ii *InventoryIndex) deliver(ctx context.Context) error {
 	for i, name := range names {
 		for _, inventory := range ii.pending[name] {
 			// Each planner invocation receives its own payload. Failed delivery
-			// must replay the original immutable observation and version.
-			payload, err := cloneInventory(inventory)
+			// must replay every original immutable observation and version.
+			payload, err := cloneInventoryBatch(inventory)
 			var plan jobmgr.WorkPlan
 			if err == nil {
 				plan, err = ii.plan(payload)
@@ -325,6 +334,18 @@ func (ii *InventoryIndex) deliver(ctx context.Context) error {
 		}
 	}
 	return resultErr
+}
+
+func cloneInventoryBatch(batch SourceInventoryBatch) (SourceInventoryBatch, error) {
+	batch.Observations = slices.Clone(batch.Observations)
+	for i := range batch.Observations {
+		cloned, err := cloneInventory(batch.Observations[i])
+		if err != nil {
+			return SourceInventoryBatch{}, err
+		}
+		batch.Observations[i] = cloned
+	}
+	return batch, nil
 }
 
 func cloneInventory(inventory SourceInventory) (SourceInventory, error) {

@@ -90,7 +90,11 @@ func planSourceTestConfig(
 	enabled, remove bool,
 	slot ...string,
 ) (jobmgr.WorkPlan, error) {
-	return controller.PlanInventory(sourceTestInventory(controller, config, enabled, remove, slot...))
+	return planInventoryTest(controller, sourceTestInventory(controller, config, enabled, remove, slot...))
+}
+
+func planInventoryTest(controller *DynCfgJobController, inventory DiscoveredJobInventory) (jobmgr.WorkPlan, error) {
+	return controller.PlanInventory(DiscoveredJobInventoryBatch{FullName: inventory.FullName, Observations: []DiscoveredJobInventory{inventory}})
 }
 
 // A fixture captures the first real executor completion after source publication

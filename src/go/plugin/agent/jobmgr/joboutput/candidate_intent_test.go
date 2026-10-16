@@ -46,7 +46,7 @@ func TestCandidateFailureTransfersResourceIntentWithBinding(t *testing.T) {
 					{Config: configs[1], Source: "source", Incarnation: 1},
 				},
 			}
-			plan, err := controller.PlanInventory(inventory)
+			plan, err := planInventoryTest(controller, inventory)
 			require.NoError(t, err)
 			applyActivationTestSubmission(t, activationTestSubmission{plan: plan}, nil, 0)
 			var previous confgroup.Config
@@ -78,7 +78,7 @@ func TestCandidateFailureTransfersResourceIntentWithBinding(t *testing.T) {
 			inventory.Version++
 			inventory.Candidates = nil
 			inventory.Sources = nil
-			plan, err = controller.PlanInventory(inventory)
+			plan, err = planInventoryTest(controller, inventory)
 			require.NoError(t, err)
 			applyActivationTestSubmission(t, activationTestSubmission{plan: plan}, nil, 0)
 			_, _, _, enabled := owner.snapshot()
@@ -127,7 +127,7 @@ func TestSiblingIntentAdmissionRevalidatesCheckedStore(t *testing.T) {
 		FullName: a.FullName(), Version: 1, AutoEnable: true, Sources: map[string]uint64{"source": 1},
 		Candidates: []DiscoveredJobCandidate{{Config: a, Source: "source", Incarnation: 1}, {Config: b, Source: "source", Incarnation: 1}},
 	}
-	plan, err := controller.PlanInventory(inventory)
+	plan, err := planInventoryTest(controller, inventory)
 	require.NoError(t, err)
 	applyActivationTestSubmission(t, activationTestSubmission{plan: plan}, nil, 0)
 	require.Nil(t, applyActivationTestSubmission(t, commands.next(t, "internal/jobs/accepted-activation"), nil, 1))

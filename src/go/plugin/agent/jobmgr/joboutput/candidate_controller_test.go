@@ -279,7 +279,7 @@ func TestCandidateControllerMaskedCursor(t *testing.T) {
 	masked := candidateInventory(t, c, inv, 0)
 	assert.Nil(t, masked.Decision.Work)
 	require.NotNil(t, c.snapshot("test_job").Cursor)
-	assert.Equal(t, a.UID(), c.snapshot("test_job").Cursor.UID)
+	assert.Equal(t, a.UID(), c.snapshot("test_job").Cursor.Key.UID)
 	remove, err := c.prepareRemove("test_job")
 	applyCandidateDelta(t, remove, err)
 	inv.Version = 2
@@ -718,7 +718,7 @@ func TestCandidateControllerSiblingAdmissionUpdatesSourceCursor(t *testing.T) {
 	sibling := candidateResult(t, c, first, candidateOutcome{Kind: candidateFailed, Listed: true}, 0).Decision.Work
 	require.NotNil(t, sibling)
 	candidateResult(t, c, sibling, candidateOutcome{Kind: candidateAdmitted}, 0)
-	assert.Equal(t, sibling.Token.Candidate, *c.snapshot("test_job").Cursor)
+	assert.Equal(t, sibling.Token.Candidate, c.snapshot("test_job").Cursor.Key)
 	ready, err := c.prepareReady("test_job", sibling.Token)
 	applyCandidateDelta(t, ready, err)
 	inv.Version = 2
@@ -1510,4 +1510,212 @@ func TestCandidateControllerSameObservationReplacementChangesOwningTier(t *testi
 	applyCandidateDelta(t, delta, err)
 	require.NotNil(t, delta.Decision.Work)
 	assert.Equal(t, replacement, delta.Decision.Work.Config)
+}
+
+func TestCandidateControllerHistoryOnlySelection(t *testing.T) {
+	for _, state := range []string{"accepted", "retry", "running", "disabled"} {
+		t.Run(state, func(t *testing.T) {
+			c := newCandidateController(1)
+			discovered := candidateTestConfig("discovered", "old").SetSourceType(confgroup.TypeDiscovered)
+			inv := candidateTestInventory(1, true, discovered)
+			first := candidateInventory(t, c, inv, 0).Decision.Work
+			candidateResult(t, c, first, candidateOutcome{Kind: candidateAdmitted}, 0)
+			if state == "retry" {
+				candidateResult(t, c, first, candidateOutcome{Kind: candidateFailed, Listed: true, RetryAfter: 10}, 0)
+			}
+			if state == "running" {
+				delta, err := c.prepareReady("test_job", first.Token)
+				applyCandidateDelta(t, delta, err)
+			}
+			inv.Version = 2
+			inv.Candidates[0] = DiscoveredJobCandidate{Config: candidateTestConfig("discovered", "rejected").SetSourceType(confgroup.TypeDiscovered), Source: "discovered", Incarnation: 2}
+			replacement := candidateInventory(t, c, inv, 1).Decision.Work
+			candidateResult(t, c, replacement, candidateOutcome{Kind: candidateRejected}, 1)
+			user := candidateTestConfig("user", "pending")
+			inv.Version = 3
+			inv.Sources["user"] = 1
+			inv.Candidates = append(inv.Candidates, DiscoveredJobCandidate{Config: user, Source: "user", Incarnation: 3})
+			proposal := candidateInventory(t, c, inv, 2).Decision.Work
+			require.NotNil(t, proposal)
+			if state == "disabled" {
+				delta, err := c.prepareDisable("test_job")
+				applyCandidateDelta(t, delta, err)
+			}
+			before := c.snapshot("test_job")
+			inv.Version = 4
+			inv.Candidates[1] = DiscoveredJobCandidate{Config: candidateTestConfig("user", "metadata-invalid"), Source: "user", Incarnation: 4}
+			bad := candidateIdentity(inv.Candidates[1])
+			delta, err := c.prepareInventoryValidated(inv, map[candidateKey]bool{bad: true}, 3)
+			applyCandidateDelta(t, delta, err)
+			after := c.snapshot("test_job")
+			choice := candidateSourceChoice(after)
+			require.NotNil(t, choice)
+			assert.Equal(t, proposal.Token.Candidate, choice.Observation.Key)
+			assert.Nil(t, choice.Member, "protected observation is not executable membership")
+			assert.NotContains(t, after.Entries, proposal.Token.Candidate)
+			assert.Equal(t, before.Binding, after.Binding)
+			assert.Equal(t, before.Intent, after.Intent)
+			assert.Nil(t, delta.Decision.Work)
+			assert.False(t, c.valid("test_job", proposal.Token))
+			assert.True(t, candidateAuthorized(after, first.Token.Candidate), "history cannot revoke retained source admission")
+			if state == "retry" {
+				assert.Equal(t, before.Wake, after.Wake)
+				wake, err := c.prepareWake("test_job", after.Wake.Token, 10)
+				applyCandidateDelta(t, wake, err)
+				require.NotNil(t, wake.Decision.Work)
+				assert.Equal(t, first.Token.Candidate, wake.Decision.Work.Token.Candidate)
+			}
+			if state == "running" {
+				assert.True(t, after.SearchClosed)
+				assert.Equal(t, candidateRunning, after.Phase)
+			}
+			if state == "disabled" {
+				assert.Equal(t, candidateDisabled, after.Enablement)
+				fresh := candidateEnable(t, c, 4)
+				require.NotNil(t, fresh.Decision.Work)
+				assert.Equal(t, first.Token.Candidate, fresh.Decision.Work.Token.Candidate)
+			}
+			inv.Version = 5
+			inv.Candidates[1] = DiscoveredJobCandidate{Config: candidateTestConfig("user", "valid-later"), Source: "user", Incarnation: 5}
+			later := candidateInventory(t, c, inv, 5)
+			require.NotNil(t, later.Decision.Work)
+			assert.Equal(t, candidateIdentity(inv.Candidates[1]), later.Decision.Work.Token.Candidate)
+		})
+	}
+}
+
+func TestCandidateControllerMaskedHistoryOnlySelection(t *testing.T) {
+	c := newCandidateController(1)
+	override := candidateTestConfig("override", "override").SetSourceType(confgroup.TypeDyncfg)
+	delta, err := c.prepareAdoptExact(override, false, dyncfg.StatusAccepted, true, 0, 0)
+	applyCandidateDelta(t, delta, err)
+	inv := candidateTestInventory(1, true, candidateTestConfig("source", "masked"))
+	candidateInventory(t, c, inv, 0)
+	consumed := *c.snapshot("test_job").Cursor
+	delta, err = c.prepareRemove("test_job")
+	applyCandidateDelta(t, delta, err)
+	inv.Version = 2
+	inv.Candidates[0] = DiscoveredJobCandidate{Config: candidateTestConfig("source", "invalid"), Source: "source", Incarnation: 2}
+	delta, err = c.prepareInventoryValidated(inv, map[candidateKey]bool{candidateIdentity(inv.Candidates[0]): true}, 1)
+	applyCandidateDelta(t, delta, err)
+	assert.Equal(t, consumed, *c.snapshot("test_job").Cursor)
+	assert.Nil(t, candidateSourceChoice(c.snapshot("test_job")).Member)
+	assert.Nil(t, delta.Decision.Work)
+	assert.Nil(t, c.snapshot("test_job").Binding)
+	inv.Version = 3
+	stock := candidateTestConfig("stock", "unrelated").SetSourceType(confgroup.TypeStock)
+	inv.Candidates = append(inv.Candidates, DiscoveredJobCandidate{Config: stock, Source: "stock", Incarnation: 3})
+	inv.Sources["stock"] = 1
+	assert.Nil(t, candidateInventory(t, c, inv, 2).Decision.Work)
+	// A real source lifetime change expires the consumed historical choice.
+	absent := candidateTestInventory(4, true, stock)
+	readded := candidateTestInventory(5, true, candidateTestConfig("source", "masked"), stock)
+	readded.Sources["source"] = 2
+	readded.Candidates[0].Incarnation = 5
+	delta, err = c.prepareInventoryBatchValidated(DiscoveredJobInventoryBatch{FullName: "test_job", Observations: []DiscoveredJobInventory{absent, readded}}, nil, 3)
+	applyCandidateDelta(t, delta, err)
+	require.NotNil(t, delta.Decision.Work)
+	assert.Equal(t, candidateIdentity(readded.Candidates[0]), delta.Decision.Work.Token.Candidate)
+	assert.Equal(t, uint64(2), c.snapshot("test_job").Cursor.Lifetime)
+}
+
+func TestCandidateControllerBatchSourceProvenance(t *testing.T) {
+	for _, introducedBeforeAbsence := range []bool{true, false} {
+		t.Run(fmt.Sprint(introducedBeforeAbsence), func(t *testing.T) {
+			c := newCandidateController(1)
+			a := candidateTestConfig("source", "a")
+			first := candidateInventory(t, c, candidateTestInventory(1, true, a), 0).Decision.Work
+			candidateResult(t, c, first, candidateOutcome{Kind: candidateAdmitted}, 0)
+			other := candidateTestConfig("source", "c")
+			middle := candidateTestInventory(2, true)
+			middle.Sources["source"] = 1
+			if introducedBeforeAbsence {
+				middle = candidateTestInventory(2, true, a, other)
+			}
+			final := candidateTestInventory(3, true, other)
+			final.Candidates[0].Incarnation = 2
+			batch := DiscoveredJobInventoryBatch{FullName: "test_job", Observations: []DiscoveredJobInventory{middle, final}}
+			delta, err := c.prepareInventoryBatchValidated(batch, nil, 1)
+			applyCandidateDelta(t, delta, err)
+			require.NotNil(t, delta.Decision.Work)
+			candidateResult(t, c, delta.Decision.Work, candidateOutcome{Kind: candidateAdmitted}, 1)
+			assert.Equal(t, introducedBeforeAbsence, candidateAuthorized(c.snapshot("test_job"), first.Token.Candidate))
+		})
+	}
+}
+
+func TestCandidateControllerBatchRemovalReadd(t *testing.T) {
+	c := newCandidateController(1)
+	a := candidateTestConfig("source", "a")
+	first := candidateInventory(t, c, candidateTestInventory(1, true, a), 0).Decision.Work
+	candidateResult(t, c, first, candidateOutcome{Kind: candidateAdmitted}, 0)
+	absent := candidateTestInventory(2, true)
+	readded := candidateTestInventory(3, true, a)
+	readded.Sources["source"] = 2
+	readded.Candidates[0].Incarnation = 2
+	batch := DiscoveredJobInventoryBatch{FullName: "test_job", Observations: []DiscoveredJobInventory{absent, readded}}
+	delta, err := c.prepareInventoryBatchValidated(batch, nil, 1)
+	require.NoError(t, err)
+	assert.True(t, c.valid("test_job", first.Token), "preparation cannot revoke committed authority")
+	assert.NotNil(t, c.snapshot("test_job").Binding)
+	applyCandidateDelta(t, delta, err)
+	assert.False(t, c.valid("test_job", first.Token))
+	assert.NotContains(t, c.snapshot("test_job").Entries, first.Token.Candidate)
+	assert.True(t, delta.Decision.Revoke)
+	require.NotNil(t, delta.Decision.Work)
+	assert.Equal(t, candidateIdentity(readded.Candidates[0]), delta.Decision.Work.Token.Candidate)
+}
+
+func TestCandidateControllerBatchReceipt(t *testing.T) {
+	c := newCandidateController(1)
+	stock := candidateTestConfig("stock", "stock").SetSourceType(confgroup.TypeStock)
+	user := candidateTestConfig("user", "user")
+	batch := DiscoveredJobInventoryBatch{FullName: "test_job", Observations: []DiscoveredJobInventory{candidateTestInventory(1, true, stock), candidateTestInventory(2, true, stock, user)}}
+	one, err := c.prepareInventoryBatchValidated(batch, nil, 0)
+	require.NoError(t, err)
+	two, err := c.prepareInventoryBatchValidated(batch, nil, 0)
+	require.NoError(t, err)
+	assert.Nil(t, c.snapshot("test_job"))
+	require.True(t, one.apply())
+	assert.False(t, two.apply())
+	require.NotNil(t, one.Decision.Work)
+	assert.Equal(t, user, one.Decision.Work.Config, "only the final complete inventory grants execution")
+	replay, err := c.prepareInventoryBatchValidated(batch, nil, 0)
+	applyCandidateDelta(t, replay, err)
+	assert.True(t, replay.Decision.Ignored)
+	// Candidate ordering is normalized before receipt construction.
+	batch.Observations[1].Candidates[0], batch.Observations[1].Candidates[1] = batch.Observations[1].Candidates[1], batch.Observations[1].Candidates[0]
+	replay, err = c.prepareInventoryBatchValidated(batch, nil, 0)
+	applyCandidateDelta(t, replay, err)
+	assert.True(t, replay.Decision.Ignored)
+	conflict := batch
+	conflict.Observations = append([]DiscoveredJobInventory(nil), batch.Observations...)
+	conflict.Observations[0] = candidateTestInventory(1, true, user)
+	_, err = c.prepareInventoryBatchValidated(conflict, nil, 0)
+	require.ErrorContains(t, err, "conflicting")
+	_, err = c.prepareInventory(batch.Observations[1], 0)
+	require.ErrorContains(t, err, "conflicting", "a final snapshot alone cannot replay an ordered batch")
+	overlap := DiscoveredJobInventoryBatch{FullName: "test_job", Observations: []DiscoveredJobInventory{candidateTestInventory(2, true, stock, user), candidateTestInventory(3, true, stock, user)}}
+	_, err = c.prepareInventoryBatchValidated(overlap, nil, 0)
+	require.ErrorContains(t, err, "overlapping")
+	stale := DiscoveredJobInventoryBatch{FullName: "test_job", Observations: []DiscoveredJobInventory{candidateTestInventory(1, true, user)}}
+	replay, err = c.prepareInventoryBatchValidated(stale, nil, 0)
+	applyCandidateDelta(t, replay, err)
+	assert.True(t, replay.Decision.Ignored)
+}
+
+func TestCandidateControllerInvalidBatch(t *testing.T) {
+	for name, batch := range map[string]DiscoveredJobInventoryBatch{
+		"empty":              {FullName: "test_job"},
+		"wrong name":         {FullName: "other_job", Observations: []DiscoveredJobInventory{candidateTestInventory(1, true)}},
+		"duplicate version":  {FullName: "test_job", Observations: []DiscoveredJobInventory{candidateTestInventory(1, true), candidateTestInventory(1, true)}},
+		"decreasing version": {FullName: "test_job", Observations: []DiscoveredJobInventory{candidateTestInventory(2, true), candidateTestInventory(1, true)}},
+	} {
+		t.Run(name, func(t *testing.T) {
+			c := newCandidateController(1)
+			_, err := c.prepareInventoryBatchValidated(batch, nil, 0)
+			require.Error(t, err)
+			assert.Nil(t, c.snapshot("test_job"))
+		})
+	}
 }

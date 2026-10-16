@@ -306,7 +306,7 @@ func TestConfigIntentAdmissionQuarantineAdvancesValidSibling(t *testing.T) {
 		Source:      "stock-source",
 		Incarnation: 1,
 	})
-	plan, err := controller.PlanInventory(inventory)
+	plan, err := planInventoryTest(controller, inventory)
 	require.NoError(t, err)
 	applyActivationTestSubmission(t, activationTestSubmission{plan: plan}, nil, 0)
 	applyActivationTestSubmission(t, commands.next(t, "internal/jobs/accepted-activation"), nil, 1)
