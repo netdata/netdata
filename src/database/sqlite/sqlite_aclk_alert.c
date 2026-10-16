@@ -1773,7 +1773,6 @@ int alert_queue_unittest(void)
         nd_uuid_t *hid = &h->host_id.uuid;
         time_t *gate = &h->health.alert_queue_next_due_s;
         time_t now = now_realtime_sec();
-        int rows;
 
         (void)db_execute(db_meta, "DELETE FROM alert_queue", NULL);
         (void)db_execute(db_meta, "DELETE FROM aclk_queue", NULL);
