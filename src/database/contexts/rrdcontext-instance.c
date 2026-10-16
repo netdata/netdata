@@ -36,8 +36,9 @@ inline STRING *rrdinstance_acquired_units_dup(RRDINSTANCE_ACQUIRED *ria) {
 }
 
 inline RRDLABELS *rrdinstance_labels(RRDINSTANCE *ri) {
-    if(ri->rrdset)
-        return ri->rrdset->rrdlabels;
+    RRDSET *st = rrdinstance_rrdset_atomic_load(ri);
+    if(st)
+        return st->rrdlabels;
 
     if (rrd_flag_check_all(ri, RRD_FLAG_OWN_LABELS | RRD_FLAG_DEMAND_LABELS)) {
         rrd_flag_clear(ri, RRD_FLAG_DEMAND_LABELS);
@@ -55,7 +56,7 @@ inline RRDLABELS *rrdinstance_acquired_labels(RRDINSTANCE_ACQUIRED *ria) {
 
 inline RRDSET *rrdinstance_acquired_rrdset(RRDINSTANCE_ACQUIRED *ria) {
     RRDINSTANCE *ri = rrdinstance_acquired_value(ria);
-    return ri->rrdset;
+    return rrdinstance_rrdset_atomic_load(ri);
 }
 
 inline RRDHOST *rrdinstance_acquired_rrdhost(RRDINSTANCE_ACQUIRED *ria) {
@@ -100,7 +101,7 @@ static void rrdinstance_free(RRDINSTANCE *ri) {
     ri->rc = NULL;
     ri->rrdlabels = NULL;
     ri->rrdmetrics = NULL;
-    ri->rrdset = NULL;
+    rrdinstance_rrdset_atomic_store(ri, NULL);
 }
 
 static void rrdinstance_insert_callback(const DICTIONARY_ITEM *item __maybe_unused, void *value, void *rrdcontext) {
@@ -108,6 +109,8 @@ static void rrdinstance_insert_callback(const DICTIONARY_ITEM *item __maybe_unus
 
     // link it to its parent
     ri->rc = rrdcontext;
+    spinlock_init(&ri->spinlock);
+    RRDSET *st = rrdinstance_rrdset_atomic_load(ri);
 
     ri->flags = ri->flags & RRD_FLAGS_ALLOWED_EXTERNALLY_ON_NEW_OBJECTS; // no need for atomics
 
@@ -116,13 +119,13 @@ static void rrdinstance_insert_callback(const DICTIONARY_ITEM *item __maybe_unus
 
     ri->rrdlabels = rrdlabels_create();
 
-    if(ri->rrdset)
+    if(st)
         ri->flags &= ~(RRD_FLAG_OWN_LABELS| RRD_FLAG_DEMAND_LABELS); // no need of atomics at the constructor
     else
         ri->flags |= (RRD_FLAG_OWN_LABELS | RRD_FLAG_DEMAND_LABELS); // no need of atomics at the constructor
 
-    if(ri->rrdset) {
-        if(unlikely(rrdset_flag_check(ri->rrdset, RRDSET_FLAG_HIDDEN)))
+    if(st) {
+        if(unlikely(rrdset_flag_check(st, RRDSET_FLAG_HIDDEN)))
             ri->flags |= RRD_FLAG_HIDDEN; // no need of atomics at the constructor
         else
             ri->flags &= ~RRD_FLAG_HIDDEN; // no need of atomics at the constructor
@@ -140,7 +143,7 @@ static void rrdinstance_insert_callback(const DICTIONARY_ITEM *item __maybe_unus
 static void rrdinstance_delete_callback(const DICTIONARY_ITEM *item __maybe_unused, void *value, void *rrdcontext __maybe_unused) {
     RRDINSTANCE *ri = (RRDINSTANCE *)value;
 
-    internal_error(ri->rrdset, "RRDINSTANCE: '%s' is freed but there is a RRDSET linked to it.", string2str(ri->id));
+    internal_error(rrdinstance_rrdset_atomic_load(ri), "RRDINSTANCE: '%s' is freed but there is a RRDSET linked to it.", string2str(ri->id));
 
     // update the count of instances
     __atomic_sub_fetch(&ri->rc->rrdhost->rrdctx.instances_count, 1, __ATOMIC_RELAXED);
@@ -204,20 +207,28 @@ static bool rrdinstance_conflict_callback(const DICTIONARY_ITEM *item __maybe_un
         rrd_flag_set_updated(ri, RRD_FLAG_UPDATE_REASON_CHANGED_METADATA);
     }
 
-    if(ri_new->rrdset && ri->rrdset != ri_new->rrdset) {
-        ri->rrdset = ri_new->rrdset;
+    // a chart re-created with the same id takes the instance over, even while the old chart still exists:
+    // the old chart's teardown (rrdinstance_rrdset_is_freed()) then finds it is no longer the owner
+    spinlock_lock(&ri->spinlock);
+
+    RRDSET *st = rrdinstance_rrdset_atomic_load(ri);
+    if(ri_new->rrdset && st != ri_new->rrdset) {
+        st = ri_new->rrdset;
+        rrdinstance_rrdset_atomic_store(ri, st);
         rrd_flag_set_updated(ri, RRD_FLAG_UPDATE_REASON_CHANGED_LINKING);
     }
 
-    if(ri->rrdset) {
+    if(st) {
         // our labels are not needed any more
         rrdlabels_flush(ri->rrdlabels);
 
-        if(unlikely(rrdset_flag_check(ri->rrdset, RRDSET_FLAG_HIDDEN)))
+        if(unlikely(rrdset_flag_check(st, RRDSET_FLAG_HIDDEN)))
             rrd_flag_set(ri, RRD_FLAG_HIDDEN);
         else
             rrd_flag_clear(ri, RRD_FLAG_HIDDEN);
     }
+
+    spinlock_unlock(&ri->spinlock);
 
     rrd_flag_set(ri, ri_new->flags & RRD_FLAGS_ALLOWED_EXTERNALLY_ON_NEW_OBJECTS); // no need for atomics on ri_new
 
@@ -260,8 +271,11 @@ void rrdinstances_destroy_from_rrdcontext(RRDCONTEXT *rc) {
 }
 
 void rrdinstance_trigger_updates(RRDINSTANCE *ri, const char *function) {
-    RRDSET *st = ri->rrdset;
+    // the chart cannot be destroyed while we hold the lock and it still owns the instance:
+    // its teardown takes the lock to unlink itself first
+    spinlock_lock(&ri->spinlock);
 
+    RRDSET *st = rrdinstance_rrdset_atomic_load(ri);
     if(st != NULL) {
         if(unlikely((unsigned int) st->priority != ri->priority)) {
             ri->priority = st->priority;
@@ -272,7 +286,10 @@ void rrdinstance_trigger_updates(RRDINSTANCE *ri, const char *function) {
             rrd_flag_set_updated(ri, RRD_FLAG_UPDATE_REASON_CHANGED_METADATA);
         }
     }
-    else if(unlikely(rrd_flag_is_collected(ri))) {
+
+    spinlock_unlock(&ri->spinlock);
+
+    if(st == NULL && unlikely(rrd_flag_is_collected(ri))) {
         // there is no rrdset, but we have it as collected!
 
         rrdinstance_set_archived(ri);
@@ -369,10 +386,16 @@ inline void rrdinstance_from_rrdset(RRDSET *st) {
                     if (!rd->rrdcontexts.rrdmetric) continue;
 
                     RRDMETRIC *rm_old = rrdmetric_acquired_value(rd->rrdcontexts.rrdmetric);
-                    rrdmetric_set_deleted_overwrite(rm_old, RRD_FLAG_UPDATED|RRD_FLAG_LIVE_RETENTION|RRD_FLAG_UPDATE_REASON_UNUSED|RRD_FLAG_UPDATE_REASON_ZERO_RETENTION);
-                    rrdmetric_rrddim_atomic_store(rm_old, NULL);
-                    rm_old->first_time_s = 0;
-                    rm_old->last_time_s = 0;
+
+                    // only if a newer dimension has not taken the metric over
+                    spinlock_lock(&ri_old->spinlock);
+                    if(rrdmetric_rrddim_atomic_load(rm_old) == rd) {
+                        rrdmetric_set_deleted_overwrite(rm_old, RRD_FLAG_UPDATED|RRD_FLAG_LIVE_RETENTION|RRD_FLAG_UPDATE_REASON_UNUSED|RRD_FLAG_UPDATE_REASON_ZERO_RETENTION);
+                        rrdmetric_rrddim_atomic_store(rm_old, NULL);
+                        rm_old->first_time_s = 0;
+                        rm_old->last_time_s = 0;
+                    }
+                    spinlock_unlock(&ri_old->spinlock);
 
                     rrdmetric_release(rd->rrdcontexts.rrdmetric);
                     rd->rrdcontexts.rrdmetric = NULL;
@@ -381,16 +404,22 @@ inline void rrdinstance_from_rrdset(RRDSET *st) {
                 }
         rrddim_foreach_done(rd);
 
-        // mark the old instance, ready to be deleted
-        if(!rrd_flag_check(ri_old, RRD_FLAG_OWN_LABELS))
-            ri_old->rrdlabels = rrdlabels_create();
+        // mark the old instance, ready to be deleted - only if a newer chart has not taken it over
+        spinlock_lock(&ri_old->spinlock);
+        bool owned = rrdinstance_rrdset_atomic_load(ri_old) == st;
+        if(owned) {
+            if(!rrd_flag_check(ri_old, RRD_FLAG_OWN_LABELS))
+                ri_old->rrdlabels = rrdlabels_create();
 
-        rrdinstance_set_deleted_overwrite(ri_old, RRD_FLAG_UPDATED|RRD_FLAG_OWN_LABELS|RRD_FLAG_LIVE_RETENTION|RRD_FLAG_UPDATE_REASON_UNUSED|RRD_FLAG_UPDATE_REASON_ZERO_RETENTION);
-        ri_old->rrdset = NULL;
-        ri_old->first_time_s = 0;
-        ri_old->last_time_s = 0;
+            rrdinstance_set_deleted_overwrite(ri_old, RRD_FLAG_UPDATED|RRD_FLAG_OWN_LABELS|RRD_FLAG_LIVE_RETENTION|RRD_FLAG_UPDATE_REASON_UNUSED|RRD_FLAG_UPDATE_REASON_ZERO_RETENTION);
+            rrdinstance_rrdset_atomic_store(ri_old, NULL);
+            ri_old->first_time_s = 0;
+            ri_old->last_time_s = 0;
+        }
+        spinlock_unlock(&ri_old->spinlock);
 
-        rrdinstance_trigger_updates(ri_old, __FUNCTION__ );
+        if(owned)
+            rrdinstance_trigger_updates(ri_old, __FUNCTION__ );
         rrdinstance_release(ria_old);
 
         /*
@@ -429,7 +458,7 @@ static inline RRDINSTANCE *rrdset_get_rrdinstance_with_trace(RRDSET *st, const c
         return NULL;
     }
 
-    if(unlikely(ri->rrdset != st))
+    if(unlikely(rrdinstance_rrdset_atomic_load(ri) != st))
         fatal("RRDINSTANCE: '%s' is not linked to RRDSET '%s' at %s()", string2str(ri->id), rrdset_id(st), function);
 
     return ri;
@@ -448,17 +477,34 @@ ALWAYS_INLINE void rrdinstance_rrdset_not_collected(RRDSET *st) {
 inline void rrdinstance_rrdset_is_freed(RRDSET *st) {
     rrdinstance_rrdset_not_collected(st);
 
-    RRDINSTANCE *ri = rrdset_get_rrdinstance(st);
-    if(unlikely(!ri)) return;
+    if(unlikely(!st->rrdcontexts.rrdinstance)) {
+        netdata_log_error("RRDINSTANCE: RRDSET '%s' is not linked to an RRDINSTANCE at %s()", rrdset_id(st), __FUNCTION__);
+        return;
+    }
 
-    rrdinstance_set_archived(ri);
+    RRDINSTANCE *ri = rrdinstance_acquired_value(st->rrdcontexts.rrdinstance);
+    if(unlikely(!ri)) {
+        netdata_log_error("RRDINSTANCE: RRDSET '%s' lost its link to an RRDINSTANCE at %s()", rrdset_id(st), __FUNCTION__);
+        return;
+    }
 
-    SWAP(ri->rrdlabels, st->rrdlabels);
-    rrd_flag_set(ri, RRD_FLAG_OWN_LABELS);
+    // A chart is destroyed when its last index item goes, which can be long after it was freed, and a chart
+    // re-created with the same id meanwhile has taken the instance over (rrdinstance_conflict_callback()).
+    // Then the instance is not ours to archive or to take our labels: only release our references to it.
+    spinlock_lock(&ri->spinlock);
+    bool owned = rrdinstance_rrdset_atomic_load(ri) == st;
+    if(owned) {
+        rrdinstance_set_archived(ri);
 
-    ri->rrdset = NULL;
+        SWAP(ri->rrdlabels, st->rrdlabels);
+        rrd_flag_set(ri, RRD_FLAG_OWN_LABELS);
 
-    rrdinstance_trigger_updates(ri, __FUNCTION__ );
+        rrdinstance_rrdset_atomic_store(ri, NULL);
+    }
+    spinlock_unlock(&ri->spinlock);
+
+    if(owned)
+        rrdinstance_trigger_updates(ri, __FUNCTION__ );
 
     rrdinstance_release(st->rrdcontexts.rrdinstance);
     st->rrdcontexts.rrdinstance = NULL;
@@ -497,7 +543,7 @@ inline void rrdinstance_updated_rrdset_name(RRDSET *st) {
 }
 
 inline void rrdinstance_updated_rrdset_flags_no_action(RRDINSTANCE *ri, RRDSET *st) {
-    if(unlikely(ri->rrdset != st))
+    if(unlikely(rrdinstance_rrdset_atomic_load(ri) != st))
         fatal("RRDCONTEXT: instance '%s' is not linked to chart '%s' on host '%s'",
               string2str(ri->id), rrdset_id(st), rrdhost_hostname(st->rrdhost));
 
