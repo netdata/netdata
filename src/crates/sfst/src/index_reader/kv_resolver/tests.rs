@@ -13,7 +13,9 @@
 //!
 //! The rollup ref resolver, which answers through this one, keeps its
 //! closed partition: a proven value in every tier, `Corrupt` across
-//! fields, into a gap, or into an undecodable chunk.
+//! fields, into a gap, or into an undecodable chunk (one decode attempt,
+//! remembered). In a trace session, rollup refs and spans share one
+//! resolver, and a span that fails leaves no long value in the cache.
 //!
 //! Fixtures cover dot-extended field families in every tier (the
 //! `a.b=` < `a=` sort hazard), the production tier boundaries (99/100 and
@@ -117,8 +119,13 @@ fn assert_equivalent(bytes: &[u8], rows: &[Vec<String>]) {
     let entries = idx.load_all_stream_entries().unwrap();
     assert_eq!(entries.len(), rows.len());
     let all: Vec<u32> = (0..total).collect();
-    let strings = KvResolver::new().strings(&idx, &all).unwrap();
+    let mut kv = KvResolver::new();
+    let strings = kv.strings(&idx, &all).unwrap();
     assert_eq!(strings.len(), total as usize);
+    assert_eq!(
+        kv.loads, chunks,
+        "`strings`, as `materialize_rows` calls it"
+    );
     for (r, (ids, want)) in entries.iter().zip(rows).enumerate() {
         let mut got: Vec<&str> = ids.iter().map(|id| strings[&id.0].as_str()).collect();
         let mut want: Vec<&str> = want.iter().map(String::as_str).collect();
@@ -309,6 +316,8 @@ fn a_low_field_short_of_its_cardinality_leaves_the_excess_unresolved() {
     assert_eq!(resolve(1), None, "a's second id would read b=y");
     assert_eq!(resolve(2), Some(b"b=y".to_vec()));
     assert_eq!(resolve(3), None, "c has no key");
+    assert!(!kv.key_into(&idx, 1, &mut key).unwrap());
+    assert!(key.is_empty(), "the guard leaves no bytes of b=y");
 }
 
 /// The rollup ref resolver answers through the KvId resolver and keeps its
@@ -388,6 +397,11 @@ fn rollup_refs_into_a_gap_or_an_undecodable_chunk_are_corrupt() {
             );
         }
     }
+    assert_eq!(
+        resolver.kv_failed_loads(),
+        1,
+        "one decode attempt, remembered"
+    );
     assert_eq!(service, 0, "low fields come first");
     assert_eq!(
         resolver.resolve(&idx, "service", 0),
@@ -397,6 +411,101 @@ fn rollup_refs_into_a_gap_or_an_undecodable_chunk_are_corrupt() {
 
 fn sid(i: usize) -> SpanId {
     SpanId::from((i as u64 + 1).to_be_bytes())
+}
+
+/// The trace of [`trace_file_of`].
+fn trace_id() -> TraceId {
+    TraceId::from([7u8; 16])
+}
+
+/// One trace ([`trace_id`]) in one file, one span per row of `key=value`
+/// pairs (span `i` has id `sid(i)`, child of span 0), no events.
+fn trace_file_of(threshold: u32, rows: &[Vec<String>]) -> Vec<u8> {
+    let arena = Bump::new();
+    let mut ri = RowIndex::new(&arena, threshold);
+    let n = rows.len();
+    let mut trace_ids = crate::TraceIds::with_capacity(n);
+    let mut span_ids = crate::SpanIds::with_capacity(n);
+    let mut parents = crate::ParentSpanIds::with_capacity(n);
+    for (i, row) in rows.iter().enumerate() {
+        let tokens: Vec<_> = row.iter().map(|kv| ri.intern(None, kv)).collect();
+        ri.row(1_000 + i as i64, &tokens);
+        trace_ids.push(trace_id());
+        span_ids.push(sid(i));
+        parents.push(if i == 0 { SpanId::UNSET } else { sid(0) });
+    }
+    ri.trace_ids = Some(trace_ids);
+    ri.span_ids = Some(span_ids);
+    ri.parent_span_ids = Some(parents);
+    ri.durations = Some(crate::Durations(vec![5; n]));
+    ri.flags = Some(crate::Flags(vec![0; n]));
+    ri.dropped_attribute_counts = Some(crate::DroppedAttributeCounts(vec![0; n]));
+    ri.build_trace_id_index = true;
+    let (buf, _s, _m) = IndexWriter::write_into(&ri, Cursor::new(Vec::new()), Vec::new()).unwrap();
+    buf.into_inner()
+}
+
+/// Flip a byte of `chunk`'s payload so its CRC no longer matches.
+fn corrupt_chunk(bytes: &mut [u8], chunk: chunk_file::ChunkId) {
+    let offset = {
+        let container = chunk_file::container::Container::open(bytes, b"SFST", 1).unwrap();
+        container.chunk_meta(chunk).unwrap().offset as usize
+    };
+    bytes[offset] ^= 0xFF;
+}
+
+/// Every span carries a value longer than the cache limit (a low field)
+/// and a mid-tier value whose chunk fails its CRC: the span fails, and
+/// the long value it resolved first is not left in the session cache.
+#[test]
+fn a_failed_span_leaves_no_long_value_cached() {
+    let long = "L".repeat(5_000);
+    let rows: Vec<Vec<String>> = (0..20)
+        .map(|i| vec![format!("a.blob={long}"), format!("m={i:02}")])
+        .collect();
+    let mut bytes = trace_file_of(10, &rows); // a.blob low, m mid
+    corrupt_chunk(&mut bytes, crate::mid_field_id(0));
+    let idx = IndexReader::open(&bytes).unwrap();
+    let mut session = crate::TraceFileSession::open(&idx);
+    let mut sources: [&mut dyn crate::trace_combine::SpanSource; 1] = [&mut session];
+    let outcome =
+        crate::trace_combine::combine(&mut sources, trace_id(), None, None, None, &|| false);
+    assert_eq!(outcome.failures.len(), 1, "the mid chunk fails the span");
+    assert_eq!(session.cached_long_values(), 0);
+}
+
+/// The session's rollup refs resolve through the session's own
+/// dictionaries: a mid-tier root field the gate resolved is not decoded
+/// again when the spans materialize.
+#[test]
+fn rollup_refs_share_the_session_dictionaries() {
+    let rows: Vec<Vec<String>> = (0..40)
+        .map(|i| vec![format!("name=op{:02}", i % 20)])
+        .collect();
+    let bytes = trace_file_of(10, &rows); // name: 20 values, mid
+    let idx = IndexReader::open(&bytes).unwrap();
+    let op00 = idx
+        .build_string_table(idx.field_table())
+        .unwrap()
+        .iter()
+        .position(|kv| kv == "name=op00")
+        .unwrap() as u32;
+    let mut session = crate::TraceFileSession::open(&idx);
+    assert_eq!(
+        session.resolve_rollup_ref("name", op00).unwrap(),
+        RollupRefOutcome::Value("op00")
+    );
+    assert_eq!(
+        session.kv_loads(),
+        1,
+        "the gate decoded `name` in the session"
+    );
+    let mut sources: [&mut dyn crate::trace_combine::SpanSource; 1] = [&mut session];
+    let outcome =
+        crate::trace_combine::combine(&mut sources, trace_id(), None, None, None, &|| false);
+    assert!(outcome.failures.is_empty());
+    assert_eq!(outcome.trace.spans.len(), 40);
+    assert_eq!(session.kv_loads(), 1, "materialization reused it");
 }
 
 /// A large trace in one file, every span with long unique values (a mid

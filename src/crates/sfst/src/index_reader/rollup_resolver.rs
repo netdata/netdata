@@ -77,7 +77,7 @@ enum FieldState {
 #[derive(Default)]
 pub struct RollupRefResolver {
     kv: KvResolver,
-    fields: HashMap<String, FieldState>,
+    memo: RollupRefMemo,
 }
 
 impl RollupRefResolver {
@@ -91,6 +91,28 @@ impl RollupRefResolver {
     /// here.
     pub fn resolve(
         &mut self,
+        reader: &IndexReader<'_>,
+        field_name: &str,
+        kv_ref: u32,
+    ) -> RollupRefOutcome<'_> {
+        self.memo.resolve(&mut self.kv, reader, field_name, kv_ref)
+    }
+}
+
+/// The root fields' memos without dictionaries of their own: a trace
+/// session keeps one and resolves through its own [`KvResolver`], so its
+/// rollup refs and its spans decode each dictionary once between them.
+#[derive(Default)]
+pub(crate) struct RollupRefMemo {
+    fields: HashMap<String, FieldState>,
+}
+
+impl RollupRefMemo {
+    /// [`RollupRefResolver::resolve`], through `kv`, the resolver of the
+    /// same file.
+    pub(crate) fn resolve(
+        &mut self,
+        kv: &mut KvResolver,
         reader: &IndexReader<'_>,
         field_name: &str,
         kv_ref: u32,
@@ -121,7 +143,7 @@ impl RollupRefResolver {
                     Entry::Occupied(_) => Ok(off),
                     Entry::Vacant(slot) => {
                         let mut key = Vec::new();
-                        self.kv.key_into(reader, kv_ref, &mut key).map(|found| {
+                        kv.key_into(reader, kv_ref, &mut key).map(|found| {
                             // `false` is a gap: no key at the ref's position.
                             slot.insert(
                                 found
@@ -152,6 +174,14 @@ impl RollupRefResolver {
             },
             _ => unreachable!("a probed field stays a range"),
         }
+    }
+}
+
+#[cfg(test)]
+impl RollupRefResolver {
+    /// Failed chunk decodes of the resolver's own dictionaries.
+    pub(crate) fn kv_failed_loads(&self) -> usize {
+        self.kv.failed_loads
     }
 }
 

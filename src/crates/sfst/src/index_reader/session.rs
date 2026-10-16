@@ -22,13 +22,14 @@
 //!   and string resolution) only once a lookup finds rows;
 //! - stream batches, EVNB/LNKB and the trace rollup (TRSU) decode lazily,
 //!   once;
-//! - KvIds resolve through the session's [`KvResolver`]: a position lookup
-//!   per id, decoding each touched field's dictionary once (mid tier
-//!   without its position bitmaps). The resolved strings accumulate in a
-//!   per-session cache; a value longer than [`CACHED_VALUE_MAX_BYTES`] is
-//!   resolved whole for the span that needs it and not kept. Values are
-//!   never cut: predicates and canonical selection see what was stored, in
-//!   every layout.
+//! - KvIds, of spans and of rollup root refs alike, resolve through the
+//!   session's [`KvResolver`]: a position lookup per id, decoding each
+//!   touched field's dictionary once (mid tier without its position
+//!   bitmaps). The resolved strings accumulate in a per-session cache; a
+//!   value longer than [`CACHED_VALUE_MAX_BYTES`] is resolved whole for the
+//!   span that needs it and not kept, even when that span fails. Values
+//!   are never cut: predicates and canonical selection see what was
+//!   stored, in every layout.
 //!
 //! Two layers: the bloom and the screen stay for the session's life
 //! (about 3 bytes per distinct trace id in the file: ~30 KB for 10k);
@@ -59,8 +60,8 @@
 use std::collections::HashMap;
 
 use crate::index_reader::{
-    IndexReader, KvResolver, MetaReader, RollupRefOutcome, RollupRefResolver, TraceEvent,
-    TraceLink, TraceSpan, kv_attr, kv_value,
+    IndexReader, KvResolver, MetaReader, RollupRefMemo, RollupRefOutcome, TraceEvent, TraceLink,
+    TraceSpan, kv_attr, kv_value,
 };
 use crate::reader::ChunkReader;
 use crate::trace_combine::{SpanRef, SpanSource};
@@ -231,7 +232,8 @@ pub struct TraceFileSession<'r, 'a> {
     kinds: HashMap<u32, i32>,
     rollup: Option<TraceRollup>,
     stats: Option<crate::TraceRollupStats>,
-    resolver: Option<RollupRefResolver>,
+    /// Rollup root refs, resolved through `kv`.
+    rollup_refs: Option<RollupRefMemo>,
     /// The caller's hook for when the session holds nothing decoded.
     on_release: Option<Box<dyn FnMut() + 'a>>,
 }
@@ -286,7 +288,7 @@ impl<'r, 'a> TraceFileSession<'r, 'a> {
             kinds: HashMap::new(),
             rollup: None,
             stats: None,
-            resolver: None,
+            rollup_refs: None,
             on_release: None,
         }
     }
@@ -462,17 +464,18 @@ impl<'r, 'a> TraceFileSession<'r, 'a> {
         Ok(Some(rollup.len()))
     }
 
-    /// Resolve a rollup root ref as a value of `field_name`, through the
-    /// file's dictionaries (the full reader) and the session's
-    /// [`RollupRefResolver`]. `Err` when the file cannot open fully.
+    /// Resolve a rollup root ref as a value of `field_name`, as
+    /// [`RollupRefResolver::resolve`](crate::RollupRefResolver::resolve)
+    /// does, through the full reader and the session's own dictionaries
+    /// (which its spans share). `Err` when the file cannot open fully.
     pub fn resolve_rollup_ref(
         &mut self,
         field_name: &str,
         kv_ref: u32,
     ) -> Result<RollupRefOutcome<'_>, crate::Error> {
         let reader = self.view.full()?;
-        let resolver = self.resolver.get_or_insert_with(RollupRefResolver::new);
-        Ok(resolver.resolve(reader, field_name, kv_ref))
+        let memo = self.rollup_refs.get_or_insert_with(RollupRefMemo::default);
+        Ok(memo.resolve(&mut self.kv, reader, field_name, kv_ref))
     }
 
     /// Tell the caller when nothing decoded is left.
@@ -645,9 +648,20 @@ impl<'r, 'a> TraceFileSession<'r, 'a> {
 
     /// Resolve `ids` into the per-session cache, looking up only the
     /// missing ones. Returns the ids of the long values it added, which
-    /// the caller removes once its span is built.
+    /// the caller removes once its span is built; on an error the span
+    /// fails, so they go at once.
     fn resolve(&mut self, ids: &[u32]) -> Result<Vec<u32>, crate::Error> {
         let mut long = Vec::new();
+        if let Err(e) = self.resolve_into(ids, &mut long) {
+            for id in long {
+                self.strings.remove(&id);
+            }
+            return Err(e);
+        }
+        Ok(long)
+    }
+
+    fn resolve_into(&mut self, ids: &[u32], long: &mut Vec<u32>) -> Result<(), crate::Error> {
         let mut key = Vec::new();
         for &id in ids {
             if self.strings.contains_key(&id) {
@@ -662,13 +676,22 @@ impl<'r, 'a> TraceFileSession<'r, 'a> {
                 self.strings.insert(id, kv);
             }
         }
-        Ok(long)
+        Ok(())
     }
 
     /// Dictionary chunks the session's resolver has decoded.
     #[cfg(test)]
     pub(crate) fn kv_loads(&self) -> usize {
         self.kv.loads
+    }
+
+    /// Cached strings longer than [`CACHED_VALUE_MAX_BYTES`].
+    #[cfg(test)]
+    pub(crate) fn cached_long_values(&self) -> usize {
+        self.strings
+            .values()
+            .filter(|kv| kv.len() > CACHED_VALUE_MAX_BYTES)
+            .count()
     }
 }
 
@@ -843,7 +866,7 @@ impl SpanSource for TraceFileSession<'_, '_> {
             || !self.kinds.is_empty()
             || self.rollup.is_some()
             || self.stats.is_some()
-            || self.resolver.is_some()
+            || self.rollup_refs.is_some()
     }
 
     /// Drop the loaded layer, keeping the bloom and the screen: an owned
@@ -862,7 +885,7 @@ impl SpanSource for TraceFileSession<'_, '_> {
         self.kinds = HashMap::new();
         self.rollup = None;
         self.stats = None;
-        self.resolver = None;
+        self.rollup_refs = None;
         self.emptied();
     }
 }

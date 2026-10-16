@@ -32,6 +32,7 @@ mod trace_plan;
 
 use kv_resolver::KvResolver;
 
+use rollup_resolver::RollupRefMemo;
 pub use rollup_resolver::{RollupRefOutcome, RollupRefResolver};
 pub use session::{PartEvidence, RollupEvidence, TraceFileSession};
 pub use trace_plan::{

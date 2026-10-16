@@ -56,6 +56,9 @@ pub(crate) struct KvResolver {
     /// Chunk decodes (mid and high), for tests that pin the cost.
     #[cfg(test)]
     pub(crate) loads: usize,
+    /// Chunk decodes that failed, for the same tests.
+    #[cfg(test)]
+    pub(crate) failed_loads: usize,
 }
 
 impl KvResolver {
@@ -69,7 +72,7 @@ impl KvResolver {
     }
 
     /// Write `id`'s `key=value` bytes into `key` (cleared first).
-    /// `Ok(false)` when no dictionary covers `id`.
+    /// `Ok(false)`, with `key` empty, when no dictionary covers `id`.
     pub(crate) fn key_into(
         &mut self,
         reader: &IndexReader<'_>,
@@ -77,6 +80,20 @@ impl KvResolver {
         key: &mut Vec<u8>,
     ) -> Result<bool, crate::Error> {
         key.clear();
+        let found = self.lookup(reader, id, key)?;
+        if !found {
+            // The low-tier guard rejects a key it has already written.
+            key.clear();
+        }
+        Ok(found)
+    }
+
+    fn lookup(
+        &mut self,
+        reader: &IndexReader<'_>,
+        id: u32,
+        key: &mut Vec<u8>,
+    ) -> Result<bool, crate::Error> {
         if self.starts.is_empty() {
             self.init(reader);
         }
@@ -114,11 +131,16 @@ impl KvResolver {
             }
             FieldTier::Mid => {
                 if matches!(field.dict, Dict::Unloaded) {
-                    field.dict = Dict::Mid(reader.sfst.mid_field_fst(field.chunk)?);
+                    let decoded = reader.sfst.mid_field_fst(field.chunk);
                     #[cfg(test)]
                     {
-                        self.loads += 1;
+                        if decoded.is_ok() {
+                            self.loads += 1;
+                        } else {
+                            self.failed_loads += 1;
+                        }
                     }
+                    field.dict = Dict::Mid(decoded?);
                 }
                 let Dict::Mid(map) = &field.dict else {
                     unreachable!("loaded above");
@@ -127,11 +149,16 @@ impl KvResolver {
             }
             FieldTier::High => {
                 if matches!(field.dict, Dict::Unloaded) {
-                    field.dict = Dict::High(reader.sfst.high_field(field.chunk)?);
+                    let decoded = reader.sfst.high_field(field.chunk);
                     #[cfg(test)]
                     {
-                        self.loads += 1;
+                        if decoded.is_ok() {
+                            self.loads += 1;
+                        } else {
+                            self.failed_loads += 1;
+                        }
                     }
+                    field.dict = Dict::High(decoded?);
                 }
                 let Dict::High(chunk) = &field.dict else {
                     unreachable!("loaded above");
