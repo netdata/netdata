@@ -527,9 +527,10 @@ The serialized `PrefixMap` holds two fields in this order: `fst_bytes`
 `BitmapValue` per key, in sorted key order). Each FST output is the
 key's position in sorted key order, which indexes into `values` and
 lets a reader find the key at a position without walking the FST
-(KvId resolution, above). Readers that only list or resolve keys stream
-the decompression and stop after `fst_bytes`, so the order is part of
-the format. `MF{i}` uses the same layout.
+(KvId resolution, under Tier-Aligned IDs below). Readers that need only
+the keys (listing them, or resolving `MF{i}` entries) stream the
+decompression and stop after `fst_bytes`, so the order is part of the
+format. `MF{i}` uses the same layout.
 
 ### `MF{i}` — Mid-card field FSTs
 
@@ -665,7 +666,7 @@ reads the entry at that position:
 
 The FST lookups are reverse lookups (`fst::raw::Fst::get_key`), which
 are only defined because each FST output is the key's sorted position
-(see `PRIM` below).
+(see `PRIM` above).
 
 Tier assignment is stable for a given input: fields are sorted by
 name within each tier, and entries within each per-field structure
