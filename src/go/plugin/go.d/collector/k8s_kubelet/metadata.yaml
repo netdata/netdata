@@ -357,3 +357,33 @@ modules:
               dimensions:
                 - name: actual
                 - name: desired
+        - name: pvc
+          description: These metrics refer to a PersistentVolumeClaim mounted on this node, one instance per PVC.
+          labels:
+            - name: k8s_namespace
+              description: Namespace of the PersistentVolumeClaim.
+            - name: k8s_pvc_name
+              description: PersistentVolumeClaim name.
+          metrics:
+            - name: k8s_kubelet.pvc_space_usage
+              description: PVC Space Usage
+              unit: B
+              chart_type: stacked
+              dimensions:
+                - name: available
+                - name: used
+                - name: reserved
+            - name: k8s_kubelet.pvc_space_utilization
+              description: PVC Space Utilization
+              unit: "%"
+              chart_type: line
+              dimensions:
+                - name: utilization
+            - name: k8s_kubelet.pvc_inodes_usage
+              description: PVC Inodes Usage
+              unit: inodes
+              chart_type: stacked
+              dimensions:
+                - name: available
+                - name: used
+                - name: reserved

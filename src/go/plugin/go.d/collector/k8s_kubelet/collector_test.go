@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"os"
+	"strings"
 	"testing"
 
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/collecttest"
@@ -158,14 +159,28 @@ func TestCollector_Collect(t *testing.T) {
 		"kubelet_runtime_operations_status":                                          279,
 		"kubelet_runtime_operations_stop_podsandbox":                                 14,
 		"kubelet_runtime_operations_version":                                         190,
-		"rest_client_requests_200":                                                   177,
+		"pvc_app_cache_inodes_available":                                             1800,
+		"pvc_app_cache_inodes_reserved":                                              0,
+		"pvc_app_cache_inodes_used":                                                  200,
+		"pvc_app_cache_space_available":                                              1500000,
+		"pvc_app_cache_space_reserved":                                               0,
+		"pvc_app_cache_space_used":                                                   500000,
+		"pvc_app_cache_space_utilization":                                            2500,
+		"pvc_app_data-db-0_inodes_available":                                         900,
+		"pvc_app_data-db-0_inodes_reserved":                                          0,
+		"pvc_app_data-db-0_inodes_used":                                              100,
+		"pvc_app_data-db-0_space_available":                                          450000,
+		"pvc_app_data-db-0_space_reserved":                                           100000,
+		"pvc_app_data-db-0_space_used":                                               450000,
+		"pvc_app_data-db-0_space_utilization":                                        5000,
+		"rest_client_requests_200":                                                   368,
 		"rest_client_requests_201":                                                   43,
 		"rest_client_requests_403":                                                   2,
 		"rest_client_requests_409":                                                   1,
-		"rest_client_requests_<error>":                                               8,
-		"rest_client_requests_GET":                                                   37,
+		"rest_client_requests_<error>":                                               45,
+		"rest_client_requests_GET":                                                   230,
 		"rest_client_requests_PATCH":                                                 177,
-		"rest_client_requests_POST":                                                  8,
+		"rest_client_requests_POST":                                                  52,
 		"token_count":                                                                0,
 		"token_fail_count":                                                           0,
 		"volume_manager_plugin_kubernetes.io/configmap_state_actual":                 3,
@@ -177,6 +192,75 @@ func TestCollector_Collect(t *testing.T) {
 	}
 
 	assert.Equal(t, expected, collr.Collect(context.Background()))
+}
+
+func TestCollector_Collect_PVCCharts(t *testing.T) {
+	type pvcChart struct {
+		ctx     string
+		labels  map[string]string
+		removed bool
+	}
+	pvcCharts := func(collr *Collector) map[string]pvcChart {
+		charts := make(map[string]pvcChart)
+		for _, chart := range *collr.Charts() {
+			if !strings.HasPrefix(chart.ID, "pvc_") {
+				continue
+			}
+			labels := make(map[string]string)
+			for _, l := range chart.Labels {
+				labels[l.Key] = l.Value
+			}
+			charts[chart.ID] = pvcChart{ctx: chart.Ctx, labels: labels, removed: chart.IsRemoved()}
+		}
+		return charts
+	}
+	cacheLabels := map[string]string{"k8s_namespace": "app", "k8s_pvc_name": "cache"}
+	dbLabels := map[string]string{"k8s_namespace": "app", "k8s_pvc_name": "data-db-0"}
+
+	// the second scrape no longer reports the "cache" PVC
+	var withoutCache []byte
+	for _, line := range strings.SplitAfter(string(dataMetrics), "\n") {
+		if !strings.Contains(line, `persistentvolumeclaim="cache"`) {
+			withoutCache = append(withoutCache, line...)
+		}
+	}
+
+	scrapes := [][]byte{dataMetrics, withoutCache}
+	var scrape int
+	ts := httptest.NewServer(
+		http.HandlerFunc(
+			func(w http.ResponseWriter, r *http.Request) {
+				_, _ = w.Write(scrapes[scrape])
+			}))
+	defer ts.Close()
+
+	collr := New()
+	collr.BearerTokenFile = ""
+	collr.URL = ts.URL + "/metrics"
+	require.NoError(t, collr.Init(context.Background()))
+
+	require.NotEmpty(t, collr.Collect(context.Background()))
+	assert.Equal(t, map[string]pvcChart{
+		"pvc_app_cache_space_usage":           {ctx: "k8s_kubelet.pvc_space_usage", labels: cacheLabels},
+		"pvc_app_cache_space_utilization":     {ctx: "k8s_kubelet.pvc_space_utilization", labels: cacheLabels},
+		"pvc_app_cache_inodes_usage":          {ctx: "k8s_kubelet.pvc_inodes_usage", labels: cacheLabels},
+		"pvc_app_data-db-0_space_usage":       {ctx: "k8s_kubelet.pvc_space_usage", labels: dbLabels},
+		"pvc_app_data-db-0_space_utilization": {ctx: "k8s_kubelet.pvc_space_utilization", labels: dbLabels},
+		"pvc_app_data-db-0_inodes_usage":      {ctx: "k8s_kubelet.pvc_inodes_usage", labels: dbLabels},
+	}, pvcCharts(collr))
+
+	scrape = 1
+	mx := collr.Collect(context.Background())
+	assert.NotContains(t, mx, "pvc_app_cache_space_used")
+	assert.Contains(t, mx, "pvc_app_data-db-0_space_used")
+	assert.Equal(t, map[string]pvcChart{
+		"pvc_app_cache_space_usage":           {ctx: "k8s_kubelet.pvc_space_usage", labels: cacheLabels, removed: true},
+		"pvc_app_cache_space_utilization":     {ctx: "k8s_kubelet.pvc_space_utilization", labels: cacheLabels, removed: true},
+		"pvc_app_cache_inodes_usage":          {ctx: "k8s_kubelet.pvc_inodes_usage", labels: cacheLabels, removed: true},
+		"pvc_app_data-db-0_space_usage":       {ctx: "k8s_kubelet.pvc_space_usage", labels: dbLabels},
+		"pvc_app_data-db-0_space_utilization": {ctx: "k8s_kubelet.pvc_space_utilization", labels: dbLabels},
+		"pvc_app_data-db-0_inodes_usage":      {ctx: "k8s_kubelet.pvc_inodes_usage", labels: dbLabels},
+	}, pvcCharts(collr))
 }
 
 func TestCollector_Collect_ReceiveInvalidResponse(t *testing.T) {
