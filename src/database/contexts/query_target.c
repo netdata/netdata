@@ -1390,6 +1390,8 @@ ssize_t weights_foreach_rrdmetric_in_context(RRDCONTEXT_ACQUIRED *rca,
         return 0;
 
     char host_node_id_str[UUID_STR_LEN] = "";
+    if((scope_instances_sp || instances_sp) && match_ids && !UUIDiszero(rc->rrdhost->node_id))
+        uuid_unparse_lower(rc->rrdhost->node_id.uuid, host_node_id_str);
 
     RRDHOST_IDENTITY host_identity = { 0 };
     if(version >= 2 && match_names && (scope_instances_sp || instances_sp))

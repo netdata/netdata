@@ -14,13 +14,13 @@ static inline PARSER_RC pluginsd_set(char **words, size_t num_words, PARSER *par
     char *value = get_word(words, num_words, idx++);
 
     RRDHOST *host = pluginsd_require_scope_host(parser, PLUGINSD_KEYWORD_SET);
-    if(!host) return PLUGINSD_DISABLE_PLUGIN(parser, NULL, NULL);
+    if(!host) return PLUGINSD_PROTOCOL_ERROR(NULL, NULL);
 
     RRDSET *st = pluginsd_require_scope_chart(parser, PLUGINSD_KEYWORD_SET, PLUGINSD_KEYWORD_CHART);
-    if(!st) return PLUGINSD_DISABLE_PLUGIN(parser, NULL, NULL);
+    if(!st) return PLUGINSD_PROTOCOL_ERROR(NULL, NULL);
 
     RRDDIM *rd = pluginsd_acquire_dimension(host, st, dimension, slot, PLUGINSD_KEYWORD_SET);
-    if(!rd) return PLUGINSD_DISABLE_PLUGIN(parser, NULL, NULL);
+    if(!rd) return PLUGINSD_PROTOCOL_ERROR(NULL, NULL);
 
     st->pluginsd.set = true;
 
@@ -54,13 +54,13 @@ static inline PARSER_RC pluginsd_begin(char **words, size_t num_words, PARSER *p
     char *microseconds_txt = get_word(words, num_words, idx++);
 
     RRDHOST *host = pluginsd_require_scope_host(parser, PLUGINSD_KEYWORD_BEGIN);
-    if(!host) return PLUGINSD_DISABLE_PLUGIN(parser, NULL, NULL);
+    if(!host) return PLUGINSD_PROTOCOL_ERROR(NULL, NULL);
 
     RRDSET *st = pluginsd_rrdset_cache_get_from_slot(parser, host, id, slot, PLUGINSD_KEYWORD_BEGIN);
-    if(!st) return PLUGINSD_DISABLE_PLUGIN(parser, NULL, NULL);
+    if(!st) return PLUGINSD_PROTOCOL_ERROR(NULL, NULL);
 
     if(!pluginsd_set_scope_chart(parser, st, PLUGINSD_KEYWORD_BEGIN))
-        return PLUGINSD_DISABLE_PLUGIN(parser, NULL, NULL);
+        return PLUGINSD_PROTOCOL_ERROR(NULL, NULL);
 
     usec_t microseconds = 0;
     if (microseconds_txt && *microseconds_txt) {
@@ -102,10 +102,10 @@ static inline PARSER_RC pluginsd_end(char **words, size_t num_words, PARSER *par
     char *pending_rrdset_next = get_word(words, num_words, 3);
 
     RRDHOST *host = pluginsd_require_scope_host(parser, PLUGINSD_KEYWORD_END);
-    if(!host) return PLUGINSD_DISABLE_PLUGIN(parser, NULL, NULL);
+    if(!host) return PLUGINSD_PROTOCOL_ERROR(NULL, NULL);
 
     RRDSET *st = pluginsd_require_scope_chart(parser, PLUGINSD_KEYWORD_END, PLUGINSD_KEYWORD_BEGIN);
-    if(!st) return PLUGINSD_DISABLE_PLUGIN(parser, NULL, NULL);
+    if(!st) return PLUGINSD_PROTOCOL_ERROR(NULL, NULL);
 
     if (unlikely(rrdset_flag_check(st, RRDSET_FLAG_DEBUG)))
         netdata_log_debug(D_PLUGINSD, "requested an END on chart '%s'", rrdset_id(st));
@@ -150,14 +150,14 @@ static inline PARSER_RC pluginsd_host_define(char **words, size_t num_words, PAR
     char *hostname = get_word(words, num_words, 2);
 
     if(unlikely(!guid || !*guid || !hostname || !*hostname))
-        return PLUGINSD_DISABLE_PLUGIN(parser, PLUGINSD_KEYWORD_HOST_DEFINE, "missing parameters");
+        return PLUGINSD_PROTOCOL_ERROR(PLUGINSD_KEYWORD_HOST_DEFINE, "missing parameters");
 
     if(unlikely(parser->user.host_define.parsing_host))
-        return PLUGINSD_DISABLE_PLUGIN(parser, PLUGINSD_KEYWORD_HOST_DEFINE,
+        return PLUGINSD_PROTOCOL_ERROR(PLUGINSD_KEYWORD_HOST_DEFINE,
             "another host definition is already open - did you send " PLUGINSD_KEYWORD_HOST_DEFINE_END "?");
 
     if(!pluginsd_validate_machine_guid(guid, &parser->user.host_define.machine_guid, parser->user.host_define.machine_guid_str))
-        return PLUGINSD_DISABLE_PLUGIN(parser, PLUGINSD_KEYWORD_HOST_DEFINE, "cannot parse MACHINE_GUID - is it a valid UUID?");
+        return PLUGINSD_PROTOCOL_ERROR(PLUGINSD_KEYWORD_HOST_DEFINE, "cannot parse MACHINE_GUID - is it a valid UUID?");
 
     parser->user.host_define.hostname = string_strdupz(hostname);
     parser->user.host_define.rrdlabels = rrdlabels_create();
@@ -172,10 +172,10 @@ static inline PARSER_RC pluginsd_host_dictionary(char **words, size_t num_words,
     char *value = get_word(words, num_words, 2);
 
     if(!name || !*name || !value)
-        return PLUGINSD_DISABLE_PLUGIN(parser, keyword, "missing parameters");
+        return PLUGINSD_PROTOCOL_ERROR(keyword, "missing parameters");
 
     if(!parser->user.host_define.parsing_host || !labels)
-        return PLUGINSD_DISABLE_PLUGIN(parser, keyword, "host is not defined, send " PLUGINSD_KEYWORD_HOST_DEFINE " before this");
+        return PLUGINSD_PROTOCOL_ERROR(keyword, "host is not defined, send " PLUGINSD_KEYWORD_HOST_DEFINE " before this");
 
     rrdlabels_add(labels, name, value, RRDLABEL_SRC_CONFIG);
     if (strcmp(name, "_node_stale_after_seconds") == 0) {
@@ -256,7 +256,7 @@ static bool pluginsd_host_claim_as_local_vnode(RRDHOST *host, const char *keywor
 
 static inline PARSER_RC pluginsd_host_define_end(char **words __maybe_unused, size_t num_words __maybe_unused, PARSER *parser) {
     if(!parser->user.host_define.parsing_host)
-        return PLUGINSD_DISABLE_PLUGIN(parser, PLUGINSD_KEYWORD_HOST_DEFINE_END, "missing initialization, send " PLUGINSD_KEYWORD_HOST_DEFINE " before this");
+        return PLUGINSD_PROTOCOL_ERROR(PLUGINSD_KEYWORD_HOST_DEFINE_END, "missing initialization, send " PLUGINSD_KEYWORD_HOST_DEFINE " before this");
 
     struct rrdhost_system_info *system_info = rrdhost_system_info_from_host_labels(parser->user.host_define.rrdlabels);
 
@@ -405,11 +405,11 @@ static inline PARSER_RC pluginsd_host(char **words, size_t num_words, PARSER *pa
     nd_uuid_t uuid;
     char uuid_str[UUID_STR_LEN];
     if(!pluginsd_validate_machine_guid(guid, &uuid, uuid_str))
-        return PLUGINSD_DISABLE_PLUGIN(parser, PLUGINSD_KEYWORD_HOST, "cannot parse MACHINE_GUID - is it a valid UUID?");
+        return PLUGINSD_PROTOCOL_ERROR(PLUGINSD_KEYWORD_HOST, "cannot parse MACHINE_GUID - is it a valid UUID?");
 
     RRDHOST *host = rrdhost_find_by_guid(uuid_str);
     if(unlikely(!host))
-        return PLUGINSD_DISABLE_PLUGIN(parser, PLUGINSD_KEYWORD_HOST, "cannot find a host with this machine guid - have you created it?");
+        return PLUGINSD_PROTOCOL_ERROR(PLUGINSD_KEYWORD_HOST, "cannot find a host with this machine guid - have you created it?");
 
     parser->user.host = host;
     uint32_t *Pvalue = (uint32_t *) JudyLGet(parser->user.vnodes.JudyL, (Word_t) host, PJE0);
@@ -439,7 +439,7 @@ static inline PARSER_RC pluginsd_host(char **words, size_t num_words, PARSER *pa
 
 static inline PARSER_RC pluginsd_chart(char **words, size_t num_words, PARSER *parser) {
     RRDHOST *host = pluginsd_require_scope_host(parser, PLUGINSD_KEYWORD_CHART);
-    if(!host) return PLUGINSD_DISABLE_PLUGIN(parser, NULL, NULL);
+    if(!host) return PLUGINSD_PROTOCOL_ERROR(NULL, NULL);
 
     int idx = 1;
     ssize_t slot = pluginsd_parse_rrd_slot(words, num_words, PLUGINSD_CHART_SLOT_MAX);
@@ -467,7 +467,7 @@ static inline PARSER_RC pluginsd_chart(char **words, size_t num_words, PARSER *p
 
     // make sure we have the required variables
     if (unlikely((!type || !*type || !id || !*id)))
-        return PLUGINSD_DISABLE_PLUGIN(parser, PLUGINSD_KEYWORD_CHART, "missing parameters");
+        return PLUGINSD_PROTOCOL_ERROR(PLUGINSD_KEYWORD_CHART, "missing parameters");
 
     // parse the name, and make sure it does not include 'type.'
     if (unlikely(name && *name)) {
@@ -547,7 +547,7 @@ static inline PARSER_RC pluginsd_chart(char **words, size_t num_words, PARSER *p
             rrdset_flag_clear(st, RRDSET_FLAG_STORE_FIRST);
 
         if(!pluginsd_set_scope_chart(parser, st, PLUGINSD_KEYWORD_CHART))
-            return PLUGINSD_DISABLE_PLUGIN(parser, NULL, NULL);
+            return PLUGINSD_PROTOCOL_ERROR(NULL, NULL);
 
         pluginsd_rrdset_cache_put_to_slot(parser, st, slot, obsolete);
         if(SERVING_STREAMING(parser))
@@ -572,13 +572,13 @@ static inline PARSER_RC pluginsd_dimension(char **words, size_t num_words, PARSE
     char *options = get_word(words, num_words, idx++);
 
     RRDHOST *host = pluginsd_require_scope_host(parser, PLUGINSD_KEYWORD_DIMENSION);
-    if(!host) return PLUGINSD_DISABLE_PLUGIN(parser, NULL, NULL);
+    if(!host) return PLUGINSD_PROTOCOL_ERROR(NULL, NULL);
 
     RRDSET *st = pluginsd_require_scope_chart(parser, PLUGINSD_KEYWORD_DIMENSION, PLUGINSD_KEYWORD_CHART);
-    if(!st) return PLUGINSD_DISABLE_PLUGIN(parser, NULL, NULL);
+    if(!st) return PLUGINSD_PROTOCOL_ERROR(NULL, NULL);
 
     if (unlikely(!id || !*id))
-        return PLUGINSD_DISABLE_PLUGIN(parser, PLUGINSD_KEYWORD_DIMENSION, "missing dimension id");
+        return PLUGINSD_PROTOCOL_ERROR(PLUGINSD_KEYWORD_DIMENSION, "missing dimension id");
 
     long multiplier = 1;
     if (multiplier_s && *multiplier_s) {
@@ -606,7 +606,7 @@ static inline PARSER_RC pluginsd_dimension(char **words, size_t num_words, PARSE
 
     RRDDIM *rd = rrddim_add(st, id, name, multiplier, divisor, rrd_algorithm_id(algorithm));
     if (unlikely(!rd))
-        return PLUGINSD_DISABLE_PLUGIN(parser, PLUGINSD_KEYWORD_DIMENSION, "failed to create dimension");
+        return PLUGINSD_PROTOCOL_ERROR(PLUGINSD_KEYWORD_DIMENSION, "failed to create dimension");
 
     int unhide_dimension = 1;
 
@@ -670,7 +670,7 @@ static inline PARSER_RC pluginsd_variable(char **words, size_t num_words, PARSER
     NETDATA_DOUBLE v;
 
     RRDHOST *host = pluginsd_require_scope_host(parser, PLUGINSD_KEYWORD_VARIABLE);
-    if(!host) return PLUGINSD_DISABLE_PLUGIN(parser, NULL, NULL);
+    if(!host) return PLUGINSD_PROTOCOL_ERROR(NULL, NULL);
 
     RRDSET *st = pluginsd_get_scope_chart(parser);
 
@@ -689,7 +689,7 @@ static inline PARSER_RC pluginsd_variable(char **words, size_t num_words, PARSER
     }
 
     if (unlikely(!name || !*name))
-        return PLUGINSD_DISABLE_PLUGIN(parser, PLUGINSD_KEYWORD_VARIABLE, "missing variable name");
+        return PLUGINSD_PROTOCOL_ERROR(PLUGINSD_KEYWORD_VARIABLE, "missing variable name");
 
     if (unlikely(!value || !*value))
         value = NULL;
@@ -704,7 +704,7 @@ static inline PARSER_RC pluginsd_variable(char **words, size_t num_words, PARSER
     }
 
     if (!global && !st)
-        return PLUGINSD_DISABLE_PLUGIN(parser, PLUGINSD_KEYWORD_VARIABLE, "no chart is defined and no GLOBAL is given");
+        return PLUGINSD_PROTOCOL_ERROR(PLUGINSD_KEYWORD_VARIABLE, "no chart is defined and no GLOBAL is given");
 
     char *endptr = NULL;
     v = (NETDATA_DOUBLE) str2ndd_encoded(value, &endptr);
@@ -770,7 +770,7 @@ static inline PARSER_RC pluginsd_label(char **words, size_t num_words, PARSER *p
     const char *value = get_word(words, num_words, 3);
 
     if (!name || !label_source || !value)
-        return PLUGINSD_DISABLE_PLUGIN(parser, PLUGINSD_KEYWORD_LABEL, "missing parameters");
+        return PLUGINSD_PROTOCOL_ERROR(PLUGINSD_KEYWORD_LABEL, "missing parameters");
 
     char *store = (char *)value;
     bool allocated_store = false;
@@ -812,7 +812,7 @@ static inline PARSER_RC pluginsd_label(char **words, size_t num_words, PARSER *p
 
 static inline PARSER_RC pluginsd_overwrite(char **words __maybe_unused, size_t num_words __maybe_unused, PARSER *parser) {
     RRDHOST *host = pluginsd_require_scope_host(parser, PLUGINSD_KEYWORD_OVERWRITE);
-    if(!host) return PLUGINSD_DISABLE_PLUGIN(parser, NULL, NULL);
+    if(!host) return PLUGINSD_PROTOCOL_ERROR(NULL, NULL);
 
     netdata_log_debug(D_PLUGINSD, "requested to OVERWRITE host labels");
 
@@ -844,11 +844,11 @@ static inline PARSER_RC pluginsd_clabel(char **words, size_t num_words, PARSER *
 
     if (!name || !value || !label_source) {
         netdata_log_error("Ignoring malformed or empty CHART LABEL command.");
-        return PLUGINSD_DISABLE_PLUGIN(parser, NULL, NULL);
+        return PLUGINSD_PROTOCOL_ERROR(NULL, NULL);
     }
 
     RRDSET *st = pluginsd_get_scope_chart(parser);
-    if(!st) return PLUGINSD_DISABLE_PLUGIN(parser, PLUGINSD_KEYWORD_CLABEL, "Got CHART LABEL without a chart");
+    if(!st) return PLUGINSD_PROTOCOL_ERROR(PLUGINSD_KEYWORD_CLABEL, "Got CHART LABEL without a chart");
 
     if(unlikely(parser->user.clabel_count++ == 0))
         rrdlabels_unmark_all(st->rrdlabels);
@@ -861,16 +861,16 @@ static inline PARSER_RC pluginsd_clabel(char **words, size_t num_words, PARSER *
 
 static inline PARSER_RC pluginsd_clabel_commit(char **words __maybe_unused, size_t num_words __maybe_unused, PARSER *parser) {
     RRDHOST *host = pluginsd_require_scope_host(parser, PLUGINSD_KEYWORD_CLABEL_COMMIT);
-    if(!host) return PLUGINSD_DISABLE_PLUGIN(parser, NULL, NULL);
+    if(!host) return PLUGINSD_PROTOCOL_ERROR(NULL, NULL);
 
     RRDSET *st = pluginsd_require_scope_chart(parser, PLUGINSD_KEYWORD_CLABEL_COMMIT, PLUGINSD_KEYWORD_BEGIN);
-    if(!st) return PLUGINSD_DISABLE_PLUGIN(parser, NULL, NULL);
+    if(!st) return PLUGINSD_PROTOCOL_ERROR(NULL, NULL);
 
     netdata_log_debug(D_PLUGINSD, "requested to commit chart labels");
 
     if(!parser->user.clabel_count) {
         netdata_log_error("PLUGINSD: 'host:%s' got CLABEL_COMMIT, without a CHART or BEGIN. Ignoring it.", rrdhost_hostname(host));
-        return PLUGINSD_DISABLE_PLUGIN(parser, NULL, NULL);
+        return PLUGINSD_PROTOCOL_ERROR(NULL, NULL);
     }
 
     // rrdlabels_remove_all_unmarked_and_changed() only sees added/removed pairs; a source-only
@@ -910,19 +910,19 @@ static ALWAYS_INLINE PARSER_RC pluginsd_begin_v2(char **words, size_t num_words,
     char *wall_clock_time_str = get_word(words, num_words, idx++);
 
     if(unlikely(!id || !update_every_str || !end_time_str || !wall_clock_time_str))
-        return PLUGINSD_DISABLE_PLUGIN(parser, PLUGINSD_KEYWORD_BEGIN_V2, "missing parameters");
+        return PLUGINSD_PROTOCOL_ERROR(PLUGINSD_KEYWORD_BEGIN_V2, "missing parameters");
 
     RRDHOST *host = pluginsd_require_scope_host(parser, PLUGINSD_KEYWORD_BEGIN_V2);
-    if(unlikely(!host)) return PLUGINSD_DISABLE_PLUGIN(parser, NULL, NULL);
+    if(unlikely(!host)) return PLUGINSD_PROTOCOL_ERROR(NULL, NULL);
 
     timing_step(TIMING_STEP_BEGIN2_PREPARE);
 
     RRDSET *st = pluginsd_rrdset_cache_get_from_slot(parser, host, id, slot, PLUGINSD_KEYWORD_BEGIN_V2);
 
-    if(unlikely(!st)) return PLUGINSD_DISABLE_PLUGIN(parser, NULL, NULL);
+    if(unlikely(!st)) return PLUGINSD_PROTOCOL_ERROR(NULL, NULL);
 
     if(!pluginsd_set_scope_chart(parser, st, PLUGINSD_KEYWORD_BEGIN_V2))
-        return PLUGINSD_DISABLE_PLUGIN(parser, NULL, NULL);
+        return PLUGINSD_PROTOCOL_ERROR(NULL, NULL);
 
     if(unlikely(rrdset_flag_check(st, RRDSET_FLAG_OBSOLETE))) {
         if(!spinlock_trylock(&st->destroy_lock))
@@ -1058,18 +1058,18 @@ static ALWAYS_INLINE PARSER_RC pluginsd_set_v2(char **words, size_t num_words, P
     char *flags_str = get_word(words, num_words, idx++);
 
     if(unlikely(!dimension || !collected_str || !value_str || !flags_str))
-        return PLUGINSD_DISABLE_PLUGIN(parser, PLUGINSD_KEYWORD_SET_V2, "missing parameters");
+        return PLUGINSD_PROTOCOL_ERROR(PLUGINSD_KEYWORD_SET_V2, "missing parameters");
 
     RRDHOST *host = pluginsd_require_scope_host(parser, PLUGINSD_KEYWORD_SET_V2);
-    if(unlikely(!host)) return PLUGINSD_DISABLE_PLUGIN(parser, NULL, NULL);
+    if(unlikely(!host)) return PLUGINSD_PROTOCOL_ERROR(NULL, NULL);
 
     RRDSET *st = pluginsd_require_scope_chart(parser, PLUGINSD_KEYWORD_SET_V2, PLUGINSD_KEYWORD_BEGIN_V2);
-    if(unlikely(!st)) return PLUGINSD_DISABLE_PLUGIN(parser, NULL, NULL);
+    if(unlikely(!st)) return PLUGINSD_PROTOCOL_ERROR(NULL, NULL);
 
     timing_step(TIMING_STEP_SET2_PREPARE);
 
     RRDDIM *rd = pluginsd_acquire_dimension(host, st, dimension, slot, PLUGINSD_KEYWORD_SET_V2);
-    if(unlikely(!rd)) return PLUGINSD_DISABLE_PLUGIN(parser, NULL, NULL);
+    if(unlikely(!rd)) return PLUGINSD_PROTOCOL_ERROR(NULL, NULL);
 
     st->pluginsd.set = true;
 
@@ -1214,10 +1214,10 @@ static ALWAYS_INLINE PARSER_RC pluginsd_end_v2(char **words __maybe_unused, size
     timing_init();
 
     RRDHOST *host = pluginsd_require_scope_host(parser, PLUGINSD_KEYWORD_END_V2);
-    if(unlikely(!host)) return PLUGINSD_DISABLE_PLUGIN(parser, NULL, NULL);
+    if(unlikely(!host)) return PLUGINSD_PROTOCOL_ERROR(NULL, NULL);
 
     RRDSET *st = pluginsd_require_scope_chart(parser, PLUGINSD_KEYWORD_END_V2, PLUGINSD_KEYWORD_BEGIN_V2);
-    if(unlikely(!st)) return PLUGINSD_DISABLE_PLUGIN(parser, NULL, NULL);
+    if(unlikely(!st)) return PLUGINSD_PROTOCOL_ERROR(NULL, NULL);
 
     parser->user.data_collections_count++;
 
@@ -1298,11 +1298,11 @@ static inline PARSER_RC pluginsd_trust_durations(char **words, size_t num_words,
     char *value = get_word(words, num_words, 1);
 
     if (!value || !*value)
-        return PLUGINSD_DISABLE_PLUGIN(parser, PLUGINSD_KEYWORD_TRUST_DURATIONS, "missing parameter");
+        return PLUGINSD_PROTOCOL_ERROR(PLUGINSD_KEYWORD_TRUST_DURATIONS, "missing parameter");
 
     int trusted = str2i(value);
     if (trusted != 0 && trusted != 1)
-        return PLUGINSD_DISABLE_PLUGIN(parser, PLUGINSD_KEYWORD_TRUST_DURATIONS, "parameter must be 0 or 1");
+        return PLUGINSD_PROTOCOL_ERROR(PLUGINSD_KEYWORD_TRUST_DURATIONS, "parameter must be 0 or 1");
 
     parser->user.trust_durations = trusted;
 
@@ -1336,7 +1336,7 @@ static void pluginsd_json_dev_null(PARSER *parser, void *action_data __maybe_unu
 
 static PARSER_RC pluginsd_json(char **words __maybe_unused, size_t num_words __maybe_unused, PARSER *parser) {
     RRDHOST *host = pluginsd_require_scope_host(parser, PLUGINSD_KEYWORD_JSON);
-    if(!host) return PLUGINSD_DISABLE_PLUGIN(parser, NULL, NULL);
+    if(!host) return PLUGINSD_PROTOCOL_ERROR(NULL, NULL);
 
     char *keyword = get_word(words, num_words, 1);
     if(!keyword) keyword = "";
@@ -1405,9 +1405,10 @@ bool parser_reconstruct_context(BUFFER *wb, void *ptr) {
     return true;
 }
 
-inline size_t pluginsd_process(RRDHOST *host, struct plugind *cd, int fd_input, int fd_output, int trust_durations, bool *retry)
+inline size_t pluginsd_process(RRDHOST *host, struct plugind *cd, int fd_input, int fd_output, int trust_durations, bool *retry, bool *protocol_error)
 {
     *retry = false;
+    *protocol_error = false;
     int enabled = cd->unsafe.enabled;
 
     if (fd_input == -1 || fd_output == -1 || !enabled) {
@@ -1445,6 +1446,7 @@ inline size_t pluginsd_process(RRDHOST *host, struct plugind *cd, int fd_input, 
     buffered_reader_init(&parser->reader);
     CLEAN_BUFFER *buffer = buffer_create(sizeof(parser->reader.read_buffer) + 2, NULL);
     bool send_quit = true;
+    PARSER_RC rc = PARSER_RC_OK;
     while(likely(service_running(SERVICE_COLLECTORS))) {
 
         if(unlikely(!buffered_reader_next_line(&parser->reader, buffer))) {
@@ -1462,7 +1464,8 @@ inline size_t pluginsd_process(RRDHOST *host, struct plugind *cd, int fd_input, 
             continue;
         }
 
-        if(unlikely(parser_action(parser, buffer->buffer)))
+        rc = parser_action(parser, buffer->buffer);
+        if(unlikely(rc != PARSER_RC_OK))
             break;
 
         buffer->len = 0;
@@ -1479,6 +1482,8 @@ inline size_t pluginsd_process(RRDHOST *host, struct plugind *cd, int fd_input, 
 
     cd->unsafe.enabled = parser->user.enabled;
     *retry = parser->user.retry;
+    // a retry also stops the parser with an error, but it is not the plugin's fault
+    *protocol_error = (rc == PARSER_RC_ERROR && !*retry);
     count = parser->user.data_collections_count;
 
     if(likely(count)) {

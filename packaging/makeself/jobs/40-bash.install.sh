@@ -17,6 +17,8 @@ fetch "${build_dir}" "${BASH_ARTIFACT_SOURCE}/bash-${BASH_VERSION}.tar.gz" \
 
 export CFLAGS="${TUNING_FLAGS} -pipe"
 export CXXFLAGS="${CFLAGS}"
+LDFLAGS="$(errata_ldflags)"
+export LDFLAGS
 export PKG_CONFIG_PATH="/openssl-static/lib64/pkgconfig"
 
 if [ "${CACHE_HIT:-0}" -eq 0 ]; then

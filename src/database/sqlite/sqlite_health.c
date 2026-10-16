@@ -167,6 +167,11 @@ static void insert_alert_queue(
     RRDCALC_STATUS new_status,
     time_t trigger_time)
 {
+    // check before preparing: an early return after PREPARE_STATEMENT would leak the statement
+    struct aclk_sync_cfg_t *aclk_host_config = __atomic_load_n(&host->aclk_host_config, __ATOMIC_ACQUIRE);
+    if (!aclk_host_config)
+        return;
+
     static __thread sqlite3_stmt *compiled_res = NULL;
     sqlite3_stmt *res = NULL;
 
@@ -182,10 +187,6 @@ static void insert_alert_queue(
     }
 
     int rc;
-
-    struct aclk_sync_cfg_t *aclk_host_config = __atomic_load_n(&host->aclk_host_config, __ATOMIC_ACQUIRE);
-    if (!aclk_host_config)
-        return;
 
     time_t submit_delay = nd_time_t_add_saturating(trigger_time, calculate_delay(old_status, new_status));
 
@@ -713,15 +714,6 @@ void sql_health_alarm_log_load(RRDHOST *host)
     int param = 0;
     SQLITE_BIND_FAIL(done, sqlite3_bind_blob(res, ++param, &host->host_id.uuid, sizeof(host->host_id.uuid), SQLITE_STATIC));
 
-    DICTIONARY *all_rrdcalcs = dictionary_create(
-        DICT_OPTION_NAME_LINK_DONT_CLONE | DICT_OPTION_VALUE_LINK_DONT_CLONE | DICT_OPTION_DONT_OVERWRITE_VALUE);
-
-    RRDCALC *rc;
-    foreach_rrdcalc_in_rrdhost_read(host, rc) {
-        dictionary_set(all_rrdcalcs, rrdcalc_name(rc), rc, sizeof(*rc));
-    }
-    foreach_rrdcalc_in_rrdhost_done(rc);
-
     param = 0;
     rw_spinlock_write_lock(&host->health_log.spinlock);
 
@@ -758,18 +750,6 @@ void sql_health_alarm_log_load(RRDHOST *host)
 
         // Check if we got last_repeat field
         time_t last_repeat = (time_t)sqlite3_column_int64(res, 25);
-
-        rc = dictionary_get(all_rrdcalcs, (char *) sqlite3_column_text(res, 13));
-        if(unlikely(rc)) {
-            if (rrdcalc_isrepeating(rc)) {
-                rc->last_repeat = last_repeat;
-                rrdcalc_runtime_snapshot_publish_repeat_state(rc);
-                // We iterate through repeating alarm entries only to
-                // find the latest last_repeat timestamp. Otherwise,
-                // there is no need to keep them in memory.
-                continue;
-            }
-        }
 
         if (sqlite3_column_type(res, 30) != SQLITE_NULL &&
             unlikely(!sqlite3_column_uuid_ptr(res, 30))) {
@@ -857,9 +837,6 @@ void sql_health_alarm_log_load(RRDHOST *host)
     }
 
     rw_spinlock_write_unlock(&host->health_log.spinlock);
-
-    dictionary_destroy(all_rrdcalcs);
-    all_rrdcalcs = NULL;
 
     if (!host->health_max_unique_id)
         host->health_max_unique_id = get_uint32_id();
@@ -1040,8 +1017,8 @@ int sql_health_get_last_executed_event(RRDHOST *host, ALARM_ENTRY *ae, RRDCALC_S
 
     int param = 0;
     SQLITE_BIND_FAIL(done, sqlite3_bind_blob(res, ++param, &host->host_id.uuid, sizeof(host->host_id.uuid), SQLITE_STATIC));
-    SQLITE_BIND_FAIL(done, sqlite3_bind_int(res, ++param, (int) ae->alarm_id));
-    SQLITE_BIND_FAIL(done, sqlite3_bind_int(res, ++param, (int) ae->unique_id));
+    SQLITE_BIND_FAIL(done, sqlite3_bind_int64(res, ++param, (sqlite3_int64) ae->alarm_id));
+    SQLITE_BIND_FAIL(done, sqlite3_bind_int64(res, ++param, (sqlite3_int64) ae->unique_id));
     SQLITE_BIND_FAIL(done, sqlite3_bind_int(res, ++param, (uint32_t) HEALTH_ENTRY_FLAG_EXEC_RUN));
 
     param = 0;
@@ -1357,23 +1334,22 @@ int health_migrate_old_health_log_table(char *table) {
 
 static uint32_t get_next_alarm_event_id(uint64_t health_log_id, uint32_t alarm_id)
 {
-    int rc;
     sqlite3_stmt *res = NULL;
     uint32_t next_event_id = alarm_id;
 
-    rc = sqlite3_prepare_v2(db_meta, SQL_GET_EVENT_ID, -1, &res, 0);
-    if (rc != SQLITE_OK) {
-        error_report("Failed to prepare statement when trying to get an event id");
+    if (!PREPARE_STATEMENT(db_meta, SQL_GET_EVENT_ID, &res))
         return alarm_id;
-    }
 
     int param = 0;
     SQLITE_BIND_FAIL(done, sqlite3_bind_int64(res, ++param, (sqlite3_int64) health_log_id));
     SQLITE_BIND_FAIL(done, sqlite3_bind_int64(res, ++param, (sqlite3_int64) alarm_id));
 
     param = 0;
-    while (sqlite3_step_monitored(res) == SQLITE_ROW)
-        next_event_id = (uint32_t)sqlite3_column_int64(res, 0);
+    // MAX() is NULL when the alarm has no detail rows: keep the alarm_id fallback
+    while (sqlite3_step_monitored(res) == SQLITE_ROW) {
+        if (sqlite3_column_type(res, 0) != SQLITE_NULL)
+            next_event_id = (uint32_t)sqlite3_column_int64(res, 0);
+    }
 
 done:
     REPORT_BIND_FAIL(res, param);

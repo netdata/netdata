@@ -110,7 +110,8 @@ bool aclk_host_state_update_auto(RRDHOST *host);
 
 void aclk_send_node_instances();
 
-void aclk_send_bin_msg(char *msg, size_t msg_len, enum aclk_topics subtopic, const char *msgname);
+// Returns 0 when the message was handed to the mqtt layer, non-zero when it was not. The message is consumed either way.
+int aclk_send_bin_msg(char *msg, size_t msg_len, enum aclk_topics subtopic, const char *msgname);
 
 char *aclk_state(void);
 char *aclk_state_json(void);

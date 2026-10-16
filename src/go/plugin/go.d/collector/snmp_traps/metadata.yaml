@@ -651,7 +651,7 @@ modules:
                 - name: auth_failures
                   description: SNMPv1/v2c community mismatch
                 - name: usm_failures
-                  description: SNMPv3 USM authentication or decryption failures
+                  description: SNMPv3 messages no configured USM user could authenticate, and unauthenticated or non-USM messages for users configured with authentication
                 - name: unknown_engine_id
                   description: SNMPv3 trap from an unknown or unregistered engine ID
                 - name: inform_response_failed

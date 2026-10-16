@@ -43,8 +43,8 @@ Netdata will start it when it starts and stop it when it exits.
 If the external plugin exits or crashes, Netdata will log an error.
 Whether Netdata starts it again depends on its exit status and on whether it has produced useful output since Netdata started.
 
-Netdata counts these lines as useful output (collected data): `END`, `END2`, `REND`, `FUNCTION`, `FUNCTION_DEL`,
-`FUNCTION_RESULT_END` and `CONFIG`. A declared function counts even though no metric has been collected yet.
+Netdata counts these lines as useful output (collected data): `END`, `FUNCTION`, `FUNCTION_DEL`, `FUNCTION_RESULT_END`
+and `CONFIG`. A declared function counts even though no metric has been collected yet.
 `TRUST_DURATIONS`, `PLUGIN_KEEPALIVE`, `CHART` and `DIMENSION` do not count.
 
 -   A plugin that exits with a non-zero value without having produced useful output since Netdata started is disabled until Netdata restarts.
@@ -54,7 +54,8 @@ Netdata counts these lines as useful output (collected data): `END`, `END2`, `RE
     One that exits with zero and has never produced useful output is restarted after `10 * update_every` seconds, and disabled after more than 10 such runs.
 -   A plugin killed by a signal other than `SIGTERM` or `SIGPIPE` is disabled.
 -   When Netdata ends the connection itself because it could not create or take ownership of a virtual node the plugin defined, the plugin is restarted after `update_every` seconds, unless it was killed by a signal other than `SIGTERM` or `SIGPIPE`, and a run without useful output does not add to the consecutive-run count.
--   Plugins may also be disabled by Netdata if they output things that Netdata does not understand.
+-   When Netdata ends the connection because it cannot parse the plugin's output (an unknown keyword, a malformed or rejected command, a command sent in the wrong context, or a function response larger than Netdata accepts), it treats the run as an exit with a non-zero value, whatever the actual exit status: the plugin is disabled if it has not produced useful output since Netdata started, and otherwise restarted after `10 * update_every` seconds, following the same consecutive-run rule. A plugin killed by a signal other than `SIGTERM` or `SIGPIPE` is still disabled.
+-   A plugin that sends `DISABLE` is disabled until Netdata restarts.
 
 So a plugin that cannot start (for example, its listening port is already in use) should finish every fallible startup step before it declares functions or sends data, and exit with a non-zero value if any of them fails.
 
@@ -825,7 +826,8 @@ it can issue a `FLUSH`. The `FLUSH` command will instruct Netdata to ignore
 all the values collected since the last `BEGIN` command.
 
 If a plugin does not behave properly (outputs invalid lines, or does not
-follow these guidelines), will be disabled by Netdata.
+follow these guidelines), Netdata disconnects it and decides whether to
+restart it as described in [Operation](#operation).
 
 ### collected values
 

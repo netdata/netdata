@@ -12,7 +12,7 @@
 #define SERVING_STREAMING(parser) ((parser)->repertoire == PARSER_INIT_STREAMING)
 #define SERVING_PLUGINSD(parser) ((parser)->repertoire == PARSER_INIT_PLUGINSD)
 
-PARSER_RC PLUGINSD_DISABLE_PLUGIN(PARSER *parser, const char *keyword, const char *msg);
+PARSER_RC PLUGINSD_PROTOCOL_ERROR(const char *keyword, const char *msg);
 
 ssize_t send_to_plugin(const char *txt, PARSER *parser, STREAM_TRAFFIC_TYPE type);
 
@@ -84,7 +84,13 @@ static inline void pluginsd_clear_scope_chart(PARSER *parser, const char *keywor
 
     RRDSET *st = parser->user.st;
 
-    if(parser->user.cleanup_slots && st)
+    // An obsolete chart must not leave the scope holding cached dimension references: the reaper frees
+    // a dimension only when nobody else references it, and an obsolete chart that is not scoped again
+    // gets its cache released only when the child reconnects - so it would be kept for as long as the
+    // child stays connected. Marking a chart obsolete unslots it, but a later scope can repopulate the
+    // cache without reviving the chart (a replication RBEGIN/RSET/REND for a chart the child has already
+    // obsoleted), and pluginsd_set_scope_chart() resets cleanup_slots.
+    if(st && (parser->user.cleanup_slots || rrdset_flag_check(st, RRDSET_FLAG_OBSOLETE)))
         rrdset_pluginsd_receive_unslot(st);
 
     // Clear collector ownership when scope ends, except when explicitly preserving
