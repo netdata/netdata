@@ -1,32 +1,5 @@
 modules:
-  - alerts:
-      - name: rum_lcp_experience_quality
-        metric: rum.lcp_population
-        info: Largest Contentful Paint exceeds its good threshold for more than 25% of recent observed document
-            experiences; critical when more than 25% exceed its poor threshold. Requires at least 30 observations and a
-            complete local population.
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/dem.conf
-      - name: rum_inp_experience_quality
-        metric: rum.inp_population
-        info: Interaction to Next Paint exceeds its good threshold for more than 25% of recent observed document
-            experiences; critical when more than 25% exceed its poor threshold. Requires at least 30 observations and a
-            complete local population.
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/dem.conf
-      - name: rum_cls_experience_quality
-        metric: rum.cls_population
-        info: Cumulative Layout Shift exceeds its good threshold for more than 25% of recent observed document
-            experiences; critical when more than 25% exceed its poor threshold. Requires at least 30 observations and a
-            complete local population.
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/dem.conf
-      - name: rum_events_dropped
-        metric: rum.otlp
-        info: RUM event log delivery failed or records were locally dropped in the last 5 minutes
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/dem.conf
-      - name: rum_spans_dropped
-        metric: rum.spans
-        info: RUM browser span delivery failed or spans were locally dropped in the last 5 minutes
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/dem.conf
-    functions:
+  - functions:
         description: Use these process-wide Functions through the Netdata Agent or Cloud to inspect RUM setup, live
             activity and retained investigation history. Invoke their public rum-* names; filter by site where
             supported.
@@ -1462,8 +1435,13 @@ modules:
                     30-minute retention period; capacity pressure or restart can shorten it. Quality alerts require at least 30
                     observations for that metric and complete local measurement state. Quiet traffic alone does not trigger an alert.
 
-                    History uses one plugin-wide journal file-age and committed-byte retention target in dem.conf, including disabled
-                    sites. Whole archives expire; the active file is protected, so the size target is not a hard disk ceiling.
+                    RUM and synthetic history share the 30-day and 1-GiB defaults in `dem.conf`, including disabled sites and retained
+                    machine identities. The byte target counts full journal file sizes including preallocation, with an 8-MiB minimum.
+                    Whole files expire by their newest saved record. With normal clocks and timely successful cleanup, some older
+                    records can remain roughly one extra day plus an hour; size pressure can remove younger history. This is not an
+                    exact record TTL or a hard disk ceiling. `dem-history-status` reports the effective policy, sampled file bytes,
+                    and storage errors; it cannot establish complete history or explain why a particular event is absent.
+
                     Export/history queues count records dropped under backpressure. Detail sampling applies to native history and enabled
                     event logs and traces. Problem overrides retain available recent native context with its original attribution, then
                     current and future detail while the session remains tracked. Earlier logs and spans are not exported retrospectively;

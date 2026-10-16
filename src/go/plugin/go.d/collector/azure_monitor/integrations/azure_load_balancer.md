@@ -630,10 +630,10 @@ The following alerts are available:
 
 | Alert name  | On metric | Description |
 |:------------|:----------|:------------|
-| [ am_load_balancers_vip_availability ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_load_balancers.conf) | azure_monitor.load_balancers.vip_availability | LB data path availability on ${label:resource_name} |
-| [ am_load_balancers_dip_availability ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_load_balancers.conf) | azure_monitor.load_balancers.dip_availability | LB health probe status on ${label:resource_name} |
-| [ am_load_balancers_global_backend_availability ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_load_balancers.conf) | azure_monitor.load_balancers.global_backend_availability | LB global backend availability on ${label:resource_name} |
-| [ am_load_balancers_snat_port_utilization ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_load_balancers.conf) | azure_monitor.load_balancers.snat_ports | LB SNAT port utilization on ${label:resource_name} |
+| [ am_load_balancers_vip_availability ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_load_balancers.conf) | azure_monitor.load_balancers.vip_availability | Data path availability of Azure Load Balancer ${label:resource_name} in ${label:resource_group} (${label:region}). Low values indicate the load balancer is unable to forward traffic |
+| [ am_load_balancers_dip_availability ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_load_balancers.conf) | azure_monitor.load_balancers.dip_availability | Health probe availability of Azure Load Balancer ${label:resource_name} in ${label:resource_group} (${label:region}). Low values indicate backend instances are failing health probes |
+| [ am_load_balancers_global_backend_availability ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_load_balancers.conf) | azure_monitor.load_balancers.global_backend_availability | Global backend availability of Azure Load Balancer ${label:resource_name} in ${label:resource_group} (${label:region}). Applies to cross-region load balancers only |
+| [ am_load_balancers_snat_port_utilization ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_load_balancers.conf) | azure_monitor.load_balancers.snat_ports | Percentage of allocated SNAT ports in use on Azure Load Balancer ${label:resource_name} in ${label:resource_group} (${label:region}). SNAT port exhaustion causes outbound connection failures |
 
 
 

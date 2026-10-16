@@ -14,17 +14,22 @@ import (
 func TestLoadConfig(t *testing.T) {
 	for name, tc := range map[string]struct {
 		body string
-		want HistoryConfig
+		want RetentionConfig
 		fail bool
 	}{
-		"partial overrides": {"enabled: yes\nhistory:\n  days: 7\n", HistoryConfig{
+		"partial overrides": {"enabled: yes\nhistory:\n  days: 7\n", RetentionConfig{
 			Days:     7,
 			MaxBytes: 1 << 30,
 		}, false},
-		"zero days":        {"history: {days: 0}", HistoryConfig{}, true},
-		"too many days":    {"history: {days: 366}", HistoryConfig{}, true},
-		"zero byte budget": {"history: {max_bytes: 0}", HistoryConfig{}, true},
-		"malformed":        {"history: [", HistoryConfig{}, true},
+		"zero days":                {"history: {days: 0}", RetentionConfig{}, true},
+		"too many days":            {"history: {days: 366}", RetentionConfig{}, true},
+		"zero byte budget":         {"history: {max_bytes: 0}", RetentionConfig{}, true},
+		"below allocation quantum": {"history: {max_bytes: 8388607}", RetentionConfig{}, true},
+		"allocation quantum": {"history: {max_bytes: 8388608}", RetentionConfig{
+			Days:     30,
+			MaxBytes: 8388608,
+		}, false},
+		"malformed": {"history: [", RetentionConfig{}, true},
 	} {
 		t.Run(name, func(t *testing.T) {
 			dir := t.TempDir()
@@ -50,13 +55,16 @@ func TestLoadConfigUsesHighestPriorityFile(t *testing.T) {
 
 func TestArtifactDefaultsAndIndependentPolicy(t *testing.T) {
 	dir := t.TempDir()
-	require.NoError(t, os.WriteFile(filepath.Join(dir, "dem.conf"), []byte("runtime: {node_path: /prepared/node, dependencies_path: /prepared}\nartifacts: {days: 2, max_bytes: 1024}"), 0600))
+	require.NoError(t, os.WriteFile(filepath.Join(dir, "dem.conf"), []byte("runtime: {mode: preloaded, preload_path: /prepared}\nartifacts: {days: 2, max_bytes: 1024}"), 0600))
 	cfg, err := LoadConfig(multipath.New(dir))
 	require.NoError(t, err)
 	assert.Equal(t, DefaultConfig().History, cfg.History)
-	assert.Equal(t, HistoryConfig{Days: 2, MaxBytes: 1024}, cfg.Artifacts)
-	assert.Equal(t, "/prepared/node", cfg.Runtime.NodePath)
-	// Preparation belongs to browser Check; RUM-only configuration needs no runtime.
+	assert.Equal(t, RetentionConfig{
+		Days:     2,
+		MaxBytes: 1024,
+	}, cfg.Artifacts)
+	assert.Equal(t, "/prepared", cfg.Runtime.PreloadPath)
+	// Runtime availability is checked by its owner; RUM configuration remains independent.
 	require.NoError(t, os.WriteFile(filepath.Join(dir, "dem.conf"), []byte("artifacts: {days: 0}"), 0600))
 	_, err = LoadConfig(multipath.New(dir))
 	require.ErrorContains(t, err, "artifacts")
@@ -73,4 +81,19 @@ func TestInvalidRetentionIdentifiesSetting(t *testing.T) {
 			})
 		}
 	}
+}
+
+func TestRuntimeValidationLeavesOtherSectionsOpaque(t *testing.T) {
+	dir := t.TempDir()
+	body := "enabled: yes\njobs: {future_option: [{duplicate: one, duplicate: two}]}\n" +
+		"history: {days: 7, unrelated: value}\nartifacts: {days: 2, unrelated: value}\n" +
+		"runtime: {allow_download: false}\n"
+	require.NoError(t, os.WriteFile(filepath.Join(dir, "dem.conf"), []byte(body), 0600))
+	cfg, err := LoadConfig(multipath.New(dir))
+	require.NoError(t, err)
+	require.Equal(t, 7, cfg.History.Days)
+	require.Equal(t, DefaultConfig().History.MaxBytes, cfg.History.MaxBytes)
+	require.Equal(t, 2, cfg.Artifacts.Days)
+	require.Equal(t, DefaultConfig().Artifacts.MaxBytes, cfg.Artifacts.MaxBytes)
+	require.False(t, cfg.Runtime.AllowDownload)
 }

@@ -807,15 +807,25 @@ static void netdev_cleanup() {
     }
 }
 
-static struct netdev *get_netdev(const char *name) {
+// cursor is the interface matched for the previous line of /proc/net/dev in this pass (NULL at the start of a
+// pass). The kernel lists interfaces in a stable order and we append them in read order, so the next line is
+// almost always cursor->next - this keeps a pass linear instead of quadratic.
+static struct netdev *get_netdev(const char *name, struct netdev **cursor) {
     struct netdev *d;
 
     uint32_t hash = simple_hash(name);
 
-    // search it, from the last position to the end
-    for(d = netdev_root ; d ; d = d->next) {
-        if(unlikely(hash == d->hash && !strcmp(name, d->name)))
+    // search it, from the last position to the end, then wrap from the start up to the last position
+    struct netdev *start = (*cursor && (*cursor)->next) ? (*cursor)->next : netdev_root;
+    for(d = start; d ; ) {
+        if(unlikely(hash == d->hash && !strcmp(name, d->name))) {
+            *cursor = d;
             return d;
+        }
+
+        d = d->next ? d->next : netdev_root;
+        if(d == start)
+            break;
     }
 
     // create a new one
@@ -870,6 +880,7 @@ static struct netdev *get_netdev(const char *name) {
 
     DOUBLE_LINKED_LIST_APPEND_ITEM_UNSAFE(netdev_root, d, prev, next);
 
+    *cursor = d;
     return d;
 }
 
@@ -935,6 +946,7 @@ int do_proc_net_dev(int update_every, usec_t dt) {
 
     time_t now = now_realtime_sec();
 
+    struct netdev *cursor = NULL;
     size_t lines = procfile_lines(ff), l;
     for(l = 2; l < lines ;l++) {
         // require 17 words on each line
@@ -944,7 +956,7 @@ int do_proc_net_dev(int update_every, usec_t dt) {
         size_t len = strlen(name);
         if(name[len - 1] == ':') name[len - 1] = '\0';
 
-        struct netdev *d = get_netdev(name);
+        struct netdev *d = get_netdev(name, &cursor);
         d->updated = true;
 
         if(unlikely(!d->configured)) {

@@ -179,7 +179,7 @@ No additional configuration is required.
 
 #### Returns
 
-At most limit active jobs, with independent current-attempt state and last-observation freshness. The response includes process artifact retained_bytes, protected_bytes and cleanup_errors under artifacts. Disabled and failed-startup jobs are visible through native configuration status.
+At most limit active jobs, with independent current-attempt state and last-observation freshness. Disabled and failed-startup jobs are visible through native configuration status.
 
 | Column | Type | Unit | Visibility | Description |
 |:-------|:-----|:-----|:-----------|:------------|
@@ -283,9 +283,45 @@ One row per retained reporter event, preserving actual and expected status and f
 | duration_ms | float | ms |  | Duration. |
 | message | string |  |  | Message. |
 
-### Synthetic artifacts
+### Retained synthetic captures
 
-Invoke `synthetics-artifact`. Retained capture metadata for one run; file bytes are verified when fetched. Supplying artifact_id requests base64-encoded bytes and requires administrator-equivalent permissions. Screenshots and HTML reports may contain sensitive content. Missing retained files are expired or unavailable; fetches are limited to 5 MiB.
+Invoke `synthetics-artifacts` to find retained screenshot and report sets, newest publication first, even after run history expires or a monitor is disabled or deleted. Each set contains one run's captures. The shared default allowance is seven days and 2 GiB, preferring each monitor's newest eligible capture. Age and size pressure can still remove it; this is not complete incident history or a hard disk cap. A later Lighthouse report may displace that monitor's earlier poor-score report. Journey recovery without a screenshot leaves its previous failure capture eligible. Disabled or deleted monitors keep the same preference; renamed monitors form separate groups.
+
+| Aspect | Description |
+|:-------|:------------|
+| Name | `Synthetics-artifacts` |
+| Require Cloud | no |
+| Performance | Reads local capture metadata and file sizes without reading capture contents or starting a browser. |
+| Security | Requires member-equivalent access. Exposes monitor identities and capture metadata, not capture contents. |
+| Availability | Available while dem.plugin is running, independently of active journey or Lighthouse jobs and retained run history. Captures can expire under age or size limits. |
+
+#### Prerequisites
+
+No additional configuration is required.
+
+#### Parameters
+
+| Parameter | Type | Description | Required | Default | Options |
+|:---------|:-----|:------------|:--------:|:--------|:--------|
+| Monitor (`job_id`) | string | Exact native module and job name to filter captures, such as journey:checkout. Leave empty for all monitors. Storage totals remain global. | no |  |  |
+| Previous page cursor (`before`) | string | The next cursor returned by the previous page. Leave empty for the newest captures. | no |  |  |
+| Maximum rows (`limit`) | string | Maximum returned sets, from 1 to 2000. Use next as before to continue when truncated is true. Captures may expire between pages. | no | 2000 |  |
+
+#### Returns
+
+One row per retained capture set. The storage object reports global effective policy, observation time, retained capture bytes, workspace bytes, unclassified bytes, pending-deletion bytes, known set and monitor counts, cleanup status and policy reload errors. Unreadable sizes are unknown with an error. Sizes are logical file lengths; workspace, unclassified files and pending deletions are outside the retained-capture allowance. Metadata does not verify file integrity.
+
+| Column | Type | Unit | Visibility | Description |
+|:-------|:-----|:-----|:-----------|:------------|
+| run_id | string |  |  | Run. |
+| job_id | string |  |  | Monitor. |
+| published_us | timestamp |  |  | Publication time in Unix microseconds. |
+| bytes | integer | bytes |  | Capture set size, including its manifest. |
+| artifact_count | integer |  |  | Number of captures in the set. |
+
+### Synthetic capture detail
+
+Invoke `synthetics-artifact`. Retained capture metadata for one run, independently of run history retention; file bytes are verified when fetched. Supplying artifact_id requests base64-encoded bytes and requires administrator-equivalent permissions. Screenshots and HTML reports may contain sensitive content. Missing retained files are expired or unavailable; fetches are limited to 5 MiB.
 
 | Aspect | Description |
 |:-------|:------------|
@@ -304,12 +340,12 @@ No additional configuration is required.
 | Parameter | Type | Description | Required | Default | Options |
 |:---------|:-----|:------------|:--------:|:--------|:--------|
 | Monitor (`job_id`) | string | Exact native module and job name that owns the requested run, such as journey:checkout. | yes |  |  |
-| Run (`run_id`) | string | Exact run identifier returned by synthetic inventory or run history. | yes |  |  |
+| Run (`run_id`) | string | Exact run identifier returned by the retained capture list, synthetic inventory or run history. | yes |  |  |
 | Artifact (`artifact_id`) | string | Exact recorded artifact identifier to fetch its bytes. Leave empty to list capture metadata. | no |  |  |
 
 #### Returns
 
-Recorded capture metadata with retained-manifest availability. Fetch verifies content and returns encoding=base64 and data_base64 without rendering HTML. A missing recorded capture returns expired_or_unavailable, which does not prove why the file is absent.
+Retained capture metadata remains available after run history expires. Fetch verifies content and returns encoding=base64 and data_base64 without rendering HTML. A missing recorded capture returns expired_or_unavailable, which does not prove why the file is absent.
 
 | Column | Type | Unit | Visibility | Description |
 |:-------|:-----|:-----|:-----------|:------------|

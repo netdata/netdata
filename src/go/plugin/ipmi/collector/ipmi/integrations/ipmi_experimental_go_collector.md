@@ -49,7 +49,7 @@ No jobs start by default. Build the experimental plugin explicitly and configure
 
 #### Limits
 
-This experimental plugin requires Linux amd64 or arm64. Keep FreeIPMI for legacy direct drivers, OEM interpretation or custom FreeIPMI interpretation files. Unknown or unavailable sensor readings leave gaps. Default FreeIPMI policy treats non-critical threshold assertions as nominal. Do not run both IPMI plugins against the same host with the canonical ipmi job name because chart IDs overlap. The Go collector uses separate ipmi_go.* contexts and the ipmi-go-sensors Function.
+This experimental plugin requires Linux. Keep FreeIPMI for legacy direct drivers, OEM interpretation or custom FreeIPMI interpretation files. Unknown or unavailable sensor readings leave gaps. Default FreeIPMI policy treats non-critical threshold assertions as nominal. Do not run both IPMI plugins against the same host with the canonical ipmi job name because chart IDs overlap. The Go collector uses separate ipmi_go.* contexts and the ipmi-go-sensors Function.
 
 #### Performance Impact
 
@@ -160,7 +160,7 @@ The following alerts are available:
 | Alert name  | On metric | Description |
 |:------------|:----------|:------------|
 | [ ipmi_go_sensor_state ](https://github.com/netdata/netdata/blob/master/src/health/health.d/ipmi.conf) | ipmi_go.sensor_state | IPMI sensor ${label:sensor} (${label:component}) state |
-| [ ipmi_events ](https://github.com/netdata/netdata/blob/master/src/health/health.d/ipmi.conf) | ipmi_go.sel | number of events in the IPMI System Event Log (SEL) |
+| [ ipmi_events ](https://github.com/netdata/netdata/blob/master/src/health/health.d/ipmi.conf) | ipmi.events | number of events in the IPMI System Event Log (SEL) |
 
 
 

@@ -324,7 +324,7 @@ state and dimension actions; chart-level metadata retains the configured policy.
 
 ## Lifecycle Defaults and Policy
 
-Default lifecycle policy when template omits lifecycle:
+Default lifecycle policy when a template omits lifecycle fields:
 
 | Policy                           | Default        |
 |----------------------------------|----------------|
@@ -332,6 +332,10 @@ Default lifecycle policy when template omits lifecycle:
 | `expire_after_cycles`            | `5`            |
 | `dimensions.max_dims`            | `0` (disabled) |
 | `dimensions.expire_after_cycles` | `0`            |
+
+Authored chart expiry preserves presence: omission uses five successful cycles, explicit zero disables expiry, and a
+positive value overrides the default. The compiler resolves this into the existing integer runtime policy. Retaining
+a chart does not retain or replay its measurements; metric-store retention remains independent.
 
 Metric collection can advance while output plans are aborted, leaving published definitions past their expiry.
 When an identity returns after it was eligible for expiry in an intervening cycle, the planner recreates its staged

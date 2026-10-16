@@ -20,6 +20,27 @@ var (
 	ErrTreeNotDrained             = errors.New("process tree cleanup was not verified")
 )
 
+// TreeOptions supplies owned child stdio and optional persistent drainage proof.
+// The caller keeps ownership of all files and may close them after Start returns.
+// Nil stdio uses the null device; Completion is never inherited by the payload.
+type TreeOptions struct {
+	Stdin      *os.File
+	Stdout     *os.File
+	Stderr     *os.File
+	Completion *TreeCompletion
+}
+
+// TreeCompletion binds one invocation to a fresh private record directory.
+// The resource owner must persist its binding to this ID before starting work.
+// Never reuse an invocation, including after a failed or interrupted launch.
+type TreeCompletion struct {
+	directory *os.File
+	id        string
+}
+
+func (c *TreeCompletion) ID() string   { return c.id }
+func (c *TreeCompletion) Close() error { return c.directory.Close() }
+
 // TreeResult records command, cancellation, setup and supervisor/protocol errors
 // independently of verified descendant cleanup. A failed or canceled command can
 // be Drained. A false Drained requires the caller to retain
@@ -140,9 +161,26 @@ func treeCompletion(data []byte, waitErr error) TreeResult {
 		}
 	}
 	rawText := strings.TrimSuffix(strings.TrimPrefix(frame, prefix), "\n")
+	if !validCommandCompletion(rawText, waitErr) {
+		return invalid()
+	}
+	return TreeResult{Err: waitErr, Drained: true}
+}
+
+// Both private supervisor protocols carry the payload's raw wait status and
+// mirror it in the helper exit code. Neither source alone proves completion.
+func validCommandCompletion(rawText string, waitErr error) bool {
+	actualExit := 0
+	if waitErr != nil {
+		var exitErr *exec.ExitError
+		if !errors.As(waitErr, &exitErr) {
+			return false
+		}
+		actualExit = exitErr.ExitCode()
+	}
 	raw, err := strconv.ParseUint(rawText, 10, 16)
 	if err != nil || strconv.FormatUint(raw, 10) != rawText {
-		return invalid()
+		return false
 	}
 	exitCode := 0
 	switch {
@@ -151,15 +189,12 @@ func treeCompletion(data []byte, waitErr error) TreeResult {
 	case raw & ^uint64(0xff) == 0 && raw&0x7f > 0 && raw&0x7f < 0x7f:
 		exitCode = 128 + int(raw&0x7f)
 	default:
-		return invalid()
+		return false
 	}
 	if actualExit != exitCode {
-		return invalid()
+		return false
 	}
-	return TreeResult{
-		Err:     waitErr,
-		Drained: true,
-	}
+	return true
 }
 
 // The helper's location is inherited from normal ndexec discovery. Errors never

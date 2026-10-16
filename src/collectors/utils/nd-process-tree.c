@@ -5,6 +5,7 @@
 #include <stdio.h>
 
 #ifdef __linux__
+#include "supervisor-pipes.h"
 #include <errno.h>
 #include <dirent.h>
 #include <fcntl.h>
@@ -15,6 +16,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <sys/prctl.h>
+#include <sys/file.h>
 #include <sys/signalfd.h>
 #include <sys/stat.h>
 #include <sys/types.h>
@@ -77,46 +79,133 @@ static bool compatible_procfs(void) {
     return compatible;
 }
 
-static bool protocol_pipes(int control_fd, int status_fd) {
-    struct stat control, status;
-    if (control_fd < 3 || status_fd < 3 || control_fd == status_fd ||
-        fstat(control_fd, &control) || fstat(status_fd, &status) ||
-        !S_ISFIFO(control.st_mode) || !S_ISFIFO(status.st_mode) ||
-        (control.st_dev == status.st_dev && control.st_ino == status.st_ino))
-        return false;
-    int control_flags = fcntl(control_fd, F_GETFL);
-    int status_flags = fcntl(status_fd, F_GETFL);
-    if (control_flags < 0 || status_flags < 0 ||
-        (control_flags & O_ACCMODE) != O_RDONLY || (status_flags & O_ACCMODE) != O_WRONLY)
-        return false;
+// The caller owns a fresh private directory and durable pending record. This
+// descriptor protocol certifies quiescence only, not the command's outcome.
+struct tree_completion {
+    int directory;
+    int lock;
+    const char *id;
+};
 
-    // Every protocol copy must stay with its owner. An inherited opposite end
-    // can hide parent EOF, and an alias can let the payload retain the protocol.
-    // Inspect only our descriptors, before any children or concurrent mutation.
-    DIR *fds = opendir("/proc/thread-self/fd");
-    if (!fds)
+static bool completion_id_valid(const char *id) {
+    if (!id || strlen(id) != 64)
         return false;
-    bool private = true;
-    struct dirent *entry;
-    errno = 0;
-    while ((entry = readdir(fds))) {
-        char *end;
-        long fd = strtol(entry->d_name, &end, 10);
-        if (*end || fd < 0 || fd > INT_MAX || fd == control_fd || fd == status_fd)
-            continue;
-        struct stat other;
-        if (fstat((int)fd, &other) != 0 ||
-            (other.st_dev == control.st_dev && other.st_ino == control.st_ino) ||
-            (other.st_dev == status.st_dev && other.st_ino == status.st_ino)) {
-            private = false;
-            break;
-        }
-        errno = 0;
+    for (size_t i = 0; i < 64; i++)
+        if (!((id[i] >= '0' && id[i] <= '9') || (id[i] >= 'a' && id[i] <= 'f')))
+            return false;
+    return true;
+}
+
+static bool private_regular(int fd) {
+    struct stat st;
+    return fstat(fd, &st) == 0 && S_ISREG(st.st_mode) && st.st_nlink == 1 &&
+           st.st_uid == geteuid() && (st.st_mode & 0777) == 0600;
+}
+
+static void completion_close(struct tree_completion *completion) {
+    if (completion->lock >= 0)
+        close(completion->lock);
+    if (completion->directory >= 0)
+        close(completion->directory);
+    completion->lock = completion->directory = -1;
+}
+
+static bool completion_open(struct tree_completion *completion) {
+    if (completion->directory < 0)
+        return true;
+    struct stat st;
+    if (!completion_id_valid(completion->id) || fstat(completion->directory, &st) ||
+        !S_ISDIR(st.st_mode) || st.st_uid != geteuid() || (st.st_mode & 0777) != 0700)
+        return false;
+    completion->lock = openat(completion->directory, "publication.lock", O_RDWR | O_NOFOLLOW | O_CLOEXEC);
+    if (completion->lock < 0 || !private_regular(completion->lock))
+        return false;
+    // A used invocation may never launch again, even with the same token.
+    if (fstatat(completion->directory, "complete", &st, AT_SYMLINK_NOFOLLOW) == 0 || errno != ENOENT)
+        return false;
+    if (fstatat(completion->directory, "complete.pending", &st, AT_SYMLINK_NOFOLLOW) == 0 || errno != ENOENT)
+        return false;
+    if (fstatat(completion->directory, "started", &st, AT_SYMLINK_NOFOLLOW) == 0 || errno != ENOENT)
+        return false;
+    int pending = openat(completion->directory, "pending", O_RDONLY | O_NONBLOCK | O_NOFOLLOW | O_CLOEXEC);
+    if (pending < 0)
+        return false;
+    if (!private_regular(pending)) {
+        close(pending);
+        return false;
     }
-    if (errno)
-        private = false;
-    closedir(fds);
-    return private;
+    char expected[96], actual[96];
+    int length = snprintf(expected, sizeof(expected), "NDTREE1 pending %s\n", completion->id);
+    ssize_t n;
+    do {
+        n = read(pending, actual, sizeof(actual));
+    } while (n < 0 && errno == EINTR);
+    bool valid = n == length && memcmp(expected, actual, (size_t)length) == 0;
+    close(pending);
+    if (!valid)
+        return false;
+    // A lost supervisor must never permit another run to complete its pin.
+    int started = openat(completion->directory, "started", O_WRONLY | O_CREAT | O_EXCL | O_NOFOLLOW | O_CLOEXEC, 0600);
+    if (started < 0)
+        return false;
+    valid = fsync(started) == 0;
+    if (close(started) != 0)
+        valid = false;
+    if (!valid || fsync(completion->directory) != 0)
+        return false;
+    // The exclusive claim rejects reuse; readers may only delay first launch.
+    int locked;
+    do {
+        locked = flock(completion->lock, LOCK_EX);
+    } while (locked < 0 && errno == EINTR);
+    return locked == 0;
+}
+
+static bool sync_fd(int fd) {
+    int result;
+    do {
+        result = fsync(fd);
+    } while (result < 0 && errno == EINTR);
+    return result == 0;
+}
+
+static bool completion_write(struct tree_completion *completion) {
+    if (completion->directory < 0)
+        return true;
+    char frame[96];
+    int length = snprintf(frame, sizeof(frame), "NDTREE1 drained %s\n", completion->id);
+    int fd = openat(completion->directory, "complete.pending", O_WRONLY | O_CREAT | O_EXCL | O_NOFOLLOW | O_CLOEXEC, 0600);
+    if (fd < 0)
+        return false;
+    size_t offset = 0;
+    while (offset < (size_t)length) {
+        ssize_t n = write(fd, frame + offset, (size_t)length - offset);
+        if (n < 0 && errno == EINTR)
+            continue;
+        if (n <= 0)
+            break;
+        offset += (size_t)n;
+    }
+    bool written = offset == (size_t)length && sync_fd(fd);
+    if (close(fd) != 0)
+        written = false;
+    if (!written || linkat(completion->directory, "complete.pending", completion->directory, "complete", 0) != 0)
+        return false;
+    if (unlinkat(completion->directory, "complete.pending", 0) != 0)
+        return false;
+    return sync_fd(completion->directory);
+}
+
+static void completion_finish(struct tree_completion *completion) {
+    if (!completion_write(completion))
+        fprintf(stderr, "nd-run: cannot persist tree completion; retain pending ownership\n");
+    // No more record I/O follows. Recovery needs this boundary, not a Go join.
+    completion_close(completion);
+}
+
+static bool protocol_pipes(int control_fd, int status_fd, const struct tree_completion *completion) {
+    const int descriptors[] = {control_fd, status_fd, completion->directory, completion->lock};
+    return supervisor_protocol_pipes(descriptors, completion->directory >= 0 ? 4 : 2);
 }
 
 static bool write_frame(int status_fd, const char *frame, size_t length) {
@@ -127,35 +216,53 @@ static bool write_frame(int status_fd, const char *frame, size_t length) {
     return written == (ssize_t)length;
 }
 
-static int setup_unavailable(int control_fd, int status_fd) {
+// Prelaunch refusals can release ownership too, but only a wait result proves
+// absence of children; neither rejected descriptors nor procfs are that proof.
+static bool completion_finish_if_childless(struct tree_completion *completion) {
+    pid_t result;
+    do {
+        result = waitpid(-1, NULL, WNOHANG | __WALL);
+    } while (result < 0 && errno == EINTR);
+    if (result >= 0 || errno != ECHILD)
+        return false;
+    completion_finish(completion);
+    return true;
+}
+
+static int setup_unavailable(int control_fd, int status_fd, struct tree_completion *completion) {
     // Only used with validated private pipes and before a successful fork.
     // Capability refusal is distinct from losing a supervisor after launch.
     // Even here, absence of children must come from wait, not procfs discovery.
+    bool childless = completion_finish_if_childless(completion);
     struct sigaction ignore_pipe = { .sa_handler = SIG_IGN };
     sigemptyset(&ignore_pipe.sa_mask);
-    if (sigaction(SIGPIPE, &ignore_pipe, NULL) == 0) {
-        pid_t result;
-        do {
-            result = waitpid(-1, NULL, WNOHANG | __WALL);
-        } while (result < 0 && errno == EINTR);
-        if (result < 0 && errno == ECHILD) {
-            static const char unavailable[] = "NDTREE1 unavailable\n";
-            (void)write_frame(status_fd, unavailable, sizeof(unavailable) - 1);
-        }
+    if (childless && sigaction(SIGPIPE, &ignore_pipe, NULL) == 0) {
+        static const char unavailable[] = "NDTREE1 unavailable\n";
+        (void)write_frame(status_fd, unavailable, sizeof(unavailable) - 1);
     }
+    completion_close(completion);
     close(control_fd);
     close(status_fd);
     return 126;
 }
 
-int nd_process_tree_run(int control_fd, int status_fd, char **command) {
-    if (!protocol_pipes(control_fd, status_fd)) {
-        fprintf(stderr, "nd-run: tree supervision requires two distinct private protocol pipes\n");
+int nd_process_tree_run(int control_fd, int status_fd, int completion_fd, const char *completion_id, char **command) {
+    struct tree_completion completion = { .directory = completion_fd, .lock = -1, .id = completion_id };
+    if (!completion_open(&completion)) {
+        fprintf(stderr, "nd-run: invalid or used tree completion record\n");
+        completion_close(&completion);
+        return 126;
+    }
+    if (!protocol_pipes(control_fd, status_fd, &completion)) {
+        (void)completion_finish_if_childless(&completion);
+        completion_close(&completion);
+        fprintf(stderr, "nd-run: tree supervision requires private protocol descriptors\n");
         return 126;
     }
     if (!compatible_procfs()) {
+        int result = setup_unavailable(control_fd, status_fd, &completion);
         fprintf(stderr, "nd-run: tree supervision requires compatible procfs with children and NSpid support\n");
-        return setup_unavailable(control_fd, status_fd);
+        return result;
     }
 
     // Block before fork: a fast child exit cannot be lost between wait and poll.
@@ -211,6 +318,7 @@ int nd_process_tree_run(int control_fd, int status_fd, char **command) {
         goto setup_failed;
     }
     if (child == 0) {
+        completion_close(&completion);
         close(control_fd);
         close(status_fd);
         close(signal_fd);
@@ -260,6 +368,7 @@ int nd_process_tree_run(int control_fd, int status_fd, char **command) {
             break;
         }
         if (exhausted) {
+            completion_finish(&completion);
             close(control_fd);
             close(signal_fd);
             if (!command_done) {
@@ -302,13 +411,19 @@ int nd_process_tree_run(int control_fd, int status_fd, char **command) {
         }
     }
 
-setup_failed:
+setup_failed: {
+    int setup_error = errno;
+    int result = setup_unavailable(control_fd, status_fd, &completion);
+    errno = setup_error;
     perror("nd-run: tree supervision setup");
-    return setup_unavailable(control_fd, status_fd);
+    return result;
+}
 }
 
 #else
-int nd_process_tree_run(int control_fd, int status_fd, char **command) {
+int nd_process_tree_run(int control_fd, int status_fd, int completion_fd, const char *completion_id, char **command) {
+    (void)completion_fd;
+    (void)completion_id;
     (void)control_fd;
     (void)status_fd;
     (void)command;

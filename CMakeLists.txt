@@ -33,8 +33,8 @@
 #   8. config.h and the other generated files (NetdataSystemFiles), on the
 #      LAST line. Not because of the compile-option snapshot it takes - that
 #      only has to follow phase 6 - but because its inputs resolve during
-#      phase 7: HAVE_CAPABILITY, HAVE_MONGOC, HAVE_LIBUNWIND, HAVE_LIBMNL,
-#      HAVE_SYSTEMD and the HAVE_SD_* set, ENABLE_LZ4/ZSTD/BROTLI, and
+#      phase 7: HAVE_CAPABILITY, HAVE_MONGOC, HAVE_LIBUNWIND, HAVE_STACKTRACE,
+#      HAVE_LIBMNL, HAVE_SYSTEMD and the HAVE_SD_* set, ENABLE_LZ4/ZSTD/BROTLI, and
 #      ENABLE_PROMETHEUS_REMOTE_WRITE, which binds latest of all. Moving it
 #      earlier fails SILENTLY: about fifteen #cmakedefine lines would emit as
 #      undefs, the build would succeed, and mongoc, brotli, zstd and systemd

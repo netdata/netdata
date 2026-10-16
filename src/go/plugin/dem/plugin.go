@@ -12,6 +12,7 @@ import (
 	"github.com/netdata/netdata/go/plugins/plugin/dem/collector/lighthouse"
 	"github.com/netdata/netdata/go/plugins/plugin/dem/collector/receiver"
 	"github.com/netdata/netdata/go/plugins/plugin/dem/collector/rum"
+	"github.com/netdata/netdata/go/plugins/plugin/dem/historyfunc"
 	"github.com/netdata/netdata/go/plugins/plugin/dem/journal"
 	rumfunctions "github.com/netdata/netdata/go/plugins/plugin/dem/rum/functions"
 	"github.com/netdata/netdata/go/plugins/plugin/dem/rum/geoip"
@@ -24,6 +25,7 @@ import (
 	synthetichistory "github.com/netdata/netdata/go/plugins/plugin/dem/synthetic/history"
 	syntheticquery "github.com/netdata/netdata/go/plugins/plugin/dem/synthetic/query"
 	syntheticregistry "github.com/netdata/netdata/go/plugins/plugin/dem/synthetic/registry"
+	"github.com/netdata/netdata/go/plugins/plugin/dem/synthetic/runtimehost"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/collectorapi"
 )
 
@@ -37,6 +39,7 @@ type Dependencies struct {
 	GeoIPPaths     geoip.Paths
 	History        *journal.Store
 	Artifacts      *artifacts.Store
+	Runtime        *runtimehost.Host
 	Executor       Executor
 	ConfigProvider func() (Config, error)
 }
@@ -77,23 +80,30 @@ func New(deps Dependencies, cfg Config) Components {
 	if deps.Artifacts != nil {
 		captures = deps.Artifacts
 	}
-	syntheticQueries := syntheticquery.New(syntheticRegistry, syntheticHistory, captures)
 	workflow := journey.Creator(journey.Dependencies{
 		Registry: syntheticRegistry,
 		Executor: deps.Executor,
 	})
-	collectors.Register("journey", workflow)
-	collectors.Register("lighthouse", lighthouse.Creator(lighthouse.Dependencies{
+	audit := lighthouse.Creator(lighthouse.Dependencies{
 		Registry: syntheticRegistry,
 		Executor: deps.Executor,
-	}))
+	})
+	if deps.Runtime != nil {
+		workflow.JobConfigIntent, audit.JobConfigIntent = deps.Runtime, deps.Runtime
+		workflow.ActivationDependencies, audit.ActivationDependencies = deps.Runtime.Dependencies, deps.Runtime.Dependencies
+	}
+	collectors.Register("journey", workflow)
+	collectors.Register("lighthouse", audit)
 	retention := &Retention{
 		policy:         cfg.History,
 		artifactPolicy: cfg.Artifacts,
 		loadConfig:     deps.ConfigProvider,
 		log:            logger.New(),
 	}
+	syntheticQueries := syntheticquery.New(syntheticRegistry, syntheticHistory, captures, retention.PolicyError)
+	var historyStatus historyfunc.Deps
 	if deps.History != nil {
+		historyStatus = deps.History
 		retention.store = deps.History
 	}
 	if deps.Artifacts != nil {
@@ -111,6 +121,11 @@ func New(deps Dependencies, cfg Config) Components {
 				ID:         "synthetics",
 				Functions:  syntheticfunctions.Declarations,
 				NewHandler: func() funcapi.MethodHandler { return syntheticfunctions.New(syntheticQueries) },
+			},
+			{
+				ID:         "dem-history",
+				Functions:  historyfunc.Declarations,
+				NewHandler: func() funcapi.MethodHandler { return historyfunc.New(historyStatus, retention.PolicyError) },
 			},
 		},
 		Retention: retention,

@@ -174,8 +174,10 @@ static void spawn_server_release_stderr_fd(SPAWN_SERVER *server, SPAWN_INSTANCE 
 SPAWN_INSTANCE* spawn_server_exec(SPAWN_SERVER *server, int stderr_fd __maybe_unused, int custom_fd __maybe_unused, const char **argv, const void *data __maybe_unused, size_t data_size __maybe_unused, SPAWN_INSTANCE_TYPE type) {
     static SPINLOCK spinlock = SPINLOCK_INITIALIZER;
 
-    if (type != SPAWN_INSTANCE_TYPE_EXEC)
+    if (type != SPAWN_INSTANCE_TYPE_EXEC) {
+        errno = ENOTSUP;
         return NULL;
+    }
 
     if(!argv || !argv[0] || !*argv[0])
         return NULL;

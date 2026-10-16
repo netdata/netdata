@@ -190,111 +190,6 @@ modules:
     troubleshooting:
       problems:
         list: []
-    alerts:
-      - name: vernemq_socket_errors
-        metric: vernemq.node_socket_errors
-        info: Node ${label:node} socket errors in the last minute
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/vernemq.conf
-      - name: vernemq_queue_message_drop
-        metric: vernemq.node_queue_undelivered_messages
-        info: Node ${label:node} dropped messages due to full queues in the last minute
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/vernemq.conf
-      - name: vernemq_queue_message_expired
-        metric: vernemq.node_queue_undelivered_messages
-        info: Node ${label:node} expired before delivery messages in the last minute
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/vernemq.conf
-      - name: vernemq_queue_message_unhandled
-        metric: vernemq.node_queue_undelivered_messages
-        info: Node ${label:node} unhandled messages in the last minute
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/vernemq.conf
-      - name: vernemq_average_scheduler_utilization
-        metric: vernemq.node_average_scheduler_utilization
-        info: Node ${label:node} scheduler utilization over the last 10 minutes
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/vernemq.conf
-      - name: vernemq_cluster_dropped
-        metric: vernemq.node_cluster_dropped
-        info: Node ${label:node} traffic dropped during communication with the cluster nodes in the last minute
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/vernemq.conf
-      - name: vernemq_netsplits
-        metric: vernemq.node_netsplits
-        info: "Node ${label:node} detected netsplits (split brain) in the last minute"
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/vernemq.conf
-      - name: vernemq_mqtt_connack_sent_reason_unsuccessful
-        metric: vernemq.node_mqtt_connack_sent_by_reason_code
-        info: Node ${label:node} unsuccessful sent v5 CONNACK packets in the last minute
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/vernemq.conf
-      - name: vernemq_mqtt_disconnect_received_reason_not_normal
-        metric: vernemq.node_mqtt_disconnect_received_by_reason_code
-        info: Node ${label:node} received not normal v5 DISCONNECT packets in the last minute
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/vernemq.conf
-      - name: vernemq_mqtt_disconnect_sent_reason_not_normal
-        metric: vernemq.node_mqtt_disconnect_sent_by_reason_code
-        info: Node ${label:node} sent not normal v5 DISCONNECT packets in the last minute
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/vernemq.conf
-      - name: vernemq_mqtt_subscribe_error
-        metric: vernemq.node_mqtt_subscribe_error
-        info: Node ${label:node} mqtt v${label:mqtt_version} failed SUBSCRIBE operations in the last minute
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/vernemq.conf
-      - name: vernemq_mqtt_subscribe_auth_error
-        metric: vernemq.node_mqtt_subscribe_auth_error
-        info: Node ${label:node} mqtt v${label:mqtt_version} unauthorized SUBSCRIBE attempts in the last minute
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/vernemq.conf
-      - name: vernemq_mqtt_unsubscribe_error
-        metric: vernemq.node_mqtt_unsubscribe_error
-        info: Node ${label:node} mqtt v${label:mqtt_version} failed UNSUBSCRIBE operations in the last minute
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/vernemq.conf
-      - name: vernemq_mqtt_publish_errors
-        metric: vernemq.node_mqtt_publish_errors
-        info: Node ${label:node} mqtt v${label:mqtt_version} failed PUBLISH operations in the last minute
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/vernemq.conf
-      - name: vernemq_mqtt_publish_auth_errors
-        metric: vernemq.node_mqtt_publish_auth_errors
-        info: Node ${label:node} mqtt v${label:mqtt_version} unauthorized PUBLISH attempts in the last minute
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/vernemq.conf
-      - name: vernemq_mqtt_puback_received_reason_unsuccessful
-        metric: vernemq.node_mqtt_puback_received_by_reason_code
-        info: Node ${label:node} mqtt v5 received unsuccessful PUBACK packets in the last minute
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/vernemq.conf
-      - name: vernemq_mqtt_puback_sent_reason_unsuccessful
-        metric: vernemq.node_mqtt_puback_sent_by_reason_code
-        info: Node ${label:node} mqtt v5 unsuccessful sent PUBACK packets in the last minute
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/vernemq.conf
-      - name: vernemq_mqtt_puback_unexpected
-        metric: vernemq.node_mqtt_puback_invalid_error
-        info: Node ${label:node} mqtt v${label:mqtt_version} received unexpected PUBACK messages in the last minute
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/vernemq.conf
-      - name: vernemq_mqtt_pubrec_received_reason_unsuccessful
-        metric: vernemq.node_mqtt_pubrec_received_by_reason_code
-        info: Node ${label:node} mqtt v5 received unsuccessful PUBREC packets in the last minute
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/vernemq.conf
-      - name: vernemq_mqtt_pubrec_sent_reason_unsuccessful
-        metric: vernemq.node_mqtt_pubrec_sent_by_reason_code
-        info: Node ${label:node} mqtt v5 unsuccessful sent PUBREC packets in the last minute
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/vernemq.conf
-      - name: vernemq_mqtt_pubrec_invalid_error
-        metric: vernemq.node_mqtt_pubrec_invalid_error
-        info: Node ${label:node} mqtt v${label:mqtt_version} received invalid PUBREC packets in the last minute
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/vernemq.conf
-      - name: vernemq_mqtt_pubrel_received_reason_unsuccessful
-        metric: vernemq.node_mqtt_pubrel_received_by_reason_code
-        info: Node ${label:node} mqtt v5 received unsuccessful PUBREL packets in the last minute
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/vernemq.conf
-      - name: vernemq_mqtt_pubrel_sent_reason_unsuccessful
-        metric: vernemq.node_mqtt_pubrel_sent_by_reason_code
-        info: Node ${label:node} mqtt v5 unsuccessful sent PUBREL packets in the last minute
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/vernemq.conf
-      - name: vernemq_mqtt_pubcomp_received_reason_unsuccessful
-        metric: vernemq.node_mqtt_pubcomp_received_by_reason_code
-        info: Node ${label:node} mqtt v5 received unsuccessful PUBCOMP packets in the last minute
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/vernemq.conf
-      - name: vernemq_mqtt_pubcomp_sent_reason_unsuccessful
-        metric: vernemq.node_mqtt_pubcomp_sent_by_reason_code
-        info: Node ${label:node} mqtt v5 unsuccessful sent  PUBCOMP packets in the last minute
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/vernemq.conf
-      - name: vernemq_mqtt_pubcomp_unexpected
-        metric: vernemq.node_mqtt_pubcomp_invalid_error
-        info: Node ${label:node} mqtt v${label:mqtt_version} received unexpected PUBCOMP packets in the last minute
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/vernemq.conf
     metrics:
       folding:
         title: Metrics
@@ -308,7 +203,7 @@ modules:
             - name: node
               description: The value of this label is identical to the value of the "node" label exposed by VerneMQ.
           metrics:
-            - name: vernemq.node_socket
+            - name: vernemq.node_sockets
               description: Open Sockets
               unit: sockets
               chart_type: line
@@ -607,7 +502,7 @@ modules:
                 - name: quota_exceeded
                 - name: administrative_action
                 - name: payload_format_invalid
-            - name: node_mqtt_disconnect_sent_by_reason_code
+            - name: vernemq.node_mqtt_disconnect_sent_by_reason_code
               description: MQTT DISCONNECT Sent by Reason
               unit: packets/s
               chart_type: stacked
@@ -808,7 +703,7 @@ modules:
               dimensions:
                 - name: success
                 - name: packet_id_not_found
-            - name: vernemq.node_mqtt_pubcomp_sent_by_reason_cod
+            - name: vernemq.node_mqtt_pubcomp_sent_by_reason_code
               description: MQTT PUBCOMP QoS 2 Sent by Reason
               unit: packets/s
               chart_type: stacked

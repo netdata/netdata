@@ -45,7 +45,7 @@ modules:
         auto_detection:
           description: No jobs start by default. Build the experimental plugin explicitly and configure the target.
         limits:
-          description: 'This experimental plugin requires Linux amd64 or arm64. Keep
+          description: 'This experimental plugin requires Linux. Keep
             FreeIPMI for legacy direct drivers, OEM interpretation or custom FreeIPMI interpretation files. Unknown or
             unavailable sensor readings leave gaps. Default FreeIPMI policy treats non-critical threshold assertions as
             nominal. Do not run both IPMI plugins against the same host with the canonical ipmi job name because chart
@@ -169,15 +169,10 @@ modules:
             cause: The plugin account cannot open the local IPMI device for reading and writing.
             fix: Grant device access through the host security policy, or run a trusted local test explicitly with sudo.
               Rebuilding the plugin does not grant device access.
+    # ipmi_events is an alarm on chart id ipmi.events, which this collector creates under the ipmi_go.sel context,
+    # so no declared context derives it. The integrations generator derives every other alert row from `metrics`.
     alerts:
-      - name: ipmi_go_sensor_state
-        metric: ipmi_go.sensor_state
-        info: IPMI sensor ${label:sensor} (${label:component}) state
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/ipmi.conf
-      - name: ipmi_events
-        metric: ipmi_go.sel
-        info: number of events in the IPMI System Event Log (SEL)
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/ipmi.conf
+      - ipmi_events
     metrics:
       folding:
         title: Metrics

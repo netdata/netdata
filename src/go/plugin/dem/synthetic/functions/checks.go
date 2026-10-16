@@ -13,7 +13,6 @@ func (h *Handler) checks(
 	args map[string]string,
 	response map[string]any,
 ) *funcapi.FunctionResponse {
-	response["artifacts"] = h.deps.ArtifactStats()
 	if err := validKind(args["kind"]); err != nil {
 		return funcapi.ErrorResponse(400, "%v", err)
 	}

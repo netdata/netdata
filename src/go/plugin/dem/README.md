@@ -46,14 +46,31 @@ contribute to summaries but stay out of timelines. Session rows sort by `last_ob
 before limiting; first/last observations and their span describe only the selected activity. A gap between observations
 does not prove continuous presence.
 
-One process-owned retention worker applies the whole-plugin `history.days` and `history.max_bytes` policy, including
-disabled sites. It removes oldest archived files by their saved-time head and committed journal bytes; it protects the active
-file. Filesystem preallocation can use more disk space than committed bytes. These are whole-file retention targets, not exact event TTLs or a hard instantaneous disk ceiling. The worker
-archives idle activity without creating an empty replacement file and applies policy changes at the next hourly sweep;
-invalid changes retain the last valid policy and produce a warning. Queued events flush every five seconds or 500 records.
+One process-owned retention worker applies one shared history budget across RUM, synthetic runs, disabled jobs and
+retained machine identities. Defaults are 30 days and 1 GiB; `history.max_bytes` must be at least 8 MiB. Accounting uses
+journal file lengths, including preallocation. Whole files expire after their latest saved record ages out; size pressure
+removes the oldest files sooner and can shorten the investigation window. High-volume RUM can evict older synthetic runs.
+New files span less than 24 hours of saved time. With normally advancing clocks and timely successful hourly maintenance,
+age alone can retain older records for approximately one extra day plus one hour. Existing files keep their actual spans.
+Query time ranges still use original observation/run time, so saved-time retention does not establish query coverage.
+
+The byte target is not a physical disk cap: active growth, allocation rounding and admitted appends can exceed it;
+open query readers can keep removed files allocated. Unsafe files and failed cleanup can leave excess until resolved.
+Hourly sweeps do not force archives; idle active files are sealed when needed for expiry. Valid policy edits apply at the
+next sweep. Invalid edits retain the last valid policy and report a warning and status error. Artifacts have a separate
+retention policy, defaulting to 7 days and 2 GiB.
+
+`dem-history-status` reports the effective policy, sampled file bytes/count, observation time, latest cleanup attempt,
+last successful cleanup, and separate inventory, cleanup, writer and policy reload errors. It is a read-only member
+Function available even with all collectors disabled, with no arguments, payload or time filters. Unknown or unattempted
+values are `null`; an inventory failure does not erase cleanup or writer facts. These facts help diagnose storage pressure
+and maintenance failures, but cannot explain whether an absent event expired, was sampled out or was never collected.
+Unusable history at startup still stops the plugin before Functions register; inspect process logs in that case.
+
+Queued events flush every five seconds or 500 records.
 Flushes sync pending appends; clean idle ticks skip sync. A crash can lose records still queued or
 not synced. Queue overflow and append failures count dropped records; sync failures produce a warning. Failed retention
-sweeps retry after five seconds. An uncertain journal mutation or sync failure makes shared history unavailable until
+sweeps retry after five seconds, independently of healthy appends. An uncertain journal mutation or sync failure makes shared history unavailable until
 restart verification; subsequent reads, writes, sync and retention fail rather than expose a partial result. RUM measurements
 and enabled exports continue independently, and synthetic current diagnosis reports history errors. This is sampled
 investigation history, not a lossless event archive.
@@ -429,30 +446,97 @@ Journey defaults to 900 seconds between attempts and a 120-second admitted timeo
 One plugin-wide admission slot serializes expensive runs. Waiting time is separate from execution time; cancellation
 while waiting starts no browser. A fresh browser is created for each run.
 
-Browser jobs currently require Linux amd64 or arm64 and an unprivileged plugin identity. Prepare Node 24 or newer,
-full Chromium, its system libraries and compatible sandbox support. Chromium sandboxing stays enabled; setup refusal
-appears as execution inability. Containers need namespace/seccomp support for the sandbox. The plugin does not install
-packages or download browsers. Restart the plugin after changing `runtime` paths in `dem.conf`.
+Browser jobs require Linux amd64 or arm64 and an unprivileged plugin identity. Chromium sandboxing stays enabled;
+containers need compatible namespace/seccomp support. RUM does not require a browser runtime.
 
-The installed `plugins.d/dem/package.json` and `package-lock.json` pin `@playwright/test`/Playwright 1.63.0,
-Lighthouse 13.4.1 and Chrome Launcher 1.2.1. Copy both files into a prepared dependency directory, then run `npm ci
---omit=dev --ignore-scripts` there with the compatible Node version. Prepare the full Chromium revision 1243
-(version 153.0.8010.12) from that Playwright release; Lighthouse needs the full browser rather than only its headless
-shell. The pinned CLI supports `node node_modules/playwright/cli.js install --no-shell chromium` for operator-managed
-installation. Install system libraries using the release's documented platform prerequisites. Make the dependency and
-browser files readable/executable by the service account, then set absolute paths:
+### Runtime setup and retirement
+
+Browser runtime delivery is experimental. DEM is disabled by default at build time. This tree provides preparation,
+execution and retirement, but no bundle builder, release artifacts or manifest installation. Development deployments
+must supply a trusted manifest and its matching bundle. Packaging and independent runtime releases are separate work;
+the current Agent-owned adapters and exact component pins are temporary. Browser jobs cannot run without those inputs.
+
+Managed mode is the default. Accepting an enabled journey or Lighthouse configuration requests its exact runtime;
+validation and disabled configurations do not download it. Preparation runs separately from website monitoring.
+An unavailable runtime leaves the monitor waiting for its dependency; it does not produce website failure measurements.
+Downloads can be disabled by the administrator:
 
 ```yaml
 runtime:
-  node_path: /usr/bin/node
-  dependencies_path: /opt/netdata-dem
-  browser_path: /opt/netdata-dem/browsers/chromium-1243/chrome-linux64/chrome
+  mode: managed
+  allow_download: false
+  max_bytes: 4294967296
+  previous_retention_days: 7
+  idle_retention_days: 30
 ```
 
-The browser executable's directory varies by architecture and installation location; use the actual full Chromium
-path. Do not configure the headless-shell executable. Check validates preparation without executing a workflow.
-Prepared packages and installed runner assets are read-only during execution; generated config, caches, profiles and
-output are confined to a private run directory.
+Managed setup reads a trusted `plugins.d/dem/runtime-<architecture>.json` manifest identifying the archive, digest,
+size limits and executable layout. The administrator must supply this file, or select an absolute `manifest_path`
+in `dem.conf`. Monitor configuration cannot choose a download URL. A checkout or package without that manifest reports
+setup unavailability; it does not guess a source or fetch a different browser.
+
+The cache defaults to `NETDATA_LIB_DIR/dem/runtime`. Its 4 GiB allowance includes preparation reservations. Known
+enabled monitors protect their runtime; every probe and browser invocation also has an independent execution pin.
+Unneeded previous generations get a 7-day grace and idle runtimes 30 days, with hourly cleanup. Storage pressure can
+shorten either grace. Protected demand and executions can exceed the allowance. If child completion cannot be proved,
+the plugin stops and retains the execution's protection; an arbitrary timeout is not permission to remove its files.
+
+This is an ordinary cache: startup cleanup or another consumer can remove an expired generation before saved monitor
+enables arrive. Online setup can download it again; offline setup reports unavailability. For guaranteed offline
+availability across that gap, use an administrator-owned preload as described below. Restart the plugin after changing
+runtime configuration; an Agent upgrade requiring a new runtime needs that exact archive available online or imported.
+
+Run administration commands as the consuming service account, with the same configuration and library directory:
+
+```sh
+dem.plugin runtime status
+dem.plugin runtime prepare
+dem.plugin runtime import --archive /absolute/path/runtime.tar.gz
+dem.plugin runtime qualify
+```
+
+`status` reports cache inventory and whether the selected archive is prepared, without downloading or launching a
+browser. `prepare` uses only the installed manifest's URL; `import` verifies an offline archive against that same trust.
+`qualify` runs a local sandboxed Playwright journey through the actual supervisor and reports qualification separately
+from preparation. It does not download missing files. `--config-dir`, `--manifest`, `--cache` and `--assets` support
+explicit installation paths; paths must be absolute. Configuration lookup follows normal plugin startup:
+`--config-dir` takes priority while retaining the selected user and stock roots; environment roots replace build
+roots, with the same installation fallbacks when neither is set. As at normal startup, terminal sessions ignore
+configuration-root environment variables; use `--config-dir` for an explicit administrator directory in that case.
+Explicit `--manifest`, `--cache` and `--allow-download` values override the loaded configuration. Cache inventory and
+maintenance errors remain separate from monitor outcomes. CLI inventory is a storage observation, not the running plugin's live preparation status.
+
+With an explicitly supplied manifest and matching bundle, the same managed store can be used in native, Docker,
+static and source-build layouts. This does not establish production delivery or qualification for those methods.
+The bundle supplies private Node, Chromium libraries, fonts and JavaScript dependencies; preparation does not install
+host packages or modify installed adapters. Persist the cache in Docker if it should survive container replacement.
+A development image can instead include a preload at its final path:
+
+```sh
+dem.plugin runtime preload --root /opt/netdata-dem-runtime --archive /absolute/path/runtime.tar.gz
+```
+
+The root must be new or empty. Use the returned `runtime.mode: preloaded` configuration:
+
+```yaml
+runtime:
+  mode: preloaded
+  preload_path: /opt/netdata-dem-runtime
+```
+
+Both modes require the installed trusted runtime manifest. If the preload command uses an explicit `--manifest`,
+its returned configuration includes that `manifest_path`. A preload must match the required bundle and remain at its
+final path; moving it or upgrading to an Agent requiring a different bundle makes it unavailable. Prepare the new
+bundle at a new final path and switch configuration after stopping all consumers of the old preload.
+
+Preloads are outside automatic retirement, and managed-cache operations refuse their roots. Keep the directory
+privately owned by the consuming service account. It may be mounted read-only for execution. Stop every consumer
+before replacing or removing its files. This supports controlled offline images and read-only deployments while
+using the same qualified bundle as managed mode. Separately installed Node, npm packages or browsers cannot be selected.
+
+`runtime status` checks prepared identity without starting a browser; `runtime qualify` tests a local sandboxed
+browser under its calling account. Qualification still needs to run under the target service's sandbox and security
+policy; a successful image build does not establish host compatibility.
 
 Configure exactly one of inline `script` or absolute `script_path` in `dem/journey.conf`. Standard named imports from
 `@playwright/test` and destructured CommonJS `require` use the real pinned package. JS/TS, mjs/mts and cjs/cts entries,
@@ -486,7 +570,7 @@ start are distinct from a failed target. A workflow failure means a declared che
 The static `dem_journey_failed` template warns on the latest fresh failed/timed-out observation. A new successful
 observation clears it. Unknown, inconclusive, execution error, cancellation and observations older than two native
 intervals are UNDEFINED, not recovery. Replacement/restart begins unknown until a new observation. Critical escalation
-and configurable sensitivity are left for a separate alert-policy decision. Native job status shows preparation errors;
+and configurable sensitivity are left for a separate alert-policy decision. Native job status identifies unavailable dependencies; plugin logs explain runtime preparation errors.
 Functions show current execution and retained diagnosis.
 
 Lighthouse performance is a desktop lab score in points from 0 to 100; FCP, LCP, TBT and Speed Index are milliseconds,
@@ -498,7 +582,8 @@ enabled.
 ## Synthetic diagnosis and captures
 
 Process Functions use the regular Netdata transport: `synthetics-checks` for active observations, `synthetics-runs`
-for retained history, `synthetics-run` for one run's full diagnosis, and `synthetics-artifact` for capture metadata or bytes.
+for retained history, `synthetics-run` for one run's full diagnosis, `synthetics-artifacts` for retained capture sets and
+storage status, and `synthetics-artifact` for one set's metadata or bytes.
 Use the advertised `job_id`, `run_id` and other parameters. Disabled/failed-startup jobs remain in native configuration
 status. Current-generation last success/failure and freshness do not reconstruct a historical incident. A running or
 waiting attempt does not refresh its previous result. Run summaries are capped at 2000 rows with an explicit truncation
@@ -523,13 +608,26 @@ Playwright APIs. Optional failure PNG screenshots and Lighthouse HTML reports ar
 `screenshot_on_failure` or `save_report` before an incident if these captures are needed. Forced browser termination
 can prevent capture. Trace, HAR, video and filmstrip are not initial capabilities.
 
-Captures live under `${NETDATA_LIB_DIR}/dem/artifacts` with a separate plugin-wide default of up to seven days subject
-to 2 GiB. Oldest finalized runs expire together; active or unverified work is protected, so this is a soft disk target.
-The inventory exposes retained/protected bytes and cleanup errors. Capture states distinguish disabled, not needed,
-unavailable and published evidence. Retained history may outlive its files; absent recorded files mean “expired or
-unavailable”. Metadata presence alone does not verify file availability; fetch verifies the manifest, size and digest.
-Captures exceeding 5 MiB are marked unavailable and are not published.
-Downloads require administrator-equivalent caller permissions and are limited to 5 MiB; HTML is returned as base64 data.
+Captures live under `${NETDATA_LIB_DIR}/dem/artifacts` with one shared default allowance of seven days and 2 GiB
+for retained capture sets. Each set contains the screenshots or reports published for one run. The newest eligible
+capture for each monitor is preferred under size pressure, then older captures are removed first if even those sets
+do not fit. Age still expires preferred captures; this does not guarantee one capture per monitor or a complete incident
+history. A later Lighthouse report can replace an earlier poor-score report; a journey recovery without a screenshot
+leaves its previous failure capture eligible. Disabled or deleted monitors retain the same preference, and renaming a
+monitor creates a separate group until its old captures expire.
+
+Active or unverified workspace, unclassified files and pending deletions are reported separately and do not consume the
+retained-capture allowance. Total disk use can exceed the allowance, including growth between sweeps; sizes are logical
+file lengths, not allocated disk space. `synthetics-artifacts` reports global storage observations, effective policy,
+cleanup status and policy reload errors even when `job_id` filters its rows. Its newest-first list accepts an optional
+`limit` from 1 to 2000 and a returned `next` cursor as `before`; captures can expire between pages.
+
+Capture discovery and downloads remain available after run history expires and after a monitor is disabled or deleted.
+Capture states distinguish disabled, not needed, unavailable and published evidence. Retained history may also outlive
+its files; absent recorded files mean “expired or unavailable”. Metadata presence alone does not verify file integrity;
+fetch verifies size and digest. Capture metadata requires member-equivalent permissions. Downloads require
+administrator-equivalent permissions and are limited to 5 MiB; HTML is returned as base64 data. A capture exceeding
+5 MiB makes that run's capture publication unavailable; no partial set or truncated file is published.
 
 The runner retains admission and private files until Linux supervision proves the entire child tree is reaped.
 Unverified completion stops further admission and exits the plugin without deleting shared state. Unexpected supervisor

@@ -168,7 +168,12 @@ jobs:
 
 ## Alerts
 
-There are no alerts configured by default for this integration.
+
+The following alerts are available:
+
+| Alert name  | On metric | Description |
+|:------------|:----------|:------------|
+| [ isc_dhcpd_dhcp_pool_utilization ](https://github.com/netdata/netdata/blob/master/src/health/health.d/isc_dhcpd.conf) | isc_dhcpd.dhcp_pool_utilization | ISC DHCP pool ${label:dhcp_pool_name} utilization |
 
 
 

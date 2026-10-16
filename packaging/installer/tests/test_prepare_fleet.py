@@ -110,6 +110,23 @@ class PrepareFleetTests(unittest.TestCase):
         self.assertEqual(manifest['resolved'], ['apps', 'network'])
         self.assertTrue((self.source / 'usr/libexec/netdata/plugins.d/go.d.plugin').exists())
 
+    def test_package_path_inventory_tracks_retained_content(self):
+        inventory = 'system/package-manifest'
+        original = '.\n./system\n./bin/netdata\n./usr/lib/netdata/conf.d/go.d\n./usr/lib/netdata/conf.d/go.d/custom.conf\n./usr/share/netdata/web\n'
+        self.put(inventory, original)
+        target, _ = self.prepare('none')
+        self.assertEqual((target / inventory).read_text(), '.\n./system\n./bin/netdata\n./usr/share/netdata/web\n')
+        self.assertEqual((self.source / inventory).read_text(), original)
+        self.run_script('--source', self.source, '--keep', 'go', '--strip-mode', 'none',
+                        '--apply', '--output', self.root / 'with-go')
+        self.assertEqual((self.root / 'with-go' / inventory).read_text(), original)
+
+    def test_package_path_inventory_symlink_is_refused(self):
+        os.symlink('../etc/netdata/custom.conf', self.source / 'system/package-manifest')
+        target, result = self.prepare(success=False)
+        self.assertFalse(target.exists())
+        self.assertIn('package path inventory must be a regular file', result.stderr)
+
     def test_missing_capability_companion_refused(self):
         other = self.root / 'incomplete-go'
         shutil.copytree(self.source, other, symlinks=True,

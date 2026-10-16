@@ -9,6 +9,7 @@ import (
 	"context"
 	"os"
 	"path/filepath"
+	"reflect"
 	"regexp"
 	"sync"
 	"testing"
@@ -18,6 +19,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/netdata/netdata/go/plugins/pkg/metrix"
+	"github.com/netdata/netdata/go/plugins/plugin/framework/confgroup"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/jobruntime"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/collecttest"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/ndexec"
@@ -26,6 +28,7 @@ import (
 
 // TestMain doubles as the fake tegrastats; see streamexectest.
 func TestMain(m *testing.M) {
+	runIfSupervisedPeer()
 	streamexectest.RunIfFake()
 	os.Exit(m.Run())
 }
@@ -87,6 +90,9 @@ func TestPowerCollectionTransitions(t *testing.T) {
 		`power_rail_power{rail="VDD_CPU_SOC_MSS"}`: 8.299,
 		`power_rail_power{rail="VIN_SYS_5V0"}`:     7.044,
 		`power_rail_power{rail="VIN"}`:             24.830,
+		`sensor_temperature{sensor="cpu"}`:         35.468,
+		`sensor_temperature{sensor="gpu"}`:         37.062,
+		`sensor_temperature{sensor="tj"}`:          37.062,
 	}
 	assertCollected(t, c, want)
 	assertCollected(t, c, want)
@@ -108,7 +114,7 @@ func TestPowerCollectionTransitions(t *testing.T) {
 	sendRecord(t, conn, "VDD_GPU 100mW/200mW/300mW")
 	waitSample(t, c, func(s sample) bool { return !s.hasReadings() })
 	_, err = collecttest.CollectScalarSeries(c)
-	require.ErrorContains(t, err, "no supported GPU, EMC or power readings")
+	require.ErrorContains(t, err, "no supported GPU, EMC, power or temperature readings")
 
 	sendRecord(t, conn, "VDD_GPU 0/10")
 	waitSample(t, c, func(s sample) bool { return len(s.PowerRails) == 1 })
@@ -116,7 +122,8 @@ func TestPowerCollectionTransitions(t *testing.T) {
 }
 
 func TestManagedRuntime(t *testing.T) {
-	c, fake := newCollectorWithFake(t)
+	_, fake := newSupervisedPeer(t, "success")
+	c := configuredCollector(t, fake, confgroup.Config{"name": t.Name()})
 	c.timing.MaxSampleAge = time.Hour // only withdrawal, not age, can remove the record after stop
 	out := &lockedBuffer{}
 	job := jobruntime.NewJobV2(jobruntime.JobV2Config{
@@ -158,6 +165,16 @@ func TestManagedRuntime(t *testing.T) {
 		return setUtilization.MatchString(out.String())
 	}, 3*time.Second, 20*time.Millisecond)
 
+	// A temperature-only record must reach the real chart emitter without rounding.
+	sendRecord(t, conn, "cpu@39.218C")
+	waitSample(t, c, func(s sample) bool { return len(s.Temperatures) == 1 })
+	setTemperature := regexp.MustCompile(`(?m)^SET '[^']+' = 39\.218$`)
+	require.Eventually(t, func() bool {
+		job.Tick(1)
+		return setTemperature.MatchString(out.String())
+	}, 3*time.Second, 20*time.Millisecond)
+	assert.Contains(t, out.String(), "CLABEL 'sensor' 'cpu' '1'\n")
+
 	run.Stop(nil)
 	select {
 	case <-done:
@@ -171,6 +188,7 @@ func TestManagedRuntime(t *testing.T) {
 
 func TestRunStartupFailure(t *testing.T) {
 	c, _ := newCollectorWithFake(t)
+	require.NoError(t, c.Init(t.Context()))
 	require.NoError(t, c.Check(t.Context()))
 	t.Cleanup(ndexec.SetRunnerPathsForTests(filepath.Join(t.TempDir(), "missing-wrapper"), ""))
 
@@ -178,6 +196,7 @@ func TestRunStartupFailure(t *testing.T) {
 	select {
 	case err := <-done:
 		require.ErrorContains(t, err, "start tegrastats")
+		require.ErrorIs(t, err, os.ErrNotExist)
 	case <-time.After(3 * time.Second):
 		t.Fatal("startup failure not returned")
 	}
@@ -209,6 +228,8 @@ func newCollectorWithFake(t *testing.T) (*Collector, *streamexectest.Fake) {
 	t.Helper()
 	fake := streamexectest.NewFake(t)
 	c := New()
+	c.Name = t.Name()
+	c.AllowPrivileged = false
 	c.findTegrastats = func() (string, error) { return fake.Binary, nil }
 	return c, fake
 }
@@ -227,15 +248,19 @@ func startRun(t *testing.T, c *Collector) (stop context.CancelFunc) {
 	require.NoError(t, c.Check(t.Context()))
 	ctx, cancel := context.WithCancel(t.Context())
 	ready, done := goRun(ctx, c)
-	t.Cleanup(func() {
-		cancel()
-		select {
-		case err := <-done:
-			assert.NoError(t, err)
-		case <-time.After(5 * time.Second):
-			t.Error("Run did not join its owned process")
-		}
-	})
+	var once sync.Once
+	stop = func() {
+		once.Do(func() {
+			cancel()
+			select {
+			case err := <-done:
+				assert.NoError(t, err)
+			case <-time.After(5 * time.Second):
+				t.Error("Run did not finish its bounded shutdown")
+			}
+		})
+	}
+	t.Cleanup(stop)
 	select {
 	case <-ready:
 	case err := <-done:
@@ -243,7 +268,7 @@ func startRun(t *testing.T, c *Collector) (stop context.CancelFunc) {
 	case <-time.After(5 * time.Second):
 		t.Fatal("readiness waited for telemetry")
 	}
-	return cancel
+	return stop
 }
 
 // goRun calls Run in the background and returns its readiness and result channels.
@@ -285,4 +310,129 @@ func (b *lockedBuffer) String() string {
 	b.mu.Lock()
 	defer b.mu.Unlock()
 	return b.buffer.String()
+}
+
+func TestCorrectedOrinCaptures(t *testing.T) {
+	c, fake := newCollectorWithFake(t)
+	startRun(t, c)
+	conn := fake.Accept(t)
+	for _, tc := range []struct {
+		file string
+		want map[string]metrix.SampleValue
+	}{
+		{"orin-r36.5-15w-root", map[string]metrix.SampleValue{
+			`sensor_temperature{sensor="cpu"}`:  39.312,
+			`sensor_temperature{sensor="gpu"}`:  34.562,
+			`sensor_temperature{sensor="soc0"}`: 36.625,
+			`sensor_temperature{sensor="soc1"}`: 36.437,
+			`sensor_temperature{sensor="soc2"}`: 35.75,
+			`sensor_temperature{sensor="tj"}`:   39.312,
+
+			"gpu_utilization": 0, `gpu_gpc_frequency{gpc="0"}`: 305, `gpu_gpc_frequency{gpc="1"}`: 0,
+			"emc_utilization": 1, "emc_frequency": 2133,
+			`power_rail_power{rail="VDD_GPU_SOC"}`: 2.403, `power_rail_power{rail="VDD_CPU_CV"}`: 0.400,
+			`power_rail_power{rail="VIN_SYS_5V0"}`: 4.745,
+		}},
+		{"orin-r36.5-50w-root", map[string]metrix.SampleValue{
+			`sensor_temperature{sensor="cpu"}`:  39.812,
+			`sensor_temperature{sensor="gpu"}`:  35.593,
+			`sensor_temperature{sensor="soc0"}`: 37.437,
+			`sensor_temperature{sensor="soc1"}`: 36.968,
+			`sensor_temperature{sensor="soc2"}`: 36.312,
+			`sensor_temperature{sensor="tj"}`:   39.812,
+
+			"gpu_utilization": 0, `gpu_gpc_frequency{gpc="0"}`: 1300, `gpu_gpc_frequency{gpc="1"}`: 1300,
+			"emc_utilization": 0, "emc_frequency": 3199,
+			`power_rail_power{rail="VDD_GPU_SOC"}`: 4.006, `power_rail_power{rail="VDD_CPU_CV"}`: 0.400,
+			`power_rail_power{rail="VIN_SYS_5V0"}`: 4.745,
+		}},
+		{"orin-r36.5-maxn-root", map[string]metrix.SampleValue{
+			`sensor_temperature{sensor="cpu"}`:  39.531,
+			`sensor_temperature{sensor="gpu"}`:  34.906,
+			`sensor_temperature{sensor="soc0"}`: 36.718,
+			`sensor_temperature{sensor="soc1"}`: 36.562,
+			`sensor_temperature{sensor="soc2"}`: 35.812,
+			`sensor_temperature{sensor="tj"}`:   39.531,
+
+			"gpu_utilization": 0, `gpu_gpc_frequency{gpc="0"}`: 305, `gpu_gpc_frequency{gpc="1"}`: 305,
+			"emc_utilization": 1, "emc_frequency": 2133,
+			`power_rail_power{rail="VDD_GPU_SOC"}`: 2.403, `power_rail_power{rail="VDD_CPU_CV"}`: 0.400,
+			`power_rail_power{rail="VIN_SYS_5V0"}`: 4.644,
+		}},
+		{"orin-r36.5-15w-account", map[string]metrix.SampleValue{
+			`sensor_temperature{sensor="cpu"}`:  39.218,
+			`sensor_temperature{sensor="gpu"}`:  34.593,
+			`sensor_temperature{sensor="soc0"}`: 36.656,
+			`sensor_temperature{sensor="soc1"}`: 36.312,
+			`sensor_temperature{sensor="soc2"}`: 35.656,
+			`sensor_temperature{sensor="tj"}`:   39.218,
+
+			"gpu_utilization":                      0,
+			`power_rail_power{rail="VDD_GPU_SOC"}`: 2.403, `power_rail_power{rail="VDD_CPU_CV"}`: 0,
+			`power_rail_power{rail="VIN_SYS_5V0"}`: 4.543,
+		}},
+	} {
+		t.Run(tc.file, func(t *testing.T) {
+			data, err := os.ReadFile(filepath.Join("testdata", "tegrastats", tc.file+".txt"))
+			require.NoError(t, err)
+			conn.Line(t, string(bytes.TrimSpace(data)))
+			require.Eventually(t, func() bool {
+				got, err := collecttest.CollectScalarSeries(c)
+				return err == nil && reflect.DeepEqual(tc.want, got)
+			}, 3*time.Second, 5*time.Millisecond)
+			assertCollected(t, c, tc.want)
+			collecttest.AssertChartCoverage(t, c, collecttest.ChartCoverageExpectation{})
+		})
+	}
+}
+
+func TestTemperatureCollectionTransitions(t *testing.T) {
+	c, fake := newCollectorWithFake(t)
+	c.timing.MaxSampleAge = 250 * time.Millisecond
+	stop := startRun(t, c)
+	conn := fake.Accept(t)
+
+	sendRecord(t, conn, "cpu@39.312C gpu@34.562C soc0@36.625C soc1@36.437C soc2@35.75C tj@39.312C")
+	waitSample(t, c, func(s sample) bool { return len(s.Temperatures) == 6 })
+	assertCollected(t, c, map[string]metrix.SampleValue{
+		`sensor_temperature{sensor="cpu"}`:  39.312,
+		`sensor_temperature{sensor="gpu"}`:  34.562,
+		`sensor_temperature{sensor="soc0"}`: 36.625,
+		`sensor_temperature{sensor="soc1"}`: 36.437,
+		`sensor_temperature{sensor="soc2"}`: 35.75,
+		`sensor_temperature{sensor="tj"}`:   39.312,
+	})
+	collecttest.AssertChartCoverage(t, c, collecttest.ChartCoverageExpectation{})
+
+	// Missing, unavailable, invalid, paired and ambiguous readings all withdraw independently.
+	sendRecord(t, conn, "cpu@0C gpu@-256C soc0@NaNC soc1@40C/41C soc2@40C soc2@41C GR3D_FREQ 10% VIN 1000/2000")
+	waitSample(t, c, func(s sample) bool { return s.GPUUtilization != nil })
+	assertCollected(t, c, map[string]metrix.SampleValue{
+		`sensor_temperature{sensor="cpu"}`: 0,
+		"gpu_utilization":                  10,
+		`power_rail_power{rail="VIN"}`:     1,
+	})
+
+	// Reordering does not change identity; a recovered sensor has no cached value.
+	sendRecord(t, conn, "gpu@-12.5C cpu@0C")
+	waitSample(t, c, func(s sample) bool { return len(s.Temperatures) == 2 })
+	assertCollected(t, c, map[string]metrix.SampleValue{
+		`sensor_temperature{sensor="gpu"}`: -12.5,
+		`sensor_temperature{sensor="cpu"}`: 0,
+	})
+	collecttest.AssertChartCoverage(t, c, collecttest.ChartCoverageExpectation{})
+
+	require.Eventually(t, func() bool {
+		_, err := collecttest.CollectScalarSeries(c)
+		return err != nil
+	}, 3*time.Second, 5*time.Millisecond)
+	_, err := collecttest.CollectScalarSeries(c)
+	require.ErrorContains(t, err, "no fresh")
+
+	sendRecord(t, conn, "tj@41.125C")
+	waitSample(t, c, func(s sample) bool { return len(s.Temperatures) == 1 })
+	assertCollected(t, c, map[string]metrix.SampleValue{`sensor_temperature{sensor="tj"}`: 41.125})
+	stop()
+	_, err = collecttest.CollectScalarSeries(c)
+	require.ErrorContains(t, err, "no fresh")
 }

@@ -93,7 +93,7 @@ closing its pipes. These rules apply per invocation; there is no persistent sess
 ## Private process-tree supervision
 
 ```text
-nd-run --supervise-tree <control-fd> <status-fd> -- command [args...]
+nd-run --supervise-tree <control-fd> <status-fd> [--completion <directory-fd> <id>] -- command [args...]
 ```
 
 This Linux-only mode applies the existing identity and minimal-environment policy, then remains a per-run subreaper.
@@ -118,6 +118,34 @@ Run real ownership fixtures in a disposable Linux environment:
 ```sh
 python3 tests/nd-run/test_process_tree.py
 ```
+
+### Persistent tree completion
+
+Callers retaining resources across process restarts may supply `--completion`. It is opt-in; ordinary tree
+supervision is unchanged. The trusted resource owner first creates a fresh private directory (mode `0700`) containing
+mode `0600` regular files `publication.lock` (empty) and `pending` (`NDTREE1 pending <id>\n`). The ID is 64 lowercase
+hexadecimal characters, unique to this invocation. Persist the files, directory entry and resource-to-ID binding
+before launch. Pass an already-open directory descriptor, never a payload-selected path.
+
+The helper validates the expected pending record and exclusively creates and persists a `started` marker, then
+acquires the exclusive `publication.lock` before forking. The marker claims this invocation even while a recovery
+reader delays launch by holding the lock. A started/used invocation cannot run again, even after supervisor loss. Protocol
+aliases are rejected, and all record handles are closed in the payload. Only after `waitpid` establishes ECHILD does
+the helper write/fsync `complete.pending`, atomically publish `complete` (`NDTREE1 drained <id>\n`), sync the directory,
+and release the publication lock. This happens before status-pipe delivery and also after a verified prelaunch setup
+refusal. Command failure does not prevent verified cleanup. Completion certifies quiescence, not command success.
+
+Recovery requires the exact matching pending/completion records and an acquired publication lock; acquiring a lock
+alone never proves drainage. Missing, malformed or unreadable evidence remains uncertain. Completion publication
+failure does not change the live status-frame result: a living owner may still use that validated drainage proof.
+Killing the helper, or losing the caller between pin creation and launch, may leave an uncertain record indefinitely.
+Do not infer completion from a PID, timeout, reboot of a container, or missing helper. Any host-reboot recovery belongs
+to the resource owner's separately established host-local storage contract.
+
+After releasing its record lock, the helper never accesses the directory again. It must reside outside any resource
+being retired and must not access that resource after publishing completion. The owner may remove completed records;
+it must serialize its own acquisition/retirement policy. This protocol uses the existing trusted-command model,
+not isolation against malicious same-account code. It neither implements retention policy nor grants new privileges.
 
 ## Regression tests
 
@@ -148,3 +176,55 @@ before verifying denial through the helper, including ambient capabilities and s
 Repeat as a non-root account to cover the inability-to-switch path. `--no-setres` exercises the portable
 setreuid/setregid build path; `--source` accepts an older helper source for regression comparisons. Full-agent CMake
 builds remain separate validation.
+
+## Restricted privileged tegrastats supervision
+
+Linux `ndsudo tegrastats` is a private supervised command. It accepts no additional arguments and never enters the
+legacy PATH/template execution path (`--test tegrastats` is not supported). It runs only
+`/usr/bin/tegrastats --interval 1000`. Existing ndsudo commands retain their behavior.
+
+The regular ELF and every directory component in `/usr/bin/tegrastats` must be root-owned and reject group/world writes.
+Symlinks, scripts, setuid/setgid modes and file capabilities are rejected. Directory traversal uses pinned descriptors and
+`O_NOFOLLOW`; descriptor execution pins the checked file through exec. This deliberately supports the fixed vendor
+installation rather than arbitrary relocated wrappers. Real/effective/saved IDs become root, supplementary groups
+are cleared, cwd is `/`, and the payload receives an empty environment and only its standard descriptors.
+
+The caller supplies two distinct private pipes: fd 3 is the control read end; fd 4 is the status write end. Inherited
+aliases are rejected using self-descriptor enumeration. The payload cannot inherit either pipe. Status is nonblocking
+and separate from stdout/stderr. Closing control, writing control input, losing the status reader, a termination signal,
+or payload exit initiates shutdown. The supervisor sends SIGKILL to the owned payload group while its leader is still
+pinned, then reaps direct/adopted children until `ECHILD`. It never signals that group after reaping the leader.
+
+The Linux subreaper does not require `/proc/*/children`. It does require procfs self-descriptor enumeration. It does
+not enumerate or kill escaped groups: an escaped live descendant keeps cleanup unfinished. No timeout is drain proof.
+The child sets parent-death SIGKILL after credential setup, with a parent race check; this protects the direct payload
+on supervisor loss, not arbitrary descendants. Callers must not kill the supervisor to enforce their waiting budget.
+
+The versioned private status stream is one of:
+
+- `NDSUP1 refused <reason>\n`, exit 126: no payload was forked. Reasons are `privilege`, `missing`, `unsafe`,
+  `arguments`, or `setup`. Only `privilege` and `missing` permit the caller to consider unprivileged fallback.
+- `NDSUP1 started\n`, followed by `NDSUP1 cleaned <raw-wait-status>\n`: the close-on-exec error pipe acknowledged
+  execution, then kernel wait exhaustion proved cleanup. The helper exit code must match the raw payload status.
+- `NDSUP1 failed\n`, followed by the same cleaned frame: child setup/exec failed. Cleanup can be verified, but this
+  is not permission to fall back.
+
+Missing, malformed or contradictory evidence means unverified cleanup, even if the helper exits successfully.
+No command-output text is part of this protocol. Exec acknowledgement does not prove usable telemetry or full fields.
+
+The Go `ndexec.Acquisition` adapter returns the existing `*Process` type. Its immutable namespace/job owner excludes
+simultaneous starts across both supervised and unprivileged routes within the plugin. It retains ownership while
+privileged cleanup is unfinished or unverified; valid late completion releases it. Unprivileged runs retain their
+existing weaker group-signal/leader-reap contract. Separate names and renamed jobs are independent. These in-memory
+leases do not survive plugin restart and are not a host singleton or persistent containment mechanism.
+
+Run the real setuid-boundary fixtures only inside a disposable root Linux Docker container with a C compiler. They
+refuse to replace an existing `/usr/bin/tegrastats`, install a synthetic ELF there, and run clients as UID 65534:
+
+```sh
+cd src/go
+NETDATA_TEST_NDSUDO_SUPERVISION=1 go test -race -count=1 ./plugin/go.d/pkg/ndexec -run 'Test(Acquisition|Supervised)'
+```
+
+These fixtures establish helper/API behavior. They do not certify NVIDIA vendor behavior, board coverage, packaging,
+or on-device overhead; those require an installed collector run on hardware. Collector adoption is a separate change.

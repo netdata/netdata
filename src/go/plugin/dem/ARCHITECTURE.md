@@ -15,13 +15,16 @@ creates and closes shared resources across framework generations.
 | `rum/functions` | Function declarations, arguments, permissions, columns and response serialization |
 | `synthetic` | Shared request, run, event and artifact values plus request validation |
 | `synthetic/registry` | Copied active-job observations, generation fencing and freshness |
-| `synthetic/query` | Active-first run lookup, retained runs and recorded-artifact membership/availability |
+| `synthetic/query` | Active-first run lookup, retained runs and manifest-owned artifact membership/availability |
 | `synthetic/history` | Synthetic record encoding and run reduction |
 | `synthetic/functions` | Function declarations, arguments, permissions, columns and response serialization |
 | `synthetic/runner` | Prepared browser execution, admission, process supervision and private reporter protocol |
 | `synthetic/runner/assets` | Immutable Node adapters and pinned dependency manifests |
+| `synthetic/runtime` | Trusted bundle verification, shared cache inventory, demand/use pins and automatic retirement |
+| `synthetic/runtimehost` | Accepted enabled demand, asynchronous preparation, readiness notifications and process maintenance |
 | `synthetic/artifacts` | Work directories, verified publication, immutable captures, reads and retention |
-| `journal` | One shared journal chain, SDK admission, independent snapshots, retention and close |
+| `journal` | Shared root policy, SDK admission and inventory, independent snapshots, retention status and close |
+| `historyfunc` | Read-only process history status presentation behind a narrow store dependency |
 | `internal/redact` | DEM text and credential redaction |
 | `internal/attemptmetrics` | Shared synthetic outcome and duration instruments |
 
@@ -232,11 +235,21 @@ store: new reads, writes, sync and retention return the failure; SDK cleanup rel
 metadata. Private temporary history is also preserved on failure. Measurements/exports remain independent; existing
 startup failure stops the plugin when retained history cannot be opened.
 
-One process worker archives idle history, reopens lazily and applies the plugin-wide age/committed-byte policy even
-when all sites are disabled. Failed sweeps retry after five seconds; the store owns the reopened lazy Log before
-enforcing retention, and the next append creates its active file. Whole archives expire; the active file and filesystem
-preallocation can exceed the configured committed-byte target. Neither retention nor history scans hold a live site lease across disk work. Publication uses
-typed metrix snapshots and static chart templates, with no V1 map bridge.
+One process worker applies the shared history policy in place, including retained machine identities, even with all
+collectors disabled. The SDK owns validated filename/header inventory, file-length accounting and tail-saved-time
+whole-file pruning. DEM selects a fixed 24-hour file span and applies policy at startup and hourly; size rotation also
+maintains the budget. Sweeps do not force archives or reopen the writer. Expired idle active files are sealed only when
+needed, and next-file creation remains lazy. Failed cleanup retries after five seconds without failing healthy appends.
+Uncertain writer mutation still makes the store unavailable for reads and writes; status retains separate writer and
+cleanup facts. Invalid config reloads preserve the last valid policy and an independently locked reload error.
+
+`historyfunc` borrows the store's status interface and the worker's reload error accessor. Each Agent generation receives
+a fresh handler; it never closes the process store. Metadata performs no I/O. Explicit status requests use header-only
+inventory, never scan records, and report unknown inventory on failure. The effective policy comes from the store, not a
+worker policy that has yet to apply. File bytes include preallocation but do not measure filesystem blocks or open unlinked
+files. Whole-file age and byte targets cannot promise complete observed-time history or exact record TTLs.
+Neither retention nor history scans hold a live site lease across disk work. Publication uses typed metrix snapshots and
+static chart templates, with no V1 map bridge.
 
 Stock native health templates own alert policy and attach independently to each site's charts. Site jobs publish
 measurements only; they do not write health configuration, invoke health reload or recover generated files. The command
@@ -268,6 +281,30 @@ the execution admission slot, artifact store and journal. Process Functions are 
 providers and published independently of collector selection. Their narrow source copies active snapshots before
 independent history I/O; no Function acquires browser admission.
 
+The process runtime host owns accepted enabled browser configuration independently of collector activation. Graph
+transactions use contained process work to validate and reserve demand before adoption, outside graph claims and
+host state locks. Commit and Abort only transfer in-memory ownership; the existing process worker releases aborted
+claims and reports physical cleanup failures through maintenance health and final Close. Late contained results abort
+once and remain process-owned until joined. Disabled/passive configuration never downloads.
+A process worker prepares the selected trusted bundle, retries failures and polls for offline imports. Run-scoped
+subscriptions wake the existing named dependency scheduler. RUM and configuration mutation do not wait for a download.
+
+The managed store serializes reservations, generation publication and retirement across consumers. Accepted demand
+and each invocation's durable use pin protect files independently. The runner acquires a use before inspecting runtime
+files, passes its completion handle to `nd-run`, and releases it after supervised drainage and local reader joins.
+Completed preparation releases its local claim and staging locks before coordinated record reclamation. Failed local
+lock closes remain owned for maintenance/final-close retry; released records are reclaimed by the existing dead-owner
+inventory. Cleanup health survives coordination failures and cannot be cleared by an older sweep.
+Unknown execution completion retains protection across process restart. A positively verified host reboot may
+release the old execution pin because its children cannot remain alive. Preparation/maintenance errors do not alter website
+outcomes. Administrator-owned preloaded bundles use installed trust and stay outside cache retirement; replacement requires stopped consumers.
+
+Startup does not wait for a saved-configuration replay marker. Unneeded cached files may expire or yield to pressure
+before saved enables arrive; this permits a cache miss, not unsafe deletion during execution. A controlled offline
+preload selects one protected bundle root, validated against installed trust and its final location.
+Preloaded roots are read-only during use and refused by managed-cache operations. Independent component paths are unsupported. Command shutdown closes the host and store only after
+jobs and contained configuration work have joined; fail-stop paths retain the existing execution evidence.
+
 The real Node adapter selects exactly one configured entry with explicit config/tsconfig and a private reporter pipe.
 Standard import mappings target real pinned package entries, never a fake test harness. Retry overrides fail before a
 worker starts. Node terminal evidence and Linux process-tree completion are distinct. Go joins stdin/stdout/stderr
@@ -290,6 +327,17 @@ Artifact publication starts only after verified tree/reader completion. A Go-own
 permission; work without it remains protected across restart. Captures are constrained beneath output and copied into
 synced immutable manifests with actual size/digest. Final publication, fetch, retention and close serialize at the store.
 Failed publication remains protected for the current owner; a later owner reconciles only marked drained leftovers.
-Expiry removes complete finalized directories without everlasting tombstones. Journal metadata missing its backing
-file is reported as expired_or_unavailable. Filesystem traversal/retention is linear in files plus finalized-run sorting;
-no metrics collection path scans artifact bytes.
+Nonempty publication records Go-owned JobID, RunID, publication time and artifact membership. Empty captures leave
+no persistent manifest. Catalogue and fetch use that ownership independently of journal survival; history only explains
+absent sets. Catalogue reads metadata and logical file lengths, sorts by publication time/RunID, and exposes bounded
+keyset pages plus an unfiltered global storage snapshot. Unknown byte categories carry errors rather than zeroes.
+
+The shared allowance counts all logical file lengths inside trusted published set directories, including manifests;
+eviction removes whole set directories. Unclassified published entries lack trusted set identity and remain separate,
+along with workspace and pending deletion. An unreadable trusted set makes retained bytes unknown and defers retention
+selection until the retained inventory is complete. Age expiry precedes size pressure, which removes older non-preferred
+sets before each JobID's newest eligible set. If preferred sets exceed the allowance, they expire oldest first as well.
+Eviction renames complete sets into `deleting/`, syncs both parents before removal, then syncs the deletion parent again.
+Recovery retries this transition without needing surviving manifest bytes; uncertain ownership blocks deletion.
+Filesystem traversal/retention is linear in files plus finalized-set sorting, without a rescan per victim. Publication
+and current-check Functions do not recursively inventory artifact storage; no metrics collection path scans artifact bytes.

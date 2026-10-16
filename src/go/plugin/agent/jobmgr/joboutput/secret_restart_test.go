@@ -194,9 +194,9 @@ func TestSecretDependentDeadlineCannotResumeRevokedGeneration(t *testing.T) {
 			scope := lifecycle.ResourceTransactionScope{ID: config.FullName()}
 			var transaction lifecycle.PreparedResourceTransaction
 			if remove {
-				transaction, err = controller.prepareRemove(target, record, true, nil, scope)
+				transaction, err = controller.prepareRemove(t.Context(), target, record, true, nil, scope)
 			} else {
-				transaction, err = controller.prepareDisable(target, record, true, nil, scope)
+				transaction, err = controller.prepareDisable(t.Context(), target, record, true, nil, scope)
 			}
 			require.NoError(t, err)
 			_, err = transaction.Apply(t.Context())

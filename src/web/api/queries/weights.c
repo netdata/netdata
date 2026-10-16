@@ -156,20 +156,8 @@ static void merge_results_dictionaries(DICTIONARY *main_results, DICTIONARY *loc
 
     struct register_result *local_result;
     dfe_start_read(local_results, local_result) {
-        // Try to get existing result in main dictionary
-        struct register_result *main_result = dictionary_get(main_results, local_result_dfe.name);
-        if (main_result) {
-            // Merge the results - keep the higher weight
-            if (local_result->value > main_result->value) {
-                // Create a copy with the new values and replace the entire entry
-                struct register_result merged_result = *local_result;
-                dictionary_set(main_results, local_result_dfe.name, &merged_result, sizeof(struct register_result));
-            }
-            // If local value is not higher, keep the existing main result (do nothing)
-        } else {
-            // Insert new result - copy the entire structure
-            dictionary_set(main_results, local_result_dfe.name, local_result, sizeof(struct register_result));
-        }
+        // workers process disjoint hosts and results are keyed by rma pointer, so keys never collide
+        dictionary_set(main_results, local_result_dfe.name, local_result, sizeof(struct register_result));
     }
     dfe_done(local_result);
 }
@@ -552,11 +540,9 @@ struct query_weights_thread_data {
     DICTIONARY *local_results;
     WEIGHTS_STATS local_stats;
     size_t local_examined_dimensions;
-    struct query_versions local_versions;
     RRDHOST **hosts;
     struct completion completion;
     size_t host_count;
-    size_t thread_id;
 };
 
 static inline struct query_weights_data *query_weights_status_qwd(struct query_weights_data *qwd) {
@@ -587,7 +573,6 @@ void query_weights_worker_thread(void *arg)
     // Initialize local statistics
     memset(&thread_data->local_stats, 0, sizeof(WEIGHTS_STATS));
     thread_data->local_examined_dimensions = 0;
-    memset(&thread_data->local_versions, 0, sizeof(struct query_versions));
 
     // Copy only immutable query inputs; mutable state is shared atomically or owned by this worker.
     struct query_weights_data local_qwd = {
@@ -615,7 +600,6 @@ void query_weights_worker_thread(void *arg)
     // Process assigned hosts
     for (size_t i = 0; i < thread_data->host_count; i++) {
         RRDHOST *host = thread_data->hosts[i];
-        if (!host) continue;
 
         // Check for timeout/interruption
         if (__atomic_load_n(&main_qwd->timed_out, __ATOMIC_RELAXED) ||
@@ -636,48 +620,8 @@ void query_weights_worker_thread(void *arg)
             break;
         }
 
-        char uuid[UUID_STR_LEN];
-        if(!UUIDiszero(host->node_id))
-            uuid_unparse_lower(host->node_id.uuid, uuid);
-        else
-            uuid[0] = '\0';
-
-        local_qwd.host_snapshot = weights_host_snapshot_get(local_qwd.host_snapshots, host);
-
-        SIMPLE_PATTERN_RESULT match = SP_MATCHED_POSITIVE;
-        if(main_qwd->scope_nodes_sp) {
-            match = simple_pattern_matches_string_extract(
-                main_qwd->scope_nodes_sp, local_qwd.host_snapshot->hostname, NULL, 0);
-            if(match == SP_NOT_MATCHED) {
-                match = simple_pattern_matches_extract(main_qwd->scope_nodes_sp, host->machine_guid, NULL, 0);
-                if(match == SP_NOT_MATCHED && *uuid)
-                    match = simple_pattern_matches_extract(main_qwd->scope_nodes_sp, uuid, NULL, 0);
-            }
-        }
-
-        if(match != SP_MATCHED_POSITIVE)
-            continue;
-
-        if(main_qwd->nodes_sp) {
-            match = simple_pattern_matches_string_extract(
-                main_qwd->nodes_sp, local_qwd.host_snapshot->hostname, NULL, 0);
-            if(match == SP_NOT_MATCHED) {
-                match = simple_pattern_matches_extract(main_qwd->nodes_sp, host->machine_guid, NULL, 0);
-                if(match == SP_NOT_MATCHED && *uuid)
-                    match = simple_pattern_matches_extract(main_qwd->nodes_sp, uuid, NULL, 0);
-            }
-        }
-
-        bool queryable_host = (match == SP_MATCHED_POSITIVE);
-
-        // Update local version hashes
-        thread_data->local_versions.contexts_hard_hash += dictionary_version(host->rrdctx.contexts);
-        thread_data->local_versions.contexts_soft_hash += rrdcontext_queue_version(&host->rrdctx.hub_queue);
-        thread_data->local_versions.alerts_hard_hash += dictionary_version(host->rrdcalc_root_index);
-        thread_data->local_versions.alerts_soft_hash += __atomic_load_n(&host->health_transitions, __ATOMIC_RELAXED);
-
-        // Process the host using the callback
-        ssize_t ret = weights_do_node_callback(&local_qwd, host, queryable_host);
+        // Hosts were already filtered by the counting pass; only queryable ones are in hosts_array
+        ssize_t ret = weights_do_node_callback(&local_qwd, host, true);
         if (ret < 0)
             break;
 
@@ -1988,7 +1932,10 @@ static void rrdset_weights_value(
 
 static void rrdset_weights_multi_dimensional_value(struct query_weights_data *qwd) {
     QUERY_TARGET_REQUEST qtr = {
+            // one RRDR dimension per metric needs the v1 response shape, but the instances filters use the names
+            // of the request's API version (id@machine_guid, name@hostname)
             .version = 1,
+            .instances_version = qwd->qwr->version,
             .scope_nodes = qwd->qwr->scope_nodes,
             .scope_contexts = qwd->qwr->scope_contexts,
             .scope_instances = qwd->qwr->scope_instances,
@@ -2598,13 +2545,11 @@ static ssize_t query_scope_foreach_host_parallel(SIMPLE_PATTERN *scope_hosts_sp,
 
     // Prepare thread data
     struct query_weights_thread_data *thread_data = mallocz(sizeof(struct query_weights_thread_data) * num_threads);
-    ND_THREAD **threads = mallocz(sizeof(ND_THREAD *) * num_threads);
 
     size_t current_host_idx = 0;
     for (size_t i = 0; i < num_threads; i++) {
         thread_data[i].main_qwd = qwd;
         thread_data[i].local_results = register_result_init_single_threaded();
-        thread_data[i].thread_id = i;
         thread_data[i].hosts = &qwd->hosts_array[current_host_idx];
 
         // Distribute hosts evenly, giving extra hosts to first threads
@@ -2628,12 +2573,6 @@ static ssize_t query_scope_foreach_host_parallel(SIMPLE_PATTERN *scope_hosts_sp,
         // Accumulate examined dimensions
         __atomic_fetch_add(&qwd->examined_dimensions, thread_data[i].local_examined_dimensions, __ATOMIC_RELAXED);
 
-        // Merge version hashes
-        qwd->versions.contexts_hard_hash += thread_data[i].local_versions.contexts_hard_hash;
-        qwd->versions.contexts_soft_hash += thread_data[i].local_versions.contexts_soft_hash;
-        qwd->versions.alerts_hard_hash += thread_data[i].local_versions.alerts_hard_hash;
-        qwd->versions.alerts_soft_hash += thread_data[i].local_versions.alerts_soft_hash;
-
         // Clean up thread data
         register_result_destroy(thread_data[i].local_results);
     }
@@ -2642,7 +2581,6 @@ static ssize_t query_scope_foreach_host_parallel(SIMPLE_PATTERN *scope_hosts_sp,
 
     // Cleanup
     freez(thread_data);
-    freez(threads);
     freez(qwd->hosts_array);
 
     return total_added;

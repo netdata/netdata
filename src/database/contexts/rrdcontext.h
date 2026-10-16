@@ -262,6 +262,7 @@ struct group_by_pass {
 
 typedef struct query_target_request {
     size_t version;
+    size_t instances_version; // the version of the instance names instances and scope_instances match; 0 = version
 
     const char *scope_nodes;
     const char *scope_contexts;
@@ -397,7 +398,6 @@ typedef struct query_target {
         SIMPLE_PATTERN *scope_labels_pattern;
         SIMPLE_PATTERN *alerts_pattern;
         SIMPLE_PATTERN *chart_label_key_pattern;
-        SIMPLE_PATTERN *scope_chart_label_key_pattern;
         struct pattern_array *labels_pa;
         struct pattern_array *scope_labels_pa;
     } instances;

@@ -172,7 +172,7 @@ The following alerts are available:
 
 | Alert name  | On metric | Description |
 |:------------|:----------|:------------|
-| [ whoisquery_days_until_expiration ](https://github.com/netdata/netdata/blob/master/src/health/health.d/whoisquery.conf) | whoisquery.time_until_expiration | time until the domain name registration expires |
+| [ whoisquery_days_until_expiration ](https://github.com/netdata/netdata/blob/master/src/health/health.d/whoisquery.conf) | whoisquery.time_until_expiration | Time until the domain name registration for ${label:domain} expires |
 
 
 

@@ -143,7 +143,7 @@ Metrics:
 | Metric | Description | Dimensions | Unit |
 |:------|:------------|:----------|:----|
 | cgroup.oomkills | OOM kills. This chart is provided by eBPF plugin. | cgroup name | kills |
-| services.oomkills | OOM kills. This chart is provided by eBPF plugin. | a dimension per systemd service | kills |
+| systemd.oomkills | OOM kills. This chart is provided by eBPF plugin. | a dimension per systemd service | kills |
 
 
 ### Per apps

@@ -72,13 +72,12 @@ func TestPreparedLinuxRuntime(t *testing.T) {
 			assert.NoError(t, os.RemoveAll(base))
 		}
 	}()
-	config := runner.Config{
-		NodePath:         values[0],
-		DependenciesPath: values[1],
-		BrowserPath:      values[2],
-		AssetsPath:       assets,
+	paths := runner.Paths{
+		Node:         values[0],
+		Dependencies: values[1],
+		Browser:      values[2],
 	}
-	engine := runner.New(config, synthetichistory.NewStore(history), captures)
+	engine := runner.New(assets, fixtureRuntime{Paths: paths}, synthetichistory.NewStore(history), captures)
 	require.NoError(t, engine.Check(context.Background(), synthetic.Journey))
 
 	var mu sync.Mutex
@@ -211,7 +210,7 @@ func TestPreparedLinuxRuntime(t *testing.T) {
 		verifyGone(t)
 		require.NotEmpty(t, got.Run.Artifacts)
 		assert.Equal(t, "available", got.Run.CaptureState)
-		_, raw, err := captures.Fetch(context.Background(), got.Run.ID, got.Run.Artifacts[0].ID)
+		_, raw, err := captures.Fetch(context.Background(), got.Run.JobID, got.Run.ID, got.Run.Artifacts[0].ID)
 		require.NoError(t, err)
 		assert.Equal(t, "\x89PNG\r\n\x1a\n", string(raw[:8]))
 	})
@@ -222,9 +221,9 @@ func TestPreparedLinuxRuntime(t *testing.T) {
 		}
 	})
 	t.Run("setup-inability", func(t *testing.T) {
-		missing := config
-		missing.BrowserPath = filepath.Join(base, "missing-browser")
-		unavailable := runner.New(missing, synthetichistory.NewStore(history), captures)
+		missing := paths
+		missing.Browser = filepath.Join(base, "missing-browser")
+		unavailable := runner.New(assets, fixtureRuntime{Paths: missing}, synthetichistory.NewStore(history), captures)
 		require.Error(t, unavailable.Check(context.Background(), synthetic.Journey))
 		got := unavailable.Execute(
 			context.Background(),
@@ -324,7 +323,7 @@ func TestPreparedLinuxRuntime(t *testing.T) {
 		require.NotNil(t, got.Run.Metrics.CLS)
 		assert.Zero(t, *got.Run.Metrics.CLS)
 		require.Len(t, got.Run.Artifacts, 1)
-		_, raw, err := captures.Fetch(context.Background(), got.Run.ID, got.Run.Artifacts[0].ID)
+		_, raw, err := captures.Fetch(context.Background(), got.Run.JobID, got.Run.ID, got.Run.Artifacts[0].ID)
 		require.NoError(t, err)
 		assert.Contains(t, string(raw), "<!doctype html>")
 	})
@@ -362,3 +361,13 @@ func readProcIdentity(pid int) (procIdentity, error) {
 		state:     fields[0],
 	}, nil
 }
+
+type fixtureRuntime struct{ Paths runner.Paths }
+
+func (r fixtureRuntime) BeginUse() (runner.Use, error) { return fixtureUse{r.Paths}, nil }
+
+type fixtureUse struct{ paths runner.Paths }
+
+func (u fixtureUse) Paths() runner.Paths                { return u.paths }
+func (u fixtureUse) Completion() *ndexec.TreeCompletion { return nil }
+func (u fixtureUse) Finish(bool) error                  { return nil }

@@ -195,7 +195,13 @@ jobs:
 
 ## Alerts
 
-There are no alerts configured by default for this integration.
+
+The following alerts are available:
+
+| Alert name  | On metric | Description |
+|:------------|:----------|:------------|
+| [ scaleio_storage_pool_capacity_utilization ](https://github.com/netdata/netdata/blob/master/src/health/health.d/scaleio.conf) | scaleio.storage_pool_capacity_utilization | Storage pool capacity utilization |
+| [ scaleio_sdc_mdm_connection_state ](https://github.com/netdata/netdata/blob/master/src/health/health.d/scaleio.conf) | scaleio.sdc_mdm_connection_state | Data Client (SDC) to Metadata Manager (MDM) connection state (0: disconnected, 1: connected) |
 
 
 

@@ -278,7 +278,24 @@ The following alerts are available:
 
 | Alert name  | On metric | Description |
 |:------------|:----------|:------------|
-| [ interface_speed ](https://github.com/netdata/netdata/blob/master/src/health/health.d/net.conf) | net.net | network interface ${label:device} current speed |
+| [ disk_space_usage ](https://github.com/netdata/netdata/blob/master/src/health/health.d/disks.conf) | disk.space | Total space utilization of disk ${label:mount_point} |
+| [ disk_inode_usage ](https://github.com/netdata/netdata/blob/master/src/health/health.d/disks.conf) | disk.inodes | Total inode utilization of disk ${label:mount_point} |
+| [ disk_fill_rate ](https://github.com/netdata/netdata/blob/master/src/health/health.d/disks.conf) | disk.space | average rate the disk fills up (positive), or frees up (negative) space, for the last hour |
+| [ out_of_disk_space_time ](https://github.com/netdata/netdata/blob/master/src/health/health.d/disks.conf) | disk.space | Estimated time the disk ${label:mount_point} will run out of space, if the system continues to add data with the rate of the last hour |
+| [ disk_inode_rate ](https://github.com/netdata/netdata/blob/master/src/health/health.d/disks.conf) | disk.inodes | average rate at which disk inodes are allocated (positive), or freed (negative), for the last hour |
+| [ out_of_disk_inodes_time ](https://github.com/netdata/netdata/blob/master/src/health/health.d/disks.conf) | disk.inodes | Estimated time the disk ${label:mount_point} will run out of inodes, if the system continues to allocate inodes with the rate of the last hour |
+| [ 10min_disk_utilization ](https://github.com/netdata/netdata/blob/master/src/health/health.d/disks.conf) | disk.util | Average percentage of time ${label:device} disk was busy over the last 10 minutes |
+| [ interface_speed ](https://github.com/netdata/netdata/blob/master/src/health/health.d/net.conf) | net.net | Network interface ${label:device} current speed |
+| [ net_interface_inbound_packets ](https://github.com/netdata/netdata/blob/master/src/health/health.d/net.conf) | net.packets | Received packets for the network interface ${label:device} in the last 10 minutes |
+| [ net_interface_outbound_packets ](https://github.com/netdata/netdata/blob/master/src/health/health.d/net.conf) | net.packets | Sent packets for the network interface ${label:device} in the last 10 minutes |
+| [ inbound_packets_dropped_ratio ](https://github.com/netdata/netdata/blob/master/src/health/health.d/net.conf) | net.drops | Ratio of inbound dropped packets for the network interface ${label:device} over the last 10 minutes |
+| [ 1m_received_packets_rate ](https://github.com/netdata/netdata/blob/master/src/health/health.d/net.conf) | net.packets | Average number of packets received by the network interface ${label:device} over the last minute |
+| [ 10s_received_packets_storm ](https://github.com/netdata/netdata/blob/master/src/health/health.d/net.conf) | net.packets | Ratio of average number of received packets for the network interface ${label:device} over the last 10 seconds, compared to the rate over the last minute |
+| [ nvme_device_critical_warnings_state ](https://github.com/netdata/netdata/blob/master/src/health/health.d/nvme.conf) | nvme.device_critical_warnings_state | NVMe device ${label:device} has critical warnings |
+| [ power_supply_capacity ](https://github.com/netdata/netdata/blob/master/src/health/health.d/power_supply_capacity.conf) | powersupply.capacity | Percentage of remaining power supply capacity |
+| [ system_reboot_detection ](https://github.com/netdata/netdata/blob/master/src/health/health.d/reboot.conf) | system.uptime | System has rebooted within the last 10 minutes |
+| [ 1m_ipv4_tcp_resets_received ](https://github.com/netdata/netdata/blob/master/src/health/health.d/tcp_resets.conf) | ipv4.tcphandshake | average number of failed TCP connection attempts over the last minute |
+| [ 10s_ipv4_tcp_resets_received ](https://github.com/netdata/netdata/blob/master/src/health/health.d/tcp_resets.conf) | ipv4.tcphandshake | average number of failed TCP connection attempts (reset or timed out before being established) over the last 10 seconds. This can be an indication that a service this host needs is down or unreachable. Netdata will not send a clear notification for this alarm. |
 
 
 

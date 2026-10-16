@@ -39,3 +39,40 @@ which do not expose a power feature for Netdata's libsensors collector. On
 [Thor](https://docs.nvidia.com/jetson/archives/r39.2/DeveloperGuide/SD/PlatformPowerAndPerformance/JetsonThor.html),
 INA3221 component rails have the same gap; the INA238 total-system `VIN` rail can also appear through sensors.
 The collector keeps that source-reported rail rather than guessing whether another collector has discovered it.
+
+## Corrected AGX Orin R36.5.0 captures
+
+Public attachments to [issue #24165](https://github.com/netdata/netdata/issues/24165)
+contain paired root (`tegrastats-caller.stdout`) and Netdata-account
+(`tegrastats-collector.stdout`) captures from one AGX Orin running Jetson Linux R36.5.0:
+
+- `orin-r36.5-15w-root.txt`: attachment 33305200, caller line 1, from the
+  [corrected 15W capture](https://github.com/netdata/netdata/issues/24165#issuecomment-6110123951).
+  GPC 1 explicitly reports zero.
+- `orin-r36.5-15w-account.txt`: the same attachment, collector line 9. GPU clocks and EMC are absent;
+  CPU/CV current power is zero even though its running average is nonzero.
+- `orin-r36.5-50w-root.txt`: attachment 33305375, caller line 1, from the
+  [corrected 50W capture](https://github.com/netdata/netdata/issues/24165#issuecomment-6110210682).
+- `orin-r36.5-maxn-root.txt`: attachment 33305418, caller line 1, from the
+  [corrected MAXN capture](https://github.com/netdata/netdata/issues/24165#issuecomment-6110239232).
+
+Only raw telemetry lines were copied. These samples verify decoding, zero preservation, and missing-field
+withdrawal through the collector; they do not establish packaged Netdata privilege, shutdown, or performance
+behavior on Jetson hardware. The captures are sequential, so their values are not simultaneous comparisons.
+
+## SoC temperatures
+
+The [NVIDIA R36.5 glossary](https://docs.nvidia.com/jetson/archives/r36.5/DeveloperGuide/AT/JetsonLinuxDevelopmentTools/TegrastatsUtility.html#reported-statistics)
+defines `name@valueC` as a named processor-block temperature in Celsius. All 304 records in the four corrected
+AGX Orin captures report scalar `cpu`, `gpu`, `soc0`, `soc1`, `soc2`, and `tj` values under both accounts.
+This stage collects those exact names without case aliases; it does not infer coverage of every legacy sensor.
+Fractions, signed scalar values and zero are preserved without deriving a temperature from other readings.
+Non-sentinel below-zero values have parser coverage, not direct device validation.
+
+The [NVIDIA AGX Orin FAQ](https://forums.developer.nvidia.com/t/jetson-agx-orin-faq/237459)
+identifies `-256C` as an unavailable powered-off GPU/CV sensor. It is omitted, as are absent, malformed and duplicate
+sensor fields. Losing one temperature does not discard other readings; a later valid value resumes the same identity.
+
+[R39.2 public captures](https://forums.developer.nvidia.com/t/devkit-idle-soc-temperature/383251)
+also show paired temperature fields. Their member meanings are unproved, so the parser rejects the complete pair
+rather than treating its prefix as a scalar. Additional sensor names and paired forms remain evidence-gated follow-ups.

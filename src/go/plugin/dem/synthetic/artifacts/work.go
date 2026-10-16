@@ -11,16 +11,16 @@ import (
 	"path/filepath"
 )
 
-func (s *Store) Begin(runID string) (_ string, retErr error) {
+func (s *Store) Begin(runID, jobID string) (_ string, retErr error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	if s.closed {
 		return "", ErrClosed
 	}
-	if !runIDPattern.MatchString(runID) {
+	if !runIDPattern.MatchString(runID) || !validJobID(jobID) {
 		return "", ErrInvalidID
 	}
-	for _, prefix := range []string{"work", "staging", "runs", "drained"} {
+	for _, prefix := range []string{"work", "staging", "runs", "drained", "deleting"} {
 		_, err := s.root.Lstat(prefix + "/" + runID)
 		if err == nil {
 			return "", ErrExists
@@ -56,7 +56,7 @@ func (s *Store) Begin(runID string) (_ string, retErr error) {
 	if err := syncExternalDir("/tmp"); err != nil {
 		return "", err
 	}
-	s.active[runID] = true
+	s.active[runID] = jobID
 	return workAlias(runID), nil
 }
 

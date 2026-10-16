@@ -1119,10 +1119,20 @@ int mqtt_ng_connect(
     return 0;
 }
 
+static uint16_t mqtt_ng_packet_id = 0;
+
+// 0 is not a valid packet id: skip it when the counter wraps.
+// Advancing again (instead of returning 1 for it) keeps the next call from handing out 1 a second time.
+static uint16_t next_packet_id(uint16_t *counter) {
+    uint16_t id;
+    do {
+        id = __atomic_add_fetch(counter, 1, __ATOMIC_RELAXED);
+    } while (!id);
+    return id;
+}
+
 uint16_t get_unused_packet_id() {
-    static uint16_t packet_id = 0;
-    uint16_t id = __atomic_fetch_add(&packet_id, 1, __ATOMIC_RELAXED) + 1;
-    return id ? id : 1;
+    return next_packet_id(&mqtt_ng_packet_id);
 }
 
 static size_t mqtt_ng_publish_size(
@@ -3432,6 +3442,22 @@ static int mqtt_ng_unittest_packet_on_the_wire_is_never_dropped(void)
     return errors;
 }
 
+static int mqtt_ng_unittest_packet_id_wrap(void)
+{
+    int errors = 0;
+
+    uint16_t counter = UINT16_MAX - 2;
+    uint16_t ids[4];
+    for (size_t i = 0; i < sizeof(ids) / sizeof(ids[0]); i++)
+        ids[i] = next_packet_id(&counter);
+
+    MQTT_NG_TEST(ids[0] == UINT16_MAX - 1 && ids[1] == UINT16_MAX, "packet ids before the wrap are sequential");
+    MQTT_NG_TEST(ids[2] == 1, "packet id 0 is skipped at the wrap");
+    MQTT_NG_TEST(ids[3] == 2, "packet id 1 is not handed out twice after the wrap");
+
+    return errors;
+}
+
 int mqtt_ng_unittest(void)
 {
     int errors = 0;
@@ -3449,6 +3475,7 @@ int mqtt_ng_unittest(void)
     errors += mqtt_ng_unittest_recently_sent_packet_keeps_its_window();
     errors += mqtt_ng_unittest_timeout_starts_when_the_message_is_fully_sent();
     errors += mqtt_ng_unittest_packet_on_the_wire_is_never_dropped();
+    errors += mqtt_ng_unittest_packet_id_wrap();
 
     if (errors)
         fprintf(stderr, "mqtt_ng unittest: %d ERROR(S)\n", errors);

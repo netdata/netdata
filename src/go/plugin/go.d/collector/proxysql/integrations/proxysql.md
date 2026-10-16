@@ -187,9 +187,9 @@ The following alerts are available:
 
 | Alert name  | On metric | Description |
 |:------------|:----------|:------------|
-| [ proxysql_hostgroup_no_online_backends ](https://github.com/netdata/netdata/blob/master/src/health/health.d/proxysql.conf) | proxysql.hostgroup_backends_status | ProxySQL hostgroup ${label:hostgroup} has no ONLINE backends |
-| [ proxysql_backend_shunned ](https://github.com/netdata/netdata/blob/master/src/health/health.d/proxysql.conf) | proxysql.backend_status | ProxySQL backend SHUNNED (${label:host}:${label:port} hostgroup ${label:hostgroup}) |
-| [ proxysql_backend_offline_hard ](https://github.com/netdata/netdata/blob/master/src/health/health.d/proxysql.conf) | proxysql.backend_status | ProxySQL backend OFFLINE_HARD (${label:host}:${label:port} hostgroup ${label:hostgroup}) |
+| [ proxysql_hostgroup_no_online_backends ](https://github.com/netdata/netdata/blob/master/src/health/health.d/proxysql.conf) | proxysql.hostgroup_backends_status | ProxySQL hostgroup ${label:hostgroup} currently has zero ONLINE backends. This means no traffic can be served for this hostgroup. |
+| [ proxysql_backend_shunned ](https://github.com/netdata/netdata/blob/master/src/health/health.d/proxysql.conf) | proxysql.backend_status | ProxySQL backend ${label:host}:${label:port} in hostgroup ${label:hostgroup} is SHUNNED (temporarily out of use due to too many connection errors in a short time or replication lag exceeding the allowed threshold) |
+| [ proxysql_backend_offline_hard ](https://github.com/netdata/netdata/blob/master/src/health/health.d/proxysql.conf) | proxysql.backend_status | ProxySQL backend ${label:host}:${label:port} in hostgroup ${label:hostgroup} is in OFFLINE_HARD mode. Backend is effectively removed from the hostgroup and no longer serves traffic. |
 
 
 

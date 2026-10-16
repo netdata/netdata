@@ -169,7 +169,6 @@ modules:
               (doubling, mirroring, internal-IP geolocation).
               See also [Validation and Data Quality](/docs/npm/network-flows/validation.md)
               and [Anti-patterns](/docs/npm/network-flows/anti-patterns.md).
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -456,7 +455,6 @@ modules:
               missing-template dimensions on `netflow.flow_sets`; Data Sets arriving before
               their templates cannot be decoded. See also
               [Validation and Data Quality](/docs/npm/network-flows/validation.md).
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -598,7 +596,6 @@ modules:
               See also
               [Validation and Data Quality](/docs/npm/network-flows/validation.md)
               and the sFlow section of [Anti-patterns](/docs/npm/network-flows/anti-patterns.md).
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -807,7 +804,6 @@ modules:
               bounded. A query that auto-falls back to a rollup tier therefore renders an empty
               city map. Narrow the time range so the query fits the raw tier, or use the
               country / state map (those survive into rollups).
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -1075,7 +1071,6 @@ modules:
               [IP Intelligence](/docs/npm/network-flows/enrichment.md)
               concept page). Order matters: list the source whose values you want to win
               **last**.
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -1308,7 +1303,6 @@ modules:
               within hours but not in your cache until the next download. The
               plugin reloads MMDB files in place every 30 seconds when the file
               signature changes, so a fresh file lands without restart.
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -1479,7 +1473,6 @@ modules:
               listed AS for the generated single-value MMDB record. If you need full MOAS
               semantics, use BMP or BioRIS routing enrichment instead of an offline ASN
               lookup database.
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -1643,7 +1636,6 @@ modules:
               Check the upstream IP2Location LITE page for the current version and next
               update date, then schedule the downloader accordingly. The plugin reloads
               the generated MMDB in place when the file signature changes.
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -1808,7 +1800,6 @@ modules:
             description: |
               Check IPDeny's usage limits and retry later. The plugin continues using the
               last generated MMDB file until the downloader publishes a replacement.
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -1971,7 +1962,6 @@ modules:
             description: |
               The supported IPIP source is country-only. Use DB-IP city-lite, MaxMind
               GeoLite2 City, GeoIP2 City, or a custom MMDB for richer geo fields.
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -2182,7 +2172,6 @@ modules:
               Operational practice: have your build pipeline write the new MMDB to a
               temp file in the same directory and `rename(2)` it over the live path so
               the swap is atomic.
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -2546,7 +2535,6 @@ modules:
               BGP-derived enrichment depends on router export policy, peer state, and
               route visibility. Validate against your specific router firmware before
               depending on this for capacity or security decisions.
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -2853,7 +2841,6 @@ modules:
               BioRIS-derived enrichment depends on the bio-rd version, upstream BGP source,
               route visibility, and refresh cadence. Validate against your bio-rd setup
               before relying on this for capacity or security decisions.
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -3118,7 +3105,6 @@ modules:
               `tls.skip_verify: true` is rejected by validation. Use `tls.ca_file` for
               custom-CA paths if you front AWS behind an internal TLS-terminating proxy
               with a private CA.
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -3417,7 +3403,6 @@ modules:
               not guarantee a fixed cadence. The `syncToken` and `creationTime` keys
               at the top of each file let you check when Google last regenerated it.
               Daily polling is a safe default; sub-hourly is unnecessary.
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -3708,7 +3693,6 @@ modules:
             description: |
               `tls.skip_verify: true` is rejected by validation. Use `tls.ca_file`
               for custom-CA paths (e.g., on an internal mirror with a private CA).
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -4023,7 +4007,6 @@ modules:
               is treated as a fetch failure by the cross-cutting source loop and triggers
               exponential backoff. Add at least one synthetic prefix (e.g. a `RFC1918`
               container) so the response is never empty.
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -4373,7 +4356,6 @@ modules:
               HTTP Basic authentication by the HTTP client. Prefer `headers:` for clarity
               and to avoid storing credentials in URLs -- e.g.
               `headers: { Authorization: "Basic dXNlcjpwYXNz" }` for HTTP basic-auth.
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -4775,7 +4757,6 @@ modules:
               Static metadata is loaded at plugin startup and there is no file-change
               watcher. Restart the plugin (or the agent) after editing
               `netflow.yaml`.
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -5168,7 +5149,6 @@ modules:
               returns the type's zero value. So `Interface.Speed >= 1` written in an `exporter_classifiers` rule
               resolves to `0 >= 1` (false) on every call. Use
               `interface_classifiers` for any rule that needs an interface field.
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -5419,7 +5399,6 @@ modules:
               The plugin cannot decode VXLAN and SRv6 in the same instance. If exporter A
               ships VXLAN tenant traffic and exporter B ships SRv6 transit traffic, you
               must choose the mode that matches the traffic this Netdata Agent receives.
-    alerts: []
     metrics:
       folding:
         title: Metrics

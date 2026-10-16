@@ -150,9 +150,10 @@ func (t *runtimeSettlementTransaction) Apply(ctx context.Context) (applied lifec
 		jobConfig.runtime = t.current.resources.candidateJob
 	}
 	prepared, err := dcjc.prepareMutationWithRetryAfterApplyAndFallback(
+		ctx,
 		t.scope, t.current, nil, lifecycle.LongLivedPermit{}, disposition, &postimage, internalReply(),
 		dcjc.configStatusCleanup(t.scope.ID, status), autoDetectionRetryToken{}, afterApply,
-		jobConfig, nil, nil,
+		jobConfig, jobConfigIntentPreserve, nil, nil, nil,
 	)
 	if err != nil {
 		return lifecycle.AppliedResourceTransaction{}, err

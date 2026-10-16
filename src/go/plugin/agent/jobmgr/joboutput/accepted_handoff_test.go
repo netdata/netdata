@@ -261,3 +261,70 @@ func requireNoHandoffActivation(t *testing.T, commands *activationTestCommands) 
 		}
 	}
 }
+
+func TestCandidateAdoptionRevalidatesAfterIntentReservation(t *testing.T) {
+	for _, invalidation := range []string{"Store generation", "candidate retirement"} {
+		t.Run(invalidation, func(t *testing.T) {
+			controller, graph, _, _, _ := newDynCfgJobTestHarness(t)
+			cleaned := make(chan struct{})
+			var checks atomic.Int32
+			configureRuntimeTestCollector(controller, func() *runtimeTestCollector {
+				var checked atomic.Bool
+				return &runtimeTestCollector{
+					factoryTestV2: &factoryTestV2{check: func(context.Context) error { checked.Store(true); checks.Add(1); return nil }},
+					cleanup: func() {
+						if checked.Load() {
+							close(cleaned)
+						}
+					},
+				}
+			})
+			commands := bindHandoffTestWorkers(t, controller)
+			config := factoryTestConfig(false).SetSourceType(confgroup.TypeDyncfg)
+			seedDynCfgJobGraphRecord(t, graph, config, dyncfg.StatusFailed)
+			before, _ := graph.Lookup(config.FullName())
+			snapshot := &factoryTestAtomicScope{value: "before"}
+			snapshot.current.Store(true)
+			controller.factory.config.ConfigModules.config.Configs = testConfigResolver(t, testAtomicResolver(t), func([]string) (secretresolver.AtomicScope, error) {
+				return snapshot, nil
+			})
+			var cut atomic.Bool
+			owner := &intentTestOwner{onPrepare: func() {
+				// Intent preparation runs after Check but before graph adoption.
+				if invalidation == "Store generation" {
+					snapshot.current.Store(false)
+				} else {
+					cut.Store(controller.factory.config.Attempts.CutProcessAttempt(
+						jobAttemptIdentity(jobmgr.ProcessAttemptJob, config.FullName()), jobmgr.ErrProcessAttemptSuperseded))
+				}
+			}}
+			installIntentTestOwner(controller, owner)
+			permit, tasks := issueTestJobPermit(t, config.FullName(), 1)
+			prepared, err := controller.Prepare(t.Context(), DynCfgJobRequest{
+				Args:       []string{controller.externalID(config.FullName()), "update"},
+				Payload:    []byte(`{"option_str":"${store:vault:test:key}"}`),
+				HasPayload: true, ContentType: "application/json", CallerSource: "user",
+			}, nil, lifecycle.ResourceTransactionScope{ID: config.FullName(), Successor: lifecycle.ResourceIdentity{ID: config.FullName(), Generation: 1}}, permit)
+			require.NoError(t, err)
+			applied, err := prepared.Apply(t.Context())
+			require.NoError(t, err)
+			require.Equal(t, 503, applied.ResultStatus())
+			after, _ := graph.Lookup(config.FullName())
+			require.Equal(t, before, after)
+			preparedCount, committed, aborted, enabled := owner.snapshot()
+			require.Equal(t, 1, preparedCount)
+			require.Zero(t, committed)
+			require.Equal(t, 1, aborted)
+			require.Zero(t, enabled)
+			require.EqualValues(t, 1, checks.Load())
+			if invalidation == "candidate retirement" {
+				require.True(t, cut.Load())
+			}
+			requireTestSignal(t, cleaned, "rejected candidate was not cleaned")
+			requireNoHandoffActivation(t, commands)
+			requireFactoryAttemptsIdle(t, controller.factory)
+			require.Equal(t, lifecycle.LongLivedCensus{}, tasks.LongLivedCensus())
+			require.False(t, controller.ActivationEnabled(config.FullName()))
+		})
+	}
+}

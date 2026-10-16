@@ -101,7 +101,7 @@ var (
 		},
 	}
 	searchQueriesChart = collectorapi.Chart{
-		ID:       "dt_vnode_updates",
+		ID:       "search_queries",
 		Title:    "Search queries on the node",
 		Units:    "queries/s",
 		Fam:      "throughput",
@@ -190,7 +190,7 @@ var (
 		},
 	}
 	dtLatencySetChart = collectorapi.Chart{
-		ID:       "dt_latency_counter",
+		ID:       "dt_latency_set",
 		Title:    "Time it takes to perform an Update Set operation",
 		Units:    "ms",
 		Fam:      "latency",
@@ -292,14 +292,14 @@ Memory collected as Megabytes, returned as bytes from Riak.
 */
 var (
 	vmProcessesCountChart = collectorapi.Chart{
-		ID:       "vm_processes",
+		ID:       "vm_processes_count",
 		Title:    "Total processes running in the Erlang VM",
 		Units:    "processes",
 		Fam:      "vm",
 		Ctx:      "riak.vm.processes.count",
 		Priority: prioVmProcessesCount,
 		Dims: collectorapi.Dims{
-			{ID: "sys_processes", Name: "processes"},
+			{ID: "sys_process_count", Name: "processes"},
 		},
 	}
 	vmProcessesMemoryChart = collectorapi.Chart{
@@ -341,7 +341,7 @@ var (
 		},
 	}
 	kvObjectSizeGetChart = collectorapi.Chart{
-		ID:       "kv_siblings_encountered_get",
+		ID:       "kv_objsize_get",
 		Title:    "Object size encountered by this node during the past minute",
 		Units:    "bytes",
 		Fam:      "load",
@@ -356,7 +356,7 @@ var (
 		},
 	}
 	searchVnodeqSizeChart = collectorapi.Chart{
-		ID:       "kv_siblings_encountered_get",
+		ID:       "search_vnodeq_size",
 		Title:    "Unprocessed messages in the vnode message queues of Search in the past minute",
 		Units:    "messages",
 		Fam:      "load",
@@ -405,7 +405,7 @@ var (
 		Title:    "Number of repair operations this node has coordinated",
 		Units:    "repairs",
 		Fam:      "load",
-		Ctx:      "riak.core.protobuf_connections",
+		Ctx:      "riak.core.repairs",
 		Priority: prioCoreRepairs,
 		Dims: collectorapi.Dims{
 			{ID: "read_repairs", Name: "read"},
@@ -440,8 +440,7 @@ var (
 )
 
 func (c *Collector) adjustCharts(mx map[string]int64) {
-	var i int
-	for _, chart := range *c.Charts() {
+	*c.charts = slices.DeleteFunc(*c.charts, func(chart *collectorapi.Chart) bool {
 		chart.Dims = slices.DeleteFunc(chart.Dims, func(dim *collectorapi.Dim) bool {
 			_, ok := mx[dim.ID]
 			if !ok {
@@ -452,10 +451,8 @@ func (c *Collector) adjustCharts(mx map[string]int64) {
 
 		if len(chart.Dims) == 0 {
 			c.Debugf("removing chart '%s': no metrics found", chart.ID)
-			continue
+			return true
 		}
-
-		(*c.Charts())[i] = chart
-		i++
-	}
+		return false
+	})
 }

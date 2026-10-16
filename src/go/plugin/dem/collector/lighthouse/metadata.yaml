@@ -57,12 +57,22 @@ modules:
     setup:
       prerequisites:
         list:
-          - title: Prepare the browser runtime
-            description: Configure the Node executable, pinned Playwright and Lighthouse dependencies, and
-              full Chromium binary in the runtime section of dem.conf. Chromium must run with its sandbox enabled
-              as the Netdata service account. Restart dem.plugin after changing runtime paths; the plugin does
-              not download dependencies. Follow the [DEM runtime preparation guide](https://github.com/netdata/netdata/blob/master/src/go/plugin/dem/README.md)
-              for the pinned versions and setup commands.
+          - title: Set up the browser runtime
+            description: |
+              Browser runtime delivery is experimental; released bundles and automatic manifest installation are not
+              provided. Supply a trusted runtime manifest and its matching bundle before enabling browser monitors.
+              Run Chromium with its sandbox enabled as the unprivileged Netdata service account on Linux amd64 or arm64.
+              Managed mode prepares the exact runtime when a browser monitor is enabled, using an administrator-installed
+              runtime manifest. For offline setup, install the trusted manifest and import its matching archive, or select
+              `runtime.mode: preloaded` in `dem.conf` with the final `preload_path` produced by `dem.plugin runtime preload`.
+              Both modes require the trusted manifest and its matching bundle. Preloads stay outside automatic cleanup;
+              stop every consumer before replacing or removing them. Separately installed runtime components are unsupported.
+
+              Run `dem.plugin runtime status` to inspect preparation and `dem.plugin runtime qualify` as the service
+              account to check a local sandboxed browser run. Follow the
+              [DEM runtime setup guide](https://github.com/netdata/netdata/blob/master/src/go/plugin/dem/README.md#runtime-setup-and-retirement)
+              for manifests, downloads, offline imports, retention and protected preloads. Restart the plugin after changing
+              runtime configuration.
       configuration:
         file:
           name: dem/lighthouse.conf
@@ -111,11 +121,10 @@ modules:
       problems:
         list:
           - name: No conclusive observations
-            description: Inspect native job status and synthetic inventory for runtime preparation errors,
+            description: Inspect native job status for unavailable dependencies and plugin logs for runtime preparation errors,
               waiting attempts or execution inability. Open the latest retained run for errors and actual failure
               phases. Missing measurements are gaps; stale, inconclusive and cancelled observations are not
               recovery.
-    alerts: []
     metrics:
       description: Each native job has its own chart identity. Attempt duration excludes waiting for admission.
         Missing observations are omitted.
@@ -204,8 +213,7 @@ modules:
               options: []
           returns:
             description: At most limit active jobs, with independent current-attempt state and last-observation
-              freshness. The response includes process artifact retained_bytes, protected_bytes and cleanup_errors
-              under artifacts. Disabled and failed-startup jobs are visible through native configuration status.
+              freshness. Disabled and failed-startup jobs are visible through native configuration status.
             columns:
               - name: job_id
                 type: string
@@ -463,11 +471,79 @@ modules:
           require_cloud: false
           prerequisites:
             list: []
+        - id: synthetics-artifacts
+          function_name: synthetics-artifacts
+          name: Retained synthetic captures
+          description: Invoke `synthetics-artifacts` to find retained screenshot and report sets, newest publication
+            first, even after run history expires or a monitor is disabled or deleted. Each set contains one run's
+            captures. The shared default allowance is seven days and 2 GiB, preferring each monitor's newest
+            eligible capture. Age and size pressure can still remove it; this is not complete incident history
+            or a hard disk cap. A later Lighthouse report may displace that monitor's earlier poor-score report.
+            Journey recovery without a screenshot leaves its previous failure capture eligible. Disabled or
+            deleted monitors keep the same preference; renamed monitors form separate groups.
+          parameters:
+            - id: job_id
+              name: Monitor (`job_id`)
+              description: Exact native module and job name to filter captures, such as journey:checkout. Leave
+                empty for all monitors. Storage totals remain global.
+              type: string
+              required: false
+              default: ''
+              options: []
+            - id: before
+              name: Previous page cursor (`before`)
+              description: The next cursor returned by the previous page. Leave empty for the newest captures.
+              type: string
+              required: false
+              default: ''
+              options: []
+            - id: limit
+              name: Maximum rows (`limit`)
+              description: Maximum returned sets, from 1 to 2000. Use next as before to continue when truncated
+                is true. Captures may expire between pages.
+              type: string
+              required: false
+              default: '2000'
+              options: []
+          returns:
+            description: One row per retained capture set. The storage object reports global effective policy,
+              observation time, retained capture bytes, workspace bytes, unclassified bytes, pending-deletion
+              bytes, known set and monitor counts, cleanup status and policy reload errors. Unreadable sizes
+              are unknown with an error. Sizes are logical file lengths; workspace, unclassified files and
+              pending deletions are outside the retained-capture allowance. Metadata does not verify file integrity.
+            columns:
+              - name: run_id
+                type: string
+                unit: ''
+                description: Run.
+              - name: job_id
+                type: string
+                unit: ''
+                description: Monitor.
+              - name: published_us
+                type: timestamp
+                unit: ''
+                description: Publication time in Unix microseconds.
+              - name: bytes
+                type: integer
+                unit: bytes
+                description: Capture set size, including its manifest.
+              - name: artifact_count
+                type: integer
+                unit: ''
+                description: Number of captures in the set.
+          performance: Reads local capture metadata and file sizes without reading capture contents or starting a browser.
+          security: Requires member-equivalent access. Exposes monitor identities and capture metadata, not capture contents.
+          availability: Available while dem.plugin is running, independently of active journey or Lighthouse jobs
+            and retained run history. Captures can expire under age or size limits.
+          require_cloud: false
+          prerequisites:
+            list: []
         - id: synthetics-artifact
           function_name: synthetics-artifact
-          name: Synthetic artifacts
-          description: Invoke `synthetics-artifact`. Retained capture metadata for one run; file bytes are
-            verified when fetched. Supplying artifact_id requests base64-encoded bytes and requires administrator-equivalent
+          name: Synthetic capture detail
+          description: Invoke `synthetics-artifact`. Retained capture metadata for one run, independently of run
+            history retention; file bytes are verified when fetched. Supplying artifact_id requests base64-encoded bytes and requires administrator-equivalent
             permissions. Screenshots and HTML reports may contain sensitive content. Missing retained files
             are expired or unavailable; fetches are limited to 5 MiB.
           parameters:
@@ -480,7 +556,7 @@ modules:
               options: []
             - id: run_id
               name: Run (`run_id`)
-              description: Exact run identifier returned by synthetic inventory or run history.
+              description: Exact run identifier returned by the retained capture list, synthetic inventory or run history.
               type: string
               required: true
               default: ''
@@ -494,7 +570,7 @@ modules:
               default: ''
               options: []
           returns:
-            description: Recorded capture metadata with retained-manifest availability. Fetch verifies content
+            description: Retained capture metadata remains available after run history expires. Fetch verifies content
               and returns encoding=base64 and data_base64 without rendering HTML. A missing recorded capture
               returns expired_or_unavailable, which does not prove why the file is absent.
             columns:

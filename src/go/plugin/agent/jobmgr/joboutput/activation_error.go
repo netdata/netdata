@@ -7,6 +7,7 @@ import (
 
 	"github.com/netdata/netdata/go/plugins/plugin/agent/jobmgr"
 	secretresolver "github.com/netdata/netdata/go/plugins/plugin/agent/secrets/resolver"
+	"github.com/netdata/netdata/go/plugins/plugin/framework/collectorapi"
 )
 
 type activationFailureKind uint8
@@ -39,6 +40,7 @@ func classifyActivationError(err error) activationFailure {
 	var transient *transientJobConstructionError
 	var resolveErr *secretresolver.AtomicResolveError
 	var invalid *invalidJobConfigurationError
+	var dependency *collectorapi.ActivationDependencyUnavailableError
 	switch {
 	case errors.Is(err, jobmgr.ErrProcessAttemptQuarantined):
 		failure.kind = activationFailureQuarantined
@@ -52,6 +54,8 @@ func classifyActivationError(err error) activationFailure {
 		// The containment fuse has its own recovery policy. Callers handle context
 		// expiry; provider/scope deadlines keep their transient classification below.
 		failure.kind = activationFailureDeadline
+	case errors.As(err, &dependency):
+		failure.kind = activationFailureTransient
 	case errors.As(err, &transient):
 		failure.kind = activationFailureTransient
 	case errors.As(err, &resolveErr):
