@@ -576,7 +576,7 @@ int netdata_main(int argc, char **argv) {
                             if (mrg_unittest()) return 1;
 #endif
                             if (paths_unittest()) return 1;
-#ifdef HAVE_LIBBACKTRACE
+#ifdef HAVE_STACKTRACE
                             if (stacktrace_unittest()) return 1;
 #endif
                             if (test_cmd_pool_fifo()) return 1;
@@ -715,7 +715,7 @@ int netdata_main(int argc, char **argv) {
                             errors += sqlite_lease_teardown_unittest();
                             return errors ? 1 : 0;
                         }
-#ifdef HAVE_LIBBACKTRACE
+#ifdef HAVE_STACKTRACE
                         else if(strcmp(optarg, "stacktracetest") == 0) {
                             unittest_running = true;
                             return stacktrace_unittest();
