@@ -70,6 +70,8 @@ void analytics_log_data(void)
  */
 void analytics_free_data(void)
 {
+    spinlock_lock(&analytics_data.spinlock);
+
     freez(analytics_data.netdata_config_stream_enabled);
     analytics_data.netdata_config_stream_enabled = NULL;
 
@@ -190,6 +192,25 @@ void analytics_free_data(void)
     freez(analytics_data.netdata_fail_reason);
     analytics_data.netdata_fail_reason = NULL;
 
+    spinlock_unlock(&analytics_data.spinlock);
+}
+
+/*
+ * Add the analytics strings /api/v1/info reports.
+ * Setters free and replace them under the spinlock, so they are read under it too.
+ */
+void analytics_info_to_json(BUFFER *wb)
+{
+    spinlock_lock(&analytics_data.spinlock);
+
+    buffer_json_member_add_quoted_string(wb, "buildinfo", analytics_data.netdata_buildinfo);
+    buffer_json_member_add_quoted_string(wb, "release-channel", analytics_data.netdata_config_release_channel);
+    buffer_json_member_add_quoted_string(wb, "notification-methods", analytics_data.netdata_notification_methods);
+
+    buffer_json_member_add_boolean(wb, "exporting-enabled", analytics_data.exporting_enabled);
+    buffer_json_member_add_quoted_string(wb, "exporting-connectors", analytics_data.netdata_exporting_connectors);
+
+    spinlock_unlock(&analytics_data.spinlock);
 }
 
 /*
@@ -556,8 +577,11 @@ void analytics_misc(void)
     analytics_set_data(&analytics_data.netdata_host_cloud_available, "true");
     analytics_set_data_str(&analytics_data.netdata_host_aclk_implementation, "Next Generation");
 
-    analytics_data.exporting_enabled = inicfg_get_boolean(&exporting_config, CONFIG_SECTION_EXPORTING, "enabled", CONFIG_BOOLEAN_NO);
-    analytics_set_data(&analytics_data.netdata_config_exporting_enabled,  analytics_data.exporting_enabled ? "true" : "false");
+    bool exporting_enabled = inicfg_get_boolean(&exporting_config, CONFIG_SECTION_EXPORTING, "enabled", CONFIG_BOOLEAN_NO);
+    spinlock_lock(&analytics_data.spinlock);
+    analytics_data.exporting_enabled = exporting_enabled;
+    spinlock_unlock(&analytics_data.spinlock);
+    analytics_set_data(&analytics_data.netdata_config_exporting_enabled, exporting_enabled ? "true" : "false");
 
     analytics_set_data(&analytics_data.netdata_config_is_private_registry, "false");
     analytics_set_data(&analytics_data.netdata_config_use_private_registry, "false");
