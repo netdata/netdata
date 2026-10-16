@@ -245,11 +245,15 @@ func newVolumeManagerChart(name string) *Chart {
 	}
 }
 
-var pvcChartsTmpl = Charts{
-	pvcSpaceUsageChartTmpl.Copy(),
-	pvcSpaceUtilizationChartTmpl.Copy(),
-	pvcInodesUsageChartTmpl.Copy(),
-}
+var (
+	pvcSpaceChartsTmpl = Charts{
+		pvcSpaceUsageChartTmpl.Copy(),
+		pvcSpaceUtilizationChartTmpl.Copy(),
+	}
+	pvcInodesChartsTmpl = Charts{
+		pvcInodesUsageChartTmpl.Copy(),
+	}
+)
 
 var (
 	pvcSpaceUsageChartTmpl = Chart{
@@ -290,22 +294,24 @@ var (
 	}
 )
 
-// newPVCCharts creates the charts of a PVC. Kubernetes names cannot contain '_', so "<namespace>_<pvc>" is unambiguous.
-func newPVCCharts(namespace, pvc string) *Charts {
-	key := namespace + "_" + pvc
-	// a dot in a chart ID would be read as the chart type/id separator
-	chartKey := strings.ReplaceAll(key, ".", "-")
+// pvcID builds the chart and dimension ID part of a PVC. Namespaces cannot contain '.' or '_' and PVC names cannot
+// contain '_', so replacing the PVC name's dots with '_' keeps IDs unique and leaves a single '.' in "type.id".
+func pvcID(namespace, pvc string) string {
+	return namespace + "_" + strings.ReplaceAll(pvc, ".", "_")
+}
 
-	charts := pvcChartsTmpl.Copy()
+func newPVCCharts(tmpl Charts, namespace, pvc string) *Charts {
+	id := pvcID(namespace, pvc)
+	charts := tmpl.Copy()
 
 	for _, chart := range *charts {
-		chart.ID = fmt.Sprintf(chart.ID, chartKey)
+		chart.ID = fmt.Sprintf(chart.ID, id)
 		chart.Labels = []collectorapi.Label{
 			{Key: labelKeyNamespace, Value: namespace, Source: collectorapi.LabelSourceK8s},
 			{Key: labelKeyPVCName, Value: pvc, Source: collectorapi.LabelSourceK8s},
 		}
 		for _, dim := range chart.Dims {
-			dim.ID = fmt.Sprintf(dim.ID, key)
+			dim.ID = fmt.Sprintf(dim.ID, id)
 		}
 	}
 
