@@ -371,17 +371,64 @@ const char *aclk_topic_cache_iterate(size_t *iter)
     return aclk_topic_cache[(*iter)++]->topic;
 }
 
+static inline unsigned long int aclk_tbeb_sec_to_ms(unsigned long int sec)
+{
+    const unsigned long int ms_per_sec = (unsigned long int)MSEC_PER_SEC;
+    return sec > ULONG_MAX / ms_per_sec ? ULONG_MAX : sec * ms_per_sec;
+}
+
+/*
+ * TBEB with randomness, for a given attempt
+ *
+ * @param attempt  1 for the first retry; 0 or less means no delay
+ * @param base     growth factor per attempt
+ * @param min_s, max_s  clamp bounds in seconds (the /env "minSeconds" and "maxSeconds")
+ * @param rnd      random value for the jitter
+ * @returns delay in ms, saturated at ULONG_MAX
+ */
+static unsigned long int aclk_tbeb_delay_calc(int attempt, int base, unsigned long int min_s, unsigned long int max_s, uint32_t rnd)
+{
+    if (attempt <= 0)
+        return 0;
+
+    const unsigned long int max_ms = aclk_tbeb_sec_to_ms(max_s);
+    const unsigned long int min_ms = MIN(aclk_tbeb_sec_to_ms(min_s), max_ms);
+
+    unsigned long int delay_s = 1;
+    if (base > 1) {
+        const unsigned long int base_ul = (unsigned long int)base;
+
+        for (int i = 0; i < attempt - 1; i++) {
+            // the next step is above the maximum, and jitter only adds to it
+            if (delay_s > max_s / base_ul)
+                return max_ms;
+
+            delay_s *= base_ul;
+        }
+    }
+
+    unsigned long int delay = aclk_tbeb_sec_to_ms(delay_s);
+    const unsigned long int jitter = rnd % MAX(1000UL, delay / 2);
+    delay = delay > ULONG_MAX - jitter ? ULONG_MAX : delay + jitter;
+
+    if (delay <= min_ms)
+        return min_ms;
+
+    if (delay >= max_ms)
+        return max_ms;
+
+    return delay;
+}
+
 /*
  * TBEB with randomness
  *
  * @param reset 1 - to reset the delay,
  *              0 - to advance a step and calculate sleep time in ms
- * @param min, max in seconds
+ * @param min_s, max_s  clamp bounds in seconds
  * @returns delay in ms
- *
  */
-
-unsigned long int aclk_tbeb_delay(int reset, int base, unsigned long int mins_ms, unsigned long int min_ms) {
+unsigned long int aclk_tbeb_delay(int reset, int base, unsigned long int min_s, unsigned long int max_s) {
     static int attempt = -1;
 
     if (reset) {
@@ -392,37 +439,7 @@ unsigned long int aclk_tbeb_delay(int reset, int base, unsigned long int mins_ms
     if (attempt < INT_MAX)
         attempt++;
 
-    if (attempt == 0)
-        return 0;
-
-    unsigned long int delay = 1;
-    unsigned long int delay_limit = MAX(mins_ms, min_ms);
-    unsigned long int base_ul = (unsigned long int)base;
-
-    // Once the exponential term exceeds both clamp thresholds, the result is clamped.
-    if (base_ul > 1) {
-        for (int i = 0; i < attempt - 1; i++) {
-            if (delay > delay_limit / base_ul)
-                return min_ms;
-
-            delay *= base_ul;
-        }
-    }
-
-    delay *= MSEC_PER_SEC;
-
-    delay += (os_random32() % (MAX(1000, delay/2)));
-
-    // Note: this is a bug, the value expected from the env backoff payload should be in seconds
-    // but the code here is in milliseconds. To avoid confusion the cloud will be sending the value
-    // in milliseconds so that the code will work as expected.
-    if (delay <= mins_ms * MSEC_PER_SEC)
-        return mins_ms;
-
-    if (delay >= min_ms * MSEC_PER_SEC)
-        return min_ms;
-
-    return delay;
+    return aclk_tbeb_delay_calc(attempt, base, min_s, max_s, os_random32());
 }
 
 static inline int aclk_parse_userpass_pair(const char *src, const char c, char **a, char **b)
@@ -671,6 +688,90 @@ int aclk_timeout_unittest(void)
 }
 
 #undef ACLK_TIMEOUT_TEST
+
+#define ACLK_BACKOFF_TEST(condition, msg) do {                                   \
+        if(!(condition)) {                                                       \
+            fprintf(stderr, "aclk backoff unittest FAILED: %s (%s:%d)\n",        \
+                    (msg), __FUNCTION__, __LINE__);                              \
+            errors++;                                                            \
+        }                                                                        \
+    } while(0)
+
+int aclk_backoff_unittest(void)
+{
+    int errors = 0;
+
+    fprintf(stderr, "\nrunning aclk backoff unittest\n");
+
+    // the first call after a reset connects immediately
+    ACLK_BACKOFF_TEST(aclk_tbeb_delay_calc(0, 2, 0, 1024, 0) == 0, "attempt 0 was delayed");
+
+    // the fallback when /env is unavailable: 1s, 2s, ... 512s, then capped at 1024s.
+    // The cap used to be returned as 1024 ms, so every retry after the 10th came ~1s apart.
+    unsigned long int expected = 1000;
+    for (int attempt = 1; attempt <= 10; attempt++, expected *= 2)
+        ACLK_BACKOFF_TEST(aclk_tbeb_delay_calc(attempt, 2, 0, 1024, 0) == expected,
+                          "fallback exponential step is wrong");
+    ACLK_BACKOFF_TEST(aclk_tbeb_delay_calc(11, 2, 0, 1024, 0) == 1024000,
+                      "fallback cap reached by the delay was not returned in ms");
+    ACLK_BACKOFF_TEST(aclk_tbeb_delay_calc(12, 2, 0, 1024, 0) == 1024000,
+                      "fallback cap past the exponential limit was not returned in ms");
+    ACLK_BACKOFF_TEST(aclk_tbeb_delay_calc(INT_MAX, 2, 0, 1024, UINT32_MAX) == 1024000,
+                      "fallback cap at the attempt limit was not returned in ms");
+
+    // what /env sends today: base 2, minSeconds 0, maxSeconds 1200
+    ACLK_BACKOFF_TEST(aclk_tbeb_delay_calc(11, 2, 0, 1200, 0) == 1024000,
+                      "/env step below the cap was clamped");
+    ACLK_BACKOFF_TEST(aclk_tbeb_delay_calc(11, 2, 0, 1200, 200000) == 1200000,
+                      "/env jitter above the cap was not clamped to the cap in ms");
+    ACLK_BACKOFF_TEST(aclk_tbeb_delay_calc(12, 2, 0, 1200, 0) == 1200000,
+                      "/env cap was not returned in ms");
+
+    // jitter is below half the delay (at least 1s) and is added to it
+    ACLK_BACKOFF_TEST(aclk_tbeb_delay_calc(1, 2, 0, 1200, 999) == 1999, "jitter below 1s was not added");
+    ACLK_BACKOFF_TEST(aclk_tbeb_delay_calc(1, 2, 0, 1200, 1000) == 1000, "jitter was not reduced modulo 1s");
+    ACLK_BACKOFF_TEST(aclk_tbeb_delay_calc(10, 2, 0, 1200, 255999) == 767999, "jitter of half the delay was wrong");
+
+    // every result stays inside [step, cap] whatever the random value
+    const uint32_t rnds[] = { 0, 1, 499, 65535, 0x7fffffffU, UINT32_MAX };
+    for (int attempt = 1; attempt <= 40; attempt++) {
+        for (size_t r = 0; r < sizeof(rnds) / sizeof(rnds[0]); r++) {
+            unsigned long int d = aclk_tbeb_delay_calc(attempt, 2, 0, 1200, rnds[r]);
+            ACLK_BACKOFF_TEST(d >= 1000 && d <= 1200000, "delay escaped [1s, cap]");
+        }
+    }
+
+    // minSeconds is a floor, in seconds
+    ACLK_BACKOFF_TEST(aclk_tbeb_delay_calc(1, 2, 30, 1200, 0) == 30000, "min clamp was not returned in ms");
+
+    // a minimum above the maximum never pushes the delay past the maximum
+    ACLK_BACKOFF_TEST(aclk_tbeb_delay_calc(1, 2, 5000, 1200, 0) == 1200000, "min above max exceeded the max");
+    ACLK_BACKOFF_TEST(aclk_tbeb_delay_calc(30, 2, 5000, 1200, 0) == 1200000, "min above max exceeded the max");
+
+    // base 1 does not grow
+    ACLK_BACKOFF_TEST(aclk_tbeb_delay_calc(100, 1, 0, 1200, 0) == 1000, "base 1 grew the delay");
+
+    // a maximum that does not fit in unsigned long ms saturates instead of wrapping
+    const unsigned long int huge_s = ULONG_MAX / (unsigned long int)MSEC_PER_SEC + 1;
+    ACLK_BACKOFF_TEST(aclk_tbeb_delay_calc(INT_MAX, 2, 0, huge_s, 0) == ULONG_MAX, "huge max wrapped");
+    ACLK_BACKOFF_TEST(aclk_tbeb_delay_calc(1, 2, 0, huge_s, 0) == 1000, "huge max changed the first step");
+
+    // the stateful wrapper: 0 right after a reset, then the first step
+    aclk_tbeb_reset();
+    ACLK_BACKOFF_TEST(aclk_tbeb_delay(0, 2, 0, 1024) == 0, "first call after reset was delayed");
+    unsigned long int d = aclk_tbeb_delay(0, 2, 0, 1024);
+    ACLK_BACKOFF_TEST(d >= 1000 && d < 2000, "second call after reset was not the first step");
+    aclk_tbeb_reset();
+
+    if (errors)
+        fprintf(stderr, "aclk backoff unittest: %d ERROR(S)\n", errors);
+    else
+        fprintf(stderr, "aclk backoff unittest: OK\n");
+
+    return errors;
+}
+
+#undef ACLK_BACKOFF_TEST
 
 static int aclk_write_all_timeout(int fd, const void *buf, size_t len, int timeout_ms)
 {
