@@ -27,6 +27,7 @@ func (c *Collector) collect(ctx context.Context) (map[string]int64, error) {
 	c.collectAPIServer(raw, mx)
 	c.collectKubelet(raw, mx)
 	c.collectVolumeManager(raw, mx)
+	c.collectVolumeStats(raw, mx)
 
 	return stm.ToMap(mx), nil
 }
@@ -90,6 +91,96 @@ func (c *Collector) collectVolumeManager(raw prometheus.Series, mx *metrics) {
 	}
 
 	mx.VolumeManager.Plugins = vmPlugins
+}
+
+// pvcStats holds the raw kubelet_volume_stats_* values of a PVC.
+type pvcStats struct {
+	namespace, name string
+
+	capacity, used, available      float64
+	inodes, inodesUsed, inodesFree float64
+}
+
+func (c *Collector) collectVolumeStats(raw prometheus.Series, mx *metrics) {
+	/*
+		# HELP kubelet_volume_stats_available_bytes [ALPHA] Number of available bytes in the volume
+		# TYPE kubelet_volume_stats_available_bytes gauge
+		kubelet_volume_stats_available_bytes{namespace="app",persistentvolumeclaim="data-db-0"} 450000
+	*/
+	stats := make(map[string]*pvcStats)
+
+	series := raw.FindByNames(
+		"kubelet_volume_stats_capacity_bytes",
+		"kubelet_volume_stats_used_bytes",
+		"kubelet_volume_stats_available_bytes",
+		"kubelet_volume_stats_inodes",
+		"kubelet_volume_stats_inodes_used",
+		"kubelet_volume_stats_inodes_free",
+	)
+
+	for _, metric := range series {
+		namespace := metric.Labels.Get("namespace")
+		pvc := metric.Labels.Get("persistentvolumeclaim")
+
+		if namespace == "" || pvc == "" {
+			continue
+		}
+
+		key := namespace + "_" + pvc
+		st, ok := stats[key]
+		if !ok {
+			st = &pvcStats{namespace: namespace, name: pvc}
+			stats[key] = st
+		}
+
+		switch metric.Name() {
+		case "kubelet_volume_stats_capacity_bytes":
+			st.capacity = metric.Value
+		case "kubelet_volume_stats_used_bytes":
+			st.used = metric.Value
+		case "kubelet_volume_stats_available_bytes":
+			st.available = metric.Value
+		case "kubelet_volume_stats_inodes":
+			st.inodes = metric.Value
+		case "kubelet_volume_stats_inodes_used":
+			st.inodesUsed = metric.Value
+		case "kubelet_volume_stats_inodes_free":
+			st.inodesFree = metric.Value
+		}
+	}
+
+	for key, st := range stats {
+		if _, ok := c.collectedPVCs[key]; !ok {
+			charts := newPVCCharts(st.namespace, st.name)
+			if err := c.charts.Add(*charts...); err != nil {
+				c.Warningf("failed to add charts for PVC '%s/%s': %v", st.namespace, st.name, err)
+				continue
+			}
+			c.collectedPVCs[key] = charts
+		}
+
+		// the kubelet reads the values separately, so they can be slightly inconsistent
+		pvc := &pvcMetrics{}
+		pvc.Space.Available.Set(st.available)
+		pvc.Space.Used.Set(st.used)
+		pvc.Space.Reserved.Set(max(0, st.capacity-st.used-st.available))
+		if total := st.used + st.available; total > 0 {
+			pvc.Space.Utilization = &pvcUtilization{}
+			pvc.Space.Utilization.Percent.Set(st.used / total * 100)
+		}
+		pvc.Inodes.Available.Set(st.inodesFree)
+		pvc.Inodes.Used.Set(st.inodesUsed)
+		pvc.Inodes.Reserved.Set(max(0, st.inodes-st.inodesUsed-st.inodesFree))
+
+		mx.PVC[key] = pvc
+	}
+
+	for key, charts := range c.collectedPVCs {
+		if _, ok := stats[key]; !ok {
+			removePVCCharts(charts)
+			delete(c.collectedPVCs, key)
+		}
+	}
 }
 
 func (c *Collector) collectKubelet(raw prometheus.Series, mx *metrics) {
@@ -257,7 +348,10 @@ func (c *Collector) collectRESTClientHTTPRequests(raw prometheus.Series, mx *met
 			_ = chart.AddDim(&Dim{ID: dimID, Name: code, Algo: collectorapi.Incremental})
 			chart.MarkNotCreated()
 		}
-		mx.RESTClient.Requests.ByStatusCode[code] = mtx.Gauge(metric.Value)
+		// a code has one series per method and host: sum them
+		v := mx.RESTClient.Requests.ByStatusCode[code]
+		v.Add(metric.Value)
+		mx.RESTClient.Requests.ByStatusCode[code] = v
 	}
 
 	chart = c.charts.Get("rest_client_requests_by_method")
@@ -272,7 +366,9 @@ func (c *Collector) collectRESTClientHTTPRequests(raw prometheus.Series, mx *met
 			_ = chart.AddDim(&Dim{ID: dimID, Name: method, Algo: collectorapi.Incremental})
 			chart.MarkNotCreated()
 		}
-		mx.RESTClient.Requests.ByMethod[method] = mtx.Gauge(metric.Value)
+		v := mx.RESTClient.Requests.ByMethod[method]
+		v.Add(metric.Value)
+		mx.RESTClient.Requests.ByMethod[method] = v
 	}
 }
 

@@ -15,16 +15,18 @@ func newMetrics() *metrics {
 	mx.Kubelet.Docker.Operations = make(map[string]mtx.Gauge)
 	mx.Kubelet.Docker.OperationsErrors = make(map[string]mtx.Gauge)
 	mx.Kubelet.PodLogFileSystemUsage = make(map[string]mtx.Gauge)
+	mx.PVC = make(map[string]*pvcMetrics)
 
 	return &mx
 }
 
 type metrics struct {
-	Token         tokenMetrics         `stm:"token"`
-	RESTClient    restClientMetrics    `stm:"rest_client"`
-	APIServer     apiServerMetrics     `stm:"apiserver"`
-	Kubelet       kubeletMetrics       `stm:"kubelet"`
-	VolumeManager volumeManagerMetrics `stm:"volume_manager"`
+	Token         tokenMetrics           `stm:"token"`
+	RESTClient    restClientMetrics      `stm:"rest_client"`
+	APIServer     apiServerMetrics       `stm:"apiserver"`
+	Kubelet       kubeletMetrics         `stm:"kubelet"`
+	VolumeManager volumeManagerMetrics   `stm:"volume_manager"`
+	PVC           map[string]*pvcMetrics `stm:"pvc"`
 }
 
 type tokenMetrics struct {
@@ -110,4 +112,26 @@ type volumeManagerPlugin struct {
 		Actual  mtx.Gauge `stm:"actual"`
 		Desired mtx.Gauge `stm:"desired"`
 	} `stm:"state"`
+}
+
+// pvcUtilizationPrecision keeps two decimal places of the utilization percentage.
+const pvcUtilizationPrecision = 100
+
+type pvcMetrics struct {
+	Space struct {
+		Available mtx.Gauge `stm:"available"`
+		Used      mtx.Gauge `stm:"used"`
+		Reserved  mtx.Gauge `stm:"reserved"`
+		// nil when used + available is 0: utilization is undefined
+		Utilization *pvcUtilization `stm:"utilization"`
+	} `stm:"space"`
+	Inodes struct {
+		Available mtx.Gauge `stm:"available"`
+		Used      mtx.Gauge `stm:"used"`
+		Reserved  mtx.Gauge `stm:"reserved"`
+	} `stm:"inodes"`
+}
+
+type pvcUtilization struct {
+	Percent mtx.Gauge `stm:",100"`
 }
