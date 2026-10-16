@@ -70,7 +70,7 @@ static void stream_receiver_remove_internal(struct stream_thread *sth, struct re
 // When a child disconnects this is the maximum we will wait
 // before we update the cloud that the child is offline
 #define MAX_CHILD_DISC_DELAY (30000)
-#define MAX_CHILD_DISC_TOLERANCE (125 / 100)
+#define MAX_CHILD_DISC_TOLERANCE_PERCENT (125)
 
 static uint32_t streaming_connected_receivers = 0;
 
@@ -1467,8 +1467,9 @@ void rrdhost_clear_receiver(struct receiver_state *rpt, STREAM_HANDSHAKE reason)
                 // This must happen after the online flag is cleared: scheduled earlier, the update could be
                 // evaluated while the child still looks online, report it live, and never be repeated.
                 // The delay is read here, before stream_path_child_disconnected() clears the stream path.
-                uint64_t total_reboot = rrdhost_stream_path_total_reboot_time_ms(host);
-                schedule_node_state_update(host, MIN((total_reboot * MAX_CHILD_DISC_TOLERANCE), MAX_CHILD_DISC_DELAY));
+                uint64_t total_reboot = MIN(rrdhost_stream_path_total_reboot_time_ms(host), MAX_CHILD_DISC_DELAY);
+                schedule_node_state_update(
+                    host, MIN(total_reboot * MAX_CHILD_DISC_TOLERANCE_PERCENT / 100, MAX_CHILD_DISC_DELAY));
 
                 // this will wait until all workers finish
                 object_state_deactivate(&host->state_id);
