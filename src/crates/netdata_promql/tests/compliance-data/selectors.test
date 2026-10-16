@@ -1,0 +1,207 @@
+load 10s
+	http_requests_total{job="api-server", instance="0", group="production"}	0+10x1000 100+30x1000
+	http_requests_total{job="api-server", instance="1", group="production"}	0+20x1000 200+30x1000
+	http_requests_total{job="api-server", instance="0", group="canary"}	0+30x1000 300+80x1000
+	http_requests_total{job="api-server", instance="1", group="canary"}	0+40x2000
+
+eval instant at 8000s rate(http_requests_total[1m])
+	{job="api-server", instance="0", group="production"} 1
+	{job="api-server", instance="1", group="production"} 2
+	{job="api-server", instance="0", group="canary"} 3
+	{job="api-server", instance="1", group="canary"} 4
+
+eval instant at 18000s rate(http_requests_total[1m])
+	{job="api-server", instance="0", group="production"} 3
+	{job="api-server", instance="1", group="production"} 3
+	{job="api-server", instance="0", group="canary"} 8
+	{job="api-server", instance="1", group="canary"} 4
+
+eval instant at 8000s rate(http_requests_total{group=~"pro.*"}[1m])
+	{job="api-server", instance="0", group="production"} 1
+	{job="api-server", instance="1", group="production"} 2
+
+eval instant at 18000s rate(http_requests_total{group=~".*ry", instance="1"}[1m])
+	{job="api-server", instance="1", group="canary"} 4
+
+eval instant at 18000s rate(http_requests_total{instance!="3"}[1m] offset 10000s)
+	{job="api-server", instance="0", group="production"} 1
+	{job="api-server", instance="1", group="production"} 2
+	{job="api-server", instance="0", group="canary"} 3
+	{job="api-server", instance="1", group="canary"} 4
+
+eval instant at 4000s rate(http_requests_total{instance!="3"}[1m] offset -4000s)
+	{job="api-server", instance="0", group="production"} 1
+	{job="api-server", instance="1", group="production"} 2
+	{job="api-server", instance="0", group="canary"} 3
+	{job="api-server", instance="1", group="canary"} 4
+
+eval instant at 18000s rate(http_requests_total[40s]) - rate(http_requests_total[1m] offset 10000s)
+	{job="api-server", instance="0", group="production"} 2
+	{job="api-server", instance="1", group="production"} 1
+	{job="api-server", instance="0", group="canary"} 5
+	{job="api-server", instance="1", group="canary"} 0
+
+# https://github.com/prometheus/prometheus/issues/3575
+eval instant at 0s http_requests_total{foo!="bar"}
+	http_requests_total{job="api-server", instance="0", group="production"} 0
+	http_requests_total{job="api-server", instance="1", group="production"} 0
+	http_requests_total{job="api-server", instance="0", group="canary"} 0
+	http_requests_total{job="api-server", instance="1", group="canary"} 0
+
+eval instant at 0s http_requests_total{foo!="bar", job="api-server"}
+	http_requests_total{job="api-server", instance="0", group="production"} 0
+	http_requests_total{job="api-server", instance="1", group="production"} 0
+	http_requests_total{job="api-server", instance="0", group="canary"} 0
+	http_requests_total{job="api-server", instance="1", group="canary"} 0
+
+eval instant at 0s http_requests_total{foo!~"bar", job="api-server"}
+	http_requests_total{job="api-server", instance="0", group="production"} 0
+	http_requests_total{job="api-server", instance="1", group="production"} 0
+	http_requests_total{job="api-server", instance="0", group="canary"} 0
+	http_requests_total{job="api-server", instance="1", group="canary"} 0
+
+eval instant at 0s http_requests_total{foo!~"bar", job="api-server", instance="1", x!="y", z="", group!=""}
+	http_requests_total{job="api-server", instance="1", group="production"} 0
+	http_requests_total{job="api-server", instance="1", group="canary"} 0
+
+# https://github.com/prometheus/prometheus/issues/7994
+eval instant at 8000s rate(http_requests_total{group=~"(?i:PRO).*"}[1m])
+	{job="api-server", instance="0", group="production"} 1
+	{job="api-server", instance="1", group="production"} 2
+
+eval instant at 8000s rate(http_requests_total{group=~".*?(?i:PRO).*"}[1m])
+	{job="api-server", instance="0", group="production"} 1
+	{job="api-server", instance="1", group="production"} 2
+
+eval instant at 8000s rate(http_requests_total{group=~".*(?i:DUC).*"}[1m])
+	{job="api-server", instance="0", group="production"} 1
+	{job="api-server", instance="1", group="production"} 2
+
+eval instant at 8000s rate(http_requests_total{group=~".*(?i:TION)"}[1m])
+	{job="api-server", instance="0", group="production"} 1
+	{job="api-server", instance="1", group="production"} 2
+
+eval instant at 8000s rate(http_requests_total{group=~".*(?i:TION).*?"}[1m])
+	{job="api-server", instance="0", group="production"} 1
+	{job="api-server", instance="1", group="production"} 2
+
+
+eval instant at 8000s rate(http_requests_total{group=~"((?i)PRO).*"}[1m])
+	{job="api-server", instance="0", group="production"} 1
+	{job="api-server", instance="1", group="production"} 2
+
+eval instant at 8000s rate(http_requests_total{group=~".*((?i)DUC).*"}[1m])
+	{job="api-server", instance="0", group="production"} 1
+	{job="api-server", instance="1", group="production"} 2
+
+eval instant at 8000s rate(http_requests_total{group=~".*((?i)TION)"}[1m])
+	{job="api-server", instance="0", group="production"} 1
+	{job="api-server", instance="1", group="production"} 2
+
+
+eval instant at 8000s rate(http_requests_total{group=~"(?i:PRODUCTION)"}[1m])
+	{job="api-server", instance="0", group="production"} 1
+	{job="api-server", instance="1", group="production"} 2
+
+eval instant at 8000s rate(http_requests_total{group=~".*(?i:C).*"}[1m])
+	{job="api-server", instance="0", group="production"} 1
+	{job="api-server", instance="1", group="production"} 2
+	{job="api-server", instance="0", group="canary"} 3
+	{job="api-server", instance="1", group="canary"} 4
+
+clear
+load 1m
+    metric1{a="a"} 0+1x100
+    metric2{b="b"} 0+1x50
+
+eval instant at 90m metric1 offset 15m or metric2 offset 45m
+    metric1{a="a"} 75
+    metric2{b="b"} 45
+
+clear
+
+load 5m
+	x{y="testvalue"} 0+10x10
+
+load 5m
+	cpu_count{instance="0", type="numa"}	0+30x10
+	cpu_count{instance="0", type="smp"} 	0+10x20
+	cpu_count{instance="1", type="smp"} 	0+20x10
+
+load 5m
+	label_grouping_test{a="aa", b="bb"}	0+10x10
+	label_grouping_test{a="a", b="abb"}	0+20x10
+
+load 5m
+	http_requests_total{job="api-server", instance="0", group="production"}	0+10x10
+	http_requests_total{job="api-server", instance="1", group="production"}	0+20x10
+	http_requests_total{job="api-server", instance="0", group="canary"}		0+30x10
+	http_requests_total{job="api-server", instance="1", group="canary"}		0+40x10
+	http_requests_total{job="app-server", instance="0", group="production"}	0+50x10
+	http_requests_total{job="app-server", instance="1", group="production"}	0+60x10
+	http_requests_total{job="app-server", instance="0", group="canary"}		0+70x10
+	http_requests_total{job="app-server", instance="1", group="canary"}		0+80x10
+
+# Single-letter label names and values.
+eval instant at 50m x{y="testvalue"}
+	x{y="testvalue"} 100
+
+# Basic Regex
+eval instant at 50m {__name__=~".+"}
+	http_requests_total{group="canary", instance="0", job="api-server"} 300
+	http_requests_total{group="canary", instance="0", job="app-server"} 700
+	http_requests_total{group="canary", instance="1", job="api-server"} 400
+	http_requests_total{group="canary", instance="1", job="app-server"} 800
+	http_requests_total{group="production", instance="0", job="api-server"} 100
+	http_requests_total{group="production", instance="0", job="app-server"} 500
+	http_requests_total{group="production", instance="1", job="api-server"} 200
+	http_requests_total{group="production", instance="1", job="app-server"} 600
+	x{y="testvalue"} 100
+	label_grouping_test{a="a", b="abb"} 200
+	label_grouping_test{a="aa", b="bb"} 100
+	cpu_count{instance="1", type="smp"} 200
+	cpu_count{instance="0", type="smp"} 100
+	cpu_count{instance="0", type="numa"} 300
+
+eval instant at 50m {job=~".+-server", job!~"api-.+"}
+	http_requests_total{group="canary", instance="0", job="app-server"} 700
+	http_requests_total{group="canary", instance="1", job="app-server"} 800
+	http_requests_total{group="production", instance="0", job="app-server"} 500
+	http_requests_total{group="production", instance="1", job="app-server"} 600
+
+eval instant at 50m http_requests_total{group!="canary"}
+	http_requests_total{group="production", instance="1", job="app-server"} 600
+	http_requests_total{group="production", instance="0", job="app-server"} 500
+	http_requests_total{group="production", instance="1", job="api-server"} 200
+	http_requests_total{group="production", instance="0", job="api-server"} 100
+
+eval instant at 50m http_requests_total{job=~".+-server",group!="canary"}
+	http_requests_total{group="production", instance="1", job="app-server"} 600
+	http_requests_total{group="production", instance="0", job="app-server"} 500
+	http_requests_total{group="production", instance="1", job="api-server"} 200
+	http_requests_total{group="production", instance="0", job="api-server"} 100
+
+eval instant at 50m http_requests_total{job!~"api-.+",group!="canary"}
+	http_requests_total{group="production", instance="1", job="app-server"} 600
+	http_requests_total{group="production", instance="0", job="app-server"} 500
+
+eval instant at 50m http_requests_total{group="production",job=~"api-.+"}
+	http_requests_total{group="production", instance="0", job="api-server"} 100
+	http_requests_total{group="production", instance="1", job="api-server"} 200
+
+eval instant at 50m http_requests_total{group="production",job="api-server"} offset 5m
+	http_requests_total{group="production", instance="0", job="api-server"} 90
+	http_requests_total{group="production", instance="1", job="api-server"} 180
+
+clear
+
+# Matrix tests.
+load 1h
+	testmetric{aa="bb"} 1
+	testmetric{a="abb"} 2
+
+eval instant at 0h testmetric
+	testmetric{aa="bb"} 1
+	testmetric{a="abb"} 2
+
+clear

@@ -36,6 +36,17 @@ if(ENABLE_DBENGINE)
     )
 endif()
 
+if(ENABLE_PROMQL)
+    list(APPEND RRD_PLUGIN_FILES
+            src/database/contexts/promql-data-source.c
+            src/database/contexts/promql-data-source.h
+    )
+    list(APPEND WEB_PLUGIN_FILES
+            src/web/api/v3/api_v3_promql.c
+            src/web/api/v3/api_v3_promql_discovery.c
+    )
+endif()
+
 set(NETDATA_FILES
         ${COLLECTORS_ALL_FILES}
         ${DAEMON_FILES}
@@ -209,6 +220,7 @@ target_include_directories(netdata PRIVATE
 target_link_libraries(netdata PRIVATE
         m
         libnetdata
+        "$<$<BOOL:${ENABLE_PROMQL}>:netdata_promql>"
         "$<$<BOOL:${HAVE_LIBRT}>:rt>"
         mqttwebsockets
         "$<$<BOOL:${ENABLE_EXPORTER_MONGODB}>:${MONGOC_LIBRARIES}>"
