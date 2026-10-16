@@ -27,12 +27,20 @@ func candidateGraphBinding(id string, binding *candidateBinding) (*dyncfg.GraphC
 }
 
 func (dcjc *DynCfgJobController) prepareCandidateDecision(ctx context.Context, scope lifecycle.ResourceTransactionScope, current lifecycle.ReadyResource, permit lifecycle.LongLivedPermit, delta *candidateDelta, facts ...preparedJobConfigLifecycle) (lifecycle.PreparedResourceTransaction, error) {
+	var resume func()
+	if before, after := delta.before, delta.after; current == nil && before != nil && before.Proposal != nil && before.Active != nil &&
+		after.Proposal == nil && after.Active != nil && after.Active.Token == before.Active.Token && delta.Decision.Work == nil {
+		// The source proposal displaced this executor without superseding its
+		// admitted intent. Restore it through an acknowledged lane transaction.
+		token := after.Active.Token
+		resume = func() { dcjc.retainCandidateResume(scope.ID, token) }
+	}
 	if delta.Decision.Binding == nil && !delta.Decision.Remove {
 		commit, err := dcjc.prepareCandidateCommit(delta, false)
 		if err != nil {
 			return nil, err
 		}
-		return dcjc.noopWithAfterApply(scope, current, permit, noResponseResult(), commit)
+		return dcjc.noopWithAfterApply(scope, current, permit, noResponseResult(), composeAfterApply(commit, resume))
 	}
 	postimage, err := candidateGraphBinding(scope.ID, delta.Decision.Binding)
 	if err != nil {
@@ -54,7 +62,7 @@ func (dcjc *DynCfgJobController) prepareCandidateDecision(ctx context.Context, s
 	if len(facts) > 0 {
 		jobConfig = facts[0]
 	}
-	return dcjc.prepareMutationAfterApplyAndFallback(ctx, scope, current, nil, permit, resourceRemovalDisposition(current), postimage, reply, cleanup, nil, jobConfig, jobConfigIntentPreserve, nil, nil, nil)
+	return dcjc.prepareMutationAfterApplyAndFallback(ctx, scope, current, nil, permit, resourceRemovalDisposition(current), postimage, reply, cleanup, resume, jobConfig, jobConfigIntentPreserve, nil, nil, nil)
 }
 
 func (dcjc *DynCfgJobController) candidateProjectionCleanup(id string, postimage *dyncfg.GraphConfig, delta *candidateDelta) lifecycle.TaskCleanup {

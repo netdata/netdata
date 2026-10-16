@@ -51,10 +51,11 @@ func (dcjc *DynCfgJobController) retainCandidateResume(id string, token candidat
 		return
 	}
 	aai.wg.Add(1)
+	commands := aai.commands
 	aai.mu.Unlock()
 	go func() {
 		defer aai.wg.Done()
-		err := dcjc.commands.SubmitPreparedAndWait(context.Background(), jobmgr.Request{
+		err := commands.SubmitPreparedAndWait(context.Background(), jobmgr.Request{
 			UID:     fmt.Sprintf("jobmgr-candidate-resume-%d-%d", token.Run, sequence),
 			LaneKey: id, Source: lifecycle.SourceJobManager, Route: "internal/jobs/candidate-resume",
 		}, dcjc.planCandidateResume(id, token))
