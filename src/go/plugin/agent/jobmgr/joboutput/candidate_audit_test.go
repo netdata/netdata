@@ -25,7 +25,7 @@ func TestProtectedSourceHistoryAfterSDFileModuleReplacement(t *testing.T) {
 	controller.modules["snmp"] = creator
 	creator.InstancePolicy = collectorapi.InstancePolicySingle
 	controller.modules["snmp_topology"] = creator
-	path := filepath.Join(t.TempDir(), "etc", "jobs.conf")
+	path := filepath.ToSlash(filepath.Join(t.TempDir(), "etc", "jobs.conf"))
 	require.NoError(t, os.MkdirAll(filepath.Dir(path), 0750))
 	read := func(payload string) DiscoveredJobCandidate {
 		require.NoError(t, os.WriteFile(path, []byte(payload), 0600))
