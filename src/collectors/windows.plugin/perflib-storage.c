@@ -2013,6 +2013,15 @@ static void logical_disk_labels(struct logical_disk *d, const char *name)
 // divisor. Shared by the perflib pass and the mount point pass so every volume looks the same.
 static void logical_disk_chart(struct logical_disk *d, const char *name, int update_every)
 {
+    // Skip optical drives (CD-ROM/DVD) and read-only volumes to prevent permanent critical alerts (#24150)
+    if (d->DriveType == 5 /* DRIVE_CDROM */ || d->readonly) {
+        if (d->st_disk_space) {
+            rrdset_is_obsolete___safe_from_collector_thread(d->st_disk_space);
+            d->st_disk_space = NULL;
+        }
+        return;
+    }
+
     if (!d->st_disk_space) {
         char chart_id[RRD_ID_LENGTH_MAX + 1];
         const char *id = logical_disk_chart_id(d, name, chart_id, sizeof(chart_id));
