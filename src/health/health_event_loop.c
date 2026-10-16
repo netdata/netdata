@@ -374,6 +374,31 @@ static void do_eval_expression(
         *result = expression_result(expression);
 }
 
+// Hands the host's saved alert transitions to the cloud: commits pending transitions, then either marks a
+// requested alert snapshot ready or drains the due rows of alert_queue. This thread is the only drainer of
+// alert_queue, and it runs this for every host, collecting or not: a disconnected child still has REMOVED
+// transitions queued for after a delay, and a snapshot Cloud requested for it still has to be sent.
+// Nothing is marked or drained while transitions are still being saved; a transition saved after a snapshot
+// reaches the cloud through alert_queue. On an idle host this costs a few atomic loads (the queue is read only
+// when a row can be due).
+static void health_alert_queue_service(RRDHOST *host) {
+    int32_t pending = __atomic_load_n(&host->health.pending_transitions, __ATOMIC_RELAXED);
+    if (pending)
+        commit_alert_transitions(host);
+
+    if (!__atomic_load_n(&host->health.pending_transitions, __ATOMIC_RELAXED)) {
+        struct aclk_sync_cfg_t *aclk_host_config = __atomic_load_n(&host->aclk_host_config, __ATOMIC_ACQUIRE);
+        if (aclk_host_config && aclk_alert_snapshot_mark_ready(aclk_host_config)) {
+            rrdhost_flag_set(host, RRDHOST_FLAG_ACLK_STREAM_ALERTS);
+        } else {
+            worker_is_busy(WORKER_HEALTH_JOB_ALARM_LOG_QUEUE);
+            if (process_alert_pending_queue(host))
+                rrdhost_flag_set(host, RRDHOST_FLAG_ACLK_STREAM_ALERTS);
+        }
+    }
+    worker_is_idle();
+}
+
 // returns the number of runnable alerts
 //
 // The caller owns `owa` and provides it so a single arena can be reused
@@ -386,8 +411,11 @@ static void health_event_loop_for_host(RRDHOST *host, bool apply_hibernation_del
     struct health_alert_status_counts status_counts = { 0 };
     bool snapshot_complete = true;
 
-    if(unlikely(!rrdhost_should_run_health(host)))
+    if(unlikely(!rrdhost_should_run_health(host))) {
+        // no alerts are evaluated, but the transitions already queued (e.g. REMOVED after a disconnect) still go out
+        health_alert_queue_service(host);
         return;
+    }
 
     rrdhost_set_health_evloop_iteration(host);
 
@@ -891,21 +919,7 @@ static void health_event_loop_for_host(RRDHOST *host, bool apply_hibernation_del
     health_alarm_log_process_to_send_notifications(host, hrm);
     alerts_raised_summary_free(hrm);
 
-    int32_t pending = __atomic_load_n(&host->health.pending_transitions, __ATOMIC_RELAXED);
-    if (pending)
-        commit_alert_transitions(host);
-
-    if (!__atomic_load_n(&host->health.pending_transitions, __ATOMIC_RELAXED)) {
-        struct aclk_sync_cfg_t *aclk_host_config = __atomic_load_n(&host->aclk_host_config, __ATOMIC_ACQUIRE);
-        if (aclk_host_config && aclk_alert_snapshot_mark_ready(aclk_host_config)) {
-            rrdhost_flag_set(host, RRDHOST_FLAG_ACLK_STREAM_ALERTS);
-        } else {
-            worker_is_busy(WORKER_HEALTH_JOB_ALARM_LOG_QUEUE);
-            if (process_alert_pending_queue(host))
-                rrdhost_flag_set(host, RRDHOST_FLAG_ACLK_STREAM_ALERTS);
-        }
-    }
-    worker_is_idle();
+    health_alert_queue_service(host);
 }
 
 __thread bool is_health_thread = false;
