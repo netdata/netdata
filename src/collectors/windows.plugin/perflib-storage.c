@@ -694,9 +694,9 @@ static void volume_space_worker(void *ptr __maybe_unused)
             value.metadata_attempted = true;
             struct logical_disk metadata_disk = {0};
             STRING *filesystem = getFileSystemType(&metadata_disk, name);
+            value.drive_type = metadata_disk.DriveType;
             if (filesystem) {
                 value.metadata_success = true;
-                value.drive_type = metadata_disk.DriveType;
                 value.serial_number = metadata_disk.SerialNumber;
                 value.readonly = metadata_disk.readonly;
                 snprintfz(value.filesystem, sizeof(value.filesystem), "%s", string2str(filesystem));
@@ -1894,8 +1894,10 @@ static void logical_disk_apply_metadata(
     if (!result || !result->metadata_attempted)
         return;
 
-    if (result->metadata_success) {
+    if (result->drive_type)
         d->DriveType = result->drive_type;
+
+    if (result->metadata_success) {
         d->SerialNumber = result->serial_number;
         d->readonly = result->readonly;
         string_freez(d->filesystem);
@@ -2013,8 +2015,9 @@ static void logical_disk_labels(struct logical_disk *d, const char *name)
 // divisor. Shared by the perflib pass and the mount point pass so every volume looks the same.
 static void logical_disk_chart(struct logical_disk *d, const char *name, int update_every)
 {
-    // Skip optical drives (CD-ROM/DVD) and read-only volumes to prevent permanent critical alerts (#24150)
-    if (d->DriveType == 5 /* DRIVE_CDROM */ || d->readonly) {
+    // Skip optical drives (CD-ROM/DVD) and read-only volumes to prevent permanent critical alerts (#24150).
+    // d->readonly is consulted only when metadata has been successfully collected.
+    if (d->DriveType == 5 /* DRIVE_CDROM */ || (d->collected_metadata && d->readonly)) {
         if (d->st_disk_space) {
             rrdset_is_obsolete___safe_from_collector_thread(d->st_disk_space);
             d->st_disk_space = NULL;
