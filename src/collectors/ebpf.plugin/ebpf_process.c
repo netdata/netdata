@@ -76,6 +76,53 @@ struct config process_config = APPCONFIG_INITIALIZER;
 #ifdef LIBBPF_MAJOR_VERSION
 #include <bpf/btf.h>
 
+static bool ebpf_process_set_autoload_by_name(
+    struct process_bpf *obj, const char *const *program_names, size_t program_names_count, bool autoload)
+{
+    for (size_t i = 0; i < program_names_count; i++) {
+        struct bpf_program *program = bpf_object__find_program_by_name(obj->obj, program_names[i]);
+        if (program) {
+            return bpf_program__set_autoload(program, autoload) == 0;
+        }
+    }
+
+    return false;
+}
+
+// CO-RE asset releases can rename or omit optional programs from generated skeletons.
+static const char *const process_wake_up_new_task_program_names[] = {
+    "netdata_wake_up_new_task_probe",
+    "netdata_wake_up_new_task",
+};
+static const char *const process_sched_process_fork_btf_program_names[] = {
+    "netdata_sched_process_fork_btf",
+};
+
+static bool ebpf_process_select_fork_accounting(struct process_bpf *obj)
+{
+    bool raw_tracepoint_available = libbpf_probe_bpf_prog_type(BPF_PROG_TYPE_TRACING, NULL) > 0 &&
+                                   ebpf_kernel_btf_find_by_name_kind(
+                                       "btf_trace_sched_process_fork", BTF_KIND_TYPEDEF) > 0;
+    if (raw_tracepoint_available &&
+        ebpf_process_set_autoload_by_name(
+            obj, process_sched_process_fork_btf_program_names,
+            sizeof(process_sched_process_fork_btf_program_names) /
+                sizeof(process_sched_process_fork_btf_program_names[0]), true)) {
+        ebpf_process_set_autoload_by_name(
+            obj, process_wake_up_new_task_program_names,
+            sizeof(process_wake_up_new_task_program_names) / sizeof(process_wake_up_new_task_program_names[0]), false);
+        return true;
+    }
+
+    ebpf_process_set_autoload_by_name(
+        obj, process_sched_process_fork_btf_program_names,
+        sizeof(process_sched_process_fork_btf_program_names) /
+            sizeof(process_sched_process_fork_btf_program_names[0]), false);
+    return ebpf_process_set_autoload_by_name(
+        obj, process_wake_up_new_task_program_names,
+        sizeof(process_wake_up_new_task_program_names) / sizeof(process_wake_up_new_task_program_names[0]), true);
+}
+
 /**
  * Disable probe
  *
@@ -88,7 +135,9 @@ static void ebpf_process_disable_probe(struct process_bpf *obj)
     bpf_program__set_autoload(obj->progs.netdata_release_task_probe, false);
     bpf_program__set_autoload(obj->progs.netdata_do_fork_probe, false);
     bpf_program__set_autoload(obj->progs.netdata_kernel_clone_probe, false);
-    bpf_program__set_autoload(obj->progs.netdata_wake_up_new_task_probe, false);
+    ebpf_process_set_autoload_by_name(
+        obj, process_wake_up_new_task_program_names,
+        sizeof(process_wake_up_new_task_program_names) / sizeof(process_wake_up_new_task_program_names[0]), false);
 }
 
 static void ebpf_disable_tracepoints(struct process_bpf *obj)
@@ -161,10 +210,17 @@ static inline int ebpf_process_load_and_attach(struct process_bpf *obj, ebpf_mod
         ebpf_disable_tracepoints(obj);
 
         ebpf_set_trampoline_target(obj);
+        if (!ebpf_process_select_fork_accounting(obj)) {
+            netdata_log_error("No supported fork-accounting program is available in the process CO-RE object.");
+            return -1;
+        }
     } else if (mode == EBPF_LOAD_PROBE || mode == EBPF_LOAD_RETPROBE) {
         ebpf_disable_tracepoints(obj);
         ebpf_disable_trampoline(obj);
-        bpf_program__set_autoload(obj->progs.netdata_sched_process_fork_btf, false);
+        ebpf_process_set_autoload_by_name(
+            obj, process_sched_process_fork_btf_program_names,
+            sizeof(process_sched_process_fork_btf_program_names) /
+                sizeof(process_sched_process_fork_btf_program_names[0]), false);
 
         bpf_program__set_autoload(
             (running_on_kernel <= NETDATA_EBPF_KERNEL_5_9_16) ? obj->progs.netdata_kernel_clone_probe :
@@ -184,16 +240,10 @@ static inline int ebpf_process_load_and_attach(struct process_bpf *obj, ebpf_mod
         bpf_program__set_autoload(obj->progs.netdata_vfork_exit, false);
 #endif
 
-        // tp_btf needs tracing support and its target in kernel BTF; otherwise count forks with the kprobe.
-        bool raw_tracepoint_available = false;
-        if (libbpf_probe_bpf_prog_type(BPF_PROG_TYPE_TRACING, NULL) > 0) {
-            raw_tracepoint_available =
-                ebpf_kernel_btf_find_by_name_kind("btf_trace_sched_process_fork", BTF_KIND_TYPEDEF) > 0;
-        }
-
-        if (!raw_tracepoint_available) {
-            bpf_program__set_autoload(obj->progs.netdata_sched_process_fork_btf, false);
-            bpf_program__set_autoload(obj->progs.netdata_wake_up_new_task_probe, true);
+        // Use tp_btf only when both the kernel and this asset bundle provide it.
+        if (!ebpf_process_select_fork_accounting(obj)) {
+            netdata_log_error("No supported fork-accounting program is available in the process CO-RE object.");
+            return -1;
         }
     }
 
