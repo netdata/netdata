@@ -107,10 +107,7 @@ func TestConfigIntentPassiveEnableDisposeAndRetirement(t *testing.T) {
 	owner := &intentTestOwner{}
 	installIntentTestOwner(controller, owner)
 	config := acceptedActivationTestConfig(confgroup.TypeUser)
-	plan, err := controller.PlanDiscovered(DiscoveredJobChange{
-		Config: config,
-		Status: dyncfg.StatusAccepted,
-	})
+	plan, err := planSourceTestConfig(controller, config, false, false)
 	require.NoError(t, err)
 	applyActivationTestSubmission(t, activationTestSubmission{
 		plan: plan,
@@ -169,7 +166,7 @@ func TestConfigIntentEnableFailureAndApplyRollback(t *testing.T) {
 			owner := &intentTestOwner{}
 			installIntentTestOwner(controller, owner)
 			config := acceptedActivationTestConfig(confgroup.TypeUser)
-			seedDynCfgJobGraphRecord(t, graph, config, dyncfg.StatusDisabled)
+			seedDynCfgJobGraphRecord(t, controller, graph, config, dyncfg.StatusDisabled)
 			sentinel := errors.New("storage unavailable")
 			if mode == "prepare failure" {
 				owner.prepareErr = sentinel
@@ -250,13 +247,15 @@ func TestConfigIntentNamedWaitRunningFailureAndDisable(t *testing.T) {
 				stopRuntimeTestResource(t, current)
 			})
 			config := acceptedActivationTestConfig(confgroup.TypeDyncfg).Set("autodetection_retry", 0)
-			seedDynCfgJobGraphRecord(t, graph, config, dyncfg.StatusAccepted)
+			seedDynCfgJobGraphRecord(t, controller, graph, config, dyncfg.StatusAccepted)
 			applyAcceptedEnableForTest(t, controller, graph, config, 1)
 			waiting := commands.next(t, "internal/jobs/accepted-activation")
 			// Notify after the failed lookup but before the waiting transaction.
 			available.Store(true)
 			controller.NotifyDependencyChanged("runtime", "browser")
 			current = applyActivationTestSubmission(t, waiting, nil, 2)
+			require.Nil(t, current)
+			current = applyActivationTestSubmission(t, commands.next(t, "internal/jobs/candidate-resume"), nil, 0)
 			require.Nil(t, current)
 			current = applyActivationTestSubmission(t, commands.next(t, "internal/jobs/accepted-activation"), nil, 3)
 			require.NotNil(t, current)
@@ -348,8 +347,13 @@ func TestConfigIntentRejectedAndAbortedUpdatePreservesIncumbent(t *testing.T) {
 	}
 	controller.modules["module"] = creator
 	config := acceptedActivationTestConfig(confgroup.TypeDyncfg)
-	current := runtimeTestStartAndSettle(t, controller, config, nil, 1)
+	commands := bindHandoffTestWorkers(t, controller)
+	seedDynCfgJobGraphRecord(t, controller, graph, config, dyncfg.StatusDisabled)
+	applyAcceptedEnableForTest(t, controller, graph, config, 1)
+	current := applyActivationTestSubmission(t, commands.next(t, "internal/jobs/accepted-activation"), nil, 2)
 	t.Cleanup(func() { stopRuntimeTestResource(t, current) })
+	require.NotNil(t, current)
+	current = applyActivationTestSubmission(t, commands.next(t, "internal/jobs/runtime-ready"), current, 0)
 	before, _ := graph.Lookup(config.FullName())
 	request := DynCfgJobRequest{
 		Args: []string{controller.externalID(config.FullName()), "update"},
@@ -448,7 +452,7 @@ func TestConfigIntentStartupRetryKeepsOneDemand(t *testing.T) {
 	})
 	require.NoError(t, controller.scheduler.Tick(t.Context(), 0))
 	config := acceptedActivationTestConfig(confgroup.TypeUser).Set("autodetection_retry", 1)
-	seedDynCfgJobGraphRecord(t, graph, config, dyncfg.StatusDisabled)
+	seedDynCfgJobGraphRecord(t, controller, graph, config, dyncfg.StatusDisabled)
 	applyAcceptedEnableForTest(t, controller, graph, config, 1)
 	current = applyActivationTestSubmission(t, commands.next(t, "internal/jobs/accepted-activation"), nil, 2)
 	sawFailed, sawRetry := false, false

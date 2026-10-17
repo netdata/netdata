@@ -65,7 +65,8 @@ type DynCfgJobController struct {
 	commands         jobmgr.PreparedCommandPort
 	restartObservers restartObservers
 	configIntents    jobConfigIntentIndex
-	scheduler        *Scheduler // tick + retry scheduler
+	scheduler        *Scheduler           // tick + retry scheduler
+	candidates       *candidateController // source selection and activation intent
 }
 
 func NewDynCfgJobController(config DynCfgJobControllerConfig) (*DynCfgJobController, error) {
@@ -92,6 +93,7 @@ func NewDynCfgJobController(config DynCfgJobControllerConfig) (*DynCfgJobControl
 		dependencies:  config.Dependencies,
 		diagnostics:   config.Diagnostics,
 		scheduler:     config.Factory.config.Scheduler,
+		candidates:    newCandidateController(config.Generation),
 	}, nil
 }
 
@@ -103,7 +105,12 @@ func (dcjc *DynCfgJobController) BindBackgroundWorkers(
 	if dcjc == nil || dcjc.scheduler == nil {
 		return errors.New("job output: invalid background worker controller")
 	}
-	dcjc.scheduler.accepted.retire = dcjc.retireActivationRestart
+	dcjc.scheduler.accepted.validWork = dcjc.candidates.valid
+	dcjc.scheduler.accepted.resumeWork = dcjc.retainCandidateResume
+	dcjc.scheduler.retireCandidates = func() {
+		dcjc.candidates.retire()
+		dcjc.restartObservers.retire()
+	}
 	if err := dcjc.scheduler.accepted.bind(
 		dcjc.factory,
 		commands,
@@ -116,7 +123,6 @@ func (dcjc *DynCfgJobController) BindBackgroundWorkers(
 	if err := dcjc.scheduler.bindBackgroundWorkers(
 		commands,
 		dcjc.planAutoDetectionRetry,
-		dcjc.planPendingJob,
 		run,
 		failure,
 	); err != nil {

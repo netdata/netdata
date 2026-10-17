@@ -14,9 +14,7 @@ import (
 	"github.com/netdata/netdata/go/plugins/plugin/agent/jobmgr/containment"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/collectorapi"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/confgroup"
-	"github.com/netdata/netdata/go/plugins/plugin/framework/dyncfg"
 	"github.com/stretchr/testify/require"
-	"gopkg.in/yaml.v2"
 )
 
 func TestDynCfgTestContainsNonCooperativeCollectorPerRawConfigIdentity(t *testing.T) {
@@ -148,12 +146,7 @@ func TestContainedConfigValidationYieldsGraphClaimForAllCallbacks(t *testing.T) 
 					}
 				}}
 				installIntentTestOwner(controller, owner)
-				payload, err := yaml.Marshal(config)
-				require.NoError(t, err)
-				intent, err := controller.prepareJobConfigIntent(t.Context(), config.FullName(), &dyncfg.GraphConfig{
-					Module: config.Module(), Name: config.Name(), Payload: payload,
-					Status: dyncfg.StatusAccepted.String(),
-				}, jobConfigIntentEnable)
+				intent, err := controller.prepareJobConfigIntent(t.Context(), config.FullName(), config, jobConfigIntentEnable)
 				require.NoError(t, err)
 				require.NotNil(t, intent)
 				require.NoError(t, intent.abort())

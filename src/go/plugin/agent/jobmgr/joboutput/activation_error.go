@@ -65,7 +65,7 @@ func classifyActivationError(err error) activationFailure {
 		default:
 			failure.kind = activationFailureProposal
 		}
-	case errors.As(err, &invalid):
+	case errors.As(err, &invalid), jobmgr.IsProposalRejection(err):
 		failure.kind = activationFailureProposal
 	}
 	return failure
