@@ -676,7 +676,16 @@ int main(int argc, char *argv[]) {
     }
 
     char new_path[] =
-#ifdef __APPLE__
+#if defined(__APPLE__) && defined(NDSUDO_APPLE_DIRS_ONLY)
+        // The native macOS package: Apple-owned directories only.
+        // /usr/local and /opt/homebrew are writable by the console admin on
+        // typical Macs (Homebrew chowns its prefix to the installing user), so
+        // a setuid-root binary searching them would execute admin-planted
+        // binaries as root. Homebrew-provided tools (smartctl, chronyc, nvme)
+        // are therefore not reachable through the package's ndsudo; the
+        // collectors that want them fail cleanly with "not available in PATH".
+        "PATH=/bin:/sbin:/usr/bin:/usr/sbin";
+#elif defined(__APPLE__)
         "PATH=/bin:/sbin:/usr/bin:/usr/sbin:/usr/local/bin:/usr/local/sbin:/opt/homebrew/bin:/opt/homebrew/sbin";
 #else
         "PATH=/bin:/sbin:/usr/bin:/usr/sbin:/usr/local/bin:/usr/local/sbin";

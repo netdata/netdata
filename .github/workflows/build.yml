@@ -76,6 +76,7 @@ jobs:
             packaging/cmake/
             packaging/makeself/
             packaging/installer/
+            packaging/macos/
             packaging/windows/
             packaging/*.sh
             packaging/*.version
@@ -1407,6 +1408,144 @@ jobs:
             && github.repository == 'netdata/netdata'
             && needs.file-check.outputs.run == 'true'
           }}
+
+  macos-pkg: # Build the native macOS package and store it as an artifact.
+    name: Build macOS Package
+    # The macOS 14 floor comes from the deployment target, not the runner;
+    # the macos-14 image is retired on 2026-11-02.
+    runs-on: macos-15
+    if: github.event_name != 'workflow_dispatch'
+    needs:
+      - file-check
+    env:
+      # Like the Windows signing step, pull requests never sign; other events
+      # sign once the signing secrets exist.
+      MACOS_SIGNING: ${{ github.event_name != 'pull_request' && secrets.MACOS_DEVELOPER_ID_APPLICATION_P12 != '' }}
+    steps:
+      - name: Skip Check
+        id: skip
+        if: needs.file-check.outputs.run != 'true'
+        run: echo "SKIPPED"
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        id: checkout
+        if: needs.file-check.outputs.run == 'true'
+        with:
+          fetch-depth: 0
+          submodules: recursive
+      - name: Fix tags
+        id: fix-tags
+        if: github.event_name != 'push' && needs.file-check.outputs.run == 'true'
+        run: |
+          git fetch --tags --force
+      - name: Install latest bash
+        id: install-bash
+        if: needs.file-check.outputs.run == 'true'
+        run: |
+          brew install bash
+      - name: Install Go
+        id: install-go
+        if: needs.file-check.outputs.run == 'true'
+        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: src/go/go.mod
+      - name: Install netdata dependencies
+        id: install-deps
+        if: needs.file-check.outputs.run == 'true'
+        run: |
+          bash ./packaging/installer/install-required-packages.sh --dont-wait --non-interactive netdata-all
+      - name: Import signing identities
+        id: import-signing
+        if: needs.file-check.outputs.run == 'true' && env.MACOS_SIGNING == 'true'
+        env:
+          MACOS_APP_P12: ${{ secrets.MACOS_DEVELOPER_ID_APPLICATION_P12 }}
+          MACOS_APP_P12_PASSWORD: ${{ secrets.MACOS_DEVELOPER_ID_APPLICATION_P12_PASSWORD }}
+          MACOS_INSTALLER_P12: ${{ secrets.MACOS_DEVELOPER_ID_INSTALLER_P12 }}
+          MACOS_INSTALLER_P12_PASSWORD: ${{ secrets.MACOS_DEVELOPER_ID_INSTALLER_P12_PASSWORD }}
+          MACOS_NOTARY_KEY_P8: ${{ secrets.MACOS_NOTARY_KEY_P8 }}
+          MACOS_NOTARY_KEY_ID: ${{ secrets.MACOS_NOTARY_KEY_ID }}
+          MACOS_NOTARY_ISSUER: ${{ secrets.MACOS_NOTARY_ISSUER_ID }}
+        run: |
+          ./packaging/macos/import-signing-identities.sh "${RUNNER_TEMP}" >> "${GITHUB_ENV}"
+      - name: Build package
+        id: build-pkg
+        if: needs.file-check.outputs.run == 'true'
+        run: |
+          ./packaging/build-package.sh PKG "${PWD}/build-pkg"
+      - name: Remove signing identities
+        id: remove-signing
+        if: always() && steps.import-signing.outcome != 'skipped'
+        run: |
+          ./packaging/macos/import-signing-identities.sh --remove "${RUNNER_TEMP}"
+      - name: Store package
+        id: store
+        if: needs.file-check.outputs.run == 'true'
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: netdata-macos-pkg
+          path: build-pkg/packages/*.pkg
+          retention-days: 30
+      - name: Install package
+        id: install-pkg
+        if: needs.file-check.outputs.run == 'true'
+        run: |
+          sudo installer -pkg build-pkg/packages/netdata-*.pkg -target /
+      - name: Smoke test
+        id: smoke
+        if: needs.file-check.outputs.run == 'true'
+        run: |
+          for _ in $(seq 1 30); do
+            curl -sf -o /dev/null http://localhost:19999/api/v1/info && break
+            sleep 2
+          done
+          curl -sf -o /dev/null http://localhost:19999/api/v1/info
+          sudo launchctl print system/com.github.netdata | grep -q 'state = running'
+          pkgutil --pkg-info cloud.netdata.agent
+          sudo grep -q "INSTALL_TYPE='macos-pkg'" /opt/netdata/etc/netdata/.install-type
+          sudo grep -qE "RELEASE_CHANNEL='(stable|nightly)'" /opt/netdata/etc/netdata/.install-type
+          sudo test -x /opt/netdata/usr/libexec/netdata/plugins.d/macos-logs.plugin
+          # The Agent spawns plugins as the netdata user; checking as root
+          # cannot catch a plugin that account is not allowed to execute.
+          # A failed or empty find must not let the loop pass vacuously.
+          plugins="$(sudo find /opt/netdata/usr/libexec/netdata/plugins.d -type f -perm -u+x)"
+          if [ -z "${plugins}" ]; then echo "no plugins found"; exit 1; fi
+          fail=0
+          for p in ${plugins}; do
+            if ! sudo -u netdata test -x "${p}"; then
+              echo "not executable by netdata: ${p}"
+              fail=1
+            fi
+          done
+          if [ "${fail}" -ne 0 ]; then exit 1; fi
+      - name: Test ndsudo search path
+        id: test-ndsudo
+        if: needs.file-check.outputs.run == 'true'
+        run: |
+          ./tests/ndsudo-macos-pkg.sh /opt/netdata/usr/libexec/netdata/plugins.d/ndsudo
+      - name: Reinstall over the existing install
+        id: reinstall-pkg
+        if: needs.file-check.outputs.run == 'true'
+        run: |
+          echo "ci-marker" | sudo tee /opt/netdata/etc/netdata/user-marker.conf > /dev/null
+          sudo installer -pkg build-pkg/packages/netdata-*.pkg -target /
+          for _ in $(seq 1 30); do
+            curl -sf -o /dev/null http://localhost:19999/api/v1/info && break
+            sleep 2
+          done
+          curl -sf -o /dev/null http://localhost:19999/api/v1/info
+          test "$(sudo cat /opt/netdata/etc/netdata/user-marker.conf)" = "ci-marker"
+      - name: Uninstall
+        id: uninstall-pkg
+        if: needs.file-check.outputs.run == 'true'
+        run: |
+          sudo /opt/netdata/usr/libexec/netdata/netdata-uninstaller.sh --purge --yes
+          # `! cmd` is exempt from errexit, so failed assertions would pass
+          # silently; assert with explicit exits instead.
+          if pgrep -x netdata; then echo "netdata still running"; exit 1; fi
+          if pkgutil --pkg-info cloud.netdata.agent 2> /dev/null; then echo "receipt still present"; exit 1; fi
+          if sudo launchctl print system/com.github.netdata > /dev/null 2>&1; then echo "agent job still registered"; exit 1; fi
+          if sudo launchctl print system/com.github.netdata.updater > /dev/null 2>&1; then echo "updater job still registered"; exit 1; fi
+          if [ -e /opt/netdata ]; then echo "/opt/netdata still present"; exit 1; fi
+          if [ -e /Library/Logs/Netdata ]; then echo "/Library/Logs/Netdata still present"; exit 1; fi
 
   macos-build: # Test building on macOS
     name: Test building on macOS
