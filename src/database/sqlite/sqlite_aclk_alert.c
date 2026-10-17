@@ -1010,8 +1010,8 @@ void aclk_push_alert_events_for_all_hosts(void)
         rrdhost_flag_clear(host, RRDHOST_FLAG_ACLK_STREAM_ALERTS);
 
         struct aclk_sync_cfg_t *aclk_host_config = __atomic_load_n(&host->aclk_host_config, __ATOMIC_ACQUIRE);
+        // alert_queue is drained only by the health thread, for every host; here only what it submitted is consumed
         if (!aclk_host_config || !aclk_alert_streaming_enabled(aclk_host_config) || rrdhost_flag_check(host, RRDHOST_FLAG_ARCHIVED)) {
-            (void)process_alert_pending_queue(host);
             if (commit_alert_events(host))
                 rrdhost_flag_set(host, RRDHOST_FLAG_ACLK_STREAM_ALERTS);
             continue;
@@ -1022,9 +1022,9 @@ void aclk_push_alert_events_for_all_hosts(void)
             rrdhost_flag_set(host, RRDHOST_FLAG_ACLK_STREAM_ALERTS);
             if (snapshot_state == ACLK_ALERT_SNAPSHOT_PENDING)
                 continue;
-            (void)process_alert_pending_queue(host);
-            // the snapshot itself is rebuilt from the health log, not from what is still queued, so a capped
-            // drain cannot make it stale; the flag is already set on this path for the remainder
+            // the snapshot itself is rebuilt from the health log, not from what is still queued, so rows the
+            // health thread has not drained yet cannot make it stale; the flag is already set on this path for
+            // the remainder
             (void)commit_alert_events(host);
             // the flag is already set on this path, so a deferred or failed rebuild is retried on the next pass,
             // and the snapshot is only sent from a rebuilt table
@@ -1345,6 +1345,19 @@ static void schedule_alert_snapshot_if_needed(struct aclk_sync_cfg_t *aclk_host_
 
 #define SNAPSHOT_ENTRIES_COUNT_COLUMN 32
 
+// True when the host has alerts in memory (a disconnected child has none: they are deleted at the disconnect).
+// Archiving a host destroys the alert index under the write lock, so the try-read keeps this count away from it;
+// when the lock is busy, assume there are alerts.
+static bool host_has_alerts(RRDHOST *host)
+{
+    if (!rw_spinlock_tryread_lock(&host->metadata_lifetime_lock))
+        return true;
+
+    bool has_alerts = dictionary_entries(host->rrdcalc_root_index) > 0;
+    rw_spinlock_read_unlock(&host->metadata_lifetime_lock);
+    return has_alerts;
+}
+
 #define ALARM_EVENTS_PER_CHUNK 1000
 void send_alert_snapshot_to_cloud(RRDHOST *host __maybe_unused)
 {
@@ -1372,11 +1385,24 @@ void send_alert_snapshot_to_cloud(RRDHOST *host __maybe_unused)
     SQLITE_BIND_FAIL(done, sqlite3_bind_blob(res, ++param, &host->host_id.uuid, sizeof(host->host_id.uuid), SQLITE_STATIC));
 
     param = 0;
-    // the first row carries the number of alerts in the snapshot; no row means there is nothing to send
-    if (sqlite3_step_monitored(res) != SQLITE_ROW)
+    // the first row carries the number of alerts in the snapshot; no row means the host has no alert to report,
+    // which is sent too: the cloud takes a snapshot as the node's complete alert state, so an empty one clears it
+    // (e.g. a disconnected child whose alerts are all REMOVED). A failed query sends nothing.
+    int rc = sqlite3_step_monitored(res);
+    if (rc != SQLITE_ROW && rc != SQLITE_DONE) {
+        error_report("Failed to read the alert snapshot of host %s, rc = %d", rrdhost_hostname(host), rc);
+        goto done;
+    }
+
+    // An empty health log view proves nothing while the host still has alerts in memory: a REMOVED saved after a
+    // re-created alert's first transition leaves the live alert REMOVED in the health log. Clearing the cloud would
+    // hide it, so send nothing then. The caller still completes the request, as it always did for an empty view:
+    // retrying would rebuild the version table on every pass for as long as the health log stays stale, and the next
+    // cloud checkpoint requests a new snapshot if the versions still differ.
+    if (rc == SQLITE_DONE && host_has_alerts(host))
         goto done;
 
-    int cnt = sqlite3_column_int(res, SNAPSHOT_ENTRIES_COUNT_COLUMN);
+    int cnt = (rc == SQLITE_ROW) ? sqlite3_column_int(res, SNAPSHOT_ENTRIES_COUNT_COLUMN) : 0;
 
     nd_uuid_t local_snapshot_uuid;
     char snapshot_uuid_str[UUID_STR_LEN];
@@ -1389,8 +1415,8 @@ void send_alert_snapshot_to_cloud(RRDHOST *host __maybe_unused)
         node_id, rrdhost_hostname(host),
         cnt, snapshot_uuid);
 
-    uint32_t chunks;
-    chunks = (cnt / ALARM_EVENTS_PER_CHUNK) + (cnt % ALARM_EVENTS_PER_CHUNK != 0);
+    // an empty snapshot is one chunk without alerts
+    uint32_t chunks = cnt ? (cnt / ALARM_EVENTS_PER_CHUNK) + (cnt % ALARM_EVENTS_PER_CHUNK != 0) : 1;
 
     alarm_snapshot_proto_ptr_t snapshot_proto = NULL;
     struct alarm_snapshot alarm_snap;
@@ -1405,9 +1431,20 @@ void send_alert_snapshot_to_cloud(RRDHOST *host __maybe_unused)
     alarm_log.node_id = node_id;
     alarm_log.claim_id = claim_id.str;
 
-    cnt = 0;
     uint64_t version = 0;
     int total_count = 0;
+
+    // no alerts: send the single empty chunk
+    if (rc == SQLITE_DONE) {
+        snapshot_proto = generate_alarm_snapshot_proto(&alarm_snap);
+        if (aclk_online_for_alerts())
+            aclk_send_alarm_snapshot(snapshot_proto);
+        else
+            destroy_alarm_snapshot_proto(snapshot_proto);
+        goto created;
+    }
+
+    cnt = 0;
     do {
         cnt++;
         total_count++;
@@ -1440,6 +1477,7 @@ void send_alert_snapshot_to_cloud(RRDHOST *host __maybe_unused)
     else
         destroy_alarm_snapshot_proto(snapshot_proto);
 
+created:
     nd_log(
         NDLS_ACCESS,
         NDLP_DEBUG,
