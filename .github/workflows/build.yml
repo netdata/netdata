@@ -815,22 +815,19 @@ jobs:
         if: needs.file-check.outputs.run == 'true'
         uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
-          name: github-artifacts
+          name: r2-artifacts
           path: artifacts
       - name: Prepare artifacts directory
         id: prepare
         if: needs.file-check.outputs.run == 'true'
         run: |
-          mkdir -p download/latest latest "download/$(cat packaging/version)"
-          mv artifacts/* download/latest
-          cp -a download/latest/* latest
-          cp -a download/latest/* "download/$(cat packaging/version)"
-          ls -al download/latest
+          ls -al artifacts
+          mv artifacts/* .
       - name: Verify that artifacts work with installer
         id: verify
         if: needs.file-check.outputs.run == 'true'
         env:
-          NETDATA_TARBALL_BASEURL: http://localhost:8080/
+          NETDATA_ARTIFACT_URL_PREFIX: http://localhost:8080/latest
         run: sh -x packaging/installer/kickstart.sh --build-only --dont-start-it --disable-telemetry --dont-wait
       - name: Failure Notification
         uses: rtCamp/action-slack-notify@33ca3be66c6f378fe1610fd1d5258632dbed5e58 # v2.4.0
@@ -878,26 +875,23 @@ jobs:
         if: needs.file-check.outputs.run == 'true'
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - name: Fetch artifacts
-        id: fetch-artifacts
+        id: fetch
         if: needs.file-check.outputs.run == 'true'
         uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
-          name: github-artifacts
+          name: r2-artifacts
           path: artifacts
       - name: Prepare artifacts directory
         id: prepare
         if: needs.file-check.outputs.run == 'true'
         run: |
-          mkdir -p download/latest latest "download/$(cat packaging/version)"
-          mv artifacts/* download/latest
-          cp -a download/latest/* latest
-          cp -a download/latest/* "download/$(cat packaging/version)"
-          ls -al download/latest
+          ls -al artifacts
+          mv artifacts/* .
       - name: Verify that artifacts work with installer
         id: verify
         if: needs.file-check.outputs.run == 'true'
         env:
-          NETDATA_TARBALL_BASEURL: http://localhost:8080/
+          NETDATA_ARTIFACT_URL_PREFIX: http://localhost:8080/latest
         run: sh -x packaging/installer/kickstart.sh --static-only --dont-start-it --disable-telemetry
       - name: Failure Notification
         uses: rtCamp/action-slack-notify@33ca3be66c6f378fe1610fd1d5258632dbed5e58 # v2.4.0
@@ -910,7 +904,7 @@ jobs:
           SLACK_MESSAGE: |-
               ${{ github.repository }}: Artifact verification for static build failed.
               Checkout:  ${{ steps.checkout.outcome }}
-              Fetch artifacts: ${{ steps.fetch-artifacts.outcome }}
+              Fetch artifacts: ${{ steps.fetch.outcome }}
               Verify artifacts: ${{ steps.verify.outcome }}
           SLACK_WEBHOOK: ${{ secrets.SLACK_WEBHOOK_URL }}
         if: >-
