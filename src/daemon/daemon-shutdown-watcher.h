@@ -48,4 +48,33 @@ void watcher_shutdown_end(void);
 
 void watcher_step_complete(watcher_step_id_t step_id);
 
+// Register a callback invoked once, before abort(), when the watcher times out.
+// On Windows this is used by winsvc.cc to report SERVICE_STOPPED to the SCM
+// so the service does not appear to crash rather than stop. Pass NULL to clear.
+#ifdef __cplusplus
+extern "C" {
+#endif
+void nd_register_shutdown_timeout_cb(void (*cb)(void));
+#ifdef __cplusplus
+}
+#endif
+
+#ifdef OS_WINDOWS
+// Stops the Windows stop-pending heartbeat thread and publishes
+// SERVICE_STOPPED to the SCM. The service registers this as the shutdown
+// timeout callback; CLI shutdowns do not invoke it.
+//
+// Exposed here (rather than only inside winsvc.cc) so daemon-shutdown-watcher.c
+// can call it without taking a C++ dependency on the service entry point.
+// extern "C" so the C source file links against the C++ definition without
+// name-mangling surprises.
+#ifdef __cplusplus
+extern "C" {
+#endif
+void netdata_svc_shutdown_aborted(void);
+#ifdef __cplusplus
+}
+#endif
+#endif
+
 #endif /* DAEMON_WATCHER_H */

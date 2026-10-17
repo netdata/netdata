@@ -104,6 +104,17 @@ static inline int registry_person_save(const DICTIONARY_ITEM *item __maybe_unuse
 // SAVE THE REGISTRY DATABASE
 
 static FILE *registry_db_open_tmp_file(const char *filename) {
+#if defined(OS_WINDOWS)
+    // Create atomically first.  A preliminary lstat() would introduce a
+    // pathname race; nd_open_no_follow() protects both the create and reuse
+    // paths from reparse-point redirection.
+    bool reuse = false;
+    int fd = nd_open_no_follow(filename, O_WRONLY | O_CREAT | O_EXCL | O_NONBLOCK, 0600);
+    if(fd == -1 && errno == EEXIST) {
+        reuse = true;
+        fd = nd_open_no_follow(filename, O_WRONLY | O_NONBLOCK, 0);
+    }
+#else
     struct stat before;
     bool reuse = lstat(filename, &before) == 0;
     if(reuse && !S_ISREG(before.st_mode)) {
@@ -123,6 +134,7 @@ static FILE *registry_db_open_tmp_file(const char *filename) {
         flags |= O_CREAT | O_EXCL;
 
     int fd = open(filename, flags, 0666);
+#endif
     if(fd == -1)
         return NULL;
 
@@ -136,8 +148,11 @@ static FILE *registry_db_open_tmp_file(const char *filename) {
         return NULL;
     }
 
-    if(!S_ISREG(after.st_mode) ||
-       (reuse && (before.st_dev != after.st_dev || before.st_ino != after.st_ino))) {
+    if(!S_ISREG(after.st_mode)
+#if !defined(OS_WINDOWS)
+       || (reuse && (before.st_dev != after.st_dev || before.st_ino != after.st_ino))
+#endif
+    ) {
         if(!reuse)
             unlink(filename);
         close(fd);
@@ -145,6 +160,7 @@ static FILE *registry_db_open_tmp_file(const char *filename) {
         return NULL;
     }
 
+#if !defined(OS_WINDOWS)
     if(reuse) {
         // O_NONBLOCK protects validation from FIFO races; the returned stream must retain fopen() semantics.
         int status_flags = fcntl(fd, F_GETFL);
@@ -155,6 +171,7 @@ static FILE *registry_db_open_tmp_file(const char *filename) {
             return NULL;
         }
     }
+#endif
 
     FILE *fp = fdopen(fd, "w");
     if(!fp) {
@@ -295,7 +312,7 @@ int registry_db_save(void) {
     else {
         netdata_log_debug(D_REGISTRY, "REGISTRY: renaming temporary old db '%s' to old db '%s'", old_tmp_filename,
                           old_filename);
-        if(rename(old_tmp_filename, old_filename) == -1) {
+        if(os_rename(old_tmp_filename, old_filename) == -1) {
             netdata_log_error("REGISTRY: cannot move file '%s' to '%s'. Saving registry DB failed!", old_tmp_filename,
                               old_filename);
             unlink(old_tmp_filename);
@@ -312,7 +329,7 @@ int registry_db_save(void) {
 
     // Publish the new DB atomically. If rename fails, the active DB remains untouched.
     netdata_log_debug(D_REGISTRY, "REGISTRY: renaming tmp db '%s' to active db '%s'", tmp_filename, registry.db_filename);
-    if(rename(tmp_filename, registry.db_filename) == -1) {
+    if(os_rename(tmp_filename, registry.db_filename) == -1) {
         netdata_log_error("REGISTRY: cannot move file '%s' to '%s'. Saving registry DB failed!", tmp_filename,
                           registry.db_filename);
         unlink(tmp_filename);

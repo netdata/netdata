@@ -10,6 +10,55 @@
 
 #include "../libnetdata.h"
 
+bool sock_create_loopback_pair(int fds[2]) {
+    if (!fds)
+        return false;
+
+#if defined(OS_WINDOWS)
+    SOCKET listener = INVALID_SOCKET;
+    SOCKET reader = INVALID_SOCKET;
+    SOCKET writer = INVALID_SOCKET;
+    struct sockaddr_in address = { 0 };
+    int address_len = sizeof(address);
+
+    listener = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
+    if (listener == INVALID_SOCKET)
+        goto fail;
+
+    address.sin_family = AF_INET;
+    address.sin_addr.s_addr = htonl(INADDR_LOOPBACK);
+    if (bind(listener, (struct sockaddr *)&address, sizeof(address)) == SOCKET_ERROR ||
+        listen(listener, 1) == SOCKET_ERROR ||
+        getsockname(listener, (struct sockaddr *)&address, &address_len) == SOCKET_ERROR)
+        goto fail;
+
+    writer = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
+    if (writer == INVALID_SOCKET || connect(writer, (struct sockaddr *)&address, sizeof(address)) == SOCKET_ERROR)
+        goto fail;
+
+    reader = accept(listener, NULL, NULL);
+    if (reader == INVALID_SOCKET)
+        goto fail;
+
+    closesocket(listener);
+    // The rest of this Windows socket layer stores SOCKET handles in int fields.
+    fds[0] = (int)(intptr_t)reader;
+    fds[1] = (int)(intptr_t)writer;
+    return true;
+
+fail:
+    if (listener != INVALID_SOCKET)
+        closesocket(listener);
+    if (reader != INVALID_SOCKET)
+        closesocket(reader);
+    if (writer != INVALID_SOCKET)
+        closesocket(writer);
+    return false;
+#else
+    return socketpair(AF_UNIX, SOCK_STREAM, 0, fds) == 0;
+#endif
+}
+
 bool ip_to_hostname(const char *ip, char *dst, size_t dst_len) {
     if(!dst || !dst_len)
         return false;
@@ -94,13 +143,16 @@ bool is_socket_closed(int fd) {
         return true;
     }
     else if (result < 0) {
-        if (errno == EAGAIN || errno == EWOULDBLOCK) {
-            // No data available, but socket is still open
+#if defined(OS_WINDOWS)
+        // Winsock owns socket errors; errno may still contain an unrelated CRT error.
+        if (WSAGetLastError() == WSAEWOULDBLOCK)
             return false;
-        } else {
-            // An error occurred
-            return true;
-        }
+        return true;
+#else
+        if (errno == EAGAIN || errno == EWOULDBLOCK)
+            return false;
+        return true;
+#endif
     }
 
     // Data is available, socket is open
@@ -375,6 +427,7 @@ inline int wait_on_socket_or_cancel_with_timeout(
         HANDLE h = (HANDLE)_get_osfhandle(fd);
         if(h != INVALID_HANDLE_VALUE && GetFileType(h) == FILE_TYPE_PIPE) {
             bool forever = (timeout_ms <= 0);
+            unsigned int aborted_retries = 0;
             if(revents)
                 *revents = 0;
             while(timeout_ms > 0 || forever) {
@@ -401,10 +454,30 @@ inline int wait_on_socket_or_cancel_with_timeout(
                             pipe_revents = POLLNVAL;
                             break;
                         case ERROR_OPERATION_ABORTED:
-                            errno = ECANCELED;
-                            if(revents)
-                                *revents = 0;
-                            return -1;
+                            // This only says that a Windows I/O operation was aborted. It does not
+                            // establish that Netdata cancelled this worker, so do not tear down a
+                            // live plugin unless the worker's own cancellation flag confirms it.
+                            if(nd_thread_signaled_to_cancel()) {
+                                errno = ECANCELED;
+                                if(revents)
+                                    *revents = 0;
+                                return -1;
+                            }
+
+                            if (++aborted_retries >= 3) {
+                                errno = EIO;
+                                if(revents)
+                                    *revents = POLLERR;
+                                return 2;
+                            }
+
+                            // Keep the same bounded, cancellable polling cadence as an empty pipe.
+                            const DWORD retry_ms = (DWORD)((timeout_ms >= ND_CHECK_CANCELLABILITY_WHILE_WAITING_EVERY_MS || forever) ?
+                                                          ND_CHECK_CANCELLABILITY_WHILE_WAITING_EVERY_MS : timeout_ms);
+                            Sleep(retry_ms);
+                            if(!forever)
+                                timeout_ms -= (int)retry_ms;
+                            continue;
                         default:
                             errno = EIO;
                             pipe_revents = POLLERR;
@@ -413,6 +486,8 @@ inline int wait_on_socket_or_cancel_with_timeout(
                     if(revents) *revents = pipe_revents;
                     return 2;
                 }
+
+                aborted_retries = 0;
 
                 if(available > 0) {
                     if(revents) *revents = POLLIN;
@@ -541,14 +616,14 @@ int accept4(int sock, struct sockaddr *addr, socklen_t *addrlen, int flags) {
 #endif
 
     if (flags) {
-        close(fd);
+        sock_close(fd);
         errno = EINVAL;
         return -1;
     }
 
     if (fcntl(fd, F_SETFL, newflags) < 0) {
         int saved_errno = errno;
-        close(fd);
+        sock_close(fd);
         errno = saved_errno;
         return -1;
     }
@@ -650,7 +725,7 @@ int accept_socket(int fd, int flags, char *client_ip, size_t ipsize, char *clien
     int nfd = accept4(fd, (struct sockaddr *)&sadr, &addrlen, flags | DEFAULT_SOCKET_FLAGS);
     if (likely(nfd >= 0)) {
         if(unlikely(!client_ip || ipsize < 2 || !client_port || portsize < 2)) {
-            close(nfd);
+            sock_close(nfd);
             errno = EINVAL;
             return -1;
         }
@@ -664,7 +739,7 @@ int accept_socket(int fd, int flags, char *client_ip, size_t ipsize, char *clien
             strncpyz(client_ip, "UNKNOWN", ipsize - 1);
             strncpyz(client_port, "UNKNOWN", portsize - 1);
         }
-        if (!strcmp(client_ip, "127.0.0.1") || !strcmp(client_ip, "::1")) {
+        if (client_ip && (!strcmp(client_ip, "127.0.0.1") || !strcmp(client_ip, "::1"))) {
             strncpyz(client_ip, "localhost", ipsize - 1);
         }
         sock_setcloexec(nfd, true);
@@ -674,8 +749,9 @@ int accept_socket(int fd, int flags, char *client_ip, size_t ipsize, char *clien
             strncpyz(client_ip, "localhost", ipsize - 1);
 #endif
 
-        client_ip[ipsize - 1] = '\0';
-        client_port[portsize - 1] = '\0';
+        // strncpyz() already null-terminates, so no need to re-terminate here.
+        // (SonarQube S3807 + S2259: redundant manual null-termination after a
+        // bounded copy that already null-terminates.)
 
         switch (((struct sockaddr *)&sadr)->sa_family) {
             case AF_UNIX:
@@ -689,7 +765,11 @@ int accept_socket(int fd, int flags, char *client_ip, size_t ipsize, char *clien
                 break;
 
             case AF_INET6:
-                if (strncmp(client_ip, "::ffff:", 7) == 0) {
+                // SonarQube S3807: `client_ip` is the caller's buffer; the
+                // NULL check at the top of the function (line ~657) already
+                // early-returns when it is NULL, but Sonar's static analysis
+                // cannot see across the branch. Add the defensive guard.
+                if (client_ip && strncmp(client_ip, "::ffff:", 7) == 0) {
                     memmove(client_ip, &client_ip[7], strlen(&client_ip[7]) + 1);
                     // netdata_log_debug(D_LISTENER, "New IPv4 web client from %s port %s on socket %d.", client_ip, client_port, fd);
                 }
@@ -707,7 +787,7 @@ int accept_socket(int fd, int flags, char *client_ip, size_t ipsize, char *clien
                    "Permission denied for client '%s', port '%s'",
                    client_ip, client_port);
 
-            close(nfd);
+            sock_close(nfd);
             nfd = -1;
             errno = EPERM;
         }

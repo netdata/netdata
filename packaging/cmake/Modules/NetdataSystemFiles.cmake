@@ -351,10 +351,15 @@ install(FILES
         COMPONENT netdata
         DESTINATION ${CONFIG_DEST})
 
-install(PROGRAMS
-        system/edit-config
-        COMPONENT netdata
-        DESTINATION ${CONFIG_DEST})
+if(OS_WINDOWS)
+  install(FILES packaging/windows/edit-config.ps1
+          COMPONENT netdata
+          DESTINATION ${LIBEXEC_DEST})
+else()
+  install(PROGRAMS system/edit-config
+          COMPONENT netdata
+          DESTINATION ${CONFIG_DEST})
+endif()
 
 if(NETDATA_NATIVE_PACKAGE)
         set(NETDATA_CONF_DEST "${CONFIG_DEST}")
@@ -431,8 +436,12 @@ if(NOT OS_WINDOWS)
             COMPONENT netdata
             DESTINATION ${LIBCONFIG_DEST})
   endif()
+else()
+  install(FILES system/netdata.conf
+          COMPONENT netdata
+          DESTINATION ${LIBCONFIG_DEST})
 
-  if(NETDATA_STAGE_SERVICE_TOOLBOX)
+  if(NETDATA_STAGE_SERVICE_TOOLBOX AND NOT OS_WINDOWS)
     configure_file(system/cron/netdata-updater-daily.in
                    system/cron/netdata-updater-daily
                    @ONLY)
@@ -798,6 +807,20 @@ endif()
 # Ship CMakeCache.txt as an archive
 #
 
+if(OS_WINDOWS)
+  install(CODE "
+        execute_process(COMMAND powershell.exe -NoProfile -ExecutionPolicy Bypass -File
+                        \"${CMAKE_SOURCE_DIR}/packaging/windows/compress-cmake-cache.ps1\"
+                        \"${CMAKE_BINARY_DIR}/CMakeCache.txt\"
+                        \"${CMAKE_BINARY_DIR}/${BUILD_INFO_CMAKE_CACHE_ARCHIVE_NAME}\"
+                        RESULT_VARIABLE result)
+        if(NOT result EQUAL 0)
+                message(FATAL_ERROR \"Failed to compress CMakeCache.txt with the native Windows helper\")
+        endif()
+        file(INSTALL \"${CMAKE_BINARY_DIR}/${BUILD_INFO_CMAKE_CACHE_ARCHIVE_NAME}\"
+             DESTINATION \"\${CMAKE_INSTALL_PREFIX}/${BUILD_INFO_CMAKE_CACHE_ARCHIVE_PATH}\")
+  " COMPONENT netdata)
+else()
 install(CODE "
         execute_process(COMMAND gzip -nc \"${CMAKE_BINARY_DIR}/CMakeCache.txt\"
                         OUTPUT_FILE \"${BUILD_INFO_CMAKE_CACHE_ARCHIVE_NAME}\"
@@ -809,18 +832,14 @@ install(CODE "
 
         file(INSTALL \"${CMAKE_BINARY_DIR}/${BUILD_INFO_CMAKE_CACHE_ARCHIVE_NAME}\"
              DESTINATION \"\${CMAKE_INSTALL_PREFIX}/${BUILD_INFO_CMAKE_CACHE_ARCHIVE_PATH}\")
-")
+        ")
+endif()
 
 #
 # vendor msys stuff on Windows
 #
 
 if(OS_WINDOWS)
-        install(FILES /usr/bin/msys-protobuf-32.dll
-                      /usr/bin/msys-yaml-0-2.dll
-                      /usr/bin/msys-uv-1.dll
-                      DESTINATION "${BINDIR}")
-
         # user-facing support-bundle tool (Windows PowerShell implementation)
         install(PROGRAMS packaging/installer/netdata-support-bundle.ps1
                 COMPONENT netdata
@@ -829,8 +848,43 @@ if(OS_WINDOWS)
         # Make bash & netdata happy
         install(DIRECTORY DESTINATION tmp)
 
-        # Make curl work with ssl
-        install(DIRECTORY /usr/ssl DESTINATION usr)
+        # Resolve native Windows executable dependencies and stage UCRT64 DLLs.
+        install(CODE [[
+            if(NOT DEFINED ENV{NETDATA_WINDOWS_RUNTIME_DLL_DIR} OR "$ENV{NETDATA_WINDOWS_RUNTIME_DLL_DIR}" STREQUAL "")
+                message(FATAL_ERROR "NETDATA_WINDOWS_RUNTIME_DLL_DIR must point to the UCRT64 bin directory when installing Windows executables.")
+            endif()
+            if(NOT IS_DIRECTORY "$ENV{NETDATA_WINDOWS_RUNTIME_DLL_DIR}")
+                message(FATAL_ERROR "NETDATA_WINDOWS_RUNTIME_DLL_DIR is not a directory: $ENV{NETDATA_WINDOWS_RUNTIME_DLL_DIR}")
+            endif()
+            set(_runtime_stage "$ENV{DESTDIR}${CMAKE_INSTALL_PREFIX}")
+            file(TO_CMAKE_PATH "${_runtime_stage}" _runtime_stage)
+            file(GLOB_RECURSE _runtime_executables LIST_DIRECTORIES FALSE
+                 "${_runtime_stage}/usr/bin/*.exe"
+                 "${_runtime_stage}/usr/libexec/netdata/plugins.d/*.exe")
+            if(NOT _runtime_executables)
+                message(FATAL_ERROR "No Windows executables found to stage runtime DLLs for.")
+            endif()
+            file(GET_RUNTIME_DEPENDENCIES EXECUTABLES ${_runtime_executables}
+                 DIRECTORIES "$ENV{NETDATA_WINDOWS_RUNTIME_DLL_DIR}"
+                 PRE_EXCLUDE_REGEXES "^api-ms-win-" "^ext-ms-"
+                 POST_EXCLUDE_REGEXES
+                     ".*[Ww][Ii][Nn][Dd][Oo][Ww][Ss][/\\][Ss][Yy][Ss][Tt][Ee][Mm]32[/\\].*"
+                     ".*[Ww][Ii][Nn][Dd][Oo][Ww][Ss][/\\][Ss][Yy][Ss][Ww][Oo][Ww]64[/\\].*"
+                     ".*[Ww][Ii][Nn][Dd][Oo][Ww][Ss][/\\][Ww][Ii][Nn][Ss][Xx][Ss][/\\].*"
+                 RESOLVED_DEPENDENCIES_VAR _runtime_dependencies
+                 UNRESOLVED_DEPENDENCIES_VAR _unresolved_runtime_dependencies)
+            if(_unresolved_runtime_dependencies)
+                message(FATAL_ERROR "Unresolved Windows runtime dependencies: ${_unresolved_runtime_dependencies}")
+            endif()
+            foreach(_runtime_dll IN LISTS _runtime_dependencies)
+                get_filename_component(_runtime_dll_name "${_runtime_dll}" NAME)
+                if(_runtime_dll_name MATCHES "^[Mm][Ss][Yy][Ss].*\\.dll$")
+                    message(FATAL_ERROR "MSYS runtime dependency is not allowed in the Windows package: ${_runtime_dll}")
+                endif()
+                file(COPY "${_runtime_dll}" DESTINATION "${_runtime_stage}/usr/bin")
+                file(COPY "${_runtime_dll}" DESTINATION "${_runtime_stage}/usr/libexec/netdata/plugins.d")
+            endforeach()
+        ]] COMPONENT netdata)
 endif()
 
 #

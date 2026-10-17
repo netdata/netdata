@@ -136,6 +136,16 @@ static inline void functions_stop_monotonic_update_on_progress(usec_t *stop_mono
 #define pluginsd_function_result_end_to_stdout() \
     fprintf(stdout, "\n" PLUGINSD_KEYWORD_FUNCTION_RESULT_END "\n")
 
+static inline bool pluginsd_flush_stdout(void) {
+    int flush_result = fflush(stdout);
+#if defined(OS_WINDOWS)
+    return flush_result != EOF && !ferror(stdout);
+#else
+    (void)flush_result;
+    return true;
+#endif
+}
+
 static inline void pluginsd_function_json_error_to_stdout(const char *transaction, int code, const char *msg) {
     char buffer[PLUGINSD_LINE_MAX + 1];
     json_escape_string(buffer, msg, PLUGINSD_LINE_MAX);
@@ -143,7 +153,8 @@ static inline void pluginsd_function_json_error_to_stdout(const char *transactio
     pluginsd_function_result_begin_to_stdout(transaction, code, "application/json", now_realtime_sec());
     fprintf(stdout, "{\"status\":%d,\"error_message\":\"%s\"}", code, buffer);
     pluginsd_function_result_end_to_stdout();
-    fflush(stdout);
+    if (unlikely(!pluginsd_flush_stdout()))
+        fatal("Cannot write to Netdata on stdout");
 }
 
 static inline void pluginsd_function_result_to_stdout(const char *transaction, BUFFER *result) {
@@ -154,20 +165,30 @@ static inline void pluginsd_function_result_to_stdout(const char *transaction, B
     fwrite(buffer_tostring(result), buffer_strlen(result), 1, stdout);
 
     pluginsd_function_result_end_to_stdout();
-    fflush(stdout);
+    if (unlikely(!pluginsd_flush_stdout()))
+        fatal("Cannot write to Netdata on stdout");
 }
 
 static inline void pluginsd_function_progress_to_stdout(const char *transaction, size_t done, size_t all) {
     fprintf(stdout, PLUGINSD_KEYWORD_FUNCTION_PROGRESS " '%s' %zu %zu\n",
             transaction, done, all);
-    fflush(stdout);
+    if (unlikely(!pluginsd_flush_stdout()))
+        fatal("Cannot write to Netdata on stdout");
 }
 
 static inline void send_newline_and_flush(netdata_mutex_t *mutex) {
     netdata_mutex_lock(mutex);
     fprintf(stdout, "\n");
+#if defined(OS_WINDOWS)
+    bool output_error = !pluginsd_flush_stdout();
+#else
     fflush(stdout);
+#endif
     netdata_mutex_unlock(mutex);
+#if defined(OS_WINDOWS)
+    if (unlikely(output_error))
+        fatal("Cannot write to Netdata on stdout");
+#endif
 }
 
 void functions_evloop_dyncfg_add(struct functions_evloop_globals *wg, const char *id, const char *path,
