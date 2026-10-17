@@ -49,7 +49,7 @@ require (
 	github.com/gorcon/rcon v1.4.0
 	github.com/gosnmp/gosnmp v1.42.1
 	github.com/grafana/regexp v0.0.0-20240518133315-a468a5bfb3bc
-	github.com/ibm-messaging/mq-golang/v5 v5.7.2
+	github.com/ibm-messaging/mq-golang/v5 v5.7.3
 	github.com/ibmdb/go_ibm_db v0.5.4 // Used by ibm.d.plugin (requires CGO)
 	github.com/jackc/pgx/v5 v5.11.0
 	github.com/jessevdk/go-flags v1.6.1
