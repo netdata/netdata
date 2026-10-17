@@ -197,6 +197,16 @@
 - Ml: train dimensions in tier-0 page-close order ([#24073](https://github.com/netdata/netdata/issues/24073))
 - Weights: match instance@machine_guid and name@hostname in the value fast path ([#24284](https://github.com/netdata/netdata/issues/24284))
 - Feat(dem): add managed browser runtime foundation ([#24246](https://github.com/netdata/netdata/issues/24246))
+- Build(deps): bump mcp from 1.28.1 to 1.30.0 in /packaging/tools/automation/mcp ([#24346](https://github.com/netdata/netdata/issues/24346))
+- Aclk: do not hand out MQTT packet id 1 twice at the wrap ([#24341](https://github.com/netdata/netdata/issues/24341))
+- Dictionary: do not hold the destroy queue lock while freeing dictionaries ([#24344](https://github.com/netdata/netdata/issues/24344))
+- Aclk: return reconnect backoff clamps in milliseconds ([#24340](https://github.com/netdata/netdata/issues/24340))
+- Streaming: wait 125% of the child reboot time before reporting it offline ([#24343](https://github.com/netdata/netdata/issues/24343))
+- Analytics: read the /api/v1/info analytics strings under their lock ([#24342](https://github.com/netdata/netdata/issues/24342))
+- Static aarch64: work around Cortex-A53 errata 835769 and 843419 ([#24207](https://github.com/netdata/netdata/issues/24207))
+- Daemon: save the crash status file on builds without libbacktrace ([#24345](https://github.com/netdata/netdata/issues/24345))
+- Contexts: let a re-created chart keep the instance it took over ([#24349](https://github.com/netdata/netdata/issues/24349))
+- Health: read the pending alert queue only when a row can be due ([#24347](https://github.com/netdata/netdata/issues/24347))
 
 ## [2.12.0] - 2026-09-30
 
