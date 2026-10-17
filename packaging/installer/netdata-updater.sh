@@ -22,7 +22,7 @@
 #  - TMPDIR (set to a usable temporary directory)
 #  - NETDATA_BASE_URL (set the base url for downloading the dist tarball)
 
-# Next unused error code: U002A
+# Next unused error code: U002B
 
 set -e
 
@@ -1208,11 +1208,11 @@ update_static() {
     # shellcheck disable=SC2086
     if sh "${ndtmpdir}/netdata-${sysarch}-latest.gz.run" --accept -- ${REINSTALL_OPTIONS} >&3 2>&3; then
       rm -r "${ndtmpdir}"
+      echo "${install_type}" > /opt/netdata/etc/netdata/.install-type
     else
-      info "NOTE: did not remove: ${ndtmpdir}"
+      installer_status=$?
+      fatal "Static installer ${ndtmpdir}/netdata-${sysarch}-latest.gz.run failed with exit status ${installer_status}, Netdata was not updated." U002A
     fi
-
-    echo "${install_type}" > /opt/netdata/etc/netdata/.install-type
   fi
 
   if [ -e "${PREVDIR}" ]; then
