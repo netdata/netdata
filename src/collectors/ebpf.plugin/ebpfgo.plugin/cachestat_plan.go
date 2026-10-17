@@ -164,8 +164,18 @@ func BuildCachestatLegacyPlan(cfg CachestatLegacyConfig) LoadPlan {
 }
 
 func kernelBTFSupported(btfPath string) bool {
-	_, err := os.Stat(filepath.Join(btfPath, cachestatDefaultBTFFile))
-	return err == nil
+	path := filepath.Join(btfPath, cachestatDefaultBTFFile)
+	info, err := os.Stat(path)
+	if err != nil || !info.Mode().IsRegular() {
+		return false
+	}
+
+	file, err := os.Open(path)
+	if err != nil {
+		return false
+	}
+	file.Close()
+	return true
 }
 
 func applyPidTableSizeClamp(n uint32) uint32 {

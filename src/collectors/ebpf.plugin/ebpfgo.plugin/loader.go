@@ -93,7 +93,7 @@ func KernelVersionFromRelease(release string) (uint32, error) {
 		return 0, fmt.Errorf("invalid kernel release %q", release)
 	}
 
-	major, err := strconv.Atoi(match[2])
+	major, err := strconv.Atoi(match[1])
 	if err != nil {
 		return 0, fmt.Errorf("parse kernel major from %q: %w", release, err)
 	}
@@ -298,7 +298,13 @@ func KernelSupported(version uint32, rhVersion int, rejected bool) bool {
 	return version >= minimumKernelVersion || rhVersion >= minimumRHVersion
 }
 
-func CanLoadCode(version uint32, rhVersion int, rejected bool, isRoot bool, pluginName string) error {
+func CanLoadCode(version uint32, rhVersion int, rejected bool, isRoot bool, requireKprobes bool, pluginName string) error {
+	if rejected {
+		return fmt.Errorf("the current collector cannot run on this rejected kernel")
+	}
+	if err := kernelEBPFFeatureError(currentKernelEBPFFeatures(), requireKprobes); err != nil {
+		return err
+	}
 	if !KernelSupported(version, rhVersion, rejected) {
 		return fmt.Errorf("the current collector cannot run on this kernel")
 	}
