@@ -260,6 +260,12 @@ struct group_by_pass {
     RRDR_GROUP_BY_FUNCTION aggregation;
 };
 
+typedef enum __attribute__((packed)) query_target_cancel {
+    QUERY_TARGET_CANCEL_NONE = 0,
+    QUERY_TARGET_CANCEL_TIMEOUT,                // the request timeout expired while building the target
+    QUERY_TARGET_CANCEL_INTERRUPTED,            // the requester went away (client closed, cloud cancelled)
+} QUERY_TARGET_CANCEL;
+
 typedef struct query_target_request {
     size_t version;
     size_t instances_version; // the version of the instance names instances and scope_instances match; 0 = version
@@ -431,6 +437,7 @@ typedef struct query_target {
         SPINLOCK spinlock;
         bool used;                              // when true, this query is currently being used
         bool relative;                          // when true, this query uses relative timestamps
+        QUERY_TARGET_CANCEL cancelled;          // set when the build stopped early; the target is incomplete
         size_t queries;                         // how many query we have done so far with this QUERY_TARGET - not related to database queries
         struct query_target *prev;
         struct query_target *next;
@@ -697,7 +704,8 @@ ssize_t query_scope_foreach_host(SIMPLE_PATTERN *scope_hosts_sp, SIMPLE_PATTERN 
                                   char *host_node_id_str);
 
 typedef ssize_t (*foreach_context_cb_t)(void *data, RRDCONTEXT_ACQUIRED *rca, bool queryable_context);
-ssize_t query_scope_foreach_context(RRDHOST *host, const char *scope_contexts, SIMPLE_PATTERN *scope_contexts_sp, SIMPLE_PATTERN *contexts_sp, foreach_context_cb_t cb, bool queryable_host, void *data);
+typedef bool (*foreach_stop_cb_t)(void *data);  // optional: true stops a scan, also over entries the scope rejects
+ssize_t query_scope_foreach_context(RRDHOST *host, const char *scope_contexts, SIMPLE_PATTERN *scope_contexts_sp, SIMPLE_PATTERN *contexts_sp, foreach_context_cb_t cb, bool queryable_host, void *data, foreach_stop_cb_t stop_cb);
 
 // ----------------------------------------------------------------------------
 // public API for weights

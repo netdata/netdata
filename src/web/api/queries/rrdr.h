@@ -52,6 +52,7 @@ typedef enum __attribute__ ((__packed__)) rrdr_result_flags {
     RRDR_RESULT_FLAG_RELATIVE      = (1 << 1), // the query uses relative time-frames
                                                // (should not to be cached by browsers and proxies)
     RRDR_RESULT_FLAG_CANCEL        = (1 << 2), // the query needs to be cancelled
+    RRDR_RESULT_FLAG_TIMEOUT       = (1 << 3), // set with CANCEL when the cause is the query timeout
 } RRDR_RESULT_FLAGS;
 
 #define RRDR_DVIEW_ANOMALY_COUNT_MULTIPLIER 1000.0
