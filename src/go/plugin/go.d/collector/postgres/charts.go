@@ -1206,6 +1206,7 @@ func newTableChart(chart *collectorapi.Chart, tbl *tableMetrics) *collectorapi.C
 	for _, v := range chart.Vars {
 		v.ID = fmt.Sprintf(v.ID, tbl.name, tbl.db, tbl.schema)
 	}
+	tbl.charts = append(tbl.charts, chart)
 	return chart
 }
 
@@ -1293,12 +1294,15 @@ func (c *Collector) addTableTOASTIndexIOCharts(tbl *tableMetrics) {
 }
 
 func (c *Collector) removeTableCharts(tbl *tableMetrics) {
-	prefix := fmt.Sprintf("table_%s_db_%s_schema_%s", tbl.name, tbl.db, tbl.schema)
-	for _, c := range *c.Charts() {
-		if strings.HasPrefix(c.ID, prefix) {
-			c.MarkRemove()
-			c.MarkNotCreated()
-		}
+	for _, chart := range tbl.charts {
+		chart.MarkRemove()
+		chart.MarkNotCreated()
+	}
+}
+
+func (c *Collector) addTableBloatCharts(tbl *tableMetrics) {
+	if err := c.Charts().Add(newTableChart(&tableBloatSizeChartTmpl, tbl), newTableChart(&tableBloatSizePercChartTmpl, tbl)); err != nil {
+		c.Warning(err)
 	}
 }
 
@@ -1367,21 +1371,8 @@ func (c *Collector) addNewIndexCharts(idx *indexMetrics) {
 		_ = charts.Remove(indexBloatSizePercChartTmpl.ID)
 	}
 
-	for _, chart := range *charts {
-		chart.ID = fmt.Sprintf(chart.ID, idx.name, idx.table, idx.db, idx.schema)
-		chart.Labels = []collectorapi.Label{
-			{Key: "database", Value: idx.db},
-			{Key: "schema", Value: idx.schema},
-			{Key: "table", Value: idx.table},
-			{Key: "parent_table", Value: idx.parentTable},
-			{Key: "index", Value: idx.name},
-		}
-		for _, d := range chart.Dims {
-			d.ID = fmt.Sprintf(d.ID, idx.name, idx.table, idx.db, idx.schema)
-		}
-		for _, v := range chart.Vars {
-			v.ID = fmt.Sprintf(v.ID, idx.name, idx.table, idx.db, idx.schema)
-		}
+	for i, chart := range *charts {
+		(*charts)[i] = newIndexChart(chart, idx)
 	}
 
 	if err := c.Charts().Add(*charts...); err != nil {
@@ -1389,12 +1380,36 @@ func (c *Collector) addNewIndexCharts(idx *indexMetrics) {
 	}
 }
 
+func newIndexChart(chart *collectorapi.Chart, idx *indexMetrics) *collectorapi.Chart {
+	chart = chart.Copy()
+
+	chart.ID = fmt.Sprintf(chart.ID, idx.name, idx.table, idx.db, idx.schema)
+	chart.Labels = []collectorapi.Label{
+		{Key: "database", Value: idx.db},
+		{Key: "schema", Value: idx.schema},
+		{Key: "table", Value: idx.table},
+		{Key: "parent_table", Value: idx.parentTable},
+		{Key: "index", Value: idx.name},
+	}
+	for _, d := range chart.Dims {
+		d.ID = fmt.Sprintf(d.ID, idx.name, idx.table, idx.db, idx.schema)
+	}
+	for _, v := range chart.Vars {
+		v.ID = fmt.Sprintf(v.ID, idx.name, idx.table, idx.db, idx.schema)
+	}
+	idx.charts = append(idx.charts, chart)
+	return chart
+}
+
+func (c *Collector) addIndexBloatCharts(idx *indexMetrics) {
+	if err := c.Charts().Add(newIndexChart(&indexBloatSizeChartTmpl, idx), newIndexChart(&indexBloatSizePercChartTmpl, idx)); err != nil {
+		c.Warning(err)
+	}
+}
+
 func (c *Collector) removeIndexCharts(idx *indexMetrics) {
-	prefix := fmt.Sprintf("index_%s_table_%s_db_%s_schema_%s", idx.name, idx.table, idx.db, idx.schema)
-	for _, c := range *c.Charts() {
-		if strings.HasPrefix(c.ID, prefix) {
-			c.MarkRemove()
-			c.MarkNotCreated()
-		}
+	for _, chart := range idx.charts {
+		chart.MarkRemove()
+		chart.MarkNotCreated()
 	}
 }
