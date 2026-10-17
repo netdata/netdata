@@ -484,13 +484,6 @@ static size_t registered_results_to_json_contexts(DICTIONARY *results, BUFFER *w
     return total_dimensions;
 }
 
-// Workload statistics for progress tracking and thread optimization
-struct workload_stats {
-    size_t nodes;
-    size_t contexts;
-    size_t metrics;
-};
-
 struct query_weights_data {
     QUERY_WEIGHTS_REQUEST *qwr;
     struct query_weights_data *shared_qwd;
@@ -524,14 +517,12 @@ struct query_weights_data {
     struct weights_host_snapshot *host_snapshot;
     ONEWAYALLOC *query_owa;
     WEIGHTS_STATS stats;
-    RRDHOST **hosts_array;
-    size_t total_hosts;
-    size_t hosts_array_capacity;
+    RRDHOST **hosts;        // pinned by query_scope_hosts_pin() until the response is built
+    size_t hosts_count;
 
     uint32_t shifts;
 
     struct query_versions versions;
-    struct workload_stats total_workload; // Overall workload statistics for progress tracking
 };
 
 // Thread-local data for parallel processing
@@ -620,7 +611,7 @@ void query_weights_worker_thread(void *arg)
             break;
         }
 
-        // Hosts were already filtered by the counting pass; only queryable ones are in hosts_array
+        // only queryable hosts are pinned
         ssize_t ret = weights_do_node_callback(&local_qwd, host, true);
         if (ret < 0)
             break;
@@ -2298,19 +2289,6 @@ static size_t registered_results_to_json_mcp(
     return state.count;
 }
 
-static ssize_t weights_count_for_rrdmetric(
-    void *data,
-    RRDHOST *host __maybe_unused,
-    RRDCONTEXT_ACQUIRED *rca __maybe_unused,
-    RRDINSTANCE_ACQUIRED *ria __maybe_unused,
-    RRDMETRIC_ACQUIRED *rma __maybe_unused)
-{
-    struct query_weights_data *qwd = data;
-
-    __atomic_fetch_add(&qwd->total_workload.metrics, 1, __ATOMIC_RELAXED);
-    return 1;
-}
-
 // ----------------------------------------------------------------------------
 // The main function
 
@@ -2392,74 +2370,6 @@ static ssize_t weights_for_rrdmetric(void *data, RRDHOST *host, RRDCONTEXT_ACQUI
     return 1;
 }
 
-static ssize_t weights_count_context_callback(void *data, RRDCONTEXT_ACQUIRED *rca, bool queryable_context) {
-    if(!queryable_context)
-        return false;
-
-    struct query_weights_data *qwd = data;
-
-    bool has_retention = false;
-    switch(qwd->qwr->method) {
-        case WEIGHTS_METHOD_VALUE:
-        case WEIGHTS_METHOD_ANOMALY_RATE:
-            has_retention = rrdcontext_retention_match(rca, qwd->qwr->after, qwd->qwr->before);
-            break;
-
-        case WEIGHTS_METHOD_MC_KS2:
-        case WEIGHTS_METHOD_MC_VOLUME:
-            has_retention = rrdcontext_retention_match(rca, qwd->qwr->after, qwd->qwr->before);
-            if(has_retention)
-                has_retention = rrdcontext_retention_match(rca, qwd->qwr->baseline_after, qwd->qwr->baseline_before);
-            break;
-    }
-
-    if(!has_retention)
-        return 0;
-
-    __atomic_fetch_add(&qwd->total_workload.contexts, 1, __ATOMIC_RELAXED);
-    ssize_t ret = weights_foreach_rrdmetric_in_context(rca,
-                                            qwd->scope_instances_sp,
-                                            qwd->scope_labels_pa,
-                                            qwd->scope_dimensions_sp,
-                                            qwd->instances_sp,
-                                            NULL,
-                                            qwd->labels_pa,
-                                            qwd->alerts_sp,
-                                            qwd->dimensions_sp,
-                                            true, true, qwd->qwr->version,
-                                            weights_count_for_rrdmetric, qwd);
-    if (ret >= 1)
-        return 1;
-    else
-        return 0;
-}
-
-static ssize_t weights_count_node_callback(void *data, RRDHOST *host, bool queryable) {
-    if(!queryable)
-        return 0;
-
-    struct query_weights_data *qwd = data;
-    if (qwd->total_hosts >= qwd->hosts_array_capacity) {
-        if(unlikely(qwd->hosts_array_capacity > SIZE_MAX / 2))
-            fatal("QUERY WEIGHTS: too many hosts to allocate");
-
-        size_t new_capacity = qwd->hosts_array_capacity ? qwd->hosts_array_capacity * 2 : 1;
-        if(unlikely(new_capacity > SIZE_MAX / sizeof(*qwd->hosts_array)))
-            fatal("QUERY WEIGHTS: too many hosts to allocate");
-
-        qwd->hosts_array = reallocz(qwd->hosts_array, new_capacity * sizeof(*qwd->hosts_array));
-        qwd->hosts_array_capacity = new_capacity;
-    }
-    qwd->hosts_array[qwd->total_hosts++] = host;
-
-    __atomic_fetch_add(&qwd->total_workload.nodes, 1, __ATOMIC_RELAXED);
-    ssize_t ret = query_scope_foreach_context(host, qwd->qwr->scope_contexts,
-                                qwd->scope_contexts_sp, qwd->contexts_sp,
-                                weights_count_context_callback, queryable, qwd);
-
-    return ret;
-}
-
 static ssize_t weights_do_context_callback(void *data, RRDCONTEXT_ACQUIRED *rca, bool queryable_context) {
     if(!queryable_context)
         return false;
@@ -2501,47 +2411,12 @@ static ssize_t weights_do_context_callback(void *data, RRDCONTEXT_ACQUIRED *rca,
     return ret;
 }
 
-// Parallel version of query_scope_foreach_host
-static ssize_t query_scope_foreach_host_parallel(SIMPLE_PATTERN *scope_hosts_sp, SIMPLE_PATTERN *hosts_sp,
-                                                  struct query_weights_data *qwd)
+#ifdef ENABLE_DBENGINE
+static void weights_foreach_host_parallel(struct query_weights_data *qwd, size_t num_threads)
 {
-#ifndef ENABLE_DBENGINE
-    return query_scope_foreach_host(scope_hosts_sp, hosts_sp,
-                                    weights_do_node_callback, qwd,
-                                    &qwd->versions, NULL);
-
-#else
-    size_t host_count = dictionary_entries(rrdhost_root_index);
-    qwd->hosts_array_capacity = host_count ? host_count : 1;
-    if(unlikely(qwd->hosts_array_capacity > SIZE_MAX / sizeof(*qwd->hosts_array)))
-        fatal("QUERY WEIGHTS: too many hosts to allocate");
-
-    qwd->hosts_array = mallocz(qwd->hosts_array_capacity * sizeof(*qwd->hosts_array));
-    qwd->total_hosts = 0;
-
-    (void) query_scope_foreach_host(scope_hosts_sp, hosts_sp, weights_count_node_callback, qwd, &qwd->versions, NULL);
-
-    size_t active_hosts = qwd->total_hosts;
-
-    size_t num_threads = netdata_conf_cpus();
-    if (num_threads < 1) num_threads = 1;
-
-    // If we have fewer hosts than threads, reduce thread count
-    if (active_hosts < num_threads) {
-        num_threads = active_hosts;
-    }
-
-    if (num_threads <= 1 || active_hosts <= 1) {
-        // Fall back to single-threaded processing
-        freez(qwd->hosts_array);
-        return query_scope_foreach_host(scope_hosts_sp, hosts_sp,
-                                      weights_do_node_callback, qwd,
-                                      &qwd->versions, NULL);
-    }
-
     // Calculate hosts per thread
-    size_t hosts_per_thread = active_hosts / num_threads;
-    size_t remaining_hosts = active_hosts % num_threads;
+    size_t hosts_per_thread = qwd->hosts_count / num_threads;
+    size_t remaining_hosts = qwd->hosts_count % num_threads;
 
     // Prepare thread data
     struct query_weights_thread_data *thread_data = mallocz(sizeof(struct query_weights_thread_data) * num_threads);
@@ -2550,7 +2425,7 @@ static ssize_t query_scope_foreach_host_parallel(SIMPLE_PATTERN *scope_hosts_sp,
     for (size_t i = 0; i < num_threads; i++) {
         thread_data[i].main_qwd = qwd;
         thread_data[i].local_results = register_result_init_single_threaded();
-        thread_data[i].hosts = &qwd->hosts_array[current_host_idx];
+        thread_data[i].hosts = &qwd->hosts[current_host_idx];
 
         // Distribute hosts evenly, giving extra hosts to first threads
         thread_data[i].host_count = hosts_per_thread + (i < remaining_hosts ? 1 : 0);
@@ -2560,8 +2435,7 @@ static ssize_t query_scope_foreach_host_parallel(SIMPLE_PATTERN *scope_hosts_sp,
         rrdeng_enq_cmd(NULL, RRDENG_OPCODE_PARALLEL_WEIGHT, &thread_data[i], &thread_data[i].completion, STORAGE_PRIORITY_INTERNAL_DBENGINE, NULL, NULL);
     }
 
-    // Wait for all threads to complete
-    ssize_t total_added = 0;
+    // Wait for all threads to complete; the pinned hosts are released only after this
     for (size_t i = 0; i < num_threads; i++) {
         completion_wait_for(&thread_data[i].completion);
         completion_destroy(&thread_data[i].completion);
@@ -2577,14 +2451,30 @@ static ssize_t query_scope_foreach_host_parallel(SIMPLE_PATTERN *scope_hosts_sp,
         register_result_destroy(thread_data[i].local_results);
     }
 
-    total_added = (ssize_t) dictionary_entries(qwd->results);
-
-    // Cleanup
     freez(thread_data);
-    freez(qwd->hosts_array);
-
-    return total_added;
+}
 #endif
+
+// Runs the query on the hosts pinned in qwd->hosts, in parallel when there are several
+static void weights_foreach_host(struct query_weights_data *qwd)
+{
+#ifdef ENABLE_DBENGINE
+    size_t num_threads = netdata_conf_cpus();
+
+    // If we have fewer hosts than threads, reduce thread count
+    if (qwd->hosts_count < num_threads)
+        num_threads = qwd->hosts_count;
+
+    if (num_threads > 1) {
+        weights_foreach_host_parallel(qwd, num_threads);
+        return;
+    }
+#endif
+
+    for (size_t i = 0; i < qwd->hosts_count; i++) {
+        if (weights_do_node_callback(qwd, qwd->hosts[i], true) < 0)
+            break;
+    }
 }
 
 static ssize_t weights_do_node_callback(void *data, RRDHOST *host, bool queryable) {
@@ -2642,7 +2532,6 @@ int web_api_v12_weights(BUFFER *wb, QUERY_WEIGHTS_REQUEST *qwr) {
             .host_snapshots = weights_host_snapshots_init(),
             .stats = {},
             .shifts = 0,
-            .total_workload = {0}, // Initialize workload statistics
             .timings = {
                     .received_ut = now_monotonic_usec(),
             }
@@ -2747,7 +2636,9 @@ int web_api_v12_weights(BUFFER *wb, QUERY_WEIGHTS_REQUEST *qwr) {
             rrdset_weights_multi_dimensional_value(&qwd);
         }
         else {
-            query_scope_foreach_host_parallel(qwd.scope_nodes_sp, qwd.nodes_sp, &qwd);
+            // the hosts stay pinned until cleanup: the results point into them until the response is built
+            qwd.hosts_count = query_scope_hosts_pin(qwd.scope_nodes_sp, qwd.nodes_sp, &qwd.hosts, &qwd.versions);
+            weights_foreach_host(&qwd);
         }
     }
 
@@ -2875,6 +2766,9 @@ cleanup:
 
     register_result_destroy(qwd.results);
     dictionary_destroy(qwd.host_snapshots);
+
+    if(qwd.hosts)
+        query_scope_hosts_unpin(qwd.hosts, qwd.hosts_count);
 
     if(error) {
         buffer_flush(wb);
