@@ -63,6 +63,11 @@ void store_host_info_and_metadata(RRDHOST *host);
 void metadata_execute_store_statement(sqlite3_stmt *stmt);
 size_t populate_metrics_from_database(void *mrg, void (*populate_cb)(void *mrg, Word_t section, nd_uuid_t *uuid));
 
+// Throttle primitives shared by the cleanup tasks in run_metadata_cleanup(). Long-running
+// cleanups must yield on both: an oversized WAL, and a per-pass runtime budget.
+#define METADATA_RUNTIME_THRESHOLD (5)              // Run time threshold for cleanup task
+bool sql_metadata_wal_size_acceptable(void);
+
 // UNIT TEST
 int metadata_unittest(void);
 #endif //NETDATA_SQLITE_METADATA_H
