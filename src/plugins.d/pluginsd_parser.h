@@ -52,6 +52,15 @@ typedef struct parser_keyword {
 typedef struct parser_user_object {
     bool cleanup_slots;
     RRDSET *st;
+
+    // References that keep an OBSOLETE chart alive while the parser uses it: the obsolete-chart reaper frees a
+    // chart nobody references, and the parser otherwise holds its charts as bare pointers.
+    struct {
+        RRDSET_ACQUIRED *scope;     // for st, while st is obsolete
+        RRDSET_ACQUIRED *lookup;    // taken by this keyword's chart lookup, for pluginsd_set_scope_chart()
+        RRDSET_ACQUIRED *released;  // given up by this keyword's scope end, released when the keyword returns
+    } st_ref;
+
     RRDHOST *host;
     void    *opaque;
     struct plugind *cd;
@@ -159,6 +168,7 @@ typedef struct parser PARSER;
 PARSER *parser_init(struct parser_user_object *user, int fd_input, int fd_output, PARSER_INPUT_TYPE flags, ND_SOCK *sock);
 void parser_init_repertoire(PARSER *parser, PARSER_REPERTOIRE repertoire);
 void parser_destroy(PARSER *working_parser);
+void pluginsd_keyword_chart_refs_release(PARSER *parser);
 void pluginsd_cleanup_v2(PARSER *parser);
 void pluginsd_keywords_init(PARSER *parser, PARSER_REPERTOIRE repertoire);
 PARSER_RC parser_execute(PARSER *parser, const PARSER_KEYWORD *keyword, char **words, size_t num_words);
@@ -252,6 +262,10 @@ static inline PARSER_RC parser_action(PARSER *parser, char *input) {
 
         rc = parser_execute(parser, parser->keyword, parser->line.words, parser->line.num_words);
         // rc = (*t->func)(words, num_words, parser);
+
+        if(unlikely(parser->user.st_ref.lookup || parser->user.st_ref.released))
+            pluginsd_keyword_chart_refs_release(parser);
+
         worker_is_idle();
     }
     else

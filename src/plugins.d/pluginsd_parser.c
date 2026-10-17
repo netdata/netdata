@@ -110,6 +110,11 @@ static inline PARSER_RC pluginsd_end(char **words, size_t num_words, PARSER *par
     if (unlikely(rrdset_flag_check(st, RRDSET_FLAG_DEBUG)))
         netdata_log_debug(D_PLUGINSD, "requested an END on chart '%s'", rrdset_id(st));
 
+    // revive it while its scope still holds it, as rrdset_timed_done() would
+    if(likely(!rrdset_flag_check(st, RRDSET_FLAG_COLLECTION_FINISHED)) &&
+       unlikely(!pluginsd_revive_scope_chart(parser, st, PLUGINSD_KEYWORD_END)))
+        return PLUGINSD_PROTOCOL_ERROR(NULL, NULL);
+
     pluginsd_clear_scope_chart(parser, PLUGINSD_KEYWORD_END, NULL);
     parser->user.data_collections_count++;
 
@@ -527,6 +532,16 @@ static inline PARSER_RC pluginsd_chart(char **words, size_t num_words, PARSER *p
     if (likely(st)) {
         if (options && *options) {
             if (strstr(options, "obsolete")) {
+                // rrdset_create() revived it, so the reaper cannot free it before this reference is held
+                rrdset_acquired_release(parser->user.st_ref.lookup);
+                parser->user.st_ref.lookup = rrdset_acquire(host, rrdset_id(st));
+                if(unlikely(rrdset_acquired_to_rrdset(parser->user.st_ref.lookup) != st)) {
+                    internal_error(true, "PLUGINSD: 'host:%s/chart:%s' cannot be acquired after its creation",
+                                   rrdhost_hostname(host), rrdset_id(st));
+                    rrdset_acquired_release(parser->user.st_ref.lookup);
+                    parser->user.st_ref.lookup = NULL;
+                }
+
                 rrdset_is_obsolete___safe_from_collector_thread(st);
                 obsolete = true;
             }
@@ -947,13 +962,8 @@ static ALWAYS_INLINE PARSER_RC pluginsd_begin_v2(char **words, size_t num_words,
     if(!pluginsd_set_scope_chart(parser, st, PLUGINSD_KEYWORD_BEGIN_V2))
         return PLUGINSD_PROTOCOL_ERROR(NULL, NULL);
 
-    if(unlikely(rrdset_flag_check(st, RRDSET_FLAG_OBSOLETE))) {
-        if(!spinlock_trylock(&st->destroy_lock))
-            fatal("PLUGINSD: chart '%s' of host '%s' is being collected while is being destroyed.", rrdset_id(st), rrdhost_hostname(st->rrdhost));
-
-        rrdset_isnot_obsolete___safe_from_collector_thread(st);
-        spinlock_unlock(&st->destroy_lock);
-    }
+    if(unlikely(!pluginsd_revive_scope_chart(parser, st, PLUGINSD_KEYWORD_BEGIN_V2)))
+        return PLUGINSD_PROTOCOL_ERROR(NULL, NULL);
 
     timing_step(TIMING_STEP_BEGIN2_FIND_CHART);
 

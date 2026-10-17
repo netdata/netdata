@@ -123,10 +123,61 @@ static inline void pluginsd_clear_scope_chart(PARSER *parser, const char *keywor
         }
     }
 
+    // The unslot above may have released the last references that kept the reaper away from an obsolete chart,
+    // and the caller may still use the chart (END, REPLAY_END): keep its reference until the keyword returns.
+    if(parser->user.st_ref.scope) {
+        // one keyword ends at most one scope
+        internal_error(parser->user.st_ref.released, "PLUGINSD: a second scope ended during %s", keyword);
+        rrdset_acquired_release(parser->user.st_ref.released);
+        parser->user.st_ref.released = parser->user.st_ref.scope;
+        parser->user.st_ref.scope = NULL;
+    }
+
     parser->user.st = NULL;
     parser->user.cleanup_slots = false;
     parser->user.clabel_count = 0;
     parser->user.clabel_changed = false;
+}
+
+// Revive an obsolete scope chart that is collected again. The scope holds a reference to it, so the reaper holds
+// destroy_lock only while it checks the chart - wait for it. Unless the reaper committed to freeing the chart before
+// that reference was taken: then destroy_lock is released only when the chart is freed, which our reference prevents.
+// The scope ends and false is returned; the caller fails the keyword, so the connection restarts and the chart is
+// defined again.
+static ALWAYS_INLINE bool pluginsd_revive_scope_chart(PARSER *parser, RRDSET *st, const char *keyword) {
+    if(likely(!rrdset_flag_check(st, RRDSET_FLAG_OBSOLETE)))
+        return true;
+
+    if(likely(parser->user.st_ref.scope)) {
+        while(!spinlock_trylock(&st->destroy_lock)) {
+            if(unlikely(rrdset_flag_check(st, RRDSET_FLAG_DELETE_COMMITTED))) {
+                nd_log(NDLS_DAEMON, NDLP_ERR,
+                       "PLUGINSD: 'host:%s/chart:%s' is being deleted while %s collects it.",
+                       rrdhost_hostname(st->rrdhost), rrdset_id(st), keyword);
+
+                // BEGIN2 may have ended the previous scope already; it does not use that chart again
+                pluginsd_keyword_chart_refs_release(parser);
+
+                // end the scope while our reference still keeps the chart
+                pluginsd_clear_scope_chart(parser, keyword, NULL);
+                pluginsd_keyword_chart_refs_release(parser);
+                return false;
+            }
+
+            tinysleep();
+        }
+    }
+    else if(!spinlock_trylock(&st->destroy_lock))
+        fatal("PLUGINSD: chart '%s' of host '%s' is being collected while is being destroyed.",
+              rrdset_id(st), rrdhost_hostname(st->rrdhost));
+
+    rrdset_isnot_obsolete___safe_from_collector_thread(st);
+    spinlock_unlock(&st->destroy_lock);
+
+    // the reaper frees only obsolete charts
+    rrdset_acquired_release(parser->user.st_ref.scope);
+    parser->user.st_ref.scope = NULL;
+    return true;
 }
 
 static ALWAYS_INLINE bool pluginsd_set_scope_chart(PARSER *parser, RRDSET *st, const char *keyword) {
@@ -151,11 +202,24 @@ static ALWAYS_INLINE bool pluginsd_set_scope_chart(PARSER *parser, RRDSET *st, c
     // Set new chart's collector_tid before any access
     __atomic_store_n(&st->pluginsd.collector_tid, my_collector_tid, __ATOMIC_RELEASE);
 
+    // The reference that keeps the new scope chart alive while it is obsolete: the one its lookup took,
+    // or, when the current scope chart is scoped again, the one its scope holds.
+    RRDSET_ACQUIRED *sta = NULL;
+    if(parser->user.st_ref.lookup && rrdset_acquired_to_rrdset(parser->user.st_ref.lookup) == st) {
+        sta = parser->user.st_ref.lookup;
+        parser->user.st_ref.lookup = NULL;
+    }
+    else if(old_st == st) {
+        sta = parser->user.st_ref.scope;
+        parser->user.st_ref.scope = NULL;
+    }
+
     // Access old_st's array in pluginsd_clear_scope_chart while old_st->collector_tid is still set.
     // Preserve the new chart tid for the old_st == st re-scope case.
     pluginsd_clear_scope_chart(parser, keyword, st);
 
     __atomic_store_n(&st->pluginsd.pos, 0, __ATOMIC_RELAXED);
+    parser->user.st_ref.scope = sta;
     parser->user.st = st;
     parser->user.cleanup_slots = false;
     parser->user.clabel_count = 0;
@@ -362,17 +426,29 @@ static ALWAYS_INLINE RRDDIM *pluginsd_acquire_dimension(RRDHOST *host, RRDSET *s
     return rd;
 }
 
-static inline RRDSET *pluginsd_find_chart(RRDHOST *host, const char *chart, const char *cmd) {
+// The reaper can free an obsolete chart, so the lookup keeps a reference to it for pluginsd_set_scope_chart().
+static inline RRDSET *pluginsd_find_chart(PARSER *parser, RRDHOST *host, const char *chart, const char *cmd) {
     if (unlikely(!chart || !*chart)) {
         netdata_log_error("PLUGINSD: 'host:%s' got a %s without a chart id.",
                           rrdhost_hostname(host), cmd);
         return NULL;
     }
 
-    RRDSET *st = rrdset_find(host, chart, true);
-    if (unlikely(!st))
+    RRDSET_ACQUIRED *sta = rrdset_find_and_acquire(host, chart, true);
+    if (unlikely(!sta)) {
         netdata_log_error("PLUGINSD: 'host:%s/chart:%s' got a %s but chart does not exist.",
                           rrdhost_hostname(host), chart, cmd);
+        return NULL;
+    }
+
+    RRDSET *st = rrdset_acquired_to_rrdset(sta);
+
+    if(unlikely(rrdset_flag_check(st, RRDSET_FLAG_OBSOLETE))) {
+        rrdset_acquired_release(parser->user.st_ref.lookup);
+        parser->user.st_ref.lookup = sta;
+    }
+    else
+        rrdset_acquired_release(sta);
 
     return st;
 }
@@ -448,19 +524,26 @@ static inline void pluginsd_rrdset_cache_put_to_slot(PARSER *parser, RRDSET *st,
 
 static ALWAYS_INLINE RRDSET *pluginsd_rrdset_cache_get_from_slot(PARSER *parser, RRDHOST *host, const char *id, ssize_t slot, const char *keyword) {
     if(unlikely(slot < 1 || (size_t)slot > host->stream.rcv.pluginsd_chart_slots.size))
-        return pluginsd_find_chart(host, id, keyword);
+        return pluginsd_find_chart(parser, host, id, keyword);
 
     RRDSET *st = host->stream.rcv.pluginsd_chart_slots.array[slot - 1];
 
-    if(!st) {
-        st = pluginsd_find_chart(host, id, keyword);
-        if(st)
-            pluginsd_rrdset_cache_put_to_slot(parser, st, slot, rrdset_flag_check(st, RRDSET_FLAG_OBSOLETE));
-    }
-    else {
+    if(st) {
         internal_fatal(string_strcmp(st->id, id) != 0,
                        "PLUGINSD: wrong chart in slot %zd, expected '%s', found '%s'",
                        slot - 1, id, string2str(st->id));
+
+        // Every unslot clears the chart's slot, so an obsolete chart is cached only while it is the scope
+        // chart, whose scope holds a reference to it. Look up any other obsolete chart, to hold one.
+        if(unlikely(rrdset_flag_check(st, RRDSET_FLAG_OBSOLETE) &&
+                    !(st == parser->user.st && parser->user.st_ref.scope)))
+            st = NULL;
+    }
+
+    if(!st) {
+        st = pluginsd_find_chart(parser, host, id, keyword);
+        if(st)
+            pluginsd_rrdset_cache_put_to_slot(parser, st, slot, rrdset_flag_check(st, RRDSET_FLAG_OBSOLETE));
     }
 
     return st;

@@ -62,9 +62,24 @@ void pluginsd_keywords_init(PARSER *parser, PARSER_REPERTOIRE repertoire) {
         pluginsd_calls_init(parser);
 }
 
+// The references of an ended scope and of an unused chart lookup are kept until the keyword returns, because the
+// keyword may still use the chart after its scope ends (END, REPLAY_END).
+void pluginsd_keyword_chart_refs_release(PARSER *parser) {
+    rrdset_acquired_release(parser->user.st_ref.lookup);
+    parser->user.st_ref.lookup = NULL;
+
+    rrdset_acquired_release(parser->user.st_ref.released);
+    parser->user.st_ref.released = NULL;
+}
+
 void parser_destroy(PARSER *parser) {
     if (unlikely(!parser))
         return;
+
+    // 0. the chart references; a parser destroyed mid-scope still holds its scope's
+    pluginsd_keyword_chart_refs_release(parser);
+    rrdset_acquired_release(parser->user.st_ref.scope);
+    parser->user.st_ref.scope = NULL;
 
     // 1. a RESULT_BEGIN..END span cut short by death: release the stashed
     //    item (forcing a 2xx code to 503 - a truncated stream must not report
