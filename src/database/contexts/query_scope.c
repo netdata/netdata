@@ -93,7 +93,8 @@ ssize_t query_scope_foreach_host(SIMPLE_PATTERN *scope_hosts_sp, SIMPLE_PATTERN 
 
 // Pins every queryable host in scope (see metadata_lifetime_lock in rrdhost.h), so the caller can keep
 // using them after the walk - from other threads too - until query_scope_hosts_unpin(). A host that
-// cannot be pinned is being removed and is left out. The versions cover every host in scope, as
+// cannot be pinned is left out: a removal holds it, or is trying to take it at that moment (an attempt
+// that fails when the host is already pinned elsewhere). The versions cover every host in scope, as
 // query_scope_foreach_host() computes them.
 //
 // It waits for rrd_rdlock(): call it only from a thread that no rrd_wrlock() holder waits on (see
