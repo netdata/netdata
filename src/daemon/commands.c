@@ -431,10 +431,10 @@ static int remove_ephemeral_host(BUFFER *wb, const char *machine_guid, bool repo
     }
     rrd_rdunlock();
 
-    // Authoritative while we hold the lock: every path that makes a host live (a child attaching,
-    // a plugin defining or re-enabling a vnode) holds the read side until the host is online (see
-    // metadata_lifetime_lock). So with the write side, an offline host stays offline - a reconnecting
-    // child is refused until we are done - and with the read side it stays allocated.
+    // Every path that makes a host live (a child attaching, a plugin defining or re-enabling a vnode)
+    // holds the read side until the host is online (see metadata_lifetime_lock). So with the write side,
+    // an offline host stays offline - a reconnecting child is refused until we are done - and with the
+    // read side it stays allocated.
     if (rrdhost_is_online(host)) {
         if (report_error)
             buffer_sprintf(wb, "Node '%s' (machine guid: %s) is online - not changing it",
@@ -444,6 +444,24 @@ static int remove_ephemeral_host(BUFFER *wb, const char *machine_guid, bool repo
         else
             rw_spinlock_read_unlock(&host->metadata_lifetime_lock);
         return 0;
+    }
+
+    // Offline is not enough to free it: a disconnecting child's receiver clears the online flag
+    // first and keeps using the host until rrdhost_clear_receiver() sets host->receiver to NULL,
+    // while the free path waits for it only briefly. With the write side no new receiver can
+    // attach, so once host->receiver is NULL it stays NULL until we are done.
+    if (unregister) {
+        rrdhost_receiver_lock(host);
+        bool receiver_attached = host->receiver != NULL;
+        rrdhost_receiver_unlock(host);
+
+        if (receiver_attached) {
+            if (report_error)
+                buffer_sprintf(wb, "Node '%s' (machine guid: %s) is busy - try again",
+                               rrdhost_hostname(host), host->machine_guid);
+            rw_spinlock_write_unlock(&host->metadata_lifetime_lock);
+            return -1;
+        }
     }
 
     bool marked = false;
