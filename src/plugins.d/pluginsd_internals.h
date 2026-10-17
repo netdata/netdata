@@ -129,6 +129,36 @@ static inline void pluginsd_clear_scope_chart(PARSER *parser, const char *keywor
     parser->user.clabel_changed = false;
 }
 
+// Makes host the host the plugin collects into (parser->user.host). Every switch of the selected host
+// goes through here.
+//
+// The selected host is used by every later CHART/BEGIN/SET until the plugin selects another one, so
+// the parser holds a pin on it (see metadata_lifetime_lock) for as long as it is selected: a removal
+// (`netdatacli remove-stale-node`, the reaper) refuses it as busy until the plugin switches away from
+// it or exits - even when it is offline, e.g. another plugin that also fed it stopped. A parser holds
+// at most one pin: this one.
+//
+// pinned: the caller pinned host (under the rrd lock) and hands the pin over. It is false for
+// localhost, which is not removed while collectors run, and for NULL, which ends the selection.
+// The chart scope belongs to the previous host, so it is cleared before that host's pin is released.
+// Re-selecting the same host is fine: the new pin is held before the old one is released.
+static inline void pluginsd_select_host(PARSER *parser, RRDHOST *host, bool pinned, const char *keyword) {
+    RRDHOST *old_pin = parser->user.host_pin;
+
+    // a BEGIN2 left without END2 keeps its stream buffer open, and the next BEGIN2 appends to it;
+    // that data is for the previous host's parent, so send it there now
+    if(parser->user.v2.stream_buffer.wb && parser->user.st)
+        stream_send_rrdset_metrics_finished(&parser->user.v2.stream_buffer, parser->user.st);
+
+    pluginsd_clear_scope_chart(parser, keyword, NULL);
+
+    parser->user.host = host;
+    parser->user.host_pin = pinned ? host : NULL;
+
+    if(old_pin)
+        rrdhost_pin_release(old_pin);
+}
+
 static ALWAYS_INLINE bool pluginsd_set_scope_chart(PARSER *parser, RRDSET *st, const char *keyword) {
     RRDSET *old_st = parser->user.st;
     pid_t old_collector_tid = (old_st) ? __atomic_load_n(&old_st->pluginsd.collector_tid, __ATOMIC_ACQUIRE) : 0;

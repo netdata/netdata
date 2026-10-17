@@ -53,6 +53,7 @@ typedef struct parser_user_object {
     bool cleanup_slots;
     RRDSET *st;
     RRDHOST *host;
+    RRDHOST *host_pin;                       // the host this parser holds a pin on, see pluginsd_select_host()
     void    *opaque;
     struct plugind *cd;
     int trust_durations;
@@ -160,6 +161,7 @@ PARSER *parser_init(struct parser_user_object *user, int fd_input, int fd_output
 void parser_init_repertoire(PARSER *parser, PARSER_REPERTOIRE repertoire);
 void parser_destroy(PARSER *working_parser);
 void pluginsd_cleanup_v2(PARSER *parser);
+void pluginsd_vnodes_index_destroy(PARSER *parser);
 void pluginsd_keywords_init(PARSER *parser, PARSER_REPERTOIRE repertoire);
 PARSER_RC parser_execute(PARSER *parser, const PARSER_KEYWORD *keyword, char **words, size_t num_words);
 
