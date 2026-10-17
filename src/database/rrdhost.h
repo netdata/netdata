@@ -379,8 +379,9 @@ struct rrdhost {
     //   marked live. The pin is acquired under rrd_rdlock() (or rrd_wrlock()), which is what keeps
     //   the pointer valid between the lookup and the pin. rrdhost_find_or_create() returns hosts
     //   pinned.
-    // - A plugin holds a pin on the host it has selected (HOST, HOST_DEFINE_END) for as long as it is
-    //   selected, because it keeps using that pointer: see pluginsd_select_host().
+    // - A plugin holds a pin on the non-local host it has selected (HOST, HOST_DEFINE_END) for as long
+    //   as it is selected, because it keeps using that pointer: see pluginsd_select_host(). Selecting
+    //   localhost takes no pin: localhost is never removed.
     // Nobody ever waits for the write side, so holding a pin cannot block anyone; failing to take a
     // pin means a removal is in progress, and the attacher refuses and retries later. Every pin MUST
     // be released with rrdhost_pin_release() on the thread that took it: a leaked pin makes the host
