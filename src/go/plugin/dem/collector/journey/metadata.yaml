@@ -296,7 +296,7 @@ modules:
             and user input; they are not universally redacted.
           availability: Available while dem.plugin is running, independently of active journey or Lighthouse
             jobs. Individual retained evidence may be absent or expired.
-          require_cloud: false
+          require_cloud: true
           prerequisites:
             list: []
         - id: synthetics-runs
@@ -414,7 +414,7 @@ modules:
             and user input; they are not universally redacted.
           availability: Available while dem.plugin is running, independently of active journey or Lighthouse
             jobs. Individual retained evidence may be absent or expired.
-          require_cloud: false
+          require_cloud: true
           prerequisites:
             list: []
         - id: synthetics-run
@@ -486,7 +486,7 @@ modules:
             and user input; they are not universally redacted.
           availability: Available while dem.plugin is running, independently of active journey or Lighthouse
             jobs. Individual retained evidence may be absent or expired.
-          require_cloud: false
+          require_cloud: true
           prerequisites:
             list: []
         - id: synthetics-artifacts
@@ -554,7 +554,7 @@ modules:
           security: Requires member-equivalent access. Exposes monitor identities and capture metadata, not capture contents.
           availability: Available while dem.plugin is running, independently of active journey or Lighthouse jobs
             and retained run history. Captures can expire under age or size limits.
-          require_cloud: false
+          require_cloud: true
           prerequisites:
             list: []
         - id: synthetics-artifact
@@ -623,6 +623,6 @@ modules:
             and user input; they are not universally redacted.
           availability: Available while dem.plugin is running, independently of active journey or Lighthouse
             jobs. Individual retained evidence may be absent or expired.
-          require_cloud: false
+          require_cloud: true
           prerequisites:
             list: []
