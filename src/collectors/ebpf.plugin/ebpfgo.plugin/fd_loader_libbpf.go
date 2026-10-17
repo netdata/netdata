@@ -81,7 +81,7 @@ func LoadFDLegacy(cfg FDLegacyConfig) (*FDLegacyHandle, error) {
 	if err != nil {
 		return nil, fmt.Errorf("kernel reject check: %w", err)
 	}
-	if err := CanLoadCode(cfg.KernelVersion, cfg.IsRHF, rejected, IsRoot(), "ebpf-go.plugin"); err != nil {
+	if err := CanLoadCode(cfg.KernelVersion, cfg.IsRHF, rejected, IsRoot(), true, "ebpf-go.plugin"); err != nil {
 		return nil, err
 	}
 

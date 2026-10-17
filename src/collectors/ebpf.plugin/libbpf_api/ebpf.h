@@ -103,8 +103,11 @@ enum netdata_ebpf_kernel_versions {
     NETDATA_EBPF_KERNEL_5_14 = 331264,   //  331264 = 5 * 65536 + 14 * 256
     NETDATA_EBPF_KERNEL_5_15 = 331520,   //  331520 = 5 * 65536 + 15 * 256
     NETDATA_EBPF_KERNEL_5_16 = 331776,   //  331776 = 5 * 65536 + 16 * 256
+    NETDATA_EBPF_KERNEL_5_17 = 332032,   //  332032 = 5 * 65536 + 17 * 256
     NETDATA_EBPF_KERNEL_6_8 = 395264,    //  395264 = 6 * 65536 +  8 * 256
-    NETDATA_EBPF_KERNEL_6_16 = 397312    //  397312 = 6 * 65536 +  16 * 256
+    NETDATA_EBPF_KERNEL_6_12 = 396288,   //  396288 = 6 * 65536 +  12 * 256
+    NETDATA_EBPF_KERNEL_6_16 = 397312,   //  397312 = 6 * 65536 +  16 * 256
+    NETDATA_EBPF_KERNEL_7_0 = 458752    //  458752 = 7 * 65536
 };
 
 enum netdata_kernel_flag {
@@ -118,7 +121,10 @@ enum netdata_kernel_flag {
     NETDATA_V5_14 = 1 << 7,
     NETDATA_V5_15 = 1 << 8,
     NETDATA_V5_16 = 1 << 9,
-    NETDATA_V6_8 = 1 << 10
+    NETDATA_V5_17 = 1 << 10,
+    NETDATA_V6_8 = 1 << 11,
+    NETDATA_V6_12 = 1 << 12,
+    NETDATA_V7_0 = 1 << 13
 };
 
 enum netdata_kernel_idx {
@@ -132,7 +138,10 @@ enum netdata_kernel_idx {
     NETDATA_IDX_V5_14,
     NETDATA_IDX_V5_15,
     NETDATA_IDX_V5_16,
-    NETDATA_IDX_V6_8
+    NETDATA_IDX_V5_17,
+    NETDATA_IDX_V6_8,
+    NETDATA_IDX_V6_12,
+    NETDATA_IDX_V7_0
 };
 
 #define NETDATA_IDX_STR_V3_10 "3.10"
@@ -145,7 +154,10 @@ enum netdata_kernel_idx {
 #define NETDATA_IDX_STR_V5_14 "5.14"
 #define NETDATA_IDX_STR_V5_15 "5.15"
 #define NETDATA_IDX_STR_V5_16 "5.16"
+#define NETDATA_IDX_STR_V5_17 "5.17"
 #define NETDATA_IDX_STR_V6_8 "6.8"
+#define NETDATA_IDX_STR_V6_12 "6.12"
+#define NETDATA_IDX_STR_V7_0 "7.0"
 
 /**
  * Minimum value has relationship with libbpf support.
@@ -369,7 +381,7 @@ typedef struct ebpf_module {
 
 int ebpf_get_kernel_version();
 int get_redhat_release();
-char *ebpf_kernel_suffix(int version, int isrh);
+int ebpf_parse_redhat_release_version(const char *release);
 struct bpf_link **
 ebpf_load_program(char *plugins_dir, ebpf_module_t *em, int kver, int is_rhf, struct bpf_object **obj);
 

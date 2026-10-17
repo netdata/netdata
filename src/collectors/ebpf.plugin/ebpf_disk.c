@@ -53,6 +53,7 @@ netdata_mutex_t plot_mutex;
 #define NETDATA_DISK_SCSI_COMPLETE_TARGET "__blk_mq_end_request"
 #define NETDATA_DISK_SCSI_COMPLETE_FALLBACK_TARGET "blk_mq_free_request"
 #define NETDATA_DISK_COMPLETE_PROGRAM "netdata_block_rq_complete"
+#define NETDATA_DISK_ISSUE_TARGET "blk_mq_start_request"
 #define NETDATA_DISK_SINGLE_QUEUE_START_TARGET "blk_start_request"
 #define NETDATA_DISK_ISSUE_PROGRAM "netdata_block_rq_issue"
 #define NETDATA_DISK_INFLIGHT_MAP "tmp_disk_tp_stat"
@@ -63,6 +64,13 @@ static struct bpf_link *disk_single_queue_start_link = NULL;
 static ebpf_local_maps_t disk_inflight_map_stats[] = {
     {.name = NETDATA_DISK_INFLIGHT_MAP, .map_fd = ND_EBPF_MAP_FD_NOT_INITIALIZED},
     {.name = NULL, .map_fd = ND_EBPF_MAP_FD_NOT_INITIALIZED}};
+
+static bool ebpf_disk_kernel_symbol_exists(const char *name)
+{
+    ebpf_addresses_t symbol = {.function = (char *)name};
+    ebpf_load_addresses(&symbol, -1);
+    return symbol.addr != 0;
+}
 
 static struct bpf_link *ebpf_disk_attach_kprobe(struct bpf_program *prog, const char *target)
 {
@@ -112,8 +120,9 @@ static void ebpf_disk_attach_scsi_completion(struct bpf_program *prog)
  */
 static void ebpf_disk_attach_single_queue_start(struct bpf_program *prog)
 {
-    if (running_on_kernel >= NETDATA_EBPF_KERNEL_5_0 || !prog ||
-        bpf_program__get_type(prog) != BPF_PROG_TYPE_KPROBE)
+    if ((running_on_kernel >= NETDATA_EBPF_KERNEL_5_0 &&
+         ebpf_disk_kernel_symbol_exists(NETDATA_DISK_ISSUE_TARGET)) ||
+        !prog || bpf_program__get_type(prog) != BPF_PROG_TYPE_KPROBE)
         return;
 
     disk_single_queue_start_link = ebpf_disk_attach_kprobe(prog, NETDATA_DISK_SINGLE_QUEUE_START_TARGET);
@@ -153,6 +162,48 @@ static void ebpf_disk_set_inflight_map_fd(struct bpf_object *obj)
 }
 
 #ifdef LIBBPF_MAJOR_VERSION
+static bool ebpf_disk_program_target_exists(struct bpf_program *program)
+{
+    const char *section = bpf_program__section_name(program);
+    if (!section)
+        return false;
+
+    if (strncmp(section, "kprobe/", sizeof("kprobe/") - 1) == 0)
+        return ebpf_disk_kernel_symbol_exists(section + sizeof("kprobe/") - 1);
+
+    if (strncmp(section, "fentry/", sizeof("fentry/") - 1) == 0)
+        return ebpf_kernel_btf_find_by_name_kind(
+                   (char *)(section + sizeof("fentry/") - 1), BTF_KIND_FUNC) > 0;
+
+    return true;
+}
+
+static void ebpf_disk_disable_autoload_by_name(struct bpf_object *obj, const char *name)
+{
+    struct bpf_program *program = bpf_object__find_program_by_name(obj, name);
+    if (program)
+        bpf_program__set_autoload(program, false);
+}
+
+static void ebpf_disk_prepare_core_programs(struct disk_bpf *obj)
+{
+    // Netdata attaches these paths explicitly with the primary programs below.
+    ebpf_disk_disable_autoload_by_name(obj->obj, "netdata_block_rq_issue_legacy");
+    ebpf_disk_disable_autoload_by_name(obj->obj, "netdata_block_rq_complete_internal");
+    ebpf_disk_disable_autoload_by_name(obj->obj, "netdata_block_rq_complete_free");
+
+    // Keep unavailable primary targets loaded for Netdata's manual fallbacks, but skip auto-attach.
+    if (!ebpf_disk_program_target_exists(obj->progs.netdata_block_rq_issue))
+        bpf_program__set_autoattach(obj->progs.netdata_block_rq_issue, false);
+    if (!ebpf_disk_program_target_exists(obj->progs.netdata_block_rq_complete))
+        bpf_program__set_autoattach(obj->progs.netdata_block_rq_complete, false);
+
+    // blk_complete_request is absent on newer kernels; it is an optional legacy path.
+    struct bpf_program *legacy_complete = bpf_object__find_program_by_name(obj->obj, "netdata_blk_complete_request");
+    if (legacy_complete && !ebpf_disk_program_target_exists(legacy_complete))
+        bpf_program__set_autoload(legacy_complete, false);
+}
+
 /**
  * Set hash table
  *
@@ -177,12 +228,7 @@ static inline void ebpf_disk_set_hash_table(struct disk_bpf *obj)
  */
 static inline int ebpf_disk_load_and_attach(struct disk_bpf *obj)
 {
-    const char *section = bpf_program__section_name(obj->progs.netdata_blk_complete_request);
-    if (section && strncmp(section, "fentry/", 7) == 0) {
-        int complete_id = ebpf_kernel_btf_find_by_name_kind("blk_complete_request", BTF_KIND_FUNC);
-        if (complete_id <= 0)
-            bpf_program__set_autoload(obj->progs.netdata_blk_complete_request, false);
-    }
+    ebpf_disk_prepare_core_programs(obj);
 
     ebpf_update_map_type(obj->maps.tbl_disk_iocall, &disk_maps[NETDATA_DISK_IO]);
 
@@ -848,14 +894,14 @@ static int ebpf_disk_load_bpf(ebpf_module_t *em)
 {
     int ret = 0;
     if (em->load & EBPF_LOAD_LEGACY) {
-        // The generic disk object set has no validated artifact for this kernel range. Do not load its 5.4
-        // fallback with baked-in structure offsets, which can attach successfully but silently collect nothing.
-        if (isrh == -1 && running_on_kernel >= NETDATA_EBPF_KERNEL_6_8) {
+        // The generic disk object set has no 6.16+ artifact. Do not load its 6.8 fallback with baked-in
+        // structure offsets, which can attach successfully but silently collect nothing.
+        if (isrh <= 0 && running_on_kernel >= NETDATA_EBPF_KERNEL_6_16) {
             unsigned int kernel_major = (unsigned int)running_on_kernel >> 16;
             unsigned int kernel_minor = ((unsigned int)running_on_kernel >> 8) & 0xff;
             netdata_log_error(
                 "Disk latency is unavailable: no compatible generic legacy BPF object for kernel %u.%u; refusing "
-                "the 5.4 fallback. Use kernel BTF with CO-RE or a compatible legacy object.",
+                "the 6.8 fallback. Use kernel BTF with CO-RE or a compatible legacy object.",
                 kernel_major,
                 kernel_minor);
             return -1;

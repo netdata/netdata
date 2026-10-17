@@ -69,7 +69,7 @@ ebpf_module_t ebpf_modules[] = {
      .cfg = &process_config,
      .config_file = NETDATA_PROCESS_CONFIG_FILE,
      .kernels =
-         NETDATA_V3_10 | NETDATA_V4_14 | NETDATA_V4_16 | NETDATA_V4_18 | NETDATA_V5_4 | NETDATA_V5_10 | NETDATA_V5_14,
+         NETDATA_V3_10 | NETDATA_V4_14 | NETDATA_V4_16 | NETDATA_V4_18 | NETDATA_V5_4 | NETDATA_V5_10 | NETDATA_V5_14 | NETDATA_V6_12 | NETDATA_V7_0,
      .load = EBPF_LOAD_LEGACY,
      .targets = process_targets,
      .probe_links = NULL,
@@ -125,7 +125,7 @@ ebpf_module_t ebpf_modules[] = {
      .cfg = &swap_config,
      .config_file = NETDATA_DIRECTORY_SWAP_CONFIG_FILE,
      .kernels =
-         NETDATA_V3_10 | NETDATA_V4_14 | NETDATA_V4_16 | NETDATA_V4_18 | NETDATA_V5_4 | NETDATA_V5_14 | NETDATA_V6_8,
+         NETDATA_V3_10 | NETDATA_V4_14 | NETDATA_V4_16 | NETDATA_V4_18 | NETDATA_V5_4 | NETDATA_V5_14 | NETDATA_V6_8 | NETDATA_V6_12 | NETDATA_V7_0,
      .load = EBPF_LOAD_LEGACY,
      .targets = swap_targets,
      .probe_links = NULL,
@@ -208,7 +208,7 @@ ebpf_module_t ebpf_modules[] = {
      .names = NULL,
      .cfg = &disk_config,
      .config_file = NETDATA_DISK_CONFIG_FILE,
-     .kernels = NETDATA_V3_10 | NETDATA_V4_14 | NETDATA_V4_16 | NETDATA_V4_18 | NETDATA_V5_4 | NETDATA_V5_14,
+     .kernels = NETDATA_V3_10 | NETDATA_V4_14 | NETDATA_V4_16 | NETDATA_V4_18 | NETDATA_V5_4 | NETDATA_V5_11 | NETDATA_V5_14 | NETDATA_V5_16 | NETDATA_V5_17 | NETDATA_V6_8,
      .load = EBPF_LOAD_LEGACY,
      .targets = NULL,
      .probe_links = NULL,

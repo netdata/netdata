@@ -8,7 +8,7 @@ import (
 	"github.com/netdata/netdata/src/collectors/ebpf.plugin/ebpfgo.plugin/libbpfloader"
 )
 
-const cachestatKernelMask uint32 = (1 << 12) - 1
+const cachestatKernelMask uint32 = (1 << 13) - 1
 const cachestatDefaultPIDTableSize uint32 = 32768
 const cachestatMaxPIDTableSize uint32 = 32768
 const cachestatDefaultBTFFile = "vmlinux"
@@ -164,8 +164,18 @@ func BuildCachestatLegacyPlan(cfg CachestatLegacyConfig) LoadPlan {
 }
 
 func kernelBTFSupported(btfPath string) bool {
-	_, err := os.Stat(filepath.Join(btfPath, cachestatDefaultBTFFile))
-	return err == nil
+	path := filepath.Join(btfPath, cachestatDefaultBTFFile)
+	info, err := os.Stat(path)
+	if err != nil || !info.Mode().IsRegular() {
+		return false
+	}
+
+	file, err := os.Open(path)
+	if err != nil {
+		return false
+	}
+	file.Close()
+	return true
 }
 
 func applyPidTableSizeClamp(n uint32) uint32 {

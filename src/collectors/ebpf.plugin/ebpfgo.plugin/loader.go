@@ -14,6 +14,7 @@ const (
 	minimumKernelVersion       = 4<<16 + 11<<8
 	minimumKernelVersionBuffer = 5<<16 + 10<<8
 	minimumKernelVersionArena  = 6<<16 + 12<<8
+	minimumKernelVersionSeven  = 7 << 16
 	minimumRHVersion           = 7*256 + 5
 )
 
@@ -83,7 +84,7 @@ const (
 )
 
 var kernelReleaseRe = regexp.MustCompile(`^([0-9]+)\.([0-9]+)\.([0-9]+)`)
-var redHatReleaseRe = regexp.MustCompile(`([0-9]+)\.([0-9]+)`)
+var redHatReleaseRe = regexp.MustCompile(`(?i)^\s*(red hat|centos|almalinux|rocky linux).*?release[[:space:]]+([0-9]+)(\.([0-9]+))?`)
 
 func KernelVersionFromRelease(release string) (uint32, error) {
 	release = strings.TrimSpace(release)
@@ -134,9 +135,12 @@ func RedHatReleaseFromFile(contents string) (int, error) {
 		return -1, fmt.Errorf("parse redhat major from %q: %w", contents, err)
 	}
 
-	minor, err := strconv.Atoi(match[2])
-	if err != nil {
-		return -1, fmt.Errorf("parse redhat minor from %q: %w", contents, err)
+	minor := 0
+	if match[4] != "" {
+		minor, err = strconv.Atoi(match[4])
+		if err != nil {
+			return -1, fmt.Errorf("parse redhat minor from %q: %w", contents, err)
+		}
 	}
 
 	return major*256 + minor, nil
@@ -144,11 +148,59 @@ func RedHatReleaseFromFile(contents string) (int, error) {
 
 func RedHatRelease() (int, error) {
 	contents, err := os.ReadFile("/etc/redhat-release")
-	if err != nil {
-		return -1, err
+	if err == nil {
+		if version, parseErr := RedHatReleaseFromFile(string(contents)); parseErr == nil {
+			return version, nil
+		}
 	}
 
-	return RedHatReleaseFromFile(string(contents))
+	contents, err = os.ReadFile("/etc/os-release")
+	if err != nil {
+		return -1, fmt.Errorf("unable to read Red Hat release metadata: %w", err)
+	}
+	if version := RedHatReleaseFromOSRelease(string(contents)); version >= 0 {
+		return version, nil
+	}
+	return -1, fmt.Errorf("host is not a recognized Red Hat-family distribution")
+}
+
+func RedHatReleaseFromOSRelease(contents string) int {
+	var major, minor int
+	isRHEL := false
+	for _, line := range strings.Split(contents, "\n") {
+		key, value, ok := strings.Cut(line, "=")
+		if !ok {
+			continue
+		}
+		value = strings.Trim(value, "\"'")
+		switch key {
+		case "ID", "ID_LIKE":
+			for _, id := range strings.Fields(value) {
+				switch strings.ToLower(id) {
+				case "rhel", "centos", "almalinux", "rocky":
+					isRHEL = true
+				}
+			}
+		case "VERSION_ID":
+			parts := strings.SplitN(value, ".", 2)
+			parsedMajor, err := strconv.Atoi(parts[0])
+			if err != nil || parsedMajor <= 0 {
+				return -1
+			}
+			major = parsedMajor
+			if len(parts) == 2 {
+				parsedMinor, err := strconv.Atoi(parts[1])
+				if err != nil || parsedMinor < 0 || parsedMinor > 255 {
+					return -1
+				}
+				minor = parsedMinor
+			}
+		}
+	}
+	if isRHEL && major > 0 && major <= (int(^uint(0)>>1)-255)/256 {
+		return major*256 + minor
+	}
+	return -1
 }
 
 // KernelVersionString returns a version string suitable for reject-list prefix
@@ -246,7 +298,13 @@ func KernelSupported(version uint32, rhVersion int, rejected bool) bool {
 	return version >= minimumKernelVersion || rhVersion >= minimumRHVersion
 }
 
-func CanLoadCode(version uint32, rhVersion int, rejected bool, isRoot bool, pluginName string) error {
+func CanLoadCode(version uint32, rhVersion int, rejected bool, isRoot bool, requireKprobes bool, pluginName string) error {
+	if rejected {
+		return fmt.Errorf("the current collector cannot run on this rejected kernel")
+	}
+	if err := kernelEBPFFeatureError(currentKernelEBPFFeatures(), requireKprobes); err != nil {
+		return err
+	}
 	if !KernelSupported(version, rhVersion, rejected) {
 		return fmt.Errorf("the current collector cannot run on this kernel")
 	}
@@ -276,6 +334,7 @@ func SelectKernelName(selector uint32) string {
 		"5.16",
 		"6.8",
 		"6.12",
+		"7.0",
 	}
 
 	if selector >= uint32(len(kernelNames)) {
@@ -300,6 +359,8 @@ func SelectMaxIndex(isRHF int, kver uint32) int {
 	}
 
 	switch {
+	case kver >= minimumKernelVersionSeven:
+		return 12
 	case kver >= minimumKernelVersionArena:
 		return 11
 	case kver >= 395264:
