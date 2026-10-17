@@ -55,5 +55,8 @@ type Dependencies struct {
 	Telemetry       *telemetry.Registry
 	JournalActivity JournalActivity
 	EngineStateRoot func() string
-	Log             Logger
+	// EngineStateReadOnly reports a run that must not write under EngineStateRoot
+	// (a terminal debug run beside the Agent's job); nil means writable.
+	EngineStateReadOnly func() bool
+	Log                 Logger
 }
