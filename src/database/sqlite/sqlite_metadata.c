@@ -228,6 +228,7 @@ sqlite3 *db_meta = NULL;
 enum metadata_opcode {
     METADATA_DATABASE_NOOP = 0,
     METADATA_DEL_DIMENSION,
+    METADATA_DEL_EXPIRED_DIMENSIONS,
     METADATA_STORE_CLAIM_ID,
     METADATA_STORE,
     METADATA_LOAD_HOST_CONTEXT,
@@ -262,6 +263,11 @@ struct meta_config_s {
     struct completion start_stop_complete;
     CmdPool cmd_pool;
     WorkerPool worker_pool;
+
+    // expired dimensions waiting for the next metadata store pass; owned by the event loop
+    METADATA_EXPIRED_DIMENSIONS *expired_dimensions;
+    size_t expired_dimensions_pending;      // records in expired_dimensions
+    size_t expired_dimensions_in_worker;    // records handed to the running metadata store pass
 } meta_config;
 
 //
@@ -2283,6 +2289,359 @@ static void ctx_hosts_load(uv_work_t *req)
     worker_is_idle();
 }
 
+// ----------------------------------------------------------------------------
+// Expired dimensions: the contexts garbage collection reports the metrics whose data expired from every tier,
+// and the metadata thread deletes their rows. Nothing else does this for metrics of contexts that stay alive
+// (pod churn): a dimension freed with data keeps its row, and the full dimension scan runs weekly.
+
+// records waiting, in the event loop and in the running pass; above it new batches are dropped (the weekly
+// dimension scan reaps them)
+#define METADATA_EXPIRED_DIMENSIONS_MAX_PENDING (1000000)
+
+static size_t expired_dimensions_dropped = 0;
+
+METADATA_EXPIRED_DIMENSIONS *metadata_expired_dimensions_create(const char *machine_guid)
+{
+    METADATA_EXPIRED_DIMENSIONS *batch = callocz(1, sizeof(*batch));
+    strncpyz(batch->machine_guid, machine_guid, sizeof(batch->machine_guid) - 1);
+    return batch;
+}
+
+void metadata_expired_dimensions_add(METADATA_EXPIRED_DIMENSIONS *batch, UUIDMAP_ID uuid, STRING *chart_id, STRING *dim_id)
+{
+    if (batch->used == batch->size) {
+        batch->size = batch->size ? batch->size * 2 : 64;
+        batch->items = reallocz(batch->items, batch->size * sizeof(*batch->items));
+    }
+
+    struct metadata_expired_dimension *e = &batch->items[batch->used];
+    if (!uuidmap_uuid(uuid, e->uuid))
+        return;
+
+    e->chart_id = string_dup(chart_id);
+    e->dim_id = string_dup(dim_id);
+    batch->used++;
+}
+
+void metadata_expired_dimensions_free(METADATA_EXPIRED_DIMENSIONS *batch)
+{
+    if (!batch)
+        return;
+
+    for (size_t i = 0; i < batch->used; i++) {
+        string_freez(batch->items[i].chart_id);
+        string_freez(batch->items[i].dim_id);
+    }
+    freez(batch->items);
+    freez(batch);
+}
+
+static void expired_dimensions_list_free(METADATA_EXPIRED_DIMENSIONS **list)
+{
+    while (*list) {
+        METADATA_EXPIRED_DIMENSIONS *batch = *list;
+        DOUBLE_LINKED_LIST_REMOVE_ITEM_UNSAFE(*list, batch, prev, next);
+        metadata_expired_dimensions_free(batch);
+    }
+}
+
+static size_t expired_dimensions_list_remaining(METADATA_EXPIRED_DIMENSIONS *list)
+{
+    size_t remaining = 0;
+    for (METADATA_EXPIRED_DIMENSIONS *batch = list; batch; batch = batch->next)
+        remaining += batch->used - batch->done;
+    return remaining;
+}
+
+// Event loop: take a new batch, unless the backlog (with the records the running pass holds) is full;
+// the batch is owned by the list or freed
+static bool expired_dimensions_append(
+    METADATA_EXPIRED_DIMENSIONS **list,
+    size_t *pending,
+    size_t in_worker,
+    METADATA_EXPIRED_DIMENSIONS *batch,
+    size_t max_pending)
+{
+    size_t records = batch->used - batch->done;
+    if (*pending + in_worker + records > max_pending) {
+        __atomic_add_fetch(&expired_dimensions_dropped, records, __ATOMIC_RELAXED);
+        metadata_expired_dimensions_free(batch);
+        return false;
+    }
+
+    DOUBLE_LINKED_LIST_APPEND_ITEM_UNSAFE(*list, batch, prev, next);
+    *pending += records;
+    return true;
+}
+
+// Event loop: the batches a pass did not finish go back in front of the ones that arrived meanwhile;
+// they were accepted already, so the backlog cap does not apply to them
+static void expired_dimensions_requeue(
+    METADATA_EXPIRED_DIMENSIONS **list, size_t *pending, METADATA_EXPIRED_DIMENSIONS *leftovers)
+{
+    if (!leftovers)
+        return;
+
+    *pending += expired_dimensions_list_remaining(leftovers);
+    DOUBLE_LINKED_LIST_APPEND_LIST_UNSAFE(leftovers, *list, prev, next);
+    *list = leftovers;
+}
+
+// Is the dimension collected again under the same uuid? The contexts garbage collection deletes a metric only
+// when no RRDDIM is linked to it, but a dimension being re-created may have taken the metric's uuid just before
+// and links to it right after; its row may have been stored already, so it must be kept.
+static bool expired_dimension_is_live(RRDHOST *host, const struct metadata_expired_dimension *e)
+{
+    // not rrdset_find_and_acquire() / rrddim_find_and_acquire(): they touch last_accessed, and an obsolete
+    // chart that keeps being accessed is never freed
+    if (!host->rrdset_root_index)
+        return false;
+
+    const DICTIONARY_ITEM *st_item = dictionary_get_and_acquire_item(host->rrdset_root_index, string2str(e->chart_id));
+    if (!st_item)
+        return false;
+
+    RRDSET *st = dictionary_acquired_item_value(st_item);
+
+    bool live = false;
+    if (st->rrddim_root_index) {
+        const DICTIONARY_ITEM *rd_item = dictionary_get_and_acquire_item(st->rrddim_root_index, string2str(e->dim_id));
+        if (rd_item) {
+            RRDDIM *rd = dictionary_acquired_item_value(rd_item);
+            nd_uuid_t uuid;
+            live = uuidmap_uuid(rd->uuid, uuid) && uuid_eq(uuid, e->uuid);
+            dictionary_acquired_item_release(st->rrddim_root_index, rd_item);
+        }
+    }
+
+    // The chart is collected again, but not this dimension: if it was its last row, deleting it also deletes the
+    // chart row and its labels (triggers), while the re-created chart may have been stored already. Store the
+    // chart and its labels again; this runs in the metadata worker, the only writer of these fields here.
+    if (!live) {
+        st->rrdlabels_last_saved_version = 0;
+        rrdset_flag_set(st, RRDSET_FLAG_METADATA_UPDATE);
+        rrdhost_flag_set(host, RRDHOST_FLAG_METADATA_UPDATE);
+    }
+
+    dictionary_acquired_item_release(host->rrdset_root_index, st_item);
+    return live;
+}
+
+static bool expired_dimension_can_be_deleted(nd_uuid_t *uuid)
+{
+    return dimension_can_be_deleted(uuid, NULL, false);
+}
+
+// Returns false when the row could not be deleted
+static bool expired_dimension_delete(nd_uuid_t *uuid, sqlite3_stmt **res)
+{
+    if (!*res && !PREPARE_STATEMENT(db_meta, DELETE_DIMENSION_UUID, res))
+        return false;
+
+    int rc = SQLITE_ERROR;
+    int param = 0;
+    SQLITE_BIND_FAIL(done, sqlite3_bind_blob(*res, ++param, uuid, sizeof(*uuid), SQLITE_STATIC));
+
+    param = 0;
+    rc = sqlite3_step_monitored(*res);
+    if (unlikely(rc != SQLITE_DONE))
+        error_report("Failed to delete expired dimension, rc = %d", rc);
+
+done:
+    REPORT_BIND_FAIL(*res, param);
+    SQLITE_RESET(*res);
+    return rc == SQLITE_DONE;
+}
+
+struct expired_dimensions_ops {
+    bool (*is_live)(RRDHOST *host, const struct metadata_expired_dimension *e);
+    bool (*can_be_deleted)(nd_uuid_t *uuid);
+    bool (*delete)(nd_uuid_t *uuid, sqlite3_stmt **res);
+    bool (*can_continue)(void);     // false on shutdown, when the WAL is too big or the pass ran long enough
+    bool (*transaction)(bool begin);    // false when it failed; nothing is left open then
+};
+
+struct expired_dimensions_result {
+    size_t checked;
+    size_t deleted;
+    size_t live;
+    size_t retained;
+    size_t failed;
+    size_t busy;        // records of hosts being freed or re-created, left for the next pass
+};
+
+// a record whose delete keeps failing is retried on this many passes, then left to the dimension scan
+#define EXPIRED_DIMENSION_DELETE_ATTEMPTS (3)
+
+// Process the batches in order, stopping when ops->can_continue() says so (checked before the first record and
+// every METADATA_WAL_CHECK_ROWS records: each delete may also delete a chart and its labels through the
+// triggers), or when a delete fails (that record is retried on the next passes). The deletes between two checks
+// share one transaction: on its own, each delete with its trigger cascade is a commit (~2 ms); if that
+// transaction is lost, its rows stay for the dimension scan. Finished batches are freed; the ones with
+// unprocessed records are returned.
+static METADATA_EXPIRED_DIMENSIONS *expired_dimensions_process(
+    METADATA_EXPIRED_DIMENSIONS *list, const struct expired_dimensions_ops *ops, struct expired_dimensions_result *result)
+{
+    sqlite3_stmt *res = NULL;
+    bool in_transaction = false;
+    size_t transaction_deleted = 0;
+
+    bool stop = false;
+    METADATA_EXPIRED_DIMENSIONS *next;
+    for (METADATA_EXPIRED_DIMENSIONS *batch = list; batch && !stop; batch = next) {
+        next = batch->next;
+
+        // The host stays allocated only while its metadata lifetime lock is held (a dictionary reference does not
+        // keep it, see rrdhost_apply_by_machine_guid()); the rrd read lock bridges the lookup to that lock, as in
+        // store_hosts_metadata(). A host being freed or re-created holds it for writing: try again later.
+        rrd_rdlock();
+        RRDHOST *host = rrdhost_find_by_guid(batch->machine_guid);
+        bool host_locked = host && rw_spinlock_tryread_lock(&host->metadata_lifetime_lock);
+        rrd_rdunlock();
+
+        if (host && !host_locked) {
+            result->busy += batch->used - batch->done;
+            continue;
+        }
+
+        while (batch->done < batch->used) {
+            if ((result->checked % METADATA_WAL_CHECK_ROWS) == 0) {
+                if (in_transaction) {
+                    in_transaction = false;
+                    if (!ops->transaction(false)) {
+                        result->deleted -= transaction_deleted;
+                        result->failed += transaction_deleted;
+                        stop = true;
+                        break;
+                    }
+                }
+
+                if (!ops->can_continue()) {
+                    stop = true;
+                    break;
+                }
+            }
+
+            struct metadata_expired_dimension *e = &batch->items[batch->done++];
+            result->checked++;
+
+            // a host that is gone has no live dimension to protect
+            if (host && ops->is_live(host, e)) {
+                result->live++;
+                batch->delete_failures = 0;
+            }
+            else if (!ops->can_be_deleted(&e->uuid)) {
+                result->retained++;
+                batch->delete_failures = 0;
+            }
+            else {
+                if (!in_transaction) {
+                    // if it cannot start, the deletes still run, one commit each
+                    in_transaction = ops->transaction(true);
+                    transaction_deleted = 0;
+                }
+
+                if (ops->delete(&e->uuid, &res)) {
+                    result->deleted++;
+                    transaction_deleted++;
+                    batch->delete_failures = 0;
+                }
+                else {
+                    result->failed++;
+                    if (++batch->delete_failures < EXPIRED_DIMENSION_DELETE_ATTEMPTS) {
+                        batch->done--;
+                        result->checked--;
+                    }
+                    else
+                        batch->delete_failures = 0;
+                    stop = true;
+                    break;
+                }
+            }
+        }
+
+        if (host_locked)
+            rw_spinlock_read_unlock(&host->metadata_lifetime_lock);
+
+        if (batch->done == batch->used) {
+            DOUBLE_LINKED_LIST_REMOVE_ITEM_UNSAFE(list, batch, prev, next);
+            metadata_expired_dimensions_free(batch);
+        }
+    }
+
+    if (in_transaction && !ops->transaction(false)) {
+        result->deleted -= transaction_deleted;
+        result->failed += transaction_deleted;
+    }
+
+    SQLITE_FINALIZE(res);
+    return list;
+}
+
+static usec_t expired_dimensions_pass_started_ut = 0;
+
+static bool expired_dimensions_transaction(bool begin)
+{
+    if (begin)
+        return db_execute(db_meta, "BEGIN TRANSACTION", NULL) == 0;
+
+    // a failed statement may have rolled the transaction back already
+    if (sqlite3_get_autocommit(db_meta))
+        return false;
+
+    if (db_execute(db_meta, "COMMIT TRANSACTION", NULL) == 0)
+        return true;
+
+    // never leave a transaction open on the shared connection
+    (void)db_execute(db_meta, "ROLLBACK TRANSACTION", NULL);
+    return false;
+}
+
+static bool expired_dimensions_can_continue(void)
+{
+    return !SHUTDOWN_REQUESTED(&meta_config) && sql_metadata_wal_size_acceptable() &&
+           now_monotonic_usec() - expired_dimensions_pass_started_ut < METADATA_RUNTIME_THRESHOLD * USEC_PER_SEC;
+}
+
+static const struct expired_dimensions_ops expired_dimensions_ops = {
+    .is_live = expired_dimension_is_live,
+    .can_be_deleted = expired_dimension_can_be_deleted,
+    .delete = expired_dimension_delete,
+    .can_continue = expired_dimensions_can_continue,
+    .transaction = expired_dimensions_transaction,
+};
+
+// Metadata worker: returns the batches left for the next pass
+static METADATA_EXPIRED_DIMENSIONS *do_pending_expired_dimensions(METADATA_EXPIRED_DIMENSIONS *list)
+{
+    if (!list)
+        return NULL;
+
+    worker_is_busy(UV_EVENT_UUID_DELETION);
+
+    usec_t started_ut = now_monotonic_usec();
+    expired_dimensions_pass_started_ut = started_ut;
+    struct expired_dimensions_result result = { 0 };
+    list = expired_dimensions_process(list, &expired_dimensions_ops, &result);
+    usec_t ended_ut = now_monotonic_usec();
+
+    nd_log_daemon(
+        (result.deleted || result.failed) ? NDLP_INFO : NDLP_DEBUG,
+        "METADATA: expired dimensions: checked %zu, deleted %zu, collected again %zu, still with data %zu, "
+        "failed %zu, host busy %zu, %zu left for the next pass, %zu dropped since start, in %0.2f ms",
+        result.checked,
+        result.deleted,
+        result.live,
+        result.retained,
+        result.failed,
+        result.busy,
+        expired_dimensions_list_remaining(list),
+        __atomic_load_n(&expired_dimensions_dropped, __ATOMIC_RELAXED),
+        (double)(ended_ut - started_ut) / USEC_PER_MS);
+
+    return list;
+}
+
 // Callback after scan of hosts is done
 static void after_metadata_hosts(uv_work_t *req, int status __maybe_unused)
 {
@@ -2299,6 +2658,13 @@ static void after_metadata_hosts(uv_work_t *req, int status __maybe_unused)
             (void) JudyLDel(&config->ae_DelJudyL, Index, PJE0);
         }
     }
+
+    config->expired_dimensions_in_worker = 0;
+    expired_dimensions_requeue(
+        &config->expired_dimensions,
+        &config->expired_dimensions_pending,
+        (METADATA_EXPIRED_DIMENSIONS *)worker->pending_expired_dimensions);
+    worker->pending_expired_dimensions = NULL;
 
     config->metadata_running = false;
     return_worker(&config->worker_pool, worker);
@@ -2837,6 +3203,10 @@ static void start_metadata_hosts(uv_work_t *req)
     // still has to release the worker-owned Judy list on that path.
     do_pending_uuid_deletion(config, (struct judy_list_t *)worker->pending_uuid_deletion);
 
+    // same place for the same reason: before the store, so a re-created dimension stored below keeps its row
+    worker->pending_expired_dimensions =
+        do_pending_expired_dimensions((METADATA_EXPIRED_DIMENSIONS *)worker->pending_expired_dimensions);
+
     worker_is_busy(UV_EVENT_METADATA_STORE);
 
     store_hosts_metadata(config, true, false);
@@ -2872,6 +3242,7 @@ static void metadata_event_loop(void *arg)
 
     worker_register_job_name(METADATA_DATABASE_NOOP, "noop");
     worker_register_job_name(METADATA_DEL_DIMENSION, "delete dimension");
+    worker_register_job_name(METADATA_DEL_EXPIRED_DIMENSIONS, "delete expired dimensions");
     worker_register_job_name(METADATA_STORE_CLAIM_ID, "add claim id");
     worker_register_job_name(METADATA_ADD_CTX_CLEANUP, "host ctx cleanup");
     worker_register_job_name(METADATA_STORE, "host metadata store");
@@ -2949,6 +3320,14 @@ static void metadata_event_loop(void *arg)
                     else
                         *Pvalue = uuid;
                     break;
+                case METADATA_DEL_EXPIRED_DIMENSIONS:
+                    (void)expired_dimensions_append(
+                        &config->expired_dimensions,
+                        &config->expired_dimensions_pending,
+                        config->expired_dimensions_in_worker,
+                        (METADATA_EXPIRED_DIMENSIONS *)cmd.param[0],
+                        METADATA_EXPIRED_DIMENSIONS_MAX_PENDING);
+                    break;
                 case METADATA_STORE_CLAIM_ID:
                     store_claim_id((nd_uuid_t *)cmd.param[0], (nd_uuid_t *)cmd.param[1]);
                     freez((void *)cmd.param[0]);
@@ -2979,16 +3358,26 @@ static void metadata_event_loop(void *arg)
                     worker->pending_alert_list = pending_alert_list;
                     worker->pending_ctx_cleanup_list = pending_ctx_cleanup_list;
                     worker->pending_uuid_deletion = pending_uuid_deletion;
+                    worker->pending_expired_dimensions = config->expired_dimensions;
                     worker->pending_sql_statement = pending_sql_statement;
                     pending_alert_list = NULL;
                     pending_ctx_cleanup_list = NULL;
                     pending_uuid_deletion = NULL;
+                    config->expired_dimensions = NULL;
+                    config->expired_dimensions_in_worker = config->expired_dimensions_pending;
+                    config->expired_dimensions_pending = 0;
                     pending_sql_statement = NULL;
                     config->metadata_running = true;
                     if (uv_queue_work(loop, &worker->request, start_metadata_hosts, after_metadata_hosts)) {
                         pending_alert_list = worker->pending_alert_list;
                         pending_ctx_cleanup_list = worker->pending_ctx_cleanup_list;
                         pending_uuid_deletion = worker->pending_uuid_deletion;
+                        config->expired_dimensions_in_worker = 0;
+                        expired_dimensions_requeue(
+                            &config->expired_dimensions,
+                            &config->expired_dimensions_pending,
+                            (METADATA_EXPIRED_DIMENSIONS *)worker->pending_expired_dimensions);
+                        worker->pending_expired_dimensions = NULL;
                         pending_sql_statement = worker->pending_sql_statement;
                         config->metadata_running = false;
                         return_worker(&config->worker_pool, worker);
@@ -3113,6 +3502,16 @@ static void metadata_event_loop(void *arg)
     judy_list_free(pending_ctx_cleanup_list, host_ctx_cleanup_free);
     judy_list_free(pending_uuid_deletion, judy_value_freez);
 
+    // expired dimensions not deleted by now are left to the dimension scan after the restart; close the queue
+    // first, so no batch arrives after the drain
+    expired_dimensions_list_free(&config->expired_dimensions);
+    config->expired_dimensions_pending = 0;
+    close_cmd_pool(&config->cmd_pool);
+    for (cmd_data_t cmd = metadata_deq_cmd(); cmd.opcode != METADATA_DATABASE_NOOP; cmd = metadata_deq_cmd()) {
+        if (cmd.opcode == METADATA_DEL_EXPIRED_DIMENSIONS)
+            metadata_expired_dimensions_free((METADATA_EXPIRED_DIMENSIONS *)cmd.param[0]);
+    }
+
     release_cmd_pool(&config->cmd_pool);
     worker_unregister();
     service_exits();
@@ -3196,6 +3595,24 @@ void metaqueue_delete_dimension_uuid(nd_uuid_t *uuid)
     uuid_copy(*use_uuid, *uuid);
     if (!queue_metadata_cmd(METADATA_DEL_DIMENSION, use_uuid, NULL))
         freez(use_uuid);
+}
+
+// Takes ownership of the batch. Never waits: the caller is the contexts garbage collection, and a batch that
+// cannot be queued is dropped (the dimension scan reaps those rows later).
+void metaqueue_delete_expired_dimensions(METADATA_EXPIRED_DIMENSIONS *batch)
+{
+    if (unlikely(!batch))
+        return;
+
+    cmd_data_t cmd = {
+        .opcode = METADATA_DEL_EXPIRED_DIMENSIONS,
+        .param = { batch, NULL },
+    };
+
+    if (!batch->used || !metadata_enq_cmd(&cmd, false)) {
+        __atomic_add_fetch(&expired_dimensions_dropped, batch->used, __ATOMIC_RELAXED);
+        metadata_expired_dimensions_free(batch);
+    }
 }
 
 void metaqueue_store_claim_id(nd_uuid_t *host_uuid, nd_uuid_t *claim_uuid)
@@ -3419,6 +3836,369 @@ static void *metadata_unittest_threads(void)
     fprintf(stderr, "Added %u elements, processed %u\n", tu.added, tu.processed);
 
     return 0;
+}
+
+// ----------------------------------------------------------------------------
+// expired dimensions unit test - the batch handling and the guarded deletion, without the event loop
+// (unittest_running keeps METADATA_STORE from running)
+
+static size_t ut_expired_deleted;
+static size_t ut_expired_can_continue_calls;
+static size_t ut_expired_can_continue_limit;
+static nd_uuid_t ut_expired_retained_uuid;
+
+static bool ut_expired_can_be_deleted(nd_uuid_t *uuid)
+{
+    return !uuid_eq(*uuid, ut_expired_retained_uuid);
+}
+
+static size_t ut_expired_fail_after;
+
+static bool ut_expired_delete(nd_uuid_t *uuid __maybe_unused, sqlite3_stmt **res __maybe_unused)
+{
+    if (ut_expired_deleted >= ut_expired_fail_after)
+        return false;
+
+    ut_expired_deleted++;
+    return true;
+}
+
+static int64_t ut_expired_count(const char *sql, nd_uuid_t *uuid)
+{
+    sqlite3_stmt *res = NULL;
+    int64_t count = -1;
+    if (!PREPARE_STATEMENT(db_meta, sql, &res))
+        return -1;
+    if (sqlite3_bind_blob(res, 1, uuid, sizeof(*uuid), SQLITE_STATIC) == SQLITE_OK &&
+        sqlite3_step_monitored(res) == SQLITE_ROW)
+        count = sqlite3_column_int64(res, 0);
+    SQLITE_FINALIZE(res);
+    return count;
+}
+
+static bool ut_expired_insert(const char *sql, nd_uuid_t *uuid1, nd_uuid_t *uuid2)
+{
+    sqlite3_stmt *res = NULL;
+    if (!PREPARE_STATEMENT(db_meta, sql, &res))
+        return false;
+    bool ok = sqlite3_bind_blob(res, 1, uuid1, sizeof(*uuid1), SQLITE_STATIC) == SQLITE_OK &&
+              (!uuid2 || sqlite3_bind_blob(res, 2, uuid2, sizeof(*uuid2), SQLITE_STATIC) == SQLITE_OK) &&
+              sqlite3_step_monitored(res) == SQLITE_DONE;
+    SQLITE_FINALIZE(res);
+    return ok;
+}
+
+static bool ut_expired_can_continue(void)
+{
+    return ut_expired_can_continue_calls++ < ut_expired_can_continue_limit;
+}
+
+static size_t ut_expired_transactions_open;
+
+static bool ut_expired_transaction(bool begin)
+{
+    if (begin)
+        ut_expired_transactions_open++;
+    else
+        ut_expired_transactions_open--;
+    return true;
+}
+
+static bool ut_expired_never_live(RRDHOST *host __maybe_unused, const struct metadata_expired_dimension *e __maybe_unused)
+{
+    return false;
+}
+
+static METADATA_EXPIRED_DIMENSIONS *ut_expired_batch(const char *machine_guid, size_t records)
+{
+    METADATA_EXPIRED_DIMENSIONS *batch = metadata_expired_dimensions_create(machine_guid);
+    STRING *chart_id = string_strdupz("unittest.expired");
+    STRING *dim_id = string_strdupz("d");
+    for (size_t i = 0; i < records; i++) {
+        nd_uuid_t uuid;
+        uuid_generate(uuid);
+        UUIDMAP_ID id = uuidmap_create(uuid);
+        metadata_expired_dimensions_add(batch, id, chart_id, dim_id);
+        uuidmap_free(id);
+    }
+    string_freez(chart_id);
+    string_freez(dim_id);
+    return batch;
+}
+
+int metadata_expired_dimensions_unittest(void)
+{
+    fprintf(stderr, "%s() running...\n", __FUNCTION__);
+    int rc = 0;
+
+    // 1. the backlog cap drops a batch that does not fit, and counts its records
+    {
+        METADATA_EXPIRED_DIMENSIONS *list = NULL;
+        size_t pending = 0;
+        size_t dropped_before = __atomic_load_n(&expired_dimensions_dropped, __ATOMIC_RELAXED);
+
+        bool first = expired_dimensions_append(&list, &pending, 0, ut_expired_batch("ut-host", 3), 5);
+        bool second = expired_dimensions_append(&list, &pending, 0, ut_expired_batch("ut-host", 3), 5);
+        // the records the running pass holds count too
+        bool third = expired_dimensions_append(&list, &pending, 2, ut_expired_batch("ut-host", 1), 5);
+        size_t dropped = __atomic_load_n(&expired_dimensions_dropped, __ATOMIC_RELAXED) - dropped_before;
+
+        if (!first || second || third || pending != 3 || dropped != 4 || !list || list->next) {
+            fprintf(stderr, "%s: backlog cap: accepted %d/%d/%d, pending %zu, dropped %zu (expected 1/0/0, 3, 4)\n",
+                    __FUNCTION__, first, second, third, pending, dropped);
+            rc = 1;
+        }
+        expired_dimensions_list_free(&list);
+    }
+
+    // 2. a live dimension with the same uuid is kept; same ids with another uuid, or a host that is gone, are
+    //    deleted when the retention check agrees; a dimension still with data is kept
+    {
+        RRD_DB_MODE old_mode = default_rrd_memory_mode;
+        default_rrd_memory_mode = RRD_DB_MODE_ALLOC;
+
+        RRDSET *st = rrdset_create_localhost(
+            "netdata", "unittest-expired-dims", "unittest-expired-dims", "netdata", NULL,
+            "Unit Testing", "x", "unittest", NULL, 1, nd_profile.update_every, RRDSET_TYPE_LINE);
+        RRDDIM *rd = st ? rrddim_add(st, "d", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE) : NULL;
+
+        if (!rd) {
+            fprintf(stderr, "%s: could not create the test chart\n", __FUNCTION__);
+            rc = 1;
+        }
+        else {
+            METADATA_EXPIRED_DIMENSIONS *list = NULL;
+            size_t pending = 0;
+
+            METADATA_EXPIRED_DIMENSIONS *batch = metadata_expired_dimensions_create(localhost->machine_guid);
+            metadata_expired_dimensions_add(batch, rd->uuid, st->id, rd->id);           // live: kept
+
+            nd_uuid_t other;
+            uuid_generate(other);
+            UUIDMAP_ID other_id = uuidmap_create(other);
+            metadata_expired_dimensions_add(batch, other_id, st->id, rd->id);           // same ids, old uuid: deleted
+
+            uuid_generate(ut_expired_retained_uuid);
+            UUIDMAP_ID retained_id = uuidmap_create(ut_expired_retained_uuid);
+            metadata_expired_dimensions_add(batch, retained_id, st->id, rd->id);        // still with data: kept
+            (void)expired_dimensions_append(&list, &pending, 0, batch, 100);
+
+            METADATA_EXPIRED_DIMENSIONS *gone = metadata_expired_dimensions_create("00000000-0000-0000-0000-000000000000");
+            metadata_expired_dimensions_add(gone, other_id, st->id, rd->id);            // host gone: deleted
+            (void)expired_dimensions_append(&list, &pending, 0, gone, 100);
+
+            uuidmap_free(other_id);
+            uuidmap_free(retained_id);
+
+            struct expired_dimensions_ops ops = {
+                .is_live = expired_dimension_is_live,
+                .can_be_deleted = ut_expired_can_be_deleted,
+                .delete = ut_expired_delete,
+                .can_continue = ut_expired_can_continue,
+                .transaction = ut_expired_transaction,
+            };
+            ut_expired_deleted = 0;
+            ut_expired_fail_after = SIZE_MAX;
+            ut_expired_can_continue_calls = 0;
+            ut_expired_can_continue_limit = SIZE_MAX;
+
+            struct expired_dimensions_result result = { 0 };
+            list = expired_dimensions_process(list, &ops, &result);
+
+            if (list || result.checked != 4 || result.live != 1 || result.retained != 1 || result.deleted != 2 ||
+                ut_expired_deleted != 2) {
+                fprintf(stderr, "%s: guard: checked %zu, live %zu, retained %zu, deleted %zu (%zu calls), %s left "
+                                "(expected 4, 1, 1, 2, nothing left)\n",
+                        __FUNCTION__, result.checked, result.live, result.retained, result.deleted,
+                        ut_expired_deleted, list ? "batches" : "nothing");
+                rc = 1;
+            }
+            expired_dimensions_list_free(&list);
+
+            // a host being freed (its metadata lifetime lock held for writing) is left for the next pass
+            batch = metadata_expired_dimensions_create(localhost->machine_guid);
+            metadata_expired_dimensions_add(batch, rd->uuid, st->id, rd->id);
+            (void)expired_dimensions_append(&list, &pending, 0, batch, 100);
+
+            rw_spinlock_write_lock(&localhost->metadata_lifetime_lock);
+            struct expired_dimensions_result busy = { 0 };
+            list = expired_dimensions_process(list, &ops, &busy);
+            rw_spinlock_write_unlock(&localhost->metadata_lifetime_lock);
+
+            if (busy.checked || busy.busy != 1 || list != batch || batch->done != 0) {
+                fprintf(stderr, "%s: busy host: checked %zu, busy %zu, batch %s (expected 0, 1, kept untouched)\n",
+                        __FUNCTION__, busy.checked, busy.busy, list == batch ? "kept" : "not kept");
+                rc = 1;
+            }
+            expired_dimensions_list_free(&list);
+        }
+
+        if (st)
+            rrdset_free(st);
+        default_rrd_memory_mode = old_mode;
+    }
+
+    // 3. a stop (full WAL) leaves exactly the unprocessed records, and they go back in front of newer batches
+    {
+        METADATA_EXPIRED_DIMENSIONS *list = NULL;
+        size_t pending = 0;
+        (void)expired_dimensions_append(&list, &pending, 0, ut_expired_batch("ut-host", 600), SIZE_MAX);
+
+        struct expired_dimensions_ops ops = {
+            .is_live = ut_expired_never_live,
+            .can_be_deleted = ut_expired_can_be_deleted,
+            .delete = ut_expired_delete,
+            .can_continue = ut_expired_can_continue,
+            .transaction = ut_expired_transaction,
+        };
+        ut_expired_deleted = 0;
+        ut_expired_fail_after = SIZE_MAX;
+        ut_expired_can_continue_calls = 0;
+        ut_expired_can_continue_limit = 2;    // before the first record and after 256, not after 512
+        uuid_clear(ut_expired_retained_uuid);
+
+        METADATA_EXPIRED_DIMENSIONS *worker_list = list;
+        list = NULL;
+        pending = 0;
+
+        struct expired_dimensions_result result = { 0 };
+        worker_list = expired_dimensions_process(worker_list, &ops, &result);
+
+        // a batch that arrived while the worker ran
+        METADATA_EXPIRED_DIMENSIONS *newer = ut_expired_batch("ut-host", 5);
+        (void)expired_dimensions_append(&list, &pending, 0, newer, SIZE_MAX);
+        expired_dimensions_requeue(&list, &pending, worker_list);
+
+        if (result.checked != 512 || ut_expired_deleted != 512 || !list || list == newer || list->next != newer ||
+            list->used - list->done != 88 || pending != 93) {
+            fprintf(stderr, "%s: carry-over: checked %zu, deleted %zu, pending %zu, first batch %s with %zu left "
+                            "(expected 512, 512, 93, the old one with 88)\n",
+                    __FUNCTION__, result.checked, ut_expired_deleted, pending,
+                    (list && list != newer) ? "the old one" : "not the old one",
+                    list ? list->used - list->done : 0);
+            rc = 1;
+        }
+
+        // nothing runs when the first check says stop
+        ut_expired_can_continue_calls = 0;
+        ut_expired_can_continue_limit = 0;
+        size_t before = expired_dimensions_list_remaining(list);
+        struct expired_dimensions_result none = { 0 };
+        list = expired_dimensions_process(list, &ops, &none);
+        if (none.checked || expired_dimensions_list_remaining(list) != before) {
+            fprintf(stderr, "%s: a stop before the first record still processed %zu records\n", __FUNCTION__, none.checked);
+            rc = 1;
+        }
+
+        // a failed delete stops the pass and keeps that record for the next one
+        ut_expired_can_continue_calls = 0;
+        ut_expired_can_continue_limit = SIZE_MAX;
+        ut_expired_deleted = 0;
+        ut_expired_fail_after = 10;
+        before = expired_dimensions_list_remaining(list);
+        struct expired_dimensions_result failing = { 0 };
+        list = expired_dimensions_process(list, &ops, &failing);
+        if (failing.deleted != 10 || failing.failed != 1 || expired_dimensions_list_remaining(list) != before - 10) {
+            fprintf(stderr, "%s: failed delete: deleted %zu, failed %zu, left %zu (expected 10, 1, %zu)\n",
+                    __FUNCTION__, failing.deleted, failing.failed, expired_dimensions_list_remaining(list), before - 10);
+            rc = 1;
+        }
+
+        // ... and after EXPIRED_DIMENSION_DELETE_ATTEMPTS failed passes it is given up (the dimension scan reaps it)
+        ut_expired_deleted = 0;
+        ut_expired_fail_after = 0;
+        for (int i = 1; i < EXPIRED_DIMENSION_DELETE_ATTEMPTS; i++) {
+            struct expired_dimensions_result again = { 0 };
+            list = expired_dimensions_process(list, &ops, &again);
+        }
+        if (expired_dimensions_list_remaining(list) != before - 11) {
+            fprintf(stderr, "%s: a record failing %d times was not given up: %zu left (expected %zu)\n",
+                    __FUNCTION__, EXPIRED_DIMENSION_DELETE_ATTEMPTS, expired_dimensions_list_remaining(list), before - 11);
+            rc = 1;
+        }
+
+        // a record that failed once and is then kept (still with data) must not pass its failure count to the next
+        // record: that one still gets all its attempts
+        if (list) {
+            struct expired_dimensions_result once = { 0 };
+            list = expired_dimensions_process(list, &ops, &once);       // the next record fails once
+            if (list) {
+                uuid_copy(ut_expired_retained_uuid, list->items[list->done].uuid);
+                struct expired_dimensions_result kept = { 0 };
+                list = expired_dimensions_process(list, &ops, &kept);   // it is kept; the one after fails once
+                for (int i = 2; i < EXPIRED_DIMENSION_DELETE_ATTEMPTS; i++) {
+                    struct expired_dimensions_result again = { 0 };
+                    list = expired_dimensions_process(list, &ops, &again);
+                }
+            }
+            uuid_clear(ut_expired_retained_uuid);
+        }
+        if (expired_dimensions_list_remaining(list) != before - 12) {
+            fprintf(stderr, "%s: a record after a kept one was given up early: %zu left (expected %zu)\n",
+                    __FUNCTION__, expired_dimensions_list_remaining(list), before - 12);
+            rc = 1;
+        }
+
+        if (ut_expired_transactions_open) {
+            fprintf(stderr, "%s: %zu transactions left open\n", __FUNCTION__, ut_expired_transactions_open);
+            rc = 1;
+        }
+
+        expired_dimensions_list_free(&list);
+    }
+
+    // 4. the real delete removes the dimension row, and the triggers remove the chart with its labels when its
+    //    last dimension goes
+    if (!db_meta) {
+        fprintf(stderr, "%s: no metadata database to test the delete\n", __FUNCTION__);
+        rc = 1;
+    }
+    else {
+        nd_uuid_t chart, d1, d2;
+        uuid_generate(chart);
+        uuid_generate(d1);
+        uuid_generate(d2);
+
+        bool inserted =
+            ut_expired_insert("INSERT INTO chart (chart_id, id) VALUES (@chart, 'unittest.expired')", &chart, NULL) &&
+            ut_expired_insert("INSERT INTO dimension (dim_id, chart_id, id) VALUES (@dim, @chart, 'd1')", &d1, &chart) &&
+            ut_expired_insert("INSERT INTO dimension (dim_id, chart_id, id) VALUES (@dim, @chart, 'd2')", &d2, &chart) &&
+            ut_expired_insert("INSERT INTO chart_label (chart_id, source_type, label_key, label_value, date_created) "
+                              "VALUES (@chart, 1, 'k', 'v', 0)", &chart, NULL);
+
+        const char *charts = "SELECT COUNT(*) FROM chart WHERE chart_id = @chart";
+        const char *labels = "SELECT COUNT(*) FROM chart_label WHERE chart_id = @chart";
+        const char *dims = "SELECT COUNT(*) FROM dimension WHERE chart_id = @chart";
+
+        // the production transaction wrapper: a commit with nothing open reports failure
+        bool begun = expired_dimensions_transaction(true);
+        sqlite3_stmt *res = NULL;
+        bool first = inserted && expired_dimension_delete(&d1, &res);
+        bool committed = begun && expired_dimensions_transaction(false);
+        bool nothing_open = !expired_dimensions_transaction(false) && sqlite3_get_autocommit(db_meta);
+        int64_t dims1 = ut_expired_count(dims, &chart), charts1 = ut_expired_count(charts, &chart),
+                labels1 = ut_expired_count(labels, &chart);
+        bool second = first && expired_dimension_delete(&d2, &res);
+        SQLITE_FINALIZE(res);
+        int64_t dims2 = ut_expired_count(dims, &chart), charts2 = ut_expired_count(charts, &chart),
+                labels2 = ut_expired_count(labels, &chart);
+
+        if (!committed || !nothing_open) {
+            fprintf(stderr, "%s: transaction: begun %d, committed %d, commit with nothing open refused %d\n",
+                    __FUNCTION__, begun, committed, nothing_open);
+            rc = 1;
+        }
+
+        if (!second || dims1 != 1 || charts1 != 1 || labels1 != 1 || dims2 != 0 || charts2 != 0 || labels2 != 0) {
+            fprintf(stderr, "%s: delete: inserted %d, deleted %d/%d, after the first dims/charts/labels %" PRId64 "/%"
+                            PRId64 "/%" PRId64 " (expected 1/1/1), after the last %" PRId64 "/%" PRId64 "/%" PRId64
+                            " (expected 0/0/0)\n",
+                    __FUNCTION__, inserted, first, second, dims1, charts1, labels1, dims2, charts2, labels2);
+            rc = 1;
+        }
+    }
+
+    return rc;
 }
 
 int metadata_unittest(void)
