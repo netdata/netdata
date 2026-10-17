@@ -111,7 +111,7 @@ Metrics:
 
 ### Per disk
 
-
+A block device listed in /proc/diskstats; the `disk_ext` discard charts need Linux 4.18 or later, and their `flushes` dimensions need Linux 5.5 or later.
 
 Labels:
 
