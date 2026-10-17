@@ -423,6 +423,160 @@ static size_t test_dbengine_burst_retention_case(
     return errors;
 }
 
+// a gap-only metric whose last point exactly fills its page: the page-full flush discards the page, and storing that
+// point sets the hot time again with no page behind it, so the final flush finds no page and must still leave no
+// retention behind
+static size_t test_dbengine_burst_retention_page_full_case(RRDHOST *host, const char *id) {
+    size_t errors = 0;
+
+    fprintf(stderr, "DBENGINE Burst Retention Test: '%s', gap-only points exactly filling a page...\n", id);
+
+    RRDSET *st = rrdset_create(host, "netdata", id, id, "netdata", NULL, "Unit Testing", "a value", "unittest",
+                               NULL, 1, 1, RRDSET_TYPE_LINE);
+    RRDDIM *rd = rrddim_add(st, "dim", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+    struct rrdeng_collect_handle *handle = (struct rrdeng_collect_handle *)rd->tiers[0].sch;
+
+    time_t t0 = START_TIMESTAMP;
+    rrddim_store_metric(rd, (usec_t)(t0 + 1) * USEC_PER_SEC, NAN, SN_EMPTY_SLOT);
+
+    size_t capacity = handle->page_entries_max;
+    for(size_t p = 1; p < capacity; p++)
+        rrddim_store_metric(rd, (usec_t)(t0 + 1 + (time_t)p) * USEC_PER_SEC, NAN, SN_EMPTY_SLOT);
+
+    if(!capacity || handle->pgc_page) {
+        fprintf(stderr, " >>> DBENGINE: BURST RETENTION: '%s' the page did not fill (capacity %zu)\n", id, capacity);
+        return 1;
+    }
+
+    for(size_t tier = 0; tier < nd_profile.storage_tiers; tier++)
+        storage_engine_store_flush(rd->tiers[tier].sch);
+
+    time_t first = 0, last = 0;
+    rrdeng_metric_retention_by_id(host->db[0].si, rd->uuid, &first, &last);
+
+    if(first || last) {
+        fprintf(stderr, " >>> DBENGINE: BURST RETENTION: '%s' retention is %" PRId64 " - %" PRId64 ", expected none\n",
+                id, (int64_t)first, (int64_t)last);
+        errors++;
+    }
+
+    return errors;
+}
+
+// rotation's retention check of a metric whose only page is still hot: the collector may flush that page right
+// after the check, so the check must leave the page's end as the clean time - a clean time of 0 would leave the
+// metric without retention once the flush clears the hot time, with its page still dirty
+static size_t test_dbengine_zero_retention_check_keeps_hot_page(RRDHOST *host, const char *id) {
+    fprintf(stderr, "DBENGINE Burst Retention Test: '%s', retention check while the page is hot...\n", id);
+
+    RRDSET *st = rrdset_create(host, "netdata", id, id, "netdata", NULL, "Unit Testing", "a value", "unittest",
+                               NULL, 1, 1, RRDSET_TYPE_LINE);
+    RRDDIM *rd = rrddim_add(st, "dim", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+    struct rrdeng_collect_handle *handle = (struct rrdeng_collect_handle *)rd->tiers[0].sch;
+
+    time_t t0 = START_TIMESTAMP;
+    for(size_t p = 0; p < 10; p++)
+        rrddim_store_metric(rd, (usec_t)(t0 + 1 + (time_t)p) * USEC_PER_SEC, (NETDATA_DOUBLE)p, SN_DEFAULT_FLAGS);
+
+    if(!handle->pgc_page) {
+        fprintf(stderr, " >>> DBENGINE: BURST RETENTION: '%s' has no hot page\n", id);
+        return 1;
+    }
+
+    mrg_metric_has_zero_disk_retention(main_mrg, handle->metric);
+
+    time_t clean = mrg_metric_get_latest_clean_time_s(main_mrg, handle->metric);
+    if(clean != t0 + 10) {
+        fprintf(stderr, " >>> DBENGINE: BURST RETENTION: '%s' clean time is %" PRId64 ", expected %" PRId64 "\n",
+                id, (int64_t)clean, (int64_t)(t0 + 10));
+        return 1;
+    }
+
+    return 0;
+}
+
+// rotation's retention check of a metric whose only page is hot and holds gaps only: the flush will discard that
+// page, so the check must not record it as retention, or the stopped metric is never deleted
+static size_t test_dbengine_zero_retention_check_ignores_gap_only_page(RRDHOST *host, const char *id) {
+    fprintf(stderr, "DBENGINE Burst Retention Test: '%s', retention check while a gap-only page is hot...\n", id);
+
+    RRDSET *st = rrdset_create(host, "netdata", id, id, "netdata", NULL, "Unit Testing", "a value", "unittest",
+                               NULL, 1, 1, RRDSET_TYPE_LINE);
+    RRDDIM *rd = rrddim_add(st, "dim", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+    struct rrdeng_collect_handle *handle = (struct rrdeng_collect_handle *)rd->tiers[0].sch;
+
+    time_t t0 = START_TIMESTAMP;
+    for(size_t p = 0; p < 10; p++)
+        rrddim_store_metric(rd, (usec_t)(t0 + 1 + (time_t)p) * USEC_PER_SEC, NAN, SN_EMPTY_SLOT);
+
+    if(!handle->pgc_page) {
+        fprintf(stderr, " >>> DBENGINE: BURST RETENTION: '%s' has no hot page\n", id);
+        return 1;
+    }
+
+    mrg_metric_has_zero_disk_retention(main_mrg, handle->metric);
+
+    for(size_t tier = 0; tier < nd_profile.storage_tiers; tier++)
+        storage_engine_store_flush(rd->tiers[tier].sch);
+
+    // the end of retention decides deletion (the first time may keep the hot time the retention reader stamped
+    // while the page was hot)
+    time_t first = 0, last = 0;
+    rrdeng_metric_retention_by_id(host->db[0].si, rd->uuid, &first, &last);
+    if(last) {
+        fprintf(stderr, " >>> DBENGINE: BURST RETENTION: '%s' retention is %" PRId64 " - %" PRId64 ", expected no end\n",
+                id, (int64_t)first, (int64_t)last);
+        return 1;
+    }
+
+    return 0;
+}
+
+// two collectors writing the same metric (a duplicate writer): one of them flushing must not clear the hot time the
+// other one stored, whether it stored nothing itself or stored before the other, or the metric reports no current
+// data until the next store
+static size_t test_dbengine_flush_keeps_other_writer_hot_time(RRDHOST *host, const char *id) {
+    fprintf(stderr, "DBENGINE Burst Retention Test: '%s', a flush with a duplicate writer...\n", id);
+
+    RRDSET *st = rrdset_create(host, "netdata", id, id, "netdata", NULL, "Unit Testing", "a value", "unittest",
+                               NULL, 1, 1, RRDSET_TYPE_LINE);
+    RRDDIM *rd = rrddim_add(st, "dim", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+
+    time_t t0 = START_TIMESTAMP;
+    for(size_t p = 0; p < 5; p++)
+        rrddim_store_metric(rd, (usec_t)(t0 + 1 + (time_t)p) * USEC_PER_SEC, (NETDATA_DOUBLE)p, SN_DEFAULT_FLAGS);
+
+    size_t errors = 0;
+    STORAGE_COLLECT_HANDLE *other = rrdeng_store_metric_init(rd->tiers[0].smh, 1, st->smg[0]);
+    if(!other) {
+        fprintf(stderr, " >>> DBENGINE: BURST RETENTION: '%s' failed to create the duplicate writer\n", id);
+        return 1;
+    }
+    METRIC *metric = ((struct rrdeng_collect_handle *)other)->metric;
+
+    // the new writer has stored nothing: its flush must leave the first writer's hot time
+    rrdeng_store_metric_flush_current_page(other);
+    time_t latest = mrg_metric_get_latest_time_s(main_mrg, metric);
+    if(latest != t0 + 5) {
+        fprintf(stderr, " >>> DBENGINE: BURST RETENTION: '%s' after an idle writer's flush the latest time is %" PRId64
+                        ", expected %" PRId64 "\n", id, (int64_t)latest, (int64_t)(t0 + 5));
+        errors++;
+    }
+
+    // the new writer stores a newer point: the first writer's flush must leave it
+    rrdeng_store_metric_next(other, (usec_t)(t0 + 6) * USEC_PER_SEC, 6, 6, 6, 1, 0, SN_DEFAULT_FLAGS);
+    rrdeng_store_metric_flush_current_page(rd->tiers[0].sch);
+    latest = mrg_metric_get_latest_time_s(main_mrg, metric);
+    if(latest != t0 + 6) {
+        fprintf(stderr, " >>> DBENGINE: BURST RETENTION: '%s' after the older writer's flush the latest time is %" PRId64
+                        ", expected %" PRId64 "\n", id, (int64_t)latest, (int64_t)(t0 + 6));
+        errors++;
+    }
+
+    rrdeng_store_metric_finalize(other);
+    return errors;
+}
+
 static size_t test_dbengine_burst_retention(RRDHOST *host) {
     size_t errors = 0;
     time_t t0 = START_TIMESTAMP;
@@ -441,17 +595,21 @@ static size_t test_dbengine_burst_retention(RRDHOST *host) {
     errors += test_dbengine_burst_retention_case(host, "dbengine-burst-leading-gaps",
                                                  100, 5, false, t0 + 1, t0 + 100);
 
-    // gap-only pages: discarded at flush, so the page start must NOT be
-    // recorded as retention; what remains is the pre-existing reader
-    // fallback from latest_time_s_hot (which survives the flush - the
-    // flush's clear is filtered out by mrg_metric_set_hot_latest_time_s
-    // ignoring zero), giving first == last == the last gap time
+    // gap-only pages: discarded at flush, and the flush clears the hot
+    // time, so nothing is left as retention
     errors += test_dbengine_burst_retention_case(host, "dbengine-burst-all-gaps",
-                                                 100, 100, true, t0 + 100, t0 + 100);
+                                                 100, 100, true, 0, 0);
 
     // gap-only pages discarded at page-full rotation: same, at capacity
     errors += test_dbengine_burst_retention_case(host, "dbengine-burst-all-gaps-capacity",
-                                                 1100, 1100, true, t0 + 1100, t0 + 1100);
+                                                 1100, 1100, true, 0, 0);
+
+    // the last gap fills the page exactly, so the final flush finds no page
+    errors += test_dbengine_burst_retention_page_full_case(host, "dbengine-burst-all-gaps-page-full");
+
+    errors += test_dbengine_zero_retention_check_keeps_hot_page(host, "dbengine-zero-retention-hot-page");
+    errors += test_dbengine_zero_retention_check_ignores_gap_only_page(host, "dbengine-zero-retention-gap-only-page");
+    errors += test_dbengine_flush_keeps_other_writer_hot_time(host, "dbengine-duplicate-writer-hot-time");
 
     return errors;
 }
