@@ -368,6 +368,24 @@ struct rrdhost {
     // locks
 
     SPINLOCK rrdhost_update_lock;
+
+    // The host's lifetime lock: the admission protocol between the paths that make a host live and
+    // the paths that remove it.
+    // - Removers (remove-stale-node, the orphan/ephemeral reaper, the memory-mode replace in
+    //   rrdhost_find_or_create()) take the write side with trywrite, re-check that the host is still
+    //   eligible AFTER acquiring it, and hold it until the host is unlinked from the index.
+    // - Attachers (the stream receiver, a plugin defining or re-enabling a vnode, an un-archive in
+    //   rrdhost_update()) hold the read side - a "pin" - from the index lookup until the host is
+    //   marked live. The pin is acquired under rrd_rdlock() (or rrd_wrlock()), which is what keeps
+    //   the pointer valid between the lookup and the pin. rrdhost_find_or_create() returns hosts
+    //   pinned.
+    // - A plugin holds a pin on the non-local host it has selected (HOST, HOST_DEFINE_END) for as long
+    //   as it is selected, because it keeps using that pointer: see pluginsd_select_host(). Selecting
+    //   localhost takes no pin: localhost is never removed.
+    // Nobody ever waits for the write side, so holding a pin cannot block anyone; failing to take a
+    // pin means a removal is in progress, and the attacher refuses and retries later. Every pin MUST
+    // be released with rrdhost_pin_release() on the thread that took it: a leaked pin makes the host
+    // unremovable. The metadata sync scan and the CLI's mark-ephemeral path also take the read side.
     RW_SPINLOCK metadata_lifetime_lock;
 
     // ------------------------------------------------------------------------
@@ -576,6 +594,18 @@ RRDHOST *rrdhost_find_by_node_id(const char *node_id);
 // the lifetime argument, that constraint, and why this is not keyed on node_id
 bool rrdhost_apply_by_machine_guid(const char *machine_guid, void (*cb)(RRDHOST *host, void *data), void *data, bool may_block);
 
+// Pin a host found in the index (see metadata_lifetime_lock). The caller MUST hold rrd_rdlock() or
+// rrd_wrlock() from the lookup until this returns. False means a removal holds the write side or is
+// trying to take it (a failed trywrite sets the writer bit briefly), so it can also fail during a
+// removal attempt that does not succeed: the caller MUST NOT make the host live and SHOULD retry later.
+static inline bool rrdhost_pin_try(RRDHOST *host) {
+    return rw_spinlock_tryread_lock(&host->metadata_lifetime_lock);
+}
+
+static inline void rrdhost_pin_release(RRDHOST *host) {
+    rw_spinlock_read_unlock(&host->metadata_lifetime_lock);
+}
+
 // Copies a machine-guid into a GUID_LEN + 1 byte destination, truncating anything longer.
 // Exposed for rrdhost_machine_guid_unittest().
 void rrdhost_machine_guid_copy(char *dst, const char *guid);
@@ -607,7 +637,8 @@ RRDHOST *rrdhost_create(
     time_t replication_step,
     struct rrdhost_system_info *system_info,
     int is_localhost,
-    bool archived
+    bool archived,
+    bool pin
     );
 
 void rrdhost_init(void);
@@ -623,6 +654,9 @@ static inline RRDHOST *rrdhost_from_nrpc_owner(NRPC_OWNER id) { return (RRDHOST 
 // used by the nRPC unittests to re-init localhost's registry identically
 void rrdhost_nrpc_registry_owner(RRDHOST *host, struct nrpc_registry_owner *owner);
 
+// Returns the host PINNED (see metadata_lifetime_lock): the caller MUST call rrdhost_pin_release()
+// on every path, once the host is marked live or the caller gave up on it. NULL means the host is
+// being created or removed by someone else right now - retry later.
 RRDHOST *rrdhost_find_or_create(
     const char *hostname,
     const char *registry_hostname,

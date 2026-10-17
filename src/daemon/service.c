@@ -288,6 +288,31 @@ static void svc_rrd_cleanup_obsolete_charts_from_all_hosts() {
         rrdcontext_request_full_gc();
 }
 
+// Whether the orphan cleanup should act on this host, and if so whether to delete it (true in
+// *delete) or only archive it (false).
+static bool svc_rrdhost_orphan_cleanup_decide(RRDHOST *host, RRDHOST *protected_host, time_t now, bool *delete) {
+    if(!rrdhost_should_be_cleaned_up(host, protected_host, now))
+        return false;
+
+    *delete = rrdhost_free_ephemeral_time_s &&
+              now - host->stream.rcv.status.last_disconnected > rrdhost_free_ephemeral_time_s &&
+              rrdhost_option_check(host, RRDHOST_OPTION_EPHEMERAL_HOST);
+
+    if (!*delete && rrdhost_flag_check(host, RRDHOST_FLAG_ARCHIVED)) {
+        // the node is archived, so the cleanup has already run
+        // however, the node may not have any retention now
+        // so it may still need to be needed
+        time_t from_s = 0, to_s = 0;
+        rrdhost_retention(host, now, rrdhost_is_online(host), &from_s, &to_s);
+        if(!from_s && !to_s)
+            *delete = true;
+        else
+            return false;
+    }
+
+    return true;
+}
+
 static void svc_rrdhost_cleanup_orphan_hosts(RRDHOST *protected_host) {
     worker_is_busy(UV_EVENT_CLEANUP_ORPHAN_HOSTS);
 
@@ -298,27 +323,21 @@ static void svc_rrdhost_cleanup_orphan_hosts(RRDHOST *protected_host) {
     while((host = next) != NULL) {
         next = host->next;
 
-        if(!rrdhost_should_be_cleaned_up(host, protected_host, now))
+        bool delete = false;
+        if(!svc_rrdhost_orphan_cleanup_decide(host, protected_host, now, &delete))
             continue;
-
-        bool delete = rrdhost_free_ephemeral_time_s &&
-                      now - host->stream.rcv.status.last_disconnected > rrdhost_free_ephemeral_time_s &&
-                      rrdhost_option_check(host, RRDHOST_OPTION_EPHEMERAL_HOST);
-
-        if (!delete && rrdhost_flag_check(host, RRDHOST_FLAG_ARCHIVED)) {
-            // the node is archived, so the cleanup has already run
-            // however, the node may not have any retention now
-            // so it may still need to be needed
-            time_t from_s = 0, to_s = 0;
-            rrdhost_retention(host, now, rrdhost_is_online(host), &from_s, &to_s);
-            if(!from_s && !to_s)
-                delete = true;
-            else
-                continue;
-        }
 
         if (!rw_spinlock_trywrite_lock(&host->metadata_lifetime_lock))
             continue;
+
+        // Decide again, now that we hold the write side: a child or a vnode collector that pinned the
+        // host before we took rrd_wrlock may have attached it after the check above (attaching does
+        // not need the rrd lock). Every attacher holds the read side until the host is live, so from
+        // here on the host cannot become live until we release it (see metadata_lifetime_lock).
+        if(!svc_rrdhost_orphan_cleanup_decide(host, protected_host, now, &delete)) {
+            rw_spinlock_write_unlock(&host->metadata_lifetime_lock);
+            continue;
+        }
 
         worker_is_busy(UV_EVENT_FREE_HOST);
 

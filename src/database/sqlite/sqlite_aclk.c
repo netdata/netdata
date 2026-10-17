@@ -234,6 +234,9 @@ static RRDHOST *load_archived_host_from_row(sqlite3_stmt *res)
                    rrdhost_hostname(host), host->machine_guid, node_str, is_ephemeral);
 #endif
 
+    // the pin from rrdhost_find_or_create() covered the initialization above; from here on an
+    // archived host is kept by RRDHOST_FLAG_PENDING_CONTEXT_LOAD, which every remover skips
+    rrdhost_pin_release(host);
     return host;
 }
 
