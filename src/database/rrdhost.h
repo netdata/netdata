@@ -595,8 +595,9 @@ RRDHOST *rrdhost_find_by_node_id(const char *node_id);
 bool rrdhost_apply_by_machine_guid(const char *machine_guid, void (*cb)(RRDHOST *host, void *data), void *data, bool may_block);
 
 // Pin a host found in the index (see metadata_lifetime_lock). The caller MUST hold rrd_rdlock() or
-// rrd_wrlock() from the lookup until this returns. False means a removal holds the host: the caller
-// MUST NOT make it live and SHOULD retry later.
+// rrd_wrlock() from the lookup until this returns. False means a removal holds the write side or is
+// trying to take it (a failed trywrite sets the writer bit briefly), so it can also fail during a
+// removal attempt that does not succeed: the caller MUST NOT make the host live and SHOULD retry later.
 static inline bool rrdhost_pin_try(RRDHOST *host) {
     return rw_spinlock_tryread_lock(&host->metadata_lifetime_lock);
 }
