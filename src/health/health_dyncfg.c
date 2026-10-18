@@ -144,6 +144,10 @@ static bool parse_config_value_database_lookup(json_object *jobj, const char *pa
                     buffer_sprintf(error, "invalid type for '%s.time_group_options' string", path);
                     return false;
                 }
+                if(jsonc_string_has_embedded_nul(jtime_group_options)) {
+                    buffer_sprintf(error, "invalid condition in '%s.time_group_options'", path);
+                    return false;
+                }
 
                 string_freez(config->time_group_options);
                 config->time_group_options = string_strdupz(json_object_get_string(jtime_group_options));
@@ -600,10 +604,13 @@ int dyncfg_health_prototype_to_conf(BUFFER *wb, RRD_ALERT_PROTOTYPE *ap, const c
                 case RRDR_GROUPING_PERCENTAGE_OF_TIME:
                 case RRDR_GROUPING_NUMBER_OF_FLAPS:
                 case RRDR_GROUPING_NUMBER_OF_TIMES:
-                    // round-trip the condition as written, so gap tokens and
-                    // `previous` survive a config export
-                    if(nap->config.time_group_options)
-                        buffer_sprintf(wb, "(%s)", string2str(nap->config.time_group_options));
+                    // Match the file reader's whitespace normalization on one physical line.
+                    if(nap->config.time_group_options) {
+                        char *condition = strdupz(string2str(nap->config.time_group_options));
+                        const char *normalized = trim_all(condition);
+                        buffer_sprintf(wb, "(%s)", normalized ? normalized : "");
+                        freez(condition);
+                    }
                     else
                         buffer_sprintf(wb, "(%s%0.2f)", alerts_group_conditions_id2txt(nap->config.time_group_condition), nap->config.time_group_value);
                 break;

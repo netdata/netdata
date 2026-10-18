@@ -1887,12 +1887,8 @@ static int alert_config_export_roundtrip(
 int sql_alert_config_unittest(void)
 {
     sqlite3 *saved_db_meta = db_meta;
-    bool owns_sqlite_lifecycle = !saved_db_meta;
     int failed = 0;
     CLEAN_BUFFER *command = NULL;
-
-    if (sqlite_library_init())
-        return 1;
 
     db_meta = NULL;
     if (sqlite3_open(":memory:", &db_meta) != SQLITE_OK) {
@@ -1900,8 +1896,6 @@ int sql_alert_config_unittest(void)
         if(db_meta)
             sqlite3_close(db_meta);
         db_meta = saved_db_meta;
-        if (owns_sqlite_lifecycle)
-            sqlite_library_shutdown();
         return 1;
     }
 
@@ -2016,8 +2010,5 @@ cleanup:
 
     sql_close_database(db_meta, "META-UNITTEST");
     db_meta = saved_db_meta;
-    if (owns_sqlite_lifecycle)
-        sqlite_library_shutdown();
-
     return failed;
 }

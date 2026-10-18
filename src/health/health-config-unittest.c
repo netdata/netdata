@@ -149,6 +149,9 @@ static const db_lookup_test_case_t test_cases[] = {
     // percentile variations
     { "percentile( 95 ) -10m", true, RRDR_GROUPING_PERCENTILE, DC_COND, 95.0, -600, 0, "percentile with spaces" },
     { "percentile(95) -10m", true, RRDR_GROUPING_PERCENTILE, DC_COND, 95.0, -600, 0, "percentile 95" },
+    { "percentile() -10m", true, RRDR_GROUPING_PERCENTILE, DC_COND, 95, -600, 0, "percentile empty keeps default" },
+    { "percentile(>) -10m", true, RRDR_GROUPING_PERCENTILE, ALERT_LOOKUP_TIME_GROUP_CONDITION_GREATER, 95, -600, 0, "percentile operator-only keeps default" },
+    { "percentile(0) -10m", true, RRDR_GROUPING_PERCENTILE, DC_COND, 0, -600, 0, "percentile explicit zero" },
     { "percentile(99) -5m", true, RRDR_GROUPING_PERCENTILE, DC_COND, 99.0, -300, 0, "percentile 99" },
     { "percentile(50) -10m", true, RRDR_GROUPING_PERCENTILE, DC_COND, 50.0, -600, 0, "percentile 50 (median)" },
     { "percentile(75) -1h", true, RRDR_GROUPING_PERCENTILE, DC_COND, 75.0, -3600, 0, "percentile 75" },
@@ -166,6 +169,9 @@ static const db_lookup_test_case_t test_cases[] = {
 
     // trimmed-mean variations
     { "trimmed-mean(5) -10m", true, RRDR_GROUPING_TRIMMED_MEAN, DC_COND, 5.0, -600, 0, "trimmed-mean 5%" },
+    { "trimmed-mean() -10m", true, RRDR_GROUPING_TRIMMED_MEAN, DC_COND, 5, -600, 0, "trimmed-mean empty keeps default" },
+    { "trimmed-mean(>) -10m", true, RRDR_GROUPING_TRIMMED_MEAN, ALERT_LOOKUP_TIME_GROUP_CONDITION_GREATER, 5, -600, 0, "trimmed-mean operator-only keeps default" },
+    { "trimmed-mean(0) -10m", true, RRDR_GROUPING_TRIMMED_MEAN, DC_COND, 0, -600, 0, "trimmed-mean explicit zero" },
     { "trimmed-mean(10) -10m", true, RRDR_GROUPING_TRIMMED_MEAN, DC_COND, 10.0, -600, 0, "trimmed-mean 10%" },
     { "trimmed-mean(1.00) -10m", true, RRDR_GROUPING_TRIMMED_MEAN, DC_COND, 1.0, -600, 0, "trimmed-mean 1%" },
 
@@ -184,6 +190,9 @@ static const db_lookup_test_case_t test_cases[] = {
 
     // trimmed-median variations
     { "trimmed-median(5) -10m", true, RRDR_GROUPING_TRIMMED_MEDIAN, DC_COND, 5.0, -600, 0, "trimmed-median 5%" },
+    { "trimmed-median() -10m", true, RRDR_GROUPING_TRIMMED_MEDIAN, DC_COND, 5, -600, 0, "trimmed-median empty keeps default" },
+    { "trimmed-median(>) -10m", true, RRDR_GROUPING_TRIMMED_MEDIAN, ALERT_LOOKUP_TIME_GROUP_CONDITION_GREATER, 5, -600, 0, "trimmed-median operator-only keeps default" },
+    { "trimmed-median(0) -10m", true, RRDR_GROUPING_TRIMMED_MEDIAN, DC_COND, 0, -600, 0, "trimmed-median explicit zero" },
     { "trimmed-median1 -10m", true, RRDR_GROUPING_TRIMMED_MEDIAN1, DC_COND, DC_VALUE, -600, 0, "trimmed-median1" },
     { "trimmed-median5 -10m", true, RRDR_GROUPING_TRIMMED_MEDIAN, DC_COND, DC_VALUE, -600, 0, "trimmed-median5" },
 
@@ -1648,8 +1657,10 @@ cleanup:
     return failed;
 }
 
-static int test_dyncfg_rejects_non_string_time_group_options(int *passed) {
-    static const char *invalid_values[] = { "{}", "[]", "1", "true", "null" };
+static int test_dyncfg_rejects_invalid_time_group_options(int *passed) {
+    static const char *invalid_values[] = {
+        "{}", "[]", "1", "true", "null", "\"\\u0000>1\"", "\">\\u00001\"", "\">1\\u0000\"",
+    };
     int failed = 0;
 
     for(size_t i = 0; i < sizeof(invalid_values) / sizeof(invalid_values[0]); i++) {
@@ -1666,7 +1677,7 @@ static int test_dyncfg_rejects_non_string_time_group_options(int *passed) {
                                     payload, NULL, NULL, result, HTTP_ACCESS_NONE, NULL, NULL);
         if(code != HTTP_RESP_BAD_REQUEST || !strstr(buffer_tostring(result), "time_group_options")) {
             fprintf(stderr,
-                    "FAILED [dyncfg rejects non-string time_group_options=%s]: code=%d response='%s'\n",
+                    "FAILED [dyncfg rejects invalid time_group_options=%s]: code=%d response='%s'\n",
                     invalid_values[i], code, buffer_tostring(result));
             failed++;
         }
@@ -1674,6 +1685,67 @@ static int test_dyncfg_rejects_non_string_time_group_options(int *passed) {
             (*passed)++;
     }
 
+    return failed;
+}
+
+static int test_dyncfg_condition_file_round_trip(int *passed) {
+    static const char *conditions[] = { "\">\\n1\"", "\">\\r\\n\\t 1\"", "\">\\t  1\"" };
+    int failed = 0;
+    health_init_prototypes();
+
+    for(size_t i = 0; i < sizeof(conditions) / sizeof(conditions[0]); i++) {
+        CLEAN_BUFFER *payload = buffer_create(0, NULL);
+        CLEAN_BUFFER *result = buffer_create(0, NULL);
+        buffer_sprintf(payload,
+                       "{\"format_version\":1,\"rules\":[{\"enabled\":true,\"type\":\"instance\","
+                       "\"config\":{\"value\":{\"update_every\":1,\"database_lookup\":{"
+                       "\"after\":-60,\"time_group\":\"percentage-of-time\",\"time_group_options\":%s}},"
+                       "\"match\":{\"on\":\"chart\"}}}]}", conditions[i]);
+        int code = dyncfg_health_cb(NULL, "health:alert:prototype", DYNCFG_CMD_USERCONFIG, "unittest",
+                                   payload, NULL, NULL, result, HTTP_ACCESS_NONE, NULL, NULL);
+        if(code != HTTP_RESP_OK) {
+            fprintf(stderr, "FAILED [condition whitespace export]: code=%d response='%s'\n",
+                    code, buffer_tostring(result));
+            failed++;
+            continue;
+        }
+
+        const char *tmpdir = getenv("TMPDIR");
+        if(!tmpdir || !*tmpdir)
+            tmpdir = P_tmpdir;
+        char filename[FILENAME_MAX + 1];
+        snprintfz(filename, sizeof(filename), "%s/netdata-health-condition-XXXXXX", tmpdir);
+        int fd = mkstemp(filename);
+        if(fd == -1) {
+            fprintf(stderr, "FAILED [condition whitespace fixture]: cannot create file\n");
+            failed++;
+            continue;
+        }
+        FILE *fp = fdopen(fd, "w");
+        if(!fp) {
+            close(fd);
+            unlink(filename);
+            fprintf(stderr, "FAILED [condition whitespace fixture]: cannot open file\n");
+            failed++;
+            continue;
+        }
+        int written = fputs(buffer_tostring(result), fp);
+        int closed = fclose(fp);
+        dictionary_flush(health_globals.prototypes.dict);
+        bool loaded = written != EOF && closed == 0 && health_readfile(filename, NULL, false) == 1;
+        RRD_ALERT_PROTOTYPE *ap = dictionary_get(health_globals.prototypes.dict, "unittest");
+        if(!loaded || !ap || ap->config.time_group != RRDR_GROUPING_PERCENTAGE_OF_TIME ||
+           ap->config.time_group_condition != ALERT_LOOKUP_TIME_GROUP_CONDITION_GREATER ||
+           ap->config.time_group_value != 1 || !ap->config.time_group_options ||
+           strcmp(string2str(ap->config.time_group_options), "> 1") != 0) {
+            fprintf(stderr, "FAILED [condition whitespace file re-import]: condition %zu changed\n", i);
+            failed++;
+        }
+        else
+            (*passed)++;
+        dictionary_flush(health_globals.prototypes.dict);
+        unlink(filename);
+    }
     return failed;
 }
 
@@ -1753,7 +1825,8 @@ int health_config_unittest(void) {
     failed += test_file_invalid_same_name_rule_is_skipped(&passed);
     failed += test_dyncfg_time_group_round_trip(&passed);
     failed += test_dyncfg_required_time_group_options(&passed);
-    failed += test_dyncfg_rejects_non_string_time_group_options(&passed);
+    failed += test_dyncfg_rejects_invalid_time_group_options(&passed);
+    failed += test_dyncfg_condition_file_round_trip(&passed);
     failed += test_dyncfg_long_condition_is_not_truncated(&passed);
     failed += test_expression_rejects_leave_the_default(&passed);
     failed += test_expression_omitted_operand_defaults_to_zero(&passed);
