@@ -74,8 +74,9 @@ set at the end.
 | CASE-020/badge-rate-sum-units | a badge SUM over a rate-only RRDSET renders the integrated volume unit by removing the source unit's trailing '/s' | n/a |  |
 | CASE-020/badge-gauge-sum-units | a badge SUM over an absolute-only RRDSET preserves the RRDSET's common units | n/a |  |
 | CASE-020/badge-mixed-algorithm-sum-units | a badge SUM over a mixed incremental-and-absolute RRDSET preserves the RRDSET's common units even when the dimension filter selects only its rate dimension | n/a |  |
-| CASE-020/folded-dimension-units | cardinality reduction preserves raw DB units and per-result SUM units for kept and folded pure-gauge, pure-rate and both mixed orders; normalized-unit groups retain a shared result unit and heterogeneous folds keep the existing source-unit fallback | n/a |  |
-| CASE-020/normalized-unit-groups | SUM groups rate requests/s and gauge requests under their common result units in both source orders, preserving raw first-source DB units and both contributors | n/a |  |
+| CASE-020/folded-dimension-units | cardinality reduction preserves per-result SUM units for kept dimensions; folding normalized-unit groups inherits a common result unit only when contributors agree and otherwise retains the existing source-unit fallback | n/a |  |
+| CASE-020/normalized-unit-groups | SUM groups rate requests/s and gauge requests under their common result units across distinct source contexts in both source orders, retaining both contributors | n/a |  |
+| CASE-020/raw-source-units-after-grouping | grouping and cardinality reduction preserve raw DB units from each result's source representative independently of normalized SUM result-unit labels | n/a |  |
 | CASE-020/badge-raw-percentage-units | badge percentage combined with return-raw keeps the SUM result units for rate, gauge and mixed-algorithm charts because percentage conversion is bypassed | n/a |  |
 | L4/family-tier-source | every forced family-tier query is served exclusively from tier1 and returns only the requested source dimension | n/a |  |
 | L4/family-tier-grid | every forced tier1 family query returns the exact aligned six-bucket view grid, including upward rounding of before to grouping boundaries | n/a |  |
@@ -161,7 +162,7 @@ set at the end.
 | CASE-023/mcp-valid-query-values | valid MCP numeric and gap expressions return the exact percentage, occurrence and flap values, including cadence-sensitive sample and time denominators | n/a |  |
 | CASE-023/mcp-valid-query-anomaly-rates | valid MCP condition queries preserve the exact anomaly rate of their selected source dimension independently of the grouped value | n/a |  |
 | CASE-023/mcp-valid-query-annotations | valid MCP condition queries preserve the exact RESET point-annotation bitmap independently of the grouped value | n/a |  |
-| CASE-023/mcp-invalid-options | non-string, malformed and non-finite MCP condition expressions return structured -32602 INVALID_PARAMS errors | n/a |  |
+| CASE-023/mcp-invalid-options | non-string, malformed or non-finite MCP condition expressions, plus NUL-bearing condition and numeric option strings, return structured -32602 INVALID_PARAMS errors | n/a |  |
 | CASE-023/weights-invalid-options | the public weights endpoint rejects a malformed expression instead of silently executing the default ==0 condition | n/a |  |
 | CASE-023/badge-invalid-options | the public badge endpoint rejects a malformed expression instead of silently rendering the default ==0 condition | n/a |  |
 | CASE-023/v1-data-invalid-options | the public v1 data endpoint rejects a malformed expression without allowing its HTTP 400 response to be cached | n/a |  |

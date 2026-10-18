@@ -70,8 +70,8 @@ layers; each layer declares which entries it consumes:
 ## Additional regression coverage
 
 - **CASE-020 — result units:** normalized rate/gauge groups, cardinality
-  folds, and raw percentage badges retain separate unit-label contracts
-  while DB metadata keeps its source units.
+  folds, raw percentage badges, and raw DB-unit preservation have separate
+  contracts. Inputs with different raw units use distinct source contexts.
 - **CASE-040 — retained tier coverage and handoffs:** late-enabled tiers,
   inverted or isolated retention, genuine gaps, partial first records,
   changing cadence, and conventional coarse-to-fine tails. Numeric values,

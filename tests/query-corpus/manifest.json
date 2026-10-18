@@ -288,7 +288,7 @@
   },
   {
     "name": "CASE-020/folded-dimension-units",
-    "proves": "cardinality reduction preserves raw DB units and per-result SUM units for kept and folded pure-gauge, pure-rate and both mixed orders; normalized-unit groups retain a shared result unit and heterogeneous folds keep the existing source-unit fallback",
+    "proves": "cardinality reduction preserves per-result SUM units for kept dimensions; folding normalized-unit groups inherits a common result unit only when contributors agree and otherwise retains the existing source-unit fallback",
     "components": [
       "gauges/dimension",
       "gauges/dimension,units",
@@ -303,10 +303,27 @@
   },
   {
     "name": "CASE-020/normalized-unit-groups",
-    "proves": "SUM groups rate requests/s and gauge requests under their common result units in both source orders, preserving raw first-source DB units and both contributors",
+    "proves": "SUM groups rate requests/s and gauge requests under their common result units across distinct source contexts in both source orders, retaining both contributors",
     "components": [
       "rate-first",
       "gauge-first"
+    ]
+  },
+  {
+    "name": "CASE-020/raw-source-units-after-grouping",
+    "proves": "grouping and cardinality reduction preserve raw DB units from each result's source representative independently of normalized SUM result-unit labels",
+    "components": [
+      "normalized/rate-first",
+      "normalized/gauge-first",
+      "folded/gauges/dimension",
+      "folded/gauges/dimension,units",
+      "folded/rates/dimension",
+      "folded/rates/dimension,units",
+      "folded/mixed/dimension",
+      "folded/mixed/dimension,units",
+      "folded/mixed-rate-first/dimension",
+      "folded/mixed-rate-first/dimension,units",
+      "folded/equal-normalized"
     ]
   },
   {
@@ -688,7 +705,7 @@
   },
   {
     "name": "CASE-023/mcp-invalid-options",
-    "proves": "non-string, malformed and non-finite MCP condition expressions return structured -32602 INVALID_PARAMS errors"
+    "proves": "non-string, malformed or non-finite MCP condition expressions, plus NUL-bearing condition and numeric option strings, return structured -32602 INVALID_PARAMS errors"
   },
   {
     "name": "CASE-023/weights-invalid-options",

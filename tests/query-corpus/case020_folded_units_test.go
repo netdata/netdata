@@ -11,6 +11,8 @@ import (
 	"github.com/netdata/netdata/tests/query-corpus/fixture"
 )
 
+const c020RawSourceUnitsContract = "CASE-020/raw-source-units-after-grouping"
+
 func c020AssertDimensionUnits(t *testing.T, section map[string]any, path string, want map[string]string) {
 	t.Helper()
 	dimensions := queryObject(t, section, "dimensions", path+".dimensions")
@@ -58,11 +60,12 @@ func TestCase020NormalizedUnitGroups(t *testing.T) {
 	const contract = "CASE-020/normalized-unit-groups"
 	for index, name := range []string{"rate-first", "gauge-first"} {
 		t.Run(name, func(t *testing.T) {
-			trackContractComponent(t, contract, name)
+			registerContractComponent(t, contract, name)
+			registerContractComponent(t, c020RawSourceUnitsContract, "normalized/"+name)
 			host := "c020-unit-order-" + name
 			context := "fixture.c020_unit_order_" + strconv.Itoa(index)
-			rate := c020Chart(context+"_z", context, "requests/s", "incremental", 5, fixture.T0)
-			gauge := c020Chart(context+"_a", context, "requests", "absolute", 7, fixture.T0)
+			rate := c020Chart(context+"_z", context+"_rate", "requests/s", "incremental", 5, fixture.T0)
+			gauge := c020Chart(context+"_a", context+"_gauge", "requests", "absolute", 7, fixture.T0)
 			charts := []fixture.Chart{rate, gauge}
 			if name == "gauge-first" {
 				charts[0], charts[1] = charts[1], charts[0]
@@ -70,27 +73,33 @@ func TestCase020NormalizedUnitGroups(t *testing.T) {
 			c020PushCharts(t, host, guid(9995+index), charts...)
 			c020WaitCharts(t, host, charts...)
 			doc := c020Query(t, c020QuerySpec{
-				host: host, context: context, timeGroup: "sum", groupBy: "units", aggregation: "sum",
+				host: host, context: context + "*", timeGroup: "sum", groupBy: "units", aggregation: "sum",
 				after: fixture.T0, before: fixture.T0 + c020Samples,
 			})
-			label, _ := c020OneColumn(t, doc)
-			if label != "requests" {
-				t.Errorf("normalized units group = %q, want requests", label)
-			}
-			view := queryObject(t, doc, "view", "view")
-			c020AssertDimensionUnits(t, view, "view", map[string]string{"requests": "requests"})
-			c020AssertDimensionUnits(t, queryObject(t, doc, "db", "db"), "db", map[string]string{
-				"requests": charts[0].Units,
+			t.Run("result-units", func(t *testing.T) {
+				trackContractComponent(t, contract, name)
+				label, _ := c020OneColumn(t, doc)
+				if label != "requests" {
+					t.Errorf("normalized units group = %q, want requests", label)
+				}
+				view := queryObject(t, doc, "view", "view")
+				c020AssertDimensionUnits(t, view, "view", map[string]string{"requests": "requests"})
+				dimensions := queryObject(t, view, "dimensions", "view.dimensions")
+				counts, ok := dimensions["aggregated"].([]any)
+				if !ok || len(counts) != 1 {
+					t.Fatalf("units group has invalid contributor counts: %v", dimensions["aggregated"])
+				}
+				count, numeric := queryInteger(counts[0])
+				if !numeric || count != 2 {
+					t.Errorf("units group did not retain both contributors: %v", dimensions["aggregated"])
+				}
 			})
-			dimensions := queryObject(t, view, "dimensions", "view.dimensions")
-			counts, ok := dimensions["aggregated"].([]any)
-			if !ok || len(counts) != 1 {
-				t.Fatalf("units group has invalid contributor counts: %v", dimensions["aggregated"])
-			}
-			count, numeric := queryInteger(counts[0])
-			if !numeric || count != 2 {
-				t.Errorf("units group did not retain both contributors: %v", dimensions["aggregated"])
-			}
+			t.Run("db-units", func(t *testing.T) {
+				trackContractComponent(t, c020RawSourceUnitsContract, "normalized/"+name)
+				c020AssertDimensionUnits(t, queryObject(t, doc, "db", "db"), "db", map[string]string{
+					"requests": charts[0].Units,
+				})
+			})
 		})
 	}
 }
@@ -121,7 +130,9 @@ func TestCase020FoldedDimensionUnits(t *testing.T) {
 			c020PushCharts(t, host, guid(9990+index), chart)
 			for _, groupBy := range []string{"dimension", "dimension,units"} {
 				t.Run(groupBy, func(t *testing.T) {
-					trackContractComponent(t, contract, item.name+"/"+groupBy)
+					component := item.name + "/" + groupBy
+					registerContractComponent(t, contract, component)
+					registerContractComponent(t, c020RawSourceUnitsContract, "folded/"+component)
 					params := daemon.DataParams(context, fixture.T0, fixture.T0+c020Samples, 1)
 					params.Set("time_group", "sum")
 					params.Set("group_by", groupBy)
@@ -136,33 +147,40 @@ func TestCase020FoldedDimensionUnits(t *testing.T) {
 					if groupBy == "dimension,units" {
 						keptID += "," + item.keptUnits
 					}
-					c020AssertDimensionUnits(t, queryObject(t, doc, "db", "db"), "db", map[string]string{
-						keptID: "requests/s", "remaining 2 dimensions": "requests/s",
+					t.Run("db-units", func(t *testing.T) {
+						trackContractComponent(t, c020RawSourceUnitsContract, "folded/"+component)
+						c020AssertDimensionUnits(t, queryObject(t, doc, "db", "db"), "db", map[string]string{
+							keptID: "requests/s", "remaining 2 dimensions": "requests/s",
+						})
 					})
-					c020AssertDimensionUnits(t, queryObject(t, doc, "view", "view"), "view", map[string]string{
-						keptID: item.keptUnits, "remaining 2 dimensions": item.foldUnits,
+					t.Run("result-units", func(t *testing.T) {
+						trackContractComponent(t, contract, component)
+						c020AssertDimensionUnits(t, queryObject(t, doc, "view", "view"), "view", map[string]string{
+							keptID: item.keptUnits, "remaining 2 dimensions": item.foldUnits,
+						})
 					})
 				})
 			}
 		})
 	}
 	t.Run("equal-normalized", func(t *testing.T) {
-		trackContractComponent(t, contract, "equal-normalized")
+		registerContractComponent(t, contract, "equal-normalized")
+		registerContractComponent(t, c020RawSourceUnitsContract, "folded/equal-normalized")
 		const host = "c020-fold-equal"
 		const context = "fixture.c020_fold_equal"
 		var charts []fixture.Chart
 		for i := 1; i <= 3; i++ {
-			units, algorithm := "requests/s", "incremental"
+			units, algorithm, sourceContext := "requests/s", "incremental", context+"_rate"
 			if i == 1 {
-				units, algorithm = "requests", "absolute"
+				units, algorithm, sourceContext = "requests", "absolute", context+"_gauge"
 			}
-			chart := c020Chart(context+"_"+strconv.Itoa(i), context, units, algorithm, i, fixture.T0)
+			chart := c020Chart(context+"_"+strconv.Itoa(i), sourceContext, units, algorithm, i, fixture.T0)
 			chart.Dimensions[0].ID = "d" + strconv.Itoa(i)
 			charts = append(charts, chart)
 		}
 		c020PushCharts(t, host, guid(9994), charts...)
 		c020WaitCharts(t, host, charts...)
-		params := daemon.DataParams(context, fixture.T0, fixture.T0+c020Samples, 1)
+		params := daemon.DataParams(context+"*", fixture.T0, fixture.T0+c020Samples, 1)
 		params.Set("time_group", "sum")
 		params.Set("group_by", "dimension,units")
 		params.Set("aggregation", "sum")
@@ -172,11 +190,17 @@ func TestCase020FoldedDimensionUnits(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		c020AssertDimensionUnits(t, queryObject(t, doc, "db", "db"), "db", map[string]string{
-			"d3,requests": "requests/s", "remaining 2 dimensions": "requests/s",
+		t.Run("db-units", func(t *testing.T) {
+			trackContractComponent(t, c020RawSourceUnitsContract, "folded/equal-normalized")
+			c020AssertDimensionUnits(t, queryObject(t, doc, "db", "db"), "db", map[string]string{
+				"d3,requests": "requests/s", "remaining 2 dimensions": "requests/s",
+			})
 		})
-		c020AssertDimensionUnits(t, queryObject(t, doc, "view", "view"), "view", map[string]string{
-			"d3,requests": "requests", "remaining 2 dimensions": "requests",
+		t.Run("result-units", func(t *testing.T) {
+			trackContractComponent(t, contract, "equal-normalized")
+			c020AssertDimensionUnits(t, queryObject(t, doc, "view", "view"), "view", map[string]string{
+				"d3,requests": "requests", "remaining 2 dimensions": "requests",
+			})
 		})
 	})
 
