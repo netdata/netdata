@@ -324,7 +324,7 @@ static int unittest_run_with_rrd(int (*test_fn)(void)) {
 }
 
 static int health_config_unittest_with_dyncfg(void) {
-    rrd_functions_inflight_init();
+    nrpc_inflight_calls_create();
     dyncfg_init(false);
     int rc = health_config_unittest();
     dyncfg_shutdown();
