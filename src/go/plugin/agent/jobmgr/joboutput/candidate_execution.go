@@ -72,8 +72,9 @@ func (dcjc *DynCfgJobController) prepareCandidateDecision(ctx context.Context, s
 }
 
 func (dcjc *DynCfgJobController) candidateProjectionCleanup(id string, postimage *dyncfg.GraphConfig, delta *candidateDelta) lifecycle.TaskCleanup {
-	if record, exists := dcjc.graph.Lookup(id); exists && delta.before != nil && delta.before.Binding != nil &&
-		delta.after.Binding != nil && delta.before.Binding.Key == delta.after.Binding.Key && record.Payload() == string(postimage.Payload) {
+	if _, exists := dcjc.graph.Lookup(id); exists && delta.before != nil && delta.before.Binding != nil &&
+		delta.after.Binding != nil && delta.before.Binding.Config.SourceType() == delta.after.Binding.Config.SourceType() &&
+		delta.before.Binding.Config.Source() == delta.after.Binding.Config.Source() {
 		return dcjc.configStatusCleanup(id, dyncfg.Status(postimage.Status))
 	}
 	config := delta.after.Binding.Config
@@ -178,7 +179,7 @@ func (dcjc *DynCfgJobController) prepareControllerActivation(ctx context.Context
 		reply := internalReply()
 		reply.candidate = delta
 		prepared, err := dcjc.prepareCandidateAdoption(ctx, scope, current, permit, attempt.stage, config, postimage, reply,
-			dcjc.configCreateCleanup(*postimage, config.SourceType(), config.Source(), dcjc.configType(dcjc.modules[config.Module()])), attempt.markApplied())
+			dcjc.candidateProjectionCleanup(scope.ID, postimage, delta), attempt.markApplied())
 		if err == nil && attempt.transferred != nil {
 			attempt.transferred.Store(true)
 		}

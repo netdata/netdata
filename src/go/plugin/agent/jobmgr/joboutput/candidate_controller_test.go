@@ -337,6 +337,14 @@ func TestCandidateControllerEnableAfterExactAndRetryWait(t *testing.T) {
 	require.NotNil(t, exact.Decision.Wake)
 	before := c.snapshot("test_job")
 	require.Len(t, before.Entries, 2)
+	coalesced := candidateEnable(t, c, 1)
+	require.True(t, coalesced.Decision.Ignored)
+	require.Nil(t, coalesced.Decision.Work)
+	assert.Equal(t, before.Intent, c.snapshot("test_job").Intent)
+	assert.Equal(t, candidateExactConfig, c.snapshot("test_job").Scope)
+	assert.Equal(t, before.Wake, c.snapshot("test_job").Wake)
+	disabled, err := c.prepareDisable("test_job")
+	applyCandidateDelta(t, disabled, err)
 	fresh := candidateEnable(t, c, 1)
 	require.NotNil(t, fresh.Decision.Work)
 	assert.NotEqual(t, before.Intent, fresh.Decision.Work.Token.Intent)
@@ -467,6 +475,12 @@ func TestCandidateControllerEnableProjectsAccepted(t *testing.T) {
 				candidateResult(t, c, work, candidateOutcome{Kind: candidateFailed, Listed: true}, 0)
 			}
 			enabled := candidateEnable(t, c, 1)
+			if health == dyncfg.StatusFailed {
+				require.True(t, enabled.Decision.Ignored)
+				require.Nil(t, enabled.Decision.Work)
+				assert.Equal(t, dyncfg.StatusFailed, c.snapshot("test_job").Binding.Health)
+				return
+			}
 			require.NotNil(t, enabled.Decision.Work)
 			require.NotNil(t, enabled.Decision.Binding)
 			assert.Equal(t, dyncfg.StatusAccepted, enabled.Decision.Binding.Health)
@@ -533,12 +547,12 @@ func TestCandidateControllerFrameworkBlockPolicies(t *testing.T) {
 			duplicate := candidateResult(t, c, work, candidateOutcome{Kind: candidateFrameworkBlocked, Block: policy, Listed: true, RetryAfter: 99}, 3)
 			assert.True(t, duplicate.Decision.Ignored)
 			if policy != candidateBlockAcceptedWait {
-				enabled, err := c.prepareEnable("test_job", 3)
-				require.NoError(t, err)
-				require.NotNil(t, enabled.Decision.Work)
-				assert.Equal(t, work.Token.Candidate, enabled.Decision.Work.Token.Candidate)
-				assert.NotEqual(t, work.Token.Intent, enabled.Decision.Work.Token.Intent)
-				assert.Equal(t, dyncfg.StatusAccepted, enabled.Decision.Binding.Health)
+				before := c.snapshot("test_job")
+				enabled := candidateEnable(t, c, 3)
+				require.True(t, enabled.Decision.Ignored)
+				require.Nil(t, enabled.Decision.Work)
+				assert.Equal(t, before.Active, c.snapshot("test_job").Active)
+				assert.Equal(t, before.Wake, c.snapshot("test_job").Wake)
 			}
 			resume, err := c.prepareResume("test_job", work.Token, 3)
 			applyCandidateDelta(t, resume, err)
@@ -561,6 +575,10 @@ func TestCandidateControllerFrameworkBlockPolicies(t *testing.T) {
 			case candidateBlockQuarantined:
 				assert.True(t, resume.Decision.Ignored)
 				assert.Nil(t, blocked.Decision.Wake)
+				coalesced := candidateEnable(t, c, 50)
+				require.True(t, coalesced.Decision.Ignored)
+				disabled, err := c.prepareDisable("test_job")
+				applyCandidateDelta(t, disabled, err)
 				enabled := candidateEnable(t, c, 50)
 				require.NotNil(t, enabled.Decision.Work)
 				assert.Equal(t, work.Token.Candidate, enabled.Decision.Work.Token.Candidate)
@@ -658,10 +676,13 @@ func TestCandidateControllerHiddenStockNewInitial(t *testing.T) {
 	a, b := candidateTestConfig("a", "a").SetSourceType(confgroup.TypeStock), candidateTestConfig("b", "b").SetSourceType(confgroup.TypeStock)
 	inv := candidateTestInventory(1, true, a, b)
 	work := candidateInventory(t, c, inv, 0).Decision.Work
-	next := candidateResult(t, c, work, candidateOutcome{Kind: candidateFailed}, 0).Decision.Work
+	first := candidateResult(t, c, work, candidateOutcome{Kind: candidateFailed}, 0)
+	assert.True(t, first.Decision.Remove)
+	next := first.Decision.Work
 	require.NotNil(t, next)
 	exhausted := candidateResult(t, c, next, candidateOutcome{Kind: candidateFailed}, 0)
-	assert.True(t, exhausted.Decision.Remove)
+	assert.False(t, exhausted.Decision.Remove, "a private trial does not delete the logical job again")
+	assert.False(t, c.snapshot("test_job").Binding.Listed)
 	assert.Nil(t, exhausted.Decision.Work)
 	added := candidateTestConfig("new", "new-stock").SetSourceType(confgroup.TypeStock)
 	inv.Version = 2
@@ -704,6 +725,11 @@ func TestCandidateControllerTrustedSourceRevoked(t *testing.T) {
 	inv.Sources[sibling.Source()] = 1
 	addition := candidateInventory(t, c, inv, 2)
 	assert.Nil(t, addition.Decision.Work, "proposal error cannot open operational sibling search")
+	coalesced := candidateEnable(t, c, 3)
+	assert.True(t, coalesced.Decision.Ignored)
+	assert.Equal(t, candidateManualSourceRevoked, c.snapshot("test_job").Manual)
+	disabled, err := c.prepareDisable("test_job")
+	applyCandidateDelta(t, disabled, err)
 	explicit := candidateEnable(t, c, 3)
 	require.NotNil(t, explicit.Decision.Work)
 	assert.Equal(t, literal, explicit.Decision.Work.Config)
@@ -748,6 +774,7 @@ func TestCandidateControllerDueRetryExposure(t *testing.T) {
 			failed := candidateResult(t, c, first, candidateOutcome{Kind: candidateFailed, Listed: true, RetryAfter: 10}, 0)
 			if sibling {
 				require.NotNil(t, failed.Decision.Work)
+				candidateResult(t, c, failed.Decision.Work, candidateOutcome{Kind: candidateAdmitted}, 1)
 				failed = candidateResult(t, c, failed.Decision.Work, candidateOutcome{Kind: candidateFailed, Listed: true, RetryAfter: 60}, 1)
 			}
 			require.NotNil(t, failed.Decision.Wake)
@@ -875,7 +902,9 @@ func TestCandidateControllerRevocationEffectsMatchWakeState(t *testing.T) {
 		"remove": func(c *candidateController, _ DiscoveredJobInventory) (*candidateDelta, error) {
 			return c.prepareRemove("test_job")
 		},
-		"fresh enable": func(c *candidateController, _ DiscoveredJobInventory) (*candidateDelta, error) {
+		"disable then enable": func(c *candidateController, _ DiscoveredJobInventory) (*candidateDelta, error) {
+			disabled, err := c.prepareDisable("test_job")
+			applyCandidateDelta(t, disabled, err)
 			return c.prepareEnable("test_job", 1)
 		},
 		"exact passive": func(c *candidateController, _ DiscoveredJobInventory) (*candidateDelta, error) {
@@ -1192,6 +1221,11 @@ func TestCandidateControllerAdmittedInvalidRequiresManualRecovery(t *testing.T) 
 				assert.Nil(t, addition.Decision.Work, "preparation invalidation is not a classified operational failure")
 				assert.Equal(t, config, c.snapshot("test_job").Binding.Config)
 			}
+			coalesced := candidateEnable(t, c, 3)
+			require.True(t, coalesced.Decision.Ignored)
+			assert.Equal(t, candidateManualPreparationInvalid, c.snapshot("test_job").Manual)
+			disabled, err := c.prepareDisable("test_job")
+			applyCandidateDelta(t, disabled, err)
 			enabled := candidateEnable(t, c, 3)
 			require.NotNil(t, enabled.Decision.Work)
 			assert.Equal(t, config, enabled.Decision.Work.Config)
@@ -1296,7 +1330,7 @@ func TestCandidateControllerReadinessRevokesHistoricalRetainedGrants(t *testing.
 	enabled := candidateEnable(t, c, 3)
 	require.NotNil(t, enabled.Decision.Work)
 	assert.Equal(t, sibling.Token.Candidate, enabled.Decision.Work.Token.Candidate)
-	assert.NotContains(t, c.snapshot("test_job").Entries, first.Token.Candidate, "fresh ENABLE prunes expired sibling grants off-loop")
+	assert.NotContains(t, c.snapshot("test_job").Entries, first.Token.Candidate, "re-enabling prunes expired sibling grants off-loop")
 	failed := candidateResult(t, c, enabled.Decision.Work, candidateOutcome{Kind: candidateFailed, Listed: true}, 4)
 	assert.Nil(t, failed.Decision.Work)
 	assert.Nil(t, failed.Decision.Wake)
@@ -1399,6 +1433,10 @@ func TestCandidateControllerRejectedTrustOptOutRevokesOnlyOwnHistoricalGrants(t 
 				assert.True(t, candidateAuthorized(after, old.Token.Candidate))
 				assert.Equal(t, int64(12), after.Wake.Due)
 			}
+			coalesced := candidateEnable(t, c, 5)
+			require.True(t, coalesced.Decision.Ignored)
+			disabled, err := c.prepareDisable("test_job")
+			applyCandidateDelta(t, disabled, err)
 			enabled := candidateEnable(t, c, 5)
 			require.NotNil(t, enabled.Decision.Work)
 			assert.Equal(t, sibling.Token.Candidate, enabled.Decision.Work.Token.Candidate)
@@ -1458,6 +1496,10 @@ func TestCandidateControllerSelectedTrustOptOutRevokesSamePipelineHistory(t *tes
 	assert.Equal(t, optOut.Config, failed.Decision.Binding.Config)
 	assert.Equal(t, candidateManualSourceRevoked, c.view("test_job").Manual)
 	assert.False(t, candidateAuthorized(c.snapshot("test_job"), first.Token.Candidate))
+	coalesced := candidateEnable(t, c, 5)
+	require.True(t, coalesced.Decision.Ignored)
+	disabled, err := c.prepareDisable("test_job")
+	applyCandidateDelta(t, disabled, err)
 	enabled := candidateEnable(t, c, 5)
 	require.NotNil(t, enabled.Decision.Work)
 	assert.Equal(t, optOut.Token.Candidate, enabled.Decision.Work.Token.Candidate)

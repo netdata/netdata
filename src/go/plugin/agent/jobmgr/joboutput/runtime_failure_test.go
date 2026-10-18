@@ -662,7 +662,7 @@ func TestRuntimeStartupFailureUsesEveryActivationPath(t *testing.T) {
 				})
 				current = runtimeTestStartAndSettle(t, controller, cfg, nil, 1)
 			} else {
-				status := dyncfg.StatusFailed
+				status := dyncfg.StatusDisabled
 				if path == "accepted" {
 					status = dyncfg.StatusAccepted
 				}

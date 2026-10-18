@@ -302,7 +302,7 @@ func seedTestCandidateBinding(
 	}
 	delta, err := controller.candidates.prepareAdoptExact(
 		config,
-		false,
+		status == dyncfg.StatusRunning || status == dyncfg.StatusFailed,
 		status,
 		true,
 		0,

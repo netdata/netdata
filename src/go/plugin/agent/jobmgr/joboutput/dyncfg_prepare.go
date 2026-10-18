@@ -203,8 +203,7 @@ func (dcjc *DynCfgJobController) prepareEnable(
 	if !exists {
 		return dcjc.reject(scope, current, permit, jobFailure{class: failureNotFound, message: "config not found."})
 	}
-	status := dyncfg.Status(record.Status)
-	if status == dyncfg.StatusRunning || status == dyncfg.StatusAccepted && current != nil {
+	if state := dcjc.candidates.view(scope.ID); state != nil && state.Enablement == candidateEnabled {
 		return dcjc.satisfyWithEnabledIntent(ctx, scope, current, permit, record, nil)
 	}
 	delta, err := dcjc.candidates.prepareEnable(scope.ID, dcjc.scheduler.retries.now())
