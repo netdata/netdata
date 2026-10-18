@@ -55,10 +55,12 @@ func TestCandidateWorkOwnershipEnableDuringSourceProposal(t *testing.T) {
 	proposed := candidateInventory(t, c, inv, 1).Decision.Work
 	require.NotNil(t, proposed)
 	require.True(t, proposed.Tentative)
-	active := candidateEnable(t, c, 2).Decision.Work
-	require.NotNil(t, active)
-	require.False(t, active.Tentative)
-	require.Equal(t, proposed.Token.Candidate, active.Token.Candidate)
+	before := c.snapshot("test_job")
+	enabled := candidateEnable(t, c, 2)
+	require.True(t, enabled.Decision.Ignored)
+	require.Nil(t, enabled.Decision.Work)
+	require.Equal(t, proposed, c.snapshot("test_job").Proposal)
+	require.Equal(t, before.Wake, c.snapshot("test_job").Wake)
 	requireCandidateWorkOwnership(t, c)
 
 	stock := candidateTestConfig("stock", "masked").SetSourceType(confgroup.TypeStock)
@@ -73,46 +75,50 @@ func TestCandidateWorkOwnershipEnableDuringSourceProposal(t *testing.T) {
 		},
 	)
 	observed := candidateInventory(t, c, inv, 3)
-	require.Nil(t, observed.Decision.Work, "unrelated inventory cannot duplicate the selected Active")
+	require.Nil(t, observed.Decision.Work, "unrelated inventory cannot duplicate the selected proposal")
 	after := requireCandidateWorkOwnership(t, c)
-	require.Equal(t, active, after.Active)
-	require.Nil(t, after.Proposal)
+	require.Nil(t, after.Active)
+	require.Equal(t, proposed, after.Proposal)
 	require.False(t, observed.Decision.Revoke)
 	coalesced := candidateEnable(t, c, 3)
 	require.True(t, coalesced.Decision.Ignored)
-	require.Equal(t, active, c.snapshot("test_job").Active)
+	require.Equal(t, proposed, c.snapshot("test_job").Proposal)
 
-	rejected := candidateResult(t, c, active, candidateOutcome{
+	rejected := candidateResult(t, c, proposed, candidateOutcome{
 		Kind: candidateRejected,
 	}, 4)
-	require.NotNil(t, rejected.Decision.Work, "rejection must immediately recover the enabled predecessor")
-	require.Equal(t, first.Token.Candidate, rejected.Decision.Work.Token.Candidate)
+	require.Nil(t, rejected.Decision.Work, "a rejected proposal preserves the predecessor's retry deadline")
+	require.NotNil(t, rejected.Decision.Wake)
+	require.Equal(t, int64(10), rejected.Decision.Wake.Due)
 	after = requireCandidateWorkOwnership(t, c)
-	require.True(t, after.Entries[active.Token.Candidate].Rejected)
+	require.True(t, after.Entries[proposed.Token.Candidate].Rejected)
 	require.Equal(t, first.Token.Candidate, after.Binding.Key)
-	require.Equal(t, dyncfg.StatusAccepted, after.Binding.Health)
-	require.False(t, c.valid("test_job", active.Token))
-	stale := candidateResult(t, c, active, candidateOutcome{
+	require.Equal(t, dyncfg.StatusFailed, after.Binding.Health)
+	require.False(t, c.valid("test_job", proposed.Token))
+	stale := candidateResult(t, c, proposed, candidateOutcome{
 		Kind: candidateAdmitted,
 	}, 5)
 	require.True(t, stale.Decision.Ignored)
+	wake, err := c.prepareWake("test_job", rejected.Decision.Wake.Token, 10)
+	applyCandidateDelta(t, wake, err)
+	require.NotNil(t, wake.Decision.Work)
 	failed := candidateResult(
 		t,
 		c,
-		rejected.Decision.Work,
+		wake.Decision.Work,
 		candidateOutcome{
 			Kind:       candidateFailed,
 			Listed:     true,
 			RetryAfter: 10,
 		},
-		5,
+		10,
 	)
 	require.NotNil(t, failed.Decision.Wake)
-	require.Equal(t, int64(15), failed.Decision.Wake.Due)
-	fresh := candidateEnable(t, c, 6)
-	require.False(t, fresh.Decision.Ignored)
-	require.NotNil(t, fresh.Decision.Work)
-	require.Equal(t, first.Token.Candidate, fresh.Decision.Work.Token.Candidate)
+	require.Equal(t, int64(20), failed.Decision.Wake.Due)
+	repeated := candidateEnable(t, c, 11)
+	require.True(t, repeated.Decision.Ignored)
+	require.Nil(t, repeated.Decision.Work)
+	require.Equal(t, failed.Decision.Wake, c.snapshot("test_job").Wake)
 	requireCandidateWorkOwnership(t, c)
 }
 

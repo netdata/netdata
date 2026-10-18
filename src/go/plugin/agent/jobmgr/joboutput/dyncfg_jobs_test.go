@@ -2535,7 +2535,7 @@ func dynCfgTestActivationCommands(t *testing.T, controller *DynCfgJobController)
 	return commands
 }
 
-func TestEnableRearmsFailedFrameworkBlockedBinding(t *testing.T) {
+func TestEnablePreservesFailedFrameworkBlockedBinding(t *testing.T) {
 	controller, graph, _, _, _ := newDynCfgJobTestHarness(t)
 	commands := dynCfgTestActivationCommands(t, controller)
 	var constructions atomic.Int64
@@ -2562,18 +2562,13 @@ func TestEnableRearmsFailedFrameworkBlockedBinding(t *testing.T) {
 	require.NoError(t, err)
 	applied, err := prepared.Apply(t.Context())
 	require.NoError(t, err)
-	require.Equal(t, 202, applied.ResultStatus())
+	require.Equal(t, 200, applied.ResultStatus())
 	after := controller.candidates.view(config.FullName())
 	record, _ = graph.Lookup(config.FullName())
 	require.Equal(t, after.Binding.Health.String(), record.Status)
-	require.Equal(t, dyncfg.StatusAccepted.String(), record.Status)
-	require.NotEqual(t, before.Intent, after.Intent)
-
-	// Fresh intent still encounters the same quarantined process identity. It
-	// settles health without entering collector code or bypassing containment.
-	require.Nil(t, applyActivationTestSubmission(t, commands.next(t, "internal/jobs/accepted-activation"), nil, 3))
-	after = controller.candidates.view(config.FullName())
-	record, _ = graph.Lookup(config.FullName())
+	require.Equal(t, dyncfg.StatusFailed.String(), record.Status)
+	require.Equal(t, before, after)
+	require.Empty(t, commands.queue, "repeated enabled policy must not schedule another activation")
 	require.True(t, after.FrameworkBlocked)
 	require.Equal(t, dyncfg.StatusFailed, after.Binding.Health)
 	require.Equal(t, after.Binding.Health.String(), record.Status)

@@ -849,17 +849,14 @@ func (c *candidateController) revoke(r *candidateRecord) {
 
 func (c *candidateController) admit(d *candidateDelta, key candidateKey, health dyncfg.Status, listed bool) error {
 	r := d.after
-	e := r.editEntry(key)
-	if e == nil || e.TrustRevoked {
-		return errors.New("job output: candidate trust has been withdrawn")
+	e, err := r.grantCandidate(key)
+	if err != nil {
+		return err
 	}
 	r.TrustWithdrawal = nil
 	if r.Manual == candidateManualSourceRevoked {
 		r.Manual = candidateManualNone
 	}
-	e.Admitted = true
-	e.GrantIntent = r.Intent
-	r.admitSource(e)
 	stamp, err := c.next()
 	if err != nil {
 		return err
@@ -873,6 +870,26 @@ func (c *candidateController) admit(d *candidateDelta, key candidateKey, health 
 	return nil
 }
 
+func (r *candidateRecord) grantCandidate(key candidateKey) (*candidateEntry, error) {
+	entry := r.editEntry(key)
+	if entry == nil || entry.TrustRevoked {
+		return nil, errors.New("job output: candidate trust has been withdrawn")
+	}
+	entry.Admitted = true
+	entry.GrantIntent = r.Intent
+	r.admitSource(entry)
+	return entry, nil
+}
+
+func (c *candidateController) admitOutcome(d *candidateDelta, key candidateKey, health dyncfg.Status, listed, sourceReplacement bool) error {
+	if binding := d.after.Binding; binding != nil && binding.Key != key && !sourceReplacement {
+		// A trial retains recovery authority without replacing the public job.
+		_, err := d.after.grantCandidate(key)
+		return err
+	}
+	return c.admit(d, key, health, listed)
+}
+
 func (c *candidateController) prepareEnable(name string, now int64) (delta *candidateDelta, err error) {
 	defer finalizeCandidateDelta(&delta)
 	d, err := c.prepare(name)
@@ -884,8 +901,7 @@ func (c *candidateController) prepareEnable(name string, now int64) (delta *cand
 	if r.Binding == nil {
 		return nil, errors.New("job output: candidate enable has no admitted binding")
 	}
-	if r.Enablement == candidateEnabled && (r.Binding.Health == dyncfg.StatusRunning ||
-		r.Binding.Health == dyncfg.StatusAccepted && (r.Active != nil || r.Proposal != nil)) {
+	if r.Enablement == candidateEnabled {
 		d.Decision.Ignored = !reconciled
 		return d, nil
 	}
@@ -1010,7 +1026,7 @@ func (c *candidateController) prepareExact(config confgroup.Config, enabled bool
 	r.Phase = candidateDormant
 	r.Enablement = candidatePassive
 	// Exact operations pin execution without deleting the observed inventory or
-	// other source-admission grants. A later explicit ENABLE reopens that scope.
+	// other source-admission grants. A later disable/enable transition reopens that scope.
 	for oldKey, old := range r.entries() {
 		if oldKey != key && !old.SourceOwned && old.Candidate.Config.SourceType() == confgroup.TypeDyncfg {
 			r.removeEntry(oldKey)
@@ -1120,7 +1136,7 @@ func (c *candidateController) prepareOutcome(name string, token candidateWorkTok
 	e.HasDue = false
 	switch outcome.Kind {
 	case candidateWaiting:
-		if err := c.admit(d, e.Key, dyncfg.StatusAccepted, true); err != nil {
+		if err := c.admitOutcome(d, e.Key, dyncfg.StatusAccepted, true, tentative); err != nil {
 			return nil, err
 		}
 		r.Phase = candidateWaitingPhase
@@ -1162,7 +1178,7 @@ func (c *candidateController) prepareOutcome(name string, token candidateWorkTok
 			health = dyncfg.StatusAccepted
 			listed = true
 		}
-		if err := c.admit(d, e.Key, health, listed); err != nil {
+		if err := c.admitOutcome(d, e.Key, health, listed, tentative); err != nil {
 			return nil, err
 		}
 		r.Wake = nil
@@ -1195,7 +1211,7 @@ func (c *candidateController) prepareOutcome(name string, token candidateWorkTok
 		}
 		r.Phase = candidateStarting
 	case candidateFailed:
-		if err := c.admit(d, e.Key, dyncfg.StatusFailed, outcome.Listed); err != nil {
+		if err := c.admitOutcome(d, e.Key, dyncfg.StatusFailed, outcome.Listed, tentative); err != nil {
 			return nil, err
 		}
 		r.Active = nil
@@ -1317,7 +1333,7 @@ func (c *candidateController) resumeCandidate(d *candidateDelta, work *candidate
 		d.Decision.Wake = nil
 		e := r.editEntry(work.Token.Candidate)
 		e.HasDue = false
-		if err := c.admit(d, e.Key, dyncfg.StatusAccepted, true); err != nil {
+		if err := c.admitOutcome(d, e.Key, dyncfg.StatusAccepted, true, false); err != nil {
 			return err
 		}
 	}

@@ -15,7 +15,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestCandidateFailureTransfersResourceIntentWithBinding(t *testing.T) {
+func TestCandidateFailedTrialsPreserveLogicalResourceIntent(t *testing.T) {
 	for _, sourceType := range []string{confgroup.TypeStock, confgroup.TypeUser} {
 		t.Run(sourceType, func(t *testing.T) {
 			controller, graph, _, _, _ := newDynCfgJobTestHarness(t)
@@ -49,19 +49,22 @@ func TestCandidateFailureTransfersResourceIntentWithBinding(t *testing.T) {
 			plan, err := planInventoryTest(controller, inventory)
 			require.NoError(t, err)
 			applyActivationTestSubmission(t, activationTestSubmission{plan: plan}, nil, 0)
-			var previous confgroup.Config
+			var binding confgroup.Config
 			for generation := uint64(1); generation <= 2; generation++ {
 				call := commands.next(t, "internal/jobs/accepted-activation")
 				config := byOption[<-checked]
 				require.NotNil(t, config)
 				require.Nil(t, applyActivationTestSubmission(t, call, nil, generation))
+				if binding == nil {
+					binding = config
+				}
 				owner.mu.Lock()
-				ownsNext := owner.enabled[jobConfigIdentity(config)]
-				ownsPrevious := previous != nil && owner.enabled[jobConfigIdentity(previous)]
+				ownsBinding := owner.enabled[jobConfigIdentity(binding)]
+				ownsTrial := config.UID() != binding.UID() && owner.enabled[jobConfigIdentity(config)]
 				count := len(owner.enabled)
 				owner.mu.Unlock()
-				require.True(t, ownsNext, "last admitted failed candidate owns resource demand")
-				require.False(t, ownsPrevious, "replacement must retire predecessor demand")
+				require.True(t, ownsBinding, "logical job retains its resource demand")
+				require.False(t, ownsTrial, "a failed trial must not acquire resource demand")
 				require.Equal(t, 1, count)
 				record, listed := graph.Lookup(config.FullName())
 				if sourceType == confgroup.TypeStock {
@@ -71,9 +74,8 @@ func TestCandidateFailureTransfersResourceIntentWithBinding(t *testing.T) {
 					require.Equal(t, dyncfg.StatusFailed.String(), record.Status)
 					exposed, err := graphRecordConfig(record)
 					require.NoError(t, err)
-					require.Equal(t, config, exposed)
+					require.Equal(t, binding, exposed)
 				}
-				previous = config
 			}
 			inventory.Version++
 			inventory.Candidates = nil

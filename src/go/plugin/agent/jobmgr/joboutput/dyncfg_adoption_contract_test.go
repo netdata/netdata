@@ -221,7 +221,7 @@ func TestDynCfgJobMutationAdoptionAndRestartPreflight(t *testing.T) {
 			command:  dyncfg.CommandEnable,
 			status:   dyncfg.StatusFailed,
 			inject:   injectCheckUnclassified,
-			wantCode: 202,
+			wantCode: 200,
 		},
 		"update disabled succeeds": {
 			command:  dyncfg.CommandUpdate,
@@ -308,7 +308,7 @@ func TestDynCfgJobMutationAdoptionAndRestartPreflight(t *testing.T) {
 			command:  dyncfg.CommandEnable,
 			status:   dyncfg.StatusFailed,
 			inject:   injectJobQuarantined,
-			wantCode: 202,
+			wantCode: 200,
 		},
 		"enable running": {
 			command:  dyncfg.CommandEnable,
@@ -532,7 +532,11 @@ func TestDynCfgJobMutationAdoptionAndRestartPreflight(t *testing.T) {
 						regexp.MustCompile(`CONFIG go.d:collector:module:job create `+record.Status+` job \S+ dyncfg `),
 						wire, "an adopted update takes the job into dyncfg ownership")
 				}
-				if exists && record.Status == dyncfg.StatusFailed.String() {
+				if test.command == dyncfg.CommandEnable && code == 200 {
+					require.Equal(t, preimage, record, "enabled policy preserves the existing configuration and health")
+					require.Equal(t, retryBefore, runtimeTestHasRetry(controller, stored.FullName()))
+					require.Empty(t, events, "enabled policy keeps the incumbent")
+				} else if exists && record.Status == dyncfg.StatusFailed.String() {
 					require.Equal(t, 202, code, "an adopted failure answers 202")
 					require.True(t, runtimeTestHasRetry(controller, stored.FullName()),
 						"an adopted preparation failure is retried")

@@ -8,6 +8,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"sort"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -26,14 +27,15 @@ func TestProcessCandidateDaemonEnableFinitePass(t *testing.T) {
 		for mode, auto := range map[string]bool{"passive": false, "automatic": true} {
 			for sources, separate := range map[string]bool{"same-source": false, "distinct-sources": true} {
 				t.Run(version+"/"+mode+"/"+sources, func(t *testing.T) {
-					configs := continuationConfigs(separate)
+					configs := candidateEchoConfigs(t, separate, 10)
 					state := &continuationCollectorState{check: func(context.Context, string) error {
 						return errors.New("endpoint unavailable")
 					}}
 					fixture := newCandidateEchoFixture(t, version, auto, state, configs)
-					require.Eventually(t, func() bool { return len(state.checked()) >= 2 }, 3*time.Second, time.Millisecond)
-					fixture.settle(t, 2)
-					fixture.assertExposed(t, configs[1])
+					require.Eventually(t, func() bool { return len(state.checked()) >= len(configs) }, 3*time.Second, time.Millisecond)
+					fixture.settle(t, len(configs))
+					fixture.assertExposed(t, configs[0])
+					fixture.assertRegistrations(t, 1)
 					fixture.command(t, "daemon-reconcile", "enable", "", 200)
 					require.Eventually(t, func() bool {
 						_, response, _ := strings.Cut(fixture.output.String(), "FUNCTION_RESULT_BEGIN daemon-reconcile ")
@@ -41,19 +43,36 @@ func TestProcessCandidateDaemonEnableFinitePass(t *testing.T) {
 						return complete && strings.Contains(afterReply, "CONFIG go.d:collector:module:local2 status failed")
 					}, time.Second, time.Millisecond, "Failed health must follow the reply that updates the daemon's status")
 
-					// Explicit callers retain the ability to start a fresh pass.
-					fixture.command(t, "explicit-enable", "enable", "user=test", 202)
-					require.Eventually(t, func() bool { return len(state.checked()) >= 4 }, 3*time.Second, time.Millisecond)
-					fixture.settle(t, 4)
+					fixture.command(t, "explicit-enable", "enable", "user=test", 200)
+					fixture.settle(t, len(configs))
 
 					fixture.command(t, "explicit-disable", "disable", "user=test", 200)
 					fixture.command(t, "daemon-reenable", "enable", "", 202)
-					require.Eventually(t, func() bool { return len(state.checked()) >= 6 }, 3*time.Second, time.Millisecond)
-					fixture.settle(t, 6)
+					require.Eventually(t, func() bool { return len(state.checked()) >= 2*len(configs) }, 3*time.Second, time.Millisecond)
+					fixture.settle(t, 2*len(configs))
+					fixture.assertExposed(t, configs[0])
+					fixture.assertRegistrations(t, 1)
 				})
 			}
 		}
 	}
+}
+
+func candidateEchoConfigs(t *testing.T, separate bool, count int) []confgroup.Config {
+	t.Helper()
+	base := continuationConfigs(false)[0]
+	configs := make([]confgroup.Config, count)
+	for i := range configs {
+		config, err := base.Clone()
+		require.NoError(t, err)
+		config["option_str"] = fmt.Sprintf("endpoint-%d", i)
+		if separate {
+			config.SetSource(fmt.Sprintf("file=candidate-%d", i))
+		}
+		configs[i] = config
+	}
+	sort.Slice(configs, func(i, j int) bool { return configs[i].UID() < configs[j].UID() })
+	return configs
 }
 
 func TestProcessCandidateDaemonEnablePreservesFallback(t *testing.T) {
@@ -83,6 +102,11 @@ func TestProcessCandidateDaemonEnablePreservesFallback(t *testing.T) {
 				fixture.output.waitContains(t, "CONFIG go.d:collector:module:local2 status running")
 				fixture.settle(t, 2)
 				fixture.assertExposedStatus(t, configs[1], "running")
+				registrations := 1
+				if separate {
+					registrations++
+				}
+				fixture.assertRegistrations(t, registrations)
 			})
 		}
 	}
@@ -281,17 +305,26 @@ func (f *candidateEchoFixture) assertExposedStatus(t *testing.T, config confgrou
 	var raw collectorapi.MockConfiguration
 	require.NoError(t, json.Unmarshal([]byte(body), &raw))
 	require.Equal(t, config["option_str"], raw.OptionStr)
-	var last string
+	var last, health string
 	for _, line := range strings.Split(f.output.String(), "\n") {
 		if strings.HasPrefix(line, "CONFIG go.d:collector:module:local2 create ") {
 			last = line
+			health = strings.Fields(line)[3]
+		} else if strings.HasPrefix(line, "CONFIG go.d:collector:module:local2 status ") {
+			health = strings.Fields(line)[3]
 		}
 	}
-	// A successful candidate is admitted as Accepted before readiness is published.
-	if status == "failed" {
-		require.Contains(t, last, "create failed ")
-	} else {
-		require.Contains(t, f.output.String(), "CONFIG go.d:collector:module:local2 status "+status)
-	}
+	require.Equal(t, status, health)
 	require.Contains(t, last, " "+config.SourceType()+" '"+config.Source()+"'")
+}
+
+func (f *candidateEchoFixture) assertRegistrations(t *testing.T, expected int) {
+	t.Helper()
+	count := 0
+	for _, line := range strings.Split(f.output.String(), "\n") {
+		if strings.HasPrefix(line, "CONFIG go.d:collector:module:local2 create ") {
+			count++
+		}
+	}
+	require.Equal(t, expected, count, "private probes must not register endpoint configurations")
 }
