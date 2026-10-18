@@ -382,6 +382,9 @@ typedef struct ebpf_module {
 int ebpf_get_kernel_version();
 int get_redhat_release();
 int ebpf_parse_redhat_release_version(const char *release);
+int ebpf_parse_redhat_release_from_os_release(const char *contents);
+uint32_t ebpf_select_disk_index(uint32_t kernels, int is_rhf, uint32_t kver);
+int ebpf_legacy_disk_supported(int is_rhf, uint32_t kver);
 struct bpf_link **
 ebpf_load_program(char *plugins_dir, ebpf_module_t *em, int kver, int is_rhf, struct bpf_object **obj);
 

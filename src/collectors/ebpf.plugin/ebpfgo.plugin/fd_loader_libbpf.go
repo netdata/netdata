@@ -88,8 +88,9 @@ func LoadFDLegacy(cfg FDLegacyConfig) (*FDLegacyHandle, error) {
 	plan := BuildFDLegacyPlan(cfg)
 	if !libbpfloader.FDSupportsCore() {
 		selector := SelectIndex(cfg.Kernels, cfg.IsRHF, cfg.KernelVersion)
-		if int(selector) > fdMaxBaseSelector {
-			selector = uint32(fdMaxBaseSelector)
+		maxBase := effectiveMaxBaseSelector(fdMaxBaseSelector, cfg.IsRHF, cfg.KernelVersion)
+		if int(selector) > maxBase {
+			selector = uint32(maxBase)
 		}
 		plan.ObjectPath = BuildObjectPathWithFlavor(
 			cfg.PluginsDir, selector, "fd", plan.IsReturn, cfg.IsRHF, ObjectFlavorBase)

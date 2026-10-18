@@ -59,11 +59,31 @@ static int test_disk_kernel_variants(void)
     for (size_t i = 0; ebpf_modules[i].info.thread_name; i++) {
         if (!strcmp(ebpf_modules[i].info.thread_name, "disk")) {
             const uint32_t expected = NETDATA_V5_11 | NETDATA_V5_16 | NETDATA_V5_17 | NETDATA_V6_8;
-            return (ebpf_modules[i].kernels & expected) == expected;
+            return (ebpf_modules[i].kernels & expected) == expected &&
+                   ebpf_select_disk_index(ebpf_modules[i].kernels, 10 * 256, NETDATA_EBPF_KERNEL_6_12) == NETDATA_IDX_V6_12 &&
+                   ebpf_select_disk_index(ebpf_modules[i].kernels, 10 * 256, NETDATA_EBPF_KERNEL_6_12 + 3) == NETDATA_IDX_V6_12 &&
+                   ebpf_select_disk_index(ebpf_modules[i].kernels, 10 * 256, NETDATA_EBPF_KERNEL_6_12 + 256) != NETDATA_IDX_V6_12 &&
+                   ebpf_select_disk_index(ebpf_modules[i].kernels, 10 * 256, NETDATA_EBPF_KERNEL_6_16) != NETDATA_IDX_V6_12 &&
+                   ebpf_select_disk_index(ebpf_modules[i].kernels, 11 * 256, NETDATA_EBPF_KERNEL_6_12) != NETDATA_IDX_V6_12 &&
+                   ebpf_select_disk_index(ebpf_modules[i].kernels, 9 * 256, NETDATA_EBPF_KERNEL_6_12) == NETDATA_IDX_V5_14 &&
+                   ebpf_select_disk_index(ebpf_modules[i].kernels, 9 * 256, NETDATA_EBPF_KERNEL_5_17) == NETDATA_IDX_V5_14 &&
+                   ebpf_select_disk_index(ebpf_modules[i].kernels, -1, NETDATA_EBPF_KERNEL_6_12) == NETDATA_IDX_V6_8;
         }
     }
 
     return 0;
+}
+
+static int test_legacy_disk_support_window(void)
+{
+    return ebpf_legacy_disk_supported(9 * 256, NETDATA_EBPF_KERNEL_5_16) &&
+           !ebpf_legacy_disk_supported(9 * 256, NETDATA_EBPF_KERNEL_5_17) &&
+           !ebpf_legacy_disk_supported(10 * 256, NETDATA_EBPF_KERNEL_6_12 - 256) &&
+           ebpf_legacy_disk_supported(10 * 256, NETDATA_EBPF_KERNEL_6_12) &&
+           ebpf_legacy_disk_supported(10 * 256, NETDATA_EBPF_KERNEL_6_12 + 3) &&
+           !ebpf_legacy_disk_supported(10 * 256, NETDATA_EBPF_KERNEL_6_16) &&
+           !ebpf_legacy_disk_supported(11 * 256, NETDATA_EBPF_KERNEL_6_12) &&
+           ebpf_legacy_disk_supported(-1, NETDATA_EBPF_KERNEL_6_16);
 }
 
 static int test_redhat_release_version_parser(void)
@@ -72,7 +92,19 @@ static int test_redhat_release_version_parser(void)
            ebpf_parse_redhat_release_version("CentOS Stream release 9") == 2304 &&
            ebpf_parse_redhat_release_version("CentOS Linux release 7.9.2009 (Core)") == 1801 &&
            ebpf_parse_redhat_release_version("AlmaLinux release 9.6 (Sage Margay)") == 2310 &&
+           ebpf_parse_redhat_release_version("CloudLinux release 8.10 (Shared)") == 2058 &&
            ebpf_parse_redhat_release_version("not a Red Hat release") == -1;
+}
+
+static int test_redhat_os_release_parser(void)
+{
+    return ebpf_parse_redhat_release_from_os_release("ID=almalinux\nVERSION_ID=10.1\n") == 2561 &&
+           ebpf_parse_redhat_release_from_os_release("ID=cloudlinux\r\nVERSION_ID=\"8.10\"\r\n") == 2058 &&
+           ebpf_parse_redhat_release_from_os_release("ID=rocky\nVERSION_ID=9.6.1\n") == 2310 &&
+           ebpf_parse_redhat_release_from_os_release("ID=rocky\nVERSION_ID=9.6.bad\n") == -1 &&
+           ebpf_parse_redhat_release_from_os_release("ID=centos\nID_LIKE=\"rhel fedora\"\nVERSION_ID=9\n") == 2304 &&
+           ebpf_parse_redhat_release_from_os_release("ID=amzn\nID_LIKE=\"centos rhel fedora\"\nVERSION_ID=2\n") == -1 &&
+           ebpf_parse_redhat_release_from_os_release("ID=fedora\nID_LIKE=\"rhel\"\nVERSION_ID=42\n") == -1;
 }
 
 static int ebpf_ut_percpu_lookup_fits_nprocs(struct bpf_object *obj)
@@ -183,7 +215,8 @@ void ebpf_ut_cleanup_memory()
  */
 static int ebpf_ut_load_binary()
 {
-    if (!test_disk_kernel_variants() || !test_redhat_release_version_parser()) {
+    if (!test_disk_kernel_variants() || !test_legacy_disk_support_window() ||
+        !test_redhat_release_version_parser() || !test_redhat_os_release_parser()) {
         fprintf(stderr, ">>> FAILED: kernel version parsing or disk selectors are inconsistent\n");
         return -1;
     }

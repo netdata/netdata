@@ -74,8 +74,9 @@ func LoadDCStatLegacy(cfg DCStatLegacyConfig) (*DCStatLegacyHandle, error) {
 	plan := BuildDCStatLegacyPlan(cfg)
 	if !libbpfloader.DCStatSupportsCore() {
 		selector := SelectIndex(cfg.Kernels, cfg.IsRHF, cfg.KernelVersion)
-		if int(selector) > dcstatMaxBaseSelector {
-			selector = uint32(dcstatMaxBaseSelector)
+		maxBase := effectiveMaxBaseSelector(dcstatMaxBaseSelector, cfg.IsRHF, cfg.KernelVersion)
+		if int(selector) > maxBase {
+			selector = uint32(maxBase)
 		}
 		plan.ObjectPath = BuildObjectPathWithFlavor(cfg.PluginsDir, selector, "dc", false, cfg.IsRHF, ObjectFlavorBase)
 		plan.LoadMode = LoadLegacy

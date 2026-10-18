@@ -60,8 +60,9 @@ func LoadSocketLegacy(cfg SocketLegacyConfig) (*SocketLegacyHandle, error) {
 	coreSupported := libbpfloader.SupportsCore()
 	if !coreSupported {
 		selector := SelectIndex(cfg.Kernels, cfg.IsRHF, cfg.KernelVersion)
-		if int(selector) > socketMaxBaseSelector {
-			selector = uint32(socketMaxBaseSelector)
+		maxBase := effectiveMaxBaseSelector(socketMaxBaseSelector, cfg.IsRHF, cfg.KernelVersion)
+		if int(selector) > maxBase {
+			selector = uint32(maxBase)
 		}
 		plan = LoadPlan{
 			KernelVersion: cfg.KernelVersion,

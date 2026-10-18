@@ -169,8 +169,9 @@ func BuildFDLegacyPlan(cfg FDLegacyConfig) LoadPlan {
 	if cfg.LoadMethod == LoadLegacy {
 		plan.Flavor = ObjectFlavorBase
 		plan.Selector = SelectIndex(cfg.Kernels, cfg.IsRHF, cfg.KernelVersion)
-		if int(plan.Selector) > fdMaxBaseSelector {
-			plan.Selector = uint32(fdMaxBaseSelector)
+		maxBase := effectiveMaxBaseSelector(fdMaxBaseSelector, cfg.IsRHF, cfg.KernelVersion)
+		if int(plan.Selector) > maxBase {
+			plan.Selector = uint32(maxBase)
 		}
 		plan.ObjectPath = BuildObjectPathWithFlavor(
 			cfg.PluginsDir, plan.Selector, "fd", plan.IsReturn, cfg.IsRHF, ObjectFlavorBase)

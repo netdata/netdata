@@ -906,6 +906,17 @@ static int ebpf_disk_load_bpf(ebpf_module_t *em)
                 kernel_minor);
             return -1;
         }
+        if (!ebpf_legacy_disk_supported(isrh, running_on_kernel)) {
+            unsigned int kernel_major = (unsigned int)running_on_kernel >> 16;
+            unsigned int kernel_minor = ((unsigned int)running_on_kernel >> 8) & 0xff;
+            netdata_log_error(
+                "Disk latency is unavailable: no compatible legacy BPF object for Red Hat release %u on kernel %u.%u; "
+                "use kernel BTF with CO-RE or a compatible legacy object.",
+                (unsigned int)isrh / 256,
+                kernel_major,
+                kernel_minor);
+            return -1;
+        }
 
         em->probe_links = ebpf_load_program(ebpf_plugin_dir, em, running_on_kernel, isrh, &em->objects);
         if (!em->probe_links) {

@@ -133,8 +133,9 @@ func BuildDNSLegacyPlan(cfg DNSLegacyConfig) LoadPlan {
 	selector := SelectIndex(cfg.Kernels, cfg.IsRHF, cfg.KernelVersion)
 	// Base-flavor DNS objects are not built beyond 5.14; cap the selector so we
 	// never construct a path that does not exist.
-	if flavor == ObjectFlavorBase && int(selector) > dnsMaxBaseSelector {
-		selector = uint32(dnsMaxBaseSelector)
+	maxBase := effectiveMaxBaseSelector(dnsMaxBaseSelector, cfg.IsRHF, cfg.KernelVersion)
+	if flavor == ObjectFlavorBase && int(selector) > maxBase {
+		selector = uint32(maxBase)
 	}
 	return LoadPlan{
 		KernelVersion: cfg.KernelVersion,
