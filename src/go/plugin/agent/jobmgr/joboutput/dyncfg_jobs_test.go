@@ -2556,7 +2556,8 @@ func TestEnableRearmsFailedFrameworkBlockedBinding(t *testing.T) {
 	require.Equal(t, before.Binding.Health.String(), record.Status)
 
 	prepared, err := controller.Prepare(t.Context(), DynCfgJobRequest{
-		Args: []string{controller.externalID(config.FullName()), "enable"},
+		Args:         []string{controller.externalID(config.FullName()), "enable"},
+		CallerSource: "user=test",
 	}, nil, lifecycle.ResourceTransactionScope{ID: config.FullName()}, lifecycle.LongLivedPermit{})
 	require.NoError(t, err)
 	applied, err := prepared.Apply(t.Context())
