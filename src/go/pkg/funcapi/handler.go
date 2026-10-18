@@ -28,7 +28,8 @@ type MethodHandler interface {
 	// MethodParams returns dynamic params for a method.
 	// Return nil to use static params from FunctionConfig.RequiredParams.
 	// It is also called for structured info with an explicit job on shared selectable Functions,
-	// without calling Handle or validating secondary selector values.
+	// and for bound structured info when FunctionConfig.DynamicInfo is enabled.
+	// Info does not call Handle or validate secondary selector values.
 	// RawRequest methods use HandleRaw instead.
 	// The context should be used for timeout/cancellation of database queries.
 	MethodParams(ctx context.Context, method string) ([]ParamConfig, error)

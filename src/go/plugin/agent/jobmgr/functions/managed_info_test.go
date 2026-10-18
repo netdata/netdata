@@ -350,11 +350,19 @@ func TestManagedInfoRawResponsePassthrough(t *testing.T) {
 	}
 }
 
-func TestFunctionConfigRequiresRawRequest(t *testing.T) {
+func TestFunctionConfigRequestModes(t *testing.T) {
 	for name, test := range map[string]struct {
 		method funcapi.FunctionConfig
 		want   string
 	}{
+		"dynamic info with raw input": {
+			method: funcapi.FunctionConfig{
+				ID:          "events",
+				DynamicInfo: true,
+				RawRequest:  true,
+			},
+			want: "DynamicInfo requires structured request handling",
+		},
 		"managed info": {
 			method: funcapi.FunctionConfig{
 				ID:          "events",

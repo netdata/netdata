@@ -141,6 +141,9 @@ func (mg *methodGeneration) handle(ctx context.Context, input HandlerInput) (lif
 	if slices.Contains(input.Args, "info") {
 		selectableJob := mg.sharedJobSelectable()
 		boundInfo := !method.RawRequest && !selectableJob
+		if boundInfo && method.DynamicInfo {
+			boundInfo = mg.kind != methodGenerationAgent && len(mg.availableJobNames(method.ID)) == 0
+		}
 		bootstrapInfo := selectableJob && (!method.RawRequest || method.ManagedInfo) &&
 			len(functionJobValues(input)) == 0
 		if boundInfo || bootstrapInfo {

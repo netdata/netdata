@@ -22,7 +22,7 @@ func TestControllerGroupSignatureLayoutGolden(t *testing.T) {
 	)
 	require.NoError(t, err)
 
-	require.EqualValues(t, "8a1dd1efb56c362f31e92db60f18704a8794fc58d06fab80fec03ed535bcb966", controller)
+	require.EqualValues(t, "837a2bf18823c134e79258269c8163a354c38d56e9427769fcc7260cd094fb4d", controller)
 }
 
 func TestControllerGroupSignatureManagedMetadata(t *testing.T) {
@@ -43,6 +43,38 @@ func TestControllerGroupSignatureManagedMetadata(t *testing.T) {
 			after, err := controllerGroupSignature(methodGenerationShared, []funcapi.FunctionConfig{method}, nil)
 			require.NoError(t, err)
 			require.NotEqual(t, before, after, "changed metadata must replace the published generation")
+		})
+	}
+}
+
+func TestControllerGroupSignatureDynamicInfo(t *testing.T) {
+	method := funcapi.FunctionConfig{ID: "events"}
+	before, err := controllerGroupSignature(methodGenerationShared, []funcapi.FunctionConfig{method}, nil)
+	require.NoError(t, err)
+	method.DynamicInfo = true
+	after, err := controllerGroupSignature(methodGenerationShared, []funcapi.FunctionConfig{method}, nil)
+	require.NoError(t, err)
+	require.NotEqual(t, before, after)
+}
+
+func TestControllerGroupSignatureAcceptedForms(t *testing.T) {
+	for name, change := range map[string]func(*funcapi.ParamConfig){
+		"separator": func(param *funcapi.ParamConfig) { param.ValueSeparator = "," },
+		"aliases":   func(param *funcapi.ParamConfig) { param.Options[0].Aliases = []string{"alternate"} },
+		"alias boundaries": func(param *funcapi.ParamConfig) {
+			param.Options[0].Aliases = []string{"a", "bc"}
+		},
+	} {
+		t.Run(name, func(t *testing.T) {
+			method := funcapi.FunctionConfig{ID: "events", RequiredParams: []funcapi.ParamConfig{
+				{ID: "source", Options: []funcapi.ParamOption{{ID: "canonical", Aliases: []string{"ab", "c"}}}},
+			}}
+			before, err := controllerGroupSignature(methodGenerationShared, []funcapi.FunctionConfig{method}, nil)
+			require.NoError(t, err)
+			change(&method.RequiredParams[0])
+			after, err := controllerGroupSignature(methodGenerationShared, []funcapi.FunctionConfig{method}, nil)
+			require.NoError(t, err)
+			require.NotEqual(t, before, after)
 		})
 	}
 }

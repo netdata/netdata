@@ -147,6 +147,23 @@ may advertise `accepted_params`, `required_params`, and help text without a
 Graph presentation is part of the production payload and is never carried in
 an `info` response.
 
+### Cached Selector Discovery
+
+SNMP topology `info` includes managed-device focus choices from its current
+collector cache when the running job is available. It does not poll devices or
+render a topology. Without a running available job, the bound Function retains
+static bootstrap metadata until its publication is reconciled; this is not a
+guarantee that a data request can succeed.
+
+Go structured Functions opt into bound discovery with
+`funcapi.FunctionConfig.DynamicInfo`. Other bound Functions retain static info
+by default. Unselected multi-job info remains static so an unavailable default
+job cannot hide healthy siblings; explicit-job info discovers that job's
+parameters. Raw methods retain their separate `ManagedInfo` contract. See the
+[Function API guide](/src/go/pkg/funcapi/README.md#info-for-structured-methods)
+for containment, cancellation and error behavior. These metadata additions do
+not change direct per-node topology requests or selector defaults.
+
 ## Notifications
 
 Status: implemented in the Agent JSON Schema, Go payload model, and validation.

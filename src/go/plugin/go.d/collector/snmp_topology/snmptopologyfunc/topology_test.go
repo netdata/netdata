@@ -23,6 +23,7 @@ func TestMethodsIncludesSelectors(t *testing.T) {
 	assert.Equal(t, FunctionName, cfg.FunctionName)
 	assert.Equal(t, []string{MethodID}, cfg.Aliases)
 	assert.Equal(t, "topology", cfg.ResponseType)
+	assert.True(t, cfg.DynamicInfo)
 	require.Len(t, cfg.RequiredParams, 5)
 	require.Nil(t, cfg.Presentation())
 
@@ -94,6 +95,7 @@ func TestTopologyHandlerMethodParams(t *testing.T) {
 	require.Len(t, params[3].Options, 2)
 	assert.Equal(t, topologyoptions.ManagedFocusAllDevices, params[3].Options[0].ID)
 	assert.Equal(t, "ip:10.0.0.1", params[3].Options[1].ID)
+	assert.Zero(t, deps.snapshotCalls, "metadata discovery must not render or collect a topology")
 
 	params, err = handler.MethodParams(context.Background(), "unknown")
 	require.NoError(t, err)

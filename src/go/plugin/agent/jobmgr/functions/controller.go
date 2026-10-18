@@ -1064,6 +1064,9 @@ func validateConfiguredMethods(module string, methods []funcapi.FunctionConfig) 
 			return nil, errors.New("jobmgr Function controller: duplicate method ID")
 		}
 		seen[method.ID] = struct{}{}
+		if method.DynamicInfo && method.RawRequest {
+			return nil, fmt.Errorf("jobmgr Function controller: method %q DynamicInfo requires structured request handling", method.ID)
+		}
 		if method.ManagedInfo && !method.RawRequest {
 			return nil, fmt.Errorf("jobmgr Function controller: method %q ManagedInfo requires RawRequest", method.ID)
 		}
@@ -1114,6 +1117,7 @@ func controllerGroupSignature(
 		writeDigestString(digest, method.ResponseType)
 		writeDigestBool(digest, method.RawRequest)
 		writeDigestBool(digest, method.ManagedInfo)
+		writeDigestBool(digest, method.DynamicInfo)
 		writeDigestBool(digest, method.HasHistory)
 		writeDigestUint64(digest, uint64(len(method.AcceptedParams)))
 		for _, name := range method.AcceptedParams {
@@ -1128,12 +1132,17 @@ func controllerGroupSignature(
 			writeDigestString(digest, parameter.Help)
 			writeDigestUint64(digest, uint64(parameter.Selection))
 			writeDigestBool(digest, parameter.UniqueView)
+			writeDigestString(digest, parameter.ValueSeparator)
 			for _, option := range parameter.Options {
 				writeDigestString(digest, option.ID)
 				writeDigestString(digest, option.Name)
 				writeDigestBool(digest, option.Default)
 				writeDigestBool(digest, option.Disabled)
 				writeDigestString(digest, option.Column)
+				writeDigestUint64(digest, uint64(len(option.Aliases)))
+				for _, alias := range option.Aliases {
+					writeDigestString(digest, alias)
+				}
 				if option.Sort != nil {
 					writeDigestString(digest, option.Sort.String())
 				} else {

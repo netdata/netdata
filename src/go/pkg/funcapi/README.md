@@ -96,12 +96,20 @@ storage, parsing or validation of extra inputs; the handler owns those semantics
 
 For a shared Function with a job selector, structured `info` without an explicit `__job` returns declaration metadata
 and the available jobs without calling `MethodParams` or `Handle`. This keeps job discovery available even when a
-source cannot be queried. Agent, instance and single-instance structured Functions also retain declaration-only info.
+source cannot be queried. Agent, instance and single-instance structured Functions retain declaration-only info
+by default.
 
 With an explicit `__job`, the framework resolves that running job and calls `MethodParams` under the same cancellation,
 availability and containment rules as data requests. It merges the result with declaration parameters and the
 framework-owned job selector, then returns metadata only. It does not call `Handle` or validate secondary selector
 values: a client may need this metadata to replace a selection that is unsupported by the new job.
+
+A structured method MAY set `DynamicInfo: true` to use `MethodParams` for bound info as well, under the same
+containment and cancellation rules. Job-backed bound methods fall back to declaration-only info when no running,
+available job exists; an error from an active handler is returned, not hidden by that fallback. Unselected shared
+multi-job info stays static even when this flag is enabled. `DynamicInfo` is not valid with `RawRequest`; raw methods
+use `ManagedInfo` instead. Methods exposing cached choices should keep discovery free of collection or rendering;
+for example, SNMP topology reads its cached managed-device targets for info without building the graph.
 
 `MethodParams` may perform source I/O or use existing collector caches. A nil result preserves declared parameters;
 an error fails the metadata request. This exposes the handler's existing discovery semantics, not an atomic snapshot
@@ -109,8 +117,9 @@ or a guarantee that the source is ready to return data. Data requests continue t
 normally.
 
 Clients SHOULD request scoped info when the selected job changes and reconcile dependent selections before querying
-data. The JSON schema and transport are unchanged. Existing clients that only request unscoped info keep their
-current behavior. Older agents may return only static declarations for scoped info, so clients MUST still handle
+data. The JSON schema and transport are unchanged. Unselected multi-job bootstrap remains declaration-only;
+opted-in bound info may include additional cached choices without a new client request. Older agents may return
+only static declarations for scoped or bound info, so clients MUST still handle
 data-request errors without presenting results from the previous job as current.
 
 ## Info for payload-aware methods
