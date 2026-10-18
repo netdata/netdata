@@ -19,28 +19,38 @@ type kernelEBPFFeatures struct {
 	kprobes      bool
 }
 
+type kernelEBPFFeatureSpec struct {
+	name     string
+	required bool
+}
+
 var (
 	kernelEBPFFeaturesOnce    sync.Once
 	runningKernelEBPFFeatures kernelEBPFFeatures
 )
 
-var requiredKernelEBPFFeatures = []string{"CONFIG_BPF", "CONFIG_BPF_SYSCALL"}
-var parsedKernelEBPFFeatures = []string{"CONFIG_BPF", "CONFIG_BPF_SYSCALL", "CONFIG_KPROBES"}
+var kernelEBPFFeatureSpecs = []kernelEBPFFeatureSpec{
+	{name: "CONFIG_BPF", required: true},
+	{name: "CONFIG_BPF_SYSCALL", required: true},
+	{name: "CONFIG_KPROBES"},
+}
 
 func parseKernelEBPFFeatures(config io.Reader) kernelEBPFFeatures {
-	values := make(map[string]bool, len(requiredKernelEBPFFeatures))
+	values := make(map[string]bool, len(kernelEBPFFeatureSpecs))
 	scanner := bufio.NewScanner(config)
 	for scanner.Scan() {
 		line := strings.TrimSpace(scanner.Text())
 		if strings.HasPrefix(line, "# CONFIG_") && strings.HasSuffix(line, " is not set") {
 			name := strings.TrimSuffix(strings.TrimPrefix(line, "# "), " is not set")
-			values[name] = false
+			if isTrackedKernelEBPFFeature(name) {
+				values[name] = false
+			}
 			continue
 		}
 
 		name, value, ok := strings.Cut(line, "=")
 		if ok {
-			if _, required := values[name]; required || isRequiredKernelEBPFFeature(name) {
+			if isTrackedKernelEBPFFeature(name) {
 				values[name] = value == "y"
 			}
 		}
@@ -49,8 +59,8 @@ func parseKernelEBPFFeatures(config io.Reader) kernelEBPFFeatures {
 		return kernelEBPFFeatures{}
 	}
 
-	for _, name := range requiredKernelEBPFFeatures {
-		if _, ok := values[name]; !ok {
+	for _, spec := range kernelEBPFFeatureSpecs {
+		if _, ok := values[spec.name]; !ok && spec.required {
 			return kernelEBPFFeatures{}
 		}
 	}
@@ -65,9 +75,9 @@ func parseKernelEBPFFeatures(config io.Reader) kernelEBPFFeatures {
 	}
 }
 
-func isRequiredKernelEBPFFeature(name string) bool {
-	for _, parsed := range parsedKernelEBPFFeatures {
-		if name == parsed {
+func isTrackedKernelEBPFFeature(name string) bool {
+	for _, spec := range kernelEBPFFeatureSpecs {
+		if name == spec.name {
 			return true
 		}
 	}

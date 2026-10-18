@@ -346,7 +346,7 @@ modules:
         description: "The plugin needs setuid because it loads data inside the kernel. Netdata sets the necessary permissions during installation."
       default_behavior:
         auto_detection:
-          description: "The plugin checks CONFIG_BPF and CONFIG_BPF_SYSCALL and selects the best available BPF object flavor (arena, buffer, or base) for the running kernel. DNS uses socket filters and does not require CONFIG_KPROBES."
+          description: "The plugin checks CONFIG_BPF and CONFIG_BPF_SYSCALL and selects the best available BPF object flavor (arena, buffer ring, or legacy) for the running kernel. DNS uses socket filters and does not require CONFIG_KPROBES."
         limits:
           description: ""
         performance_impact:

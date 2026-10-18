@@ -126,11 +126,11 @@ func KernelVersion() (uint32, error) {
 func RedHatReleaseFromFile(contents string) (int, error) {
 	contents = strings.TrimSpace(contents)
 	match := redHatReleaseRe.FindStringSubmatch(contents)
-	if len(match) != 3 {
+	if len(match) != 5 {
 		return -1, fmt.Errorf("invalid redhat release %q", contents)
 	}
 
-	major, err := strconv.Atoi(match[1])
+	major, err := strconv.Atoi(match[2])
 	if err != nil {
 		return -1, fmt.Errorf("parse redhat major from %q: %w", contents, err)
 	}
