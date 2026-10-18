@@ -15,7 +15,7 @@ import (
 )
 
 func TestCase035IntermediatePageVisibility(t *testing.T) {
-	const contract = "CASE-035/tier0-page-boundary-keeps-every-sample"
+	const contract = "CASE-035/intermediate-page-max-preserved"
 	type phase struct {
 		cadence int
 		points  [][2]int64

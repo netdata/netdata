@@ -69,6 +69,9 @@ layers; each layer declares which entries it consumes:
 
 ## Additional regression coverage
 
+- **CASE-020 — result units:** normalized rate/gauge groups, cardinality
+  folds, and raw percentage badges retain separate unit-label contracts
+  while DB metadata keeps its source units.
 - **CASE-040 — retained tier coverage and handoffs:** late-enabled tiers,
   inverted or isolated retention, genuine gaps, partial first records,
   changing cadence, and conventional coarse-to-fine tails. Numeric values,
@@ -85,8 +88,9 @@ layers; each layer declares which entries it consumes:
   four numeric observations across a cadence change and an explicit gap.
   AVG/MIN/MAX, SUM, anomaly rate, and partial-data annotation have separate
   fixture-derived expectations.
-- **CASE-035 and storage backends:** intermediate-page and singleton-bridge
-  maxima survive restart and repeated warmed queries. A separate signed
+- **CASE-035 and storage backends:** the independent
+  `CASE-035/intermediate-page-max-preserved` contract keeps intermediate-page
+  and singleton-bridge maxima across restart and repeated warmed queries. A separate signed
   fixture checks negative values, RESET, and anomaly rates across Gorilla,
   raw DBENGINE pages, RAM, and ALLOC while preserving the positive controls.
 

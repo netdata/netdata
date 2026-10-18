@@ -866,6 +866,9 @@ func TestCase023MCPQueryMetricsContract(t *testing.T) {
 				{name: "positive-infinity", value: "+Inf"},
 				{name: "negative-infinity", value: "-Inf"},
 				{name: "overflow-to-infinity", value: "1e309"},
+				{name: "leading-nul", value: "\x00>1"},
+				{name: "interior-nul", value: ">\x001"},
+				{name: "trailing-nul", value: ">1\x00"},
 			}
 			for _, invalid := range invalidOptions {
 				t.Run(group.name+"/"+invalid.name+"-options", func(t *testing.T) {
@@ -876,6 +879,18 @@ func TestCase023MCPQueryMetricsContract(t *testing.T) {
 					response := c023MCPCall(t, requestID, session(t).Session, arguments)
 					requestID++
 					c023MCPAssertOptionsError(t, response.Document, group.name)
+				})
+			}
+		}
+		for _, group := range []string{"percentile", "trimmed-mean", "trimmed-median"} {
+			for index, value := range []string{"\x0095", "9\x005", "95\x00"} {
+				t.Run(group+"/nul-"+strconv.Itoa(index), func(t *testing.T) {
+					arguments := baseArguments(standardContext, "bool", fixture.T0, standard.LastT())
+					arguments["time_group"] = group
+					arguments["time_group_options"] = value
+					response := c023MCPCall(t, requestID, session(t).Session, arguments)
+					requestID++
+					c023MCPAssertOptionsError(t, response.Document, group)
 				})
 			}
 		}

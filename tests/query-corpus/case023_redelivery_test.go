@@ -242,11 +242,12 @@ func TestCase023ResidualPointCoverage(t *testing.T) {
 			times     float64
 		}{
 			{terminal, ">0", 1},
+			{terminal, ">5", 1},
 			{storedGap, "==gap", 1},
 			{adjacentGaps, "==gap", 2},
 		} {
 			for _, group := range []string{"number-of-times", "number-of-flaps"} {
-				t.Run(check.chart.Context+"/"+group, func(t *testing.T) {
+				t.Run(check.chart.Context+"/"+check.condition+"/"+group, func(t *testing.T) {
 					col := query(t, check.chart, group, check.condition)["load"]
 					total := 0.0
 					for _, point := range col {

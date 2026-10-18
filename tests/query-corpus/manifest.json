@@ -287,6 +287,35 @@
     "proves": "a badge SUM over a mixed incremental-and-absolute RRDSET preserves the RRDSET's common units even when the dimension filter selects only its rate dimension"
   },
   {
+    "name": "CASE-020/folded-dimension-units",
+    "proves": "cardinality reduction preserves raw DB units and per-result SUM units for kept and folded pure-gauge, pure-rate and mixed dimensions, including dimension-and-units groups",
+    "components": [
+      "gauges/dimension",
+      "gauges/dimension,units",
+      "rates/dimension",
+      "rates/dimension,units",
+      "mixed/dimension",
+      "mixed/dimension,units"
+    ]
+  },
+  {
+    "name": "CASE-020/normalized-unit-groups",
+    "proves": "SUM groups rate requests/s and gauge requests under their common result units in both source orders, preserving raw first-source DB units and both contributors",
+    "components": [
+      "rate-first",
+      "gauge-first"
+    ]
+  },
+  {
+    "name": "CASE-020/badge-raw-percentage-units",
+    "proves": "badge percentage combined with return-raw keeps the SUM result units for rate, gauge and mixed-algorithm charts because percentage conversion is bypassed",
+    "components": [
+      "rate",
+      "gauge",
+      "mixed-chart-rate-selection"
+    ]
+  },
+  {
     "name": "L4/family-tier-source",
     "proves": "every forced family-tier query is served exclusively from tier1 and returns only the requested source dimension"
   },
@@ -943,10 +972,16 @@
   },
   {
     "name": "CASE-035/tier0-page-boundary-keeps-every-sample",
-    "proves": "a DBENGINE tier-0 query crossing adjacent pages with different collection cadences preserves the exact fixture-measured volume of a series whose rate changes at every sample. The 10-to-1 direction gives the first fine-page samples distinct contributions, so advancing by the old ten-second cadence cannot skip nine equal-looking samples; the 1-to-10 mirror makes duplication or displacement of the first coarse-page sample change the exact row total. The oracle is the independent per-sample rate-times-duration ledger, and the public timestamp grid is unchanged. Additional slow-fast-slow and singleton-bridge controls retain an intermediate-page maximum across hot, restarted and repeated warmed queries.",
+    "proves": "a DBENGINE tier-0 query crossing adjacent pages with different collection cadences preserves the exact fixture-measured volume of a series whose rate changes at every sample. The 10-to-1 direction gives the first fine-page samples distinct contributions, so advancing by the old ten-second cadence cannot skip nine equal-looking samples; the 1-to-10 mirror makes duplication or displacement of the first coarse-page sample change the exact row total. The oracle is the independent per-sample rate-times-duration ledger, and the public timestamp grid is unchanged.",
     "components": [
       "slows-down",
-      "speeds-up",
+      "speeds-up"
+    ]
+  },
+  {
+    "name": "CASE-035/intermediate-page-max-preserved",
+    "proves": "tier0 MAX retains an intermediate page's unique maximum across slow-fast-slow and singleton-bridge cadence changes, including hot, restarted, warmed and repeated queries with exact timestamps and tier0 source evidence",
+    "components": [
       "intermediate-page",
       "singleton-bridge"
     ]
