@@ -69,6 +69,16 @@ func TestEnablePreservesEnabledCandidateRetryState(t *testing.T) {
 				require.True(t, ok)
 				require.Equal(t, record, after)
 				require.Equal(t, lifecycle.LongLivedCensus{}, tasks.LongLivedCensus())
+
+				early, err := controller.candidates.prepareWake(a.FullName(), before.Wake.Token, before.Wake.Due-1)
+				applyCandidateDelta(t, early, err)
+				require.True(t, early.Decision.Ignored)
+				require.Nil(t, early.Decision.Work)
+				require.Equal(t, before, controller.candidates.snapshot(a.FullName()))
+
+				due, err := controller.candidates.prepareWake(a.FullName(), before.Wake.Token, before.Wake.Due)
+				applyCandidateDelta(t, due, err)
+				require.NotNil(t, due.Decision.Work, "the retained capability must run at its logical deadline")
 			})
 		}
 	}
