@@ -38,7 +38,11 @@ func TestCase023RedeliveryAcrossGroupings(t *testing.T) {
 		"CASE-023/redelivery-counted-once",
 		"CASE-023/redelivery-zero-not-empty",
 	} {
-		registerContract(t, contract)
+		if contract == "CASE-023/redelivery-zero-not-empty" {
+			registerContract(t, contract)
+		} else {
+			registerContractComponent(t, contract, "tier1")
+		}
 	}
 
 	const samples = 2400 // 40 tier-1 windows
@@ -111,7 +115,7 @@ func TestCase023RedeliveryAcrossGroupings(t *testing.T) {
 	// delivered one point per bucket to this grouping, and a bucket that
 	// used to carry a value must not become EMPTY
 	t.Run("samples-everywhere", func(t *testing.T) {
-		trackContract(t, "CASE-023/redelivery-samples-everywhere")
+		trackContractComponent(t, "CASE-023/redelivery-samples-everywhere", "tier1")
 		col := query(t, "percentage-of-samples", ">=1")
 		want := make([]expectedColumnPoint, windows*perWindow)
 		for i := range want {
@@ -133,7 +137,7 @@ func TestCase023RedeliveryAcrossGroupings(t *testing.T) {
 	// is a zero. Returning EMPTY instead punches holes into a chart wherever
 	// the user zooms past the stored resolution.
 	t.Run("counted-once", func(t *testing.T) {
-		trackContract(t, "CASE-023/redelivery-counted-once")
+		trackContractComponent(t, "CASE-023/redelivery-counted-once", "tier1")
 		for _, group := range []string{"number-of-times", "number-of-flaps"} {
 			col := query(t, group, "==0")
 			if !assertGridAndNonEmpty(t, col) {
@@ -171,8 +175,8 @@ func TestCase023ResidualPointCoverage(t *testing.T) {
 	const countContract = "CASE-023/redelivery-counted-once"
 	const timeContract = "CASE-023/residual-point-time-share"
 	const sampleContract = "CASE-023/redelivery-samples-everywhere"
-	registerContract(t, countContract)
-	registerContract(t, sampleContract)
+	registerContractComponent(t, countContract, "residual-tier0")
+	registerContractComponent(t, sampleContract, "residual-tier0")
 	for _, shape := range []string{"terminal", "interior", "stored-gap"} {
 		registerContractComponent(t, timeContract, shape)
 	}
@@ -231,7 +235,7 @@ func TestCase023ResidualPointCoverage(t *testing.T) {
 	}
 
 	t.Run("counted-once", func(t *testing.T) {
-		trackContract(t, countContract)
+		trackContractComponent(t, countContract, "residual-tier0")
 		for _, check := range []struct {
 			chart     fixture.Chart
 			condition string
@@ -292,7 +296,7 @@ func TestCase023ResidualPointCoverage(t *testing.T) {
 	}
 
 	t.Run("gap-samples-everywhere", func(t *testing.T) {
-		trackContract(t, sampleContract)
+		trackContractComponent(t, sampleContract, "residual-tier0")
 		want := make([]expectedColumnPoint, 5)
 		for row, share := range []float64{0, 100, 100, 100, 50} {
 			// The last row delivers the repeated gap and the following numeric point.

@@ -744,11 +744,19 @@
   },
   {
     "name": "CASE-023/redelivery-samples-everywhere",
-    "proves": "percentage-of-samples treats every delivery of a wide stored point as a sample and therefore answers every covered result bucket"
+    "proves": "percentage-of-samples treats every delivery of a wide stored point as a sample and therefore answers every covered result bucket",
+    "components": [
+      "tier1",
+      "residual-tier0"
+    ]
   },
   {
     "name": "CASE-023/redelivery-counted-once",
-    "proves": "number-of-times and number-of-flaps count one stored window at most once even when it is delivered into several result buckets"
+    "proves": "number-of-times and number-of-flaps count one stored window at most once even when it is delivered into several result buckets",
+    "components": [
+      "tier1",
+      "residual-tier0"
+    ]
   },
   {
     "name": "CASE-023/redelivery-zero-not-empty",
