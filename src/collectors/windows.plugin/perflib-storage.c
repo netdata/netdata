@@ -3132,7 +3132,8 @@ static int logical_disk_metadata_unittest_run(void)
     dictionary_set(mountPoints, "R:", NULL, 0);
 
     logicalDisks = dictionary_create_advanced(
-        DICT_OPTION_FIXED_SIZE, NULL, sizeof(struct logical_disk));
+        DICT_OPTION_DONT_OVERWRITE_VALUE | DICT_OPTION_FIXED_SIZE,
+        NULL, sizeof(struct logical_disk));
     struct logical_disk *mp_recov =
         dictionary_set(logicalDisks, "R:", NULL, sizeof(*mp_recov));
     mp_recov->collected_metadata = true;
