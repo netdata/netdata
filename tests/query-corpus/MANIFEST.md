@@ -74,7 +74,7 @@ set at the end.
 | CASE-020/badge-rate-sum-units | a badge SUM over a rate-only RRDSET renders the integrated volume unit by removing the source unit's trailing '/s' | n/a |  |
 | CASE-020/badge-gauge-sum-units | a badge SUM over an absolute-only RRDSET preserves the RRDSET's common units | n/a |  |
 | CASE-020/badge-mixed-algorithm-sum-units | a badge SUM over a mixed incremental-and-absolute RRDSET preserves the RRDSET's common units even when the dimension filter selects only its rate dimension | n/a |  |
-| CASE-020/folded-dimension-units | cardinality reduction preserves raw DB units and per-result SUM units for kept and folded pure-gauge, pure-rate and mixed dimensions, including dimension-and-units groups | n/a |  |
+| CASE-020/folded-dimension-units | cardinality reduction preserves raw DB units and per-result SUM units for kept and folded pure-gauge, pure-rate and both mixed orders; normalized-unit groups retain a shared result unit and heterogeneous folds keep the existing source-unit fallback | n/a |  |
 | CASE-020/normalized-unit-groups | SUM groups rate requests/s and gauge requests under their common result units in both source orders, preserving raw first-source DB units and both contributors | n/a |  |
 | CASE-020/badge-raw-percentage-units | badge percentage combined with return-raw keeps the SUM result units for rate, gauge and mixed-algorithm charts because percentage conversion is bypassed | n/a |  |
 | L4/family-tier-source | every forced family-tier query is served exclusively from tier1 and returns only the requested source dimension | n/a |  |

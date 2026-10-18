@@ -288,14 +288,17 @@
   },
   {
     "name": "CASE-020/folded-dimension-units",
-    "proves": "cardinality reduction preserves raw DB units and per-result SUM units for kept and folded pure-gauge, pure-rate and mixed dimensions, including dimension-and-units groups",
+    "proves": "cardinality reduction preserves raw DB units and per-result SUM units for kept and folded pure-gauge, pure-rate and both mixed orders; normalized-unit groups retain a shared result unit and heterogeneous folds keep the existing source-unit fallback",
     "components": [
       "gauges/dimension",
       "gauges/dimension,units",
       "rates/dimension",
       "rates/dimension,units",
       "mixed/dimension",
-      "mixed/dimension,units"
+      "mixed/dimension,units",
+      "mixed-rate-first/dimension",
+      "mixed-rate-first/dimension,units",
+      "equal-normalized"
     ]
   },
   {

@@ -31,6 +31,29 @@ func c020AssertDimensionUnits(t *testing.T, section map[string]any, path string,
 	}
 }
 
+func c020WaitCharts(t *testing.T, host string, charts ...fixture.Chart) {
+	t.Helper()
+	// Context retention alone may be satisfied before its second chart arrives.
+	for _, chart := range charts {
+		params := daemon.DataParams(chart.Context, chart.FirstT()-1, chart.LastT(), c020Samples)
+		params.Set("instances", chart.ID)
+		deadline := time.Now().Add(15 * time.Second)
+		for {
+			doc, err := td.DataV3(host, params)
+			if err == nil {
+				retention, ok := daemon.QueryRetention(doc)
+				if ok && retention.FirstEntry == chart.FirstT() && retention.LastEntry == chart.LastT() {
+					break
+				}
+			}
+			if time.Now().After(deadline) {
+				t.Fatalf("chart %q did not finish ingestion", chart.ID)
+			}
+			time.Sleep(100 * time.Millisecond)
+		}
+	}
+}
+
 func TestCase020NormalizedUnitGroups(t *testing.T) {
 	const contract = "CASE-020/normalized-unit-groups"
 	for index, name := range []string{"rate-first", "gauge-first"} {
@@ -45,25 +68,7 @@ func TestCase020NormalizedUnitGroups(t *testing.T) {
 				charts[0], charts[1] = charts[1], charts[0]
 			}
 			c020PushCharts(t, host, guid(9995+index), charts...)
-			// Context retention alone may be satisfied before its second chart arrives.
-			for _, chart := range charts {
-				params := daemon.DataParams(context, chart.FirstT()-1, chart.LastT(), c020Samples)
-				params.Set("instances", chart.ID)
-				deadline := time.Now().Add(15 * time.Second)
-				for {
-					doc, err := td.DataV3(host, params)
-					if err == nil {
-						retention, ok := daemon.QueryRetention(doc)
-						if ok && retention.FirstEntry == chart.FirstT() && retention.LastEntry == chart.LastT() {
-							break
-						}
-					}
-					if time.Now().After(deadline) {
-						t.Fatalf("chart %q did not finish ingestion", chart.ID)
-					}
-					time.Sleep(100 * time.Millisecond)
-				}
-			}
+			c020WaitCharts(t, host, charts...)
 			doc := c020Query(t, c020QuerySpec{
 				host: host, context: context, timeGroup: "sum", groupBy: "units", aggregation: "sum",
 				after: fixture.T0, before: fixture.T0 + c020Samples,
@@ -101,6 +106,7 @@ func TestCase020FoldedDimensionUnits(t *testing.T) {
 		{"gauges", [3]string{"absolute", "absolute", "absolute"}, "requests/s", "requests/s"},
 		{"rates", [3]string{"incremental", "incremental", "incremental"}, "requests", "requests"},
 		{"mixed", [3]string{"incremental", "absolute", "incremental"}, "requests", "requests/s"},
+		{"mixed-rate-first", [3]string{"absolute", "incremental", "incremental"}, "requests", "requests/s"},
 	} {
 		t.Run(item.name, func(t *testing.T) {
 			host := "c020-fold-" + item.name
@@ -140,4 +146,38 @@ func TestCase020FoldedDimensionUnits(t *testing.T) {
 			}
 		})
 	}
+	t.Run("equal-normalized", func(t *testing.T) {
+		trackContractComponent(t, contract, "equal-normalized")
+		const host = "c020-fold-equal"
+		const context = "fixture.c020_fold_equal"
+		var charts []fixture.Chart
+		for i := 1; i <= 3; i++ {
+			units, algorithm := "requests/s", "incremental"
+			if i == 1 {
+				units, algorithm = "requests", "absolute"
+			}
+			chart := c020Chart(context+"_"+strconv.Itoa(i), context, units, algorithm, i, fixture.T0)
+			chart.Dimensions[0].ID = "d" + strconv.Itoa(i)
+			charts = append(charts, chart)
+		}
+		c020PushCharts(t, host, guid(9994), charts...)
+		c020WaitCharts(t, host, charts...)
+		params := daemon.DataParams(context, fixture.T0, fixture.T0+c020Samples, 1)
+		params.Set("time_group", "sum")
+		params.Set("group_by", "dimension,units")
+		params.Set("aggregation", "sum")
+		params.Set("options", "jsonwrap|unaligned")
+		params.Set("cardinality_limit", "2")
+		doc, err := td.DataV3(host, params)
+		if err != nil {
+			t.Fatal(err)
+		}
+		c020AssertDimensionUnits(t, queryObject(t, doc, "db", "db"), "db", map[string]string{
+			"d3,requests": "requests/s", "remaining 2 dimensions": "requests/s",
+		})
+		c020AssertDimensionUnits(t, queryObject(t, doc, "view", "view"), "view", map[string]string{
+			"d3,requests": "requests", "remaining 2 dimensions": "requests",
+		})
+	})
+
 }
