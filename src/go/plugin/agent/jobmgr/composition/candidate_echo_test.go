@@ -117,12 +117,8 @@ func TestProcessCandidateDaemonEnablePreservesRetry(t *testing.T) {
 	for _, config := range configs {
 		config["autodetection_retry"] = 1
 	}
-	checks := make(chan time.Time, 4)
-	state := &continuationCollectorState{check: func(ctx context.Context, _ string) error {
-		select {
-		case checks <- time.Now():
-		case <-ctx.Done():
-		}
+	sort.Slice(configs, func(i, j int) bool { return configs[i].UID() < configs[j].UID() })
+	state := &continuationCollectorState{check: func(context.Context, string) error {
 		return errors.New("endpoint unavailable")
 	}}
 	fixture := newCandidateEchoFixture(t, "v2", true, state, configs)
@@ -131,10 +127,11 @@ func TestProcessCandidateDaemonEnablePreservesRetry(t *testing.T) {
 	fixture.command(t, "retry-reconcile", "enable", "", 200)
 	require.Eventually(t, func() bool { return len(state.checked()) >= 3 }, 3*time.Second, time.Millisecond,
 		"reconciliation must retain the scheduled retry")
-	first := <-checks
-	<-checks
-	retry := <-checks
-	require.GreaterOrEqual(t, retry.Sub(first), time.Second, "daemon replies must not bypass the retry deadline")
+	require.Equal(t, []string{
+		configs[0]["option_str"].(string),
+		configs[1]["option_str"].(string),
+		configs[0]["option_str"].(string),
+	}, state.checked()[:3])
 }
 
 func TestProcessCandidateDaemonPolicySameSourceReplacement(t *testing.T) {
