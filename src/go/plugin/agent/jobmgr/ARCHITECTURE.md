@@ -791,6 +791,11 @@ the plugin restarts. Echo replies update status or record rejection without repl
   validation and a resource reservation. For source-owned config, a fresh ENABLE starts a new same-tier alternative
   search and resets attempt/deadline facts under a new intent; DynCfg-owned config remains exact. Construction,
   readiness and health settle afterward. ENABLE during current enabled Accepted work coalesces without resetting its pass.
+  For source-owned jobs, an ENABLE with no caller source reconciles already-enabled intent even when health is Failed:
+  it preserves the exposed binding, active alternatives, finite pass, and retry deadlines. These requests are the
+  daemon's automatic registration replies; ordinary UI/API calls carry caller provenance and retain fresh-enable
+  behavior. A handcrafted source-less ENABLE follows the same reconciliation rule. Passive and disabled jobs still
+  enable normally, and DynCfg-owned jobs keep their exact-config enable behavior.
 - **Other mutations.** Disabled UPDATE, DISABLE and REMOVE return `200` when applied. Runtime quarantine discovered
   after an accepted UPDATE is reported through later failed status and diagnostics; the mutation reply remains `202`.
 - **Informative commands.** TEST preserves its validation/error codes and never adopts its payload. RESTART probes
@@ -807,7 +812,8 @@ the plugin restarts. Echo replies update status or record rejection without repl
 
 Health is reported through CONFIG status and lifecycle diagnostics. `TestDynCfgJobMutationAdoptionAndRestartPreflight`
 covers plugin mutation outcomes; composition RESTART tests exercise the outer reply, blocked startup, concurrent disable,
-cancellation, and deadlines through the actual kernel.
+cancellation, and deadlines through the actual kernel. `composition/candidate_echo_test.go` feeds automatic daemon
+replies through real Function ingress; candidate-only tests cannot detect a CREATE/ENABLE feedback loop.
 
 ### Accepted-job activation
 

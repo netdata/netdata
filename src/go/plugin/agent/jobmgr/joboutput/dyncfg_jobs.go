@@ -241,6 +241,15 @@ func (dcjc *DynCfgJobController) Prepare(
 	case dyncfg.CommandUpdate:
 		transaction, err = dcjc.prepareUpdate(ctx, request, target, record, exists, current, scope, permit)
 	case dyncfg.CommandEnable:
+		// Registration echoes have no caller and must not reset enabled recovery.
+		if request.CallerSource == "" && exists {
+			candidate := dcjc.candidates.view(scope.ID)
+			if candidate != nil && candidate.Enablement == candidateEnabled && candidate.Binding != nil &&
+				candidate.Binding.Config.SourceType() != confgroup.TypeDyncfg {
+				transaction, err = dcjc.satisfyWithEnabledIntent(ctx, scope, current, permit, record, nil)
+				break
+			}
+		}
 		transaction, err = dcjc.prepareEnable(ctx, target, record, exists, current, scope, permit)
 	case dyncfg.CommandRestart:
 		transaction, err = dcjc.prepareRestart(ctx, target, record, exists, current, scope, permit)
