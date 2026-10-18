@@ -238,6 +238,7 @@ struct volume_space_request {
 };
 
 static netdata_mutex_t volume_space_mutex;
+static bool volume_space_mutex_initialized = false;
 static netdata_cond_t volume_space_cond;
 static DICTIONARY *volume_space_request = NULL;
 static DICTIONARY *volume_space_results = NULL;
@@ -417,6 +418,7 @@ static void initialize(void)
     mountPointsDiscoveryWarningActive = false;
 
     netdata_mutex_init(&volume_space_mutex);
+    volume_space_mutex_initialized = true;
     netdata_cond_init(&volume_space_cond);
     volume_space_worker_stop = false;
     mount_points_worker_stop = false;
@@ -1487,6 +1489,33 @@ static void mount_points_worker(void *ptr __maybe_unused)
     InterlockedExchange(&mount_points_worker_finished[worker_id], 1);
 }
 
+static void volume_space_discard_path_work(const char *name)
+{
+    if (!name || !*name)
+        return;
+
+    if (volume_space_cycle_results)
+        dictionary_del(volume_space_cycle_results, name);
+
+    if (volume_space_mutex_initialized) {
+        netdata_mutex_lock(&volume_space_mutex);
+        if (volume_space_results)
+            dictionary_del(volume_space_results, name);
+        if (volume_space_request)
+            dictionary_del(volume_space_request, name);
+        if (volume_space_latest_generation)
+            dictionary_del(volume_space_latest_generation, name);
+        netdata_mutex_unlock(&volume_space_mutex);
+    } else {
+        if (volume_space_results)
+            dictionary_del(volume_space_results, name);
+        if (volume_space_request)
+            dictionary_del(volume_space_request, name);
+        if (volume_space_latest_generation)
+            dictionary_del(volume_space_latest_generation, name);
+    }
+}
+
 static void logical_disks_invalidate_changed_volumes(
     DICTIONARY *previous_volume_ids, DICTIONARY *new_volume_ids)
 {
@@ -1502,6 +1531,7 @@ static void logical_disks_invalidate_changed_volumes(
             struct logical_disk *d = dictionary_get(logicalDisks, path);
             if (d)
                 logical_disk_cleanup(d);
+            volume_space_discard_path_work(path);
         }
     }
     dfe_done(old_id);
@@ -3093,18 +3123,43 @@ static int logical_disk_metadata_unittest_run(void)
     dictionary_set(new_vids, "E:", "Volume{new}", sizeof("Volume{new}"));
 
     DICTIONARY *saved_disks = logicalDisks;
-    logicalDisks = dictionary_create_advanced(DICT_OPTION_FIXED_SIZE, NULL, sizeof(struct logical_disk));
-    struct logical_disk *tracked = dictionary_set(logicalDisks, "E:", NULL, sizeof(*tracked));
+    DICTIONARY *saved_vsr = volume_space_results;
+    DICTIONARY *saved_vlg = volume_space_latest_generation;
+
+    logicalDisks = dictionary_create_advanced(
+        DICT_OPTION_FIXED_SIZE, NULL, sizeof(struct logical_disk));
+    struct logical_disk *tracked =
+        dictionary_set(logicalDisks, "E:", NULL, sizeof(*tracked));
     tracked->collected_metadata = true;
     tracked->readonly = true;
     tracked->readonly_known = true;
     tracked->DriveType = 5;
 
+    volume_space_results = dictionary_create_advanced(
+        DICT_OPTION_FIXED_SIZE, NULL, sizeof(struct volume_space_result));
+    struct volume_space_result stale_res = { .success = true, .readonly = true };
+    dictionary_set(volume_space_results, "E:", &stale_res, sizeof(stale_res));
+
+    volume_space_latest_generation = dictionary_create_advanced(
+        DICT_OPTION_FIXED_SIZE, NULL, sizeof(uint64_t));
+    uint64_t stale_gen = 10;
+    dictionary_set(volume_space_latest_generation, "E:", &stale_gen, sizeof(stale_gen));
+
     logical_disks_invalidate_changed_volumes(prev_vids, new_vids);
     errors += mount_points_unittest_expect(
         "changed volume identity invalidates logical disk cached metadata",
         !tracked->collected_metadata && !tracked->readonly && !tracked->readonly_known);
+    errors += mount_points_unittest_expect(
+        "changed volume identity discards published space results for path",
+        dictionary_get(volume_space_results, "E:") == NULL);
+    errors += mount_points_unittest_expect(
+        "changed volume identity discards in-flight generation for path",
+        dictionary_get(volume_space_latest_generation, "E:") == NULL);
 
+    dictionary_destroy(volume_space_results);
+    dictionary_destroy(volume_space_latest_generation);
+    volume_space_results = saved_vsr;
+    volume_space_latest_generation = saved_vlg;
     dictionary_destroy(logicalDisks);
     logicalDisks = saved_disks;
     dictionary_destroy(prev_vids);
@@ -3685,6 +3740,7 @@ void do_PerflibStorage_cleanup(void)
     }
     netdata_mutex_unlock(&volume_space_mutex);
 
+    volume_space_mutex_initialized = false;
     netdata_cond_destroy(&volume_space_cond);
     netdata_mutex_destroy(&volume_space_mutex);
 
