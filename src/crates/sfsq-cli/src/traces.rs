@@ -458,8 +458,13 @@ pub fn run_suggest(args: &SuggestArgs, out: &mut dyn std::io::Write) -> Result<(
     for s in &data.items {
         let tier = s.tier.map(|t| format!(" tier={t:?}")).unwrap_or_default();
         let cut = if s.truncated { " truncated" } else { "" };
-        let numeric = if s.numeric { " numeric" } else { "" };
-        writeln!(out, "{} match={:?}{tier}{cut}{numeric}", s.text, s.class)?;
+        let kinds = if s.kinds.is_empty() {
+            String::new()
+        } else {
+            let list: Vec<String> = s.kinds.iter().map(|k| format!("{k:?}")).collect();
+            format!(" kinds={}", list.join("+"))
+        };
+        writeln!(out, "{} match={:?}{tier}{cut}{kinds}", s.text, s.class)?;
     }
     let complete = data
         .complete_after

@@ -69,8 +69,8 @@ pub struct Metadata {
     /// and storage stats ([`LeafStats`]: cardinality + tier). The flat
     /// [`FieldTable`] the tier machinery and legacy consumers use is
     /// **derived** from this tree at read time
-    /// ([`SchemaTree::derive_field_table`]); coalesced scalar field types
-    /// come from [`SchemaTree::derive_scalar_kinds`].
+    /// ([`SchemaTree::derive_field_table`]); each path's value kinds come
+    /// from [`SchemaTree::derive_leaf_kinds`].
     pub tree: SchemaTree,
     /// Manifest of the per-row column chunks this file carries, with each
     /// column's type. Empty when the file has no per-row columns. The
@@ -239,21 +239,6 @@ impl ValueKind {
     /// True for value-bearing leaf kinds (everything but `Kvlist`/`Array`).
     pub fn is_leaf(self) -> bool {
         !matches!(self, ValueKind::Kvlist | ValueKind::Array)
-    }
-
-    /// True for the scalar kinds that can be a UI facet — the value-bearing
-    /// kinds except `Null` (absence) and the empty containers, which are
-    /// not scalars: paths holding only those get no entry in
-    /// [`SchemaTree::derive_scalar_kinds`].
-    pub fn is_scalar(self) -> bool {
-        matches!(
-            self,
-            ValueKind::Bool
-                | ValueKind::Int
-                | ValueKind::Double
-                | ValueKind::Str
-                | ValueKind::Bytes
-        )
     }
 }
 
@@ -538,110 +523,91 @@ impl SchemaTree {
             .collect()
     }
 
-    /// Derive the coalesced **scalar** field view: for each leaf path
-    /// whose kinds include at least one scalar, the path's single coalesced
-    /// scalar [`ValueKind`]. Container-only paths (objects/arrays, including
-    /// `Null`/empty-only) yield no entry — their scalars live at child paths.
-    /// Ordered by path. Coalescing lattice: drop `Null`; fold empty containers
-    /// away; `Int ⊔ Double = Double`; any other scalar mix → `Str`.
-    pub fn derive_scalar_kinds(&self) -> Vec<(String, ValueKind)> {
+    /// Every leaf path with the set of leaf kinds it holds — all a file
+    /// records about types: which kinds occurred at a path, not which value
+    /// had which kind (values are stored as text). Ordered by path. A path
+    /// that is also a container (`arr` with `arr[]`, `obj` with `obj.k`)
+    /// lists only its leaf occurrences; the children are paths of their own.
+    pub fn derive_leaf_kinds(&self) -> Vec<(String, ValueKinds)> {
         use std::collections::BTreeMap;
-        // path -> accumulated scalar-kind flags.
-        let mut by_path: BTreeMap<String, ScalarSet> = BTreeMap::new();
+        let mut by_path: BTreeMap<String, ValueKinds> = BTreeMap::new();
         for (id, node) in self.iter() {
-            if !node.kind.is_leaf() {
-                continue;
+            if node.kind.is_leaf() {
+                by_path.entry(self.path(id)).or_default().insert(node.kind);
             }
-            by_path.entry(self.path(id)).or_default().add(node.kind);
         }
-        by_path
-            .into_iter()
-            .filter_map(|(path, set)| set.coalesce().map(|k| (path, k)))
-            .collect()
-    }
-
-    /// The leaf paths with at least one `Int` or `Double` leaf, whatever
-    /// other kinds they also hold. Not the coalesced view: `Int` with `Str`
-    /// coalesces to `Str`, yet its stored numbers still compare as numbers
-    /// (values are stored as text and parsed at comparison time).
-    pub fn derive_numeric_paths(&self) -> std::collections::BTreeSet<String> {
-        self.iter()
-            .filter(|(_, node)| matches!(node.kind, ValueKind::Int | ValueKind::Double))
-            .map(|(id, _)| self.path(id))
-            .collect()
+        by_path.into_iter().collect()
     }
 }
 
-/// Join two ALREADY-COALESCED scalar kinds across files/sources with the
-/// same lattice [`SchemaTree::derive_scalar_kinds`] applies within one
-/// tree (equal → itself; Int ⊔ Double → Double; any other mix → Str) —
-/// the cross-source half of the field→kind map trace/search results
-/// carry. Inputs come from `derive_scalar_kinds`, so they are always
-/// value-bearing kinds and the join always exists.
-pub fn join_value_kinds(a: ValueKind, b: ValueKind) -> ValueKind {
-    let mut set = ScalarSet::default();
-    set.add(a);
-    set.add(b);
-    // Non-scalar inputs cannot arise from derive_scalar_kinds (asserted in
-    // dev builds); in release, degrade to the universal string fallback
-    // rather than panicking.
-    let joined = set.coalesce();
-    debug_assert!(
-        joined.is_some(),
-        "join_value_kinds called with non-scalar kinds {a:?}/{b:?}"
-    );
-    joined.unwrap_or(ValueKind::Str)
-}
+/// A set of leaf [`ValueKind`]s: the kinds one path holds. Iterates in
+/// [`ValueKinds::LEAF_ORDER`].
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Hash)]
+pub struct ValueKinds(u8);
 
-/// Accumulates which scalar kinds a path's leaves carry, for coalescing.
-#[derive(Default)]
-struct ScalarSet {
-    bool_: bool,
-    int: bool,
-    double: bool,
-    str_: bool,
-    bytes: bool,
-}
+impl ValueKinds {
+    /// The leaf kinds, in the canonical order sets iterate in.
+    pub const LEAF_ORDER: [ValueKind; 8] = [
+        ValueKind::Null,
+        ValueKind::Bool,
+        ValueKind::Int,
+        ValueKind::Double,
+        ValueKind::Str,
+        ValueKind::Bytes,
+        ValueKind::EmptyKvlist,
+        ValueKind::EmptyArray,
+    ];
 
-impl ScalarSet {
-    fn add(&mut self, kind: ValueKind) {
-        match kind {
-            ValueKind::Bool => self.bool_ = true,
-            ValueKind::Int => self.int = true,
-            ValueKind::Double => self.double = true,
-            ValueKind::Str => self.str_ = true,
-            ValueKind::Bytes => self.bytes = true,
-            // Null, empty containers, and containers contribute no scalar.
-            _ => {}
-        }
-    }
-
-    /// The coalesced scalar kind, or `None` if the path has no scalar leaves.
-    fn coalesce(&self) -> Option<ValueKind> {
-        let count = [self.bool_, self.int, self.double, self.str_, self.bytes]
+    fn bit(kind: ValueKind) -> Option<u8> {
+        Self::LEAF_ORDER
             .iter()
-            .filter(|&&b| b)
-            .count();
-        match count {
-            0 => None,
-            1 => Some(if self.bool_ {
-                ValueKind::Bool
-            } else if self.int {
-                ValueKind::Int
-            } else if self.double {
-                ValueKind::Double
-            } else if self.str_ {
-                ValueKind::Str
-            } else {
-                ValueKind::Bytes
-            }),
-            // Numeric widening is the only multi-kind join that isn't `Str`.
-            _ if self.int && self.double && !self.bool_ && !self.str_ && !self.bytes => {
-                Some(ValueKind::Double)
-            }
-            // Any other scalar mix → the universal string fallback.
-            _ => Some(ValueKind::Str),
+            .position(|&k| k == kind)
+            .map(|i| 1 << i)
+    }
+
+    /// Add a leaf kind. Interior kinds (`Kvlist`, `Array`) never label a
+    /// value and are ignored.
+    pub fn insert(&mut self, kind: ValueKind) {
+        debug_assert!(kind.is_leaf(), "ValueKinds::insert({kind:?})");
+        if let Some(bit) = Self::bit(kind) {
+            self.0 |= bit;
         }
+    }
+
+    /// Both sets' kinds.
+    pub fn union(self, other: Self) -> Self {
+        Self(self.0 | other.0)
+    }
+
+    pub fn contains(self, kind: ValueKind) -> bool {
+        Self::bit(kind).is_some_and(|bit| self.0 & bit != 0)
+    }
+
+    pub fn is_empty(self) -> bool {
+        self.0 == 0
+    }
+
+    /// Whether the path holds numbers: the numeric operators compare
+    /// stored text that parses as a number, whatever else the path holds.
+    pub fn has_number(self) -> bool {
+        self.contains(ValueKind::Int) || self.contains(ValueKind::Double)
+    }
+
+    /// The kinds, in [`Self::LEAF_ORDER`].
+    pub fn iter(self) -> impl Iterator<Item = ValueKind> {
+        Self::LEAF_ORDER
+            .into_iter()
+            .filter(move |&k| self.contains(k))
+    }
+}
+
+impl FromIterator<ValueKind> for ValueKinds {
+    fn from_iter<I: IntoIterator<Item = ValueKind>>(iter: I) -> Self {
+        let mut kinds = Self::default();
+        for kind in iter {
+            kinds.insert(kind);
+        }
+        kinds
     }
 }
 

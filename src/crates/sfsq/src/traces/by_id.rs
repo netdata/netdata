@@ -25,11 +25,11 @@
 //! never reads — a file the bloom rules out, or one that does not hold
 //! the trace — is not discovered, so it is not reported.
 //!
-//! The result also carries a field→schema-kind map, so consumers type
-//! values from the declared schema kinds instead of inferring them from
-//! rendered strings. Its sectioning and the cross-source coalescing
-//! rule (the `sfst::join_value_kinds` lattice over exactly the
-//! sources that contributed retained spans) live on [`FieldKinds`].
+//! The result also carries a field→kinds map, so consumers type values
+//! from the stored schema instead of inferring them from rendered
+//! strings. Its sectioning and its scope (each key's leaf kinds, unioned
+//! over exactly the sources that contributed retained spans) live on
+//! [`FieldKinds`].
 
 use std::collections::BTreeMap;
 use std::sync::Arc;
@@ -143,20 +143,22 @@ pub enum TraceRequestError {
     SourceSet(#[from] SourceSetError),
 }
 
-/// The coalesced field→schema-kind maps for typed reconstruction,
-/// SECTIONED to mirror how the trace exposes names: span-level `fields`
-/// keep their storage names; event/link attribute keys are the
-/// prefix-stripped names `sfst::TraceEvent`/`sfst::TraceLink` expose
-/// (a flat result map would collide an event attr `foo` with a link
-/// attr `foo` whose kinds differ). Every section is FILTERED to exactly
-/// the names the returned trace exposes; the KINDS coalesce — via the
-/// `sfst::join_value_kinds` lattice — from exactly the sources whose
-/// spans the result retained. Sorted by name.
+/// The field→kinds maps for typed reconstruction, SECTIONED to mirror
+/// how the trace exposes names: span-level `fields` keep their storage
+/// names; event/link attribute keys are the prefix-stripped names
+/// `sfst::TraceEvent`/`sfst::TraceLink` expose (a flat result map would
+/// collide an event attr `foo` with a link attr `foo` whose kinds
+/// differ). Every section is FILTERED to exactly the names the returned
+/// trace exposes. A name's kinds are the union of its leaf kinds over
+/// exactly the sources whose spans the result retained — uncoalesced,
+/// and file-wide: a source's schema covers every span it holds, not
+/// only this trace's (which value had which kind is not stored). Sorted
+/// by name.
 #[derive(Debug, Default, PartialEq, Eq)]
 pub struct FieldKinds {
-    pub fields: Vec<(String, sfst::ValueKind)>,
-    pub event_attributes: Vec<(String, sfst::ValueKind)>,
-    pub link_attributes: Vec<(String, sfst::ValueKind)>,
+    pub fields: Vec<(String, sfst::ValueKinds)>,
+    pub event_attributes: Vec<(String, sfst::ValueKinds)>,
+    pub link_attributes: Vec<(String, sfst::ValueKinds)>,
 }
 
 /// One assembled trace plus everything the consumer needs to interpret
@@ -169,8 +171,8 @@ pub struct TraceData {
     pub trace: sfst::Trace,
     /// Query-level completeness.
     pub status: QueryStatus,
-    /// Field → coalesced scalar kind for the returned trace; see
-    /// [`FieldKinds`] for the sectioning and coalescing contract.
+    /// Field → leaf kinds for the returned trace; see [`FieldKinds`] for
+    /// the sectioning and scope.
     pub field_kinds: FieldKinds,
     /// Parallel to `trace.spans`: the query's shaper cut part of the
     /// span (all `false` without a shaper).
@@ -382,19 +384,17 @@ pub fn trace_by_id(
 
     // ── Field kinds: from exactly the contributing sources, projected
     // onto exactly the names the result exposes ───────────────────────
-    let mut kinds: BTreeMap<String, sfst::ValueKind> = BTreeMap::new();
-    let mut fold = |pairs: Vec<(String, sfst::ValueKind)>| {
-        for (field, kind) in pairs {
-            kinds
-                .entry(field)
-                .and_modify(|k| *k = sfst::join_value_kinds(*k, kind))
-                .or_insert(kind);
+    let mut kinds: BTreeMap<String, sfst::ValueKinds> = BTreeMap::new();
+    let mut fold = |pairs: Vec<(String, sfst::ValueKinds)>| {
+        for (field, set) in pairs {
+            let entry = kinds.entry(field).or_default();
+            *entry = entry.union(set);
         }
     };
     for &idx in &outcome.contributing_sources {
         if idx < session_count {
             match sessions[idx].metadata() {
-                Ok(metadata) => fold(metadata.tree.derive_scalar_kinds()),
+                Ok(metadata) => fold(metadata.tree.derive_leaf_kinds()),
                 Err(e) => {
                     tracing::warn!(
                         "sfsq traces: source {} metadata failed to read: {e}",
@@ -404,7 +404,8 @@ pub fn trace_by_id(
                 }
             }
         } else {
-            fold(tails[idx - session_count].1.field_kinds().to_vec());
+            let tail = tails[idx - session_count].1.field_kinds();
+            fold(tail.iter().map(|(k, v)| (k.clone(), *v)).collect());
         }
     }
     // Exposed names per section. Span fields keep storage names; event/
@@ -423,7 +424,7 @@ pub fn trace_by_id(
             link_attr_names.extend(lk.attributes.iter().map(|(k, _)| k.as_str()));
         }
     }
-    let project = |names: &BTreeSet<&str>, prefix: &str| -> Vec<(String, sfst::ValueKind)> {
+    let project = |names: &BTreeSet<&str>, prefix: &str| -> Vec<(String, sfst::ValueKinds)> {
         names
             .iter()
             .filter_map(|name| {

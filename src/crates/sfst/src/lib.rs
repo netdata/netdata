@@ -123,7 +123,6 @@ pub use reader::{read_summary, read_summary_path};
 pub use registry::{File, Registry, RetentionPolicy};
 pub use rollup_upgrade::{StatsUpgrade, add_trace_rollup_stats, derive_trace_rollup};
 pub use row_index::RowIndex;
-pub use schema::join_value_kinds;
 pub use span_extras::{EventIndex, EventRef, EventRows, LinkIndex, LinkRef, LinkRows};
 pub use trace_bloom::{RepeatFilter, TraceIdBloom};
 pub use trace_combine::{CombineOutcome, LoadedSources, SpanRef, SpanSource};
@@ -157,7 +156,7 @@ pub use schema::{
     DroppedAttributeCounts, Durations, FieldEntry, FieldTable, FieldTier, Flags, HighField,
     Histogram, IdRanges, KvId, LeafStats, Metadata, NodeId, ObservedTimestamps, ParentSpanIds,
     SchemaEdge, SchemaNode, SchemaTree, SpanId, SpanIds, Step, StreamBatch, Summary, TraceId,
-    TraceIds, ValueKind,
+    TraceIds, ValueKind, ValueKinds,
 };
 // Writer-input-only vocabulary stays crate-internal (the build owns the writer).
 pub(crate) use schema::{ALL_COLUMNS, ColumnSpec};

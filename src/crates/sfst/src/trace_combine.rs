@@ -357,7 +357,7 @@ pub struct CombineOutcome {
     pub failures: Vec<(usize, crate::Error)>,
     /// Input indices of the sources whose spans were RETAINED in the
     /// trace (sorted, deduplicated) — the domain of per-source result
-    /// metadata, e.g. sfsq's coalesced field→schema-kind map: it
+    /// metadata, e.g. sfsq's field→kinds map: it
     /// describes the returned data, not files that merely might contain
     /// the trace.
     pub contributing_sources: Vec<usize>,

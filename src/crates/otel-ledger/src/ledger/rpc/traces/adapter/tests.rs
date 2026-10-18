@@ -13,9 +13,9 @@
 //!   pin);
 //! - [`to_trace_result`]: the whole wire envelope — echoed lowercase
 //!   id, coverage echo, status, items, summary_root, roots/children,
-//!   an ABSENT `parent_span_id` for roots, event/link sub-shapes, no
-//!   `field_kinds` even when the engine reports kinds — plus the
-//!   empty-trace degenerate;
+//!   an ABSENT `parent_span_id` for roots, event/link sub-shapes, the
+//!   sectioned `field_kinds` map with each set in canonical order — plus
+//!   the empty-trace degenerate;
 //! - the selection-key grammar: `BUILTIN_WORDS`/`OWNER_WORDS` in
 //!   lockstep with the engine enums (a new owner fails compilation,
 //!   a new builtin fails this suite) and selection-key parsing with
@@ -111,6 +111,7 @@ fn span(id: u8, parent: Option<u8>, start_ns: i64) -> sfst::TraceSpan {
 // asserted envelope field by field.
 #[test]
 fn trace_result_shape_is_pinned() {
+    use sfst::ValueKind::{Int, Null, Str};
     let trace_id = parse_trace_id("11111111111111111111111111111111").unwrap();
     let data = TraceData {
         trace: sfst::Trace {
@@ -120,8 +121,11 @@ fn trace_result_shape_is_pinned() {
         },
         status: QueryStatus::Complete,
         field_kinds: FieldKinds {
-            fields: vec![("name".into(), sfst::ValueKind::Str)],
-            event_attributes: vec![("k".into(), sfst::ValueKind::Str)],
+            fields: vec![
+                ("attributes.n".into(), kinds(&[Str, Int, Null])),
+                ("name".into(), kinds(&[Str])),
+            ],
+            event_attributes: vec![("k".into(), kinds(&[Str]))],
             link_attributes: vec![],
         },
         span_cut: Vec::new(),
@@ -164,10 +168,20 @@ fn trace_result_shape_is_pinned() {
     let s1 = &v["spans"][1];
     assert_eq!(s1["parent_span_id"], "0101010101010101");
 
-    assert!(
-        v.get("field_kinds").is_none(),
-        "the engine's field kinds stay off the wire"
+    assert_eq!(
+        v["field_kinds"],
+        json!({
+            "fields": {"attributes.n": ["null", "int", "str"], "name": ["str"]},
+            "event_attributes": {"k": ["str"]},
+            "link_attributes": {},
+        }),
+        "sectioned, each set in canonical order"
     );
+}
+
+/// A kind set from its members.
+fn kinds(list: &[sfst::ValueKind]) -> sfst::ValueKinds {
+    list.iter().copied().collect()
 }
 
 // ── Search: selection keys ──────────────────────────────────────────
@@ -599,29 +613,34 @@ fn rendered_keys_round_trip_through_the_selection_grammar() {
     }
 }
 
-/// A key is marked `numeric` only when the engine marked it; two keys cut
-/// onto one text merge their marks, in either order.
+/// A key carries the engine's kinds in canonical order, none for a key
+/// without kinds (a builtin); two keys cut onto one text list the union
+/// of their kinds, in either order, and the higher tier.
 #[test]
-fn key_suggestions_carry_the_numeric_mark_only_when_set() {
+fn key_suggestions_carry_their_kinds() {
     use sfsq::traces::{SuggestData, Suggestion};
-    let key = |text: String, numeric| Suggestion {
+    use sfst::ValueKind::{Double, Int, Str};
+    let key = |text: String, list: &[sfst::ValueKind]| Suggestion {
         text,
         truncated: false,
         class: sfst::MatchClass::Prefix,
         tier: Some(sfst::FieldTier::Low),
         enumerable: true,
-        numeric,
+        kinds: kinds(list),
     };
     let p = "a".repeat(LIST_VALUE_MAX_BYTES - 2);
     let q = "b".repeat(LIST_VALUE_MAX_BYTES - 2);
     let data = SuggestData {
         items: vec![
-            key("span.code".into(), true),
-            key("span.label".into(), false),
-            key(p.clone(), false),
-            key(format!("{p}€x"), true),
-            key(q.clone(), true),
-            key(format!("{q}€x"), false),
+            key("span.code".into(), &[Int]),
+            key("name".into(), &[]),
+            key(p.clone(), &[Str]),
+            key(format!("{p}€x"), &[Double, Int]),
+            key(q.clone(), &[Int]),
+            Suggestion {
+                tier: Some(sfst::FieldTier::High),
+                ..key(format!("{q}€x"), &[])
+            },
         ],
         truncated: false,
         status: QueryStatus::Complete,
@@ -631,10 +650,10 @@ fn key_suggestions_carry_the_numeric_mark_only_when_set() {
     assert_eq!(
         v["items"],
         json!([
-            {"text": "span.code", "match": "prefix", "tier": "low", "numeric": true},
-            {"text": "span.label", "match": "prefix", "tier": "low"},
-            {"text": p, "match": "prefix", "truncated": true, "tier": "low", "numeric": true},
-            {"text": q, "match": "prefix", "truncated": true, "tier": "low", "numeric": true},
+            {"text": "span.code", "match": "prefix", "tier": "low", "kinds": ["int"]},
+            {"text": "name", "match": "prefix", "tier": "low"},
+            {"text": p, "match": "prefix", "truncated": true, "tier": "low", "kinds": ["int", "double", "str"]},
+            {"text": q, "match": "prefix", "truncated": true, "tier": "high", "kinds": ["int"]},
         ])
     );
 }
@@ -648,7 +667,7 @@ fn suggestions_are_capped_flagged_and_listed_once() {
         class,
         tier: None,
         enumerable: true,
-        numeric: false,
+        kinds: sfst::ValueKinds::default(),
     };
     // Control characters: 256 raw bytes the engine kept are 1,536 on
     // the wire; the adapter cuts them to the cap, and two texts that
@@ -760,7 +779,7 @@ impl sfst::trace_combine::SpanSource for VecSource {
 fn shaped_trace(spans: Vec<sfst::TraceSpan>) -> TraceResult {
     let trace_id = parse_trace_id("11111111111111111111111111111111").unwrap();
     let mut source = VecSource(spans);
-    let mut shaper = WireShaper;
+    let mut shaper = WireShaper::default();
     let out = sfst::trace_combine::combine(
         &mut [&mut source as &mut dyn sfst::trace_combine::SpanSource],
         trace_id,
@@ -844,6 +863,56 @@ fn a_trace_over_the_byte_budget_keeps_its_earliest_spans() {
     assert!(spans_bytes <= TRACE_SPANS_MAX_BYTES);
     let v = serde_json::to_value(&r).unwrap();
     assert_eq!(v["status"], json!({"partial": ["byte_budget"]}));
+}
+
+/// The field kinds count against the byte budget: a budget-bound trace
+/// whose every exposed name holds every leaf kind (the longest entry the
+/// shaper charges) and needs escaping still fits — the serialized
+/// `spans` list and `field_kinds` together, brackets, commas and the
+/// map's envelope included.
+#[test]
+fn field_kinds_count_against_the_byte_budget() {
+    let n = TRACE_SPANS_MAX_BYTES / 512;
+    let id = |i: usize| sfst::SpanId::from((i as u64 + 1).to_be_bytes());
+    let spans: Vec<sfst::TraceSpan> = (0..n)
+        .map(|i| {
+            let mut s = span(1, None, 1_000 + i as i64);
+            s.span_id = id(i);
+            s.fields = vec![(format!("attributes.f\"{i}\u{1}"), "x".repeat(100))];
+            s.events[0].attributes = vec![(format!("e\\{i}"), "v".into())];
+            s.links[0].attributes = vec![(format!("l\"{i}"), "v".into())];
+            s
+        })
+        .collect();
+    let r = shaped_trace(spans);
+    let kept = r.spans.len();
+    assert!(kept > 0 && kept < n, "the budget binds: kept {kept} of {n}");
+    let every: sfst::ValueKinds = sfst::ValueKinds::LEAF_ORDER.into_iter().collect();
+    let section = |names: Vec<String>| names.into_iter().map(|n| (n, every)).collect();
+    let mut data_kinds = FieldKinds::default();
+    let (mut f, mut e, mut l) = (Vec::new(), Vec::new(), Vec::new());
+    for s in &r.spans {
+        f.extend(s.fields.iter().map(|(k, _)| k.clone()));
+        e.extend(
+            s.events
+                .iter()
+                .flat_map(|ev| ev.attributes.iter().map(|(k, _)| k.clone())),
+        );
+        l.extend(
+            s.links
+                .iter()
+                .flat_map(|lk| lk.attributes.iter().map(|(k, _)| k.clone())),
+        );
+    }
+    data_kinds.fields = section(f);
+    data_kinds.event_attributes = section(e);
+    data_kinds.link_attributes = section(l);
+    let spans_bytes = json_len(&r.spans);
+    let kinds_bytes = json_len(&field_kinds_wire(data_kinds));
+    assert!(
+        spans_bytes + kinds_bytes <= TRACE_SPANS_MAX_BYTES,
+        "spans {spans_bytes} + kinds {kinds_bytes} > {TRACE_SPANS_MAX_BYTES}"
+    );
 }
 
 #[test]

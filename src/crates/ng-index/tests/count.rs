@@ -372,13 +372,19 @@ fn typed_tree_and_coalesced_kinds_roundtrip() {
     let tree = reader.tree();
     assert!(tree.len() > 1, "tree should carry leaf nodes");
 
-    // Coalesced scalar kinds per the `SchemaTree::derive_scalar_kinds` lattice
-    // (Int ⊔ Double = Double; any other scalar mix → Str): the polymorphic
-    // Int+Str path reads Str, the always-Int path Int.
-    let scalars: std::collections::HashMap<String, sfst::ValueKind> =
-        tree.derive_scalar_kinds().into_iter().collect();
-    assert_eq!(scalars.get("attributes.poly"), Some(&sfst::ValueKind::Str));
-    assert_eq!(scalars.get("attributes.n"), Some(&sfst::ValueKind::Int));
+    // Every kind a path held survives sealing, uncoalesced: the polymorphic
+    // path holds Int and Str, the always-Int path Int alone.
+    let kinds: std::collections::HashMap<String, sfst::ValueKinds> =
+        tree.derive_leaf_kinds().into_iter().collect();
+    let set = |list: &[sfst::ValueKind]| list.iter().copied().collect::<sfst::ValueKinds>();
+    assert_eq!(
+        kinds.get("attributes.poly"),
+        Some(&set(&[sfst::ValueKind::Int, sfst::ValueKind::Str]))
+    );
+    assert_eq!(
+        kinds.get("attributes.n"),
+        Some(&set(&[sfst::ValueKind::Int]))
+    );
 
     // Derived field table: it is built from the tree's leaves, so the Int and
     // Str leaves sharing the `attributes.poly` path must collapse to one entry.

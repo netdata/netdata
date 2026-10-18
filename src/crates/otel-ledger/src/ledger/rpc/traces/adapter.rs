@@ -12,19 +12,19 @@
 //! mode dispatch and the sealed-SFST + live-WAL source capture
 //! ([`super::sources`]) — the adapter never touches registry state.
 
-use std::collections::HashMap;
+use std::collections::{BTreeMap, HashMap, HashSet};
 
 use sfsq::traces::{
     AttributeKey, AttributeOwner, BuiltinField, CompareOp, Condition, DURATION_BIN_LABELS,
-    DurationPercentiles, OverviewData, Predicate, PredicateError, PredicateTarget, PredicateValue,
-    SearchData, TOKENS_MAX, Token, TokenQuery, TraceData,
+    DurationPercentiles, FieldKinds, OverviewData, Predicate, PredicateError, PredicateTarget,
+    PredicateValue, SearchData, TOKENS_MAX, Token, TokenQuery, TraceData,
 };
 
 use super::wire::{
     AnchorWire, CONDITION_VALUES_MAX, ConditionParams, ConditionValue, CoverageWire, EventWire,
-    LinkWire, OverviewGridWire, OverviewPercentilesWire, OverviewSection, OverviewTotals,
-    SearchItems, SearchResult, ServiceBreakdownWire, ServiceSpansWire, SpanWire, StatusWire,
-    SuggestResult, SuggestionWire, TraceItems, TraceResult, TraceSummaryWire,
+    FieldKindsWire, LinkWire, OverviewGridWire, OverviewPercentilesWire, OverviewSection,
+    OverviewTotals, SearchItems, SearchResult, ServiceBreakdownWire, ServiceSpansWire, SpanWire,
+    StatusWire, SuggestResult, SuggestionWire, TraceItems, TraceResult, TraceSummaryWire,
 };
 
 /// Parse a W3C text-form trace id: exactly 32 hex chars (16 bytes),
@@ -101,8 +101,9 @@ pub(crate) fn completion_capture_range(window: &std::ops::Range<u32>) -> std::op
 /// stops a pathological value from dominating the response.
 pub(crate) const TRACE_VALUE_MAX_BYTES: usize = 8 * 1024;
 
-/// Budget for a trace's spans, in compact JSON bytes ([`WireShaper`]).
-/// Past it the engine keeps the earliest spans and reports `byte_budget`.
+/// Budget for a trace's spans and their field kinds, in compact JSON
+/// bytes ([`WireShaper`]). Past it the engine keeps the earliest spans
+/// and reports `byte_budget`.
 pub(crate) const TRACE_SPANS_MAX_BYTES: usize = 2 * 1024 * 1024;
 
 /// Per-value cap, in JSON bytes (see [`truncate_value`]), on the
@@ -185,8 +186,8 @@ fn json_len(value: &impl serde::Serialize) -> usize {
 ///
 /// The engine already shaped the trace with [`WireShaper`]: values are
 /// capped (flagged per span in `span_cut`), a trace past the budget is
-/// its earliest spans with their own graph and reports `byte_budget`.
-/// This only maps it.
+/// its earliest spans with their own graph and field kinds and reports
+/// `byte_budget`. This only maps it.
 pub(crate) fn to_trace_result(
     trace_id: &sfst::TraceId,
     data: TraceData,
@@ -218,22 +219,110 @@ pub(crate) fn to_trace_result(
         roots: t.roots,
         children: t.children,
         spans,
+        field_kinds: field_kinds_wire(data.field_kinds),
         matched: data.matched,
     }
+}
+
+/// Field kinds → the wire map, each kind spelled as its [`kind_word`].
+fn field_kinds_wire(k: FieldKinds) -> FieldKindsWire {
+    let section = |v: Vec<(String, sfst::ValueKinds)>| -> BTreeMap<String, Vec<&'static str>> {
+        v.into_iter()
+            .map(|(n, kinds)| (n, kind_words(kinds)))
+            .collect()
+    };
+    FieldKindsWire {
+        fields: section(k.fields),
+        event_attributes: section(k.event_attributes),
+        link_attributes: section(k.link_attributes),
+    }
+}
+
+/// A kind set's wire words, in its canonical order.
+fn kind_words(kinds: sfst::ValueKinds) -> Vec<&'static str> {
+    kinds.iter().map(kind_word).collect()
+}
+
+/// The wire word for each schema value kind. Exhaustive on purpose: a
+/// new engine kind fails compilation here until its wire name is decided.
+fn kind_word(k: sfst::ValueKind) -> &'static str {
+    match k {
+        sfst::ValueKind::Null => "null",
+        sfst::ValueKind::Bool => "bool",
+        sfst::ValueKind::Int => "int",
+        sfst::ValueKind::Double => "double",
+        sfst::ValueKind::Str => "str",
+        sfst::ValueKind::Bytes => "bytes",
+        sfst::ValueKind::EmptyKvlist => "empty_kvlist",
+        sfst::ValueKind::EmptyArray => "empty_array",
+        // Interior kinds never label a value (`ValueKinds` holds leaves).
+        sfst::ValueKind::Kvlist => "kvlist",
+        sfst::ValueKind::Array => "array",
+    }
+}
+
+/// The most a name's field-kind entry can take beyond the name itself:
+/// `:`, the longest kind list (every leaf kind) and `,`.
+fn kind_entry_bound() -> usize {
+    json_len(&kind_words(
+        sfst::ValueKinds::LEAF_ORDER.into_iter().collect(),
+    )) + 2
 }
 
 /// Shapes a trace's spans for the wire while the engine merges them (the
 /// trace handler passes it to `TraceQuery::shaper`): caps each span's
 /// values at [`TRACE_VALUE_MAX_BYTES`], flags the span when it cut one,
-/// and weighs it as its compact JSON. The engine keeps spans while they
-/// fit [`TRACE_SPANS_MAX_BYTES`], so the merge itself holds no more than
-/// the response will.
-pub(crate) struct WireShaper;
+/// and weighs it as its compact JSON and the comma after it, plus, for
+/// each name it is the first to expose, an upper bound of that name's
+/// field-kind entry (kinds are known only once the merge is done). The
+/// first span also carries the list's brackets and the empty field-kind
+/// map. The engine keeps spans while they fit [`TRACE_SPANS_MAX_BYTES`],
+/// so `spans` and `field_kinds` together never exceed it.
+pub(crate) struct WireShaper {
+    /// Names already charged: span fields, event and link attributes.
+    names: [HashSet<String>; 3],
+    /// [`kind_entry_bound`], computed once.
+    entry: usize,
+    /// The fixed cost still to charge, on the first span: the spans
+    /// list's brackets and the empty field-kind map.
+    fixed: usize,
+}
+
+impl Default for WireShaper {
+    fn default() -> Self {
+        Self {
+            names: Default::default(),
+            entry: kind_entry_bound(),
+            fixed: 2 + json_len(&field_kinds_wire(FieldKinds::default())),
+        }
+    }
+}
 
 impl sfst::trace_combine::SpanShaper for WireShaper {
     fn shape(&mut self, span: &mut sfst::TraceSpan) -> sfst::trace_combine::Shaped {
         let cut = cap_span_values(span);
-        let weight = json_len(&span_wire(span, cut));
+        let mut weight = json_len(&span_wire(span, cut)) + 1 + std::mem::take(&mut self.fixed);
+        let entry = self.entry;
+        let [fields, events, links] = &mut self.names;
+        let mut charge = |seen: &mut HashSet<String>, name: &str| {
+            if !seen.contains(name) {
+                seen.insert(name.to_string());
+                weight += json_len(&name) + entry;
+            }
+        };
+        for (name, _) in &span.fields {
+            charge(fields, name);
+        }
+        for event in &span.events {
+            for (name, _) in &event.attributes {
+                charge(events, name);
+            }
+        }
+        for link in &span.links {
+            for (name, _) in &link.attributes {
+                charge(links, name);
+            }
+        }
         sfst::trace_combine::Shaped { weight, cut }
     }
 
@@ -605,19 +694,21 @@ pub(crate) fn parse_enumeration_key(key: &str) -> Result<(AttributeOwner, Attrib
 /// key for value suggestions. Texts are capped at
 /// [`LIST_VALUE_MAX_BYTES`] of JSON (the engine cut raw bytes) and
 /// flagged when cut; a text cut to an earlier item's is listed once,
-/// keeping either's `numeric` mark.
+/// with the higher tier and both items' kinds (the engine's merge rule).
 pub(crate) fn to_suggest_result(
     data: sfsq::traces::SuggestData,
     key: Option<String>,
 ) -> SuggestResult {
     let mut items: Vec<SuggestionWire> = Vec::with_capacity(data.items.len());
+    let mut kinds: Vec<sfst::ValueKinds> = Vec::with_capacity(data.items.len());
     let mut listed: HashMap<String, usize> = HashMap::new();
     for s in data.items {
         let mut text = s.text;
         let cut = truncate_value(&mut text, LIST_VALUE_MAX_BYTES);
         if let Some(&i) = listed.get(&text) {
             items[i].truncated |= cut || s.truncated;
-            items[i].numeric |= s.numeric;
+            items[i].tier = items[i].tier.max(s.tier.map(Into::into));
+            kinds[i] = kinds[i].union(s.kinds);
             continue;
         }
         listed.insert(text.clone(), items.len());
@@ -627,8 +718,12 @@ pub(crate) fn to_suggest_result(
             truncated: cut || s.truncated,
             tier: s.tier.map(Into::into),
             is_virtual: !s.enumerable,
-            numeric: s.numeric,
+            kinds: Vec::new(),
         });
+        kinds.push(s.kinds);
+    }
+    for (item, kinds) in items.iter_mut().zip(kinds) {
+        item.kinds = kind_words(kinds);
     }
     SuggestResult {
         mode: "suggest",

@@ -212,7 +212,7 @@ impl OtelTracesHandler {
         let highlight = build_tokens(&params.conditions, &params.text).map_err(client_err)?;
         let query = TraceQuery::new(trace_id)
             .span_cap(TRACE_SPAN_CAP)
-            .shaper(Box::new(WireShaper))
+            .shaper(Box::new(WireShaper::default()))
             .highlight(highlight);
 
         let bounds = validate_trace_bounds(params.after, params.before).map_err(client_err)?;

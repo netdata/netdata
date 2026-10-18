@@ -15,9 +15,9 @@
 //! - `#[serde(with = "serde_bytes")]` is wire-identical to a plain `Vec<u8>`
 //!   under bincode — a decode-speed change only, no `VERSION` bump;
 //! - `derive_field_table` orders low → mid → high then by name and collapses
-//!   polymorphic paths to one entry; `derive_scalar_kinds` applies the
-//!   coalescing lattice; `derive_numeric_paths` keeps every path with an
-//!   `Int`/`Double` leaf, mixed or not;
+//!   polymorphic paths to one entry; `derive_leaf_kinds` lists every leaf
+//!   kind of every path, nested and polymorphic paths included, and
+//!   `ValueKinds` iterates in its canonical order;
 //! - `validate` rejects every malformed tree shape as `Error::CorruptIndex`
 //!   at the META decode trust boundary;
 //! - `fill_field_stats` then `derive_field_table` reproduces the input table
@@ -120,7 +120,7 @@ fn serde_bytes_is_wire_compatible_with_plain_vec_u8() {
 
 use crate::{
     FieldEntry, FieldTable, FieldTier, LeafStats, SchemaEdge, SchemaNode, SchemaTree, Step,
-    ValueKind,
+    ValueKind, ValueKinds,
 };
 
 /// `derive_field_table` over a `flat` tree hands the input table back,
@@ -194,62 +194,11 @@ fn derive_field_table_collapses_polymorphic_path() {
     assert_eq!(derived.get("id").unwrap().cardinality, 7);
 }
 
-/// The scalar coalescing lattice, path-ordered: `Null` drops; containers,
-/// empty or not, contribute no scalar; `Int ⊔ Double = Double`; any other
-/// scalar mix → `Str`; a scalar-plus-container path surfaces its scalar
-/// leaf (the container occurrences live at child paths).
+/// Every leaf path lists every leaf kind it holds — polymorphic, nested
+/// and array paths included — and nothing is coalesced: a path that is
+/// also a container lists only its leaf occurrences.
 #[test]
-fn scalar_coalescing_lattice() {
-    let stats = LeafStats {
-        cardinality: 1,
-        tier: FieldTier::Low,
-    };
-    let node = |parent: u32, name: &str, kind: ValueKind| SchemaNode {
-        kind,
-        edge: Some(SchemaEdge {
-            parent,
-            step: Step::Field(name.into()),
-        }),
-        leaf: if kind.is_leaf() { Some(stats) } else { None },
-    };
-    let tree = SchemaTree::from_nodes(vec![
-        SchemaNode {
-            kind: ValueKind::Kvlist,
-            edge: None,
-            leaf: None,
-        }, // 0 root
-        node(0, "nullstr", ValueKind::Null),     // 1
-        node(0, "nullstr", ValueKind::Str),      // 2  -> Str
-        node(0, "intdouble", ValueKind::Int),    // 3
-        node(0, "intdouble", ValueKind::Double), // 4  -> Double
-        node(0, "intstr", ValueKind::Int),       // 5
-        node(0, "intstr", ValueKind::Str),       // 6  -> Str
-        node(0, "arr", ValueKind::EmptyArray),   // 7  leaf
-        node(0, "arr", ValueKind::Array),        // 8  interior -> excluded
-        node(0, "scalarobj", ValueKind::Str),    // 9  leaf -> Str
-        node(0, "scalarobj", ValueKind::Kvlist), // 10 interior
-        node(0, "nullobj", ValueKind::Null),     // 11 leaf
-        node(0, "nullobj", ValueKind::Kvlist),   // 12 interior -> excluded
-    ]);
-
-    let scalars = tree.derive_scalar_kinds();
-    assert_eq!(
-        scalars,
-        vec![
-            ("intdouble".to_string(), ValueKind::Double),
-            ("intstr".to_string(), ValueKind::Str),
-            ("nullstr".to_string(), ValueKind::Str),
-            ("scalarobj".to_string(), ValueKind::Str),
-        ]
-    );
-}
-
-/// The numeric paths are the paths with at least one `Int` or `Double`
-/// leaf, whatever else they hold: unlike the coalescing lattice, a mix with
-/// `Str` or `Bool` keeps the path numeric (stored values compare as
-/// numbers when they parse, whatever kind they arrived as).
-#[test]
-fn numeric_paths_have_an_int_or_double_leaf() {
+fn leaf_kinds_list_every_kind_per_path() {
     let stats = LeafStats {
         cardinality: 1,
         tier: FieldTier::Low,
@@ -266,30 +215,137 @@ fn numeric_paths_have_an_int_or_double_leaf() {
             edge: None,
             leaf: None,
         }, // 0 root
-        // Numeric: one kind, or mixed with other kinds.
-        node(0, field("int"), ValueKind::Int),
-        node(0, field("double"), ValueKind::Double),
-        node(0, field("intstr"), ValueKind::Int),
-        node(0, field("intstr"), ValueKind::Str),
-        node(0, field("booldouble"), ValueKind::Bool),
-        node(0, field("booldouble"), ValueKind::Double),
-        // Not numeric.
-        node(0, field("str"), ValueKind::Str),
-        node(0, field("bool"), ValueKind::Bool),
-        node(0, field("null"), ValueKind::Null),
-        // Nested numeric leaves: `obj.n` (node 10's child) and `arr[]`
-        // (node 12's element).
-        node(0, field("obj"), ValueKind::Kvlist),
-        node(10, field("n"), ValueKind::Int),
-        node(0, field("arr"), ValueKind::Array),
-        node(12, Step::ArrayElem, ValueKind::Double),
+        node(0, field("nullstr"), ValueKind::Null),  // 1
+        node(0, field("nullstr"), ValueKind::Str),   // 2
+        node(0, field("intdouble"), ValueKind::Int), // 3
+        node(0, field("intdouble"), ValueKind::Double), // 4
+        node(0, field("intstr"), ValueKind::Str),    // 5
+        node(0, field("intstr"), ValueKind::Int),    // 6
+        node(0, field("arr"), ValueKind::EmptyArray), // 7  leaf
+        node(0, field("arr"), ValueKind::Array),     // 8  interior
+        node(8, Step::ArrayElem, ValueKind::Int),    // 9  arr[]
+        node(8, Step::ArrayElem, ValueKind::Bool),   // 10 arr[]
+        node(0, field("obj"), ValueKind::EmptyKvlist), // 11 leaf
+        node(0, field("obj"), ValueKind::Kvlist),    // 12 interior
+        node(12, field("n"), ValueKind::Double),     // 13 obj.n
+        node(0, field("bytes"), ValueKind::Bytes),   // 14
+        node(0, field("onlyobj"), ValueKind::Kvlist), // 15 interior only
+        node(15, field("k"), ValueKind::Str),        // 16 onlyobj.k
     ]);
 
-    let numeric: Vec<String> = tree.derive_numeric_paths().into_iter().collect();
+    let kinds = |list: &[ValueKind]| list.iter().copied().collect::<ValueKinds>();
+    use ValueKind::*;
     assert_eq!(
-        numeric,
-        vec!["arr[]", "booldouble", "double", "int", "intstr", "obj.n"]
+        tree.derive_leaf_kinds(),
+        vec![
+            ("arr".to_string(), kinds(&[EmptyArray])),
+            ("arr[]".to_string(), kinds(&[Bool, Int])),
+            ("bytes".to_string(), kinds(&[Bytes])),
+            ("intdouble".to_string(), kinds(&[Int, Double])),
+            ("intstr".to_string(), kinds(&[Int, Str])),
+            ("nullstr".to_string(), kinds(&[Null, Str])),
+            ("obj".to_string(), kinds(&[EmptyKvlist])),
+            ("obj.n".to_string(), kinds(&[Double])),
+            ("onlyobj.k".to_string(), kinds(&[Str])),
+        ]
     );
+}
+
+/// Paths holding only `Null` or only an empty container still list their
+/// kind; a path that is a value in one row and a parent in another lists
+/// its leaf kind beside its children; a flat key spelled `a.b` and a
+/// nested `a{b}` render one path, whose kinds union; a producer's flat
+/// all-string tree reads `Str` everywhere.
+#[test]
+fn leaf_kinds_cover_null_empty_aliased_and_flat_paths() {
+    let stats = LeafStats {
+        cardinality: 1,
+        tier: FieldTier::Low,
+    };
+    let node = |parent: u32, step: Step, kind: ValueKind| SchemaNode {
+        kind,
+        edge: Some(SchemaEdge { parent, step }),
+        leaf: if kind.is_leaf() { Some(stats) } else { None },
+    };
+    let field = |name: &str| Step::Field(name.into());
+    let tree = SchemaTree::from_nodes(vec![
+        SchemaNode {
+            kind: ValueKind::Kvlist,
+            edge: None,
+            leaf: None,
+        }, // 0 root
+        node(0, field("null"), ValueKind::Null),       // 1
+        node(0, field("obj"), ValueKind::EmptyKvlist), // 2
+        node(0, field("arr"), ValueKind::EmptyArray),  // 3
+        node(0, field("x"), ValueKind::Int),           // 4  x=5
+        node(0, field("x"), ValueKind::Kvlist),        // 5  x.k=v
+        node(5, field("k"), ValueKind::Str),           // 6
+        node(0, field("a.b"), ValueKind::Int),         // 7  flat "a.b"
+        node(0, field("a"), ValueKind::Kvlist),        // 8  nested a{b}
+        node(8, field("b"), ValueKind::Bool),          // 9
+    ]);
+    let kinds = |list: &[ValueKind]| list.iter().copied().collect::<ValueKinds>();
+    use ValueKind::*;
+    assert_eq!(
+        tree.derive_leaf_kinds(),
+        vec![
+            ("a.b".to_string(), kinds(&[Bool, Int])),
+            ("arr".to_string(), kinds(&[EmptyArray])),
+            ("null".to_string(), kinds(&[Null])),
+            ("obj".to_string(), kinds(&[EmptyKvlist])),
+            ("x".to_string(), kinds(&[Int])),
+            ("x.k".to_string(), kinds(&[Str])),
+        ]
+    );
+
+    let table: FieldTable = vec![
+        FieldEntry {
+            name: "a".into(),
+            cardinality: 1,
+            tier: FieldTier::Low,
+        },
+        FieldEntry {
+            name: "b".into(),
+            cardinality: 1,
+            tier: FieldTier::Low,
+        },
+    ]
+    .into();
+    assert_eq!(
+        SchemaTree::flat(&table).derive_leaf_kinds(),
+        vec![
+            ("a".to_string(), kinds(&[Str])),
+            ("b".to_string(), kinds(&[Str])),
+        ]
+    );
+}
+
+/// `ValueKinds` is a set: insertion order and repeats do not matter, it
+/// iterates in `LEAF_ORDER`, unions, and says whether it holds a number.
+#[test]
+fn value_kinds_is_an_ordered_set() {
+    use ValueKind::*;
+    let a: ValueKinds = [Str, Int, Str].into_iter().collect();
+    let b: ValueKinds = [Int, Str].into_iter().collect();
+    assert_eq!(a, b);
+    assert_eq!(a.iter().collect::<Vec<_>>(), [Int, Str]);
+    let all: ValueKinds = ValueKinds::LEAF_ORDER.into_iter().rev().collect();
+    assert_eq!(all.iter().collect::<Vec<_>>(), ValueKinds::LEAF_ORDER);
+    assert!(ValueKinds::default().is_empty());
+    assert_eq!(
+        a.union([Null].into_iter().collect())
+            .iter()
+            .collect::<Vec<_>>(),
+        [Null, Int, Str]
+    );
+    for (set, number) in [
+        (vec![Int], true),
+        (vec![Double], true),
+        (vec![Str, Double], true),
+        (vec![Str, Bool, Bytes, Null, EmptyArray, EmptyKvlist], false),
+    ] {
+        assert_eq!(set.into_iter().collect::<ValueKinds>().has_number(), number);
+    }
 }
 
 /// `validate` is the trust boundary `ChunkReader::metadata` applies to a

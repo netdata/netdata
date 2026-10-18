@@ -48,8 +48,13 @@ type Fingerprint = (
     Vec<sfst::TraceSpan>,
     Vec<usize>,
     Vec<Vec<usize>>,
-    Vec<(String, sfst::ValueKind)>,
+    Vec<(String, sfst::ValueKinds)>,
 );
+
+/// A kind set from its members.
+fn kinds_of(list: &[sfst::ValueKind]) -> sfst::ValueKinds {
+    list.iter().copied().collect()
+}
 
 fn fingerprint(data: &sfsq::traces::TraceData) -> Fingerprint {
     // WHOLE spans: TraceSpan is Eq, so any sealed-vs-tail divergence in
@@ -160,7 +165,7 @@ fn assert_corpus_shape(data: &sfsq::traces::TraceData) {
         data.field_kinds
             .event_attributes
             .iter()
-            .any(|(k, kind)| k == "exception.line" && *kind == sfst::ValueKind::Int),
+            .any(|(k, kinds)| k == "exception.line" && *kinds == kinds_of(&[sfst::ValueKind::Int])),
         "event attr kinds: {:?}",
         data.field_kinds.event_attributes
     );
@@ -168,7 +173,7 @@ fn assert_corpus_shape(data: &sfsq::traces::TraceData) {
         data.field_kinds
             .link_attributes
             .iter()
-            .any(|(k, kind)| k == "peer" && *kind == sfst::ValueKind::Str)
+            .any(|(k, kinds)| k == "peer" && *kinds == kinds_of(&[sfst::ValueKind::Str]))
     );
     // Complete is part of the shape: no layout of this corpus may trip
     // a partial reason.
@@ -475,10 +480,10 @@ fn pre_cancelled_returns_empty_with_cancelled() {
 }
 
 #[test]
-fn field_kinds_coalesce_across_sources_and_tail() {
+fn field_kinds_union_across_sources_and_tail() {
     // The same attribute is an Int in a sealed file, a Double in the
-    // tail: the merged kind widens to Double. A string+int mix falls to
-    // Str. Kinds merge from CONTRIBUTING sources only.
+    // tail: its kinds are both. A string+int mix keeps both too — nothing
+    // coalesces. Kinds merge from CONTRIBUTING sources only.
     let dir = tempfile::tempdir().unwrap();
     let mut a = sp(1, 0, 100, "a");
     a.attrs = vec![kv_int("payload.size", 3), kv_int("mixed", 1)];
@@ -500,8 +505,9 @@ fn field_kinds_coalesce_across_sources_and_tail() {
             .map(|(_, v)| *v)
             .unwrap_or_else(|| panic!("kind for {name} present: {:?}", data.field_kinds.fields))
     };
-    assert_eq!(kind_of("payload.size"), sfst::ValueKind::Double);
-    assert_eq!(kind_of("mixed"), sfst::ValueKind::Str);
+    use sfst::ValueKind::{Double, Int, Str};
+    assert_eq!(kind_of("payload.size"), kinds_of(&[Int, Double]));
+    assert_eq!(kind_of("mixed"), kinds_of(&[Int, Str]));
 
     // A non-contributing source's kinds must NOT leak in: a file holding
     // only a DIFFERENT trace id contributes nothing.
@@ -529,6 +535,256 @@ fn field_kinds_coalesce_across_sources_and_tail() {
         "non-contributing source leaked kinds: {:?}",
         data.field_kinds.fields
     );
+}
+
+/// Field kinds against ground truth, identical in every layout: every
+/// name the returned spans expose has exactly the kinds the contributing
+/// sources stored under it, and no other name has any. A key int in one
+/// source and str in another lists both; an event attribute and a link
+/// attribute sharing a name keep their own kinds; a key only in a span
+/// the byte budget cut, or only in another trace, is absent; a kind only
+/// another trace of the same file stored is present (a file records
+/// kinds per key, not per value); null and empty-container values have
+/// their kinds too.
+#[test]
+fn field_kinds_are_exact_in_every_layout() {
+    use sfst::ValueKind::{Double, EmptyArray, EmptyKvlist, Int, Null, Str};
+    let dir = tempfile::tempdir().unwrap();
+    let mut a = sp(1, 0, 100, "a");
+    let kv_any = |key: &str, value| opentelemetry_proto::tonic::common::v1::KeyValue {
+        key: key.into(),
+        value,
+        key_strindex: 0,
+    };
+    let any = |v| Some(opentelemetry_proto::tonic::common::v1::AnyValue { value: Some(v) });
+    use opentelemetry_proto::tonic::common::v1::{
+        ArrayValue, KeyValueList, any_value::Value as Av,
+    };
+    a.attrs = vec![
+        kv_int("k.mixed", 1),
+        kv_int("k.int", 2),
+        kv_str("k.str", "x"),
+        kv_any("k.null", None),
+        kv_any(
+            "k.obj",
+            any(Av::KvlistValue(KeyValueList { values: vec![] })),
+        ),
+        kv_any("k.arr", any(Av::ArrayValue(ArrayValue { values: vec![] }))),
+    ];
+    a.events = vec![("ev", vec![kv_int("shared", 1)])];
+    a.links = vec![([0x33u8; 16], [0x44u8; 8], vec![kv_str("shared", "x")])];
+    let mut other = SpanSpec {
+        trace: [0x11u8; 16],
+        ..sp(9, 0, 105, "other")
+    };
+    other.attrs = vec![kv_str("k.int", "text"), kv_str("k.other", "z")];
+    let mut b = sp(2, 1, 110, "b");
+    b.attrs = vec![kv_str("k.mixed", "one"), kv_double("k.dbl", 0.5)];
+    let mut c = sp(3, 1, 120, "c");
+    c.attrs = vec![kv_int("k.cut", 1)];
+    let early = || vec![req(&[a.clone(), other.clone()])];
+    let late = || vec![req(&[b.clone(), c.clone()])];
+    let wal_all = write_wal(
+        dir.path(),
+        early().into_iter().chain(late()).collect(),
+        "all",
+    );
+    let wal_a = write_wal(dir.path(), early(), "early");
+    let wal_b = write_wal(dir.path(), late(), "late");
+    let layouts: Vec<(&str, Vec<TraceSource>)> = vec![
+        (
+            "single-sealed",
+            vec![sealed_source(dir.path(), &wal_all, "all")],
+        ),
+        (
+            "two-sealed",
+            vec![
+                sealed_source(dir.path(), &wal_a, "a2"),
+                sealed_source(dir.path(), &wal_b, "b2"),
+            ],
+        ),
+        (
+            "sealed-plus-tail",
+            vec![
+                sealed_source(dir.path(), &wal_a, "a3"),
+                tail_source(&wal_b, "b3"),
+            ],
+        ),
+        (
+            "chunk-plus-tail",
+            vec![memory_source(&wal_a, "a4"), tail_source(&wal_b, "b4")],
+        ),
+    ];
+    for (layout, sources) in layouts {
+        let data = trace_by_id(
+            sources,
+            TraceQuery::new(sfst::TraceId::from(TRACE)).shaper(Box::new(Cut4 { budget: 2 })),
+            CancellationToken::new(),
+            Arc::new(AtomicUsize::new(0)),
+        )
+        .expect("valid request");
+        assert_eq!(
+            span_names(&data),
+            ["a", "b"],
+            "{layout}: c is past the budget"
+        );
+        let k = &data.field_kinds;
+        let get = |section: &[(String, sfst::ValueKinds)], name: &str| {
+            section
+                .iter()
+                .find(|(n, _)| n == name)
+                .map(|(_, kinds)| *kinds)
+        };
+        for (name, want) in [
+            ("attributes.k.mixed", Some(kinds_of(&[Int, Str]))),
+            ("attributes.k.int", Some(kinds_of(&[Int, Str]))),
+            ("attributes.k.str", Some(kinds_of(&[Str]))),
+            ("attributes.k.dbl", Some(kinds_of(&[Double]))),
+            ("attributes.k.null", Some(kinds_of(&[Null]))),
+            ("attributes.k.obj", Some(kinds_of(&[EmptyKvlist]))),
+            ("attributes.k.arr", Some(kinds_of(&[EmptyArray]))),
+            ("name", Some(kinds_of(&[Str]))),
+            ("_kind", Some(kinds_of(&[Int]))),
+            ("attributes.k.cut", None),
+            ("attributes.k.other", None),
+        ] {
+            assert_eq!(get(&k.fields, name), want, "{layout}: {name}");
+        }
+        assert_eq!(
+            k.event_attributes,
+            [("shared".to_string(), kinds_of(&[Int]))],
+            "{layout}"
+        );
+        assert_eq!(
+            k.link_attributes,
+            [("shared".to_string(), kinds_of(&[Str]))],
+            "{layout}"
+        );
+        let mut exposed: Vec<&str> = data
+            .trace
+            .spans
+            .iter()
+            .flat_map(|s| s.fields.iter().map(|(n, _)| n.as_str()))
+            .collect();
+        exposed.sort();
+        exposed.dedup();
+        let named: Vec<&str> = k.fields.iter().map(|(n, _)| n.as_str()).collect();
+        assert_eq!(named, exposed, "{layout}: exactly the exposed names");
+        assert!(
+            k.fields.iter().all(|(_, kinds)| !kinds.is_empty()),
+            "{layout}"
+        );
+    }
+}
+
+/// Sources that contribute no retained span add no kinds, whatever the
+/// bloom says: a losing unequal resend (`str`) and a span past the byte
+/// budget (`double`) each sit alone in their source, and the kept spans'
+/// key keeps only its own kind (`int`). Sealed in one file together, the
+/// file's schema covers all three — the documented over-approximation.
+#[test]
+fn non_contributing_sources_add_no_kinds() {
+    use sfst::ValueKind::{Double, Int, Str};
+    let dir = tempfile::tempdir().unwrap();
+    let mut a = sp(1, 0, 100, "a");
+    a.attrs = vec![kv_int("k.x", 1)];
+    let mut b = sp(2, 1, 150, "b");
+    b.attrs = vec![kv_int("k.x", 2)];
+    // Same span id and kind as `a`, later: the losing copy.
+    let mut resend = sp(1, 0, 120, "a");
+    resend.attrs = vec![kv_str("k.x", "late")];
+    let mut c = sp(3, 1, 300, "c");
+    c.attrs = vec![kv_double("k.x", 0.5)];
+    let wal_a = write_wal(dir.path(), vec![req(&[a.clone(), b.clone()])], "ka");
+    let wal_b = write_wal(dir.path(), vec![req(&[resend.clone()])], "kb");
+    let wal_c = write_wal(dir.path(), vec![req(&[c.clone()])], "kc");
+    let wal_all = write_wal(dir.path(), vec![req(&[a, b, resend, c])], "kall");
+    let run_cut = |sources: Vec<TraceSource>| {
+        trace_by_id(
+            sources,
+            TraceQuery::new(sfst::TraceId::from(TRACE)).shaper(Box::new(Cut4 { budget: 2 })),
+            CancellationToken::new(),
+            Arc::new(AtomicUsize::new(0)),
+        )
+        .expect("valid request")
+    };
+    let x_kinds = |data: &sfsq::traces::TraceData| {
+        data.field_kinds
+            .fields
+            .iter()
+            .find(|(n, _)| n == "attributes.k.x")
+            .map(|(_, kinds)| *kinds)
+    };
+    let layouts: Vec<(&str, Vec<TraceSource>)> = vec![
+        (
+            "three-sealed",
+            vec![
+                sealed_source(dir.path(), &wal_a, "a1"),
+                sealed_source(dir.path(), &wal_b, "b1"),
+                sealed_source(dir.path(), &wal_c, "c1"),
+            ],
+        ),
+        (
+            "sealed-plus-tails",
+            vec![
+                sealed_source(dir.path(), &wal_a, "a2"),
+                tail_source(&wal_b, "b2"),
+                tail_source(&wal_c, "c2"),
+            ],
+        ),
+        (
+            "chunk-sealed-tail",
+            vec![
+                memory_source(&wal_a, "a3"),
+                sealed_source(dir.path(), &wal_b, "b3"),
+                tail_source(&wal_c, "c3"),
+            ],
+        ),
+    ];
+    for (layout, sources) in layouts {
+        let data = run_cut(sources);
+        assert_eq!(span_names(&data), ["a", "b"], "{layout}");
+        assert_eq!(
+            data.trace.spans[0]
+                .fields
+                .iter()
+                .find(|(n, _)| n == "attributes.k.x")
+                .map(|(_, v)| v.as_str()),
+            Some("1"),
+            "{layout}: the canonical copy is kept"
+        );
+        assert_eq!(x_kinds(&data), Some(kinds_of(&[Int])), "{layout}");
+    }
+    let data = run_cut(vec![sealed_source(dir.path(), &wal_all, "all")]);
+    assert_eq!(span_names(&data), ["a", "b"]);
+    assert_eq!(x_kinds(&data), Some(kinds_of(&[Int, Double, Str])));
+}
+
+/// Two byte-equal copies of a span — the same text from an `int` in one
+/// source and a `str` in another — are one span held by both sources, so
+/// both contribute and the key lists both kinds.
+#[test]
+fn byte_equal_resends_list_both_sources_kinds() {
+    use sfst::ValueKind::{Int, Str};
+    let dir = tempfile::tempdir().unwrap();
+    let mut as_int = sp(1, 0, 100, "a");
+    as_int.attrs = vec![kv_int("k.x", 1)];
+    let mut as_str = sp(1, 0, 100, "a");
+    as_str.attrs = vec![kv_str("k.x", "1")];
+    let wal_int = write_wal(dir.path(), vec![req(&[as_int])], "ki");
+    let wal_str = write_wal(dir.path(), vec![req(&[as_str])], "ks");
+    let data = run(vec![
+        sealed_source(dir.path(), &wal_int, "i"),
+        sealed_source(dir.path(), &wal_str, "s"),
+    ]);
+    assert_eq!(span_names(&data), ["a"]);
+    let kinds = data
+        .field_kinds
+        .fields
+        .iter()
+        .find(|(n, _)| n == "attributes.k.x")
+        .map(|(_, kinds)| *kinds);
+    assert_eq!(kinds, Some(kinds_of(&[Int, Str])));
 }
 
 #[test]

@@ -19,6 +19,8 @@
 //! Consumers: the mode dispatcher is [`super::handler`], the engine
 //! mapping is [`super::adapter`].
 
+use std::collections::BTreeMap;
+
 use serde::{Deserialize, Serialize};
 
 use sfsq::traces::{PartialReason, QueryStatus};
@@ -606,12 +608,13 @@ pub struct SuggestionWire {
     /// client error.
     #[serde(rename = "virtual", skip_serializing_if = "std::ops::Not::not")]
     pub is_virtual: bool,
-    /// Keys only: present (`true`) when a visited source stored a number
-    /// under this attribute key, so the ordering ops (`>`, `>=`, `<`,
-    /// `<=`) can match its values; absent otherwise, and never on a
-    /// builtin key (those are typed by the grammar).
-    #[serde(skip_serializing_if = "std::ops::Not::not")]
-    pub numeric: bool,
+    /// Keys only: the kinds of value the visited sources stored under
+    /// this attribute key, in the order of [`FieldKindsWire`]; absent for
+    /// builtin keys (typed by the grammar) and for values. The ordering
+    /// ops (`>`, `>=`, `<`, `<=`) can match a key holding `int` or
+    /// `double`.
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    pub kinds: Vec<&'static str>,
 }
 
 /// Match classes on the wire; the two typo-tolerant engine classes are
@@ -636,7 +639,7 @@ impl From<sfst::MatchClass> for MatchWire {
     }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize)]
 #[serde(rename_all = "snake_case")]
 pub enum TierWire {
     Low,
@@ -876,12 +879,43 @@ pub struct TraceResult {
     /// whose resolved parent is span `i`.
     pub children: Vec<Vec<usize>>,
     pub spans: Vec<SpanWire>,
+    /// The value kinds of every name the returned spans expose.
+    pub field_kinds: FieldKindsWire,
     /// Ascending indices into `spans` of the spans matching the
     /// request's chips or free text: a span matches when it satisfies a
     /// positive chip (or text token) on its full values, before any value
     /// cut. Negated and trace-level chips mark nothing. Empty without
     /// chips; covers the returned spans only.
     pub matched: Vec<u32>,
+}
+
+/// The value kinds of every name the returned spans expose, sectioned as
+/// the spans expose names: span `fields` by storage name, event and link
+/// attributes by their prefix-stripped names (an event attribute and a
+/// link attribute may share a name with different kinds). Each name maps
+/// to the kinds of value stored under it, in the order `null`, `bool`,
+/// `int`, `double`, `str`, `bytes`, `empty_kvlist`, `empty_array`,
+/// unioned over the sources that contributed the returned spans.
+///
+/// Every name the spans expose has an entry unless `status` reports a
+/// source failure (a missing name then means "unknown"). A source records
+/// the kinds a key held across all its spans, not per value, so a list
+/// may name a kind this trace's values do not have; it misses none they
+/// have.
+///
+/// Values travel as text, rendered per kind: `int` in decimal; `double`
+/// in plain decimal with the fewest digits that read back as the same
+/// double, never an exponent (`1` for 1.0, `0.1`, 22 digits for 1e21,
+/// `NaN`, `inf`); `bool` as `true`/`false`; `bytes` as lowercase
+/// hex; `null` as the empty string; `empty_kvlist` as `{}` and
+/// `empty_array` as `[]`; `str` as itself. A client can narrow a value's
+/// kind by its text (`abc` is no `int`), not tell `1` the int from `1`
+/// the string.
+#[derive(Debug, Serialize)]
+pub struct FieldKindsWire {
+    pub fields: BTreeMap<String, Vec<&'static str>>,
+    pub event_attributes: BTreeMap<String, Vec<&'static str>>,
+    pub link_attributes: BTreeMap<String, Vec<&'static str>>,
 }
 
 /// Result accounting. `returned` counts the spans in this response —
@@ -893,8 +927,9 @@ pub struct TraceItems {
 
 /// One span, ids in W3C lowercase hex. `fields` are the engine's
 /// resolved row facets as `[name, value]` string pairs (order
-/// preserved; names are storage names). `kind` is the raw OTLP
-/// span-kind int; the readable label is in `fields` under `kind`.
+/// preserved; names are storage names — `field_kinds.fields` gives the
+/// kinds of value each holds). `kind` is the raw OTLP span-kind int;
+/// the readable label is in `fields` under `kind`.
 #[derive(Debug, Serialize)]
 pub struct SpanWire {
     pub span_id: String,

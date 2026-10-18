@@ -5,7 +5,7 @@
 //! - **Oracle equivalence under re-layouts:** the same corpus sealed as
 //!   one file, split across files, or served partly as an in-memory
 //!   chunk / WAL tail returns IDENTICAL results (ids, order, summary
-//!   numbers, attached spans, kinds).
+//!   numbers).
 //! - **The over-approximation never leaks:** a trace whose only match is
 //!   a LOSING resend copy is dropped by phase-2 canonical re-evaluation;
 //!   a trace whose canonical copy matches is found however its raw rank
@@ -22,8 +22,8 @@
 //! (including the completion slack), the span-cap honesty pair,
 //! budget-truncated sources that cannot falsify completeness, the
 //! trace:id pin shortcut past discovery, tri-state exclusion of
-//! indeterminate trace-level candidates, UNSET trace ids, the empty
-//! window set, and the field-kind projection.
+//! indeterminate trace-level candidates, UNSET trace ids, and the empty
+//! window set.
 //!
 //! The op's engine contract lives in `src/traces/search.rs`; the
 //! sibling suites in this directory pin the other traces query ops, and
@@ -2133,8 +2133,7 @@ fn a_window_file_that_cannot_beat_the_page_is_never_compiled() {
 }
 
 /// A value longer than any defensive cut is evaluated whole, sealed or
-/// tail alike: a condition that depends on its last bytes matches, and
-/// the attached span carries the full value.
+/// tail alike: a condition that depends on its last bytes matches.
 #[test]
 fn long_values_are_evaluated_whole_in_every_layout() {
     let dir = tempfile::tempdir().unwrap();

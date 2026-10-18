@@ -491,13 +491,11 @@ give structure; leaf nodes carry the path's `cardinality` + `tier`. The flat
 the tree at read time (`SchemaTree::derive_field_table`): one `FieldEntry` per
 distinct leaf path, ordered low → mid → high then by name, which yields the count of mid-card and
 high-card fields and thus how many `MF{i}`/`HF{i}` chunks are present. A
-polymorphic path (multiple leaf kinds) collapses to one `FieldEntry`; its single
-coalesced **scalar** type (for typed/UI display) comes from
-`SchemaTree::derive_scalar_kinds` (drop `Null`; empty containers contribute no
-scalar; `Int ⊔ Double = Double`; any other scalar mix → `Str`).
-`SchemaTree::derive_numeric_paths` lists the paths with at least one `Int` or
-`Double` leaf, mixed or not: stored values are text, and the numeric comparators
-parse them, so a mixed path still compares as numbers. A producer with
+polymorphic path (multiple leaf kinds) collapses to one `FieldEntry`;
+`SchemaTree::derive_leaf_kinds` gives every leaf path's *set* of leaf kinds
+(`ValueKinds`), uncoalesced. Stored values are text and the numeric comparators
+parse them, so a path holding any `Int` or `Double` leaf compares as numbers
+whatever else it holds. A producer with
 no typed tree (raw `(ts, key=value)` rows) emits a flat `Str`-typed tree
 (`SchemaTree::flat`) so every file has a valid descriptor. Per-occurrence type
 is not stored anywhere — the tree records the *set* of kinds per path, not which

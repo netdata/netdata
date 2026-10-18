@@ -325,7 +325,7 @@ fn keys_match_by_rendered_or_bare_name_with_their_highest_tier() {
             class: Exact,
             tier: Some(FieldTier::Mid),
             enumerable: true,
-            numeric: false,
+            kinds: kinds_of(&[sfst::ValueKind::Str]),
         },
         "the bare name is exact; the higher tier wins"
     );
@@ -456,12 +456,12 @@ fn a_tails_key_tier_follows_its_value_count() {
     );
 }
 
-/// A key is numeric when any visited source stored a number (an `Int` or
-/// `Double`) under it, mixed with text in the same source or not, sealed
-/// or tail, whichever source in the walk holds the number; builtins never
-/// are, whatever their storage holds.
+/// A key's kinds are every leaf kind any visited source stored under it,
+/// mixed in one source or across sources, sealed, chunk or tail, whatever
+/// order the walk visits them in; it holds a number when any source
+/// stored one; builtins carry none, whatever their storage holds.
 #[test]
-fn a_key_is_numeric_when_any_source_stored_a_number() {
+fn key_kinds_union_every_source() {
     let dir = tempfile::tempdir().unwrap();
     let mut old = sp(1, 0, (BASE_S + 10) * 1_000_000_000, "op");
     old.attrs = vec![
@@ -471,13 +471,12 @@ fn a_key_is_numeric_when_any_source_stored_a_number() {
         kv_str("label", "a"),
         kv_int("both", 1),
     ];
-    // One source holding a key as a number and as text: the coalesced
-    // kind is text, the mark stays.
+    // One source holding a key as a number and as text: both kinds.
     let mut old_text = sp(4, 0, (BASE_S + 10) * 1_000_000_000, "op");
     old_text.attrs = vec![kv_str("both", "x")];
     // Sources are visited newest first: `mixed` arrives as text and the
-    // older file's number must still mark it; `late` arrives as a number
-    // and the older file's text must not unmark it.
+    // older file adds its number; `late` arrives as a number and the
+    // older file adds its text.
     let mut new = sp(2, 0, (BASE_S + 20) * 1_000_000_000, "op");
     new.attrs = vec![kv_str("mixed", "x"), kv_int("late", 7)];
     new.events = vec![("retry", vec![kv_int("attempt", 2)])];
@@ -501,10 +500,34 @@ fn a_key_is_numeric_when_any_source_stored_a_number() {
         SuggestQuery::keys(render).max_items(200),
     );
 
+    use sfst::ValueKind::{Double, Int, Str};
+    let kinds = |text: &str| {
+        data.items
+            .iter()
+            .find(|s| s.text == text)
+            .unwrap_or_else(|| panic!("{text} is a key"))
+            .kinds
+    };
+    for (text, want) in [
+        ("event.attempt", kinds_of(&[Int])),
+        ("span.both", kinds_of(&[Int, Str])),
+        ("span.code", kinds_of(&[Int])),
+        ("span.label", kinds_of(&[Str])),
+        ("span.late", kinds_of(&[Int, Str])),
+        ("span.mixed", kinds_of(&[Int, Str])),
+        ("span.ratio", kinds_of(&[Double])),
+        ("span.tail_both", kinds_of(&[Int, Str])),
+        ("span.tail_label", kinds_of(&[Str])),
+        ("name", kinds_of(&[])),
+        ("kind", kinds_of(&[])),
+        ("status", kinds_of(&[])),
+    ] {
+        assert_eq!(kinds(text), want, "{text}");
+    }
     let mut numeric: Vec<&str> = data
         .items
         .iter()
-        .filter(|s| s.numeric)
+        .filter(|s| s.kinds.has_number())
         .map(|s| s.text.as_str())
         .collect();
     numeric.sort();
@@ -524,6 +547,40 @@ fn a_key_is_numeric_when_any_source_stored_a_number() {
         assert!(data.items.iter().any(|s| s.text == text), "{text} is a key");
     }
     assert_eq!(data.status, QueryStatus::Complete);
+}
+
+/// The same frames served sealed and as a tail suggest the same keys
+/// with the same kinds: both derive them from the same schema tree.
+#[test]
+fn sealed_and_tail_kinds_agree() {
+    let dir = tempfile::tempdir().unwrap();
+    let mut a = sp(1, 0, (BASE_S + 10) * 1_000_000_000, "op");
+    a.attrs = vec![
+        kv_int("code", 200),
+        kv_str("mixed", "x"),
+        kv_double("ratio", 0.5),
+    ];
+    a.events = vec![("retry", vec![kv_int("attempt", 2)])];
+    let mut b = sp(2, 0, (BASE_S + 11) * 1_000_000_000, "op");
+    b.attrs = vec![kv_int("mixed", 1), kv_str("label", "l")];
+    let wal = write_wal(dir.path(), vec![req(&[a, b])], "w");
+    let kinds = |data: SuggestData| -> Vec<(String, Vec<sfst::ValueKind>)> {
+        data.items
+            .into_iter()
+            .map(|s| (s.text, s.kinds.iter().collect()))
+            .collect()
+    };
+    let query = || SuggestQuery::keys(render).max_items(200);
+    let sealed = kinds(run(vec![sealed_source(dir.path(), &wal, "s")], query()));
+    let tail = kinds(run(vec![tail_source(&wal, "t")], query()));
+    assert_eq!(sealed, tail);
+    use sfst::ValueKind::{Int, Str};
+    assert!(sealed.contains(&("span.mixed".to_string(), vec![Int, Str])));
+}
+
+/// A kind set from its members.
+fn kinds_of(list: &[sfst::ValueKind]) -> sfst::ValueKinds {
+    list.iter().copied().collect()
 }
 
 /// Keys spread over every owner and all three source shapes: each lands

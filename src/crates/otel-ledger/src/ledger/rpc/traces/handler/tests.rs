@@ -361,7 +361,49 @@ async fn trace_by_id_assembles_the_fixture_trace_end_to_end() {
         "fields carry the span name: {}",
         s0["fields"]
     );
-    assert!(v.get("field_kinds").is_none(), "no field kinds on the wire");
+    // Every name the spans expose has kinds, and nothing else does.
+    let exposed = |section: &str, names: Vec<String>| {
+        let mut want: Vec<String> = names;
+        want.sort();
+        want.dedup();
+        let got: Vec<String> = v["field_kinds"][section]
+            .as_object()
+            .unwrap_or_else(|| panic!("{section} is a map: {}", v["field_kinds"]))
+            .keys()
+            .cloned()
+            .collect();
+        assert_eq!(got, want, "{section}");
+    };
+    let spans = v["spans"].as_array().unwrap();
+    let pairs = |list: &serde_json::Value| -> Vec<String> {
+        list.as_array()
+            .unwrap()
+            .iter()
+            .map(|kv| kv[0].as_str().unwrap().to_string())
+            .collect()
+    };
+    exposed(
+        "fields",
+        spans.iter().flat_map(|s| pairs(&s["fields"])).collect(),
+    );
+    exposed(
+        "event_attributes",
+        spans
+            .iter()
+            .flat_map(|s| s["events"].as_array().unwrap().clone())
+            .flat_map(|e| pairs(&e["attributes"]))
+            .collect(),
+    );
+    exposed(
+        "link_attributes",
+        spans
+            .iter()
+            .flat_map(|s| s["links"].as_array().unwrap().clone())
+            .flat_map(|l| pairs(&l["attributes"]))
+            .collect(),
+    );
+    assert_eq!(v["field_kinds"]["fields"]["name"], json!(["str"]));
+    assert_eq!(v["field_kinds"]["fields"]["_kind"], json!(["int"]));
 }
 
 #[tokio::test]
@@ -379,6 +421,13 @@ async fn absent_trace_id_is_a_complete_empty_trace() {
     assert_eq!(v["items"]["returned"], 0);
     assert_eq!(v["spans"], json!([]));
     assert_eq!(v["summary_root"], serde_json::Value::Null);
+    assert_eq!(v["field_kinds"], empty_field_kinds());
+}
+
+/// The field-kind map of a trace answer that exposes no names: every
+/// section present, empty.
+fn empty_field_kinds() -> serde_json::Value {
+    json!({"fields": {}, "event_attributes": {}, "link_attributes": {}})
 }
 
 #[tokio::test]
@@ -1479,7 +1528,7 @@ async fn suggest_lists_matching_values_and_keys() {
     assert!(v.get("key").is_none());
     assert_eq!(
         v["items"][0],
-        json!({"text": "resource.service.name", "match": "prefix", "tier": "low"})
+        json!({"text": "resource.service.name", "match": "prefix", "tier": "low", "kinds": ["str"]})
     );
 
     // A virtual key is flagged: it has no values to ask for.
@@ -1492,10 +1541,10 @@ async fn suggest_lists_matching_values_and_keys() {
     );
 }
 
-/// A key that holds numbers carries `numeric: true` end to end; a text
-/// key carries no mark.
+/// A key's stored kinds travel end to end: a key holding numbers lists
+/// `int`, a text key `str`.
 #[tokio::test]
-async fn suggest_marks_keys_that_hold_numbers() {
+async fn suggest_lists_the_kinds_a_key_holds() {
     use opentelemetry_proto::tonic::common::v1::{AnyValue, KeyValue, any_value::Value as Av};
     let attr = |key: &str, value| KeyValue {
         key: key.into(),
@@ -1517,8 +1566,8 @@ async fn suggest_marks_keys_that_hold_numbers() {
     assert_eq!(
         v["items"],
         json!([
-            {"text": "span.http.route", "match": "prefix", "tier": "low"},
-            {"text": "span.http.status_code", "match": "prefix", "tier": "low", "numeric": true},
+            {"text": "span.http.route", "match": "prefix", "tier": "low", "kinds": ["str"]},
+            {"text": "span.http.status_code", "match": "prefix", "tier": "low", "kinds": ["int"]},
         ])
     );
 }
@@ -1592,6 +1641,7 @@ async fn lists_and_trace_lookups_have_their_own_admission() {
     .unwrap();
     assert_eq!(v["status"], json!({"partial": ["busy"]}));
     assert_eq!(v["items"]["returned"], 0);
+    assert_eq!(v["field_kinds"], empty_field_kinds());
 
     let mut body = window_body();
     merge(&mut body, json!({"key": "resource.service.name"}));
