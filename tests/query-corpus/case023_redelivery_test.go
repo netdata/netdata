@@ -167,6 +167,143 @@ func TestCase023RedeliveryAcrossGroupings(t *testing.T) {
 	})
 }
 
+func TestCase023ResidualPointCoverage(t *testing.T) {
+	const countContract = "CASE-023/redelivery-counted-once"
+	const timeContract = "CASE-023/residual-point-time-share"
+	const sampleContract = "CASE-023/redelivery-samples-everywhere"
+	registerContract(t, countContract)
+	registerContract(t, sampleContract)
+	for _, shape := range []string{"terminal", "interior", "stored-gap"} {
+		registerContractComponent(t, timeContract, shape)
+	}
+
+	base := int64(fixture.T0 - fixture.T0%10)
+	terminal := fixture.Series("fixture.c023terminal", "fixture.c023terminal", base, 4, 10,
+		func(i int) string {
+			if i == 4 {
+				return "7"
+			}
+			return "0"
+		}, func(int) string { return stream.FlagNotAnomalous })
+	interior := fixture.Series("fixture.c023interior", "fixture.c023interior", base, 8, 10,
+		func(int) string { return "7" }, func(int) string { return stream.FlagNotAnomalous })
+	storedGap := fixture.Series("fixture.c023storedgap", "fixture.c023storedgap", base, 6, 10,
+		func(int) string { return "7" }, func(i int) string {
+			if i == 4 {
+				return stream.FlagEmpty
+			}
+			return stream.FlagNotAnomalous
+		})
+	adjacentGaps := fixture.Series("fixture.c023adjacentgaps", "fixture.c023adjacentgaps", base, 6, 10,
+		func(int) string { return "7" }, func(i int) string {
+			if i == 4 || i == 5 {
+				return stream.FlagEmpty
+			}
+			return stream.FlagNotAnomalous
+		})
+	for i, ch := range []fixture.Chart{terminal, interior, storedGap, adjacentGaps} {
+		pushLiveBurst(t, ch.Context, guid(9981+i), ch)
+		if _, err := td.WaitRetention(ch.Context, ch.Context, ch.FirstT(), ch.LastT(), 15*time.Second); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	boundary := base + 40
+	after, before := boundary-13, boundary+2
+	query := func(t *testing.T, ch fixture.Chart, group, condition string) map[string][]canon.Pt {
+		t.Helper()
+		p := daemon.DataParamsTier(ch.Context, 0, after, before, 5, group)
+		p.Set("options", "jsonwrap|unaligned|virtual-points")
+		p.Set("time_group_options", condition)
+		doc, err := td.DataV3(ch.Context, p)
+		if err != nil {
+			t.Fatal(err)
+		}
+		cols, err := canon.Columns(doc)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if !assertOnlyColumn(t, cols, "load") || !assertSelectedTier(t, doc, 0) ||
+			!queryTimestampGridExact(t, doc, queryExpectedVirtualGrid(t, after, before, 5, false)) {
+			t.Fatal("residual-point query changed its dimension, source tier, or requested grid")
+		}
+		return cols
+	}
+
+	t.Run("counted-once", func(t *testing.T) {
+		trackContract(t, countContract)
+		for _, check := range []struct {
+			chart     fixture.Chart
+			condition string
+			times     float64
+		}{
+			{terminal, ">0", 1},
+			{storedGap, "==gap", 1},
+			{adjacentGaps, "==gap", 2},
+		} {
+			for _, group := range []string{"number-of-times", "number-of-flaps"} {
+				t.Run(check.chart.Context+"/"+group, func(t *testing.T) {
+					col := query(t, check.chart, group, check.condition)["load"]
+					total := 0.0
+					for _, point := range col {
+						if point.Value == nil || point.PA&canon.AnnotationEmpty != 0 {
+							t.Fatal("a covered row lost its numeric event verdict")
+						}
+						if *point.Value != 0 && *point.Value != 1 {
+							t.Errorf("one matching sample produced event count %g", *point.Value)
+						}
+						total += *point.Value
+					}
+					want := check.times
+					if group == "number-of-flaps" {
+						want = 1
+					}
+					if total != want {
+						t.Errorf("%s counted %g matching events, want %g", group, total, want)
+					}
+				})
+			}
+		}
+	})
+
+	for i, ch := range []fixture.Chart{terminal, interior, storedGap} {
+		shape := []string{"terminal", "interior", "stored-gap"}[i]
+		t.Run(shape+"/time-share", func(t *testing.T) {
+			trackContractComponent(t, timeContract, shape)
+			condition := ">0"
+			if shape == "stored-gap" {
+				condition = "==gap"
+			}
+			want := make([]expectedColumnPoint, 5)
+			for row := range want {
+				share := 100.0
+				if shape != "interior" && row == 0 {
+					share = 0
+				} else if shape != "interior" && row == 4 {
+					// Only (B-1,B] matches inside the final three-second row.
+					share = 100.0 / 3.0
+				}
+				want[row] = wantNumberAt(after+int64(row+1)*3, share)
+			}
+			if !assertExactColumn(t, query(t, ch, "percentage-of-time", condition), "load", want, printTol) {
+				t.Error("percentage-of-time lost interval coverage at a stored endpoint")
+			}
+		})
+	}
+
+	t.Run("gap-samples-everywhere", func(t *testing.T) {
+		trackContract(t, sampleContract)
+		want := make([]expectedColumnPoint, 5)
+		for row, share := range []float64{0, 100, 100, 100, 50} {
+			// The last row delivers the repeated gap and the following numeric point.
+			want[row] = wantNumberAt(after+int64(row+1)*3, share)
+		}
+		if !assertExactColumn(t, query(t, storedGap, "percentage-of-samples", "==gap"), "load", want, printTol) {
+			t.Error("percentage-of-samples stopped counting each delivered gap")
+		}
+	})
+}
+
 // One counter reset, counted once — whatever the resolution asked for.
 //
 // Above tier 0 a reset is inferred from a window whose minimum falls below

@@ -755,6 +755,15 @@
     "proves": "a bucket covered only by a repeated wide point remains a numeric zero when no occurrence or flap belongs there, rather than becoming EMPTY"
   },
   {
+    "name": "CASE-023/residual-point-time-share",
+    "proves": "percentage-of-time preserves numeric and gap interval coverage when a result row straddles a stored endpoint, including a terminal partial row, using the selected row duration as denominator",
+    "components": [
+      "terminal",
+      "interior",
+      "stored-gap"
+    ]
+  },
+  {
     "name": "CASE-023/reset-counted-once",
     "proves": "one counter reset counts once above tier 0, at any resolution: carrying the PRE-reset peak forward makes the window after the reset look like it dropped too, and re-delivering the reset window compares it against the maximum its own first delivery stored - both turn one reboot into several"
   },
