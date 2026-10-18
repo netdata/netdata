@@ -119,7 +119,10 @@ pub enum PlanMatcher {
     /// `values` (the pinned dictionary-numeric rule; several values =
     /// the grammar's multi-value numeric equality). See
     /// [`numeric_token_matches`].
-    Number { cmp: NumberCmp, values: Vec<f64> },
+    Number {
+        cmp: NumberCmp,
+        values: Vec<NumberValue>,
+    },
     /// Values containing the term, Unicode-simple case-insensitive
     /// ([`crate::ContainsMatcher`]: the same rule as suggest's contains
     /// class). An empty term matches nothing.
@@ -137,15 +140,43 @@ pub enum NumberCmp {
     Lte,
 }
 
+/// The right-hand side of a [`PlanMatcher::Number`] comparison. An
+/// integer stays an integer so that [`numeric_token_matches`] can
+/// compare it exactly: an `f64` cannot tell integers apart past 2^53.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub enum NumberValue {
+    Int(i64),
+    Float(f64),
+}
+
 /// THE numeric token comparator — shared verbatim by the dictionary
 /// walks here and by the span-side evaluator in the engine crate, so
 /// the raw index path and the canonical span path can never disagree on
 /// what a numeric comparison means. A value that does not parse as a
 /// number never matches; a NaN `rhs` matches nothing.
-pub fn numeric_token_matches(value: &str, cmp: NumberCmp, rhs: f64) -> bool {
+///
+/// An integer `rhs` against a stored value that parses as an `i64`
+/// compares exactly; everything else compares as `f64`. The two agree
+/// whenever both sides lie within ±2^53. Stored values are text, so a
+/// double printed as integer digits compares by those digits, and a
+/// stored integer outside the `i64` range compares as `f64`.
+pub fn numeric_token_matches(value: &str, cmp: NumberCmp, rhs: NumberValue) -> bool {
+    if let NumberValue::Int(rhs) = rhs
+        && let Ok(v) = value.parse::<i64>()
+    {
+        return compare(cmp, v, rhs);
+    }
     let Ok(v) = value.parse::<f64>() else {
         return false;
     };
+    let rhs = match rhs {
+        NumberValue::Int(n) => n as f64,
+        NumberValue::Float(f) => f,
+    };
+    compare(cmp, v, rhs)
+}
+
+fn compare<T: PartialOrd>(cmp: NumberCmp, v: T, rhs: T) -> bool {
     match cmp {
         NumberCmp::Eq => v == rhs,
         NumberCmp::Gt => v > rhs,
@@ -475,7 +506,7 @@ enum ValueTest<'m> {
     },
     Number {
         cmp: NumberCmp,
-        values: &'m [f64],
+        values: &'m [NumberValue],
     },
     /// `None`: the empty term, which matches nothing.
     Contains(Option<crate::ContainsMatcher>),

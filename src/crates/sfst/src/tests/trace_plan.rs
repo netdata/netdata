@@ -20,9 +20,10 @@ use std::io::Cursor;
 
 use bumpalo::Bump;
 
+use crate::NumberValue::{self, Float, Int};
 use crate::{
-    CompiledTracePlan, Durations, IndexReader, IndexWriter, PlanTerm, RowIndex, ScanLimits,
-    ScanWork, TracePlan,
+    CompiledTracePlan, Durations, IndexReader, IndexWriter, NumberCmp, PlanTerm, RowIndex,
+    ScanLimits, ScanWork, TracePlan, numeric_token_matches,
 };
 
 /// No ceiling on either unit.
@@ -132,7 +133,7 @@ fn not_tokens(field: &str, exact: &[&str], patterns: &[&str]) -> PlanTerm {
 
 /// A numeric-comparison `Fields` term; `negated` applies the same
 /// `presence ∩ complement` rule.
-fn number(field: &str, cmp: crate::NumberCmp, values: &[f64], negated: bool) -> PlanTerm {
+fn number(field: &str, cmp: crate::NumberCmp, values: &[NumberValue], negated: bool) -> PlanTerm {
     PlanTerm::Fields {
         fields: vec![field.to_string()],
         matcher: crate::PlanMatcher::Number {
@@ -291,30 +292,40 @@ fn tier_matrix_matches_the_oracle() {
         ),
         // ── Dictionary numerics ────────────────────────────
         (
-            plan(vec![number("num", crate::NumberCmp::Gte, &[45.0], false)]),
+            plan(vec![number(
+                "num",
+                crate::NumberCmp::Gte,
+                &[Int(45)],
+                false,
+            )]),
             Box::new(|r: &FixtureRow| r.num >= 45),
         ),
         (
-            plan(vec![number("fnum", crate::NumberCmp::Lt, &[3.0], false)]),
+            plan(vec![number(
+                "fnum",
+                crate::NumberCmp::Lt,
+                &[Float(3.0)],
+                false,
+            )]),
             Box::new(|r: &FixtureRow| r.fnum < 3.0),
         ),
         (
             plan(vec![number(
                 "num",
                 crate::NumberCmp::Eq,
-                &[5.0, 7.0],
+                &[Int(5), Int(7)],
                 false,
             )]),
             Box::new(|r: &FixtureRow| r.num == 5 || r.num == 7),
         ),
         // Negated numeric equality: present and no value equals.
         (
-            plan(vec![number("num", crate::NumberCmp::Eq, &[5.0], true)]),
+            plan(vec![number("num", crate::NumberCmp::Eq, &[Int(5)], true)]),
             Box::new(|r: &FixtureRow| r.num != 5),
         ),
         // Unparseable stored values never match a numeric comparison.
         (
-            plan(vec![number("m", crate::NumberCmp::Gte, &[0.0], false)]),
+            plan(vec![number("m", crate::NumberCmp::Gte, &[Int(0)], false)]),
             Box::new(|_| false),
         ),
         // ── Duration interval sets, straight and negated ───
@@ -339,7 +350,7 @@ fn tier_matrix_matches_the_oracle() {
             plan(vec![
                 tokens("l", &["a"], &[]),
                 not_tokens("m", &["v02"], &[]),
-                number("num", crate::NumberCmp::Lt, &[40.0], false),
+                number("num", crate::NumberCmp::Lt, &[Int(40)], false),
             ]),
             Box::new(|r: &FixtureRow| r.l == "a" && r.m != "v02" && r.num < 40),
         ),
@@ -1083,7 +1094,12 @@ fn multi_plan_compile_equals_per_plan() {
             tokens("h", &[], &["w.*"]),
         ]),
         plan(vec![not_tokens("m", &["v03"], &[])]),
-        plan(vec![number("fnum", crate::NumberCmp::Lt, &[20.0], false)]),
+        plan(vec![number(
+            "fnum",
+            crate::NumberCmp::Lt,
+            &[Float(20.0)],
+            false,
+        )]),
         plan(vec![fields_in(&["m"], &["h"], "1")]),
         plan(vec![PlanTerm::EventGroup {
             conditions: vec![crate::GroupCondition::TimeSinceStart {
@@ -1269,4 +1285,128 @@ fn subgroup_field_stops_after_one_walk() {
             .is_none()
     );
     assert_eq!(work.dict_bytes, one_walk);
+}
+
+/// The comparator compares an integer right-hand side exactly against
+/// stored integer text and keeps the `f64` rule for everything else,
+/// so results inside ±2^53 are unchanged.
+#[test]
+fn numeric_comparator_is_exact_for_integers() {
+    const P53: i64 = 1 << 53;
+    use NumberCmp::{Eq, Gt, Gte, Lt, Lte};
+    let cases: &[(&str, NumberCmp, NumberValue, bool)] = &[
+        // Past 2^53 an f64 cannot tell these apart; integers can.
+        ("9007199254740993", Eq, Int(P53), false),
+        ("9007199254740993", Eq, Int(P53 + 1), true),
+        ("9007199254740993", Gt, Int(P53), true),
+        ("9007199254740993", Lte, Int(P53), false),
+        ("9007199254740992", Lt, Int(P53 + 1), true),
+        ("-9007199254740993", Eq, Int(-P53), false),
+        ("-9007199254740993", Lt, Int(-P53), true),
+        ("9223372036854775807", Eq, Int(i64::MAX), true),
+        ("9223372036854775806", Lt, Int(i64::MAX), true),
+        ("-9223372036854775808", Eq, Int(i64::MIN), true),
+        // Inside ±2^53, the f64 rule's answers.
+        ("379", Eq, Int(379), true),
+        ("+379", Eq, Int(379), true),
+        ("0379", Eq, Int(379), true),
+        ("379.0", Eq, Int(379), true),
+        ("1e3", Eq, Int(1000), true),
+        ("379.5", Gt, Int(379), true),
+        ("379", Eq, Float(379.0), true),
+        ("0.1", Eq, Float(0.1), true),
+        ("2.5", Gte, Float(2.5), true),
+        ("abc", Gte, Int(0), false),
+        ("", Eq, Int(0), false),
+        ("1", Eq, Float(f64::NAN), false),
+        // Integer text past the i64 range falls back to f64, where it
+        // equals i64::MAX.
+        ("9223372036854775808", Gt, Int(i64::MAX), false),
+    ];
+    for &(value, cmp, rhs, want) in cases {
+        assert_eq!(
+            numeric_token_matches(value, cmp, rhs),
+            want,
+            "{value} {cmp:?} {rhs:?}"
+        );
+    }
+}
+
+/// Dictionary walks compare integers exactly past 2^53 in every tier,
+/// plain and negated: neighbours an f64 would equate stay apart.
+#[test]
+fn big_integer_terms_select_exact_rows() {
+    const P53: i64 = 1 << 53;
+    const ROWS: usize = 128;
+    let lo = |i: usize| [P53 - 1, P53, P53 + 1, P53 + 2][i % 4];
+    let mid = |i: usize| P53 + (i % 16) as i64;
+    let hi = |i: usize| P53 + i as i64;
+    let arena = Bump::new();
+    let mut ri = RowIndex::new(&arena, 10);
+    for i in 0..ROWS {
+        let kvs = [
+            format!("lo={}", lo(i)),
+            format!("mid={}", mid(i)),
+            format!("hi={}", hi(i)),
+        ];
+        let slots: Vec<_> = kvs.iter().map(|kv| ri.intern(None, kv)).collect();
+        ri.row(1_000 + i as i64, &slots);
+    }
+    let (buf, _s, _m) = IndexWriter::write_into(&ri, Cursor::new(Vec::new()), Vec::new()).unwrap();
+    let bytes = buf.into_inner();
+    let idx = IndexReader::open(&bytes).unwrap();
+    for (field, tier) in [
+        ("lo", crate::FieldTier::Low),
+        ("mid", crate::FieldTier::Mid),
+        ("hi", crate::FieldTier::High),
+    ] {
+        assert_eq!(idx.field_table().get(field).unwrap().tier, tier, "{field}");
+    }
+
+    type Want = Box<dyn Fn(usize) -> bool>;
+    let cases: Vec<(PlanTerm, Want)> = vec![
+        (
+            number("lo", NumberCmp::Eq, &[Int(P53)], false),
+            Box::new(move |i| lo(i) == P53),
+        ),
+        (
+            number("lo", NumberCmp::Gt, &[Int(P53)], false),
+            Box::new(move |i| lo(i) > P53),
+        ),
+        (
+            number("lo", NumberCmp::Eq, &[Int(P53)], true),
+            Box::new(move |i| lo(i) != P53),
+        ),
+        (
+            number("mid", NumberCmp::Eq, &[Int(P53 + 3), Int(P53 + 9)], false),
+            Box::new(move |i| mid(i) == P53 + 3 || mid(i) == P53 + 9),
+        ),
+        (
+            number("mid", NumberCmp::Lte, &[Int(P53 + 1)], false),
+            Box::new(move |i| mid(i) <= P53 + 1),
+        ),
+        (
+            number("hi", NumberCmp::Eq, &[Int(P53 + 5)], false),
+            Box::new(|i| i == 5),
+        ),
+        (
+            number("hi", NumberCmp::Gte, &[Int(P53 + 100)], false),
+            Box::new(|i| i >= 100),
+        ),
+        (
+            number("hi", NumberCmp::Lt, &[Int(P53 + 1)], false),
+            Box::new(|i| i == 0),
+        ),
+    ];
+    for (ci, (term, want)) in cases.into_iter().enumerate() {
+        let mut work = ScanWork::default();
+        let compiled = compile(&idx, &plan(vec![term]), &mut work);
+        let expected: Vec<u32> = (0..ROWS).filter(|&i| want(i)).map(|i| i as u32).collect();
+        let mut w = ScanWork::default();
+        assert_eq!(
+            compiled.matched_in_range(0, ROWS as u32, &mut w),
+            expected,
+            "case {ci}"
+        );
+    }
 }

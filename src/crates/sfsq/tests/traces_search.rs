@@ -39,7 +39,7 @@ use std::sync::atomic::{AtomicUsize, Ordering};
 use tokio_util::sync::CancellationToken;
 
 use common::{
-    SpanSpec, corrupt_chunk, hide_chunk, kv_str, memory_source, missing_source, req_with,
+    SpanSpec, corrupt_chunk, hide_chunk, kv_int, kv_str, memory_source, missing_source, req_with,
     sealed_source, sealed_source_at, sp, tail_source, unavailable_source, write_wal,
 };
 use opentelemetry_proto::tonic::collector::trace::v1::ExportTraceServiceRequest;
@@ -53,6 +53,10 @@ use sfsq::traces::{
 /// One second in nanoseconds — the corpus' timestamp unit (`500 * NS`
 /// below reads as 500s).
 const NS: u64 = 1_000_000_000;
+
+/// T4's `big` attribute: 2^53 + 1, the first integer an `f64` cannot
+/// hold (it reads back as 2^53).
+const BIG: i64 = (1 << 53) + 1;
 
 fn tid(n: u8) -> [u8; 16] {
     let mut b = [0u8; 16];
@@ -218,7 +222,11 @@ fn early_requests() -> Vec<ExportTraceServiceRequest> {
             &[
                 SpanSpec {
                     kind: 5, // CONSUMER
-                    attrs: vec![kv_str("queue", "q1"), kv_str("retries", "3")],
+                    attrs: vec![
+                        kv_str("queue", "q1"),
+                        kv_str("retries", "3"),
+                        kv_int("big", BIG),
+                    ],
                     links: vec![
                         (tid(1), [0x11; 8], vec![kv_str("rel", "follows")]),
                         (tid(2), [0x22; 8], vec![kv_str("rel", "other")]),
@@ -573,6 +581,44 @@ fn oracle_equivalence_under_relayouts() {
                 vec![PredicateValue::Float(3.0)],
             )])),
             vec![hex(4)],
+        ),
+        (
+            // Integers compare exactly past 2^53: T4's `big` is 2^53 + 1,
+            // which an f64 comparison would equate with 2^53.
+            "numeric-big-int-neighbor",
+            canon_query(pred(vec![cond(
+                PredicateTarget::Attribute(AttributeOwner::Span, "big".into()),
+                CompareOp::Eq,
+                vec![PredicateValue::Integer(BIG - 1)],
+            )])),
+            vec![],
+        ),
+        (
+            "numeric-big-int-eq",
+            canon_query(pred(vec![cond(
+                PredicateTarget::Attribute(AttributeOwner::Span, "big".into()),
+                CompareOp::Eq,
+                vec![PredicateValue::Integer(BIG)],
+            )])),
+            vec![hex(4)],
+        ),
+        (
+            "numeric-big-int-gt",
+            canon_query(pred(vec![cond(
+                PredicateTarget::Attribute(AttributeOwner::Span, "big".into()),
+                CompareOp::Gt,
+                vec![PredicateValue::Integer(BIG - 1)],
+            )])),
+            vec![hex(4)],
+        ),
+        (
+            "numeric-big-int-lte",
+            canon_query(pred(vec![cond(
+                PredicateTarget::Attribute(AttributeOwner::Span, "big".into()),
+                CompareOp::Lte,
+                vec![PredicateValue::Integer(BIG - 1)],
+            )])),
+            vec![],
         ),
         (
             // span:id — the SPAN column scan; T5's middle child.

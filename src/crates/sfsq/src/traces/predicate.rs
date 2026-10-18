@@ -939,11 +939,12 @@ fn condition_matcher(op: CompareOp, values: &[PredicateValue]) -> sfst::PlanMatc
         .iter()
         .any(|v| matches!(v, PredicateValue::Integer(_) | PredicateValue::Float(_)));
     if numeric {
-        let values: Vec<f64> = values
+        // Integers stay integers: the comparator compares them exactly.
+        let values: Vec<sfst::NumberValue> = values
             .iter()
             .map(|v| match v {
-                PredicateValue::Integer(n) => *n as f64,
-                PredicateValue::Float(f) => *f,
+                PredicateValue::Integer(n) => sfst::NumberValue::Int(*n),
+                PredicateValue::Float(f) => sfst::NumberValue::Float(*f),
                 PredicateValue::Text(_) => unreachable!("validated: values are homogeneous"),
             })
             .collect();
@@ -1077,7 +1078,7 @@ pub(crate) enum EvalMatcher {
     },
     Number {
         cmp: sfst::NumberCmp,
-        values: Vec<f64>,
+        values: Vec<sfst::NumberValue>,
     },
     /// `None`: the empty term, which matches nothing (the plan's rule).
     Contains(Option<sfst::ContainsMatcher>),
@@ -2265,7 +2266,7 @@ mod tests {
                     fields: vec!["attributes.code".into()],
                     matcher: sfst::PlanMatcher::Number {
                         cmp: sfst::NumberCmp::Gte,
-                        values: vec![500.0],
+                        values: vec![sfst::NumberValue::Int(500)],
                     },
                     negated: false,
                 },
@@ -2273,7 +2274,7 @@ mod tests {
                     fields: vec!["attributes.ratio".into()],
                     matcher: sfst::PlanMatcher::Number {
                         cmp: sfst::NumberCmp::Eq,
-                        values: vec![0.5, 2.0],
+                        values: vec![sfst::NumberValue::Float(0.5), sfst::NumberValue::Int(2)],
                     },
                     negated: false,
                 },

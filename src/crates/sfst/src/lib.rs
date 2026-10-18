@@ -108,7 +108,7 @@ pub mod registry;
 pub use error::Error;
 pub use index_reader::{
     BitmapFilter, CompiledTracePlan, GroupCondition, IdColumnKind, IndexReader, MetaReader,
-    NumberCmp, PartEvidence, PlanMatcher, PlanTerm, RollupEvidence, RollupRefOutcome,
+    NumberCmp, NumberValue, PartEvidence, PlanMatcher, PlanTerm, RollupEvidence, RollupRefOutcome,
     RollupRefResolver, ScanLimits, ScanWork, Trace, TraceEvent, TraceFileSession, TraceLink,
     TracePlan, TraceSpan, numeric_token_matches,
 };

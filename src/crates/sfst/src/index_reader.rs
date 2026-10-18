@@ -36,8 +36,8 @@ use rollup_resolver::RollupRefMemo;
 pub use rollup_resolver::{RollupRefOutcome, RollupRefResolver};
 pub use session::{PartEvidence, RollupEvidence, TraceFileSession};
 pub use trace_plan::{
-    CompiledTracePlan, GroupCondition, IdColumnKind, NumberCmp, PlanMatcher, PlanTerm, ScanLimits,
-    ScanWork, TracePlan, numeric_token_matches,
+    CompiledTracePlan, GroupCondition, IdColumnKind, NumberCmp, NumberValue, PlanMatcher, PlanTerm,
+    ScanLimits, ScanWork, TracePlan, numeric_token_matches,
 };
 
 use crate::{

@@ -804,6 +804,49 @@ fn highlight_shared_and_unset_ids() {
     assert_eq!(data.matched, [0, 2], "any positive token marks a span");
 }
 
+/// Integer comparisons are exact past 2^53, in sealed files and in the
+/// WAL tail: `= 2^53` does not mark the span holding 2^53 + 1, which an
+/// f64 comparison would equate with it.
+#[test]
+fn highlight_compares_big_integers_exactly() {
+    const BIG: i64 = (1 << 53) + 1;
+    let dir = tempfile::tempdir().unwrap();
+    let mut a = sp(1, 0, 1, "a");
+    a.attrs = vec![kv_int("big", BIG)];
+    let mut b = sp(2, 1, 2, "b");
+    b.attrs = vec![kv_int("big", BIG - 1)];
+    let wal = write_wal(dir.path(), vec![req(&[a, b])], "w");
+    let big = |op, n| {
+        sfsq::traces::Token::positive(sfsq::traces::Predicate {
+            conditions: vec![sfsq::traces::Condition {
+                target: sfsq::traces::PredicateTarget::Attribute(
+                    sfsq::traces::AttributeOwner::Span,
+                    "big".into(),
+                ),
+                op,
+                values: vec![sfsq::traces::PredicateValue::Integer(n)],
+            }],
+        })
+    };
+    use sfsq::traces::CompareOp::{Eq, Gt, Lt};
+    let cases = [
+        (big(Eq, BIG), vec![0]),
+        (big(Eq, BIG - 1), vec![1]),
+        (big(Gt, BIG - 1), vec![0]),
+        (big(Lt, BIG), vec![1]),
+    ];
+    for (i, (token, want)) in cases.into_iter().enumerate() {
+        for (layout, src) in [
+            ("sealed", sealed_source(dir.path(), &wal, &format!("w{i}"))),
+            ("tail", tail_source(&wal, &format!("w{i}-tail"))),
+        ] {
+            let data = highlight(vec![src], vec![token.clone()], None);
+            assert_eq!(span_names(&data), ["a", "b"], "case {i} on {layout}");
+            assert_eq!(data.matched, want, "case {i} on {layout}");
+        }
+    }
+}
+
 /// Past the byte budget the trace is a prefix, and so are its marks: a
 /// matching span the budget refused is not reported.
 #[test]
