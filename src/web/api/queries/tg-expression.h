@@ -537,15 +537,19 @@ static inline NETDATA_DOUBLE tg_expression_share(TG_EXPRESSION *e, const TG_POIN
     }
 
     else {
-        // tg_point_average() is the point's own value below tier 1, so this
-        // only differs for a window - the first window of a `previous`
-        // series, which has no predecessor to compare against yet. It has
-        // to leave the same predecessor behind as the branch above, or the
-        // window after it is compared against an interpolation instead of
-        // an average.
-        share = tg_expression_eval(e, tg_point_average(p), p->is_gap) ? 1.0 : 0.0;
-        if(!p->is_gap && netdata_double_isnumber(p->max))
-            e->previous_max = p->max;
+        NETDATA_DOUBLE value = tg_point_average(p);
+        // A singleton after a rollup must retain its bound or restart floor,
+        // rather than count a drop against the rollup's average again.
+        if(e->operand == TG_EXPRESSION_OPERAND_PREVIOUS && e->cmp == TG_EXPRESSION_LESS &&
+           e->has_previous && !p->is_gap)
+            e->previous = e->previous_max;
+
+        share = tg_expression_eval(e, value, p->is_gap) ? 1.0 : 0.0;
+
+        // Count-one anomaly values and raw min/max use different domains.
+        NETDATA_DOUBLE bound = p->count > 1 ? p->max : value;
+        if(!p->is_gap && netdata_double_isnumber(bound))
+            e->previous_max = bound;
     }
 
     // what a repeat of this point replays - see tg_expression_replay()

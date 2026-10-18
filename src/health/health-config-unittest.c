@@ -598,6 +598,85 @@ static int test_expression_omitted_operand_defaults_to_zero(int *passed) {
     return failed;
 }
 
+static int test_expression_mixed_count_previous(int *passed) {
+    static const struct {
+        const char *condition;
+        const char *description;
+        size_t points;
+        struct {
+            TG_POINT point;
+            NETDATA_DOUBLE share;
+        } steps[7];
+    } tests[] = {
+        { "<previous", "singleton retains the preceding window bound", 4, {
+            { { .value=55, .sum=110, .min=10, .max=100, .count=2, .first=true }, 0 },
+            { { .value=75, .sum=75, .min=75, .max=75, .count=1, .first=true }, 1 },
+            { { .value=73, .sum=75, .min=75, .max=75, .count=1, .first=false }, 1 },
+            { { .value=80, .sum=80, .min=80, .max=80, .count=1, .first=true }, 0 },
+        } },
+        { "<previous", "singleton does not recount the preceding reset", 7, {
+            { { .value=100, .sum=200, .min=100, .max=100, .count=2, .first=true }, 0 },
+            { { .value=40, .sum=120, .min=0, .max=110, .count=3, .first=true }, 1 },
+            { { .value=NAN, .sum=NAN, .min=NAN, .max=NAN, .count=1, .is_gap=true, .first=true }, 0 },
+            { { .value=20, .sum=20, .min=20, .max=20, .count=1, .first=true }, 0 },
+            { { .value=5, .sum=20, .min=20, .max=20, .count=1, .first=false }, 0 },
+            { { .value=25, .sum=25, .min=25, .max=25, .count=1, .first=true }, 0 },
+            { { .value=5, .sum=5, .min=5, .max=5, .count=1, .first=true }, 1 },
+        } },
+        { "<previous", "ordinary samples retain exact predecessor comparisons", 3, {
+            { { .value=100, .sum=100, .min=100, .max=100, .count=1, .first=true }, 0 },
+            { { .value=50, .sum=50, .min=50, .max=50, .count=1, .first=true }, 1 },
+            { { .value=60, .sum=60, .min=60, .max=60, .count=1, .first=true }, 0 },
+        } },
+        { "<previous", "anomaly-rate predecessors use the delivered value domain", 3, {
+            { { .value=100, .sum=3000, .min=1000, .max=2000, .count=1, .first=true }, 0 },
+            { { .value=50, .sum=3000, .min=1000, .max=2000, .count=1, .first=true }, 1 },
+            { { .value=60, .sum=3000, .min=1000, .max=2000, .count=1, .first=true }, 0 },
+        } },
+        { ">previous", "other operators retain the preceding average", 2, {
+            { { .value=55, .sum=110, .min=10, .max=100, .count=2, .first=true }, 0 },
+            { { .value=75, .sum=75, .min=75, .max=75, .count=1, .first=true }, 1 },
+        } },
+    };
+
+    int failed = 0;
+    for(size_t i = 0; i < _countof(tests); i++) {
+        TG_EXPRESSION e;
+        if(!tg_expression_parse(&e, tests[i].condition)) {
+            fprintf(stderr, "FAILED [%s]: cannot parse condition\n", tests[i].description);
+            failed++;
+            continue;
+        }
+
+        bool ok = true;
+        for(size_t j = 0; j < tests[i].points; j++) {
+            NETDATA_DOUBLE share = tg_expression_share(&e, &tests[i].steps[j].point);
+            if(share != tests[i].steps[j].share) {
+                fprintf(stderr, "FAILED [%s]: point %zu share=%f, expected %f\n",
+                        tests[i].description, j, share, tests[i].steps[j].share);
+                ok = false;
+            }
+        }
+        if(ok)
+            (*passed)++;
+        else
+            failed++;
+    }
+
+    TG_EXPRESSION e;
+    bool ok = tg_expression_parse(&e, "<previous");
+    ok = ok && !tg_expression_eval(&e, 55, false);
+    ok = ok && !tg_expression_eval(&e, 75, false);
+    ok = ok && tg_expression_eval(&e, 70, false);
+    if(ok)
+        (*passed)++;
+    else {
+        fprintf(stderr, "FAILED [delivered-sample predecessor control]\n");
+        failed++;
+    }
+    return failed;
+}
+
 static int test_dyncfg_update_every_boundaries(int *passed) {
     static const struct {
         const char *value_member;
@@ -1830,6 +1909,7 @@ int health_config_unittest(void) {
     failed += test_dyncfg_long_condition_is_not_truncated(&passed);
     failed += test_expression_rejects_leave_the_default(&passed);
     failed += test_expression_omitted_operand_defaults_to_zero(&passed);
+    failed += test_expression_mixed_count_previous(&passed);
 
     // the same alert configuration, taken through the metadata database
     // instead of the parser - counted BEFORE the summary, or a failure here
