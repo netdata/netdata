@@ -137,6 +137,50 @@ func TestProcessCandidateDaemonEnablePreservesRetry(t *testing.T) {
 	require.GreaterOrEqual(t, retry.Sub(first), time.Second, "daemon replies must not bypass the retry deadline")
 }
 
+func TestProcessCandidateDaemonPolicySameSourceReplacement(t *testing.T) {
+	for _, version := range []string{"v1", "v2"} {
+		for _, initial := range []string{"running", "failed", "disabled"} {
+			t.Run(version+"/"+initial, func(t *testing.T) {
+				configs := continuationConfigs(false)[:1]
+				state := &continuationCollectorState{check: func(_ context.Context, option string) error {
+					if initial == "failed" && option == configs[0]["option_str"] {
+						return errors.New("original endpoint unavailable")
+					}
+					return nil
+				}}
+				fixture := newCandidateEchoFixture(t, version, false, state, configs)
+				health := initial
+				if initial == "disabled" {
+					fixture.output.waitContains(t, "CONFIG go.d:collector:module:local2 status running")
+					fixture.policyDisabled.Store(true)
+					fixture.command(t, "disable-before-reload", "disable", "user=test", 200)
+				}
+				fixture.output.waitContains(t, "CONFIG go.d:collector:module:local2 status "+health)
+				fixture.assertRegistrations(t, 1)
+				checks, code := 2, 202
+				if initial == "disabled" {
+					checks, code = 1, 200
+				} else {
+					health = "running"
+				}
+				statuses := strings.Count(fixture.output.String(), "CONFIG go.d:collector:module:local2 status "+health)
+				replacement, err := configs[0].Clone()
+				require.NoError(t, err)
+				replacement["option_str"] = "replacement-endpoint"
+				(&continuationFixture{t: t, batches: fixture.batches}).observe([]confgroup.Config{replacement})
+				fixture.output.waitContains(t, fmt.Sprintf("FUNCTION_RESULT_BEGIN daemon-echo-2 %d ", code))
+				require.Eventually(t, func() bool {
+					return len(state.checked()) == checks && strings.Count(fixture.output.String(),
+						"CONFIG go.d:collector:module:local2 status "+health) > statuses
+				}, 3*time.Second, time.Millisecond, "a genuine replacement must receive current daemon policy")
+				fixture.assertRegistrations(t, 2)
+				fixture.assertExposedStatus(t, replacement, health)
+				require.Never(t, func() bool { return len(state.checked()) > checks }, 100*time.Millisecond, time.Millisecond)
+			})
+		}
+	}
+}
+
 // Observe emitted registrations independently of the writer: replying inline
 // would deadlock on the frame owner's output lock.
 type candidateEchoOutput struct {
@@ -154,11 +198,13 @@ func (o *candidateEchoOutput) Write(payload []byte) (int, error) {
 }
 
 type candidateEchoFixture struct {
-	output *candidateEchoOutput
-	input  *io.PipeWriter
-	state  *continuationCollectorState
-	wire   sync.Mutex
-	echoes atomic.Int32
+	batches        chan []*confgroup.Group
+	output         *candidateEchoOutput
+	input          *io.PipeWriter
+	state          *continuationCollectorState
+	wire           sync.Mutex
+	echoes         atomic.Int32
+	policyDisabled atomic.Bool
 }
 
 func newCandidateEchoFixture(t *testing.T, version string, auto bool, state *continuationCollectorState, configs []confgroup.Config) *candidateEchoFixture {
@@ -187,6 +233,7 @@ func newCandidateEchoFixture(t *testing.T, version string, auto bool, state *con
 		creator.Create = func() collectorapi.CollectorV1 { return &continuationV1Collector{state: state} }
 	}
 	batches := make(chan []*confgroup.Group, 1)
+	f.batches = batches
 	cfg := testProductionProcessConfig(reader, f.output)
 	cfg.AutoEnable = auto
 	cfg.Modules = collectorapi.Registry{"module": creator}
@@ -250,7 +297,11 @@ func (f *candidateEchoFixture) echo(ctx context.Context) error {
 				continue
 			}
 			uid := fmt.Sprintf("daemon-echo-%d", f.echoes.Add(1))
-			if err := f.write(uid, "enable", ""); err != nil {
+			command := "enable"
+			if f.policyDisabled.Load() {
+				command = "disable"
+			}
+			if err := f.write(uid, command, ""); err != nil {
 				if ctx.Err() != nil {
 					return nil
 				}

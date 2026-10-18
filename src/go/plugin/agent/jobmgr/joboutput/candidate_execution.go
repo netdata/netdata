@@ -72,7 +72,9 @@ func (dcjc *DynCfgJobController) prepareCandidateDecision(ctx context.Context, s
 }
 
 func (dcjc *DynCfgJobController) candidateProjectionCleanup(id string, postimage *dyncfg.GraphConfig, delta *candidateDelta) lifecycle.TaskCleanup {
-	if _, exists := dcjc.graph.Lookup(id); exists && delta.before != nil && delta.before.Binding != nil &&
+	// Passive source replacements need a registration to obtain daemon policy.
+	if _, exists := dcjc.graph.Lookup(id); exists && delta.after.Enablement != candidatePassive &&
+		delta.before != nil && delta.before.Binding != nil &&
 		delta.after.Binding != nil && delta.before.Binding.Config.SourceType() == delta.after.Binding.Config.SourceType() &&
 		delta.before.Binding.Config.Source() == delta.after.Binding.Config.Source() {
 		return dcjc.configStatusCleanup(id, dyncfg.Status(postimage.Status))
