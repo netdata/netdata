@@ -279,6 +279,8 @@ static void rrdr_dimension_units_array_v2(BUFFER *wb, const char *key, RRDR *r, 
 
         if(units_override)
             buffer_json_add_array_item_string(wb, units_override);
+        else if(!source_units && r->result_units && r->result_units[c])
+            buffer_json_add_array_item_string(wb, string2str(r->result_units[c]));
         else {
             // per RESULT dimension, because sum integrates per METRIC: in a
             // query mixing counters and gauges the counter's volume must not
