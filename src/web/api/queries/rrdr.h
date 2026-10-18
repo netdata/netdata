@@ -70,6 +70,7 @@ typedef struct rrdresult {
     STRING **di;              // array of d dimension ids
     STRING **dn;              // array of d dimension names
     STRING **du;              // array of d dimension units
+    STRING **result_units;    // optional normalized units for groups keyed by result units
     uint32_t *dgbs;           // array of d dimension group by slots - NOT ALLOCATED when RRDR is created
     uint32_t *dgbc;           // array of d dimension group by counts - NOT ALLOCATED when RRDR is created
     uint32_t *dp;             // array of d dimension priority - NOT ALLOCATED when RRDR is created
@@ -117,9 +118,8 @@ typedef struct rrdresult {
         TIER_QUERY_FETCH tier_query_fetch;  // which value to use from STORAGE_POINT
         QUERY_POINT_MODE point_mode;
 
-        // set by create() when the parsed expression names a gap token:
-        // the ONLY way gap slots reach a grouping (they are filtered out
-        // of the hot path for everyone else)
+        // Time percentages need every gap in their denominator; other
+        // condition groupings request gaps only for a gap-token operand.
         bool wants_gaps;
 
         size_t points_wanted;               // used by SES and DES

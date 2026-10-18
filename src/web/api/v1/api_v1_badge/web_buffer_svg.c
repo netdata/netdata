@@ -1051,7 +1051,7 @@ int api_v1_badge(RRDHOST *host, struct web_client *w, char *url) {
             else
                 units = "";
         }
-        else if(options & RRDR_OPTION_PERCENTAGE)
+        else if((options & RRDR_OPTION_PERCENTAGE) && !(options & RRDR_OPTION_RETURN_RAW))
             units = "%";
         else {
             // the groupings that answer a question ABOUT the samples report
