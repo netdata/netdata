@@ -289,7 +289,9 @@ int health_parse_db_lookup(size_t line, const char *filename, char *string, stru
             // the legacy numeric field stays populated whenever the
             // condition can be expressed in it, so everything that reads
             // it keeps working
-            if(e.operand == TG_EXPRESSION_OPERAND_NUMBER)
+            // Numeric-only groupings keep their own defaults when the operand is omitted.
+            if(e.operand == TG_EXPRESSION_OPERAND_NUMBER &&
+               (time_grouping_is_expression(ac->time_group) || strpbrk(expr, "0123456789")))
                 ac->time_group_value = e.target;
         }
 

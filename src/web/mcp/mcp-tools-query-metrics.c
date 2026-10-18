@@ -37,7 +37,7 @@
 #include "web/api/formatters/rrd2json.h"
 
 static bool mcp_query_metrics_numeric_option_valid(struct json_object *option) {
-    if(!option || !json_object_is_type(option, json_type_string))
+    if(!option || !json_object_is_type(option, json_type_string) || jsonc_string_has_embedded_nul(option))
         return false;
 
     const char *value = json_object_get_string(option);
@@ -424,7 +424,7 @@ MCP_RETURN_CODE mcp_tool_query_metrics_execute(MCP_CLIENT *mcpc, struct json_obj
             if(numeric_time_group && has_time_group_options) {
                 if(!mcp_query_metrics_numeric_option_valid(time_group_options_obj)) {
                     buffer_sprintf(mcpc->error,
-                                   "Parameter 'time_group_options' must be a number when using time_group='%s'.",
+                                   "Parameter 'time_group_options' must be a string containing a finite number when using time_group='%s'.",
                                    time_group_str);
                     return MCP_RC_INVALID_PARAMS;
                 }
@@ -439,7 +439,8 @@ MCP_RETURN_CODE mcp_tool_query_metrics_execute(MCP_CLIENT *mcpc, struct json_obj
 
                 const char *expression = json_object_get_string(time_group_options_obj);
                 TG_EXPRESSION parsed;
-                if(!expression || !tg_expression_parse(&parsed, expression)) {
+                if(!expression || jsonc_string_has_embedded_nul(time_group_options_obj) ||
+                   !tg_expression_parse(&parsed, expression)) {
                     buffer_sprintf(mcpc->error,
                                    "Invalid condition in parameter 'time_group_options' when using time_group='%s'.",
                                    time_group_str);
