@@ -646,6 +646,7 @@ func TestCase023MCPQueryMetricsContract(t *testing.T) {
 			"after":             after,
 			"before":            before,
 			"points":            1,
+			"time_group":        "max",
 			"tier":              0,
 			"group_by":          []string{"dimension"},
 			"aggregation":       "average",
