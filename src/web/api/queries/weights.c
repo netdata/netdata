@@ -59,7 +59,7 @@ const char *weights_method_to_string(WEIGHTS_METHOD method) {
 
 typedef enum {
     RESULT_IS_BASE_HIGH_RATIO     = (1 << 0),
-    RESULT_IS_PERCENTAGE_OF_TIME  = (1 << 1),
+    RESULT_IS_PERCENTAGE_OF_SAMPLES  = (1 << 1),
 } RESULT_FLAGS;
 
 struct register_result {
@@ -1868,7 +1868,7 @@ static void rrdset_metric_correlations_volume(
         pcent = (highlight_average.value - baseline_average.value) / baseline_average.value * highlight_countif.value;
     }
     else {
-        flags = RESULT_IS_PERCENTAGE_OF_TIME;
+        flags = RESULT_IS_PERCENTAGE_OF_SAMPLES;
         pcent = highlight_countif.value;
     }
 
@@ -2070,7 +2070,7 @@ static size_t spread_results_evenly(DICTIONARY *results, WEIGHTS_STATS *stats) {
     NETDATA_DOUBLE *slots = mallocz(dimensions * sizeof(*slots));
     dimensions = 0;
     dfe_start_read(results, t) {
-        if(t->flags & RESULT_IS_PERCENTAGE_OF_TIME)
+        if(t->flags & RESULT_IS_PERCENTAGE_OF_SAMPLES)
             t->value = t->value * stats->max_base_high_ratio;
 
         slots[dimensions++] = t->value;
