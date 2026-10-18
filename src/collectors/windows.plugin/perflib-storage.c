@@ -3125,6 +3125,49 @@ static int logical_disk_metadata_unittest_run(void)
         "space query recovering read-only volume remains skipped",
         logical_disk_space_chart_skipped(&d_recov));
 
+    // Production do_mount_points recovery path exercises state transition and suppression
+    DICTIONARY *saved_mp = mountPoints;
+    DICTIONARY *saved_ld = logicalDisks;
+    mountPoints = dictionary_create(DICT_OPTION_SINGLE_THREADED);
+    dictionary_set(mountPoints, "R:", NULL, 0);
+
+    logicalDisks = dictionary_create_advanced(
+        DICT_OPTION_FIXED_SIZE, NULL, sizeof(struct logical_disk));
+    struct logical_disk *mp_recov =
+        dictionary_set(logicalDisks, "R:", NULL, sizeof(*mp_recov));
+    mp_recov->collected_metadata = true;
+    mp_recov->readonly = true;
+    mp_recov->readonly_known = true;
+    mp_recov->space_failed_since = 500000;
+
+    DICTIONARY *recov_results = dictionary_create_advanced(
+        DICT_OPTION_FIXED_SIZE, NULL, sizeof(struct volume_space_result));
+    struct volume_space_result ok_res = {
+        .success = true,
+        .total_bytes = 1000,
+        .free_bytes = 500,
+    };
+    dictionary_set(recov_results, "R:", &ok_res, sizeof(ok_res));
+
+    do_mount_points(recov_results, 1, 600000);
+    mp_recov = dictionary_get(logicalDisks, "R:");
+    errors += mount_points_unittest_expect(
+        "do_mount_points recovery resets space_failed_since",
+        mp_recov && mp_recov->space_failed_since == 0);
+    errors += mount_points_unittest_expect(
+        "do_mount_points recovery keeps readonly_known and clears metadata",
+        mp_recov && !mp_recov->collected_metadata && mp_recov->readonly_known &&
+            mp_recov->readonly);
+    errors += mount_points_unittest_expect(
+        "do_mount_points recovering read-only volume remains skipped",
+        logical_disk_space_chart_skipped(mp_recov));
+
+    dictionary_destroy(recov_results);
+    dictionary_destroy(mountPoints);
+    dictionary_destroy(logicalDisks);
+    mountPoints = saved_mp;
+    logicalDisks = saved_ld;
+
     return errors;
 }
 
