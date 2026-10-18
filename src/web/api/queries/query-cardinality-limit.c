@@ -271,6 +271,12 @@ RRDR *rrd2rrdr_cardinality_limit(RRDR *r) {
         for (size_t i = kept_dimensions; i < queried_count; i++) {
             size_t src_d = sorted_dims[i].dim_idx;
             new_r->od[remaining_idx] |= r->od[src_d] & RRDR_DIMENSION_NOT_RATE;
+            if(new_r->result_units && new_r->result_units[remaining_idx] &&
+               r->result_units[src_d] != r->result_units[first_remaining_d]) {
+                // Different result units retain the existing raw-unit fallback.
+                string_freez(new_r->result_units[remaining_idx]);
+                new_r->result_units[remaining_idx] = NULL;
+            }
 
             if(new_r->dgbc)
                 new_r->dgbc[remaining_idx] += r->dgbc[src_d];
