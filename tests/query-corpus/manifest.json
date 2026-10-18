@@ -900,7 +900,7 @@
   },
   {
     "name": "CASE-034/near-live-partial-data-is-trimmed",
-    "proves": "within twice the maximum collection interval of the live edge, a decline in contributing dimensions trims the response at the first incomplete row instead of publishing unstable partial aggregates. A complete two-dimension control keeps all six requested rows; when one dimension is delayed by two samples, both columns end after the last four complete rows while view.after/view.before/view.update_every remain request-derived. DEBUG metadata reports max_update_every=20, expected_after=before-20, and the exact data-dependent cutoff"
+    "proves": "within twice the maximum collection interval of the live edge, a decline in contributing dimensions trims the response at the first incomplete row instead of publishing unstable partial aggregates. A complete two-dimension control keeps all six requested rows; when one dimension is delayed by two samples, both columns end after the last four complete rows while view.after/view.before/view.update_every remain request-derived. DEBUG metadata reports twice the fixture collection interval as max_update_every, before minus that bound as expected_after, and the exact data-dependent trimmed_after."
   },
   {
     "name": "CASE-035/completed-rollup-keeps-original-cadence",
@@ -926,10 +926,12 @@
   },
   {
     "name": "CASE-035/tier0-page-boundary-keeps-every-sample",
-    "proves": "a DBENGINE tier-0 query crossing adjacent pages with different collection cadences preserves the exact fixture-measured volume of a series whose rate changes at every sample. The 10-to-1 direction gives the first fine-page samples distinct contributions, so advancing by the old ten-second cadence cannot skip nine equal-looking samples; the 1-to-10 mirror makes duplication or displacement of the first coarse-page sample change the exact row total. The oracle is the independent per-sample rate-times-duration ledger, and the public timestamp grid is unchanged",
+    "proves": "a DBENGINE tier-0 query crossing adjacent pages with different collection cadences preserves the exact fixture-measured volume of a series whose rate changes at every sample. The 10-to-1 direction gives the first fine-page samples distinct contributions, so advancing by the old ten-second cadence cannot skip nine equal-looking samples; the 1-to-10 mirror makes duplication or displacement of the first coarse-page sample change the exact row total. The oracle is the independent per-sample rate-times-duration ledger, and the public timestamp grid is unchanged Additional slow-fast-slow and singleton-bridge controls retain an intermediate-page maximum across hot, restarted and repeated warmed queries.",
     "components": [
       "slows-down",
-      "speeds-up"
+      "speeds-up",
+      "intermediate-page",
+      "singleton-bridge"
     ]
   },
   {
@@ -1248,5 +1250,349 @@
   {
     "name": "W/limit-mcp",
     "proves": "MCP weights preserve caller default and minimum limits and descending raw scores while reporting exact-boundary truncation truthfully"
+  },
+  {
+    "name": "CASE-040/inverted-tier-retention",
+    "proves": "automatic selection preserves constant-valued history when a coarse tier is enabled after retained fine-tier history; forced-tier queries independently check storage"
+  },
+  {
+    "name": "CASE-040/handoff-sum",
+    "proves": "fine-to-coarse handoffs conserve the sum of a piecewise-constant series across output bucket widths without duplicate contributions",
+    "components": [
+      "single-tier-control",
+      "fine-to-coarse"
+    ]
+  },
+  {
+    "name": "CASE-040/handoff-average",
+    "proves": "fine-to-coarse handoffs preserve interval averages of a piecewise-constant series across output bucket widths",
+    "components": [
+      "single-tier-control",
+      "fine-to-coarse"
+    ]
+  },
+  {
+    "name": "CASE-040/handoff-min",
+    "proves": "fine-to-coarse handoffs preserve minima in fine prefixes of output buckets spanning a coarse-tier boundary",
+    "components": [
+      "single-tier-control",
+      "fine-to-coarse"
+    ]
+  },
+  {
+    "name": "CASE-040/handoff-max",
+    "proves": "fine-to-coarse handoffs preserve maxima in fine prefixes of output buckets spanning a coarse-tier boundary",
+    "components": [
+      "single-tier-control",
+      "fine-to-coarse"
+    ]
+  },
+  {
+    "name": "CASE-040/handoff-metadata",
+    "proves": "fine-to-coarse handoffs preserve the exact anomaly rate of complete nested records across output bucket widths",
+    "components": [
+      "single-tier-control",
+      "fine-to-coarse"
+    ]
+  },
+  {
+    "name": "CASE-040/handoff-rate-sum",
+    "proves": "fine-to-coarse handoffs conserve integrated rate-backed totals across output bucket widths without duplicate contributions",
+    "components": [
+      "single-tier-control",
+      "fine-to-coarse"
+    ]
+  },
+  {
+    "name": "CASE-040/isolated-coarse-head",
+    "proves": "automatic selection preserves an isolated constant coarse head record when fine retention starts later"
+  },
+  {
+    "name": "CASE-040/isolated-coarse-tail",
+    "proves": "automatic selection reads the retained fine tail following an isolated coarse head record"
+  },
+  {
+    "name": "CASE-040/inverted-retention-annotations",
+    "proves": "complete constant retained rows carry no EMPTY or other point annotations across late-enabled and isolated coarse heads",
+    "components": [
+      "late-tier",
+      "isolated-head"
+    ]
+  },
+  {
+    "name": "CASE-040/handoff-annotations",
+    "proves": "complete nested records carry no point annotations across fine-to-coarse handoffs and single-tier controls",
+    "components": [
+      "single-tier-control",
+      "fine-to-coarse"
+    ]
+  },
+  {
+    "name": "CASE-040/missed-seam-sum",
+    "proves": "a missed fine-tier collection at a fine-to-coarse seam contributes nothing to SUM and does not duplicate a coarse record",
+    "components": [
+      "grouping-4",
+      "grouping-60"
+    ]
+  },
+  {
+    "name": "CASE-040/late-tier-gap-null",
+    "proves": "wholly empty rows in restart-created late-tier page holes remain NULL with EMPTY annotations",
+    "components": [
+      "tier1",
+      "tier2"
+    ]
+  },
+  {
+    "name": "CASE-040/late-tier-boundary-average",
+    "proves": "retained constant fine samples at a late-tier page-hole boundary contribute their exact average independently of wholly empty rows",
+    "components": [
+      "tier1",
+      "tier2"
+    ]
+  },
+  {
+    "name": "CASE-040/post-gap-coarse-min",
+    "proves": "a stored empty coarse read-ahead interval preserves the first real post-gap record's minimum across an inverted fine-to-coarse seam"
+  },
+  {
+    "name": "CASE-040/retained-island-average",
+    "proves": "every output row within a retained constant coarse-island record preserves its exact average before disconnected ALLOC fine retention"
+  },
+  {
+    "name": "CASE-040/retained-island-sum",
+    "proves": "every output row within a retained constant coarse-island record conserves its exact duration-proportional sum before disconnected ALLOC fine retention"
+  },
+  {
+    "name": "CASE-040/fine-selected-gap-null",
+    "proves": "fine-selected queries spanning disconnected ALLOC fine and coarse retention leave every wholly unretained row NULL with EMPTY annotations"
+  },
+  {
+    "name": "CASE-040/coarse-selected-gap-null",
+    "proves": "coarse-selected queries spanning disconnected dbengine retention leave wholly unretained tail rows NULL with EMPTY annotations"
+  },
+  {
+    "name": "CASE-040/partial-first-record-sum",
+    "proves": "automatic SUM includes all retained fine samples in a partially populated first coarse interval"
+  },
+  {
+    "name": "CASE-040/partial-first-record-average",
+    "proves": "automatic AVERAGE includes all retained fine samples in a partially populated first coarse interval"
+  },
+  {
+    "name": "CASE-040/partial-first-record-min",
+    "proves": "automatic MIN includes all retained fine samples in a partially populated first coarse interval"
+  },
+  {
+    "name": "CASE-040/partial-first-record-max",
+    "proves": "automatic MAX includes all retained fine samples in a partially populated first coarse interval"
+  },
+  {
+    "name": "CASE-040/partial-first-record-metadata",
+    "proves": "automatic queries preserve the fixture-derived anomaly rate of all retained fine samples in a partially populated first coarse interval"
+  },
+  {
+    "name": "CASE-040/conventional-tail-sum",
+    "proves": "a genuine conventional coarse-to-fine handoff conserves complete piecewise-constant SUM rows on an aligned 4-second grid including the newest fine tail"
+  },
+  {
+    "name": "CASE-040/conventional-tail-average",
+    "proves": "a genuine conventional coarse-to-fine handoff preserves complete piecewise-constant AVERAGE rows on an aligned 4-second grid including the newest fine tail"
+  },
+  {
+    "name": "CASE-040/conventional-tail-min",
+    "proves": "a genuine conventional coarse-to-fine handoff preserves complete piecewise-constant MIN rows on an aligned 4-second grid including the newest fine tail"
+  },
+  {
+    "name": "CASE-040/conventional-tail-max",
+    "proves": "a genuine conventional coarse-to-fine handoff preserves complete piecewise-constant MAX rows on an aligned 4-second grid including the newest fine tail"
+  },
+  {
+    "name": "CASE-040/conventional-tail-metadata",
+    "proves": "a genuine conventional coarse-to-fine handoff preserves exact anomaly rates on an aligned 4-second grid including anomalous newest fine-tail samples"
+  },
+  {
+    "name": "CASE-040/shifted-constant-seam",
+    "proves": "under the ruled coarse-estimate envelope a shifted fine-to-coarse seam row stays between adjacent fixture-derived coarse-record averages while the fine control preserves exact raw truth"
+  },
+  {
+    "name": "CASE-040/coarse-gap-boundary-average",
+    "proves": "a partial output row overlapping the last retained coarse record keeps its exact constant average before a disconnected fine island"
+  },
+  {
+    "name": "CASE-040/coarse-gap-boundary-sum",
+    "proves": "a partial output row overlapping the last retained coarse record keeps its exact retained volume before a disconnected fine island"
+  },
+  {
+    "name": "CASE-040/coarse-gap-resume-average",
+    "proves": "the first fine sample after a retention hole reaches its own output row without changing the exact average"
+  },
+  {
+    "name": "CASE-040/coarse-gap-resume-sum",
+    "proves": "the first fine sample after a retention hole reaches its own output row without losing its exact volume"
+  },
+  {
+    "name": "CASE-040/historical-head-cadence",
+    "proves": "automatic head preference uses the actual historical coarse interval and preserves the fine prefix when current cadence is wider"
+  },
+  {
+    "name": "CASE-041/min-source-values",
+    "proves": "forced tier0, tier1 and tier2 MIN over whole aligned and coarser buckets equals the exact positive fixture extrema, including an empty retained interval",
+    "components": [
+      "tier1/complete/tier0/aligned",
+      "tier1/complete/tier0/coarser",
+      "tier1/complete/tier1/aligned",
+      "tier1/complete/tier1/coarser",
+      "tier1/gapped/tier0/aligned",
+      "tier1/gapped/tier0/coarser",
+      "tier1/gapped/tier1/aligned",
+      "tier1/gapped/tier1/coarser",
+      "tier2/complete/tier0/aligned",
+      "tier2/complete/tier0/coarser",
+      "tier2/complete/tier2/aligned",
+      "tier2/complete/tier2/coarser",
+      "tier2/gapped/tier0/aligned",
+      "tier2/gapped/tier0/coarser",
+      "tier2/gapped/tier2/aligned",
+      "tier2/gapped/tier2/coarser"
+    ]
+  },
+  {
+    "name": "CASE-041/min-no-interpolation",
+    "proves": "finer and shifted forced-tier1/tier2 MIN views contain numeric answers selected only from retained record extrema, never intermediate interpolated values",
+    "components": [
+      "tier1/complete/fine",
+      "tier1/complete/shifted",
+      "tier1/gapped/fine",
+      "tier1/gapped/shifted",
+      "tier2/complete/fine",
+      "tier2/complete/shifted",
+      "tier2/gapped/fine",
+      "tier2/gapped/shifted"
+    ]
+  },
+  {
+    "name": "CASE-041/min-preserves-extremum",
+    "proves": "finer and shifted forced-tier1/tier2 MIN views spanning complete sharp records preserve the overall fixture extremum somewhere in the result, independently of subrecord ownership",
+    "components": [
+      "tier1/complete/fine",
+      "tier1/complete/shifted",
+      "tier1/gapped/fine",
+      "tier1/gapped/shifted",
+      "tier2/complete/fine",
+      "tier2/complete/shifted",
+      "tier2/gapped/fine",
+      "tier2/gapped/shifted"
+    ]
+  },
+  {
+    "name": "CASE-041/max-source-values",
+    "proves": "forced tier0, tier1 and tier2 MAX over whole aligned and coarser buckets equals the exact positive fixture extrema, including an empty retained interval",
+    "components": [
+      "tier1/complete/tier0/aligned",
+      "tier1/complete/tier0/coarser",
+      "tier1/complete/tier1/aligned",
+      "tier1/complete/tier1/coarser",
+      "tier1/gapped/tier0/aligned",
+      "tier1/gapped/tier0/coarser",
+      "tier1/gapped/tier1/aligned",
+      "tier1/gapped/tier1/coarser",
+      "tier2/complete/tier0/aligned",
+      "tier2/complete/tier0/coarser",
+      "tier2/complete/tier2/aligned",
+      "tier2/complete/tier2/coarser",
+      "tier2/gapped/tier0/aligned",
+      "tier2/gapped/tier0/coarser",
+      "tier2/gapped/tier2/aligned",
+      "tier2/gapped/tier2/coarser"
+    ]
+  },
+  {
+    "name": "CASE-041/max-no-interpolation",
+    "proves": "finer and shifted forced-tier1/tier2 MAX views contain numeric answers selected only from retained record extrema, never intermediate interpolated values",
+    "components": [
+      "tier1/complete/fine",
+      "tier1/complete/shifted",
+      "tier1/gapped/fine",
+      "tier1/gapped/shifted",
+      "tier2/complete/fine",
+      "tier2/complete/shifted",
+      "tier2/gapped/fine",
+      "tier2/gapped/shifted"
+    ]
+  },
+  {
+    "name": "CASE-041/max-preserves-extremum",
+    "proves": "finer and shifted forced-tier1/tier2 MAX views spanning complete sharp records preserve the overall fixture extremum somewhere in the result, independently of subrecord ownership",
+    "components": [
+      "tier1/complete/fine",
+      "tier1/complete/shifted",
+      "tier1/gapped/fine",
+      "tier1/gapped/shifted",
+      "tier2/complete/fine",
+      "tier2/complete/shifted",
+      "tier2/gapped/fine",
+      "tier2/gapped/shifted"
+    ]
+  },
+  {
+    "name": "CASE-042/full-backfill-average",
+    "proves": "full historical tier backfill over a complete aligned record with four absolute 7-valued source observations across a cadence change and gap returns AVERAGE=7 at forced tier1"
+  },
+  {
+    "name": "CASE-042/full-backfill-sum",
+    "proves": "full historical tier backfill over a complete aligned record with four absolute 7-valued source observations across a cadence change and gap returns SUM=28 at forced tier1"
+  },
+  {
+    "name": "CASE-042/full-backfill-min",
+    "proves": "full historical tier backfill over a complete aligned record with four absolute 7-valued source observations across a cadence change and gap returns MIN=7 at forced tier1"
+  },
+  {
+    "name": "CASE-042/full-backfill-max",
+    "proves": "full historical tier backfill over a complete aligned record with four absolute 7-valued source observations across a cadence change and gap returns MAX=7 at forced tier1"
+  },
+  {
+    "name": "CASE-042/full-backfill-anomaly-rate",
+    "proves": "full historical tier backfill preserves one anomalous observation out of four numeric source observations as an exact 25% anomaly rate"
+  },
+  {
+    "name": "CASE-042/full-backfill-partial",
+    "proves": "a complete historical coarse record backfilled across an explicit source gap is marked PARTIAL, without EMPTY or RESET"
+  },
+  {
+    "name": "L1/storage-backend-signed-values",
+    "proves": "every tier0 backend preserves the exact signed numeric-gap-numeric fixture, including a negative value after a gap, both hot and after applicable DBENGINE restarts",
+    "components": [
+      "dbengine-gorilla-hot",
+      "dbengine-gorilla-restart",
+      "dbengine-raw-hot",
+      "dbengine-raw-restart",
+      "ram",
+      "alloc"
+    ]
+  },
+  {
+    "name": "L1/storage-backend-signed-reset",
+    "proves": "every tier0 backend preserves RESET only on its signed reset sample, EMPTY only on gaps, and clears both flags on following ordinary samples",
+    "components": [
+      "dbengine-gorilla-hot",
+      "dbengine-gorilla-restart",
+      "dbengine-raw-hot",
+      "dbengine-raw-restart",
+      "ram",
+      "alloc"
+    ]
+  },
+  {
+    "name": "L1/storage-backend-signed-anomaly-rate",
+    "proves": "every tier0 backend preserves the exact 100% anomaly rate of an R-only signed sample while gaps and surrounding A samples have zero anomaly rate",
+    "components": [
+      "dbengine-gorilla-hot",
+      "dbengine-gorilla-restart",
+      "dbengine-raw-hot",
+      "dbengine-raw-restart",
+      "ram",
+      "alloc"
+    ]
   }
 ]

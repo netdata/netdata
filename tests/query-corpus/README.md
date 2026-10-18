@@ -67,6 +67,29 @@ layers; each layer declares which entries it consumes:
 `reset-flagged`, `anomalous`, `negative`, `all-zero`, `single-point`,
 `mixed-update-every`, `two-children`.
 
+## Additional regression coverage
+
+- **CASE-040 — retained tier coverage and handoffs:** late-enabled tiers,
+  inverted or isolated retention, genuine gaps, partial first records,
+  changing cadence, and conventional coarse-to-fine tails. Numeric values,
+  anomaly evidence, and annotations have independent verdicts. Fixtures use
+  constants or complete records where exact arithmetic is required; the
+  shifted varying-record seam retains its documented coarse estimate bound.
+- **CASE-041 — tiered MIN/MAX:** forced tier0 controls and tier1/tier2
+  aligned, coarser, finer, and shifted grids, with sharp positive extrema
+  and empty records. Aligned value correctness, rejection of invented
+  intermediate extrema, and preservation of the overall extremum are
+  independent contracts. The fine-grid checks do not prescribe which
+  subbucket owns an extremum whose timestamp was lost during rollup.
+- **CASE-042 — full historical backfill:** a late-enabled tier backfills
+  four numeric observations across a cadence change and an explicit gap.
+  AVG/MIN/MAX, SUM, anomaly rate, and partial-data annotation have separate
+  fixture-derived expectations.
+- **CASE-035 and storage backends:** intermediate-page and singleton-bridge
+  maxima survive restart and repeated warmed queries. A separate signed
+  fixture checks negative values, RESET, and anomaly rates across Gorilla,
+  raw DBENGINE pages, RAM, and ALLOC while preserving the positive controls.
+
 ## Rules
 
 - **One green/red verdict represents one semantic invariant.** A manifest
