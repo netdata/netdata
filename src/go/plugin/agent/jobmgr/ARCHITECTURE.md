@@ -577,8 +577,9 @@ configuration, source cursor or resource-intent owner. If all endpoints fail, th
 Failure of that binding updates its health, subject to the existing failed-stock visibility policy.
 
 A successfully checked alternative or genuine accepted source replacement can update the binding. CONFIG CREATE is
-needed when the public source metadata changes or an unlisted job becomes visible; unchanged source metadata needs
-only STATUS because GET reads the committed raw payload. Failed stock removal can leave enabled controller recovery
+needed when the public source metadata changes, an unlisted job becomes visible, or a genuine passive source
+replacement needs normal daemon policy. Enabled handoffs with unchanged source metadata need only STATUS because
+GET reads the committed raw payload. Failed stock removal can leave enabled controller recovery
 alive while the public job is unlisted. A later successfully admitted alternative recreates its binding and metadata.
 
 GET reads the exposed graph binding and preserves unresolved raw references without Init/Check.
