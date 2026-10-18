@@ -201,6 +201,7 @@ type candidateEchoFixture struct {
 	state          *continuationCollectorState
 	wire           sync.Mutex
 	echoes         atomic.Int32
+	gets           atomic.Int32
 	policyDisabled atomic.Bool
 }
 
@@ -349,7 +350,7 @@ func (f *candidateEchoFixture) assertExposed(t *testing.T, config confgroup.Conf
 
 func (f *candidateEchoFixture) assertExposedStatus(t *testing.T, config confgroup.Config, status string) {
 	t.Helper()
-	body := f.command(t, "exposed-config", "get", "user=test", 200)
+	body := f.command(t, fmt.Sprintf("exposed-config-%d", f.gets.Add(1)), "get", "user=test", 200)
 	var raw collectorapi.MockConfiguration
 	require.NoError(t, json.Unmarshal([]byte(body), &raw))
 	require.Equal(t, config["option_str"], raw.OptionStr)

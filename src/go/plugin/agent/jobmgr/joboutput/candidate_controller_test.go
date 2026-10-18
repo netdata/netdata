@@ -895,25 +895,25 @@ func TestCandidateControllerAcceptedWaitRetainsPassAndCapability(t *testing.T) {
 }
 
 func TestCandidateControllerRevocationEffectsMatchWakeState(t *testing.T) {
-	actions := map[string]func(*candidateController, DiscoveredJobInventory) (*candidateDelta, error){
-		"disable": func(c *candidateController, _ DiscoveredJobInventory) (*candidateDelta, error) {
+	actions := map[string]func(*testing.T, *candidateController, DiscoveredJobInventory) (*candidateDelta, error){
+		"disable": func(t *testing.T, c *candidateController, _ DiscoveredJobInventory) (*candidateDelta, error) {
 			return c.prepareDisable("test_job")
 		},
-		"remove": func(c *candidateController, _ DiscoveredJobInventory) (*candidateDelta, error) {
+		"remove": func(t *testing.T, c *candidateController, _ DiscoveredJobInventory) (*candidateDelta, error) {
 			return c.prepareRemove("test_job")
 		},
-		"disable then enable": func(c *candidateController, _ DiscoveredJobInventory) (*candidateDelta, error) {
+		"disable then enable": func(t *testing.T, c *candidateController, _ DiscoveredJobInventory) (*candidateDelta, error) {
 			disabled, err := c.prepareDisable("test_job")
 			applyCandidateDelta(t, disabled, err)
 			return c.prepareEnable("test_job", 1)
 		},
-		"exact passive": func(c *candidateController, _ DiscoveredJobInventory) (*candidateDelta, error) {
+		"exact passive": func(t *testing.T, c *candidateController, _ DiscoveredJobInventory) (*candidateDelta, error) {
 			return c.prepareExact(candidateTestConfig("override", "exact").SetSourceType(confgroup.TypeDyncfg), false, 1)
 		},
-		"exact disabled adoption": func(c *candidateController, _ DiscoveredJobInventory) (*candidateDelta, error) {
+		"exact disabled adoption": func(t *testing.T, c *candidateController, _ DiscoveredJobInventory) (*candidateDelta, error) {
 			return c.prepareAdoptExact(candidateTestConfig("override", "exact").SetSourceType(confgroup.TypeDyncfg), false, dyncfg.StatusDisabled, true, 0, 1)
 		},
-		"passive source replacement": func(c *candidateController, inv DiscoveredJobInventory) (*candidateDelta, error) {
+		"passive source replacement": func(t *testing.T, c *candidateController, inv DiscoveredJobInventory) (*candidateDelta, error) {
 			inv.Version++
 			inv.AutoEnable = false
 			inv.Candidates[0].Config = candidateTestConfig("a", "new")
@@ -928,7 +928,7 @@ func TestCandidateControllerRevocationEffectsMatchWakeState(t *testing.T) {
 			work := candidateInventory(t, c, inv, 0).Decision.Work
 			failed := candidateResult(t, c, work, candidateOutcome{Kind: candidateFailed, Listed: true, RetryAfter: 10}, 0)
 			require.NotNil(t, failed.Decision.Wake)
-			delta, err := action(c, inv)
+			delta, err := action(t, c, inv)
 			require.NoError(t, err)
 			assert.Nil(t, delta.after.Wake)
 			assert.Nil(t, delta.Decision.Wake, "revoked timer must not be rescheduled by Apply effects")
@@ -1364,26 +1364,41 @@ func candidateHistoricalGrant(t *testing.T, discovered bool) (*candidateControll
 	return c, inv, first, sibling
 }
 
-func TestCandidateControllerAcceptedSourceRevisionRevokesHistoricalGrant(t *testing.T) {
-	c, inv, old, sibling := candidateHistoricalGrant(t, false)
-	inv.Version = 3
-	inv.Candidates[0].Config = candidateTestConfig("a", "valid revision")
-	inv.Candidates[0].Incarnation = 8
-	fresh := candidateInventory(t, c, inv, 4).Decision.Work
-	require.NotNil(t, fresh)
-	assert.False(t, fresh.Tentative, "the fresh source candidate enters the existing finite pass")
-	failed := candidateResult(t, c, fresh, candidateOutcome{Kind: candidateFailed, Listed: true}, 4)
-	assert.False(t, candidateAuthorized(c.snapshot("test_job"), old.Token.Candidate), "accepted source replacement must revoke historical source recovery")
-	require.NotNil(t, failed.Decision.Wake)
-	assert.Equal(t, int64(103), failed.Decision.Wake.Due, "only the other source's deadline survives")
-	wake, err := c.prepareWake("test_job", failed.Decision.Wake.Token, 12)
-	applyCandidateDelta(t, wake, err)
-	assert.True(t, wake.Decision.Ignored)
-	assert.Nil(t, wake.Decision.Work)
-	wake, err = c.prepareWake("test_job", failed.Decision.Wake.Token, 103)
-	applyCandidateDelta(t, wake, err)
-	require.NotNil(t, wake.Decision.Work)
-	assert.Equal(t, sibling.Token.Candidate, wake.Decision.Work.Token.Candidate)
+func TestCandidateControllerSourceRevisionSupersedesOnlyHistoricalGrants(t *testing.T) {
+	for name, admitted := range map[string]bool{"private failure": false, "public admission": true} {
+		t.Run(name, func(t *testing.T) {
+			c, inv, old, sibling := candidateHistoricalGrant(t, false)
+			inv.Version = 3
+			inv.Candidates[0].Config = candidateTestConfig("a", "valid revision")
+			inv.Candidates[0].Incarnation = 8
+			fresh := candidateInventory(t, c, inv, 4).Decision.Work
+			require.NotNil(t, fresh)
+			require.False(t, fresh.Tentative, "the fresh source candidate enters the existing finite pass")
+			if admitted {
+				candidateResult(t, c, fresh, candidateOutcome{Kind: candidateAdmitted, Listed: true}, 4)
+			}
+			failed := candidateResult(t, c, fresh, candidateOutcome{Kind: candidateFailed, Listed: true}, 4)
+			record := c.snapshot("test_job")
+			assert.False(t, candidateAuthorized(record, old.Token.Candidate), "a newer source member supersedes obsolete retry-only grants")
+			expectedBinding := sibling.Token.Candidate
+			if admitted {
+				expectedBinding = fresh.Token.Candidate
+			}
+			assert.Equal(t, expectedBinding, record.Binding.Key)
+			assert.True(t, candidateAuthorized(record, record.Binding.Key), "source cuts must retain the public binding authority")
+			expectedDue, expectedCandidate := int64(103), sibling.Token.Candidate
+			require.NotNil(t, failed.Decision.Wake)
+			assert.Equal(t, expectedDue, failed.Decision.Wake.Due)
+			wake, err := c.prepareWake(inv.FullName, failed.Decision.Wake.Token, expectedDue-1)
+			applyCandidateDelta(t, wake, err)
+			assert.True(t, wake.Decision.Ignored)
+			assert.Nil(t, wake.Decision.Work)
+			wake, err = c.prepareWake(inv.FullName, failed.Decision.Wake.Token, expectedDue)
+			applyCandidateDelta(t, wake, err)
+			require.NotNil(t, wake.Decision.Work)
+			assert.Equal(t, expectedCandidate, wake.Decision.Work.Token.Candidate)
+		})
+	}
 }
 
 func TestCandidateControllerSurvivingSiblingDoesNotReplaceHistoricalGrant(t *testing.T) {

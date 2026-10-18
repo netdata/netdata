@@ -123,7 +123,8 @@ Where:
 
 - `transaction_id` is the same ID received in the original command
 - `http_status_code` is the standard HTTP response code:
-    - `200`: Success (DYNCFG_RESP_RUNNING) - Configuration accepted and running
+    - `200`: Success (DYNCFG_RESP_RUNNING) - Configuration accepted and running, or already-enabled collector intent
+      satisfied; non-running health is reported in a following status frame
     - `202`: Accepted (DYNCFG_RESP_ACCEPTED) - Configuration accepted but not running: still starting, or adopted
       and failed (the status frame says which)
     - `298`: Accepted but disabled (DYNCFG_RESP_ACCEPTED_DISABLED)
@@ -151,13 +152,20 @@ An error from that path is not proof that the plugin rejected the change. Netdat
 observing a successful reply; reading the plugin's current configuration does not prove that Netdata saved it.
 Clients MUST NOT turn an uncertain update result into an `add` attempt.
 
-For Go collector and service-discovery jobs, `update` that accepts a replacement for activation and `enable` that
-transitions a passive or disabled job to enabled return `202`, without waiting for runtime readiness or physical
-cleanup. Repeated `enable` on an already-enabled job returns `200` regardless of health and preserves ongoing work
-and retry deadlines; use `restart` for an immediate attempt on the stored configuration. Disabled `update` and an
-identical running DynCfg-source `update` return `200`. `CONFIG <id> STATUS` reports later health. `add` is passive
-until Netdata echoes enabledness; `add` and disabled `update` validate structure without acquiring external
-dependencies. Interactive `update` still rejects any failed preflight, irrespective of retry policy.
+For Go collector and service-discovery jobs, `update` that accepts a replacement for activation returns `202`,
+without waiting for runtime readiness or physical cleanup. Disabled `update` and an identical running DynCfg-source
+`update` return `200`. `CONFIG <id> STATUS` reports later health. `add` is passive until Netdata echoes enabledness;
+`add` and disabled `update` validate structure without acquiring external dependencies. Interactive `update` still
+rejects any failed preflight, irrespective of retry policy.
+
+For Go collector jobs, `enable` that transitions a passive or disabled job to enabled returns `202`. Repeated
+`enable` on an already-enabled job returns `200` regardless of health and preserves ongoing work and retry deadlines;
+when health is not Running, the plugin follows the reply with `CONFIG <id> STATUS <health>` to correct the daemon's
+Running status implied by `200`. Use `restart` for an immediate attempt on the stored configuration.
+
+For service-discovery jobs, `enable` returns `200` when already running and `202` otherwise. An already-enabled
+Accepted pipeline retains its pending activation; a Failed pipeline starts a new activation attempt. Use `enable`
+to recover a failed service-discovery job; these jobs do not support `restart`.
 
 The result data depends on the command:
 

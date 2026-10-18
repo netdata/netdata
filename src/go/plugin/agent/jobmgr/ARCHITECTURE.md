@@ -531,8 +531,11 @@ Passive daemon discovery admits one logical job as `accepted` without Init/Check
 Automatic source mode first checks a tentative proposal while preserving an incumbent. Invalid proposals quarantine
 their exact membership. A genuine source proposal retains its persistent-source acceptance boundary, including
 source-specific Failed/removal. Ordinary alternative probes keep failures, waits and retry grants private: they do
-not replace the public binding or its resource demand. A successful checked alternative is admitted through the
-existing handoff; runtime readiness closes automatic alternative search.
+not replace the public binding or its resource demand. The current binding owns an admission independently of
+historical retry grants. New source revisions can supersede obsolete retry-only candidates, but cannot revoke the
+unchanged binding or its retry deadline. Replacing the binding releases that protection; source-lifetime removal and
+trust withdrawal independently revoke both public and historical authority during inventory folding. A successful
+checked alternative uses the existing handoff; runtime readiness closes automatic alternative search.
 
 Failed, blocked and waiting candidate outcomes apply the controller's public binding decision through
 `prepareCandidateDecision`, including dependency and physical-release waits. A private wait commits its recovery

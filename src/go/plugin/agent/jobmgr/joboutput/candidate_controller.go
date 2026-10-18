@@ -658,6 +658,11 @@ func candidateRetainedGrant(r *candidateRecord, key candidateKey, e *candidateEn
 	if !e.Admitted {
 		return false
 	}
+	// Source/readiness cuts retire historical recovery, not the current public
+	// admission. candidateAuthorized still enforces source lifetime and trust.
+	if r.Binding != nil && r.Binding.Key == key {
+		return true
+	}
 	if e.SourceOwned && !e.Observed && e.AbsentVersion != 0 && r.sourceAdmission(e.Key.Source, e.SourceLifetime) >= e.AbsentVersion {
 		return false
 	}
@@ -849,7 +854,7 @@ func (c *candidateController) revoke(r *candidateRecord) {
 
 func (c *candidateController) admit(d *candidateDelta, key candidateKey, health dyncfg.Status, listed bool) error {
 	r := d.after
-	e, err := r.grantCandidate(key)
+	e, err := r.grantRecovery(key)
 	if err != nil {
 		return err
 	}
@@ -870,7 +875,7 @@ func (c *candidateController) admit(d *candidateDelta, key candidateKey, health 
 	return nil
 }
 
-func (r *candidateRecord) grantCandidate(key candidateKey) (*candidateEntry, error) {
+func (r *candidateRecord) grantRecovery(key candidateKey) (*candidateEntry, error) {
 	entry := r.editEntry(key)
 	if entry == nil || entry.TrustRevoked {
 		return nil, errors.New("job output: candidate trust has been withdrawn")
@@ -884,7 +889,7 @@ func (r *candidateRecord) grantCandidate(key candidateKey) (*candidateEntry, err
 func (c *candidateController) admitOutcome(d *candidateDelta, key candidateKey, health dyncfg.Status, listed, sourceReplacement bool) error {
 	if binding := d.after.Binding; binding != nil && binding.Key != key && !sourceReplacement {
 		// A trial retains recovery authority without replacing the public job.
-		_, err := d.after.grantCandidate(key)
+		_, err := d.after.grantRecovery(key)
 		return err
 	}
 	return c.admit(d, key, health, listed)

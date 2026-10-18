@@ -2276,7 +2276,7 @@ func TestServiceDiscovery_DyncfgEnableFromFailed(t *testing.T) {
 	tests := map[string]struct {
 		createSim func() *dyncfgSim
 	}{
-		"enable config from failed state starts pipeline": {
+		"failed enabled config recovers with enable": {
 			createSim: func() *dyncfgSim {
 				return &dyncfgSim{
 					do: func(sd *ServiceDiscovery) {
@@ -2296,11 +2296,15 @@ func TestServiceDiscovery_DyncfgEnableFromFailed(t *testing.T) {
 						}
 						sd.seen.Add(failedCfg)
 						sd.exposed.Add(&dyncfg.Entry[sdConfig]{
-							Cfg:    failedCfg,
-							Status: dyncfg.StatusFailed,
+							Cfg:     failedCfg,
+							Status:  dyncfg.StatusFailed,
+							Enabled: true,
 						})
 
-						// Enable should start the pipeline
+						sendDyncfgCmd(sd, "0-restart",
+							[]string{sd.dyncfgJobID(testDiscovererTypeNetListeners, "test-job"), "restart"}, nil, "")
+
+						// Failed SD pipelines recover through enable, even when already enabled.
 						sendDyncfgCmd(sd, "1-enable",
 							[]string{sd.dyncfgJobID(testDiscovererTypeNetListeners, "test-job"), "enable"},
 							nil, "")
@@ -2315,6 +2319,7 @@ func TestServiceDiscovery_DyncfgEnableFromFailed(t *testing.T) {
 					},
 					wantRunning: []string{"dyncfg:net_listeners:test-job"},
 					wantDyncfgFunc: func(t *testing.T, got string) {
+						assert.Contains(t, got, "FUNCTION_RESULT_BEGIN 0-restart 501 application/json")
 						assert.Contains(t, got, "FUNCTION_RESULT_BEGIN 1-enable 202 application/json")
 						assert.Contains(t, got, "CONFIG test:sd:net_listeners:test-job status running")
 					},
