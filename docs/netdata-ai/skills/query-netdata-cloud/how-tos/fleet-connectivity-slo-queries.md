@@ -140,7 +140,7 @@ is the fraction of 1s**. No `countif` needed (see gotcha 3):
    - **Storage resolution — still applies.** `countif` tests its
      condition against whatever is stored, and above tier 0 that is
      a per-minute **average** (see gotcha 4). A minute that was down
-     40s of 60 stores 0.67 — not exactly 0 — so it never matches
+     40s of 60 stores 0.33 — not exactly 0 — so it never matches
      `=0`; only fully-down minutes are counted and the total comes
      out low. Request `"tier": 0` and confirm under `db.per_tier`
      that tier 0 actually served the data.
