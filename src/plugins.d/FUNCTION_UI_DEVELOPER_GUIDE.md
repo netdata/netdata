@@ -881,6 +881,29 @@ Always handle the info request first:
 - `accepted_params` determines which parameters the function accepts
 - `required_params` generates filter UI and validates execution
 
+### Accepted Option Forms
+
+Functions may describe existing alternate input forms in `required_params`:
+
+- An option's optional `aliases` array lists alternate IDs accepted for that option. For example, the
+  network-connections `container` option accepts `container_name`.
+- A selector's optional `value_separator` describes an accepted encoding of several values in one string. The
+  network-connections `sockets` and `protocols` selectors declare `","`.
+- Option IDs are opaque. An exact canonical ID takes precedence over alias matching and joined-value splitting.
+  A job named `beta rack,1` is still one job; `prod-a` and `prod_a` remain distinct IDs.
+- An alias advertised by several options does not uniquely identify any option. Consumers must not select one
+  arbitrarily or invent aliases by replacing punctuation.
+- Split a joined value only when the selector declares its separator and the whole string is not an exact ID.
+  Omitting `value_separator` does not implicitly permit comma splitting. Array entries remain literal unless that
+  producer declares an accepted alternate encoding.
+
+These are discovery declarations, not changes to the Function parser or permission to reject previously accepted
+requests. A producer must advertise only forms its request path actually accepts. The Go `ParamConfig.RequiredParam`
+serializer exposes `ValueSeparator` and `ParamOption.Aliases` without changing `ResolveParam` behavior. Existing
+clients can continue selecting and sending canonical option IDs without using this optional metadata.
+
+### Error Responses
+
 For errors, return:
 
 ```json

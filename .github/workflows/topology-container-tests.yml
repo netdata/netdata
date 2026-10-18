@@ -12,6 +12,7 @@ on:
       - 'src/collectors/common-cgroups/**'
       - 'src/libnetdata/local-sockets/**'
       - 'src/libnetdata/netipc/**'
+      - 'src/plugins.d/FUNCTION_UI_SCHEMA.json'
   pull_request:
     paths:
       - '.github/workflows/topology-container-tests.yml'
@@ -21,6 +22,7 @@ on:
       - 'src/collectors/common-cgroups/**'
       - 'src/libnetdata/local-sockets/**'
       - 'src/libnetdata/netipc/**'
+      - 'src/plugins.d/FUNCTION_UI_SCHEMA.json'
 
 concurrency:
   group: topology-container-tests-${{ github.ref }}
@@ -104,6 +106,13 @@ jobs:
 
       - name: Validate topology fixtures
         run: python3 src/collectors/network-viewer.plugin/tests/validate_topology_container_fixtures.py
+
+      - name: Validate topology selector metadata
+        run: |
+          set -euo pipefail
+          selector_runtime_dir="$(mktemp -d "${RUNNER_TEMP:?}/topology-selector.XXXXXX")"
+          python3 src/collectors/network-viewer.plugin/tests/validate_topology_selector_metadata.py \
+            build/network-viewer.plugin --run-dir "$selector_runtime_dir"
 
       - name: Validate network-viewer topology payload (live)
         run: |

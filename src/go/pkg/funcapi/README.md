@@ -4,6 +4,13 @@
 Job Manager owns publication, job routing, execution and response framing. The
 [process boundary](../../plugin/framework/functions/README.md) owns protocol input.
 
+## Accepted selector forms
+
+`ParamOption.Aliases` and `ParamConfig.ValueSeparator` serialize optional discovery metadata for alternate input
+forms already accepted by a producer. They do not change `ResolveParam` or enable new parsing automatically.
+Advertise only forms the request path actually accepts. Canonical option IDs remain opaque and take precedence over
+aliases or joined-value splitting; see the [Function contract](../../../plugins.d/FUNCTION_UI_DEVELOPER_GUIDE.md#accepted-option-forms).
+
 ## Process Function providers
 
 Use `agent.Config.ProcessFunctions` (or `composition.Config.ProcessFunctions`) for

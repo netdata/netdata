@@ -1669,6 +1669,12 @@ void network_viewer_emit_response(const char *transaction, BUFFER *wb)
     pluginsd_function_result_to_stdout(transaction, wb);
     netdata_mutex_unlock(&stdout_mutex);
 }
+static void topology_write_option_alias(BUFFER *wb, const char *alias) {
+    buffer_json_member_add_array(wb, "aliases");
+    buffer_json_add_array_item_string(wb, alias);
+    buffer_json_array_close(wb);
+}
+
 static void topology_write_response_metadata(BUFFER *wb) {
     buffer_json_member_add_uint64(wb, "status", HTTP_RESP_OK);
     buffer_json_member_add_string(wb, "type", "topology");
@@ -1716,6 +1722,7 @@ static void topology_write_response_metadata(BUFFER *wb) {
                 {
                     buffer_json_member_add_string(wb, "id", "container");
                     buffer_json_member_add_string(wb, "name", "Container Name");
+                    topology_write_option_alias(wb, "container_name");
                 }
                 buffer_json_object_close(wb);
             }
@@ -1756,6 +1763,7 @@ static void topology_write_response_metadata(BUFFER *wb) {
             buffer_json_member_add_string(wb, "name", "Sockets");
             buffer_json_member_add_string(wb, "help", "Select one or more socket directions.");
             buffer_json_member_add_string(wb, "type", "multiselect");
+            buffer_json_member_add_string(wb, "value_separator", ",");
             buffer_json_member_add_array(wb, "options");
             {
                 buffer_json_add_array_item_object(wb);
@@ -1790,12 +1798,14 @@ static void topology_write_response_metadata(BUFFER *wb) {
             buffer_json_member_add_string(wb, "name", "Protocols");
             buffer_json_member_add_string(wb, "help", "Select one or more socket protocol families.");
             buffer_json_member_add_string(wb, "type", "multiselect");
+            buffer_json_member_add_string(wb, "value_separator", ",");
             buffer_json_member_add_array(wb, "options");
             {
                 buffer_json_add_array_item_object(wb);
                 {
                     buffer_json_member_add_string(wb, "id", "ipv4_tcp");
                     buffer_json_member_add_string(wb, "name", "IPv4 TCP");
+                    topology_write_option_alias(wb, "ipv4-tcp");
                     buffer_json_member_add_boolean(wb, "defaultSelected", true);
                 }
                 buffer_json_object_close(wb);
@@ -1803,6 +1813,7 @@ static void topology_write_response_metadata(BUFFER *wb) {
                 {
                     buffer_json_member_add_string(wb, "id", "ipv6_tcp");
                     buffer_json_member_add_string(wb, "name", "IPv6 TCP");
+                    topology_write_option_alias(wb, "ipv6-tcp");
                     buffer_json_member_add_boolean(wb, "defaultSelected", true);
                 }
                 buffer_json_object_close(wb);
@@ -1810,6 +1821,7 @@ static void topology_write_response_metadata(BUFFER *wb) {
                 {
                     buffer_json_member_add_string(wb, "id", "ipv4_udp");
                     buffer_json_member_add_string(wb, "name", "IPv4 UDP");
+                    topology_write_option_alias(wb, "ipv4-udp");
                     buffer_json_member_add_boolean(wb, "defaultSelected", true);
                 }
                 buffer_json_object_close(wb);
@@ -1817,6 +1829,7 @@ static void topology_write_response_metadata(BUFFER *wb) {
                 {
                     buffer_json_member_add_string(wb, "id", "ipv6_udp");
                     buffer_json_member_add_string(wb, "name", "IPv6 UDP");
+                    topology_write_option_alias(wb, "ipv6-udp");
                     buffer_json_member_add_boolean(wb, "defaultSelected", true);
                 }
                 buffer_json_object_close(wb);
@@ -1838,6 +1851,7 @@ static void topology_write_response_metadata(BUFFER *wb) {
                 {
                     buffer_json_member_add_string(wb, "id", "by_ip");
                     buffer_json_member_add_string(wb, "name", "Non-Private Endpoints by IP");
+                    topology_write_option_alias(wb, "by-ip");
                     buffer_json_member_add_boolean(wb, "defaultSelected", true);
                 }
                 buffer_json_object_close(wb);

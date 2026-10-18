@@ -158,24 +158,40 @@
         "name": { "type": "string" },
         "defaultSelected": { "type": "boolean" },
         "disabled": { "type": "boolean" },
+        "aliases": {
+          "type": "array",
+          "items": { "type": "string", "minLength": 1 },
+          "description": "Alternate option IDs accepted by the producer. Canonical IDs take precedence; aliases are not global normalization rules."
+        },
         "sort": { "$ref": "#/definitions/field_sort" }
       },
       "additionalProperties": true
     },
     "required_param": {
       "type": "object",
-      "required": ["id", "name", "type", "options"],
+      "required": ["id", "name", "type"],
       "properties": {
         "id": { "type": "string" },
         "name": { "type": "string" },
-        "type": { "enum": ["select", "multiselect"] },
+        "type": { "enum": ["select", "multiselect", "text"] },
         "options": {
           "type": "array",
           "items": { "$ref": "#/definitions/required_param_option" }
         },
         "help": { "type": "string" },
-        "unique_view": { "type": "boolean" }
+        "unique_view": { "type": "boolean" },
+        "value_separator": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Separator accepted by the producer for multiple values encoded in one string. Exact option IDs remain literal, even when they contain the separator."
+        }
       },
+      "allOf": [
+        {
+          "if": { "properties": { "type": { "enum": ["select", "multiselect"] } } },
+          "then": { "required": ["options"] }
+        }
+      ],
       "additionalProperties": true
     },
     "accepted_params": {

@@ -150,14 +150,20 @@ func (h *functionInfoHarness) call(t *testing.T, args []string, payload []byte, 
 
 func assertFunctionInfoSchema(t *testing.T, payload []byte, definition string) {
 	t.Helper()
+	var response any
+	require.NoError(t, json.Unmarshal(payload, &response))
+	assert.NoError(t, functionInfoSchema(t, definition).Validate(response))
+}
+
+func functionInfoSchema(t *testing.T, definition string) *jsonschema.Schema {
+	t.Helper()
 	data, err := os.ReadFile("../../../../../plugins.d/FUNCTION_UI_SCHEMA.json")
 	require.NoError(t, err)
-	var document, response any
+	var document any
 	require.NoError(t, json.Unmarshal(data, &document))
-	require.NoError(t, json.Unmarshal(payload, &response))
 	compiler := jsonschema.NewCompiler()
 	require.NoError(t, compiler.AddResource("function.json", document))
 	schema, err := compiler.Compile("function.json#/definitions/" + definition)
 	require.NoError(t, err)
-	assert.NoError(t, schema.Validate(response))
+	return schema
 }
