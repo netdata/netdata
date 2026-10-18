@@ -680,7 +680,6 @@ impl FileIndexer {
                 continue;
             }
 
-
             let timestamp = {
                 let entry = journal_file.entry_ref(entry_offset)?;
                 entry.header.realtime

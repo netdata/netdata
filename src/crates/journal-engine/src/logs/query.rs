@@ -292,35 +292,27 @@ fn retrieve_log_entries(
     // bounds (see find_log_entries).
     let anchor_usec = match params.anchor() {
         Anchor::Timestamp(ts) => ts.get(),
-        Anchor::Head => {
-            file_indexes
-                .iter()
-                .map(|fi| fi.start_time().to_microseconds().get())
-                .min()
-                .unwrap_or(0)
-        }
-        Anchor::Tail => {
-            file_indexes
-                .iter()
-                .map(|fi| fi.end_time().to_microseconds().get())
-                .max()
-                .unwrap_or(0)
-        }
+        Anchor::Head => file_indexes
+            .iter()
+            .map(|fi| fi.start_time().to_microseconds().get())
+            .min()
+            .unwrap_or(0),
+        Anchor::Tail => file_indexes
+            .iter()
+            .map(|fi| fi.end_time().to_microseconds().get())
+            .max()
+            .unwrap_or(0),
     };
 
     let mut relevant_indexes: Vec<&FileIndex> = match params.direction() {
-        Direction::Forward => {
-            file_indexes
-                .iter()
-                .filter(|fi| fi.end_time().to_microseconds().get() >= anchor_usec)
-                .collect()
-        }
-        Direction::Backward => {
-            file_indexes
-                .iter()
-                .filter(|fi| fi.start_time().to_microseconds().get() <= anchor_usec)
-                .collect()
-        }
+        Direction::Forward => file_indexes
+            .iter()
+            .filter(|fi| fi.end_time().to_microseconds().get() >= anchor_usec)
+            .collect(),
+        Direction::Backward => file_indexes
+            .iter()
+            .filter(|fi| fi.start_time().to_microseconds().get() <= anchor_usec)
+            .collect(),
     };
 
     // Files excluded by the anchor pre-filter still count as done for

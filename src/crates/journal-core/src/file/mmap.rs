@@ -314,7 +314,6 @@ impl<M: MemoryMap> WindowManager<M> {
         if let Some(idx) = self.lookup_window_by_range(position, size_needed) {
             Ok(&mut self.windows[idx])
         } else if let Some(idx) = self.lookup_window_by_position(position) {
-
             let _window = self.windows.remove(idx);
             // The removal above shifts (or drops) indices, so clear the
             // active index: if create_window fails below, no stale index
@@ -334,7 +333,6 @@ impl<M: MemoryMap> WindowManager<M> {
             self.active_window_idx = Some(self.windows.len() - 1);
             Ok(self.windows.last_mut().unwrap())
         } else {
-
             if self.windows.len() >= self.max_windows {
                 self.windows.remove(self.find_window_to_evict());
                 // The eviction above shifted indices; clear the active

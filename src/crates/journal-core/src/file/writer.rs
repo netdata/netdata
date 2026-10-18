@@ -565,7 +565,6 @@ impl JournalWriter {
         journal_file: &mut JournalFile<MmapMut>,
         capacity: NonZeroU64,
     ) -> Result<NonZeroU64> {
-
         let array_offset = self.append_offset;
         let array_size = {
             let array_guard = journal_file.offset_array_mut(array_offset, Some(capacity))?;
