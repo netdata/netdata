@@ -124,9 +124,9 @@ Where:
 - `transaction_id` is the same ID received in the original command
 - `http_status_code` is the standard HTTP response code:
     - `200`: Success (DYNCFG_RESP_RUNNING) - Configuration accepted and running, or already-enabled collector intent
-      satisfied; non-running health is reported in a following status frame
-    - `202`: Accepted (DYNCFG_RESP_ACCEPTED) - Configuration accepted but not running: still starting, or adopted
-      and failed (the status frame says which)
+      satisfied with health other than Accepted; non-running health is reported in a following status frame
+    - `202`: Accepted (DYNCFG_RESP_ACCEPTED) - Configuration accepted but not running: still starting, including
+      repeated ENABLE while Accepted, or adopted and failed (the status frame says which)
     - `298`: Accepted but disabled (DYNCFG_RESP_ACCEPTED_DISABLED)
     - `299`: Accepted but restart required (DYNCFG_RESP_ACCEPTED_RESTART_REQUIRED)
     - `400`: Bad request - Invalid configuration
@@ -159,9 +159,10 @@ without waiting for runtime readiness or physical cleanup. Disabled `update` and
 rejects any failed preflight, irrespective of retry policy.
 
 For Go collector jobs, `enable` that transitions a passive or disabled job to enabled returns `202`. Repeated
-`enable` on an already-enabled job returns `200` regardless of health and preserves ongoing work and retry deadlines;
-when health is not Running, the plugin follows the reply with `CONFIG <id> STATUS <health>` to correct the daemon's
-Running status implied by `200`. Use `restart` for an immediate attempt on the stored configuration.
+`enable` on an already-enabled job preserves ongoing work and retry deadlines regardless of health. It returns `202`
+while health is Accepted and `200` otherwise, including Failed. After a `200` reply with non-Running health, the plugin
+follows with `CONFIG <id> STATUS <health>` to correct the daemon's Running status implied by `200`. Use `restart` for
+an immediate attempt on the stored configuration.
 
 For service-discovery jobs, `enable` returns `200` when already running and `202` otherwise. An already-enabled
 Accepted pipeline retains its pending activation; a Failed pipeline starts a new activation attempt. Use `enable`

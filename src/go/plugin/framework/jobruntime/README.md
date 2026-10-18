@@ -22,7 +22,8 @@ A normal startup error uses the existing configured autodetection retry cadence 
 retain a Failed configuration, including stock jobs; `RunFailure` reports the collector's class and whether startup may
 be retried. UPDATE that accepts a replacement for activation and ENABLE that transitions a passive or disabled job
 acknowledge configuration with 202 before this runtime outcome; Job Manager publishes later health separately.
-ENABLE on an already-enabled job returns 200 and preserves its work and retry deadlines regardless of health.
+ENABLE on an already-enabled job preserves its work and retry deadlines regardless of health. It returns 202 while
+health is Accepted and 200 otherwise, including Failed.
 RESTART observes the exact activation outside the mutation lane.
 Logical stop revokes output and Function admission promptly; physical cleanup still waits for their admitted work.
 A startup error classified with

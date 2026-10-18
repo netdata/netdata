@@ -802,10 +802,11 @@ the plugin restarts. Echo replies update status or record rejection without repl
   permits replacement and returns `202` with `accepted`; predecessor physical cleanup and new runtime readiness do not
   hold the reply. The accepted replacement has no incumbent fallback. An identical running DynCfg payload retains its
   current runtime and returns `200`.
-- **ENABLE.** An already-enabled job is satisfied (`200`) independently of health and caller provenance. Repeated
-  policy notifications preserve its public configuration, active work, finite pass, retry deadlines and exact/source
-  scope. Passive or disabled configurations accept enabled intent (`202`) through a short transaction. That actual
-  transition starts a fresh same-tier alternative search for source-owned jobs; DynCfg-owned config remains exact.
+- **ENABLE.** An already-enabled job preserves its intent independently of health and caller provenance, returning
+  `202` while health is Accepted and `200` otherwise, including Failed. Repeated policy notifications preserve its
+  public configuration, active work, finite pass, retry deadlines and exact/source scope. Passive or disabled
+  configurations accept enabled intent (`202`) through a short transaction. That actual transition starts a fresh
+  same-tier alternative search for source-owned jobs; DynCfg-owned config remains exact.
   Changed enabled identities with a configuration-intent resource owner first require pure raw validation and a
   resource reservation. Construction, readiness and health settle afterward. Explicit RESTART targets the stored
   configuration when an immediate recovery attempt is needed.

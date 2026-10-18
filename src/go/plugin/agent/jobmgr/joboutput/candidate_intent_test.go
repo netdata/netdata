@@ -57,6 +57,8 @@ func TestCandidateFailedTrialsPreserveLogicalResourceIntent(t *testing.T) {
 				require.Nil(t, applyActivationTestSubmission(t, call, nil, generation))
 				if binding == nil {
 					binding = config
+				} else {
+					require.NotEqual(t, binding.UID(), config.UID(), "the resource-intent assertion must exercise a distinct failed sibling")
 				}
 				owner.mu.Lock()
 				ownsBinding := owner.enabled[jobConfigIdentity(binding)]
