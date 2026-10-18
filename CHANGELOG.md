@@ -207,6 +207,11 @@
 - Daemon: save the crash status file on builds without libbacktrace ([#24345](https://github.com/netdata/netdata/issues/24345))
 - Contexts: let a re-created chart keep the instance it took over ([#24349](https://github.com/netdata/netdata/issues/24349))
 - Health: read the pending alert queue only when a row can be due ([#24347](https://github.com/netdata/netdata/issues/24347))
+- Fix(go.d): try alternative configs for same-name collector jobs ([#24350](https://github.com/netdata/netdata/issues/24350))
+- Otel-streams: reconnect silent websockets and parse every jetstream account status ([#24357](https://github.com/netdata/netdata/issues/24357))
+- Build(deps): bump github.com/godbus/dbus/v5 from 5.2.3 to 5.2.4 in /src/go ([#24358](https://github.com/netdata/netdata/issues/24358))
+- Build(deps): bump github.com/ibm-messaging/mq-golang/v5 from 5.7.2 to 5.7.3 in /src/go ([#24361](https://github.com/netdata/netdata/issues/24361))
+- Build(deps): bump github.com/klauspost/compress from 1.20.1 to 1.20.3 in /src/go ([#24359](https://github.com/netdata/netdata/issues/24359))
 
 ## [2.12.0] - 2026-09-30
 
