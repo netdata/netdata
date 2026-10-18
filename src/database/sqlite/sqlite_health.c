@@ -6,6 +6,7 @@
 #include "sqlite_metadata.h"
 #include "health/health_internals.h"
 #include "health/health-alert-entry.h"
+#include "database/contexts/api_v2_contexts_alerts.h"
 
 extern __thread bool is_health_thread;
 
@@ -1815,11 +1816,80 @@ static void alert_config_readback_cb(struct sql_alert_config_data *acd, void *da
         strncpyz(rb->options, acd->value.db.time_group_options, sizeof(rb->options) - 1);
 }
 
+static int alert_config_export_roundtrip(
+    DICTIONARY *configs, const char *expected_options, const char *expected_lookup,
+    RRDR_TIME_GROUPING expected_group, ALERT_LOOKUP_TIME_GROUP_CONDITION expected_condition,
+    NETDATA_DOUBLE expected_value)
+{
+    CLEAN_BUFFER *exported = buffer_create(0, NULL);
+    struct alert_transitions_callback_data data = { .wb = exported };
+    buffer_json_initialize(exported, "\"", "\"", 0, true, BUFFER_JSON_OPTIONS_DEFAULT);
+    int added = sql_get_alert_configuration(configs, contexts_v2_alert_config_to_json_from_sql_alert_config_data,
+                                            &data, false);
+    buffer_json_finalize(exported);
+
+    CLEAN_JSON_OBJECT *root = json_tokener_parse(buffer_tostring(exported));
+    json_object *value = NULL, *db = NULL, *method = NULL, *options = NULL;
+    if(added != 1 || !root || !json_object_object_get_ex(root, "value", &value) ||
+       !json_object_object_get_ex(value, "db", &db) || !json_object_object_get_ex(db, "method", &method)) {
+        fprintf(stderr, "FAILED [SQL alert export]: missing database lookup\n");
+        return 1;
+    }
+
+    bool has_options = json_object_object_get_ex(db, "time_group_options", &options);
+    if(has_options != (expected_options != NULL) ||
+       (has_options && (!options || !json_object_is_type(options, json_type_string) ||
+                        strcmp(json_object_get_string(options), expected_options) != 0))) {
+        fprintf(stderr, "FAILED [SQL alert export]: absent and explicit blank options must stay distinct\n");
+        return 1;
+    }
+
+    // Contexts and DynCfg wrap the same lookup in different schemas.
+    json_object_object_add(db, "time_group", json_object_get(method));
+    json_object_object_del(db, "method");
+    CLEAN_BUFFER *payload = buffer_create(0, NULL);
+    CLEAN_BUFFER *result = buffer_create(0, NULL);
+    buffer_sprintf(payload,
+                   "{\"format_version\":1,\"rules\":[{\"enabled\":true,\"type\":\"instance\","
+                   "\"config\":{\"value\":{\"update_every\":1,\"database_lookup\":%s},"
+                   "\"match\":{\"on\":\"chart\"}}}]}",
+                   json_object_to_json_string_ext(db, JSON_C_TO_STRING_PLAIN));
+    int code = dyncfg_health_cb(NULL, "health:alert:prototype", DYNCFG_CMD_USERCONFIG, "unittest",
+                               payload, NULL, NULL, result, HTTP_ACCESS_NONE, NULL, NULL);
+    const char *found = strstr(buffer_tostring(result), "lookup: ");
+    if(code != HTTP_RESP_OK || !found) {
+        fprintf(stderr, "FAILED [SQL alert re-import]: code=%d response='%s'\n", code, buffer_tostring(result));
+        return 1;
+    }
+
+    found += sizeof("lookup: ") - 1;
+    size_t length = strcspn(found, "\n");
+    char lookup[256];
+    if(length != strlen(expected_lookup) || length >= sizeof(lookup) || memcmp(found, expected_lookup, length)) {
+        fprintf(stderr, "FAILED [SQL alert re-import]: expected lookup '%s', response='%s'\n",
+                expected_lookup, buffer_tostring(result));
+        return 1;
+    }
+    memcpy(lookup, found, length);
+    lookup[length] = '\0';
+    struct rrd_alert_config parsed = { .time_group_value = NAN };
+    bool matches = health_parse_db_lookup(1, "unittest", lookup, &parsed) &&
+                   parsed.time_group == expected_group && parsed.time_group_condition == expected_condition &&
+                   ((isnan(expected_value) && isnan(parsed.time_group_value)) ||
+                    (!isnan(expected_value) && parsed.time_group_value == expected_value));
+    string_freez(parsed.dimensions);
+    string_freez(parsed.time_group_options);
+    if(!matches)
+        fprintf(stderr, "FAILED [SQL alert reparse]: condition changed after export and re-import\n");
+    return !matches;
+}
+
 int sql_alert_config_unittest(void)
 {
     sqlite3 *saved_db_meta = db_meta;
     bool owns_sqlite_lifecycle = !saved_db_meta;
     int failed = 0;
+    CLEAN_BUFFER *command = NULL;
 
     if (sqlite_library_init())
         return 1;
@@ -1858,6 +1928,7 @@ int sql_alert_config_unittest(void)
     ap.match.on.chart = string_strdupz("chart");
     ap.config.name = string_strdupz("unittest");
     ap.config.source = string_strdupz("unittest");
+    ap.config.recipient = string_strdupz("unittest");
     ap.config.update_every = 1;
     ap.config.after = -86400;
     ap.config.time_group = RRDR_GROUPING_PERCENTAGE_OF_TIME;
@@ -1902,10 +1973,41 @@ int sql_alert_config_unittest(void)
         }
     }
 
+    failed += alert_config_export_roundtrip(configs, "==gap", "percentage-of-time(==gap) -24h",
+                                           RRDR_GROUPING_PERCENTAGE_OF_TIME, ALERT_LOOKUP_TIME_GROUP_CONDITION_EQUAL, NAN);
+
+    static const struct {
+        const char *sql_options;
+        const char *expected_options;
+        const char *expected_lookup;
+        ALERT_LOOKUP_TIME_GROUP_CONDITION condition;
+        NETDATA_DOUBLE value;
+    } legacy[] = {
+        { "NULL", NULL, "percentage-of-samples(!=2.00) -24h", ALERT_LOOKUP_TIME_GROUP_CONDITION_NOT_EQUAL, 2 },
+        { "''", "", "percentage-of-samples(=0.00) -24h", ALERT_LOOKUP_TIME_GROUP_CONDITION_EQUAL, 0 },
+        { "'   '", "   ", "percentage-of-samples(=0.00) -24h", ALERT_LOOKUP_TIME_GROUP_CONDITION_EQUAL, 0 },
+    };
+    command = buffer_create(0, NULL);
+    for(size_t i = 0; i < sizeof(legacy) / sizeof(legacy[0]); i++) {
+        buffer_flush(command);
+        buffer_sprintf(command,
+                       "UPDATE alert_hash SET p_db_lookup_method='countif', time_group_condition=%d, "
+                       "time_group_value=2, time_group_options=%s",
+                       ALERT_LOOKUP_TIME_GROUP_CONDITION_NOT_EQUAL, legacy[i].sql_options);
+        if(db_execute(db_meta, buffer_tostring(command), NULL)) {
+            fprintf(stderr, "FAILED [legacy SQL alert fixture]: cannot set expression presence\n");
+            failed++;
+            continue;
+        }
+        failed += alert_config_export_roundtrip(configs, legacy[i].expected_options, legacy[i].expected_lookup,
+                                               RRDR_GROUPING_COUNTIF, legacy[i].condition, legacy[i].value);
+    }
+
     dictionary_destroy(configs);
     string_freez(ap.match.on.chart);
     string_freez(ap.config.name);
     string_freez(ap.config.source);
+    string_freez(ap.config.recipient);
     string_freez(ap.config.time_group_options);
 
 cleanup:
