@@ -145,6 +145,8 @@ func TestCandidateTrustWithdrawalPreservesUnrelatedRecovery(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			c, inv, old, sibling := candidateHistoricalGrant(t, true)
 			if blocked {
+				disabled, err := c.prepareDisable(inv.FullName)
+				applyCandidateDelta(t, disabled, err)
 				work := candidateEnable(t, c, 4).Decision.Work
 				require.NotNil(t, work)
 				require.Equal(t, sibling.Token.Candidate, work.Token.Candidate)

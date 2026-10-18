@@ -50,7 +50,7 @@ func (c *candidateOwnershipParsingCollector) UnmarshalYAML(unmarshal func(any) e
 	return unmarshal(&c.Config)
 }
 
-func TestCandidateWorkOwnershipPublicEnableRejectsSelectedPayload(t *testing.T) {
+func TestCandidateWorkOwnershipReenableRejectsSelectedPayload(t *testing.T) {
 	gates := &candidateOwnershipParseGates{
 		entered: make(chan int, 8),
 	}
@@ -162,7 +162,8 @@ func TestCandidateWorkOwnershipPublicEnableRejectsSelectedPayload(t *testing.T) 
 	})
 	observe()
 	entered(0)
-	fixture.command("fresh-enable", "enable", 202)
+	fixture.command("disable-before-replacement", "disable", 200)
+	fixture.command("reenable-replacement", "enable", 202)
 	gates.release(0)
 	entered(1)
 	s := cfg("s", "masked", confgroup.TypeStock)
@@ -190,15 +191,16 @@ func TestCandidateWorkOwnershipPublicEnableRejectsSelectedPayload(t *testing.T) 
 		t,
 		2,
 		gates.sequence.Load(),
-		"one tentative and one enabled U attempt; inventory cannot add another",
+		"one tentative and one re-enabled U attempt; inventory cannot add another",
 	)
-	fixture.command("second-enable", "enable", 202)
+	fixture.command("disable-before-retry", "disable", 200)
+	fixture.command("reenable", "enable", 202)
 	require.Eventually(
 		t,
 		func() bool { return len(state.checked()) == 3 },
 		2*time.Second,
 		time.Millisecond,
-		"later ENABLE must start valid predecessor recovery; output=%s",
+		"a real enablement transition starts predecessor recovery; output=%s",
 		output,
 	)
 	require.Equal(

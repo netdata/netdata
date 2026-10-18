@@ -117,7 +117,7 @@ func TestCandidateContinuationSuccessfulSiblingSurvivesPeriodicObservations(t *t
 	}
 }
 
-func TestCandidateContinuationFailedBindingFollowsLastCandidate(t *testing.T) {
+func TestCandidateContinuationFailedTrialsKeepLogicalBinding(t *testing.T) {
 	for _, version := range []string{"v1", "v2"} {
 		for mode, auto := range map[string]bool{"daemon-enable": false, "automatic": true} {
 			t.Run(version+"/"+mode, func(t *testing.T) {
@@ -129,16 +129,15 @@ func TestCandidateContinuationFailedBindingFollowsLastCandidate(t *testing.T) {
 				fixture.enableIfPassive(auto)
 				require.Eventually(t, func() bool { return len(state.checked()) == 2 }, time.Second, time.Millisecond)
 				fixture.waitStatus(dyncfg.StatusFailed)
-				fixture.assertExposed("failed-binding", configs[1])
-				fixture.assertLastMetadata(configs[1])
+				fixture.assertExposed("failed-binding", configs[0])
+				fixture.assertLastMetadata(configs[0])
 				require.Equal(t, []string{configs[0]["option_str"].(string), configs[1]["option_str"].(string)}, state.checked())
 				require.Zero(t, state.active.Load())
 
-				// Stored-config commands must target the exposed candidate, even
-				// though another failed candidate shares its public module/name.
-				fixture.command("restart-last", "restart", 422)
-				require.Equal(t, []string{configs[0]["option_str"].(string), configs[1]["option_str"].(string), configs[1]["option_str"].(string)}, state.checked())
-				fixture.assertExposed("after-restart", configs[1])
+				// Stored-config commands target the logical binding, not a failed trial.
+				fixture.command("restart-bound", "restart", 422)
+				require.Equal(t, []string{configs[0]["option_str"].(string), configs[1]["option_str"].(string), configs[0]["option_str"].(string)}, state.checked())
+				fixture.assertExposed("after-restart", configs[0])
 				require.NoError(t, fixture.generation.run.DirtyCause())
 			})
 		}
@@ -299,7 +298,7 @@ func TestCandidateContinuationFailedUserTierMasksStock(t *testing.T) {
 			fixture.waitStatus(dyncfg.StatusFailed)
 			require.Never(t, func() bool { return len(state.checked()) != 2 || state.maxActive.Load() != 0 }, 100*time.Millisecond, time.Millisecond)
 			require.Equal(t, []string{configs[0]["option_str"].(string), configs[1]["option_str"].(string)}, state.checked())
-			fixture.assertExposed("masked-stock", configs[1])
+			fixture.assertExposed("masked-stock", configs[0])
 			require.NoError(t, fixture.generation.run.DirtyCause())
 		})
 	}

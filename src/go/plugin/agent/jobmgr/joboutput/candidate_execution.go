@@ -72,8 +72,11 @@ func (dcjc *DynCfgJobController) prepareCandidateDecision(ctx context.Context, s
 }
 
 func (dcjc *DynCfgJobController) candidateProjectionCleanup(id string, postimage *dyncfg.GraphConfig, delta *candidateDelta) lifecycle.TaskCleanup {
-	if record, exists := dcjc.graph.Lookup(id); exists && delta.before != nil && delta.before.Binding != nil &&
-		delta.after.Binding != nil && delta.before.Binding.Key == delta.after.Binding.Key && record.Payload() == string(postimage.Payload) {
+	// Passive source replacements need a registration to obtain daemon policy.
+	if _, exists := dcjc.graph.Lookup(id); exists && delta.after.Enablement != candidatePassive &&
+		delta.before != nil && delta.before.Binding != nil &&
+		delta.after.Binding != nil && delta.before.Binding.Config.SourceType() == delta.after.Binding.Config.SourceType() &&
+		delta.before.Binding.Config.Source() == delta.after.Binding.Config.Source() {
 		return dcjc.configStatusCleanup(id, dyncfg.Status(postimage.Status))
 	}
 	config := delta.after.Binding.Config
@@ -178,7 +181,7 @@ func (dcjc *DynCfgJobController) prepareControllerActivation(ctx context.Context
 		reply := internalReply()
 		reply.candidate = delta
 		prepared, err := dcjc.prepareCandidateAdoption(ctx, scope, current, permit, attempt.stage, config, postimage, reply,
-			dcjc.configCreateCleanup(*postimage, config.SourceType(), config.Source(), dcjc.configType(dcjc.modules[config.Module()])), attempt.markApplied())
+			dcjc.candidateProjectionCleanup(scope.ID, postimage, delta), attempt.markApplied())
 		if err == nil && attempt.transferred != nil {
 			attempt.transferred.Store(true)
 		}
@@ -366,25 +369,24 @@ func (dcjc *DynCfgJobController) prepareControllerWait(ctx context.Context, atte
 	if err != nil {
 		return nil, err
 	}
-	wait := func() { dcjc.scheduler.accepted.waitForController(scope.ID, attempt.token, release) }
-	if !admit && (delta.after.Binding == nil || delta.after.Binding.Key != attempt.spec.work.Token.Candidate || attempt.spec.work.Tentative) {
-		commit, err := dcjc.prepareCandidateCommit(delta, false)
-		if err != nil {
-			return nil, err
-		}
-		return dcjc.noopWithAfterApply(scope, current, permit, noResponseResult(), composeAfterApply(commit, wait, attempt.markApplied()))
-	}
-	postimage, err := candidateGraphBinding(scope.ID, delta.after.Binding)
+	postimage, err := candidateGraphBinding(scope.ID, delta.Decision.Binding)
 	if err != nil {
 		return nil, err
 	}
-	if postimage == nil {
-		return nil, errors.New("job output: admitted wait has no exposed binding")
+	prepared, err := dcjc.prepareCandidateDecision(ctx, scope, current, permit, delta, candidateDecisionOptions{
+		lifecycle: preparedJobConfigLifecycle{
+			identity: dcjc.postimageJobConfigLifecycleGraphState(postimage).identity,
+			failure:  jobConfigFailure(cause, "activation"),
+		},
+	})
+	if err != nil {
+		return nil, err
 	}
-	reply := internalReply()
-	reply.candidate = delta
-	return dcjc.prepareMutationAfterApplyAndFallback(ctx, scope, current, nil, permit, resourceRemovalDisposition(current), postimage, reply,
-		dcjc.candidateProjectionCleanup(scope.ID, postimage, delta), composeAfterApply(wait, attempt.markApplied()), preparedJobConfigLifecycle{identity: dcjc.postimageJobConfigLifecycleGraphState(postimage).identity, failure: jobConfigFailure(cause, "activation")}, jobConfigIntentEnable, nil, nil, nil)
+	wait := func() { dcjc.scheduler.accepted.waitForController(scope.ID, attempt.token, release) }
+	return &candidateCompletionTransaction{
+		PreparedResourceTransaction: prepared,
+		applied:                     composeAfterApply(wait, attempt.markApplied()),
+	}, nil
 }
 
 func (dcjc *DynCfgJobController) prepareControllerBlocked(ctx context.Context, attempt acceptedActivationAttempt, current lifecycle.ReadyResource, scope lifecycle.ResourceTransactionScope, permit lifecycle.LongLivedPermit, cause error, block candidateBlockPolicy) (lifecycle.PreparedResourceTransaction, error) {

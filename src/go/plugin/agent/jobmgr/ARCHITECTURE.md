@@ -527,10 +527,20 @@ suppress progress or coalesce ENABLE. Binding/source admission grants remain sep
 Resume delivery follows the same Proposal-before-Active execution priority. Framework blocks belong to Active;
 resuming a tentative Proposal cannot consume that predecessor state or admit the Proposal before validation.
 
-Passive daemon discovery admits `accepted` without Init/Check; ENABLE starts the search. Automatic source mode first
-checks a tentative proposal while preserving an incumbent. Invalid proposals quarantine their exact membership;
-operational failure crosses the persistent-source acceptance boundary, commits source-specific Failed/removal, and
-allows the next eligible same-tier candidate. A successful runtime closes automatic alternative search at readiness.
+Passive daemon discovery admits one logical job as `accepted` without Init/Check; ENABLE starts the search.
+Automatic source mode first checks a tentative proposal while preserving an incumbent. Invalid proposals quarantine
+their exact membership. A genuine source proposal retains its persistent-source acceptance boundary, including
+source-specific Failed/removal. Ordinary alternative probes keep failures, waits and retry grants private: they do
+not replace the public binding or its resource demand. The current binding owns an admission independently of
+historical retry grants. New source revisions can supersede obsolete retry-only candidates, but cannot revoke the
+unchanged binding or its retry deadline. Replacing the binding releases that protection; source-lifetime removal and
+trust withdrawal independently revoke both public and historical authority during inventory folding. A successful
+checked alternative uses the existing handoff; runtime readiness closes automatic alternative search.
+
+Failed, blocked and waiting candidate outcomes apply the controller's public binding decision through
+`prepareCandidateDecision`, including dependency and physical-release waits. A private wait commits its recovery
+state and registers its wake-up without requiring a listed binding or changing the incumbent's lifecycle diagnostics.
+Dependency arrival resumes that exact candidate; source withdrawal revokes it before a later notification can restart it.
 
 Common event sequences:
 
@@ -554,7 +564,7 @@ Removal of the actual admitted source is checked independently of that cursor.
 
 Admission of a newly introduced source membership supersedes retained grants that disappeared at or before that
 revision of the same source lifetime. Admitting a preexisting surviving sibling preserves those grants. Membership
-introduction and disappearance are source facts; later retries and fresh ENABLE do not rewrite that provenance.
+introduction and disappearance are source facts; later retries and enablement transitions do not rewrite that provenance.
 
 Source policy lives in `joboutput/candidate_controller.go`; `joboutput/candidate_execution.go` applies decisions and
 releases execution effects after commit. `joboutput/accepted_activation.go` retains contained execution, dependency
@@ -568,11 +578,17 @@ Revoked pass members are skipped while surviving members keep their position ahe
 
 ### Exposed collector binding
 
-The single DynCfg collector/name describes one authoritative admitted candidate. Raw GET, CONFIG source metadata,
-health and stored-config command targets MUST refer to that same binding. Adopting B after A updates the binding even
-if both candidates settle Failed; a status-only publication cannot communicate a changed source. Failed stock
-removal can leave enabled controller recovery alive while the public job is unlisted. A later admitted candidate
-recreates its own binding and metadata.
+The single DynCfg collector/name describes one logical job and its admitted configuration. Raw GET, CONFIG source
+metadata, health and stored-config command targets MUST refer to that same binding. Trying another endpoint does
+not admit it: unsuccessful alternatives retain private recovery grants and deadlines without replacing the public
+configuration, source cursor or resource-intent owner. If all endpoints fail, the logical binding remains stable.
+Failure of that binding updates its health, subject to the existing failed-stock visibility policy.
+
+A successfully checked alternative or genuine accepted source replacement can update the binding. CONFIG CREATE is
+needed when the public source metadata changes, an unlisted job becomes visible, or a genuine passive source
+replacement needs normal daemon policy. Enabled handoffs with unchanged source metadata need only STATUS because
+GET reads the committed raw payload. Failed stock removal can leave enabled controller recovery
+alive while the public job is unlisted. A later successfully admitted alternative recreates its binding and metadata.
 
 GET reads the exposed graph binding and preserves unresolved raw references without Init/Check.
 Inner RESTART selects and pins the exposed stored config in its resource lane; its outer response observer uses an
@@ -786,11 +802,14 @@ the plugin restarts. Echo replies update status or record rejection without repl
   permits replacement and returns `202` with `accepted`; predecessor physical cleanup and new runtime readiness do not
   hold the reply. The accepted replacement has no incumbent fallback. An identical running DynCfg payload retains its
   current runtime and returns `200`.
-- **ENABLE.** Running is already satisfied (`200`). Other stored configurations accept enabled intent (`202`) through
-  a short transaction. Changed enabled identities with a configuration-intent resource owner first require pure raw
-  validation and a resource reservation. For source-owned config, a fresh ENABLE starts a new same-tier alternative
-  search and resets attempt/deadline facts under a new intent; DynCfg-owned config remains exact. Construction,
-  readiness and health settle afterward. ENABLE during current enabled Accepted work coalesces without resetting its pass.
+- **ENABLE.** An already-enabled job preserves its intent independently of health and caller provenance, returning
+  `202` while health is Accepted and `200` otherwise, including Failed. Repeated policy notifications preserve its
+  public configuration, active work, finite pass, retry deadlines and exact/source scope. Passive or disabled
+  configurations accept enabled intent (`202`) through a short transaction. That actual transition starts a fresh
+  same-tier alternative search for source-owned jobs; DynCfg-owned config remains exact.
+  Changed enabled identities with a configuration-intent resource owner first require pure raw validation and a
+  resource reservation. Construction, readiness and health settle afterward. Explicit RESTART targets the stored
+  configuration when an immediate recovery attempt is needed.
 - **Other mutations.** Disabled UPDATE, DISABLE and REMOVE return `200` when applied. Runtime quarantine discovered
   after an accepted UPDATE is reported through later failed status and diagnostics; the mutation reply remains `202`.
 - **Informative commands.** TEST preserves its validation/error codes and never adopts its payload. RESTART probes
@@ -807,7 +826,8 @@ the plugin restarts. Echo replies update status or record rejection without repl
 
 Health is reported through CONFIG status and lifecycle diagnostics. `TestDynCfgJobMutationAdoptionAndRestartPreflight`
 covers plugin mutation outcomes; composition RESTART tests exercise the outer reply, blocked startup, concurrent disable,
-cancellation, and deadlines through the actual kernel.
+cancellation, and deadlines through the actual kernel. `composition/candidate_echo_test.go` feeds automatic daemon
+replies through real Function ingress; candidate-only tests cannot detect a CREATE/ENABLE feedback loop.
 
 ### Accepted-job activation
 
@@ -913,8 +933,8 @@ retry of that candidate, while eligible siblings may still receive their initial
 - A due wake submits a short lane transaction in `joboutput/candidate_execution.go`. The controller checks the capability and
   enabled/open search, chooses eligible work, and commits its state before releasing an executor effect. Waiting for
   a collector's Check never blocks deadline delivery for an unrelated job.
-- Identical inventory, sibling changes and rejected proposals do not reset another candidate's cooldown. Explicit
-  fresh ENABLE resets attempt facts; disable/removal/supersession/run retirement revokes old deadline capabilities.
+- Identical inventory, sibling changes and rejected proposals do not reset another candidate's cooldown. An actual
+  enablement transition resets attempt facts; disable/removal/supersession/run retirement revokes old deadline capabilities.
 - Exact DynCfg recovery uses its admitted binding; source alternatives use the admitted continuation's tier. While
   a higher-source proposal is pending, its predecessor keeps its own recovery scope until admission. Removing a
   historical earliest grant recomputes the surviving deadline even when the proposal prevents immediate execution.
