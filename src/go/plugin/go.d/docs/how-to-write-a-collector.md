@@ -188,10 +188,11 @@ collects for the public job name, and its successful selection stays sticky on i
 
 DynCfg `update` rejects every failed preflight regardless of `autodetection_retry`, preserving the incumbent:
 `422` for a permanent or unclassified collector failure, `503` for a temporary one. Successful replacement preflight
-returns `202` before runtime startup completes. Non-running `enable` accepts intent with `202` before probing;
-later failures are reported through job status and use the retry policy above. `add` is passive until enabled.
-RESTART probes only the currently exposed stored config; it does not try source siblings. A fresh ENABLE of a
-non-running source-owned job starts a new alternative search. A classified failure keeps a failed stock job listed in
+returns `202` before runtime startup completes. Enabling a passive or disabled job accepts intent with `202` before
+probing; later failures are reported through job status and use the retry policy above. Repeated `enable` on an
+already-enabled job returns `200` regardless of health, preserving its work and retry deadlines. `add` is passive
+until enabled. RESTART probes only the currently exposed stored config; it does not try source siblings. A
+passive/disabled-to-enabled transition starts a new alternative search for a source-owned job. A classified failure keeps a failed stock job listed in
 DynCfg instead of removing it. Leave the expected absence of a service at a stock endpoint unclassified. For all
 command outcomes, including `restart` and `test`, see
 [the Job Manager reply contract](/src/go/plugin/agent/jobmgr/ARCHITECTURE.md#dyncfg-reply-contract).
