@@ -656,7 +656,8 @@ static struct {
      .free  = tg_number_of_flaps_free,
      .add   = tg_number_of_flaps_add,
      .flush = tg_number_of_flaps_flush,
-     .tier_query_fetch = TIER_QUERY_FETCH_AVERAGE
+     .tier_query_fetch = TIER_QUERY_FETCH_AVERAGE,
+     .point_mode = QUERY_POINT_MODE_HOLD
     },
     {.name = "number-of-times",
      .hash  = 0,
@@ -668,7 +669,8 @@ static struct {
      .free  = tg_number_of_times_free,
      .add   = tg_number_of_times_add,
      .flush = tg_number_of_times_flush,
-     .tier_query_fetch = TIER_QUERY_FETCH_AVERAGE
+     .tier_query_fetch = TIER_QUERY_FETCH_AVERAGE,
+     .point_mode = QUERY_POINT_MODE_HOLD
     },
 
     {.name = "extremes",

@@ -11,9 +11,8 @@
 // alias): the share of the samples in each bucket that matched the
 // condition.
 //
-// The values it returns are unchanged; what changed is that the condition
-// is now parsed by the shared grammar, so this understands gap tokens and
-// the predecessor keywords, and a bare number finally means what it says.
+// The sample-fraction calculation uses the shared condition grammar,
+// including gap tokens, predecessor keywords and bare numeric operands.
 
 struct tg_countif {
     TG_EXPRESSION expr;
