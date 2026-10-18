@@ -151,10 +151,12 @@ An error from that path is not proof that the plugin rejected the change. Netdat
 observing a successful reply; reading the plugin's current configuration does not prove that Netdata saved it.
 Clients MUST NOT turn an uncertain update result into an `add` attempt.
 
-For Go collector and service-discovery jobs, `update` that accepts a replacement for activation and non-running
-`enable` return `202`, without waiting for runtime readiness or physical cleanup. Disabled `update` and an identical running DynCfg-source
-`update` return `200`. `CONFIG <id> STATUS` reports later health. `add` is passive until Netdata echoes enabledness;
-`add` and disabled `update` validate structure without acquiring external
+For Go collector and service-discovery jobs, `update` that accepts a replacement for activation and `enable` that
+transitions a passive or disabled job to enabled return `202`, without waiting for runtime readiness or physical
+cleanup. Repeated `enable` on an already-enabled job returns `200` regardless of health and preserves ongoing work
+and retry deadlines; use `restart` for an immediate attempt on the stored configuration. Disabled `update` and an
+identical running DynCfg-source `update` return `200`. `CONFIG <id> STATUS` reports later health. `add` is passive
+until Netdata echoes enabledness; `add` and disabled `update` validate structure without acquiring external
 dependencies. Interactive `update` still rejects any failed preflight, irrespective of retry policy.
 
 The result data depends on the command:

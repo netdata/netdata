@@ -534,6 +534,11 @@ source-specific Failed/removal. Ordinary alternative probes keep failures, waits
 not replace the public binding or its resource demand. A successful checked alternative is admitted through the
 existing handoff; runtime readiness closes automatic alternative search.
 
+Failed, blocked and waiting candidate outcomes apply the controller's public binding decision through
+`prepareCandidateDecision`, including dependency and physical-release waits. A private wait commits its recovery
+state and registers its wake-up without requiring a listed binding or changing the incumbent's lifecycle diagnostics. Dependency arrival resumes
+that exact candidate; source withdrawal revokes it before a later notification can restart it.
+
 Common event sequences:
 
 | Event | Outcome |
