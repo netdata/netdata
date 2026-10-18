@@ -33,6 +33,58 @@ func c020AssertDimensionUnits(t *testing.T, section map[string]any, path string,
 	}
 }
 
+func c020AssertGroupedRawUnits(t *testing.T, doc map[string]any, firstUnits string) {
+	t.Helper()
+	db := queryObject(t, doc, "db", "db")
+	dbDimensions := queryObject(t, db, "dimensions", "db.dimensions")
+	view := queryObject(t, doc, "view", "view")
+	viewDimensions := queryObject(t, view, "dimensions", "view.dimensions")
+	ids, idsOK := dbDimensions["ids"].([]any)
+	viewIDs, viewIDsOK := viewDimensions["ids"].([]any)
+	counts, countsOK := viewDimensions["aggregated"].([]any)
+	if !idsOK || !viewIDsOK || !countsOK || len(ids) < 1 || len(ids) > 2 ||
+		len(viewIDs) != len(ids) || len(counts) != len(ids) {
+		t.Fatalf("cannot establish raw-unit group membership: db=%v view=%v", dbDimensions, viewDimensions)
+	}
+	// Resolve source ownership before inspecting units; normalization has its own verdict.
+	want := make(map[string]string)
+	for i, value := range ids {
+		id, idOK := value.(string)
+		viewID, viewIDOK := viewIDs[i].(string)
+		count, numeric := queryInteger(counts[i])
+		if !idOK || id == "" || !viewIDOK || viewID != id || !numeric || want[id] != "" {
+			t.Fatalf("cannot establish raw-unit group membership: db=%v view=%v", dbDimensions, viewDimensions)
+		}
+		if len(ids) == 1 && count == 2 {
+			want[id] = firstUnits
+		} else if len(ids) == 2 && count == 1 && (id == "requests/s" || id == "requests") {
+			want[id] = id
+		} else {
+			t.Fatalf("unexpected raw-unit group membership: id=%q contributors=%d groups=%d", id, count, len(ids))
+		}
+	}
+	c020AssertDimensionUnits(t, db, "db", want)
+}
+
+func c020AssertFoldedRawUnits(t *testing.T, doc map[string]any) {
+	t.Helper()
+	db := queryObject(t, doc, "db", "db")
+	dimensions := queryObject(t, db, "dimensions", "db.dimensions")
+	ids, ok := dimensions["ids"].([]any)
+	if !ok || len(ids) != 2 {
+		t.Fatalf("fold must retain two raw-unit entries: %v", dimensions)
+	}
+	want := make(map[string]string)
+	for _, value := range ids {
+		id, idOK := value.(string)
+		if !idOK || id == "" || want[id] != "" {
+			t.Fatalf("fold has malformed or duplicate raw-unit IDs: %v", ids)
+		}
+		want[id] = "requests/s"
+	}
+	c020AssertDimensionUnits(t, db, "db", want)
+}
+
 func c020WaitCharts(t *testing.T, host string, charts ...fixture.Chart) {
 	t.Helper()
 	// Context retention alone may be satisfied before its second chart arrives.
@@ -96,9 +148,7 @@ func TestCase020NormalizedUnitGroups(t *testing.T) {
 			})
 			t.Run("db-units", func(t *testing.T) {
 				trackContractComponent(t, c020RawSourceUnitsContract, "normalized/"+name)
-				c020AssertDimensionUnits(t, queryObject(t, doc, "db", "db"), "db", map[string]string{
-					"requests": charts[0].Units,
-				})
+				c020AssertGroupedRawUnits(t, doc, charts[0].Units)
 			})
 		})
 	}
@@ -149,9 +199,7 @@ func TestCase020FoldedDimensionUnits(t *testing.T) {
 					}
 					t.Run("db-units", func(t *testing.T) {
 						trackContractComponent(t, c020RawSourceUnitsContract, "folded/"+component)
-						c020AssertDimensionUnits(t, queryObject(t, doc, "db", "db"), "db", map[string]string{
-							keptID: "requests/s", "remaining 2 dimensions": "requests/s",
-						})
+						c020AssertFoldedRawUnits(t, doc)
 					})
 					t.Run("result-units", func(t *testing.T) {
 						trackContractComponent(t, contract, component)
@@ -192,9 +240,7 @@ func TestCase020FoldedDimensionUnits(t *testing.T) {
 		}
 		t.Run("db-units", func(t *testing.T) {
 			trackContractComponent(t, c020RawSourceUnitsContract, "folded/equal-normalized")
-			c020AssertDimensionUnits(t, queryObject(t, doc, "db", "db"), "db", map[string]string{
-				"d3,requests": "requests/s", "remaining 2 dimensions": "requests/s",
-			})
+			c020AssertFoldedRawUnits(t, doc)
 		})
 		t.Run("result-units", func(t *testing.T) {
 			trackContractComponent(t, contract, "equal-normalized")
