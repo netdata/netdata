@@ -73,6 +73,10 @@ const (
 )
 
 const (
+	prioPVCCapacity = 50800 + iota
+)
+
+const (
 	labelKeyPrefix = "k8s_"
 	//labelKeyLabelPrefix      = labelKeyPrefix + "label_"
 	//labelKeyAnnotationPrefix = labelKeyPrefix + "annotation_"
@@ -90,6 +94,7 @@ const (
 	labelKeyQoSClass       = labelKeyPrefix + "qos_class"
 	labelKeyDeploymentName = labelKeyPrefix + "deployment_name"
 	labelKeyCronJobName    = labelKeyPrefix + "cronjob_name"
+	labelKeyPVCName        = labelKeyPrefix + "pvc_name"
 )
 
 var baseCharts = collectorapi.Charts{
@@ -156,6 +161,10 @@ var cronJobChartsTmpl = collectorapi.Charts{
 	cronJobLastScheduleTimeAgoChartTmpl.Copy(),
 	cronJobSuspendStatusChartTmpl.Copy(),
 	cronJobAgeChartTmpl.Copy(),
+}
+
+var pvcChartsTmpl = collectorapi.Charts{
+	pvcCapacityChartTmpl.Copy(),
 }
 
 var (
@@ -977,6 +986,47 @@ func (c *Collector) addCronJobCharts(st *cronJobState) {
 
 func (c *Collector) removeCronJobCharts(st *cronJobState) {
 	c.removeCharts("cronjob", st.id())
+}
+
+var (
+	pvcCapacityChartTmpl = collectorapi.Chart{
+		IDSep:    true,
+		ID:       "pvc_%s.capacity",
+		Title:    "PVC Capacity",
+		Units:    "B",
+		Fam:      "pvc",
+		Ctx:      "k8s_state.pvc_capacity",
+		Priority: prioPVCCapacity,
+		Dims: collectorapi.Dims{
+			{ID: "pvc_%s_requested", Name: "requested"},
+			{ID: "pvc_%s_capacity", Name: "capacity"},
+		},
+	}
+)
+
+func (c *Collector) addPVCCharts(ps *pvcState) {
+	charts := pvcChartsTmpl.Copy()
+
+	for _, chart := range *charts {
+		chart.ID = fmt.Sprintf(chart.ID, replaceDots(ps.id()))
+		chart.Labels = []collectorapi.Label{
+			{Key: labelKeyClusterID, Value: c.kubeClusterID, Source: collectorapi.LabelSourceK8s},
+			{Key: labelKeyClusterName, Value: c.kubeClusterName, Source: collectorapi.LabelSourceK8s},
+			{Key: labelKeyNamespace, Value: ps.namespace, Source: collectorapi.LabelSourceK8s},
+			{Key: labelKeyPVCName, Value: ps.name, Source: collectorapi.LabelSourceK8s},
+		}
+		for _, d := range chart.Dims {
+			d.ID = fmt.Sprintf(d.ID, ps.id())
+		}
+	}
+
+	if err := c.Charts().Add(*charts...); err != nil {
+		c.Warning(err)
+	}
+}
+
+func (c *Collector) removePVCCharts(ps *pvcState) {
+	c.removeCharts("pvc", ps.id())
 }
 
 func (c *Collector) removeCharts(kind, id string) {

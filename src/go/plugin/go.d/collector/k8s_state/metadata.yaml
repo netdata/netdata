@@ -493,3 +493,22 @@ modules:
                 - name: Evicted
                 - name: OOMKilled
                 - name: Other
+        - name: persistentvolumeclaim
+          description: These metrics refer to PersistentVolumeClaims and are collected only when the service account can `list` and `watch` `persistentvolumeclaims` in all namespaces; otherwise they are skipped.
+          labels:
+            - name: k8s_cluster_id
+              description: Cluster ID. This is equal to the kube-system namespace UID.
+            - name: k8s_cluster_name
+              description: Cluster name. Cluster name discovery only works in GKE.
+            - name: k8s_namespace
+              description: Namespace.
+            - name: k8s_pvc_name
+              description: PersistentVolumeClaim name.
+          metrics:
+            - name: k8s_state.pvc_capacity
+              description: PVC Capacity
+              unit: B
+              chart_type: line
+              dimensions:
+                - name: requested
+                - name: capacity
