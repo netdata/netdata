@@ -323,7 +323,12 @@
       "folded/mixed/dimension,units",
       "folded/mixed-rate-first/dimension",
       "folded/mixed-rate-first/dimension,units",
-      "folded/equal-normalized"
+      "folded/equal-normalized",
+      "unitless/only",
+      "unitless/repeated",
+      "unitless/empty-first",
+      "unitless/named-first",
+      "unitless/multiple"
     ]
   },
   {
@@ -340,7 +345,12 @@
       "folded/mixed/dimension,units",
       "folded/mixed-rate-first/dimension",
       "folded/mixed-rate-first/dimension,units",
-      "folded/equal-normalized"
+      "folded/equal-normalized",
+      "unitless/only",
+      "unitless/repeated",
+      "unitless/empty-first",
+      "unitless/named-first",
+      "unitless/multiple"
     ]
   },
   {

@@ -116,6 +116,49 @@ func c020AssertFoldedRawUnits(t *testing.T, doc map[string]any) {
 	c020AssertDimensionUnits(t, db, "db", want)
 }
 
+func TestCase020UnitlessCombinedUnits(t *testing.T) {
+	for index, item := range []struct {
+		name  string
+		units []string
+		want  []string
+	}{
+		{"only", []string{""}, []string{""}},
+		{"repeated", []string{"", ""}, []string{""}},
+		{"empty-first", []string{"", "requests"}, []string{"", "requests"}},
+		{"named-first", []string{"requests", ""}, []string{"", "requests"}},
+		{"multiple", []string{"requests", "", "bytes", ""}, []string{"", "requests", "bytes"}},
+	} {
+		t.Run(item.name, func(t *testing.T) {
+			component := "unitless/" + item.name
+			registerContractComponent(t, c020CombinedViewUnitsContract, component)
+			registerContractComponent(t, c020RawSourceUnitsContract, component)
+			host := "c020-unitless-" + item.name
+			context := "fixture.c020_unitless_" + strconv.Itoa(index)
+			charts := make([]fixture.Chart, 0, len(item.units))
+			wantDimensions := make(map[string]string)
+			for i, units := range item.units {
+				id := context + "_" + strconv.Itoa(i)
+				charts = append(charts, c020Chart(id, id, units, "absolute", i+1, fixture.T0))
+				wantDimensions[id] = units
+			}
+			c020PushCharts(t, host, guid(10020+index), charts...)
+			waitChartsRetention(t, host, charts...)
+			doc := c020Query(t, c020QuerySpec{
+				host: host, context: context + "*", timeGroup: "average", groupBy: "context", aggregation: "sum",
+				after: fixture.T0, before: fixture.T0 + c020Samples,
+			})
+			t.Run("combined-view-units", func(t *testing.T) {
+				trackContractComponent(t, c020CombinedViewUnitsContract, component)
+				c020AssertCombinedViewUnits(t, doc, item.want...)
+			})
+			t.Run("db-dimension-units", func(t *testing.T) {
+				trackContractComponent(t, c020RawSourceUnitsContract, component)
+				c020AssertDimensionUnits(t, queryObject(t, doc, "db", "db"), "db", wantDimensions)
+			})
+		})
+	}
+}
+
 func TestCase020NormalizedUnitGroups(t *testing.T) {
 	const contract = "CASE-020/normalized-unit-groups"
 	for index, name := range []string{"rate-first", "gauge-first"} {
