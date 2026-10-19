@@ -389,7 +389,7 @@ fn kinds(list: &[sfst::ValueKind]) -> sfst::ValueKinds {
     list.iter().copied().collect()
 }
 
-// ── Search: selection keys ──────────────────────────────────────────
+// ── Search: keys ────────────────────────────────────────────────────
 
 /// The wire's keys, pinned literally: the UI spells exactly these, so a
 /// vocabulary change shows up here. Every builtin key and the five
@@ -815,10 +815,10 @@ fn coverage_all() -> CoverageWire {
 }
 
 #[test]
-fn rendered_keys_round_trip_through_the_selection_grammar() {
+fn rendered_keys_round_trip_through_the_parser() {
     // render ∘ parse = identity, so a suggested key feeds straight back
-    // as a selection key or a values request: every owner-qualified
-    // attribute form, then every builtin word.
+    // as a condition key or a values request: every attribute owner's
+    // prefix, then every builtin key.
     let cases: Vec<(AttributeOwner, AttributeKey)> = vec![
         (
             AttributeOwner::Resource,

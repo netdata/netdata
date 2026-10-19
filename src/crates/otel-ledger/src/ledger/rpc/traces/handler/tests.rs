@@ -827,6 +827,49 @@ async fn the_otel_defaults_are_selectable_in_the_functions_view() {
     assert_eq!(ids(&v["data"]), ["0b", "0a"]);
 }
 
+/// A kind or status code this build does not know is stored as its
+/// decimal number, so it filters and suggests like any other label.
+#[tokio::test]
+async fn unknown_enum_values_filter_and_suggest_as_numbers() {
+    let mut odd = otlp_req_svc(0x0A, 1, base_ns(10), "svc");
+    let span = &mut odd.resource_spans[0].scope_spans[0].spans[0];
+    span.kind = 9;
+    span.status = Some(opentelemetry_proto::tonic::trace::v1::Status {
+        code: 7,
+        message: String::new(),
+    });
+    let registries = make_registries();
+    install_wal(
+        &registries,
+        "default",
+        1,
+        vec![odd, otlp_req_svc(0x0B, 1, base_ns(20), "svc")],
+    )
+    .await;
+    let h = make_handler_over(registries);
+
+    for (key, value) in [("kind", "9"), ("status.code", "7")] {
+        let mut body = functions_body(20);
+        body["conditions"] = json!([{"key": key, "op": "=", "values": [value]}]);
+        let v = serde_json::to_value(call_on(&h, body).await.unwrap()).unwrap();
+        assert_eq!(ids(&v["data"]), ["0a"], "{key} = {value}");
+
+        let mut body = window_body();
+        merge(&mut body, json!({"key": key}));
+        let v = serde_json::to_value(call_on(&h, as_mode("suggest", body)).await.unwrap()).unwrap();
+        let values: Vec<&str> = v["items"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|i| i["text"].as_str().unwrap())
+            .collect();
+        assert!(
+            values.contains(&value),
+            "{key} suggests {value}: {values:?}"
+        );
+    }
+}
+
 #[tokio::test]
 async fn pagination_walks_the_corpus_without_dups_or_gaps_across_the_tie() {
     let h = handler_with_search_corpus().await;

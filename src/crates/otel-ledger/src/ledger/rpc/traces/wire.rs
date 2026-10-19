@@ -598,8 +598,10 @@ pub struct SuggestionWire {
     /// How it matched the term.
     #[serde(rename = "match")]
     pub match_class: MatchWire,
-    /// Present (`true`) only when `text` is a cut prefix of a longer
-    /// value: an equality selection does not match it.
+    /// Present (`true`) only when `text` is a cut prefix of something
+    /// longer: of a value (cut at the value cap), or of a key past the
+    /// request-key limit, which cannot be sent back. An equality condition
+    /// does not match it; a key suggestion flagged so is not a key.
     #[serde(skip_serializing_if = "std::ops::Not::not")]
     pub truncated: bool,
     /// Keys only: the highest cardinality tier any visited source gives
@@ -614,7 +616,7 @@ pub struct SuggestionWire {
     pub is_virtual: bool,
     /// Keys only: the kinds of value the visited sources stored under
     /// this attribute key, in the order of [`FieldKindsWire`]; absent for
-    /// builtin keys (typed by the grammar) and for values. The ordering
+    /// builtin keys (typed by their definition) and for values. The ordering
     /// ops (`>`, `>=`, `<`, `<=`) can match a key holding `int` or
     /// `double`.
     #[serde(skip_serializing_if = "Vec::is_empty")]

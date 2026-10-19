@@ -105,7 +105,7 @@ fn ids(data: &SearchData) -> Vec<String> {
     data.traces.iter().map(|t| t.trace_id.to_string()).collect()
 }
 
-/// `tid(n)`'s canonical hex rendering — the text form `trace:id =`
+/// `tid(n)`'s canonical hex rendering — the text form `trace_id =`
 /// conditions pin.
 fn hex(n: u8) -> String {
     sfst::TraceId::from(tid(n)).to_string()
@@ -530,7 +530,7 @@ fn negated_conditions_never_prune() {
     assert_eq!(ids(&on), vec![hex(2)]);
     assert_eq!(norm(&on), norm(&off));
 
-    // `trace:duration != 6s`: trace 1 (2s) must return — a naive
+    // `trace_duration != 6s`: trace 1 (2s) must return — a naive
     // reading of the Eq-compiled interval's lo (6s) would prune it.
     let q = || {
         SearchQuery::new(pred(vec![builtin(
@@ -675,7 +675,7 @@ fn split_root_claims_survive_on_any_match() {
     }
 }
 
-/// Pinned candidate sets (`trace:id =`) never engage the gate: the
+/// Pinned candidate sets (`trace_id =`) never engage the gate: the
 /// lookup must always assemble, trace-level conditions included.
 #[test]
 fn pinned_lookups_bypass_the_gate() {

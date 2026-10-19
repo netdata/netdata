@@ -263,7 +263,7 @@ fn tier_matrix_matches_the_oracle() {
             plan(vec![not_tokens("absent", &["x"], &[])]),
             Box::new(|_| false),
         ),
-        // ── Multi-field OR (the unscoped disjunction) ──────
+        // ── Multi-field OR ──────
         (
             plan(vec![PlanTerm::Fields {
                 fields: vec!["s".to_string(), "l".to_string()],

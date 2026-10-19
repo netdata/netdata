@@ -575,8 +575,8 @@ impl Condition {
                 ),
                 CompareOp::Eq | CompareOp::Regex | CompareOp::NotEq | CompareOp::NotRegex,
             ) => None,
-            // The colon-set ids: span/parent by column scan (both
-            // polarities — single-valued, no subgroup fork); trace:id
+            // The id keys: span/parent by column scan (both
+            // polarities — single-valued, no subgroup fork); trace_id
             // pins/filters the candidate set; link ids POSITIVE only
             // (the negated subgroup semantics are an open design
             // question for the refine step).
@@ -684,7 +684,7 @@ impl Predicate {
         })
     }
 
-    /// Strip `trace:id` conditions out of the predicate — they are
+    /// Strip `trace_id` conditions out of the predicate — they are
     /// neither span-local (a `TraceSpan` carries no trace id) nor
     /// trace-level builtins; they constrain the ENGINE's candidate
     /// set: `=` values intersect into a PIN set (phase-1 discovery is
@@ -720,7 +720,7 @@ impl Predicate {
                     });
                 }
                 CompareOp::NotEq => excluded.extend(ids),
-                _ => unreachable!("validated: trace:id takes = / !="),
+                _ => unreachable!("validated: trace_id takes = / !="),
             }
         }
         (
@@ -866,7 +866,7 @@ impl Predicate {
                     });
                 }
                 (PredicateTarget::Builtin(BuiltinField::TraceId), _) => {
-                    unreachable!("trace:id conditions are split out before lowering")
+                    unreachable!("trace_id conditions are split out before lowering")
                 }
                 (PredicateTarget::FreeText, _) => {
                     let PredicateValue::Text(term) = &condition.values[0] else {
@@ -966,14 +966,14 @@ fn condition_matcher(op: CompareOp, values: &[PredicateValue]) -> sfst::PlanMatc
     }
 }
 
-/// The engine-level candidate constraints of `trace:id` conditions
+/// The engine-level candidate constraints of `trace_id` conditions
 /// (see [`Predicate::split_trace_id_conditions`]).
 #[derive(Default)]
 pub(crate) struct TraceIdConstraints {
     /// `Some` = the candidate set is EXACTLY these ids (already the
-    /// intersection of every `trace:id =` condition; may be empty).
+    /// intersection of every `trace_id =` condition; may be empty).
     pub(crate) pins: Option<std::collections::BTreeSet<sfst::TraceId>>,
-    /// Ids excluded by `trace:id !=` conditions.
+    /// Ids excluded by `trace_id !=` conditions.
     pub(crate) excluded: std::collections::BTreeSet<sfst::TraceId>,
 }
 
@@ -1212,8 +1212,8 @@ impl EvalPredicate {
                 matcher,
                 negated,
             } => {
-                // Values gathered across the term's fields (several for
-                // the any-owner disjunction; multi-valued fields yield
+                // Values gathered across the term's fields (one storage
+                // field per attribute or builtin; multi-valued fields yield
                 // several entries; event/link names and attributes live
                 // in the subgroup terms, never here). Negation is the
                 // pinned presence ∩ complement: present with NO matching
@@ -1902,7 +1902,7 @@ mod tests {
             }
         };
 
-        // Attribute owners and the any-owner disjunction: every op.
+        // Attribute owners: every op.
         evaluable(cond(
             span_attr("x"),
             CompareOp::Eq,
@@ -2007,7 +2007,7 @@ mod tests {
             ))
             .contains("subgroup")
         );
-        // The colon set: span/parent/trace ids both polarities; link
+        // The id keys: span/parent/trace ids both polarities; link
         // ids and events.name positive-only (the negated subgroup
         // semantics are the recorded open question).
         for i in [BuiltinField::SpanId, BuiltinField::ParentSpanId] {

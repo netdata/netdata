@@ -21,7 +21,7 @@
 //! matrix, post-validation source vanish, unavailable-source honesty
 //! (including the completion slack), the span-cap honesty pair,
 //! budget-truncated sources that cannot falsify completeness, the
-//! trace:id pin shortcut past discovery, tri-state exclusion of
+//! trace_id pin shortcut past discovery, tri-state exclusion of
 //! indeterminate trace-level candidates, UNSET trace ids, and the empty
 //! window set.
 //!
@@ -620,7 +620,7 @@ fn oracle_equivalence_under_relayouts() {
             vec![],
         ),
         (
-            // span:id — the SPAN column scan; T5's middle child.
+            // span_id — the SPAN column scan; T5's middle child.
             "span-id",
             canon_query(pred(vec![builtin(
                 BuiltinField::SpanId,
@@ -630,7 +630,7 @@ fn oracle_equivalence_under_relayouts() {
             vec![hex(5)],
         ),
         (
-            // span:parentID — children of T5's root.
+            // parent_span_id — children of T5's root.
             "parent-id",
             canon_query(pred(vec![builtin(
                 BuiltinField::ParentSpanId,
@@ -651,7 +651,7 @@ fn oracle_equivalence_under_relayouts() {
             vec![hex(3), hex(1)],
         ),
         (
-            // trace:id pins the candidate set; the span-local remainder
+            // trace_id pins the candidate set; the span-local remainder
             // still applies in phase 2.
             "trace-id-pin",
             canon_query(pred(vec![
@@ -674,7 +674,7 @@ fn oracle_equivalence_under_relayouts() {
             vec![],
         ),
         (
-            // trace:id != excludes at pool admission.
+            // trace_id != excludes at pool admission.
             "trace-id-excluded",
             canon_query(pred(vec![
                 builtin(BuiltinField::Status, CompareOp::Eq, vec![text("ERROR")]),
@@ -683,7 +683,7 @@ fn oracle_equivalence_under_relayouts() {
             vec![hex(2)],
         ),
         (
-            // link:spanID / link:traceID — the LNKB row scan; T4 links
+            // links.span_id / links.trace_id — the LNKB row scan; T4 links
             // to T1's root span.
             "link-span-id",
             canon_query(pred(vec![builtin(
@@ -703,7 +703,7 @@ fn oracle_equivalence_under_relayouts() {
             vec![hex(4)],
         ),
         (
-            // event:name rides the flat events.name token; the span-side
+            // events.name rides the flat events.name token; the span-side
             // evaluator gathers from the STRUCTURED event names.
             "event-name",
             canon_query(pred(vec![builtin(
@@ -767,7 +767,7 @@ fn oracle_equivalence_under_relayouts() {
             vec![],
         ),
         (
-            // event:timeSinceStart computes in the refine (the corpus
+            // events.time_since_start computes in the refine (the corpus
             // writes events at start + 1ns).
             "event-time-since-start",
             canon_query(pred(vec![builtin(
@@ -1731,7 +1731,7 @@ fn budget_truncated_old_source_cannot_falsify_completeness() {
     assert_eq!(ids(&unbudgeted), vec![hex(249)]);
 }
 
-/// `trace:id =` pins bypass phase-1 discovery entirely: the search
+/// `trace_id =` pins bypass phase-1 discovery entirely: the search
 /// answers with a ZERO visited-rows budget (assembly is not a
 /// discovery cost), proving no scan ran.
 #[test]

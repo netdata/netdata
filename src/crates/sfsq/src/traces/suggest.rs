@@ -241,9 +241,10 @@ impl SuggestQuery {
 /// One suggestion.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Suggestion {
-    /// The key or value, cut to [`DISPLAY_MAX_BYTES`] when `truncated`.
+    /// The key (whole), or the value cut to [`DISPLAY_MAX_BYTES`] when
+    /// `truncated`.
     pub text: String,
-    /// The text is a prefix of at least one longer value.
+    /// Values only: the text is a prefix of at least one longer value.
     pub truncated: bool,
     pub class: MatchClass,
     /// Keys only: the highest tier a visited source gives the key;

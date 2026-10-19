@@ -580,7 +580,7 @@ mod tests {
     }
 
     #[test]
-    fn span_trace_state_and_status_message_are_facets() {
+    fn span_trace_state_and_status_message_are_entries() {
         let mut f = Flattener::new();
         let e = f.flatten_span(Span {
             trace_state: "ot=th:8".into(),

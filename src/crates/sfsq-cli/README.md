@@ -160,7 +160,7 @@ overrides the assembly cap (default 65,536; 0 rejected).
 The token flags mark spans. The summary line then ends with `, N matched`,
 and the line of each span that matches a token ends with `[match]`. Only
 positive tokens on spans mark spans: `--not` tokens, and tokens on the
-whole trace or on `trace-id`, mark no span.
+whole trace or on `trace_id`, mark no span.
 
 ### `suggest` — suggest keys or values
 

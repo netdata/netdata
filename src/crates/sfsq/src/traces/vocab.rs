@@ -157,7 +157,7 @@ impl BuiltinField {
     /// the type docs).
     ///
     /// Values come back as the STORAGE labels (`kind` ∈
-    /// `UNSPECIFIED/INTERNAL/SERVER/CLIENT/PRODUCER/CONSUMER`, `status` ∈
+    /// `UNSPECIFIED/INTERNAL/SERVER/CLIENT/PRODUCER/CONSUMER`, `status.code` ∈
     /// `UNSET/OK/ERROR`, or the decimal number of a variant the writer did
     /// not know).
     pub fn dictionary_field(self) -> Option<&'static str> {

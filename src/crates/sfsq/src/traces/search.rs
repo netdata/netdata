@@ -157,7 +157,7 @@
 //!
 //! Under a residual mechanism a FILTERED search may omit a matching
 //! trace while reporting `Complete`; the trace stays findable
-//! unfiltered, by id (`trace:id` pins bypass the gate), and in the
+//! unfiltered, by id (`trace_id` pins bypass the gate), and in the
 //! panels. The differential gate-on/gate-off superset test therefore
 //! runs on tie-free, single-valued, corruption-free corpora — inside
 //! the accepted mechanisms the divergence is fine; everywhere else
@@ -1297,7 +1297,7 @@ struct CandidatePool {
     ranked: BTreeSet<(std::cmp::Reverse<i64>, TraceId)>,
     best: HashMap<TraceId, (i64, Origin)>,
     examined: HashSet<TraceId>,
-    /// Ids excluded by `trace:id !=` conditions — never admitted.
+    /// Ids excluded by `trace_id !=` conditions — never admitted.
     excluded: BTreeSet<TraceId>,
 }
 
@@ -1529,7 +1529,7 @@ pub fn search(
     let mut truncated_unbounded = false;
     let mut files: Vec<FileDiscovery> = Vec::new();
     let mut pool = CandidatePool::new(trace_ids.excluded);
-    // `trace:id =` PINS the candidate set: discovery is skipped whole —
+    // `trace_id =` PINS the candidate set: discovery is skipped whole —
     // the pins go straight to assembly at rank `i64::MAX` (examine
     // every pin, ordered by id on the tie; UNSET ids are not traces and
     // drop per the pinned candidate rule) — and phase-2 re-evaluation
@@ -1740,7 +1740,7 @@ pub fn search(
     }
 
     // ── The pre-assembly gates (see the gate module) ─────────────────
-    // Engaged only when the candidate set is not pinned (a `trace:id =`
+    // Engaged only when the candidate set is not pinned (a `trace_id =`
     // lookup must always assemble) and no completion source failed or
     // was unavailable so far (every assembly is already degraded then —
     // trace-level evaluation excludes all candidates as indeterminate,

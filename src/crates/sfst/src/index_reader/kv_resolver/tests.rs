@@ -629,3 +629,34 @@ fn a_large_trace_decodes_each_field_chunk_once() {
     }
     check(&idx.trace_by_id(trace).unwrap().spans);
 }
+
+/// A row token is `name=value`. One without `=` is damage, not a name
+/// with an empty value: materializing its span fails, so the combiner
+/// reports the source. A real empty value (`name=`) reads as an empty
+/// value.
+#[test]
+fn a_row_token_without_a_separator_fails_its_span() {
+    let combine = |bytes: &[u8]| {
+        let idx = IndexReader::open(bytes).unwrap();
+        let mut session = crate::TraceFileSession::open(&idx);
+        let mut sources: [&mut dyn crate::trace_combine::SpanSource; 1] = [&mut session];
+        crate::trace_combine::combine(&mut sources, trace_id(), None, None, None, &|| false)
+    };
+    let empty = trace_file_of(10, &[vec!["attributes.example=".to_string()]]);
+    let outcome = combine(&empty);
+    assert!(outcome.failures.is_empty());
+    assert_eq!(
+        outcome.trace.spans[0].fields,
+        [("attributes.example".to_string(), String::new())]
+    );
+
+    let damaged = trace_file_of(10, &[vec!["attributes.example".to_string()]]);
+    let outcome = combine(&damaged);
+    assert!(outcome.trace.spans.is_empty());
+    assert_eq!(outcome.failures.len(), 1);
+    assert!(
+        matches!(outcome.failures[0].1, crate::Error::CorruptIndex(_)),
+        "{:?}",
+        outcome.failures[0].1
+    );
+}

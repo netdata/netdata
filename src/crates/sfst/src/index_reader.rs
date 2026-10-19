@@ -311,8 +311,9 @@ impl Trace {
 
 /// The value half of a resolved `key=value` token (split on the FIRST `=`, so
 /// value-embedded `=` bytes are preserved — e.g. `trace_state=ot=th:8` yields
-/// `ot=th:8`), or empty for an unresolvable ref (corrupt file — the row path
-/// renders those empty too rather than failing the trace).
+/// `ot=th:8`), or empty for an unresolvable event or link ref (corrupt file:
+/// consumers drop the empty name). A row facet token that does not resolve
+/// to `key=value` fails its source instead (`session.rs`, `field_pair`).
 fn kv_value(strings: &HashMap<u32, String>, id: crate::KvId) -> String {
     strings
         .get(&id.0)

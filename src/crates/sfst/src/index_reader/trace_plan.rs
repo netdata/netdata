@@ -16,8 +16,8 @@
 //!
 //! Every dictionary term is `fields × matcher × negated`:
 //!
-//! - `fields` holds ONE storage field, or several OR-combined (the
-//!   grammar's unscoped attribute = resource ∪ span disjunction);
+//! - `fields` holds ONE storage field, or several OR-combined (a caller
+//!   may name several fields for one term; sfsq names one);
 //! - the matcher selects tokens — exact values and anchored regexes, a
 //!   NUMERIC comparison evaluated at the dictionary (each distinct
 //!   stored value parsed once; unparseable values never match), or a
@@ -190,9 +190,9 @@ fn compare<T: PartialOrd>(cmp: NumberCmp, v: T, rhs: T) -> bool {
 #[derive(Debug, Clone, PartialEq)]
 pub enum PlanTerm {
     /// Rows selected by `matcher` over the union of `fields` (one
-    /// STORAGE field name, or several for the unscoped resource ∪ span
-    /// disjunction — the caller constructs names through its vocabulary
-    /// mapping; this crate does not interpret them). `negated` applies
+    /// STORAGE field name, or several OR-combined — the caller constructs
+    /// names through its vocabulary mapping; this crate does not
+    /// interpret them). `negated` applies
     /// the pinned rule in the module docs
     /// (`presence(fields) ∩ complement(match)`); a positive term on an
     /// absent field matches nothing (the `compile_filter` precedent).
@@ -258,7 +258,7 @@ pub enum GroupCondition {
         field: String,
         matcher: PlanMatcher,
     },
-    /// `event:timeSinceStart` in any of the inclusive ns intervals —
+    /// `events.time_since_start` in any of the inclusive ns intervals —
     /// computed in refine from the event time and the row start
     /// (event groups only).
     TimeSinceStart {
