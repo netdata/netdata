@@ -361,49 +361,220 @@ async fn trace_by_id_assembles_the_fixture_trace_end_to_end() {
         "fields carry the span name: {}",
         s0["fields"]
     );
-    // Every name the spans expose has kinds, and nothing else does.
-    let exposed = |section: &str, names: Vec<String>| {
-        let mut want: Vec<String> = names;
-        want.sort();
-        want.dedup();
-        let got: Vec<String> = v["field_kinds"][section]
-            .as_object()
-            .unwrap_or_else(|| panic!("{section} is a map: {}", v["field_kinds"]))
-            .keys()
-            .cloned()
-            .collect();
-        assert_eq!(got, want, "{section}");
-    };
-    let spans = v["spans"].as_array().unwrap();
-    let pairs = |list: &serde_json::Value| -> Vec<String> {
-        list.as_array()
+    assert_eq!(attribute_keys_exposed(&v), kinds_keys(&v));
+    assert!(
+        v["field_kinds"].get("name").is_none(),
+        "builtins carry no kinds"
+    );
+    assert!(
+        v["spans"]
+            .as_array()
             .unwrap()
             .iter()
-            .map(|kv| kv[0].as_str().unwrap().to_string())
-            .collect()
+            .all(|s| !pair_keys(&s["fields"]).iter().any(|k| k.starts_with('_'))),
+        "no internal copy leaves the agent"
+    );
+}
+
+/// The keys of a list of `[key, value]` pairs.
+fn pair_keys(list: &serde_json::Value) -> Vec<String> {
+    list.as_array()
+        .unwrap()
+        .iter()
+        .map(|kv| kv[0].as_str().unwrap().to_string())
+        .collect()
+}
+
+/// Every attribute key a trace answer's spans expose (fields, event and
+/// link attributes), sorted and distinct.
+fn attribute_keys_exposed(v: &serde_json::Value) -> Vec<String> {
+    let mut keys = Vec::new();
+    for s in v["spans"].as_array().unwrap() {
+        keys.extend(pair_keys(&s["fields"]));
+        for e in s["events"].as_array().unwrap() {
+            keys.extend(pair_keys(&e["attributes"]));
+        }
+        for l in s["links"].as_array().unwrap() {
+            keys.extend(pair_keys(&l["attributes"]));
+        }
+    }
+    keys.retain(|k| {
+        matches!(
+            sfsq::traces::classify_storage(k),
+            sfsq::traces::StorageName::Key(_, sfsq::traces::AttributeKey::Attribute(_))
+        )
+    });
+    keys.sort();
+    keys.dedup();
+    keys
+}
+
+/// The keys of a trace answer's `field_kinds`, sorted.
+fn kinds_keys(v: &serde_json::Value) -> Vec<String> {
+    v["field_kinds"]
+        .as_object()
+        .unwrap_or_else(|| panic!("field_kinds is a map: {}", v["field_kinds"]))
+        .keys()
+        .cloned()
+        .collect()
+}
+
+/// A span with every OTLP part the trace answer names: resource, scope
+/// (name, version, attributes), span attributes, an error status with a
+/// message, the trace state, an event and a link with attributes.
+fn rich_request() -> opentelemetry_proto::tonic::collector::trace::v1::ExportTraceServiceRequest {
+    use opentelemetry_proto::tonic::common::v1::{
+        AnyValue, InstrumentationScope, KeyValue, any_value::Value as Av,
     };
-    exposed(
-        "fields",
-        spans.iter().flat_map(|s| pairs(&s["fields"])).collect(),
-    );
-    exposed(
-        "event_attributes",
-        spans
+    use opentelemetry_proto::tonic::trace::v1::{Status, span};
+    let attr = |key: &str, value: &str| KeyValue {
+        key: key.into(),
+        value: Some(AnyValue {
+            value: Some(Av::StringValue(value.into())),
+        }),
+        key_strindex: 0,
+    };
+    let mut req = otlp_req(0x11, 1, 1_000_000_000);
+    let scope = &mut req.resource_spans[0].scope_spans[0];
+    scope.scope = Some(InstrumentationScope {
+        name: "lib".into(),
+        version: "1.2".into(),
+        attributes: vec![attr("tier", "web")],
+        ..Default::default()
+    });
+    let s = &mut scope.spans[0];
+    s.kind = 2;
+    s.trace_state = "ot=th:8".into();
+    s.status = Some(Status {
+        code: 2,
+        message: "boom".into(),
+    });
+    s.attributes = vec![attr("http.request.method", "GET")];
+    s.events = vec![span::Event {
+        time_unix_nano: s.start_time_unix_nano + 10,
+        name: "exception".into(),
+        attributes: vec![attr("exception.type", "E")],
+        ..Default::default()
+    }];
+    s.links = vec![span::Link {
+        trace_id: vec![0x22; 16],
+        span_id: vec![0x33; 8],
+        trace_state: "a=b".into(),
+        attributes: vec![attr("peer", "p")],
+        ..Default::default()
+    }];
+    req
+}
+
+/// The same span answers alike from a sealed file and from a live WAL:
+/// every key is a search key, the status sits under `status.code` /
+/// `status.message`, event and link attributes carry their full keys,
+/// internal copies stay in, and `field_kinds` covers exactly the
+/// attribute keys.
+#[tokio::test]
+async fn a_rich_span_answers_with_keys_sealed_and_tail() {
+    let mut answers = Vec::new();
+    for sealed in [true, false] {
+        let registries = make_registries();
+        if sealed {
+            install_sealed(&registries, "default", 1, vec![rich_request()]).await;
+        } else {
+            install_wal(&registries, "default", 1, vec![rich_request()]).await;
+        }
+        let h = make_handler_over(registries);
+        let v = serde_json::to_value(
+            call_on(&h, json!({"trace": {"id": FIXTURE_TRACE_ID}}))
+                .await
+                .unwrap(),
+        )
+        .unwrap();
+        assert_eq!(v["status"], json!({"complete": true}), "sealed={sealed}");
+        let s = &v["spans"][0];
+        let mut fields: Vec<(String, String)> = s["fields"]
+            .as_array()
+            .unwrap()
             .iter()
-            .flat_map(|s| s["events"].as_array().unwrap().clone())
-            .flat_map(|e| pairs(&e["attributes"]))
-            .collect(),
-    );
-    exposed(
-        "link_attributes",
-        spans
-            .iter()
-            .flat_map(|s| s["links"].as_array().unwrap().clone())
-            .flat_map(|l| pairs(&l["attributes"]))
-            .collect(),
-    );
-    assert_eq!(v["field_kinds"]["fields"]["name"], json!(["str"]));
-    assert_eq!(v["field_kinds"]["fields"]["_kind"], json!(["int"]));
+            .map(|kv| {
+                (
+                    kv[0].as_str().unwrap().into(),
+                    kv[1].as_str().unwrap().into(),
+                )
+            })
+            .collect();
+        fields.sort();
+        let want: Vec<(String, String)> = [
+            ("attributes.http.request.method", "GET"),
+            ("kind", "SERVER"),
+            ("name", "span-1"),
+            ("resource.attributes.service.name", "svc"),
+            ("scope.attributes.tier", "web"),
+            ("scope.name", "lib"),
+            ("scope.version", "1.2"),
+            ("status.code", "ERROR"),
+            ("status.message", "boom"),
+            ("trace_state", "ot=th:8"),
+        ]
+        .map(|(k, v)| (k.to_string(), v.to_string()))
+        .to_vec();
+        assert_eq!(fields, want, "sealed={sealed}");
+        assert!(s.get("kind").is_none(), "sealed={sealed}");
+        assert_eq!(
+            s["events"],
+            json!([{
+                "time_unix_nano": 1_000_001_010_u64,
+                "name": "exception",
+                "dropped_attributes_count": 0,
+                "attributes": [["events.attributes.exception.type", "E"]],
+            }]),
+            "sealed={sealed}"
+        );
+        assert_eq!(
+            s["links"][0]["attributes"],
+            json!([["links.attributes.peer", "p"]]),
+            "sealed={sealed}"
+        );
+        assert_eq!(
+            kinds_keys(&v),
+            [
+                "attributes.http.request.method",
+                "events.attributes.exception.type",
+                "links.attributes.peer",
+                "resource.attributes.service.name",
+                "scope.attributes.tier",
+            ],
+            "sealed={sealed}"
+        );
+        assert_eq!(
+            attribute_keys_exposed(&v),
+            kinds_keys(&v),
+            "sealed={sealed}"
+        );
+        // A key suggestion carries the same key string and, over the same
+        // source, the same kinds.
+        let suggested = serde_json::to_value(
+            call_on(
+                &h,
+                json!({"suggest": {"after": 1, "before": 10, "max_items": 200}}),
+            )
+            .await
+            .unwrap(),
+        )
+        .unwrap();
+        for key in kinds_keys(&v) {
+            let item = suggested["items"]
+                .as_array()
+                .unwrap()
+                .iter()
+                .find(|i| i["text"] == key.as_str())
+                .unwrap_or_else(|| panic!("{key} is suggested: {suggested}"));
+            assert_eq!(
+                item["kinds"], v["field_kinds"][&key],
+                "{key} sealed={sealed}"
+            );
+        }
+        answers.push(v["field_kinds"].clone());
+    }
+    assert_eq!(answers[0], answers[1], "sealed and tail kinds agree");
 }
 
 #[tokio::test]
@@ -424,10 +595,9 @@ async fn absent_trace_id_is_a_complete_empty_trace() {
     assert_eq!(v["field_kinds"], empty_field_kinds());
 }
 
-/// The field-kind map of a trace answer that exposes no names: every
-/// section present, empty.
+/// The field-kind map of a trace answer that exposes no names.
 fn empty_field_kinds() -> serde_json::Value {
-    json!({"fields": {}, "event_attributes": {}, "link_attributes": {}})
+    json!({})
 }
 
 #[tokio::test]

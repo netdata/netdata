@@ -13,9 +13,12 @@
 //!   pin);
 //! - [`to_trace_result`]: the whole wire envelope — echoed lowercase
 //!   id, coverage echo, status, items, summary_root, roots/children,
-//!   an ABSENT `parent_span_id` for roots, event/link sub-shapes, the
-//!   sectioned `field_kinds` map with each set in canonical order — plus
-//!   the empty-trace degenerate;
+//!   an ABSENT `parent_span_id` for roots, event/link sub-shapes with
+//!   full attribute keys, the one `field_kinds` map over attribute keys
+//!   with each set in canonical order — plus the empty-trace degenerate;
+//!   the emission rule (keys and `trace_state` only; internal copies
+//!   never; names outside the vocabulary dropped with `dropped_fields`);
+//!   the byte budget's accounting;
 //! - the keys: every key the wire takes, pinned literally (the UI
 //!   spells exactly these), and the rejections with their messages;
 //! - the cursor codec: encode/parse round-trip, malformed
@@ -87,7 +90,10 @@ fn span(id: u8, parent: Option<u8>, start_ns: i64) -> sfst::TraceSpan {
         dropped_attributes_count: 0,
         dropped_events_count: 0,
         dropped_links_count: 0,
-        fields: vec![("name".into(), format!("span-{id}"))],
+        fields: vec![
+            ("name".into(), format!("span-{id}")),
+            ("_kind".into(), "2".into()),
+        ],
         events: vec![sfst::TraceEvent {
             time_unix_nano: 42,
             name: "ev".into(),
@@ -120,6 +126,7 @@ fn trace_result_shape_is_pinned() {
         status: QueryStatus::Complete,
         field_kinds: FieldKinds {
             fields: vec![
+                ("_kind".into(), kinds(&[Int])),
                 ("attributes.n".into(), kinds(&[Str, Int, Null])),
                 ("name".into(), kinds(&[Str])),
             ],
@@ -157,9 +164,17 @@ fn trace_result_shape_is_pinned() {
         s0.get("parent_span_id").is_none(),
         "an unset parent is ABSENT (OTel root convention), not a zero string"
     );
-    assert_eq!(s0["fields"], json!([["name", "span-1"]]));
+    assert_eq!(
+        s0["fields"],
+        json!([["name", "span-1"]]),
+        "no internal copy"
+    );
+    assert!(s0.get("kind").is_none(), "the raw kind int left the wire");
     assert_eq!(s0["events"][0]["name"], "ev");
-    assert_eq!(s0["events"][0]["attributes"], json!([["k", "v"]]));
+    assert_eq!(
+        s0["events"][0]["attributes"],
+        json!([["events.attributes.k", "v"]])
+    );
     assert_eq!(s0["links"][0]["trace_id"], "ab".repeat(16));
     assert_eq!(s0["links"][0]["span_id"], "cd".repeat(8));
 
@@ -169,11 +184,203 @@ fn trace_result_shape_is_pinned() {
     assert_eq!(
         v["field_kinds"],
         json!({
-            "fields": {"attributes.n": ["null", "int", "str"], "name": ["str"]},
-            "event_attributes": {"k": ["str"]},
-            "link_attributes": {},
+            "attributes.n": ["null", "int", "str"],
+            "events.attributes.k": ["str"],
         }),
-        "sectioned, each set in canonical order"
+        "one map over attribute keys, each set in canonical order"
+    );
+}
+
+/// The trace by its result, at a complete status.
+fn result_of(spans: Vec<sfst::TraceSpan>, field_kinds: FieldKinds) -> serde_json::Value {
+    let trace_id = parse_trace_id("11111111111111111111111111111111").unwrap();
+    let n = spans.len();
+    let data = TraceData {
+        trace: sfst::Trace {
+            spans,
+            roots: (0..n).collect(),
+            children: vec![Vec::new(); n],
+        },
+        status: QueryStatus::Complete,
+        field_kinds,
+        span_cut: Vec::new(),
+        matched: Vec::new(),
+    };
+    serde_json::to_value(to_trace_result(&trace_id, data, coverage_all())).unwrap()
+}
+
+/// Every owner's names go out as keys, with `trace_state`; the internal
+/// copies never do. Null, empty-map and empty-array values travel as
+/// stored, and a flat event facet (the defensive path for a file
+/// without event structures) is a key like any other.
+#[test]
+fn span_fields_are_keys_and_the_trace_state() {
+    use sfst::ValueKind::{EmptyArray, EmptyKvlist, Null, Str};
+    let mut s = span(1, None, 1_000);
+    s.fields = [
+        ("resource.attributes.service.name", "svc"),
+        ("scope.name", "lib"),
+        ("scope.version", "1.0"),
+        ("scope.attributes.tier", "web"),
+        ("name", "GET /"),
+        ("kind", "SERVER"),
+        ("_kind", "2"),
+        ("trace_state", "ot=th:8"),
+        ("status.code", "ERROR"),
+        ("_status_code", "2"),
+        ("status.message", "boom"),
+        ("attributes.none", ""),
+        ("attributes.map", "{}"),
+        ("attributes.list", "[]"),
+        ("events.name", "flat"),
+        ("events.attributes.flat", "x"),
+    ]
+    .map(|(k, v)| (k.to_string(), v.to_string()))
+    .to_vec();
+    s.links[0].attributes = vec![("peer".into(), "p".into())];
+    let mut t = span(2, None, 2_000);
+    t.fields = vec![("name".into(), "no-state".into())];
+    t.events.clear();
+    t.links.clear();
+    let field_kinds = FieldKinds {
+        fields: vec![
+            ("attributes.list".into(), kinds(&[EmptyArray])),
+            ("attributes.map".into(), kinds(&[EmptyKvlist])),
+            ("attributes.none".into(), kinds(&[Null])),
+            ("events.attributes.flat".into(), kinds(&[Str])),
+            ("resource.attributes.service.name".into(), kinds(&[Str])),
+            ("scope.attributes.tier".into(), kinds(&[Str])),
+            ("status.code".into(), kinds(&[Str])),
+            ("trace_state".into(), kinds(&[Str])),
+        ],
+        event_attributes: vec![("k".into(), kinds(&[Str]))],
+        link_attributes: vec![("peer".into(), kinds(&[Str]))],
+    };
+    let v = result_of(vec![s, t], field_kinds);
+    assert_eq!(v["status"], json!({"complete": true}));
+    assert_eq!(
+        v["spans"][0],
+        json!({
+            "span_id": "0101010101010101",
+            "start_ns": 1_000,
+            "duration_ns": 500,
+            "flags": 1,
+            "dropped_attributes_count": 0,
+            "dropped_events_count": 0,
+            "dropped_links_count": 0,
+            "fields": [
+                ["resource.attributes.service.name", "svc"],
+                ["scope.name", "lib"],
+                ["scope.version", "1.0"],
+                ["scope.attributes.tier", "web"],
+                ["name", "GET /"],
+                ["kind", "SERVER"],
+                ["trace_state", "ot=th:8"],
+                ["status.code", "ERROR"],
+                ["status.message", "boom"],
+                ["attributes.none", ""],
+                ["attributes.map", "{}"],
+                ["attributes.list", "[]"],
+                ["events.name", "flat"],
+                ["events.attributes.flat", "x"],
+            ],
+            "events": [{
+                "time_unix_nano": 42,
+                "name": "ev",
+                "dropped_attributes_count": 0,
+                "attributes": [["events.attributes.k", "v"]],
+            }],
+            "links": [{
+                "trace_id": "ab".repeat(16),
+                "span_id": "cd".repeat(8),
+                "trace_state": "ot=th:8",
+                "flags": 0,
+                "dropped_attributes_count": 0,
+                "attributes": [["links.attributes.peer", "p"]],
+            }],
+        })
+    );
+    assert_eq!(v["spans"][1]["fields"], json!([["name", "no-state"]]));
+    assert_eq!(
+        v["field_kinds"],
+        json!({
+            "attributes.list": ["empty_array"],
+            "attributes.map": ["empty_kvlist"],
+            "attributes.none": ["null"],
+            "events.attributes.flat": ["str"],
+            "events.attributes.k": ["str"],
+            "links.attributes.peer": ["str"],
+            "resource.attributes.service.name": ["str"],
+            "scope.attributes.tier": ["str"],
+        }),
+        "attribute keys only; a flat event facet and the event's own attribute share one map"
+    );
+}
+
+/// Names outside the key vocabulary — the status names of earlier
+/// versions, an attribute prefix with no attribute, an unknown prefix,
+/// an unresolvable reference — are left out, and the result says so
+/// once, however many spans carry them.
+#[test]
+fn names_outside_the_vocabulary_are_dropped_and_reported() {
+    let mut spans = Vec::new();
+    for id in 1..=3 {
+        let mut s = span(id, None, 1_000 * i64::from(id));
+        s.fields = [
+            ("name", "op"),
+            ("status_code", "ERROR"),
+            ("status_message", "boom"),
+            ("attributes.", "x"),
+            ("span.http.method", "GET"),
+            ("", ""),
+        ]
+        .map(|(k, v)| (k.to_string(), v.to_string()))
+        .to_vec();
+        s.events[0].attributes = vec![("".into(), "".into()), ("k".into(), "v".into())];
+        s.links[0].attributes = vec![("".into(), "".into())];
+        spans.push(s);
+    }
+    assert_eq!(
+        dropped_names(&spans).into_iter().collect::<Vec<_>>(),
+        [
+            "",
+            "attributes.",
+            "events.attributes.",
+            "links.attributes.",
+            "span.http.method",
+            "status_code",
+            "status_message",
+        ]
+    );
+    let v = result_of(spans, FieldKinds::default());
+    assert_eq!(v["status"], json!({"partial": ["dropped_fields"]}));
+    for s in v["spans"].as_array().unwrap() {
+        assert_eq!(s["fields"], json!([["name", "op"]]));
+        assert_eq!(
+            s["events"][0]["attributes"],
+            json!([["events.attributes.k", "v"]])
+        );
+        assert_eq!(s["links"][0]["attributes"], json!([]));
+    }
+    // An earlier reason stays beside the new one.
+    let trace_id = parse_trace_id("11111111111111111111111111111111").unwrap();
+    let mut s = span(1, None, 1_000);
+    s.fields = vec![("status_code".into(), "OK".into())];
+    let data = TraceData {
+        trace: sfst::Trace {
+            spans: vec![s],
+            roots: vec![0],
+            children: vec![vec![]],
+        },
+        status: QueryStatus::Partial([sfsq::traces::PartialReason::SourceFailure].into()),
+        field_kinds: FieldKinds::default(),
+        span_cut: Vec::new(),
+        matched: Vec::new(),
+    };
+    let v = serde_json::to_value(to_trace_result(&trace_id, data, coverage_all())).unwrap();
+    assert_eq!(
+        v["status"],
+        json!({"partial": ["source_failure", "dropped_fields"]})
     );
 }
 
@@ -909,54 +1116,80 @@ fn a_trace_over_the_byte_budget_keeps_its_earliest_spans() {
     assert_eq!(v["status"], json!({"partial": ["byte_budget"]}));
 }
 
-/// The field kinds count against the byte budget: a budget-bound trace
-/// whose every exposed name holds every leaf kind (the longest entry the
-/// shaper charges) and needs escaping still fits — the serialized
-/// `spans` list and `field_kinds` together, brackets, commas and the
-/// map's envelope included.
+/// The engine's field kinds for `spans` as storage names (span fields)
+/// and bare names (event and link attributes), every name holding `of`.
+fn kinds_of_input(spans: &[sfst::TraceSpan], of: sfst::ValueKinds) -> FieldKinds {
+    let mut k = FieldKinds::default();
+    for s in spans {
+        k.fields
+            .extend(s.fields.iter().map(|(n, _)| (n.clone(), of)));
+        for e in &s.events {
+            k.event_attributes
+                .extend(e.attributes.iter().map(|(n, _)| (n.clone(), of)));
+        }
+        for l in &s.links {
+            k.link_attributes
+                .extend(l.attributes.iter().map(|(n, _)| (n.clone(), of)));
+        }
+    }
+    k
+}
+
+/// The field kinds count against the byte budget, and the shaper charges
+/// exactly the keys `field_kinds` holds. A budget-bound trace whose names
+/// need escaping still fits. With every key holding every leaf kind (the
+/// entry the shaper charges), the charge is exact up to the two commas
+/// the last span and the last entry do not take; with ordinary kind sets
+/// it is an upper bound. Builtins, `trace_state` and internal copies are
+/// charged nothing.
 #[test]
 fn field_kinds_count_against_the_byte_budget() {
+    use sfst::ValueKind::{Int, Str};
     let n = TRACE_SPANS_MAX_BYTES / 512;
     let id = |i: usize| sfst::SpanId::from((i as u64 + 1).to_be_bytes());
     let spans: Vec<sfst::TraceSpan> = (0..n)
         .map(|i| {
             let mut s = span(1, None, 1_000 + i as i64);
             s.span_id = id(i);
-            s.fields = vec![(format!("attributes.f\"{i}\u{1}"), "x".repeat(100))];
+            s.fields = vec![
+                (format!("attributes.f\"{i}\u{1}"), "x".repeat(100)),
+                ("name".into(), "op".into()),
+                ("status.code".into(), "OK".into()),
+                ("trace_state".into(), "ot=th:8".into()),
+                ("_kind".into(), "2".into()),
+            ];
             s.events[0].attributes = vec![(format!("e\\{i}"), "v".into())];
             s.links[0].attributes = vec![(format!("l\"{i}"), "v".into())];
             s
         })
         .collect();
+    let input = spans.clone();
     let r = shaped_trace(spans);
     let kept = r.spans.len();
     assert!(kept > 0 && kept < n, "the budget binds: kept {kept} of {n}");
-    let every: sfst::ValueKinds = sfst::ValueKinds::LEAF_ORDER.into_iter().collect();
-    let section = |names: Vec<String>| names.into_iter().map(|n| (n, every)).collect();
-    let mut data_kinds = FieldKinds::default();
-    let (mut f, mut e, mut l) = (Vec::new(), Vec::new(), Vec::new());
-    for s in &r.spans {
-        f.extend(s.fields.iter().map(|(k, _)| k.clone()));
-        e.extend(
-            s.events
-                .iter()
-                .flat_map(|ev| ev.attributes.iter().map(|(k, _)| k.clone())),
-        );
-        l.extend(
-            s.links
-                .iter()
-                .flat_map(|lk| lk.attributes.iter().map(|(k, _)| k.clone())),
-        );
-    }
-    data_kinds.fields = section(f);
-    data_kinds.event_attributes = section(e);
-    data_kinds.link_attributes = section(l);
+    let mut shaper = WireShaper::default();
+    let charged: usize = input[..kept]
+        .iter()
+        .map(|s| {
+            use sfst::trace_combine::SpanShaper;
+            shaper.shape(&mut s.clone()).weight
+        })
+        .sum();
     let spans_bytes = json_len(&r.spans);
-    let kinds_bytes = json_len(&field_kinds_wire(data_kinds));
+    let every: sfst::ValueKinds = sfst::ValueKinds::LEAF_ORDER.into_iter().collect();
+    let real = spans_bytes + json_len(&field_kinds_wire(kinds_of_input(&input[..kept], every)));
     assert!(
-        spans_bytes + kinds_bytes <= TRACE_SPANS_MAX_BYTES,
-        "spans {spans_bytes} + kinds {kinds_bytes} > {TRACE_SPANS_MAX_BYTES}"
+        real <= TRACE_SPANS_MAX_BYTES,
+        "{real} > {TRACE_SPANS_MAX_BYTES}"
     );
+    assert!(
+        (0..=2).contains(&(charged - real)),
+        "charged {charged}, real {real}"
+    );
+    for of in [kinds(&[Str]), kinds(&[Int, Str])] {
+        let real = spans_bytes + json_len(&field_kinds_wire(kinds_of_input(&input[..kept], of)));
+        assert!(charged >= real, "charged {charged} < real {real}");
+    }
 }
 
 #[test]
@@ -971,4 +1204,170 @@ fn a_list_rows_long_strings_are_cut_and_flagged() {
     );
     assert_eq!(v["traces"][0]["truncated"], true);
     assert!(v["traces"][1].get("truncated").is_none());
+}
+
+// ── Guard: every stored name is in the vocabulary ───────────────────
+
+/// Every name the flattener writes for an OTLP request is a key,
+/// `trace_state` or an internal copy — never unknown, so the emission
+/// rule drops nothing from data this build stores — and every key renders
+/// back to the name it came from. The OTLP messages are exhaustive
+/// literals with non-default values (unknown enum values included), so a
+/// proto upgrade that adds a field fails to compile here until the
+/// flattener and the vocabulary have a place for it.
+#[test]
+fn every_stored_name_is_a_key() {
+    use opentelemetry_proto::tonic::collector::trace::v1::ExportTraceServiceRequest;
+    use opentelemetry_proto::tonic::common::v1::{
+        AnyValue, ArrayValue, InstrumentationScope, KeyValue, KeyValueList, any_value::Value as Av,
+    };
+    use opentelemetry_proto::tonic::resource::v1::Resource;
+    use opentelemetry_proto::tonic::trace::v1::{ResourceSpans, ScopeSpans, Span, Status, span};
+    let text = |v: &str| AnyValue {
+        value: Some(Av::StringValue(v.into())),
+    };
+    let kv = |key: &str, value: AnyValue| KeyValue {
+        key: key.into(),
+        value: Some(value),
+        key_strindex: 0,
+    };
+    let nested = || AnyValue {
+        value: Some(Av::KvlistValue(KeyValueList {
+            values: vec![
+                kv("inner", text("x")),
+                kv(
+                    "list",
+                    AnyValue {
+                        value: Some(Av::ArrayValue(ArrayValue {
+                            values: vec![text("a"), text("b")],
+                        })),
+                    },
+                ),
+            ],
+        })),
+    };
+    let attrs = || {
+        vec![
+            kv("plain", text("v")),
+            kv("map", nested()),
+            kv("", text("e")),
+            kv("a=b", text("q")),
+        ]
+    };
+    let req = ExportTraceServiceRequest {
+        resource_spans: vec![ResourceSpans {
+            resource: Some(Resource {
+                attributes: attrs(),
+                dropped_attributes_count: 1,
+                entity_refs: Vec::new(),
+            }),
+            scope_spans: vec![ScopeSpans {
+                scope: Some(InstrumentationScope {
+                    name: "lib".into(),
+                    version: "1".into(),
+                    attributes: attrs(),
+                    dropped_attributes_count: 1,
+                }),
+                spans: vec![Span {
+                    trace_id: vec![1; 16],
+                    span_id: vec![2; 8],
+                    trace_state: "ot=th:8".into(),
+                    parent_span_id: vec![3; 8],
+                    flags: 1,
+                    name: "op".into(),
+                    kind: 9,
+                    start_time_unix_nano: 1_000_000_000,
+                    end_time_unix_nano: 1_000_000_500,
+                    attributes: attrs(),
+                    dropped_attributes_count: 1,
+                    events: vec![span::Event {
+                        time_unix_nano: 1_000_000_100,
+                        name: "ev".into(),
+                        attributes: attrs(),
+                        dropped_attributes_count: 1,
+                    }],
+                    dropped_events_count: 1,
+                    links: vec![span::Link {
+                        trace_id: vec![4; 16],
+                        span_id: vec![5; 8],
+                        trace_state: "a=b".into(),
+                        attributes: attrs(),
+                        dropped_attributes_count: 1,
+                        flags: 1,
+                    }],
+                    dropped_links_count: 1,
+                    status: Some(Status {
+                        message: "boom".into(),
+                        code: 7,
+                    }),
+                }],
+                schema_url: "s".into(),
+            }],
+            schema_url: "s".into(),
+        }],
+    };
+    let (flat, _) = ng_flatten::flatten_trace_request(req);
+    let mut names: Vec<String> = Vec::new();
+    let mut add = |entries: &[ng_flatten::Entry]| {
+        names.extend(entries.iter().map(|e| flat.tree.path(e.node)));
+    };
+    for rg in &flat.resources {
+        add(&rg.resource);
+        for sg in &rg.scopes {
+            add(&sg.scope);
+            for s in &sg.spans {
+                add(&s.entries);
+                for e in &s.events {
+                    add(std::slice::from_ref(&e.name));
+                    add(&e.attributes);
+                }
+                for l in &s.links {
+                    add(&l.attributes);
+                }
+            }
+        }
+    }
+    names.sort();
+    names.dedup();
+    assert!(names.len() > 20, "the request flattened: {names:?}");
+    let mut uses = std::collections::BTreeSet::new();
+    for name in &names {
+        match sfsq::traces::classify_storage(name) {
+            StorageName::Key(owner, key) => {
+                assert_eq!(&sfsq::traces::render_key(owner, &key), name, "{name}");
+                uses.insert(match key {
+                    AttributeKey::Attribute(_) => format!("{owner:?} attribute"),
+                    AttributeKey::Builtin(b) => format!("{b:?}"),
+                });
+            }
+            StorageName::TraceState => {
+                uses.insert("trace_state".into());
+            }
+            StorageName::Internal => {
+                uses.insert(format!("internal {name}"));
+            }
+            StorageName::Unknown => panic!("{name} is stored but not in the vocabulary"),
+        }
+    }
+    assert_eq!(
+        uses.into_iter().collect::<Vec<_>>(),
+        [
+            "Event attribute",
+            "EventName",
+            "Instrumentation attribute",
+            "InstrumentationName",
+            "InstrumentationVersion",
+            "Kind",
+            "Link attribute",
+            "Name",
+            "Resource attribute",
+            "Span attribute",
+            "Status",
+            "StatusMessage",
+            "internal _kind",
+            "internal _status_code",
+            "trace_state",
+        ],
+        "every kind of stored name is covered"
+    );
 }

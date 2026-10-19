@@ -761,20 +761,15 @@ impl SpanSource for TraceFileSession<'_, '_> {
         // Row facets: the `events.`/`links.` tokens exist for search; in
         // the reconstructed span they appear structured instead, so drop
         // the flat duplicates (only when the structure is present).
-        let fields: Vec<(String, String)> = row_ids
-            .iter()
-            .map(|kv| {
-                let s = self.strings.get(&kv.0).map(String::as_str).unwrap_or("");
-                match s.split_once('=') {
-                    Some((k, v)) => (k.to_string(), v.to_string()),
-                    None => (s.to_string(), String::new()),
-                }
-            })
-            .filter(|(k, _)| {
-                !((has_events && k.starts_with("events."))
-                    || (has_links && k.starts_with("links.")))
-            })
-            .collect();
+        let mut fields: Vec<(String, String)> = Vec::with_capacity(row_ids.len());
+        for kv in &row_ids {
+            let token = self.strings.get(&kv.0).map(String::as_str).unwrap_or("");
+            let (k, v) = field_pair(token)?;
+            if (has_events && k.starts_with("events.")) || (has_links && k.starts_with("links.")) {
+                continue;
+            }
+            fields.push((k.to_string(), v.to_string()));
+        }
 
         let extras = self.extras.as_ref().expect("populated above by extras()");
         let events: Vec<TraceEvent> = match &extras.events {
@@ -887,5 +882,36 @@ impl SpanSource for TraceFileSession<'_, '_> {
         self.stats = None;
         self.rollup_refs = None;
         self.emptied();
+    }
+}
+
+/// A field token's name and value. A token is `name=value`; one without
+/// `=` is damage, not an empty value (`name=`), so the file is reported
+/// instead of read on.
+fn field_pair(token: &str) -> Result<(&str, &str), crate::Error> {
+    token.split_once('=').ok_or_else(|| {
+        crate::Error::CorruptIndex(format!("trace session: field token {token:?} has no '='"))
+    })
+}
+
+#[cfg(test)]
+mod field_token_tests {
+    use super::field_pair;
+
+    /// The first `=` splits; an empty value is a value; no `=` at all
+    /// (including the empty token of an unresolvable id) is damage.
+    #[test]
+    fn a_token_without_a_separator_is_damage() {
+        assert_eq!(
+            field_pair("attributes.example=").unwrap(),
+            ("attributes.example", "")
+        );
+        assert_eq!(field_pair("name=a=b").unwrap(), ("name", "a=b"));
+        for bad in ["attributes.example", ""] {
+            assert!(
+                matches!(field_pair(bad), Err(crate::Error::CorruptIndex(_))),
+                "{bad:?}"
+            );
+        }
     }
 }

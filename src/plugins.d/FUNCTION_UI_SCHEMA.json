@@ -811,7 +811,8 @@
                   "file_budget",
                   "deadline",
                   "no_new_matches",
-                  "trace_fragments"
+                  "trace_fragments",
+                  "dropped_fields"
                 ]
               }
             }

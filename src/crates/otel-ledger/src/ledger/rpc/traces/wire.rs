@@ -883,7 +883,7 @@ pub struct TraceResult {
     /// whose resolved parent is span `i`.
     pub children: Vec<Vec<usize>>,
     pub spans: Vec<SpanWire>,
-    /// The value kinds of every name the returned spans expose.
+    /// The value kinds of every attribute key the returned spans expose.
     pub field_kinds: FieldKindsWire,
     /// Ascending indices into `spans` of the spans matching the
     /// request's chips or free text: a span matches when it satisfies a
@@ -893,19 +893,21 @@ pub struct TraceResult {
     pub matched: Vec<u32>,
 }
 
-/// The value kinds of every name the returned spans expose, sectioned as
-/// the spans expose names: span `fields` by storage name, event and link
-/// attributes by their prefix-stripped names (an event attribute and a
-/// link attribute may share a name with different kinds). Each name maps
-/// to the kinds of value stored under it, in the order `null`, `bool`,
-/// `int`, `double`, `str`, `bytes`, `empty_kvlist`, `empty_array`,
-/// unioned over the sources that contributed the returned spans.
+/// The value kinds of every attribute key the returned spans expose
+/// (span `fields`, event and link `attributes`), keyed by the key itself
+/// — the same key string a chip and a key suggestion use. Builtin keys
+/// (`name`, `kind`, `status.code`, ...) and `trace_state` have no entry,
+/// as on key suggestions. Each key maps to the kinds of value stored
+/// under it, in the order `null`, `bool`, `int`, `double`, `str`,
+/// `bytes`, `empty_kvlist`, `empty_array`, unioned over the sources that
+/// contributed the returned spans: the same derivation as a key
+/// suggestion's `kinds`, equal to it over the same sources.
 ///
-/// Every name the spans expose has an entry unless `status` reports a
-/// source failure (a missing name then means "unknown"). A source records
-/// the kinds a key held across all its spans, not per value, so a list
-/// may name a kind this trace's values do not have; it misses none they
-/// have.
+/// Every attribute key the spans expose has an entry unless `status`
+/// reports a source failure (a missing key then means "unknown"). A
+/// source records the kinds a key held across all its spans, not per
+/// value, so a list may name a kind this trace's values do not have; it
+/// misses none they have.
 ///
 /// Values travel as text, rendered per kind: `int` in decimal; `double`
 /// in plain decimal with the fewest digits that read back as the same
@@ -915,12 +917,7 @@ pub struct TraceResult {
 /// `empty_array` as `[]`; `str` as itself. A client can narrow a value's
 /// kind by its text (`abc` is no `int`), not tell `1` the int from `1`
 /// the string.
-#[derive(Debug, Serialize)]
-pub struct FieldKindsWire {
-    pub fields: BTreeMap<String, Vec<&'static str>>,
-    pub event_attributes: BTreeMap<String, Vec<&'static str>>,
-    pub link_attributes: BTreeMap<String, Vec<&'static str>>,
-}
+pub type FieldKindsWire = BTreeMap<String, Vec<&'static str>>;
 
 /// Result accounting. `returned` counts the spans in this response —
 /// under a `size_cap` partial, more unique spans exist than returned.
@@ -929,11 +926,14 @@ pub struct TraceItems {
     pub returned: usize,
 }
 
-/// One span, ids in W3C lowercase hex. `fields` are the engine's
-/// resolved row facets as `[name, value]` string pairs (order
-/// preserved; names are storage names — `field_kinds.fields` gives the
-/// kinds of value each holds). `kind` is the raw OTLP span-kind int;
-/// the readable label is in `fields` under `kind`.
+/// One span, ids in W3C lowercase hex. `fields` are the span's resolved
+/// facets as `[key, value]` string pairs (order preserved): every key is
+/// a search key (`name`, `kind`, `status.code`, `status.message`,
+/// `scope.name`, `scope.version`, `resource.attributes.<key>`,
+/// `scope.attributes.<key>`, `attributes.<key>`), plus `trace_state`,
+/// shown but not a search key. `field_kinds` gives the kinds of value
+/// each attribute key holds. A stored name outside the key vocabulary is
+/// left out, and `status` then carries `dropped_fields`.
 #[derive(Debug, Serialize)]
 pub struct SpanWire {
     pub span_id: String,
@@ -942,7 +942,6 @@ pub struct SpanWire {
     pub parent_span_id: Option<String>,
     pub start_ns: i64,
     pub duration_ns: i64,
-    pub kind: i32,
     /// W3C trace flags (the low byte carries the sampled bit).
     pub flags: u32,
     pub dropped_attributes_count: u32,
@@ -959,8 +958,8 @@ pub struct SpanWire {
     pub truncated: bool,
 }
 
-/// One span event; attribute keys are prefix-stripped (`foo`, not
-/// `events.attributes.foo`).
+/// One span event; attribute keys are full search keys
+/// (`events.attributes.<key>`). Its name's search key is `events.name`.
 #[derive(Debug, Serialize)]
 pub struct EventWire {
     pub time_unix_nano: u64,
@@ -969,7 +968,9 @@ pub struct EventWire {
     pub attributes: Vec<(String, String)>,
 }
 
-/// One span link, ids in W3C lowercase hex.
+/// One span link, ids in W3C lowercase hex; attribute keys are full
+/// search keys (`links.attributes.<key>`). Its ids' search keys are
+/// `links.trace_id` and `links.span_id`.
 #[derive(Debug, Serialize)]
 pub struct LinkWire {
     pub trace_id: String,
@@ -1089,6 +1090,7 @@ pub enum PartialReasonWire {
     Deadline,
     NoNewMatches,
     TraceFragments,
+    DroppedFields,
 }
 
 impl From<PartialReason> for PartialReasonWire {
@@ -1107,6 +1109,7 @@ impl From<PartialReason> for PartialReasonWire {
             PartialReason::Deadline => PartialReasonWire::Deadline,
             PartialReason::NoNewMatches => PartialReasonWire::NoNewMatches,
             PartialReason::TraceFragments => PartialReasonWire::TraceFragments,
+            PartialReason::DroppedFields => PartialReasonWire::DroppedFields,
         }
     }
 }

@@ -14,7 +14,9 @@
 //! Consumers render it, never reinterpret it: the CLI prints the set,
 //! and the ledger's `to_*_result` adapters map it 1:1 onto the wire
 //! `StatusWire` (search pagination additionally requires
-//! [`QueryStatus::is_complete`] before it emits a next cursor).
+//! [`QueryStatus::is_complete`] before it emits a next cursor). The one
+//! reason a consumer adds is [`DroppedFields`](PartialReason::DroppedFields),
+//! for the names it leaves out of what it emits.
 
 use std::collections::BTreeSet;
 
@@ -96,6 +98,14 @@ pub enum PartialReason {
     /// can also miss a match its other files hold, so a trace may count
     /// less, not only more. Overview-only.
     TraceFragments,
+    /// A consumer left out field names that are not in the key
+    /// vocabulary ([`super::vocab::classify_storage`] says `Unknown`): no
+    /// span is missing, but those spans lack the dropped fields. Such
+    /// names come from a damaged file or from a file written by another
+    /// version (for example the status names before `status.code`).
+    /// Raised by a consumer that shapes trace-by-id results, never by an
+    /// engine operation.
+    DroppedFields,
 }
 
 /// The status of one query's result.
@@ -113,6 +123,16 @@ impl QueryStatus {
     /// missing.
     pub fn is_complete(&self) -> bool {
         matches!(self, QueryStatus::Complete)
+    }
+
+    /// This status with `reason` added.
+    pub fn with(self, reason: PartialReason) -> Self {
+        let mut reasons = match self {
+            QueryStatus::Complete => BTreeSet::new(),
+            QueryStatus::Partial(reasons) => reasons,
+        };
+        reasons.insert(reason);
+        QueryStatus::Partial(reasons)
     }
 
     /// Whether `reason` is among the partial reasons (`false` for

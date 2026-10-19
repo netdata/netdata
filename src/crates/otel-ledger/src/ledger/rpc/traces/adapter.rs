@@ -13,12 +13,13 @@
 //! mode dispatch and the sealed-SFST + live-WAL source capture
 //! ([`super::sources`]) — the adapter never touches registry state.
 
-use std::collections::{BTreeMap, HashMap, HashSet};
+use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet};
 
 use sfsq::traces::{
     AttributeKey, AttributeOwner, BuiltinField, CompareOp, Condition, DURATION_BIN_LABELS,
     DurationPercentiles, FieldKinds, KeyError, OverviewData, Predicate, PredicateError,
-    PredicateTarget, PredicateValue, SearchData, TOKENS_MAX, Token, TokenQuery, TraceData,
+    PredicateTarget, PredicateValue, SearchData, StorageName, TOKENS_MAX, Token, TokenQuery,
+    TraceData,
 };
 
 use super::wire::{
@@ -190,13 +191,21 @@ fn json_len(value: &impl serde::Serialize) -> usize {
 /// The engine already shaped the trace with [`WireShaper`]: values are
 /// capped (flagged per span in `span_cut`), a trace past the budget is
 /// its earliest spans with their own graph and field kinds and reports
-/// `byte_budget`. This only maps it.
+/// `byte_budget`. This maps it, leaving out the names [`span_wire`] does
+/// not emit; names outside the key vocabulary add `dropped_fields` and
+/// one warning for the whole response.
 pub(crate) fn to_trace_result(
     trace_id: &sfst::TraceId,
     data: TraceData,
     coverage: CoverageWire,
 ) -> TraceResult {
     let t = data.trace;
+    let mut status = data.status;
+    let dropped = dropped_names(&t.spans);
+    if !dropped.is_empty() {
+        warn_dropped(trace_id, &dropped);
+        status = status.with(sfsq::traces::PartialReason::DroppedFields);
+    }
     let cut = data
         .span_cut
         .iter()
@@ -214,7 +223,7 @@ pub(crate) fn to_trace_result(
         version: 1,
         trace_id: trace_id.to_string(),
         coverage,
-        status: StatusWire::from(&data.status),
+        status: StatusWire::from(&status),
         items: TraceItems {
             returned: spans.len(),
         },
@@ -227,18 +236,123 @@ pub(crate) fn to_trace_result(
     }
 }
 
-/// Field kinds → the wire map, each kind spelled as its [`kind_word`].
-fn field_kinds_wire(k: FieldKinds) -> FieldKindsWire {
-    let section = |v: Vec<(String, sfst::ValueKinds)>| -> BTreeMap<String, Vec<&'static str>> {
-        v.into_iter()
-            .map(|(n, kinds)| (n, kind_words(kinds)))
-            .collect()
-    };
-    FieldKindsWire {
-        fields: section(k.fields),
-        event_attributes: section(k.event_attributes),
-        link_attributes: section(k.link_attributes),
+/// What a span field name is on the wire.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum FieldUse {
+    /// An attribute key: emitted, with an entry in `field_kinds`.
+    Attribute,
+    /// A builtin key or the trace state: emitted, without kinds.
+    Plain,
+    /// An internal raw-int copy: never emitted.
+    Internal,
+    /// Outside the key vocabulary: left out and reported.
+    Unknown,
+}
+
+fn field_use(name: &str) -> FieldUse {
+    match sfsq::traces::classify_storage(name) {
+        StorageName::Key(_, AttributeKey::Attribute(_)) => FieldUse::Attribute,
+        StorageName::Key(_, AttributeKey::Builtin(_)) | StorageName::TraceState => FieldUse::Plain,
+        StorageName::Internal => FieldUse::Internal,
+        StorageName::Unknown => FieldUse::Unknown,
     }
+}
+
+/// An event or link attribute's key: the owner's prefix and the engine's
+/// bare name; `None` for an empty name (an unresolvable reference),
+/// which names no attribute.
+fn attribute_key(owner: AttributeOwner, name: &str) -> Option<String> {
+    let prefix = owner.attribute_prefix().expect("an attribute owner");
+    (!name.is_empty()).then(|| format!("{prefix}{name}"))
+}
+
+/// The distinct names the spans carry that [`span_wire`] leaves out
+/// because they are outside the key vocabulary. An event or link
+/// attribute with no name is listed under its bare prefix.
+fn dropped_names(spans: &[sfst::TraceSpan]) -> BTreeSet<String> {
+    let mut dropped = BTreeSet::new();
+    let mut known: HashMap<&str, FieldUse> = HashMap::new();
+    for span in spans {
+        for (name, _) in &span.fields {
+            let used = *known.entry(name).or_insert_with(|| field_use(name));
+            if used == FieldUse::Unknown {
+                dropped.insert(name.clone());
+            }
+        }
+        for (owner, attributes) in span
+            .events
+            .iter()
+            .map(|e| (AttributeOwner::Event, &e.attributes))
+            .chain(
+                span.links
+                    .iter()
+                    .map(|l| (AttributeOwner::Link, &l.attributes)),
+            )
+        {
+            if attributes.iter().any(|(name, _)| name.is_empty()) {
+                dropped.insert(
+                    owner
+                        .attribute_prefix()
+                        .expect("an attribute owner")
+                        .to_string(),
+                );
+            }
+        }
+    }
+    dropped
+}
+
+/// The most names one warning lists.
+const DROPPED_NAMES_LISTED: usize = 16;
+
+/// One warning per response for the names left out.
+fn warn_dropped(trace_id: &sfst::TraceId, dropped: &BTreeSet<String>) {
+    let listed: Vec<&str> = dropped
+        .iter()
+        .take(DROPPED_NAMES_LISTED)
+        .map(String::as_str)
+        .collect();
+    let more = dropped.len().saturating_sub(DROPPED_NAMES_LISTED);
+    let tail = if more > 0 {
+        format!(" and {more} more")
+    } else {
+        String::new()
+    };
+    tracing::warn!(
+        "otel-traces: trace {trace_id}: left out {} field name(s) outside the key vocabulary: {:?}{tail}",
+        dropped.len(),
+        listed
+    );
+}
+
+/// Field kinds → the wire map: one entry per attribute key the spans
+/// expose (builtins carry none), each kind spelled as its [`kind_word`].
+/// A key the engine lists twice (a flat event facet beside the event's
+/// own attribute) takes the union.
+fn field_kinds_wire(k: FieldKinds) -> FieldKindsWire {
+    let mut map: BTreeMap<String, sfst::ValueKinds> = BTreeMap::new();
+    let mut add = |key: String, kinds: sfst::ValueKinds| {
+        let entry = map.entry(key).or_default();
+        *entry = entry.union(kinds);
+    };
+    for (name, kinds) in k.fields {
+        if field_use(&name) == FieldUse::Attribute {
+            add(name, kinds);
+        }
+    }
+    for (owner, section) in [
+        (AttributeOwner::Event, k.event_attributes),
+        (AttributeOwner::Link, k.link_attributes),
+    ] {
+        for (name, kinds) in section {
+            if let Some(key) = attribute_key(owner, &name) {
+                add(key, kinds);
+            }
+        }
+    }
+    map.into_iter()
+        .map(|(key, kinds)| (key, kind_words(kinds)))
+        .collect()
 }
 
 /// A kind set's wire words, in its canonical order.
@@ -276,14 +390,15 @@ fn kind_entry_bound() -> usize {
 /// trace handler passes it to `TraceQuery::shaper`): caps each span's
 /// values at [`TRACE_VALUE_MAX_BYTES`], flags the span when it cut one,
 /// and weighs it as its compact JSON and the comma after it, plus, for
-/// each name it is the first to expose, an upper bound of that name's
-/// field-kind entry (kinds are known only once the merge is done). The
-/// first span also carries the list's brackets and the empty field-kind
-/// map. The engine keeps spans while they fit [`TRACE_SPANS_MAX_BYTES`],
-/// so `spans` and `field_kinds` together never exceed it.
+/// each attribute key it is the first to expose (the keys of
+/// `field_kinds`), an upper bound of that key's entry (kinds are known
+/// only once the merge is done). The first span also carries the list's
+/// brackets and the empty field-kind map. The engine keeps spans while
+/// they fit [`TRACE_SPANS_MAX_BYTES`], so `spans` and `field_kinds`
+/// together never exceed it.
 pub(crate) struct WireShaper {
-    /// Names already charged: span fields, event and link attributes.
-    names: [HashSet<String>; 3],
+    /// Attribute keys already charged.
+    names: HashSet<String>,
     /// [`kind_entry_bound`], computed once.
     entry: usize,
     /// The fixed cost still to charge, on the first span: the spans
@@ -306,24 +421,32 @@ impl sfst::trace_combine::SpanShaper for WireShaper {
         let cut = cap_span_values(span);
         let mut weight = json_len(&span_wire(span, cut)) + 1 + std::mem::take(&mut self.fixed);
         let entry = self.entry;
-        let [fields, events, links] = &mut self.names;
-        let mut charge = |seen: &mut HashSet<String>, name: &str| {
-            if !seen.contains(name) {
-                seen.insert(name.to_string());
-                weight += json_len(&name) + entry;
+        let seen = &mut self.names;
+        let mut charge = |key: &str| {
+            if !seen.contains(key) {
+                seen.insert(key.to_string());
+                weight += json_len(&key) + entry;
             }
         };
         for (name, _) in &span.fields {
-            charge(fields, name);
-        }
-        for event in &span.events {
-            for (name, _) in &event.attributes {
-                charge(events, name);
+            if field_use(name) == FieldUse::Attribute {
+                charge(name);
             }
         }
-        for link in &span.links {
-            for (name, _) in &link.attributes {
-                charge(links, name);
+        for (owner, attributes) in span
+            .events
+            .iter()
+            .map(|e| (AttributeOwner::Event, &e.attributes))
+            .chain(
+                span.links
+                    .iter()
+                    .map(|l| (AttributeOwner::Link, &l.attributes)),
+            )
+        {
+            for (name, _) in attributes {
+                if let Some(key) = attribute_key(owner, name) {
+                    charge(&key);
+                }
             }
         }
         sfst::trace_combine::Shaped { weight, cut }
@@ -336,6 +459,9 @@ impl sfst::trace_combine::SpanShaper for WireShaper {
 
 /// One assembled span → the wire shape (events and links ride along).
 /// `truncated` says whether [`cap_span_values`] cut any of its values.
+/// Emits keys and the trace state only: internal raw-int copies and
+/// names outside the key vocabulary stay out, and event and link
+/// attributes carry their full keys.
 fn span_wire(s: &sfst::TraceSpan, truncated: bool) -> SpanWire {
     SpanWire {
         span_id: s.span_id.to_string(),
@@ -344,16 +470,31 @@ fn span_wire(s: &sfst::TraceSpan, truncated: bool) -> SpanWire {
         parent_span_id: (!s.parent_span_id.is_unset()).then(|| s.parent_span_id.to_string()),
         start_ns: s.start_ns,
         duration_ns: s.duration_ns,
-        kind: s.kind,
         flags: s.flags,
         dropped_attributes_count: s.dropped_attributes_count,
         dropped_events_count: s.dropped_events_count,
         dropped_links_count: s.dropped_links_count,
-        fields: s.fields.clone(),
+        fields: s
+            .fields
+            .iter()
+            .filter(|(name, _)| matches!(field_use(name), FieldUse::Attribute | FieldUse::Plain))
+            .cloned()
+            .collect(),
         events: s.events.iter().map(event_wire).collect(),
         links: s.links.iter().map(link_wire).collect(),
         truncated,
     }
+}
+
+/// Event or link attributes → wire pairs keyed by their full keys.
+fn attribute_pairs(
+    owner: AttributeOwner,
+    attributes: &[(String, String)],
+) -> Vec<(String, String)> {
+    attributes
+        .iter()
+        .filter_map(|(name, value)| attribute_key(owner, name).map(|key| (key, value.clone())))
+        .collect()
 }
 
 /// One span event → the wire shape.
@@ -362,7 +503,7 @@ fn event_wire(e: &sfst::TraceEvent) -> EventWire {
         time_unix_nano: e.time_unix_nano,
         name: e.name.clone(),
         dropped_attributes_count: e.dropped_attributes_count,
-        attributes: e.attributes.clone(),
+        attributes: attribute_pairs(AttributeOwner::Event, &e.attributes),
     }
 }
 
@@ -374,7 +515,7 @@ fn link_wire(l: &sfst::TraceLink) -> LinkWire {
         trace_state: l.trace_state.clone(),
         flags: l.flags,
         dropped_attributes_count: l.dropped_attributes_count,
-        attributes: l.attributes.clone(),
+        attributes: attribute_pairs(AttributeOwner::Link, &l.attributes),
     }
 }
 

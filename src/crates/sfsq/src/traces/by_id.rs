@@ -153,7 +153,9 @@ pub enum TraceRequestError {
 /// exactly the sources whose spans the result retained — uncoalesced,
 /// and file-wide: a source's schema covers every span it holds, not
 /// only this trace's (which value had which kind is not stored). Sorted
-/// by name.
+/// by name. Storage names are vocabulary keys (`vocab::parse_key`), so a
+/// consumer that wants one map keyed by key puts the owner prefix back
+/// on the event and link names.
 #[derive(Debug, Default, PartialEq, Eq)]
 pub struct FieldKinds {
     pub fields: Vec<(String, sfst::ValueKinds)>,
