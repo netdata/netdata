@@ -75,6 +75,12 @@ fi
 echo "create-pkg: staging install tree"
 rm -rf "${STAGING}" "${INNER_DIR}" "${OUTPUT}"
 mkdir -p "${STAGING}" "${INNER_DIR}" "$(dirname "${OUTPUT}")"
+# The static installer's layout (makeself/jobs/00-prepare-destination): the
+# binaries land in a real bin/ through a usr/sbin symlink, so tools that look
+# in /opt/netdata/bin (kickstart, the generic uninstaller) and the configured
+# usr/sbin paths both find them.
+mkdir -p "${STAGING}/opt/netdata/bin" "${STAGING}/opt/netdata/usr"
+ln -s ../bin "${STAGING}/opt/netdata/usr/sbin"
 DESTDIR="${STAGING}" cmake --install "${BUILD_DIR}" > "${WORK_DIR}/install.log" 2>&1
 
 echo "create-pkg: running the payload artifact gate"
