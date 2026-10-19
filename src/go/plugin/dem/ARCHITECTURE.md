@@ -34,7 +34,7 @@ relative to `src/go/`.
   - **Synthetics**: the plugin *pulls* by running scripted browsers on a schedule (Playwright journeys and Lighthouse
     audits).
 - Both run on the shared Go plugin framework (`plugin/agent`, `plugin/framework`): four native collector modules,
-  configured through DynCfg, scheduled by the framework, publishing charts that stock alerts read.
+  configured through DynCfg, scheduled by the framework, publishing charts, many of them with stock alerts.
 - Beyond charts, DEM keeps sampled investigation detail in a journal and optional screenshots/reports on disk. Process
   Functions expose both, and keep working even when every collector is disabled.
 - The command (`cmd/demplugin`) owns the shared stores. Jobs only borrow them, and the stores close only after a clean
@@ -124,7 +124,7 @@ Two **registries** connect jobs to Functions. `rum/registry` and `synthetic/regi
 running (admitted sites, receiver availability, active synthetic jobs). They hold no desired configuration, so
 Functions report what really runs; consumers join native DynCfg state to show disabled or failed configurations.
 
-The four collector modules:
+The four collector modules (the journeys below show them in action):
 
 | Module | Job shape | Defaults | Owns while running |
 |---|---|---|---|
@@ -176,7 +176,8 @@ sequenceDiagram
 
 ### Admission checks, in order
 
-A collection request passes these checks before any processing. The first failure decides the response.
+Checks run in this order, cheapest first, and nothing is decoded until admission passes. The first failing check
+decides the response.
 
 | Step | Check | On failure |
 |---|---|---|
@@ -187,7 +188,7 @@ A collection request passes these checks before any processing. The first failur
 | 5 | Bot user agent or `?bot=1`, unless the site includes bots | 204, intentional exclusion |
 | 6 | Body reads completely within the limit | 413 or 400 |
 | 7 | The site's collection sample rate is zero | 204, nothing decoded |
-| 8 | GeoIP lookup for public client addresses, unless geolocation is `off` | Fields stay absent |
+| 8 | GeoIP lookup for public client addresses, unless geolocation is `off` | Never rejects; location fields stay absent |
 | 9 | Faro payload decodes and normalizes | 400 |
 | 10 | The site processor ingests the beacon | 202 Accepted |
 
@@ -257,7 +258,8 @@ Key points of this path:
 - **A fresh browser per run.** Runs share no browser state.
 - **The runtime is prepared elsewhere.** The runtime host downloads or imports the browser runtime in the background,
   or an administrator supplies a preload. A run only pins an already prepared runtime for its duration.
-- **Proof of completion.** A run finishes only when Linux supervision proves that the whole child process tree has
+- **Proof of completion.** The Node adapter and its browser start through `nd-run`, the Agent's unprivileged launcher,
+  acting as a Linux subreaper. A run finishes only when that supervision proves the whole child process tree has
   exited. Only then are captures published and the admission slot released.
 
 How a run can end:
@@ -314,7 +316,7 @@ What makes this layer predictable:
   queryable while the plugin itself is enabled.
 - **Fresh handlers.** Each framework run generation gets new handler instances; the stores they read stay open.
 - **Read-only and short leases.** Functions copy running state quickly and do their disk reads on their own journal
-  snapshots. No Function ever waits for a browser run.
+  snapshots or through the capture store. No Function ever waits for a browser run.
 
 ## Storage and retention
 
@@ -323,7 +325,7 @@ What makes this layer predictable:
 | Investigation journal | `${NETDATA_LIB_DIR}/dem/journal` | 30 days, 1 GiB | RUM investigation entries and synthetic run records | Retention worker, at startup and hourly |
 | Captures | `${NETDATA_LIB_DIR}/dem/artifacts` | 7 days, 2 GiB | Screenshots and HTML reports, one set per run | Retention worker, at startup and hourly |
 | Browser runtime cache | `${NETDATA_LIB_DIR}/dem/runtime` | 4 GiB; 7-day grace for previous, 30-day for idle runtimes | Prepared Node + Chromium bundles | Runtime host worker, at startup and hourly |
-| Measurement windows | Memory | Per-site `window` (5 minutes by default) | Rolling populations, live feed, investigation context | The site job; lost on restart |
+| In-memory site state | Memory | Measurements: per-site `window` (5 minutes by default); investigation context: bounded session and entry counts | Rolling populations, live feed, investigation context | The site job; lost on restart |
 
 - The journal and capture budgets live in `dem.conf`. The retention worker reloads them before each sweep, so valid
   edits apply without a restart. Runtime cache settings apply after a plugin restart.
@@ -434,6 +436,7 @@ flowchart LR
     Q --> A("synthetic/artifacts")
     H --> J("journal")
     Col("collector/*") --> Reg
+    Col -->|"site history writer"| H
     Col --> Dom("domain packages<br/>aggregate · httpapi · otlp · geoip")
 
     classDef pkg fill:#fef3c7,stroke:#d97706,color:#0b1021;
@@ -502,6 +505,8 @@ Receiver:
 - Receiver `Init` / `Check` validate and prepare without binding.
 - `Run` binds the listener, publishes availability and signals readiness.
 - Receiver replacement preserves site aggregation and pending investigation/export queues.
+- Receiver and OTLP TLS preparation use the shared context-aware TLS helper, so native preflight cancellation reaches
+  credential-file reads.
 
 Sites:
 
@@ -540,8 +545,6 @@ Sites:
 - Concurrent body reads can complete out of receipt-time order. Rolling-window reads filter every expired observation;
   session activity and deduplication keep the newest receipt time without rewriting event timestamps.
 - HTTP rejection accounting reaches aggregation only.
-- Receiver and OTLP TLS preparation use the shared context-aware TLS helper, so native preflight cancellation reaches
-  credential-file reads.
 
 ### Capture policy and privacy
 
@@ -557,6 +560,8 @@ Sites:
 | `country` (default) | Performed | Country only | Country only |
 | `city` | Performed | Country plus approximate city/coordinates | Country only; never city coordinates |
 
+- City mode adds approximate city/coordinates to live observations only. Journals and OTLP never receive city
+  coordinates.
 - Disabled frustration has no instruments or page counts.
 - Application-provided user IDs use bounded text normalization without path-style numeric/UUID substitution.
 - Per-event user attribution and retained observed-ID membership are distinct from display summaries.
@@ -764,7 +769,6 @@ Alerts:
 
 - Function reads lease domain state only while copying snapshots.
 - Historical queries own independent journal snapshots and check caller cancellation between files and rows.
-- Neither retention nor history scans hold a live site lease across disk work.
 - Live queries merge per-site stream heads by receipt time while preserving each stream's sequence prefix; concurrent
   receipt and ingestion order can differ.
 - All-site Errors, Pages and Sessions use a separate site-scoped row key without replacing their filter values.
@@ -842,7 +846,7 @@ flowchart LR
 
 | File kind | Startup check |
 |---|---|
-| Preexisting active `dem.journal` | SDK strict index verifier, before `NewLog` can mutate history |
+| Every preexisting active `dem.journal` | SDK strict index verifier during recovery, before `NewLog` can mutate history |
 | Nonempty finalized `dem@…journal` archive | Archived header state and complete current-schema coverage |
 | Empty finalized archive | Strict verification, because it has no encoder marker |
 
@@ -871,6 +875,7 @@ Retention worker:
 - Uncertain writer mutation still makes the store unavailable for reads and writes. Status retains separate writer and
   cleanup facts.
 - Invalid config reloads preserve the last valid policy and an independently locked reload error.
+- Neither retention nor history scans hold a live site lease across disk work.
 
 `dem-history-status` (`historyfunc`):
 
