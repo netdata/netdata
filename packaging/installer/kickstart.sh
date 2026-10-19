@@ -2561,7 +2561,7 @@ prepare_offline_install_source() {
   if [ -e "${1}" ]; then
     if [ ! -d "${1}" ]; then
       fatal "${1} is not a directory, unable to prepare offline install source." F0503
-    elif [ -n "$(find "${1}" -mindepth 1 -print)" ]; then
+    elif [ -n "$(find "${1}/" -mindepth 1 -maxdepth 1 -print)" ]; then
       fatal "${1} already contains files. Either specify a different directory, or remove the files." F052E
     fi
   else
