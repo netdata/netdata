@@ -3091,7 +3091,7 @@ parse_args() {
       "--offline-install-source")
         if [ -d "${2}" ]; then
           # shellcheck disable=SC2164
-          NETDATA_OFFLINE_INSTALL_SOURCE="$(cd "${2}"; pwd -P)"
+          NETDATA_OFFLINE_INSTALL_SOURCE="$(cd "${2}" >/dev/null 2>&1; pwd -P)"
           NETDATA_TARBALL_BASEURL="file://${NETDATA_OFFLINE_INSTALL_SOURCE}"
           shift 1
         else
