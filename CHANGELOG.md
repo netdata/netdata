@@ -212,6 +212,7 @@
 - Build(deps): bump github.com/godbus/dbus/v5 from 5.2.3 to 5.2.4 in /src/go ([#24358](https://github.com/netdata/netdata/issues/24358))
 - Build(deps): bump github.com/ibm-messaging/mq-golang/v5 from 5.7.2 to 5.7.3 in /src/go ([#24361](https://github.com/netdata/netdata/issues/24361))
 - Build(deps): bump github.com/klauspost/compress from 1.20.1 to 1.20.3 in /src/go ([#24359](https://github.com/netdata/netdata/issues/24359))
+- Fix(go.d): keep candidate recovery private across enable and waits ([#24367](https://github.com/netdata/netdata/issues/24367))
 
 ## [2.12.0] - 2026-09-30
 
