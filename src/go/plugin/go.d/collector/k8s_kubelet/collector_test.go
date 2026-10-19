@@ -163,16 +163,10 @@ func TestCollector_Collect(t *testing.T) {
 		"kubelet_runtime_operations_status":                                          279,
 		"kubelet_runtime_operations_stop_podsandbox":                                 14,
 		"kubelet_runtime_operations_version":                                         190,
-		"pvc_app_cache_inodes_available":                                             1800,
-		"pvc_app_cache_inodes_reserved":                                              0,
-		"pvc_app_cache_inodes_used":                                                  200,
 		"pvc_app_cache_space_available":                                              1500000,
 		"pvc_app_cache_space_reserved":                                               0,
 		"pvc_app_cache_space_used":                                                   500000,
 		"pvc_app_cache_space_utilization":                                            2500,
-		"pvc_app_data-db-0_inodes_available":                                         900,
-		"pvc_app_data-db-0_inodes_reserved":                                          0,
-		"pvc_app_data-db-0_inodes_used":                                              100,
 		"pvc_app_data-db-0_space_available":                                          450000,
 		"pvc_app_data-db-0_space_reserved":                                           100000,
 		"pvc_app_data-db-0_space_used":                                               450000,
@@ -212,11 +206,6 @@ func TestCollector_Collect_VolumeStats(t *testing.T) {
 			"pvc_" + id + "_space_utilization": {ctx: "k8s_kubelet.pvc_space_utilization", labels: labels(pvc)},
 		}
 	}
-	inodesCharts := func(id, pvc string) map[string]pvcChart {
-		return map[string]pvcChart{
-			"pvc_" + id + "_inodes_usage": {ctx: "k8s_kubelet.pvc_inodes_usage", labels: labels(pvc)},
-		}
-	}
 	merge := func(ms ...map[string]pvcChart) map[string]pvcChart {
 		out := make(map[string]pvcChart)
 		for _, m := range ms {
@@ -241,11 +230,8 @@ func TestCollector_Collect_VolumeStats(t *testing.T) {
 				"pvc_app_data_space_used":        600,
 				"pvc_app_data_space_reserved":    100,
 				"pvc_app_data_space_utilization": 6666,
-				"pvc_app_data_inodes_available":  60,
-				"pvc_app_data_inodes_used":       40,
-				"pvc_app_data_inodes_reserved":   0,
 			},
-			wantCharts: merge(spaceCharts("app_data", "data"), inodesCharts("app_data", "data")),
+			wantCharts: spaceCharts("app_data", "data"),
 		},
 		"empty volume is real data": {
 			series: volumeStats("data", 1000, 0, 1000, 100, 0, 100),
@@ -254,13 +240,10 @@ func TestCollector_Collect_VolumeStats(t *testing.T) {
 				"pvc_app_data_space_used":        0,
 				"pvc_app_data_space_reserved":    0,
 				"pvc_app_data_space_utilization": 0,
-				"pvc_app_data_inodes_available":  100,
-				"pvc_app_data_inodes_used":       0,
-				"pvc_app_data_inodes_reserved":   0,
 			},
-			wantCharts: merge(spaceCharts("app_data", "data"), inodesCharts("app_data", "data")),
+			wantCharts: spaceCharts("app_data", "data"),
 		},
-		"zero inodes (SMB share): no inode chart": {
+		"inode series are ignored (SMB share reports 0 inodes)": {
 			series: volumeStats("share", 1000, 600, 400, 0, 0, 0),
 			wantMetrics: map[string]int64{
 				"pvc_app_share_space_available":   400,
@@ -275,16 +258,12 @@ func TestCollector_Collect_VolumeStats(t *testing.T) {
 			wantMetrics: map[string]int64{},
 			wantCharts:  map[string]pvcChart{},
 		},
-		"missing series: no chart for its group": {
+		"missing space series: no charts": {
 			series: slices.DeleteFunc(volumeStats("data", 1000, 600, 300, 100, 40, 60), func(s volumeStatsSeries) bool {
 				return s.name == "kubelet_volume_stats_used_bytes"
 			}),
-			wantMetrics: map[string]int64{
-				"pvc_app_data_inodes_available": 60,
-				"pvc_app_data_inodes_used":      40,
-				"pvc_app_data_inodes_reserved":  0,
-			},
-			wantCharts: inodesCharts("app_data", "data"),
+			wantMetrics: map[string]int64{},
+			wantCharts:  map[string]pvcChart{},
 		},
 		"used + available above capacity: reserved clamped at 0": {
 			series: volumeStats("data", 100, 80, 30, 100, 40, 60),
@@ -293,11 +272,8 @@ func TestCollector_Collect_VolumeStats(t *testing.T) {
 				"pvc_app_data_space_used":        80,
 				"pvc_app_data_space_reserved":    0,
 				"pvc_app_data_space_utilization": 7272,
-				"pvc_app_data_inodes_available":  60,
-				"pvc_app_data_inodes_used":       40,
-				"pvc_app_data_inodes_reserved":   0,
 			},
-			wantCharts: merge(spaceCharts("app_data", "data"), inodesCharts("app_data", "data")),
+			wantCharts: spaceCharts("app_data", "data"),
 		},
 		"names differing only in '.' and '-' get distinct charts": {
 			series: slices.Concat(
@@ -369,10 +345,8 @@ func TestCollector_Collect_VolumeStatsChartLifecycle(t *testing.T) {
 		return map[string][]string{
 			"pvc_app_data_space_usage":        dataState,
 			"pvc_app_data_space_utilization":  dataState,
-			"pvc_app_data_inodes_usage":       dataState,
 			"pvc_app_cache_space_usage":       cacheState,
 			"pvc_app_cache_space_utilization": cacheState,
-			"pvc_app_cache_inodes_usage":      cacheState,
 		}
 	}
 
@@ -420,7 +394,6 @@ func TestCollector_Collect_VolumeStatsChartLifecycle(t *testing.T) {
 		var pvcs []string
 		for key := range pvcMetricsOf(mx) {
 			pvc, _, _ := strings.Cut(strings.TrimPrefix(key, "pvc_"), "_space")
-			pvc, _, _ = strings.Cut(pvc, "_inodes")
 			if !slices.Contains(pvcs, pvc) {
 				pvcs = append(pvcs, pvc)
 			}

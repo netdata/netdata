@@ -250,9 +250,6 @@ var (
 		pvcSpaceUsageChartTmpl.Copy(),
 		pvcSpaceUtilizationChartTmpl.Copy(),
 	}
-	pvcInodesChartsTmpl = Charts{
-		pvcInodesUsageChartTmpl.Copy(),
-	}
 )
 
 var (
@@ -277,19 +274,6 @@ var (
 		Ctx:   "k8s_kubelet.pvc_space_utilization",
 		Dims: Dims{
 			{ID: "pvc_%s_space_utilization", Name: "utilization", Div: pvcUtilizationPrecision},
-		},
-	}
-	pvcInodesUsageChartTmpl = Chart{
-		ID:    "pvc_%s_inodes_usage",
-		Title: "PVC Inodes Usage",
-		Units: "inodes",
-		Fam:   "pvc",
-		Ctx:   "k8s_kubelet.pvc_inodes_usage",
-		Type:  collectorapi.Stacked,
-		Dims: Dims{
-			{ID: "pvc_%s_inodes_available", Name: "available"},
-			{ID: "pvc_%s_inodes_used", Name: "used"},
-			{ID: "pvc_%s_inodes_reserved", Name: "reserved"},
 		},
 	}
 )
