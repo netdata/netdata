@@ -113,7 +113,7 @@
 //!
 //! # Trace-level filter semantics: TRUE roots only (decision 1D)
 //!
-//! `trace:root_service_name` / `trace:root_name` conditions match the
+//! `root_service_name` / `root_name` conditions match the
 //! trace's TRUE root — the earliest span with a genuinely unset parent
 //! — and NOTHING else: a trace whose root span was never exported has
 //! no root as far as filters are concerned, either polarity

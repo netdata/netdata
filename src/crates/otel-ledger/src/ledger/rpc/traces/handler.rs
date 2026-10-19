@@ -37,9 +37,8 @@ use sfsq::traces::{
 
 use super::adapter::{
     WireShaper, build_tokens, check_request_text, completion_capture_range, heatmap_tokens,
-    parse_cursor, parse_trace_id, parse_values_key, render_attribute_key, resolve_window,
-    to_overview_section, to_search_result, to_suggest_result, to_trace_result,
-    validate_trace_bounds,
+    parse_cursor, parse_trace_id, parse_values_key, resolve_window, to_overview_section,
+    to_search_result, to_suggest_result, to_trace_result, validate_trace_bounds,
 };
 use super::sources::{Capture, CaptureError, RemotePolicy, TracesSourceSupplier};
 use super::wire::{
@@ -563,7 +562,7 @@ impl OtelTracesHandler {
                 let (owner, key) = parse_values_key(key).map_err(client_err)?;
                 SuggestQuery::values(owner, key)
             }
-            None => SuggestQuery::keys(render_attribute_key),
+            None => SuggestQuery::keys(),
         };
         // Validated before admission: a bad request is a client error,
         // not `busy`.
@@ -641,8 +640,7 @@ fn map_suggest_error(e: SuggestRequestError) -> netdata_plugin_error::NetdataPlu
         | SuggestRequestError::Window(_)
         | SuggestRequestError::NotEnumerable(_)
         | SuggestRequestError::BuiltinKeyOutsideBuiltinOwner(_)
-        | SuggestRequestError::AttributeKeyUnderBuiltinOwner(_)
-        | SuggestRequestError::AnyOwnerNotEnumerable) => engine_rejected(e),
+        | SuggestRequestError::AttributeKeyUnderBuiltinOwner(_)) => engine_rejected(e),
     }
 }
 

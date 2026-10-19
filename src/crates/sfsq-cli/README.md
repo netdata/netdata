@@ -107,8 +107,8 @@ all tokens. Different tokens can match different spans of the trace. All
 four flags are repeatable.
 
 - `--where COND` — one span must match all `--where` conditions together.
-  A condition on the whole trace (`root-name`, `root-service-name`,
-  `trace-duration`) or on `trace-id` is a token of its own.
+  A condition on the whole trace (`root_name`, `root_service_name`,
+  `trace_duration`) or on `trace_id` is a token of its own.
 - `--and COND` — a token of its own: a span of the trace matches the
   condition.
 - `--not COND` — a token of its own: no span of the trace matches the
@@ -119,10 +119,19 @@ four flags are repeatable.
   status message, the event names, or an attribute value. Keys do not
   match. A term has 3 or more characters.
 
-`COND` is `TARGET<op>VALUE`. `TARGET` is `OWNER.KEY` (the attribute owners
-`resource`, `span`, `instrumentation`, `event`, `link`), `.KEY` (any owner:
-resource ∪ span), or a builtin-field word (the list is under `suggest`
-below). The ops:
+`COND` is `KEY<op>VALUE`. `KEY` is the OpenTelemetry (OTLP) field path of the
+data. These are the same keys that the search of the Netdata Agent uses:
+
+- An attribute: `resource.attributes.NAME`, `scope.attributes.NAME`,
+  `attributes.NAME` (a span attribute), `events.attributes.NAME` or
+  `links.attributes.NAME`. `NAME` is the attribute name, with its dots:
+  `resource.attributes.service.name`.
+- A field: `name`, `kind`, `status.code`, `status.message`, `scope.name`,
+  `scope.version`, `events.name`, `duration`, `span_id`, `parent_span_id`,
+  `trace_id`, `links.span_id`, `links.trace_id`, `events.time_since_start`,
+  `root_name`, `root_service_name`, `trace_duration`.
+
+The ops:
 
 | Op | Meaning |
 |---|---|
@@ -156,23 +165,17 @@ whole trace or on `trace-id`, mark no span.
 ### `suggest` — suggest keys or values
 
 ```
-sfsq-cli suggest (--sfst FILE | --wal FILE)… [--owner OWNER --key KEY]
+sfsq-cli suggest (--sfst FILE | --wal FILE)… [--key KEY]
                  [--term TEXT] [--max-items N] [--max-files N]
                  [--stale-files N] [--deadline-ms N]
                  [--start-ns N --end-ns N]
 ```
 
-Without `--owner` and `--key`, `suggest` gives keys. With them, it gives
-the values of that key. `OWNER` is one of `resource`, `span`,
-`instrumentation`, `event`, `link`, `builtin`. `KEY` is the bare attribute
-name, or — under `--owner builtin` — one of the builtin-field words: `name`,
-`kind`, `status`, `status-message`, `instrumentation-name`,
-`instrumentation-version`, `event-name`, `duration`, `span-id`,
-`parent-span-id`, `trace-id`, `link-span-id`, `link-trace-id`,
-`event-time-since-start`, `root-name`, `root-service-name`,
-`trace-duration`. Only `name`, `kind`, `status`, `status-message`, the two
-`instrumentation-…` words and `event-name` have stored values. If you give
-one of the others as `--key`, the command fails. `suggest` reads the newest
+Without `--key`, `suggest` gives keys. With it, it gives the values of that
+key. `KEY` is a key as in `COND` above. Only these fields have stored values:
+`name`, `kind`, `status.code`, `status.message`, `scope.name`,
+`scope.version` and `events.name`. If you give another field as `--key`, the
+command fails. `suggest` reads the newest
 files first. A key or a value matches `--term` when it is equal to the
 term, starts with it, contains it, or starts within one edit (terms of 4 or
 more characters) or two edits (8 or more) of it. An empty term matches
@@ -187,8 +190,9 @@ all.
 - `--deadline-ms` — stop after this number of milliseconds.
 
 Each suggestion is one line: `<text> match=<class>`, then `tier=…` for a
-key, `truncated` when the text is cut for display, and `numeric` for a key
-that holds numbers. The last line gives
+key, `truncated` when a value is cut for display (keys are not cut), and
+`kinds=…` for an attribute key: the kinds of values that it holds, joined with
+`+` (for example `kinds=Int+Str`). The last line gives
 the count, the `truncated` flag, the status, `complete after <unix second>`
 when a limit stopped the walk (the files that it read hold all spans from
 that second), and the time.
@@ -260,18 +264,18 @@ sfsq-cli trace --trace-id 4bf92f3577b34da6a3ce929d0e0e4736 \
   --text checkout
 
 # Checkout traces with a span of ≥ 1ms in the last 10 minutes, newest first
-# (root-service-name matches the trace's true root; window in epoch ns)
+# (root_service_name matches the trace's true root; window in epoch ns)
 sfsq-cli search --sfst /var/lib/netdata/otel/traces/index/<SEQ>.sfst \
-  --where 'root-service-name=checkout' --min-duration-ns 1000000 \
+  --where 'root_service_name=checkout' --min-duration-ns 1000000 \
   --start-ns 1769000000000000000 --end-ns 1769000600000000000
 
 # Traces with a frontend span and a PostgreSQL span, and no error span
 sfsq-cli search --sfst /var/lib/netdata/otel/traces/index/<SEQ>.sfst \
-  --and 'resource.service.name=frontend' --and 'span.db.system=postgresql' \
-  --not 'status=ERROR'
+  --and 'resource.attributes.service.name=frontend' \
+  --and 'attributes.db.system=postgresql' --not 'status.code=ERROR'
 
 # Which values does the span attribute http.method take?
-sfsq-cli suggest --owner span --key http.method \
+sfsq-cli suggest --key attributes.http.method \
   --sfst /var/lib/netdata/otel/traces/index/<SEQ>.sfst
 ```
 

@@ -7,8 +7,8 @@
 //! sealed before `TRSS` — and as rollup discovery's single-source
 //! pre-filter.
 //!
-//! Trace-level predicates (`trace:root_service_name` / `trace:root_name`
-//! selections, `trace:duration` lower bounds) are decided
+//! Trace-level predicates (`root_service_name` / `root_name`
+//! selections, `trace_duration` lower bounds) are decided
 //! post-assembly; without a gate every candidate in the window is
 //! assembled just to be discarded, and rare predicates burn the
 //! assembled ceiling on discards. The per-file `TRSU` rollup already

@@ -123,7 +123,7 @@ mod tests {
             "--where",
             "name=a",
             "--and",
-            "status=ERROR",
+            "status.code=ERROR",
             "--not",
             "kind=CLIENT",
             "--text",
@@ -152,7 +152,7 @@ mod tests {
                 (tokens.conditions, tokens.and, tokens.not, tokens.text),
                 (
                     vec!["name=a".to_string()],
-                    vec!["status=ERROR".to_string()],
+                    vec!["status.code=ERROR".to_string()],
                     vec!["kind=CLIENT".to_string()],
                     vec!["-abc".to_string()],
                 ),

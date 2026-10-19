@@ -104,9 +104,11 @@ pub use sources::{
 pub use status::{PartialReason, QueryStatus, StatusBuilder};
 pub use suggest::{
     DEADLINE_CHECK_EVERY, DEFAULT_STALE_FILES, DEFAULT_SUGGEST_FILES, DEFAULT_SUGGEST_ITEMS,
-    DISPLAY_MAX_BYTES, KeyRenderer, SuggestData, SuggestQuery, SuggestRequestError, Suggestion,
-    suggest,
+    DISPLAY_MAX_BYTES, SuggestData, SuggestQuery, SuggestRequestError, Suggestion, suggest,
 };
-pub use vocab::{AttributeKey, AttributeOwner, BuiltinField, storage_to_attribute};
+pub use vocab::{
+    AttributeKey, AttributeOwner, BuiltinField, KeyError, StorageName, TRACE_STATE_FIELD,
+    classify_storage, key_forms, parse_key, render_key, storage_to_attribute,
+};
 pub use wal_scan::{TraceScanError, TraceWalScan};
 pub use window::{TimeWindow, WindowError};

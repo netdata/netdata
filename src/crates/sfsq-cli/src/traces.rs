@@ -13,9 +13,9 @@
 //! right for shut-down or recovered WALs (the dev case); an actively
 //! written WAL should be queried through a live agent instead.
 //!
-//! The owner/builtin spellings here (`--owner span`, `--key status`)
-//! are this DEV TOOL's rendering of the engine's typed vocabulary — not
-//! a wire contract; wire adapters define their own.
+//! Keys are the engine's vocabulary — OTLP field paths such as
+//! `resource.attributes.service.name` or `status.code`
+//! (`sfsq::traces::parse_key`) — the same keys the agent's wire takes.
 
 use std::path::PathBuf;
 use std::sync::Arc;
@@ -25,8 +25,8 @@ use anyhow::{Context, Result, bail};
 use tokio_util::sync::CancellationToken;
 
 use sfsq::traces::{
-    AttributeKey, AttributeOwner, BuiltinField, CompareOp, Condition, OverviewQuery, Predicate,
-    PredicateTarget, PredicateValue, QueryStatus, SearchQuery, SearchSources, SourceId,
+    AttributeKey, AttributeOwner, BuiltinField, CompareOp, Condition, KeyError, OverviewQuery,
+    Predicate, PredicateTarget, PredicateValue, QueryStatus, SearchQuery, SearchSources, SourceId,
     SuggestQuery, TimeWindow, Token, TokenQuery, TraceQuery, TraceSfstCandidate, TraceSource,
     TraceWalTail, WalCoverage, overview, search, starts_with_pattern, suggest, trace_by_id,
 };
@@ -237,109 +237,20 @@ pub fn run_trace(args: &TraceArgs, out: &mut dyn std::io::Write) -> Result<()> {
     Ok(())
 }
 
-// ── Key words (the suggest command's owners and keys) ─────────────────
+// ── Keys ───────────────────────────────────────────────────────────────
 
-/// An `AttributeOwner` as a CLI word (this tool's rendering, not a
-/// wire contract). `Any` is deliberately absent: it exists for
-/// predicates (`--where .key=...`), not enumeration.
-#[derive(Debug, Clone, Copy, clap::ValueEnum)]
-pub enum OwnerArg {
-    Resource,
-    Span,
-    Instrumentation,
-    Event,
-    Link,
-    Builtin,
-}
-
-impl From<OwnerArg> for AttributeOwner {
-    fn from(s: OwnerArg) -> AttributeOwner {
-        match s {
-            OwnerArg::Resource => AttributeOwner::Resource,
-            OwnerArg::Span => AttributeOwner::Span,
-            OwnerArg::Instrumentation => AttributeOwner::Instrumentation,
-            OwnerArg::Event => AttributeOwner::Event,
-            OwnerArg::Link => AttributeOwner::Link,
-            OwnerArg::Builtin => AttributeOwner::Builtin,
+/// Parse a key given to `flag` (the engine's vocabulary); the error
+/// names the key forms.
+fn parse_key(flag: &str, key: &str) -> Result<(AttributeOwner, AttributeKey)> {
+    sfsq::traces::parse_key(key).map_err(|e| match e {
+        KeyError::EmptyAttribute => {
+            anyhow::anyhow!("{flag} key {key:?} has an empty attribute key")
         }
-    }
-}
-
-/// The CLI spelling of each builtin field (kebab-case), used by
-/// `--key` under `--owner builtin`, by `--where` builtin targets, and
-/// by the output rendering. Must stay 1:1 with the engine's
-/// `BuiltinField::ALL` — pinned by the `every_builtin_has_a_cli_word`
-/// test below.
-const BUILTIN_WORDS: [(&str, BuiltinField); 17] = [
-    ("name", BuiltinField::Name),
-    ("kind", BuiltinField::Kind),
-    ("status", BuiltinField::Status),
-    ("status-message", BuiltinField::StatusMessage),
-    ("instrumentation-name", BuiltinField::InstrumentationName),
-    (
-        "instrumentation-version",
-        BuiltinField::InstrumentationVersion,
-    ),
-    ("event-name", BuiltinField::EventName),
-    ("duration", BuiltinField::Duration),
-    ("span-id", BuiltinField::SpanId),
-    ("parent-span-id", BuiltinField::ParentSpanId),
-    ("trace-id", BuiltinField::TraceId),
-    ("link-span-id", BuiltinField::LinkSpanId),
-    ("link-trace-id", BuiltinField::LinkTraceId),
-    ("event-time-since-start", BuiltinField::EventTimeSinceStart),
-    ("root-name", BuiltinField::RootName),
-    ("root-service-name", BuiltinField::RootServiceName),
-    ("trace-duration", BuiltinField::TraceDuration),
-];
-
-fn owner_word(owner: AttributeOwner) -> &'static str {
-    match owner {
-        AttributeOwner::Resource => "resource",
-        AttributeOwner::Span => "span",
-        AttributeOwner::Instrumentation => "instrumentation",
-        AttributeOwner::Event => "event",
-        AttributeOwner::Link => "link",
-        AttributeOwner::Builtin => "builtin",
-        // Never enumerated (the engine rejects it); rendered only if a
-        // future path prints a predicate target through this table.
-        AttributeOwner::Any => "any",
-    }
-}
-
-fn key_word(key: &AttributeKey) -> String {
-    match key {
-        AttributeKey::Attribute(a) => a.clone(),
-        AttributeKey::Builtin(i) => BUILTIN_WORDS
-            .iter()
-            .find(|(_, v)| v == i)
-            .map(|(w, _)| (*w).to_string())
-            .expect("every builtin field has a CLI word"),
-    }
-}
-
-/// Parse `--key` against the owner: attribute owners take the bare key
-/// verbatim; the Builtin owner takes one of the kebab-case words.
-fn parse_key(owner: AttributeOwner, key: &str) -> Result<AttributeKey> {
-    if owner != AttributeOwner::Builtin {
-        // Same always-a-typo class as the `--where` guards: an empty
-        // key enumerates nothing, silently.
-        if key.is_empty() {
-            bail!("--key must not be empty");
-        }
-        return Ok(AttributeKey::Attribute(key.to_string()));
-    }
-    BUILTIN_WORDS
-        .iter()
-        .find(|(w, _)| *w == key)
-        .map(|(_, i)| AttributeKey::Builtin(*i))
-        .ok_or_else(|| {
-            let words: Vec<&str> = BUILTIN_WORDS.iter().map(|(w, _)| *w).collect();
-            anyhow::anyhow!(
-                "unknown builtin field {key:?}; one of: {}",
-                words.join(", ")
-            )
-        })
+        KeyError::Unknown => anyhow::anyhow!(
+            "unknown {flag} key {key:?}: use {}",
+            sfsq::traces::key_forms()
+        ),
+    })
 }
 
 /// Both-or-neither `--start-ns`/`--end-ns` into an engine window (the
@@ -374,13 +285,9 @@ pub struct SuggestArgs {
     #[arg(long = "wal")]
     pub wals: Vec<PathBuf>,
 
-    /// Suggest this key's values (with --key); without it, suggest keys.
-    #[arg(long, value_enum, requires = "key")]
-    pub owner: Option<OwnerArg>,
-
-    /// The key: the bare attribute name, or (under --owner builtin) a
-    /// builtin-field word.
-    #[arg(long, requires = "owner")]
+    /// Suggest this key's values (`attributes.http.method`, `status.code`,
+    /// ...); without it, suggest keys.
+    #[arg(long)]
     pub key: Option<String>,
 
     /// The typed text; empty matches everything.
@@ -414,22 +321,14 @@ pub struct SuggestArgs {
     pub end_ns: Option<i64>,
 }
 
-/// This tool's key rendering: `<owner>.<key>`, a builtin by its word.
-fn cli_key(owner: AttributeOwner, key: &AttributeKey) -> String {
-    match key {
-        AttributeKey::Builtin(_) => key_word(key),
-        AttributeKey::Attribute(_) => format!("{}.{}", owner_word(owner), key_word(key)),
-    }
-}
-
 pub fn run_suggest(args: &SuggestArgs, out: &mut dyn std::io::Write) -> Result<()> {
     let started = std::time::Instant::now();
-    let mut query = match (args.owner, &args.key) {
-        (Some(owner), Some(key)) => {
-            let owner: AttributeOwner = owner.into();
-            SuggestQuery::values(owner, parse_key(owner, key)?)
+    let mut query = match &args.key {
+        Some(key) => {
+            let (owner, key) = parse_key("--key", key)?;
+            SuggestQuery::values(owner, key)
         }
-        _ => SuggestQuery::keys(cli_key),
+        None => SuggestQuery::keys(),
     };
     query = query.term(args.term.clone());
     if let Some(max) = args.max_items {
@@ -491,12 +390,13 @@ pub fn run_suggest(args: &SuggestArgs, out: &mut dyn std::io::Write) -> Result<(
 pub struct TokenArgs {
     /// A condition, repeatable: one span must satisfy every `--where`
     /// together (trace-level targets are tokens of their own). COND is
-    /// `TARGET<op>VALUE`. TARGET is `OWNER.KEY`
-    /// (resource/span/instrumentation/event/link), `.KEY` (any owner:
-    /// resource ∪ span), or a builtin-field word (`name`, `status`,
-    /// `kind`, …). OPS: `=`, `!=` (text), `=~`, `!~` (regex anchored to
-    /// the whole value), `^=`, `!^=` (starts with), `>`, `<`, `>=`, `<=`
-    /// (numeric).
+    /// `KEY<op>VALUE`. KEY is an OTLP field path:
+    /// `resource.attributes.<key>`, `scope.attributes.<key>`,
+    /// `attributes.<key>`, `events.attributes.<key>`,
+    /// `links.attributes.<key>`, or a field such as `name`, `kind`,
+    /// `status.code`, `duration`. OPS: `=`, `!=` (text), `=~`, `!~` (regex
+    /// anchored to the whole value), `^=`, `!^=` (starts with), `>`, `<`,
+    /// `>=`, `<=` (numeric).
     #[arg(long = "where", value_name = "COND")]
     pub conditions: Vec<String>,
 
@@ -551,7 +451,7 @@ impl TokenArgs {
     }
 }
 
-/// Parse one condition given to `flag`: `TARGET <op> VALUE`. The op
+/// Parse one condition given to `flag`: `KEY <op> VALUE`. The op
 /// match is leftmost, longest-symbol first, so `>=` never parses as `>`
 /// with a `=value`, `=~` never as `=` with a `~value`, and `!^=` never as
 /// `^=` after a target ending in `!`. Ordering ops take numeric values;
@@ -578,7 +478,7 @@ fn parse_condition(flag: &str, spec: &str) -> Result<Condition> {
         })
         .min_by_key(|&(at, len, _)| (at, std::cmp::Reverse(len)))
         .map(|(at, len, op)| (&spec[..at], op, &spec[at + len..]))
-        .ok_or_else(|| anyhow::anyhow!("{flag} must be TARGET<op>VALUE, got {spec:?}"))?;
+        .ok_or_else(|| anyhow::anyhow!("{flag} must be KEY<op>VALUE, got {spec:?}"))?;
     // An empty value is a structurally valid predicate that matches no
     // well-formed dictionary entry — in this dev tool it is always a
     // typo, so fail loudly instead of returning a silent empty result.
@@ -609,52 +509,13 @@ fn parse_condition(flag: &str, spec: &str) -> Result<Condition> {
     })
 }
 
-/// A condition's target, given to `flag`: `OWNER.KEY` for the attribute
-/// owners, a bare builtin-field word otherwise.
+/// A condition's target, given to `flag`: a key of the engine's
+/// vocabulary. An attribute prefix with nothing after it would be a
+/// structurally valid predicate that matches no dictionary entry — always
+/// a typo here, so it fails loudly instead of returning an empty result.
 fn parse_target(flag: &str, word: &str) -> Result<PredicateTarget> {
-    // An empty key after the owner strip (a bare `.` or a trailing
-    // `owner.`) is a structurally valid predicate that matches no
-    // dictionary entry — positive or negated (the pinned rule is
-    // presence ∩ complement, so absence never satisfies `!=` either).
-    // The same always-a-typo class as an empty value: fail loudly
-    // instead of returning a silent empty result.
-    let non_empty = |key: &str| -> Result<String> {
-        if key.is_empty() {
-            bail!("{flag} target {word:?} has an empty attribute key");
-        }
-        Ok(key.to_string())
-    };
-    // `.KEY` = the any-owner attribute (resource ∪ span disjunction).
-    if let Some(key) = word.strip_prefix('.') {
-        return Ok(PredicateTarget::Attribute(
-            AttributeOwner::Any,
-            non_empty(key)?,
-        ));
-    }
-    for (owner_name, owner) in [
-        ("resource", AttributeOwner::Resource),
-        ("span", AttributeOwner::Span),
-        ("instrumentation", AttributeOwner::Instrumentation),
-        ("event", AttributeOwner::Event),
-        ("link", AttributeOwner::Link),
-    ] {
-        if let Some(key) = word
-            .strip_prefix(owner_name)
-            .and_then(|r| r.strip_prefix('.'))
-        {
-            return Ok(PredicateTarget::Attribute(owner, non_empty(key)?));
-        }
-    }
-    BUILTIN_WORDS
-        .iter()
-        .find(|(w, _)| *w == word)
-        .map(|(_, i)| PredicateTarget::Builtin(*i))
-        .ok_or_else(|| {
-            anyhow::anyhow!(
-                "unknown {flag} target {word:?}: use OWNER.KEY \
-                 (resource/span/instrumentation/event/link) or a builtin-field word"
-            )
-        })
+    let (owner, key) = parse_key(flag, word)?;
+    Ok(PredicateTarget::from_key(owner, key))
 }
 
 // ── Overview ───────────────────────────────────────────────────────────
@@ -827,25 +688,38 @@ pub fn run_search(args: &SearchArgs, out: &mut dyn std::io::Write) -> Result<()>
 mod tests {
     use super::*;
 
-    /// The empty-key guard fires on every owner spelling, and
-    /// dot-prefixed keys stay spellable (`..foo` = Any-owner key `.foo`).
+    /// Targets are vocabulary keys: the empty-key guard fires on every
+    /// attribute prefix, dotted attribute paths stay whole, and the
+    /// TraceQL-style forms are gone.
     #[test]
-    fn where_targets_reject_empty_keys_but_keep_dotted_ones() {
-        for bad in [".", "span.", "resource.", "event."] {
+    fn where_targets_are_vocabulary_keys() {
+        for bad in ["attributes.", "resource.attributes.", "events.attributes."] {
             let err = parse_target("--where", bad).expect_err(bad);
             assert!(
                 err.to_string().contains("empty attribute key"),
                 "{bad}: {err}"
             );
         }
-        assert!(matches!(
-            parse_target("--where", "..foo"),
-            Ok(PredicateTarget::Attribute(AttributeOwner::Any, k)) if k == ".foo"
-        ));
-        assert!(matches!(
-            parse_target("--where", "span.http.method"),
-            Ok(PredicateTarget::Attribute(AttributeOwner::Span, k)) if k == "http.method"
-        ));
+        for bad in [".foo", "span.http.method", "status", "status-message"] {
+            let err = parse_target("--where", bad).expect_err(bad);
+            assert!(err.to_string().contains("unknown"), "{bad}: {err}");
+        }
+        assert_eq!(
+            parse_target("--where", "attributes.http.method").unwrap(),
+            PredicateTarget::Attribute(AttributeOwner::Span, "http.method".into())
+        );
+        assert_eq!(
+            parse_target("--where", "resource.attributes.service.name").unwrap(),
+            PredicateTarget::Attribute(AttributeOwner::Resource, "service.name".into())
+        );
+        assert_eq!(
+            parse_target("--where", "status.code").unwrap(),
+            PredicateTarget::Builtin(BuiltinField::Status)
+        );
+        assert_eq!(
+            parse_target("--where", "events.time_since_start").unwrap(),
+            PredicateTarget::Builtin(BuiltinField::EventTimeSinceStart)
+        );
     }
 
     fn text(v: &str) -> PredicateValue {
@@ -881,11 +755,11 @@ mod tests {
                 cond(name(), CompareOp::Regex, vec![text(r"a\.b(?s:.*)")]),
             ),
             (
-                "span.k!^=x",
+                "attributes.k!^=x",
                 cond(span_attr("k"), CompareOp::NotRegex, vec![text("x(?s:.*)")]),
             ),
             (
-                "span.k>=5",
+                "attributes.k>=5",
                 cond(
                     span_attr("k"),
                     CompareOp::Gte,
@@ -893,7 +767,7 @@ mod tests {
                 ),
             ),
             (
-                "span.k<1.5",
+                "attributes.k<1.5",
                 cond(
                     span_attr("k"),
                     CompareOp::Lt,
@@ -904,10 +778,10 @@ mod tests {
             assert_eq!(parse_condition("--and", spec).unwrap(), want, "{spec}");
         }
         for (spec, why) in [
-            ("name", "must be TARGET<op>VALUE"),
+            ("name", "must be KEY<op>VALUE"),
             ("name^=", "empty value"),
-            ("span.k>x", "numeric value"),
-            ("span.=x", "empty attribute key"),
+            ("attributes.k>x", "numeric value"),
+            ("attributes.=x", "empty attribute key"),
         ] {
             let err = parse_condition("--not", spec).unwrap_err().to_string();
             assert!(err.contains("--not") && err.contains(why), "{spec}: {err}");
@@ -920,9 +794,9 @@ mod tests {
     #[test]
     fn token_flags_build_the_query() {
         let flags = TokenArgs {
-            conditions: vec!["name=a".into(), "root-name=r".into()],
-            and: vec!["span.k^=p".into()],
-            not: vec!["status=ERROR".into()],
+            conditions: vec!["name=a".into(), "root_name=r".into()],
+            and: vec!["attributes.k^=p".into()],
+            not: vec!["status.code=ERROR".into()],
             text: vec!["checkout".into()],
         };
         let duration = cond(
@@ -1092,26 +966,5 @@ mod tests {
             (empty.start(), empty.end()),
             (wal::HEADER_SIZE as u64, wal::HEADER_SIZE as u64)
         );
-    }
-
-    /// The CLI word table must stay in lockstep with the engine's
-    /// builtin-field set: a variant without a word would make `key_word`
-    /// PANIC while rendering `attributes` output (the parse side already
-    /// fails gracefully). Walks the engine's `ALL`, so adding a builtin
-    /// engine-side breaks this test until the CLI learns it.
-    #[test]
-    fn every_builtin_has_a_cli_word() {
-        for builtin in BuiltinField::ALL {
-            assert!(
-                BUILTIN_WORDS.iter().any(|(_, v)| *v == builtin),
-                "builtin field {builtin:?} has no CLI word in BUILTIN_WORDS"
-            );
-        }
-        // And the table holds nothing stale: same size, distinct words.
-        assert_eq!(BUILTIN_WORDS.len(), BuiltinField::ALL.len());
-        let mut words: Vec<&str> = BUILTIN_WORDS.iter().map(|(w, _)| *w).collect();
-        words.sort_unstable();
-        words.dedup();
-        assert_eq!(words.len(), BUILTIN_WORDS.len(), "duplicate CLI words");
     }
 }

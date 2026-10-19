@@ -389,7 +389,7 @@ async fn suggestions_and_unbounded_lookups_skip_offloaded_files() {
     let window = json!({"after": T_S, "before": T_S + 100});
     for body in [
         json!({"suggest": window}),
-        json!({"suggest": {"after": T_S, "before": T_S + 100, "key": "resource.service.name"}}),
+        json!({"suggest": {"after": T_S, "before": T_S + 100, "key": "resource.attributes.service.name"}}),
     ] {
         let v = call(&h, body.clone()).await.unwrap();
         assert_eq!(v["status"], partial, "{body}");

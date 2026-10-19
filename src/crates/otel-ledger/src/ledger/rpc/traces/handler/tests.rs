@@ -601,18 +601,18 @@ async fn chips_narrow_by_service_operation_and_attributes() {
     let h = handler_with_search_corpus().await;
 
     let mut body = window_body();
-    body["conditions"] = json!([{"key": "resource.service.name", "op": "=", "values": ["svc-a"]}]);
+    body["conditions"] =
+        json!([{"key": "resource.attributes.service.name", "op": "=", "values": ["svc-a"]}]);
     let v = list(&h, body).await.unwrap();
     assert_eq!(ids(&v), vec!["0e", "0c", "0a"]);
 
     // Multi-value OR within a chip.
     let mut body = window_body();
-    body["conditions"] =
-        json!([{"key": "resource.service.name", "op": "=", "values": ["svc-a", "svc-b"]}]);
+    body["conditions"] = json!([{"key": "resource.attributes.service.name", "op": "=", "values": ["svc-a", "svc-b"]}]);
     let v = list(&h, body).await.unwrap();
     assert_eq!(ids(&v).len(), 5);
 
-    // Builtin word: only B and E have a second span.
+    // Builtin key: only B and E have a second span.
     let mut body = window_body();
     body["conditions"] = json!([{"key": "name", "op": "=", "values": ["span-2"]}]);
     let v = list(&h, body).await.unwrap();
@@ -620,7 +620,7 @@ async fn chips_narrow_by_service_operation_and_attributes() {
 
     // Chips AND at trace level.
     let mut body = window_body();
-    body["conditions"] = json!([{"key": "name", "op": "=", "values": ["span-2"]}, {"key": "resource.service.name", "op": "=", "values": ["svc-b"]}]);
+    body["conditions"] = json!([{"key": "name", "op": "=", "values": ["span-2"]}, {"key": "resource.attributes.service.name", "op": "=", "values": ["svc-b"]}]);
     let v = list(&h, body).await.unwrap();
     assert_eq!(ids(&v), vec!["0b"]);
 }
@@ -645,7 +645,7 @@ async fn the_otel_defaults_are_selectable_in_the_functions_view() {
     let h = make_handler_over(registries);
 
     let mut body = functions_body(20);
-    body["conditions"] = json!([{"key": "status", "op": "=", "values": ["UNSET"]}]);
+    body["conditions"] = json!([{"key": "status.code", "op": "=", "values": ["UNSET"]}]);
     let v = serde_json::to_value(call_on(&h, body).await.unwrap()).unwrap();
     assert_eq!(ids(&v["data"]), ["0b"]);
     let o = &v["data"]["overview"];
@@ -856,7 +856,10 @@ async fn a_finished_suggestion_releases_its_permit() {
         .await
         .with_suggest_concurrency(1);
     let mut body = window_body();
-    merge(&mut body, json!({"key": "resource.service.name"}));
+    merge(
+        &mut body,
+        json!({"key": "resource.attributes.service.name"}),
+    );
     for _ in 0..2 {
         let v = serde_json::to_value(call_on(&h, as_mode("suggest", body.clone())).await.unwrap())
             .unwrap();
@@ -1075,7 +1078,8 @@ async fn the_aggregate_bins_only_the_selected_traces() {
     // A chip active: the aggregate follows it (the svc-a traces A, C,
     // E).
     let mut body = functions_body(20);
-    body["conditions"] = json!([{"key": "resource.service.name", "op": "=", "values": ["svc-a"]}]);
+    body["conditions"] =
+        json!([{"key": "resource.attributes.service.name", "op": "=", "values": ["svc-a"]}]);
     let v = serde_json::to_value(call_on(&h, body).await.unwrap()).unwrap();
     assert_eq!(ids(&v["data"]), ["0e", "0c", "0a"]);
     let o = &v["data"]["overview"];
@@ -1102,7 +1106,7 @@ async fn the_aggregate_follows_the_chips_but_never_the_duration_ones() {
     // service chip alone — duration is its own axis.
     let mut body = functions_body(20);
     body["conditions"] = json!([
-        {"key": "resource.service.name", "op": "=", "values": ["svc-a"]},
+        {"key": "resource.attributes.service.name", "op": "=", "values": ["svc-a"]},
         {"key": "trace_duration", "op": ">=", "values": [1_000]}
     ]);
     let v = serde_json::to_value(call_on(&h, body).await.unwrap()).unwrap();
@@ -1113,8 +1117,7 @@ async fn the_aggregate_follows_the_chips_but_never_the_duration_ones() {
     // Values OR within a chip: both services select everything, and the
     // grid equals the unfiltered one.
     let mut body = functions_body(20);
-    body["conditions"] =
-        json!([{"key": "resource.service.name", "op": "=", "values": ["svc-a", "svc-b"]}]);
+    body["conditions"] = json!([{"key": "resource.attributes.service.name", "op": "=", "values": ["svc-a", "svc-b"]}]);
     let v = serde_json::to_value(call_on(&h, body).await.unwrap()).unwrap();
     let o = &v["data"]["overview"];
     assert_eq!(o["totals"], json!({"traces": 5}));
@@ -1146,7 +1149,7 @@ async fn trace_level_chips_filter_the_grid_too() {
 
     // Mixed with a span-level chip, both apply to the grid as to the list.
     let mut body = functions_body(20);
-    body["conditions"] = json!([{"key": "root_service_name", "op": "=", "values": ["svc-a"]}, {"key": "resource.service.name", "op": "=", "values": ["svc-b"]}]);
+    body["conditions"] = json!([{"key": "root_service_name", "op": "=", "values": ["svc-a"]}, {"key": "resource.attributes.service.name", "op": "=", "values": ["svc-b"]}]);
     let v = serde_json::to_value(call_on(&h, body).await.unwrap()).unwrap();
     assert!(ids(&v["data"]).is_empty(), "no trace is on both services");
     assert_eq!(v["data"]["overview"]["totals"]["traces"], 0);
@@ -1298,7 +1301,10 @@ async fn tenant_scoping_isolates_and_defaults() {
     // TenantId::resolve_query sites): trace, the Functions view, and one
     // enumeration path each see tenant-a's data only when scoped.
     let mut values_body = window_body();
-    merge(&mut values_body, json!({"key": "resource.service.name"}));
+    merge(
+        &mut values_body,
+        json!({"key": "resource.attributes.service.name"}),
+    );
     for mut wrapped in [
         json!({"trace": {"id": "0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a"}}),
         functions_body(20),
@@ -1506,11 +1512,11 @@ async fn suggest_lists_matching_values_and_keys() {
     let mut body = window_body();
     merge(
         &mut body,
-        json!({"key": "resource.service.name", "term": "svc-"}),
+        json!({"key": "resource.attributes.service.name", "term": "svc-"}),
     );
     let v = serde_json::to_value(call_on(&h, as_mode("suggest", body)).await.unwrap()).unwrap();
     assert_eq!(v["mode"], "suggest");
-    assert_eq!(v["key"], "resource.service.name");
+    assert_eq!(v["key"], "resource.attributes.service.name");
     assert_eq!(
         v["items"],
         json!([
@@ -1521,14 +1527,14 @@ async fn suggest_lists_matching_values_and_keys() {
     assert_eq!(v["status"], json!({"complete": true}));
     assert_eq!(v["truncated"], false);
 
-    // Keys: rendered in the selection grammar, matched by bare name too.
+    // Keys: rendered as OTLP field paths, matched by bare name too.
     let mut body = window_body();
     merge(&mut body, json!({"term": "service"}));
     let v = serde_json::to_value(call_on(&h, as_mode("suggest", body)).await.unwrap()).unwrap();
     assert!(v.get("key").is_none());
     assert_eq!(
         v["items"][0],
-        json!({"text": "resource.service.name", "match": "prefix", "tier": "low", "kinds": ["str"]})
+        json!({"text": "resource.attributes.service.name", "match": "prefix", "tier": "low", "kinds": ["str"]})
     );
 
     // A virtual key is flagged: it has no values to ask for.
@@ -1561,13 +1567,13 @@ async fn suggest_lists_the_kinds_a_key_holds() {
     let h = make_handler_over(registries);
 
     let mut body = window_body();
-    merge(&mut body, json!({"term": "span.http."}));
+    merge(&mut body, json!({"term": "attributes.http."}));
     let v = serde_json::to_value(call_on(&h, as_mode("suggest", body)).await.unwrap()).unwrap();
     assert_eq!(
         v["items"],
         json!([
-            {"text": "span.http.route", "match": "prefix", "tier": "low", "kinds": ["str"]},
-            {"text": "span.http.status_code", "match": "prefix", "tier": "low", "kinds": ["int"]},
+            {"text": "attributes.http.route", "match": "prefix", "tier": "low", "kinds": ["str"]},
+            {"text": "attributes.http.status_code", "match": "prefix", "tier": "low", "kinds": ["int"]},
         ])
     );
 }
@@ -1607,7 +1613,7 @@ async fn suggest_is_validated_before_admission_and_bounded() {
             "'term' is longer than 1024 bytes",
         ),
         (
-            json!({"suggest": {"key": format!("span.{}", "k".repeat(1020))}}),
+            json!({"suggest": {"key": format!("attributes.{}", "k".repeat(1014))}}),
             "'key' is longer than 1024 bytes",
         ),
     ] {
@@ -1644,7 +1650,10 @@ async fn lists_and_trace_lookups_have_their_own_admission() {
     assert_eq!(v["field_kinds"], empty_field_kinds());
 
     let mut body = window_body();
-    merge(&mut body, json!({"key": "resource.service.name"}));
+    merge(
+        &mut body,
+        json!({"key": "resource.attributes.service.name"}),
+    );
     let v = serde_json::to_value(call_on(&h, as_mode("suggest", body)).await.unwrap()).unwrap();
     assert_ne!(v["status"], json!({"partial": ["busy"]}), "{v}");
 }
@@ -1688,7 +1697,7 @@ async fn chips_and_text_filter_the_list_and_the_grid() {
     let chip = |key: &str, op: &str, values: serde_json::Value| json!([{"key": key, "op": op, "values": values}]);
 
     let v = run(
-        chip("resource.service.name", "=", json!(["svc-a"])),
+        chip("resource.attributes.service.name", "=", json!(["svc-a"])),
         json!([]),
     )
     .await;
@@ -1696,7 +1705,7 @@ async fn chips_and_text_filter_the_list_and_the_grid() {
     assert_eq!(v["data"]["overview"]["totals"]["traces"], 3);
 
     let v = run(
-        chip("resource.service.name", "!=", json!(["svc-a"])),
+        chip("resource.attributes.service.name", "!=", json!(["svc-a"])),
         json!([]),
     )
     .await;
@@ -1704,7 +1713,7 @@ async fn chips_and_text_filter_the_list_and_the_grid() {
     assert_eq!(v["data"]["overview"]["totals"]["traces"], 2);
 
     let v = run(
-        chip("resource.service.name", "^=", json!(["svc-"])),
+        chip("resource.attributes.service.name", "^=", json!(["svc-"])),
         json!([]),
     )
     .await;
@@ -1751,7 +1760,7 @@ async fn every_chip_op_reaches_the_engine() {
             3,
         ),
         (
-            chip("resource.service.name", "!^=", json!(["svc-a"])),
+            chip("resource.attributes.service.name", "!^=", json!(["svc-a"])),
             vec!["0b", "0d"],
             2,
         ),
@@ -1806,9 +1815,9 @@ async fn bad_chips_and_text_are_client_errors() {
     let none = json!([]);
     for (conditions, text, message) in [
         (
-            chip("resource.service.name", "~=", json!(["x"])),
+            chip("resource.attributes.service.name", "~=", json!(["x"])),
             none.clone(),
-            "condition on 'resource.service.name': unknown op '~='",
+            "condition on 'resource.attributes.service.name': unknown op '~='",
         ),
         (
             chip("nope", "=", json!(["x"])),
@@ -1816,19 +1825,19 @@ async fn bad_chips_and_text_are_client_errors() {
             "unknown key \"nope\": use",
         ),
         (
-            chip("resource.service.name", "=", json!(too_many)),
+            chip("resource.attributes.service.name", "=", json!(too_many)),
             none.clone(),
-            "condition on 'resource.service.name' carries 65 values, over the limit of 64",
+            "condition on 'resource.attributes.service.name' carries 65 values, over the limit of 64",
         ),
         (
-            chip("resource.service.name", "=~", json!(["("])),
+            chip("resource.attributes.service.name", "=~", json!(["("])),
             none.clone(),
-            "'resource.service.name =~': invalid pattern \"(\": ",
+            "'resource.attributes.service.name =~': invalid pattern \"(\": ",
         ),
         (
-            chip("resource.service.name", "^=", json!([5])),
+            chip("resource.attributes.service.name", "^=", json!([5])),
             none.clone(),
-            "condition on 'resource.service.name': '^=' takes text values",
+            "condition on 'resource.attributes.service.name': '^=' takes text values",
         ),
         (
             chip("trace_duration", ">=", json!(["long"])),
@@ -1856,9 +1865,9 @@ async fn bad_chips_and_text_are_client_errors() {
             "'trace_duration >=' takes exactly one value, got 2",
         ),
         (
-            chip("resource.service.name", "=", json!([])),
+            chip("resource.attributes.service.name", "=", json!([])),
             none.clone(),
-            "'resource.service.name =' has no values",
+            "'resource.attributes.service.name =' has no values",
         ),
         (
             chip("trace_id", "=", json!(["xyz"])),
@@ -1866,9 +1875,9 @@ async fn bad_chips_and_text_are_client_errors() {
             "'trace_id' takes 32-character hex ids, got \"xyz\"",
         ),
         (
-            chip("status", "=", json!([5])),
+            chip("status.code", "=", json!([5])),
             none.clone(),
-            "'status =' takes text values",
+            "'status.code =' takes text values",
         ),
         (
             none.clone(),

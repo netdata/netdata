@@ -2,8 +2,9 @@
 //! the wire-neutral `sfsq::traces` engine — the traces analogue of
 //! the logs `adapter`: a pure translation layer, no I/O of its own.
 //!
-//! * wire → engine — request-side parsing: hex ids, the selection-key
-//!   grammar, the pagination cursor, window canonicalization
+//! * wire → engine — request-side parsing: hex ids, keys (the engine's
+//!   vocabulary, `sfsq::traces::parse_key`: OTLP field paths), the
+//!   pagination cursor, window canonicalization
 //!   ([`resolve_window`]), the search tokens ([`build_tokens`]).
 //! * engine → wire — the response shapers (`to_*_result`), ids rendered
 //!   as W3C lowercase hex.
@@ -16,8 +17,8 @@ use std::collections::{BTreeMap, HashMap, HashSet};
 
 use sfsq::traces::{
     AttributeKey, AttributeOwner, BuiltinField, CompareOp, Condition, DURATION_BIN_LABELS,
-    DurationPercentiles, FieldKinds, OverviewData, Predicate, PredicateError, PredicateTarget,
-    PredicateValue, SearchData, TOKENS_MAX, Token, TokenQuery, TraceData,
+    DurationPercentiles, FieldKinds, KeyError, OverviewData, Predicate, PredicateError,
+    PredicateTarget, PredicateValue, SearchData, TOKENS_MAX, Token, TokenQuery, TraceData,
 };
 
 use super::wire::{
@@ -108,11 +109,13 @@ pub(crate) const TRACE_SPANS_MAX_BYTES: usize = 2 * 1024 * 1024;
 
 /// Per-value cap, in JSON bytes (see [`truncate_value`]), on the
 /// free-length strings of list rows (root service and name, breakdown
-/// service names) and of suggestions. Both are for display; the trace
-/// view carries values up to [`TRACE_VALUE_MAX_BYTES`]. With at most
-/// [`super::wire::SEARCH_LIMIT_MAX`] rows or
-/// [`super::wire::SUGGEST_ITEMS_MAX`] suggestions, a response stays well
-/// under 1 MB by construction, so no byte budget has to cut items off.
+/// service names) and of value suggestions. Both are for display; the
+/// trace view carries values up to [`TRACE_VALUE_MAX_BYTES`]. Suggested
+/// keys are capped at [`super::wire::REQUEST_TEXT_MAX_BYTES`] instead, so
+/// they can be sent back. With at most [`super::wire::SEARCH_LIMIT_MAX`]
+/// rows or [`super::wire::SUGGEST_ITEMS_MAX`] suggestions, a response
+/// stays well under 1 MB by construction, so no byte budget has to cut
+/// items off.
 pub(crate) const LIST_VALUE_MAX_BYTES: usize = 256;
 
 /// Cut `s` at a character boundary so that it takes at most `max` bytes
@@ -375,74 +378,14 @@ fn link_wire(l: &sfst::TraceLink) -> LinkWire {
     }
 }
 
-// ── Search: selection-key grammar ───────────────────────────────────
+// ── Search: keys ────────────────────────────────────────────────────
 
-/// The wire word for each builtin field (snake_case). Also the words
-/// key enumeration emits ([`render_attribute_key`]), so filters and
-/// facet keys stay one vocabulary. The lockstep test walks
-/// `BuiltinField::ALL`, so a new engine builtin breaks the suite until
-/// it gets a wire word.
-const BUILTIN_WORDS: [(&str, BuiltinField); 17] = [
-    ("name", BuiltinField::Name),
-    ("kind", BuiltinField::Kind),
-    ("status", BuiltinField::Status),
-    ("status_message", BuiltinField::StatusMessage),
-    ("instrumentation_name", BuiltinField::InstrumentationName),
-    (
-        "instrumentation_version",
-        BuiltinField::InstrumentationVersion,
-    ),
-    ("event_name", BuiltinField::EventName),
-    ("duration", BuiltinField::Duration),
-    ("span_id", BuiltinField::SpanId),
-    ("parent_span_id", BuiltinField::ParentSpanId),
-    ("trace_id", BuiltinField::TraceId),
-    ("link_span_id", BuiltinField::LinkSpanId),
-    ("link_trace_id", BuiltinField::LinkTraceId),
-    ("event_time_since_start", BuiltinField::EventTimeSinceStart),
-    ("root_name", BuiltinField::RootName),
-    ("root_service_name", BuiltinField::RootServiceName),
-    ("trace_duration", BuiltinField::TraceDuration),
-];
-
-/// The attribute owners a selection key may name, as `<owner>.<key>`.
-/// The engine enum has two further owners that stay un-named here:
-/// `Builtin` is spelled as the bare builtin words above, and the
-/// predicates-only `Any` is not wire-nameable at all. `suggest` emits
-/// attribute keys owner-qualified ([`render_attribute_key`]), so
-/// attribute chip keys are always qualified; its `.expect` keeps this
-/// table in lockstep with the engine enum.
-const OWNER_WORDS: [(&str, AttributeOwner); 5] = [
-    ("resource", AttributeOwner::Resource),
-    ("span", AttributeOwner::Span),
-    ("instrumentation", AttributeOwner::Instrumentation),
-    ("event", AttributeOwner::Event),
-    ("link", AttributeOwner::Link),
-];
-
-/// Parse one selection key: `<owner>.<key>` (the key part verbatim, dots
-/// included — `resource.service.name` → the `service.name` resource
-/// attribute) or a bare builtin word.
+/// Parse one key — the engine's vocabulary, its OTLP field path
+/// (`resource.attributes.service.name`, `status.code`) — as the target
+/// a condition tests.
 pub(crate) fn parse_selection_key(key: &str) -> Result<PredicateTarget, String> {
-    for (word, owner) in OWNER_WORDS {
-        if let Some(rest) = key.strip_prefix(word).and_then(|r| r.strip_prefix('.')) {
-            if rest.is_empty() {
-                return Err(format!("key {key:?} names no attribute"));
-            }
-            return Ok(PredicateTarget::Attribute(owner, rest.to_string()));
-        }
-    }
-    BUILTIN_WORDS
-        .iter()
-        .find(|(w, _)| *w == key)
-        .map(|(_, f)| PredicateTarget::Builtin(*f))
-        .ok_or_else(|| {
-            format!(
-                "unknown key {key:?}: use resource.<key> / span.<key> / \
-                 instrumentation.<key> / event.<key> / link.<key>, or a builtin \
-                 field word"
-            )
-        })
+    let (owner, key) = parse_enumeration_key(key)?;
+    Ok(PredicateTarget::from_key(owner, key))
 }
 
 /// The search tokens of a request: one token per chip and per free-text
@@ -626,33 +569,7 @@ pub(crate) fn heatmap_tokens(tokens: &TokenQuery) -> TokenQuery {
     }
 }
 
-// ── Suggest: key parsing and rendering ──────────────────────────────
-
-/// The selection-grammar word of a builtin field.
-fn builtin_word(field: BuiltinField) -> &'static str {
-    BUILTIN_WORDS
-        .iter()
-        .find(|(_, f)| *f == field)
-        .map(|(w, _)| *w)
-        .expect("the lockstep test pins a wire word for every builtin")
-}
-
-/// Render one key into the selection grammar — the exact inverse of
-/// [`parse_selection_key`] (round-trip pinned by tests), so a suggested
-/// key feeds straight back as a selection or a values request.
-pub(crate) fn render_attribute_key(owner: AttributeOwner, key: &AttributeKey) -> String {
-    match key {
-        AttributeKey::Builtin(b) => builtin_word(*b).to_string(),
-        AttributeKey::Attribute(a) => {
-            let word = OWNER_WORDS
-                .iter()
-                .find(|(_, o)| *o == owner)
-                .map(|(w, _)| *w)
-                .expect("attribute keys only ever carry attribute owners");
-            format!("{word}.{a}")
-        }
-    }
-}
+// ── Suggest: keys ───────────────────────────────────────────────────
 
 /// A key whose values a request suggests: bounded in length,
 /// and with stored values (a virtual builtin such as the duration has
@@ -663,10 +580,7 @@ pub(crate) fn parse_values_key(key: &str) -> Result<(AttributeOwner, AttributeKe
     if let AttributeKey::Builtin(b) = key
         && b.dictionary_field().is_none()
     {
-        return Err(format!(
-            "'{}' has no stored values to list",
-            builtin_word(b)
-        ));
+        return Err(format!("'{}' has no stored values to list", b.key()));
     }
     Ok((owner, key))
 }
@@ -681,20 +595,22 @@ pub(crate) fn check_request_text(name: &str, text: &str) -> Result<(), String> {
     Ok(())
 }
 
-/// A selection-grammar key as the engine's (owner, key) pair.
+/// A key as the engine's (owner, key) pair; the error names the key
+/// forms.
 pub(crate) fn parse_enumeration_key(key: &str) -> Result<(AttributeOwner, AttributeKey), String> {
-    Ok(match parse_selection_key(key)? {
-        PredicateTarget::Attribute(owner, a) => (owner, AttributeKey::Attribute(a)),
-        PredicateTarget::Builtin(f) => (AttributeOwner::Builtin, AttributeKey::Builtin(f)),
-        PredicateTarget::FreeText => return Err(format!("'{key}' is not a key")),
+    sfsq::traces::parse_key(key).map_err(|e| match e {
+        KeyError::EmptyAttribute => format!("key {key:?} names no attribute"),
+        KeyError::Unknown => format!("unknown key {key:?}: use {}", sfsq::traces::key_forms()),
     })
 }
 
 /// Shape suggestions into the wire result. `key` echoes the request's
-/// key for value suggestions. Texts are capped at
-/// [`LIST_VALUE_MAX_BYTES`] of JSON (the engine cut raw bytes) and
-/// flagged when cut; a text cut to an earlier item's is listed once,
-/// with the higher tier and both items' kinds (the engine's merge rule).
+/// key for value suggestions. Values are capped at
+/// [`LIST_VALUE_MAX_BYTES`] of JSON (the engine cut raw bytes), keys at
+/// [`super::wire::REQUEST_TEXT_MAX_BYTES`] (the engine sends them whole),
+/// so every key that is not flagged can be sent back as a request key;
+/// a text cut to an earlier item's is listed once, with the higher tier
+/// and both items' kinds (the engine's merge rule).
 pub(crate) fn to_suggest_result(
     data: sfsq::traces::SuggestData,
     key: Option<String>,
@@ -702,9 +618,13 @@ pub(crate) fn to_suggest_result(
     let mut items: Vec<SuggestionWire> = Vec::with_capacity(data.items.len());
     let mut kinds: Vec<sfst::ValueKinds> = Vec::with_capacity(data.items.len());
     let mut listed: HashMap<String, usize> = HashMap::new();
+    let max = match key {
+        Some(_) => LIST_VALUE_MAX_BYTES,
+        None => super::wire::REQUEST_TEXT_MAX_BYTES,
+    };
     for s in data.items {
         let mut text = s.text;
-        let cut = truncate_value(&mut text, LIST_VALUE_MAX_BYTES);
+        let cut = truncate_value(&mut text, max);
         if let Some(&i) = listed.get(&text) {
             items[i].truncated |= cut || s.truncated;
             items[i].tier = items[i].tier.max(s.tier.map(Into::into));

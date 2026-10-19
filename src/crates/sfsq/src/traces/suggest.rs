@@ -6,11 +6,12 @@
 //! tier and the WAL tail, so a candidate ranks the same wherever it
 //! lives.
 //!
-//! Keys come back as the caller renders them ([`KeyRenderer`]: the
-//! engine owns no wire words), and a key matches by the better of its
-//! rendered form (`resource.service.name`) and its bare name
-//! (`service.name`; a builtin's bare name is its rendered word): users
-//! type attribute names, not owners. Every builtin field is a key
+//! Keys come back as vocabulary keys ([`render_key`]: their OTLP field
+//! paths), and a key matches by the better of its full form
+//! (`resource.attributes.service.name`) and its bare name
+//! (`service.name`; a builtin's bare name is its key): users type
+//! attribute names, not owners. Keys are never cut: one too long for a
+//! consumer's request limit is the consumer's to flag. Every builtin field is a key
 //! whatever the data holds (builtins are engine capabilities); a key's
 //! tier is the highest any visited source gives it, and a key no source
 //! carries (a virtual builtin such as the duration) has none. An
@@ -63,7 +64,7 @@ use tokio_util::sync::CancellationToken;
 use super::order::{complete_after, newest_first};
 use super::sources::{SourceSetError, TraceSource, validate_sources};
 use super::status::{PartialReason, QueryStatus, StatusBuilder};
-use super::vocab::{AttributeKey, AttributeOwner, BuiltinField, storage_to_attribute};
+use super::vocab::{AttributeKey, AttributeOwner, BuiltinField, render_key, storage_to_attribute};
 use super::wal_scan::TraceWalScan;
 use super::window::{TimeWindow, WindowError};
 use crate::source::map_source;
@@ -94,10 +95,6 @@ pub enum SuggestRequestError {
     BuiltinKeyOutsideBuiltinOwner(AttributeOwner),
     #[error("the Builtin owner holds no attribute keys, got attribute {0:?} (pin C4)")]
     AttributeKeyUnderBuiltinOwner(String),
-    /// `Any` exists for predicates (the owner-agnostic filter); values
-    /// are per concrete owner.
-    #[error("the Any owner is a predicate construct; enumeration takes a concrete owner")]
-    AnyOwnerNotEnumerable,
     #[error(transparent)]
     SourceSet(#[from] SourceSetError),
 }
@@ -105,7 +102,7 @@ pub enum SuggestRequestError {
 /// Resolve a values request's `(owner, key)` pair to the storage
 /// dictionary field it reads. The owner/key pairing is strict (pin C4):
 /// builtin keys only under the Builtin owner, attribute keys only under
-/// a concrete attribute owner, `Any` never. A virtual builtin — no value
+/// an attribute owner. A virtual builtin — no value
 /// dictionary anywhere (decision 18B) — has no field to resolve and is
 /// rejected.
 fn storage_field_of(
@@ -113,7 +110,6 @@ fn storage_field_of(
     key: &AttributeKey,
 ) -> Result<String, SuggestRequestError> {
     match (owner, key) {
-        (AttributeOwner::Any, _) => Err(SuggestRequestError::AnyOwnerNotEnumerable),
         (AttributeOwner::Builtin, AttributeKey::Builtin(i)) => i
             .dictionary_field()
             .map(str::to_string)
@@ -139,8 +135,8 @@ fn pruned(window: Option<TimeWindow>, summary: &sfst::Summary) -> bool {
     window.is_some_and(|w| !w.overlaps_summary(summary.min_timestamp_s, summary.max_timestamp_s))
 }
 
-/// Longest suggestion text, in bytes; longer values are cut at a
-/// character boundary and flagged.
+/// Longest value suggestion, in bytes; longer values are cut at a
+/// character boundary and flagged. Keys are never cut.
 pub const DISPLAY_MAX_BYTES: usize = 256;
 /// Suggestions returned when the query does not say.
 pub const DEFAULT_SUGGEST_ITEMS: usize = 50;
@@ -152,13 +148,9 @@ pub const DEFAULT_STALE_FILES: usize = 8;
 /// Values scanned between two deadline checks inside one source.
 pub const DEADLINE_CHECK_EVERY: usize = 1024;
 
-/// Renders a key as the caller names it (the ledger's selection grammar,
-/// the CLI's words).
-pub type KeyRenderer = fn(AttributeOwner, &AttributeKey) -> String;
-
 #[derive(Debug, Clone)]
 enum Target {
-    Keys(KeyRenderer),
+    Keys,
     Values(AttributeOwner, AttributeKey),
 }
 
@@ -183,9 +175,9 @@ impl SuggestQuery {
         Self::new(Target::Values(owner, key))
     }
 
-    /// Suggest keys, each rendered by `render`.
-    pub fn keys(render: KeyRenderer) -> Self {
-        Self::new(Target::Keys(render))
+    /// Suggest keys, as vocabulary keys.
+    pub fn keys() -> Self {
+        Self::new(Target::Keys)
     }
 
     fn new(target: Target) -> Self {
@@ -298,7 +290,7 @@ pub fn suggest(
         return Err(SuggestRequestError::ZeroLimit);
     }
     let target = match &query.target {
-        Target::Keys(render) => Resolved::Keys(*render),
+        Target::Keys => Resolved::Keys,
         Target::Values(owner, key) => Resolved::Values(storage_field_of(*owner, key)?),
     };
     validate_sources(&sources)?;
@@ -306,7 +298,7 @@ pub fn suggest(
 
     let matcher = ValueMatcher::new(&query.term);
     let mut set = BoundedSuggestions::new(query.max_items);
-    if let Resolved::Keys(render) = target {
+    if let Resolved::Keys = target {
         for field in BuiltinField::ALL {
             let key = AttributeKey::Builtin(field);
             let info = KeyInfo {
@@ -314,14 +306,7 @@ pub fn suggest(
                 enumerable: true,
                 kinds: sfst::ValueKinds::default(),
             };
-            offer_key(
-                &mut set,
-                &matcher,
-                render,
-                AttributeOwner::Builtin,
-                &key,
-                info,
-            );
+            offer_key(&mut set, &matcher, AttributeOwner::Builtin, &key, info);
         }
     }
     let mut status = StatusBuilder::new();
@@ -401,7 +386,7 @@ pub fn suggest(
 
 /// The query's target, validated.
 enum Resolved {
-    Keys(KeyRenderer),
+    Keys,
     /// The storage field holding the key's values.
     Values(String),
 }
@@ -437,7 +422,7 @@ fn visit_sfst(
     };
     let storage = match target {
         Resolved::Values(storage) => storage,
-        Resolved::Keys(render) => {
+        Resolved::Keys => {
             let fields = match meta.field_table() {
                 Ok(fields) => fields,
                 Err(e) => return Visit::Failed(format!("field table: {e}")),
@@ -454,7 +439,7 @@ fn visit_sfst(
                         enumerable: true,
                         kinds: kinds.get(&field.name).copied().unwrap_or_default(),
                     };
-                    changed |= offer_key(set, matcher, *render, owner, &key, info);
+                    changed |= offer_key(set, matcher, owner, &key, info);
                 }
             }
             return Visit::Scanned { changed };
@@ -490,7 +475,7 @@ fn visit_tail(
     };
     let storage = match target {
         Resolved::Values(storage) => storage,
-        Resolved::Keys(render) => {
+        Resolved::Keys => {
             let mut changed = false;
             for (name, values) in scan.pair_table() {
                 if let Some((owner, key)) = storage_to_attribute(name) {
@@ -502,7 +487,7 @@ fn visit_tail(
                         enumerable: true,
                         kinds: scan.field_kinds().get(name).copied().unwrap_or_default(),
                     };
-                    changed |= offer_key(set, matcher, *render, owner, &key, info);
+                    changed |= offer_key(set, matcher, owner, &key, info);
                 }
             }
             return Visit::Scanned { changed };
@@ -547,12 +532,11 @@ struct KeyInfo {
 fn offer_key(
     set: &mut BoundedSuggestions,
     matcher: &ValueMatcher,
-    render: KeyRenderer,
     owner: AttributeOwner,
     key: &AttributeKey,
     info: KeyInfo,
 ) -> bool {
-    let text = render(owner, key);
+    let text = render_key(owner, key);
     let (bare, info) = match key {
         AttributeKey::Attribute(name) => (matcher.classify(name.as_bytes()), info),
         AttributeKey::Builtin(b) => (
@@ -636,11 +620,15 @@ impl BoundedSuggestions {
     }
 
     /// Offer a matching candidate (`key`: a key's details; `None` for a
-    /// value); `true` when the set changed. A key seen again keeps the
-    /// highest tier and every kind any source gave it; that alone is no
-    /// change.
+    /// value); `true` when the set changed. A value is shown cut to
+    /// [`DISPLAY_MAX_BYTES`]; a key whole, so a suggested key can always be
+    /// sent back. A key seen again keeps the highest tier and every kind
+    /// any source gave it; that alone is no change.
     fn offer(&mut self, value: &str, class: MatchClass, key: Option<KeyInfo>) -> bool {
-        let (display, cut) = display_text(value);
+        let (display, cut) = match key {
+            Some(_) => (value, false),
+            None => display_text(value),
+        };
         if let Some(entry) = self.best.get_mut(display) {
             // Another candidate with the same display text: keep the
             // better class, the higher tier and every kind, and
@@ -749,12 +737,6 @@ mod tests {
 
     #[test]
     fn kinds_merge_without_a_change_and_never_reach_a_builtin() {
-        fn render(_: AttributeOwner, key: &AttributeKey) -> String {
-            match key {
-                AttributeKey::Attribute(a) => a.clone(),
-                AttributeKey::Builtin(b) => format!("{b:?}"),
-            }
-        }
         use sfst::ValueKind::{Int, Str};
         let info = |kinds: &[sfst::ValueKind]| KeyInfo {
             tier: Some(sfst::FieldTier::Low),
@@ -767,7 +749,6 @@ mod tests {
         assert!(offer_key(
             &mut set,
             &matcher,
-            render,
             AttributeOwner::Span,
             &code,
             info(&[Str])
@@ -776,7 +757,6 @@ mod tests {
             !offer_key(
                 &mut set,
                 &matcher,
-                render,
                 AttributeOwner::Span,
                 &code,
                 info(&[Int])
@@ -786,7 +766,6 @@ mod tests {
         offer_key(
             &mut set,
             &matcher,
-            render,
             AttributeOwner::Span,
             &code,
             info(&[Str]),
@@ -795,7 +774,6 @@ mod tests {
         offer_key(
             &mut set,
             &matcher,
-            render,
             AttributeOwner::Builtin,
             &name,
             info(&[Int]),
@@ -807,7 +785,10 @@ mod tests {
             .collect();
         assert_eq!(
             kinds,
-            [("Name".into(), vec![]), ("code".into(), vec![Int, Str])]
+            [
+                ("attributes.code".into(), vec![Int, Str]),
+                ("name".into(), vec![])
+            ]
         );
     }
 
@@ -830,6 +811,24 @@ mod tests {
         assert!(set.offer("a", Prefix, None));
         assert!(!set.offer("b", Contains, None));
         assert_eq!(texts(set), [("a".into(), Prefix, false)]);
+    }
+
+    #[test]
+    fn long_keys_stay_whole_and_distinct() {
+        let info = KeyInfo {
+            tier: Some(sfst::FieldTier::Low),
+            enumerable: true,
+            kinds: sfst::ValueKinds::default(),
+        };
+        let head = "k".repeat(DISPLAY_MAX_BYTES);
+        let (long_a, long_b) = (format!("{head}a"), format!("{head}é"));
+        let mut set = BoundedSuggestions::new(4);
+        assert!(set.offer(&long_a, Prefix, Some(info)));
+        assert!(set.offer(&long_b, Prefix, Some(info)));
+        assert_eq!(
+            texts(set),
+            [(long_a, Prefix, false), (long_b, Prefix, false)]
+        );
     }
 
     #[test]

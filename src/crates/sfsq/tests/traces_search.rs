@@ -551,11 +551,10 @@ fn oracle_equivalence_under_relayouts() {
             vec![hex(3), hex(6), hex(4), hex(1)],
         ),
         (
-            // The any-owner disjunction: `env` is a RESOURCE attribute of
-            // svc-a; the any-owner lookup reaches it.
-            "any-owner-attribute",
+            // `env` is a RESOURCE attribute of svc-a.
+            "resource-attribute",
             canon_query(pred(vec![cond(
-                PredicateTarget::Attribute(AttributeOwner::Any, "env".into()),
+                PredicateTarget::Attribute(AttributeOwner::Resource, "env".into()),
                 CompareOp::Eq,
                 vec![text("prod")],
             )])),

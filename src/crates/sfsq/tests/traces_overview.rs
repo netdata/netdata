@@ -477,7 +477,7 @@ fn name_in(values: &[&str]) -> Predicate {
     }
 }
 
-/// `resource.service.name = <value>` (the rail's service filter).
+/// `resource.attributes.service.name = <value>` (the rail's service filter).
 fn service_eq(value: &str) -> Predicate {
     Predicate {
         conditions: vec![cond(

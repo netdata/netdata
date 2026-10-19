@@ -274,15 +274,6 @@ fn cancellation_is_all_or_empty_and_zero_limits_are_rejected() {
     }
 }
 
-/// A test renderer: lowercase owner word + `.` + name; builtins by
-/// their lowercased variant name.
-fn render(owner: AttributeOwner, key: &AttributeKey) -> String {
-    match key {
-        AttributeKey::Builtin(b) => format!("{b:?}").to_lowercase(),
-        AttributeKey::Attribute(a) => format!("{}.{a}", format!("{owner:?}").to_lowercase()),
-    }
-}
-
 #[test]
 fn keys_match_by_rendered_or_bare_name_with_their_highest_tier() {
     let dir = tempfile::tempdir().unwrap();
@@ -312,7 +303,7 @@ fn keys_match_by_rendered_or_bare_name_with_their_highest_tier() {
     let keys = |term: &str| {
         run(
             sources.clone(),
-            SuggestQuery::keys(render).term(term).max_items(50),
+            SuggestQuery::keys().term(term).max_items(50),
         )
     };
 
@@ -320,7 +311,7 @@ fn keys_match_by_rendered_or_bare_name_with_their_highest_tier() {
     assert_eq!(
         data.items[0],
         Suggestion {
-            text: "span.hi".into(),
+            text: "attributes.hi".into(),
             truncated: false,
             class: Exact,
             tier: Some(FieldTier::Mid),
@@ -332,7 +323,10 @@ fn keys_match_by_rendered_or_bare_name_with_their_highest_tier() {
 
     // Users type attribute names, not owners.
     let data = keys("serv");
-    assert_eq!(items(&data)[0], ("resource.service.name", Prefix));
+    assert_eq!(
+        items(&data)[0],
+        ("resource.attributes.service.name", Prefix)
+    );
 
     // Every builtin is a key; one no source carries has no tier.
     let data = keys("");
@@ -345,7 +339,7 @@ fn keys_match_by_rendered_or_bare_name_with_their_highest_tier() {
     );
     assert_eq!(tier_of("name"), Some(Some(FieldTier::Low)));
     assert_eq!(
-        tier_of("span.k"),
+        tier_of("attributes.k"),
         Some(Some(FieldTier::Low)),
         "from the tail"
     );
@@ -423,12 +417,12 @@ fn the_window_prunes_sealed_and_unavailable_sources_but_never_the_tail() {
 
 #[test]
 fn every_builtin_is_a_key_without_any_source() {
-    let data = run(Vec::new(), SuggestQuery::keys(render).max_items(200));
+    let data = run(Vec::new(), SuggestQuery::keys().max_items(200));
     let mut keys: Vec<String> = data.items.into_iter().map(|s| s.text).collect();
     keys.sort();
     let mut want: Vec<String> = BuiltinField::ALL
         .iter()
-        .map(|b| format!("{b:?}").to_lowercase())
+        .map(|b| b.key().to_string())
         .collect();
     want.sort();
     assert_eq!(keys, want, "the builtin keys are static");
@@ -445,12 +439,12 @@ fn a_tails_key_tier_follows_its_value_count() {
     );
     let data = run(
         vec![tail_source(&t, "t")],
-        SuggestQuery::keys(render).term("span.t"),
+        SuggestQuery::keys().term("attributes.t"),
     );
     assert_eq!(
         data.items
             .iter()
-            .find(|s| s.text == "span.t")
+            .find(|s| s.text == "attributes.t")
             .map(|s| s.tier),
         Some(Some(FieldTier::Mid))
     );
@@ -497,7 +491,7 @@ fn key_kinds_union_every_source() {
             memory_source(&new, "new"),
             tail_source(&tail, "tail"),
         ],
-        SuggestQuery::keys(render).max_items(200),
+        SuggestQuery::keys().max_items(200),
     );
 
     use sfst::ValueKind::{Double, Int, Str};
@@ -509,18 +503,18 @@ fn key_kinds_union_every_source() {
             .kinds
     };
     for (text, want) in [
-        ("event.attempt", kinds_of(&[Int])),
-        ("span.both", kinds_of(&[Int, Str])),
-        ("span.code", kinds_of(&[Int])),
-        ("span.label", kinds_of(&[Str])),
-        ("span.late", kinds_of(&[Int, Str])),
-        ("span.mixed", kinds_of(&[Int, Str])),
-        ("span.ratio", kinds_of(&[Double])),
-        ("span.tail_both", kinds_of(&[Int, Str])),
-        ("span.tail_label", kinds_of(&[Str])),
+        ("events.attributes.attempt", kinds_of(&[Int])),
+        ("attributes.both", kinds_of(&[Int, Str])),
+        ("attributes.code", kinds_of(&[Int])),
+        ("attributes.label", kinds_of(&[Str])),
+        ("attributes.late", kinds_of(&[Int, Str])),
+        ("attributes.mixed", kinds_of(&[Int, Str])),
+        ("attributes.ratio", kinds_of(&[Double])),
+        ("attributes.tail_both", kinds_of(&[Int, Str])),
+        ("attributes.tail_label", kinds_of(&[Str])),
         ("name", kinds_of(&[])),
         ("kind", kinds_of(&[])),
-        ("status", kinds_of(&[])),
+        ("status.code", kinds_of(&[])),
     ] {
         assert_eq!(kinds(text), want, "{text}");
     }
@@ -534,16 +528,22 @@ fn key_kinds_union_every_source() {
     assert_eq!(
         numeric,
         [
-            "event.attempt",
-            "span.both",
-            "span.code",
-            "span.late",
-            "span.mixed",
-            "span.ratio",
-            "span.tail_both",
+            "attributes.both",
+            "attributes.code",
+            "attributes.late",
+            "attributes.mixed",
+            "attributes.ratio",
+            "attributes.tail_both",
+            "events.attributes.attempt",
         ]
     );
-    for text in ["span.label", "span.tail_label", "name", "kind", "status"] {
+    for text in [
+        "attributes.label",
+        "attributes.tail_label",
+        "name",
+        "kind",
+        "status.code",
+    ] {
         assert!(data.items.iter().any(|s| s.text == text), "{text} is a key");
     }
     assert_eq!(data.status, QueryStatus::Complete);
@@ -570,12 +570,12 @@ fn sealed_and_tail_kinds_agree() {
             .map(|s| (s.text, s.kinds.iter().collect()))
             .collect()
     };
-    let query = || SuggestQuery::keys(render).max_items(200);
+    let query = || SuggestQuery::keys().max_items(200);
     let sealed = kinds(run(vec![sealed_source(dir.path(), &wal, "s")], query()));
     let tail = kinds(run(vec![tail_source(&wal, "t")], query()));
     assert_eq!(sealed, tail);
     use sfst::ValueKind::{Int, Str};
-    assert!(sealed.contains(&("span.mixed".to_string(), vec![Int, Str])));
+    assert!(sealed.contains(&("attributes.mixed".to_string(), vec![Int, Str])));
 }
 
 /// A kind set from its members.
@@ -618,7 +618,7 @@ fn keys_partition_by_owner_whatever_the_source_order() {
     ];
 
     let keys_of = |sources: Vec<TraceSource>| -> Vec<String> {
-        let data = run(sources, SuggestQuery::keys(render).max_items(200));
+        let data = run(sources, SuggestQuery::keys().max_items(200));
         assert_eq!(data.status, QueryStatus::Complete);
         assert!(!data.truncated);
         let mut keys: Vec<String> = data.items.into_iter().map(|s| s.text).collect();
@@ -627,26 +627,26 @@ fn keys_partition_by_owner_whatever_the_source_order() {
     };
     let keys = keys_of(sources.clone());
     for want in [
-        "resource.host",
-        "resource.service.name",
-        "span.ratio",
-        "span.retries",
-        "span.trace_state",
-        "instrumentation.lang",
-        "event.attempt",
-        "link.rel",
+        "resource.attributes.host",
+        "resource.attributes.service.name",
+        "attributes.ratio",
+        "attributes.retries",
+        "attributes.trace_state",
+        "scope.attributes.lang",
+        "events.attributes.attempt",
+        "links.attributes.rel",
     ] {
         assert!(keys.iter().any(|k| k == want), "{want} in {keys:?}");
     }
     for builtin in BuiltinField::ALL {
-        let word = format!("{builtin:?}").to_lowercase();
-        assert!(keys.contains(&word), "builtin {word} in {keys:?}");
+        let key = builtin.key().to_string();
+        assert!(keys.contains(&key), "builtin {key} in {keys:?}");
     }
     for internal in ["_kind", "_status_code", "trace_state"] {
         assert!(
             !keys
                 .iter()
-                .any(|k| k.ends_with(internal) && !k.starts_with("span.")),
+                .any(|k| k.ends_with(internal) && !k.starts_with("attributes.")),
             "{internal} must not surface: {keys:?}"
         );
     }
@@ -656,9 +656,8 @@ fn keys_partition_by_owner_whatever_the_source_order() {
     assert_eq!(keys_of(reversed), keys);
 }
 
-/// Dictionary-backed builtins suggest their STORAGE labels (mapping them
-/// to wire words is the adapter's job); a virtual builtin has no values
-/// and asking for them is a request error.
+/// Dictionary-backed builtins suggest their stored labels; a virtual
+/// builtin has no values and asking for them is a request error.
 #[test]
 fn builtin_values_are_storage_labels_and_virtual_builtins_have_none() {
     let dir = tempfile::tempdir().unwrap();
@@ -735,13 +734,6 @@ fn bad_requests_are_rejected_and_an_absent_key_is_empty() {
         )
         .unwrap_err()
     };
-    assert!(matches!(
-        fails(
-            Vec::new(),
-            SuggestQuery::values(AttributeOwner::Any, AttributeKey::Attribute("k".into()))
-        ),
-        SuggestRequestError::AnyOwnerNotEnumerable
-    ));
     assert!(matches!(
         fails(
             Vec::new(),

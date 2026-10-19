@@ -24,15 +24,13 @@
 
 use sfst::{PlanTerm, TracePlan, TraceSpan};
 
-use super::vocab::{AttributeOwner, BuiltinField};
+use super::vocab::{AttributeKey, AttributeOwner, BuiltinField};
 use super::window::TimeWindow;
 
 /// What a condition tests. Attribute keys carry an [`AttributeOwner`]
 /// ([`AttributeOwner::Builtin`] is not an attribute owner — request
-/// error); [`AttributeOwner::Any`] is the owner-agnostic attribute
-/// (the resource ∪ span disjunction); builtins are the full fixed
-/// [`BuiltinField`] set, colon forms included (`span:id` =
-/// [`BuiltinField::SpanId`], …).
+/// error); builtins are the full fixed [`BuiltinField`] set. A
+/// vocabulary key names its target through [`PredicateTarget::from_key`].
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum PredicateTarget {
     Attribute(AttributeOwner, String),
@@ -45,13 +43,21 @@ pub enum PredicateTarget {
     FreeText,
 }
 
+impl PredicateTarget {
+    /// The target a parsed vocabulary key names
+    /// ([`super::vocab::parse_key`]).
+    pub fn from_key(owner: AttributeOwner, key: AttributeKey) -> Self {
+        match key {
+            AttributeKey::Builtin(b) => PredicateTarget::Builtin(b),
+            AttributeKey::Attribute(a) => PredicateTarget::Attribute(owner, a),
+        }
+    }
+}
+
 impl std::fmt::Display for PredicateTarget {
-    /// Diagnostic rendering (error messages only — no wire grammar).
+    /// Diagnostic rendering (error messages only).
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            PredicateTarget::Attribute(AttributeOwner::Any, key) => {
-                write!(f, "any-owner attribute {key:?}")
-            }
             PredicateTarget::Attribute(owner, key) => write!(f, "{owner:?} attribute {key:?}"),
             PredicateTarget::Builtin(i) => write!(f, "builtin field {i:?}"),
             PredicateTarget::FreeText => write!(f, "free text"),
@@ -527,12 +533,12 @@ impl Condition {
     /// Whether this build evaluates this condition — see the module
     /// docs. `None` = evaluable; `Some(construct)` names the
     /// not-yet-evaluable construct. Evaluable: everything span-local —
-    /// attributes (any owner incl. `Any`, every op), the dictionary
+    /// attributes (every owner, every op), the dictionary
     /// builtins, duration bounds/equality, and the span/parent/trace
     /// ids (both polarities) — plus the POSITIVE event/link subgroup
     /// forms and the trace-level builtins. The gaps are the NEGATED
-    /// subgroup forms — link ids, `event:name`, event/link attributes,
-    /// `event:timeSinceStart` — which sit on the recorded open
+    /// subgroup forms — link ids, `events.name`, event/link attributes,
+    /// `events.time_since_start` — which sit on the recorded open
     /// subgroup-semantics question. Assumes structural validity
     /// ([`Condition::validate`] runs first).
     fn unevaluable_construct(&self) -> Option<String> {
@@ -545,20 +551,19 @@ impl Condition {
             {
                 None
             }
-            // Attribute owners (incl. the any-owner disjunction): every
-            // op — tokens for text, the dictionary-numeric path for
-            // numbers, presence ∩ complement for negation.
+            // Attribute owners: every op — tokens for text, the
+            // dictionary-numeric path for numbers, presence ∩ complement
+            // for negation.
             (
                 PredicateTarget::Attribute(
                     AttributeOwner::Resource
                     | AttributeOwner::Span
-                    | AttributeOwner::Instrumentation
-                    | AttributeOwner::Any,
+                    | AttributeOwner::Instrumentation,
                     _,
                 ),
                 _,
             ) => None,
-            // Dictionary-backed builtins except event:name (refine).
+            // Dictionary-backed builtins except events.name (refine).
             (
                 PredicateTarget::Builtin(
                     Name
@@ -583,7 +588,7 @@ impl Condition {
             (PredicateTarget::Builtin(LinkSpanId | LinkTraceId), CompareOp::NotEq) => Some(
                 format!("negated {} (subgroup semantics, refine step)", self.target),
             ),
-            // event:name POSITIVE forms evaluate through the event
+            // events.name POSITIVE forms evaluate through the event
             // subgroup (any number of conditions — a single event must
             // satisfy them all); negated forms wait for the
             // subgroup-semantics decision.
@@ -610,7 +615,7 @@ impl Condition {
                     self.target
                 ))
             }
-            // event:timeSinceStart computes in the refine; != would be a
+            // events.time_since_start computes in the refine; != would be a
             // negated per-event condition — deferred with the fork for a
             // uniform rule.
             (PredicateTarget::Builtin(EventTimeSinceStart), op)
@@ -876,26 +881,10 @@ impl Predicate {
                 }
                 (target, op) => {
                     let fields: Vec<String> = match target {
-                        // The any-owner attribute is the pinned
-                        // resource ∪ span disjunction.
-                        PredicateTarget::Attribute(AttributeOwner::Any, key) => vec![
-                            format!(
-                                "{}{key}",
-                                AttributeOwner::Resource
-                                    .attribute_prefix()
-                                    .expect("attribute owner")
-                            ),
-                            format!(
-                                "{}{key}",
-                                AttributeOwner::Span
-                                    .attribute_prefix()
-                                    .expect("attribute owner")
-                            ),
-                        ],
                         PredicateTarget::Attribute(owner, key) => {
-                            let prefix = owner.attribute_prefix().expect(
-                                "validated: a concrete attribute owner (not Builtin or Any)",
-                            );
+                            let prefix = owner
+                                .attribute_prefix()
+                                .expect("validated: an attribute owner (not Builtin)");
                             vec![format!("{prefix}{key}")]
                         }
                         PredicateTarget::Builtin(i) => vec![
@@ -1297,7 +1286,7 @@ impl EvalPredicate {
                     sfst::IdColumnKind::ParentSpanId => span.parent_span_id,
                 };
                 // The UNSET sentinel is ABSENT for both polarities: a
-                // root span never satisfies `span:parentID != x`.
+                // root span never satisfies `parent_span_id != x`.
                 if id.is_unset() {
                     return false;
                 }
@@ -1812,11 +1801,6 @@ mod tests {
             vec![PredicateValue::Float(1.5)],
         ));
         ok(cond(
-            PredicateTarget::Attribute(AttributeOwner::Any, "x".into()),
-            CompareOp::Regex,
-            vec![text("a|b")],
-        ));
-        ok(cond(
             PredicateTarget::Builtin(BuiltinField::TraceDuration),
             CompareOp::Gte,
             vec![PredicateValue::Integer(5)],
@@ -1936,16 +1920,6 @@ mod tests {
             CompareOp::Eq,
             vec![text("v")],
         ));
-        evaluable(cond(
-            PredicateTarget::Attribute(AttributeOwner::Any, "x".into()),
-            CompareOp::Eq,
-            vec![text("v")],
-        ));
-        evaluable(cond(
-            PredicateTarget::Attribute(AttributeOwner::Any, "x".into()),
-            CompareOp::NotRegex,
-            vec![text("v.*")],
-        ));
         // Dictionary numerics on attributes.
         evaluable(cond(
             span_attr("x"),
@@ -1957,7 +1931,7 @@ mod tests {
             CompareOp::Eq,
             vec![PredicateValue::Integer(5), PredicateValue::Float(1.5)],
         ));
-        // Dictionary-backed builtins except event:name: all four ops.
+        // Dictionary-backed builtins except events.name: all four ops.
         for i in [
             BuiltinField::Name,
             BuiltinField::Kind,
@@ -2034,7 +2008,7 @@ mod tests {
             .contains("subgroup")
         );
         // The colon set: span/parent/trace ids both polarities; link
-        // ids and event:name positive-only (the negated subgroup
+        // ids and events.name positive-only (the negated subgroup
         // semantics are the recorded open question).
         for i in [BuiltinField::SpanId, BuiltinField::ParentSpanId] {
             for op in [CompareOp::Eq, CompareOp::NotEq] {
@@ -2088,7 +2062,7 @@ mod tests {
             ))
             .contains("subgroup")
         );
-        // TWO event:name conditions form a single-event subgroup —
+        // TWO events.name conditions form a single-event subgroup —
         // well-defined (one event named both = unsatisfiable) and
         // evaluable through the refine.
         let two = Predicate {
@@ -2211,13 +2185,13 @@ mod tests {
             contradictory.to_trace_plan().terms,
             vec![PlanTerm::duration(Some(501), Some(99))]
         );
-        // Stage-B lowerings: negation, any-owner disjunction, numerics,
+        // Stage-B lowerings: negation, a resource attribute, numerics,
         // multi-value and negated duration equality.
         let stage_b = Predicate {
             conditions: vec![
                 cond(span_attr("x"), CompareOp::NotEq, vec![text("a"), text("b")]),
                 cond(
-                    PredicateTarget::Attribute(AttributeOwner::Any, "env".into()),
+                    PredicateTarget::Attribute(AttributeOwner::Resource, "env".into()),
                     CompareOp::Eq,
                     vec![text("prod")],
                 ),
@@ -2255,7 +2229,7 @@ mod tests {
                     negated: true,
                 },
                 PlanTerm::Fields {
-                    fields: vec!["resource.attributes.env".into(), "attributes.env".into(),],
+                    fields: vec!["resource.attributes.env".into()],
                     matcher: sfst::PlanMatcher::Tokens {
                         exact: vec!["prod".into()],
                         patterns: vec![],
@@ -2453,31 +2427,6 @@ mod tests {
             )],
             None
         ));
-        // ── Stage B: the any-owner disjunction gathers both owners ──
-        assert!(matches(
-            vec![cond(
-                PredicateTarget::Attribute(AttributeOwner::Any, "service.name".into()),
-                CompareOp::Eq,
-                vec![text("svc")],
-            )],
-            None
-        ));
-        assert!(matches(
-            vec![cond(
-                PredicateTarget::Attribute(AttributeOwner::Any, "team".into()),
-                CompareOp::Eq,
-                vec![text("b")],
-            )],
-            None
-        ));
-        assert!(!matches(
-            vec![cond(
-                PredicateTarget::Attribute(AttributeOwner::Any, "nowhere".into()),
-                CompareOp::NotEq,
-                vec![text("v")],
-            )],
-            None
-        ));
         // ── Stage B: numerics via the shared comparator ─────────────
         let span2 = TraceSpan {
             fields: vec![
@@ -2523,7 +2472,7 @@ mod tests {
             CompareOp::NotEq,
             vec![PredicateValue::Integer(5)],
         )));
-        // event:timeSinceStart saturates far-future event times (a
+        // events.time_since_start saturates far-future event times (a
         // wrapping cast would flip them negative and fail `> 0`).
         let mut far = span.clone();
         far.events = vec![sfst::TraceEvent {

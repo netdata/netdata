@@ -351,9 +351,12 @@ pub struct SearchParams {
 
 /// One search-bar chip: `key op values`, one token of the query.
 ///
-/// - `key`: the selection grammar (`<owner>.<key>` or a bare builtin
-///   word, as `suggest` renders keys), including the trace-level words
-///   (`root_name`, `root_service_name`, `trace_duration`, `trace_id`).
+/// - `key`: a key — its OTLP field path, as `suggest` renders keys
+///   (`resource.attributes.<key>`, `scope.attributes.<key>`,
+///   `attributes.<key>`, `events.attributes.<key>`,
+///   `links.attributes.<key>`, `name`, `kind`, `status.code`, ...),
+///   including the trace-level keys (`root_name`, `root_service_name`,
+///   `trace_duration`, `trace_id`).
 /// - `op`: `=` `!=` `=~` `!~` `>` `>=` `<` `<=` `^=` `!^=`. A `!` op means
 ///   NOT EXISTS: no span of the trace matches the positive form (for a
 ///   trace-level key: the trace does not). `=~` is a regex over the
@@ -428,8 +431,8 @@ pub struct SuggestParams {
     pub after: u32,
     #[serde(default)]
     pub before: u32,
-    /// The key whose values to suggest, in the selection grammar
-    /// (`<owner>.<key>` or a bare builtin word); at most
+    /// The key whose values to suggest (its OTLP field path, as key
+    /// suggestions render it); at most
     /// [`REQUEST_TEXT_MAX_BYTES`], and with stored values (a key
     /// suggestion flagged `virtual` has none).
     #[serde(default)]
@@ -561,8 +564,9 @@ pub struct OverviewTotals {
 }
 
 /// Suggestions, best first: match class, then bytes. Bounded by
-/// construction: at most [`SUGGEST_ITEMS_MAX`] items of at most the
-/// adapter's `LIST_VALUE_MAX_BYTES` each.
+/// construction: at most [`SUGGEST_ITEMS_MAX`] items, each value at most
+/// the adapter's `LIST_VALUE_MAX_BYTES` and each key at most
+/// [`REQUEST_TEXT_MAX_BYTES`].
 #[derive(Debug, Serialize)]
 pub struct SuggestResult {
     /// The response's self-description: always `"suggest"`.
@@ -589,7 +593,7 @@ pub struct SuggestResult {
 
 #[derive(Debug, Serialize)]
 pub struct SuggestionWire {
-    /// A key in the selection grammar, or a value as stored.
+    /// A key (its OTLP field path), or a value as stored.
     pub text: String,
     /// How it matched the term.
     #[serde(rename = "match")]

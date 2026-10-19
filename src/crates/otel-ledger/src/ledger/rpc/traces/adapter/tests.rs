@@ -16,10 +16,8 @@
 //!   an ABSENT `parent_span_id` for roots, event/link sub-shapes, the
 //!   sectioned `field_kinds` map with each set in canonical order — plus
 //!   the empty-trace degenerate;
-//! - the selection-key grammar: `BUILTIN_WORDS`/`OWNER_WORDS` in
-//!   lockstep with the engine enums (a new owner fails compilation,
-//!   a new builtin fails this suite) and selection-key parsing with
-//!   its rejections;
+//! - the keys: every key the wire takes, pinned literally (the UI
+//!   spells exactly these), and the rejections with their messages;
 //! - the cursor codec: encode/parse round-trip, malformed
 //!   rejections, over-cap walks advised to narrow;
 //! - window canonicalization: the now-derived default window, the
@@ -186,66 +184,102 @@ fn kinds(list: &[sfst::ValueKind]) -> sfst::ValueKinds {
 
 // ── Search: selection keys ──────────────────────────────────────────
 
+/// The wire's keys, pinned literally: the UI spells exactly these, so a
+/// vocabulary change shows up here. Every builtin key and the five
+/// attribute prefixes.
 #[test]
-fn every_builtin_has_a_wire_word_and_nothing_stale() {
-    // Bidirectional lockstep with the engine's builtin set: every
-    // BuiltinField::ALL entry has exactly one wire word, and the
-    // table holds nothing stale (same length, distinct words). Same
-    // guard pattern as sfsq-cli/src/traces.rs
-    // (every_builtin_has_a_cli_word).
-    for builtin in BuiltinField::ALL {
-        assert!(
-            BUILTIN_WORDS.iter().any(|(_, f)| *f == builtin),
-            "builtin {builtin:?} has no wire word"
+fn the_wire_keys_are_pinned() {
+    use BuiltinField::*;
+    let builtins = [
+        ("name", Name),
+        ("kind", Kind),
+        ("status.code", Status),
+        ("status.message", StatusMessage),
+        ("scope.name", InstrumentationName),
+        ("scope.version", InstrumentationVersion),
+        ("events.name", EventName),
+        ("duration", Duration),
+        ("span_id", SpanId),
+        ("parent_span_id", ParentSpanId),
+        ("trace_id", TraceId),
+        ("links.span_id", LinkSpanId),
+        ("links.trace_id", LinkTraceId),
+        ("events.time_since_start", EventTimeSinceStart),
+        ("root_name", RootName),
+        ("root_service_name", RootServiceName),
+        ("trace_duration", TraceDuration),
+    ];
+    assert_eq!(
+        builtins.len(),
+        BuiltinField::ALL.len(),
+        "a builtin is missing"
+    );
+    for (key, field) in builtins {
+        assert_eq!(
+            parse_selection_key(key).unwrap(),
+            PredicateTarget::Builtin(field),
+            "{key}"
         );
     }
-    assert_eq!(BUILTIN_WORDS.len(), BuiltinField::ALL.len());
-    let mut words: Vec<&str> = BUILTIN_WORDS.iter().map(|(w, _)| *w).collect();
-    words.sort_unstable();
-    words.dedup();
-    assert_eq!(words.len(), BUILTIN_WORDS.len(), "duplicate wire words");
+    let attributes = [
+        (
+            "resource.attributes.service.name",
+            AttributeOwner::Resource,
+            "service.name",
+        ),
+        (
+            "scope.attributes.telemetry.sdk",
+            AttributeOwner::Instrumentation,
+            "telemetry.sdk",
+        ),
+        (
+            "attributes.http.request.method",
+            AttributeOwner::Span,
+            "http.request.method",
+        ),
+        (
+            "events.attributes.exception.type",
+            AttributeOwner::Event,
+            "exception.type",
+        ),
+        ("links.attributes.peer", AttributeOwner::Link, "peer"),
+    ];
+    for (key, owner, attribute) in attributes {
+        assert_eq!(
+            parse_selection_key(key).unwrap(),
+            PredicateTarget::Attribute(owner, attribute.into()),
+            "{key}"
+        );
+    }
 }
 
 #[test]
-fn every_engine_owner_is_deliberately_placed_in_the_wire_grammar() {
-    // Exhaustive match: a NEW engine owner fails compilation here until
-    // its wire spelling (or deliberate absence) is decided.
-    fn wire_spelling(owner: AttributeOwner) -> Option<&'static str> {
-        match owner {
-            AttributeOwner::Resource => Some("resource"),
-            AttributeOwner::Span => Some("span"),
-            AttributeOwner::Instrumentation => Some("instrumentation"),
-            AttributeOwner::Event => Some("event"),
-            AttributeOwner::Link => Some("link"),
-            // Bare builtin words, not an owner prefix.
-            AttributeOwner::Builtin => None,
-            // Not enumerable; keys are always owner-qualified.
-            AttributeOwner::Any => None,
-        }
+fn keys_reject_empty_attributes_and_the_old_spellings() {
+    for empty in ["attributes.", "resource.attributes.", "links.attributes."] {
+        assert_eq!(
+            parse_selection_key(empty).unwrap_err(),
+            format!("key {empty:?} names no attribute")
+        );
     }
-    for (word, owner) in OWNER_WORDS {
-        assert_eq!(wire_spelling(owner), Some(word));
-    }
-    assert_eq!(wire_spelling(AttributeOwner::Builtin), None);
-    assert_eq!(wire_spelling(AttributeOwner::Any), None);
-}
-
-#[test]
-fn selection_keys_parse_owners_builtins_and_dotted_attributes() {
-    assert_eq!(
-        parse_selection_key("resource.service.name").unwrap(),
-        PredicateTarget::Attribute(AttributeOwner::Resource, "service.name".into())
-    );
-    assert_eq!(
-        parse_selection_key("span.http.method").unwrap(),
-        PredicateTarget::Attribute(AttributeOwner::Span, "http.method".into())
-    );
-    assert_eq!(
-        parse_selection_key("status").unwrap(),
-        PredicateTarget::Builtin(BuiltinField::Status)
-    );
-    for bad in ["resource.", "bogus", "resource", "svc.name"] {
-        assert!(parse_selection_key(bad).is_err(), "{bad} must not parse");
+    for bad in [
+        "bogus",
+        "resource",
+        "resource.service.name",
+        "span.http.method",
+        "instrumentation.lib",
+        "status",
+        "status_message",
+        "instrumentation_name",
+        "event_name",
+        "link_trace_id",
+        "event_time_since_start",
+        ".service.name",
+    ] {
+        let err = parse_selection_key(bad).unwrap_err();
+        assert!(
+            err.contains("resource.attributes.<key>") && err.contains("status.code"),
+            "{bad}: {err}"
+        );
     }
 }
 
@@ -595,7 +629,7 @@ fn rendered_keys_round_trip_through_the_selection_grammar() {
         ),
     ];
     for (owner, key) in cases {
-        let rendered = render_attribute_key(owner, &key);
+        let rendered = sfsq::traces::render_key(owner, &key);
         assert_eq!(
             parse_enumeration_key(&rendered).unwrap(),
             (owner, key),
@@ -604,7 +638,7 @@ fn rendered_keys_round_trip_through_the_selection_grammar() {
     }
     for builtin in BuiltinField::ALL {
         let rendered =
-            render_attribute_key(AttributeOwner::Builtin, &AttributeKey::Builtin(builtin));
+            sfsq::traces::render_key(AttributeOwner::Builtin, &AttributeKey::Builtin(builtin));
         assert_eq!(
             parse_enumeration_key(&rendered).unwrap(),
             (AttributeOwner::Builtin, AttributeKey::Builtin(builtin)),
@@ -614,8 +648,11 @@ fn rendered_keys_round_trip_through_the_selection_grammar() {
 }
 
 /// A key carries the engine's kinds in canonical order, none for a key
-/// without kinds (a builtin); two keys cut onto one text list the union
-/// of their kinds, in either order, and the higher tier.
+/// without kinds (a builtin). Keys are cut at the request-key limit, not
+/// the value cap: a key past 256 bytes stays whole; two keys cut onto one
+/// text list the union of their kinds, in either order, and the higher
+/// tier; a key whose escapes pass the limit is flagged, so every
+/// unflagged key can be sent back.
 #[test]
 fn key_suggestions_carry_their_kinds() {
     use sfsq::traces::{SuggestData, Suggestion};
@@ -628,12 +665,17 @@ fn key_suggestions_carry_their_kinds() {
         enumerable: true,
         kinds: kinds(list),
     };
-    let p = "a".repeat(LIST_VALUE_MAX_BYTES - 2);
-    let q = "b".repeat(LIST_VALUE_MAX_BYTES - 2);
+    let max = super::super::wire::REQUEST_TEXT_MAX_BYTES;
+    let long = format!("attributes.{}", "l".repeat(300));
+    let ctl = "\u{1}".repeat(max / 6 + 1);
+    let p = "a".repeat(max - 2);
+    let q = "b".repeat(max - 2);
     let data = SuggestData {
         items: vec![
-            key("span.code".into(), &[Int]),
+            key("attributes.code".into(), &[Int]),
             key("name".into(), &[]),
+            key(long.clone(), &[Str]),
+            key(ctl.clone(), &[Str]),
             key(p.clone(), &[Str]),
             key(format!("{p}€x"), &[Double, Int]),
             key(q.clone(), &[Int]),
@@ -650,8 +692,10 @@ fn key_suggestions_carry_their_kinds() {
     assert_eq!(
         v["items"],
         json!([
-            {"text": "span.code", "match": "prefix", "tier": "low", "kinds": ["int"]},
+            {"text": "attributes.code", "match": "prefix", "tier": "low", "kinds": ["int"]},
             {"text": "name", "match": "prefix", "tier": "low"},
+            {"text": long, "match": "prefix", "tier": "low", "kinds": ["str"]},
+            {"text": &ctl[..max / 6], "match": "prefix", "truncated": true, "tier": "low", "kinds": ["str"]},
             {"text": p, "match": "prefix", "truncated": true, "tier": "low", "kinds": ["int", "double", "str"]},
             {"text": q, "match": "prefix", "truncated": true, "tier": "high", "kinds": ["int"]},
         ])
