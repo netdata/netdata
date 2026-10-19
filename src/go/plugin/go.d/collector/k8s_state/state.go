@@ -19,6 +19,7 @@ func newKubeState() *kubeState {
 		deployments: make(map[string]*deploymentState),
 		cronJobs:    make(map[string]*cronJobState),
 		jobs:        make(map[string]*jobState),
+		pvcs:        make(map[string]*pvcState),
 	}
 }
 
@@ -62,6 +63,12 @@ func newJobState() *jobState {
 	}
 }
 
+func newPVCState() *pvcState {
+	return &pvcState{
+		new: true,
+	}
+}
+
 type kubeState struct {
 	*sync.Mutex
 	nodes       map[string]*nodeState
@@ -69,6 +76,7 @@ type kubeState struct {
 	deployments map[string]*deploymentState
 	cronJobs    map[string]*cronJobState
 	jobs        map[string]*jobState
+	pvcs        map[string]*pvcState
 }
 
 type (
@@ -231,3 +239,20 @@ type jobState struct {
 	completionTime *time.Time
 	active         int32
 }
+
+type pvcState struct {
+	new     bool
+	deleted bool
+
+	uid       string
+	name      string
+	namespace string
+
+	// A quantity that is not set is not reported, a Pending PVC has no capacity yet.
+	hasRequested bool
+	requested    int64 // bytes
+	hasCapacity  bool
+	capacity     int64 // bytes
+}
+
+func (ps pvcState) id() string { return ps.namespace + "_" + ps.name }

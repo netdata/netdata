@@ -3,17 +3,21 @@
 package k8s_state
 
 import (
+	"bytes"
 	"context"
 	"errors"
 	"fmt"
 	"os"
+	"slices"
 	"strings"
 	"testing"
 	"time"
 
+	authorizationv1 "k8s.io/api/authorization/v1"
 	batchv1 "k8s.io/api/batch/v1"
 	"k8s.io/apimachinery/pkg/types"
 
+	"github.com/netdata/netdata/go/plugins/logger"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/collectorapi"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/collecttest"
 
@@ -21,9 +25,11 @@ import (
 	"github.com/stretchr/testify/require"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	apiresource "k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/kubernetes/fake"
 	k8stesting "k8s.io/client-go/testing"
@@ -928,6 +934,184 @@ func TestCollector_Collect(t *testing.T) {
 				}
 			},
 		},
+		"PVCs": {
+			create: func(t *testing.T) testCase {
+				ctx := context.Background()
+				bound := newPVC("bound", "10Gi", "10Gi")
+				expanding := newPVC("expanding", "20Gi", "10Gi")
+				pending := newPVC("pending", "5Gi", "")
+				noRequest := newPVC("no-request", "", "1Gi")
+				client := fake.NewClientset(bound, expanding, pending, noRequest)
+				allowPVCAccess(client, "list", "watch")
+
+				step1 := func(t *testing.T, collr *Collector) {
+					mx := collr.Collect(context.Background())
+					expected := map[string]int64{
+						"discovery_node_discoverer_state": 1,
+						"discovery_pod_discoverer_state":  1,
+						"pvc_default_bound_capacity":      10737418240,
+						"pvc_default_bound_requested":     10737418240,
+						"pvc_default_expanding_capacity":  10737418240,
+						"pvc_default_expanding_requested": 21474836480,
+						"pvc_default_no-request_capacity": 1073741824,
+						"pvc_default_pending_requested":   5368709120,
+					}
+
+					assert.Equal(t, expected, mx)
+					assert.Equal(t,
+						len(pvcChartsTmpl)*4+
+							len(baseCharts),
+						len(*collr.Charts()),
+					)
+					// A value that is not set is a gap: a Pending PVC has no capacity, this one has no request.
+					missing := []string{"pvc_default_pending_capacity", "pvc_default_no-request_requested"}
+					skip := func(_ *collectorapi.Chart, dim *collectorapi.Dim) bool {
+						return slices.Contains(missing, dim.ID)
+					}
+					collecttest.TestMetricsHasAllChartsDimsSkip(t, collr.Charts(), mx, skip)
+
+					chart := collr.Charts().Get("pvc_default_bound.capacity")
+					require.NotNil(t, chart)
+					assert.Equal(t, []collectorapi.Label{
+						{Key: "k8s_cluster_id", Value: collr.kubeClusterID, Source: collectorapi.LabelSourceK8s},
+						{Key: "k8s_cluster_name", Value: collr.kubeClusterName, Source: collectorapi.LabelSourceK8s},
+						{Key: "k8s_namespace", Value: "default", Source: collectorapi.LabelSourceK8s},
+						{Key: "k8s_pvc_name", Value: "bound", Source: collectorapi.LabelSourceK8s},
+					}, chart.Labels)
+
+					// The pending PVC gets bound, the expansion of the other one completes.
+					pvcs := client.CoreV1().PersistentVolumeClaims(corev1.NamespaceDefault)
+					_, _ = pvcs.Update(ctx, newPVC("pending", "5Gi", "5Gi"), metav1.UpdateOptions{})
+					_, _ = pvcs.Update(ctx, newPVC("expanding", "20Gi", "20Gi"), metav1.UpdateOptions{})
+				}
+
+				step2 := func(t *testing.T, collr *Collector) {
+					mx := collr.Collect(context.Background())
+					expected := map[string]int64{
+						"discovery_node_discoverer_state": 1,
+						"discovery_pod_discoverer_state":  1,
+						"pvc_default_bound_capacity":      10737418240,
+						"pvc_default_bound_requested":     10737418240,
+						"pvc_default_expanding_capacity":  21474836480,
+						"pvc_default_expanding_requested": 21474836480,
+						"pvc_default_no-request_capacity": 1073741824,
+						"pvc_default_pending_capacity":    5368709120,
+						"pvc_default_pending_requested":   5368709120,
+					}
+
+					assert.Equal(t, expected, mx)
+					assert.Equal(t,
+						len(pvcChartsTmpl)*4+
+							len(baseCharts),
+						len(*collr.Charts()),
+					)
+					assert.Equal(t, 0, calcObsoleteCharts(*collr.Charts()))
+					missing := []string{"pvc_default_no-request_requested"}
+					skip := func(_ *collectorapi.Chart, dim *collectorapi.Dim) bool {
+						return slices.Contains(missing, dim.ID)
+					}
+					collecttest.TestMetricsHasAllChartsDimsSkip(t, collr.Charts(), mx, skip)
+				}
+
+				return testCase{
+					client: client,
+					steps:  []testCaseStep{step1, step2},
+				}
+			},
+		},
+		"delete a PVC in runtime": {
+			create: func(t *testing.T) testCase {
+				ctx := context.Background()
+				pvc := newPVC("data", "10Gi", "10Gi")
+				pvcSibling := newPVC("data-old", "20Gi", "20Gi") // "default_data" is a prefix of "default_data-old"
+				client := fake.NewClientset(pvc, pvcSibling)
+				allowPVCAccess(client, "list", "watch")
+
+				step1 := func(t *testing.T, collr *Collector) {
+					_ = collr.Collect(context.Background())
+					pvcs := client.CoreV1().PersistentVolumeClaims(pvc.Namespace)
+					_ = pvcs.Delete(ctx, pvc.Name, metav1.DeleteOptions{})
+				}
+
+				step2 := func(t *testing.T, collr *Collector) {
+					mx := collr.Collect(context.Background())
+					expected := map[string]int64{
+						"discovery_node_discoverer_state": 1,
+						"discovery_pod_discoverer_state":  1,
+						"pvc_default_data-old_capacity":   21474836480,
+						"pvc_default_data-old_requested":  21474836480,
+					}
+
+					assert.Equal(t, expected, mx)
+					assert.Equal(t,
+						len(pvcChartsTmpl)*2+
+							len(baseCharts),
+						len(*collr.Charts()),
+					)
+					assert.Equal(t,
+						len(pvcChartsTmpl),
+						calcObsoleteCharts(*collr.Charts()),
+					)
+					obsolete := make(map[string]bool)
+					for _, chart := range *collr.Charts() {
+						obsolete[chart.ID] = chart.Obsolete
+					}
+					assert.Equal(t, map[string]bool{
+						discoveryStatusChart.ID:         false,
+						"pvc_default_data.capacity":     true,
+						"pvc_default_data-old.capacity": false,
+					}, obsolete)
+					collecttest.TestMetricsHasAllChartsDims(t, collr.Charts(), mx)
+				}
+
+				return testCase{
+					client: client,
+					steps:  []testCaseStep{step1, step2},
+				}
+			},
+		},
+		"PVC access denied": {
+			create: func(t *testing.T) testCase {
+				deploy := newDeployment("replicaset01")
+				client := fake.NewClientset(deploy, newPVC("data", "10Gi", "10Gi"))
+				allowPVCAccess(client)
+				forbidPVCs(client)
+
+				step1 := func(t *testing.T, collr *Collector) {
+					mx := collr.Collect(context.Background())
+					expected := map[string]int64{
+						"deploy_default_replicaset01_age":                       3,
+						"deploy_default_replicaset01_condition_available":       1,
+						"deploy_default_replicaset01_condition_progressing":     1,
+						"deploy_default_replicaset01_condition_replica_failure": 1,
+						"deploy_default_replicaset01_current_replicas":          1,
+						"deploy_default_replicaset01_desired_replicas":          2,
+						"deploy_default_replicaset01_ready_replicas":            3,
+						"discovery_node_discoverer_state":                       1,
+						"discovery_pod_discoverer_state":                        1,
+					}
+
+					copyAge(expected, mx)
+
+					assert.Equal(t, expected, mx)
+					assert.Equal(t,
+						len(deploymentChartsTmpl)+
+							len(baseCharts),
+						len(*collr.Charts()),
+					)
+					collecttest.TestMetricsHasAllChartsDims(t, collr.Charts(), mx)
+
+					kd, ok := collr.discoverer.(*kubeDiscovery)
+					require.True(t, ok)
+					assert.Len(t, kd.discoverers, 5)
+				}
+
+				return testCase{
+					client: client,
+					steps:  []testCaseStep{step1},
+				}
+			},
+		},
 	}
 
 	for name, creator := range tests {
@@ -950,6 +1134,69 @@ func TestCollector_Collect(t *testing.T) {
 				}
 				executeStep(t, collr)
 			}
+		})
+	}
+}
+
+func TestKubeDiscovery_canListWatchPVCs(t *testing.T) {
+	reviewList := authorizationv1.ResourceAttributes{
+		Verb:     "list",
+		Resource: "persistentvolumeclaims",
+	}
+	reviewWatch := authorizationv1.ResourceAttributes{
+		Verb:     "watch",
+		Resource: "persistentvolumeclaims",
+	}
+
+	tests := map[string]struct {
+		prepare      func(client *fake.Clientset)
+		wantAllowed  bool
+		wantReviewed []authorizationv1.ResourceAttributes
+		wantWarning  string
+	}{
+		"list and watch allowed": {
+			prepare:      func(client *fake.Clientset) { allowPVCAccess(client, "list", "watch") },
+			wantAllowed:  true,
+			wantReviewed: []authorizationv1.ResourceAttributes{reviewList, reviewWatch},
+		},
+		"list and watch denied": {
+			prepare:      func(client *fake.Clientset) { allowPVCAccess(client) },
+			wantReviewed: []authorizationv1.ResourceAttributes{reviewList, reviewWatch},
+			wantWarning:  "the service account cannot list/watch persistentvolumeclaims",
+		},
+		"list denied": {
+			prepare:      func(client *fake.Clientset) { allowPVCAccess(client, "watch") },
+			wantReviewed: []authorizationv1.ResourceAttributes{reviewList, reviewWatch},
+			wantWarning:  "the service account cannot list persistentvolumeclaims",
+		},
+		"watch denied": {
+			prepare:      func(client *fake.Clientset) { allowPVCAccess(client, "list") },
+			wantReviewed: []authorizationv1.ResourceAttributes{reviewList, reviewWatch},
+			wantWarning:  "the service account cannot watch persistentvolumeclaims",
+		},
+		"access review fails": {
+			prepare:      func(client *fake.Clientset) { failAccessReviews(client, errors.New("access review error")) },
+			wantReviewed: []authorizationv1.ResourceAttributes{reviewList},
+			wantWarning:  "cannot check if the service account can list persistentvolumeclaims: access review error",
+		},
+	}
+
+	for name, test := range tests {
+		t.Run(name, func(t *testing.T) {
+			client := fake.NewClientset()
+			test.prepare(client)
+			var logs bytes.Buffer
+			kd := newKubeDiscovery(client, logger.NewWithWriter(&logs))
+
+			assert.Equal(t, test.wantAllowed, kd.canListWatchPVCs(context.Background()))
+			assert.Equal(t, test.wantReviewed, reviewedAttributes(client))
+
+			if test.wantWarning == "" {
+				assert.Empty(t, logs.String())
+				return
+			}
+			assert.Equal(t, 1, strings.Count(logs.String(), "PersistentVolumeClaim metrics disabled"))
+			assert.Contains(t, logs.String(), test.wantWarning)
 		})
 	}
 }
@@ -1093,6 +1340,29 @@ func newDeployment(name string) *appsv1.Deployment {
 	}
 }
 
+// newPVC creates a PVC in the default namespace. An empty requested has no storage request, an empty capacity
+// leaves the PVC Pending (no status.capacity).
+func newPVC(name, requested, capacity string) *corev1.PersistentVolumeClaim {
+	pvc := &corev1.PersistentVolumeClaim{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:              name,
+			Namespace:         corev1.NamespaceDefault,
+			CreationTimestamp: metav1.Time{Time: time.Now()},
+		},
+		Status: corev1.PersistentVolumeClaimStatus{
+			Phase: corev1.ClaimPending,
+		},
+	}
+	if requested != "" {
+		pvc.Spec.Resources.Requests = corev1.ResourceList{corev1.ResourceStorage: mustQuantity(requested)}
+	}
+	if capacity != "" {
+		pvc.Status.Phase = corev1.ClaimBound
+		pvc.Status.Capacity = corev1.ResourceList{corev1.ResourceStorage: mustQuantity(capacity)}
+	}
+	return pvc
+}
+
 func prepareCronJob(name string) *batchv1.CronJob {
 	return &batchv1.CronJob{
 		ObjectMeta: metav1.ObjectMeta{
@@ -1211,4 +1481,53 @@ func isLabelValueSet(c *collectorapi.Chart, name string) bool {
 		}
 	}
 	return false
+}
+
+// allowPVCAccess makes the fake API server grant the verbs on PersistentVolumeClaims (core group, all namespaces)
+// in SelfSubjectAccessReviews, and deny everything else. Without it the fake denies every review.
+func allowPVCAccess(client *fake.Clientset, verbs ...string) {
+	reactor := func(action k8stesting.Action) (bool, runtime.Object, error) {
+		review := action.(k8stesting.CreateAction).GetObject().(*authorizationv1.SelfSubjectAccessReview)
+		attrs := review.Spec.ResourceAttributes
+		review.Status.Allowed = attrs != nil &&
+			attrs.Group == "" && attrs.Namespace == "" && attrs.Resource == "persistentvolumeclaims" &&
+			slices.Contains(verbs, attrs.Verb)
+		return true, review, nil
+	}
+	client.PrependReactor("create", "selfsubjectaccessreviews", reactor)
+}
+
+// failAccessReviews makes the fake API server fail every SelfSubjectAccessReview with err.
+func failAccessReviews(client *fake.Clientset, err error) {
+	client.PrependReactor("create", "selfsubjectaccessreviews", func(k8stesting.Action) (bool, runtime.Object, error) {
+		return true, nil, err
+	})
+}
+
+// forbidPVCs makes the fake API server refuse to list and watch PersistentVolumeClaims, as a real one does for a
+// service account without the permission: the informer of such a resource never syncs.
+func forbidPVCs(client *fake.Clientset) {
+	err := errors.New("RBAC: access denied")
+	forbidden := apierrors.NewForbidden(corev1.Resource("persistentvolumeclaims"), "", err)
+
+	client.PrependReactor("list", "persistentvolumeclaims", func(k8stesting.Action) (bool, runtime.Object, error) {
+		return true, nil, forbidden
+	})
+	client.PrependWatchReactor("persistentvolumeclaims", func(k8stesting.Action) (bool, watch.Interface, error) {
+		return true, nil, forbidden
+	})
+}
+
+// reviewedAttributes returns the resource attributes of the SelfSubjectAccessReviews the client sent, in order.
+func reviewedAttributes(client *fake.Clientset) []authorizationv1.ResourceAttributes {
+	var attrs []authorizationv1.ResourceAttributes
+	for _, action := range client.Actions() {
+		create, ok := action.(k8stesting.CreateAction)
+		if !ok || create.GetResource().Resource != "selfsubjectaccessreviews" {
+			continue
+		}
+		review := create.GetObject().(*authorizationv1.SelfSubjectAccessReview)
+		attrs = append(attrs, *review.Spec.ResourceAttributes)
+	}
+	return attrs
 }
