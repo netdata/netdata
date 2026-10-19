@@ -618,6 +618,7 @@ int ebpf_filesystem_initialize_ebpf_data(ebpf_module_t *em)
     int i;
     const char *saved_name = em->info.thread_name;
     uint64_t kernels = em->kernels;
+    uint64_t rhel10_kernels = em->rhel10_kernels;
     bool loaded_any = false;
     for (i = 0; localfs[i].filesystem; i++) {
         ebpf_filesystem_partitions_t *efp = &localfs[i];
@@ -630,6 +631,7 @@ int ebpf_filesystem_initialize_ebpf_data(ebpf_module_t *em)
         if (!efp->probe_links && efp->flags & NETDATA_FILESYSTEM_LOAD_EBPF_PROGRAM) {
             em->info.thread_name = efp->filesystem;
             em->kernels = efp->kernels;
+            em->rhel10_kernels = efp->rhel10_kernels;
             em->maps = efp->fs_maps;
 #ifdef LIBBPF_MAJOR_VERSION
             ebpf_define_map_type(em->maps, em->maps_per_core, running_on_kernel);
@@ -640,6 +642,7 @@ int ebpf_filesystem_initialize_ebpf_data(ebpf_module_t *em)
                     efp->load_failed = true;
                     em->info.thread_name = saved_name;
                     em->kernels = kernels;
+                    em->rhel10_kernels = rhel10_kernels;
                     em->maps = NULL;
                     continue;
                 }
@@ -651,6 +654,7 @@ int ebpf_filesystem_initialize_ebpf_data(ebpf_module_t *em)
                     efp->load_failed = true;
                     em->info.thread_name = saved_name;
                     em->kernels = kernels;
+                    em->rhel10_kernels = rhel10_kernels;
                     em->maps = NULL;
                     continue;
                 } else if (ebpf_fs_load_and_attach(em->maps, efp->fs_obj, efp->functions, NULL)) {
@@ -659,6 +663,7 @@ int ebpf_filesystem_initialize_ebpf_data(ebpf_module_t *em)
                     efp->fs_obj = NULL;
                     em->info.thread_name = saved_name;
                     em->kernels = kernels;
+                    em->rhel10_kernels = rhel10_kernels;
                     em->maps = NULL;
                     continue;
                 }
@@ -680,6 +685,7 @@ int ebpf_filesystem_initialize_ebpf_data(ebpf_module_t *em)
     em->info.thread_name = saved_name;
     netdata_mutex_unlock(&lock);
     em->kernels = kernels;
+    em->rhel10_kernels = rhel10_kernels;
     em->maps = NULL;
 
     if (!dimensions) {

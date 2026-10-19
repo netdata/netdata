@@ -175,7 +175,8 @@ func RedHatRelease() (int, error) {
 
 func redHatReleaseFromUnreadableFile(redHatErr error, osRelease string, osReleaseErr error) (int, error) {
 	if osReleaseErr != nil {
-		return -1, errors.Join(redHatErr, fmt.Errorf("unable to read /etc/os-release: %w", osReleaseErr))
+		// Keep the primary read error discoverable; a secondary ENOENT would hide it from errors.Is callers.
+		return -1, fmt.Errorf("%w (also unable to read /etc/os-release: %v)", redHatErr, osReleaseErr)
 	}
 	if version := RedHatReleaseFromOSRelease(osRelease); version >= 0 {
 		return version, nil

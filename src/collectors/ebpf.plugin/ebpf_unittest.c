@@ -86,6 +86,43 @@ static int test_legacy_disk_support_window(void)
            ebpf_legacy_disk_supported(-1, NETDATA_EBPF_KERNEL_6_16);
 }
 
+static int test_rhel10_selector_respects_module_mask(void)
+{
+    const uint32_t old_kernel_mask = NETDATA_V5_4 | NETDATA_V5_14 | NETDATA_V6_8;
+    const uint32_t with_612_mask = old_kernel_mask | NETDATA_V6_12;
+
+    return ebpf_select_index(old_kernel_mask, 10 * 256, NETDATA_EBPF_KERNEL_6_12) == NETDATA_IDX_V6_8 &&
+           ebpf_select_index(with_612_mask, 10 * 256, NETDATA_EBPF_KERNEL_6_12) == NETDATA_IDX_V6_12;
+}
+
+static int test_rhel10_module_masks(void)
+{
+    for (size_t i = 0; ebpf_modules[i].info.thread_name; i++) {
+        ebpf_module_t *em = &ebpf_modules[i];
+        if (!em->kernels)
+            continue;
+
+        if (!(em->rhel10_kernels & NETDATA_V6_12) ||
+            ebpf_select_module_index(em, 10 * 256, NETDATA_EBPF_KERNEL_6_12) != NETDATA_IDX_V6_12 ||
+            ebpf_select_module_index(em, -1, NETDATA_EBPF_KERNEL_6_12) !=
+                ebpf_select_index(em->kernels, -1, NETDATA_EBPF_KERNEL_6_12))
+            return 0;
+    }
+
+    for (size_t i = 0; localfs[i].filesystem; i++) {
+        ebpf_module_t em = {.info.thread_name = localfs[i].filesystem,
+                            .kernels = localfs[i].kernels,
+                            .rhel10_kernels = localfs[i].rhel10_kernels};
+        if (!(em.rhel10_kernels & NETDATA_V6_12) ||
+            ebpf_select_module_index(&em, 10 * 256, NETDATA_EBPF_KERNEL_6_12) != NETDATA_IDX_V6_12 ||
+            ebpf_select_module_index(&em, -1, NETDATA_EBPF_KERNEL_6_12) !=
+                ebpf_select_index(em.kernels, -1, NETDATA_EBPF_KERNEL_6_12))
+            return 0;
+    }
+
+    return 1;
+}
+
 static int test_redhat_release_version_parser(void)
 {
     return ebpf_parse_redhat_release_version("Red Hat Enterprise Linux release 10.0 (Coughlan)") == 2560 &&
@@ -216,6 +253,7 @@ void ebpf_ut_cleanup_memory()
 static int ebpf_ut_load_binary()
 {
     if (!test_disk_kernel_variants() || !test_legacy_disk_support_window() ||
+        !test_rhel10_selector_respects_module_mask() || !test_rhel10_module_masks() ||
         !test_redhat_release_version_parser() || !test_redhat_os_release_parser()) {
         fprintf(stderr, ">>> FAILED: kernel version parsing or disk selectors are inconsistent\n");
         return -1;

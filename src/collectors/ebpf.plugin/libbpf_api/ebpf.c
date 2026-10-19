@@ -579,10 +579,8 @@ static int ebpf_select_max_index(int is_rhf, uint32_t kver)
  * @param is_rhf  is Red Hat fammily?
  * param  kver    the kernel version
  */
-static uint32_t ebpf_select_index(uint32_t kernels, int is_rhf, uint32_t kver)
+uint32_t ebpf_select_index(uint32_t kernels, int is_rhf, uint32_t kver)
 {
-    if (ebpf_is_rhel10_6_12_stream(is_rhf, kver))
-        kernels |= NETDATA_V6_12;
     uint32_t start = ebpf_select_max_index(is_rhf, kver);
     uint32_t idx;
 
@@ -602,6 +600,14 @@ uint32_t ebpf_select_disk_index(uint32_t kernels, int is_rhf, uint32_t kver)
     if (ebpf_is_rhel10_6_12_stream(is_rhf, kver))
         return NETDATA_IDX_V6_12;
     return ebpf_select_index(kernels, is_rhf, kver);
+}
+
+uint32_t ebpf_select_module_index(const ebpf_module_t *em, int is_rhf, uint32_t kver)
+{
+    uint64_t kernels = ebpf_is_rhel10_6_12_stream(is_rhf, kver) ? em->rhel10_kernels : em->kernels;
+
+    return !strcmp(em->info.thread_name, "disk") ? ebpf_select_disk_index(kernels, is_rhf, kver)
+                                                   : ebpf_select_index(kernels, is_rhf, kver);
 }
 
 int ebpf_legacy_disk_supported(int is_rhf, uint32_t kver)
@@ -1130,10 +1136,7 @@ static void ebpf_update_legacy_controller(ebpf_module_t *em, struct bpf_object *
 struct bpf_link **ebpf_load_program(char *plugins_dir, ebpf_module_t *em, int kver, int is_rhf, struct bpf_object **obj)
 {
     char lpath[4096];
-
-    uint32_t idx = !strcmp(em->info.thread_name, "disk")
-                       ? ebpf_select_disk_index(em->kernels, is_rhf, kver)
-                       : ebpf_select_index(em->kernels, is_rhf, kver);
+    uint32_t idx = ebpf_select_module_index(em, is_rhf, kver);
 
     ebpf_mount_name(lpath, 4095, plugins_dir, idx, em->info.thread_name, em->mode, is_rhf);
 

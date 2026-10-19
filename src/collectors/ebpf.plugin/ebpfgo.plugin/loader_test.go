@@ -85,7 +85,7 @@ func TestRHEL10612StreamIsBoundedAndDoesNotTryGenericObjects(t *testing.T) {
 		t.Fatalf("buildFallbackPlans() returned %d plans, want RHF buffer and base only: %#v", len(plans), plans)
 	}
 
-	if got := SelectMaxIndex(11*256, minimumKernelVersionArena); got == 11 {
+	if SelectMaxIndex(11*256, minimumKernelVersionArena) == 11 {
 		t.Fatalf("SelectMaxIndex() selected RHEL 10's 6.12 rung for RHEL 11")
 	}
 }
@@ -178,6 +178,11 @@ func TestRedHatReleaseFallsBackAfterUnreadableReleaseFile(t *testing.T) {
 	if version != -1 || !errors.Is(err, fs.ErrPermission) {
 		t.Fatalf("both unreadable files returned (%d, %v), want (-1, permission error)", version, err)
 	}
+
+	version, err = redHatReleaseFromUnreadableFile(redHatErr, "", fs.ErrNotExist)
+	if version != -1 || !errors.Is(err, fs.ErrPermission) || errors.Is(err, fs.ErrNotExist) {
+		t.Fatalf("permission error plus absent fallback returned (%d, %v), want only the primary permission error to match", version, err)
+	}
 }
 
 func TestShouldWarnRedHatDetectionError(t *testing.T) {
@@ -189,7 +194,11 @@ func TestShouldWarnRedHatDetectionError(t *testing.T) {
 		"wrapped not red hat": {err: fmt.Errorf("release lookup: %w", errNotRedHatFamily), want: false},
 		"metadata absent":     {err: fs.ErrNotExist, want: false},
 		"metadata unreadable": {err: fs.ErrPermission, want: true},
-		"no error":            {err: nil, want: false},
+		"primary unreadable fallback absent": {
+			err:  fmt.Errorf("unable to read redhat-release: %w (also unable to read os-release: %v)", fs.ErrPermission, fs.ErrNotExist),
+			want: true,
+		},
+		"no error": {err: nil, want: false},
 	}
 
 	for name, tc := range tests {

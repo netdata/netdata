@@ -357,6 +357,7 @@ typedef struct ebpf_module {
     struct config *cfg;
     const char *config_file;
     uint64_t kernels;
+    uint64_t rhel10_kernels;
     netdata_ebpf_load_mode_t load;
     netdata_ebpf_targets_t *targets;
     struct bpf_link **probe_links;
@@ -384,6 +385,8 @@ int get_redhat_release();
 int ebpf_parse_redhat_release_version(const char *release);
 int ebpf_parse_redhat_release_from_os_release(const char *contents);
 uint32_t ebpf_select_disk_index(uint32_t kernels, int is_rhf, uint32_t kver);
+uint32_t ebpf_select_index(uint32_t kernels, int is_rhf, uint32_t kver);
+uint32_t ebpf_select_module_index(const ebpf_module_t *em, int is_rhf, uint32_t kver);
 int ebpf_legacy_disk_supported(int is_rhf, uint32_t kver);
 struct bpf_link **
 ebpf_load_program(char *plugins_dir, ebpf_module_t *em, int kver, int is_rhf, struct bpf_object **obj);
@@ -443,6 +446,7 @@ typedef struct ebpf_filesystem_partitions {
 
     ebpf_addresses_t addresses;
     uint64_t kernels;
+    uint64_t rhel10_kernels;
     ebpf_local_maps_t *fs_maps;
 
     // BPF structure
