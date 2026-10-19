@@ -2603,7 +2603,7 @@ prepare_offline_install_source() {
             failed="$((failed + 1))"
             warning "Failed to download ${archive_url}. ${BADNET_MSG}."
           elif echo "${f}" | grep -qvE ".*-latest.*" ; then
-            latest_name="$(echo "${f}" | sed -i -e 's/v.*\.\([a-z]\+\)\.run$/latest.\1.run/' -)"
+            latest_name="$(echo "${f}" | sed -e 's/v.*\.\([a-z]\+\)\.run$/latest.\1.run/' -)"
             ln -sf "${f}" "${latest_name}"
           fi
         done
