@@ -209,9 +209,16 @@ static inline void replace_evaluate_from_pcre2(LOG_JOB *jb, HASHED_KEY *k, REPLA
             if(group_number >= 0) {
                 PCRE2_SIZE start_offset = ovector[2 * group_number];
                 PCRE2_SIZE end_offset = ovector[2 * group_number + 1];
-                PCRE2_SIZE length = end_offset - start_offset;
 
-                txt_l2j_append(&jb->rewrites.tmp, k->value.txt + start_offset, length);
+                // groups that did not participate in the match have both offsets set to PCRE2_UNSET
+                const char *value = "";
+                PCRE2_SIZE length = 0;
+                if(start_offset != PCRE2_UNSET) {
+                    value = k->value.txt + start_offset;
+                    length = end_offset - start_offset;
+                }
+
+                txt_l2j_append(&jb->rewrites.tmp, value, length);
             }
             else {
                 if(hashed_keys_match(&node->name, &jb->line.key))
