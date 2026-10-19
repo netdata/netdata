@@ -1852,6 +1852,40 @@ remote neighbors of a resolved local device stay visible in those tables without
 creating loose router or IP actors; polished UI must not depend on raw
 `actor_metadata` or endpoint JSON for them.
 
+## Cato Networks Shape
+
+Cato topology has account-qualified site, device, PoP and remote BGP peer
+identities. A `bgp_peer` with a known account and remote address declares
+`merge_identity: ["account_id", "remote_ip", "remote_asn"]`. The same tuple across
+sites names one shared remote object; different accounts do not share its key.
+The existing source-local `id` remains site-qualified and is not a cross-source
+key. Consumers must use the actor type's declared merge tuple, not every column
+marked as identity or merge identity in the shared actor table.
+
+A peer without a remote address, or defensively without an account, is emitted
+as `bgp_peer_observation` with the same label policy, modal and visual appearance,
+but no merge identity. It remains source-local under the ordinary identity
+contract. An ASN alone does not identify a router. One warning,
+`cato.bgp_peer_identity_unqualified`, reports incomplete identity without
+discarding the map. Such observations may already group multiple peers in the
+collector's existing normalization; source isolation prevents further false
+cross-source matching, not reconstruction of missing provider identity.
+
+Neither peer type declares a singleton site parent. Incident `bgp_session` links
+retain site association, session state, route counts and related session facts.
+The peer's Links modal presents those independent sessions. Existing scalar
+`site_id`, `pop_name`, `connectivity_status` and local `id` are retained as source
+report attributes for direct-view compatibility, not as authoritative global
+peer placement or a global session state. No blanket `first` or `set` reducer is
+added to these columns: aggregation must retain one coherent representative
+report, preserve alternatives and warn when reports conflict. That requires the
+corresponding generic CTS conflict handling; the producer correction alone does
+not make older strict aggregators compatible.
+
+Both peer types share one visual-family legend entry. Overlapping IP/ASN tuples
+in independent domains inside one account remain the deferred domain-identity
+problem; an account qualifier does not establish a universal network namespace.
+
 ## vSphere Shape
 
 For vSphere:

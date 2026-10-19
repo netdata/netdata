@@ -5,6 +5,7 @@ package cato_networks
 import (
 	"fmt"
 	"sort"
+	"strings"
 	"time"
 
 	topologyv1 "github.com/netdata/netdata/go/plugins/pkg/topology/v1"
@@ -29,6 +30,7 @@ func buildTopology(
 
 	actorIndexes := make(map[string]int, len(order)*2)
 	popSeen := make(map[string]bool)
+	var hasUnqualifiedPeer bool
 
 	for _, siteID := range order {
 		site := sites[siteID]
@@ -51,7 +53,9 @@ func buildTopology(
 			addSitePopLink(links, stringsDict, site, siteActorIndex, actorIndexes[popActorID])
 		}
 
-		addBGPPeerTopology(actors, links, stringsDict, actorIndexes, site, siteActorIndex)
+		if addBGPPeerTopology(actors, links, stringsDict, actorIndexes, accountID, site, siteActorIndex) {
+			hasUnqualifiedPeer = true
+		}
 	}
 
 	actorTable, err := actors.Table()
@@ -100,6 +104,13 @@ func buildTopology(
 			"sites": len(order),
 			"links": links.Rows(),
 		},
+	}
+	if hasUnqualifiedPeer {
+		data.Notifications = []topologyv1.Notification{{
+			Severity: topologyv1.NotificationSeverityWarning,
+			Code:     "cato.bgp_peer_identity_unqualified",
+			Message:  "Some BGP peer observations lack an account or remote IP address. They remain source-local and may represent multiple peers; cross-source correlation is unavailable for these observations.",
+		}}
 	}
 	return data, nil
 }
@@ -322,10 +333,12 @@ func addBGPPeerTopology(
 	actors, links *topologyv1.TableBuilder,
 	dict *topologyv1.StringDictionary,
 	actorIndexes map[string]int,
+	accountID string,
 	site *siteState,
 	siteActor int,
-) {
+) bool {
 	seen := make(map[string]bool)
+	var unqualified bool
 
 	for _, peer := range site.BGPPeers {
 		if peer.RemoteIP == "" && peer.RemoteASN == "" {
@@ -336,30 +349,37 @@ func addBGPPeerTopology(
 			continue
 		}
 		seen[peerActorID] = true
-		peerActor := addBGPPeerActor(actors, dict, site, peer, peerActorID)
+		actorType := catofunc.ActorTypeBGPPeer
+		if strings.TrimSpace(accountID) == "" || strings.TrimSpace(peer.RemoteIP) == "" {
+			actorType = catofunc.ActorTypeBGPPeerObservation
+			unqualified = true
+		}
+		peerActor := addBGPPeerActor(actors, dict, accountID, site, peer, peerActorID, actorType)
 		actorIndexes[peerActorID] = peerActor
 		addBGPLink(links, dict, siteActor, peerActor, peer)
 	}
+	return unqualified
 }
 
 func addBGPPeerActor(
 	table *topologyv1.TableBuilder,
 	dict *topologyv1.StringDictionary,
+	accountID string,
 	site *siteState,
 	peer bgpPeerState,
-	peerActorID string,
+	peerActorID, actorType string,
 ) int {
 	displayName := peer.RemoteIP
 	if displayName == "" {
 		displayName = peer.RemoteASN
 	}
 	return table.Add(
-		dict.Ref(catofunc.ActorTypeBGPPeer),
+		dict.Ref(actorType),
 		dict.Ref(topologyLayer),
 		peerActorID,
 		displayName,
 		"",
-		"",
+		accountID,
 		site.ID,
 		"",
 		site.PopName,
