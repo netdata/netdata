@@ -103,6 +103,7 @@ static time_t query_point_storage_cadence(const QUERY_POINT *point) {
 typedef struct query_pending_gap {
     time_t duration;
     time_t cadence;
+    time_t inferred_duration;
     size_t samples;
     bool first;
 } QUERY_PENDING_GAP;
@@ -121,6 +122,7 @@ static void query_flush_gap_to_group(
     if(pending->duration <= 0)
         return;
 
+    size_t samples = pending->samples + (size_t)(pending->inferred_duration / pending->cadence);
     TG_POINT gap = {
         .value = NAN,
         .sum = NAN,
@@ -128,7 +130,7 @@ static void query_flush_gap_to_group(
         .max = NAN,
         .count = 0,
         .duration = pending->duration,
-        .samples = pending->samples,
+        .samples = samples ? samples : 1,
         .is_gap = true,
         .first = pending->first,
     };
@@ -140,7 +142,7 @@ ALWAYS_INLINE
 static void query_add_gap_to_group(
     RRDR *r, QUERY_ENGINE_OPS *ops, RRDR_TIME_GROUPING add_flush,
     QUERY_PENDING_GAP *pending, time_t duration, time_t storage_cadence,
-    bool first, bool count_as_group_point) {
+    bool first, bool inferred, bool count_as_group_point) {
     if(likely(!r->time_grouping.wants_gaps || duration <= 0))
         return;
 
@@ -150,7 +152,11 @@ static void query_add_gap_to_group(
 
     pending->duration += duration;
     pending->cadence = cadence;
-    pending->samples += (size_t)(duration / cadence) + (duration % cadence != 0);
+    // Inferred bridges count elapsed slots; delivered gaps retain their individual weights.
+    if(inferred)
+        pending->inferred_duration += duration;
+    else
+        pending->samples += (size_t)(duration / cadence) + (duration % cadence != 0);
     pending->first = first;
     if(count_as_group_point)
         ops->group_points_added++;
@@ -164,11 +170,11 @@ static void query_add_synthetic_gap_to_group(
     time_t offset = (from - origin) % cadence;
     if(offset) {
         time_t duration = MIN(to - from, cadence - offset);
-        query_add_gap_to_group(r, ops, add_flush, pending, duration, cadence, false, false);
+        query_add_gap_to_group(r, ops, add_flush, pending, duration, cadence, false, false, false);
         from += duration;
     }
 
-    query_add_gap_to_group(r, ops, add_flush, pending, to - from, cadence, true, false);
+    query_add_gap_to_group(r, ops, add_flush, pending, to - from, cadence, true, false, false);
 }
 
 // Feeds one delivered point into the current bucket.
@@ -232,7 +238,7 @@ static void query_add_synthetic_gap_to_group(
     if(unlikely(_from > _slot_from && (r)->time_grouping.wants_gaps)) {                                              \
         time_t _missing = _from - _slot_from;                                                                        \
         query_add_gap_to_group(                                                                                      \
-            (r), (ops), (add_flush), (pending_gap), _missing, _gap_cadence, true, true);                            \
+            (r), (ops), (add_flush), (pending_gap), _missing, _gap_cadence, true, true, true);                      \
         (ops)->group_covered_s += _missing;                                                                          \
         _slot_from = _from;                                                                                          \
     }                                                                                                                \
@@ -279,7 +285,8 @@ static void query_add_synthetic_gap_to_group(
         else                                                                                                         \
             query_add_gap_to_group(                                                                                  \
                 (r), (ops), (add_flush), (pending_gap),                                                              \
-                _duration, _gap_cadence, !(point).added, false);                                                    \
+                _duration, _gap_cadence, !(point).added,                                                             \
+                (point).sp.end_time_s <= (point).sp.start_time_s, false);                                           \
     }                                                                                                                \
                                                                                                                      \
     (ops)->group_points_added++;                                                                                     \
