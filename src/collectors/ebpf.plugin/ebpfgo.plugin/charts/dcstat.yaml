@@ -1,0 +1,34 @@
+version: v1
+context_namespace: dcstat
+groups:
+  - family: dcstat
+    metrics:
+      - ratio
+      - reference
+      - slow
+      - miss
+    charts:
+      - id: dc_hit_ratio
+        title: Directory cache ratio
+        context: filesystem.dc_hit_ratio
+        units: "%"
+        type: area
+        dimensions:
+          - selector: ratio
+            name: ratio
+            algorithm: absolute
+      - id: dc_reference
+        title: Variables used to calculate hit ratio.
+        context: filesystem.dc_reference
+        units: files
+        type: area
+        dimensions:
+          - selector: reference
+            name: reference
+            algorithm: absolute
+          - selector: slow
+            name: slow
+            algorithm: absolute
+          - selector: miss
+            name: miss
+            algorithm: absolute
