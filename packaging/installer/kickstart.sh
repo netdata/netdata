@@ -3087,9 +3087,9 @@ parse_args() {
         ;;
       "--offline-install-source")
         if [ -d "${2}" ]; then
-          NETDATA_OFFLINE_INSTALL_SOURCE="${2}"
           # shellcheck disable=SC2164
-          NETDATA_TARBALL_BASEURL="file://$(cd "${2}"; pwd)"
+          NETDATA_OFFLINE_INSTALL_SOURCE="$(cd "${2}"; pwd -P)"
+          NETDATA_TARBALL_BASEURL="file://${NETDATA_OFFLINE_INSTALL_SOURCE}"
           shift 1
         else
           fatal "A source directory must be specified with the --offline-install-source option." F0501
