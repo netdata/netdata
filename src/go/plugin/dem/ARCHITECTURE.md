@@ -34,7 +34,8 @@ relative to `src/go/`.
   - **Synthetics**: the plugin *pulls* by running scripted browsers on a schedule (Playwright journeys and Lighthouse
     audits).
 - Both run on the shared Go plugin framework (`plugin/agent`, `plugin/framework`): four native collector modules,
-  configured through DynCfg, scheduled by the framework, publishing charts, many of them with stock alerts.
+  configured through DynCfg, scheduled by the framework, publishing charts. Stock alerts cover RUM Web Vitals (LCP,
+  INP, CLS), OTLP export failures and loss, and journey failures.
 - Beyond charts, DEM keeps sampled investigation detail in a journal and optional screenshots/reports on disk. Process
   Functions expose both, and keep working even when every collector is disabled.
 - The command (`cmd/demplugin`) owns the shared stores. Jobs only borrow them, and the stores close only after a clean
@@ -56,10 +57,11 @@ A few words used throughout this guide:
 | Beacon | One browser POST to `/rum/<site>/collect`, decoded into a normalized `beacon.Beacon`. |
 | Measurement | Rolling-window populations and counts (Web Vitals, timings, errors) published as charts. |
 | Investigation detail | Sampled per-event entries saved to the journal and read back by Functions. |
-| Run | One journey or Lighthouse execution, saved as a start record and a completion record. |
+| Run | One journey or Lighthouse execution. Once it pins the browser runtime, it saves a start record before launch and a completion record when it finishes. |
 | Capture | A screenshot or HTML report published for one run. |
 | Browser runtime | The Node + Chromium bundle that executes synthetic runs. RUM never needs it. |
-| Generation | One admitted instance of a job's runtime state. Replacing or restarting a job starts a new generation. |
+| Job generation | One admitted instance of a job's runtime state. Replacing or restarting a job starts a new generation. |
+| Framework generation | One run of the framework inside the process. A framework restart (for example on SIGHUP) starts a new one while the command keeps the stores open. |
 
 ## The big picture
 
@@ -79,6 +81,7 @@ flowchart LR
     UI("Functions UI")
 
     Browsers -->|"beacons"| Receiver --> Sites
+    Receiver --> Charts
     Sched --> Synth --> Runner
     Sites --> Charts
     Synth --> Charts
@@ -106,7 +109,7 @@ How to read it:
 - **Green** boxes are collector jobs. The framework creates, schedules and retires them like any `go.d` job.
 - **Yellow** boxes are process services. They exist once per process, independently of which jobs are enabled.
 - **Grey** cylinders are on-disk stores, owned by the command for the whole process lifetime.
-- **Blue** boxes are outside the plugin.
+- **Blue** boxes are outside DEM's own code: external systems and the shared framework scheduler.
 - The receiver and the site jobs are separate: one receiver serves every site, and each site keeps its own state.
 - Not drawn: the retention worker and the browser runtime cache (see [Storage and retention](#storage-and-retention)).
 
@@ -120,9 +123,10 @@ DEM splits responsibility between three kinds of owner. Most contracts at the en
 | Collector jobs (`collector/*`) | One job run | The runtime objects of that job and the metrics it publishes | The receiver's listener; a site's aggregator |
 | Command (`cmd/demplugin`) | The whole process | Shared stores and services: journal, captures, browser runtime, execution admission slot, retention | The journal survives every job reload |
 
-Two **registries** connect jobs to Functions. `rum/registry` and `synthetic/registry` hold only what is actually
-running (admitted sites, receiver availability, active synthetic jobs). They hold no desired configuration, so
-Functions report what really runs; consumers join native DynCfg state to show disabled or failed configurations.
+Two **registries** connect running jobs to each other and to Functions. `rum/registry` and `synthetic/registry` hold
+only what is actually running (admitted sites, receiver availability, active synthetic jobs). `rum/registry` also leases
+the exact admitted site to the receiver for each request. The registries hold no desired configuration, so Functions
+report what really runs; consumers join native DynCfg state to show disabled or failed configurations.
 
 The four collector modules (the journeys below show them in action):
 
@@ -130,12 +134,12 @@ The four collector modules (the journeys below show them in action):
 |---|---|---|---|
 | `receiver` | Single instance (`dem:collector:receiver`) | Listens on `127.0.0.1:19938`, `update_every: 10` | HTTP listener, GeoIP resolver, receiver availability |
 | `rum` | One job per website (`dem:collector:rum:<name>`) | 5-minute measurement `window`, `update_every: 10` | Aggregator, route, diagnostics, history writer, optional exporters |
-| `journey` | One job per Playwright entry | Every 900 s, 120 s timeout | Prepared request, registration, metric store |
+| `journey` | One job per journey script (`script` or `script_path`) | Every 900 s, 120 s timeout | Prepared request, registration, metric store |
 | `lighthouse` | One job per audited URL | Every 1800 s, 180 s timeout | Prepared request, registration, metric store |
 
 ## Journey 1: a browser report
 
-A website installs one script tag. From then on, every visitor's browser sends reports to the receiver, and each
+A website installs one script tag. From then on, every sampled visitor's browser sends reports to the receiver, and each
 report travels through the plugin like this (for an example site named `shop`):
 
 ```mermaid
@@ -174,10 +178,9 @@ sequenceDiagram
 | `GET /rum/ping` | Reachability check from a viewer's browser. Reveals nothing about sites. |
 | `GET /rum/demo` | Test page carrying the bootstrap of an admitted site (`?key=`, default `demo`). |
 
-### Admission checks, in order
+### Collection request steps, in order
 
-Checks run in this order, cheapest first, and nothing is decoded until admission passes. The first failing check
-decides the response.
+The first failing step decides the response. The body is read only after step 5 and decoded only after step 7.
 
 | Step | Check | On failure |
 |---|---|---|
@@ -187,7 +190,7 @@ decides the response.
 | 4 | Declared body length is within the receiver limit | 413 |
 | 5 | Bot user agent or `?bot=1`, unless the site includes bots | 204, intentional exclusion |
 | 6 | Body reads completely within the limit | 413 or 400 |
-| 7 | The site's collection sample rate is zero | 204, nothing decoded |
+| 7 | The site's `measure_sample_rate` is 0 | 204, nothing decoded |
 | 8 | GeoIP lookup for public client addresses, unless geolocation is `off` | Never rejects; location fields stay absent |
 | 9 | Faro payload decodes and normalizes | 400 |
 | 10 | The site processor ingests the beacon | 202 Accepted |
@@ -264,16 +267,17 @@ Key points of this path:
 
 How a run can end:
 
-| Situation | Recorded as | Effect on the plugin |
-|---|---|---|
-| Journey tests all pass, or the Lighthouse audit completes | Success | None |
-| A declared check fails | Failure | None |
-| The overall deadline passes | Timeout | None |
-| The run is cancelled, or cancelled while waiting | Cancelled | None |
-| The monitor cannot load or run | Execution error, still a measured outcome | None |
-| Process-tree completion cannot be verified | Error | Admission is poisoned and the plugin fail-stops |
+| Situation | Outcome | Journal records | Effect on the plugin |
+|---|---|---|---|
+| Journey tests all pass, or the Lighthouse audit completes | `success` | Start and completion | None |
+| A declared check fails | `failed` | Start and completion | None |
+| Skipped, expected-failure, empty or incomplete suite | `inconclusive` | Start and completion | None |
+| The overall deadline passes | `timeout` | Start and completion | None |
+| The run is cancelled | `cancelled` | None when cancelled while waiting | None |
+| The monitor cannot load or run | `error`, still counted in metrics and the registry | None when it fails before the runtime is pinned and checked | None |
+| Process-tree completion cannot be verified | No outcome published | A saved start record stays `unknown` | Admission is poisoned and the plugin fail-stops |
 
-The README defines the full outcome semantics, including inconclusive suites.
+The README defines the full outcome semantics.
 
 ## Journey 3: investigation
 
@@ -328,9 +332,11 @@ What makes this layer predictable:
 | In-memory site state | Memory | Measurements: per-site `window` (5 minutes by default); investigation context: bounded session and entry counts | Rolling populations, live feed, investigation context | The site job; lost on restart |
 
 - The journal and capture budgets live in `dem.conf`. The retention worker reloads them before each sweep, so valid
-  edits apply without a restart. Runtime cache settings apply after a plugin restart.
+  edits apply at the next hourly sweep, without a restart. Runtime cache settings apply after a plugin restart.
 - Budgets are targets, not physical disk caps. The README explains what can exceed them.
-- Terminal and debug runs use private temporary storage and leave live state untouched.
+- Terminal and debug runs use a private temporary journal and capture store and leave live history and captures
+  untouched. The browser runtime cache is not private: it still uses `runtime.cache_path` or
+  `${NETDATA_LIB_DIR}/dem/runtime`.
 
 ## Startup and shutdown
 
@@ -350,7 +356,7 @@ flowchart TD
 
     Conf --> Journal --> Art --> RT --> Compose --> Run --> Clean
     Clean -->|"yes"| Close
-    Clean -->|"error, forced recovery<br/>or unverified run"| Exit
+    Clean -->|"error, shutdown not joined<br/>or unverified run"| Exit
 
     classDef step fill:#dbeafe,stroke:#2563eb,color:#0b1021;
     classDef run fill:#dcfce7,stroke:#16a34a,color:#0b1021;
@@ -365,13 +371,17 @@ flowchart TD
   runner holds the single plugin-wide admission slot.
 - Unusable retained history stops the plugin at startup, before any Function registers.
 - An initial capture cleanup failure does not stop startup; the retention worker retries it.
-- The runner can signal a fatal, unverified run at any time. The command then exits without closing stores, so
-  nothing deletes files a surviving child might still use.
+- Browser runtime setup problems (missing manifest, unsupported platform, bad preload) never stop startup. Synthetic
+  jobs see the runtime as unavailable, and RUM keeps working.
+- The runner can signal a fatal, unverified process tree (from a run or a preflight probe) at any time. The command
+  then exits without closing stores, so nothing deletes files a surviving child might still use.
 
 ## Package map
 
-The root `dem` package only composes: it wires native collectors, process Function providers, query services and
-retention. It does not decode domain journal records, reduce investigation results or serialize Function tables. The
+The root `dem` package composes the plugin and owns its process-level policy: it loads and validates `dem.conf`
+(`config.go`), opens the browser runtime from the installed manifest (`runtime_setup.go`), runs the retention worker
+(`retention.go`), and wires native collectors, process Function providers, query services and retention
+(`plugin.go`). It does not decode domain journal records, reduce investigation results or serialize Function tables. The
 command creates and closes the shared resources across framework generations.
 
 Shared and process-wide packages:
@@ -385,23 +395,22 @@ Shared and process-wide packages:
 | `internal/attemptmetrics` | Shared synthetic outcome and duration instruments |
 | `config/` | Installed configuration files; not a Go package |
 
-RUM packages. The processing packages (`rum/beacon` through `rum/geoip`) are separate from the investigation query
-and Function presentation packages (`rum/registry` through `rum/functions`):
+RUM packages, in data-path order. RUM processing is separate from investigation queries and Function presentation:
 
-| Package | Responsibility |
-|---|---|
-| `rum/beacon` | Normalized browser observations, event kinds and pure sampling and normalization rules |
-| `rum/config` | Receiver/site declarations, validation and effective capture and sampling policy |
-| `rum/faro` | Faro wire decoding, spans, event classification and pinned bootstrap rendering/assets |
-| `rum/httpapi` | HTTP endpoints, exact route leases, origin/proxy/body/rate policy, caching and demo responses |
-| `rum/diagnostics` | Last rejected-origin observation owned by one site runtime |
-| `rum/aggregate` | One site's rolling measurements and investigation state, behind one lock |
-| `rum/otlp` | RUM log/span mapping, export queues, transport and drainage |
-| `rum/geoip` | Receiver-owned geographic sources, snapshots and validated lookups |
-| `rum/registry` | Admitted sites, exact-generation request/read leases and receiver availability |
-| `rum/query` | Copied site observations, live cursors, redaction and active/retained investigation results |
-| `rum/history` | RUM record encoding, retained-event reducers and the per-site queued writer |
-| `rum/functions` | Function declarations, arguments, permissions, columns and response serialization |
+| Role | Package | Responsibility |
+|---|---|---|
+| Processing | `rum/beacon` | Normalized browser observations, event kinds and pure sampling and normalization rules |
+| Processing | `rum/config` | Receiver/site declarations, validation and effective capture and sampling policy |
+| Processing | `rum/faro` | Faro wire decoding, spans, event classification and pinned bootstrap rendering/assets |
+| Processing | `rum/httpapi` | HTTP endpoints, exact route leases, origin/proxy/body/rate policy, caching and demo responses |
+| Processing | `rum/diagnostics` | Last rejected-origin observation owned by one site runtime |
+| Processing | `rum/aggregate` | One site's rolling measurements and investigation state, behind one lock |
+| Processing | `rum/otlp` | RUM log/span mapping, export queues, transport and drainage |
+| Processing | `rum/geoip` | Receiver-owned geographic sources, snapshots and validated lookups |
+| Running state | `rum/registry` | Admitted sites, exact-generation request/read leases and receiver availability |
+| History | `rum/history` | RUM record encoding, retained-event reducers and the per-site queued writer |
+| Read side | `rum/query` | Copied site observations, live cursors, redaction and active/retained investigation results |
+| Read side | `rum/functions` | Function declarations, arguments, permissions, columns and response serialization |
 
 Synthetic packages:
 
@@ -413,7 +422,7 @@ Synthetic packages:
 | `synthetic/history` | Synthetic record encoding and run reduction |
 | `synthetic/functions` | Function declarations, arguments, permissions, columns and response serialization |
 | `synthetic/runner` | Prepared browser execution, admission, process supervision and private reporter protocol |
-| `synthetic/runner/assets` | Immutable Node adapters and pinned dependency manifests |
+| `synthetic/runner/assets` | Immutable Node adapters and pinned dependency manifests; not a Go package |
 | `synthetic/runtime` | Trusted bundle verification, shared cache inventory, demand/use pins and automatic retirement |
 | `synthetic/runtimehost` | Accepted enabled demand, asynchronous preparation, readiness notifications and process maintenance |
 | `synthetic/artifacts` | Work directories, verified publication, immutable captures, reads and retention |
@@ -439,6 +448,7 @@ flowchart LR
     Col("collector/*") --> Reg
     Col -->|"site history writer"| H
     Col --> Dom("domain packages<br/>aggregate · httpapi · otlp · geoip")
+    Reg --> Dom
 
     classDef pkg fill:#fef3c7,stroke:#d97706,color:#0b1021;
     class Fn,Q,Reg,H,A,J,Col,Dom pkg;
