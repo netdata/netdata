@@ -171,7 +171,7 @@ modules:
             - name: k8s_state.node_pods_readiness_state
               description: Pods readiness state
               unit: pods
-              chart_type: line
+              chart_type: stacked
               dimensions:
                 - name: ready
                 - name: unready
