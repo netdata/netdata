@@ -403,6 +403,14 @@ referenced actor columns, and define the referenced label and port tables:
 `merge_identity` is what the Cloud aggregator may use across payloads.
 `parent_identity` expresses containment or "lives on" relationships.
 
+An absent or empty `merge_identity` authorizes no identity-based cross-source
+matching. Keep those actors scoped to their original contribution, including
+the source Agent and job. Do not fall back to `identity`, a display field, or a
+tuple containing an invented global namespace. Local identity still supports
+the map within that contribution. Separately declared correlation rules retain
+their explicit matching semantics; absence of a merge key does not invent a
+new correlation rule.
+
 Do not use display names as identity. Identity is canonical matching data, not
 UI text. If an identity column is not explicitly listed in the actor type
 `presentation.label_policy.columns`, the UI must not use it as a label
@@ -1227,7 +1235,10 @@ Two parents retaining data for the same node are two meaningful rows in
 `retention` and must not collapse into one, whatever the merge policy.
 Actors from different payloads must merge only by the `merge_identity` their
 type declares; a merged actor combines its labels, attributes, links, evidence,
-and detail tables by table policy. Streaming declares `machine_guid` plus
+and detail tables by table policy. With no declared merge key, identity-based
+matching stays source-local, not a fallback to the local `identity`. Preserve
+source scope while remapping the contribution's graph and detail references.
+Streaming declares `machine_guid` plus
 `node_id`; the table-level merge keys the streaming design wants are not
 expressible with the shipped declarations (`append`, and `set` for
 `actor_labels`) and are recorded in the implementation scope document as design
@@ -1762,9 +1773,19 @@ creating loose router or IP actors; polished UI must not depend on raw
 
 For vSphere:
 
-- actors should use stable vSphere managed object ids when available;
-- inventory path can be an additional merge identity but should not be the
-  only identity when a stable object id exists;
+- qualified actors use `vsphere_instance_uuid`, `object_type`, and
+  `vsphere_moid` as identity and merge identity; MoRefs are unique only inside
+  their vCenter, not across unrelated vCenters;
+- containment uses the same namespace plus `parent_object_type` and
+  `parent_moid`; raw MoRefs and integer graph references are unchanged;
+- the namespace comes from the client's existing vCenter `InstanceUUID()` and
+  is captured with cached inventory, never fetched by a topology request;
+- if that UUID is unavailable, keep the existing source-local identity and
+  containment, omit merge identity, and return the usable map with a
+  `vsphere.identity_unqualified` warning; do not invent a provider identity from
+  the Agent, job, endpoint, or a random value;
+- inventory paths and names are display data, not a substitute for a qualified
+  provider identity;
 - containment links such as datacenter -> cluster -> host -> VM are
   `hierarchical` with `direction_role: "ownership"`;
 - VM-to-host relationships are topology facts, not metric overlays;
@@ -1776,6 +1797,12 @@ The vSphere producer is `src/go/plugin/go.d/collector/vsphere/func_topology*.go`
 in `func_readiness.go`, which also passes `job.Name()` as the `collect_job`
 overlay selector and `job.FullName()` only as the agent id; it uses the
 `src/go/pkg/topology/v1` helpers.
+
+Consumers must implement the source-only rule for absent/empty merge identity
+before this missing-UUID fallback can be used for infrastructure-wide views.
+Older CTS implementations that fall back to local identity do not satisfy this
+contract. Per-node views do not depend on this CTS change. Metrics, overlays,
+modal fields and VM actor `power_state` remain unchanged.
 
 ## Test Reconstruction
 

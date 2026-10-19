@@ -406,7 +406,7 @@
         },
         "merge_identity": {
           "type": "array",
-          "description": "Actor-table column ids that may be used by a cross-node or cross-source aggregator.",
+          "description": "Actor-table column ids authorized for identity-based matching across source payloads. Omitted or empty means source-local only; an aggregator must not fall back to identity for cross-source matching.",
           "items": {
             "$ref": "#/$defs/id"
           },

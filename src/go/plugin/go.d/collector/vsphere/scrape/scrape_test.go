@@ -174,7 +174,7 @@ func prepareScraper(t *testing.T) (s *Scraper, res *rs.Resources, teardown func(
 	teardown = func() { model.Remove(); srv.Close() }
 
 	c := newClient(t, srv.URL)
-	d := discover.New(c)
+	d := discover.New(c, c.InstanceUUID())
 	res, err := d.Discover()
 	require.NoError(t, err)
 

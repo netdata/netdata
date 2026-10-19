@@ -39,6 +39,8 @@ func TestDiscoverer_Discover(t *testing.T) {
 	assert.True(t, len(res.Datastores) > 0)
 	assert.True(t, isHierarchySet(res))
 	assert.True(t, isMetricListsCollected(res))
+	assert.NotEmpty(t, res.VCenterInstanceUUID)
+	assert.Equal(t, d.vCenterInstanceUUID, res.VCenterInstanceUUID)
 }
 
 func TestDiscoverer_DiscoverNetworkTopologyOptIn(t *testing.T) {
@@ -542,7 +544,7 @@ func prepareDiscovererSim(t *testing.T) (d *Discoverer, model *simulator.Model, 
 	teardown = func() { model.Remove(); srv.Close() }
 	c := newClient(t, srv.URL)
 
-	return New(c), model, teardown
+	return New(c, c.InstanceUUID()), model, teardown
 }
 
 func newClient(t *testing.T, vCenterURL *url.URL) *client.Client {
