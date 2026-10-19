@@ -16,6 +16,9 @@ index of trace IDs so that a whole trace can be looked up by its ID. A span sent
 with the OpenTelemetry defaults, `UNSPECIFIED` and `UNSET`, so those values can be filtered on like any other. Spans
 stored by an earlier version keep no kind or status for those defaults, so until their files leave retention a filter
 on `UNSET`, `UNSPECIFIED`, or a negation such as a status other than `ERROR` does not match them.
+Spans stored by an earlier version also keep their status under an older name: the Traces tab shows no status for
+them, they are not counted as errors, and a status filter does not match them. This stays true until their files leave
+retention; offloaded files stay in object storage until you remove them.
 
 ## Retention
 

@@ -217,11 +217,6 @@ impl<'a> Container<'a> {
         Ok(payload)
     }
 
-    /// The chunk ids in on-disk (TOC) order. No payload is read.
-    pub fn chunk_ids(&self) -> impl Iterator<Item = ChunkId> + '_ {
-        self.toc.ids()
-    }
-
     /// Whether a chunk with `id` exists in the TOC (no CRC check).
     pub fn has_chunk(&self, id: ChunkId) -> bool {
         self.toc.get(id).is_some()
@@ -547,19 +542,6 @@ mod tests {
             .unwrap();
         let c_off = bytes.windows(5).position(|w| w == b"gamma").unwrap();
         assert!(a_off < c_off);
-    }
-
-    /// The ids come back in on-disk order, not sorted, end marker
-    /// excluded.
-    #[test]
-    fn container_lists_its_chunk_ids() {
-        let chunks: &[(ChunkId, &[u8])] = &[(*b"ZZZZ", b"z"), (*b"AAAA", b"a"), (*b"MMMM", b"")];
-        let bytes = stream(chunks);
-        let c = Container::open(&bytes, &MAGIC, VERSION).unwrap();
-        assert_eq!(
-            c.chunk_ids().collect::<Vec<_>>(),
-            vec![*b"ZZZZ", *b"AAAA", *b"MMMM"]
-        );
     }
 
     #[test]

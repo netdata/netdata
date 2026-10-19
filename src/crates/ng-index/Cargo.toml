@@ -25,7 +25,6 @@ thiserror = { workspace = true }
 wal = { workspace = true }
 
 [dev-dependencies]
-chunk-file = { workspace = true }
 file-registry = { workspace = true }
 opentelemetry-proto = { workspace = true }
 otel-logs-identity = { workspace = true }

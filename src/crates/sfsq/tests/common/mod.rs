@@ -73,7 +73,7 @@ pub struct SpanSpec {
     pub name: &'static str,
     pub kind: i32,
     /// OTLP status `(code, message)`; `None` sends no status object, which
-    /// is stored as the OTel default (`status_code = UNSET`, no message).
+    /// is stored as the OTel default (`status.code = UNSET`, no message).
     pub status: Option<(i32, &'static str)>,
     /// W3C trace state, stored verbatim when non-empty.
     pub trace_state: &'static str,

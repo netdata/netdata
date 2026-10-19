@@ -131,8 +131,8 @@ impl BuiltinField {
         match self {
             BuiltinField::Name => Some("name"),
             BuiltinField::Kind => Some("kind"),
-            BuiltinField::Status => Some("status_code"),
-            BuiltinField::StatusMessage => Some("status_message"),
+            BuiltinField::Status => Some("status.code"),
+            BuiltinField::StatusMessage => Some("status.message"),
             BuiltinField::InstrumentationName => Some("scope.name"),
             BuiltinField::InstrumentationVersion => Some("scope.version"),
             BuiltinField::EventName => Some("events.name"),
@@ -152,7 +152,7 @@ pub enum AttributeKey {
 }
 
 /// Internal facets that must never surface as keys: the raw-int shadow
-/// entries of the label-carrying `kind` / `status_code` fields.
+/// entries of the label-carrying `kind` / `status.code` fields.
 const INTERNAL_FIELDS: [&str; 2] = ["_kind", "_status_code"];
 
 /// Map one storage field name to its key, or `None` when the field is
@@ -187,7 +187,7 @@ pub fn storage_to_attribute(storage: &str) -> Option<(AttributeOwner, AttributeK
 
 /// The storage fields free text searches (decision 18: values only): the
 /// span name, the status message and event names, plus every attribute
-/// owner's values. Never field names, the `kind`/`status_code` labels, or
+/// owner's values. Never field names, the `kind`/`status.code` labels, or
 /// ids.
 pub(crate) struct TextScope {
     /// Fields searched by exact storage name.
@@ -272,8 +272,8 @@ mod tests {
             ("links.attributes.rel", attr(AttributeOwner::Link, "rel")),
             ("name", intr(BuiltinField::Name)),
             ("kind", intr(BuiltinField::Kind)),
-            ("status_code", intr(BuiltinField::Status)),
-            ("status_message", intr(BuiltinField::StatusMessage)),
+            ("status.code", intr(BuiltinField::Status)),
+            ("status.message", intr(BuiltinField::StatusMessage)),
             ("scope.name", intr(BuiltinField::InstrumentationName)),
             ("scope.version", intr(BuiltinField::InstrumentationVersion)),
             ("events.name", intr(BuiltinField::EventName)),

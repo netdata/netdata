@@ -238,12 +238,6 @@ impl std::fmt::Debug for Toc<'_> {
 }
 
 impl<'a> Toc<'a> {
-    /// The chunk ids in TOC order (= on-disk order: offsets strictly
-    /// increase), the end marker excluded.
-    pub fn ids(&self) -> impl Iterator<Item = ChunkId> + '_ {
-        self.entries[..self.entries.len() - 1].iter().map(|e| e.id)
-    }
-
     /// The byte size of a TOC with `num_chunks` chunks.
     ///
     /// Plain arithmetic for trusted counts; [`parse`](Toc::parse)

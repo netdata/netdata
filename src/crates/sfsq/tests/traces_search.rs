@@ -2268,7 +2268,7 @@ const TEXT_BATCH: usize = 100;
 /// flag, status messages, an event (name + attribute), a link
 /// attribute, a resource attribute on batch 3 and a scope attribute on
 /// batch 5. Status ERROR without a message on others: free text never
-/// searches `status_code`.
+/// searches `status.code`.
 fn text_corpus() -> (
     Vec<ExportTraceServiceRequest>,
     Vec<ExportTraceServiceRequest>,
@@ -2364,7 +2364,7 @@ fn text_corpus() -> (
 /// and link structures) or decoded (WAL tails): span names, status
 /// messages, span/resource/scope attribute values, event names and
 /// attribute values, and link attribute values, case-insensitively;
-/// never field names or `status_code`.
+/// never field names or `status.code`.
 #[test]
 fn text_index_span_parity() {
     let dir = tempfile::tempdir().unwrap();
@@ -2440,7 +2440,7 @@ fn text_index_span_parity() {
         ("from-batch", 7),    // link attribute value
         ("canary", 100),      // resource attribute value
         ("telescope", 100),   // scope attribute value
-        ("error", 0),         // only a field name and `status_code`
+        ("error", 0),         // only a field name and `status.code`
         ("rel", 0),           // only a field name
     ];
     for (term, count) in terms {

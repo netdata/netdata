@@ -7,8 +7,8 @@
 //!
 //! One span → one SFST row. What becomes what at seal time (the builder is
 //! `src/crates/ng-index/src/sfst_build.rs::populate_trace_row_index`):
-//! - interned facets: `name`, `kind`/`_kind`, `status_code`/`_status_code`,
-//!   `trace_state`, `status_message`, `attributes.*` (emitted by
+//! - interned facets: `name`, `kind`/`_kind`, `status.code`/`_status_code`,
+//!   `status.message`, `trace_state`, `attributes.*` (emitted by
 //!   [`Flattener::flatten_span`]), plus the event/link `events.*` / `links.*`
 //!   entries — searchable tokens in the shared [`SchemaTree`];
 //! - per-row columns from [`SpanRecord`]: `ts` (row key), `duration`,
@@ -16,7 +16,7 @@
 //!   with the `TIDX` index + `TBLM` bloom built from the chronological
 //!   `trace_id` column, the `EVNB`/`LNKB` event/link chunks fed by the
 //!   structured lists, and the trace rollup capturing the `name`/`_kind`/
-//!   `status_code` facets plus the resource's `service.name`.
+//!   `status.code` facets plus the resource's `service.name`.
 //!
 //! [`prepare_trace_frame`] is the single normalize → flatten → encode recipe;
 //! producers: `ng-ingest::write_trace_request` (no bounds — dev/bench) and the
@@ -59,8 +59,8 @@ pub struct SpanScopeGroup {
 
 /// One span: its per-row columns, its flattened entries, and its structured
 /// sub-objects (span analog of [`crate::logs::Record`]). Carries every OTLP
-/// `Span` field: the scalar facets (`name`, `kind`, `status_code`,
-/// `trace_state`, `status_message`) and `attributes.*` live in
+/// `Span` field: the scalar facets (`name`, `kind`, `status.code`,
+/// `status.message`, `trace_state`) and `attributes.*` live in
 /// [`entries`](Self::entries); events and links are the structured lists
 /// ([`EventRecord`] / [`LinkRecord`]) whose searchable parts double as entries
 /// at seal time.

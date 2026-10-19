@@ -2185,7 +2185,7 @@ mod tests {
                     vec!["svc".into()],
                     vec![],
                 ),
-                PlanTerm::tokens("status_code", vec!["ERROR".into()], vec![]),
+                PlanTerm::tokens("status.code", vec!["ERROR".into()], vec![]),
                 PlanTerm::tokens("attributes.http.method", vec![], vec!["GET|PUT".into()]),
                 // Both duration bounds intersect into ONE interval term.
                 PlanTerm::duration(Some(101), Some(500)),
@@ -2308,7 +2308,7 @@ mod tests {
                 ("resource.attributes.service.name".into(), "svc".into()),
                 ("name".into(), "GET /".into()),
                 ("kind".into(), "SERVER".into()),
-                ("status_code".into(), "ERROR".into()),
+                ("status.code".into(), "ERROR".into()),
                 ("attributes.team".into(), "a".into()),
                 ("attributes.team".into(), "b".into()),
             ],
@@ -2791,7 +2791,7 @@ mod tests {
 
     /// Free text lowers to one field-set term over the text scope: the
     /// name, status message and event names, and every attribute
-    /// owner's fields — not `kind`, `status_code` or the scope name.
+    /// owner's fields — not `kind`, `status.code` or the scope name.
     #[test]
     fn free_text_lowers_to_the_text_scope() {
         let plan = group(vec![free_text("Abc")]).to_trace_plan();
@@ -2799,7 +2799,7 @@ mod tests {
         assert_eq!(
             plan.terms,
             vec![PlanTerm::FieldsIn {
-                exact: strings(&["name", "status_message", "events.name"]),
+                exact: strings(&["name", "status.message", "events.name"]),
                 prefixes: strings(&[
                     "resource.attributes.",
                     "attributes.",
@@ -2824,7 +2824,7 @@ mod tests {
             ("links.attributes.", "a.b", true),
             ("attributes.http.url", "", true),
             ("kind", "", false),
-            ("status_code", "", false),
+            ("status.code", "", false),
             ("scope.name", "", false),
             ("events.", "name", true),
             ("events.", "names", false),

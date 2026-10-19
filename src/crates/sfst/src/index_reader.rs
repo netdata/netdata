@@ -190,8 +190,8 @@ pub struct IndexReader<'a> {
 }
 
 /// One materialized span of a reconstructed trace: its ids, timing, per-row
-/// scalars, attribute facets (`name`, `kind`, `status_code`, `trace_state`,
-/// `status_message`, `attributes.*`) as flat `(key, value)` pairs, and its
+/// scalars, attribute facets (`name`, `kind`, `status.code`, `trace_state`,
+/// `status.message`, `attributes.*`) as flat `(key, value)` pairs, and its
 /// structured events/links (from the `EVNB`/`LNKB` chunks; empty when the
 /// file predates them or the span has none). Built by
 /// [`IndexReader::trace_by_id`] and the cross-source combiner alike.

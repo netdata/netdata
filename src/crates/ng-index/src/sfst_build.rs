@@ -408,7 +408,7 @@ fn populate_trace_row_index(
     const ROLLUP_SERVICE_KEY: &str = "resource.attributes.service.name";
     const ROLLUP_NAME_KEY: &str = "name";
     const ROLLUP_KIND_RAW_KEY: &str = "_kind";
-    const ROLLUP_STATUS_KEY: &str = "status_code";
+    const ROLLUP_STATUS_KEY: &str = "status.code";
 
     let mut rollup = sfst::TraceRollupRows::new();
     let mut trace_ids = TraceIds::default();
@@ -562,7 +562,7 @@ fn populate_trace_row_index(
                     // first entry, `kind` on the first Int-valued one,
                     // `status` on the first of any type; the finer nuances
                     // are unreachable from ingest because the flattener emits
-                    // `_kind` only as Int and `status_code` only as Str
+                    // `_kind` only as Int and `status.code` only as Str
                     // (ng-flatten common.rs). Honest OTLP spans carry each of
                     // these exactly once.
                     {

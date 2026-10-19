@@ -577,26 +577,28 @@ impl Flattener {
     }
 
     /// Flatten a span's own fields — the queryable scalar facets (`name`, `kind`,
-    /// `status_code`, `trace_state`, `status_message`), `attributes.*`, and the
-    /// structured `events[]` / `links[]` lists. Identifier/timing fields
-    /// (`trace_id`, `span_id`, `parent_span_id`, start/duration, `flags`, the
-    /// dropped counts) are carried as per-row scalars on
+    /// `status.code`, `status.message`, `trace_state`), `attributes.*`, and the
+    /// structured `events[]` / `links[]` lists. Facet names are OTLP field paths
+    /// (the status lives under a `status` node, as in OTLP). Identifier/timing
+    /// fields (`trace_id`, `span_id`, `parent_span_id`, start/duration, `flags`,
+    /// the dropped counts) are carried as per-row scalars on
     /// [`crate::traces::SpanRecord`], not as entries — same split as
     /// [`Flattener::flatten_record`] for logs.
     ///
-    /// Enum facets (`kind`, `status_code`) store **both** representations:
-    /// - the clean name (`kind`, `status_code`) carries the user-facing **label**
-    ///   (`SERVER`, `ERROR`, …) — what an operator queries;
-    /// - the `_`-prefixed name (`_kind`, `_status_code`) carries the raw **int** —
-    ///   lossless and forward-compatible when unknown future variants appear.
+    /// Enum facets (`kind`, `status.code`) store **both** representations:
+    /// - the clean name (`kind`, `status.code`) carries the user-facing **label**
+    ///   (`SERVER`, `ERROR`, …) — what an operator queries; a variant unknown to
+    ///   this build is labelled with its decimal number, so the label is total;
+    /// - the `_`-prefixed name (`_kind`, `_status_code`) carries the raw **int**,
+    ///   for the seal's rollup and other internal readers; it never surfaces as
+    ///   a key.
     ///
-    /// The raw int is always emitted; the label only for a known variant.
     /// Defaults are stored too (`UNSPECIFIED` kind; `UNSET` status — also what
     /// an absent status object means), so they stay filterable and enumerable.
     /// This dual form is span-specific: `SpanKind`/`StatusCode` are closed enums
     /// whose labels are worth indexing, unlike the open numeric
     /// `severity_number`. `trace_state` is carried **verbatim** (it can carry the
-    /// OpenTelemetry sampling threshold, `ot=th:`); `status_message` is emitted
+    /// OpenTelemetry sampling threshold, `ot=th:`); `status.message` is emitted
     /// whenever non-empty, independent of the status code.
     pub fn flatten_span(&mut self, span: Span) -> FlattenedSpan {
         let mut out = Vec::new();
@@ -606,9 +608,7 @@ impl Flattener {
         }
 
         // UNSPECIFIED (0) is stored as itself, never rewritten to INTERNAL.
-        if let Some(label) = span_kind_label(span.kind) {
-            self.scalar("kind", Value::Str(label.to_string()), &mut out);
-        }
+        self.scalar("kind", Value::Str(span_kind_label(span.kind)), &mut out);
         self.scalar("_kind", Value::Int(span.kind as i64), &mut out);
 
         if !span.trace_state.is_empty() {
@@ -617,12 +617,21 @@ impl Flattener {
 
         // An absent status object is the OTel default: UNSET.
         let status = span.status.unwrap_or_default();
-        if let Some(label) = status_code_label(status.code) {
-            self.scalar("status_code", Value::Str(label.to_string()), &mut out);
-        }
+        let status_node = self.descend(ROOT, &["status"]);
+        self.emit(
+            status_node,
+            StepRef::Field("code"),
+            Value::Str(status_code_label(status.code)),
+            &mut out,
+        );
         self.scalar("_status_code", Value::Int(status.code as i64), &mut out);
         if !status.message.is_empty() {
-            self.scalar("status_message", Value::Str(status.message), &mut out);
+            self.emit(
+                status_node,
+                StepRef::Field("message"),
+                Value::Str(status.message),
+                &mut out,
+            );
         }
 
         if !span.attributes.is_empty() {
@@ -697,28 +706,29 @@ impl Flattener {
     }
 }
 
-/// Readable label for an OTLP `SpanKind`, or `None` for an unknown (future)
-/// variant — the caller still stores the raw int for those.
-fn span_kind_label(kind: i32) -> Option<&'static str> {
+/// Label for an OTLP `SpanKind`: the proto value name without its
+/// `SPAN_KIND_` prefix, or the decimal number for a variant this build does
+/// not know, so the label field stays total and filterable.
+fn span_kind_label(kind: i32) -> String {
     match kind {
-        0 => Some("UNSPECIFIED"),
-        1 => Some("INTERNAL"),
-        2 => Some("SERVER"),
-        3 => Some("CLIENT"),
-        4 => Some("PRODUCER"),
-        5 => Some("CONSUMER"),
-        _ => None,
+        0 => "UNSPECIFIED".to_string(),
+        1 => "INTERNAL".to_string(),
+        2 => "SERVER".to_string(),
+        3 => "CLIENT".to_string(),
+        4 => "PRODUCER".to_string(),
+        5 => "CONSUMER".to_string(),
+        other => other.to_string(),
     }
 }
 
-/// Readable label for an OTLP `Status.StatusCode`, or `None` for an unknown
-/// variant — the caller still stores the raw int for those.
-fn status_code_label(code: i32) -> Option<&'static str> {
+/// Label for an OTLP `Status.StatusCode`: the proto value name without its
+/// `STATUS_CODE_` prefix, or the decimal number for an unknown variant.
+fn status_code_label(code: i32) -> String {
     match code {
-        0 => Some("UNSET"),
-        1 => Some("OK"),
-        2 => Some("ERROR"),
-        _ => None,
+        0 => "UNSET".to_string(),
+        1 => "OK".to_string(),
+        2 => "ERROR".to_string(),
+        other => other.to_string(),
     }
 }
 
