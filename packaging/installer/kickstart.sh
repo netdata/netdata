@@ -2,7 +2,7 @@
 #
 # SPDX-License-Identifier: GPL-3.0-or-later
 #
-# Next unused error code: F052E
+# Next unused error code: F052F
 
 # ======================================================================
 # Constants
@@ -2561,6 +2561,8 @@ prepare_offline_install_source() {
   if [ -e "${1}" ]; then
     if [ ! -d "${1}" ]; then
       fatal "${1} is not a directory, unable to prepare offline install source." F0503
+    elif [ -n "$(find "${1}" -mindepth 1 -print)" ]; then
+      fatal "${1} already contains files. Either specify a different directory, or remove the files." F052E
     fi
   else
     run mkdir -p "${1}" || fatal "Unable to create target directory for offline install preparation." F0504
