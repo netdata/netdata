@@ -199,7 +199,19 @@ static size_t query_planer_expand_duration_in_points(time_t this_update_every, t
     return points;
 }
 
-static void query_planer_initialize_plans(QUERY_ENGINE_OPS *ops) {
+static void query_planer_initialize_plan(QUERY_ENGINE_OPS *ops, size_t p) {
+    QUERY_METRIC *qm = ops->qm;
+    size_t tier = qm->plan.array[p].tier;
+    ops->r->internal.qt->db.tiers[tier].queries++;
+    STORAGE_ENGINE *eng = query_metric_storage_engine(ops->r->internal.qt, qm, tier);
+    storage_engine_query_init(eng->seb, qm->tiers[tier].smh, &ops->plans[p].handle,
+                              ops->plans[p].expanded_after, ops->plans[p].expanded_before,
+                              ops->r->internal.qt->request.priority);
+    ops->plans[p].initialized = true;
+    ops->plans[p].finalized = false;
+}
+
+static void query_planer_initialize_plans(QUERY_ENGINE_OPS *ops, size_t first_plan) {
     QUERY_METRIC *qm = ops->qm;
 
     for(size_t p = 0; p < qm->plan.used ; p++) {
@@ -233,18 +245,20 @@ static void query_planer_initialize_plans(QUERY_ENGINE_OPS *ops) {
         time_t after = qm->plan.array[p].after - (time_t)(update_every * points_to_add_to_after);
         time_t before = qm->plan.array[p].before + (time_t)(update_every * points_to_add_to_before);
 
+        if(p > 0 && tier < qm->plan.array[p - 1].tier &&
+           qm->plan.array[p].after > qm->plan.array[p - 1].before) {
+            // Inclusive read endpoints must not truncate a disconnected older island.
+            time_t floor;
+            if(__builtin_add_overflow(qm->plan.array[p - 1].before, update_every, &floor))
+                floor = nd_time_t_max();
+            after = MAX(after, MIN(floor, qm->plan.array[p].after));
+        }
+
         ops->plans[p].expanded_after = after;
         ops->plans[p].expanded_before = before;
 
-        ops->r->internal.qt->db.tiers[tier].queries++;
-
-        struct query_metric_tier *tier_ptr = &qm->tiers[tier];
-        STORAGE_ENGINE *eng = query_metric_storage_engine(ops->r->internal.qt, qm, tier);
-        storage_engine_query_init(eng->seb, tier_ptr->smh, &ops->plans[p].handle,
-                                  after, before, ops->r->internal.qt->request.priority);
-
-        ops->plans[p].initialized = true;
-        ops->plans[p].finalized = false;
+        if(p >= first_plan)
+            query_planer_initialize_plan(ops, p);
     }
 }
 
@@ -256,6 +270,8 @@ static void query_planer_finalize_plan(QUERY_ENGINE_OPS *ops, size_t plan_id) {
         ops->plans[plan_id].initialized = false;
         ops->plans[plan_id].finalized = true;
     }
+    if(ops->pending_head && ops->pending_head_plan == plan_id)
+        ops->pending_head = false;
 }
 
 void query_planer_finalize_remaining_plans(QUERY_ENGINE_OPS *ops) {
@@ -299,10 +315,21 @@ static void query_planer_set_active_plan(QUERY_ENGINE_OPS *ops, size_t plan_id, 
     ops->seqh = &ops->plans[plan_id].handle;
     ops->current_plan = plan_id;
 
-    if(plan_id + 1 < qm->plan.used && qm->plan.array[plan_id + 1].after < qm->plan.array[plan_id].before)
-        query_planer_set_expire_time(ops, qm->plan.array[plan_id + 1].after);
-    else
-        query_planer_set_expire_time(ops, qm->plan.array[plan_id].before);
+    time_t expire_time = qm->plan.array[plan_id].before;
+    ops->plan_switch_time_offset = ops->point_mode == QUERY_POINT_MODE_TOTAL ? ops->view_update_every : 0;
+    if(plan_id + 1 < qm->plan.used) {
+        QUERY_PLAN_ENTRY *next = &qm->plan.array[plan_id + 1];
+        expire_time = MIN(expire_time, next->after);
+        if(next->tier > ops->tier) {
+            // Read the fine prefix before switching, and hand over between complete coarse records.
+            ops->plan_switch_time_offset = ops->view_update_every;
+            time_t dt = qm->tiers[next->tier].db_update_every_s;
+            time_t first_start = qm->tiers[next->tier].db_first_time_s - dt;
+            if(dt > 0 && expire_time >= first_start)
+                expire_time -= (expire_time - first_start) % dt;
+        }
+    }
+    query_planer_set_expire_time(ops, expire_time);
 
     ops->plan_expanded_after = ops->plans[plan_id].expanded_after;
     ops->plan_expanded_before = ops->plans[plan_id].expanded_before;
@@ -347,10 +374,122 @@ bool query_planer_next_plan(QUERY_ENGINE_OPS *ops, time_t now, time_t last_point
     return true;
 }
 
-static int compare_query_plan_entries_on_start_time(const void *a, const void *b) {
-    QUERY_PLAN_ENTRY *p1 = (QUERY_PLAN_ENTRY *)a;
-    QUERY_PLAN_ENTRY *p2 = (QUERY_PLAN_ENTRY *)b;
-    return (p1->after < p2->after)?-1:1;
+static int compare_query_plan_boundaries(const void *a, const void *b) {
+    time_t t1 = *(const time_t *)a;
+    time_t t2 = *(const time_t *)b;
+    return (t1 > t2) - (t1 < t2);
+}
+
+static int compare_query_plan_entries(const void *a, const void *b) {
+    const QUERY_PLAN_ENTRY *p1 = a, *p2 = b;
+    return (p1->after > p2->after) - (p1->after < p2->after);
+}
+
+static bool query_plan_fill_coverage(QUERY_ENGINE_OPS *ops, size_t selected_tier,
+                                     time_t after_wanted, time_t before_wanted) {
+    QUERY_METRIC *qm = ops->qm;
+    time_t boundaries[2 * RRD_STORAGE_TIERS];
+    size_t boundaries_used = 0;
+    size_t head_order[RRD_STORAGE_TIERS], tail_order[RRD_STORAGE_TIERS];
+    size_t head_used = 0, tail_used = 0;
+
+    head_order[head_used++] = tail_order[tail_used++] = selected_tier;
+    for(size_t tier = selected_tier + 1; tier < nd_profile.storage_tiers; tier++)
+        head_order[head_used++] = tier;
+    for(size_t tier = selected_tier; tier > 0; tier--)
+        head_order[head_used++] = tail_order[tail_used++] = tier - 1;
+    for(size_t tier = selected_tier + 1; tier < nd_profile.storage_tiers; tier++)
+        tail_order[tail_used++] = tier;
+
+    for(size_t tier = 0; tier < nd_profile.storage_tiers; tier++) {
+        if(!query_metric_tier_overlaps_timeframe(qm, tier, after_wanted, before_wanted))
+            continue;
+
+        time_t after = MAX(after_wanted, qm->tiers[tier].db_first_time_s);
+        time_t before = MIN(before_wanted, qm->tiers[tier].db_last_time_s);
+        if(after >= before)
+            continue;
+
+        boundaries[boundaries_used++] = after;
+        boundaries[boundaries_used++] = before;
+    }
+
+    qsort(boundaries, boundaries_used, sizeof(*boundaries), compare_query_plan_boundaries);
+    qm->plan.used = 0;
+    for(size_t b = 1; b < boundaries_used; b++) {
+        time_t after = boundaries[b - 1], before = boundaries[b];
+        if(after == before)
+            continue;
+
+        // Preserve normal head/tail preference, but never assume retention follows tier order.
+        const size_t *order = after < qm->tiers[selected_tier].db_first_time_s ? head_order : tail_order;
+        for(size_t p = 0; p < nd_profile.storage_tiers; p++) {
+            size_t tier = order[p];
+            if(!query_metric_is_valid_tier(qm, tier) ||
+               qm->tiers[tier].db_first_time_s > after || qm->tiers[tier].db_last_time_s < before)
+                continue;
+
+            if(qm->plan.used && qm->plan.array[qm->plan.used - 1].tier == tier &&
+               qm->plan.array[qm->plan.used - 1].before == after)
+                qm->plan.array[qm->plan.used - 1].before = before;
+            else {
+                if(qm->plan.used >= QUERY_PLANS_MAX)
+                    return false;
+
+                qm->plan.array[qm->plan.used++] = (QUERY_PLAN_ENTRY){
+                    .tier = tier, .after = after, .before = before,
+                };
+            }
+            break;
+        }
+    }
+
+    // Retention timestamps are sample endpoints: a clipped single point is still data.
+    for(size_t p = 0; p < nd_profile.storage_tiers; p++) {
+        size_t tier = head_order[p];
+        if(!query_metric_tier_overlaps_timeframe(qm, tier, after_wanted, before_wanted))
+            continue;
+
+        time_t after = MAX(after_wanted, qm->tiers[tier].db_first_time_s);
+        time_t before = MIN(before_wanted, qm->tiers[tier].db_last_time_s);
+        if(after != before)
+            continue;
+
+        bool covered = false;
+        for(size_t i = 0; i < qm->plan.used; i++) {
+            if(qm->plan.array[i].after <= after && qm->plan.array[i].before >= before) {
+                covered = true;
+                break;
+            }
+        }
+        if(covered)
+            continue;
+
+        const size_t *order = after < qm->tiers[selected_tier].db_first_time_s ? head_order : tail_order;
+        for(size_t i = 0; i < nd_profile.storage_tiers; i++) {
+            size_t candidate = order[i];
+            if(query_metric_tier_overlaps_timeframe(qm, candidate, after, before)) {
+                tier = candidate;
+                break;
+            }
+        }
+
+        if(qm->plan.used >= QUERY_PLANS_MAX)
+            return false;
+        qm->plan.array[qm->plan.used++] = (QUERY_PLAN_ENTRY){
+            .tier = tier, .after = after, .before = before,
+        };
+    }
+    if(qm->plan.used > 1)
+        qsort(qm->plan.array, qm->plan.used, sizeof(*qm->plan.array), compare_query_plan_entries);
+
+    // Keep an isolated point readable until the next plan starts, including on coarse output grids.
+    for(size_t p = 0; p + 1 < qm->plan.used; p++) {
+        if(qm->plan.array[p].after == qm->plan.array[p].before)
+            qm->plan.array[p].before = qm->plan.array[p + 1].after;
+    }
+
+    return qm->plan.used != 0;
 }
 
 static bool query_plan_build_entries(QUERY_ENGINE_OPS *ops, time_t after_wanted, time_t before_wanted, size_t points_wanted) {
@@ -383,89 +522,11 @@ static bool query_plan_build_entries(QUERY_ENGINE_OPS *ops, time_t after_wanted,
     qm->plan.array[0].after = (qm->tiers[selected_tier].db_first_time_s < after_wanted) ? after_wanted : qm->tiers[selected_tier].db_first_time_s;
     qm->plan.array[0].before = (qm->tiers[selected_tier].db_last_time_s > before_wanted) ? before_wanted : qm->tiers[selected_tier].db_last_time_s;
 
-    if(switch_tiers) {
-        // the selected tier
-        time_t selected_tier_first_time_s = qm->plan.array[0].after;
-        time_t selected_tier_last_time_s = qm->plan.array[0].before;
-
-        // check if our selected tier can start the query
-        if (selected_tier_first_time_s > after_wanted) {
-            // we need some help from other tiers
-            for (size_t tr = (int)selected_tier + 1; tr < nd_profile.storage_tiers && qm->plan.used < QUERY_PLANS_MAX ; tr++) {
-                if(!query_metric_is_valid_tier(qm, tr))
-                    continue;
-
-                // find the first time of this tier
-                time_t tier_first_time_s = qm->tiers[tr].db_first_time_s;
-                time_t tier_last_time_s = qm->tiers[tr].db_last_time_s;
-
-                // can it help?
-                if (tier_first_time_s < selected_tier_first_time_s && tier_first_time_s <= before_wanted && tier_last_time_s >= after_wanted) {
-                    // it can help us add detail at the beginning of the query
-                    QUERY_PLAN_ENTRY t = {
-                        .tier = tr,
-                        .after = (tier_first_time_s < after_wanted) ? after_wanted : tier_first_time_s,
-                        .before = selected_tier_first_time_s,
-                    };
-
-                    if(!query_plan_entry_is_valid(qm, &t, after_wanted, before_wanted))
-                        return false;
-
-                    ops->plans[qm->plan.used].initialized = false;
-                    ops->plans[qm->plan.used].finalized = false;
-                    qm->plan.array[qm->plan.used++] = t;
-
-                    // prepare for the tier
-                    selected_tier_first_time_s = t.after;
-
-                    if (t.after <= after_wanted)
-                        break;
-                }
-            }
-        }
-
-        // check if our selected tier can finish the query
-        if (selected_tier_last_time_s < before_wanted) {
-            // we need some help from other tiers
-            for (int tr = (int)selected_tier - 1; tr >= 0 && qm->plan.used < QUERY_PLANS_MAX ; tr--) {
-                if(!query_metric_is_valid_tier(qm, tr))
-                    continue;
-
-                // find the last time of this tier
-                time_t tier_first_time_s = qm->tiers[tr].db_first_time_s;
-                time_t tier_last_time_s = qm->tiers[tr].db_last_time_s;
-
-                //buffer_sprintf(wb, ": EVAL BEFORE tier %d, %ld", tier, last_time_s);
-
-                // can it help?
-                if (tier_last_time_s > selected_tier_last_time_s && tier_first_time_s <= before_wanted && tier_last_time_s >= after_wanted) {
-                    // it can help us add detail at the end of the query
-                    QUERY_PLAN_ENTRY t = {
-                        .tier = tr,
-                        .after = selected_tier_last_time_s,
-                        .before = (tier_last_time_s > before_wanted) ? before_wanted : tier_last_time_s,
-                    };
-
-                    if(!query_plan_entry_is_valid(qm, &t, after_wanted, before_wanted))
-                        return false;
-
-                    ops->plans[qm->plan.used].initialized = false;
-                    ops->plans[qm->plan.used].finalized = false;
-                    qm->plan.array[qm->plan.used++] = t;
-
-                    // prepare for the tier
-                    selected_tier_last_time_s = t.before;
-
-                    if (t.before >= before_wanted)
-                        break;
-                }
-            }
-        }
+    if(switch_tiers && (qm->plan.array[0].after > after_wanted || qm->plan.array[0].before < before_wanted)) {
+        if(!query_plan_fill_coverage(ops, selected_tier, after_wanted, before_wanted))
+            return false;
     }
 
-    // sort the query plan
-    if(qm->plan.used > 1)
-        qsort(&qm->plan.array, qm->plan.used, sizeof(QUERY_PLAN_ENTRY), compare_query_plan_entries_on_start_time);
 
     for(size_t p = 0; p < qm->plan.used ;p++) {
         if(!query_plan_entry_is_valid(qm, &qm->plan.array[p], after_wanted, before_wanted))
@@ -475,17 +536,56 @@ static bool query_plan_build_entries(QUERY_ENGINE_OPS *ops, time_t after_wanted,
     return true;
 }
 
+static size_t query_planer_head_candidate(QUERY_ENGINE_OPS *ops) {
+    QUERY_TARGET *qt = ops->r->internal.qt;
+    QUERY_METRIC *qm = ops->qm;
+    size_t selected_tier = qm->plan.used > 1 ?
+        query_metric_best_tier_for_timeframe(qm, qt->window.after, qt->window.before, qt->window.points) :
+        qm->plan.array[0].tier;
+    size_t selected_plan = 0;
+    while(selected_plan < qm->plan.used && qm->plan.array[selected_plan].tier < selected_tier)
+        selected_plan++;
+    if(selected_plan > 0 && selected_plan < qm->plan.used &&
+       qm->plan.array[selected_plan].tier == selected_tier &&
+       qm->plan.array[selected_plan].after == qm->tiers[selected_tier].db_first_time_s)
+        return selected_plan;
+    return 0;
+}
+
 static bool query_plan(QUERY_ENGINE_OPS *ops, time_t after_wanted, time_t before_wanted, size_t points_wanted) {
     if(!query_plan_build_entries(ops, after_wanted, before_wanted, points_wanted))
         return false;
 
-    query_planer_initialize_plans(ops);
-    if(!query_planer_activate_plan(ops, 0, 0)) {
+    size_t first_plan = query_planer_head_candidate(ops);
+    query_planer_initialize_plans(ops, first_plan);
+    if(!query_planer_activate_plan(ops, first_plan, 0)) {
         query_planer_finalize_remaining_plans(ops);
         return false;
     }
 
     return true;
+}
+
+void query_planer_prefer_complete_head(QUERY_ENGINE_OPS *ops) {
+    // Storage reads belong to execution, after the other dimensions have been prefetched.
+    size_t selected_plan = ops->current_plan;
+    QUERY_METRIC *qm = ops->qm;
+    if(selected_plan > 0) {
+        // A coarse retention timestamp is an endpoint, not the beginning of its first record.
+        // Read the actual interval: historical pages need not use the current collection interval.
+        STORAGE_POINT first = query_planer_next_metric(ops);
+        ops->pending_head_point = first;
+        ops->pending_head_plan = selected_plan;
+        ops->pending_head = true;
+        if(storage_point_is_gap(first) || storage_point_is_unset(first) ||
+           first.start_time_s > qm->plan.array[0].after ||
+           first.end_time_s < qm->plan.array[selected_plan - 1].before) {
+            // Preserve the selected probe until the deferred fine prefix reaches that plan.
+            for(size_t p = 0; p < selected_plan; p++)
+                query_planer_initialize_plan(ops, p);
+            query_planer_set_active_plan(ops, 0, 0);
+        }
+    }
 }
 
 
@@ -752,10 +852,15 @@ static int query_plan_unittest_expect_ops_cache_is_local(void) {
     QUERY_ENGINE_OPS_CACHE cache_b = { 0 };
 
     QUERY_ENGINE_OPS *a = rrd2rrdr_query_ops_get(&r_a, &cache_a);
+    a->pending_head = true;
+    a->pending_head_plan = QUERY_PLANS_MAX - 1;
+    a->pending_head_point = (STORAGE_POINT){.start_time_s = 10, .end_time_s = 20, .count = 1};
     rrd2rrdr_query_ops_release(&cache_a, a);
 
     QUERY_ENGINE_OPS *a_reused = rrd2rrdr_query_ops_get(&r_a, &cache_a);
     bool same_cache_reused = (a_reused == a);
+    bool pending_cleared = !a_reused->pending_head && a_reused->pending_head_plan == 0 &&
+                           a_reused->pending_head_point.end_time_s == 0;
     rrd2rrdr_query_ops_release(&cache_a, a_reused);
 
     QUERY_ENGINE_OPS *b = rrd2rrdr_query_ops_get(&r_b, &cache_b);
@@ -767,15 +872,15 @@ static int query_plan_unittest_expect_ops_cache_is_local(void) {
     onewayalloc_destroy(owa_a);
     onewayalloc_destroy(owa_b);
 
-    if(same_cache_reused && separate_cache_isolated) {
+    if(same_cache_reused && separate_cache_isolated && pending_cleared) {
         fprintf(stderr, "OK query ops cache locality\n");
         return 0;
     }
 
     fprintf(stderr,
-            "FAILED query ops cache locality: same_cache_reused=%s, separate_cache_isolated=%s\n",
+            "FAILED query ops cache locality: same_cache_reused=%s, separate_cache_isolated=%s, pending_cleared=%s\n",
             same_cache_reused ? "true" : "false",
-            separate_cache_isolated ? "true" : "false");
+            separate_cache_isolated ? "true" : "false", pending_cleared ? "true" : "false");
     return 1;
 }
 
@@ -1084,6 +1189,166 @@ int query_plan_unittest(void) {
     }
 
     {
+        QUERY_METRIC qm = {0};
+        query_plan_unittest_set_tier(&qm, 0, 50, 250, 1);
+        query_plan_unittest_set_tier(&qm, 1, 100, 250, 10);
+        QUERY_PLAN_ENTRY expected[] = {
+            { .tier = 0, .after = 50, .before = 100 },
+            { .tier = 1, .after = 100, .before = 250 },
+        };
+        errors += query_plan_unittest_expect_plan(
+            "finer tier fills older history", &qm, 0, 0, 50, 250, 20, expected, _countof(expected));
+    }
+
+    {
+        QUERY_METRIC qm = {0};
+        query_plan_unittest_set_tier(&qm, 0, 50, 100, 1);
+        query_plan_unittest_set_tier(&qm, 1, 50, 250, 60);
+        QUERY_PLAN_ENTRY expected[] = {
+            { .tier = 0, .after = 50, .before = 100 },
+            { .tier = 1, .after = 100, .before = 250 },
+        };
+        errors += query_plan_unittest_expect_plan(
+            "coarser tier fills newer history", &qm, 0, 0, 50, 250, 100, expected, _countof(expected));
+    }
+
+    {
+        QUERY_METRIC qm = {0};
+        query_plan_unittest_set_tier(&qm, 0, 10, 250, 1);
+        query_plan_unittest_set_tier(&qm, 1, 50, 200, 10);
+        query_plan_unittest_set_tier(&qm, 2, 100, 150, 20);
+        QUERY_PLAN_ENTRY expected[] = {
+            { .tier = 0, .after = 10, .before = 50 },
+            { .tier = 1, .after = 50, .before = 100 },
+            { .tier = 2, .after = 100, .before = 150 },
+            { .tier = 1, .after = 150, .before = 200 },
+            { .tier = 0, .after = 200, .before = 250 },
+        };
+        errors += query_plan_unittest_expect_plan(
+            "nested tiers fill both sides without losing segments", &qm, 0, 0,
+            10, 250, 20, expected, _countof(expected));
+    }
+
+    {
+        QUERY_METRIC qm = {0};
+        query_plan_unittest_set_tier(&qm, 0, 30, 70, 1);
+        query_plan_unittest_set_tier(&qm, 1, 80, 100, 10);
+        query_plan_unittest_set_tier(&qm, 2, 10, 20, 60);
+        QUERY_PLAN_ENTRY expected[] = {
+            { .tier = 2, .after = 10, .before = 20 },
+            { .tier = 0, .after = 30, .before = 70 },
+            { .tier = 1, .after = 80, .before = 100 },
+        };
+        errors += query_plan_unittest_expect_plan(
+            "disconnected head retention keeps islands and gaps", &qm, 0, 0,
+            10, 100, 12, expected, _countof(expected));
+    }
+
+    {
+        QUERY_METRIC qm = {0};
+        query_plan_unittest_set_tier(&qm, 0, 80, 100, 1);
+        query_plan_unittest_set_tier(&qm, 1, 10, 20, 10);
+        query_plan_unittest_set_tier(&qm, 2, 30, 70, 60);
+        QUERY_PLAN_ENTRY expected[] = {
+            { .tier = 1, .after = 10, .before = 20 },
+            { .tier = 2, .after = 30, .before = 70 },
+            { .tier = 0, .after = 80, .before = 100 },
+        };
+        errors += query_plan_unittest_expect_plan(
+            "disconnected tail retention keeps islands and gaps", &qm, 0, 0,
+            10, 100, 12, expected, _countof(expected));
+    }
+
+    {
+        QUERY_METRIC qm = {0};
+        query_plan_unittest_set_tier(&qm, 0, 10, 250, 1);
+        query_plan_unittest_set_tier(&qm, 1, 100, 150, 10);
+        QUERY_PLAN_ENTRY expected[] = {
+            { .tier = 1, .after = 100, .before = 150 },
+        };
+        errors += query_plan_unittest_expect_plan(
+            "explicit tier keeps inverted retention isolated", &qm, RRDR_OPTION_SELECTED_TIER, 1,
+            10, 250, 20, expected, _countof(expected));
+    }
+
+    {
+        QUERY_METRIC qm = {0};
+        query_plan_unittest_set_tier(&qm, 0, 10, 100, 1);
+        query_plan_unittest_set_tier(&qm, 1, 100, 200, 10);
+        QUERY_PLAN_ENTRY expected[] = {
+            { .tier = 0, .after = 10, .before = 100 },
+            { .tier = 1, .after = 100, .before = 200 },
+        };
+        errors += query_plan_unittest_expect_plan(
+            "touching inverted retention has no gap", &qm, 0, 0,
+            10, 200, 20, expected, _countof(expected));
+    }
+
+    {
+        QUERY_METRIC qm = {0};
+        query_plan_unittest_set_tier(&qm, 0, 10, 200, 1);
+        QUERY_PLAN_ENTRY expected[] = {
+            { .tier = 0, .after = 100, .before = 100 },
+        };
+        errors += query_plan_unittest_expect_plan(
+            "single timestamp retains existing plan", &qm, 0, 0,
+            100, 100, 1, expected, _countof(expected));
+    }
+
+    {
+        QUERY_METRIC qm = {0};
+        query_plan_unittest_set_tier(&qm, 0, 150, 250, 1);
+        query_plan_unittest_set_tier(&qm, 1, 50, 100, 10);
+        QUERY_PLAN_ENTRY expected[] = {
+            { .tier = 1, .after = 50, .before = 100 },
+            { .tier = 0, .after = 150, .before = 150 },
+        };
+        errors += query_plan_unittest_expect_plan(
+            "sample exactly at query end remains available", &qm, 0, 0,
+            50, 150, 20, expected, _countof(expected));
+    }
+
+    {
+        QUERY_METRIC qm = {0};
+        query_plan_unittest_set_tier(&qm, 0, 50, 100, 1);
+        query_plan_unittest_set_tier(&qm, 1, 150, 150, 60);
+        QUERY_PLAN_ENTRY expected[] = {
+            { .tier = 0, .after = 50, .before = 100 },
+            { .tier = 1, .after = 150, .before = 150 },
+        };
+        errors += query_plan_unittest_expect_plan(
+            "isolated single-sample tier remains available", &qm, 0, 0,
+            50, 200, 100, expected, _countof(expected));
+    }
+
+    {
+        QUERY_METRIC qm = {0};
+        query_plan_unittest_set_tier(&qm, 0, 100, 200, 1);
+        query_plan_unittest_set_tier(&qm, 1, 50, 50, 60);
+        QUERY_PLAN_ENTRY expected[] = {
+            { .tier = 1, .after = 50, .before = 100 },
+            { .tier = 0, .after = 100, .before = 200 },
+        };
+        errors += query_plan_unittest_expect_plan(
+            "isolated head sample stays readable until the next tier", &qm, 0, 0,
+            40, 200, 100, expected, _countof(expected));
+    }
+
+    {
+        QUERY_METRIC qm = {0};
+        query_plan_unittest_set_tier(&qm, 0, 150, 150, 1);
+        query_plan_unittest_set_tier(&qm, 1, 50, 100, 10);
+        query_plan_unittest_set_tier(&qm, 2, 150, 150, 60);
+        QUERY_PLAN_ENTRY expected[] = {
+            { .tier = 1, .after = 50, .before = 100 },
+            { .tier = 0, .after = 150, .before = 150 },
+        };
+        errors += query_plan_unittest_expect_plan(
+            "isolated tail sample prefers a finer tier", &qm, 0, 0,
+            50, 200, 20, expected, _countof(expected));
+    }
+
+    {
         QUERY_METRIC metrics[2] = {0};
         QUERY_TARGET qt = {0};
 
@@ -1097,6 +1362,64 @@ int query_plan_unittest(void) {
 
     errors += query_plan_unittest_expect_ops_cache_is_local();
     errors += query_plan_unittest_expect_result_expiry();
+
+    {
+        QUERY_METRIC qm = {0};
+        query_plan_unittest_set_tier(&qm, 0, 1, 123, 1);
+        query_plan_unittest_set_tier(&qm, 1, 124, 324, 4);
+        qm.plan.used = 2;
+        qm.plan.array[0] = (QUERY_PLAN_ENTRY){ .tier = 0, .after = 1, .before = 123 };
+        qm.plan.array[1] = (QUERY_PLAN_ENTRY){ .tier = 1, .after = 124, .before = 324 };
+        QUERY_ENGINE_OPS ops = { .qm = &qm, .view_update_every = 8 };
+        query_planer_set_active_plan(&ops, 0, 0);
+        if(ops.current_plan_expire_time != 120 || ops.result_plan_expire_time != 128) {
+            fprintf(stderr, "FAILED fine-to-coarse handoff expiry\n");
+            errors++;
+        }
+        else
+            fprintf(stderr, "OK fine-to-coarse handoff expiry\n");
+
+        query_planer_set_active_plan(&ops, 1, 0);
+        if(ops.plan_switch_time_offset != 0 || ops.current_plan_expire_time != 324) {
+            fprintf(stderr, "FAILED handoff offset reset\n");
+            errors++;
+        }
+        else
+            fprintf(stderr, "OK handoff offset reset\n");
+    }
+
+    {
+        nd_profile.storage_tiers = 5;
+        QUERY_METRIC qm = {0};
+        query_plan_unittest_set_tier(&qm, 0, 100, 800, 1);
+        query_plan_unittest_set_tier(&qm, 1, 200, 700, 5);
+        query_plan_unittest_set_tier(&qm, 2, 500, 600, 10);
+        query_plan_unittest_set_tier(&qm, 3, 400, 900, 20);
+        query_plan_unittest_set_tier(&qm, 4, 300, 1000, 40);
+        QUERY_PLAN_ENTRY expected[] = {
+            { .tier = 0, .after = 100, .before = 200 },
+            { .tier = 1, .after = 200, .before = 300 },
+            { .tier = 4, .after = 300, .before = 400 },
+            { .tier = 3, .after = 400, .before = 500 },
+            { .tier = 2, .after = 500, .before = 600 },
+            { .tier = 1, .after = 600, .before = 700 },
+            { .tier = 0, .after = 700, .before = 800 },
+            { .tier = 3, .after = 800, .before = 900 },
+            { .tier = 4, .after = 900, .before = 1000 },
+        };
+        errors += query_plan_unittest_expect_best_tier(
+            "five-tier capacity fixture selects tier2", &qm, 100, 1000, 100, 2);
+        errors += query_plan_unittest_expect_plan(
+            "five-tier older coverage preserves fallback order", &qm, 0, 2,
+            100, 600, 100, expected, 5);
+        errors += query_plan_unittest_expect_plan(
+            "five-tier newer coverage preserves fallback order", &qm, 0, 2,
+            500, 1000, 100, &expected[4], 5);
+        errors += query_plan_unittest_expect_plan(
+            "five-tier coverage uses all nine plan entries", &qm, 0, 2,
+            100, 1000, 100, expected, _countof(expected));
+        nd_profile.storage_tiers = 3;
+    }
 
     nd_profile.storage_tiers = old_storage_tiers;
     nd_profile.update_every = old_update_every;
