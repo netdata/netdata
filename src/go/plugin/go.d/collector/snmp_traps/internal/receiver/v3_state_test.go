@@ -4,8 +4,11 @@ package receiver
 
 import (
 	"encoding/hex"
+	"io/fs"
+	"maps"
 	"net"
 	"os"
+	"path/filepath"
 	"testing"
 	"time"
 
@@ -108,7 +111,7 @@ func TestPrepareV3RollbackKeepsPreExistingEngineBootsPath(t *testing.T) {
 		USMUsers:          []USMUser{{Username: "testuser", EngineID: testEngineIDHex, AuthProto: "none", PrivProto: "none"}},
 		EngineIDWhitelist: []string{testEngineIDHex},
 	}), nil)
-	if err := recv.PrepareV3(root, jobName); err == nil {
+	if err := recv.PrepareV3(root, jobName, false); err == nil {
 		t.Fatal("expected engine-boots preparation failure")
 	}
 	if _, err := os.Stat(paths.localEngineID); !os.IsNotExist(err) {
@@ -342,7 +345,7 @@ func newStaticV3TestReceiver(t *testing.T, whitelist []string) (*Receiver, *rece
 		EngineIDWhitelist: whitelist,
 		LocalEngineID:     testLocalEngineIDHex,
 	}), recorder.report)
-	if err := recv.PrepareV3(t.TempDir(), "static-v3-test"); err != nil {
+	if err := recv.PrepareV3(t.TempDir(), "static-v3-test", false); err != nil {
 		t.Fatalf("prepare v3 receiver: %v", err)
 	}
 	t.Cleanup(recv.RollbackPreparedState)
@@ -492,5 +495,96 @@ func TestSendInformResponseV3AuthPriv(t *testing.T) {
 	}
 	if got := hex.EncodeToString([]byte(usp.AuthoritativeEngineID)); got != testLocalEngineIDHex {
 		t.Fatalf("response authoritative engine ID = %q, want %q", got, testLocalEngineIDHex)
+	}
+}
+
+// snapshotEngineState maps every file under root to its content.
+func snapshotEngineState(t *testing.T, root string) map[string]string {
+	t.Helper()
+	files := map[string]string{}
+	err := filepath.WalkDir(root, func(path string, d fs.DirEntry, err error) error {
+		if err != nil || d.IsDir() {
+			return err
+		}
+		data, err := os.ReadFile(path)
+		if err != nil {
+			return err
+		}
+		files[path] = string(data)
+		return nil
+	})
+	if err != nil {
+		t.Fatalf("walk %s: %v", root, err)
+	}
+	return files
+}
+
+// A terminal debug run shares the state root with the Agent's job: it loads
+// and advances the engine state in memory but never creates or writes files.
+func TestEngineStateReadOnly(t *testing.T) {
+	for name, tc := range map[string]struct {
+		saved     bool
+		wantBoots int64
+	}{
+		"without saved state": {wantBoots: 1},
+		"with saved state":    {saved: true, wantBoots: 6},
+	} {
+		t.Run(name, func(t *testing.T) {
+			root := t.TempDir()
+			paths := newEngineStatePaths(root, "test-job")
+			if tc.saved {
+				if err := os.MkdirAll(paths.dir, 0750); err != nil {
+					t.Fatalf("mkdir engine state dir: %v", err)
+				}
+				if err := os.WriteFile(paths.engineBoots, []byte("5\n"), 0640); err != nil {
+					t.Fatalf("write engine boots: %v", err)
+				}
+				if err := os.WriteFile(paths.localEngineID, []byte(testLocalEngineIDHex+"\n"), 0640); err != nil {
+					t.Fatalf("write local engine id: %v", err)
+				}
+			}
+			before := snapshotEngineState(t, root)
+			paths.readOnly = true
+
+			eb, err := newEngineBoots(paths)
+			if err != nil {
+				t.Fatalf("newEngineBoots: %v", err)
+			}
+			if got := eb.bootsValue(); got != tc.wantBoots {
+				t.Fatalf("boots = %d, want %d", got, tc.wantBoots)
+			}
+			lid, err := newLocalEngineID(paths, "")
+			if err != nil {
+				t.Fatalf("newLocalEngineID: %v", err)
+			}
+			if tc.saved && lid.hexString() != testLocalEngineIDHex {
+				t.Fatalf("local engine id = %s, want the saved %s", lid.hexString(), testLocalEngineIDHex)
+			}
+			if !tc.saved && len(lid.bytes()) != 12 {
+				t.Fatalf("generated local engine id length = %d, want 12", len(lid.bytes()))
+			}
+			if after := snapshotEngineState(t, root); !maps.Equal(before, after) {
+				t.Fatalf("state root changed: before %v, after %v", before, after)
+			}
+		})
+	}
+}
+
+func TestPrepareV3ReadOnlyLeavesRootUntouched(t *testing.T) {
+	root := t.TempDir()
+	recv := New(NewPolicy(PolicyConfig{
+		Versions:          []string{"v3"},
+		USMUsers:          []USMUser{{Username: "testuser", EngineID: testEngineIDHex, AuthProto: "none", PrivProto: "none"}},
+		EngineIDWhitelist: []string{testEngineIDHex},
+	}), nil)
+	if err := recv.PrepareV3(root, "debug-run", true); err != nil {
+		t.Fatalf("PrepareV3 read-only: %v", err)
+	}
+	if files := snapshotEngineState(t, root); len(files) != 0 {
+		t.Fatalf("read-only preparation wrote %v", files)
+	}
+	recv.RollbackPreparedState()
+	if files := snapshotEngineState(t, root); len(files) != 0 {
+		t.Fatalf("rollback wrote %v", files)
 	}
 }
