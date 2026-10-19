@@ -31,7 +31,7 @@ func tryLoadCachestatPlan(cfg CachestatLegacyConfig, plan LoadPlan) (*CachestatL
 		return nil, err
 	}
 
-	if err := rt.Attach(cfg.AccountFunction); err != nil {
+	if err := rt.Attach(cfg.Targets.AddToPageCacheLru.Name, cfg.Targets.MarkPageAccessed.Name, cfg.AccountFunction); err != nil {
 		rt.Close()
 		return nil, err
 	}
@@ -78,18 +78,19 @@ func LoadCachestatLegacy(cfg CachestatLegacyConfig) (*CachestatLegacyHandle, err
 	plan := BuildCachestatLegacyPlan(cfg)
 	coreSupported := libbpfloader.SupportsCore()
 	if !coreSupported {
-		selector := SelectIndex(cfg.Kernels, cfg.IsRHF, cfg.KernelVersion)
-		maxBase := effectiveMaxBaseSelector(cachestatMaxBaseSelector, cfg.IsRHF, cfg.KernelVersion)
-		if int(selector) > maxBase {
-			selector = uint32(maxBase)
-		}
-		plan.ObjectPath = BuildObjectPathWithFlavor(cfg.PluginsDir, selector, "cachestat", false, cfg.IsRHF, ObjectFlavorBase)
 		plan.LoadMode = LoadLegacy
+		if err := validateLegacyArtifactFamily("cachestat", plan); err != nil {
+			return nil, err
+		}
 		// No fallback in legacy mode: there is only one object.
 		return tryLoadCachestatPlan(cfg, plan)
 	}
 
 	plans := buildFallbackPlans(plan, cfg.PluginsDir, cfg.IsRHF, "cachestat", cachestatMaxBaseSelector)
+	plans = append(plans, buildCoreLegacyFallbackPlans(plan, cfg.PluginsDir, cfg.IsRHF, "cachestat", cachestatMaxBaseSelector)...)
+	if len(plans) == 0 {
+		return nil, fmt.Errorf("cachestat has no compatible object family for this kernel")
+	}
 	var lastErr error
 	for i, fp := range plans {
 		handle, err := tryLoadCachestatPlan(cfg, fp)

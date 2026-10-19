@@ -26,6 +26,49 @@ static ebpf_tracepoint_t softirq_tracepoints[] = {
     /* end */
     {.enabled = false, .class = NULL, .event = NULL}};
 
+#ifdef LIBBPF_MAJOR_VERSION
+static int ebpf_softirq_load_core(void)
+{
+    softirq_bpf_obj = softirq_bpf__open();
+    if (!softirq_bpf_obj)
+        return -1;
+
+    ebpf_update_map_type(softirq_bpf_obj->maps.tbl_softirq, &softirq_maps[SOFTIRQ_MAP_LATENCY]);
+    int ret = softirq_bpf__load(softirq_bpf_obj);
+    if (!ret)
+        ret = softirq_bpf__attach(softirq_bpf_obj);
+    if (ret) {
+        softirq_bpf__destroy(softirq_bpf_obj);
+        softirq_bpf_obj = NULL;
+        return -1;
+    }
+
+    softirq_maps[SOFTIRQ_MAP_LATENCY].map_fd = bpf_map__fd(softirq_bpf_obj->maps.tbl_softirq);
+    if (softirq_maps[SOFTIRQ_MAP_LATENCY].map_fd < 0) {
+        softirq_bpf__destroy(softirq_bpf_obj);
+        softirq_bpf_obj = NULL;
+        return -1;
+    }
+
+    return 0;
+}
+#endif
+
+void ebpf_softirq_unload_bpf(ebpf_module_t *em)
+{
+    if (em->load & EBPF_LOAD_LEGACY) {
+        ebpf_unload_legacy_bpf(em);
+        return;
+    }
+#ifdef LIBBPF_MAJOR_VERSION
+    if (softirq_bpf_obj) {
+        softirq_bpf__destroy(softirq_bpf_obj);
+        softirq_bpf_obj = NULL;
+        softirq_maps[SOFTIRQ_MAP_LATENCY].map_fd = ND_EBPF_MAP_FD_NOT_INITIALIZED;
+    }
+#endif
+}
+
 // these must be in the order defined by the kernel:
 // https://elixir.bootlin.com/linux/v5.12.19/source/include/trace/events/irq.h#L13
 static softirq_val_t softirq_vals[] = {
@@ -229,8 +272,21 @@ void ebpf_softirq_thread(void *ptr)
 #ifdef LIBBPF_MAJOR_VERSION
     ebpf_define_map_type(em->maps, em->maps_per_core, running_on_kernel);
 #endif
-    em->probe_links = ebpf_load_program(ebpf_plugin_dir, em, running_on_kernel, isrh, &em->objects);
-    if (!em->probe_links) {
+    int load_error;
+#ifdef LIBBPF_MAJOR_VERSION
+    if (em->load & EBPF_LOAD_CORE) {
+        load_error = ebpf_softirq_load_core();
+        if (load_error) {
+            em->probe_links = ebpf_load_program(ebpf_plugin_dir, em, running_on_kernel, isrh, &em->objects);
+            load_error = em->probe_links ? 0 : -1;
+        }
+    } else
+#endif
+    {
+        em->probe_links = ebpf_load_program(ebpf_plugin_dir, em, running_on_kernel, isrh, &em->objects);
+        load_error = em->probe_links ? 0 : -1;
+    }
+    if (load_error) {
         goto endsoftirq;
     }
     ebpf_mark_program_loaded();

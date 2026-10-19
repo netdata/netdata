@@ -388,8 +388,11 @@ uint32_t ebpf_select_disk_index(uint32_t kernels, int is_rhf, uint32_t kver);
 uint32_t ebpf_select_index(uint32_t kernels, int is_rhf, uint32_t kver);
 uint32_t ebpf_select_module_index(const ebpf_module_t *em, int is_rhf, uint32_t kver);
 int ebpf_legacy_disk_supported(int is_rhf, uint32_t kver);
+int ebpf_legacy_artifact_family_supported(const char *name, int is_rhf, uint32_t kver);
+int ebpf_rhf_kernel_lineage_matches(const char *kernel_release, int rhf, int cloudlinux);
 struct bpf_link **
 ebpf_load_program(char *plugins_dir, ebpf_module_t *em, int kver, int is_rhf, struct bpf_object **obj);
+int ebpf_load_legacy_fallback(ebpf_module_t *em, int kver, int is_rhf);
 
 void ebpf_mount_config_name(char *filename, size_t length, char *path, const char *config);
 int ebpf_load_config(struct config *config, char *filename);

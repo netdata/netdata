@@ -52,6 +52,7 @@ const (
 
 type LoadPlan struct {
 	KernelVersion uint32
+	Kernels       uint32
 	IsRHF         int
 	Selector      uint32
 	Flavor        ObjectFlavor
@@ -90,6 +91,7 @@ const (
 
 var kernelReleaseRe = regexp.MustCompile(`^([0-9]+)\.([0-9]+)\.([0-9]+)`)
 var redHatReleaseRe = regexp.MustCompile(`(?i)^\s*(red hat|centos|almalinux|rocky linux|cloudlinux).*?release[[:space:]]+([0-9]+)(\.([0-9]+))?`)
+var redHatKernelReleaseRe = regexp.MustCompile(`\.el([0-9]+)(?:_[0-9]+)?(?:\.|$)`)
 
 func KernelVersionFromRelease(release string) (uint32, error) {
 	release = strings.TrimSpace(release)
@@ -373,6 +375,57 @@ func isRHEL10Kernel612Stream(isRHF int, kver uint32) bool {
 		kver >= minimumKernelVersionArena && kver < maximumKernelVersionArena
 }
 
+func isGenericKernel612Stream(isRHF int, kver uint32) bool {
+	return isRHF <= 0 && kver >= minimumKernelVersionArena && kver < maximumKernelVersionArena
+}
+
+func legacyArtifactFamilyAvailable(module string, isRHF int, kver uint32) bool {
+	if kver < minimumKernelVersionBuffer {
+		return module != "dns" || kver >= 4<<16+14<<8
+	}
+	if isRHEL10Kernel612Stream(isRHF, kver) || isGenericKernel612Stream(isRHF, kver) {
+		return true
+	}
+	if isRHF > 0 {
+		return kver < 5<<16+17<<8
+	}
+	return true
+}
+
+func legacyArtifactFlavorAvailable(module string, flavor ObjectFlavor, isRHF int, kver uint32) bool {
+	if flavor == ObjectFlavorBase {
+		return legacyArtifactFamilyAvailable(module, isRHF, kver)
+	}
+
+	if isRHEL10Kernel612Stream(isRHF, kver) {
+		return true
+	}
+	if flavor == ObjectFlavorArena && kver < minimumKernelVersionArena {
+		return false
+	}
+	if flavor != ObjectFlavorBuffer && flavor != ObjectFlavorArena {
+		return false
+	}
+	if kver < minimumKernelVersionBuffer {
+		return false
+	}
+	switch module {
+	case "cachestat", "dc", "dcstat", "dns", "fd", "socket", "process", "swap":
+		return true
+	default:
+		return false
+	}
+}
+
+func validateLegacyArtifactFamily(module string, plan LoadPlan) error {
+	if plan.LoadMode == LoadLegacy && !legacyArtifactFlavorAvailable(module, plan.Flavor, plan.IsRHF, plan.KernelVersion) {
+		kver := plan.KernelVersion
+		return fmt.Errorf("%s has no verified legacy object family for kernel %d.%d.%d", module,
+			kver>>16, (kver>>8)&0xff, kver&0xff)
+	}
+	return nil
+}
+
 func SelectMaxIndex(isRHF int, kver uint32) int {
 	if isRHF > 0 {
 		switch {
@@ -404,7 +457,7 @@ func SelectMaxIndex(isRHF int, kver uint32) int {
 		return 7
 	case kver >= 330240:
 		return 6
-	case kver >= 328448:
+	case kver >= 266496: // 4.17 through 5.3 use the 5.4 producer family.
 		return 4
 	case kver >= 265984:
 		return 2
@@ -431,8 +484,11 @@ func SelectIndex(kernels uint32, isRHF int, kver uint32) uint32 {
 }
 
 func effectiveMaxBaseSelector(maxBaseSelector, isRHF int, kver uint32) int {
-	if isRHEL10Kernel612Stream(isRHF, kver) {
+	if isRHEL10Kernel612Stream(isRHF, kver) || isGenericKernel612Stream(isRHF, kver) {
 		return 11
+	}
+	if isRHF <= 0 && kver >= minimumKernelVersionSeven {
+		return 12
 	}
 	return maxBaseSelector
 }
@@ -562,6 +618,7 @@ func BuildLoadPlan(req LoadPlanRequest) LoadPlan {
 
 	return LoadPlan{
 		KernelVersion: req.KernelVersion,
+		Kernels:       req.Kernels,
 		IsRHF:         req.IsRHF,
 		Selector:      selector,
 		Flavor:        flavor,
@@ -589,13 +646,44 @@ func resolveKernelAndRH() (kver uint32, isRHF int, err error) {
 	}
 	isRHF = -1
 	if rhf, rherr := RedHatRelease(); rherr == nil {
-		isRHF = rhf
+		release, releaseErr := readFirstExistingFile("/proc/sys/kernel/osrelease")
+		if releaseErr == nil && redHatKernelLineageMatches(release, rhf, isCloudLinuxOS()) {
+			isRHF = rhf
+		}
 	} else if shouldWarnRedHatDetectionError(rherr) {
 		fmt.Fprintf(os.Stderr,
 			"ebpf-go.plugin: warning: unable to determine Red Hat-family release metadata (%v); treating host as non-RHEL\n",
 			rherr)
 	}
 	return kver, isRHF, nil
+}
+
+func redHatKernelLineageMatches(release string, rhf int, cloudLinux bool) bool {
+	if strings.Contains(release, ".elrepo") {
+		return false
+	}
+	if strings.Contains(release, ".lve") {
+		return cloudLinux && rhf/256 == 8
+	}
+	if match := redHatKernelReleaseRe.FindStringSubmatch(release); len(match) == 2 {
+		major, err := strconv.Atoi(match[1])
+		return err == nil && major == rhf/256
+	}
+	return false
+}
+
+func isCloudLinuxOS() bool {
+	contents, err := os.ReadFile("/etc/os-release")
+	if err != nil {
+		return false
+	}
+	for _, line := range strings.Split(string(contents), "\n") {
+		key, value, ok := strings.Cut(line, "=")
+		if ok && key == "ID" {
+			return strings.EqualFold(strings.Trim(value, " \t\"'"), "cloudlinux")
+		}
+	}
+	return false
 }
 
 func shouldWarnRedHatDetectionError(err error) bool {
@@ -628,11 +716,12 @@ func buildKprobeLegacyPlan(req kprobePlanRequest) LoadPlan {
 	// Base-flavor objects are not built for every kernel the buffer/arena objects
 	// cover.  Cap the selector so we never construct a path that does not exist.
 	baseMax := effectiveMaxBaseSelector(req.MaxBaseSelector, req.IsRHF, req.KernelVersion)
-	if flavor == ObjectFlavorBase && baseMax > 0 && int(selector) > baseMax {
-		selector = uint32(baseMax)
+	if flavor == ObjectFlavorBase && baseMax > 0 {
+		selector = selectHighestIndexAtOrBelow(req.Kernels, req.IsRHF, req.KernelVersion, baseMax, req.Name)
 	}
 	return LoadPlan{
 		KernelVersion: req.KernelVersion,
+		Kernels:       req.Kernels,
 		IsRHF:         req.IsRHF,
 		Selector:      selector,
 		Flavor:        flavor,
@@ -641,6 +730,36 @@ func buildKprobeLegacyPlan(req kprobePlanRequest) LoadPlan {
 		LoadMode:      loadMode,
 		ProgramMode:   LoadTrampoline,
 	}
+}
+
+func selectHighestIndexAtOrBelow(kernels uint32, isRHF int, kver uint32, maxIndex int, module string) uint32 {
+	if isRHF == -1 {
+		kernels &^= 1 << 7
+	}
+	switch module {
+	case "cachestat", "dc", "dcstat", "fd", "process", "socket", "swap":
+		// These are the only generic 7.0 base objects emitted by the producer.
+	default:
+		kernels &^= 1 << 12
+	}
+	switch module {
+	case "cachestat", "dc", "dcstat", "dns", "socket":
+		// These modules do not ship a base 5.10 object.
+		kernels &^= 1 << 5
+	}
+	if module != "fd" && module != "disk" {
+		kernels &^= 1 << 6
+	}
+	selector := SelectIndex(kernels, isRHF, kver)
+	if int(selector) <= maxIndex {
+		return selector
+	}
+	for idx := maxIndex; idx > 0; idx-- {
+		if kernels&(1<<uint(idx)) != 0 {
+			return uint32(idx)
+		}
+	}
+	return 0
 }
 
 // buildFallbackPlans returns plans in preference order: primary first, then
@@ -653,6 +772,9 @@ func buildFallbackPlans(primary LoadPlan, pluginsDir string, isRHF int, name str
 	maxBaseSelector = effectiveMaxBaseSelector(maxBaseSelector, isRHF, primary.KernelVersion)
 	plans := make([]LoadPlan, 0, 6)
 	addPlan := func(plan LoadPlan) {
+		if plan.LoadMode == LoadLegacy && !legacyArtifactFlavorAvailable(name, plan.Flavor, isRHF, primary.KernelVersion) {
+			return
+		}
 		plans = append(plans, plan)
 		if isRHF == -1 || isRHEL10Kernel612Stream(isRHF, primary.KernelVersion) {
 			return
@@ -678,7 +800,7 @@ func buildFallbackPlans(primary LoadPlan, pluginsDir string, isRHF int, name str
 		fb.Flavor = ObjectFlavorBase
 		fbSelector := primary.Selector
 		if maxBaseSelector > 0 && int(fbSelector) > maxBaseSelector {
-			fbSelector = uint32(maxBaseSelector)
+			fbSelector = selectHighestIndexAtOrBelow(primary.Kernels, isRHF, primary.KernelVersion, maxBaseSelector, name)
 		}
 		fb.Selector = fbSelector
 		fb.ObjectPath = BuildObjectPathWithFlavor(pluginsDir, fbSelector, name, primary.IsReturn, isRHF, ObjectFlavorBase)
@@ -686,6 +808,24 @@ func buildFallbackPlans(primary LoadPlan, pluginsDir string, isRHF int, name str
 	}
 
 	return plans
+}
+
+func buildCoreLegacyFallbackPlans(primary LoadPlan, pluginsDir string, isRHF int, name string, maxBaseSelector int) []LoadPlan {
+	if primary.LoadMode != LoadCore || !legacyArtifactFlavorAvailable(name, primary.Flavor, isRHF, primary.KernelVersion) {
+		return nil
+	}
+
+	maxBaseSelector = effectiveMaxBaseSelector(maxBaseSelector, isRHF, primary.KernelVersion)
+	selector := primary.Selector
+	if primary.Flavor == ObjectFlavorBase && maxBaseSelector > 0 && int(selector) > maxBaseSelector {
+		selector = selectHighestIndexAtOrBelow(primary.Kernels, isRHF, primary.KernelVersion, maxBaseSelector, name)
+	}
+
+	legacy := primary
+	legacy.Selector = selector
+	legacy.LoadMode = LoadLegacy
+	legacy.ObjectPath = BuildObjectPathWithFlavor(pluginsDir, selector, name, primary.IsReturn, isRHF, primary.Flavor)
+	return buildFallbackPlans(legacy, pluginsDir, isRHF, name, maxBaseSelector)
 }
 
 func readFirstExistingFile(paths ...string) (string, error) {

@@ -36,7 +36,8 @@ int netdata_cachestat_runtime_prepare(
     int maps_per_core,
     const char *account_function);
 int netdata_cachestat_runtime_load(struct netdata_ebpf_cachestat_runtime *rt);
-int netdata_cachestat_runtime_attach(struct netdata_ebpf_cachestat_runtime *rt, const char *account_function);
+int netdata_cachestat_runtime_attach(struct netdata_ebpf_cachestat_runtime *rt, const char *add_function,
+                                     const char *access_function, const char *account_function);
 int netdata_cachestat_runtime_update_controller(
     struct netdata_ebpf_cachestat_runtime *rt,
     int apps_enabled,
@@ -142,15 +143,19 @@ func (r *CachestatRuntime) Load() error {
 	return nil
 }
 
-func (r *CachestatRuntime) Attach(accountFunction string) error {
+func (r *CachestatRuntime) Attach(addFunction, accessFunction, accountFunction string) error {
 	if r == nil || r.ptr == nil {
 		return ErrDisabled
 	}
 
-	cfn := C.CString(accountFunction)
-	defer C.free(unsafe.Pointer(cfn))
+	add := C.CString(addFunction)
+	defer C.free(unsafe.Pointer(add))
+	access := C.CString(accessFunction)
+	defer C.free(unsafe.Pointer(access))
+	account := C.CString(accountFunction)
+	defer C.free(unsafe.Pointer(account))
 
-	if ret := C.netdata_cachestat_runtime_attach(r.ptr, cfn); ret != 0 {
+	if ret := C.netdata_cachestat_runtime_attach(r.ptr, add, access, account); ret != 0 {
 		return fmt.Errorf("attach cachestat runtime failed: %d", int(ret))
 	}
 

@@ -5,6 +5,40 @@ import (
 	"testing"
 )
 
+func TestSelectCachestatKernelTargetFromReader(t *testing.T) {
+	tests := []struct {
+		name       string
+		candidates []string
+		kallsyms   string
+		want       string
+	}{
+		{
+			name:       "folio helpers preferred",
+			candidates: []string{"filemap_add_folio", "add_to_page_cache_lru"},
+			kallsyms:   "ffffffff81000000 T add_to_page_cache_lru\nffffffff81000001 T filemap_add_folio\n",
+			want:       "filemap_add_folio",
+		},
+		{
+			name:       "legacy helper fallback",
+			candidates: []string{"folio_mark_accessed", "mark_page_accessed"},
+			kallsyms:   "ffffffff81000000 T mark_page_accessed\n",
+			want:       "mark_page_accessed",
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			got, err := selectCachestatKernelTargetFromReader(tc.candidates, strings.NewReader(tc.kallsyms))
+			if err != nil {
+				t.Fatalf("selectCachestatKernelTargetFromReader(): %v", err)
+			}
+			if got != tc.want {
+				t.Fatalf("selectCachestatKernelTargetFromReader() = %q, want %q", got, tc.want)
+			}
+		})
+	}
+}
+
 func TestSelectCachestatAccountPageTargetFromReader(t *testing.T) {
 	candidates := defaultCachestatTargets().AccountPage
 

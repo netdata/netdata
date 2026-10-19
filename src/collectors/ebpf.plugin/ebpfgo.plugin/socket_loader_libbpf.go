@@ -59,25 +59,19 @@ func LoadSocketLegacy(cfg SocketLegacyConfig) (*SocketLegacyHandle, error) {
 	plan := BuildSocketLegacyPlan(cfg)
 	coreSupported := libbpfloader.SupportsCore()
 	if !coreSupported {
-		selector := SelectIndex(cfg.Kernels, cfg.IsRHF, cfg.KernelVersion)
-		maxBase := effectiveMaxBaseSelector(socketMaxBaseSelector, cfg.IsRHF, cfg.KernelVersion)
-		if int(selector) > maxBase {
-			selector = uint32(maxBase)
-		}
-		plan = LoadPlan{
-			KernelVersion: cfg.KernelVersion,
-			IsRHF:         cfg.IsRHF,
-			Selector:      selector,
-			Flavor:        ObjectFlavorBase,
-			ObjectPath:    BuildObjectPathWithFlavor(cfg.PluginsDir, selector, "socket", false, cfg.IsRHF, ObjectFlavorBase),
-			LoadMode:      LoadLegacy,
-			ProgramMode:   LoadTrampoline,
+		plan.LoadMode = LoadLegacy
+		if err := validateLegacyArtifactFamily("socket", plan); err != nil {
+			return nil, err
 		}
 		// No fallback in legacy mode: there is only one object.
 		return tryLoadSocketPlan(cfg, plan)
 	}
 
 	plans := buildFallbackPlans(plan, cfg.PluginsDir, cfg.IsRHF, "socket", socketMaxBaseSelector)
+	plans = append(plans, buildCoreLegacyFallbackPlans(plan, cfg.PluginsDir, cfg.IsRHF, "socket", socketMaxBaseSelector)...)
+	if len(plans) == 0 {
+		return nil, fmt.Errorf("socket has no compatible object family for this kernel")
+	}
 	var lastErr error
 	for i, fp := range plans {
 		handle, err := tryLoadSocketPlan(cfg, fp)

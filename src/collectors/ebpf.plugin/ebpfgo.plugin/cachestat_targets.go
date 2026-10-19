@@ -43,8 +43,45 @@ func defaultCachestatTargets() CachestatTargets {
 	}
 }
 
+func (t *CachestatTargets) ResolveCacheAndAccessTargets() error {
+	add, err := selectCachestatKernelTarget([]string{"filemap_add_folio", "add_to_page_cache_lru"})
+	if err != nil {
+		return err
+	}
+	access, err := selectCachestatKernelTarget([]string{"folio_mark_accessed", "mark_page_accessed"})
+	if err != nil {
+		return err
+	}
+	t.AddToPageCacheLru.Name = add
+	t.MarkPageAccessed.Name = access
+	return nil
+}
+
+func selectCachestatKernelTarget(candidates []string) (string, error) {
+	symbols, err := openProcKallsyms()
+	if err != nil {
+		return "", err
+	}
+	defer symbols.Close()
+	return selectCachestatKernelTargetFromReader(candidates, symbols)
+}
+
+func selectCachestatKernelTargetFromReader(candidates []string, symbols io.Reader) (string, error) {
+	name, err := selectKallsymsCandidate(candidates, symbols)
+	if err != nil {
+		return "", err
+	}
+	if name == "" {
+		return "", fmt.Errorf("no cachestat target found among %v", candidates)
+	}
+	return name, nil
+}
+
 func resolveCachestatTargets() (CachestatTargets, error) {
 	targets := defaultCachestatTargets()
+	if err := targets.ResolveCacheAndAccessTargets(); err != nil {
+		return CachestatTargets{}, err
+	}
 	if err := targets.ResolveAccountPageTarget(); err != nil {
 		return CachestatTargets{}, err
 	}

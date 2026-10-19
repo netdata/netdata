@@ -152,8 +152,7 @@ enum netdata_fd_global_key {
 static const char *fd_open_program_name(int kind, int flavor)
 {
 #ifdef NETDATA_FD_LIBBPF_CORE_SUPPORTED
-    if (kind == NETDATA_FD_RUNTIME_CORE &&
-        (flavor == NETDATA_FD_RUNTIME_FLAVOR_BUFFER || flavor == NETDATA_FD_RUNTIME_FLAVOR_ARENA))
+    if (flavor == NETDATA_FD_RUNTIME_FLAVOR_BUFFER || flavor == NETDATA_FD_RUNTIME_FLAVOR_ARENA)
         return "netdata_sys_open_buffer";
 #else
     (void)kind;
@@ -172,8 +171,7 @@ static const char *fd_open_program_name(int kind, int flavor)
 static const char *fd_close_program_name(int kind, int flavor)
 {
 #ifdef NETDATA_FD_LIBBPF_CORE_SUPPORTED
-    if (kind == NETDATA_FD_RUNTIME_CORE &&
-        (flavor == NETDATA_FD_RUNTIME_FLAVOR_BUFFER || flavor == NETDATA_FD_RUNTIME_FLAVOR_ARENA))
+    if (flavor == NETDATA_FD_RUNTIME_FLAVOR_BUFFER || flavor == NETDATA_FD_RUNTIME_FLAVOR_ARENA)
         return "netdata_close_buffer";
 #else
     (void)kind;
@@ -336,10 +334,10 @@ struct netdata_ebpf_fd_runtime *netdata_fd_runtime_open_mode(const char *path, i
     /* The buffer/arena flavors accumulate per-TGID counters in userspace; the
      * table has to know the entry layout before the first event arrives. */
     nd_ebpf_acc_init(&rt->acc, sizeof(struct netdata_ebpf_fd_pid_entry), offsetof(struct netdata_ebpf_fd_pid_entry, tgid));
+    rt->flavor = fd_runtime_flavor_from_path(path);
 
     if (use_core) {
         rt->kind = NETDATA_FD_RUNTIME_CORE;
-        rt->flavor = fd_runtime_flavor_from_path(path);
         struct bpf_object_open_opts opts = {
             .sz = sizeof(opts),
             .btf_custom_path = custom_btf_path && *custom_btf_path ? custom_btf_path : NULL,
@@ -549,7 +547,18 @@ int netdata_fd_runtime_load(struct netdata_ebpf_fd_runtime *rt)
     }
 #endif
 
-    return bpf_object__load(rt->obj);
+#ifdef NETDATA_FD_LIBBPF_CORE_SUPPORTED
+    // Raw arena objects need the generated skeleton's mmap'd data section.
+    if (rt->flavor == NETDATA_FD_RUNTIME_FLAVOR_ARENA)
+        return -1;
+#endif
+
+    int rc = bpf_object__load(rt->obj);
+#ifdef NETDATA_FD_LIBBPF_CORE_SUPPORTED
+    if (rc == 0 && rt->flavor == NETDATA_FD_RUNTIME_FLAVOR_BUFFER && fd_setup_ring_buffer(rt) != 0)
+        rc = -1;
+#endif
+    return rc;
 }
 
 /* The open and close symbols differ by kernel version (do_sys_openat2 vs

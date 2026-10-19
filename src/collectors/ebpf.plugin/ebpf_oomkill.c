@@ -32,6 +32,50 @@ static ebpf_tracepoint_t oomkill_tracepoints[] = {
     /* end */
     {.enabled = false, .class = NULL, .event = NULL}};
 
+#ifdef LIBBPF_MAJOR_VERSION
+static int ebpf_oomkill_load_core(ebpf_module_t *em)
+{
+    oomkill_bpf_obj = oomkill_bpf__open();
+    if (!oomkill_bpf_obj)
+        return -1;
+
+    ebpf_update_map_type(oomkill_bpf_obj->maps.tbl_oomkill, &oomkill_maps[0]);
+    int ret = oomkill_bpf__load(oomkill_bpf_obj);
+    if (!ret)
+        ret = oomkill_bpf__attach(oomkill_bpf_obj);
+    if (ret) {
+        oomkill_bpf__destroy(oomkill_bpf_obj);
+        oomkill_bpf_obj = NULL;
+        return -1;
+    }
+
+    oomkill_maps[0].map_fd = bpf_map__fd(oomkill_bpf_obj->maps.tbl_oomkill);
+    if (oomkill_maps[0].map_fd < 0) {
+        oomkill_bpf__destroy(oomkill_bpf_obj);
+        oomkill_bpf_obj = NULL;
+        return -1;
+    }
+
+    (void)em;
+    return 0;
+}
+#endif
+
+void ebpf_oomkill_unload_bpf(ebpf_module_t *em)
+{
+    if (em->load & EBPF_LOAD_LEGACY) {
+        ebpf_unload_legacy_bpf(em);
+        return;
+    }
+#ifdef LIBBPF_MAJOR_VERSION
+    if (oomkill_bpf_obj) {
+        oomkill_bpf__destroy(oomkill_bpf_obj);
+        oomkill_bpf_obj = NULL;
+        oomkill_maps[0].map_fd = ND_EBPF_MAP_FD_NOT_INITIALIZED;
+    }
+#endif
+}
+
 static netdata_publish_syscall_t oomkill_publish_aggregated =
     {.name = "kills", .dimension = "kills", .algorithm = "absolute", .next = NULL};
 
@@ -494,8 +538,21 @@ void ebpf_oomkill_thread(void *ptr)
 #ifdef LIBBPF_MAJOR_VERSION
     ebpf_define_map_type(em->maps, em->maps_per_core, running_on_kernel);
 #endif
-    em->probe_links = ebpf_load_program(ebpf_plugin_dir, em, running_on_kernel, isrh, &em->objects);
-    if (!em->probe_links) {
+    int load_error;
+#ifdef LIBBPF_MAJOR_VERSION
+    if (em->load & EBPF_LOAD_CORE) {
+        load_error = ebpf_oomkill_load_core(em);
+        if (load_error) {
+            em->probe_links = ebpf_load_program(ebpf_plugin_dir, em, running_on_kernel, isrh, &em->objects);
+            load_error = em->probe_links ? 0 : -1;
+        }
+    } else
+#endif
+    {
+        em->probe_links = ebpf_load_program(ebpf_plugin_dir, em, running_on_kernel, isrh, &em->objects);
+        load_error = em->probe_links ? 0 : -1;
+    }
+    if (load_error) {
         goto endoomkill;
     }
     ebpf_mark_program_loaded();

@@ -570,7 +570,8 @@ int netdata_cachestat_runtime_load(struct netdata_ebpf_cachestat_runtime *rt)
     return 0;
 }
 
-int netdata_cachestat_runtime_attach(struct netdata_ebpf_cachestat_runtime *rt, const char *account_function)
+int netdata_cachestat_runtime_attach(struct netdata_ebpf_cachestat_runtime *rt, const char *add_function,
+                                     const char *access_function, const char *account_function)
 {
     struct bpf_object *obj = cachestat_runtime_object(rt);
     if (!rt || !obj)
@@ -586,12 +587,12 @@ int netdata_cachestat_runtime_attach(struct netdata_ebpf_cachestat_runtime *rt, 
     if (!rt->links)
         return -1;
 
-    rt->links[0] = cachestat_attach_program_by_name(obj, rt->program_names[0], "add_to_page_cache_lru");
-    rt->links[1] = cachestat_attach_program_by_name(obj, rt->program_names[1], "mark_page_accessed");
+    rt->links[0] = cachestat_attach_program_by_name(obj, rt->program_names[0], add_function);
+    rt->links[1] = cachestat_attach_program_by_name(obj, rt->program_names[1], access_function);
     rt->links[2] = cachestat_attach_program_by_name(obj, rt->program_names[2], account_function);
     rt->links[3] = cachestat_attach_program_by_name(obj, rt->program_names[3], "mark_buffer_dirty");
 
-    const char *targets[] = {"add_to_page_cache_lru", "mark_page_accessed", account_function, "mark_buffer_dirty"};
+    const char *targets[] = {add_function, access_function, account_function, "mark_buffer_dirty"};
     if (nd_ebpf_validate_links(rt->links, rt->program_names, targets, 4, "cachestat") != 0) {
         nd_ebpf_destroy_links(&rt->links, 4);
         return -1;

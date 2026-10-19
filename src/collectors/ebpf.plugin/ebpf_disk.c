@@ -894,25 +894,13 @@ static int ebpf_disk_load_bpf(ebpf_module_t *em)
 {
     int ret = 0;
     if (em->load & EBPF_LOAD_LEGACY) {
-        // The generic disk object set has no 6.16+ artifact. Do not load its 6.8 fallback with baked-in
-        // structure offsets, which can attach successfully but silently collect nothing.
-        if (isrh <= 0 && running_on_kernel >= NETDATA_EBPF_KERNEL_6_16) {
-            unsigned int kernel_major = (unsigned int)running_on_kernel >> 16;
-            unsigned int kernel_minor = ((unsigned int)running_on_kernel >> 8) & 0xff;
-            netdata_log_error(
-                "Disk latency is unavailable: no compatible generic legacy BPF object for kernel %u.%u; refusing "
-                "the 6.8 fallback. Use kernel BTF with CO-RE or a compatible legacy object.",
-                kernel_major,
-                kernel_minor);
-            return -1;
-        }
         if (!ebpf_legacy_disk_supported(isrh, running_on_kernel)) {
             unsigned int kernel_major = (unsigned int)running_on_kernel >> 16;
             unsigned int kernel_minor = ((unsigned int)running_on_kernel >> 8) & 0xff;
             netdata_log_error(
-                "Disk latency is unavailable: no compatible legacy BPF object for Red Hat release %u on kernel %u.%u; "
+                "Disk latency is unavailable: no compatible legacy BPF object for %s on kernel %u.%u; "
                 "use kernel BTF with CO-RE or a compatible legacy object.",
-                (unsigned int)isrh / 256,
+                isrh > 0 ? "this Red Hat kernel lineage" : "this generic kernel lineage",
                 kernel_major,
                 kernel_minor);
             return -1;
@@ -921,12 +909,6 @@ static int ebpf_disk_load_bpf(ebpf_module_t *em)
         em->probe_links = ebpf_load_program(ebpf_plugin_dir, em, running_on_kernel, isrh, &em->objects);
         if (!em->probe_links) {
             ret = -1;
-        } else {
-            ebpf_disk_set_inflight_map_fd(em->objects);
-            ebpf_disk_attach_single_queue_start(
-                bpf_object__find_program_by_name(em->objects, NETDATA_DISK_ISSUE_PROGRAM));
-            ebpf_disk_attach_scsi_completion(
-                bpf_object__find_program_by_name(em->objects, NETDATA_DISK_COMPLETE_PROGRAM));
         }
     }
 #ifdef LIBBPF_MAJOR_VERSION
@@ -939,12 +921,23 @@ static int ebpf_disk_load_bpf(ebpf_module_t *em)
             if (ret) {
                 disk_bpf__destroy(disk_bpf_obj);
                 disk_bpf_obj = NULL;
-            } else {
-                ebpf_disk_set_hash_table(disk_bpf_obj);
             }
         }
     }
 #endif
+
+    if (ret && (em->load & EBPF_LOAD_CORE))
+        ret = ebpf_load_legacy_fallback(em, running_on_kernel, isrh);
+
+    if (!ret && (em->load & EBPF_LOAD_LEGACY)) {
+        ebpf_disk_set_inflight_map_fd(em->objects);
+        ebpf_disk_attach_single_queue_start(
+            bpf_object__find_program_by_name(em->objects, NETDATA_DISK_ISSUE_PROGRAM));
+        ebpf_disk_attach_scsi_completion(
+            bpf_object__find_program_by_name(em->objects, NETDATA_DISK_COMPLETE_PROGRAM));
+    } else if (!ret && disk_bpf_obj) {
+        ebpf_disk_set_hash_table(disk_bpf_obj);
+    }
 
     if (ret)
         netdata_log_error("%s %s", EBPF_DEFAULT_ERROR_MSG, em->info.thread_name);

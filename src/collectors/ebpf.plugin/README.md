@@ -611,13 +611,12 @@ This will create the chart `disk_latency_io` for each disk on the host. The foll
 - `blk_complete_request`: IO completion on the older request path. It is attached only when the running kernel
     provides this function (a `kprobe` with legacy code, `fentry` with CO-RE code).
 
-Disk latency is unavailable on generic kernels 6.16 and newer when the plugin must use legacy BPF objects. On
-Red Hat-family kernels 5.17 and newer, legacy disk objects are supported on the RHEL 10 kernel stream based on 6.12,
-including its errata kernels. Outside that stream the plugin fails closed rather than using an object with incompatible
-compiled structure offsets. Modules with CO-RE support can use BTF to adapt to the running kernel's types instead of
-relying on legacy objects compiled for another layout. For RHEL 10 disk latency, use kernel BTF and the disk CO-RE
-implementation until the published legacy package includes the matching object. Generic legacy objects are built for
-5.11, 5.16, 5.17 and 6.8 kernel layouts.
+When BTF is unavailable, generic kernels newer than the newest matching disk object use the latest older shipped
+legacy object family. Legacy objects use compile-time kernel structure offsets, so disk latency on newer kernels may
+not match the running kernel's layout. Red Hat-family kernels 5.17 and newer remain supported only on the RHEL 10
+kernel stream based on 6.12, including its errata kernels; outside that stream the plugin fails closed. Modules with
+CO-RE support can use BTF to adapt to the running kernel's types. Generic legacy objects are built for 5.11, 5.16,
+5.17 and 6.8 kernel layouts.
 
 Disk Latency is the single most important metric to focus on when it comes to storage performance, under most circumstances.
 For hard drives, an average latency somewhere between 10 to 20 ms can be considered acceptable. For SSD (Solid State Drives),

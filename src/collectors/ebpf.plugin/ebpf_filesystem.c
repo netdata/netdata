@@ -279,22 +279,22 @@ static int ebpf_fs_attach_kprobe(struct filesystem_bpf *obj, const char **functi
 
     // kretprobe
     obj->links.netdata_fs_file_read_retprobe =
-        bpf_program__attach_kprobe(obj->progs.netdata_fs_file_read_retprobe, false, functions[NETDATA_KEY_BTF_READ]);
+        bpf_program__attach_kprobe(obj->progs.netdata_fs_file_read_retprobe, true, functions[NETDATA_KEY_BTF_READ]);
     if (libbpf_get_error(obj->links.netdata_fs_file_read_retprobe))
         goto cleanup_getattr;
 
     obj->links.netdata_fs_file_write_retprobe =
-        bpf_program__attach_kprobe(obj->progs.netdata_fs_file_write_retprobe, false, functions[NETDATA_KEY_BTF_WRITE]);
+        bpf_program__attach_kprobe(obj->progs.netdata_fs_file_write_retprobe, true, functions[NETDATA_KEY_BTF_WRITE]);
     if (libbpf_get_error(obj->links.netdata_fs_file_write_retprobe))
         goto cleanup_file_read_ret;
 
     obj->links.netdata_fs_file_open_retprobe =
-        bpf_program__attach_kprobe(obj->progs.netdata_fs_file_open_retprobe, false, functions[NETDATA_KEY_BTF_OPEN]);
+        bpf_program__attach_kprobe(obj->progs.netdata_fs_file_open_retprobe, true, functions[NETDATA_KEY_BTF_OPEN]);
     if (libbpf_get_error(obj->links.netdata_fs_file_open_retprobe))
         goto cleanup_file_write_ret;
 
     obj->links.netdata_fs_getattr_retprobe =
-        bpf_program__attach_kprobe(obj->progs.netdata_fs_getattr_retprobe, false, functions[NETDATA_KEY_BTF_SYNC_ATTR]);
+        bpf_program__attach_kprobe(obj->progs.netdata_fs_getattr_retprobe, true, functions[NETDATA_KEY_BTF_SYNC_ATTR]);
     if (libbpf_get_error(obj->links.netdata_fs_getattr_retprobe))
         goto cleanup_file_open_ret;
 
@@ -305,7 +305,7 @@ static int ebpf_fs_attach_kprobe(struct filesystem_bpf *obj, const char **functi
             goto cleanup_getattr_ret;
 
         obj->links.netdata_fs_2nd_file_open_retprobe = bpf_program__attach_kprobe(
-            obj->progs.netdata_fs_2nd_file_open_retprobe, false, functions[NETDATA_KEY_BTF_OPEN2]);
+            obj->progs.netdata_fs_2nd_file_open_retprobe, true, functions[NETDATA_KEY_BTF_OPEN2]);
         if (libbpf_get_error(obj->links.netdata_fs_2nd_file_open_retprobe))
             goto cleanup_2nd_open_probe;
     }
@@ -651,21 +651,31 @@ int ebpf_filesystem_initialize_ebpf_data(ebpf_module_t *em)
             else {
                 efp->fs_obj = filesystem_bpf__open();
                 if (!efp->fs_obj) {
-                    efp->load_failed = true;
-                    em->info.thread_name = saved_name;
-                    em->kernels = kernels;
-                    em->rhel10_kernels = rhel10_kernels;
-                    em->maps = NULL;
-                    continue;
+                    if (em->load & EBPF_LOAD_CORE)
+                        efp->probe_links = ebpf_load_program(
+                            ebpf_plugin_dir, em, running_on_kernel, isrh, &efp->objects);
+                    if (!efp->probe_links) {
+                        efp->load_failed = true;
+                        em->info.thread_name = saved_name;
+                        em->kernels = kernels;
+                        em->rhel10_kernels = rhel10_kernels;
+                        em->maps = NULL;
+                        continue;
+                    }
                 } else if (ebpf_fs_load_and_attach(em->maps, efp->fs_obj, efp->functions, NULL)) {
-                    efp->load_failed = true;
                     filesystem_bpf__destroy(efp->fs_obj);
                     efp->fs_obj = NULL;
-                    em->info.thread_name = saved_name;
-                    em->kernels = kernels;
-                    em->rhel10_kernels = rhel10_kernels;
-                    em->maps = NULL;
-                    continue;
+                    if (em->load & EBPF_LOAD_CORE)
+                        efp->probe_links = ebpf_load_program(
+                            ebpf_plugin_dir, em, running_on_kernel, isrh, &efp->objects);
+                    if (!efp->probe_links) {
+                        efp->load_failed = true;
+                        em->info.thread_name = saved_name;
+                        em->kernels = kernels;
+                        em->rhel10_kernels = rhel10_kernels;
+                        em->maps = NULL;
+                        continue;
+                    }
                 }
             }
 #endif

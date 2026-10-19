@@ -102,6 +102,16 @@ static void ebpf_vfs_disable_probes(struct vfs_bpf *obj)
     bpf_program__set_autoload(obj->progs.netdata_vfs_create_kretprobe, false);
 }
 
+static void ebpf_vfs_disable_trampoline_entry_probes(struct vfs_bpf *obj)
+{
+    bpf_program__set_autoload(obj->progs.netdata_vfs_write_fentry, false);
+    bpf_program__set_autoload(obj->progs.netdata_vfs_writev_fentry, false);
+    bpf_program__set_autoload(obj->progs.netdata_vfs_read_fentry, false);
+    bpf_program__set_autoload(obj->progs.netdata_vfs_readv_fentry, false);
+    bpf_program__set_autoload(obj->progs.netdata_vfs_fsync_fentry, false);
+    bpf_program__set_autoload(obj->progs.netdata_vfs_open_fentry, false);
+}
+
 /*
  * Disable trampoline
  *
@@ -323,6 +333,7 @@ static inline int ebpf_vfs_load_and_attach(struct vfs_bpf *obj, ebpf_module_t *e
 
     if (test == EBPF_LOAD_TRAMPOLINE) {
         ebpf_vfs_disable_probes(obj);
+        ebpf_vfs_disable_trampoline_entry_probes(obj);
 
         ebpf_vfs_set_trampoline_target(obj);
     } else {
@@ -2415,6 +2426,9 @@ static int ebpf_vfs_load_bpf(ebpf_module_t *em)
         }
     }
 #endif
+
+    if (ret && (em->load & EBPF_LOAD_CORE))
+        ret = ebpf_load_legacy_fallback(em, running_on_kernel, isrh);
 
     return ret;
 }

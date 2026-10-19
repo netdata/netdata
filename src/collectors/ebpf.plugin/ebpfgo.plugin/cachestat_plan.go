@@ -141,10 +141,15 @@ func resolveCachestatLegacyConfig() (CachestatLegacyConfig, error) {
 	cfg.KernelVersion = kver
 	cfg.IsRHF = isRHF
 
-	if err := cfg.Targets.ResolveAccountPageTarget(); err != nil {
-		return CachestatLegacyConfig{}, err
+	if cfg.Enabled {
+		if err := cfg.Targets.ResolveCacheAndAccessTargets(); err != nil {
+			return CachestatLegacyConfig{}, err
+		}
+		if err := cfg.Targets.ResolveAccountPageTarget(); err != nil {
+			return CachestatLegacyConfig{}, err
+		}
+		cfg.AccountFunction = cfg.Targets.AccountPageDirtied.Name
 	}
-	cfg.AccountFunction = cfg.Targets.AccountPageDirtied.Name
 
 	return cfg, nil
 }

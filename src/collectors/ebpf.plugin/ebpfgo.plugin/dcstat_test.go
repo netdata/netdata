@@ -76,13 +76,12 @@ func TestBuildDCStatLegacyPlan(t *testing.T) {
 				HasBTF:        true,
 				ObjectFlavor:  "arena",
 			},
-			want:     "pnetdata_ebpf_dc.5.14.o",
+			want:     "pnetdata_ebpf_dc.6.12.o",
 			wantMode: LoadCore,
 		},
 		"tracing-explicit": {
 			// "tracing" (= base flavor) on kernel 6.12 must fall back to the
-			// highest existing base object (5.14, selector 7) rather than a
-			// non-existent pnetdata_ebpf_dc.6.12.o.
+			// generic 6.12 object rather than a stale earlier kernel layout.
 			cfg: DCStatLegacyConfig{
 				PluginsDir:    defaultPluginsDir(),
 				Kernels:       dcstatKernelMask,
@@ -92,7 +91,7 @@ func TestBuildDCStatLegacyPlan(t *testing.T) {
 				HasBTF:        true,
 				ObjectFlavor:  "tracing",
 			},
-			want:     "pnetdata_ebpf_dc.5.14.o",
+			want:     "pnetdata_ebpf_dc.6.12.o",
 			wantMode: LoadCore,
 		},
 	}
@@ -132,7 +131,7 @@ func TestBuildDCStatFallbackPlansCapBaseSelector(t *testing.T) {
 	want := []string{
 		"pnetdata_ebpf_dc_arena.6.12.o",
 		"pnetdata_ebpf_dc_buffer.6.12.o",
-		"pnetdata_ebpf_dc.5.14.o",
+		"pnetdata_ebpf_dc.6.12.o",
 	}
 	for i, base := range want {
 		if got := filepath.Base(plans[i].ObjectPath); got != base {

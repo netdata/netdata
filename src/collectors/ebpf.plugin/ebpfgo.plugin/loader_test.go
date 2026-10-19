@@ -357,14 +357,41 @@ func TestEffectiveMaxBaseSelector(t *testing.T) {
 		kver uint32
 		want int
 	}{
-		{name: "generic remains capped", max: 7, rhf: -1, kver: 396288, want: 7},
+		{name: "generic 6.12 uses generated base family", max: 7, rhf: -1, kver: 396288, want: 11},
 		{name: "RHEL 9 remains capped", max: 7, rhf: 9 * 256, kver: 396288, want: 7},
 		{name: "RHEL 10 uses generated base family", max: 7, rhf: 10 * 256, kver: 396288, want: 11},
+		{name: "generic 6.16 remains capped", max: 7, rhf: -1, kver: 6*65536 + 16*256, want: 7},
+		{name: "generic 7.0 uses generated base family", max: 7, rhf: -1, kver: minimumKernelVersionSeven, want: 12},
 	}
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
 			if got := effectiveMaxBaseSelector(tc.max, tc.rhf, tc.kver); got != tc.want {
 				t.Fatalf("effectiveMaxBaseSelector() = %d, want %d", got, tc.want)
+			}
+		})
+	}
+}
+
+func TestRedHatKernelLineageMatches(t *testing.T) {
+	tests := []struct {
+		name       string
+		release    string
+		rhf        int
+		cloudLinux bool
+		want       bool
+	}{
+		{name: "matching el10", release: "6.12.0-124.8.1.el10_1.x86_64", rhf: 10 * 256, want: true},
+		{name: "matching el9", release: "5.14.0-503.el9.x86_64", rhf: 9 * 256, want: true},
+		{name: "ELRepo RHEL9 rebuild", release: "6.12.1-1.el9.elrepo.x86_64", rhf: 9 * 256, want: false},
+		{name: "UEK suffix", release: "5.15.0-300.163.18.el8uek.x86_64", rhf: 8 * 256, want: false},
+		{name: "wrong el major", release: "5.14.0-503.el8.x86_64", rhf: 9 * 256, want: false},
+		{name: "CloudLinux 8 lve", release: "4.18.0-425.lve.el8.x86_64", rhf: 8 * 256, cloudLinux: true, want: true},
+		{name: "lve on another distro", release: "4.18.0-425.lve.el8.x86_64", rhf: 8 * 256, want: false},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			if got := redHatKernelLineageMatches(tc.release, tc.rhf, tc.cloudLinux); got != tc.want {
+				t.Fatalf("redHatKernelLineageMatches() = %t, want %t", got, tc.want)
 			}
 		})
 	}
@@ -515,6 +542,7 @@ func TestBuildLoadPlan(t *testing.T) {
 			})
 
 			tc.want.ObjectPath = filepath.Join(defaultPluginsDir(), "ebpf.d", tc.want.ObjectPath)
+			tc.want.Kernels = tc.kernels
 			// The plan must carry the requested family, not just bake it into the
 			// path: buildFallbackPlans reads primary.IsReturn to keep the fallback
 			// chain in the same 'p'/'r' family.  Asserted for every case here so a
@@ -577,5 +605,97 @@ func TestKernelRejected(t *testing.T) {
 	}
 	if !rejected {
 		t.Fatalf("KernelRejected() = false, want true")
+	}
+}
+
+func TestLegacyArtifactFamilyAvailability(t *testing.T) {
+	tests := []struct {
+		name   string
+		module string
+		rhf    int
+		kver   uint32
+		want   bool
+	}{
+		{name: "3.10 keeps available collector", module: "swap", rhf: 7 * 256, kver: 3<<16 + 10<<8, want: true},
+		{name: "3.10 has no DNS object", module: "dns", rhf: 7 * 256, kver: 3<<16 + 10<<8},
+		{name: "generic 6.10 disk artifact", module: "disk", rhf: -1, kver: 6<<16 + 10<<8, want: true},
+		{name: "generic 6.10 legacy artifact family", module: "process", rhf: -1, kver: 6<<16 + 10<<8, want: true},
+		{name: "generic 6.12 full family", module: "dns", rhf: -1, kver: 6<<16 + 12<<8, want: true},
+		{name: "generic 6.16 falls back to older family", module: "swap", rhf: -1, kver: 6<<16 + 16<<8, want: true},
+		{name: "generic 6.16 disk falls back to older family", module: "disk", rhf: -1, kver: 6<<16 + 16<<8, want: true},
+		{name: "generic 7.0 process artifact", module: "process", rhf: -1, kver: minimumKernelVersionSeven, want: true},
+		{name: "generic 7.0 cachestat base artifact", module: "cachestat", rhf: -1, kver: minimumKernelVersionSeven, want: true},
+		{name: "generic 7.0 dcstat base artifact", module: "dc", rhf: -1, kver: minimumKernelVersionSeven, want: true},
+		{name: "generic 7.0 dcstat validator name", module: "dcstat", rhf: -1, kver: minimumKernelVersionSeven, want: true},
+		{name: "generic 7.0 fd base artifact", module: "fd", rhf: -1, kver: minimumKernelVersionSeven, want: true},
+		{name: "generic 7.0 socket base artifact", module: "socket", rhf: -1, kver: minimumKernelVersionSeven, want: true},
+		{name: "generic 7.0 no DNS artifact", module: "dns", rhf: -1, kver: minimumKernelVersionSeven},
+		{name: "RHEL 9 object family", module: "socket", rhf: 9 * 256, kver: 5<<16 + 14<<8, want: true},
+		{name: "RHEL 9 5.16 remains compatible", module: "socket", rhf: 9 * 256, kver: 5<<16 + 16<<8, want: true},
+		{name: "non-RHEL10 RH 5.17 fails closed", module: "swap", rhf: 9 * 256, kver: 5<<16 + 17<<8},
+		{name: "RHEL 10 6.12 family", module: "dns", rhf: 10 * 256, kver: 6<<16 + 12<<8, want: true},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			if got := legacyArtifactFamilyAvailable(tc.module, tc.rhf, tc.kver); got != tc.want {
+				t.Fatalf("legacyArtifactFamilyAvailable(%q, %d, %d) = %v, want %v", tc.module, tc.rhf, tc.kver, got, tc.want)
+			}
+		})
+	}
+}
+
+func TestSelectMaxIndexMatchesGenericPre54BuildRung(t *testing.T) {
+	for _, kver := range []uint32{4<<16 + 17<<8, 5 << 16, 5<<16 + 2<<8, 5<<16 + 3<<8} {
+		if got := SelectKernelName(uint32(SelectMaxIndex(-1, kver))); got != "5.4" {
+			t.Errorf("SelectMaxIndex(-1, %d) selected %q, want 5.4 producer family", kver, got)
+		}
+	}
+}
+
+func TestBuildCoreLegacyFallbackPlansUsesOnlyVerifiedFamilies(t *testing.T) {
+	primary := LoadPlan{
+		KernelVersion: minimumKernelVersionArena,
+		Kernels:       (1 << 12) - 1,
+		IsRHF:         -1,
+		Selector:      11,
+		Flavor:        ObjectFlavorBuffer,
+		LoadMode:      LoadCore,
+	}
+	plans := buildCoreLegacyFallbackPlans(primary, "/plugins", -1, "cachestat", cachestatMaxBaseSelector)
+	if len(plans) != 2 {
+		t.Fatalf("buildCoreLegacyFallbackPlans() returned %d plans, want buffer then base", len(plans))
+	}
+	if plans[0].LoadMode != LoadLegacy || plans[0].Flavor != ObjectFlavorBuffer || plans[0].Selector != 11 {
+		t.Fatalf("legacy fallback plan = %+v, want legacy buffer selector 11", plans[0])
+	}
+
+	primary.KernelVersion = minimumKernelVersionSeven
+	primary.Selector = 12
+	primary.Flavor = ObjectFlavorBase
+	if plans := buildFallbackPlans(primary, "/plugins", -1, "cachestat", cachestatMaxBaseSelector); len(plans) != 1 || plans[0].LoadMode != LoadCore {
+		t.Fatalf("CO-RE plan for generic 7.0 cachestat = %+v, want one CO-RE plan", plans)
+	}
+	plans = buildCoreLegacyFallbackPlans(primary, "/plugins", -1, "cachestat", cachestatMaxBaseSelector)
+	if len(plans) != 1 || plans[0].Selector != 12 || plans[0].LoadMode != LoadLegacy {
+		t.Fatalf("fallback plans for generic 7.0 cachestat = %+v, want one 7.0 legacy plan", plans)
+	}
+}
+
+func TestBuildFallbackPlansKeepsGenericSevenArenaObjectWithoutBTF(t *testing.T) {
+	cfg := SocketLegacyConfig{
+		PluginsDir:    defaultPluginsDir(),
+		Kernels:       socketKernelMask,
+		IsRHF:         -1,
+		KernelVersion: minimumKernelVersionSeven,
+		HasBTF:        false,
+		ObjectFlavor:  "arena",
+	}
+	plans := buildFallbackPlans(BuildSocketLegacyPlan(cfg), cfg.PluginsDir, cfg.IsRHF, "socket", socketMaxBaseSelector)
+	if len(plans) != 3 {
+		t.Fatalf("buildFallbackPlans() returned %d plans, want arena, buffer, and base plans: %+v", len(plans), plans)
+	}
+	if plans[0].LoadMode != LoadLegacy || plans[0].Selector != 12 || plans[0].Flavor != ObjectFlavorArena {
+		t.Fatalf("generic 7.0 no-BTF plan = %+v, want arena object at selector 12", plans[0])
 	}
 }

@@ -300,6 +300,64 @@ static int ebpf_get_redhat_release_from_os_release(void)
     return ebpf_parse_redhat_release_from_os_release(contents);
 }
 
+static int ebpf_os_release_is_cloudlinux(void)
+{
+    FILE *fp = fopen("/etc/os-release", "r");
+    if (!fp)
+        return 0;
+
+    char line[512];
+    int is_cloudlinux = 0;
+    while (fgets(line, sizeof(line), fp)) {
+        if (strncmp(line, "ID=", 3))
+            continue;
+        char *value = line + 3;
+        value[strcspn(value, "\r\n")] = '\0';
+        while (isspace((unsigned char)*value))
+            value++;
+        size_t value_length = strlen(value);
+        if (value_length >= 2 && (*value == '"' || *value == '\'') && value[value_length - 1] == *value) {
+            value[value_length - 1] = '\0';
+            value++;
+        }
+        is_cloudlinux = !strcasecmp(value, "cloudlinux");
+        break;
+    }
+    fclose(fp);
+    return is_cloudlinux;
+}
+
+int ebpf_rhf_kernel_lineage_matches(const char *kernel_release, int rhf, int cloudlinux)
+{
+    if (!kernel_release || rhf < 0)
+        return 0;
+
+    if (strstr(kernel_release, ".elrepo"))
+        return 0;
+
+    if (strstr(kernel_release, ".lve"))
+        return rhf / 256 == 8 && cloudlinux;
+
+    const char *el = strstr(kernel_release, ".el");
+    if (!el || !isdigit((unsigned char)el[3]))
+        return 0;
+
+    errno = 0;
+    char *end;
+    long major = strtol(el + 3, &end, 10);
+    if (errno || end == el + 3 || (*end != '.' && *end != '_' && *end != '\0'))
+        return 0;
+    return major == rhf / 256;
+}
+
+static int ebpf_confirm_redhat_kernel_lineage(int rhf)
+{
+    struct utsname uts;
+    if (uname(&uts))
+        return -1;
+    return ebpf_rhf_kernel_lineage_matches(uts.release, rhf, ebpf_os_release_is_cloudlinux()) ? rhf : -1;
+}
+
 int get_redhat_release()
 {
     char buffer[VERSION_STRING_LEN + 1];
@@ -311,11 +369,11 @@ int get_redhat_release()
             buffer[length] = '\0';
             int release = ebpf_parse_redhat_release_version(buffer);
             if (release >= 0)
-                return release;
+                return ebpf_confirm_redhat_kernel_lineage(release);
         }
     }
 
-    return ebpf_get_redhat_release_from_os_release();
+    return ebpf_confirm_redhat_kernel_lineage(ebpf_get_redhat_release_from_os_release());
 }
 
 /**
@@ -599,6 +657,8 @@ uint32_t ebpf_select_disk_index(uint32_t kernels, int is_rhf, uint32_t kver)
 {
     if (ebpf_is_rhel10_6_12_stream(is_rhf, kver))
         return NETDATA_IDX_V6_12;
+    if (is_rhf <= 0 && kver >= NETDATA_EBPF_KERNEL_6_12)
+        return ebpf_select_index(kernels, is_rhf, kver);
     return ebpf_select_index(kernels, is_rhf, kver);
 }
 
@@ -612,10 +672,34 @@ uint32_t ebpf_select_module_index(const ebpf_module_t *em, int is_rhf, uint32_t 
 
 int ebpf_legacy_disk_supported(int is_rhf, uint32_t kver)
 {
-    if (is_rhf <= 0 || kver < NETDATA_EBPF_KERNEL_5_17)
+    if (kver < NETDATA_EBPF_KERNEL_5_17)
         return 1;
 
-    return ebpf_is_rhel10_6_12_stream(is_rhf, kver);
+    if (ebpf_is_rhel10_6_12_stream(is_rhf, kver))
+        return 1;
+
+    return is_rhf <= 0;
+}
+
+int ebpf_legacy_artifact_family_supported(const char *name, int is_rhf, uint32_t kver)
+{
+    if (kver < NETDATA_EBPF_KERNEL_4_14)
+        return strcmp(name, "dns") != 0;
+
+    if (ebpf_is_rhel10_6_12_stream(is_rhf, kver) ||
+        (is_rhf <= 0 && kver >= NETDATA_EBPF_KERNEL_6_12 && kver < NETDATA_EBPF_KERNEL_6_12 + 256))
+        return 1;
+
+    if (is_rhf > 0)
+        return kver < NETDATA_EBPF_KERNEL_5_17;
+
+    // Generic 6.12 is a complete legacy family. On newer kernels, use the
+    // newest rung in this module's mask, including the available older disk objects.
+
+    if (kver >= NETDATA_EBPF_KERNEL_6_8)
+        return 1;
+
+    return 1;
 }
 
 /**
@@ -1012,14 +1096,54 @@ static ebpf_specify_name_t *ebpf_find_names(ebpf_specify_name_t *names, const ch
     return NULL;
 }
 
+static bool ebpf_optional_legacy_target(const char *section_name)
+{
+    static const char *const optional_targets[] = {
+        "nfs4_file_open", "blk_complete_request", "swap_read_folio", "swap_readpage",
+        "swap_writepage", "__swap_writepage", NULL,
+    };
+
+    if (!section_name)
+        return false;
+
+    const char *target = strchr(section_name, '/');
+    if (!target || !target[1])
+        return false;
+    target++;
+
+    for (size_t i = 0; optional_targets[i]; i++) {
+        if (!strcmp(target, optional_targets[i])) {
+            char *symbol = ebpf_find_symbol((char *)target);
+            bool missing = !symbol || strcmp(symbol, target);
+            freez(symbol);
+            return missing;
+        }
+    }
+
+    return false;
+}
+
 static struct bpf_link **ebpf_attach_programs(struct bpf_object *obj, size_t length, ebpf_specify_name_t *names)
 {
     struct bpf_link **links = callocz(length, sizeof(struct bpf_link *));
     size_t i = 0;
+    int failed = 0;
     struct bpf_program *prog;
     ebpf_specify_name_t *w;
+    size_t attached = 0;
     bpf_object__for_each_program(prog, obj)
     {
+        if (!bpf_program__autoload(prog)) {
+            i++;
+            continue;
+        }
+
+        // These compatibility probes are compiled as alternatives; absence must not disable the collector.
+        if (ebpf_optional_legacy_target(bpf_program__section_name(prog))) {
+            i++;
+            continue;
+        }
+
         if (names) {
             const char *name = bpf_program__name(prog);
             w = ebpf_find_names(names, name);
@@ -1036,8 +1160,21 @@ static struct bpf_link **ebpf_attach_programs(struct bpf_object *obj, size_t len
         if (libbpf_get_error(links[i])) {
             links[i] = NULL;
         }
+        if (!links[i] && (!w || !w->optional))
+            failed = 1;
+        else if (links[i])
+            attached++;
 
         i++;
+    }
+
+    if (failed || !attached) {
+        for (i = 0; i < length; i++) {
+            if (links[i])
+                bpf_link__destroy(links[i]);
+        }
+        freez(links);
+        return NULL;
     }
 
     return links;
@@ -1138,11 +1275,14 @@ struct bpf_link **ebpf_load_program(char *plugins_dir, ebpf_module_t *em, int kv
     char lpath[4096];
     uint32_t idx = ebpf_select_module_index(em, is_rhf, kver);
 
-    ebpf_mount_name(lpath, 4095, plugins_dir, idx, em->info.thread_name, em->mode, is_rhf);
+    if (!ebpf_legacy_artifact_family_supported(em->info.thread_name, is_rhf, kver)) {
+        netdata_log_error("ERROR: no verified legacy eBPF object family for %s on kernel %d.%d.%d",
+                          em->info.thread_name, kver >> 16, (kver >> 8) & 0xff, kver & 0xff);
+        *obj = NULL;
+        return NULL;
+    }
 
-    // When this function is called ebpf.plugin is using legacy code, so we should reset the variable
-    em->load &= ~NETDATA_EBPF_LOAD_METHODS;
-    em->load |= EBPF_LOAD_LEGACY;
+    ebpf_mount_name(lpath, 4095, plugins_dir, idx, em->info.thread_name, em->mode, is_rhf);
 
     *obj = bpf_object__open_file(lpath, NULL);
     if ((!*obj || libbpf_get_error(*obj)) && is_rhf > 0 && !ebpf_is_rhel10_6_12_stream(is_rhf, kver)) {
@@ -1174,7 +1314,28 @@ struct bpf_link **ebpf_load_program(char *plugins_dir, ebpf_module_t *em, int kv
     collector_info("eBPF program %s loaded with success!", lpath);
 #endif
 
-    return ebpf_attach_programs(*obj, count_programs, em->names);
+    struct bpf_link **links = ebpf_attach_programs(*obj, count_programs, em->names);
+    if (!links) {
+        bpf_object__close(*obj);
+        *obj = NULL;
+    }
+
+    return links;
+}
+
+int ebpf_load_legacy_fallback(ebpf_module_t *em, int kver, int is_rhf)
+{
+    if (!em || !(em->load & EBPF_LOAD_CORE))
+        return -1;
+
+    netdata_log_info("CO-RE load failed for %s; trying a verified legacy object", em->info.thread_name);
+    em->probe_links = ebpf_load_program(ebpf_plugin_dir, em, kver, is_rhf, &em->objects);
+    if (!em->probe_links)
+        return -1;
+
+    em->load &= ~EBPF_LOAD_CORE;
+    em->load |= EBPF_LOAD_LEGACY;
+    return 0;
 }
 
 char *ebpf_find_symbol(char *search)
@@ -1506,7 +1667,8 @@ static netdata_ebpf_load_mode_t ebpf_select_load_mode(
 #ifdef LIBBPF_MAJOR_VERSION
     if ((load & EBPF_LOAD_CORE) || (load & EBPF_LOAD_PLAY_DICE)) {
         // Quick fix for Oracle linux 8.x
-        load = (!btf_file || (is_rh > 0 && (kver >= NETDATA_EBPF_KERNEL_5_4 && kver < NETDATA_EBPF_KERNEL_5_5))) ?
+        load = (!btf_file || (is_rh > 0 &&
+                              (kver >= NETDATA_EBPF_KERNEL_5_4 && kver < NETDATA_EBPF_KERNEL_5_5))) ?
                    EBPF_LOAD_LEGACY :
                    EBPF_LOAD_CORE;
     }
@@ -1516,6 +1678,17 @@ static netdata_ebpf_load_mode_t ebpf_select_load_mode(
 
     return load;
 }
+
+#ifdef LIBBPF_MAJOR_VERSION
+static bool ebpf_trampoline_supported(void)
+{
+    static int supported = -1;
+    if (supported < 0)
+        supported = libbpf_probe_bpf_prog_type(BPF_PROG_TYPE_TRACING, NULL) > 0;
+
+    return supported;
+}
+#endif
 
 /**
  * Update Module using config
@@ -1573,6 +1746,14 @@ void ebpf_update_module_using_config(
         inicfg_get(modules->cfg, EBPF_GLOBAL_SECTION, EBPF_CFG_CORE_ATTACH, EBPF_CFG_ATTACH_TRAMPOLINE);
     netdata_ebpf_program_loaded_t fill_lm = ebpf_convert_core_type(core_attach, modules->mode);
     ebpf_update_target_with_conf(modules, fill_lm);
+#ifdef LIBBPF_MAJOR_VERSION
+    if ((modules->load & EBPF_LOAD_CORE) && modules->targets && !ebpf_trampoline_supported()) {
+        for (netdata_ebpf_targets_t *target = modules->targets; target->name; target++) {
+            if (target->mode == EBPF_LOAD_TRAMPOLINE)
+                target->mode = EBPF_LOAD_PROBE;
+        }
+    }
+#endif
 
     value = ebpf_convert_collect_pid_to_string(modules->apps_level);
     const char *collect_pid = inicfg_get(modules->cfg, EBPF_GLOBAL_SECTION, EBPF_CFG_COLLECT_PID, value);

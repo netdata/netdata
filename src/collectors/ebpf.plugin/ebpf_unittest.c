@@ -58,16 +58,16 @@ static int test_disk_kernel_variants(void)
 
     for (size_t i = 0; ebpf_modules[i].info.thread_name; i++) {
         if (!strcmp(ebpf_modules[i].info.thread_name, "disk")) {
-            const uint32_t expected = NETDATA_V5_11 | NETDATA_V5_16 | NETDATA_V5_17 | NETDATA_V6_8;
+            const uint32_t expected = NETDATA_V5_11 | NETDATA_V5_16 | NETDATA_V5_17 | NETDATA_V6_8 | NETDATA_V6_12;
             return (ebpf_modules[i].kernels & expected) == expected &&
                    ebpf_select_disk_index(ebpf_modules[i].kernels, 10 * 256, NETDATA_EBPF_KERNEL_6_12) == NETDATA_IDX_V6_12 &&
                    ebpf_select_disk_index(ebpf_modules[i].kernels, 10 * 256, NETDATA_EBPF_KERNEL_6_12 + 3) == NETDATA_IDX_V6_12 &&
-                   ebpf_select_disk_index(ebpf_modules[i].kernels, 10 * 256, NETDATA_EBPF_KERNEL_6_12 + 256) != NETDATA_IDX_V6_12 &&
-                   ebpf_select_disk_index(ebpf_modules[i].kernels, 10 * 256, NETDATA_EBPF_KERNEL_6_16) != NETDATA_IDX_V6_12 &&
+                   ebpf_select_disk_index(ebpf_modules[i].kernels, 10 * 256, NETDATA_EBPF_KERNEL_6_12 + 256) == NETDATA_IDX_V6_12 &&
+                   ebpf_select_disk_index(ebpf_modules[i].kernels, 10 * 256, NETDATA_EBPF_KERNEL_6_16) == NETDATA_IDX_V6_12 &&
                    ebpf_select_disk_index(ebpf_modules[i].kernels, 11 * 256, NETDATA_EBPF_KERNEL_6_12) != NETDATA_IDX_V6_12 &&
                    ebpf_select_disk_index(ebpf_modules[i].kernels, 9 * 256, NETDATA_EBPF_KERNEL_6_12) == NETDATA_IDX_V5_14 &&
                    ebpf_select_disk_index(ebpf_modules[i].kernels, 9 * 256, NETDATA_EBPF_KERNEL_5_17) == NETDATA_IDX_V5_14 &&
-                   ebpf_select_disk_index(ebpf_modules[i].kernels, -1, NETDATA_EBPF_KERNEL_6_12) == NETDATA_IDX_V6_8;
+                   ebpf_select_disk_index(ebpf_modules[i].kernels, -1, NETDATA_EBPF_KERNEL_6_12) == NETDATA_IDX_V6_12;
         }
     }
 
@@ -83,7 +83,49 @@ static int test_legacy_disk_support_window(void)
            ebpf_legacy_disk_supported(10 * 256, NETDATA_EBPF_KERNEL_6_12 + 3) &&
            !ebpf_legacy_disk_supported(10 * 256, NETDATA_EBPF_KERNEL_6_16) &&
            !ebpf_legacy_disk_supported(11 * 256, NETDATA_EBPF_KERNEL_6_12) &&
+           ebpf_legacy_disk_supported(-1, NETDATA_EBPF_KERNEL_6_12) &&
+           ebpf_legacy_disk_supported(-1, NETDATA_EBPF_KERNEL_6_12 + 256) &&
            ebpf_legacy_disk_supported(-1, NETDATA_EBPF_KERNEL_6_16);
+}
+
+static int test_legacy_artifact_family_support(void)
+{
+    return ebpf_legacy_artifact_family_supported("swap", 7 * 256, 3 * 65536 + 10 * 256) &&
+           !ebpf_legacy_artifact_family_supported("dns", 7 * 256, 3 * 65536 + 10 * 256) &&
+           ebpf_legacy_artifact_family_supported("disk", -1, NETDATA_EBPF_KERNEL_6_8 + 2 * 256) &&
+           ebpf_legacy_artifact_family_supported("process", -1, NETDATA_EBPF_KERNEL_6_8 + 2 * 256) &&
+           ebpf_legacy_artifact_family_supported("dns", -1, NETDATA_EBPF_KERNEL_6_12) &&
+           ebpf_legacy_artifact_family_supported("disk", -1, NETDATA_EBPF_KERNEL_6_16) &&
+           ebpf_legacy_artifact_family_supported("process", -1, NETDATA_EBPF_KERNEL_7_0) &&
+           !ebpf_legacy_artifact_family_supported("dns", -1, NETDATA_EBPF_KERNEL_7_0) &&
+           ebpf_legacy_artifact_family_supported("dns", 10 * 256, NETDATA_EBPF_KERNEL_6_12) &&
+           !ebpf_legacy_artifact_family_supported("swap", 9 * 256, NETDATA_EBPF_KERNEL_5_17);
+}
+
+static int test_generic612_module_masks(void)
+{
+    for (size_t i = 0; ebpf_modules[i].info.thread_name; i++) {
+        if (ebpf_modules[i].kernels && !(ebpf_modules[i].kernels & NETDATA_V6_12))
+            return 0;
+    }
+
+    for (size_t i = 0; localfs[i].filesystem; i++) {
+        if (!(localfs[i].kernels & NETDATA_V6_12))
+            return 0;
+    }
+
+    return 1;
+}
+
+static int test_red_hat_kernel_lineage(void)
+{
+    return ebpf_rhf_kernel_lineage_matches("6.12.0-124.8.1.el10_1.x86_64", 10 * 256, 0) &&
+           ebpf_rhf_kernel_lineage_matches("5.14.0-503.el9.x86_64", 9 * 256, 0) &&
+           !ebpf_rhf_kernel_lineage_matches("6.12.1-1.el9.elrepo.x86_64", 9 * 256, 0) &&
+           !ebpf_rhf_kernel_lineage_matches("5.15.0-300.el8uek.x86_64", 8 * 256, 0) &&
+           !ebpf_rhf_kernel_lineage_matches("5.14.0-503.el8.x86_64", 9 * 256, 0) &&
+           ebpf_rhf_kernel_lineage_matches("4.18.0-425.lve.el8.x86_64", 8 * 256, 1) &&
+           !ebpf_rhf_kernel_lineage_matches("4.18.0-425.lve.el8.x86_64", 8 * 256, 0);
 }
 
 static int test_rhel10_selector_respects_module_mask(void)
@@ -253,6 +295,8 @@ void ebpf_ut_cleanup_memory()
 static int ebpf_ut_load_binary()
 {
     if (!test_disk_kernel_variants() || !test_legacy_disk_support_window() ||
+        !test_legacy_artifact_family_support() || !test_generic612_module_masks() ||
+        !test_red_hat_kernel_lineage() ||
         !test_rhel10_selector_respects_module_mask() || !test_rhel10_module_masks() ||
         !test_redhat_release_version_parser() || !test_redhat_os_release_parser()) {
         fprintf(stderr, ">>> FAILED: kernel version parsing or disk selectors are inconsistent\n");
