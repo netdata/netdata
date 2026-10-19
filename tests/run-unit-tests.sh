@@ -42,7 +42,7 @@ kickstart_path_unit_test() {
 
 spawn_server_unit_tests() {
   # Shared with the macOS CI job, which builds netdata and then runs only this suite.
-  cmake --build "${NETDATA_BUILD_DIR:-./build}" --target spawn-tester
+  fakeroot cmake --build "${NETDATA_BUILD_DIR:-./build}" --target spawn-tester
   bash "$(dirname "$0")/spawn-server-tests.sh"
 }
 
