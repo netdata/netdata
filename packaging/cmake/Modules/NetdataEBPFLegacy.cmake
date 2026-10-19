@@ -33,9 +33,13 @@ function(netdata_fetch_legacy_ebpf_code)
         message(FATAL_ERROR "Could not determine libc implementation, unable to install eBPF legacy code.")
     endif()
 
+    # The URL is listed multiple times because CMake tries each URL in turn,
+    # which gives us retries on transient download failures.
+    set(_url "https://github.com/netdata/kernel-collector/releases/download/v1.7.0.4/netdata-kernel-collector-${_libc}-v1.7.0.4.tar.xz")
+
     ExternalProject_Add(
         ebpf-code-legacy
-        URL https://github.com/netdata/kernel-collector/releases/download/v1.7.0.4/netdata-kernel-collector-${_libc}-v1.7.0.4.tar.xz
+        URL ${_url} ${_url} ${_url}
         URL_HASH SHA256=${_hash}
         SOURCE_DIR "${ebpf-legacy_SOURCE_DIR}"
         CONFIGURE_COMMAND ""
