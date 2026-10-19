@@ -127,6 +127,8 @@ GET /api/v3/function?function=systemd-journal info after:1234567890 before:12345
   - A free-form `text` selector does not require `options`
   - Common fields: `help`, `unique_view`, optional `value_separator` for an accepted joined-value encoding
   - `options[]`: `id`, `name`, optional `defaultSelected`, `disabled`, `sort`, `aliases`
+  - Optional `focus` declares topology roots/depth controls; see
+    [Topology focus controls](FUNCTION_UI_DEVELOPER_GUIDE.md#topology-focus-controls).
 
 Option IDs are opaque. Match an exact ID before considering declared aliases or splitting a joined value;
 `beta rack,1` can be one ID, and `prod-a` differs from `prod_a`. An alias advertised by several options is ambiguous

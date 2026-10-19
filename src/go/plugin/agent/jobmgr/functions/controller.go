@@ -1073,6 +1073,9 @@ func validateConfiguredMethods(module string, methods []funcapi.FunctionConfig) 
 		if len(method.AcceptedParams) != 0 && !method.RawRequest {
 			return nil, fmt.Errorf("jobmgr Function controller: method %q AcceptedParams requires RawRequest", method.ID)
 		}
+		if err := funcapi.ValidateFocusParams(method.RequiredParams); err != nil {
+			return nil, fmt.Errorf("jobmgr Function controller: method %q: %w", method.ID, err)
+		}
 		if !validQuotedProtocolField(method.Help) {
 			return nil, errors.New("jobmgr Function controller: invalid Function help")
 		}
@@ -1133,6 +1136,11 @@ func controllerGroupSignature(
 			writeDigestUint64(digest, uint64(parameter.Selection))
 			writeDigestBool(digest, parameter.UniqueView)
 			writeDigestString(digest, parameter.ValueSeparator)
+			focus, err := json.Marshal(parameter.Focus)
+			if err != nil {
+				return "", fmt.Errorf("jobmgr Function controller: method %q focus: %w", method.ID, err)
+			}
+			writeDigestString(digest, string(focus))
 			for _, option := range parameter.Options {
 				writeDigestString(digest, option.ID)
 				writeDigestString(digest, option.Name)

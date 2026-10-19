@@ -11,6 +11,16 @@ forms already accepted by a producer. They do not change `ResolveParam` or enabl
 Advertise only forms the request path actually accepts. Canonical option IDs remain opaque and take precedence over
 aliases or joined-value splitting; see the [Function contract](../../../plugins.d/FUNCTION_UI_DEVELOPER_GUIDE.md#accepted-option-forms).
 
+## Topology focus metadata
+
+`ParamConfig.Focus` declares optional roots/depth roles for aggregate-first topology focus. `RequiredParam` clones
+the descriptor and nested slices so emitted metadata does not share mutable ownership with declarations.
+`ValidateFocusParams` checks role uniqueness, canonical sentinel options, depth values and traversal declarations;
+managed Function publication and responses reject invalid declarations. Data-bound references are checked by
+`topologyv1.ValidateDecodedResponse`, not by metadata-only discovery. The descriptor changes neither parameter
+resolution nor direct filtering. Wire semantics belong to the
+[topology contract](../../../plugins.d/FUNCTION_TOPOLOGY_DEVELOPER_GUIDE.md#aggregate-first-focus).
+
 ## Process Function providers
 
 Use `agent.Config.ProcessFunctions` (or `composition.Config.ProcessFunctions`) for

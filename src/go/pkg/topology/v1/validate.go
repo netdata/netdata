@@ -53,7 +53,10 @@ func ValidateDecodedResponse(payload any) error {
 		return fmt.Errorf("response.data.schema_version is not %q", SchemaVersion)
 	}
 
-	return ValidateDecodedData(data)
+	if err := ValidateDecodedData(data); err != nil {
+		return err
+	}
+	return validateFocusMetadata(obj["required_params"], data)
 }
 
 func ValidateDecodedData(data map[string]any) error {

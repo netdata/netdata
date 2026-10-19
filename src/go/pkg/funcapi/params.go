@@ -67,6 +67,8 @@ type ParamConfig struct {
 	UniqueView bool
 	// ValueSeparator advertises a joined-value encoding accepted by the producer.
 	ValueSeparator string
+	// Focus declares aggregate-first graph controls; absence retains ordinary source-side semantics.
+	Focus *FocusConfig
 }
 
 // RequiredParam converts ParamConfig to the wire format used by required_params.
@@ -85,6 +87,9 @@ func (p ParamConfig) RequiredParam() map[string]any {
 	}
 	if p.ValueSeparator != "" {
 		out["value_separator"] = p.ValueSeparator
+	}
+	if p.Focus != nil {
+		out["focus"] = p.Focus.clone()
 	}
 	return out
 }

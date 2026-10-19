@@ -164,6 +164,89 @@ parameters. Raw methods retain their separate `ManagedInfo` contract. See the
 for containment, cancellation and error behavior. These metadata additions do
 not change direct per-node topology requests or selector defaults.
 
+### Aggregate-First Focus
+
+Status: the Agent declares this optional contract. Cloud consumers must implement
+the following behavior before enabling aggregate-first focus; the metadata alone
+does not change direct Agent filtering or the deployed CTS implementation.
+
+A selector's optional `focus` object distinguishes a graph operation from an
+ordinary source-side filter. At most one selector declares `role: "roots"` and
+one declares `role: "depth"`; depth requires roots. Names such as `focus`, `depth`
+or a topology Function name have no implicit meaning. Selectors without this
+metadata retain their source-side semantics.
+
+- Roots declare `unfocused_option`, `bindings` and `traversal`. The unfocused ID
+  must be a canonical default option. Selecting it, even together with other choices,
+  bypasses focus, depth and post-focus pruning.
+- Depth is single-select and declares a canonical `unlimited_option`. Every other
+  option ID is a non-negative integer hop count. Without a depth selector,
+  traversal is unlimited.
+- `bindings` names an actor-owned detail table and its `option_column` and
+  `actor_column`. The table type has role `actor_detail`, owner `actor` and
+  aggregation `append`. The option column is `string` or `string_ref`; each value
+  is a canonical root option, never the unfocused ID or an alias. The actor column
+  is a non-null `actor_ref` into this response's actor rows. Normal compact-table
+  codecs and dictionary resolution apply.
+- Bindings may be one-to-many or many-to-one. A zero-row table is valid; an option
+  without bindings is unresolved, not an instruction to select everything.
+  Bindings describe actors surviving ordinary source-side controls in this map.
+- The binding table is supporting data, not graph structure or a modal section.
+  Producers should mark its default visibility `hidden` and not include it in
+  modal sections. Info responses describe the binding table but do not contain it.
+
+An aggregator discovers controls from each source's Function metadata, omits the
+declared roots/depth controls from fan-out requests, and obtains complete maps for
+the remaining selections. Producers declaring focus must therefore default to
+unfocused operation when those controls are omitted. The aggregator resolves
+bindings against source actor occurrences, correlates the maps, remaps the bound
+actors, then applies focus to the merged graph. It must also remap declared table,
+actor-type and link-type references if registries are namespaced. Never match a
+choice by its display label or guess its identity from an IP-like ID.
+
+The data response's focus metadata is authoritative for that map, including its
+available choices and resolved traversal policy after other selectors. Info may
+advertise the default policy; it must not render or query devices just to populate
+bindings. Conflicting policies or unresolved selected choices must be reported
+through topology notifications, not silently treated as successful focus or as
+the unfocused choice. In particular, a missing choice is not proof that another
+source's equal-looking label or local ID identifies the same entity.
+
+`traversal` defines this undirected graph operation, independently of layout or
+link arrow direction:
+
+1. Actor types in `connector_types` are single-hop connectors; types in
+   `boundary_types` are boundaries. These disjoint sets and `prune_leaf_types`
+   reference declared actor types. All other actors are ordinary vertices.
+2. From each bound ordinary root at distance zero, a direct ordinary-to-ordinary
+   edge costs one hop. Crossing one connector to an ordinary neighbor also costs
+   one hop. Connector-to-connector chains do not propagate traversal. Boundaries
+   never propagate depth, including at unlimited depth.
+3. Include ordinary actors within the selected depth. For positive or unlimited
+   depth, also include every connector or boundary incident to one of those
+   actors, even when that actor is at the depth limit. At depth zero, do not add
+   those incident actors automatically.
+4. If `connect_roots` is true, also include all actors and edges on every equal
+   shortest path between each pair of roots. This separate operation counts raw
+   graph edges, permits connectors and boundaries, and is not limited by depth.
+   Disconnected roots stay separate; no edge is invented.
+5. Retain links whose endpoints both belong to the depth-selected set, plus links
+   whose endpoint pair belongs to a connecting path. Do not retain every link
+   induced by the final union: that would add unrelated cross-links between paths.
+6. Iteratively remove actors of `prune_leaf_types` with at most one distinct
+   retained neighbor, together with their incident links, until stable. A declared
+   `protected_memberships` actor-type/link-type pair exempts an actor of that type
+   while it has a retained incident link of the specified type. Parallel links do
+   not count as distinct neighbors. Empty pruning declarations disable this step.
+
+SNMP emits bindings as `data.tables.actor.focus_roots`, with columns `option` and
+`actor`. Choices and bindings use the same reconciled managed-device addresses as
+direct focus, not raw SNMP aliases. Its `segment` type is a connector and
+`l3_subnet_segment` is a boundary. IP mode prunes both types, protecting retained
+`l3_subnet_membership` links; MAC mode does not prune after focus. These are producer
+declarations, not names CTS may hardcode. Existing per-node focus remains local;
+omitting focus/depth produces the complete contribution used for aggregation.
+
 ## Notifications
 
 Status: implemented in the Agent JSON Schema, Go payload model, and validation.

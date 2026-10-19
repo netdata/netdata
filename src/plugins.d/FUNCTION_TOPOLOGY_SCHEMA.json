@@ -38,7 +38,10 @@
     "required_params": {
       "type": "array",
       "items": {
-        "type": "object"
+        "type": "object",
+        "properties": {
+          "focus": { "$ref": "#/$defs/focus" }
+        }
       }
     },
     "help": {
@@ -57,6 +60,136 @@
     }
   },
   "$defs": {
+    "focus_bindings": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "table",
+        "option_column",
+        "actor_column"
+      ],
+      "properties": {
+        "table": {
+          "type": "string",
+          "minLength": 1
+        },
+        "option_column": {
+          "type": "string",
+          "minLength": 1
+        },
+        "actor_column": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "focus_membership": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "actor_type",
+        "link_type"
+      ],
+      "properties": {
+        "actor_type": {
+          "type": "string",
+          "minLength": 1
+        },
+        "link_type": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "focus_traversal": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "connect_roots"
+      ],
+      "properties": {
+        "connector_types": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          },
+          "uniqueItems": true
+        },
+        "boundary_types": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          },
+          "uniqueItems": true
+        },
+        "connect_roots": {
+          "type": "boolean"
+        },
+        "prune_leaf_types": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          },
+          "uniqueItems": true
+        },
+        "protected_memberships": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "$ref": "#/$defs/focus_membership"
+          }
+        }
+      }
+    },
+    "focus": {
+      "oneOf": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "role",
+            "unfocused_option",
+            "bindings",
+            "traversal"
+          ],
+          "properties": {
+            "role": {
+              "const": "roots"
+            },
+            "unfocused_option": {
+              "type": "string",
+              "minLength": 1
+            },
+            "bindings": {
+              "$ref": "#/$defs/focus_bindings"
+            },
+            "traversal": {
+              "$ref": "#/$defs/focus_traversal"
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "role",
+            "unlimited_option"
+          ],
+          "properties": {
+            "role": {
+              "const": "depth"
+            },
+            "unlimited_option": {
+              "type": "string",
+              "minLength": 1
+            }
+          }
+        }
+      ]
+    },
     "topology_data": {
       "type": "object",
       "additionalProperties": false,

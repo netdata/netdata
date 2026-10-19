@@ -902,6 +902,19 @@ requests. A producer must advertise only forms its request path actually accepts
 serializer exposes `ValueSeparator` and `ParamOption.Aliases` without changing `ResolveParam` behavior. Existing
 clients can continue selecting and sending canonical option IDs without using this optional metadata.
 
+### Topology Focus Controls
+
+A `select` or `multiselect` may declare optional `focus` metadata. `role: "roots"` identifies a graph-root selector
+with an explicit unfocused option, source-actor bindings and traversal policy; `role: "depth"` identifies its
+single-select hop limit and unlimited option. Without this declaration, a selector remains an ordinary source-side
+control. The schema validates the descriptor structure; Go managed declarations and responses also validate its
+option IDs and role relationships. This metadata does not change Function request parsing or implement filtering.
+
+The [topology contract](FUNCTION_TOPOLOGY_DEVELOPER_GUIDE.md#aggregate-first-focus) owns binding resolution,
+aggregate-first ordering and traversal semantics. Direct Agent clients keep sending the existing selectors; cloud
+consumers must implement that contract before withholding focus controls from fan-out requests. Data response
+metadata may refine the info response's choices and policy for the actual map returned.
+
 ### Error Responses
 
 For errors, return:

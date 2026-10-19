@@ -355,6 +355,12 @@ func TestFunctionConfigRequestModes(t *testing.T) {
 		method funcapi.FunctionConfig
 		want   string
 	}{
+		"invalid focus": {
+			method: funcapi.FunctionConfig{ID: "events", RequiredParams: []funcapi.ParamConfig{{
+				ID: "near", Focus: &funcapi.FocusConfig{Role: "unsupported"},
+			}}},
+			want: "unknown focus role",
+		},
 		"dynamic info with raw input": {
 			method: funcapi.FunctionConfig{
 				ID:          "events",

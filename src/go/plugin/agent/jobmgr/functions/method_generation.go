@@ -364,6 +364,9 @@ func (mg *methodGeneration) responseResult(
 		params = funcapi.MergeParamConfigs(params, response.RequiredParams)
 	}
 	params = mg.withJobParam(method.ID, params)
+	if err := funcapi.ValidateFocusParams(params); err != nil {
+		return functionErrorResult(500, "module returned invalid focus metadata: %v", err)
+	}
 	help := response.Help
 	if info && help == "" {
 		help = method.Help
