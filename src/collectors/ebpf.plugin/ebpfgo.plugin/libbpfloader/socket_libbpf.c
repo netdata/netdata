@@ -591,6 +591,7 @@ struct netdata_ebpf_socket_runtime *netdata_socket_runtime_open_mode(const char 
         return NULL;
 
     struct bpf_object *obj = bpf_object__open_file(path, NULL);
+    // A failed open leaves nothing to close: libbpf 1.x returns NULL, older versions an error pointer
     if (!obj || libbpf_get_error(obj)) {
         freez(rt);
         return NULL;
