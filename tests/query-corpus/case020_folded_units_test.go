@@ -3,15 +3,46 @@
 package corpus
 
 import (
+	"reflect"
 	"strconv"
 	"testing"
-	"time"
 
 	"github.com/netdata/netdata/tests/query-corpus/daemon"
 	"github.com/netdata/netdata/tests/query-corpus/fixture"
 )
 
 const c020RawSourceUnitsContract = "CASE-020/raw-source-units-after-grouping"
+const c020CombinedViewUnitsContract = "CASE-020/combined-view-units"
+
+func c020AssertCombinedViewUnits(t *testing.T, doc map[string]any, expected ...string) {
+	t.Helper()
+	view := queryObject(t, doc, "view", "view")
+	if len(expected) == 1 {
+		if got, ok := view["units"].(string); !ok || got != expected[0] {
+			t.Errorf("view.units = %v, want common result unit %q", view["units"], expected[0])
+		}
+		return
+	}
+	units, ok := view["units"].([]any)
+	if !ok || len(units) != len(expected) {
+		t.Fatalf("view.units = %v, want distinct result units %v", view["units"], expected)
+	}
+	got := make(map[string]bool)
+	for _, value := range units {
+		unit, ok := value.(string)
+		if !ok || got[unit] {
+			t.Fatalf("view.units has malformed or duplicate units: %v", units)
+		}
+		got[unit] = true
+	}
+	want := make(map[string]bool)
+	for _, unit := range expected {
+		want[unit] = true
+	}
+	if !reflect.DeepEqual(got, want) {
+		t.Errorf("view.units = %v, want distinct result units %v", units, expected)
+	}
+}
 
 func c020AssertDimensionUnits(t *testing.T, section map[string]any, path string, want map[string]string) {
 	t.Helper()
@@ -85,35 +116,13 @@ func c020AssertFoldedRawUnits(t *testing.T, doc map[string]any) {
 	c020AssertDimensionUnits(t, db, "db", want)
 }
 
-func c020WaitCharts(t *testing.T, host string, charts ...fixture.Chart) {
-	t.Helper()
-	// Context retention alone may be satisfied before its second chart arrives.
-	for _, chart := range charts {
-		params := daemon.DataParams(chart.Context, chart.FirstT()-1, chart.LastT(), c020Samples)
-		params.Set("instances", chart.ID)
-		deadline := time.Now().Add(15 * time.Second)
-		for {
-			doc, err := td.DataV3(host, params)
-			if err == nil {
-				retention, ok := daemon.QueryRetention(doc)
-				if ok && retention.FirstEntry == chart.FirstT() && retention.LastEntry == chart.LastT() {
-					break
-				}
-			}
-			if time.Now().After(deadline) {
-				t.Fatalf("chart %q did not finish ingestion", chart.ID)
-			}
-			time.Sleep(100 * time.Millisecond)
-		}
-	}
-}
-
 func TestCase020NormalizedUnitGroups(t *testing.T) {
 	const contract = "CASE-020/normalized-unit-groups"
 	for index, name := range []string{"rate-first", "gauge-first"} {
 		t.Run(name, func(t *testing.T) {
 			registerContractComponent(t, contract, name)
 			registerContractComponent(t, c020RawSourceUnitsContract, "normalized/"+name)
+			registerContractComponent(t, c020CombinedViewUnitsContract, "normalized/"+name)
 			host := "c020-unit-order-" + name
 			context := "fixture.c020_unit_order_" + strconv.Itoa(index)
 			rate := c020Chart(context+"_z", context+"_rate", "requests/s", "incremental", 5, fixture.T0)
@@ -123,7 +132,7 @@ func TestCase020NormalizedUnitGroups(t *testing.T) {
 				charts[0], charts[1] = charts[1], charts[0]
 			}
 			c020PushCharts(t, host, guid(9995+index), charts...)
-			c020WaitCharts(t, host, charts...)
+			waitChartsRetention(t, host, charts...)
 			doc := c020Query(t, c020QuerySpec{
 				host: host, context: context + "*", timeGroup: "sum", groupBy: "units", aggregation: "sum",
 				after: fixture.T0, before: fixture.T0 + c020Samples,
@@ -149,6 +158,10 @@ func TestCase020NormalizedUnitGroups(t *testing.T) {
 			t.Run("db-units", func(t *testing.T) {
 				trackContractComponent(t, c020RawSourceUnitsContract, "normalized/"+name)
 				c020AssertGroupedRawUnits(t, doc, charts[0].Units)
+			})
+			t.Run("combined-view-units", func(t *testing.T) {
+				trackContractComponent(t, c020CombinedViewUnitsContract, "normalized/"+name)
+				c020AssertCombinedViewUnits(t, doc, "requests")
 			})
 		})
 	}
@@ -183,6 +196,7 @@ func TestCase020FoldedDimensionUnits(t *testing.T) {
 					component := item.name + "/" + groupBy
 					registerContractComponent(t, contract, component)
 					registerContractComponent(t, c020RawSourceUnitsContract, "folded/"+component)
+					registerContractComponent(t, c020CombinedViewUnitsContract, "folded/"+component)
 					params := daemon.DataParams(context, fixture.T0, fixture.T0+c020Samples, 1)
 					params.Set("time_group", "sum")
 					params.Set("group_by", groupBy)
@@ -207,6 +221,14 @@ func TestCase020FoldedDimensionUnits(t *testing.T) {
 							keptID: item.keptUnits, "remaining 2 dimensions": item.foldUnits,
 						})
 					})
+					t.Run("combined-view-units", func(t *testing.T) {
+						trackContractComponent(t, c020CombinedViewUnitsContract, "folded/"+component)
+						if item.keptUnits == item.foldUnits {
+							c020AssertCombinedViewUnits(t, doc, item.keptUnits)
+						} else {
+							c020AssertCombinedViewUnits(t, doc, item.keptUnits, item.foldUnits)
+						}
+					})
 				})
 			}
 		})
@@ -214,6 +236,7 @@ func TestCase020FoldedDimensionUnits(t *testing.T) {
 	t.Run("equal-normalized", func(t *testing.T) {
 		registerContractComponent(t, contract, "equal-normalized")
 		registerContractComponent(t, c020RawSourceUnitsContract, "folded/equal-normalized")
+		registerContractComponent(t, c020CombinedViewUnitsContract, "folded/equal-normalized")
 		const host = "c020-fold-equal"
 		const context = "fixture.c020_fold_equal"
 		var charts []fixture.Chart
@@ -227,7 +250,7 @@ func TestCase020FoldedDimensionUnits(t *testing.T) {
 			charts = append(charts, chart)
 		}
 		c020PushCharts(t, host, guid(9994), charts...)
-		c020WaitCharts(t, host, charts...)
+		waitChartsRetention(t, host, charts...)
 		params := daemon.DataParams(context+"*", fixture.T0, fixture.T0+c020Samples, 1)
 		params.Set("time_group", "sum")
 		params.Set("group_by", "dimension,units")
@@ -247,6 +270,10 @@ func TestCase020FoldedDimensionUnits(t *testing.T) {
 			c020AssertDimensionUnits(t, queryObject(t, doc, "view", "view"), "view", map[string]string{
 				"d3,requests": "requests", "remaining 2 dimensions": "requests",
 			})
+		})
+		t.Run("combined-view-units", func(t *testing.T) {
+			trackContractComponent(t, c020CombinedViewUnitsContract, "folded/equal-normalized")
+			c020AssertCombinedViewUnits(t, doc, "requests")
 		})
 	})
 

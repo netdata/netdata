@@ -72,6 +72,7 @@ type Daemon struct {
 	process         daemonProcess
 	processPID      int
 	waitCh          chan error
+	runtimeDir      string
 
 	// Tests shorten these bounds; zero selects the production defaults.
 	termTimeout time.Duration
@@ -312,9 +313,33 @@ func startAttempt(o Options, hostname, streamKey string) (*Daemon, error) {
 	return d, nil
 }
 
-func (d *Daemon) launch() error {
+func (d *Daemon) cleanupRuntime() error {
+	if d.runtimeDir == "" {
+		return nil
+	}
+	err := os.RemoveAll(d.runtimeDir)
+	if err == nil {
+		d.runtimeDir = ""
+	}
+	return err
+}
+
+func (d *Daemon) launch() (err error) {
+	// Test subdirectory names can exceed Unix-socket limits; keep IPC paths short.
+	runDir, err := os.MkdirTemp("", "qc-ipc-")
+	if err != nil {
+		return fmt.Errorf("daemon: runtime directory: %w", err)
+	}
+	d.runtimeDir = runDir
+	defer func() {
+		if err != nil && d.process == nil {
+			err = errors.Join(err, d.cleanupRuntime())
+		}
+	}()
 	confPath := filepath.Join(d.Opts.RunDir, "etc", "netdata.conf")
 	cmd := exec.Command(d.Opts.Binary, "-D", "-c", confPath)
+	// CLI startup unlinks its socket, so inherited runtime paths must never reach a test daemon.
+	cmd.Env = append(os.Environ(), "NETDATA_RUN_DIR="+runDir, "NETDATA_PIPENAME="+filepath.Join(runDir, "netdata.pipe"))
 	stdout, err := os.Create(filepath.Join(d.Opts.RunDir, "log", "stdout.log"))
 	if err != nil {
 		return fmt.Errorf("daemon: stdout log: %w", err)
@@ -420,7 +445,12 @@ func startupLogShowsBindCollision(runDir string) bool {
 }
 
 // Stop terminates the daemon gracefully, escalating to SIGKILL.
-func (d *Daemon) Stop() error {
+func (d *Daemon) Stop() (err error) {
+	defer func() {
+		if d.process == nil {
+			err = errors.Join(err, d.cleanupRuntime())
+		}
+	}()
 	if d.process == nil {
 		return nil
 	}

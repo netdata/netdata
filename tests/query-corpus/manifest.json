@@ -327,6 +327,23 @@
     ]
   },
   {
+    "name": "CASE-020/combined-view-units",
+    "proves": "combined view units equal the distinct computed units of exposed result dimensions after SUM normalization and cardinality folding, in both source orders, while raw source units remain independent",
+    "components": [
+      "normalized/rate-first",
+      "normalized/gauge-first",
+      "folded/gauges/dimension",
+      "folded/gauges/dimension,units",
+      "folded/rates/dimension",
+      "folded/rates/dimension,units",
+      "folded/mixed/dimension",
+      "folded/mixed/dimension,units",
+      "folded/mixed-rate-first/dimension",
+      "folded/mixed-rate-first/dimension,units",
+      "folded/equal-normalized"
+    ]
+  },
+  {
     "name": "CASE-020/badge-raw-percentage-units",
     "proves": "badge percentage combined with return-raw keeps the SUM result units for rate, gauge and mixed-algorithm charts because percentage conversion is bypassed",
     "components": [
@@ -859,6 +876,50 @@
   {
     "name": "CASE-023/gap-weight",
     "proves": "a gap counts in stored SLOTS, not seconds: percentage-of-samples weighs uncollected time against the collection interval, so on a 10s metric a 100s hole is ten missing samples and not a hundred - measuring it against the query grid (1s for an ordinary query) would let one missing slot outweigh ten collected ones"
+  },
+  {
+    "name": "CASE-023/synthetic-gap-occurrences",
+    "proves": "a stopped instance counts each missing nominal source slot once, matching explicit stored gaps across UE1 and UE10 coarse, fine and partial-slot virtual grids",
+    "components": [
+      "ue1/stopped/points1",
+      "ue1/stopped/points4",
+      "ue1/stopped/points10",
+      "ue1/stopped/points100",
+      "ue1/stored/points1",
+      "ue1/stored/points4",
+      "ue1/stored/points10",
+      "ue1/stored/points100",
+      "ue10/stopped/points1",
+      "ue10/stopped/points4",
+      "ue10/stopped/points10",
+      "ue10/stopped/points100",
+      "ue10/stored/points1",
+      "ue10/stored/points4",
+      "ue10/stored/points10",
+      "ue10/stored/points100"
+    ]
+  },
+  {
+    "name": "CASE-023/synthetic-gap-sample-weight",
+    "proves": "a stopped instance weights missing samples by the nominal source slots delivered to each result bucket, matching explicit stored gaps and preserving COUNTIF delivered-sample semantics on fine and partial-slot grids",
+    "components": [
+      "ue1/stopped/points1",
+      "ue1/stopped/points4",
+      "ue1/stopped/points10",
+      "ue1/stopped/points100",
+      "ue1/stored/points1",
+      "ue1/stored/points4",
+      "ue1/stored/points10",
+      "ue1/stored/points100",
+      "ue10/stopped/points1",
+      "ue10/stopped/points4",
+      "ue10/stopped/points10",
+      "ue10/stopped/points100",
+      "ue10/stored/points1",
+      "ue10/stored/points4",
+      "ue10/stored/points10",
+      "ue10/stored/points100"
+    ]
   },
   {
     "name": "CASE-023/tier-wide-point-source",

@@ -7,6 +7,11 @@ results pass through strict typed decoders before semantic assertions.
 Explicit formatter stability cases use labeled byte or shape pins. The daemon
 contains no test hooks; storage and contexts are real.
 
+Every daemon uses private configuration, database, log and runtime directories.
+The harness overrides inherited CLI socket and runtime paths in the child
+environment, so separate daemons and concurrent corpus runs cannot replace
+another instance's CLI socket.
+
 ## The layered ladder
 
 The ladder isolates narrow query stages to control combinatorial growth.
@@ -71,7 +76,10 @@ layers; each layer declares which entries it consumes:
 
 - **CASE-020 — result units:** normalized rate/gauge groups, cardinality
   folds, raw percentage badges, and raw DB-unit preservation have separate
-  contracts. Inputs with different raw units use distinct source contexts.
+  contracts. Combined view units have an independent verdict and must match
+  the exposed computed dimensions. Inputs with different raw units use distinct source contexts.
+- **CASE-023 — missing slots:** stopped instances and explicit stored gaps
+  exercise occurrence identity and sample weights at coarse, fine and partial-slot resolutions.
 - **CASE-040 — retained tier coverage and handoffs:** late-enabled tiers,
   inverted or isolated retention, genuine gaps, partial first records,
   changing cadence, and conventional coarse-to-fine tails. Numeric values,

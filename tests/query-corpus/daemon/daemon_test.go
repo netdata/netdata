@@ -3,15 +3,85 @@
 package daemon
 
 import (
+	"encoding/json"
 	"errors"
 	"fmt"
 	"math"
 	"os"
+	"path/filepath"
+	"reflect"
 	"strings"
 	"syscall"
 	"testing"
 	"time"
 )
+
+func TestMain(m *testing.M) {
+	if os.Getenv("QUERY_CORPUS_TEST_DAEMON_ENV") == "1" {
+		info, statErr := os.Stat(os.Getenv("NETDATA_RUN_DIR"))
+		ready := "false"
+		if statErr == nil && info.IsDir() {
+			ready = "true"
+		}
+		err := json.NewEncoder(os.Stdout).Encode(map[string]string{
+			"run": os.Getenv("NETDATA_RUN_DIR"), "pipe": os.Getenv("NETDATA_PIPENAME"), "ready": ready,
+		})
+		if err != nil {
+			os.Exit(1)
+		}
+		os.Exit(0)
+	}
+	os.Exit(m.Run())
+}
+
+func TestDaemonRuntimeEnvironmentIsPrivate(t *testing.T) {
+	executable, err := os.Executable()
+	if err != nil {
+		t.Fatal(err)
+	}
+	parent := map[string]string{"run": "parent-runtime", "pipe": "parent-cli-socket"}
+	t.Setenv("QUERY_CORPUS_TEST_DAEMON_ENV", "1")
+	t.Setenv("NETDATA_RUN_DIR", parent["run"])
+	t.Setenv("NETDATA_PIPENAME", parent["pipe"])
+	seen := make(map[string]bool)
+	for _, name := range []string{"first", "second"} {
+		t.Run(name, func(t *testing.T) {
+			root := t.TempDir()
+			if err := os.MkdirAll(filepath.Join(root, "log"), 0o755); err != nil {
+				t.Fatal(err)
+			}
+			d := &Daemon{Opts: Options{Binary: executable, RunDir: root}, BaseURL: "invalid://environment-test"}
+			// The helper records the actual child environment and exits before readiness.
+			if err := d.launch(); err == nil || d.process != nil {
+				t.Fatalf("environment helper did not exit and reap: %v", err)
+			}
+			output, err := os.ReadFile(filepath.Join(root, "log", "stdout.log"))
+			if err != nil {
+				t.Fatal(err)
+			}
+			var got map[string]string
+			if err := json.Unmarshal(output, &got); err != nil {
+				t.Fatalf("environment helper output %q: %v", output, err)
+			}
+			run := got["run"]
+			if !filepath.IsAbs(run) || run == parent["run"] || seen[run] {
+				t.Fatalf("runtime path is not private to this launch: %v", got)
+			}
+			seen[run] = true
+			want := map[string]string{"run": run, "pipe": filepath.Join(run, "netdata.pipe"), "ready": "true"}
+			if !reflect.DeepEqual(got, want) {
+				t.Errorf("child environment = %v, want private paths %v", got, want)
+			}
+			if _, err := os.Stat(run); !os.IsNotExist(err) {
+				t.Errorf("reaped helper retained its runtime directory: %v", err)
+			}
+		})
+	}
+	gotParent := map[string]string{"run": os.Getenv("NETDATA_RUN_DIR"), "pipe": os.Getenv("NETDATA_PIPENAME")}
+	if !reflect.DeepEqual(gotParent, parent) {
+		t.Errorf("launcher changed parent environment: %v", gotParent)
+	}
+}
 
 func TestNetdataConfigDisablesUnlistedPlugins(t *testing.T) {
 	const disabled = "\n    enable running new plugins = no\n"
@@ -315,12 +385,17 @@ func TestStopIsCheckedAndBounded(t *testing.T) {
 		waitCh := make(chan error, 1)
 		process := &fakeProcess{onSignal: func() { waitCh <- nil }}
 		d := testStoppingDaemon(process, waitCh)
+		runtimeDir := t.TempDir()
+		d.runtimeDir = runtimeDir
 
 		if err := d.Stop(); err != nil {
 			t.Fatal(err)
 		}
 		if len(process.signals) != 1 || process.signals[0] != syscall.SIGTERM || process.kills != 0 {
 			t.Fatalf("signals=%v kills=%d", process.signals, process.kills)
+		}
+		if _, err := os.Stat(runtimeDir); !os.IsNotExist(err) {
+			t.Errorf("reaped process retained its runtime directory: %v", err)
 		}
 	})
 
@@ -377,6 +452,7 @@ func TestStopIsCheckedAndBounded(t *testing.T) {
 		waitCh := make(chan error)
 		process := &fakeProcess{}
 		d := testStoppingDaemon(process, waitCh)
+		d.runtimeDir = t.TempDir()
 
 		started := time.Now()
 		err := d.Stop()
@@ -385,6 +461,9 @@ func TestStopIsCheckedAndBounded(t *testing.T) {
 		}
 		if elapsed := time.Since(started); elapsed > 100*time.Millisecond {
 			t.Fatalf("Stop() took %v, want bounded completion", elapsed)
+		}
+		if _, err := os.Stat(d.runtimeDir); err != nil {
+			t.Errorf("unreaped process lost its runtime directory: %v", err)
 		}
 	})
 
