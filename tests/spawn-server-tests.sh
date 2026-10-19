@@ -20,8 +20,7 @@ tester="${build_dir}/spawn-tester"
 
 if [ ! -x "${tester}" ]; then
     printf 'spawn-tester not found at %s\n' "${tester}" >&2
-    printf 'Build it first (it is part of the default target set), or point NETDATA_BUILD_DIR at the\n' >&2
-    printf 'build tree.\n' >&2
+    printf 'Build it first using cmake --build %s --target spawn-tester.\n' "${NETDATA_BUILD_DIR}" >&2
     exit 1
 fi
 
