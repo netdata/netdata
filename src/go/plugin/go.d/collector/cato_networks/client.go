@@ -181,10 +181,9 @@ func (c *sdkAPIClient) AccountMetrics(
 	res, err := c.client.AccountMetrics(ctx,
 		nil, nil, nil, &buckets,
 		labels,
-		nil, nil, nil, nil, nil, nil, nil, nil,
+		nil,
 		siteIDs,
-		nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil,
-		nil, nil, &accountID, nil, timeFrame, groupInterfaces, nil,
+		nil, nil, &accountID, nil, timeFrame, groupInterfaces, nil, nil,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("accountMetrics: %w", err)
