@@ -385,7 +385,8 @@ Shared and process-wide packages:
 | `internal/attemptmetrics` | Shared synthetic outcome and duration instruments |
 | `config/` | Installed configuration files; not a Go package |
 
-RUM packages. Processing is separate from investigation queries and Function presentation:
+RUM packages. The processing packages (`rum/beacon` through `rum/geoip`) are separate from the investigation query
+and Function presentation packages (`rum/registry` through `rum/functions`):
 
 | Package | Responsibility |
 |---|---|
@@ -476,7 +477,7 @@ File layout within packages:
 Command-owned resources:
 
 - The command owns the investigation journal and the plugin-wide retention service.
-- It closes them only after `agenthost.Result` reports `Err == nil` and `ExitRequired == false`.
+- It closes the journal only after `agenthost.Result` reports `Err == nil` and `ExitRequired == false`.
 - An error or a recovery requiring process exit may leave consumers alive; process exit owns their handles.
 - Process-service finalizers run before job retirement and cannot close resources used by jobs.
 - The command creates its history directory as the service account under the existing writable Agent state root.
@@ -494,6 +495,7 @@ Collectors:
 
 - Each package in `collector/` is a registered native collector. Its lifecycle methods show acquisition, readiness,
   collection and retirement; its metric definitions show the measurements it publishes.
+- Fixed instruments are prepared once.
 - Publication uses typed metrix snapshots and static chart templates, with no V1 map bridge.
 
 ## RUM contracts
@@ -650,6 +652,7 @@ Report identity and replay suppression:
   retries preserve identical IDs/revisions.
 - Identity evidence lasts at most 30 minutes, subject to capacity and restart. The SDK has no finite maximum delivery
   delay, so this is best-effort replay suppression.
+- Unidentified errors, logs, spans and ordinary custom events have no replay suppression.
 
 Vital attribution:
 
@@ -728,13 +731,12 @@ Capacity loss:
 - The drop counter remains cumulative actual loss.
 - Identity loss is scoped to affected measurements. Resource identity loss still invalidates session completeness,
   because resource-only reports can renew session activity.
-- Unidentified errors, logs, spans and ordinary custom events have no replay suppression.
 
 ### Metrics and alerts
 
 Instruments:
 
-- Fixed instruments are prepared once, with site labels bound during initialization.
+- Site labels are bound to fixed instruments during initialization.
 - Dynamic breakdown handles are not retained in an unbounded cache. Dynamic series use ephemeral metrix handles and a
   separate bucket label for pooled Other.
 - Top-N window counts are gauges, not cumulative counters with changing membership.
@@ -833,7 +835,7 @@ flowchart LR
 
 | Phase | Cost follows |
 |---|---|
-| Capture | Retained file count |
+| Snapshot capture | Retained file count |
 | Selection | Native bucket/hash traversal plus selected postings |
 | Reduction | Selected records and distinct summary keys |
 
@@ -1003,7 +1005,8 @@ Publication:
 
 Catalogue and fetch:
 
-- Catalogue and fetch use that ownership independently of journal survival. History only explains absent sets.
+- Catalogue and fetch use the Go-owned publication record (JobID, RunID, publication time, membership)
+  independently of journal survival. History only explains absent sets.
 - The catalogue reads metadata and logical file lengths, sorts by publication time/RunID, and exposes bounded keyset
   pages plus an unfiltered global storage snapshot.
 - Unknown byte categories carry errors rather than zeroes.
