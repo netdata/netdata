@@ -387,13 +387,11 @@ static inline NETDATA_DOUBLE tg_expression_replay(const TG_EXPRESSION *e, const 
 //     weight(max) = (avg - min) / (max - min)
 //
 // For a 0/1 dimension - the shape a fleet availability signal has - that
-// is exact whenever the window's samples are evenly spaced, because the
-// average is then the fraction of time at 1. A rollup keeps a count and a
-// span but not per-sample durations, so a window whose cadence changed
-// mid-way is weighted by SAMPLES rather than by time and the two differ.
-// It is an approximation for a continuous metric in any case, because the
-// interior estimate does not move with the threshold. tier 0 is exact, so
-// a query that needs precision should ask for tier 0.
+// is exact over a whole, fully collected window at a steady cadence. A
+// rollup loses internal gaps and per-sample durations: missing time can
+// inflate availability, and a cadence change weights SAMPLES rather than
+// time. Partial windows and continuous metrics remain estimates. Tier 0
+// retains the finest available records and separately represented gaps.
 //
 // Evaluating the condition on the average instead (what the engine does
 // for every other aggregation) is not usable here: a minute that was up
@@ -403,9 +401,7 @@ static inline NETDATA_DOUBLE tg_expression_window_fraction(
     TG_EXPRESSION *e, const TG_POINT *p) {
 
     if(p->max <= p->min)
-        // the window never moved, so there is nothing to estimate: it held
-        // one value for its whole duration and either satisfied the
-        // condition or did not
+        // Every collected sample had one value; any internal missing time was lost in the rollup.
         return tg_expression_compare(e->cmp, tg_point_average(p), e->target) ? 1.0 : 0.0;
 
     NETDATA_DOUBLE w = (tg_point_average(p) - p->min) / (p->max - p->min);

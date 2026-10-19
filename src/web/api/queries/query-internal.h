@@ -13,8 +13,10 @@
 typedef struct query_point {
     STORAGE_POINT sp;
     NETDATA_DOUBLE value;
+    time_t storage_cadence; // retained before projection clips the point
     uint8_t tier;
     bool added;
+    bool synthetic;
 #ifdef NETDATA_INTERNAL_CHECKS
     size_t id;
 #endif
@@ -25,6 +27,7 @@ typedef struct query_point {
     .sp = STORAGE_POINT_UNSET, \
     .value = NAN, \
     .added = false, \
+    .synthetic = true, \
     .id = 0, \
 }
 #else
@@ -32,6 +35,7 @@ typedef struct query_point {
     .sp = STORAGE_POINT_UNSET, \
     .value = NAN, \
     .added = false, \
+    .synthetic = true, \
 }
 #endif
 

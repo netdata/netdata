@@ -692,6 +692,10 @@ without a value applies to zero, so `>` is shorthand for `>0`.
 
 There are no `and`/`or` compounds.
 
+Long-window lookups may read lower-resolution data. See [Accuracy over long
+windows](../web/api/queries/README.md#accuracy-over-long-windows) for the limits
+of event counts and availability estimates, including gaps hidden inside stored intervals.
+
 The result of the lookup will be available as `$this` and `$NAME` in expressions. The timestamps of the timeframe evaluated by the database lookup are available as variables `$after` and `$before` (both are unix timestamps).
 
 #### Alert Line `calc`

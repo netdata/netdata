@@ -171,25 +171,27 @@ at lower resolution. Over a window long enough to read that older data,
 **estimate**:
 
 - For `percentage-of-time`, a metric that is only ever 0 or 1 - an availability
-  signal - is exact when collected at a steady interval. If the collection
-  interval changed inside a stored interval, that one is weighted by samples
-  rather than by time; other signals and conditions are approximate.
+  signal - is exact over whole stored intervals when every sample was collected
+  at a steady interval. If the collection interval changed inside a stored
+  interval, that one is weighted by samples rather than by time. Partial stored
+  intervals, other signals and other conditions are approximate.
 - `number-of-flaps` and `number-of-times` are exact only when each stored
   interval contains at most one relevant transition or match. They count at
   most one event per stored interval, so bursts of events are reported as one.
 - `number-of-times` with `previous` still detects a counter going backwards,
   so reboot counting keeps working.
 - A gap inside a stored interval is not visible, so partially collected
-  intervals count as collected. This understates `percentage-of-time`
-  over long windows: uncollected time inside a stored interval cannot be
-  separated from collected time there.
+  intervals count as collected. This can overstate availability and understate
+  missing time. For example, a 60-second stored interval with 30 collected ones
+  and 30 missing seconds reports 100% for `==1` and 0% for `==gap`, although
+  both exact shares are 50%. The error depends on the condition.
 - When the requested resolution is finer than the stored one, every result
   bucket covering the same stored interval reports that interval's estimate.
 
 `percentage-of-time` always measures against the **selected duration**, not
-against the part of it that was collected. For a condition that does not match
-gaps, uncollected time does not enter the numerator, so a metric with one
-matching sample and the rest of the window missing answers a small percentage,
+against the part of it that was collected. When gaps remain separately represented
+in storage, uncollected time does not enter the numerator for a numeric condition.
+A metric with one matching sample and the rest of the window missing answers a small percentage,
 not 100%. A condition such as `==gap` or `==null` includes uncollected time in
 the numerator instead. That is what makes it usable for availability.
 
