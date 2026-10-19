@@ -73,10 +73,17 @@ void version_hashes_api_v2(BUFFER *wb, struct query_versions *versions) {
     buffer_json_object_close(wb);
 }
 
-static void combined_units_to_json(BUFFER *wb, DICTIONARY *dict) {
-    bool single = dictionary_entries(dict) == 1;
+static void combined_units_to_json(BUFFER *wb, DICTIONARY *dict, bool has_empty_units) {
+    bool single = dictionary_entries(dict) + (has_empty_units ? 1 : 0) == 1;
     if(!single)
         buffer_json_member_add_array(wb, "units");
+
+    if(has_empty_units) {
+        if(single)
+            buffer_json_member_add_string(wb, "units", "");
+        else
+            buffer_json_add_array_item_string(wb, "");
+    }
 
     const char *s;
     dfe_start_read(dict, s) {
@@ -114,7 +121,13 @@ static void query_target_combined_units_v2(BUFFER *wb, QUERY_TARGET *qt, size_t 
                 qt, rates, rrdcontext_acquired_units(qt->contexts.array[c].rca), ub, sizeof(ub)), NULL, 0);
         }
 
-        combined_units_to_json(wb, dict);
+        if(dictionary_entries(dict) == 1) {
+            char ub[64];
+            buffer_json_member_add_string(wb, "units", query_target_rate_adjusted_units_for(
+                qt, rates, rrdcontext_acquired_units(qt->contexts.array[0].rca), ub, sizeof(ub)));
+        }
+        else
+            combined_units_to_json(wb, dict, false);
         dictionary_destroy(dict);
     }
 }
@@ -143,6 +156,7 @@ static void rrdr_combined_units_v2(BUFFER *wb, RRDR *r, RRDR_OPTIONS options) {
     }
 
     DICTIONARY *dict = NULL;
+    bool has_empty_units = false;
     const char *first_units = NULL;
     char first_buffer[64];
     if(r->du) {
@@ -159,15 +173,23 @@ static void rrdr_combined_units_v2(BUFFER *wb, RRDR *r, RRDR_OPTIONS options) {
             const char *units = rrdr_dimension_units_v2(r, c, false, buffer, sizeof(buffer));
             if(!dict && strcmp(first_units, units) != 0) {
                 dict = dictionary_create(DICT_OPTION_SINGLE_THREADED | DICT_OPTION_DONT_OVERWRITE_VALUE);
-                dictionary_set(dict, first_units, NULL, 0);
+                if(*first_units)
+                    dictionary_set(dict, first_units, NULL, 0);
+                else
+                    has_empty_units = true;
             }
-            if(dict)
-                dictionary_set(dict, units, NULL, 0);
+            if(dict) {
+                // Empty units are valid metadata, but dictionary keys must be nonempty.
+                if(*units)
+                    dictionary_set(dict, units, NULL, 0);
+                else
+                    has_empty_units = true;
+            }
         }
     }
 
     if(dict)
-        combined_units_to_json(wb, dict);
+        combined_units_to_json(wb, dict, has_empty_units);
     else if(first_units)
         buffer_json_member_add_string(wb, "units", first_units);
     else
