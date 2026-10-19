@@ -664,7 +664,7 @@ static ssize_t rrdcontext_to_json_v2_add_host(void *data, RRDHOST *host, bool qu
         ssize_t added = query_scope_foreach_context(
                 host, ctl->request->scope_contexts,
                 ctl->contexts.scope_pattern, ctl->contexts.pattern,
-                rrdcontext_to_json_v2_add_context, queryable_host, ctl);
+                rrdcontext_to_json_v2_add_context, queryable_host, ctl, NULL);
 
         if(unlikely(added < 0))
             return -1; // stop the query

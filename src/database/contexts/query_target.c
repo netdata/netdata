@@ -187,6 +187,7 @@ static QUERY_TARGET *query_target_get(void) {
     spinlock_unlock(&query_target_base.used.spinlock);
 
     qt->internal.used = true;
+    qt->internal.cancelled = QUERY_TARGET_CANCEL_NONE;
     qt->internal.queries++;
     thread_qt = qt;
 
@@ -229,11 +230,47 @@ typedef struct query_target_locals {
     size_t instances_version;
 
     size_t metrics_skipped_due_to_not_matching_timeframe;
+    size_t cancel_checks;
 
     char host_node_id_str[UUID_STR_LEN];
     const STRING *host_hostname; // borrowed while query_node_add() traverses one host
     QUERY_NODE *qn; // temp to pass on callbacks, ignore otherwise - no need to free
 } QUERY_TARGET_LOCALS;
+
+// how many walk steps between two timeout/interrupt checks
+#define QUERY_TARGET_CANCEL_CHECK_EVERY 64
+
+// True when building the target has to stop: its timeout expired or the requester went away.
+// Without force, the clock and the interrupt callback are consulted only every
+// QUERY_TARGET_CANCEL_CHECK_EVERY calls; the decision sticks once made.
+static bool query_target_build_cancelled(QUERY_TARGET_LOCALS *qtl, bool force) {
+    QUERY_TARGET *qt = qtl->qt;
+
+    if(unlikely(qt->internal.cancelled))
+        return true;
+
+    if(!force && (++qtl->cancel_checks % QUERY_TARGET_CANCEL_CHECK_EVERY))
+        return false;
+
+    if(qt->request.timeout_ms > 0) {
+        usec_t elapsed_ut = now_monotonic_usec() - qt->timings.received_ut;
+        if(elapsed_ut >= (usec_t)qt->request.timeout_ms * USEC_PER_MS) {
+            qt->internal.cancelled = QUERY_TARGET_CANCEL_TIMEOUT;
+            nd_log(NDLS_ACCESS, NDLP_WARNING,
+                   "QUERY CANCELED WHILE PREPARING: RUNTIME EXCEEDED %0.2f ms (LIMIT %lld ms)",
+                   (NETDATA_DOUBLE)elapsed_ut / USEC_PER_MS, (long long)qt->request.timeout_ms);
+            return true;
+        }
+    }
+
+    if(qt->request.interrupt_callback && qt->request.interrupt_callback(qt->request.interrupt_callback_data)) {
+        qt->internal.cancelled = QUERY_TARGET_CANCEL_INTERRUPTED;
+        nd_log(NDLS_ACCESS, NDLP_NOTICE, "QUERY INTERRUPTED WHILE PREPARING");
+        return true;
+    }
+
+    return false;
+}
 
 struct storage *query_metric_storage_engine(QUERY_TARGET *qt, QUERY_METRIC *qm, size_t tier) {
     QUERY_NODE *qn = query_node(qt, qm->link.query_node_id);
@@ -869,6 +906,9 @@ static bool query_instance_add(QUERY_TARGET_LOCALS *qtl, QUERY_NODE *qn, QUERY_C
     else {
         RRDMETRIC *rm;
         dfe_start_read(ri->rrdmetrics, rm) {
+            if(query_target_build_cancelled(qtl, false))
+                break;
+
             if(query_dimension_add(qtl, qn, qc, qi, (RRDMETRIC_ACQUIRED *) rm_dfe.item,
                                    queryable_instance, &metrics_added, priority++))
                 dimensions_added++;
@@ -989,6 +1029,9 @@ static ssize_t query_scope_foreach_instance(QUERY_TARGET_LOCALS *qtl, QUERY_NODE
         // Pattern query - iterate through all instances
         RRDINSTANCE *ri;
         dfe_start_read(rc->rrdinstances, ri) {
+            if(query_target_build_cancelled(qtl, false))
+                break;
+
             if(rrd_flag_is_deleted(ri))
                 continue;
 
@@ -1020,6 +1063,10 @@ static ssize_t query_scope_foreach_instance(QUERY_TARGET_LOCALS *qtl, QUERY_NODE
     return added;
 }
 
+static bool query_context_scan_should_stop(void *data) {
+    return query_target_build_cancelled(data, false);
+}
+
 static ssize_t query_context_add(void *data, RRDCONTEXT_ACQUIRED *rca, bool queryable_context) {
     QUERY_TARGET_LOCALS *qtl = data;
 
@@ -1036,8 +1083,11 @@ static ssize_t query_context_add(void *data, RRDCONTEXT_ACQUIRED *rca, bool quer
     if(!added) {
         query_context_release(qc);
         qt->contexts.used--;
-        return 0;
     }
+
+    // a negative return stops query_scope_foreach_context()
+    if(query_target_build_cancelled(qtl, false))
+        return -1;
 
     return added;
 }
@@ -1067,6 +1117,11 @@ static inline QUERY_NODE *query_node_allocate(QUERY_TARGET *qt, RRDHOST *host) {
 static ssize_t query_node_add(void *data, RRDHOST *host, bool queryable_host) {
     QUERY_TARGET_LOCALS *qtl = data;
     QUERY_TARGET *qt = qtl->qt;
+
+    // a negative return stops query_scope_foreach_host()
+    if(query_target_build_cancelled(qtl, true))
+        return -1;
+
     QUERY_NODE *qn = query_node_allocate(qt, host);
 
     if(!UUIDiszero(host->node_id)) {
@@ -1117,7 +1172,7 @@ static ssize_t query_node_add(void *data, RRDHOST *host, bool queryable_host) {
         added = query_scope_foreach_context(
                 host, qtl->scope_contexts,
                 qt->contexts.scope_pattern, qt->contexts.pattern,
-                query_context_add, queryable_host, qtl);
+                query_context_add, queryable_host, qtl, query_context_scan_should_stop);
 
         if(added < 0)
             added = 0;
@@ -1127,13 +1182,18 @@ static ssize_t query_node_add(void *data, RRDHOST *host, bool queryable_host) {
     rrdhost_identity_release(&host_identity);
     qtl->qn = NULL;
 
+    if(qt->internal.cancelled) {
+        // keep the node: contexts added before the stop may reference it (added is not reliable here)
+        return -1;
+    }
+
     if(!added) {
         query_node_release(qn);
         qt->nodes.used--;
-        return false;
+        return 0;
     }
 
-    return true;
+    return 1;
 }
 
 void query_target_generate_name(QUERY_TARGET *qt) {
@@ -1367,6 +1427,12 @@ QUERY_TARGET *query_target_create(QUERY_TARGET_REQUEST *qtr) {
                                  query_node_add, &qtl,
                                  &qt->versions,
                                  qtl.host_node_id_str);
+
+    // a cancelled target is incomplete: callers get it back marked, and rrd2rrdr() does not execute it
+    if(unlikely(qt->internal.cancelled)) {
+        qt->timings.preprocessed_ut = now_monotonic_usec();
+        return qt;
+    }
 
     // we need the available db retention for this call
     // so it has to be done last
