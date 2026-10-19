@@ -989,7 +989,7 @@ verify_manifest() {
         fi
       done
     elif [ -r "./sha256sums.txt" ]; then
-      files="$(awk '{ print $2 }' ./sha256sums.txt | tr -d '*')"
+      files="$(awk '{ print $2 }' ./sha256sums.txt | tr -d '*' | sed -e 's|^\./||' -)"
       if [ -n "${required_file}" ]; then
         progress "Verifying that ${required_file} exists in sha256sums.txt"
 
@@ -2590,10 +2590,6 @@ prepare_offline_install_source() {
           return 2
         fi
 
-        if echo "${archive_info}" | grep -qvE ".*-latest.*"; then
-          archive_info="$(echo "${archive_info}" | grep -vE ".*-latest.*")"
-        fi
-
         archive_names="$(echo "${archive_info}" | awk '{ print $1 }')"
 
         failed=0
@@ -2604,6 +2600,9 @@ prepare_offline_install_source() {
           if ! download "${archive_url}" "${f}"; then
             failed="$((failed + 1))"
             warning "Failed to download ${archive_url}. ${BADNET_MSG}."
+          elif echo "${f}" | grep -qvE ".*-latest.*" ; then
+            latest_name="$(echo "${f}" | sed -i -e 's/v.*\.\([a-z]\+\)\.run$/latest.\1.run/' -)"
+            ln -sf "${f}" "${latest_name}"
           fi
         done
 
@@ -2679,11 +2678,15 @@ prepare_offline_install_source() {
 
   if [ "${DRY_RUN}" -ne 1 ]; then
     progress "Generating updated Manifest for offline install source directory."
+    rm -f sha256sums.txt
     rm -f Manifest
 
     for f in *; do
       [ -f "${f}" ] || continue
-      echo "${f} $(wc -c "${f}" | awk '{ print $1 }') $(safe_sha256sum "${f}" | awk '{ print $1 }')" >> ./Manifest
+      h="$(safe_sha256sum "${f}" | awk '{ print $1 }')"
+      s="$(wc -c "${f}" | awk '{ print $1 }')"
+      echo "${f} ${s} ${h}" >> ./Manifest
+      echo "${h} *${f}" >> ./sha256sums.txt
     done
   else
     progress "Would generate updated Manifest for offline install source directory."
