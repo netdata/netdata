@@ -195,6 +195,8 @@ groups:
     metrics:
       - ipsec_tunnels_active
       - ipsec_tunnel_sa_lifetime
+      - ipsec_tunnel_state
+      - ipsec_gateway_state
     charts:
       - id: ipsec_tunnels
         title: IPsec Tunnels
@@ -213,6 +215,23 @@ groups:
         dimensions:
           - selector: ipsec_tunnel_sa_lifetime
             name: remaining_lifetime
+      - id: ipsec_tunnel_state
+        title: IPsec Tunnel State
+        context: ipsec.tunnel.state
+        units: state
+        instances:
+          by_labels: [tunnel, tunnel_id]
+        dimensions:
+          - selector: ipsec_tunnel_state
+      - id: ipsec_gateway_state
+        title: IPsec Gateway State
+        context: ipsec.gateway.state
+        units: state
+        label_promotion: [ike_version]
+        instances:
+          by_labels: [gateway]
+        dimensions:
+          - selector: ipsec_gateway_state
 
   - family: bgp peers
     metrics:
