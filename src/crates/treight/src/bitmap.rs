@@ -160,9 +160,12 @@ impl Bitmap {
     /// tree bytes to `out`. The end bound is clamped to the universe size;
     /// a range that is empty or starts at/after the clamped end yields an
     /// empty bitmap. Ranges covering more than half the universe store
-    /// their complement instead (the descriptor comes back inverted) — the
-    /// density trade [`from_sorted_iter_complemented`](Self::from_sorted_iter_complemented)
-    /// exists for.
+    /// their complement `[0, start) ∪ [end, universe)` instead (the
+    /// descriptor comes back inverted), the density trade
+    /// [`from_sorted_iter_complemented`](Self::from_sorted_iter_complemented)
+    /// makes for value lists. Either form is written range-wise
+    /// (`RawBitmap::from_disjoint_ranges`), so cost tracks the stored
+    /// bytes, not the range length.
     pub fn from_range(
         range: impl std::ops::RangeBounds<u32>,
         universe_size: u32,
@@ -189,10 +192,27 @@ impl Bitmap {
         let half_universe = universe_size as u64 / 2;
 
         if range_len > half_universe {
-            let complement = (0..start).chain(end..universe_size);
-            Self::from_sorted_iter_complemented(complement, universe_size, out)
+            // The complement's two pieces; either is empty when the range
+            // touches that end of the universe.
+            let mut complement = [(0, 0); 2];
+            let mut pieces = 0;
+            if start > 0 {
+                complement[pieces] = (0, start);
+                pieces += 1;
+            }
+            if end < universe_size {
+                complement[pieces] = (end, universe_size);
+                pieces += 1;
+            }
+            Self {
+                inner: RawBitmap::from_disjoint_ranges(&complement[..pieces], universe_size, out),
+                inverted: true,
+            }
         } else {
-            Self::from_sorted_iter(start..end, universe_size, out)
+            Self {
+                inner: RawBitmap::from_disjoint_ranges(&[(start, end)], universe_size, out),
+                inverted: false,
+            }
         }
     }
 

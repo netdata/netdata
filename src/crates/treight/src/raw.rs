@@ -25,8 +25,8 @@ use std::io;
 use crate::ceil_log8;
 use crate::node::{NodeReader, child_index, child_offset, skip_subtree_at};
 use crate::ops::{
-    contains_inner, difference_subtree, intersect_subtree, range_count, remove_range_subtree,
-    symmetric_difference_subtree, union_subtree,
+    contains_inner, difference_subtree, intersect_subtree, range_count, ranges_subtree,
+    remove_range_subtree, symmetric_difference_subtree, union_subtree,
 };
 
 /// A compressed bitmap's descriptor: `universe_size`, the exclusive upper
@@ -129,10 +129,10 @@ impl RawBitmap {
     /// Build a bitmap with every value in `range` set, appending the tree
     /// bytes to `out`. The end bound is clamped to the universe size; a
     /// range starting at or past the clamped end yields an empty
-    /// descriptor. The clamped range feeds
-    /// [`from_sorted_iter`](Self::from_sorted_iter) value by value — no
-    /// complement trick here; `Bitmap::from_range` is the density-aware
-    /// caller-facing version.
+    /// descriptor. The clamped range is written range-wise
+    /// (`from_disjoint_ranges`), not value by value — no complement trick
+    /// here; `Bitmap::from_range` is the density-aware caller-facing
+    /// version.
     pub fn from_range(
         range: impl std::ops::RangeBounds<u32>,
         universe_size: u32,
@@ -156,7 +156,39 @@ impl RawBitmap {
             return Self::empty(universe_size);
         }
 
-        Self::from_sorted_iter(start..end, universe_size, out)
+        Self::from_disjoint_ranges(&[(start, end)], universe_size, out)
+    }
+
+    /// Build the bitmap holding exactly `ranges`, appending its tree bytes
+    /// to `out`: half-open `(start, end)` pairs, sorted, disjoint,
+    /// non-empty and within the universe (debug-asserted); an empty slice
+    /// yields the empty descriptor. The shared builder behind both
+    /// `from_range` constructors: ops.rs's `ranges_subtree` writes full
+    /// subtrees as `0xFF` runs, so cost tracks the bytes written, not the
+    /// values. The bytes equal `from_sorted_iter` over the same values.
+    pub(crate) fn from_disjoint_ranges(
+        ranges: &[(u32, u32)],
+        universe_size: u32,
+        out: &mut Vec<u8>,
+    ) -> Self {
+        debug_assert!(
+            ranges
+                .iter()
+                .all(|&(start, end)| start < end && end <= universe_size)
+        );
+        debug_assert!(ranges.windows(2).all(|w| w[0].1 <= w[1].0));
+
+        if ranges.is_empty() {
+            return Self::empty(universe_size);
+        }
+
+        let levels = ceil_log8(universe_size);
+        ranges_subtree(levels, 0, ranges, out);
+
+        Self {
+            universe_size,
+            levels: levels as u8,
+        }
     }
 
     /// The universe size (exclusive upper bound on values).

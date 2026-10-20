@@ -1,5 +1,5 @@
-//! Recursive subtree walkers behind `RawBitmap`'s query, mutation and
-//! set-op methods. `raw` is the only importer of this module; bitmap.rs
+//! Recursive subtree walkers behind `RawBitmap`'s query, range
+//! construction, mutation and set-op methods. `raw` is the only importer of this module; bitmap.rs
 //! and sfst reach these through `RawBitmap`/`Bitmap` methods. Everything
 //! here is `pub(crate)`.
 //!
@@ -167,6 +167,71 @@ pub(crate) fn remove_range_subtree(
     } else {
         out.pop();
         false
+    }
+}
+
+/// Bytes in a full subtree `level` levels tall, one per node:
+/// 1 + 8 + ... + 8^(level-1) = (8^level - 1) / 7. Every one is `0xFF`.
+fn full_subtree_len(level: u32) -> usize {
+    (((1u64 << (3 * level)) - 1) / 7) as usize
+}
+
+/// Append the subtree at `level` that starts at value `base` and holds
+/// exactly the values of `ranges`: half-open `(start, end)` pairs,
+/// sorted, disjoint, non-empty, each intersecting this subtree. A child
+/// inside a single range is a full subtree, whose pre-order bytes are all
+/// `0xFF`, so it is written as one run without visiting its nodes; only
+/// children on a range edge recurse. Cost tracks the bytes written, not
+/// the values. `u64` arithmetic, as in `range_count`.
+pub(crate) fn ranges_subtree(level: u32, base: u64, ranges: &[(u32, u32)], out: &mut Vec<u8>) {
+    if level == 1 {
+        let mut leaf = 0u8;
+        for &(start, end) in ranges {
+            let lo = (start as u64).saturating_sub(base).min(8) as u8;
+            let hi = (end as u64 - base).min(8) as u8;
+            leaf |= ((1u16 << hi) - (1u16 << lo)) as u8;
+        }
+        out.push(leaf);
+        return;
+    }
+
+    let child_level = level - 1;
+    let stride: u64 = 1u64 << (3 * child_level);
+    let node_end = base + 8 * stride;
+
+    let mut node = 0u8;
+    for &(start, end) in ranges {
+        let lo_child = ((start as u64).max(base) - base) / stride;
+        let hi_child = ((end as u64).min(node_end) - 1 - base) / stride;
+        node |= ((1u16 << (hi_child + 1)) - (1u16 << lo_child)) as u8;
+    }
+    out.push(node);
+
+    // Ranges are sorted, so each child's ranges are the next contiguous
+    // run of the slice and `i` only moves forward.
+    let mut i = 0;
+    for child in 0..8u8 {
+        if node & (1 << child) == 0 {
+            continue;
+        }
+
+        let child_base = base + (child as u64) * stride;
+        let child_end = child_base + stride;
+
+        while ranges[i].1 as u64 <= child_base {
+            i += 1;
+        }
+        let mut j = i;
+        while j < ranges.len() && (ranges[j].0 as u64) < child_end {
+            j += 1;
+        }
+
+        match ranges[i..j] {
+            [(start, end)] if start as u64 <= child_base && end as u64 >= child_end => {
+                out.resize(out.len() + full_subtree_len(child_level), 0xFF);
+            }
+            _ => ranges_subtree(child_level, child_base, &ranges[i..j], out),
+        }
     }
 }
 

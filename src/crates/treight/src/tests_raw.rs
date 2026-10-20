@@ -1194,8 +1194,8 @@ proptest! {
 
 // from_range normalizes any RangeBounds<u32> into a half-open
 // start..end (an inclusive end widens by one, the end is clamped to
-// the universe) and delegates to from_sorted_iter. An inverted or
-// empty range yields an empty set, never a panic.
+// the universe) and builds that range. An inverted or empty range
+// yields an empty set, never a panic.
 #[test]
 fn test_from_range_full() {
     let mut data = Vec::new();
