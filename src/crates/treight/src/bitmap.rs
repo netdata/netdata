@@ -29,7 +29,20 @@
 //! payload beside it; the `roaring` feature (roaring.rs) bridges
 //! `RoaringBitmap` and feeds the differential fuzz target
 //! fuzz/fuzz_targets/against_roaring.rs.
+use crate::ceil_log8;
 use crate::raw::{Iter, RawBitmap};
+
+/// Bytes in the canonical tree holding every value of `0..universe_size`:
+/// one node per distinct prefix at each height, `ceil(universe / 8^h)` for
+/// `h = 1..=levels`. Equals `estimate_data_size(universe_size,
+/// 0..universe_size)` (lib.rs) in O(levels) instead of O(universe).
+pub(crate) fn full_tree_len(universe_size: u32) -> usize {
+    let mut total = 0;
+    for height in 1..=ceil_log8(universe_size) {
+        total += (universe_size as u64).div_ceil(1u64 << (3 * height)) as usize;
+    }
+    total
+}
 
 /// A bitmap that may store its complement for better compression: a
 /// [`RawBitmap`] tree plus an `inverted` flag, with every accessor flipping
@@ -118,10 +131,17 @@ impl Bitmap {
         }
     }
 
-    /// Returns `true` if no bits are set.
+    /// Returns `true` if no bits are set. For the inverted form that means
+    /// the stored tree holds the whole universe. Every node of a valid tree
+    /// is also a node of that full tree, so a blob of any other length is
+    /// rejected without a walk; a blob of the full length can still miss
+    /// values (a leaf keeps another bit), so only then is the tree counted.
+    /// `and`/`or` check both operands here, and sfst's `PosSet::is_empty`
+    /// (sfst/src/index_reader.rs) delegates here.
     pub fn is_empty(&self, data: &[u8]) -> bool {
         if self.inverted {
-            self.inner.len(data) == self.inner.universe_size() as u64
+            let universe = self.inner.universe_size();
+            data.len() == full_tree_len(universe) && self.inner.len(data) == universe as u64
         } else {
             self.inner.is_empty(data)
         }

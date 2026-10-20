@@ -17,6 +17,10 @@
 //!   tree; boolean short-circuits against them return identity results,
 //!   `and` with a full operand copying the other side's tree bytes into
 //!   `out`.
+//! - An inverted `is_empty` holds only for a stored tree of the whole
+//!   universe: rejected on blob length, counted when the length matches
+//!   (a same-length tree can still miss values), up to depth 7; the
+//!   full-tree length equals `estimate_data_size` over the universe.
 //! - A double `complement()` round-trips to the original set.
 //! - `from_range` holds exactly the range, follows the half-universe
 //!   complement rule, and stores the same bytes as the direct builder
@@ -116,6 +120,89 @@ fn test_bitmap_empty_full() {
     assert_eq!(bm.len(&empty_data), 64);
     for i in 0..64 {
         assert!(bm.contains(&empty_data, i));
+    }
+}
+
+/// The full-tree length `is_empty` compares against equals the builder's
+/// size for the whole universe: the empty universe, both sides of every
+/// depth boundary up to 7, and a few sizes between.
+#[test]
+fn test_full_tree_len_matches_estimate() {
+    let mut universes = vec![0u32, 100, 1000, 30_000, 1_000_000];
+    for depth in 1..=7u32 {
+        let top = 1u32 << (3 * depth);
+        universes.extend([top - 1, top, top + 1]);
+    }
+    for u in universes {
+        assert_eq!(
+            crate::bitmap::full_tree_len(u),
+            estimate_data_size(u, 0..u),
+            "u={u}"
+        );
+    }
+}
+
+/// An inverted bitmap is empty only when its stored tree holds the whole
+/// universe. `is_empty` rejects any other blob length without walking, but
+/// a tree of the full tree's length can still miss values (a leaf keeps
+/// another bit), so that case must fall through to the count. Pinned at
+/// every depth up to 7, on and between the depth boundaries, together with
+/// `and`/`or`, which consult `is_empty` for their short-circuits.
+#[test]
+fn test_bitmap_inverted_is_empty() {
+    let universes = [
+        1, 2, 7, 8, 9, 16, 63, 64, 65, 100, 511, 512, 513, 4095, 4096, 4097, 32768, 32769, 262_144,
+        262_145, 2_097_152,
+    ];
+    for u in universes {
+        let mut full_data = Vec::new();
+        let full = Bitmap::from_sorted_iter_complemented(0..u, u, &mut full_data);
+        assert!(full.is_empty(&full_data), "u={u}: every value stored");
+        assert_eq!(full.len(&full_data), 0, "u={u}");
+
+        if u < 2 {
+            continue;
+        }
+
+        // Value 0 shares its leaf with value 1, so the blob keeps its length.
+        let mut same_len = Vec::new();
+        let one = Bitmap::from_sorted_iter_complemented(1..u, u, &mut same_len);
+        assert_eq!(same_len.len(), full_data.len(), "u={u}");
+        assert!(
+            !one.is_empty(&same_len),
+            "u={u}: same length, value 0 missing"
+        );
+        assert_eq!(one.len(&same_len), 1, "u={u}");
+
+        let mut zero_data = Vec::new();
+        let zero = Bitmap::from_sorted_iter([0].into_iter(), u, &mut zero_data);
+        let mut out = Vec::new();
+        let and = one.and(&same_len, &zero, &zero_data, &mut out);
+        assert!(
+            !and.is_empty(&out) && and.contains(&out, 0) && and.len(&out) == 1,
+            "u={u}: and"
+        );
+        let mut out = Vec::new();
+        let and = full.and(&full_data, &zero, &zero_data, &mut out);
+        assert!(
+            and.is_empty(&out),
+            "u={u}: and with an empty inverted operand"
+        );
+        let mut out = Vec::new();
+        let or = full.or(&full_data, &one, &same_len, &mut out);
+        assert!(
+            or.contains(&out, 0) && or.len(&out) == 1,
+            "u={u}: or with an empty inverted operand"
+        );
+
+        if u > 8 {
+            // A whole leaf missing: a shorter blob, rejected on length.
+            let mut short = Vec::new();
+            let eight = Bitmap::from_sorted_iter_complemented(8..u, u, &mut short);
+            assert!(short.len() < full_data.len(), "u={u}");
+            assert!(!eight.is_empty(&short), "u={u}: first leaf missing");
+            assert_eq!(eight.len(&short), 8, "u={u}");
+        }
     }
 }
 
