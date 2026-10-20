@@ -415,14 +415,26 @@ static int remove_ephemeral_host(BUFFER *wb, const char *machine_guid, bool repo
     bool locked = unregister ? rw_spinlock_trywrite_lock(&host->metadata_lifetime_lock)
                              : rw_spinlock_tryread_lock(&host->metadata_lifetime_lock);
     if (!locked) {
-        if (report_error)
-            buffer_sprintf(wb, "Node '%s' (machine guid: %s) is busy - try again",
-                           rrdhost_hostname(host), host->machine_guid);
+        // a plugin holds the read side of a vnode for as long as it has it selected, so an online
+        // vnode fails here: report it as online, as it is reported when we get the lock
+        bool online = rrdhost_is_online(host);
+        if (report_error) {
+            if (online)
+                buffer_sprintf(wb, "Node '%s' (machine guid: %s) is online - not changing it",
+                               rrdhost_hostname(host), host->machine_guid);
+            else
+                buffer_sprintf(wb, "Node '%s' (machine guid: %s) is busy - try again",
+                               rrdhost_hostname(host), host->machine_guid);
+        }
         rrd_rdunlock();
-        return -1;
+        return online ? 0 : -1;
     }
     rrd_rdunlock();
 
+    // Every path that makes a host live (a child attaching, a plugin defining or re-enabling a vnode)
+    // holds the read side until the host is online (see metadata_lifetime_lock). So with the write side,
+    // an offline host stays offline - a reconnecting child is refused until we are done - and with the
+    // read side it stays allocated.
     if (rrdhost_is_online(host)) {
         if (report_error)
             buffer_sprintf(wb, "Node '%s' (machine guid: %s) is online - not changing it",
@@ -432,6 +444,24 @@ static int remove_ephemeral_host(BUFFER *wb, const char *machine_guid, bool repo
         else
             rw_spinlock_read_unlock(&host->metadata_lifetime_lock);
         return 0;
+    }
+
+    // Offline is not enough to free it: a disconnecting child's receiver clears the online flag
+    // first and keeps using the host until rrdhost_clear_receiver() sets host->receiver to NULL,
+    // while the free path waits for it only briefly. With the write side no new receiver can
+    // attach, so once host->receiver is NULL it stays NULL until we are done.
+    if (unregister) {
+        rrdhost_receiver_lock(host);
+        bool receiver_attached = host->receiver != NULL;
+        rrdhost_receiver_unlock(host);
+
+        if (receiver_attached) {
+            if (report_error)
+                buffer_sprintf(wb, "Node '%s' (machine guid: %s) is busy - try again",
+                               rrdhost_hostname(host), host->machine_guid);
+            rw_spinlock_write_unlock(&host->metadata_lifetime_lock);
+            return -1;
+        }
     }
 
     bool marked = false;

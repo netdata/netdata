@@ -121,6 +121,11 @@ static RRDHOST *dbengine_rrdhost_find_or_create(char *name) {
         0
         );
     system_tz_free(&tz);
+
+    // nothing removes hosts while these tests run
+    if (host)
+        rrdhost_pin_release(host);
+
     return host;
 }
 
