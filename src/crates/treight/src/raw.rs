@@ -63,10 +63,12 @@ impl RawBitmap {
     /// duplicates are tolerated (they re-OR a set bit). Values at or past
     /// the universe are not checked either.
     ///
-    /// Single pass over the pre-order serialization: when a value's node
-    /// index changes at some level, a zeroed node byte is pushed there and
-    /// every value ORs its bit into the byte currently open at that level.
-    /// Cost is O(values × levels) with no bitvec staging; an empty iterator
+    /// Single pass over the pre-order serialization, one node byte open per
+    /// level. Each value is compared with the previous one: the highest
+    /// 3-bit group where they differ names the deepest node they share,
+    /// which gains the value's child bit; every level below it opens a new
+    /// node byte, and the levels above it already hold the value's bits.
+    /// Cost is O(values + bytes) with no bitvec staging; an empty iterator
     /// appends nothing and yields an empty descriptor, and otherwise the
     /// bytes appended are exactly `estimate_data_size`'s count.
     pub fn from_sorted_iter(
@@ -79,32 +81,42 @@ impl RawBitmap {
             return Self::empty(universe_size);
         }
 
-        let base = out.len();
-        // Per-level scratch, indexed by the loop's dl (≤ 10 for a u32
-        // universe): u32::MAX forces the first value to open a byte at
-        // every level.
-        let mut prev_group = [u32::MAX; 11];
+        // Position of the node byte open at each level, indexed like
+        // `child_index`'s level (0 = leaf, ≤ 10 for a u32 universe).
         let mut node_pos = [0usize; 11];
+        let mut prev: Option<u32> = None;
 
         for v in iter {
-            for dl in (0..levels).rev() {
-                // Node index at this level. `checked_shr` covers the
-                // 11-level tree, whose root shift 3 × 11 = 33 is past u32:
-                // the index is always 0 there.
-                let group = v.checked_shr(3 * (dl + 1)).unwrap_or(0);
-
-                if group != prev_group[dl as usize] {
-                    prev_group[dl as usize] = group;
-                    node_pos[dl as usize] = out.len();
-                    out.push(0);
+            let new_levels = match prev {
+                None => levels,
+                Some(p) => {
+                    let diff = v ^ p;
+                    if diff == 0 {
+                        continue;
+                    }
+                    let shared = (31 - diff.leading_zeros()) / 3;
+                    // A value past 8^levels shares no node, not even the
+                    // root: it opens a new root, as the per-level loop
+                    // this replaced did (the orphan subtrees roaring.rs
+                    // describes).
+                    if shared >= levels {
+                        levels
+                    } else {
+                        out[node_pos[shared as usize]] |= 1u8 << child_index(shared, v);
+                        shared
+                    }
                 }
+            };
 
-                out[node_pos[dl as usize]] |= 1u8 << child_index(dl, v);
+            for dl in (0..new_levels).rev() {
+                node_pos[dl as usize] = out.len();
+                out.push(1u8 << child_index(dl, v));
             }
+            prev = Some(v);
         }
 
         // No values: leave `out` untouched and return the empty descriptor.
-        if out.len() == base {
+        if prev.is_none() {
             return Self::empty(universe_size);
         }
 
