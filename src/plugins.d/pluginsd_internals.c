@@ -91,12 +91,22 @@ void parser_destroy(PARSER *parser) {
     //    sweep answer every caller still waiting on this plugin
     pluginsd_calls_cleanup(parser);
 
+    // the pin of the host a plugin has selected (pluginsd_select_host()): released only now, after the
+    // functions drain above, and on every path that destroys the parser. Streaming parsers never
+    // hold one - their host is set at creation and they have no HOST keyword.
+    if(parser->user.host_pin)
+        pluginsd_select_host(parser, NULL, false, "PARSER DESTROY");
+
     // 4. free the parser, THEN drop the transport's base ref: survivors
     //    (registry entries, dyncfg nodes, in-flight-call pins) keep holding a valid
     //    but dead transport until they release it; its destructor never
     //    touches the parser
     struct nrpc_transport *transport = parser->inflight.transport;
     parser->inflight.transport = NULL;
+
+    // the vnode index owns an interned STRING per machine guid; pluginsd_process() drains it on a
+    // plugin's normal teardown, this releases it on every other path
+    pluginsd_vnodes_index_destroy(parser);
 
     freez(parser);
 
