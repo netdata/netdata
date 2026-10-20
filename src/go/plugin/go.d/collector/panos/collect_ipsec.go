@@ -47,9 +47,6 @@ func (c *Collector) collectIPSecMetrics(ctx context.Context) (bool, error) {
 	c.metrics.ipsec.tunnelsActive.Observe(float64(payload.activeCount))
 
 	var errs []error
-	if payload.entriesFound && payload.activeCount != int64(len(payload.tunnels)) {
-		errs = append(errs, fmt.Errorf("IPsec active tunnel count mismatch: ntun=%d entries=%d; per-tunnel lifetime metrics may be incomplete", payload.activeCount, len(payload.tunnels)))
-	}
 	for _, tunnel := range payload.tunnels {
 		key := ipsecTunnelKey(tunnel)
 		value, err := parseRequiredPANOSIntField("IPsec tunnel "+firstNonEmpty(tunnel.Name, key)+" remain", tunnel.Remain)
@@ -94,12 +91,21 @@ func parseIPSecTunnels(body []byte) (ipsecTunnelPayload, error) {
 		payload.activeCount = activeCount
 		return payload, nil
 	}
-	if strings.TrimSpace(result.NTun) == "" {
-		activeCount = int64(len(result.Entries.Entries))
-	}
+	// <ntun> is the number of configured tunnels, not established SAs (PAN-OS lists
+	// only established SAs in <entries>), so it is not an active count when entries are present.
 	payload.tunnels = result.Entries.Entries
-	payload.activeCount = activeCount
+	payload.activeCount = countIPSecTunnels(payload.tunnels)
 	return payload, nil
+}
+
+// countIPSecTunnels counts distinct tunnels, so an SA that briefly coexists with
+// its replacement during a rekey is not counted twice.
+func countIPSecTunnels(tunnels []ipsecTunnel) int64 {
+	seen := make(map[string]struct{}, len(tunnels))
+	for _, tunnel := range tunnels {
+		seen[ipsecTunnelKey(tunnel)] = struct{}{}
+	}
+	return int64(len(seen))
 }
 
 func ipsecTunnelKey(tunnel ipsecTunnel) string {

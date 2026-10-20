@@ -37,6 +37,7 @@ var (
 	dataEnvironment, _         = os.ReadFile("testdata/environment.xml")
 	dataLicenses, _            = os.ReadFile("testdata/licenses.xml")
 	dataIPSecSA, _             = os.ReadFile("testdata/ipsec_sa.xml")
+	dataIPSecSAPartial, _      = os.ReadFile("testdata/ipsec_sa_partial.xml")
 )
 
 func Test_testDataIsValid(t *testing.T) {
@@ -52,6 +53,7 @@ func Test_testDataIsValid(t *testing.T) {
 		"dataEnvironment":         dataEnvironment,
 		"dataLicenses":            dataLicenses,
 		"dataIPSecSA":             dataIPSecSA,
+		"dataIPSecSAPartial":      dataIPSecSAPartial,
 	} {
 		require.NotNil(t, data, name)
 	}
@@ -1747,22 +1749,50 @@ func TestCollector_Collect(t *testing.T) {
 				},
 			},
 		},
-		"IPsec count mismatch is partial success": {
+		"IPsec ntun counts configured tunnels, not active SAs": {
+			prepare: func(_ *Collector, api *mockAPIClient) {
+				api.responses = map[string][]byte{ipsecSACommand: dataIPSecSAPartial}
+			},
+			steps: []collectStep{
+				{
+					name: "active count is the number of SAs listed, ntun=6 is ignored",
+					wantMetrics: map[string]metrix.SampleValue{
+						metricKey("ipsec_tunnels_active", nil): 2,
+						metricKey("ipsec_tunnel_sa_lifetime", ipsecLabels("branch-d", "gw-branch-d", "198.51.100.40", "3", "ESP", "G256")): 5145,
+						metricKey("ipsec_tunnel_sa_lifetime", ipsecLabels("branch-c", "gw-branch-c", "198.51.100.30", "4", "ESP", "G256")): 4743,
+					},
+					notWantLog: []string{"count mismatch"},
+				},
+			},
+		},
+		"IPsec no established SAs reports zero active tunnels": {
+			prepare: func(_ *Collector, api *mockAPIClient) {
+				api.responses = map[string][]byte{
+					ipsecSACommand: []byte(`<response status="success"><result><entries/><ntun>6</ntun></result></response>`),
+				}
+			},
+			steps: []collectStep{
+				{
+					name:        "empty entries with ntun=6 is zero active, not six",
+					wantMetrics: map[string]metrix.SampleValue{metricKey("ipsec_tunnels_active", nil): 0},
+				},
+			},
+		},
+		"IPsec rekey overlap is counted once": {
 			prepare: func(_ *Collector, api *mockAPIClient) {
 				api.responses = map[string][]byte{
 					ipsecSACommand: []byte(
-						`<response status="success"><result><ntun>2</ntun><entries><entry><name>branch-a</name><gateway>gw-branch-a</gateway><remote>198.51.100.10</remote><remain>60</remain><tid>66</tid></entry></entries></result></response>`,
+						`<response status="success"><result><entries>` +
+							`<entry><name>branch-a</name><gateway>gw-branch-a</gateway><remote>198.51.100.10</remote><remain>60</remain><tid>66</tid><i_spi>1</i_spi></entry>` +
+							`<entry><name>branch-a</name><gateway>gw-branch-a</gateway><remote>198.51.100.10</remote><remain>7200</remain><tid>66</tid><i_spi>2</i_spi></entry>` +
+							`</entries><ntun>2</ntun></result></response>`,
 					),
 				}
 			},
 			steps: []collectStep{
 				{
-					name: "count and tunnel metrics commit",
-					wantMetrics: map[string]metrix.SampleValue{
-						metricKey("ipsec_tunnels_active", nil): 2,
-						metricKey("ipsec_tunnel_sa_lifetime", ipsecLabels("branch-a", "gw-branch-a", "198.51.100.10", "66", "unknown", "unknown")): 60,
-					},
-					wantLog: []string{"IPsec active tunnel count mismatch: ntun=2 entries=1"},
+					name:        "two SAs for one tunnel count as one active tunnel",
+					wantMetrics: map[string]metrix.SampleValue{metricKey("ipsec_tunnels_active", nil): 1},
 				},
 			},
 		},
