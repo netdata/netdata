@@ -1,8 +1,9 @@
 // Differential fuzz target: replays random op sequences on a
 // `treight::RawBitmap` and a `roaring::RoaringBitmap` (the oracle) built
 // from the same values, asserting the two implementations always agree on
-// len, min/max, emptiness, membership, ranges, ascending iteration and
-// set-op results; the serialize roundtrip checks treight alone.
+// len, min/max, emptiness, membership, ranges, ascending iteration,
+// range construction and set-op results; the serialize roundtrip checks
+// treight alone.
 //
 // A treight bitmap is a `Copy` descriptor whose tree bytes live in an
 // external blob (src/crates/treight/src/raw.rs `RawBitmap`), so each side
@@ -67,6 +68,7 @@ enum Operation {
     CheckIter,
     RangeCardinality(Num, Num),
     RemoveRange(Num, Num),
+    FromRange(Num, Num),
     And,
     Or,
     Sub,
@@ -198,6 +200,22 @@ fuzz_target!(|input: FuzzInput| {
                 let hi = (a.max(b) % universe).saturating_add(1);
                 lhs_t.remove_range(&mut lhs_d, lo..hi);
                 lhs_r.remove_range(lo..hi);
+            }
+            Operation::FromRange(Num(a), Num(b)) => {
+                // Replace LHS with a freshly built lo..hi range; later ops
+                // and the closing size check then run on a range-built
+                // blob. The length is capped at 65,536 values so every
+                // iteration stays fast; ranges of millions of values are
+                // pinned by the unit tests (src/crates/treight/src/
+                // tests_raw.rs `test_from_range_bytes_large_universes`).
+                let lo = a % universe;
+                let hi = lo.saturating_add(b % 65_536 + 1).min(universe);
+                let mut data = Vec::new();
+                lhs_t = treight::RawBitmap::from_range(lo..hi, universe, &mut data);
+                lhs_d = data;
+                lhs_r = roaring::RoaringBitmap::new();
+                lhs_r.insert_range(lo..hi);
+                check_equal(&lhs_t, &lhs_d, &lhs_r);
             }
             Operation::And => {
                 let mut out = Vec::new();

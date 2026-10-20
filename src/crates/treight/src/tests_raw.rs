@@ -9,6 +9,11 @@
 //!   hand-checked builds, and `from_sorted_iter`/`from_range` round
 //!   trips (ascending input required, duplicates tolerated, an empty
 //!   iterator appends nothing).
+//! - Byte-level builder pins at every tree depth up to `u32::MAX`:
+//!   `from_sorted_iter` against the insert-built oracle
+//!   (`build_by_insert`), and `from_range` against `from_sorted_iter`
+//!   over the same range, exhaustively in small universes and as
+//!   proptests.
 //! - Queries over the raw blob: `contains`, ascending `iter`, `len`,
 //!   `is_empty`, `min`/`max`, `range_cardinality`.
 //! - The four set ops as pure blob-to-blob functions, with
@@ -24,6 +29,7 @@
 //! `from_sorted_iter` (both undefined; no test feeds them), and roaring
 //! equivalence over long mutation sequences (fuzz-target territory).
 use crate::*;
+use proptest::prelude::*;
 
 // The level curve at its boundaries: 0 maps to 0 levels (no tree at
 // all), and exact powers of 8 stay on the lower level.
@@ -1081,6 +1087,111 @@ fn test_from_sorted_iter_large_universe() {
     assert!(!bm.contains(&data, 1));
 }
 
+/// Build `values` (ascending) by repeated `insert` into an empty blob.
+/// `insert` patches the tree in place and shares no code with the
+/// builders, and canonical storage admits one blob per set, so this is
+/// an independent byte-level oracle for every builder.
+pub(crate) fn build_by_insert(universe_size: u32, values: &[u32]) -> Vec<u8> {
+    let bm = RawBitmap::empty(universe_size);
+    let mut data = Vec::new();
+    for &v in values {
+        bm.insert(&mut data, v);
+    }
+    data
+}
+
+/// Strategy for the byte-level builder pins: a universe anywhere up to
+/// `u32::MAX` (tree depths 1-11) and up to 512 ascending values, half
+/// scattered and half clustered around a random base, so leaves are
+/// both shared and lone.
+fn arb_values_any_universe() -> impl Strategy<Value = (u32, Vec<u32>)> {
+    prop_oneof![1u32..=4096, 4097u32..=u32::MAX].prop_flat_map(|universe| {
+        (
+            proptest::collection::vec(0..universe, 0..=256usize),
+            0..universe,
+            proptest::collection::vec(0u32..4096, 0..=256usize),
+        )
+            .prop_map(move |(mut vals, base, offsets)| {
+                vals.extend(
+                    offsets
+                        .into_iter()
+                        .filter_map(|o| base.checked_add(o))
+                        .filter(|&v| v < universe),
+                );
+                vals.sort_unstable();
+                vals.dedup();
+                (universe, vals)
+            })
+    })
+}
+
+// Byte-level pin: from_sorted_iter writes exactly the insert oracle's
+// blob, from 1-level trees up to the 11-level u32::MAX universe, for
+// sparse, clustered and dense inputs.
+#[test]
+fn test_from_sorted_iter_matches_insert_oracle() {
+    let cases: Vec<(u32, Vec<u32>)> = vec![
+        (1, vec![0]),
+        (8, (0..8).collect()),
+        (9, vec![0, 8]),
+        (64, vec![7, 8, 63]),
+        (513, (0..513).step_by(7).collect()),
+        (4096, (0..20).chain(500..530).chain(4000..4096).collect()),
+        (1_000_000, vec![0, 7, 8, 63, 64, 511, 512, 999_999]),
+        (
+            u32::MAX,
+            vec![0, 1 << 30, (1 << 31) + 5, u32::MAX - 9, u32::MAX - 1],
+        ),
+    ];
+    for (universe, values) in &cases {
+        let mut data = Vec::new();
+        RawBitmap::from_sorted_iter(values.iter().copied(), *universe, &mut data);
+        assert_eq!(
+            data,
+            build_by_insert(*universe, values),
+            "universe={universe}"
+        );
+    }
+}
+
+proptest! {
+    /// The same byte-level pin over generated sets at every tree depth.
+    #[test]
+    fn from_sorted_iter_matches_insert_oracle((universe, vals) in arb_values_any_universe()) {
+        let mut data = Vec::new();
+        RawBitmap::from_sorted_iter(vals.iter().copied(), universe, &mut data);
+        prop_assert_eq!(data, build_by_insert(universe, &vals));
+    }
+
+    /// `estimate_data_size` counts exactly the bytes the builder writes,
+    /// at every tree depth (`tests_roaring.rs` pins it for small
+    /// universes only).
+    #[test]
+    fn estimate_data_size_matches_builder((universe, vals) in arb_values_any_universe()) {
+        let mut data = Vec::new();
+        RawBitmap::from_sorted_iter(vals.iter().copied(), universe, &mut data);
+        prop_assert_eq!(estimate_data_size(universe, vals.iter().copied()), data.len());
+    }
+
+    /// `from_range` writes the same bytes as `from_sorted_iter` over the
+    /// same range (itself pinned to the insert oracle above), for ranges
+    /// of up to 20,000 values anywhere in universes of every depth.
+    #[test]
+    fn from_range_matches_from_sorted_iter(
+        universe in prop_oneof![1u32..=4096, 4097u32..=u32::MAX],
+        start_frac in 0.0f64..=1.0,
+        len in 0u32..=20_000,
+    ) {
+        let start = (universe as f64 * start_frac) as u32;
+        let end = start.saturating_add(len).min(universe);
+        let mut got = Vec::new();
+        RawBitmap::from_range(start..end, universe, &mut got);
+        let mut want = Vec::new();
+        RawBitmap::from_sorted_iter(start..end, universe, &mut want);
+        prop_assert_eq!(got, want);
+    }
+}
+
 // from_range normalizes any RangeBounds<u32> into a half-open
 // start..end (an inclusive end widens by one, the end is clamped to
 // the universe) and delegates to from_sorted_iter. An inverted or
@@ -1163,30 +1274,48 @@ fn test_from_range_clamped_to_universe() {
     assert_eq!(bm.iter(&data).collect::<Vec<_>>(), vec![60, 61, 62, 63]);
 }
 
-// The delegate must agree with the direct builder: same membership
-// for full and middle ranges at every depth tested.
+// Byte-level pin: from_range writes the same blob as from_sorted_iter
+// over the same range, for every start..end in universes at each level
+// boundary (full, empty and single-value ranges included).
 #[test]
-fn test_from_range_matches_from_sorted_iter() {
-    for &universe in &[8, 64, 512, 4096] {
-        let mut data1 = Vec::new();
-        let from_range = RawBitmap::from_range(0..universe, universe, &mut data1);
-        let mut data2 = Vec::new();
-        let from_iter = RawBitmap::from_sorted_iter(0..universe, universe, &mut data2);
-        assert!(
-            bitmaps_equal(&from_range, &data1, &from_iter, &data2),
-            "universe={universe}"
-        );
+fn test_from_range_bytes_exhaustive() {
+    for universe in [1u32, 2, 7, 8, 9, 63, 64, 65, 100, 511, 512, 513] {
+        for start in 0..=universe {
+            for end in start..=universe {
+                let mut got = Vec::new();
+                RawBitmap::from_range(start..end, universe, &mut got);
+                let mut want = Vec::new();
+                RawBitmap::from_sorted_iter(start..end, universe, &mut want);
+                assert_eq!(got, want, "universe={universe} range={start}..{end}");
+            }
+        }
+    }
+}
 
-        let start = universe / 4;
-        let end = universe * 3 / 4;
-        let mut data3 = Vec::new();
-        let from_range = RawBitmap::from_range(start..end, universe, &mut data3);
-        let mut data4 = Vec::new();
-        let from_iter = RawBitmap::from_sorted_iter(start..end, universe, &mut data4);
-        assert!(
-            bitmaps_equal(&from_range, &data3, &from_iter, &data4),
-            "universe={universe} range={start}..{end}"
-        );
+// The same pin at large universes and the 11-level u32::MAX tree, whose
+// root spans 8^11 = 2^33 values, past u32; ranges of millions of values
+// cover tall full subtrees (the fuzz target caps its ranges at 65,536).
+#[test]
+fn test_from_range_bytes_large_universes() {
+    let cases: [(u32, u32, u32); 10] = [
+        (4096, 1024, 3072),
+        (1 << 24, 0, 1),
+        (1 << 24, 12_345, 112_345),
+        // Full subtrees up to 7 levels tall (8^7 = 2,097,152 values).
+        (1 << 24, 1_000, 3_000_000),
+        (u32::MAX, 2_000_000, 4_300_000),
+        (1 << 24, (1 << 24) - 70_000, 1 << 24),
+        (1_000_000, 262_143, 262_145),
+        (u32::MAX, 0, 9),
+        (u32::MAX, (1 << 30) - 3, (1 << 30) + 70_000),
+        (u32::MAX, u32::MAX - 40_000, u32::MAX),
+    ];
+    for (universe, start, end) in cases {
+        let mut got = Vec::new();
+        RawBitmap::from_range(start..end, universe, &mut got);
+        let mut want = Vec::new();
+        RawBitmap::from_sorted_iter(start..end, universe, &mut want);
+        assert_eq!(got, want, "universe={universe} range={start}..{end}");
     }
 }
 
