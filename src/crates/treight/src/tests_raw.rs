@@ -24,10 +24,10 @@
 //! - `estimate_data_size`'s exactness against real builds (the fuzz
 //!   target re-asserts the tie after arbitrary op sequences,
 //!   `fuzz/fuzz_targets/against_roaring.rs`).
-//! - Subtree skipping (node.rs `skip_subtree_at`, `NodeReader::skip`),
-//!   which jumps over leaf runs unread: it ends every subtree where a
-//!   byte-by-byte reference walk does, at every depth 1-11 and as a
-//!   proptest.
+//! - Subtree skipping and counting (node.rs `skip_subtree_at`,
+//!   `NodeReader::skip`/`skip_subtree`, and `len`): every subtree ends,
+//!   and counts, as a byte-by-byte reference walk says, at every depth
+//!   1-11 and as a proptest.
 //!
 //! Not pinned here: descending or out-of-range values fed to
 //! `from_sorted_iter` (both undefined; no test feeds them), and roaring
@@ -1545,29 +1545,41 @@ fn test_estimate_data_size_dense() {
 
 // ── Subtree skipping ───────────────────────────────────────────────
 
-/// Every node of a canonical tree as `(start, height, end)`, found by a
-/// byte-by-byte pre-order walk that reads every node and leaf — the
-/// reference the fast skip (node.rs `skip_subtree_at`, which never reads
-/// leaf bytes) must agree with.
-fn reference_spans(data: &[u8], levels: u32) -> Vec<(usize, u32, usize)> {
-    fn walk(data: &[u8], pos: usize, height: u32, spans: &mut Vec<(usize, u32, usize)>) -> usize {
+/// Every node of a canonical tree as `(start, height, end, values)`, found
+/// by a byte-by-byte pre-order walk that reads every node and sums its
+/// leaves' bits — the reference the fast skip (node.rs `skip_subtree_at`,
+/// which never reads leaf bytes) and the popcount count
+/// (`subtree_population`) must agree with.
+fn reference_spans(data: &[u8], levels: u32) -> Vec<(usize, u32, usize, u64)> {
+    fn walk(
+        data: &[u8],
+        pos: usize,
+        height: u32,
+        spans: &mut Vec<(usize, u32, usize, u64)>,
+    ) -> (usize, u64) {
         let slot = spans.len();
-        spans.push((pos, height, 0));
+        spans.push((pos, height, 0, 0));
         let node = data[pos];
         let mut end = pos + 1;
-        if height > 1 {
+        let mut values = 0;
+        if height == 1 {
+            values = node.count_ones() as u64;
+        } else {
             for child in 0..8 {
                 if node & (1 << child) != 0 {
-                    end = walk(data, end, height - 1, spans);
+                    let (child_end, child_values) = walk(data, end, height - 1, spans);
+                    end = child_end;
+                    values += child_values;
                 }
             }
         }
         spans[slot].2 = end;
-        end
+        spans[slot].3 = values;
+        (end, values)
     }
     let mut spans = Vec::new();
     if !data.is_empty() {
-        let end = walk(data, 0, levels, &mut spans);
+        let (end, _) = walk(data, 0, levels, &mut spans);
         assert_eq!(
             end,
             data.len(),
@@ -1577,31 +1589,43 @@ fn reference_spans(data: &[u8], levels: u32) -> Vec<(usize, u32, usize)> {
     spans
 }
 
-/// Skip every subtree of `data` with both entry points and compare with
-/// the reference walk.
+/// Skip and count every subtree of `data` with each entry point and
+/// compare with the reference walk; `len` must equal the root's count.
 fn assert_skips_match(universe: u32, data: &[u8]) {
     let levels = ceil_log8(universe);
-    for (start, height, end) in reference_spans(data, levels) {
+    let spans = reference_spans(data, levels);
+    for &(start, height, end, values) in &spans {
+        let label = format!("universe={universe} start={start} height={height}");
         assert_eq!(
             crate::node::skip_subtree_at(data, start, height),
             end,
-            "universe={universe} start={start} height={height}"
+            "{label}"
         );
         let mut reader = crate::node::NodeReader {
             nodes: data,
             pos: start,
         };
         reader.skip(height);
-        assert_eq!(
-            reader.pos, end,
-            "universe={universe} start={start} height={height}"
-        );
+        assert_eq!(reader.pos, end, "{label}");
+        let mut reader = crate::node::NodeReader {
+            nodes: data,
+            pos: start,
+        };
+        assert_eq!(reader.skip_subtree(height), values, "{label}");
+        assert_eq!(reader.pos, end, "{label}");
     }
+    let len = spans.first().map_or(0, |span| span.3);
+    assert_eq!(
+        RawBitmap::empty(universe).len(data),
+        len,
+        "universe={universe}"
+    );
 }
 
-// The fast skip lands where a byte-by-byte walk does, for every node of
-// sparse, clustered and dense trees at every depth 1-11: single values,
-// full trees (every height-2 node with 8 children), and ranges.
+// The fast skip lands where a byte-by-byte walk does, and the count
+// matches its leaf bits, for every node of sparse, clustered and dense
+// trees at every depth 1-11: single values, full trees (every height-2
+// node with 8 children), and ranges.
 #[test]
 fn test_skip_matches_reference_walk() {
     let mut cases: Vec<(u32, Vec<u8>)> = Vec::new();

@@ -44,6 +44,22 @@ fn popcount(byte: u8) -> usize {
     POPCOUNT[byte as usize] as usize
 }
 
+/// The number of values in `bytes`, which must be exactly one canonical
+/// subtree: every node but the root is one set bit in its parent and every
+/// other set bit is a value, so values = set bits - (nodes - 1). One pass
+/// over the bytes, eight at a time, instead of a walk of the tree.
+pub(crate) fn subtree_population(bytes: &[u8]) -> u64 {
+    let mut words = bytes.chunks_exact(8);
+    let mut set_bits = 0u64;
+    for word in &mut words {
+        set_bits += u64::from_le_bytes(word.try_into().unwrap()).count_ones() as u64;
+    }
+    for &byte in words.remainder() {
+        set_bits += popcount(byte) as u64;
+    }
+    set_bits - (bytes.len() as u64 - 1)
+}
+
 /// Advance `pos` past the subtree whose root node byte is `data[pos]` and
 /// whose height is `level` node bytes (1 = single leaf byte); returns the
 /// position just past it. Used by `NodeReader::skip` and by
@@ -90,12 +106,6 @@ impl Node {
     #[inline]
     pub(crate) fn has_child(self, child: u8) -> bool {
         self.0 & (1u8 << child) != 0
-    }
-
-    /// The number of present children; for a leaf byte, its value count.
-    #[inline]
-    pub(crate) fn count_children(self) -> u32 {
-        self.0.count_ones()
     }
 
     /// The lowest present child index; assumes at least one child is set.
@@ -197,23 +207,12 @@ impl NodeReader<'_> {
     }
 
     /// Advance the cursor past the subtree rooted at the next node byte,
-    /// which is `level` levels tall, returning how many values it contains:
-    /// a leaf byte counts its set bits, an inner node sums its present
-    /// children. Callers that only need the end position use `skip`.
+    /// which is `level` levels tall, returning how many values it contains,
+    /// counted from the skipped bytes (`subtree_population`). Callers that
+    /// only need the end position use `skip`.
     pub(crate) fn skip_subtree(&mut self, level: u32) -> u64 {
-        let node = self.next();
-        let level = level - 1;
-
-        if level == 0 {
-            return node.count_children() as u64;
-        }
-
-        let mut count = 0u64;
-        for child in 0..8u8 {
-            if node.has_child(child) {
-                count += self.skip_subtree(level);
-            }
-        }
-        count
+        let start = self.pos;
+        self.skip(level);
+        subtree_population(&self.nodes[start..self.pos])
     }
 }

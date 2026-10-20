@@ -23,7 +23,7 @@
 use std::io;
 
 use crate::ceil_log8;
-use crate::node::{NodeReader, child_index, child_offset, skip_subtree_at};
+use crate::node::{NodeReader, child_index, child_offset, skip_subtree_at, subtree_population};
 use crate::ops::{
     contains_inner, difference_subtree, intersect_subtree, range_count, ranges_subtree,
     remove_range_subtree, symmetric_difference_subtree, union_subtree,
@@ -247,14 +247,15 @@ impl RawBitmap {
         iter
     }
 
-    /// The number of set values: a full walk summing each leaf byte's bits
-    /// (`NodeReader::skip_subtree`); 0 for an empty blob.
+    /// The number of set values: the whole blob is one subtree, so one pass
+    /// over its bytes counts it (node.rs `subtree_population`), with no
+    /// tree walk; 0 for an empty blob.
     pub fn len(&self, data: &[u8]) -> u64 {
         if data.is_empty() {
             return 0;
         }
 
-        NodeReader::new(data).skip_subtree(self.levels())
+        subtree_population(data)
     }
 
     /// `true` when nothing is set. O(1): blobs are canonical — a non-empty
