@@ -53,7 +53,7 @@ static int test_disk_kernel_variants(void)
 {
     if (NETDATA_V5_16 != (1u << NETDATA_IDX_V5_16) || NETDATA_V5_17 != (1u << NETDATA_IDX_V5_17) ||
         NETDATA_V6_8 != (1u << NETDATA_IDX_V6_8) || NETDATA_V6_12 != (1u << NETDATA_IDX_V6_12) ||
-        NETDATA_V7_0 != (1u << NETDATA_IDX_V7_0))
+        NETDATA_V7_0 != (1u << NETDATA_IDX_V7_0) || NETDATA_V6_16_2 != (1u << NETDATA_IDX_V6_16_2))
         return 0;
 
     for (size_t i = 0; ebpf_modules[i].info.thread_name; i++) {
@@ -62,8 +62,12 @@ static int test_disk_kernel_variants(void)
             return (ebpf_modules[i].kernels & expected) == expected &&
                    ebpf_select_disk_index(ebpf_modules[i].kernels, 10 * 256, NETDATA_EBPF_KERNEL_6_12) == NETDATA_IDX_V6_12 &&
                    ebpf_select_disk_index(ebpf_modules[i].kernels, 10 * 256, NETDATA_EBPF_KERNEL_6_12 + 3) == NETDATA_IDX_V6_12 &&
-                   ebpf_select_disk_index(ebpf_modules[i].kernels, 10 * 256, NETDATA_EBPF_KERNEL_6_12 + 256) == NETDATA_IDX_V6_12 &&
-                   ebpf_select_disk_index(ebpf_modules[i].kernels, 10 * 256, NETDATA_EBPF_KERNEL_6_16) == NETDATA_IDX_V6_12 &&
+                   ebpf_select_disk_index(ebpf_modules[i].kernels, 10 * 256, NETDATA_EBPF_KERNEL_6_12 + 256) == NETDATA_IDX_V5_14 &&
+                   ebpf_select_disk_index(ebpf_modules[i].kernels, 10 * 256, NETDATA_EBPF_KERNEL_6_16) == NETDATA_IDX_V5_14 &&
+                   ebpf_select_disk_index(ebpf_modules[i].kernels, -1, NETDATA_EBPF_KERNEL_6_16_2 - 1) == NETDATA_IDX_V6_12 &&
+                   ebpf_select_disk_index(ebpf_modules[i].kernels, -1, NETDATA_EBPF_KERNEL_6_16_2) == NETDATA_IDX_V6_16_2 &&
+                   ebpf_select_disk_index(ebpf_modules[i].kernels, -1, NETDATA_EBPF_KERNEL_6_16_2 + 1) == NETDATA_IDX_V6_12 &&
+                   ebpf_select_disk_index(ebpf_modules[i].kernels, -1, NETDATA_EBPF_KERNEL_7_0) == NETDATA_IDX_V7_0 &&
                    ebpf_select_disk_index(ebpf_modules[i].kernels, 11 * 256, NETDATA_EBPF_KERNEL_6_12) != NETDATA_IDX_V6_12 &&
                    ebpf_select_disk_index(ebpf_modules[i].kernels, 9 * 256, NETDATA_EBPF_KERNEL_6_12) == NETDATA_IDX_V5_14 &&
                    ebpf_select_disk_index(ebpf_modules[i].kernels, 9 * 256, NETDATA_EBPF_KERNEL_5_17) == NETDATA_IDX_V5_14 &&
@@ -97,7 +101,7 @@ static int test_legacy_artifact_family_support(void)
            ebpf_legacy_artifact_family_supported("dns", -1, NETDATA_EBPF_KERNEL_6_12) &&
            ebpf_legacy_artifact_family_supported("disk", -1, NETDATA_EBPF_KERNEL_6_16) &&
            ebpf_legacy_artifact_family_supported("process", -1, NETDATA_EBPF_KERNEL_7_0) &&
-           !ebpf_legacy_artifact_family_supported("dns", -1, NETDATA_EBPF_KERNEL_7_0) &&
+           ebpf_legacy_artifact_family_supported("dns", -1, NETDATA_EBPF_KERNEL_7_0) &&
            ebpf_legacy_artifact_family_supported("dns", 10 * 256, NETDATA_EBPF_KERNEL_6_12) &&
            !ebpf_legacy_artifact_family_supported("swap", 9 * 256, NETDATA_EBPF_KERNEL_5_17);
 }
@@ -111,6 +115,19 @@ static int test_generic612_module_masks(void)
 
     for (size_t i = 0; localfs[i].filesystem; i++) {
         if (!(localfs[i].kernels & NETDATA_V6_12))
+            return 0;
+    }
+
+    return 1;
+}
+
+static int test_generic6162_artifact_masks(void)
+{
+    for (size_t i = 0; ebpf_modules[i].info.thread_name; i++) {
+        const char *name = ebpf_modules[i].info.thread_name;
+        bool expected = !strcmp(name, "disk") || !strcmp(name, "swap");
+        if (!!(ebpf_modules[i].kernels & NETDATA_V6_16_2) != expected ||
+            (ebpf_modules[i].rhel10_kernels & NETDATA_V6_16_2))
             return 0;
     }
 
@@ -296,6 +313,7 @@ static int ebpf_ut_load_binary()
 {
     if (!test_disk_kernel_variants() || !test_legacy_disk_support_window() ||
         !test_legacy_artifact_family_support() || !test_generic612_module_masks() ||
+        !test_generic6162_artifact_masks() ||
         !test_red_hat_kernel_lineage() ||
         !test_rhel10_selector_respects_module_mask() || !test_rhel10_module_masks() ||
         !test_redhat_release_version_parser() || !test_redhat_os_release_parser()) {

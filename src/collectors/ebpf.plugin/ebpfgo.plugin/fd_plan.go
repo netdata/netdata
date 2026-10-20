@@ -12,7 +12,7 @@ import (
 // for kernels up to 7.0, so SelectIndex has to be able to reach selector 12.
 // The base flavor is bounded by fdMaxBaseSelector instead, which is where the
 // real object-availability limit lives.
-const fdKernelMask uint32 = (1 << 13) - 1
+const fdKernelMask uint32 = (1 << 14) - 1
 
 const fdDefaultPIDTableSize uint32 = 32768
 

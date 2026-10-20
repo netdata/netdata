@@ -810,8 +810,8 @@ void netdata_fd_runtime_close(struct netdata_ebpf_fd_runtime *rt)
     freez(rt->items_buf);
     nd_ebpf_key_table_free(&rt->pid_keys);
 #ifdef NETDATA_FD_LIBBPF_CORE_SUPPORTED
+    fd_destroy_ring_buffer(rt);
     if (rt->kind == NETDATA_FD_RUNTIME_CORE) {
-        fd_destroy_ring_buffer(rt);
         fd_runtime_destroy_core(rt);
     } else if (rt->obj)
         bpf_object__close(rt->obj);

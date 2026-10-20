@@ -26,6 +26,10 @@ func TestKernelVersionFromRelease(t *testing.T) {
 			release: "6.12.0-211.7.1.el10_2.x86_64",
 			want:    396288,
 		},
+		"exact generic 6.16.2 release": {
+			release: "6.16.2-1-generic",
+			want:    minimumKernelVersion6162,
+		},
 	}
 
 	for name, tc := range tests {
@@ -38,6 +42,38 @@ func TestKernelVersionFromRelease(t *testing.T) {
 				t.Fatalf("KernelVersionFromRelease(%q) = %d, want %d", tc.release, got, tc.want)
 			}
 		})
+	}
+}
+
+func TestGeneric6162SelectorIsExactAndCannotWalkDownFromSeven(t *testing.T) {
+	tests := []struct {
+		name string
+		kver uint32
+		want uint32
+	}{
+		{name: "6.16.1 uses 6.12", kver: minimumKernelVersion6162 - 1, want: 11},
+		{name: "6.16.2 uses exact rung", kver: minimumKernelVersion6162, want: 13},
+		{name: "6.16.3 uses 6.12", kver: minimumKernelVersion6162 + 1, want: 11},
+		{name: "7.0 does not walk down to 6.16.2", kver: minimumKernelVersionSeven, want: 12},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			if got := SelectMaxIndex(-1, tc.kver); got != int(tc.want) {
+				t.Fatalf("SelectMaxIndex() = %d, want %d", got, tc.want)
+			}
+			if got := SelectIndex(socketKernelMask, -1, tc.kver); got != tc.want {
+				t.Fatalf("SelectIndex() = %d, want %d", got, tc.want)
+			}
+		})
+	}
+
+	if got := SelectIndex((1<<13)-1, -1, minimumKernelVersion6162); got != 11 {
+		t.Fatalf("6.16.2 without an exact-rung artifact selected %d, want 6.12 selector 11", got)
+	}
+
+	path := BuildObjectPath(defaultPluginsDir(), 13, "socket", false, -1)
+	if filepath.Base(path) != "pnetdata_ebpf_socket.6.16.2.o" {
+		t.Fatalf("BuildObjectPath() = %q, want exact 6.16.2 object", path)
 	}
 }
 
@@ -629,7 +665,7 @@ func TestLegacyArtifactFamilyAvailability(t *testing.T) {
 		{name: "generic 7.0 dcstat validator name", module: "dcstat", rhf: -1, kver: minimumKernelVersionSeven, want: true},
 		{name: "generic 7.0 fd base artifact", module: "fd", rhf: -1, kver: minimumKernelVersionSeven, want: true},
 		{name: "generic 7.0 socket base artifact", module: "socket", rhf: -1, kver: minimumKernelVersionSeven, want: true},
-		{name: "generic 7.0 no DNS artifact", module: "dns", rhf: -1, kver: minimumKernelVersionSeven},
+		{name: "generic 7.0 DNS falls back to 6.12 artifact", module: "dns", rhf: -1, kver: minimumKernelVersionSeven, want: true},
 		{name: "RHEL 9 object family", module: "socket", rhf: 9 * 256, kver: 5<<16 + 14<<8, want: true},
 		{name: "RHEL 9 5.16 remains compatible", module: "socket", rhf: 9 * 256, kver: 5<<16 + 16<<8, want: true},
 		{name: "non-RHEL10 RH 5.17 fails closed", module: "swap", rhf: 9 * 256, kver: 5<<16 + 17<<8},

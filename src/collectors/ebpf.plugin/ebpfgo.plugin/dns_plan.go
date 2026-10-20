@@ -8,7 +8,7 @@ import (
 )
 
 const (
-	dnsKernelMask uint32 = (1 << 13) - 1
+	dnsKernelMask uint32 = (1 << 14) - 1
 	// dnsDefaultUpdateEvery is intentionally half of dnsDefaultFlowTTL so the SHM
 	// stays fresh mid-window; NV_DNS_UPDATE_EVERY must equal the TTL to keep
 	// consecutive NV snapshots non-overlapping (each query counted once).

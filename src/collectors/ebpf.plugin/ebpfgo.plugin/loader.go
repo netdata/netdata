@@ -17,6 +17,7 @@ const (
 	minimumKernelVersionBuffer = 5<<16 + 10<<8
 	minimumKernelVersionArena  = 6<<16 + 12<<8
 	maximumKernelVersionArena  = 6<<16 + 13<<8
+	minimumKernelVersion6162   = 6<<16 + 16<<8 + 2
 	minimumKernelVersionSeven  = 7 << 16
 	minimumRHVersion           = 7*256 + 5
 )
@@ -361,10 +362,11 @@ func SelectKernelName(selector uint32) string {
 		"6.8",
 		"6.12",
 		"7.0",
+		"6.16.2",
 	}
 
 	if selector >= uint32(len(kernelNames)) {
-		return kernelNames[len(kernelNames)-1]
+		return "7.0"
 	}
 
 	return kernelNames[selector]
@@ -443,6 +445,8 @@ func SelectMaxIndex(isRHF int, kver uint32) int {
 	}
 
 	switch {
+	case isRHF <= 0 && kver == minimumKernelVersion6162:
+		return 13
 	case kver >= minimumKernelVersionSeven:
 		return 12
 	case kver >= minimumKernelVersionArena:
@@ -472,6 +476,9 @@ func SelectIndex(kernels uint32, isRHF int, kver uint32) uint32 {
 	start := SelectMaxIndex(isRHF, kver)
 	if isRHF == -1 {
 		kernels &^= 1 << 7
+	}
+	if isRHF <= 0 && kver == minimumKernelVersion6162 {
+		kernels &^= 1 << 12 // 7.0 objects are not a safe walk-down from 6.16.2.
 	}
 
 	for idx := start; idx > 0; idx-- {

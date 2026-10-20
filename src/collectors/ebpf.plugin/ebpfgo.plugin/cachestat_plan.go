@@ -8,7 +8,7 @@ import (
 	"github.com/netdata/netdata/src/collectors/ebpf.plugin/ebpfgo.plugin/libbpfloader"
 )
 
-const cachestatKernelMask uint32 = (1 << 13) - 1
+const cachestatKernelMask uint32 = (1 << 14) - 1
 const cachestatDefaultPIDTableSize uint32 = 32768
 const cachestatMaxPIDTableSize uint32 = 32768
 const cachestatDefaultBTFFile = "vmlinux"

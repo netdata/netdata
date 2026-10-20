@@ -568,7 +568,8 @@ static char *ebpf_select_kernel_name(uint32_t selector)
         NETDATA_IDX_STR_V5_17,
         NETDATA_IDX_STR_V6_8,
         NETDATA_IDX_STR_V6_12,
-        NETDATA_IDX_STR_V7_0};
+        NETDATA_IDX_STR_V7_0,
+        NETDATA_IDX_STR_V6_16_2};
 
     return kernel_names[selector];
 }
@@ -601,7 +602,9 @@ static int ebpf_select_max_index(int is_rhf, uint32_t kver)
         else if (kver >= NETDATA_EBPF_KERNEL_4_11)
             return NETDATA_IDX_V4_18;
     } else { // Kernels from kernel.org
-        if (kver >= NETDATA_EBPF_KERNEL_7_0)
+        if (kver == NETDATA_EBPF_KERNEL_6_16_2)
+            return NETDATA_IDX_V6_16_2;
+        else if (kver >= NETDATA_EBPF_KERNEL_7_0)
             return NETDATA_IDX_V7_0;
         else if (kver >= NETDATA_EBPF_KERNEL_6_12)
             return NETDATA_IDX_V6_12;
@@ -644,6 +647,8 @@ uint32_t ebpf_select_index(uint32_t kernels, int is_rhf, uint32_t kver)
 
     if (is_rhf <= 0)
         kernels &= ~NETDATA_V5_14;
+    if (is_rhf <= 0 && kver == NETDATA_EBPF_KERNEL_6_16_2)
+        kernels &= ~NETDATA_V7_0;
 
     for (idx = start; idx; idx--) {
         if (kernels & 1 << idx)
@@ -657,8 +662,6 @@ uint32_t ebpf_select_disk_index(uint32_t kernels, int is_rhf, uint32_t kver)
 {
     if (ebpf_is_rhel10_6_12_stream(is_rhf, kver))
         return NETDATA_IDX_V6_12;
-    if (is_rhf <= 0 && kver >= NETDATA_EBPF_KERNEL_6_12)
-        return ebpf_select_index(kernels, is_rhf, kver);
     return ebpf_select_index(kernels, is_rhf, kver);
 }
 
@@ -1113,10 +1116,27 @@ static bool ebpf_optional_legacy_target(const char *section_name)
 
     for (size_t i = 0; optional_targets[i]; i++) {
         if (!strcmp(target, optional_targets[i])) {
-            char *symbol = ebpf_find_symbol((char *)target);
-            bool missing = !symbol || strcmp(symbol, target);
-            freez(symbol);
-            return missing;
+            char filename[FILENAME_MAX + 1];
+            snprintfz(filename, FILENAME_MAX, "%s%s", netdata_configured_host_prefix, NETDATA_KALLSYMS);
+            procfile *ff = procfile_open(filename, " \t", PROCFILE_FLAG_DEFAULT);
+            if (!ff)
+                return false; // Symbol availability is unknown; preserve the strict attachment result.
+
+            ff = procfile_readall(ff);
+            if (!ff)
+                return false;
+
+            bool found = false;
+            unsigned long lines = procfile_lines(ff);
+            for (unsigned long line = 0; line < lines; line++) {
+                char *symbol = procfile_lineword(ff, line, 2);
+                if (symbol && !strcmp(symbol, target)) {
+                    found = true;
+                    break;
+                }
+            }
+            procfile_close(ff);
+            return !found;
         }
     }
 
@@ -1307,6 +1327,19 @@ struct bpf_link **ebpf_load_program(char *plugins_dir, ebpf_module_t *em, int kv
 
     ebpf_update_maps(em, *obj);
     ebpf_update_legacy_controller(em, *obj);
+
+    static const uint32_t artifact_kernel_versions[] = {
+        3 * 65536 + 10 * 256, NETDATA_EBPF_KERNEL_4_14, 4 * 65536 + 16 * 256,
+        4 * 65536 + 18 * 256, NETDATA_EBPF_KERNEL_5_4,  NETDATA_EBPF_KERNEL_5_10,
+        NETDATA_EBPF_KERNEL_5_11, NETDATA_EBPF_KERNEL_5_14, NETDATA_EBPF_KERNEL_5_15,
+        NETDATA_EBPF_KERNEL_5_16, NETDATA_EBPF_KERNEL_5_17, NETDATA_EBPF_KERNEL_6_8,
+        NETDATA_EBPF_KERNEL_6_12, NETDATA_EBPF_KERNEL_7_0,
+        NETDATA_EBPF_KERNEL_6_16_2,
+    };
+    if (is_rhf <= 0 && (uint32_t)kver > artifact_kernel_versions[idx])
+        netdata_log_info("Legacy eBPF module %s uses %s objects on kernel %d.%d.%d",
+                         em->info.thread_name, ebpf_select_kernel_name(idx),
+                         kver >> 16, (kver >> 8) & 0xff, kver & 0xff);
 
     size_t count_programs = ebpf_count_programs(*obj);
 
