@@ -24,6 +24,8 @@
 //! - `estimate_data_size`'s exactness against real builds (the fuzz
 //!   target re-asserts the tie after arbitrary op sequences,
 //!   `fuzz/fuzz_targets/against_roaring.rs`).
+//! - All four set ops against a sorted-merge oracle at every depth 1-11
+//!   (bulk tails included), without the `roaring` feature.
 //! - Subtree skipping and counting (node.rs `skip_subtree_at`,
 //!   `NodeReader::skip`/`skip_subtree`, and `len`): every subtree ends,
 //!   and counts, as a byte-by-byte reference walk says, at every depth
@@ -1854,5 +1856,79 @@ proptest! {
     #[test]
     fn set_op_need_contract((universe, a, b) in arb_pair_any_universe()) {
         assert_need_contract(universe, &a, &b);
+    }
+}
+
+// ── Set ops against a sorted-merge oracle at every depth ───────────
+
+/// All four raw set ops write exactly the canonical bytes of the oracle
+/// result (a sorted merge of the value lists, built by `from_sorted_iter`),
+/// in both operand orders. Covers bulk tails (ops.rs) wherever one operand
+/// runs out, at any depth 1-11, with no feature flags.
+fn assert_set_ops_match_oracle(universe: u32, a: &[u32], b: &[u32]) {
+    use std::collections::BTreeSet;
+
+    let (ra, da) = make_bitmap(universe, a);
+    let (rb, db) = make_bitmap(universe, b);
+    let sa: BTreeSet<u32> = a.iter().copied().collect();
+    let sb: BTreeSet<u32> = b.iter().copied().collect();
+    let canonical = |set: BTreeSet<u32>| {
+        let mut data = Vec::new();
+        RawBitmap::from_sorted_iter(set.into_iter(), universe, &mut data);
+        data
+    };
+    let label = format!("universe={universe} a={} b={}", a.len(), b.len());
+
+    let mut out = Vec::new();
+    ra.union(&da, &rb, &db, &mut out);
+    assert_eq!(out, canonical(&sa | &sb), "union {label}");
+    out.clear();
+    ra.intersect(&da, &rb, &db, &mut out);
+    assert_eq!(out, canonical(&sa & &sb), "intersect {label}");
+    out.clear();
+    ra.difference(&da, &rb, &db, &mut out);
+    assert_eq!(out, canonical(&sa - &sb), "difference {label}");
+    out.clear();
+    ra.symmetric_difference(&da, &rb, &db, &mut out);
+    assert_eq!(out, canonical(&sa ^ &sb), "symmetric_difference {label}");
+}
+
+// Shapes where one operand runs out early, so a bulk tail starts deep in
+// the tree and its "done" result climbs through every ancestor: a set
+// against its own prefix, its first value, and its last value, plus
+// interleaved sets, at depths 1-11.
+#[test]
+fn test_set_ops_match_oracle_every_depth() {
+    for levels in 1..=11u32 {
+        let universe = (1u64 << (3 * levels)).min(u32::MAX as u64) as u32;
+        let step = (universe / 509).max(1);
+        let spread: Vec<u32> = (0..universe).step_by(step as usize).take(512).collect();
+        let prefix: Vec<u32> = spread[..spread.len() / 3].to_vec();
+        let odd: Vec<u32> = spread
+            .iter()
+            .map(|v| v | 1)
+            .filter(|&v| v < universe)
+            .collect();
+        let first = vec![spread[0]];
+        let last = vec![*spread.last().unwrap()];
+        for (a, b) in [
+            (&spread, &prefix),
+            (&spread, &first),
+            (&spread, &last),
+            (&spread, &odd),
+            (&prefix, &odd),
+        ] {
+            assert_set_ops_match_oracle(universe, a, b);
+            assert_set_ops_match_oracle(universe, b, a);
+        }
+    }
+}
+
+proptest! {
+    /// The same oracle over generated overlapping pairs at every depth.
+    #[test]
+    fn set_ops_match_oracle((universe, a, b) in arb_pair_any_universe()) {
+        assert_set_ops_match_oracle(universe, &a, &b);
+        assert_set_ops_match_oracle(universe, &b, &a);
     }
 }

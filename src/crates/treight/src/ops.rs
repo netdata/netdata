@@ -9,9 +9,11 @@
 //!   child `c` of it starts at `base + c * 8^(h-1)` (`child_index`/
 //!   `child_offset`, node.rs).
 //! - `NodeReader` walks the serialized tree in pre-order (node byte, then
-//!   present children in index order), so each call consumes exactly one
-//!   subtree and later children are reached by skipping the preceding
-//!   ones.
+//!   present children in index order); later children are reached by
+//!   skipping the preceding ones. A call consumes exactly one subtree
+//!   unless its notes say otherwise: `range_count` stops past its range,
+//!   and the set-op walkers may leave cursors mid-tree (`need` and bulk
+//!   tails, below).
 //! - Bytes appended to `out` are the result subtree's serialization;
 //!   `RawBitmap`'s set-op methods in raw.rs snapshot `out.len()` around
 //!   the call and treat the growth as the result's tree bytes — the
@@ -281,10 +283,10 @@ fn skip_children(reader: &mut NodeReader, mut children: u8, level: u32) {
 }
 
 // The four set-op walkers below share one shape: both readers advance in
-// lockstep, one subtree per child present in either operand (visited by
-// iterating the set bits of `node_a | node_b`, lowest first), and the
-// operations differ in the leaf byte op plus what a child present in only
-// one operand does:
+// lockstep over the children present in either operand (the set bits of
+// `node_a | node_b`, lowest first; AND/SUB may stop after the last shared
+// one, see `need`), and the operations differ in the leaf byte op plus
+// what a child present in only one operand does:
 //
 //   Operation | Leaf op | A-only child | B-only child
 //   ----------+---------+--------------+-------------
@@ -297,8 +299,9 @@ fn skip_children(reader: &mut NodeReader, mut children: u8, level: u32) {
 // that (empty-blob short-circuits plus an unconditional `assert_eq!` on
 // universe sizes) before dispatch. OR never prunes: union always emits
 // its `a|b` node byte. AND/SUB/XOR prune subtrees that compute to
-// nothing, reporting survival with a `bool` and back-patching the
-// reserved node byte with the surviving child bits.
+// nothing and back-patch the reserved node byte with the surviving child
+// bits; AND reports survival with a `bool`, SUB/XOR with `Walk`, which
+// adds `Done` for bulk tails.
 //
 // AND and SUB take a `need` flag: whether the caller reads on after this
 // subtree (a later sibling or ancestor). Only then must the cursors end at
@@ -316,7 +319,7 @@ fn skip_children(reader: &mut NodeReader, mut children: u8, level: u32) {
 // read again, so trailing A-only children start the tail. AND has no tail
 // (one-sided children are dropped). Walkers report it as `Walk::Done`
 // (`true` for OR); each caller ORs the copied children into its node byte
-// and returns at once.
+// and returns at once. Cursor positions are undefined after a tail.
 
 /// Union of two subtrees (see the table above): leaf and node bytes are
 /// OR'd, children unique to one side are copied verbatim, and nothing is

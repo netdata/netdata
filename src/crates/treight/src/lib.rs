@@ -10,9 +10,12 @@
 //!
 //! API shape: every bitmap is a `Copy` descriptor (universe size + level
 //! count) whose tree bytes live in an external `&[u8]` / `&mut Vec<u8>`
-//! blob passed to each method. Values are `u32` indexes below the universe
-//! size; a zero-byte blob is valid — the empty set for [`RawBitmap`], the
-//! full set for an inverted [`Bitmap`].
+//! blob passed to each method. The blob is exactly the tree's bytes, as a
+//! builder or `deserialize_from` produced them: `len`, `is_empty` and the
+//! set ops' tail copies read to its end, so no trailing bytes may follow.
+//! Values are `u32` indexes below the universe size; a zero-byte blob is
+//! valid — the empty set for [`RawBitmap`], the full set for an inverted
+//! [`Bitmap`].
 //!
 //! Modules:
 //! - `raw` — [`RawBitmap`] and [`Iter`]: build from a sorted iterator or a
