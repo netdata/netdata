@@ -260,6 +260,17 @@ fn above(child: u8) -> u8 {
     !(child | (child - 1))
 }
 
+/// Outcome of a pruning set-op walker: the subtree computed to nothing,
+/// survived, or survived and finished the whole walk with a bulk tail copy
+/// (see the walker notes below), after which the caller only fixes its own
+/// node byte and returns `Done` too.
+#[derive(Clone, Copy, PartialEq, Eq)]
+pub(crate) enum Walk {
+    Empty,
+    Kept,
+    Done,
+}
+
 /// Skip every child subtree in `children` (`level` levels tall).
 #[inline(always)]
 fn skip_children(reader: &mut NodeReader, mut children: u8, level: u32) {
@@ -296,17 +307,33 @@ fn skip_children(reader: &mut NodeReader, mut children: u8, level: u32) {
 // `false` at the root, and a call passes `true` to every shared child but
 // its last. SUB always consumes `a` (its children are copied), so its flag
 // covers `b` only.
+//
+// Bulk tails: once one operand has nothing left to read, the rest of the
+// other operand's bytes is the rest of the result, ancestors' later
+// children included, so it is copied with one extend and the walk stops.
+// OR and XOR read both cursors exactly, so "nothing left" is a cursor at
+// its blob's end. SUB uses its flag: with `need_b` unset nothing of `b` is
+// read again, so trailing A-only children start the tail. AND has no tail
+// (one-sided children are dropped). Walkers report it as `Walk::Done`
+// (`true` for OR); each caller ORs the copied children into its node byte
+// and returns at once.
 
 /// Union of two subtrees (see the table above): leaf and node bytes are
 /// OR'd, children unique to one side are copied verbatim, and nothing is
 /// pruned — the result is a canonical non-empty subtree whenever the
-/// inputs are.
-pub(crate) fn union_subtree(a: &mut NodeReader, b: &mut NodeReader, level: u32, out: &mut Vec<u8>) {
+/// inputs are. Returns `true` once a bulk tail finished the whole walk;
+/// the node byte already holds every child.
+pub(crate) fn union_subtree(
+    a: &mut NodeReader,
+    b: &mut NodeReader,
+    level: u32,
+    out: &mut Vec<u8>,
+) -> bool {
     let node_a = a.next().bits();
     let node_b = b.next().bits();
     out.push(node_a | node_b);
     if level == 1 {
-        return;
+        return false;
     }
 
     let child_level = level - 1;
@@ -315,13 +342,34 @@ pub(crate) fn union_subtree(a: &mut NodeReader, b: &mut NodeReader, level: u32, 
         let child = children & children.wrapping_neg();
         children &= children - 1;
         if node_a & node_b & child != 0 {
-            union_subtree(a, b, child_level, out);
+            if union_subtree(a, b, child_level, out) {
+                return true;
+            }
         } else if node_a & child != 0 {
             copy_subtree(a, child_level, out);
         } else {
             copy_subtree(b, child_level, out);
         }
+        if children != 0 && copy_tail(a, b, out) {
+            return true;
+        }
     }
+    false
+}
+
+/// The OR/XOR bulk tail: if either cursor is at its blob's end, append
+/// the other's remaining bytes and return `true`.
+#[inline]
+fn copy_tail(a: &mut NodeReader, b: &mut NodeReader, out: &mut Vec<u8>) -> bool {
+    let rest = if b.pos == b.nodes.len() {
+        &a.nodes[a.pos..]
+    } else if a.pos == a.nodes.len() {
+        &b.nodes[b.pos..]
+    } else {
+        return false;
+    };
+    out.extend_from_slice(rest);
+    true
 }
 
 /// Intersection of two subtrees (see the table above): leaves AND
@@ -397,16 +445,16 @@ pub(crate) fn intersect_subtree(
 /// Set difference `a - b` of two subtrees (see the table above): leaves
 /// keep `a & !b`, A-only children are copied verbatim (B has nothing to
 /// remove there), B-only ones are skipped past, and empty results are
-/// pruned. `a` is always consumed; B-only children after the last shared
-/// one are skipped only if `need_b` (see the `need` rule above). Returns
-/// `true` if the subtree survived.
+/// pruned. `a` is consumed unless a bulk tail ends the walk; B-only
+/// children after the last shared one are skipped only if `need_b` (see
+/// the `need` and bulk-tail rules above).
 pub(crate) fn difference_subtree(
     a: &mut NodeReader,
     b: &mut NodeReader,
     level: u32,
     out: &mut Vec<u8>,
     need_b: bool,
-) -> bool {
+) -> Walk {
     let node_a = a.next().bits();
     let node_b = b.next().bits();
 
@@ -414,9 +462,9 @@ pub(crate) fn difference_subtree(
         let result = node_a & !node_b;
         if result != 0 {
             out.push(result);
-            return true;
+            return Walk::Kept;
         }
-        return false;
+        return Walk::Empty;
     }
 
     let child_level = level - 1;
@@ -438,8 +486,15 @@ pub(crate) fn difference_subtree(
         let child = children & children.wrapping_neg();
         children &= children - 1;
         if shared & child != 0 {
-            if difference_subtree(a, b, child_level, out, need_b || child != last) {
-                result_bits |= child;
+            match difference_subtree(a, b, child_level, out, need_b || child != last) {
+                Walk::Empty => {}
+                Walk::Kept => result_bits |= child,
+                Walk::Done => {
+                    // Only the last shared child can finish the walk, and
+                    // the tail it copied holds this node's A-only tail too.
+                    out[node_pos] = result_bits | child | (node_a & tail);
+                    return Walk::Done;
+                }
             }
         } else if node_a & child != 0 {
             copy_subtree(a, child_level, out);
@@ -449,6 +504,13 @@ pub(crate) fn difference_subtree(
         }
     }
     let mut a_tail = node_a & tail;
+    if a_tail != 0 && !need_b {
+        // Nothing of `b` is read again: the rest of `a` is the result's tail.
+        out.extend_from_slice(&a.nodes[a.pos..]);
+        a.pos = a.nodes.len();
+        out[node_pos] = result_bits | a_tail;
+        return Walk::Done;
+    }
     result_bits |= a_tail;
     while a_tail != 0 {
         copy_subtree(a, child_level, out);
@@ -460,24 +522,24 @@ pub(crate) fn difference_subtree(
 
     if result_bits != 0 {
         out[node_pos] = result_bits;
-        true
+        Walk::Kept
     } else {
         out.pop();
-        false
+        Walk::Empty
     }
 }
 
 /// Symmetric difference `a ^ b` of two subtrees (see the table above):
 /// leaves XOR byte-wise, children unique to either side are copied
 /// verbatim (the other operand has nothing there), and equal leaves XOR
-/// to zero, so empty subtrees are pruned. Returns `true` if the subtree
-/// survived.
+/// to zero, so empty subtrees are pruned; a bulk tail can end the walk
+/// (see the rules above).
 pub(crate) fn symmetric_difference_subtree(
     a: &mut NodeReader,
     b: &mut NodeReader,
     level: u32,
     out: &mut Vec<u8>,
-) -> bool {
+) -> Walk {
     let node_a = a.next().bits();
     let node_b = b.next().bits();
 
@@ -485,9 +547,9 @@ pub(crate) fn symmetric_difference_subtree(
         let result = node_a ^ node_b;
         if result != 0 {
             out.push(result);
-            return true;
+            return Walk::Kept;
         }
-        return false;
+        return Walk::Empty;
     }
 
     let child_level = level - 1;
@@ -500,8 +562,14 @@ pub(crate) fn symmetric_difference_subtree(
         let child = children & children.wrapping_neg();
         children &= children - 1;
         if node_a & node_b & child != 0 {
-            if symmetric_difference_subtree(a, b, child_level, out) {
-                result_bits |= child;
+            match symmetric_difference_subtree(a, b, child_level, out) {
+                Walk::Empty => {}
+                Walk::Kept => result_bits |= child,
+                Walk::Done => {
+                    // The copied tail holds every remaining child here.
+                    out[node_pos] = result_bits | child | children;
+                    return Walk::Done;
+                }
             }
         } else if node_a & child != 0 {
             copy_subtree(a, child_level, out);
@@ -510,13 +578,18 @@ pub(crate) fn symmetric_difference_subtree(
             copy_subtree(b, child_level, out);
             result_bits |= child;
         }
+        // Every remaining child is one-sided once a cursor is exhausted.
+        if children != 0 && copy_tail(a, b, out) {
+            out[node_pos] = result_bits | children;
+            return Walk::Done;
+        }
     }
 
     if result_bits != 0 {
         out[node_pos] = result_bits;
-        true
+        Walk::Kept
     } else {
         out.pop();
-        false
+        Walk::Empty
     }
 }

@@ -1789,14 +1789,14 @@ fn assert_need_contract(universe: u32, a: &[u32], b: &[u32]) {
     let levels = ceil_log8(universe);
     let label = format!("universe={universe} a={} b={}", a.len(), b.len());
 
-    for (name, walker) in [
-        (
-            "intersect",
-            intersect_subtree
-                as fn(&mut NodeReader, &mut NodeReader, u32, &mut Vec<u8>, bool) -> bool,
-        ),
-        ("difference", difference_subtree),
-    ] {
+    type Walker = fn(&mut NodeReader, &mut NodeReader, u32, &mut Vec<u8>, bool);
+    let intersect: Walker = |a, b, level, out, need| {
+        intersect_subtree(a, b, level, out, need);
+    };
+    let difference: Walker = |a, b, level, out, need| {
+        difference_subtree(a, b, level, out, need);
+    };
+    for (name, walker) in [("intersect", intersect), ("difference", difference)] {
         let mut lazy = Vec::new();
         walker(
             &mut NodeReader::new(&da),
