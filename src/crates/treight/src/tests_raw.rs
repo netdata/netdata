@@ -1664,3 +1664,45 @@ proptest! {
         assert_skips_match(universe, &data);
     }
 }
+
+// Range counts whose end falls on, just before and just after every child
+// edge at every height, where `range_count` stops early: compared with a
+// sorted-value oracle for sparse, clustered and dense sets at depths 1-7,
+// with starts at 0, mid-range and one below the end.
+#[test]
+fn test_range_cardinality_ends_at_child_edges() {
+    for levels in 1..=7u32 {
+        let universe = 1u32 << (3 * levels);
+        let span = universe.min(1 << 14);
+        let sets: [Vec<u32>; 3] = [
+            (0..universe)
+                .step_by((universe as usize / 97).max(1))
+                .collect(),
+            (universe - span..universe).filter(|v| v % 9 != 4).collect(),
+            (0..span).collect(),
+        ];
+        for values in &sets {
+            let (bm, data) = make_bitmap(universe, values);
+            let count = |a: u32, b: u32| {
+                (values.partition_point(|&v| v < b) - values.partition_point(|&v| v < a)) as u64
+            };
+            for height in 0..levels {
+                let stride = 1u64 << (3 * height);
+                for k in (1..(universe as u64 / stride))
+                    .step_by(((universe as u64 / stride) / 40).max(1) as usize)
+                {
+                    let edge = (k * stride) as u32;
+                    for end in [edge - 1, edge, edge + 1] {
+                        for start in [0, end / 2, end.saturating_sub(1)] {
+                            assert_eq!(
+                                bm.range_cardinality(&data, start..end),
+                                count(start, end),
+                                "universe={universe} height={height} {start}..{end}"
+                            );
+                        }
+                    }
+                }
+            }
+        }
+    }
+}

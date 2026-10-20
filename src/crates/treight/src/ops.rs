@@ -50,9 +50,10 @@ pub(crate) fn contains_inner(nodes: &mut NodeReader, level: u32, value: u32) -> 
 /// `[start, end)`. `base` is the value the subtree's root starts at (0 at
 /// the tree root). Children fully inside the range are counted in one
 /// shot by `skip_subtree` — its return value is the subtree's population
-/// — fully outside ones are skipped, and partially overlapping ones
-/// recurse; the leaf counts only its bits inside `[start, end)`, clamped
-/// to the leaf's 8 values.
+/// — children before the range are skipped, the walk stops at the first
+/// child past it (the reader's position is then undefined), and partially
+/// overlapping ones recurse; the leaf counts only its bits inside
+/// `[start, end)`, clamped to the leaf's 8 values.
 ///
 /// Arithmetic is `u64` because the span of an 11-level (u32-max) tree is
 /// `8^11 = 2^33`, so `base` and the range offsets can exceed `u32::MAX`
@@ -86,8 +87,17 @@ pub(crate) fn range_count(
         let child_base = base + (child as u64) * stride;
         let child_end = child_base + stride;
 
-        if child_end <= start || child_base >= end {
-            // Fully outside: skip without counting.
+        if child_base >= end {
+            // This and every later child start past the range: stop without
+            // skipping them. The reader is left mid-tree, which is safe: only
+            // the subtree holding `end` stops early, every later sibling of
+            // each ancestor starts past `end` too, so they stop as well, and
+            // `range_cardinality` drops the reader.
+            break;
+        }
+
+        if child_end <= start {
+            // Fully before the range: skip without counting.
             reader.skip(child_level);
         } else if child_base >= start && child_end <= end {
             // Fully inside: count everything in the subtree.
