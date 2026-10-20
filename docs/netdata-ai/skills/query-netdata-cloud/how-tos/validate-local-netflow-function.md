@@ -110,6 +110,8 @@ bearers, raw IP addresses, or raw flow rows into durable artifacts.
 
 - Prefer the Cloud transport for these checks. It needs only the Cloud
   token and does not require a direct agent bearer.
+- `flows:netflow` requires a Space on a paid plan; a free Space gets 403
+  with the commercial-plan message.
 - Direct-agent diagnosis is also possible. Use the sibling
   direct-agent how-to when the test must prove the bearer mint/cache
   path and the `X-Netdata-Auth` call path.
