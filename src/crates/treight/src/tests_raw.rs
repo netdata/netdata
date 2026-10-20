@@ -1743,3 +1743,116 @@ proptest! {
         prop_assert!(bm.iter(&data).eq(vals.iter().copied()));
     }
 }
+
+// ── The set-op `need` flag ─────────────────────────────────────────
+
+/// Two overlapping sets in one universe at any tree depth: `b` keeps a
+/// random part of `a` and adds up to 64 values, so pairs share some
+/// subtrees and differ in others.
+fn arb_pair_any_universe() -> impl Strategy<Value = (u32, Vec<u32>, Vec<u32>)> {
+    arb_values_any_universe().prop_flat_map(|(universe, a)| {
+        let n = a.len();
+        (
+            Just(universe),
+            Just(a),
+            proptest::collection::vec(any::<bool>(), n),
+            proptest::collection::vec(0..universe, 0..=64usize),
+        )
+            .prop_map(|(universe, a, keep, extra)| {
+                let mut b: Vec<u32> = a
+                    .iter()
+                    .zip(&keep)
+                    .filter(|(_, k)| **k)
+                    .map(|(v, _)| *v)
+                    .collect();
+                b.extend(extra);
+                b.sort_unstable();
+                b.dedup();
+                (universe, a, b)
+            })
+    })
+}
+
+/// The walkers that take `need` (ops.rs `intersect_subtree`,
+/// `difference_subtree`) write the same bytes either way, and with `need`
+/// set leave both cursors at the end of their trees, which a later sibling
+/// or ancestor relies on when it reads on.
+fn assert_need_contract(universe: u32, a: &[u32], b: &[u32]) {
+    use crate::node::NodeReader;
+    use crate::ops::{difference_subtree, intersect_subtree};
+
+    let (_, da) = make_bitmap(universe, a);
+    let (_, db) = make_bitmap(universe, b);
+    if da.is_empty() || db.is_empty() {
+        return;
+    }
+    let levels = ceil_log8(universe);
+    let label = format!("universe={universe} a={} b={}", a.len(), b.len());
+
+    for (name, walker) in [
+        (
+            "intersect",
+            intersect_subtree
+                as fn(&mut NodeReader, &mut NodeReader, u32, &mut Vec<u8>, bool) -> bool,
+        ),
+        ("difference", difference_subtree),
+    ] {
+        let mut lazy = Vec::new();
+        walker(
+            &mut NodeReader::new(&da),
+            &mut NodeReader::new(&db),
+            levels,
+            &mut lazy,
+            false,
+        );
+        let mut needed = Vec::new();
+        let (mut ra, mut rb) = (NodeReader::new(&da), NodeReader::new(&db));
+        walker(&mut ra, &mut rb, levels, &mut needed, true);
+        assert_eq!(lazy, needed, "{name} {label}");
+        assert_eq!(
+            (ra.pos, rb.pos),
+            (da.len(), db.len()),
+            "{name} cursors {label}"
+        );
+    }
+}
+
+// The `need` contract on hand-picked shapes at depths 1-11: identical sets,
+// disjoint sets, one value apart, and a set against its own prefix and
+// suffix.
+#[test]
+fn test_set_op_need_contract() {
+    for levels in 1..=11u32 {
+        let universe = (1u64 << (3 * levels)).min(u32::MAX as u64) as u32;
+        let span = universe.min(1 << 12);
+        let base: Vec<u32> = (0..span).step_by(3).collect();
+        let shifted: Vec<u32> = base
+            .iter()
+            .map(|v| v + 1)
+            .filter(|&v| v < universe)
+            .collect();
+        let prefix: Vec<u32> = base[..base.len() / 2].to_vec();
+        let suffix: Vec<u32> = base[base.len() / 2..].to_vec();
+        let high = vec![universe - 1];
+        for (a, b) in [
+            (&base, &base),
+            (&base, &shifted),
+            (&base, &prefix),
+            (&prefix, &base),
+            (&base, &suffix),
+            (&suffix, &base),
+            (&base, &high),
+            (&high, &base),
+        ] {
+            assert_need_contract(universe, a, b);
+        }
+    }
+}
+
+proptest! {
+    /// The same contract over generated overlapping pairs at every depth.
+    #[test]
+    fn set_op_need_contract((universe, a, b) in arb_pair_any_universe()) {
+        assert_need_contract(universe, &a, &b);
+    }
+}

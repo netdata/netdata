@@ -585,7 +585,7 @@ impl RawBitmap {
         let base = out.len();
         let mut ra = NodeReader::new(a);
         let mut rb = NodeReader::new(b);
-        intersect_subtree(&mut ra, &mut rb, self.levels(), out);
+        intersect_subtree(&mut ra, &mut rb, self.levels(), out, false);
 
         if out.len() == base {
             RawBitmap::empty(self.universe_size)
@@ -624,7 +624,7 @@ impl RawBitmap {
         let base = out.len();
         let mut ra = NodeReader::new(a);
         let mut rb = NodeReader::new(b);
-        difference_subtree(&mut ra, &mut rb, self.levels(), out);
+        difference_subtree(&mut ra, &mut rb, self.levels(), out, false);
 
         if out.len() == base {
             RawBitmap::empty(self.universe_size)

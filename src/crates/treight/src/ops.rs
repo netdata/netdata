@@ -254,6 +254,21 @@ pub(crate) fn copy_subtree(reader: &mut NodeReader, level: u32, out: &mut Vec<u8
     out.extend_from_slice(&reader.nodes[start..reader.pos]);
 }
 
+/// Child bits strictly above child bit `child` (a single-bit mask).
+#[inline(always)]
+fn above(child: u8) -> u8 {
+    !(child | (child - 1))
+}
+
+/// Skip every child subtree in `children` (`level` levels tall).
+#[inline(always)]
+fn skip_children(reader: &mut NodeReader, mut children: u8, level: u32) {
+    while children != 0 {
+        reader.skip(level);
+        children &= children - 1;
+    }
+}
+
 // The four set-op walkers below share one shape: both readers advance in
 // lockstep, one subtree per child present in either operand (visited by
 // iterating the set bits of `node_a | node_b`, lowest first), and the
@@ -273,6 +288,14 @@ pub(crate) fn copy_subtree(reader: &mut NodeReader, level: u32, out: &mut Vec<u8
 // its `a|b` node byte. AND/SUB/XOR prune subtrees that compute to
 // nothing, reporting survival with a `bool` and back-patching the
 // reserved node byte with the surviving child bits.
+//
+// AND and SUB take a `need` flag: whether the caller reads on after this
+// subtree (a later sibling or ancestor). Only then must the cursors end at
+// the subtree's end; otherwise children after the last shared one are left
+// unread, and the cursor positions are undefined afterwards. raw.rs passes
+// `false` at the root, and a call passes `true` to every shared child but
+// its last. SUB always consumes `a` (its children are copied), so its flag
+// covers `b` only.
 
 /// Union of two subtrees (see the table above): leaf and node bytes are
 /// OR'd, children unique to one side are copied verbatim, and nothing is
@@ -303,13 +326,15 @@ pub(crate) fn union_subtree(a: &mut NodeReader, b: &mut NodeReader, level: u32, 
 
 /// Intersection of two subtrees (see the table above): leaves AND
 /// byte-wise, children unique to one side are skipped past, and subtrees
-/// that intersect to nothing are pruned. Returns `true` if the subtree
-/// survived.
+/// that intersect to nothing are pruned. Only children up to the last one
+/// both sides share can contribute; the rest are skipped only if `need`
+/// (see the `need` rule above). Returns `true` if the subtree survived.
 pub(crate) fn intersect_subtree(
     a: &mut NodeReader,
     b: &mut NodeReader,
     level: u32,
     out: &mut Vec<u8>,
+    need: bool,
 ) -> bool {
     let node_a = a.next().bits();
     let node_b = b.next().bits();
@@ -324,18 +349,29 @@ pub(crate) fn intersect_subtree(
         return false;
     }
 
-    // Inner node: reserve a slot for the result node byte.
     let child_level = level - 1;
+    let shared = node_a & node_b;
+    if shared == 0 {
+        if need {
+            skip_children(a, node_a, child_level);
+            skip_children(b, node_b, child_level);
+        }
+        return false;
+    }
+
+    // Inner node: reserve a slot for the result node byte.
     let node_pos = out.len();
     out.push(0);
 
+    let last = 0x80u8 >> shared.leading_zeros();
+    let tail = above(last);
     let mut result_bits: u8 = 0;
-    let mut children = node_a | node_b;
+    let mut children = (node_a | node_b) & !tail;
     while children != 0 {
         let child = children & children.wrapping_neg();
         children &= children - 1;
-        if node_a & node_b & child != 0 {
-            if intersect_subtree(a, b, child_level, out) {
+        if shared & child != 0 {
+            if intersect_subtree(a, b, child_level, out, need || child != last) {
                 result_bits |= child;
             }
         } else if node_a & child != 0 {
@@ -343,6 +379,10 @@ pub(crate) fn intersect_subtree(
         } else {
             b.skip(child_level);
         }
+    }
+    if need {
+        skip_children(a, node_a & tail, child_level);
+        skip_children(b, node_b & tail, child_level);
     }
 
     if result_bits != 0 {
@@ -357,12 +397,15 @@ pub(crate) fn intersect_subtree(
 /// Set difference `a - b` of two subtrees (see the table above): leaves
 /// keep `a & !b`, A-only children are copied verbatim (B has nothing to
 /// remove there), B-only ones are skipped past, and empty results are
-/// pruned. Returns `true` if the subtree survived.
+/// pruned. `a` is always consumed; B-only children after the last shared
+/// one are skipped only if `need_b` (see the `need` rule above). Returns
+/// `true` if the subtree survived.
 pub(crate) fn difference_subtree(
     a: &mut NodeReader,
     b: &mut NodeReader,
     level: u32,
     out: &mut Vec<u8>,
+    need_b: bool,
 ) -> bool {
     let node_a = a.next().bits();
     let node_b = b.next().bits();
@@ -380,13 +423,22 @@ pub(crate) fn difference_subtree(
     let node_pos = out.len();
     out.push(0);
 
+    // Children up to the last shared one walk in lockstep; after it only
+    // A-only children (copied) and B-only ones (skipped if needed) remain.
+    let shared = node_a & node_b;
+    let (last, tail) = if shared == 0 {
+        (0, 0xFF)
+    } else {
+        let last = 0x80u8 >> shared.leading_zeros();
+        (last, above(last))
+    };
     let mut result_bits: u8 = 0;
-    let mut children = node_a | node_b;
+    let mut children = (node_a | node_b) & !tail;
     while children != 0 {
         let child = children & children.wrapping_neg();
         children &= children - 1;
-        if node_a & node_b & child != 0 {
-            if difference_subtree(a, b, child_level, out) {
+        if shared & child != 0 {
+            if difference_subtree(a, b, child_level, out, need_b || child != last) {
                 result_bits |= child;
             }
         } else if node_a & child != 0 {
@@ -395,6 +447,15 @@ pub(crate) fn difference_subtree(
         } else {
             b.skip(child_level);
         }
+    }
+    let mut a_tail = node_a & tail;
+    result_bits |= a_tail;
+    while a_tail != 0 {
+        copy_subtree(a, child_level, out);
+        a_tail &= a_tail - 1;
+    }
+    if need_b {
+        skip_children(b, node_b & tail, child_level);
     }
 
     if result_bits != 0 {
