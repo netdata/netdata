@@ -24,6 +24,10 @@
 //! - `estimate_data_size`'s exactness against real builds (the fuzz
 //!   target re-asserts the tie after arbitrary op sequences,
 //!   `fuzz/fuzz_targets/against_roaring.rs`).
+//! - Subtree skipping (node.rs `skip_subtree_at`, `NodeReader::skip`),
+//!   which jumps over leaf runs unread: it ends every subtree where a
+//!   byte-by-byte reference walk does, at every depth 1-11 and as a
+//!   proptest.
 //!
 //! Not pinned here: descending or out-of-range values fed to
 //! `from_sorted_iter` (both undefined; no test feeds them), and roaring
@@ -1537,4 +1541,102 @@ fn test_estimate_data_size_dense() {
     let (_, data) = make_bitmap(64, &values);
     let estimated = estimate_data_size(64, values.iter().copied());
     assert_eq!(estimated, data.len());
+}
+
+// ── Subtree skipping ───────────────────────────────────────────────
+
+/// Every node of a canonical tree as `(start, height, end)`, found by a
+/// byte-by-byte pre-order walk that reads every node and leaf — the
+/// reference the fast skip (node.rs `skip_subtree_at`, which never reads
+/// leaf bytes) must agree with.
+fn reference_spans(data: &[u8], levels: u32) -> Vec<(usize, u32, usize)> {
+    fn walk(data: &[u8], pos: usize, height: u32, spans: &mut Vec<(usize, u32, usize)>) -> usize {
+        let slot = spans.len();
+        spans.push((pos, height, 0));
+        let node = data[pos];
+        let mut end = pos + 1;
+        if height > 1 {
+            for child in 0..8 {
+                if node & (1 << child) != 0 {
+                    end = walk(data, end, height - 1, spans);
+                }
+            }
+        }
+        spans[slot].2 = end;
+        end
+    }
+    let mut spans = Vec::new();
+    if !data.is_empty() {
+        let end = walk(data, 0, levels, &mut spans);
+        assert_eq!(
+            end,
+            data.len(),
+            "reference walk must consume the whole blob"
+        );
+    }
+    spans
+}
+
+/// Skip every subtree of `data` with both entry points and compare with
+/// the reference walk.
+fn assert_skips_match(universe: u32, data: &[u8]) {
+    let levels = ceil_log8(universe);
+    for (start, height, end) in reference_spans(data, levels) {
+        assert_eq!(
+            crate::node::skip_subtree_at(data, start, height),
+            end,
+            "universe={universe} start={start} height={height}"
+        );
+        let mut reader = crate::node::NodeReader {
+            nodes: data,
+            pos: start,
+        };
+        reader.skip(height);
+        assert_eq!(
+            reader.pos, end,
+            "universe={universe} start={start} height={height}"
+        );
+    }
+}
+
+// The fast skip lands where a byte-by-byte walk does, for every node of
+// sparse, clustered and dense trees at every depth 1-11: single values,
+// full trees (every height-2 node with 8 children), and ranges.
+#[test]
+fn test_skip_matches_reference_walk() {
+    let mut cases: Vec<(u32, Vec<u8>)> = Vec::new();
+    for levels in 1..=11u32 {
+        let top = (1u64 << (3 * levels)).min(u32::MAX as u64) as u32;
+        for universe in [top, top / 2 + 1] {
+            let span = universe.min(1 << 15);
+            for values in [
+                vec![0],
+                vec![universe - 1],
+                (0..span).step_by(7).collect::<Vec<u32>>(),
+                (universe - span..universe).collect::<Vec<u32>>(),
+                (0..span).filter(|v| v % 64 < 3).collect::<Vec<u32>>(),
+            ] {
+                let (_, data) = make_bitmap(universe, &values);
+                cases.push((universe, data));
+            }
+        }
+    }
+    for universe in [8, 64, 512, 4096, 32768, 262_144] {
+        let mut data = Vec::new();
+        RawBitmap::from_range(0..universe, universe, &mut data);
+        cases.push((universe, data));
+    }
+    for (universe, data) in &cases {
+        assert_skips_match(*universe, data);
+    }
+}
+
+proptest! {
+    /// The same agreement over generated sets at every tree depth.
+    #[test]
+    fn skip_matches_reference_walk((universe, vals) in arb_values_any_universe()) {
+        let mut data = Vec::new();
+        RawBitmap::from_sorted_iter(vals.iter().copied(), universe, &mut data);
+        assert_skips_match(universe, &data);
+    }
 }

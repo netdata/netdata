@@ -8,7 +8,8 @@
 //! `[3 * level, 3 * level + 3)`. Throughout, `level` is a subtree's height
 //! in node bytes (1 = single leaf byte). Walkers assume the canonical form
 //! (every byte non-zero, no empty subtrees) and never validate it: `raw.rs`
-//! builds and patches these bytes, `ops.rs` reads two trees in lockstep.
+//! builds and patches these bytes, `ops.rs` reads two trees in lockstep,
+//! and `skip_subtree_at` relies on it to jump over leaf runs unread.
 /// Bits `[3 * level, 3 * level + 3)` of `value`: the child slot `value`
 /// occupies in its parent node, whose children head subtrees `level` levels
 /// tall (level 0 indexes a bit within a leaf byte).
@@ -24,24 +25,57 @@ pub(crate) fn child_offset(level: u32, child: u8) -> u32 {
     (child as u32) << (3 * level)
 }
 
+/// Set bits per byte value. Skips chain one popcount per height-2 node, so
+/// its latency is on the critical path: a table lookup is one load, while
+/// `u8::count_ones` is a multi-instruction bit trick on the default x86-64
+/// target (no `popcnt`) and a vector-register round trip on aarch64.
+static POPCOUNT: [u8; 256] = {
+    let mut table = [0u8; 256];
+    let mut byte = 0;
+    while byte < 256 {
+        table[byte] = (byte as u8).count_ones() as u8;
+        byte += 1;
+    }
+    table
+};
+
+#[inline(always)]
+fn popcount(byte: u8) -> usize {
+    POPCOUNT[byte as usize] as usize
+}
+
 /// Advance `pos` past the subtree whose root node byte is `data[pos]` and
 /// whose height is `level` node bytes (1 = single leaf byte); returns the
-/// position just past it. The slice-position counterpart of
-/// `NodeReader::skip_subtree`, used by `insert`/`remove` to step over
-/// existing sibling subtrees in place.
-pub(crate) fn skip_subtree_at(data: &[u8], mut pos: usize, level: u32) -> usize {
-    let node = data[pos];
-    pos += 1;
-    let level = level - 1;
-    if level == 0 {
-        return pos;
-    }
-    for child in 0..8u8 {
-        if node & (1 << child) != 0 {
-            pos = skip_subtree_at(data, pos, level);
+/// position just past it. Used by `NodeReader::skip` and by
+/// `insert`/`remove` to step over existing sibling subtrees in place.
+///
+/// Leaf bytes are never read: a height-2 node with `k` children is always
+/// followed by exactly `k` leaf bytes, so its subtree ends at
+/// `pos + 1 + popcount(node)`. A height-3 node is a run of such jumps, one
+/// per child; taller nodes recurse over their set bits only. On a corrupt
+/// blob the skip can therefore end somewhere a byte-by-byte walk would not
+/// (canonical input is assumed, see the module docs).
+pub(crate) fn skip_subtree_at(data: &[u8], pos: usize, level: u32) -> usize {
+    match level {
+        1 => pos + 1,
+        2 => pos + 1 + popcount(data[pos]),
+        _ => {
+            let mut children = data[pos];
+            let mut pos = pos + 1;
+            if level == 3 {
+                while children != 0 {
+                    pos += 1 + popcount(data[pos]);
+                    children &= children - 1;
+                }
+            } else {
+                while children != 0 {
+                    pos = skip_subtree_at(data, pos, level - 1);
+                    children &= children - 1;
+                }
+            }
+            pos
         }
     }
-    pos
 }
 
 /// One node byte of the serialized tree: bit `i` set means child `i`
@@ -146,7 +180,7 @@ impl NodeReader<'_> {
         // Skip all children before the highest set child.
         for child in 0..max_child {
             if node.has_child(child) {
-                self.skip_subtree(level);
+                self.skip(level);
             }
         }
 
@@ -155,13 +189,17 @@ impl NodeReader<'_> {
     }
 
     /// Advance the cursor past the subtree rooted at the next node byte,
+    /// which is `level` levels tall, without counting it
+    /// (`skip_subtree_at`). Mirrors `skip_hits` in GNU idutils' `src/fid.c`.
+    #[inline]
+    pub(crate) fn skip(&mut self, level: u32) {
+        self.pos = skip_subtree_at(self.nodes, self.pos, level);
+    }
+
+    /// Advance the cursor past the subtree rooted at the next node byte,
     /// which is `level` levels tall, returning how many values it contains:
     /// a leaf byte counts its set bits, an inner node sums its present
-    /// children.
-    ///
-    /// Mirrors `skip_hits` in GNU idutils' `src/fid.c`; the C
-    /// original only skips — returning the population is this
-    /// implementation's addition.
+    /// children. Callers that only need the end position use `skip`.
     pub(crate) fn skip_subtree(&mut self, level: u32) -> u64 {
         let node = self.next();
         let level = level - 1;

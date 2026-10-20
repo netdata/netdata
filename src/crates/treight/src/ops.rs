@@ -40,7 +40,7 @@ pub(crate) fn contains_inner(nodes: &mut NodeReader, level: u32, value: u32) -> 
     // Skip preceding sibling subtrees.
     for sibling in 0..child {
         if node.has_child(sibling) {
-            nodes.skip_subtree(level);
+            nodes.skip(level);
         }
     }
     contains_inner(nodes, level, value)
@@ -88,7 +88,7 @@ pub(crate) fn range_count(
 
         if child_end <= start || child_base >= end {
             // Fully outside: skip without counting.
-            reader.skip_subtree(child_level);
+            reader.skip(child_level);
         } else if child_base >= start && child_end <= end {
             // Fully inside: count everything in the subtree.
             count += reader.skip_subtree(child_level);
@@ -152,7 +152,7 @@ pub(crate) fn remove_range_subtree(
             result_bits |= 1 << child;
         } else if child_base >= start && child_end <= end {
             // Fully inside removal range: drop.
-            reader.skip_subtree(child_level);
+            reader.skip(child_level);
         } else {
             // Partial overlap: recurse.
             if remove_range_subtree(reader, child_level, child_base, start, end, out) {
@@ -236,11 +236,11 @@ pub(crate) fn ranges_subtree(level: u32, base: u64, ranges: &[(u32, u32)], out: 
 }
 
 /// Copy the subtree at `level` from the reader to `out` verbatim:
-/// `skip_subtree` advances the reader past it and the traversed byte
-/// range is appended as-is.
+/// `skip` advances the reader past it and the traversed byte range is
+/// appended as-is.
 pub(crate) fn copy_subtree(reader: &mut NodeReader, level: u32, out: &mut Vec<u8>) {
     let start = reader.pos;
-    reader.skip_subtree(level);
+    reader.skip(level);
     out.extend_from_slice(&reader.nodes[start..reader.pos]);
 }
 
@@ -338,10 +338,10 @@ pub(crate) fn intersect_subtree(
                 }
             }
             (true, false) => {
-                a.skip_subtree(child_level);
+                a.skip(child_level);
             }
             (false, true) => {
-                b.skip_subtree(child_level);
+                b.skip(child_level);
             }
             (false, false) => {}
         }
@@ -399,7 +399,7 @@ pub(crate) fn difference_subtree(
                 result_bits |= 1 << child;
             }
             (false, true) => {
-                b.skip_subtree(child_level);
+                b.skip(child_level);
             }
             (false, false) => {}
         }

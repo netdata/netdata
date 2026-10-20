@@ -206,7 +206,8 @@ impl RawBitmap {
     /// return `false` — no panic, unlike `insert`/`remove`. The descent is
     /// ops.rs's `contains_inner` (the fid.c `is_hit_1` port): it walks the
     /// value's path, skipping lower siblings' subtrees on the way, so cost
-    /// tracks the tree bytes before the path, not just the depth.
+    /// tracks the inner node bytes before the path, not just the depth
+    /// (leaf runs are jumped unread, node.rs `skip_subtree_at`).
     pub fn contains(&self, data: &[u8], value: u32) -> bool {
         if value >= self.universe_size || data.is_empty() {
             return false;
