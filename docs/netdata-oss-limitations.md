@@ -57,6 +57,8 @@ Functions provide on-demand, detailed information beyond standard metrics.
 | **Database Queries**    | Top queries, deadlocks, errors              |     ✗     |     ✓     |  ✓   |
 | **Streaming Status**    | Netdata streaming topology                  |     ✗     |     ✓     |  ✓   |
 | **API Call Tracing**    | Netdata API request tracing                 |     ✗     |     ✓     |  ✓   |
+| **Network Flows**       | NetFlow, IPFIX and sFlow traffic analysis   |     ✗     |     ✗     |  ✓   |
+| **Traces**              | OpenTelemetry traces stored on the Agent    |     ✗     |     ✗     |  ✓   |
 
 ### Configuration and Management
 
