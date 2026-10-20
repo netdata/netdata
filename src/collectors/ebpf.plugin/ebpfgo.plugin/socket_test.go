@@ -144,3 +144,29 @@ func TestBuildSocketLegacyPlan(t *testing.T) {
 		})
 	}
 }
+
+func TestSocket6162BaseFallbackUsesGenerated612Family(t *testing.T) {
+	cfg := SocketLegacyConfig{
+		PluginsDir:    defaultPluginsDir(),
+		Kernels:       socketKernelMask,
+		IsRHF:         -1,
+		KernelVersion: exactKernelVersion6162,
+		HasBTF:        true,
+		ObjectFlavor:  "arena",
+	}
+
+	plans := buildFallbackPlans(BuildSocketLegacyPlan(cfg), cfg.PluginsDir, cfg.IsRHF, "socket", socketMaxBaseSelector)
+	want := []string{
+		"pnetdata_ebpf_socket_arena.6.16.2.o",
+		"pnetdata_ebpf_socket_buffer.6.16.2.o",
+		"pnetdata_ebpf_socket.6.12.o",
+	}
+	if len(plans) != len(want) {
+		t.Fatalf("buildFallbackPlans() returned %d plans, want %d: %+v", len(plans), len(want), plans)
+	}
+	for i, expected := range want {
+		if got := filepath.Base(plans[i].ObjectPath); got != expected {
+			t.Errorf("plans[%d] = %q, want %q", i, got, expected)
+		}
+	}
+}

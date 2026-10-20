@@ -1,8 +1,19 @@
 package main
 
 import (
+	"errors"
 	"testing"
 )
+
+func TestCachestatTargetResolutionFailureDisablesOnlyCachestat(t *testing.T) {
+	cfg := CachestatLegacyConfig{Enabled: true}
+	resolveOptionalCachestatTargets(&cfg, func() (CachestatTargets, error) {
+		return CachestatTargets{}, errors.New("kallsyms unavailable")
+	})
+	if cfg.Enabled {
+		t.Fatal("cachestat remained enabled after target resolution failed")
+	}
+}
 
 func TestApplyPidTableSizeClamp(t *testing.T) {
 	tests := map[string]struct {

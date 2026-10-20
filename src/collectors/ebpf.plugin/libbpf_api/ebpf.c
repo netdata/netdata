@@ -210,13 +210,19 @@ int ebpf_parse_redhat_release_from_os_release(const char *contents)
     if (!contents)
         return -1;
 
+    const size_t contents_max_length = VERSION_STRING_LEN * 4;
+    size_t contents_length = strnlen(contents, contents_max_length + 1);
+    if (contents_length > contents_max_length)
+        return -1;
+    const char *contents_end = contents + contents_length;
+
     int is_rhel = 0;
     int major = 0;
     int minor = 0;
 
-    for (const char *line = contents; *line;) {
-        const char *line_end = strchr(line, '\n');
-        size_t length = line_end ? (size_t)(line_end - line) : strlen(line);
+    for (const char *line = contents; line < contents_end;) {
+        const char *line_end = memchr(line, '\n', (size_t)(contents_end - line));
+        size_t length = line_end ? (size_t)(line_end - line) : (size_t)(contents_end - line);
         const char *value = NULL;
         size_t value_length = 0;
         if (length >= 3 && !memcmp(line, "ID=", 3)) {
@@ -315,7 +321,7 @@ static int ebpf_os_release_is_cloudlinux(void)
         value[strcspn(value, "\r\n")] = '\0';
         while (isspace((unsigned char)*value))
             value++;
-        size_t value_length = strlen(value);
+        size_t value_length = strnlen(value, sizeof(line) - (size_t)(value - line));
         if (value_length >= 2 && (*value == '"' || *value == '\'') && value[value_length - 1] == *value) {
             value[value_length - 1] = '\0';
             value++;
@@ -696,12 +702,7 @@ int ebpf_legacy_artifact_family_supported(const char *name, int is_rhf, uint32_t
     if (is_rhf > 0)
         return kver < NETDATA_EBPF_KERNEL_5_17;
 
-    // Generic 6.12 is a complete legacy family. On newer kernels, use the
-    // newest rung in this module's mask, including the available older disk objects.
-
-    if (kver >= NETDATA_EBPF_KERNEL_6_8)
-        return 1;
-
+    // Module masks constrain generic selection to artifact families that exist.
     return 1;
 }
 
@@ -1120,11 +1121,11 @@ static bool ebpf_optional_legacy_target(const char *section_name)
             snprintfz(filename, FILENAME_MAX, "%s%s", netdata_configured_host_prefix, NETDATA_KALLSYMS);
             procfile *ff = procfile_open(filename, " \t", PROCFILE_FLAG_DEFAULT);
             if (!ff)
-                return false; // Symbol availability is unknown; preserve the strict attachment result.
+                return true; // Unknown symbol availability keeps this compatibility probe optional.
 
             ff = procfile_readall(ff);
             if (!ff)
-                return false;
+                return true;
 
             bool found = false;
             unsigned long lines = procfile_lines(ff);
@@ -1336,7 +1337,7 @@ struct bpf_link **ebpf_load_program(char *plugins_dir, ebpf_module_t *em, int kv
         NETDATA_EBPF_KERNEL_6_12, NETDATA_EBPF_KERNEL_7_0,
         NETDATA_EBPF_KERNEL_6_16_2,
     };
-    if (is_rhf <= 0 && (uint32_t)kver > artifact_kernel_versions[idx])
+    if (is_rhf <= 0 && ((uint32_t)kver >> 8) > (artifact_kernel_versions[idx] >> 8))
         netdata_log_info("Legacy eBPF module %s uses %s objects on kernel %d.%d.%d",
                          em->info.thread_name, ebpf_select_kernel_name(idx),
                          kver >> 16, (kver >> 8) & 0xff, kver & 0xff);

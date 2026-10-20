@@ -57,6 +57,31 @@ func (t *CachestatTargets) ResolveCacheAndAccessTargets() error {
 	return nil
 }
 
+func (t *CachestatTargets) ResolveAllFromReader(symbols io.Reader) error {
+	resolved, err := selectKallsymsCandidateSets(
+		symbols,
+		[]string{"filemap_add_folio", "add_to_page_cache_lru"},
+		[]string{"folio_mark_accessed", "mark_page_accessed"},
+		t.AccountPage,
+	)
+	if err != nil {
+		return fmt.Errorf("reading kernel symbols: %w", err)
+	}
+	for i, candidates := range [][]string{
+		{"filemap_add_folio", "add_to_page_cache_lru"},
+		{"folio_mark_accessed", "mark_page_accessed"},
+		t.AccountPage,
+	} {
+		if resolved[i] == "" {
+			return fmt.Errorf("no cachestat target found among %v", candidates)
+		}
+	}
+	t.AddToPageCacheLru.Name = resolved[0]
+	t.MarkPageAccessed.Name = resolved[1]
+	t.AccountPageDirtied.Name = resolved[2]
+	return nil
+}
+
 func selectCachestatKernelTarget(candidates []string) (string, error) {
 	symbols, err := openProcKallsyms()
 	if err != nil {
@@ -79,10 +104,12 @@ func selectCachestatKernelTargetFromReader(candidates []string, symbols io.Reade
 
 func resolveCachestatTargets() (CachestatTargets, error) {
 	targets := defaultCachestatTargets()
-	if err := targets.ResolveCacheAndAccessTargets(); err != nil {
+	symbols, err := openProcKallsyms()
+	if err != nil {
 		return CachestatTargets{}, err
 	}
-	if err := targets.ResolveAccountPageTarget(); err != nil {
+	defer symbols.Close()
+	if err := targets.ResolveAllFromReader(symbols); err != nil {
 		return CachestatTargets{}, err
 	}
 

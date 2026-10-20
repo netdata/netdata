@@ -543,8 +543,7 @@ void ebpf_oomkill_thread(void *ptr)
     if (em->load & EBPF_LOAD_CORE) {
         load_error = ebpf_oomkill_load_core(em);
         if (load_error) {
-            em->probe_links = ebpf_load_program(ebpf_plugin_dir, em, running_on_kernel, isrh, &em->objects);
-            load_error = em->probe_links ? 0 : -1;
+            load_error = ebpf_load_legacy_fallback(em, running_on_kernel, isrh);
         }
     } else
 #endif

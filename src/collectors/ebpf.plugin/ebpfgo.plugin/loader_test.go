@@ -28,7 +28,7 @@ func TestKernelVersionFromRelease(t *testing.T) {
 		},
 		"exact generic 6.16.2 release": {
 			release: "6.16.2-1-generic",
-			want:    minimumKernelVersion6162,
+			want:    exactKernelVersion6162,
 		},
 	}
 
@@ -51,9 +51,9 @@ func TestGeneric6162SelectorIsExactAndCannotWalkDownFromSeven(t *testing.T) {
 		kver uint32
 		want uint32
 	}{
-		{name: "6.16.1 uses 6.12", kver: minimumKernelVersion6162 - 1, want: 11},
-		{name: "6.16.2 uses exact rung", kver: minimumKernelVersion6162, want: 13},
-		{name: "6.16.3 uses 6.12", kver: minimumKernelVersion6162 + 1, want: 11},
+		{name: "6.16.1 uses 6.12", kver: exactKernelVersion6162 - 1, want: 11},
+		{name: "6.16.2 uses exact rung", kver: exactKernelVersion6162, want: 13},
+		{name: "6.16.3 uses 6.12", kver: exactKernelVersion6162 + 1, want: 11},
 		{name: "7.0 does not walk down to 6.16.2", kver: minimumKernelVersionSeven, want: 12},
 	}
 	for _, tc := range tests {
@@ -67,7 +67,7 @@ func TestGeneric6162SelectorIsExactAndCannotWalkDownFromSeven(t *testing.T) {
 		})
 	}
 
-	if got := SelectIndex((1<<13)-1, -1, minimumKernelVersion6162); got != 11 {
+	if got := SelectIndex((1<<13)-1, -1, exactKernelVersion6162); got != 11 {
 		t.Fatalf("6.16.2 without an exact-rung artifact selected %d, want 6.12 selector 11", got)
 	}
 
@@ -396,7 +396,7 @@ func TestEffectiveMaxBaseSelector(t *testing.T) {
 		{name: "generic 6.12 uses generated base family", max: 7, rhf: -1, kver: 396288, want: 11},
 		{name: "RHEL 9 remains capped", max: 7, rhf: 9 * 256, kver: 396288, want: 7},
 		{name: "RHEL 10 uses generated base family", max: 7, rhf: 10 * 256, kver: 396288, want: 11},
-		{name: "generic 6.16 remains capped", max: 7, rhf: -1, kver: 6*65536 + 16*256, want: 7},
+		{name: "generic 6.16 uses generated 6.12 base family", max: 7, rhf: -1, kver: 6*65536 + 16*256, want: 11},
 		{name: "generic 7.0 uses generated base family", max: 7, rhf: -1, kver: minimumKernelVersionSeven, want: 12},
 	}
 	for _, tc := range tests {
@@ -665,7 +665,7 @@ func TestLegacyArtifactFamilyAvailability(t *testing.T) {
 		{name: "generic 7.0 dcstat validator name", module: "dcstat", rhf: -1, kver: minimumKernelVersionSeven, want: true},
 		{name: "generic 7.0 fd base artifact", module: "fd", rhf: -1, kver: minimumKernelVersionSeven, want: true},
 		{name: "generic 7.0 socket base artifact", module: "socket", rhf: -1, kver: minimumKernelVersionSeven, want: true},
-		{name: "generic 7.0 DNS falls back to 6.12 artifact", module: "dns", rhf: -1, kver: minimumKernelVersionSeven, want: true},
+		{name: "generic 7.0 DNS has an older compatible family", module: "dns", rhf: -1, kver: minimumKernelVersionSeven, want: true},
 		{name: "RHEL 9 object family", module: "socket", rhf: 9 * 256, kver: 5<<16 + 14<<8, want: true},
 		{name: "RHEL 9 5.16 remains compatible", module: "socket", rhf: 9 * 256, kver: 5<<16 + 16<<8, want: true},
 		{name: "non-RHEL10 RH 5.17 fails closed", module: "swap", rhf: 9 * 256, kver: 5<<16 + 17<<8},

@@ -54,9 +54,7 @@ func TestBuildFDLegacyPlan(t *testing.T) {
 			wantMode:      LoadCore,
 		},
 		"arena-on-debian-falls-back-to-tracing": {
-			// Arena is blocked on Debian; the base flavor is chosen and the
-			// selector must be capped to the highest generic base rung (5.11), because no
-			// base fd object exists beyond 5.14.
+			// Arena is blocked on Debian, so use the shipped generic 6.12 base fd object.
 			kernelVersion: 396288,
 			isDebian:      true,
 			hasBTF:        true,
@@ -172,12 +170,12 @@ func TestBuildFDLegacyPlanWithoutBTFKeepsArenaFlavor(t *testing.T) {
 	}
 }
 
-// TestBuildFDFallbackPlansCapBaseSelector guards two things at once: the base
-// object family stops at 5.14, and the whole fallback chain stays in the
+// TestBuildFDFallbackPlansCapBaseSelector guards that generic 6.16.2 base
+// fallback uses the generated 6.12 family and stays in the
 // return-probe ('r') family.
 func TestBuildFDFallbackPlansCapBaseSelector(t *testing.T) {
 	cfg := baseFDConfig()
-	cfg.KernelVersion = 396288 // 6.12
+	cfg.KernelVersion = exactKernelVersion6162
 	cfg.HasBTF = true
 	cfg.ObjectFlavor = "arena"
 
@@ -187,8 +185,8 @@ func TestBuildFDFallbackPlansCapBaseSelector(t *testing.T) {
 	}
 
 	want := []string{
-		"rnetdata_ebpf_fd_arena.6.12.o",
-		"rnetdata_ebpf_fd_buffer.6.12.o",
+		"rnetdata_ebpf_fd_arena.6.16.2.o",
+		"rnetdata_ebpf_fd_buffer.6.16.2.o",
 		"rnetdata_ebpf_fd.6.12.o",
 	}
 	for i, base := range want {

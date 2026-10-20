@@ -1,6 +1,7 @@
 package main
 
 import (
+	"fmt"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -142,16 +143,21 @@ func resolveCachestatLegacyConfig() (CachestatLegacyConfig, error) {
 	cfg.IsRHF = isRHF
 
 	if cfg.Enabled {
-		if err := cfg.Targets.ResolveCacheAndAccessTargets(); err != nil {
-			return CachestatLegacyConfig{}, err
-		}
-		if err := cfg.Targets.ResolveAccountPageTarget(); err != nil {
-			return CachestatLegacyConfig{}, err
-		}
-		cfg.AccountFunction = cfg.Targets.AccountPageDirtied.Name
+		resolveOptionalCachestatTargets(&cfg, resolveCachestatTargets)
 	}
 
 	return cfg, nil
+}
+
+func resolveOptionalCachestatTargets(cfg *CachestatLegacyConfig, resolve func() (CachestatTargets, error)) {
+	targets, err := resolve()
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "ebpf-go.plugin: cachestat disabled: %v\n", err)
+		cfg.Enabled = false
+		return
+	}
+	cfg.Targets = targets
+	cfg.AccountFunction = targets.AccountPageDirtied.Name
 }
 
 func BuildCachestatLegacyPlan(cfg CachestatLegacyConfig) LoadPlan {

@@ -697,7 +697,6 @@ int ebpf_filesystem_initialize_ebpf_data(ebpf_module_t *em)
     em->kernels = kernels;
     em->rhel10_kernels = rhel10_kernels;
     em->maps = NULL;
-
     if (!dimensions) {
         dimensions = ebpf_fill_histogram_dimension(NETDATA_EBPF_HIST_MAX_BINS);
 
@@ -819,7 +818,7 @@ void ebpf_filesystem_cleanup_ebpf_data(void)
  *
  * @param ptr thread data.
  */
-void ebpf_filesystem_unload_bpf(ebpf_module_t *em)
+void ebpf_filesystem_unload_bpf(ebpf_module_t *em __maybe_unused)
 {
     int i;
     for (i = 0; localfs[i].filesystem; i++) {
@@ -831,7 +830,7 @@ void ebpf_filesystem_unload_bpf(ebpf_module_t *em)
             efp->flags = NETDATA_FILESYSTEM_FLAG_NO_PARTITION;
         }
 #endif
-        if ((em->load & EBPF_LOAD_LEGACY) && efp->probe_links) {
+        if (efp->probe_links) {
             ebpf_unload_legacy_code(efp->objects, efp->probe_links);
             efp->objects = NULL;
             efp->probe_links = NULL;
@@ -1169,7 +1168,14 @@ void ebpf_filesystem_thread(void *ptr)
 
     netdata_mutex_lock(&lock);
     ebpf_create_fs_charts(em->update_every);
-    ebpf_update_stats(&plugin_statistics, em);
+    ebpf_module_t stats_em = *em;
+    for (int i = 0; localfs[i].filesystem; i++) {
+        if (localfs[i].probe_links) {
+            stats_em.load |= EBPF_LOAD_LEGACY;
+            break;
+        }
+    }
+    ebpf_update_stats(&plugin_statistics, &stats_em);
     netdata_mutex_unlock(&lock);
 
     filesystem_collector(em);

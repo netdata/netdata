@@ -67,7 +67,7 @@ static int test_disk_kernel_variants(void)
                    ebpf_select_disk_index(ebpf_modules[i].kernels, -1, NETDATA_EBPF_KERNEL_6_16_2 - 1) == NETDATA_IDX_V6_12 &&
                    ebpf_select_disk_index(ebpf_modules[i].kernels, -1, NETDATA_EBPF_KERNEL_6_16_2) == NETDATA_IDX_V6_16_2 &&
                    ebpf_select_disk_index(ebpf_modules[i].kernels, -1, NETDATA_EBPF_KERNEL_6_16_2 + 1) == NETDATA_IDX_V6_12 &&
-                   ebpf_select_disk_index(ebpf_modules[i].kernels, -1, NETDATA_EBPF_KERNEL_7_0) == NETDATA_IDX_V7_0 &&
+                   ebpf_select_disk_index(ebpf_modules[i].kernels, -1, NETDATA_EBPF_KERNEL_7_0) == NETDATA_IDX_V6_12 &&
                    ebpf_select_disk_index(ebpf_modules[i].kernels, 11 * 256, NETDATA_EBPF_KERNEL_6_12) != NETDATA_IDX_V6_12 &&
                    ebpf_select_disk_index(ebpf_modules[i].kernels, 9 * 256, NETDATA_EBPF_KERNEL_6_12) == NETDATA_IDX_V5_14 &&
                    ebpf_select_disk_index(ebpf_modules[i].kernels, 9 * 256, NETDATA_EBPF_KERNEL_5_17) == NETDATA_IDX_V5_14 &&
@@ -287,6 +287,7 @@ void ebpf_ut_initialize_structure(netdata_run_mode_t mode)
     test_em.kernels =
         NETDATA_V3_10 | NETDATA_V4_14 | NETDATA_V4_16 | NETDATA_V4_18 | NETDATA_V5_4 | NETDATA_V5_10 |
         NETDATA_V5_14 | NETDATA_V6_12 | NETDATA_V7_0;
+    test_em.rhel10_kernels = test_em.kernels;
     test_em.pid_map_size = ND_EBPF_DEFAULT_PID_SIZE;
     test_em.apps_level = NETDATA_APPS_LEVEL_REAL_PARENT;
     test_em.mode = mode;

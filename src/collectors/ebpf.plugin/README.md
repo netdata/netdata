@@ -616,7 +616,7 @@ legacy object family. Legacy objects use compile-time kernel structure offsets, 
 not match the running kernel's layout. Red Hat-family kernels 5.17 and newer remain supported only on the RHEL 10
 kernel stream based on 6.12, including its errata kernels; outside that stream the plugin fails closed. Modules with
 CO-RE support can use BTF to adapt to the running kernel's types. Generic legacy objects are built for 5.11, 5.16,
-5.17 and 6.8 kernel layouts.
+5.17, 6.8 and 6.12 kernel layouts.
 
 Disk Latency is the single most important metric to focus on when it comes to storage performance, under most circumstances.
 For hard drives, an average latency somewhere between 10 to 20 ms can be considered acceptable. For SSD (Solid State Drives),

@@ -105,6 +105,25 @@ ffffffff81000001 T __set_page_dirty
 	}
 }
 
+func TestResolveAllCachestatTargetsFromOneReader(t *testing.T) {
+	targets := defaultCachestatTargets()
+	kallsyms := strings.NewReader(strings.Join([]string{
+		"ffffffff81000000 T add_to_page_cache_lru",
+		"ffffffff81000001 T filemap_add_folio",
+		"ffffffff81000002 T mark_page_accessed",
+		"ffffffff81000003 T folio_mark_accessed",
+		"ffffffff81000004 T __set_page_dirty",
+		"ffffffff81000005 T account_page_dirtied",
+	}, "\n"))
+	if err := targets.ResolveAllFromReader(kallsyms); err != nil {
+		t.Fatalf("ResolveAllFromReader(): %v", err)
+	}
+	if targets.AddToPageCacheLru.Name != "filemap_add_folio" || targets.MarkPageAccessed.Name != "folio_mark_accessed" ||
+		targets.AccountPageDirtied.Name != "account_page_dirtied" {
+		t.Fatalf("unexpected resolved targets: %+v", targets)
+	}
+}
+
 func TestResolveCachestatAccountPageTargetFillsSlot(t *testing.T) {
 	targets := defaultCachestatTargets()
 	if targets.AccountPageDirtied.Name != "" {

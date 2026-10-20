@@ -19,8 +19,8 @@ const (
 	// this value or records expire in the kernel ring before Go collects them.
 	dnsDefaultFlowTTL      = 20
 	dnsDefaultObjectFlavor = "buffer"
-	// dnsMaxBaseSelector is the highest SelectKernelName index for which a
-	// base-flavor (no suffix) dns object file is shipped.
+	// dnsMaxBaseSelector is the base-flavor cap before the complete 6.12 family.
+	// Newer generic kernels use that complete family as their walk-down target.
 	dnsMaxBaseSelector = 7 // 5.14
 )
 
@@ -131,9 +131,9 @@ func resolveDNSLegacyConfig() (DNSLegacyConfig, error) {
 func BuildDNSLegacyPlan(cfg DNSLegacyConfig) LoadPlan {
 	flavor := selectConfiguredObjectFlavor(cfg.ObjectFlavor, cfg.KernelVersion, cfg.IsDebian)
 	selector := SelectIndex(cfg.Kernels, cfg.IsRHF, cfg.KernelVersion)
-	// Base-flavor DNS objects are not built beyond 5.14; cap the selector so we
-	// never construct a path that does not exist.
-	maxBase := effectiveMaxBaseSelector(dnsMaxBaseSelector, cfg.IsRHF, cfg.KernelVersion)
+	// DNS base objects stop at 6.12; buffer and arena artifacts exist at newer
+	// generic selectors and should retain the kernel-matched primary object.
+	maxBase := effectiveMaxBaseSelectorForModule(dnsMaxBaseSelector, "dns", cfg.IsRHF, cfg.KernelVersion)
 	if flavor == ObjectFlavorBase {
 		selector = selectHighestIndexAtOrBelow(cfg.Kernels, cfg.IsRHF, cfg.KernelVersion, maxBase, "dns")
 	}

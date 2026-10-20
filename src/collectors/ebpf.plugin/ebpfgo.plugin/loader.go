@@ -17,7 +17,7 @@ const (
 	minimumKernelVersionBuffer = 5<<16 + 10<<8
 	minimumKernelVersionArena  = 6<<16 + 12<<8
 	maximumKernelVersionArena  = 6<<16 + 13<<8
-	minimumKernelVersion6162   = 6<<16 + 16<<8 + 2
+	exactKernelVersion6162     = 6<<16 + 16<<8 + 2
 	minimumKernelVersionSeven  = 7 << 16
 	minimumRHVersion           = 7*256 + 5
 )
@@ -445,7 +445,7 @@ func SelectMaxIndex(isRHF int, kver uint32) int {
 	}
 
 	switch {
-	case isRHF <= 0 && kver == minimumKernelVersion6162:
+	case isRHF <= 0 && kver == exactKernelVersion6162:
 		return 13
 	case kver >= minimumKernelVersionSeven:
 		return 12
@@ -477,7 +477,7 @@ func SelectIndex(kernels uint32, isRHF int, kver uint32) uint32 {
 	if isRHF == -1 {
 		kernels &^= 1 << 7
 	}
-	if isRHF <= 0 && kver == minimumKernelVersion6162 {
+	if isRHF <= 0 && kver == exactKernelVersion6162 {
 		kernels &^= 1 << 12 // 7.0 objects are not a safe walk-down from 6.16.2.
 	}
 
@@ -491,7 +491,18 @@ func SelectIndex(kernels uint32, isRHF int, kver uint32) uint32 {
 }
 
 func effectiveMaxBaseSelector(maxBaseSelector, isRHF int, kver uint32) int {
-	if isRHEL10Kernel612Stream(isRHF, kver) || isGenericKernel612Stream(isRHF, kver) {
+	return effectiveMaxBaseSelectorForModule(maxBaseSelector, "", isRHF, kver)
+}
+
+func effectiveMaxBaseSelectorForModule(maxBaseSelector int, module string, isRHF int, kver uint32) int {
+	if module == "dns" && isRHF <= 0 && kver >= minimumKernelVersionArena {
+		// DNS base objects stop at 6.12; flavored objects can match newer kernels.
+		return 11
+	}
+	if isRHEL10Kernel612Stream(isRHF, kver) ||
+		(isRHF <= 0 && kver >= minimumKernelVersionArena && kver < minimumKernelVersionSeven) {
+		// Generic kernels before 7.0 and the RHEL 10 6.12 stream have a
+		// producer-backed 6.12 base family, even when the flavored object is newer.
 		return 11
 	}
 	if isRHF <= 0 && kver >= minimumKernelVersionSeven {
@@ -722,7 +733,7 @@ func buildKprobeLegacyPlan(req kprobePlanRequest) LoadPlan {
 	selector := SelectIndex(req.Kernels, req.IsRHF, req.KernelVersion)
 	// Base-flavor objects are not built for every kernel the buffer/arena objects
 	// cover.  Cap the selector so we never construct a path that does not exist.
-	baseMax := effectiveMaxBaseSelector(req.MaxBaseSelector, req.IsRHF, req.KernelVersion)
+	baseMax := effectiveMaxBaseSelectorForModule(req.MaxBaseSelector, req.Name, req.IsRHF, req.KernelVersion)
 	if flavor == ObjectFlavorBase && baseMax > 0 {
 		selector = selectHighestIndexAtOrBelow(req.Kernels, req.IsRHF, req.KernelVersion, baseMax, req.Name)
 	}
@@ -776,7 +787,7 @@ func selectHighestIndexAtOrBelow(kernels uint32, isRHF int, kver uint32, maxInde
 // maxBaseSelector is the highest selector index for which base-flavor objects
 // exist for this module; pass 0 to disable the cap.
 func buildFallbackPlans(primary LoadPlan, pluginsDir string, isRHF int, name string, maxBaseSelector int) []LoadPlan {
-	maxBaseSelector = effectiveMaxBaseSelector(maxBaseSelector, isRHF, primary.KernelVersion)
+	maxBaseSelector = effectiveMaxBaseSelectorForModule(maxBaseSelector, name, isRHF, primary.KernelVersion)
 	plans := make([]LoadPlan, 0, 6)
 	addPlan := func(plan LoadPlan) {
 		if plan.LoadMode == LoadLegacy && !legacyArtifactFlavorAvailable(name, plan.Flavor, isRHF, primary.KernelVersion) {
@@ -822,7 +833,7 @@ func buildCoreLegacyFallbackPlans(primary LoadPlan, pluginsDir string, isRHF int
 		return nil
 	}
 
-	maxBaseSelector = effectiveMaxBaseSelector(maxBaseSelector, isRHF, primary.KernelVersion)
+	maxBaseSelector = effectiveMaxBaseSelectorForModule(maxBaseSelector, name, isRHF, primary.KernelVersion)
 	selector := primary.Selector
 	if primary.Flavor == ObjectFlavorBase && maxBaseSelector > 0 && int(selector) > maxBaseSelector {
 		selector = selectHighestIndexAtOrBelow(primary.Kernels, isRHF, primary.KernelVersion, maxBaseSelector, name)

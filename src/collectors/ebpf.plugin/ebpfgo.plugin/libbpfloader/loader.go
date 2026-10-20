@@ -68,7 +68,9 @@ func (r *CachestatRuntime) Load() error {
 	return ErrDisabled
 }
 
-func (r *CachestatRuntime) Attach(accountFunction string) error {
+func (r *CachestatRuntime) Attach(addFunction, accessFunction, accountFunction string) error {
+	_ = addFunction
+	_ = accessFunction
 	_ = accountFunction
 	return ErrDisabled
 }

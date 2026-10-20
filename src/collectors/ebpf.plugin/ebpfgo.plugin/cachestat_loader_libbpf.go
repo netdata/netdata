@@ -79,15 +79,12 @@ func LoadCachestatLegacy(cfg CachestatLegacyConfig) (*CachestatLegacyHandle, err
 	coreSupported := libbpfloader.SupportsCore()
 	if !coreSupported {
 		plan.LoadMode = LoadLegacy
-		if err := validateLegacyArtifactFamily("cachestat", plan); err != nil {
-			return nil, err
-		}
-		// No fallback in legacy mode: there is only one object.
-		return tryLoadCachestatPlan(cfg, plan)
 	}
 
 	plans := buildFallbackPlans(plan, cfg.PluginsDir, cfg.IsRHF, "cachestat", cachestatMaxBaseSelector)
-	plans = append(plans, buildCoreLegacyFallbackPlans(plan, cfg.PluginsDir, cfg.IsRHF, "cachestat", cachestatMaxBaseSelector)...)
+	if coreSupported {
+		plans = append(plans, buildCoreLegacyFallbackPlans(plan, cfg.PluginsDir, cfg.IsRHF, "cachestat", cachestatMaxBaseSelector)...)
+	}
 	if len(plans) == 0 {
 		return nil, fmt.Errorf("cachestat has no compatible object family for this kernel")
 	}
